@@ -1,6 +1,6 @@
 # Roadmap — toward an all-in-one RSI hangar extractor
 
-**Vision:** an open-source, local-first browser extension that scrapes *all* of a
+**Vision:** an open-source, local-first browser extension that scrapes _all_ of a
 user's own RSI / Star Citizen account data, organizes it into one clean, portable
 database, and (eventually) lets the user share that database with other tools/sites.
 
@@ -38,20 +38,20 @@ A full-DB **JSON export/import** that emits the whole `sources` object is done
 
 ## Data surface
 
-| Source | Page / endpoint | Served as | Status | Notes |
-|---|---|---|---|---|
-| **Hangar / pledges** | `/account/pledges` | HTML | ✅ Done | ships, CCUs, add-ons, coupons; thumbnails |
-| **Buy-backs** | `/account/buy-back-pledges` | HTML | ✅ Done | server-rendered `<article>` cards — same HTML pipeline as the hangar (no GraphQL needed) |
-| **Store credit / funds** | account header / GraphQL | TBD | 🔜 | small but useful (spendable balance) |
-| **CCU chain / optimizer** | derived from pledges + ship prices | n/a | 🔜 | analysis layer; uses external ship-matrix prices (cached) |
-| **Org membership** | `/account/organization` (or community) | TBD | ❓ | optional |
-| **Profile** (handle, moniker, citizen record, enlist date) | profile page | HTML/GraphQL | ❓ | low-sensitivity public-ish data |
-| **Wallet / transactions / billing** | `/account/...` | TBD | ⚠️ Opt-in only | **PII / financial** — see privacy note |
+| Source                                                     | Page / endpoint                        | Served as    | Status         | Notes                                                                                    |
+| ---------------------------------------------------------- | -------------------------------------- | ------------ | -------------- | ---------------------------------------------------------------------------------------- |
+| **Hangar / pledges**                                       | `/account/pledges`                     | HTML         | ✅ Done        | ships, CCUs, add-ons, coupons; thumbnails                                                |
+| **Buy-backs**                                              | `/account/buy-back-pledges`            | HTML         | ✅ Done        | server-rendered `<article>` cards — same HTML pipeline as the hangar (no GraphQL needed) |
+| **Store credit / funds**                                   | account header / GraphQL               | TBD          | 🔜             | small but useful (spendable balance)                                                     |
+| **Org membership**                                         | `/account/organization` (or community) | TBD          | ❓             | optional                                                                                 |
+| **Profile** (handle, moniker, citizen record, enlist date) | profile page                           | HTML/GraphQL | ❓             | low-sensitivity public-ish data                                                          |
+| **Wallet / transactions / billing**                        | `/account/...`                         | TBD          | ⚠️ Opt-in only | **PII / financial** — see privacy note                                                   |
 
 ## Privacy & scope (important for a shareable tool)
 
-Because the end goal is feeding this data to *other sites*, be deliberate about
+Because the end goal is feeding this data to _other sites_, be deliberate about
 what's collected:
+
 - **Default scope = fleet data** (ships, CCUs, add-ons, buybacks, store credit).
 - **Financial/PII data** (transaction history, billing, email) stays **opt-in and
   off by default**, and ideally is excluded from anything shared externally.
@@ -66,21 +66,31 @@ what's collected:
      lib.js resolves `{ msrp, pledgeUrl }` for a ship from the star-citizen.wiki
      per-vehicle record (the RSI ship-matrix carries images but **no** prices).
      Same lazy, locally-matched, hard-cached approach as `OH.getShipImage`. This
-     is the building block for: store value of your hangar, paid-vs-current
-     comparison, and CCU-chain pricing. No UI yet — wire it into Inventory/Stats
-     and the Store Data view when this lands.
+     is the building block for: store value of your hangar and paid-vs-current
+     comparison. No UI yet — wire it into Inventory/Stats and the Store Data view
+     when this lands.
    - **Item-type enrichment:** classify add-ons precisely (paint vs decoration vs
      armor vs gear, etc.) by matching item names against star-citizen.wiki /
      starcitizen.tools, cached locally. Today's classifier can't tell a reward
-     *paint* (e.g. "Luminalia 2953 Day 7") from a generic add-on because RSI
+     _paint_ (e.g. "Luminalia 2953 Day 7") from a generic add-on because RSI
      doesn't tag it — only an external reference can. Refs:
      starcitizen.tools/Luminalia, starcitizen.tools/Freelancer_series/Paints.
 3. ~~**Buy-backs**~~ — ✅ done. Turned out to be **server-rendered HTML** (`<article>`
    cards at `/account/buy-back-pledges?page=N&pagesize=100`), not the GraphQL frontend
    earlier notes assumed — so it reuses the existing HTML pipeline (`parseBuybacks`).
 4. **Consumption layer** — JSON export/import is ✅ done (`OH.exportDB`/`OH.importDB`,
-   Developers page). Still to decide: how sites read the DB live (whitelisted
-   `externally_connectable` messaging API).
-5. **CCU-chain optimizer** — the high-value analysis feature on top of the DB.
+   Developers page). Still to decide: how an approved site reads the DB directly
+   (an opt-in, domain-whitelisted `externally_connectable` messaging API). Note
+   this API isn't supported the same way across browsers — factor it into the
+   browser-support work below.
+5. **Browser support** — broaden beyond Chrome/Edge/Brave.
+   - **Firefox:** smooth out the MV3 event-page / `browser.*` vs `chrome.*`
+     differences (see CONTRIBUTING "Firefox notes").
+   - **Safari:** repackage as a Safari Web Extension via Xcode
+     (`safari-web-extension-converter`). This is a port, not a drop-in load, and
+     Safari doesn't support `externally_connectable` — so the consumption layer
+     above needs a Safari-friendly path (or export/import only on Safari).
 6. **Dashboard source switcher** + full-DB export.
 7. Optional sources (org, profile) and opt-in PII sources as needed.
+
+The first logo is done; branding/store-listing assets come with the public release.

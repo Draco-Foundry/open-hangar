@@ -12,7 +12,7 @@ script. The extension's `host_permissions` for `robertsspaceindustries.com` let
 cookie, so no RSI tab needs to be open — only an active RSI login in the profile.
 (The scan can't run in `background.js`: MV3 service workers have no `DOMParser`,
 which `parser.js` needs.) The one fragility: if RSI ever marks its session cookie
-`SameSite=Strict` *and* Chrome withholds it from extension requests, the fetch
+`SameSite=Strict` _and_ Chrome withholds it from extension requests, the fetch
 comes back logged-out. The fallback would be to scan via a hidden RSI tab
 (`chrome.tabs.create` → content script) — not implemented while the direct fetch
 works.
@@ -97,6 +97,15 @@ Firefox MV3 uses an event page rather than a true service worker and has some
 differences in `chrome.*` vs `browser.*` namespaces. The `chrome.*` calls here
 work via Firefox's compatibility shim, but if you hit issues, that's the first
 place to look.
+
+## Safari notes
+
+A Safari build is on the roadmap and is a **port, not a drop-in load**. Safari Web
+Extensions are packaged inside a macOS/iOS app via Xcode — start from Apple's
+`safari-web-extension-converter` against this folder. Two things to watch: Safari
+doesn't support `externally_connectable` (so the planned approved-sites API needs a
+Safari-specific path, or export/import only there), and the `cookies` permission and
+host permissions behave differently than on Chrome. See ROADMAP.md.
 
 ## PRs
 
