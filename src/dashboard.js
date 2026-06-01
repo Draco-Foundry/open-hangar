@@ -39,7 +39,7 @@ const BB_KINDS = [
 // Community links — fill these in (footer + Developers page use them).
 // Until set, a "soon" placeholder shows instead of a broken link.
 const REPO_URL = 'https://github.com/Draco-Foundry/open-hangar';
-const DISCORD_URL = '';
+const DISCORD_URL = 'https://discord.gg/FF8Wm5HdnV';
 
 // Supporters shown on the Developers page. Each entry is { name, url? }.
 // Empty arrays render a friendly placeholder. When the GitHub repo is public
@@ -407,7 +407,7 @@ function renderSupporters() {
   if (b) {
     b.innerHTML = BOOSTERS.length
       ? BOOSTERS.map((s) => chip(s, 'booster')).join('')
-      : '<span class="muted">Discord coming soon — boosters will be thanked here.</span>';
+      : `<span class="muted">Boosters will be thanked here — ${link(DISCORD_URL, 'join the Discord')}.</span>`;
   }
 }
 

@@ -209,6 +209,4 @@ redistribute other people's data.
 MIT — see [LICENSE](LICENSE).
 
 - **GitHub:** [Draco-Foundry/open-hangar](https://github.com/Draco-Foundry/open-hangar)
-- **Discord:** _coming soon_
-  </content>
-  </invoke>
+- **Discord:** [Draco Foundry](https://discord.gg/FF8Wm5HdnV)
