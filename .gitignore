@@ -1,0 +1,12 @@
+node_modules/
+*.log
+.DS_Store
+dist/
+*.zip
+# local RSI captures may contain personal data — never commit.
+# (Scrubbed test fixtures live in test/fixtures/ and ARE committed.)
+/captures/
+*.local.html
+
+# local editor / tooling config (personal, not project)
+.claude/settings.local.json

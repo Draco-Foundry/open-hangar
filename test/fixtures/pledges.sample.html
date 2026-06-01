@@ -1,0 +1,45 @@
+<!doctype html>
+<!--
+  Scrubbed sample of RSI's /account/pledges markup — enough cards to exercise the
+  parser's classification paths (ship / CCU / add-on). No personal data. If RSI
+  changes their markup, update this fixture from a fresh (scrubbed) capture so the
+  tests reflect reality. See CONTRIBUTING.md.
+-->
+<html>
+  <body>
+    <div class="account-pledges">
+      <!-- Standalone ship -->
+      <div class="row">
+        <input class="js-pledge-id" value="111" />
+        <input class="js-pledge-name" value="Origin 300i" />
+        <input class="js-pledge-value" value="$55.00 USD" />
+        <input class="js-pledge-currency" value="USD" />
+        <div class="item">
+          <span class="kind">Ship</span>
+          <span class="title">300i</span>
+          <div class="image" style="background-image:url('https://media.robertsspaceindustries.com/abc/store_small.jpg')"></div>
+        </div>
+      </div>
+
+      <!-- Cross-chassis upgrade (CCU) -->
+      <div class="row">
+        <input class="js-pledge-id" value="222" />
+        <input class="js-pledge-name" value="Upgrade - Aurora MR to Avenger Titan" />
+        <input class="js-pledge-value" value="$25.00 USD" />
+        <input class="js-pledge-currency" value="USD" />
+      </div>
+
+      <!-- Standalone add-on -->
+      <div class="row">
+        <input class="js-pledge-id" value="333" />
+        <input class="js-pledge-name" value="Add-On - Star Citizen Digital Poster" />
+        <input class="js-pledge-value" value="$5.00 USD" />
+        <input class="js-pledge-currency" value="USD" />
+        <div class="item">
+          <span class="kind">Poster</span>
+          <span class="title">Digital Poster</span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

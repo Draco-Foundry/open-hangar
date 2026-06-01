@@ -1,0 +1,24 @@
+{
+  "name": "open-hangar",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Browser extension that scrapes your own Star Citizen / RSI account data into a clean, local database.",
+  "license": "MIT",
+  "homepage": "https://github.com/Draco-Foundry/open-hangar#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Draco-Foundry/open-hangar.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Draco-Foundry/open-hangar/issues"
+  },
+  "scripts": {
+    "test": "node --test test/parser.test.js",
+    "format": "prettier --write \"**/*.{js,html,json,md}\"",
+    "format:check": "prettier --check \"**/*.{js,html,json,md}\""
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.0",
+    "prettier": "^3.3.0"
+  }
+}

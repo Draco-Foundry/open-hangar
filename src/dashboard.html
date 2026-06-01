@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Hangar</title>
+    <style>
+      :root {
+        --bg: #0d1117;
+        --panel: #161b22;
+        --panel-2: #1c222b;
+        --line: #2a3139;
+        --text: #e6edf3;
+        --muted: #8b949e;
+        --accent: #2f81f7;
+        --accent-hover: #4493f8;
+        --link: #58a6ff;
+        --shadow: 0 1px 3px rgba(1, 4, 9, 0.5);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        transition: background-color 0.2s ease, color 0.2s ease;
+      }
+      .wrap { max-width: 1200px; margin: 0 auto; padding: 20px 20px 64px; }
+
+      header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 20px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid var(--line);
+        flex-wrap: wrap;
+      }
+      header h1 { font-size: 18px; margin: 0; }
+      header .ver { color: var(--muted); font-size: 12px; }
+      /* Global scan indicator (visible from every view) */
+      .scan-indicator { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--accent); background: rgba(47, 129, 247, 0.12); border: 1px solid rgba(47, 129, 247, 0.4); border-radius: 999px; padding: 3px 10px; }
+      .scan-indicator[hidden] { display: none; }
+      .scan-indicator .spin { width: 11px; height: 11px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: oh-spin 0.7s linear infinite; }
+      @keyframes oh-spin { to { transform: rotate(360deg); } }
+      nav { display: flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+      nav a {
+        padding: 6px 10px;
+        border-radius: 6px;
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      nav a:hover { color: var(--text); background: var(--panel); }
+      nav a.active { color: var(--text); background: var(--panel-2); }
+
+      .view { display: none; }
+      .view.active { display: block; }
+
+      button {
+        padding: 7px 12px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      button:hover { background: var(--accent-hover); }
+      button:disabled { opacity: 0.5; cursor: default; }
+
+      /* Login affordance (anchor styled as a button), shown when signed out */
+      .btn-login {
+        display: inline-block;
+        padding: 7px 12px;
+        border: 1px solid var(--accent);
+        border-radius: 6px;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 600;
+        font-size: 13px;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      .btn-login:hover { background: var(--accent-hover); }
+      .btn-login[hidden] { display: none; }
+
+      /* Secondary (ghost) buttons — Log out / Clear Data */
+      .btn-secondary {
+        background: transparent;
+        color: var(--muted);
+        border: 1px solid var(--line);
+      }
+      .btn-secondary:hover { background: var(--panel); color: var(--text); }
+      .btn-secondary[hidden] { display: none; }
+
+      /* Action button row in the Citizen Card */
+      .cc-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+      .citizen-card .btn-secondary { border-color: rgba(255, 255, 255, 0.25); color: rgba(255, 255, 255, 0.82); }
+      .citizen-card .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+      @media (max-width: 820px) { .cc-actions { justify-content: flex-start; } }
+
+      /* Signed-out wall: replaces the card body with a centred Log In button */
+      .cc-loggedout { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; }
+      /* .cc-account/.cc-side set display:flex, which would beat the UA [hidden]
+         rule — so hide them explicitly when the `hidden` attribute is set. */
+      .cc-account[hidden], .cc-side[hidden], .cc-loggedout[hidden] { display: none; }
+      .cc-lo-inner { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 12px; }
+      .cc-lo-title { font-size: 24px; font-weight: 700; color: #fff; letter-spacing: 0.2px; text-shadow: 0 1px 10px rgba(0, 0, 0, 0.5); }
+      .cc-lo-sub { margin: 0; color: rgba(255, 255, 255, 0.78); font-size: 14px; }
+      .cc-lo-btn { font-size: 16px; padding: 12px 24px; }
+
+      .section-title { font-size: 16px; margin: 0 0 14px; }
+      .muted { color: var(--muted); }
+      #status { color: var(--muted); font-size: 13px; min-height: 18px; }
+      #status.error { color: #f85149; }
+      .scanned { color: var(--muted); font-size: 12px; }
+
+      /* Home */
+      .home-split { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: start; }
+      .home-about p, .home-about li { color: var(--text); }
+      .home-about h3 { font-size: 14px; margin: 18px 0 6px; }
+      .home-about ul { padding-left: 18px; margin: 6px 0; }
+      .home-cards { display: flex; flex-direction: column; gap: 12px; }
+      @media (max-width: 820px) {
+        .home-split { grid-template-columns: 1fr; gap: 18px; }
+      }
+      .home-card {
+        display: block;
+        text-decoration: none;
+        color: inherit;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 16px;
+        background: var(--panel);
+        transition: border-color 0.12s ease, transform 0.12s ease;
+      }
+      .home-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+      .home-card h3 { margin: 0 0 6px; font-size: 15px; }
+      .home-card p { margin: 0; color: var(--muted); font-size: 12px; }
+      .badge-soon { font-size: 10px; font-weight: 700; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0 6px; margin-left: 6px; text-transform: uppercase; }
+
+      /* Profile hero (character overview) */
+      .citizen-card {
+        position: relative;
+        display: flex;
+        align-items: stretch;
+        gap: 24px;
+        padding: 26px 28px;
+        margin-bottom: 22px;
+        min-height: 220px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        overflow: hidden;
+        background-color: #05070f;
+        background-image:
+          linear-gradient(to right, rgba(4, 5, 13, 0.92), rgba(4, 5, 13, 0.55) 50%, rgba(4, 5, 13, 0.82)),
+          url('https://media.robertsspaceindustries.com/7afb9xaatlio1/source.jpg'),
+          url('assets/banner.svg');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        color: #fff;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 18px rgba(0, 0, 0, 0.35);
+      }
+      .cc-account { display: flex; align-items: center; gap: 26px; flex: 1; min-width: 0; }
+      /* Portrait column: avatar with the UEE/enlisted meta stacked beneath it,
+         centered as a unit so the block sits balanced in the card. */
+      .cc-portrait { display: flex; flex-direction: column; align-items: center; gap: 12px; flex: 0 0 124px; align-self: center; }
+      .cc-avatar {
+        width: 124px; height: 124px; flex: 0 0 124px;
+        border-radius: 16px;
+        background: #0b0e13 center / cover no-repeat;
+        border: 2px solid rgba(255, 255, 255, 0.25);
+        box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.06), 0 6px 20px rgba(0, 0, 0, 0.6);
+        transition: transform 0.15s ease, border-color 0.15s ease;
+      }
+      .cc-avatar:hover { transform: translateY(-2px); }
+      .cc-avatar.tier-sub { border-color: #b8c2cf; }
+      .cc-avatar.tier-imperator { border-color: #f0b429; box-shadow: 0 0 0 4px rgba(240, 180, 41, 0.22), 0 6px 22px rgba(0, 0, 0, 0.6); }
+      .cc-info { display: flex; flex-direction: column; justify-content: center; gap: 12px; min-width: 0; }
+      .cc-name { font-size: 27px; font-weight: 700; color: #fff; line-height: 1.1; letter-spacing: 0.2px; text-shadow: 0 1px 10px rgba(0, 0, 0, 0.5); }
+      /* Meta sits under the portrait: centered, one plain line per item. */
+      .cc-meta { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 124px; color: rgba(255, 255, 255, 0.6); font-size: 11px; text-align: center; }
+      .cc-meta-line { white-space: nowrap; line-height: 1.4; }
+      .cc-meta a { color: #58a6ff; text-decoration: none; font-weight: 600; }
+      .cc-meta a:hover { text-decoration: underline; }
+      /* Main organization (logo · name · rank). Name may be long → it wraps. */
+      .cc-org[hidden] { display: none; }
+      .cc-org-link { display: inline-flex; align-items: center; gap: 10px; max-width: 460px; text-decoration: none; color: inherit; }
+      .cc-org-logo { width: 34px; height: 34px; flex: 0 0 34px; border-radius: 6px; object-fit: cover; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.18); }
+      .cc-org-logo-ph { display: inline-block; }
+      .cc-org-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+      .cc-org-name { font-weight: 600; color: #fff; font-size: 13px; overflow-wrap: anywhere; }
+      .cc-org-rank { color: rgba(255, 255, 255, 0.6); font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+      a.cc-org-link:hover .cc-org-name { text-decoration: underline; }
+      a.cc-org-link:hover .cc-org-logo { border-color: rgba(255, 255, 255, 0.45); }
+      /* No-org state: muted, no link, dimmed placeholder logo */
+      .cc-org-none .cc-org-name { color: rgba(255, 255, 255, 0.5); font-weight: 400; font-style: italic; }
+      .cc-org-none .cc-org-logo-ph { opacity: 0.4; }
+      .cc-side {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        justify-content: space-between;
+        flex: 0 0 auto;
+        text-align: right;
+      }
+      .cc-side-bottom { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; }
+      .cc-side .scanned, .cc-side #status { color: rgba(255, 255, 255, 0.72); font-size: 12px; min-height: 0; }
+      .cc-versions { color: rgba(255, 255, 255, 0.5); font-size: 11px; }
+      .cc-versions a { color: rgba(255, 255, 255, 0.72); text-decoration: underline; }
+      .cc-versions a:hover { color: #fff; }
+      .citizen-card .home-balances, .citizen-card .home-flair { margin-bottom: 0; align-self: flex-start; }
+      /* balances → one unified HUD strip with dividers */
+      .citizen-card .home-balances { gap: 0; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 10px; overflow: hidden; }
+      .citizen-card .bal { background: transparent; border: 0; border-left: 1px solid rgba(255, 255, 255, 0.1); border-radius: 0; padding: 8px 16px; box-shadow: none; }
+      .citizen-card .bal:first-child { border-left: 0; }
+      .citizen-card .bal b { font-size: 15px; }
+      .citizen-card .flair { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.2); color: #fff; box-shadow: none; }
+      .citizen-card .bal-lbl, .citizen-card .flair-lbl { color: rgba(255, 255, 255, 0.6); }
+      .citizen-card .flair-bar { width: 84px; height: 7px; }
+      @media (max-width: 820px) {
+        .citizen-card { flex-direction: column; align-items: stretch; min-height: 0; }
+        .cc-side { align-items: flex-start; text-align: left; gap: 12px; }
+        .cc-side-bottom { align-items: flex-start; }
+      }
+
+      /* Account flair (Subscriber / Chairman's Club) */
+      .home-flair { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+      .home-flair:empty { display: none; }
+      .flair { display: inline-flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: 13px; color: var(--text); text-decoration: none; cursor: pointer; transition: border-color 0.12s ease; }
+      .flair:hover { border-color: var(--accent); }
+      .citizen-card .flair:hover { border-color: rgba(255, 255, 255, 0.45); }
+      .flair-lbl { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+      .flair.sub { border-color: #bd8b1d; }
+      .flair.sub b { color: #f0b429; }            /* Imperator → gold */
+      .flair.sub-centurion { border-color: #7d8590; }
+      .flair.sub-centurion b { color: #b8c2cf; }  /* Centurion → silver */
+      .flair.concierge { border-color: #6e40c9; }
+      .flair.concierge b { color: #d2a8ff; }
+      .flair-prog { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; }
+      .flair-bar { display: inline-block; width: 60px; height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
+      .flair-bar > span { display: block; height: 100%; background: #d2a8ff; }
+
+      /* Account balances row (Store Credit / UEC / REC) */
+      .home-balances { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+      .home-balances:empty { display: none; }
+      .bal { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: 14px; }
+      .bal-lbl { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+      .bal b { font-variant-numeric: tabular-nums; }
+      .bal.store b { color: #f0b429; }
+      .bal.uec b { color: #2dd4bf; }
+      .bal.rec b { color: #d2a8ff; }
+
+      /* Home dashboard summary strip */
+      .home-summary { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 22px; }
+      .home-summary:empty { display: none; }
+      .sum-box { flex: 1; min-width: 110px; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--panel); }
+      .sum-big { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+      .sum-lbl { color: var(--muted); font-size: 12px; margin-top: 2px; }
+      /* First-run: emphasize Scan, de-emphasize data-dependent cards */
+      .no-data #scan-home { box-shadow: 0 0 0 3px rgba(28, 108, 255, 0.25); }
+      .no-data .home-card.needs-data { opacity: 0.45; }
+      .stale { color: #d29922; }
+      /* Keyboard focus visibility (a11y) */
+      a:focus-visible, button:focus-visible, .chip:focus-visible, .home-card:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+        border-radius: 6px;
+      }
+      /* Footer */
+      .site-footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; text-align: center; }
+      .site-footer a { color: var(--link); text-decoration: none; }
+      .site-footer a:hover { text-decoration: underline; }
+
+      /* Stats */
+      .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 26px; }
+      .stat-box { border: 1px solid var(--line); border-radius: 10px; padding: 14px; background: var(--panel); }
+      .stat-box .big { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+      .stat-box .lbl { color: var(--muted); font-size: 12px; margin-top: 2px; }
+      .bar-row { display: flex; align-items: center; gap: 10px; margin: 7px 0; }
+      .bar-label { width: 96px; font-size: 12px; }
+      .bar-track { flex: 1; background: var(--panel-2); border-radius: 4px; height: 18px; overflow: hidden; }
+      .bar-fill { height: 100%; background: var(--accent); }
+      .bar-val { width: 150px; text-align: right; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+      .top-list { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+      .top-list .row { display: flex; gap: 10px; padding: 8px 12px; border-top: 1px solid var(--line); }
+      .top-list .row:first-child { border-top: 0; }
+      .top-list .row .nm { flex: 1; }
+      .top-list .row .vl { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+      /* Search + sort controls (inventory) */
+      .controls { display: flex; gap: 8px; margin-bottom: 14px; }
+      .controls[hidden] { display: none; }
+      #search, #sort {
+        padding: 7px 11px; background: var(--panel); border: 1px solid var(--line);
+        border-radius: 6px; color: var(--text); font: inherit; font-size: 13px;
+      }
+      #search { flex: 1; }
+      #search::placeholder { color: var(--muted); }
+      #sort { cursor: pointer; }
+      #search:focus, #sort:focus { outline: none; border-color: var(--accent); }
+      #bb-search, #bb-sort { padding: 7px 11px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; color: var(--text); font: inherit; font-size: 13px; }
+      #bb-search { flex: 1; }
+      #bb-search::placeholder { color: var(--muted); }
+      #bb-sort { cursor: pointer; }
+      #bb-search:focus, #bb-sort:focus { outline: none; border-color: var(--accent); }
+      .result-count { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+      .controls { flex-wrap: wrap; }
+      .layout-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+      .layout-toggle button {
+        padding: 7px 11px; border: 0; border-left: 1px solid var(--line);
+        border-radius: 0; background: var(--panel); color: var(--muted);
+        font-size: 12px; font-weight: 600;
+      }
+      .layout-toggle button:first-child { border-left: 0; }
+      .layout-toggle button:hover { background: var(--panel-2); color: var(--text); }
+      .layout-toggle button.active { background: var(--panel-2); color: var(--text); }
+
+      /* Filter chips */
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+      .chip {
+        display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px;
+        border-radius: 999px; border: 1px solid var(--line); background: var(--panel);
+        color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; user-select: none;
+      }
+      .chip .n { background: var(--panel-2); color: var(--text); border-radius: 999px; padding: 0 7px; font-size: 11px; }
+      .chip[aria-pressed="true"] { color: var(--text); }
+      .chip.k-ship[aria-pressed="true"] { border-color: #2ea043; }
+      .chip.k-ccu[aria-pressed="true"] { border-color: #6e40c9; }
+      .chip.k-addon[aria-pressed="true"] { border-color: #1f6feb; }
+      .chip.k-coupon[aria-pressed="true"] { border-color: #bd561d; }
+      .chip[aria-pressed="false"] { opacity: 0.5; }
+
+      /* Fleet gallery — base is the "gallery" layout */
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+      /* Compact: smaller, denser cards */
+      .grid.compact { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+      .grid.compact .card-body { padding: 8px 10px; gap: 4px; }
+      .grid.compact .card-name { font-size: 12px; }
+      .grid.compact .card-contents { display: none; }
+      /* List: full-width rows with aligned columns (thumb | name | contents | kind | value) */
+      .grid.list { grid-template-columns: 1fr; gap: 6px; }
+      .grid.list .card { flex-direction: row; align-items: stretch; }
+      .grid.list .thumb { width: 104px; flex: 0 0 104px; aspect-ratio: 16 / 10; }
+      .grid.list .card-body {
+        display: grid;
+        grid-template-columns: minmax(150px, 1.3fr) minmax(0, 2fr) 72px 100px;
+        align-items: center;
+        gap: 14px;
+        padding: 8px 14px;
+      }
+      .grid.list .card-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .grid.list .card-contents { margin-top: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .grid.list .card-foot { display: contents; } /* lift badge + value into the row grid */
+      .grid.list .badge { justify-self: start; }
+      .grid.list .val { text-align: right; }
+      @media (max-width: 700px) {
+        .grid.list .card-body { grid-template-columns: 1fr 80px; }
+        .grid.list .card-contents { display: none; }
+        .grid.list .badge { display: none; }
+      }
+      .card { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel); transition: border-color 0.12s ease, transform 0.12s ease; }
+      .card { cursor: pointer; }
+      .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+
+      /* Inventory hover preview (larger image follows the cursor) */
+      #item-preview {
+        position: fixed;
+        z-index: 60;
+        width: 360px;
+        max-width: 42vw;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+        background: var(--panel);
+        box-shadow: 0 12px 34px rgba(0, 0, 0, 0.6);
+        opacity: 0;
+        transition: opacity 0.1s ease;
+        pointer-events: none;
+      }
+      #item-preview.show { opacity: 1; }
+      #item-preview img { display: block; width: 100%; height: auto; }
+
+      /* Inventory item detail modal */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        background: rgba(2, 4, 9, 0.72);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .modal-overlay[hidden] { display: none; }
+      .modal-card {
+        position: relative;
+        width: 560px;
+        max-width: 100%;
+        max-height: 88vh;
+        overflow: auto;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+      }
+      .modal-close {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.45);
+        border: 1px solid var(--line);
+        color: #fff;
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        font-size: 16px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0;
+      }
+      .modal-close:hover { background: rgba(0, 0, 0, 0.7); }
+      .modal-img { width: 100%; height: 240px; object-fit: cover; display: block; background: #0b0e13; }
+      .modal-img.placeholder { display: flex; align-items: center; justify-content: center; color: var(--muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.08em; }
+      .modal-info { padding: 18px 20px 22px; }
+      .modal-name { margin: 0 0 10px; font-size: 18px; }
+      .modal-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+      .modal-val { font-variant-numeric: tabular-nums; font-size: 14px; }
+      .mr { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; }
+      .mr-k { color: var(--muted); }
+      .mr-v { font-variant-numeric: tabular-nums; }
+      .modal-h { margin: 16px 0 8px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+      .modal-contents { width: 100%; border-collapse: collapse; font-size: 13px; }
+      .modal-contents td { padding: 6px 8px; border-top: 1px solid var(--line); vertical-align: top; }
+      .modal-contents td:first-child { color: var(--muted); width: 30%; white-space: nowrap; }
+      .thumb { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; display: block; background: #0b0e13; }
+      .thumb.placeholder { display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); background: radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,0.04), transparent), #0b0e13; }
+      .card-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+      .card-name { font-weight: 600; font-size: 13px; line-height: 1.3; }
+      .ccu-flow { color: var(--muted); font-weight: 400; }
+      .card-contents { color: var(--muted); font-size: 11px; line-height: 1.35; }
+      .card-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .val { font-variant-numeric: tabular-nums; font-size: 13px; }
+
+      .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+      .badge.ccu { color: #d2a8ff; border-color: #6e40c9; }
+      .badge.ship { color: #7ee787; border-color: #2ea043; }
+      .badge.addon { color: #79c0ff; border-color: #1f6feb; }
+      .badge.coupon { color: #f0883e; border-color: #bd561d; }
+      .badge.paint { color: #ff9bd4; border-color: #c14b8a; }
+      .chip.k-paint[aria-pressed="true"] { border-color: #c14b8a; }
+      .bb-reclaim { color: var(--link); text-decoration: none; font-size: 12px; font-weight: 600; }
+      .bb-reclaim:hover { text-decoration: underline; }
+
+      .empty { color: var(--muted); padding: 48px 0; text-align: center; }
+      .placeholder-view { border: 1px dashed var(--line); border-radius: 10px; padding: 40px 28px; }
+      .placeholder-view h2 { margin-top: 0; }
+      .prose { max-width: none; }
+      .prose p, .prose li { color: var(--text); }
+      .prose a { color: var(--link); }
+      .prose h3 { font-size: 14px; margin: 22px 0 6px; }
+      .prose ul { padding-left: 18px; }
+      .prose code { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-size: 12px; }
+      .prose pre { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow: auto; font-size: 12px; line-height: 1.5; color: var(--text); }
+      .data-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 4px; }
+      #data-msg { font-size: 12px; min-height: 16px; margin-bottom: 8px; }
+      #data-msg.error { color: #f85149; }
+
+      /* Thanks & supporters */
+      .supporters { display: flex; flex-wrap: wrap; gap: 28px; margin: 10px 0 4px; }
+      .sup-group { min-width: 200px; }
+      .sup-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 8px; }
+      .sup-list { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+      .sup-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 12px; font-weight: 600; text-decoration: none; }
+      a.sup-chip:hover { border-color: var(--accent); }
+      .sup-chip.booster { border-color: #6e40c9; }
+      .sup-chip.booster b { color: #d2a8ff; }
+      .dev-linkbox {
+        float: right;
+        width: 230px;
+        margin: 0 0 18px 24px;
+        padding: 14px 16px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        box-shadow: var(--shadow);
+      }
+      .dev-linkbox .dlb-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 8px; }
+      .dev-linkbox a { display: block; color: var(--link); text-decoration: none; font-size: 13px; font-weight: 600; padding: 4px 0; }
+      .dev-linkbox a:hover { text-decoration: underline; }
+      .dev-linkbox #dev-links span { display: block; padding: 4px 0; color: var(--muted); font-size: 13px; }
+      @media (max-width: 700px) { .dev-linkbox { float: none; width: auto; margin: 0 0 16px; } }
+
+      /* Subtle elevation for a more elegant feel */
+      .card, .home-card, .stat-box, .group, .placeholder-view { box-shadow: var(--shadow); }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>Open Hangar</h1>
+        <span id="scan-indicator" class="scan-indicator" hidden></span>
+        <nav id="nav">
+          <a href="#home" data-view="home">Home</a>
+          <a href="#inventory" data-view="inventory">Inventory</a>
+          <a href="#stats" data-view="stats">Stats</a>
+          <a href="#buybacks" data-view="buybacks">Buy-Backs</a>
+          <a href="#store" data-view="store">Store Data</a>
+          <a href="#developers" data-view="developers">Developers</a>
+        </nav>
+      </header>
+
+      <!-- HOME -->
+      <section class="view active" id="view-home">
+        <div class="citizen-card">
+          <div class="cc-account" id="cc-account">
+            <div class="cc-portrait">
+              <div class="cc-avatar" id="cc-avatar"></div>
+              <div class="cc-meta" id="cc-meta"></div>
+            </div>
+            <div class="cc-info">
+              <div class="cc-name" id="cc-name">Open Hangar</div>
+              <div class="cc-org" id="cc-org"></div>
+              <div class="home-balances" id="home-balances"></div>
+              <div class="home-flair" id="home-flair"></div>
+            </div>
+          </div>
+          <div class="cc-side" id="cc-side">
+            <div class="cc-versions" id="versions"></div>
+            <div class="cc-side-bottom">
+              <div class="scanned" id="scanned-home"></div>
+              <div id="status"></div>
+              <div class="cc-actions">
+                <button id="scan-home">Scan</button>
+                <button id="logout-home" class="btn-secondary" hidden>Log out</button>
+                <button id="clear-home" class="btn-secondary" hidden>Clear Data</button>
+              </div>
+            </div>
+          </div>
+          <!-- Shown instead of the card content when signed out of RSI -->
+          <div class="cc-loggedout" id="cc-loggedout" hidden>
+            <div class="cc-lo-inner">
+              <div class="cc-lo-title">Open Hangar</div>
+              <p class="cc-lo-sub">Sign in to RSI to scan and view your hangar.</p>
+              <a class="btn-login cc-lo-btn" href="https://robertsspaceindustries.com/connect" target="_blank" rel="noopener">Log In to RSI ↗</a>
+            </div>
+          </div>
+        </div>
+        <div class="home-summary" id="home-summary"></div>
+        <div class="home-split">
+          <div class="home-about">
+            <h2 class="section-title">About Open Hangar</h2>
+            <p>An open-source tool that <strong>scrapes and organizes your own</strong> Star
+              Citizen account data from robertsspaceindustries.com into a clean, portable, local
+              database — built to be the data layer other apps, sites, and projects can build on.
+              This viewer is just a convenience layer so non-developers can browse it too.</p>
+            <h3>How it works</h3>
+            <p>RSI authenticates with a session cookie. Because the extension has permission
+              for the RSI domain, it reads your hangar using your existing login — no password,
+              no RSI tab, and your data is sent to no server. Everything is parsed and stored
+              locally in your browser.</p>
+            <h3>Privacy</h3>
+            <ul>
+              <li>No password or credentials — only the session you already have.</li>
+              <li>No external server stores your data; nothing you scrape leaves your browser.</li>
+              <li>Outbound requests carry no personal data: hangar thumbnails and the home
+                banner image from RSI's media servers, and the current game version from the
+                public star-citizen.wiki API.</li>
+            </ul>
+            <h3>Open source</h3>
+            <p>Released under the MIT license and built to be auditable — every line is readable,
+              and contributions are welcome.</p>
+          </div>
+          <div class="home-cards">
+            <a class="home-card needs-data" href="#inventory" data-view="inventory">
+              <h3>Inventory</h3>
+              <p>Ships, upgrades, add-ons. Browse, search, and filter your fleet.</p>
+            </a>
+            <a class="home-card needs-data" href="#stats" data-view="stats">
+              <h3>Stats</h3>
+              <p>Fleet value, totals, and breakdowns by category.</p>
+            </a>
+            <a class="home-card" href="#buybacks" data-view="buybacks">
+              <h3>Buy-Backs</h3>
+              <p>Melted pledges you can re-acquire from RSI.</p>
+            </a>
+            <a class="home-card" href="#store" data-view="store">
+              <h3>Store Data <span class="badge-soon">Planned</span></h3>
+              <p>RSI store catalog &amp; current prices — to value your fleet and plan CCUs.</p>
+            </a>
+            <a class="home-card" href="#developers" data-view="developers">
+              <h3>Developers</h3>
+              <p>What this is, how it pulls data, and how to build on it.</p>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- INVENTORY -->
+      <section class="view" id="view-inventory">
+        <h2 class="section-title">Inventory</h2>
+        <div class="controls">
+          <input id="search" type="search" placeholder="Search by name…" autocomplete="off" />
+          <select id="sort">
+            <option value="default">Sort: Hangar order</option>
+            <option value="value-desc">Value: high → low</option>
+            <option value="value-asc">Value: low → high</option>
+            <option value="name-asc">Name: A → Z</option>
+            <option value="name-desc">Name: Z → A</option>
+          </select>
+          <div class="layout-toggle" id="layout">
+            <button data-layout="gallery">Gallery</button>
+            <button data-layout="compact">Compact</button>
+            <button data-layout="list">List</button>
+          </div>
+        </div>
+        <div class="chips" id="chips"></div>
+        <div id="results"></div>
+      </section>
+
+      <!-- STATS -->
+      <section class="view" id="view-stats">
+        <h2 class="section-title">Stats</h2>
+        <div id="stats-body"></div>
+      </section>
+
+      <!-- BUY-BACKS -->
+      <section class="view" id="view-buybacks">
+        <h2 class="section-title">Buy-Backs</h2>
+        <div class="controls" id="bb-controls" hidden>
+          <input id="bb-search" type="search" placeholder="Search buy-backs…" autocomplete="off" />
+          <select id="bb-sort">
+            <option value="default">Sort: Scan order</option>
+            <option value="name-asc">Name: A → Z</option>
+            <option value="name-desc">Name: Z → A</option>
+            <option value="date-desc">Date: newest first</option>
+            <option value="date-asc">Date: oldest first</option>
+          </select>
+        </div>
+        <div class="chips" id="bb-chips"></div>
+        <div id="buybacks-body"></div>
+      </section>
+
+      <!-- STORE -->
+      <section class="view" id="view-store">
+        <h2 class="section-title">Store Data</h2>
+        <div class="placeholder-view">
+          <h2>RSI store catalog &amp; prices <span class="badge-soon">Planned</span></h2>
+          <p class="muted">This section will pull the public RSI pledge-store catalog
+            (ships and their current prices) and cache it locally, so Open Hangar can:</p>
+          <ul class="muted">
+            <li>show the current store value of everything in your hangar,</li>
+            <li>compare what you paid vs. today's price,</li>
+            <li>and power CCU-chain planning (shortest/cheapest path between ships).</li>
+          </ul>
+          <p class="muted">Planned source: the cached ship-matrix API, kept separate from the
+            core scraper. Tracked in <code>ROADMAP.md</code>.</p>
+        </div>
+      </section>
+
+      <!-- DEVELOPERS -->
+      <section class="view" id="view-developers">
+        <h2 class="section-title">For Developers</h2>
+        <div class="prose">
+          <aside class="dev-linkbox">
+            <div class="dlb-title">Quick links</div>
+            <span id="dev-links"></span>
+            <a href="https://api.star-citizen.wiki" target="_blank" rel="noopener">star-citizen.wiki API</a>
+            <a href="https://docs.star-citizen.wiki" target="_blank" rel="noopener">API docs</a>
+            <a href="https://robertsspaceindustries.com/tos" target="_blank" rel="noopener">RSI Terms of Service</a>
+          </aside>
+          <p>Open Hangar is built as a <strong>data tool</strong>: it reads a user's own Star
+            Citizen account and organizes it into a clean, structured, local database that other
+            tools and sites can build on. Open source, MIT-licensed, auditable.</p>
+
+          <h3>How it pulls data</h3>
+          <p>RSI uses cookie-based session auth. The extension holds host permission for
+            <code>robertsspaceindustries.com</code>, so its own <code>fetch</code> requests carry the
+            user's existing session cookie — no password, no RSI tab, no server. Server-rendered
+            pages (the hangar) are fetched and parsed locally; nothing is sent anywhere. The fragile
+            bit (RSI's markup) is isolated in <code>parser.js</code>.</p>
+
+          <h3>The data model</h3>
+          <p>Every pledge is normalized to one object:</p>
+          <pre>{ id, name, value, currency,
+  contents: [{ kind, label, image }],
+  image, containsShip,
+  isCCU, ccu: { from, to },
+  isAddOn, isCoupon,
+  kind }   // ship | ccu | addon | coupon | other</pre>
+          <p>The <strong>hangar</strong>, <strong>buy-backs</strong>, and
+            <strong>account identity + balances</strong> (handle, org, rank, Store Credit, UEC, REC —
+            read from the dashboard's embedded JSON and the public citizen dossier) are live; the
+            <strong>store catalog</strong> is planned.</p>
+
+          <h3>The export file</h3>
+          <p>One self-describing JSON file, ordered <em>provenance → who → what they own</em> so it
+            maps straight onto a backend table. Schema <strong>v2</strong> added the
+            <code>account</code> block (org, rank, balances); v1 had <code>sources</code> only.</p>
+          <pre>{
+  app, appVersion, exportedAt, schemaVersion,   // provenance
+  account: {                                    // who this is
+    handle, displayName, avatar,
+    ueeRecord, enlistedSince, country,
+    organization: { name, sid, rank, logo },    // null if none / private
+    subscriber, concierge,
+    balances: {                                 // storeCredit.value is in CENTS
+      storeCredit: { value, currency, symbol, label },
+      uec:         { value, currency, symbol, label },
+      rec:         { value, currency, symbol, label }
+    },
+    capturedAt
+  },
+  sources: {                                    // what they own
+    hangar:   { items: [ …pledges… ],  scannedAt },
+    buybacks: { items: [ …buy-backs… ], scannedAt }
+  }
+}</pre>
+
+          <h3>Using it in your project</h3>
+          <p><strong>JSON export/import is live</strong> — download the whole database (the shape
+            above) to back it up or feed it into your own project; import restores a previous export.
+            Import restores the <code>sources</code> (holdings); the <code>account</code> block is a
+            read-only snapshot for consumers — the Citizen Card always reflects the live RSI session.
+            An opt-in, whitelisted messaging API (<code>externally_connectable</code>) so approved
+            sites can request the database directly is still on the roadmap.</p>
+          <div class="data-actions">
+            <button id="export-db">Export JSON</button>
+            <button id="import-db" class="btn-secondary">Import JSON…</button>
+            <input id="import-file" type="file" accept="application/json,.json" hidden />
+          </div>
+          <div id="data-msg" class="muted"></div>
+
+          <h3>Terms &amp; fair use</h3>
+          <ul>
+            <li>Read-only, personal, and rate-limited — it reads only the signed-in user's own account.</li>
+            <li>Respect RSI's Terms of Service; don't redistribute other people's data.</li>
+            <li>MIT-licensed and open source — audit every line, file issues, and send PRs.</li>
+          </ul>
+
+          <h3>Data sources &amp; references</h3>
+          <p>Where every piece of data comes from — handy for verifying the scrape or building your own:</p>
+          <ul>
+            <li><strong>Hangar</strong> (live) — <a href="https://robertsspaceindustries.com/account/pledges" target="_blank" rel="noopener">RSI › Account › Pledges</a> · server-rendered HTML, parsed by <code>parser.js</code></li>
+            <li><strong>Account identity + balances</strong> (live) — <a href="https://robertsspaceindustries.com/en/account/dashboard" target="_blank" rel="noopener">RSI › Account › Dashboard</a> · embedded JSON blob</li>
+            <li><strong>Buy-Backs</strong> (live) — <a href="https://robertsspaceindustries.com/en/account/buy-back-pledges" target="_blank" rel="noopener">RSI › Account › Buy-Back Pledges</a> · server-rendered HTML, parsed by <code>parser.js</code></li>
+            <li><strong>Store catalog &amp; prices</strong> (planned) — <a href="https://robertsspaceindustries.com/pledge" target="_blank" rel="noopener">RSI Pledge Store</a> · <a href="https://robertsspaceindustries.com/ship-matrix" target="_blank" rel="noopener">Ship Matrix</a></li>
+            <li><strong>Game version &amp; ship data</strong> — <a href="https://api.star-citizen.wiki" target="_blank" rel="noopener">star-citizen.wiki API</a> · <a href="https://docs.star-citizen.wiki" target="_blank" rel="noopener">API docs</a></li>
+            <li><strong>RSI Terms of Service</strong> — <a href="https://robertsspaceindustries.com/tos" target="_blank" rel="noopener">robertsspaceindustries.com/tos</a></li>
+          </ul>
+
+          <h3>Thanks &amp; supporters</h3>
+          <p>Open Hangar is community-built and community-kept. Huge thanks to everyone who
+            contributes code, reports parser breakages when RSI changes their site, or supports
+            the project on Discord.</p>
+          <div class="supporters">
+            <div class="sup-group">
+              <div class="sup-title">GitHub contributors</div>
+              <div class="sup-list" id="sup-contributors"></div>
+            </div>
+            <div class="sup-group">
+              <div class="sup-title">Discord boosters</div>
+              <div class="sup-list" id="sup-boosters"></div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <footer class="site-footer" id="footer"></footer>
+    </div>
+
+    <!-- Inventory hover preview -->
+    <div id="item-preview"><img alt="" /></div>
+
+    <!-- Inventory item detail modal -->
+    <div class="modal-overlay" id="item-modal" hidden>
+      <div class="modal-card">
+        <button class="modal-close" id="modal-close" aria-label="Close">&times;</button>
+        <div class="modal-body" id="modal-body"></div>
+      </div>
+    </div>
+
+    <script src="scraper/parser.js"></script>
+    <script src="lib.js"></script>
+    <script src="dashboard.js"></script>
+  </body>
+</html>

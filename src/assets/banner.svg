@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 240" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="space" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0a1430"/>
+      <stop offset="0.5" stop-color="#0a0f24"/>
+      <stop offset="1" stop-color="#05070f"/>
+    </linearGradient>
+    <radialGradient id="neb1" cx="18%" cy="18%" r="62%">
+      <stop offset="0" stop-color="#1c6cff" stop-opacity="0.28"/>
+      <stop offset="0.6" stop-color="#1c6cff" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#1c6cff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="neb2" cx="72%" cy="88%" r="66%">
+      <stop offset="0" stop-color="#8b3fd6" stop-opacity="0.30"/>
+      <stop offset="0.6" stop-color="#8b3fd6" stop-opacity="0.07"/>
+      <stop offset="1" stop-color="#8b3fd6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="neb3" cx="55%" cy="26%" r="42%">
+      <stop offset="0" stop-color="#16a3a3" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#16a3a3" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="sun" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="0.22" stop-color="#cfe3ff" stop-opacity="0.85"/>
+      <stop offset="0.6" stop-color="#1c6cff" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#1c6cff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="planetBody" cx="34%" cy="28%" r="85%">
+      <stop offset="0" stop-color="#3a567f"/>
+      <stop offset="0.55" stop-color="#1a2a4a"/>
+      <stop offset="1" stop-color="#0a1226"/>
+    </radialGradient>
+    <radialGradient id="planetAtmo" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#6fb0ff" stop-opacity="0"/>
+      <stop offset="0.84" stop-color="#6fb0ff" stop-opacity="0"/>
+      <stop offset="0.9" stop-color="#7fc0ff" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#7fc0ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="240" fill="url(#space)"/>
+  <rect width="1200" height="240" fill="url(#neb1)"/>
+  <rect width="1200" height="240" fill="url(#neb2)"/>
+  <rect width="1200" height="240" fill="url(#neb3)"/>
+
+  <!-- distant sun -->
+  <circle cx="185" cy="58" r="95" fill="url(#sun)" opacity="0.85"/>
+  <circle cx="185" cy="58" r="6" fill="#ffffff"/>
+
+  <!-- small moon -->
+  <circle cx="720" cy="52" r="20" fill="#26344f"/>
+  <circle cx="714" cy="46" r="20" fill="#0a1226" opacity="0.5"/>
+
+  <!-- large planet rising on the lower-right horizon -->
+  <circle cx="960" cy="330" r="215" fill="url(#planetAtmo)"/>
+  <circle cx="960" cy="330" r="205" fill="url(#planetBody)"/>
+
+  <!-- starfield -->
+  <g fill="#ffffff">
+    <circle cx="40" cy="150" r="1.2" opacity="0.7"/>
+    <circle cx="95" cy="60" r="0.8" opacity="0.55"/>
+    <circle cx="150" cy="180" r="1.0" opacity="0.6"/>
+    <circle cx="250" cy="40" r="0.7" opacity="0.5"/>
+    <circle cx="300" cy="120" r="1.3" opacity="0.8"/>
+    <circle cx="360" cy="70" r="0.8" opacity="0.5"/>
+    <circle cx="420" cy="160" r="1.0" opacity="0.65"/>
+    <circle cx="470" cy="35" r="0.7" opacity="0.5"/>
+    <circle cx="520" cy="110" r="1.1" opacity="0.7"/>
+    <circle cx="580" cy="180" r="0.8" opacity="0.5"/>
+    <circle cx="620" cy="55" r="1.2" opacity="0.75"/>
+    <circle cx="680" cy="135" r="0.7" opacity="0.5"/>
+    <circle cx="780" cy="90" r="1.0" opacity="0.6"/>
+    <circle cx="840" cy="160" r="0.8" opacity="0.5"/>
+    <circle cx="1080" cy="50" r="1.1" opacity="0.7"/>
+    <circle cx="1130" cy="120" r="0.8" opacity="0.55"/>
+    <circle cx="1160" cy="40" r="1.0" opacity="0.6"/>
+    <circle cx="1050" cy="95" r="0.7" opacity="0.5"/>
+    <circle cx="240" cy="200" r="0.9" opacity="0.55"/>
+    <circle cx="500" cy="210" r="1.0" opacity="0.6"/>
+    <circle cx="120" cy="110" r="0.6" opacity="0.4"/>
+    <circle cx="400" cy="25" r="0.7" opacity="0.5"/>
+    <circle cx="660" cy="205" r="0.8" opacity="0.5"/>
+  </g>
+</svg>
