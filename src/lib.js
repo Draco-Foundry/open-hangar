@@ -102,7 +102,9 @@
       if (acct && acct.loggedIn && acct.nickname) {
         db.owner = { nickname: acct.nickname, displayname: acct.displayname || null };
       }
-    } catch { /* owner stamp is optional */ }
+    } catch {
+      /* owner stamp is optional */
+    }
     await chrome.storage.local.set({ [DB_KEY]: db });
     await chrome.storage.local.remove(['hangar', 'scannedAt']); // drop legacy keys
     return scannedAt;
@@ -130,8 +132,8 @@
           chrome.cookies.remove({
             url: `http${c.secure ? 's' : ''}://${c.domain.replace(/^\./, '')}${c.path}`,
             name: c.name,
-          })
-        )
+          }),
+        ),
       );
       await chrome.storage.local.remove('account'); // cached identity is now stale
       return { ok: true, removed: cookies.length };
@@ -154,7 +156,14 @@
     const handle = a?.nickname || owner?.nickname || null;
     if (!a && !handle) return null; // nothing known about the user
     const credit = (c) =>
-      c ? { value: c.value ?? null, currency: c.currency || null, symbol: c.symbol || null, label: c.label || null } : null;
+      c
+        ? {
+            value: c.value ?? null,
+            currency: c.currency || null,
+            symbol: c.symbol || null,
+            label: c.label || null,
+          }
+        : null;
     const org = a?.org;
     return {
       handle,
@@ -164,13 +173,27 @@
       enlistedSince: a?.enlistedSince || null,
       country: a?.countryName || null,
       organization: org
-        ? { name: org.name || null, sid: org.sid || null, rank: org.rank || null, logo: org.logo || null }
+        ? {
+            name: org.name || null,
+            sid: org.sid || null,
+            rank: org.rank || null,
+            logo: org.logo || null,
+          }
         : null, // null = no main org, or the affiliation is private/redacted
       subscriber: a?.subscriber || null, // { type, frequency } | null
       concierge: a?.concierge || null, // { level, next, percent } | null
       balances: a
-        ? { storeCredit: credit(a.credits?.store), uec: credit(a.credits?.uec), rec: credit(a.credits?.rec) }
+        ? {
+            storeCredit: credit(a.credits?.store),
+            uec: credit(a.credits?.uec),
+            rec: credit(a.credits?.rec),
+          }
         : null,
+      // NOTE: the referral CODE/URL are deliberately NOT exported. They live in the
+      // in-tool runtime (account cache + the referral source) but are stripped from
+      // the export file — the code is a personal, shareable credential the user
+      // chose to keep out of exports. Referral COUNTS and recruit/prospect lists
+      // still export; only code/url are stripped (see exportDB).
       capturedAt: a?.fetchedAt || null, // when this identity snapshot was read
     };
   }
@@ -186,16 +209,33 @@
     const db = await OH.loadDB();
     const { account } = await chrome.storage.local.get('account');
     let appVersion = null;
-    try { appVersion = chrome.runtime.getManifest().version; } catch { /* non-extension context */ }
+    try {
+      appVersion = chrome.runtime.getManifest().version;
+    } catch {
+      /* non-extension context */
+    }
     return {
       app: 'open-hangar',
       appVersion,
       exportedAt: new Date().toISOString(),
       schemaVersion: SCHEMA_VERSION,
       account: shapeAccountForExport(account, db.owner),
-      sources: db.sources,
+      sources: sanitizeSourcesForExport(db.sources),
     };
   };
+
+  // Strip the referral CODE/URL from the exported referral source — the user's
+  // personal referral credential is kept out of export files (counts + recruit/
+  // prospect lists still export). Returns a shallow copy; never mutates the stored
+  // DB. Other sources pass through untouched.
+  function sanitizeSourcesForExport(sources) {
+    if (!sources || typeof sources !== 'object') return sources;
+    const ref = sources.referral;
+    if (!ref || !ref.items || typeof ref.items !== 'object' || Array.isArray(ref.items))
+      return sources;
+    const { code, url, ...rest } = ref.items; // drop code + url (url embeds the code)
+    return { ...sources, referral: { ...ref, items: rest } };
+  }
 
   // Validate + persist an imported database (the shape exportDB emits, or a bare
   // { schemaVersion, sources }). Replaces the stored DB — import is a restore,
@@ -213,11 +253,16 @@
       return { ok: false, error: 'Missing "sources" — this is not an Open Hangar export.' };
     }
     if (obj.schemaVersion && obj.schemaVersion > SCHEMA_VERSION) {
-      return { ok: false, error: `Export is schema v${obj.schemaVersion}; this extension supports v${SCHEMA_VERSION}. Update the extension first.` };
+      return {
+        ok: false,
+        error: `Export is schema v${obj.schemaVersion}; this extension supports v${SCHEMA_VERSION}. Update the extension first.`,
+      };
     }
     const db = { schemaVersion: SCHEMA_VERSION, sources: {} };
     for (const [id, src] of Object.entries(obj.sources)) {
-      if (src && Array.isArray(src.items)) {
+      // Most sources store an array of items (hangar, buybacks); the referral
+      // source stores a single object. Accept either so a full restore round-trips.
+      if (src && (Array.isArray(src.items) || (src.items && typeof src.items === 'object'))) {
         db.sources[id] = { items: src.items, scannedAt: src.scannedAt || null };
       }
     }
@@ -251,7 +296,9 @@
         return { error: `Couldn't reach RSI (${e.message}). Check your connection.` };
       }
       if (res.status === 401 || res.status === 403) {
-        return { error: 'RSI rejected the request — your session may have expired. Sign in again.' };
+        return {
+          error: 'RSI rejected the request — your session may have expired. Sign in again.',
+        };
       }
       if (!res.ok) return { error: `RSI responded ${res.status} on page ${page}.` };
 
@@ -260,19 +307,26 @@
 
       if (page === 1 && !items.length) {
         if (looksLoggedOut(res, html)) {
-          return { error: 'Not signed in to RSI. Open robertsspaceindustries.com, log in, then scan again.' };
+          return {
+            error:
+              'Not signed in to RSI. Open robertsspaceindustries.com, log in, then scan again.',
+          };
         }
         // A source can declare how an *intentionally* empty list reads.
         if (src.emptyMarker && src.emptyMarker.test(html)) break; // legitimately empty
         // Signed in but parsed nothing: if the page still carries the data markers,
         // the parser couldn't read them → RSI likely changed their markup.
         if (src.marker && src.marker.test(html)) {
-          return { error: `Signed in, but couldn't read any ${src.label.toLowerCase()} — RSI may have changed their page markup. See CONTRIBUTING.md ("Rediscovering the data source").` };
+          return {
+            error: `Signed in, but couldn't read any ${src.label.toLowerCase()} — RSI may have changed their page markup. See CONTRIBUTING.md ("Rediscovering the data source").`,
+          };
         }
         // Sources that need server-rendered HTML but got none (e.g. a client-side
         // SPA shell) say so, rather than silently reporting "empty".
         if (src.requiresRender) {
-          return { error: `Couldn't read ${src.label.toLowerCase()} — RSI returned no server-rendered content (this page may load via JavaScript). See TODO.md.` };
+          return {
+            error: `Couldn't read ${src.label.toLowerCase()} — RSI returned no server-rendered content (this page may load via JavaScript). See TODO.md.`,
+          };
         }
         break; // logged in, source is genuinely empty
       }
@@ -331,19 +385,73 @@
   // signed-in user's nickname, displayname, and creditsData — no GraphQL needed.
   const ACCOUNT_URL = 'https://robertsspaceindustries.com/en/account/dashboard';
   const ACCOUNT_TTL_MS = 10 * 60 * 1000;
-  const ACCOUNT_CACHE_V = 5; // bump when the cached account shape changes
+  const ACCOUNT_CACHE_V = 6; // bump when the cached account shape changes (v6: + referral)
+
+  // Brace-scan outward from a key match to extract the smallest enclosing {...}
+  // JSON object, then parse it. Shared by extractAccount/extractReferral because
+  // the dashboard embeds several separate HTML-escaped JSON blobs. `un` must be
+  // already entity-unescaped. Returns the parsed object or null.
+  function extractObjectAround(un, keyIdx) {
+    if (keyIdx < 0) return null;
+    let depth = 0,
+      start = -1;
+    for (let p = keyIdx; p >= 0; p--) {
+      const c = un[p];
+      if (c === '}') depth++;
+      else if (c === '{') {
+        if (depth === 0) {
+          start = p;
+          break;
+        }
+        depth--;
+      }
+    }
+    let d = 0,
+      end = -1;
+    for (let p = start; p < un.length; p++) {
+      const c = un[p];
+      if (c === '{') d++;
+      else if (c === '}') {
+        d--;
+        if (d === 0) {
+          end = p;
+          break;
+        }
+      }
+    }
+    if (start < 0 || end < 0) return null;
+    try {
+      return JSON.parse(un.slice(start, end + 1));
+    } catch {
+      return null;
+    }
+  }
+
+  const unescapeEntities = (html) =>
+    html
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&')
+      .replace(/&#0?39;/g, "'");
 
   function extractAccount(html) {
-    const un = html.replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#0?39;/g, "'");
-    const idx = un.indexOf('"nickname"');
-    if (idx < 0) return null;
-    // Balanced-brace scan outward from the nickname key to grab the whole object.
-    let depth = 0, start = -1;
-    for (let p = idx; p >= 0; p--) { const c = un[p]; if (c === '}') depth++; else if (c === '{') { if (depth === 0) { start = p; break; } depth--; } }
-    let d = 0, end = -1;
-    for (let p = start; p < un.length; p++) { const c = un[p]; if (c === '{') d++; else if (c === '}') { d--; if (d === 0) { end = p; break; } } }
-    if (start < 0 || end < 0) return null;
-    try { return JSON.parse(un.slice(start, end + 1)); } catch { return null; }
+    const un = unescapeEntities(html);
+    return extractObjectAround(un, un.indexOf('"nickname"'));
+  }
+
+  // The dashboard HTML embeds a SEPARATE referral blob (not inside the nickname
+  // object): { referralCode, referralUrl, referralUrlCopy, referrerReferralCode }.
+  // referralUrlCopy is the clean (non-encoded) enlist URL. Verified May 2026.
+  // Returns { code, url, referrerCode } or null when absent (e.g. signed out).
+  function extractReferral(html) {
+    const un = unescapeEntities(html);
+    const m = /"referralCode"\s*:/.exec(un);
+    const obj = m ? extractObjectAround(un, m.index) : null;
+    if (!obj || !obj.referralCode) return null;
+    return {
+      code: obj.referralCode,
+      url: obj.referralUrlCopy || obj.referralUrl || null,
+      referrerCode: obj.referrerReferralCode || null,
+    };
   }
 
   // → { loggedIn: true|false|null, nickname, displayname, credits } where credits
@@ -368,14 +476,19 @@
     // has NO label (it's an <a class="value">…</a>); SID and rank entries pair a
     // <span class="label"> with a <strong class="value">. So: name = the first
     // labelless value (prefer the <a>), and read sid/rank by their labels.
-    let name = '', sid = null, rank = null;
+    let name = '',
+      sid = null,
+      rank = null;
     for (const entry of info.querySelectorAll('.entry')) {
       const label = clean(entry.querySelector('.label')?.textContent).toLowerCase();
       const value = clean(entry.querySelector('.value')?.textContent);
       if (!value) continue;
-      if (!label) { if (!name) name = value; }       // labelless ⇒ org name
-      else if (label.includes('sid')) sid = value;    // "Spectrum Identification (SID)"
-      else if (label.includes('rank')) rank = value;  // "Organization rank"
+      if (!label) {
+        if (!name) name = value;
+      } // labelless ⇒ org name
+      else if (label.includes('sid'))
+        sid = value; // "Spectrum Identification (SID)"
+      else if (label.includes('rank')) rank = value; // "Organization rank"
     }
     if (!name) name = clean(info.querySelector('a.value')?.textContent); // fallback
     if (!name || /^redacted$/i.test(name)) return null; // no org, or private
@@ -392,7 +505,12 @@
 
   OH.getAccount = async function getAccount({ force = false } = {}) {
     const { account } = await chrome.storage.local.get('account');
-    if (!force && account?.fetchedAt && account.v === ACCOUNT_CACHE_V && Date.now() - account.fetchedAt < ACCOUNT_TTL_MS) {
+    if (
+      !force &&
+      account?.fetchedAt &&
+      account.v === ACCOUNT_CACHE_V &&
+      Date.now() - account.fetchedAt < ACCOUNT_TTL_MS
+    ) {
       return account;
     }
     try {
@@ -400,16 +518,26 @@
       const html = res.ok ? await res.text() : '';
       const obj = extractAccount(html);
       if (!obj) {
-        return { loggedIn: res.ok && !looksLoggedOut(res, html) ? null : false, fetchedAt: Date.now() };
+        return {
+          loggedIn: res.ok && !looksLoggedOut(res, html) ? null : false,
+          fetchedAt: Date.now(),
+        };
       }
       const credits = {};
       for (const c of obj.creditsData || []) {
-        credits[c.variant] = { value: c.value, symbol: c.symbol, label: c.label, currency: c.currency };
+        credits[c.variant] = {
+          value: c.value,
+          symbol: c.symbol,
+          label: c.label,
+          currency: c.currency,
+        };
       }
       const sub = obj.subscriberData;
       const con = obj.conciergeData;
       const avatar = obj.avatar
-        ? (obj.avatar.startsWith('http') ? obj.avatar : 'https://robertsspaceindustries.com' + obj.avatar)
+        ? obj.avatar.startsWith('http')
+          ? obj.avatar
+          : 'https://robertsspaceindustries.com' + obj.avatar
         : null;
       const out = {
         v: ACCOUNT_CACHE_V,
@@ -421,20 +549,30 @@
         countryName: obj.countryName || null,
         credits,
         subscriber: sub && sub.type ? { type: sub.type, frequency: sub.frequency || null } : null,
-        concierge: con && con.conciergeCurrentLevel
-          ? { level: con.conciergeCurrentLevel, next: con.conciergeNextLevel || null, percent: con.conciergeNextLevelPercentage ?? null }
-          : null,
+        concierge:
+          con && con.conciergeCurrentLevel
+            ? {
+                level: con.conciergeCurrentLevel,
+                next: con.conciergeNextLevel || null,
+                percent: con.conciergeNextLevelPercentage ?? null,
+              }
+            : null,
         citizenRecord: null,
         org: null, // { name, sid, rank, logo } from the public dossier, or null
+        referral: extractReferral(html), // { code, url, referrerCode } | null — from the SAME fetch (free)
       };
       // UEE Citizen Record + main Organization live on the public dossier
       // (citizen profile) page — one fetch covers both.
       if (out.nickname) {
         try {
-          const cres = await fetch(`https://robertsspaceindustries.com/en/citizens/${encodeURIComponent(out.nickname)}`, { credentials: 'omit' });
+          const cres = await fetch(
+            `https://robertsspaceindustries.com/en/citizens/${encodeURIComponent(out.nickname)}`,
+            { credentials: 'omit' },
+          );
           if (cres.ok) {
             const cdoc = new DOMParser().parseFromString(await cres.text(), 'text/html');
-            out.citizenRecord = cdoc.querySelector('.citizen-record .value')?.textContent?.trim() || null;
+            out.citizenRecord =
+              cdoc.querySelector('.citizen-record .value')?.textContent?.trim() || null;
             out.org = parseMainOrg(cdoc);
           }
         } catch (e) {
@@ -449,11 +587,175 @@
     }
   };
 
+  // --- Referrals: recruits + prospects (GraphQL) ---------------------------
+  // The referral pages (/en/referral, /en/referral-legacy) are JS-rendered, so we
+  // hit their data API directly: POST /graphql, operation GetReferralRecruitsList,
+  // with the session cookie (credentials:'include') — no CSRF token needed (same
+  // trust model as the hangar fetch). Verified replayable against a live account
+  // (May 2026). Two "campaigns": '2' = CURRENT program, '1' = LEGACY (pre-cutoff,
+  // different rewards). The PROSPECT pool is shared across both; only RECRUIT
+  // counts differ (legacy = all-time total, current = post-cutoff conversions).
+  // Each row: { id, displayName, nickname, avatar, enlistedOn, convertedOn }.
+  // `converted:true` filters to recruits; `false` returns the full prospect list.
+  const GRAPHQL_URL = 'https://robertsspaceindustries.com/graphql';
+  const REFERRAL_CAMPAIGNS = { current: '2', legacy: '1' };
+  const REFERRAL_PAGE_SIZE = 50; // API accepts this; pages don't overlap (verified)
+  const REFERRAL_MAX_PAGES = 200; // safety cap (10k rows)
+  const REFERRAL_QUERY = `query GetReferralRecruitsList($campaignId: ID!, $converted: Boolean!, $display: ReferralRecruitsListDisplay, $limit: Int!, $page: Int!, $sortBy: ReferralRecruitsListSortBy) {
+  referralRecruitsList(query: {campaignId: $campaignId, converted: $converted, display: $display, limit: $limit, page: $page, sortBy: $sortBy}) {
+    recruitsCount
+    prospectsCount
+    data { id displayName nickname avatar enlistedOn convertedOn }
+  }
+}`;
+
+  // One page of the recruits/prospects list for a campaign. Returns
+  // { recruitsCount, prospectsCount, data: [...] } or { error }.
+  async function fetchReferralPage(campaignId, converted, page) {
+    let res;
+    try {
+      res = await fetch(GRAPHQL_URL, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          operationName: 'GetReferralRecruitsList',
+          query: REFERRAL_QUERY,
+          variables: {
+            campaignId,
+            converted,
+            display: 'ALL_TIME',
+            limit: REFERRAL_PAGE_SIZE,
+            page,
+            sortBy: 'NEWEST',
+          },
+        }),
+      });
+    } catch (e) {
+      return { error: `Couldn't reach RSI (${e.message}).` };
+    }
+    if (res.status === 401 || res.status === 403)
+      return { error: 'RSI rejected the request — sign in again.' };
+    if (!res.ok) return { error: `RSI responded ${res.status}.` };
+    let json;
+    try {
+      json = await res.json();
+    } catch {
+      return { error: 'RSI returned a non-JSON referral response.' };
+    }
+    if (json.errors && json.errors.length)
+      return { error: json.errors.map((e) => e.message).join('; ') };
+    const node = json?.data?.referralRecruitsList;
+    if (!node)
+      return { error: 'Referral data missing from response (RSI may have changed the API).' };
+    return {
+      recruitsCount: node.recruitsCount ?? null,
+      prospectsCount: node.prospectsCount ?? null,
+      data: Array.isArray(node.data) ? node.data : [],
+    };
+  }
+
+  // Walk every page of one campaign+converted list, deduping by id (page 1/2 were
+  // verified non-overlapping, but dedupe guards against RSI clamping out-of-range
+  // pages like the hangar does). Returns { count, items } or { error }.
+  async function fetchReferralList(campaignId, converted, onProgress) {
+    const seen = new Set();
+    const items = [];
+    let count = null;
+    for (let page = 1; page <= REFERRAL_MAX_PAGES; page++) {
+      const res = await fetchReferralPage(campaignId, converted, page);
+      if (res.error) return page === 1 ? { error: res.error } : { count, items }; // keep partial after page 1
+      count = converted ? res.recruitsCount : res.prospectsCount;
+      let added = 0;
+      for (const it of res.data) {
+        const key = it.id ?? `${it.nickname}:${it.enlistedOn}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        items.push({
+          id: it.id ?? null,
+          handle: it.nickname || null,
+          moniker: it.displayName || null,
+          avatar: it.avatar || null,
+          enlistedOn: it.enlistedOn || null,
+          convertedOn: it.convertedOn || null,
+        });
+        added++;
+      }
+      onProgress?.(items.length, count);
+      if (added === 0 || res.data.length < REFERRAL_PAGE_SIZE) break;
+      await sleep(DELAY_MS);
+    }
+    return { count, items };
+  }
+
+  // Scrape the full referral picture and persist it as the 'referral' source.
+  // Shape: { code, url, current:{recruits}, legacy:{recruits}, prospects,
+  //          recruitsList:[...], prospectsList:[...] }. recruitsList carries a
+  // `campaign` tag per row ('current'|'legacy') since legacy is a superset.
+  // Returns { ok, referral?, scannedAt?, error? }. Never throws.
+  OH.getReferral = async function getReferral(onProgress) {
+    try {
+      // Code/url come free from the account fetch (already cached/fetched there).
+      const acct = await OH.getAccount();
+      if (acct && acct.loggedIn === false) return { ok: false, error: 'Not signed in to RSI.' };
+      const code = acct?.referral?.code || null;
+      const url = acct?.referral?.url || null;
+
+      // Recruits: legacy is the all-time superset, current is the post-cutoff subset.
+      // Pull both and tag each row; prospects are shared, so fetch once (current).
+      onProgress?.('recruits (legacy)', 0, null);
+      const legacyRecruits = await fetchReferralList(REFERRAL_CAMPAIGNS.legacy, true, (n, t) =>
+        onProgress?.('recruits (legacy)', n, t),
+      );
+      if (legacyRecruits.error && !legacyRecruits.items?.length)
+        return { ok: false, error: legacyRecruits.error };
+
+      onProgress?.('recruits (current)', 0, null);
+      const currentRecruits = await fetchReferralList(REFERRAL_CAMPAIGNS.current, true, (n, t) =>
+        onProgress?.('recruits (current)', n, t),
+      );
+
+      onProgress?.('prospects', 0, null);
+      const prospects = await fetchReferralList(REFERRAL_CAMPAIGNS.current, false, (n, t) =>
+        onProgress?.('prospects', n, t),
+      );
+
+      // Merge recruit lists: tag current ids, then mark legacy-only rows.
+      const currentIds = new Set((currentRecruits.items || []).map((r) => r.id));
+      const recruitsList = (legacyRecruits.items || []).map((r) => ({
+        ...r,
+        campaign: currentIds.has(r.id) ? 'current' : 'legacy',
+      }));
+
+      const referral = {
+        code,
+        url,
+        current: { recruits: currentRecruits.count ?? null },
+        legacy: { recruits: legacyRecruits.count ?? null },
+        prospects: prospects.count ?? null,
+        recruitsList,
+        prospectsList: prospects.items || [],
+      };
+
+      const scannedAt = await saveSource('referral', referral);
+      return { ok: true, referral, scannedAt };
+    } catch (err) {
+      return { ok: false, error: String(err?.message || err) };
+    }
+  };
+
+  // Load the persisted referral source (the object saved by getReferral), or null.
+  OH.loadReferral = async function loadReferral() {
+    const src = await OH.loadSource('referral');
+    return src && src.items && !Array.isArray(src.items) ? src.items : null;
+  };
+
   // --- Misc UI helpers ------------------------------------------------------
 
   OH.escapeHtml = function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, (c) =>
-      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+    return String(s).replace(
+      /[&<>"']/g,
+      (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
     );
   };
 
@@ -486,7 +788,10 @@
     const { scVersion } = await chrome.storage.local.get('scVersion');
     if (!force && scVersion?.code && Date.now() - scVersion.fetchedAt < SC_TTL_MS) return scVersion;
     try {
-      const res = await fetch(SC_VERSIONS_URL, { credentials: 'omit', headers: { Accept: 'application/json' } });
+      const res = await fetch(SC_VERSIONS_URL, {
+        credentials: 'omit',
+        headers: { Accept: 'application/json' },
+      });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const json = await res.json();
       const list = Array.isArray(json.data) ? json.data : [];
@@ -531,7 +836,10 @@
     if (!name) return '';
     return String(name)
       .replace(/\s*[-–]\s*upgraded\b/i, '')
-      .replace(/\b(standard|collector'?s|warbond|original|anniversary|invictus|iae|digital|starter|game\s*package|package|pack|edition|loaner|lti|vip|bis|best\s*in\s*show|\d{4})\b/gi, ' ')
+      .replace(
+        /\b(standard|collector'?s|warbond|original|anniversary|invictus|iae|digital|starter|game\s*package|package|pack|edition|loaner|lti|vip|bis|best\s*in\s*show|\d{4})\b/gi,
+        ' ',
+      )
       .replace(/\s{2,}/g, ' ')
       .trim();
   };
@@ -549,14 +857,18 @@
     matrixInflight = (async () => {
       const list = [];
       try {
-        const res = await fetch(SHIP_MATRIX_URL, { credentials: 'omit', headers: { Accept: 'application/json' } });
+        const res = await fetch(SHIP_MATRIX_URL, {
+          credentials: 'omit',
+          headers: { Accept: 'application/json' },
+        });
         if (res.ok) {
           const json = await res.json();
           const data = Array.isArray(json.data) ? json.data : [];
           for (const s of data) {
             if (!s || !s.name) continue;
             const im = s.media && s.media[0] && s.media[0].images;
-            const url = im && (im.store_small || im.store_large || im.slideshow || im.product_thumb_large);
+            const url =
+              im && (im.store_small || im.store_large || im.slideshow || im.product_thumb_large);
             if (url) list.push({ lname: String(s.name).toLowerCase(), img: url });
           }
         }
@@ -565,7 +877,9 @@
       }
       if (list.length) {
         matrixMem = list;
-        try { await chrome.storage.local.set({ shipMatrix: { at: Date.now(), list } }); } catch {}
+        try {
+          await chrome.storage.local.set({ shipMatrix: { at: Date.now(), list } });
+        } catch {}
       }
       matrixInflight = null;
       return list;
@@ -587,14 +901,19 @@
       try {
         // The API caps page size at 200, so walk every page (≈288 vehicles → 2).
         for (let page = 1; page <= 5; page++) {
-          const res = await fetch(`${SC_API}/vehicles?page%5Bsize%5D=200&page%5Bnumber%5D=${page}`, { credentials: 'omit', headers: { Accept: 'application/json' } });
+          const res = await fetch(
+            `${SC_API}/vehicles?page%5Bsize%5D=200&page%5Bnumber%5D=${page}`,
+            { credentials: 'omit', headers: { Accept: 'application/json' } },
+          );
           if (!res.ok) break;
           const json = await res.json();
           const data = Array.isArray(json.data) ? json.data : [];
           for (const v of data) {
-            if (v && v.name && v.slug) list.push({ lname: String(v.name).toLowerCase(), slug: v.slug });
+            if (v && v.name && v.slug)
+              list.push({ lname: String(v.name).toLowerCase(), slug: v.slug });
           }
-          const last = (json.meta && json.meta.last_page) || (json.links && json.links.next ? page + 1 : page);
+          const last =
+            (json.meta && json.meta.last_page) || (json.links && json.links.next ? page + 1 : page);
           if (!data.length || page >= last) break;
         }
       } catch {
@@ -602,7 +921,9 @@
       }
       if (list.length) {
         catalogMem = list;
-        try { await chrome.storage.local.set({ shipCatalog: { at: Date.now(), list } }); } catch {}
+        try {
+          await chrome.storage.local.set({ shipCatalog: { at: Date.now(), list } });
+        } catch {}
       }
       catalogInflight = null;
       return list;
@@ -613,9 +934,9 @@
   // Score how well a catalog entry's (lowercased) name matches the query. 0 = no
   // match. Higher = better. Shared by both sources so fuzz rules stay consistent.
   function nameScore(n, q) {
-    if (n === q) return 100;                                  // exact
+    if (n === q) return 100; // exact
     if (n.startsWith(q + ' ')) return 80 - (n.length - q.length) * 0.1; // canonical extends query (Genesis → Genesis Starliner)
-    if (q.startsWith(n + ' ')) return 70 + n.length * 0.1;              // query extends canonical (PTV Buggy → PTV); prefer longer core
+    if (q.startsWith(n + ' ')) return 70 + n.length * 0.1; // query extends canonical (PTV Buggy → PTV); prefer longer core
     if (n.includes(q) || q.includes(n)) return 40 + Math.min(n.length, q.length) * 0.1; // loose contains
     return 0;
   }
@@ -624,10 +945,14 @@
   function matchMatrixImage(matrix, rawName) {
     const q = OH.normShipName(rawName).toLowerCase();
     if (!q || !matrix.length) return null;
-    let best = null, bestScore = 0;
+    let best = null,
+      bestScore = 0;
     for (const v of matrix) {
       const s = nameScore(v.lname, q);
-      if (s > bestScore) { bestScore = s; best = v.img; }
+      if (s > bestScore) {
+        bestScore = s;
+        best = v.img;
+      }
     }
     return best;
   }
@@ -656,12 +981,16 @@
   // Fetch a single vehicle's store image by slug (exact, reliable). ~600px webp.
   async function fetchVehicleImage(slug) {
     try {
-      const res = await fetch(`${SC_API}/vehicles/${encodeURIComponent(slug)}?include=images`, { credentials: 'omit', headers: { Accept: 'application/json' } });
+      const res = await fetch(`${SC_API}/vehicles/${encodeURIComponent(slug)}?include=images`, {
+        credentials: 'omit',
+        headers: { Accept: 'application/json' },
+      });
       if (!res.ok) return null;
       const json = await res.json();
       const v = Array.isArray(json.data) ? json.data[0] : json.data;
       const imgs = v && v.images;
-      if (Array.isArray(imgs) && imgs.length) return imgs[0].thumbnail_url || imgs[0].original_url || null;
+      if (Array.isArray(imgs) && imgs.length)
+        return imgs[0].thumbnail_url || imgs[0].original_url || null;
     } catch {
       /* ignore — caller caches a negative */
     }
@@ -732,12 +1061,18 @@
     try {
       const catalog = await getCatalog();
       for (const slug of matchSlugs(catalog, rawName)) {
-        const res = await fetch(`${SC_API}/vehicles/${encodeURIComponent(slug)}`, { credentials: 'omit', headers: { Accept: 'application/json' } });
+        const res = await fetch(`${SC_API}/vehicles/${encodeURIComponent(slug)}`, {
+          credentials: 'omit',
+          headers: { Accept: 'application/json' },
+        });
         if (!res.ok) continue;
         const json = await res.json();
         const v = Array.isArray(json.data) ? json.data[0] : json.data;
         const msrp = v && Number(v.msrp);
-        if (msrp) { price = { msrp, pledgeUrl: v.pledge_url || null }; break; }
+        if (msrp) {
+          price = { msrp, pledgeUrl: v.pledge_url || null };
+          break;
+        }
       }
     } catch {
       /* leave price null */

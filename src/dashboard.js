@@ -63,6 +63,8 @@ const state = {
   query: '',
   sort: 'default',
   layout: 'gallery', // gallery | compact | list
+  referral: null, // { code, url, current, legacy, prospects, recruitsList, prospectsList }
+  refTab: 'recruits', // referral list tab: 'recruits' | 'prospects'
 };
 
 function setStatus(text, isError = false) {
@@ -82,7 +84,8 @@ function setScanning(text, done = false) {
     scanIndicator.innerHTML = '';
     return;
   }
-  scanIndicator.innerHTML = (done ? '' : '<span class="spin"></span>') + `<span>${OH.escapeHtml(text)}</span>`;
+  scanIndicator.innerHTML =
+    (done ? '' : '<span class="spin"></span>') + `<span>${OH.escapeHtml(text)}</span>`;
   scanIndicator.hidden = false;
   if (done) {
     scanIndicatorTimer = setTimeout(() => {
@@ -120,8 +123,12 @@ function currentView() {
 
 function route() {
   const v = currentView();
-  document.querySelectorAll('.view').forEach((s) => s.classList.toggle('active', s.id === 'view-' + v));
-  document.querySelectorAll('#nav a').forEach((a) => a.classList.toggle('active', a.dataset.view === v));
+  document
+    .querySelectorAll('.view')
+    .forEach((s) => s.classList.toggle('active', s.id === 'view-' + v));
+  document
+    .querySelectorAll('#nav a')
+    .forEach((a) => a.classList.toggle('active', a.dataset.view === v));
   if (v === 'home') renderHome();
   else if (v === 'inventory') renderInventory();
   else if (v === 'stats') renderStats();
@@ -138,11 +145,11 @@ const DASH = '—'; // uniform placeholder for missing / logged-out dynamic data
 // Concierge (Chairman's Club) tiers, low → high spend, coloured richer the higher
 // you climb. Names from star-citizen.tools/Concierge.
 const CONCIERGE_COLORS = {
-  'high admiral': '#c0824f',   // bronze
-  'grand admiral': '#b6c2cf',  // silver
-  'space marshal': '#3fb6d8',  // cyan
+  'high admiral': '#c0824f', // bronze
+  'grand admiral': '#b6c2cf', // silver
+  'space marshal': '#3fb6d8', // cyan
   'wing commander': '#9b7bff', // violet
-  'praetorian': '#e06aae',     // rose
+  praetorian: '#e06aae', // rose
   'legatus navium': '#f0c040', // gold (top)
 };
 
@@ -183,7 +190,7 @@ function resolveImageName(p) {
 // preview), and the backing item (so the detail modal shows it too).
 function enhanceCardImages(container) {
   const cards = [...container.querySelectorAll('.card[data-resolve]')].filter(
-    (c) => c.dataset.resolve && !c.querySelector('img.thumb')
+    (c) => c.dataset.resolve && !c.querySelector('img.thumb'),
   );
   let i = 0;
   const CONCURRENCY = 3;
@@ -214,16 +221,21 @@ function enhanceCardImages(container) {
 // RSI account → the home Citizen Card: avatar, name, est/country/UEE record,
 // quick links, balances (Store/UEC/REC), and subscriber/concierge flair.
 function renderAccount() {
-  const nameEl = $('#cc-name'), metaEl = $('#cc-meta'), avEl = $('#cc-avatar');
+  const nameEl = $('#cc-name'),
+    metaEl = $('#cc-meta'),
+    avEl = $('#cc-avatar');
   const orgEl = $('#cc-org');
-  const balEl = $('#home-balances'), flairEl = $('#home-flair');
+  const balEl = $('#home-balances'),
+    flairEl = $('#home-flair');
 
   OH.getAccount().then((a) => {
     // Signed out → replace the whole card with the centred "Log In to RSI" wall.
     // `null` (couldn't tell) keeps the normal card so a transient error doesn't
     // lock out a signed-in user.
     const loggedOut = a.loggedIn === false;
-    const acctEl = $('#cc-account'), sideEl = $('#cc-side'), loEl = $('#cc-loggedout');
+    const acctEl = $('#cc-account'),
+      sideEl = $('#cc-side'),
+      loEl = $('#cc-loggedout');
     if (acctEl) acctEl.hidden = loggedOut;
     if (sideEl) sideEl.hidden = loggedOut;
     if (loEl) loEl.hidden = !loggedOut;
@@ -232,12 +244,15 @@ function renderAccount() {
     // Avatar (+ subscriber-tier ring)
     if (avEl) {
       avEl.style.backgroundImage = safeBgUrl(a.avatar);
-      avEl.className = 'cc-avatar' + (a.subscriber?.type === 'Imperator' ? ' tier-imperator' : a.subscriber ? ' tier-sub' : '');
+      avEl.className =
+        'cc-avatar' +
+        (a.subscriber?.type === 'Imperator' ? ' tier-imperator' : a.subscriber ? ' tier-sub' : '');
     }
 
     // Name
     if (nameEl) {
-      nameEl.textContent = a.displayname || a.nickname || (a.loggedIn === false ? 'Not signed in' : DASH);
+      nameEl.textContent =
+        a.displayname || a.nickname || (a.loggedIn === false ? 'Not signed in' : DASH);
     }
 
     // Meta (UEE record + enlisted date) under the portrait.
@@ -286,7 +301,9 @@ function renderAccount() {
       const parts = [];
       if (a.subscriber?.type) {
         const tier = a.subscriber.type === 'Imperator' ? 'sub' : 'sub sub-centurion';
-        parts.push(`<a class="flair ${tier}" href="https://robertsspaceindustries.com/en/pledge/subscriptions" target="_blank" rel="noopener"><span class="flair-lbl">Subscriber</span> <b>${OH.escapeHtml(a.subscriber.type)}</b></a>`);
+        parts.push(
+          `<a class="flair ${tier}" href="https://robertsspaceindustries.com/en/pledge/subscriptions" target="_blank" rel="noopener"><span class="flair-lbl">Subscriber</span> <b>${OH.escapeHtml(a.subscriber.type)}</b></a>`,
+        );
       }
       if (a.concierge?.level) {
         const col = CONCIERGE_COLORS[a.concierge.level.toLowerCase()] || '#d2a8ff';
@@ -294,7 +311,9 @@ function renderAccount() {
         const prog = a.concierge.next
           ? `<span class="flair-prog"><span class="flair-bar"><span style="width:${pct}%;background:${col}"></span></span>${pct}% → ${OH.escapeHtml(a.concierge.next)}</span>`
           : '';
-        parts.push(`<a class="flair concierge" style="border-color:${col}" href="https://robertsspaceindustries.com/en/account/concierge" target="_blank" rel="noopener"><span class="flair-lbl">Chairman's Club</span> <b style="color:${col}">${OH.escapeHtml(a.concierge.level)}</b>${prog}</a>`);
+        parts.push(
+          `<a class="flair concierge" style="border-color:${col}" href="https://robertsspaceindustries.com/en/account/concierge" target="_blank" rel="noopener"><span class="flair-lbl">Chairman's Club</span> <b style="color:${col}">${OH.escapeHtml(a.concierge.level)}</b>${prog}</a>`,
+        );
       }
       flairEl.innerHTML = parts.join('');
     }
@@ -303,13 +322,50 @@ function renderAccount() {
     if (balEl) {
       const c = a.credits || {};
       const fmt = (n) => Number(n).toLocaleString('en-US');
-      const pill = (cls, label, val) => `<span class="bal ${cls}"><span class="bal-lbl">${label}</span> <b>${val}</b></span>`;
+      const pill = (cls, label, val) =>
+        `<span class="bal ${cls}"><span class="bal-lbl">${label}</span> <b>${val}</b></span>`;
       balEl.innerHTML =
-        pill('store', 'Store Credit', c.store ? '$' + (c.store.value / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : DASH) +
+        pill(
+          'store',
+          'Store Credit',
+          c.store
+            ? '$' +
+                (c.store.value / 100).toLocaleString('en-US', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })
+            : DASH,
+        ) +
         pill('uec', 'UEC', c.uec ? '¤' + fmt(c.uec.value) : DASH) +
         pill('rec', 'REC', c.rec ? '¤' + fmt(c.rec.value) : DASH);
     }
+
+    renderReferralPill(a);
   });
+}
+
+// Citizen Card referral pill: recruit count + code with a copy button. Prefers the
+// scanned referral source (full counts); falls back to just the code from the
+// account fetch (which carries it for free) so it shows even before a referral scan.
+function renderReferralPill(a) {
+  const el = $('#home-referral');
+  if (!el) return;
+  const ref = state.referral;
+  const code = ref?.code || a?.referral?.code || null;
+  if (!a || !a.loggedIn || !code) {
+    el.innerHTML = '';
+    return;
+  }
+  const recruits = ref?.legacy?.recruits ?? ref?.current?.recruits ?? null;
+  const url = ref?.url || a?.referral?.url || null;
+  const countPart =
+    recruits != null
+      ? `<span class="bal-lbl">Referrals</span> <b>${recruits.toLocaleString('en-US')}</b> recruits`
+      : `<span class="bal-lbl">Referral code</span>`;
+  el.innerHTML = `<span class="ref-pill">${countPart}
+      <span class="ref-code">${OH.escapeHtml(code)}</span>
+      <button class="ref-copy" data-copy="${OH.escapeHtml(url || code)}" title="Copy referral link">Copy</button>
+    </span>`;
 }
 
 function renderVersions() {
@@ -346,7 +402,8 @@ function renderHome() {
   if (has) {
     const count = (k) => state.items.filter((p) => p.kind === k).length;
     const ships = state.items.filter((p) => p.containsShip).length;
-    const box = (big, lbl) => `<div class="sum-box"><div class="sum-big">${big}</div><div class="sum-lbl">${lbl}</div></div>`;
+    const box = (big, lbl) =>
+      `<div class="sum-box"><div class="sum-big">${big}</div><div class="sum-lbl">${lbl}</div></div>`;
     sum.innerHTML =
       box(state.items.length, 'pledges') +
       box(money(OH.totalValue(state.items)), 'fleet value') +
@@ -437,11 +494,16 @@ function computeShown() {
     const byName = (a, b) => (a.name || '').localeCompare(b.name || '');
     list = list.slice().sort((a, b) => {
       switch (state.sort) {
-        case 'value-desc': return cmpValue(a, b, -1);
-        case 'value-asc': return cmpValue(a, b, 1);
-        case 'name-asc': return byName(a, b);
-        case 'name-desc': return byName(b, a);
-        default: return 0;
+        case 'value-desc':
+          return cmpValue(a, b, -1);
+        case 'value-asc':
+          return cmpValue(a, b, 1);
+        case 'name-asc':
+          return byName(a, b);
+        case 'name-desc':
+          return byName(b, a);
+        default:
+          return 0;
       }
     });
   }
@@ -451,7 +513,7 @@ function computeShown() {
 function chipHtml(kind) {
   const n = state.items.filter((p) => p.kind === kind.key).length;
   return `<button class="chip k-${kind.key}" data-key="${kind.key}" aria-pressed="${state.shown.has(
-    kind.key
+    kind.key,
   )}">${OH.escapeHtml(kind.label)}<span class="n">${n}</span></button>`;
 }
 
@@ -487,7 +549,9 @@ function cardHtml(p) {
 }
 
 function renderInventory() {
-  layoutEl.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.layout === state.layout));
+  layoutEl
+    .querySelectorAll('button')
+    .forEach((b) => b.classList.toggle('active', b.dataset.layout === state.layout));
   if (!state.items.length) {
     chipsEl.innerHTML = '';
     resultsEl.innerHTML = '<div class="empty">No hangar data yet. Scan from the Home tab.</div>';
@@ -511,13 +575,15 @@ function renderStats() {
   const body = $('#stats-body');
   if (!state.items.length) {
     body.innerHTML = '<div class="empty">No hangar data yet. Scan from the Home tab.</div>';
+    renderReferrals(); // referrals are independent of hangar data — still show them
     return;
   }
   const items = state.items;
   const count = (k) => items.filter((p) => p.kind === k).length;
   const ships = items.filter((p) => p.containsShip).length;
 
-  const box = (big, lbl) => `<div class="stat-box"><div class="big">${big}</div><div class="lbl">${lbl}</div></div>`;
+  const box = (big, lbl) =>
+    `<div class="stat-box"><div class="big">${big}</div><div class="lbl">${lbl}</div></div>`;
   const stats =
     box(items.length, 'pledges') +
     box(money(OH.totalValue(items)), 'total value') +
@@ -548,7 +614,10 @@ function renderStats() {
     .sort((a, b) => b.value - a.value)
     .slice(0, 10);
   const topRows = top
-    .map((p) => `<div class="row"><div class="nm">${OH.escapeHtml(plainName(p))}</div><div class="vl">${OH.escapeHtml(formatValue(p))}</div></div>`)
+    .map(
+      (p) =>
+        `<div class="row"><div class="nm">${OH.escapeHtml(plainName(p))}</div><div class="vl">${OH.escapeHtml(formatValue(p))}</div></div>`,
+    )
     .join('');
 
   body.innerHTML =
@@ -556,6 +625,179 @@ function renderStats() {
     `<h3 class="section-title">By category</h3>${bars}` +
     `<h3 class="section-title" style="margin-top:26px">Top pledges by value</h3>` +
     `<div class="top-list">${topRows || '<div class="row muted">No priced pledges.</div>'}</div>`;
+
+  renderReferrals();
+}
+
+// --- Referrals (section inside Stats) -------------------------------------
+// Charts are hand-built inline SVG — no chart lib, no network (extension CSP +
+// the project's zero-runtime-deps rule). Data comes from OH.getReferral.
+
+// Parse RSI's "YYYY-MM-DD HH:MM:SS" timestamps to a Date (treat as local).
+function parseEnlist(s) {
+  if (!s) return null;
+  const t = Date.parse(s.replace(' ', 'T'));
+  return Number.isNaN(t) ? null : new Date(t);
+}
+const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+// Build a cumulative-over-time area+line chart + a per-month bar chart, as one SVG.
+function recruitsOverTimeSvg(rows) {
+  const dated = rows
+    .map((r) => parseEnlist(r.enlistedOn))
+    .filter(Boolean)
+    .sort((a, b) => a - b);
+  if (dated.length < 2) return '<p class="muted">Not enough dated recruits to chart yet.</p>';
+  // Bucket by month.
+  const counts = new Map();
+  for (const d of dated) counts.set(monthKey(d), (counts.get(monthKey(d)) || 0) + 1);
+  // Fill gaps between first and last month so the x-axis is continuous.
+  const months = [];
+  const start = new Date(dated[0].getFullYear(), dated[0].getMonth(), 1);
+  const end = new Date(
+    dated[dated.length - 1].getFullYear(),
+    dated[dated.length - 1].getMonth(),
+    1,
+  );
+  for (let d = new Date(start); d <= end; d.setMonth(d.getMonth() + 1)) {
+    months.push({ key: monthKey(d), n: counts.get(monthKey(d)) || 0 });
+  }
+  let cum = 0;
+  const series = months.map((m) => ({ ...m, cum: (cum += m.n) }));
+  const W = 560,
+    H = 180,
+    padL = 34,
+    padR = 8,
+    padB = 22,
+    padT = 8;
+  const iw = W - padL - padR,
+    ih = H - padT - padB;
+  const maxCum = series[series.length - 1].cum || 1;
+  const maxBar = Math.max(1, ...series.map((s) => s.n));
+  const x = (i) => padL + (series.length === 1 ? iw / 2 : (i / (series.length - 1)) * iw);
+  const yCum = (v) => padT + ih - (v / maxCum) * ih;
+  const linePts = series.map((s, i) => `${x(i).toFixed(1)},${yCum(s.cum).toFixed(1)}`).join(' ');
+  const areaPts = `${padL},${padT + ih} ${linePts} ${(padL + iw).toFixed(1)},${(padT + ih).toFixed(1)}`;
+  const barW = Math.max(2, (iw / series.length) * 0.5);
+  const bars = series
+    .map((s, i) => {
+      const h = (s.n / maxBar) * ih;
+      return `<rect class="bar" x="${(x(i) - barW / 2).toFixed(1)}" y="${(padT + ih - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" opacity="0.35"></rect>`;
+    })
+    .join('');
+  // X labels: first, middle, last month.
+  const lblIdx = [...new Set([0, Math.floor(series.length / 2), series.length - 1])];
+  const labels = lblIdx
+    .map(
+      (i) =>
+        `<text class="tick" x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle">${series[i].key}</text>`,
+    )
+    .join('');
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Recruits over time">
+    <line class="axis" x1="${padL}" y1="${padT + ih}" x2="${padL + iw}" y2="${padT + ih}"></line>
+    ${bars}
+    <polygon class="area" points="${areaPts}"></polygon>
+    <polyline class="line" points="${linePts}"></polyline>
+    <text class="tick" x="${padL - 6}" y="${yCum(maxCum) + 3}" text-anchor="end">${maxCum}</text>
+    <text class="tick" x="${padL - 6}" y="${padT + ih}" text-anchor="end">0</text>
+    ${labels}
+  </svg>`;
+}
+
+function conversionHtml(ref) {
+  const prospects = ref.prospects ?? 0;
+  const legacyR = ref.legacy?.recruits ?? 0;
+  const currentR = ref.current?.recruits ?? 0;
+  const pct = prospects > 0 ? (legacyR / prospects) * 100 : 0;
+  const restPct = Math.max(0, 100 - pct);
+  return `<div class="ref-conv-rate" style="font-size:26px;font-weight:700;margin-bottom:8px">${pct.toFixed(1)}%</div>
+    <div class="ref-conv-bar">
+      <div class="seg-conv" style="width:${pct.toFixed(2)}%"></div>
+      <div class="seg-rest" style="width:${restPct.toFixed(2)}%"></div>
+    </div>
+    <div class="ref-conv-legend">
+      <span><span class="dot" style="background:#7ee787"></span>${legacyR.toLocaleString('en-US')} recruits</span>
+      <span><span class="dot" style="background:rgba(255,255,255,0.1)"></span>${(prospects - legacyR).toLocaleString('en-US')} still prospects</span>
+    </div>
+    <div class="muted" style="margin-top:10px;font-size:12px">Current program: ${currentR.toLocaleString('en-US')} · Legacy total: ${legacyR.toLocaleString('en-US')} · Prospects: ${prospects.toLocaleString('en-US')}</div>`;
+}
+
+function refListRows() {
+  const ref = state.referral;
+  const list = state.refTab === 'prospects' ? ref.prospectsList || [] : ref.recruitsList || [];
+  if (!list.length) return `<tr><td colspan="3" class="muted">No ${state.refTab} found.</td></tr>`;
+  return list
+    .map((r) => {
+      const handle = r.handle || r.moniker || '—';
+      const link = r.handle
+        ? `<a href="https://robertsspaceindustries.com/en/citizens/${encodeURIComponent(r.handle)}" target="_blank" rel="noopener">${OH.escapeHtml(handle)}</a>`
+        : OH.escapeHtml(handle);
+      const badge =
+        state.refTab === 'recruits' && r.campaign
+          ? ` <span class="ref-badge ${r.campaign}">${r.campaign}</span>`
+          : '';
+      const when = r.enlistedOn
+        ? new Date(r.enlistedOn.replace(' ', 'T')).toLocaleDateString()
+        : '—';
+      return `<tr>
+      <td class="r-handle">${link}${badge}</td>
+      <td>${OH.escapeHtml(r.moniker || '')}</td>
+      <td>${OH.escapeHtml(when)}</td>
+    </tr>`;
+    })
+    .join('');
+}
+
+function renderReferrals() {
+  const body = $('#referrals-body');
+  if (!body) return;
+  const ref = state.referral;
+  if (!ref) {
+    body.innerHTML = '';
+    return;
+  } // nothing scanned → section hidden
+
+  const box = (big, lbl) =>
+    `<div class="stat-box"><div class="big">${big}</div><div class="lbl">${lbl}</div></div>`;
+  const recruitsRows = ref.recruitsList || [];
+  const legacyR = ref.legacy?.recruits ?? 0;
+  const currentR = ref.current?.recruits ?? 0;
+  // Best month by new recruits (from dated rows).
+  const byMonth = new Map();
+  for (const r of recruitsRows) {
+    const d = parseEnlist(r.enlistedOn);
+    if (d) byMonth.set(monthKey(d), (byMonth.get(monthKey(d)) || 0) + 1);
+  }
+  let best = null;
+  for (const [k, n] of byMonth) if (!best || n > best.n) best = { k, n };
+
+  const stats =
+    box(legacyR.toLocaleString('en-US'), 'recruits (all-time)') +
+    box(currentR.toLocaleString('en-US'), 'recruits (current)') +
+    box((ref.prospects ?? 0).toLocaleString('en-US'), 'prospects') +
+    box(best ? `${best.n}` : '—', best ? `best month (${best.k})` : 'best month');
+
+  const tab = (key, label, n) =>
+    `<button class="ref-tab ${state.refTab === key ? 'active' : ''}" data-reftab="${key}">${label} <b>${n.toLocaleString('en-US')}</b></button>`;
+
+  body.innerHTML = `<div class="ref-section">
+    <h3 class="section-title">Referrals</h3>
+    <div class="stat-grid">${stats}</div>
+    <div class="ref-charts">
+      <div class="ref-chart"><h4>Recruits over time (cumulative · monthly)</h4>${recruitsOverTimeSvg(recruitsRows)}</div>
+      <div class="ref-chart"><h4>Prospect → recruit conversion</h4>${conversionHtml(ref)}</div>
+    </div>
+    <div class="ref-list-controls">
+      <div class="ref-tabs">
+        ${tab('recruits', 'Recruits', legacyR)}
+        ${tab('prospects', 'Prospects', ref.prospects ?? 0)}
+      </div>
+    </div>
+    <table class="ref-table">
+      <thead><tr><th>Handle</th><th>Moniker</th><th>Enlisted</th></tr></thead>
+      <tbody>${refListRows()}</tbody>
+    </table>
+  </div>`;
 }
 
 // --- Buy-Backs ------------------------------------------------------------
@@ -568,7 +810,7 @@ function buybackUrl(b) {
 function buybackCardHtml(b) {
   const img = realImage(b.image);
   // A CCU resolves art from its target ship; a plain buy-back from its own name.
-  const resolve = img ? '' : (b.ccu && b.ccu.to ? b.ccu.to : b.name);
+  const resolve = img ? '' : b.ccu && b.ccu.to ? b.ccu.to : b.name;
   const thumb = img
     ? `<img class="thumb" loading="lazy" src="${OH.escapeHtml(img)}" alt="">`
     : `<div class="thumb placeholder">Buy-Back</div>`;
@@ -603,7 +845,7 @@ function presentBbKinds() {
 function bbChipHtml(kind) {
   const n = state.buybacks.filter((b) => b.kind === kind.key).length;
   return `<button class="chip k-${kind.key}" data-key="${kind.key}" aria-pressed="${state.bbShown.has(
-    kind.key
+    kind.key,
   )}">${OH.escapeHtml(kind.label)}<span class="n">${n}</span></button>`;
 }
 
@@ -613,14 +855,22 @@ function computeBuybacks() {
   if (q) list = list.filter((b) => `${b.name || ''} ${b.contains || ''}`.toLowerCase().includes(q));
   if (state.bbSort !== 'default') {
     const byName = (a, b) => (a.name || '').localeCompare(b.name || '');
-    const dt = (b) => { const t = Date.parse(b.date); return Number.isNaN(t) ? 0 : t; };
+    const dt = (b) => {
+      const t = Date.parse(b.date);
+      return Number.isNaN(t) ? 0 : t;
+    };
     list = list.slice().sort((a, b) => {
       switch (state.bbSort) {
-        case 'name-asc': return byName(a, b);
-        case 'name-desc': return byName(b, a);
-        case 'date-desc': return dt(b) - dt(a);
-        case 'date-asc': return dt(a) - dt(b);
-        default: return 0;
+        case 'name-asc':
+          return byName(a, b);
+        case 'name-desc':
+          return byName(b, a);
+        case 'date-desc':
+          return dt(b) - dt(a);
+        case 'date-asc':
+          return dt(a) - dt(b);
+        default:
+          return 0;
       }
     });
   }
@@ -761,19 +1011,25 @@ function positionPreview(x, y) {
 function onCardMouseMove(e) {
   const card = e.target.closest('.card');
   const img = card && card.dataset.image;
-  if (!img) { if (previewId) hidePreview(); return; }
+  if (!img) {
+    if (previewId) hidePreview();
+    return;
+  }
   if (card.dataset.id !== previewId && itemPreviewImg) {
     const id = card.dataset.id;
     previewId = id;
     clearTimeout(previewTimer);
-    itemPreviewImg.src = img;                 // instant: the already-cached thumbnail
+    itemPreviewImg.src = img; // instant: the already-cached thumbnail
     itemPreview.classList.add('show');
     const hi = hiRes(img);
-    if (hi !== img) {                         // upgrade to full-res after a brief dwell
+    if (hi !== img) {
+      // upgrade to full-res after a brief dwell
       previewTimer = setTimeout(() => {
         const probe = new Image();
-        probe.onload = () => { if (previewId === id) itemPreviewImg.src = hi; };
-        probe.src = hi;                        // 404 → onload never fires, thumbnail stays
+        probe.onload = () => {
+          if (previewId === id) itemPreviewImg.src = hi;
+        };
+        probe.src = hi; // 404 → onload never fires, thumbnail stays
       }, 180);
     }
   }
@@ -799,10 +1055,14 @@ function openItemModal(p) {
   const contents = p.contents || [];
   const contentsHtml = contents.length
     ? `<table class="modal-contents"><tbody>${contents
-        .map((c) => `<tr><td>${OH.escapeHtml(c.kind || '—')}</td><td>${OH.escapeHtml(c.label || '')}</td></tr>`)
+        .map(
+          (c) =>
+            `<tr><td>${OH.escapeHtml(c.kind || '—')}</td><td>${OH.escapeHtml(c.label || '')}</td></tr>`,
+        )
         .join('')}</tbody></table>`
     : '<p class="muted">No itemized contents.</p>';
-  const row = (k, v) => `<div class="mr"><span class="mr-k">${k}</span><span class="mr-v">${v}</span></div>`;
+  const row = (k, v) =>
+    `<div class="mr"><span class="mr-k">${k}</span><span class="mr-v">${v}</span></div>`;
   modalBody.innerHTML =
     img +
     `<div class="modal-info">
@@ -819,7 +1079,13 @@ function openItemModal(p) {
   // If the full-res "source" image 404s, fall back to the thumbnail.
   const mimg = modalBody.querySelector('img.modal-img');
   if (mimg && p.image) {
-    mimg.addEventListener('error', () => { if (!mimg.src.endsWith(p.image)) mimg.src = p.image; }, { once: true });
+    mimg.addEventListener(
+      'error',
+      () => {
+        if (!mimg.src.endsWith(p.image)) mimg.src = p.image;
+      },
+      { once: true },
+    );
   }
 }
 function closeItemModal() {
@@ -833,8 +1099,13 @@ function openBuybackModal(b) {
   const img = realImage(b.image)
     ? `<img class="modal-img" src="${OH.escapeHtml(hiRes(b.image))}" alt="">`
     : `<div class="modal-img placeholder">Buy-Back</div>`;
-  const url = b.href ? (b.href.startsWith('http') ? b.href : 'https://robertsspaceindustries.com' + b.href) : '';
-  const row = (k, v) => `<div class="mr"><span class="mr-k">${k}</span><span class="mr-v">${v}</span></div>`;
+  const url = b.href
+    ? b.href.startsWith('http')
+      ? b.href
+      : 'https://robertsspaceindustries.com' + b.href
+    : '';
+  const row = (k, v) =>
+    `<div class="mr"><span class="mr-k">${k}</span><span class="mr-v">${v}</span></div>`;
   modalBody.innerHTML =
     img +
     `<div class="modal-info">
@@ -849,7 +1120,13 @@ function openBuybackModal(b) {
   itemModal.hidden = false;
   const mimg = modalBody.querySelector('img.modal-img');
   if (mimg && b.image) {
-    mimg.addEventListener('error', () => { if (!mimg.src.endsWith(b.image)) mimg.src = b.image; }, { once: true });
+    mimg.addEventListener(
+      'error',
+      () => {
+        if (!mimg.src.endsWith(b.image)) mimg.src = b.image;
+      },
+      { once: true },
+    );
   }
 }
 resultsEl.addEventListener('click', (e) => {
@@ -868,8 +1145,42 @@ if (buybacksBodyEl) {
   });
 }
 modalClose.addEventListener('click', closeItemModal);
-itemModal.addEventListener('click', (e) => { if (e.target === itemModal) closeItemModal(); });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !itemModal.hidden) closeItemModal(); });
+itemModal.addEventListener('click', (e) => {
+  if (e.target === itemModal) closeItemModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !itemModal.hidden) closeItemModal();
+});
+
+// Referral list tab switching (Recruits / Prospects) inside Stats.
+const referralsBodyEl = $('#referrals-body');
+if (referralsBodyEl) {
+  referralsBodyEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-reftab]');
+    if (!btn) return;
+    state.refTab = btn.dataset.reftab;
+    renderReferrals();
+  });
+}
+
+// Copy referral link/code button (Citizen Card pill). Uses the clipboard API with
+// a brief "Copied" confirmation; falls back silently if clipboard is unavailable.
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.ref-copy');
+  if (!btn) return;
+  try {
+    await navigator.clipboard.writeText(btn.dataset.copy || '');
+    const prev = btn.textContent;
+    btn.textContent = 'Copied';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = prev;
+      btn.classList.remove('copied');
+    }, 1500);
+  } catch {
+    /* clipboard blocked — no-op */
+  }
+});
 
 scanBtn.addEventListener('click', async () => {
   scanBtn.disabled = true;
@@ -900,14 +1211,25 @@ scanBtn.addEventListener('click', async () => {
     state.bbShown = new Set(presentBbKinds().map((k) => k.key));
   }
 
+  // Referrals — separate source (GraphQL, not in OH.SOURCES). Independent, so a
+  // failure here doesn't affect the hangar/buy-back results above.
+  const r = await OH.getReferral((phase, n) => {
+    setStatus(`Scanning referrals — ${phase}… ${n}`);
+    setScanning(`referrals ${phase}… ${n}`);
+  });
+  if (r?.ok) state.referral = r.referral;
+
   const parts = [];
   if (h) parts.push(h.ok ? `${h.items.length} pledges` : `hangar: ${h.error}`);
   if (b) parts.push(b.ok ? `${b.items.length} buy-backs` : `buy-backs: ${b.error}`);
-  const anyErr = (h && !h.ok) || (b && !b.ok);
+  if (r)
+    parts.push(r.ok ? `${r.referral.legacy?.recruits ?? 0} recruits` : `referrals: ${r.error}`);
+  const anyErr = (h && !h.ok) || (b && !b.ok) || (r && !r.ok);
   const summary = parts.join(' · ');
   setStatus(summary, anyErr);
   setScanning(`${anyErr ? '⚠ ' : '✓ '}${summary}`, true);
   route();
+  renderAccount(); // refresh the Citizen Card pill with the new referral counts
   scanBtn.disabled = false;
 });
 
@@ -926,7 +1248,10 @@ logoutBtn.addEventListener('click', async () => {
 });
 
 clearBtn.addEventListener('click', async () => {
-  if (!confirm('Clear all scraped hangar data stored in this browser? You can re-scan at any time.')) return;
+  if (
+    !confirm('Clear all scraped hangar data stored in this browser? You can re-scan at any time.')
+  )
+    return;
   await OH.clearData();
   state.items = [];
   state.scannedAt = null;
@@ -935,7 +1260,9 @@ clearBtn.addEventListener('click', async () => {
   state.owner = null;
   state.shown = new Set();
   state.bbShown = new Set();
+  state.referral = null;
   setStatus('Local data cleared.');
+  renderAccount(); // clear the referral pill too
   route();
 });
 
@@ -952,7 +1279,10 @@ function setDataMsg(text, isError = false) {
 }
 
 const sourceItemCount = (sources) =>
-  Object.values(sources || {}).reduce((s, src) => s + (src.items?.length || 0), 0);
+  Object.values(sources || {}).reduce(
+    (s, src) => s + (Array.isArray(src.items) ? src.items.length : 0),
+    0,
+  );
 
 if (exportBtn) {
   exportBtn.addEventListener('click', async () => {
@@ -978,8 +1308,11 @@ if (importBtn && importFile) {
     const file = importFile.files?.[0];
     importFile.value = ''; // allow re-importing the same file later
     if (!file) return;
-    if ((state.items.length || state.scannedAt) &&
-        !confirm('Importing replaces your current data. Continue?')) return;
+    if (
+      (state.items.length || state.scannedAt) &&
+      !confirm('Importing replaces your current data. Continue?')
+    )
+      return;
     let obj;
     try {
       obj = JSON.parse(await file.text());
@@ -988,17 +1321,25 @@ if (importBtn && importFile) {
       return;
     }
     const res = await OH.importDB(obj);
-    if (!res.ok) { setDataMsg(res.error, true); return; }
+    if (!res.ok) {
+      setDataMsg(res.error, true);
+      return;
+    }
     const hangar = res.db.sources.hangar || { items: [], scannedAt: null };
     state.items = hangar.items || [];
     state.scannedAt = hangar.scannedAt || null;
     const bb = res.db.sources.buybacks || { items: [], scannedAt: null };
     state.buybacks = bb.items || [];
     state.buybacksScannedAt = bb.scannedAt || null;
+    const refSrc = res.db.sources.referral;
+    state.referral = refSrc && refSrc.items && !Array.isArray(refSrc.items) ? refSrc.items : null;
     state.owner = null; // imports aren't attributed to an account (see importDB)
     state.shown = new Set(presentKinds().map((k) => k.key));
     state.bbShown = new Set(presentBbKinds().map((k) => k.key));
-    setDataMsg(`Imported ${sourceItemCount(res.db.sources)} item(s) — open Inventory / Buy-Backs to view.`);
+    renderAccount(); // reflect imported referral in the pill
+    setDataMsg(
+      `Imported ${sourceItemCount(res.db.sources)} item(s) — open Inventory / Buy-Backs / Stats to view.`,
+    );
   });
 }
 
@@ -1022,6 +1363,7 @@ async function reconcileAccount() {
     state.owner = null;
     state.shown = new Set();
     state.bbShown = new Set();
+    state.referral = null;
     return `Cleared ${prev}'s hangar — a different account is signed in. Scan to load this account's hangar.`;
   }
   return '';
@@ -1054,6 +1396,9 @@ document.addEventListener('visibilitychange', async () => {
   const buybacks = db.sources.buybacks || { items: [], scannedAt: null };
   state.buybacks = buybacks.items || [];
   state.buybacksScannedAt = buybacks.scannedAt || null;
+  const referral = db.sources.referral;
+  state.referral =
+    referral && referral.items && !Array.isArray(referral.items) ? referral.items : null;
   state.owner = db.owner || null;
 
   const notice = await reconcileAccount();
@@ -1064,4 +1409,3 @@ document.addEventListener('visibilitychange', async () => {
   renderFooter();
   renderSupporters();
 })();
-

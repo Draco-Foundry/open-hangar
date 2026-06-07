@@ -14,13 +14,14 @@ genuinely-empty list (RSI's "No pledges available") from a JS-only shell
 (`requiresRender`), so a future RSI change to a client-rendered page is reported
 rather than silently empty.
 
-If RSI ever *does* move this page to a JS-only render (the scan would then report
+If RSI ever _does_ move this page to a JS-only render (the scan would then report
 "no server-rendered content"), the fallback is a content script on a real rendered
 tab — see the original notes below.
 
 <details><summary>Historical investigation (superseded — kept for context)</summary>
 
 ### What we learned (so the discovery isn't repeated)
+
 - The buyback page is **not** server-rendered like the hangar. Fetching the URL
   returns an empty SPA shell — `0` of `.js-pledge-id` / `.row` / `.kind`. So the
   HTML-scrape approach used for the hangar (parser.js) does **not** work here.
@@ -35,15 +36,18 @@ tab — see the original notes below.
   `FeatureToggle` — the actual buyback-list query was **not yet captured**.
 
 ### Next step: capture the buyback query
+
 Use DevTools → Network with **Preserve log** ON, navigate into the buy-back page,
 then use the Network **Search** (magnifier / Esc → Search tab) to search all
 response bodies for a **ship name you know is in your buybacks**. That pinpoints
 the exact request regardless of operation name. Record:
+
 - operationName, full `query` string, and `variables` (esp. pagination),
 - response shape (fields for ship name, price/store-credit, id, totalCount/pageInfo),
 - whether it needs an `x-rsi-token` (or similar) request header.
 
 ### Implementation sketch (once the query is known)
+
 - Add a GraphQL source in `lib.js`: `POST /graphql` with `{ credentials: 'include' }`,
   body `{ operationName, query, variables }`, paginated via `variables`.
 - If it needs an anti-CSRF token header, read it via `getCsrfToken()` (already in
@@ -61,10 +65,12 @@ the exact request regardless of operation name. Record:
 </details>
 
 ### Buyback tokens on the Citizen Card (planned)
+
 Surface the number of **buy-back tokens** available — and the **next-available
 date** — on the front-page Citizen Card, next to the balances. Tokens cap how many
 melted pledges you can re-acquire and replenish on a schedule, so both the count
 and the reset date are useful at a glance.
+
 - **Source (preferred):** the buy-back GraphQL response likely carries the token
   count and/or a reset timestamp — capture it alongside the buyback list (see
   above) so this comes "for free" with that pipeline.
@@ -80,6 +86,7 @@ Today the scan persists across the extension's internal views (single page) but
 dies if the dashboard tab is closed — it runs in the page, not the background
 service worker. Moving it to survive a tab close is **not** a quick change; do the
 research before touching it:
+
 - **Why it's in the page:** MV3 service workers have no `DOMParser`, which
   `parser.js` needs. Confirm whether an **offscreen document**
   (`chrome.offscreen`, reason `DOM_PARSER`) is the right host — it gives a DOM in
@@ -99,8 +106,9 @@ research before touching it:
 Resolved. Two sources now, matched locally (`nameScore`) so RSI shorthands work
 ("Genesis" → "Genesis Starliner", "PTV Buggy" → "PTV", "C8R Pisces" → "C8R Pisces
 Rescue", "600i Explorer" → "600i"):
+
 - **Primary: RSI ship-matrix** (`/ship-matrix/index`) — one cached fetch returns
-  ALL ~250 ships *with* images, including in-concept ships the wiki lacks (Vulcan,
+  ALL ~250 ships _with_ images, including in-concept ships the wiki lacks (Vulcan,
   Genesis, Odin). We cache a slim {name → image} (~25KB) for 30 days.
 - **Fallback: star-citizen.wiki** — for anything the ship-matrix misses (catalog
   match → per-slug image fetch). Also fixed its catalog pagination bug (`limit=600`
@@ -118,6 +126,7 @@ Redesign the Inventory and Buy-Backs views together so they share one presentati
 layer. The image, hover-preview, and click-to-modal systems are already shared
 (`enhanceCardImages` / `onCardMouseMove` / the detail modal); what's left is the
 **layout** itself. Goals:
+
 - One card/grid component used by both views (Buy-Backs currently has no
   Gallery / Compact / List toggle — fold it into the shared layout rather than
   bolting the toggle on now).
@@ -144,7 +153,7 @@ Two layers of fix:
    `skin`, not generic `addon`. This alone fixes most reward paints/skins. Then add
    the new kinds to `OH.KINDS` (+ chip colours) and the stats breakdown.
 2. **External reference for untagged items.** Some reward items have no `.kind` at
-   all — only their *name* identifies them. Match the name against
+   all — only their _name_ identifies them. Match the name against
    star-citizen.wiki / starcitizen.tools (cached) to assign a type. See ROADMAP
    "item-type enrichment". This is the only way to know a bare "Luminalia …" name
    is a paint when RSI tags nothing.
@@ -169,7 +178,62 @@ same fetch as the UEE record — `parseMainOrg` reads the `.main-org` block's
 Private affiliations (`visibility-R` / REDACTED) and no-org members render
 nothing. Long org names wrap (the name column has no nowrap).
 
+## Referrals & prospects — ✅ DONE (GraphQL, not JS-render-gated after all)
+
+Referral code, recruits, and prospects are scraped and shown: a pill on the Citizen
+Card (recruit count + code + copy button) and a **Referrals section in the Stats
+view** (summary tiles, an inline-SVG "recruits over time" chart, a prospect→recruit
+conversion chart, and a Recruits/Prospects list with per-row links to each citizen).
+
+**What we found (verified live against a real account, May 2026):**
+
+- **Two pages, both behind login:** current `…/en/referral` (campaignId `2`) and
+  legacy `…/en/referral-legacy` (campaignId `1`, pre-cutoff, different rewards).
+- The pages are JS-rendered, BUT — unlike the early buy-backs fear — the **data API
+  is plainly replayable**: `POST /graphql`, operation `GetReferralRecruitsList`,
+  with `credentials:'include'` and **no CSRF token** (same trust model as the hangar
+  fetch). Query is sent inline (no persisted-query hash). Pagination is `page`/`limit`
+  (limit 50 verified; pages don't overlap). So no content-script/offscreen hack was
+  needed — it's a normal cookie'd fetch.
+- Each row: `{ id, displayName (moniker), nickname (handle), avatar, enlistedOn,
+convertedOn }`. `converted:true` → recruits; `false` → the full prospect list.
+- **Prospect pool is shared** across both campaigns; only **recruit** counts differ
+  (legacy = all-time total, current = post-cutoff subset). We fetch legacy recruits
+  as the superset and tag each row `current`/`legacy` by id-membership in the current
+  set; prospects fetched once.
+- **Referral code/url come for FREE:** the account dashboard HTML embeds a separate
+  `{ referralCode, referralUrl, referralUrlCopy, referrerReferralCode }` blob (NOT
+  inside the nickname object), so `getAccount` parses it in the same fetch — no extra
+  request. `referralUrlCopy` is the clean enlist URL.
+
+**Implementation:**
+
+- `lib.js`: `extractReferral(html)` (+ refactored shared `extractObjectAround`) feeds
+  `getAccount().referral = { code, url, referrerCode }`. `OH.getReferral()` does the
+  GraphQL walk and persists a `referral` source:
+  `{ code, url, current:{recruits}, legacy:{recruits}, prospects, recruitsList:[{id,
+handle, moniker, avatar, enlistedOn, convertedOn, campaign}], prospectsList:[…] }`.
+  Account cache bumped to v6. `importDB` accepts object-shaped sources (referral)
+  alongside array sources. The referral **code/url are stripped on export**
+  (`sanitizeSourcesForExport`) — kept in the runtime but never written to export
+  files (personal credential); counts + recruit/prospect lists still export.
+- `dashboard.js`: Citizen Card pill (`renderReferralPill`), Stats section
+  (`renderReferrals`) with hand-built inline **SVG** charts (no chart lib / no
+  network — honours CSP + zero-deps), Recruits/Prospects tabs, scan wiring, and
+  load/clear/import/reconcile all updated to carry `state.referral`.
+
+**Privacy:** recruit/prospect rows are _other people's_ handles + enlist dates tied
+to your account — treated like the rest of the scraped DB (local only, in export,
+never auto-shared). Keep the "don't redistribute other people's data" line in mind
+for any future sharing/API.
+
+**Not done / later:** reward-tier rails + the public Weekly/Monthly/All-time
+leaderboard on the page (out of scope for v1); "current streak" tile and
+enlist-year breakdown (the chart foundation is there). Display defaults to ALL_TIME;
+the API's `display` enum (other ranges) and `sortBy` aren't surfaced in the UI yet.
+
 ## Consumption layer (deferred — parked by design)
+
 How external sites read the database (whitelisted `externally_connectable` API,
 JSON export/import, etc.) — to be decided once the database (hangar + buybacks) is
 complete. Keep it local-first/auditable to fit open-source + store distribution.

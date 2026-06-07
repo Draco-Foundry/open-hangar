@@ -10,7 +10,7 @@ built-in viewer so non-developers can browse their hangar — but the point is
 **reusable data you can build on**.
 
 > ⚠️ Unofficial, fan-made tool. Not affiliated with Cloud Imperium Games / RSI.
-> It reads only *your own* account, locally, using your existing browser session.
+> It reads only _your own_ account, locally, using your existing browser session.
 
 ## Contents
 
@@ -45,7 +45,9 @@ step for the next developer.
   structured records — **working today**.
 - **Scrapes your buy-backs** (melted pledges you can re-acquire) — working; same
   server-rendered HTML pipeline as the hangar.
-- **Reads account identity + balances** (handle, Store Credit, UEC, REC) — working.
+- **Reads account identity + balances** (handle, org, rank, Store Credit, UEC, REC) — working.
+- **Scrapes your referrals** (code + recruits/prospects, current & legacy programs,
+  with charts) via RSI's GraphQL API — working.
 - **Classifies** each pledge (`ship` / `ccu` / `addon` / `coupon`) and parses CCU
   chains (`from → to`).
 - **Stores** everything locally in a versioned database; nothing leaves your browser.
@@ -70,7 +72,7 @@ Sources live in a registry (`OH.SOURCES`) and persist as one versioned object:
 `{ schemaVersion, sources: { hangar: { items, scannedAt } }, owner }`.
 
 The **JSON export** wraps that in provenance and a flattened identity block,
-ordered *who → what they own* so it drops straight into a backend table:
+ordered _who → what they own_ so it drops straight into a backend table:
 
 ```js
 { app, appVersion, exportedAt, schemaVersion,   // provenance
@@ -81,7 +83,9 @@ ordered *who → what they own* so it drops straight into a backend table:
     subscriber, concierge,
     balances: { storeCredit, uec, rec },         // storeCredit.value is in cents
     capturedAt },
-  sources: { hangar: {…}, buybacks: {…} } }       // holdings
+  sources: { hangar: {…}, buybacks: {…},          // holdings
+    referral: { items: { current, legacy, prospects,
+                         recruitsList, prospectsList } } } }  // code/url NOT exported
 ```
 
 ## How it works
@@ -120,7 +124,7 @@ sort) and **Stats**. Re-scan any time to refresh. The Home page also has
 
 ## For developers
 
-Open Hangar is meant to be the data layer for *your* project. The contract is the
+Open Hangar is meant to be the data layer for _your_ project. The contract is the
 local storage shape above, and a **JSON export/import** (Developers page) lets you
 pull the whole database out — including account identity, org, rank, and balances —
 or restore it, as a single self-describing file (import restores the holdings; the
@@ -147,7 +151,7 @@ changes browser state, and the reason the extension requests the `cookies`
 permission alongside `storage`).
 
 **Multiple accounts / shared browsers:** scraped data is tied to the RSI account
-it was scanned from. If you open Open Hangar while signed in to a *different*
+it was scanned from. If you open Open Hangar while signed in to a _different_
 account, it clears the previous account's hangar and prompts a fresh scan — so
 accounts never mix. While you're signed out, your last scan stays visible
 (labelled with whose it is) so you can still browse offline.
