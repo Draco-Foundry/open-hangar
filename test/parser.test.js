@@ -70,7 +70,7 @@ test('parsePledges returns [] for empty / non-pledge input', () => {
 
 const buybackFixture = fs.readFileSync(
   path.join(__dirname, 'fixtures', 'buybacks.sample.html'),
-  'utf8'
+  'utf8',
 );
 const buybacks = OpenHangar.parseBuybacks(buybackFixture);
 
@@ -84,7 +84,7 @@ test('parses buy-back <article> cards (name, date, items from <dd>, id/href from
   assert.match(a.image, /store_small\.jpg$/);
   assert.equal(a.href, '/account/buy-back-pledges/reclaim/987654');
   assert.equal(a.toShipId, '42');
-  assert.equal(a.kind, 'buyback');
+  assert.equal(a.kind, 'ship'); // a melted ship classifies as 'ship' (classifyBuyback default)
 });
 
 test('buy-back id falls back to the reclaim URL when data-pledgeid is absent', () => {

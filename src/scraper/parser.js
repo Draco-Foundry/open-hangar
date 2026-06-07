@@ -80,9 +80,7 @@
   ns.normalizePledge = function normalizePledge(raw) {
     const name = (raw.name ?? '').trim();
     const contents = Array.isArray(raw.contents) ? raw.contents : [];
-    const containsShip = contents.some(
-      (c) => (c.kind || '').trim().toLowerCase() === 'ship'
-    );
+    const containsShip = contents.some((c) => (c.kind || '').trim().toLowerCase() === 'ship');
 
     const ccu = ns.detectCCU(name);
     const isCCU = ccu != null;
@@ -92,29 +90,30 @@
     // either explicitly name-prefixed, or a card whose only contents are
     // non-ship items (a standalone paint, skin, decoration, etc.).
     const isAddOn =
-      !isCCU &&
-      !isCoupon &&
-      (ADDON_NAME_RE.test(name) || (!containsShip && contents.length > 0));
+      !isCCU && !isCoupon && (ADDON_NAME_RE.test(name) || (!containsShip && contents.length > 0));
 
     // Paint/skin/livery — a finer add-on type. Detect from the name OR from a
     // contained item's kind (RSI tags some as kind "Paint"/"Skin"). Best-effort;
     // untagged reward paints still need the external reference (ROADMAP).
-    const contentIsPaint = contents.some((c) => PAINT_NAME_RE.test(`${c.kind || ''} ${c.label || ''}`));
-    const isPaint = !isCCU && !containsShip && !isCoupon && (PAINT_NAME_RE.test(name) || contentIsPaint);
+    const contentIsPaint = contents.some((c) =>
+      PAINT_NAME_RE.test(`${c.kind || ''} ${c.label || ''}`),
+    );
+    const isPaint =
+      !isCCU && !containsShip && !isCoupon && (PAINT_NAME_RE.test(name) || contentIsPaint);
 
     // Backward-compatible display category (the dashboard renders `kind`). Derived,
     // best-effort — the structured fields above are the source of truth.
     const kind = isCCU
       ? 'ccu'
       : containsShip
-      ? 'ship'
-      : isCoupon
-      ? 'coupon'
-      : isPaint
-      ? 'paint'
-      : isAddOn
-      ? 'addon'
-      : 'other';
+        ? 'ship'
+        : isCoupon
+          ? 'coupon'
+          : isPaint
+            ? 'paint'
+            : isAddOn
+              ? 'addon'
+              : 'other';
 
     return {
       id: raw.id ?? null,
@@ -142,11 +141,7 @@
   // grab a parent `.row` that wraps several cards. Falls back progressively.
   function resolveCard(anchor) {
     for (let el = anchor; el && el.nodeType === 1; el = el.parentElement) {
-      if (
-        el.classList &&
-        el.classList.contains('row') &&
-        el.querySelector('.js-pledge-name')
-      ) {
+      if (el.classList && el.classList.contains('row') && el.querySelector('.js-pledge-name')) {
         return el;
       }
     }
@@ -195,7 +190,12 @@
   // with art, then any image on the card. CCUs/coupons often have none.
   function pickImage(card, contents) {
     const ship = contents.find((c) => /^ship$/i.test(c.kind) && c.image);
-    return ship?.image || contents.find((c) => c.image)?.image || bgUrl(card.querySelector('.image')) || null;
+    return (
+      ship?.image ||
+      contents.find((c) => c.image)?.image ||
+      bgUrl(card.querySelector('.image')) ||
+      null
+    );
   }
 
   // Read every pledge card under `root` (a Document or Element).
@@ -217,7 +217,10 @@
       // from the value string ("$35.00 USD" → USD), else null.
       const rawCurrency = val('js-pledge-currency');
       let currency = /^[A-Z]{3}$/.test(rawCurrency || '') ? rawCurrency : null;
-      if (!currency) { const m = (rawValue || '').match(/\b([A-Z]{3})\b/); currency = m ? m[1] : null; }
+      if (!currency) {
+        const m = (rawValue || '').match(/\b([A-Z]{3})\b/);
+        currency = m ? m[1] : null;
+      }
       const contents = readContents(card);
 
       pledges.push(
@@ -229,7 +232,7 @@
           contents,
           image: pickImage(card, contents),
           raw: { rawValue },
-        })
+        }),
       );
     }
 
@@ -270,10 +273,17 @@
       if (!name) continue; // every real buy-back card has a name
 
       const dds = node.querySelectorAll('dd');
-      let date = '', contains = '';
-      if (dds.length >= 4) { date = clean(dds[0].textContent); contains = clean(dds[2].textContent); }
-      else if (dds.length >= 2) { date = clean(dds[0].textContent); contains = clean(dds[1].textContent); }
-      else if (dds.length === 1) { date = clean(dds[0].textContent); }
+      let date = '',
+        contains = '';
+      if (dds.length >= 4) {
+        date = clean(dds[0].textContent);
+        contains = clean(dds[2].textContent);
+      } else if (dds.length >= 2) {
+        date = clean(dds[0].textContent);
+        contains = clean(dds[1].textContent);
+      } else if (dds.length === 1) {
+        date = clean(dds[0].textContent);
+      }
 
       // The reclaim button carries the ids and the buy-back href.
       const btn = node.querySelector(".holosmallbtn, a[href*='reclaim'], a[href*='buy-back']");
@@ -289,19 +299,35 @@
       }
 
       const img = node.querySelector('img');
-      const image = img?.getAttribute('src') || bgUrl(node.querySelector('[style*="background"]')) || null;
+      const image =
+        img?.getAttribute('src') || bgUrl(node.querySelector('[style*="background"]')) || null;
 
       // Best-effort buy-back price (store-credit cost). RSI's exact markup here is
       // unconfirmed, so we read a price-labelled element if one exists; otherwise
       // leave it blank. Refine the selector once a real capture is available.
-      const price = clean(node.querySelector('.price, [class*="price"], [class*="cost"]')?.textContent) || '';
+      const price =
+        clean(node.querySelector('.price, [class*="price"], [class*="cost"]')?.textContent) || '';
 
       // A buy-back can itself be a CCU ("Upgrade - X to Y"); detect it so the UI
       // can show the from→to flow and resolve art from the *target* ship.
       const ccu = ns.detectCCU(name);
       const kind = ns.classifyBuyback(name, contains); // ship|ccu|paint|addon|coupon
 
-      out.push({ id: String(id), name, image, date, contains, href, price, isCCU: !!ccu, ccu, fromShipId, toShipId, toSkuId, kind });
+      out.push({
+        id: String(id),
+        name,
+        image,
+        date,
+        contains,
+        href,
+        price,
+        isCCU: !!ccu,
+        ccu,
+        fromShipId,
+        toShipId,
+        toSkuId,
+        kind,
+      });
     }
     return out;
   };

@@ -12,7 +12,7 @@ script. The extension's `host_permissions` for `robertsspaceindustries.com` let
 cookie, so no RSI tab needs to be open — only an active RSI login in the profile.
 (The scan can't run in `background.js`: MV3 service workers have no `DOMParser`,
 which `parser.js` needs.) The one fragility: if RSI ever marks its session cookie
-`SameSite=Strict` *and* Chrome withholds it from extension requests, the fetch
+`SameSite=Strict` _and_ Chrome withholds it from extension requests, the fetch
 comes back logged-out. The fallback would be to scan via a hidden RSI tab
 (`chrome.tabs.create` → content script) — not implemented while the direct fetch
 works.

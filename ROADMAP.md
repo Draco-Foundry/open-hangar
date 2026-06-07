@@ -1,6 +1,6 @@
 # Roadmap — toward an all-in-one RSI hangar extractor
 
-**Vision:** an open-source, local-first browser extension that scrapes *all* of a
+**Vision:** an open-source, local-first browser extension that scrapes _all_ of a
 user's own RSI / Star Citizen account data, organizes it into one clean, portable
 database, and (eventually) lets the user share that database with other tools/sites.
 
@@ -38,20 +38,21 @@ A full-DB **JSON export/import** that emits the whole `sources` object is done
 
 ## Data surface
 
-| Source | Page / endpoint | Served as | Status | Notes |
-|---|---|---|---|---|
-| **Hangar / pledges** | `/account/pledges` | HTML | ✅ Done | ships, CCUs, add-ons, coupons; thumbnails |
-| **Buy-backs** | `/account/buy-back-pledges` | HTML | ✅ Done | server-rendered `<article>` cards — same HTML pipeline as the hangar (no GraphQL needed) |
-| **Store credit / funds** | account header / GraphQL | TBD | 🔜 | small but useful (spendable balance) |
-| **CCU chain / optimizer** | derived from pledges + ship prices | n/a | 🔜 | analysis layer; uses external ship-matrix prices (cached) |
-| **Org membership** | `/account/organization` (or community) | TBD | ❓ | optional |
-| **Profile** (handle, moniker, citizen record, enlist date) | profile page | HTML/GraphQL | ❓ | low-sensitivity public-ish data |
-| **Wallet / transactions / billing** | `/account/...` | TBD | ⚠️ Opt-in only | **PII / financial** — see privacy note |
+| Source                                                     | Page / endpoint                        | Served as    | Status         | Notes                                                                                    |
+| ---------------------------------------------------------- | -------------------------------------- | ------------ | -------------- | ---------------------------------------------------------------------------------------- |
+| **Hangar / pledges**                                       | `/account/pledges`                     | HTML         | ✅ Done        | ships, CCUs, add-ons, coupons; thumbnails                                                |
+| **Buy-backs**                                              | `/account/buy-back-pledges`            | HTML         | ✅ Done        | server-rendered `<article>` cards — same HTML pipeline as the hangar (no GraphQL needed) |
+| **Store credit / funds**                                   | account header / GraphQL               | TBD          | 🔜             | small but useful (spendable balance)                                                     |
+| **CCU chain / optimizer**                                  | derived from pledges + ship prices     | n/a          | 🔜             | analysis layer; uses external ship-matrix prices (cached)                                |
+| **Org membership**                                         | `/account/organization` (or community) | TBD          | ❓             | optional                                                                                 |
+| **Profile** (handle, moniker, citizen record, enlist date) | profile page                           | HTML/GraphQL | ❓             | low-sensitivity public-ish data                                                          |
+| **Wallet / transactions / billing**                        | `/account/...`                         | TBD          | ⚠️ Opt-in only | **PII / financial** — see privacy note                                                   |
 
 ## Privacy & scope (important for a shareable tool)
 
-Because the end goal is feeding this data to *other sites*, be deliberate about
+Because the end goal is feeding this data to _other sites_, be deliberate about
 what's collected:
+
 - **Default scope = fleet data** (ships, CCUs, add-ons, buybacks, store credit).
 - **Financial/PII data** (transaction history, billing, email) stays **opt-in and
   off by default**, and ideally is excluded from anything shared externally.
@@ -72,7 +73,7 @@ what's collected:
    - **Item-type enrichment:** classify add-ons precisely (paint vs decoration vs
      armor vs gear, etc.) by matching item names against star-citizen.wiki /
      starcitizen.tools, cached locally. Today's classifier can't tell a reward
-     *paint* (e.g. "Luminalia 2953 Day 7") from a generic add-on because RSI
+     _paint_ (e.g. "Luminalia 2953 Day 7") from a generic add-on because RSI
      doesn't tag it — only an external reference can. Refs:
      starcitizen.tools/Luminalia, starcitizen.tools/Freelancer_series/Paints.
 3. ~~**Buy-backs**~~ — ✅ done. Turned out to be **server-rendered HTML** (`<article>`
