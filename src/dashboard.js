@@ -251,7 +251,7 @@ const state = {
   buybacks: [], // buy-back pledges (separate source)
   buybacksScannedAt: null,
   bbQuery: '',
-  bbSort: 'default',
+  bbSort: 'date-desc', // default to newest buy-backs first
   bbShown: new Set(), // buy-back kind filter
   owner: null, // { nickname, displayname } the stored data was scanned from
   shown: new Set(), // inventory kind filter
@@ -727,7 +727,10 @@ function cardHtml(p) {
     p.isCCU && p.ccu
       ? `${OH.escapeHtml(p.ccu.from)} <span class="ccu-flow">→</span> ${OH.escapeHtml(p.ccu.to)}`
       : OH.escapeHtml(p.name || '—');
-  let contentsLine = '';
+  // Always emit the contents cell (empty when there's nothing) so the List view's
+  // fixed column grid stays aligned across rows — items with vs. without contents
+  // must occupy the same number of grid cells. Gallery/compact hide empties via CSS.
+  let contentsLine = '<div class="card-contents"></div>';
   if (!p.isCCU && contents.length) {
     const head = contents.slice(0, 4).join(' · ');
     const more = contents.length > 4 ? ` +${contents.length - 4}` : '';
@@ -1110,8 +1113,13 @@ function refListRows() {
   return list
     .map((r) => {
       const handle = r.handle || r.moniker || '—';
-      const link = r.handle
-        ? `<a href="https://robertsspaceindustries.com/en/citizens/${encodeURIComponent(r.handle)}" target="_blank" rel="noopener">${OH.escapeHtml(handle)}</a>`
+      // Link the handle to the citizen's RSI dossier, but styled as plain text
+      // (not a blue hyperlink) — see .ref-citizen-link.
+      const citizenUrl = r.handle
+        ? `https://robertsspaceindustries.com/en/citizens/${encodeURIComponent(r.handle)}`
+        : null;
+      const link = citizenUrl
+        ? `<a class="ref-citizen-link" href="${citizenUrl}" target="_blank" rel="noopener">${OH.escapeHtml(handle)}</a>`
         : OH.escapeHtml(handle);
       // Only flag legacy-ladder recruits; "current" is the default, so no badge.
       const badge =

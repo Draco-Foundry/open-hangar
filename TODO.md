@@ -1,5 +1,20 @@
 # TODO / Later
 
+## Ideas parked for a decision (not yet committed to a direction)
+
+- **Hover-image behavior on cards.** The mouseover preview currently shows the
+  full-res image, which takes a beat to load. Idea: instead of a visible hover
+  popup, use the hover (or even render-time) purely to _prefetch_ the high-res
+  image silently, so that when the user **clicks** the item the detail modal already
+  has a crisp image ready. Open question: keep the hover preview at all, or replace
+  it with silent prefetch? (Affects `onCardMouseMove` / `enhanceCardImages` / the
+  modal in `dashboard.js`.) Undecided — revisit.
+- **Show the user's dossier bio on the front page.** The public citizen dossier
+  (`/en/citizens/<handle>`) has a free-text bio we could scrape (we already fetch
+  that page for the UEE record + org). Open question: where does it fit on the
+  Citizen Card without crowding it? Maybe a collapsible line under the org, or a
+  hover/tooltip. Needs a layout decision before building.
+
 ## Buybacks — ✅ SOLVED (server-rendered HTML, not GraphQL)
 
 The earlier conclusion below was **wrong**: buy-backs are NOT GraphQL-only. A full

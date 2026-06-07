@@ -929,12 +929,16 @@
       .ref-table tr:hover td {
         background: rgba(255, 255, 255, 0.03);
       }
-      .ref-table .r-handle a {
-        color: #58a6ff;
+      /* Handle links to the RSI dossier but reads as plain text — only a subtle
+         underline on hover hints it's clickable. */
+      .ref-citizen-link {
+        color: inherit;
         text-decoration: none;
+        cursor: pointer;
       }
-      .ref-table .r-handle a:hover {
+      .ref-citizen-link:hover {
         text-decoration: underline;
+        text-decoration-color: var(--muted);
       }
       .ref-badge {
         font-size: 10px;
@@ -1655,6 +1659,11 @@
         font-size: 11px;
         line-height: 1.35;
       }
+      /* An always-emitted but empty contents cell (keeps List columns aligned) adds
+         no visual gap in gallery/compact — only List needs it to occupy a grid cell. */
+      .grid:not(.list) .card-contents:empty {
+        display: none;
+      }
       .card-foot {
         margin-top: auto;
         display: flex;
@@ -2032,11 +2041,11 @@
         <div class="controls" id="bb-controls" hidden>
           <input id="bb-search" type="search" placeholder="Search buy-backs…" autocomplete="off" />
           <select id="bb-sort">
-            <option value="default">Sort: Scan order</option>
-            <option value="name-asc">Name: A → Z</option>
-            <option value="name-desc">Name: Z → A</option>
             <option value="date-desc">Date: newest first</option>
             <option value="date-asc">Date: oldest first</option>
+            <option value="name-asc">Name: A → Z</option>
+            <option value="name-desc">Name: Z → A</option>
+            <option value="default">Scan order</option>
           </select>
         </div>
         <div class="chips" id="bb-chips"></div>

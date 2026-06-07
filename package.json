@@ -1,6 +1,6 @@
 {
   "name": "open-hangar",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "description": "Browser extension that reads your own Star Citizen / RSI account data into a clean, reusable local database you can build on.",
   "license": "MIT",
