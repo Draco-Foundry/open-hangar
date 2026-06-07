@@ -110,12 +110,100 @@ const REFERRAL_LADDER_LEGACY = [
 ];
 
 // Time-limited "special incentive" events: a recruit who CONVERTS (buys a game
-// package, spending the threshold) inside one of these windows earns a bonus
-// reward for both you and them. STATIC reference data from
-// starcitizen.tools/Referral_program (May 2026) — best-effort and will go stale as
-// CIG adds events; keep updated. Dates are inclusive [start, end]. We match a
-// recruit's convertedOn against these to surface "you earned this event reward".
+// package, spending the threshold) inside one of these windows earns a bonus reward.
+// `reward` is what the REFERRER ("You") earns. STATIC reference data, complete list
+// from starcitizen.tools/Referral_program (verified June 2026). Dates inclusive
+// [start, end]. Will go stale as CIG adds ~monthly events — see TODO for the planned
+// auto-refresh; until then, append new events here.
 const REFERRAL_EVENTS = [
+  {
+    start: '2019-10-28',
+    end: '2019-11-05',
+    name: 'Alpha 3.7.0 Free Fly',
+    reward: 'Kruger P-52 Merlin',
+  },
+  { start: '2020-04-29', end: '2020-05-11', name: 'Alpha 3.9.0', reward: 'Greycat PTV (LTI)' },
+  {
+    start: '2020-09-09',
+    end: '2020-09-24',
+    name: 'Ship Showdown 2020',
+    reward: 'Kruger P-52 Merlin (LTI)',
+  },
+  { start: '2020-12-17', end: '2021-01-11', name: 'Alpha 3.12.0', reward: 'Drake Dragonfly (LTI)' },
+  { start: '2021-04-22', end: '2021-05-17', name: 'Alpha 3.13.0', reward: 'RSI Aurora ES (LTI)' },
+  {
+    start: '2021-08-06',
+    end: '2021-08-31',
+    name: 'Alpha 3.14.0',
+    reward: 'Drake Dragonfly (LTI, Coalfire paint)',
+  },
+  {
+    start: '2021-11-01',
+    end: '2021-11-30',
+    name: 'Alpha 3.15.0 Fall',
+    reward: 'Argo MPUV-1C (LTI)',
+  },
+  {
+    start: '2022-02-17',
+    end: '2022-02-28',
+    name: 'Alpha 3.16.1 Free Fly',
+    reward: 'Artimex Lodestone Armor + Gemini A03 Sniper Rifle',
+  },
+  {
+    start: '2022-09-08',
+    end: '2022-09-18',
+    name: 'Ship Showdown 2022',
+    reward: 'Consolidated Outland HoverQuad (LTI)',
+  },
+  { start: '2022-12-08', end: '2023-01-09', name: 'Luminalia 2952', reward: 'Argo MPUV-1C (LTI)' },
+  {
+    start: '2023-04-13',
+    end: '2023-05-02',
+    name: 'Alpha 3.18.0 Free Fly',
+    reward: 'Kruger P-52 Merlin (LTI)',
+  },
+  {
+    start: '2023-07-06',
+    end: '2023-07-31',
+    name: 'Foundation Festival',
+    reward: 'Greycat STV (LTI, Electric Green paint)',
+  },
+  {
+    start: '2023-10-19',
+    end: '2023-10-30',
+    name: 'Alpha 3.21.0',
+    reward: 'HoverQuad (LTI, Copperhead paint)',
+  },
+  {
+    start: '2023-12-11',
+    end: '2024-01-08',
+    name: 'Luminalia 2953',
+    reward: 'CCC Aves Armor Set + gear bundle',
+  },
+  {
+    start: '2024-02-08',
+    end: '2024-02-26',
+    name: 'Lunar New Year 2024',
+    reward: 'Drake Dragonfly Black + Red Alert gear',
+  },
+  {
+    start: '2024-04-12',
+    end: '2024-05-02',
+    name: 'Overdrive Initiative',
+    reward: 'Kruger P-52 Merlin (LTI)',
+  },
+  {
+    start: '2024-07-12',
+    end: '2024-07-31',
+    name: 'Foundation Festival 2024',
+    reward: 'Aopoa Nox (LTI)',
+  },
+  {
+    start: '2024-10-17',
+    end: '2024-10-31',
+    name: 'CitizenCon 2954',
+    reward: 'HoverQuad (LTI, Copperhead paint)',
+  },
   { start: '2024-12-10', end: '2025-01-06', name: 'Luminalia 2954', reward: 'Mirai Pulse (LTI)' },
   {
     start: '2025-01-28',
@@ -139,7 +227,7 @@ const REFERRAL_EVENTS = [
     start: '2026-02-11',
     end: '2026-02-23',
     name: 'Coramor 2956',
-    reward: 'HoverQuad (Lovestruck paint, LTI)',
+    reward: 'HoverQuad (LTI, Lovestruck paint)',
   },
 ];
 
@@ -470,9 +558,10 @@ function renderReferralPill(a) {
   const url = ref?.url || a?.referral?.url || null;
   const countPart =
     recruits != null
-      ? `<span class="bal-lbl">Referrals</span> <b>${recruits.toLocaleString('en-US')}</b> recruits`
+      ? `<span class="bal-lbl">Referrals</span> <b>${recruits.toLocaleString('en-US')}</b>`
       : `<span class="bal-lbl">Referral code</span>`;
   el.innerHTML = `<span class="ref-pill">${countPart}
+      <span class="ref-pill-sep"></span>
       <span class="ref-code">${OH.escapeHtml(code)}</span>
       <button class="ref-copy" data-copy="${OH.escapeHtml(url || code)}" title="Copy referral link">Copy</button>
     </span>`;
@@ -1143,25 +1232,13 @@ function renderReferrals() {
     }
   }
 
-  // Prospect funnel: pending (never converted) + oldest pending age.
+  // Prospect funnel: pending = prospects who haven't converted.
   const pending = prospectsList.length;
-  const pendingAges = prospectsList
-    .map((p) => {
-      const e = parseTs(p.enlistedOn);
-      return e ? (now - e) / DAY : null;
-    })
-    .filter((x) => x != null);
-  const oldestPending = pendingAges.length ? Math.max(...pendingAges) : null;
-  const fmtAge = (days) =>
-    days == null ? '—' : days >= 365 ? `${(days / 365).toFixed(1)}y` : `${Math.round(days)}d`;
 
-  const latest = dates.length
-    ? new Date(Math.max(...dates)).toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      })
-    : '—';
+  const fmtDay = (ms) =>
+    new Date(ms).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  const latest = dates.length ? fmtDay(Math.max(...dates)) : '—';
+  const first = dates.length ? fmtDay(Math.min(...dates)) : '—';
 
   // Three labelled clusters that read top→bottom as a story:
   //   Overview (what you have) → Recent activity (how you're trending) →
@@ -1180,8 +1257,8 @@ function renderReferrals() {
 
   const pipeline =
     box(pending.toLocaleString('en-US'), 'pending prospects') +
-    box(fmtAge(oldestPending), 'oldest pending') +
     box(best ? `${best.n}` : '—', best ? `best month (${best.k})` : 'best month') +
+    box(first, 'first conversion') +
     box(
       nextTier ? projection : '—',
       nextTier ? `est. to ${nextTier.at.toLocaleString('en-US')} tier` : 'all tiers done',

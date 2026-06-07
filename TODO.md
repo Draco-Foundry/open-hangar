@@ -238,11 +238,10 @@ The reward ladders (`REFERRAL_LADDER_STANDARD` / `_LEGACY`) and event windows
 [starcitizen.tools/Referral_program](https://starcitizen.tools/Referral_program)
 (captured May 2026). Two gaps to close:
 
-1. **Completeness/accuracy audit.** Cross-check the hardcoded ladders + event list
-   against the live wiki (and RSI where possible) and correct any drift. The event
-   list especially is **partial** — it only covers ~Dec 2024 → Feb 2026 (5 events);
-   older events (and any added since) are missing, so older recruits' event bonuses
-   won't all match. Standard/legacy tiers should be verified item-by-item too.
+1. **Completeness/accuracy audit.** ✅ Done June 2026 — standard + legacy ladders
+   verified item-by-item against the wiki (accurate), and the event list completed to
+   the full 23 events back to 2019 (`REFERRAL_EVENTS`). Ongoing: re-verify as the wiki
+   updates, and append each new CIG event until the auto-refresh below lands.
 2. **Keep it fresh without manual edits.** CIG adds a new incentive event roughly
    monthly. Decide a low-maintenance refresh path that works under extension CSP on
    **Chrome + Firefox + Safari** (no remote `<script>`; `fetch` to an allowed host is
