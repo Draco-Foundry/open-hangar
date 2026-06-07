@@ -7,7 +7,7 @@
  */
 
 const $ = (sel) => document.querySelector(sel);
-const VIEWS = ['home', 'inventory', 'stats', 'buybacks', 'store', 'developers'];
+const VIEWS = ['home', 'inventory', 'buybacks', 'stats', 'referrals', 'store', 'developers'];
 
 const statusEl = $('#status');
 const scannedHomeEl = $('#scanned-home');
@@ -34,6 +34,113 @@ const BB_KINDS = [
   { key: 'addon', label: 'Add-ons' },
   { key: 'coupon', label: 'Coupons' },
   { key: 'other', label: 'Other' },
+];
+
+// Referral reward ladders (STATIC reference data, sourced from
+// starcitizen.tools/Referral_program, May 2026). Both ladders are keyed by the
+// same recruit/recruitment-point count, so we compute the user's progress on each
+// from their scraped recruit total. `at` = recruits/RP required; `reward` = what
+// unlocks there. Not per-account — this is the public tier list everyone shares.
+// (Live "which have I claimed" state is a future enhancement; see TODO.)
+const REFERRAL_LADDER_STANDARD = [
+  // Each tier's reward is a list of individual items. `ship: true` items get a
+  // lazy-resolved hover image (OH.getShipImage) + an RSI ship-matrix link; other
+  // items link to a starcitizen.tools search. `img` names the ship to resolve when
+  // it differs from the display label.
+  { at: 1, items: [{ n: 'GCD-Army Armor Set' }] },
+  { at: 2, items: [{ n: 'Quartz "GCD-Army" SMG' }] },
+  { at: 3, items: [{ n: 'Gladius Dunlevy Model' }] },
+  { at: 4, items: [{ n: 'Pulse', ship: true }, { n: 'Pulse "GCD-Army" Paint' }] },
+  { at: 5, items: [{ n: 'Parallax "GCD-Army" Energy Assault Rifle' }] },
+  { at: 6, items: [{ n: 'Archibald Hurston Figurine' }] },
+  { at: 7, items: [{ n: 'ArcCorp Cog Sphere Replica' }] },
+  { at: 8, items: [{ n: 'Stormwal Sculpture Replica' }] },
+  { at: 9, items: [{ n: "Wally's Bar Hologram Replica" }] },
+  { at: 10, items: [{ n: 'Big Benny\'s "Classic" Vending Machine' }] },
+  { at: 15, items: [{ n: 'Spirit of the Starman Statue' }] },
+  { at: 25, items: [{ n: 'Enemy of the Empire Statue' }] },
+  { at: 42, items: [{ n: 'Gladius Dunlevy', ship: true, img: 'Gladius' }] },
+  { at: 50, items: [{ n: 'R.A.P.T.O.R' }] },
+  { at: 75, items: [{ n: 'Storm', ship: true }, { n: 'Storm "GCD-Army" Paint' }] },
+  { at: 100, items: [{ n: 'Freelancer Paint Pack (4 paints)' }] },
+  { at: 200, items: [{ n: 'Esperia Stinger', ship: true, img: 'Stinger' }] },
+  { at: 500, items: [{ n: 'Captured Vanduul Scythe', ship: true, img: 'Scythe' }] },
+  { at: 1042, items: [{ n: 'Idris-M', ship: true }] },
+];
+const REFERRAL_LADDER_LEGACY = [
+  { at: 1, rank: 'Recruiter', items: [{ n: 'Badger Repeater' }, { n: 'UEE badges' }] },
+  { at: 3, rank: 'Private', items: [{ n: 'Gimbal Mounts' }, { n: 'Bulldog Repeaters' }] },
+  {
+    at: 5,
+    rank: 'Corporal',
+    items: [{ n: 'PTV (LTI)', ship: true, img: 'PTV' }, { n: 'Fish Tank' }],
+  },
+  {
+    at: 10,
+    rank: 'Sergeant',
+    items: [{ n: 'Gladius (LTI)', ship: true, img: 'Gladius' }, { n: 'Gold Display Case' }],
+  },
+  { at: 25, rank: 'Lieutenant', items: [{ n: 'Arena Commander Racing Package' }] },
+  { at: 42, rank: 'Captain', items: [{ n: 'Arena Commander Combat Package' }] },
+  { at: 75, rank: 'Major', items: [{ n: 'Razor (LTI)', ship: true, img: 'Razor' }] },
+  {
+    at: 100,
+    rank: 'Lt. Colonel',
+    items: [{ n: 'Esperia Blade replica (LTI)', ship: true, img: 'Blade' }],
+  },
+  {
+    at: 200,
+    rank: 'Colonel',
+    items: [{ n: 'Esperia Glaive replica (LTI)', ship: true, img: 'Glaive' }],
+  },
+  {
+    at: 500,
+    rank: 'Brigadier General',
+    items: [
+      { n: 'Anvil Terrapin (LTI)', ship: true, img: 'Terrapin' },
+      { n: 'Anvil Hurricane (LTI)', ship: true, img: 'Hurricane' },
+    ],
+  },
+  { at: 1042, rank: 'Major General', items: [{ n: 'Million Mile High Club access' }] },
+  {
+    at: 2017,
+    rank: 'Lt. General',
+    items: [{ n: 'Aegis Javelin (LTI)', ship: true, img: 'Javelin' }],
+  },
+];
+
+// Time-limited "special incentive" events: a recruit who CONVERTS (buys a game
+// package, spending the threshold) inside one of these windows earns a bonus
+// reward for both you and them. STATIC reference data from
+// starcitizen.tools/Referral_program (May 2026) — best-effort and will go stale as
+// CIG adds events; keep updated. Dates are inclusive [start, end]. We match a
+// recruit's convertedOn against these to surface "you earned this event reward".
+const REFERRAL_EVENTS = [
+  { start: '2024-12-10', end: '2025-01-06', name: 'Luminalia 2954', reward: 'Mirai Pulse (LTI)' },
+  {
+    start: '2025-01-28',
+    end: '2025-02-17',
+    name: 'Lunar New Year 2955',
+    reward: 'Drake Dragonfly (Coalfire paint)',
+  },
+  {
+    start: '2025-05-15',
+    end: '2025-05-27',
+    name: 'Invictus Launch Week 2955',
+    reward: 'Kruger P-52 Merlin (LTI)',
+  },
+  {
+    start: '2025-11-20',
+    end: '2025-12-05',
+    name: 'IAE 2955',
+    reward: 'Star Kitten Drake Dragonfly',
+  },
+  {
+    start: '2026-02-11',
+    end: '2026-02-23',
+    name: 'Coramor 2956',
+    reward: 'HoverQuad (Lovestruck paint, LTI)',
+  },
 ];
 
 // Community links — fill these in (footer + Developers page use them).
@@ -65,6 +172,8 @@ const state = {
   layout: 'gallery', // gallery | compact | list
   referral: null, // { code, url, current, legacy, prospects, recruitsList, prospectsList }
   refTab: 'recruits', // referral list tab: 'recruits' | 'prospects'
+  refQuery: '', // referral list search
+  refSort: 'newest', // referral list sort: newest | oldest | name
 };
 
 function setStatus(text, isError = false) {
@@ -132,6 +241,7 @@ function route() {
   if (v === 'home') renderHome();
   else if (v === 'inventory') renderInventory();
   else if (v === 'stats') renderStats();
+  else if (v === 'referrals') renderReferrals();
   else if (v === 'buybacks') renderBuybacks();
   // 'store' is static markup; About now lives on Home.
 }
@@ -575,7 +685,6 @@ function renderStats() {
   const body = $('#stats-body');
   if (!state.items.length) {
     body.innerHTML = '<div class="empty">No hangar data yet. Scan from the Home tab.</div>';
-    renderReferrals(); // referrals are independent of hangar data — still show them
     return;
   }
   const items = state.items;
@@ -625,26 +734,41 @@ function renderStats() {
     `<h3 class="section-title">By category</h3>${bars}` +
     `<h3 class="section-title" style="margin-top:26px">Top pledges by value</h3>` +
     `<div class="top-list">${topRows || '<div class="row muted">No priced pledges.</div>'}</div>`;
-
-  renderReferrals();
 }
 
-// --- Referrals (section inside Stats) -------------------------------------
+// --- Referrals (dedicated view) ------------------------------------------
 // Charts are hand-built inline SVG — no chart lib, no network (extension CSP +
 // the project's zero-runtime-deps rule). Data comes from OH.getReferral.
 
 // Parse RSI's "YYYY-MM-DD HH:MM:SS" timestamps to a Date (treat as local).
-function parseEnlist(s) {
+function parseTs(s) {
   if (!s) return null;
   const t = Date.parse(s.replace(' ', 'T'));
   return Number.isNaN(t) ? null : new Date(t);
 }
+// A recruit "happens" when they CONVERT (cross the spend threshold), not when they
+// enlisted — so recruit time-stats key on convertedOn (fall back to enlistedOn for
+// any older row missing it). Prospects never converted, so they use enlistedOn.
+const recruitDate = (r) => parseTs(r.convertedOn) || parseTs(r.enlistedOn);
 const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+// Return the bonus event whose [start,end] window contains date `d`, or null.
+// Compared at day granularity (inclusive of the end day).
+function eventForDate(d) {
+  if (!d) return null;
+  const t = d.getTime();
+  for (const ev of REFERRAL_EVENTS) {
+    const s = parseTs(ev.start + ' 00:00:00');
+    const e = parseTs(ev.end + ' 23:59:59');
+    if (s && e && t >= s.getTime() && t <= e.getTime()) return ev;
+  }
+  return null;
+}
 
 // Build a cumulative-over-time area+line chart + a per-month bar chart, as one SVG.
 function recruitsOverTimeSvg(rows) {
   const dated = rows
-    .map((r) => parseEnlist(r.enlistedOn))
+    .map(recruitDate)
     .filter(Boolean)
     .sort((a, b) => a - b);
   if (dated.length < 2) return '<p class="muted">Not enough dated recruits to chart yet.</p>';
@@ -706,9 +830,8 @@ function recruitsOverTimeSvg(rows) {
 
 function conversionHtml(ref) {
   const prospects = ref.prospects ?? 0;
-  const legacyR = ref.legacy?.recruits ?? 0;
-  const currentR = ref.current?.recruits ?? 0;
-  const pct = prospects > 0 ? (legacyR / prospects) * 100 : 0;
+  const recruits = ref.legacy?.recruits ?? 0;
+  const pct = prospects > 0 ? (recruits / prospects) * 100 : 0;
   const restPct = Math.max(0, 100 - pct);
   return `<div class="ref-conv-rate" style="font-size:26px;font-weight:700;margin-bottom:8px">${pct.toFixed(1)}%</div>
     <div class="ref-conv-bar">
@@ -716,88 +839,432 @@ function conversionHtml(ref) {
       <div class="seg-rest" style="width:${restPct.toFixed(2)}%"></div>
     </div>
     <div class="ref-conv-legend">
-      <span><span class="dot" style="background:#7ee787"></span>${legacyR.toLocaleString('en-US')} recruits</span>
-      <span><span class="dot" style="background:rgba(255,255,255,0.1)"></span>${(prospects - legacyR).toLocaleString('en-US')} still prospects</span>
-    </div>
-    <div class="muted" style="margin-top:10px;font-size:12px">Current program: ${currentR.toLocaleString('en-US')} · Legacy total: ${legacyR.toLocaleString('en-US')} · Prospects: ${prospects.toLocaleString('en-US')}</div>`;
+      <span><span class="dot" style="background:#7ee787"></span>${recruits.toLocaleString('en-US')} recruits</span>
+      <span><span class="dot" style="background:rgba(255,255,255,0.1)"></span>${(prospects - recruits).toLocaleString('en-US')} prospects</span>
+    </div>`;
+}
+
+// New recruits per calendar year (by conversion date), as a small bar chart.
+function recruitsByYearHtml(rows) {
+  const byYear = new Map();
+  for (const r of rows) {
+    const d = recruitDate(r);
+    if (d) byYear.set(d.getFullYear(), (byYear.get(d.getFullYear()) || 0) + 1);
+  }
+  if (!byYear.size) return '<p class="muted">No dated recruits yet.</p>';
+  const years = [...byYear.keys()].sort((a, b) => a - b);
+  const max = Math.max(...byYear.values());
+  return years
+    .map((y) => {
+      const n = byYear.get(y);
+      const pct = Math.round((n / max) * 100);
+      return `<div class="bar-row">
+        <div class="bar-label">${y}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+        <div class="bar-val">${n}</div>
+      </div>`;
+    })
+    .join('');
+}
+
+// Render one reward item as a link. Ships link to the RSI ship-matrix and carry a
+// data-resolve so the shared hover-preview lazily fetches their art (reusing
+// OH.getShipImage / #item-preview). Non-ship items link to a starcitizen.tools
+// search. `img` overrides the ship name used for art lookup when it differs.
+function rewardItemHtml(item) {
+  const label = OH.escapeHtml(item.n);
+  if (item.ship) {
+    const shipName = item.img || item.n.replace(/\s*\(LTI\)/i, '').trim();
+    const href = `https://robertsspaceindustries.com/ship-matrix/search?q=${encodeURIComponent(shipName)}`;
+    return `<a class="reward-item ship" href="${href}" target="_blank" rel="noopener" data-resolve="${OH.escapeHtml(shipName)}">${label}</a>`;
+  }
+  const href = `https://starcitizen.tools/index.php?search=${encodeURIComponent(item.n)}`;
+  return `<a class="reward-item" href="${href}" target="_blank" rel="noopener">${label}</a>`;
+}
+
+// All items of a tier, joined — each independently linked/hoverable.
+function rewardItemsHtml(items) {
+  return (items || []).map(rewardItemHtml).join('<span class="reward-sep"> · </span>');
+}
+
+// Render one reward ladder (standard | legacy) as rows, marking each tier unlocked
+// (recruits ≥ tier) or locked, and highlighting the NEXT tier with the gap to go.
+// `recruits` is the user's all-time recruit total (legacy total = same number).
+function rewardLadderHtml(ladder, recruits, title, note) {
+  const next = ladder.find((t) => recruits < t.at) || null;
+  const unlocked = ladder.filter((t) => recruits >= t.at).length;
+  const rows = ladder
+    .map((t) => {
+      const isUnlocked = recruits >= t.at;
+      const isNext = next && t.at === next.at;
+      const cls = isUnlocked ? 'reward-unlocked' : isNext ? 'reward-next' : 'reward-locked';
+      const mark = isUnlocked ? '✓' : isNext ? '◷' : '🔒';
+      const need = isNext
+        ? ` <span class="reward-togo">${(t.at - recruits).toLocaleString('en-US')} to go</span>`
+        : '';
+      const rank = t.rank ? `<span class="reward-rank">${OH.escapeHtml(t.rank)}</span> ` : '';
+      return `<tr class="${cls}">
+        <td class="reward-mark">${mark}</td>
+        <td class="reward-at">${t.at.toLocaleString('en-US')}</td>
+        <td class="reward-name">${rank}${rewardItemsHtml(t.items)}${need}</td>
+      </tr>`;
+    })
+    .join('');
+  const nextItems = next ? rewardItemsHtml(next.items) : '';
+  const nextLine = next
+    ? `Next: ${nextItems} at ${next.at.toLocaleString('en-US')} (${(next.at - recruits).toLocaleString('en-US')} more)`
+    : 'All tiers unlocked 🎉';
+  return `<div class="reward-ladder">
+    <h4>${OH.escapeHtml(title)} <span class="reward-progress">${unlocked}/${ladder.length} unlocked</span></h4>
+    ${note ? `<p class="muted reward-note">${note}</p>` : ''}
+    <p class="muted reward-next-line">${nextLine}</p>
+    <table class="reward-table"><tbody>${rows}</tbody></table>
+  </div>`;
+}
+
+// Both ladders side by side. Legacy is only shown if the user has legacy access —
+// which we infer from the data: a legacy recruit count means they qualified
+// (referred ≥1 package buyer before the 2025-07-02 cutoff).
+function rewardsHtml(ref) {
+  const recruits = ref.legacy?.recruits ?? 0;
+  const hasLegacy = (ref.legacy?.recruits ?? 0) > 0;
+  const standard = rewardLadderHtml(
+    REFERRAL_LADDER_STANDARD,
+    recruits,
+    'Standard ladder',
+    'Always-on rewards; tiers by total recruits.',
+  );
+  if (!hasLegacy) return `<div class="reward-ladders">${standard}</div>`;
+  const legacy = rewardLadderHtml(
+    REFERRAL_LADDER_LEGACY,
+    recruits,
+    'Legacy ladder',
+    'Pre-July 2025 ladder — you keep access, and new recruits still count toward it.',
+  );
+  return `<div class="reward-ladders two">${standard}${legacy}</div>`;
+}
+
+// Event bonuses you earned. The reward is granted ONCE per event (not per recruit).
+// "Date received" = the earliest recruit conversion that fell in the event window
+// (i.e. when you first qualified). Best-effort — the event list is hand-maintained
+// and may lag CIG's, and per-day nuances within an event aren't modelled.
+function eventRewardsHtml(recruitsRows) {
+  const hits = new Map(); // event name -> { ev, firstDate }
+  for (const r of recruitsRows) {
+    const d = recruitDate(r);
+    const ev = eventForDate(d);
+    if (!ev) continue;
+    const cur = hits.get(ev.name);
+    if (!cur) hits.set(ev.name, { ev, firstDate: d });
+    else if (d < cur.firstDate) cur.firstDate = d;
+  }
+  const earned = [...hits.values()].sort((a, b) => parseTs(b.ev.start) - parseTs(a.ev.start));
+  const intro = `<p class="muted" style="font-size:12px;margin:0 0 12px">
+    A recruit who <strong>converted</strong> during a special-incentive event earns you that
+    event's bonus reward — once per event. Best-effort; may not include the newest events.</p>`;
+  if (!earned.length) {
+    return intro + '<p class="muted">No recruits converted during a tracked bonus event.</p>';
+  }
+  const items = earned
+    .map(
+      ({ ev, firstDate }) => `<li class="event-item">
+        <span class="event-check">✓</span>
+        <span class="event-text">${OH.escapeHtml(ev.name)} — ${OH.escapeHtml(ev.reward)}</span>
+        <span class="event-date">${firstDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+      </li>`,
+    )
+    .join('');
+  return (
+    intro +
+    `<p class="reward-next-line" style="margin-bottom:10px"><strong>${earned.length}</strong> event bonus reward(s) earned.</p>
+    <ul class="event-list">${items}</ul>`
+  );
+}
+
+// The active referral list (recruits | prospects), with search + sort applied.
+function refFilteredList() {
+  const ref = state.referral;
+  let list = (state.refTab === 'prospects' ? ref.prospectsList : ref.recruitsList) || [];
+  const q = state.refQuery.trim().toLowerCase();
+  if (q) {
+    list = list.filter((r) => `${r.handle || ''} ${r.moniker || ''}`.toLowerCase().includes(q));
+  }
+  // Sort by the date shown in this tab: recruits by conversion, prospects by enlist.
+  const ts = (r) => {
+    const d = state.refTab === 'recruits' ? recruitDate(r) : parseTs(r.enlistedOn);
+    return d ? d.getTime() : 0;
+  };
+  const byName = (a, b) => (a.handle || a.moniker || '').localeCompare(b.handle || b.moniker || '');
+  list = list.slice().sort((a, b) => {
+    switch (state.refSort) {
+      case 'oldest':
+        return ts(a) - ts(b);
+      case 'name':
+        return byName(a, b);
+      case 'newest':
+      default:
+        return ts(b) - ts(a);
+    }
+  });
+  return list;
 }
 
 function refListRows() {
-  const ref = state.referral;
-  const list = state.refTab === 'prospects' ? ref.prospectsList || [] : ref.recruitsList || [];
-  if (!list.length) return `<tr><td colspan="3" class="muted">No ${state.refTab} found.</td></tr>`;
+  const full =
+    (state.refTab === 'prospects' ? state.referral.prospectsList : state.referral.recruitsList) ||
+    [];
+  const list = refFilteredList();
+  if (!list.length) {
+    const msg = full.length ? `No ${state.refTab} match your search.` : `No ${state.refTab} found.`;
+    return `<tr><td colspan="3" class="muted">${msg}</td></tr>`;
+  }
   return list
     .map((r) => {
       const handle = r.handle || r.moniker || '—';
       const link = r.handle
         ? `<a href="https://robertsspaceindustries.com/en/citizens/${encodeURIComponent(r.handle)}" target="_blank" rel="noopener">${OH.escapeHtml(handle)}</a>`
         : OH.escapeHtml(handle);
+      // Only flag legacy-ladder recruits; "current" is the default, so no badge.
       const badge =
-        state.refTab === 'recruits' && r.campaign
-          ? ` <span class="ref-badge ${r.campaign}">${r.campaign}</span>`
+        state.refTab === 'recruits' && r.campaign === 'legacy'
+          ? ` <span class="ref-badge legacy">legacy</span>`
           : '';
-      const when = r.enlistedOn
-        ? new Date(r.enlistedOn.replace(' ', 'T')).toLocaleDateString()
-        : '—';
+      // Recruits show their CONVERSION date (when they counted); prospects show
+      // when they enlisted (they haven't converted). Flag recruits who converted
+      // during a bonus event with a small ★.
+      let when = '—';
+      let eventTag = '';
+      if (state.refTab === 'recruits') {
+        const d = recruitDate(r);
+        when = d ? d.toLocaleDateString() : '—';
+        const ev = d ? eventForDate(d) : null;
+        if (ev)
+          eventTag = ` <span class="ref-event" title="${OH.escapeHtml(ev.name)}: ${OH.escapeHtml(ev.reward)}">★</span>`;
+      } else {
+        const d = parseTs(r.enlistedOn);
+        when = d ? d.toLocaleDateString() : '—';
+      }
       return `<tr>
       <td class="r-handle">${link}${badge}</td>
       <td>${OH.escapeHtml(r.moniker || '')}</td>
-      <td>${OH.escapeHtml(when)}</td>
+      <td>${OH.escapeHtml(when)}${eventTag}</td>
     </tr>`;
     })
     .join('');
+}
+
+// Re-render only the list table + result count (used by search/sort/tab events so
+// we don't rebuild the whole page and lose input focus / chart state).
+function renderRefList() {
+  const tbody = $('#ref-tbody');
+  const count = $('#ref-count');
+  if (tbody) tbody.innerHTML = refListRows();
+  if (count) {
+    const shown = refFilteredList().length;
+    const total =
+      (state.refTab === 'prospects' ? state.referral.prospectsList : state.referral.recruitsList) ||
+      [];
+    count.textContent = `Showing ${shown.toLocaleString('en-US')} of ${total.length.toLocaleString('en-US')}`;
+  }
+  // The date column means different things per tab (see refListRows).
+  const dateCol = $('#ref-date-col');
+  if (dateCol) dateCol.textContent = state.refTab === 'recruits' ? 'Converted' : 'Enlisted';
+  document.querySelectorAll('#referrals-body .ref-tab').forEach((b) => {
+    b.classList.toggle('active', b.dataset.reftab === state.refTab);
+  });
 }
 
 function renderReferrals() {
   const body = $('#referrals-body');
   if (!body) return;
   const ref = state.referral;
-  if (!ref) {
-    body.innerHTML = '';
-    return;
-  } // nothing scanned → section hidden
 
-  const box = (big, lbl) =>
-    `<div class="stat-box"><div class="big">${big}</div><div class="lbl">${lbl}</div></div>`;
-  const recruitsRows = ref.recruitsList || [];
-  const legacyR = ref.legacy?.recruits ?? 0;
-  const currentR = ref.current?.recruits ?? 0;
-  // Best month by new recruits (from dated rows).
-  const byMonth = new Map();
-  for (const r of recruitsRows) {
-    const d = parseEnlist(r.enlistedOn);
-    if (d) byMonth.set(monthKey(d), (byMonth.get(monthKey(d)) || 0) + 1);
+  // Not signed in / never scanned → a friendly prompt instead of a blank page.
+  if (!ref) {
+    body.innerHTML = `<div class="placeholder-view">
+      <p class="muted">No referral data yet. Click <strong>Scan</strong> on the Home page to pull
+        your recruits and prospects from your
+        <a href="https://robertsspaceindustries.com/en/referral" target="_blank" rel="noopener">RSI Referral Rewards</a> page.</p>
+    </div>`;
+    return;
   }
+
+  const box = (big, lbl, cls = '') =>
+    `<div class="stat-box ${cls}"><div class="big">${big}</div><div class="lbl">${lbl}</div></div>`;
+  const recruitsRows = ref.recruitsList || [];
+  const recruits = ref.legacy?.recruits ?? 0; // all-time recruit total
+  const prospects = ref.prospects ?? 0;
+  const total = prospects + recruits; // everyone who used your code (signed up or converted)
+
+  // Date-derived stats from recruit CONVERSION dates (when they actually counted).
+  const dates = recruitsRows.map(recruitDate).filter(Boolean);
+  const byMonth = new Map();
+  for (const d of dates) byMonth.set(monthKey(d), (byMonth.get(monthKey(d)) || 0) + 1);
   let best = null;
   for (const [k, n] of byMonth) if (!best || n > best.n) best = { k, n };
+  const convRate = prospects > 0 ? `${((recruits / prospects) * 100).toFixed(1)}%` : '—';
 
-  const stats =
-    box(legacyR.toLocaleString('en-US'), 'recruits (all-time)') +
-    box(currentR.toLocaleString('en-US'), 'recruits (current)') +
-    box((ref.prospects ?? 0).toLocaleString('en-US'), 'prospects') +
-    box(best ? `${best.n}` : '—', best ? `best month (${best.k})` : 'best month');
+  // --- Richer, referral-specific stats ------------------------------------
+  const DAY = 86400000;
+  const now = new Date();
+  const prospectsList = ref.prospectsList || [];
+
+  // Momentum: conversions in the last 30 / 90 days, and trend vs the prior 30.
+  const convInWindow = (fromDaysAgo, toDaysAgo = 0) =>
+    dates.filter((d) => {
+      const age = (now - d) / DAY;
+      return age >= toDaysAgo && age < fromDaysAgo;
+    }).length;
+  const last30 = convInWindow(30);
+  const prev30 = convInWindow(60, 30);
+  const last90 = convInWindow(90);
+  let trend = '';
+  if (prev30 > 0) {
+    const pct = Math.round(((last30 - prev30) / prev30) * 100);
+    trend = pct === 0 ? '→ flat' : pct > 0 ? `↑ ${pct}%` : `↓ ${Math.abs(pct)}%`;
+  } else if (last30 > 0) {
+    trend = '↑ new';
+  }
+
+  // Recent pace (recruits/month over the last 90 days) → projection to next tier.
+  const pace90 = last90 / 3; // per month
+  const nextTier = REFERRAL_LADDER_STANDARD.find((t) => recruits < t.at) || null;
+  let projection = '—';
+  if (nextTier) {
+    const toGo = nextTier.at - recruits;
+    if (pace90 > 0) {
+      const months = toGo / pace90;
+      projection =
+        months < 1
+          ? '< 1 mo'
+          : months < 18
+            ? `~${Math.round(months)} mo`
+            : `~${(months / 12).toFixed(1)} yr`;
+    }
+  }
+
+  // Prospect funnel: pending (never converted) + oldest pending age.
+  const pending = prospectsList.length;
+  const pendingAges = prospectsList
+    .map((p) => {
+      const e = parseTs(p.enlistedOn);
+      return e ? (now - e) / DAY : null;
+    })
+    .filter((x) => x != null);
+  const oldestPending = pendingAges.length ? Math.max(...pendingAges) : null;
+  const fmtAge = (days) =>
+    days == null ? '—' : days >= 365 ? `${(days / 365).toFixed(1)}y` : `${Math.round(days)}d`;
+
+  const latest = dates.length
+    ? new Date(Math.max(...dates)).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      })
+    : '—';
+
+  // Three labelled clusters that read top→bottom as a story:
+  //   Overview (what you have) → Recent activity (how you're trending) →
+  //   Pipeline & progress (what's coming).
+  const overview =
+    box(total.toLocaleString('en-US'), 'total (prospects + recruits)', 'span2') +
+    box(recruits.toLocaleString('en-US'), 'recruits') +
+    box(prospects.toLocaleString('en-US'), 'prospects') +
+    box(convRate, 'conversion');
+
+  const activity =
+    box(last30.toLocaleString('en-US'), 'recruits · last 30d') +
+    box(trend || '—', 'vs prior 30d') +
+    box(last90.toLocaleString('en-US'), 'recruits · last 90d') +
+    box(latest, 'latest conversion');
+
+  const pipeline =
+    box(pending.toLocaleString('en-US'), 'pending prospects') +
+    box(fmtAge(oldestPending), 'oldest pending') +
+    box(best ? `${best.n}` : '—', best ? `best month (${best.k})` : 'best month') +
+    box(
+      nextTier ? projection : '—',
+      nextTier ? `est. to ${nextTier.at.toLocaleString('en-US')} tier` : 'all tiers done',
+    );
 
   const tab = (key, label, n) =>
     `<button class="ref-tab ${state.refTab === key ? 'active' : ''}" data-reftab="${key}">${label} <b>${n.toLocaleString('en-US')}</b></button>`;
 
-  body.innerHTML = `<div class="ref-section">
-    <h3 class="section-title">Referrals</h3>
-    <div class="stat-grid">${stats}</div>
+  const code = ref.code
+    ? `<div class="ref-code-banner">Your referral code:
+        <span class="ref-code">${OH.escapeHtml(ref.code)}</span>
+        <button class="ref-copy" data-copy="${OH.escapeHtml(ref.url || ref.code)}" title="Copy referral link">Copy link</button>
+      </div>`
+    : '';
+
+  body.innerHTML = `
+    ${code}
+
+    <div class="stat-group-label">Overview</div>
+    <div class="stat-grid ref-totals">${overview}</div>
+
+    <div class="stat-group-label">Recent activity</div>
+    <div class="stat-grid">${activity}</div>
+
+    <div class="stat-group-label">Pipeline &amp; progress</div>
+    <div class="stat-grid">${pipeline}</div>
+
+    <h3 class="section-title" style="margin-top:26px">Trends</h3>
     <div class="ref-charts">
       <div class="ref-chart"><h4>Recruits over time (cumulative · monthly)</h4>${recruitsOverTimeSvg(recruitsRows)}</div>
       <div class="ref-chart"><h4>Prospect → recruit conversion</h4>${conversionHtml(ref)}</div>
     </div>
+    <div class="stat-group-label">Recruits by year</div>
+    ${recruitsByYearHtml(recruitsRows)}
+
+    <h3 class="section-title" style="margin-top:26px">Tier rewards</h3>
+    ${rewardsHtml(ref)}
+
+    <h3 class="section-title" style="margin-top:26px">Event bonuses</h3>
+    ${eventRewardsHtml(recruitsRows)}
+
+    <h3 class="section-title" style="margin-top:26px">People</h3>
     <div class="ref-list-controls">
       <div class="ref-tabs">
-        ${tab('recruits', 'Recruits', legacyR)}
-        ${tab('prospects', 'Prospects', ref.prospects ?? 0)}
+        ${tab('recruits', 'Recruits', recruits)}
+        ${tab('prospects', 'Prospects', prospects)}
       </div>
+      <input id="ref-search" class="ref-search" type="search" placeholder="Search handle / moniker…" value="${OH.escapeHtml(state.refQuery)}" />
+      <select id="ref-sort" class="ref-sort">
+        <option value="newest"${state.refSort === 'newest' ? ' selected' : ''}>Newest first</option>
+        <option value="oldest"${state.refSort === 'oldest' ? ' selected' : ''}>Oldest first</option>
+        <option value="name"${state.refSort === 'name' ? ' selected' : ''}>Name (A–Z)</option>
+      </select>
     </div>
-    <table class="ref-table">
-      <thead><tr><th>Handle</th><th>Moniker</th><th>Enlisted</th></tr></thead>
-      <tbody>${refListRows()}</tbody>
-    </table>
-  </div>`;
+    <div id="ref-count" class="result-count"></div>
+    <div class="ref-table-scroll">
+      <table class="ref-table">
+        <thead><tr><th>Handle</th><th>Moniker</th><th id="ref-date-col">Converted</th></tr></thead>
+        <tbody id="ref-tbody">${refListRows()}</tbody>
+      </table>
+    </div>`;
+
+  renderRefList(); // fills #ref-count
+  enhanceRewardImages(body); // lazily resolve ship art for reward-item hovers
+}
+
+// Resolve ship art for reward items (links with data-resolve) so the shared hover
+// preview has an image to show. Lazy + concurrency-capped, mirroring
+// enhanceCardImages; sets data-image on each resolved item.
+function enhanceRewardImages(container) {
+  const items = [...container.querySelectorAll('.reward-item.ship[data-resolve]')].filter(
+    (el) => !el.dataset.image,
+  );
+  let i = 0;
+  const CONCURRENCY = 3;
+  const worker = async () => {
+    while (i < items.length) {
+      const el = items[i++];
+      const url = await OH.getShipImage(el.dataset.resolve);
+      if (url) el.dataset.image = url;
+    }
+  };
+  for (let w = 0; w < CONCURRENCY; w++) worker();
 }
 
 // --- Buy-Backs ------------------------------------------------------------
@@ -1042,6 +1509,36 @@ if (buybacksBodyEl) {
   buybacksBodyEl.addEventListener('mouseleave', hidePreview);
 }
 
+// Hover preview for reward items (ship art). Keyed on the item's resolve name since
+// these links have no id. Reuses the same #item-preview popup as inventory cards.
+// (Listeners are attached where referralsBodyEl is defined, below.)
+function onRewardHover(e) {
+  const item = e.target.closest('.reward-item.ship[data-image]');
+  const img = item && item.dataset.image;
+  if (!img) {
+    if (previewId) hidePreview();
+    return;
+  }
+  const key = 'reward:' + item.dataset.resolve;
+  if (key !== previewId && itemPreviewImg) {
+    previewId = key;
+    clearTimeout(previewTimer);
+    itemPreviewImg.src = img;
+    itemPreview.classList.add('show');
+    const hi = hiRes(img);
+    if (hi !== img) {
+      previewTimer = setTimeout(() => {
+        const probe = new Image();
+        probe.onload = () => {
+          if (previewId === key) itemPreviewImg.src = hi;
+        };
+        probe.src = hi;
+      }, 180);
+    }
+  }
+  positionPreview(e.clientX, e.clientY);
+}
+
 function fmtScan() {
   return state.scannedAt ? new Date(state.scannedAt).toLocaleString() : '—';
 }
@@ -1152,14 +1649,33 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !itemModal.hidden) closeItemModal();
 });
 
-// Referral list tab switching (Recruits / Prospects) inside Stats.
+// Referral list tab switching (Recruits / Prospects) + reward-item hover preview.
 const referralsBodyEl = $('#referrals-body');
 if (referralsBodyEl) {
+  referralsBodyEl.addEventListener('mousemove', onRewardHover);
+  referralsBodyEl.addEventListener('mouseleave', hidePreview);
+  // Tab switch (Recruits / Prospects): reset the search, re-render the list only.
   referralsBodyEl.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-reftab]');
     if (!btn) return;
+    if (state.refTab === btn.dataset.reftab) return;
     state.refTab = btn.dataset.reftab;
-    renderReferrals();
+    state.refQuery = '';
+    const search = $('#ref-search');
+    if (search) search.value = '';
+    renderRefList();
+  });
+  // Search box: filter the list live (lightweight re-render keeps focus).
+  referralsBodyEl.addEventListener('input', (e) => {
+    if (e.target.id !== 'ref-search') return;
+    state.refQuery = e.target.value;
+    renderRefList();
+  });
+  // Sort dropdown.
+  referralsBodyEl.addEventListener('change', (e) => {
+    if (e.target.id !== 'ref-sort') return;
+    state.refSort = e.target.value;
+    renderRefList();
   });
 }
 

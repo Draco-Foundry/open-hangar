@@ -227,10 +227,83 @@ to your account — treated like the rest of the scraped DB (local only, in expo
 never auto-shared). Keep the "don't redistribute other people's data" line in mind
 for any future sharing/API.
 
-**Not done / later:** reward-tier rails + the public Weekly/Monthly/All-time
-leaderboard on the page (out of scope for v1); "current streak" tile and
-enlist-year breakdown (the chart foundation is there). Display defaults to ALL_TIME;
-the API's `display` enum (other ranges) and `sortBy` aren't surfaced in the UI yet.
+**Not done / later:** the public Weekly/Monthly/All-time leaderboard on the page
+(out of scope for v1). Display defaults to ALL_TIME; the API's `display` enum (other
+ranges) and `sortBy` aren't surfaced in the UI yet.
+
+### Referral rewards data — verify & complete (planned)
+
+The reward ladders (`REFERRAL_LADDER_STANDARD` / `_LEGACY`) and event windows
+(`REFERRAL_EVENTS`) in `dashboard.js` are **hardcoded best-effort** from
+[starcitizen.tools/Referral_program](https://starcitizen.tools/Referral_program)
+(captured May 2026). Two gaps to close:
+
+1. **Completeness/accuracy audit.** Cross-check the hardcoded ladders + event list
+   against the live wiki (and RSI where possible) and correct any drift. The event
+   list especially is **partial** — it only covers ~Dec 2024 → Feb 2026 (5 events);
+   older events (and any added since) are missing, so older recruits' event bonuses
+   won't all match. Standard/legacy tiers should be verified item-by-item too.
+2. **Keep it fresh without manual edits.** CIG adds a new incentive event roughly
+   monthly. Decide a low-maintenance refresh path that works under extension CSP on
+   **Chrome + Firefox + Safari** (no remote `<script>`; `fetch` to an allowed host is
+   fine). Options, lightest → heaviest:
+   - **Ship a versioned JSON** (`referral-rewards.json`) bundled in the extension;
+     update it on release. Zero runtime network, but stale between releases.
+   - **Fetch a community-maintained JSON** (e.g. a file in this GitHub repo / Pages)
+     at runtime, cached locally with a TTL like the ship-matrix cache; fall back to
+     the bundled copy offline. Needs the host in `host_permissions` + each store's
+     review, but auto-updates without a release. **Likely the right balance.**
+   - **Parse the wiki live** — fragile (wiki markup changes, 403s to non-browsers as
+     we hit) and heavier; avoid unless the JSON approaches fail.
+     Whatever the source, keep the parser/shape in ONE place and treat reward art the
+     way ship images already work (lazy, cached, CSP-safe).
+
+### Referral reward item links + hover art — make them correct (planned)
+
+The per-item links/hover on the Referrals page (`rewardItemHtml` in `dashboard.js`)
+are **placeholder-quality** and need finishing:
+
+- **Links are searches, not destinations.** Ship items point at the RSI ship-matrix
+  _search_ (`/ship-matrix/search?q=…`) and non-ship items at a starcitizen.tools
+  _search_ — not the actual reward/item page. Replace with canonical deep links
+  (curated per item, or resolved from the wiki/ship-matrix once and cached).
+- **Hover art is ship-only.** Only `ship: true` items resolve an image (via
+  `OH.getShipImage`); armor/statues/paints/figurines/decorations show no preview.
+  Add image resolution for non-ship reward items (wiki image lookup, lazy + cached
+  - CSP-safe, same pattern as ship art) so every item can hover-preview.
+- **Verify ship-name overrides.** Some items use an `img:`/name override (e.g.
+  "Esperia Blade" → `Blade`); confirm each resolves to the right art, especially
+  replicas/variants vs. the flyable ship.
+- Fold this into the rewards-data source above so links + image URLs travel with the
+  reward definitions rather than being derived ad hoc at render time.
+
+## Dashboard CSS cleanup (planned — maintainability, not user-facing)
+
+A styling audit found the dashboard is visually consistent (uniform view titles,
+correct color semantics: green=success/unlocked, cyan=next/in-progress,
+gold=legacy/event) but has **maintainability** drift worth cleaning up. None of
+this changes the rendered UI — it's for keeping the open-source CSS tidy. Ordered by
+value:
+
+1. **Semantic color tokens.** ~60 hardcoded colors repeat across views. Add to
+   `:root`: `--ok:#7ee787` (success/unlocked), `--next:#3fb6d8` (in-progress),
+   `--gold:#f0b429`, `--event:#f0c040`, `--error:#f85149`, `--warn:#d29922`,
+   `--violet:#d2a8ff`, `--thumb-bg:#0b0e13`, plus an on-image white-overlay pair —
+   then replace the literals. Consolidate the two near-identical golds (`#f0b429` vs
+   `#f0c040`) and replace hardcoded `#58a6ff` with the existing `var(--link)`.
+2. **Kill inline `style="margin-top:26px"` on every sub-heading** (~5× in
+   `dashboard.js`). Either split `.view-title` (h2) from `.section-title` (h3) with a
+   built-in top margin, or add a `.section-title.spaced` variant. Also fixes the
+   heading-rhythm inconsistency (h3 26px vs `.stat-group-label` 18px tops).
+3. **Move `.ref-conv-rate` inline styles into its (currently empty) CSS rule;**
+   give `.ref-conv-legend .dot` modifier classes instead of inline `background:`.
+4. **Extract shared base classes** (biggest dedup): `.tbl` for the 3 near-identical
+   tables (`.ref-table`/`.reward-table`/`.modal-contents`), `.pill` for
+   chip/sup-chip/bal/flair, `.field`/`.select` for the 3 duplicated search/sort input
+   pairs, `.metric` for stat-box/sum-box (+ size modifiers for the 20/24/26px headline
+   numbers). Merge the doubly-defined `.controls` rule.
+5. **Standardize a spacing scale** (`--sp-2:8px; --sp-3:12px; --sp-4:16px`) for card
+   padding + cluster bottom-margins, which currently drift (18/22/26px).
 
 ## Consumption layer (deferred — parked by design)
 

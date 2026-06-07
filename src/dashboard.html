@@ -745,14 +745,25 @@
         border-color: #7ee787;
       }
 
-      /* Referrals section inside Stats */
-      #referrals-body:empty {
-        display: none;
+      /* Referrals view */
+      .ref-totals .stat-box.span2 {
+        grid-column: span 2;
       }
-      .ref-section {
-        margin-top: 30px;
-        padding-top: 22px;
-        border-top: 1px solid var(--line);
+      .ref-totals .stat-box.span2 .big {
+        color: #7ee787;
+      }
+      .ref-code-banner {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 16px;
+        padding: 10px 14px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        font-size: 14px;
+        color: var(--muted);
       }
       .ref-charts {
         display: grid;
@@ -842,6 +853,24 @@
         display: inline-flex;
         gap: 6px;
       }
+      .ref-search {
+        flex: 1;
+        min-width: 160px;
+        padding: 6px 10px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--text);
+        font-size: 13px;
+      }
+      .ref-sort {
+        padding: 6px 10px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--text);
+        font-size: 13px;
+      }
       .ref-tab {
         cursor: pointer;
         background: transparent;
@@ -856,12 +885,24 @@
         border-color: #7ee787;
         background: rgba(126, 231, 135, 0.08);
       }
+      /* Cap the (potentially 1000s-long) list and scroll within it; the header
+         stays pinned so columns stay labelled while scrolling. */
+      .ref-table-scroll {
+        max-height: 460px;
+        overflow-y: auto;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
       .ref-table {
         width: 100%;
         border-collapse: collapse;
         font-size: 13px;
       }
       .ref-table th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--panel-2);
         text-align: left;
         color: var(--muted);
         font-weight: 600;
@@ -901,6 +942,160 @@
       .ref-badge.legacy {
         color: #f0b429;
         border-color: rgba(240, 180, 41, 0.5);
+      }
+
+      /* Referral reward ladders */
+      .reward-ladders {
+        display: grid;
+        gap: 18px;
+      }
+      .reward-ladders.two {
+        grid-template-columns: 1fr 1fr;
+      }
+      @media (max-width: 760px) {
+        .reward-ladders.two {
+          grid-template-columns: 1fr;
+        }
+      }
+      .reward-ladder {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px 16px;
+      }
+      .reward-ladder h4 {
+        margin: 0 0 4px;
+        font-size: 14px;
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .reward-progress {
+        font-size: 11px;
+        font-weight: 600;
+        color: #7ee787;
+      }
+      .reward-note {
+        font-size: 11px;
+        margin: 0 0 8px;
+      }
+      .reward-next-line {
+        font-size: 12px;
+        margin: 0 0 10px;
+        color: var(--text);
+      }
+      .reward-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      .reward-table td {
+        padding: 5px 6px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        vertical-align: top;
+      }
+      .reward-mark {
+        width: 18px;
+        text-align: center;
+      }
+      .reward-at {
+        width: 44px;
+        text-align: right;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .reward-unlocked .reward-mark {
+        color: #7ee787;
+      }
+      .reward-unlocked .reward-name {
+        color: var(--text);
+      }
+      .reward-next {
+        background: rgba(63, 182, 216, 0.08);
+      }
+      .reward-next .reward-mark {
+        color: #3fb6d8;
+      }
+      .reward-next .reward-name {
+        color: #fff;
+        font-weight: 600;
+      }
+      .reward-locked {
+        opacity: 0.5;
+      }
+      .reward-togo {
+        font-size: 10px;
+        color: #3fb6d8;
+        margin-left: 6px;
+        white-space: nowrap;
+      }
+      /* ★ marker on recruits who converted during a bonus event */
+      .ref-event {
+        color: #f0c040;
+        margin-left: 4px;
+      }
+      /* Individual reward items (each links out; ships also hover-preview art) */
+      .reward-item {
+        color: var(--link);
+        text-decoration: none;
+      }
+      .reward-item:hover {
+        text-decoration: underline;
+      }
+      .reward-item.ship {
+        color: #7ee787;
+      }
+      .reward-sep {
+        color: var(--muted);
+      }
+      .reward-rank {
+        color: var(--muted);
+        font-weight: 600;
+        margin-right: 4px;
+      }
+      .reward-via {
+        color: var(--muted);
+        cursor: help;
+        white-space: nowrap;
+      }
+      /* Event bonuses — a simple one-line-per-item list. */
+      .event-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .event-item {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        padding: 5px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        font-size: 13px;
+      }
+      .event-check {
+        color: #7ee787;
+      }
+      .event-text {
+        flex: 1;
+      }
+      .event-date {
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      /* Small label above a stat-tile cluster, so rows are scannable groups */
+      .stat-group-label {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        margin: 18px 0 8px;
+      }
+      .stat-group-label:first-child {
+        margin-top: 0;
       }
 
       /* Home dashboard summary strip */
@@ -970,7 +1165,9 @@
       /* Stats */
       .stat-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        /* auto-FIT (not auto-fill) so the tiles stretch to fill the row's full
+           width instead of bunching left with empty phantom columns on the right. */
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
         gap: 12px;
         margin-bottom: 26px;
       }
@@ -1672,8 +1869,9 @@
         <nav id="nav">
           <a href="#home" data-view="home">Home</a>
           <a href="#inventory" data-view="inventory">Inventory</a>
-          <a href="#stats" data-view="stats">Stats</a>
           <a href="#buybacks" data-view="buybacks">Buy-Backs</a>
+          <a href="#stats" data-view="stats">Stats</a>
+          <a href="#referrals" data-view="referrals">Referrals</a>
           <a href="#store" data-view="store">Store Data</a>
           <a href="#developers" data-view="developers">Developers</a>
         </nav>
@@ -1760,13 +1958,17 @@
               <h3>Inventory</h3>
               <p>Ships, upgrades, add-ons. Browse, search, and filter your fleet.</p>
             </a>
+            <a class="home-card" href="#buybacks" data-view="buybacks">
+              <h3>Buy-Backs</h3>
+              <p>Melted pledges you can re-acquire from RSI.</p>
+            </a>
             <a class="home-card needs-data" href="#stats" data-view="stats">
               <h3>Stats</h3>
               <p>Fleet value, totals, and breakdowns by category.</p>
             </a>
-            <a class="home-card" href="#buybacks" data-view="buybacks">
-              <h3>Buy-Backs</h3>
-              <p>Melted pledges you can re-acquire from RSI.</p>
+            <a class="home-card" href="#referrals" data-view="referrals">
+              <h3>Referrals</h3>
+              <p>Your recruits, prospects, rewards, and referral stats.</p>
             </a>
             <a class="home-card" href="#store" data-view="store">
               <h3>Store Data <span class="badge-soon">Planned</span></h3>
@@ -1806,6 +2008,11 @@
       <section class="view" id="view-stats">
         <h2 class="section-title">Stats</h2>
         <div id="stats-body"></div>
+      </section>
+
+      <!-- REFERRALS -->
+      <section class="view" id="view-referrals">
+        <h2 class="section-title">Referrals</h2>
         <div id="referrals-body"></div>
       </section>
 
