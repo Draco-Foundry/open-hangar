@@ -37,8 +37,8 @@
 
   // CCU (Cross-Chassis Upgrade) names look like "Upgrade - <from> to <to>".
   // We gate on the "Upgrade -" prefix AND the " to " join so a stray
-  // "Upgrade -" without a target can't false-positive. Captures from/to for the
-  // future CCU-chain optimizer.
+  // "Upgrade -" without a target can't false-positive. Captures from/to so the
+  // CCU can be classified and displayed (the "from → to" chain).
   //
   // NOTE: the previous scaffold used /^\s*upgrade\s*-.*-/i (two dashes). RSI's
   // real names carry a single dash ("Upgrade - Pulse to C8R Pisces ..."), so the

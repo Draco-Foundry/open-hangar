@@ -1837,8 +1837,7 @@
           </p>
           <ul class="muted">
             <li>show the current store value of everything in your hangar,</li>
-            <li>compare what you paid vs. today's price,</li>
-            <li>and power CCU-chain planning (shortest/cheapest path between ships).</li>
+            <li>and compare what you paid vs. today's price.</li>
           </ul>
           <p class="muted">
             Planned source: the cached ship-matrix API, kept separate from the core scraper. Tracked
@@ -1934,9 +1933,11 @@
             above) to back it up or feed it into your own project; import restores a previous
             export. Import restores the <code>sources</code> (holdings); the
             <code>account</code> block is a read-only snapshot for consumers — the Citizen Card
-            always reflects the live RSI session. An opt-in, whitelisted messaging API
-            (<code>externally_connectable</code>) so approved sites can request the database
-            directly is still on the roadmap.
+            always reflects the live RSI session. Still on the roadmap: an opt-in way for sites you
+            approve to ask the extension for your data directly, instead of exporting a file by
+            hand. It would be limited to a short list of domains you trust, using the browser's
+            <code>externally_connectable</code> messaging channel (note this isn't supported
+            identically across Chrome, Firefox, and Safari).
           </p>
           <div class="data-actions">
             <button id="export-db">Export JSON</button>
