@@ -1,0 +1,13 @@
+# Normalize line endings: store everything as LF in the repo, so Prettier's
+# format:check (which expects LF) passes on every OS and contributors on Windows
+# don't introduce CRLF churn. Text files are auto-detected; force LF for the
+# source/text types we ship.
+* text=auto eol=lf
+
+# Binary assets — never touch their bytes.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.svg text eol=lf
+*.ico binary
