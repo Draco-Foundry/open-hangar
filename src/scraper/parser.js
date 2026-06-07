@@ -264,7 +264,10 @@
   //   • art         → best-effort: an <img> or a background-image in the card
   // Selector map derived from the MIT-licensed SC-Open/hangarlink-hangarexport
   // extension. Returns:
-  //   { id, name, image, date, contains, href, fromShipId, toShipId, toSkuId, kind }
+  //   { id, name, image, date, contains, href, wasUpgraded, fromShipId, toShipId,
+  //     toSkuId, kind }
+  // (`wasUpgraded` = a melted CCU'd ship reverted to its original; its name suffix
+  //  is stripped and its stale "Contained" string discarded — see below.)
   ns.parseBuybacksFromDOM = function parseBuybacksFromDOM(root = document) {
     const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
     const out = [];
@@ -308,21 +311,35 @@
       const price =
         clean(node.querySelector('.price, [class*="price"], [class*="cost"]')?.textContent) || '';
 
+      // Melted-CCU quirk: when an upgraded ship is melted, RSI reverts it to the
+      // ORIGINAL ship but tags the name "<ship> - upgraded" and leaves a STALE
+      // "Contained" cell naming the former CCU target (e.g. "Tiburon and 2 items")
+      // — which you do NOT get back. So for "- upgraded" buybacks, drop the suffix
+      // and discard the misleading contains string; the original ship is the truth.
+      const wasUpgraded = /\s-\s*upgraded\s*$/i.test(name);
+      let displayName = name;
+      let displayContains = contains;
+      if (wasUpgraded) {
+        displayName = name.replace(/\s-\s*upgraded\s*$/i, '').trim();
+        displayContains = ''; // stale CCU-target data — not what's actually returned
+      }
+
       // A buy-back can itself be a CCU ("Upgrade - X to Y"); detect it so the UI
       // can show the from→to flow and resolve art from the *target* ship.
-      const ccu = ns.detectCCU(name);
-      const kind = ns.classifyBuyback(name, contains); // ship|ccu|paint|addon|coupon
+      const ccu = ns.detectCCU(displayName);
+      const kind = ns.classifyBuyback(displayName, displayContains); // ship|ccu|paint|addon|coupon
 
       out.push({
         id: String(id),
-        name,
+        name: displayName,
         image,
         date,
-        contains,
+        contains: displayContains,
         href,
         price,
         isCCU: !!ccu,
         ccu,
+        wasUpgraded, // true = a melted CCU'd ship, reverted to its original
         fromShipId,
         toShipId,
         toSkuId,

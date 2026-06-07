@@ -96,3 +96,21 @@ test('parseBuybacks returns [] for empty input', () => {
   assert.deepEqual(OpenHangar.parseBuybacks(null), []);
   assert.deepEqual(OpenHangar.parseBuybacks('<div>nothing</div>'), []);
 });
+
+test('melted-CCU buy-back: strips "- upgraded" and drops the stale contained ship', () => {
+  // RSI reverts a melted CCU'd ship to the original but leaves a "- upgraded" name
+  // and a stale "Contained" cell naming the former CCU target (which you DON'T get).
+  const html = `<article>
+      <h1>Standalone Ships - Mustang Alpha - upgraded</h1>
+      <dl>
+        <dt>Last Modified</dt><dd>May 30, 2026</dd>
+        <dt>Contained</dt><dd></dd><dd>Tiburon and 2 items</dd><dd></dd>
+      </dl>
+      <a class="holosmallbtn" href="/account/buy-back-pledges/reclaim/555" data-pledgeid="555">Reclaim</a>
+    </article>`;
+  const [b] = OpenHangar.parseBuybacks(html);
+  assert.equal(b.name, 'Standalone Ships - Mustang Alpha'); // "- upgraded" stripped
+  assert.equal(b.contains, ''); // stale CCU-target ("Tiburon…") discarded
+  assert.equal(b.wasUpgraded, true);
+  assert.equal(b.kind, 'ship');
+});

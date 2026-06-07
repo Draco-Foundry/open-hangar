@@ -3,7 +3,7 @@
 [![Roadmap](https://img.shields.io/badge/%F0%9F%97%BA%EF%B8%8F-Roadmap-orange?style=for-the-badge)](ROADMAP.md)
 [![Contributing](https://img.shields.io/badge/Contributing-guide-blueviolet?style=for-the-badge)](CONTRIBUTING.md)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.3-blue?style=for-the-badge)](manifest.json)
+[![Version](https://img.shields.io/badge/version-0.2.4-blue?style=for-the-badge)](manifest.json)
 
 Open Hangar is an open-source browser extension that reads your own Star Citizen /
 RSI account and saves it as clean, structured data on your own machine — so you, or
