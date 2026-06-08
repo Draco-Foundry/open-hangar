@@ -86,8 +86,9 @@ the exact request regardless of operation name. Record:
 
 - Add a GraphQL source in `lib.js`: `POST /graphql` with `{ credentials: 'include' }`,
   body `{ operationName, query, variables }`, paginated via `variables`.
-- If it needs an anti-CSRF token header, read it via `getCsrfToken()` (already in
-  parser.js) — check `<meta>` / cookie / JS global for where RSI stores it.
+- If it needs an anti-CSRF token header, add a small token reader (RSI exposes the
+  token via a `<meta>` tag, cookie, or JS global). A `getCsrfToken()` helper used to
+  live in parser.js but was removed to keep the read-only audit story clean.
 - If it uses Apollo **persisted queries** (body has only `extensions.persistedQuery.sha256Hash`,
   no `query` text), send the full query on first call (standard APQ fallback).
 - Parse the JSON response into the same normalized shape as pledges where possible.

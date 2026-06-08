@@ -39,9 +39,11 @@ Here's how to find the new shape:
    - **Classification** — `normalizePledge()` derives `isCCU` / `isAddOn` /
      `containsShip` from the name and `.kind` set. If RSI changes naming
      conventions, update the `CCU_RE` / `ADDON_NAME_RE` patterns there.
-   - **Token (only if you add write actions)** — `getCsrfToken()` in `parser.js`
-     looks for an anti-forgery token in a `<meta>` tag, cookie, or JS global. The
-     read-only scan doesn't need it, but a future melt/buyback action would.
+   - **Token (only if you add write actions)** — the read-only scan needs no
+     anti-forgery token, so none is read. (An earlier `getCsrfToken()` helper was
+     removed to keep the audit story unambiguously read-only.) A future melt/buyback
+     action would re-introduce a token reader — RSI exposes the token via a `<meta>`
+     tag, cookie, or JS global.
 5. Confirm how "no more pages" is signaled. RSI clamps an out-of-range `?page=`
    to the last page rather than returning empty, so `OH.scanHangar()` terminates
    when a page yields **no new pledge IDs** (dedup-based), not on an empty
@@ -69,11 +71,11 @@ The scan is persisted automatically under `storage.db.sources[id]`, and
 
 ## Versioning
 
-[SemVer](https://semver.org), with one project rule: we stay in `0.0.x` during
-pre-release development. **`0.1.0` is reserved for the first public GitHub
-release.** After that, bump **minor** (`0.2.0`…) for features and **patch**
-(`0.1.1`…) for fixes; `1.0.0` is the first "official/stable" release. The version
-lives only in `manifest.json` (the Home page badge reads it from there).
+[SemVer](https://semver.org). The project is in its `0.x` pre-`1.0` line (the first
+public Chrome Web Store launch ships from `0.2.x`): bump **minor** (`0.3.0`…) for
+features and **patch** (`0.2.7`…) for fixes; `1.0.0` is reserved for the first
+"official/stable" release. `manifest.json` is the source of truth for the version
+(the Home page badge reads it from there); keep `package.json` in sync.
 
 ## Principles
 

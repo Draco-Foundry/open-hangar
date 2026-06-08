@@ -110,11 +110,51 @@
     return scannedAt;
   }
 
+  // Recovery slot. When data is auto-cleared because a *different* RSI account
+  // signs in, the previous DB is stashed here first, so an accidental account
+  // switch (or a transiently mis-served account page) can't irreversibly destroy
+  // a large scan. A manual "Clear Data" is an explicit, confirmed wipe and purges
+  // this slot too.
+  const RECOVERY_KEY = 'dbRecovery';
+
   // Wipe all scraped data (every source + the account cache + legacy keys),
   // leaving UI preferences (e.g. uiLayout) intact. Used when a different RSI
   // account is detected, or for a manual "clear data" action.
-  OH.clearData = async function clearData() {
-    await chrome.storage.local.remove([DB_KEY, 'hangar', 'scannedAt', 'account']);
+  //   { backup: true }  → snapshot the current DB to the recovery slot first
+  //                       (the auto-clear path; recoverable via OH.recoverData).
+  //   { backup: false } → full wipe, including any recovery snapshot (manual).
+  OH.clearData = async function clearData({ backup = false } = {}) {
+    if (backup) {
+      const db = await OH.loadDB();
+      const hasData =
+        db &&
+        (db.owner ||
+          Object.values(db.sources || {}).some(
+            (s) => s && Array.isArray(s.items) && s.items.length,
+          ));
+      if (hasData) await chrome.storage.local.set({ [RECOVERY_KEY]: { at: Date.now(), db } });
+      await chrome.storage.local.remove([DB_KEY, 'hangar', 'scannedAt', 'account']);
+      return;
+    }
+    await chrome.storage.local.remove([DB_KEY, 'hangar', 'scannedAt', 'account', RECOVERY_KEY]);
+  };
+
+  // The most recent auto-cleared snapshot ({ at, db }), or null. Lets the UI
+  // offer a one-click restore after a different-account auto-clear.
+  OH.getRecovery = async function getRecovery() {
+    const raw = await chrome.storage.local.get(RECOVERY_KEY);
+    const rec = raw[RECOVERY_KEY];
+    return rec && rec.db && rec.db.schemaVersion ? rec : null;
+  };
+
+  // Restore a previously auto-cleared snapshot back into the live DB and drop the
+  // recovery slot. Returns the restored DB, or null if there was nothing to restore.
+  OH.recoverData = async function recoverData() {
+    const rec = await OH.getRecovery();
+    if (!rec) return null;
+    await chrome.storage.local.set({ [DB_KEY]: rec.db });
+    await chrome.storage.local.remove(RECOVERY_KEY);
+    return rec.db;
   };
 
   // Log the user out of RSI by clearing every robertsspaceindustries.com cookie —

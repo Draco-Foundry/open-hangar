@@ -88,8 +88,9 @@ bottom. Items marked ✅ are ready in the repo; ⬜ need you to do them.
 
 **`host_permissions` → `https://api.star-citizen.wiki/*`**
 
-> Public, read-only API used to fetch the current game version and ship images for
-> items RSI ships without art. No credentials or personal data are sent.
+> Public, read-only API used as a fallback for the current game version and for ship
+> art when RSI's own public ship-matrix has no image for an item RSI ships without
+> art. No credentials or personal data are sent.
 
 ## 6. Listing copy (ready to paste)
 
@@ -128,7 +129,7 @@ bottom. Items marked ✅ are ready in the repo; ⬜ need you to do them.
   rather soft-launch by link first — optional, not required).
 - ⬜ Submit. First review with the `cookies` permission can take **several days to
   ~2 weeks**; have the §5 justifications ready in case of a clarification email.
-- ⬜ After approval, tag the release (e.g. `git tag v0.2.1 && git push origin v0.2.1`)
+- ⬜ After approval, tag the release (e.g. `git tag v0.2.6 && git push origin v0.2.6`)
   and draft a GitHub Release.
 
 ## 8. Post-launch

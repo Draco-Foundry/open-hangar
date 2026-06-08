@@ -1886,6 +1886,7 @@ clearBtn.addEventListener('click', async () => {
   state.referral = null;
   setStatus('Local data cleared.');
   renderAccount(); // clear the referral pill too
+  refreshRecoveryUI(); // a full manual wipe also drops any recovery snapshot
   route();
 });
 
@@ -1893,12 +1894,35 @@ clearBtn.addEventListener('click', async () => {
 const exportBtn = $('#export-db');
 const importBtn = $('#import-db');
 const importFile = $('#import-file');
+const restoreBtn = $('#restore-db');
 const dataMsg = $('#data-msg');
 
 function setDataMsg(text, isError = false) {
   if (!dataMsg) return;
   dataMsg.textContent = text;
   dataMsg.classList.toggle('error', isError);
+}
+
+// Show the "Restore previous hangar" button only when an auto-cleared snapshot
+// exists (i.e. a different RSI account triggered a backup-and-clear).
+async function refreshRecoveryUI() {
+  if (!restoreBtn) return;
+  const rec = await OH.getRecovery();
+  restoreBtn.hidden = !rec;
+}
+
+if (restoreBtn) {
+  restoreBtn.addEventListener('click', async () => {
+    const db = await OH.recoverData();
+    if (!db) {
+      setDataMsg('Nothing to restore.', true);
+      restoreBtn.hidden = true;
+      return;
+    }
+    // Reload from the restored DB via the normal init path — guarantees state,
+    // pills, and views all reflect the recovered data consistently.
+    location.reload();
+  });
 }
 
 const sourceItemCount = (sources) =>
@@ -1978,7 +2002,7 @@ async function reconcileAccount() {
   }
   if (acct.loggedIn && acct.nickname && state.owner && acct.nickname !== state.owner.nickname) {
     const prev = state.owner.displayname || state.owner.nickname;
-    await OH.clearData();
+    await OH.clearData({ backup: true }); // recoverable — see Restore in Developers
     state.items = [];
     state.scannedAt = null;
     state.buybacks = [];
@@ -1987,7 +2011,8 @@ async function reconcileAccount() {
     state.shown = new Set();
     state.bbShown = new Set();
     state.referral = null;
-    return `Cleared ${prev}'s hangar — a different account is signed in. Scan to load this account's hangar.`;
+    refreshRecoveryUI();
+    return `Cleared ${prev}'s hangar — a different account is signed in. The previous data was saved; use “Restore previous hangar” in the Developers tab to bring it back, or scan to load this account.`;
   }
   return '';
 }
@@ -2029,6 +2054,7 @@ document.addEventListener('visibilitychange', async () => {
   state.bbShown = new Set(presentBbKinds().map((k) => k.key));
   route();
   if (notice) setStatus(notice);
+  await refreshRecoveryUI();
   renderFooter();
   renderSupporters();
 })();

@@ -45,16 +45,19 @@ purpose (§3).
 
 ## 3. Permissions & data handling (for the store reviewer)
 
-| Permission                         | Why it is needed                                                                                                                                                                                  | Scope limit                                                                            |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `storage`                          | Persist the user's own scanned data + UI preferences locally (`chrome.storage.local`).                                                                                                            | Local only; never transmitted.                                                         |
-| `cookies`                          | Implements "Log out of RSI" — clears `robertsspaceindustries.com` cookies (incl. the HttpOnly session cookie page scripts can't remove) so the user can end their RSI session from the extension. | Cookie **values are never read or transmitted**; only removed on explicit user action. |
-| host: `robertsspaceindustries.com` | Read the signed-in user's own account pages via same-session `fetch`, parsed locally.                                                                                                             | Read-only, rate-limited, user's own account only.                                      |
-| host: `api.star-citizen.wiki`      | Public, read-only API for the current game version and ship art for items RSI ships without images.                                                                                               | No credentials or personal data sent.                                                  |
+| Permission                         | Why it is needed                                                                                                                                                                                                                                                    | Scope limit                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `storage`                          | Persist the user's own scanned data + UI preferences locally (`chrome.storage.local`).                                                                                                                                                                              | Local only; never transmitted.                                                         |
+| `cookies`                          | Implements "Log out of RSI" — clears `robertsspaceindustries.com` cookies (incl. the HttpOnly session cookie page scripts can't remove) so the user can end their RSI session from the extension.                                                                   | Cookie **values are never read or transmitted**; only removed on explicit user action. |
+| host: `robertsspaceindustries.com` | Read the signed-in user's own account pages — hangar, buy-backs, balances, and the referrals GraphQL endpoint (a read-only `POST` query) — via same-session `fetch`, parsed locally; also RSI's public ship-matrix index for art on items RSI ships without images. | Read-only, rate-limited, user's own account only.                                      |
+| host: `api.star-citizen.wiki`      | Public, read-only **fallback** API for the current game version and for ship art when RSI's ship-matrix has no image.                                                                                                                                               | No credentials or personal data sent.                                                  |
 
 **Data handling summary (for data-disclosure forms):**
 
-- **Data collected:** only the signed-in user's own RSI account data.
+- **Data collected:** only the signed-in user's own RSI account data. (The referral
+  section of that account lists the user's own recruits/prospects — other citizens'
+  public handles, monikers, and dates — which are likewise stored locally only and
+  never transmitted.)
 - **Where it goes:** stored locally on the user's device. **No server. No
   transmission to the developer or any third party. No sale or sharing of data.**
 - **Credentials:** none requested, entered, or stored. The extension relies on the
