@@ -3,10 +3,12 @@
 Everything needed to submit **Open Hangar** to the Chrome Web Store. Work top to
 bottom. Items marked ✅ are ready in the repo; ⬜ need you to do them.
 
-> See `docs/RSI-TOS-RISK.md` for CIG/RSI compliance notes — short version: this is a
-> well-precedented class of tool (CCUGame et al.), non-commercial and
-> credential-free, so a normal public listing is fine. Just keep the brand out of
-> the title and use your own art (already covered below).
+> See `docs/COMPLIANCE.md` for the full Compliance & Risk Statement (single purpose,
+> per-permission justification, data handling, and the established-precedent peers).
+> Short version: this is a well-precedented, credential-free, non-commercial,
+> open-source class of tool, so a normal public listing is fine — keep the brand out
+> of the title and use your own art (covered below). The statement is written to be
+> pasted/linked for a reviewer if questions arise.
 
 ---
 
