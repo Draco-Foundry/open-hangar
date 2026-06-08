@@ -332,6 +332,7 @@ function route() {
   else if (v === 'referrals') renderReferrals();
   else if (v === 'buybacks') renderBuybacks();
   // 'store' is static markup; About now lives on Home.
+  updateSignedOutBanner(); // re-apply the cached signed-out banner state on this view
 }
 
 window.addEventListener('hashchange', route);
@@ -428,9 +429,11 @@ function renderAccount() {
 
   OH.getAccount().then((a) => {
     // Signed out → replace the whole card with the centred "Log In to RSI" wall.
-    // `null` (couldn't tell) keeps the normal card so a transient error doesn't
-    // lock out a signed-in user.
-    const loggedOut = a.loggedIn === false;
+    // Show the wall whenever we DON'T have a confirmed login (false = logged out,
+    // null = couldn't determine): in both cases there's no live account data, so a
+    // dashed card with no prompt is confusing — better to guide the user to log in.
+    // (A confirmed `true` is the only state that shows the normal card.)
+    const loggedOut = a.loggedIn !== true;
     const acctEl = $('#cc-account'),
       sideEl = $('#cc-side'),
       loEl = $('#cc-loggedout');
@@ -438,6 +441,8 @@ function renderAccount() {
     if (sideEl) sideEl.hidden = loggedOut;
     if (loEl) loEl.hidden = !loggedOut;
     if (logoutBtn) logoutBtn.hidden = a.loggedIn !== true;
+
+    updateSignedOutBanner(loggedOut);
 
     // Avatar (+ subscriber-tier ring)
     if (avEl) {
@@ -540,6 +545,23 @@ function renderAccount() {
 
     renderReferralPill(a);
   });
+}
+
+// Global "signed out, showing cached scan" banner. Shows on EVERY view when the
+// user isn't confirmed-logged-in AND there's locally scanned data still displayed
+// (hangar, buy-backs, or referrals). When logged out with no data at all, the
+// normal empty-state prompts handle it, so we don't show the banner. This is the
+// single place that enforces the "scanned data persists, but labelled as cached"
+// rule across all current and future views.
+// `lastLoggedOut` caches the most recent known login state so route() can re-apply
+// the banner on view switches without re-fetching the account each time.
+let lastLoggedOut = false;
+function updateSignedOutBanner(loggedOut) {
+  if (typeof loggedOut === 'boolean') lastLoggedOut = loggedOut;
+  const el = $('#signedout-banner');
+  if (!el) return;
+  const hasData = state.items.length > 0 || state.buybacks.length > 0 || state.referral != null;
+  el.hidden = !(lastLoggedOut && hasData);
 }
 
 // Citizen Card referral pill: recruit count + code with a copy button. Prefers the

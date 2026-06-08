@@ -518,8 +518,13 @@
       const html = res.ok ? await res.text() : '';
       const obj = extractAccount(html);
       if (!obj) {
+        // We reached the dashboard but found no account object. A genuinely
+        // logged-in dashboard ALWAYS embeds the nickname JSON, so "fetched OK but
+        // no account" means logged out — not merely "couldn't tell". Only a failed
+        // fetch (network/!res.ok) is treated as unknown (null), so a transient
+        // error doesn't wrongly flip a signed-in user to the logged-out wall.
         return {
-          loggedIn: res.ok && !looksLoggedOut(res, html) ? null : false,
+          loggedIn: res.ok ? false : null,
           fetchedAt: Date.now(),
         };
       }

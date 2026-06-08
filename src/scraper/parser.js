@@ -302,8 +302,14 @@
       }
 
       const img = node.querySelector('img');
-      const image =
+      let image =
         img?.getAttribute('src') || bgUrl(node.querySelector('[style*="background"]')) || null;
+      // RSI sometimes returns a RELATIVE image path (e.g. "/media/…"); in the
+      // extension page context that resolves to chrome-extension://… and 404s.
+      // Absolutize any root-relative URL to the RSI host so the <img> loads.
+      if (image && image.startsWith('/')) {
+        image = 'https://robertsspaceindustries.com' + image;
+      }
 
       // Best-effort buy-back price (store-credit cost). RSI's exact markup here is
       // unconfirmed, so we read a price-labelled element if one exists; otherwise

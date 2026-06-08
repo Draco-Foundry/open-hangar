@@ -1853,6 +1853,27 @@
         font-weight: 600;
         padding: 4px 0;
       }
+      /* Global signed-out banner (cached-data notice), shown above every view */
+      .signedout-banner {
+        margin: 0 0 18px;
+        padding: 8px 14px;
+        border: 1px solid rgba(240, 180, 41, 0.4);
+        background: rgba(240, 180, 41, 0.1);
+        border-radius: 8px;
+        font-size: 13px;
+        color: var(--text);
+      }
+      .signedout-banner[hidden] {
+        display: none;
+      }
+      .signedout-banner a {
+        color: var(--link);
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .signedout-banner a:hover {
+        text-decoration: underline;
+      }
       .dev-linkbox a:hover {
         text-decoration: underline;
       }
@@ -1895,6 +1916,18 @@
           <a href="#developers" data-view="developers">Developers</a>
         </nav>
       </header>
+
+      <!-- Global "signed out, showing cached scan" banner. Shown on every view when
+           the user is logged out of RSI but local scanned data is still displayed. -->
+      <div id="signedout-banner" class="signedout-banner" hidden>
+        <span
+          >Signed out of RSI — showing your last saved scan.
+          <a href="https://robertsspaceindustries.com/connect" target="_blank" rel="noopener"
+            >Log in to RSI ↗</a
+          >
+          to refresh.</span
+        >
+      </div>
 
       <!-- HOME -->
       <section class="view active" id="view-home">
