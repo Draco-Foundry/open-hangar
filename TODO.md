@@ -95,6 +95,34 @@ and the reset date are useful at a glance.
 - **UI:** a pill on the Citizen Card like Store Credit / UEC / REC, e.g.
   "Buyback Tokens 3 · next Jun 12".
 
+## Multi-account caching + character switcher (needs research first)
+
+Today the model is **single-account by design**: the DB holds one account's data,
+and `reconcileAccount` (dashboard.js) **wipes** it when a different RSI account signs
+in, so accounts never mix. Idea: instead of wiping, **cache each account's scan
+separately** and let the user pick which character to view via a dropdown/switcher.
+
+Research before building — this is an architecture change, not a quick add:
+
+- **Storage shape.** Move from one DB to keyed-by-owner, e.g.
+  `{ accounts: { [nickname]: { schemaVersion, sources, owner, scannedAt } },
+active }`. Plan a migration from the current single-DB shape (v6 cache → vNext).
+- **What "active" means.** When signed in to RSI, does the UI auto-select the
+  logged-in account, or honor the manual dropdown pick? Probably: live session wins,
+  but you can browse any cached account while signed out (ties into the existing
+  "cached scan" banner).
+- **Privacy/consent.** Caching multiple people's data on a shared computer is more
+  sensitive than the current wipe-on-switch behavior — which exists precisely as a
+  multi-account _safety_ feature. Keep an explicit per-account "Clear" + a global
+  "Clear all," and make retention obvious. Don't silently accumulate accounts.
+- **UI.** A character dropdown near the Citizen Card (avatar + handle); switching
+  re-renders all views from that account's cached data. Label clearly when viewing a
+  non-active (cached) account.
+- **Export/import.** Decide whether export is per-account (current behavior) or
+  can bundle all accounts; importing shouldn't clobber other cached accounts.
+- **Scope check.** Weigh against the project's privacy-first stance — the current
+  wipe-on-switch is a feature, not a gap. This should be **opt-in**, not the default.
+
 ## Make a scan survive closing the dashboard tab (needs research first)
 
 Today the scan persists across the extension's internal views (single page) but
@@ -175,6 +203,44 @@ Two layers of fix:
 
 Keep `kind` backward-compatible (ship / ccu / addon / coupon / other) and extend
 with the finer types; update the inventory filter chips + Stats accordingly.
+
+## Hangar data enrichment + interop export (planned — do in one signed-in session)
+
+Four related roadmap features. The first three depend on what RSI's live hangar
+markup actually exposes, which needs a quick **signed-in inspection of a real
+pledge card** before building (don't guess selectors — silent bad data). The fourth
+is fully specced and ready. Tackle together next time RSI is logged in.
+
+1. **Melt value per item.** Show each pledge's store-credit melt value in Inventory
+   (and as a Stats total: "fleet melt value"). **Unconfirmed** whether melt value is
+   in the hangar DOM — today we only read `js-pledge-value` (purchase price). Inspect
+   a pledge card for a melt/credit field; if absent in the list view, it may require
+   the per-pledge melt/manage endpoint (heavier — keep read-only, no actions).
+2. **Base item of a package/CCU'd ship.** Surface the original base ship for
+   packages and upgraded ships in the live hangar (we already do this for melted
+   buybacks via the `- upgraded` fix). Check the package markup for the base-item
+   field; `contents[]` may already carry enough to derive it.
+3. **Status flags: LTI / Warbond / Gift / (subscriber).** Add filter chips for these
+   collector-relevant attributes. **Unconfirmed** whether they're in the card markup
+   (as classes/labels/inputs) — inspect first; if present, parse into the pledge
+   model and add Inventory filters.
+4. **Hangar Transfer Format (HTF) export — ✅ specced, ready to build.** A public
+   community interchange format consumed by Erkul (DPS calc), FleetYards, Starship42
+   (3D viewer), HangarXPLOR — exporting it directly serves the "be the data layer"
+   goal. Spec: `https://docs.starcitizen.fans` (`hangar-transfer-format.yaml`, OAS3,
+   v0.0.1 draft). Core schemas:
+   - `rsi.pledge.json`: `pledge_id, pledge_name, pledge_date, pledge_cost` (we have
+     id/name/cost; **pledge_date is not currently scraped** — check the card).
+   - `rsi.ship.json`: `ship_code, ship_name, manufacturer_code, manufacturer_name`.
+   - `core.entity.json`: `name, entity_type` (ship | component | decoration).
+   - **Ship-code mapping:** ship names → codes (e.g. `ANVL_Carrack`) via
+     `https://docs.starcitizen.fans/ship-codes.json` (array of
+     `{ship_code, ship_name, manufacturer_code, manufacturer_name}`, ~186 ships).
+     Fuzzy-match locally + cache, same pattern as `OH.getShipImage` / the ship-matrix
+     (CSP-safe, no bundled blob). Add `docs.starcitizen.fans` to `host_permissions`.
+   - **UI:** an "Export HTF" button beside the existing JSON export on the Developers
+     page. Pledge-level export works with current data; ship-code mapping is the only
+     fuzzy part — can ship pledge-only first, add codes second.
 
 ## Account identity + funds — ✅ SOLVED (server-side)
 
