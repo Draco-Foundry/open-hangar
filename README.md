@@ -3,7 +3,7 @@
 [![Roadmap](https://img.shields.io/badge/%F0%9F%97%BA%EF%B8%8F-Roadmap-orange?style=for-the-badge)](ROADMAP.md)
 [![Contributing](https://img.shields.io/badge/Contributing-guide-blueviolet?style=for-the-badge)](CONTRIBUTING.md)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.5-blue?style=for-the-badge)](manifest.json)
+[![Version](https://img.shields.io/badge/version-0.2.6-blue?style=for-the-badge)](manifest.json)
 
 Open Hangar is an open-source browser extension that reads your own Star Citizen /
 RSI account and saves it as clean, structured data on your own machine — so you, or
@@ -125,7 +125,12 @@ src/
 
 ## Install
 
-Open Hangar isn't in the extension stores yet, so for now you load it yourself.
+**Chrome / Edge / Brave** (from the store): install **Open Hangar** from the
+[Chrome Web Store](https://chromewebstore.google.com/) <!-- TODO: replace with the live listing URL once published -->.
+After installing, sign in to `robertsspaceindustries.com` in the same browser, click
+the Open Hangar icon, then **Scan Hangar**.
+
+Prefer to run it from source, or on a browser without a store build? Load it unpacked:
 
 **Chrome / Edge / Brave** (unpacked):
 

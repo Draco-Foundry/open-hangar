@@ -22,17 +22,6 @@
 (function () {
   const ns = (globalThis.OpenHangar = globalThis.OpenHangar || {});
 
-  // Kept for completeness; the DOM scrape doesn't need a token, but a future
-  // melt/buyback action might. See CONTRIBUTING.md if this returns null.
-  ns.getCsrfToken = function getCsrfToken() {
-    const meta = document.querySelector('meta[name="csrf-token"], meta[name="rsi-token"]');
-    if (meta && meta.content) return meta.content;
-    const m = document.cookie.match(/(?:^|;\s*)(?:Rsi-Token|csrf_token)=([^;]+)/);
-    if (m) return decodeURIComponent(m[1]);
-    if (globalThis.RSI && globalThis.RSI.token) return globalThis.RSI.token;
-    return null;
-  };
-
   // --- Classification -------------------------------------------------------
 
   // CCU (Cross-Chassis Upgrade) names look like "Upgrade - <from> to <to>".

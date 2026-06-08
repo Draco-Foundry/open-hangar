@@ -36,12 +36,14 @@ uninstalling the extension (which deletes all stored data).
 The extension makes a small number of outbound requests, none of which carry your
 personal data:
 
-- **robertsspaceindustries.com** — to read your own account (above) and to load
-  hangar thumbnails and the home banner image.
-- **api.star-citizen.wiki** (public, read-only) — to fetch the current game version
-  and ship images for items RSI ships without art. These image lookups, done by ship
-  name, are cached locally and are the only outbound signal that weakly relates to
-  what you are viewing; no credentials or personal data are sent.
+- **robertsspaceindustries.com** — to read your own account (above), to load hangar
+  thumbnails and the home banner image, and to look up ship art for items RSI ships
+  without images from RSI's public ship-matrix index. No credentials are sent for the
+  ship-matrix lookup.
+- **api.star-citizen.wiki** (public, read-only) — a fallback for the current game
+  version and for ship art when the ship-matrix has no image. These lookups, done by
+  ship name, are cached locally and are the only outbound signal that weakly relates
+  to what you are viewing; no credentials or personal data are sent.
 
 ## Permissions and why they are used
 
