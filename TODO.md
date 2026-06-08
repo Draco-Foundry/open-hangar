@@ -225,43 +225,34 @@ Two layers of fix:
 Keep `kind` backward-compatible (ship / ccu / addon / coupon / other) and extend
 with the finer types; update the inventory filter chips + Stats accordingly.
 
-## Hangar data enrichment + interop export (planned — do in one signed-in session)
+## Hangar Transfer Format (HTF) export (planned)
 
-Four related roadmap features. The first three depend on what RSI's live hangar
-markup actually exposes, which needs a quick **signed-in inspection of a real
-pledge card** before building (don't guess selectors — silent bad data). The fourth
-is fully specced and ready. Tackle together next time RSI is logged in.
+> Scope note: trading-oriented hangar enrichment (per-item melt value, base-item
+> surfacing, LTI/Warbond/Gift status filters) was **considered and deliberately
+> dropped** — that's CCU/trade-optimizer territory (HangarXPLOR et al.), not Open
+> Hangar's "clean reusable data layer" goal. Live-markup inspection (June 2026) also
+> showed none are simple field reads: melt value isn't in the hangar DOM (would be a
+> derived calc), and Warbond/Gift flags weren't present on inspected cards. Not
+> pursuing. HTF export below is kept because it directly serves the data-layer goal.
 
-1. **Melt value per item.** Show each pledge's store-credit melt value in Inventory
-   (and as a Stats total: "fleet melt value"). **Unconfirmed** whether melt value is
-   in the hangar DOM — today we only read `js-pledge-value` (purchase price). Inspect
-   a pledge card for a melt/credit field; if absent in the list view, it may require
-   the per-pledge melt/manage endpoint (heavier — keep read-only, no actions).
-2. **Base item of a package/CCU'd ship.** Surface the original base ship for
-   packages and upgraded ships in the live hangar (we already do this for melted
-   buybacks via the `- upgraded` fix). Check the package markup for the base-item
-   field; `contents[]` may already carry enough to derive it.
-3. **Status flags: LTI / Warbond / Gift / (subscriber).** Add filter chips for these
-   collector-relevant attributes. **Unconfirmed** whether they're in the card markup
-   (as classes/labels/inputs) — inspect first; if present, parse into the pledge
-   model and add Inventory filters.
-4. **Hangar Transfer Format (HTF) export — ✅ specced, ready to build.** A public
-   community interchange format consumed by Erkul (DPS calc), FleetYards, Starship42
-   (3D viewer), HangarXPLOR — exporting it directly serves the "be the data layer"
-   goal. Spec: `https://docs.starcitizen.fans` (`hangar-transfer-format.yaml`, OAS3,
-   v0.0.1 draft). Core schemas:
-   - `rsi.pledge.json`: `pledge_id, pledge_name, pledge_date, pledge_cost` (we have
-     id/name/cost; **pledge_date is not currently scraped** — check the card).
-   - `rsi.ship.json`: `ship_code, ship_name, manufacturer_code, manufacturer_name`.
-   - `core.entity.json`: `name, entity_type` (ship | component | decoration).
-   - **Ship-code mapping:** ship names → codes (e.g. `ANVL_Carrack`) via
-     `https://docs.starcitizen.fans/ship-codes.json` (array of
-     `{ship_code, ship_name, manufacturer_code, manufacturer_name}`, ~186 ships).
-     Fuzzy-match locally + cache, same pattern as `OH.getShipImage` / the ship-matrix
-     (CSP-safe, no bundled blob). Add `docs.starcitizen.fans` to `host_permissions`.
-   - **UI:** an "Export HTF" button beside the existing JSON export on the Developers
-     page. Pledge-level export works with current data; ship-code mapping is the only
-     fuzzy part — can ship pledge-only first, add codes second.
+A public community **interchange format** consumed by other SC tools (Erkul DPS
+calc, FleetYards, Starship42 3D viewer, HangarXPLOR) — exporting it directly serves
+the "be the data layer other tools build on" mission. Spec:
+`https://docs.starcitizen.fans` (`hangar-transfer-format.yaml`, OAS3, v0.0.1 draft).
+
+- Core schemas:
+  - `rsi.pledge.json`: `pledge_id, pledge_name, pledge_date, pledge_cost` (we have
+    id/name/cost; **pledge_date is not currently scraped** — check the card).
+  - `rsi.ship.json`: `ship_code, ship_name, manufacturer_code, manufacturer_name`.
+  - `core.entity.json`: `name, entity_type` (ship | component | decoration).
+- **Ship-code mapping:** ship names → codes (e.g. `ANVL_Carrack`) via
+  `https://docs.starcitizen.fans/ship-codes.json` (array of
+  `{ship_code, ship_name, manufacturer_code, manufacturer_name}`, ~186 ships).
+  Fuzzy-match locally + cache, same pattern as `OH.getShipImage` / the ship-matrix
+  (CSP-safe, no bundled blob). Add `docs.starcitizen.fans` to `host_permissions`.
+- **UI:** an "Export HTF" button beside the existing JSON export on the Developers
+  page. Pledge-level export works with current data; ship-code mapping is the only
+  fuzzy part — can ship pledge-only first, add codes second.
 
 ## Account identity + funds — ✅ SOLVED (server-side)
 
