@@ -166,13 +166,9 @@ number of peers — the HangarXPLOR family, StarCitizen Hangar helper, SCTool Sh
 Exporter, SC Labs Importer, Guardians Hub Sync, ATLAS — instead declare _"will not
 collect or use your data,"_ the same posture Open Hangar takes.)
 
-**One internal inconsistency worth noting** (not to disparage a peer, but because it
-illustrates the bar reviewers already clear): **Outreach RSI Sync** simultaneously
-claims _"100% local processing … does not send any data to a third-party server"_
-and, lower in the same listing, _"the data is securely sent to your profile on our
-web platform."_ Open Hangar's local-only claim has no such tension: there is no web
-platform and no server for data to be sent to (§3, §4), and the claim is verifiable
-in the open source.
+Open Hangar's local-only claim is not merely a declaration: with no web platform and
+no backend (§3, §4), there is nowhere for data to be sent, and a reviewer can confirm
+this directly in the open source.
 
 **Representative flagship precedents** (the highest-install, most directly
 comparable peers):
