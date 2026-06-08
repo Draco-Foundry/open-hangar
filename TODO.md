@@ -15,6 +15,27 @@
   Citizen Card without crowding it? Maybe a collapsible line under the org, or a
   hover/tooltip. Needs a layout decision before building.
 
+## Scan resilience — retry transient fetch failures (planned)
+
+`scanHtmlSource` in `lib.js` currently **aborts the whole scan on the first failed
+page fetch** — a network blip or a transient RSI 5xx on page N kills the run and
+discards everything. RSI's account pages hiccup often enough that a single retry
+noticeably improves reliability.
+
+- **Retry transient failures only:** a network error (the `catch`), or a `5xx`/`429`
+  response. Do **NOT** retry `401`/`403` (session expired — fail fast and tell the
+  user to sign in) or a clean `4xx`.
+- **Small bounded backoff:** e.g. up to 2–3 retries with increasing delay
+  (~`DELAY_MS`, then 2×, 4×). Keep it polite — this is a good-citizen scraper; no
+  tight retry loops.
+- **Partial-success behavior:** if a mid-scan page ultimately fails after retries,
+  consider returning the pages gathered so far (like the referral list's
+  keep-partial-after-page-1 pattern) rather than discarding everything, with a clear
+  "scanned N of … then stopped" notice.
+- Applies to the hangar + buy-back HTML sources; the referral GraphQL walk already
+  keeps partial results, so align the behaviors. Keep the politeness `DELAY_MS`
+  between successful pages unchanged.
+
 ## Buybacks — ✅ SOLVED (server-rendered HTML, not GraphQL)
 
 The earlier conclusion below was **wrong**: buy-backs are NOT GraphQL-only. A full
