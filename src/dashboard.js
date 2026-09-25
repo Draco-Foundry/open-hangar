@@ -257,6 +257,7 @@ const state = {
   bbQuery: '',
   bbSort: 'date-desc', // default to newest buy-backs first
   bbShown: new Set(), // buy-back kind filter
+  bbTraits: new Set(), // buy-back trait filter (AND)
   bbLayout: 'gallery', // gallery | compact | list | market (independent of inventory)
   owner: null, // { nickname, displayname } the stored data was scanned from
   shown: new Set(), // inventory kind filter
@@ -726,10 +727,7 @@ function computeShown() {
     ? state.items.filter((p) => state.shown.has(p.kind))
     : state.items.slice();
   // Traits narrow further: a pledge must have every selected trait.
-  if (state.traits.size) {
-    const picked = TRAITS.filter((t) => state.traits.has(t.key));
-    list = list.filter((p) => picked.every((t) => t.test(p)));
-  }
+  list = applyTraits(list, state.traits, pledgeFacets);
   if (q) list = list.filter((p) => haystack(p).includes(q));
   if (state.sort !== 'default') {
     const byName = (a, b) => (a.name || '').localeCompare(b.name || '');
@@ -764,34 +762,60 @@ function computeShown() {
 // so they're a second, AND-combined selection: Ships + LTI + Giftable = LTI ships
 // you can gift. Only traits some pledge actually has are shown.
 const GAME_ITEM_RE = /\b(star citizen|squadron 42)\b.*\b(digital|download|game|package)\b/i;
+
+// Traits read a common "facets" view so the same filters work on hangar pledges
+// (tagged items) and buy-backs (one free-text "Items" line, e.g.
+// "Cutlass Black · Lifetime Insurance"). null = not known for that source.
+function pledgeFacets(p) {
+  return {
+    name: p.name || '',
+    items: p.contents || [],
+    lti: p.insurance === 'LTI',
+    giftable: p.giftable === true,
+    value: Number.isFinite(p.value) ? p.value : null,
+  };
+}
+function buybackFacets(b) {
+  const labels = String(b.contains || '')
+    .split(/\s*[·•|;]\s*|\s*,\s+(?=[A-Z0-9])/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+  return {
+    name: b.name || '',
+    items: labels.map((label) => ({ kind: '', label })),
+    lti: labels.some((l) => /lifetime insurance|\bLTI\b/i.test(l)),
+    giftable: null,
+    value: null,
+  };
+}
+const notInsurance = (c) => !/insurance/i.test(`${c.kind || ''} ${c.label || ''}`);
+
+// Trait filters cut ACROSS kinds (a pack is still a "ship" pledge), so they're a
+// second, AND-combined row under the kind chips: Ships + LTI + Giftable = LTI
+// ships you can gift. A trait only shows if some item in that view has it.
 const TRAITS = [
   {
     key: 'package',
     label: 'Game packages',
     title: 'Pledges that include game access (Star Citizen / Squadron 42)',
-    test: (p) =>
-      /^package\b/i.test(p.name || '') ||
-      (p.contents || []).some(
-        (c) => /^game$/i.test(c.kind || '') || GAME_ITEM_RE.test(c.label || ''),
-      ),
+    test: (f) =>
+      /^package\b/i.test(f.name) ||
+      f.items.some((c) => /^game$/i.test(c.kind || '') || GAME_ITEM_RE.test(c.label || '')),
   },
   {
     // Most packs bundle a ship with paints and gear (e.g. Nine Tails Shogun Pack:
     // 1 vehicle + 1 paint + 8 gear items), so count every item, not just ships.
-    // The insurance line isn't an item.
     key: 'pack',
     label: 'Packs',
     title: 'Pledges that bundle two or more items (ships, paints, gear…)',
-    test: (p) =>
-      (p.contents || []).filter((c) => !/insurance/i.test(`${c.kind || ''} ${c.label || ''}`))
-        .length >= 2,
+    test: (f) => f.items.filter(notInsurance).length >= 2,
   },
-  { key: 'lti', label: 'LTI', title: 'Lifetime insurance', test: (p) => p.insurance === 'LTI' },
+  { key: 'lti', label: 'LTI', title: 'Lifetime insurance', test: (f) => f.lti },
   {
     key: 'giftable',
     label: 'Giftable',
     title: 'RSI shows a Gift action for this pledge',
-    test: (p) => p.giftable === true,
+    test: (f) => f.giftable === true,
   },
   {
     key: 'warbond',
@@ -799,23 +823,38 @@ const TRAITS = [
     // RSI's hangar has no warbond marker, so this relies on the pledge name — some
     // warbond purchases (e.g. packs) aren't named that way and won't show here.
     title: "Pledges whose name says Warbond (RSI doesn't always include it)",
-    test: (p) => /warbond/i.test(p.name || ''),
+    test: (f) => /warbond/i.test(f.name),
   },
   {
     key: 'free',
     label: 'Free / rewards',
     title: '$0 pledges — referral, event and other rewards',
-    test: (p) => p.value === 0,
+    test: (f) => f.value === 0,
   },
 ];
 
-function traitChipHtml(t) {
-  const n = state.items.filter(t.test).length;
-  if (!n) return '';
-  const on = state.traits.has(t.key);
-  return `<button class="chip trait" data-trait="${t.key}" aria-pressed="${on}" title="${OH.escapeHtml(t.title)}">${OH.escapeHtml(
-    t.label,
-  )}<span class="n">${n}</span></button>`;
+// Keep only items having every selected trait.
+function applyTraits(list, selected, facets) {
+  if (!selected.size) return list;
+  const picked = TRAITS.filter((t) => selected.has(t.key));
+  return list.filter((x) => {
+    const f = facets(x);
+    return picked.every((t) => t.test(f));
+  });
+}
+
+// Second chip row: traits present in `list`, plus Clear when anything is picked.
+function traitRowHtml(list, selected, facets, anyFilter) {
+  const all = list.map(facets);
+  const chips = TRAITS.map((t) => {
+    const n = all.filter(t.test).length;
+    if (!n) return '';
+    return `<button class="chip trait" data-trait="${t.key}" aria-pressed="${selected.has(t.key)}" title="${OH.escapeHtml(t.title)}">${OH.escapeHtml(
+      t.label,
+    )}<span class="n">${n}</span></button>`;
+  }).join('');
+  const clear = anyFilter ? '<button class="chip chip-clear" data-clear="1">Clear</button>' : '';
+  return chips || clear ? `<div class="chip-row chip-row-traits">${chips}${clear}</div>` : '';
 }
 
 function chipHtml(kind) {
@@ -1262,12 +1301,9 @@ function renderInventory() {
     resultsEl.innerHTML = '<div class="empty">No hangar data yet. Scan from the Home tab.</div>';
     return;
   }
-  const traitChips = TRAITS.map(traitChipHtml).join('');
-  const anyFilter = state.shown.size || state.traits.size;
   chipsEl.innerHTML =
-    presentKinds().map(chipHtml).join('') +
-    (traitChips ? `<span class="chip-sep" aria-hidden="true"></span>${traitChips}` : '') +
-    (anyFilter ? '<button class="chip chip-clear" data-clear="1">Clear</button>' : '');
+    `<div class="chip-row">${presentKinds().map(chipHtml).join('')}</div>` +
+    traitRowHtml(state.items, state.traits, pledgeFacets, state.shown.size || state.traits.size);
   const shown = computeShown();
   if (!shown.length) {
     resultsEl.innerHTML = '<div class="empty">No pledges match the current filters.</div>';
@@ -1927,6 +1963,7 @@ function computeBuybacks() {
   let list = state.bbShown.size
     ? state.buybacks.filter((b) => state.bbShown.has(b.kind))
     : state.buybacks.slice();
+  list = applyTraits(list, state.bbTraits, buybackFacets);
   if (q) list = list.filter((b) => `${b.name || ''} ${b.contains || ''}`.toLowerCase().includes(q));
   if (state.bbSort !== 'default') {
     const byName = (a, b) => (a.name || '').localeCompare(b.name || '');
@@ -1974,7 +2011,16 @@ function renderBuybacks() {
       .querySelectorAll('button')
       .forEach((b) => b.classList.toggle('active', b.dataset.layout === state.bbLayout));
   }
-  if (bbChipsEl) bbChipsEl.innerHTML = presentBbKinds().map(bbChipHtml).join('');
+  if (bbChipsEl) {
+    bbChipsEl.innerHTML =
+      `<div class="chip-row">${presentBbKinds().map(bbChipHtml).join('')}</div>` +
+      traitRowHtml(
+        state.buybacks,
+        state.bbTraits,
+        buybackFacets,
+        state.bbShown.size || state.bbTraits.size,
+      );
+  }
   const list = computeBuybacks();
   const when = state.buybacksScannedAt ? new Date(state.buybacksScannedAt).toLocaleString() : '';
   if (!list.length) {
@@ -2098,9 +2144,18 @@ if (bbChipsEl) {
   bbChipsEl.addEventListener('click', (e) => {
     const btn = e.target.closest('.chip');
     if (!btn) return;
-    const key = btn.dataset.key;
-    if (state.bbShown.has(key)) state.bbShown.delete(key);
-    else state.bbShown.add(key);
+    if (btn.dataset.clear) {
+      state.bbShown.clear();
+      state.bbTraits.clear();
+    } else if (btn.dataset.trait) {
+      const t = btn.dataset.trait;
+      if (state.bbTraits.has(t)) state.bbTraits.delete(t);
+      else state.bbTraits.add(t);
+    } else {
+      const key = btn.dataset.key;
+      if (state.bbShown.has(key)) state.bbShown.delete(key);
+      else state.bbShown.add(key);
+    }
     renderBuybacks();
   });
 }
@@ -2465,6 +2520,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true } = {}
       state.buybacks = b.items;
       state.buybacksScannedAt = b.scannedAt;
       state.bbShown = new Set(); // default: no filter selected = show all
+      state.bbTraits = new Set();
       parts.push(`${b.items.length} buy-backs${b.partial ? ` (partial: ${b.partial})` : ''}`);
       if (b.partial) anyErr = true;
     } else {
@@ -2564,6 +2620,7 @@ clearBtn.addEventListener('click', async () => {
   state.shown = new Set();
   state.traits = new Set();
   state.bbShown = new Set();
+  state.bbTraits = new Set();
   state.referral = null;
   setStatus('Local data cleared.');
   renderAccount(); // clear the referral pill too
@@ -2691,6 +2748,7 @@ if (importBtn && importFile) {
     state.shown = new Set(); // default: no filter selected = show all
     state.traits = new Set();
     state.bbShown = new Set(); // default: no filter selected = show all
+    state.bbTraits = new Set();
     renderAccount(); // reflect imported referral in the pill
     setDataMsg(
       `Imported ${sourceItemCount(res.db.sources)} item(s) — open Inventory / Buy-Backs / Stats to view.`,
@@ -2719,6 +2777,7 @@ async function reconcileAccount() {
     state.shown = new Set();
     state.traits = new Set();
     state.bbShown = new Set();
+    state.bbTraits = new Set();
     state.referral = null;
     refreshRecoveryUI();
     return `Cleared ${prev}'s hangar — a different account is signed in. The previous data was saved; use “Restore previous hangar” in the Developers tab to bring it back, or scan to load this account.`;
@@ -2770,6 +2829,7 @@ document.addEventListener('visibilitychange', async () => {
   state.shown = new Set(); // default: no filter selected = show all
   state.traits = new Set();
   state.bbShown = new Set(); // default: no filter selected = show all
+  state.bbTraits = new Set();
   route();
   if (notice) setStatus(notice);
   await refreshRecoveryUI();
