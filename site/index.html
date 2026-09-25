@@ -42,20 +42,27 @@
         </p>
 
         <div class="installs" id="installs">
-          <!-- Store URLs: fill in as each listing is approved. Empty = "Coming soon". -->
-          <a class="install" data-browser="chrome" data-url="">
-            <span class="b-name">Chrome</span><span class="b-note">Coming soon</span>
+          <!-- Per-store status. When a listing goes live: set data-status="live" and
+               data-url to the store page. Other values: "review", "planned". -->
+          <a class="install" data-browser="chrome" data-status="review" data-url="">
+            <span class="b-name">Chrome</span><span class="b-note">In review</span>
           </a>
-          <a class="install" data-browser="edge" data-url="">
-            <span class="b-name">Edge</span><span class="b-note">Coming soon</span>
+          <a class="install" data-browser="edge" data-status="review" data-url="">
+            <span class="b-name">Edge</span><span class="b-note">In review</span>
           </a>
-          <a class="install" data-browser="firefox" data-url="">
-            <span class="b-name">Firefox</span><span class="b-note">Coming soon</span>
+          <a class="install" data-browser="firefox" data-status="review" data-url="">
+            <span class="b-name">Firefox</span><span class="b-note">In review</span>
+          </a>
+          <a class="install" data-browser="safari" data-status="planned" data-url="">
+            <span class="b-name">Safari</span><span class="b-note">Planned</span>
           </a>
         </div>
-        <p class="also">
-          Brave, Opera and Vivaldi install from the Chrome Web Store. Safari is on the roadmap.
+        <p class="also" id="status-line">
+          Submitted to the Chrome, Edge and Firefox stores on Sept 25, 2026 — reviews usually take a
+          few days. Can't wait?
+          <a href="https://github.com/Draco-Foundry/open-hangar#install">Load it from source</a>.
         </p>
+        <p class="also">Brave, Opera and Vivaldi install from the Chrome Web Store.</p>
       </div>
     </header>
 
@@ -186,7 +193,7 @@
     </footer>
 
     <script>
-      // Wire up store links, and put the visitor's own browser first.
+      // Wire up store links + status, and put the visitor's own browser first.
       (function () {
         var ua = navigator.userAgent;
         var mine = /Edg\//.test(ua)
@@ -195,23 +202,33 @@
             ? 'firefox'
             : /Chrome\//.test(ua)
               ? 'chrome'
-              : null;
+              : /Safari\//.test(ua)
+                ? 'safari'
+                : null;
+        var LABELS = { review: 'In review', planned: 'Planned' };
         var box = document.getElementById('installs');
+        var allLive = true;
         box.querySelectorAll('.install').forEach(function (a) {
           var url = a.getAttribute('data-url');
-          if (url) {
+          var status = a.getAttribute('data-status') || 'planned';
+          var note = a.querySelector('.b-note');
+          if (status === 'live' && url) {
             a.href = url;
-            a.querySelector('.b-note').textContent =
-              'Add to ' + a.querySelector('.b-name').textContent;
+            a.classList.add('live');
+            note.textContent = 'Add to ' + a.querySelector('.b-name').textContent;
           } else {
-            a.classList.add('soon');
+            a.classList.add('soon', 'status-' + status);
             a.setAttribute('aria-disabled', 'true');
+            note.textContent = LABELS[status] || 'Coming soon';
+            if (status === 'review') allLive = false;
           }
           if (a.getAttribute('data-browser') === mine) {
             a.classList.add('mine');
             box.prepend(a);
           }
         });
+        // Drop the "submitted / in review" line once nothing is pending.
+        if (allLive) document.getElementById('status-line').remove();
       })();
     </script>
   </body>
