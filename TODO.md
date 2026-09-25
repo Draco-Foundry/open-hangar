@@ -385,6 +385,30 @@ are **placeholder-quality** and need finishing:
 - Fold this into the rewards-data source above so links + image URLs travel with the
   reward definitions rather than being derived ad hoc at render time.
 
+## Replace `innerHTML` templates with a DOM builder (planned — post-launch)
+
+Mozilla's `web-ext lint` flags **25 `UNSAFE_VAR_ASSIGNMENT` warnings** — every
+`el.innerHTML = \`…${value}…\``in`dashboard.js`. They don't block review: all 25
+were audited before the v0.2.7 submission (21 already escaped via `OH.escapeHtml`, 4
+real gaps fixed — see PR #3), and a strict `extension_pages`CSP backstops them. But
+escaping is currently a *convention* every contributor must remember; one missed`escapeHtml` on RSI-sourced or imported data is an injection.
+
+**Goal:** make safe rendering the default, and clear the warnings honestly.
+
+- Add a tiny `h(tag, attrs, ...children)` helper (in `lib.js`) that builds nodes with
+  `createElement` / `textContent` / `setAttribute` — strings are always text, never
+  markup. URL attributes (`href`, `src`) go through one allowlist check (https +
+  expected hosts), generalizing `buybackUrl()`.
+- Convert views incrementally, highest-risk first: anything rendering RSI or imported
+  data (cards, modal, referral lists, buy-backs), then static chrome. Swap
+  `innerHTML =` for `el.replaceChildren(...)`.
+- Keep inline SVG charts as-is or build them with `createElementNS` — they're
+  numeric/constant today.
+- **Do not** "silence" the linter with `el['innerHTML']` or DOMParser-then-append
+  tricks — they're the same risk and AMO reviewers treat them as evasion.
+- Done when `npm run lint:firefox` reports 0 `UNSAFE_VAR_ASSIGNMENT` and the UI is
+  visually unchanged (re-shoot store screenshots to compare).
+
 ## Dashboard CSS cleanup (planned — maintainability, not user-facing)
 
 A styling audit found the dashboard is visually consistent (uniform view titles,
