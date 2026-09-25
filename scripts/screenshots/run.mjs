@@ -14,6 +14,8 @@
  * GETs to public endpoints, without cookies.
  *
  * Chrome is found automatically; override with CHROME_PATH=/path/to/chrome.
+ * `npm run demo` serves the same demo dashboard without capturing, for trying
+ * UI changes by hand at http://localhost:8323.
  */
 
 import http from 'node:http';
@@ -113,6 +115,13 @@ async function handle(req, res) {
 const server = http.createServer(handle);
 await new Promise((ok) => server.listen(PORT, ok));
 console.log(`demo dashboard on http://localhost:${PORT}`);
+
+// `npm run demo` (--serve): just keep the demo dashboard running for manual
+// testing in a normal browser — no screenshots. Ctrl+C to stop.
+if (process.argv.includes('--serve')) {
+  console.log('serving only (Ctrl+C to stop)');
+  await new Promise(() => {});
+}
 
 const browser = await puppeteer.launch({
   executablePath: findChrome(),

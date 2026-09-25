@@ -13,13 +13,14 @@
     "url": "https://github.com/Draco-Foundry/open-hangar/issues"
   },
   "scripts": {
-    "test": "node --test test/parser.test.js test/scan.test.js",
+    "test": "node --test test/parser.test.js test/scan.test.js test/htf.test.js",
     "format": "prettier --write \"**/*.{js,html,json,md}\"",
     "format:check": "prettier --check \"**/*.{js,html,json,md}\"",
     "build": "node scripts/pack.mjs",
     "lint:firefox": "npm run build && web-ext lint --source-dir dist/firefox",
     "pack": "npm run build && web-ext build --source-dir dist/chrome --artifacts-dir dist --filename open-hangar-chrome-{version}.zip --overwrite-dest && web-ext build --source-dir dist/firefox --artifacts-dir dist --filename open-hangar-firefox-{version}.zip --overwrite-dest",
-    "screenshots": "node scripts/screenshots/run.mjs"
+    "screenshots": "node scripts/screenshots/run.mjs",
+    "demo": "node scripts/screenshots/run.mjs --serve"
   },
   "devDependencies": {
     "jsdom": "^24.1.0",

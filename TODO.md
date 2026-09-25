@@ -257,7 +257,16 @@ Two layers of fix:
 Keep `kind` backward-compatible (ship / ccu / addon / coupon / other) and extend
 with the finer types; update the inventory filter chips + Stats accordingly.
 
-## Hangar Transfer Format (HTF) export (planned)
+## Hangar Transfer Format (HTF) export — ✅ DONE (pledge + ship codes)
+
+`OH.buildHTF` / `OH.exportHTF` in `lib.js`, "Export HTF" on the Developers page,
+tests in `test/htf.test.js`. Findings that changed the plan below: HTF is a **bare
+array, one entry per ship** (no wrapper/version); nearly every field is optional;
+the docs' `ship-codes.json` is stale (2022) and GPL-3.0, so we bundle HangarXPLOR's
+MIT-licensed, maintained table instead (`src/data/`, 305 ships) — no new host
+permission. FleetYards' importer matches on `name`. Still open: **`pledge_date`**
+(not scraped yet — add from the hangar card's date column), refreshing the bundled
+table periodically, and a real FleetYards import test. Original plan below.
 
 > Scope note: trading-oriented hangar enrichment (per-item melt value, base-item
 > surfacing, LTI/Warbond/Gift status filters) was **considered and deliberately
