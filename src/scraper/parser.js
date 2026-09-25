@@ -52,18 +52,54 @@
     return { from: m[1].trim(), to: m[2].trim() };
   };
 
+  // RSI prefixes most pledge names with their store category — "Standalone Ships
+  // - …", "Paints - …", "Gear - …", "Subscribers Store - …", "Add-On - …". Pull
+  // that leading category out (the text before the first " - "); '' if none.
+  ns.buybackCategoryPrefix = function buybackCategoryPrefix(name) {
+    const m = String(name || '').match(/^\s*([^-–]+?)\s*[-–]\s/);
+    return m ? m[1].trim() : '';
+  };
+
   // Classify a buy-back from its name + the free-text "contains" string (buy-back
-  // cards have no structured .kind tiles like the hangar, so this is name-based
-  // and best-effort). Returns one of: ccu | paint | addon | coupon | ship.
-  // Defaults to 'ship' because most melted pledges are ships. Precise paint/skin
-  // detection for *untagged* items still needs the external reference (ROADMAP).
+  // cards have no structured .kind tiles like the hangar). The store-category
+  // prefix is the most reliable signal — e.g. "Subscribers Store - Chance Cube"
+  // is NOT a ship — so map it first, then fall back to content hints, then 'ship'
+  // (most untagged melted pledges are ships). Returns: ccu|paint|addon|coupon|
+  // other|ship.
   ns.classifyBuyback = function classifyBuyback(name, contains) {
     const hay = `${name || ''} ${contains || ''}`;
     if (ns.detectCCU(name)) return 'ccu';
     if (COUPON_NAME_RE.test(hay)) return 'coupon';
+
+    const prefix = ns.buybackCategoryPrefix(name);
+    if (/^(paints?|skins?|liver(y|ies))$/i.test(prefix)) return 'paint';
+    if (/^(gear|armou?r|weapons?|components?|fps)$/i.test(prefix)) return 'addon';
+    if (/^subscribers?\s+(store|vault)$/i.test(prefix)) return 'other';
+    if (/^(add[-\s]?ons?|decorations?|posters?|flair|model\s+ships?)$/i.test(prefix))
+      return 'addon';
+    if (/^(standalone\s+ships?|ships?|packages?|combos?|warbonds?|game\s+packages?)$/i.test(prefix))
+      return 'ship';
+
     if (PAINT_NAME_RE.test(hay)) return 'paint';
     if (ADDON_NAME_RE.test(name)) return 'addon';
     return 'ship';
+  };
+
+  // Insurance term, read from the contained item RSI tags kind "Insurance" (its
+  // label names the duration: "Lifetime Insurance", "120 Month Insurance",
+  // "6 Months Insurance", …). Normalized to the short forms sellers use —
+  // LTI / 120M / 6M / 5Y. Returns null when the pledge carries no insurance item
+  // (most CCUs, gear, and add-ons), which the UI renders as "----".
+  ns.insuranceTerm = function insuranceTerm(contents) {
+    const ins = (contents || []).find((c) => /insurance/i.test(c.kind || ''));
+    if (!ins) return null;
+    const label = ins.label || '';
+    if (/life\s*-?\s*time|lifetime|\blti\b/i.test(label)) return 'LTI';
+    const mo = label.match(/(\d+)\s*month/i);
+    if (mo) return `${mo[1]}M`;
+    const yr = label.match(/(\d+)\s*year/i);
+    if (yr) return `${yr[1]}Y`;
+    return label || null; // unrecognized phrasing — surface RSI's text verbatim
   };
 
   ns.normalizePledge = function normalizePledge(raw) {
@@ -118,6 +154,8 @@
       isCoupon,
       isPaint,
       kind, // display category: 'ccu' | 'ship' | 'addon' | 'coupon' | 'other'
+      giftable: raw.giftable === true, // hangar showed a "Gift" action → transferable
+      insurance: ns.insuranceTerm(contents), // 'LTI' | '120M' | '6M' | … | null
       raw: raw.raw ?? null, // keep originals while reverse-engineering
     };
   };
@@ -211,6 +249,12 @@
         currency = m ? m[1] : null;
       }
       const contents = readContents(card);
+      // Giftability is whatever RSI decided: a transferable pledge renders a
+      // "Gift" action (`a.js-gift`), a bound one doesn't. We read the rendered
+      // button rather than re-deriving the rules (store-credit purchases, gear,
+      // CCUs, …) — RSI already computed it. `.js-gift` lives inside this card's
+      // `.row`, so scope the query to the card to avoid neighbour bleed.
+      const giftable = !!card.querySelector('.js-gift');
 
       pledges.push(
         ns.normalizePledge({
@@ -220,6 +264,7 @@
           currency,
           contents,
           image: pickImage(card, contents),
+          giftable,
           raw: { rawValue },
         }),
       );
