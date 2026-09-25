@@ -260,7 +260,7 @@ const state = {
   bbLayout: 'gallery', // gallery | compact | list | market (independent of inventory)
   owner: null, // { nickname, displayname } the stored data was scanned from
   shown: new Set(), // inventory kind filter
-  traits: new Set(), // inventory trait filter (AND): package, multiship, lti, …
+  traits: new Set(), // inventory trait filter (AND): package, pack, lti, …
   query: '',
   sort: 'default',
   layout: 'gallery', // gallery | compact | list | market
@@ -776,10 +776,15 @@ const TRAITS = [
       ),
   },
   {
-    key: 'multiship',
-    label: 'Multi-ship packs',
-    title: 'Pledges with two or more ships inside',
-    test: (p) => (p.contents || []).filter((c) => /^ship$/i.test(c.kind || '')).length >= 2,
+    // Most packs bundle a ship with paints and gear (e.g. Nine Tails Shogun Pack:
+    // 1 vehicle + 1 paint + 8 gear items), so count every item, not just ships.
+    // The insurance line isn't an item.
+    key: 'pack',
+    label: 'Packs',
+    title: 'Pledges that bundle two or more items (ships, paints, gear…)',
+    test: (p) =>
+      (p.contents || []).filter((c) => !/insurance/i.test(`${c.kind || ''} ${c.label || ''}`))
+        .length >= 2,
   },
   { key: 'lti', label: 'LTI', title: 'Lifetime insurance', test: (p) => p.insurance === 'LTI' },
   {
@@ -791,7 +796,9 @@ const TRAITS = [
   {
     key: 'warbond',
     label: 'Warbond',
-    title: 'Bought with new money at a warbond discount',
+    // RSI's hangar has no warbond marker, so this relies on the pledge name — some
+    // warbond purchases (e.g. packs) aren't named that way and won't show here.
+    title: "Pledges whose name says Warbond (RSI doesn't always include it)",
     test: (p) => /warbond/i.test(p.name || ''),
   },
   {
