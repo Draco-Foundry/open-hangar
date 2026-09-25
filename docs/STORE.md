@@ -126,7 +126,7 @@ bottom. Items marked ✅ are ready in the repo; ⬜ need you to do them.
   rather soft-launch by link first — optional, not required).
 - ⬜ Submit. First review with the `cookies` permission can take **several days to
   ~2 weeks**; have the §5 justifications ready in case of a clarification email.
-- ⬜ After approval, tag the release (e.g. `git tag v0.2.6 && git push origin v0.2.6`)
+- ⬜ After approval, tag the release (e.g. `git tag v0.2.7 && git push origin v0.2.7`)
   and draft a GitHub Release.
 
 ## 8. Microsoft Edge Add-ons (after Chrome — same zip)
