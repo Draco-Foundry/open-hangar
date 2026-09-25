@@ -152,6 +152,60 @@ footer nav {
   margin: 12px 0 0;
 }
 
+/* Fan kit screenshots — always shown whole (aspect-ratio kept, never cropped). */
+.shot {
+  position: relative;
+  margin: 0;
+}
+.shot img:not(.mbtc) {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.shot-hero {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.mbtc {
+  position: absolute;
+  right: 2%;
+  bottom: 4%;
+  width: clamp(40px, 6%, 84px);
+  height: auto;
+  opacity: 0.85;
+}
+.mbtc-left {
+  right: auto;
+  left: 2%;
+}
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 48px;
+}
+.gallery .shot img:not(.mbtc) {
+  border-radius: 10px;
+}
+.gallery .mbtc {
+  width: clamp(36px, 12%, 64px);
+}
+
+.notices {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-top: 20px;
+}
+.notices img {
+  flex: none;
+  opacity: 0.85;
+}
+.notices p {
+  margin: 0 0 6px;
+  font-size: 0.875rem; /* Fankit Guidelines: no smaller than 10pt */
+}
+
 /* Privacy page */
 .doc {
   max-width: 720px;

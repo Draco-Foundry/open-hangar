@@ -59,6 +59,26 @@
       </div>
     </header>
 
+    <!-- Fan kit art: shown whole (never cropped, so CIG's watermark stays intact),
+         with the "Made By The Community" badge in the opposite corner, per the
+         Fankit Guidelines. See img/fankit/NOTICE.md. -->
+    <figure class="shot shot-hero">
+      <picture>
+        <source
+          type="image/webp"
+          srcset="img/fankit/sc-02-1280.webp 1280w, img/fankit/sc-02-1920.webp 1920w"
+          sizes="(max-width: 1400px) 100vw, 1400px"
+        />
+        <img
+          src="img/fankit/sc-02-1920.jpg"
+          width="1920"
+          height="1080"
+          alt="A ship parked on a hangar deck, lit by the landing lights"
+        />
+      </picture>
+      <img class="mbtc" src="img/fankit/made-by-the-community.png" alt="Made By The Community" />
+    </figure>
+
     <main class="wrap">
       <section class="features">
         <div class="feature">
@@ -96,6 +116,51 @@
           <li>Click the Open Hangar icon and hit <strong>Scan</strong>.</li>
         </ol>
       </section>
+
+      <section class="gallery">
+        <figure class="shot">
+          <picture>
+            <source
+              type="image/webp"
+              srcset="img/fankit/sc-25-1280.webp 1280w, img/fankit/sc-25-1920.webp 1920w"
+              sizes="(max-width: 700px) 100vw, 464px"
+            />
+            <img
+              src="img/fankit/sc-25-1920.jpg"
+              width="1920"
+              height="1080"
+              loading="lazy"
+              alt="A capital ship over a planet, escorted by fighters"
+            />
+          </picture>
+          <img
+            class="mbtc mbtc-left"
+            src="img/fankit/made-by-the-community.png"
+            alt="Made By The Community"
+          />
+        </figure>
+        <figure class="shot">
+          <picture>
+            <source
+              type="image/webp"
+              srcset="img/fankit/sc-14-1280.webp 1280w, img/fankit/sc-14-1920.webp 1920w"
+              sizes="(max-width: 700px) 100vw, 464px"
+            />
+            <img
+              src="img/fankit/sc-14-1920.jpg"
+              width="1920"
+              height="1080"
+              loading="lazy"
+              alt="Fighters firing in a dogfight above a planet"
+            />
+          </picture>
+          <img
+            class="mbtc"
+            src="img/fankit/made-by-the-community.png"
+            alt="Made By The Community"
+          />
+        </figure>
+      </section>
     </main>
 
     <footer class="wrap">
@@ -104,10 +169,19 @@
         <a href="privacy.html">Privacy policy</a>
         <a href="https://github.com/Draco-Foundry/open-hangar/issues">Report an issue</a>
       </nav>
-      <p class="disclaimer">
-        Unofficial, fan-made, and not affiliated with Cloud Imperium Games or Roberts Space
-        Industries.
-      </p>
+      <div class="notices">
+        <img src="img/fankit/made-by-the-community.png" alt="" width="56" height="56" />
+        <div>
+          <p><strong>This is an unofficial Star Citizen Fan Site.</strong></p>
+          <p>
+            This site is not endorsed by or affiliated with the Cloud Imperium or Roberts Space
+            Industries group of companies. All game content and materials are copyright Cloud
+            Imperium Rights LLC and Cloud Imperium Rights Ltd. Star Citizen®, Squadron 42®, Roberts
+            Space Industries®, and Cloud Imperium® are registered trademarks of Cloud Imperium
+            Rights LLC. All rights reserved.
+          </p>
+        </div>
+      </div>
     </footer>
 
     <script>
