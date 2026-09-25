@@ -120,3 +120,10 @@ test('missing value/insurance fields degrade gracefully', () => {
   assert.equal(e.lti, false);
   assert.equal(e.warbond, false);
 });
+
+test('pledge_date is exported when the pledge has one', () => {
+  const [e] = OH.buildHTF([pledge({ date: '2016-12-08' })], codes);
+  assert.equal(e.pledge_date, '2016-12-08');
+  const [f] = OH.buildHTF([pledge()], codes);
+  assert.equal(f.pledge_date, undefined);
+});

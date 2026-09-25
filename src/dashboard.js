@@ -727,8 +727,17 @@ function computeShown() {
   if (q) list = list.filter((p) => haystack(p).includes(q));
   if (state.sort !== 'default') {
     const byName = (a, b) => (a.name || '').localeCompare(b.name || '');
+    // ISO dates compare as strings; undated pledges (older scans) sink to the end.
+    const byDate = (a, b, dir) => {
+      if (!a.date || !b.date) return (a.date ? 0 : 1) - (b.date ? 0 : 1);
+      return a.date === b.date ? 0 : (a.date < b.date ? -1 : 1) * dir;
+    };
     list = list.slice().sort((a, b) => {
       switch (state.sort) {
+        case 'date-desc':
+          return byDate(a, b, -1);
+        case 'date-asc':
+          return byDate(a, b, 1);
         case 'value-desc':
           return cmpValue(a, b, -1);
         case 'value-asc':
@@ -2198,6 +2207,7 @@ function openItemModal(p) {
       <h3 class="modal-name">${OH.escapeHtml(plainName(p))}</h3>
       <div class="modal-meta"><span class="badge ${badgeClass}">${OH.escapeHtml(p.kind)}</span><span class="modal-val">${OH.escapeHtml(formatValue(p))}</span></div>
       ${row('ID', OH.escapeHtml(p.id || '—'))}
+      ${p.date ? row('Pledged', OH.escapeHtml(p.date)) : ''}
       ${p.currency ? row('Currency', OH.escapeHtml(p.currency)) : ''}
       ${p.isCCU && p.ccu ? row('Upgrade', OH.escapeHtml(`${p.ccu.from} → ${p.ccu.to}`)) : ''}
       ${row('Scanned', OH.escapeHtml(fmtScan()))}
