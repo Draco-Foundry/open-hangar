@@ -292,41 +292,72 @@
     return OH.normShipName(String(label || '').replace(MFR_PREFIX, '')).trim();
   };
 
-  function matchShipCode(codes, name) {
-    const q = name.toLowerCase();
-    if (!q) return null;
+  // Best entry in `list` whose name matches `q` (lowercase), or null. Loose
+  // "contains" hits (<70) are too risky for an identifier, so they're ignored.
+  function bestByName(list, q, nameOf) {
     let best = null;
     let bestScore = 0;
-    for (const c of codes) {
-      const n = String(c.ship_name || '').toLowerCase();
-      const s = nameScore(n, q);
+    for (const x of list) {
+      const s = nameScore(String(nameOf(x) || '').toLowerCase(), q);
       if (s > bestScore) {
         bestScore = s;
-        best = c;
+        best = x;
       }
     }
-    // Loose "contains" hits (<70) are too risky for an identifier; skip them.
     return bestScore >= 70 ? best : null;
   }
 
-  // Pure: normalized hangar items + ship-code list → HTF array.
-  OH.buildHTF = function buildHTF(items, codes = []) {
+  // Ship identity for an HTF entry: the bundled HangarXPLOR table first; failing
+  // that (ships newer than the snapshot), RSI's live ship-matrix, building the
+  // code the same way HangarXPLOR does (MFR_Ship_Name). Returns null if neither
+  // knows the ship.
+  function shipIdentity(name, codes, matrix) {
+    const q = name.toLowerCase();
+    if (!q) return null;
+    const c = bestByName(codes, q, (x) => x.ship_name);
+    if (c) {
+      return {
+        name: c.ship_name,
+        code: c.ship_code,
+        mfr: c.manufacturer_code,
+        mfrName: c.manufacturer_name,
+      };
+    }
+    const m = bestByName(
+      matrix.filter((x) => x.mfr),
+      q,
+      (x) => x.name,
+    );
+    if (m) {
+      return {
+        name: m.name,
+        code: `${m.mfr}_${m.name}`.replace(/[^a-z0-9]/gi, '_').replace(/_+/g, '_'),
+        mfr: m.mfr,
+        mfrName: m.mfrName,
+      };
+    }
+    return null;
+  }
+
+  // Pure: normalized hangar items + ship-code list (+ optional RSI ship-matrix
+  // entries) → HTF array. `name` is the base ship (what importers match models
+  // on, e.g. "Gladius"); `ship_name` keeps the full edition/variant name from the
+  // hangar ("Gladius Dunlevy"), which FleetYards shows as the ship's own name.
+  OH.buildHTF = function buildHTF(items, codes = [], matrix = []) {
     const out = [];
     for (const p of items || []) {
       const ships = (p.contents || []).filter((c) => /^ship$/i.test(c.kind || ''));
       for (const ship of ships) {
-        const name = OH.htfShipName(ship.label);
-        if (!name) continue;
-        const code = matchShipCode(codes, name);
-        const entry = { name, entity_type: 'ship' };
-        if (code) {
-          entry.ship_code = code.ship_code;
-          entry.ship_name = code.ship_name;
-          entry.manufacturer_code = code.manufacturer_code;
-          entry.manufacturer_name = code.manufacturer_name;
-        } else {
-          entry.ship_name = name;
+        const label = OH.htfShipName(ship.label);
+        if (!label) continue;
+        const id = shipIdentity(label, codes, matrix);
+        const entry = { name: id ? id.name : label, entity_type: 'ship' };
+        if (id) {
+          entry.ship_code = id.code;
+          entry.manufacturer_code = id.mfr;
+          entry.manufacturer_name = id.mfrName;
         }
+        entry.ship_name = label;
         if (p.id != null) entry.pledge_id = String(p.id);
         if (p.name) entry.pledge_name = p.name;
         if (p.date) entry.pledge_date = p.date; // ISO YYYY-MM-DD, per the spec
@@ -356,7 +387,8 @@
   // Build an HTF export from the stored hangar. Returns { ships, unmatched }.
   OH.exportHTF = async function exportHTF() {
     const { items } = await OH.loadSource('hangar');
-    const ships = OH.buildHTF(items, await loadShipCodes());
+    const [codes, matrix] = await Promise.all([loadShipCodes(), getShipMatrix()]);
+    const ships = OH.buildHTF(items, codes, matrix);
     return { ships, unmatched: ships.filter((s) => !s.ship_code).length };
   };
 
@@ -1033,7 +1065,8 @@
   const shipImgInflight = new Map(); // normName -> Promise (dedupe concurrent)
   let catalogMem = null; // [{ lname, slug }]  (wiki)
   let catalogInflight = null;
-  let matrixMem = null; // [{ lname, img }]  (RSI ship-matrix)
+  let matrixMem = null; // [{ lname, name, img, mfr, mfrName }]  (RSI ship-matrix)
+  const MATRIX_CACHE_V = 2; // v2: + display name + manufacturer (for HTF ship codes)
   let matrixInflight = null;
 
   // Strip edition/marketing/year suffixes so "Starfarer Gemini Standard Edition"
@@ -1050,12 +1083,19 @@
       .trim();
   };
 
-  // RSI ship-matrix → slim [{ lname, img }] for every ship, fetched once and
-  // cached. The index is large (~5MB) but we keep only name+image (~25KB).
+  // RSI ship-matrix → slim [{ lname, name, img, mfr, mfrName }] for every ship,
+  // fetched once and cached. The index is large (~5MB) but we keep only what the
+  // image lookup and HTF ship codes need (~35KB).
   async function getShipMatrix() {
     if (matrixMem) return matrixMem;
     const cached = (await chrome.storage.local.get('shipMatrix')).shipMatrix;
-    if (cached && cached.at && Date.now() - cached.at < CATALOG_TTL && Array.isArray(cached.list)) {
+    if (
+      cached &&
+      cached.v === MATRIX_CACHE_V &&
+      cached.at &&
+      Date.now() - cached.at < CATALOG_TTL &&
+      Array.isArray(cached.list)
+    ) {
       matrixMem = cached.list;
       return matrixMem;
     }
@@ -1075,7 +1115,13 @@
             const im = s.media && s.media[0] && s.media[0].images;
             const url =
               im && (im.store_small || im.store_large || im.slideshow || im.product_thumb_large);
-            if (url) list.push({ lname: String(s.name).toLowerCase(), img: url });
+            list.push({
+              lname: String(s.name).toLowerCase(),
+              name: String(s.name).trim(),
+              img: url || null,
+              mfr: (s.manufacturer && s.manufacturer.code) || null,
+              mfrName: (s.manufacturer && s.manufacturer.name) || null,
+            });
           }
         }
       } catch {
@@ -1084,7 +1130,9 @@
       if (list.length) {
         matrixMem = list;
         try {
-          await chrome.storage.local.set({ shipMatrix: { at: Date.now(), list } });
+          await chrome.storage.local.set({
+            shipMatrix: { v: MATRIX_CACHE_V, at: Date.now(), list },
+          });
         } catch {}
       }
       matrixInflight = null;
@@ -1154,6 +1202,7 @@
     let best = null,
       bestScore = 0;
     for (const v of matrix) {
+      if (!v.img) continue;
       const s = nameScore(v.lname, q);
       if (s > bestScore) {
         bestScore = s;
