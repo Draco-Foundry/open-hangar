@@ -3,11 +3,12 @@
 > **Submission status (2026-09-25, v0.2.7):**
 > | Store | Status | IDs / links |
 > | --- | --- | --- |
-> | Chrome Web Store | draft (publisher `dracofoundry@gmail.com`) | item `aeabioadfphghjennmdbnpelojlhndjl` |
+> | Chrome Web Store | in review (publisher `dracofoundry@gmail.com`) | item `aeabioadfphghjennmdbnpelojlhndjl` |
 > | Firefox AMO | awaiting review | `addons.mozilla.org/firefox/addon/open-hangar/` · gecko id `open-hangar@draco-foundry` |
 > | Microsoft Edge | in review (~7 business days) | CRX `fmcnemfepnifokjelgjacgdhoodaiicl` · Store ID `0RDCKFFGW5QL` |
 >
-> When each goes live, set its `data-url` in `site/index.html` so the install button activates.
+> When each goes live, set that button's `data-status="live"` and `data-url` in
+> `site/index.html`; the "in review" line disappears once none are pending.
 
 Everything needed to submit **Open Hangar** to the Chrome Web Store. Work top to
 bottom. Items marked ✅ are ready in the repo; ⬜ need you to do them.
