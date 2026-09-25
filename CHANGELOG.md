@@ -10,6 +10,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   warbond. Special editions export as their base ship with the edition kept as the
   ship's name (e.g. a Gladius named "Gladius Dunlevy"), and ships newer than the
   bundled code list are identified from RSI's live ship matrix.
+- **More Inventory filters.** Alongside Ships / CCUs / Paints / Add-ons, a second
+  row of traits you can combine: **Game packages**, **Multi-ship packs**, **LTI**,
+  **Giftable**, **Warbond** and **Free / rewards** — e.g. Ships + LTI + Giftable.
+  A **Clear** button resets everything.
 - **Pledge dates.** Each pledge's purchase date is now read from your hangar, shown in
   the item details, and sortable in Inventory ("Pledged: newest / oldest first").
 - **Sharper, faster ship images.** The blurry hover popup on inventory and buy-back
