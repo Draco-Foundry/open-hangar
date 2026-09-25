@@ -329,6 +329,7 @@
         }
         if (p.id != null) entry.pledge_id = String(p.id);
         if (p.name) entry.pledge_name = p.name;
+        if (p.date) entry.pledge_date = p.date; // ISO YYYY-MM-DD, per the spec
         if (Number.isFinite(p.value)) {
           entry.pledge_cost = `$${p.value.toFixed(2)} ${p.currency || 'USD'}`;
         }

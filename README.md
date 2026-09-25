@@ -204,7 +204,8 @@ Next: store listings live → store catalog & prices (incl. warbonds) → finer
 item-type classification → Hangar Transfer Format export → Safari → an opt-in API
 for approved sites.
 
-Full detail in [ROADMAP.md](ROADMAP.md); parked ideas in [TODO.md](TODO.md).
+Full detail in [ROADMAP.md](ROADMAP.md); parked ideas in [TODO.md](TODO.md); release
+notes in [CHANGELOG.md](CHANGELOG.md).
 
 ## Contributing
 
