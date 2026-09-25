@@ -16,8 +16,9 @@ Rules we follow (from the Agreement and Guidelines):
 - The required trademark notice + "unofficial Star Citizen Fan Site" disclaimer is on
   the home page footer (≥10pt).
 - Not used in the extension itself or in store listings.
-- The site URL has been / must be sent to legal_notices@cloudimperiumgames.com
-  (Agreement §2k).
+- Site URL (`openhangar.space`, plus the `www` and github.io redirects) sent to
+  legal_notices@cloudimperiumgames.com on 2026-09-25 (Agreement §2k). Re-notify if
+  the domain changes.
 
 | File                        | Source                                             |
 | --------------------------- | -------------------------------------------------- |
