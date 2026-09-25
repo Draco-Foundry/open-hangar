@@ -2540,6 +2540,29 @@ if (exportBtn) {
   });
 }
 
+// Hangar Transfer Format: ships only, one entry per ship — the file FleetYards
+// (Hangar → Import) and other community tools read.
+const exportHtfBtn = $('#export-htf');
+if (exportHtfBtn) {
+  exportHtfBtn.addEventListener('click', async () => {
+    const { ships, unmatched } = await OH.exportHTF();
+    if (!ships.length) {
+      setDataMsg('No ships to export yet — scan your hangar first.');
+      return;
+    }
+    const date = new Date().toISOString().slice(0, 10);
+    downloadBlob(
+      new Blob([JSON.stringify(ships, null, 2)], { type: 'application/json' }),
+      `open-hangar-htf-${date}.json`,
+    );
+    setDataMsg(
+      `Exported ${ships.length} ship(s) in Hangar Transfer Format` +
+        (unmatched ? ` · ${unmatched} without a ship code (kept by name)` : '') +
+        '. Import it at FleetYards → Hangar → Import.',
+    );
+  });
+}
+
 if (importBtn && importFile) {
   importBtn.addEventListener('click', () => importFile.click());
   importFile.addEventListener('change', async () => {
