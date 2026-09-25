@@ -388,10 +388,11 @@ are **placeholder-quality** and need finishing:
 ## Replace `innerHTML` templates with a DOM builder (planned — post-launch)
 
 Mozilla's `web-ext lint` flags **25 `UNSAFE_VAR_ASSIGNMENT` warnings** — every
-`el.innerHTML = \`…${value}…\``in`dashboard.js`. They don't block review: all 25
+`innerHTML` assignment built from a template string in `dashboard.js`. They don't
+block review: all 25
 were audited before the v0.2.7 submission (21 already escaped via `OH.escapeHtml`, 4
 real gaps fixed — see PR #3), and a strict `extension_pages`CSP backstops them. But
-escaping is currently a *convention* every contributor must remember; one missed`escapeHtml` on RSI-sourced or imported data is an injection.
+escaping is currently a _convention_ every contributor must remember; one missed`escapeHtml` on RSI-sourced or imported data is an injection.
 
 **Goal:** make safe rendering the default, and clear the warnings honestly.
 
