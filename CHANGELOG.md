@@ -13,7 +13,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 - **More Inventory filters.** Alongside Ships / CCUs / Paints / Add-ons, a second
   row of traits you can combine: **Game packages**, **Packs** (ship + paints + gear bundles), **LTI**,
   **Giftable**, **Warbond** and **Free / rewards** — e.g. Ships + LTI + Giftable.
-  A **Clear** button resets everything.
+  They sit on their own row under the main filters, and Buy-Backs gets the ones
+  that apply there (Game packages, Packs, LTI, Warbond). A **Clear** button resets
+  everything.
 - **Pledge dates.** Each pledge's purchase date is now read from your hangar, shown in
   the item details, and sortable in Inventory ("Pledged: newest / oldest first").
 - **Sharper, faster ship images.** The blurry hover popup on inventory and buy-back

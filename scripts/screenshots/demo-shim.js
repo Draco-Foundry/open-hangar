@@ -200,6 +200,40 @@
       image: null,
     },
   ];
+  buybacks.push(
+    {
+      id: '8805',
+      name: 'Package - Aurora MR Starter Pack',
+      date: '2023-12-02',
+      contains: 'Aurora MR · Star Citizen Digital Download · 6 Month Insurance',
+      href: '/account/buy-back-pledges/reclaim/8805',
+      price: '',
+      isCCU: false,
+      ccu: null,
+      wasUpgraded: false,
+      fromShipId: '',
+      toShipId: '',
+      toSkuId: '',
+      kind: 'ship',
+      image: null,
+    },
+    {
+      id: '8806',
+      name: 'Standalone Ships - Cutlass Black plus Akuma Paint',
+      date: '2023-06-18',
+      contains: 'Cutlass Black · Cutlass - Akuma Paint · Lifetime Insurance',
+      href: '/account/buy-back-pledges/reclaim/8806',
+      price: '',
+      isCCU: false,
+      ccu: null,
+      wasUpgraded: false,
+      fromShipId: '',
+      toShipId: '',
+      toSkuId: '',
+      kind: 'ship',
+      image: null,
+    },
+  );
   const iso = (d) => new Date(now - d * day).toISOString();
   const recruitsList = Array.from({ length: 14 }, (_, i) => ({
     id: `r${i}`,
