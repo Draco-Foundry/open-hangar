@@ -2086,20 +2086,22 @@ const itemModal = $('#item-modal');
 const modalBody = $('#modal-body');
 const modalClose = $('#modal-close');
 let previewId = null;
-let previewTimer = null;
 
-// RSI media thumbnails are tiny (~216px); swap the variant for the full-res
-// "source" image. Falls back to the original if "source" doesn't exist.
-function hiRes(url) {
-  if (!url || !/media\.robertsspaceindustries\.com/.test(url)) return url;
-  if (/\/source\.\w+(\?|$)/.test(url)) return url; // already full-res (e.g. wiki source.png)
-  // RSI media: swap the size variant (store_small.jpg, slideshow.jpg, …) for the
-  // full-res source.jpg. Covers both hangar thumbnails and ship-matrix images.
-  return url.replace(/\/[^/?]+(\?.*)?$/, '/source.jpg$1');
+// Sharper versions of an RSI media thumbnail (store_small ≈ 350px), best first.
+// Every RSI media image comes in named size variants in the SAME file type as
+// the thumbnail (a .png thumb has source.png, not source.jpg). slideshow_wide
+// (~1200px) is plenty for the modal/popup and a fraction of the 4K "source";
+// source is the fallback. Non-RSI or already-large URLs have no candidates.
+function hiResCandidates(url) {
+  if (!url || !/media\.robertsspaceindustries\.com/.test(url)) return [];
+  const m = url.match(/^(.*\/)([^/?]+)\.(\w+)(\?.*)?$/);
+  if (!m) return [];
+  const [, base, variant, ext, query = ''] = m;
+  if (/^(source|slideshow_wide|wallpaper_\d+x\d+)$/.test(variant)) return [];
+  return ['slideshow_wide', 'source'].map((v) => `${base}${v}.${ext}${query}`);
 }
 
 function hidePreview() {
-  clearTimeout(previewTimer);
   if (itemPreview) itemPreview.classList.remove('show');
   previewId = null;
 }
@@ -2116,43 +2118,65 @@ function positionPreview(x, y) {
   itemPreview.style.left = left + 'px';
   itemPreview.style.top = top + 'px';
 }
-function onCardMouseMove(e) {
-  const card = e.target.closest('.card');
-  const img = card && card.dataset.image;
-  if (!img) {
-    if (previewId) hidePreview();
-    return;
+const loadImage = (src) =>
+  new Promise((resolve) => {
+    const probe = new Image();
+    probe.onload = () => resolve(true);
+    probe.onerror = () => resolve(false);
+    probe.src = src;
+  });
+
+// Each thumbnail's sharp version is resolved at most once and shared:
+// Map<thumb, Promise<url|null>> — the first candidate that loads (now in the
+// browser cache), or null to keep the thumbnail.
+const hiResLoads = new Map();
+function loadHiRes(thumb) {
+  if (!hiResLoads.has(thumb)) {
+    hiResLoads.set(
+      thumb,
+      (async () => {
+        for (const url of hiResCandidates(thumb)) if (await loadImage(url)) return url;
+        return null;
+      })(),
+    );
   }
-  if (card.dataset.id !== previewId && itemPreviewImg) {
-    const id = card.dataset.id;
-    previewId = id;
-    clearTimeout(previewTimer);
-    itemPreviewImg.src = img; // instant: the already-cached thumbnail
-    itemPreview.classList.add('show');
-    const hi = hiRes(img);
-    if (hi !== img) {
-      // upgrade to full-res after a brief dwell
-      previewTimer = setTimeout(() => {
-        const probe = new Image();
-        probe.onload = () => {
-          if (previewId === id) itemPreviewImg.src = hi;
-        };
-        probe.src = hi; // 404 → onload never fires, thumbnail stays
-      }, 180);
-    }
-  }
-  positionPreview(e.clientX, e.clientY);
-}
-resultsEl.addEventListener('mousemove', onCardMouseMove);
-resultsEl.addEventListener('mouseleave', hidePreview);
-if (buybacksBodyEl) {
-  buybacksBodyEl.addEventListener('mousemove', onCardMouseMove);
-  buybacksBodyEl.addEventListener('mouseleave', hidePreview);
+  return hiResLoads.get(thumb);
 }
 
-// Hover preview for reward items (ship art). Keyed on the item's resolve name since
-// these links have no id. Reuses the same #item-preview popup as inventory cards.
-// (Listeners are attached where referralsBodyEl is defined, below.)
+// Show `thumb` in <img> right away (blurred while a sharper copy may exist),
+// then swap the moment the sharp one loads — no second hover or click needed.
+function progressiveImage(imgEl, thumb, isCurrent = () => imgEl.isConnected) {
+  imgEl.src = thumb;
+  if (!hiResCandidates(thumb).length) {
+    imgEl.classList.remove('img-loading');
+    return;
+  }
+  imgEl.classList.add('img-loading');
+  loadHiRes(thumb).then((hi) => {
+    if (!isCurrent()) return;
+    if (hi) imgEl.src = hi;
+    imgEl.classList.remove('img-loading');
+  });
+}
+
+// Cards: no hover popup (the card already shows the art). Resting on a card
+// quietly starts its full-res download so the detail modal opens sharp.
+let hoverCardId = null;
+let hoverTimer = null;
+function onCardHover(e) {
+  const card = e.target.closest('.card');
+  const id = card && card.dataset.image ? card.dataset.id : null;
+  if (id === hoverCardId) return;
+  hoverCardId = id;
+  clearTimeout(hoverTimer);
+  if (id) hoverTimer = setTimeout(() => loadHiRes(card.dataset.image), 120);
+}
+resultsEl.addEventListener('mousemove', onCardHover);
+if (buybacksBodyEl) buybacksBodyEl.addEventListener('mousemove', onCardHover);
+
+// Hover preview for reward items (ship art) — these are text links with no
+// picture, so the popup is the only way to see the ship. Keyed on the item's
+// resolve name since they have no id. (Listeners attach near referralsBodyEl.)
 function onRewardHover(e) {
   const item = e.target.closest('.reward-item.ship[data-image]');
   const img = item && item.dataset.image;
@@ -2163,19 +2187,8 @@ function onRewardHover(e) {
   const key = 'reward:' + item.dataset.resolve;
   if (key !== previewId && itemPreviewImg) {
     previewId = key;
-    clearTimeout(previewTimer);
-    itemPreviewImg.src = img;
     itemPreview.classList.add('show');
-    const hi = hiRes(img);
-    if (hi !== img) {
-      previewTimer = setTimeout(() => {
-        const probe = new Image();
-        probe.onload = () => {
-          if (previewId === key) itemPreviewImg.src = hi;
-        };
-        probe.src = hi;
-      }, 180);
-    }
+    progressiveImage(itemPreviewImg, img, () => previewId === key);
   }
   positionPreview(e.clientX, e.clientY);
 }
@@ -2186,8 +2199,9 @@ function fmtScan() {
 function openItemModal(p) {
   hidePreview();
   const real = realImage(p.image);
+  // src is set by progressiveImage() below (thumbnail first, then full-res).
   const img = real
-    ? `<img class="modal-img" src="${OH.escapeHtml(hiRes(real))}" alt="">`
+    ? `<img class="modal-img" alt="">`
     : `<div class="modal-img placeholder">${OH.escapeHtml(p.kind)}</div>`;
   const badgeClass = ['ccu', 'ship', 'paint', 'addon', 'coupon'].includes(p.kind) ? p.kind : '';
   const contents = p.contents || [];
@@ -2215,17 +2229,8 @@ function openItemModal(p) {
       ${contentsHtml}
     </div>`;
   itemModal.hidden = false;
-  // If the full-res "source" image 404s, fall back to the thumbnail.
   const mimg = modalBody.querySelector('img.modal-img');
-  if (mimg && p.image) {
-    mimg.addEventListener(
-      'error',
-      () => {
-        if (!mimg.src.endsWith(p.image)) mimg.src = p.image;
-      },
-      { once: true },
-    );
-  }
+  if (mimg) progressiveImage(mimg, real);
 }
 function closeItemModal() {
   itemModal.hidden = true;
@@ -2235,8 +2240,9 @@ function closeItemModal() {
 // Buy-back detail modal (reuses the inventory modal shell).
 function openBuybackModal(b) {
   hidePreview();
-  const img = realImage(b.image)
-    ? `<img class="modal-img" src="${OH.escapeHtml(hiRes(b.image))}" alt="">`
+  const real = realImage(b.image);
+  const img = real
+    ? `<img class="modal-img" alt="">`
     : `<div class="modal-img placeholder">Buy-Back</div>`;
   const url = buybackUrl(b);
   const row = (k, v) =>
@@ -2254,14 +2260,8 @@ function openBuybackModal(b) {
     </div>`;
   itemModal.hidden = false;
   const mimg = modalBody.querySelector('img.modal-img');
-  if (mimg && b.image) {
-    mimg.addEventListener(
-      'error',
-      () => {
-        if (!mimg.src.endsWith(b.image)) mimg.src = b.image;
-      },
-      { once: true },
-    );
+  if (mimg) {
+    progressiveImage(mimg, real);
   }
 }
 resultsEl.addEventListener('click', (e) => {

@@ -1744,6 +1744,11 @@
         object-fit: cover;
         display: block;
         background: #0b0e13;
+        transition: filter 0.25s ease;
+      }
+      /* Thumbnail shown while the full-res image loads (progressiveImage). */
+      .img-loading {
+        filter: blur(6px) saturate(1.1);
       }
       .modal-img.placeholder {
         display: flex;
