@@ -1,6 +1,6 @@
 # Open Hangar
 
-[![Website](https://img.shields.io/badge/Website-open--hangar-2f81f7?style=for-the-badge)](https://draco-foundry.github.io/open-hangar/)
+[![Website](https://img.shields.io/badge/Website-openhangar.space-2f81f7?style=for-the-badge)](https://openhangar.space/)
 [![Version](https://img.shields.io/badge/version-0.2.7-blue?style=for-the-badge)](manifest.json)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 [![Roadmap](https://img.shields.io/badge/%F0%9F%97%BA%EF%B8%8F-Roadmap-orange?style=for-the-badge)](ROADMAP.md)
@@ -19,7 +19,7 @@ viewer, or export everything as one JSON file and build on it.
 - **For developers:** the data layer RSI doesn't offer — no public API, so Open
   Hangar handles the session auth and page parsing and hands you clean records.
 
-👉 **[Install it from the website](https://draco-foundry.github.io/open-hangar/)**
+👉 **[Install it from the website](https://openhangar.space/)**
 
 > Unofficial and fan-made; not affiliated with Cloud Imperium Games or RSI. It reads
 > only _your own_ account, on your own computer.
@@ -53,7 +53,7 @@ single JSON file.
 ## Install
 
 **From the store** — the easiest way. Pick your browser on the
-[Open Hangar website](https://draco-foundry.github.io/open-hangar/). Brave, Opera and
+[Open Hangar website](https://openhangar.space/). Brave, Opera and
 Vivaldi use the Chrome Web Store build.
 
 > Store listings are in review. Until they're live, load it from source (below).
@@ -183,7 +183,7 @@ The `cookies` permission is used only by **Log out**, which clears RSI's cookies
 you can fully end your session. Signing in with a different RSI account clears the
 previous account's data, so accounts never mix.
 
-Full policy: [draco-foundry.github.io/open-hangar/privacy.html](https://draco-foundry.github.io/open-hangar/privacy.html).
+Full policy: [openhangar.space/privacy.html](https://openhangar.space/privacy.html).
 
 ## Roadmap
 
@@ -214,5 +214,5 @@ Code: MIT — see [LICENSE](LICENSE). Star Citizen Fankit images on the website 
 © Cloud Imperium and not covered by the MIT license — see
 [site/img/fankit/NOTICE.md](site/img/fankit/NOTICE.md).
 
-- **Website:** [draco-foundry.github.io/open-hangar](https://draco-foundry.github.io/open-hangar/)
+- **Website:** [openhangar.space](https://openhangar.space/)
 - **Discord:** [Draco Foundry](https://discord.gg/FF8Wm5HdnV)

@@ -51,8 +51,9 @@ bottom. Items marked ✅ are ready in the repo; ⬜ need you to do them.
 
 ## 4. Privacy & compliance (the part that gets extensions rejected)
 
-- ⬜ **Host a privacy policy** and paste its URL in the dashboard. Ready-to-publish
-  text is in `docs/PRIVACY.md` — host it via GitHub Pages or link the raw file.
+- ✅ **Privacy policy hosted** — paste this URL in each store dashboard:
+  **`https://openhangar.space/privacy.html`** (source: `site/privacy.html`, mirrors
+  `docs/PRIVACY.md`). Homepage / support URL: `https://openhangar.space/`.
 - ⬜ **Single purpose** statement (dashboard asks for it): see §6.
 - ⬜ **Permission justifications** (dashboard requires one per permission): see §5.
 - ⬜ **Data-usage disclosures** (checkboxes in the dashboard):
