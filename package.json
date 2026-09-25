@@ -18,11 +18,13 @@
     "format:check": "prettier --check \"**/*.{js,html,json,md}\"",
     "build": "node scripts/pack.mjs",
     "lint:firefox": "npm run build && web-ext lint --source-dir dist/firefox",
-    "pack": "npm run build && web-ext build --source-dir dist/chrome --artifacts-dir dist --filename open-hangar-chrome-{version}.zip --overwrite-dest && web-ext build --source-dir dist/firefox --artifacts-dir dist --filename open-hangar-firefox-{version}.zip --overwrite-dest"
+    "pack": "npm run build && web-ext build --source-dir dist/chrome --artifacts-dir dist --filename open-hangar-chrome-{version}.zip --overwrite-dest && web-ext build --source-dir dist/firefox --artifacts-dir dist --filename open-hangar-firefox-{version}.zip --overwrite-dest",
+    "screenshots": "node scripts/screenshots/run.mjs"
   },
   "devDependencies": {
     "jsdom": "^24.1.0",
     "prettier": "^3.3.0",
+    "puppeteer-core": "^25.12.0",
     "web-ext": "^10.7.0"
   }
 }
