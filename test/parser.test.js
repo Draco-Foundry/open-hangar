@@ -53,6 +53,26 @@ test('classifies a standalone add-on (no ship)', () => {
   assert.equal(p.containsShip, false);
 });
 
+test('reads giftability from the rendered Gift action', () => {
+  assert.equal(byId('111').giftable, true); // has <a class="js-gift">
+  assert.equal(byId('222').giftable, false); // CCU: no Gift action
+  assert.equal(byId('333').giftable, false); // add-on: no Gift action
+});
+
+test('reads the insurance term from the contained Insurance item', () => {
+  assert.equal(byId('111').insurance, 'LTI'); // "Lifetime Insurance" → LTI
+  assert.equal(byId('222').insurance, null); // no insurance item
+});
+
+test('insuranceTerm normalizes month / year / lifetime phrasings', () => {
+  const t = (label) => OpenHangar.insuranceTerm([{ kind: 'Insurance', label }]);
+  assert.equal(t('Lifetime Insurance'), 'LTI');
+  assert.equal(t('120 Month Insurance'), '120M');
+  assert.equal(t('6 Months Insurance'), '6M');
+  assert.equal(t('5 Year Insurance'), '5Y');
+  assert.equal(OpenHangar.insuranceTerm([]), null);
+});
+
 test('detectCCU only matches "Upgrade - X to Y" names', () => {
   assert.equal(OpenHangar.detectCCU('Origin 300i'), null);
   assert.deepEqual(OpenHangar.detectCCU('Upgrade - Cutlass Black to Freelancer'), {
@@ -90,6 +110,16 @@ test('parses buy-back <article> cards (name, date, items from <dd>, id/href from
 test('buy-back id falls back to the reclaim URL when data-pledgeid is absent', () => {
   assert.equal(buybacks[1].id, '123456');
   assert.equal(buybacks[1].contains, 'Avenger Titan'); // dd[1] of 2
+});
+
+test('classifyBuyback maps the store-category prefix (not everything is a ship)', () => {
+  const c = OpenHangar.classifyBuyback;
+  assert.equal(c('Subscribers Store - Chance Cube'), 'other'); // the reported bug
+  assert.equal(c('Standalone Ships - Pitbull plus Aquamarine Paint'), 'ship');
+  assert.equal(c('Paints - Wolf - 8 Paint Pack'), 'paint');
+  assert.equal(c('Gear - Monde Keystone Armor Set'), 'addon');
+  assert.equal(c('Upgrade - Aurora MR to Avenger Titan'), 'ccu');
+  assert.equal(c('Drake Cutlass Black'), 'ship'); // no prefix → ship fallback
 });
 
 test('parseBuybacks returns [] for empty input', () => {

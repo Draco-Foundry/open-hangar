@@ -101,21 +101,36 @@ the exact request regardless of operation name. Record:
 
 </details>
 
-### Buyback tokens on the Citizen Card (planned)
+### Buyback tokens on the front-page Citizen Card (planned — BLOCKED on a capture)
 
-Surface the number of **buy-back tokens** available — and the **next-available
-date** — on the front-page Citizen Card, next to the balances. Tokens cap how many
-melted pledges you can re-acquire and replenish on a schedule, so both the count
-and the reset date are useful at a glance.
+Surface the number of **available buy-back tokens** — and ideally the
+**next-available date** — on the front-page Citizen Card, next to the balances
+(Store Credit / UEC / REC). Tokens cap how many melted pledges you can re-acquire
+and replenish on a schedule, so the count is useful at a glance. UI: a pill like the
+existing balances, e.g. "Buyback Tokens 3 · next Jun 12".
 
-- **Source (preferred):** the buy-back GraphQL response likely carries the token
-  count and/or a reset timestamp — capture it alongside the buyback list (see
-  above) so this comes "for free" with that pipeline.
-- **Source (fallback):** if the API doesn't expose the reset date, derive "next
-  available" from the documented replenish cadence on
+**⛔ Blocked — needs a real capture taken while a token is available.** The current
+test account has **0 tokens available**, and the element that shows the count (and
+any reset date) most likely only renders — or only shows a non-zero value — when at
+least one token exists. So the selector/source can't be pinned down yet. Revisit the
+moment a token shows up on the account.
+
+When a token IS available, capture it and record the source here:
+
+- **Buy-back page (most likely):** `/account/buy-back-pledges` is now a normal
+  server-rendered HTML source (see "Buybacks — ✅ SOLVED" above — the earlier GraphQL
+  assumption was wrong), so the token count is probably a label on that page. Save the
+  page HTML (same as we did for the hangar gift button) and find the element.
+- **Account dashboard (check too):** `/en/account/dashboard` embeds the JSON blob
+  `OH.getAccount()` already parses (nickname / `creditsData` / referral). If the token
+  count travels there, it comes "for free" alongside the balances — no extra fetch.
+- **Reset date fallback:** if neither exposes the next-available date, derive it from
+  the documented replenish cadence on
   [starcitizen.tools/Buyback](https://starcitizen.tools/Buyback) (cached locally).
-- **UI:** a pill on the Citizen Card like Store Credit / UEC / REC, e.g.
-  "Buyback Tokens 3 · next Jun 12".
+
+Once the source is known: parse the count (+ reset) in `lib.js` (`getAccount` or the
+buy-back scan), thread it through `state`, and add the pill in `renderAccount`
+(dashboard.js) next to the existing balances.
 
 ## Multi-account caching + character switcher (needs research first)
 

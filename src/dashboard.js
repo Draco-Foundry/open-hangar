@@ -14,6 +14,9 @@ const scannedHomeEl = $('#scanned-home');
 const chipsEl = $('#chips');
 const resultsEl = $('#results');
 const scanBtn = $('#scan-home');
+const scanMenuBtn = $('#scan-menu-btn');
+const scanMenu = $('#scan-menu');
+const scanSelectedBtn = $('#scan-selected');
 const logoutBtn = $('#logout-home');
 const clearBtn = $('#clear-home');
 const searchEl = $('#search');
@@ -24,6 +27,7 @@ const scanIndicator = $('#scan-indicator');
 const bbSearchEl = $('#bb-search');
 const bbSortEl = $('#bb-sort');
 const bbChipsEl = $('#bb-chips');
+const bbLayoutEl = $('#bb-layout');
 
 // Buy-back kind labels (buy-backs classify into a slightly different set than
 // the hangar — notably 'paint'). Order = display order.
@@ -243,7 +247,7 @@ const DISCORD_URL = 'https://discord.gg/FF8Wm5HdnV';
 const CONTRIBUTORS = [];
 const BOOSTERS = [];
 
-const LAYOUTS = ['gallery', 'compact', 'list'];
+const LAYOUTS = ['gallery', 'compact', 'list', 'market'];
 
 const state = {
   items: [],
@@ -253,11 +257,17 @@ const state = {
   bbQuery: '',
   bbSort: 'date-desc', // default to newest buy-backs first
   bbShown: new Set(), // buy-back kind filter
+  bbLayout: 'gallery', // gallery | compact | list | market (independent of inventory)
   owner: null, // { nickname, displayname } the stored data was scanned from
   shown: new Set(), // inventory kind filter
   query: '',
   sort: 'default',
-  layout: 'gallery', // gallery | compact | list
+  layout: 'gallery', // gallery | compact | list | market
+  // Market (sale-sheet) "My Price" annotations, keyed by item (see marketKey):
+  // { [key]: { price } }. Stored SEPARATELY from the scan so a re-scan never
+  // wipes your prices. Purely local — never exported or sent.
+  market: {},
+  marketGiftableOnly: false, // Market view: show only sellable (giftable) items
   referral: null, // { code, url, current, legacy, prospects, recruitsList, prospectsList }
   refTab: 'recruits', // referral list tab: 'recruits' | 'prospects'
   refQuery: '', // referral list search
@@ -709,7 +719,11 @@ function cmpValue(a, b, dir) {
 
 function computeShown() {
   const q = state.query.trim().toLowerCase();
-  let list = state.items.filter((p) => state.shown.has(p.kind));
+  // Filter chips are an INCLUDE selection: an empty set means "show everything"
+  // (the default), and picking kinds narrows to just those.
+  let list = state.shown.size
+    ? state.items.filter((p) => state.shown.has(p.kind))
+    : state.items.slice();
   if (q) list = list.filter((p) => haystack(p).includes(q));
   if (state.sort !== 'default') {
     const byName = (a, b) => (a.name || '').localeCompare(b.name || '');
@@ -733,9 +747,12 @@ function computeShown() {
 
 function chipHtml(kind) {
   const n = state.items.filter((p) => p.kind === kind.key).length;
-  return `<button class="chip k-${kind.key}" data-key="${kind.key}" aria-pressed="${state.shown.has(
-    kind.key,
-  )}">${OH.escapeHtml(kind.label)}<span class="n">${n}</span></button>`;
+  // With no selection everything shows, so every chip reads as active; once any
+  // chip is picked only the picked ones stay active (the rest dim via CSS).
+  const active = state.shown.size === 0 || state.shown.has(kind.key);
+  return `<button class="chip k-${kind.key}" data-key="${kind.key}" aria-pressed="${active}">${OH.escapeHtml(
+    kind.label,
+  )}<span class="n">${n}</span></button>`;
 }
 
 function cardHtml(p) {
@@ -772,6 +789,397 @@ function cardHtml(p) {
   </div>`;
 }
 
+// --- Market (sale-sheet) view --------------------------------------------
+// A per-category table — Items Name · Insurance · Melt Price · My Price · Stock
+// — the layout grey-market sellers screenshot as a store listing. Everything
+// but My Price comes from the scan: identical pledges are STACKED into one row
+// and Stock is how many you own. My Price is the only seller annotation, stored
+// locally (state.market) and keyed by item — never exported or sent anywhere.
+// There's no "Sold" control: a re-scan drops items you no longer hold, so the
+// scan itself is the source of truth for what's still for sale.
+
+// Identity key for an item — what makes two pledges "the same" for stacking and
+// for attaching a price. Keyed by display name + melt value (not RSI's per-copy
+// pledge id, which differs between duplicates), so copies merge and a saved
+// price survives re-scans where individual pledge ids churn.
+function marketKey(p) {
+  const v = Number.isFinite(p.value) ? p.value : '';
+  return `${plainName(p).trim().toLowerCase()}|${v}`;
+}
+
+// Persist the price map. Debounced so typing in a field doesn't hammer storage.
+let marketSaveTimer = null;
+function saveMarket() {
+  clearTimeout(marketSaveTimer);
+  marketSaveTimer = setTimeout(() => {
+    chrome.storage.local.set({ marketAnnotations: state.market });
+  }, 300);
+}
+
+// Set this item's price, dropping the entry when cleared so the map stays tidy.
+function setMarketPrice(key, value) {
+  if (value === '' || value == null) delete state.market[key];
+  else state.market[key] = { price: value };
+  saveMarket();
+}
+
+// Insurance term (LTI / 3M / 120M / …). Not parsed from RSI yet — the parser
+// reads an "Insurance" tile but not its term (see ROADMAP). Render whatever a
+// future parser sets on p.insurance; until then show an em-dash placeholder so
+// the column exists and lights up automatically once extraction lands.
+function marketInsurance(p) {
+  return p.insurance || '----';
+}
+
+// A pledge is meltable when it has a real store-credit melt value (> $0).
+// Non-meltable items (rewards, $0 reward gear, unparseable) have no resale floor
+// and are hidden from the Market view entirely.
+function isMeltable(p) {
+  return Number.isFinite(p.value) && p.value > 0;
+}
+
+// Melt Price for the row. Non-meltable pledges are filtered out before render, so
+// this is effectively always a price; the fallback is just defensive.
+function meltLabel(p) {
+  return isMeltable(p) ? formatValue(p) : 'Not meltable';
+}
+
+// Sale-sheet sections, in display order. A pledge lands in the FIRST section
+// whose test matches. "Packs" vs "Standalone Ships" both contain a ship, so we
+// split them with a best-effort heuristic: a pack is a game package / bundle
+// (named "Package …", a "Star Citizen + Squadron 42" game pack, or a card that
+// contains more than one ship). A single ship that merely ships with a paint
+// (e.g. "Cutter plus Groundswell Paint") stays a Standalone Ship.
+function isPack(p) {
+  if (!p.containsShip) return false;
+  const name = p.name || '';
+  if (/\bpackage\b/i.test(name)) return true;
+  if (/squadron\s*42|\bsq42\b/i.test(name)) return true;
+  const ships = (p.contents || []).filter((c) => /^ship$/i.test((c.kind || '').trim()));
+  return ships.length > 1;
+}
+
+const MARKET_SECTIONS = [
+  { key: 'ship', label: 'Standalone Ships', test: (p) => p.containsShip && !isPack(p) },
+  { key: 'pack', label: 'Packs', test: (p) => isPack(p) },
+  { key: 'ccu', label: 'Upgrades', test: (p) => p.isCCU },
+  { key: 'paint', label: 'Paints', test: (p) => p.kind === 'paint' },
+  { key: 'addon', label: 'Add-ons', test: (p) => p.kind === 'addon' },
+  { key: 'other', label: 'Other', test: () => true },
+];
+
+function marketSectionOf(p) {
+  return MARKET_SECTIONS.find((s) => s.test(p)) || MARKET_SECTIONS[MARKET_SECTIONS.length - 1];
+}
+
+// One stacked row. `g` is { key, rep, stock } — a representative pledge plus how
+// many identical copies were merged into it (the Stock).
+function marketRowHtml(g) {
+  const p = g.rep;
+  const key = OH.escapeHtml(g.key);
+  const melt = meltLabel(p);
+  const saved = state.market[g.key];
+  const price = saved && saved.price != null ? OH.escapeHtml(String(saved.price)) : '';
+  const gift = giftableLabel(g);
+  return `<tr class="mk-row" data-key="${key}">
+    <td class="mk-name">${OH.escapeHtml(plainName(p))}</td>
+    <td class="mk-ins">${OH.escapeHtml(marketInsurance(p))}</td>
+    <td class="mk-gift gift-${g.giftable === 0 ? 'no' : 'yes'}">${gift}</td>
+    <td class="mk-melt">${OH.escapeHtml(melt)}</td>
+    <td class="mk-mine"><input class="mk-price" type="text" inputmode="decimal" value="${price}" placeholder="—" aria-label="My price"></td>
+    <td class="mk-stock">${g.stock}</td>
+  </tr>`;
+}
+
+function marketTableHtml(section, groups) {
+  return `<section class="market-section">
+    <h3 class="market-title">${OH.escapeHtml(section.label)}<span class="market-n">${groups.length}</span></h3>
+    <table class="market-table">
+      <thead><tr>
+        <th>Items Name</th><th>Insurance</th><th>Giftable</th><th>Melt Price</th>
+        <th>My Price</th><th>Stock</th>
+      </tr></thead>
+      <tbody>${groups.map(marketRowHtml).join('')}</tbody>
+    </table>
+  </section>`;
+}
+
+// Stack identical pledges (same marketKey) within a section into one group,
+// preserving the incoming (sorted) order of first appearance. `giftable` counts
+// how many copies are giftable — copies of the "same" item can differ (e.g. a
+// cash-bought copy is giftable, a store-credit one isn't), so we track the count
+// rather than a single yes/no.
+function stackPledges(pledges) {
+  const order = [];
+  const byKey = new Map();
+  for (const p of pledges) {
+    const key = marketKey(p);
+    let g = byKey.get(key);
+    if (!g) {
+      g = { key, rep: p, stock: 0, giftable: 0 };
+      byKey.set(key, g);
+      order.push(g);
+    }
+    g.stock += 1;
+    if (p.giftable) g.giftable += 1;
+  }
+  return order;
+}
+
+// Giftable cell text: Yes / No when all copies agree, else "<giftable>/<stock>".
+function giftableLabel(g) {
+  if (g.giftable === 0) return 'No';
+  if (g.giftable === g.stock) return 'Yes';
+  return `${g.giftable}/${g.stock}`;
+}
+
+// Pledges shown in Market: the inventory filters/sort, minus non-meltable items
+// (no resale value), then the Giftable-only toggle (giftable is per-copy, so it
+// keeps only the sellable copies).
+function marketShown() {
+  let shown = computeShown().filter(isMeltable);
+  if (state.marketGiftableOnly) shown = shown.filter((p) => p.giftable);
+  return shown;
+}
+
+// Group shown pledges into [{ section, groups }] for the non-empty sections.
+// Shared by the renderer and the CSV/image exporters so they never diverge.
+function computeMarketSections(shown) {
+  const buckets = new Map(MARKET_SECTIONS.map((s) => [s.key, []]));
+  for (const p of shown) buckets.get(marketSectionOf(p).key).push(p);
+  return MARKET_SECTIONS.filter((s) => buckets.get(s.key).length).map((s) => ({
+    section: s,
+    groups: stackPledges(buckets.get(s.key)),
+  }));
+}
+
+function marketToolbarHtml(shown) {
+  return `<div class="market-toolbar">
+    <div class="result-count">Showing ${shown.length} of ${state.items.length} · Melt ${money(OH.totalValue(shown))}</div>
+    <div class="market-actions">
+      <label class="mk-toggle"><input type="checkbox" class="mk-giftable-only" ${
+        state.marketGiftableOnly ? 'checked' : ''
+      }> Giftable only</label>
+      <button class="mk-btn mk-export-csv" type="button">Export CSV</button>
+      <button class="mk-btn mk-export-img" type="button">Copy image</button>
+      <span class="mk-export-status" aria-live="polite"></span>
+    </div>
+  </div>`;
+}
+
+function renderMarket() {
+  const shown = marketShown();
+  const sections = computeMarketSections(shown);
+  const body = sections.length
+    ? `<div class="market">${sections.map(({ section, groups }) => marketTableHtml(section, groups)).join('')}</div>`
+    : '<div class="empty">No meltable pledges match the current filters.</div>';
+  resultsEl.innerHTML = marketToolbarHtml(shown) + body;
+}
+
+// --- Market export (CSV / image) -----------------------------------------
+// Both operate on exactly what's on screen (filters + Giftable-only applied) so
+// the file matches the view. Everything stays local — a download or a clipboard
+// copy; nothing is uploaded.
+
+function marketFilename(ext) {
+  const who = (state.owner && (state.owner.nickname || state.owner.displayname)) || 'hangar';
+  return `open-hangar-sale-sheet-${who}.${ext}`.replace(/[^\w.-]+/g, '_');
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+let exportStatusTimer = null;
+function setExportStatus(el, text) {
+  if (!el) return;
+  el.textContent = text;
+  clearTimeout(exportStatusTimer);
+  exportStatusTimer = setTimeout(() => {
+    el.textContent = '';
+  }, 4000);
+}
+
+// One CSV cell — quote when it contains a comma, quote, or newline (RFC 4180).
+function csvCell(v) {
+  const s = String(v == null ? '' : v);
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function marketCsv(sections) {
+  const lines = [['Category', 'Item', 'Insurance', 'Giftable', 'Melt Price', 'My Price', 'Stock']];
+  for (const { section, groups } of sections) {
+    for (const g of groups) {
+      const saved = state.market[g.key];
+      lines.push([
+        section.label,
+        plainName(g.rep),
+        marketInsurance(g.rep),
+        giftableLabel(g),
+        meltLabel(g.rep),
+        saved && saved.price != null ? saved.price : '',
+        g.stock,
+      ]);
+    }
+  }
+  return lines.map((r) => r.map(csvCell).join(',')).join('\r\n');
+}
+
+function exportMarketCsv(statusEl) {
+  const sections = computeMarketSections(marketShown());
+  if (!sections.length) return setExportStatus(statusEl, 'Nothing to export');
+  downloadBlob(
+    new Blob([marketCsv(sections)], { type: 'text/csv;charset=utf-8' }),
+    marketFilename('csv'),
+  );
+  setExportStatus(statusEl, 'Saved CSV');
+}
+
+// Text values for one row of the image (mirrors the table, price prefixed "$").
+function marketImageCells(g) {
+  const saved = state.market[g.key];
+  return {
+    name: plainName(g.rep),
+    ins: marketInsurance(g.rep),
+    gift: giftableLabel(g),
+    melt: meltLabel(g.rep),
+    price: saved && saved.price != null ? '$' + saved.price : '—',
+    stock: String(g.stock),
+  };
+}
+
+const MK_IMG_COLS = [
+  { key: 'name', label: 'Items Name' },
+  { key: 'ins', label: 'Insurance' },
+  { key: 'gift', label: 'Giftable' },
+  { key: 'melt', label: 'Melt Price' },
+  { key: 'price', label: 'My Price' },
+  { key: 'stock', label: 'Stock' },
+];
+
+// Render the sale sheet to a canvas — drawn cell-by-cell (no external lib, no
+// images, so nothing taints the canvas) using the dashboard's dark palette.
+function marketImageCanvas(sections) {
+  const SCALE = 2; // crisp on hi-dpi
+  const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+  const PAD = 24;
+  const CELL_X = 14;
+  const ROW_H = 30;
+  const HEAD_H = 34;
+  const TITLE_H = 36;
+  const SECTION_GAP = 18;
+  const NAME_MAX = 380;
+  const f = (weight, size) => `${weight} ${size}px ${FONT}`;
+
+  const meas = document.createElement('canvas').getContext('2d');
+
+  // One shared column grid: width = widest header/cell, name column capped.
+  const widths = MK_IMG_COLS.map((c) => {
+    meas.font = f(600, 13);
+    let w = meas.measureText(c.label).width;
+    meas.font = f(400, 13);
+    for (const { groups } of sections) {
+      for (const g of groups) w = Math.max(w, meas.measureText(marketImageCells(g)[c.key]).width);
+    }
+    return Math.min(w, c.key === 'name' ? NAME_MAX : Infinity) + CELL_X * 2;
+  });
+  const tableW = widths.reduce((a, b) => a + b, 0);
+  const W = tableW + PAD * 2;
+  let H = PAD * 2 - SECTION_GAP;
+  for (const { groups } of sections) H += TITLE_H + HEAD_H + groups.length * ROW_H + SECTION_GAP;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W * SCALE;
+  canvas.height = H * SCALE;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(SCALE, SCALE);
+  ctx.textBaseline = 'middle';
+
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, W, H);
+
+  const colX = [];
+  let cx = PAD;
+  for (const w of widths) {
+    colX.push(cx);
+    cx += w;
+  }
+  const clip = (text, maxW) => {
+    meas.font = f(400, 13);
+    if (meas.measureText(text).width <= maxW) return text;
+    let t = text;
+    while (t.length > 1 && meas.measureText(t + '…').width > maxW) t = t.slice(0, -1);
+    return t + '…';
+  };
+
+  let y = PAD;
+  for (const { section, groups } of sections) {
+    ctx.fillStyle = '#e6edf3';
+    ctx.font = f(600, 16);
+    ctx.fillText(`${section.label}  (${groups.length})`, PAD, y + TITLE_H / 2);
+    y += TITLE_H;
+
+    ctx.fillStyle = '#1c222b';
+    ctx.fillRect(PAD, y, tableW, HEAD_H);
+    ctx.fillStyle = '#e6edf3';
+    ctx.font = f(600, 13);
+    MK_IMG_COLS.forEach((c, i) => ctx.fillText(c.label, colX[i] + CELL_X, y + HEAD_H / 2));
+    y += HEAD_H;
+
+    groups.forEach((g, ri) => {
+      if (ri % 2 === 1) {
+        ctx.fillStyle = '#161b22';
+        ctx.fillRect(PAD, y, tableW, ROW_H);
+      }
+      ctx.strokeStyle = '#2a3139';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(PAD, y + ROW_H + 0.5);
+      ctx.lineTo(PAD + tableW, y + ROW_H + 0.5);
+      ctx.stroke();
+
+      const cells = marketImageCells(g);
+      MK_IMG_COLS.forEach((c, i) => {
+        if (c.key === 'name' || c.key === 'price') ctx.fillStyle = '#e6edf3';
+        else if (c.key === 'gift') ctx.fillStyle = g.giftable === 0 ? '#8b949e' : '#2ea043';
+        else ctx.fillStyle = '#8b949e';
+        ctx.font = f(c.key === 'gift' && g.giftable !== 0 ? 600 : 400, 13);
+        ctx.fillText(clip(cells[c.key], widths[i] - CELL_X * 2), colX[i] + CELL_X, y + ROW_H / 2);
+      });
+      y += ROW_H;
+    });
+    y += SECTION_GAP;
+  }
+  return canvas;
+}
+
+function copyMarketImage(statusEl) {
+  const sections = computeMarketSections(marketShown());
+  if (!sections.length) return setExportStatus(statusEl, 'Nothing to export');
+  marketImageCanvas(sections).toBlob(async (blob) => {
+    if (!blob) return setExportStatus(statusEl, 'Image failed');
+    // Prefer a clipboard copy (paste straight into Discord/forums); fall back to
+    // a PNG download where the async Clipboard image API isn't available.
+    try {
+      if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
+        return setExportStatus(statusEl, 'Copied to clipboard');
+      }
+      throw new Error('clipboard unavailable');
+    } catch {
+      downloadBlob(blob, marketFilename('png'));
+      setExportStatus(statusEl, 'Saved PNG');
+    }
+  }, 'image/png');
+}
+
 function renderInventory() {
   layoutEl
     .querySelectorAll('button')
@@ -785,6 +1193,10 @@ function renderInventory() {
   const shown = computeShown();
   if (!shown.length) {
     resultsEl.innerHTML = '<div class="empty">No pledges match the current filters.</div>';
+    return;
+  }
+  if (state.layout === 'market') {
+    renderMarket();
     return;
   }
   resultsEl.innerHTML =
@@ -1418,14 +1830,18 @@ function presentBbKinds() {
 
 function bbChipHtml(kind) {
   const n = state.buybacks.filter((b) => b.kind === kind.key).length;
-  return `<button class="chip k-${kind.key}" data-key="${kind.key}" aria-pressed="${state.bbShown.has(
-    kind.key,
-  )}">${OH.escapeHtml(kind.label)}<span class="n">${n}</span></button>`;
+  const active = state.bbShown.size === 0 || state.bbShown.has(kind.key);
+  return `<button class="chip k-${kind.key}" data-key="${kind.key}" aria-pressed="${active}">${OH.escapeHtml(
+    kind.label,
+  )}<span class="n">${n}</span></button>`;
 }
 
 function computeBuybacks() {
   const q = state.bbQuery.trim().toLowerCase();
-  let list = state.buybacks.filter((b) => state.bbShown.has(b.kind));
+  // Same include-selection model as the inventory chips: empty = show all.
+  let list = state.bbShown.size
+    ? state.buybacks.filter((b) => state.bbShown.has(b.kind))
+    : state.buybacks.slice();
   if (q) list = list.filter((b) => `${b.name || ''} ${b.contains || ''}`.toLowerCase().includes(q));
   if (state.bbSort !== 'default') {
     const byName = (a, b) => (a.name || '').localeCompare(b.name || '');
@@ -1468,6 +1884,11 @@ function renderBuybacks() {
     return;
   }
   if (controls) controls.hidden = false;
+  if (bbLayoutEl) {
+    bbLayoutEl
+      .querySelectorAll('button')
+      .forEach((b) => b.classList.toggle('active', b.dataset.layout === state.bbLayout));
+  }
   if (bbChipsEl) bbChipsEl.innerHTML = presentBbKinds().map(bbChipHtml).join('');
   const list = computeBuybacks();
   const when = state.buybacksScannedAt ? new Date(state.buybacksScannedAt).toLocaleString() : '';
@@ -1475,10 +1896,75 @@ function renderBuybacks() {
     body.innerHTML = '<div class="empty">No buy-backs match the current filters.</div>';
     return;
   }
+  const count = `<div class="result-count">Showing ${list.length} of ${state.buybacks.length}${when ? ` · scanned ${OH.escapeHtml(when)}` : ''}</div>`;
+  // Market = a reclaim-focused table (buy-backs have no melt/giftable/insurance);
+  // the other layouts reuse the shared card grid like the inventory.
+  if (state.bbLayout === 'market') {
+    body.innerHTML = count + buybackMarketHtml(list);
+    return; // table has no thumbnails to enhance
+  }
   body.innerHTML =
-    `<div class="result-count">Showing ${list.length} of ${state.buybacks.length}${when ? ` · scanned ${OH.escapeHtml(when)}` : ''}</div>` +
-    `<div class="grid">${list.map(buybackCardHtml).join('')}</div>`;
+    count + `<div class="grid ${state.bbLayout}">${list.map(buybackCardHtml).join('')}</div>`;
   enhanceCardImages(body);
+}
+
+// Buy-back "Market": one reclaim table per kind (Ships, CCUs, Paints, …), with
+// the columns a buy-back has — name, reclaim cost, quantity, and a reclaim link.
+// Identical copies are stacked into one row with a Qty count, mirroring the
+// inventory Market's per-category stacked tables.
+function buybackName(b) {
+  return b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '—';
+}
+
+function stackBuybacks(list) {
+  const order = [];
+  const byKey = new Map();
+  for (const b of list) {
+    const key = `${buybackName(b).toLowerCase()}|${b.price || ''}`;
+    let g = byKey.get(key);
+    if (!g) {
+      g = { rep: b, qty: 0 };
+      byKey.set(key, g);
+      order.push(g);
+    }
+    g.qty += 1;
+  }
+  return order;
+}
+
+function buybackRowHtml(g) {
+  const b = g.rep;
+  const name = b.ccu
+    ? `${OH.escapeHtml(b.ccu.from)} <span class="ccu-flow">→</span> ${OH.escapeHtml(b.ccu.to)}`
+    : OH.escapeHtml(b.name || '—');
+  const url = buybackUrl(b);
+  const reclaim = url
+    ? `<a class="bb-reclaim" href="${OH.escapeHtml(url)}" target="_blank" rel="noopener">Reclaim ↗</a>`
+    : '—';
+  return `<tr class="mk-row">
+    <td class="mk-name">${name}</td>
+    <td class="mk-melt">${b.price ? OH.escapeHtml(b.price) : '—'}</td>
+    <td class="mk-stock">${g.qty}</td>
+    <td class="mk-mine">${reclaim}</td>
+  </tr>`;
+}
+
+function buybackMarketHtml(list) {
+  const buckets = new Map(BB_KINDS.map((k) => [k.key, []]));
+  for (const b of list) (buckets.get(b.kind) || buckets.get('other')).push(b);
+  const sections = BB_KINDS.filter((k) => buckets.get(k.key).length).map((k) => {
+    const groups = stackBuybacks(buckets.get(k.key));
+    return `<section class="market-section">
+      <h3 class="market-title">${OH.escapeHtml(k.label)}<span class="market-n">${groups.length}</span></h3>
+      <table class="market-table">
+        <thead><tr>
+          <th>Items Name</th><th>Reclaim Cost</th><th>Qty</th><th>Reclaim</th>
+        </tr></thead>
+        <tbody>${groups.map(buybackRowHtml).join('')}</tbody>
+      </table>
+    </section>`;
+  });
+  return `<div class="market">${sections.join('')}</div>`;
 }
 
 // --- Events ---------------------------------------------------------------
@@ -1524,6 +2010,15 @@ if (bbChipsEl) {
     renderBuybacks();
   });
 }
+if (bbLayoutEl) {
+  bbLayoutEl.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-layout]');
+    if (!b) return;
+    state.bbLayout = b.dataset.layout;
+    chrome.storage.local.set({ bbLayout: state.bbLayout });
+    renderBuybacks();
+  });
+}
 
 layoutEl.addEventListener('click', (e) => {
   const b = e.target.closest('button[data-layout]');
@@ -1543,6 +2038,29 @@ function onThumbError(e) {
   img.replaceWith(ph);
 }
 resultsEl.addEventListener('error', onThumbError, true);
+
+// Market sale-sheet: persist My Price as it's typed. We update state + storage
+// WITHOUT re-rendering so the field keeps focus; the price is keyed by item
+// (data-key) so it sticks to that item across re-scans.
+resultsEl.addEventListener('input', (e) => {
+  const el = e.target;
+  if (!el.classList || !el.classList.contains('mk-price')) return;
+  const row = el.closest('.mk-row');
+  if (!row) return;
+  setMarketPrice(row.dataset.key, el.value.trim());
+});
+
+// Market toolbar: "Giftable only" filter re-renders; CSV / image export the view.
+resultsEl.addEventListener('change', (e) => {
+  if (!e.target.classList || !e.target.classList.contains('mk-giftable-only')) return;
+  state.marketGiftableOnly = e.target.checked;
+  renderInventory();
+});
+resultsEl.addEventListener('click', (e) => {
+  const status = resultsEl.querySelector('.mk-export-status');
+  if (e.target.closest('.mk-export-csv')) exportMarketCsv(status);
+  else if (e.target.closest('.mk-export-img')) copyMarketImage(status);
+});
 if (buybacksBodyEl) buybacksBodyEl.addEventListener('error', onThumbError, true);
 
 // --- Inventory: hover preview + click detail modal ------------------------
@@ -1805,56 +2323,116 @@ document.addEventListener('click', async (e) => {
   }
 });
 
-scanBtn.addEventListener('click', async () => {
+// Scan a chosen set of sources. Each is independent and persisted on its own, so
+// a partial scan (e.g. just referrals) refreshes only those and leaves the rest
+// of your data untouched; a failure in one still keeps the others' results.
+async function runScan({ hangar = true, buybacks = true, referrals = true } = {}) {
+  if (!hangar && !buybacks && !referrals) return;
   scanBtn.disabled = true;
+  if (scanSelectedBtn) scanSelectedBtn.disabled = true;
   setStatus('Scanning…');
   setScanning('Scanning…');
-  // Scan every registered source (hangar + buy-backs). Each is independent, so a
-  // failure in one (e.g. buy-backs) still keeps the other's results.
-  const res = await OH.scanAll((id, page, c) => {
-    const label = OH.getSource(id)?.label || id;
-    setStatus(`Scanning ${label}… page ${page}, ${c} items`);
-    setScanning(`${label}… ${c}`);
-  });
+  const parts = [];
+  let anyErr = false;
 
-  const h = res.hangar;
-  if (h?.ok) {
-    state.items = h.items;
-    state.scannedAt = h.scannedAt;
-    state.shown = new Set(presentKinds().map((k) => k.key));
-    const acct = await OH.getAccount();
-    if (acct.loggedIn && acct.nickname) {
-      state.owner = { nickname: acct.nickname, displayname: acct.displayname || null };
+  if (hangar) {
+    const h = await OH.scanSource('hangar', (page, c) => {
+      setStatus(`Scanning hangar… page ${page}, ${c} items`);
+      setScanning(`hangar… ${c}`);
+    });
+    if (h.ok) {
+      state.items = h.items;
+      state.scannedAt = h.scannedAt;
+      state.shown = new Set(); // default: no filter selected = show all
+      const acct = await OH.getAccount();
+      if (acct.loggedIn && acct.nickname) {
+        state.owner = { nickname: acct.nickname, displayname: acct.displayname || null };
+      }
+      parts.push(`${h.items.length} pledges`);
+    } else {
+      parts.push(`hangar: ${h.error}`);
+      anyErr = true;
     }
   }
-  const b = res.buybacks;
-  if (b?.ok) {
-    state.buybacks = b.items;
-    state.buybacksScannedAt = b.scannedAt;
-    state.bbShown = new Set(presentBbKinds().map((k) => k.key));
+
+  if (buybacks) {
+    const b = await OH.scanSource('buybacks', (page, c) => {
+      setStatus(`Scanning buy-backs… page ${page}, ${c} items`);
+      setScanning(`buy-backs… ${c}`);
+    });
+    if (b.ok) {
+      state.buybacks = b.items;
+      state.buybacksScannedAt = b.scannedAt;
+      state.bbShown = new Set(); // default: no filter selected = show all
+      parts.push(`${b.items.length} buy-backs`);
+    } else {
+      parts.push(`buy-backs: ${b.error}`);
+      anyErr = true;
+    }
   }
 
-  // Referrals — separate source (GraphQL, not in OH.SOURCES). Independent, so a
-  // failure here doesn't affect the hangar/buy-back results above.
-  const r = await OH.getReferral((phase, n) => {
-    setStatus(`Scanning referrals — ${phase}… ${n}`);
-    setScanning(`referrals ${phase}… ${n}`);
-  });
-  if (r?.ok) state.referral = r.referral;
+  // Referrals — separate source (GraphQL, not in OH.SOURCES).
+  if (referrals) {
+    const r = await OH.getReferral((phase, n) => {
+      setStatus(`Scanning referrals — ${phase}… ${n}`);
+      setScanning(`referrals ${phase}… ${n}`);
+    });
+    if (r?.ok) {
+      state.referral = r.referral;
+      parts.push(`${r.referral.legacy?.recruits ?? 0} recruits`);
+    } else if (r) {
+      parts.push(`referrals: ${r.error}`);
+      anyErr = true;
+    }
+  }
 
-  const parts = [];
-  if (h) parts.push(h.ok ? `${h.items.length} pledges` : `hangar: ${h.error}`);
-  if (b) parts.push(b.ok ? `${b.items.length} buy-backs` : `buy-backs: ${b.error}`);
-  if (r)
-    parts.push(r.ok ? `${r.referral.legacy?.recruits ?? 0} recruits` : `referrals: ${r.error}`);
-  const anyErr = (h && !h.ok) || (b && !b.ok) || (r && !r.ok);
-  const summary = parts.join(' · ');
+  const summary = parts.join(' · ') || 'Nothing scanned';
   setStatus(summary, anyErr);
   setScanning(`${anyErr ? '⚠ ' : '✓ '}${summary}`, true);
   route();
   renderAccount(); // refresh the Citizen Card pill with the new referral counts
   scanBtn.disabled = false;
-});
+  if (scanSelectedBtn) scanSelectedBtn.disabled = false;
+}
+
+// Primary button scans everything; the caret opens a per-source menu.
+scanBtn.addEventListener('click', () => runScan());
+
+function closeScanMenu() {
+  if (!scanMenu || scanMenu.hidden) return;
+  scanMenu.hidden = true;
+  if (scanMenuBtn) scanMenuBtn.setAttribute('aria-expanded', 'false');
+}
+
+if (scanMenuBtn && scanMenu) {
+  scanMenuBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // don't let the document handler immediately re-close it
+    const open = scanMenu.hidden;
+    scanMenu.hidden = !open;
+    scanMenuBtn.setAttribute('aria-expanded', String(open));
+  });
+  // Clicks inside the menu (toggling checkboxes) shouldn't close it.
+  scanMenu.addEventListener('click', (e) => e.stopPropagation());
+  document.addEventListener('click', closeScanMenu);
+}
+
+if (scanSelectedBtn) {
+  scanSelectedBtn.addEventListener('click', () => {
+    const checked = new Set(
+      [...document.querySelectorAll('.scan-src:checked')].map((el) => el.value),
+    );
+    if (!checked.size) {
+      setStatus('Select at least one source to scan.', true);
+      return;
+    }
+    closeScanMenu();
+    runScan({
+      hangar: checked.has('hangar'),
+      buybacks: checked.has('buybacks'),
+      referrals: checked.has('referrals'),
+    });
+  });
+}
 
 logoutBtn.addEventListener('click', async () => {
   logoutBtn.disabled = true;
@@ -1981,8 +2559,8 @@ if (importBtn && importFile) {
     const refSrc = res.db.sources.referral;
     state.referral = refSrc && refSrc.items && !Array.isArray(refSrc.items) ? refSrc.items : null;
     state.owner = null; // imports aren't attributed to an account (see importDB)
-    state.shown = new Set(presentKinds().map((k) => k.key));
-    state.bbShown = new Set(presentBbKinds().map((k) => k.key));
+    state.shown = new Set(); // default: no filter selected = show all
+    state.bbShown = new Set(); // default: no filter selected = show all
     renderAccount(); // reflect imported referral in the pill
     setDataMsg(
       `Imported ${sourceItemCount(res.db.sources)} item(s) — open Inventory / Buy-Backs / Stats to view.`,
@@ -2034,8 +2612,14 @@ document.addEventListener('visibilitychange', async () => {
 // --- Init -----------------------------------------------------------------
 
 (async () => {
-  const { uiLayout } = await chrome.storage.local.get('uiLayout');
+  const { uiLayout, bbLayout, marketAnnotations } = await chrome.storage.local.get([
+    'uiLayout',
+    'bbLayout',
+    'marketAnnotations',
+  ]);
   if (LAYOUTS.includes(uiLayout)) state.layout = uiLayout;
+  if (LAYOUTS.includes(bbLayout)) state.bbLayout = bbLayout;
+  if (marketAnnotations && typeof marketAnnotations === 'object') state.market = marketAnnotations;
 
   const db = await OH.loadDB();
   const hangar = db.sources.hangar || { items: [], scannedAt: null };
@@ -2050,8 +2634,8 @@ document.addEventListener('visibilitychange', async () => {
   state.owner = db.owner || null;
 
   const notice = await reconcileAccount();
-  state.shown = new Set(presentKinds().map((k) => k.key));
-  state.bbShown = new Set(presentBbKinds().map((k) => k.key));
+  state.shown = new Set(); // default: no filter selected = show all
+  state.bbShown = new Set(); // default: no filter selected = show all
   route();
   if (notice) setStatus(notice);
   await refreshRecoveryUI();
