@@ -48,7 +48,8 @@ viewer, or export everything as one JSON file and build on it.
 | **Referrals** | Your recruits and prospects (current and legacy programs), reward tiers, event bonuses and charts                                             |
 
 All of it is stored locally in one versioned database, and can be exported as a
-single JSON file.
+single JSON file — or as a **Hangar Transfer Format** (HTF) file that FleetYards and
+other community tools can import.
 
 ## Install
 
@@ -155,6 +156,13 @@ data shape above plus the **JSON export/import** on the Developers page: pull th
 whole database out as one self-describing file, or restore it. (Import restores
 holdings; the `account` block is a read-only snapshot.)
 
+**Export HTF** writes the community
+[Hangar Transfer Format](https://docs.starcitizen.fans/hangar-transfer-format.yaml):
+one entry per ship with `ship_code`, manufacturer, `pledge_*`, `lti` and `warbond` —
+import it at FleetYards (Hangar → Import). Ship codes come from a bundled snapshot of
+[HangarXPLOR](https://github.com/dolkensp/HangarXPLOR)'s MIT-licensed table
+(`src/data/`); CCUs, paints and add-ons have no HTF equivalent and are skipped.
+
 Planned: an opt-in way for sites you approve to request your data directly, limited
 to domains you trust (via `externally_connectable`). See [ROADMAP.md](ROADMAP.md).
 
@@ -167,6 +175,7 @@ Useful commands:
 | `npm run pack`         | Store-ready zips in `dist/`                                       |
 | `npm run lint:firefox` | Mozilla's `web-ext lint` against the Firefox build                |
 | `npm run screenshots`  | Store screenshots (real UI + demo data) into `docs/store-assets/` |
+| `npm run demo`         | Same demo dashboard at `localhost:8323`, for trying UI changes    |
 | `npm run format`       | Prettier                                                          |
 
 To add a data source, see [CONTRIBUTING.md](CONTRIBUTING.md).
