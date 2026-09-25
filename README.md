@@ -160,13 +160,14 @@ to domains you trust (via `externally_connectable`). See [ROADMAP.md](ROADMAP.md
 
 Useful commands:
 
-| Command                | Does                                                    |
-| ---------------------- | ------------------------------------------------------- |
-| `npm test`             | Parser tests                                            |
-| `npm run build`        | Per-browser bundles in `dist/chrome` and `dist/firefox` |
-| `npm run pack`         | Store-ready zips in `dist/`                             |
-| `npm run lint:firefox` | Mozilla's `web-ext lint` against the Firefox build      |
-| `npm run format`       | Prettier                                                |
+| Command                | Does                                                              |
+| ---------------------- | ----------------------------------------------------------------- |
+| `npm test`             | Parser tests                                                      |
+| `npm run build`        | Per-browser bundles in `dist/chrome` and `dist/firefox`           |
+| `npm run pack`         | Store-ready zips in `dist/`                                       |
+| `npm run lint:firefox` | Mozilla's `web-ext lint` against the Firefox build                |
+| `npm run screenshots`  | Store screenshots (real UI + demo data) into `docs/store-assets/` |
+| `npm run format`       | Prettier                                                          |
 
 To add a data source, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
