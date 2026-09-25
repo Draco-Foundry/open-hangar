@@ -153,7 +153,7 @@
       isAddOn,
       isCoupon,
       isPaint,
-      kind, // display category: 'ccu' | 'ship' | 'addon' | 'coupon' | 'other'
+      kind, // display category: 'ccu' | 'ship' | 'paint' | 'addon' | 'coupon' | 'other'
       giftable: raw.giftable === true, // hangar showed a "Gift" action → transferable
       insurance: ns.insuranceTerm(contents), // 'LTI' | '120M' | '6M' | … | null
       raw: raw.raw ?? null, // keep originals while reverse-engineering
