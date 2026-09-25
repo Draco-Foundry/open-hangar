@@ -142,7 +142,7 @@ h1 {
 
 /* Screenshot tour */
 .tour {
-  margin: 48px 0 0;
+  margin: 36px 0 0;
 }
 .tour h2 {
   font-size: 1.25rem;
@@ -220,6 +220,9 @@ h1 {
   .tour-thumbs {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+  .gallery {
+    grid-template-columns: 1fr;
+  }
 }
 
 .features {
@@ -280,10 +283,6 @@ footer nav {
   width: 100%;
   height: auto;
 }
-.shot-hero {
-  max-width: 1400px;
-  margin: 0 auto;
-}
 .mbtc {
   position: absolute;
   right: 2%;
@@ -298,7 +297,7 @@ footer nav {
 }
 .gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   margin-bottom: 48px;
 }
