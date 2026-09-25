@@ -1,5 +1,14 @@
 # Chrome Web Store — Launch Checklist & Listing
 
+> **Submission status (2026-09-25, v0.2.7):**
+> | Store | Status | IDs / links |
+> | --- | --- | --- |
+> | Chrome Web Store | draft (publisher `dracofoundry@gmail.com`) | item `aeabioadfphghjennmdbnpelojlhndjl` |
+> | Firefox AMO | awaiting review | `addons.mozilla.org/firefox/addon/open-hangar/` · gecko id `open-hangar@draco-foundry` |
+> | Microsoft Edge | in review (~7 business days) | CRX `fmcnemfepnifokjelgjacgdhoodaiicl` · Store ID `0RDCKFFGW5QL` |
+>
+> When each goes live, set its `data-url` in `site/index.html` so the install button activates.
+
 Everything needed to submit **Open Hangar** to the Chrome Web Store. Work top to
 bottom. Items marked ✅ are ready in the repo; ⬜ need you to do them.
 
@@ -136,15 +145,16 @@ bottom. Items marked ✅ are ready in the repo; ⬜ need you to do them.
 
 ## 8. Microsoft Edge Add-ons (after Chrome — same zip)
 
-- ⬜ Register at [Partner Center → Edge](https://partner.microsoft.com/dashboard/microsoftedge/overview) — **free**.
-- ⬜ Upload `open-hangar-chrome-<version>.zip`; reuse the §3 assets, §5
+- ✅ Register at [Partner Center → Edge](https://partner.microsoft.com/dashboard/microsoftedge/overview) — **free**.
+- ✅ Upload `open-hangar-chrome-<version>.zip`; reuse the §3 assets, §5
   justifications, §6 copy, and the privacy-policy URL.
-- ⬜ Submit. Review is typically up to ~7 business days.
+- ✅ Submitted (v0.2.7). Review is typically up to ~7 business days. Edge wants a
+  300×300 logo: `docs/store-assets/logo-300.png`.
 
 ## 9. Firefox Add-ons (AMO)
 
-- ⬜ Sign in at [addons.mozilla.org/developers](https://addons.mozilla.org/developers/) — **free**.
-- ⬜ Upload `open-hangar-firefox-<version>.zip` as a **listed** add-on.
+- ✅ Sign in at [addons.mozilla.org/developers](https://addons.mozilla.org/developers/) — **free**.
+- ✅ Upload `open-hangar-firefox-<version>.zip` as a **listed** add-on (desktop only).
 - ⬜ AMO requires **source code** only for minified/bundled code — ours ships
   unminified, so none is needed.
 - ⬜ Reuse the §6 copy + privacy-policy URL; category: _Other_ or _Games &
