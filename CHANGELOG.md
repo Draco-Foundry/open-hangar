@@ -7,7 +7,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 - **Hangar Transfer Format export.** New "Export HTF" button on the Developers page
   writes your fleet in the community format FleetYards and other tools import — one
   entry per ship, with ship codes, manufacturer, pledge name/date/cost, LTI and
-  warbond.
+  warbond. Special editions export as their base ship with the edition kept as the
+  ship's name (e.g. a Gladius named "Gladius Dunlevy"), and ships newer than the
+  bundled code list are identified from RSI's live ship matrix.
 - **Pledge dates.** Each pledge's purchase date is now read from your hangar, shown in
   the item details, and sortable in Inventory ("Pledged: newest / oldest first").
 - **Sharper, faster ship images.** The blurry hover popup on inventory and buy-back
