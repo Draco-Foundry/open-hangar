@@ -321,8 +321,45 @@
     return /name=["']password["']|id=["']?password|account\/connect/i.test(html);
   }
 
+  // Fetch one page, retrying only *transient* failures (network error, 5xx, 429)
+  // with a small, polite backoff. Auth failures and other 4xx return at once.
+  // Returns { res } or { error, transient }.
+  const RETRIES = 3;
+  const MAX_RETRY_WAIT_MS = 15000;
+  async function fetchPage(url, onRetry) {
+    let lastError = null;
+    for (let attempt = 0; attempt <= RETRIES; attempt++) {
+      if (attempt > 0) {
+        await sleep(lastError.wait);
+        onRetry?.(attempt, RETRIES);
+      }
+      let res;
+      try {
+        res = await fetch(url, { credentials: 'include' });
+      } catch (e) {
+        lastError = {
+          msg: `Couldn't reach RSI (${e.message})`,
+          wait: DELAY_MS * 2 ** (attempt + 1),
+        };
+        continue;
+      }
+      if (res.status === 429 || res.status >= 500) {
+        const after = Number(res.headers.get('retry-after')) * 1000;
+        lastError = {
+          msg: `RSI responded ${res.status}`,
+          wait: Math.min(after > 0 ? after : DELAY_MS * 2 ** (attempt + 1), MAX_RETRY_WAIT_MS),
+        };
+        continue;
+      }
+      return { res };
+    }
+    return { error: lastError.msg, transient: true };
+  }
+
   // Paginated HTML source: fetch ?page=N&pagesize=…, parse, dedupe by id, stop
   // when a page yields no NEW ids (RSI clamps out-of-range pages to the last).
+  // onProgress(page, count, retry?) — retry = { attempt, of } while retrying.
+  // If RSI keeps failing mid-scan, returns what was gathered as { items, partial }.
   async function scanHtmlSource(src, onProgress) {
     const seen = new Set();
     const all = [];
@@ -330,12 +367,14 @@
 
     for (let page = 1; page <= MAX_PAGES; page++) {
       const url = `${src.url}?page=${page}&pagesize=${size}`;
-      let res;
-      try {
-        res = await fetch(url, { credentials: 'include' });
-      } catch (e) {
-        return { error: `Couldn't reach RSI (${e.message}). Check your connection.` };
+      const got = await fetchPage(url, (attempt, of) =>
+        onProgress?.(page, all.length, { attempt, of }),
+      );
+      if (got.error) {
+        if (page === 1) return { error: `${got.error}. Check your connection and try again.` };
+        return { items: all, partial: { page, reason: got.error } };
       }
+      const res = got.res;
       if (res.status === 401 || res.status === 403) {
         return {
           error: 'RSI rejected the request — your session may have expired. Sign in again.',
@@ -401,6 +440,28 @@
       else return { ok: false, error: `Source type '${src.type}' is not implemented yet.` };
 
       if (result.error) return { ok: false, error: result.error };
+
+      // A scan cut short by RSI never *shrinks* your data: if an earlier scan
+      // holds more items, keep it and say so instead of saving the partial one.
+      if (result.partial) {
+        const { page, reason } = result.partial;
+        const prev = await OH.loadSource(src.id);
+        const prevCount = Array.isArray(prev.items) ? prev.items.length : 0;
+        if (prevCount > result.items.length) {
+          return {
+            ok: false,
+            error: `RSI stopped responding at page ${page} (${reason}) — kept your previous scan of ${prevCount}. Try again in a minute.`,
+          };
+        }
+        const scannedAt = await saveSource(src.id, result.items);
+        return {
+          ok: true,
+          items: result.items,
+          scannedAt,
+          partial: `stopped at page ${page} (${reason}) — rescan to get the rest`,
+        };
+      }
+
       const scannedAt = await saveSource(src.id, result.items);
       return { ok: true, items: result.items, scannedAt };
     } catch (err) {

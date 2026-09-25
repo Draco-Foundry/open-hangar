@@ -2339,9 +2339,13 @@ async function runScan({ hangar = true, buybacks = true, referrals = true } = {}
   let anyErr = false;
 
   if (hangar) {
-    const h = await OH.scanSource('hangar', (page, c) => {
-      setStatus(`Scanning hangar… page ${page}, ${c} items`);
-      setScanning(`hangar… ${c}`);
+    const h = await OH.scanSource('hangar', (page, c, retry) => {
+      setStatus(
+        retry
+          ? `RSI hiccup on hangar page ${page} — retrying (${retry.attempt}/${retry.of})…`
+          : `Scanning hangar… page ${page}, ${c} items`,
+      );
+      setScanning(retry ? `hangar… retrying` : `hangar… ${c}`);
     });
     if (h.ok) {
       state.items = h.items;
@@ -2351,7 +2355,8 @@ async function runScan({ hangar = true, buybacks = true, referrals = true } = {}
       if (acct.loggedIn && acct.nickname) {
         state.owner = { nickname: acct.nickname, displayname: acct.displayname || null };
       }
-      parts.push(`${h.items.length} pledges`);
+      parts.push(`${h.items.length} pledges${h.partial ? ` (partial: ${h.partial})` : ''}`);
+      if (h.partial) anyErr = true;
     } else {
       parts.push(`hangar: ${h.error}`);
       anyErr = true;
@@ -2359,15 +2364,20 @@ async function runScan({ hangar = true, buybacks = true, referrals = true } = {}
   }
 
   if (buybacks) {
-    const b = await OH.scanSource('buybacks', (page, c) => {
-      setStatus(`Scanning buy-backs… page ${page}, ${c} items`);
-      setScanning(`buy-backs… ${c}`);
+    const b = await OH.scanSource('buybacks', (page, c, retry) => {
+      setStatus(
+        retry
+          ? `RSI hiccup on buy-backs page ${page} — retrying (${retry.attempt}/${retry.of})…`
+          : `Scanning buy-backs… page ${page}, ${c} items`,
+      );
+      setScanning(retry ? `buy-backs… retrying` : `buy-backs… ${c}`);
     });
     if (b.ok) {
       state.buybacks = b.items;
       state.buybacksScannedAt = b.scannedAt;
       state.bbShown = new Set(); // default: no filter selected = show all
-      parts.push(`${b.items.length} buy-backs`);
+      parts.push(`${b.items.length} buy-backs${b.partial ? ` (partial: ${b.partial})` : ''}`);
+      if (b.partial) anyErr = true;
     } else {
       parts.push(`buy-backs: ${b.error}`);
       anyErr = true;
