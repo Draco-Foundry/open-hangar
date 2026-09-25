@@ -8,12 +8,14 @@
 <html>
   <body>
     <div class="account-pledges">
-      <!-- Standalone ship -->
+      <!-- Standalone ship: giftable (has a Gift action) and LTI-insured -->
       <div class="row">
         <input class="js-pledge-id" value="111" />
         <input class="js-pledge-name" value="Origin 300i" />
         <input class="js-pledge-value" value="$55.00 USD" />
         <input class="js-pledge-currency" value="USD" />
+        <a class="shadow-button js-gift gift"><span class="label">Gift</span></a>
+        <a class="shadow-button js-reclaim reclaim"><span class="label">Exchange</span></a>
         <div class="item">
           <span class="kind">Ship</span>
           <span class="title">300i</span>
@@ -23,6 +25,10 @@
               background-image: url('https://media.robertsspaceindustries.com/abc/store_small.jpg');
             "
           ></div>
+        </div>
+        <div class="item">
+          <span class="kind">Insurance</span>
+          <span class="title">Lifetime Insurance</span>
         </div>
       </div>
 
