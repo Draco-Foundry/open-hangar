@@ -108,9 +108,20 @@
     addon(9018, 'Add-On - Fleet Week Hangar Poster', 5),
     {
       ...ship(9019, 'Standalone Ships - Nine Tails Shogun Pack', 75, 'ATLS IKTI Akuma'),
+      // Mirrors the real store pack: 1 vehicle, 1 paint, 8 gear items, LTI.
       contents: [
         { kind: 'Ship', label: 'ATLS IKTI Akuma', image: null },
-        { kind: 'Ship', label: 'Pulse', image: null },
+        { kind: 'Paint', label: 'Cutlass - Akuma Paint', image: null },
+        ...[
+          "Behring P8-AR 'Akuma' Rifle",
+          "Gemini A03 'Akuma' Sniper Rifle",
+          "Gemini LH86 'Akuma' Pistol",
+          "Quirinus Tech Shogun Kiba 'Akuma' Helmet",
+          "Quirinus Tech Artimex 'Akuma' Core",
+          "Quirinus Tech Artimex 'Akuma' Arms",
+          "Quirinus Tech Artimex 'Akuma' Legs",
+          "CDS Geist 'Stronghold' Backpack",
+        ].map((label) => ({ kind: 'FPS Equipment', label, image: null })),
         { kind: 'Insurance', label: 'Lifetime Insurance', image: null },
       ],
     },
