@@ -2,6 +2,15 @@
 
 ## Ideas parked for a decision (not yet committed to a direction)
 
+- **Website analytics — decided: not yet (2026-09-25).** Store dashboards (Chrome,
+  Edge, AMO) already give installs/active users/uninstalls, and "no tracking
+  anywhere" is part of the privacy story. Revisit when actively promoting across
+  several channels (Reddit, Spectrum, Discord) and needing to know which drives
+  visits. If so: **GoatCounter** (free for non-commercial, cookieless, no consent
+  banner) on `site/`, plus a short "Website" section in the privacy policy
+  (`site/privacy.html` + `docs/PRIVACY.md`). Avoid Google Analytics (cookies +
+  consent banner, undercuts the privacy message).
+
 - **Hover-image behavior on cards.** The mouseover preview currently shows the
   full-res image, which takes a beat to load. Idea: instead of a visible hover
   popup, use the hover (or even render-time) purely to _prefetch_ the high-res
