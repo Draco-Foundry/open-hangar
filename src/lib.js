@@ -277,6 +277,88 @@
     return { ...sources, referral: { ...ref, items: rest } };
   }
 
+  // --- Hangar Transfer Format (HTF) export ---------------------------------
+  // The community interchange format read by FleetYards, HangarXPLOR & co.
+  // (spec: docs.starcitizen.fans/hangar-transfer-format.yaml, v0.0.1 draft): a
+  // bare JSON array with ONE ENTRY PER SHIP (a pledge with two ships → two
+  // entries sharing the pledge_* fields). CCUs, paints, add-ons and buy-backs
+  // have no HTF representation and are left out. Ship codes come from a bundled
+  // snapshot of HangarXPLOR's MIT-licensed ship-codes.json (src/data/).
+  const MFR_PREFIX =
+    /^(?:Aegis|Anvil|Aopoa|Argo|Banu|CNOU|Consolidated Outland|Crusader|Drake|Esperia|Gatac|Greycat Industrial|Greycat|Kruger|MISC|Mirai|Origin|Roberts Space Industries|RSI|Tumbril|Vanduul|Xi'an)[^a-z0-9]+/i;
+
+  // "Anvil Carrack" / "Carrack Warbond" → "Carrack".
+  OH.htfShipName = function htfShipName(label) {
+    return OH.normShipName(String(label || '').replace(MFR_PREFIX, '')).trim();
+  };
+
+  function matchShipCode(codes, name) {
+    const q = name.toLowerCase();
+    if (!q) return null;
+    let best = null;
+    let bestScore = 0;
+    for (const c of codes) {
+      const n = String(c.ship_name || '').toLowerCase();
+      const s = nameScore(n, q);
+      if (s > bestScore) {
+        bestScore = s;
+        best = c;
+      }
+    }
+    // Loose "contains" hits (<70) are too risky for an identifier; skip them.
+    return bestScore >= 70 ? best : null;
+  }
+
+  // Pure: normalized hangar items + ship-code list → HTF array.
+  OH.buildHTF = function buildHTF(items, codes = []) {
+    const out = [];
+    for (const p of items || []) {
+      const ships = (p.contents || []).filter((c) => /^ship$/i.test(c.kind || ''));
+      for (const ship of ships) {
+        const name = OH.htfShipName(ship.label);
+        if (!name) continue;
+        const code = matchShipCode(codes, name);
+        const entry = { name, entity_type: 'ship' };
+        if (code) {
+          entry.ship_code = code.ship_code;
+          entry.ship_name = code.ship_name;
+          entry.manufacturer_code = code.manufacturer_code;
+          entry.manufacturer_name = code.manufacturer_name;
+        } else {
+          entry.ship_name = name;
+        }
+        if (p.id != null) entry.pledge_id = String(p.id);
+        if (p.name) entry.pledge_name = p.name;
+        if (Number.isFinite(p.value)) {
+          entry.pledge_cost = `$${p.value.toFixed(2)} ${p.currency || 'USD'}`;
+        }
+        entry.lti = p.insurance === 'LTI';
+        entry.warbond = /warbond/i.test(p.name || '');
+        out.push(entry);
+      }
+    }
+    return out;
+  };
+
+  let shipCodesCache = null;
+  async function loadShipCodes() {
+    if (shipCodesCache) return shipCodesCache;
+    try {
+      const res = await fetch(chrome.runtime.getURL('src/data/ship-codes.json'));
+      shipCodesCache = res.ok ? await res.json() : [];
+    } catch {
+      shipCodesCache = [];
+    }
+    return shipCodesCache;
+  }
+
+  // Build an HTF export from the stored hangar. Returns { ships, unmatched }.
+  OH.exportHTF = async function exportHTF() {
+    const { items } = await OH.loadSource('hangar');
+    const ships = OH.buildHTF(items, await loadShipCodes());
+    return { ships, unmatched: ships.filter((s) => !s.ship_code).length };
+  };
+
   // Validate + persist an imported database (the shape exportDB emits, or a bare
   // { schemaVersion, sources }). Replaces the stored DB — import is a restore,
   // not a merge. `owner` is intentionally NOT carried over: an import is the

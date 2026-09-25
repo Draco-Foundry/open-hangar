@@ -262,7 +262,8 @@
     },
     runtime: {
       getManifest: () => ({ version: '0.2.7', name: 'Open Hangar' }),
-      getURL: (p) => p,
+      // Extension paths are rooted at the repo; the harness serves src/ at /.
+      getURL: (p) => '/' + String(p).replace(/^\/?src\//, ''),
       onInstalled: { addListener() {} },
     },
     cookies: { getAll: async () => [], remove: async () => {} },
