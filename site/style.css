@@ -98,6 +98,26 @@ h1 {
   font-size: 0.85rem;
   color: #c9d1d9;
 }
+/* Status dot before the note: amber = in review, grey = planned, green = live. */
+.b-note::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: 1px;
+  background: #6e7681;
+}
+.install.status-review .b-note::before {
+  background: #d29922;
+}
+.install.live .b-note::before {
+  background: #3fb950;
+}
+.also a {
+  color: var(--link);
+}
 .also {
   margin: 16px 0 0;
   font-size: 0.875rem;
