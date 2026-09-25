@@ -2,11 +2,14 @@
   "manifest_version": 3,
   "name": "Open Hangar",
   "description": "Read your own Star Citizen / RSI hangar, buy-backs, balances & referrals into a clean, local, exportable database.",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "author": "Draco Foundry",
   "homepage_url": "https://github.com/Draco-Foundry/open-hangar",
   "permissions": ["storage", "cookies"],
   "host_permissions": ["https://robertsspaceindustries.com/*", "https://api.star-citizen.wiki/*"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'"
+  },
   "background": {
     "service_worker": "src/background.js"
   },

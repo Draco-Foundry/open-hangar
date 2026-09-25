@@ -10,3 +10,8 @@ dist/
 
 # local editor / tooling config (personal, not project)
 .claude/settings.local.json
+
+# copied in at deploy time by .github/workflows/pages.yml
+/site/icon.svg
+/site/banner.svg
+/.claude/launch.json
