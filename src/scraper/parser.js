@@ -156,8 +156,40 @@
       kind, // display category: 'ccu' | 'ship' | 'paint' | 'addon' | 'coupon' | 'other'
       giftable: raw.giftable === true, // hangar showed a "Gift" action → transferable
       insurance: ns.insuranceTerm(contents), // 'LTI' | '120M' | '6M' | … | null
+      date: raw.date ?? null, // pledge (purchase) date, ISO 'YYYY-MM-DD', or null
       raw: raw.raw ?? null, // keep originals while reverse-engineering
     };
+  };
+
+  // RSI prints dates as "December 08, 2016" / "Dec 8, 2016" (sometimes behind a
+  // "Created:" label). Return ISO 'YYYY-MM-DD' — built by hand, not via Date, so
+  // the user's timezone can't shift the day — or null if it doesn't parse.
+  const MONTHS = [
+    'jan',
+    'feb',
+    'mar',
+    'apr',
+    'may',
+    'jun',
+    'jul',
+    'aug',
+    'sep',
+    'oct',
+    'nov',
+    'dec',
+  ];
+  ns.parseRsiDate = function parseRsiDate(text) {
+    const s = String(text || '')
+      .replace(/^\s*created\s*:?\s*/i, '')
+      .trim();
+    let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); // already ISO
+    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+    m = s.match(/^([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})\b/);
+    if (!m) return null;
+    const month = MONTHS.indexOf(m[1].toLowerCase()) + 1;
+    const day = Number(m[2]);
+    if (!month || day < 1 || day > 31) return null;
+    return `${m[3]}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   };
 
   // --- DOM extraction -------------------------------------------------------
@@ -255,6 +287,10 @@
       // CCUs, …) — RSI already computed it. `.js-gift` lives inside this card's
       // `.row`, so scope the query to the card to avoid neighbour bleed.
       const giftable = !!card.querySelector('.js-gift');
+      // Pledge date: the card's first `.date-col` (the selector HangarXPLOR has
+      // relied on for years), e.g. "Created: December 08, 2016".
+      const dateEl = card.querySelector('.date-col');
+      const date = dateEl ? ns.parseRsiDate(dateEl.textContent.replace(/\s+/g, ' ')) : null;
 
       pledges.push(
         ns.normalizePledge({
@@ -265,6 +301,7 @@
           contents,
           image: pickImage(card, contents),
           giftable,
+          date,
           raw: { rawValue },
         }),
       );

@@ -3,7 +3,14 @@ name: Pages
 on:
   push:
     branches: [main]
-    paths: ['site/**', 'icons/icon.svg', 'src/assets/banner.svg', '.github/workflows/pages.yml']
+    paths:
+      [
+        'site/**',
+        'icons/icon.svg',
+        'src/assets/banner.svg',
+        'manifest.json',
+        '.github/workflows/pages.yml',
+      ]
   workflow_dispatch:
 
 permissions:
@@ -23,8 +30,24 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history, to date the last version bump below
       # Reuse the extension's own art rather than keeping copies in site/.
       - run: cp icons/icon.svg src/assets/banner.svg site/
+      # Stamp the current version and its release date into the landing page, so
+      # the site can never show a stale version. "Updated" = the last commit that
+      # changed manifest.json's version line.
+      - name: Stamp version + release date
+        run: |
+          VERSION=$(node -p "require('./manifest.json').version")
+          ISO=$(git log -1 --format=%cs -G'"version"' -- manifest.json)
+          HUMAN=$(date -u -d "$ISO" '+%b %-d, %Y')
+          sed -i -E \
+            -e "s#(<strong data-version>)[^<]*(</strong>)#\1${VERSION}\2#" \
+            -e "s#(<time data-updated datetime=\")[^\"]*(\">)[^<]*(</time>)#\1${ISO}\2${HUMAN}\3#" \
+            site/index.html
+          grep -E 'data-version|data-updated' site/index.html
+          echo "Stamped v${VERSION}, updated ${HUMAN}"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

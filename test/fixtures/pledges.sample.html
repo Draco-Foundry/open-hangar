@@ -1,7 +1,8 @@
 <!doctype html>
 <!--
   Scrubbed sample of RSI's /account/pledges markup — enough cards to exercise the
-  parser's classification paths (ship / CCU / add-on). No personal data. If RSI
+  parser's classification paths (ship / CCU / add-on) and the pledge date column
+  (with and without the "Created:" label; the add-on has none). No personal data. If RSI
   changes their markup, update this fixture from a fresh (scrubbed) capture so the
   tests reflect reality. See CONTRIBUTING.md.
 -->
@@ -14,6 +15,7 @@
         <input class="js-pledge-name" value="Origin 300i" />
         <input class="js-pledge-value" value="$55.00 USD" />
         <input class="js-pledge-currency" value="USD" />
+        <div class="date-col"><label>Created:</label> December 08, 2016</div>
         <a class="shadow-button js-gift gift"><span class="label">Gift</span></a>
         <a class="shadow-button js-reclaim reclaim"><span class="label">Exchange</span></a>
         <div class="item">
@@ -38,6 +40,7 @@
         <input class="js-pledge-name" value="Upgrade - Aurora MR to Avenger Titan" />
         <input class="js-pledge-value" value="$25.00 USD" />
         <input class="js-pledge-currency" value="USD" />
+        <div class="date-col">March 3, 2024</div>
       </div>
 
       <!-- Standalone add-on -->
