@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy Policy — Open Hangar</title>
+    <meta
+      name="description"
+      content="Open Hangar's privacy policy: no account, no server, and no personal data collected. Your data stays in your browser."
+    />
+    <link rel="canonical" href="https://draco-foundry.github.io/open-hangar/privacy.html" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- Mirrors docs/PRIVACY.md — keep the two in sync. -->
+    <main class="wrap doc">
+      <p><a href="./">← Open Hangar</a></p>
+      <h1>Privacy Policy</h1>
+      <p class="updated"><em>Last updated: 2026-06-07</em></p>
+
+      <p>
+        Open Hangar is an open-source browser extension that reads your own Star Citizen / Roberts
+        Space Industries (RSI) account data and stores it
+        <strong>locally in your browser</strong>. This policy explains exactly what it does and does
+        not do with data.
+      </p>
+
+      <h2>The short version</h2>
+      <ul>
+        <li>
+          <strong>No account, no password, no sign-up.</strong> Open Hangar uses the RSI session you
+          are already signed in with in your browser.
+        </li>
+        <li>
+          <strong>No server. Nothing is sent to us — we have no server to send it to.</strong>
+          Your scraped data never leaves your device.
+        </li>
+        <li><strong>We do not collect, sell, transfer, or share any personal data.</strong></li>
+      </ul>
+
+      <h2>What data is accessed and where it is stored</h2>
+      <p>
+        When you click <strong>Scan</strong>, the extension reads <strong>your own</strong>
+        RSI account by making requests to robertsspaceindustries.com using your existing browser
+        session, and parses the results locally. This may include:
+      </p>
+      <ul>
+        <li>Your hangar (pledges: ships, CCUs, add-ons, coupons)</li>
+        <li>Your buy-back pledges</li>
+        <li>
+          Account identity and balances (handle, display name, org, rank, Store Credit, UEC, REC)
+        </li>
+        <li>Your referral code and your recruits/prospects (handles, monikers, dates)</li>
+      </ul>
+      <p>
+        All of this is stored <strong>only</strong> in your browser's local extension storage
+        (<code>chrome.storage.local</code>). It is never transmitted to the developer or any third
+        party. You can remove it at any time with <strong>Clear Data</strong>
+        on the Home page, or by uninstalling the extension (which deletes all stored data).
+      </p>
+
+      <h2>Outbound network requests</h2>
+      <p>
+        The extension makes a small number of outbound requests, none of which carry your personal
+        data:
+      </p>
+      <ul>
+        <li>
+          <strong>robertsspaceindustries.com</strong> — to read your own account (above), to load
+          hangar thumbnails and the home banner image, and to look up ship art for items RSI ships
+          without images from RSI's public ship-matrix index. No credentials are sent for the
+          ship-matrix lookup.
+        </li>
+        <li>
+          <strong>api.star-citizen.wiki</strong> (public, read-only) — a fallback for the current
+          game version and for ship art when the ship-matrix has no image. These lookups, done by
+          ship name, are cached locally and are the only outbound signal that weakly relates to what
+          you are viewing; no credentials or personal data are sent.
+        </li>
+      </ul>
+
+      <h2>Permissions and why they are used</h2>
+      <ul>
+        <li><strong>storage</strong> — to save your scanned data and UI preferences locally.</li>
+        <li>
+          <strong>cookies</strong> — used solely for "Log out of RSI," which clears
+          robertsspaceindustries.com cookies so you can fully end your RSI session from the
+          extension. Cookie values are never read or transmitted.
+        </li>
+        <li>
+          <strong>host access</strong> to robertsspaceindustries.com and api.star-citizen.wiki — to
+          make the read-only requests described above.
+        </li>
+      </ul>
+
+      <h2>Data export</h2>
+      <p>
+        Open Hangar lets you export your database as a JSON file that you choose to save. That file
+        is created locally and handled entirely by you; the extension does not upload it anywhere.
+        (Your referral code is deliberately excluded from exports.)
+      </p>
+
+      <h2>Multiple accounts</h2>
+      <p>
+        Scraped data is tied to the RSI account it was scanned from. If you open Open Hangar while
+        signed in to a different account, it clears the previous account's data and prompts a fresh
+        scan, so accounts never mix.
+      </p>
+
+      <h2>Changes to this policy</h2>
+      <p>
+        Material changes will be noted in the project's repository and the "Last updated" date
+        above.
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        Open Hangar is open source. Questions and issues:
+        <a href="https://github.com/Draco-Foundry/open-hangar/issues"
+          >github.com/Draco-Foundry/open-hangar/issues</a
+        >
+      </p>
+    </main>
+    <footer class="wrap">
+      <p class="disclaimer">
+        Unofficial, fan-made, and not affiliated with Cloud Imperium Games or Roberts Space
+        Industries.
+      </p>
+    </footer>
+  </body>
+</html>

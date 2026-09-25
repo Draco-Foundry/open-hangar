@@ -611,7 +611,7 @@ function renderVersions() {
   OH.getScVersion().then((v) => {
     let sc = 'Star Citizen n/a';
     if (v.code) {
-      const label = OH.formatScVersion(v.code); // e.g. "4.8.0-LIVE"
+      const label = OH.escapeHtml(OH.formatScVersion(v.code)); // e.g. "4.8.0-LIVE"
       const semver = (v.code.match(/(\d+\.\d+(?:\.\d+)?)/) || [])[1]; // e.g. "4.8.0"
       sc = semver
         ? `<a href="https://starcitizen.tools/Star_Citizen_Alpha_${semver}" target="_blank" rel="noopener">Star Citizen ${label}</a>`
@@ -760,7 +760,7 @@ function cardHtml(p) {
   const img = realImage(p.image);
   const resolve = img ? '' : resolveImageName(p); // ship name to fetch art for
   const thumb = img
-    ? `<img class="thumb" loading="lazy" data-kind="${p.kind}" src="${OH.escapeHtml(img)}" alt="">`
+    ? `<img class="thumb" loading="lazy" data-kind="${OH.escapeHtml(p.kind)}" src="${OH.escapeHtml(img)}" alt="">`
     : `<div class="thumb placeholder">${OH.escapeHtml(p.kind)}</div>`;
   const nameHtml =
     p.isCCU && p.ccu
@@ -1788,9 +1788,16 @@ function enhanceRewardImages(container) {
 
 // --- Buy-Backs ------------------------------------------------------------
 
+// Only ever link to RSI itself — href can come from an imported file, so resolve
+// it against RSI and reject anything that lands on another host or scheme.
 function buybackUrl(b) {
-  if (!b.href) return '';
-  return b.href.startsWith('http') ? b.href : 'https://robertsspaceindustries.com' + b.href;
+  if (typeof b.href !== 'string' || !b.href) return '';
+  try {
+    const u = new URL(b.href, 'https://robertsspaceindustries.com');
+    return u.protocol === 'https:' && u.hostname === 'robertsspaceindustries.com' ? u.href : '';
+  } catch {
+    return '';
+  }
 }
 
 function buybackCardHtml(b) {
@@ -2221,11 +2228,7 @@ function openBuybackModal(b) {
   const img = realImage(b.image)
     ? `<img class="modal-img" src="${OH.escapeHtml(hiRes(b.image))}" alt="">`
     : `<div class="modal-img placeholder">Buy-Back</div>`;
-  const url = b.href
-    ? b.href.startsWith('http')
-      ? b.href
-      : 'https://robertsspaceindustries.com' + b.href
-    : '';
+  const url = buybackUrl(b);
   const row = (k, v) =>
     `<div class="mr"><span class="mr-k">${k}</span><span class="mr-v">${v}</span></div>`;
   modalBody.innerHTML =
@@ -2557,7 +2560,10 @@ if (importBtn && importFile) {
     state.buybacks = bb.items || [];
     state.buybacksScannedAt = bb.scannedAt || null;
     const refSrc = res.db.sources.referral;
-    state.referral = refSrc && refSrc.items && !Array.isArray(refSrc.items) ? refSrc.items : null;
+    state.referral =
+      refSrc && refSrc.items && !Array.isArray(refSrc.items)
+        ? OH.normalizeReferral(refSrc.items)
+        : null;
     state.owner = null; // imports aren't attributed to an account (see importDB)
     state.shown = new Set(); // default: no filter selected = show all
     state.bbShown = new Set(); // default: no filter selected = show all
@@ -2630,7 +2636,9 @@ document.addEventListener('visibilitychange', async () => {
   state.buybacksScannedAt = buybacks.scannedAt || null;
   const referral = db.sources.referral;
   state.referral =
-    referral && referral.items && !Array.isArray(referral.items) ? referral.items : null;
+    referral && referral.items && !Array.isArray(referral.items)
+      ? OH.normalizeReferral(referral.items)
+      : null;
   state.owner = db.owner || null;
 
   const notice = await reconcileAccount();
