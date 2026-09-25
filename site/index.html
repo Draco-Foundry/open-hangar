@@ -96,6 +96,78 @@
     </figure>
 
     <main class="wrap">
+      <!-- Real UI with a fictional demo account (npm run screenshots); the images
+           are copied into site/img/screens/ at deploy from docs/store-assets/. -->
+      <section class="tour" aria-labelledby="tour-title">
+        <h2 id="tour-title">See it in action</h2>
+        <figure class="tour-stage">
+          <img
+            id="tour-img"
+            src="img/screens/screenshot-1-inventory.jpg"
+            width="1280"
+            height="800"
+            alt="Inventory: your fleet as a searchable gallery with insurance and value"
+          />
+          <figcaption id="tour-caption">
+            <strong>Inventory</strong> — your whole fleet as a searchable, filterable gallery, with
+            insurance, value and pledge dates.
+          </figcaption>
+        </figure>
+        <div class="tour-thumbs" role="tablist" aria-label="Screenshots">
+          <button
+            role="tab"
+            aria-selected="true"
+            data-src="img/screens/screenshot-1-inventory.jpg"
+            data-title="Inventory"
+            data-text="your whole fleet as a searchable, filterable gallery, with insurance, value and pledge dates."
+          >
+            <img src="img/screens/screenshot-1-inventory.jpg" alt="" loading="lazy" />
+            <span>Inventory</span>
+          </button>
+          <button
+            role="tab"
+            aria-selected="false"
+            data-src="img/screens/screenshot-2-home.jpg"
+            data-title="Home"
+            data-text="your Citizen Card: handle, org and rank, balances and referral count at a glance."
+          >
+            <img src="img/screens/screenshot-2-home.jpg" alt="" loading="lazy" />
+            <span>Home</span>
+          </button>
+          <button
+            role="tab"
+            aria-selected="false"
+            data-src="img/screens/screenshot-3-referrals.jpg"
+            data-title="Referrals"
+            data-text="recruits, prospects, conversion stats, reward tiers and event bonuses."
+          >
+            <img src="img/screens/screenshot-3-referrals.jpg" alt="" loading="lazy" />
+            <span>Referrals</span>
+          </button>
+          <button
+            role="tab"
+            aria-selected="false"
+            data-src="img/screens/screenshot-4-buybacks.jpg"
+            data-title="Buy-Backs"
+            data-text="every melted pledge you can re-acquire, with a direct link to reclaim it on RSI."
+          >
+            <img src="img/screens/screenshot-4-buybacks.jpg" alt="" loading="lazy" />
+            <span>Buy-Backs</span>
+          </button>
+          <button
+            role="tab"
+            aria-selected="false"
+            data-src="img/screens/screenshot-5-stats.jpg"
+            data-title="Stats"
+            data-text="fleet value, category breakdowns and your top pledges."
+          >
+            <img src="img/screens/screenshot-5-stats.jpg" alt="" loading="lazy" />
+            <span>Stats</span>
+          </button>
+        </div>
+        <p class="tour-note">Screens show a fictional demo account.</p>
+      </section>
+
       <section class="features">
         <div class="feature">
           <h2>Private by design</h2>
@@ -201,6 +273,27 @@
       </div>
     </footer>
 
+    <script>
+      // Screenshot tour: thumbnails swap the big image + caption.
+      (function () {
+        var img = document.getElementById('tour-img');
+        var cap = document.getElementById('tour-caption');
+        var tabs = document.querySelectorAll('.tour-thumbs button');
+        tabs.forEach(function (tab) {
+          tab.addEventListener('click', function () {
+            tabs.forEach(function (t) {
+              t.setAttribute('aria-selected', String(t === tab));
+            });
+            img.src = tab.dataset.src;
+            img.alt = tab.dataset.title + ': ' + tab.dataset.text;
+            cap.innerHTML = '';
+            var strong = document.createElement('strong');
+            strong.textContent = tab.dataset.title;
+            cap.append(strong, ' — ' + tab.dataset.text);
+          });
+        });
+      })();
+    </script>
     <script>
       // Wire up store links + status, and put the visitor's own browser first.
       (function () {
