@@ -175,6 +175,59 @@
         gap: 8px;
         justify-content: flex-end;
       }
+
+      /* Split "Scan" button + per-source menu */
+      .scan-split {
+        position: relative;
+        display: inline-flex;
+      }
+      .scan-split #scan-home {
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
+      }
+      .scan-caret {
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+        border-left: 1px solid rgba(255, 255, 255, 0.3);
+        padding: 7px 9px;
+        line-height: 1;
+      }
+      .scan-menu {
+        position: absolute;
+        right: 0;
+        bottom: calc(100% + 6px);
+        z-index: 30;
+        min-width: 188px;
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+        padding: 11px;
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+      }
+      .scan-menu[hidden] {
+        display: none;
+      }
+      .scan-opt {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+        cursor: pointer;
+        user-select: none;
+      }
+      .scan-opt input {
+        accent-color: var(--accent);
+        cursor: pointer;
+      }
+      .scan-go {
+        margin-top: 2px;
+        width: 100%;
+      }
       .citizen-card .btn-secondary {
         border-color: rgba(255, 255, 255, 0.25);
         color: rgba(255, 255, 255, 0.82);
@@ -1344,6 +1397,141 @@
         color: var(--text);
       }
 
+      /* Market (sale-sheet) view — per-category tables sellers screenshot */
+      .market-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 14px;
+      }
+      .market-toolbar .result-count {
+        margin-bottom: 0;
+      }
+      .market-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .mk-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+        cursor: pointer;
+        user-select: none;
+      }
+      .mk-toggle input {
+        accent-color: var(--accent);
+        cursor: pointer;
+      }
+      .mk-btn {
+        padding: 6px 12px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--panel);
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .mk-btn:hover {
+        background: var(--panel-2);
+        border-color: var(--accent);
+      }
+      .mk-export-status {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .market {
+        display: flex;
+        flex-direction: column;
+        gap: 26px;
+      }
+      .market-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text);
+        margin: 0 0 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .market-n {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+        background: var(--panel-2);
+        border-radius: 999px;
+        padding: 1px 9px;
+      }
+      .market-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+      .market-table th {
+        text-align: left;
+        font-weight: 700;
+        color: var(--text);
+        background: var(--panel-2);
+        padding: 11px 14px;
+        white-space: nowrap;
+      }
+      .market-table th:first-child {
+        border-top-left-radius: 6px;
+      }
+      .market-table th:last-child {
+        border-top-right-radius: 6px;
+      }
+      .market-table td {
+        padding: 10px 14px;
+        color: var(--text);
+        border-bottom: 1px solid var(--line);
+        vertical-align: middle;
+      }
+      .market-table tbody tr:nth-child(even) {
+        background: var(--panel);
+      }
+      .mk-name {
+        width: 46%;
+      }
+      .mk-ins,
+      .mk-melt,
+      .mk-stock {
+        white-space: nowrap;
+        color: var(--muted);
+      }
+      .mk-gift {
+        white-space: nowrap;
+        font-weight: 600;
+      }
+      .mk-gift.gift-yes {
+        color: #2ea043;
+      }
+      .mk-gift.gift-no {
+        color: var(--muted);
+        font-weight: 400;
+      }
+      .mk-price {
+        width: 84px;
+        padding: 5px 8px;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        background: var(--panel);
+        color: var(--text);
+        font-size: 13px;
+        font-family: inherit;
+      }
+      .mk-price:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+
       /* Filter chips */
       .chips {
         display: flex;
@@ -1951,7 +2139,34 @@
               <div class="scanned" id="scanned-home"></div>
               <div id="status"></div>
               <div class="cc-actions">
-                <button id="scan-home">Scan</button>
+                <div class="scan-split">
+                  <button id="scan-home">Scan</button>
+                  <button
+                    id="scan-menu-btn"
+                    class="scan-caret"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    aria-label="Scan options"
+                    title="Choose what to scan"
+                  >
+                    ▾
+                  </button>
+                  <div id="scan-menu" class="scan-menu" hidden>
+                    <label class="scan-opt"
+                      ><input type="checkbox" class="scan-src" value="hangar" checked />
+                      Inventory</label
+                    >
+                    <label class="scan-opt"
+                      ><input type="checkbox" class="scan-src" value="buybacks" checked />
+                      Buy-Backs</label
+                    >
+                    <label class="scan-opt"
+                      ><input type="checkbox" class="scan-src" value="referrals" checked />
+                      Referrals</label
+                    >
+                    <button id="scan-selected" class="scan-go">Scan selected</button>
+                  </div>
+                </div>
                 <button id="logout-home" class="btn-secondary" hidden>Log out</button>
                 <button id="clear-home" class="btn-secondary" hidden>Clear Data</button>
               </div>
@@ -2050,6 +2265,7 @@
             <button data-layout="gallery">Gallery</button>
             <button data-layout="compact">Compact</button>
             <button data-layout="list">List</button>
+            <button data-layout="market">Market</button>
           </div>
         </div>
         <div class="chips" id="chips"></div>
@@ -2080,6 +2296,12 @@
             <option value="name-desc">Name: Z → A</option>
             <option value="default">Scan order</option>
           </select>
+          <div class="layout-toggle" id="bb-layout">
+            <button data-layout="gallery">Gallery</button>
+            <button data-layout="compact">Compact</button>
+            <button data-layout="list">List</button>
+            <button data-layout="market">Market</button>
+          </div>
         </div>
         <div class="chips" id="bb-chips"></div>
         <div id="buybacks-body"></div>
