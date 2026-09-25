@@ -14,6 +14,10 @@ bottom. Items marked ✅ are ready in the repo; ⬜ need you to do them.
 
 ## 1. Developer account (one-time, ~30 min)
 
+- ✅ Chrome Web Store account: `dracofoundry@gmail.com` (publisher **Draco Foundry**).
+- ⬜ Public **contact email** on every store: `support@openhangar.space` (Porkbun
+  forward → the maintainer's inbox). Verify it in each dashboard.
+
 - ⬜ Register at the [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole) — **$5 one-time fee**.
 - ⬜ Verify the account (email + payment).
 - ⬜ Consider publishing under the **Draco-Foundry** brand (group publisher) rather

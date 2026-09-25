@@ -73,7 +73,7 @@ date above.
 
 ## Contact
 
-Open Hangar is open source. Questions and issues:
+Email support@openhangar.space, or open an issue on GitHub:
 https://github.com/Draco-Foundry/open-hangar/issues
 
 _Unofficial, fan-made, and not affiliated with Cloud Imperium Games or RSI._

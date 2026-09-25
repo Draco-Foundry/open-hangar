@@ -216,3 +216,4 @@ Code: MIT — see [LICENSE](LICENSE). Star Citizen Fankit images on the website 
 
 - **Website:** [openhangar.space](https://openhangar.space/)
 - **Discord:** [Draco Foundry](https://discord.gg/FF8Wm5HdnV)
+- **Email:** [support@openhangar.space](mailto:support@openhangar.space)
