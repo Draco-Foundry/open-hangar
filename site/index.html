@@ -75,26 +75,6 @@
       </div>
     </header>
 
-    <!-- Fan kit art: shown whole (never cropped, so CIG's watermark stays intact),
-         with the "Made By The Community" badge in the opposite corner, per the
-         Fankit Guidelines. See img/fankit/NOTICE.md. -->
-    <figure class="shot shot-hero">
-      <picture>
-        <source
-          type="image/webp"
-          srcset="img/fankit/sc-02-1280.webp 1280w, img/fankit/sc-02-1920.webp 1920w"
-          sizes="(max-width: 1400px) 100vw, 1400px"
-        />
-        <img
-          src="img/fankit/sc-02-1920.jpg"
-          width="1920"
-          height="1080"
-          alt="A ship parked on a hangar deck, lit by the landing lights"
-        />
-      </picture>
-      <img class="mbtc" src="img/fankit/made-by-the-community.png" alt="Made By The Community" />
-    </figure>
-
     <main class="wrap">
       <!-- Real UI with a fictional demo account (npm run screenshots); the images
            are copied into site/img/screens/ at deploy from docs/store-assets/. -->
@@ -205,13 +185,37 @@
         </ol>
       </section>
 
+      <!-- Fan kit art: shown whole (never cropped, so CIG's watermark stays intact),
+           with the "Made By The Community" badge in the opposite corner, per the
+           Fankit Guidelines. See img/fankit/NOTICE.md. -->
       <section class="gallery">
         <figure class="shot">
           <picture>
             <source
               type="image/webp"
+              srcset="img/fankit/sc-02-1280.webp 1280w, img/fankit/sc-02-1920.webp 1920w"
+              sizes="(max-width: 700px) 100vw, 310px"
+            />
+            <img
+              src="img/fankit/sc-02-1920.jpg"
+              width="1920"
+              height="1080"
+              loading="lazy"
+              alt="A ship parked on a hangar deck, lit by the landing lights"
+            />
+          </picture>
+          <img
+            class="mbtc"
+            src="img/fankit/made-by-the-community.png"
+            alt="Made By The Community"
+          />
+        </figure>
+        <figure class="shot">
+          <picture>
+            <source
+              type="image/webp"
               srcset="img/fankit/sc-25-1280.webp 1280w, img/fankit/sc-25-1920.webp 1920w"
-              sizes="(max-width: 700px) 100vw, 464px"
+              sizes="(max-width: 700px) 100vw, 310px"
             />
             <img
               src="img/fankit/sc-25-1920.jpg"
@@ -232,7 +236,7 @@
             <source
               type="image/webp"
               srcset="img/fankit/sc-14-1280.webp 1280w, img/fankit/sc-14-1920.webp 1920w"
-              sizes="(max-width: 700px) 100vw, 464px"
+              sizes="(max-width: 700px) 100vw, 310px"
             />
             <img
               src="img/fankit/sc-14-1920.jpg"
