@@ -36,7 +36,7 @@ bottom. Items marked ✅ are ready in the repo; ⬜ need you to do them.
 
 ## 3. Store listing assets
 
-- ⬜ **Screenshots** (1–5 required), **1280×800** or 640×400 PNG/JPG. Capture with
+- ✅ **Screenshots** (1–5 required), **1280×800** or 640×400 PNG/JPG — `docs/store-assets/screenshot-1…5-*.png` (24-bit, no alpha; real UI rendered with a fictional demo account). Capture with
   real data, looking polished:
   1. Home / Citizen Card (identity + balances)
   2. Inventory (fleet gallery)
