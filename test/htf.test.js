@@ -172,4 +172,6 @@ test('ships newer than the bundled table fall back to the RSI ship-matrix', () =
       ['Raptor', undefined, undefined],
     ],
   );
+  // Manufacturer name comes from the table when the code is known there.
+  assert.equal(out[1].manufacturer_name, 'Musashi Industrial & Starflight Concern');
 });
