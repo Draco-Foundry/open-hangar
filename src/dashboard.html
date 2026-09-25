@@ -1533,11 +1533,18 @@
       }
 
       /* Filter chips */
+      /* Row 1: kinds (one per pledge). Row 2: traits that refine it (AND). */
       .chips {
         display: flex;
-        flex-wrap: wrap;
+        flex-direction: column;
         gap: 8px;
         margin-bottom: 18px;
+      }
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
       }
       .chip {
         display: inline-flex;
@@ -1578,13 +1585,7 @@
       .chip[aria-pressed='false'] {
         opacity: 0.5;
       }
-      /* Trait chips (second, AND-combined filter row): dashed until picked. */
-      .chip-sep {
-        align-self: stretch;
-        width: 1px;
-        margin: 2px 4px;
-        background: var(--line);
-      }
+      /* Trait chips (second row): dashed until picked. */
       .chip.trait {
         border-style: dashed;
       }
