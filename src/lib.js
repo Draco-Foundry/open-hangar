@@ -333,7 +333,10 @@
         name: m.name,
         code: `${m.mfr}_${m.name}`.replace(/[^a-z0-9]/gi, '_').replace(/_+/g, '_'),
         mfr: m.mfr,
-        mfrName: m.mfrName,
+        // Prefer the table's full manufacturer name for the same code (RSI's
+        // matrix says just "MISC" where the table says "Musashi Industrial…").
+        mfrName:
+          (codes.find((x) => x.manufacturer_code === m.mfr) || {}).manufacturer_name || m.mfrName,
       };
     }
     return null;
