@@ -97,7 +97,7 @@
       '120M',
     ),
     ship(9009, 'Standalone Ship - Anvil Arrow', 75, 'Arrow', '6M'),
-    ship(9010, 'Standalone Ship - Drake Corsair', 250, 'Corsair'),
+    ship(9010, 'Standalone Ship - Drake Corsair Warbond', 220, 'Corsair'),
     ship(9011, 'Standalone Ship - Aegis Vanguard Sentinel', 275, 'Vanguard Sentinel'),
     ship(9012, 'Standalone Ship - MISC Freelancer MAX', 150, 'Freelancer MAX'),
     ccu(9013, 'Avenger Titan', 'Cutlass Black', 20),
@@ -106,7 +106,18 @@
     paint(9016, 'Paints - Carrack Stormbringer Paint', 15),
     paint(9017, 'Paints - Cutlass Black Ghoulish Green Paint', 5),
     addon(9018, 'Add-On - Fleet Week Hangar Poster', 5),
+    {
+      ...ship(9019, 'Standalone Ships - Nine Tails Shogun Pack', 75, 'ATLS IKTI Akuma'),
+      contents: [
+        { kind: 'Ship', label: 'ATLS IKTI Akuma', image: null },
+        { kind: 'Ship', label: 'Pulse', image: null },
+        { kind: 'Insurance', label: 'Lifetime Insurance', image: null },
+      ],
+    },
+    ship(9020, 'Aegis Gladius Dunlevy - Referral Reward', 0, 'Gladius Dunlevy', 'LTI', false),
   ];
+  // The starter package grants game access (what the "Game packages" trait finds).
+  hangar[0].contents.push({ kind: 'Game', label: 'Star Citizen Digital Download', image: null });
   // Spread pledge dates from 2014 to last year so date sorting has something to show.
   hangar.forEach((p, i) => {
     const d = new Date(Date.UTC(2014 + (i % 12), (i * 5) % 12, 1 + ((i * 7) % 27)));

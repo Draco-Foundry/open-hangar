@@ -1578,6 +1578,30 @@
       .chip[aria-pressed='false'] {
         opacity: 0.5;
       }
+      /* Trait chips (second, AND-combined filter row): dashed until picked. */
+      .chip-sep {
+        align-self: stretch;
+        width: 1px;
+        margin: 2px 4px;
+        background: var(--line);
+      }
+      .chip.trait {
+        border-style: dashed;
+      }
+      .chip.trait[aria-pressed='false'] {
+        opacity: 0.85;
+      }
+      .chip.trait[aria-pressed='true'] {
+        border-style: solid;
+        border-color: var(--accent);
+        background: rgba(47, 129, 247, 0.14);
+      }
+      .chip.chip-clear {
+        opacity: 1;
+        border-color: transparent;
+        background: transparent;
+        color: var(--link);
+      }
 
       /* Fleet gallery — base is the "gallery" layout */
       .grid {
