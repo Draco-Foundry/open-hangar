@@ -127,3 +127,49 @@ test('pledge_date is exported when the pledge has one', () => {
   const [f] = OH.buildHTF([pledge()], codes);
   assert.equal(f.pledge_date, undefined);
 });
+
+test('special editions: name = base ship (for importers), ship_name = full edition name', () => {
+  const out = OH.buildHTF(
+    [
+      pledge({ contents: [{ kind: 'Ship', label: 'Gladius Dunlevy' }] }),
+      pledge({ contents: [{ kind: 'Ship', label: 'Mustang Omega : AMD' }] }),
+    ],
+    codes,
+  );
+  assert.deepEqual(
+    out.map((e) => [e.name, e.ship_name, e.ship_code]),
+    [
+      ['Gladius', 'Gladius Dunlevy', 'AEGS_Gladius'],
+      ['Mustang Omega', 'Mustang Omega : AMD', 'CNOU_Mustang_Omega'],
+    ],
+  );
+});
+
+test('ships newer than the bundled table fall back to the RSI ship-matrix', () => {
+  const matrix = [
+    { lname: 'pitbull', name: 'Pitbull', mfr: 'DRAK', mfrName: 'Drake Interplanetary' },
+    {
+      lname: 'starlite',
+      name: 'Starlite',
+      mfr: 'MISC',
+      mfrName: 'Musashi Industrial & Starflight Concern',
+    },
+  ];
+  const out = OH.buildHTF(
+    [
+      pledge({ contents: [{ kind: 'Ship', label: 'Pitbull' }] }),
+      pledge({ contents: [{ kind: 'Ship', label: 'Starlite' }] }),
+      pledge({ contents: [{ kind: 'Ship', label: 'Raptor' }] }), // in neither → by name only
+    ],
+    codes,
+    matrix,
+  );
+  assert.deepEqual(
+    out.map((e) => [e.name, e.ship_code, e.manufacturer_code]),
+    [
+      ['Pitbull', 'DRAK_Pitbull', 'DRAK'],
+      ['Starlite', 'MISC_Starlite', 'MISC'],
+      ['Raptor', undefined, undefined],
+    ],
+  );
+});
