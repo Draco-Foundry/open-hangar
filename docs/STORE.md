@@ -22,15 +22,12 @@ bottom. Items marked ✅ are ready in the repo; ⬜ need you to do them.
 ## 2. Package the extension
 
 - ✅ Valid MV3 `manifest.json` (loads unpacked today).
-- ⬜ **Zip the extension** for upload. Include only runtime files — NOT
-  `node_modules/`, `test/`, `docs/`, `.git/`, `.github/`, dotfiles. Suggested zip
-  contents:
-  ```
-  manifest.json
-  icons/            (icon16, icon32, icon48, icon128 .png)
-  src/              (background.js, dashboard.html, dashboard.js, lib.js, scraper/, assets/)
-  ```
-  (A `scripts/pack.*` helper to produce this zip is a nice future addition — see TODO.)
+- ✅ **`npm run pack`** builds both store zips into `dist/` (runtime files only —
+  `manifest.json`, `icons/`, `src/`):
+  - `open-hangar-chrome-<version>.zip` — Chrome Web Store **and** Edge Add-ons.
+  - `open-hangar-firefox-<version>.zip` — Firefox AMO. `scripts/pack.mjs` adds the
+    Firefox-only manifest keys (event-page `background.scripts`, gecko add-on id,
+    `data_collection_permissions: none`). Validate with `npm run lint:firefox`.
 - ✅ Icons: 128px declared (required). 16/32/48 also added to the manifest.
 
 ## 3. Store listing assets
@@ -132,7 +129,29 @@ bottom. Items marked ✅ are ready in the repo; ⬜ need you to do them.
 - ⬜ After approval, tag the release (e.g. `git tag v0.2.6 && git push origin v0.2.6`)
   and draft a GitHub Release.
 
-## 8. Post-launch
+## 8. Microsoft Edge Add-ons (after Chrome — same zip)
+
+- ⬜ Register at [Partner Center → Edge](https://partner.microsoft.com/dashboard/microsoftedge/overview) — **free**.
+- ⬜ Upload `open-hangar-chrome-<version>.zip`; reuse the §3 assets, §5
+  justifications, §6 copy, and the privacy-policy URL.
+- ⬜ Submit. Review is typically up to ~7 business days.
+
+## 9. Firefox Add-ons (AMO)
+
+- ⬜ Sign in at [addons.mozilla.org/developers](https://addons.mozilla.org/developers/) — **free**.
+- ⬜ Upload `open-hangar-firefox-<version>.zip` as a **listed** add-on.
+- ⬜ AMO requires **source code** only for minified/bundled code — ours ships
+  unminified, so none is needed.
+- ⬜ Reuse the §6 copy + privacy-policy URL; category: _Other_ or _Games &
+  Entertainment_.
+- ⬜ Automated validation is instant; human review can follow after listing.
+
+## 10. Safari (deferred)
+
+Needs a Mac with Xcode and the **$99/yr** Apple Developer Program. See
+CONTRIBUTING "Safari notes" — revisit after the other three stores are live.
+
+## 11. Post-launch
 
 - ⬜ Add the store link to the README + org profile.
 - ⬜ Watch the dashboard for policy notices; respond promptly to any review query.

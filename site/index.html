@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Hangar — your Star Citizen hangar, in a clean local database</title>
+    <meta
+      name="description"
+      content="Open Hangar is a free, open-source browser extension that reads your own Star Citizen / RSI hangar, buy-backs, balances and referrals into a clean, local, exportable database. No password, no server."
+    />
+    <link rel="canonical" href="https://draco-foundry.github.io/open-hangar/" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Open Hangar" />
+    <meta
+      property="og:description"
+      content="Read your own Star Citizen / RSI hangar into a clean, local, exportable database. Free and open source."
+    />
+    <meta property="og:url" content="https://draco-foundry.github.io/open-hangar/" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Open Hangar",
+        "applicationCategory": "BrowserApplication",
+        "operatingSystem": "Chrome, Edge, Firefox",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "license": "https://opensource.org/licenses/MIT",
+        "url": "https://draco-foundry.github.io/open-hangar/"
+      }
+    </script>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="wrap">
+        <img class="logo" src="icon.svg" alt="" width="72" height="72" />
+        <h1>Open Hangar</h1>
+        <p class="tagline">
+          Your Star Citizen hangar, buy-backs, balances and referrals — in one clean, local database
+          you can browse and export.
+        </p>
+
+        <div class="installs" id="installs">
+          <!-- Store URLs: fill in as each listing is approved. Empty = "Coming soon". -->
+          <a class="install" data-browser="chrome" data-url="">
+            <span class="b-name">Chrome</span><span class="b-note">Coming soon</span>
+          </a>
+          <a class="install" data-browser="edge" data-url="">
+            <span class="b-name">Edge</span><span class="b-note">Coming soon</span>
+          </a>
+          <a class="install" data-browser="firefox" data-url="">
+            <span class="b-name">Firefox</span><span class="b-note">Coming soon</span>
+          </a>
+        </div>
+        <p class="also">
+          Brave, Opera and Vivaldi install from the Chrome Web Store. Safari is on the roadmap.
+        </p>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section class="features">
+        <div class="feature">
+          <h2>Private by design</h2>
+          <p>
+            Runs entirely in your browser using the RSI session you're already signed in with. No
+            password, no account, no server — nothing leaves your device.
+          </p>
+        </div>
+        <div class="feature">
+          <h2>Your whole fleet</h2>
+          <p>
+            Ships, CCUs, add-ons and buy-backs with search, sort and filters, plus stats and
+            breakdowns across your hangar.
+          </p>
+        </div>
+        <div class="feature">
+          <h2>Referral tracking</h2>
+          <p>Recruits, prospects, conversion stats, reward tiers and event bonuses on one page.</p>
+        </div>
+        <div class="feature">
+          <h2>Built to build on</h2>
+          <p>
+            Export everything as one JSON file to back it up or feed your own tools. MIT-licensed
+            and fully auditable.
+          </p>
+        </div>
+      </section>
+
+      <section class="how">
+        <h2>How it works</h2>
+        <ol>
+          <li>Install the extension for your browser.</li>
+          <li>Sign in to robertsspaceindustries.com as you normally would.</li>
+          <li>Click the Open Hangar icon and hit <strong>Scan</strong>.</li>
+        </ol>
+      </section>
+    </main>
+
+    <footer class="wrap">
+      <nav>
+        <a href="https://github.com/Draco-Foundry/open-hangar">Source on GitHub</a>
+        <a href="privacy.html">Privacy policy</a>
+        <a href="https://github.com/Draco-Foundry/open-hangar/issues">Report an issue</a>
+      </nav>
+      <p class="disclaimer">
+        Unofficial, fan-made, and not affiliated with Cloud Imperium Games or Roberts Space
+        Industries.
+      </p>
+    </footer>
+
+    <script>
+      // Wire up store links, and put the visitor's own browser first.
+      (function () {
+        var ua = navigator.userAgent;
+        var mine = /Edg\//.test(ua)
+          ? 'edge'
+          : /Firefox\//.test(ua)
+            ? 'firefox'
+            : /Chrome\//.test(ua)
+              ? 'chrome'
+              : null;
+        var box = document.getElementById('installs');
+        box.querySelectorAll('.install').forEach(function (a) {
+          var url = a.getAttribute('data-url');
+          if (url) {
+            a.href = url;
+            a.querySelector('.b-note').textContent =
+              'Add to ' + a.querySelector('.b-name').textContent;
+          } else {
+            a.classList.add('soon');
+            a.setAttribute('aria-disabled', 'true');
+          }
+          if (a.getAttribute('data-browser') === mine) {
+            a.classList.add('mine');
+            box.prepend(a);
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

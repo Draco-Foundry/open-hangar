@@ -303,7 +303,8 @@
       // Most sources store an array of items (hangar, buybacks); the referral
       // source stores a single object. Accept either so a full restore round-trips.
       if (src && (Array.isArray(src.items) || (src.items && typeof src.items === 'object'))) {
-        db.sources[id] = { items: src.items, scannedAt: src.scannedAt || null };
+        const items = id === 'referral' ? OH.normalizeReferral(src.items) : src.items;
+        db.sources[id] = { items, scannedAt: src.scannedAt || null };
       }
     }
     await chrome.storage.local.set({ [DB_KEY]: db });
@@ -802,6 +803,22 @@
       /[&<>"']/g,
       (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
     );
+  };
+
+  // Referral data can arrive from an imported file, and the UI interpolates its
+  // counts straight into HTML as numbers — so coerce them to real numbers (and
+  // the lists to arrays) before anything renders them.
+  OH.normalizeReferral = function normalizeReferral(ref) {
+    const num = (v) => (v == null ? v : Number.isFinite(+v) ? +v : 0);
+    const count = (o) => (o && typeof o === 'object' ? { ...o, recruits: num(o.recruits) } : o);
+    return {
+      ...ref,
+      current: count(ref.current),
+      legacy: count(ref.legacy),
+      prospects: num(ref.prospects),
+      recruitsList: Array.isArray(ref.recruitsList) ? ref.recruitsList : [],
+      prospectsList: Array.isArray(ref.prospectsList) ? ref.prospectsList : [],
+    };
   };
 
   // Shared category metadata for labelling/colouring kinds across the app.
