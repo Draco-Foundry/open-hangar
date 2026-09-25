@@ -1,6 +1,6 @@
 {
   "name": "open-hangar",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "private": true,
   "description": "Browser extension that reads your own Star Citizen / RSI account data into a clean, reusable local database you can build on.",
   "license": "MIT",
@@ -15,10 +15,14 @@
   "scripts": {
     "test": "node --test test/parser.test.js",
     "format": "prettier --write \"**/*.{js,html,json,md}\"",
-    "format:check": "prettier --check \"**/*.{js,html,json,md}\""
+    "format:check": "prettier --check \"**/*.{js,html,json,md}\"",
+    "build": "node scripts/pack.mjs",
+    "lint:firefox": "npm run build && web-ext lint --source-dir dist/firefox",
+    "pack": "npm run build && web-ext build --source-dir dist/chrome --artifacts-dir dist --filename open-hangar-chrome-{version}.zip --overwrite-dest && web-ext build --source-dir dist/firefox --artifacts-dir dist --filename open-hangar-firefox-{version}.zip --overwrite-dest"
   },
   "devDependencies": {
     "jsdom": "^24.1.0",
-    "prettier": "^3.3.0"
+    "prettier": "^3.3.0",
+    "web-ext": "^10.7.0"
   }
 }

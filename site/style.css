@@ -1,0 +1,226 @@
+:root {
+  --bg: #0d1117;
+  --panel: #161b22;
+  --line: #2a3139;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #2f81f7;
+  --accent-hover: #4493f8;
+  --link: #58a6ff;
+  color-scheme: dark;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font:
+    16px/1.6 system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+a {
+  color: var(--link);
+}
+.wrap {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.hero {
+  background:
+    url('banner.svg') center / cover no-repeat,
+    #05070f;
+  border-bottom: 1px solid var(--line);
+  padding: 64px 0 48px;
+  text-align: center;
+}
+.logo {
+  display: block;
+  margin: 0 auto 12px;
+}
+h1 {
+  font-size: clamp(2rem, 6vw, 3rem);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+.tagline {
+  max-width: 620px;
+  margin: 12px auto 32px;
+  font-size: 1.125rem;
+  color: #c9d1d9;
+}
+
+.installs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+.install {
+  display: flex;
+  flex-direction: column;
+  min-width: 170px;
+  padding: 12px 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(22, 27, 34, 0.85);
+  color: var(--text);
+  text-decoration: none;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.install:hover:not(.soon) {
+  border-color: var(--accent);
+}
+.install.mine {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.install.mine:hover:not(.soon) {
+  background: var(--accent-hover);
+}
+.install.soon {
+  cursor: default;
+  opacity: 0.7;
+}
+.b-name {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+.b-note {
+  font-size: 0.85rem;
+  color: #c9d1d9;
+}
+.also {
+  margin: 16px 0 0;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  margin: 48px 0;
+}
+.feature {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px;
+}
+.feature h2 {
+  font-size: 1.05rem;
+  margin: 0 0 6px;
+}
+.feature p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.how {
+  margin-bottom: 48px;
+}
+.how h2 {
+  font-size: 1.25rem;
+}
+.how ol {
+  padding-left: 1.25rem;
+  color: #c9d1d9;
+}
+
+footer {
+  border-top: 1px solid var(--line);
+  padding: 24px 16px 40px;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+.disclaimer {
+  margin: 12px 0 0;
+}
+
+/* Fan kit screenshots — always shown whole (aspect-ratio kept, never cropped). */
+.shot {
+  position: relative;
+  margin: 0;
+}
+.shot img:not(.mbtc) {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.shot-hero {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.mbtc {
+  position: absolute;
+  right: 2%;
+  bottom: 4%;
+  width: clamp(40px, 6%, 84px);
+  height: auto;
+  opacity: 0.85;
+}
+.mbtc-left {
+  right: auto;
+  left: 2%;
+}
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 48px;
+}
+.gallery .shot img:not(.mbtc) {
+  border-radius: 10px;
+}
+.gallery .mbtc {
+  width: clamp(36px, 12%, 64px);
+}
+
+.notices {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-top: 20px;
+}
+.notices img {
+  flex: none;
+  opacity: 0.85;
+}
+.notices p {
+  margin: 0 0 6px;
+  font-size: 0.875rem; /* Fankit Guidelines: no smaller than 10pt */
+}
+
+/* Privacy page */
+.doc {
+  max-width: 720px;
+  padding: 40px 16px 24px;
+}
+.doc h1 {
+  font-size: 2rem;
+}
+.doc h2 {
+  font-size: 1.2rem;
+  margin-top: 32px;
+}
+.doc li {
+  margin: 4px 0;
+}
+.doc .updated {
+  color: var(--muted);
+}

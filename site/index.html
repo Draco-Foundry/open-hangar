@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Hangar — your Star Citizen hangar, in a clean local database</title>
+    <meta
+      name="description"
+      content="Open Hangar is a free, open-source browser extension that reads your own Star Citizen / RSI hangar, buy-backs, balances and referrals into a clean, local, exportable database. No password, no server."
+    />
+    <link rel="canonical" href="https://draco-foundry.github.io/open-hangar/" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Open Hangar" />
+    <meta
+      property="og:description"
+      content="Read your own Star Citizen / RSI hangar into a clean, local, exportable database. Free and open source."
+    />
+    <meta property="og:url" content="https://draco-foundry.github.io/open-hangar/" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Open Hangar",
+        "applicationCategory": "BrowserApplication",
+        "operatingSystem": "Chrome, Edge, Firefox",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "license": "https://opensource.org/licenses/MIT",
+        "url": "https://draco-foundry.github.io/open-hangar/"
+      }
+    </script>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="wrap">
+        <img class="logo" src="icon.svg" alt="" width="72" height="72" />
+        <h1>Open Hangar</h1>
+        <p class="tagline">
+          Your Star Citizen hangar, buy-backs, balances and referrals — in one clean, local database
+          you can browse and export.
+        </p>
+
+        <div class="installs" id="installs">
+          <!-- Store URLs: fill in as each listing is approved. Empty = "Coming soon". -->
+          <a class="install" data-browser="chrome" data-url="">
+            <span class="b-name">Chrome</span><span class="b-note">Coming soon</span>
+          </a>
+          <a class="install" data-browser="edge" data-url="">
+            <span class="b-name">Edge</span><span class="b-note">Coming soon</span>
+          </a>
+          <a class="install" data-browser="firefox" data-url="">
+            <span class="b-name">Firefox</span><span class="b-note">Coming soon</span>
+          </a>
+        </div>
+        <p class="also">
+          Brave, Opera and Vivaldi install from the Chrome Web Store. Safari is on the roadmap.
+        </p>
+      </div>
+    </header>
+
+    <!-- Fan kit art: shown whole (never cropped, so CIG's watermark stays intact),
+         with the "Made By The Community" badge in the opposite corner, per the
+         Fankit Guidelines. See img/fankit/NOTICE.md. -->
+    <figure class="shot shot-hero">
+      <picture>
+        <source
+          type="image/webp"
+          srcset="img/fankit/sc-02-1280.webp 1280w, img/fankit/sc-02-1920.webp 1920w"
+          sizes="(max-width: 1400px) 100vw, 1400px"
+        />
+        <img
+          src="img/fankit/sc-02-1920.jpg"
+          width="1920"
+          height="1080"
+          alt="A ship parked on a hangar deck, lit by the landing lights"
+        />
+      </picture>
+      <img class="mbtc" src="img/fankit/made-by-the-community.png" alt="Made By The Community" />
+    </figure>
+
+    <main class="wrap">
+      <section class="features">
+        <div class="feature">
+          <h2>Private by design</h2>
+          <p>
+            Runs entirely in your browser using the RSI session you're already signed in with. No
+            password, no account, no server — nothing leaves your device.
+          </p>
+        </div>
+        <div class="feature">
+          <h2>Your whole fleet</h2>
+          <p>
+            Ships, CCUs, add-ons and buy-backs with search, sort and filters, plus stats and
+            breakdowns across your hangar.
+          </p>
+        </div>
+        <div class="feature">
+          <h2>Referral tracking</h2>
+          <p>Recruits, prospects, conversion stats, reward tiers and event bonuses on one page.</p>
+        </div>
+        <div class="feature">
+          <h2>Built to build on</h2>
+          <p>
+            Export everything as one JSON file to back it up or feed your own tools. MIT-licensed
+            and fully auditable.
+          </p>
+        </div>
+      </section>
+
+      <section class="how">
+        <h2>How it works</h2>
+        <ol>
+          <li>Install the extension for your browser.</li>
+          <li>Sign in to robertsspaceindustries.com as you normally would.</li>
+          <li>Click the Open Hangar icon and hit <strong>Scan</strong>.</li>
+        </ol>
+      </section>
+
+      <section class="gallery">
+        <figure class="shot">
+          <picture>
+            <source
+              type="image/webp"
+              srcset="img/fankit/sc-25-1280.webp 1280w, img/fankit/sc-25-1920.webp 1920w"
+              sizes="(max-width: 700px) 100vw, 464px"
+            />
+            <img
+              src="img/fankit/sc-25-1920.jpg"
+              width="1920"
+              height="1080"
+              loading="lazy"
+              alt="A capital ship over a planet, escorted by fighters"
+            />
+          </picture>
+          <img
+            class="mbtc mbtc-left"
+            src="img/fankit/made-by-the-community.png"
+            alt="Made By The Community"
+          />
+        </figure>
+        <figure class="shot">
+          <picture>
+            <source
+              type="image/webp"
+              srcset="img/fankit/sc-14-1280.webp 1280w, img/fankit/sc-14-1920.webp 1920w"
+              sizes="(max-width: 700px) 100vw, 464px"
+            />
+            <img
+              src="img/fankit/sc-14-1920.jpg"
+              width="1920"
+              height="1080"
+              loading="lazy"
+              alt="Fighters firing in a dogfight above a planet"
+            />
+          </picture>
+          <img
+            class="mbtc"
+            src="img/fankit/made-by-the-community.png"
+            alt="Made By The Community"
+          />
+        </figure>
+      </section>
+    </main>
+
+    <footer class="wrap">
+      <nav>
+        <a href="https://github.com/Draco-Foundry/open-hangar">Source on GitHub</a>
+        <a href="privacy.html">Privacy policy</a>
+        <a href="https://github.com/Draco-Foundry/open-hangar/issues">Report an issue</a>
+      </nav>
+      <div class="notices">
+        <img src="img/fankit/made-by-the-community.png" alt="" width="56" height="56" />
+        <div>
+          <p><strong>This is an unofficial Star Citizen Fan Site.</strong></p>
+          <p>
+            This site is not endorsed by or affiliated with the Cloud Imperium or Roberts Space
+            Industries group of companies. All game content and materials are copyright Cloud
+            Imperium Rights LLC and Cloud Imperium Rights Ltd. Star Citizen®, Squadron 42®, Roberts
+            Space Industries®, and Cloud Imperium® are registered trademarks of Cloud Imperium
+            Rights LLC. All rights reserved.
+          </p>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      // Wire up store links, and put the visitor's own browser first.
+      (function () {
+        var ua = navigator.userAgent;
+        var mine = /Edg\//.test(ua)
+          ? 'edge'
+          : /Firefox\//.test(ua)
+            ? 'firefox'
+            : /Chrome\//.test(ua)
+              ? 'chrome'
+              : null;
+        var box = document.getElementById('installs');
+        box.querySelectorAll('.install').forEach(function (a) {
+          var url = a.getAttribute('data-url');
+          if (url) {
+            a.href = url;
+            a.querySelector('.b-note').textContent =
+              'Add to ' + a.querySelector('.b-name').textContent;
+          } else {
+            a.classList.add('soon');
+            a.setAttribute('aria-disabled', 'true');
+          }
+          if (a.getAttribute('data-browser') === mine) {
+            a.classList.add('mine');
+            box.prepend(a);
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
