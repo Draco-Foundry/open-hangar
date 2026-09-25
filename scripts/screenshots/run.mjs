@@ -99,7 +99,9 @@ async function handle(req, res) {
   }
 
   if (u.pathname === '/' || u.pathname === '/dashboard.html') {
-    return res.writeHead(200, { 'content-type': 'text/html' }).end(demoDashboard());
+    return res
+      .writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' })
+      .end(demoDashboard());
   }
 
   const base = u.pathname.startsWith('/__demo/') ? HERE : SRC;
@@ -108,7 +110,10 @@ async function handle(req, res) {
   if (!file.startsWith(base) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
     return res.writeHead(404).end();
   }
-  res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' });
+  res.writeHead(200, {
+    'content-type': TYPES[path.extname(file)] || 'application/octet-stream',
+    'cache-control': 'no-store', // always serve the latest edits (npm run demo)
+  });
   fs.createReadStream(file).pipe(res);
 }
 

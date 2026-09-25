@@ -11,13 +11,11 @@
   (`site/privacy.html` + `docs/PRIVACY.md`). Avoid Google Analytics (cookies +
   consent banner, undercuts the privacy message).
 
-- **Hover-image behavior on cards.** The mouseover preview currently shows the
-  full-res image, which takes a beat to load. Idea: instead of a visible hover
-  popup, use the hover (or even render-time) purely to _prefetch_ the high-res
-  image silently, so that when the user **clicks** the item the detail modal already
-  has a crisp image ready. Open question: keep the hover preview at all, or replace
-  it with silent prefetch? (Affects `onCardMouseMove` / `enhanceCardImages` / the
-  modal in `dashboard.js`.) Undecided — revisit.
+- ~~**Hover-image behavior on cards.**~~ ✅ Decided + done: the card hover popup is
+  gone; hover now prefetches a ~1200px `slideshow_wide` variant (same file type as
+  the thumbnail — PNG thumbs have PNG variants) and the modal opens with it, or
+  blurs up from the thumbnail. Reward items (text links, no picture) keep the popup.
+  See `hiResCandidates` / `loadHiRes` / `progressiveImage` in `dashboard.js`.
 - **Show the user's dossier bio on the front page.** The public citizen dossier
   (`/en/citizens/<handle>`) has a free-text bio we could scrape (we already fetch
   that page for the UEE record + org). Open question: where does it fit on the
