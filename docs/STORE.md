@@ -40,9 +40,9 @@ bottom. Items marked ✅ are ready in the repo; ⬜ need you to do them.
   4. Stats
   5. Developers (export/import) — signals the "data tool" angle
      Tip: a clean browser window, dark theme, no personal email visible.
-- ⬜ **Small promo tile**: **440×280** PNG (required). Can be the logo on a dark
+- ✅ **Small promo tile**: **440×280** PNG (required) — `docs/store-assets/promo-small-440x280.png`. Can be the logo on a dark
   background. (`icons/icon.svg` + the banner in `src/assets/` are starting points.)
-- ⬜ (Optional) Marquee promo: 1400×560.
+- ✅ (Optional) Marquee promo: 1400×560 — `docs/store-assets/promo-marquee-1400x560.png`.
 - ✅ **Listing title**: `Open Hangar` (≤ 75 chars).
 - ✅ **Summary / short description** (≤ 132 chars) — see §6.
 - ✅ **Detailed description** — see §6.
