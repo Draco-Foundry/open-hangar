@@ -152,7 +152,7 @@ test('ships newer than the bundled table fall back to the RSI ship-matrix', () =
       lname: 'starlite',
       name: 'Starlite',
       mfr: 'MISC',
-      mfrName: 'Musashi Industrial & Starflight Concern',
+      mfrName: 'MISC', // what RSI's matrix actually says
     },
   ];
   const out = OH.buildHTF(
