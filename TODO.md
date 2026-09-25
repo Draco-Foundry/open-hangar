@@ -264,8 +264,8 @@ tests in `test/htf.test.js`. Findings that changed the plan below: HTF is a **ba
 array, one entry per ship** (no wrapper/version); nearly every field is optional;
 the docs' `ship-codes.json` is stale (2022) and GPL-3.0, so we bundle HangarXPLOR's
 MIT-licensed, maintained table instead (`src/data/`, 305 ships) — no new host
-permission. FleetYards' importer matches on `name`. Still open: **`pledge_date`**
-(not scraped yet — add from the hangar card's date column), refreshing the bundled
+permission. FleetYards' importer matches on `name`. `pledge_date` now comes from
+the hangar card's `.date-col` (parser `date`, ISO). Still open: refreshing the bundled
 table periodically, and a real FleetYards import test. Original plan below.
 
 > Scope note: trading-oriented hangar enrichment (per-item melt value, base-item

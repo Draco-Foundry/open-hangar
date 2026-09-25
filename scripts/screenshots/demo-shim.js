@@ -107,6 +107,11 @@
     paint(9017, 'Paints - Cutlass Black Ghoulish Green Paint', 5),
     addon(9018, 'Add-On - Fleet Week Hangar Poster', 5),
   ];
+  // Spread pledge dates from 2014 to last year so date sorting has something to show.
+  hangar.forEach((p, i) => {
+    const d = new Date(Date.UTC(2014 + (i % 12), (i * 5) % 12, 1 + ((i * 7) % 27)));
+    p.date = d.toISOString().slice(0, 10);
+  });
   const buybacks = [
     {
       id: '8801',

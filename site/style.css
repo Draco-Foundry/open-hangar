@@ -118,6 +118,22 @@ h1 {
 .also a {
   color: var(--link);
 }
+.version {
+  display: inline-block;
+  margin: 14px 0 0;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(13, 17, 23, 0.6);
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.version strong {
+  color: var(--text);
+}
+.version a {
+  color: var(--link);
+}
 .also {
   margin: 16px 0 0;
   font-size: 0.875rem;

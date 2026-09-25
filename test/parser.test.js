@@ -144,3 +144,20 @@ test('melted-CCU buy-back: strips "- upgraded" and drops the stale contained shi
   assert.equal(b.wasUpgraded, true);
   assert.equal(b.kind, 'ship');
 });
+
+test('reads the pledge date from the .date-col (with or without a "Created:" label)', () => {
+  assert.equal(byId('111').date, '2016-12-08');
+  assert.equal(byId('222').date, '2024-03-03');
+  assert.equal(byId('333').date, null); // no date column on this card
+});
+
+test('parseRsiDate handles RSI date phrasings and rejects junk', () => {
+  const d = OpenHangar.parseRsiDate;
+  assert.equal(d('Created: December 08, 2016'), '2016-12-08');
+  assert.equal(d('Dec 8, 2016'), '2016-12-08');
+  assert.equal(d('Sept. 25 2026'), '2026-09-25');
+  assert.equal(d('2023-11-24'), '2023-11-24');
+  assert.equal(d(''), null);
+  assert.equal(d('yesterday'), null);
+  assert.equal(d('Foo 12, 2020'), null);
+});
