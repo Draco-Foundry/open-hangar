@@ -9,6 +9,7 @@ on:
         'icons/icon.svg',
         'src/assets/banner.svg',
         'manifest.json',
+        'docs/store-assets/screenshot-*',
         '.github/workflows/pages.yml',
       ]
   workflow_dispatch:
@@ -34,6 +35,8 @@ jobs:
           fetch-depth: 0 # full history, to date the last version bump below
       # Reuse the extension's own art rather than keeping copies in site/.
       - run: cp icons/icon.svg src/assets/banner.svg site/
+      # Screenshot tour images: same files as the store listings (npm run screenshots).
+      - run: mkdir -p site/img/screens && cp docs/store-assets/screenshot-*.jpg site/img/screens/
       # Stamp the current version and its release date into the landing page, so
       # the site can never show a stale version. "Updated" = the last commit that
       # changed manifest.json's version line.
