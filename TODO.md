@@ -24,7 +24,14 @@
   Citizen Card without crowding it? Maybe a collapsible line under the org, or a
   hover/tooltip. Needs a layout decision before building.
 
-## Scan resilience — retry transient fetch failures (planned)
+## Scan resilience — retry transient fetch failures — ✅ DONE
+
+Implemented in `lib.js` (`fetchPage` + `scanHtmlSource` + `OH.scanSource`), tested in
+`test/scan.test.js`: network errors, 5xx and 429 are retried up to 3× with backoff
+(0.8s → 1.6s → 3.2s; `Retry-After` honoured, capped at 15s); 401/403 and other 4xx
+fail fast. A scan cut short mid-way saves what it gathered **unless** an earlier scan
+holds more items — then the earlier scan is kept and the user is told. The dashboard
+shows "RSI hiccup … retrying (n/3)" and flags partial results. Original plan below.
 
 `scanHtmlSource` in `lib.js` currently **aborts the whole scan on the first failed
 page fetch** — a network blip or a transient RSI 5xx on page N kills the run and
