@@ -95,10 +95,13 @@ saving it as a fixture is the fastest feedback loop.
 
 ## Firefox notes
 
-Firefox MV3 uses an event page rather than a true service worker and has some
-differences in `chrome.*` vs `browser.*` namespaces. The `chrome.*` calls here
-work via Firefox's compatibility shim, but if you hit issues, that's the first
-place to look.
+Firefox MV3 runs an event page rather than a service worker. `manifest.json` stays
+Chrome-shaped; `npm run build` writes `dist/firefox/manifest.json` with the
+Firefox-only keys added (`background.scripts`, the gecko add-on id, and
+`data_collection_permissions`). Load that folder via `about:debugging`, and run
+`npm run lint:firefox` before submitting — it should report 0 errors. The `chrome.*`
+calls work via Firefox's compatibility shim; if you hit an API difference, that's the
+first place to look.
 
 ## Safari notes
 
