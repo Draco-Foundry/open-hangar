@@ -268,6 +268,7 @@ const state = {
   selecting: false, // Inventory "Select" mode (pick items for a fleet image)
   selected: new Set(), // picked pledge ids (strings)
   imagePrice: 'melt', // fleet image price column: melt | mine | store | none
+  statsTab: 'overview', // Stats tab: overview | value | fleet | history
   query: '',
   sort: 'default',
   layout: 'gallery', // gallery | compact | list | market
@@ -700,7 +701,7 @@ function renderHome() {
       const d = OH.diffSnapshots(hist[hist.length - 2], hist[hist.length - 1]);
       ch.innerHTML = `Since ${OH.escapeHtml(fmtDay(hist[hist.length - 2].at))}: ${OH.escapeHtml(
         changeSummary(d),
-      )} · <a href="#stats">history</a>`;
+      )} · <a href="#stats" data-stats-tab="history">history</a>`;
       ch.hidden = false;
     } else {
       ch.hidden = true;
@@ -1904,7 +1905,6 @@ function fleetSectionHtml() {
   };
   const unknown = f.ships - f.known;
   return (
-    `<h3 class="section-title">Fleet</h3>` +
     `<div class="stat-grid">${boxes}</div>` +
     `<div class="fleet-cols"><div><h4 class="modal-h">By role</h4>${bars(f.byCareer)}</div>` +
     `<div><h4 class="modal-h">By size</h4>${bars(f.bySize)}</div></div>` +
@@ -1973,7 +1973,7 @@ function historySectionHtml() {
   const hist = state.history;
   if (!hist.length) return '';
   if (hist.length < 2) {
-    return `<h3 class="section-title" id="history">History</h3><p class="muted value-note">Tracking since ${fmtDay(
+    return `<p class="muted">Tracking since ${fmtDay(
       hist[0].at,
     )}. Rescan after your hangar changes and each change shows up here.</p>`;
   }
@@ -1987,7 +1987,7 @@ function historySectionHtml() {
     );
   }
   return (
-    `<h3 class="section-title" id="history">History</h3>` +
+    `<h3 class="section-title" id="history">Melt value over time</h3>` +
     historySvg(hist) +
     `<div class="hist-list">${steps.join('')}</div>` +
     `<p class="muted value-note">A snapshot is kept each time a full scan finds changes (last ${hist.length}). Stored only in this browser.</p>`
@@ -2043,16 +2043,48 @@ function renderStats() {
     )
     .join('');
 
+  const tabs = {
+    overview: () =>
+      `<div class="stat-grid">${stats}</div>` +
+      `<h3 class="section-title">By category</h3>${bars}` +
+      `<h3 class="section-title" style="margin-top:26px">Top pledges by value</h3>` +
+      `<div class="top-list">${topRows || '<div class="row muted">No priced pledges.</div>'}</div>`,
+    value: () => valueSectionHtml() + meltSectionHtml(),
+    fleet: () =>
+      fleetSectionHtml() ||
+      `<p class="muted">${pricesLoading ? 'Loading ship data…' : 'Ship data unavailable (offline?).'}</p>`,
+    history: () =>
+      historySectionHtml() ||
+      '<p class="muted">History starts with your next scan — each scan that finds changes is kept here.</p>',
+  };
+  const tab = tabs[state.statsTab] ? state.statsTab : 'overview';
   body.innerHTML =
-    `<div class="stat-grid">${stats}</div>` +
-    valueSectionHtml() +
-    meltSectionHtml() +
-    fleetSectionHtml() +
-    historySectionHtml() +
-    `<h3 class="section-title">By category</h3>${bars}` +
-    `<h3 class="section-title" style="margin-top:26px">Top pledges by value</h3>` +
-    `<div class="top-list">${topRows || '<div class="row muted">No priced pledges.</div>'}</div>`;
+    `<div class="layout-toggle stats-tabs" role="tablist">${STATS_TABS.map(
+      ([key, label]) =>
+        `<button role="tab" data-stats-tab="${key}" aria-selected="${key === tab}" class="${
+          key === tab ? 'active' : ''
+        }">${label}</button>`,
+    ).join('')}</div>` + tabs[tab]();
 }
+
+// Stats is split into tabs; the choice is remembered like the Inventory layout.
+const STATS_TABS = [
+  ['overview', 'Overview'],
+  ['value', 'Value'],
+  ['fleet', 'Fleet'],
+  ['history', 'History'],
+];
+function setStatsTab(tab) {
+  if (!STATS_TABS.some(([k]) => k === tab)) return;
+  state.statsTab = tab;
+  chrome.storage.local.set({ uiStatsTab: tab });
+  if (currentView() === 'stats') renderStats();
+}
+// Tab buttons, and links elsewhere (e.g. Home's "history") that open a tab.
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-stats-tab]');
+  if (el) setStatsTab(el.dataset.statsTab);
+});
 
 // --- Referrals (dedicated view) ------------------------------------------
 // Charts are hand-built inline SVG — no chart lib, no network (extension CSP +
@@ -3528,12 +3560,14 @@ document.addEventListener('visibilitychange', async () => {
 // --- Init -----------------------------------------------------------------
 
 (async () => {
-  const { uiLayout, bbLayout, marketAnnotations } = await chrome.storage.local.get([
+  const { uiLayout, bbLayout, marketAnnotations, uiStatsTab } = await chrome.storage.local.get([
+    'uiStatsTab',
     'uiLayout',
     'bbLayout',
     'marketAnnotations',
   ]);
   if (LAYOUTS.includes(uiLayout)) state.layout = uiLayout;
+  if (STATS_TABS.some(([k]) => k === uiStatsTab)) state.statsTab = uiStatsTab;
   if (LAYOUTS.includes(bbLayout)) state.bbLayout = bbLayout;
   if (marketAnnotations && typeof marketAnnotations === 'object') state.market = marketAnnotations;
 
