@@ -155,6 +155,7 @@
       isPaint,
       kind, // display category: 'ccu' | 'ship' | 'paint' | 'addon' | 'coupon' | 'other'
       giftable: raw.giftable === true, // hangar showed a "Gift" action → transferable
+      meltable: raw.meltable === true, // hangar showed an "Exchange" (melt) action
       insurance: ns.insuranceTerm(contents), // 'LTI' | '120M' | '6M' | … | null
       date: raw.date ?? null, // pledge (purchase) date, ISO 'YYYY-MM-DD', or null
       raw: raw.raw ?? null, // keep originals while reverse-engineering
@@ -287,6 +288,9 @@
       // CCUs, …) — RSI already computed it. `.js-gift` lives inside this card's
       // `.row`, so scope the query to the card to avoid neighbour bleed.
       const giftable = !!card.querySelector('.js-gift');
+      // Meltable: RSI renders an "Exchange" action (`a.js-reclaim`) on pledges you
+      // can melt for store credit — same approach as giftability, same scoping.
+      const meltable = !!card.querySelector('.js-reclaim');
       // Pledge date: the card's first `.date-col` (the selector HangarXPLOR has
       // relied on for years), e.g. "Created: December 08, 2016".
       const dateEl = card.querySelector('.date-col');
@@ -301,6 +305,7 @@
           contents,
           image: pickImage(card, contents),
           giftable,
+          meltable,
           date,
           raw: { rawValue },
         }),
