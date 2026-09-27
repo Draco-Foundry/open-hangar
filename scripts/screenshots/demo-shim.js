@@ -282,6 +282,7 @@
     snap(hangar, ts),
   ];
   const store = {
+    uiStatsTab: 'value', // store screenshot shows the Value tab
     db: {
       schemaVersion: 2,
       owner,
