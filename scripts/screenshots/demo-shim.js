@@ -127,6 +127,11 @@
     },
     ship(9020, 'Aegis Gladius Dunlevy - Referral Reward', 0, 'Gladius Dunlevy', 'LTI', false),
   ];
+  // Everything paid is meltable in the demo except the starter package (commonly
+  // kept as the game licence) and the $0 referral reward.
+  hangar.forEach((p) => {
+    p.meltable = p.value > 0 && p.id !== '9001';
+  });
   // The starter package grants game access (what the "Game packages" trait finds).
   hangar[0].contents.push({ kind: 'Game', label: 'Star Citizen Digital Download', image: null });
   // Spread pledge dates from 2014 to last year so date sorting has something to show.
