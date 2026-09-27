@@ -17,7 +17,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   that apply there (Game packages, Packs, LTI, Warbond). A **Clear** button resets
   everything.
 - **Meltable + giftable at a glance.** Each pledge now records whether RSI lets you
-  melt it (its Exchange action) as well as gift it. Both show in the item details,
+  melt it (its Exchange action) as well as gift it. Every card shows **M** and **G**
+  tags — green for yes, red for no — and both show in the item details,
   **Meltable** joins the filters, and the Market view uses RSI's own answer instead
   of guessing from price.
 - **Pledge dates.** Each pledge's purchase date is now read from your hangar, shown in
