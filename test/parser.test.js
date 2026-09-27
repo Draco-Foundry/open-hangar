@@ -161,3 +161,9 @@ test('parseRsiDate handles RSI date phrasings and rejects junk', () => {
   assert.equal(d('yesterday'), null);
   assert.equal(d('Foo 12, 2020'), null);
 });
+
+test('reads meltability from the rendered Exchange action', () => {
+  assert.equal(byId('111').meltable, true); // ship: has <a class="js-reclaim">
+  assert.equal(byId('222').meltable, true); // CCU: can be melted too
+  assert.equal(byId('333').meltable, false); // add-on: no Exchange action
+});

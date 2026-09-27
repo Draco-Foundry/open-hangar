@@ -16,6 +16,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   They sit on their own row under the main filters, and Buy-Backs gets the ones
   that apply there (Game packages, Packs, LTI, Warbond). A **Clear** button resets
   everything.
+- **Meltable + giftable at a glance.** Each pledge now records whether RSI lets you
+  melt it (its Exchange action) as well as gift it. Both show in the item details,
+  **Meltable** joins the filters, and the Market view uses RSI's own answer instead
+  of guessing from price.
 - **Pledge dates.** Each pledge's purchase date is now read from your hangar, shown in
   the item details, and sortable in Inventory ("Pledged: newest / oldest first").
 - **Sharper, faster ship images.** The blurry hover popup on inventory and buy-back

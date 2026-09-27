@@ -772,6 +772,7 @@ function pledgeFacets(p) {
     items: p.contents || [],
     lti: p.insurance === 'LTI',
     giftable: p.giftable === true,
+    meltable: p.meltable === true,
     value: Number.isFinite(p.value) ? p.value : null,
   };
 }
@@ -785,6 +786,7 @@ function buybackFacets(b) {
     items: labels.map((label) => ({ kind: '', label })),
     lti: labels.some((l) => /lifetime insurance|\bLTI\b/i.test(l)),
     giftable: null,
+    meltable: null,
     value: null,
   };
 }
@@ -816,6 +818,12 @@ const TRAITS = [
     label: 'Giftable',
     title: 'RSI shows a Gift action for this pledge',
     test: (f) => f.giftable === true,
+  },
+  {
+    key: 'meltable',
+    label: 'Meltable',
+    title: 'RSI shows an Exchange action — can be melted for store credit',
+    test: (f) => f.meltable === true,
   },
   {
     key: 'warbond',
@@ -943,11 +951,13 @@ function marketInsurance(p) {
   return p.insurance || '----';
 }
 
-// A pledge is meltable when it has a real store-credit melt value (> $0).
-// Non-meltable items (rewards, $0 reward gear, unparseable) have no resale floor
-// and are hidden from the Market view entirely.
+// A pledge is meltable when RSI offers to melt it (the hangar's "Exchange"
+// action → p.meltable) AND it has a real store-credit value (> $0). Older scans
+// predate p.meltable, so there the value alone decides. Non-meltable items
+// (rewards, $0 reward gear, pledges RSI won't exchange) have no resale floor and
+// are hidden from the Market view entirely.
 function isMeltable(p) {
-  return Number.isFinite(p.value) && p.value > 0;
+  return p.meltable !== false && Number.isFinite(p.value) && p.value > 0;
 }
 
 // Melt Price for the row. Non-meltable pledges are filtered out before render, so
@@ -2355,6 +2365,8 @@ function openItemModal(p) {
       <div class="modal-meta"><span class="badge ${badgeClass}">${OH.escapeHtml(p.kind)}</span><span class="modal-val">${OH.escapeHtml(formatValue(p))}</span></div>
       ${row('ID', OH.escapeHtml(p.id || '—'))}
       ${p.date ? row('Pledged', OH.escapeHtml(p.date)) : ''}
+      ${row('Giftable', p.giftable ? 'Yes' : 'No')}
+      ${p.meltable === undefined ? '' : row('Meltable', p.meltable ? 'Yes' : 'No')}
       ${p.currency ? row('Currency', OH.escapeHtml(p.currency)) : ''}
       ${p.isCCU && p.ccu ? row('Upgrade', OH.escapeHtml(`${p.ccu.from} → ${p.ccu.to}`)) : ''}
       ${row('Scanned', OH.escapeHtml(fmtScan()))}
