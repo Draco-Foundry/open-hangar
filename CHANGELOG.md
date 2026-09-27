@@ -4,6 +4,24 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased — next: 0.2.8
 
+- **Fleet image — pick what goes on it.** Click **Select** in Inventory, pick items
+  (cards, or checkboxes in Market view), give it a title and choose the price shown
+  (melt value, your Market price, store price or none), then **Copy image** or
+  **Save PNG**. You get a clean picture card for each item, with ship art,
+  contents, insurance and giftable, ready for a sale post or a fleet share. The
+  Market CSV and image exports also use your selection when there is one.
+- **Melt candidates.** Stats lists pledges you could melt and buy back for the same
+  store credit: meltable, no LTI, nothing but ships inside, and paid at least
+  today's store price. The same list is an Inventory filter too.
+- **CCU value.** Each CCU is priced at its standard value (the gap between its two
+  ships), so warbond CCUs show what they saved you. CCUs also count in **Below
+  store price** and appear in Stats' best deals.
+- **Fleet stats.** Stats shows total cargo (SCU), crew seats, how many ships are
+  flight ready, and your fleet by role and size.
+- **History.** Every full scan that finds changes keeps a small snapshot in your
+  browser. Home says what changed since last time (new, gone, upgraded, change
+  in melt value), and Stats shows melt value over time with a log you can open
+  for each scan.
 - **Hangar value.** Stats has a new **Hangar value** section: what the ships in
   your hangar sell for at today's store prices, how that compares with what you
   paid, your best deals, and which ships have no public price (concept/limited).

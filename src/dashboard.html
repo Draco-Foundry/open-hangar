@@ -1305,6 +1305,141 @@
         font-size: 12px;
         margin: 10px 0 26px;
       }
+      /* Select mode + fleet image bar */
+      .select-toggle[aria-pressed='true'] {
+        border-color: var(--accent);
+        background: rgba(47, 129, 247, 0.14);
+      }
+      .card.selected {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px var(--accent);
+        position: relative;
+      }
+      .card.selected::after {
+        content: '✓';
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: #fff;
+        font-size: 13px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .select-bar {
+        position: sticky;
+        bottom: 12px;
+        margin-top: 16px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border: 1px solid var(--accent);
+        border-radius: 10px;
+        background: var(--panel);
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+        z-index: 5;
+      }
+      .select-bar[hidden] {
+        display: none;
+      }
+      .sb-count {
+        font-weight: 600;
+        font-size: 13px;
+        min-width: 90px;
+      }
+      .sb-sep {
+        flex: 1;
+      }
+      .sb-title,
+      #sb-price {
+        padding: 6px 8px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--panel-2);
+        color: var(--text);
+        font-size: 12px;
+      }
+      .sb-title {
+        width: 180px;
+      }
+      .top-list.spaced {
+        margin-bottom: 26px;
+      }
+      .mk-btn.primary {
+        border-color: var(--accent);
+        background: rgba(47, 129, 247, 0.2);
+      }
+      .mk-btn:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+      .mk-sel {
+        width: 28px;
+        text-align: center;
+      }
+      /* Home: what changed since the last scan */
+      .home-changes {
+        margin: -6px 0 14px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      /* Stats: fleet + history */
+      .fleet-cols {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 8px 28px;
+      }
+      .value-note.tight {
+        margin: -4px 0 10px;
+      }
+      .hist-chart {
+        width: 100%;
+        max-width: 640px;
+        height: auto;
+        color: var(--accent);
+        margin: 4px 0 10px;
+      }
+      .hist-chart text {
+        fill: var(--muted);
+        font-size: 11px;
+      }
+      .hist-chart circle {
+        fill: var(--accent);
+      }
+      .hist-step {
+        border-top: 1px solid var(--line);
+        padding: 7px 2px;
+        font-size: 13px;
+      }
+      .hist-step summary {
+        cursor: pointer;
+      }
+      .hist-date {
+        color: var(--muted);
+        display: inline-block;
+        min-width: 110px;
+      }
+      ul.changes {
+        margin: 6px 0 2px 18px;
+        padding: 0;
+        list-style: none;
+      }
+      ul.changes .add {
+        color: #3fb950;
+      }
+      ul.changes .del {
+        color: #f85149;
+      }
+      ul.changes .chg {
+        color: var(--muted);
+      }
       .top-list {
         border: 1px solid var(--line);
         border-radius: 10px;
@@ -2282,6 +2417,7 @@
           </div>
         </div>
         <div class="home-summary" id="home-summary"></div>
+        <div class="home-changes" id="home-changes" hidden></div>
         <div class="home-split">
           <div class="home-about">
             <h2 class="section-title">About Open Hangar</h2>
@@ -2364,9 +2500,42 @@
             <button data-layout="list">List</button>
             <button data-layout="market">Market</button>
           </div>
+          <button
+            id="select-toggle"
+            class="mk-btn select-toggle"
+            type="button"
+            aria-pressed="false"
+            title="Pick items to make a fleet image (e.g. a sale post)"
+          >
+            Select
+          </button>
         </div>
         <div class="chips" id="chips"></div>
         <div id="results"></div>
+        <div class="select-bar" id="select-bar" hidden>
+          <span class="sb-count" id="sb-count"></span>
+          <button class="mk-btn" type="button" data-sb="all">Select all shown</button>
+          <button class="mk-btn" type="button" data-sb="none">Clear</button>
+          <span class="sb-sep"></span>
+          <input
+            id="sb-title"
+            class="sb-title"
+            type="text"
+            maxlength="60"
+            placeholder="My hangar"
+            aria-label="Image title"
+          />
+          <select id="sb-price" aria-label="Prices on the image">
+            <option value="melt">Melt value</option>
+            <option value="mine">My price (Market)</option>
+            <option value="store">Store price</option>
+            <option value="none">No prices</option>
+          </select>
+          <button class="mk-btn primary" type="button" data-sb="copy">Copy image</button>
+          <button class="mk-btn" type="button" data-sb="save">Save PNG</button>
+          <span class="mk-export-status" id="sb-status" aria-live="polite"></span>
+          <button class="mk-btn" type="button" data-sb="done">Done</button>
+        </div>
       </section>
 
       <!-- STATS -->
