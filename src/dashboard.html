@@ -2140,6 +2140,35 @@
       .bb-reclaim:hover {
         text-decoration: underline;
       }
+      .bb-end {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .bb-date:empty,
+      .bb-end:empty {
+        display: none;
+      }
+      /* Buy-back rows: name | items | kind | date | price + Reclaim */
+      #buybacks-body .grid.list .card-body {
+        grid-template-columns: minmax(150px, 1.3fr) minmax(0, 2fr) 72px 130px 90px;
+      }
+      #buybacks-body .grid.list .bb-date,
+      #buybacks-body .grid.list .bb-end {
+        display: block;
+        white-space: nowrap;
+      }
+      #buybacks-body .grid.list .bb-end {
+        text-align: right;
+      }
+      @media (max-width: 700px) {
+        #buybacks-body .grid.list .card-body {
+          grid-template-columns: 1fr auto auto;
+        }
+        #buybacks-body .grid.list .foot-left {
+          display: none;
+        }
+      }
 
       .empty {
         color: var(--muted);
