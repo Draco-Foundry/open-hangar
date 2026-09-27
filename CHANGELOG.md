@@ -4,6 +4,22 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased — next: 0.2.8
 
+- **Hangar value.** Stats has a new **Hangar value** section: what the ships in
+  your hangar sell for at today's store prices, how that compares with what you
+  paid, your best deals, and which ships have no public price (concept/limited).
+  Prices come from star-citizen.wiki's vehicle list, which is downloaded once and
+  cached for 30 days (about 6 requests, nothing per ship). Items show their store
+  price in the details popup, Inventory can sort by **Store price**, and Home shows
+  the total. Ships only — paints, gear, game access and CCUs aren't priced.
+- **Below store price filter.** Flags ship pledges you paid less for than today's
+  store price, which catches warbonds and sales even when the pledge name doesn't
+  say "Warbond".
+- **Exclude filters.** Click a trait filter once to include, again to exclude
+  (red), a third time to clear — e.g. **Not giftable**, **Not meltable**, **No LTI**.
+- "Total value" / "fleet value" are now labelled **melt value**, to tell them apart
+  from store value.
+- Fixed: the ship-art lookup only read the first 250 of ~300 wiki vehicles, so some
+  newer ships never got a picture.
 - **Hangar Transfer Format export.** New "Export HTF" button on the Developers page
   writes your fleet in the community format FleetYards and other tools import — one
   entry per ship, with ship codes, manufacturer, pledge name/date/cost, LTI and
