@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased — next: 0.2.8
 
+- Fixed: in Buy-Backs' List view, rows without an items line were shifted a column,
+  stretching the kind badge across the row and squashing the date.
 - **Stats is split into tabs** — Overview, Value, Fleet and History — and remembers
   the last one you opened. Home's "history" link jumps straight to History.
 - **Fleet image — pick what goes on it.** Click **Select** in Inventory, pick items
