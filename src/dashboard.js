@@ -257,11 +257,12 @@ const state = {
   bbQuery: '',
   bbSort: 'date-desc', // default to newest buy-backs first
   bbShown: new Set(), // buy-back kind filter
-  bbTraits: new Set(), // buy-back trait filter (AND)
+  bbTraits: new Map(), // buy-back trait filter (AND): key → 'yes' | 'no'
   bbLayout: 'gallery', // gallery | compact | list | market (independent of inventory)
   owner: null, // { nickname, displayname } the stored data was scanned from
   shown: new Set(), // inventory kind filter
-  traits: new Set(), // inventory trait filter (AND): package, pack, lti, …
+  traits: new Map(), // inventory trait filter (AND): key → 'yes' | 'no' (exclude)
+  priceOf: null, // ship name → { msrp } resolver (OH.getPriceIndex), once loaded
   query: '',
   sort: 'default',
   layout: 'gallery', // gallery | compact | list | market
@@ -305,6 +306,42 @@ function setScanning(text, done = false) {
 }
 
 const money = (n) => '$' + n.toFixed(2);
+const dollars = (n) => '$' + Math.round(n).toLocaleString('en-US');
+
+// --- Hangar value (ship store prices) ---------------------------------------
+// Prices come from the cached star-citizen.wiki catalog (OH.getPriceIndex).
+// Loaded lazily the first time a view needs them; views re-render once ready.
+let pricesLoading = null;
+let valueCache = { items: null, priceOf: null, value: null };
+function ensurePrices() {
+  if (state.priceOf || pricesLoading || !state.items.length) return;
+  pricesLoading = OH.getPriceIndex()
+    .then((priceOf) => {
+      state.priceOf = priceOf;
+      pricesLoading = null;
+      route();
+    })
+    .catch(() => {
+      pricesLoading = null;
+    });
+}
+// OH.hangarValue for the current items, memoised until the items change.
+function hangarValue() {
+  if (!state.priceOf) return null;
+  if (valueCache.items !== state.items || valueCache.priceOf !== state.priceOf) {
+    valueCache = {
+      items: state.items,
+      priceOf: state.priceOf,
+      value: OH.hangarValue(state.items, state.priceOf),
+    };
+  }
+  return valueCache.value;
+}
+// Store-price info for one pledge ({ store, ships, unpriced, paid, below }) or null.
+function storeInfo(p) {
+  const v = hangarValue();
+  return (v && v.pledges[p.id]) || null;
+}
 
 function formatValue(p) {
   if (!Number.isFinite(p.value)) return '';
@@ -624,6 +661,7 @@ function renderVersions() {
 }
 
 function renderHome() {
+  ensurePrices();
   renderVersions();
   renderAccount();
   const has = state.items.length > 0;
@@ -639,7 +677,8 @@ function renderHome() {
       `<div class="sum-box"><div class="sum-big">${big}</div><div class="sum-lbl">${lbl}</div></div>`;
     sum.innerHTML =
       box(state.items.length, 'pledges') +
-      box(money(OH.totalValue(state.items)), 'fleet value') +
+      box(money(OH.totalValue(state.items)), 'melt value') +
+      (hangarValue()?.store ? box(dollars(hangarValue().store), 'ships at store price') : '') +
       box(ships, 'ships') +
       box(count('ccu'), 'CCUs') +
       (count('paint') ? box(count('paint'), 'paints') : '') +
@@ -746,6 +785,8 @@ function computeShown() {
           return cmpValue(a, b, -1);
         case 'value-asc':
           return cmpValue(a, b, 1);
+        case 'store-desc':
+          return (storeInfo(b)?.store ?? -1) - (storeInfo(a)?.store ?? -1);
         case 'name-asc':
           return byName(a, b);
         case 'name-desc':
@@ -772,8 +813,9 @@ function pledgeFacets(p) {
     items: p.contents || [],
     lti: p.insurance === 'LTI',
     giftable: p.giftable === true,
-    meltable: p.meltable === true,
+    meltable: p.meltable === undefined ? null : p.meltable === true,
     value: Number.isFinite(p.value) ? p.value : null,
+    below: storeInfo(p) ? storeInfo(p).below : null,
   };
 }
 function buybackFacets(b) {
@@ -788,6 +830,7 @@ function buybackFacets(b) {
     giftable: null,
     meltable: null,
     value: null,
+    below: null,
   };
 }
 const notInsurance = (c) => !/insurance/i.test(`${c.kind || ''} ${c.label || ''}`);
@@ -800,6 +843,7 @@ const TRAITS = [
     key: 'package',
     label: 'Game packages',
     title: 'Pledges that include game access (Star Citizen / Squadron 42)',
+    notLabel: 'No game package',
     test: (f) =>
       /^package\b/i.test(f.name) ||
       f.items.some((c) => /^game$/i.test(c.kind || '') || GAME_ITEM_RE.test(c.label || '')),
@@ -810,20 +854,25 @@ const TRAITS = [
     key: 'pack',
     label: 'Packs',
     title: 'Pledges that bundle two or more items (ships, paints, gear…)',
+    notLabel: 'Single items',
     test: (f) => f.items.filter(notInsurance).length >= 2,
   },
-  { key: 'lti', label: 'LTI', title: 'Lifetime insurance', test: (f) => f.lti },
+  { key: 'lti', label: 'LTI', notLabel: 'No LTI', title: 'Lifetime insurance', test: (f) => f.lti },
   {
     key: 'giftable',
     label: 'Giftable',
     title: 'RSI shows a Gift action for this pledge',
+    notLabel: 'Not giftable',
     test: (f) => f.giftable === true,
+    neg: (f) => f.giftable === false,
   },
   {
     key: 'meltable',
     label: 'Meltable',
     title: 'RSI shows an Exchange action — can be melted for store credit',
+    notLabel: 'Not meltable',
     test: (f) => f.meltable === true,
+    neg: (f) => f.meltable === false,
   },
   {
     key: 'warbond',
@@ -831,23 +880,49 @@ const TRAITS = [
     // RSI's hangar has no warbond marker, so this relies on the pledge name — some
     // warbond purchases (e.g. packs) aren't named that way and won't show here.
     title: "Pledges whose name says Warbond (RSI doesn't always include it)",
+    notLabel: 'Not warbond',
     test: (f) => /warbond/i.test(f.name),
+  },
+  {
+    // Catches warbonds and sales that aren't named that way (see TODO.md).
+    key: 'below',
+    label: 'Below store price',
+    title:
+      "Paid less than the ships' current store price (star-citizen.wiki) — warbonds, sales, older cheaper pricing. Ship pledges only.",
+    notLabel: 'At / above store price',
+    test: (f) => f.below === true,
+    neg: (f) => f.below === false,
   },
   {
     key: 'free',
     label: 'Free / rewards',
     title: '$0 pledges — referral, event and other rewards',
+    notLabel: 'Paid pledges',
     test: (f) => f.value === 0,
+    neg: (f) => f.value != null && f.value > 0,
   },
 ];
 
-// Keep only items having every selected trait.
+// A trait chip cycles off → include → exclude → off. Exclude means "known not
+// to have it": unknown values (older scans, buy-backs) match neither.
+const traitNeg = (t) => t.neg || ((f) => !t.test(f));
+function traitMatch(t, mode, f) {
+  return mode === 'no' ? traitNeg(t)(f) : t.test(f);
+}
+function cycleTrait(selected, key) {
+  const mode = selected.get(key);
+  if (!mode) selected.set(key, 'yes');
+  else if (mode === 'yes') selected.set(key, 'no');
+  else selected.delete(key);
+}
+
+// Keep only items matching every selected trait (in its include/exclude mode).
 function applyTraits(list, selected, facets) {
   if (!selected.size) return list;
   const picked = TRAITS.filter((t) => selected.has(t.key));
   return list.filter((x) => {
     const f = facets(x);
-    return picked.every((t) => t.test(f));
+    return picked.every((t) => traitMatch(t, selected.get(t.key), f));
   });
 }
 
@@ -855,10 +930,18 @@ function applyTraits(list, selected, facets) {
 function traitRowHtml(list, selected, facets, anyFilter) {
   const all = list.map(facets);
   const chips = TRAITS.map((t) => {
-    const n = all.filter(t.test).length;
-    if (!n) return '';
-    return `<button class="chip trait" data-trait="${t.key}" aria-pressed="${selected.has(t.key)}" title="${OH.escapeHtml(t.title)}">${OH.escapeHtml(
-      t.label,
+    const mode = selected.get(t.key);
+    const yes = all.filter(t.test).length;
+    const no = all.filter(traitNeg(t)).length;
+    // Offer a trait only when it splits the list (some have it, some are known
+    // not to) — or when it's already picked, so it can still be cleared.
+    if (!mode && (!yes || yes === all.length)) return '';
+    const label = mode === 'no' ? t.notLabel || `Not ${t.label}` : t.label;
+    const n = mode === 'no' ? no : yes;
+    const hint = mode === 'yes' ? 'Click again to exclude' : mode === 'no' ? 'Click to clear' : '';
+    const title = hint ? `${t.title} · ${hint}` : t.title;
+    return `<button class="chip trait" data-trait="${t.key}" data-mode="${mode || ''}" aria-pressed="${!!mode}" title="${OH.escapeHtml(title)}">${OH.escapeHtml(
+      label,
     )}<span class="n">${n}</span></button>`;
   }).join('');
   const clear = anyFilter ? '<button class="chip chip-clear" data-clear="1">Clear</button>' : '';
@@ -892,6 +975,14 @@ function flagsHtml(p) {
   )}</span>`;
 }
 
+// Hover text on a card's price: what the ships in it sell for today.
+function valTitle(p) {
+  const si = storeInfo(p);
+  if (!si || !si.store) return '';
+  const tail = si.unpriced ? ` (+${si.unpriced} unpriced)` : '';
+  return ` title="Ships at today's store price: ${dollars(si.store)}${tail}"`;
+}
+
 function cardHtml(p) {
   const contents = (p.contents || []).map((c) => c.label || c.kind).filter(Boolean);
   const img = realImage(p.image);
@@ -920,7 +1011,7 @@ function cardHtml(p) {
       ${contentsLine}
       <div class="card-foot">
         <span class="foot-left"><span class="badge ${badgeClass}">${OH.escapeHtml(p.kind)}</span>${flagsHtml(p)}</span>
-        <span class="val">${OH.escapeHtml(formatValue(p))}</span>
+        <span class="val"${valTitle(p)}>${OH.escapeHtml(formatValue(p))}</span>
       </div>
     </div>
   </div>`;
@@ -1320,6 +1411,7 @@ function copyMarketImage(statusEl) {
 }
 
 function renderInventory() {
+  ensurePrices();
   layoutEl
     .querySelectorAll('button')
     .forEach((b) => b.classList.toggle('active', b.dataset.layout === state.layout));
@@ -1348,7 +1440,64 @@ function renderInventory() {
 
 // --- Stats ----------------------------------------------------------------
 
+// Stats → Hangar value: ships at today's store price vs what you paid, best
+// deals, and which ships couldn't be priced.
+function valueSectionHtml() {
+  const v = hangarValue();
+  if (!v) {
+    const msg = pricesLoading ? 'Loading store prices…' : 'Store prices unavailable (offline?).';
+    return `<h3 class="section-title">Hangar value</h3><p class="muted">${msg}</p>`;
+  }
+  if (!v.ships) return '';
+  const box = (big, lbl, cls = '') =>
+    `<div class="stat-box ${cls}"><div class="big">${big}</div><div class="lbl">${lbl}</div></div>`;
+  const gap = v.storePriced - v.paidPriced;
+  const sign = gap >= 0 ? '+' : '−';
+  const pct = v.paidPriced ? Math.round((Math.abs(gap) / v.paidPriced) * 100) : 0;
+  const boxes =
+    box(dollars(v.store), 'ships at store price') +
+    box(`${v.priced} / ${v.ships}`, 'ships priced') +
+    (v.paidPriced
+      ? box(
+          `${sign}${dollars(Math.abs(gap))}`,
+          `vs what you paid${pct ? ` (${sign}${pct}%)` : ''}`,
+          gap >= 0 ? 'good' : '',
+        )
+      : '');
+  const deals = state.items
+    .map((p) => ({ p, si: v.pledges[p.id] }))
+    .filter((x) => x.si && x.si.below)
+    .sort((a, b) => b.si.store - b.si.paid - (a.si.store - a.si.paid))
+    .slice(0, 10);
+  const dealRows = deals
+    .map(
+      ({ p, si }) =>
+        `<div class="row"><div class="nm">${OH.escapeHtml(plainName(p))}</div><div class="vl">${dollars(
+          si.paid,
+        )} → ${dollars(si.store)} <span class="gain">+${dollars(si.store - si.paid)}</span></div></div>`,
+    )
+    .join('');
+  const missing = v.ships - v.priced;
+  const unpriced = v.unpriced.length
+    ? `<details class="unpriced"><summary>${missing} ship${
+        missing === 1 ? '' : 's'
+      } without a public price</summary><p class="muted">${v.unpriced
+        .map((u) => OH.escapeHtml(u.n > 1 ? `${u.name} ×${u.n}` : u.name))
+        .join(' · ')}</p></details>`
+    : '';
+  return (
+    `<h3 class="section-title">Hangar value</h3>` +
+    `<div class="stat-grid">${boxes}</div>` +
+    (dealRows
+      ? `<h4 class="modal-h">Best deals — paid below today's store price</h4><div class="top-list">${dealRows}</div>`
+      : '') +
+    unpriced +
+    `<p class="muted value-note">Ships only, at current standalone store prices (USD, before tax) from star-citizen.wiki. Paints, gear, game access and CCUs aren't counted; concept and limited ships often have no public price. "vs what you paid" covers ship pledges whose ships are all priced.</p>`
+  );
+}
+
 function renderStats() {
+  ensurePrices();
   const body = $('#stats-body');
   if (!state.items.length) {
     body.innerHTML = '<div class="empty">No hangar data yet. Scan from the Home tab.</div>';
@@ -1362,7 +1511,7 @@ function renderStats() {
     `<div class="stat-box"><div class="big">${big}</div><div class="lbl">${lbl}</div></div>`;
   const stats =
     box(items.length, 'pledges') +
-    box(money(OH.totalValue(items)), 'total value') +
+    box(money(OH.totalValue(items)), 'melt value') +
     box(ships, 'with ships') +
     box(count('ccu'), 'CCUs') +
     box(count('addon'), 'add-ons') +
@@ -1398,6 +1547,7 @@ function renderStats() {
 
   body.innerHTML =
     `<div class="stat-grid">${stats}</div>` +
+    valueSectionHtml() +
     `<h3 class="section-title">By category</h3>${bars}` +
     `<h3 class="section-title" style="margin-top:26px">Top pledges by value</h3>` +
     `<div class="top-list">${topRows || '<div class="row muted">No priced pledges.</div>'}</div>`;
@@ -2134,9 +2284,7 @@ chipsEl.addEventListener('click', (e) => {
     state.shown.clear();
     state.traits.clear();
   } else if (btn.dataset.trait) {
-    const t = btn.dataset.trait;
-    if (state.traits.has(t)) state.traits.delete(t);
-    else state.traits.add(t);
+    cycleTrait(state.traits, btn.dataset.trait);
   } else {
     const key = btn.dataset.key;
     if (state.shown.has(key)) state.shown.delete(key);
@@ -2175,9 +2323,7 @@ if (bbChipsEl) {
       state.bbShown.clear();
       state.bbTraits.clear();
     } else if (btn.dataset.trait) {
-      const t = btn.dataset.trait;
-      if (state.bbTraits.has(t)) state.bbTraits.delete(t);
-      else state.bbTraits.add(t);
+      cycleTrait(state.bbTraits, btn.dataset.trait);
     } else {
       const key = btn.dataset.key;
       if (state.bbShown.has(key)) state.bbShown.delete(key);
@@ -2356,6 +2502,27 @@ function onRewardHover(e) {
 function fmtScan() {
   return state.scannedAt ? new Date(state.scannedAt).toLocaleString() : '—';
 }
+// "Store price" row in the item modal: the ships' current price, the gap to
+// what was paid, and per-ship prices when there's more than one.
+function storeRow(p, row) {
+  const si = storeInfo(p);
+  if (!si || !si.store) return '';
+  let v = dollars(si.store);
+  if (si.unpriced) v += ` + ${si.unpriced} unpriced`;
+  else if (si.paid != null && si.paid > 0) {
+    const d = si.store - si.paid;
+    if (d >= 1) v += ` <span class="gain">(paid ${dollars(d)} less)</span>`;
+    else if (d <= -1) v += ` <span class="muted">(paid ${dollars(-d)} more — likely extras)</span>`;
+  }
+  const parts =
+    si.ships.length > 1
+      ? `<div class="mr-sub">${si.ships
+          .map((x) => `${OH.escapeHtml(x.label)} ${x.msrp ? dollars(x.msrp) : '—'}`)
+          .join(' · ')}</div>`
+      : '';
+  return row('Store price', v + parts);
+}
+
 function openItemModal(p) {
   hidePreview();
   const real = realImage(p.image);
@@ -2384,6 +2551,7 @@ function openItemModal(p) {
       ${p.date ? row('Pledged', OH.escapeHtml(p.date)) : ''}
       ${row('Giftable', p.giftable ? 'Yes' : 'No')}
       ${p.meltable === undefined ? '' : row('Meltable', p.meltable ? 'Yes' : 'No')}
+      ${storeRow(p, row)}
       ${p.currency ? row('Currency', OH.escapeHtml(p.currency)) : ''}
       ${p.isCCU && p.ccu ? row('Upgrade', OH.escapeHtml(`${p.ccu.from} → ${p.ccu.to}`)) : ''}
       ${row('Scanned', OH.escapeHtml(fmtScan()))}
@@ -2523,7 +2691,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true } = {}
       state.items = h.items;
       state.scannedAt = h.scannedAt;
       state.shown = new Set(); // default: no filter selected = show all
-      state.traits = new Set();
+      state.traits = new Map();
       const acct = await OH.getAccount();
       if (acct.loggedIn && acct.nickname) {
         state.owner = { nickname: acct.nickname, displayname: acct.displayname || null };
@@ -2549,7 +2717,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true } = {}
       state.buybacks = b.items;
       state.buybacksScannedAt = b.scannedAt;
       state.bbShown = new Set(); // default: no filter selected = show all
-      state.bbTraits = new Set();
+      state.bbTraits = new Map();
       parts.push(`${b.items.length} buy-backs${b.partial ? ` (partial: ${b.partial})` : ''}`);
       if (b.partial) anyErr = true;
     } else {
@@ -2647,9 +2815,9 @@ clearBtn.addEventListener('click', async () => {
   state.buybacksScannedAt = null;
   state.owner = null;
   state.shown = new Set();
-  state.traits = new Set();
+  state.traits = new Map();
   state.bbShown = new Set();
-  state.bbTraits = new Set();
+  state.bbTraits = new Map();
   state.referral = null;
   setStatus('Local data cleared.');
   renderAccount(); // clear the referral pill too
@@ -2775,9 +2943,9 @@ if (importBtn && importFile) {
         : null;
     state.owner = null; // imports aren't attributed to an account (see importDB)
     state.shown = new Set(); // default: no filter selected = show all
-    state.traits = new Set();
+    state.traits = new Map();
     state.bbShown = new Set(); // default: no filter selected = show all
-    state.bbTraits = new Set();
+    state.bbTraits = new Map();
     renderAccount(); // reflect imported referral in the pill
     setDataMsg(
       `Imported ${sourceItemCount(res.db.sources)} item(s) — open Inventory / Buy-Backs / Stats to view.`,
@@ -2804,9 +2972,9 @@ async function reconcileAccount() {
     state.buybacksScannedAt = null;
     state.owner = null;
     state.shown = new Set();
-    state.traits = new Set();
+    state.traits = new Map();
     state.bbShown = new Set();
-    state.bbTraits = new Set();
+    state.bbTraits = new Map();
     state.referral = null;
     refreshRecoveryUI();
     return `Cleared ${prev}'s hangar — a different account is signed in. The previous data was saved; use “Restore previous hangar” in the Developers tab to bring it back, or scan to load this account.`;
@@ -2856,9 +3024,9 @@ document.addEventListener('visibilitychange', async () => {
 
   const notice = await reconcileAccount();
   state.shown = new Set(); // default: no filter selected = show all
-  state.traits = new Set();
+  state.traits = new Map();
   state.bbShown = new Set(); // default: no filter selected = show all
-  state.bbTraits = new Set();
+  state.bbTraits = new Map();
   route();
   if (notice) setStatus(notice);
   await refreshRecoveryUI();

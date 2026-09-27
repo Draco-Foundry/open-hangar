@@ -63,13 +63,11 @@ what's collected:
 1. ~~**Source-registry refactor**~~ — ✅ done (`OH.SOURCES` + versioned DB in lib.js).
 2. **Store Data** — RSI store catalog & prices (likely a cached `api`-type source).
    Includes a **current warbonds** view broken into Standalone / Package / CCU.
-   - **Pricing foundation (done, not yet surfaced):** `OH.getShipPrice(name)` in
-     lib.js resolves `{ msrp, pledgeUrl }` for a ship from the star-citizen.wiki
-     per-vehicle record (the RSI ship-matrix carries images but **no** prices).
-     Same lazy, locally-matched, hard-cached approach as `OH.getShipImage`. This
-     is the building block for: store value of your hangar and paid-vs-current
-     comparison. No UI yet — wire it into Inventory/Stats and the Store Data view
-     when this lands.
+   - ~~**Hangar value**~~ — ✅ done. `OH.getPriceIndex()` prices ships from the
+     cached star-citizen.wiki vehicle list (`msrp`; the RSI ship-matrix has no
+     prices), `OH.hangarValue()` totals them; surfaced in Stats, the item modal,
+     Home, a Store-price sort and the "Below store price" filter. Still to do
+     here: the Store Data view itself (current warbonds, CCU chains).
    - **Item-type enrichment:** classify add-ons precisely (paint vs decoration vs
      armor vs gear, etc.) by matching item names against star-citizen.wiki /
      starcitizen.tools, cached locally. Today's classifier can't tell a reward
