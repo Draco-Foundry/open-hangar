@@ -875,6 +875,23 @@ function chipHtml(kind) {
   )}<span class="n">${n}</span></button>`;
 }
 
+// M / G tags on a card: green = RSI says yes, red = no, grey = unknown (scans
+// made before meltability was read). Colour isn't the only signal — the
+// tooltip and aria-label spell it out.
+function flagHtml(letter, value, yes, no) {
+  const state = value === true ? 'yes' : value === false ? 'no' : 'unk';
+  const label = value === true ? yes : value === false ? no : `${yes}: unknown — rescan`;
+  return `<span class="flag ${state}" title="${label}" aria-label="${label}">${letter}</span>`;
+}
+function flagsHtml(p) {
+  return `<span class="flags">${flagHtml('M', p.meltable, 'Meltable', 'Not meltable')}${flagHtml(
+    'G',
+    p.giftable,
+    'Giftable',
+    'Not giftable',
+  )}</span>`;
+}
+
 function cardHtml(p) {
   const contents = (p.contents || []).map((c) => c.label || c.kind).filter(Boolean);
   const img = realImage(p.image);
@@ -902,7 +919,7 @@ function cardHtml(p) {
       <div class="card-name">${nameHtml}</div>
       ${contentsLine}
       <div class="card-foot">
-        <span class="badge ${badgeClass}">${OH.escapeHtml(p.kind)}</span>
+        <span class="foot-left"><span class="badge ${badgeClass}">${OH.escapeHtml(p.kind)}</span>${flagsHtml(p)}</span>
         <span class="val">${OH.escapeHtml(formatValue(p))}</span>
       </div>
     </div>
