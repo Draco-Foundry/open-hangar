@@ -90,9 +90,10 @@
     return db.sources[id] || { items: [], scannedAt: null };
   };
 
-  async function saveSource(id, items) {
+  async function saveSource(id, items, { record = false } = {}) {
     const db = await OH.loadDB();
     const scannedAt = Date.now();
+    if (record) recordHistory(db, db.sources[id], items, scannedAt);
     db.sources[id] = { items, scannedAt };
     // Stamp which RSI account this data belongs to, so the UI can detect when a
     // different account signs in later and clear the stale data (multi-account
@@ -580,7 +581,9 @@
         };
       }
 
-      const scannedAt = await saveSource(src.id, result.items);
+      // Only complete hangar scans go into the history (a partial one would read
+      // as pledges disappearing).
+      const scannedAt = await saveSource(src.id, result.items, { record: src.id === 'hangar' });
       return { ok: true, items: result.items, scannedAt };
     } catch (err) {
       return { ok: false, error: String(err?.message || err) };
@@ -1067,7 +1070,7 @@
   const shipImgMem = new Map(); // normName -> url|null (per session)
   const shipImgInflight = new Map(); // normName -> Promise (dedupe concurrent)
   let catalogMem = null; // [{ lname, slug, cls, msrp }]  (wiki)
-  const CATALOG_CACHE_V = 2; // v2: + class name + msrp (hangar value), all pages
+  const CATALOG_CACHE_V = 3; // v2: + class name + msrp, all pages · v3: + fleet fields
   let catalogInflight = null;
   let matrixMem = null; // [{ lname, name, img, mfr, mfrName }]  (RSI ship-matrix)
   const MATRIX_CACHE_V = 2; // v2: + display name + manufacturer (for HTF ship codes)
@@ -1145,6 +1148,13 @@
     return matrixInflight;
   }
 
+  // English text of a wiki translated field ({ en_EN: … }), or the plain string.
+  function en(x) {
+    if (!x) return null;
+    if (typeof x === 'string') return x;
+    return typeof x.en_EN === 'string' ? x.en_EN : null;
+  }
+
   // The full wiki vehicle catalog (name + slug), fetched once and cached slim.
   async function getCatalog() {
     if (catalogMem) return catalogMem;
@@ -1180,6 +1190,13 @@
                 slug: v.slug,
                 cls: v.class_name ? String(v.class_name).toLowerCase() : null,
                 msrp: Number(v.msrp) > 0 ? Number(v.msrp) : null, // USD store price
+                // Fleet stats (Stats → Fleet): what the ship is for and how big.
+                career: en(v.type) || v.career || null,
+                role: en(v.foci && v.foci[0]) || v.role || null,
+                size: en(v.size) || null,
+                status: en(v.production_status) || null, // flight-ready | in-concept | …
+                crew: (v.crew && Number(v.crew.max)) || null,
+                cargo: Number(v.cargo_capacity) || 0, // SCU
               });
           }
           const last =
@@ -1326,53 +1343,72 @@
     return 60 - (nt.length - qt.length);
   }
 
-  // Build a resolver label → { msrp, name } | null from a catalog (and the
-  // bundled ship-code table, whose codes mostly equal the wiki's class names).
+  // Resolvers over a wiki catalog (and the bundled ship-code table, whose codes
+  // mostly equal the wiki's class names):
+  //   shipOf(label)  → the catalog entry for that ship, priced or not (fleet stats)
+  //   priceOf(label) → { msrp, name } | null, falling back from an unpriced exact
+  //                    hit (e.g. a special edition) to its priced base ship
   // Pure — exported for tests.
-  OH.makePriceIndex = function makePriceIndex(catalog, codes = []) {
+  OH.makeShipIndex = function makeShipIndex(catalog, codes = []) {
     const cat = (catalog || [])
       .filter((v) => v && v.lname && !/wikelo/i.test(v.lname)) // in-game reward variants
       .map((v) => ({ ...v, n: v.lname.replace(MFR_PREFIX, '') }));
     const byCls = new Map(cat.filter((v) => v.cls).map((v) => [v.cls, v]));
-    const mem = new Map();
-    return function priceOf(label) {
-      const q = OH.htfShipName(label).toLowerCase();
-      if (!q) return null;
-      if (mem.has(q)) return mem.get(q);
-      let hit = null;
-      const id = shipIdentity(q, codes, []);
-      const c = id && byCls.get(String(id.code).toLowerCase());
-      if (c && c.msrp) hit = c;
-      if (!hit) {
+
+    // Best name match (≥55; loose "contains" hits are too risky). Ties — the wiki
+    // lists some ships twice — go to the priced entry.
+    function byName(names) {
+      for (const name of names) {
         let best = null;
         let bestScore = 0;
-        const names = [q];
-        if (id && id.name.toLowerCase() !== q) names.push(id.name.toLowerCase());
-        for (const name of names) {
-          for (const v of cat) {
-            const sc = Math.max(nameScore(v.n, name), tokenScore(v.n, name));
-            if (sc < 55) continue; // loose "contains" hits are too risky for a price
-            // Ties (the wiki lists some ships twice) go to the priced entry.
-            if (sc > bestScore || (sc === bestScore && best && !best.msrp && v.msrp)) {
-              bestScore = sc;
-              best = v;
-            }
+        for (const v of cat) {
+          const sc = Math.max(nameScore(v.n, name), tokenScore(v.n, name));
+          if (sc < 55) continue;
+          if (sc > bestScore || (sc === bestScore && !best.msrp && v.msrp)) {
+            bestScore = sc;
+            best = v;
           }
-          if (best) break;
         }
-        if (best && best.msrp) hit = best;
+        if (best) return best;
       }
-      const out = hit ? { msrp: hit.msrp, name: hit.lname } : null;
+      return null;
+    }
+
+    const mem = new Map(); // q -> { ship, price }
+    function resolve(label) {
+      const q = OH.htfShipName(label).toLowerCase();
+      if (!q) return { ship: null, price: null };
+      if (mem.has(q)) return mem.get(q);
+      const id = shipIdentity(q, codes, []);
+      const exact = id && byCls.get(String(id.code).toLowerCase());
+      const names = [q];
+      if (id && id.name.toLowerCase() !== q) names.push(id.name.toLowerCase());
+      const named = exact && exact.msrp ? null : byName(names);
+      const ship = exact || named;
+      const priced = exact && exact.msrp ? exact : named && named.msrp ? named : null;
+      const out = { ship, price: priced ? { msrp: priced.msrp, name: priced.lname } : null };
       mem.set(q, out);
       return out;
+    }
+    return {
+      shipOf: (label) => resolve(label).ship,
+      priceOf: (label) => resolve(label).price,
     };
   };
 
-  // Live resolver backed by the cached wiki catalog. Resolves to a function that
-  // always returns null when offline, so callers never need to special-case it.
-  OH.getPriceIndex = async function getPriceIndex() {
+  // Just the price resolver (label → { msrp, name } | null).
+  OH.makePriceIndex = function makePriceIndex(catalog, codes = []) {
+    return OH.makeShipIndex(catalog, codes).priceOf;
+  };
+
+  // Live resolvers backed by the cached wiki catalog. Offline, they just return
+  // null, so callers never need to special-case it.
+  OH.getShipIndex = async function getShipIndex() {
     const [catalog, codes] = await Promise.all([getCatalog(), loadShipCodes()]);
-    return OH.makePriceIndex(catalog, codes);
+    return OH.makeShipIndex(catalog, codes);
+  };
+  OH.getPriceIndex = async function getPriceIndex() {
+    return (await OH.getShipIndex()).priceOf;
   };
 
   // Back-compat single-ship lookup on top of the index.
@@ -1393,7 +1429,33 @@
     let ships = 0;
     let priced = 0;
     const unpricedNames = new Map();
+    const ccu = { n: 0, priced: 0, store: 0, paid: 0 };
     for (const p of items || []) {
+      // A CCU's standard price is the gap between its ships' store prices;
+      // warbond CCUs sell for less, which is what `below` catches.
+      if (p.isCCU && p.ccu) {
+        const from = priceOf(p.ccu.from);
+        const to = priceOf(p.ccu.to);
+        const paid = Number.isFinite(p.value) ? p.value : null;
+        const std = from && to && to.msrp > from.msrp ? to.msrp - from.msrp : null;
+        ccu.n++;
+        if (std != null) {
+          ccu.priced++;
+          ccu.store += std;
+          if (paid != null) ccu.paid += paid;
+        }
+        pledges[p.id] = {
+          ccu: true,
+          store: std,
+          from: from ? from.msrp : null,
+          to: to ? to.msrp : null,
+          ships: [],
+          unpriced: std == null ? 1 : 0,
+          paid,
+          below: std != null && paid != null && paid > 0 && std - paid >= 1,
+        };
+        continue;
+      }
       const list = (p.contents || []).filter((c) => /^ship$/i.test(c.kind || ''));
       if (!list.length) continue;
       const rows = list.map((c) => {
@@ -1423,11 +1485,117 @@
       store,
       paidPriced, // what was paid for the fully-priced ship pledges
       storePriced: Object.values(pledges)
-        .filter((x) => !x.unpriced && x.paid != null)
+        .filter((x) => !x.ccu && !x.unpriced && x.paid != null)
         .reduce((a, x) => a + x.store, 0),
       ships,
       priced,
       unpriced: [...unpricedNames].map(([name, n]) => ({ name, n })),
+      ccu,
     };
+  };
+
+  // Melt candidates: pledges you could melt and buy back for the same store
+  // credit — meltable, no LTI, nothing but ships inside (no paints, gear or game
+  // access to lose), and paid at or above the ships' current store price. RSI
+  // doesn't say whether a ship is on sale right now, so the UI says to check.
+  // `info` is the pledge's OH.hangarValue entry. Pure.
+  const GAME_RE = /\b(star citizen|squadron 42)\b.*\b(digital|download|game|package)\b/i;
+  OH.isMeltCandidate = function isMeltCandidate(p, info) {
+    if (!p || p.meltable !== true || p.insurance === 'LTI' || p.isCCU) return false;
+    if (!info || info.ccu || info.unpriced || !info.store || !(info.paid > 0)) return false;
+    if (/^package\b/i.test(p.name || '') || /warbond/i.test(p.name || '')) return false;
+    const extras = (p.contents || []).filter(
+      (c) => !/^(ship|insurance)$/i.test((c.kind || '').trim()) || GAME_RE.test(c.label || ''),
+    );
+    return !extras.length && info.paid >= info.store - 0.5;
+  };
+
+  // Fleet stats from the wiki's per-ship data: every ship in every pledge (a
+  // pack with two ships counts two). Pure.
+  OH.fleetStats = function fleetStats(items, shipOf) {
+    const out = {
+      ships: 0,
+      known: 0,
+      cargo: 0,
+      crew: 0,
+      byCareer: {},
+      bySize: {},
+      byStatus: {},
+    };
+    const bump = (map, k) => {
+      map[k] = (map[k] || 0) + 1;
+    };
+    for (const p of items || []) {
+      for (const c of p.contents || []) {
+        if (!/^ship$/i.test(c.kind || '')) continue;
+        out.ships++;
+        const v = shipOf(c.label);
+        if (!v) continue;
+        out.known++;
+        out.cargo += v.cargo || 0;
+        out.crew += v.crew || 0;
+        bump(out.byCareer, v.career || 'Other');
+        bump(out.bySize, v.size || 'Other');
+        bump(out.byStatus, v.status || 'unknown');
+      }
+    }
+    return out;
+  };
+
+  // --- Scan history --------------------------------------------------------------
+  // Each full hangar scan that changed something is kept as a compact snapshot
+  // ({ at, items: [[id, name, value]] }) in the DB, so the UI can say what changed
+  // since last time and chart melt value over time. Local only, never exported.
+  const HISTORY_MAX = 30;
+  OH.snapshotOf = function snapshotOf(items, at) {
+    return {
+      at,
+      items: (items || []).map((p) => [
+        String(p.id ?? ''),
+        p.name || '',
+        Number.isFinite(p.value) ? p.value : 0,
+      ]),
+    };
+  };
+  const meltOf = (snap) => snap.items.reduce((a, x) => a + (x[2] || 0), 0);
+  OH.snapshotMelt = meltOf;
+
+  // What changed from snapshot a to b: added / removed pledges, and ones whose
+  // name or value changed (an applied CCU keeps its pledge id). Pure.
+  OH.diffSnapshots = function diffSnapshots(a, b) {
+    const before = new Map(a.items.map((x) => [x[0], x]));
+    const after = new Map(b.items.map((x) => [x[0], x]));
+    const row = (x) => ({ id: x[0], name: x[1], value: x[2] });
+    const added = b.items.filter((x) => !before.has(x[0])).map(row);
+    const removed = a.items.filter((x) => !after.has(x[0])).map(row);
+    const changed = [];
+    for (const x of b.items) {
+      const y = before.get(x[0]);
+      if (y && (y[1] !== x[1] || Math.abs(y[2] - x[2]) >= 0.01)) {
+        changed.push({ id: x[0], from: y[1], to: x[1], fromValue: y[2], toValue: x[2] });
+      }
+    }
+    return { added, removed, changed, melt: meltOf(b) - meltOf(a) };
+  };
+
+  // Append a snapshot to db.history unless nothing changed (then just note when
+  // it was last confirmed). Seeds the history from the previous scan first, so
+  // the very first scan after this feature shipped already has a "before".
+  function recordHistory(db, prevHangar, items, at) {
+    const hist = Array.isArray(db.history) ? db.history : [];
+    if (!hist.length && prevHangar && Array.isArray(prevHangar.items) && prevHangar.items.length) {
+      hist.push(OH.snapshotOf(prevHangar.items, prevHangar.scannedAt || at - 1));
+    }
+    const snap = OH.snapshotOf(items, at);
+    const last = hist[hist.length - 1];
+    const d = last && OH.diffSnapshots(last, snap);
+    if (d && !d.added.length && !d.removed.length && !d.changed.length) last.checkedAt = at;
+    else hist.push(snap);
+    db.history = hist.slice(-HISTORY_MAX);
+  }
+
+  OH.getHistory = async function getHistory() {
+    const db = await OH.loadDB();
+    return Array.isArray(db.history) ? db.history : [];
   };
 })();

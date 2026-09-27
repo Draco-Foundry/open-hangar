@@ -21,6 +21,8 @@ requests to robertsspaceindustries.com using your existing browser session, and
 parses the results locally. This may include:
 
 - Your hangar (pledges: ships, CCUs, add-ons, coupons)
+- A short history of past hangar scans (pledge id, name and value per scan), so
+  the extension can show what changed between scans
 - Your buy-back pledges
 - Account identity and balances (handle, display name, org, rank, Store Credit,
   UEC, REC)
