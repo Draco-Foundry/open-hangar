@@ -2,14 +2,9 @@
 
 ## Ideas parked for a decision (not yet committed to a direction)
 
-- **Detect warbonds (and other discounts) by price, not name.** RSI's hangar has no
-  warbond marker and newer warbond pledges often aren't named that way (e.g.
-  "Standalone Ships - Nine Tails Shogun Pack" was bought as a warbond). RSI often
-  sells the same item as a warbond (new money, discounted) and a store-credit
-  version, and the warbond is almost always cheaper. When the hangar-value feature
-  lands (`OH.getShipPrice`, ROADMAP "Store Data"), compare the pledge's paid value
-  to the standard price and flag **"Paid below store price"** — catches warbonds and
-  sales alike. Until then the Warbond filter is name-based (tooltip says so).
+- ~~**Detect warbonds (and other discounts) by price, not name.**~~ ✅ Done: the
+  **Below store price** filter compares a ship pledge's paid value to its ships'
+  current store price (`OH.hangarValue`). The name-based Warbond filter stays too.
 
 - **Website analytics — decided: not yet (2026-09-25).** Store dashboards (Chrome,
   Edge, AMO) already give installs/active users/uninstalls, and "no tracking

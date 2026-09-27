@@ -1066,7 +1066,8 @@
   const CATALOG_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
   const shipImgMem = new Map(); // normName -> url|null (per session)
   const shipImgInflight = new Map(); // normName -> Promise (dedupe concurrent)
-  let catalogMem = null; // [{ lname, slug }]  (wiki)
+  let catalogMem = null; // [{ lname, slug, cls, msrp }]  (wiki)
+  const CATALOG_CACHE_V = 2; // v2: + class name + msrp (hangar value), all pages
   let catalogInflight = null;
   let matrixMem = null; // [{ lname, name, img, mfr, mfrName }]  (RSI ship-matrix)
   const MATRIX_CACHE_V = 2; // v2: + display name + manufacturer (for HTF ship codes)
@@ -1148,7 +1149,13 @@
   async function getCatalog() {
     if (catalogMem) return catalogMem;
     const cached = (await chrome.storage.local.get('shipCatalog')).shipCatalog;
-    if (cached && cached.at && Date.now() - cached.at < CATALOG_TTL && Array.isArray(cached.list)) {
+    if (
+      cached &&
+      cached.v === CATALOG_CACHE_V &&
+      cached.at &&
+      Date.now() - cached.at < CATALOG_TTL &&
+      Array.isArray(cached.list)
+    ) {
       catalogMem = cached.list;
       return catalogMem;
     }
@@ -1156,8 +1163,9 @@
     catalogInflight = (async () => {
       const list = [];
       try {
-        // The API caps page size at 200, so walk every page (≈288 vehicles → 2).
-        for (let page = 1; page <= 5; page++) {
+        // The API serves 50 per page whatever we ask for (≈300 vehicles → 6
+        // pages), so walk until last_page.
+        for (let page = 1; page <= 12; page++) {
           const res = await fetch(
             `${SC_API}/vehicles?page%5Bsize%5D=200&page%5Bnumber%5D=${page}`,
             { credentials: 'omit', headers: { Accept: 'application/json' } },
@@ -1167,7 +1175,12 @@
           const data = Array.isArray(json.data) ? json.data : [];
           for (const v of data) {
             if (v && v.name && v.slug)
-              list.push({ lname: String(v.name).toLowerCase(), slug: v.slug });
+              list.push({
+                lname: String(v.name).toLowerCase(),
+                slug: v.slug,
+                cls: v.class_name ? String(v.class_name).toLowerCase() : null,
+                msrp: Number(v.msrp) > 0 ? Number(v.msrp) : null, // USD store price
+              });
           }
           const last =
             (json.meta && json.meta.last_page) || (json.links && json.links.next ? page + 1 : page);
@@ -1179,7 +1192,9 @@
       if (list.length) {
         catalogMem = list;
         try {
-          await chrome.storage.local.set({ shipCatalog: { at: Date.now(), list } });
+          await chrome.storage.local.set({
+            shipCatalog: { v: CATALOG_CACHE_V, at: Date.now(), list },
+          });
         } catch {}
       }
       catalogInflight = null;
@@ -1295,54 +1310,124 @@
     return promise;
   };
 
-  // --- Ship price (DEFERRED FOUNDATION — see ROADMAP "Store Data") -----------
-  // The star-citizen.wiki per-vehicle record also carries `msrp` (USD pledge
-  // price) and `pledge_url`. We expose a name→price resolver now (same lazy,
-  // cached, locally-matched approach as images) so the future Store Data /
-  // pricing features can build on it. The RSI ship-matrix has NO prices, so this
-  // uses the wiki only. NOT yet surfaced in the UI.
-  const shipPriceMem = new Map(); // key -> { msrp, pledgeUrl } | null
+  // --- Ship prices + hangar value ------------------------------------------
+  // The star-citizen.wiki vehicle list carries each ship's `msrp` (current USD
+  // store price), so pricing a whole hangar costs the same ~6 cached catalog
+  // requests as the image lookup — nothing per ship. Concept ships the wiki has
+  // no price for stay unpriced (the UI says how many).
 
-  // Resolve { msrp, pledgeUrl } for a raw RSI ship name, or null. Never throws.
-  OH.getShipPrice = async function getShipPrice(rawName) {
-    const key = OH.normShipName(rawName).toLowerCase();
-    if (!key) return null;
-    if (shipPriceMem.has(key)) return shipPriceMem.get(key);
+  // Word-set match for names RSI and the wiki order differently: "Hercules
+  // Starlifter C2" ↔ "C2 Hercules Starlifter", "Aurora MR" ↔ "Aurora Mk I MR".
+  // Every query word must appear; fewer extra words scores higher.
+  function tokenScore(n, q) {
+    const nt = n.split(/\s+/);
+    const qt = q.split(/\s+/);
+    if (qt.length < 2 || !qt.every((w) => nt.includes(w))) return 0;
+    return 60 - (nt.length - qt.length);
+  }
 
-    const hit = ((await chrome.storage.local.get('shipPrices')).shipPrices || {})[key];
-    if (hit && Date.now() - hit.at < CATALOG_TTL) {
-      shipPriceMem.set(key, hit.price);
-      return hit.price;
-    }
-
-    let price = null;
-    try {
-      const catalog = await getCatalog();
-      for (const slug of matchSlugs(catalog, rawName)) {
-        const res = await fetch(`${SC_API}/vehicles/${encodeURIComponent(slug)}`, {
-          credentials: 'omit',
-          headers: { Accept: 'application/json' },
-        });
-        if (!res.ok) continue;
-        const json = await res.json();
-        const v = Array.isArray(json.data) ? json.data[0] : json.data;
-        const msrp = v && Number(v.msrp);
-        if (msrp) {
-          price = { msrp, pledgeUrl: v.pledge_url || null };
-          break;
+  // Build a resolver label → { msrp, name } | null from a catalog (and the
+  // bundled ship-code table, whose codes mostly equal the wiki's class names).
+  // Pure — exported for tests.
+  OH.makePriceIndex = function makePriceIndex(catalog, codes = []) {
+    const cat = (catalog || [])
+      .filter((v) => v && v.lname && !/wikelo/i.test(v.lname)) // in-game reward variants
+      .map((v) => ({ ...v, n: v.lname.replace(MFR_PREFIX, '') }));
+    const byCls = new Map(cat.filter((v) => v.cls).map((v) => [v.cls, v]));
+    const mem = new Map();
+    return function priceOf(label) {
+      const q = OH.htfShipName(label).toLowerCase();
+      if (!q) return null;
+      if (mem.has(q)) return mem.get(q);
+      let hit = null;
+      const id = shipIdentity(q, codes, []);
+      const c = id && byCls.get(String(id.code).toLowerCase());
+      if (c && c.msrp) hit = c;
+      if (!hit) {
+        let best = null;
+        let bestScore = 0;
+        const names = [q];
+        if (id && id.name.toLowerCase() !== q) names.push(id.name.toLowerCase());
+        for (const name of names) {
+          for (const v of cat) {
+            const sc = Math.max(nameScore(v.n, name), tokenScore(v.n, name));
+            if (sc < 55) continue; // loose "contains" hits are too risky for a price
+            // Ties (the wiki lists some ships twice) go to the priced entry.
+            if (sc > bestScore || (sc === bestScore && best && !best.msrp && v.msrp)) {
+              bestScore = sc;
+              best = v;
+            }
+          }
+          if (best) break;
         }
+        if (best && best.msrp) hit = best;
       }
-    } catch {
-      /* leave price null */
+      const out = hit ? { msrp: hit.msrp, name: hit.lname } : null;
+      mem.set(q, out);
+      return out;
+    };
+  };
+
+  // Live resolver backed by the cached wiki catalog. Resolves to a function that
+  // always returns null when offline, so callers never need to special-case it.
+  OH.getPriceIndex = async function getPriceIndex() {
+    const [catalog, codes] = await Promise.all([getCatalog(), loadShipCodes()]);
+    return OH.makePriceIndex(catalog, codes);
+  };
+
+  // Back-compat single-ship lookup on top of the index.
+  OH.getShipPrice = async function getShipPrice(rawName) {
+    const hit = (await OH.getPriceIndex())(rawName);
+    return hit ? { msrp: hit.msrp, pledgeUrl: null } : null;
+  };
+
+  // Store value of a hangar. Only ships are priced (paints/gear/game access have
+  // no reliable public price), so for packs this is the ships' part. Pure.
+  //  pledges[id] = { store, ships: [{ label, msrp }], unpriced, paid, below }
+  //  `below` = paid less than the ships' current store price (warbonds, sales,
+  //  older cheaper pricing) — only for ship pledges that priced completely.
+  OH.hangarValue = function hangarValue(items, priceOf) {
+    const pledges = {};
+    let store = 0;
+    let paidPriced = 0;
+    let ships = 0;
+    let priced = 0;
+    const unpricedNames = new Map();
+    for (const p of items || []) {
+      const list = (p.contents || []).filter((c) => /^ship$/i.test(c.kind || ''));
+      if (!list.length) continue;
+      const rows = list.map((c) => {
+        const hit = priceOf(c.label);
+        return { label: OH.htfShipName(c.label) || c.label, msrp: hit ? hit.msrp : null };
+      });
+      const unpriced = rows.filter((r) => r.msrp == null).length;
+      const sum = rows.reduce((a, r) => a + (r.msrp || 0), 0);
+      const paid = Number.isFinite(p.value) ? p.value : null;
+      ships += rows.length;
+      priced += rows.length - unpriced;
+      for (const r of rows) {
+        if (r.msrp == null) unpricedNames.set(r.label, (unpricedNames.get(r.label) || 0) + 1);
+      }
+      store += sum;
+      if (!unpriced && paid != null) paidPriced += paid;
+      pledges[p.id] = {
+        store: sum || null,
+        ships: rows,
+        unpriced,
+        paid,
+        below: !unpriced && paid != null && paid > 0 && sum - paid >= 1,
+      };
     }
-    shipPriceMem.set(key, price);
-    try {
-      const cur = (await chrome.storage.local.get('shipPrices')).shipPrices || {};
-      cur[key] = { price, at: Date.now() };
-      await chrome.storage.local.set({ shipPrices: cur });
-    } catch {
-      /* storage unavailable — memory cache still applies */
-    }
-    return price;
+    return {
+      pledges,
+      store,
+      paidPriced, // what was paid for the fully-priced ship pledges
+      storePriced: Object.values(pledges)
+        .filter((x) => !x.unpriced && x.paid != null)
+        .reduce((a, x) => a + x.store, 0),
+      ships,
+      priced,
+      unpriced: [...unpricedNames].map(([name, n]) => ({ name, n })),
+    };
   };
 })();
