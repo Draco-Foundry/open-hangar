@@ -86,7 +86,7 @@ required for Firefox.)
    - **Home** — your Citizen Card: identity, org, balances, referral count.
    - **Inventory** — gallery, compact or list view, with search, filters and sort.
    - **Buy-Backs** — everything you can reclaim, with links back to RSI.
-   - **Stats** — fleet breakdowns and your referral dashboard.
+   - **Stats** — fleet breakdowns and **hangar value** (your ships at today's store prices vs what you paid, best deals), plus your referral dashboard.
    - **Developers** — export or import the whole database as JSON.
 
 Re-scan any time to refresh. **Clear Data** wipes the local copy; **Log out** ends

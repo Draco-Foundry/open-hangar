@@ -1282,6 +1282,29 @@
         color: var(--muted);
         font-variant-numeric: tabular-nums;
       }
+      .gain {
+        color: #3fb950;
+      }
+      .stat-box.good .big {
+        color: #3fb950;
+      }
+      .mr-sub {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 2px;
+      }
+      details.unpriced {
+        margin: 14px 0 6px;
+        font-size: 13px;
+      }
+      details.unpriced summary {
+        cursor: pointer;
+        color: var(--muted);
+      }
+      .value-note {
+        font-size: 12px;
+        margin: 10px 0 26px;
+      }
       .top-list {
         border: 1px solid var(--line);
         border-radius: 10px;
@@ -1596,6 +1619,12 @@
         border-style: solid;
         border-color: var(--accent);
         background: rgba(47, 129, 247, 0.14);
+      }
+      /* Excluding ("Not giftable"): red outline. */
+      .chip.trait[data-mode='no'] {
+        border-style: solid;
+        border-color: #f85149;
+        background: rgba(248, 81, 73, 0.12);
       }
       .chip.chip-clear {
         opacity: 1;
@@ -2325,6 +2354,7 @@
             <option value="date-asc">Pledged: oldest first</option>
             <option value="value-desc">Value: high → low</option>
             <option value="value-asc">Value: low → high</option>
+            <option value="store-desc">Store price: high → low</option>
             <option value="name-asc">Name: A → Z</option>
             <option value="name-desc">Name: Z → A</option>
           </select>
