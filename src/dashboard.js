@@ -2639,16 +2639,17 @@ function buybackCardHtml(b) {
     ? `<a class="bb-reclaim" href="${OH.escapeHtml(url)}" target="_blank" rel="noopener">Reclaim ↗</a>`
     : '';
   const badgeClass = ['ccu', 'ship', 'paint', 'addon', 'coupon'].includes(b.kind) ? b.kind : '';
+  // Every cell is always emitted (empty when there's nothing) so the List view's
+  // fixed column grid lines up across rows, as in the Inventory cards.
   return `<div class="card" data-id="${OH.escapeHtml(String(b.id || ''))}" data-image="${OH.escapeHtml(img || '')}" data-resolve="${OH.escapeHtml(resolve)}">
     ${thumb}
     <div class="card-body">
       <div class="card-name">${nameHtml}</div>
-      ${b.contains ? `<div class="card-contents">${OH.escapeHtml(b.contains)}</div>` : ''}
+      <div class="card-contents">${OH.escapeHtml(b.contains || '')}</div>
       <div class="card-foot">
-        <span class="badge ${badgeClass}">${OH.escapeHtml(b.kind || 'buy-back')}</span>
-        ${b.date ? `<span class="bb-date">${OH.escapeHtml(b.date)}</span>` : ''}
-        ${b.price ? `<span class="val">${OH.escapeHtml(b.price)}</span>` : ''}
-        ${reclaim}
+        <span class="foot-left"><span class="badge ${badgeClass}">${OH.escapeHtml(b.kind || 'buy-back')}</span></span>
+        <span class="bb-date">${OH.escapeHtml(b.date || '')}</span>
+        <span class="bb-end">${b.price ? `<span class="val">${OH.escapeHtml(b.price)}</span>` : ''}${reclaim}</span>
       </div>
     </div>
   </div>`;
