@@ -1660,7 +1660,7 @@
       .grid.list .card-foot {
         display: contents;
       } /* lift badge + value into the row grid */
-      .grid.list .badge {
+      .grid.list .foot-left {
         justify-self: start;
       }
       .grid.list .val {
@@ -1892,6 +1892,41 @@
       .val {
         font-variant-numeric: tabular-nums;
         font-size: 13px;
+      }
+      .foot-left {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+      }
+      /* M(eltable) / G(iftable) tags: green yes, red no, grey unknown. */
+      .flags {
+        display: inline-flex;
+        gap: 3px;
+      }
+      .flag {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1;
+        color: var(--muted);
+        cursor: default;
+      }
+      .flag.yes {
+        color: #7ee787;
+        border-color: #2ea043;
+        background: rgba(46, 160, 67, 0.15);
+      }
+      .flag.no {
+        color: #ff7b72;
+        border-color: #f85149;
+        background: rgba(248, 81, 73, 0.12);
       }
 
       .badge {
