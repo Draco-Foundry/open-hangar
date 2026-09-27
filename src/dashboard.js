@@ -262,7 +262,12 @@ const state = {
   owner: null, // { nickname, displayname } the stored data was scanned from
   shown: new Set(), // inventory kind filter
   traits: new Map(), // inventory trait filter (AND): key → 'yes' | 'no' (exclude)
-  priceOf: null, // ship name → { msrp } resolver (OH.getPriceIndex), once loaded
+  priceOf: null, // ship name → { msrp } resolver (OH.getShipIndex), once loaded
+  shipOf: null, // ship name → wiki catalog entry (role, size, cargo…), once loaded
+  history: [], // hangar scan snapshots (OH.getHistory), oldest first
+  selecting: false, // Inventory "Select" mode (pick items for a fleet image)
+  selected: new Set(), // picked pledge ids (strings)
+  imagePrice: 'melt', // fleet image price column: melt | mine | store | none
   query: '',
   sort: 'default',
   layout: 'gallery', // gallery | compact | list | market
@@ -315,9 +320,10 @@ let pricesLoading = null;
 let valueCache = { items: null, priceOf: null, value: null };
 function ensurePrices() {
   if (state.priceOf || pricesLoading || !state.items.length) return;
-  pricesLoading = OH.getPriceIndex()
-    .then((priceOf) => {
+  pricesLoading = OH.getShipIndex()
+    .then(({ priceOf, shipOf }) => {
       state.priceOf = priceOf;
+      state.shipOf = shipOf;
       pricesLoading = null;
       route();
     })
@@ -687,6 +693,19 @@ function renderHome() {
   } else {
     sum.innerHTML = '';
   }
+  const ch = $('#home-changes');
+  if (ch) {
+    const hist = state.history;
+    if (has && hist.length >= 2) {
+      const d = OH.diffSnapshots(hist[hist.length - 2], hist[hist.length - 1]);
+      ch.innerHTML = `Since ${OH.escapeHtml(fmtDay(hist[hist.length - 2].at))}: ${OH.escapeHtml(
+        changeSummary(d),
+      )} · <a href="#stats">history</a>`;
+      ch.hidden = false;
+    } else {
+      ch.hidden = true;
+    }
+  }
 
   // Scanned line: first-run prompt (#2) or scan freshness with a stale nudge (#5).
   if (!has) {
@@ -816,6 +835,7 @@ function pledgeFacets(p) {
     meltable: p.meltable === undefined ? null : p.meltable === true,
     value: Number.isFinite(p.value) ? p.value : null,
     below: storeInfo(p) ? storeInfo(p).below : null,
+    meltCandidate: state.priceOf ? OH.isMeltCandidate(p, storeInfo(p)) : null,
   };
 }
 function buybackFacets(b) {
@@ -831,6 +851,7 @@ function buybackFacets(b) {
     meltable: null,
     value: null,
     below: null,
+    meltCandidate: null,
   };
 }
 const notInsurance = (c) => !/insurance/i.test(`${c.kind || ''} ${c.label || ''}`);
@@ -888,10 +909,19 @@ const TRAITS = [
     key: 'below',
     label: 'Below store price',
     title:
-      "Paid less than the ships' current store price (star-citizen.wiki) — warbonds, sales, older cheaper pricing. Ship pledges only.",
+      "Paid less than today's store price (star-citizen.wiki) — warbonds, sales, older cheaper pricing. Ship pledges and CCUs.",
     notLabel: 'At / above store price',
     test: (f) => f.below === true,
     neg: (f) => f.below === false,
+  },
+  {
+    key: 'melt',
+    label: 'Melt candidates',
+    title:
+      'Meltable, no LTI, ships only, and paid at least today’s store price — you could melt and buy it back for the same credit (check it’s on sale first)',
+    notLabel: 'Keep',
+    test: (f) => f.meltCandidate === true,
+    neg: (f) => f.meltCandidate === false,
   },
   {
     key: 'free',
@@ -1004,7 +1034,8 @@ function cardHtml(p) {
     contentsLine = `<div class="card-contents">${OH.escapeHtml(head)}${more}</div>`;
   }
   const badgeClass = ['ccu', 'ship', 'paint', 'addon', 'coupon'].includes(p.kind) ? p.kind : '';
-  return `<div class="card" data-id="${OH.escapeHtml(String(p.id || ''))}" data-image="${OH.escapeHtml(img || '')}" data-resolve="${OH.escapeHtml(resolve)}">
+  const sel = state.selecting && state.selected.has(String(p.id)) ? ' selected' : '';
+  return `<div class="card${sel}" data-id="${OH.escapeHtml(String(p.id || ''))}" data-image="${OH.escapeHtml(img || '')}" data-resolve="${OH.escapeHtml(resolve)}">
     ${thumb}
     <div class="card-body">
       <div class="card-name">${nameHtml}</div>
@@ -1111,8 +1142,12 @@ function marketRowHtml(g) {
   const saved = state.market[g.key];
   const price = saved && saved.price != null ? OH.escapeHtml(String(saved.price)) : '';
   const gift = giftableLabel(g);
+  const picked = g.ids.every((id) => state.selected.has(id));
+  const pick = state.selecting
+    ? `<td class="mk-sel"><input type="checkbox" class="mk-pick" ${picked ? 'checked' : ''} aria-label="Select"></td>`
+    : '';
   return `<tr class="mk-row" data-key="${key}">
-    <td class="mk-name">${OH.escapeHtml(plainName(p))}</td>
+    ${pick}<td class="mk-name">${OH.escapeHtml(plainName(p))}</td>
     <td class="mk-ins">${OH.escapeHtml(marketInsurance(p))}</td>
     <td class="mk-gift gift-${g.giftable === 0 ? 'no' : 'yes'}">${gift}</td>
     <td class="mk-melt">${OH.escapeHtml(melt)}</td>
@@ -1126,7 +1161,7 @@ function marketTableHtml(section, groups) {
     <h3 class="market-title">${OH.escapeHtml(section.label)}<span class="market-n">${groups.length}</span></h3>
     <table class="market-table">
       <thead><tr>
-        <th>Items Name</th><th>Insurance</th><th>Giftable</th><th>Melt Price</th>
+        ${state.selecting ? '<th class="mk-sel"></th>' : ''}<th>Items Name</th><th>Insurance</th><th>Giftable</th><th>Melt Price</th>
         <th>My Price</th><th>Stock</th>
       </tr></thead>
       <tbody>${groups.map(marketRowHtml).join('')}</tbody>
@@ -1146,11 +1181,12 @@ function stackPledges(pledges) {
     const key = marketKey(p);
     let g = byKey.get(key);
     if (!g) {
-      g = { key, rep: p, stock: 0, giftable: 0 };
+      g = { key, rep: p, stock: 0, giftable: 0, ids: [] };
       byKey.set(key, g);
       order.push(g);
     }
     g.stock += 1;
+    g.ids.push(String(p.id));
     if (p.giftable) g.giftable += 1;
   }
   return order;
@@ -1185,7 +1221,11 @@ function computeMarketSections(shown) {
 
 function marketToolbarHtml(shown) {
   return `<div class="market-toolbar">
-    <div class="result-count">Showing ${shown.length} of ${state.items.length} · Melt ${money(OH.totalValue(shown))}</div>
+    <div class="result-count">Showing ${shown.length} of ${state.items.length} · Melt ${money(OH.totalValue(shown))}${
+      state.selected.size
+        ? ` · <strong>exports use your ${state.selected.size} selected</strong>`
+        : ''
+    }</div>
     <div class="market-actions">
       <label class="mk-toggle"><input type="checkbox" class="mk-giftable-only" ${
         state.marketGiftableOnly ? 'checked' : ''
@@ -1262,8 +1302,14 @@ function marketCsv(sections) {
   return lines.map((r) => r.map(csvCell).join(',')).join('\r\n');
 }
 
+// What the Market exports cover: the view, narrowed to the selection if any.
+function marketExportShown() {
+  const shown = marketShown();
+  return state.selected.size ? shown.filter((p) => state.selected.has(String(p.id))) : shown;
+}
+
 function exportMarketCsv(statusEl) {
-  const sections = computeMarketSections(marketShown());
+  const sections = computeMarketSections(marketExportShown());
   if (!sections.length) return setExportStatus(statusEl, 'Nothing to export');
   downloadBlob(
     new Blob([marketCsv(sections)], { type: 'text/csv;charset=utf-8' }),
@@ -1391,7 +1437,7 @@ function marketImageCanvas(sections) {
 }
 
 function copyMarketImage(statusEl) {
-  const sections = computeMarketSections(marketShown());
+  const sections = computeMarketSections(marketExportShown());
   if (!sections.length) return setExportStatus(statusEl, 'Nothing to export');
   marketImageCanvas(sections).toBlob(async (blob) => {
     if (!blob) return setExportStatus(statusEl, 'Image failed');
@@ -1412,6 +1458,7 @@ function copyMarketImage(statusEl) {
 
 function renderInventory() {
   ensurePrices();
+  updateSelectBar();
   layoutEl
     .querySelectorAll('button')
     .forEach((b) => b.classList.toggle('active', b.dataset.layout === state.layout));
@@ -1438,6 +1485,301 @@ function renderInventory() {
   enhanceCardImages(resultsEl);
 }
 
+// --- Select mode + fleet image -------------------------------------------
+// "Select" in Inventory turns card clicks into picks (and adds a checkbox to
+// Market rows). The bar at the bottom makes a picture of just the picked items
+// — for a sale post, a fleet brag, a "what should I melt" thread. Drawn on a
+// canvas locally; copied to the clipboard or saved as PNG, never uploaded.
+const selectBar = $('#select-bar');
+const selectToggle = $('#select-toggle');
+
+function toggleSelected(ids) {
+  for (const id of ids) {
+    if (state.selected.has(id)) state.selected.delete(id);
+    else state.selected.add(id);
+  }
+  updateSelectBar();
+}
+function selectedItems() {
+  return state.items.filter((p) => state.selected.has(String(p.id)));
+}
+function updateSelectBar() {
+  if (!selectBar) return;
+  selectBar.hidden = !state.selecting;
+  if (selectToggle) {
+    selectToggle.setAttribute('aria-pressed', String(state.selecting));
+    selectToggle.textContent = state.selecting ? 'Done selecting' : 'Select';
+  }
+  const n = state.selected.size;
+  $('#sb-count').textContent = n ? `${n} selected` : 'Click items to select them';
+  selectBar.querySelectorAll('[data-sb="copy"],[data-sb="save"]').forEach((b) => {
+    b.disabled = !n;
+  });
+  const title = $('#sb-title');
+  if (title && !title.placeholder.includes("'s")) {
+    const who = state.owner && (state.owner.displayname || state.owner.nickname);
+    title.placeholder = who ? `${who}'s hangar` : 'My hangar';
+  }
+}
+function setSelecting(on) {
+  state.selecting = on;
+  if (currentView() === 'inventory') renderInventory();
+}
+
+// Price text for the image, per the bar's "Price" choice.
+function imagePriceText(p, mode) {
+  if (mode === 'melt') return Number.isFinite(p.value) ? formatValue(p) : '';
+  if (mode === 'store') {
+    const si = storeInfo(p);
+    return si && si.store ? dollars(si.store) : '';
+  }
+  if (mode === 'mine') {
+    const saved = state.market[marketKey(p)];
+    if (!saved || saved.price == null || saved.price === '') return '';
+    const n = Number(saved.price);
+    return Number.isFinite(n) ? money(n) : String(saved.price);
+  }
+  return '';
+}
+
+async function imageUrlFor(p) {
+  const real = realImage(p.image);
+  if (real) return real;
+  const name = resolveImageName(p);
+  if (!name) return null;
+  try {
+    return await OH.getShipImage(name);
+  } catch {
+    return null;
+  }
+}
+// Load an image the canvas may read back (CORS). RSI's media CDN allows it;
+// anything that doesn't just becomes a placeholder tile.
+function loadCanvasImage(url) {
+  return new Promise((resolve) => {
+    if (!url) return resolve(null);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    const timer = setTimeout(() => resolve(null), 8000);
+    img.onload = () => {
+      clearTimeout(timer);
+      resolve(img);
+    };
+    img.onerror = () => {
+      clearTimeout(timer);
+      resolve(null);
+    };
+    img.src = url;
+  });
+}
+
+async function fleetImageCanvas(list, { title, price }) {
+  const SCALE = 2;
+  const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+  const f = (w, px) => `${w} ${px}px ${FONT}`;
+  const C = {
+    bg: '#0d1117',
+    card: '#161b22',
+    line: '#30363d',
+    text: '#e6edf3',
+    muted: '#8b949e',
+    ph: '#21262d',
+    good: '#3fb950',
+    bad: '#f85149',
+  };
+  const PAD = 28,
+    GAP = 16,
+    CW = 300,
+    IH = 169,
+    BH = 92,
+    CH = IH + BH,
+    HEAD = 62,
+    FOOT = 30;
+  const cols = list.length <= 2 ? list.length : list.length <= 6 ? 3 : 4;
+  const rows = Math.ceil(list.length / cols);
+  const W = PAD * 2 + cols * CW + (cols - 1) * GAP;
+  const H = PAD + HEAD + rows * CH + (rows - 1) * GAP + FOOT + PAD;
+  const canvas = document.createElement('canvas');
+  canvas.width = W * SCALE;
+  canvas.height = H * SCALE;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(SCALE, SCALE);
+
+  const imgs = await Promise.all(list.map(async (p) => loadCanvasImage(await imageUrlFor(p))));
+
+  const clip = (text, maxW) => {
+    if (ctx.measureText(text).width <= maxW) return text;
+    let t = text;
+    while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1);
+    return t + '…';
+  };
+  const wrap = (text, maxW, maxLines) => {
+    const words = String(text).split(/\s+/);
+    const lines = [];
+    let cur = '';
+    for (let i = 0; i < words.length; i++) {
+      const next = cur ? `${cur} ${words[i]}` : words[i];
+      if (ctx.measureText(next).width <= maxW || !cur) cur = next;
+      else {
+        lines.push(cur);
+        cur = words[i];
+        if (lines.length === maxLines - 1) {
+          cur = words.slice(i).join(' ');
+          break;
+        }
+      }
+    }
+    if (cur) lines.push(cur);
+    return lines.slice(0, maxLines).map((l, i) => (i === maxLines - 1 ? clip(l, maxW) : l));
+  };
+
+  ctx.fillStyle = C.bg;
+  ctx.fillRect(0, 0, W, H);
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = C.text;
+  ctx.font = f(700, 24);
+  ctx.fillText(clip(title, W - PAD * 2), PAD, PAD + 26);
+  let sub = `${list.length} item${list.length === 1 ? '' : 's'}`;
+  if (price === 'melt') sub += ` · ${money(OH.totalValue(list))} melt value`;
+  ctx.fillStyle = C.muted;
+  ctx.font = f(400, 13);
+  ctx.fillText(sub, PAD, PAD + 48);
+
+  list.forEach((p, i) => {
+    const x = PAD + (i % cols) * (CW + GAP);
+    const y = PAD + HEAD + Math.floor(i / cols) * (CH + GAP);
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(x, y, CW, CH, 10);
+    ctx.fillStyle = C.card;
+    ctx.fill();
+    ctx.clip();
+    const img = imgs[i];
+    if (img) {
+      // cover-crop into the 16:9 slot
+      const r = Math.max(CW / img.naturalWidth, IH / img.naturalHeight);
+      const w = img.naturalWidth * r,
+        h = img.naturalHeight * r;
+      ctx.drawImage(img, x + (CW - w) / 2, y + (IH - h) / 2, w, h);
+    } else {
+      ctx.fillStyle = C.ph;
+      ctx.fillRect(x, y, CW, IH);
+      ctx.fillStyle = C.muted;
+      ctx.font = f(600, 14);
+      ctx.textAlign = 'center';
+      ctx.fillText(String(p.kind || '').toUpperCase(), x + CW / 2, y + IH / 2 + 5);
+      ctx.textAlign = 'left';
+    }
+    ctx.restore();
+    ctx.strokeStyle = C.line;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(x + 0.5, y + 0.5, CW - 1, CH - 1, 10);
+    ctx.stroke();
+
+    const tx = x + 12,
+      tw = CW - 24;
+    const name =
+      p.isCCU && p.ccu
+        ? `${p.ccu.from} → ${p.ccu.to}`
+        : plainName(p).replace(
+            /^(standalone ships?|paints?|gear|add-ons?|subscribers store)\s*[-–]\s*/i,
+            '',
+          );
+    ctx.fillStyle = C.text;
+    ctx.font = f(600, 14);
+    const nameLines = wrap(name, tw, 2);
+    nameLines.forEach((line, k) => ctx.fillText(line, tx, y + IH + 22 + k * 18));
+    // what's inside (minus insurance, which the bottom row shows)
+    const inside = p.isCCU
+      ? 'Ship upgrade'
+      : (p.contents || [])
+          .filter((c) => !/insurance/i.test(`${c.kind || ''} ${c.label || ''}`))
+          .map((c) => c.label || c.kind)
+          .filter(Boolean)
+          .join(' · ');
+    if (inside) {
+      ctx.fillStyle = C.muted;
+      ctx.font = f(400, 12);
+      ctx.fillText(clip(inside, tw), tx, y + IH + 22 + nameLines.length * 18 + 2);
+    }
+    // bottom row: insurance · giftable on the left, price on the right
+    const by = y + CH - 14;
+    const pt = imagePriceText(p, price);
+    ctx.font = f(700, 15);
+    const pw = pt ? ctx.measureText(pt).width : 0;
+    if (pt) {
+      ctx.fillStyle = C.text;
+      ctx.fillText(pt, x + CW - 12 - pw, by);
+    }
+    const ins = marketInsurance(p);
+    const left = [
+      ins && ins !== '—' ? ins : '',
+      p.giftable === true ? 'Giftable' : p.giftable === false ? 'Not giftable' : '',
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    ctx.fillStyle = C.muted;
+    ctx.font = f(400, 12);
+    ctx.fillText(clip(left, tw - pw - 10), tx, by);
+  });
+
+  ctx.fillStyle = C.muted;
+  ctx.font = f(400, 11);
+  ctx.textAlign = 'right';
+  ctx.fillText('Made with Open Hangar · openhangar.space', W - PAD, H - PAD + 6);
+  ctx.textAlign = 'left';
+  return canvas;
+}
+
+async function makeFleetImage(action) {
+  const status = $('#sb-status');
+  const list = selectedItems();
+  if (!list.length) return setExportStatus(status, 'Select some items first');
+  if (list.length > 80) return setExportStatus(status, 'Pick 80 or fewer for one image');
+  setExportStatus(status, 'Drawing…');
+  const titleEl = $('#sb-title');
+  const title = (titleEl.value || titleEl.placeholder || 'My hangar').trim();
+  const canvas = await fleetImageCanvas(list, { title, price: state.imagePrice });
+  canvas.toBlob(async (blob) => {
+    if (!blob) return setExportStatus(status, 'Image failed');
+    const who = (state.owner && (state.owner.nickname || state.owner.displayname)) || 'hangar';
+    const filename = `open-hangar-fleet-${who}.png`.replace(/[^\w.-]+/g, '_');
+    if (action === 'copy') {
+      try {
+        if (!navigator.clipboard || !window.ClipboardItem) throw new Error('no clipboard');
+        await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
+        return setExportStatus(status, 'Copied — paste it anywhere');
+      } catch {
+        /* fall through to a download */
+      }
+    }
+    downloadBlob(blob, filename);
+    setExportStatus(status, 'Saved PNG');
+  }, 'image/png');
+}
+
+if (selectToggle) selectToggle.addEventListener('click', () => setSelecting(!state.selecting));
+if (selectBar) {
+  selectBar.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-sb]');
+    if (!b) return;
+    const act = b.dataset.sb;
+    if (act === 'all') {
+      const shown = state.layout === 'market' ? marketShown() : computeShown();
+      for (const p of shown) state.selected.add(String(p.id));
+      renderInventory();
+    } else if (act === 'none') {
+      state.selected.clear();
+      renderInventory();
+    } else if (act === 'done') setSelecting(false);
+    else if (act === 'copy' || act === 'save') makeFleetImage(act);
+  });
+  $('#sb-price').addEventListener('change', (e) => {
+    state.imagePrice = e.target.value;
+  });
+}
+
 // --- Stats ----------------------------------------------------------------
 
 // Stats → Hangar value: ships at today's store price vs what you paid, best
@@ -1462,6 +1804,15 @@ function valueSectionHtml() {
           `${sign}${dollars(Math.abs(gap))}`,
           `vs what you paid${pct ? ` (${sign}${pct}%)` : ''}`,
           gap >= 0 ? 'good' : '',
+        )
+      : '') +
+    (v.ccu.priced
+      ? box(
+          dollars(v.ccu.store),
+          `${v.ccu.priced} CCU${v.ccu.priced === 1 ? '' : 's'} at standard price (paid ${dollars(
+            v.ccu.paid,
+          )})`,
+          v.ccu.store > v.ccu.paid ? 'good' : '',
         )
       : '');
   const deals = state.items
@@ -1492,7 +1843,154 @@ function valueSectionHtml() {
       ? `<h4 class="modal-h">Best deals — paid below today's store price</h4><div class="top-list">${dealRows}</div>`
       : '') +
     unpriced +
-    `<p class="muted value-note">Ships only, at current standalone store prices (USD, before tax) from star-citizen.wiki. Paints, gear, game access and CCUs aren't counted; concept and limited ships often have no public price. "vs what you paid" covers ship pledges whose ships are all priced.</p>`
+    `<p class="muted value-note">Ships at current standalone store prices (USD, before tax) from star-citizen.wiki; a CCU's standard price is the gap between its two ships. Paints, gear and game access aren't counted; concept and limited ships often have no public price. "vs what you paid" covers ship pledges whose ships are all priced.</p>`
+  );
+}
+
+// Stats → Melt candidates (OH.isMeltCandidate): biggest credit first.
+function meltSectionHtml() {
+  const v = hangarValue();
+  if (!v) return '';
+  const list = state.items
+    .filter((p) => OH.isMeltCandidate(p, v.pledges[p.id]))
+    .sort((a, b) => b.value - a.value);
+  if (!list.length) return '';
+  const total = list.reduce((a, p) => a + p.value, 0);
+  const rows = list
+    .slice(0, 15)
+    .map(
+      (p) =>
+        `<div class="row"><div class="nm">${OH.escapeHtml(plainName(p))}</div><div class="vl">melt ${money(
+          p.value,
+        )} · store ${dollars(v.pledges[p.id].store)}</div></div>`,
+    )
+    .join('');
+  const more =
+    list.length > 15
+      ? `<div class="row muted">+${list.length - 15} more — use the Melt candidates filter in Inventory</div>`
+      : '';
+  return (
+    `<h3 class="section-title">Melt candidates <span class="muted">${list.length} · ${money(total)} credit</span></h3>` +
+    `<p class="muted value-note tight">Pledges you could melt and buy back for the same store credit: meltable, no LTI, nothing but ships inside, and you paid at least today's store price. Check the ship is on sale before melting — limited ships may not come back, and non-LTI insurance resets to the store's standard.</p>` +
+    `<div class="top-list spaced">${rows}${more}</div>`
+  );
+}
+
+// Stats → Fleet: what your ships are for, how big, how many fly today.
+function fleetSectionHtml() {
+  if (!state.shipOf) return '';
+  const f = OH.fleetStats(state.items, state.shipOf);
+  if (!f.ships) return '';
+  const box = (big, lbl) =>
+    `<div class="stat-box"><div class="big">${big}</div><div class="lbl">${lbl}</div></div>`;
+  const flying = f.byStatus['flight-ready'] || 0;
+  const boxes =
+    box(f.ships, 'ships & vehicles') +
+    box(`${flying} / ${f.known}`, 'flight ready') +
+    box(Math.round(f.cargo).toLocaleString('en-US'), 'cargo (SCU)') +
+    box(f.crew.toLocaleString('en-US'), 'crew seats');
+  const bars = (map) => {
+    const rows = Object.entries(map).sort((a, b) => b[1] - a[1]);
+    const max = Math.max(1, ...rows.map((r) => r[1]));
+    return rows
+      .map(
+        ([k, n]) => `<div class="bar-row">
+        <div class="bar-label">${OH.escapeHtml(k.charAt(0).toUpperCase() + k.slice(1))}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((n / max) * 100)}%"></div></div>
+        <div class="bar-val">${n}</div>
+      </div>`,
+      )
+      .join('');
+  };
+  const unknown = f.ships - f.known;
+  return (
+    `<h3 class="section-title">Fleet</h3>` +
+    `<div class="stat-grid">${boxes}</div>` +
+    `<div class="fleet-cols"><div><h4 class="modal-h">By role</h4>${bars(f.byCareer)}</div>` +
+    `<div><h4 class="modal-h">By size</h4>${bars(f.bySize)}</div></div>` +
+    `<p class="muted value-note">Ship data from star-citizen.wiki${
+      unknown ? ` · ${unknown} ship${unknown === 1 ? '' : 's'} not matched` : ''
+    }. Crew seats = each ship's maximum crew.</p>`
+  );
+}
+
+// One line per history step: what changed between two snapshots.
+function changeSummary(d) {
+  const parts = [];
+  if (d.added.length) parts.push(`+${d.added.length} new`);
+  if (d.removed.length) parts.push(`${d.removed.length} gone`);
+  if (d.changed.length) parts.push(`${d.changed.length} changed`);
+  if (Math.abs(d.melt) >= 0.01)
+    parts.push(`melt value ${d.melt > 0 ? '+' : '−'}${money(Math.abs(d.melt))}`);
+  return parts.join(' · ') || 'no changes';
+}
+function changeDetails(d) {
+  const li = (cls, text) => `<li class="${cls}">${OH.escapeHtml(text)}</li>`;
+  return `<ul class="changes">${[
+    ...d.added.map((x) => li('add', `+ ${x.name} (${money(x.value)})`)),
+    ...d.removed.map((x) => li('del', `− ${x.name} (${money(x.value)})`)),
+    ...d.changed.map((x) =>
+      li('chg', `~ ${x.from} → ${x.to} (${money(x.fromValue)} → ${money(x.toValue)})`),
+    ),
+  ].join('')}</ul>`;
+}
+const fmtDay = (t) => new Date(t).toLocaleDateString(undefined, { dateStyle: 'medium' });
+
+// Melt value per snapshot as a small line chart (inline SVG, no chart lib).
+function historySvg(hist) {
+  const pts = hist.map((h) => ({ t: h.at, v: OH.snapshotMelt(h) }));
+  const W = 560,
+    H = 150,
+    L = 56,
+    R = 10,
+    T = 10,
+    B = 22;
+  const t0 = pts[0].t,
+    t1 = pts[pts.length - 1].t || t0 + 1;
+  const vmin = Math.min(...pts.map((p) => p.v)),
+    vmax = Math.max(...pts.map((p) => p.v));
+  const span = vmax - vmin || 1;
+  const x = (t) => L + ((t - t0) / (t1 - t0 || 1)) * (W - L - R);
+  const y = (v) => T + (1 - (v - vmin) / span) * (H - T - B);
+  const line = pts.map((p) => `${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
+  const dots = pts
+    .map(
+      (p) =>
+        `<circle cx="${x(p.t).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="3"><title>${fmtDay(p.t)}: ${money(p.v)}</title></circle>`,
+    )
+    .join('');
+  return `<svg class="hist-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Melt value over time">
+    <text x="${L - 6}" y="${T + 8}" text-anchor="end">${dollars(vmax)}</text>
+    <text x="${L - 6}" y="${H - B}" text-anchor="end">${dollars(vmin)}</text>
+    <text x="${L}" y="${H - 4}">${fmtDay(t0)}</text>
+    <text x="${W - R}" y="${H - 4}" text-anchor="end">${fmtDay(t1)}</text>
+    <polyline points="${line}" fill="none" stroke="currentColor" stroke-width="2"/>${dots}
+  </svg>`;
+}
+
+// Stats → History: melt value over time + a log of what changed per scan.
+function historySectionHtml() {
+  const hist = state.history;
+  if (!hist.length) return '';
+  if (hist.length < 2) {
+    return `<h3 class="section-title" id="history">History</h3><p class="muted value-note">Tracking since ${fmtDay(
+      hist[0].at,
+    )}. Rescan after your hangar changes and each change shows up here.</p>`;
+  }
+  const steps = [];
+  for (let i = hist.length - 1; i > 0 && steps.length < 12; i--) {
+    const d = OH.diffSnapshots(hist[i - 1], hist[i]);
+    steps.push(
+      `<details class="hist-step"><summary><span class="hist-date">${fmtDay(hist[i].at)}</span> ${OH.escapeHtml(
+        changeSummary(d),
+      )}</summary>${changeDetails(d)}</details>`,
+    );
+  }
+  return (
+    `<h3 class="section-title" id="history">History</h3>` +
+    historySvg(hist) +
+    `<div class="hist-list">${steps.join('')}</div>` +
+    `<p class="muted value-note">A snapshot is kept each time a full scan finds changes (last ${hist.length}). Stored only in this browser.</p>`
   );
 }
 
@@ -1548,6 +2046,9 @@ function renderStats() {
   body.innerHTML =
     `<div class="stat-grid">${stats}</div>` +
     valueSectionHtml() +
+    meltSectionHtml() +
+    fleetSectionHtml() +
+    historySectionHtml() +
     `<h3 class="section-title">By category</h3>${bars}` +
     `<h3 class="section-title" style="margin-top:26px">Top pledges by value</h3>` +
     `<div class="top-list">${topRows || '<div class="row muted">No priced pledges.</div>'}</div>`;
@@ -2507,20 +3008,24 @@ function fmtScan() {
 function storeRow(p, row) {
   const si = storeInfo(p);
   if (!si || !si.store) return '';
-  let v = dollars(si.store);
+  let v = dollars(si.store) + (si.ccu ? ' standard' : '');
   if (si.unpriced) v += ` + ${si.unpriced} unpriced`;
   else if (si.paid != null && si.paid > 0) {
     const d = si.store - si.paid;
     if (d >= 1) v += ` <span class="gain">(paid ${dollars(d)} less)</span>`;
     else if (d <= -1) v += ` <span class="muted">(paid ${dollars(-d)} more — likely extras)</span>`;
   }
-  const parts =
-    si.ships.length > 1
+  const parts = si.ccu
+    ? `<div class="mr-sub">${dollars(si.from)} → ${dollars(si.to)} ships</div>`
+    : si.ships.length > 1
       ? `<div class="mr-sub">${si.ships
           .map((x) => `${OH.escapeHtml(x.label)} ${x.msrp ? dollars(x.msrp) : '—'}`)
           .join(' · ')}</div>`
       : '';
-  return row('Store price', v + parts);
+  const melt = OH.isMeltCandidate(p, si)
+    ? row('Melt candidate', 'Yes — paid full price, no LTI or extras')
+    : '';
+  return row('Store price', v + parts) + melt;
 }
 
 function openItemModal(p) {
@@ -2597,8 +3102,24 @@ function openBuybackModal(b) {
 resultsEl.addEventListener('click', (e) => {
   const card = e.target.closest('.card');
   if (!card) return;
+  if (state.selecting) {
+    toggleSelected([card.dataset.id]);
+    card.classList.toggle('selected', state.selected.has(card.dataset.id));
+    return;
+  }
   const p = state.items.find((it) => String(it.id) === card.dataset.id);
   if (p) openItemModal(p);
+});
+resultsEl.addEventListener('change', (e) => {
+  const box = e.target.closest('.mk-pick');
+  if (!box) return;
+  const key = box.closest('.mk-row')?.dataset.key;
+  const g = computeMarketSections(marketShown())
+    .flatMap((x) => x.groups)
+    .find((x) => x.key === key);
+  if (!g) return;
+  for (const id of g.ids) box.checked ? state.selected.add(id) : state.selected.delete(id);
+  updateSelectBar();
 });
 if (buybacksBodyEl) {
   buybacksBodyEl.addEventListener('click', (e) => {
@@ -2690,6 +3211,8 @@ async function runScan({ hangar = true, buybacks = true, referrals = true } = {}
     if (h.ok) {
       state.items = h.items;
       state.scannedAt = h.scannedAt;
+      state.history = await OH.getHistory();
+      state.selected.clear();
       state.shown = new Set(); // default: no filter selected = show all
       state.traits = new Map();
       const acct = await OH.getAccount();
@@ -2811,6 +3334,8 @@ clearBtn.addEventListener('click', async () => {
   await OH.clearData();
   state.items = [];
   state.scannedAt = null;
+  state.history = [];
+  state.selected.clear();
   state.buybacks = [];
   state.buybacksScannedAt = null;
   state.owner = null;
@@ -2933,6 +3458,8 @@ if (importBtn && importFile) {
     const hangar = res.db.sources.hangar || { items: [], scannedAt: null };
     state.items = hangar.items || [];
     state.scannedAt = hangar.scannedAt || null;
+    state.history = Array.isArray(res.db.history) ? res.db.history : [];
+    state.selected.clear();
     const bb = res.db.sources.buybacks || { items: [], scannedAt: null };
     state.buybacks = bb.items || [];
     state.buybacksScannedAt = bb.scannedAt || null;
@@ -2968,6 +3495,8 @@ async function reconcileAccount() {
     await OH.clearData({ backup: true }); // recoverable — see Restore in Developers
     state.items = [];
     state.scannedAt = null;
+    state.history = [];
+    state.selected.clear();
     state.buybacks = [];
     state.buybacksScannedAt = null;
     state.owner = null;
@@ -3012,6 +3541,7 @@ document.addEventListener('visibilitychange', async () => {
   const hangar = db.sources.hangar || { items: [], scannedAt: null };
   state.items = hangar.items || [];
   state.scannedAt = hangar.scannedAt || null;
+  state.history = Array.isArray(db.history) ? db.history : [];
   const buybacks = db.sources.buybacks || { items: [], scannedAt: null };
   state.buybacks = buybacks.items || [];
   state.buybacksScannedAt = buybacks.scannedAt || null;

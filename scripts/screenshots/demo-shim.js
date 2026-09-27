@@ -268,10 +268,24 @@
   };
   const owner = { nickname: 'Demo_Citizen', displayname: 'Demo Citizen' };
   const ts = now - 2 * 3600e3;
+  // Scan history (Stats → History, Home "since last scan"): a melted Aurora, a
+  // few pledges bought over the last months.
+  const snap = (items, at) => ({
+    at,
+    items: items.map((p) => [String(p.id), p.name, p.value]),
+  });
+  const aurora = { id: 8999, name: 'Package - Aurora MR Starter', value: 45 };
+  const history = [
+    snap([...hangar.slice(0, -4), aurora], now - 150 * 86400e3),
+    snap([...hangar.slice(0, -2), aurora], now - 70 * 86400e3),
+    snap(hangar.slice(0, -1), now - 21 * 86400e3),
+    snap(hangar, ts),
+  ];
   const store = {
     db: {
       schemaVersion: 2,
       owner,
+      history,
       sources: {
         hangar: { items: hangar, scannedAt: ts },
         buybacks: { items: buybacks, scannedAt: ts },

@@ -73,3 +73,97 @@ test('hangarValue totals ships and flags pledges paid below store price', () => 
   assert.equal(v.storePriced, 710);
   assert.deepEqual(v.unpriced, [{ name: 'Totally Unknown Ship', n: 1 }]);
 });
+
+test('CCUs are priced as the gap between their ships', () => {
+  const items = [
+    {
+      id: 10,
+      name: 'Upgrade - Cutlass Black to Carrack Warbond Edition',
+      value: 400,
+      isCCU: true,
+      ccu: { from: 'Cutlass Black', to: 'Carrack Warbond Edition' },
+      contents: [],
+    },
+  ];
+  const v = OH.hangarValue(items, priceOf);
+  assert.equal(v.pledges[10].store, 490); // 600 - 110
+  assert.equal(v.pledges[10].below, true);
+  assert.deepEqual(v.ccu, { n: 1, priced: 1, store: 490, paid: 400 });
+  assert.equal(v.store, 0); // CCUs aren't ships
+});
+
+test('melt candidates: meltable, no LTI, ships only, paid full price', () => {
+  const ship = (over) => ({
+    id: 20,
+    name: 'Standalone Ship - Cutlass Black',
+    value: 110,
+    meltable: true,
+    insurance: '6 Months',
+    contents: [
+      { kind: 'Ship', label: 'Cutlass Black' },
+      { kind: 'Insurance', label: '6 Months Insurance' },
+    ],
+    ...over,
+  });
+  const check = (p) => OH.isMeltCandidate(p, OH.hangarValue([p], priceOf).pledges[p.id]);
+  assert.equal(check(ship()), true);
+  assert.equal(check(ship({ insurance: 'LTI' })), false);
+  assert.equal(check(ship({ meltable: false })), false);
+  assert.equal(check(ship({ value: 90 })), false); // bought cheaper — you'd lose that
+  assert.equal(
+    check(ship({ contents: [...ship().contents, { kind: 'Paint', label: 'Some paint' }] })),
+    false,
+  );
+});
+
+test('fleetStats sums cargo and groups by size', () => {
+  const { shipOf } = OH.makeShipIndex(catalog, codes);
+  const f = OH.fleetStats(
+    [
+      { contents: [{ kind: 'Ship', label: 'Carrack' }] },
+      {
+        contents: [
+          { kind: 'Ship', label: 'Cutlass Black' },
+          { kind: 'Paint', label: 'x' },
+        ],
+      },
+    ],
+    shipOf,
+  );
+  assert.equal(f.ships, 2);
+  assert.equal(f.known, 2);
+  assert.equal(f.cargo, shipOf('Carrack').cargo + shipOf('Cutlass Black').cargo);
+  assert.ok(f.cargo > 0);
+  assert.equal(
+    Object.values(f.bySize).reduce((a, b) => a + b, 0),
+    2,
+  );
+});
+
+test('diffSnapshots finds new, gone and upgraded pledges', () => {
+  const a = OH.snapshotOf(
+    [
+      { id: 1, name: 'Cutlass Black', value: 110 },
+      { id: 2, name: 'Aurora MR', value: 30 },
+    ],
+    1,
+  );
+  const b = OH.snapshotOf(
+    [
+      { id: 1, name: 'Cutlass Black - upgraded', value: 150 },
+      { id: 3, name: 'Carrack', value: 600 },
+    ],
+    2,
+  );
+  const d = OH.diffSnapshots(a, b);
+  assert.deepEqual(
+    d.added.map((x) => x.id),
+    ['3'],
+  );
+  assert.deepEqual(
+    d.removed.map((x) => x.id),
+    ['2'],
+  );
+  assert.equal(d.changed.length, 1);
+  assert.equal(d.melt, 750 - 140);
+});
