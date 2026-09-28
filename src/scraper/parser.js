@@ -54,9 +54,11 @@
 
   // RSI prefixes most pledge names with their store category — "Standalone Ships
   // - …", "Paints - …", "Gear - …", "Subscribers Store - …", "Add-On - …". Pull
-  // that leading category out (the text before the first " - "); '' if none.
+  // that leading category out (the text before the first spaced " - "); '' if
+  // none. The dash must have spaces around it: "Add-Ons - X" is category
+  // "Add-Ons", not "Add".
   ns.buybackCategoryPrefix = function buybackCategoryPrefix(name) {
-    const m = String(name || '').match(/^\s*([^-–]+?)\s*[-–]\s/);
+    const m = String(name || '').match(/^\s*(.+?)\s+[-–]\s/);
     return m ? m[1].trim() : '';
   };
 
@@ -77,8 +79,8 @@
     if (/^subscribers?\s+(store|vault)$/i.test(prefix)) return 'other';
     if (/^(add[-\s]?ons?|decorations?|posters?|flair|model\s+ships?)$/i.test(prefix))
       return 'addon';
-    if (/^(standalone\s+ships?|ships?|packages?|combos?|warbonds?|game\s+packages?)$/i.test(prefix))
-      return 'ship';
+    if (/^(packs?|packages?|combos?|bundles?|game\s+packages?)$/i.test(prefix)) return 'pack';
+    if (/^(standalone\s+ships?|ships?|warbonds?)$/i.test(prefix)) return 'ship';
 
     if (PAINT_NAME_RE.test(hay)) return 'paint';
     if (ADDON_NAME_RE.test(name)) return 'addon';
@@ -90,6 +92,18 @@
   // "6 Months Insurance", …). Normalized to the short forms sellers use —
   // LTI / 120M / 6M / 5Y. Returns null when the pledge carries no insurance item
   // (most CCUs, gear, and add-ons), which the UI renders as "----".
+  // Insurance hinted by a buy-back's name ("… - LTI", "… - 10 Year", "6 Month"),
+  // since RSI's buy-back list doesn't list contents. null when there's no hint.
+  ns.insuranceFromName = function insuranceFromName(name) {
+    const n = String(name || '');
+    if (/\blti\b|lifetime/i.test(n)) return 'LTI';
+    const yr = n.match(/\b(\d+)\s*[- ]?\s*years?\b/i);
+    if (yr) return `${Number(yr[1]) * 12}M`;
+    const mo = n.match(/\b(\d+)\s*[- ]?\s*months?\b/i);
+    if (mo) return `${mo[1]}M`;
+    return null;
+  };
+
   ns.insuranceTerm = function insuranceTerm(contents) {
     const ins = (contents || []).find((c) => /insurance/i.test(c.kind || ''));
     if (!ins) return null;

@@ -1890,6 +1890,9 @@
       .chip.k-addon[aria-pressed='true'] {
         border-color: #1f6feb;
       }
+      .chip.k-pack[aria-pressed='true'] {
+        border-color: #d29922;
+      }
       .chip.k-coupon[aria-pressed='true'] {
         border-color: #bd561d;
       }
@@ -1963,9 +1966,17 @@
         flex: 0 0 104px;
         aspect-ratio: 16 / 10;
       }
+      .grid:not(.list) .card-ins {
+        display: none;
+      }
+      .grid.list .card-ins {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+      }
       .grid.list .card-body {
         display: grid;
-        grid-template-columns: minmax(150px, 1.3fr) minmax(0, 2fr) 124px 90px;
+        grid-template-columns: minmax(150px, 1.3fr) minmax(0, 2fr) 56px 124px 90px;
         align-items: center;
         gap: 14px;
         padding: 8px 14px;
@@ -1995,7 +2006,8 @@
         .grid.list .card-body {
           grid-template-columns: 1fr 80px;
         }
-        .grid.list .card-contents {
+        .grid.list .card-contents,
+        .grid.list .card-ins {
           display: none;
         }
         .grid.list .badge {
