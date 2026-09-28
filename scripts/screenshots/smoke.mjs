@@ -97,6 +97,10 @@ try {
   const cards = await page.$$eval('#home-summary .sum-box', (e) => e.length);
   cards ? ok(`summary shows ${cards} boxes`) : fail('home summary empty');
   (await page.$('.howto details[open]')) ? ok('how-to guide open') : fail('how-to guide missing');
+  const site = await page.$eval('#site-link', (e) => e.textContent).catch(() => '');
+  /something big is coming/i.test(site) && !(await page.$('#site-link button'))
+    ? ok('website sync shows the teaser (no connect button)')
+    : fail(`site link: "${site}"`);
 
   // Currency: EUR converts the melt box (needs the live rates service).
   const rates = await page.evaluate(async () => {

@@ -6,6 +6,8 @@ export const prerender = false;
 const user = Astro.locals.user!;
 let message = '';
 let ok = false;
+// The extension opens /link?code=K7Q-4PX so there's nothing to type.
+const prefill = normalizeCode(Astro.url.searchParams.get('code') || '');
 
 if (Astro.request.method === 'POST') {
   const code = normalizeCode(String((await Astro.request.formData()).get('code') || ''));
@@ -25,14 +27,18 @@ if (Astro.request.method === 'POST') {
 <Base title="Connect Your Extension">
   <h1>Connect Your Extension</h1>
   <p class="muted">
-    In Open Hangar, open <strong>Developers → Connect to openhangar.space</strong>. It shows a short code like{' '}
-    <code>K7Q-4PX</code>. Type it here.
+    {
+      prefill && !message
+        ? 'Your Open Hangar extension wants to connect to this account. Check the code matches the one in the extension, then press Connect.'
+        : 'In Open Hangar, press Connect on the Home page. It opens this page with the code filled in (or shows a code like K7Q-4PX to type here).'
+    }
   </p>
   <div class="card" style="max-width:420px">
     <form class="form" method="post">
       <label
         >Code<input
           name="code"
+          value={ok ? '' : prefill}
           required
           maxlength="8"
           autocomplete="off"
