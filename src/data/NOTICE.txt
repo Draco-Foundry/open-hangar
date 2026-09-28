@@ -1,3 +1,14 @@
+src/data/ship-catalog.json
+==========================
+
+Ship list (names, class names, store prices in USD, role, size, production
+status, crew and cargo) from the Star Citizen Wiki API,
+https://api.star-citizen.wiki (maintained by the Star Citizen Wiki community,
+https://github.com/StarCitizenWiki/API, MIT License). English fields only.
+Refreshed weekly by .github/workflows/ship-catalog.yml; the extension also
+downloads the live list and caches it for 30 days. Star Citizen and all ship
+names are trademarks of Cloud Imperium Rights LLC.
+
 src/data/ship-codes.json
 ========================
 

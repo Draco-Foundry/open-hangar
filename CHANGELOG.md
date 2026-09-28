@@ -4,6 +4,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Hangar value shows instantly, even offline.** A copy of the ship price list now
+  ships inside the extension (refreshed weekly), so Stats and store prices appear
+  right away while the live list updates in the background.
 - **Safer rendering.** Everything the dashboard draws now goes through an allowlist
   sanitizer, so even unexpected data from RSI or an imported file can't inject
   scripts. Firefox's add-on checker now reports zero warnings (was 26).
