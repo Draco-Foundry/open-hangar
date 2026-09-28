@@ -24,7 +24,7 @@ const discord = discordEnabled();
       )
     }
     <form class="form" id="f" data-next={next}>
-      <label>Username or Email<input name="login" required autocomplete="username" /></label>
+      <label>Email<input name="login" type="email" required autocomplete="email" /></label>
       <label>Password<input name="password" type="password" required autocomplete="current-password" /></label>
       <button type="submit">Sign in</button>
       <div class="error" id="err" role="alert"></div>
@@ -42,13 +42,12 @@ const discord = discordEnabled();
     e.preventDefault();
     err.textContent = '';
     const d = new FormData(form);
-    const login = String(d.get('login')).trim();
-    const password = String(d.get('password'));
-    const { data, error } = login.includes('@')
-      ? await authClient.signIn.email({ email: login, password })
-      : await authClient.signIn.username({ username: login, password });
+    const { data, error } = await authClient.signIn.email({
+      email: String(d.get('login')).trim(),
+      password: String(d.get('password')),
+    });
     if (error) {
-      err.textContent = error.message || 'Wrong username, email or password.';
+      err.textContent = error.message || 'Wrong email or password.';
       return;
     }
     // With 2FA on, the client plugin sends us to /two-factor instead.

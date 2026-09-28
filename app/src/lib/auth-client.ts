@@ -1,10 +1,9 @@
 // Browser-side auth calls (sign in/up/out, 2FA). Same origin as the site.
 import { createAuthClient } from 'better-auth/client';
-import { twoFactorClient, usernameClient } from 'better-auth/client/plugins';
+import { twoFactorClient } from 'better-auth/client/plugins';
 
 export const authClient = createAuthClient({
   plugins: [
-    usernameClient(),
     twoFactorClient({
       // Signed in with a password but 2FA is on: finish on the code page.
       onTwoFactorRedirect() {

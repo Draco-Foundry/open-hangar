@@ -27,17 +27,6 @@ const discord = discordEnabled();
     <form class="form" id="f">
       <label>Email<input name="email" type="email" required autocomplete="email" /></label>
       <label
-        >Username (what your org sees; your email stays private)<input
-          name="username"
-          required
-          minlength="3"
-          maxlength="24"
-          pattern="[A-Za-z0-9_\-]+"
-          title="3 to 24 letters, numbers, _ or -"
-          autocomplete="username"
-        /></label
-      >
-      <label
         >Password (10+ characters)<input
           name="password"
           type="password"
@@ -61,11 +50,12 @@ const discord = discordEnabled();
     e.preventDefault();
     err.textContent = '';
     const d = new FormData(form);
-    const username = String(d.get('username')).trim();
+    const email = String(d.get('email')).trim();
     const { error } = await authClient.signUp.email({
-      name: username, // Better Auth needs a name; the username doubles as it
-      username,
-      email: String(d.get('email')),
+      // Better Auth needs a name; nobody sees it. RSI handles come from synced
+      // hangars (one per RSI account, so alts don't clash).
+      name: email.split('@')[0],
+      email,
       password: String(d.get('password')),
     });
     if (error) err.textContent = error.message || 'Could not create the account.';
