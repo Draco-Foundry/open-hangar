@@ -4,6 +4,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Your currency.** Pick USD, EUR, GBP, CAD or AUD on the Home card and every
+  amount (melt value, store prices, buy-backs, org value, images) shows in it,
+  converted from USD at the day's rate, before tax. Rates are public (the ECB's,
+  via Frankfurter) and fetched at most once a day. My Price stays as you type it.
 - **Buy-backs: View on RSI.** Each buy-back in the Market table links to just that
   item on RSI's buy-back page. Hangar links now just say **View**.
 - **Updates page restyled.** Big version number and date, with changes grouped
