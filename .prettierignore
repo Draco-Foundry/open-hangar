@@ -4,3 +4,4 @@ src/assets
 package-lock.json
 test/fixtures/*.json
 src/data/ship-catalog.json
+test/fixtures/*.html

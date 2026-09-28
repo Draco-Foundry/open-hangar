@@ -1858,6 +1858,65 @@
     return out;
   };
 
+  // --- Buy-back details -----------------------------------------------------------
+  // Each buy-back's own page has its price, the ships in it and what else comes
+  // with it (insurance!). A buy-back never changes, so a page is read once and
+  // kept (storage key `bbDetails`, by pledge id). CCUs have no page of their own.
+  const BBD_KEY = 'bbDetails';
+  let bbdMem = null;
+  OH.getBuybackDetails = async function getBuybackDetails() {
+    if (!bbdMem) bbdMem = (await chrome.storage.local.get(BBD_KEY))[BBD_KEY] || {};
+    return bbdMem;
+  };
+  let bbdSave = null;
+  function saveBuybackDetails() {
+    clearTimeout(bbdSave);
+    bbdSave = setTimeout(() => chrome.storage.local.set({ [BBD_KEY]: bbdMem }), 500);
+  }
+  // Read one buy-back page (cached). → detail | { error }.
+  OH.fetchBuybackDetail = async function fetchBuybackDetail(id) {
+    const all = await OH.getBuybackDetails();
+    if (all[id]) return all[id];
+    if (!/^\d+$/.test(String(id))) return { error: 'No RSI page for this buy-back.' };
+    const got = await fetchPage(`https://robertsspaceindustries.com/pledge/buyback/${id}`);
+    if (got.error) return { error: got.error };
+    if (!got.res.ok) return { error: `RSI responded ${got.res.status}.` };
+    const html = await got.res.text();
+    const d = window.OpenHangar.parseBuybackDetail(html);
+    if (!d || d.price == null) {
+      return looksLoggedOut(got.res, html)
+        ? { error: 'Not signed in to RSI.' }
+        : { error: "Couldn't read this buy-back's page." };
+    }
+    all[id] = { ...d, at: Date.now() };
+    saveBuybackDetails();
+    return all[id];
+  };
+  // Read many, politely (one at a time, RSI's usual delay between). onProgress
+  // (done, total); stop by returning false from shouldGo(). → { done, errors }.
+  OH.fetchBuybackDetails = async function fetchBuybackDetails(
+    ids,
+    onProgress,
+    shouldGo = () => true,
+  ) {
+    const all = await OH.getBuybackDetails();
+    const todo = ids.filter((id) => !all[id] && /^\d+$/.test(String(id)));
+    let done = 0;
+    let errors = 0;
+    for (const id of todo) {
+      if (!shouldGo()) break;
+      const r = await OH.fetchBuybackDetail(id);
+      if (r.error) {
+        errors++;
+        if (/signed in/i.test(r.error)) break;
+      }
+      done++;
+      onProgress?.(done, todo.length);
+      await sleep(DELAY_MS);
+    }
+    return { done, errors, total: todo.length };
+  };
+
   // --- Display currency -----------------------------------------------------------
   // RSI prices everything in USD. Users can view amounts in one of a few big
   // currencies, converted at the day's rate (before tax). Rates are the ECB's,
