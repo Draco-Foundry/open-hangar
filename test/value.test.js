@@ -183,3 +183,24 @@ test('mergeHistory unions by time, collapses repeats, drops junk', () => {
   const many = Array.from({ length: 150 }, (_, i) => s(i, [{ id: i, name: 'x', value: i }]));
   assert.equal(OH.mergeHistory(many, []).length, 100);
 });
+
+test('getFxRates fetches USD-based rates once and caches them', async () => {
+  const store = {};
+  global.chrome.storage.local.get = async (k) => ({ [k]: store[k] });
+  global.chrome.storage.local.set = async (o) => Object.assign(store, o);
+  let calls = 0;
+  const fetchFn = async (url) => {
+    calls++;
+    assert.match(url, /base=USD/);
+    return {
+      ok: true,
+      json: async () => ({ date: '2026-09-28', rates: { EUR: 0.88, GBP: 0.75 } }),
+    };
+  };
+  const r1 = await OH.getFxRates(fetchFn);
+  const r2 = await OH.getFxRates(fetchFn);
+  assert.equal(r1.rates.EUR, 0.88);
+  assert.equal(r1.rates.USD, 1);
+  assert.equal(r2.rates.GBP, 0.75);
+  assert.equal(calls, 1);
+});

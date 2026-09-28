@@ -47,6 +47,9 @@ personal data:
   thumbnails, and to look up ship art for items RSI ships
   without images from RSI's public ship-matrix index. No credentials are sent for the
   ship-matrix lookup.
+- **api.frankfurter.dev** (public, read-only) — only if you pick a currency other
+  than USD: today's exchange rates (the same for everyone), at most once a day. No
+  credentials or personal data are sent.
 - **api.star-citizen.wiki** (public, read-only) — a fallback for the current game
   version and for ship art when the ship-matrix has no image, and the source of ship
   store prices for Hangar value. Prices come from downloading the whole public

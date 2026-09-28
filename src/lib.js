@@ -1858,6 +1858,35 @@
     return out;
   };
 
+  // --- Display currency -----------------------------------------------------------
+  // RSI prices everything in USD. Users can view amounts in one of a few big
+  // currencies, converted at the day's rate (before tax). Rates are the ECB's,
+  // via Frankfurter (api.frankfurter.dev: public, no key, CORS open), fetched
+  // at most once a day and cached. Nothing about the user is sent.
+  OH.CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD'];
+  const FX_KEY = 'fxRates';
+  const FX_TTL = 24 * 3600e3;
+  OH.getFxRates = async function getFxRates(fetchFn = fetch) {
+    const { [FX_KEY]: cached } = await chrome.storage.local.get(FX_KEY);
+    if (cached && cached.rates && Date.now() - cached.at < FX_TTL) return cached;
+    try {
+      const want = OH.CURRENCIES.filter((c) => c !== 'USD').join(',');
+      const res = await fetchFn(`https://api.frankfurter.dev/v1/latest?base=USD&symbols=${want}`, {
+        credentials: 'omit',
+        headers: { Accept: 'application/json' },
+      });
+      const json = res.ok ? await res.json() : null;
+      if (json && json.rates) {
+        const fresh = { at: Date.now(), date: json.date || null, rates: { USD: 1, ...json.rates } };
+        await chrome.storage.local.set({ [FX_KEY]: fresh });
+        return fresh;
+      }
+    } catch (e) {
+      OH.log('warn', 'fx', `exchange rates download failed: ${e?.message || e}`);
+    }
+    return cached && cached.rates ? cached : null; // stale beats nothing
+  };
+
   // --- Updates -----------------------------------------------------------------
   // Compare dotted versions ("0.2.10" > "0.2.9"). → negative | 0 | positive. Pure.
   OH.compareVersions = function compareVersions(a, b) {

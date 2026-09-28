@@ -1489,6 +1489,20 @@
       .home-changes a {
         color: #58a6ff;
       }
+      .currency-select {
+        padding: 2px 6px;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        background: var(--panel-2);
+        color: var(--text);
+        font-size: 12px;
+      }
+      .cc-side .currency-note {
+        max-width: 260px;
+        margin: 6px 0 0 auto;
+        font-size: 11px;
+        text-align: right;
+      }
       .remind-toggle {
         display: flex;
         align-items: center;
@@ -2499,10 +2513,8 @@
         color: var(--muted);
       }
       /* Store: your CCUs + price list */
-      .view a:not([class]) {
-        color: var(--link);
-      }
       .store-intro a {
+        color: var(--link);
         font-weight: 600;
       }
       #price-search {
@@ -2873,6 +2885,20 @@
               >
                 <input type="checkbox" id="remind-toggle" checked /> Weekly rescan reminder
               </label>
+              <label
+                class="remind-toggle"
+                title="Show amounts in your currency (converted from USD)"
+              >
+                Currency
+                <select id="currency-select" class="currency-select">
+                  <option value="USD">USD $</option>
+                  <option value="EUR">EUR €</option>
+                  <option value="GBP">GBP £</option>
+                  <option value="CAD">CAD $</option>
+                  <option value="AUD">AUD $</option>
+                </select>
+              </label>
+              <p class="currency-note muted" hidden></p>
             </div>
           </div>
           <!-- Shown instead of the card content when signed out of RSI -->
@@ -3236,6 +3262,7 @@
         </p>
 
         <h3 class="section-title" style="margin-top: 28px">Ship prices</h3>
+        <p class="currency-note muted store-intro" hidden></p>
         <input id="price-search" type="search" placeholder="Search ships…" autocomplete="off" />
         <div id="price-table"></div>
         <p class="muted value-note">
