@@ -2279,7 +2279,7 @@
       }
       /* Cards: price always on its own line under the tags, so every card in a
          row looks the same whatever the name or card width. */
-      .grid:not(.list) .card-foot .val {
+      .grid:not(.list) .card-foot > .val {
         flex-basis: 100%;
         text-align: right;
       }
@@ -2372,7 +2372,9 @@
       .bb-end {
         display: inline-flex;
         align-items: center;
-        gap: 10px;
+        gap: 12px;
+        margin-left: auto;
+        white-space: nowrap;
       }
       .bb-date:empty,
       .bb-end:empty {
@@ -2380,15 +2382,19 @@
       }
       /* Buy-back rows: name | items | kind | date | price + Reclaim */
       #buybacks-body .grid.list .card-body {
-        grid-template-columns: minmax(150px, 1.3fr) minmax(0, 2fr) 72px 130px 90px;
+        grid-template-columns: minmax(150px, 1.3fr) minmax(0, 2fr) 72px 130px 180px;
       }
-      #buybacks-body .grid.list .bb-date,
-      #buybacks-body .grid.list .bb-end {
+      #buybacks-body .grid.list .bb-date {
         display: block;
         white-space: nowrap;
       }
+      /* price and Reclaim side by side with a gap, right-aligned */
       #buybacks-body .grid.list .bb-end {
-        text-align: right;
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        white-space: nowrap;
+        margin-left: 0; /* the cards' push-right would skew List columns */
       }
       @media (max-width: 700px) {
         #buybacks-body .grid.list .card-body {
