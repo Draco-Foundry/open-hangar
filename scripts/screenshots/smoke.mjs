@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer-core';
 import fs from 'node:fs';
+import os from 'node:os';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const URL0 = 'http://localhost:8323/';
@@ -133,6 +134,33 @@ try {
     const text = await page.$eval('#stats-body', (e) => e.textContent.trim().length);
     text > 40 ? ok(`${tab} tab renders`) : fail(`${tab} tab is empty`);
   }
+
+  console.log('Org Fleet');
+  await go('#org');
+  await page.click('#org-mine');
+  const buddy = path.join(os.tmpdir(), 'open-hangar-htf-Buddy-2026-01-01.json');
+  fs.writeFileSync(
+    buddy,
+    JSON.stringify([
+      { name: 'Carrack', entity_type: 'ship', lti: true },
+      { name: 'Cutlass Black', entity_type: 'ship', lti: false },
+    ]),
+  );
+  const input = await page.$('#org-file');
+  await input.uploadFile(buddy);
+  await page
+    .waitForFunction(() => document.querySelectorAll('.org-member').length >= 2, { timeout: 15000 })
+    .catch(() => {});
+  await page
+    .waitForFunction(() => document.querySelector('.org-table tbody tr'), { timeout: 20000 })
+    .catch(() => {});
+  const org = await page.evaluate(() => ({
+    members: document.querySelectorAll('.org-member').length,
+    rows: document.querySelectorAll('.org-table tbody tr').length,
+  }));
+  org.members === 2 && org.rows > 0
+    ? ok(`org fleet: ${org.members} members, ${org.rows} ship types`)
+    : fail(`org fleet: ${JSON.stringify(org)}`);
 
   console.log('Saved accounts');
   await go('#developers');
