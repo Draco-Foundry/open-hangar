@@ -47,7 +47,7 @@ const BB_KINDS = [
   { key: 'package', label: 'Packages' },
   { key: 'ccu', label: 'CCUs' },
   { key: 'paint', label: 'Paints' },
-  { key: 'addon', label: 'Add-ons' },
+  { key: 'addon', label: 'Add-Ons' },
   { key: 'coupon', label: 'Coupons' },
   { key: 'other', label: 'Other' },
 ];
@@ -1354,7 +1354,7 @@ const MARKET_SECTIONS = [
   { key: 'pack', label: 'Packs', test: (p) => isPack(p) },
   { key: 'ccu', label: 'Upgrades', test: (p) => p.isCCU },
   { key: 'paint', label: 'Paints', test: (p) => p.kind === 'paint' },
-  { key: 'addon', label: 'Add-ons', test: (p) => p.kind === 'addon' },
+  { key: 'addon', label: 'Add-Ons', test: (p) => p.kind === 'addon' },
   { key: 'other', label: 'Other', test: () => true },
 ];
 
@@ -2315,8 +2315,8 @@ function orgMemberPanelHtml(f, members) {
         ? `<p class="org-intro">Only ${OH.escapeHtml(m.name)} covers: <strong>${onlyMe.map((r) => OH.escapeHtml(r.label)).join(', ')}</strong></p>`
         : ''
     }
-    <div class="fleet-cols"><div><h4 class="modal-h">By role</h4>${pairBarsHtml(me.byCareer, rest.byCareer, m.name, 'Rest of org')}</div>
-    <div><h4 class="modal-h">By size</h4>${pairBarsHtml(me.bySize, rest.bySize, m.name, 'Rest of org')}</div></div>
+    <div class="fleet-cols"><div><h4 class="modal-h">By Role</h4>${pairBarsHtml(me.byCareer, rest.byCareer, m.name, 'Rest of org')}</div>
+    <div><h4 class="modal-h">By Size</h4>${pairBarsHtml(me.bySize, rest.bySize, m.name, 'Rest of org')}</div></div>
     <h4 class="modal-h">Ships</h4><p class="org-owners">${me.ships
       .map((sh) => OH.escapeHtml(sh.count > 1 ? `${sh.name} ×${sh.count}` : sh.name))
       .join(', ')}</p></div>`;
@@ -2347,9 +2347,9 @@ function orgComparePanelHtml(members) {
     B.name,
   )}</strong><button type="button" class="org-close" data-close="compare" aria-label="Close">×</button></div>
     <div class="cmp-cols">${col(fa, A.name)}${col(fb, B.name)}</div>
-    <div class="fleet-cols"><div><h4 class="modal-h">By role</h4>${pairBarsHtml(fa.byCareer, fb.byCareer, A.name, B.name)}</div>
-    <div><h4 class="modal-h">By size</h4>${pairBarsHtml(fa.bySize, fb.bySize, A.name, B.name)}</div></div>
-    <h4 class="modal-h">Both own</h4><p class="org-owners">${list(both)}</p>
+    <div class="fleet-cols"><div><h4 class="modal-h">By Role</h4>${pairBarsHtml(fa.byCareer, fb.byCareer, A.name, B.name)}</div>
+    <div><h4 class="modal-h">By Size</h4>${pairBarsHtml(fa.bySize, fb.bySize, A.name, B.name)}</div></div>
+    <h4 class="modal-h">Both Own</h4><p class="org-owners">${list(both)}</p>
     <h4 class="modal-h">Only ${OH.escapeHtml(A.name)}</h4><p class="org-owners">${list(onlyA)}</p>
     <h4 class="modal-h">Only ${OH.escapeHtml(B.name)}</h4><p class="org-owners">${list(onlyB)}</p></div>`;
 }
@@ -2366,7 +2366,7 @@ function orgBiggestHtml(f) {
           .join(', ')}</td></tr>`,
     )
     .join('');
-  return `<h3 class="section-title" style="margin-top:22px">Biggest ships</h3>
+  return `<h3 class="section-title" style="margin-top:22px">Biggest Ships</h3>
     <table class="org-table"><thead><tr><th>Ship</th><th>Size</th><th class="num">Count</th><th class="num">Store price</th><th>Owners</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -2420,8 +2420,8 @@ async function renderOrg() {
       orgRolesHtml(f) +
       orgBiggestHtml(f) +
       orgMembersHtml(f, members) +
-      `<div class="fleet-cols"><div><h4 class="modal-h">By role</h4>${orgBarsHtml(f.byCareer)}</div>` +
-      `<div><h4 class="modal-h">By size</h4>${orgBarsHtml(f.bySize)}</div></div>` +
+      `<div class="fleet-cols"><div><h4 class="modal-h">By Role</h4>${orgBarsHtml(f.byCareer)}</div>` +
+      `<div><h4 class="modal-h">By Size</h4>${orgBarsHtml(f.bySize)}</div></div>` +
       `<h3 class="section-title" style="margin-top:22px">Ships</h3>` +
       `<table class="org-table"><thead><tr><th>Ship</th><th class="num">Count</th><th class="num">LTI</th><th class="num">Store price</th><th>Owners</th></tr></thead><tbody>${rows}</tbody></table>`,
   );
@@ -2530,7 +2530,7 @@ function valueSectionHtml() {
   const v = hangarValue();
   if (!v) {
     const msg = pricesLoading ? 'Loading store prices…' : 'Store prices unavailable (offline?).';
-    return `<h3 class="section-title">Hangar value</h3><p class="muted">${msg}</p>`;
+    return `<h3 class="section-title">Hangar Value</h3><p class="muted">${msg}</p>`;
   }
   if (!v.ships) return '';
   const box = (big, lbl, cls = '') =>
@@ -2579,10 +2579,10 @@ function valueSectionHtml() {
         .join(' · ')}</p></details>`
     : '';
   return (
-    `<h3 class="section-title">Hangar value</h3>` +
+    `<h3 class="section-title">Hangar Value</h3>` +
     `<div class="stat-grid">${boxes}</div>` +
     (dealRows
-      ? `<h4 class="modal-h">Best deals — paid below today's store price</h4><div class="top-list">${dealRows}</div>`
+      ? `<h4 class="modal-h">Best Deals: Paid Below Today's Store Price</h4><div class="top-list">${dealRows}</div>`
       : '') +
     unpriced +
     `<p class="muted value-note">Ships at current standalone store prices (USD, before tax) from star-citizen.wiki; a CCU's standard price is the gap between its two ships. Paints, gear and game access aren't counted; concept and limited ships often have no public price. "vs what you paid" covers ship pledges whose ships are all priced.</p>`
@@ -2612,7 +2612,7 @@ function meltSectionHtml() {
       ? `<div class="row muted">+${list.length - 15} more — use the Melt candidates filter in Inventory</div>`
       : '';
   return (
-    `<h3 class="section-title">Melt candidates <span class="muted">${list.length} · ${money(total)} credit</span></h3>` +
+    `<h3 class="section-title">Melt Candidates <span class="muted">${list.length} · ${money(total)} credit</span></h3>` +
     `<p class="muted value-note tight">Pledges you could melt and buy back for the same store credit: meltable, no LTI, nothing but ships inside, and you paid at least today's store price. Check the ship is on sale before melting — limited ships may not come back, and non-LTI insurance resets to the store's standard.</p>` +
     `<div class="top-list spaced">${rows}${more}</div>`
   );
@@ -2647,8 +2647,8 @@ function fleetSectionHtml() {
   const unknown = f.ships - f.known;
   return (
     `<div class="stat-grid">${boxes}</div>` +
-    `<div class="fleet-cols"><div><h4 class="modal-h">By role</h4>${bars(f.byCareer)}</div>` +
-    `<div><h4 class="modal-h">By size</h4>${bars(f.bySize)}</div></div>` +
+    `<div class="fleet-cols"><div><h4 class="modal-h">By Role</h4>${bars(f.byCareer)}</div>` +
+    `<div><h4 class="modal-h">By Size</h4>${bars(f.bySize)}</div></div>` +
     `<p class="muted value-note">Ship data from star-citizen.wiki${
       unknown ? ` · ${unknown} ship${unknown === 1 ? '' : 's'} not matched` : ''
     }. Crew seats = each ship's maximum crew.</p>`
@@ -2728,7 +2728,7 @@ function historySectionHtml() {
     );
   }
   return (
-    `<h3 class="section-title" id="history">Melt value over time</h3>` +
+    `<h3 class="section-title" id="history">Melt Value Over Time</h3>` +
     historySvg(hist) +
     `<div class="hist-list">${steps.join('')}</div>` +
     `<p class="muted value-note">A snapshot is kept each time a full scan finds changes — ${hist.length} so far, up to the last 100.</p>`
@@ -2787,8 +2787,8 @@ function renderStats() {
   const tabs = {
     overview: () =>
       `<div class="stat-grid">${stats}</div>` +
-      `<h3 class="section-title">By category</h3>${bars}` +
-      `<h3 class="section-title" style="margin-top:26px">Top pledges by value</h3>` +
+      `<h3 class="section-title">By Category</h3>${bars}` +
+      `<h3 class="section-title" style="margin-top:26px">Top Pledges by Value</h3>` +
       `<div class="top-list">${topRows || '<div class="row muted">No priced pledges.</div>'}</div>`,
     value: () => valueSectionHtml() + meltSectionHtml(),
     fleet: () =>
@@ -2871,7 +2871,7 @@ function collectionSectionHtml() {
       sBox(c.makers.length, 'manufacturers')
     }</div>` +
     `<h3 class="section-title">Insurance</h3>${ins.length ? sBars(ins) : '<p class="muted">No insurance found in your pledges.</p>'}` +
-    `<h3 class="section-title" style="margin-top:26px">Collection by manufacturer</h3>` +
+    `<h3 class="section-title" style="margin-top:26px">Collection by Manufacturer</h3>` +
     `<p class="muted value-note tight">How many of each maker's ship models you own (out of the ones with a store price). Hover a row to see which.</p>` +
     (makers || '<p class="muted">No ships matched the ship list yet.</p>')
   );
@@ -2913,11 +2913,11 @@ function buybackStatsHtml() {
       sBox(next || '—', 'next token') +
       sBox(`${real} / ${bbs.length}`, 'with details loaded')
     }</div>` +
-    `<h3 class="section-title">By type</h3>${sBars(byKind)}` +
-    `<h3 class="section-title" style="margin-top:26px">Most valuable to buy back</h3>` +
+    `<h3 class="section-title">By Type</h3>${sBars(byKind)}` +
+    `<h3 class="section-title" style="margin-top:26px">Most Valuable to Buy Back</h3>` +
     `<div class="top-list">${top.map(({ b, v }) => bbRow(b, (bbDetail(b) ? '' : '~') + dollars(v))).join('') || '<div class="row muted">No prices yet.</div>'}</div>` +
     (most.length
-      ? `<h3 class="section-title" style="margin-top:26px">Melted most often</h3><div class="top-list">${most
+      ? `<h3 class="section-title" style="margin-top:26px">Melted Most Often</h3><div class="top-list">${most
           .map(
             ([n, k]) =>
               `<div class="row"><div class="nm">${OH.escapeHtml(n)}</div><div class="vl">×${k}</div></div>`,
@@ -2959,10 +2959,10 @@ function topListsHtml() {
   const list = (rows) =>
     `<div class="top-list">${rows || '<div class="row muted">Nothing here yet.</div>'}</div>`;
   return (
-    `<div class="top-cols"><div><h3 class="section-title">Most valuable pledges</h3>${list(
+    `<div class="top-cols"><div><h3 class="section-title">Most Valuable Pledges</h3>${list(
       byValue.map((p) => itemRow(p, OH.escapeHtml(formatValue(p)))).join(''),
     )}</div>` +
-    `<div><h3 class="section-title">Biggest savings vs store price</h3>${list(
+    `<div><h3 class="section-title">Biggest Savings vs Store Price</h3>${list(
       savings
         .map(({ p, si }) =>
           itemRow(
@@ -2972,10 +2972,10 @@ function topListsHtml() {
         )
         .join(''),
     )}</div>` +
-    `<div><h3 class="section-title">Oldest pledges</h3>${list(
+    `<div><h3 class="section-title">Oldest Pledges</h3>${list(
       oldest.map((p) => itemRow(p, OH.escapeHtml(p.date))).join(''),
     )}</div>` +
-    `<div><h3 class="section-title">Most valuable LTI ships</h3>${list(
+    `<div><h3 class="section-title">Most Valuable LTI Ships</h3>${list(
       ltiShips.map((p) => itemRow(p, OH.escapeHtml(formatValue(p)))).join(''),
     )}</div></div>` +
     `<p class="muted value-note">Click any row to open it. Savings compare what you paid with today's standard store price (warbonds, sales, CCU'd pledges).</p>`
@@ -3004,8 +3004,8 @@ const STATS_TABS = [
   ['value', 'Value'],
   ['fleet', 'Fleet'],
   ['collection', 'Collection'],
-  ['buybacks', 'Buy-backs'],
-  ['top', 'Top lists'],
+  ['buybacks', 'Buy-Backs'],
+  ['top', 'Top Lists'],
   ['history', 'History'],
 ];
 function setStatsTab(tab) {
@@ -3493,16 +3493,16 @@ function renderReferrals() {
 
     <h3 class="section-title" style="margin-top:26px">Trends</h3>
     <div class="ref-charts">
-      <div class="ref-chart"><h4>Recruits over time (cumulative · monthly)</h4>${recruitsOverTimeSvg(recruitsRows)}</div>
-      <div class="ref-chart"><h4>Prospect → recruit conversion</h4>${conversionHtml(ref)}</div>
+      <div class="ref-chart"><h4>Recruits Over Time (Cumulative · Monthly)</h4>${recruitsOverTimeSvg(recruitsRows)}</div>
+      <div class="ref-chart"><h4>Prospect → Recruit Conversion</h4>${conversionHtml(ref)}</div>
     </div>
     <div class="stat-group-label">Recruits by year</div>
     ${recruitsByYearHtml(recruitsRows)}
 
-    <h3 class="section-title" style="margin-top:26px">Tier rewards</h3>
+    <h3 class="section-title" style="margin-top:26px">Tier Rewards</h3>
     ${rewardsHtml(ref)}
 
-    <h3 class="section-title" style="margin-top:26px">Event bonuses</h3>
+    <h3 class="section-title" style="margin-top:26px">Event Bonuses</h3>
     ${eventRewardsHtml(recruitsRows)}
 
     <h3 class="section-title" style="margin-top:26px">People</h3>
@@ -3749,7 +3749,7 @@ function renderBuybacks() {
     setHTML(
       body,
       `<div class="placeholder-view">
-      <h2>Buy-back pledges</h2>
+      <h2>Buy-Back Pledges</h2>
       <p class="muted">Your melted pledges that you can re-acquire from RSI. Click
         <strong>Scan</strong> on the Home page to pull them in alongside your hangar.</p>
       <p class="muted">Buy-backs are read from
@@ -4263,7 +4263,7 @@ function openBuybackModal(b) {
           : ''
       }${
         d.also.length
-          ? `<h4 class="modal-h">Also contains</h4><table class="modal-contents"><tbody>${d.also
+          ? `<h4 class="modal-h">Also Contains</h4><table class="modal-contents"><tbody>${d.also
               .map((x) => `<tr><td>${OH.escapeHtml(x)}</td></tr>`)
               .join('')}</tbody></table>`
           : ''

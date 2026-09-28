@@ -3094,10 +3094,10 @@
         <div class="home-changes" id="home-changes" hidden></div>
         <div class="home-split">
           <div class="home-about howto">
-            <h2 class="section-title">How to use Open Hangar</h2>
+            <h2 class="section-title">How to Use Open Hangar</h2>
 
             <details open>
-              <summary>Getting started</summary>
+              <summary>Getting Started</summary>
               <ol>
                 <li>
                   Sign in at <strong>robertsspaceindustries.com</strong> in this browser. If you're
@@ -3120,7 +3120,7 @@
             </details>
 
             <details>
-              <summary>Browsing your hangar</summary>
+              <summary>Browsing Your Hangar</summary>
               <ul>
                 <li>
                   <a href="#inventory" data-view="inventory">Inventory</a> shows every pledge.
@@ -3140,7 +3140,7 @@
             </details>
 
             <details>
-              <summary>What's my hangar worth?</summary>
+              <summary>What's My Hangar Worth?</summary>
               <ul>
                 <li>
                   <a href="#stats" data-view="stats">Stats</a> → <strong>Value</strong> shows your
@@ -3164,7 +3164,7 @@
             </details>
 
             <details>
-              <summary>Selling or showing off your fleet</summary>
+              <summary>Selling or Showing Off Your Fleet</summary>
               <ul>
                 <li>
                   In Inventory, hit <strong>Select</strong>, click the items you want, give it a
@@ -3179,7 +3179,7 @@
             </details>
 
             <details>
-              <summary>Your org's combined fleet</summary>
+              <summary>Your Org's Combined Fleet</summary>
               <ul>
                 <li>
                   Ask members to open Open Hangar and use <strong>Developers → Export HTF</strong>.
@@ -3194,7 +3194,7 @@
             </details>
 
             <details>
-              <summary>Backups and switching browsers</summary>
+              <summary>Backups and Switching Browsers</summary>
               <ul>
                 <li>Your data stays put when Open Hangar updates.</li>
                 <li>
@@ -3214,7 +3214,7 @@
             </details>
 
             <details>
-              <summary>Something not working?</summary>
+              <summary>Something Not Working?</summary>
               <ul>
                 <li>
                   Click <strong>Copy error report</strong> next to the error (it's also on the
@@ -3250,7 +3250,7 @@
             </details>
 
             <details>
-              <summary>About and privacy</summary>
+              <summary>About and Privacy</summary>
               <p>
                 Open Hangar is free and open source. It reads your own Star Citizen account using
                 the RSI login you already have in this browser, and saves everything locally.
@@ -3435,7 +3435,7 @@
           exactly that and tracks warbond deals day to day.
         </p>
 
-        <h3 class="section-title" style="margin-top: 28px">Ship prices</h3>
+        <h3 class="section-title" style="margin-top: 28px">Ship Prices</h3>
         <p class="currency-note muted store-intro" hidden></p>
         <input id="price-search" type="search" placeholder="Search ships…" autocomplete="off" />
         <div id="price-table"></div>
@@ -3477,7 +3477,7 @@
             sites can build on. Open source, MIT-licensed, auditable.
           </p>
 
-          <h3>How it pulls data</h3>
+          <h3>How It Pulls Data</h3>
           <p>
             RSI uses cookie-based session auth. The extension holds host permission for
             <code>robertsspaceindustries.com</code>, so its own <code>fetch</code> requests carry
@@ -3486,7 +3486,7 @@
             bit (RSI's markup) is isolated in <code>parser.js</code>.
           </p>
 
-          <h3>The data model</h3>
+          <h3>The Data Model</h3>
           <p>Every pledge is normalized to one object:</p>
           <pre>
 { id, name, value, currency,
@@ -3504,7 +3504,7 @@
             the <strong>store catalog</strong> is planned.
           </p>
 
-          <h3>The export file</h3>
+          <h3>The Export File</h3>
           <p>
             One self-describing JSON file, ordered <em>provenance → who → what they own</em> so it
             maps straight onto a backend table. Schema <strong>v2</strong> added the
@@ -3538,7 +3538,7 @@
 }</pre
           >
 
-          <h3>Using it in your project</h3>
+          <h3>Using It in Your Project</h3>
           <p>
             <strong>JSON export/import is live</strong> — download the whole database (the shape
             above) to back it up or feed it into your own project; import restores a previous
@@ -3566,14 +3566,14 @@
           </div>
           <div id="data-msg" class="muted"></div>
 
-          <h3>Saved accounts</h3>
+          <h3>Saved Accounts</h3>
           <p>
             Each RSI account you scan keeps its own data here. Sign in as another account and Open
             Hangar sets the current one aside and loads that account's last scan instead.
           </p>
           <div id="profiles" class="profiles"></div>
 
-          <h3>Error report</h3>
+          <h3>Error Report</h3>
           <p>
             Something not working? Copy this report and paste it in #bug-reports on Discord or in a
             GitHub issue. It has your Open Hangar version, browser, item counts and the recent
@@ -3585,11 +3585,11 @@
           </div>
           <div id="report-msg" class="muted"></div>
           <details id="report-preview" class="report-preview">
-            <summary>See exactly what gets copied</summary>
+            <summary>See Exactly What Gets Copied</summary>
             <pre id="report-text"></pre>
           </details>
 
-          <h3>Terms &amp; fair use</h3>
+          <h3>Terms &amp; Fair Use</h3>
           <ul>
             <li>
               Read-only, personal, and rate-limited — it reads only the signed-in user's own
@@ -3599,7 +3599,7 @@
             <li>MIT-licensed and open source — audit every line, file issues, and send PRs.</li>
           </ul>
 
-          <h3>Data sources &amp; references</h3>
+          <h3>Data Sources &amp; References</h3>
           <p>
             Where every piece of data comes from — handy for verifying the scrape or building your
             own:
@@ -3674,7 +3674,7 @@
             </li>
           </ul>
 
-          <h3>Thanks &amp; supporters</h3>
+          <h3>Thanks &amp; Supporters</h3>
           <p>
             Open Hangar is community-built and community-kept. Huge thanks to everyone who
             contributes code, reports parser breakages when RSI changes their site, or supports the

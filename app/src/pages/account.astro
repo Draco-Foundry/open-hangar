@@ -33,7 +33,7 @@ const welcome = Astro.url.searchParams.has('welcome');
   </section>
 
   <section class="card" id="tfa" data-enabled={user.twoFactorEnabled ? '1' : ''}>
-    <h2 style="margin-top:0">Two-factor sign-in</h2>
+    <h2 style="margin-top:0">Two-Factor Sign-In</h2>
     {
       user.twoFactorEnabled ? (
         <p class="ok">On. You'll be asked for a code from your authenticator app when you sign in.</p>
@@ -66,7 +66,7 @@ const welcome = Astro.url.searchParams.has('welcome');
   </section>
 
   <section class="card">
-    <h2 style="margin-top:0">Connected extensions</h2>
+    <h2 style="margin-top:0">Connected Extensions</h2>
     {
       tokens.length ? (
         <table>
@@ -97,14 +97,14 @@ const welcome = Astro.url.searchParams.has('welcome');
         </table>
       ) : (
         <p class="muted">
-          None yet. <a href="/link">Connect your extension</a> to sync your hangar here.
+          None yet. <a href="/link">Connect Your Extension</a> to sync your hangar here.
         </p>
       )
     }
   </section>
 
   <section class="card">
-    <h2 style="margin-top:0">Delete account</h2>
+    <h2 style="margin-top:0">Delete Account</h2>
     <p class="muted">
       Removes your account, your synced hangar and every connected extension, right away. Your extension keeps
       working offline.
