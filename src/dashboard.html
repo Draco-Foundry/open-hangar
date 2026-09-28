@@ -758,6 +758,17 @@
       .bal.bbt b {
         color: #58a6ff;
       }
+      .top-list .row.clickable {
+        cursor: pointer;
+      }
+      .top-list .row.clickable:hover {
+        background: var(--panel-2);
+      }
+      .top-cols {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+        gap: 8px 28px;
+      }
       .bb-open {
         all: unset;
         cursor: pointer;
