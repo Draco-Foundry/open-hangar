@@ -131,6 +131,13 @@ try {
     text > 40 ? ok(`${tab} tab renders`) : fail(`${tab} tab is empty`);
   }
 
+  console.log('Saved accounts');
+  await go('#developers');
+  const prof = await page.$$eval('#profiles .profile-row', (r) => r.map((e) => e.textContent));
+  prof.length && /signed in/.test(prof[0])
+    ? ok(`${prof.length} saved account(s) listed`)
+    : fail('saved accounts list empty');
+
   for (const view of ['referrals', 'developers']) {
     console.log(view[0].toUpperCase() + view.slice(1));
     await go('#' + view);
