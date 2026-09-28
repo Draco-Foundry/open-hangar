@@ -1,0 +1,149 @@
+name: Publish to stores
+
+# Uploads a released version to the extension stores. Run it by hand
+# (Actions → Publish to stores → Run workflow) after the Release workflow has
+# built that tag. Nothing here runs on its own: publishing is always a choice.
+#
+# Each store is skipped (not failed) until its secrets exist:
+#   Firefox: AMO_JWT_ISSUER, AMO_JWT_SECRET
+#   Edge:    EDGE_PRODUCT_ID, EDGE_CLIENT_ID, EDGE_API_KEY
+#   Chrome:  CWS_EXTENSION_ID, CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN
+# Every store still reviews the upload before it goes live.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish, e.g. v0.2.9'
+        required: true
+      store:
+        description: 'Which store'
+        type: choice
+        options: [firefox, edge, chrome, all]
+        default: all
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm test
+      - name: Check the tag matches manifest.json
+        id: v
+        run: |
+          V=$(node -p "require('./manifest.json').version")
+          T="${{ github.event.inputs.tag }}"
+          if [ "$V" != "${T#v}" ]; then echo "manifest.json is $V but the tag is $T"; exit 1; fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+      - run: npm run pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: |
+            dist/*.zip
+            dist/firefox/**
+
+  firefox:
+    needs: build
+    if: github.event.inputs.store == 'firefox' || github.event.inputs.store == 'all'
+    runs-on: ubuntu-latest
+    env:
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: dist
+      - name: Submit to addons.mozilla.org
+        run: |
+          if [ -z "$AMO_JWT_ISSUER" ] || [ -z "$AMO_JWT_SECRET" ]; then
+            echo "::notice::Firefox skipped: AMO secrets not set"; exit 0
+          fi
+          npm install --no-save web-ext
+          # Listed channel = the public AMO page. Don't wait for Mozilla's review.
+          npx web-ext sign --channel=listed --source-dir dist/firefox \
+            --api-key "$AMO_JWT_ISSUER" --api-secret "$AMO_JWT_SECRET" \
+            --approval-timeout 0
+
+  edge:
+    needs: build
+    if: github.event.inputs.store == 'edge' || github.event.inputs.store == 'all'
+    runs-on: ubuntu-latest
+    env:
+      PRODUCT: ${{ secrets.EDGE_PRODUCT_ID }}
+      CLIENT: ${{ secrets.EDGE_CLIENT_ID }}
+      KEY: ${{ secrets.EDGE_API_KEY }}
+      VERSION: ${{ needs.build.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: dist
+      - name: Submit to Edge Add-ons
+        run: |
+          if [ -z "$PRODUCT" ] || [ -z "$CLIENT" ] || [ -z "$KEY" ]; then
+            echo "::notice::Edge skipped: Edge secrets not set"; exit 0
+          fi
+          API="https://api.addons.microsoftedge.microsoft.com/v1/products/$PRODUCT/submissions"
+          H=(-H "Authorization: ApiKey $KEY" -H "X-ClientID: $CLIENT")
+          # 1) upload the package to the draft, 2) wait for it, 3) submit.
+          OP=$(curl -sS -D - -o /dev/null "${H[@]}" -H "Content-Type: application/zip" \
+            -X POST "$API/draft/package" --data-binary "@dist/open-hangar-chrome-$VERSION.zip" \
+            | awk -F': ' 'tolower($1)=="location"{print $2}' | tr -d '\r')
+          [ -n "$OP" ] || { echo "Upload was not accepted"; exit 1; }
+          for i in $(seq 1 30); do
+            R=$(curl -sS "${H[@]}" "$API/draft/package/operations/$OP")
+            S=$(echo "$R" | jq -r .status)
+            echo "upload: $S"
+            [ "$S" = "Succeeded" ] && break
+            [ "$S" = "Failed" ] && { echo "$R"; exit 1; }
+            sleep 10
+          done
+          [ "$S" = "Succeeded" ] || { echo "Upload still processing, check Partner Center"; exit 1; }
+          curl -sS -f "${H[@]}" -H "Content-Type: application/json" -X POST "$API" \
+            -d "{\"notes\":\"Open Hangar $VERSION. Changes: https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md\"}"
+
+  chrome:
+    needs: build
+    if: github.event.inputs.store == 'chrome' || github.event.inputs.store == 'all'
+    runs-on: ubuntu-latest
+    env:
+      EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+      CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+      CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+      REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+      VERSION: ${{ needs.build.outputs.version }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: dist
+      - name: Submit to the Chrome Web Store
+        run: |
+          if [ -z "$EXTENSION_ID" ] || [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ] || [ -z "$REFRESH_TOKEN" ]; then
+            echo "::notice::Chrome skipped: Chrome Web Store secrets not set"; exit 0
+          fi
+          # Upload, then submit for review (publishes once Google approves).
+          npx --yes chrome-webstore-upload-cli@3 upload --auto-publish \
+            --source "dist/open-hangar-chrome-$VERSION.zip"
