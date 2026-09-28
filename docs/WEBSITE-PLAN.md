@@ -79,6 +79,23 @@ Device-code flow (works on Chrome, Edge and Firefox alike):
   approval queue to start (then report button), an "I took this" confirmation,
   removal requests, size/daily upload limits.
 
+- **Org fleet builder** (phase 2). Members opt in to sharing their ships with the
+  org; officers plan an outfit (e.g. a Javelin op) by roles and crew seats, add
+  loadout notes (link out to Erkul), and see readiness: which roles are covered and
+  by whom.
+- **Org page** (phase 2): combined fleet by role, plus plain-language gaps ("no
+  dedicated medical ship"). Reuses the extension's Org Fleet role logic.
+- **Your profile** (phase 2, private to you): fleet by role, value, LTI share,
+  rarest ship you own, fleet history graph.
+- **Ship pages** (phase 3): % of synced pilots who own it, LTI rate, "often owned
+  alongside". Anonymous counts only.
+- **Community stats** (phase 3): pilots synced, ships tracked, most owned / rarest
+  ships, ships trending up or down. Only switched on after ~100 synced pilots so
+  the numbers mean something.
+- **No rankings, ever.** We don't rank pilots or orgs (no leaderboards, biggest
+  fleets, top collections). Hangars are private by default; pooled stats are
+  anonymous.
+
 ## Before sync ships to users
 
 - Privacy policy (repo + site) rewritten for optional sync: what's stored, where
