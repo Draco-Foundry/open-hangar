@@ -167,3 +167,19 @@ test('diffSnapshots finds new, gone and upgraded pledges', () => {
   assert.equal(d.changed.length, 1);
   assert.equal(d.melt, 750 - 140);
 });
+
+test('mergeHistory unions by time, collapses repeats, drops junk', () => {
+  const s = (at, items) => OH.snapshotOf(items, at);
+  const one = [{ id: 1, name: 'A', value: 10 }];
+  const two = [...one, { id: 2, name: 'B', value: 20 }];
+  const mine = [s(100, one), s(300, two)];
+  const backup = [s(100, one), s(200, one), { at: 'bad' }, null];
+  const m = OH.mergeHistory(mine, backup);
+  assert.deepEqual(
+    m.map((x) => x.at),
+    [100, 300],
+  ); // 200 was identical to 100 → folded in
+  assert.equal(m[0].checkedAt, 200);
+  const many = Array.from({ length: 150 }, (_, i) => s(i, [{ id: i, name: 'x', value: i }]));
+  assert.equal(OH.mergeHistory(many, []).length, 100);
+});

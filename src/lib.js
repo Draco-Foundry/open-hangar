@@ -18,7 +18,8 @@
  *   { app, appVersion, exportedAt, schemaVersion,
  *     account: { handle, displayName, …, organization:{name,sid,rank,logo},
  *                balances:{storeCredit,uec,rec} },
- *     sources: { hangar, buybacks } }
+ *     sources: { hangar, buybacks },
+ *     history: [ { at, items: [[id, name, value]] } ] }   // scan snapshots
  * See OH.exportDB. Schema v2 added the `account` block (v1 had sources only).
  */
 
@@ -262,6 +263,8 @@
       schemaVersion: SCHEMA_VERSION,
       account: shapeAccountForExport(account, db.owner),
       sources: sanitizeSourcesForExport(db.sources),
+      // Scan history rides along so a backup file is a complete restore point.
+      history: Array.isArray(db.history) ? db.history : [],
     };
   };
 
@@ -418,6 +421,10 @@
       };
     }
     const db = { schemaVersion: SCHEMA_VERSION, sources: {} };
+    // History is merged, never replaced: restoring an old backup must not throw
+    // away snapshots taken since, and vice versa.
+    const current = await OH.loadDB();
+    db.history = OH.mergeHistory(current.history, obj.history);
     for (const [id, src] of Object.entries(obj.sources)) {
       // Most sources store an array of items (hangar, buybacks); the referral
       // source stores a single object. Accept either so a full restore round-trips.
@@ -1545,8 +1552,9 @@
   // --- Scan history --------------------------------------------------------------
   // Each full hangar scan that changed something is kept as a compact snapshot
   // ({ at, items: [[id, name, value]] }) in the DB, so the UI can say what changed
-  // since last time and chart melt value over time. Local only, never exported.
-  const HISTORY_MAX = 30;
+  // since last time and chart melt value over time. Stays in this browser; it is
+  // included in the user's own JSON export (their backup file).
+  const HISTORY_MAX = 100;
   OH.snapshotOf = function snapshotOf(items, at) {
     return {
       at,
@@ -1593,6 +1601,37 @@
     else hist.push(snap);
     db.history = hist.slice(-HISTORY_MAX);
   }
+
+  // Keep only well-formed snapshots ({ at, items: [[id, name, value]] }).
+  function cleanSnapshot(x) {
+    if (!x || !Number.isFinite(x.at) || !Array.isArray(x.items)) return null;
+    const items = x.items
+      .filter((r) => Array.isArray(r) && r.length >= 3)
+      .map((r) => [String(r[0]), String(r[1]), Number(r[2]) || 0]);
+    const out = { at: x.at, items };
+    if (Number.isFinite(x.checkedAt)) out.checkedAt = x.checkedAt;
+    return out;
+  }
+
+  // Union of two histories (e.g. this browser's + a backup file's): by time,
+  // one snapshot per timestamp, consecutive identical snapshots collapsed,
+  // newest HISTORY_MAX kept. Pure.
+  OH.mergeHistory = function mergeHistory(a, b) {
+    const byAt = new Map();
+    for (const x of [...(Array.isArray(a) ? a : []), ...(Array.isArray(b) ? b : [])]) {
+      const c = cleanSnapshot(x);
+      if (c && !byAt.has(c.at)) byAt.set(c.at, c);
+    }
+    const out = [];
+    for (const snap of [...byAt.values()].sort((x, y) => x.at - y.at)) {
+      const last = out[out.length - 1];
+      const d = last && OH.diffSnapshots(last, snap);
+      if (d && !d.added.length && !d.removed.length && !d.changed.length) {
+        last.checkedAt = Math.max(last.checkedAt || last.at, snap.checkedAt || snap.at);
+      } else out.push(snap);
+    }
+    return out.slice(-HISTORY_MAX);
+  };
 
   OH.getHistory = async function getHistory() {
     const db = await OH.loadDB();
