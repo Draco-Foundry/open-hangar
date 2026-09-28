@@ -1,9 +1,9 @@
 # Chrome Web Store — Launch Checklist & Listing
 
-> **Submission status (2026-09-25, v0.2.7):**
+> **Submission status (2026-09-28):**
 > | Store | Status | IDs / links |
 > | --- | --- | --- |
-> | Chrome Web Store | **live** v0.2.7 (2026-09-28, publisher `dracofoundry@gmail.com`) | item `aeabioadfphghjennmdbnpelojlhndjl` · [listing](https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl) |
+> | Chrome Web Store | **live** v0.2.7 (2026-09-28); v0.2.8 to upload ( publisher `dracofoundry@gmail.com`) | item `aeabioadfphghjennmdbnpelojlhndjl` · [listing](https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl) |
 > | Firefox AMO | awaiting review | `addons.mozilla.org/firefox/addon/open-hangar/` · gecko id `open-hangar@draco-foundry` |
 > | Microsoft Edge | in review (~7 business days) | CRX `fmcnemfepnifokjelgjacgdhoodaiicl` · Store ID `0RDCKFFGW5QL` |
 >
@@ -111,29 +111,33 @@ bottom. Items marked ✅ are ready in the repo; ⬜ need you to do them.
 > Open Hangar reads the signed-in user's own Star Citizen / RSI account data and
 > organizes it into a clean, local, browsable database they can also export.
 
-**Summary (≤132 chars):**
+**Summary (≤132 chars, also the manifest `description`):**
 
-> Read your own Star Citizen / RSI hangar, buy-backs, balances & referrals into a
-> clean, local, exportable database.
+> Your Star Citizen hangar, made useful: ship values, melt candidates, CCU savings, fleet stats and buy-backs. Private and local.
 
 **Detailed description:**
 
-> Open Hangar is an open-source companion for your Star Citizen / RSI account. It
-> reads what RSI already shows you — your hangar (ships, CCUs, add-ons), buy-backs,
-> account balances, org & rank, and referral recruits/prospects — and saves it as
-> clean, structured data on your own machine.
+> Open Hangar is a free, open-source companion for your Star Citizen account. It reads
+> what RSI already shows you (your hangar, buy-backs, balances, org and referrals) and
+> turns it into something you can actually use.
 >
-> • Runs entirely in your browser. No password, no server, nothing leaves your
-> device — it uses the RSI session you're already signed in with.
-> • Browse your fleet with search, sort, and filters; see stats and breakdowns.
-> • A full Referrals page: recruits, prospects, conversion stats, reward tiers, and
-> event bonuses.
-> • Export your whole database as one JSON file to back it up or build on it.
+> What you get:
+> • Hangar value: what your ships sell for at today's store prices, and what you paid
+> • Melt candidates, CCU savings, and the pledges you got for less than store price
+> • Fleet stats: cargo, crew seats, roles, and how much of your fleet is flight ready
+> • Filters for everything: LTI, giftable, meltable, packs, warbonds and more
+> • History: see what changed since your last scan, and back it all up to a file
+> • Fleet images: pick the items you want and copy a clean picture for a sale post
+> • Buy-backs with direct reclaim links, and a full referrals dashboard
+> • Export to JSON, or to FleetYards and other tools (Hangar Transfer Format)
 >
-> Built for developers as a reusable data layer, and for fans who just want a
-> friendly way to browse their hangar. MIT-licensed and fully auditable on GitHub.
+> Private by design: it runs entirely in your browser, using the RSI session you're
+> already signed in with. No password, no account, no server. Nothing leaves your
+> device.
 >
-> Unofficial, fan-made, and not affiliated with Cloud Imperium Games or RSI.
+> MIT-licensed and open source on GitHub. Ideas and bug reports are always welcome.
+>
+> Unofficial and fan-made. Not affiliated with Cloud Imperium Games or RSI.
 
 ## 7. Submit & review
 

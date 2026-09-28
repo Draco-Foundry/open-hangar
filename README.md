@@ -1,12 +1,12 @@
 # Open Hangar
 
 [![Website](https://img.shields.io/badge/Website-openhangar.space-2f81f7?style=for-the-badge)](https://openhangar.space/)
-[![Version](https://img.shields.io/badge/version-0.2.7-blue?style=for-the-badge)](manifest.json)
+[![Version](https://img.shields.io/badge/version-0.2.8-blue?style=for-the-badge)](manifest.json)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 [![Roadmap](https://img.shields.io/badge/%F0%9F%97%BA%EF%B8%8F-Roadmap-orange?style=for-the-badge)](ROADMAP.md)
 
-**Your Star Citizen hangar, buy-backs, balances and referrals — in one clean, local
-database you can browse and export.**
+**Your Star Citizen hangar, made useful: what your ships are worth, what you could
+melt, what your CCUs saved you, and a clean local database you can export.**
 
 Open Hangar is a free, open-source browser extension for **Chrome, Edge and Firefox**.
 It reads your own RSI account using the session you're already signed in with, and
@@ -14,10 +14,10 @@ saves it on your machine as tidy, structured data. Browse your fleet in the buil
 viewer, or export everything as one JSON file and build on it.
 
 - **No password, no account, no server.** Nothing leaves your browser.
-- **For players:** a fast, searchable view of your fleet, buy-backs, stats and
-  referral progress.
-- **For developers:** the data layer RSI doesn't offer — no public API, so Open
-  Hangar handles the session auth and page parsing and hands you clean records.
+- **For players:** hangar value at today's store prices, melt candidates, fleet
+  stats, history between scans, buy-backs, referrals, and fleet images to share.
+- **For developers:** the data layer RSI doesn't offer. There's no public API, so
+  Open Hangar handles the session auth and page parsing and hands you clean records.
 
 👉 **[Install it from the website](https://openhangar.space/)**
 
@@ -40,12 +40,12 @@ viewer, or export everything as one JSON file and build on it.
 
 ## What it reads
 
-| Source        | What you get                                                                                                                                  |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Hangar**    | Every pledge — ships, CCUs (`from → to`), paints, add-ons, coupons — with contents, value, insurance (LTI, 120M, …) and whether it's giftable |
-| **Buy-backs** | Melted pledges you can re-acquire, with a direct reclaim link                                                                                 |
-| **Account**   | Handle, display name, Store Credit, UEC, REC, main org and rank                                                                               |
-| **Referrals** | Your recruits and prospects (current and legacy programs), reward tiers, event bonuses and charts                                             |
+| Source        | What you get                                                                                                                                 |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Hangar**    | Every pledge (ships, CCUs `from → to`, paints, add-ons, coupons) with contents, value, date, insurance and whether it's giftable or meltable |
+| **Buy-backs** | Melted pledges you can re-acquire, with a direct reclaim link                                                                                |
+| **Account**   | Handle, display name, Store Credit, UEC, REC, main org and rank                                                                              |
+| **Referrals** | Your recruits and prospects (current and legacy programs), reward tiers, event bonuses and charts                                            |
 
 All of it is stored locally in one versioned database, and can be exported as a
 single JSON file — or as a **Hangar Transfer Format** (HTF) file that FleetYards and
@@ -231,9 +231,9 @@ redistribute other people's data.
 
 ## License & community
 
-Code: MIT — see [LICENSE](LICENSE). Star Citizen Fankit images on the website are
-© Cloud Imperium and not covered by the MIT license — see
-[site/img/fankit/NOTICE.md](site/img/fankit/NOTICE.md).
+Code: MIT, see [LICENSE](LICENSE). The "Made By The Community" badge in the website
+footer is from the Star Citizen Fankit, © Cloud Imperium, and not covered by the MIT
+license (see [site/img/fankit/NOTICE.md](site/img/fankit/NOTICE.md)).
 
 - **Website:** [openhangar.space](https://openhangar.space/)
 - **Discord:** [Draco Foundry](https://discord.gg/FF8Wm5HdnV)
