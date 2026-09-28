@@ -1298,7 +1298,7 @@
   const shipImgMem = new Map(); // normName -> url|null (per session)
   const shipImgInflight = new Map(); // normName -> Promise (dedupe concurrent)
   let catalogMem = null; // [{ lname, slug, cls, msrp }]  (wiki)
-  const CATALOG_CACHE_V = 5; // v2: class + msrp, all pages · v3: fleet fields · v4: display name · v5: + ship matrix (concept ships)
+  const CATALOG_CACHE_V = 6; // v2: class + msrp, all pages · v3: fleet fields · v4: display name · v5: + ship matrix (concept ships) · v6: manufacturer
   let catalogInflight = null;
   let matrixMem = null; // [{ lname, name, img, mfr, mfrName }]  (RSI ship-matrix)
   const MATRIX_CACHE_V = 2; // v2: + display name + manufacturer (for HTF ship codes)
@@ -1400,6 +1400,7 @@
       status: en(v.production_status) || null, // flight-ready | in-concept | …
       crew: (v.crew && Number(v.crew.max)) || null,
       cargo: Number(v.cargo_capacity) || 0, // SCU
+      mfr: (v.manufacturer && v.manufacturer.name) || null,
     };
   };
 
@@ -1458,7 +1459,7 @@
         byName.set(m.lname, out[out.length - 1]);
         continue;
       }
-      for (const k of ['msrp', 'status', 'career', 'role', 'size', 'crew', 'cls']) {
+      for (const k of ['msrp', 'status', 'career', 'role', 'size', 'crew', 'cls', 'mfr']) {
         if (hit[k] == null && m[k] != null) hit[k] = m[k];
       }
       if (!hit.cargo && m.cargo) hit.cargo = m.cargo;
@@ -1855,6 +1856,51 @@
         bump(out.byStatus, v.status || 'unknown');
       }
     }
+    return out;
+  };
+
+  // Stats → Collection: insurance mix, giftable/meltable split, and per
+  // manufacturer how many of their ship models you own. Pure.
+  //   → { insurance: {term: n}, giftable, notGiftable, meltable, notMeltable,
+  //       makers: [{ name, own, total, models: [names owned] }] }
+  OH.collectionStats = function collectionStats(items, shipOf, catalog) {
+    const out = {
+      insurance: {},
+      giftable: 0,
+      notGiftable: 0,
+      meltable: 0,
+      notMeltable: 0,
+      makers: [],
+    };
+    const owned = new Map(); // maker → Set(model lname)
+    for (const p of items || []) {
+      if (p.insurance) out.insurance[p.insurance] = (out.insurance[p.insurance] || 0) + 1;
+      if (p.giftable === true) out.giftable++;
+      else if (p.giftable === false) out.notGiftable++;
+      if (p.meltable === true) out.meltable++;
+      else if (p.meltable === false) out.notMeltable++;
+      for (const c of p.contents || []) {
+        if (!/^ship$/i.test(c.kind || '')) continue;
+        const v = shipOf(c.label);
+        if (!v || !v.mfr) continue;
+        if (!owned.has(v.mfr)) owned.set(v.mfr, new Map());
+        owned.get(v.mfr).set(v.lname, v.name || v.lname);
+      }
+    }
+    // Models a maker sells: priced ships in the list (skips ground-vehicle noise).
+    const totals = new Map();
+    for (const v of catalog || []) {
+      if (!v.mfr || !v.msrp) continue;
+      totals.set(v.mfr, (totals.get(v.mfr) || 0) + 1);
+    }
+    out.makers = [...owned]
+      .map(([name, models]) => ({
+        name,
+        own: models.size,
+        total: Math.max(totals.get(name) || 0, models.size),
+        models: [...models.values()].sort(),
+      }))
+      .sort((a, b) => b.own - a.own || a.name.localeCompare(b.name));
     return out;
   };
 

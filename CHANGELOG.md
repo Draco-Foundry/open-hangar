@@ -4,6 +4,12 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **More Stats.** Three new tabs. **Collection**: your insurance mix, giftable and
+  meltable counts, and per manufacturer how many of their ships you own ("Origin:
+  9 of 17", hover for which). **Buy-backs**: what it would cost to buy everything
+  back, your tokens and the next one, the most valuable buy-backs and the ships
+  you've melted most often. **Top lists**: most valuable pledges, biggest savings vs
+  store price, oldest pledges and most valuable LTI ships. Click any row to open it.
 - **What's in a buy-back.** Click a buy-back's name (Market) or card to see what's
   in it, read from its RSI page: every ship in a pack, the insurance, what else it
   includes, and the real buy-back price. **Load details** does the same for every
