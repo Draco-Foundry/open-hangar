@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Open Hangar — source logo. Edit here, then regenerate the PNGs:
+       magick -background none icons/icon.svg -resize NxN icons/iconN.png -->
+  <defs>
+    <linearGradient id="oh-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b2330"/>
+      <stop offset="1" stop-color="#0d1117"/>
+    </linearGradient>
+    <linearGradient id="oh-acc" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#58a6ff"/>
+      <stop offset="1" stop-color="#2f81f7"/>
+    </linearGradient>
+    <linearGradient id="oh-bay" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f81f7" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#0d1117" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- rounded panel background -->
+  <rect x="3" y="3" width="122" height="122" rx="27" fill="url(#oh-bg)" stroke="#2a3139" stroke-width="2"/>
+
+  <!-- glow rising from the open bay -->
+  <path d="M40 101 V72 a24 24 0 0 1 48 0 V101 Z" fill="url(#oh-bay)"/>
+
+  <!-- hangar shell: peaked roof + walls -->
+  <path d="M22 101 V60 L64 28 L106 60 V101" fill="none" stroke="url(#oh-acc)"
+        stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+
+  <!-- ship launching out of the bay -->
+  <path d="M64 40 L80 90 L64 80 L48 90 Z" fill="#e6edf3"/>
+  <path d="M64 40 L64 80 L48 90 Z" fill="#aac8ef"/>
+
+  <!-- hangar floor -->
+  <rect x="20" y="101" width="88" height="7" rx="3.5" fill="url(#oh-acc)"/>
+</svg>

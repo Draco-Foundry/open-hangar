@@ -1,0 +1,153 @@
+/* Same palette as the extension dashboard, so the two feel like one product. */
+:root {
+  --bg: #0d1117;
+  --panel: #161b22;
+  --panel-2: #1c222b;
+  --line: #2a3139;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #2f81f7;
+  --accent-hover: #4493f8;
+  --link: #58a6ff;
+  --good: #3fb950;
+  --bad: #f85149;
+  color-scheme: dark;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    14px/1.5 system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+a {
+  color: var(--link);
+}
+.wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+h1 {
+  font-size: 26px;
+  margin: 28px 0 8px;
+}
+h2 {
+  font-size: 18px;
+  margin: 26px 0 10px;
+}
+.muted {
+  color: var(--muted);
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+.btn,
+button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--accent);
+  color: #fff;
+  font: 600 13px system-ui;
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn:hover,
+button:hover {
+  background: var(--accent-hover);
+}
+.btn.secondary,
+button.secondary {
+  background: var(--panel-2);
+  color: var(--text);
+}
+button.danger {
+  background: transparent;
+  color: var(--bad);
+  border-color: var(--bad);
+}
+label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+input {
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 14px;
+}
+input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+.form {
+  display: grid;
+  gap: 12px;
+  max-width: 380px;
+}
+.error {
+  color: var(--bad);
+  min-height: 1.4em;
+  font-size: 13px;
+}
+.ok {
+  color: var(--good);
+}
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+}
+.stat {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.stat .big {
+  font-size: 24px;
+  font-weight: 700;
+}
+.stat .lbl {
+  color: var(--muted);
+  font-size: 12px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+th,
+td {
+  text-align: left;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+}
+th {
+  color: var(--muted);
+  font-weight: 600;
+}
+td.num,
+th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
