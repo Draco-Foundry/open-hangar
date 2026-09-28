@@ -98,6 +98,26 @@ try {
   cards ? ok(`summary shows ${cards} boxes`) : fail('home summary empty');
   (await page.$('.howto details[open]')) ? ok('how-to guide open') : fail('how-to guide missing');
 
+  // Currency: EUR converts the melt box (needs the live rates service).
+  const rates = await page.evaluate(async () => {
+    try {
+      return JSON.stringify(await OH.getFxRates());
+    } catch (e) {
+      return 'ERR ' + e.message;
+    }
+  });
+  /"EUR":/.test(rates) ? ok('exchange rates load') : fail(`exchange rates: ${rates}`);
+  await page.select('#currency-select', 'EUR');
+  await page
+    .waitForFunction(() => /€/.test(document.querySelector('#view-home').textContent), {
+      timeout: 8000,
+    })
+    .catch(() => {});
+  const eur = await page.$eval('#view-home', (e) => /€[\d,]+\.\d\d/.test(e.textContent));
+  eur ? ok('currency switch shows €') : fail(`currency switch: no € on Home`);
+  await page.select('#currency-select', 'USD');
+  await new Promise((r) => setTimeout(r, 300));
+
   console.log('Inventory');
   await go('#inventory');
   const n = await page.$$eval('#results .card', (e) => e.length);

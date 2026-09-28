@@ -435,8 +435,19 @@ function setScanning(text, done = false) {
   }
 }
 
-const money = (n) => '$' + n.toFixed(2);
-const dollars = (n) => '$' + Math.round(n).toLocaleString('en-US');
+// Amounts are USD; `fx` converts them to the display currency (Home → Currency).
+// `rawMoney` is for numbers the user typed (My Price), which aren't converted.
+const fx = { code: 'USD', rate: 1, date: null };
+const fmtCurrency = (n, digits) =>
+  new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: fx.code,
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(n);
+const money = (n) => fmtCurrency(n * fx.rate, 2);
+const dollars = (n) => fmtCurrency(Math.round(n * fx.rate), 0);
+const rawMoney = (n) => fmtCurrency(n, 2);
 
 // --- Hangar value (ship store prices) ---------------------------------------
 // Prices come from the cached star-citizen.wiki catalog (OH.getPriceIndex).
@@ -477,6 +488,7 @@ function storeInfo(p) {
 
 function formatValue(p) {
   if (!Number.isFinite(p.value)) return '';
+  if (!p.currency || p.currency === 'USD' || !/^[A-Z]{3}$/.test(p.currency)) return money(p.value);
   const s = '$' + p.value.toFixed(2);
   // Only append a real non-USD ISO-4217 code. Guards against RSI's junk currency
   // on $0 reward items (e.g. "TyCustomer_ledger_-en") in data scanned before the
@@ -748,17 +760,7 @@ function renderAccount() {
         `<span class="bal ${cls}"><span class="bal-lbl">${label}</span> <b>${val}</b></span>`;
       setHTML(
         balEl,
-        pill(
-          'store',
-          'Store Credit',
-          c.store
-            ? '$' +
-                (c.store.value / 100).toLocaleString('en-US', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })
-            : DASH,
-        ) +
+        pill('store', 'Store Credit', c.store ? money(c.store.value / 100) : DASH) +
           pill('uec', 'UEC', c.uec ? '¤' + fmt(c.uec.value) : DASH) +
           pill('rec', 'REC', c.rec ? '¤' + fmt(c.rec.value) : DASH) +
           `<a class="bal bbt" href="#buybacks" data-view="buybacks" title="${OH.escapeHtml(
@@ -1359,8 +1361,8 @@ function marketRowHtml(g) {
   const price = saved && saved.price != null ? OH.escapeHtml(String(saved.price)) : '';
   const gift = giftableLabel(g);
   const picked = g.ids.every((id) => state.selected.has(id));
-  const pct = OH.escapeHtml(pctOfMelt(saved && saved.price, p.value));
-  return `<tr class="mk-row${picked ? ' picked' : ''}" data-key="${key}" data-melt="${Number.isFinite(p.value) ? p.value : ''}">
+  const pct = OH.escapeHtml(pctOfMelt(saved && saved.price, p.value * fx.rate));
+  return `<tr class="mk-row${picked ? ' picked' : ''}" data-key="${key}" data-melt="${Number.isFinite(p.value) ? p.value * fx.rate : ''}">
     <td class="mk-sel"><input type="checkbox" class="mk-pick" ${picked ? 'checked' : ''} aria-label="Pick for export"></td>
     <td class="mk-name">${OH.escapeHtml(plainName(p))}</td>
     <td class="mk-ins">${OH.escapeHtml(marketInsurance(p))}</td>
@@ -1519,7 +1521,7 @@ function marketCsv(sections) {
         marketInsurance(g.rep),
         giftableLabel(g),
         meltLabel(g.rep),
-        pctOfMelt(saved && saved.price, g.rep.value),
+        pctOfMelt(saved && saved.price, g.rep.value * fx.rate),
         saved && saved.price != null ? saved.price : '',
         g.stock,
       ]);
@@ -1552,7 +1554,7 @@ function marketImageCells(g) {
     ins: marketInsurance(g.rep),
     gift: giftableLabel(g),
     melt: meltLabel(g.rep),
-    price: saved && saved.price != null ? '$' + saved.price : '—',
+    price: saved && saved.price != null ? rawMoney(priceNumber(saved.price) ?? 0) : '—',
     stock: String(g.stock),
   };
 }
@@ -1772,7 +1774,7 @@ function imagePriceText(p, mode) {
     const saved = state.market[marketKey(p)];
     if (!saved || saved.price == null || saved.price === '') return '';
     const n = Number(saved.price);
-    return Number.isFinite(n) ? money(n) : String(saved.price);
+    return Number.isFinite(n) ? rawMoney(n) : String(saved.price);
   }
   return '';
 }
@@ -4508,18 +4510,69 @@ async function initUpdates() {
   }
 }
 
+// --- Display currency -------------------------------------------------------
+function currencyNote() {
+  return fx.code === 'USD'
+    ? ''
+    : `Converted from USD at the ${fx.date ? `${fx.date} ` : ''}exchange rate, before tax. RSI's own EUR/GBP store prices include VAT, so they'll look higher.`;
+}
+function renderCurrencyNote() {
+  document.querySelectorAll('.currency-note').forEach((el) => {
+    el.textContent = currencyNote();
+    el.hidden = !el.textContent;
+  });
+}
+async function applyCurrency(code) {
+  const want = OH.CURRENCIES.includes(code) ? code : 'USD';
+  let rate = 1;
+  let date = null;
+  if (want !== 'USD') {
+    const r = await OH.getFxRates();
+    if (r && r.rates && r.rates[want]) {
+      rate = r.rates[want];
+      date = r.date;
+    } else {
+      setStatus?.('Couldn’t load exchange rates, showing USD for now.');
+      Object.assign(fx, { code: 'USD', rate: 1, date: null });
+      renderCurrencyNote();
+      return;
+    }
+  }
+  Object.assign(fx, { code: want, rate, date });
+  valueCache = { items: null, priceOf: null, value: null };
+  renderCurrencyNote();
+  route(); // re-render the current view in the new currency
+}
+{
+  const sel = $('#currency-select');
+  if (sel) {
+    sel.addEventListener('change', async () => {
+      await chrome.storage.local.set({ currency: sel.value });
+      applyCurrency(sel.value);
+    });
+  }
+}
+
 // --- Init -----------------------------------------------------------------
 
 (async () => {
-  const { uiLayout, bbLayout, marketAnnotations, uiStatsTab, lastBackupAt, remindRescan } =
-    await chrome.storage.local.get([
-      'remindRescan',
-      'lastBackupAt',
-      'uiStatsTab',
-      'uiLayout',
-      'bbLayout',
-      'marketAnnotations',
-    ]);
+  const {
+    uiLayout,
+    bbLayout,
+    marketAnnotations,
+    uiStatsTab,
+    lastBackupAt,
+    remindRescan,
+    currency,
+  } = await chrome.storage.local.get([
+    'currency',
+    'remindRescan',
+    'lastBackupAt',
+    'uiStatsTab',
+    'uiLayout',
+    'bbLayout',
+    'marketAnnotations',
+  ]);
   if (LAYOUTS.includes(uiLayout)) state.layout = uiLayout;
   if (STATS_TABS.some(([k]) => k === uiStatsTab)) state.statsTab = uiStatsTab;
   if (Number.isFinite(lastBackupAt)) state.lastBackupAt = lastBackupAt;
@@ -4548,4 +4601,9 @@ async function initUpdates() {
   renderFooter();
   renderSupporters();
   initUpdates();
+  if (currency && currency !== 'USD') {
+    const sel = $('#currency-select');
+    if (sel) sel.value = currency;
+    applyCurrency(currency);
+  }
 })();
