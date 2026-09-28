@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## 0.2.8 — 2026-09-28
 
+- **New Home card background.** A subtle hex-grid texture of our own replaces the
+  RSI image, so the Home page no longer loads anything from RSI's media servers.
 - **How-to on the Home page.** A "How to use Open Hangar" section with Getting
   started open by default, and quick guides for browsing, hangar value, selling,
   backups and getting help.
