@@ -65,6 +65,8 @@
       emptyMarker: /no pledges available/i, // RSI's "you have no buy-backs" message
       requiresRender: true, // if RSI ever serves a JS-only shell, report it (don't silently say "empty")
       parse: (html) => window.OpenHangar.parseBuybacks(html),
+      // Read once from page 1 and kept next to the items (db.sources.buybacks.meta).
+      meta: (html) => ({ tokens: window.OpenHangar.parseBuybackTokens(html) }),
     },
     // { id: 'store', label: 'Store', type: 'api', … }  ← see ROADMAP.md
   ];
@@ -207,11 +209,11 @@
     return db.sources[id] || { items: [], scannedAt: null };
   };
 
-  async function saveSource(id, items, { record = false } = {}) {
+  async function saveSource(id, items, { record = false, meta } = {}) {
     const db = await OH.loadDB();
     const scannedAt = Date.now();
     if (record) recordHistory(db, db.sources[id], items, scannedAt);
-    db.sources[id] = { items, scannedAt };
+    db.sources[id] = meta ? { items, scannedAt, meta } : { items, scannedAt };
     // Stamp which RSI account this data belongs to, so the UI can detect when a
     // different account signs in later and clear the stale data (multi-account
     // safety). Best-effort: if we can't read the account, leave owner untouched.
@@ -687,6 +689,7 @@
     const seen = new Set();
     const all = [];
     const size = src.pageSize || PAGE_SIZE;
+    let meta;
 
     for (let page = 1; page <= MAX_PAGES; page++) {
       const url = `${src.url}?page=${page}&pagesize=${size}`;
@@ -696,7 +699,7 @@
       });
       if (got.error) {
         if (page === 1) return { error: `${got.error}. Check your connection and try again.` };
-        return { items: all, partial: { page, reason: got.error } };
+        return { items: all, meta, partial: { page, reason: got.error } };
       }
       const res = got.res;
       if (res.status === 401 || res.status === 403) {
@@ -708,6 +711,13 @@
 
       const html = await res.text();
       const items = src.parse(html);
+      if (page === 1 && src.meta) {
+        try {
+          meta = src.meta(html);
+        } catch {
+          /* optional extras */
+        }
+      }
 
       if (page === 1 && !items.length) {
         if (looksLoggedOut(res, html)) {
@@ -748,7 +758,7 @@
       if (added === 0) break;
       await sleep(DELAY_MS);
     }
-    return { items: all };
+    return { items: all, meta };
   }
 
   // Scan one source by id and persist it. Returns { ok, items?, scannedAt?, error? }.
@@ -785,7 +795,7 @@
             error: `RSI stopped responding at page ${page} (${reason}) — kept your previous scan of ${prevCount}. Try again in a minute.`,
           };
         }
-        const scannedAt = await saveSource(src.id, result.items);
+        const scannedAt = await saveSource(src.id, result.items, { meta: result.meta });
         return {
           ok: true,
           items: result.items,
@@ -796,7 +806,10 @@
 
       // Only complete hangar scans go into the history (a partial one would read
       // as pledges disappearing).
-      const scannedAt = await saveSource(src.id, result.items, { record: src.id === 'hangar' });
+      const scannedAt = await saveSource(src.id, result.items, {
+        record: src.id === 'hangar',
+        meta: result.meta,
+      });
       OH.log('info', src.id, `scan ok, ${result.items.length} items`);
       return { ok: true, items: result.items, scannedAt };
     } catch (err) {

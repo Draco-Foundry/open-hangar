@@ -149,6 +149,16 @@ try {
 
   console.log('Buy-Backs');
   await go('#buybacks');
+  const tok = await page.$eval('.bb-tokens', (e) => e.textContent).catch(() => '');
+  /have 2 buy-back tokens/.test(tok) ? ok('buy-back tokens shown') : fail(`tokens: "${tok}"`);
+  await page.select('#bb-sort', 'price-desc');
+  const bbPrices = await page.$$eval('#buybacks-body .card .val', (v) =>
+    v.map((e) => Number(e.textContent.replace(/[$,]/g, ''))),
+  );
+  bbPrices.length && bbPrices.every((x, i) => i === 0 || bbPrices[i - 1] >= x)
+    ? ok(`buy-backs sort by price (${bbPrices.length} priced)`)
+    : fail(`buy-back price sort: ${JSON.stringify(bbPrices)}`);
+  await page.select('#bb-sort', 'date-desc');
   await page.click('#bb-layout [data-layout="list"]');
   await checkListAlignment('Buy-Backs', '#buybacks-body');
 
