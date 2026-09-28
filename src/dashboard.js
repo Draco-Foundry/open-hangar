@@ -1369,6 +1369,7 @@ function marketRowHtml(g) {
     <td class="mk-pct"><input class="mk-pct-in" type="text" inputmode="decimal" value="${pct}" placeholder="%" aria-label="Percent of melt"></td>
     <td class="mk-mine"><input class="mk-price" type="text" inputmode="decimal" value="${price}" placeholder="$" aria-label="My price"></td>
     <td class="mk-stock">${g.stock}</td>
+    <td class="mk-view">${viewOnRsiLink(p)}</td>
   </tr>`;
 }
 
@@ -1380,7 +1381,7 @@ function marketTableHtml(section, groups) {
         <th class="mk-sel"><input type="checkbox" class="mk-pick-all" aria-label="Pick all in ${OH.escapeHtml(section.label)}" ${
           groups.every((g) => g.ids.every((id) => state.selected.has(id))) ? 'checked' : ''
         }></th><th>Items Name</th><th>Insurance</th><th>Giftable</th><th>Melt Price</th>
-        <th title="Your price as a percent of melt value">% of Melt</th><th>My Price</th><th>Stock</th>
+        <th title="Your price as a percent of melt value">% of Melt</th><th>My Price</th><th>Stock</th><th title="Open the pledge in your RSI hangar, e.g. to screenshot its details">RSI</th>
       </tr></thead>
       <tbody>${groups.map(marketRowHtml).join('')}</tbody>
     </table>
@@ -3658,6 +3659,32 @@ function storeRow(p, row) {
   return row('Store price', v + parts) + melt;
 }
 
+// RSI has no per-pledge address, and its hangar always shows 10 per page
+// (a smaller page size is ignored), so link the page the pledge is on and say
+// where on it: "page 4, #3". Positions are from the last scan (newest first),
+// so they shift after buying or melting until the next scan.
+const RSI_PAGE = 10;
+let hangarPos = null;
+function hangarSpot(p) {
+  if (!hangarPos || hangarPos.items !== state.items) {
+    hangarPos = { items: state.items, at: new Map(state.items.map((x, i) => [String(x.id), i])) };
+  }
+  const i = hangarPos.at.get(String(p.id));
+  if (i == null) return null;
+  const page = Math.floor(i / RSI_PAGE) + 1;
+  return {
+    page,
+    pos: (i % RSI_PAGE) + 1,
+    url: `https://robertsspaceindustries.com/account/pledges?page=${page}`,
+  };
+}
+function viewOnRsiLink(p, long = false) {
+  const s = hangarSpot(p);
+  if (!s) return '';
+  const label = long ? `Page ${s.page}, #${s.pos} in your hangar ↗` : `p${s.page} #${s.pos} ↗`;
+  return `<a class="bb-reclaim" href="${OH.escapeHtml(s.url)}" target="_blank" rel="noopener" title="Opens page ${s.page} of your RSI hangar; it's number ${s.pos} on that page (as of your last scan)">${label}</a>`;
+}
+
 function openItemModal(p) {
   hidePreview();
   const real = realImage(p.image);
@@ -3690,6 +3717,7 @@ function openItemModal(p) {
       ${storeRow(p, row)}
       ${p.currency ? row('Currency', OH.escapeHtml(p.currency)) : ''}
       ${p.isCCU && p.ccu ? row('Upgrade', OH.escapeHtml(`${p.ccu.from} → ${p.ccu.to}`)) : ''}
+      ${hangarSpot(p) ? row('On RSI', viewOnRsiLink(p, true)) : ''}
       ${row('Scanned', OH.escapeHtml(fmtScan()))}
       <h4 class="modal-h">Contents (${contents.length})</h4>
       ${contentsHtml}
