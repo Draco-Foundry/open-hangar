@@ -1859,6 +1859,14 @@
       .chip[aria-pressed='true'] {
         color: var(--text);
       }
+      /* Chips are <button>s; keep the generic button hover (solid blue) off them. */
+      .chip:hover {
+        background: var(--panel-2);
+        color: var(--text);
+      }
+      .chip.trait[aria-pressed='true']:hover {
+        background: rgba(47, 129, 247, 0.22);
+      }
       .chip.k-ship[aria-pressed='true'] {
         border-color: #2ea043;
       }
@@ -2200,6 +2208,12 @@
         font-size: 13px;
         white-space: nowrap;
         margin-left: auto;
+      }
+      /* Cards: price always on its own line under the tags, so every card in a
+         row looks the same whatever the name or card width. */
+      .grid:not(.list) .card-foot .val {
+        flex-basis: 100%;
+        text-align: right;
       }
       .foot-left {
         display: inline-flex;
