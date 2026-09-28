@@ -239,6 +239,9 @@ const REFERRAL_EVENTS = [
 // Until set, a "soon" placeholder shows instead of a broken link.
 const REPO_URL = 'https://github.com/Draco-Foundry/open-hangar';
 const DISCORD_URL = 'https://discord.gg/FF8Wm5HdnV';
+// Feature ideas live in GitHub Discussions → Ideas (upvotable); Discord covers
+// people without a GitHub account.
+const IDEAS_URL = `${REPO_URL}/discussions/categories/ideas`;
 
 // Supporters shown on the Developers page. Each entry is { name, url? }.
 // Empty arrays render a friendly placeholder. When the GitHub repo is public
@@ -759,9 +762,14 @@ function renderFooter() {
   const v = chrome.runtime.getManifest().version;
   const gh = link(REPO_URL, 'GitHub');
   const dc = link(DISCORD_URL, 'Discord');
-  $('#footer').innerHTML = `${gh} · ${dc} · MIT License · v${v}`;
+  const ideas = link(IDEAS_URL, 'Suggest a feature');
+  $('#footer').innerHTML = `${gh} · ${dc} · ${ideas} · MIT License · v${v}`;
   const dev = $('#dev-links');
-  if (dev) dev.innerHTML = link(REPO_URL, 'GitHub') + link(DISCORD_URL, 'Discord');
+  if (dev)
+    dev.innerHTML =
+      link(REPO_URL, 'GitHub') +
+      link(DISCORD_URL, 'Discord') +
+      link(IDEAS_URL, 'Suggest a feature');
 }
 
 // Developers page "Thanks & supporters": render contributor / booster chips,

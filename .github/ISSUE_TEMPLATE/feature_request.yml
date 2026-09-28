@@ -1,0 +1,26 @@
+name: ✨ Feature request
+description: A specific, ready-to-build improvement. (Loose ideas → Discussions → Ideas.)
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Got a rough idea you'd like others to weigh in on? Post it in [Discussions → Ideas](https://github.com/Draco-Foundry/open-hangar/discussions/categories/ideas) instead, where people can upvote it.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do?
+      description: The thing you're trying to do, and why it matters to you.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could Open Hangar help?
+      description: Your idea for how it should work. Sketches or examples from other tools are welcome.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Fits the project
+      options:
+        - label: It only needs data from my own RSI account (Open Hangar never reads other people's accounts or sends data to a server).
