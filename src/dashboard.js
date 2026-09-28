@@ -1242,7 +1242,7 @@ function cardHtml(p) {
     <div class="card-body">
       <div class="card-name" title="${OH.escapeHtml(plainName(p))}">${nameHtml}</div>
       ${contentsLine}
-      <div class="card-ins" title="Insurance">${OH.escapeHtml(p.insurance || '')}</div>
+      <div class="card-ins" title="Insurance">${OH.escapeHtml(insLabel(p.insurance))}</div>
       <div class="card-foot">
         <span class="foot-left"><span class="badge ${badgeClass}">${OH.escapeHtml(p.kind)}</span>${flagsHtml(p)}</span>
         <span class="val"${valTitle(p)}>${OH.escapeHtml(formatValue(p))}</span>
@@ -1302,12 +1302,18 @@ function priceAtPct(pct, melt) {
   return n != null && melt > 0 ? String(Math.round(melt * n) / 100) : '';
 }
 
-// Insurance term (LTI / 3M / 120M / …). Not parsed from RSI yet — the parser
-// reads an "Insurance" tile but not its term (see ROADMAP). Render whatever a
-// future parser sets on p.insurance; until then show an em-dash placeholder so
-// the column exists and lights up automatically once extraction lands.
+// Insurance for display: the parser stores short terms (LTI / 6M / 120M / 5Y);
+// people read "120 Months". Unknown phrasing passes through as RSI wrote it.
+function insLabel(t) {
+  if (!t) return '';
+  const m = String(t).match(/^(\d+)\s*([MY])$/i);
+  if (!m) return String(t);
+  const n = Number(m[1]);
+  const unit = /y/i.test(m[2]) ? 'Year' : 'Month';
+  return `${n} ${unit}${n === 1 ? '' : 's'}`;
+}
 function marketInsurance(p) {
-  return p.insurance || '----';
+  return insLabel(p.insurance) || '----';
 }
 
 // A pledge is meltable when RSI offers to melt it (the hangar's "Exchange"
@@ -1945,9 +1951,9 @@ async function fleetImageCanvas(list, { title, price }) {
       ctx.fillStyle = C.text;
       ctx.fillText(pt, x + CW - 12 - pw, by);
     }
-    const ins = marketInsurance(p);
+    const ins = insLabel(p.insurance);
     const left = [
-      ins && ins !== '—' ? ins : '',
+      ins,
       p.giftable === true ? 'Giftable' : p.giftable === false ? 'Not giftable' : '',
     ]
       .filter(Boolean)
@@ -3417,7 +3423,7 @@ function buybackReclaimLink(b) {
   return `<a class="bb-reclaim" href="${OH.escapeHtml(url)}" target="_blank" rel="noopener" title="${tip}">Reclaim ↗</a>`;
 }
 function bbInsurance(b) {
-  return b.insurance || window.OpenHangar.insuranceFromName(b.name) || '—';
+  return insLabel(b.insurance || window.OpenHangar.insuranceFromName(b.name)) || '—';
 }
 
 function bbPriceHtml(b) {
