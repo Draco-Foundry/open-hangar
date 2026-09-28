@@ -27,9 +27,8 @@ const welcome = Astro.url.searchParams.has('welcome');
 
   <section class="card">
     <h2 style="margin-top:0">Profile</h2>
-    <p>
-      <strong>{(user as { displayUsername?: string; username?: string }).displayUsername || (user as { username?: string }).username || user.name}</strong><br /><span class="muted">{user.email}</span>
-    </p>
+    <p><strong>{user.email}</strong></p>
+    <p class="muted">RSI handles will show here for each hangar you sync (your main and any alts).</p>
   </section>
 
   <section class="card" id="tfa" data-enabled={user.twoFactorEnabled ? '1' : ''}>
