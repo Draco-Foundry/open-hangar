@@ -26,7 +26,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-body);
-  font-size: var(--font-size, 14px);
+  font-size: var(--font-size, 16px);
   line-height: 1.5;
 }
 h1,
@@ -44,11 +44,11 @@ a {
   padding: 0 20px;
 }
 h1 {
-  font-size: 26px;
+  font-size: 30px;
   margin: 28px 0 8px;
 }
 h2 {
-  font-size: 18px;
+  font-size: 20px;
   margin: 26px 0 10px;
 }
 .muted {
@@ -70,7 +70,7 @@ button {
   border-radius: min(var(--radius), 8px);
   background: var(--accent);
   color: #fff;
-  font: 600 13px var(--font-body);
+  font: 600 14px var(--font-body);
   cursor: pointer;
   text-decoration: none;
 }
@@ -91,7 +91,7 @@ button.danger {
 label {
   display: grid;
   gap: 4px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
 }
 input {
@@ -114,7 +114,7 @@ input:focus {
 .error {
   color: var(--bad);
   min-height: 1.4em;
-  font-size: 13px;
+  font-size: 14px;
 }
 .ok {
   color: var(--good);
@@ -131,17 +131,17 @@ input:focus {
   padding: 14px 16px;
 }
 .stat .big {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 700;
 }
 .stat .lbl {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 15px;
 }
 th,
 td {
