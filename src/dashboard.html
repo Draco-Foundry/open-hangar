@@ -1372,6 +1372,22 @@
       .stats-tabs {
         margin-bottom: 20px;
       }
+      .backup-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 12px;
+        margin-top: 22px;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel);
+        font-size: 12px;
+      }
+      .backup-row .muted {
+        flex: 1;
+        min-width: 240px;
+      }
       .top-list.spaced {
         margin-bottom: 26px;
       }
@@ -2702,7 +2718,8 @@
       recruitsList: [ { handle, moniker, enlistedOn, convertedOn, campaign } ],
       prospectsList: [ … ]
     }, scannedAt }                              // NB: referral code/url are NOT exported
-  }
+  },
+  history: [ { at, items: [ [id, name, value] ] } ]  // scan snapshots (Stats → History)
 }</pre
           >
 
@@ -2710,11 +2727,12 @@
           <p>
             <strong>JSON export/import is live</strong> — download the whole database (the shape
             above) to back it up or feed it into your own project; import restores a previous
-            export. Import restores the <code>sources</code> (holdings); the
-            <code>account</code> block is a read-only snapshot for consumers — the Citizen Card
-            always reflects the live RSI session. Still on the roadmap: an opt-in way for sites you
-            approve to ask the extension for your data directly, instead of exporting a file by
-            hand. It would be limited to a short list of domains you trust, using the browser's
+            export. Import restores the <code>sources</code> (holdings) and merges the scan
+            <code>history</code> with what's already here; the <code>account</code> block is a
+            read-only snapshot for consumers — the Citizen Card always reflects the live RSI
+            session. Still on the roadmap: an opt-in way for sites you approve to ask the extension
+            for your data directly, instead of exporting a file by hand. It would be limited to a
+            short list of domains you trust, using the browser's
             <code>externally_connectable</code> messaging channel (note this isn't supported
             identically across Chrome, Firefox, and Safari).
           </p>
