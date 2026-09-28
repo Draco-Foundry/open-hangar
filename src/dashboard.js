@@ -12,11 +12,11 @@ const VIEWS = [
   'inventory',
   'buybacks',
   'stats',
+  'store',
   'org',
   'referrals',
-  'store',
-  'developers',
   'updates',
+  'developers',
 ];
 
 const statusEl = $('#status');
