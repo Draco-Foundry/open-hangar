@@ -167,3 +167,15 @@ test('reads meltability from the rendered Exchange action', () => {
   assert.equal(byId('222').meltable, true); // CCU: can be melted too
   assert.equal(byId('333').meltable, false); // add-on: no Exchange action
 });
+
+test('parseBuybackTokens reads the "You have N opportunity" header', () => {
+  const P = globalThis.OpenHangar;
+  assert.equal(
+    P.parseBuybackTokens(
+      '<p class="buy-back-warning"><span class="warn-icon"></span>You have <strong>2</strong> opportunity to buy back a pledge with store credits.<br/>',
+    ),
+    2,
+  );
+  assert.equal(P.parseBuybackTokens('You have no opportunities to buy back a pledge'), 0);
+  assert.equal(P.parseBuybackTokens('<html>nothing here</html>'), null);
+});
