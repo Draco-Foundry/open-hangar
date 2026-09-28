@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Open Hangar",
   "description": "Your Star Citizen hangar, made useful: ship values, melt candidates, CCU savings, fleet stats and buy-backs. Private and local.",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "author": "Draco Foundry",
   "homepage_url": "https://github.com/Draco-Foundry/open-hangar",
   "permissions": ["storage", "cookies"],
