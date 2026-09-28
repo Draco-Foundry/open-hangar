@@ -20,7 +20,8 @@
     "lint:firefox": "npm run build && web-ext lint --source-dir dist/firefox",
     "pack": "npm run build && web-ext build --source-dir dist/chrome --artifacts-dir dist --filename open-hangar-chrome-{version}.zip --overwrite-dest && web-ext build --source-dir dist/firefox --artifacts-dir dist --filename open-hangar-firefox-{version}.zip --overwrite-dest",
     "screenshots": "node scripts/screenshots/run.mjs",
-    "demo": "node scripts/screenshots/run.mjs --serve"
+    "demo": "node scripts/screenshots/run.mjs --serve",
+    "test:ui": "node scripts/screenshots/smoke.mjs"
   },
   "devDependencies": {
     "jsdom": "^24.1.0",
