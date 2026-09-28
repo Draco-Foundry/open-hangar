@@ -11,7 +11,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   column (read from the name when RSI includes it). Add-ons such as Retaliator
   modules no longer land under Ships.
 - **Insurance in List view.** Inventory's List layout has an Insurance column (LTI,
-  120M, 6M, …).
+  120 Months, 6 Months, …). Insurance reads in full everywhere ("120 Months", not
+  "120M"), including the Market and fleet images.
 - **Your currency.** Pick USD, EUR, GBP, CAD or AUD on the Home card and every
   amount (melt value, store prices, buy-backs, org value, images) shows in it,
   converted from USD at the day's rate, before tax. Rates are public (the ECB's,
