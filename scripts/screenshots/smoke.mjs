@@ -172,6 +172,14 @@ try {
   const prices = await page.$$eval('#price-table tbody tr', (r) => r.length);
   prices > 50 ? ok(`price list: ${prices} ships`) : fail(`price list only ${prices} rows`);
 
+  console.log('Updates');
+  await go('#updates');
+  await page.waitForSelector('#updates-body .release', { timeout: 5000 }).catch(() => {});
+  const rel = await page.$$eval('#updates-body .release', (r) => r.length);
+  const tags = await page.$$eval('.release-tag', (t) => t.map((e) => e.textContent).join('|'));
+  rel >= 3 ? ok(`${rel} releases listed`) : fail(`only ${rel} releases listed`);
+  /Your version/.test(tags) ? ok('current version tagged') : fail('current version not tagged');
+
   console.log('Saved accounts');
   await go('#developers');
   const prof = await page.$$eval('#profiles .profile-row', (r) => r.map((e) => e.textContent));

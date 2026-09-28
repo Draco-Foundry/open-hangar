@@ -4,6 +4,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Updates page.** A new **Updates** page lists every release with its date and
+  what changed (also linked from the version on Home and in the footer). When a new
+  version has downloaded, a bar at the top says so with a **Reload to update**
+  button, and after an update Home points you to what's new.
 - **Store page.** Formerly "Store Data": every ship's store price, role, size and
   status with search, plus what each of your CCUs is worth. For planning upgrade
   chains it points you to ccugame.app, which does that job well.
@@ -135,10 +139,10 @@ First store release (Chrome Web Store, Firefox Add-ons, Microsoft Edge Add-ons).
 
 ## 0.2.0 – 0.2.6 — June 2026
 
-- **0.2.6** — pre-launch hardening and documentation.
-- **0.2.5** — signed-out view shows your cached scan; buy-back image fixes.
-- **0.2.4** — melted-CCU buy-backs show the right ship.
-- **0.2.3** — list-view alignment, buy-backs sorted newest first.
-- **0.2.2** — referral polish and the full event list.
-- **0.2.1** — privacy policy and store launch kit.
-- **0.2.0** — dedicated Referrals page with stats, charts, reward tiers and events.
+- **0.2.6:** pre-launch hardening and documentation.
+- **0.2.5:** signed-out view shows your cached scan; buy-back image fixes.
+- **0.2.4:** melted-CCU buy-backs show the right ship.
+- **0.2.3:** list-view alignment, buy-backs sorted newest first.
+- **0.2.2:** referral polish and the full event list.
+- **0.2.1:** privacy policy and store launch kit.
+- **0.2.0:** dedicated Referrals page with stats, charts, reward tiers and events.
