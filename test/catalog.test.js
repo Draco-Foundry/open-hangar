@@ -55,3 +55,33 @@ test('mergeCatalogs adds concept ships and fills gaps, but no flight-ready dupes
   assert.equal(out[1].slug, 'pioneer');
   assert.equal(list[0].msrp, null); // input untouched
 });
+
+test('collectionStats: insurance mix, gift/melt split, makers owned of total', () => {
+  const cat = [
+    { lname: 'carrack', name: 'Carrack', mfr: 'Anvil Aerospace', msrp: 600 },
+    { lname: 'arrow', name: 'Arrow', mfr: 'Anvil Aerospace', msrp: 75 },
+    { lname: 'cutlass black', name: 'Cutlass Black', mfr: 'Drake Interplanetary', msrp: 110 },
+  ];
+  const shipOf = (n) => cat.find((v) => v.lname === String(n).toLowerCase()) || null;
+  const items = [
+    {
+      insurance: 'LTI',
+      giftable: true,
+      meltable: true,
+      contents: [{ kind: 'Ship', label: 'Carrack' }],
+    },
+    {
+      insurance: '120M',
+      giftable: false,
+      meltable: true,
+      contents: [{ kind: 'Ship', label: 'Cutlass Black' }],
+    },
+  ];
+  const c = OH.collectionStats(items, shipOf, cat);
+  assert.deepEqual(c.insurance, { LTI: 1, '120M': 1 });
+  assert.equal(c.giftable, 1);
+  assert.equal(c.notGiftable, 1);
+  const anvil = c.makers.find((m) => m.name === 'Anvil Aerospace');
+  assert.equal(anvil.own, 1);
+  assert.equal(anvil.total, 2);
+});

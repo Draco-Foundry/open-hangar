@@ -223,6 +223,21 @@ try {
     text > 40 ? ok(`${tab} tab renders`) : fail(`${tab} tab is empty`);
   }
 
+  for (const [tab, sel] of [
+    ['collection', '#stats-body .bar-row'],
+    ['buybacks', '#stats-body .stat-box'],
+    ['top', '#stats-body .row.clickable'],
+  ]) {
+    await page.evaluate((t) => document.querySelector(`[data-stats-tab="${t}"]`).click(), tab);
+    await page.waitForSelector(sel, { timeout: 8000 }).catch(() => {});
+    (await page.$(sel)) ? ok(`${tab} tab renders`) : fail(`${tab} tab empty`);
+  }
+  await page.click('#stats-body .row.clickable');
+  (await page.$eval('#item-modal', (m) => !m.hidden))
+    ? ok('top list row opens the pledge')
+    : fail('top list row did not open');
+  await page.keyboard.press('Escape');
+
   console.log('Org Fleet');
   await go('#org');
   await page.click('#org-mine');

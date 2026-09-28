@@ -2594,6 +2594,9 @@ function renderStats() {
     fleet: () =>
       fleetSectionHtml() ||
       `<p class="muted">${pricesLoading ? 'Loading ship data…' : 'Ship data unavailable (offline?).'}</p>`,
+    collection: () => collectionSectionHtml(),
+    buybacks: () => buybackStatsHtml(),
+    top: () => topListsHtml(),
     history: () =>
       (historySectionHtml() ||
         '<p class="muted">History starts with your next scan — each scan that finds changes is kept here.</p>') +
@@ -2608,6 +2611,173 @@ function renderStats() {
           key === tab ? 'active' : ''
         }">${label}</button>`,
     ).join('')}</div>` + tabs[tab](),
+  );
+}
+
+// --- Stats: Collection / Buy-backs / Top lists --------------------------------
+// Rows with data-open-item / data-open-bb open that pledge or buy-back.
+const sBox = (big, lbl, cls = '') =>
+  `<div class="stat-box ${cls}"><div class="big">${big}</div><div class="lbl">${lbl}</div></div>`;
+function sBars(rows, fmt = (n) => n) {
+  const max = Math.max(1, ...rows.map((r) => r[1]));
+  return rows
+    .map(
+      ([
+        label,
+        n,
+        title,
+      ]) => `<div class="bar-row"${title ? ` title="${OH.escapeHtml(title)}"` : ''}>
+        <div class="bar-label">${OH.escapeHtml(label)}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((n / max) * 100)}%"></div></div>
+        <div class="bar-val">${fmt(n)}</div>
+      </div>`,
+    )
+    .join('');
+}
+const itemRow = (p, right) =>
+  `<div class="row clickable" data-open-item="${OH.escapeHtml(String(p.id))}"><div class="nm">${OH.escapeHtml(
+    plainName(p),
+  )}</div><div class="vl">${right}</div></div>`;
+const bbRow = (b, right) =>
+  `<div class="row clickable" data-open-bb="${OH.escapeHtml(String(b.id))}"><div class="nm">${OH.escapeHtml(
+    buybackName(b),
+  )}</div><div class="vl">${right}</div></div>`;
+
+function collectionSectionHtml() {
+  if (!state.shipOf)
+    return `<p class="muted">${pricesLoading ? 'Loading ship data…' : 'Ship data unavailable (offline?).'}</p>`;
+  const c = OH.collectionStats(state.items, state.shipOf, state.catalog || []);
+  const insOrder = (t) => (t === 'LTI' ? 1e6 : parseInt(t, 10) * (/y/i.test(t) ? 12 : 1) || 0);
+  const ins = Object.entries(c.insurance)
+    .sort((a, b) => insOrder(b[0]) - insOrder(a[0]))
+    .map(([t, n]) => [insLabel(t), n]);
+  const withIns = ins.reduce((a, r) => a + r[1], 0);
+  const lti = c.insurance.LTI || 0;
+  const makers = c.makers
+    .map(
+      (m) => `<div class="bar-row" title="${OH.escapeHtml(m.models.join(', '))}">
+        <div class="bar-label">${OH.escapeHtml(m.name)}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((m.own / m.total) * 100)}%"></div></div>
+        <div class="bar-val">${m.own} of ${m.total}</div>
+      </div>`,
+    )
+    .join('');
+  return (
+    `<div class="stat-grid">${
+      sBox(withIns ? `${Math.round((lti / withIns) * 100)}%` : '—', 'of insured pledges are LTI') +
+      sBox(c.giftable, 'giftable') +
+      sBox(c.notGiftable, 'not giftable') +
+      sBox(c.meltable, 'meltable') +
+      sBox(c.makers.length, 'manufacturers')
+    }</div>` +
+    `<h3 class="section-title">Insurance</h3>${ins.length ? sBars(ins) : '<p class="muted">No insurance found in your pledges.</p>'}` +
+    `<h3 class="section-title" style="margin-top:26px">Collection by manufacturer</h3>` +
+    `<p class="muted value-note tight">How many of each maker's ship models you own (out of the ones with a store price). Hover a row to see which.</p>` +
+    (makers || '<p class="muted">No ships matched the ship list yet.</p>')
+  );
+}
+
+function buybackStatsHtml() {
+  const bbs = state.buybacks;
+  if (!bbs.length) return '<p class="muted">No buy-backs yet. Scan from Home to include them.</p>';
+  if (!state.priceOf) ensurePrices();
+  const byKind = BB_KINDS.map((k) => [k.label, bbs.filter((b) => b.kind === k.key).length]).filter(
+    (r) => r[1],
+  );
+  const priced = bbs.map((b) => ({ b, v: bbPrice(b) })).filter((x) => x.v);
+  const total = priced.reduce((a, x) => a + x.v, 0);
+  const real = bbs.filter((b) => bbDetail(b)).length;
+  // Most-melted: same ship melted again and again.
+  const counts = new Map();
+  for (const b of bbs) {
+    if (b.isCCU) continue;
+    const k = String(b.name || '')
+      .replace(/^\s*.+?\s+[-–]\s/, '')
+      .trim();
+    if (k) counts.set(k, (counts.get(k) || 0) + 1);
+  }
+  const most = [...counts]
+    .filter((r) => r[1] > 1)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
+  const top = priced.sort((a, b) => b.v - a.v).slice(0, 10);
+  const next = nextTokenDate();
+  return (
+    `<div class="stat-grid">${
+      sBox(bbs.length, 'buy-backs') +
+      sBox(
+        dollars(total),
+        `to buy all back${real < bbs.length ? ' (≈, load details for real prices)' : ''}`,
+      ) +
+      sBox(state.bbTokens != null ? state.bbTokens : '—', 'buy-back tokens') +
+      sBox(next || '—', 'next token') +
+      sBox(`${real} / ${bbs.length}`, 'with details loaded')
+    }</div>` +
+    `<h3 class="section-title">By type</h3>${sBars(byKind)}` +
+    `<h3 class="section-title" style="margin-top:26px">Most valuable to buy back</h3>` +
+    `<div class="top-list">${top.map(({ b, v }) => bbRow(b, (bbDetail(b) ? '' : '~') + dollars(v))).join('') || '<div class="row muted">No prices yet.</div>'}</div>` +
+    (most.length
+      ? `<h3 class="section-title" style="margin-top:26px">Melted most often</h3><div class="top-list">${most
+          .map(
+            ([n, k]) =>
+              `<div class="row"><div class="nm">${OH.escapeHtml(n)}</div><div class="vl">×${k}</div></div>`,
+          )
+          .join('')}</div>`
+      : '')
+  );
+}
+
+function topListsHtml() {
+  const items = state.items;
+  const byValue = items
+    .filter((p) => Number.isFinite(p.value) && p.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
+  const dt = (p) => {
+    const t = Date.parse(p.date);
+    return Number.isNaN(t) ? null : t;
+  };
+  const oldest = items
+    .filter((p) => dt(p) != null)
+    .sort((a, b) => dt(a) - dt(b))
+    .slice(0, 10);
+  const v = hangarValue();
+  const savings = v
+    ? items
+        .map((p) => ({ p, si: v.pledges[p.id] }))
+        .filter(
+          (x) => x.si && x.si.store && Number.isFinite(x.si.paid) && x.si.store - x.si.paid >= 1,
+        )
+        .sort((a, b) => b.si.store - b.si.paid - (a.si.store - a.si.paid))
+        .slice(0, 10)
+    : [];
+  const ltiShips = items
+    .filter((p) => p.insurance === 'LTI' && p.containsShip && Number.isFinite(p.value))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
+  const list = (rows) =>
+    `<div class="top-list">${rows || '<div class="row muted">Nothing here yet.</div>'}</div>`;
+  return (
+    `<div class="top-cols"><div><h3 class="section-title">Most valuable pledges</h3>${list(
+      byValue.map((p) => itemRow(p, OH.escapeHtml(formatValue(p)))).join(''),
+    )}</div>` +
+    `<div><h3 class="section-title">Biggest savings vs store price</h3>${list(
+      savings
+        .map(({ p, si }) =>
+          itemRow(
+            p,
+            `${dollars(si.paid)} → ${dollars(si.store)} <span class="gain">+${dollars(si.store - si.paid)}</span>`,
+          ),
+        )
+        .join(''),
+    )}</div>` +
+    `<div><h3 class="section-title">Oldest pledges</h3>${list(
+      oldest.map((p) => itemRow(p, OH.escapeHtml(p.date))).join(''),
+    )}</div>` +
+    `<div><h3 class="section-title">Most valuable LTI ships</h3>${list(
+      ltiShips.map((p) => itemRow(p, OH.escapeHtml(formatValue(p)))).join(''),
+    )}</div></div>` +
+    `<p class="muted value-note">Click any row to open it. Savings compare what you paid with today's standard store price (warbonds, sales, CCU'd pledges).</p>`
   );
 }
 
@@ -2632,6 +2802,9 @@ const STATS_TABS = [
   ['overview', 'Overview'],
   ['value', 'Value'],
   ['fleet', 'Fleet'],
+  ['collection', 'Collection'],
+  ['buybacks', 'Buy-backs'],
+  ['top', 'Top lists'],
   ['history', 'History'],
 ];
 function setStatsTab(tab) {
@@ -4656,6 +4829,20 @@ async function applyCurrency(code) {
     });
   }
 }
+
+$('#stats-body')?.addEventListener('click', (e) => {
+  const it = e.target.closest('[data-open-item]');
+  if (it) {
+    const p = state.items.find((x) => String(x.id) === it.dataset.openItem);
+    if (p) openItemModal(p);
+    return;
+  }
+  const bb = e.target.closest('[data-open-bb]');
+  if (bb) {
+    const b = state.buybacks.find((x) => String(x.id) === bb.dataset.openBb);
+    if (b) openBuybackModal(b);
+  }
+});
 
 // --- Init -----------------------------------------------------------------
 
