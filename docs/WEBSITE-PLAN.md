@@ -61,6 +61,15 @@ Device-code flow (works on Chrome, Edge and Firefox alike):
 4. **Move openhangar.space into the Astro project** so the landing page and the app
    share one codebase (GitHub Pages retired).
 
+## Idea backlog
+
+- **Community gallery** (after phase 1; pairs with phase 3). Logged-in players upload
+  in-game screenshots, tagged by ship and location; they rotate as site backgrounds
+  with credit ("📷 by <handle>"), fill a gallery page, and a full-screen "digital
+  frame" mode (filter by ship). Needs: R2 storage + Cloudflare Images resizing, an
+  approval queue to start (then report button), an "I took this" confirmation,
+  removal requests, size/daily upload limits.
+
 ## Before sync ships to users
 
 - Privacy policy (repo + site) rewritten for optional sync: what's stored, where
