@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Open Hangar",
-  "description": "Read your own Star Citizen / RSI hangar, buy-backs, balances & referrals into a clean, local, exportable database.",
-  "version": "0.2.7",
+  "description": "Your Star Citizen hangar, made useful: ship values, melt candidates, CCU savings, fleet stats and buy-backs. Private and local.",
+  "version": "0.2.8",
   "author": "Draco Foundry",
   "homepage_url": "https://github.com/Draco-Foundry/open-hangar",
   "permissions": ["storage", "cookies"],
