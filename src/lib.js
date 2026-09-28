@@ -1600,7 +1600,9 @@
     if (shipImgMem.has(key)) return shipImgMem.get(key);
 
     const hit = ((await chrome.storage.local.get('shipImages')).shipImages || {})[key];
-    if (hit && Date.now() - hit.at < SHIP_IMG_TTL) {
+    // Found images keep for 90 days; "no image" answers only for a day, so a
+    // network blip or a later-added ship doesn't leave a blank card for months.
+    if (hit && Date.now() - hit.at < (hit.url ? SHIP_IMG_TTL : 24 * 3600e3)) {
       shipImgMem.set(key, hit.url);
       return hit.url;
     }
