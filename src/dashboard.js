@@ -2173,14 +2173,21 @@ function orgBarsHtml(map) {
     .join('');
 }
 
-// Roles covered / missing, as chips; hover a covered one for its ships.
+// Org Fleet is click-to-explore: a role chip opens what fills it (or, for a
+// missing role, ships that would); a member opens their fleet next to the rest
+// of the org; two members can be compared side by side.
+const orgUi = { role: null, member: null, a: null, b: null };
+
 function orgRolesHtml(f) {
   const missing = f.roles.filter((r) => !r.count);
   const chips = f.roles
-    .map((r) =>
-      r.count
-        ? `<span class="role-chip have" title="${OH.escapeHtml(r.ships.join(', '))}">${OH.escapeHtml(r.label)} <b>${r.count}</b></span>`
-        : `<span class="role-chip missing">${OH.escapeHtml(r.label)}</span>`,
+    .map(
+      (r) =>
+        `<button type="button" class="role-chip ${r.count ? 'have' : 'missing'}${
+          orgUi.role === r.key ? ' open' : ''
+        }" data-role="${r.key}" aria-expanded="${orgUi.role === r.key}">${OH.escapeHtml(r.label)}${
+          r.count ? ` <b>${r.count}</b>` : ''
+        }</button>`,
     )
     .join('');
   return `<h3 class="section-title" style="margin-top:22px">Roles</h3>
@@ -2188,8 +2195,163 @@ function orgRolesHtml(f) {
       missing.length
         ? `No ships for: <strong>${missing.map((r) => OH.escapeHtml(r.label)).join(', ')}</strong>.`
         : 'Every role is covered.'
-    } Hover a role to see which ships fill it.</p>
-    <div class="role-chips">${chips}</div>`;
+    } Click a role to see what fills it.</p>
+    <div class="role-chips">${chips}</div>${orgRolePanelHtml(f)}`;
+}
+
+function orgRolePanelHtml(f) {
+  const r = f.roles.find((x) => x.key === orgUi.role);
+  if (!r) return '';
+  const def = OH.ORG_ROLES.find((x) => x.key === r.key);
+  if (r.count) {
+    const rows = f.ships
+      .filter((sh) => sh.role && def.re.test(sh.role))
+      .map(
+        (sh) =>
+          `<tr><td>${OH.escapeHtml(sh.name)}</td><td class="muted">${OH.escapeHtml(sh.role)}</td><td class="num">${
+            sh.count
+          }</td><td class="org-owners">${sh.owners
+            .map((o) => OH.escapeHtml(o.n > 1 ? `${o.name} ×${o.n}` : o.name))
+            .join(', ')}</td></tr>`,
+      )
+      .join('');
+    return `<div class="org-panel"><div class="org-panel-head"><strong>${OH.escapeHtml(r.label)}</strong> · ${
+      r.count
+    } ship${r.count === 1 ? '' : 's'}<button type="button" class="org-close" data-close="role" aria-label="Close">×</button></div>
+      <table class="org-table"><thead><tr><th>Ship</th><th>Role</th><th class="num">Count</th><th>Owners</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+  const options = (state.catalog || [])
+    .filter((v) => v.role && def.re.test(v.role) && v.msrp)
+    .sort((x, y) => x.msrp - y.msrp)
+    .slice(0, 10)
+    .map(
+      (v) =>
+        `<tr><td>${OH.escapeHtml(v.name || v.lname)}</td><td class="muted">${OH.escapeHtml(v.role)}</td><td class="muted">${OH.escapeHtml(
+          v.status === 'flight-ready' ? 'Flight ready' : 'In concept',
+        )}</td><td class="num">${dollars(v.msrp)}</td></tr>`,
+    )
+    .join('');
+  return `<div class="org-panel"><div class="org-panel-head"><strong>${OH.escapeHtml(r.label)}</strong> · nobody has one yet<button type="button" class="org-close" data-close="role" aria-label="Close">×</button></div>
+    ${
+      options
+        ? `<p class="muted org-intro">Ships that fill this role, cheapest first:</p><table class="org-table"><thead><tr><th>Ship</th><th>Role</th><th>Status</th><th class="num">Store price</th></tr></thead><tbody>${options}</tbody></table>`
+        : '<p class="muted">No ships in the ship list fill this role.</p>'
+    }</div>`;
+}
+
+// Member table: click a name to open their fleet vs the rest of the org.
+function orgMembersHtml(f, members) {
+  const rows = f.byMember
+    .map(
+      (m) =>
+        `<tr class="org-mrow${orgUi.member === m.name ? ' open' : ''}" data-member="${OH.escapeHtml(m.name)}"><td><button type="button" class="bb-open">${OH.escapeHtml(
+          m.name,
+        )}</button></td><td class="num">${m.ships}</td><td class="num">${m.lti}</td><td class="num">${
+          m.priced ? dollars(m.store) : '—'
+        }</td><td class="num">${f.store ? Math.round((m.store / f.store) * 100) + '%' : '—'}</td></tr>`,
+    )
+    .join('');
+  const opts = (sel) =>
+    members
+      .map(
+        (m) =>
+          `<option value="${OH.escapeHtml(m.name)}"${m.name === sel ? ' selected' : ''}>${OH.escapeHtml(m.name)}</option>`,
+      )
+      .join('');
+  const compare =
+    members.length >= 2
+      ? `<div class="org-compare-bar">Compare <select class="org-cmp" data-side="a"><option value="">pick a member</option>${opts(
+          orgUi.a,
+        )}</select> with <select class="org-cmp" data-side="b"><option value="">pick a member</option>${opts(orgUi.b)}</select></div>`
+      : '';
+  return `<h3 class="section-title" style="margin-top:22px">Members</h3>
+    <p class="muted org-intro">Click a member to see their fleet next to the rest of the org.</p>
+    <table class="org-table"><thead><tr><th>Member</th><th class="num">Ships</th><th class="num">LTI</th><th class="num">Fleet value</th><th class="num">Share</th></tr></thead><tbody>${rows}</tbody></table>
+    ${orgMemberPanelHtml(f, members)}${compare}${orgComparePanelHtml(members)}`;
+}
+
+// Two-series bars: one row per key, `a` and `b` side by side.
+function pairBarsHtml(mapA, mapB, labelA, labelB) {
+  const keys = [...new Set([...Object.keys(mapA), ...Object.keys(mapB)])].sort(
+    (x, y) => (mapB[y] || 0) + (mapA[y] || 0) - ((mapB[x] || 0) + (mapA[x] || 0)),
+  );
+  const max = Math.max(1, ...keys.map((k) => Math.max(mapA[k] || 0, mapB[k] || 0)));
+  const cap = (k) => k.charAt(0).toUpperCase() + k.slice(1);
+  return `<div class="pair-legend"><span class="sw a"></span>${OH.escapeHtml(labelA)} <span class="sw b"></span>${OH.escapeHtml(
+    labelB,
+  )}</div>${keys
+    .map(
+      (
+        k,
+      ) => `<div class="pair-row"><div class="bar-label">${OH.escapeHtml(cap(k))}</div><div class="pair-bars">
+        <div class="pair-bar a" style="width:${Math.round(((mapA[k] || 0) / max) * 100)}%"><span>${mapA[k] || 0}</span></div>
+        <div class="pair-bar b" style="width:${Math.round(((mapB[k] || 0) / max) * 100)}%"><span>${mapB[k] || 0}</span></div>
+      </div></div>`,
+    )
+    .join('')}`;
+}
+
+function orgMemberPanelHtml(f, members) {
+  const m = members.find((x) => x.name === orgUi.member);
+  if (!m) return '';
+  const me = OH.orgFleet([m], state.shipOf, state.priceOf);
+  const rest = OH.orgFleet(
+    members.filter((x) => x !== m),
+    state.shipOf,
+    state.priceOf,
+  );
+  const onlyMe = me.roles.filter((r) => r.count && !rest.roles.find((x) => x.key === r.key).count);
+  const box = (big, lbl) =>
+    `<div class="stat-box"><div class="big">${big}</div><div class="lbl">${lbl}</div></div>`;
+  return `<div class="org-panel"><div class="org-panel-head"><strong>${OH.escapeHtml(m.name)}</strong> vs the rest of the org<button type="button" class="org-close" data-close="member" aria-label="Close">×</button></div>
+    <div class="stat-grid">${
+      box(me.shipCount, 'ships') +
+      box(dollars(me.store), 'fleet value') +
+      box(f.store ? Math.round((me.store / f.store) * 100) + '%' : '—', 'of org value') +
+      box(me.roles.filter((r) => r.count).length, 'roles covered')
+    }</div>
+    ${
+      onlyMe.length
+        ? `<p class="org-intro">Only ${OH.escapeHtml(m.name)} covers: <strong>${onlyMe.map((r) => OH.escapeHtml(r.label)).join(', ')}</strong></p>`
+        : ''
+    }
+    <div class="fleet-cols"><div><h4 class="modal-h">By role</h4>${pairBarsHtml(me.byCareer, rest.byCareer, m.name, 'Rest of org')}</div>
+    <div><h4 class="modal-h">By size</h4>${pairBarsHtml(me.bySize, rest.bySize, m.name, 'Rest of org')}</div></div>
+    <h4 class="modal-h">Ships</h4><p class="org-owners">${me.ships
+      .map((sh) => OH.escapeHtml(sh.count > 1 ? `${sh.name} ×${sh.count}` : sh.name))
+      .join(', ')}</p></div>`;
+}
+
+function orgComparePanelHtml(members) {
+  const A = members.find((x) => x.name === orgUi.a);
+  const B = members.find((x) => x.name === orgUi.b);
+  if (!A || !B || A === B) return '';
+  const fa = OH.orgFleet([A], state.shipOf, state.priceOf);
+  const fb = OH.orgFleet([B], state.shipOf, state.priceOf);
+  const namesA = new Set(fa.ships.map((x) => x.name));
+  const namesB = new Set(fb.ships.map((x) => x.name));
+  const both = [...namesA].filter((n) => namesB.has(n));
+  const onlyA = [...namesA].filter((n) => !namesB.has(n));
+  const onlyB = [...namesB].filter((n) => !namesA.has(n));
+  const col = (f, name) =>
+    `<div class="cmp-col"><h4 class="modal-h">${OH.escapeHtml(name)}</h4>
+      <div class="cmp-kv"><span>Ships</span><b>${f.shipCount}</b></div>
+      <div class="cmp-kv"><span>Fleet value</span><b>${dollars(f.store)}</b></div>
+      <div class="cmp-kv"><span>LTI</span><b>${f.byMember[0] ? f.byMember[0].lti : 0}</b></div>
+      <div class="cmp-kv"><span>Cargo</span><b>${Math.round(f.cargo).toLocaleString('en-US')} SCU</b></div>
+      <div class="cmp-kv"><span>Crew seats</span><b>${f.crew}</b></div>
+      <div class="cmp-kv"><span>Roles covered</span><b>${f.roles.filter((r) => r.count).length}</b></div></div>`;
+  const list = (arr) =>
+    arr.length ? arr.map((n) => OH.escapeHtml(n)).join(', ') : '<span class="muted">none</span>';
+  return `<div class="org-panel"><div class="org-panel-head"><strong>${OH.escapeHtml(A.name)}</strong> vs <strong>${OH.escapeHtml(
+    B.name,
+  )}</strong><button type="button" class="org-close" data-close="compare" aria-label="Close">×</button></div>
+    <div class="cmp-cols">${col(fa, A.name)}${col(fb, B.name)}</div>
+    <div class="fleet-cols"><div><h4 class="modal-h">By role</h4>${pairBarsHtml(fa.byCareer, fb.byCareer, A.name, B.name)}</div>
+    <div><h4 class="modal-h">By size</h4>${pairBarsHtml(fa.bySize, fb.bySize, A.name, B.name)}</div></div>
+    <h4 class="modal-h">Both own</h4><p class="org-owners">${list(both)}</p>
+    <h4 class="modal-h">Only ${OH.escapeHtml(A.name)}</h4><p class="org-owners">${list(onlyA)}</p>
+    <h4 class="modal-h">Only ${OH.escapeHtml(B.name)}</h4><p class="org-owners">${list(onlyB)}</p></div>`;
 }
 
 function orgBiggestHtml(f) {
@@ -2206,19 +2368,6 @@ function orgBiggestHtml(f) {
     .join('');
   return `<h3 class="section-title" style="margin-top:22px">Biggest ships</h3>
     <table class="org-table"><thead><tr><th>Ship</th><th>Size</th><th class="num">Count</th><th class="num">Store price</th><th>Owners</th></tr></thead><tbody>${rows}</tbody></table>`;
-}
-
-function orgMembersHtml(f) {
-  const rows = f.byMember
-    .map(
-      (m) =>
-        `<tr><td>${OH.escapeHtml(m.name)}</td><td class="num">${m.ships}</td><td class="num">${m.lti}</td><td class="num">${
-          m.priced ? dollars(m.store) : '—'
-        }</td><td class="num">${f.store ? Math.round((m.store / f.store) * 100) + '%' : '—'}</td></tr>`,
-    )
-    .join('');
-  return `<h3 class="section-title" style="margin-top:22px">Members</h3>
-    <table class="org-table"><thead><tr><th>Member</th><th class="num">Ships</th><th class="num">LTI</th><th class="num">Fleet value</th><th class="num">Share</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 async function renderOrg() {
@@ -2270,7 +2419,7 @@ async function renderOrg() {
       }</div>` +
       orgRolesHtml(f) +
       orgBiggestHtml(f) +
-      orgMembersHtml(f) +
+      orgMembersHtml(f, members) +
       `<div class="fleet-cols"><div><h4 class="modal-h">By role</h4>${orgBarsHtml(f.byCareer)}</div>` +
       `<div><h4 class="modal-h">By size</h4>${orgBarsHtml(f.bySize)}</div></div>` +
       `<h3 class="section-title" style="margin-top:22px">Ships</h3>` +
@@ -2343,6 +2492,26 @@ $('#org-csv')?.addEventListener('click', async () => {
     `open-hangar-org-fleet-${new Date().toISOString().slice(0, 10)}.csv`,
   );
   orgMsg('Saved CSV.');
+});
+$('#org-body')?.addEventListener('click', (e) => {
+  const role = e.target.closest('[data-role]');
+  const row = e.target.closest('.org-mrow');
+  const close = e.target.closest('.org-close');
+  if (role) orgUi.role = orgUi.role === role.dataset.role ? null : role.dataset.role;
+  else if (row) orgUi.member = orgUi.member === row.dataset.member ? null : row.dataset.member;
+  else if (close) {
+    const k = close.dataset.close;
+    if (k === 'role') orgUi.role = null;
+    if (k === 'member') orgUi.member = null;
+    if (k === 'compare') orgUi.a = orgUi.b = null;
+  } else return;
+  renderOrg();
+});
+$('#org-body')?.addEventListener('change', (e) => {
+  const sel = e.target.closest('.org-cmp');
+  if (!sel) return;
+  orgUi[sel.dataset.side] = sel.value || null;
+  renderOrg();
 });
 document.addEventListener('click', async (e) => {
   const b = e.target.closest('.org-remove');
