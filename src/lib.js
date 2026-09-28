@@ -175,7 +175,7 @@
       '```',
       'Open Hangar error report',
       `Version:   ${manifest.version || '?'} (${manifest.browser_specific_settings ? 'Firefox' : 'Chrome'} build)`,
-      `Browser:   ${browserLabel(navigator.userAgent || '')}`,
+      `Browser:   ${browserLabel((globalThis.navigator && globalThis.navigator.userAgent) || '')}`,
       `Hangar:    ${count(src('hangar'))} items, scanned ${ago(src('hangar').scannedAt)}`,
       `Buy-backs: ${count(src('buybacks'))} items, scanned ${ago(src('buybacks').scannedAt)}`,
       `History:   ${Array.isArray(db.history) ? db.history.length : 0} snapshots`,
