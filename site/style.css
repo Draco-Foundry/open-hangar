@@ -326,7 +326,7 @@ footer nav {
 }
 .notices p {
   margin: 0 0 6px;
-  font-size: 0.875rem; /* Fankit Guidelines: no smaller than 10pt */
+  font-size: 0.875rem; /* keep the fan-site notice readable, not fine print */
 }
 
 /* Privacy page */
