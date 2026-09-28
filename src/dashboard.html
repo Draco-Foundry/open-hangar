@@ -2253,6 +2253,28 @@
       #data-msg.error {
         color: #f85149;
       }
+      .link-btn {
+        border: 0;
+        padding: 0;
+        background: none;
+        color: var(--link);
+        font: inherit;
+        text-decoration: underline;
+        cursor: pointer;
+      }
+      .report-preview {
+        margin: 8px 0 18px;
+        font-size: 12px;
+      }
+      .report-preview summary {
+        cursor: pointer;
+        color: var(--muted);
+      }
+      .report-preview pre {
+        max-height: 320px;
+        overflow: auto;
+        white-space: pre;
+      }
 
       /* Thanks & supporters */
       .supporters {
@@ -2756,6 +2778,22 @@
             <input id="import-file" type="file" accept="application/json,.json" hidden />
           </div>
           <div id="data-msg" class="muted"></div>
+
+          <h3>Error report</h3>
+          <p>
+            Something not working? Copy this report and paste it in #bug-reports on Discord or in a
+            GitHub issue. It has your Open Hangar version, browser, item counts and the recent
+            errors. It doesn't include your handle, referral code or any item names.
+          </p>
+          <div class="data-actions">
+            <button id="copy-report" type="button">Copy error report</button>
+            <button id="clear-log" type="button" class="btn-secondary">Clear log</button>
+          </div>
+          <div id="report-msg" class="muted"></div>
+          <details id="report-preview" class="report-preview">
+            <summary>See exactly what gets copied</summary>
+            <pre id="report-text"></pre>
+          </details>
 
           <h3>Terms &amp; fair use</h3>
           <ul>
