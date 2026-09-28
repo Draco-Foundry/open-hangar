@@ -4,6 +4,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Concept ships.** The ship list now includes ships that aren't flyable yet
+  (Pioneer, Odyssey, Orion, …) from RSI's ship matrix, so they get a store price
+  and count toward hangar value. The Store page's price list is split into
+  **Flight ready** and **In concept** tables.
 - **Updates page.** A new **Updates** page lists every release with its date and
   what changed (also linked from the version on Home and in the footer). When a new
   version has downloaded, a bar at the top says so with a **Reload to update**

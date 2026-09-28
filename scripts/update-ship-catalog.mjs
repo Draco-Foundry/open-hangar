@@ -33,7 +33,8 @@ if (same) {
   console.log(`No changes (${list.length} vehicles).`);
 } else {
   const out = {
-    source: 'https://api.star-citizen.wiki/api/v2/vehicles (Star Citizen Wiki community)',
+    source:
+      'https://api.star-citizen.wiki/api/v2/vehicles + /shipmatrix/vehicles (Star Citizen Wiki community)',
     fetched: new Date().toISOString().slice(0, 10),
     count: list.length,
     list,
