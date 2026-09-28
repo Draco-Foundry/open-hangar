@@ -1583,6 +1583,7 @@ function marketImageCells(g) {
     ins: marketInsurance(g.rep),
     gift: giftableLabel(g),
     melt: meltLabel(g.rep),
+    store: marketStore(g.rep) || '—',
     price: saved && saved.price != null ? rawMoney(priceNumber(saved.price) ?? 0) : '—',
     stock: String(g.stock),
   };
@@ -1593,13 +1594,14 @@ const MK_IMG_COLS = [
   { key: 'ins', label: 'Insurance' },
   { key: 'gift', label: 'Giftable' },
   { key: 'melt', label: 'Melt Price' },
+  { key: 'store', label: 'Store Price' },
   { key: 'price', label: 'My Price' },
   { key: 'stock', label: 'Stock' },
 ];
 
 // Render the sale sheet to a canvas — drawn cell-by-cell (no external lib, no
 // images, so nothing taints the canvas) using the dashboard's dark palette.
-function marketImageCanvas(sections) {
+function marketImageCanvas(sections, { title = '' } = {}) {
   const SCALE = 2; // crisp on hi-dpi
   const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
   const PAD = 24;
@@ -1625,7 +1627,8 @@ function marketImageCanvas(sections) {
   });
   const tableW = widths.reduce((a, b) => a + b, 0);
   const W = tableW + PAD * 2;
-  let H = PAD * 2 - SECTION_GAP;
+  const HEADER_H = title ? 44 : 0;
+  let H = PAD * 2 - SECTION_GAP + HEADER_H;
   for (const { groups } of sections) H += TITLE_H + HEAD_H + groups.length * ROW_H + SECTION_GAP;
 
   const canvas = document.createElement('canvas');
@@ -1653,6 +1656,17 @@ function marketImageCanvas(sections) {
   };
 
   let y = PAD;
+  if (title) {
+    ctx.fillStyle = '#e6edf3';
+    ctx.font = f(700, 22);
+    ctx.fillText(clip(title, tableW), PAD, y + 16);
+    ctx.fillStyle = '#8b949e';
+    ctx.font = f(400, 12);
+    ctx.textAlign = 'right';
+    ctx.fillText('Open Hangar · openhangar.space', PAD + tableW, y + 16);
+    ctx.textAlign = 'left';
+    y += HEADER_H;
+  }
   for (const { section, groups } of sections) {
     ctx.fillStyle = '#e6edf3';
     ctx.font = f(600, 16);
@@ -1798,6 +1812,8 @@ function updateSelectBar() {
   if (!selectBar) return;
   const inMarket = currentView() === 'inventory' && state.layout === 'market';
   selectBar.hidden = !(state.selecting || (inMarket && state.selected.size));
+  const priceSel = $('#sb-price');
+  if (priceSel) priceSel.hidden = inMarket; // the table shows melt, store and your price
   const done = selectBar.querySelector('[data-sb="done"]');
   if (done) done.hidden = !state.selecting; // Market has no mode to leave
   const live = resultsEl.querySelector('.mk-selcount');
@@ -2030,7 +2046,12 @@ async function makeFleetImage(action) {
   setExportStatus(status, 'Drawing…');
   const titleEl = $('#sb-title');
   const title = (titleEl.value || titleEl.placeholder || 'My hangar').trim();
-  const canvas = await fleetImageCanvas(list, { title, price: state.imagePrice });
+  // In Market view the picture is the table itself (rows are easy to scan);
+  // elsewhere it's the card layout.
+  const inMarket = currentView() === 'inventory' && state.layout === 'market';
+  const canvas = inMarket
+    ? marketImageCanvas(computeMarketSections(marketExportShown()), { title })
+    : await fleetImageCanvas(list, { title, price: state.imagePrice });
   canvas.toBlob(async (blob) => {
     if (!blob) return setExportStatus(status, 'Image failed');
     const who = (state.owner && (state.owner.nickname || state.owner.displayname)) || 'hangar';
