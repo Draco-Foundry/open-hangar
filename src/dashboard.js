@@ -295,6 +295,7 @@ const state = {
   // { [key]: { price } }. Stored SEPARATELY from the scan so a re-scan never
   // wipes your prices. Purely local — never exported or sent.
   market: {},
+  bbPicked: new Set(), // Buy-Backs Market: picked buy-back ids (for totals + exports)
   marketGiftableOnly: false, // Market view: show only sellable (giftable) items
   referral: null, // { code, url, current, legacy, prospects, recruitsList, prospectsList }
   refTab: 'recruits', // referral list tab: 'recruits' | 'prospects'
@@ -1614,7 +1615,10 @@ const MK_IMG_COLS = [
 
 // Render the sale sheet to a canvas — drawn cell-by-cell (no external lib, no
 // images, so nothing taints the canvas) using the dashboard's dark palette.
-function marketImageCanvas(sections, { title = '' } = {}) {
+function marketImageCanvas(
+  sections,
+  { title = '', cols = MK_IMG_COLS, cellsOf = marketImageCells } = {},
+) {
   const SCALE = 2; // crisp on hi-dpi
   const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
   const PAD = 24;
@@ -1629,12 +1633,12 @@ function marketImageCanvas(sections, { title = '' } = {}) {
   const meas = document.createElement('canvas').getContext('2d');
 
   // One shared column grid: width = widest header/cell, name column capped.
-  const widths = MK_IMG_COLS.map((c) => {
+  const widths = cols.map((c) => {
     meas.font = f(600, 13);
     let w = meas.measureText(c.label).width;
     meas.font = f(400, 13);
     for (const { groups } of sections) {
-      for (const g of groups) w = Math.max(w, meas.measureText(marketImageCells(g)[c.key]).width);
+      for (const g of groups) w = Math.max(w, meas.measureText(cellsOf(g)[c.key]).width);
     }
     return Math.min(w, c.key === 'name' ? NAME_MAX : Infinity) + CELL_X * 2;
   });
@@ -1690,7 +1694,7 @@ function marketImageCanvas(sections, { title = '' } = {}) {
     ctx.fillRect(PAD, y, tableW, HEAD_H);
     ctx.fillStyle = '#e6edf3';
     ctx.font = f(600, 13);
-    MK_IMG_COLS.forEach((c, i) => ctx.fillText(c.label, colX[i] + CELL_X, y + HEAD_H / 2));
+    cols.forEach((c, i) => ctx.fillText(c.label, colX[i] + CELL_X, y + HEAD_H / 2));
     y += HEAD_H;
 
     groups.forEach((g, ri) => {
@@ -1705,8 +1709,8 @@ function marketImageCanvas(sections, { title = '' } = {}) {
       ctx.lineTo(PAD + tableW, y + ROW_H + 0.5);
       ctx.stroke();
 
-      const cells = marketImageCells(g);
-      MK_IMG_COLS.forEach((c, i) => {
+      const cells = cellsOf(g);
+      cols.forEach((c, i) => {
         if (c.key === 'name' || c.key === 'price') ctx.fillStyle = '#e6edf3';
         else if (c.key === 'gift') ctx.fillStyle = g.giftable === 0 ? '#8b949e' : '#2ea043';
         else ctx.fillStyle = '#8b949e';
@@ -3840,10 +3844,16 @@ function renderBuybacks() {
     tokenLineHtml() +
     bbDetailsBarHtml(list) +
     `<div class="result-count">Showing ${list.length} of ${state.buybacks.length}${when ? ` · scanned ${OH.escapeHtml(when)}` : ''}</div>`;
-  // Market = a reclaim-focused table (buy-backs have no melt/giftable/insurance);
+  // Market = a table like the Inventory Market (pick, total, price, export);
   // the other layouts reuse the shared card grid like the inventory.
   if (state.bbLayout === 'market') {
-    setHTML(body, count + buybackMarketHtml(list));
+    setHTML(
+      body,
+      tokenLineHtml() +
+        bbDetailsBarHtml(list) +
+        bbToolbarHtml(list, when) +
+        buybackMarketHtml(list),
+    );
     return; // table has no thumbnails to enhance
   }
   setHTML(
@@ -3915,36 +3925,216 @@ function bbPriceHtml(b) {
     : '';
 }
 
+// --- Buy-Backs Market -------------------------------------------------------
 // One row per buy-back: each is its own pledge (own insurance, own extras), so
-// identical names are never merged.
+// identical names are never merged. Like the Inventory Market: tick rows to
+// total and export them; My Price / % (of the buy-back price) are saved
+// alongside the Inventory ones under "bb:<id>".
+const bbKey = (b) => `bb:${b.id}`;
+function bbStoreText(b) {
+  const sp = buybackStorePrice(b);
+  return sp ? dollars(sp) : '';
+}
+// Store price minus RSI's real buy-back price (only once details are loaded).
+// Ships and CCUs only: a pack's extras make a ship-price comparison misleading.
+function bbVsStore(b) {
+  if (!b.isCCU && b.kind !== 'ship') return null;
+  const d = bbDetail(b);
+  const sp = buybackStorePrice(b);
+  return d && d.price != null && sp ? sp - d.price : null;
+}
+function bbVsStoreText(b) {
+  const v = bbVsStore(b);
+  if (v == null) return '';
+  if (Math.abs(v) < 1) return 'Same';
+  return v > 0 ? `Save ${dollars(v)}` : `${dollars(-v)} more`;
+}
+function bbPriceText(b) {
+  const d = bbDetail(b);
+  if (d && d.price != null) return money(d.price);
+  if (b.price) return String(b.price);
+  const sp = buybackStorePrice(b);
+  return sp ? `~${dollars(sp)}` : '';
+}
+
 function buybackRowHtml(b) {
   const name = b.ccu
     ? `${OH.escapeHtml(b.ccu.from)} <span class="ccu-flow">→</span> ${OH.escapeHtml(b.ccu.to)}`
     : OH.escapeHtml(b.name || '—');
-  return `<tr class="mk-row" data-id="${OH.escapeHtml(String(b.id || ''))}">
+  const key = bbKey(b);
+  const saved = state.market[key];
+  const price = bbPrice(b);
+  const base = price ? price * fx.rate : '';
+  const mine = saved && saved.price != null ? OH.escapeHtml(String(saved.price)) : '';
+  const pct = OH.escapeHtml(pctOfMelt(saved && saved.price, base));
+  const picked = state.bbPicked.has(String(b.id));
+  const vs = bbVsStore(b);
+  return `<tr class="mk-row${picked ? ' picked' : ''}" data-id="${OH.escapeHtml(String(b.id || ''))}" data-key="${OH.escapeHtml(key)}" data-melt="${base}">
+    <td class="mk-sel"><input type="checkbox" class="mk-pick" ${picked ? 'checked' : ''} aria-label="Pick for total and export"></td>
     <td class="mk-name"><button type="button" class="bb-open" title="See what's in it">${name}</button></td>
     <td class="mk-ins">${OH.escapeHtml(bbInsurance(b))}</td>
     <td class="mk-melt">${bbPriceHtml(b) || '—'}</td>
+    <td class="mk-store">${OH.escapeHtml(bbStoreText(b)) || '<span class="muted">—</span>'}</td>
+    <td class="mk-vs${vs != null && vs >= 1 ? ' gain' : ''}">${OH.escapeHtml(bbVsStoreText(b)) || '<span class="muted">—</span>'}</td>
+    <td class="mk-pct"><input class="mk-pct-in" type="text" inputmode="decimal" value="${pct}" placeholder="%" aria-label="Percent of buy-back price"></td>
+    <td class="mk-mine"><input class="mk-price" type="text" inputmode="decimal" value="${mine}" placeholder="$" aria-label="My price"></td>
     <td class="mk-view">${buybackReclaimLink(b) || '—'}</td>
   </tr>`;
 }
 
-function buybackMarketHtml(list) {
+// [{ section, groups }] per buy-back kind (groups = the buy-backs themselves),
+// shared by the table and the CSV/image exports.
+function bbMarketSections(list) {
   const buckets = new Map(BB_KINDS.map((k) => [k.key, []]));
   for (const b of list) (buckets.get(b.kind) || buckets.get('other')).push(b);
-  const sections = BB_KINDS.filter((k) => buckets.get(k.key).length).map((k) => {
-    const rows = buckets.get(k.key);
+  return BB_KINDS.filter((k) => buckets.get(k.key).length).map((k) => ({
+    section: k,
+    groups: buckets.get(k.key),
+  }));
+}
+
+function buybackMarketHtml(list) {
+  const sections = bbMarketSections(list).map(({ section, groups }) => {
+    const all = groups.every((b) => state.bbPicked.has(String(b.id)));
     return `<section class="market-section">
-      <h3 class="market-title">${OH.escapeHtml(k.label)}<span class="market-n">${rows.length}</span></h3>
+      <h3 class="market-title">${OH.escapeHtml(section.label)}<span class="market-n">${groups.length}</span></h3>
       <table class="market-table">
         <thead><tr>
-          <th>Items Name</th><th>Insurance</th><th title="RSI's buy-back price (after Load details); ~ = estimate from today's store price">Price</th><th>Reclaim</th>
+          <th class="mk-sel"><input type="checkbox" class="mk-pick-all" aria-label="Pick all in ${OH.escapeHtml(section.label)}" ${all ? 'checked' : ''}></th>
+          <th>Items Name</th><th>Insurance</th><th title="RSI's buy-back price (after Load details); ~ = estimate from today's store price">Buy-Back Price</th>
+          <th title="Today's standard store price (ships, or a CCU's price gap)">Store Price</th><th title="Store price minus the buy-back price (needs Load details)">vs Store</th>
+          <th title="Your price as a percent of the buy-back price">% of Price</th><th>My Price</th><th>Reclaim</th>
         </tr></thead>
-        <tbody>${rows.map(buybackRowHtml).join('')}</tbody>
+        <tbody>${groups.map(buybackRowHtml).join('')}</tbody>
       </table>
     </section>`;
   });
   return `<div class="market">${sections.join('')}</div>`;
+}
+
+// " · 3 picked · $420 · 3 tokens with store credit (you have 2)".
+function bbSelText() {
+  const picked = state.buybacks.filter((b) => state.bbPicked.has(String(b.id)));
+  if (!picked.length) return ' · tick rows to total and export them';
+  let total = 0;
+  let est = false;
+  for (const b of picked) {
+    const d = bbDetail(b);
+    const v = bbPrice(b);
+    if (v) total += v;
+    if (!d || d.price == null) est = true;
+  }
+  const n = picked.length;
+  const tokens =
+    state.bbTokens != null
+      ? ` · ${n} token${n === 1 ? '' : 's'} with store credit (you have ${state.bbTokens})`
+      : '';
+  return ` · ${n} picked · ${est ? '~' : ''}${money(total)}${tokens}`;
+}
+function updateBbSelText() {
+  const el = buybacksBodyEl && buybacksBodyEl.querySelector('.mk-selcount');
+  if (el) el.textContent = bbSelText();
+}
+
+function bbToolbarHtml(list, when) {
+  return `<div class="market-toolbar">
+    <div class="result-count">Showing ${list.length} of ${state.buybacks.length}${
+      when ? ` · scanned ${OH.escapeHtml(when)}` : ''
+    }<span class="mk-selcount">${OH.escapeHtml(bbSelText())}</span></div>
+    <div class="market-actions">
+      <button class="mk-btn bb-export-csv" type="button">Export CSV</button>
+      <button class="mk-btn bb-export-img" type="button">Copy image</button>
+      <span class="mk-export-status" aria-live="polite"></span>
+    </div>
+  </div>`;
+}
+
+// Exports cover the view, narrowed to the picked rows if any.
+function bbExportSections() {
+  const list = computeBuybacks();
+  const picked = list.filter((b) => state.bbPicked.has(String(b.id)));
+  return bbMarketSections(picked.length ? picked : list);
+}
+function bbMine(b) {
+  const saved = state.market[bbKey(b)];
+  return saved && saved.price != null ? saved.price : '';
+}
+function bbName(b) {
+  return b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '';
+}
+function bbFilename(ext) {
+  return marketFilename(ext).replace('sale-sheet', 'buy-backs');
+}
+function exportBuybackCsv(statusEl) {
+  const sections = bbExportSections();
+  if (!sections.length) return setExportStatus(statusEl, 'Nothing to export');
+  const lines = [
+    [
+      'Category',
+      'Item',
+      'Insurance',
+      'Buy-Back Price',
+      'Store Price',
+      'vs Store',
+      '% of Price',
+      'My Price',
+    ],
+  ];
+  for (const { section, groups } of sections) {
+    for (const b of groups) {
+      const price = bbPrice(b);
+      lines.push([
+        section.label,
+        bbName(b),
+        bbInsurance(b),
+        bbPriceText(b),
+        bbStoreText(b),
+        bbVsStoreText(b),
+        pctOfMelt(bbMine(b), price ? price * fx.rate : 0),
+        bbMine(b),
+      ]);
+    }
+  }
+  const csv = lines.map((r) => r.map(csvCell).join(',')).join('\r\n');
+  downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), bbFilename('csv'));
+  setExportStatus(statusEl, 'Saved CSV');
+}
+const BB_IMG_COLS = [
+  { key: 'name', label: 'Items Name' },
+  { key: 'ins', label: 'Insurance' },
+  { key: 'melt', label: 'Buy-Back Price' },
+  { key: 'store', label: 'Store Price' },
+  { key: 'vs', label: 'vs Store' },
+  { key: 'price', label: 'My Price' },
+];
+function bbImageCells(b) {
+  const mine = bbMine(b);
+  return {
+    name: bbName(b),
+    ins: bbInsurance(b),
+    melt: bbPriceText(b) || '—',
+    store: bbStoreText(b) || '—',
+    vs: bbVsStoreText(b) || '—',
+    price: mine !== '' ? rawMoney(priceNumber(mine) ?? 0) : '—',
+  };
+}
+function copyBuybackImage(statusEl) {
+  const sections = bbExportSections();
+  if (!sections.length) return setExportStatus(statusEl, 'Nothing to export');
+  const canvas = marketImageCanvas(sections, { cols: BB_IMG_COLS, cellsOf: bbImageCells });
+  canvas.toBlob(async (blob) => {
+    if (!blob) return setExportStatus(statusEl, 'Image failed');
+    try {
+      if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
+        return setExportStatus(statusEl, 'Copied to clipboard');
+      }
+      throw new Error('clipboard unavailable');
+    } catch {
+      downloadBlob(blob, bbFilename('png'));
+      setExportStatus(statusEl, 'Saved PNG');
+    }
+  }, 'image/png');
 }
 
 // --- Events ---------------------------------------------------------------
@@ -4058,7 +4248,7 @@ resultsEl.addEventListener('error', onThumbError, true);
 // (data-key) so it sticks to that item across re-scans.
 // My Price and % of Melt are two views of one number: typing either fills in
 // the other (price is what's stored).
-resultsEl.addEventListener('input', (e) => {
+function onMarketPriceInput(e) {
   const el = e.target;
   if (!el.classList) return;
   const isPrice = el.classList.contains('mk-price');
@@ -4081,7 +4271,9 @@ resultsEl.addEventListener('input', (e) => {
     box.checked = true;
     box.dispatchEvent(new Event('change', { bubbles: true }));
   }
-});
+}
+resultsEl.addEventListener('input', onMarketPriceInput);
+if (buybacksBodyEl) buybacksBodyEl.addEventListener('input', onMarketPriceInput);
 
 // Market toolbar: "Giftable only" filter re-renders; CSV / image export the view.
 resultsEl.addEventListener('change', (e) => {
@@ -4419,7 +4611,28 @@ resultsEl.addEventListener('change', (e) => {
   updateSelectBar();
 });
 if (buybacksBodyEl) {
+  buybacksBodyEl.addEventListener('change', (e) => {
+    const box = e.target.closest('.mk-pick, .mk-pick-all');
+    if (!box) return;
+    const rows = box.classList.contains('mk-pick-all')
+      ? [...box.closest('table').querySelectorAll('tbody .mk-row')]
+      : [box.closest('.mk-row')];
+    for (const row of rows) {
+      if (box.checked) state.bbPicked.add(row.dataset.id);
+      else state.bbPicked.delete(row.dataset.id);
+      row.classList.toggle('picked', box.checked);
+      const cb = row.querySelector('.mk-pick');
+      if (cb) cb.checked = box.checked;
+    }
+    const table = box.closest('table');
+    const all = table && table.querySelector('.mk-pick-all');
+    if (all) all.checked = [...table.querySelectorAll('tbody .mk-pick')].every((c) => c.checked);
+    updateBbSelText();
+  });
   buybacksBodyEl.addEventListener('click', (e) => {
+    const status = buybacksBodyEl.querySelector('.mk-export-status');
+    if (e.target.closest('.bb-export-csv')) return void exportBuybackCsv(status);
+    if (e.target.closest('.bb-export-img')) return void copyBuybackImage(status);
     if (e.target.closest('#bbd-load')) return void loadBuybackDetails();
     if (e.target.closest('#bbd-stop')) {
       if (bbLoading) bbLoading.stop = true;
