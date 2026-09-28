@@ -271,6 +271,7 @@ const state = {
   buybacksScannedAt: null,
   bbQuery: '',
   bbSort: 'date-desc', // default to newest buy-backs first
+  groupByType: true, // Inventory: one section per type
   bbDetails: {}, // pledge id → details read from the buy-back's own RSI page
   bbShown: new Set(), // buy-back kind filter
   bbTraits: new Map(), // buy-back trait filter (AND): key → 'yes' | 'no'
@@ -1719,13 +1720,43 @@ function renderInventory() {
     renderMarket();
     return;
   }
-  setHTML(
-    resultsEl,
-    `<div class="result-count">Showing ${shown.length} of ${state.items.length} · ${money(OH.totalValue(shown))}</div>` +
-      `<div class="grid ${state.layout}">${shown.map(cardHtml).join('')}</div>`,
-  );
+  const groupToggle = `<label class="mk-toggle inv-group-toggle"><input type="checkbox" class="inv-group" ${
+    state.groupByType ? 'checked' : ''
+  }> Group by type</label>`;
+  const head = `<div class="market-toolbar"><div class="result-count">Showing ${shown.length} of ${
+    state.items.length
+  } · ${money(OH.totalValue(shown))}</div><div class="market-actions">${groupToggle}</div></div>`;
+  if (!state.groupByType) {
+    setHTML(
+      resultsEl,
+      head + `<div class="grid ${state.layout}">${shown.map(cardHtml).join('')}</div>`,
+    );
+  } else {
+    // One section per type (sort order kept inside each), sticky titles like Market.
+    const buckets = new Map(INV_SECTIONS.map((x) => [x.key, []]));
+    for (const p of shown) buckets.get(INV_SECTIONS.find((x) => x.test(p)).key).push(p);
+    setHTML(
+      resultsEl,
+      head +
+        INV_SECTIONS.filter((x) => buckets.get(x.key).length)
+          .map(
+            (x) =>
+              `<section class="inv-section"><h3 class="market-title">${OH.escapeHtml(x.label)}<span class="market-n">${
+                buckets.get(x.key).length
+              }</span></h3><div class="grid ${state.layout}">${buckets.get(x.key).map(cardHtml).join('')}</div></section>`,
+          )
+          .join(''),
+    );
+  }
   enhanceCardImages(resultsEl);
 }
+
+// Inventory sections (Group by type): the Market's, plus Coupons on their own.
+const INV_SECTIONS = [
+  ...MARKET_SECTIONS.filter((x) => x.key !== 'other'),
+  { key: 'coupon', label: 'Coupons', test: (p) => p.kind === 'coupon' },
+  { key: 'other', label: 'Other', test: () => true },
+];
 
 // --- Select mode + fleet image -------------------------------------------
 // "Select" in Inventory turns card clicks into picks (and adds a checkbox to
@@ -2746,7 +2777,8 @@ function topListsHtml() {
     ? items
         .map((p) => ({ p, si: v.pledges[p.id] }))
         .filter(
-          (x) => x.si && x.si.store && Number.isFinite(x.si.paid) && x.si.store - x.si.paid >= 1,
+          // paid > 0: free rewards aren't savings
+          (x) => x.si && x.si.store && x.si.paid > 0 && x.si.store - x.si.paid >= 1,
         )
         .sort((a, b) => b.si.store - b.si.paid - (a.si.store - a.si.paid))
         .slice(0, 10)
@@ -3806,6 +3838,12 @@ resultsEl.addEventListener('input', (e) => {
 
 // Market toolbar: "Giftable only" filter re-renders; CSV / image export the view.
 resultsEl.addEventListener('change', (e) => {
+  if (!e.target.classList || !e.target.classList.contains('inv-group')) return;
+  state.groupByType = e.target.checked;
+  chrome.storage.local.set({ uiGroupByType: state.groupByType });
+  renderInventory();
+});
+resultsEl.addEventListener('change', (e) => {
   if (!e.target.classList || !e.target.classList.contains('mk-giftable-only')) return;
   state.marketGiftableOnly = e.target.checked;
   renderInventory();
@@ -4855,8 +4893,10 @@ $('#stats-body')?.addEventListener('click', (e) => {
     lastBackupAt,
     remindRescan,
     currency,
+    uiGroupByType,
   } = await chrome.storage.local.get([
     'currency',
+    'uiGroupByType',
     'remindRescan',
     'lastBackupAt',
     'uiStatsTab',
@@ -4865,6 +4905,7 @@ $('#stats-body')?.addEventListener('click', (e) => {
     'marketAnnotations',
   ]);
   if (LAYOUTS.includes(uiLayout)) state.layout = uiLayout;
+  if (uiGroupByType === false) state.groupByType = false;
   if (STATS_TABS.some(([k]) => k === uiStatsTab)) state.statsTab = uiStatsTab;
   if (Number.isFinite(lastBackupAt)) state.lastBackupAt = lastBackupAt;
   const remind = $('#remind-toggle');
