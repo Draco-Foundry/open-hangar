@@ -4,6 +4,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Buy-Backs Market tools.** Like the Inventory Market: tick rows to see their total
+  and how many tokens they'd use, compare with today's store price (and what you save
+  once details are loaded), jot My Price / %, and Export CSV or Copy image.
+- Fixed: hovering a name in the Buy-Backs table no longer covers it in a blue box.
 - **Sharp pictures right away.** Clicking an item shows its picture clearly at once
   (no blurry loading step); a higher-res copy slips in when it's ready.
 - Fixed: some items (e.g. StarKitten helmets, Epoch Society shirt, AMD Never Settle
