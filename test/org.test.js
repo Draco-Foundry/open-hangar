@@ -75,3 +75,21 @@ test('combines members into one fleet with owners and totals', () => {
   assert.deepEqual(carrack.owners.map((o) => o.name).sort(), ['A', 'B']);
   assert.ok(f.cargo > 0);
 });
+
+test('reports roles covered/missing, biggest ships and value per member', () => {
+  const f = OH.orgFleet(
+    [
+      { name: 'A', ships: [{ name: 'Carrack', lti: true }, { name: 'Cutlass Black' }] },
+      { name: 'B', ships: [{ name: 'Prospector' }] },
+    ],
+    shipOf,
+    priceOf,
+  );
+  const role = (k) => f.roles.find((r) => r.key === k);
+  assert.ok(role('mining').count >= 1, 'Prospector covers mining');
+  assert.equal(role('medical').count, 0);
+  assert.equal(f.byMember[0].name, 'A');
+  assert.equal(f.byMember[0].ships, 2);
+  assert.ok(f.byMember[0].store > f.byMember[1].store);
+  assert.ok(f.biggest.some((s) => /carrack/i.test(s.name)));
+});

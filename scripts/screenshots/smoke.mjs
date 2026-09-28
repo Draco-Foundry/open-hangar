@@ -198,6 +198,11 @@ try {
   org.members === 2 && org.rows > 0
     ? ok(`org fleet: ${org.members} members, ${org.rows} ship types`)
     : fail(`org fleet: ${JSON.stringify(org)}`);
+  const roleChips = await page.$$eval('.role-chip', (c) => c.length);
+  const memberRows = await page.$$eval('.org-table', (t) => t.length);
+  roleChips === 16 && memberRows >= 3
+    ? ok(`org roles (${roleChips}) + biggest ships + members`)
+    : fail(`org extras: ${roleChips} role chips, ${memberRows} tables`);
 
   console.log('Store');
   await go('#store');

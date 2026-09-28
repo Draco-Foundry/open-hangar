@@ -2128,6 +2128,54 @@ function orgBarsHtml(map) {
     .join('');
 }
 
+// Roles covered / missing, as chips; hover a covered one for its ships.
+function orgRolesHtml(f) {
+  const missing = f.roles.filter((r) => !r.count);
+  const chips = f.roles
+    .map((r) =>
+      r.count
+        ? `<span class="role-chip have" title="${OH.escapeHtml(r.ships.join(', '))}">${OH.escapeHtml(r.label)} <b>${r.count}</b></span>`
+        : `<span class="role-chip missing">${OH.escapeHtml(r.label)}</span>`,
+    )
+    .join('');
+  return `<h3 class="section-title" style="margin-top:22px">Roles</h3>
+    <p class="muted org-intro">${
+      missing.length
+        ? `No ships for: <strong>${missing.map((r) => OH.escapeHtml(r.label)).join(', ')}</strong>.`
+        : 'Every role is covered.'
+    } Hover a role to see which ships fill it.</p>
+    <div class="role-chips">${chips}</div>`;
+}
+
+function orgBiggestHtml(f) {
+  if (!f.biggest.length) return '';
+  const rows = f.biggest
+    .map(
+      (r) =>
+        `<tr><td>${OH.escapeHtml(r.name)}</td><td>${OH.escapeHtml(r.size || '')}</td><td class="num">${
+          r.count
+        }</td><td class="num">${r.msrp ? dollars(r.msrp) : '—'}</td><td class="org-owners">${r.owners
+          .map((o) => OH.escapeHtml(o.n > 1 ? `${o.name} ×${o.n}` : o.name))
+          .join(', ')}</td></tr>`,
+    )
+    .join('');
+  return `<h3 class="section-title" style="margin-top:22px">Biggest ships</h3>
+    <table class="org-table"><thead><tr><th>Ship</th><th>Size</th><th class="num">Count</th><th class="num">Store price</th><th>Owners</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function orgMembersHtml(f) {
+  const rows = f.byMember
+    .map(
+      (m) =>
+        `<tr><td>${OH.escapeHtml(m.name)}</td><td class="num">${m.ships}</td><td class="num">${m.lti}</td><td class="num">${
+          m.priced ? dollars(m.store) : '—'
+        }</td><td class="num">${f.store ? Math.round((m.store / f.store) * 100) + '%' : '—'}</td></tr>`,
+    )
+    .join('');
+  return `<h3 class="section-title" style="margin-top:22px">Members</h3>
+    <table class="org-table"><thead><tr><th>Member</th><th class="num">Ships</th><th class="num">LTI</th><th class="num">Fleet value</th><th class="num">Share</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
 async function renderOrg() {
   ensurePrices();
   const body = $('#org-body');
@@ -2175,6 +2223,9 @@ async function renderOrg() {
         box(Math.round(f.cargo).toLocaleString('en-US'), 'cargo (SCU)') +
         box(f.crew.toLocaleString('en-US'), 'crew seats')
       }</div>` +
+      orgRolesHtml(f) +
+      orgBiggestHtml(f) +
+      orgMembersHtml(f) +
       `<div class="fleet-cols"><div><h4 class="modal-h">By role</h4>${orgBarsHtml(f.byCareer)}</div>` +
       `<div><h4 class="modal-h">By size</h4>${orgBarsHtml(f.bySize)}</div></div>` +
       `<h3 class="section-title" style="margin-top:22px">Ships</h3>` +

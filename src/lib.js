@@ -1964,16 +1964,47 @@
   // Combine members' ship lists into one fleet. shipOf/priceOf are the wiki
   // resolvers (OH.makeShipIndex). Ships group by their matched wiki name when
   // known, so "Carrack" and "Anvil Carrack" count together. Pure.
+  // Jobs an org usually wants covered, matched against each ship's role (the
+  // wiki's "foci", e.g. "Light Mining", "Heavy Refueling"). Order = display.
+  OH.ORG_ROLES = [
+    { key: 'cargo', label: 'Cargo', re: /freight|cargo/i },
+    { key: 'mining', label: 'Mining', re: /mining/i },
+    { key: 'salvage', label: 'Salvage', re: /salvage/i },
+    { key: 'refining', label: 'Refining', re: /refinery/i },
+    { key: 'medical', label: 'Medical', re: /medical/i },
+    { key: 'refuel', label: 'Refueling', re: /refuel/i },
+    { key: 'repair', label: 'Repair', re: /repair/i },
+    { key: 'explore', label: 'Exploration', re: /pathfinder|expedition/i },
+    { key: 'science', label: 'Science / data', re: /science|data/i },
+    { key: 'dropship', label: 'Troop transport', re: /dropship|boarding/i },
+    { key: 'interdiction', label: 'Interdiction', re: /interdiction/i },
+    { key: 'bomber', label: 'Bombers', re: /bomber/i },
+    { key: 'capital', label: 'Capital warships', re: /frigate|corvette|destroyer|battlecruiser/i },
+    { key: 'carrier', label: 'Carriers', re: /carrier/i },
+    { key: 'passenger', label: 'Passengers', re: /passenger|touring/i },
+    { key: 'construction', label: 'Construction', re: /construction/i },
+  ];
+  const SIZE_RANK = { capital: 5, large: 4, medium: 3, small: 2, snub: 1, vehicle: 0 };
+
   OH.orgFleet = function orgFleet(members, shipOf, priceOf) {
     const byShip = new Map();
     const tally = { shipCount: 0, store: 0, priced: 0, cargo: 0, crew: 0 };
     const byCareer = {};
     const bySize = {};
     const bump = (m, k) => (m[k] = (m[k] || 0) + 1);
+    const byMember = [];
     for (const m of members || []) {
+      const mine = { name: m.name, ships: 0, lti: 0, store: 0, priced: 0 };
+      byMember.push(mine);
       for (const s of m.ships || []) {
         const v = shipOf(s.name);
         const price = priceOf(s.name);
+        mine.ships++;
+        if (s.lti) mine.lti++;
+        if (price) {
+          mine.store += price.msrp;
+          mine.priced++;
+        }
         const key = v ? v.lname : s.name.toLowerCase();
         let row = byShip.get(key);
         if (!row) {
@@ -1984,6 +2015,7 @@
             owners: new Map(),
             msrp: price ? price.msrp : null,
             career: (v && v.career) || null,
+            role: (v && v.role) || null,
             size: (v && v.size) || null,
           };
           byShip.set(key, row);
@@ -2007,7 +2039,33 @@
     const ships = [...byShip.values()]
       .map((r) => ({ ...r, owners: [...r.owners].map(([name, n]) => ({ name, n })) }))
       .sort((a, b) => b.count - a.count || (b.msrp || 0) - (a.msrp || 0));
-    return { ships, members: (members || []).length, ...tally, byCareer, bySize };
+    // Which jobs the fleet can do, and with what (missing ones have count 0).
+    const roles = OH.ORG_ROLES.map((r) => {
+      const hits = ships.filter((sh) => sh.role && r.re.test(sh.role));
+      return {
+        key: r.key,
+        label: r.label,
+        count: hits.reduce((n, sh) => n + sh.count, 0),
+        ships: hits.map((sh) => sh.name),
+      };
+    });
+    // Biggest hulls first (by size class, then price).
+    const rank = (sh) => SIZE_RANK[String(sh.size || '').toLowerCase()] ?? -1;
+    const biggest = ships
+      .filter((sh) => rank(sh) >= 3)
+      .sort((a, b) => rank(b) - rank(a) || (b.msrp || 0) - (a.msrp || 0))
+      .slice(0, 8);
+    byMember.sort((a, b) => b.store - a.store || b.ships - a.ships);
+    return {
+      ships,
+      members: (members || []).length,
+      ...tally,
+      byCareer,
+      bySize,
+      roles,
+      biggest,
+      byMember,
+    };
   };
 
   // --- Scan history --------------------------------------------------------------
