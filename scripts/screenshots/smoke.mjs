@@ -243,6 +243,36 @@ try {
   bbm.rows === bbTotal && bbm.reclaim && bbm.ins
     ? ok(`buy-back market: ${bbm.rows} rows, one each, Reclaim + Insurance`)
     : fail(`buy-back market: ${JSON.stringify(bbm)} vs ${bbTotal}`);
+  // Market tools: pricing a row ticks it; picked rows are totalled.
+  const bbTools = await page.evaluate(() => {
+    const row = document.querySelector('#buybacks-body .market-table tbody tr');
+    const pct = row.querySelector('.mk-pct-in');
+    pct.value = '50';
+    pct.dispatchEvent(new Event('input', { bubbles: true }));
+    return {
+      picked: row.querySelector('.mk-pick').checked,
+      price: row.querySelector('.mk-price').value,
+      sel: document.querySelector('#buybacks-body .mk-selcount').textContent,
+      exports:
+        !!document.querySelector('.bb-export-csv') && !!document.querySelector('.bb-export-img'),
+      store: !!document.querySelector('#buybacks-body .mk-store'),
+    };
+  });
+  bbTools.picked &&
+  bbTools.price &&
+  /1 picked/.test(bbTools.sel) &&
+  bbTools.exports &&
+  bbTools.store
+    ? ok(`buy-back market tools: pick, % → price, total ("${bbTools.sel.trim()}"), exports`)
+    : fail(`buy-back market tools: ${JSON.stringify(bbTools)}`);
+  await page.evaluate(() => {
+    const box = document.querySelector('#buybacks-body .mk-pick');
+    box.click(); // untick so later checks start clean
+    const row = box.closest('tr');
+    const price = row.querySelector('.mk-price');
+    price.value = '';
+    price.dispatchEvent(new Event('input', { bubbles: true }));
+  });
   // Click a name: the details window reads the buy-back's own page.
   await page.click('#buybacks-body .bb-open');
   await page
