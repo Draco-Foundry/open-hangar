@@ -231,9 +231,9 @@ redistribute other people's data.
 
 ## License & community
 
-Code: MIT, see [LICENSE](LICENSE). The "Made By The Community" badge in the website
-footer is from the Star Citizen Fankit, © Cloud Imperium, and not covered by the MIT
-license (see [site/img/fankit/NOTICE.md](site/img/fankit/NOTICE.md)).
+Code: MIT, see [LICENSE](LICENSE). Open Hangar uses no Star Citizen Fankit assets.
+Star Citizen® and related names are trademarks of Cloud Imperium Rights LLC; this is
+an unofficial fan project, not affiliated with the Cloud Imperium group of companies.
 
 - **Website:** [openhangar.space](https://openhangar.space/)
 - **Discord:** [Draco Foundry](https://discord.gg/FF8Wm5HdnV)
