@@ -55,6 +55,9 @@ page.on('console', (m) => {
   if (m.type() === 'error' && !/Failed to load resource|net::/.test(m.text())) {
     fail(`console error: ${m.text()}`);
   }
+  // The allowlist sanitizer dropped something we render: add it to SAFE_TAGS /
+  // SAFE_ATTRS in dashboard.js (if it's safe) or stop generating it.
+  if (m.text().startsWith('[setHTML]')) fail(`sanitizer: ${m.text()}`);
 });
 
 const go = async (hash) => {
