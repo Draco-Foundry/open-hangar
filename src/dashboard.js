@@ -3659,24 +3659,30 @@ function storeRow(p, row) {
   return row('Store price', v + parts) + melt;
 }
 
-// RSI has no per-pledge address, but its hangar takes a page size, so page N
-// at one pledge per page is the Nth pledge, in the order we scanned (newest
-// first). Right until the hangar changes; a rescan fixes the positions.
+// RSI has no per-pledge address, and its hangar always shows 10 per page
+// (a smaller page size is ignored), so link the page the pledge is on and say
+// where on it: "page 4, #3". Positions are from the last scan (newest first),
+// so they shift after buying or melting until the next scan.
+const RSI_PAGE = 10;
 let hangarPos = null;
-function hangarUrl(p) {
+function hangarSpot(p) {
   if (!hangarPos || hangarPos.items !== state.items) {
     hangarPos = { items: state.items, at: new Map(state.items.map((x, i) => [String(x.id), i])) };
   }
   const i = hangarPos.at.get(String(p.id));
-  return i == null
-    ? null
-    : `https://robertsspaceindustries.com/account/pledges?page=${i + 1}&pagesize=1`;
+  if (i == null) return null;
+  const page = Math.floor(i / RSI_PAGE) + 1;
+  return {
+    page,
+    pos: (i % RSI_PAGE) + 1,
+    url: `https://robertsspaceindustries.com/account/pledges?page=${page}`,
+  };
 }
-function viewOnRsiLink(p, label = 'View ↗') {
-  const url = hangarUrl(p);
-  return url
-    ? `<a class="bb-reclaim" href="${OH.escapeHtml(url)}" target="_blank" rel="noopener" title="Open this pledge in your RSI hangar (position as of your last scan)">${label}</a>`
-    : '';
+function viewOnRsiLink(p, long = false) {
+  const s = hangarSpot(p);
+  if (!s) return '';
+  const label = long ? `Page ${s.page}, #${s.pos} in your hangar ↗` : `p${s.page} #${s.pos} ↗`;
+  return `<a class="bb-reclaim" href="${OH.escapeHtml(s.url)}" target="_blank" rel="noopener" title="Opens page ${s.page} of your RSI hangar; it's number ${s.pos} on that page (as of your last scan)">${label}</a>`;
 }
 
 function openItemModal(p) {
@@ -3711,7 +3717,7 @@ function openItemModal(p) {
       ${storeRow(p, row)}
       ${p.currency ? row('Currency', OH.escapeHtml(p.currency)) : ''}
       ${p.isCCU && p.ccu ? row('Upgrade', OH.escapeHtml(`${p.ccu.from} → ${p.ccu.to}`)) : ''}
-      ${hangarUrl(p) ? row('On RSI', viewOnRsiLink(p, 'Open in your hangar ↗')) : ''}
+      ${hangarSpot(p) ? row('On RSI', viewOnRsiLink(p, true)) : ''}
       ${row('Scanned', OH.escapeHtml(fmtScan()))}
       <h4 class="modal-h">Contents (${contents.length})</h4>
       ${contentsHtml}
