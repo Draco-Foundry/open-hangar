@@ -125,6 +125,34 @@ try {
   console.log('Inventory');
   await go('#inventory');
   const n = await page.$$eval('#results .card', (e) => e.length);
+  // A broken RSI image falls back to the ship-art lookup by name.
+  await page
+    .waitForSelector('#results .card[data-resolve] img.thumb', { timeout: 15000 })
+    .catch(() => {});
+  const broken = await page.evaluate(() => {
+    const card = [...document.querySelectorAll('#results .card')].find(
+      (c) => c.querySelector('img.thumb') && c.dataset.resolve,
+    );
+    if (!card) return null;
+    card.querySelector('img.thumb').src =
+      'https://robertsspaceindustries.com/media/open-hangar-missing/broken.jpg';
+    return card.dataset.id;
+  });
+  if (broken) {
+    await page
+      .waitForFunction(
+        (id) => {
+          const img = document.querySelector(`#results .card[data-id="${id}"] img.thumb`);
+          return (
+            img && !/open-hangar-missing/.test(img.src) && img.complete && img.naturalWidth > 0
+          );
+        },
+        { timeout: 15000 },
+        broken,
+      )
+      .then(() => ok('broken RSI image falls back to ship art'))
+      .catch(() => fail('broken RSI image did not fall back'));
+  }
   n >= 10 ? ok(`${n} cards`) : fail(`only ${n} inventory cards`);
   await page.click('.card[data-id]');
   (await page.$eval('#item-modal', (m) => !m.hidden && getComputedStyle(m).display !== 'none'))
