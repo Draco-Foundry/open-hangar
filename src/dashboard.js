@@ -459,6 +459,7 @@ function route() {
   else if (v === 'stats') renderStats();
   else if (v === 'referrals') renderReferrals();
   else if (v === 'buybacks') renderBuybacks();
+  else if (v === 'developers') renderProfiles();
   // 'store' is static markup; About now lives on Home.
   updateSignedOutBanner(); // re-apply the cached signed-out banner state on this view
 }
@@ -3449,7 +3450,9 @@ logoutBtn.addEventListener('click', async () => {
 
 clearBtn.addEventListener('click', async () => {
   if (
-    !confirm('Clear all scraped hangar data stored in this browser? You can re-scan at any time.')
+    !confirm(
+      "Clear this account's scanned data from this browser? Other saved accounts are kept. You can re-scan at any time.",
+    )
   )
     return;
   await OH.clearData();
@@ -3634,36 +3637,87 @@ if (importBtn && importFile) {
   });
 }
 
-// Multi-account safety: force a fresh read of the current RSI account (the cache
-// could still hold the previous user) and, if a *different* account is signed
-// in, drop the stored hangar — it isn't theirs. Returns a notice string or ''.
+// Fill `state` from a stored DB (init, account switches, restores).
+function loadStateFromDB(db) {
+  const hangar = db.sources.hangar || { items: [], scannedAt: null };
+  state.items = hangar.items || [];
+  state.scannedAt = hangar.scannedAt || null;
+  state.history = Array.isArray(db.history) ? db.history : [];
+  const buybacks = db.sources.buybacks || { items: [], scannedAt: null };
+  state.buybacks = buybacks.items || [];
+  state.buybacksScannedAt = buybacks.scannedAt || null;
+  const referral = db.sources.referral;
+  state.referral =
+    referral && referral.items && !Array.isArray(referral.items)
+      ? OH.normalizeReferral(referral.items)
+      : null;
+  state.owner = db.owner || null;
+  state.selected.clear();
+  state.shown = new Set();
+  state.traits = new Map();
+  state.bbShown = new Set();
+  state.bbTraits = new Map();
+}
+
+// Multi-account: force a fresh read of the signed-in RSI account (the cache could
+// still hold the previous user). If it's a *different* account from the stored
+// data, park the current data under its owner and load the new account's saved
+// scans (OH.switchProfile), so alts never wipe each other. Returns a notice or ''.
 async function reconcileAccount() {
   let acct;
   try {
     acct = await OH.getAccount({ force: true });
   } catch {
-    return ''; // offline / can't determine — keep showing what we have
+    return ''; // offline / can't determine: keep showing what we have
   }
-  if (acct.loggedIn && acct.nickname && state.owner && acct.nickname !== state.owner.nickname) {
-    const prev = state.owner.displayname || state.owner.nickname;
-    await OH.clearData({ backup: true }); // recoverable — see Restore in Developers
-    state.items = [];
-    state.scannedAt = null;
-    state.history = [];
-    state.selected.clear();
-    state.buybacks = [];
-    state.buybacksScannedAt = null;
-    state.owner = null;
-    state.shown = new Set();
-    state.traits = new Map();
-    state.bbShown = new Set();
-    state.bbTraits = new Map();
-    state.referral = null;
-    refreshRecoveryUI();
-    return `Cleared ${prev}'s hangar — a different account is signed in. The previous data was saved; use “Restore previous hangar” in the Developers tab to bring it back, or scan to load this account.`;
+  if (
+    acct.loggedIn &&
+    acct.nickname &&
+    state.owner &&
+    acct.nickname.toLowerCase() !== String(state.owner.nickname || '').toLowerCase()
+  ) {
+    const who = acct.displayname || acct.nickname;
+    const { restored, parked } = await OH.switchProfile(acct.nickname, acct.displayname);
+    loadStateFromDB(await OH.loadDB());
+    await OH.getAccount({ force: true }); // re-cache the new account
+    renderAccount();
+    const kept = parked
+      ? ` ${parked}'s data is saved and comes back when you sign in as them.`
+      : '';
+    return restored
+      ? `Switched to ${who}: loaded your last scan.${kept}`
+      : `Switched to ${who}. Hit Scan to load this account.${kept}`;
   }
   return '';
 }
+
+// Developers → Saved accounts: every account with data in this browser.
+async function renderProfiles() {
+  const box = $('#profiles');
+  if (!box) return;
+  const list = await OH.listProfiles();
+  if (!list.length) {
+    box.innerHTML = '<p class="muted">No saved accounts yet. Scan to save one.</p>';
+    return;
+  }
+  box.innerHTML = list
+    .map((p) => {
+      const name = OH.escapeHtml(p.displayname || p.nickname);
+      const when = p.scannedAt ? new Date(p.scannedAt).toLocaleDateString() : 'never scanned';
+      const tail = p.active
+        ? '<span class="badge ship">signed in</span>'
+        : `<button class="btn-secondary profile-remove" data-nick="${OH.escapeHtml(p.nickname)}">Remove</button>`;
+      return `<div class="profile-row"><span class="profile-name">${name}</span><span class="muted">${p.pledges} pledges · ${when}</span>${tail}</div>`;
+    })
+    .join('');
+}
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('.profile-remove');
+  if (!b) return;
+  if (!confirm(`Remove the saved data for ${b.dataset.nick} from this browser?`)) return;
+  await OH.deleteProfile(b.dataset.nick);
+  renderProfiles();
+});
 
 // Returning to the tab (e.g. after logging in/out on RSI in another tab)
 // re-checks the account so the UI reflects it without a manual reload. Debounced
@@ -3696,20 +3750,8 @@ document.addEventListener('visibilitychange', async () => {
   if (LAYOUTS.includes(bbLayout)) state.bbLayout = bbLayout;
   if (marketAnnotations && typeof marketAnnotations === 'object') state.market = marketAnnotations;
 
-  const db = await OH.loadDB();
-  const hangar = db.sources.hangar || { items: [], scannedAt: null };
-  state.items = hangar.items || [];
-  state.scannedAt = hangar.scannedAt || null;
-  state.history = Array.isArray(db.history) ? db.history : [];
-  const buybacks = db.sources.buybacks || { items: [], scannedAt: null };
-  state.buybacks = buybacks.items || [];
-  state.buybacksScannedAt = buybacks.scannedAt || null;
-  const referral = db.sources.referral;
-  state.referral =
-    referral && referral.items && !Array.isArray(referral.items)
-      ? OH.normalizeReferral(referral.items)
-      : null;
-  state.owner = db.owner || null;
+  await OH.migrateRecovery(); // old "Restore previous hangar" snapshot → saved account
+  loadStateFromDB(await OH.loadDB());
 
   const notice = await reconcileAccount();
   state.shown = new Set(); // default: no filter selected = show all
@@ -3719,6 +3761,7 @@ document.addEventListener('visibilitychange', async () => {
   route();
   if (notice) setStatus(notice);
   await refreshRecoveryUI();
+  renderProfiles();
   renderFooter();
   renderSupporters();
 })();
