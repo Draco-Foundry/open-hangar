@@ -1993,21 +1993,36 @@ function ownedCCUs() {
     .filter((c) => c.fromMsrp && c.toMsrp);
 }
 
+// One table per production state (flight ready first, then concepts, …).
+const SHIP_STATES = [
+  ['flight-ready', 'Flight ready'],
+  ['in-production', 'In production'],
+  ['in-concept', 'In concept'],
+];
 function priceRowsHtml(q) {
   const needle = q.trim().toLowerCase();
   const rows = (state.catalog || [])
     .filter((v) => v.msrp && (!needle || v.lname.includes(needle)))
     .sort((a, b) => (a.name || a.lname).localeCompare(b.name || b.lname));
   if (!rows.length) return '<p class="muted">No ships match.</p>';
-  const status = (s) => (s === 'flight-ready' ? 'Flight ready' : s ? 'In concept' : '');
-  return `<table class="org-table"><thead><tr><th>Ship</th><th class="num">Store price</th><th>Role</th><th>Size</th><th>Status</th></tr></thead><tbody>${rows
+  const known = new Set(SHIP_STATES.map(([k]) => k));
+  const groups = SHIP_STATES.map(([k, label]) => [label, rows.filter((v) => v.status === k)]);
+  groups.push(['Other', rows.filter((v) => !known.has(v.status))]);
+  return groups
+    .filter(([, list]) => list.length)
     .map(
-      (v) =>
-        `<tr><td>${OH.escapeHtml(v.name || v.lname)}</td><td class="num">${dollars(v.msrp)}</td><td>${OH.escapeHtml(
-          v.role || '',
-        )}</td><td>${OH.escapeHtml(v.size || '')}</td><td class="org-owners">${status(v.status)}</td></tr>`,
+      ([label, list]) =>
+        `<h4 class="price-group">${label} <span class="muted">(${list.length})</span></h4>` +
+        `<table class="org-table"><thead><tr><th>Ship</th><th class="num">Store price</th><th>Role</th><th>Size</th></tr></thead><tbody>${list
+          .map(
+            (v) =>
+              `<tr><td>${OH.escapeHtml(v.name || v.lname)}</td><td class="num">${dollars(v.msrp)}</td><td>${OH.escapeHtml(
+                v.role || '',
+              )}</td><td>${OH.escapeHtml(v.size || '')}</td></tr>`,
+          )
+          .join('')}</tbody></table>`,
     )
-    .join('')}</tbody></table>`;
+    .join('');
 }
 
 function renderStore() {
