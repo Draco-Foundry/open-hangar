@@ -1780,9 +1780,26 @@
         font-size: 13px;
         font-family: inherit;
       }
-      .mk-price:focus {
+      .mk-price:focus,
+      .mk-pct-in:focus {
         outline: none;
         border-color: var(--accent);
+      }
+      .mk-pct-in {
+        width: 56px;
+        padding: 5px 8px;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        background: var(--panel);
+        color: var(--text);
+        font-size: 13px;
+        font-family: inherit;
+      }
+      .market-table tr.picked td {
+        background: rgba(56, 139, 253, 0.1);
+      }
+      .mk-selcount {
+        color: var(--muted);
       }
 
       /* Filter chips */

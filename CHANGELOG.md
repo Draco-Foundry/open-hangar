@@ -4,6 +4,11 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Market: tick and price as you go.** Every Market row has a checkbox now (and
+  each table a tick-all), no Select mode needed; the export count updates as you
+  tick, and the image bar appears once something is picked. A new **% of Melt**
+  column sits next to **My Price**: type 55 and the price fills in at 55% of melt,
+  or type a price and the % works itself out. The CSV includes both.
 - **Concept ships.** The ship list now includes ships that aren't flyable yet
   (Pioneer, Odyssey, Orion, …) from RSI's ship matrix, so they get a store price
   and count toward hangar value. The Store page's price list is split into
