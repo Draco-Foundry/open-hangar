@@ -2,7 +2,7 @@
 
 What's changed in each release of Open Hangar. Dates are when the version was cut.
 
-## Unreleased
+## 0.2.9 — 2026-09-28
 
 - **Org Fleet you can explore.** Click a role to open which ships fill it and who
   owns them; click a missing role to see ships that would fill it, cheapest first.
@@ -38,8 +38,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   amount (melt value, store prices, buy-backs, org value, images) shows in it,
   converted from USD at the day's rate, before tax. Rates are public (the ECB's,
   via Frankfurter) and fetched at most once a day. My Price stays as you type it.
-- **Buy-backs: View on RSI.** Each buy-back in the Market table links to just that
-  item on RSI's buy-back page. Hangar links now just say **View**.
+- **Shorter links.** Links to your RSI hangar just say **View**; every buy-back has one
+  **Reclaim** link.
 - **Updates page restyled.** Big version number and date, with changes grouped
   under **New & improved** and **Fixed**.
 - Fixed: on narrow cards the price ran into the M / G tags; it now drops to its own
