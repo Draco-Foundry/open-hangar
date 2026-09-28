@@ -4994,6 +4994,88 @@ async function initUpdates() {
   }
 }
 
+// --- openhangar.space: connect + sync (optional) -----------------------------
+let siteWait = null; // { stop, code } while waiting for the website to confirm
+async function renderSiteLink() {
+  const el = $('#site-link');
+  if (!el) return;
+  // Until the website is live, show "coming soon". Developers switch it on
+  // by setting the `siteUrl` storage key (e.g. to http://localhost:4321).
+  if (!(await OH.siteEnabled())) {
+    setHTML(
+      el,
+      '<span class="tease">🚀 <strong>Something big is coming.</strong> Your hangar on any device, your org’s fleet live, and more. Stay tuned.</span>',
+    );
+    return;
+  }
+  const link = await OH.getSiteLink();
+  if (siteWait) {
+    setHTML(
+      el,
+      `<span>Waiting for you to confirm on openhangar.space · code <code>${OH.escapeHtml(siteWait.code)}</code></span><button type="button" class="btn-secondary" data-site="cancel">Cancel</button>`,
+    );
+    return;
+  }
+  if (!link) {
+    setHTML(
+      el,
+      `<span class="muted">openhangar.space: not connected (optional)</span><button type="button" class="btn-secondary" data-site="connect" title="Sync your hangar to the website to see it on any device. Nothing is sent until you press Sync now.">Connect</button>`,
+    );
+    return;
+  }
+  const when = link.lastSync
+    ? `synced ${new Date(link.lastSync).toLocaleString()}`
+    : 'not synced yet';
+  setHTML(
+    el,
+    `<span class="ok">✓ Connected</span><span class="muted">${OH.escapeHtml(link.name || 'openhangar.space')} · ${OH.escapeHtml(when)}</span><button type="button" data-site="sync">Sync now</button><button type="button" class="btn-secondary" data-site="open">Open</button><button type="button" class="btn-secondary" data-site="disconnect">Disconnect</button>`,
+  );
+}
+$('#site-link')?.addEventListener('click', async (e) => {
+  const act = e.target.closest('[data-site]')?.dataset.site;
+  if (!act) return;
+  try {
+    if (act === 'connect') {
+      const start = await OH.siteLinkStart();
+      siteWait = { stop: false, code: start.user_code };
+      renderSiteLink();
+      chrome.tabs.create({
+        url: `${start.verification_uri}?code=${encodeURIComponent(start.user_code)}`,
+      });
+      const token = await OH.siteLinkWait(start, () => siteWait && !siteWait.stop);
+      siteWait = null;
+      setStatus(
+        token
+          ? 'Connected to openhangar.space. Press Sync now to send your hangar.'
+          : 'Not connected.',
+      );
+    } else if (act === 'cancel') {
+      if (siteWait) siteWait.stop = true;
+      siteWait = null;
+    } else if (act === 'sync') {
+      setStatus('Syncing to openhangar.space…');
+      await OH.siteSync();
+      setStatus('Synced to openhangar.space.');
+    } else if (act === 'open') {
+      chrome.tabs.create({ url: `${await OH.siteUrl()}/hangar` });
+    } else if (act === 'disconnect') {
+      if (
+        !confirm(
+          'Disconnect from openhangar.space? Your synced copy stays on the website until you delete it there.',
+        )
+      )
+        return;
+      await OH.siteDisconnect();
+      setStatus('Disconnected from openhangar.space.');
+    }
+  } catch (err) {
+    siteWait = null;
+    setStatus(String(err?.message || err));
+    OH.log('warn', 'site', String(err?.message || err));
+  }
+  renderSiteLink();
+});
+
 // --- Display currency -------------------------------------------------------
 function currencyNote() {
   return fx.code === 'USD'
@@ -5103,6 +5185,7 @@ $('#stats-body')?.addEventListener('click', (e) => {
   renderFooter();
   renderSupporters();
   initUpdates();
+  renderSiteLink();
   if (currency && currency !== 'USD') {
     const sel = $('#currency-select');
     if (sel) sel.value = currency;

@@ -25,7 +25,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
 
   if (!context.locals.user && PRIVATE.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
-    return context.redirect(`/sign-in?next=${encodeURIComponent(pathname)}`);
+    return context.redirect(`/sign-in?next=${encodeURIComponent(pathname + context.url.search)}`);
   }
   return next();
 });
