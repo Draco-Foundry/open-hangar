@@ -4,6 +4,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## 0.2.8 — 2026-09-28
 
+- **How-to on the Home page.** A "How to use Open Hangar" section with Getting
+  started open by default, and quick guides for browsing, hangar value, selling,
+  backups and getting help.
 - **Shorter install warning.** Chrome now only says the extension can access
   robertsspaceindustries.com. The ship-data site it also uses is public and needs no
   special permission, so we dropped it.
