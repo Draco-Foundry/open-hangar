@@ -4,6 +4,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Market images are tables.** In Market view, Copy image and Save PNG make a picture of
+  your picked rows as the table (grouped by section, with store price and your title),
+  easy to read down; the card picture is still there in the other layouts.
 - **Market: Store Price column.** Each row shows today's store price next to its melt
   price, so the gap is easy to see (also in the CSV).
 - **Market: pricing ticks the row.** Typing a price or % ticks that item for export.
