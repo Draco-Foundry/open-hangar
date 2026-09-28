@@ -143,8 +143,7 @@ install prompt only names robertsspaceindustries.com.)_
   rather soft-launch by link first — optional, not required).
 - ⬜ Submit. First review with the `cookies` permission can take **several days to
   ~2 weeks**; have the §5 justifications ready in case of a clarification email.
-- ⬜ Tag the release: `git tag v0.2.8 && git push origin v0.2.8`. The Release workflow builds the zips and publishes the GitHub Release with the CHANGELOG notes
-  and draft a GitHub Release.
+- ⬜ Tag the release: `git tag v0.2.8 && git push origin v0.2.8`. The Release workflow builds the zips and publishes the GitHub Release with the CHANGELOG notes.
 
 ## 8. Microsoft Edge Add-ons (after Chrome — same zip)
 
