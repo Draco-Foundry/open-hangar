@@ -4,6 +4,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Safer rendering.** Everything the dashboard draws now goes through an allowlist
+  sanitizer, so even unexpected data from RSI or an imported file can't inject
+  scripts. Firefox's add-on checker now reports zero warnings (was 26).
 - **Alt accounts.** Each RSI account now keeps its own data. Sign in as a different
   account and Open Hangar sets the current one aside and loads that account's last
   scan (or asks you to scan). Switch back and everything returns. Developers has a

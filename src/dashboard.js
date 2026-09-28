@@ -287,6 +287,71 @@ const state = {
   refSort: 'newest', // referral list sort: newest | oldest | name
 };
 
+// All dynamic markup goes through setHTML() instead of innerHTML. It's an
+// ALLOWLIST sanitizer (the same idea as DOMPurify): the HTML is parsed into an
+// inert document, and only the tags and attributes this dashboard actually uses
+// survive. Links must be ordinary web/mailto/relative URLs, and style attributes
+// can't load anything (no url()). Anything else is dropped and logged as
+// "[setHTML] dropped …" (the UI smoke test fails on that log), so it backs up
+// OH.escapeHtml rather than replacing it. Table sections parse in table context
+// so <tr>/<td> survive.
+const htmlParser = new DOMParser();
+const TABLE_PARTS = new Set(['TBODY', 'THEAD', 'TFOOT']);
+const SAFE_TAGS = new Set(
+  (
+    'a abbr b br button caption code details div em figcaption figure h2 h3 h4 hr i img ' +
+    'input label li ol option p pre section select small span strong sub summary sup ' +
+    'table tbody td th thead time tr u ul ' +
+    'svg g circle ellipse line path polygon polyline rect text tspan title defs lineargradient stop'
+  ).split(' '),
+);
+const SAFE_ATTRS = new Set(
+  (
+    'alt checked class colspan datetime disabled height hidden href id inputmode loading ' +
+    'maxlength name placeholder rel role rowspan selected src style tabindex target title type ' +
+    'value width ' +
+    'cx cy d dominant-baseline fill fill-opacity font-size font-weight offset opacity points ' +
+    'preserveaspectratio r rx ry stop-color stroke stroke-dasharray stroke-linecap ' +
+    'stroke-linejoin stroke-opacity stroke-width text-anchor transform viewbox x x1 x2 xmlns y y1 y2'
+  ).split(' '),
+);
+const SAFE_URL = /^(https?:|mailto:|#|\/|\.|[^:]*$)/i;
+function setHTML(el, html) {
+  if (!el) return;
+  if (html == null || html === '') {
+    el.replaceChildren();
+    return;
+  }
+  const tag = el.tagName;
+  const t = tag.toLowerCase();
+  let src = String(html);
+  if (tag === 'TR') src = `<table><tbody><tr>${src}</tr></tbody></table>`;
+  else if (TABLE_PARTS.has(tag)) src = `<table><${t}>${src}</${t}></table>`;
+  else if (tag === 'TABLE') src = `<table>${src}</table>`;
+  const body = htmlParser.parseFromString(src, 'text/html').body;
+  const root =
+    tag === 'TR' || TABLE_PARTS.has(tag) || tag === 'TABLE' ? body.querySelector(t) : body;
+  for (const node of [...root.querySelectorAll('*')]) {
+    const name = node.tagName.toLowerCase();
+    if (!SAFE_TAGS.has(name)) {
+      console.warn(`[setHTML] dropped <${name}>`);
+      node.remove();
+      continue;
+    }
+    for (const a of [...node.attributes]) {
+      const an = a.name.toLowerCase();
+      const known = SAFE_ATTRS.has(an) || an.startsWith('data-') || an.startsWith('aria-');
+      const badUrl = (an === 'href' || an === 'src') && !SAFE_URL.test(a.value.trim());
+      const badStyle = an === 'style' && /url\s*\(|expression|javascript:/i.test(a.value);
+      if (!known || badUrl || badStyle) {
+        console.warn(`[setHTML] dropped ${an}= on <${name}>`);
+        node.removeAttribute(a.name);
+      }
+    }
+  }
+  el.replaceChildren(...root.childNodes);
+}
+
 function setStatus(text, isError = false) {
   statusEl.textContent = text;
   statusEl.classList.toggle('error', isError);
@@ -343,16 +408,18 @@ function setScanning(text, done = false) {
   clearTimeout(scanIndicatorTimer);
   if (!text) {
     scanIndicator.hidden = true;
-    scanIndicator.innerHTML = '';
+    setHTML(scanIndicator, '');
     return;
   }
-  scanIndicator.innerHTML =
-    (done ? '' : '<span class="spin"></span>') + `<span>${OH.escapeHtml(text)}</span>`;
+  setHTML(
+    scanIndicator,
+    (done ? '' : '<span class="spin"></span>') + `<span>${OH.escapeHtml(text)}</span>`,
+  );
   scanIndicator.hidden = false;
   if (done) {
     scanIndicatorTimer = setTimeout(() => {
       scanIndicator.hidden = true;
-      scanIndicator.innerHTML = '';
+      setHTML(scanIndicator, '');
     }, 6000);
   }
 }
@@ -593,9 +660,11 @@ function renderAccount() {
         metaEl.textContent = 'Log in to scan your hangar';
       } else if (a.loggedIn) {
         // UEE record + enlisted date, each on its own plain line under the portrait.
-        metaEl.innerHTML =
+        setHTML(
+          metaEl,
           `<span class="cc-meta-line">UEE ${OH.escapeHtml(a.citizenRecord || DASH)}</span>` +
-          `<span class="cc-meta-line">Enlisted ${OH.escapeHtml(fmtEnlisted(a.enlistedSince))}</span>`;
+            `<span class="cc-meta-line">Enlisted ${OH.escapeHtml(fmtEnlisted(a.enlistedSince))}</span>`,
+        );
       } else {
         metaEl.textContent = DASH;
       }
@@ -615,15 +684,21 @@ function renderAccount() {
           `<span class="cc-org-name">${OH.escapeHtml(org.name)}</span>` +
           (org.rank ? `<span class="cc-org-rank">${OH.escapeHtml(org.rank)}</span>` : '') +
           `</span>`;
-        orgEl.innerHTML = org.sid
-          ? `<a class="cc-org-link" href="https://robertsspaceindustries.com/orgs/${encodeURIComponent(org.sid)}" target="_blank" rel="noopener">${inner}</a>`
-          : `<span class="cc-org-link">${inner}</span>`;
+        setHTML(
+          orgEl,
+          org.sid
+            ? `<a class="cc-org-link" href="https://robertsspaceindustries.com/orgs/${encodeURIComponent(org.sid)}" target="_blank" rel="noopener">${inner}</a>`
+            : `<span class="cc-org-link">${inner}</span>`,
+        );
         orgEl.hidden = false;
       } else if (a.loggedIn) {
-        orgEl.innerHTML = `<span class="cc-org-link cc-org-none"><span class="cc-org-logo cc-org-logo-ph"></span><span class="cc-org-text"><span class="cc-org-name">No affiliation</span></span></span>`;
+        setHTML(
+          orgEl,
+          `<span class="cc-org-link cc-org-none"><span class="cc-org-logo cc-org-logo-ph"></span><span class="cc-org-text"><span class="cc-org-name">No affiliation</span></span></span>`,
+        );
         orgEl.hidden = false;
       } else {
-        orgEl.innerHTML = '';
+        setHTML(orgEl, '');
         orgEl.hidden = true;
       }
     }
@@ -647,7 +722,7 @@ function renderAccount() {
           `<a class="flair concierge" style="border-color:${col}" href="https://robertsspaceindustries.com/en/account/concierge" target="_blank" rel="noopener"><span class="flair-lbl">Chairman's Club</span> <b style="color:${col}">${OH.escapeHtml(a.concierge.level)}</b>${prog}</a>`,
         );
       }
-      flairEl.innerHTML = parts.join('');
+      setHTML(flairEl, parts.join(''));
     }
 
     // Balances — always rendered, with dashes when there's no data (uniform).
@@ -656,7 +731,8 @@ function renderAccount() {
       const fmt = (n) => Number(n).toLocaleString('en-US');
       const pill = (cls, label, val) =>
         `<span class="bal ${cls}"><span class="bal-lbl">${label}</span> <b>${val}</b></span>`;
-      balEl.innerHTML =
+      setHTML(
+        balEl,
         pill(
           'store',
           'Store Credit',
@@ -668,8 +744,9 @@ function renderAccount() {
                 })
             : DASH,
         ) +
-        pill('uec', 'UEC', c.uec ? '¤' + fmt(c.uec.value) : DASH) +
-        pill('rec', 'REC', c.rec ? '¤' + fmt(c.rec.value) : DASH);
+          pill('uec', 'UEC', c.uec ? '¤' + fmt(c.uec.value) : DASH) +
+          pill('rec', 'REC', c.rec ? '¤' + fmt(c.rec.value) : DASH),
+      );
     }
 
     renderReferralPill(a);
@@ -702,7 +779,7 @@ function renderReferralPill(a) {
   const ref = state.referral;
   const code = ref?.code || a?.referral?.code || null;
   if (!a || !a.loggedIn || !code) {
-    el.innerHTML = '';
+    setHTML(el, '');
     return;
   }
   const recruits = ref?.legacy?.recruits ?? ref?.current?.recruits ?? null;
@@ -711,11 +788,14 @@ function renderReferralPill(a) {
     recruits != null
       ? `<span class="bal-lbl">Referrals</span> <b>${recruits.toLocaleString('en-US')}</b>`
       : `<span class="bal-lbl">Referral code</span>`;
-  el.innerHTML = `<span class="ref-pill">${countPart}
+  setHTML(
+    el,
+    `<span class="ref-pill">${countPart}
       <span class="ref-pill-sep"></span>
       <span class="ref-code">${OH.escapeHtml(code)}</span>
       <button class="ref-copy" data-copy="${OH.escapeHtml(url || code)}" title="Copy referral link">Copy</button>
-    </span>`;
+    </span>`,
+  );
 }
 
 function renderVersions() {
@@ -726,7 +806,7 @@ function renderVersions() {
   const oh = REPO_URL
     ? `<a href="${REPO_URL}/releases" target="_blank" rel="noopener">Open Hangar v${ext}</a>`
     : `Open Hangar v${ext}`;
-  el.innerHTML = `${oh} · Star Citizen …`;
+  setHTML(el, `${oh} · Star Citizen …`);
   OH.getScVersion().then((v) => {
     let sc = 'Star Citizen n/a';
     if (v.code) {
@@ -736,7 +816,7 @@ function renderVersions() {
         ? `<a href="https://starcitizen.tools/Star_Citizen_Alpha_${semver}" target="_blank" rel="noopener">Star Citizen ${label}</a>`
         : `Star Citizen ${label}`;
     }
-    el.innerHTML = `${oh} · ${sc}`;
+    setHTML(el, `${oh} · ${sc}`);
   });
 }
 
@@ -755,26 +835,31 @@ function renderHome() {
     const ships = state.items.filter((p) => p.containsShip).length;
     const box = (big, lbl) =>
       `<div class="sum-box"><div class="sum-big">${big}</div><div class="sum-lbl">${lbl}</div></div>`;
-    sum.innerHTML =
+    setHTML(
+      sum,
       box(state.items.length, 'pledges') +
-      box(money(OH.totalValue(state.items)), 'melt value') +
-      (hangarValue()?.store ? box(dollars(hangarValue().store), 'ships at store price') : '') +
-      box(ships, 'ships') +
-      box(count('ccu'), 'CCUs') +
-      (count('paint') ? box(count('paint'), 'paints') : '') +
-      box(count('addon'), 'add-ons') +
-      (state.buybacks.length ? box(state.buybacks.length, 'buy-backs') : '');
+        box(money(OH.totalValue(state.items)), 'melt value') +
+        (hangarValue()?.store ? box(dollars(hangarValue().store), 'ships at store price') : '') +
+        box(ships, 'ships') +
+        box(count('ccu'), 'CCUs') +
+        (count('paint') ? box(count('paint'), 'paints') : '') +
+        box(count('addon'), 'add-ons') +
+        (state.buybacks.length ? box(state.buybacks.length, 'buy-backs') : ''),
+    );
   } else {
-    sum.innerHTML = '';
+    setHTML(sum, '');
   }
   const ch = $('#home-changes');
   if (ch) {
     const hist = state.history;
     if (has && hist.length >= 2) {
       const d = OH.diffSnapshots(hist[hist.length - 2], hist[hist.length - 1]);
-      ch.innerHTML = `Since ${OH.escapeHtml(fmtDay(hist[hist.length - 2].at))}: ${OH.escapeHtml(
-        changeSummary(d),
-      )} · <a href="#stats" data-stats-tab="history">history</a>`;
+      setHTML(
+        ch,
+        `Since ${OH.escapeHtml(fmtDay(hist[hist.length - 2].at))}: ${OH.escapeHtml(
+          changeSummary(d),
+        )} · <a href="#stats" data-stats-tab="history">history</a>`,
+      );
       ch.hidden = false;
     } else {
       ch.hidden = true;
@@ -789,7 +874,10 @@ function renderHome() {
   const when = state.scannedAt ? new Date(state.scannedAt).toLocaleString() : 'previously';
   const ageDays = state.scannedAt ? (Date.now() - state.scannedAt) / 86400000 : 0;
   if (ageDays > 7) {
-    scannedHomeEl.innerHTML = `Scanned ${OH.escapeHtml(when)} — <span class="stale">over a week old, consider rescanning</span>`;
+    setHTML(
+      scannedHomeEl,
+      `Scanned ${OH.escapeHtml(when)} — <span class="stale">over a week old, consider rescanning</span>`,
+    );
   } else {
     scannedHomeEl.textContent = `Scanned ${when}`;
   }
@@ -806,13 +894,15 @@ function renderFooter() {
   const gh = link(REPO_URL, 'GitHub');
   const dc = link(DISCORD_URL, 'Discord');
   const ideas = link(IDEAS_URL, 'Suggest a feature');
-  $('#footer').innerHTML = `${gh} · ${dc} · ${ideas} · MIT License · v${v}`;
+  setHTML($('#footer'), `${gh} · ${dc} · ${ideas} · MIT License · v${v}`);
   const dev = $('#dev-links');
   if (dev)
-    dev.innerHTML =
+    setHTML(
+      dev,
       link(REPO_URL, 'GitHub') +
-      link(DISCORD_URL, 'Discord') +
-      link(IDEAS_URL, 'Suggest a feature');
+        link(DISCORD_URL, 'Discord') +
+        link(IDEAS_URL, 'Suggest a feature'),
+    );
 }
 
 // Developers page "Thanks & supporters": render contributor / booster chips,
@@ -826,15 +916,21 @@ function renderSupporters() {
   };
   const c = $('#sup-contributors');
   if (c) {
-    c.innerHTML = CONTRIBUTORS.length
-      ? CONTRIBUTORS.map((s) => chip(s)).join('')
-      : `<span class="muted">Be the first — ${link(REPO_URL, 'contributions welcome')}.</span>`;
+    setHTML(
+      c,
+      CONTRIBUTORS.length
+        ? CONTRIBUTORS.map((s) => chip(s)).join('')
+        : `<span class="muted">Be the first — ${link(REPO_URL, 'contributions welcome')}.</span>`,
+    );
   }
   const b = $('#sup-boosters');
   if (b) {
-    b.innerHTML = BOOSTERS.length
-      ? BOOSTERS.map((s) => chip(s, 'booster')).join('')
-      : `<span class="muted">Boosters will be thanked here — ${link(DISCORD_URL, 'join the Discord')}.</span>`;
+    setHTML(
+      b,
+      BOOSTERS.length
+        ? BOOSTERS.map((s) => chip(s, 'booster')).join('')
+        : `<span class="muted">Boosters will be thanked here — ${link(DISCORD_URL, 'join the Discord')}.</span>`,
+    );
   }
 }
 
@@ -1322,7 +1418,7 @@ function renderMarket() {
   const body = sections.length
     ? `<div class="market">${sections.map(({ section, groups }) => marketTableHtml(section, groups)).join('')}</div>`
     : '<div class="empty">No meltable pledges match the current filters.</div>';
-  resultsEl.innerHTML = marketToolbarHtml(shown) + body;
+  setHTML(resultsEl, marketToolbarHtml(shown) + body);
 }
 
 // --- Market export (CSV / image) -----------------------------------------
@@ -1542,25 +1638,29 @@ function renderInventory() {
     .querySelectorAll('button')
     .forEach((b) => b.classList.toggle('active', b.dataset.layout === state.layout));
   if (!state.items.length) {
-    chipsEl.innerHTML = '';
-    resultsEl.innerHTML = '<div class="empty">No hangar data yet. Scan from the Home tab.</div>';
+    setHTML(chipsEl, '');
+    setHTML(resultsEl, '<div class="empty">No hangar data yet. Scan from the Home tab.</div>');
     return;
   }
-  chipsEl.innerHTML =
+  setHTML(
+    chipsEl,
     `<div class="chip-row">${presentKinds().map(chipHtml).join('')}</div>` +
-    traitRowHtml(state.items, state.traits, pledgeFacets, state.shown.size || state.traits.size);
+      traitRowHtml(state.items, state.traits, pledgeFacets, state.shown.size || state.traits.size),
+  );
   const shown = computeShown();
   if (!shown.length) {
-    resultsEl.innerHTML = '<div class="empty">No pledges match the current filters.</div>';
+    setHTML(resultsEl, '<div class="empty">No pledges match the current filters.</div>');
     return;
   }
   if (state.layout === 'market') {
     renderMarket();
     return;
   }
-  resultsEl.innerHTML =
+  setHTML(
+    resultsEl,
     `<div class="result-count">Showing ${shown.length} of ${state.items.length} · ${money(OH.totalValue(shown))}</div>` +
-    `<div class="grid ${state.layout}">${shown.map(cardHtml).join('')}</div>`;
+      `<div class="grid ${state.layout}">${shown.map(cardHtml).join('')}</div>`,
+  );
   enhanceCardImages(resultsEl);
 }
 
@@ -2070,7 +2170,7 @@ function renderStats() {
   ensurePrices();
   const body = $('#stats-body');
   if (!state.items.length) {
-    body.innerHTML = '<div class="empty">No hangar data yet. Scan from the Home tab.</div>';
+    setHTML(body, '<div class="empty">No hangar data yet. Scan from the Home tab.</div>');
     return;
   }
   const items = state.items;
@@ -2131,13 +2231,15 @@ function renderStats() {
       backupRowHtml(),
   };
   const tab = tabs[state.statsTab] ? state.statsTab : 'overview';
-  body.innerHTML =
+  setHTML(
+    body,
     `<div class="layout-toggle stats-tabs" role="tablist">${STATS_TABS.map(
       ([key, label]) =>
         `<button role="tab" data-stats-tab="${key}" aria-selected="${key === tab}" class="${
           key === tab ? 'active' : ''
         }">${label}</button>`,
-    ).join('')}</div>` + tabs[tab]();
+    ).join('')}</div>` + tabs[tab](),
+  );
 }
 
 // History lives only in this browser, so the History tab offers a backup file
@@ -2502,7 +2604,7 @@ function refListRows() {
 function renderRefList() {
   const tbody = $('#ref-tbody');
   const count = $('#ref-count');
-  if (tbody) tbody.innerHTML = refListRows();
+  if (tbody) setHTML(tbody, refListRows());
   if (count) {
     const shown = refFilteredList().length;
     const total =
@@ -2525,11 +2627,14 @@ function renderReferrals() {
 
   // Not signed in / never scanned → a friendly prompt instead of a blank page.
   if (!ref) {
-    body.innerHTML = `<div class="placeholder-view">
+    setHTML(
+      body,
+      `<div class="placeholder-view">
       <p class="muted">No referral data yet. Click <strong>Scan</strong> on the Home page to pull
         your recruits and prospects from your
         <a href="https://robertsspaceindustries.com/en/referral" target="_blank" rel="noopener">RSI Referral Rewards</a> page.</p>
-    </div>`;
+    </div>`,
+    );
     return;
   }
 
@@ -2629,7 +2734,9 @@ function renderReferrals() {
       </div>`
     : '';
 
-  body.innerHTML = `
+  setHTML(
+    body,
+    `
     ${code}
 
     <div class="stat-group-label">Overview</div>
@@ -2674,7 +2781,8 @@ function renderReferrals() {
         <thead><tr><th>Handle</th><th>Moniker</th><th id="ref-date-col">Converted</th></tr></thead>
         <tbody id="ref-tbody">${refListRows()}</tbody>
       </table>
-    </div>`;
+    </div>`,
+  );
 
   renderRefList(); // fills #ref-count
   enhanceRewardImages(body); // lazily resolve ship art for reward-item hovers
@@ -2795,14 +2903,17 @@ function renderBuybacks() {
   if (!body) return;
   if (!state.buybacks.length) {
     if (controls) controls.hidden = true;
-    body.innerHTML = `<div class="placeholder-view">
+    setHTML(
+      body,
+      `<div class="placeholder-view">
       <h2>Buy-back pledges</h2>
       <p class="muted">Your melted pledges that you can re-acquire from RSI. Click
         <strong>Scan</strong> on the Home page to pull them in alongside your hangar.</p>
       <p class="muted">Buy-backs are read from
         <a href="https://robertsspaceindustries.com/account/buy-back-pledges" target="_blank" rel="noopener">RSI › Account › Buy-Back Pledges</a>
         — the same server-rendered pages as the hangar.</p>
-    </div>`;
+    </div>`,
+    );
     return;
   }
   if (controls) controls.hidden = false;
@@ -2812,30 +2923,34 @@ function renderBuybacks() {
       .forEach((b) => b.classList.toggle('active', b.dataset.layout === state.bbLayout));
   }
   if (bbChipsEl) {
-    bbChipsEl.innerHTML =
+    setHTML(
+      bbChipsEl,
       `<div class="chip-row">${presentBbKinds().map(bbChipHtml).join('')}</div>` +
-      traitRowHtml(
-        state.buybacks,
-        state.bbTraits,
-        buybackFacets,
-        state.bbShown.size || state.bbTraits.size,
-      );
+        traitRowHtml(
+          state.buybacks,
+          state.bbTraits,
+          buybackFacets,
+          state.bbShown.size || state.bbTraits.size,
+        ),
+    );
   }
   const list = computeBuybacks();
   const when = state.buybacksScannedAt ? new Date(state.buybacksScannedAt).toLocaleString() : '';
   if (!list.length) {
-    body.innerHTML = '<div class="empty">No buy-backs match the current filters.</div>';
+    setHTML(body, '<div class="empty">No buy-backs match the current filters.</div>');
     return;
   }
   const count = `<div class="result-count">Showing ${list.length} of ${state.buybacks.length}${when ? ` · scanned ${OH.escapeHtml(when)}` : ''}</div>`;
   // Market = a reclaim-focused table (buy-backs have no melt/giftable/insurance);
   // the other layouts reuse the shared card grid like the inventory.
   if (state.bbLayout === 'market') {
-    body.innerHTML = count + buybackMarketHtml(list);
+    setHTML(body, count + buybackMarketHtml(list));
     return; // table has no thumbnails to enhance
   }
-  body.innerHTML =
-    count + `<div class="grid ${state.bbLayout}">${list.map(buybackCardHtml).join('')}</div>`;
+  setHTML(
+    body,
+    count + `<div class="grid ${state.bbLayout}">${list.map(buybackCardHtml).join('')}</div>`,
+  );
   enhanceCardImages(body);
 }
 
@@ -3169,9 +3284,10 @@ function openItemModal(p) {
     : '<p class="muted">No itemized contents.</p>';
   const row = (k, v) =>
     `<div class="mr"><span class="mr-k">${k}</span><span class="mr-v">${v}</span></div>`;
-  modalBody.innerHTML =
+  setHTML(
+    modalBody,
     img +
-    `<div class="modal-info">
+      `<div class="modal-info">
       <h3 class="modal-name">${OH.escapeHtml(plainName(p))}</h3>
       <div class="modal-meta"><span class="badge ${badgeClass}">${OH.escapeHtml(p.kind)}</span><span class="modal-val">${OH.escapeHtml(formatValue(p))}</span></div>
       ${row('ID', OH.escapeHtml(p.id || '—'))}
@@ -3184,14 +3300,15 @@ function openItemModal(p) {
       ${row('Scanned', OH.escapeHtml(fmtScan()))}
       <h4 class="modal-h">Contents (${contents.length})</h4>
       ${contentsHtml}
-    </div>`;
+    </div>`,
+  );
   itemModal.hidden = false;
   const mimg = modalBody.querySelector('img.modal-img');
   if (mimg) progressiveImage(mimg, real);
 }
 function closeItemModal() {
   itemModal.hidden = true;
-  modalBody.innerHTML = '';
+  setHTML(modalBody, '');
 }
 
 // Buy-back detail modal (reuses the inventory modal shell).
@@ -3204,9 +3321,10 @@ function openBuybackModal(b) {
   const url = buybackUrl(b);
   const row = (k, v) =>
     `<div class="mr"><span class="mr-k">${k}</span><span class="mr-v">${v}</span></div>`;
-  modalBody.innerHTML =
+  setHTML(
+    modalBody,
     img +
-    `<div class="modal-info">
+      `<div class="modal-info">
       <h3 class="modal-name">${b.ccu ? `${OH.escapeHtml(b.ccu.from)} → ${OH.escapeHtml(b.ccu.to)}` : OH.escapeHtml(b.name || '—')}</h3>
       <div class="modal-meta"><span class="badge">buy-back</span>${b.price ? `<span class="modal-val">${OH.escapeHtml(b.price)}</span>` : ''}</div>
       ${b.ccu ? row('Upgrade', OH.escapeHtml(`${b.ccu.from} → ${b.ccu.to}`)) : ''}
@@ -3214,7 +3332,8 @@ function openBuybackModal(b) {
       ${b.contains ? row('Contains', OH.escapeHtml(b.contains)) : ''}
       ${b.id ? row('Pledge ID', OH.escapeHtml(b.id)) : ''}
       ${url ? `<div class="mr"><span class="mr-k">Reclaim</span><span class="mr-v"><a href="${OH.escapeHtml(url)}" target="_blank" rel="noopener">Open on RSI ↗</a></span></div>` : ''}
-    </div>`;
+    </div>`,
+  );
   itemModal.hidden = false;
   const mimg = modalBody.querySelector('img.modal-img');
   if (mimg) {
@@ -3697,19 +3816,22 @@ async function renderProfiles() {
   if (!box) return;
   const list = await OH.listProfiles();
   if (!list.length) {
-    box.innerHTML = '<p class="muted">No saved accounts yet. Scan to save one.</p>';
+    setHTML(box, '<p class="muted">No saved accounts yet. Scan to save one.</p>');
     return;
   }
-  box.innerHTML = list
-    .map((p) => {
-      const name = OH.escapeHtml(p.displayname || p.nickname);
-      const when = p.scannedAt ? new Date(p.scannedAt).toLocaleDateString() : 'never scanned';
-      const tail = p.active
-        ? '<span class="badge ship">signed in</span>'
-        : `<button class="btn-secondary profile-remove" data-nick="${OH.escapeHtml(p.nickname)}">Remove</button>`;
-      return `<div class="profile-row"><span class="profile-name">${name}</span><span class="muted">${p.pledges} pledges · ${when}</span>${tail}</div>`;
-    })
-    .join('');
+  setHTML(
+    box,
+    list
+      .map((p) => {
+        const name = OH.escapeHtml(p.displayname || p.nickname);
+        const when = p.scannedAt ? new Date(p.scannedAt).toLocaleDateString() : 'never scanned';
+        const tail = p.active
+          ? '<span class="badge ship">signed in</span>'
+          : `<button class="btn-secondary profile-remove" data-nick="${OH.escapeHtml(p.nickname)}">Remove</button>`;
+        return `<div class="profile-row"><span class="profile-name">${name}</span><span class="muted">${p.pledges} pledges · ${when}</span>${tail}</div>`;
+      })
+      .join(''),
+  );
 }
 document.addEventListener('click', async (e) => {
   const b = e.target.closest('.profile-remove');
