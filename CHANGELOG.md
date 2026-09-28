@@ -4,6 +4,11 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased — next: 0.2.8
 
+- **Tidier cards.** Kind badges (SHIP / PAINT / ADDON…) are a fixed width so the
+  M / G tags line up row to row; card names drop RSI's "Standalone Ships - /
+  Paints - / Gear - " prefix (the badge already says it; hover for the full name);
+  and the items line only lists what the name doesn't already say — so a paint
+  no longer repeats its own name, and ships show just their insurance and extras.
 - **Back up your history.** The JSON export (Developers → Export JSON, or the new
   **Download backup** button on Stats → History) now includes your scan history,
   and importing a backup **merges** history instead of wiping it. History keeps the

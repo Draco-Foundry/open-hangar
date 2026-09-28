@@ -1824,7 +1824,7 @@
       }
       .grid.list .card-body {
         display: grid;
-        grid-template-columns: minmax(150px, 1.3fr) minmax(0, 2fr) 72px 100px;
+        grid-template-columns: minmax(150px, 1.3fr) minmax(0, 2fr) 124px 90px;
         align-items: center;
         gap: 14px;
         padding: 8px 14px;
@@ -2079,8 +2079,14 @@
       .foot-left {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
         min-width: 0;
+      }
+      /* Fixed-width kind badge so the M / G tags after it line up row to row. */
+      .foot-left .badge {
+        min-width: 64px;
+        text-align: center;
+        box-sizing: border-box;
       }
       /* M(eltable) / G(iftable) tags: green yes, red no, grey unknown. */
       .flags {
