@@ -4,6 +4,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Inventory grouped by type.** Gallery, Compact and List now show Standalone
+  Ships, Packs, Upgrades, Paints, Add-ons, Coupons and Other as their own sections,
+  with the title pinned while you scroll. Your sort applies inside each section.
+  Untick **Group by type** for one big grid.
 - **More Stats.** Three new tabs. **Collection**: your insurance mix, giftable and
   meltable counts, and per manufacturer how many of their ships you own ("Origin:
   9 of 17", hover for which). **Buy-backs**: what it would cost to buy everything
