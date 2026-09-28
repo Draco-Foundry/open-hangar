@@ -71,6 +71,122 @@
 
   OH.getSource = (id) => OH.SOURCES.find((s) => s.id === id) || null;
 
+  // --- Error log --------------------------------------------------------------
+  // A small rolling log (last LOG_MAX entries) of errors, failed/partial scans and
+  // RSI retries, so a user can copy a report into a bug post. Stays local like
+  // everything else; messages are scrubbed of emails and referral codes, and
+  // nothing logs item names or the user's handle.
+  const LOG_KEY = 'errorLog';
+  const LOG_MAX = 100;
+  let logChain = Promise.resolve();
+
+  OH.scrubLog = function scrubLog(text) {
+    return String(text ?? '')
+      .replace(/chrome-extension:\/\/[a-z]+\/|moz-extension:\/\/[\w-]+\//gi, '/')
+      .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[email]')
+      .replace(/\bSTAR-[A-Z0-9]{4}-[A-Z0-9]{4}\b/gi, '[referral]')
+      .replace(/([?&](?:token|key|code|referral)=)[^&\s]+/gi, '$1[redacted]')
+      .slice(0, 600);
+  };
+
+  // Append { at, level: info|warn|error, where, msg }. Never throws; writes are
+  // chained so bursts (retries) don't overwrite each other.
+  OH.log = function log(level, where, msg) {
+    const entry = { at: Date.now(), level, where: String(where), msg: OH.scrubLog(msg) };
+    logChain = logChain
+      .then(async () => {
+        const cur = (await chrome.storage.local.get(LOG_KEY))[LOG_KEY] || [];
+        cur.push(entry);
+        await chrome.storage.local.set({ [LOG_KEY]: cur.slice(-LOG_MAX) });
+      })
+      .catch(() => {});
+    return logChain;
+  };
+  OH.getLog = async function getLog() {
+    try {
+      return (await chrome.storage.local.get(LOG_KEY))[LOG_KEY] || [];
+    } catch {
+      return [];
+    }
+  };
+  OH.clearLog = () => chrome.storage.local.remove(LOG_KEY);
+
+  const stamp = (t) => {
+    const d = new Date(t);
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(
+      d.getMinutes(),
+    )}:${p(d.getSeconds())}`;
+  };
+  const ago = (t) => {
+    if (!t) return 'never';
+    const h = (Date.now() - t) / 3600e3;
+    return h < 1
+      ? 'under an hour ago'
+      : h < 48
+        ? `${Math.round(h)}h ago`
+        : `${Math.round(h / 24)} days ago`;
+  };
+  OH.formatLogLine = (e) =>
+    `${stamp(e.at)}  ${String(e.level).toUpperCase().padEnd(5)}  ${String(e.where).padEnd(8)}  ${e.msg}`;
+
+  // Browser + OS from the user agent, e.g. "Chrome 141 on Windows".
+  function browserLabel(ua) {
+    const m = /Edg\/(\d+)/.exec(ua)
+      ? ['Edge', /Edg\/(\d+)/.exec(ua)[1]]
+      : /Firefox\/(\d+)/.exec(ua)
+        ? ['Firefox', /Firefox\/(\d+)/.exec(ua)[1]]
+        : /Chrome\/(\d+)/.exec(ua)
+          ? ['Chrome', /Chrome\/(\d+)/.exec(ua)[1]]
+          : ['Unknown browser', ''];
+    const os = /Windows/.test(ua)
+      ? 'Windows'
+      : /Android/.test(ua)
+        ? 'Android'
+        : /Mac OS X/.test(ua)
+          ? 'macOS'
+          : /CrOS/.test(ua)
+            ? 'ChromeOS'
+            : /Linux/.test(ua)
+              ? 'Linux'
+              : 'unknown OS';
+    return `${m[0]} ${m[1]} on ${os}`.replace('  ', ' ');
+  }
+
+  // A copy-paste report for bug posts: version, browser, data counts, cache
+  // state and the recent log. Wrapped in a code block so Discord/GitHub keep
+  // the columns. Contains counts and dates only — no handle, codes or names.
+  OH.errorReport = async function errorReport({ maxLines = 40 } = {}) {
+    let manifest = {};
+    try {
+      manifest = chrome.runtime.getManifest();
+    } catch {
+      /* not in an extension page */
+    }
+    const db = await OH.loadDB();
+    const src = (id) => db.sources[id] || {};
+    const count = (s) =>
+      Array.isArray(s.items) ? s.items.length : s.items && typeof s.items === 'object' ? 1 : 0;
+    const store = await chrome.storage.local.get(['shipCatalog', 'shipMatrix']);
+    const cat = store.shipCatalog || {};
+    const mat = store.shipMatrix || {};
+    const log = await OH.getLog();
+    const lines = [
+      '```',
+      'Open Hangar error report',
+      `Version:   ${manifest.version || '?'} (${manifest.browser_specific_settings ? 'Firefox' : 'Chrome'} build)`,
+      `Browser:   ${browserLabel(navigator.userAgent || '')}`,
+      `Hangar:    ${count(src('hangar'))} items, scanned ${ago(src('hangar').scannedAt)}`,
+      `Buy-backs: ${count(src('buybacks'))} items, scanned ${ago(src('buybacks').scannedAt)}`,
+      `History:   ${Array.isArray(db.history) ? db.history.length : 0} snapshots`,
+      `Catalog:   ${Array.isArray(cat.list) ? cat.list.length : 0} ships (v${cat.v || '?'}, ${ago(cat.at)}) · ship matrix ${Array.isArray(mat.list) ? mat.list.length : 0}`,
+      `Log:       ${log.length ? `last ${Math.min(maxLines, log.length)} of ${log.length}` : 'empty'}`,
+      ...log.slice(-maxLines).map(OH.formatLogLine),
+      '```',
+    ];
+    return lines.join('\n');
+  };
+
   // --- Storage (versioned multi-source DB) ----------------------------------
 
   const emptyDB = () => ({ schemaVersion: SCHEMA_VERSION, sources: {} });
@@ -138,7 +254,14 @@
       await chrome.storage.local.remove([DB_KEY, 'hangar', 'scannedAt', 'account']);
       return;
     }
-    await chrome.storage.local.remove([DB_KEY, 'hangar', 'scannedAt', 'account', RECOVERY_KEY]);
+    await chrome.storage.local.remove([
+      DB_KEY,
+      'hangar',
+      'scannedAt',
+      'account',
+      RECOVERY_KEY,
+      LOG_KEY,
+    ]);
   };
 
   // The most recent auto-cleared snapshot ({ at, db }), or null. Lets the UI
@@ -457,7 +580,7 @@
     for (let attempt = 0; attempt <= RETRIES; attempt++) {
       if (attempt > 0) {
         await sleep(lastError.wait);
-        onRetry?.(attempt, RETRIES);
+        onRetry?.(attempt, RETRIES, lastError.msg);
       }
       let res;
       try {
@@ -493,9 +616,10 @@
 
     for (let page = 1; page <= MAX_PAGES; page++) {
       const url = `${src.url}?page=${page}&pagesize=${size}`;
-      const got = await fetchPage(url, (attempt, of) =>
-        onProgress?.(page, all.length, { attempt, of }),
-      );
+      const got = await fetchPage(url, (attempt, of, reason) => {
+        OH.log('warn', src.id, `page ${page}: ${reason}, retry ${attempt}/${of}`);
+        onProgress?.(page, all.length, { attempt, of });
+      });
       if (got.error) {
         if (page === 1) return { error: `${got.error}. Check your connection and try again.` };
         return { items: all, partial: { page, reason: got.error } };
@@ -565,12 +689,20 @@
       if (src.type === 'html') result = await scanHtmlSource(src, onProgress);
       else return { ok: false, error: `Source type '${src.type}' is not implemented yet.` };
 
-      if (result.error) return { ok: false, error: result.error };
+      if (result.error) {
+        OH.log('error', src.id, result.error);
+        return { ok: false, error: result.error };
+      }
 
       // A scan cut short by RSI never *shrinks* your data: if an earlier scan
       // holds more items, keep it and say so instead of saving the partial one.
       if (result.partial) {
         const { page, reason } = result.partial;
+        OH.log(
+          'warn',
+          src.id,
+          `scan stopped at page ${page} (${reason}), ${result.items.length} items read`,
+        );
         const prev = await OH.loadSource(src.id);
         const prevCount = Array.isArray(prev.items) ? prev.items.length : 0;
         if (prevCount > result.items.length) {
@@ -591,8 +723,10 @@
       // Only complete hangar scans go into the history (a partial one would read
       // as pledges disappearing).
       const scannedAt = await saveSource(src.id, result.items, { record: src.id === 'hangar' });
+      OH.log('info', src.id, `scan ok, ${result.items.length} items`);
       return { ok: true, items: result.items, scannedAt };
     } catch (err) {
+      OH.log('error', src.id, `scan crashed: ${err?.stack || err?.message || err}`);
       return { ok: false, error: String(err?.message || err) };
     }
   };
@@ -1210,8 +1344,9 @@
             (json.meta && json.meta.last_page) || (json.links && json.links.next ? page + 1 : page);
           if (!data.length || page >= last) break;
         }
-      } catch {
+      } catch (e) {
         /* offline — leave catalog empty; getShipImage just returns null */
+        OH.log('warn', 'catalog', `ship catalog download failed: ${e?.message || e}`);
       }
       if (list.length) {
         catalogMem = list;
