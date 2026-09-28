@@ -1,0 +1,64 @@
+name: Release
+
+# Push a tag like v0.2.8 (or run by hand with a tag) and this builds the Chrome
+# and Firefox zips and publishes a GitHub Release with that version's
+# CHANGELOG section as the notes. The tag must match manifest.json's version.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to release, e.g. v0.2.7'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag
+        id: tag
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm test
+      - name: Check the tag matches manifest.json
+        run: |
+          V=$(node -p "require('./manifest.json').version")
+          if [ "$V" != "${{ steps.tag.outputs.version }}" ]; then
+            echo "manifest.json is $V but the tag is ${{ steps.tag.outputs.tag }}"; exit 1
+          fi
+      - run: npm run pack
+      - name: Release notes from CHANGELOG
+        run: |
+          V="${{ steps.tag.outputs.version }}"
+          awk -v v="$V" '
+            index($0, "## " v " ") == 1 { on = 1; next }
+            on && /^## / { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then echo "See CHANGELOG.md." > notes.md; fi
+          printf '\n---\n**Install:** [openhangar.space](https://openhangar.space/). The zips below are the exact store packages.\n' >> notes.md
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          T="${{ steps.tag.outputs.tag }}"
+          if gh release view "$T" >/dev/null 2>&1; then
+            gh release upload "$T" dist/*.zip --clobber
+            gh release edit "$T" --notes-file notes.md
+          else
+            gh release create "$T" dist/*.zip --title "Open Hangar ${{ steps.tag.outputs.version }}" --notes-file notes.md
+          fi
