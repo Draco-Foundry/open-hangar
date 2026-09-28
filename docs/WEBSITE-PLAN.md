@@ -56,6 +56,15 @@ Device-code flow (works on Chrome, Edge and Firefox alike):
    extension, Sync now, view your hangar/stats on the site, export, delete account.
 2. **Orgs.** Create or join with an invite code; leaders see the live combined fleet
    (what Org Fleet does today with files), roles/compare views, member share settings.
+   - **Orgs form themselves:** each sync carries the player's main org (SID) and
+     rank. When members of the same org sync, its page appears; nobody has to
+     create it.
+   - **Public or private members:** private members' ships still count in the
+     org fleet as "anonymous owner".
+   - **Org admins by rank:** the highest ranks get the org's admin tools. Rank is
+     checked against RSI's public org member list before granting it, because
+     the extension's data could be edited.
+
 3. **Reference data.** Ship pages, prices, loaners and more, starcitizen.tools style,
    using the wiki API we already use.
 4. **Move openhangar.space into the Astro project** so the landing page and the app
