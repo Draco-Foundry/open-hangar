@@ -751,6 +751,21 @@
       .bal.rec b {
         color: #d2a8ff;
       }
+      a.bal.bbt {
+        text-decoration: none;
+        color: inherit;
+      }
+      .bal.bbt b {
+        color: #58a6ff;
+      }
+      .bb-tokens {
+        margin: 0 0 12px;
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        font-size: 13px;
+      }
 
       /* Referral pill on the Citizen Card (matches the balance pill row) */
       .home-referral {
@@ -3075,6 +3090,8 @@
           <select id="bb-sort">
             <option value="date-desc">Date: newest first</option>
             <option value="date-asc">Date: oldest first</option>
+            <option value="price-desc">Price: high to low</option>
+            <option value="price-asc">Price: low to high</option>
             <option value="name-asc">Name: A → Z</option>
             <option value="name-desc">Name: Z → A</option>
             <option value="default">Scan order</option>

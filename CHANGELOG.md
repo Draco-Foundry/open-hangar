@@ -4,6 +4,11 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Buy-back tokens and prices.** Your buy-back token count (read from RSI's
+  buy-back page when you scan) shows on Home and at the top of Buy-Backs, with the
+  date of the next quarterly token. Buy-backs now show each ship's store price
+  today (or a CCU's price gap), and you can sort **Price: high to low / low to
+  high**.
 - **Market: tick and price as you go.** Every Market row has a checkbox now (and
   each table a tick-all), no Select mode needed; the export count updates as you
   tick, and the image bar appears once something is picked. A new **% of Melt**

@@ -760,7 +760,12 @@ function renderAccount() {
             : DASH,
         ) +
           pill('uec', 'UEC', c.uec ? '¤' + fmt(c.uec.value) : DASH) +
-          pill('rec', 'REC', c.rec ? '¤' + fmt(c.rec.value) : DASH),
+          pill('rec', 'REC', c.rec ? '¤' + fmt(c.rec.value) : DASH) +
+          `<a class="bal bbt" href="#buybacks" data-view="buybacks" title="${OH.escapeHtml(
+            tokenTitle(),
+          )}"><span class="bal-lbl">Buy-back tokens</span> <b>${
+            state.bbTokens != null ? state.bbTokens : DASH
+          }</b></a>`,
       );
     }
 
@@ -3144,7 +3149,7 @@ function buybackCardHtml(b) {
       <div class="card-foot">
         <span class="foot-left"><span class="badge ${badgeClass}">${OH.escapeHtml(b.kind || 'buy-back')}</span></span>
         <span class="bb-date">${OH.escapeHtml(b.date || '')}</span>
-        <span class="bb-end">${b.price ? `<span class="val">${OH.escapeHtml(b.price)}</span>` : ''}${reclaim}</span>
+        <span class="bb-end">${bbPriceHtml(b)}${reclaim}</span>
       </div>
     </div>
   </div>`;
@@ -3161,6 +3166,67 @@ function bbChipHtml(kind) {
   return `<button class="chip k-${kind.key}" data-key="${kind.key}" aria-pressed="${active}">${OH.escapeHtml(
     kind.label,
   )}<span class="n">${n}</span></button>`;
+}
+
+// --- Buy-back tokens + prices ---------------------------------------------
+// RSI adds one buy-back token per quarter (they don't roll over). Dates from
+// RSI's "2026 Buy Back Token Schedule" Spectrum post; add next year's when
+// it's announced.
+const BUYBACK_TOKEN_DATES = ['2026-01-05', '2026-04-06', '2026-07-06', '2026-10-05'];
+function nextTokenDate(now = Date.now()) {
+  const d = BUYBACK_TOKEN_DATES.map((x) => new Date(x + 'T12:00:00Z')).find((t) => t > now);
+  return d
+    ? d.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: 'UTC',
+      })
+    : null;
+}
+function tokenTitle() {
+  const next = nextTokenDate();
+  return `A token lets you buy back one melted pledge with store credit. RSI adds one each quarter${
+    next ? ` (next: ${next})` : ''
+  }; they don't roll over.`;
+}
+function tokenLineHtml() {
+  const n = state.bbTokens;
+  const next = nextTokenDate();
+  const have =
+    n == null
+      ? 'Rescan to see your buy-back tokens.'
+      : `You have <strong>${n}</strong> buy-back token${n === 1 ? '' : 's'}${
+          n ? ' (one store-credit buy-back each)' : ''
+        }.`;
+  return `<div class="bb-tokens">${have} ${
+    next ? `Next token: <strong>${OH.escapeHtml(next)}</strong>.` : 'RSI adds one each quarter.'
+  } Tokens don't roll over, so use one before the next arrives. Cash buy-backs don't need a token.</div>`;
+}
+
+// Standard store price of what a buy-back gives back: the ship's price today
+// (from the ship list), or a CCU's price gap. RSI's actual buy-back price can
+// differ; this is for comparing and sorting. null when unknown.
+function buybackStorePrice(b) {
+  if (!state.priceOf) return null;
+  if (b.isCCU && b.ccu) {
+    const from = state.priceOf(b.ccu.from);
+    const to = state.priceOf(b.ccu.to);
+    return from && to && to.msrp > from.msrp ? to.msrp - from.msrp : null;
+  }
+  if (b.kind !== 'ship') return null;
+  const bare = String(b.name || '').replace(/^\s*[^-–]+?\s*[-–]\s/, '');
+  const tries = [
+    bare,
+    bare.replace(/\s*[-–]\s*(lti|iae|ilw|warbond|standard edition|\d+\s*months?.*)$/i, ''),
+    (b.contains || '').split(/\s+and\s+/i)[0],
+  ];
+  for (const t of tries) {
+    const hit = t && state.priceOf(t.trim());
+    if (hit && hit.msrp) return hit.msrp;
+  }
+  return null;
 }
 
 function computeBuybacks() {
@@ -3187,6 +3253,13 @@ function computeBuybacks() {
           return dt(b) - dt(a);
         case 'date-asc':
           return dt(a) - dt(b);
+        case 'price-desc':
+        case 'price-asc': {
+          const pa = buybackStorePrice(a);
+          const pb = buybackStorePrice(b);
+          if (pa == null || pb == null) return (pa == null) - (pb == null); // unknown last
+          return state.bbSort === 'price-desc' ? pb - pa : pa - pb;
+        }
         default:
           return 0;
       }
@@ -3232,13 +3305,16 @@ function renderBuybacks() {
         ),
     );
   }
+  if (!state.priceOf) ensurePrices();
   const list = computeBuybacks();
   const when = state.buybacksScannedAt ? new Date(state.buybacksScannedAt).toLocaleString() : '';
   if (!list.length) {
     setHTML(body, '<div class="empty">No buy-backs match the current filters.</div>');
     return;
   }
-  const count = `<div class="result-count">Showing ${list.length} of ${state.buybacks.length}${when ? ` · scanned ${OH.escapeHtml(when)}` : ''}</div>`;
+  const count =
+    tokenLineHtml() +
+    `<div class="result-count">Showing ${list.length} of ${state.buybacks.length}${when ? ` · scanned ${OH.escapeHtml(when)}` : ''}</div>`;
   // Market = a reclaim-focused table (buy-backs have no melt/giftable/insurance);
   // the other layouts reuse the shared card grid like the inventory.
   if (state.bbLayout === 'market') {
@@ -3276,6 +3352,12 @@ function stackBuybacks(list) {
   return order;
 }
 
+function bbPriceHtml(b) {
+  if (b.price) return `<span class="val">${OH.escapeHtml(b.price)}</span>`;
+  const sp = buybackStorePrice(b);
+  return sp ? `<span class="val" title="Store price today">${dollars(sp)}</span>` : '';
+}
+
 function buybackRowHtml(g) {
   const b = g.rep;
   const name = b.ccu
@@ -3287,7 +3369,7 @@ function buybackRowHtml(g) {
     : '—';
   return `<tr class="mk-row">
     <td class="mk-name">${name}</td>
-    <td class="mk-melt">${b.price ? OH.escapeHtml(b.price) : '—'}</td>
+    <td class="mk-melt">${bbPriceHtml(b) || '—'}</td>
     <td class="mk-stock">${g.qty}</td>
     <td class="mk-mine">${reclaim}</td>
   </tr>`;
@@ -3302,7 +3384,7 @@ function buybackMarketHtml(list) {
       <h3 class="market-title">${OH.escapeHtml(k.label)}<span class="market-n">${groups.length}</span></h3>
       <table class="market-table">
         <thead><tr>
-          <th>Items Name</th><th>Reclaim Cost</th><th>Qty</th><th>Reclaim</th>
+          <th>Items Name</th><th title="Standard store price today; RSI's buy-back price can differ">Store Price</th><th>Qty</th><th>Reclaim</th>
         </tr></thead>
         <tbody>${groups.map(buybackRowHtml).join('')}</tbody>
       </table>
@@ -4089,6 +4171,8 @@ function loadStateFromDB(db) {
   const buybacks = db.sources.buybacks || { items: [], scannedAt: null };
   state.buybacks = buybacks.items || [];
   state.buybacksScannedAt = buybacks.scannedAt || null;
+  state.bbTokens =
+    buybacks.meta && Number.isFinite(buybacks.meta.tokens) ? buybacks.meta.tokens : null;
   const referral = db.sources.referral;
   state.referral =
     referral && referral.items && !Array.isArray(referral.items)
