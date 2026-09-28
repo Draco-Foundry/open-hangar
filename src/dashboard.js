@@ -7,7 +7,17 @@
  */
 
 const $ = (sel) => document.querySelector(sel);
-const VIEWS = ['home', 'inventory', 'buybacks', 'stats', 'org', 'referrals', 'store', 'developers'];
+const VIEWS = [
+  'home',
+  'inventory',
+  'buybacks',
+  'stats',
+  'org',
+  'referrals',
+  'store',
+  'developers',
+  'updates',
+];
 
 const statusEl = $('#status');
 const scannedHomeEl = $('#scanned-home');
@@ -531,6 +541,7 @@ function route() {
   else if (v === 'developers') renderProfiles();
   else if (v === 'org') renderOrg();
   else if (v === 'store') renderStore();
+  else if (v === 'updates') renderUpdates();
   // 'store' is static markup; About now lives on Home.
   updateSignedOutBanner(); // re-apply the cached signed-out banner state on this view
 }
@@ -810,7 +821,8 @@ function renderVersions() {
   const oh = REPO_URL
     ? `<a href="${REPO_URL}/releases" target="_blank" rel="noopener">Open Hangar v${ext}</a>`
     : `Open Hangar v${ext}`;
-  setHTML(el, `${oh} · Star Citizen …`);
+  const news = '<a href="#updates" data-view="updates">What’s new</a>';
+  setHTML(el, `${oh} · ${news} · Star Citizen …`);
   OH.getScVersion().then((v) => {
     let sc = 'Star Citizen n/a';
     if (v.code) {
@@ -820,7 +832,7 @@ function renderVersions() {
         ? `<a href="https://starcitizen.tools/Star_Citizen_Alpha_${semver}" target="_blank" rel="noopener">Star Citizen ${label}</a>`
         : `Star Citizen ${label}`;
     }
-    setHTML(el, `${oh} · ${sc}`);
+    setHTML(el, `${oh} · ${news} · ${sc}`);
   });
 }
 
@@ -898,7 +910,10 @@ function renderFooter() {
   const gh = link(REPO_URL, 'GitHub');
   const dc = link(DISCORD_URL, 'Discord');
   const ideas = link(IDEAS_URL, 'Suggest a feature');
-  setHTML($('#footer'), `${gh} · ${dc} · ${ideas} · MIT License · v${v}`);
+  setHTML(
+    $('#footer'),
+    `${gh} · ${dc} · ${ideas} · MIT License · <a href="#updates" data-view="updates">v${v}</a>`,
+  );
   const dev = $('#dev-links');
   if (dev)
     setHTML(
@@ -4095,6 +4110,129 @@ document.addEventListener('visibilitychange', async () => {
   if (notice) setStatus(notice);
 });
 
+// --- Updates ----------------------------------------------------------------
+// The Updates page reads the CHANGELOG.md that ships in the extension (see
+// scripts/pack.mjs). The background worker sets `updateReady` when a new
+// version is waiting and `justUpdated` right after one installs.
+let changelog = null;
+async function loadChangelog() {
+  if (!changelog) {
+    try {
+      const res = await fetch(chrome.runtime.getURL('CHANGELOG.md'));
+      changelog = res.ok ? OH.parseChangelog(await res.text()) : [];
+    } catch {
+      changelog = [];
+    }
+  }
+  return changelog;
+}
+
+// "2026-09-28" → "Sep 28, 2026"; anything else (e.g. "June 2026") as written.
+const releaseDate = (d) =>
+  /^\d{4}-\d{2}-\d{2}$/.test(d)
+    ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: 'UTC',
+      })
+    : d;
+
+async function renderUpdates() {
+  const body = $('#updates-body');
+  const cur = chrome.runtime.getManifest().version;
+  const { justUpdated } = await chrome.storage.local.get('justUpdated');
+  const from = justUpdated && justUpdated.to === cur ? justUpdated.from : null;
+  const list = await loadChangelog();
+  if (!list.length) {
+    setHTML(
+      body,
+      `<p class="muted">Release notes aren't bundled in this build. See them <a href="${REPO_URL}/blob/main/CHANGELOG.md" target="_blank" rel="noopener">on GitHub</a>.</p>`,
+    );
+    return;
+  }
+  setHTML(
+    body,
+    list
+      .map((r) => {
+        const isCur = OH.compareVersions(r.version, cur) === 0;
+        const isNew =
+          from &&
+          OH.compareVersions(r.version, from) > 0 &&
+          OH.compareVersions(r.version, cur) <= 0;
+        const tag = isCur
+          ? `<span class="release-tag${isNew ? ' new' : ''}">${isNew ? 'New · ' : ''}Your version</span>`
+          : isNew
+            ? '<span class="release-tag new">New</span>'
+            : '';
+        return `<section class="release">
+          <div class="release-head"><h3>${OH.escapeHtml(r.title)}</h3>${
+            r.date ? `<span class="release-date">${OH.escapeHtml(releaseDate(r.date))}</span>` : ''
+          }${tag}</div>
+          ${r.intro.map((t) => `<p>${OH.inlineMarkdown(t)}</p>`).join('')}
+          ${r.items.length ? `<ul>${r.items.map((t) => `<li>${OH.inlineMarkdown(t)}</li>`).join('')}</ul>` : ''}
+        </section>`;
+      })
+      .join(''),
+  );
+}
+
+function showUpdateBanner(version) {
+  const cur = chrome.runtime.getManifest().version;
+  const bar = $('#update-banner');
+  if (!bar || !version || OH.compareVersions(version, cur) <= 0) return;
+  $('#update-text').textContent = `Open Hangar ${version} is ready. Reload to start using it.`;
+  bar.hidden = false;
+}
+
+async function initUpdates() {
+  const cur = chrome.runtime.getManifest().version;
+  const { updateReady, justUpdated, lastUpdateCheck } = await chrome.storage.local.get([
+    'updateReady',
+    'justUpdated',
+    'lastUpdateCheck',
+  ]);
+  showUpdateBanner(updateReady);
+  chrome.storage.onChanged?.addListener((ch, area) => {
+    if (area === 'local' && ch.updateReady) showUpdateBanner(ch.updateReady.newValue);
+  });
+  $('#update-reload')?.addEventListener('click', async () => {
+    $('#update-reload').disabled = true;
+    await chrome.storage.local.set({ reopenAfterUpdate: true });
+    chrome.runtime.reload(); // closes this tab; the new version reopens it on Updates
+  });
+
+  const note = $('#updated-note');
+  if (note && justUpdated && justUpdated.to === cur && !justUpdated.seen) {
+    setHTML(
+      note,
+      `<span>Open Hangar updated to ${OH.escapeHtml(cur)}. <a href="#updates" data-view="updates">See what’s new</a></span><button type="button" class="note-close" aria-label="Dismiss">×</button>`,
+    );
+    note.hidden = false;
+    const seen = () => {
+      note.hidden = true;
+      chrome.storage.local.set({ justUpdated: { ...justUpdated, seen: true } });
+    };
+    note.addEventListener('click', (e) => {
+      if (e.target.closest('.note-close, a')) seen();
+    });
+  }
+
+  // Nudge the browser to look for a new version (at most every 6 hours). If
+  // one exists it downloads in the background and `updateReady` follows.
+  // Chrome/Edge only: Firefox checks on its own schedule and has no such call
+  // (looked up by name so Firefox's linter doesn't flag it).
+  const check = chrome.runtime[['request', 'Update', 'Check'].join('')];
+  if (typeof check === 'function' && !(Date.now() - (lastUpdateCheck || 0) < 6 * 3600e3)) {
+    chrome.storage.local.set({ lastUpdateCheck: Date.now() });
+    try {
+      await check.call(chrome.runtime);
+    } catch {
+      /* unpacked builds and throttling land here; nothing to do */
+    }
+  }
+}
+
 // --- Init -----------------------------------------------------------------
 
 (async () => {
@@ -4134,4 +4272,5 @@ document.addEventListener('visibilitychange', async () => {
   renderProfiles();
   renderFooter();
   renderSupporters();
+  initUpdates();
 })();

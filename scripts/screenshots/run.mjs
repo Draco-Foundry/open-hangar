@@ -104,6 +104,15 @@ async function handle(req, res) {
       .end(demoDashboard());
   }
 
+  if (u.pathname === '/CHANGELOG.md') {
+    return res
+      .writeHead(200, {
+        'content-type': 'text/markdown; charset=utf-8',
+        'cache-control': 'no-store',
+      })
+      .end(fs.readFileSync(path.join(SRC, '..', 'CHANGELOG.md')));
+  }
+
   const base = u.pathname.startsWith('/__demo/') ? HERE : SRC;
   const rel = decodeURIComponent(u.pathname.replace(/^\/__demo\//, '/'));
   const file = path.join(base, rel);
