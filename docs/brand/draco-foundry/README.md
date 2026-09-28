@@ -11,3 +11,18 @@ gear sits centred with room for Discord's round crop.
 | `logo-128.png`          | Small uses (favicons, embeds)    |
 | `preview-round-256.png` | How it looks in Discord's circle |
 | `dreamina-source.jpg`   | The crop at full resolution      |
+
+## Banner
+
+The Starfarer (Storm Surge paint) scene was made in Dreamina from references;
+`banner.py` lays the logo and wordmark over it (Bahnschrift, fitted to the dark
+space left of the ship). Rebuild with `python docs/brand/draco-foundry/banner.py`.
+
+| File                          | Use                                               |
+| ----------------------------- | ------------------------------------------------- |
+| `banner-960x540.jpg`          | Discord server banner (needs Boost level 2)       |
+| `banner-1920x1080.jpg`        | Anywhere 16:9 (Discord invite background, social) |
+| `banner-1280x640.jpg`         | GitHub repo social preview                        |
+| `invite-splash-1920x1080.jpg` | Discord invite background without text            |
+| `banner-3840x2160.jpg`        | Master                                            |
+| `banner-scene.jpg`            | The Dreamina scene on its own                     |
