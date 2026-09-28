@@ -40,3 +40,18 @@ test('prices resolve offline from the bundled snapshot', async () => {
   assert.equal(priceOf('Carrack').msrp, 600);
   assert.ok(priceOf('Cutlass Black').msrp > 0);
 });
+
+test('mergeCatalogs adds concept ships and fills gaps, but no flight-ready dupes', () => {
+  const list = [{ lname: 'cutlass black', slug: 'cutlass-black', msrp: null, status: null }];
+  const matrix = [
+    { lname: 'cutlass black', slug: 'cutlass-black', msrp: 110, status: 'flight-ready' },
+    { lname: 'pioneer', slug: 'pioneer', msrp: 925, status: 'in-concept' },
+    { lname: 'hornet tracker mk i', slug: 'x', msrp: 90, status: 'flight-ready' },
+  ];
+  const out = OH.mergeCatalogs(list, matrix);
+  assert.equal(out.length, 2);
+  assert.equal(out[0].msrp, 110);
+  assert.equal(out[0].status, 'flight-ready');
+  assert.equal(out[1].slug, 'pioneer');
+  assert.equal(list[0].msrp, null); // input untouched
+});

@@ -1285,7 +1285,7 @@
   const shipImgMem = new Map(); // normName -> url|null (per session)
   const shipImgInflight = new Map(); // normName -> Promise (dedupe concurrent)
   let catalogMem = null; // [{ lname, slug, cls, msrp }]  (wiki)
-  const CATALOG_CACHE_V = 4; // v2: class + msrp, all pages · v3: fleet fields · v4: display name
+  const CATALOG_CACHE_V = 5; // v2: class + msrp, all pages · v3: fleet fields · v4: display name · v5: + ship matrix (concept ships)
   let catalogInflight = null;
   let matrixMem = null; // [{ lname, name, img, mfr, mfrName }]  (RSI ship-matrix)
   const MATRIX_CACHE_V = 2; // v2: + display name + manufacturer (for HTF ship codes)
@@ -1390,12 +1390,12 @@
     };
   };
 
-  // Download the whole wiki vehicle list, slimmed. The API serves 50 per page
-  // whatever we ask for (≈300 vehicles → 6 pages), so walk until last_page.
-  OH.fetchShipCatalog = async function fetchShipCatalog(fetchFn = fetch) {
+  // Walk one paged wiki endpoint and return every record's slim entry. The
+  // API serves 50 per page whatever we ask for, so walk until last_page.
+  async function fetchAllPages(path, fetchFn) {
     const list = [];
     for (let page = 1; page <= 12; page++) {
-      const res = await fetchFn(`${SC_API}/vehicles?page%5Bsize%5D=200&page%5Bnumber%5D=${page}`, {
+      const res = await fetchFn(`${SC_API}/${path}?page%5Bsize%5D=200&page%5Bnumber%5D=${page}`, {
         credentials: 'omit',
         headers: { Accept: 'application/json' },
       });
@@ -1411,6 +1411,47 @@
       if (!data.length || page >= last) break;
     }
     return list;
+  }
+
+  // The whole ship list, slimmed. `vehicles` is what's in the game files
+  // (flight-ready ships, ground vehicles); `shipmatrix` is RSI's ship matrix,
+  // which adds concept ships (Pioneer, Odyssey, …) and fills prices/status the
+  // first list lacks. Merged by slug, then name; the game-file entry wins,
+  // and only not-yet-flyable ships are added from the matrix.
+  OH.fetchShipCatalog = async function fetchShipCatalog(fetchFn = fetch) {
+    const list = await fetchAllPages('vehicles', fetchFn);
+    let matrix = [];
+    try {
+      matrix = await fetchAllPages('shipmatrix/vehicles', fetchFn);
+    } catch (e) {
+      OH.log('warn', 'catalog', `ship matrix download failed: ${e?.message || e}`);
+    }
+    return OH.mergeCatalogs(list, matrix);
+  };
+
+  // Game-file list + ship-matrix list → one list. Pure.
+  OH.mergeCatalogs = function mergeCatalogs(list, matrix) {
+    const out = list.map((v) => ({ ...v }));
+    const bySlug = new Map(out.map((v) => [v.slug, v]));
+    const byName = new Map(out.map((v) => [v.lname, v]));
+    for (const m of matrix || []) {
+      const hit = bySlug.get(m.slug) || byName.get(m.lname);
+      if (!hit) {
+        // A flight-ready ship is always in the game-file list already, often
+        // under a slightly different name ("… Mk I"); only concepts are new.
+        if (m.status === 'flight-ready') continue;
+        out.push({ ...m });
+        bySlug.set(m.slug, out[out.length - 1]);
+        byName.set(m.lname, out[out.length - 1]);
+        continue;
+      }
+      for (const k of ['msrp', 'status', 'career', 'role', 'size', 'crew', 'cls']) {
+        if (hit[k] == null && m[k] != null) hit[k] = m[k];
+      }
+      if (!hit.cargo && m.cargo) hit.cargo = m.cargo;
+      if (!hit.name && m.name) hit.name = m.name;
+    }
+    return out;
   };
 
   // The ship list that ships inside the extension (src/data/ship-catalog.json,
