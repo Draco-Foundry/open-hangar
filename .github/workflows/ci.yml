@@ -18,3 +18,20 @@ jobs:
       # Click through the real dashboard with the demo account (Chrome is
       # preinstalled on GitHub's Ubuntu runners).
       - run: npm run test:ui
+
+  # The website (app.openhangar.space): type-check and build. Uses a throwaway
+  # secret; nothing is deployed from here.
+  app:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: echo "BETTER_AUTH_SECRET=ci-only-not-a-real-secret" > .dev.vars
+      - run: npx astro check
+      - run: npx astro build

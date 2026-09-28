@@ -1,0 +1,122 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+}
+const { title } = Astro.props;
+const user = Astro.locals.user;
+const path = Astro.url.pathname;
+const nav = user
+  ? [
+      ['/hangar', 'My hangar'],
+      ['/link', 'Connect extension'],
+      ['/account', 'Account'],
+    ]
+  : [];
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title ? `${title} · Open Hangar` : 'Open Hangar'}</title>
+  </head>
+  <body>
+    <header class="top">
+      <div class="wrap bar">
+        <a class="brand" href="/"><img src="/favicon.svg" alt="" width="26" height="26" /> Open Hangar</a>
+        <nav>
+          {
+            nav.map(([href, label]) => (
+              <a href={href} class={path.startsWith(href) ? 'on' : ''}>
+                {label}
+              </a>
+            ))
+          }
+          {
+            user ? (
+              <button class="secondary" id="sign-out" type="button">
+                Sign out
+              </button>
+            ) : (
+              <>
+                <a href="/sign-in">Sign in</a>
+                <a class="btn" href="/sign-up">
+                  Create account
+                </a>
+              </>
+            )
+          }
+        </nav>
+      </div>
+    </header>
+    <main class="wrap">
+      <slot />
+    </main>
+    <footer class="wrap foot muted">
+      Open Hangar is an unofficial Star Citizen fan project, not affiliated with the Cloud Imperium group of
+      companies. <a href="https://openhangar.space/privacy.html">Privacy</a> ·
+      <a href="https://github.com/Draco-Foundry/open-hangar">GitHub</a>
+    </footer>
+    <script>
+      import { authClient } from '../lib/auth-client';
+      document.getElementById('sign-out')?.addEventListener('click', async () => {
+        await authClient.signOut();
+        location.href = '/';
+      });
+    </script>
+  </body>
+</html>
+
+<style>
+  .top {
+    border-bottom: 1px solid var(--line);
+    background: rgba(13, 17, 23, 0.9);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    backdrop-filter: blur(6px);
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 58px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--text);
+    font-weight: 700;
+    font-size: 16px;
+    text-decoration: none;
+  }
+  nav {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  nav a:not(.btn) {
+    color: var(--muted);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 13px;
+  }
+  nav a.on,
+  nav a:not(.btn):hover {
+    color: var(--text);
+  }
+  main {
+    min-height: calc(100vh - 140px);
+    padding-bottom: 40px;
+  }
+  .foot {
+    border-top: 1px solid var(--line);
+    padding: 18px 20px;
+    font-size: 12px;
+  }
+</style>

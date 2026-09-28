@@ -1,0 +1,89 @@
+---
+import Base from '../layouts/Base.astro';
+import { discordEnabled } from '../lib/auth';
+
+export const prerender = false;
+if (Astro.locals.user) return Astro.redirect('/hangar');
+const discord = discordEnabled();
+---
+
+<Base title="Create account">
+  <h1>Create your account</h1>
+  <p class="muted">
+    Optional: the extension works fine without one. An account lets you sync your hangar here, see it on any
+    device, and (soon) join your org.
+  </p>
+  <div class="card" style="max-width:460px">
+    {
+      discord && (
+        <>
+          <button type="button" class="discord" data-social="discord">
+            Continue with Discord
+          </button>
+          <p class="or muted">or with email</p>
+        </>
+      )
+    }
+    <form class="form" id="f">
+      <label>Email<input name="email" type="email" required autocomplete="email" /></label>
+      <label
+        >Username (what your org sees; your email stays private)<input
+          name="username"
+          required
+          minlength="3"
+          maxlength="24"
+          pattern="[A-Za-z0-9_\-]+"
+          title="3 to 24 letters, numbers, _ or -"
+          autocomplete="username"
+        /></label
+      >
+      <label
+        >Password (10+ characters)<input
+          name="password"
+          type="password"
+          required
+          minlength="10"
+          autocomplete="new-password"
+        /></label
+      >
+      <button type="submit">Create account</button>
+      <div class="error" id="err" role="alert"></div>
+    </form>
+    <p class="muted">Already have one? <a href="/sign-in">Sign in</a></p>
+  </div>
+</Base>
+
+<script>
+  import { authClient } from '../lib/auth-client';
+  const form = document.getElementById('f') as HTMLFormElement;
+  const err = document.getElementById('err')!;
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    err.textContent = '';
+    const d = new FormData(form);
+    const username = String(d.get('username')).trim();
+    const { error } = await authClient.signUp.email({
+      name: username, // Better Auth needs a name; the username doubles as it
+      username,
+      email: String(d.get('email')),
+      password: String(d.get('password')),
+    });
+    if (error) err.textContent = error.message || 'Could not create the account.';
+    else location.href = '/account?welcome=1';
+  });
+  document.querySelector('[data-social="discord"]')?.addEventListener('click', () =>
+    authClient.signIn.social({ provider: 'discord', callbackURL: '/hangar' }),
+  );
+</script>
+
+<style>
+  .discord {
+    width: 100%;
+    justify-content: center;
+    background: #5865f2;
+  }
+  .or {
+    text-align: center;
+    margin: 12px 0;
+  }
+</style>
