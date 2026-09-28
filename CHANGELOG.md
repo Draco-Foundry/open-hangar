@@ -4,6 +4,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## 0.2.8 — 2026-09-28
 
+- **Shorter install warning.** Chrome now only says the extension can access
+  robertsspaceindustries.com. The ship-data site it also uses is public and needs no
+  special permission, so we dropped it.
 - **Error report you can copy and paste.** Open Hangar now keeps a small log of
   errors, failed or partial scans and RSI retries (last 100). When something goes
   wrong, the error message has a **Copy error report** link, and Developers has the
