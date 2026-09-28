@@ -28,9 +28,17 @@ function build() {
   });
 }
 
+// Reuse the instance while the D1 binding is the same object; rebuild if it
+// changes (dev hot reloads hand out a fresh binding, and a cached instance
+// holding a stale one breaks every request).
 let instance: ReturnType<typeof build> | null = null;
+let boundTo: unknown = null;
 export function getAuth() {
-  instance ??= build();
+  if (!instance || boundTo !== env.DB) {
+    if (!env.DB) throw new Error('D1 binding "DB" is missing (check wrangler.jsonc).');
+    instance = build();
+    boundTo = env.DB;
+  }
   return instance;
 }
 

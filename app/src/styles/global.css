@@ -1,4 +1,4 @@
-/* Same palette as the extension dashboard, so the two feel like one product. */
+/* Fallback = the extension's palette; themes.css overrides per choice. */
 :root {
   --bg: #0d1117;
   --panel: #161b22;
@@ -11,6 +11,10 @@
   --link: #58a6ff;
   --good: #3fb950;
   --bad: #f85149;
+  --glow: rgba(47, 129, 247, 0.35);
+  --radius: 12px;
+  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-head: var(--font-body);
   color-scheme: dark;
 }
 * {
@@ -21,12 +25,15 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font:
-    14px/1.5 system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+  font-family: var(--font-body);
+  font-size: var(--font-size, 14px);
+  line-height: 1.5;
+}
+h1,
+h2,
+h3,
+.brand {
+  font-family: var(--font-head);
 }
 a {
   color: var(--link);
@@ -50,7 +57,7 @@ h2 {
 .card {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 18px 20px;
 }
 .btn,
@@ -60,10 +67,10 @@ button {
   gap: 8px;
   padding: 8px 14px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: min(var(--radius), 8px);
   background: var(--accent);
   color: #fff;
-  font: 600 13px system-ui;
+  font: 600 13px var(--font-body);
   cursor: pointer;
   text-decoration: none;
 }
@@ -90,10 +97,10 @@ label {
 input {
   padding: 9px 11px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: min(var(--radius), 8px);
   background: var(--panel-2);
   color: var(--text);
-  font-size: 14px;
+  font: inherit;
 }
 input:focus {
   outline: 2px solid var(--accent);
@@ -120,7 +127,7 @@ input:focus {
 .stat {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius);
   padding: 14px 16px;
 }
 .stat .big {

@@ -1,10 +1,16 @@
 ---
 import '../styles/global.css';
+import '../styles/themes.css';
+import { ALL_FONT_IDS, fontHref, readTheme } from '../lib/theme';
 
 interface Props {
   title?: string;
+  /** /design loads every font so switching is instant. */
+  allFonts?: boolean;
 }
-const { title } = Astro.props;
+const { title, allFonts = false } = Astro.props;
+const theme = readTheme(Astro.cookies.get('oh_theme')?.value);
+const fonts = fontHref(allFonts ? ALL_FONT_IDS : [theme.font]);
 const user = Astro.locals.user;
 const path = Astro.url.pathname;
 const nav = user
@@ -16,11 +22,13 @@ const nav = user
   : [];
 ---
 
-<html lang="en">
+<html lang="en" data-palette={theme.palette} data-font={theme.font} data-style={theme.style}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    {fonts && <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />}
+    {fonts && <link rel="stylesheet" href={fonts} />}
     <title>{title ? `${title} · Open Hangar` : 'Open Hangar'}</title>
   </head>
   <body>
@@ -35,6 +43,9 @@ const nav = user
               </a>
             ))
           }
+          <a href="/design" class={path.startsWith('/design') ? 'on' : ''}>
+            Design
+          </a>
           {
             user ? (
               <button class="secondary" id="sign-out" type="button">
@@ -57,7 +68,7 @@ const nav = user
     </main>
     <footer class="wrap foot muted">
       Open Hangar is an unofficial Star Citizen fan project, not affiliated with the Cloud Imperium group of
-      companies. <a href="https://openhangar.space/privacy.html">Privacy</a> ·
+      companies. <a href="https://openhangar.space/privacy.html">Privacy</a> ·{" "}
       <a href="https://github.com/Draco-Foundry/open-hangar">GitHub</a>
     </footer>
     <script>
@@ -73,7 +84,7 @@ const nav = user
 <style>
   .top {
     border-bottom: 1px solid var(--line);
-    background: rgba(13, 17, 23, 0.9);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
     position: sticky;
     top: 0;
     z-index: 5;
