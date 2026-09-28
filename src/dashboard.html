@@ -2439,6 +2439,31 @@
         text-align: right;
         font-variant-numeric: tabular-nums;
       }
+      .role-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin: 6px 0 4px;
+      }
+      .role-chip {
+        padding: 4px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        font-size: 12px;
+      }
+      .role-chip.have {
+        border-color: rgba(63, 185, 80, 0.5);
+        color: #3fb950;
+        cursor: help;
+      }
+      .role-chip.have b {
+        color: var(--text);
+        margin-left: 2px;
+      }
+      .role-chip.missing {
+        color: var(--muted);
+        border-style: dashed;
+      }
       .org-owners {
         color: var(--muted);
       }
