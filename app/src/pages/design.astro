@@ -1,69 +1,18 @@
 ---
 import Base from '../layouts/Base.astro';
-import { FONTS, PALETTES, STYLES, readTheme } from '../lib/theme';
+import ThemePicker from '../components/ThemePicker.astro';
 
 export const prerender = false;
-const t = readTheme(Astro.cookies.get('oh_theme')?.value);
 ---
 
 <Base title="Design" allFonts>
   <h1>Design</h1>
   <p class="muted">
-    Pick a colour scheme, font and style. The page below changes live, and your choice follows you around the site
-    (it's saved in this browser), so try it on every page.
+    Pick a colour scheme, font and style. The page changes live and your choice follows you around the site. Signed
+    in, it's saved to your account (Account → Appearance).
   </p>
 
-  <div class="pickers card">
-    <div class="picker">
-      <h2>Colours</h2>
-      <div class="opts" data-axis="palette">
-        {
-          PALETTES.map((p) => (
-            <button type="button" class="opt" data-id={p.id} aria-pressed={p.id === t.palette}>
-              <span class="sw">
-                {p.swatch.map((c) => (
-                  <i style={`background:${c}`} />
-                ))}
-              </span>
-              {p.label}
-            </button>
-          ))
-        }
-      </div>
-    </div>
-    <div class="picker">
-      <h2>Font</h2>
-      <div class="opts" data-axis="font">
-        {
-          FONTS.map((f) => (
-            <button
-              type="button"
-              class="opt"
-              data-id={f.id}
-              aria-pressed={f.id === t.font}
-              style={`font-family:'${f.sample}',system-ui`}
-            >
-              {f.label}
-            </button>
-          ))
-        }
-      </div>
-    </div>
-    <div class="picker">
-      <h2>Style</h2>
-      <div class="opts" data-axis="style">
-        {
-          STYLES.map((s) => (
-            <button type="button" class="opt" data-id={s.id} aria-pressed={s.id === t.style} title={s.note}>
-              {s.label}
-              <small class="muted">{s.note}</small>
-            </button>
-          ))
-        }
-      </div>
-    </div>
-    <p class="muted current">Current: <code id="current"></code></p>
-  </div>
+  <div class="card"><ThemePicker /></div>
 
   <h2>Preview</h2>
   <div class="stat-grid">
@@ -102,76 +51,9 @@ const t = readTheme(Astro.cookies.get('oh_theme')?.value);
   </div>
 </Base>
 
-<script>
-  const html = document.documentElement;
-  const axes = ['palette', 'font', 'style'] as const;
-  const current = () => axes.map((a) => html.dataset[a]).join('.');
-  const show = () => {
-    const el = document.getElementById('current');
-    if (el) el.textContent = current();
-  };
-  show();
-  document.querySelectorAll<HTMLElement>('.opts').forEach((group) => {
-    group.addEventListener('click', (e) => {
-      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.opt');
-      if (!btn) return;
-      const axis = group.dataset.axis as (typeof axes)[number];
-      html.dataset[axis] = btn.dataset.id!;
-      group.querySelectorAll('.opt').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
-      document.cookie = `oh_theme=${current()}; path=/; max-age=31536000; samesite=lax`;
-      show();
-    });
-  });
-</script>
+
 
 <style>
-  .pickers {
-    display: grid;
-    gap: 6px;
-  }
-  .picker h2 {
-    margin: 6px 0 8px;
-    font-size: 14px;
-  }
-  .opts {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .opt {
-    background: var(--panel-2);
-    color: var(--text);
-    border: 1px solid var(--line);
-    font-weight: 600;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-    min-width: 120px;
-  }
-  .opt small {
-    font-weight: 400;
-    font-size: 11px;
-  }
-  .opt[aria-pressed='true'] {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px var(--glow);
-  }
-  .opt:hover {
-    background: var(--panel);
-  }
-  .sw {
-    display: flex;
-    gap: 3px;
-  }
-  .sw i {
-    width: 18px;
-    height: 12px;
-    border-radius: 3px;
-    border: 1px solid rgba(128, 128, 128, 0.4);
-  }
-  .current {
-    margin: 8px 0 0;
-  }
   .two {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));

@@ -1,13 +1,24 @@
 // Design options (see styles/themes.css). The choice lives in the `oh_theme`
 // cookie as "palette.font.style" so pages render in it on the server.
 export const PALETTES = [
-  { id: 'hangar', label: 'Hangar Blue', swatch: ['#0d1117', '#161b22', '#2f81f7'] },
-  { id: 'steel', label: 'Foundry Steel', swatch: ['#0a0e14', '#121821', '#1ea7ff'] },
-  { id: 'quantum', label: 'Quantum Teal', swatch: ['#060b16', '#0c1526', '#14d3c3'] },
-  { id: 'crusader', label: 'Crusader Amber', swatch: ['#0f0e0c', '#1a1815', '#f0a020'] },
-  { id: 'drake', label: 'Drake Rust', swatch: ['#100b0a', '#1b1311', '#e5533d'] },
-  { id: 'aegis', label: 'Aegis Violet', swatch: ['#0b0a12', '#14121f', '#8b5cf6'] },
-  { id: 'origin', label: 'Origin Light', swatch: ['#f6f5f2', '#ffffff', '#b08a3e'] },
+  // Open Hangar's own
+  { id: 'hangar', label: 'Hangar Blue', group: 'Open Hangar', swatch: ['#0d1117', '#161b22', '#2f81f7'] },
+  { id: 'steel', label: 'Foundry Steel', group: 'Open Hangar', swatch: ['#0a0e14', '#121821', '#1ea7ff'] },
+  { id: 'quantum', label: 'Quantum Teal', group: 'Open Hangar', swatch: ['#060b16', '#0c1526', '#14d3c3'] },
+  { id: 'amber', label: 'Amber', group: 'Open Hangar', swatch: ['#0f0e0c', '#1a1815', '#f0a020'] },
+  { id: 'rust', label: 'Rust', group: 'Open Hangar', swatch: ['#100b0a', '#1b1311', '#e5533d'] },
+  { id: 'nebula', label: 'Nebula', group: 'Open Hangar', swatch: ['#0b0a12', '#14121f', '#8b5cf6'] },
+  // Manufacturer-inspired (colours only, not official)
+  { id: 'rsi', label: 'RSI', group: 'Manufacturers', swatch: ['#070b14', '#0e1524', '#3d8bff'] },
+  { id: 'origin', label: 'Origin', group: 'Manufacturers', swatch: ['#f6f5f2', '#ffffff', '#b08a3e'] },
+  { id: 'crusader', label: 'Crusader', group: 'Manufacturers', swatch: ['#f3f7fb', '#ffffff', '#1e88e5'] },
+  { id: 'misc', label: 'MISC', group: 'Manufacturers', swatch: ['#0c1112', '#141c1d', '#1fb5a3'] },
+  { id: 'drake', label: 'Drake', group: 'Manufacturers', swatch: ['#0e0e0d', '#181816', '#f2b705'] },
+  { id: 'anvil', label: 'Anvil', group: 'Manufacturers', swatch: ['#0c0e0b', '#151912', '#7cb342'] },
+  { id: 'aegis', label: 'Aegis', group: 'Manufacturers', swatch: ['#0d0d0f', '#17171a', '#e0442f'] },
+  { id: 'argo', label: 'Argo', group: 'Manufacturers', swatch: ['#121315', '#1b1d20', '#ffc400'] },
+  { id: 'cnou', label: 'Consolidated Outland', group: 'Manufacturers', swatch: ['#f7f6f4', '#ffffff', '#f26b1d'] },
+  { id: 'aopoa', label: 'Aopoa', group: 'Manufacturers', swatch: ['#080917', '#10122a', '#6d5dfc'] },
 ] as const;
 
 export const FONTS = [
@@ -15,6 +26,7 @@ export const FONTS = [
   { id: 'inter', label: 'Inter', sample: 'Inter' },
   { id: 'exo', label: 'Exo 2', sample: 'Exo 2' },
   { id: 'rajdhani', label: 'Rajdhani', sample: 'Rajdhani' },
+  { id: 'rajdhani-inter', label: 'Rajdhani + Inter', sample: 'Rajdhani' },
   { id: 'orbitron', label: 'Orbitron + Inter', sample: 'Orbitron' },
   { id: 'chakra', label: 'Chakra Petch', sample: 'Chakra Petch' },
   { id: 'grotesk', label: 'Space Grotesk', sample: 'Space Grotesk' },
@@ -44,6 +56,7 @@ const FAMILIES: Record<string, string> = {
   inter: 'Inter:wght@400;600;700',
   exo: 'Exo+2:wght@400;600;700',
   rajdhani: 'Rajdhani:wght@500;600;700',
+  'rajdhani-inter': 'Rajdhani:wght@500;600;700&family=Inter:wght@400;600;700',
   orbitron: 'Orbitron:wght@500;700&family=Inter:wght@400;600;700',
   chakra: 'Chakra+Petch:wght@400;600;700',
   grotesk: 'Space+Grotesk:wght@400;600;700',
