@@ -3858,8 +3858,9 @@ document.addEventListener('visibilitychange', async () => {
 // --- Init -----------------------------------------------------------------
 
 (async () => {
-  const { uiLayout, bbLayout, marketAnnotations, uiStatsTab, lastBackupAt } =
+  const { uiLayout, bbLayout, marketAnnotations, uiStatsTab, lastBackupAt, remindRescan } =
     await chrome.storage.local.get([
+      'remindRescan',
       'lastBackupAt',
       'uiStatsTab',
       'uiLayout',
@@ -3869,6 +3870,13 @@ document.addEventListener('visibilitychange', async () => {
   if (LAYOUTS.includes(uiLayout)) state.layout = uiLayout;
   if (STATS_TABS.some(([k]) => k === uiStatsTab)) state.statsTab = uiStatsTab;
   if (Number.isFinite(lastBackupAt)) state.lastBackupAt = lastBackupAt;
+  const remind = $('#remind-toggle');
+  if (remind) {
+    remind.checked = remindRescan !== false;
+    remind.addEventListener('change', () =>
+      chrome.storage.local.set({ remindRescan: remind.checked }),
+    );
+  }
   if (LAYOUTS.includes(bbLayout)) state.bbLayout = bbLayout;
   if (marketAnnotations && typeof marketAnnotations === 'object') state.market = marketAnnotations;
 
