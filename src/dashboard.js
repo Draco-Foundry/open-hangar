@@ -1957,9 +1957,9 @@ if (selectBar) {
   });
 }
 
-// --- Store: CCU planner + price list ----------------------------------------
-// The planner (OH.planCCU) uses standard store prices and the CCUs in your
-// hangar. Ship names come from the wiki list (state.catalog).
+// --- Store: your CCUs + price list -----------------------------------------
+// Light on purpose: chain planning is ccugame.app's job, we just show what
+// your CCUs are worth at standard store prices. Ship list is state.catalog.
 function ownedCCUs() {
   if (!state.priceOf) return [];
   const v = hangarValue();
@@ -2001,8 +2001,6 @@ function renderStore() {
     setHTML($('#price-table'), '<p class="muted">Loading ship prices…</p>');
     return;
   }
-  const names = state.catalog.filter((v) => v.msrp).map((v) => v.name || v.lname);
-  setHTML($('#ship-names'), names.map((n) => `<option value="${OH.escapeHtml(n)}">`).join(''));
   setHTML($('#price-table'), priceRowsHtml($('#price-search').value));
   const owned = ownedCCUs();
   setHTML(
@@ -2020,44 +2018,6 @@ function renderStore() {
   );
 }
 
-function planCCUFromForm() {
-  const out = $('#ccu-result');
-  if (!state.priceOf) return setHTML(out, '<p class="muted">Ship prices are still loading…</p>');
-  const pick = (id) => {
-    const text = $(id).value.trim();
-    const hit = text && state.priceOf(text);
-    const entry = hit && state.catalog && state.catalog.find((v) => v.lname === hit.name);
-    return hit ? { name: (entry && entry.name) || text, msrp: hit.msrp } : null;
-  };
-  const from = pick('#ccu-from');
-  const to = pick('#ccu-to');
-  if (!from || !to) {
-    return setHTML(
-      out,
-      '<p class="muted">Pick both ships from the list (they need a store price).</p>',
-    );
-  }
-  const plan = OH.planCCU(from, to, ownedCCUs());
-  if (plan.error) return setHTML(out, `<p class="muted">${OH.escapeHtml(plan.error)}</p>`);
-  const steps = plan.steps
-    .map((st) =>
-      st.type === 'buy'
-        ? `<li>Buy a CCU: ${OH.escapeHtml(st.from)} → ${OH.escapeHtml(st.to)} (${dollars(st.cost)})</li>`
-        : `<li class="apply">Apply your ${OH.escapeHtml(st.from)} → ${OH.escapeHtml(st.to)} CCU</li>`,
-    )
-    .join('');
-  const cover = plan.covered
-    ? `Your CCUs cover ${dollars(plan.covered)} of the ${dollars(plan.gap)} gap.`
-    : 'None of your CCUs fit this path, so it’s one straight upgrade.';
-  setHTML(
-    out,
-    `<div class="ccu-plan"><div class="ccu-cash">About ${dollars(plan.cash)} to go</div><div class="muted">${cover}</div><ol>${steps}</ol></div>`,
-  );
-}
-$('#ccu-go')?.addEventListener('click', planCCUFromForm);
-['#ccu-from', '#ccu-to'].forEach((id) =>
-  $(id)?.addEventListener('keydown', (e) => e.key === 'Enter' && planCCUFromForm()),
-);
 $('#price-search')?.addEventListener('input', (e) =>
   setHTML($('#price-table'), priceRowsHtml(e.target.value)),
 );

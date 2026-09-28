@@ -1804,66 +1804,6 @@
     return out;
   };
 
-  // --- CCU planner ----------------------------------------------------------------
-  // Cheapest way from the ship you have to the ship you want, using CCUs you
-  // already own and buying standard CCUs for the gaps. At standard prices any
-  // chain of bought CCUs costs the same as one (the price gap), so the saving
-  // comes from how much of the gap your owned CCUs cover. That's weighted
-  // interval scheduling on the price line: pick non-overlapping owned CCUs
-  // (from ≥ where you are, to ≤ the target) covering the most dollars. Pure.
-  //   start/target: { name, msrp }   owned: [{ from, to, fromMsrp, toMsrp }]
-  //   → { gap, covered, cash, steps: [{ type: 'buy'|'apply', from, to, cost }] } | { error }
-  OH.planCCU = function planCCU(start, target, owned = []) {
-    if (!start || !target || !(start.msrp > 0) || !(target.msrp > 0)) {
-      return { error: 'Pick two ships with a store price.' };
-    }
-    if (target.msrp <= start.msrp) {
-      return {
-        error: `${target.name} doesn't cost more than ${start.name}, so there's no CCU for that.`,
-      };
-    }
-    const usable = owned
-      .filter((c) => c.fromMsrp >= start.msrp && c.toMsrp <= target.msrp && c.toMsrp > c.fromMsrp)
-      .sort((a, b) => a.toMsrp - b.toMsrp);
-    // best[i]: most dollars covered using CCUs among the first i (by end price)
-    const startOf = (i) => {
-      let j = i; // number of CCUs that end at or before usable[i] starts
-      while (j > 0 && usable[j - 1].toMsrp > usable[i].fromMsrp) j--;
-      return j;
-    };
-    const best = [0];
-    for (let i = 0; i < usable.length; i++) {
-      const c = usable[i];
-      best.push(Math.max(best[i], best[startOf(i)] + (c.toMsrp - c.fromMsrp)));
-    }
-    // walk back to the chosen CCUs
-    const chosen = [];
-    let i = usable.length;
-    while (i > 0) {
-      if (best[i] === best[i - 1]) {
-        i--;
-        continue;
-      }
-      chosen.unshift(usable[i - 1]);
-      i = startOf(i - 1);
-    }
-    const steps = [];
-    let cur = start;
-    for (const c of chosen) {
-      if (c.fromMsrp > cur.msrp) {
-        steps.push({ type: 'buy', from: cur.name, to: c.from, cost: c.fromMsrp - cur.msrp });
-      }
-      steps.push({ type: 'apply', from: c.from, to: c.to, cost: 0 });
-      cur = { name: c.to, msrp: c.toMsrp };
-    }
-    if (target.msrp > cur.msrp) {
-      steps.push({ type: 'buy', from: cur.name, to: target.name, cost: target.msrp - cur.msrp });
-    }
-    const gap = target.msrp - start.msrp;
-    const covered = best[usable.length] || 0;
-    return { gap, covered, cash: gap - covered, steps };
-  };
-
   // --- Org fleet ------------------------------------------------------------------
   // Members share a file; we keep only their ship list. Accepts an HTF export
   // (a bare array, ships only: the one to ask for) or a full Open Hangar backup
