@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Draco Foundry — source logo (Discord server icon, GitHub org avatar).
+       A "D" traced as a constellation (Draco, the dragon) glowing over a forge.
+       Keep the emblem inside the centre circle: Discord crops icons round.
+       Regenerate PNGs: node docs/brand/draco-foundry/render.mjs -->
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="75%">
+      <stop offset="0" stop-color="#1c2533"/>
+      <stop offset="0.65" stop-color="#10151d"/>
+      <stop offset="1" stop-color="#0a0d12"/>
+    </radialGradient>
+    <radialGradient id="forge" cx="50%" cy="100%" r="60%">
+      <stop offset="0" stop-color="#ff7a1a" stop-opacity="0.55"/>
+      <stop offset="0.45" stop-color="#ff5a1a" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#ff5a1a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fillD" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ff8a2a" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#ff8a2a" stop-opacity="0.02"/>
+    </linearGradient>
+    <linearGradient id="line" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffd27a"/>
+      <stop offset="1" stop-color="#ff8a2a"/>
+    </linearGradient>
+    <radialGradient id="halo">
+      <stop offset="0" stop-color="#fff4d6" stop-opacity="0.9"/>
+      <stop offset="0.35" stop-color="#ffc861" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#ffc861" stop-opacity="0"/>
+    </radialGradient>
+    <!-- four-point star -->
+    <path id="star" d="M0 -1 L0.22 -0.22 L1 0 L0.22 0.22 L0 1 L-0.22 0.22 L-1 0 L-0.22 -0.22 Z"/>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#forge)"/>
+
+  <!-- faint background stars -->
+  <g fill="#c9d6ea" opacity="0.55">
+    <circle cx="210" cy="230" r="3"/><circle cx="820" cy="190" r="2.5"/>
+    <circle cx="860" cy="430" r="2"/><circle cx="170" cy="520" r="2.5"/>
+    <circle cx="300" cy="140" r="2"/><circle cx="760" cy="300" r="2"/>
+    <circle cx="250" cy="770" r="2"/><circle cx="800" cy="720" r="2.5"/>
+    <circle cx="620" cy="150" r="2"/><circle cx="130" cy="360" r="2"/>
+  </g>
+
+  <!-- the D (shifted so its visual centre sits on the canvas centre) -->
+  <g transform="translate(-32 0)">
+  <!-- the D: glow fill, then constellation lines -->
+  <path d="M372 262 L372 762 L524 768 L656 684 L716 520 L684 376 L548 268 Z" fill="url(#fillD)"/>
+  <path d="M372 262 L372 512 L372 762 L524 768 L656 684 L716 520 L684 376 L548 268 Z"
+        fill="none" stroke="url(#line)" stroke-width="16" stroke-linejoin="round"/>
+
+  <!-- constellation stars: halo + four-point sparkle -->
+  <g>
+    <g transform="translate(372 262)"><circle r="70" fill="url(#halo)"/><use href="#star" transform="scale(34)" fill="#fff6dc"/></g>
+    <g transform="translate(372 512)"><circle r="48" fill="url(#halo)"/><use href="#star" transform="scale(22)" fill="#fff6dc"/></g>
+    <g transform="translate(372 762)"><circle r="62" fill="url(#halo)"/><use href="#star" transform="scale(30)" fill="#fff6dc"/></g>
+    <g transform="translate(548 268)"><circle r="46" fill="url(#halo)"/><use href="#star" transform="scale(20)" fill="#fff6dc"/></g>
+    <g transform="translate(684 376)"><circle r="56" fill="url(#halo)"/><use href="#star" transform="scale(26)" fill="#fff6dc"/></g>
+    <!-- Eltanin, the dragon's eye: brightest -->
+    <g transform="translate(716 520)"><circle r="96" fill="url(#halo)"/><use href="#star" transform="scale(46)" fill="#ffffff"/></g>
+    <g transform="translate(656 684)"><circle r="52" fill="url(#halo)"/><use href="#star" transform="scale(24)" fill="#fff6dc"/></g>
+    <g transform="translate(524 768)"><circle r="44" fill="url(#halo)"/><use href="#star" transform="scale(20)" fill="#fff6dc"/></g>
+  </g>
+  </g>
+
+  <!-- forge sparks rising -->
+  <g fill="#ffb347">
+    <circle cx="470" cy="880" r="6" opacity="0.9"/><circle cx="560" cy="905" r="5" opacity="0.8"/>
+    <circle cx="515" cy="850" r="4" opacity="0.7"/><circle cx="600" cy="860" r="3.5" opacity="0.6"/>
+    <circle cx="430" cy="840" r="3" opacity="0.55"/><circle cx="640" cy="820" r="3" opacity="0.5"/>
+    <circle cx="545" cy="820" r="2.5" opacity="0.5"/>
+  </g>
+</svg>
