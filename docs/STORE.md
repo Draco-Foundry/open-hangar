@@ -172,3 +172,16 @@ CONTRIBUTING "Safari notes" — revisit after the other three stores are live.
 
 - ⬜ Add the store link to the README + org profile.
 - ⬜ Watch the dashboard for policy notices; respond promptly to any review query.
+
+## 12. Publishing updates from GitHub
+
+1. Bump `manifest.json` / `package.json`, move the CHANGELOG's Unreleased notes under
+   the new version, merge, then push a tag (`git tag v0.2.9 && git push origin v0.2.9`).
+   The **Release** workflow builds the zips and the GitHub Release.
+2. **Actions → Publish to stores → Run workflow**, enter the tag, pick a store (or all).
+   It uploads and submits for review; each store still reviews before it goes live.
+
+A store with no secrets is skipped. Secrets (repo Settings → Secrets → Actions):
+`AMO_JWT_ISSUER`, `AMO_JWT_SECRET` (set), `EDGE_PRODUCT_ID`, `EDGE_CLIENT_ID`,
+`EDGE_API_KEY`, `CWS_EXTENSION_ID`, `CWS_CLIENT_ID`, `CWS_CLIENT_SECRET`,
+`CWS_REFRESH_TOKEN`.
