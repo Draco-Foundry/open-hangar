@@ -1,0 +1,79 @@
+---
+import Base from '../layouts/Base.astro';
+
+export const prerender = false;
+const user = Astro.locals.user;
+---
+
+<Base>
+  <section class="hero">
+    <h1>Your Star Citizen hangar, anywhere.</h1>
+    <p class="lead">
+      The Open Hangar extension reads your RSI hangar in your own browser. It works fully offline. If you want, sync
+      it here to see it on any device and, soon, share your fleet with your org.
+    </p>
+    <p class="cta">
+      {
+        user ? (
+          <a class="btn" href="/hangar">
+            Open my hangar
+          </a>
+        ) : (
+          <>
+            <a class="btn" href="/sign-up">
+              Create an account
+            </a>
+            <a class="btn secondary" href="/sign-in">
+              Sign in
+            </a>
+          </>
+        )
+      }
+      <a class="btn secondary" href="https://openhangar.space">Get the extension</a>
+    </p>
+  </section>
+  <section class="grid3">
+    <div class="card">
+      <h2>Offline or synced</h2>
+      <p class="muted">Your choice. Nothing leaves your browser until you press Sync, and you can disconnect any time.</p>
+    </div>
+    <div class="card">
+      <h2>Secure sign-in</h2>
+      <p class="muted">Email or Discord, with two-factor codes. Delete your account and data in one click.</p>
+    </div>
+    <div class="card">
+      <h2>Orgs (coming soon)</h2>
+      <p class="muted">Join your org and see the combined fleet live, no more passing files around.</p>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .hero {
+    padding: 50px 0 20px;
+    max-width: 720px;
+  }
+  .hero h1 {
+    font-size: 38px;
+    line-height: 1.15;
+  }
+  .lead {
+    font-size: 16px;
+    color: var(--muted);
+  }
+  .cta {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+  }
+  .grid3 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+    margin-top: 30px;
+  }
+  .grid3 h2 {
+    margin-top: 0;
+  }
+</style>
