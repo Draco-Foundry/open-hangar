@@ -1,5 +1,5 @@
 /*
- * Render logo.svg to the PNG sizes Discord and GitHub want, using the same
+ * Render logo.svg (built by build.mjs) to the PNG sizes Discord and GitHub want, using the same
  * puppeteer-core + installed Chrome as the screenshot harness.
  *   node docs/brand/draco-foundry/render.mjs
  * Outputs next to this file: logo-1024.png, logo-512.png (Discord server icon),
