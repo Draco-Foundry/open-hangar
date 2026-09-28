@@ -4,6 +4,11 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Org Fleet you can explore.** Click a role to open which ships fill it and who
+  owns them; click a missing role to see ships that would fill it, cheapest first.
+  Click a member to see their fleet next to the rest of the org (role and size
+  charts side by side, and roles only they cover). **Compare** any two members:
+  totals, charts, and which ships both own or only one does.
 - **Inventory grouped by type.** Gallery, Compact and List now show Standalone
   Ships, Packs, Upgrades, Paints, Add-ons, Coupons and Other as their own sections,
   with the title pinned while you scroll. Your sort applies inside each section.
