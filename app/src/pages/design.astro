@@ -1,0 +1,186 @@
+---
+import Base from '../layouts/Base.astro';
+import { FONTS, PALETTES, STYLES, readTheme } from '../lib/theme';
+
+export const prerender = false;
+const t = readTheme(Astro.cookies.get('oh_theme')?.value);
+---
+
+<Base title="Design" allFonts>
+  <h1>Design</h1>
+  <p class="muted">
+    Pick a colour scheme, font and style. The page below changes live, and your choice follows you around the site
+    (it's saved in this browser), so try it on every page.
+  </p>
+
+  <div class="pickers card">
+    <div class="picker">
+      <h2>Colours</h2>
+      <div class="opts" data-axis="palette">
+        {
+          PALETTES.map((p) => (
+            <button type="button" class="opt" data-id={p.id} aria-pressed={p.id === t.palette}>
+              <span class="sw">
+                {p.swatch.map((c) => (
+                  <i style={`background:${c}`} />
+                ))}
+              </span>
+              {p.label}
+            </button>
+          ))
+        }
+      </div>
+    </div>
+    <div class="picker">
+      <h2>Font</h2>
+      <div class="opts" data-axis="font">
+        {
+          FONTS.map((f) => (
+            <button
+              type="button"
+              class="opt"
+              data-id={f.id}
+              aria-pressed={f.id === t.font}
+              style={`font-family:'${f.sample}',system-ui`}
+            >
+              {f.label}
+            </button>
+          ))
+        }
+      </div>
+    </div>
+    <div class="picker">
+      <h2>Style</h2>
+      <div class="opts" data-axis="style">
+        {
+          STYLES.map((s) => (
+            <button type="button" class="opt" data-id={s.id} aria-pressed={s.id === t.style} title={s.note}>
+              {s.label}
+              <small class="muted">{s.note}</small>
+            </button>
+          ))
+        }
+      </div>
+    </div>
+    <p class="muted current">Current: <code id="current"></code></p>
+  </div>
+
+  <h2>Preview</h2>
+  <div class="stat-grid">
+    <div class="stat"><div class="big">202</div><div class="lbl">pledges</div></div>
+    <div class="stat"><div class="big">$13,620.00</div><div class="lbl">melt value</div></div>
+    <div class="stat"><div class="big">22</div><div class="lbl">with LTI</div></div>
+    <div class="stat"><div class="big">1,065</div><div class="lbl">buy-backs</div></div>
+  </div>
+
+  <div class="two">
+    <div class="card">
+      <h2 style="margin-top:0">Most valuable pledges</h2>
+      <table>
+        <thead><tr><th>Pledge</th><th>Insurance</th><th class="num">Melt value</th></tr></thead>
+        <tbody>
+          <tr><td>Anvil Carrack</td><td>LTI</td><td class="num">$600.00</td></tr>
+          <tr><td>Origin 400i</td><td>LTI</td><td class="num">$250.00</td></tr>
+          <tr><td>Aegis Vanguard Sentinel</td><td>120 Months</td><td class="num">$275.00</td></tr>
+          <tr><td>Drake Cutlass Black</td><td>6 Months</td><td class="num">$110.00</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0">Connect your extension</h2>
+      <form class="form" onsubmit="return false">
+        <label>Code<input value="K7Q-4PX" /></label>
+        <div class="row">
+          <button type="button">Connect</button>
+          <button type="button" class="secondary">Cancel</button>
+          <button type="button" class="danger">Disconnect</button>
+        </div>
+        <p class="ok">Connected! Your extension will pick it up in a few seconds.</p>
+        <p class="muted">Syncing is always your choice. <a href="#">Learn more</a></p>
+      </form>
+    </div>
+  </div>
+</Base>
+
+<script>
+  const html = document.documentElement;
+  const axes = ['palette', 'font', 'style'] as const;
+  const current = () => axes.map((a) => html.dataset[a]).join('.');
+  const show = () => {
+    const el = document.getElementById('current');
+    if (el) el.textContent = current();
+  };
+  show();
+  document.querySelectorAll<HTMLElement>('.opts').forEach((group) => {
+    group.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.opt');
+      if (!btn) return;
+      const axis = group.dataset.axis as (typeof axes)[number];
+      html.dataset[axis] = btn.dataset.id!;
+      group.querySelectorAll('.opt').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+      document.cookie = `oh_theme=${current()}; path=/; max-age=31536000; samesite=lax`;
+      show();
+    });
+  });
+</script>
+
+<style>
+  .pickers {
+    display: grid;
+    gap: 6px;
+  }
+  .picker h2 {
+    margin: 6px 0 8px;
+    font-size: 14px;
+  }
+  .opts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .opt {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    font-weight: 600;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 120px;
+  }
+  .opt small {
+    font-weight: 400;
+    font-size: 11px;
+  }
+  .opt[aria-pressed='true'] {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--glow);
+  }
+  .opt:hover {
+    background: var(--panel);
+  }
+  .sw {
+    display: flex;
+    gap: 3px;
+  }
+  .sw i {
+    width: 18px;
+    height: 12px;
+    border-radius: 3px;
+    border: 1px solid rgba(128, 128, 128, 0.4);
+  }
+  .current {
+    margin: 8px 0 0;
+  }
+  .two {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 14px;
+    margin-top: 14px;
+  }
+  .row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+</style>

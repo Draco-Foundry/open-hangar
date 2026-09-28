@@ -1,0 +1,209 @@
+/*
+ * Design options, picked on /design and remembered in the `oh_theme` cookie.
+ * Three independent axes, set as attributes on <html>:
+ *   data-palette  colours       data-font  typefaces       data-style  shapes/effects
+ * global.css only uses the variables, so every page follows the choice.
+ */
+
+/* ---------- Palettes ---------- */
+[data-palette='hangar'] {
+  /* The extension's colours (default). */
+  --bg: #0d1117;
+  --panel: #161b22;
+  --panel-2: #1c222b;
+  --line: #2a3139;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #2f81f7;
+  --accent-hover: #4493f8;
+  --link: #58a6ff;
+  --glow: rgba(47, 129, 247, 0.35);
+}
+[data-palette='steel'] {
+  /* Draco Foundry brand: gunmetal and electric blue. */
+  --bg: #0a0e14;
+  --panel: #121821;
+  --panel-2: #19212d;
+  --line: #2b3646;
+  --text: #dbe6f3;
+  --muted: #7f8ea3;
+  --accent: #1ea7ff;
+  --accent-hover: #4dbaff;
+  --link: #5cc4ff;
+  --glow: rgba(30, 167, 255, 0.45);
+}
+[data-palette='quantum'] {
+  /* Deep navy with a teal quantum glow. */
+  --bg: #060b16;
+  --panel: #0c1526;
+  --panel-2: #122036;
+  --line: #1f3350;
+  --text: #d9f4f5;
+  --muted: #7b9cb0;
+  --accent: #14d3c3;
+  --accent-hover: #48e3d6;
+  --link: #5eead4;
+  --glow: rgba(20, 211, 195, 0.4);
+}
+[data-palette='crusader'] {
+  /* Charcoal with warm amber. */
+  --bg: #0f0e0c;
+  --panel: #1a1815;
+  --panel-2: #23201b;
+  --line: #3a342b;
+  --text: #f1e9dc;
+  --muted: #a3978a;
+  --accent: #f0a020;
+  --accent-hover: #f5b547;
+  --link: #f7c066;
+  --glow: rgba(240, 160, 32, 0.35);
+}
+[data-palette='drake'] {
+  /* Rust red, dirty and loud. */
+  --bg: #100b0a;
+  --panel: #1b1311;
+  --panel-2: #251916;
+  --line: #3d2823;
+  --text: #f3e4df;
+  --muted: #a88d86;
+  --accent: #e5533d;
+  --accent-hover: #ee7461;
+  --link: #f48b78;
+  --glow: rgba(229, 83, 61, 0.35);
+}
+[data-palette='aegis'] {
+  /* Near-black with military violet. */
+  --bg: #0b0a12;
+  --panel: #14121f;
+  --panel-2: #1c192b;
+  --line: #2f2a45;
+  --text: #e9e6f7;
+  --muted: #958fb0;
+  --accent: #8b5cf6;
+  --accent-hover: #a37bf8;
+  --link: #b69cff;
+  --glow: rgba(139, 92, 246, 0.4);
+}
+[data-palette='origin'] {
+  /* Light: clean white with champagne gold (Origin showroom). */
+  --bg: #f6f5f2;
+  --panel: #ffffff;
+  --panel-2: #efece6;
+  --line: #ded9cf;
+  --text: #1c1b19;
+  --muted: #6f6a61;
+  --accent: #b08a3e;
+  --accent-hover: #c39d52;
+  --link: #8a6a26;
+  --glow: rgba(176, 138, 62, 0.25);
+  --good: #1f7a34;
+  --bad: #c62828;
+  color-scheme: light;
+}
+
+/* ---------- Fonts ---------- */
+[data-font='system'] {
+  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-head: var(--font-body);
+}
+[data-font='inter'] {
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-head: 'Inter', system-ui, sans-serif;
+}
+[data-font='exo'] {
+  --font-body: 'Exo 2', system-ui, sans-serif;
+  --font-head: 'Exo 2', system-ui, sans-serif;
+}
+[data-font='rajdhani'] {
+  --font-body: 'Rajdhani', system-ui, sans-serif;
+  --font-head: 'Rajdhani', system-ui, sans-serif;
+  --font-size: 15px;
+}
+[data-font='orbitron'] {
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-head: 'Orbitron', system-ui, sans-serif;
+}
+[data-font='chakra'] {
+  --font-body: 'Chakra Petch', system-ui, sans-serif;
+  --font-head: 'Chakra Petch', system-ui, sans-serif;
+}
+[data-font='grotesk'] {
+  --font-body: 'Space Grotesk', system-ui, sans-serif;
+  --font-head: 'Space Grotesk', system-ui, sans-serif;
+}
+
+/* ---------- Styles ---------- */
+/* Clean: soft rounded panels, no effects (default). */
+[data-style='clean'] {
+  --radius: 12px;
+}
+
+/* HUD: clipped corners, thin glowing edges, uppercase labels. */
+[data-style='hud'] {
+  --radius: 0px;
+}
+[data-style='hud'] .card,
+[data-style='hud'] .stat {
+  clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  box-shadow: inset 0 0 24px var(--glow);
+}
+[data-style='hud'] .stat .lbl,
+[data-style='hud'] th,
+[data-style='hud'] h2 {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+[data-style='hud'] .btn,
+[data-style='hud'] button {
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+[data-style='hud'] body {
+  background-image: linear-gradient(color-mix(in srgb, var(--accent) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 6%, transparent) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Glass: frosted translucent panels over a lit background. */
+[data-style='glass'] {
+  --radius: 16px;
+}
+[data-style='glass'] body {
+  background:
+    radial-gradient(900px 500px at 15% -10%, var(--glow), transparent 70%),
+    radial-gradient(800px 600px at 110% 20%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
+}
+[data-style='glass'] .card,
+[data-style='glass'] .stat {
+  background: color-mix(in srgb, var(--panel) 62%, transparent);
+  backdrop-filter: blur(14px) saturate(140%);
+  border-color: color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+/* Industrial: sharp corners, hazard stripes, bold uppercase. */
+[data-style='industrial'] {
+  --radius: 2px;
+}
+[data-style='industrial'] .card,
+[data-style='industrial'] .stat {
+  border-left: 4px solid var(--accent);
+}
+[data-style='industrial'] .stat {
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 10%, transparent) 0 8px,
+    transparent 8px 16px
+  );
+  background-size: 100% 6px;
+  background-repeat: no-repeat;
+}
+[data-style='industrial'] h1,
+[data-style='industrial'] h2,
+[data-style='industrial'] .btn,
+[data-style='industrial'] button,
+[data-style='industrial'] th {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
