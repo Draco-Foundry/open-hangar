@@ -40,7 +40,7 @@ The extension makes a small number of outbound requests, none of which carry you
 personal data:
 
 - **robertsspaceindustries.com** — to read your own account (above), to load hangar
-  thumbnails and the home banner image, and to look up ship art for items RSI ships
+  thumbnails, and to look up ship art for items RSI ships
   without images from RSI's public ship-matrix index. No credentials are sent for the
   ship-matrix lookup.
 - **api.star-citizen.wiki** (public, read-only) — a fallback for the current game
