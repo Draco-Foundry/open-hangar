@@ -3295,7 +3295,7 @@ function eventRewardsHtml(recruitsRows) {
     else if (d < cur.firstDate) cur.firstDate = d;
   }
   const earned = [...hits.values()].sort((a, b) => parseTs(b.ev.start) - parseTs(a.ev.start));
-  const intro = `<p class="muted" style="font-size:13px;margin:0 0 12px">
+  const intro = `<p class="muted" style="font-size:12px;margin:0 0 12px">
     A recruit who <strong>converted</strong> during a special-incentive event earns you that
     event's bonus reward — once per event. Best-effort; may not include the newest events.</p>`;
   if (!earned.length) {
