@@ -45,7 +45,7 @@
   --link: #5eead4;
   --glow: rgba(20, 211, 195, 0.4);
 }
-[data-palette='crusader'] {
+[data-palette='amber'] {
   /* Charcoal with warm amber. */
   --bg: #0f0e0c;
   --panel: #1a1815;
@@ -58,7 +58,7 @@
   --link: #f7c066;
   --glow: rgba(240, 160, 32, 0.35);
 }
-[data-palette='drake'] {
+[data-palette='rust'] {
   /* Rust red, dirty and loud. */
   --bg: #100b0a;
   --panel: #1b1311;
@@ -71,8 +71,8 @@
   --link: #f48b78;
   --glow: rgba(229, 83, 61, 0.35);
 }
-[data-palette='aegis'] {
-  /* Near-black with military violet. */
+[data-palette='nebula'] {
+  /* Near-black with violet. */
   --bg: #0b0a12;
   --panel: #14121f;
   --panel-2: #1c192b;
@@ -101,6 +101,133 @@
   color-scheme: light;
 }
 
+/* ---------- Manufacturer-inspired palettes ----------
+ * Colours only (no logos), approximating each maker's look from their ships,
+ * MFDs and store pages. Not official.
+ */
+[data-palette='rsi'] {
+  --bg: #070b14;
+  --panel: #0e1524;
+  --panel-2: #141d31;
+  --line: #243251;
+  --text: #dde7f7;
+  --muted: #8193b3;
+  --accent: #3d8bff;
+  --accent-hover: #64a2ff;
+  --link: #7fb3ff;
+  --glow: rgba(61, 139, 255, 0.35);
+}
+[data-palette='crusader'] {
+  /* Clean white and sky blue. */
+  --bg: #f3f7fb;
+  --panel: #ffffff;
+  --panel-2: #e8eff7;
+  --line: #d3dde9;
+  --text: #13233a;
+  --muted: #5d6f88;
+  --accent: #1e88e5;
+  --accent-hover: #3d9bea;
+  --link: #1569b8;
+  --glow: rgba(30, 136, 229, 0.22);
+  --good: #1f7a34;
+  --bad: #c62828;
+  color-scheme: light;
+}
+[data-palette='misc'] {
+  /* Industrial with teal. */
+  --bg: #0c1112;
+  --panel: #141c1d;
+  --panel-2: #1b2627;
+  --line: #2c3c3d;
+  --text: #e0eeec;
+  --muted: #8aa3a0;
+  --accent: #1fb5a3;
+  --accent-hover: #3fc7b7;
+  --link: #5fd6c8;
+  --glow: rgba(31, 181, 163, 0.35);
+}
+[data-palette='drake'] {
+  /* Gunmetal with hazard yellow. */
+  --bg: #0e0e0d;
+  --panel: #181816;
+  --panel-2: #21211e;
+  --line: #36352f;
+  --text: #f0ede2;
+  --muted: #a19d8e;
+  --accent: #f2b705;
+  --accent-hover: #f7c63a;
+  --link: #f9d155;
+  --glow: rgba(242, 183, 5, 0.3);
+}
+[data-palette='anvil'] {
+  /* Military olive with green screens. */
+  --bg: #0c0e0b;
+  --panel: #151912;
+  --panel-2: #1c2118;
+  --line: #2f3728;
+  --text: #e3e9dc;
+  --muted: #929c86;
+  --accent: #7cb342;
+  --accent-hover: #93c35f;
+  --link: #a8d27a;
+  --glow: rgba(124, 179, 66, 0.3);
+}
+[data-palette='aegis'] {
+  /* Dark military grey with warning red. */
+  --bg: #0d0d0f;
+  --panel: #17171a;
+  --panel-2: #1f1f23;
+  --line: #333339;
+  --text: #ececef;
+  --muted: #9a9aa3;
+  --accent: #e0442f;
+  --accent-hover: #e86653;
+  --link: #f07f6e;
+  --glow: rgba(224, 68, 47, 0.3);
+}
+[data-palette='argo'] {
+  /* Utility yellow on grey. */
+  --bg: #121315;
+  --panel: #1b1d20;
+  --panel-2: #23262a;
+  --line: #373b41;
+  --text: #eceef1;
+  --muted: #9ba1aa;
+  --accent: #ffc400;
+  --accent-hover: #ffd23d;
+  --link: #ffdb63;
+  --glow: rgba(255, 196, 0, 0.28);
+}
+[data-palette='cnou'] {
+  /* Consolidated Outland: white with bright orange. */
+  --bg: #f7f6f4;
+  --panel: #ffffff;
+  --panel-2: #efece8;
+  --line: #ddd7cf;
+  --text: #1f1c19;
+  --muted: #6e675f;
+  --accent: #f26b1d;
+  --accent-hover: #f5843f;
+  --link: #c9530f;
+  --glow: rgba(242, 107, 29, 0.22);
+  --good: #1f7a34;
+  --bad: #c62828;
+  color-scheme: light;
+}
+[data-palette='aopoa'] {
+  /* Xi'an: deep blue and violet. */
+  --bg: #080917;
+  --panel: #10122a;
+  --panel-2: #171a38;
+  --line: #2a2e5a;
+  --text: #e4e3fb;
+  --muted: #8f8fc0;
+  --accent: #6d5dfc;
+  --accent-hover: #8a7dfd;
+  --link: #a59cff;
+  --glow: rgba(109, 93, 252, 0.4);
+}
+
 /* ---------- Fonts ---------- */
 [data-font='system'] {
   --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -118,6 +245,10 @@
   --font-body: 'Rajdhani', system-ui, sans-serif;
   --font-head: 'Rajdhani', system-ui, sans-serif;
   --font-size: 15px;
+}
+[data-font='rajdhani-inter'] {
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-head: 'Rajdhani', system-ui, sans-serif;
 }
 [data-font='orbitron'] {
   --font-body: 'Inter', system-ui, sans-serif;
