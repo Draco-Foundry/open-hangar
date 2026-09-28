@@ -290,7 +290,49 @@ const state = {
 function setStatus(text, isError = false) {
   statusEl.textContent = text;
   statusEl.classList.toggle('error', isError);
+  if (isError) {
+    OH.log('error', 'status', text);
+    // One click to a paste-ready report for #bug-reports / GitHub.
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'link-btn';
+    btn.textContent = 'Copy error report';
+    btn.addEventListener('click', () => copyErrorReport(btn));
+    statusEl.append(' ', btn);
+  }
 }
+
+// Copy OH.errorReport() to the clipboard; `el` shows the outcome briefly.
+async function copyErrorReport(el) {
+  const text = await OH.errorReport();
+  let ok = false;
+  try {
+    await navigator.clipboard.writeText(text);
+    ok = true;
+  } catch {
+    /* clipboard blocked: the Developers page shows the text to copy by hand */
+  }
+  if (el) {
+    const was = el.textContent;
+    el.textContent = ok
+      ? 'Copied! Paste it in #bug-reports or a GitHub issue'
+      : 'Copy failed. See Developers → Error report';
+    setTimeout(() => {
+      el.textContent = was;
+    }, 3000);
+  }
+  return ok;
+}
+
+// Uncaught page errors go into the log too (paths only, no extension id).
+window.addEventListener('error', (e) => {
+  const where = `${e.filename || '?'}:${e.lineno || 0}`;
+  OH.log('error', 'page', e.error?.stack || `${e.message} @ ${where}`);
+});
+window.addEventListener('unhandledrejection', (e) => {
+  const r = e.reason;
+  OH.log('error', 'page', `unhandled: ${(r && (r.stack || r.message)) || r}`);
+});
 
 // Global scan indicator in the header — visible from every view (the scan keeps
 // running across view switches since this is a single page). `done` shows a
@@ -3440,6 +3482,26 @@ function setDataMsg(text, isError = false) {
   if (!dataMsg) return;
   dataMsg.textContent = text;
   dataMsg.classList.toggle('error', isError);
+  if (isError) OH.log('error', 'data', text);
+}
+
+// Developers → Error report: copy, clear, and a preview of exactly what's in it.
+const reportPreview = $('#report-preview');
+async function refreshReportPreview() {
+  const pre = $('#report-text');
+  if (pre && reportPreview && reportPreview.open) pre.textContent = await OH.errorReport();
+}
+if (reportPreview) {
+  reportPreview.addEventListener('toggle', refreshReportPreview);
+  $('#copy-report').addEventListener('click', async (e) => {
+    await copyErrorReport(e.currentTarget);
+    refreshReportPreview();
+  });
+  $('#clear-log').addEventListener('click', async () => {
+    await OH.clearLog();
+    $('#report-msg').textContent = 'Log cleared.';
+    refreshReportPreview();
+  });
 }
 
 // Show the "Restore previous hangar" button only when an auto-cleared snapshot

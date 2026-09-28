@@ -4,6 +4,13 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased — next: 0.2.8
 
+- **Error report you can copy and paste.** Open Hangar now keeps a small log of
+  errors, failed or partial scans and RSI retries (last 100). When something goes
+  wrong, the error message has a **Copy error report** link, and Developers has the
+  same button plus a preview of exactly what's in it. It includes your version,
+  browser, item counts and recent errors, never your handle, referral code or item
+  names. Paste it in #bug-reports on Discord or a GitHub issue (the bug form asks
+  for it).
 - **Suggest a feature** link in the dashboard footer, the Developers page and the
   website — it goes to the new GitHub Discussions → Ideas board, where ideas can be
   upvoted (or tell us on Discord).
