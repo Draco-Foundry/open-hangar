@@ -41,6 +41,8 @@ for (const [name, transform] of Object.entries(targets)) {
   for (const dir of RUNTIME) cpSync(dir, `${out}/${dir}`, { recursive: true });
   // icon.svg is the design source, not a runtime asset.
   rmSync(`${out}/icons/icon.svg`, { force: true });
+  // Release notes for the dashboard's Updates page.
+  cpSync('CHANGELOG.md', `${out}/CHANGELOG.md`);
   writeFileSync(`${out}/manifest.json`, JSON.stringify(transform(base), null, 2) + '\n');
   console.log(`built ${out}`);
 }

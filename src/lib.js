@@ -1804,6 +1804,79 @@
     return out;
   };
 
+  // --- Updates -----------------------------------------------------------------
+  // Compare dotted versions ("0.2.10" > "0.2.9"). → negative | 0 | positive. Pure.
+  OH.compareVersions = function compareVersions(a, b) {
+    const pa = String(a || '')
+      .split('.')
+      .map((n) => parseInt(n, 10) || 0);
+    const pb = String(b || '')
+      .split('.')
+      .map((n) => parseInt(n, 10) || 0);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+      const d = (pa[i] || 0) - (pb[i] || 0);
+      if (d) return d;
+    }
+    return 0;
+  };
+
+  // CHANGELOG.md → [{ title, version, date, intro: [text], items: [text] }],
+  // newest first, skipping "Unreleased". Headings look like
+  // "## 0.2.8 — 2026-09-28"; bullets may wrap onto indented lines. Text stays
+  // markdown (see OH.inlineMarkdown). `version` is the heading's first version
+  // number, so a range like "0.2.0 – 0.2.6" compares as 0.2.0. Pure.
+  OH.parseChangelog = function parseChangelog(md) {
+    const out = [];
+    let cur = null;
+    let para = null;
+    for (const raw of String(md || '').split(/\r?\n/)) {
+      const h = raw.match(/^## (.+?)\s+[—-]\s+(.+)$/) || raw.match(/^## (.+)$/);
+      if (h) {
+        const title = h[1].trim();
+        cur = /unreleased/i.test(title)
+          ? null
+          : {
+              title,
+              version: (title.match(/\d+\.\d+(?:\.\d+)?/) || [title])[0],
+              date: (h[2] || '').trim(),
+              intro: [],
+              items: [],
+            };
+        if (cur) out.push(cur);
+        para = null;
+        continue;
+      }
+      if (!cur) continue;
+      const line = raw.trim();
+      if (!line) {
+        para = null;
+        continue;
+      }
+      if (/^[-*] /.test(line)) {
+        cur.items.push(line.slice(2));
+        para = { list: cur.items, i: cur.items.length - 1 };
+      } else if (para) {
+        para.list[para.i] += ' ' + line;
+      } else {
+        cur.intro.push(line);
+        para = { list: cur.intro, i: cur.intro.length - 1 };
+      }
+    }
+    return out;
+  };
+
+  // A little markdown → safe HTML: escapes everything, then **bold**, `code`
+  // and [links](https://…) (http/https only). Pure.
+  OH.inlineMarkdown = function inlineMarkdown(text) {
+    return OH.escapeHtml(String(text || ''))
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(
+        /\[([^\]]+)\]\((https?:\/\/[^\s)"&]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener">$1</a>',
+      );
+  };
+
   // --- Org fleet ------------------------------------------------------------------
   // Members share a file; we keep only their ship list. Accepts an HTF export
   // (a bare array, ships only: the one to ask for) or a full Open Hangar backup
