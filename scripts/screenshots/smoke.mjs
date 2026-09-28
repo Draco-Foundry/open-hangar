@@ -269,6 +269,18 @@ try {
   roleChips === 16 && memberRows >= 3
     ? ok(`org roles (${roleChips}) + biggest ships + members`)
     : fail(`org extras: ${roleChips} role chips, ${memberRows} tables`);
+  await page.click('.role-chip.missing');
+  (await page.$('.org-panel'))
+    ? ok('missing role opens suggestions')
+    : fail('role click opened nothing');
+  await page.click('.org-mrow');
+  (await page.$('.pair-row')) ? ok('member opens vs-org charts') : fail('member panel missing');
+  const names = await page.$$eval('.org-cmp[data-side="a"] option', (o) =>
+    o.map((x) => x.value).filter(Boolean),
+  );
+  await page.select('.org-cmp[data-side="a"]', names[0]);
+  await page.select('.org-cmp[data-side="b"]', names[1]);
+  (await page.$('.cmp-cols')) ? ok('compare two members') : fail('compare panel missing');
 
   console.log('Store');
   await go('#store');
