@@ -179,6 +179,22 @@ try {
     ? ok(`buy-backs sort by price (${bbPrices.length} priced)`)
     : fail(`buy-back price sort: ${JSON.stringify(bbPrices)}`);
   await page.select('#bb-sort', 'date-desc');
+  await page.click('#bb-layout [data-layout="market"]');
+  const bbm = await page.evaluate(() => ({
+    rows: document.querySelectorAll('#buybacks-body .market-table tbody tr').length,
+    cards: window.state ? null : null,
+    reclaim: [...document.querySelectorAll('#buybacks-body .market-table tbody tr')].every((r) =>
+      /Reclaim/.test(r.textContent),
+    ),
+    ins: !!document.querySelector('#buybacks-body .market-table .mk-ins'),
+  }));
+  const bbTotal = await page.$eval('#buybacks-body .result-count', (e) =>
+    Number((e.textContent.match(/of (\d+)/) || [])[1]),
+  );
+  bbm.rows === bbTotal && bbm.reclaim && bbm.ins
+    ? ok(`buy-back market: ${bbm.rows} rows, one each, Reclaim + Insurance`)
+    : fail(`buy-back market: ${JSON.stringify(bbm)} vs ${bbTotal}`);
+  await page.click('#bb-layout [data-layout="gallery"]');
   await page.click('#bb-layout [data-layout="list"]');
   await checkListAlignment('Buy-Backs', '#buybacks-body');
 
