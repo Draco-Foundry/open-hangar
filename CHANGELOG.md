@@ -2,6 +2,12 @@
 
 What's changed in each release of Open Hangar. Dates are when the version was cut.
 
+## Unreleased
+
+- **Market: Store Price column.** Each row shows today's store price next to its melt
+  price, so the gap is easy to see (also in the CSV).
+- **Market: pricing ticks the row.** Typing a price or % ticks that item for export.
+
 ## 0.2.9 — 2026-09-28
 
 - **Org Fleet you can explore.** Click a role to open which ships fill it and who
