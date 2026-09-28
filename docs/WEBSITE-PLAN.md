@@ -17,13 +17,13 @@ device, orgs with live combined fleets, and (later) Star Citizen reference data.
 
 ## Stack
 
-| Piece                 | Choice                                                   | Why                                                                                      |
-| --------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Site + API            | Cloudflare **Pages** with **Pages Functions**            | One project; custom subdomain works with our Porkbun DNS (a CNAME), no nameserver move   |
-| Database              | Cloudflare **D1** (SQLite)                               | Free tier covers us for a long time; bound directly to Functions                         |
-| Auth                  | **Better Auth** (open source) on D1                      | Discord login + email/password, TOTP 2FA plugin, sessions; self-hosted, no per-user fees |
-| Email (verify, reset) | **Resend** (free tier)                                   | Needed for email sign-up and password resets                                             |
-| Front end             | Plain HTML/JS like the dashboard, reusing its components | No framework needed; can adopt one later if the site grows                               |
+| Piece                 | Choice                                                                                           | Why                                                                                                                                                                |
+| --------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Site + API            | **Astro** (server output) with the official **Cloudflare adapter**, deployed to Cloudflare Pages | Content pages (landing, ship reference) stay fast and search-friendly; logged-in pages render on the server; custom subdomain works with our Porkbun DNS (a CNAME) |
+| Database              | Cloudflare **D1** (SQLite)                                                                       | Free tier covers us for a long time; bound directly to Functions                                                                                                   |
+| Auth                  | **Better Auth** (open source) on D1, via its Astro integration                                   | Discord login + email/password, TOTP 2FA plugin, sessions; self-hosted, no per-user fees                                                                           |
+| Email (verify, reset) | **Resend** (free tier)                                                                           | Needed for email sign-up and password resets                                                                                                                       |
+| Interactive bits      | Astro **islands** in Svelte (or Preact) for charts, compare tools, filters                       | Only the interactive parts ship JavaScript; everything else is plain HTML                                                                                          |
 
 The extension talks to the API with `fetch` from its own page; the API allows the
 extension origins via CORS, so **no new install permission** is needed.
@@ -58,6 +58,8 @@ Device-code flow (works on Chrome, Edge and Firefox alike):
    (what Org Fleet does today with files), roles/compare views, member share settings.
 3. **Reference data.** Ship pages, prices, loaners and more, starcitizen.tools style,
    using the wiki API we already use.
+4. **Move openhangar.space into the Astro project** so the landing page and the app
+   share one codebase (GitHub Pages retired).
 
 ## Before sync ships to users
 
