@@ -3,3 +3,4 @@ icons
 src/assets
 package-lock.json
 test/fixtures/*.json
+src/data/ship-catalog.json

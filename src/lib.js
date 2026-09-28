@@ -1370,7 +1370,63 @@
     return typeof x.en_EN === 'string' ? x.en_EN : null;
   }
 
-  // The full wiki vehicle catalog (name + slug), fetched once and cached slim.
+  // One wiki vehicle record → the slim entry we keep. Shared with
+  // scripts/update-ship-catalog.mjs so the bundled snapshot has the same shape.
+  OH.slimVehicle = function slimVehicle(v) {
+    if (!v || !v.name || !v.slug) return null;
+    return {
+      lname: String(v.name).toLowerCase(),
+      slug: v.slug,
+      cls: v.class_name ? String(v.class_name).toLowerCase() : null,
+      msrp: Number(v.msrp) > 0 ? Number(v.msrp) : null, // USD store price
+      // Fleet stats (Stats → Fleet): what the ship is for and how big.
+      career: en(v.type) || v.career || null,
+      role: en(v.foci && v.foci[0]) || v.role || null,
+      size: en(v.size) || null,
+      status: en(v.production_status) || null, // flight-ready | in-concept | …
+      crew: (v.crew && Number(v.crew.max)) || null,
+      cargo: Number(v.cargo_capacity) || 0, // SCU
+    };
+  };
+
+  // Download the whole wiki vehicle list, slimmed. The API serves 50 per page
+  // whatever we ask for (≈300 vehicles → 6 pages), so walk until last_page.
+  OH.fetchShipCatalog = async function fetchShipCatalog(fetchFn = fetch) {
+    const list = [];
+    for (let page = 1; page <= 12; page++) {
+      const res = await fetchFn(`${SC_API}/vehicles?page%5Bsize%5D=200&page%5Bnumber%5D=${page}`, {
+        credentials: 'omit',
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) break;
+      const json = await res.json();
+      const data = Array.isArray(json.data) ? json.data : [];
+      for (const v of data) {
+        const slim = OH.slimVehicle(v);
+        if (slim) list.push(slim);
+      }
+      const last =
+        (json.meta && json.meta.last_page) || (json.links && json.links.next ? page + 1 : page);
+      if (!data.length || page >= last) break;
+    }
+    return list;
+  };
+
+  // The ship list that ships inside the extension (src/data/ship-catalog.json,
+  // refreshed weekly by a GitHub Action), or null.
+  async function bundledCatalog() {
+    try {
+      const res = await fetch(chrome.runtime.getURL('src/data/ship-catalog.json'));
+      const json = res.ok ? await res.json() : null;
+      return json && Array.isArray(json.list) && json.list.length ? json.list : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // The full wiki vehicle catalog, cached slim for CATALOG_TTL. On a cold cache
+  // the bundled snapshot answers straight away (prices show instantly, and
+  // offline) while the live list downloads in the background for next time.
   async function getCatalog() {
     if (catalogMem) return catalogMem;
     const cached = (await chrome.storage.local.get('shipCatalog')).shipCatalog;
@@ -1385,41 +1441,12 @@
       return catalogMem;
     }
     if (catalogInflight) return catalogInflight;
-    catalogInflight = (async () => {
-      const list = [];
+    const refresh = (async () => {
+      let list = [];
       try {
-        // The API serves 50 per page whatever we ask for (≈300 vehicles → 6
-        // pages), so walk until last_page.
-        for (let page = 1; page <= 12; page++) {
-          const res = await fetch(
-            `${SC_API}/vehicles?page%5Bsize%5D=200&page%5Bnumber%5D=${page}`,
-            { credentials: 'omit', headers: { Accept: 'application/json' } },
-          );
-          if (!res.ok) break;
-          const json = await res.json();
-          const data = Array.isArray(json.data) ? json.data : [];
-          for (const v of data) {
-            if (v && v.name && v.slug)
-              list.push({
-                lname: String(v.name).toLowerCase(),
-                slug: v.slug,
-                cls: v.class_name ? String(v.class_name).toLowerCase() : null,
-                msrp: Number(v.msrp) > 0 ? Number(v.msrp) : null, // USD store price
-                // Fleet stats (Stats → Fleet): what the ship is for and how big.
-                career: en(v.type) || v.career || null,
-                role: en(v.foci && v.foci[0]) || v.role || null,
-                size: en(v.size) || null,
-                status: en(v.production_status) || null, // flight-ready | in-concept | …
-                crew: (v.crew && Number(v.crew.max)) || null,
-                cargo: Number(v.cargo_capacity) || 0, // SCU
-              });
-          }
-          const last =
-            (json.meta && json.meta.last_page) || (json.links && json.links.next ? page + 1 : page);
-          if (!data.length || page >= last) break;
-        }
+        list = await OH.fetchShipCatalog();
       } catch (e) {
-        /* offline — leave catalog empty; getShipImage just returns null */
+        /* offline: fall back to the bundled snapshot (below) */
         OH.log('warn', 'catalog', `ship catalog download failed: ${e?.message || e}`);
       }
       if (list.length) {
@@ -1431,9 +1458,16 @@
         } catch {}
       }
       catalogInflight = null;
-      return list;
+      return list.length ? list : catalogMem || [];
     })();
-    return catalogInflight;
+    catalogInflight = refresh;
+    const bundled = await bundledCatalog();
+    if (catalogMem) return catalogMem; // the live list already landed
+    if (bundled) {
+      catalogMem = bundled; // answer now; `refresh` replaces it when it lands
+      return bundled;
+    }
+    return refresh;
   }
 
   // Score how well a catalog entry's (lowercased) name matches the query. 0 = no
