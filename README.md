@@ -209,6 +209,13 @@ for approved sites.
 Full detail in [ROADMAP.md](ROADMAP.md); parked ideas in [TODO.md](TODO.md); release
 notes in [CHANGELOG.md](CHANGELOG.md).
 
+## Ideas & feedback
+
+- **Got an idea?** Post it in [Discussions → Ideas](https://github.com/Draco-Foundry/open-hangar/discussions/categories/ideas)
+  and upvote the ones you want most — that's how we decide what to build next.
+- **Found a bug?** [Open an issue](https://github.com/Draco-Foundry/open-hangar/issues/new/choose).
+- **No GitHub account?** Tell us on [Discord](https://discord.gg/FF8Wm5HdnV).
+
 ## Contributing
 
 The most valuable contribution is keeping `parser.js` working when RSI updates their
