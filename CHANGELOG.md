@@ -4,6 +4,14 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Buy-backs, one row each.** The Buy-Backs Market no longer merges same-named
+  buy-backs: each is its own pledge with its own insurance and extras, and each
+  **Reclaim** opens that exact one (CCUs open their single buy-back entry, where
+  RSI's reclaim button is). New **Packs & packages** section and an **Insurance**
+  column (read from the name when RSI includes it). Add-ons such as Retaliator
+  modules no longer land under Ships.
+- **Insurance in List view.** Inventory's List layout has an Insurance column (LTI,
+  120M, 6M, …).
 - **Your currency.** Pick USD, EUR, GBP, CAD or AUD on the Home card and every
   amount (melt value, store prices, buy-backs, org value, images) shows in it,
   converted from USD at the day's rate, before tax. Rates are public (the ECB's,

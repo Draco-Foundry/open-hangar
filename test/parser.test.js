@@ -179,3 +179,14 @@ test('parseBuybackTokens reads the "You have N opportunity" header', () => {
   assert.equal(P.parseBuybackTokens('You have no opportunities to buy back a pledge'), 0);
   assert.equal(P.parseBuybackTokens('<html>nothing here</html>'), null);
 });
+
+test('classifyBuyback: hyphenated categories and packs', () => {
+  const P = globalThis.OpenHangar;
+  assert.equal(P.classifyBuyback('Add-Ons - Retaliator Torpedo Module – Stern', ''), 'addon');
+  assert.equal(P.classifyBuyback('Packs - Valkyrie Liberator Drop Pack WB', ''), 'pack');
+  assert.equal(P.classifyBuyback('Package - C8X Pisces Expedition - Starter Pack', ''), 'pack');
+  assert.equal(P.classifyBuyback('Standalone Ships - Buccaneer - 10 Year', ''), 'ship');
+  assert.equal(P.insuranceFromName('Standalone Ships - Buccaneer - 10 Year'), '120M');
+  assert.equal(P.insuranceFromName('Standalone Ship - 2943 RSI Aurora LX - LTI'), 'LTI');
+  assert.equal(P.insuranceFromName('Standalone Ships - Hull A'), null);
+});
