@@ -1315,6 +1315,12 @@ function insLabel(t) {
   const unit = /y/i.test(m[2]) ? 'Year' : 'Month';
   return `${n} ${unit}${n === 1 ? '' : 's'}`;
 }
+// Today's standard store price for what's in the pledge (ships' prices, or a
+// CCU's price gap), from the ship list. '' when unknown.
+function marketStore(p) {
+  const si = storeInfo(p);
+  return si && si.store ? dollars(si.store) : '';
+}
 function marketInsurance(p) {
   return insLabel(p.insurance) || '----';
 }
@@ -1379,6 +1385,7 @@ function marketRowHtml(g) {
     <td class="mk-ins">${OH.escapeHtml(marketInsurance(p))}</td>
     <td class="mk-gift gift-${g.giftable === 0 ? 'no' : 'yes'}">${gift}</td>
     <td class="mk-melt">${OH.escapeHtml(melt)}</td>
+    <td class="mk-store">${OH.escapeHtml(marketStore(p)) || '<span class="muted">—</span>'}</td>
     <td class="mk-pct"><input class="mk-pct-in" type="text" inputmode="decimal" value="${pct}" placeholder="%" aria-label="Percent of melt"></td>
     <td class="mk-mine"><input class="mk-price" type="text" inputmode="decimal" value="${price}" placeholder="$" aria-label="My price"></td>
     <td class="mk-stock">${g.stock}</td>
@@ -1393,7 +1400,7 @@ function marketTableHtml(section, groups) {
       <thead><tr>
         <th class="mk-sel"><input type="checkbox" class="mk-pick-all" aria-label="Pick all in ${OH.escapeHtml(section.label)}" ${
           groups.every((g) => g.ids.every((id) => state.selected.has(id))) ? 'checked' : ''
-        }></th><th>Items Name</th><th>Insurance</th><th>Giftable</th><th>Melt Price</th>
+        }></th><th>Items Name</th><th>Insurance</th><th>Giftable</th><th>Melt Price</th><th title="Today's standard store price (ships, or a CCU's price gap)">Store Price</th>
         <th title="Your price as a percent of melt value">% of Melt</th><th>My Price</th><th>Stock</th><th title="Open the pledge in your RSI hangar, e.g. to screenshot its details">RSI</th>
       </tr></thead>
       <tbody>${groups.map(marketRowHtml).join('')}</tbody>
@@ -1521,7 +1528,17 @@ function csvCell(v) {
 
 function marketCsv(sections) {
   const lines = [
-    ['Category', 'Item', 'Insurance', 'Giftable', 'Melt Price', '% of Melt', 'My Price', 'Stock'],
+    [
+      'Category',
+      'Item',
+      'Insurance',
+      'Giftable',
+      'Melt Price',
+      'Store Price',
+      '% of Melt',
+      'My Price',
+      'Stock',
+    ],
   ];
   for (const { section, groups } of sections) {
     for (const g of groups) {
@@ -1532,6 +1549,7 @@ function marketCsv(sections) {
         marketInsurance(g.rep),
         giftableLabel(g),
         meltLabel(g.rep),
+        marketStore(g.rep),
         pctOfMelt(saved && saved.price, g.rep.value * fx.rate),
         saved && saved.price != null ? saved.price : '',
         g.stock,
@@ -4002,6 +4020,12 @@ resultsEl.addEventListener('input', (e) => {
     const price = priceAtPct(el.value.trim(), melt);
     setMarketPrice(row.dataset.key, price);
     row.querySelector('.mk-price').value = price;
+  }
+  // Pricing a row means you're selling it: tick it (never auto-untick).
+  const box = row.querySelector('.mk-pick');
+  if (el.value.trim() && box && !box.checked) {
+    box.checked = true;
+    box.dispatchEvent(new Event('change', { bubbles: true }));
   }
 });
 

@@ -162,6 +162,23 @@ try {
     price.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await page.click('.market-table .mk-pick');
+  // Typing a % ticks the row on its own.
+  const autoTick = await page.evaluate(() => {
+    const row = document.querySelectorAll('.market-table .mk-row')[1];
+    const pct = row.querySelector('.mk-pct-in');
+    pct.value = '60';
+    pct.dispatchEvent(new Event('input', { bubbles: true }));
+    const ticked = row.querySelector('.mk-pick').checked;
+    const store = row.querySelector('.mk-store').textContent.trim();
+    pct.value = '';
+    pct.dispatchEvent(new Event('input', { bubbles: true }));
+    row.querySelector('.mk-pick').click();
+    return { ticked, store };
+  });
+  autoTick.ticked ? ok('typing a % ticks the row') : fail('typing a % did not tick the row');
+  /^\$\d/.test(autoTick.store)
+    ? ok(`store price column (${autoTick.store})`)
+    : fail(`store price: "${autoTick.store}"`);
   await page.click('#layout [data-layout="gallery"]');
   await page.click('#select-toggle');
   const [c1, c2] = await page.$$('#results .card');
