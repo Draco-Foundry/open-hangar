@@ -23,6 +23,8 @@ parses the results locally. This may include:
 - Your hangar (pledges: ships, CCUs, add-ons, coupons)
 - If you use more than one RSI account in this browser, each account's scans are kept
   separately so they don't overwrite each other
+- Any org members' ship lists you choose to import on the Org Fleet page (ship names
+  and LTI only)
 - A short history of past hangar scans (pledge id, name and value per scan), so
   the extension can show what changed between scans (kept only here, and included
   in the JSON backup file you can download yourself)

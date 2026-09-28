@@ -7,7 +7,7 @@
  */
 
 const $ = (sel) => document.querySelector(sel);
-const VIEWS = ['home', 'inventory', 'buybacks', 'stats', 'referrals', 'store', 'developers'];
+const VIEWS = ['home', 'inventory', 'buybacks', 'stats', 'org', 'referrals', 'store', 'developers'];
 
 const statusEl = $('#status');
 const scannedHomeEl = $('#scanned-home');
@@ -527,6 +527,7 @@ function route() {
   else if (v === 'referrals') renderReferrals();
   else if (v === 'buybacks') renderBuybacks();
   else if (v === 'developers') renderProfiles();
+  else if (v === 'org') renderOrg();
   // 'store' is static markup; About now lives on Home.
   updateSignedOutBanner(); // re-apply the cached signed-out banner state on this view
 }
@@ -1952,6 +1953,174 @@ if (selectBar) {
     state.imagePrice = e.target.value;
   });
 }
+
+// --- Org fleet ------------------------------------------------------------
+// Members' ship lists (from HTF exports or backups) combined into one fleet.
+// Stored under `orgFleet` in this browser only: { members: [{ name, importedAt, ships }] }.
+let orgMembers = null;
+async function loadOrg() {
+  if (!orgMembers) {
+    const { orgFleet } = await chrome.storage.local.get('orgFleet');
+    orgMembers = (orgFleet && Array.isArray(orgFleet.members) && orgFleet.members) || [];
+  }
+  return orgMembers;
+}
+async function saveOrg() {
+  await chrome.storage.local.set({ orgFleet: { members: orgMembers } });
+}
+function upsertMember(name, ships) {
+  const i = orgMembers.findIndex((m) => m.name.toLowerCase() === name.toLowerCase());
+  const row = { name, importedAt: Date.now(), ships };
+  if (i >= 0) orgMembers[i] = row;
+  else orgMembers.push(row);
+}
+const orgMsg = (t) => {
+  const el = $('#org-msg');
+  if (el) el.textContent = t;
+};
+
+function orgBarsHtml(map) {
+  const rows = Object.entries(map).sort((a, b) => b[1] - a[1]);
+  const max = Math.max(1, ...rows.map((r) => r[1]));
+  return rows
+    .map(
+      ([k, n]) => `<div class="bar-row">
+        <div class="bar-label">${OH.escapeHtml(k.charAt(0).toUpperCase() + k.slice(1))}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((n / max) * 100)}%"></div></div>
+        <div class="bar-val">${n}</div>
+      </div>`,
+    )
+    .join('');
+}
+
+async function renderOrg() {
+  ensurePrices();
+  const body = $('#org-body');
+  const members = await loadOrg();
+  if (!members.length) {
+    setHTML(
+      body,
+      '<div class="empty">No fleets yet. Import member files, or start with <strong>Add my fleet</strong>.</div>',
+    );
+    return;
+  }
+  const chips = members
+    .map(
+      (m) =>
+        `<span class="org-member">${OH.escapeHtml(m.name)} · ${m.ships.length} ships<button type="button" class="org-remove" data-name="${OH.escapeHtml(m.name)}" title="Remove" aria-label="Remove ${OH.escapeHtml(m.name)}">×</button></span>`,
+    )
+    .join('');
+  if (!state.shipOf) {
+    setHTML(body, `<div class="org-members">${chips}</div><p class="muted">Loading ship data…</p>`);
+    return;
+  }
+  const f = OH.orgFleet(members, state.shipOf, state.priceOf);
+  const box = (big, lbl) =>
+    `<div class="stat-box"><div class="big">${big}</div><div class="lbl">${lbl}</div></div>`;
+  const rows = f.ships
+    .map(
+      (r) => `<tr>
+        <td>${OH.escapeHtml(r.name)}</td>
+        <td class="num">${r.count}</td>
+        <td class="num">${r.lti}</td>
+        <td class="num">${r.msrp ? dollars(r.msrp) : '—'}</td>
+        <td class="org-owners">${r.owners
+          .map((o) => OH.escapeHtml(o.n > 1 ? `${o.name} ×${o.n}` : o.name))
+          .join(', ')}</td>
+      </tr>`,
+    )
+    .join('');
+  setHTML(
+    body,
+    `<div class="org-members">${chips}</div>` +
+      `<div class="stat-grid">${
+        box(f.members, 'members') +
+        box(f.shipCount, 'ships') +
+        box(dollars(f.store), `at store price (${f.priced} priced)`) +
+        box(Math.round(f.cargo).toLocaleString('en-US'), 'cargo (SCU)') +
+        box(f.crew.toLocaleString('en-US'), 'crew seats')
+      }</div>` +
+      `<div class="fleet-cols"><div><h4 class="modal-h">By role</h4>${orgBarsHtml(f.byCareer)}</div>` +
+      `<div><h4 class="modal-h">By size</h4>${orgBarsHtml(f.bySize)}</div></div>` +
+      `<h3 class="section-title" style="margin-top:22px">Ships</h3>` +
+      `<table class="org-table"><thead><tr><th>Ship</th><th class="num">Count</th><th class="num">LTI</th><th class="num">Store price</th><th>Owners</th></tr></thead><tbody>${rows}</tbody></table>`,
+  );
+}
+
+$('#org-import')?.addEventListener('click', () => $('#org-file').click());
+$('#org-file')?.addEventListener('change', async (e) => {
+  const files = [...(e.target.files || [])];
+  e.target.value = '';
+  await loadOrg();
+  let added = 0;
+  const problems = [];
+  for (const file of files) {
+    let obj;
+    try {
+      obj = JSON.parse(await file.text());
+    } catch {
+      problems.push(`${file.name}: not JSON`);
+      continue;
+    }
+    const r = OH.shipsFromFile(obj, file.name);
+    if (r.error) {
+      problems.push(`${file.name}: ${r.error}`);
+      continue;
+    }
+    const name = (
+      r.name ||
+      prompt(`Whose fleet is ${file.name}?`, file.name.replace(/\.json$/i, '')) ||
+      ''
+    ).trim();
+    if (!name) continue;
+    upsertMember(name, r.ships);
+    added++;
+  }
+  await saveOrg();
+  orgMsg(
+    `Added ${added} fleet${added === 1 ? '' : 's'}.` +
+      (problems.length ? ` Skipped: ${problems.join('; ')}` : ''),
+  );
+  renderOrg();
+});
+$('#org-mine')?.addEventListener('click', async () => {
+  if (!state.items.length) return orgMsg('Scan your hangar first.');
+  await loadOrg();
+  const who = (state.owner && (state.owner.displayname || state.owner.nickname)) || 'Me';
+  const r = OH.shipsFromFile({ sources: { hangar: { items: state.items } } });
+  if (r.error) return orgMsg(r.error);
+  upsertMember(who, r.ships);
+  await saveOrg();
+  orgMsg(`Added your fleet (${r.ships.length} ships).`);
+  renderOrg();
+});
+$('#org-csv')?.addEventListener('click', async () => {
+  const members = await loadOrg();
+  if (!members.length || !state.shipOf) return orgMsg('Nothing to export yet.');
+  const f = OH.orgFleet(members, state.shipOf, state.priceOf);
+  const lines = [['Ship', 'Count', 'LTI', 'Store price (USD)', 'Owners']].concat(
+    f.ships.map((r) => [
+      r.name,
+      r.count,
+      r.lti,
+      r.msrp ?? '',
+      r.owners.map((o) => `${o.name} x${o.n}`).join('; '),
+    ]),
+  );
+  downloadBlob(
+    new Blob([lines.map((l) => l.map(csvCell).join(',')).join('\n')], { type: 'text/csv' }),
+    `open-hangar-org-fleet-${new Date().toISOString().slice(0, 10)}.csv`,
+  );
+  orgMsg('Saved CSV.');
+});
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('.org-remove');
+  if (!b) return;
+  await loadOrg();
+  orgMembers = orgMembers.filter((m) => m.name !== b.dataset.name);
+  await saveOrg();
+  renderOrg();
+});
 
 // --- Stats ----------------------------------------------------------------
 
@@ -3696,7 +3865,10 @@ if (exportHtfBtn) {
     const date = new Date().toISOString().slice(0, 10);
     downloadBlob(
       new Blob([JSON.stringify(ships, null, 2)], { type: 'application/json' }),
-      `open-hangar-htf-${date}.json`,
+      `open-hangar-htf-${(state.owner && state.owner.nickname) || 'me'}-${date}.json`.replace(
+        /[^\w.-]+/g,
+        '_',
+      ),
     );
     setDataMsg(
       `Exported ${ships.length} ship(s) in Hangar Transfer Format` +
