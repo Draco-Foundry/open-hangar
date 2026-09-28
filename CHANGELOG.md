@@ -4,6 +4,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased — next: 0.2.8
 
+- **Suggest a feature** link in the dashboard footer, the Developers page and the
+  website — it goes to the new GitHub Discussions → Ideas board, where ideas can be
+  upvoted (or tell us on Discord).
 - **Tidier cards.** Kind badges (SHIP / PAINT / ADDON…) are a fixed width so the
   M / G tags line up row to row; card names drop RSI's "Standalone Ships - /
   Paints - / Gear - " prefix (the badge already says it; hover for the full name);

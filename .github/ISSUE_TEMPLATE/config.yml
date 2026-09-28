@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💡 Suggest an idea (vote on others)
+    url: https://github.com/Draco-Foundry/open-hangar/discussions/categories/ideas
+    about: Post feature ideas in Discussions → Ideas, and upvote the ones you want most.
+  - name: 💬 Chat on Discord
+    url: https://discord.gg/FF8Wm5HdnV
+    about: Questions, quick feedback, or no GitHub account? Come say hi.
