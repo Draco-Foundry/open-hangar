@@ -289,7 +289,7 @@
       history,
       sources: {
         hangar: { items: hangar, scannedAt: ts },
-        buybacks: { items: buybacks, scannedAt: ts },
+        buybacks: { items: buybacks, scannedAt: ts, meta: { tokens: 2 } },
         referral: { items: referral, scannedAt: ts },
       },
     },

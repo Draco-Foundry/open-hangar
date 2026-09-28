@@ -431,6 +431,18 @@
     return out;
   };
 
+  // Buy-back tokens: the page header reads "You have <strong>2</strong>
+  // opportunity to buy back a pledge with store credits." → 2. "no" → 0.
+  // null when the sentence isn't there (RSI changed the page, or signed out).
+  ns.parseBuybackTokens = function parseBuybackTokens(html) {
+    const text = String(html || '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ');
+    const m = text.match(/you have (\d+|no) opportunit(?:y|ies) to buy back/i);
+    if (!m) return null;
+    return /^no$/i.test(m[1]) ? 0 : Number(m[1]);
+  };
+
   ns.parseBuybacks = function parseBuybacks(payload) {
     if (payload == null) return [];
     if (typeof payload === 'string') {
