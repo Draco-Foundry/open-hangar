@@ -282,6 +282,80 @@
     return rec.db;
   };
 
+  // --- Saved accounts (multi-account) ---------------------------------------
+  // The live DB (DB_KEY) always belongs to the RSI account that's signed in.
+  // Other accounts' DBs are parked under `profile:<nickname>` and swapped back
+  // in when that account signs in again, so alts never wipe each other.
+  const PROFILE_PREFIX = 'profile:';
+  const profileKey = (nick) => PROFILE_PREFIX + String(nick).toLowerCase();
+  const dbHasData = (db) =>
+    !!db &&
+    Object.values(db.sources || {}).some(
+      (s) => s && s.items && (Array.isArray(s.items) ? s.items.length : true),
+    );
+
+  // Make `nickname` the live account: park the current DB under its owner, then
+  // load the new account's parked DB (if any). Returns { restored, parked }.
+  OH.switchProfile = async function switchProfile(nickname, displayname = null) {
+    const cur = await OH.loadDB();
+    let parked = null;
+    if (cur.owner && cur.owner.nickname && dbHasData(cur)) {
+      if (cur.owner.nickname.toLowerCase() === String(nickname).toLowerCase()) {
+        return { restored: false, parked: null }; // already live
+      }
+      await chrome.storage.local.set({ [profileKey(cur.owner.nickname)]: cur });
+      parked = cur.owner.displayname || cur.owner.nickname;
+    }
+    const key = profileKey(nickname);
+    const saved = (await chrome.storage.local.get(key))[key];
+    const next =
+      saved && saved.schemaVersion
+        ? saved
+        : { ...emptyDB(), owner: { nickname, displayname: displayname || null } };
+    await chrome.storage.local.set({ [DB_KEY]: next });
+    await chrome.storage.local.remove([key, 'account']); // live now; account cache is stale
+    return { restored: !!(saved && saved.schemaVersion), parked };
+  };
+
+  // Every account with data in this browser: the live one plus parked ones.
+  //   [{ nickname, displayname, pledges, scannedAt, active }]
+  OH.listProfiles = async function listProfiles() {
+    const all = await chrome.storage.local.get(null);
+    const row = (db, active) => ({
+      nickname: db.owner && db.owner.nickname,
+      displayname: (db.owner && db.owner.displayname) || null,
+      pledges: (db.sources.hangar && (db.sources.hangar.items || []).length) || 0,
+      scannedAt: (db.sources.hangar && db.sources.hangar.scannedAt) || null,
+      active,
+    });
+    const out = [];
+    const live = all[DB_KEY];
+    if (live && live.owner && live.owner.nickname) out.push(row(live, true));
+    for (const [k, v] of Object.entries(all)) {
+      if (k.startsWith(PROFILE_PREFIX) && v && v.schemaVersion && v.owner) out.push(row(v, false));
+    }
+    return out;
+  };
+
+  // Forget a parked account's saved data.
+  OH.deleteProfile = (nickname) => chrome.storage.local.remove(profileKey(nickname));
+
+  // One-time: turn an old "Restore previous hangar" snapshot (from before saved
+  // accounts existed) into a parked account, unless that account is live.
+  OH.migrateRecovery = async function migrateRecovery() {
+    const rec = await OH.getRecovery();
+    const nick = rec && rec.db.owner && rec.db.owner.nickname;
+    if (!nick) return false;
+    const live = await OH.loadDB();
+    const isLive =
+      live.owner && live.owner.nickname && live.owner.nickname.toLowerCase() === nick.toLowerCase();
+    const key = profileKey(nick);
+    const existing = (await chrome.storage.local.get(key))[key];
+    if (!isLive && !existing) await chrome.storage.local.set({ [key]: rec.db });
+    await chrome.storage.local.remove(RECOVERY_KEY);
+    return !isLive && !existing;
+  };
+
   // Log the user out of RSI by clearing every robertsspaceindustries.com cookie —
   // including the HttpOnly session cookie that document.cookie / a /logout
   // navigation can't reliably drop. Works across both RSI frontends. Requires the

@@ -2,6 +2,14 @@
 
 What's changed in each release of Open Hangar. Dates are when the version was cut.
 
+## Unreleased
+
+- **Alt accounts.** Each RSI account now keeps its own data. Sign in as a different
+  account and Open Hangar sets the current one aside and loads that account's last
+  scan (or asks you to scan). Switch back and everything returns. Developers has a
+  **Saved accounts** list with a Remove button. Clear Data now only clears the
+  account that's signed in.
+
 ## 0.2.8 — 2026-09-28
 
 - **New Home card background.** A subtle hex-grid texture of our own replaces the
