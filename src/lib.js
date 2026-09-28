@@ -1963,6 +1963,94 @@
     return { done, errors, total: todo.length };
   };
 
+  // --- openhangar.space (optional sync) -------------------------------------------
+  // Nothing leaves the browser unless the user connects AND presses Sync now.
+  // Connecting uses a device code: the site confirms it while signed in, then
+  // hands this extension a sync token (stored in `siteLink`).
+  const SITE_DEFAULT = 'https://app.openhangar.space';
+  OH.siteUrl = async function siteUrl() {
+    const { siteUrl } = await chrome.storage.local.get('siteUrl'); // dev override
+    return (siteUrl || SITE_DEFAULT).replace(/\/+$/, '');
+  };
+  // Off for everyone until app.openhangar.space launches; on only when a
+  // developer sets `siteUrl` (local testing).
+  OH.siteEnabled = async function siteEnabled() {
+    const { siteUrl } = await chrome.storage.local.get('siteUrl');
+    return Boolean(siteUrl);
+  };
+  OH.getSiteLink = async function getSiteLink() {
+    return (await chrome.storage.local.get('siteLink')).siteLink || null;
+  };
+  async function siteFetch(path, init = {}) {
+    if (!(await OH.siteEnabled())) throw new Error('Sync to openhangar.space is coming soon.');
+    const base = await OH.siteUrl();
+    return fetch(base + path, {
+      ...init,
+      credentials: 'omit',
+      headers: { 'content-type': 'application/json', ...(init.headers || {}) },
+    });
+  }
+  // → { device_code, user_code, verification_uri, expires_in, interval }
+  OH.siteLinkStart = async function siteLinkStart() {
+    const res = await siteFetch('/api/link/start', { method: 'POST', body: '{}' });
+    if (!res.ok) throw new Error(`openhangar.space responded ${res.status}`);
+    return res.json();
+  };
+  // Poll until approved (→ { name }), expired or stopped (→ null).
+  OH.siteLinkWait = async function siteLinkWait(start, shouldGo = () => true) {
+    const until = Date.now() + start.expires_in * 1000;
+    const label = `Open Hangar on ${/Firefox\//.test(globalThis.navigator?.userAgent || '') ? 'Firefox' : 'Chrome'}`;
+    while (Date.now() < until && shouldGo()) {
+      await sleep((start.interval || 3) * 1000);
+      const res = await siteFetch('/api/link/poll', {
+        method: 'POST',
+        body: JSON.stringify({ device_code: start.device_code, label }),
+      }).catch(() => null);
+      if (!res) continue;
+      const j = await res.json().catch(() => ({}));
+      if (j.status === 'approved' && j.token) {
+        const link = {
+          token: j.token,
+          name: j.name || '',
+          connectedAt: Date.now(),
+          lastSync: null,
+        };
+        await chrome.storage.local.set({ siteLink: link });
+        return link;
+      }
+      if (j.status === 'expired') return null;
+    }
+    return null;
+  };
+  // Upload the same payload as the JSON backup. → { synced_at } or throws.
+  OH.siteSync = async function siteSync() {
+    const link = await OH.getSiteLink();
+    if (!link) throw new Error('Not connected to openhangar.space.');
+    const res = await siteFetch('/api/sync', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${link.token}` },
+      body: JSON.stringify(await OH.exportDB()),
+    });
+    if (res.status === 401) {
+      await chrome.storage.local.remove('siteLink');
+      throw new Error('This extension was disconnected on the website. Connect again.');
+    }
+    if (!res.ok) throw new Error(`openhangar.space responded ${res.status}`);
+    const j = await res.json();
+    await chrome.storage.local.set({ siteLink: { ...link, lastSync: j.synced_at } });
+    return j;
+  };
+  OH.siteDisconnect = async function siteDisconnect() {
+    const link = await OH.getSiteLink();
+    if (link) {
+      await siteFetch('/api/sync', {
+        method: 'DELETE',
+        headers: { authorization: `Bearer ${link.token}` },
+      }).catch(() => null);
+    }
+    await chrome.storage.local.remove('siteLink');
+  };
+
   // --- Display currency -----------------------------------------------------------
   // RSI prices everything in USD. Users can view amounts in one of a few big
   // currencies, converted at the day's rate (before tax). Rates are the ECB's,

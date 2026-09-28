@@ -1536,6 +1536,36 @@
         font-size: 11px;
         text-align: right;
       }
+      .site-link {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 12px 0 0;
+        padding: 10px 14px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel);
+        font-size: 13px;
+      }
+      .site-link .tease strong {
+        color: var(--text);
+      }
+      .site-link:empty {
+        display: none;
+      }
+      .site-link .ok {
+        color: #3fb950;
+        font-weight: 600;
+      }
+      .site-link button {
+        padding: 4px 10px;
+        font-size: 12px;
+      }
+      .site-link code {
+        font-size: 13px;
+        letter-spacing: 2px;
+      }
       .remind-toggle {
         display: flex;
         align-items: center;
@@ -3096,6 +3126,8 @@
             </div>
           </div>
         </div>
+        <!-- openhangar.space connect/sync: always visible (even signed out of RSI). -->
+        <div class="site-link" id="site-link"></div>
         <div class="home-summary" id="home-summary"></div>
         <div class="home-changes" id="home-changes" hidden></div>
         <div class="home-split">
