@@ -3,7 +3,7 @@
 > **Submission status (2026-09-25, v0.2.7):**
 > | Store | Status | IDs / links |
 > | --- | --- | --- |
-> | Chrome Web Store | in review (publisher `dracofoundry@gmail.com`) | item `aeabioadfphghjennmdbnpelojlhndjl` |
+> | Chrome Web Store | **live** v0.2.7 (2026-09-28, publisher `dracofoundry@gmail.com`) | item `aeabioadfphghjennmdbnpelojlhndjl` · [listing](https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl) |
 > | Firefox AMO | awaiting review | `addons.mozilla.org/firefox/addon/open-hangar/` · gecko id `open-hangar@draco-foundry` |
 > | Microsoft Edge | in review (~7 business days) | CRX `fmcnemfepnifokjelgjacgdhoodaiicl` · Store ID `0RDCKFFGW5QL` |
 >
