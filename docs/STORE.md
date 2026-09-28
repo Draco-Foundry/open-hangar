@@ -4,7 +4,7 @@
 > | Store | Status | IDs / links |
 > | --- | --- | --- |
 > | Chrome Web Store | **live** v0.2.7 (2026-09-28); v0.2.8 to upload ( publisher `dracofoundry@gmail.com`) | item `aeabioadfphghjennmdbnpelojlhndjl` · [listing](https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl) |
-> | Firefox AMO | awaiting review | `addons.mozilla.org/firefox/addon/open-hangar/` · gecko id `open-hangar@draco-foundry` |
+> | Firefox AMO | **live** v0.2.7 (2026-09-28); v0.2.8 to upload | [listing](https://addons.mozilla.org/en-US/firefox/addon/open-hangar/) · gecko id `open-hangar@draco-foundry` |
 > | Microsoft Edge | in review (~7 business days) | CRX `fmcnemfepnifokjelgjacgdhoodaiicl` · Store ID `0RDCKFFGW5QL` |
 >
 > When each goes live, set that button's `data-status="live"` and `data-url` in
