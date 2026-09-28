@@ -2401,6 +2401,70 @@
       .org-owners {
         color: var(--muted);
       }
+      /* Store: CCU planner + price list */
+      .store-intro {
+        max-width: 760px;
+        font-size: 13px;
+      }
+      .ccu-form {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 12px;
+        margin: 10px 0 14px;
+      }
+      .ccu-form label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .ccu-form input,
+      #price-search {
+        width: 260px;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--panel-2);
+        color: var(--text);
+        font-size: 13px;
+      }
+      .ccu-plan {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel);
+        padding: 14px 18px;
+        margin-bottom: 12px;
+      }
+      .ccu-plan .ccu-cash {
+        font-size: 22px;
+        font-weight: 700;
+      }
+      .ccu-plan ol {
+        margin: 10px 0 0 18px;
+        padding: 0;
+        font-size: 13px;
+      }
+      .ccu-plan li {
+        margin: 4px 0;
+      }
+      .ccu-plan .apply {
+        color: #3fb950;
+      }
+      .ccu-owned {
+        margin: 6px 0 10px;
+        font-size: 13px;
+      }
+      .ccu-owned summary {
+        cursor: pointer;
+        color: var(--muted);
+      }
+      #price-table {
+        max-height: 460px;
+        overflow: auto;
+        margin-top: 10px;
+      }
       .link-btn {
         border: 0;
         padding: 0;
@@ -2554,7 +2618,7 @@
           <a href="#stats" data-view="stats">Stats</a>
           <a href="#org" data-view="org">Org Fleet</a>
           <a href="#referrals" data-view="referrals">Referrals</a>
-          <a href="#store" data-view="store">Store Data</a>
+          <a href="#store" data-view="store">Store</a>
           <a href="#developers" data-view="developers">Developers</a>
         </nav>
       </header>
@@ -2709,6 +2773,10 @@
                   same store credit. Check the ship is actually on sale before you melt anything.
                 </li>
                 <li>
+                  Planning an upgrade? The <a href="#store" data-view="store">Store</a> page's CCU
+                  planner finds the cheapest path using the CCUs you already own.
+                </li>
+                <li>
                   The <strong>Fleet</strong> tab adds up cargo, crew and roles, and
                   <strong>History</strong> charts your melt value over time.
                 </li>
@@ -2849,8 +2917,8 @@
               <p>Your recruits, prospects, rewards, and referral stats.</p>
             </a>
             <a class="home-card" href="#store" data-view="store">
-              <h3>Store Data <span class="badge-soon">Planned</span></h3>
-              <p>RSI store catalog and current prices, to value your fleet and plan CCUs.</p>
+              <h3>Store</h3>
+              <p>CCU planner, and every ship's current store price.</p>
             </a>
             <a class="home-card" href="#developers" data-view="developers">
               <h3>Developers</h3>
@@ -2975,22 +3043,43 @@
       </section>
 
       <section class="view" id="view-store">
-        <h2 class="section-title">Store Data</h2>
-        <div class="placeholder-view">
-          <h2>RSI store catalog &amp; prices <span class="badge-soon">Planned</span></h2>
-          <p class="muted">
-            This section will pull the public RSI pledge-store catalog (ships and their current
-            prices) and cache it locally, so Open Hangar can:
-          </p>
-          <ul class="muted">
-            <li>show the current store value of everything in your hangar,</li>
-            <li>and compare what you paid vs. today's price.</li>
-          </ul>
-          <p class="muted">
-            Planned source: the cached ship-matrix API, kept separate from the core scraper. Tracked
-            in <code>ROADMAP.md</code>.
-          </p>
+        <h2 class="section-title">Store</h2>
+
+        <h3 class="section-title">CCU planner</h3>
+        <p class="muted store-intro">
+          Pick the ship you have and the one you want. Open Hangar finds the cheapest way there
+          using the CCUs already in your hangar, and tells you what to buy for the gaps at standard
+          store prices.
+        </p>
+        <div class="ccu-form">
+          <label
+            >From
+            <input
+              id="ccu-from"
+              list="ship-names"
+              placeholder="e.g. Cutlass Black"
+              autocomplete="off"
+          /></label>
+          <label
+            >To <input id="ccu-to" list="ship-names" placeholder="e.g. Carrack" autocomplete="off"
+          /></label>
+          <button id="ccu-go" type="button">Plan it</button>
         </div>
+        <datalist id="ship-names"></datalist>
+        <div id="ccu-result"></div>
+        <details class="ccu-owned">
+          <summary>Your CCUs</summary>
+          <div id="ccu-owned"></div>
+        </details>
+
+        <h3 class="section-title" style="margin-top: 28px">Ship prices</h3>
+        <input id="price-search" type="search" placeholder="Search ships…" autocomplete="off" />
+        <div id="price-table"></div>
+        <p class="muted value-note">
+          Standard store prices (USD, before tax) from star-citizen.wiki. RSI sometimes sells
+          warbond or limited-time CCUs for less, and some ships can't be bought or used as a CCU
+          target at all. Check the store before you buy.
+        </p>
       </section>
 
       <!-- DEVELOPERS -->

@@ -4,6 +4,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **CCU planner.** The Store page (formerly "Store Data") works out the cheapest way
+  from the ship you have to the one you want, using the CCUs already in your hangar
+  and telling you which CCUs to buy for the gaps, at standard store prices. It also
+  lists every ship's store price, role, size and status, with search.
 - **Org Fleet.** A new page that combines your org members' ship lists into one
   fleet: every ship, who owns it, LTI count, store value, cargo, crew, and a role and
   size breakdown, with CSV export. Members share their **Export HTF** file (ships
