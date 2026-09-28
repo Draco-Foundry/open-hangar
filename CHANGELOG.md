@@ -4,6 +4,12 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **What's in a buy-back.** Click a buy-back's name (Market) or card to see what's
+  in it, read from its RSI page: every ship in a pack, the insurance, what else it
+  includes, and the real buy-back price. **Load details** does the same for every
+  buy-back you're looking at, one page at a time, so the Insurance and Price columns
+  fill in (prices marked ~ are estimates until then). Each page is read once and
+  kept.
 - **Buy-backs, one row each.** The Buy-Backs Market no longer merges same-named
   buy-backs: each is its own pledge with its own insurance and extras, and each
   **Reclaim** opens that exact one (CCUs open their single buy-back entry, where
