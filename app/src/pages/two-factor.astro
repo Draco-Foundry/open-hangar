@@ -6,8 +6,8 @@ const raw = Astro.url.searchParams.get('next') || '/hangar';
 const next = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/hangar';
 ---
 
-<Base title="Two-factor check">
-  <h1>Enter your code</h1>
+<Base title="Two-Factor Check">
+  <h1>Enter Your Code</h1>
   <p class="muted">Open your authenticator app and type the 6-digit code for Open Hangar.</p>
   <div class="card" style="max-width:420px">
     <form class="form" id="f" data-next={next}>
