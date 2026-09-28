@@ -1276,6 +1276,23 @@ function setMarketPrice(key, value) {
   saveMarket();
 }
 
+// "$1,250" / "310.5" → 1250 / 310.5, or null.
+function priceNumber(v) {
+  if (v == null || v === '') return null;
+  const n = Number(String(v).replace(/[$,\s]/g, ''));
+  return Number.isFinite(n) ? n : null;
+}
+// My price as a % of melt value, rounded (e.g. 55), or ''.
+function pctOfMelt(price, melt) {
+  const n = priceNumber(price);
+  return n != null && melt > 0 ? String(Math.round((n / melt) * 1000) / 10) : '';
+}
+// Price at pct% of melt, to the cent without trailing zeros (170.5, 171).
+function priceAtPct(pct, melt) {
+  const n = priceNumber(pct);
+  return n != null && melt > 0 ? String(Math.round(melt * n) / 100) : '';
+}
+
 // Insurance term (LTI / 3M / 120M / …). Not parsed from RSI yet — the parser
 // reads an "Insurance" tile but not its term (see ROADMAP). Render whatever a
 // future parser sets on p.insurance; until then show an em-dash placeholder so
@@ -1337,15 +1354,15 @@ function marketRowHtml(g) {
   const price = saved && saved.price != null ? OH.escapeHtml(String(saved.price)) : '';
   const gift = giftableLabel(g);
   const picked = g.ids.every((id) => state.selected.has(id));
-  const pick = state.selecting
-    ? `<td class="mk-sel"><input type="checkbox" class="mk-pick" ${picked ? 'checked' : ''} aria-label="Select"></td>`
-    : '';
-  return `<tr class="mk-row" data-key="${key}">
-    ${pick}<td class="mk-name">${OH.escapeHtml(plainName(p))}</td>
+  const pct = OH.escapeHtml(pctOfMelt(saved && saved.price, p.value));
+  return `<tr class="mk-row${picked ? ' picked' : ''}" data-key="${key}" data-melt="${Number.isFinite(p.value) ? p.value : ''}">
+    <td class="mk-sel"><input type="checkbox" class="mk-pick" ${picked ? 'checked' : ''} aria-label="Pick for export"></td>
+    <td class="mk-name">${OH.escapeHtml(plainName(p))}</td>
     <td class="mk-ins">${OH.escapeHtml(marketInsurance(p))}</td>
     <td class="mk-gift gift-${g.giftable === 0 ? 'no' : 'yes'}">${gift}</td>
     <td class="mk-melt">${OH.escapeHtml(melt)}</td>
-    <td class="mk-mine"><input class="mk-price" type="text" inputmode="decimal" value="${price}" placeholder="—" aria-label="My price"></td>
+    <td class="mk-pct"><input class="mk-pct-in" type="text" inputmode="decimal" value="${pct}" placeholder="%" aria-label="Percent of melt"></td>
+    <td class="mk-mine"><input class="mk-price" type="text" inputmode="decimal" value="${price}" placeholder="$" aria-label="My price"></td>
     <td class="mk-stock">${g.stock}</td>
   </tr>`;
 }
@@ -1355,8 +1372,10 @@ function marketTableHtml(section, groups) {
     <h3 class="market-title">${OH.escapeHtml(section.label)}<span class="market-n">${groups.length}</span></h3>
     <table class="market-table">
       <thead><tr>
-        ${state.selecting ? '<th class="mk-sel"></th>' : ''}<th>Items Name</th><th>Insurance</th><th>Giftable</th><th>Melt Price</th>
-        <th>My Price</th><th>Stock</th>
+        <th class="mk-sel"><input type="checkbox" class="mk-pick-all" aria-label="Pick all in ${OH.escapeHtml(section.label)}" ${
+          groups.every((g) => g.ids.every((id) => state.selected.has(id))) ? 'checked' : ''
+        }></th><th>Items Name</th><th>Insurance</th><th>Giftable</th><th>Melt Price</th>
+        <th title="Your price as a percent of melt value">% of Melt</th><th>My Price</th><th>Stock</th>
       </tr></thead>
       <tbody>${groups.map(marketRowHtml).join('')}</tbody>
     </table>
@@ -1413,13 +1432,17 @@ function computeMarketSections(shown) {
   }));
 }
 
+// " · exports use your 3 picked" (or nothing), kept live as boxes are ticked.
+function marketSelText() {
+  const n = state.selected.size;
+  return n
+    ? ` · exports use your ${n} picked (tick boxes to change)`
+    : ' · tick rows to export just those';
+}
+
 function marketToolbarHtml(shown) {
   return `<div class="market-toolbar">
-    <div class="result-count">Showing ${shown.length} of ${state.items.length} · Melt ${money(OH.totalValue(shown))}${
-      state.selected.size
-        ? ` · <strong>exports use your ${state.selected.size} selected</strong>`
-        : ''
-    }</div>
+    <div class="result-count">Showing ${shown.length} of ${state.items.length} · Melt ${money(OH.totalValue(shown))}<span class="mk-selcount">${marketSelText()}</span></div>
     <div class="market-actions">
       <label class="mk-toggle"><input type="checkbox" class="mk-giftable-only" ${
         state.marketGiftableOnly ? 'checked' : ''
@@ -1478,7 +1501,9 @@ function csvCell(v) {
 }
 
 function marketCsv(sections) {
-  const lines = [['Category', 'Item', 'Insurance', 'Giftable', 'Melt Price', 'My Price', 'Stock']];
+  const lines = [
+    ['Category', 'Item', 'Insurance', 'Giftable', 'Melt Price', '% of Melt', 'My Price', 'Stock'],
+  ];
   for (const { section, groups } of sections) {
     for (const g of groups) {
       const saved = state.market[g.key];
@@ -1488,6 +1513,7 @@ function marketCsv(sections) {
         marketInsurance(g.rep),
         giftableLabel(g),
         meltLabel(g.rep),
+        pctOfMelt(saved && saved.price, g.rep.value),
         saved && saved.price != null ? saved.price : '',
         g.stock,
       ]);
@@ -1703,7 +1729,12 @@ function selectedItems() {
 }
 function updateSelectBar() {
   if (!selectBar) return;
-  selectBar.hidden = !state.selecting;
+  const inMarket = currentView() === 'inventory' && state.layout === 'market';
+  selectBar.hidden = !(state.selecting || (inMarket && state.selected.size));
+  const done = selectBar.querySelector('[data-sb="done"]');
+  if (done) done.hidden = !state.selecting; // Market has no mode to leave
+  const live = resultsEl.querySelector('.mk-selcount');
+  if (live) live.textContent = marketSelText();
   if (selectToggle) {
     selectToggle.setAttribute('aria-pressed', String(state.selecting));
     selectToggle.textContent = state.selecting ? 'Done selecting' : 'Select';
@@ -3369,12 +3400,25 @@ resultsEl.addEventListener('error', onThumbError, true);
 // Market sale-sheet: persist My Price as it's typed. We update state + storage
 // WITHOUT re-rendering so the field keeps focus; the price is keyed by item
 // (data-key) so it sticks to that item across re-scans.
+// My Price and % of Melt are two views of one number: typing either fills in
+// the other (price is what's stored).
 resultsEl.addEventListener('input', (e) => {
   const el = e.target;
-  if (!el.classList || !el.classList.contains('mk-price')) return;
+  if (!el.classList) return;
+  const isPrice = el.classList.contains('mk-price');
+  const isPct = el.classList.contains('mk-pct-in');
+  if (!isPrice && !isPct) return;
   const row = el.closest('.mk-row');
   if (!row) return;
-  setMarketPrice(row.dataset.key, el.value.trim());
+  const melt = Number(row.dataset.melt);
+  if (isPrice) {
+    setMarketPrice(row.dataset.key, el.value.trim());
+    row.querySelector('.mk-pct-in').value = pctOfMelt(el.value.trim(), melt);
+  } else {
+    const price = priceAtPct(el.value.trim(), melt);
+    setMarketPrice(row.dataset.key, price);
+    row.querySelector('.mk-price').value = price;
+  }
 });
 
 // Market toolbar: "Giftable only" filter re-renders; CSV / image export the view.
@@ -3619,14 +3663,24 @@ resultsEl.addEventListener('click', (e) => {
   if (p) openItemModal(p);
 });
 resultsEl.addEventListener('change', (e) => {
-  const box = e.target.closest('.mk-pick');
+  const box = e.target.closest('.mk-pick, .mk-pick-all');
   if (!box) return;
-  const key = box.closest('.mk-row')?.dataset.key;
-  const g = computeMarketSections(marketShown())
-    .flatMap((x) => x.groups)
-    .find((x) => x.key === key);
-  if (!g) return;
-  for (const id of g.ids) box.checked ? state.selected.add(id) : state.selected.delete(id);
+  const groups = computeMarketSections(marketShown()).flatMap((x) => x.groups);
+  const byKey = new Map(groups.map((g) => [g.key, g]));
+  const rows = box.classList.contains('mk-pick-all')
+    ? [...box.closest('table').querySelectorAll('tbody .mk-row')]
+    : [box.closest('.mk-row')];
+  for (const row of rows) {
+    const g = byKey.get(row.dataset.key);
+    if (!g) continue;
+    for (const id of g.ids) box.checked ? state.selected.add(id) : state.selected.delete(id);
+    row.classList.toggle('picked', box.checked);
+    const cb = row.querySelector('.mk-pick');
+    if (cb) cb.checked = box.checked;
+  }
+  const table = box.closest('table');
+  const all = table && table.querySelector('.mk-pick-all');
+  if (all) all.checked = [...table.querySelectorAll('tbody .mk-pick')].every((c) => c.checked);
   updateSelectBar();
 });
 if (buybacksBodyEl) {

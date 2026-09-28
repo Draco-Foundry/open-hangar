@@ -111,6 +111,33 @@ try {
   await checkListAlignment('Inventory', '#results');
   await page.click('#layout [data-layout="market"]');
   (await page.$('.market-table')) ? ok('Market view renders') : fail('Market view empty');
+  // Tick a row without Select mode; % and price stay linked.
+  await page.click('.market-table .mk-pick');
+  const mk = await page.evaluate(() => {
+    const row = document.querySelector('.market-table .mk-row');
+    const pct = row.querySelector('.mk-pct-in');
+    pct.value = '50';
+    pct.dispatchEvent(new Event('input', { bubbles: true }));
+    return {
+      count: document.querySelector('.mk-selcount').textContent,
+      bar: !document.querySelector('#select-bar').hidden,
+      price: Number(row.querySelector('.mk-price').value),
+      melt: Number(row.dataset.melt),
+    };
+  });
+  /1 picked/.test(mk.count) && mk.bar
+    ? ok('market rows tick without Select mode')
+    : fail(`market tick: ${JSON.stringify(mk)}`);
+  Math.abs(mk.price - mk.melt / 2) < 0.01
+    ? ok(`50% of melt → $${mk.price}`)
+    : fail(`% of melt: ${JSON.stringify(mk)}`);
+  await page.evaluate(() => {
+    const row = document.querySelector('.market-table .mk-row');
+    const price = row.querySelector('.mk-price');
+    price.value = '';
+    price.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.click('.market-table .mk-pick');
   await page.click('#layout [data-layout="gallery"]');
   await page.click('#select-toggle');
   const [c1, c2] = await page.$$('#results .card');
