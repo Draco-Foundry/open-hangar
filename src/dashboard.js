@@ -269,6 +269,7 @@ const state = {
   selected: new Set(), // picked pledge ids (strings)
   imagePrice: 'melt', // fleet image price column: melt | mine | store | none
   statsTab: 'overview', // Stats tab: overview | value | fleet | history
+  lastBackupAt: null, // when the user last downloaded a JSON backup (ms)
   query: '',
   sort: 'default',
   layout: 'gallery', // gallery | compact | list | market
@@ -1990,7 +1991,7 @@ function historySectionHtml() {
     `<h3 class="section-title" id="history">Melt value over time</h3>` +
     historySvg(hist) +
     `<div class="hist-list">${steps.join('')}</div>` +
-    `<p class="muted value-note">A snapshot is kept each time a full scan finds changes (last ${hist.length}). Stored only in this browser.</p>`
+    `<p class="muted value-note">A snapshot is kept each time a full scan finds changes — ${hist.length} so far, up to the last 100.</p>`
   );
 }
 
@@ -2054,8 +2055,9 @@ function renderStats() {
       fleetSectionHtml() ||
       `<p class="muted">${pricesLoading ? 'Loading ship data…' : 'Ship data unavailable (offline?).'}</p>`,
     history: () =>
-      historySectionHtml() ||
-      '<p class="muted">History starts with your next scan — each scan that finds changes is kept here.</p>',
+      (historySectionHtml() ||
+        '<p class="muted">History starts with your next scan — each scan that finds changes is kept here.</p>') +
+      backupRowHtml(),
   };
   const tab = tabs[state.statsTab] ? state.statsTab : 'overview';
   body.innerHTML =
@@ -2065,6 +2067,22 @@ function renderStats() {
           key === tab ? 'active' : ''
         }">${label}</button>`,
     ).join('')}</div>` + tabs[tab]();
+}
+
+// History lives only in this browser, so the History tab offers a backup file
+// (scans + history) and says how old the last one is.
+function backupRowHtml() {
+  const t = state.lastBackupAt;
+  const days = t ? Math.floor((Date.now() - t) / 86400000) : null;
+  const when = !t
+    ? '<span class="stale">never backed up</span>'
+    : days > 60
+      ? `<span class="stale">last backup ${fmtDay(t)}</span>`
+      : `last backup ${fmtDay(t)}`;
+  return `<div class="backup-row">
+    <button class="mk-btn" type="button" data-backup>Download backup</button>
+    <span class="muted">${when} · Your scans and this history live only in this browser — uninstalling the extension or moving to another browser loses them. Keep the file somewhere safe (a Drive or OneDrive folder works) and restore it with Developers → Import JSON.</span>
+  </div>`;
 }
 
 // Stats is split into tabs; the choice is remembered like the Inventory layout.
@@ -3424,23 +3442,34 @@ const sourceItemCount = (sources) =>
     0,
   );
 
+// Download the whole DB (scans + history) as a JSON backup and remember when,
+// so the History tab can nudge people whose last backup is old or missing.
+async function downloadBackup() {
+  const data = await OH.exportDB();
+  const who = data.account?.handle ? `-${data.account.handle}` : '';
+  const date = new Date().toISOString().slice(0, 10);
+  downloadBlob(
+    new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }),
+    `open-hangar${who}-${date}.json`,
+  );
+  state.lastBackupAt = Date.now();
+  chrome.storage.local.set({ lastBackupAt: state.lastBackupAt });
+  return data;
+}
+
 if (exportBtn) {
   exportBtn.addEventListener('click', async () => {
-    const data = await OH.exportDB();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const who = data.account?.handle ? `-${data.account.handle}` : '';
-    const date = new Date().toISOString().slice(0, 10);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `open-hangar${who}-${date}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    setDataMsg(`Exported ${sourceItemCount(data.sources)} item(s).`);
+    const data = await downloadBackup();
+    setDataMsg(
+      `Exported ${sourceItemCount(data.sources)} item(s) and ${data.history.length} history snapshot(s).`,
+    );
   });
 }
+document.addEventListener('click', async (e) => {
+  if (!e.target.closest('[data-backup]')) return;
+  await downloadBackup();
+  if (currentView() === 'stats') renderStats();
+});
 
 // Hangar Transfer Format: ships only, one entry per ship — the file FleetYards
 // (Hangar → Import) and other community tools read.
@@ -3473,7 +3502,9 @@ if (importBtn && importFile) {
     if (!file) return;
     if (
       (state.items.length || state.scannedAt) &&
-      !confirm('Importing replaces your current data. Continue?')
+      !confirm(
+        'Importing replaces your current data. Your scan history is kept and merged with the file’s. Continue?',
+      )
     )
       return;
     let obj;
@@ -3561,14 +3592,17 @@ document.addEventListener('visibilitychange', async () => {
 // --- Init -----------------------------------------------------------------
 
 (async () => {
-  const { uiLayout, bbLayout, marketAnnotations, uiStatsTab } = await chrome.storage.local.get([
-    'uiStatsTab',
-    'uiLayout',
-    'bbLayout',
-    'marketAnnotations',
-  ]);
+  const { uiLayout, bbLayout, marketAnnotations, uiStatsTab, lastBackupAt } =
+    await chrome.storage.local.get([
+      'lastBackupAt',
+      'uiStatsTab',
+      'uiLayout',
+      'bbLayout',
+      'marketAnnotations',
+    ]);
   if (LAYOUTS.includes(uiLayout)) state.layout = uiLayout;
   if (STATS_TABS.some(([k]) => k === uiStatsTab)) state.statsTab = uiStatsTab;
+  if (Number.isFinite(lastBackupAt)) state.lastBackupAt = lastBackupAt;
   if (LAYOUTS.includes(bbLayout)) state.bbLayout = bbLayout;
   if (marketAnnotations && typeof marketAnnotations === 'object') state.market = marketAnnotations;
 

@@ -125,7 +125,8 @@ ordered _who → what they own_ so it drops straight into a backend table:
     capturedAt },
   sources: { hangar: {…}, buybacks: {…},
     referral: { items: { current, legacy, prospects,
-                         recruitsList, prospectsList } } } }  // referral code/url never exported
+                         recruitsList, prospectsList } } },  // referral code/url never exported
+  history: [ { at, items: [[id, name, value]] } ] }        // scan snapshots; merged on import
 ```
 
 ## How it works

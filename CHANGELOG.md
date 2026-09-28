@@ -4,6 +4,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased — next: 0.2.8
 
+- **Back up your history.** The JSON export (Developers → Export JSON, or the new
+  **Download backup** button on Stats → History) now includes your scan history,
+  and importing a backup **merges** history instead of wiping it. History keeps the
+  last **100** changes (was 30). The History tab shows when you last backed up.
 - Fixed: in Buy-Backs' List view, rows without an items line were shifted a column,
   stretching the kind badge across the row and squashing the date.
 - **Stats is split into tabs** — Overview, Value, Fleet and History — and remembers
