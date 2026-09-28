@@ -266,6 +266,7 @@ const state = {
   shown: new Set(), // inventory kind filter
   traits: new Map(), // inventory trait filter (AND): key → 'yes' | 'no' (exclude)
   priceOf: null, // ship name → { msrp } resolver (OH.getShipIndex), once loaded
+  catalog: null, // slim wiki ship list for the Store page (OH.getShipCatalog)
   shipOf: null, // ship name → wiki catalog entry (role, size, cargo…), once loaded
   history: [], // hangar scan snapshots (OH.getHistory), oldest first
   selecting: false, // Inventory "Select" mode (pick items for a fleet image)
@@ -435,9 +436,10 @@ let valueCache = { items: null, priceOf: null, value: null };
 function ensurePrices() {
   if (state.priceOf || pricesLoading || !state.items.length) return;
   pricesLoading = OH.getShipIndex()
-    .then(({ priceOf, shipOf }) => {
+    .then(async ({ priceOf, shipOf }) => {
       state.priceOf = priceOf;
       state.shipOf = shipOf;
+      state.catalog = await OH.getShipCatalog();
       pricesLoading = null;
       route();
     })
@@ -528,6 +530,7 @@ function route() {
   else if (v === 'buybacks') renderBuybacks();
   else if (v === 'developers') renderProfiles();
   else if (v === 'org') renderOrg();
+  else if (v === 'store') renderStore();
   // 'store' is static markup; About now lives on Home.
   updateSignedOutBanner(); // re-apply the cached signed-out banner state on this view
 }
@@ -1953,6 +1956,111 @@ if (selectBar) {
     state.imagePrice = e.target.value;
   });
 }
+
+// --- Store: CCU planner + price list ----------------------------------------
+// The planner (OH.planCCU) uses standard store prices and the CCUs in your
+// hangar. Ship names come from the wiki list (state.catalog).
+function ownedCCUs() {
+  if (!state.priceOf) return [];
+  const v = hangarValue();
+  return state.items
+    .filter((p) => p.isCCU && p.ccu)
+    .map((p) => {
+      const si = v && v.pledges[p.id];
+      return {
+        from: OH.htfShipName(p.ccu.from) || p.ccu.from,
+        to: OH.htfShipName(p.ccu.to) || p.ccu.to,
+        fromMsrp: si && si.from,
+        toMsrp: si && si.to,
+        paid: p.value,
+      };
+    })
+    .filter((c) => c.fromMsrp && c.toMsrp);
+}
+
+function priceRowsHtml(q) {
+  const needle = q.trim().toLowerCase();
+  const rows = (state.catalog || [])
+    .filter((v) => v.msrp && (!needle || v.lname.includes(needle)))
+    .sort((a, b) => (a.name || a.lname).localeCompare(b.name || b.lname));
+  if (!rows.length) return '<p class="muted">No ships match.</p>';
+  const status = (s) => (s === 'flight-ready' ? 'Flight ready' : s ? 'In concept' : '');
+  return `<table class="org-table"><thead><tr><th>Ship</th><th class="num">Store price</th><th>Role</th><th>Size</th><th>Status</th></tr></thead><tbody>${rows
+    .map(
+      (v) =>
+        `<tr><td>${OH.escapeHtml(v.name || v.lname)}</td><td class="num">${dollars(v.msrp)}</td><td>${OH.escapeHtml(
+          v.role || '',
+        )}</td><td>${OH.escapeHtml(v.size || '')}</td><td class="org-owners">${status(v.status)}</td></tr>`,
+    )
+    .join('')}</tbody></table>`;
+}
+
+function renderStore() {
+  ensurePrices();
+  if (!state.catalog) {
+    setHTML($('#price-table'), '<p class="muted">Loading ship prices…</p>');
+    return;
+  }
+  const names = state.catalog.filter((v) => v.msrp).map((v) => v.name || v.lname);
+  setHTML($('#ship-names'), names.map((n) => `<option value="${OH.escapeHtml(n)}">`).join(''));
+  setHTML($('#price-table'), priceRowsHtml($('#price-search').value));
+  const owned = ownedCCUs();
+  setHTML(
+    $('#ccu-owned'),
+    owned.length
+      ? `<ul>${owned
+          .map(
+            (c) =>
+              `<li>${OH.escapeHtml(c.from)} → ${OH.escapeHtml(c.to)}: worth ${dollars(
+                c.toMsrp - c.fromMsrp,
+              )}${Number.isFinite(c.paid) ? ` (you paid ${money(c.paid)})` : ''}</li>`,
+          )
+          .join('')}</ul>`
+      : '<p class="muted">No CCUs with known prices in your hangar yet.</p>',
+  );
+}
+
+function planCCUFromForm() {
+  const out = $('#ccu-result');
+  if (!state.priceOf) return setHTML(out, '<p class="muted">Ship prices are still loading…</p>');
+  const pick = (id) => {
+    const text = $(id).value.trim();
+    const hit = text && state.priceOf(text);
+    const entry = hit && state.catalog && state.catalog.find((v) => v.lname === hit.name);
+    return hit ? { name: (entry && entry.name) || text, msrp: hit.msrp } : null;
+  };
+  const from = pick('#ccu-from');
+  const to = pick('#ccu-to');
+  if (!from || !to) {
+    return setHTML(
+      out,
+      '<p class="muted">Pick both ships from the list (they need a store price).</p>',
+    );
+  }
+  const plan = OH.planCCU(from, to, ownedCCUs());
+  if (plan.error) return setHTML(out, `<p class="muted">${OH.escapeHtml(plan.error)}</p>`);
+  const steps = plan.steps
+    .map((st) =>
+      st.type === 'buy'
+        ? `<li>Buy a CCU: ${OH.escapeHtml(st.from)} → ${OH.escapeHtml(st.to)} (${dollars(st.cost)})</li>`
+        : `<li class="apply">Apply your ${OH.escapeHtml(st.from)} → ${OH.escapeHtml(st.to)} CCU</li>`,
+    )
+    .join('');
+  const cover = plan.covered
+    ? `Your CCUs cover ${dollars(plan.covered)} of the ${dollars(plan.gap)} gap.`
+    : 'None of your CCUs fit this path, so it’s one straight upgrade.';
+  setHTML(
+    out,
+    `<div class="ccu-plan"><div class="ccu-cash">About ${dollars(plan.cash)} to go</div><div class="muted">${cover}</div><ol>${steps}</ol></div>`,
+  );
+}
+$('#ccu-go')?.addEventListener('click', planCCUFromForm);
+['#ccu-from', '#ccu-to'].forEach((id) =>
+  $(id)?.addEventListener('keydown', (e) => e.key === 'Enter' && planCCUFromForm()),
+);
+$('#price-search')?.addEventListener('input', (e) =>
+  setHTML($('#price-table'), priceRowsHtml(e.target.value)),
+);
 
 // --- Org fleet ------------------------------------------------------------
 // Members' ship lists (from HTF exports or backups) combined into one fleet.

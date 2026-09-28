@@ -66,8 +66,9 @@ what's collected:
    - ~~**Hangar value**~~ — ✅ done. `OH.getPriceIndex()` prices ships from the
      cached star-citizen.wiki vehicle list (`msrp`; the RSI ship-matrix has no
      prices), `OH.hangarValue()` totals them; surfaced in Stats, the item modal,
-     Home, a Store-price sort and the "Below store price" filter. Still to do
-     here: the Store Data view itself (current warbonds, CCU chains).
+     Home, a Store-price sort and the "Below store price" filter.
+   - ~~**CCU planner + price list**~~ — ✅ done (Store page, `OH.planCCU`). Still to
+     do: live warbond / limited-time CCU offers from RSI's store.
    - **Item-type enrichment:** classify add-ons precisely (paint vs decoration vs
      armor vs gear, etc.) by matching item names against star-citizen.wiki /
      starcitizen.tools, cached locally. Today's classifier can't tell a reward
