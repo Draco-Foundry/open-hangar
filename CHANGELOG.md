@@ -4,6 +4,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **View on RSI.** Market rows and the item details window link straight to that
+  pledge in your RSI hangar (handy for a screenshot of its details). It uses the
+  pledge's position from your last scan, so rescan after buying or melting.
 - **Buy-back tokens and prices.** Your buy-back token count (read from RSI's
   buy-back page when you scan) shows on Home and at the top of Buy-Backs, with the
   date of the next quarterly token. Buy-backs now show each ship's store price

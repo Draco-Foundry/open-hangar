@@ -1369,6 +1369,7 @@ function marketRowHtml(g) {
     <td class="mk-pct"><input class="mk-pct-in" type="text" inputmode="decimal" value="${pct}" placeholder="%" aria-label="Percent of melt"></td>
     <td class="mk-mine"><input class="mk-price" type="text" inputmode="decimal" value="${price}" placeholder="$" aria-label="My price"></td>
     <td class="mk-stock">${g.stock}</td>
+    <td class="mk-view">${viewOnRsiLink(p)}</td>
   </tr>`;
 }
 
@@ -1380,7 +1381,7 @@ function marketTableHtml(section, groups) {
         <th class="mk-sel"><input type="checkbox" class="mk-pick-all" aria-label="Pick all in ${OH.escapeHtml(section.label)}" ${
           groups.every((g) => g.ids.every((id) => state.selected.has(id))) ? 'checked' : ''
         }></th><th>Items Name</th><th>Insurance</th><th>Giftable</th><th>Melt Price</th>
-        <th title="Your price as a percent of melt value">% of Melt</th><th>My Price</th><th>Stock</th>
+        <th title="Your price as a percent of melt value">% of Melt</th><th>My Price</th><th>Stock</th><th title="Open the pledge in your RSI hangar, e.g. to screenshot its details">RSI</th>
       </tr></thead>
       <tbody>${groups.map(marketRowHtml).join('')}</tbody>
     </table>
@@ -3658,6 +3659,26 @@ function storeRow(p, row) {
   return row('Store price', v + parts) + melt;
 }
 
+// RSI has no per-pledge address, but its hangar takes a page size, so page N
+// at one pledge per page is the Nth pledge, in the order we scanned (newest
+// first). Right until the hangar changes; a rescan fixes the positions.
+let hangarPos = null;
+function hangarUrl(p) {
+  if (!hangarPos || hangarPos.items !== state.items) {
+    hangarPos = { items: state.items, at: new Map(state.items.map((x, i) => [String(x.id), i])) };
+  }
+  const i = hangarPos.at.get(String(p.id));
+  return i == null
+    ? null
+    : `https://robertsspaceindustries.com/account/pledges?page=${i + 1}&pagesize=1`;
+}
+function viewOnRsiLink(p, label = 'View ↗') {
+  const url = hangarUrl(p);
+  return url
+    ? `<a class="bb-reclaim" href="${OH.escapeHtml(url)}" target="_blank" rel="noopener" title="Open this pledge in your RSI hangar (position as of your last scan)">${label}</a>`
+    : '';
+}
+
 function openItemModal(p) {
   hidePreview();
   const real = realImage(p.image);
@@ -3690,6 +3711,7 @@ function openItemModal(p) {
       ${storeRow(p, row)}
       ${p.currency ? row('Currency', OH.escapeHtml(p.currency)) : ''}
       ${p.isCCU && p.ccu ? row('Upgrade', OH.escapeHtml(`${p.ccu.from} → ${p.ccu.to}`)) : ''}
+      ${hangarUrl(p) ? row('On RSI', viewOnRsiLink(p, 'Open in your hangar ↗')) : ''}
       ${row('Scanned', OH.escapeHtml(fmtScan()))}
       <h4 class="modal-h">Contents (${contents.length})</h4>
       ${contentsHtml}
