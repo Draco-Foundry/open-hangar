@@ -4,6 +4,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Fixed: some ships (e.g. Vanduul Blade, P-52 Merlin, Nox, Mustang Omega AMD Edition)
+  showed a blank card when RSI's image link was broken; they now fall back to the
+  ship's art from RSI's ship list. Missing-image lookups retry after a day.
 - **Market images are tables.** In Market view, Copy image and Save PNG make a picture of
   your picked rows as the table (grouped by section, with store price and your title),
   easy to read down; the card picture is still there in the other layouts.

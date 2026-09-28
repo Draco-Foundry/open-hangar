@@ -1221,7 +1221,9 @@ function valTitle(p) {
 function cardHtml(p) {
   const contents = extraContents(p);
   const img = realImage(p.image);
-  const resolve = img ? '' : resolveImageName(p); // ship name to fetch art for
+  // Ship name for art lookup: used when RSI gives no image, and as a fallback if
+  // RSI's image link turns out to be broken (see onThumbError).
+  const resolve = resolveImageName(p);
   const thumb = img
     ? `<img class="thumb" loading="lazy" data-kind="${OH.escapeHtml(p.kind)}" src="${OH.escapeHtml(img)}" alt="">`
     : `<div class="thumb placeholder">${OH.escapeHtml(p.kind)}</div>`;
@@ -3606,7 +3608,7 @@ function buybackUrl(b) {
 function buybackCardHtml(b) {
   const img = realImage(b.image);
   // A CCU resolves art from its target ship; a plain buy-back from its own name.
-  const resolve = img ? '' : b.ccu && b.ccu.to ? b.ccu.to : b.name;
+  const resolve = b.ccu && b.ccu.to ? b.ccu.to : b.name; // also the broken-image fallback
   const thumb = img
     ? `<img class="thumb" loading="lazy" src="${OH.escapeHtml(img)}" alt="">`
     : `<div class="thumb placeholder">Buy-Back</div>`;
@@ -4010,13 +4012,33 @@ layoutEl.addEventListener('click', (e) => {
 });
 
 // Broken thumbnails → placeholder (error events don't bubble; capture phase).
+// A thumbnail failed to load (RSI sometimes serves broken image links): show
+// the placeholder, then try the ship-art lookup once by the card's ship name.
 function onThumbError(e) {
   const img = e.target;
   if (img.tagName !== 'IMG' || !img.classList.contains('thumb')) return;
+  const card = img.closest('.card');
   const ph = document.createElement('div');
   ph.className = 'thumb placeholder';
   ph.textContent = img.dataset.kind || '';
   img.replaceWith(ph);
+  if (!card || !card.dataset.resolve || card.dataset.fallback) return;
+  card.dataset.fallback = '1'; // one retry only, never a loop
+  OH.getShipImage(card.dataset.resolve).then((url) => {
+    if (!url || !ph.isConnected) return;
+    const fresh = document.createElement('img');
+    fresh.className = 'thumb';
+    fresh.loading = 'lazy';
+    fresh.alt = '';
+    fresh.src = url;
+    ph.replaceWith(fresh);
+    card.dataset.image = url;
+    const id = card.dataset.id;
+    const item =
+      state.items.find((x) => String(x.id) === id) ||
+      state.buybacks.find((x) => String(x.id) === id);
+    if (item) item.image = url; // hover preview + details use it too
+  });
 }
 resultsEl.addEventListener('error', onThumbError, true);
 
