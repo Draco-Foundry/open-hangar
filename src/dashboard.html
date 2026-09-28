@@ -2310,6 +2310,25 @@
       #data-msg.error {
         color: #f85149;
       }
+      .profiles {
+        margin: 8px 0 18px;
+      }
+      .profile-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        margin-bottom: 6px;
+        font-size: 13px;
+      }
+      .profile-name {
+        font-weight: 600;
+      }
+      .profile-row > :last-child {
+        margin-left: auto;
+      }
       .link-btn {
         border: 0;
         padding: 0;
@@ -2636,6 +2655,10 @@
               <ul>
                 <li>Your data stays put when Open Hangar updates.</li>
                 <li>
+                  Got alts? Each RSI account keeps its own data. Sign in as the other account and
+                  Open Hangar switches over; switch back and your first account's data returns.
+                </li>
+                <li>
                   Uninstalling, or moving to another browser or computer, starts you from empty. So
                   first go to <a href="#stats" data-view="stats">Stats</a> →
                   <strong>History</strong> → <strong>Download backup</strong>.
@@ -2961,6 +2984,13 @@
             <input id="import-file" type="file" accept="application/json,.json" hidden />
           </div>
           <div id="data-msg" class="muted"></div>
+
+          <h3>Saved accounts</h3>
+          <p>
+            Each RSI account you scan keeps its own data here. Sign in as another account and Open
+            Hangar sets the current one aside and loads that account's last scan instead.
+          </p>
+          <div id="profiles" class="profiles"></div>
 
           <h3>Error report</h3>
           <p>
