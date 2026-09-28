@@ -198,14 +198,14 @@ try {
   await page.click('#buybacks-body .bb-open');
   await page
     .waitForFunction(
-      () => /Also contains/.test(document.querySelector('#modal-body').textContent),
+      () => /Also Contains/.test(document.querySelector('#modal-body').textContent),
       {
         timeout: 8000,
       },
     )
     .catch(() => {});
   const bbModal = await page.$eval('#modal-body', (e) => e.textContent);
-  /Also contains/.test(bbModal) && /Lifetime Insurance/.test(bbModal) && /LTI/.test(bbModal)
+  /Also Contains/.test(bbModal) && /Lifetime Insurance/.test(bbModal) && /LTI/.test(bbModal)
     ? ok('buy-back details: ships, insurance, also contains')
     : fail(`buy-back details: "${bbModal.slice(0, 160)}"`);
   await page.keyboard.press('Escape');
