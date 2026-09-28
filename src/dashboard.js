@@ -368,6 +368,32 @@ function plainName(p) {
   return p.isCCU && p.ccu ? `${p.ccu.from} → ${p.ccu.to}` : p.name || '—';
 }
 
+// Cards drop RSI's store-category prefix ("Standalone Ships - ", "Paints - ",
+// "Gear - "…) — the kind badge already says it. The full name stays in the
+// tooltip, the details popup, search and exports.
+const CATEGORY_PREFIX_RE =
+  /^(standalone ships?|paints?|gear|add-ons?|subscribers store|upgrades?)\s*[-–]\s*/i;
+function cardName(p) {
+  return plainName(p).replace(CATEGORY_PREFIX_RE, '');
+}
+// A pledge's items minus the ones its name already spells out ("ROC - Black
+// Cherry Paint" inside "Paints - ROC - Black Cherry Paint"), so the card's
+// items line only adds information.
+const squashText = (t) =>
+  String(t || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+function extraContents(p) {
+  const name = squashText(p.name);
+  return (p.contents || [])
+    .map((c) => c.label || c.kind)
+    .filter((l) => {
+      const q = squashText(l);
+      return q && !name.includes(q);
+    });
+}
+
 // --- Routing --------------------------------------------------------------
 
 function currentView() {
@@ -1016,7 +1042,7 @@ function valTitle(p) {
 }
 
 function cardHtml(p) {
-  const contents = (p.contents || []).map((c) => c.label || c.kind).filter(Boolean);
+  const contents = extraContents(p);
   const img = realImage(p.image);
   const resolve = img ? '' : resolveImageName(p); // ship name to fetch art for
   const thumb = img
@@ -1025,7 +1051,7 @@ function cardHtml(p) {
   const nameHtml =
     p.isCCU && p.ccu
       ? `${OH.escapeHtml(p.ccu.from)} <span class="ccu-flow">→</span> ${OH.escapeHtml(p.ccu.to)}`
-      : OH.escapeHtml(p.name || '—');
+      : OH.escapeHtml(cardName(p));
   // Always emit the contents cell (empty when there's nothing) so the List view's
   // fixed column grid stays aligned across rows — items with vs. without contents
   // must occupy the same number of grid cells. Gallery/compact hide empties via CSS.
@@ -1040,7 +1066,7 @@ function cardHtml(p) {
   return `<div class="card${sel}" data-id="${OH.escapeHtml(String(p.id || ''))}" data-image="${OH.escapeHtml(img || '')}" data-resolve="${OH.escapeHtml(resolve)}">
     ${thumb}
     <div class="card-body">
-      <div class="card-name">${nameHtml}</div>
+      <div class="card-name" title="${OH.escapeHtml(plainName(p))}">${nameHtml}</div>
       ${contentsLine}
       <div class="card-foot">
         <span class="foot-left"><span class="badge ${badgeClass}">${OH.escapeHtml(p.kind)}</span>${flagsHtml(p)}</span>
@@ -1681,13 +1707,7 @@ async function fleetImageCanvas(list, { title, price }) {
 
     const tx = x + 12,
       tw = CW - 24;
-    const name =
-      p.isCCU && p.ccu
-        ? `${p.ccu.from} → ${p.ccu.to}`
-        : plainName(p).replace(
-            /^(standalone ships?|paints?|gear|add-ons?|subscribers store)\s*[-–]\s*/i,
-            '',
-          );
+    const name = p.isCCU && p.ccu ? `${p.ccu.from} → ${p.ccu.to}` : cardName(p);
     ctx.fillStyle = C.text;
     ctx.font = f(600, 14);
     const nameLines = wrap(name, tw, 2);
