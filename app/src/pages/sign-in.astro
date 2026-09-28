@@ -10,8 +10,8 @@ if (Astro.locals.user) return Astro.redirect(next);
 const discord = discordEnabled();
 ---
 
-<Base title="Sign in">
-  <h1>Sign in</h1>
+<Base title="Sign In">
+  <h1>Sign In</h1>
   <div class="card" style="max-width:460px">
     {
       discord && (
@@ -24,7 +24,7 @@ const discord = discordEnabled();
       )
     }
     <form class="form" id="f" data-next={next}>
-      <label>Email or username<input name="login" required autocomplete="username" /></label>
+      <label>Username or Email<input name="login" required autocomplete="username" /></label>
       <label>Password<input name="password" type="password" required autocomplete="current-password" /></label>
       <button type="submit">Sign in</button>
       <div class="error" id="err" role="alert"></div>
@@ -48,7 +48,7 @@ const discord = discordEnabled();
       ? await authClient.signIn.email({ email: login, password })
       : await authClient.signIn.username({ username: login, password });
     if (error) {
-      err.textContent = error.message || 'Wrong email, username or password.';
+      err.textContent = error.message || 'Wrong username, email or password.';
       return;
     }
     // With 2FA on, the client plugin sends us to /two-factor instead.

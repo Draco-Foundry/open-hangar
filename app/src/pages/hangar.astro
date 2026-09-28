@@ -42,14 +42,14 @@ const money = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDi
 const name = (p: Item) => String(p.name || '').replace(/^\s*.+?\s+[-–]\s/, '');
 ---
 
-<Base title="My hangar">
-  <h1>My hangar</h1>
+<Base title="My Hangar">
+  <h1>My Hangar</h1>
   {
     !row ? (
       <div class="card">
         <p>Nothing synced yet.</p>
         <p class="muted">
-          <a href="/link">Connect your extension</a>, then press <strong>Sync now</strong> in it. Your hangar shows
+          <a href="/link">Connect Your Extension</a>, then press <strong>Sync now</strong> in it. Your hangar shows
           up here.
         </p>
       </div>
@@ -74,7 +74,7 @@ const name = (p: Item) => String(p.name || '').replace(/^\s*.+?\s+[-–]\s/, '')
             <div class="lbl">buy-backs</div>
           </div>
         </div>
-        <h2>By type</h2>
+        <h2>By Type</h2>
         <p>
           {kinds.map(([k, n]) => (
             <span class="pill">
@@ -82,7 +82,7 @@ const name = (p: Item) => String(p.name || '').replace(/^\s*.+?\s+[-–]\s/, '')
             </span>
           ))}
         </p>
-        <h2>Most valuable pledges</h2>
+        <h2>Most Valuable Pledges</h2>
         <table>
           <thead>
             <tr>
