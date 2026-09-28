@@ -412,31 +412,24 @@ are **placeholder-quality** and need finishing:
 - Fold this into the rewards-data source above so links + image URLs travel with the
   reward definitions rather than being derived ad hoc at render time.
 
-## Replace `innerHTML` templates with a DOM builder (planned — post-launch)
+## ~~Replace `innerHTML` templates with a DOM builder~~ ✅ Done differently (2026-09-28)
 
-Mozilla's `web-ext lint` flags **25 `UNSAFE_VAR_ASSIGNMENT` warnings** — every
-`innerHTML` assignment built from a template string in `dashboard.js`. They don't
-block review: all 25 were audited before the v0.2.7 submission (21 already escaped
-via `OH.escapeHtml`, 4 real gaps fixed — see PR #3), and a strict `extension_pages`
-CSP backstops them. But escaping is currently a _convention_ every contributor must
-remember; one missed `escapeHtml` call on RSI-sourced or imported data is an
-injection.
+`web-ext lint` now reports **0 warnings** (was 26 `UNSAFE_VAR_ASSIGNMENT`). Every
+dynamic render goes through `setHTML(el, html)` in `dashboard.js`, an **allowlist**
+sanitizer: parse into an inert DOMParser document, keep only the tags/attributes the
+dashboard uses (`SAFE_TAGS` / `SAFE_ATTRS`, plus `data-*` / `aria-*`), allow only
+web/mailto/relative URLs in `href`/`src`, drop `style` values with `url(`, then
+`replaceChildren`. `OH.escapeHtml` stays the first line of defence.
 
-**Goal:** make safe rendering the default, and clear the warnings honestly.
+Why this isn't the "DOMParser-then-append trick" the old note warned about: that
+note meant parsing and appending _unfiltered_ markup to hide the same risk. This
+filters to an allowlist (the DOMPurify model), so injected tags/handlers/URLs are
+removed, not just hidden from the linter. Guard rails: anything dropped logs
+`[setHTML] dropped …` and `npm run test:ui` fails on it; `test/sanitize.test.js`
+feeds it real attack strings.
 
-- Add a tiny `h(tag, attrs, ...children)` helper (in `lib.js`) that builds nodes with
-  `createElement` / `textContent` / `setAttribute` — strings are always text, never
-  markup. URL attributes (`href`, `src`) go through one allowlist check (https +
-  expected hosts), generalizing `buybackUrl()`.
-- Convert views incrementally, highest-risk first: anything rendering RSI or imported
-  data (cards, modal, referral lists, buy-backs), then static chrome. Swap
-  `innerHTML =` for `el.replaceChildren(...)`.
-- Keep inline SVG charts as-is or build them with `createElementNS` — they're
-  numeric/constant today.
-- **Do not** "silence" the linter with `el['innerHTML']` or DOMParser-then-append
-  tricks — they're the same risk and AMO reviewers treat them as evasion.
-- Done when `npm run lint:firefox` reports 0 `UNSAFE_VAR_ASSIGNMENT` and the UI is
-  visually unchanged (re-shoot store screenshots to compare).
+If an AMO reviewer still objects: swap the body of `setHTML` for vendored DOMPurify
+(same call sites), or do the per-view `h()` DOM builder originally planned.
 
 ## Dashboard CSS cleanup (planned — maintainability, not user-facing)
 
