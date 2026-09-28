@@ -238,7 +238,12 @@
   // Pull the URL out of an element's inline `background-image: url(...)`.
   function bgUrl(el) {
     const m = (el?.getAttribute('style') || '').match(/url\((['"]?)(.*?)\1\)/i);
-    return m ? m[2] : null;
+    if (!m) return null;
+    // RSI serves some art as a RELATIVE path ("/media/…"), which would resolve
+    // against the extension's own origin and break. Make it absolute.
+    return m[2].startsWith('/') && !m[2].startsWith('//')
+      ? 'https://robertsspaceindustries.com' + m[2]
+      : m[2];
   }
 
   function readContents(card) {

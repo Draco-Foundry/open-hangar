@@ -599,8 +599,12 @@ function fmtEnlisted(s) {
 // RSI ships CCUs (and some items) with a generic "DEFAULT IMAGE" placeholder.
 // Treat those (and missing URLs) as no-image so we can resolve the real ship art.
 const DEFAULT_IMG_RE = /default[-_]?image|\/default\b/i;
+// Older scans may hold RSI's relative "/media/..." paths: make them absolute.
 function realImage(url) {
-  return url && !DEFAULT_IMG_RE.test(url) ? url : null;
+  if (!url || DEFAULT_IMG_RE.test(url)) return null;
+  return url.startsWith('/') && !url.startsWith('//')
+    ? 'https://robertsspaceindustries.com' + url
+    : url;
 }
 
 // The ship name to look an image up by: a CCU's target ship, else a ship's own
@@ -1357,10 +1361,17 @@ function isPack(p) {
   return ships.length > 1;
 }
 
+// A standalone hangar pledge ("VFG Industrial Hangar", "Self-Land Hangar",
+// "Revel & York Hangar"…). Packs that include a hangar stay under Packs.
+function isHangar(p) {
+  return !p.containsShip && !p.isCCU && /hangar/i.test(plainName(p));
+}
+
 const MARKET_SECTIONS = [
   { key: 'ship', label: 'Standalone Ships', test: (p) => p.containsShip && !isPack(p) },
   { key: 'pack', label: 'Packs', test: (p) => isPack(p) },
   { key: 'ccu', label: 'Upgrades', test: (p) => p.isCCU },
+  { key: 'hangar', label: 'Hangars', test: (p) => isHangar(p) },
   { key: 'paint', label: 'Paints', test: (p) => p.kind === 'paint' },
   { key: 'addon', label: 'Add-Ons', test: (p) => p.kind === 'addon' },
   { key: 'other', label: 'Other', test: () => true },
@@ -4155,19 +4166,13 @@ function loadHiRes(thumb) {
   return hiResLoads.get(thumb);
 }
 
-// Show `thumb` in <img> right away (blurred while a sharper copy may exist),
-// then swap the moment the sharp one loads — no second hover or click needed.
+// Show `thumb` in <img> right away (already cached from the card, so it's
+// instant and sharp enough), then quietly swap in the sharper copy once loaded.
 function progressiveImage(imgEl, thumb, isCurrent = () => imgEl.isConnected) {
   imgEl.src = thumb;
-  if (!hiResCandidates(thumb).length) {
-    imgEl.classList.remove('img-loading');
-    return;
-  }
-  imgEl.classList.add('img-loading');
+  if (!hiResCandidates(thumb).length) return;
   loadHiRes(thumb).then((hi) => {
-    if (!isCurrent()) return;
-    if (hi) imgEl.src = hi;
-    imgEl.classList.remove('img-loading');
+    if (hi && isCurrent()) imgEl.src = hi;
   });
 }
 
@@ -4258,6 +4263,18 @@ function viewOnRsiLink(p) {
   return `<a class="bb-reclaim" href="${OH.escapeHtml(s.url)}" target="_blank" rel="noopener" title="Opens page ${s.page} of your RSI hangar; it's number ${s.pos} on that page (as of your last scan)">View ↗</a>`;
 }
 
+// A pledge item's type. RSI leaves some blank (armor pieces, hangars), so
+// infer those from the name: helmet/core/arms/legs/backpack… are Gear.
+const GEAR_RE =
+  /(helmet|core|arms|legs|backpack|undersuit|armou?r|jacket|shirt|pants|boots|gloves|hat)/i;
+function contentKind(c) {
+  if (c.kind) return c.kind;
+  const l = c.label || '';
+  if (/hangar/i.test(l)) return 'Hangar';
+  if (GEAR_RE.test(l)) return 'Gear';
+  return '—';
+}
+
 function openItemModal(p) {
   hidePreview();
   const real = realImage(p.image);
@@ -4271,7 +4288,7 @@ function openItemModal(p) {
     ? `<table class="modal-contents"><tbody>${contents
         .map(
           (c) =>
-            `<tr><td>${OH.escapeHtml(c.kind || '—')}</td><td>${OH.escapeHtml(c.label || '')}</td></tr>`,
+            `<tr><td>${OH.escapeHtml(contentKind(c))}</td><td>${OH.escapeHtml(c.label || '')}</td></tr>`,
         )
         .join('')}</tbody></table>`
     : '<p class="muted">No itemized contents.</p>';

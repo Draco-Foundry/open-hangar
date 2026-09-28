@@ -4,6 +4,15 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Sharp pictures right away.** Clicking an item shows its picture clearly at once
+  (no blurry loading step); a higher-res copy slips in when it's ready.
+- Fixed: some items (e.g. StarKitten helmets, Epoch Society shirt, AMD Never Settle
+  pack, Puglisi Collection) showed no picture because RSI gave a partial image link.
+  Already-scanned items are fixed too, no rescan needed.
+- **Hangars get their own group.** Pledges like VFG Industrial Hangar or Self-Land
+  Hangar show under Hangars in Inventory and Market.
+- **Gear is labelled.** Pack contents RSI leaves unlabelled (helmet, core, arms, legs,
+  backpack…) now show as Gear, and hangars as Hangar.
 - Fixed: some ships (e.g. Vanduul Blade, P-52 Merlin, Nox, Mustang Omega AMD Edition)
   showed a blank card when RSI's image link was broken; they now fall back to the
   ship's art from RSI's ship list. Missing-image lookups retry after a day.
