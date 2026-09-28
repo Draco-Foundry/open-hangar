@@ -250,9 +250,6 @@ h1 {
   .tour-thumbs {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .gallery {
-    grid-template-columns: 1fr;
-  }
 }
 
 .features {
@@ -315,35 +312,6 @@ footer nav {
 }
 .disclaimer {
   margin: 12px 0 0;
-}
-
-/* Fan kit screenshots: always shown whole (aspect ratio kept, never cropped). */
-.shot {
-  position: relative;
-  margin: 0;
-}
-.shot img:not(.mbtc) {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-.mbtc {
-  position: absolute;
-  top: 4%;
-  right: 3%;
-  width: clamp(28px, 10%, 48px);
-  height: auto;
-  opacity: 0.8;
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
-}
-.gallery {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 48px;
-}
-.gallery .shot img:not(.mbtc) {
-  border-radius: 10px;
 }
 
 .notices {
