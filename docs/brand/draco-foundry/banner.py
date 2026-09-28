@@ -40,7 +40,8 @@ def text_width(text, fnt, tracking):
     return sum(d.textlength(c, font=fnt) for c in text) + tracking * (len(text) - 1)
 
 
-def build():
+def build(ly=330):
+    """ly = top of the brand block (px on the 3840x2160 master)."""
     scene = Image.open(SCENE).convert('RGB')
     # cover-fit to 16:9
     s = max(W / scene.width, H / scene.height)
@@ -50,7 +51,7 @@ def build():
 
     # soft darkening behind the brand block so it reads on any scene
     shade = Image.new('L', (W, H), 0)
-    ImageDraw.Draw(shade).ellipse((-900, -700, 2100, 1500), fill=150)
+    ImageDraw.Draw(shade).ellipse((-900, ly - 1030, 2100, ly + 1170), fill=150)
     shade = shade.filter(ImageFilter.GaussianBlur(260))
     img = Image.composite(Image.new('RGBA', (W, H), (4, 8, 16, 255)), img, shade)
 
@@ -58,7 +59,7 @@ def build():
     # left of the ship: everything is sized to end before MAX_X.
     MAX_X = int(W * 0.42)
     L = 400
-    lx, ly = 200, 330
+    lx = 200
     tx = lx + L + 70
     tr_big = 20
     size = 200
@@ -111,6 +112,9 @@ def main():
     # GitHub social preview is 2:1: trim a little off the bottom
     gh = master.crop((0, 0, W, W // 2)).resize((1280, 640), Image.LANCZOS)
     gh.save(HERE / 'banner-1280x640.jpg', quality=92)
+    # Discord server banner: Discord writes the server name over the top-left,
+    # so the brand block sits lower, under that strip.
+    build(ly=1010).resize((960, 540), Image.LANCZOS).save(HERE / 'server-banner-960x540.jpg', quality=92)
     # clean scene (no text) for Discord's invite background
     Image.open(SCENE).convert('RGB').resize((1920, 1080), Image.LANCZOS).save(
         HERE / 'invite-splash-1920x1080.jpg', quality=92
