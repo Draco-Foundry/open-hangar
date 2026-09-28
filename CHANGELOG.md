@@ -4,6 +4,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Org Fleet: roles, biggest ships, members.** See which jobs your org can cover
+  (mining, salvage, medical, refueling, repair, exploration and more) and which it
+  can't, the biggest hulls and who owns them, and each member's ship count, LTI
+  count and fleet value.
 - **View on RSI.** Market rows and the item details window link to the page of
   your RSI hangar that pledge is on and say where ("page 4, #3"), handy for a
   screenshot of its details. Positions come from your last scan, so rescan after
