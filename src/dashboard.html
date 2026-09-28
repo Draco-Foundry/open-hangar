@@ -108,6 +108,15 @@
         color: var(--text);
         background: var(--panel-2);
       }
+      /* Updates / Developers: reference pages, set apart from the main flow */
+      .nav-sep {
+        width: 1px;
+        margin: 6px 6px;
+        background: var(--line);
+      }
+      nav a.nav-minor {
+        font-weight: 500;
+      }
 
       .view {
         display: none;
@@ -2648,11 +2657,12 @@
           <a href="#inventory" data-view="inventory">Inventory</a>
           <a href="#buybacks" data-view="buybacks">Buy-Backs</a>
           <a href="#stats" data-view="stats">Stats</a>
+          <a href="#store" data-view="store">Store</a>
           <a href="#org" data-view="org">Org Fleet</a>
           <a href="#referrals" data-view="referrals">Referrals</a>
-          <a href="#store" data-view="store">Store</a>
-          <a href="#developers" data-view="developers">Developers</a>
-          <a href="#updates" data-view="updates">Updates</a>
+          <span class="nav-sep" aria-hidden="true"></span>
+          <a href="#updates" data-view="updates" class="nav-minor">Updates</a>
+          <a href="#developers" data-view="developers" class="nav-minor">Developers</a>
         </nav>
       </header>
 
@@ -2949,6 +2959,10 @@
               <h3>Stats</h3>
               <p>Hangar value, melt candidates, fleet stats and history.</p>
             </a>
+            <a class="home-card" href="#store" data-view="store">
+              <h3>Store</h3>
+              <p>Every ship's store price, and what your CCUs are worth.</p>
+            </a>
             <a class="home-card" href="#org" data-view="org">
               <h3>Org Fleet</h3>
               <p>Combine your org members' ship lists into one fleet.</p>
@@ -2956,10 +2970,6 @@
             <a class="home-card" href="#referrals" data-view="referrals">
               <h3>Referrals</h3>
               <p>Your recruits, prospects, rewards, and referral stats.</p>
-            </a>
-            <a class="home-card" href="#store" data-view="store">
-              <h3>Store</h3>
-              <p>Every ship's store price, and what your CCUs are worth.</p>
             </a>
             <a class="home-card" href="#developers" data-view="developers">
               <h3>Developers</h3>
