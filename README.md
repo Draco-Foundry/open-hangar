@@ -57,8 +57,9 @@ other community tools can import.
 [Open Hangar website](https://openhangar.space/). Brave, Opera and
 Vivaldi use the Chrome Web Store build.
 
-> **Chrome:** [live on the Chrome Web Store](https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl). Edge and Firefox are still in
-> review; until then, load it from source (below).
+> **Live:** [Chrome Web Store](https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl)
+> and [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/open-hangar/). Edge is still in review; until then, load it from
+> source (below).
 
 **From source:**
 
