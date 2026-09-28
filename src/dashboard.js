@@ -2030,6 +2030,8 @@ function ownedCCUs() {
     .filter((c) => c.fromMsrp && c.toMsrp);
 }
 
+const capFirst = (t) => String(t || '').replace(/^\w/, (c) => c.toUpperCase());
+
 // One table per production state (flight ready first, then concepts, …).
 const SHIP_STATES = [
   ['flight-ready', 'Flight ready'],
@@ -2055,7 +2057,7 @@ function priceRowsHtml(q) {
             (v) =>
               `<tr><td>${OH.escapeHtml(v.name || v.lname)}</td><td class="num">${dollars(v.msrp)}</td><td>${OH.escapeHtml(
                 v.role || '',
-              )}</td><td>${OH.escapeHtml(v.size || '')}</td></tr>`,
+              )}</td><td>${OH.escapeHtml(capFirst(v.size))}</td></tr>`,
           )
           .join('')}</tbody></table>`,
     )
@@ -3254,7 +3256,7 @@ function tokenLineHtml() {
         }.`;
   return `<div class="bb-tokens">${have} ${
     next ? `Next token: <strong>${OH.escapeHtml(next)}</strong>.` : 'RSI adds one each quarter.'
-  } Tokens don't roll over, so use one before the next arrives. Cash buy-backs don't need a token.</div>`;
+  } Tokens don't roll over, so use them all before the next one arrives. Cash buy-backs don't need a token.</div>`;
 }
 
 // Standard store price of what a buy-back gives back: the ship's price today
@@ -3404,6 +3406,25 @@ function stackBuybacks(list) {
   return order;
 }
 
+// The buy-back list DOES honour pagesize=1 (unlike the hangar), so page N is
+// exactly the Nth buy-back in scan order. Right until your buy-backs change.
+let bbPos = null;
+function buybackViewUrl(b) {
+  if (!bbPos || bbPos.items !== state.buybacks) {
+    bbPos = { items: state.buybacks, at: new Map(state.buybacks.map((x, i) => [String(x.id), i])) };
+  }
+  const i = bbPos.at.get(String(b.id));
+  return i == null
+    ? null
+    : `https://robertsspaceindustries.com/account/buy-back-pledges?pagesize=1&page=${i + 1}`;
+}
+function buybackViewLink(b) {
+  const url = buybackViewUrl(b);
+  return url
+    ? `<a class="bb-reclaim" href="${OH.escapeHtml(url)}" target="_blank" rel="noopener" title="Open just this buy-back on RSI (position as of your last scan)">View ↗</a>`
+    : '';
+}
+
 function bbPriceHtml(b) {
   if (b.price) return `<span class="val">${OH.escapeHtml(b.price)}</span>`;
   const sp = buybackStorePrice(b);
@@ -3423,6 +3444,7 @@ function buybackRowHtml(g) {
     <td class="mk-name">${name}</td>
     <td class="mk-melt">${bbPriceHtml(b) || '—'}</td>
     <td class="mk-stock">${g.qty}</td>
+    <td class="mk-view">${buybackViewLink(b)}</td>
     <td class="mk-mine">${reclaim}</td>
   </tr>`;
 }
@@ -3436,7 +3458,7 @@ function buybackMarketHtml(list) {
       <h3 class="market-title">${OH.escapeHtml(k.label)}<span class="market-n">${groups.length}</span></h3>
       <table class="market-table">
         <thead><tr>
-          <th>Items Name</th><th title="Standard store price today; RSI's buy-back price can differ">Store Price</th><th>Qty</th><th>Reclaim</th>
+          <th>Items Name</th><th title="Standard store price today; RSI's buy-back price can differ">Store Price</th><th>Qty</th><th title="Open just this buy-back on RSI, e.g. to screenshot it">RSI</th><th>Reclaim</th>
         </tr></thead>
         <tbody>${groups.map(buybackRowHtml).join('')}</tbody>
       </table>
@@ -3729,11 +3751,10 @@ function hangarSpot(p) {
     url: `https://robertsspaceindustries.com/account/pledges?page=${page}`,
   };
 }
-function viewOnRsiLink(p, long = false) {
+function viewOnRsiLink(p) {
   const s = hangarSpot(p);
   if (!s) return '';
-  const label = long ? `Page ${s.page}, #${s.pos} in your hangar ↗` : `p${s.page} #${s.pos} ↗`;
-  return `<a class="bb-reclaim" href="${OH.escapeHtml(s.url)}" target="_blank" rel="noopener" title="Opens page ${s.page} of your RSI hangar; it's number ${s.pos} on that page (as of your last scan)">${label}</a>`;
+  return `<a class="bb-reclaim" href="${OH.escapeHtml(s.url)}" target="_blank" rel="noopener" title="Opens page ${s.page} of your RSI hangar; it's number ${s.pos} on that page (as of your last scan)">View ↗</a>`;
 }
 
 function openItemModal(p) {
@@ -3768,7 +3789,7 @@ function openItemModal(p) {
       ${storeRow(p, row)}
       ${p.currency ? row('Currency', OH.escapeHtml(p.currency)) : ''}
       ${p.isCCU && p.ccu ? row('Upgrade', OH.escapeHtml(`${p.ccu.from} → ${p.ccu.to}`)) : ''}
-      ${hangarSpot(p) ? row('On RSI', viewOnRsiLink(p, true)) : ''}
+      ${hangarSpot(p) ? row('On RSI', viewOnRsiLink(p)) : ''}
       ${row('Scanned', OH.escapeHtml(fmtScan()))}
       <h4 class="modal-h">Contents (${contents.length})</h4>
       ${contentsHtml}
@@ -4370,6 +4391,28 @@ const releaseDate = (d) =>
       })
     : d;
 
+// Split a release's bullets into "New & improved" and "Fixed" (bullets that
+// start with "Fixed"/"Fix:"), ccugame-changelog style.
+function releaseGroupsHtml(items) {
+  const isFix = (t) => /^(\*\*)?fix(ed)?\b/i.test(t);
+  const groups = [
+    ['new', 'New & improved', items.filter((t) => !isFix(t))],
+    ['fixed', 'Fixed', items.filter(isFix)],
+  ];
+  return groups
+    .filter(([, , list]) => list.length)
+    .map(
+      ([k, label, list]) =>
+        `<span class="release-group g-${k}">${label}</span><ul>${list
+          .map(
+            (t) =>
+              `<li>${OH.inlineMarkdown(capFirst(t.replace(/^(\*\*)?fix(ed)?\s*:?\s*/i, '$1')))}</li>`,
+          )
+          .join('')}</ul>`,
+    )
+    .join('');
+}
+
 async function renderUpdates() {
   const body = $('#updates-body');
   const cur = chrome.runtime.getManifest().version;
@@ -4402,7 +4445,7 @@ async function renderUpdates() {
             r.date ? `<span class="release-date">${OH.escapeHtml(releaseDate(r.date))}</span>` : ''
           }${tag}</div>
           ${r.intro.map((t) => `<p>${OH.inlineMarkdown(t)}</p>`).join('')}
-          ${r.items.length ? `<ul>${r.items.map((t) => `<li>${OH.inlineMarkdown(t)}</li>`).join('')}</ul>` : ''}
+          ${releaseGroupsHtml(r.items)}
         </section>`;
       })
       .join(''),
