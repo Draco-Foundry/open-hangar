@@ -10,6 +10,13 @@
  * browser starts, when the extension installs/updates, and whenever the stored
  * data changes (so a new scan clears it at once). No alarms permission needed.
  * Turned off with the Home page toggle (storage key `remindRescan`).
+ *
+ * Updates: the browser downloads new versions itself. If a dashboard tab is
+ * open we don't yank it away mid-scan; we store `updateReady` and the
+ * dashboard shows a "Reload to update" bar. With nothing open we apply it at
+ * once. After an update, `justUpdated` lets the dashboard point at the
+ * Updates page, and a Reload from the bar reopens the dashboard there
+ * (`reopenAfterUpdate`, checked each time the worker starts).
  */
 
 const STALE_DAYS = 7;
@@ -30,9 +37,43 @@ async function updateReminder() {
   }
 }
 
-chrome.runtime.onInstalled.addListener((details) => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   console.debug('[OpenHangar] installed:', details.reason);
   updateReminder();
+  if (details.reason !== 'update') return;
+  const to = chrome.runtime.getManifest().version;
+  await chrome.storage.local.remove('updateReady');
+  if (details.previousVersion && details.previousVersion !== to) {
+    await chrome.storage.local.set({ justUpdated: { from: details.previousVersion, to } });
+  }
+});
+
+// The dashboard's "Reload to update" button sets `reopenAfterUpdate` and
+// reloads; this runs when the (new) worker starts and brings the tab back.
+chrome.storage.local.get('reopenAfterUpdate').then(({ reopenAfterUpdate }) => {
+  if (!reopenAfterUpdate) return;
+  chrome.storage.local.remove(['reopenAfterUpdate', 'updateReady']);
+  chrome.tabs.create({ url: chrome.runtime.getURL('src/dashboard.html#updates') });
+});
+
+// Is a dashboard (or any extension tab) open right now?
+async function dashboardOpen() {
+  try {
+    if (chrome.runtime.getContexts) {
+      return (await chrome.runtime.getContexts({ contextTypes: ['TAB'] })).length > 0;
+    }
+    if (chrome.extension && chrome.extension.getViews) {
+      return chrome.extension.getViews({ type: 'tab' }).length > 0;
+    }
+  } catch {
+    /* unknown: play safe and wait */
+  }
+  return true;
+}
+
+chrome.runtime.onUpdateAvailable?.addListener(async (details) => {
+  if (await dashboardOpen()) chrome.storage.local.set({ updateReady: details.version });
+  else chrome.runtime.reload();
 });
 chrome.runtime.onStartup.addListener(updateReminder);
 chrome.storage.onChanged.addListener((changes, area) => {
