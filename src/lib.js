@@ -1792,6 +1792,85 @@
     return out;
   };
 
+  // --- Org fleet ------------------------------------------------------------------
+  // Members share a file; we keep only their ship list. Accepts an HTF export
+  // (a bare array, ships only: the one to ask for) or a full Open Hangar backup
+  // (ships are read from the hangar; nothing else is kept). Pure.
+  //   → { name, ships: [{ name, lti }] } | { error }
+  OH.shipsFromFile = function shipsFromFile(obj, fileName = '') {
+    const fromName = (String(fileName).match(/open-hangar-htf-(.+?)-\d{4}-\d{2}-\d{2}/) || [])[1];
+    if (Array.isArray(obj)) {
+      const ships = obj
+        .filter((e) => e && (e.name || e.ship_name) && (e.entity_type || 'ship') === 'ship')
+        .map((e) => ({ name: String(e.name || e.ship_name), lti: e.lti === true }));
+      if (!ships.length) return { error: 'No ships in that file.' };
+      return { name: fromName || null, ships };
+    }
+    const items = obj && obj.sources && obj.sources.hangar && obj.sources.hangar.items;
+    if (Array.isArray(items)) {
+      const ships = [];
+      for (const p of items) {
+        for (const c of p.contents || []) {
+          if (/^ship$/i.test(c.kind || '')) {
+            ships.push({ name: OH.htfShipName(c.label) || c.label, lti: p.insurance === 'LTI' });
+          }
+        }
+      }
+      if (!ships.length) return { error: 'No ships in that backup.' };
+      return { name: (obj.account && obj.account.handle) || fromName || null, ships };
+    }
+    return { error: "That isn't an Open Hangar HTF export or backup." };
+  };
+
+  // Combine members' ship lists into one fleet. shipOf/priceOf are the wiki
+  // resolvers (OH.makeShipIndex). Ships group by their matched wiki name when
+  // known, so "Carrack" and "Anvil Carrack" count together. Pure.
+  OH.orgFleet = function orgFleet(members, shipOf, priceOf) {
+    const byShip = new Map();
+    const tally = { shipCount: 0, store: 0, priced: 0, cargo: 0, crew: 0 };
+    const byCareer = {};
+    const bySize = {};
+    const bump = (m, k) => (m[k] = (m[k] || 0) + 1);
+    for (const m of members || []) {
+      for (const s of m.ships || []) {
+        const v = shipOf(s.name);
+        const price = priceOf(s.name);
+        const key = v ? v.lname : s.name.toLowerCase();
+        let row = byShip.get(key);
+        if (!row) {
+          row = {
+            name: v ? v.lname.replace(/\b\w/g, (c) => c.toUpperCase()) : s.name,
+            count: 0,
+            lti: 0,
+            owners: new Map(),
+            msrp: price ? price.msrp : null,
+            career: (v && v.career) || null,
+            size: (v && v.size) || null,
+          };
+          byShip.set(key, row);
+        }
+        row.count++;
+        if (s.lti) row.lti++;
+        row.owners.set(m.name, (row.owners.get(m.name) || 0) + 1);
+        tally.shipCount++;
+        if (price) {
+          tally.store += price.msrp;
+          tally.priced++;
+        }
+        if (v) {
+          tally.cargo += v.cargo || 0;
+          tally.crew += v.crew || 0;
+          bump(byCareer, v.career || 'Other');
+          bump(bySize, v.size || 'Other');
+        }
+      }
+    }
+    const ships = [...byShip.values()]
+      .map((r) => ({ ...r, owners: [...r.owners].map(([name, n]) => ({ name, n })) }))
+      .sort((a, b) => b.count - a.count || (b.msrp || 0) - (a.msrp || 0));
+    return { ships, members: (members || []).length, ...tally, byCareer, bySize };
+  };
+
   // --- Scan history --------------------------------------------------------------
   // Each full hangar scan that changed something is kept as a compact snapshot
   // ({ at, items: [[id, name, value]] }) in the DB, so the UI can say what changed

@@ -4,6 +4,11 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Org Fleet.** A new page that combines your org members' ship lists into one
+  fleet: every ship, who owns it, LTI count, store value, cargo, crew, and a role and
+  size breakdown, with CSV export. Members share their **Export HTF** file (ships
+  only); full backups work too, but only the ships are read. HTF files are now named
+  with your handle so they're easy to tell apart.
 - **Rescan reminder.** When your last scan is a week old, the Open Hangar toolbar icon
   shows an amber **!** (hover it to see how old). Scanning clears it; switch it off
   with **Weekly rescan reminder** on the Home card. No new permissions.
