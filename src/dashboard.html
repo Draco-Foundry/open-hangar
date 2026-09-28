@@ -2339,6 +2339,68 @@
       .profile-row > :last-child {
         margin-left: auto;
       }
+      /* Org fleet */
+      .org-intro {
+        max-width: 760px;
+        font-size: 13px;
+      }
+      .org-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin: 12px 0 20px;
+      }
+      .org-members {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 18px;
+      }
+      .org-member {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 6px 5px 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        font-size: 12px;
+      }
+      .org-member button {
+        border: 0;
+        background: none;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 14px;
+        padding: 0 6px;
+      }
+      .org-member button:hover {
+        color: #f85149;
+      }
+      .org-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        margin-top: 8px;
+      }
+      .org-table th,
+      .org-table td {
+        text-align: left;
+        padding: 7px 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      .org-table th {
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .org-table td.num,
+      .org-table th.num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .org-owners {
+        color: var(--muted);
+      }
       .link-btn {
         border: 0;
         padding: 0;
@@ -2490,6 +2552,7 @@
           <a href="#inventory" data-view="inventory">Inventory</a>
           <a href="#buybacks" data-view="buybacks">Buy-Backs</a>
           <a href="#stats" data-view="stats">Stats</a>
+          <a href="#org" data-view="org">Org Fleet</a>
           <a href="#referrals" data-view="referrals">Referrals</a>
           <a href="#store" data-view="store">Store Data</a>
           <a href="#developers" data-view="developers">Developers</a>
@@ -2668,6 +2731,21 @@
             </details>
 
             <details>
+              <summary>Your org's combined fleet</summary>
+              <ul>
+                <li>
+                  Ask members to open Open Hangar and use <strong>Developers → Export HTF</strong>.
+                  That file is ships only, nothing personal.
+                </li>
+                <li>
+                  Import their files on <a href="#org" data-view="org">Org Fleet</a>, add your own
+                  with <strong>Add my fleet</strong>, and see every ship, who owns it, and the
+                  totals. Export it as a CSV for your org's spreadsheet.
+                </li>
+              </ul>
+            </details>
+
+            <details>
               <summary>Backups and switching browsers</summary>
               <ul>
                 <li>Your data stays put when Open Hangar updates.</li>
@@ -2761,6 +2839,10 @@
             <a class="home-card needs-data" href="#stats" data-view="stats">
               <h3>Stats</h3>
               <p>Hangar value, melt candidates, fleet stats and history.</p>
+            </a>
+            <a class="home-card" href="#org" data-view="org">
+              <h3>Org Fleet</h3>
+              <p>Combine your org members' ship lists into one fleet.</p>
             </a>
             <a class="home-card" href="#referrals" data-view="referrals">
               <h3>Referrals</h3>
@@ -2873,6 +2955,25 @@
       </section>
 
       <!-- STORE -->
+      <!-- ORG FLEET -->
+      <section class="view" id="view-org">
+        <h2 class="section-title">Org Fleet</h2>
+        <p class="muted org-intro">
+          Put your org's hangars together into one fleet. Each member opens Open Hangar, goes to
+          <strong>Developers → Export HTF</strong> (ships only, nothing personal) and sends you the
+          file. Import them here. Full backups work too, but only the ships are read. Everything
+          stays in this browser.
+        </p>
+        <div class="org-actions">
+          <button id="org-import" type="button">Import member files…</button>
+          <button id="org-mine" type="button" class="btn-secondary">Add my fleet</button>
+          <button id="org-csv" type="button" class="btn-secondary">Export CSV</button>
+          <input id="org-file" type="file" accept="application/json,.json" multiple hidden />
+          <span id="org-msg" class="muted" aria-live="polite"></span>
+        </div>
+        <div id="org-body"></div>
+      </section>
+
       <section class="view" id="view-store">
         <h2 class="section-title">Store Data</h2>
         <div class="placeholder-view">
