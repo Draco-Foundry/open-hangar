@@ -43,6 +43,7 @@ const bbLayoutEl = $('#bb-layout');
 // the hangar — notably 'paint'). Order = display order.
 const BB_KINDS = [
   { key: 'ship', label: 'Ships' },
+  { key: 'pack', label: 'Packs & packages' },
   { key: 'ccu', label: 'CCUs' },
   { key: 'paint', label: 'Paints' },
   { key: 'addon', label: 'Add-ons' },
@@ -1241,6 +1242,7 @@ function cardHtml(p) {
     <div class="card-body">
       <div class="card-name" title="${OH.escapeHtml(plainName(p))}">${nameHtml}</div>
       ${contentsLine}
+      <div class="card-ins" title="Insurance">${OH.escapeHtml(p.insurance || '')}</div>
       <div class="card-foot">
         <span class="foot-left"><span class="badge ${badgeClass}">${OH.escapeHtml(p.kind)}</span>${flagsHtml(p)}</span>
         <span class="val"${valTitle(p)}>${OH.escapeHtml(formatValue(p))}</span>
@@ -3190,10 +3192,7 @@ function buybackCardHtml(b) {
   const nameHtml = b.ccu
     ? `${OH.escapeHtml(b.ccu.from)} <span class="ccu-flow">→</span> ${OH.escapeHtml(b.ccu.to)}`
     : OH.escapeHtml(b.name || '—');
-  const url = buybackUrl(b);
-  const reclaim = url
-    ? `<a class="bb-reclaim" href="${OH.escapeHtml(url)}" target="_blank" rel="noopener">Reclaim ↗</a>`
-    : '';
+  const reclaim = buybackReclaimLink(b);
   const badgeClass = ['ccu', 'ship', 'paint', 'addon', 'coupon'].includes(b.kind) ? b.kind : '';
   // Every cell is always emitted (empty when there's nothing) so the List view's
   // fixed column grid lines up across rows, as in the Inventory cards.
@@ -3271,7 +3270,7 @@ function buybackStorePrice(b) {
     const to = state.priceOf(b.ccu.to);
     return from && to && to.msrp > from.msrp ? to.msrp - from.msrp : null;
   }
-  if (b.kind !== 'ship') return null;
+  if (b.kind !== 'ship' && b.kind !== 'pack') return null;
   const bare = String(b.name || '').replace(/^\s*[^-–]+?\s*[-–]\s/, '');
   const tries = [
     bare,
@@ -3392,22 +3391,6 @@ function buybackName(b) {
   return b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '—';
 }
 
-function stackBuybacks(list) {
-  const order = [];
-  const byKey = new Map();
-  for (const b of list) {
-    const key = `${buybackName(b).toLowerCase()}|${b.price || ''}`;
-    let g = byKey.get(key);
-    if (!g) {
-      g = { rep: b, qty: 0 };
-      byKey.set(key, g);
-      order.push(g);
-    }
-    g.qty += 1;
-  }
-  return order;
-}
-
 // The buy-back list DOES honour pagesize=1 (unlike the hangar), so page N is
 // exactly the Nth buy-back in scan order. Right until your buy-backs change.
 let bbPos = null;
@@ -3420,11 +3403,21 @@ function buybackViewUrl(b) {
     ? null
     : `https://robertsspaceindustries.com/account/buy-back-pledges?pagesize=1&page=${i + 1}`;
 }
-function buybackViewLink(b) {
-  const url = buybackViewUrl(b);
-  return url
-    ? `<a class="bb-reclaim" href="${OH.escapeHtml(url)}" target="_blank" rel="noopener" title="Open just this buy-back on RSI (position as of your last scan)">View ↗</a>`
-    : '';
+
+// One "Reclaim" link for every buy-back: RSI's reclaim page, or for CCUs (which
+// have no page of their own; RSI reclaims them in a pop-up) the one-item
+// buy-back list entry where that button is.
+function buybackReclaimLink(b) {
+  const direct = buybackUrl(b);
+  const url = direct || buybackViewUrl(b);
+  if (!url) return '';
+  const tip = direct
+    ? 'Open the buy-back page on RSI'
+    : "Opens just this CCU in RSI's buy-back list, where its reclaim button is";
+  return `<a class="bb-reclaim" href="${OH.escapeHtml(url)}" target="_blank" rel="noopener" title="${tip}">Reclaim ↗</a>`;
+}
+function bbInsurance(b) {
+  return b.insurance || window.OpenHangar.insuranceFromName(b.name) || '—';
 }
 
 function bbPriceHtml(b) {
@@ -3433,21 +3426,17 @@ function bbPriceHtml(b) {
   return sp ? `<span class="val" title="Store price today">${dollars(sp)}</span>` : '';
 }
 
-function buybackRowHtml(g) {
-  const b = g.rep;
+// One row per buy-back: each is its own pledge (own insurance, own extras), so
+// identical names are never merged.
+function buybackRowHtml(b) {
   const name = b.ccu
     ? `${OH.escapeHtml(b.ccu.from)} <span class="ccu-flow">→</span> ${OH.escapeHtml(b.ccu.to)}`
     : OH.escapeHtml(b.name || '—');
-  const url = buybackUrl(b);
-  const reclaim = url
-    ? `<a class="bb-reclaim" href="${OH.escapeHtml(url)}" target="_blank" rel="noopener">Reclaim ↗</a>`
-    : '—';
   return `<tr class="mk-row">
     <td class="mk-name">${name}</td>
+    <td class="mk-ins">${OH.escapeHtml(bbInsurance(b))}</td>
     <td class="mk-melt">${bbPriceHtml(b) || '—'}</td>
-    <td class="mk-stock">${g.qty}</td>
-    <td class="mk-view">${buybackViewLink(b)}</td>
-    <td class="mk-mine">${reclaim}</td>
+    <td class="mk-view">${buybackReclaimLink(b) || '—'}</td>
   </tr>`;
 }
 
@@ -3455,14 +3444,14 @@ function buybackMarketHtml(list) {
   const buckets = new Map(BB_KINDS.map((k) => [k.key, []]));
   for (const b of list) (buckets.get(b.kind) || buckets.get('other')).push(b);
   const sections = BB_KINDS.filter((k) => buckets.get(k.key).length).map((k) => {
-    const groups = stackBuybacks(buckets.get(k.key));
+    const rows = buckets.get(k.key);
     return `<section class="market-section">
-      <h3 class="market-title">${OH.escapeHtml(k.label)}<span class="market-n">${groups.length}</span></h3>
+      <h3 class="market-title">${OH.escapeHtml(k.label)}<span class="market-n">${rows.length}</span></h3>
       <table class="market-table">
         <thead><tr>
-          <th>Items Name</th><th title="Standard store price today; RSI's buy-back price can differ">Store Price</th><th>Qty</th><th title="Open just this buy-back on RSI, e.g. to screenshot it">RSI</th><th>Reclaim</th>
+          <th>Items Name</th><th title="From the buy-back's name when RSI includes it">Insurance</th><th title="Standard store price today; RSI's buy-back price can differ">Store Price</th><th>Reclaim</th>
         </tr></thead>
-        <tbody>${groups.map(buybackRowHtml).join('')}</tbody>
+        <tbody>${rows.map(buybackRowHtml).join('')}</tbody>
       </table>
     </section>`;
   });
@@ -4271,7 +4260,12 @@ function loadStateFromDB(db) {
   state.scannedAt = hangar.scannedAt || null;
   state.history = Array.isArray(db.history) ? db.history : [];
   const buybacks = db.sources.buybacks || { items: [], scannedAt: null };
-  state.buybacks = buybacks.items || [];
+  // Re-sort with today's rules (older scans stored older kinds, e.g. add-ons
+  // filed under ships).
+  state.buybacks = (buybacks.items || []).map((b) => ({
+    ...b,
+    kind: window.OpenHangar.classifyBuyback(b.name, b.contains),
+  }));
   state.buybacksScannedAt = buybacks.scannedAt || null;
   state.bbTokens =
     buybacks.meta && Number.isFinite(buybacks.meta.tokens) ? buybacks.meta.tokens : null;
