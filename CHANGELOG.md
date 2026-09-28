@@ -4,7 +4,6 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
-- **Easier to read.** Text across the dashboard is a size bigger.
 - **Sharp pictures right away.** Clicking an item shows its picture clearly at once
   (no blurry loading step); a higher-res copy slips in when it's ready.
 - Fixed: some items (e.g. StarKitten helmets, Epoch Society shirt, AMD Never Settle
