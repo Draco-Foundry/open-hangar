@@ -171,13 +171,6 @@ try {
     .catch(() => {});
   const prices = await page.$$eval('#price-table tbody tr', (r) => r.length);
   prices > 50 ? ok(`price list: ${prices} ships`) : fail(`price list only ${prices} rows`);
-  await page.type('#ccu-from', 'Cutlass Black');
-  await page.type('#ccu-to', 'Carrack');
-  await page.click('#ccu-go');
-  const plan = await page.$eval('#ccu-result', (e) => e.textContent);
-  /to go/.test(plan)
-    ? ok(`CCU plan: ${plan.match(/About \$[\d,]+ to go/)?.[0]}`)
-    : fail(`CCU plan: "${plan}"`);
 
   console.log('Saved accounts');
   await go('#developers');

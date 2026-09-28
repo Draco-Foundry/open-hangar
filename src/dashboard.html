@@ -2401,64 +2401,10 @@
       .org-owners {
         color: var(--muted);
       }
-      /* Store: CCU planner + price list */
+      /* Store: your CCUs + price list */
       .store-intro {
         max-width: 760px;
         font-size: 13px;
-      }
-      .ccu-form {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: flex-end;
-        gap: 12px;
-        margin: 10px 0 14px;
-      }
-      .ccu-form label {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        font-size: 12px;
-        color: var(--muted);
-      }
-      .ccu-form input,
-      #price-search {
-        width: 260px;
-        padding: 8px 10px;
-        border: 1px solid var(--line);
-        border-radius: 6px;
-        background: var(--panel-2);
-        color: var(--text);
-        font-size: 13px;
-      }
-      .ccu-plan {
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        background: var(--panel);
-        padding: 14px 18px;
-        margin-bottom: 12px;
-      }
-      .ccu-plan .ccu-cash {
-        font-size: 22px;
-        font-weight: 700;
-      }
-      .ccu-plan ol {
-        margin: 10px 0 0 18px;
-        padding: 0;
-        font-size: 13px;
-      }
-      .ccu-plan li {
-        margin: 4px 0;
-      }
-      .ccu-plan .apply {
-        color: #3fb950;
-      }
-      .ccu-owned {
-        margin: 6px 0 10px;
-        font-size: 13px;
-      }
-      .ccu-owned summary {
-        cursor: pointer;
-        color: var(--muted);
       }
       #price-table {
         max-height: 460px;
@@ -2773,8 +2719,9 @@
                   same store credit. Check the ship is actually on sale before you melt anything.
                 </li>
                 <li>
-                  Planning an upgrade? The <a href="#store" data-view="store">Store</a> page's CCU
-                  planner finds the cheapest path using the CCUs you already own.
+                  The <a href="#store" data-view="store">Store</a> page lists every ship's store
+                  price and what each of your CCUs is worth. For planning upgrade chains, use
+                  <a href="https://ccugame.app" target="_blank" rel="noopener">ccugame.app</a>.
                 </li>
                 <li>
                   The <strong>Fleet</strong> tab adds up cargo, crew and roles, and
@@ -2918,7 +2865,7 @@
             </a>
             <a class="home-card" href="#store" data-view="store">
               <h3>Store</h3>
-              <p>CCU planner, and every ship's current store price.</p>
+              <p>Every ship's store price, and what your CCUs are worth.</p>
             </a>
             <a class="home-card" href="#developers" data-view="developers">
               <h3>Developers</h3>
@@ -3045,32 +2992,13 @@
       <section class="view" id="view-store">
         <h2 class="section-title">Store</h2>
 
-        <h3 class="section-title">CCU planner</h3>
+        <h3 class="section-title">Your CCUs</h3>
+        <div id="ccu-owned"></div>
         <p class="muted store-intro">
-          Pick the ship you have and the one you want. Open Hangar finds the cheapest way there
-          using the CCUs already in your hangar, and tells you what to buy for the gaps at standard
-          store prices.
+          Planning an upgrade chain?
+          <a href="https://ccugame.app" target="_blank" rel="noopener">ccugame.app</a> is built for
+          exactly that and tracks warbond deals day to day.
         </p>
-        <div class="ccu-form">
-          <label
-            >From
-            <input
-              id="ccu-from"
-              list="ship-names"
-              placeholder="e.g. Cutlass Black"
-              autocomplete="off"
-          /></label>
-          <label
-            >To <input id="ccu-to" list="ship-names" placeholder="e.g. Carrack" autocomplete="off"
-          /></label>
-          <button id="ccu-go" type="button">Plan it</button>
-        </div>
-        <datalist id="ship-names"></datalist>
-        <div id="ccu-result"></div>
-        <details class="ccu-owned">
-          <summary>Your CCUs</summary>
-          <div id="ccu-owned"></div>
-        </details>
 
         <h3 class="section-title" style="margin-top: 28px">Ship prices</h3>
         <input id="price-search" type="search" placeholder="Search ships…" autocomplete="off" />
