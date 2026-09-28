@@ -184,9 +184,24 @@ test('classifyBuyback: hyphenated categories and packs', () => {
   const P = globalThis.OpenHangar;
   assert.equal(P.classifyBuyback('Add-Ons - Retaliator Torpedo Module – Stern', ''), 'addon');
   assert.equal(P.classifyBuyback('Packs - Valkyrie Liberator Drop Pack WB', ''), 'pack');
-  assert.equal(P.classifyBuyback('Package - C8X Pisces Expedition - Starter Pack', ''), 'pack');
+  assert.equal(P.classifyBuyback('Package - C8X Pisces Expedition - Starter Pack', ''), 'package');
   assert.equal(P.classifyBuyback('Standalone Ships - Buccaneer - 10 Year', ''), 'ship');
   assert.equal(P.insuranceFromName('Standalone Ships - Buccaneer - 10 Year'), '120M');
   assert.equal(P.insuranceFromName('Standalone Ship - 2943 RSI Aurora LX - LTI'), 'LTI');
   assert.equal(P.insuranceFromName('Standalone Ships - Hull A'), null);
+});
+
+test('parseBuybackDetail reads price, ships and insurance from a buy-back page', () => {
+  const P = globalThis.OpenHangar;
+  const html = fs.readFileSync(path.join(__dirname, 'fixtures', 'buyback-detail.html'), 'utf8');
+  const d = P.parseBuybackDetail(html);
+  assert.equal(d.price, 2920);
+  assert.equal(d.currency, 'USD');
+  assert.ok(d.ships.length >= 15, `ships: ${d.ships.length}`);
+  assert.equal(d.ships[0].name, '85X');
+  assert.equal(d.ships[0].manufacturer, 'Origin Jumpworks');
+  assert.ok(d.also.includes('Lifetime Insurance'));
+  assert.equal(d.insurance, 'LTI');
+  assert.equal(P.classifyBuyback('Packs - Origin Complete Pack - 2951', ''), 'pack');
+  assert.equal(P.classifyBuyback('Package - C8X Pisces Expedition - Starter Pack', ''), 'package');
 });

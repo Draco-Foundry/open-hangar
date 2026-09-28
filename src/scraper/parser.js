@@ -79,7 +79,8 @@
     if (/^subscribers?\s+(store|vault)$/i.test(prefix)) return 'other';
     if (/^(add[-\s]?ons?|decorations?|posters?|flair|model\s+ships?)$/i.test(prefix))
       return 'addon';
-    if (/^(packs?|packages?|combos?|bundles?|game\s+packages?)$/i.test(prefix)) return 'pack';
+    if (/^(packs?|combos?|bundles?)$/i.test(prefix)) return 'pack';
+    if (/^(packages?|game\s+packages?)$/i.test(prefix)) return 'package';
     if (/^(standalone\s+ships?|ships?|warbonds?)$/i.test(prefix)) return 'ship';
 
     if (PAINT_NAME_RE.test(hay)) return 'paint';
@@ -455,6 +456,50 @@
     const m = text.match(/you have (\d+|no) opportunit(?:y|ies) to buy back/i);
     if (!m) return null;
     return /^no$/i.test(m[1]) ? 0 : Number(m[1]);
+  };
+
+  // One buy-back's own page (/pledge/buyback/<pledge id>): what the list page
+  // leaves out. → { title, price (USD), currency, ships: [{ name, manufacturer,
+  // focus, image }], also: [labels], insurance } or null if it isn't one.
+  ns.parseBuybackDetail = function parseBuybackDetail(html) {
+    const doc =
+      typeof html === 'string' ? new DOMParser().parseFromString(html, 'text/html') : html;
+    const clean = (t) =>
+      String(t || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const priceEl = doc.querySelector('.final-price[data-value]');
+    const title = clean(doc.querySelector('.content-block4 h1, #store-wrapper h1')?.textContent);
+    if (!priceEl && !title) return null;
+    const ships = [...doc.querySelectorAll('.package-listing.ship li')].map((li) => {
+      const info = {};
+      for (const d of li.querySelectorAll('.info')) {
+        const m = clean(d.textContent).match(/^([^:]+):\s*(.*)$/);
+        if (m) info[m[1].toLowerCase()] = m[2];
+      }
+      let image = li.querySelector('img')?.getAttribute('src') || null;
+      if (image && image.startsWith('/')) image = 'https://robertsspaceindustries.com' + image;
+      return {
+        name: info.ship || info.vehicle || '',
+        manufacturer: info.manufacturer || '',
+        focus: info.focus || '',
+        image,
+      };
+    });
+    const also = [...doc.querySelectorAll('.package-listing.item li')].map((li) =>
+      clean(li.textContent),
+    );
+    const cents = priceEl ? Number(priceEl.getAttribute('data-value')) : NaN;
+    return {
+      title,
+      price: Number.isFinite(cents) ? cents / 100 : null,
+      currency: priceEl?.getAttribute('data-currency') || 'USD',
+      ships: ships.filter((x) => x.name),
+      also,
+      insurance: ns.insuranceTerm(
+        also.map((label) => ({ kind: /insurance/i.test(label) ? 'Insurance' : '', label })),
+      ),
+    };
   };
 
   ns.parseBuybacks = function parseBuybacks(payload) {

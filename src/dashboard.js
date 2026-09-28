@@ -43,7 +43,8 @@ const bbLayoutEl = $('#bb-layout');
 // the hangar — notably 'paint'). Order = display order.
 const BB_KINDS = [
   { key: 'ship', label: 'Ships' },
-  { key: 'pack', label: 'Packs & packages' },
+  { key: 'pack', label: 'Packs' },
+  { key: 'package', label: 'Packages' },
   { key: 'ccu', label: 'CCUs' },
   { key: 'paint', label: 'Paints' },
   { key: 'addon', label: 'Add-ons' },
@@ -270,6 +271,7 @@ const state = {
   buybacksScannedAt: null,
   bbQuery: '',
   bbSort: 'date-desc', // default to newest buy-backs first
+  bbDetails: {}, // pledge id → details read from the buy-back's own RSI page
   bbShown: new Set(), // buy-back kind filter
   bbTraits: new Map(), // buy-back trait filter (AND): key → 'yes' | 'no'
   bbLayout: 'gallery', // gallery | compact | list | market (independent of inventory)
@@ -3276,7 +3278,7 @@ function buybackStorePrice(b) {
     const to = state.priceOf(b.ccu.to);
     return from && to && to.msrp > from.msrp ? to.msrp - from.msrp : null;
   }
-  if (b.kind !== 'ship' && b.kind !== 'pack') return null;
+  if (!['ship', 'pack', 'package'].includes(b.kind)) return null;
   const bare = String(b.name || '').replace(/^\s*[^-–]+?\s*[-–]\s/, '');
   const tries = [
     bare,
@@ -3288,6 +3290,41 @@ function buybackStorePrice(b) {
     if (hit && hit.msrp) return hit.msrp;
   }
   return null;
+}
+
+// "Load details" reads each shown buy-back's own page (price, contents,
+// insurance), one at a time. Cached for good, so it's a one-off per buy-back.
+let bbLoading = null; // { stop: bool }
+function bbDetailsBarHtml(list) {
+  const need = list.filter((b) => !b.isCCU && /^\d+$/.test(String(b.id)) && !state.bbDetails[b.id]);
+  const have = list.filter((b) => state.bbDetails[b.id]).length;
+  if (bbLoading) {
+    return `<div class="bb-details-bar"><span id="bbd-progress">Reading buy-back pages…</span> <button type="button" class="mk-btn" id="bbd-stop">Stop</button></div>`;
+  }
+  if (!need.length) return have ? '' : '';
+  const mins = Math.max(1, Math.round((need.length * 1.3) / 60));
+  return `<div class="bb-details-bar">${have ? `${have} of ${list.length} have details. ` : ''}Insurance, real prices and pack contents come from each buy-back's own RSI page. <button type="button" class="mk-btn primary" id="bbd-load">Load details for ${need.length}</button> <span class="muted">(about ${mins} min, one page at a time; you can keep browsing)</span></div>`;
+}
+async function loadBuybackDetails() {
+  const list = computeBuybacks().filter((b) => !b.isCCU && !state.bbDetails[b.id]);
+  bbLoading = { stop: false };
+  renderBuybacks();
+  const res = await OH.fetchBuybackDetails(
+    list.map((b) => String(b.id)),
+    (done, total) => {
+      const el = $('#bbd-progress');
+      if (el) el.textContent = `Reading buy-back pages… ${done} of ${total}`;
+      if (done % 10 === 0 && currentView() === 'buybacks') {
+        state.bbDetails = { ...state.bbDetails };
+      }
+    },
+    () => !bbLoading.stop,
+  );
+  bbLoading = null;
+  state.bbDetails = { ...(await OH.getBuybackDetails()) };
+  if (res.errors)
+    setStatus(`Read ${res.done - res.errors} buy-back pages; ${res.errors} couldn't be read.`);
+  if (currentView() === 'buybacks') renderBuybacks();
 }
 
 function computeBuybacks() {
@@ -3316,8 +3353,8 @@ function computeBuybacks() {
           return dt(a) - dt(b);
         case 'price-desc':
         case 'price-asc': {
-          const pa = buybackStorePrice(a);
-          const pb = buybackStorePrice(b);
+          const pa = bbPrice(a);
+          const pb = bbPrice(b);
           if (pa == null || pb == null) return (pa == null) - (pb == null); // unknown last
           return state.bbSort === 'price-desc' ? pb - pa : pa - pb;
         }
@@ -3375,6 +3412,7 @@ function renderBuybacks() {
   }
   const count =
     tokenLineHtml() +
+    bbDetailsBarHtml(list) +
     `<div class="result-count">Showing ${list.length} of ${state.buybacks.length}${when ? ` · scanned ${OH.escapeHtml(when)}` : ''}</div>`;
   // Market = a reclaim-focused table (buy-backs have no melt/giftable/insurance);
   // the other layouts reuse the shared card grid like the inventory.
@@ -3422,14 +3460,33 @@ function buybackReclaimLink(b) {
     : "Opens just this CCU in RSI's buy-back list, where its reclaim button is";
   return `<a class="bb-reclaim" href="${OH.escapeHtml(url)}" target="_blank" rel="noopener" title="${tip}">Reclaim ↗</a>`;
 }
+function bbDetail(b) {
+  return state.bbDetails[b.id] || null;
+}
 function bbInsurance(b) {
-  return insLabel(b.insurance || window.OpenHangar.insuranceFromName(b.name)) || '—';
+  const d = bbDetail(b);
+  return (
+    insLabel((d && d.insurance) || b.insurance || window.OpenHangar.insuranceFromName(b.name)) ||
+    (d ? 'None' : '—')
+  );
 }
 
+// The buy-back's real price once its page has been read; else today's store
+// price for the ship as an estimate.
+function bbPrice(b) {
+  const d = bbDetail(b);
+  if (d && d.price != null) return d.price;
+  return buybackStorePrice(b);
+}
 function bbPriceHtml(b) {
+  const d = bbDetail(b);
+  if (d && d.price != null)
+    return `<span class="val" title="Buy-back price on RSI">${money(d.price)}</span>`;
   if (b.price) return `<span class="val">${OH.escapeHtml(b.price)}</span>`;
   const sp = buybackStorePrice(b);
-  return sp ? `<span class="val" title="Store price today">${dollars(sp)}</span>` : '';
+  return sp
+    ? `<span class="val est" title="Estimate: the ship's store price today. Load details for the real buy-back price.">~${dollars(sp)}</span>`
+    : '';
 }
 
 // One row per buy-back: each is its own pledge (own insurance, own extras), so
@@ -3438,8 +3495,8 @@ function buybackRowHtml(b) {
   const name = b.ccu
     ? `${OH.escapeHtml(b.ccu.from)} <span class="ccu-flow">→</span> ${OH.escapeHtml(b.ccu.to)}`
     : OH.escapeHtml(b.name || '—');
-  return `<tr class="mk-row">
-    <td class="mk-name">${name}</td>
+  return `<tr class="mk-row" data-id="${OH.escapeHtml(String(b.id || ''))}">
+    <td class="mk-name"><button type="button" class="bb-open" title="See what's in it">${name}</button></td>
     <td class="mk-ins">${OH.escapeHtml(bbInsurance(b))}</td>
     <td class="mk-melt">${bbPriceHtml(b) || '—'}</td>
     <td class="mk-view">${buybackReclaimLink(b) || '—'}</td>
@@ -3455,7 +3512,7 @@ function buybackMarketHtml(list) {
       <h3 class="market-title">${OH.escapeHtml(k.label)}<span class="market-n">${rows.length}</span></h3>
       <table class="market-table">
         <thead><tr>
-          <th>Items Name</th><th title="From the buy-back's name when RSI includes it">Insurance</th><th title="Standard store price today; RSI's buy-back price can differ">Store Price</th><th>Reclaim</th>
+          <th>Items Name</th><th>Insurance</th><th title="RSI's buy-back price (after Load details); ~ = estimate from today's store price">Price</th><th>Reclaim</th>
         </tr></thead>
         <tbody>${rows.map(buybackRowHtml).join('')}</tbody>
       </table>
@@ -3808,26 +3865,61 @@ function openBuybackModal(b) {
   const img = real
     ? `<img class="modal-img" alt="">`
     : `<div class="modal-img placeholder">Buy-Back</div>`;
-  const url = buybackUrl(b);
+  const url = buybackReclaimLink(b);
   const row = (k, v) =>
     `<div class="mr"><span class="mr-k">${k}</span><span class="mr-v">${v}</span></div>`;
+  const d = bbDetail(b);
+  const contents = d
+    ? `${
+        d.ships.length
+          ? `<h4 class="modal-h">Ships (${d.ships.length})</h4><table class="modal-contents"><tbody>${d.ships
+              .map(
+                (x) =>
+                  `<tr><td>${OH.escapeHtml(x.name)}</td><td class="muted">${OH.escapeHtml(
+                    [x.manufacturer, x.focus].filter(Boolean).join(' · '),
+                  )}</td></tr>`,
+              )
+              .join('')}</tbody></table>`
+          : ''
+      }${
+        d.also.length
+          ? `<h4 class="modal-h">Also contains</h4><table class="modal-contents"><tbody>${d.also
+              .map((x) => `<tr><td>${OH.escapeHtml(x)}</td></tr>`)
+              .join('')}</tbody></table>`
+          : ''
+      }`
+    : b.isCCU || !/^\d+$/.test(String(b.id))
+      ? ''
+      : '<p class="muted" id="bbd-modal-loading">Loading what’s in it from RSI…</p>';
   setHTML(
     modalBody,
     img +
       `<div class="modal-info">
       <h3 class="modal-name">${b.ccu ? `${OH.escapeHtml(b.ccu.from)} → ${OH.escapeHtml(b.ccu.to)}` : OH.escapeHtml(b.name || '—')}</h3>
-      <div class="modal-meta"><span class="badge">buy-back</span>${b.price ? `<span class="modal-val">${OH.escapeHtml(b.price)}</span>` : ''}</div>
+      <div class="modal-meta"><span class="badge">buy-back</span>${bbPriceHtml(b) ? `<span class="modal-val">${bbPriceHtml(b)}</span>` : ''}</div>
       ${b.ccu ? row('Upgrade', OH.escapeHtml(`${b.ccu.from} → ${b.ccu.to}`)) : ''}
+      ${b.isCCU ? '' : row('Insurance', OH.escapeHtml(bbInsurance(b)))}
       ${b.date ? row('Melted', OH.escapeHtml(b.date)) : ''}
-      ${b.contains ? row('Contains', OH.escapeHtml(b.contains)) : ''}
       ${b.id ? row('Pledge ID', OH.escapeHtml(b.id)) : ''}
-      ${url ? `<div class="mr"><span class="mr-k">Reclaim</span><span class="mr-v"><a href="${OH.escapeHtml(url)}" target="_blank" rel="noopener">Open on RSI ↗</a></span></div>` : ''}
+      ${url ? row('Reclaim', url) : ''}
+      ${contents}
     </div>`,
   );
   itemModal.hidden = false;
   const mimg = modalBody.querySelector('img.modal-img');
-  if (mimg) {
-    progressiveImage(mimg, real);
+  if (mimg) progressiveImage(mimg, real);
+  if (!d && !b.isCCU && /^\d+$/.test(String(b.id))) {
+    OH.fetchBuybackDetail(String(b.id)).then(async (r) => {
+      if (itemModal.hidden) return;
+      if (r.error) {
+        const el = $('#bbd-modal-loading');
+        if (el) el.textContent = `Couldn't load the contents: ${r.error}`;
+        return;
+      }
+      state.bbDetails = { ...(await OH.getBuybackDetails()) };
+      openBuybackModal(b); // re-draw with the contents
+      if (currentView() === 'buybacks') renderBuybacks();
+    });
   }
 }
 resultsEl.addEventListener('click', (e) => {
@@ -3864,6 +3956,18 @@ resultsEl.addEventListener('change', (e) => {
 });
 if (buybacksBodyEl) {
   buybacksBodyEl.addEventListener('click', (e) => {
+    if (e.target.closest('#bbd-load')) return void loadBuybackDetails();
+    if (e.target.closest('#bbd-stop')) {
+      if (bbLoading) bbLoading.stop = true;
+      return;
+    }
+    const open = e.target.closest('.bb-open');
+    if (open) {
+      const id = open.closest('.mk-row')?.dataset.id;
+      const bb = state.buybacks.find((it) => String(it.id) === id);
+      if (bb) openBuybackModal(bb);
+      return;
+    }
     if (e.target.closest('a')) return; // let links (Reclaim) work normally
     const card = e.target.closest('.card');
     if (!card) return;
@@ -4586,6 +4690,7 @@ async function applyCurrency(code) {
   if (LAYOUTS.includes(bbLayout)) state.bbLayout = bbLayout;
   if (marketAnnotations && typeof marketAnnotations === 'object') state.market = marketAnnotations;
 
+  state.bbDetails = { ...(await OH.getBuybackDetails()) };
   await OH.migrateRecovery(); // old "Restore previous hangar" snapshot → saved account
   loadStateFromDB(await OH.loadDB());
 

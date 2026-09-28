@@ -81,6 +81,12 @@ async function handle(req, res) {
 
   if (u.pathname === '/proxy') {
     const target = u.searchParams.get('u') || '';
+    // A buy-back's own page needs a signed-in session; serve the saved sample.
+    if (/\/pledge\/buyback\/\d+/.test(target)) {
+      return res
+        .writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+        .end(fs.readFileSync(path.join(SRC, '..', 'test', 'fixtures', 'buyback-detail.html')));
+    }
     if (!PROXY_ALLOW.test(target)) return res.writeHead(403).end();
     try {
       if (!proxyCache.has(target)) {

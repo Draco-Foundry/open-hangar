@@ -356,7 +356,7 @@
   window.fetch = (input, init = {}) => {
     const url = typeof input === 'string' ? input : input.url;
     if (/^https:\/\/(robertsspaceindustries\.com|api\.star-citizen\.wiki)\//.test(url)) {
-      if (/\/account\/|\/graphql|\/citizens\//.test(url))
+      if (/\/account\/|\/graphql|\/citizens\//.test(url) && !/\/pledge\/buyback\//.test(url))
         return Promise.resolve(new Response('', { status: 404 }));
       return realFetch('/proxy?u=' + encodeURIComponent(url), { method: 'GET' });
     }

@@ -758,6 +758,25 @@
       .bal.bbt b {
         color: #58a6ff;
       }
+      .bb-open {
+        all: unset;
+        cursor: pointer;
+        color: var(--text);
+      }
+      .bb-open:hover {
+        color: var(--link);
+        text-decoration: underline;
+      }
+      .val.est {
+        color: var(--muted);
+      }
+      .bb-details-bar {
+        margin: 0 0 12px;
+        padding: 8px 12px;
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        font-size: 13px;
+      }
       .bb-tokens {
         margin: 0 0 12px;
         padding: 8px 12px;
@@ -1738,11 +1757,17 @@
         flex-direction: column;
         gap: 26px;
       }
+      /* Section titles stay pinned while you scroll through their table. */
       .market-title {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        background: var(--bg);
+        padding: 8px 0;
         font-size: 18px;
         font-weight: 600;
         color: var(--text);
-        margin: 0 0 10px;
+        margin: 0 0 6px;
         display: flex;
         align-items: center;
         gap: 8px;
@@ -1891,6 +1916,9 @@
         border-color: #1f6feb;
       }
       .chip.k-pack[aria-pressed='true'] {
+        border-color: #d29922;
+      }
+      .chip.k-package[aria-pressed='true'] {
         border-color: #d29922;
       }
       .chip.k-coupon[aria-pressed='true'] {

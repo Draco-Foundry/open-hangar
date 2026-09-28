@@ -194,6 +194,21 @@ try {
   bbm.rows === bbTotal && bbm.reclaim && bbm.ins
     ? ok(`buy-back market: ${bbm.rows} rows, one each, Reclaim + Insurance`)
     : fail(`buy-back market: ${JSON.stringify(bbm)} vs ${bbTotal}`);
+  // Click a name: the details window reads the buy-back's own page.
+  await page.click('#buybacks-body .bb-open');
+  await page
+    .waitForFunction(
+      () => /Also contains/.test(document.querySelector('#modal-body').textContent),
+      {
+        timeout: 8000,
+      },
+    )
+    .catch(() => {});
+  const bbModal = await page.$eval('#modal-body', (e) => e.textContent);
+  /Also contains/.test(bbModal) && /Lifetime Insurance/.test(bbModal) && /LTI/.test(bbModal)
+    ? ok('buy-back details: ships, insurance, also contains')
+    : fail(`buy-back details: "${bbModal.slice(0, 160)}"`);
+  await page.keyboard.press('Escape');
   await page.click('#bb-layout [data-layout="gallery"]');
   await page.click('#bb-layout [data-layout="list"]');
   await checkListAlignment('Buy-Backs', '#buybacks-body');
