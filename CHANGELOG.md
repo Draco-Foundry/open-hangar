@@ -4,6 +4,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Rescan reminder.** When your last scan is a week old, the Open Hangar toolbar icon
+  shows an amber **!** (hover it to see how old). Scanning clears it; switch it off
+  with **Weekly rescan reminder** on the Home card. No new permissions.
 - **Hangar value shows instantly, even offline.** A copy of the ship price list now
   ships inside the extension (refreshed weekly), so Stats and store prices appear
   right away while the live list updates in the background.
