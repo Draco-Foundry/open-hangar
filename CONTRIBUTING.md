@@ -19,7 +19,8 @@ works.
 
 ## Rediscovering the data source
 
-When a scan returns nothing (or garbage), RSI probably changed something.
+When a scan returns nothing (or garbage), RSI probably changed something. For the
+whole triage, fix and release playbook see [docs/RSI-CHANGES.md](docs/RSI-CHANGES.md).
 Here's how to find the new shape:
 
 1. Log in at `https://robertsspaceindustries.com/account/pledges`.
