@@ -32,13 +32,43 @@ a {
   padding: 0 16px;
 }
 
+/* Hero: the Starfarer over a planet (docs/brand/draco-foundry), darkened in
+   the middle so the title and buttons stay readable. The ship sits right of
+   centre; on phones it slides mostly out of frame, which is fine. */
 .hero {
-  background:
-    url('banner.svg') center / cover no-repeat,
-    #05070f;
+  position: relative;
+  background-color: #05070f;
+  background-image:
+    radial-gradient(ellipse 48% 70% at 50% 48%, rgba(5, 7, 15, 0.85), rgba(5, 7, 15, 0.2) 80%),
+    linear-gradient(180deg, rgba(5, 7, 15, 0.25), rgba(5, 7, 15, 0.1) 60%, var(--bg)),
+    url('img/hero-1920.jpg');
+  background-image:
+    radial-gradient(ellipse 48% 70% at 50% 48%, rgba(5, 7, 15, 0.85), rgba(5, 7, 15, 0.2) 80%),
+    linear-gradient(180deg, rgba(5, 7, 15, 0.25), rgba(5, 7, 15, 0.1) 60%, var(--bg)),
+    image-set(
+      url('img/hero-1920.webp') type('image/webp'),
+      url('img/hero-1920.jpg') type('image/jpeg')
+    );
+  background-size: cover;
+  background-position: 70% 55%;
   border-bottom: 1px solid var(--line);
-  padding: 64px 0 48px;
+  padding: 96px 0 88px;
   text-align: center;
+}
+@media (min-width: 1600px) {
+  .hero {
+    background-image:
+      radial-gradient(ellipse 40% 70% at 50% 48%, rgba(5, 7, 15, 0.85), rgba(5, 7, 15, 0.2) 80%),
+      linear-gradient(180deg, rgba(5, 7, 15, 0.25), rgba(5, 7, 15, 0.1) 60%, var(--bg)),
+      image-set(
+        url('img/hero-2560.webp') type('image/webp'),
+        url('img/hero-1920.jpg') type('image/jpeg')
+      );
+  }
+}
+.hero h1,
+.hero .tagline {
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
 }
 .logo {
   display: block;
@@ -264,6 +294,20 @@ footer {
   font-size: 0.875rem;
   color: var(--muted);
 }
+.maker {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  color: var(--text);
+  text-decoration: none;
+}
+.maker img {
+  border-radius: 50%;
+}
+.maker:hover strong {
+  color: var(--link);
+}
 footer nav {
   display: flex;
   flex-wrap: wrap;
@@ -273,7 +317,7 @@ footer nav {
   margin: 12px 0 0;
 }
 
-/* Fan kit screenshots — always shown whole (aspect-ratio kept, never cropped). */
+/* Fan kit screenshots: always shown whole (aspect ratio kept, never cropped). */
 .shot {
   position: relative;
   margin: 0;
@@ -285,15 +329,12 @@ footer nav {
 }
 .mbtc {
   position: absolute;
-  right: 2%;
-  bottom: 4%;
-  width: clamp(40px, 6%, 84px);
+  top: 4%;
+  right: 3%;
+  width: clamp(28px, 10%, 48px);
   height: auto;
-  opacity: 0.85;
-}
-.mbtc-left {
-  right: auto;
-  left: 2%;
+  opacity: 0.8;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
 }
 .gallery {
   display: grid;
@@ -303,9 +344,6 @@ footer nav {
 }
 .gallery .shot img:not(.mbtc) {
   border-radius: 10px;
-}
-.gallery .mbtc {
-  width: clamp(36px, 12%, 64px);
 }
 
 .notices {
