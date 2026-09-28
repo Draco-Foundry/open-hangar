@@ -1432,6 +1432,10 @@
         opacity: 0.45;
         cursor: default;
       }
+      .mk-view,
+      .mk-view a {
+        white-space: nowrap;
+      }
       .mk-sel {
         width: 28px;
         text-align: center;
@@ -1916,6 +1920,13 @@
       .grid.compact .card-contents {
         display: none;
       }
+      .grid.compact .foot-left {
+        gap: 6px;
+      }
+      .grid.compact .foot-left .badge {
+        min-width: 54px;
+        padding: 1px 6px;
+      }
       /* List: full-width rows with aligned columns (thumb | name | contents | kind | value) */
       .grid.list {
         grid-template-columns: 1fr;
@@ -1956,6 +1967,7 @@
       }
       .grid.list .val {
         text-align: right;
+        margin-left: 0; /* the card layouts' push-right would skew List columns */
       }
       @media (max-width: 700px) {
         .grid.list .card-body {
@@ -2173,22 +2185,27 @@
       .grid:not(.list) .card-contents:empty {
         display: none;
       }
+      /* Badge + M/G tags on the left, price on the right; on narrow cards the
+         price drops to its own line instead of running into the tags. */
       .card-foot {
         margin-top: auto;
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
-        gap: 8px;
+        gap: 4px 8px;
       }
       .val {
         font-variant-numeric: tabular-nums;
         font-size: 13px;
+        white-space: nowrap;
+        margin-left: auto;
       }
       .foot-left {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        min-width: 0;
+        flex-shrink: 0;
       }
       /* Fixed-width kind badge so the M / G tags after it line up row to row. */
       .foot-left .badge {
@@ -2468,6 +2485,21 @@
         color: var(--muted);
       }
       /* Store: your CCUs + price list */
+      .view a:not([class]) {
+        color: var(--link);
+      }
+      .store-intro a {
+        font-weight: 600;
+      }
+      #price-search {
+        width: 260px;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--panel-2);
+        color: var(--text);
+        font-size: 13px;
+      }
       .store-intro {
         max-width: 760px;
         font-size: 13px;
@@ -2621,13 +2653,39 @@
         flex-wrap: wrap;
         gap: 10px;
       }
+      .release {
+        padding: 20px 24px;
+        border-radius: 14px;
+      }
+      .release-head {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid var(--line);
+      }
       .release-head h3 {
         margin: 0;
-        font-size: 16px;
+        font-size: 22px;
       }
       .release-date {
         color: var(--muted);
+        font-size: 13px;
+      }
+      .release-group {
+        display: inline-block;
+        margin: 16px 0 2px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        background: var(--panel-2);
         font-size: 12px;
+        font-weight: 700;
+      }
+      .release-group.g-fixed {
+        color: #f0b429;
+      }
+      .release-group.g-new {
+        color: #3fb950;
       }
       .release-tag {
         font-size: 11px;

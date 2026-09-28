@@ -4,6 +4,12 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Buy-backs: View on RSI.** Each buy-back in the Market table links to just that
+  item on RSI's buy-back page. Hangar links now just say **View**.
+- **Updates page restyled.** Big version number and date, with changes grouped
+  under **New & improved** and **Fixed**.
+- Fixed: on narrow cards the price ran into the M / G tags; it now drops to its own
+  line. The Store page's search box and ccugame.app link are styled again.
 - **Org Fleet: roles, biggest ships, members.** See which jobs your org can cover
   (mining, salvage, medical, refueling, repair, exploration and more) and which it
   can't, the biggest hulls and who owns them, and each member's ship count, LTI
