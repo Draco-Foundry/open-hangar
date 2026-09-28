@@ -98,11 +98,9 @@ bottom. Items marked ✅ are ready in the repo; ⬜ need you to do them.
 > the returned pages/JSON locally. Read-only and rate-limited; only the user's own
 > account is accessed.
 
-**`host_permissions` → `https://api.star-citizen.wiki/*`**
-
-> Public, read-only API used as a fallback for the current game version and for ship
-> art when RSI's own public ship-matrix has no image for an item RSI ships without
-> art. No credentials or personal data are sent.
+_(Since 0.2.8 there is no `api.star-citizen.wiki` host permission: that public API
+sends `Access-Control-Allow-Origin: *` and we fetch it without credentials, so the
+install prompt only names robertsspaceindustries.com.)_
 
 ## 6. Listing copy (ready to paste)
 

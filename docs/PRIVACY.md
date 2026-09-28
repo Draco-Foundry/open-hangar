@@ -57,7 +57,7 @@ personal data:
 - **cookies** — used solely for "Log out of RSI," which clears
   robertsspaceindustries.com cookies so you can fully end your RSI session from the
   extension. Cookie values are never read or transmitted.
-- **host access** to robertsspaceindustries.com and api.star-citizen.wiki — to make
+- **host access** to robertsspaceindustries.com, to make
   the read-only requests described above.
 
 ## Data export
