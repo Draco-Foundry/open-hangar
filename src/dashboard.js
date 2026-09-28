@@ -1089,7 +1089,7 @@ const TRAITS = [
   {
     key: 'meltable',
     label: 'Meltable',
-    title: 'RSI shows an Exchange action — can be melted for store credit',
+    title: 'RSI shows an Exchange action, so it can be melted for store credit',
     notLabel: 'Not meltable',
     test: (f) => f.meltable === true,
     neg: (f) => f.meltable === false,
@@ -1108,7 +1108,7 @@ const TRAITS = [
     key: 'below',
     label: 'Below store price',
     title:
-      "Paid less than today's store price (star-citizen.wiki) — warbonds, sales, older cheaper pricing. Ship pledges and CCUs.",
+      "Paid less than today's store price (star-citizen.wiki): warbonds, sales, older cheaper pricing. Ship pledges and CCUs.",
     notLabel: 'At / above store price',
     test: (f) => f.below === true,
     neg: (f) => f.below === false,
@@ -1125,7 +1125,7 @@ const TRAITS = [
   {
     key: 'free',
     label: 'Free / rewards',
-    title: '$0 pledges — referral, event and other rewards',
+    title: '$0 pledges: referral, event and other rewards',
     notLabel: 'Paid pledges',
     test: (f) => f.value === 0,
     neg: (f) => f.value != null && f.value > 0,
