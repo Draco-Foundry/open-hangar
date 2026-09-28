@@ -104,6 +104,25 @@ def build(ly=330):
     return img.convert('RGB')
 
 
+def logo_only(L=560, pad=190):
+    """Scene with just the round gear logo in the bottom-left corner."""
+    scene = Image.open(SCENE).convert('RGB').resize((W, H), Image.LANCZOS).convert('RGBA')
+    lx, ly = pad, H - pad - L
+    shade = Image.new('L', (W, H), 0)
+    ImageDraw.Draw(shade).ellipse((lx - 500, ly - 500, lx + L + 500, ly + L + 500), fill=120)
+    shade = shade.filter(ImageFilter.GaussianBlur(200))
+    img = Image.composite(Image.new('RGBA', (W, H), (4, 8, 16, 255)), scene, shade)
+    glow = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(glow).ellipse((lx - 20, ly - 20, lx + L + 20, ly + L + 20), fill=(60, 150, 255, 170))
+    img = Image.alpha_composite(img, glow.filter(ImageFilter.GaussianBlur(44)))
+    logo = Image.open(HERE / 'dreamina-source.jpg').convert('RGBA').resize((L, L), Image.LANCZOS)
+    mask = Image.new('L', (L, L), 0)
+    ImageDraw.Draw(mask).ellipse((0, 0, L - 1, L - 1), fill=255)
+    img.paste(logo, (lx, ly), mask)
+    ImageDraw.Draw(img).ellipse((lx, ly, lx + L - 1, ly + L - 1), outline=(120, 190, 255, 210), width=5)
+    return img.convert('RGB')
+
+
 def main():
     master = build()
     master.save(HERE / 'banner-3840x2160.jpg', quality=92)
@@ -115,6 +134,11 @@ def main():
     # Discord server banner: Discord writes the server name over the top-left,
     # so the brand block sits lower, under that strip.
     build(ly=1010).resize((960, 540), Image.LANCZOS).save(HERE / 'server-banner-960x540.jpg', quality=92)
+    # Logo-only Discord banner: Discord already shows the server name up top,
+    # so just the gear, bottom-left.
+    logo_only().resize((960, 540), Image.LANCZOS).save(
+        HERE / 'server-banner-logo-960x540.jpg', quality=92
+    )
     # clean scene (no text) for Discord's invite background
     Image.open(SCENE).convert('RGB').resize((1920, 1080), Image.LANCZOS).save(
         HERE / 'invite-splash-1920x1080.jpg', quality=92
