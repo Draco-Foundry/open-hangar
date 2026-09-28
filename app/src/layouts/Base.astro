@@ -9,14 +9,14 @@ interface Props {
   allFonts?: boolean;
 }
 const { title, allFonts = false } = Astro.props;
-const theme = readTheme(Astro.cookies.get('oh_theme')?.value);
+const theme = readTheme(Astro.locals.themePref ?? Astro.cookies.get('oh_theme')?.value);
 const fonts = fontHref(allFonts ? ALL_FONT_IDS : [theme.font]);
 const user = Astro.locals.user;
 const path = Astro.url.pathname;
 const nav = user
   ? [
-      ['/hangar', 'My hangar'],
-      ['/link', 'Connect extension'],
+      ['/hangar', 'My Hangar'],
+      ['/link', 'Connect Extension'],
       ['/account', 'Account'],
     ]
   : [];
@@ -34,7 +34,7 @@ const nav = user
   <body>
     <header class="top">
       <div class="wrap bar">
-        <a class="brand" href="/"><img src="/favicon.svg" alt="" width="26" height="26" /> Open Hangar</a>
+        <a class="brand" href="/" aria-label="Open Hangar home"><img src="/favicon.svg" alt="" width="26" height="26" /> <span>Open Hangar</span></a>
         <nav>
           {
             nav.map(([href, label]) => (
@@ -49,13 +49,13 @@ const nav = user
           {
             user ? (
               <button class="secondary" id="sign-out" type="button">
-                Sign out
+                Sign Out
               </button>
             ) : (
               <>
-                <a href="/sign-in">Sign in</a>
+                <a href="/sign-in">Sign In</a>
                 <a class="btn" href="/sign-up">
-                  Create account
+                  Create Account
                 </a>
               </>
             )
@@ -124,6 +124,28 @@ const nav = user
   main {
     min-height: calc(100vh - 140px);
     padding-bottom: 40px;
+  }
+  /* Phones: icon-only brand, tighter links, allow wrapping. */
+  @media (max-width: 640px) {
+    .bar {
+      height: auto;
+      min-height: 54px;
+      padding-top: 8px;
+      padding-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .brand span {
+      display: none;
+    }
+    nav {
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    nav a:not(.btn) {
+      font-size: 12px;
+      white-space: nowrap;
+    }
   }
   .foot {
     border-top: 1px solid var(--line);

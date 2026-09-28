@@ -1,5 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
+import ThemePicker from '../components/ThemePicker.astro';
 import { db } from '../lib/sync';
 
 export const prerender = false;
@@ -29,6 +30,12 @@ const welcome = Astro.url.searchParams.has('welcome');
     <h2 style="margin-top:0">Profile</h2>
     <p><strong>{user.email}</strong></p>
     <p class="muted">RSI handles will show here for each hangar you sync (your main and any alts).</p>
+  </section>
+
+  <section class="card" id="appearance">
+    <h2 style="margin-top:0">Appearance</h2>
+    <p class="muted">How the site looks for you, on every device you sign in on.</p>
+    <ThemePicker />
   </section>
 
   <section class="card" id="tfa" data-enabled={user.twoFactorEnabled ? '1' : ''}>
@@ -96,7 +103,7 @@ const welcome = Astro.url.searchParams.has('welcome');
         </table>
       ) : (
         <p class="muted">
-          None yet. <a href="/link">Connect Your Extension</a> to sync your hangar here.
+          None yet. <a href="/link">Connect your extension</a> to sync your hangar here.
         </p>
       )
     }

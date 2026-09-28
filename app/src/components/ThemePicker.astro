@@ -1,0 +1,156 @@
+---
+// Appearance picker: colours (grouped), font, style. Applies instantly and
+// saves via /api/theme (cookie, plus the account when signed in).
+import { FONTS, PALETTES, STYLES, readTheme } from '../lib/theme';
+
+const t = readTheme(Astro.locals.themePref ?? Astro.cookies.get('oh_theme')?.value);
+const groups = [...new Set(PALETTES.map((p) => p.group))];
+---
+
+<div class="pickers">
+  <div class="picker">
+    <h3>Colours</h3>
+    {
+      groups.map((g) => (
+        <>
+          <p class="group muted">{g === 'Manufacturers' ? 'Manufacturer-Inspired' : g}</p>
+          <div class="opts" data-axis="palette">
+            {PALETTES.filter((p) => p.group === g).map((p) => (
+              <button type="button" class="opt" data-id={p.id} aria-pressed={p.id === t.palette}>
+                <span class="sw">
+                  {p.swatch.map((c) => (
+                    <i style={`background:${c}`} />
+                  ))}
+                </span>
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </>
+      ))
+    }
+  </div>
+  <div class="picker">
+    <h3>Font</h3>
+    <div class="opts" data-axis="font">
+      {
+        FONTS.map((f) => (
+          <button
+            type="button"
+            class="opt"
+            data-id={f.id}
+            aria-pressed={f.id === t.font}
+            style={`font-family:'${f.sample}',system-ui`}
+          >
+            {f.label}
+          </button>
+        ))
+      }
+    </div>
+  </div>
+  <div class="picker">
+    <h3>Style</h3>
+    <div class="opts" data-axis="style">
+      {
+        STYLES.map((s) => (
+          <button type="button" class="opt" data-id={s.id} aria-pressed={s.id === t.style}>
+            {s.label}
+            <small class="muted">{s.note}</small>
+          </button>
+        ))
+      }
+    </div>
+  </div>
+  <p class="muted status" aria-live="polite"></p>
+</div>
+
+<script>
+  const html = document.documentElement;
+  const axes = ['palette', 'font', 'style'] as const;
+  const current = () => axes.map((a) => html.dataset[a]).join('.');
+  let saveTimer: ReturnType<typeof setTimeout> | undefined;
+  document.querySelectorAll<HTMLElement>('.pickers').forEach((root) => {
+    const status = root.querySelector('.status');
+    root.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.opt');
+      const group = btn?.closest<HTMLElement>('.opts');
+      if (!btn || !group) return;
+      const axis = group.dataset.axis as (typeof axes)[number];
+      html.dataset[axis] = btn.dataset.id!;
+      root
+        .querySelectorAll(`.opts[data-axis="${axis}"] .opt`)
+        .forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(async () => {
+        const res = await fetch('/api/theme', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ theme: current() }),
+        }).catch(() => null);
+        const out: { saved?: boolean } | null = res && res.ok ? await res.json() : null;
+        if (status) {
+          status.textContent = out
+            ? out.saved
+              ? 'Saved to your account.'
+              : 'Saved in this browser. Sign in to keep it on every device.'
+            : 'Couldn’t save right now.';
+        }
+      }, 250);
+    });
+  });
+</script>
+
+<style>
+  .pickers {
+    display: grid;
+    gap: 6px;
+  }
+  .picker h3 {
+    margin: 8px 0 6px;
+    font-size: 14px;
+  }
+  .group {
+    margin: 6px 0 4px;
+    font-size: 12px;
+  }
+  .opts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .opt {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    font-weight: 600;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 116px;
+  }
+  .opt small {
+    font-weight: 400;
+    font-size: 11px;
+  }
+  .opt[aria-pressed='true'] {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--glow);
+  }
+  .opt:hover {
+    background: var(--panel);
+  }
+  .sw {
+    display: flex;
+    gap: 3px;
+  }
+  .sw i {
+    width: 18px;
+    height: 12px;
+    border-radius: 3px;
+    border: 1px solid rgba(128, 128, 128, 0.4);
+  }
+  .status {
+    min-height: 1.4em;
+    margin: 6px 0 0;
+  }
+</style>
