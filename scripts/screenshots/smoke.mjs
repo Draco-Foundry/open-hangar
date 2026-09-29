@@ -483,40 +483,49 @@ try {
   prices > 50 ? ok(`price list: ${prices} ships`) : fail(`price list only ${prices} rows`);
   const st = await page.evaluate(async () => {
     const rows = () => document.querySelectorAll('#price-table tbody tr').length;
-    const sale = rows();
-    const yes = document.querySelectorAll('#price-table .sale.on, #price-table .sale.wb').length;
+    const flying = rows(); // default tab: Flight Ready
     document.querySelector('[data-price-tab="all"]').click();
     const all = rows();
     document.querySelector('[data-price-tab="in-concept"]').click();
     const concept = rows();
     const ccus = document.querySelectorAll('#ccu-owned tbody tr').length;
+    // "In store now" comes from each ship's own store page (stubbed here):
+    // Cutlass Black in stock, Carrack not in the store.
+    OH.getShipStock = async (url) => (/Cutlass-Black/i.test(url) ? 'in' : 'out');
     // Wishlist a ship with buy-backs; its row opens the list of them.
-    state.wishlist = [state.buybacks.find((b) => b.ccu)?.ccu.to || state.buybacks[0].name];
+    state.wishlist = ['Cutlass Black', 'Carrack'];
     renderStore();
-    const open = document.querySelector('[data-wish-bbs]');
-    open?.click();
+    await new Promise((r) => setTimeout(r, 300));
+    const stock = [...document.querySelectorAll('#wishlist .sale')].map((e) => e.textContent);
+    document.querySelector('[data-wish-bbs]')?.click();
     const sub = document.querySelector('.wish-bbs');
     const res = {
-      sale,
-      yes,
+      flying,
       all,
       concept,
       ccus,
-      line: document.querySelector('#store-status-line').textContent,
+      stock,
+      priceStock: document.querySelectorAll('#price-table .sale').length,
+      tabs: [...document.querySelectorAll('[data-price-tab]')].map((b) => b.textContent),
       bbRows: sub && !sub.hidden ? sub.querySelectorAll('tbody tr').length : 0,
       reclaim: sub ? /Reclaim/.test(sub.textContent) : false,
       panels: document.querySelectorAll('#view-store .store-panel').length,
       ccugame: /ccugame/i.test(document.querySelector('#view-store').textContent),
     };
     state.wishlist = [];
-    state.priceTab = 'sale';
+    state.priceTab = 'flight-ready';
     return res;
   });
-  st.panels === 3 && st.yes === st.sale && st.all > st.sale && st.concept > 0 && !st.ccugame
-    ? ok(`store panels: ${st.sale} for sale now, ${st.all} in all, ${st.concept} in concept`)
+  st.panels === 3 &&
+  st.all > st.flying &&
+  st.concept > 0 &&
+  !st.ccugame &&
+  !st.tabs.includes('For Sale Now') &&
+  st.priceStock === 0
+    ? ok(`store panels: ${st.flying} flight ready, ${st.all} in all, ${st.concept} in concept`)
     : fail(`store page: ${JSON.stringify(st)}`);
-  /Live from RSI's store/.test(st.line) && st.ccus > 0 && st.bbRows > 0 && st.reclaim
-    ? ok(`live status line, ${st.ccus} CCU rows, wishlist buy-backs open (${st.bbRows})`)
+  st.stock.join('|') === 'In stock|Not in store' && st.ccus > 0 && st.bbRows > 0 && st.reclaim
+    ? ok(`wishlist stock from ship pages (${st.stock.join(', ')}), buy-backs open (${st.bbRows})`)
     : fail(`store details: ${JSON.stringify(st)}`);
 
   console.log('Updates');

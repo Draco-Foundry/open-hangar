@@ -2362,6 +2362,61 @@
     return cached || null;
   };
 
+  // --- Is a ship in the store right now? -------------------------------------------
+  // The upgrade-tool feed above only lists CCU targets, so it can't answer this.
+  // Each ship's own store page does: its schema.org data carries the store's
+  // stock ("InStock" / "OutOfStock"), and a missing page means not in the store.
+  // One page per ship, so this is only asked for ships someone is looking at.
+  // Page HTML → 'in' | 'out' | null (couldn't tell). Pure.
+  OH.parseShipStock = function parseShipStock(html) {
+    let seen = false;
+    let inStock = false;
+    for (const m of String(html || '').matchAll(
+      /<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi,
+    )) {
+      let j;
+      try {
+        j = JSON.parse(m[1]);
+      } catch {
+        continue;
+      }
+      for (const node of Array.isArray(j) ? j : [j]) {
+        const offers = node && node.offers;
+        for (const o of Array.isArray(offers) ? offers : offers ? [offers] : []) {
+          const a = String((o && o.availability) || '');
+          if (!a) continue;
+          seen = true;
+          if (/InStock|LimitedAvailability|PreOrder/i.test(a)) inStock = true;
+        }
+      }
+    }
+    return seen ? (inStock ? 'in' : 'out') : null;
+  };
+  const STOCK_KEY = 'shipStock';
+  const STOCK_TTL = 6 * 3600e3;
+  // Store page URL → 'in' | 'out' | null, cached 6 hours per ship.
+  OH.getShipStock = async function getShipStock(url, fetchFn = fetch) {
+    if (!/^https:\/\/robertsspaceindustries\.com\/pledge\//.test(url || '')) return null;
+    const { [STOCK_KEY]: cache = {} } = await chrome.storage.local.get(STOCK_KEY);
+    const hit = cache[url];
+    if (hit && Date.now() - hit.at < STOCK_TTL) return hit.s;
+    let s = null;
+    try {
+      const res = await fetchFn(url, { credentials: 'omit' });
+      if (res.status === 404) s = 'out';
+      else if (res.ok) s = OH.parseShipStock(await res.text());
+    } catch (e) {
+      OH.log('warn', 'store', `stock check failed: ${e?.message || e}`);
+    }
+    if (s) {
+      await mutateStored(STOCK_KEY, (cur = {}) => ({
+        ...pruneTimed(cur, () => STOCK_TTL),
+        [url]: { s, at: Date.now() },
+      })).catch(() => {});
+    }
+    return s;
+  };
+
   // --- Loaner ships (RSI support: "Loaner Ship Matrix") --------------------------
   // A public help-center article with one table row per not-yet-flyable ship:
   // "YOUR SHIP" → "OUR LOANER(S)". Row names use shorthand ("Hull D, E",
