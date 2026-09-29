@@ -342,6 +342,7 @@ const state = {
   // wipes your prices. Purely local — never exported or sent.
   market: {},
   wishlist: [], // ship names (Store → Wishlist)
+  priceTab: 'sale', // Store → Ship Prices tab
   bbPicked: new Set(), // Buy-Backs Market: picked buy-back ids (for totals + exports)
   marketGiftableOnly: false, // Market view: show only sellable (giftable) items
   referral: null, // { code, url, current, legacy, prospects, recruitsList, prospectsList }
@@ -2155,25 +2156,6 @@ if (selectBar) {
 }
 
 // --- Store: your CCUs + price list -----------------------------------------
-// Light on purpose: chain planning is ccugame.app's job, we just show what
-// your CCUs are worth at standard store prices. Ship list is state.catalog.
-function ownedCCUs() {
-  if (!state.priceOf) return [];
-  const v = hangarValue();
-  return state.items
-    .filter((p) => p.isCCU && p.ccu)
-    .map((p) => {
-      const si = v && v.pledges[p.id];
-      return {
-        from: OH.htfShipName(p.ccu.from) || p.ccu.from,
-        to: OH.htfShipName(p.ccu.to) || p.ccu.to,
-        fromMsrp: si && si.from,
-        toMsrp: si && si.to,
-        paid: p.value,
-      };
-    })
-    .filter((c) => c.fromMsrp && c.toMsrp);
-}
 
 const capFirst = (t) => String(t || '').replace(/^\w/, (c) => c.toUpperCase());
 
@@ -2183,59 +2165,263 @@ const SHIP_STATES = [
   ['in-production', 'In production'],
   ['in-concept', 'In concept'],
 ];
+// --- Store page -------------------------------------------------------------
+// Three panels: Wishlist, Your CCUs and Ship Prices. Long lists scroll inside
+// their panel. "In store now" is live from RSI's store (OH.getStoreShips,
+// cached 6 hours).
+let storeData = null; // { at, ships }
+let storeByKey = null; // shipKey(name) → store entry
+let storeRequested = false;
+function ensureStore() {
+  if (storeRequested) return;
+  storeRequested = true;
+  OH.getStoreShips().then((d) => {
+    if (!d) return;
+    storeData = d;
+    storeByKey = new Map();
+    for (const s of d.ships) {
+      storeByKey.set(shipKey(s.name), s);
+      storeByKey.set(s.lname, s);
+    }
+    if (currentView() === 'store') renderStore();
+  });
+}
+// Store entries by catalog slug, built through the same fuzzy ship matching the
+// rest of the dashboard uses ("Freelancer" ↔ "MISC Freelancer", "C2 Hercules" ↔
+// "C2 Hercules Starlifter"). Rebuilt when the store data or ship list changes.
+// A special edition ("600i 2951 BIS") is a different store item: never pair
+// it with a plain name.
+const specialEdition = (n) => /\b(bis|best in show|\d{4})\b/i.test(n || '');
+let storeBySlug = null;
+let storeBySlugFor = null;
+function storeSlugMap() {
+  if (!storeData || !state.shipOf) return null;
+  if (storeBySlugFor !== storeData.at + ':' + (state.catalog || []).length) {
+    storeBySlug = new Map();
+    for (const s of storeData.ships) {
+      const v = shipEntry(s.name);
+      if (v && specialEdition(v.name) !== specialEdition(s.name)) continue;
+      if (v && !storeBySlug.has(v.slug)) storeBySlug.set(v.slug, s);
+    }
+    // Exact names win over fuzzy ones for the same ship.
+    for (const s of storeData.ships) {
+      const v = (state.catalog || []).find((c) => c.lname === s.lname);
+      if (v) storeBySlug.set(v.slug, s);
+    }
+    storeBySlugFor = storeData.at + ':' + (state.catalog || []).length;
+  }
+  return storeBySlug;
+}
+function storeOf(name) {
+  if (!storeByKey || !name) return null;
+  const v = shipEntry(name);
+  const bySlug = storeSlugMap();
+  const hit =
+    (v && bySlug && bySlug.get(v.slug)) ||
+    storeByKey.get(shipKey(name)) ||
+    storeByKey.get(String(name).toLowerCase()) ||
+    null;
+  return hit && specialEdition(hit.name) === specialEdition(name) ? hit : null;
+}
+// The "In store now" cell for a ship (or '' when RSI's list doesn't have it).
+function inStoreHtml(name) {
+  const s = storeOf(name);
+  if (!s) return storeData ? '<span class="muted">—</span>' : '';
+  const tip = OH.escapeHtml(
+    s.editions.map((e) => `${e.title} ${dollars(e.price)}`).join(', ') ||
+      'Not for sale on RSI right now',
+  );
+  if (s.warbond) {
+    const wb = Math.min(...s.editions.filter((e) => e.warbond).map((e) => e.price));
+    return `<span class="sale wb" title="${tip}">Warbond ${dollars(wb)}</span>`;
+  }
+  if (s.forSale) return `<span class="sale on" title="${tip}">Yes</span>`;
+  return `<span class="sale off" title="${tip}">No</span>`;
+}
+
+// Wishlist: one row per ship; its buy-backs (standalone copies, and CCUs that
+// upgrade to it) open underneath with dates, pledge IDs and Reclaim links.
+function wishlistHtml() {
+  if (!state.wishlist.length) {
+    return '<p class="muted sp-empty">Open any ship (search at the top, or a name in Ship Prices) and press <strong>Add to Wishlist</strong>.</p>';
+  }
+  const owned = new Map(ownedShips().map((s) => [shipKey(s.label), s.pledges.length]));
+  const esc = OH.escapeHtml;
+  const rows = state.wishlist
+    .map((name, i) => {
+      const v = shipEntry(name);
+      const title = (v && v.name) || name;
+      const bbs = state.buybacks.filter((b) => buybackHasShip(b, title));
+      const ships = bbs.filter((b) => !b.ccu).length;
+      const ccus = bbs.length - ships;
+      const have = owned.get(shipKey(title));
+      const status = v && (SHIP_STATES.find(([k]) => k === v.status) || [])[1];
+      const summary = [
+        ships ? `${ships} ship buy-back${ships === 1 ? '' : 's'}` : '',
+        ccus ? `${ccus} CCU${ccus === 1 ? '' : 's'} to it` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      const detail = bbs.length
+        ? `<tr class="wish-bbs" id="wish-bbs-${i}" hidden><td colspan="7"><table class="org-table inner"><thead><tr><th>Buy-back</th><th>Melted</th><th>Pledge ID</th><th class="num">Price</th><th></th></tr></thead><tbody>${bbs
+            .map(
+              (b) => `<tr>
+                <td>${esc(b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '')}</td>
+                <td>${esc(b.date || '')}</td>
+                <td>${/^\d+$/.test(String(b.id)) ? esc(String(b.id)) : '<span class="muted">—</span>'}</td>
+                <td class="num">${esc(bbPriceText(b)) || '<span class="muted">—</span>'}</td>
+                <td class="num">${buybackReclaimLink(b)}</td>
+              </tr>`,
+            )
+            .join('')}</tbody></table></td></tr>`
+        : '';
+      return `<tr>
+        <td>${shipLink(title)}</td>
+        <td class="num">${v && v.msrp ? dollars(v.msrp) : '<span class="muted">—</span>'}</td>
+        <td>${inStoreHtml(title)}</td>
+        <td>${esc(status || '')}</td>
+        <td>${
+          bbs.length
+            ? `<button type="button" class="ship-link wish-open" data-wish-bbs="${i}" aria-expanded="false">${esc(summary)} ▾</button>`
+            : '<span class="muted">none</span>'
+        }</td>
+        <td>${have ? `you own ${have}` : ''}</td>
+        <td class="num"><button type="button" class="ship-link" data-wish-remove="${esc(name)}">Remove</button></td>
+      </tr>${detail}`;
+    })
+    .join('');
+  return `<table class="org-table wishlist"><thead><tr><th>Ship</th><th class="num">Store price</th><th>In store now</th><th>Status</th><th>Buy-backs</th><th></th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// Your CCUs: identical ones stacked, searchable, all of them (not just priced).
+function ccuPanelHtml(q) {
+  const v = hangarValue();
+  const needle = q.trim().toLowerCase();
+  const stacks = new Map();
+  for (const p of state.items) {
+    if (!p.isCCU || !p.ccu) continue;
+    const from = OH.htfShipName(p.ccu.from) || p.ccu.from;
+    const to = OH.htfShipName(p.ccu.to) || p.ccu.to;
+    const key = `${from}→${to}`.toLowerCase();
+    const si = v && v.pledges[p.id];
+    const st = stacks.get(key) || { from, to, n: 0, paid: 0, worth: null };
+    st.n++;
+    st.paid += Number.isFinite(p.value) ? p.value : 0;
+    if (si && si.from && si.to) st.worth = si.to - si.from;
+    stacks.set(key, st);
+  }
+  const all = [...stacks.values()];
+  if (!all.length) return '<p class="muted sp-empty">No CCUs in your hangar.</p>';
+  const shown = all
+    .filter((c) => !needle || `${c.from} ${c.to}`.toLowerCase().includes(needle))
+    .sort((a, b) => (b.worth || 0) - (a.worth || 0));
+  if (!shown.length) return '<p class="muted sp-empty">No CCUs match.</p>';
+  return `<table class="org-table"><thead><tr><th>Upgrade</th><th class="num">Worth</th><th class="num">You paid</th><th class="num">Stock</th><th>Target in store</th></tr></thead><tbody>${shown
+    .map(
+      (c) => `<tr>
+        <td>${shipLink(c.from)} <span class="ccu-flow">→</span> ${shipLink(c.to)}</td>
+        <td class="num">${c.worth != null ? dollars(c.worth) : '<span class="muted">—</span>'}</td>
+        <td class="num">${money(c.paid)}</td>
+        <td class="num">${c.n}</td>
+        <td>${inStoreHtml(c.to)}</td>
+      </tr>`,
+    )
+    .join('')}</tbody></table>`;
+}
+
+// Ship Prices: tabs (For sale now, Flight ready, In production, In concept, All).
+const PRICE_TABS = [
+  ['sale', 'For Sale Now'],
+  ['flight-ready', 'Flight Ready'],
+  ['in-production', 'In Production'],
+  ['in-concept', 'In Concept'],
+  ['all', 'All'],
+];
 function priceRowsHtml(q) {
   const needle = q.trim().toLowerCase();
+  const tab = state.priceTab;
   const rows = (state.catalog || [])
     .filter((v) => v.msrp && (!needle || v.lname.includes(needle)))
+    .filter((v) => {
+      if (tab === 'all') return true;
+      if (tab === 'sale') return !!(storeOf(v.name) || {}).forSale;
+      return v.status === tab;
+    })
     .sort((a, b) => (a.name || a.lname).localeCompare(b.name || b.lname));
-  if (!rows.length) return '<p class="muted">No ships match.</p>';
-  const known = new Set(SHIP_STATES.map(([k]) => k));
-  const groups = SHIP_STATES.map(([k, label]) => [label, rows.filter((v) => v.status === k)]);
-  groups.push(['Other', rows.filter((v) => !known.has(v.status))]);
-  return groups
-    .filter(([, list]) => list.length)
+  if (!rows.length) {
+    return tab === 'sale' && !storeData
+      ? '<p class="muted sp-empty">Checking RSI’s store…</p>'
+      : '<p class="muted sp-empty">No ships match.</p>';
+  }
+  const statusLabel = (s) => (SHIP_STATES.find(([k]) => k === s) || [])[1] || capFirst(s || '');
+  return `<table class="org-table"><thead><tr><th>Ship</th><th class="num">Store price</th><th>In store now</th><th>Status</th><th>Role</th><th>Size</th></tr></thead><tbody>${rows
     .map(
-      ([label, list]) =>
-        `<h4 class="price-group">${label} <span class="muted">(${list.length})</span></h4>` +
-        `<table class="org-table"><thead><tr><th>Ship</th><th class="num">Store price</th><th>Role</th><th>Size</th></tr></thead><tbody>${list
-          .map(
-            (v) =>
-              `<tr><td>${shipLink(v.name || v.lname)}</td><td class="num">${dollars(v.msrp)}</td><td>${OH.escapeHtml(
-                v.role || '',
-              )}</td><td>${OH.escapeHtml(capFirst(v.size))}</td></tr>`,
-          )
-          .join('')}</tbody></table>`,
+      (v) =>
+        `<tr><td>${shipLink(v.name || v.lname)}</td><td class="num">${dollars(v.msrp)}</td><td>${inStoreHtml(
+          v.name,
+        )}</td><td>${OH.escapeHtml(statusLabel(v.status))}</td><td>${OH.escapeHtml(v.role || '')}</td><td>${OH.escapeHtml(
+          capFirst(v.size),
+        )}</td></tr>`,
     )
-    .join('');
+    .join('')}</tbody></table>`;
 }
 
 function renderStore() {
   ensurePrices();
+  ensureStore();
+  const tabs = $('#price-tabs');
+  if (tabs) {
+    setHTML(
+      tabs,
+      PRICE_TABS.map(
+        ([k, label]) =>
+          `<button type="button" data-price-tab="${k}" class="${state.priceTab === k ? 'active' : ''}">${label}</button>`,
+      ).join(''),
+    );
+  }
+  const line = $('#store-status-line');
+  if (line) {
+    line.textContent = storeData
+      ? `Live from RSI's store, checked ${new Date(storeData.at).toLocaleString()}: ${
+          storeData.ships.filter((s) => s.forSale).length
+        } of ${storeData.ships.length} ships for sale, ${
+          storeData.ships.filter((s) => s.warbond).length
+        } with a warbond.`
+      : 'Checking RSI’s store…';
+  }
+  setHTML($('#wish-n'), state.wishlist.length ? String(state.wishlist.length) : '');
+  setHTML($('#wishlist'), wishlistHtml());
   if (!state.catalog) {
-    setHTML($('#price-table'), '<p class="muted">Loading ship prices…</p>');
+    setHTML($('#price-table'), '<p class="muted sp-empty">Loading ship prices…</p>');
+    setHTML($('#ccu-owned'), '<p class="muted sp-empty">Loading…</p>');
     return;
   }
   setHTML($('#price-table'), priceRowsHtml($('#price-search').value));
-  setHTML($('#wishlist'), wishlistHtml());
-  const owned = ownedCCUs();
-  setHTML(
-    $('#ccu-owned'),
-    owned.length
-      ? `<ul>${owned
-          .map(
-            (c) =>
-              `<li>${OH.escapeHtml(c.from)} → ${OH.escapeHtml(c.to)}: worth ${dollars(
-                c.toMsrp - c.fromMsrp,
-              )}${Number.isFinite(c.paid) ? ` (you paid ${money(c.paid)})` : ''}</li>`,
-          )
-          .join('')}</ul>`
-      : '<p class="muted">No CCUs with known prices in your hangar yet.</p>',
-  );
+  setHTML($('#ccu-owned'), ccuPanelHtml($('#ccu-search').value));
+  const ccuN = state.items.filter((p) => p.isCCU).length;
+  setHTML($('#ccu-n'), ccuN ? String(ccuN) : '');
 }
 
 $('#price-search')?.addEventListener('input', (e) =>
   setHTML($('#price-table'), priceRowsHtml(e.target.value)),
 );
+$('#ccu-search')?.addEventListener('input', (e) =>
+  setHTML($('#ccu-owned'), ccuPanelHtml(e.target.value)),
+);
+$('#view-store')?.addEventListener('click', (e) => {
+  const tab = e.target.closest('[data-price-tab]');
+  if (tab) {
+    state.priceTab = tab.dataset.priceTab;
+    return void renderStore();
+  }
+  const open = e.target.closest('[data-wish-bbs]');
+  if (open) {
+    const sub = $(`#wish-bbs-${open.dataset.wishBbs}`);
+    if (!sub) return;
+    sub.hidden = !sub.hidden;
+    open.setAttribute('aria-expanded', String(!sub.hidden));
+  }
+});
 
 // --- Org fleet ------------------------------------------------------------
 // Members' ship lists (from HTF exports or backups) combined into one fleet.
@@ -6235,6 +6421,7 @@ function openShipModal(name) {
       ${row('Size', v && v.size ? esc(capFirst(v.size)) : '')}
       ${row('Crew', v && v.crew ? esc(String(v.crew)) : '')}
       ${row('Cargo', v && v.cargo ? `${esc(String(v.cargo))} SCU` : '')}
+      ${row('In store now', storeOf(title) ? inStoreHtml(title) : '')}
       ${row('Comes with', includedOf(title) ? includedOf(title).map(vesselLink).join(', ') : '')}
       ${row('Loaners', loan ? loan.loaners.map((l) => shipLink(l)).join(', ') : '')}
       ${row(
@@ -6243,7 +6430,6 @@ function openShipModal(name) {
           `<a href="https://robertsspaceindustries.com/ship-matrix/search?q=${q}" target="_blank" rel="noopener" class="bb-reclaim">RSI ↗</a>`,
           `<a href="https://starcitizen.tools/index.php?search=${q}" target="_blank" rel="noopener" class="bb-reclaim">Wiki ↗</a>`,
           '<a href="https://www.erkul.games/live/calculator" target="_blank" rel="noopener" class="bb-reclaim">Erkul ↗</a>',
-          '<a href="https://ccugame.app" target="_blank" rel="noopener" class="bb-reclaim">CCU paths ↗</a>',
         ].join(' · '),
       )}
       <h4 class="modal-h">In Your Hangar (${pledges.length})</h4>
@@ -6255,6 +6441,7 @@ function openShipModal(name) {
   itemModal.hidden = false;
   fillModalArt(null, title, true);
   if (!loanerMatrix) ensureLoaners();
+  ensureStore();
 }
 
 // One click handler for ship / pledge / buy-back links anywhere on the page.
@@ -6292,34 +6479,6 @@ function toggleWishlist(name) {
     ? state.wishlist.filter((n) => !sameShip(n, name))
     : [...state.wishlist, name];
   chrome.storage.local.set({ wishlist: state.wishlist });
-}
-function wishlistHtml() {
-  if (!state.wishlist.length) {
-    return '<p class="muted">Open any ship (search at the top, or a name in the price list below) and press <strong>Add to Wishlist</strong>.</p>';
-  }
-  const owned = new Map(ownedShips().map((s) => [shipKey(s.label), s.pledges.length]));
-  const rows = state.wishlist
-    .map((name) => {
-      const v = shipEntry(name);
-      const bbs = state.buybacks.filter((b) => buybackHasShip(b, name));
-      const have = owned.get(shipKey((v && v.name) || name));
-      const status = v && (SHIP_STATES.find(([k]) => k === v.status) || [])[1];
-      return `<tr>
-        <td>${shipLink((v && v.name) || name)}</td>
-        <td class="num">${v && v.msrp ? dollars(v.msrp) : '<span class="muted">—</span>'}</td>
-        <td>${OH.escapeHtml(status || '')}</td>
-        <td>${
-          bbs.length
-            ? `${bbs.length} in buy-backs · ${buybackReclaimLink(bbs[0])}`
-            : '<span class="muted">none</span>'
-        }</td>
-        <td>${have ? `you own ${have}` : ''}</td>
-        <td><button type="button" class="ship-link wish-remove" data-wish-remove="${OH.escapeHtml(name)}" title="Remove from wishlist">Remove</button></td>
-      </tr>`;
-    })
-    .join('');
-  return `<table class="org-table wishlist"><thead><tr><th>Ship</th><th class="num">Store price</th><th>Status</th><th>Buy-backs</th><th></th><th></th></tr></thead><tbody>${rows}</tbody></table>
-    <p class="muted value-note">Want the cheapest way there? Plan the upgrade path on <a href="https://ccugame.app" target="_blank" rel="noopener">ccugame.app</a>.</p>`;
 }
 document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-wish-toggle]');

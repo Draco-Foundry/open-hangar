@@ -110,6 +110,13 @@ async function handle(req, res) {
       .end(demoDashboard());
   }
 
+  // RSI's store status (a POST the proxy can't forward): a saved snapshot.
+  if (u.pathname === '/__store-ships.json') {
+    return res
+      .writeHead(200, { 'content-type': 'application/json' })
+      .end(fs.readFileSync(path.join(SRC, '..', 'test', 'fixtures', 'store-ships.json')));
+  }
+
   if (u.pathname === '/CHANGELOG.md') {
     return res
       .writeHead(200, {

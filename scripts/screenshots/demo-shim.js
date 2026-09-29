@@ -355,6 +355,7 @@
   const realFetch = window.fetch.bind(window);
   window.fetch = (input, init = {}) => {
     const url = typeof input === 'string' ? input : input.url;
+    if (/\/pledge-store\/api\/upgrade\/graphql/.test(url)) return realFetch('/__store-ships.json');
     if (/^https:\/\/(robertsspaceindustries\.com|api\.star-citizen\.wiki)\//.test(url)) {
       if (/\/account\/|\/graphql|\/citizens\//.test(url) && !/\/pledge\/buyback\//.test(url))
         return Promise.resolve(new Response('', { status: 404 }));
