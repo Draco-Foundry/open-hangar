@@ -4,6 +4,11 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **More currencies.** Home → Currency adds NZD, CHF, SEK, PLN, CZK, BRL, CNY, JPY and KRW
+  (yen and won shown without cents).
+- **Store listing in 11 languages.** The extension's description now shows in your
+  browser's language: 简体中文, Français, 한국어, Español, Português, Deutsch, Українська,
+  Italiano, Čeština and Русский.
 - **CCUs show the ship you're upgrading to.** Cards and the details window (Inventory
   and Buy-Backs) use the destination ship's picture instead of RSI's generic upgrade art.
 - **Buy-Backs Market tools.** Like the Inventory Market: tick rows to see their total
