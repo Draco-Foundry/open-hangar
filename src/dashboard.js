@@ -2217,7 +2217,7 @@ function priceRowsHtml(q) {
         `<table class="org-table"><thead><tr><th>Ship</th><th class="num">Store price</th><th>Role</th><th>Size</th></tr></thead><tbody>${list
           .map(
             (v) =>
-              `<tr><td>${OH.escapeHtml(v.name || v.lname)}</td><td class="num">${dollars(v.msrp)}</td><td>${OH.escapeHtml(
+              `<tr><td>${shipLink(v.name || v.lname)}</td><td class="num">${dollars(v.msrp)}</td><td>${OH.escapeHtml(
                 v.role || '',
               )}</td><td>${OH.escapeHtml(capFirst(v.size))}</td></tr>`,
           )
@@ -2911,8 +2911,9 @@ function renderStats() {
       `<div class="top-list">${topRows || '<div class="row muted">No priced pledges.</div>'}</div>`,
     value: () => valueSectionHtml() + meltSectionHtml(),
     fleet: () =>
-      fleetSectionHtml() ||
-      `<p class="muted">${pricesLoading ? 'Loading ship data…' : 'Ship data unavailable (offline?).'}</p>`,
+      (fleetSectionHtml() ||
+        `<p class="muted">${pricesLoading ? 'Loading ship data…' : 'Ship data unavailable (offline?).'}</p>`) +
+      `<h3 class="section-title" style="margin-top:26px">Loaners</h3>${loanersSectionHtml()}`,
     collection: () => collectionSectionHtml(),
     buybacks: () => buybackStatsHtml(),
     top: () => topListsHtml(),
@@ -5110,7 +5111,11 @@ function openItemModal(p) {
     ? `<table class="modal-contents"><tbody>${contents
         .map(
           (c) =>
-            `<tr><td>${OH.escapeHtml(contentKind(c))}</td><td>${OH.escapeHtml(c.label || '')}</td></tr>`,
+            `<tr><td>${OH.escapeHtml(contentKind(c))}</td><td>${
+              /^ship$/i.test(c.kind || '') && c.label
+                ? shipLink(c.label)
+                : OH.escapeHtml(c.label || '')
+            }</td></tr>`,
         )
         .join('')}</tbody></table>`
     : '<p class="muted">No itemized contents.</p>';
@@ -6084,19 +6089,296 @@ async function applyCurrency(code) {
   }
 }
 
-$('#stats-body')?.addEventListener('click', (e) => {
+// --- Ships: details window, loaners, global search ------------------------
+// Any element with data-ship="<name>" opens that ship's details window; with
+// data-open-item / data-open-bb, that pledge or buy-back (see the click
+// handler below, shared by every view and the search box).
+
+// RSI's loaner matrix (OH.getLoanerMatrix, cached a week), fetched on first use.
+let loanerMatrix = null;
+let loanersRequested = false;
+function ensureLoaners() {
+  if (loanersRequested) return;
+  loanersRequested = true;
+  OH.getLoanerMatrix().then((m) => {
+    if (!m) return;
+    loanerMatrix = m;
+    if (currentView() === 'stats') renderStats();
+  });
+}
+
+const shipKey = (name) => OH.normShipName(name || '').toLowerCase();
+// The catalog entry for a ship name, or null.
+function shipEntry(name) {
+  if (!name) return null;
+  return (
+    (state.shipOf && state.shipOf(name)) ||
+    (state.catalog || []).find((v) => v.lname === String(name).toLowerCase()) ||
+    null
+  );
+}
+function sameShip(a, b) {
+  if (!a || !b) return false;
+  const va = shipEntry(a);
+  const vb = shipEntry(b);
+  if (va && vb) return va.slug === vb.slug;
+  return shipKey(a) === shipKey(b);
+}
+// Ships in the hangar, one entry per ship: [{ label, pledges: [p…] }].
+function ownedShips() {
+  const byKey = new Map();
+  for (const p of state.items) {
+    for (const c of p.contents || []) {
+      if (!/^ship$/i.test(c.kind || '') || !c.label) continue;
+      const v = shipEntry(c.label);
+      const key = v ? v.slug : shipKey(c.label);
+      if (!byKey.has(key)) byKey.set(key, { label: v ? v.name : c.label, pledges: [] });
+      byKey.get(key).pledges.push(p);
+    }
+  }
+  return [...byKey.values()];
+}
+// A buy-back that gives back this ship (standalone or its CCU target).
+function buybackHasShip(b, name) {
+  if (b.ccu) return sameShip(b.ccu.to, name);
+  if (!['ship', 'pack', 'package'].includes(b.kind)) return false;
+  const bare = String(b.name || '').replace(/^\s*[^-–]+?\s*[-–]\s/, '');
+  const base = bare.replace(
+    /\s*[-–]\s*(lti|iae|ilw|warbond|standard edition|\d+\s*(months?|years?).*)$/i,
+    '',
+  );
+  return sameShip(base, name) || sameShip(bare, name);
+}
+const shipLink = (name, text = name) =>
+  `<button type="button" class="ship-link" data-ship="${OH.escapeHtml(name)}">${OH.escapeHtml(text)}</button>`;
+
+// Stats → Fleet: the loaners your not-yet-flyable ships give you.
+function loanersSectionHtml() {
+  ensureLoaners();
+  if (!loanerMatrix) return '<p class="muted">Loading RSI\'s loaner list…</p>';
+  const rows = [];
+  for (const s of ownedShips()) {
+    const row = OH.loanersFor(s.label, loanerMatrix);
+    if (row) rows.push({ ship: s.label, loaners: row.loaners });
+  }
+  if (!rows.length)
+    return '<p class="muted">Every ship you own is flight ready, so there are no loaners to show.</p>';
+  const all = [...new Set(rows.flatMap((r) => r.loaners))].sort((a, b) => a.localeCompare(b));
+  return `<p>You can fly <strong>${all.length}</strong> loaner${all.length === 1 ? '' : 's'}: ${all
+    .map((l) => shipLink(l))
+    .join(', ')}.</p>
+    <table class="org-table"><thead><tr><th>Your ship</th><th>Loaners</th></tr></thead><tbody>${rows
+      .sort((a, b) => a.ship.localeCompare(b.ship))
+      .map(
+        (r) =>
+          `<tr><td>${shipLink(r.ship)}</td><td>${r.loaners.map((l) => shipLink(l)).join(', ')}</td></tr>`,
+      )
+      .join('')}</tbody></table>
+    <p class="muted value-note">From RSI's <a href="https://support.robertsspaceindustries.com/hc/en-us/articles/360003093114" target="_blank" rel="noopener">Loaner Ship Matrix</a>. Loaners need a game package on the account and don't stack.</p>`;
+}
+
+function openShipModal(name) {
+  hidePreview();
+  const v = shipEntry(name);
+  const title = (v && v.name) || name;
+  const pledges = state.items.filter((p) =>
+    (p.contents || []).some((c) => /^ship$/i.test(c.kind || '') && sameShip(c.label, title)),
+  );
+  const bbs = state.buybacks.filter((b) => buybackHasShip(b, title));
+  const status = v && (SHIP_STATES.find(([k]) => k === v.status) || [])[1];
+  const loan = loanerMatrix && OH.loanersFor(title, loanerMatrix);
+  const row = (k, val) =>
+    val
+      ? `<div class="mr"><span class="mr-k">${k}</span><span class="mr-v">${val}</span></div>`
+      : '';
+  const esc = OH.escapeHtml;
+  const q = encodeURIComponent(title);
+  const pledgeRows = pledges.length
+    ? `<table class="modal-contents"><tbody>${pledges
+        .map(
+          (p) =>
+            `<tr><td><button type="button" class="ship-link" data-open-item="${esc(String(p.id))}">${esc(
+              plainName(p),
+            )}</button></td><td class="num">${esc(formatValue(p))}</td></tr>`,
+        )
+        .join('')}</tbody></table>`
+    : '<p class="muted">Not in your hangar.</p>';
+  const bbRows = bbs.length
+    ? `<h4 class="modal-h">In Your Buy-Backs (${bbs.length})</h4><table class="modal-contents"><tbody>${bbs
+        .map(
+          (b) =>
+            `<tr><td><button type="button" class="ship-link" data-open-bb="${esc(String(b.id))}">${esc(
+              b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '',
+            )}</button></td><td class="num">${buybackReclaimLink(b)}</td></tr>`,
+        )
+        .join('')}</tbody></table>`
+    : '';
+  setHTML(
+    modalBody,
+    `<div class="modal-img placeholder">Ship</div>
+    <div class="modal-info">
+      <h3 class="modal-name">${esc(title)}</h3>
+      <div class="modal-meta">${status ? `<span class="badge ship">${esc(status)}</span>` : ''}${
+        v && v.msrp ? `<span class="modal-val">${dollars(v.msrp)}</span>` : ''
+      }</div>
+      ${row('Manufacturer', v && v.mfr ? esc(v.mfr) : '')}
+      ${row('Role', v && (v.role || v.career) ? esc(capFirst(v.role || v.career)) : '')}
+      ${row('Size', v && v.size ? esc(capFirst(v.size)) : '')}
+      ${row('Crew', v && v.crew ? esc(String(v.crew)) : '')}
+      ${row('Cargo', v && v.cargo ? `${esc(String(v.cargo))} SCU` : '')}
+      ${row('Loaners', loan ? loan.loaners.map((l) => shipLink(l)).join(', ') : '')}
+      ${row(
+        'Links',
+        [
+          `<a href="https://robertsspaceindustries.com/ship-matrix/search?q=${q}" target="_blank" rel="noopener" class="bb-reclaim">RSI ↗</a>`,
+          `<a href="https://starcitizen.tools/index.php?search=${q}" target="_blank" rel="noopener" class="bb-reclaim">Wiki ↗</a>`,
+          '<a href="https://www.erkul.games/live/calculator" target="_blank" rel="noopener" class="bb-reclaim">Erkul ↗</a>',
+          '<a href="https://ccugame.app" target="_blank" rel="noopener" class="bb-reclaim">CCU paths ↗</a>',
+        ].join(' · '),
+      )}
+      <h4 class="modal-h">In Your Hangar (${pledges.length})</h4>
+      ${pledgeRows}
+      ${bbRows}
+      ${v ? '' : '<p class="muted">No ship data for this name yet.</p>'}
+    </div>`,
+  );
+  itemModal.hidden = false;
+  fillModalArt(null, title, true);
+  if (!loanerMatrix) ensureLoaners();
+}
+
+// One click handler for ship / pledge / buy-back links anywhere on the page.
+document.addEventListener('click', (e) => {
+  const s = e.target.closest('[data-ship]');
+  if (s) {
+    e.preventDefault();
+    closeGlobalSearch();
+    return void openShipModal(s.dataset.ship);
+  }
   const it = e.target.closest('[data-open-item]');
   if (it) {
     const p = state.items.find((x) => String(x.id) === it.dataset.openItem);
+    closeGlobalSearch();
     if (p) openItemModal(p);
     return;
   }
   const bb = e.target.closest('[data-open-bb]');
   if (bb) {
     const b = state.buybacks.find((x) => String(x.id) === bb.dataset.openBb);
+    closeGlobalSearch();
     if (b) openBuybackModal(b);
   }
 });
+
+// --- Global search (header) ------------------------------------------------
+// One box over everything: ships (catalog), hangar pledges (names and what's
+// inside), buy-backs and referral rewards. "/" focuses it; Esc closes.
+const gsearch = $('#gsearch');
+const gsearchOut = $('#gsearch-results');
+function closeGlobalSearch() {
+  if (gsearchOut) gsearchOut.hidden = true;
+}
+function globalSearchHtml(q) {
+  const needle = q.trim().toLowerCase();
+  const esc = OH.escapeHtml;
+  const has = (s) =>
+    String(s || '')
+      .toLowerCase()
+      .includes(needle);
+  const group = (title, rows) =>
+    rows.length
+      ? `<div class="gs-group"><div class="gs-title">${title}</div>${rows.join('')}</div>`
+      : '';
+  const owned = new Map(ownedShips().map((s) => [shipKey(s.label), s.pledges.length]));
+  const ships = (state.catalog || [])
+    .filter((v) => has(v.name))
+    .sort((a, b) => (owned.has(shipKey(b.name)) ? 1 : 0) - (owned.has(shipKey(a.name)) ? 1 : 0))
+    .slice(0, 6)
+    .map((v) => {
+      const n = owned.get(shipKey(v.name));
+      return `<button type="button" class="gs-row" data-ship="${esc(v.name)}"><span>${esc(v.name)}</span><span class="muted">${
+        n ? `owned ×${n}` : v.msrp ? dollars(v.msrp) : ''
+      }</span></button>`;
+    });
+  const pledges = state.items
+    .filter((p) => has(plainName(p)) || (p.contents || []).some((c) => has(c.label)))
+    .slice(0, 8)
+    .map(
+      (p) =>
+        `<button type="button" class="gs-row" data-open-item="${esc(String(p.id))}"><span>${esc(
+          plainName(p),
+        )}</span><span class="muted">${[
+          p.giftable ? 'giftable' : '',
+          isMeltable(p) ? 'meltable' : '',
+          formatValue(p),
+        ]
+          .filter(Boolean)
+          .join(' · ')}</span></button>`,
+    );
+  const bbs = state.buybacks
+    .filter((b) => has(b.name) || (b.ccu && (has(b.ccu.from) || has(b.ccu.to))))
+    .slice(0, 5)
+    .map(
+      (b) =>
+        `<button type="button" class="gs-row" data-open-bb="${esc(String(b.id))}"><span>${esc(
+          b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '',
+        )}</span><span class="muted">buy-back</span></button>`,
+    );
+  const ref = state.referral;
+  const rewards = ref
+    ? earnedRewards(
+        ref.legacy?.recruits ?? 0,
+        ref.recruitsList || [],
+        (ref.legacy?.recruits ?? 0) > 0,
+      )
+        .filter((r) => has(r.name))
+        .slice(0, 3)
+        .map(
+          (r) =>
+            `<a class="gs-row" href="#referrals"><span>${esc(r.name)}</span><span class="muted">reward · ${esc(r.sub)}</span></a>`,
+        )
+    : [];
+  const html =
+    group('Ships', ships) +
+    group('Your Hangar', pledges) +
+    group('Buy-Backs', bbs) +
+    group('Referral Rewards', rewards);
+  return html || `<div class="gs-empty muted">Nothing matches "${esc(q.trim())}".</div>`;
+}
+if (gsearch && gsearchOut) {
+  gsearch.addEventListener('input', () => {
+    const q = gsearch.value;
+    if (q.trim().length < 2) return closeGlobalSearch();
+    ensurePrices();
+    setHTML(gsearchOut, globalSearchHtml(q));
+    gsearchOut.hidden = false;
+  });
+  gsearch.addEventListener('focus', () => {
+    if (gsearch.value.trim().length >= 2) gsearch.dispatchEvent(new Event('input'));
+  });
+  gsearch.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeGlobalSearch();
+      gsearch.blur();
+    } else if (e.key === 'Enter') {
+      gsearchOut.querySelector('.gs-row')?.click();
+    }
+  });
+  gsearchOut.addEventListener('click', (e) => {
+    if (e.target.closest('a.gs-row')) closeGlobalSearch();
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.gsearch')) closeGlobalSearch();
+  });
+  document.addEventListener('keydown', (e) => {
+    const typing =
+      /^(input|textarea|select)$/i.test(e.target.tagName) || e.target.isContentEditable;
+    if (e.key === '/' && !typing) {
+      e.preventDefault();
+      gsearch.focus();
+    }
+  });
+}
 
 // --- Init -----------------------------------------------------------------
 
