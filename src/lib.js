@@ -2304,8 +2304,6 @@
   // A public help-center article with one table row per not-yet-flyable ship:
   // "YOUR SHIP" → "OUR LOANER(S)". Row names use shorthand ("Hull D, E",
   // "Idris-M & P", "Pulse (+ LX)", "Cyclone Variants"), expanded into patterns.
-  const LOANER_URL =
-    'https://support.robertsspaceindustries.com/api/v2/help_center/en-us/articles/360003093114.json';
   const decodeEntities = (s) =>
     String(s || '')
       .replace(/&nbsp;| /g, ' ')
@@ -2318,6 +2316,15 @@
     decodeEntities(String(h).replace(/<[^>]+>/g, ' '))
       .replace(/\s+/g, ' ')
       .trim();
+  // Row names compared the same way as the ships they're matched against.
+  const normPattern = (n) =>
+    OH.normShipName(
+      String(n)
+        .replace(/\*/g, '')
+        .replace(/\s+frigate\b/i, ''),
+    )
+      .toLowerCase()
+      .replace(/\s+/g, ' ');
   // "600i Explorer and Executive" → ["600i Explorer", "600i Executive"], etc.
   function loanerPatterns(cell) {
     let text = cell;
@@ -2341,9 +2348,9 @@
           n = first.replace(/[A-Za-z]$/, part); // Idris-M & P
         else if (firstWords.length > 1) n = [...firstWords.slice(0, -1), part].join(' '); // Hull D, E
       }
-      out.push({ n: n.toLowerCase(), prefix });
+      out.push({ n: normPattern(n), prefix });
     }
-    for (const v of extra) out.push({ n: `${first} ${v}`.toLowerCase(), prefix: false });
+    for (const v of extra) out.push({ n: normPattern(`${first} ${v}`), prefix: false });
     return out;
   }
   OH.parseLoanerMatrix = function parseLoanerMatrix(html) {
@@ -2374,30 +2381,37 @@
     }
     return best;
   };
-  const LOANER_KEY = 'loanerMatrix';
-  const LOANER_TTL = 7 * 24 * 3600e3;
-  // Cached a week; the cached copy (or null) when RSI's help center is down.
-  OH.getLoanerMatrix = async function getLoanerMatrix(fetchFn = fetch) {
-    const { [LOANER_KEY]: cached } = await chrome.storage.local.get(LOANER_KEY);
-    if (cached && Date.now() - cached.at < LOANER_TTL) return cached.rows;
+  // Fetch one RSI help article's ship table (same two-column layout for the
+  // loaner matrix and the included-vessels list), cached a week under `key`.
+  // The cached copy (or null) when RSI's help center is down.
+  const HELP_TTL = 7 * 24 * 3600e3;
+  async function getHelpTable(id, key, minRows, fetchFn) {
+    const { [key]: cached } = await chrome.storage.local.get(key);
+    if (cached && Date.now() - cached.at < HELP_TTL) return cached.rows;
     try {
-      const res = await fetchFn(LOANER_URL, {
-        credentials: 'omit',
-        headers: { Accept: 'application/json' },
-      });
+      const res = await fetchFn(
+        `https://support.robertsspaceindustries.com/api/v2/help_center/en-us/articles/${id}.json`,
+        { credentials: 'omit', headers: { Accept: 'application/json' } },
+      );
       const json = res.ok ? await res.json() : null;
       const rows = OH.parseLoanerMatrix(json?.article?.body);
-      if (rows.length >= 10) {
+      if (rows.length >= minRows) {
         await chrome.storage.local.set({
-          [LOANER_KEY]: { at: Date.now(), updated: json.article.updated_at || null, rows },
+          [key]: { at: Date.now(), updated: json.article.updated_at || null, rows },
         });
         return rows;
       }
     } catch (e) {
-      OH.log('warn', 'loaners', `loaner matrix download failed: ${e?.message || e}`);
+      OH.log('warn', 'loaners', `help article ${id} download failed: ${e?.message || e}`);
     }
     return cached ? cached.rows : null;
-  };
+  }
+  OH.getLoanerMatrix = (fetchFn = fetch) =>
+    getHelpTable('360003093114', 'loanerMatrix', 10, fetchFn);
+  // "Included Vessels": snubs and rovers that come with a ship for keeps
+  // (Carrack → C8 Pisces + URSA). Same table shape; match with loanersFor.
+  OH.getIncludedVessels = (fetchFn = fetch) =>
+    getHelpTable('4408770370455', 'includedVessels', 5, fetchFn);
 
   const REF_EVENTS_KEY = 'referralEvents';
   const REF_EVENTS_TTL = 7 * 24 * 3600e3;

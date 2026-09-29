@@ -20,7 +20,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   list) for its specs, store price, which of your pledges and buy-backs have it, its
   loaners, and links to RSI, the wiki, Erkul and ccugame.
 - **Loaners.** Stats → Fleet lists the loaner ships your not-yet-flyable ships give you,
-  straight from RSI's Loaner Ship Matrix.
+  straight from RSI's Loaner Ship Matrix. Only ships you can't fly in the game yet get loaners.
+  **Included Vessels** (the snubs and rovers a ship comes with for keeps, like the Carrack's
+  Pisces and URSA) are listed separately, and show in each ship's window as "Comes with".
 - **Check for updates.** A button on the Updates page asks the store for a new version
   right away (Chrome and Edge); Firefox gets directions, since it checks on its own.
 - **Referrals, levelled up.**
