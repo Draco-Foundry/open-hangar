@@ -2476,6 +2476,84 @@
     return cached ? cached.items : [];
   };
 
+  // --- This Week in Star Citizen: a short summary -------------------------------
+  // The weekly post has a fixed shape: a few paragraphs on last week, "Now let's
+  // see what's going on this week", then a day-by-day schedule (h4 day, list of
+  // items). The summary is the first sentence of each paragraph plus that
+  // schedule, read straight from the post (no AI, nothing sent anywhere).
+  // Post body HTML → { points: [..], schedule: [{ day, items: [..] }] }. Pure.
+  OH.parseTwisc = function parseTwisc(html) {
+    const clean = (s) =>
+      decodeEntities(String(s || '').replace(/<[^>]+>/g, ' '))
+        .replace(/\s+/g, ' ')
+        .replace(/\s+([.,!?;:])/g, '$1')
+        .trim();
+    const src = String(html || '').replace(
+      /<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi,
+      '',
+    );
+    const cut = src.search(/<h[1-6][^>]*>[^<]*Weekly Community Content Schedule/i);
+    const intro = cut >= 0 ? src.slice(0, cut) : src;
+    const rest = cut >= 0 ? src.slice(cut) : '';
+    const firstSentence = (t) => {
+      const m = t.match(/^.*?[.!?](?=\s|$)/);
+      const s = (m ? m[0] : t).trim();
+      return s.length > 200 ? `${s.slice(0, 197).trimEnd()}…` : s;
+    };
+    const points = [];
+    for (const m of intro.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)) {
+      const t = clean(m[1]);
+      // Skip the sign-off ("…, see you soon.") and anything too short to say much.
+      if (t.length < 40 || /see you (soon|next)/i.test(t)) continue;
+      points.push(firstSentence(t));
+      if (points.length >= 6) break;
+    }
+    const schedule = [];
+    for (const m of rest.matchAll(/<h4[^>]*>([\s\S]*?)<\/h4>([\s\S]*?)(?=<h[1-6][^>]*>|$)/gi)) {
+      const day = clean(m[1]);
+      const items = [...m[2].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)]
+        .map((x) => clean(x[1]))
+        .filter(Boolean);
+      if (!/^(mon|tue|wed|thu|fri|sat|sun)/i.test(day) || !items.length) continue;
+      schedule.push({ day: day.replace(/\b\w+/g, (w) => w[0] + w.slice(1).toLowerCase()), items });
+    }
+    return { points, schedule };
+  };
+  // The post page loads its body from a separate file on RSI's site; its address
+  // sits in the page. Page HTML → body URL or null. Pure.
+  OH.twiscBodyUrl = function twiscBodyUrl(pageHtml) {
+    const m = String(pageHtml || '').match(
+      /s3Url\s*=\s*'(https:\/\/robertsspaceindustries\.com\/[^']+)'/,
+    );
+    return m ? m[1] : null;
+  };
+  const TWISC_KEY = 'twisc';
+  // → { title, url, points, schedule } for the newest This Week in Star Citizen,
+  // cached until a newer one appears (checked with the hourly news list); null
+  // if it can't be read.
+  OH.getTwiscSummary = async function getTwiscSummary(fetchFn = fetch) {
+    const news = await OH.getRsiNews(fetchFn);
+    const post = news.find((n) => /this week in star citizen/i.test(n.title));
+    if (!post) return null;
+    const { [TWISC_KEY]: cached } = await chrome.storage.local.get(TWISC_KEY);
+    if (cached && cached.url === post.url && cached.points && cached.points.length) return cached;
+    try {
+      const page = await fetchFn(post.url, { credentials: 'omit' });
+      const bodyUrl = page.ok ? OH.twiscBodyUrl(await page.text()) : null;
+      const body = bodyUrl ? await fetchFn(bodyUrl, { credentials: 'omit' }) : null;
+      if (body && body.ok) {
+        const sum = { title: post.title, url: post.url, ...OH.parseTwisc(await body.text()) };
+        if (sum.points.length || sum.schedule.length) {
+          await chrome.storage.local.set({ [TWISC_KEY]: sum });
+          return sum;
+        }
+      }
+    } catch (e) {
+      OH.log('warn', 'news', `This Week in Star Citizen summary failed: ${e?.message || e}`);
+    }
+    return cached || { title: post.title, url: post.url, points: [], schedule: [] };
+  };
+
   // --- Loaner ships (RSI support: "Loaner Ship Matrix") --------------------------
   // A public help-center article with one table row per not-yet-flyable ship:
   // "YOUR SHIP" → "OUR LOANER(S)". Row names use shorthand ("Hull D, E",

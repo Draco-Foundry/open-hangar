@@ -939,23 +939,49 @@ async function wishlistStock({ force = false } = {}) {
   return out;
 }
 let homeWishToken = 0;
-// Home: RSI's newest Comm-Links (OH.getRsiNews, cached an hour).
+// Home: a short summary of the newest "This Week in Star Citizen" (OH.getTwiscSummary),
+// or RSI's three newest Comm-Links if the post can't be read.
 let homeNewsToken = 0;
 function renderHomeNews() {
   const box = $('#home-news');
   if (!box) return;
   const token = ++homeNewsToken;
-  if (!box.dataset.filled) setHTML(box, `<h3>Latest from RSI</h3><p class="muted">Loading…</p>`);
-  OH.getRsiNews().then((items) => {
+  const esc = OH.escapeHtml;
+  const shell = (title, body, more) =>
+    `<h3>${title}</h3><div class="home-scroll">${body}</div><p class="home-more">${more}</p>`;
+  if (!box.dataset.filled)
+    setHTML(box, shell('This Week in Star Citizen', '<p class="muted">Loading…</p>', ''));
+  OH.getTwiscSummary().then(async (sum) => {
     if (token !== homeNewsToken) return;
-    const esc = OH.escapeHtml;
     box.dataset.filled = '1';
+    if (sum && (sum.points.length || sum.schedule.length)) {
+      const date = (sum.title.match(/-\s*(.+)$/) || [])[1] || '';
+      const schedule = sum.schedule.length
+        ? `<div class="twisc-week">This week</div><ul class="twisc-sched">${sum.schedule
+            .map(
+              (d) =>
+                `<li><span class="muted">${esc(d.day.replace(/,.*$/, ''))}</span> ${esc(d.items.join(' · '))}</li>`,
+            )
+            .join('')}</ul>`
+        : '';
+      setHTML(
+        box,
+        shell(
+          `This Week in Star Citizen${date ? ` <span class="muted twisc-date">${esc(date)}</span>` : ''}`,
+          `<ul class="twisc-points">${sum.points.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>${schedule}`,
+          `<a href="${esc(sum.url)}" target="_blank" rel="noopener">Read it on RSI ↗</a>`,
+        ),
+      );
+      return;
+    }
+    const items = (await OH.getRsiNews()).slice(0, 3);
+    if (token !== homeNewsToken) return;
     setHTML(
       box,
-      `<h3>Latest from RSI</h3>${
+      shell(
+        'Latest from RSI',
         items.length
           ? `<ul class="news-list">${items
-              .slice(0, 3)
               .map(
                 (n) =>
                   `<li><a href="${esc(n.url)}" target="_blank" rel="noopener" title="${esc(n.title)}">${
@@ -967,8 +993,9 @@ function renderHomeNews() {
                   )}</span></span></a></li>`,
               )
               .join('')}</ul>`
-          : '<p class="muted">Couldn’t reach RSI’s Comm-Link list right now.</p>'
-      }<p class="home-more"><a href="https://robertsspaceindustries.com/comm-link" target="_blank" rel="noopener">All Comm-Links ↗</a></p>`,
+          : '<p class="muted">Couldn’t reach RSI right now.</p>',
+        '<a href="https://robertsspaceindustries.com/comm-link" target="_blank" rel="noopener">All Comm-Links ↗</a>',
+      ),
     );
   });
 }
@@ -1000,11 +1027,11 @@ function renderHomePanels() {
     ];
     setHTML(
       wish,
-      `<h3>Wishlist: On Sale Now <span class="market-n">${onSale.length}</span></h3>${
+      `<h3>Wishlist: On Sale Now <span class="market-n">${onSale.length}</span></h3><div class="home-scroll">${
         items.length
           ? `<ul class="home-list">${items.join('')}</ul>`
           : `<p class="muted">None of your ${list.length} wishlist ship${list.length === 1 ? ' is' : 's are'} for sale right now.</p>`
-      }<p class="home-more"><a href="#store" data-view="store">Your wishlist →</a></p>`,
+      }</div><p class="home-more"><a href="#store" data-view="store">Your wishlist →</a></p>`,
     );
   });
 }

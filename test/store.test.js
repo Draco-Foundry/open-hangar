@@ -108,3 +108,20 @@ test('getRsiNews caches an hour and keeps the last list when RSI is down', async
   assert.equal((await OH.getRsiNews(ok)).length, 10);
   assert.equal(calls, 1);
 });
+
+test('This Week in Star Citizen: short summary from the real post', () => {
+  const read = (n) => fs.readFileSync(path.join(__dirname, 'fixtures', n), 'utf8');
+  assert.match(
+    OH.twiscBodyUrl(read('twisc-page.html')),
+    /^https:\/\/robertsspaceindustries\.com\/alexandria\/html\//,
+  );
+  assert.equal(OH.twiscBodyUrl("<script>const s3Url = 'https://evil.example/x';</script>"), null);
+  const sum = OH.parseTwisc(read('twisc-body.html'));
+  assert.ok(sum.points.length >= 4 && sum.points.length <= 6);
+  assert.match(sum.points[0], /^Last week was a busy one on the testing front/);
+  assert.ok(sum.points.every((p) => !/\s[.,!?]/.test(p) && !/see you soon/i.test(p)));
+  assert.deepEqual(sum.schedule, [
+    { day: 'Thursday, October 1', items: ['New Game Library System'] },
+    { day: 'Friday, October 2', items: ['RSI Weekly Newsletter'] },
+  ]);
+});
