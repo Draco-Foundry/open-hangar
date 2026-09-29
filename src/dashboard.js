@@ -955,7 +955,7 @@ function renderHomeNews() {
       `<h3>Latest from RSI</h3>${
         items.length
           ? `<ul class="news-list">${items
-              .slice(0, 6)
+              .slice(0, 3)
               .map(
                 (n) =>
                   `<li><a href="${esc(n.url)}" target="_blank" rel="noopener" title="${esc(n.title)}">${
@@ -1330,7 +1330,8 @@ function traitRowHtml(list, selected, facets, anyFilter) {
     const n = mode === 'no' ? no : yes;
     const hint = mode === 'yes' ? 'Click again to exclude' : mode === 'no' ? 'Click to clear' : '';
     const title = hint ? `${t.title} · ${hint}` : t.title;
-    return `<button class="chip trait" data-trait="${t.key}" data-mode="${mode || ''}" aria-pressed="${!!mode}" title="${OH.escapeHtml(title)}">${OH.escapeHtml(
+    const k = t.key === 'pack' || t.key === 'package' ? ` k-${t.key}` : '';
+    return `<button class="chip trait${k}" data-trait="${t.key}" data-mode="${mode || ''}" aria-pressed="${!!mode}" title="${OH.escapeHtml(title)}">${OH.escapeHtml(
       label,
     )}<span class="n">${n}</span></button>`;
   }).join('');
@@ -1398,7 +1399,8 @@ function cardHtml(p) {
     const more = contents.length > 4 ? ` +${contents.length - 4}` : '';
     contentsLine = `<div class="card-contents">${OH.escapeHtml(head)}${more}</div>`;
   }
-  const badgeClass = ['ccu', 'ship', 'paint', 'addon', 'coupon'].includes(p.kind) ? p.kind : '';
+  const type = pledgeType(p);
+  const badgeClass = TYPE_KEYS.includes(type) ? type : '';
   const sel = state.selecting && state.selected.has(String(p.id)) ? ' selected' : '';
   const rsiImg = ccuArt ? realImage(p.image) || '' : '';
   return `<div class="card${sel}" data-id="${OH.escapeHtml(String(p.id || ''))}" data-image="${OH.escapeHtml(img || '')}" data-resolve="${OH.escapeHtml(resolve)}" data-rsi-image="${OH.escapeHtml(rsiImg)}">
@@ -1408,7 +1410,7 @@ function cardHtml(p) {
       ${contentsLine}
       <div class="card-ins" title="Insurance">${OH.escapeHtml(insLabel(p.insurance))}</div>
       <div class="card-foot">
-        <span class="foot-left"><span class="badge ${badgeClass}">${OH.escapeHtml(p.kind)}</span>${flagsHtml(p)}</span>
+        <span class="foot-left"><span class="badge ${badgeClass}">${OH.escapeHtml(type)}</span>${flagsHtml(p)}</span>
         <span class="val"${valTitle(p)}>${OH.escapeHtml(formatValue(p))}</span>
       </div>
     </div>
@@ -1507,6 +1509,15 @@ function meltLabel(p) {
 // (named "Package …", a "Star Citizen + Squadron 42" game pack, or a card that
 // contains more than one ship). A single ship that merely ships with a paint
 // (e.g. "Cutter plus Groundswell Paint") stays a Standalone Ship.
+// The type shown on a pledge's badge (and its color, same everywhere):
+// ccu · package (game access) · pack · ship · paint · addon · coupon.
+const TYPE_KEYS = ['ccu', 'ship', 'pack', 'package', 'paint', 'addon', 'coupon'];
+function pledgeType(p) {
+  if (p.isCCU) return 'ccu';
+  if (p.containsShip && TRAITS[0].test(pledgeFacets(p))) return 'package';
+  if (isPack(p)) return 'pack';
+  return p.kind;
+}
 function isPack(p) {
   if (!p.containsShip) return false;
   const name = p.name || '';
@@ -2413,7 +2424,7 @@ function wishlistHtml() {
       // Ships and packs first, then CCUs; newest melt first within each.
       const bbRank = (b) => (b.ccu ? 2 : b.kind === 'ship' ? 0 : 1);
       const bbType = (b) =>
-        b.ccu ? 'CCU' : b.kind === 'pack' || b.kind === 'package' ? 'Pack' : 'Ship';
+        b.ccu ? 'CCU' : b.kind === 'package' ? 'Package' : b.kind === 'pack' ? 'Pack' : 'Ship';
       const bbs = state.buybacks
         .filter((b) => buybackHasShip(b, title))
         .sort(
@@ -2436,7 +2447,7 @@ function wishlistHtml() {
         ? `<tr class="wish-bbs" id="wish-bbs-${i}" hidden><td colspan="7"><table class="org-table inner"><thead><tr><th>Type</th><th>Buy-back</th><th>Melted</th><th>Pledge ID</th><th class="num">Price</th><th></th></tr></thead><tbody>${bbs
             .map(
               (b) => `<tr>
-                <td><span class="badge ${b.ccu ? 'ccu' : 'ship'}">${bbType(b)}</span></td>
+                <td><span class="badge ${bbType(b).toLowerCase()}">${bbType(b)}</span></td>
                 <td>${esc(b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '')}</td>
                 <td>${esc(b.date || '')}</td>
                 <td>${/^\d+$/.test(String(b.id)) ? esc(String(b.id)) : '<span class="muted">—</span>'}</td>
@@ -4671,7 +4682,7 @@ function buybackCardHtml(b) {
     ? `${OH.escapeHtml(b.ccu.from)} <span class="ccu-flow">→</span> ${OH.escapeHtml(b.ccu.to)}`
     : OH.escapeHtml(b.name || '—');
   const reclaim = buybackReclaimLink(b);
-  const badgeClass = ['ccu', 'ship', 'paint', 'addon', 'coupon'].includes(b.kind) ? b.kind : '';
+  const badgeClass = TYPE_KEYS.includes(b.isCCU ? 'ccu' : b.kind) ? (b.isCCU ? 'ccu' : b.kind) : '';
   // Every cell is always emitted (empty when there's nothing) so the List view's
   // fixed column grid lines up across rows, as in the Inventory cards.
   return `<div class="card" data-id="${OH.escapeHtml(String(b.id || ''))}" data-image="${OH.escapeHtml(img || '')}" data-resolve="${OH.escapeHtml(resolve)}" data-rsi-image="${OH.escapeHtml(ccuArt ? realImage(b.image) || '' : '')}">
@@ -5549,7 +5560,8 @@ function openItemModal(p) {
   const real = realImage(p.image);
   // The picture is filled in by fillModalArt() below.
   const img = `<div class="modal-img placeholder">${OH.escapeHtml(p.kind)}</div>`;
-  const badgeClass = ['ccu', 'ship', 'paint', 'addon', 'coupon'].includes(p.kind) ? p.kind : '';
+  const type = pledgeType(p);
+  const badgeClass = TYPE_KEYS.includes(type) ? type : '';
   const contents = p.contents || [];
   const contentsHtml = contents.length
     ? `<table class="modal-contents"><tbody>${contents
@@ -5570,7 +5582,7 @@ function openItemModal(p) {
     img +
       `<div class="modal-info">
       <h3 class="modal-name">${OH.escapeHtml(plainName(p))}</h3>
-      <div class="modal-meta"><span class="badge ${badgeClass}">${OH.escapeHtml(p.kind)}</span><span class="modal-val">${OH.escapeHtml(formatValue(p))}</span></div>
+      <div class="modal-meta"><span class="badge ${badgeClass}">${OH.escapeHtml(type)}</span><span class="modal-val">${OH.escapeHtml(formatValue(p))}</span></div>
       ${row('ID', OH.escapeHtml(p.id || '—'))}
       ${p.date ? row('Pledged', OH.escapeHtml(p.date)) : ''}
       ${row('Giftable', p.giftable ? 'Yes' : 'No')}

@@ -4,6 +4,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **One color per type, everywhere:** ship green, CCU purple, paint pink, add-on blue, coupon
+  orange, pack gold and game package teal, on badges and filter chips across Inventory,
+  Buy-Backs and the wishlist. Packs and game packages in Inventory now say PACK / PACKAGE.
 - Big amounts in the Home summary shorten ("CN¥13.7K") so they fit; hover for the full value.
 - **Latest from RSI** on Home: RSI's six newest Comm-Links with a picture, type and how long
   ago, each opening on RSI.
