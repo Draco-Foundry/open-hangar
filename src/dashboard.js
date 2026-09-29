@@ -954,21 +954,13 @@ function renderHomeNews() {
   OH.getTwiscSummary().then(async (sum) => {
     if (token !== homeNewsToken) return;
     box.dataset.filled = '1';
-    if (sum && (sum.points.length || sum.schedule.length)) {
+    if (sum && sum.lead) {
       const date = (sum.title.match(/-\s*(.+)$/) || [])[1] || '';
-      const schedule = sum.schedule.length
-        ? `<div class="twisc-week">This week</div><ul class="twisc-sched">${sum.schedule
-            .map(
-              (d) =>
-                `<li><span class="muted">${esc(d.day.replace(/,.*$/, ''))}</span> ${esc(d.items.join(' · '))}</li>`,
-            )
-            .join('')}</ul>`
-        : '';
       setHTML(
         box,
         shell(
           `This Week in Star Citizen${date ? ` <span class="muted twisc-date">${esc(date)}</span>` : ''}`,
-          `<ul class="twisc-points">${sum.points.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>${schedule}`,
+          `${sum.image ? `<a href="${esc(sum.url)}" target="_blank" rel="noopener"><img class="twisc-img" src="${esc(sum.image)}" alt=""></a>` : ''}<p class="twisc-lead">${esc(sum.lead)}</p>`,
           `<a href="${esc(sum.url)}" target="_blank" rel="noopener">Read it on RSI ↗</a>`,
         ),
       );
@@ -1004,11 +996,12 @@ function renderHomePanels() {
   const wish = $('#home-wish');
   renderHomeNews();
   if (!wish) return;
-  if (!state.wishlist.length) {
-    setHTML(
-      wish,
-      `<h3>Wishlist</h3><p class="muted">Open any ship (search at the top) and press <strong>Add to Wishlist</strong>. Ships on it that go on sale show up here.</p>`,
-    );
+  // No wishlist: no box; the news panel takes the whole row.
+  const empty = !state.wishlist.length;
+  wish.hidden = empty;
+  wish.parentElement.classList.toggle('solo', empty);
+  if (empty) {
+    ++homeWishToken; // drop any check still running
     return;
   }
   const token = ++homeWishToken;
