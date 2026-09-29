@@ -2,6 +2,15 @@
 
 ## Ideas parked for a decision (not yet committed to a direction)
 
+- **Translate the dashboard (planned).** Same 11 languages as the store listings
+  (English, 简体中文, Français, 한국어, Español, Português Brasileiro, Deutsch,
+  Українська, Italiano, Čeština, Русский; ccugame.app offers these). Store summaries
+  (`_locales/`) and full listings (`docs/STORE-LISTINGS.md`) are done. Plan: a `t()`
+  helper + per-language string files, a language picker next to Currency, start
+  with nav, Home, Inventory, Buy-Backs and Market, then the rest; a "help translate"
+  link so native speakers can fix wording. Decide after seeing whether non-English
+  installs show up in the store dashboards.
+
 - ~~**Detect warbonds (and other discounts) by price, not name.**~~ ✅ Done: the
   **Below store price** filter compares a ship pledge's paid value to its ships'
   current store price (`OH.hangarValue`). The name-based Warbond filter stays too.

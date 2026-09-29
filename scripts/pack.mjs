@@ -1,7 +1,7 @@
 /*
  * pack.mjs — build store-ready bundles.
  * ---------------------------------------------------------------------------
- * Copies only the runtime files (manifest, icons, src) into dist/<target>/ and
+ * Copies only the runtime files (manifest, _locales, icons, src) into dist/<target>/ and
  * writes a per-browser manifest. `npm run pack` then zips each with web-ext.
  *
  *   chrome   — manifest.json as-is. Same zip goes to Chrome Web Store + Edge.
@@ -14,7 +14,7 @@
 
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 
-const RUNTIME = ['icons', 'src'];
+const RUNTIME = ['_locales', 'icons', 'src'];
 const base = JSON.parse(readFileSync('manifest.json', 'utf8'));
 
 const targets = {
