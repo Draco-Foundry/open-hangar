@@ -628,14 +628,18 @@ function enhanceCardImages(container) {
   const worker = async () => {
     while (i < cards.length) {
       const card = cards[i++];
-      const url = await OH.getShipImage(card.dataset.resolve);
+      const art = await OH.getShipImage(card.dataset.resolve);
+      const url = art || card.dataset.rsiImage;
       if (!url) continue;
       card.dataset.image = url;
       const id = card.dataset.id;
       const item =
         state.items.find((p) => String(p.id) === id) ||
         state.buybacks.find((b) => String(b.id) === id);
-      if (item) item.image = url;
+      if (item) {
+        item.image = url;
+        if (art) item.shipArt = true; // a CCU's target art is in hand now
+      }
       const ph = card.querySelector('.thumb.placeholder');
       if (ph) {
         const im = document.createElement('img');
@@ -1225,7 +1229,10 @@ function valTitle(p) {
 
 function cardHtml(p) {
   const contents = extraContents(p);
-  const img = realImage(p.image);
+  // A CCU shows the ship it upgrades to (looked up by enhanceCardImages); RSI's
+  // own art for it is a generic upgrade picture, kept only as the fallback.
+  const ccuArt = p.isCCU && p.ccu && p.ccu.to && !p.shipArt;
+  const img = ccuArt ? null : realImage(p.image);
   // Ship name for art lookup: used when RSI gives no image, and as a fallback if
   // RSI's image link turns out to be broken (see onThumbError).
   const resolve = resolveImageName(p);
@@ -1247,7 +1254,8 @@ function cardHtml(p) {
   }
   const badgeClass = ['ccu', 'ship', 'paint', 'addon', 'coupon'].includes(p.kind) ? p.kind : '';
   const sel = state.selecting && state.selected.has(String(p.id)) ? ' selected' : '';
-  return `<div class="card${sel}" data-id="${OH.escapeHtml(String(p.id || ''))}" data-image="${OH.escapeHtml(img || '')}" data-resolve="${OH.escapeHtml(resolve)}">
+  const rsiImg = ccuArt ? realImage(p.image) || '' : '';
+  return `<div class="card${sel}" data-id="${OH.escapeHtml(String(p.id || ''))}" data-image="${OH.escapeHtml(img || '')}" data-resolve="${OH.escapeHtml(resolve)}" data-rsi-image="${OH.escapeHtml(rsiImg)}">
     ${thumb}
     <div class="card-body">
       <div class="card-name" title="${OH.escapeHtml(plainName(p))}">${nameHtml}</div>
@@ -3621,7 +3629,8 @@ function buybackUrl(b) {
 }
 
 function buybackCardHtml(b) {
-  const img = realImage(b.image);
+  const ccuArt = b.ccu && b.ccu.to && !b.shipArt; // show the target ship (see cardHtml)
+  const img = ccuArt ? null : realImage(b.image);
   // A CCU resolves art from its target ship; a plain buy-back from its own name.
   const resolve = b.ccu && b.ccu.to ? b.ccu.to : b.name; // also the broken-image fallback
   const thumb = img
@@ -3634,7 +3643,7 @@ function buybackCardHtml(b) {
   const badgeClass = ['ccu', 'ship', 'paint', 'addon', 'coupon'].includes(b.kind) ? b.kind : '';
   // Every cell is always emitted (empty when there's nothing) so the List view's
   // fixed column grid lines up across rows, as in the Inventory cards.
-  return `<div class="card" data-id="${OH.escapeHtml(String(b.id || ''))}" data-image="${OH.escapeHtml(img || '')}" data-resolve="${OH.escapeHtml(resolve)}">
+  return `<div class="card" data-id="${OH.escapeHtml(String(b.id || ''))}" data-image="${OH.escapeHtml(img || '')}" data-resolve="${OH.escapeHtml(resolve)}" data-rsi-image="${OH.escapeHtml(ccuArt ? realImage(b.image) || '' : '')}">
     ${thumb}
     <div class="card-body">
       <div class="card-name">${nameHtml}</div>
@@ -4467,13 +4476,31 @@ function contentKind(c) {
   return '—';
 }
 
+// The detail window's picture: RSI's art, except a CCU shows the ship it
+// upgrades to; with no RSI art, look the ship up by name. Starts as the
+// placeholder and swaps in whichever picture turns up.
+function fillModalArt(real, resolve, preferShip) {
+  const show = (url) => {
+    const slot = modalBody.querySelector('.modal-img');
+    if (!url || !slot) return;
+    const im = document.createElement('img');
+    im.className = 'modal-img';
+    im.alt = '';
+    slot.replaceWith(im);
+    progressiveImage(im, url);
+  };
+  if (!resolve || (real && !preferShip)) return show(real);
+  const opened = modalBody.firstElementChild;
+  OH.getShipImage(resolve).then((art) => {
+    if (modalBody.firstElementChild === opened) show(art || real);
+  });
+}
+
 function openItemModal(p) {
   hidePreview();
   const real = realImage(p.image);
-  // src is set by progressiveImage() below (thumbnail first, then full-res).
-  const img = real
-    ? `<img class="modal-img" alt="">`
-    : `<div class="modal-img placeholder">${OH.escapeHtml(p.kind)}</div>`;
+  // The picture is filled in by fillModalArt() below.
+  const img = `<div class="modal-img placeholder">${OH.escapeHtml(p.kind)}</div>`;
   const badgeClass = ['ccu', 'ship', 'paint', 'addon', 'coupon'].includes(p.kind) ? p.kind : '';
   const contents = p.contents || [];
   const contentsHtml = contents.length
@@ -4506,8 +4533,7 @@ function openItemModal(p) {
     </div>`,
   );
   itemModal.hidden = false;
-  const mimg = modalBody.querySelector('img.modal-img');
-  if (mimg) progressiveImage(mimg, real);
+  fillModalArt(real, resolveImageName(p), p.isCCU && !p.shipArt);
 }
 function closeItemModal() {
   itemModal.hidden = true;
@@ -4518,9 +4544,7 @@ function closeItemModal() {
 function openBuybackModal(b) {
   hidePreview();
   const real = realImage(b.image);
-  const img = real
-    ? `<img class="modal-img" alt="">`
-    : `<div class="modal-img placeholder">Buy-Back</div>`;
+  const img = `<div class="modal-img placeholder">Buy-Back</div>`; // see fillModalArt
   const url = buybackReclaimLink(b);
   const row = (k, v) =>
     `<div class="mr"><span class="mr-k">${k}</span><span class="mr-v">${v}</span></div>`;
@@ -4562,8 +4586,8 @@ function openBuybackModal(b) {
     </div>`,
   );
   itemModal.hidden = false;
-  const mimg = modalBody.querySelector('img.modal-img');
-  if (mimg) progressiveImage(mimg, real);
+  const shipish = b.ccu || ['ship', 'pack', 'package'].includes(b.kind);
+  fillModalArt(real, b.ccu && b.ccu.to ? b.ccu.to : shipish ? b.name : '', !!b.ccu && !b.shipArt);
   if (!d && !b.isCCU && /^\d+$/.test(String(b.id))) {
     OH.fetchBuybackDetail(String(b.id)).then(async (r) => {
       if (itemModal.hidden) return;

@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **CCUs show the ship you're upgrading to.** Cards and the details window (Inventory
+  and Buy-Backs) use the destination ship's picture instead of RSI's generic upgrade art.
 - **Buy-Backs Market tools.** Like the Inventory Market: tick rows to see their total
   and how many tokens they'd use, compare with today's store price (and what you save
   once details are loaded), jot My Price / %, and Export CSV or Copy image.
