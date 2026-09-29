@@ -511,8 +511,8 @@ try {
   await page.addScriptTag({ path: 'node_modules/jsqr/dist/jsQR.js' });
   const share = await page.evaluate(async () => {
     let types = null;
-    navigator.clipboard.write = async (items) => {
-      types = items[0].types;
+    window.downloadBlob = (blob, name) => {
+      types = [blob.type, name];
     };
     document.querySelector('#ref-share-code').checked = true;
     const c = await referralShareCanvas({ withCode: true });
@@ -531,9 +531,60 @@ try {
   share.w > 1000 &&
   share.types &&
   share.types[0] === 'image/png' &&
+  /\.png$/.test(share.types[1]) &&
   share.qr === 'https://robertsspaceindustries.com/enlist?referral=STAR-DEMO-0000'
     ? ok(`share image ${share.w}×${share.h}, QR scans to the referral link, "${share.status}"`)
     : fail(`share image: ${JSON.stringify(share)}`);
+
+  console.log('Wishlist, spending, events');
+  const wse = await page.evaluate(async () => {
+    openShipModal('Carrack');
+    const btn = document.querySelector('[data-wish-toggle]');
+    const before = btn.textContent;
+    btn.click();
+    const after = btn.textContent;
+    document.querySelector('#modal-close').click();
+    location.hash = '#store';
+    await new Promise((r) => setTimeout(r, 400));
+    const wish = document.querySelector('#wishlist').textContent;
+    document.querySelector('[data-wish-remove]')?.click();
+    const cleared = !state.wishlist.length;
+    setStatsTab('spending');
+    location.hash = '#stats';
+    await new Promise((r) => setTimeout(r, 400));
+    const spend = document.querySelector('#stats-body').textContent;
+    const bars = document.querySelectorAll('#stats-body .bar-row').length;
+    // A bonus event running today shows the Home banner.
+    const today = new Date().toISOString().slice(0, 10);
+    referralEvents = [
+      ...referralEvents,
+      { start: today, end: today, name: 'Test Expo', reward: 'Drake Dragonfly with LTI' },
+    ];
+    location.hash = '#home';
+    await new Promise((r) => setTimeout(r, 400));
+    const banner = document.querySelector('#event-banner');
+    return {
+      before,
+      after,
+      wish: /Carrack/.test(wish),
+      cleared,
+      spend: /pledged in total/.test(spend),
+      bars,
+      banner: !banner.hidden && /Test Expo/.test(banner.textContent),
+    };
+  });
+  wse.before === 'Add to Wishlist' &&
+  wse.after === 'Remove from Wishlist' &&
+  wse.wish &&
+  wse.cleared
+    ? ok('wishlist: add from the ship window, listed on Store, remove')
+    : fail(`wishlist: ${JSON.stringify(wse)}`);
+  wse.spend && wse.bars >= 3
+    ? ok(`spending tab: ${wse.bars} years`)
+    : fail(`spending: ${JSON.stringify(wse)}`);
+  wse.banner
+    ? ok('home banner while a bonus event runs')
+    : fail(`event banner: ${JSON.stringify(wse)}`);
 
   for (const view of ['referrals', 'developers']) {
     console.log(view[0].toUpperCase() + view.slice(1));
