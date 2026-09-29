@@ -4,8 +4,11 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Store searches show how many there are ("Search 221 ships…") and a live count while you
+  type ("4 of 221"); the CCU search hides when you only have a few.
 - **Sort your wishlist.** Name (the default), price high to low or low to high, in stock
-  first, or **My order**: drag ships into any order you like (saved).
+  first, or **My order**: grab a ship and drag it; the others slide out of the way as it
+  moves, and the order is saved when you let go.
 - Prices no longer carry a "~". Buy-back prices that are still today's store price (until
   Load details reads RSI's exact one) say so when you hover them.
 - Wishlist buy-backs include **packs that contain the ship** (e.g. a 600i inside the Origin

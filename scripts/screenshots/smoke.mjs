@@ -583,7 +583,6 @@ try {
       stock: await pick('stock'),
       mineBefore: await pick('mine'),
       grips: document.querySelectorAll('#wishlist .wish-grip').length,
-      draggable: document.querySelectorAll('#wishlist tr[draggable="true"]').length,
     };
     moveWishlist('Carrack', 'Pioneer');
     res.mineAfter = order().join(',');
@@ -598,10 +597,70 @@ try {
   ws.stock === 'Cutlass Black,Carrack,Pioneer' &&
   ws.mineBefore === 'Pioneer,Cutlass Black,Carrack' &&
   ws.grips === 3 &&
-  ws.draggable === 3 &&
   ws.mineAfter === 'Carrack,Pioneer,Cutlass Black'
     ? ok('wishlist sorts (name, price both ways, in stock first) and drag order')
     : fail(`wishlist sort: ${JSON.stringify(ws)}`);
+
+  // A real mouse drag in "My order": the last row dragged to the top.
+  const rowsBox = await page.evaluate(async () => {
+    state.wishlist = ['Pioneer', 'Cutlass Black', 'Carrack'];
+    state.wishSort = 'mine';
+    renderStore();
+    await new Promise((r) => setTimeout(r, 200));
+    const rows = [...document.querySelectorAll('#wishlist tr[data-wish-name]')];
+    rows[rows.length - 1].scrollIntoView({ block: 'center' });
+    return rows.map((r) => {
+      const b = r.querySelector('.wish-grip').getBoundingClientRect();
+      return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+    });
+  });
+  await page.mouse.move(rowsBox[2].x, rowsBox[2].y);
+  await page.mouse.down();
+  let lifted = false;
+  for (let k = 1; k <= 12; k++) {
+    await page.mouse.move(
+      rowsBox[2].x,
+      rowsBox[2].y + ((rowsBox[0].y - 20 - rowsBox[2].y) * k) / 12,
+    );
+    if (k === 6)
+      lifted = await page.evaluate(() => !!document.querySelector('#wishlist tr.lifted'));
+  }
+  await page.mouse.up();
+  const dragged = await page.evaluate(() => {
+    const out = state.wishlist.join(',');
+    state.wishlist = [];
+    state.wishSort = 'name';
+    chrome.storage.local.set({ uiWishSort: 'name', wishlist: [] });
+    renderStore();
+    return out;
+  });
+  lifted && dragged === 'Carrack,Pioneer,Cutlass Black'
+    ? ok('mouse drag lifts the row and reorders the wishlist')
+    : fail(`live drag: lifted=${lifted} order=${dragged}`);
+
+  // Panel searches: counts in the placeholder, "N of M" while typing, no CCU
+  // search for a handful of CCUs.
+  const sm = await page.evaluate(async () => {
+    const box = document.querySelector('#price-search');
+    const placeholder = box.placeholder;
+    box.value = 'cutlass';
+    box.dispatchEvent(new Event('input'));
+    const count = document.querySelector('#price-search-count').textContent;
+    box.value = '';
+    box.dispatchEvent(new Event('input'));
+    return {
+      placeholder,
+      count,
+      cleared: document.querySelector('#price-search-count').textContent,
+      ccuHidden: document.querySelector('#ccu-search').hidden,
+    };
+  });
+  /^Search \d+ ships…$/.test(sm.placeholder) &&
+  /^\d+ of \d+$/.test(sm.count) &&
+  !sm.cleared &&
+  sm.ccuHidden
+    ? ok(`panel search: "${sm.placeholder}", "${sm.count}", CCU search hidden for a few CCUs`)
+    : fail(`panel search: ${JSON.stringify(sm)}`);
 
   console.log('Updates');
   await go('#updates');
