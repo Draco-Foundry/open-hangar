@@ -45,3 +45,17 @@ test('loanersFor returns null for flyable ships', () => {
   assert.equal(OH.loanersFor('Cutlass Black', matrix), null);
   assert.equal(OH.loanersFor('Constellation Taurus', matrix), null);
 });
+
+test('included vessels: RSI list parses and matches parent ships', () => {
+  const inc = OH.parseLoanerMatrix(
+    fs.readFileSync(path.join(__dirname, 'fixtures', 'included-vessels.html'), 'utf8'),
+  );
+  const got = (n) => (OH.loanersFor(n, inc) || {}).loaners || null;
+  assert.ok(inc.length >= 10);
+  assert.deepEqual(got('Carrack'), ['C8 Pisces', 'URSA Rover']);
+  assert.deepEqual(got('Constellation Andromeda'), ['P-52 Merlin']);
+  assert.deepEqual(got('Idris-M'), ['MPUV-Personnel']); // "Idris-M Frigate"
+  assert.deepEqual(got('Javelin'), ['MPUV-Cargo']); // "Javelin*"
+  assert.deepEqual(got('600i Executive'), ['G12* (currently Cyclone)']); // "600i Executive Edition"
+  assert.equal(got('Cutlass Black'), null);
+});
