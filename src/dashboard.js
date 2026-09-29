@@ -476,10 +476,15 @@ function setScanning(text, done = false) {
     setHTML(scanIndicator, '');
     return;
   }
+  // The badge stays short so it never reflows the header (a long label pushed
+  // the search box onto a second line); the detail is in its hover text and
+  // the Home status line.
+  const short = done ? (/^⚠/.test(text) ? '⚠ Scan finished' : '✓ Scan done') : 'Scanning…';
   setHTML(
     scanIndicator,
-    (done ? '' : '<span class="spin"></span>') + `<span>${OH.escapeHtml(text)}</span>`,
+    (done ? '' : '<span class="spin"></span>') + `<span>${OH.escapeHtml(short)}</span>`,
   );
+  scanIndicator.title = text.replace(/^[✓⚠]\s*/, '');
   scanIndicator.hidden = false;
   if (done) {
     scanIndicatorTimer = setTimeout(() => {
@@ -907,9 +912,105 @@ function renderVersions() {
   });
 }
 
+// --- Home: quick-info panels -------------------------------------------------
+// "Wishlist: On Sale Now" (wishlist ships in RSI's store right now, from each
+// ship's store page) and "At a Glance" (tokens, next referral reward, loaners).
+async function wishlistStock({ force = false } = {}) {
+  await ensureStore();
+  const out = [];
+  for (const name of state.wishlist) {
+    const s = storeOf(name);
+    const st = s && s.link ? await OH.getShipStock(s.link, fetch, { force }) : null;
+    if (st && st.state) stockMem.set(s.link, st.state);
+    out.push({ name: (shipEntry(name) || {}).name || name, st });
+  }
+  return out;
+}
+let homeWishToken = 0;
+function renderHomePanels() {
+  const wish = $('#home-wish');
+  const glance = $('#home-glance');
+  if (glance) setHTML(glance, glanceHtml());
+  if (!wish) return;
+  if (!state.wishlist.length) {
+    setHTML(
+      wish,
+      `<h3>Wishlist</h3><p class="muted">Open any ship (search at the top) and press <strong>Add to Wishlist</strong>. Ships on it that go on sale show up here.</p>`,
+    );
+    return;
+  }
+  const token = ++homeWishToken;
+  setHTML(wish, `<h3>Wishlist: On Sale Now</h3><p class="muted">Checking RSI's store…</p>`);
+  wishlistStock().then((list) => {
+    if (token !== homeWishToken) return;
+    const onSale = list.filter((x) => x.st && x.st.state === 'in');
+    const inPack = list.filter((x) => x.st && x.st.state === 'pack');
+    const row = (x, text, cls) =>
+      `<li>${shipLink(x.name)}<span class="sale ${cls}">${OH.escapeHtml(text)}</span></li>`;
+    const items = [
+      ...onSale.map((x) =>
+        row(x, x.st.price ? `In stock ${dollars(x.st.price)}` : 'In stock', 'on'),
+      ),
+      ...inPack.map((x) => row(x, 'Only in a pack', 'wb')),
+    ];
+    setHTML(
+      wish,
+      `<h3>Wishlist: On Sale Now <span class="market-n">${onSale.length}</span></h3>${
+        items.length
+          ? `<ul class="home-list">${items.join('')}</ul>`
+          : `<p class="muted">None of your ${list.length} wishlist ship${list.length === 1 ? ' is' : 's are'} for sale right now.</p>`
+      }<p class="home-more"><a href="#store" data-view="store">Your wishlist →</a></p>`,
+    );
+  });
+}
+function glanceHtml() {
+  const rows = [];
+  const add = (label, value, href) =>
+    rows.push(
+      `<li><span class="muted">${label}</span><span>${href ? `<a href="${href}" data-view="${href.slice(1)}">${value}</a>` : value}</span></li>`,
+    );
+  if (state.bbTokens != null) {
+    const next = nextTokenDate();
+    add(
+      'Buy-back tokens',
+      `${state.bbTokens}${next ? ` · next ${OH.escapeHtml(next)}` : ''}`,
+      '#buybacks',
+    );
+  }
+  const ref = state.referral;
+  if (ref) {
+    const recruits = ref.legacy?.recruits ?? 0;
+    const p = tierProgress(REFERRAL_LADDER_STANDARD, recruits);
+    add(
+      'Next referral reward',
+      p.next
+        ? `${(p.next.at - recruits).toLocaleString('en-US')} more to ${OH.escapeHtml(rewardNames(p.next.items))}`
+        : 'All unlocked',
+      '#referrals',
+    );
+  }
+  if (state.items.length) {
+    ensureLoaners();
+    if (loanerMatrix) {
+      const loaners = new Set();
+      for (const sh of ownedShips())
+        for (const l of (loanersOf(sh.label) || {}).loaners || []) loaners.add(l);
+      add('Loaners you can fly', loaners.size ? String(loaners.size) : 'None', '#stats');
+    }
+  }
+  add(
+    'Wishlist',
+    `${state.wishlist.length} ship${state.wishlist.length === 1 ? '' : 's'}`,
+    '#store',
+  );
+  if (state.scannedAt) add('Last scan', OH.escapeHtml(fmtScan()));
+  return `<h3>At a Glance</h3><ul class="home-kv">${rows.join('')}</ul>`;
+}
+
 function renderHome() {
   ensurePrices();
   renderEventBanner();
+  renderHomePanels();
   renderVersions();
   renderAccount();
   const has = state.items.length > 0;
@@ -2174,11 +2275,10 @@ const SHIP_STATES = [
 // (OH.getShipStock), checked just for the wishlist and the ship window.
 let storeData = null; // { at, ships }
 let storeByKey = null; // shipKey(name) → store entry
-let storeRequested = false;
+let storeRequested = null; // the pending/finished load (a promise)
 function ensureStore() {
-  if (storeRequested) return;
-  storeRequested = true;
-  OH.getStoreShips().then((d) => {
+  if (storeRequested) return storeRequested;
+  storeRequested = OH.getStoreShips().then((d) => {
     if (!d) return;
     storeData = d;
     storeByKey = new Map();
@@ -2187,7 +2287,9 @@ function ensureStore() {
       storeByKey.set(s.lname, s);
     }
     if (currentView() === 'store') renderStore();
+    if (currentView() === 'home') renderHomePanels();
   });
+  return storeRequested;
 }
 // Store entries by catalog slug, built through the same fuzzy ship matching the
 // rest of the dashboard uses ("Freelancer" ↔ "MISC Freelancer", "C2 Hercules" ↔
@@ -5726,8 +5828,8 @@ document.addEventListener('click', async (e) => {
 // Scan a chosen set of sources. Each is independent and persisted on its own, so
 // a partial scan (e.g. just referrals) refreshes only those and leaves the rest
 // of your data untouched; a failure in one still keeps the others' results.
-async function runScan({ hangar = true, buybacks = true, referrals = true } = {}) {
-  if (!hangar && !buybacks && !referrals) return;
+async function runScan({ hangar = true, buybacks = true, referrals = true, store = true } = {}) {
+  if (!hangar && !buybacks && !referrals && !store) return;
   scanBtn.disabled = true;
   if (scanSelectedBtn) scanSelectedBtn.disabled = true;
   setStatus('Scanning…');
@@ -5803,6 +5905,15 @@ async function runScan({ hangar = true, buybacks = true, referrals = true } = {}
     }
   }
 
+  // Store: re-check RSI's store for your wishlist ships (skips the 6-hour cache).
+  if (store && state.wishlist.length) {
+    setStatus('Checking the store for your wishlist…');
+    setScanning('store');
+    const list = await wishlistStock({ force: true });
+    const n = list.filter((x) => x.st && x.st.state === 'in').length;
+    parts.push(`${n} wishlist ship${n === 1 ? '' : 's'} on sale`);
+  }
+
   const summary = parts.join(' · ') || 'Nothing scanned';
   setStatus(summary, anyErr);
   setScanning(`${anyErr ? '⚠ ' : '✓ '}${summary}`, true);
@@ -5847,6 +5958,7 @@ if (scanSelectedBtn) {
       hangar: checked.has('hangar'),
       buybacks: checked.has('buybacks'),
       referrals: checked.has('referrals'),
+      store: checked.has('store'),
     });
   });
 }
@@ -6486,6 +6598,7 @@ function ensureLoaners() {
     if (m) loanerMatrix = m;
     if (inc) includedVessels = inc;
     if ((m || inc) && currentView() === 'stats') renderStats();
+    if ((m || inc) && currentView() === 'home') renderHomePanels();
   });
 }
 // What a ship comes with for keeps ("G12* (currently Cyclone)" → clean text).
