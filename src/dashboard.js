@@ -963,20 +963,13 @@ function renderHomePanels() {
     );
   });
 }
+// Only things the Citizen Card above doesn't already show.
 function glanceHtml() {
   const rows = [];
   const add = (label, value, href) =>
     rows.push(
       `<li><span class="muted">${label}</span><span>${href ? `<a href="${href}" data-view="${href.slice(1)}">${value}</a>` : value}</span></li>`,
     );
-  if (state.bbTokens != null) {
-    const next = nextTokenDate();
-    add(
-      'Buy-back tokens',
-      `${state.bbTokens}${next ? ` · next ${OH.escapeHtml(next)}` : ''}`,
-      '#buybacks',
-    );
-  }
   const ref = state.referral;
   if (ref) {
     const recruits = ref.legacy?.recruits ?? 0;
@@ -998,12 +991,8 @@ function glanceHtml() {
       add('Loaners you can fly', loaners.size ? String(loaners.size) : 'None', '#stats');
     }
   }
-  add(
-    'Wishlist',
-    `${state.wishlist.length} ship${state.wishlist.length === 1 ? '' : 's'}`,
-    '#store',
-  );
-  if (state.scannedAt) add('Last scan', OH.escapeHtml(fmtScan()));
+  if (!rows.length)
+    return '<h3>At a Glance</h3><p class="muted">Scan your hangar to fill this in.</p>';
   return `<h3>At a Glance</h3><ul class="home-kv">${rows.join('')}</ul>`;
 }
 
@@ -5926,6 +5915,14 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
 // Primary button scans everything; the caret opens a per-source menu.
 scanBtn.addEventListener('click', () => runScan());
 
+// Open below the ▾ button, right edges lined up; above it if there's no room.
+function placeScanMenu() {
+  const b = scanMenuBtn.getBoundingClientRect();
+  const h = scanMenu.offsetHeight || 0;
+  const below = b.bottom + 6 + h <= window.innerHeight - 8;
+  scanMenu.style.right = `${Math.max(8, window.innerWidth - b.right)}px`;
+  scanMenu.style.top = below ? `${b.bottom + 6}px` : `${Math.max(8, b.top - 6 - h)}px`;
+}
 function closeScanMenu() {
   if (!scanMenu || scanMenu.hidden) return;
   scanMenu.hidden = true;
@@ -5936,9 +5933,14 @@ if (scanMenuBtn && scanMenu) {
   scanMenuBtn.addEventListener('click', (e) => {
     e.stopPropagation(); // don't let the document handler immediately re-close it
     const open = scanMenu.hidden;
+    if (open) placeScanMenu();
     scanMenu.hidden = !open;
     scanMenuBtn.setAttribute('aria-expanded', String(open));
+    if (open) placeScanMenu(); // again now that it has a size
   });
+  // Scrolling or resizing moves the button; just close the menu.
+  window.addEventListener('resize', closeScanMenu);
+  window.addEventListener('scroll', closeScanMenu, { passive: true });
   // Clicks inside the menu (toggling checkboxes) shouldn't close it.
   scanMenu.addEventListener('click', (e) => e.stopPropagation());
   document.addEventListener('click', closeScanMenu);

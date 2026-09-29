@@ -4,9 +4,11 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Fixed: the Scan ▾ menu was cut off by the Citizen Card; it now opens below the button.
 - **A cleaner Home page.** The column of page links is gone (the top bar has them) and "How
   to Use" is one dropdown. New at the top: **Wishlist: On Sale Now** (your wishlist ships in
-  RSI's store right now) and **At a Glance** (buy-back tokens, next referral reward, loaners).
+  RSI's store right now) and **At a Glance** (next referral reward and
+  loaners you can fly: nothing the Citizen Card already shows).
 - **Scan → Store (wishlist)** re-checks RSI's store for your wishlist ships; untick the rest to
   check only the store.
 - The scan badge by the title stays short ("Scanning…", details on hover), so it no longer
