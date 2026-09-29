@@ -112,8 +112,10 @@
     if (/life\s*-?\s*time|lifetime|\blti\b/i.test(label)) return 'LTI';
     const mo = label.match(/(\d+)\s*month/i);
     if (mo) return `${mo[1]}M`;
+    // Years in months, the same as insuranceFromName ("10 Year" → "120M"), so
+    // one term never shows up two ways in filters and stats.
     const yr = label.match(/(\d+)\s*year/i);
-    if (yr) return `${yr[1]}Y`;
+    if (yr) return `${Number(yr[1]) * 12}M`;
     return label || null; // unrecognized phrasing — surface RSI's text verbatim
   };
 
@@ -394,7 +396,7 @@
       const toSkuId = btn?.getAttribute('data-toskuid') || '';
       if (!id) {
         const m = href.match(/(\d+)/); // fall back to an id embedded in the reclaim URL
-        id = m ? m[1] : name;
+        id = m ? m[1] : null; // no button: the scanner gives it a per-page id (never merged)
       }
 
       const img = node.querySelector('img');
@@ -432,7 +434,7 @@
       const kind = ns.classifyBuyback(displayName, displayContains); // ship|ccu|paint|addon|coupon
 
       out.push({
-        id: String(id),
+        id: id ? String(id) : null,
         name: displayName,
         image,
         date,
