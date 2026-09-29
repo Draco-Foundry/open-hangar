@@ -2,37 +2,37 @@
 
 What's changed in each release of Open Hangar. Dates are when the version was cut.
 
-## Unreleased
+## 0.2.10 — 2026-09-29
 
-- **More currencies.** Home → Currency adds NZD, CHF, SEK, PLN, CZK, BRL, CNY, JPY and KRW
-  (yen and won shown without cents).
-- **Store listing in 11 languages.** The extension's description now shows in your
-  browser's language: 简体中文, Français, 한국어, Español, Português, Deutsch, Українська,
-  Italiano, Čeština and Русский.
-- **CCUs show the ship you're upgrading to.** Cards and the details window (Inventory
-  and Buy-Backs) use the destination ship's picture instead of RSI's generic upgrade art.
 - **Buy-Backs Market tools.** Like the Inventory Market: tick rows to see their total
   and how many tokens they'd use, compare with today's store price (and what you save
   once details are loaded), jot My Price / %, and Export CSV or Copy image.
-- Fixed: hovering a name in the Buy-Backs table no longer covers it in a blue box.
-- **Sharp pictures right away.** Clicking an item shows its picture clearly at once
-  (no blurry loading step); a higher-res copy slips in when it's ready.
-- Fixed: some items (e.g. StarKitten helmets, Epoch Society shirt, AMD Never Settle
-  pack, Puglisi Collection) showed no picture because RSI gave a partial image link.
-  Already-scanned items are fixed too, no rescan needed.
-- **Hangars get their own group.** Pledges like VFG Industrial Hangar or Self-Land
-  Hangar show under Hangars in Inventory and Market.
-- **Gear is labelled.** Pack contents RSI leaves unlabelled (helmet, core, arms, legs,
-  backpack…) now show as Gear, and hangars as Hangar.
-- Fixed: some ships (e.g. Vanduul Blade, P-52 Merlin, Nox, Mustang Omega AMD Edition)
-  showed a blank card when RSI's image link was broken; they now fall back to the
-  ship's art from RSI's ship list. Missing-image lookups retry after a day.
+- **CCUs show the ship you're upgrading to.** Cards and the details window (Inventory
+  and Buy-Backs) use the destination ship's picture instead of RSI's generic upgrade art.
 - **Market images are tables.** In Market view, Copy image and Save PNG make a picture of
   your picked rows as the table (grouped by section, with store price and your title),
   easy to read down; the card picture is still there in the other layouts.
 - **Market: Store Price column.** Each row shows today's store price next to its melt
   price, so the gap is easy to see (also in the CSV).
 - **Market: pricing ticks the row.** Typing a price or % ticks that item for export.
+- **Hangars get their own group.** Pledges like VFG Industrial Hangar or Self-Land
+  Hangar show under Hangars in Inventory and Market.
+- **Gear is labelled.** Pack contents RSI leaves unlabelled (helmet, core, arms, legs,
+  backpack…) now show as Gear, and hangars as Hangar.
+- **More currencies.** Home → Currency adds NZD, CHF, SEK, PLN, CZK, BRL, CNY, JPY and KRW
+  (yen and won shown without cents).
+- **Store listing in 11 languages.** The extension's description now shows in your
+  browser's language: 简体中文, Français, 한국어, Español, Português, Deutsch, Українська,
+  Italiano, Čeština and Русский.
+- **Sharp pictures right away.** Clicking an item shows its picture clearly at once
+  (no blurry loading step); a higher-res copy slips in when it's ready.
+- Fixed: some items (e.g. StarKitten helmets, Epoch Society shirt, AMD Never Settle
+  pack, Puglisi Collection) showed no picture because RSI gave a partial image link.
+  Already-scanned items are fixed too, no rescan needed.
+- Fixed: some ships (e.g. Vanduul Blade, P-52 Merlin, Nox, Mustang Omega AMD Edition)
+  showed a blank card when RSI's image link was broken; they now fall back to the
+  ship's art from RSI's ship list. Missing-image lookups retry after a day.
+- Fixed: hovering a name in the Buy-Backs table no longer covers it in a blue box.
 
 ## 0.2.9 — 2026-09-28
 
