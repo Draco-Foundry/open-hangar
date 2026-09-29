@@ -8,14 +8,15 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   orange, pack gold and game package teal, on badges and filter chips across Inventory,
   Buy-Backs and the wishlist. Packs and game packages in Inventory now say PACK / PACKAGE.
 - Big amounts in the Home summary shorten ("CN¥13.7K") so they fit; hover for the full value.
-- **This Week in Star Citizen** on Home: the newest weekly post boiled down to a few bullet
-  points plus the week's schedule, read straight from RSI (no AI); "Read it on RSI" for the rest.
+- **This Week in Star Citizen** on Home: the newest weekly post with its picture and opening
+  paragraph; "Read it on RSI" for the rest.
 - Removed "melt candidates" (the Inventory filter, the Stats section and the item-window line):
   the idea that you could melt a pledge and buy it back for the same credit doesn't hold up.
 - Fixed: the Scan ▾ menu was cut off by the Citizen Card; it now opens below the button.
 - **A cleaner Home page.** The column of page links is gone (the top bar has them) and "How
   to Use" is one dropdown. Side by side: **Wishlist: On Sale Now** (your wishlist ships in
-  RSI's store right now) and **This Week in Star Citizen**, the same height; long lists scroll inside.
+  RSI's store right now; hidden when your wishlist is empty) and **This Week in Star Citizen**, the
+  same height; long lists scroll inside.
 - **Scan → Store (wishlist)** re-checks RSI's store for your wishlist ships; untick the rest to
   check only the store.
 - The scan badge by the title stays short ("Scanning…", details on hover), so it no longer
