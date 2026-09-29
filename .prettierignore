@@ -13,3 +13,4 @@ app/.vscode
 test/fixtures/referral-events.wikitext
 test/fixtures/loaner-matrix.html
 test/fixtures/included-vessels.html
+test/fixtures/store-ships.json
