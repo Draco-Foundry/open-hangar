@@ -2364,13 +2364,19 @@
 
   // --- Is a ship in the store right now? -------------------------------------------
   // The upgrade-tool feed above only lists CCU targets, so it can't answer this.
-  // Each ship's own store page does: its schema.org data carries the store's
-  // stock ("InStock" / "OutOfStock"), and a missing page means not in the store.
+  // Each ship's own store page does: its schema.org data lists every offer for
+  // the ship with a link that says what it is, /Standalone-Ships/…, /Upgrades/…
+  // (a CCU to it) or /Packages/… (a pack that includes it), and the store's
+  // stock for each. A missing page means it's not in the store at all.
   // One page per ship, so this is only asked for ships someone is looking at.
-  // Page HTML → 'in' | 'out' | null (couldn't tell). Pure.
+  // Page HTML → { state: 'in' | 'pack' | 'out', price, packs: [{ name, price }] }
+  // or null (couldn't tell). 'in' = a standalone offer in stock. Pure.
   OH.parseShipStock = function parseShipStock(html) {
     let seen = false;
-    let inStock = false;
+    const standalone = [];
+    const packs = [];
+    const inStock = (o) =>
+      /InStock|LimitedAvailability|PreOrder/i.test(String(o.availability || ''));
     for (const m of String(html || '').matchAll(
       /<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi,
     )) {
@@ -2381,20 +2387,30 @@
         continue;
       }
       for (const node of Array.isArray(j) ? j : [j]) {
-        const offers = node && node.offers;
-        for (const o of Array.isArray(offers) ? offers : offers ? [offers] : []) {
-          const a = String((o && o.availability) || '');
-          if (!a) continue;
-          seen = true;
-          if (/InStock|LimitedAvailability|PreOrder/i.test(a)) inStock = true;
+        if (!node || node['@type'] !== 'Product' || !node.offers) continue;
+        seen = true;
+        const top = node.offers;
+        const list = Array.isArray(top.offers) ? top.offers : Array.isArray(top) ? top : [top];
+        for (const o of list) {
+          if (!o || !inStock(o)) continue;
+          const url = String(o.url || '');
+          const price = Number(o.price) || null;
+          if (/\/Standalone-Ships\//i.test(url)) standalone.push(price);
+          else if (/\/Packages\//i.test(url))
+            packs.push({ name: String(o.name || 'a pack'), price });
         }
       }
     }
-    return seen ? (inStock ? 'in' : 'out') : null;
+    if (!seen) return null;
+    if (standalone.length) {
+      const prices = standalone.filter(Boolean);
+      return { state: 'in', price: prices.length ? Math.min(...prices) : null, packs };
+    }
+    return { state: packs.length ? 'pack' : 'out', price: null, packs };
   };
-  const STOCK_KEY = 'shipStock';
+  const STOCK_KEY = 'shipStock2'; // v2: standalone vs pack-only
   const STOCK_TTL = 6 * 3600e3;
-  // Store page URL → 'in' | 'out' | null, cached 6 hours per ship.
+  // Store page URL → result of parseShipStock (a 404 is 'out'), cached 6 hours.
   OH.getShipStock = async function getShipStock(url, fetchFn = fetch) {
     if (!/^https:\/\/robertsspaceindustries\.com\/pledge\//.test(url || '')) return null;
     const { [STOCK_KEY]: cache = {} } = await chrome.storage.local.get(STOCK_KEY);
@@ -2403,7 +2419,7 @@
     let s = null;
     try {
       const res = await fetchFn(url, { credentials: 'omit' });
-      if (res.status === 404) s = 'out';
+      if (res.status === 404) s = { state: 'out', price: null, packs: [] };
       else if (res.ok) s = OH.parseShipStock(await res.text());
     } catch (e) {
       OH.log('warn', 'store', `stock check failed: ${e?.message || e}`);
