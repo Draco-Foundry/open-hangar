@@ -2953,7 +2953,7 @@
   // --- Scan history --------------------------------------------------------------
   // Each full hangar scan that changed something is kept as a compact snapshot
   // ({ at, items: [[id, name, value]] }) in the DB, so the UI can say what changed
-  // since last time and chart melt value over time. Stays in this browser; it is
+  // since last time and chart account value over time. Stays in this browser; it is
   // included in the user's own JSON export (their backup file).
   const HISTORY_MAX = 100;
   const HISTORY_MAX_BYTES = 3e6; // about 3 MB: big hangars keep fewer snapshots

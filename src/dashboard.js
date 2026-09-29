@@ -3271,8 +3271,34 @@ function changeDetails(d) {
 const fmtDay = (t) => new Date(t).toLocaleDateString(undefined, { dateStyle: 'medium' });
 
 // Melt value per snapshot as a small line chart (inline SVG, no chart lib).
+// Account value of a history snapshot: what the ships it held sell for at
+// today's store prices. Pledges still in the hangar use their exact ships
+// (OH.hangarValue); ones since melted or gifted are estimated from their name
+// ("Standalone Ship - Cutlass Black" → Cutlass Black). CCUs, paints and gear
+// count $0, as in Hangar value.
+function snapshotStore(snap) {
+  const v = hangarValue();
+  let sum = 0;
+  for (const [id, name] of snap.items) {
+    const si = v && v.pledges[id];
+    if (si) {
+      sum += si.ccu ? 0 : si.store || 0;
+      continue;
+    }
+    if (/\bupgrade\b|\bccu\b|\s→\s|\bpaint\b/i.test(name || '')) continue;
+    const bare = String(name || '').replace(/^\s*[^-–]+?\s*[-–]\s/, '');
+    const base = bare.replace(
+      /\s*[-–]\s*(lti|iae|ilw|warbond|standard edition|\d+\s*(months?|years?).*)$/i,
+      '',
+    );
+    const hit = state.priceOf && (state.priceOf(base) || state.priceOf(bare));
+    sum += (hit && hit.msrp) || 0;
+  }
+  return sum;
+}
+
 function historySvg(hist) {
-  const pts = hist.map((h) => ({ t: h.at, v: OH.snapshotMelt(h) }));
+  const pts = hist.map((h) => ({ t: h.at, v: snapshotStore(h) }));
   const W = 560,
     H = 150,
     L = 56,
@@ -3290,10 +3316,10 @@ function historySvg(hist) {
   const dots = pts
     .map(
       (p) =>
-        `<circle cx="${x(p.t).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="3"><title>${fmtDay(p.t)}: ${money(p.v)}</title></circle>`,
+        `<circle cx="${x(p.t).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="3"><title>${fmtDay(p.t)}: ${dollars(p.v)}</title></circle>`,
     )
     .join('');
-  return `<svg class="hist-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Melt value over time">
+  return `<svg class="hist-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Account value over time">
     <text x="${L - 6}" y="${T + 8}" text-anchor="end">${dollars(vmax)}</text>
     <text x="${L - 6}" y="${H - B}" text-anchor="end">${dollars(vmin)}</text>
     <text x="${L}" y="${H - 4}">${fmtDay(t0)}</text>
@@ -3302,7 +3328,7 @@ function historySvg(hist) {
   </svg>`;
 }
 
-// Stats → History: melt value over time + a log of what changed per scan.
+// Stats → History: account value over time + a log of what changed per scan.
 function historySectionHtml() {
   const hist = state.history;
   if (!hist.length) return '';
@@ -3321,8 +3347,11 @@ function historySectionHtml() {
     );
   }
   return (
-    `<h3 class="section-title" id="history">Melt Value Over Time</h3>` +
-    historySvg(hist) +
+    `<h3 class="section-title" id="history">Account Value Over Time</h3>` +
+    (state.priceOf
+      ? historySvg(hist) +
+        `<p class="muted value-note tight">What the ships you held at each scan sell for at today's store prices. Pledges you've since melted are estimated from their names.</p>`
+      : '<p class="muted">Loading ship prices…</p>') +
     `<div class="hist-list">${steps.join('')}</div>` +
     `<p class="muted value-note">A snapshot is kept each time a full scan finds changes — ${hist.length} so far, up to the last 100.</p>`
   );
