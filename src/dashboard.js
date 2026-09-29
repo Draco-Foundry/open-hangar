@@ -4883,7 +4883,18 @@ let previewId = null;
 // (~1200px) is plenty for the modal/popup and a fraction of the 4K "source";
 // source is the fallback. Non-RSI or already-large URLs have no candidates.
 function hiResCandidates(url) {
-  if (!url || !/media\.robertsspaceindustries\.com/.test(url)) return [];
+  if (!url) return [];
+  // The other RSI form (buy-backs, pledge contents): the size is a folder,
+  // robertsspaceindustries.com/media/<id>/<variant>/<file>.
+  const dir = url.match(
+    /^(https:\/\/robertsspaceindustries\.com\/media\/[^/]+\/)([^/]+)(\/[^/?]+)(\?.*)?$/,
+  );
+  if (dir) {
+    const [, base, variant, file, query = ''] = dir;
+    if (/^(source|slideshow_wide|wallpaper_\d+x\d+)$/.test(variant)) return [];
+    return ['slideshow_wide', 'source'].map((v) => `${base}${v}${file}${query}`);
+  }
+  if (!/media\.robertsspaceindustries\.com/.test(url)) return [];
   const m = url.match(/^(.*\/)([^/?]+)\.(\w+)(\?.*)?$/);
   if (!m) return [];
   const [, base, variant, ext, query = ''] = m;
