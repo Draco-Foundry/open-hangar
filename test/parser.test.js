@@ -69,7 +69,7 @@ test('insuranceTerm normalizes month / year / lifetime phrasings', () => {
   assert.equal(t('Lifetime Insurance'), 'LTI');
   assert.equal(t('120 Month Insurance'), '120M');
   assert.equal(t('6 Months Insurance'), '6M');
-  assert.equal(t('5 Year Insurance'), '5Y');
+  assert.equal(t('5 Year Insurance'), '60M'); // same unit as insuranceFromName
   assert.equal(OpenHangar.insuranceTerm([]), null);
 });
 

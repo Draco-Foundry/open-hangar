@@ -28,7 +28,7 @@
 
   const PAGE_SIZE = 10;
   const DELAY_MS = 400; // politeness throttle between pages
-  const MAX_PAGES = 200; // safety cap
+  const MAX_PAGES = 1000; // safety cap: 10,000 pledges at RSI's 10 per page
   const DB_KEY = 'db';
   // v2 added the exported `account` block (identity + org/rank + balances).
   // The stored `sources` items shape is unchanged from v1, so a v1 DB in storage
@@ -209,25 +209,34 @@
     return db.sources[id] || { items: [], scannedAt: null };
   };
 
-  async function saveSource(id, items, { record = false, meta } = {}) {
-    const db = await OH.loadDB();
-    const scannedAt = Date.now();
-    if (record) recordHistory(db, db.sources[id], items, scannedAt);
-    db.sources[id] = meta ? { items, scannedAt, meta } : { items, scannedAt };
-    // Stamp which RSI account this data belongs to, so the UI can detect when a
-    // different account signs in later and clear the stale data (multi-account
-    // safety). Best-effort: if we can't read the account, leave owner untouched.
-    try {
-      const acct = await OH.getAccount();
+  // Saves are queued, and the DB is read right before it's written (the account
+  // lookup happens first), so a save can't write back a stale copy over another
+  // save or an account switch that happened while it was waiting.
+  let saveChain = Promise.resolve();
+  function saveSource(id, items, { record = false, meta } = {}) {
+    const run = saveChain.then(async () => {
+      // Stamp which RSI account this data belongs to, so the UI can detect when a
+      // different account signs in later and clear the stale data (multi-account
+      // safety). Best-effort: if we can't read the account, leave owner untouched.
+      let acct = null;
+      try {
+        acct = await OH.getAccount();
+      } catch {
+        /* owner stamp is optional */
+      }
+      const db = await OH.loadDB();
+      const scannedAt = Date.now();
+      if (record) recordHistory(db, db.sources[id], items, scannedAt);
+      db.sources[id] = meta ? { items, scannedAt, meta } : { items, scannedAt };
       if (acct && acct.loggedIn && acct.nickname) {
         db.owner = { nickname: acct.nickname, displayname: acct.displayname || null };
       }
-    } catch {
-      /* owner stamp is optional */
-    }
-    await chrome.storage.local.set({ [DB_KEY]: db });
-    await chrome.storage.local.remove(['hangar', 'scannedAt']); // drop legacy keys
-    return scannedAt;
+      await chrome.storage.local.set({ [DB_KEY]: db });
+      await chrome.storage.local.remove(['hangar', 'scannedAt']); // drop legacy keys
+      return scannedAt;
+    });
+    saveChain = run.catch(() => {});
+    return run;
   }
 
   // Recovery slot. When data is auto-cleared because a *different* RSI account
@@ -628,8 +637,15 @@
       // Most sources store an array of items (hangar, buybacks); the referral
       // source stores a single object. Accept either so a full restore round-trips.
       if (src && (Array.isArray(src.items) || (src.items && typeof src.items === 'object'))) {
-        const items = id === 'referral' ? OH.normalizeReferral(src.items) : src.items;
+        // Rows must be objects (a hand-edited or damaged file could hold nulls).
+        const items =
+          id === 'referral'
+            ? OH.normalizeReferral(src.items)
+            : src.items.filter((x) => x && typeof x === 'object');
         db.sources[id] = { items, scannedAt: src.scannedAt || null };
+        // Extras saved with a scan (e.g. buy-back tokens) survive the round trip.
+        if (src.meta && typeof src.meta === 'object' && !Array.isArray(src.meta))
+          db.sources[id].meta = src.meta;
       }
     }
     await chrome.storage.local.set({ [DB_KEY]: db });
@@ -690,6 +706,8 @@
     const all = [];
     const size = src.pageSize || PAGE_SIZE;
     let meta;
+    let lastPage = 0;
+    let lastAdded = 0;
 
     for (let page = 1; page <= MAX_PAGES; page++) {
       const url = `${src.url}?page=${page}&pagesize=${size}`;
@@ -747,16 +765,28 @@
       if (!items.length) break;
 
       let added = 0;
+      items.forEach((it, i) => {
+        // Rows without an id (e.g. a buy-back with no reclaim button) get one
+        // from their position, so identical copies stay separate.
+        if (it.id == null || it.id === '') it.id = `${src.id}-p${page}-${i}`;
+      });
       for (const it of items) {
-        const key = it.id ?? `${it.name}:${it.value}`;
+        const key = it.id;
         if (seen.has(key)) continue;
         seen.add(key);
         all.push(it);
         added++;
       }
       onProgress?.(page, all.length);
+      lastPage = page;
+      lastAdded = added;
       if (added === 0) break;
       await sleep(DELAY_MS);
+    }
+    // Still finding new items on the last allowed page: the list goes on, so
+    // report it as partial (saved without counting the rest as "removed").
+    if (lastPage === MAX_PAGES && lastAdded > 0) {
+      return { items: all, meta, partial: { page: MAX_PAGES + 1, reason: 'page limit reached' } };
     }
     return { items: all, meta };
   }
@@ -811,6 +841,8 @@
         meta: result.meta,
       });
       OH.log('info', src.id, `scan ok, ${result.items.length} items`);
+      // A complete buy-back list: drop cached details for ones since reclaimed.
+      if (src.id === 'buybacks') await OH.pruneBuybackDetails(result.items.map((b) => b.id));
       return { ok: true, items: result.items, scannedAt };
     } catch (err) {
       OH.log('error', src.id, `scan crashed: ${err?.stack || err?.message || err}`);
@@ -1120,7 +1152,9 @@
     let count = null;
     for (let page = 1; page <= REFERRAL_MAX_PAGES; page++) {
       const res = await fetchReferralPage(campaignId, converted, page);
-      if (res.error) return page === 1 ? { error: res.error } : { count, items }; // keep partial after page 1
+      // A later page failing leaves the list short: say so, so the caller can
+      // keep the previous scan's list instead of saving a truncated one.
+      if (res.error) return page === 1 ? { error: res.error } : { count, items, partial: true };
       count = converted ? res.recruitsCount : res.prospectsCount;
       let added = 0;
       for (const it of res.data) {
@@ -1176,9 +1210,41 @@
         onProgress?.('prospects', n, t),
       );
 
+      // Any list that failed (or came back short) keeps the previous scan's
+      // values, so one RSI hiccup can't wipe good data. `partial` names them.
+      const prev = await OH.loadReferral();
+      const bad = (l) => !!(l.error || l.partial);
+      const partial = [];
+      let legacyCount = legacyRecruits.count ?? null;
+      let legacyItems = legacyRecruits.items || [];
+      if (bad(legacyRecruits) && prev) {
+        legacyCount = prev.legacy?.recruits ?? legacyCount;
+        legacyItems = prev.recruitsList || legacyItems;
+        partial.push('recruits');
+      }
+      let currentCount = currentRecruits.count ?? null;
+      let currentIds = new Set((currentRecruits.items || []).map((r) => r.id));
+      if (bad(currentRecruits)) {
+        if (prev) {
+          currentCount = prev.current?.recruits ?? null;
+          currentIds = new Set(
+            (prev.recruitsList || []).filter((r) => r.campaign === 'current').map((r) => r.id),
+          );
+        }
+        partial.push('current recruits');
+      }
+      let prospectCount = prospects.count ?? null;
+      let prospectItems = prospects.items || [];
+      if (bad(prospects)) {
+        if (prev) {
+          prospectCount = prev.prospects ?? null;
+          prospectItems = prev.prospectsList || [];
+        }
+        partial.push('prospects');
+      }
+
       // Merge recruit lists: tag current ids, then mark legacy-only rows.
-      const currentIds = new Set((currentRecruits.items || []).map((r) => r.id));
-      const recruitsList = (legacyRecruits.items || []).map((r) => ({
+      const recruitsList = legacyItems.map((r) => ({
         ...r,
         campaign: currentIds.has(r.id) ? 'current' : 'legacy',
       }));
@@ -1186,15 +1252,15 @@
       const referral = {
         code,
         url,
-        current: { recruits: currentRecruits.count ?? null },
-        legacy: { recruits: legacyRecruits.count ?? null },
-        prospects: prospects.count ?? null,
+        current: { recruits: currentCount },
+        legacy: { recruits: legacyCount },
+        prospects: prospectCount,
         recruitsList,
-        prospectsList: prospects.items || [],
+        prospectsList: prospectItems,
       };
 
       const scannedAt = await saveSource('referral', referral);
-      return { ok: true, referral, scannedAt };
+      return { ok: true, referral, scannedAt, partial: partial.length ? partial.join(', ') : null };
     } catch (err) {
       return { ok: false, error: String(err?.message || err) };
     }
@@ -1297,12 +1363,37 @@
   const CATALOG_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
   const shipImgMem = new Map(); // normName -> url|null (per session)
   const shipImgInflight = new Map(); // normName -> Promise (dedupe concurrent)
+
+  // Read-modify-write of one storage key, queued so concurrent callers (the
+  // dashboard resolves several pictures at once) can't overwrite each other.
+  let storeChain = Promise.resolve();
+  function mutateStored(key, mutate) {
+    const run = storeChain.then(async () => {
+      const cur = (await chrome.storage.local.get(key))[key];
+      const next = mutate(cur || undefined);
+      await chrome.storage.local.set({ [key]: next });
+      return next;
+    });
+    storeChain = run.catch(() => {});
+    return run;
+  }
+  OH.mutateStored = mutateStored;
+  // Drop cache entries ({ at, … }) older than ttlOf(entry). Returns a copy.
+  function pruneTimed(obj, ttlOf) {
+    const now = Date.now();
+    const out = {};
+    for (const [k, e] of Object.entries(obj || {})) {
+      if (e && typeof e.at === 'number' && now - e.at < ttlOf(e)) out[k] = e;
+    }
+    return out;
+  }
   let catalogMem = null; // [{ lname, slug, cls, msrp }]  (wiki)
   const CATALOG_CACHE_V = 6; // v2: class + msrp, all pages · v3: fleet fields · v4: display name · v5: + ship matrix (concept ships) · v6: manufacturer
   let catalogInflight = null;
   let matrixMem = null; // [{ lname, name, img, mfr, mfrName }]  (RSI ship-matrix)
   const MATRIX_CACHE_V = 2; // v2: + display name + manufacturer (for HTF ship codes)
   let matrixInflight = null;
+  let matrixFailedAt = 0; // a failed download isn't retried for 10 minutes
 
   // Strip edition/marketing/year suffixes so "Starfarer Gemini Standard Edition"
   // → "Starfarer Gemini" before matching.
@@ -1335,6 +1426,7 @@
       return matrixMem;
     }
     if (matrixInflight) return matrixInflight;
+    if (Date.now() - matrixFailedAt < 10 * 60e3) return [];
     matrixInflight = (async () => {
       const list = [];
       try {
@@ -1369,6 +1461,8 @@
             shipMatrix: { v: MATRIX_CACHE_V, at: Date.now(), list },
           });
         } catch {}
+      } else {
+        matrixFailedAt = Date.now();
       }
       matrixInflight = null;
       return list;
@@ -1413,7 +1507,9 @@
         credentials: 'omit',
         headers: { Accept: 'application/json' },
       });
-      if (!res.ok) break;
+      // A failed page means an incomplete list: throw, so nobody caches it
+      // (getCatalog keeps the previous or bundled list instead).
+      if (!res.ok) throw new Error(`${path} page ${page}: HTTP ${res.status}`);
       const json = await res.json();
       const data = Array.isArray(json.data) ? json.data : [];
       for (const v of data) {
@@ -1433,13 +1529,10 @@
   // first list lacks. Merged by slug, then name; the game-file entry wins,
   // and only not-yet-flyable ships are added from the matrix.
   OH.fetchShipCatalog = async function fetchShipCatalog(fetchFn = fetch) {
+    // Both halves or nothing: without the matrix, concept ships and many prices
+    // would be missing from a list that's then cached for 30 days.
     const list = await fetchAllPages('vehicles', fetchFn);
-    let matrix = [];
-    try {
-      matrix = await fetchAllPages('shipmatrix/vehicles', fetchFn);
-    } catch (e) {
-      OH.log('warn', 'catalog', `ship matrix download failed: ${e?.message || e}`);
-    }
+    const matrix = await fetchAllPages('shipmatrix/vehicles', fetchFn);
     return OH.mergeCatalogs(list, matrix);
   };
 
@@ -1609,27 +1702,33 @@
     if (shipImgInflight.has(key)) return shipImgInflight.get(key);
 
     const promise = (async () => {
-      let url = null;
-      // 1) RSI ship-matrix (one cached fetch, covers concept ships).
-      url = matchMatrixImage(await getShipMatrix(), rawName);
-      // 2) Fallback: star-citizen.wiki (catalog match → per-slug image fetch).
-      if (!url) {
-        const catalog = await getCatalog();
-        for (const slug of matchSlugs(catalog, rawName)) {
-          url = await fetchVehicleImage(slug);
-          if (url) break; // first candidate with art wins
-        }
-      }
-      shipImgMem.set(key, url);
       try {
-        const cur = (await chrome.storage.local.get('shipImages')).shipImages || {};
-        cur[key] = { url, at: Date.now() };
-        await chrome.storage.local.set({ shipImages: cur });
-      } catch {
-        /* storage full / unavailable — memory cache still applies */
+        let url = null;
+        // 1) RSI ship-matrix (one cached fetch, covers concept ships).
+        url = matchMatrixImage(await getShipMatrix(), rawName);
+        // 2) Fallback: star-citizen.wiki (catalog match → per-slug image fetch).
+        if (!url) {
+          const catalog = await getCatalog();
+          for (const slug of matchSlugs(catalog, rawName)) {
+            url = await fetchVehicleImage(slug);
+            if (url) break; // first candidate with art wins
+          }
+        }
+        shipImgMem.set(key, url);
+        await mutateStored('shipImages', (cur = {}) => {
+          const out = pruneTimed(cur, (e) => (e.url ? SHIP_IMG_TTL : 24 * 3600e3));
+          out[key] = { url, at: Date.now() };
+          return out;
+        }).catch(() => {
+          /* storage full / unavailable — memory cache still applies */
+        });
+        return url;
+      } catch (e) {
+        OH.log('warn', 'image', `ship art lookup failed: ${e?.message || e}`);
+        return null; // callers treat null as "no picture"; retried next session
+      } finally {
+        shipImgInflight.delete(key);
       }
-      shipImgInflight.delete(key);
-      return url;
     })();
     shipImgInflight.set(key, promise);
     return promise;
@@ -1916,11 +2015,33 @@
     if (!bbdMem) bbdMem = (await chrome.storage.local.get(BBD_KEY))[BBD_KEY] || {};
     return bbdMem;
   };
+  // Saves are debounced, merged with what's stored (another tab may have added
+  // some), and flushed if the page closes before the timer fires.
   let bbdSave = null;
+  function flushBuybackDetails() {
+    clearTimeout(bbdSave);
+    bbdSave = null;
+    if (!bbdMem) return Promise.resolve();
+    const mine = bbdMem;
+    return mutateStored(BBD_KEY, (cur = {}) => ({ ...cur, ...mine })).catch(() => {});
+  }
   function saveBuybackDetails() {
     clearTimeout(bbdSave);
-    bbdSave = setTimeout(() => chrome.storage.local.set({ [BBD_KEY]: bbdMem }), 500);
+    bbdSave = setTimeout(flushBuybackDetails, 500);
   }
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('pagehide', () => {
+      if (bbdSave) flushBuybackDetails();
+    });
+  }
+  // Forget details of buy-backs that are gone (reclaimed). `ids` = current list.
+  OH.pruneBuybackDetails = async function pruneBuybackDetails(ids) {
+    const keep = new Set(ids.map(String));
+    const next = await mutateStored(BBD_KEY, (cur = {}) =>
+      Object.fromEntries(Object.entries(cur).filter(([id]) => keep.has(id))),
+    ).catch(() => null);
+    if (next) bbdMem = next;
+  };
   // Read one buy-back page (cached). → detail | { error }.
   OH.fetchBuybackDetail = async function fetchBuybackDetail(id) {
     const all = await OH.getBuybackDetails();
@@ -2132,13 +2253,17 @@
   OH.wikiImageUrls = async function wikiImageUrls(files, fetchFn = fetch) {
     const want = [...new Set(files.filter(Boolean))];
     const { [WIKI_FILES_KEY]: cache = {} } = await chrome.storage.local.get(WIKI_FILES_KEY);
+    // Found pictures keep a month; "no such file" answers only a day.
+    const ttl = (e) => (e.url ? WIKI_FILES_TTL : 24 * 3600e3);
     const out = {};
     const missing = [];
     for (const f of want) {
       const hit = cache[f];
-      if (hit && Date.now() - hit.at < WIKI_FILES_TTL) out[f] = hit.url;
-      else missing.push(f);
+      if (hit && Date.now() - hit.at < ttl(hit)) {
+        if (hit.url) out[f] = hit.url;
+      } else missing.push(f);
     }
+    const fresh = {};
     for (let i = 0; i < missing.length; i += 50) {
       const batch = missing.slice(i, i + 50);
       try {
@@ -2148,26 +2273,29 @@
           { credentials: 'omit', headers: { Accept: 'application/json' } },
         );
         const json = res.ok ? await res.json() : null;
+        const pages = json && json.query && json.query.pages;
+        if (!pages) continue; // a failed request caches nothing; retried next time
         const byTitle = {};
-        for (const pg of Object.values(json?.query?.pages || {})) {
+        for (const pg of Object.values(pages)) {
           const info = pg.imageinfo && pg.imageinfo[0];
           if (info) byTitle[pg.title] = info.thumburl || info.url;
         }
         for (const f of batch) {
           const url = byTitle['File:' + wikiTitle(f)] || null;
-          cache[f] = { url, at: Date.now() };
+          fresh[f] = { url, at: Date.now() };
           if (url) out[f] = url;
         }
       } catch (e) {
         OH.log('warn', 'referral', `wiki images failed: ${e?.message || e}`);
       }
     }
-    if (missing.length) {
-      try {
-        await chrome.storage.local.set({ [WIKI_FILES_KEY]: cache });
-      } catch {
+    if (Object.keys(fresh).length) {
+      await mutateStored(WIKI_FILES_KEY, (cur = {}) => ({
+        ...pruneTimed(cur, ttl),
+        ...fresh,
+      })).catch(() => {
         /* storage full: this session still has the URLs */
-      }
+      });
     }
     return out;
   };
@@ -2441,6 +2569,14 @@
   // since last time and chart melt value over time. Stays in this browser; it is
   // included in the user's own JSON export (their backup file).
   const HISTORY_MAX = 100;
+  const HISTORY_MAX_BYTES = 3e6; // about 3 MB: big hangars keep fewer snapshots
+  // Newest snapshots that fit both caps (count and rough JSON size). Pure.
+  OH.trimHistory = function trimHistory(hist) {
+    const out = hist.slice(-HISTORY_MAX);
+    let bytes = out.reduce((n, sn) => n + JSON.stringify(sn).length, 0);
+    while (out.length > 2 && bytes > HISTORY_MAX_BYTES) bytes -= JSON.stringify(out.shift()).length;
+    return out;
+  };
   OH.snapshotOf = function snapshotOf(items, at) {
     return {
       at,
@@ -2485,7 +2621,7 @@
     const d = last && OH.diffSnapshots(last, snap);
     if (d && !d.added.length && !d.removed.length && !d.changed.length) last.checkedAt = at;
     else hist.push(snap);
-    db.history = hist.slice(-HISTORY_MAX);
+    db.history = OH.trimHistory(hist);
   }
 
   // Keep only well-formed snapshots ({ at, items: [[id, name, value]] }).
@@ -2516,7 +2652,7 @@
         last.checkedAt = Math.max(last.checkedAt || last.at, snap.checkedAt || snap.at);
       } else out.push(snap);
     }
-    return out.slice(-HISTORY_MAX);
+    return OH.trimHistory(out);
   };
 
   OH.getHistory = async function getHistory() {

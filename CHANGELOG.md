@@ -22,6 +22,13 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 - **Land Claims get their own group.** Geotack Planetary Beacons (and Geotack-X) and
   other land claims show under Land Claims, and as "Land Claim" inside pack contents.
 - Fixed: the Hangars group and Gear labels from 0.2.10 didn't show up.
+- **Sturdier scans.** A hiccup from RSI or the wikis no longer overwrites good data:
+  a referral list that fails keeps your last scan's, a half-downloaded ship list isn't
+  saved, and failed picture lookups are retried instead of remembered. Very large
+  hangars no longer hit the browser's storage limit (scan history is capped by size),
+  and hangars past 2,000 pledges are read in full.
+- Fixed: "10 Year" insurance showed up two ways; it's now always "120 Months".
+- Fixed: importing a backup kept everything except your buy-back token count.
 - Fixed: when RSI's image server drops a picture, it's retried once instead of staying
   blank until you refresh.
 
