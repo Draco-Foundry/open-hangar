@@ -2,6 +2,12 @@
 
 What's changed in each release of Open Hangar. Dates are when the version was cut.
 
+## Unreleased
+
+- **Land Claims get their own group.** Geotack Planetary Beacons (and Geotack-X) and
+  other land claims show under Land Claims, and as "Land Claim" inside pack contents.
+- Fixed: the Hangars group and Gear labels from 0.2.10 didn't show up.
+
 ## 0.2.10 — 2026-09-29
 
 - **Buy-Backs Market tools.** Like the Inventory Market: tick rows to see their total

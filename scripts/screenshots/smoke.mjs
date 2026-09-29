@@ -216,6 +216,27 @@ try {
   /2 selected/.test(sel) ? ok('select mode picks items') : fail(`select mode: "${sel}"`);
   await page.click('[data-sb="done"]');
 
+  console.log('Item types');
+  const types = await page.evaluate(() => {
+    const p = (name) => ({ name, containsShip: false, isCCU: false });
+    const kind = (label) => contentKind({ kind: '', label });
+    return {
+      hangar: isHangar(p('Add-Ons - VFG Industrial Hangar')),
+      notHangar: isHangar(p('Hangarbay Poster')),
+      claim: isLandClaim(p('Geotack Planetary Beacon')) && isLandClaim(p('Geotack-X')),
+      section: marketSectionOf(p('Geotack-X Planetary Beacon')).label,
+      gear: kind("Quirinus Tech Artimex 'Akuma' Core"),
+      notGear: kind('Score Poster'),
+      claimKind: kind('Geotack Planetary Beacon'),
+    };
+  });
+  types.hangar && !types.notHangar && types.claim && types.section === 'Land Claims'
+    ? ok('hangars and land claims (Geotack) grouped')
+    : fail(`item grouping: ${JSON.stringify(types)}`);
+  types.gear === 'Gear' && types.notGear === '—' && types.claimKind === 'Land Claim'
+    ? ok('unlabelled contents: Gear / Land Claim, no false matches')
+    : fail(`content kinds: ${JSON.stringify(types)}`);
+
   console.log('Buy-Backs');
   await go('#buybacks');
   const tok = await page.$eval('.bb-tokens', (e) => e.textContent).catch(() => '');
