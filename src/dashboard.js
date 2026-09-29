@@ -343,6 +343,7 @@ const state = {
   market: {},
   wishlist: [], // ship names (Store → Wishlist)
   priceTab: 'flight-ready', // Store → Ship Prices tab
+  wishSort: 'name', // Store → Wishlist order: name | price-desc | price-asc | stock | mine
   bbPicked: new Set(), // Buy-Backs Market: picked buy-back ids (for totals + exports)
   marketGiftableOnly: false, // Market view: show only sellable (giftable) items
   referral: null, // { code, url, current, legacy, prospects, recruitsList, prospectsList }
@@ -371,7 +372,7 @@ const SAFE_TAGS = new Set(
 );
 const SAFE_ATTRS = new Set(
   (
-    'alt checked class colspan datetime disabled height hidden href id inputmode loading ' +
+    'alt checked class colspan datetime disabled draggable height hidden href id inputmode loading ' +
     'maxlength name placeholder rel role rowspan selected src style tabindex target title type ' +
     'value width ' +
     'cx cy d dominant-baseline fill fill-opacity font-size font-weight offset opacity points ' +
@@ -2232,13 +2233,20 @@ function inStoreHtml(name) {
   if (!s || !s.link) return storeData ? '<span class="muted">—</span>' : '';
   return `<a class="sale" href="${OH.escapeHtml(s.link)}" target="_blank" rel="noopener" data-stock-url="${OH.escapeHtml(s.link)}">Checking…</a>`;
 }
+const stockMem = new Map(); // store page URL → 'in' | 'pack' | 'out' (this session)
 function fillStock(container) {
   if (!container) return;
+  const pending = [];
+  let fresh = false; // any answer we didn't have yet (so a stock sort can change)
   for (const el of container.querySelectorAll('[data-stock-url]')) {
     if (el.dataset.stockDone) continue;
     el.dataset.stockDone = '1';
-    OH.getShipStock(el.dataset.stockUrl).then((st) => {
+    const req = OH.getShipStock(el.dataset.stockUrl).then((st) => {
       const state = st && st.state;
+      if (state && stockMem.get(el.dataset.stockUrl) !== state) {
+        stockMem.set(el.dataset.stockUrl, state);
+        fresh = true;
+      }
       el.classList.add(state === 'in' ? 'on' : state === 'pack' ? 'wb' : 'off');
       const packList = st && st.packs.length ? st.packs.map((p) => p.name).join(', ') : '';
       if (state === 'in') {
@@ -2255,9 +2263,45 @@ function fillStock(container) {
         el.title = "Couldn't read RSI's store page";
       }
     });
+    pending.push(req);
+  }
+  if (pending.length && container.id === 'wishlist' && state.wishSort === 'stock') {
+    Promise.all(pending).then(() => {
+      if (!fresh || currentView() !== 'store') return;
+      setHTML($('#wishlist'), wishlistHtml());
+      fillStock($('#wishlist'));
+    });
   }
 }
 
+// Wishlist order: the saved order ("My order", drag to change) or a sort.
+const WISH_SORTS = [
+  ['name', 'Name (A–Z)'],
+  ['price-desc', 'Price (high to low)'],
+  ['price-asc', 'Price (low to high)'],
+  ['stock', 'In stock first'],
+  ['mine', 'My order (drag)'],
+];
+function wishlistOrder() {
+  const list = state.wishlist.slice();
+  if (state.wishSort === 'mine') return list;
+  const price = (n) => (shipEntry(n) || {}).msrp || 0;
+  const label = (n) => ((shipEntry(n) || {}).name || n).toLowerCase();
+  const stockRank = (n) => {
+    const st = storeOf(n);
+    const s = st && stockMem.get(st.link);
+    return s === 'in' ? 0 : s === 'pack' ? 1 : s === 'out' ? 2 : 3;
+  };
+  const byName = (a, b) => label(a).localeCompare(label(b));
+  const cmp =
+    {
+      name: byName,
+      'price-desc': (a, b) => price(b) - price(a) || byName(a, b),
+      'price-asc': (a, b) => price(a) - price(b) || byName(a, b),
+      stock: (a, b) => stockRank(a) - stockRank(b) || byName(a, b),
+    }[state.wishSort] || byName;
+  return list.sort(cmp);
+}
 // Wishlist: one row per ship; its buy-backs (standalone copies, and CCUs that
 // upgrade to it) open underneath with dates, pledge IDs and Reclaim links.
 function wishlistHtml() {
@@ -2266,7 +2310,8 @@ function wishlistHtml() {
   }
   const owned = new Map(ownedShips().map((s) => [shipKey(s.label), s.pledges.length]));
   const esc = OH.escapeHtml;
-  const rows = state.wishlist
+  const mine = state.wishSort === 'mine';
+  const rows = wishlistOrder()
     .map((name, i) => {
       const v = shipEntry(name);
       const title = (v && v.name) || name;
@@ -2306,8 +2351,8 @@ function wishlistHtml() {
             )
             .join('')}</tbody></table></td></tr>`
         : '';
-      return `<tr>
-        <td>${shipLink(title)}</td>
+      return `<tr${mine ? ` class="wish-drag" draggable="true" data-wish-name="${esc(name)}"` : ''}>
+        <td>${mine ? '<span class="wish-grip" title="Drag to reorder" aria-hidden="true">⠿</span>' : ''}${shipLink(title)}</td>
         <td class="num">${v && v.msrp ? dollars(v.msrp) : '<span class="muted">—</span>'}</td>
         <td>${inStoreHtml(title)}</td>
         <td>${esc(status || '')}</td>
@@ -2408,6 +2453,7 @@ function renderStore() {
     );
   }
   setHTML($('#wish-n'), state.wishlist.length ? String(state.wishlist.length) : '');
+  if ($('#wish-sort')) $('#wish-sort').value = state.wishSort;
   setHTML($('#wishlist'), wishlistHtml());
   fillStock($('#wishlist'));
   if (!state.catalog) {
@@ -2419,6 +2465,55 @@ function renderStore() {
   setHTML($('#ccu-owned'), ccuPanelHtml($('#ccu-search').value));
   const ccuN = state.items.filter((p) => p.isCCU).length;
   setHTML($('#ccu-n'), ccuN ? String(ccuN) : '');
+}
+
+{
+  const sel = $('#wish-sort');
+  if (sel) {
+    setHTML(sel, WISH_SORTS.map(([k, l]) => `<option value="${k}">${l}</option>`).join(''));
+    sel.addEventListener('change', () => {
+      state.wishSort = sel.value;
+      chrome.storage.local.set({ uiWishSort: sel.value });
+      renderStore();
+    });
+  }
+  // "My order": drag a row onto another to move it there (saved).
+  const list = $('#wishlist');
+  let dragName = null;
+  list?.addEventListener('dragstart', (e) => {
+    const row = e.target.closest('tr[data-wish-name]');
+    if (!row) return;
+    dragName = row.dataset.wishName;
+    row.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', dragName);
+  });
+  list?.addEventListener('dragover', (e) => {
+    if (!dragName || !e.target.closest('tr[data-wish-name]')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  });
+  list?.addEventListener('drop', (e) => {
+    const row = e.target.closest('tr[data-wish-name]');
+    if (!dragName || !row) return;
+    e.preventDefault();
+    moveWishlist(dragName, row.dataset.wishName);
+    dragName = null;
+  });
+  list?.addEventListener('dragend', () => {
+    dragName = null;
+    list.querySelectorAll('.dragging').forEach((r) => r.classList.remove('dragging'));
+  });
+}
+function moveWishlist(name, beforeName) {
+  if (name === beforeName) return;
+  const from = state.wishlist.indexOf(name);
+  const to = state.wishlist.indexOf(beforeName);
+  if (from < 0 || to < 0) return;
+  state.wishlist.splice(from, 1);
+  state.wishlist.splice(to, 0, name);
+  chrome.storage.local.set({ wishlist: state.wishlist });
+  renderStore();
 }
 
 $('#price-search')?.addEventListener('input', (e) =>
@@ -3226,7 +3321,7 @@ function buybackStatsHtml() {
     }</div>` +
     `<h3 class="section-title">By Type</h3>${sBars(byKind)}` +
     `<h3 class="section-title" style="margin-top:26px">Most Valuable to Buy Back</h3>` +
-    `<div class="top-list">${top.map(({ b, v }) => bbRow(b, (bbDetail(b) ? '' : '~') + dollars(v))).join('') || '<div class="row muted">No prices yet.</div>'}</div>` +
+    `<div class="top-list">${top.map(({ b, v }) => bbRow(b, dollars(v))).join('') || '<div class="row muted">No prices yet.</div>'}</div>` +
     (most.length
       ? `<h3 class="section-title" style="margin-top:26px">Melted Most Often</h3><div class="top-list">${most
           .map(
@@ -4255,8 +4350,8 @@ function renderReferrals() {
         months < 1
           ? '< 1 mo'
           : months < 18
-            ? `~${Math.round(months)} mo`
-            : `~${(months / 12).toFixed(1)} yr`;
+            ? `${Math.round(months)} mo`
+            : `${(months / 12).toFixed(1)} yr`;
     }
   }
 
@@ -4704,7 +4799,7 @@ function bbPriceHtml(b) {
   if (b.price) return `<span class="val">${OH.escapeHtml(b.price)}</span>`;
   const sp = buybackStorePrice(b);
   return sp
-    ? `<span class="val est" title="Estimate: the ship's store price today. Load details for the real buy-back price.">~${dollars(sp)}</span>`
+    ? `<span class="val est" title="Today's store price. Load details for RSI's exact buy-back price.">${dollars(sp)}</span>`
     : '';
 }
 
@@ -4737,7 +4832,7 @@ function bbPriceText(b) {
   if (d && d.price != null) return money(d.price);
   if (b.price) return String(b.price);
   const sp = buybackStorePrice(b);
-  return sp ? `~${dollars(sp)}` : '';
+  return sp ? dollars(sp) : '';
 }
 
 function buybackRowHtml(b) {
@@ -4784,7 +4879,7 @@ function buybackMarketHtml(list) {
       <table class="market-table">
         <thead><tr>
           <th class="mk-sel"><input type="checkbox" class="mk-pick-all" aria-label="Pick all in ${OH.escapeHtml(section.label)}" ${all ? 'checked' : ''}></th>
-          <th>Items Name</th><th>Insurance</th><th title="RSI's buy-back price (after Load details); ~ = estimate from today's store price">Buy-Back Price</th>
+          <th>Items Name</th><th>Insurance</th><th title="RSI's buy-back price once Load details has read it; before that, today's store price">Buy-Back Price</th>
           <th title="Today's standard store price (ships, or a CCU's price gap)">Store Price</th><th title="Store price minus the buy-back price (needs Load details)">vs Store</th>
           <th title="Your price as a percent of the buy-back price">% of Price</th><th>My Price</th><th>Reclaim</th>
         </tr></thead>
@@ -4800,19 +4895,16 @@ function bbSelText() {
   const picked = state.buybacks.filter((b) => state.bbPicked.has(String(b.id)));
   if (!picked.length) return ' · tick rows to total and export them';
   let total = 0;
-  let est = false;
   for (const b of picked) {
-    const d = bbDetail(b);
     const v = bbPrice(b);
     if (v) total += v;
-    if (!d || d.price == null) est = true;
   }
   const n = picked.length;
   const tokens =
     state.bbTokens != null
       ? ` · ${n} token${n === 1 ? '' : 's'} with store credit (you have ${state.bbTokens})`
       : '';
-  return ` · ${n} picked · ${est ? '~' : ''}${money(total)}${tokens}`;
+  return ` · ${n} picked · ${money(total)}${tokens}`;
 }
 function updateBbSelText() {
   const el = buybacksBodyEl && buybacksBodyEl.querySelector('.mk-selcount');
@@ -6764,8 +6856,10 @@ if (gsearch && gsearchOut) {
     currency,
     uiGroupByType,
     wishlist,
+    uiWishSort,
   } = await chrome.storage.local.get([
     'wishlist',
+    'uiWishSort',
     'currency',
     'uiGroupByType',
     'remindRescan',
@@ -6778,6 +6872,7 @@ if (gsearch && gsearchOut) {
   if (LAYOUTS.includes(uiLayout)) state.layout = uiLayout;
   if (uiGroupByType === false) state.groupByType = false;
   if (Array.isArray(wishlist)) state.wishlist = wishlist.filter((n) => typeof n === 'string');
+  if (WISH_SORTS.some(([k]) => k === uiWishSort)) state.wishSort = uiWishSort;
   if (STATS_TABS.some(([k]) => k === uiStatsTab)) state.statsTab = uiStatsTab;
   if (Number.isFinite(lastBackupAt)) state.lastBackupAt = lastBackupAt;
   const remind = $('#remind-toggle');
