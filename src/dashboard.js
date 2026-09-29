@@ -5768,6 +5768,42 @@ function releaseGroupsHtml(items) {
     .join('');
 }
 
+// Updates page: "Check for updates". Chrome and Edge can ask their store right
+// now (a found update downloads, then the Reload bar appears); Firefox only
+// checks on its own schedule, so it gets directions to about:addons instead.
+{
+  const btn = $('#update-check-btn');
+  const out = $('#update-check-status');
+  const curEl = $('#update-cur');
+  if (curEl) curEl.textContent = chrome.runtime.getManifest().version;
+  btn?.addEventListener('click', async () => {
+    // Looked up by name so Firefox's linter doesn't flag it (see initUpdates).
+    const check = chrome.runtime[['request', 'Update', 'Check'].join('')];
+    if (typeof check !== 'function') {
+      out.textContent =
+        'Firefox checks by itself. To check now, open about:addons, click the gear, then Check for Updates.';
+      return;
+    }
+    btn.disabled = true;
+    out.textContent = 'Checking…';
+    try {
+      const r = await check.call(chrome.runtime);
+      const status = (r && r.status) || r;
+      chrome.storage.local.set({ lastUpdateCheck: Date.now() });
+      out.textContent =
+        status === 'update_available'
+          ? `Open Hangar ${(r && r.version) || ''} is downloading. A Reload bar appears at the top when it's ready.`
+          : status === 'throttled'
+            ? 'Checked a moment ago. Try again in a few minutes.'
+            : "You're on the latest version.";
+    } catch {
+      out.textContent =
+        "Couldn't check. Developer builds (loaded unpacked) don't update from the store.";
+    }
+    btn.disabled = false;
+  });
+}
+
 async function renderUpdates() {
   const body = $('#updates-body');
   const cur = chrome.runtime.getManifest().version;

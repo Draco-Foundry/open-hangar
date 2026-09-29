@@ -414,6 +414,24 @@ try {
   const tags = await page.$$eval('.release-tag', (t) => t.map((e) => e.textContent).join('|'));
   rel >= 3 ? ok(`${rel} releases listed`) : fail(`only ${rel} releases listed`);
   /Your version/.test(tags) ? ok('current version tagged') : fail('current version not tagged');
+  const chk = await page.evaluate(async () => {
+    const btn = document.querySelector('#update-check-btn');
+    const out = () => document.querySelector('#update-check-status').textContent;
+    btn.click(); // no update API in the demo = Firefox
+    const firefox = out();
+    chrome.runtime.requestUpdateCheck = async () => ({
+      status: 'update_available',
+      version: '9.9.9',
+    });
+    btn.click();
+    await new Promise((r) => setTimeout(r, 200));
+    const chrome1 = out();
+    delete chrome.runtime.requestUpdateCheck;
+    return { cur: document.querySelector('#update-cur').textContent, firefox, chrome1 };
+  });
+  chk.cur && /about:addons/.test(chk.firefox) && /9\.9\.9 is downloading/.test(chk.chrome1)
+    ? ok('Check for updates: store check (Chrome) and directions (Firefox)')
+    : fail(`check for updates: ${JSON.stringify(chk)}`);
 
   console.log('Saved accounts');
   await go('#developers');
