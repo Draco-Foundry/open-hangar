@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Open Hangar",
+    "description": "Extension name (a brand; keep as is)."
+  },
+  "extDescription": {
+    "message": "스타 시티즌 격납고를 제대로 활용하세요: 함선 가치, 멜트 후보, CCU 절약, 함대 통계, 바이백. 개인적이고 로컬에서만 작동합니다.",
+    "description": "Store summary and manifest description, 132 characters max."
+  }
+}
