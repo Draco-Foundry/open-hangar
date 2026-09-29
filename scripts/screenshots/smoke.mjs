@@ -407,6 +407,57 @@ try {
     ? ok(`${prof.length} saved account(s) listed`)
     : fail('saved accounts list empty');
 
+  console.log('Referrals');
+  await go('#referrals');
+  const refUi = await page.evaluate(() => ({
+    hero: document.querySelector('.ref-hero-n')?.textContent.trim(),
+    next: document.querySelector('.ref-hero-next')?.textContent.trim(),
+    dots: document.querySelectorAll('.rt-step').length,
+    lit: document.querySelectorAll('.rt-step.on').length,
+    gallery: document.querySelectorAll('.ref-gcard').length,
+    timeline: document.querySelectorAll('.ref-timeline li').length,
+    ageBars: document.querySelectorAll('.ref-charts .bar-row').length,
+    banner: !!document.querySelector('.ref-event-banner'),
+  }));
+  /^14 recruits/.test(refUi.hero) && /more to/.test(refUi.next)
+    ? ok(`progress hero: "${refUi.hero}", "${refUi.next.slice(0, 50)}…"`)
+    : fail(`referral hero: ${JSON.stringify(refUi)}`);
+  refUi.dots > 19 && refUi.lit >= 10
+    ? ok(`ladder tracks: ${refUi.lit} of ${refUi.dots} tiers lit`)
+    : fail(`ladder tracks: ${JSON.stringify(refUi)}`);
+  refUi.gallery >= 10 && refUi.timeline >= 10 && refUi.ageBars >= 5 && refUi.banner
+    ? ok(
+        `gallery ${refUi.gallery} rewards, ${refUi.timeline} milestones, prospect ages, event banner`,
+      )
+    : fail(`referral sections: ${JSON.stringify(refUi)}`);
+  // jsQR (dev-only) reads the QR back out of the finished image.
+  await page.addScriptTag({ path: 'node_modules/jsqr/dist/jsQR.js' });
+  const share = await page.evaluate(async () => {
+    let types = null;
+    navigator.clipboard.write = async (items) => {
+      types = items[0].types;
+    };
+    document.querySelector('#ref-share-code').checked = true;
+    const c = await referralShareCanvas({ withCode: true });
+    document.querySelector('#ref-share').click();
+    await new Promise((r) => setTimeout(r, 1500));
+    const px = c.getContext('2d').getImageData(0, 0, c.width, c.height);
+    const qr = window.jsQR(px.data, c.width, c.height);
+    return {
+      w: c.width,
+      h: c.height,
+      qr: qr && qr.data,
+      types,
+      status: document.querySelector('#ref-share-status').textContent,
+    };
+  });
+  share.w > 1000 &&
+  share.types &&
+  share.types[0] === 'image/png' &&
+  share.qr === 'https://robertsspaceindustries.com/enlist?referral=STAR-DEMO-0000'
+    ? ok(`share image ${share.w}×${share.h}, QR scans to the referral link, "${share.status}"`)
+    : fail(`share image: ${JSON.stringify(share)}`);
+
   for (const view of ['referrals', 'developers']) {
     console.log(view[0].toUpperCase() + view.slice(1));
     await go('#' + view);
