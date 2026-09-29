@@ -497,6 +497,21 @@ try {
         : { state: 'pack', price: null, packs: [{ name: 'Ultimate Explorer Pack', price: 1150 }] };
     // Wishlist a ship with buy-backs; its row opens the list of them.
     state.wishlist = ['Cutlass Black', 'Carrack'];
+    // A pack buy-back whose loaded details include the Carrack counts for it.
+    state.buybacks.push({
+      id: '999001',
+      kind: 'pack',
+      name: 'Packs - Origin Complete Pack 2951',
+      contains: '400i and 9 other items',
+    });
+    state.bbDetails['999001'] = { ships: [{ name: 'Carrack' }], also: [] };
+    renderStore();
+    const packRow = [...document.querySelectorAll('#wishlist tbody tr')].find((r) =>
+      /^Carrack/.test(r.textContent.trim()),
+    );
+    const packSummary = packRow ? packRow.textContent : '';
+    state.buybacks.pop();
+    delete state.bbDetails['999001'];
     renderStore();
     await new Promise((r) => setTimeout(r, 300));
     const stock = [...document.querySelectorAll('#wishlist .sale')].map((e) => e.textContent);
@@ -510,7 +525,9 @@ try {
       stock,
       priceStock: document.querySelectorAll('#price-table .sale').length,
       tabs: [...document.querySelectorAll('[data-price-tab]')].map((b) => b.textContent),
-      bbRows: sub && !sub.hidden ? sub.querySelectorAll('tbody tr').length : 0,
+      bbRows: sub && !sub.hidden ? sub.querySelectorAll('table.inner > tbody > tr').length : 0,
+      bbTypes: sub ? [...sub.querySelectorAll('tbody .badge')].map((b) => b.textContent) : [],
+      pack: /1 pack/.test(packSummary) && !/buy-back|to it/.test(packSummary),
       reclaim: sub ? /Reclaim/.test(sub.textContent) : false,
       panels: document.querySelectorAll('#view-store .store-panel').length,
       ccugame: /ccugame/i.test(document.querySelector('#view-store').textContent),
@@ -524,14 +541,20 @@ try {
   st.concept > 0 &&
   !st.ccugame &&
   !st.tabs.includes('For Sale Now') &&
+  st.tabs.join('|') === 'Flight Ready|In Concept|All' &&
   st.priceStock === 0
     ? ok(`store panels: ${st.flying} flight ready, ${st.all} in all, ${st.concept} in concept`)
     : fail(`store page: ${JSON.stringify(st)}`);
   st.stock.join('|') === 'In stock ($110)|Only in a pack' &&
   st.ccus > 0 &&
   st.bbRows > 0 &&
-  st.reclaim
-    ? ok(`wishlist stock from ship pages (${st.stock.join(', ')}), buy-backs open (${st.bbRows})`)
+  st.reclaim &&
+  st.bbTypes.length === st.bbRows &&
+  st.pack &&
+  st.bbTypes.join() === [...st.bbTypes].sort((a, b) => (a === 'CCU') - (b === 'CCU')).join()
+    ? ok(
+        `wishlist stock from ship pages (${st.stock.join(', ')}), buy-backs (${st.bbTypes.join(', ')})`,
+      )
     : fail(`store details: ${JSON.stringify(st)}`);
 
   console.log('Updates');
@@ -631,7 +654,12 @@ try {
     await new Promise((r) => setTimeout(r, 400));
     const wish = document.querySelector('#wishlist').textContent;
     document.querySelector('[data-wish-remove]')?.click();
-    const cleared = !state.wishlist.length;
+    const undoBar = document.querySelector('#wish-undo');
+    const undoShown = !undoBar.hidden && /Removed Carrack/.test(undoBar.textContent);
+    undoBar.querySelector('[data-wish-undo]').click();
+    const restored = state.wishlist.length === 1 && undoBar.hidden;
+    document.querySelector('[data-wish-remove]')?.click();
+    const cleared = !state.wishlist.length && undoShown && restored;
     setStatsTab('spending');
     location.hash = '#stats';
     await new Promise((r) => setTimeout(r, 400));
@@ -660,7 +688,7 @@ try {
   wse.after === 'Remove from Wishlist' &&
   wse.wish &&
   wse.cleared
-    ? ok('wishlist: add from the ship window, listed on Store, remove')
+    ? ok('wishlist: add from the ship window, listed on Store, remove with Undo')
     : fail(`wishlist: ${JSON.stringify(wse)}`);
   wse.spend && wse.bars >= 3
     ? ok(`spending tab: ${wse.bars} years`)
