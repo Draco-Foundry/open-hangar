@@ -713,6 +713,32 @@ try {
   refUi.dots > 19 && refUi.lit >= 10
     ? ok(`ladder tracks: ${refUi.lit} of ${refUi.dots} tiers lit`)
     : fail(`ladder tracks: ${JSON.stringify(refUi)}`);
+  // Hovering a ladder dot pops up that tier's reward picture with a caption.
+  await page.waitForSelector('.rt-step[data-image]', { timeout: 15000 }).catch(() => {});
+  const dotBox = await page.evaluate(() => {
+    const d = document.querySelector('.rt-step[data-image]');
+    if (!d) return null;
+    d.scrollIntoView({ block: 'center' });
+    const b = d.querySelector('.rt-dot').getBoundingClientRect();
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2, tip: d.dataset.tip };
+  });
+  let dotPop = null;
+  if (dotBox) {
+    await page.mouse.move(dotBox.x, dotBox.y);
+    await new Promise((r) => setTimeout(r, 300));
+    dotPop = await page.evaluate(() => {
+      const p = document.querySelector('#item-preview');
+      return {
+        shown: p.classList.contains('show'),
+        cap: p.querySelector('.ip-cap').textContent,
+        img: !!p.querySelector('img').getAttribute('src'),
+      };
+    });
+    await page.mouse.move(5, 5);
+  }
+  dotPop && dotPop.shown && dotPop.img && dotPop.cap === dotBox.tip
+    ? ok(`ladder dot hover: picture + "${dotPop.cap.slice(0, 40)}…"`)
+    : fail(`ladder dot hover: ${JSON.stringify({ dotBox, dotPop })}`);
   refUi.gallery >= 10 && refUi.timeline >= 10 && refUi.ageBars >= 5 && refUi.banner
     ? ok(
         `gallery ${refUi.gallery} rewards, ${refUi.timeline} milestones, prospect ages, event banner`,
