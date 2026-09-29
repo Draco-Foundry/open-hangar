@@ -2237,14 +2237,22 @@ function fillStock(container) {
     if (el.dataset.stockDone) continue;
     el.dataset.stockDone = '1';
     OH.getShipStock(el.dataset.stockUrl).then((st) => {
-      el.classList.add(st === 'in' ? 'on' : 'off');
-      el.textContent = st === 'in' ? 'In stock' : st === 'out' ? 'Not in store' : 'Unknown';
-      el.title =
-        st === 'in'
-          ? "In stock on RSI's store page right now"
-          : st === 'out'
-            ? "Not for sale on RSI's store right now"
-            : "Couldn't read RSI's store page";
+      const state = st && st.state;
+      el.classList.add(state === 'in' ? 'on' : state === 'pack' ? 'wb' : 'off');
+      const packList = st && st.packs.length ? st.packs.map((p) => p.name).join(', ') : '';
+      if (state === 'in') {
+        el.textContent = st.price ? `In stock (${dollars(st.price)})` : 'In stock';
+        el.title = `Sold on its own in RSI's store right now${packList ? `. Also in: ${packList}` : ''}`;
+      } else if (state === 'pack') {
+        el.textContent = 'Only in a pack';
+        el.title = `Not sold on its own right now; comes in: ${packList}`;
+      } else if (state === 'out') {
+        el.textContent = 'Not in store';
+        el.title = "Not for sale on RSI's store right now";
+      } else {
+        el.textContent = 'Unknown';
+        el.title = "Couldn't read RSI's store page";
+      }
     });
   }
 }

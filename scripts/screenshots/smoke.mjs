@@ -490,8 +490,11 @@ try {
     const concept = rows();
     const ccus = document.querySelectorAll('#ccu-owned tbody tr').length;
     // "In store now" comes from each ship's own store page (stubbed here):
-    // Cutlass Black in stock, Carrack not in the store.
-    OH.getShipStock = async (url) => (/Cutlass-Black/i.test(url) ? 'in' : 'out');
+    // Cutlass Black sold on its own, Carrack only in a pack.
+    OH.getShipStock = async (url) =>
+      /Cutlass-Black/i.test(url)
+        ? { state: 'in', price: 110, packs: [] }
+        : { state: 'pack', price: null, packs: [{ name: 'Ultimate Explorer Pack', price: 1150 }] };
     // Wishlist a ship with buy-backs; its row opens the list of them.
     state.wishlist = ['Cutlass Black', 'Carrack'];
     renderStore();
@@ -524,7 +527,10 @@ try {
   st.priceStock === 0
     ? ok(`store panels: ${st.flying} flight ready, ${st.all} in all, ${st.concept} in concept`)
     : fail(`store page: ${JSON.stringify(st)}`);
-  st.stock.join('|') === 'In stock|Not in store' && st.ccus > 0 && st.bbRows > 0 && st.reclaim
+  st.stock.join('|') === 'In stock ($110)|Only in a pack' &&
+  st.ccus > 0 &&
+  st.bbRows > 0 &&
+  st.reclaim
     ? ok(`wishlist stock from ship pages (${st.stock.join(', ')}), buy-backs open (${st.bbRows})`)
     : fail(`store details: ${JSON.stringify(st)}`);
 
