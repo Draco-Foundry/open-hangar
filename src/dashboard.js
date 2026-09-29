@@ -2897,7 +2897,8 @@ function renderStats() {
     fleet: () =>
       (fleetSectionHtml() ||
         `<p class="muted">${pricesLoading ? 'Loading ship data…' : 'Ship data unavailable (offline?).'}</p>`) +
-      `<h3 class="section-title" style="margin-top:26px">Loaners</h3>${loanersSectionHtml()}`,
+      `<h3 class="section-title" style="margin-top:26px">Loaners</h3>${loanersSectionHtml()}` +
+      `<h3 class="section-title" style="margin-top:26px">Included Vessels</h3>${includedSectionHtml()}`,
     collection: () => collectionSectionHtml(),
     buybacks: () => buybackStatsHtml(),
     top: () => topListsHtml(),
@@ -6070,16 +6071,23 @@ async function applyCurrency(code) {
 
 // RSI's loaner matrix (OH.getLoanerMatrix, cached a week), fetched on first use.
 let loanerMatrix = null;
+let includedVessels = null; // RSI's "Included Vessels" list (kept for good)
 let loanersRequested = false;
 function ensureLoaners() {
   if (loanersRequested) return;
   loanersRequested = true;
-  OH.getLoanerMatrix().then((m) => {
-    if (!m) return;
-    loanerMatrix = m;
-    if (currentView() === 'stats') renderStats();
+  Promise.all([OH.getLoanerMatrix(), OH.getIncludedVessels()]).then(([m, inc]) => {
+    if (m) loanerMatrix = m;
+    if (inc) includedVessels = inc;
+    if ((m || inc) && currentView() === 'stats') renderStats();
   });
 }
+// What a ship comes with for keeps ("G12* (currently Cyclone)" → clean text).
+function includedOf(name) {
+  const row = includedVessels && OH.loanersFor(name, includedVessels);
+  return row ? row.loaners.map((t) => t.replace(/\*/g, '').trim()) : null;
+}
+const vesselLink = (t) => shipLink(t.replace(/\s*\(.*\)\s*$/, '').trim(), t);
 
 const shipKey = (name) => OH.normShipName(name || '').toLowerCase();
 // The catalog entry for a ship name, or null.
@@ -6123,6 +6131,14 @@ function buybackHasShip(b, name) {
   );
   return sameShip(base, name) || sameShip(bare, name);
 }
+// Loaners only apply while a ship can't be flown yet; RSI's list sometimes still
+// names ships that are already flight ready, so those are skipped.
+function loanersOf(name) {
+  if (!loanerMatrix) return null;
+  const v = shipEntry(name);
+  if (v && v.status === 'flight-ready') return null;
+  return OH.loanersFor(name, loanerMatrix);
+}
 const shipLink = (name, text = name) =>
   `<button type="button" class="ship-link" data-ship="${OH.escapeHtml(name)}">${OH.escapeHtml(text)}</button>`;
 
@@ -6132,11 +6148,11 @@ function loanersSectionHtml() {
   if (!loanerMatrix) return '<p class="muted">Loading RSI\'s loaner list…</p>';
   const rows = [];
   for (const s of ownedShips()) {
-    const row = OH.loanersFor(s.label, loanerMatrix);
+    const row = loanersOf(s.label);
     if (row) rows.push({ ship: s.label, loaners: row.loaners });
   }
   if (!rows.length)
-    return '<p class="muted">Every ship you own is flight ready, so there are no loaners to show.</p>';
+    return '<p class="muted">Every ship you own is flight ready, so you have no loaners. Loaners are only given for ships you can&#39;t fly in the game yet.</p>';
   const all = [...new Set(rows.flatMap((r) => r.loaners))].sort((a, b) => a.localeCompare(b));
   return `<p>You can fly <strong>${all.length}</strong> loaner${all.length === 1 ? '' : 's'}: ${all
     .map((l) => shipLink(l))
@@ -6148,7 +6164,24 @@ function loanersSectionHtml() {
           `<tr><td>${shipLink(r.ship)}</td><td>${r.loaners.map((l) => shipLink(l)).join(', ')}</td></tr>`,
       )
       .join('')}</tbody></table>
-    <p class="muted value-note">From RSI's <a href="https://support.robertsspaceindustries.com/hc/en-us/articles/360003093114" target="_blank" rel="noopener">Loaner Ship Matrix</a>. Loaners need a game package on the account and don't stack.</p>`;
+    <p class="muted value-note">From RSI's <a href="https://support.robertsspaceindustries.com/hc/en-us/articles/360003093114" target="_blank" rel="noopener">Loaner Ship Matrix</a>. Loaners are only given while a ship isn't flyable in the game yet (they go away once it's flight ready), need a game package on the account, and don't stack.</p>`;
+}
+
+// Stats → Fleet: snubs and rovers your ships come with permanently.
+function includedSectionHtml() {
+  ensureLoaners();
+  if (!includedVessels) return '<p class="muted">Loading RSI&#39;s included-vessels list…</p>';
+  const rows = [];
+  for (const s of ownedShips()) {
+    const inc = includedOf(s.label);
+    if (inc) rows.push({ ship: s.label, inc });
+  }
+  if (!rows.length) return '<p class="muted">None of your ships come with an included vessel.</p>';
+  return `<table class="org-table"><thead><tr><th>Your ship</th><th>Comes with</th></tr></thead><tbody>${rows
+    .sort((a, b) => a.ship.localeCompare(b.ship))
+    .map((r) => `<tr><td>${shipLink(r.ship)}</td><td>${r.inc.map(vesselLink).join(', ')}</td></tr>`)
+    .join('')}</tbody></table>
+    <p class="muted value-note">From RSI's <a href="https://support.robertsspaceindustries.com/hc/en-us/articles/4408770370455" target="_blank" rel="noopener">Included Vessels</a> list. Unlike loaners, these are yours to keep.</p>`;
 }
 
 function openShipModal(name) {
@@ -6160,7 +6193,7 @@ function openShipModal(name) {
   );
   const bbs = state.buybacks.filter((b) => buybackHasShip(b, title));
   const status = v && (SHIP_STATES.find(([k]) => k === v.status) || [])[1];
-  const loan = loanerMatrix && OH.loanersFor(title, loanerMatrix);
+  const loan = loanersOf(title);
   const row = (k, val) =>
     val
       ? `<div class="mr"><span class="mr-k">${k}</span><span class="mr-v">${val}</span></div>`
@@ -6203,6 +6236,7 @@ function openShipModal(name) {
       ${row('Size', v && v.size ? esc(capFirst(v.size)) : '')}
       ${row('Crew', v && v.crew ? esc(String(v.crew)) : '')}
       ${row('Cargo', v && v.cargo ? `${esc(String(v.cargo))} SCU` : '')}
+      ${row('Comes with', includedOf(title) ? includedOf(title).map(vesselLink).join(', ') : '')}
       ${row('Loaners', loan ? loan.loaners.map((l) => shipLink(l)).join(', ') : '')}
       ${row(
         'Links',
