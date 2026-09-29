@@ -4,9 +4,14 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Wishlist buy-backs include **packs that contain the ship** (e.g. a 600i inside the Origin
+  Complete Pack), listed ships first, then packs, then CCUs, with a Type column. Load details
+  on Buy-Backs to check every pack's contents.
+- Wishlist: removing a ship is a small ✕ now, with an **Undo** bar for a few seconds in case of a misclick.
 - **A tidier Store page.** Wishlist, Your CCUs and Ship Prices are now separate panels;
   long lists scroll inside their panel with their own search, and Ship Prices has tabs
-  (Flight Ready, In Production, In Concept, All).
+  (Flight Ready, In Concept, All). Ships "in production" count as In Concept (neither can be
+  flown yet).
 - **In store now.** For your wishlist and in each ship's window, read from the ship's own
   page on RSI's store: "In stock" (sold on its own, with the price), "Only in a pack"
   (hover for which), or "Not in store".

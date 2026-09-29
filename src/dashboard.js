@@ -2159,10 +2159,11 @@ if (selectBar) {
 
 const capFirst = (t) => String(t || '').replace(/^\w/, (c) => c.toUpperCase());
 
-// One table per production state (flight ready first, then concepts, …).
+// Production state labels. "In production" reads as "In concept": to a player
+// both mean "can't fly it yet", and the difference was hard to tell apart.
 const SHIP_STATES = [
   ['flight-ready', 'Flight ready'],
-  ['in-production', 'In production'],
+  ['in-production', 'In concept'],
   ['in-concept', 'In concept'],
 ];
 // --- Store page -------------------------------------------------------------
@@ -2269,21 +2270,33 @@ function wishlistHtml() {
     .map((name, i) => {
       const v = shipEntry(name);
       const title = (v && v.name) || name;
-      const bbs = state.buybacks.filter((b) => buybackHasShip(b, title));
-      const ships = bbs.filter((b) => !b.ccu).length;
-      const ccus = bbs.length - ships;
+      // Ships and packs first, then CCUs; newest melt first within each.
+      const bbRank = (b) => (b.ccu ? 2 : b.kind === 'ship' ? 0 : 1);
+      const bbType = (b) =>
+        b.ccu ? 'CCU' : b.kind === 'pack' || b.kind === 'package' ? 'Pack' : 'Ship';
+      const bbs = state.buybacks
+        .filter((b) => buybackHasShip(b, title))
+        .sort(
+          (a, b) =>
+            bbRank(a) - bbRank(b) || String(b.date || '').localeCompare(String(a.date || '')),
+        );
+      const ships = bbs.filter((b) => !b.ccu && b.kind === 'ship').length;
+      const packs = bbs.filter((b) => !b.ccu && b.kind !== 'ship').length;
+      const ccus = bbs.filter((b) => b.ccu).length;
       const have = owned.get(shipKey(title));
       const status = v && (SHIP_STATES.find(([k]) => k === v.status) || [])[1];
       const summary = [
-        ships ? `${ships} ship buy-back${ships === 1 ? '' : 's'}` : '',
-        ccus ? `${ccus} CCU${ccus === 1 ? '' : 's'} to it` : '',
+        ships ? `${ships} ship${ships === 1 ? '' : 's'}` : '',
+        packs ? `${packs} pack${packs === 1 ? '' : 's'}` : '',
+        ccus ? `${ccus} CCU${ccus === 1 ? '' : 's'}` : '',
       ]
         .filter(Boolean)
         .join(' · ');
       const detail = bbs.length
-        ? `<tr class="wish-bbs" id="wish-bbs-${i}" hidden><td colspan="7"><table class="org-table inner"><thead><tr><th>Buy-back</th><th>Melted</th><th>Pledge ID</th><th class="num">Price</th><th></th></tr></thead><tbody>${bbs
+        ? `<tr class="wish-bbs" id="wish-bbs-${i}" hidden><td colspan="7"><table class="org-table inner"><thead><tr><th>Type</th><th>Buy-back</th><th>Melted</th><th>Pledge ID</th><th class="num">Price</th><th></th></tr></thead><tbody>${bbs
             .map(
               (b) => `<tr>
+                <td><span class="badge ${b.ccu ? 'ccu' : 'ship'}">${bbType(b)}</span></td>
                 <td>${esc(b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '')}</td>
                 <td>${esc(b.date || '')}</td>
                 <td>${/^\d+$/.test(String(b.id)) ? esc(String(b.id)) : '<span class="muted">—</span>'}</td>
@@ -2304,11 +2317,15 @@ function wishlistHtml() {
             : '<span class="muted">none</span>'
         }</td>
         <td>${have ? `you own ${have}` : ''}</td>
-        <td class="num"><button type="button" class="ship-link" data-wish-remove="${esc(name)}">Remove</button></td>
+        <td class="num"><button type="button" class="wish-x" data-wish-remove="${esc(name)}" title="Remove from wishlist" aria-label="Remove ${esc(title)} from wishlist">✕</button></td>
       </tr>${detail}`;
     })
     .join('');
-  return `<table class="org-table wishlist"><thead><tr><th>Ship</th><th class="num">Store price</th><th>In store now</th><th>Status</th><th>Buy-backs</th><th></th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+  const unchecked = uncheckedPacks();
+  const note = unchecked
+    ? `<p class="muted value-note">${unchecked} pack buy-back${unchecked === 1 ? '' : 's'} not checked yet: RSI's list only names the first item in a pack. <a href="#buybacks" data-view="buybacks">Load details</a> on the Buy-Backs page to find your wishlist ships inside every pack.</p>`
+    : '';
+  return `${note}<table class="org-table wishlist"><thead><tr><th>Ship</th><th class="num">Store price</th><th>In store now</th><th>Status</th><th>Buy-backs</th><th></th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 // Your CCUs: identical ones stacked, searchable, all of them (not just priced).
@@ -2346,10 +2363,9 @@ function ccuPanelHtml(q) {
     .join('')}</tbody></table>`;
 }
 
-// Ship Prices: tabs (For sale now, Flight ready, In production, In concept, All).
+// Ship Prices: tabs (Flight Ready, In Concept incl. in production, All).
 const PRICE_TABS = [
   ['flight-ready', 'Flight Ready'],
-  ['in-production', 'In Production'],
   ['in-concept', 'In Concept'],
   ['all', 'All'],
 ];
@@ -2360,6 +2376,7 @@ function priceRowsHtml(q) {
     .filter((v) => v.msrp && (!needle || v.lname.includes(needle)))
     .filter((v) => {
       if (tab === 'all') return true;
+      if (tab === 'in-concept') return v.status === 'in-concept' || v.status === 'in-production';
       return v.status === tab;
     })
     .sort((a, b) => (a.name || a.lname).localeCompare(b.name || b.lname));
@@ -6316,7 +6333,24 @@ function buybackHasShip(b, name) {
     /\s*[-–]\s*(lti|iae|ilw|warbond|standard edition|\d+\s*(months?|years?).*)$/i,
     '',
   );
-  return sameShip(base, name) || sameShip(bare, name);
+  if (sameShip(base, name) || sameShip(bare, name)) return true;
+  if (b.kind === 'ship') return false;
+  // A pack: its full ship list once "Load details" has read its page, else the
+  // one item RSI's list names ("400i and 9 other items").
+  const d = state.bbDetails && state.bbDetails[b.id];
+  if (d && Array.isArray(d.ships) && d.ships.length)
+    return d.ships.some((x) => sameShip(x.name, name));
+  const first = String(b.contains || '').split(/\s+and\s+\d+\s+other\b/i)[0];
+  return first.split(/\s*,\s*|\s+and\s+/i).some((t) => t && sameShip(t, name));
+}
+// Packs whose contents haven't been read yet (only their first item is known).
+function uncheckedPacks() {
+  return state.buybacks.filter(
+    (b) =>
+      !b.ccu &&
+      (b.kind === 'pack' || b.kind === 'package') &&
+      !(state.bbDetails && state.bbDetails[b.id] && (state.bbDetails[b.id].ships || []).length),
+  ).length;
 }
 // Loaners only apply while a ship can't be flown yet; RSI's list sometimes still
 // names ships that are already flight ready, so those are skipped.
@@ -6493,10 +6527,43 @@ document.addEventListener('click', (e) => {
   }
   const r = e.target.closest('[data-wish-remove]');
   if (r) {
-    toggleWishlist(r.dataset.wishRemove);
+    // One click removes; an Undo bar brings it back (same spot) for 8 seconds.
+    const name = r.dataset.wishRemove;
+    const at = state.wishlist.indexOf(name);
+    toggleWishlist(name);
+    renderStore();
+    showWishUndo(name, at);
+    return;
+  }
+  if (e.target.closest('[data-wish-undo]') && wishUndo) {
+    const { name, at } = wishUndo;
+    if (!onWishlist(name)) {
+      state.wishlist.splice(Math.max(0, at), 0, name);
+      chrome.storage.local.set({ wishlist: state.wishlist });
+    }
+    hideWishUndo();
     renderStore();
   }
 });
+let wishUndo = null; // { name, at, timer }
+function showWishUndo(name, at) {
+  const bar = $('#wish-undo');
+  if (!bar) return;
+  clearTimeout(wishUndo && wishUndo.timer);
+  wishUndo = { name, at, timer: setTimeout(hideWishUndo, 8000) };
+  const v = shipEntry(name);
+  setHTML(
+    bar,
+    `Removed ${OH.escapeHtml((v && v.name) || name)} from your wishlist. <button type="button" class="ship-link wish-undo-btn" data-wish-undo>Undo</button>`,
+  );
+  bar.hidden = false;
+}
+function hideWishUndo() {
+  clearTimeout(wishUndo && wishUndo.timer);
+  wishUndo = null;
+  const bar = $('#wish-undo');
+  if (bar) bar.hidden = true;
+}
 
 // --- Stats → Spending ---------------------------------------------------------
 // What you've pledged per year (by pledge date) and the running total. Uses

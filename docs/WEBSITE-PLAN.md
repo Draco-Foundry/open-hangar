@@ -92,6 +92,10 @@ Device-code flow (works on Chrome, Edge and Firefox alike):
 - **Community stats** (phase 3): pilots synced, ships tracked, most owned / rarest
   ships, ships trending up or down. Only switched on after ~100 synced pilots so
   the numbers mean something.
+- **Latest news on the front page** (owner priority). The home page already shows recent
+  Comm-Links; make news the lead: RSI announcements and changes players need to act on
+  (e.g. the Aurora Mk I being discontinued permanently), with the date and a link to
+  RSI's post. Sources to weigh: Comm-Link feed, RSI status page, patch notes.
 - **Store sale history: decided no (2026-09-29).** Logging only starts the day it's
   turned on, and trackersc.com already has the past. The extension shows live "In store
   now" status instead (RSI's upgrade-tool feed), which is exact when checked.
