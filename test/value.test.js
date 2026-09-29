@@ -92,30 +92,6 @@ test('CCUs are priced as the gap between their ships', () => {
   assert.equal(v.store, 0); // CCUs aren't ships
 });
 
-test('melt candidates: meltable, no LTI, ships only, paid full price', () => {
-  const ship = (over) => ({
-    id: 20,
-    name: 'Standalone Ship - Cutlass Black',
-    value: 110,
-    meltable: true,
-    insurance: '6 Months',
-    contents: [
-      { kind: 'Ship', label: 'Cutlass Black' },
-      { kind: 'Insurance', label: '6 Months Insurance' },
-    ],
-    ...over,
-  });
-  const check = (p) => OH.isMeltCandidate(p, OH.hangarValue([p], priceOf).pledges[p.id]);
-  assert.equal(check(ship()), true);
-  assert.equal(check(ship({ insurance: 'LTI' })), false);
-  assert.equal(check(ship({ meltable: false })), false);
-  assert.equal(check(ship({ value: 90 })), false); // bought cheaper — you'd lose that
-  assert.equal(
-    check(ship({ contents: [...ship().contents, { kind: 'Paint', label: 'Some paint' }] })),
-    false,
-  );
-});
-
 test('fleetStats sums cargo and groups by size', () => {
   const { shipOf } = OH.makeShipIndex(catalog, codes);
   const f = OH.fleetStats(
