@@ -4809,6 +4809,20 @@ function buybackStorePrice(b) {
     return from && to && to.msrp > from.msrp ? to.msrp - from.msrp : null;
   }
   if (!['ship', 'pack', 'package'].includes(b.kind)) return null;
+  // Once its page has been read, price every ship it holds: a pack's value is
+  // all of its ships, not just the first one RSI's list names.
+  const d = bbDetail(b);
+  if (d && Array.isArray(d.ships) && d.ships.length) {
+    let sum = 0;
+    for (const x of d.ships) {
+      const hit = state.priceOf(x.name);
+      if (hit && hit.msrp) sum += hit.msrp;
+    }
+    return sum || null;
+  }
+  // Packs and packages hold several ships; without their contents any single
+  // ship's price would badly understate them, so say nothing.
+  if (b.kind !== 'ship') return null;
   const bare = String(b.name || '').replace(/^\s*[^-–]+?\s*[-–]\s/, '');
   const tries = [
     bare,
@@ -5102,7 +5116,7 @@ function buybackMarketHtml(list) {
         <thead><tr>
           <th class="mk-sel"><input type="checkbox" class="mk-pick-all" aria-label="Pick all in ${OH.escapeHtml(section.label)}" ${all ? 'checked' : ''}></th>
           <th>Items Name</th><th>Insurance</th><th title="RSI's buy-back price once Load details has read it; before that, today's store price">Buy-Back Price</th>
-          <th title="Today's standard store price (ships, or a CCU's price gap)">Store Price</th><th title="Store price minus the buy-back price (needs Load details)">vs Store</th>
+          <th title="Today's store price of every ship inside (packs need Load details), or a CCU's price gap">Store Price</th><th title="Store price minus the buy-back price (needs Load details)">vs Store</th>
           <th title="Your price as a percent of the buy-back price">% of Price</th><th>My Price</th><th>Reclaim</th>
         </tr></thead>
         <tbody>${groups.map(buybackRowHtml).join('')}</tbody>

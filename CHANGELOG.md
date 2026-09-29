@@ -4,6 +4,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Fixed: pack buy-backs showed a store price far below the buy-back price because only one
+  ship was priced. Now every ship in the pack counts (after Load details); before that, no
+  store price is shown rather than a wrong one.
 - Stats → History now charts **account value** (your ships at today's store prices) instead
   of melt value.
 - **One color per type, everywhere:** ship green, CCU purple, paint pink, add-on blue, coupon
