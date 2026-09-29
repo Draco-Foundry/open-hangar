@@ -1229,6 +1229,29 @@
         color: var(--muted);
         font-weight: 400;
       }
+      .wish-sort-label {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      #wish-sort {
+        margin-left: 6px;
+        padding: 5px 8px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--panel-2);
+        color: var(--text);
+        font-size: 13px;
+      }
+      .wish-drag {
+        cursor: grab;
+      }
+      .wish-drag.dragging {
+        opacity: 0.45;
+      }
+      .wish-grip {
+        margin-right: 8px;
+        color: var(--muted);
+      }
       .wish-x {
         all: unset;
         cursor: pointer;
@@ -3887,6 +3910,10 @@
         <div class="store-panel">
           <div class="sp-head">
             <h3>Wishlist <span class="market-n" id="wish-n"></span></h3>
+            <label class="wish-sort-label"
+              >Sort
+              <select id="wish-sort" aria-label="Sort wishlist"></select
+            ></label>
           </div>
           <div class="wish-undo" id="wish-undo" role="status" hidden></div>
           <div class="sp-scroll" id="wishlist"></div>
