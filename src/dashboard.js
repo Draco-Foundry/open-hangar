@@ -1374,9 +1374,9 @@ function insLabel(t) {
   if (!t) return '';
   const m = String(t).match(/^(\d+)\s*([MY])$/i);
   if (!m) return String(t);
-  const n = Number(m[1]);
-  const unit = /y/i.test(m[2]) ? 'Year' : 'Month';
-  return `${n} ${unit}${n === 1 ? '' : 's'}`;
+  // Older scans stored years ("10Y"): show them in months too ("120 Months").
+  const n = Number(m[1]) * (/y/i.test(m[2]) ? 12 : 1);
+  return `${n} Month${n === 1 ? '' : 's'}`;
 }
 // Today's standard store price for what's in the pledge (ships' prices, or a
 // CCU's price gap), from the ship list. '' when unknown.
@@ -5407,7 +5407,10 @@ async function runScan({ hangar = true, buybacks = true, referrals = true } = {}
     });
     if (r?.ok) {
       state.referral = r.referral;
-      parts.push(`${r.referral.legacy?.recruits ?? 0} recruits`);
+      parts.push(
+        `${r.referral.legacy?.recruits ?? 0} recruits${r.partial ? ` (kept last scan's ${r.partial}: RSI didn't answer)` : ''}`,
+      );
+      if (r.partial) anyErr = true;
     } else if (r) {
       parts.push(`referrals: ${r.error}`);
       anyErr = true;
@@ -5766,6 +5769,7 @@ document.addEventListener('click', async (e) => {
 let lastFocusCheck = 0;
 document.addEventListener('visibilitychange', async () => {
   if (document.visibilityState !== 'visible') return;
+  if (scanBtn.disabled) return; // mid-scan: switching accounts now would race the scan's saves
   const now = Date.now();
   if (now - lastFocusCheck < 3000) return;
   lastFocusCheck = now;
