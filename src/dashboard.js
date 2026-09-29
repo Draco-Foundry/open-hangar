@@ -4682,7 +4682,6 @@ const BB_IMG_COLS = [
   { key: 'ins', label: 'Insurance' },
   { key: 'melt', label: 'Buy-Back Price' },
   { key: 'store', label: 'Store Price' },
-  { key: 'vs', label: 'vs Store' },
   { key: 'price', label: 'My Price' },
 ];
 function bbImageCells(b) {

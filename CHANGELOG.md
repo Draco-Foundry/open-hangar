@@ -4,6 +4,7 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- The Buy-Backs table image leaves out the "vs Store" column (it's still on screen).
 - Fixed: buy-back pictures looked blurry in the details window; they now load the sharp version.
 - **Wishlist.** Add ships from their details window; Store → Wishlist shows each one's
   price, whether you already own it, and any copies in your buy-backs you could reclaim
