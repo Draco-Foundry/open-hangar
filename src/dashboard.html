@@ -280,11 +280,11 @@
         padding: 7px 9px;
         line-height: 1;
       }
+      /* Pinned to the viewport (placed under the ▾ button by openScanMenu) so the
+         Citizen Card's rounded, clipped edges can't cut it off. */
       .scan-menu {
-        position: absolute;
-        right: 0;
-        bottom: calc(100% + 6px);
-        z-index: 30;
+        position: fixed;
+        z-index: 80;
         min-width: 188px;
         display: flex;
         flex-direction: column;
