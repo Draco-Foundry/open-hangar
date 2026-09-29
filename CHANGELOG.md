@@ -12,7 +12,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   - **Share image:** one clean picture of your referral stats, progress and the ships
     you've earned, ready to paste into Discord. Tick "Include my code" to add your code
     and a QR code people can scan.
-  - **Rewards Earned:** everything you've unlocked as picture cards, event bonuses included.
+  - **Rewards Earned:** everything you've unlocked as picture cards, event bonuses included,
+    each with its own picture from the Star Citizen wiki.
   - **Milestones:** when you hit each tier.
   - **Prospects:** how long people have been waiting to buy, and how fast your recruits
     bought (typical time, same day, within 30 days).

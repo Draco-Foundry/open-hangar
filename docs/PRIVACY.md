@@ -58,7 +58,8 @@ personal data:
   outbound signal that weakly relates to what you are viewing; no credentials or
   personal data are sent.
 - **starcitizen.tools** (public, read-only) — when you open the Referrals page, the
-  list of referral bonus events (the same page for everyone), at most once a week.
+  list of referral bonus events and the pictures of referral rewards (the same for
+  everyone), cached for a week to a month.
   No credentials or personal data are sent.
 
 ## Permissions and why they are used
