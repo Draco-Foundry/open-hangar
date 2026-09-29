@@ -107,7 +107,11 @@ try {
     const wish = document.querySelector('#home-wish').textContent;
     state.wishlist = [];
     renderHomePanels();
+    const emptyHidden =
+      document.querySelector('#home-wish').hidden &&
+      document.querySelector('.home-grid').classList.contains('solo');
     return {
+      emptyHidden,
       guide:
         !!document.querySelector('details.howto-all') &&
         !document.querySelector('details.howto-all').open,
@@ -132,7 +136,7 @@ try {
     return res;
   });
   await page
-    .waitForFunction(() => document.querySelectorAll('#home-news .twisc-points li').length > 0, {
+    .waitForFunction(() => !!document.querySelector('#home-news .twisc-lead'), {
       timeout: 8000,
     })
     .catch(() => {});
@@ -148,8 +152,9 @@ try {
     const res = {
       beside: box.parentElement === wish.parentElement,
       title: box.querySelector('h3').textContent,
-      points: box.querySelectorAll('.twisc-points li').length,
-      sched: box.querySelector('.twisc-sched')?.textContent || '',
+      lead: box.querySelector('.twisc-lead')?.textContent || '',
+      img: !!box.querySelector('.twisc-img'),
+      bullets: box.querySelectorAll('.twisc-points li').length,
       link: box.querySelector('.home-more a')?.href || '',
       sameHeight: Math.abs(box.offsetHeight - wish.offsetHeight) <= 1,
       scrolls: scroll ? scroll.scrollHeight > scroll.clientHeight : false,
@@ -166,10 +171,11 @@ try {
   });
   news.beside &&
   /This Week in Star Citizen/.test(news.title) &&
-  news.points >= 4 &&
-  /New Game Library System/.test(news.sched) &&
+  /^Last week was a busy one on the testing front/.test(news.lead) &&
+  news.img &&
+  news.bullets === 0 &&
   /comm-link/.test(news.link)
-    ? ok(`home: This Week in Star Citizen summary (${news.points} points + schedule)`)
+    ? ok('home: This Week in Star Citizen post with its opening paragraph')
     : fail(`home news: ${JSON.stringify(news)}`);
   news.sameHeight && news.scrolls && news.linkVisible
     ? ok('home: panels the same height; a long wishlist scrolls, link stays visible')
@@ -201,8 +207,8 @@ try {
   /On Sale Now 1/.test(home.wish) && /Cutlass Black/.test(home.wish) && !/Pioneer/.test(home.wish)
     ? ok('home: wishlist ships on sale now')
     : fail(`home wishlist: ${home.wish}`);
-  !home.glance && home.storeOpt
-    ? ok('home: no At a Glance; Scan has a Store (wishlist) option')
+  !home.glance && home.storeOpt && home.emptyHidden
+    ? ok('home: no At a Glance; empty wishlist hides its box; Scan has a Store option')
     : fail(`home layout: ${JSON.stringify(home)}`);
   const site = await page.$eval('#site-link', (e) => e.textContent).catch(() => '');
   /something big is coming/i.test(site) && !(await page.$('#site-link button'))
