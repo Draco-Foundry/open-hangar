@@ -1375,13 +1375,20 @@ function isPack(p) {
 // A standalone hangar pledge ("VFG Industrial Hangar", "Self-Land Hangar",
 // "Revel & York Hangar"…). Packs that include a hangar stay under Packs.
 function isHangar(p) {
-  return !p.containsShip && !p.isCCU && /hangar/i.test(plainName(p));
+  return !p.containsShip && !p.isCCU && /\bhangar\b/i.test(plainName(p));
+}
+// A land claim: "Land Claim - …" pledges and Geotack beacons (Geotack
+// Planetary Beacon, Geotack-X), which are how claims are placed in game.
+const LAND_CLAIM_RE = /\b(land claim|geotack)\b/i;
+function isLandClaim(p) {
+  return !p.containsShip && !p.isCCU && LAND_CLAIM_RE.test(plainName(p));
 }
 
 const MARKET_SECTIONS = [
   { key: 'ship', label: 'Standalone Ships', test: (p) => p.containsShip && !isPack(p) },
   { key: 'pack', label: 'Packs', test: (p) => isPack(p) },
   { key: 'ccu', label: 'Upgrades', test: (p) => p.isCCU },
+  { key: 'landclaim', label: 'Land Claims', test: (p) => isLandClaim(p) },
   { key: 'hangar', label: 'Hangars', test: (p) => isHangar(p) },
   { key: 'paint', label: 'Paints', test: (p) => p.kind === 'paint' },
   { key: 'addon', label: 'Add-Ons', test: (p) => p.kind === 'addon' },
@@ -4469,11 +4476,12 @@ function viewOnRsiLink(p) {
 // A pledge item's type. RSI leaves some blank (armor pieces, hangars), so
 // infer those from the name: helmet/core/arms/legs/backpack… are Gear.
 const GEAR_RE =
-  /(helmet|core|arms|legs|backpack|undersuit|armou?r|jacket|shirt|pants|boots|gloves|hat)/i;
+  /\b(helmet|core|arms|legs|backpack|undersuit|armou?r|jacket|shirt|pants|boots|gloves|hat)\b/i;
 function contentKind(c) {
   if (c.kind) return c.kind;
   const l = c.label || '';
-  if (/hangar/i.test(l)) return 'Hangar';
+  if (LAND_CLAIM_RE.test(l)) return 'Land Claim';
+  if (/\bhangar\b/i.test(l)) return 'Hangar';
   if (GEAR_RE.test(l)) return 'Gear';
   return '—';
 }
