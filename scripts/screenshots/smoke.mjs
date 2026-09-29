@@ -556,6 +556,20 @@ try {
     const text = await page.$eval('#stats-body', (e) => e.textContent.trim().length);
     text > 40 ? ok(`${tab} tab renders`) : fail(`${tab} tab is empty`);
   }
+  const acct = await page.evaluate(() => {
+    const last = state.history[state.history.length - 1];
+    return {
+      title: [...document.querySelectorAll('#stats-body h3')].map((h) => h.textContent).join('|'),
+      store: snapshotStore(last),
+      now: hangarValue().store,
+      tip: document.querySelector('.hist-chart circle:last-of-type title')?.textContent || '',
+    };
+  });
+  /Account Value Over Time/.test(acct.title) &&
+  acct.store > 0 &&
+  Math.abs(acct.store - acct.now) < 1
+    ? ok(`history charts account value (latest ${acct.tip})`)
+    : fail(`account value: ${JSON.stringify(acct)}`);
 
   for (const [tab, sel] of [
     ['collection', '#stats-body .bar-row'],
