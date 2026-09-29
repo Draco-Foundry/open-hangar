@@ -6,10 +6,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 - **A tidier Store page.** Wishlist, Your CCUs and Ship Prices are now separate panels;
   long lists scroll inside their panel with their own search, and Ship Prices has tabs
-  (For Sale Now, Flight Ready, In Production, In Concept, All).
-- **In store now.** Live from RSI's store: whether each ship is on sale right now, and
-  if a warbond is available (with its price). Also on wishlist rows, CCU targets and the
-  ship window.
+  (Flight Ready, In Production, In Concept, All).
+- **In store now.** For your wishlist and in each ship's window: "In stock" or "Not in
+  store", read from the ship's own page on RSI's store.
 - **Wishlist buy-backs.** Shows ship buy-backs and CCUs to that ship separately; click to
   see every one with its melt date, pledge ID, price and Reclaim link.
 - Your CCUs lists all of them (identical ones stacked), not just ones with known prices.
