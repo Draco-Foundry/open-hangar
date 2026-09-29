@@ -2470,7 +2470,15 @@
         border-color: #d29922;
       }
       .chip.k-package[aria-pressed='true'] {
+        border-color: #1b9aaa;
+      }
+      .chip.trait.k-pack[aria-pressed='true'] {
         border-color: #d29922;
+        background: rgba(210, 153, 34, 0.14);
+      }
+      .chip.trait.k-package[aria-pressed='true'] {
+        border-color: #1b9aaa;
+        background: rgba(27, 154, 170, 0.14);
       }
       .chip.k-coupon[aria-pressed='true'] {
         border-color: #bd561d;
@@ -2897,6 +2905,16 @@
       .badge.paint {
         color: #ff9bd4;
         border-color: #c14b8a;
+      }
+      /* Type colors, the same on every page: ship green, CCU purple, paint pink,
+         add-on blue, coupon orange, pack gold, game package teal. */
+      .badge.pack {
+        color: #e3b341;
+        border-color: #d29922;
+      }
+      .badge.package {
+        color: #56d4dd;
+        border-color: #1b9aaa;
       }
       .chip.k-paint[aria-pressed='true'] {
         border-color: #c14b8a;
