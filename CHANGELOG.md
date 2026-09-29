@@ -4,6 +4,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Latest from RSI** on Home: RSI's six newest Comm-Links with a picture, type and how long
+  ago, each opening on RSI.
+- Removed "melt candidates" (the Inventory filter, the Stats section and the item-window line):
+  the idea that you could melt a pledge and buy it back for the same credit doesn't hold up.
 - Fixed: the Scan ▾ menu was cut off by the Citizen Card; it now opens below the button.
 - **A cleaner Home page.** The column of page links is gone (the top bar has them) and "How
   to Use" is one dropdown. New at the top: **Wishlist: On Sale Now** (your wishlist ships in

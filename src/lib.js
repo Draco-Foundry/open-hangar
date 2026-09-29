@@ -1912,22 +1912,6 @@
     };
   };
 
-  // Melt candidates: pledges you could melt and buy back for the same store
-  // credit — meltable, no LTI, nothing but ships inside (no paints, gear or game
-  // access to lose), and paid at or above the ships' current store price. RSI
-  // doesn't say whether a ship is on sale right now, so the UI says to check.
-  // `info` is the pledge's OH.hangarValue entry. Pure.
-  const GAME_RE = /\b(star citizen|squadron 42)\b.*\b(digital|download|game|package)\b/i;
-  OH.isMeltCandidate = function isMeltCandidate(p, info) {
-    if (!p || p.meltable !== true || p.insurance === 'LTI' || p.isCCU) return false;
-    if (!info || info.ccu || info.unpriced || !info.store || !(info.paid > 0)) return false;
-    if (/^package\b/i.test(p.name || '') || /warbond/i.test(p.name || '')) return false;
-    const extras = (p.contents || []).filter(
-      (c) => !/^(ship|insurance)$/i.test((c.kind || '').trim()) || GAME_RE.test(c.label || ''),
-    );
-    return !extras.length && info.paid >= info.store - 0.5;
-  };
-
   // Fleet stats from the wiki's per-ship data: every ship in every pledge (a
   // pack with two ships counts two). Pure.
   OH.fleetStats = function fleetStats(items, shipOf) {
@@ -2434,6 +2418,64 @@
     return s;
   };
 
+  // --- Latest from RSI (Comm-Links) -------------------------------------------------
+  // RSI's own Comm-Link hub list (the "Latest" tab on robertsspaceindustries.com),
+  // newest first. The API returns ready-made HTML cards; this reads the fields.
+  // → [{ title, url, type, when, excerpt, image }]. Pure.
+  OH.parseCommLinks = function parseCommLinks(html) {
+    const text = (s) =>
+      decodeEntities(String(s || '').replace(/<[^>]+>/g, ' '))
+        .replace(/\s+/g, ' ')
+        .trim();
+    const out = [];
+    for (const m of String(html || '').matchAll(/<a class="content-block2[\s\S]*?<\/a>/g)) {
+      const b = m[0];
+      const href = (b.match(/href="([^"]+)"/) || [])[1];
+      const title = text((b.match(/<div class="title[^"]*">([\s\S]*?)<\/div>/) || [])[1]);
+      if (!href || !title) continue;
+      out.push({
+        title,
+        url: href.startsWith('http') ? href : `https://robertsspaceindustries.com${href}`,
+        type: text((b.match(/<div class="type[^"]*">[\s\S]*?<span>([\s\S]*?)<\/span>/) || [])[1]),
+        when: text((b.match(/<span class="value">([\s\S]*?)<\/span>/) || [])[1]),
+        excerpt: text((b.match(/<div class="body">([\s\S]*?)<\/div>/) || [])[1]),
+        image: (b.match(/url\('([^']+)'\)/) || [])[1] || null,
+      });
+    }
+    return out;
+  };
+  const NEWS_KEY = 'rsiNews';
+  const NEWS_TTL = 3600e3;
+  // Newest Comm-Links (cached an hour); the cached copy or [] when RSI doesn't answer.
+  OH.getRsiNews = async function getRsiNews(fetchFn = fetch) {
+    const { [NEWS_KEY]: cached } = await chrome.storage.local.get(NEWS_KEY);
+    if (cached && Date.now() - cached.at < NEWS_TTL) return cached.items;
+    try {
+      const res = await fetchFn('https://robertsspaceindustries.com/api/hub/getCommlinkItems', {
+        method: 'POST',
+        credentials: 'omit',
+        headers: { 'content-type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          channel: '',
+          series: '',
+          type: '',
+          text: '',
+          sort: 'publish_new',
+          page: 1,
+        }),
+      });
+      const json = res.ok ? await res.json() : null;
+      const items = OH.parseCommLinks(json && json.data);
+      if (items.length) {
+        await chrome.storage.local.set({ [NEWS_KEY]: { at: Date.now(), items } });
+        return items;
+      }
+    } catch (e) {
+      OH.log('warn', 'news', `Comm-Link list download failed: ${e?.message || e}`);
+    }
+    return cached ? cached.items : [];
+  };
+
   // --- Loaner ships (RSI support: "Loaner Ship Matrix") --------------------------
   // A public help-center article with one table row per not-yet-flyable ship:
   // "YOUR SHIP" → "OUR LOANER(S)". Row names use shorthand ("Hull D, E",
@@ -2445,7 +2487,9 @@
       .replace(/&#39;|&rsquo;|&lsquo;/g, "'")
       .replace(/&quot;/g, '"')
       .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>');
+      .replace(/&gt;/g, '>')
+      .replace(/&#x([0-9a-f]+);/gi, (m, h) => String.fromCodePoint(parseInt(h, 16)))
+      .replace(/&#(\d+);/g, (m, d) => String.fromCodePoint(Number(d)));
   const cellText = (h) =>
     decodeEntities(String(h).replace(/<[^>]+>/g, ' '))
       .replace(/\s+/g, ' ')

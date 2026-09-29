@@ -84,3 +84,27 @@ test('getShipStock: a missing page means not in the store; cached', async () => 
   assert.equal(calls, 1);
   assert.equal(await OH.getShipStock('https://evil.example/x', gone), null);
 });
+
+test('parseCommLinks reads RSI Comm-Link cards (real list)', () => {
+  const items = OH.parseCommLinks(
+    fs.readFileSync(path.join(__dirname, 'fixtures', 'commlinks.html'), 'utf8'),
+  );
+  assert.equal(items.length, 10);
+  assert.equal(items[0].title, 'This Week in Star Citizen - September 28, 2026');
+  assert.match(items[0].url, /^https:\/\/robertsspaceindustries\.com\/comm-link\//);
+  assert.equal(items[0].when, '1 day ago');
+  assert.ok(items[0].excerpt.includes('\u2018verse')); // &#8216; decoded
+  for (const it of items) assert.doesNotMatch(it.title, /&#?\w+;|</);
+});
+
+test('getRsiNews caches an hour and keeps the last list when RSI is down', async () => {
+  const html = fs.readFileSync(path.join(__dirname, 'fixtures', 'commlinks.html'), 'utf8');
+  let calls = 0;
+  const ok = async () => {
+    calls++;
+    return { ok: true, json: async () => ({ success: 1, data: html }) };
+  };
+  assert.equal((await OH.getRsiNews(ok)).length, 10);
+  assert.equal((await OH.getRsiNews(ok)).length, 10);
+  assert.equal(calls, 1);
+});
