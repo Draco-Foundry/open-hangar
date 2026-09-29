@@ -14,3 +14,5 @@ test/fixtures/referral-events.wikitext
 test/fixtures/loaner-matrix.html
 test/fixtures/included-vessels.html
 test/fixtures/store-ships.json
+test/fixtures/ship-page-in.html
+test/fixtures/ship-page-out.html
