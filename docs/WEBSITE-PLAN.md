@@ -92,17 +92,9 @@ Device-code flow (works on Chrome, Edge and Firefox alike):
 - **Community stats** (phase 3): pilots synced, ships tracked, most owned / rarest
   ships, ships trending up or down. Only switched on after ~100 synced pilots so
   the numbers mean something.
-- **Store tracker** (early; it only gets more valuable with time). A Cloudflare cron
-  reads RSI's public store data (the upgrade tool's `initShipUpgrade` feed: every
-  ship, its editions, available or not, prices) and stores only changes. Changes land
-  every few days, clustered around 10:00 and 12:00-14:00 US Central (owner's trackersc
-  log, Aug-Sep 2026), so check every 15 min in those windows and hourly otherwise: a
-  couple hundred small requests a day, free on Workers, and start/end times accurate to
-  the check interval. trackersc.com already posts store-change alerts to Discords, so
-  don't just repeat those: our angle is per-ship sale history (when did the Carrack last
-  have a warbond, how long did it last) and the user's own data ("a ship on your
-  wishlist just went on warbond", "a CCU target in your buy-backs is back in the store").
-  Same cron can log funding, server status and patch versions.
+- **Store sale history: decided no (2026-09-29).** Logging only starts the day it's
+  turned on, and trackersc.com already has the past. The extension shows live "In store
+  now" status instead (RSI's upgrade-tool feed), which is exact when checked.
 - **No rankings, ever.** We don't rank pilots or orgs (no leaderboards, biggest
   fleets, top collections). Hangars are private by default; pooled stats are
   anonymous.
