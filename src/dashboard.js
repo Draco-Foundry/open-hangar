@@ -2351,7 +2351,7 @@ function wishlistHtml() {
             )
             .join('')}</tbody></table></td></tr>`
         : '';
-      return `<tr${mine ? ` class="wish-drag" draggable="true" data-wish-name="${esc(name)}"` : ''}>
+      return `<tr${mine ? ` class="wish-drag" data-wish-name="${esc(name)}"` : ''}>
         <td>${mine ? '<span class="wish-grip" title="Drag to reorder" aria-hidden="true">⠿</span>' : ''}${shipLink(title)}</td>
         <td class="num">${v && v.msrp ? dollars(v.msrp) : '<span class="muted">—</span>'}</td>
         <td>${inStoreHtml(title)}</td>
@@ -2391,10 +2391,11 @@ function ccuPanelHtml(q) {
     stacks.set(key, st);
   }
   const all = [...stacks.values()];
-  if (!all.length) return '<p class="muted sp-empty">No CCUs in your hangar.</p>';
   const shown = all
     .filter((c) => !needle || `${c.from} ${c.to}`.toLowerCase().includes(needle))
     .sort((a, b) => (b.worth || 0) - (a.worth || 0));
+  searchCounts.ccu = { shown: shown.length, total: all.length };
+  if (!all.length) return '<p class="muted sp-empty">No CCUs in your hangar.</p>';
   if (!shown.length) return '<p class="muted sp-empty">No CCUs match.</p>';
   return `<table class="org-table"><thead><tr><th>Upgrade</th><th class="num">Worth</th><th class="num">You paid</th><th class="num">Stock</th></tr></thead><tbody>${shown
     .map(
@@ -2417,14 +2418,17 @@ const PRICE_TABS = [
 function priceRowsHtml(q) {
   const needle = q.trim().toLowerCase();
   const tab = state.priceTab;
-  const rows = (state.catalog || [])
-    .filter((v) => v.msrp && (!needle || v.lname.includes(needle)))
+  const inTab = (state.catalog || [])
+    .filter((v) => v.msrp)
     .filter((v) => {
       if (tab === 'all') return true;
       if (tab === 'in-concept') return v.status === 'in-concept' || v.status === 'in-production';
       return v.status === tab;
-    })
+    });
+  const rows = inTab
+    .filter((v) => !needle || v.lname.includes(needle))
     .sort((a, b) => (a.name || a.lname).localeCompare(b.name || b.lname));
+  searchCounts.price = { shown: rows.length, total: inTab.length };
   if (!rows.length) {
     return '<p class="muted sp-empty">No ships match.</p>';
   }
@@ -2437,6 +2441,31 @@ function priceRowsHtml(q) {
         )}</td></tr>`,
     )
     .join('')}</tbody></table>`;
+}
+
+// Panel searches: "Search 221 ships…" placeholders, a live "12 of 221" while
+// typing, and no CCU search when there are only a few to look through.
+const searchCounts = { price: null, ccu: null };
+function updateSearchMeta() {
+  const meta = (input, count, noun) => {
+    const box = $(input);
+    const out = $(`${input}-count`);
+    if (!box || !count) return;
+    box.placeholder = `Search ${count.total.toLocaleString('en-US')} ${noun}${count.total === 1 ? '' : 's'}…`;
+    if (out) {
+      out.textContent = box.value.trim()
+        ? `${count.shown.toLocaleString('en-US')} of ${count.total.toLocaleString('en-US')}`
+        : '';
+    }
+  };
+  meta('#price-search', searchCounts.price, 'ship');
+  meta('#ccu-search', searchCounts.ccu, 'CCU');
+  const ccuBox = $('#ccu-search');
+  if (ccuBox && searchCounts.ccu) {
+    const few = searchCounts.ccu.total <= 8 && !ccuBox.value.trim();
+    ccuBox.hidden = few;
+    if ($('#ccu-search-count')) $('#ccu-search-count').hidden = few;
+  }
 }
 
 function renderStore() {
@@ -2463,6 +2492,7 @@ function renderStore() {
   }
   setHTML($('#price-table'), priceRowsHtml($('#price-search').value));
   setHTML($('#ccu-owned'), ccuPanelHtml($('#ccu-search').value));
+  updateSearchMeta();
   const ccuN = state.items.filter((p) => p.isCCU).length;
   setHTML($('#ccu-n'), ccuN ? String(ccuN) : '');
 }
@@ -2477,33 +2507,94 @@ function renderStore() {
       renderStore();
     });
   }
-  // "My order": drag a row onto another to move it there (saved).
+  // "My order": press a row and drag it; the row lifts and follows the pointer,
+  // and the rows it passes slide out of the way (animated). Let go to save.
+  // Pointer events rather than native drag-and-drop, so there's no ghost image.
   const list = $('#wishlist');
-  let dragName = null;
-  list?.addEventListener('dragstart', (e) => {
+  let drag = null; // { row, detail, startY, pointerId, moved }
+  const shipRows = () => [...list.querySelectorAll('.wishlist > tbody > tr[data-wish-name]')];
+  // A row's buy-back sub-row (if any) travels with it.
+  const detailOf = (row) =>
+    row.nextElementSibling && row.nextElementSibling.classList.contains('wish-bbs')
+      ? row.nextElementSibling
+      : null;
+  // Move rows in the DOM and animate everyone from where they were (FLIP).
+  function flipMove(mutate) {
+    const all = [...list.querySelectorAll('.wishlist > tbody > tr')];
+    const before = new Map(all.map((r) => [r, r.getBoundingClientRect().top]));
+    mutate();
+    for (const r of all) {
+      if (drag && (r === drag.row || r === drag.detail)) continue;
+      const dy = before.get(r) - r.getBoundingClientRect().top;
+      if (!dy) continue;
+      r.style.transition = 'none';
+      r.style.transform = `translateY(${dy}px)`;
+      requestAnimationFrame(() => {
+        r.style.transition = 'transform 160ms ease';
+        r.style.transform = '';
+      });
+    }
+  }
+  list?.addEventListener('pointerdown', (e) => {
     const row = e.target.closest('tr[data-wish-name]');
-    if (!row) return;
-    dragName = row.dataset.wishName;
-    row.classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', dragName);
-  });
-  list?.addEventListener('dragover', (e) => {
-    if (!dragName || !e.target.closest('tr[data-wish-name]')) return;
+    if (!row || state.wishSort !== 'mine' || e.button !== 0) return;
+    if (e.target.closest('a, button, input, select') && !e.target.closest('.wish-grip')) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    drag = {
+      row,
+      detail: detailOf(row),
+      startY: e.clientY,
+      grab: e.clientY - row.getBoundingClientRect().top, // where on the row it was held
+      pointerId: e.pointerId,
+      moved: false,
+    };
+    row.setPointerCapture(e.pointerId);
+    row.classList.add('lifted');
   });
-  list?.addEventListener('drop', (e) => {
-    const row = e.target.closest('tr[data-wish-name]');
-    if (!dragName || !row) return;
-    e.preventDefault();
-    moveWishlist(dragName, row.dataset.wishName);
-    dragName = null;
+  list?.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    drag.moved = drag.moved || Math.abs(e.clientY - drag.startY) > 3;
+    // The first other row whose middle is below the pointer: drop in front of it.
+    const others = shipRows().filter((r) => r !== drag.row);
+    const target = others.find((r) => {
+      const b = r.getBoundingClientRect();
+      return e.clientY < b.top + b.height / 2;
+    });
+    const tbody = drag.row.parentElement;
+    const want = target || null; // null = the end
+    const nextShip = (() => {
+      let n = (drag.detail || drag.row).nextElementSibling;
+      while (n && !n.dataset.wishName) n = n.nextElementSibling;
+      return n || null;
+    })();
+    if (want !== nextShip) {
+      flipMove(() => {
+        tbody.insertBefore(drag.row, want);
+        if (drag.detail) tbody.insertBefore(drag.detail, drag.row.nextElementSibling);
+      });
+    }
+    // Keep the held row under the pointer (offset from its slot in the list).
+    drag.row.style.transform = '';
+    const slot = drag.row.getBoundingClientRect().top;
+    const dy = e.clientY - drag.grab - slot;
+    for (const r of [drag.row, drag.detail]) if (r) r.style.transform = `translateY(${dy}px)`;
   });
-  list?.addEventListener('dragend', () => {
-    dragName = null;
-    list.querySelectorAll('.dragging').forEach((r) => r.classList.remove('dragging'));
-  });
+  const endDrag = (e) => {
+    if (!drag || (e && e.pointerId !== drag.pointerId)) return;
+    const { row, detail, moved } = drag;
+    row.classList.remove('lifted');
+    for (const r of [row, detail]) if (r) r.style.transform = '';
+    drag = null;
+    if (!moved) return;
+    const order = shipRows().map((r) => r.dataset.wishName);
+    if (JSON.stringify(order) !== JSON.stringify(state.wishlist)) {
+      state.wishlist = order;
+      chrome.storage.local.set({ wishlist: state.wishlist });
+    }
+    renderStore();
+  };
+  list?.addEventListener('pointerup', endDrag);
+  list?.addEventListener('pointercancel', endDrag);
 }
 function moveWishlist(name, beforeName) {
   if (name === beforeName) return;
@@ -2516,12 +2607,14 @@ function moveWishlist(name, beforeName) {
   renderStore();
 }
 
-$('#price-search')?.addEventListener('input', (e) =>
-  setHTML($('#price-table'), priceRowsHtml(e.target.value)),
-);
-$('#ccu-search')?.addEventListener('input', (e) =>
-  setHTML($('#ccu-owned'), ccuPanelHtml(e.target.value)),
-);
+$('#price-search')?.addEventListener('input', (e) => {
+  setHTML($('#price-table'), priceRowsHtml(e.target.value));
+  updateSearchMeta();
+});
+$('#ccu-search')?.addEventListener('input', (e) => {
+  setHTML($('#ccu-owned'), ccuPanelHtml(e.target.value));
+  updateSearchMeta();
+});
 $('#view-store')?.addEventListener('click', (e) => {
   const tab = e.target.closest('[data-price-tab]');
   if (tab) {
