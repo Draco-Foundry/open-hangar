@@ -2300,6 +2300,68 @@
     return out;
   };
 
+  // --- Live store status (RSI's upgrade tool data) ----------------------------------
+  // The public data behind RSI's CCU upgrade tool lists every ship with the
+  // editions on sale right now ("skus": Standard, Warbond, …, each available or
+  // not). No skus = not for sale. Prices come in cents.
+  const STORE_URL = 'https://robertsspaceindustries.com/pledge-store/api/upgrade/graphql';
+  const STORE_QUERY =
+    'query initShipUpgrade { ships { id name flyableStatus msrp link skus { id title available price } } }';
+  // Raw response → [{ id, name, lname, link, concept, editions: [{ title, price, warbond }], forSale, warbond, price }]. Pure.
+  OH.parseStoreShips = function parseStoreShips(json) {
+    const data = Array.isArray(json) ? json[0] : json;
+    const ships = data && data.data && Array.isArray(data.data.ships) ? data.data.ships : [];
+    return ships
+      .filter((s) => s && s.name)
+      .map((s) => {
+        const editions = (s.skus || [])
+          .filter((k) => k && k.available)
+          .map((k) => ({
+            title: String(k.title || '').trim(),
+            price: Number(k.price) / 100,
+            warbond: /warbond/i.test(k.title || ''),
+          }));
+        const prices = editions.map((e) => e.price).filter((p) => p > 0);
+        return {
+          id: s.id,
+          name: String(s.name).trim(),
+          lname: String(s.name).trim().toLowerCase(),
+          link: s.link ? `https://robertsspaceindustries.com${s.link}` : null,
+          concept: /concept/i.test(s.flyableStatus || ''),
+          editions,
+          forSale: editions.length > 0,
+          warbond: editions.some((e) => e.warbond),
+          price: prices.length ? Math.min(...prices) : null,
+        };
+      });
+  };
+  const STORE_KEY = 'storeShips';
+  const STORE_TTL = 6 * 3600e3;
+  // → { at, ships } (cached 6 hours), or the cached copy / null when RSI doesn't answer.
+  OH.getStoreShips = async function getStoreShips(fetchFn = fetch, { force = false } = {}) {
+    const { [STORE_KEY]: cached } = await chrome.storage.local.get(STORE_KEY);
+    if (!force && cached && Date.now() - cached.at < STORE_TTL) return cached;
+    try {
+      const res = await fetchFn(STORE_URL, {
+        method: 'POST',
+        credentials: 'omit',
+        headers: { 'content-type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify([
+          { operationName: 'initShipUpgrade', variables: {}, query: STORE_QUERY },
+        ]),
+      });
+      const ships = res.ok ? OH.parseStoreShips(await res.json()) : [];
+      if (ships.length >= 50) {
+        const fresh = { at: Date.now(), ships };
+        await chrome.storage.local.set({ [STORE_KEY]: fresh });
+        return fresh;
+      }
+    } catch (e) {
+      OH.log('warn', 'store', `store status download failed: ${e?.message || e}`);
+    }
+    return cached || null;
+  };
+
   // --- Loaner ships (RSI support: "Loaner Ship Matrix") --------------------------
   // A public help-center article with one table row per not-yet-flyable ship:
   // "YOUR SHIP" → "OUR LOANER(S)". Row names use shorthand ("Hull D, E",

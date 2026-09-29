@@ -1174,6 +1174,68 @@
         white-space: nowrap;
         text-align: left;
       }
+      /* Store page panels */
+      .store-panel {
+        margin: 0 0 18px;
+        padding: 14px 16px 12px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--panel);
+      }
+      .sp-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
+      }
+      .sp-head h3 {
+        margin: 0;
+        font-size: 16px;
+        margin-right: auto;
+      }
+      .sp-head input[type='search'] {
+        width: 220px;
+        max-width: 100%;
+      }
+      .sp-scroll {
+        max-height: 340px;
+        overflow: auto;
+        border-radius: 8px;
+      }
+      .sp-scroll.tall {
+        max-height: 520px;
+      }
+      .sp-scroll thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--panel-2);
+      }
+      .sp-empty {
+        margin: 6px 2px;
+      }
+      .sale {
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .sale.on {
+        color: #3fb950;
+      }
+      .sale.wb {
+        color: #e3b341;
+      }
+      .sale.off {
+        color: var(--muted);
+        font-weight: 400;
+      }
+      .wish-bbs > td {
+        padding: 0 0 10px 18px;
+        background: var(--panel-2);
+      }
+      .org-table.inner {
+        margin: 6px 0 0;
+      }
       .update-check {
         display: flex;
         align-items: center;
@@ -3035,7 +3097,8 @@
         color: var(--link);
         font-weight: 600;
       }
-      #price-search {
+      #price-search,
+      #ccu-search {
         width: 260px;
         padding: 8px 10px;
         border: 1px solid var(--line);
@@ -3518,9 +3581,9 @@
                   same store credit. Check the ship is actually on sale before you melt anything.
                 </li>
                 <li>
-                  The <a href="#store" data-view="store">Store</a> page lists every ship's store
-                  price and what each of your CCUs is worth. For planning upgrade chains, use
-                  <a href="https://ccugame.app" target="_blank" rel="noopener">ccugame.app</a>.
+                  The <a href="#store" data-view="store">Store</a> page shows every ship's price,
+                  whether it's in RSI's store right now, what each of your CCUs is worth, and your
+                  wishlist.
                 </li>
                 <li>
                   The <strong>Fleet</strong> tab adds up cargo, crew and roles, and
@@ -3791,27 +3854,36 @@
 
       <section class="view" id="view-store">
         <h2 class="section-title">Store</h2>
+        <p class="muted store-intro" id="store-status-line"></p>
 
-        <h3 class="section-title">Wishlist</h3>
-        <div id="wishlist"></div>
+        <div class="store-panel">
+          <div class="sp-head">
+            <h3>Wishlist <span class="market-n" id="wish-n"></span></h3>
+          </div>
+          <div class="sp-scroll" id="wishlist"></div>
+        </div>
 
-        <h3 class="section-title" style="margin-top: 28px">Your CCUs</h3>
-        <div id="ccu-owned"></div>
-        <p class="muted store-intro">
-          Planning an upgrade chain?
-          <a href="https://ccugame.app" target="_blank" rel="noopener">ccugame.app</a> is built for
-          exactly that and tracks warbond deals day to day.
-        </p>
+        <div class="store-panel">
+          <div class="sp-head">
+            <h3>Your CCUs <span class="market-n" id="ccu-n"></span></h3>
+            <input id="ccu-search" type="search" placeholder="Search CCUs…" autocomplete="off" />
+          </div>
+          <div class="sp-scroll" id="ccu-owned"></div>
+        </div>
 
-        <h3 class="section-title" style="margin-top: 28px">Ship Prices</h3>
-        <p class="currency-note muted store-intro" hidden></p>
-        <input id="price-search" type="search" placeholder="Search ships…" autocomplete="off" />
-        <div id="price-table"></div>
-        <p class="muted value-note">
-          Standard store prices (USD, before tax) from star-citizen.wiki. RSI sometimes sells
-          warbond or limited-time CCUs for less, and some ships can't be bought or used as a CCU
-          target at all. Check the store before you buy.
-        </p>
+        <div class="store-panel">
+          <div class="sp-head">
+            <h3>Ship Prices</h3>
+            <div class="layout-toggle sp-tabs" id="price-tabs" role="tablist"></div>
+            <input id="price-search" type="search" placeholder="Search ships…" autocomplete="off" />
+          </div>
+          <p class="currency-note muted store-intro" hidden></p>
+          <div class="sp-scroll tall" id="price-table"></div>
+          <p class="muted value-note">
+            Store prices are RSI's standard prices (USD, before tax). "In store now" is live from
+            RSI's store: hover it for the editions on sale.
+          </p>
+        </div>
       </section>
 
       <!-- UPDATES -->
