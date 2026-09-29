@@ -118,14 +118,33 @@ try {
       storeOpt: !!document.querySelector('.scan-src[value="store"]'),
     };
   });
+  const menu = await page.evaluate(() => {
+    document.querySelector('#scan-menu-btn').click();
+    const m = document.querySelector('#scan-menu').getBoundingClientRect();
+    const b = document.querySelector('#scan-menu-btn').getBoundingClientRect();
+    // The element actually drawn at the menu's first option must be the menu.
+    const hit = document.elementFromPoint(m.left + 20, m.top + 14);
+    const res = {
+      below: m.top >= b.bottom,
+      inView: m.top >= 0 && m.bottom <= innerHeight,
+      visible: !!hit && !!hit.closest('#scan-menu'),
+    };
+    document.body.click();
+    return res;
+  });
+  menu.below && menu.inView && menu.visible
+    ? ok('scan menu opens below the button, fully visible')
+    : fail(`scan menu: ${JSON.stringify(menu)}`);
   home.guide && home.cards === 0
     ? ok('how-to guide folded into one closed dropdown; no link cards')
     : fail(`home layout: ${JSON.stringify(home)}`);
   /On Sale Now 1/.test(home.wish) && /Cutlass Black/.test(home.wish) && !/Pioneer/.test(home.wish)
     ? ok('home: wishlist ships on sale now')
     : fail(`home wishlist: ${home.wish}`);
-  /Buy-back tokens/.test(home.glance) && /Next referral reward/.test(home.glance) && home.storeOpt
-    ? ok('home: at-a-glance panel; Scan has a Store (wishlist) option')
+  /Next referral reward/.test(home.glance) &&
+  !/Buy-back tokens|Last scan|Melt candidates/.test(home.glance) &&
+  home.storeOpt
+    ? ok('home: at-a-glance (no repeats of the card); Scan has a Store (wishlist) option')
     : fail(`home glance: ${JSON.stringify(home)}`);
   const site = await page.$eval('#site-link', (e) => e.textContent).catch(() => '');
   /something big is coming/i.test(site) && !(await page.$('#site-link button'))
