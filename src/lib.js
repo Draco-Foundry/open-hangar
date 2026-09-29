@@ -2300,6 +2300,105 @@
     return out;
   };
 
+  // --- Loaner ships (RSI support: "Loaner Ship Matrix") --------------------------
+  // A public help-center article with one table row per not-yet-flyable ship:
+  // "YOUR SHIP" → "OUR LOANER(S)". Row names use shorthand ("Hull D, E",
+  // "Idris-M & P", "Pulse (+ LX)", "Cyclone Variants"), expanded into patterns.
+  const LOANER_URL =
+    'https://support.robertsspaceindustries.com/api/v2/help_center/en-us/articles/360003093114.json';
+  const decodeEntities = (s) =>
+    String(s || '')
+      .replace(/&nbsp;| /g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&#39;|&rsquo;|&lsquo;/g, "'")
+      .replace(/&quot;/g, '"')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>');
+  const cellText = (h) =>
+    decodeEntities(String(h).replace(/<[^>]+>/g, ' '))
+      .replace(/\s+/g, ' ')
+      .trim();
+  // "600i Explorer and Executive" → ["600i Explorer", "600i Executive"], etc.
+  function loanerPatterns(cell) {
+    let text = cell;
+    const out = [];
+    // "Pulse (+ LX)" / "X1 (+ Velocity, Force)": the base plus each variant.
+    const plus = text.match(/^(.*?)\s*\(\+\s*([^)]*)\)\s*$/);
+    let extra = [];
+    if (plus) {
+      text = plus[1];
+      extra = plus[2].split(/\s*,\s*/).filter(Boolean);
+    }
+    const prefix = /\bvariants?\b/i.test(text);
+    text = text.replace(/\s*\bvariants?\b/i, '').trim();
+    const parts = text.split(/\s*(?:\/|,|&|\band\b)\s*/i).filter(Boolean);
+    const first = parts[0] || '';
+    const firstWords = first.split(' ');
+    for (const part of parts) {
+      let n = part;
+      if (part !== first && !part.includes(' ')) {
+        if (/^[A-Za-z]$/.test(part) && /-[A-Za-z]$/.test(first))
+          n = first.replace(/[A-Za-z]$/, part); // Idris-M & P
+        else if (firstWords.length > 1) n = [...firstWords.slice(0, -1), part].join(' '); // Hull D, E
+      }
+      out.push({ n: n.toLowerCase(), prefix });
+    }
+    for (const v of extra) out.push({ n: `${first} ${v}`.toLowerCase(), prefix: false });
+    return out;
+  }
+  OH.parseLoanerMatrix = function parseLoanerMatrix(html) {
+    const rows = [];
+    for (const tr of String(html || '').match(/<tr[\s\S]*?<\/tr>/gi) || []) {
+      const cells = (tr.match(/<td[\s\S]*?<\/td>/gi) || []).map(cellText);
+      if (cells.length < 2 || !cells[0] || !cells[1]) continue;
+      const loaners = cells[1].split(/\s*,\s*/).filter(Boolean);
+      rows.push({ ship: cells[0], patterns: loanerPatterns(cells[0]), loaners });
+    }
+    return rows;
+  };
+  // The matrix row for a ship name, or null. The longest matching pattern wins,
+  // so "Constellation Phoenix Emerald" beats "Constellation Phoenix". Pure.
+  OH.loanersFor = function loanersFor(name, matrix) {
+    const n = OH.normShipName(name).toLowerCase().replace(/\s+/g, ' ');
+    if (!n) return null;
+    let best = null;
+    let bestLen = 0;
+    for (const row of matrix || []) {
+      for (const p of row.patterns) {
+        const hit = n === p.n || (p.prefix && n.startsWith(p.n + ' '));
+        if (hit && p.n.length > bestLen) {
+          best = row;
+          bestLen = p.n.length;
+        }
+      }
+    }
+    return best;
+  };
+  const LOANER_KEY = 'loanerMatrix';
+  const LOANER_TTL = 7 * 24 * 3600e3;
+  // Cached a week; the cached copy (or null) when RSI's help center is down.
+  OH.getLoanerMatrix = async function getLoanerMatrix(fetchFn = fetch) {
+    const { [LOANER_KEY]: cached } = await chrome.storage.local.get(LOANER_KEY);
+    if (cached && Date.now() - cached.at < LOANER_TTL) return cached.rows;
+    try {
+      const res = await fetchFn(LOANER_URL, {
+        credentials: 'omit',
+        headers: { Accept: 'application/json' },
+      });
+      const json = res.ok ? await res.json() : null;
+      const rows = OH.parseLoanerMatrix(json?.article?.body);
+      if (rows.length >= 10) {
+        await chrome.storage.local.set({
+          [LOANER_KEY]: { at: Date.now(), updated: json.article.updated_at || null, rows },
+        });
+        return rows;
+      }
+    } catch (e) {
+      OH.log('warn', 'loaners', `loaner matrix download failed: ${e?.message || e}`);
+    }
+    return cached ? cached.rows : null;
+  };
+
   const REF_EVENTS_KEY = 'referralEvents';
   const REF_EVENTS_TTL = 7 * 24 * 3600e3;
   // Cached for a week; null when it can't be fetched (callers keep their list).
