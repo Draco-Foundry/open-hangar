@@ -22,6 +22,7 @@ test('parseReferralEvents reads every row of the wiki table', () => {
     end: '2019-11-05',
     name: 'Alpha 3.7.0 Free Fly',
     reward: 'Kruger Intergalactic P-52 Merlin',
+    image: 'P-52 in space - Isometric.jpg',
   });
   for (const e of ev) {
     assert.match(e.start, /^\d{4}-\d{2}-\d{2}$/);
@@ -58,4 +59,37 @@ test('getReferralEvents caches for a week and survives a failed fetch', async ()
     throw new Error('offline');
   };
   assert.equal((await OH.getReferralEvents(down)).length, 25); // falls back to the cache
+});
+
+test('wikiImageUrls resolves file names in one request and caches them', async () => {
+  const store = {};
+  global.chrome.storage.local.get = async (k) => ({ [k]: store[k] });
+  global.chrome.storage.local.set = async (o) => Object.assign(store, o);
+  const urls = [];
+  const fetchFn = async (url) => {
+    urls.push(url);
+    return {
+      ok: true,
+      json: async () => ({
+        query: {
+          pages: {
+            1: {
+              title: 'File:Referral Pulse.jpg',
+              imageinfo: [{ thumburl: 'https://m/pulse.webp' }],
+            },
+            '-1': { title: 'File:Nope.jpg', missing: '' },
+          },
+        },
+      }),
+    };
+  };
+  const r = await OH.wikiImageUrls(
+    ['Referral_Pulse.jpg', 'nope.jpg', 'Referral_Pulse.jpg'],
+    fetchFn,
+  );
+  assert.deepEqual(r, { 'Referral_Pulse.jpg': 'https://m/pulse.webp' });
+  assert.equal(urls.length, 1);
+  assert.match(decodeURIComponent(urls[0]), /titles=File:Referral Pulse\.jpg\|File:Nope\.jpg/);
+  await OH.wikiImageUrls(['Referral_Pulse.jpg', 'nope.jpg'], fetchFn);
+  assert.equal(urls.length, 1); // both answers (found and missing) are cached
 });
