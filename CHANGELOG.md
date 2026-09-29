@@ -4,6 +4,18 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Referrals, levelled up.**
+  - A progress panel up top: your recruits, legacy rank, a bar to the next reward with
+    an estimate at your pace, and both reward ladders as a track of lit-up dots.
+  - **Share image:** one clean picture of your referral stats, progress and the ships
+    you've earned, ready to paste into Discord. Tick "Include my code" to add your code
+    and a QR code people can scan.
+  - **Rewards Earned:** everything you've unlocked as picture cards, event bonuses included.
+  - **Milestones:** when you hit each tier.
+  - **Prospects:** how long people have been waiting to buy, and how fast your recruits
+    bought (typical time, same day, within 30 days).
+  - **Bonus events:** a banner when one is running, and the event list now refreshes
+    itself from the Star Citizen wiki.
 - **Land Claims get their own group.** Geotack Planetary Beacons (and Geotack-X) and
   other land claims show under Land Claims, and as "Land Claim" inside pack contents.
 - Fixed: the Hangars group and Gear labels from 0.2.10 didn't show up.

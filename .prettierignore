@@ -10,3 +10,4 @@ app/.astro
 app/.wrangler
 app/worker-configuration.d.ts
 app/.vscode
+test/fixtures/referral-events.wikitext

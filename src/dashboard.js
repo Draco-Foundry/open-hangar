@@ -246,6 +246,8 @@ const REFERRAL_EVENTS = [
     reward: 'HoverQuad (LTI, Lovestruck paint)',
   },
 ];
+// Live list: the built-in one, refreshed from the wiki (refreshReferralEvents).
+let referralEvents = REFERRAL_EVENTS;
 
 // Community links — fill these in (footer + Developers page use them).
 // Until set, a "soon" placeholder shows instead of a broken link.
@@ -3114,7 +3116,7 @@ const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
 function eventForDate(d) {
   if (!d) return null;
   const t = d.getTime();
-  for (const ev of REFERRAL_EVENTS) {
+  for (const ev of referralEvents) {
     const s = parseTs(ev.start + ' 00:00:00');
     const e = parseTs(ev.end + ' 23:59:59');
     if (s && e && t >= s.getTime() && t <= e.getTime()) return ev;
@@ -3318,7 +3320,7 @@ function eventRewardsHtml(recruitsRows) {
   const earned = [...hits.values()].sort((a, b) => parseTs(b.ev.start) - parseTs(a.ev.start));
   const intro = `<p class="muted" style="font-size:12px;margin:0 0 12px">
     A recruit who <strong>converted</strong> during a special-incentive event earns you that
-    event's bonus reward — once per event. Best-effort; may not include the newest events.</p>`;
+    event's bonus reward — once per event. The event list refreshes weekly from the Star Citizen wiki.</p>`;
   if (!earned.length) {
     return intro + '<p class="muted">No recruits converted during a tracked bonus event.</p>';
   }
@@ -3436,6 +3438,517 @@ function renderRefList() {
   });
 }
 
+// --- Referrals: progress, gallery, milestones, insights, share card ---------
+// The bonus-event list starts as the built-in REFERRAL_EVENTS and is refreshed
+// from the wiki (OH.getReferralEvents, cached a week) the first time the page
+// opens; wiki rows replace built-in ones with the same start date.
+let refEventsRequested = false;
+function refreshReferralEvents() {
+  if (refEventsRequested) return;
+  refEventsRequested = true;
+  OH.getReferralEvents().then((wiki) => {
+    if (!wiki || !wiki.length) return;
+    const byStart = new Map(REFERRAL_EVENTS.map((e) => [e.start, e]));
+    for (const e of wiki) byStart.set(e.start, e);
+    referralEvents = [...byStart.values()].sort((a, b) => a.start.localeCompare(b.start));
+    if (currentView() === 'referrals' && state.referral) renderReferrals();
+  });
+}
+
+const fmtDate = (d) =>
+  d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+const rewardNames = (items) => (items || []).map((i) => i.n).join(' + ');
+
+// The tier you're on and the next one, for a ladder.
+function tierProgress(ladder, recruits) {
+  const next = ladder.find((t) => recruits < t.at) || null;
+  const done = ladder.filter((t) => recruits >= t.at);
+  const prev = done.length ? done[done.length - 1] : null;
+  const from = prev ? prev.at : 0;
+  const pct = next ? Math.max(0, Math.min(1, (recruits - from) / (next.at - from))) : 1;
+  return { next, prev, from, pct, done: done.length };
+}
+
+// A row of dots, one per tier: lit when earned, ringed for the next one.
+function ladderTrackHtml(ladder, recruits, label) {
+  const { next } = tierProgress(ladder, recruits);
+  const dots = ladder
+    .map((t) => {
+      const cls = recruits >= t.at ? 'on' : next && t.at === next.at ? 'next' : '';
+      const tip = `${t.at.toLocaleString('en-US')} recruits${t.rank ? ` · ${t.rank}` : ''}: ${rewardNames(t.items)}`;
+      return `<div class="rt-step ${cls}" title="${OH.escapeHtml(tip)}"><span class="rt-dot"></span><span class="rt-at">${t.at.toLocaleString('en-US')}</span></div>`;
+    })
+    .join('');
+  return `<div class="rt"><div class="rt-label">${OH.escapeHtml(label)}</div><div class="rt-track">${dots}</div></div>`;
+}
+
+// The legacy rank you hold (e.g. "Sergeant"), or ''.
+function legacyRank(recruits) {
+  const done = REFERRAL_LADDER_LEGACY.filter((t) => recruits >= t.at);
+  return done.length ? done[done.length - 1].rank : '';
+}
+
+// Top of the page: recruits, rank, the bar to the next reward, both tracks.
+function refHeroHtml(ref, recruits, projection, hasLegacy) {
+  const p = tierProgress(REFERRAL_LADDER_STANDARD, recruits);
+  const rank = hasLegacy ? legacyRank(recruits) : '';
+  const nextLine = p.next
+    ? `<strong>${(p.next.at - recruits).toLocaleString('en-US')} more</strong> to ${OH.escapeHtml(rewardNames(p.next.items))}${
+        projection && projection !== '—'
+          ? ` <span class="muted">· at your pace ${OH.escapeHtml(projection)}</span>`
+          : ''
+      }`
+    : 'Every standard reward unlocked 🎉';
+  const running = runningEvent();
+  const eventPill = running
+    ? `<div class="ref-hero-event">🎁 Bonus event on now: <strong>${OH.escapeHtml(running.name)}</strong>, until ${OH.escapeHtml(
+        fmtDate(parseTs(running.end + ' 00:00:00')),
+      )}</div>`
+    : '';
+  return `<div class="ref-hero">
+    <div class="ref-hero-top">
+      <div>
+        <div class="ref-hero-n">${recruits.toLocaleString('en-US')}<span> recruit${recruits === 1 ? '' : 's'}</span></div>
+        ${rank ? `<div class="ref-hero-rank">${OH.escapeHtml(rank)}</div>` : ''}
+      </div>
+      <div class="ref-share">
+        <label class="mk-toggle" title="Adds your referral code and a QR code people can scan"><input type="checkbox" id="ref-share-code"> Include my code</label>
+        <button type="button" class="mk-btn" id="ref-share">Share image</button>
+        <span class="mk-export-status" id="ref-share-status" aria-live="polite"></span>
+      </div>
+    </div>
+    <div class="ref-hero-next">${nextLine}</div>
+    <div class="ref-hero-bar"><div style="width:${(p.pct * 100).toFixed(1)}%"></div></div>
+    <div class="ref-hero-bar-ends"><span>${p.from.toLocaleString('en-US')}</span><span>${p.next ? p.next.at.toLocaleString('en-US') : ''}</span></div>
+    ${eventPill}
+    ${ladderTrackHtml(REFERRAL_LADDER_STANDARD, recruits, 'Standard ladder')}
+    ${hasLegacy ? ladderTrackHtml(REFERRAL_LADDER_LEGACY, recruits, 'Legacy ladder') : ''}
+  </div>`;
+}
+
+// Bonus events you earned: once per event, dated by the first recruit who
+// converted inside its window.
+function earnedEvents(recruitsRows) {
+  const hits = new Map();
+  for (const r of recruitsRows) {
+    const d = recruitDate(r);
+    const ev = eventForDate(d);
+    if (!ev) continue;
+    const cur = hits.get(ev.name);
+    if (!cur) hits.set(ev.name, { ev, firstDate: d });
+    else if (d < cur.firstDate) cur.firstDate = d;
+  }
+  return [...hits.values()].sort((a, b) => b.firstDate - a.firstDate);
+}
+
+// Everything you've earned, as picture cards: tier rewards (both ladders) and
+// event bonuses. Ship rewards get their art looked up after render.
+function earnedRewards(recruits, recruitsRows, hasLegacy) {
+  const out = [];
+  const add = (items, sub) => {
+    for (const it of items) {
+      out.push({
+        name: it.n,
+        sub,
+        resolve: it.ship ? it.img || it.n.replace(/\s*\(LTI\)/i, '').trim() : '',
+      });
+    }
+  };
+  for (const t of REFERRAL_LADDER_STANDARD.filter((x) => recruits >= x.at).reverse())
+    add(t.items, `${t.at} recruit${t.at === 1 ? '' : 's'}`);
+  if (hasLegacy) {
+    for (const t of REFERRAL_LADDER_LEGACY.filter((x) => recruits >= x.at).reverse())
+      add(t.items, `Legacy · ${t.rank}`);
+  }
+  for (const { ev } of earnedEvents(recruitsRows)) {
+    out.unshift({ name: shortReward(ev.reward), sub: `Event · ${ev.name}`, resolve: ev.reward });
+  }
+  return out;
+}
+// "Drake Interplanetary Dragonfly with lifetime insurance and …" → "Drake Interplanetary Dragonfly".
+function shortReward(text) {
+  return (
+    String(text || '')
+      .replace(/\s+(with|and)\b.*$/i, '')
+      .replace(/,.*$/, '')
+      .trim() || text
+  );
+}
+function rewardIcon(name) {
+  if (/armou?r|helmet|undersuit|core|legs|arms/i.test(name)) return '🛡️';
+  if (/rifle|smg|pistol|repeater|weapon|sniper/i.test(name)) return '🎯';
+  if (/paint/i.test(name)) return '🎨';
+  if (/statue|sculpture|figurine|replica|model|hologram|trophy|case/i.test(name)) return '🗿';
+  if (/package|access|badge/i.test(name)) return '🎟️';
+  return '🏅';
+}
+function rewardsGalleryHtml(list) {
+  if (!list.length)
+    return '<p class="muted">No rewards yet. Your first recruit unlocks the GCD-Army armor.</p>';
+  return `<div class="ref-gallery">${list
+    .map(
+      (
+        r,
+      ) => `<div class="ref-gcard"${r.resolve ? ` data-resolve="${OH.escapeHtml(r.resolve)}"` : ''}>
+        <div class="ref-gimg"><span>${rewardIcon(r.name)}</span></div>
+        <div class="ref-gname" title="${OH.escapeHtml(r.name)}">${OH.escapeHtml(r.name)}</div>
+        <div class="ref-gsub">${OH.escapeHtml(r.sub)}</div>
+      </div>`,
+    )
+    .join('')}</div>`;
+}
+// Swap the icon for ship art where there is some (few at a time).
+function enhanceGalleryImages(container) {
+  const cards = [...container.querySelectorAll('.ref-gcard[data-resolve]')];
+  let i = 0;
+  const worker = async () => {
+    while (i < cards.length) {
+      const card = cards[i++];
+      const url = await OH.getShipImage(card.dataset.resolve);
+      const slot = card.querySelector('.ref-gimg');
+      if (!url || !slot || !slot.isConnected) continue;
+      const im = document.createElement('img');
+      im.alt = '';
+      im.loading = 'lazy';
+      im.src = url;
+      im.addEventListener('error', () => im.remove());
+      slot.replaceChildren(im);
+      card.dataset.image = url;
+    }
+  };
+  for (let w = 0; w < 3; w++) worker();
+}
+
+// When each tier was reached: the Nth recruit's conversion date. If RSI's list
+// is shorter than the total (very old recruits), early tiers have no date.
+function milestonesHtml(recruits, recruitsRows, hasLegacy) {
+  const dates = recruitsRows
+    .map(recruitDate)
+    .filter(Boolean)
+    .sort((a, b) => a - b);
+  const offset = recruits - dates.length; // recruits we have no date for
+  const byAt = new Map();
+  const tiers = [...REFERRAL_LADDER_STANDARD, ...(hasLegacy ? REFERRAL_LADDER_LEGACY : [])].filter(
+    (t) => recruits >= t.at,
+  );
+  for (const t of tiers) {
+    const cur = byAt.get(t.at) || { at: t.at, items: [], rank: '' };
+    cur.items.push(...t.items);
+    if (t.rank) cur.rank = t.rank;
+    byAt.set(t.at, cur);
+  }
+  const rows = [...byAt.values()].sort((a, b) => b.at - a.at);
+  if (!rows.length) return '<p class="muted">Your first milestone is 1 recruit.</p>';
+  return `<ol class="ref-timeline">${rows
+    .map((m) => {
+      const d = dates[m.at - 1 - offset];
+      return `<li><span class="rtl-dot"></span>
+        <div class="rtl-head"><strong>${m.at.toLocaleString('en-US')} recruit${m.at === 1 ? '' : 's'}</strong>${
+          m.rank ? ` <span class="reward-rank">${OH.escapeHtml(m.rank)}</span>` : ''
+        }<span class="rtl-date">${d ? OH.escapeHtml(fmtDate(d)) : 'before your recruit list starts'}</span></div>
+        <div class="rtl-items muted">${OH.escapeHtml(rewardNames(m.items))}</div></li>`;
+    })
+    .join('')}</ol>`;
+}
+
+// How long prospects have been waiting, and how fast recruits converted.
+function prospectInsightsHtml(ref) {
+  const DAY = 86400000;
+  const now = Date.now();
+  const buckets = [
+    ['Under 30 days', 30],
+    ['1 to 3 months', 91],
+    ['3 to 12 months', 365],
+    ['1 to 2 years', 730],
+    ['Over 2 years', Infinity],
+  ].map(([label, max]) => ({ label, max, n: 0 }));
+  for (const p of ref.prospectsList || []) {
+    const d = parseTs(p.enlistedOn);
+    if (!d) continue;
+    const age = (now - d) / DAY;
+    buckets.find((b) => age < b.max).n++;
+  }
+  const maxN = Math.max(1, ...buckets.map((b) => b.n));
+  const bars = buckets
+    .map(
+      (b) => `<div class="bar-row">
+        <div class="bar-label">${b.label}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((b.n / maxN) * 100)}%"></div></div>
+        <div class="bar-val">${b.n.toLocaleString('en-US')}</div>
+      </div>`,
+    )
+    .join('');
+  const waits = (ref.recruitsList || [])
+    .map((r) => {
+      const a = parseTs(r.enlistedOn);
+      const b = parseTs(r.convertedOn);
+      return a && b && b >= a ? (b - a) / DAY : null;
+    })
+    .filter((x) => x != null)
+    .sort((a, b) => a - b);
+  let speed = '<p class="muted">No recruits with both dates yet.</p>';
+  if (waits.length) {
+    const median = waits[Math.floor(waits.length / 2)];
+    const within = (days) =>
+      Math.round((waits.filter((w) => w <= days).length / waits.length) * 100);
+    const days = (n) =>
+      n < 1 ? 'same day' : `${Math.round(n)} day${Math.round(n) === 1 ? '' : 's'}`;
+    speed = `<div class="stat-grid">
+      <div class="stat-box"><div class="big">${days(median)}</div><div class="lbl">typical time to convert</div></div>
+      <div class="stat-box"><div class="big">${within(1)}%</div><div class="lbl">bought the same day</div></div>
+      <div class="stat-box"><div class="big">${within(30)}%</div><div class="lbl">within 30 days</div></div>
+      <div class="stat-box"><div class="big">${100 - within(365)}%</div><div class="lbl">took over a year</div></div>
+    </div>`;
+  }
+  return `<div class="ref-charts">
+    <div class="ref-chart"><h4>Waiting Prospects by Age</h4>${bars}
+      <p class="muted ref-small">People who signed up with your code but haven't bought a game package yet. RSI doesn't share a way to contact them.</p></div>
+    <div class="ref-chart"><h4>How Fast Recruits Bought</h4>${speed}</div>
+  </div>`;
+}
+
+// The event running today, or null.
+function runningEvent() {
+  const today = new Date();
+  return eventForDate(today);
+}
+function eventBannerHtml() {
+  const running = runningEvent();
+  if (running) {
+    return `<div class="ref-event-banner live">🎁 <strong>${OH.escapeHtml(running.name)}</strong> is on until ${OH.escapeHtml(
+      fmtDate(parseTs(running.end + ' 00:00:00')),
+    )}. Anyone who enlists with your code and buys a game package gets you: <strong>${OH.escapeHtml(running.reward)}</strong>.</div>`;
+  }
+  const past = referralEvents.filter((e) => parseTs(e.end + ' 23:59:59') < new Date());
+  const last = past[past.length - 1];
+  return last
+    ? `<div class="ref-event-banner">No bonus event right now. The last one was <strong>${OH.escapeHtml(last.name)}</strong> (${OH.escapeHtml(
+        fmtDate(parseTs(last.start + ' 00:00:00')),
+      )}, ${OH.escapeHtml(last.reward)}). CIG runs one every few months.</div>`
+    : '';
+}
+
+// --- Share card -----------------------------------------------------------
+async function referralShareCanvas({ withCode }) {
+  const ref = state.referral;
+  const recruits = ref.legacy?.recruits ?? 0;
+  const prospects = ref.prospects ?? 0;
+  const hasLegacy = recruits > 0 && !!ref.legacy;
+  const rows = ref.recruitsList || [];
+  const p = tierProgress(REFERRAL_LADDER_STANDARD, recruits);
+  const rank = hasLegacy ? legacyRank(recruits) : '';
+  const earned = earnedRewards(recruits, rows, hasLegacy);
+  const ships = earned.filter((r) => r.resolve).slice(0, 6);
+  const who = (state.owner && (state.owner.nickname || state.owner.displayname)) || '';
+  const url =
+    ref.url || (ref.code ? `https://robertsspaceindustries.com/enlist?referral=${ref.code}` : '');
+  const qr = withCode && url ? OpenHangarQR.encode(url) : null;
+
+  const dates = rows.map(recruitDate).filter(Boolean);
+  const last30 = dates.filter((d) => Date.now() - d < 30 * 86400000).length;
+  const byMonth = new Map();
+  for (const d of dates) byMonth.set(monthKey(d), (byMonth.get(monthKey(d)) || 0) + 1);
+  const best = Math.max(0, ...byMonth.values());
+
+  const imgs = await Promise.all(
+    ships.map(async (r) => loadCanvasImage(await OH.getShipImage(r.resolve))),
+  );
+
+  const SCALE = 2;
+  const W = 900;
+  const PAD = 36;
+  const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+  const f = (w, s) => `${w} ${s}px ${FONT}`;
+  const H = 1000; // drawn tall, cropped to the content at the end
+  const canvas = document.createElement('canvas');
+  canvas.width = W * SCALE;
+  canvas.height = H * SCALE;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(SCALE, SCALE);
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#0d1117');
+  bg.addColorStop(1, '#131c2b');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+  ctx.textBaseline = 'alphabetic';
+
+  let y = PAD + 22;
+  ctx.fillStyle = '#8b949e';
+  ctx.font = f(600, 15);
+  ctx.fillText(who ? `${who.toUpperCase()} · REFERRALS` : 'REFERRALS', PAD, y);
+  ctx.textAlign = 'right';
+  ctx.fillText('Open Hangar', W - PAD, y);
+  ctx.textAlign = 'left';
+
+  y += 72;
+  ctx.fillStyle = '#e6edf3';
+  ctx.font = f(800, 72);
+  const nText = recruits.toLocaleString('en-US');
+  ctx.fillText(nText, PAD, y);
+  const nW = ctx.measureText(nText).width;
+  ctx.font = f(600, 24);
+  ctx.fillStyle = '#8b949e';
+  ctx.fillText(recruits === 1 ? 'recruit' : 'recruits', PAD + nW + 12, y);
+  if (rank) {
+    ctx.fillStyle = '#e3b341';
+    ctx.font = f(700, 18);
+    ctx.fillText(rank.toUpperCase(), PAD, y + 30);
+  }
+
+  // Progress to the next tier.
+  y += rank ? 70 : 50;
+  ctx.fillStyle = '#e6edf3';
+  ctx.font = f(600, 17);
+  const next = p.next
+    ? `${(p.next.at - recruits).toLocaleString('en-US')} more to ${rewardNames(p.next.items)}`
+    : 'Every standard reward unlocked';
+  ctx.fillText(next, PAD, y);
+  y += 14;
+  const barW = W - PAD * 2;
+  ctx.fillStyle = '#21262d';
+  ctx.beginPath();
+  ctx.roundRect(PAD, y, barW, 14, 7);
+  ctx.fill();
+  ctx.fillStyle = '#3fb950';
+  ctx.beginPath();
+  ctx.roundRect(PAD, y, Math.max(14, barW * p.pct), 14, 7);
+  ctx.fill();
+  ctx.fillStyle = '#8b949e';
+  ctx.font = f(400, 13);
+  y += 32;
+  ctx.fillText(p.from.toLocaleString('en-US'), PAD, y);
+  if (p.next) {
+    ctx.textAlign = 'right';
+    ctx.fillText(p.next.at.toLocaleString('en-US'), W - PAD, y);
+    ctx.textAlign = 'left';
+  }
+
+  // Stat boxes.
+  y += 24;
+  const stats = [
+    [prospects.toLocaleString('en-US'), 'prospects'],
+    [prospects ? `${((recruits / prospects) * 100).toFixed(1)}%` : '—', 'conversion'],
+    [String(last30), 'last 30 days'],
+    [String(best), 'best month'],
+  ];
+  const boxW = (barW - 3 * 12) / 4;
+  stats.forEach(([big, lbl], i) => {
+    const x = PAD + i * (boxW + 12);
+    ctx.fillStyle = '#161b22';
+    ctx.beginPath();
+    ctx.roundRect(x, y, boxW, 78, 10);
+    ctx.fill();
+    ctx.fillStyle = '#e6edf3';
+    ctx.font = f(700, 26);
+    ctx.fillText(big, x + 16, y + 38);
+    ctx.fillStyle = '#8b949e';
+    ctx.font = f(400, 13);
+    ctx.fillText(lbl, x + 16, y + 62);
+  });
+  y += 78;
+
+  // Ship rewards earned.
+  if (ships.length) {
+    y += 34;
+    ctx.fillStyle = '#e6edf3';
+    ctx.font = f(600, 16);
+    ctx.fillText(
+      `Rewards earned: ${earned.length}${earned.length > ships.length ? ` (ships shown)` : ''}`,
+      PAD,
+      y,
+    );
+    y += 14;
+    const tw = (barW - 5 * 12) / 6;
+    const th = tw * 0.6;
+    ships.forEach((r, i) => {
+      const x = PAD + i * (tw + 12);
+      ctx.fillStyle = '#161b22';
+      ctx.beginPath();
+      ctx.roundRect(x, y, tw, th, 8);
+      ctx.fill();
+      const im = imgs[i];
+      if (im) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(x, y, tw, th, 8);
+        ctx.clip();
+        const s = Math.max(tw / im.width, th / im.height);
+        ctx.drawImage(
+          im,
+          x + (tw - im.width * s) / 2,
+          y + (th - im.height * s) / 2,
+          im.width * s,
+          im.height * s,
+        );
+        ctx.restore();
+      }
+      ctx.fillStyle = '#c9d1d9';
+      ctx.font = f(500, 12);
+      let label = r.name;
+      while (label.length > 3 && ctx.measureText(label).width > tw) label = label.slice(0, -2);
+      if (label !== r.name) label = label.replace(/.$/, '…');
+      ctx.fillText(label, x, y + th + 18);
+    });
+    y += th + 30;
+  }
+
+  // Footer, with the code + QR when asked for.
+  const footY = y + (qr ? 140 : 56);
+  if (qr) {
+    const q = 132; // incl. a 3-module white quiet zone so phones can scan it
+    const cell = q / (qr.size + 6);
+    const qx = W - PAD - q;
+    const qy = footY - q + 6;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(qx, qy, q, q);
+    ctx.fillStyle = '#000000';
+    for (let r = 0; r < qr.size; r++)
+      for (let c = 0; c < qr.size; c++)
+        if (qr.modules[r][c])
+          ctx.fillRect(qx + (c + 3) * cell, qy + (r + 3) * cell, cell + 0.3, cell + 0.3);
+    ctx.fillStyle = '#e6edf3';
+    ctx.font = f(700, 18);
+    ctx.fillText(`Enlist with my code: ${ref.code}`, PAD, footY - 22);
+    ctx.fillStyle = '#8b949e';
+    ctx.font = f(400, 13);
+    ctx.fillText(
+      'Scan the QR code, or enter the code when you sign up at robertsspaceindustries.com',
+      PAD,
+      footY,
+    );
+  } else {
+    ctx.fillStyle = '#8b949e';
+    ctx.font = f(400, 13);
+    ctx.fillText('Made with Open Hangar · openhangar.space', PAD, footY);
+  }
+  const usedH = Math.min(H, footY + PAD);
+  const out = document.createElement('canvas');
+  out.width = W * SCALE;
+  out.height = usedH * SCALE;
+  out.getContext('2d').drawImage(canvas, 0, 0);
+  return out;
+}
+
+async function shareReferralImage() {
+  const status = $('#ref-share-status');
+  const withCode = !!$('#ref-share-code')?.checked;
+  setExportStatus(status, 'Drawing…');
+  const canvas = await referralShareCanvas({ withCode });
+  canvas.toBlob(async (blob) => {
+    if (!blob) return setExportStatus(status, 'Image failed');
+    try {
+      if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
+        return setExportStatus(status, 'Copied to clipboard');
+      }
+      throw new Error('clipboard unavailable');
+    } catch {
+      downloadBlob(blob, marketFilename('png').replace('sale-sheet', 'referrals'));
+      setExportStatus(status, 'Saved PNG');
+    }
+  }, 'image/png');
+}
+
 function renderReferrals() {
   const body = $('#referrals-body');
   if (!body) return;
@@ -3460,6 +3973,7 @@ function renderReferrals() {
   const recruits = ref.legacy?.recruits ?? 0; // all-time recruit total
   const prospects = ref.prospects ?? 0;
   const total = prospects + recruits; // everyone who used your code (signed up or converted)
+  const hasLegacy = recruits > 0; // a legacy recruit count means legacy ladder access (see rewardsHtml)
 
   // Date-derived stats from recruit CONVERSION dates (when they actually counted).
   const dates = recruitsRows.map(recruitDate).filter(Boolean);
@@ -3554,8 +4068,12 @@ function renderReferrals() {
     body,
     `
     ${code}
+    ${refHeroHtml(ref, recruits, nextTier ? projection : '', hasLegacy)}
 
-    <div class="stat-group-label">Overview</div>
+    <h3 class="section-title" style="margin-top:26px">Rewards Earned</h3>
+    ${rewardsGalleryHtml(earnedRewards(recruits, recruitsRows, hasLegacy))}
+
+    <div class="stat-group-label" style="margin-top:22px">Overview</div>
     <div class="stat-grid ref-totals">${overview}</div>
 
     <div class="stat-group-label">Recent activity</div>
@@ -3572,10 +4090,17 @@ function renderReferrals() {
     <div class="stat-group-label">Recruits by year</div>
     ${recruitsByYearHtml(recruitsRows)}
 
+    <h3 class="section-title" style="margin-top:26px">Prospects</h3>
+    ${prospectInsightsHtml(ref)}
+
+    <h3 class="section-title" style="margin-top:26px">Milestones</h3>
+    ${milestonesHtml(recruits, recruitsRows, hasLegacy)}
+
     <h3 class="section-title" style="margin-top:26px">Tier Rewards</h3>
     ${rewardsHtml(ref)}
 
     <h3 class="section-title" style="margin-top:26px">Event Bonuses</h3>
+    ${eventBannerHtml()}
     ${eventRewardsHtml(recruitsRows)}
 
     <h3 class="section-title" style="margin-top:26px">People</h3>
@@ -3602,6 +4127,8 @@ function renderReferrals() {
 
   renderRefList(); // fills #ref-count
   enhanceRewardImages(body); // lazily resolve ship art for reward-item hovers
+  enhanceGalleryImages(body);
+  refreshReferralEvents(); // once: newer bonus events from the wiki
 }
 
 // Resolve ship art for reward items (links with data-resolve) so the shared hover
@@ -4701,6 +5228,7 @@ if (referralsBodyEl) {
   referralsBodyEl.addEventListener('mouseleave', hidePreview);
   // Tab switch (Recruits / Prospects): reset the search, re-render the list only.
   referralsBodyEl.addEventListener('click', (e) => {
+    if (e.target.closest('#ref-share')) return void shareReferralImage();
     const btn = e.target.closest('[data-reftab]');
     if (!btn) return;
     if (state.refTab === btn.dataset.reftab) return;
