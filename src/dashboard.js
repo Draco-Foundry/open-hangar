@@ -3901,8 +3901,10 @@ function ladderTrackHtml(ladder, recruits, label) {
   const dots = ladder
     .map((t) => {
       const cls = recruits >= t.at ? 'on' : next && t.at === next.at ? 'next' : '';
-      const tip = `${t.at.toLocaleString('en-US')} recruits${t.rank ? ` · ${t.rank}` : ''}: ${rewardNames(t.items)}`;
-      return `<div class="rt-step ${cls}" title="${OH.escapeHtml(tip)}"><span class="rt-dot"></span><span class="rt-at">${t.at.toLocaleString('en-US')}</span></div>`;
+      const tip = `${t.at.toLocaleString('en-US')} recruit${t.at === 1 ? '' : 's'}${t.rank ? ` · ${t.rank}` : ''}: ${rewardNames(t.items)}`;
+      return `<div class="rt-step ${cls}" data-tip="${OH.escapeHtml(tip)}" aria-label="${OH.escapeHtml(tip)}"${
+        t.file ? ` data-file="${OH.escapeHtml(t.file)}"` : ''
+      }><span class="rt-dot"></span><span class="rt-at">${t.at.toLocaleString('en-US')}</span></div>`;
     })
     .join('');
   return `<div class="rt"><div class="rt-label">${OH.escapeHtml(label)}</div><div class="rt-track">${dots}</div></div>`;
@@ -4554,6 +4556,7 @@ function renderReferrals() {
   renderRefList(); // fills #ref-count
   enhanceRewardImages(body); // lazily resolve ship art for reward-item hovers
   enhanceGalleryImages(body);
+  enhanceLadderDots(body);
   refreshReferralEvents(); // once: newer bonus events from the wiki
 }
 
@@ -5363,19 +5366,33 @@ if (buybacksBodyEl) buybacksBodyEl.addEventListener('mousemove', onCardHover);
 // picture, so the popup is the only way to see the ship. Keyed on the item's
 // resolve name since they have no id. (Listeners attach near referralsBodyEl.)
 function onRewardHover(e) {
-  const item = e.target.closest('.reward-item.ship[data-image]');
+  // Reward links (ship art) and the ladder dots (each tier's reward picture).
+  const item = e.target.closest('.reward-item.ship[data-image], .rt-step[data-image]');
   const img = item && item.dataset.image;
   if (!img) {
     if (previewId) hidePreview();
     return;
   }
-  const key = 'reward:' + item.dataset.resolve;
+  const dot = item.classList.contains('rt-step');
+  const key = dot ? 'dot:' + item.dataset.tip : 'reward:' + item.dataset.resolve;
   if (key !== previewId && itemPreviewImg) {
     previewId = key;
+    const cap = itemPreview.querySelector('.ip-cap');
+    if (cap) {
+      cap.textContent = dot ? item.dataset.tip : '';
+      cap.hidden = !dot;
+    }
     itemPreview.classList.add('show');
     progressiveImage(itemPreviewImg, img, () => previewId === key);
   }
   positionPreview(e.clientX, e.clientY);
+}
+// The ladder dots' pictures: each tier's wiki image, looked up in one batch.
+async function enhanceLadderDots(container) {
+  const dots = [...container.querySelectorAll('.rt-step[data-file]')];
+  if (!dots.length) return;
+  const urls = await OH.wikiImageUrls(dots.map((d) => d.dataset.file));
+  for (const d of dots) if (urls[d.dataset.file]) d.dataset.image = urls[d.dataset.file];
 }
 
 function fmtScan() {

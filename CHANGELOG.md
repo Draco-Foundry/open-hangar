@@ -4,6 +4,7 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Referrals: hover a dot on the reward ladders to see that tier's reward picture.
 - Store searches show how many there are ("Search 221 ships…") and a live count while you
   type ("4 of 221"); the CCU search hides when you only have a few.
 - **Sort your wishlist.** Name (the default), price high to low or low to high, in stock
