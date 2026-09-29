@@ -19,6 +19,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 - **Land Claims get their own group.** Geotack Planetary Beacons (and Geotack-X) and
   other land claims show under Land Claims, and as "Land Claim" inside pack contents.
 - Fixed: the Hangars group and Gear labels from 0.2.10 didn't show up.
+- Fixed: when RSI's image server drops a picture, it's retried once instead of staying
+  blank until you refresh.
 
 ## 0.2.10 — 2026-09-29
 

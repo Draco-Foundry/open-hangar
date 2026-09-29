@@ -216,6 +216,21 @@ try {
   /2 selected/.test(sel) ? ok('select mode picks items') : fail(`select mode: "${sel}"`);
   await page.click('[data-sb="done"]');
 
+  console.log('Broken thumbnails');
+  await go('#inventory');
+  const thumb = await page.evaluate(async () => {
+    const img = document.querySelector('#results .card img.thumb');
+    const card = img.closest('.card');
+    img.src = `${location.origin}/missing-${Date.now()}.jpg`; // 404
+    await new Promise((r) => setTimeout(r, 800));
+    const retried = img.dataset.retried === '1' && img.isConnected; // waiting to retry
+    await new Promise((r) => setTimeout(r, 2500));
+    return { retried, placeholder: !!card.querySelector('.thumb.placeholder, img.thumb') };
+  });
+  thumb.retried && thumb.placeholder
+    ? ok('a failed picture is retried once before falling back')
+    : fail(`thumbnail retry: ${JSON.stringify(thumb)}`);
+
   console.log('Item types');
   const types = await page.evaluate(() => {
     const p = (name) => ({ name, containsShip: false, isCCU: false });

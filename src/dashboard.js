@@ -4763,6 +4763,16 @@ layoutEl.addEventListener('click', (e) => {
 function onThumbError(e) {
   const img = e.target;
   if (img.tagName !== 'IMG' || !img.classList.contains('thumb')) return;
+  // RSI's image server sometimes drops a request: try the same picture once
+  // more before giving up on it (a refresh used to be the only retry).
+  if (!img.dataset.retried && /^https?:/.test(img.src)) {
+    img.dataset.retried = '1';
+    const src = img.src;
+    setTimeout(() => {
+      if (img.isConnected) img.src = src + (src.includes('?') ? '&' : '?') + 'retry=1';
+    }, 1500);
+    return;
+  }
   const card = img.closest('.card');
   const ph = document.createElement('div');
   ph.className = 'thumb placeholder';
