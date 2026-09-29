@@ -4,15 +4,15 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Big amounts in the Home summary shorten ("CN¥13.7K") so they fit; hover for the full value.
 - **Latest from RSI** on Home: RSI's six newest Comm-Links with a picture, type and how long
   ago, each opening on RSI.
 - Removed "melt candidates" (the Inventory filter, the Stats section and the item-window line):
   the idea that you could melt a pledge and buy it back for the same credit doesn't hold up.
 - Fixed: the Scan ▾ menu was cut off by the Citizen Card; it now opens below the button.
 - **A cleaner Home page.** The column of page links is gone (the top bar has them) and "How
-  to Use" is one dropdown. New at the top: **Wishlist: On Sale Now** (your wishlist ships in
-  RSI's store right now) and **At a Glance** (next referral reward and
-  loaners you can fly: nothing the Citizen Card already shows).
+  to Use" is one dropdown. Side by side: **Wishlist: On Sale Now** (your wishlist ships in
+  RSI's store right now) and **Latest from RSI**.
 - **Scan → Store (wishlist)** re-checks RSI's store for your wishlist ships; untick the rest to
   check only the store.
 - The scan badge by the title stays short ("Scanning…", details on hover), so it no longer
