@@ -204,3 +204,22 @@ test('getFxRates fetches USD-based rates once and caches them', async () => {
   assert.equal(r2.rates.GBP, 0.75);
   assert.equal(calls, 1);
 });
+
+test('getFxRates refetches a cache saved before a currency was added', async () => {
+  const store = {
+    fxRates: { at: Date.now(), date: '2026-09-27', rates: { USD: 1, EUR: 0.9 } }, // no `want`
+  };
+  global.chrome.storage.local.get = async (k) => ({ [k]: store[k] });
+  global.chrome.storage.local.set = async (o) => Object.assign(store, o);
+  let calls = 0;
+  const fetchFn = async () => {
+    calls++;
+    return {
+      ok: true,
+      json: async () => ({ date: '2026-09-28', rates: { EUR: 0.88, KRW: 1357 } }),
+    };
+  };
+  const r = await OH.getFxRates(fetchFn);
+  assert.equal(calls, 1);
+  assert.equal(r.rates.KRW, 1357);
+});

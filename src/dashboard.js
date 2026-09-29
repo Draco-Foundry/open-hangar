@@ -443,13 +443,15 @@ function setScanning(text, done = false) {
 // Amounts are USD; `fx` converts them to the display currency (Home → Currency).
 // `rawMoney` is for numbers the user typed (My Price), which aren't converted.
 const fx = { code: 'USD', rate: 1, date: null };
-const fmtCurrency = (n, digits) =>
-  new Intl.NumberFormat('en-US', {
+const fmtCurrency = (n, digits) => {
+  if (OH.ZERO_DECIMAL.includes(fx.code)) digits = 0; // ¥ / ₩ have no cents
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: fx.code,
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).format(n);
+};
 const money = (n) => fmtCurrency(n * fx.rate, 2);
 const dollars = (n) => fmtCurrency(Math.round(n * fx.rate), 0);
 const rawMoney = (n) => fmtCurrency(n, 2);

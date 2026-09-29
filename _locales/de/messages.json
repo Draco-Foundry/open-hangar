@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Open Hangar",
+    "description": "Extension name (a brand; keep as is)."
+  },
+  "extDescription": {
+    "message": "Dein Star Citizen Hangar, endlich nützlich: Schiffswerte, Melt-Kandidaten, CCU-Ersparnis, Flottenstatistik, Buy-Backs. Lokal.",
+    "description": "Store summary and manifest description, 132 characters max."
+  }
+}

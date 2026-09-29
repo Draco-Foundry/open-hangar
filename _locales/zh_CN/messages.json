@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Open Hangar",
+    "description": "Extension name (a brand; keep as is)."
+  },
+  "extDescription": {
+    "message": "让你的星际公民机库真正好用：舰船价值、可熔炼物品、CCU 节省、舰队统计和回购。私密，全部在本地运行。",
+    "description": "Store summary and manifest description, 132 characters max."
+  }
+}
