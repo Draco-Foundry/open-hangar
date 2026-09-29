@@ -56,11 +56,19 @@ test('getStoreShips caches for 6 hours and keeps the last copy when RSI is down'
   assert.equal(again.ships.length, 242); // cached copy
 });
 
-test('parseShipStock reads the store page stock (real RSI pages)', () => {
+test('parseShipStock: standalone vs only-in-a-pack vs not in store (real RSI pages)', () => {
   const page = (n) =>
     fs.readFileSync(path.join(__dirname, 'fixtures', `ship-page-${n}.html`), 'utf8');
-  assert.equal(OH.parseShipStock(page('in')), 'in'); // Cutlass Black
-  assert.equal(OH.parseShipStock(page('out')), 'out'); // E1 Spirit
+  const cutlass = OH.parseShipStock(page('in')); // standalone offer in stock
+  assert.equal(cutlass.state, 'in');
+  assert.equal(cutlass.price, 110);
+  const carrack = OH.parseShipStock(page('pack')); // only offer: Ultimate Explorer Pack
+  assert.equal(carrack.state, 'pack');
+  assert.deepEqual(
+    carrack.packs.map((p) => p.name),
+    ['Ultimate Explorer Pack'],
+  );
+  assert.equal(OH.parseShipStock(page('out')).state, 'out'); // E1 Spirit
   assert.equal(OH.parseShipStock('<html>no data</html>'), null);
 });
 
@@ -71,8 +79,8 @@ test('getShipStock: a missing page means not in the store; cached', async () => 
     return { ok: false, status: 404 };
   };
   const url = 'https://robertsspaceindustries.com/pledge/ships/merchantman/Merchantman';
-  assert.equal(await OH.getShipStock(url, gone), 'out');
-  assert.equal(await OH.getShipStock(url, gone), 'out');
+  assert.equal((await OH.getShipStock(url, gone)).state, 'out');
+  assert.equal((await OH.getShipStock(url, gone)).state, 'out');
   assert.equal(calls, 1);
   assert.equal(await OH.getShipStock('https://evil.example/x', gone), null);
 });
