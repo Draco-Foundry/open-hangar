@@ -509,6 +509,18 @@ const fmtCurrency = (n, digits) => {
 const money = (n) => fmtCurrency(n * fx.rate, 2);
 const dollars = (n) => fmtCurrency(Math.round(n * fx.rate), 0);
 const rawMoney = (n) => fmtCurrency(n, 2);
+// For tight boxes: 10,000 and up in short form ("CN¥13.7K"); the caller puts
+// the full amount on hover.
+const shortMoney = (n, full) => {
+  const v = n * fx.rate;
+  if (Math.abs(v) < 10000) return full(n);
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: fx.code,
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(v);
+};
 
 // --- Hangar value (ship store prices) ---------------------------------------
 // Prices come from the cached star-citizen.wiki catalog (OH.getPriceIndex).
@@ -946,7 +958,7 @@ function renderHomeNews() {
               .slice(0, 6)
               .map(
                 (n) =>
-                  `<li><a href="${esc(n.url)}" target="_blank" rel="noopener">${
+                  `<li><a href="${esc(n.url)}" target="_blank" rel="noopener" title="${esc(n.title)}">${
                     n.image
                       ? `<img class="news-thumb" src="${esc(n.image)}" alt="" loading="lazy">`
                       : ''
@@ -963,9 +975,7 @@ function renderHomeNews() {
 
 function renderHomePanels() {
   const wish = $('#home-wish');
-  const glance = $('#home-glance');
   renderHomeNews();
-  if (glance) setHTML(glance, glanceHtml());
   if (!wish) return;
   if (!state.wishlist.length) {
     setHTML(
@@ -998,38 +1008,6 @@ function renderHomePanels() {
     );
   });
 }
-// Only things the Citizen Card above doesn't already show.
-function glanceHtml() {
-  const rows = [];
-  const add = (label, value, href) =>
-    rows.push(
-      `<li><span class="muted">${label}</span><span>${href ? `<a href="${href}" data-view="${href.slice(1)}">${value}</a>` : value}</span></li>`,
-    );
-  const ref = state.referral;
-  if (ref) {
-    const recruits = ref.legacy?.recruits ?? 0;
-    const p = tierProgress(REFERRAL_LADDER_STANDARD, recruits);
-    add(
-      'Next referral reward',
-      p.next
-        ? `${(p.next.at - recruits).toLocaleString('en-US')} more to ${OH.escapeHtml(rewardNames(p.next.items))}`
-        : 'All unlocked',
-      '#referrals',
-    );
-  }
-  if (state.items.length) {
-    ensureLoaners();
-    if (loanerMatrix) {
-      const loaners = new Set();
-      for (const sh of ownedShips())
-        for (const l of (loanersOf(sh.label) || {}).loaners || []) loaners.add(l);
-      add('Loaners you can fly', loaners.size ? String(loaners.size) : 'None', '#stats');
-    }
-  }
-  if (!rows.length)
-    return '<h3>At a Glance</h3><p class="muted">Scan your hangar to fill this in.</p>';
-  return `<h3>At a Glance</h3><ul class="home-kv">${rows.join('')}</ul>`;
-}
 
 function renderHome() {
   ensurePrices();
@@ -1046,13 +1024,15 @@ function renderHome() {
   if (has) {
     const count = (k) => state.items.filter((p) => p.kind === k).length;
     const ships = state.items.filter((p) => p.containsShip).length;
-    const box = (big, lbl) =>
-      `<div class="sum-box"><div class="sum-big">${big}</div><div class="sum-lbl">${lbl}</div></div>`;
+    const box = (big, lbl, full) =>
+      `<div class="sum-box"${full && full !== big ? ` title="${OH.escapeHtml(full)}"` : ''}><div class="sum-big">${big}</div><div class="sum-lbl">${lbl}</div></div>`;
+    const melt = OH.totalValue(state.items);
+    const store = hangarValue()?.store;
     setHTML(
       sum,
       box(state.items.length, 'pledges') +
-        box(money(OH.totalValue(state.items)), 'melt value') +
-        (hangarValue()?.store ? box(dollars(hangarValue().store), 'ships at store price') : '') +
+        box(shortMoney(melt, money), 'melt value', money(melt)) +
+        (store ? box(shortMoney(store, dollars), 'ships at store price', dollars(store)) : '') +
         box(ships, 'ships') +
         box(count('ccu'), 'CCUs') +
         (count('paint') ? box(count('paint'), 'paints') : '') +
@@ -6592,7 +6572,6 @@ function ensureLoaners() {
     if (m) loanerMatrix = m;
     if (inc) includedVessels = inc;
     if ((m || inc) && currentView() === 'stats') renderStats();
-    if ((m || inc) && currentView() === 'home') renderHomePanels();
   });
 }
 // What a ship comes with for keeps ("G12* (currently Cyclone)" → clean text).
