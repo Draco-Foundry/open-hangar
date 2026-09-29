@@ -105,7 +105,6 @@ try {
     renderHomePanels();
     await new Promise((r) => setTimeout(r, 600));
     const wish = document.querySelector('#home-wish').textContent;
-    const glance = document.querySelector('#home-glance').textContent;
     state.wishlist = [];
     renderHomePanels();
     return {
@@ -114,7 +113,7 @@ try {
         !document.querySelector('details.howto-all').open,
       cards: document.querySelectorAll('.home-card').length,
       wish,
-      glance,
+      glance: !!document.querySelector('#home-glance'),
       storeOpt: !!document.querySelector('.scan-src[value="store"]'),
     };
   });
@@ -138,13 +137,37 @@ try {
     })
     .catch(() => {});
   const news = await page.evaluate(() => ({
+    beside:
+      document.querySelector('#home-news').parentElement ===
+      document.querySelector('#home-wish').parentElement,
     n: document.querySelectorAll('#home-news .news-list li').length,
     first: document.querySelector('#home-news .news-title')?.textContent || '',
     link: document.querySelector('#home-news .news-list a')?.href || '',
   }));
-  news.n === 6 && /This Week in Star Citizen/.test(news.first) && /comm-link/.test(news.link)
+  news.beside &&
+  news.n === 6 &&
+  /This Week in Star Citizen/.test(news.first) &&
+  /comm-link/.test(news.link)
     ? ok(`home: Latest from RSI (${news.n} posts, "${news.first}")`)
     : fail(`home news: ${JSON.stringify(news)}`);
+  const compact = await page.evaluate(() => {
+    const saved = { ...fx };
+    Object.assign(fx, { code: 'CNY', rate: 7 });
+    renderHome();
+    const boxes = [...document.querySelectorAll('#home-summary .sum-box')];
+    const melt = boxes.find((b) => /melt value/.test(b.textContent));
+    const res = {
+      text: melt.querySelector('.sum-big').textContent,
+      title: melt.title,
+      fits: melt.querySelector('.sum-big').scrollWidth <= melt.clientWidth,
+    };
+    Object.assign(fx, saved);
+    renderHome();
+    return res;
+  });
+  /K$/.test(compact.text) && /,/.test(compact.title) && compact.fits
+    ? ok(`summary: big amounts shortened (${compact.text}, hover ${compact.title})`)
+    : fail(`summary compact: ${JSON.stringify(compact)}`);
   menu.below && menu.inView && menu.visible
     ? ok('scan menu opens below the button, fully visible')
     : fail(`scan menu: ${JSON.stringify(menu)}`);
@@ -154,11 +177,9 @@ try {
   /On Sale Now 1/.test(home.wish) && /Cutlass Black/.test(home.wish) && !/Pioneer/.test(home.wish)
     ? ok('home: wishlist ships on sale now')
     : fail(`home wishlist: ${home.wish}`);
-  /Next referral reward/.test(home.glance) &&
-  !/Buy-back tokens|Last scan|Melt candidates/.test(home.glance) &&
-  home.storeOpt
-    ? ok('home: at-a-glance (no repeats of the card); Scan has a Store (wishlist) option')
-    : fail(`home glance: ${JSON.stringify(home)}`);
+  !home.glance && home.storeOpt
+    ? ok('home: no At a Glance; Scan has a Store (wishlist) option')
+    : fail(`home layout: ${JSON.stringify(home)}`);
   const site = await page.$eval('#site-link', (e) => e.textContent).catch(() => '');
   /something big is coming/i.test(site) && !(await page.$('#site-link button'))
     ? ok('website sync shows the teaser (no connect button)')
