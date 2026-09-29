@@ -4,6 +4,13 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Search everything.** A search box at the top (press **/**) finds ships, your pledges
+  (including what's inside them), buy-backs and referral rewards in one go.
+- **Ship details.** Click any ship name (in search, pledge contents, or the Store's price
+  list) for its specs, store price, which of your pledges and buy-backs have it, its
+  loaners, and links to RSI, the wiki, Erkul and ccugame.
+- **Loaners.** Stats → Fleet lists the loaner ships your not-yet-flyable ships give you,
+  straight from RSI's Loaner Ship Matrix.
 - **Check for updates.** A button on the Updates page asks the store for a new version
   right away (Chrome and Edge); Firefox gets directions, since it checks on its own.
 - **Referrals, levelled up.**

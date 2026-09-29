@@ -231,6 +231,50 @@ try {
     ? ok('a failed picture is retried once before falling back')
     : fail(`thumbnail retry: ${JSON.stringify(thumb)}`);
 
+  console.log('Search and ship details');
+  await go('#home');
+  await page
+    .waitForFunction(() => window.state && state.catalog && state.catalog.length, {
+      timeout: 15000,
+    })
+    .catch(() => {});
+  const gs = await page.evaluate(async () => {
+    const box = document.querySelector('#gsearch');
+    box.value = 'cutlass';
+    box.dispatchEvent(new Event('input'));
+    const out = document.querySelector('#gsearch-results');
+    const groups = [...out.querySelectorAll('.gs-title')].map((t) => t.textContent);
+    const ship = out.querySelector('.gs-row[data-ship]');
+    const shipName = ship && ship.dataset.ship;
+    ship?.click();
+    await new Promise((r) => setTimeout(r, 300));
+    const modal = document.querySelector('#modal-body');
+    return {
+      groups,
+      shipName,
+      closed: out.hidden,
+      title: modal.querySelector('.modal-name')?.textContent,
+      inHangar: /In Your Hangar \(\d+\)/.test(modal.textContent),
+      links: modal.querySelectorAll('.mr-v a').length,
+    };
+  });
+  await page.evaluate(() => document.querySelector('#modal-close').click());
+  gs.groups.includes('Ships') && gs.groups.includes('Your Hangar') && gs.closed
+    ? ok(`search "cutlass": ${gs.groups.join(', ')}`)
+    : fail(`global search: ${JSON.stringify(gs)}`);
+  gs.title && gs.inHangar && gs.links >= 3
+    ? ok(`ship window for ${gs.title}: specs, pledges, links`)
+    : fail(`ship window: ${JSON.stringify(gs)}`);
+  const loan = await page.evaluate(() => {
+    const m = OH.parseLoanerMatrix(
+      '<table><tr><td>Carrack</td><td>C8 Pisces, URSA Rover</td></tr></table>',
+    );
+    return OH.loanersFor('Carrack', m);
+  });
+  loan && loan.loaners.length === 2
+    ? ok('loaner lookup works in the page')
+    : fail(`loaners: ${JSON.stringify(loan)}`);
+
   console.log('Item types');
   const types = await page.evaluate(() => {
     const p = (name) => ({ name, containsShip: false, isCCU: false });
