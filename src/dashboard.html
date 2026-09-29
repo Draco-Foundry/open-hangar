@@ -1212,6 +1212,11 @@
         z-index: 1;
         background: var(--panel-2);
       }
+      .sp-count {
+        font-size: 12px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
       .sp-empty {
         margin: 6px 2px;
       }
@@ -1244,9 +1249,16 @@
       }
       .wish-drag {
         cursor: grab;
+        touch-action: none;
+        user-select: none;
       }
-      .wish-drag.dragging {
-        opacity: 0.45;
+      .wish-drag.lifted {
+        position: relative;
+        z-index: 2;
+        cursor: grabbing;
+        background: var(--panel-2);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+        outline: 1px solid var(--accent);
       }
       .wish-grip {
         margin-right: 8px;
@@ -3922,6 +3934,7 @@
         <div class="store-panel">
           <div class="sp-head">
             <h3>Your CCUs <span class="market-n" id="ccu-n"></span></h3>
+            <span class="sp-count" id="ccu-search-count" aria-live="polite"></span>
             <input id="ccu-search" type="search" placeholder="Search CCUs…" autocomplete="off" />
           </div>
           <div class="sp-scroll" id="ccu-owned"></div>
@@ -3931,6 +3944,7 @@
           <div class="sp-head">
             <h3>Ship Prices</h3>
             <div class="layout-toggle sp-tabs" id="price-tabs" role="tablist"></div>
+            <span class="sp-count" id="price-search-count" aria-live="polite"></span>
             <input id="price-search" type="search" placeholder="Search ships…" autocomplete="off" />
           </div>
           <p class="currency-note muted store-intro" hidden></p>
