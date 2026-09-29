@@ -1090,6 +1090,17 @@
         border-color: rgba(63, 185, 80, 0.5);
         background: rgba(63, 185, 80, 0.08);
       }
+      .update-check {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin: 0 0 18px;
+        padding: 10px 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        font-size: 13px;
+      }
       .ref-code-banner {
         display: flex;
         align-items: center;
@@ -3713,6 +3724,11 @@
           Every Open Hangar release and what changed. Your browser installs new versions on its own;
           when one is ready you'll see a bar at the top with a Reload button.
         </p>
+        <div class="update-check">
+          <span>You're on <strong id="update-cur"></strong></span>
+          <button type="button" class="mk-btn" id="update-check-btn">Check for updates</button>
+          <span class="muted" id="update-check-status" aria-live="polite"></span>
+        </div>
         <div id="updates-body"></div>
       </section>
 
