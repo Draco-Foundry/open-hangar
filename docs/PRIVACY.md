@@ -57,6 +57,9 @@ personal data:
   hangar. Ship-art lookups, done by ship name, are cached locally and are the only
   outbound signal that weakly relates to what you are viewing; no credentials or
   personal data are sent.
+- **starcitizen.tools** (public, read-only) — when you open the Referrals page, the
+  list of referral bonus events (the same page for everyone), at most once a week.
+  No credentials or personal data are sent.
 
 ## Permissions and why they are used
 

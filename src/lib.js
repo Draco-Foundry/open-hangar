@@ -2076,6 +2076,73 @@
     'KRW',
   ];
   OH.ZERO_DECIMAL = ['JPY', 'KRW']; // shown without cents
+
+  // --- Referral bonus events (starcitizen.tools) ---------------------------------
+  // The wiki's "Special Incentive Events" table: one row per event with start,
+  // end, name and the rewards. Returns [{ start, end, name, reward }] where
+  // `reward` is what the referrer ("You") gets, as plain text.
+  function wikiPlain(s) {
+    return String(s || '')
+      .replace(/<ref[^>]*\/>/gi, '')
+      .replace(/<ref[\s\S]*?<\/ref>/gi, '')
+      .replace(/\[\[(?:File|Image):[^\]]*\]\]/gi, '')
+      .replace(/\[\[[^\]|]*\|([^\]]*)\]\]/g, '$1')
+      .replace(/\[\[([^\]]*)\]\]/g, '$1')
+      .replace(/\{\{[\s\S]*?\}\}/g, '')
+      .replace(/'{2,}/g, '')
+      .replace(/<[^>]+>/g, '')
+      .replace(/�/g, '"')
+      .replace(/[ \t]+/g, ' ')
+      .trim();
+  }
+  OH.parseReferralEvents = function parseReferralEvents(wikitext) {
+    const out = [];
+    for (const row of String(wikitext || '').split(/\n\|-[^\n]*\n/)) {
+      const cells = ('\n' + row)
+        .split(/\n\|(?![-}+])/)
+        .slice(1)
+        .map((c) => c.replace(/\n\|\}[\s\S]*$/, ''));
+      if (cells.length < 6) continue;
+      const [start, end, name] = cells.map((c) => wikiPlain(c));
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) continue;
+      let reward = wikiPlain(cells.slice(5).join('\n'));
+      // Newer rows list "You:" and "Referral:" rewards; keep what the referrer gets.
+      const you = reward.match(/You:?\s*([\s\S]*?)(?:\n\s*Referral\b|$)/i);
+      if (you) reward = you[1];
+      reward = reward
+        .split('\n')
+        .map((l) => l.replace(/^\s*\*\s*/, '').trim())
+        .filter(Boolean)
+        .join(', ')
+        .replace(/^(The|A|An)\s+/i, '')
+        .replace(/\.$/, '');
+      if (name && reward) out.push({ start, end, name, reward });
+    }
+    return out;
+  };
+  const REF_EVENTS_KEY = 'referralEvents';
+  const REF_EVENTS_TTL = 7 * 24 * 3600e3;
+  // Cached for a week; null when it can't be fetched (callers keep their list).
+  OH.getReferralEvents = async function getReferralEvents(fetchFn = fetch) {
+    const { [REF_EVENTS_KEY]: cached } = await chrome.storage.local.get(REF_EVENTS_KEY);
+    if (cached && Date.now() - cached.at < REF_EVENTS_TTL) return cached.events;
+    try {
+      const res = await fetchFn(
+        'https://starcitizen.tools/api.php?action=parse&page=Referral_program&prop=wikitext&section=5&format=json&origin=*',
+        { credentials: 'omit', headers: { Accept: 'application/json' } },
+      );
+      const json = res.ok ? await res.json() : null;
+      const events = OH.parseReferralEvents(json?.parse?.wikitext?.['*']);
+      if (events.length) {
+        await chrome.storage.local.set({ [REF_EVENTS_KEY]: { at: Date.now(), events } });
+        return events;
+      }
+    } catch (e) {
+      OH.log('warn', 'referral', `event list download failed: ${e?.message || e}`);
+    }
+    return cached ? cached.events : null;
+  };
+
   const FX_KEY = 'fxRates';
   const FX_TTL = 24 * 3600e3;
   OH.getFxRates = async function getFxRates(fetchFn = fetch) {
