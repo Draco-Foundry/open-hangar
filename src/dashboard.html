@@ -2567,6 +2567,15 @@
         width: 100%;
         height: auto;
       }
+      #item-preview .ip-cap {
+        padding: 8px 12px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .rt-step[data-image] {
+        cursor: help;
+      }
 
       /* Inventory item detail modal */
       .modal-overlay {
@@ -4212,7 +4221,10 @@
     </div>
 
     <!-- Inventory hover preview -->
-    <div id="item-preview"><img alt="" /></div>
+    <div id="item-preview">
+      <img alt="" />
+      <div class="ip-cap" hidden></div>
+    </div>
 
     <!-- Inventory item detail modal -->
     <div class="modal-overlay" id="item-modal" hidden>
