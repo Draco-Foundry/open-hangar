@@ -69,6 +69,9 @@
         border: 1px solid rgba(47, 129, 247, 0.4);
         border-radius: 999px;
         padding: 3px 10px;
+        max-width: 170px;
+        white-space: nowrap;
+        overflow: hidden;
       }
       .scan-indicator[hidden] {
         display: none;
@@ -387,11 +390,74 @@
       }
 
       /* Home */
-      .home-split {
+      .home-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 30px;
-        align-items: start;
+        gap: 18px;
+        margin: 0 0 18px;
+      }
+      @media (max-width: 820px) {
+        .home-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .home-panel {
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--panel);
+      }
+      .home-panel h3 {
+        margin: 0 0 10px;
+        font-size: 15px;
+      }
+      .home-list,
+      .home-kv {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .home-list li,
+      .home-kv li {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 6px 0;
+        border-bottom: 1px solid var(--line);
+        font-size: 13px;
+      }
+      .home-list li:last-child,
+      .home-kv li:last-child {
+        border-bottom: 0;
+      }
+      .home-more {
+        margin: 8px 0 0;
+        font-size: 13px;
+      }
+      .home-panel a {
+        color: var(--text);
+        text-decoration: none;
+      }
+      .home-panel a:hover {
+        color: var(--link);
+        text-decoration: underline;
+      }
+      .home-more a {
+        color: var(--link);
+      }
+      .howto-all {
+        padding: 10px 16px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--panel);
+      }
+      .howto-all > summary {
+        cursor: pointer;
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .howto-all[open] > summary {
+        margin-bottom: 8px;
       }
       .home-about p,
       .home-about li {
@@ -404,42 +470,6 @@
       .home-about ul {
         padding-left: 18px;
         margin: 6px 0;
-      }
-      .home-cards {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-      @media (max-width: 820px) {
-        .home-split {
-          grid-template-columns: 1fr;
-          gap: 18px;
-        }
-      }
-      .home-card {
-        display: block;
-        text-decoration: none;
-        color: inherit;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 16px;
-        background: var(--panel);
-        transition:
-          border-color 0.12s ease,
-          transform 0.12s ease;
-      }
-      .home-card:hover {
-        border-color: var(--accent);
-        transform: translateY(-2px);
-      }
-      .home-card h3 {
-        margin: 0 0 6px;
-        font-size: 15px;
-      }
-      .home-card p {
-        margin: 0;
-        color: var(--muted);
-        font-size: 12px;
       }
       .badge-soon {
         font-size: 10px;
@@ -1693,17 +1723,13 @@
       .no-data #scan-home {
         box-shadow: 0 0 0 3px rgba(28, 108, 255, 0.25);
       }
-      .no-data .home-card.needs-data {
-        opacity: 0.45;
-      }
       .stale {
         color: #d29922;
       }
       /* Keyboard focus visibility (a11y) */
       a:focus-visible,
       button:focus-visible,
-      .chip:focus-visible,
-      .home-card:focus-visible {
+      .chip:focus-visible {
         outline: 2px solid var(--accent);
         outline-offset: 2px;
         border-radius: 6px;
@@ -3434,7 +3460,6 @@
 
       /* Subtle elevation for a more elegant feel */
       .card,
-      .home-card,
       .stat-box,
       .group,
       .placeholder-view {
@@ -3537,6 +3562,12 @@
                       ><input type="checkbox" class="scan-src" value="referrals" checked />
                       Referrals</label
                     >
+                    <label
+                      class="scan-opt"
+                      title="Is each ship on your wishlist in RSI's store right now?"
+                      ><input type="checkbox" class="scan-src" value="store" checked /> Store
+                      (wishlist)</label
+                    >
                     <button id="scan-selected" class="scan-go">Scan selected</button>
                   </div>
                 </div>
@@ -3594,220 +3625,189 @@
         <div class="ref-event-banner live home-event" id="event-banner" hidden></div>
         <div class="home-summary" id="home-summary"></div>
         <div class="home-changes" id="home-changes" hidden></div>
-        <div class="home-split">
-          <div class="home-about howto">
-            <h2 class="section-title">How to Use Open Hangar</h2>
-
-            <details open>
-              <summary>Getting Started</summary>
-              <ol>
-                <li>
-                  Sign in at <strong>robertsspaceindustries.com</strong> in this browser. If you're
-                  signed out, the card above shows a Log In button.
-                </li>
-                <li>
-                  Hit <strong>Scan</strong>. The little ▾ arrow next to it lets you scan just
-                  Inventory, Buy-Backs or Referrals.
-                </li>
-                <li>
-                  Give it a moment. Big hangars take a minute, and if RSI hiccups, Open Hangar
-                  retries on its own.
-                </li>
-                <li>
-                  Rescan whenever your hangar changes. Open Hangar remembers what changed since last
-                  time, and puts an amber <strong>!</strong> on its toolbar icon when your last scan
-                  is a week old.
-                </li>
-              </ol>
-            </details>
-
-            <details>
-              <summary>Browsing Your Hangar</summary>
-              <ul>
-                <li>
-                  <a href="#inventory" data-view="inventory">Inventory</a> shows every pledge.
-                  Search, sort, and switch between Gallery, Compact, List and Market views.
-                </li>
-                <li>
-                  The first row of chips picks the kind (Ships, CCUs, Paints…). The second row
-                  filters by trait: click once to include, twice to exclude (red), a third time to
-                  clear.
-                </li>
-                <li>Click any item for its details: contents, pledge date, store price.</li>
-                <li>
-                  The <strong>M</strong> and <strong>G</strong> tags mean meltable and giftable:
-                  green is yes, red is no.
-                </li>
-              </ul>
-            </details>
-
-            <details>
-              <summary>What's My Hangar Worth?</summary>
-              <ul>
-                <li>
-                  <a href="#stats" data-view="stats">Stats</a> → <strong>Value</strong> shows your
-                  ships at today's store prices next to what you paid, your best deals, and what
-                  your CCUs are worth.
-                </li>
-                <li>
-                  <strong>Melt candidates</strong> are pledges you could melt and buy back for the
-                  same store credit. Check the ship is actually on sale before you melt anything.
-                </li>
-                <li>
-                  The <a href="#store" data-view="store">Store</a> page shows every ship's price,
-                  whether it's in RSI's store right now, what each of your CCUs is worth, and your
-                  wishlist.
-                </li>
-                <li>
-                  The <strong>Fleet</strong> tab adds up cargo, crew and roles, and
-                  <strong>History</strong> charts your melt value over time.
-                </li>
-              </ul>
-            </details>
-
-            <details>
-              <summary>Selling or Showing Off Your Fleet</summary>
-              <ul>
-                <li>
-                  In Inventory, hit <strong>Select</strong>, click the items you want, give it a
-                  title and pick which price to show. Then <strong>Download image</strong> and post
-                  it in Discord or a forum.
-                </li>
-                <li>
-                  The <strong>Market</strong> view is a sale sheet with a "My price" column you fill
-                  in. It exports to CSV or an image.
-                </li>
-              </ul>
-            </details>
-
-            <details>
-              <summary>Your Org's Combined Fleet</summary>
-              <ul>
-                <li>
-                  Ask members to open Open Hangar and use <strong>Developers → Export HTF</strong>.
-                  That file is ships only, nothing personal.
-                </li>
-                <li>
-                  Import their files on <a href="#org" data-view="org">Org Fleet</a>, add your own
-                  with <strong>Add my fleet</strong>, and see every ship, who owns it, and the
-                  totals. Export it as a CSV for your org's spreadsheet.
-                </li>
-              </ul>
-            </details>
-
-            <details>
-              <summary>Backups and Switching Browsers</summary>
-              <ul>
-                <li>Your data stays put when Open Hangar updates.</li>
-                <li>
-                  Got alts? Each RSI account keeps its own data. Sign in as the other account and
-                  Open Hangar switches over; switch back and your first account's data returns.
-                </li>
-                <li>
-                  Uninstalling, or moving to another browser or computer, starts you from empty. So
-                  first go to <a href="#stats" data-view="stats">Stats</a> →
-                  <strong>History</strong> → <strong>Download backup</strong>.
-                </li>
-                <li>
-                  To restore, open <a href="#developers" data-view="developers">Developers</a> →
-                  <strong>Import JSON</strong> and pick the file.
-                </li>
-              </ul>
-            </details>
-
-            <details>
-              <summary>Something Not Working?</summary>
-              <ul>
-                <li>
-                  Click <strong>Copy error report</strong> next to the error (it's also on the
-                  <a href="#developers" data-view="developers">Developers</a> page).
-                </li>
-                <li>
-                  Paste it in #bug-reports on
-                  <a
-                    class="ext-discord"
-                    href="https://discord.gg/FF8Wm5HdnV"
-                    target="_blank"
-                    rel="noopener"
-                    >Discord</a
-                  >
-                  or in a
-                  <a
-                    href="https://github.com/Draco-Foundry/open-hangar/issues/new/choose"
-                    target="_blank"
-                    rel="noopener"
-                    >GitHub issue</a
-                  >. It has no personal info in it.
-                </li>
-                <li>
-                  Got an idea instead? Post it on the
-                  <a
-                    href="https://github.com/Draco-Foundry/open-hangar/discussions/categories/ideas"
-                    target="_blank"
-                    rel="noopener"
-                    >Ideas board</a
-                  >.
-                </li>
-              </ul>
-            </details>
-
-            <details>
-              <summary>About and Privacy</summary>
-              <p>
-                Open Hangar is free and open source. It reads your own Star Citizen account using
-                the RSI login you already have in this browser, and saves everything locally.
-              </p>
-              <ul>
-                <li>
-                  No password, no account, and no server. Nothing you scan leaves your browser.
-                </li>
-                <li>
-                  The only other requests are public ones with nothing personal in them: ship
-                  pictures from RSI, and ship prices and the game version from star-citizen.wiki.
-                </li>
-                <li>
-                  MIT-licensed, so every line is readable on
-                  <a
-                    href="https://github.com/Draco-Foundry/open-hangar"
-                    target="_blank"
-                    rel="noopener"
-                    >GitHub</a
-                  >, and contributions are welcome.
-                </li>
-              </ul>
-            </details>
-          </div>
-          <div class="home-cards">
-            <a class="home-card needs-data" href="#inventory" data-view="inventory">
-              <h3>Inventory</h3>
-              <p>Ships, upgrades, add-ons. Browse, search, and filter your fleet.</p>
-            </a>
-            <a class="home-card" href="#buybacks" data-view="buybacks">
-              <h3>Buy-Backs</h3>
-              <p>Melted pledges you can re-acquire from RSI.</p>
-            </a>
-            <a class="home-card needs-data" href="#stats" data-view="stats">
-              <h3>Stats</h3>
-              <p>Hangar value, melt candidates, fleet stats and history.</p>
-            </a>
-            <a class="home-card" href="#store" data-view="store">
-              <h3>Store</h3>
-              <p>Every ship's store price, and what your CCUs are worth.</p>
-            </a>
-            <a class="home-card" href="#org" data-view="org">
-              <h3>Org Fleet</h3>
-              <p>Combine your org members' ship lists into one fleet.</p>
-            </a>
-            <a class="home-card" href="#referrals" data-view="referrals">
-              <h3>Referrals</h3>
-              <p>Your recruits, prospects, rewards, and referral stats.</p>
-            </a>
-            <a class="home-card" href="#developers" data-view="developers">
-              <h3>Developers</h3>
-              <p>What this is, how it pulls data, and how to build on it.</p>
-            </a>
-          </div>
+        <div class="home-grid">
+          <div class="home-panel" id="home-wish"></div>
+          <div class="home-panel" id="home-glance"></div>
         </div>
+        <details class="home-about howto howto-all">
+          <summary>How to Use Open Hangar</summary>
+
+          <details open>
+            <summary>Getting Started</summary>
+            <ol>
+              <li>
+                Sign in at <strong>robertsspaceindustries.com</strong> in this browser. If you're
+                signed out, the card above shows a Log In button.
+              </li>
+              <li>
+                Hit <strong>Scan</strong>. The little ▾ arrow next to it lets you scan just
+                Inventory, Buy-Backs or Referrals.
+              </li>
+              <li>
+                Give it a moment. Big hangars take a minute, and if RSI hiccups, Open Hangar retries
+                on its own.
+              </li>
+              <li>
+                Rescan whenever your hangar changes. Open Hangar remembers what changed since last
+                time, and puts an amber <strong>!</strong> on its toolbar icon when your last scan
+                is a week old.
+              </li>
+            </ol>
+          </details>
+
+          <details>
+            <summary>Browsing Your Hangar</summary>
+            <ul>
+              <li>
+                <a href="#inventory" data-view="inventory">Inventory</a> shows every pledge. Search,
+                sort, and switch between Gallery, Compact, List and Market views.
+              </li>
+              <li>
+                The first row of chips picks the kind (Ships, CCUs, Paints…). The second row filters
+                by trait: click once to include, twice to exclude (red), a third time to clear.
+              </li>
+              <li>Click any item for its details: contents, pledge date, store price.</li>
+              <li>
+                The <strong>M</strong> and <strong>G</strong> tags mean meltable and giftable: green
+                is yes, red is no.
+              </li>
+            </ul>
+          </details>
+
+          <details>
+            <summary>What's My Hangar Worth?</summary>
+            <ul>
+              <li>
+                <a href="#stats" data-view="stats">Stats</a> → <strong>Value</strong> shows your
+                ships at today's store prices next to what you paid, your best deals, and what your
+                CCUs are worth.
+              </li>
+              <li>
+                <strong>Melt candidates</strong> are pledges you could melt and buy back for the
+                same store credit. Check the ship is actually on sale before you melt anything.
+              </li>
+              <li>
+                The <a href="#store" data-view="store">Store</a> page shows every ship's price,
+                whether it's in RSI's store right now, what each of your CCUs is worth, and your
+                wishlist.
+              </li>
+              <li>
+                The <strong>Fleet</strong> tab adds up cargo, crew and roles, and
+                <strong>History</strong> charts your melt value over time.
+              </li>
+            </ul>
+          </details>
+
+          <details>
+            <summary>Selling or Showing Off Your Fleet</summary>
+            <ul>
+              <li>
+                In Inventory, hit <strong>Select</strong>, click the items you want, give it a title
+                and pick which price to show. Then <strong>Download image</strong> and post it in
+                Discord or a forum.
+              </li>
+              <li>
+                The <strong>Market</strong> view is a sale sheet with a "My price" column you fill
+                in. It exports to CSV or an image.
+              </li>
+            </ul>
+          </details>
+
+          <details>
+            <summary>Your Org's Combined Fleet</summary>
+            <ul>
+              <li>
+                Ask members to open Open Hangar and use <strong>Developers → Export HTF</strong>.
+                That file is ships only, nothing personal.
+              </li>
+              <li>
+                Import their files on <a href="#org" data-view="org">Org Fleet</a>, add your own
+                with <strong>Add my fleet</strong>, and see every ship, who owns it, and the totals.
+                Export it as a CSV for your org's spreadsheet.
+              </li>
+            </ul>
+          </details>
+
+          <details>
+            <summary>Backups and Switching Browsers</summary>
+            <ul>
+              <li>Your data stays put when Open Hangar updates.</li>
+              <li>
+                Got alts? Each RSI account keeps its own data. Sign in as the other account and Open
+                Hangar switches over; switch back and your first account's data returns.
+              </li>
+              <li>
+                Uninstalling, or moving to another browser or computer, starts you from empty. So
+                first go to <a href="#stats" data-view="stats">Stats</a> →
+                <strong>History</strong> → <strong>Download backup</strong>.
+              </li>
+              <li>
+                To restore, open <a href="#developers" data-view="developers">Developers</a> →
+                <strong>Import JSON</strong> and pick the file.
+              </li>
+            </ul>
+          </details>
+
+          <details>
+            <summary>Something Not Working?</summary>
+            <ul>
+              <li>
+                Click <strong>Copy error report</strong> next to the error (it's also on the
+                <a href="#developers" data-view="developers">Developers</a> page).
+              </li>
+              <li>
+                Paste it in #bug-reports on
+                <a
+                  class="ext-discord"
+                  href="https://discord.gg/FF8Wm5HdnV"
+                  target="_blank"
+                  rel="noopener"
+                  >Discord</a
+                >
+                or in a
+                <a
+                  href="https://github.com/Draco-Foundry/open-hangar/issues/new/choose"
+                  target="_blank"
+                  rel="noopener"
+                  >GitHub issue</a
+                >. It has no personal info in it.
+              </li>
+              <li>
+                Got an idea instead? Post it on the
+                <a
+                  href="https://github.com/Draco-Foundry/open-hangar/discussions/categories/ideas"
+                  target="_blank"
+                  rel="noopener"
+                  >Ideas board</a
+                >.
+              </li>
+            </ul>
+          </details>
+
+          <details>
+            <summary>About and Privacy</summary>
+            <p>
+              Open Hangar is free and open source. It reads your own Star Citizen account using the
+              RSI login you already have in this browser, and saves everything locally.
+            </p>
+            <ul>
+              <li>No password, no account, and no server. Nothing you scan leaves your browser.</li>
+              <li>
+                The only other requests are public ones with nothing personal in them: ship pictures
+                from RSI, and ship prices and the game version from star-citizen.wiki.
+              </li>
+              <li>
+                MIT-licensed, so every line is readable on
+                <a
+                  href="https://github.com/Draco-Foundry/open-hangar"
+                  target="_blank"
+                  rel="noopener"
+                  >GitHub</a
+                >, and contributions are welcome.
+              </li>
+            </ul>
+          </details>
+        </details>
       </section>
 
       <!-- INVENTORY -->

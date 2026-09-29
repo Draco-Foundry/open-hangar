@@ -4,6 +4,13 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **A cleaner Home page.** The column of page links is gone (the top bar has them) and "How
+  to Use" is one dropdown. New at the top: **Wishlist: On Sale Now** (your wishlist ships in
+  RSI's store right now) and **At a Glance** (buy-back tokens, next referral reward, loaners).
+- **Scan → Store (wishlist)** re-checks RSI's store for your wishlist ships; untick the rest to
+  check only the store.
+- The scan badge by the title stays short ("Scanning…", details on hover), so it no longer
+  pushes the search box onto a second line.
 - Referrals: hover a dot on the reward ladders to see that tier's reward picture.
 - Store searches show how many there are ("Search 221 ships…") and a live count while you
   type ("4 of 221"); the CCU search hides when you only have a few.

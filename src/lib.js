@@ -2411,11 +2411,12 @@
   const STOCK_KEY = 'shipStock2'; // v2: standalone vs pack-only
   const STOCK_TTL = 6 * 3600e3;
   // Store page URL → result of parseShipStock (a 404 is 'out'), cached 6 hours.
-  OH.getShipStock = async function getShipStock(url, fetchFn = fetch) {
+  // `force` skips the cache (Scan → Store).
+  OH.getShipStock = async function getShipStock(url, fetchFn = fetch, { force = false } = {}) {
     if (!/^https:\/\/robertsspaceindustries\.com\/pledge\//.test(url || '')) return null;
     const { [STOCK_KEY]: cache = {} } = await chrome.storage.local.get(STOCK_KEY);
     const hit = cache[url];
-    if (hit && Date.now() - hit.at < STOCK_TTL) return hit.s;
+    if (!force && hit && Date.now() - hit.at < STOCK_TTL) return hit.s;
     let s = null;
     try {
       const res = await fetchFn(url, { credentials: 'omit' });
