@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Check for updates.** A button on the Updates page asks the store for a new version
+  right away (Chrome and Edge); Firefox gets directions, since it checks on its own.
 - **Referrals, levelled up.**
   - A progress panel up top: your recruits, legacy rank, a bar to the next reward with
     an estimate at your pace, and both reward ladders as a track of lit-up dots.
