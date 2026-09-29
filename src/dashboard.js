@@ -927,9 +927,44 @@ async function wishlistStock({ force = false } = {}) {
   return out;
 }
 let homeWishToken = 0;
+// Home: RSI's newest Comm-Links (OH.getRsiNews, cached an hour).
+let homeNewsToken = 0;
+function renderHomeNews() {
+  const box = $('#home-news');
+  if (!box) return;
+  const token = ++homeNewsToken;
+  if (!box.dataset.filled) setHTML(box, `<h3>Latest from RSI</h3><p class="muted">Loading…</p>`);
+  OH.getRsiNews().then((items) => {
+    if (token !== homeNewsToken) return;
+    const esc = OH.escapeHtml;
+    box.dataset.filled = '1';
+    setHTML(
+      box,
+      `<h3>Latest from RSI</h3>${
+        items.length
+          ? `<ul class="news-list">${items
+              .slice(0, 6)
+              .map(
+                (n) =>
+                  `<li><a href="${esc(n.url)}" target="_blank" rel="noopener">${
+                    n.image
+                      ? `<img class="news-thumb" src="${esc(n.image)}" alt="" loading="lazy">`
+                      : ''
+                  }<span class="news-text"><span class="news-title">${esc(n.title)}</span><span class="news-meta">${esc(
+                    [capFirst(n.type), n.when].filter(Boolean).join(' · '),
+                  )}</span></span></a></li>`,
+              )
+              .join('')}</ul>`
+          : '<p class="muted">Couldn’t reach RSI’s Comm-Link list right now.</p>'
+      }<p class="home-more"><a href="https://robertsspaceindustries.com/comm-link" target="_blank" rel="noopener">All Comm-Links ↗</a></p>`,
+    );
+  });
+}
+
 function renderHomePanels() {
   const wish = $('#home-wish');
   const glance = $('#home-glance');
+  renderHomeNews();
   if (glance) setHTML(glance, glanceHtml());
   if (!wish) return;
   if (!state.wishlist.length) {
@@ -1191,7 +1226,6 @@ function pledgeFacets(p) {
     meltable: p.meltable === undefined ? null : p.meltable === true,
     value: Number.isFinite(p.value) ? p.value : null,
     below: storeInfo(p) ? storeInfo(p).below : null,
-    meltCandidate: state.priceOf ? OH.isMeltCandidate(p, storeInfo(p)) : null,
   };
 }
 function buybackFacets(b) {
@@ -1207,7 +1241,6 @@ function buybackFacets(b) {
     meltable: null,
     value: null,
     below: null,
-    meltCandidate: null,
   };
 }
 const notInsurance = (c) => !/insurance/i.test(`${c.kind || ''} ${c.label || ''}`);
@@ -1269,15 +1302,6 @@ const TRAITS = [
     notLabel: 'At / above store price',
     test: (f) => f.below === true,
     neg: (f) => f.below === false,
-  },
-  {
-    key: 'melt',
-    label: 'Melt candidates',
-    title:
-      'Meltable, no LTI, ships only, and paid at least today’s store price — you could melt and buy it back for the same credit (check it’s on sale first)',
-    notLabel: 'Keep',
-    test: (f) => f.meltCandidate === true,
-    neg: (f) => f.meltCandidate === false,
   },
   {
     key: 'free',
@@ -3176,35 +3200,6 @@ function valueSectionHtml() {
   );
 }
 
-// Stats → Melt candidates (OH.isMeltCandidate): biggest credit first.
-function meltSectionHtml() {
-  const v = hangarValue();
-  if (!v) return '';
-  const list = state.items
-    .filter((p) => OH.isMeltCandidate(p, v.pledges[p.id]))
-    .sort((a, b) => b.value - a.value);
-  if (!list.length) return '';
-  const total = list.reduce((a, p) => a + p.value, 0);
-  const rows = list
-    .slice(0, 15)
-    .map(
-      (p) =>
-        `<div class="row"><div class="nm">${OH.escapeHtml(plainName(p))}</div><div class="vl">melt ${money(
-          p.value,
-        )} · store ${dollars(v.pledges[p.id].store)}</div></div>`,
-    )
-    .join('');
-  const more =
-    list.length > 15
-      ? `<div class="row muted">+${list.length - 15} more — use the Melt candidates filter in Inventory</div>`
-      : '';
-  return (
-    `<h3 class="section-title">Melt Candidates <span class="muted">${list.length} · ${money(total)} credit</span></h3>` +
-    `<p class="muted value-note tight">Pledges you could melt and buy back for the same store credit: meltable, no LTI, nothing but ships inside, and you paid at least today's store price. Check the ship is on sale before melting — limited ships may not come back, and non-LTI insurance resets to the store's standard.</p>` +
-    `<div class="top-list spaced">${rows}${more}</div>`
-  );
-}
-
 // Stats → Fleet: what your ships are for, how big, how many fly today.
 function fleetSectionHtml() {
   if (!state.shipOf) return '';
@@ -3377,7 +3372,7 @@ function renderStats() {
       `<h3 class="section-title">By Category</h3>${bars}` +
       `<h3 class="section-title" style="margin-top:26px">Top Pledges by Value</h3>` +
       `<div class="top-list">${topRows || '<div class="row muted">No priced pledges.</div>'}</div>`,
-    value: () => valueSectionHtml() + meltSectionHtml(),
+    value: () => valueSectionHtml(),
     fleet: () =>
       (fleetSectionHtml() ||
         `<p class="muted">${pricesLoading ? 'Loading ship data…' : 'Ship data unavailable (offline?).'}</p>`) +
@@ -5508,10 +5503,7 @@ function storeRow(p, row) {
           .map((x) => `${OH.escapeHtml(x.label)} ${x.msrp ? dollars(x.msrp) : '—'}`)
           .join(' · ')}</div>`
       : '';
-  const melt = OH.isMeltCandidate(p, si)
-    ? row('Melt candidate', 'Yes — paid full price, no LTI or extras')
-    : '';
-  return row('Store price', v + parts) + melt;
+  return row('Store price', v + parts);
 }
 
 // RSI has no per-pledge address, and its hangar always shows 10 per page

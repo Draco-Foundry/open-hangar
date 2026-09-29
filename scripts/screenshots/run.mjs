@@ -110,6 +110,17 @@ async function handle(req, res) {
       .end(demoDashboard());
   }
 
+  // RSI's Comm-Link list (a POST too): the saved fixture.
+  if (u.pathname === '/__commlinks.json') {
+    const data = fs.readFileSync(
+      path.join(SRC, '..', 'test', 'fixtures', 'commlinks.html'),
+      'utf8',
+    );
+    return res
+      .writeHead(200, { 'content-type': 'application/json' })
+      .end(JSON.stringify({ success: 1, code: 'OK', data }));
+  }
+
   // RSI's store status (a POST the proxy can't forward): a saved snapshot.
   if (u.pathname === '/__store-ships.json') {
     return res
