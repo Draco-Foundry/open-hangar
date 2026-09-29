@@ -450,6 +450,27 @@ try {
     ? ok('type badges: ship / pack / package / CCU, 7 distinct colors')
     : fail(`type colors: ${JSON.stringify(types2)}`);
 
+  const packPrice = await page.evaluate(() => {
+    const pack = {
+      id: '999002',
+      kind: 'pack',
+      name: 'Packs - Test Explorer Pack',
+      contains: 'Carrack and 5 other items',
+    };
+    const noDetails = buybackStorePrice(pack);
+    state.bbDetails['999002'] = { ships: [{ name: 'Carrack' }, { name: 'Pioneer' }], also: [] };
+    const withDetails = buybackStorePrice(pack);
+    delete state.bbDetails['999002'];
+    const carrack = state.priceOf('Carrack').msrp;
+    const pioneer = state.priceOf('Pioneer').msrp;
+    return { noDetails, withDetails, expect: carrack + pioneer };
+  });
+  packPrice.noDetails === null && packPrice.withDetails === packPrice.expect
+    ? ok(
+        `pack buy-back store price: every ship (${packPrice.withDetails}), none before Load details`,
+      )
+    : fail(`pack store price: ${JSON.stringify(packPrice)}`);
+
   console.log('Item types');
   const types = await page.evaluate(() => {
     const p = (name) => ({ name, containsShip: false, isCCU: false });
