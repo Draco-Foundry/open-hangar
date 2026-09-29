@@ -545,7 +545,7 @@ try {
   st.priceStock === 0
     ? ok(`store panels: ${st.flying} flight ready, ${st.all} in all, ${st.concept} in concept`)
     : fail(`store page: ${JSON.stringify(st)}`);
-  st.stock.join('|') === 'In stock ($110)|Only in a pack' &&
+  st.stock.join('|') === 'Only in a pack|In stock ($110)' &&
   st.ccus > 0 &&
   st.bbRows > 0 &&
   st.reclaim &&
@@ -556,6 +556,52 @@ try {
         `wishlist stock from ship pages (${st.stock.join(', ')}), buy-backs (${st.bbTypes.join(', ')})`,
       )
     : fail(`store details: ${JSON.stringify(st)}`);
+
+  const ws = await page.evaluate(async () => {
+    OH.getShipStock = async (url) =>
+      /Cutlass-Black/i.test(url)
+        ? { state: 'in', price: 110, packs: [] }
+        : /Carrack/i.test(url)
+          ? { state: 'pack', price: null, packs: [{ name: 'Some Pack' }] }
+          : { state: 'out', price: null, packs: [] };
+    state.wishlist = ['Pioneer', 'Cutlass Black', 'Carrack'];
+    const order = () =>
+      [...document.querySelectorAll('#wishlist .wishlist > tbody > tr:not(.wish-bbs)')].map(
+        (r) => r.querySelector('.ship-link').textContent,
+      );
+    const pick = async (v) => {
+      const sel = document.querySelector('#wish-sort');
+      sel.value = v;
+      sel.dispatchEvent(new Event('change'));
+      await new Promise((r) => setTimeout(r, 300));
+      return order().join(',');
+    };
+    const res = {
+      name: await pick('name'),
+      high: await pick('price-desc'),
+      low: await pick('price-asc'),
+      stock: await pick('stock'),
+      mineBefore: await pick('mine'),
+      grips: document.querySelectorAll('#wishlist .wish-grip').length,
+      draggable: document.querySelectorAll('#wishlist tr[draggable="true"]').length,
+    };
+    moveWishlist('Carrack', 'Pioneer');
+    res.mineAfter = order().join(',');
+    state.wishlist = [];
+    state.wishSort = 'name';
+    chrome.storage.local.set({ uiWishSort: 'name', wishlist: [] });
+    return res;
+  });
+  ws.name === 'Carrack,Cutlass Black,Pioneer' &&
+  ws.high === 'Pioneer,Carrack,Cutlass Black' &&
+  ws.low === 'Cutlass Black,Carrack,Pioneer' &&
+  ws.stock === 'Cutlass Black,Carrack,Pioneer' &&
+  ws.mineBefore === 'Pioneer,Cutlass Black,Carrack' &&
+  ws.grips === 3 &&
+  ws.draggable === 3 &&
+  ws.mineAfter === 'Carrack,Pioneer,Cutlass Black'
+    ? ok('wishlist sorts (name, price both ways, in stock first) and drag order')
+    : fail(`wishlist sort: ${JSON.stringify(ws)}`);
 
   console.log('Updates');
   await go('#updates');

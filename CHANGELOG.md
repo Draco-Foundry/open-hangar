@@ -4,6 +4,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Sort your wishlist.** Name (the default), price high to low or low to high, in stock
+  first, or **My order**: drag ships into any order you like (saved).
+- Prices no longer carry a "~". Buy-back prices that are still today's store price (until
+  Load details reads RSI's exact one) say so when you hover them.
 - Wishlist buy-backs include **packs that contain the ship** (e.g. a 600i inside the Origin
   Complete Pack), listed ships first, then packs, then CCUs, with a Type column. Load details
   on Buy-Backs to check every pack's contents.
