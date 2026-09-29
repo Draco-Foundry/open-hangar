@@ -110,6 +110,14 @@ async function handle(req, res) {
       .end(demoDashboard());
   }
 
+  // This Week in Star Citizen: the saved post page and its body.
+  if (u.pathname === '/__twisc-page.html' || u.pathname === '/__twisc-body.html') {
+    const f = u.pathname === '/__twisc-page.html' ? 'twisc-page.html' : 'twisc-body.html';
+    return res
+      .writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+      .end(fs.readFileSync(path.join(SRC, '..', 'test', 'fixtures', f)));
+  }
+
   // RSI's Comm-Link list (a POST too): the saved fixture.
   if (u.pathname === '/__commlinks.json') {
     const data = fs.readFileSync(

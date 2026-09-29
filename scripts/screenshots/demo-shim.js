@@ -357,6 +357,10 @@
     const url = typeof input === 'string' ? input : input.url;
     if (/\/pledge-store\/api\/upgrade\/graphql/.test(url)) return realFetch('/__store-ships.json');
     if (/\/api\/hub\/getCommlinkItems/.test(url)) return realFetch('/__commlinks.json');
+    if (/robertsspaceindustries\.com\/comm-link\/transmission\//.test(url))
+      return realFetch('/__twisc-page.html');
+    if (/robertsspaceindustries\.com\/alexandria\/html\//.test(url))
+      return realFetch('/__twisc-body.html');
     if (/^https:\/\/(robertsspaceindustries\.com|api\.star-citizen\.wiki)\//.test(url)) {
       if (/\/account\/|\/graphql|\/citizens\//.test(url) && !/\/pledge\/buyback\//.test(url))
         return Promise.resolve(new Response('', { status: 404 }));
