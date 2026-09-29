@@ -78,7 +78,10 @@ const REFERRAL_LADDER_STANDARD = [
   { at: 42, items: [{ n: 'Gladius Dunlevy', ship: true, img: 'Gladius' }] },
   { at: 50, items: [{ n: 'R.A.P.T.O.R' }] },
   { at: 75, items: [{ n: 'Storm', ship: true }, { n: 'Storm "GCD-Army" Paint' }] },
-  { at: 100, items: [{ n: 'Freelancer Paint Pack (4 paints)' }] },
+  {
+    at: 100,
+    items: [{ n: 'Freelancer MAX', ship: true }, { n: 'Freelancer Paint Pack (4 paints)' }],
+  },
   { at: 200, items: [{ n: 'Esperia Stinger', ship: true, img: 'Stinger' }] },
   { at: 500, items: [{ n: 'Captured Vanduul Scythe', ship: true, img: 'Scythe' }] },
   { at: 1042, items: [{ n: 'Idris-M', ship: true }] },
@@ -124,6 +127,47 @@ const REFERRAL_LADDER_LEGACY = [
     items: [{ n: 'Aegis Javelin (LTI)', ship: true, img: 'Javelin' }],
   },
 ];
+// Each tier's picture on starcitizen.tools/Referral_program (a wiki file name,
+// resolved to an image URL by OH.wikiImageUrls). Keyed by recruits needed.
+const REFERRAL_TIER_FILES = {
+  standard: {
+    1: 'Referral Armor 21 9.jpg',
+    2: 'Volt SMG Energy 01 UEE01.jpg',
+    3: 'Referral Gladius Statue.jpg',
+    4: 'Referral Pulse.jpg',
+    5: 'Volt Rifle Energy 01 UEE01.jpg',
+    6: 'Referral Statue Hurston.jpg',
+    7: 'Referral Flair Arccorp statue.jpg',
+    8: 'Referral Flair Orison statue.jpg',
+    9: 'Referral Flair Newbabbage statue.jpg',
+    10: 'Referral Flair BigBennys.jpg',
+    15: 'Player Deco Statue Stand NavyPilot 21 9.jpg',
+    25: 'Player Deco Statue Stand Vanduul 21 9.jpg',
+    42: 'Referral Gladius Paint Squadron.jpg',
+    50: 'R.A.P.T.O.R sweeping waste front - Cropped.jpg',
+    75: 'Referral Storm Paint UEE.jpg',
+    100: 'Referral Freelancer Group.jpg',
+    200: 'Stinger landed in cave hanger with pilot looking at it.jpg',
+    500: 'Scythe x2 flying by desert world.jpg',
+    1042: 'Idris M flying over world - cropped.jpg',
+  },
+  legacy: {
+    1: 'Badger and Badges.png',
+    3: 'Gimbals and Guns.png',
+    5: 'SurfAndTurf.jpg',
+    10: 'GladiusAndGold.jpg',
+    25: 'Arena Commander Racing Package.png',
+    42: 'Arena Commander Combat Package.png',
+    75: 'Razor in space - Isometric.jpg',
+    100: 'Blade.jpg',
+    200: 'Vanduul glaive viz3.jpg',
+    500: 'Anvil Ship Package.png',
+    1042: 'MMHC.png',
+    2017: 'Invictus-2951-Javelin-War-Hammer-flyby-everus.jpg',
+  },
+};
+for (const t of REFERRAL_LADDER_STANDARD) t.file = REFERRAL_TIER_FILES.standard[t.at];
+for (const t of REFERRAL_LADDER_LEGACY) t.file = REFERRAL_TIER_FILES.legacy[t.at];
 
 // Time-limited "special incentive" events: a recruit who CONVERTS (buys a game
 // package, spending the threshold) inside one of these windows earns a bonus reward.
@@ -3545,23 +3589,29 @@ function earnedEvents(recruitsRows) {
 // event bonuses. Ship rewards get their art looked up after render.
 function earnedRewards(recruits, recruitsRows, hasLegacy) {
   const out = [];
-  const add = (items, sub) => {
+  const add = (items, sub, file) => {
     for (const it of items) {
       out.push({
         name: it.n,
         sub,
+        file: file || '',
         resolve: it.ship ? it.img || it.n.replace(/\s*\(LTI\)/i, '').trim() : '',
       });
     }
   };
   for (const t of REFERRAL_LADDER_STANDARD.filter((x) => recruits >= x.at).reverse())
-    add(t.items, `${t.at} recruit${t.at === 1 ? '' : 's'}`);
+    add(t.items, `${t.at} recruit${t.at === 1 ? '' : 's'}`, t.file);
   if (hasLegacy) {
     for (const t of REFERRAL_LADDER_LEGACY.filter((x) => recruits >= x.at).reverse())
-      add(t.items, `Legacy · ${t.rank}`);
+      add(t.items, `Legacy · ${t.rank}`, t.file);
   }
   for (const { ev } of earnedEvents(recruitsRows)) {
-    out.unshift({ name: shortReward(ev.reward), sub: `Event · ${ev.name}`, resolve: ev.reward });
+    out.unshift({
+      name: shortReward(ev.reward),
+      sub: `Event · ${ev.name}`,
+      file: ev.image || '',
+      resolve: ev.reward,
+    });
   }
   return out;
 }
@@ -3574,46 +3624,47 @@ function shortReward(text) {
       .trim() || text
   );
 }
-function rewardIcon(name) {
-  if (/armou?r|helmet|undersuit|core|legs|arms/i.test(name)) return '🛡️';
-  if (/rifle|smg|pistol|repeater|weapon|sniper/i.test(name)) return '🎯';
-  if (/paint/i.test(name)) return '🎨';
-  if (/statue|sculpture|figurine|replica|model|hologram|trophy|case/i.test(name)) return '🗿';
-  if (/package|access|badge/i.test(name)) return '🎟️';
-  return '🏅';
-}
 function rewardsGalleryHtml(list) {
   if (!list.length)
     return '<p class="muted">No rewards yet. Your first recruit unlocks the GCD-Army armor.</p>';
+  const attr = (k, v) => (v ? ` data-${k}="${OH.escapeHtml(v)}"` : '');
   return `<div class="ref-gallery">${list
     .map(
-      (
-        r,
-      ) => `<div class="ref-gcard"${r.resolve ? ` data-resolve="${OH.escapeHtml(r.resolve)}"` : ''}>
-        <div class="ref-gimg"><span>${rewardIcon(r.name)}</span></div>
+      (r) => `<div class="ref-gcard"${attr('file', r.file)}${attr('resolve', r.resolve)}>
+        <div class="ref-gimg"></div>
         <div class="ref-gname" title="${OH.escapeHtml(r.name)}">${OH.escapeHtml(r.name)}</div>
         <div class="ref-gsub">${OH.escapeHtml(r.sub)}</div>
       </div>`,
     )
     .join('')}</div>`;
 }
-// Swap the icon for ship art where there is some (few at a time).
-function enhanceGalleryImages(container) {
-  const cards = [...container.querySelectorAll('.ref-gcard[data-resolve]')];
+// Fill each card's picture: the wiki's picture for that tier/event (one batched
+// lookup), else the ship's art for ship rewards.
+async function enhanceGalleryImages(container) {
+  const cards = [...container.querySelectorAll('.ref-gcard')];
+  const put = (card, url) => {
+    const slot = card.querySelector('.ref-gimg');
+    if (!url || !slot || !slot.isConnected) return;
+    const im = document.createElement('img');
+    im.alt = '';
+    im.loading = 'lazy';
+    im.src = url;
+    im.addEventListener('error', () => im.remove());
+    slot.replaceChildren(im);
+    card.dataset.image = url;
+  };
+  const files = await OH.wikiImageUrls(cards.map((c) => c.dataset.file).filter(Boolean));
+  const rest = [];
+  for (const card of cards) {
+    const url = card.dataset.file && files[card.dataset.file];
+    if (url) put(card, url);
+    else if (card.dataset.resolve) rest.push(card);
+  }
   let i = 0;
   const worker = async () => {
-    while (i < cards.length) {
-      const card = cards[i++];
-      const url = await OH.getShipImage(card.dataset.resolve);
-      const slot = card.querySelector('.ref-gimg');
-      if (!url || !slot || !slot.isConnected) continue;
-      const im = document.createElement('img');
-      im.alt = '';
-      im.loading = 'lazy';
-      im.src = url;
-      im.addEventListener('error', () => im.remove());
-      slot.replaceChildren(im);
-      card.dataset.image = url;
+    while (i < rest.length) {
+      const card = rest[i++];
+      put(card, await OH.getShipImage(card.dataset.resolve));
     }
   };
   for (let w = 0; w < 3; w++) worker();
@@ -3738,7 +3789,7 @@ async function referralShareCanvas({ withCode }) {
   const p = tierProgress(REFERRAL_LADDER_STANDARD, recruits);
   const rank = hasLegacy ? legacyRank(recruits) : '';
   const earned = earnedRewards(recruits, rows, hasLegacy);
-  const ships = earned.filter((r) => r.resolve).slice(0, 6);
+  const ships = earned.filter((r) => r.file || r.resolve).slice(0, 6);
   const who = (state.owner && (state.owner.nickname || state.owner.displayname)) || '';
   const url =
     ref.url || (ref.code ? `https://robertsspaceindustries.com/enlist?referral=${ref.code}` : '');
@@ -3750,8 +3801,13 @@ async function referralShareCanvas({ withCode }) {
   for (const d of dates) byMonth.set(monthKey(d), (byMonth.get(monthKey(d)) || 0) + 1);
   const best = Math.max(0, ...byMonth.values());
 
+  const files = await OH.wikiImageUrls(ships.map((r) => r.file).filter(Boolean));
   const imgs = await Promise.all(
-    ships.map(async (r) => loadCanvasImage(await OH.getShipImage(r.resolve))),
+    ships.map(async (r) =>
+      loadCanvasImage(
+        (r.file && files[r.file]) || (r.resolve && (await OH.getShipImage(r.resolve))),
+      ),
+    ),
   );
 
   const SCALE = 2;
@@ -3853,7 +3909,7 @@ async function referralShareCanvas({ withCode }) {
     ctx.fillStyle = '#e6edf3';
     ctx.font = f(600, 16);
     ctx.fillText(
-      `Rewards earned: ${earned.length}${earned.length > ships.length ? ` (ships shown)` : ''}`,
+      `Rewards earned: ${earned.length}${earned.length > ships.length ? ` (latest ${ships.length})` : ''}`,
       PAD,
       y,
     );

@@ -2104,6 +2104,7 @@
         .map((c) => c.replace(/\n\|\}[\s\S]*$/, ''));
       if (cells.length < 6) continue;
       const [start, end, name] = cells.map((c) => wikiPlain(c));
+      const file = (cells[4].match(/\[\[(?:File|Image):([^|\]]+)/i) || [])[1];
       if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) continue;
       let reward = wikiPlain(cells.slice(5).join('\n'));
       // Newer rows list "You:" and "Referral:" rewards; keep what the referrer gets.
@@ -2116,10 +2117,61 @@
         .join(', ')
         .replace(/^(The|A|An)\s+/i, '')
         .replace(/\.$/, '');
-      if (name && reward) out.push({ start, end, name, reward });
+      if (name && reward) out.push({ start, end, name, reward, image: file ? file.trim() : '' });
     }
     return out;
   };
+  // Wiki file names ("Referral Pulse.jpg") → 400px image URLs on
+  // media.starcitizen.tools, 50 per request, cached a month. → { file: url }.
+  const WIKI_FILES_KEY = 'wikiFiles';
+  const WIKI_FILES_TTL = 30 * 24 * 3600e3;
+  const wikiTitle = (f) => {
+    const t = String(f).replace(/_/g, ' ').trim();
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  };
+  OH.wikiImageUrls = async function wikiImageUrls(files, fetchFn = fetch) {
+    const want = [...new Set(files.filter(Boolean))];
+    const { [WIKI_FILES_KEY]: cache = {} } = await chrome.storage.local.get(WIKI_FILES_KEY);
+    const out = {};
+    const missing = [];
+    for (const f of want) {
+      const hit = cache[f];
+      if (hit && Date.now() - hit.at < WIKI_FILES_TTL) out[f] = hit.url;
+      else missing.push(f);
+    }
+    for (let i = 0; i < missing.length; i += 50) {
+      const batch = missing.slice(i, i + 50);
+      try {
+        const titles = batch.map((f) => 'File:' + wikiTitle(f)).join('|');
+        const res = await fetchFn(
+          `https://starcitizen.tools/api.php?action=query&prop=imageinfo&iiprop=url&iiurlwidth=400&format=json&origin=*&titles=${encodeURIComponent(titles)}`,
+          { credentials: 'omit', headers: { Accept: 'application/json' } },
+        );
+        const json = res.ok ? await res.json() : null;
+        const byTitle = {};
+        for (const pg of Object.values(json?.query?.pages || {})) {
+          const info = pg.imageinfo && pg.imageinfo[0];
+          if (info) byTitle[pg.title] = info.thumburl || info.url;
+        }
+        for (const f of batch) {
+          const url = byTitle['File:' + wikiTitle(f)] || null;
+          cache[f] = { url, at: Date.now() };
+          if (url) out[f] = url;
+        }
+      } catch (e) {
+        OH.log('warn', 'referral', `wiki images failed: ${e?.message || e}`);
+      }
+    }
+    if (missing.length) {
+      try {
+        await chrome.storage.local.set({ [WIKI_FILES_KEY]: cache });
+      } catch {
+        /* storage full: this session still has the URLs */
+      }
+    }
+    return out;
+  };
+
   const REF_EVENTS_KEY = 'referralEvents';
   const REF_EVENTS_TTL = 7 * 24 * 3600e3;
   // Cached for a week; null when it can't be fetched (callers keep their list).
