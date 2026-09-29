@@ -231,6 +231,17 @@ try {
     ? ok('a failed picture is retried once before falling back')
     : fail(`thumbnail retry: ${JSON.stringify(thumb)}`);
 
+  const hi = await page.evaluate(() => [
+    hiResCandidates('https://robertsspaceindustries.com/media/abc123/store_hub_small/Pioneer.jpg'),
+    hiResCandidates('https://media.robertsspaceindustries.com/abc123/store_small.jpg'),
+    hiResCandidates('https://robertsspaceindustries.com/media/abc123/source/Pioneer.jpg'),
+  ]);
+  hi[0][0] === 'https://robertsspaceindustries.com/media/abc123/slideshow_wide/Pioneer.jpg' &&
+  hi[1][0] === 'https://media.robertsspaceindustries.com/abc123/slideshow_wide.jpg' &&
+  hi[2].length === 0
+    ? ok('sharp pictures for both RSI image forms (buy-backs included)')
+    : fail(`hi-res candidates: ${JSON.stringify(hi)}`);
+
   console.log('Search and ship details');
   await go('#home');
   await page
