@@ -96,7 +96,37 @@ try {
   await go('#home');
   const cards = await page.$$eval('#home-summary .sum-box', (e) => e.length);
   cards ? ok(`summary shows ${cards} boxes`) : fail('home summary empty');
-  (await page.$('.howto details[open]')) ? ok('how-to guide open') : fail('how-to guide missing');
+  const home = await page.evaluate(async () => {
+    OH.getShipStock = async (url) =>
+      /Cutlass-Black/i.test(url)
+        ? { state: 'in', price: 110, packs: [] }
+        : { state: 'out', price: null, packs: [] };
+    state.wishlist = ['Cutlass Black', 'Pioneer'];
+    renderHomePanels();
+    await new Promise((r) => setTimeout(r, 600));
+    const wish = document.querySelector('#home-wish').textContent;
+    const glance = document.querySelector('#home-glance').textContent;
+    state.wishlist = [];
+    renderHomePanels();
+    return {
+      guide:
+        !!document.querySelector('details.howto-all') &&
+        !document.querySelector('details.howto-all').open,
+      cards: document.querySelectorAll('.home-card').length,
+      wish,
+      glance,
+      storeOpt: !!document.querySelector('.scan-src[value="store"]'),
+    };
+  });
+  home.guide && home.cards === 0
+    ? ok('how-to guide folded into one closed dropdown; no link cards')
+    : fail(`home layout: ${JSON.stringify(home)}`);
+  /On Sale Now 1/.test(home.wish) && /Cutlass Black/.test(home.wish) && !/Pioneer/.test(home.wish)
+    ? ok('home: wishlist ships on sale now')
+    : fail(`home wishlist: ${home.wish}`);
+  /Buy-back tokens/.test(home.glance) && /Next referral reward/.test(home.glance) && home.storeOpt
+    ? ok('home: at-a-glance panel; Scan has a Store (wishlist) option')
+    : fail(`home glance: ${JSON.stringify(home)}`);
   const site = await page.$eval('#site-link', (e) => e.textContent).catch(() => '');
   /something big is coming/i.test(site) && !(await page.$('#site-link button'))
     ? ok('website sync shows the teaser (no connect button)')
