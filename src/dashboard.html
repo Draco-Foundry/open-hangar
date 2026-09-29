@@ -99,6 +99,17 @@
         width: 190px;
         padding: 6px 10px;
         font-size: 13px;
+        color: var(--text);
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+      }
+      .gsearch input:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+      .value-note a {
+        color: var(--link);
       }
       .gsearch-results {
         position: absolute;
@@ -1150,6 +1161,18 @@
       .ref-event-banner.live {
         border-color: rgba(63, 185, 80, 0.5);
         background: rgba(63, 185, 80, 0.08);
+      }
+      .wish-btn {
+        margin: 2px 0 10px;
+      }
+      .home-event {
+        margin: 0 0 16px;
+      }
+      .spend-val {
+        width: auto;
+        min-width: 90px;
+        white-space: nowrap;
+        text-align: left;
       }
       .update-check {
         display: flex;
@@ -3304,7 +3327,7 @@
           <input
             id="gsearch"
             type="search"
-            placeholder="Search everything  /"
+            placeholder="Global hangar search  /"
             autocomplete="off"
             aria-label="Search ships, hangar, buy-backs and rewards"
           />
@@ -3432,6 +3455,7 @@
         </div>
         <!-- openhangar.space connect/sync: always visible (even signed out of RSI). -->
         <div class="site-link" id="site-link"></div>
+        <div class="ref-event-banner live home-event" id="event-banner" hidden></div>
         <div class="home-summary" id="home-summary"></div>
         <div class="home-changes" id="home-changes" hidden></div>
         <div class="home-split">
@@ -3510,8 +3534,8 @@
               <ul>
                 <li>
                   In Inventory, hit <strong>Select</strong>, click the items you want, give it a
-                  title and pick which price to show. Then <strong>Copy image</strong> and paste it
-                  into Discord or a forum post.
+                  title and pick which price to show. Then <strong>Download image</strong> and post
+                  it in Discord or a forum.
                 </li>
                 <li>
                   The <strong>Market</strong> view is a sale sheet with a "My price" column you fill
@@ -3702,8 +3726,7 @@
             <option value="store">Store price</option>
             <option value="none">No prices</option>
           </select>
-          <button class="mk-btn primary" type="button" data-sb="copy">Copy image</button>
-          <button class="mk-btn" type="button" data-sb="save">Save PNG</button>
+          <button class="mk-btn primary" type="button" data-sb="save">Download image</button>
           <span class="mk-export-status" id="sb-status" aria-live="polite"></span>
           <button class="mk-btn" type="button" data-sb="done">Done</button>
         </div>
@@ -3769,7 +3792,10 @@
       <section class="view" id="view-store">
         <h2 class="section-title">Store</h2>
 
-        <h3 class="section-title">Your CCUs</h3>
+        <h3 class="section-title">Wishlist</h3>
+        <div id="wishlist"></div>
+
+        <h3 class="section-title" style="margin-top: 28px">Your CCUs</h3>
         <div id="ccu-owned"></div>
         <p class="muted store-intro">
           Planning an upgrade chain?

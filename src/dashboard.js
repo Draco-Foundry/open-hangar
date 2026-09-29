@@ -341,6 +341,7 @@ const state = {
   // { [key]: { price } }. Stored SEPARATELY from the scan so a re-scan never
   // wipes your prices. Purely local — never exported or sent.
   market: {},
+  wishlist: [], // ship names (Store → Wishlist)
   bbPicked: new Set(), // Buy-Backs Market: picked buy-back ids (for totals + exports)
   marketGiftableOnly: false, // Market view: show only sellable (giftable) items
   referral: null, // { code, url, current, legacy, prospects, recruitsList, prospectsList }
@@ -906,6 +907,7 @@ function renderVersions() {
 
 function renderHome() {
   ensurePrices();
+  renderEventBanner();
   renderVersions();
   renderAccount();
   const has = state.items.length > 0;
@@ -1551,7 +1553,7 @@ function marketToolbarHtml(shown) {
         state.marketGiftableOnly ? 'checked' : ''
       }> Giftable only</label>
       <button class="mk-btn mk-export-csv" type="button">Export CSV</button>
-      <button class="mk-btn mk-export-img" type="button">Copy image</button>
+      <button class="mk-btn mk-export-img" type="button">Download image</button>
       <span class="mk-export-status" aria-live="polite"></span>
     </div>
   </div>`;
@@ -1568,8 +1570,7 @@ function renderMarket() {
 
 // --- Market export (CSV / image) -----------------------------------------
 // Both operate on exactly what's on screen (filters + Giftable-only applied) so
-// the file matches the view. Everything stays local — a download or a clipboard
-// copy; nothing is uploaded.
+// the file matches the view. Everything stays local: it's a download, nothing is uploaded.
 
 function marketFilename(ext) {
   const who = (state.owner && (state.owner.nickname || state.owner.displayname)) || 'hangar';
@@ -1585,6 +1586,16 @@ function downloadBlob(blob, filename) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Every picture export (share image, Market/Buy-Backs tables, fleet image)
+// downloads as a PNG.
+function downloadImage(canvas, filename, statusEl) {
+  canvas.toBlob((blob) => {
+    if (!blob) return setExportStatus(statusEl, 'Image failed');
+    downloadBlob(blob, filename);
+    setExportStatus(statusEl, 'Downloaded');
+  }, 'image/png');
 }
 
 let exportStatusTimer = null;
@@ -1790,21 +1801,7 @@ function marketImageCanvas(
 function copyMarketImage(statusEl) {
   const sections = computeMarketSections(marketExportShown());
   if (!sections.length) return setExportStatus(statusEl, 'Nothing to export');
-  marketImageCanvas(sections).toBlob(async (blob) => {
-    if (!blob) return setExportStatus(statusEl, 'Image failed');
-    // Prefer a clipboard copy (paste straight into Discord/forums); fall back to
-    // a PNG download where the async Clipboard image API isn't available.
-    try {
-      if (navigator.clipboard && window.ClipboardItem) {
-        await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
-        return setExportStatus(statusEl, 'Copied to clipboard');
-      }
-      throw new Error('clipboard unavailable');
-    } catch {
-      downloadBlob(blob, marketFilename('png'));
-      setExportStatus(statusEl, 'Saved PNG');
-    }
-  }, 'image/png');
+  downloadImage(marketImageCanvas(sections), marketFilename('png'), statusEl);
 }
 
 function renderInventory() {
@@ -1874,7 +1871,7 @@ const INV_SECTIONS = [
 // "Select" in Inventory turns card clicks into picks (and adds a checkbox to
 // Market rows). The bar at the bottom makes a picture of just the picked items
 // — for a sale post, a fleet brag, a "what should I melt" thread. Drawn on a
-// canvas locally; copied to the clipboard or saved as PNG, never uploaded.
+// canvas locally; downloaded as a PNG, never uploaded.
 const selectBar = $('#select-bar');
 const selectToggle = $('#select-toggle');
 
@@ -2132,22 +2129,8 @@ async function makeFleetImage(action) {
   const canvas = inMarket
     ? marketImageCanvas(computeMarketSections(marketExportShown()), { title })
     : await fleetImageCanvas(list, { title, price: state.imagePrice });
-  canvas.toBlob(async (blob) => {
-    if (!blob) return setExportStatus(status, 'Image failed');
-    const who = (state.owner && (state.owner.nickname || state.owner.displayname)) || 'hangar';
-    const filename = `open-hangar-fleet-${who}.png`.replace(/[^\w.-]+/g, '_');
-    if (action === 'copy') {
-      try {
-        if (!navigator.clipboard || !window.ClipboardItem) throw new Error('no clipboard');
-        await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
-        return setExportStatus(status, 'Copied — paste it anywhere');
-      } catch {
-        /* fall through to a download */
-      }
-    }
-    downloadBlob(blob, filename);
-    setExportStatus(status, 'Saved PNG');
-  }, 'image/png');
+  const who = (state.owner && (state.owner.nickname || state.owner.displayname)) || 'hangar';
+  downloadImage(canvas, `open-hangar-fleet-${who}.png`.replace(/[^\w.-]+/g, '_'), status);
 }
 
 if (selectToggle) selectToggle.addEventListener('click', () => setSelecting(!state.selecting));
@@ -2164,7 +2147,7 @@ if (selectBar) {
       state.selected.clear();
       renderInventory();
     } else if (act === 'done') setSelecting(false);
-    else if (act === 'copy' || act === 'save') makeFleetImage(act);
+    else if (act === 'save') makeFleetImage(act);
   });
   $('#sb-price').addEventListener('change', (e) => {
     state.imagePrice = e.target.value;
@@ -2233,6 +2216,7 @@ function renderStore() {
     return;
   }
   setHTML($('#price-table'), priceRowsHtml($('#price-search').value));
+  setHTML($('#wishlist'), wishlistHtml());
   const owned = ownedCCUs();
   setHTML(
     $('#ccu-owned'),
@@ -2917,6 +2901,7 @@ function renderStats() {
     collection: () => collectionSectionHtml(),
     buybacks: () => buybackStatsHtml(),
     top: () => topListsHtml(),
+    spending: () => spendingSectionHtml(),
     history: () =>
       (historySectionHtml() ||
         '<p class="muted">History starts with your next scan — each scan that finds changes is kept here.</p>') +
@@ -3126,6 +3111,7 @@ const STATS_TABS = [
   ['collection', 'Collection'],
   ['buybacks', 'Buy-Backs'],
   ['top', 'Top Lists'],
+  ['spending', 'Spending'],
   ['history', 'History'],
 ];
 function setStatsTab(tab) {
@@ -3497,6 +3483,7 @@ function refreshReferralEvents() {
     for (const e of wiki) byStart.set(e.start, e);
     referralEvents = [...byStart.values()].sort((a, b) => a.start.localeCompare(b.start));
     if (currentView() === 'referrals' && state.referral) renderReferrals();
+    renderEventBanner();
   });
 }
 
@@ -3558,7 +3545,7 @@ function refHeroHtml(ref, recruits, projection, hasLegacy) {
       </div>
       <div class="ref-share">
         <label class="mk-toggle" title="Adds your referral code and a QR code people can scan"><input type="checkbox" id="ref-share-code"> Include my code</label>
-        <button type="button" class="mk-btn" id="ref-share">Share image</button>
+        <button type="button" class="mk-btn" id="ref-share">Download image</button>
         <span class="mk-export-status" id="ref-share-status" aria-live="polite"></span>
       </div>
     </div>
@@ -3991,19 +3978,7 @@ async function shareReferralImage() {
   const withCode = !!$('#ref-share-code')?.checked;
   setExportStatus(status, 'Drawing…');
   const canvas = await referralShareCanvas({ withCode });
-  canvas.toBlob(async (blob) => {
-    if (!blob) return setExportStatus(status, 'Image failed');
-    try {
-      if (navigator.clipboard && window.ClipboardItem) {
-        await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
-        return setExportStatus(status, 'Copied to clipboard');
-      }
-      throw new Error('clipboard unavailable');
-    } catch {
-      downloadBlob(blob, marketFilename('png').replace('sale-sheet', 'referrals'));
-      setExportStatus(status, 'Saved PNG');
-    }
-  }, 'image/png');
+  downloadImage(canvas, marketFilename('png').replace('sale-sheet', 'referrals'), status);
 }
 
 function renderReferrals() {
@@ -4645,7 +4620,7 @@ function bbToolbarHtml(list, when) {
     }<span class="mk-selcount">${OH.escapeHtml(bbSelText())}</span></div>
     <div class="market-actions">
       <button class="mk-btn bb-export-csv" type="button">Export CSV</button>
-      <button class="mk-btn bb-export-img" type="button">Copy image</button>
+      <button class="mk-btn bb-export-img" type="button">Download image</button>
       <span class="mk-export-status" aria-live="polite"></span>
     </div>
   </div>`;
@@ -4724,19 +4699,7 @@ function copyBuybackImage(statusEl) {
   const sections = bbExportSections();
   if (!sections.length) return setExportStatus(statusEl, 'Nothing to export');
   const canvas = marketImageCanvas(sections, { cols: BB_IMG_COLS, cellsOf: bbImageCells });
-  canvas.toBlob(async (blob) => {
-    if (!blob) return setExportStatus(statusEl, 'Image failed');
-    try {
-      if (navigator.clipboard && window.ClipboardItem) {
-        await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
-        return setExportStatus(statusEl, 'Copied to clipboard');
-      }
-      throw new Error('clipboard unavailable');
-    } catch {
-      downloadBlob(blob, bbFilename('png'));
-      setExportStatus(statusEl, 'Saved PNG');
-    }
-  }, 'image/png');
+  downloadImage(canvas, bbFilename('png'), statusEl);
 }
 
 // --- Events ---------------------------------------------------------------
@@ -6221,6 +6184,9 @@ function openShipModal(name) {
       <div class="modal-meta">${status ? `<span class="badge ship">${esc(status)}</span>` : ''}${
         v && v.msrp ? `<span class="modal-val">${dollars(v.msrp)}</span>` : ''
       }</div>
+      <button type="button" class="mk-btn wish-btn" data-wish-toggle="${esc(title)}">${
+        onWishlist(title) ? 'Remove from Wishlist' : 'Add to Wishlist'
+      }</button>
       ${row('Manufacturer', v && v.mfr ? esc(v.mfr) : '')}
       ${row('Role', v && (v.role || v.career) ? esc(capFirst(v.role || v.career)) : '')}
       ${row('Size', v && v.size ? esc(capFirst(v.size)) : '')}
@@ -6269,6 +6235,138 @@ document.addEventListener('click', (e) => {
     if (b) openBuybackModal(b);
   }
 });
+
+// --- Wishlist ---------------------------------------------------------------
+// Ships you want (by name), kept in this browser (`wishlist`). Toggled from the
+// ship window; listed on the Store page with price, and any buy-back copies
+// you could reclaim instead of buying new.
+function onWishlist(name) {
+  return state.wishlist.some((n) => sameShip(n, name));
+}
+function toggleWishlist(name) {
+  state.wishlist = onWishlist(name)
+    ? state.wishlist.filter((n) => !sameShip(n, name))
+    : [...state.wishlist, name];
+  chrome.storage.local.set({ wishlist: state.wishlist });
+}
+function wishlistHtml() {
+  if (!state.wishlist.length) {
+    return '<p class="muted">Open any ship (search at the top, or a name in the price list below) and press <strong>Add to Wishlist</strong>.</p>';
+  }
+  const owned = new Map(ownedShips().map((s) => [shipKey(s.label), s.pledges.length]));
+  const rows = state.wishlist
+    .map((name) => {
+      const v = shipEntry(name);
+      const bbs = state.buybacks.filter((b) => buybackHasShip(b, name));
+      const have = owned.get(shipKey((v && v.name) || name));
+      const status = v && (SHIP_STATES.find(([k]) => k === v.status) || [])[1];
+      return `<tr>
+        <td>${shipLink((v && v.name) || name)}</td>
+        <td class="num">${v && v.msrp ? dollars(v.msrp) : '<span class="muted">—</span>'}</td>
+        <td>${OH.escapeHtml(status || '')}</td>
+        <td>${
+          bbs.length
+            ? `${bbs.length} in buy-backs · ${buybackReclaimLink(bbs[0])}`
+            : '<span class="muted">none</span>'
+        }</td>
+        <td>${have ? `you own ${have}` : ''}</td>
+        <td><button type="button" class="ship-link wish-remove" data-wish-remove="${OH.escapeHtml(name)}" title="Remove from wishlist">Remove</button></td>
+      </tr>`;
+    })
+    .join('');
+  return `<table class="org-table wishlist"><thead><tr><th>Ship</th><th class="num">Store price</th><th>Status</th><th>Buy-backs</th><th></th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="muted value-note">Want the cheapest way there? Plan the upgrade path on <a href="https://ccugame.app" target="_blank" rel="noopener">ccugame.app</a>.</p>`;
+}
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-wish-toggle]');
+  if (t) {
+    toggleWishlist(t.dataset.wishToggle);
+    t.textContent = onWishlist(t.dataset.wishToggle) ? 'Remove from Wishlist' : 'Add to Wishlist';
+    if (currentView() === 'store') renderStore();
+    return;
+  }
+  const r = e.target.closest('[data-wish-remove]');
+  if (r) {
+    toggleWishlist(r.dataset.wishRemove);
+    renderStore();
+  }
+});
+
+// --- Stats → Spending ---------------------------------------------------------
+// What you've pledged per year (by pledge date) and the running total. Uses
+// each pledge's melt value, the store credit you'd get back, so gifts and
+// rewards count as $0 and upgrades count what they added.
+function spendingSectionHtml() {
+  const byYear = new Map();
+  let undated = 0;
+  for (const p of state.items) {
+    const y = /^(\d{4})/.exec(p.date || '');
+    const v = Number.isFinite(p.value) ? p.value : 0;
+    if (!y) {
+      undated += v;
+      continue;
+    }
+    const cur = byYear.get(y[1]) || { n: 0, sum: 0 };
+    cur.n++;
+    cur.sum += v;
+    byYear.set(y[1], cur);
+  }
+  if (!byYear.size) return '<p class="muted">No dated pledges yet. Scan your hangar first.</p>';
+  const years = [...byYear.keys()].sort();
+  const first = Number(years[0]);
+  const last = Number(years[years.length - 1]);
+  const all = [];
+  for (let y = first; y <= last; y++)
+    all.push([String(y), byYear.get(String(y)) || { n: 0, sum: 0 }]);
+  const total = all.reduce((a, [, r]) => a + r.sum, 0) + undated;
+  const max = Math.max(1, ...all.map(([, r]) => r.sum));
+  const best = all.reduce((b, cur) => (cur[1].sum > b[1].sum ? cur : b));
+  let running = 0;
+  const box = (big, lbl) =>
+    `<div class="stat-box"><div class="big">${big}</div><div class="lbl">${lbl}</div></div>`;
+  const bars = all
+    .map(([y, r]) => {
+      running += r.sum;
+      return `<div class="bar-row">
+        <div class="bar-label">${y}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((r.sum / max) * 100)}%"></div></div>
+        <div class="bar-val spend-val">${money(r.sum)} <span class="muted">· ${r.n} pledge${r.n === 1 ? '' : 's'} · total ${money(running)}</span></div>
+      </div>`;
+    })
+    .join('');
+  return `<div class="stat-grid">
+      ${box(money(total), 'pledged in total')}
+      ${box(`${all.length}`, `years (${first} to ${last})`)}
+      ${box(money(total / all.length), 'average per year')}
+      ${box(best[0], `biggest year (${money(best[1].sum)})`)}
+    </div>
+    <h3 class="section-title" style="margin-top:22px">By Year</h3>
+    ${bars}
+    <p class="muted value-note">By pledge date, using each pledge's melt value (the store credit it would return), so gifts and rewards count as $0 and upgrades count only what they added.${
+      undated ? ` ${money(undated)} of pledges have no date.` : ''
+    } Stays on your PC like everything else.</p>`;
+}
+
+// --- Home: event heads-up -----------------------------------------------------
+// A banner while a referral bonus event runs (they come with the big sales:
+// IAE, Invictus, CitizenCon, Luminalia…), from the wiki's event list.
+function renderEventBanner() {
+  const el = $('#event-banner');
+  if (!el) return;
+  refreshReferralEvents();
+  const ev = runningEvent();
+  if (!ev) {
+    el.hidden = true;
+    return;
+  }
+  setHTML(
+    el,
+    `<strong>${OH.escapeHtml(ev.name)}</strong> is on until ${OH.escapeHtml(
+      fmtDate(parseTs(ev.end + ' 00:00:00')),
+    )}. Referral bonus: <strong>${OH.escapeHtml(shortReward(ev.reward))}</strong> for anyone who enlists with your code and buys a game package. <a href="#referrals" data-view="referrals">Your referrals</a>`,
+  );
+  el.hidden = false;
+}
 
 // --- Global search (header) ------------------------------------------------
 // One box over everything: ships (catalog), hangar pledges (names and what's
@@ -6392,7 +6490,9 @@ if (gsearch && gsearchOut) {
     remindRescan,
     currency,
     uiGroupByType,
+    wishlist,
   } = await chrome.storage.local.get([
+    'wishlist',
     'currency',
     'uiGroupByType',
     'remindRescan',
@@ -6404,6 +6504,7 @@ if (gsearch && gsearchOut) {
   ]);
   if (LAYOUTS.includes(uiLayout)) state.layout = uiLayout;
   if (uiGroupByType === false) state.groupByType = false;
+  if (Array.isArray(wishlist)) state.wishlist = wishlist.filter((n) => typeof n === 'string');
   if (STATS_TABS.some(([k]) => k === uiStatsTab)) state.statsTab = uiStatsTab;
   if (Number.isFinite(lastBackupAt)) state.lastBackupAt = lastBackupAt;
   const remind = $('#remind-toggle');
