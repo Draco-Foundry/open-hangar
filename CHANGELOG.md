@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Stats → History now charts **account value** (your ships at today's store prices) instead
+  of melt value.
 - **One color per type, everywhere:** ship green, CCU purple, paint pink, add-on blue, coupon
   orange, pack gold and game package teal, on badges and filter chips across Inventory,
   Buy-Backs and the wishlist. Packs and game packages in Inventory now say PACK / PACKAGE.
