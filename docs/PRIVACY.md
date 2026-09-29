@@ -57,6 +57,9 @@ personal data:
   hangar. Ship-art lookups, done by ship name, are cached locally and are the only
   outbound signal that weakly relates to what you are viewing; no credentials or
   personal data are sent.
+- **support.robertsspaceindustries.com** (public, read-only) — RSI's Loaner Ship
+  Matrix help article (the same page for everyone), at most once a week, to show
+  which loaners your ships give you. No credentials or personal data are sent.
 - **starcitizen.tools** (public, read-only) — when you open the Referrals page, the
   list of referral bonus events and the pictures of referral rewards (the same for
   everyone), cached for a week to a month.
