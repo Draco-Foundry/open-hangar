@@ -1,10 +1,10 @@
 # Chrome Web Store — Launch Checklist & Listing
 
-> **Submission status (2026-09-28):**
+> **Submission status (2026-09-29):**
 > | Store | Status | IDs / links |
 > | --- | --- | --- |
-> | Chrome Web Store | **live** v0.2.7; v0.2.8 review to be cancelled and replaced by v0.2.9 (publisher `dracofoundry@gmail.com`) | item `aeabioadfphghjennmdbnpelojlhndjl` · [listing](https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl) |
-> | Firefox AMO | **live** v0.2.9 (approved 2026-09-28) | [listing](https://addons.mozilla.org/en-US/firefox/addon/open-hangar/) · gecko id `open-hangar@draco-foundry` |
+> | Chrome Web Store | **live** v0.2.8; v0.2.9 in review (0.2.10 goes up once it clears; Chrome refuses uploads while a review is pending) (publisher `dracofoundry@gmail.com`) | item `aeabioadfphghjennmdbnpelojlhndjl` · [listing](https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl) |
+> | Firefox AMO | **live** v0.2.9 (approved 2026-09-28); v0.2.10 submitted 2026-09-29 | [listing](https://addons.mozilla.org/en-US/firefox/addon/open-hangar/) · gecko id `open-hangar@draco-foundry` |
 > | Microsoft Edge | in review (~7 business days) | CRX `fmcnemfepnifokjelgjacgdhoodaiicl` · Store ID `0RDCKFFGW5QL` |
 >
 > When each goes live, set that button's `data-status="live"` and `data-url` in
