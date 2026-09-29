@@ -132,24 +132,48 @@ try {
     return res;
   });
   await page
-    .waitForFunction(() => document.querySelectorAll('#home-news .news-list li').length > 0, {
+    .waitForFunction(() => document.querySelectorAll('#home-news .twisc-points li').length > 0, {
       timeout: 8000,
     })
     .catch(() => {});
-  const news = await page.evaluate(() => ({
-    beside:
-      document.querySelector('#home-news').parentElement ===
-      document.querySelector('#home-wish').parentElement,
-    n: document.querySelectorAll('#home-news .news-list li').length,
-    first: document.querySelector('#home-news .news-title')?.textContent || '',
-    link: document.querySelector('#home-news .news-list a')?.href || '',
-  }));
+  const news = await page.evaluate(async () => {
+    const box = document.querySelector('#home-news');
+    const wish = document.querySelector('#home-wish');
+    // Many wishlist ships on sale: the list scrolls inside a same-height panel.
+    OH.getShipStock = async () => ({ state: 'in', price: 20, packs: [] });
+    state.wishlist = state.catalog.slice(0, 20).map((v) => v.name);
+    renderHomePanels();
+    await new Promise((r) => setTimeout(r, 800));
+    const scroll = wish.querySelector('.home-scroll');
+    const res = {
+      beside: box.parentElement === wish.parentElement,
+      title: box.querySelector('h3').textContent,
+      points: box.querySelectorAll('.twisc-points li').length,
+      sched: box.querySelector('.twisc-sched')?.textContent || '',
+      link: box.querySelector('.home-more a')?.href || '',
+      sameHeight: Math.abs(box.offsetHeight - wish.offsetHeight) <= 1,
+      scrolls: scroll ? scroll.scrollHeight > scroll.clientHeight : false,
+      linkVisible: (() => {
+        const a = wish.querySelector('.home-more a');
+        const r = a && a.getBoundingClientRect();
+        const w = wish.getBoundingClientRect();
+        return !!r && r.bottom <= w.bottom;
+      })(),
+    };
+    state.wishlist = [];
+    renderHomePanels();
+    return res;
+  });
   news.beside &&
-  news.n === 3 &&
-  /This Week in Star Citizen/.test(news.first) &&
+  /This Week in Star Citizen/.test(news.title) &&
+  news.points >= 4 &&
+  /New Game Library System/.test(news.sched) &&
   /comm-link/.test(news.link)
-    ? ok(`home: Latest from RSI (${news.n} posts, "${news.first}")`)
+    ? ok(`home: This Week in Star Citizen summary (${news.points} points + schedule)`)
     : fail(`home news: ${JSON.stringify(news)}`);
+  news.sameHeight && news.scrolls && news.linkVisible
+    ? ok('home: panels the same height; a long wishlist scrolls, link stays visible')
+    : fail(`home panels: ${JSON.stringify(news)}`);
   const compact = await page.evaluate(() => {
     const saved = { ...fx };
     Object.assign(fx, { code: 'CNY', rate: 7 });
