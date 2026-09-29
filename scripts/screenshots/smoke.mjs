@@ -285,6 +285,26 @@ try {
   loan && loan.loaners.length === 2
     ? ok('loaner lookup works in the page')
     : fail(`loaners: ${JSON.stringify(loan)}`);
+  const flyable = await page.evaluate(() => {
+    loanerMatrix = OH.parseLoanerMatrix(
+      '<table><tr><td>Carrack</td><td>C8 Pisces</td></tr><tr><td>Pioneer</td><td>Caterpillar, Nomad</td></tr></table>',
+    );
+    includedVessels = OH.parseLoanerMatrix(
+      '<table><tr><td>Carrack</td><td>C8 Pisces, URSA Rover</td></tr></table>',
+    );
+    return {
+      carrack: loanersOf('Carrack'),
+      pioneer: loanersOf('Pioneer'),
+      inc: includedOf('Carrack'),
+    };
+  });
+  !flyable.carrack &&
+  flyable.pioneer &&
+  flyable.pioneer.loaners.length === 2 &&
+  flyable.inc &&
+  flyable.inc.length === 2
+    ? ok('loaners only for unflyable ships; Carrack shows its included vessels instead')
+    : fail(`flight-ready filter: ${JSON.stringify(flyable)}`);
 
   console.log('Item types');
   const types = await page.evaluate(() => {
