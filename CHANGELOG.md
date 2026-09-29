@@ -4,7 +4,16 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
-- **Search everything.** A search box at the top (press **/**) finds ships, your pledges
+- **Wishlist.** Add ships from their details window; Store → Wishlist shows each one's
+  price, whether you already own it, and any copies in your buy-backs you could reclaim
+  instead. Upgrade paths link to ccugame.app.
+- **Spending over time.** Stats → Spending: what you've pledged each year and the running
+  total. Private, like everything else.
+- **Sale heads-up.** A banner on Home while a referral bonus event is running (they come
+  with IAE, Invictus, CitizenCon and the other big sales).
+- **Images download.** Every picture export (Market and Buy-Backs tables, fleet image,
+  referral share image) now saves a PNG instead of copying to the clipboard.
+- **Global hangar search.** A search box at the top (press **/**) finds ships, your pledges
   (including what's inside them), buy-backs and referral rewards in one go.
 - **Ship details.** Click any ship name (in search, pledge contents, or the Store's price
   list) for its specs, store price, which of your pledges and buy-backs have it, its
