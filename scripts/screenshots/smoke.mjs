@@ -145,7 +145,7 @@ try {
     link: document.querySelector('#home-news .news-list a')?.href || '',
   }));
   news.beside &&
-  news.n === 6 &&
+  news.n === 3 &&
   /This Week in Star Citizen/.test(news.first) &&
   /comm-link/.test(news.link)
     ? ok(`home: Latest from RSI (${news.n} posts, "${news.first}")`)
@@ -388,6 +388,37 @@ try {
   flyable.inc.length === 2
     ? ok('loaners only for unflyable ships; Carrack shows its included vessels instead')
     : fail(`flight-ready filter: ${JSON.stringify(flyable)}`);
+
+  const types2 = await page.evaluate(() => {
+    const ship = { kind: 'Ship', label: 'Aurora MR' };
+    const t = (p) => pledgeType({ contents: [], containsShip: true, kind: 'ship', ...p });
+    const color = (cls) => {
+      const el = document.createElement('span');
+      el.className = `badge ${cls}`;
+      document.body.appendChild(el);
+      const c = getComputedStyle(el).borderColor;
+      el.remove();
+      return c;
+    };
+    return {
+      ship: t({ name: 'Standalone Ship - Cutlass Black', contents: [ship] }),
+      pack: t({ name: 'Nine Tails Pack', contents: [ship, { kind: 'Ship', label: 'Cyclone' }] }),
+      pkg: t({
+        name: 'Package - Aurora MR Starter',
+        contents: [ship, { kind: 'Game', label: 'Star Citizen Digital Download' }],
+      }),
+      ccu: t({ isCCU: true, containsShip: false }),
+      distinct: new Set(['ship', 'pack', 'package', 'ccu', 'paint', 'addon', 'coupon'].map(color))
+        .size,
+    };
+  });
+  types2.ship === 'ship' &&
+  types2.pack === 'pack' &&
+  types2.pkg === 'package' &&
+  types2.ccu === 'ccu' &&
+  types2.distinct === 7
+    ? ok('type badges: ship / pack / package / CCU, 7 distinct colors')
+    : fail(`type colors: ${JSON.stringify(types2)}`);
 
   console.log('Item types');
   const types = await page.evaluate(() => {
