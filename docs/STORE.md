@@ -84,6 +84,12 @@ bottom. Items marked ✅ are ready in the repo; ⬜ need you to do them.
 > Stores the user's scanned hangar/buy-back/referral data and UI preferences
 > locally in the browser (`chrome.storage.local`). Nothing is sent to any server.
 
+**`unlimitedStorage`** (added in 0.2.11)
+
+> Large hangars plus their scan history (used for "what changed since last scan")
+> can exceed the default 10 MB local storage quota, which would make scans fail.
+> All data stays on the user's device; this only lifts the local size cap.
+
 **`cookies`**
 
 > Used solely to implement "Log out of RSI": clears robertsspaceindustries.com
