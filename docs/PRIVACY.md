@@ -44,7 +44,8 @@ The extension makes a small number of outbound requests, none of which carry you
 personal data:
 
 - **robertsspaceindustries.com** — to read your own account (above), to load hangar
-  thumbnails, and to look up ship art for items RSI ships
+  thumbnails, to list RSI's newest Comm-Links on the Home page (the same public list
+  for everyone), and to look up ship art for items RSI ships
   without images from RSI's public ship-matrix index. No credentials are sent for the
   ship-matrix lookup.
 - **api.frankfurter.dev** (public, read-only) — only if you pick a currency other

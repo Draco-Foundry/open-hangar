@@ -132,6 +132,19 @@ try {
     document.body.click();
     return res;
   });
+  await page
+    .waitForFunction(() => document.querySelectorAll('#home-news .news-list li').length > 0, {
+      timeout: 8000,
+    })
+    .catch(() => {});
+  const news = await page.evaluate(() => ({
+    n: document.querySelectorAll('#home-news .news-list li').length,
+    first: document.querySelector('#home-news .news-title')?.textContent || '',
+    link: document.querySelector('#home-news .news-list a')?.href || '',
+  }));
+  news.n === 6 && /This Week in Star Citizen/.test(news.first) && /comm-link/.test(news.link)
+    ? ok(`home: Latest from RSI (${news.n} posts, "${news.first}")`)
+    : fail(`home news: ${JSON.stringify(news)}`);
   menu.below && menu.inView && menu.visible
     ? ok('scan menu opens below the button, fully visible')
     : fail(`scan menu: ${JSON.stringify(menu)}`);
