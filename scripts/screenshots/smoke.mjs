@@ -288,8 +288,32 @@ try {
   // Phone width: nothing scrolls sideways.
   await page.setViewport({ width: 390, height: 844 });
   await new Promise((r) => setTimeout(r, 200));
-  const phone = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
-  phone <= 0 ? ok('home fits a 390px phone') : fail(`home at 390px overflows by ${phone}px`);
+  // Every page, not just Home (Stats' tab row once ran 142px off a phone).
+  const phone = await page.evaluate(async () => {
+    const out = {};
+    for (const v of [
+      'home',
+      'inventory',
+      'buybacks',
+      'stats',
+      'store',
+      'org',
+      'referrals',
+      'updates',
+      'developers',
+    ]) {
+      location.hash = '#' + v;
+      await new Promise((r) => setTimeout(r, 500));
+      const over = document.documentElement.scrollWidth - innerWidth;
+      if (over > 0) out[v] = over;
+    }
+    location.hash = '#home';
+    await new Promise((r) => setTimeout(r, 300));
+    return out;
+  });
+  Object.keys(phone).length === 0
+    ? ok('every page fits a 390px phone')
+    : fail(`pages overflow at 390px: ${JSON.stringify(phone)}`);
   await page.setViewport({ width: 1280, height: 900 });
 
   menu.below && menu.inView && menu.visible

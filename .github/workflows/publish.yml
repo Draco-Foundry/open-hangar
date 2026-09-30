@@ -36,7 +36,7 @@ jobs:
           ref: ${{ github.event.inputs.tag }}
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm install
       - run: npm test
       - name: Check the tag matches manifest.json
@@ -67,7 +67,7 @@ jobs:
           ref: ${{ github.event.inputs.tag }}
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - uses: actions/download-artifact@v4
         with:
           name: packages
@@ -78,9 +78,14 @@ jobs:
             echo "::notice::Firefox skipped: AMO secrets not set"; exit 0
           fi
           npm install --no-save web-ext
+          # The Svelte pages (ui/) are compiled by Vite, so AMO needs the source
+          # and build steps: attach this exact commit's source (docs/AMO-SOURCE.md
+          # explains how to rebuild it).
+          git archive --format=zip -o "$RUNNER_TEMP/open-hangar-source.zip" HEAD
           # Listed channel = the public AMO page. Don't wait for Mozilla's review.
           npx web-ext sign --channel=listed --source-dir dist/firefox \
             --api-key "$AMO_JWT_ISSUER" --api-secret "$AMO_JWT_SECRET" \
+            --upload-source-code "$RUNNER_TEMP/open-hangar-source.zip" \
             --approval-timeout 0
 
   edge:
@@ -134,7 +139,7 @@ jobs:
     steps:
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - uses: actions/download-artifact@v4
         with:
           name: packages

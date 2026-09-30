@@ -52,6 +52,13 @@ body:not(:has(#view-home.active)) .wrap > header {
   background: var(--bg);
 }
 
+/* Stats' eight tabs wrap onto a second line on narrow screens instead of running
+   off the side of a phone. */
+.stats-tabs {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
 /* Home: Citizen Card (3/4) beside For You (1/4); the card spans the row when there
    are no alerts, and on narrow windows For You drops under it. */
 .home-hero {
