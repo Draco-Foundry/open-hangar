@@ -35,7 +35,7 @@ parses the results locally. This may include:
 
 All of this is stored **only** in your browser's local extension storage
 (`chrome.storage.local`). It is never transmitted to the developer or any third
-party. You can remove it at any time with **Clear Data** on the Home page, or by
+party. You can remove it at any time with **Clear Data** in the settings menu (click your portrait), or by
 uninstalling the extension (which deletes all stored data).
 
 ## Outbound network requests
@@ -76,7 +76,7 @@ personal data:
 - **unlimitedStorage** — big hangars and buy-back lists, plus scan history, can outgrow
   the browser's default 10 MB limit; this lifts the limit. Everything still stays on
   your device.
-- **cookies** — used solely for "Log out of RSI," which clears
+- **cookies** — used solely for "Log Out of RSI," which clears
   robertsspaceindustries.com cookies so you can fully end your RSI session from the
   extension. Cookie values are never read or transmitted.
 - **host access** to robertsspaceindustries.com, to make
