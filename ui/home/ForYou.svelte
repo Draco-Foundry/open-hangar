@@ -6,7 +6,7 @@
   //  - a ship you own turned flight ready (shown for two weeks)
   //  - buy-backs that match ships on your wishlist
   //  - your enlistment anniversary (the week around it)
-  // Renders nothing when there's nothing to say (the Citizen Card then spans the row).
+  // Works the list out and hands it to the top bar's bell (it has no markup of its own).
   import { app, OH, version } from '../lib/app.svelte.js';
 
   const a = app();
@@ -17,7 +17,6 @@
   let ready = $state({}); // ship name → when we first saw it flight ready
   let onSale = $state([]); // [{ name, price }]
   let enlisted = $state(null);
-  let lastIgnored = $state(null);
   store.get(['homeIgnored', 'homeReady']).then((r) => {
     ignored = new Set(r.homeIgnored || []);
     ready = r.homeReady || {};
@@ -135,135 +134,8 @@
     const next = new Set(ignored);
     next.add(key);
     ignored = next;
-    lastIgnored = key;
     store.set({ homeIgnored: [...next].slice(-200) });
-  }
-  function undo() {
-    const next = new Set(ignored);
-    next.delete(lastIgnored);
-    ignored = next;
-    lastIgnored = null;
-    store.set({ homeIgnored: [...next] });
   }
 </script>
 
-{#if alerts.length || lastIgnored}
-  <section class="oh-p fy-card">
-    <div class="oh-ph">
-      <h3>Hangar Alerts</h3>
-      <span class="count">{alerts.length ? `${alerts.length} alert${alerts.length === 1 ? '' : 's'}` : 'All caught up'}</span>
-    </div>
-    <div class="list">
-      {#each alerts as x (x.key)}
-        <div class="fy {x.kind}">
-          <a
-            class="tx"
-            href={x.href || undefined}
-            onclick={x.go
-              ? (e) => {
-                  e.preventDefault();
-                  x.go();
-                }
-              : undefined}
-          >
-            <span class="t" title={x.title}>{x.title}</span>
-            <span class="s" title={x.sub}>{x.sub}</span>
-          </a>
-          <button type="button" class="ig" onclick={() => ignore(x.key)} title="Ignore" aria-label="Ignore: {x.title}">×</button>
-        </div>
-      {/each}
-    </div>
-    {#if lastIgnored}
-      <p class="undo">Hidden. <button type="button" onclick={undo}>Undo</button></p>
-    {/if}
-  </section>
-{/if}
-
-<style>
-  .fy-card {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-  }
-  .count {
-    font-size: 13px;
-    color: var(--muted);
-  }
-  .list {
-    display: grid;
-    align-content: start;
-  }
-  /* One plain row per alert: a thin colour edge says what kind it is. */
-  .fy {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 8px;
-    align-items: center;
-    padding: 10px 0 10px 12px;
-    border-left: 3px solid var(--accent);
-  }
-  .fy + .fy {
-    margin-top: 8px;
-  }
-  .fy.onsale,
-  .fy.good {
-    border-left-color: var(--good);
-  }
-  .fy.warn {
-    border-left-color: var(--warn);
-  }
-  .tx {
-    min-width: 0;
-    display: grid;
-    gap: 2px;
-    text-decoration: none;
-    color: inherit;
-  }
-  .t {
-    font: 700 14px/1.3 var(--font-head);
-    color: var(--head);
-  }
-  .tx:hover .t {
-    color: var(--link);
-  }
-  .s {
-    font-size: 13px;
-    color: var(--muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .ig {
-    width: 26px;
-    height: 26px;
-    padding: 0;
-    border: 0;
-    border-radius: 6px;
-    background: none;
-    color: var(--faint);
-    font-size: 18px;
-    line-height: 1;
-    cursor: pointer;
-  }
-  .ig:hover {
-    background: var(--panel-2);
-    color: var(--head);
-  }
-  .undo button {
-    border: 1px solid var(--line-2);
-    background: none;
-    border-radius: 8px;
-    padding: 3px 9px;
-    font-size: 12px;
-    color: var(--muted);
-    cursor: pointer;
-  }
-  .undo button:hover {
-    color: var(--head);
-  }
-  .undo {
-    margin: 10px 0 0;
-    font-size: 13px;
-    color: var(--muted);
-  }
-</style>
+<!-- No markup: Hangar Alerts show in the top bar's bell (dashboard.js renderBell). -->

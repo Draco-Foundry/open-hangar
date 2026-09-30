@@ -147,7 +147,8 @@ try {
         `Events (ended event not shown as live), Game Status wave, news lead + ${cards.news} items`,
       )
     : fail(`home cards: ${JSON.stringify(cards)}`);
-  // For You: a wishlist sale shows beside the card (3/4 + 1/4); Ignore hides it, Undo restores.
+  // Hangar Alerts live in the top bar's bell: a wishlist sale shows with a count, and ×
+  // ignores it. The Citizen Card has the whole row on Home.
   const home = await page.evaluate(async () => {
     OH.getShipStock = async (url) =>
       /Cutlass-Black/i.test(url)
@@ -157,29 +158,26 @@ try {
     state.wishlist = ['Cutlass Black', 'Pioneer'];
     document.dispatchEvent(new CustomEvent('oh:home'));
     await new Promise((r) => setTimeout(r, 800));
-    const fy = document.querySelector('#oh-foryou');
-    const wish = fy.textContent;
+    const bell = document.querySelector('#bell-menu');
+    const wish = bell.textContent;
+    const count = document.querySelector('#bell-n').textContent;
     const card = document.querySelector('.citizen-card').getBoundingClientRect();
-    const side = fy.getBoundingClientRect();
-    const quarter =
-      side.left > card.right && Math.abs(side.width / (card.width + side.width) - 0.25) < 0.06;
-    const saleIgnore = [...fy.querySelectorAll('.fy')]
-      .find((x) => /Cutlass Black/.test(x.textContent))
-      ?.querySelector('.ig');
-    saleIgnore?.click();
-    await new Promise((r) => setTimeout(r, 100));
-    const hidden = !/Cutlass Black is on sale/.test(fy.textContent);
-    fy.querySelector('.undo button')?.click();
-    await new Promise((r) => setTimeout(r, 100));
-    const undone = /Cutlass Black is on sale/.test(fy.textContent);
+    const full =
+      card.width > document.querySelector('.home-hero').getBoundingClientRect().width - 2;
+    const x = [...bell.querySelectorAll('.bm-row')]
+      .find((r) => /Cutlass Black/.test(r.textContent))
+      ?.querySelector('.bm-x');
+    x?.click();
+    await new Promise((r) => setTimeout(r, 150));
+    const hidden = !/Cutlass Black is on sale/.test(bell.textContent);
     state.wishlist = [];
     document.dispatchEvent(new CustomEvent('oh:home'));
     await chrome.storage.local.set({ homeIgnored: [] });
     return {
       wish,
-      quarter,
+      count,
+      full,
       hidden,
-      undone,
       guide:
         !document.querySelector('#view-home .howto') &&
         !!document.querySelector('#view-guide .howto-page details') &&
@@ -361,11 +359,14 @@ try {
   home.guide && home.cards === 0
     ? ok('how-to guide on its own page (gear menu → How to Use), off Home')
     : fail(`home layout: ${JSON.stringify(home)}`);
-  /Cutlass Black is on sale/.test(home.wish) && !/Pioneer/.test(home.wish) && home.quarter
-    ? ok('For You: wishlist sale alert, a quarter of the row beside the Citizen Card')
+  /Cutlass Black is on sale/.test(home.wish) &&
+  !/Pioneer/.test(home.wish) &&
+  home.count === '1' &&
+  home.full
+    ? ok('Hangar Alerts in the bell: wishlist sale with a count; the Citizen Card spans the row')
     : fail(`For You: ${JSON.stringify(home)}`);
-  home.hidden && home.undone && home.storeOpt
-    ? ok('For You: Ignore hides an alert, Undo brings it back; Scan has a Store option')
+  home.hidden && home.storeOpt
+    ? ok('bell: × ignores an alert; Scan has a Store option')
     : fail(`For You ignore: ${JSON.stringify(home)}`);
   const site = await page.$eval('#site-link', (e) => e.textContent).catch(() => '');
   !site.trim() && !(await page.$('#site-link button'))
