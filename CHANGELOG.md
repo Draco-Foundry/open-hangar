@@ -7,7 +7,7 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 - **Home redesign bits:** a big **Global Hangar Search** sits centered under the Citizen Card
   (press / on any page to jump to it). It searches only what's yours (pledges, buy-backs, earned
   rewards), not the store. The currency picker moved to the top right of every page.
-- Citizen Card tidied: balances are compact tiles with short amounts (¤1.2M, ¤90K; hover for the
+- Citizen Card tidied: balances are compact tiles with short amounts (¤ 1.2M, ¤ 90K; hover for the
   exact figure), referral and flair share one row, and the rescan reminder and Clear Data live
   under a settings button.
 - After a scan, Home no longer repeats the counts above the Scan button (only problems show).
