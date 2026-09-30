@@ -10,11 +10,11 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 - New: **A rebuilt Home page.** Your account value up top, with how much it's grown since your
   first scan and how it compares to its melt value, plus counts you can click to jump
   straight into Inventory with that filter on.
-- New: **Events** card: the event running right now (only while it's actually on), the last
-  one, any referral bonus event, and when your next buy-back token arrives.
-- New: **Game Status** card: the LIVE version and when it was released ("14 days ago"), and
-  what's on the test servers with the PTU wave, plus a link to the latest patch notes.
-- New: **Hangar Alerts** beside your Citizen Card: a wishlist ship on sale, a ship you own
+- New: **Game Status** beside your Citizen Card: the LIVE version and when it was released
+  ("14 days ago"), what's on the test servers with the PTU wave, a link to the latest patch
+  notes, the event running right now (only while it's actually on), any referral bonus
+  event, and when your next buy-back token arrives.
+- New: **Hangar Alerts** in the top bar's bell: a wishlist ship on sale, a ship you own
   turning flight ready, buy-backs that match your wishlist, and your enlistment anniversary.
   Ignore any you don't care about.
 - New: **Latest Acquisitions** (your five newest pledges) and **Hangar Spotlight** (a ship from

@@ -986,7 +986,7 @@ function renderAccount() {
       flairEl.hidden = !parts.length;
     }
 
-    // Wallet: Store Credit, UEC, REC, Buy-Back Tokens (with the next token's date).
+    // Wallet: Store Credit, UEC, REC, Buy-Back Tokens (the next token's date is on Game Status).
     // Big amounts are shortened (¤ 1.2M); the exact figure is in the hover text.
     // Streamer Mode turns the money and aUEC amounts into dots.
     if (balEl) {
@@ -998,8 +998,6 @@ function renderAccount() {
       const aUEC = (x) =>
         !x ? [DASH] : streamer.on ? [MASK] : ['¤ ' + compactNum(x.value), '¤ ' + fmt(x.value)];
       const store = c.store ? c.store.value / 100 : null;
-      const next = nextTokenDate();
-      const nextShort = next ? next.replace(/^\w+, /, '').replace(/, \d{4}$/, '') : '';
       setHTML(
         balEl,
         tile(
@@ -1014,7 +1012,7 @@ function renderAccount() {
             tokenTitle(),
           )}"><span class="bal-lbl">Buy-Back Tokens</span><b>${
             state.bbTokens != null ? state.bbTokens : DASH
-          }${nextShort ? `<span class="bal-next">next ${OH.escapeHtml(nextShort)}</span>` : ''}</b></a>`,
+          }</b></a>`,
       );
     }
   });

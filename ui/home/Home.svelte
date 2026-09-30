@@ -1,10 +1,9 @@
 <script>
   // Home under the Citizen Card, in priority order (docs/REDESIGN-0.3.md):
-  // value + events + game status, then your pledges + spotlight, then news + referrals.
+  // value + spotlight, then your newest pledges + news, then referrals. Game Status
+  // (with events and the next buy-back token) sits beside the Citizen Card.
   import { app, version } from '../lib/app.svelte.js';
   import ValueCard from './ValueCard.svelte';
-  import EventsCard from './EventsCard.svelte';
-  import StatusCard from './StatusCard.svelte';
   import Acquisitions from './Acquisitions.svelte';
   import Spotlight from './Spotlight.svelte';
   import News from './News.svelte';
@@ -15,19 +14,15 @@
 </script>
 
 <div class="oh-rows">
-  <div class="oh-row3">
-    {#if has}<ValueCard />{/if}
-    <EventsCard />
-    <StatusCard />
-  </div>
   {#if has}
     <div class="oh-row2">
-      <Acquisitions />
+      <ValueCard />
       <Spotlight />
     </div>
   {/if}
-  <div class="oh-row21">
+  <div class="oh-row2">
+    {#if has}<Acquisitions />{/if}
     <News />
-    {#if recruits > 0}<Referrals />{/if}
   </div>
+  {#if recruits > 0}<Referrals />{/if}
 </div>

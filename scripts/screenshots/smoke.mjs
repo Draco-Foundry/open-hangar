@@ -129,10 +129,10 @@ try {
     })
     .catch(() => {});
   const cards = await page.evaluate(() => {
-    const txt = document.querySelector('#oh-home').textContent;
+    const txt = document.querySelector('#oh-status').textContent;
     return {
-      events: /Events/.test(txt) && /Buy-Back Token/.test(txt),
-      stale: /Last: Pirate Week/.test(txt) || !/Pirate Week/.test(txt),
+      events: /Next Buy-Back Token/.test(txt),
+      stale: /Last event: Pirate Week/.test(txt) || !/Pirate Week/.test(txt),
       wave: /4\.10\.2[\s\S]{0,40}Wave 3/.test(txt) && /Released [A-Z][a-z]{2} \d+ · /.test(txt),
       news: document.querySelectorAll('#oh-home .nl').length,
       lead: document.querySelector('#oh-home .lead .p')?.textContent || '',
@@ -144,7 +144,7 @@ try {
   cards.news >= 1 &&
   /^Last week was a busy one/.test(cards.lead)
     ? ok(
-        `Events (ended event not shown as live), Game Status wave, news lead + ${cards.news} items`,
+        `Game Status beside the card: waves, events (ended not shown as live), next token; news lead + ${cards.news} items`,
       )
     : fail(`home cards: ${JSON.stringify(cards)}`);
   // Hangar Alerts live in the top bar's bell: a wishlist sale shows with a count, and ×
@@ -162,8 +162,10 @@ try {
     const wish = bell.textContent;
     const count = document.querySelector('#bell-n').textContent;
     const card = document.querySelector('.citizen-card').getBoundingClientRect();
+    // Citizen Card at three quarters, Game Status beside it.
+    const side = document.querySelector('#oh-status').getBoundingClientRect();
     const full =
-      card.width > document.querySelector('.home-hero').getBoundingClientRect().width - 2;
+      side.left > card.right && Math.abs(side.width / (card.width + side.width) - 0.25) < 0.06;
     const x = [...bell.querySelectorAll('.bm-row')]
       .find((r) => /Cutlass Black/.test(r.textContent))
       ?.querySelector('.bm-x');
@@ -363,7 +365,9 @@ try {
   !/Pioneer/.test(home.wish) &&
   home.count === '1' &&
   home.full
-    ? ok('Hangar Alerts in the bell: wishlist sale with a count; the Citizen Card spans the row')
+    ? ok(
+        'Hangar Alerts in the bell: wishlist sale with a count; Game Status a quarter beside the card',
+      )
     : fail(`For You: ${JSON.stringify(home)}`);
   home.hidden && home.storeOpt
     ? ok('bell: × ignores an alert; Scan has a Store option')
@@ -1287,7 +1291,7 @@ try {
     ];
     location.hash = '#home';
     await new Promise((r) => setTimeout(r, 400));
-    const banner = document.querySelector('#oh-home');
+    const banner = document.querySelector('#oh-status');
     return {
       before,
       after,
