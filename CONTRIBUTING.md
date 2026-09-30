@@ -1,8 +1,23 @@
 # Contributing
 
-The most valuable thing you can contribute is keeping `src/scraper/parser.js`
-working, because RSI changes their site and the rest of the extension depends on
-this layer staying honest.
+## How to Help
+
+Open Hangar is maintained by one person, and its code is **source available** under
+the [PolyForm Strict License](LICENSE): you're welcome to read and audit every line,
+but not to redistribute it or publish changed versions.
+
+- **Bug reports and ideas are always welcome.** Open an
+  [issue](https://github.com/Draco-Foundry/open-hangar/issues) or post in
+  [Ideas](https://github.com/Draco-Foundry/open-hangar/discussions/categories/ideas).
+- **Unsolicited code changes (pull requests) aren't accepted.** If you've found a fix,
+  describe it in an issue instead; if a code change is wanted, you'll be asked first.
+
+The notes below document how the extension works, for anyone auditing it.
+
+## Keeping the Parser Honest
+
+The most important part to keep working is `src/scraper/parser.js`, because RSI
+changes their site and the rest of the extension depends on this layer staying honest.
 
 ## How auth works
 

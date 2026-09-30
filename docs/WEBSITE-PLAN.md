@@ -193,6 +193,43 @@ Migrations in `app/migrations/`; the account, org and history tables are in
 - Rate limits on the API; payload size cap; token revocation.
 - Fan-site notice on the site (same as openhangar.space).
 
+## Launch: Support and Transparency (scheduled, 2026-09-30)
+
+Owner's intent: no profit, donations only, to offset running costs. The website stays
+free for everyone; nothing is ever locked behind support.
+
+- **Donations:** platform to be decided (Patreon, Ko-fi, GitHub Sponsors or Open
+  Collective). Go where most supporters already are, even with higher fees.
+- **Costs page** on the website, kept current: every fee listed (Cloudflare Pro,
+  Workers Paid, both domains' renewals, anything else) and "this month: $X of $Y
+  covered".
+- **Supporters page in the extension:** opt-in list of supporters with RSI handle and
+  favourite ship (with its picture); the list lives on the website, the extension shows
+  it. Plus a cosmetic "Supporter" badge on website profiles. No perks that lock features.
+- Check CIG's fan-content guidelines before launching donations.
+- **Money handling (not legal or tax advice; check with a tax preparer before launch):**
+  donations to the owner personally are usually taxable income, offset by running costs.
+  Start with a separate bank account used only for Open Hangar; consider an LLC once
+  donations are regular; a nonprofit is overkill. Open Collective's usual host (Open
+  Source Collective) needs an OSI licence, which PolyForm Strict isn't, so donations go
+  direct (Ko-fi / Patreon / GitHub Sponsors) and the Costs page is the ledger.
+- **Surplus policy, published before the first donation:** keep a reserve of about 12
+  months of costs; once it's full, show "Fully funded, thank you" and stop asking;
+  anything beyond goes to a named Star Citizen community cause (e.g. starcitizen.tools,
+  whose data Open Hangar uses, or a charity drive), with every transfer published.
+
+## License and Repo (awaiting owner's go, 2026-09-30)
+
+The owner doesn't want forks running their own version. Proposed: switch future
+releases from MIT to **PolyForm Strict 1.0.0** (code stays public and auditable; no
+redistribution or modified versions). Versions already released stay MIT. The owner is
+the only author and the repo has no forks, so the switch is clean. Needs: LICENSE file,
+a third-party notice for HangarXPLOR's MIT code, README badge and wording, the site's
+"MIT-licensed" line and schema, the Firefox listing's license field, and "source
+available" instead of "open source" everywhere. Also: `main` requires the owner's
+approval, and CONTRIBUTING says unsolicited code changes aren't accepted (ideas and bug
+reports welcome).
+
 ## Launch Batch (scheduled with the items above)
 
 Owner ideas, 2026-09-30. Ship together when sign-ups open:

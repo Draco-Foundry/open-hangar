@@ -2,7 +2,7 @@
 
 _Last updated: 2026-06-07_
 
-Open Hangar is an open-source browser extension that reads your own Star Citizen /
+Open Hangar is a source-available browser extension that reads your own Star Citizen /
 Roberts Space Industries (RSI) account data and stores it **locally in your
 browser**. This policy explains exactly what it does and does not do with data.
 
