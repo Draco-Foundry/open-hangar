@@ -1,7 +1,7 @@
 # 0.3.0: The Redesign
 
 Decided 2026-09-30. One big extension release: every page redesigned and rebuilt in
-**Svelte**, in the **Hangar Deck** style. Built on a branch while `main` keeps shipping
+**Svelte**, in one look: **Clean Pro**. Built on a branch while `main` keeps shipping
 small fixes; beta-tested before the stores.
 
 ## What Stays
@@ -13,28 +13,17 @@ small fixes; beta-tested before the stores.
 - Colour meanings (Color Key): green good news, amber worth a look, red a problem, blue
   clickable, one colour per item type. Headings in Title Case.
 
-## Looks (Themes)
+## Style: Clean Pro (the Only Look)
 
-Every player gets a choice, on the same layout: a **Look** setting (next to the currency
-picker) swaps colours, fonts, corners and glow; boxes, order and components never change.
-In Svelte a look is mostly a token set plus a few style rules, like the website's Design
-picker.
+The owner's call (2026-09-30): **one theme, simple and easy to read**. No theme picker,
+no alternate looks; light mode stays the one scheduled option. Reference mockup: the
+"Open Hangar Home Styles" artifact (Clean Pro tab).
 
-- **Hangar Deck**: default.
-- **Clean Pro**: graphite, heavy numbers, colour only for meaning; for players who want
-  pure readability. Ships in 0.3.0 with Hangar Deck.
-- **MobiGlas**: frosted glass, cut corners, HUD brackets. Later, if players ask for it.
-- Every page is checked in each look (and in light mode once it exists). Once sync is
-  live, the chosen look can follow the account between extension and website.
-
-## Style: Hangar Deck (Default Look)
-
-Deep navy hull, cyan running lights. Ship art carries the colour; only the most important
-number on a page glows. Calm, premium, readable. Reference mockup: the "Open Hangar Home
-Styles" artifact (Hangar Deck tab).
-
-- Display: Chakra Petch (headings, big numbers). Body: IBM Plex Sans. Data: IBM Plex Mono.
-- Section labels: small caps-style uppercase with a cyan marker.
+- Graphite surfaces, no glow, no decoration. Colour only where it means something (the
+  Color Key); everything else is neutral.
+- Heavy, clear numbers: Manrope for headings and figures, Source Sans 3 for body text.
+- Panels separated by fill, not borders; generous spacing; links in counts underlined
+  quietly so they read as clickable.
 - Big numbers shorten past a threshold (counts from 1,000: "1.2K"; money from $100,000:
   "$1.24M"), exact value on hover, so huge hangars never break a layout.
 
