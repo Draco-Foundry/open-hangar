@@ -121,3 +121,32 @@ test('a role held only by concept ships is covered but not ready', () => {
   assert.equal(mining.ready, 1);
   assert.equal(f.ships.find((s) => s.name === 'Pioneer').status, 'in-concept');
 });
+
+test('every ship role in the bundled ship list belongs to an org role', () => {
+  const list = require('../src/data/ship-catalog.json');
+  const ships = Array.isArray(list) ? list : list.list || list.ships || list.data;
+  // Land-claim beacons aren't ships and have no role.
+  const unplaced = ships
+    .filter((v) => !/geotack/i.test(v.name))
+    .filter(
+      (v) =>
+        !v.role || !v.role.split(' / ').every((one) => OH.ORG_ROLES.some((r) => r.re.test(one))),
+    )
+    .map((v) => `${v.name}: ${v.role || '(no role)'}`);
+  assert.deepEqual(unplaced, []);
+});
+
+test('the Kraken counts as a carrier (its second role)', () => {
+  const f = OH.orgFleet(
+    [{ name: 'me', ships: [{ name: 'Kraken' }] }],
+    () => ({
+      lname: 'kraken',
+      name: 'Kraken',
+      role: 'Multi-Role / Light Carrier',
+      status: 'in-concept',
+    }),
+    () => null,
+  );
+  assert.equal(f.roles.find((r) => r.key === 'carrier').count, 1);
+  assert.equal(f.roles.find((r) => r.key === 'multirole').count, 1);
+});
