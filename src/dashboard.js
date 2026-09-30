@@ -689,8 +689,19 @@ function realImage(url) {
 // name. Add-ons/coupons return '' (don't fetch art for non-ships).
 function resolveImageName(p) {
   if (p.isCCU && p.ccu && p.ccu.to) return p.ccu.to;
-  if (p.kind === 'ship' || p.containsShip) return p.name || '';
-  return '';
+  if (!(p.kind === 'ship' || p.containsShip)) return '';
+  const name = p.name || '';
+  // "Package - Aurora MR Starter Pack" isn't a ship name: use the first ship inside
+  // (a pledge's contents list, or a buy-back's "Aurora MR · Star Citizen…" line).
+  if (/^(package|packs?|bundles?)\s*-|\b(pack|starter|bundle)\b/i.test(name)) {
+    const ship = (p.contents || []).find((c) => /ship|vehicle/i.test(c.kind || '') && c.label);
+    if (ship) return ship.label;
+    const first = String(p.contains || '')
+      .split('·')[0]
+      .trim();
+    if (first && !/digital download|insurance|game package/i.test(first)) return first;
+  }
+  return name;
 }
 
 // After a card grid renders, fill in missing ship art from the wiki API (lazy,
@@ -4745,8 +4756,9 @@ function buybackUrl(b) {
 function buybackCardHtml(b) {
   const ccuArt = b.ccu && b.ccu.to && !b.shipArt; // show the target ship (see cardHtml)
   const img = ccuArt ? null : realImage(b.image);
-  // A CCU resolves art from its target ship; a plain buy-back from its own name.
-  const resolve = b.ccu && b.ccu.to ? b.ccu.to : b.name; // also the broken-image fallback
+  // A CCU resolves art from its target ship; a package from the first ship in it; a
+  // plain buy-back from its own name. Also the broken-image fallback.
+  const resolve = b.ccu && b.ccu.to ? b.ccu.to : resolveImageName({ ...b, kind: 'ship' }) || b.name;
   const thumb = img
     ? `<img class="thumb" loading="lazy" src="${OH.escapeHtml(img)}" alt="">`
     : `<div class="thumb placeholder">Buy-Back</div>`;

@@ -23,6 +23,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 - Improved: the top menu stays pinned while you scroll, on every page except Home.
 - Improved: search moved into the Citizen Card (press / on any page, as before).
 - Fixed: Stats' tabs ran off the side of a phone screen; they wrap now.
+- Fixed: pictures, prices and specs for the original Auroras ("Aurora MR", "Aurora LN"…), which
+  RSI renamed "Aurora Mk I". Packages and starter packs ("Aurora MR Starter Pack") now show
+  the ship inside instead of a blank box.
 - Changed: **Open Hangar's code is now source available** (PolyForm Strict License). It stays public on GitHub so anyone can read and audit it, but it can't be copied into other versions. Earlier releases stay MIT.
 - Improved: Citizen Card: long org names wrap to two lines at most (full name on hover), and the
   "Open Hangar vX · What's new · Star Citizen X" line moved to the page footer.

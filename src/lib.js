@@ -1655,6 +1655,17 @@
   // Score how well a catalog entry's (lowercased) name matches the query. 0 = no
   // match. Higher = better. Shared by both sources so fuzz rules stay consistent.
   function nameScore(n, q) {
+    // RSI renamed the original Auroras "Aurora Mk I …" (the Mk II is a new ship), but
+    // pledges and buy-backs still say "Aurora MR": also try the name without "Mk I".
+    // "\bmk i\b" can't match "mk ii".
+    const bare = n
+      .replace(/\bmk i\b/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    if (bare !== n && !/\bmk i\b/.test(q)) return Math.max(rawScore(n, q), rawScore(bare, q) - 1);
+    return rawScore(n, q);
+  }
+  function rawScore(n, q) {
     if (n === q) return 100; // exact
     if (n.startsWith(q + ' ')) return 80 - (n.length - q.length) * 0.1; // canonical extends query (Genesis → Genesis Starliner)
     if (q.startsWith(n + ' ')) return 70 + n.length * 0.1; // query extends canonical (PTV Buggy → PTV); prefer longer core
