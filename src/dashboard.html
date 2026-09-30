@@ -469,94 +469,6 @@
         font-size: 12px;
       }
 
-      .home-scroll {
-        flex: 1;
-        min-height: 0;
-        overflow: auto;
-      }
-      .twisc-date {
-        font-size: 13px;
-        font-weight: 400;
-        margin-left: 6px;
-      }
-      .twisc-img {
-        display: block;
-        width: 100%;
-        height: 130px;
-        object-fit: cover;
-        border-radius: 8px;
-        margin: 0 0 10px;
-      }
-      .twisc-lead {
-        margin: 0;
-        font-size: 13px;
-        line-height: 1.55;
-      }
-
-      .home-list {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-      }
-      .home-list li {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 6px 0;
-        border-bottom: 1px solid var(--line);
-        font-size: 13px;
-      }
-      .home-list li:last-child {
-        border-bottom: 0;
-      }
-      .home-more {
-        margin: 8px 0 0;
-        font-size: 13px;
-      }
-
-      .home-more a {
-        color: var(--link);
-      }
-      .news-list {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        display: grid;
-        gap: 2px;
-      }
-      .news-list a {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 6px;
-        border-radius: 8px;
-      }
-
-      .news-thumb {
-        width: 84px;
-        height: 48px;
-        flex: none;
-        object-fit: cover;
-        border-radius: 6px;
-        background: var(--panel-2);
-      }
-      .news-text {
-        display: flex;
-        flex-direction: column;
-        min-width: 0;
-      }
-      .news-title {
-        font-size: 13px;
-        font-weight: 600;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .news-meta {
-        font-size: 12px;
-        color: var(--muted);
-      }
-
       .home-about p,
       .home-about li {
         color: var(--text);
@@ -587,76 +499,6 @@
         font-weight: 500;
       }
 
-      .flair {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 8px 12px;
-        font-size: 13px;
-        color: var(--text);
-        text-decoration: none;
-        cursor: pointer;
-        transition: border-color 0.12s ease;
-      }
-      .flair:hover {
-        border-color: var(--accent);
-      }
-
-      .flair-lbl {
-        color: var(--muted);
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.03em;
-      }
-      .flair.sub {
-        border-color: var(--rsi-gold-line);
-      }
-      .flair.sub b {
-        color: var(--rsi-gold);
-      }
-      /* Centurion → silver */
-      .flair.concierge {
-        border-color: var(--rsi-club-line);
-      }
-      .flair.concierge b {
-        color: var(--rsi-club);
-      }
-
-      .bal {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 8px 12px;
-        font-size: 14px;
-      }
-      .bal-lbl {
-        color: var(--muted);
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.03em;
-      }
-      .bal b {
-        font-variant-numeric: tabular-nums;
-      }
-      .bal.store b {
-        color: var(--text);
-      }
-      .bal.uec b {
-        color: var(--text);
-      }
-      .bal.rec b {
-        color: var(--text);
-      }
-      a.bal.bbt {
-        text-decoration: none;
-        color: inherit;
-      }
-      .bal.bbt b {
-        color: var(--text);
-      }
       .inv-section + .inv-section {
         margin-top: 22px;
       }
@@ -3323,23 +3165,54 @@
             >
               ▾
             </button>
-            <div id="scan-menu" class="scan-menu" hidden>
-              <label class="scan-opt"
-                ><input type="checkbox" class="scan-src" value="hangar" checked /> Inventory</label
+            <div id="scan-menu" class="scan-menu sm-rich" hidden>
+              <div class="sm-head">
+                <span>What to Scan</span
+                ><button type="button" class="sm-all" data-scan-all>Select All</button>
+              </div>
+              <label class="sm-opt"
+                ><input
+                  type="checkbox"
+                  class="scan-src"
+                  value="hangar"
+                  data-name="Inventory"
+                  checked
+                /><span class="sm-txt"
+                  ><b>Inventory</b><small>Your pledges, ships and upgrades</small></span
+                ></label
               >
-              <label class="scan-opt"
-                ><input type="checkbox" class="scan-src" value="buybacks" checked />
-                Buy-Backs</label
+              <label class="sm-opt"
+                ><input
+                  type="checkbox"
+                  class="scan-src"
+                  value="buybacks"
+                  data-name="Buy-Backs"
+                  checked
+                /><span class="sm-txt"
+                  ><b>Buy-Backs</b><small>Melted pledges you can get back</small></span
+                ></label
               >
-              <label class="scan-opt"
-                ><input type="checkbox" class="scan-src" value="referrals" checked />
-                Referrals</label
+              <label class="sm-opt"
+                ><input
+                  type="checkbox"
+                  class="scan-src"
+                  value="referrals"
+                  data-name="Referrals"
+                  checked
+                /><span class="sm-txt"
+                  ><b>Referrals</b><small>Recruits and the rewards you've earned</small></span
+                ></label
               >
-              <label
-                class="scan-opt"
-                title="Is each ship on your wishlist in RSI's store right now?"
-                ><input type="checkbox" class="scan-src" value="store" checked /> Store
-                (wishlist)</label
+              <label class="sm-opt"
+                ><input
+                  type="checkbox"
+                  class="scan-src"
+                  value="store"
+                  data-name="Store"
+                  checked
+                /><span class="sm-txt"
+                  ><b>Store</b><small>Is anything on your wishlist for sale?</small></span
+                ></label
               >
               <button id="scan-selected" class="scan-go">Scan Now</button>
             </div>
@@ -3453,7 +3326,6 @@
             </div>
             <!-- Scan progress and messages (kept outside cc-account so they show signed out too). -->
             <div class="cc-status">
-              <div class="scanned" id="scanned-home" hidden></div>
               <div id="status"></div>
             </div>
             <!-- Shown instead of the card content when signed out of RSI -->
@@ -3473,6 +3345,20 @@
           </div>
           <aside id="oh-foryou" aria-label="Hangar Alerts"></aside>
         </div>
+        <!-- First run (nothing scanned yet): a big welcome with Scan All Now; the
+             search and the Home cards show once there's something to show. -->
+        <section class="oh-welcome" id="oh-welcome" hidden>
+          <h2>Welcome to Open Hangar</h2>
+          <p>
+            Your whole Star Citizen hangar in one place: what it's worth, your buy-backs, your
+            referrals and more. Everything stays on this computer.
+          </p>
+          <button type="button" class="welcome-scan" id="welcome-scan">Scan All Now</button>
+          <p class="welcome-note" id="welcome-note">
+            A big hangar takes about a minute. To scan just some of it, use the ▾ next to Scan at
+            the top.
+          </p>
+        </section>
         <!-- Global Hangar Search: its own line under the card (owner, 2026-09-30); the
              right quarter is kept for the website Connect button at launch. -->
         <div class="home-search">

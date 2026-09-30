@@ -25,7 +25,11 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   on any page, as before) and much richer results: a plain yes or no first, then each match
   with its picture, what it's inside, its key facts and its price.
 - New: **Scan lives in the top menu** on every page. It says **Scan All**, or **Scan Custom**
-  when you untick something in its ▾ menu, and it remembers your choice.
+  when you untick something in its ▾ menu (which now explains each option), and it
+  remembers your choice.
+- New: **A welcome screen** on Home until your first scan, with one big **Scan All Now**.
+- Improved: the "buy-backs match your wishlist" alert opens Buy-Backs showing just those
+  buy-backs, with a Show all button.
 - New: **The gear menu** (top right) holds your currency, **Streamer Mode**, the rescan
   reminder, **Log Out of RSI** (for switching accounts; your saved data stays), Clear Data, and
   the Updates and Developers pages.
