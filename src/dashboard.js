@@ -7038,9 +7038,10 @@ function renderEventBanner() {
   el.hidden = false;
 }
 
-// --- Global search (header) ------------------------------------------------
-// One box over everything: ships (catalog), hangar pledges (names and what's
-// inside), buy-backs and referral rewards. "/" focuses it; Esc closes.
+// --- Global hangar search (Home) ------------------------------------------------
+// Searches what's yours: hangar pledges (names and what's inside), buy-backs
+// and earned referral rewards. Not the store catalog: a ship you don't own
+// finds nothing. "/" focuses it; Esc closes.
 const gsearch = $('#gsearch');
 const gsearchOut = $('#gsearch-results');
 function closeGlobalSearch() {
@@ -7057,17 +7058,6 @@ function globalSearchHtml(q) {
     rows.length
       ? `<div class="gs-group"><div class="gs-title">${title}</div>${rows.join('')}</div>`
       : '';
-  const owned = new Map(ownedShips().map((s) => [shipKey(s.label), s.pledges.length]));
-  const ships = (state.catalog || [])
-    .filter((v) => has(v.name))
-    .sort((a, b) => (owned.has(shipKey(b.name)) ? 1 : 0) - (owned.has(shipKey(a.name)) ? 1 : 0))
-    .slice(0, 6)
-    .map((v) => {
-      const n = owned.get(shipKey(v.name));
-      return `<button type="button" class="gs-row" data-ship="${esc(v.name)}"><span>${esc(v.name)}</span><span class="muted">${
-        n ? `owned ×${n}` : v.msrp ? dollars(v.msrp) : ''
-      }</span></button>`;
-    });
   const pledges = state.items
     .filter((p) => has(plainName(p)) || (p.contents || []).some((c) => has(c.label)))
     .slice(0, 8)
@@ -7107,10 +7097,7 @@ function globalSearchHtml(q) {
         )
     : [];
   const html =
-    group('Ships', ships) +
-    group('Your Hangar', pledges) +
-    group('Buy-Backs', bbs) +
-    group('Referral Rewards', rewards);
+    group('Your Hangar', pledges) + group('Buy-Backs', bbs) + group('Referral Rewards', rewards);
   return html || `<div class="gs-empty muted">Nothing matches "${esc(q.trim())}".</div>`;
 }
 if (gsearch && gsearchOut) {

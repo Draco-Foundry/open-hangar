@@ -418,13 +418,23 @@ try {
     box.dispatchEvent(new Event('input'));
     const out = document.querySelector('#gsearch-results');
     const groups = [...out.querySelectorAll('.gs-title')].map((t) => t.textContent);
-    const ship = out.querySelector('.gs-row[data-ship]');
-    const shipName = ship && ship.dataset.ship;
-    ship?.click();
+    const hangarRow = !!out.querySelector('.gs-row[data-open-item]');
+    const storeRow = !!out.querySelector('.gs-row[data-ship]');
+    // A ship you don't own isn't in your hangar: nothing to show.
+    box.value = 'Idris';
+    box.dispatchEvent(new Event('input'));
+    const notOwned = /Nothing matches/.test(out.textContent);
+    box.value = '';
+    box.dispatchEvent(new Event('input'));
+    const shipName = ownedShips().find((s) => /cutlass/i.test(s.label))?.label;
+    openShipModal(shipName);
     await new Promise((r) => setTimeout(r, 300));
     const modal = document.querySelector('#modal-body');
     return {
       groups,
+      hangarRow,
+      storeRow,
+      notOwned,
       shipName,
       closed: out.hidden,
       title: modal.querySelector('.modal-name')?.textContent,
@@ -433,8 +443,8 @@ try {
     };
   });
   await page.evaluate(() => document.querySelector('#modal-close').click());
-  gs.groups.includes('Ships') && gs.groups.includes('Your Hangar') && gs.closed
-    ? ok(`search "cutlass": ${gs.groups.join(', ')}`)
+  !gs.groups.includes('Ships') && gs.hangarRow && !gs.storeRow && gs.notOwned && gs.closed
+    ? ok(`hangar search "cutlass": ${gs.groups.join(', ')}; "Idris" (not owned) finds nothing`)
     : fail(`global search: ${JSON.stringify(gs)}`);
   gs.title && gs.inHangar && gs.links >= 3
     ? ok(`ship window for ${gs.title}: specs, pledges, links`)
