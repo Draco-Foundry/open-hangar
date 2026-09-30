@@ -198,6 +198,11 @@ Clear All) either way. Picking keeps the sidebar open (never closes on a click).
    and page count under it, e.g. "Buy-backs · page 8 · 800 items", then "Hangar",
    etc.). Later scans: the top-bar Scan button's fill already shows progress; the detail
    line goes in its tooltip and the ▾ menu, nothing on the page moves.
+8. **Referrals share image: "best month" needs its date.** The generated image
+   (src/dashboard.js ~4505, `best = Math.max(...byMonth.values())`) keeps only the
+   count, so the box reads "12 · best month". Keep the month key like the Referrals page
+   does (~4729) and label it "best month · Mar 2024" (month name, not "2024-03"); ties
+   go to the most recent month. Check the label still fits the box at 4 across.
 
 ## Scheduled Alongside
 
