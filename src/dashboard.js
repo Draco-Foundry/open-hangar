@@ -7360,7 +7360,7 @@ function renderBell() {
   const esc = OH.escapeHtml;
   setHTML(
     menu,
-    `<div class="bm-head"><span>${list.length ? `${list.length} alert${list.length === 1 ? '' : 's'}` : 'All caught up'}</span><a href="#home" data-view="home">All on Home</a></div>` +
+    `<div class="bm-head"><span>${list.length ? `${list.length} alert${list.length === 1 ? '' : 's'}` : 'All caught up'}</span>${list.length ? '<button type="button" class="bm-clear" data-clear-alerts>Clear All</button>' : ''}</div>` +
       (list.length
         ? list
             .map(
@@ -7374,6 +7374,11 @@ function renderBell() {
 document.addEventListener('oh:alerts', renderBell);
 $('#bell-menu')?.addEventListener('click', (e) => {
   const list = window.OHApp?.alerts?.list || [];
+  // Clear All ignores every alert showing (each comes back if something new happens).
+  if (e.target.closest('[data-clear-alerts]')) {
+    for (const x of list) window.OHApp.alerts.ignore(x.key);
+    return;
+  }
   const ig = e.target.closest('[data-ignore]');
   if (ig) {
     window.OHApp.alerts.ignore(list[+ig.dataset.ignore].key);

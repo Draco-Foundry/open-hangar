@@ -1005,12 +1005,15 @@ nav .nav-n:empty {
   text-transform: uppercase;
   color: var(--muted);
 }
-.bm-head a {
+.bm-clear {
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--link);
+  font: 700 12px var(--font-head);
   letter-spacing: 0;
   text-transform: none;
-  font-size: 12px;
-  text-decoration: none;
+  cursor: pointer;
 }
 .bm-row {
   display: grid;
