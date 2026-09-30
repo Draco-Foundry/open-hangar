@@ -1126,7 +1126,10 @@ function renderFooter() {
   const ideas = link(IDEAS_URL, 'Suggest a feature');
   // The versions line (Open Hangar vX · What's new · Star Citizen X) lives here,
   // not on the Citizen Card: it's reference info, not about your character.
-  setHTML($('#footer'), `${gh} · ${dc} · ${ideas} · MIT License · <span id="versions"></span>`);
+  setHTML(
+    $('#footer'),
+    `${gh} · ${dc} · ${ideas} · Source Available · <span id="versions"></span>`,
+  );
   renderVersions();
   const dev = $('#dev-links');
   if (dev)

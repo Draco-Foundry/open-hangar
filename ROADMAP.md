@@ -1,6 +1,6 @@
 # Roadmap — toward an all-in-one RSI hangar extractor
 
-**Vision:** an open-source, local-first browser extension that scrapes _all_ of a
+**Vision:** a source-available, local-first browser extension that scrapes _all_ of a
 user's own RSI / Star Citizen account data, organizes it into one clean, portable
 database, and (eventually) lets the user share that database with other tools/sites.
 

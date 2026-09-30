@@ -20,7 +20,7 @@ Locales: zh_CN (简体中文), fr, ko, es, pt_BR, de, uk, it, cs, ru.
 
 ## 简体中文 (zh_CN)
 
-Open Hangar 是一款免费、开源的星际公民账户助手。它读取 RSI 已经展示给你的内容（机库、回购、余额、军团和推荐奖励），把它们整理成真正好用的样子。
+Open Hangar 是一款免费的星际公民账户助手。它读取 RSI 已经展示给你的内容（机库、回购、余额、军团和推荐奖励），把它们整理成真正好用的样子。
 
 你能得到：
 • 机库价值：你的舰船按今天的商店价格值多少，以及你当初付了多少
@@ -34,7 +34,7 @@ Open Hangar 是一款免费、开源的星际公民账户助手。它读取 RSI 
 
 隐私优先：它完全在你的浏览器里运行，使用你已经登录的 RSI 会话。不需要密码、不需要账户、没有服务器。任何数据都不会离开你的设备。
 
-MIT 许可，开源于 GitHub。欢迎提出想法和报告问题。
+源代码公开于 GitHub。欢迎提出想法和报告问题。
 
 非官方粉丝作品。与 Cloud Imperium Games 或 RSI 无关。
 
@@ -42,7 +42,7 @@ MIT 许可，开源于 GitHub。欢迎提出想法和报告问题。
 
 ## Français (fr)
 
-Open Hangar est un compagnon gratuit et open source pour votre compte Star Citizen. Il lit ce que RSI vous montre déjà (votre hangar, vos rachats, vos soldes, votre organisation et vos parrainages) et en fait quelque chose de vraiment utile.
+Open Hangar est un compagnon gratuit pour votre compte Star Citizen. Il lit ce que RSI vous montre déjà (votre hangar, vos rachats, vos soldes, votre organisation et vos parrainages) et en fait quelque chose de vraiment utile.
 
 Ce que vous obtenez :
 • Valeur du hangar : ce que valent vos vaisseaux au prix actuel de la boutique, et ce que vous avez payé
@@ -56,7 +56,7 @@ Ce que vous obtenez :
 
 Privé par conception : tout tourne dans votre navigateur, avec la session RSI où vous êtes déjà connecté. Pas de mot de passe, pas de compte, pas de serveur. Rien ne quitte votre appareil.
 
-Sous licence MIT et open source sur GitHub. Idées et rapports de bugs toujours bienvenus.
+Code source public sur GitHub. Idées et rapports de bugs toujours bienvenus.
 
 Non officiel, fait par un fan. Sans lien avec Cloud Imperium Games ou RSI.
 
@@ -64,7 +64,7 @@ Non officiel, fait par un fan. Sans lien avec Cloud Imperium Games ou RSI.
 
 ## 한국어 (ko)
 
-Open Hangar는 스타 시티즌 계정을 위한 무료 오픈 소스 도우미입니다. RSI가 이미 보여 주는 정보(격납고, 바이백, 잔액, 조직, 추천)를 읽어서 실제로 쓸모 있게 정리해 줍니다.
+Open Hangar는 스타 시티즌 계정을 위한 무료 도우미입니다. RSI가 이미 보여 주는 정보(격납고, 바이백, 잔액, 조직, 추천)를 읽어서 실제로 쓸모 있게 정리해 줍니다.
 
 주요 기능:
 • 격납고 가치: 오늘 상점 가격 기준 함선 가치와 실제로 지불한 금액
@@ -78,7 +78,7 @@ Open Hangar는 스타 시티즌 계정을 위한 무료 오픈 소스 도우미�
 
 개인정보 보호 중심: 이미 로그인한 RSI 세션을 사용해 브라우저 안에서만 작동합니다. 비밀번호도, 계정도, 서버도 없습니다. 어떤 데이터도 기기 밖으로 나가지 않습니다.
 
-MIT 라이선스, GitHub에서 오픈 소스로 공개되어 있습니다. 아이디어와 버그 제보는 언제나 환영합니다.
+소스 코드는 GitHub에 공개되어 있습니다. 아이디어와 버그 제보는 언제나 환영합니다.
 
 비공식 팬 제작물입니다. Cloud Imperium Games 또는 RSI와 관련이 없습니다.
 
@@ -86,7 +86,7 @@ MIT 라이선스, GitHub에서 오픈 소스로 공개되어 있습니다. 아�
 
 ## Español (es)
 
-Open Hangar es un compañero gratuito y de código abierto para tu cuenta de Star Citizen. Lee lo que RSI ya te muestra (tu hangar, buy-backs, saldos, organización y referidos) y lo convierte en algo que de verdad puedes usar.
+Open Hangar es un compañero gratuito para tu cuenta de Star Citizen. Lee lo que RSI ya te muestra (tu hangar, buy-backs, saldos, organización y referidos) y lo convierte en algo que de verdad puedes usar.
 
 Lo que obtienes:
 • Valor del hangar: cuánto valen tus naves al precio actual de la tienda, y cuánto pagaste
@@ -100,7 +100,7 @@ Lo que obtienes:
 
 Privado por diseño: funciona por completo en tu navegador, con la sesión de RSI que ya tienes abierta. Sin contraseña, sin cuenta, sin servidor. Nada sale de tu dispositivo.
 
-Licencia MIT y código abierto en GitHub. Las ideas y los reportes de errores siempre son bienvenidos.
+Código fuente público en GitHub. Las ideas y los reportes de errores siempre son bienvenidos.
 
 No oficial, hecho por fans. Sin relación con Cloud Imperium Games ni RSI.
 
@@ -108,7 +108,7 @@ No oficial, hecho por fans. Sin relación con Cloud Imperium Games ni RSI.
 
 ## Português Brasileiro (pt_BR)
 
-O Open Hangar é um companheiro gratuito e de código aberto para a sua conta do Star Citizen. Ele lê o que a RSI já mostra para você (seu hangar, buy-backs, saldos, organização e indicações) e transforma tudo em algo que você realmente consegue usar.
+O Open Hangar é um companheiro gratuito para a sua conta do Star Citizen. Ele lê o que a RSI já mostra para você (seu hangar, buy-backs, saldos, organização e indicações) e transforma tudo em algo que você realmente consegue usar.
 
 O que você ganha:
 • Valor do hangar: quanto suas naves valem no preço atual da loja, e quanto você pagou
@@ -122,7 +122,7 @@ O que você ganha:
 
 Privado por natureza: roda inteiramente no seu navegador, usando a sessão da RSI em que você já está logado. Sem senha, sem conta, sem servidor. Nada sai do seu dispositivo.
 
-Licença MIT e código aberto no GitHub. Ideias e relatos de bugs são sempre bem-vindos.
+Código-fonte público no GitHub. Ideias e relatos de bugs são sempre bem-vindos.
 
 Não oficial, feito por fãs. Sem vínculo com a Cloud Imperium Games ou a RSI.
 
@@ -130,7 +130,7 @@ Não oficial, feito por fãs. Sem vínculo com a Cloud Imperium Games ou a RSI.
 
 ## Deutsch (de)
 
-Open Hangar ist ein kostenloser Open-Source-Begleiter für deinen Star Citizen Account. Er liest, was RSI dir sowieso schon zeigt (deinen Hangar, Buy-Backs, Guthaben, Org und Empfehlungen), und macht daraus etwas, das du wirklich nutzen kannst.
+Open Hangar ist ein kostenloser Begleiter für deinen Star Citizen Account. Er liest, was RSI dir sowieso schon zeigt (deinen Hangar, Buy-Backs, Guthaben, Org und Empfehlungen), und macht daraus etwas, das du wirklich nutzen kannst.
 
 Was du bekommst:
 • Hangarwert: was deine Schiffe zu heutigen Shop-Preisen wert sind, und was du bezahlt hast
@@ -144,7 +144,7 @@ Was du bekommst:
 
 Privat von Grund auf: läuft komplett in deinem Browser, mit der RSI-Sitzung, in der du schon angemeldet bist. Kein Passwort, kein Konto, kein Server. Nichts verlässt dein Gerät.
 
-MIT-lizenziert und Open Source auf GitHub. Ideen und Fehlerberichte sind immer willkommen.
+Quellcode öffentlich auf GitHub. Ideen und Fehlerberichte sind immer willkommen.
 
 Inoffiziell und von Fans gemacht. Nicht verbunden mit Cloud Imperium Games oder RSI.
 
@@ -152,7 +152,7 @@ Inoffiziell und von Fans gemacht. Nicht verbunden mit Cloud Imperium Games oder 
 
 ## Українська (uk)
 
-Open Hangar це безкоштовний помічник з відкритим кодом для твого акаунта Star Citizen. Він читає те, що RSI вже показує тобі (ангар, buy-back, баланси, організацію й реферали), і перетворює це на щось справді корисне.
+Open Hangar це безкоштовний помічник для твого акаунта Star Citizen. Він читає те, що RSI вже показує тобі (ангар, buy-back, баланси, організацію й реферали), і перетворює це на щось справді корисне.
 
 Що ти отримуєш:
 • Вартість ангара: скільки коштують твої кораблі за сьогоднішніми цінами магазину і скільки ти заплатив
@@ -166,7 +166,7 @@ Open Hangar це безкоштовний помічник з відкритим
 
 Приватність за замовчуванням: усе працює у твоєму браузері з сесією RSI, у якій ти вже увійшов. Без пароля, без акаунта, без сервера. Ніщо не покидає твій пристрій.
 
-Ліцензія MIT, відкритий код на GitHub. Ідеї та повідомлення про помилки завжди вітаються.
+Вихідний код доступний на GitHub. Ідеї та повідомлення про помилки завжди вітаються.
 
 Неофіційний фанатський проєкт. Не пов'язаний з Cloud Imperium Games або RSI.
 
@@ -174,7 +174,7 @@ Open Hangar це безкоштовний помічник з відкритим
 
 ## Italiano (it)
 
-Open Hangar è un compagno gratuito e open source per il tuo account di Star Citizen. Legge quello che RSI ti mostra già (il tuo hangar, i buy-back, i saldi, la tua org e i referral) e lo trasforma in qualcosa di davvero utile.
+Open Hangar è un compagno gratuito per il tuo account di Star Citizen. Legge quello che RSI ti mostra già (il tuo hangar, i buy-back, i saldi, la tua org e i referral) e lo trasforma in qualcosa di davvero utile.
 
 Cosa ottieni:
 • Valore dell'hangar: quanto valgono le tue navi ai prezzi di oggi dello store, e quanto hai pagato
@@ -188,7 +188,7 @@ Cosa ottieni:
 
 Privato per scelta: funziona interamente nel tuo browser, usando la sessione RSI in cui sei già connesso. Niente password, niente account, niente server. Nulla lascia il tuo dispositivo.
 
-Licenza MIT e open source su GitHub. Idee e segnalazioni di bug sono sempre benvenute.
+Codice sorgente pubblico su GitHub. Idee e segnalazioni di bug sono sempre benvenute.
 
 Non ufficiale, fatto da fan. Non affiliato a Cloud Imperium Games o RSI.
 
@@ -196,7 +196,7 @@ Non ufficiale, fatto da fan. Non affiliato a Cloud Imperium Games o RSI.
 
 ## Čeština (cs)
 
-Open Hangar je bezplatný open-source pomocník pro tvůj účet ve Star Citizen. Čte to, co ti RSI už ukazuje (hangár, buy-backy, zůstatky, organizaci a doporučení), a dělá z toho něco, co opravdu využiješ.
+Open Hangar je bezplatný pomocník pro tvůj účet ve Star Citizen. Čte to, co ti RSI už ukazuje (hangár, buy-backy, zůstatky, organizaci a doporučení), a dělá z toho něco, co opravdu využiješ.
 
 Co dostaneš:
 • Hodnota hangáru: kolik tvoje lodě stojí podle dnešních cen v obchodě a kolik jsi zaplatil
@@ -210,7 +210,7 @@ Co dostaneš:
 
 Soukromí v základu: běží celý ve tvém prohlížeči a používá relaci RSI, ve které už jsi přihlášený. Žádné heslo, žádný účet, žádný server. Nic neopustí tvoje zařízení.
 
-Licence MIT, open source na GitHubu. Nápady a hlášení chyb jsou vždy vítány.
+Zdrojový kód je veřejný na GitHubu. Nápady a hlášení chyb jsou vždy vítány.
 
 Neoficiální fanouškovský projekt. Není spojen s Cloud Imperium Games ani RSI.
 
@@ -218,7 +218,7 @@ Neoficiální fanouškovský projekt. Není spojen s Cloud Imperium Games ani RS
 
 ## Русский (ru)
 
-Open Hangar это бесплатный помощник с открытым кодом для твоего аккаунта Star Citizen. Он читает то, что RSI и так тебе показывает (ангар, бай-бэки, балансы, организацию и рефералы), и превращает это во что-то действительно полезное.
+Open Hangar это бесплатный помощник для твоего аккаунта Star Citizen. Он читает то, что RSI и так тебе показывает (ангар, бай-бэки, балансы, организацию и рефералы), и превращает это во что-то действительно полезное.
 
 Что ты получаешь:
 • Стоимость ангара: сколько стоят твои корабли по сегодняшним ценам магазина и сколько ты заплатил
@@ -232,6 +232,6 @@ Open Hangar это бесплатный помощник с открытым к�
 
 Приватность по умолчанию: всё работает в твоём браузере через сессию RSI, в которой ты уже вошёл. Без пароля, без аккаунта, без сервера. Ничего не покидает твоё устройство.
 
-Лицензия MIT, открытый код на GitHub. Идеи и сообщения об ошибках всегда приветствуются.
+Исходный код доступен на GitHub. Идеи и сообщения об ошибках всегда приветствуются.
 
 Неофициальный фанатский проект. Не связан с Cloud Imperium Games или RSI.

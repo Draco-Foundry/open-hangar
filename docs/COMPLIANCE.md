@@ -13,7 +13,7 @@ It is an internal good-faith compliance summary, not legal advice.
 
 ## 1. Executive summary
 
-Open Hangar is a **free, open-source (MIT), non-commercial** browser extension that
+Open Hangar is a **free, source-available, non-commercial** browser extension that
 lets a Star Citizen / RSI account holder read **their own** account data — hangar,
 buy-backs, balances, organization, and referral standing — and view or export it
 **locally**. It:
@@ -70,7 +70,7 @@ A full user-facing privacy policy is published in `docs/PRIVACY.md`.
 
 ## 4. Transparency & auditability
 
-Open Hangar is **MIT-licensed and fully open-source**, so every claim in this
+Open Hangar's **source code is public** (PolyForm Strict), so every claim in this
 document is independently verifiable by reading the source. There is no obfuscated,
 minified, or remotely-hosted code; the extension ships no remote `<script>` and
 loads no remote executable code (consistent with Manifest V3 and store policy). A
@@ -170,7 +170,7 @@ collect or use your data,"_ the same posture Open Hangar takes.)
 
 Open Hangar's local-only claim is not merely a declaration: with no web platform and
 no backend (§3, §4), there is nowhere for data to be sent, and a reviewer can confirm
-this directly in the open source.
+this directly in the public source.
 
 **Representative flagship precedents** (the highest-install, most directly
 comparable peers):
@@ -216,7 +216,7 @@ stance on fan activity:
   and
   [Fankit & Fandom FAQ](https://support.robertsspaceindustries.com/hc/en-us/articles/360006895793-Star-Citizen-Fankit-and-Fandom-FAQ)
   permit **personal, non-commercial** fan use of their IP. Open Hangar is free,
-  MIT-licensed, and does not resell data or IP.
+  source available, and does not resell data or IP.
 - CIG explicitly cautions users **never to give their RSI login to third-party
   tools.** Open Hangar requests **no credentials**, so it is consistent with — not
   contrary to — that guidance.
@@ -239,7 +239,7 @@ stance on fan activity:
   `lib.js`; no bulk or automated account actions).
 - Keep the extension local-only with no data transmission; keep the privacy policy
   accurate to behavior.
-- Keep the code open-source and free of remote code execution.
+- Keep the code public (source available) and free of remote code execution.
 - Maintain the unaffiliated disclaimer and brand guardrails in §6.
 - Respond promptly to any platform or rights-holder inquiry.
 
@@ -247,7 +247,7 @@ stance on fan activity:
 
 ## 8. Conclusion
 
-Open Hangar is a transparent, local-only, credential-free, open-source tool that
+Open Hangar is a transparent, local-only, credential-free, source-available tool that
 reads only the user's own account data and sends it nowhere. It fits squarely within
 an established and currently-listed Chrome Web Store category, while operating more
 conservatively than several approved peers. We are confident it meets store policy
