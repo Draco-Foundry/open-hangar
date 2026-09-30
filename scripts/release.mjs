@@ -14,7 +14,9 @@ import fs from 'node:fs';
 const args = process.argv.slice(2);
 const version = args.find((a) => !a.startsWith('--'));
 const dry = args.includes('--dry-run');
-const run = (cmd, opts = {}) => execSync(cmd, { encoding: 'utf8', stdio: 'pipe', ...opts }).trim();
+// With stdio: 'inherit' execSync returns null (the output went to the terminal).
+const run = (cmd, opts = {}) =>
+  (execSync(cmd, { encoding: 'utf8', stdio: 'pipe', ...opts }) ?? '').trim();
 const fail = (msg) => {
   console.error(`✖ ${msg}`);
   process.exit(1);
