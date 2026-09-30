@@ -153,6 +153,9 @@ Clear All) either way. Picking keeps the sidebar open (never closes on a click).
    fetched can't be matched (details stay opt-in: scans stay fast): when some
    packs are unchecked, add a quiet line under the Buy-Backs group, "N packs not
    checked yet · Get Details".
+   Owner's rule: packs and packages are **separate line items**. The standalone 400i,
+   the Origin Complete Pack buy-back and any hangar package holding a 400i each get
+   their own row, never merged into one, in both the hangar and buy-back groups.
 2. **Scrolling the search results scrolls the whole page.** With the mouse over a gap
    (e.g. between the "In your hangar" and "In your buy-backs" groups) the wheel moves
    the page instead of the results. Results scroll in `.gs-scroll` (ui/theme.css).
