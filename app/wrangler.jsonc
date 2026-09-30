@@ -8,12 +8,11 @@
     "directory": "./dist",
     "binding": "ASSETS",
   },
-  // Replace database_id with the real one after `wrangler d1 create open-hangar`.
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "open-hangar",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "74bd4c7f-1ab3-4aab-b336-dd03482610d4",
       "migrations_dir": "migrations",
     },
   ],
@@ -21,12 +20,15 @@
   //   BETTER_AUTH_SECRET     required
   //   DISCORD_CLIENT_SECRET  Log in with Discord (needs DISCORD_CLIENT_ID too)
   //   RESEND_API_KEY         account emails; without it, links are logged instead
+  // BETTER_AUTH_URL is overridden to http://localhost:4321 in .dev.vars for local dev.
   "vars": {
-    "BETTER_AUTH_URL": "http://localhost:4321",
+    "BETTER_AUTH_URL": "https://app.openhangar.space",
     // Discord application ID (public). Empty = Discord login hidden.
     "DISCORD_CLIENT_ID": "1554856207179714671",
     "EMAIL_FROM": "Open Hangar <noreply@openhangar.space>",
   },
+  // Served at app.openhangar.space (Cloudflare creates the DNS record and certificate).
+  "routes": [{ "pattern": "app.openhangar.space", "custom_domain": true }],
   "observability": {
     "enabled": true,
   },
