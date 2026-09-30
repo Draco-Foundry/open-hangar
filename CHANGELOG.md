@@ -4,6 +4,11 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Citizen Card: long org names wrap to two lines at most (full name on hover), and the
+  "Open Hangar vX · What's new · Star Citizen X" line moved to the page footer.
+- Org Fleet: a role nobody has lists **every** ship that fills it (cheapest first, scrolling), not
+  just the 10 cheapest, so big ships like the Orion show up.
+
 - **Org Fleet roles cover every ship.** A ship now keeps every role the wiki lists, not just the
   first (the Kraken is Multi-Role and Light Carrier, so it counts as a carrier). New role groups
   for fighters, gunships, ground combat, minelaying, recovery, reporting, multi-role, starter and
