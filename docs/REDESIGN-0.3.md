@@ -31,7 +31,7 @@ no alternate looks; light mode stays the one scheduled option. Reference mockup:
 
 Ordered by what a viewer needs first:
 
-1. **Citizen Card** ("Pilot ID", signed off 2026-09-30), with **Hangar Alerts** beside it
+1. [#167](https://github.com/Draco-Foundry/open-hangar/issues/167) **Citizen Card** ("Pilot ID", signed off 2026-09-30), with **Hangar Alerts** beside it
    at a quarter of the row; the card spans the row when there are no alerts. No controls
    on the card. Portrait down the left at full height (RSI's 1024px `/source/` image, the
    165px thumbnail underneath as a fallback; initials when there's no portrait); name and
@@ -41,22 +41,22 @@ Ordered by what a viewer needs first:
    9 years" (full date on hover). Subscriber and Chairman's Club on one line, each only
    when it applies. Wallet two by two: Store Credit, UEC, REC, Buy-Back Tokens ("next
    Oct 5"). Referrals are not on the card (own Home card). Handle display: undecided.
-2. **For You**: alerts, each with **Ignore** (stays hidden until something new happens):
+2. [#168](https://github.com/Draco-Foundry/open-hangar/issues/168) **For You**: alerts, each with **Ignore** (stays hidden until something new happens):
    wishlist ship on sale, a ship you own changes status (e.g. flight ready), buy-backs
    matching your wishlist, milestones (enlistment anniversary). No CCU nagging (players
    hoard CCUs for future chains on purpose). Hidden when empty.
-3. **Account Value** (stats, no chart): value today, "+$X since <first scan>", "+$X vs
+3. [#169](https://github.com/Draco-Foundry/open-hangar/issues/169) **Account Value** (stats, no chart): value today, "+$X since <first scan>", "+$X vs
    what you paid" (red when negative), clickable counts that open Inventory filtered,
    changes since last scan. New users: "vs paid" only until a second scan.
-4. **Events**: the wiki event only while its dates say it's on (the wiki card can stay up
+4. [#164](https://github.com/Draco-Foundry/open-hangar/issues/164) **Events**: the wiki event only while its dates say it's on (the wiki card can stay up
    after it ends), last event, referral bonus events, Free Fly (if a reliable source is
    found), next buy-back token.
-5. **Game Status**: LIVE + PTU/EPTU with wave, link to the latest patch notes (Spectrum
+5. [#166](https://github.com/Draco-Foundry/open-hangar/issues/166) **Game Status**: LIVE + PTU/EPTU with wave, link to the latest patch notes (Spectrum
    Patch Notes channel).
-6. **Latest Acquisitions** (newest pledges, year shown when not this year) beside **Ship
+6. [#165](https://github.com/Draco-Foundry/open-hangar/issues/165) **Latest Acquisitions** (newest pledges, year shown when not this year) beside **Ship
    Spotlight** (a ship from your fleet: art, role, size, crew, cargo, length, store price;
    "Another" to flip).
-7. **Latest From RSI** with chips **All · News · Patch Notes · Store** (This Week in Star
+7. [#170](https://github.com/Draco-Foundry/open-hangar/issues/170) **Latest From RSI** with chips **All · News · Patch Notes · Store** (This Week in Star
    Citizen as the lead; older weekly posts filtered) beside a small **Referrals** progress
    card (only with referral history).
 8. The "Something big is coming" teaser as one quiet line at the bottom.
@@ -144,6 +144,8 @@ Clear All) either way. Picking keeps the sidebar open (never closes on a click).
 
 ## Owner's Fix List (notes from 2026-09-30, next update)
 
+Tracked as GitHub issues from 2026-09-30 on; the issue is the source of truth.
+
 1. **Global Hangar Search misses ships inside buy-back packs.** Searching "400i" finds
    the standalone buy-back but not the Origin Complete Pack that contains it. Search
    (`globalSearchHtml` in src/dashboard.js) only checks a buy-back's name, `contains`
@@ -198,7 +200,7 @@ Clear All) either way. Picking keeps the sidebar open (never closes on a click).
    and page count under it, e.g. "Buy-backs · page 8 · 800 items", then "Hangar",
    etc.). Later scans: the top-bar Scan button's fill already shows progress; the detail
    line goes in its tooltip and the ▾ menu, nothing on the page moves.
-8. **Referrals share image: "best month" needs its date.** The generated image
+8. [#171](https://github.com/Draco-Foundry/open-hangar/issues/171) **Referrals share image: "best month" needs its date.** The generated image
    (src/dashboard.js ~4505, `best = Math.max(...byMonth.values())`) keeps only the
    count, so the box reads "12 · best month". Keep the month key like the Referrals page
    does (~4729) and label it "best month · Mar 2024" (month name, not "2024-03"); ties
