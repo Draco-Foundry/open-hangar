@@ -105,38 +105,7 @@
         color: var(--muted);
         font-size: 12px;
       }
-      /* Global scan indicator (visible from every view) */
-      .scan-indicator {
-        display: inline-flex;
-        align-items: center;
-        gap: 7px;
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--accent);
-        background: rgba(47, 129, 247, 0.12);
-        border: 1px solid rgba(47, 129, 247, 0.4);
-        border-radius: 999px;
-        padding: 3px 10px;
-        max-width: 170px;
-        white-space: nowrap;
-        overflow: hidden;
-      }
-      .scan-indicator[hidden] {
-        display: none;
-      }
-      .scan-indicator .spin {
-        width: 11px;
-        height: 11px;
-        border: 2px solid currentColor;
-        border-right-color: transparent;
-        border-radius: 50%;
-        animation: oh-spin 0.7s linear infinite;
-      }
-      @keyframes oh-spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
+
       nav {
         display: flex;
         gap: 4px;
@@ -485,11 +454,6 @@
       .cc-settings {
         display: inline-flex;
       }
-      .cc-gear {
-        display: inline-flex;
-        align-items: center;
-        padding: 7px 9px;
-      }
       .settings-menu {
         min-width: 220px;
         gap: 11px;
@@ -531,14 +495,6 @@
         padding: 8px 12px;
         border: 1px dashed var(--line);
         border-radius: 8px;
-        font-size: 13px;
-      }
-      .bb-tokens {
-        margin: 0 0 12px;
-        padding: 8px 12px;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--panel);
         font-size: 13px;
       }
 
@@ -3138,12 +3094,18 @@
   <body>
     <div class="wrap">
       <header>
-        <h1>Open Hangar</h1>
-        <span id="scan-indicator" class="scan-indicator" hidden></span>
+        <a class="brand" href="#home" data-view="home"
+          ><img class="brand-mark" src="../icons/icon128.png" alt="" />
+          <h1>Open Hangar</h1></a
+        >
         <nav id="nav">
           <a href="#home" data-view="home">Home</a>
-          <a href="#inventory" data-view="inventory">Inventory</a>
-          <a href="#buybacks" data-view="buybacks">Buy-Backs</a>
+          <a href="#inventory" data-view="inventory"
+            >Inventory <span class="nav-n" id="nav-n-inventory"></span
+          ></a>
+          <a href="#buybacks" data-view="buybacks"
+            >Buy-Backs <span class="nav-n" id="nav-n-buybacks"></span
+          ></a>
           <a href="#stats" data-view="stats">Stats</a>
           <a href="#store" data-view="store">Store</a>
           <a href="#org" data-view="org">Org Fleet</a>
@@ -3153,8 +3115,55 @@
           <!-- Language flags go here once the dashboard is translated (TODO.md). -->
           <!-- Scan ▾ (every page), then the gear menu: currency, Streamer Mode, rescan
                reminder, Log Out of RSI, Clear Data, Updates, Developers (0.3.0). -->
+          <span
+            class="stream-pill"
+            id="stream-pill"
+            hidden
+            title="Streamer Mode is on: money is hidden"
+            >● Streamer</span
+          >
+          <!-- Search your hangar from any page (/ focuses it). -->
+          <div class="gsearch top-search" id="top-search">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M10 3a7 7 0 0 1 5.6 11.2l4.6 4.6-1.4 1.4-4.6-4.6A7 7 0 1 1 10 3Zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z"
+              />
+            </svg>
+            <input
+              id="gsearch-top"
+              type="search"
+              placeholder="Search"
+              autocomplete="off"
+              aria-label="Search your hangar, buy-backs and rewards"
+            />
+            <kbd class="gsearch-key">/</kbd>
+            <div id="gsearch-top-results" class="gsearch-results top-results" hidden></div>
+          </div>
+          <!-- Hangar Alerts from any page. -->
+          <div class="bell-wrap">
+            <button
+              id="bell-btn"
+              class="icon-btn"
+              type="button"
+              aria-haspopup="true"
+              aria-expanded="false"
+              aria-label="Hangar Alerts"
+              title="Hangar Alerts"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5.5-6.84V3.5a1.5 1.5 0 0 0-3 0v.66A7 7 0 0 0 5 11v5l-2 2v1h18v-1Z"
+                /></svg
+              ><span class="badge-n" id="bell-n" hidden></span>
+            </button>
+            <div id="bell-menu" class="scan-menu bell-menu" hidden></div>
+          </div>
           <div class="scan-split">
-            <button id="scan-home">Scan All</button>
+            <button id="scan-home">
+              <span class="scan-fill"></span><span class="scan-label">Scan All</span>
+            </button>
             <button
               id="scan-menu-btn"
               class="scan-caret"
@@ -3220,20 +3229,27 @@
           <div class="cc-settings">
             <button
               id="settings-btn"
-              class="btn-secondary cc-gear"
+              class="avatar-btn"
+              type="button"
               aria-haspopup="true"
               aria-expanded="false"
-              aria-label="Settings"
-              title="Settings"
+              aria-label="Your menu"
+              title="Your menu"
             >
-              <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-                <path
-                  fill="currentColor"
-                  d="M19.14 12.94a7.4 7.4 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7 7 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2.4h-3.8a.5.5 0 0 0-.49.42l-.36 2.54a7 7 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.88a.5.5 0 0 0 .12.64l2.03 1.58a7.4 7.4 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.39 1.05.7 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.8a.5.5 0 0 0 .49-.42l.36-2.54a7 7 0 0 0 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"
-                />
-              </svg>
+              <span class="avatar-img" id="menu-avatar"
+                ><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M19.14 12.94a7.4 7.4 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7 7 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2.4h-3.8a.5.5 0 0 0-.49.42l-.36 2.54a7 7 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.88a.5.5 0 0 0 .12.64l2.03 1.58a7.4 7.4 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.39 1.05.7 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.8a.5.5 0 0 0 .49-.42l.36-2.54a7 7 0 0 0 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"
+                  /></svg></span
+              ><span class="upd-dot" id="upd-dot" hidden></span>
             </button>
             <div id="settings-menu" class="scan-menu settings-menu" hidden>
+              <div class="menu-who" id="menu-who" hidden></div>
+              <div class="menu-upd" id="menu-upd" hidden>
+                <span id="menu-upd-text"></span
+                ><button type="button" id="menu-upd-reload">Reload</button>
+              </div>
               <!-- Language picker goes here once the dashboard is translated (TODO.md). -->
               <label class="scan-opt menu-currency"
                 ><span>Currency</span>
@@ -3382,7 +3398,7 @@
 
       <!-- INVENTORY -->
       <section class="view" id="view-inventory">
-        <h2 class="section-title">Inventory</h2>
+        <div class="page-sum" id="inv-sum"></div>
         <div class="controls">
           <input id="search" type="search" placeholder="Search by name…" autocomplete="off" />
           <select id="sort">
@@ -3410,11 +3426,35 @@
           >
             Select
           </button>
+          <div class="exp-wrap">
+            <button
+              id="inv-exp-btn"
+              class="mk-btn exp-btn"
+              type="button"
+              aria-haspopup="true"
+              aria-expanded="false"
+            >
+              Export ▾
+            </button>
+            <div id="inv-exp-menu" class="scan-menu exp-menu" hidden>
+              <button type="button" class="menu-item" data-export="inv-csv">
+                CSV of what's showing<small>Just the rows your filters show</small>
+              </button>
+              <button type="button" class="menu-item" data-export="inv-image">
+                Share image<small>Pick items, then Download image</small>
+              </button>
+              <button type="button" class="menu-item" data-export="backup">
+                Everything (JSON)<small>Your full backup</small>
+              </button>
+            </div>
+          </div>
         </div>
         <div class="chips" id="chips"></div>
+        <div class="views" id="inv-views"></div>
         <div id="results"></div>
         <div class="select-bar" id="select-bar" hidden>
           <span class="sb-count" id="sb-count"></span>
+          <span class="sb-melt" id="sb-melt" hidden></span>
           <button class="mk-btn" type="button" data-sb="all">Select all shown</button>
           <button class="mk-btn" type="button" data-sb="none">Clear</button>
           <span class="sb-sep"></span>
@@ -3452,7 +3492,7 @@
 
       <!-- BUY-BACKS -->
       <section class="view" id="view-buybacks">
-        <h2 class="section-title">Buy-Backs</h2>
+        <div class="page-sum" id="bb-sum"></div>
         <div class="controls" id="bb-controls" hidden>
           <input id="bb-search" type="search" placeholder="Search buy-backs…" autocomplete="off" />
           <select id="bb-sort">
@@ -3469,6 +3509,25 @@
             <button data-layout="compact">Compact</button>
             <button data-layout="list">List</button>
             <button data-layout="market">Market</button>
+          </div>
+          <div class="exp-wrap">
+            <button
+              id="bb-exp-btn"
+              class="mk-btn exp-btn"
+              type="button"
+              aria-haspopup="true"
+              aria-expanded="false"
+            >
+              Export ▾
+            </button>
+            <div id="bb-exp-menu" class="scan-menu exp-menu" hidden>
+              <button type="button" class="menu-item" data-export="bb-csv">
+                CSV of what's showing<small>Just the rows your filters show</small>
+              </button>
+              <button type="button" class="menu-item" data-export="backup">
+                Everything (JSON)<small>Your full backup</small>
+              </button>
+            </div>
           </div>
         </div>
         <div class="chips" id="bb-chips"></div>

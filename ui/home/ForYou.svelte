@@ -124,6 +124,13 @@
     return out.filter((x) => !ignored.has(x.key));
   });
 
+  // The top bar's bell shows these same alerts on every page (dashboard.js renderBell).
+  $effect(() => {
+    const list = alerts.map((x) => ({ ...x }));
+    window.OHApp.alerts = { list, ignore };
+    document.dispatchEvent(new CustomEvent('oh:alerts'));
+  });
+
   function ignore(key) {
     const next = new Set(ignored);
     next.add(key);
