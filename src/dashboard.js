@@ -327,6 +327,7 @@ const state = {
   bbTraits: new Map(), // buy-back trait filter (AND): key → 'yes' | 'no'
   bbLayout: 'gallery', // gallery | compact | list | market (independent of inventory)
   owner: null, // { nickname, displayname } the stored data was scanned from
+  storeCredit: null, // dollars, from the RSI account (counts in Account Value)
   shown: new Set(), // inventory kind filter
   traits: new Map(), // inventory trait filter (AND): key → 'yes' | 'no' (exclude)
   priceOf: null, // ship name → { msrp } resolver (OH.getShipIndex), once loaded
@@ -601,6 +602,21 @@ function hangarValue() {
     };
   }
   return valueCache.value;
+}
+// OH.accountValue (everything you own: ships, CCUs, other pledges, Store Credit),
+// memoised like hangarValue. Null until store prices load.
+let acctCache = { v: null, credit: null, value: null };
+function accountValue() {
+  const v = hangarValue();
+  if (!v) return null;
+  if (acctCache.v !== v || acctCache.credit !== state.storeCredit) {
+    acctCache = {
+      v,
+      credit: state.storeCredit,
+      value: OH.accountValue(state.items, state.priceOf, state.storeCredit, v),
+    };
+  }
+  return acctCache.value;
 }
 // Store-price info for one pledge ({ store, ships, unpriced, paid, below }) or null.
 function storeInfo(p) {
@@ -1172,6 +1188,10 @@ function renderAccount() {
       const aUEC = (x) =>
         !x ? [DASH] : streamer.on ? [MASK] : ['¤ ' + compactNum(x.value), '¤ ' + fmt(x.value)];
       const store = c.store ? c.store.value / 100 : null;
+      if (store !== state.storeCredit) {
+        state.storeCredit = store;
+        homeUpdated();
+      }
       setHTML(
         balEl,
         tile(
@@ -3610,7 +3630,7 @@ function valueSectionHtml() {
       ? `<h4 class="modal-h">Best Deals: Paid Below Today's Store Price</h4><div class="top-list">${dealRows}</div>`
       : '') +
     unpriced +
-    `<p class="muted value-note">Ships at current standalone store prices (USD, before tax) from star-citizen.wiki; a CCU's standard price is the gap between its two ships. Paints, gear and game access aren't counted; concept and limited ships often have no public price. "vs melt value" covers ship pledges whose ships are all priced. Melt value is the pledge's value on RSI (what it was originally bought for); for gifted or grey-market pledges that isn't what you paid.</p>`
+    `<p class="muted value-note">Ships at current standalone store prices (USD, before tax) from star-citizen.wiki; a CCU's standard price is the gap between its two ships. Paints, gear and game access aren't counted; concept and limited ships often have no public price. "vs melt value" covers ship pledges whose ships are all priced. Account Value on Home adds CCUs at standard price, everything else at melt value, and your Store Credit; buy-backs, UEC and REC aren't counted. Melt value is the pledge's value on RSI (what it was originally bought for); for gifted or grey-market pledges that isn't what you paid.</p>`
   );
 }
 
@@ -3673,35 +3693,30 @@ function changeDetails(d) {
 }
 const fmtDay = (t) => new Date(t).toLocaleDateString(undefined, { dateStyle: 'medium' });
 
-// Melt value per snapshot as a small line chart (inline SVG, no chart lib).
-// Account value of a history snapshot: what the ships it held sell for at
-// today's store prices. Pledges still in the hangar use their exact ships
-// (OH.hangarValue); ones since melted or gifted are estimated from their name
-// ("Standalone Ship - Cutlass Black" → Cutlass Black). CCUs, paints and gear
-// count $0, as in Hangar value.
+// Account value of a history snapshot, on the same rules as the headline
+// (OH.snapshotValue): pledges still owned count exactly as today; ones since melted
+// or gifted are estimated from their name or their melt value.
+// The latest scan is "now": if it predates Store Credit being recorded, it takes
+// today's credit, so the chart always ends on the headline.
 function snapshotStore(snap) {
-  const v = hangarValue();
-  let sum = 0;
-  for (const [id, name] of snap.items) {
-    const si = v && v.pledges[id];
-    if (si) {
-      sum += si.ccu ? 0 : si.store || 0;
-      continue;
-    }
-    if (/\bupgrade\b|\bccu\b|\s→\s|\bpaint\b/i.test(name || '')) continue;
-    const bare = String(name || '').replace(/^\s*[^-–]+?\s*[-–]\s/, '');
-    const base = bare.replace(
-      /\s*[-–]\s*(lti|iae|ilw|warbond|standard edition|\d+\s*(months?|years?).*)$/i,
-      '',
-    );
-    const hit = state.priceOf && (state.priceOf(base) || state.priceOf(bare));
-    sum += (hit && hit.msrp) || 0;
-  }
-  return sum;
+  const hist = state.history || [];
+  const latest = snap === hist[hist.length - 1];
+  const s =
+    !Number.isFinite(snap.credit) && latest && state.storeCredit != null
+      ? { ...snap, credit: state.storeCredit }
+      : snap;
+  return OH.snapshotValue(s, accountValue(), state.priceOf);
+}
+// Tooltip note for chart points from scans that didn't record Store Credit.
+function creditNote(snap) {
+  const hist = state.history || [];
+  return Number.isFinite(snap.credit) || snap === hist[hist.length - 1]
+    ? ''
+    : ' (Store Credit not recorded)';
 }
 
 function historySvg(hist) {
-  const pts = hist.map((h) => ({ t: h.at, v: snapshotStore(h) }));
+  const pts = hist.map((h) => ({ t: h.at, v: snapshotStore(h), note: creditNote(h) }));
   const W = 560,
     H = 150,
     L = 56,
@@ -3719,7 +3734,7 @@ function historySvg(hist) {
   const dots = pts
     .map(
       (p) =>
-        `<circle cx="${x(p.t).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="3"><title>${fmtDay(p.t)}: ${dollars(p.v)}</title></circle>`,
+        `<circle cx="${x(p.t).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="3"><title>${fmtDay(p.t)}: ${dollars(p.v)}${p.note}</title></circle>`,
     )
     .join('');
   return `<svg class="hist-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Account value over time">
@@ -3753,7 +3768,7 @@ function historySectionHtml() {
     `<h3 class="section-title" id="history">Account Value Over Time</h3>` +
     (state.priceOf
       ? historySvg(hist) +
-        `<p class="muted value-note tight">What the ships you held at each scan sell for at today's store prices. Pledges you've since melted are estimated from their names.</p>`
+        `<p class="muted value-note tight">Everything you held at each scan, valued like Account Value today: ships at today's store prices, CCUs at standard price, everything else at melt value, plus Store Credit from scans that recorded it. Pledges you've since melted are estimated from their names.</p>`
       : '<p class="muted">Loading ship prices…</p>') +
     `<div class="hist-list">${steps.join('')}</div>` +
     `<p class="muted value-note">A snapshot is kept each time a full scan finds changes — ${hist.length} so far, up to the last 100.</p>`
@@ -8095,6 +8110,9 @@ window.OHApp = {
   },
   hangarValue,
   // A history snapshot's ships at today's store prices (same as Stats → History).
+  accountValue,
+  creditNote,
+  // A history snapshot's value on the headline's rules (same as Stats → History).
   snapshotStore: (snap) => (state.priceOf ? snapshotStore(snap) : null),
   money,
   dollars,
