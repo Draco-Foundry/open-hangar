@@ -196,6 +196,29 @@ try {
     ? ok('colors: tokens, Color Key (12), white balances, exports share the palette')
     : fail(`colors: ${JSON.stringify(colors)}`);
 
+  const tweaks = await page.evaluate(async () => {
+    const a = await OH.getAccount();
+    const real = OH.getAccount;
+    const long =
+      'The Extraordinarily Long Named Interstellar Merchant and Exploration Consortium of Stanton';
+    OH.getAccount = async () => ({ ...a, org: { name: long, rank: 'Petty Officer', sid: 'X' } });
+    renderAccount();
+    await new Promise((r) => setTimeout(r, 200));
+    const nm = document.querySelector('#cc-org .cc-org-name');
+    const lh = parseFloat(getComputedStyle(nm).lineHeight) || 16;
+    OH.getAccount = real;
+    renderAccount();
+    return {
+      twoLines: nm.getBoundingClientRect().height <= lh * 2 + 2,
+      title: nm.title === long,
+      cardClean: !document.querySelector('.citizen-card #versions'),
+      footer: /Open Hangar v\d/.test(document.querySelector('#footer').textContent),
+    };
+  });
+  tweaks.twoLines && tweaks.title && tweaks.cardClean && tweaks.footer
+    ? ok('citizen card: long org name capped at two lines; versions line in the footer')
+    : fail(`card tweaks: ${JSON.stringify(tweaks)}`);
+
   // Phone width: nothing scrolls sideways.
   await page.setViewport({ width: 390, height: 844 });
   await new Promise((r) => setTimeout(r, 200));
