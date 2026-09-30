@@ -57,7 +57,7 @@ jobs:
       - name: Smoke test
         run: |
           for i in $(seq 1 18); do # a new domain can take a few minutes
-            code=$(curl -s -o /dev/null -w '%{http_code}' https://staging.openhangar.space/sign-in)
+            code=$(curl -s -o /dev/null -w '%{http_code}' https://staging.openhangar.space/api/health)
             [ "$code" = "200" ] && { echo "staging is up"; exit 0; }
             sleep 10
           done
@@ -100,9 +100,17 @@ jobs:
         run: |
           npx wrangler d1 migrations apply open-hangar-stats --remote
           npx wrangler deploy
+      - name: Watchdog webhooks for the stats Worker
+        working-directory: stats-worker
+        env:
+          OPS: ${{ secrets.DISCORD_OPS_WEBHOOK }}
+          STATUS: ${{ secrets.DISCORD_STATUS_WEBHOOK }}
+        run: |
+          echo "$OPS" | npx wrangler secret put DISCORD_OPS_WEBHOOK
+          echo "$STATUS" | npx wrangler secret put DISCORD_STATUS_WEBHOOK
       - name: Smoke test
         run: |
-          code=$(curl -s -o /dev/null -w '%{http_code}' https://app.openhangar.space/sign-in)
+          code=$(curl -s -o /dev/null -w '%{http_code}' https://app.openhangar.space/api/health)
           [ "$code" = "200" ] || { echo "production answered $code"; exit 1; }
 
   notify:

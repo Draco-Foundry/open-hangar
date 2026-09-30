@@ -1,7 +1,9 @@
-// Open Hangar store stats: once a day, snapshot each store's public numbers into
+// Open Hangar store stats + watchdog. Store stats: once a day, snapshot each store's public numbers into
 // D1 (one row per UTC date; a rerun the same day replaces it). No fetch handler,
 // so there's no public URL: read the data with `npm run stats` or the D1 console.
 // Nothing here comes from the extension itself; Open Hangar sends no telemetry.
+// Watchdog: every 5 minutes, see src/watchdog.js.
+import { watchdog } from './watchdog.js';
 
 const AMO = 'https://addons.mozilla.org/api/v5/addons/addon/open-hangar/';
 const EDGE =
@@ -62,8 +64,14 @@ export async function snapshot() {
   return { date: new Date().toISOString().slice(0, 10), ...firefox, ...edge, ...chrome };
 }
 
+const DAILY = '0 13 * * *';
+
 export default {
-  async scheduled(_event, env) {
+  async scheduled(event, env) {
+    if (event.cron !== DAILY) {
+      await watchdog(env);
+      return;
+    }
     const row = await snapshot();
     const cols = Object.keys(row);
     await env.DB.prepare(
