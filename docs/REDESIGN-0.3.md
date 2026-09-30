@@ -13,7 +13,21 @@ small fixes; beta-tested before the stores.
 - Colour meanings (Color Key): green good news, amber worth a look, red a problem, blue
   clickable, one colour per item type. Headings in Title Case.
 
-## Style: Hangar Deck
+## Looks (Themes)
+
+Every player gets a choice, on the same layout: a **Look** setting (next to the currency
+picker) swaps colours, fonts, corners and glow; boxes, order and components never change.
+In Svelte a look is mostly a token set plus a few style rules, like the website's Design
+picker.
+
+- **Hangar Deck**: default.
+- **Clean Pro**: graphite, heavy numbers, colour only for meaning; for players who want
+  pure readability. Ships in 0.3.0 with Hangar Deck.
+- **MobiGlas**: frosted glass, cut corners, HUD brackets. Later, if players ask for it.
+- Every page is checked in each look (and in light mode once it exists). Once sync is
+  live, the chosen look can follow the account between extension and website.
+
+## Style: Hangar Deck (Default Look)
 
 Deep navy hull, cyan running lights. Ship art carries the colour; only the most important
 number on a page glows. Calm, premium, readable. Reference mockup: the "Open Hangar Home
