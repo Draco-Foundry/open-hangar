@@ -1247,9 +1247,9 @@ const notInsurance = (c) => !/insurance/i.test(`${c.kind || ''} ${c.label || ''}
 const TRAITS = [
   {
     key: 'package',
-    label: 'Game packages',
+    label: 'Game Packages',
     title: 'Pledges that include game access (Star Citizen / Squadron 42)',
-    notLabel: 'No game package',
+    notLabel: 'No Game Package',
     test: (f) =>
       /^package\b/i.test(f.name) ||
       f.items.some((c) => /^game$/i.test(c.kind || '') || GAME_ITEM_RE.test(c.label || '')),
@@ -1260,7 +1260,7 @@ const TRAITS = [
     key: 'pack',
     label: 'Packs',
     title: 'Pledges that bundle two or more items (ships, paints, gear…)',
-    notLabel: 'Single items',
+    notLabel: 'Single Items',
     test: (f) => f.items.filter(notInsurance).length >= 2,
   },
   { key: 'lti', label: 'LTI', notLabel: 'No LTI', title: 'Lifetime insurance', test: (f) => f.lti },
@@ -1268,7 +1268,7 @@ const TRAITS = [
     key: 'giftable',
     label: 'Giftable',
     title: 'RSI shows a Gift action for this pledge',
-    notLabel: 'Not giftable',
+    notLabel: 'Not Giftable',
     test: (f) => f.giftable === true,
     neg: (f) => f.giftable === false,
   },
@@ -1276,7 +1276,7 @@ const TRAITS = [
     key: 'meltable',
     label: 'Meltable',
     title: 'RSI shows an Exchange action, so it can be melted for store credit',
-    notLabel: 'Not meltable',
+    notLabel: 'Not Meltable',
     test: (f) => f.meltable === true,
     neg: (f) => f.meltable === false,
   },
@@ -1286,24 +1286,24 @@ const TRAITS = [
     // RSI's hangar has no warbond marker, so this relies on the pledge name — some
     // warbond purchases (e.g. packs) aren't named that way and won't show here.
     title: "Pledges whose name says Warbond (RSI doesn't always include it)",
-    notLabel: 'Not warbond',
+    notLabel: 'Not Warbond',
     test: (f) => /warbond/i.test(f.name),
   },
   {
     // Catches warbonds and sales that aren't named that way (see TODO.md).
     key: 'below',
-    label: 'Below store price',
+    label: 'Below Store Price',
     title:
       "Paid less than today's store price (star-citizen.wiki): warbonds, sales, older cheaper pricing. Ship pledges and CCUs.",
-    notLabel: 'At / above store price',
+    notLabel: 'At / Above Store Price',
     test: (f) => f.below === true,
     neg: (f) => f.below === false,
   },
   {
     key: 'free',
-    label: 'Free / rewards',
+    label: 'Free / Rewards',
     title: '$0 pledges: referral, event and other rewards',
-    notLabel: 'Paid pledges',
+    notLabel: 'Paid Pledges',
     test: (f) => f.value === 0,
     neg: (f) => f.value != null && f.value > 0,
   },
@@ -1371,7 +1371,7 @@ function chipHtml(kind) {
 function flagHtml(letter, value, yes, no) {
   const state = value === true ? 'yes' : value === false ? 'no' : 'unk';
   const label = value === true ? yes : value === false ? no : `${yes}: unknown — rescan`;
-  const word = value === true ? yes : value === false ? no : `${yes}?`;
+  const word = value == null ? `${yes}?` : yes; // red / green carries the yes or no
   return `<span class="flag ${state}" title="${label}" aria-label="${label}"><span class="fl-s">${letter}</span><span class="fl-l">${word}</span></span>`;
 }
 function flagsHtml(p) {
