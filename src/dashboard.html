@@ -3901,6 +3901,15 @@
         </nav>
         <div class="hdr-prefs">
           <!-- Language flags go here once the dashboard is translated (TODO.md). -->
+          <!-- Scan from any page (same as the Citizen Card's Scan). -->
+          <button
+            id="scan-top"
+            class="scan-top"
+            type="button"
+            title="Scan your hangar, buy-backs and referrals"
+          >
+            Scan
+          </button>
           <select
             id="currency-select"
             class="currency-select"
@@ -4031,18 +4040,6 @@
                       </button>
                     </div>
                   </div>
-
-                  <div class="gsearch gsearch-home cc-search">
-                    <input
-                      id="gsearch"
-                      type="search"
-                      placeholder="Search your hangar"
-                      autocomplete="off"
-                      aria-label="Search ships, hangar, buy-backs and rewards"
-                    />
-                    <kbd class="gsearch-key" title="Press / on any page to search">/</kbd>
-                    <div id="gsearch-results" class="gsearch-results" hidden></div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -4061,7 +4058,22 @@
               </div>
             </div>
           </div>
-          <aside id="oh-foryou" aria-label="For You"></aside>
+          <aside id="oh-foryou" aria-label="Hangar Alerts"></aside>
+        </div>
+        <!-- Global Hangar Search: its own line under the card (owner, 2026-09-30); the
+             right quarter is kept for the website Connect button at launch. -->
+        <div class="home-search">
+          <div class="gsearch gsearch-home">
+            <input
+              id="gsearch"
+              type="search"
+              placeholder="Global Hangar Search"
+              autocomplete="off"
+              aria-label="Search ships, hangar, buy-backs and rewards"
+            />
+            <kbd class="gsearch-key" title="Press / on any page to search">/</kbd>
+            <div id="gsearch-results" class="gsearch-results" hidden></div>
+          </div>
         </div>
         <!-- Everything under the card is the Svelte Home (ui/home, built into ui/). -->
         <div id="oh-home"></div>

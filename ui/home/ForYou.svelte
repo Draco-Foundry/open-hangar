@@ -1,5 +1,5 @@
 <script>
-  // For You: alerts only this extension can give, because only it sees your hangar.
+  // Hangar Alerts (was "For You"): alerts only this extension can give, because only it sees your hangar.
   // Each has Ignore; an ignored alert stays hidden until something new happens (its
   // key changes). Nothing here nags about CCUs: players hoard them on purpose.
   //  - a wishlist ship on sale in RSI's store right now
@@ -142,7 +142,7 @@
 {#if alerts.length || lastIgnored}
   <section class="oh-p fy-card">
     <div class="oh-ph">
-      <h3>For You</h3>
+      <h3>Hangar Alerts</h3>
       <span class="count">{alerts.length ? `${alerts.length} alert${alerts.length === 1 ? '' : 's'}` : 'All caught up'}</span>
     </div>
     <div class="list">

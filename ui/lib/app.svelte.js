@@ -14,6 +14,7 @@ export const OH = () => window.OH;
 export const live = $state({
   main: null, // starcitizen.tools main page settings: { event, patches }
   live: null, // LIVE version code from star-citizen.wiki
+  released: null, // when that LIVE build was released (ms)
   news: [], // RSI Comm-Links
   twisc: null, // newest This Week in Star Citizen summary
   patches: [], // RSI Spectrum patch notes
@@ -34,6 +35,7 @@ export function loadLive() {
   ]).then(([main, v, news, twisc, patches]) => {
     live.main = main;
     live.live = v && v.code ? lib.formatScVersion(v.code).replace(/-LIVE$/i, '') : null;
+    live.released = (v && v.released) || null;
     live.news = news || [];
     live.twisc = twisc;
     live.patches = patches || [];
