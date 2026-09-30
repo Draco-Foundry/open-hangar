@@ -4,6 +4,16 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Org Fleet roles cover every ship.** A ship now keeps every role the wiki lists, not just the
+  first (the Kraken is Multi-Role and Light Carrier, so it counts as a carrier). New role groups
+  for fighters, gunships, ground combat, minelaying, recovery, reporting, multi-role, starter and
+  racing, named after the wiki's own roles. A test fails if any ship's role isn't placed.
+- Biggest Ships sizes are capitalized (Capital, Large, …).
+- Buy-back cards line up: badge and date on one row, price and Reclaim on the next, whatever the
+  date's length.
+- Hovering a button no longer turns it solid blue (that hid the text of outlined buttons and tabs);
+  it just brightens.
+
 ## 0.2.11 — 2026-09-29
 
 - **Org Fleet:** your own entry now follows your latest scan (Add my fleet used to be a one-off

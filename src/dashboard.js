@@ -3033,7 +3033,7 @@ function orgBiggestHtml(f) {
   const rows = f.biggest
     .map(
       (r) =>
-        `<tr><td>${OH.escapeHtml(r.name)}</td><td>${OH.escapeHtml(r.size || '')}</td><td class="num">${
+        `<tr><td>${OH.escapeHtml(r.name)}</td><td>${OH.escapeHtml(capFirst(r.size || ''))}</td><td class="num">${
           r.count
         }</td><td class="num">${r.msrp ? dollars(r.msrp) : '—'}</td><td class="org-owners">${r.owners
           .map((o) => OH.escapeHtml(o.n > 1 ? `${o.name} ×${o.n}` : o.name))

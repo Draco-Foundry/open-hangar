@@ -713,7 +713,8 @@ try {
     : fail(`org fleet: ${JSON.stringify(org)}`);
   const roleChips = await page.$$eval('.role-chip', (c) => c.length);
   const memberRows = await page.$$eval('.org-table', (t) => t.length);
-  roleChips === 16 && memberRows >= 3
+  const roleCount = await page.evaluate(() => OH.ORG_ROLES.length);
+  roleChips === roleCount && memberRows >= 3
     ? ok(`org roles (${roleChips}) + biggest ships + members`)
     : fail(`org extras: ${roleChips} role chips, ${memberRows} tables`);
   await page.click('.role-chip.missing');
