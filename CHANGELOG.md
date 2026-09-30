@@ -26,6 +26,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 - Fixed: Home showed a big empty box when your wishlist was empty.
 - Improved: every word is capitalized in Org Fleet roles, sizes and charts ("Science / Data", "Capital",
   "Light Fighter"), ship statuses ("Flight Ready", "In Concept") and table headers.
+- Fixed: ship sizes that showed as "undefined". Ground vehicles (Storm, Nova, Spartan, Ursa…)
+  now say Vehicle, and special editions (Wikelo Specials, PYAM Exec…) use their base ship's size.
 
 ## 0.2.11 — 2026-09-29
 
