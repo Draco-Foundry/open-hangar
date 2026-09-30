@@ -2798,12 +2798,30 @@ async function loadOrg() {
 async function saveOrg() {
   await chrome.storage.local.set({ orgFleet: { members: orgMembers } });
 }
-function upsertMember(name, ships) {
+function upsertMember(name, ships, extra = {}) {
   const i = orgMembers.findIndex((m) => m.name.toLowerCase() === name.toLowerCase());
-  const row = { name, importedAt: Date.now(), ships };
+  const row = { name, importedAt: Date.now(), ships, ...extra };
   if (i >= 0) orgMembers[i] = row;
   else orgMembers.push(row);
 }
+// Your own entry follows your latest scan; "Add my fleet" used to be a one-off
+// copy, so ships bought later never showed up. Matched by the flag, or (for
+// entries saved before it existed) by your RSI name. True when it changed.
+function syncMyOrgFleet() {
+  if (!state.items.length || !state.owner) return false;
+  const names = [state.owner.displayname, state.owner.nickname]
+    .filter(Boolean)
+    .map((n) => n.toLowerCase());
+  const m = orgMembers.find((x) => x.mine || names.includes(String(x.name).toLowerCase()));
+  if (!m) return false;
+  const r = OH.shipsFromFile({ sources: { hangar: { items: state.items } } });
+  if (r.error) return false;
+  const changed = !m.mine || JSON.stringify(m.ships) !== JSON.stringify(r.ships);
+  if (!changed) return false;
+  Object.assign(m, { mine: true, ships: r.ships, importedAt: state.scannedAt || Date.now() });
+  return true;
+}
+
 const orgMsg = (t) => {
   const el = $('#org-msg');
   if (el) el.textContent = t;
@@ -2830,22 +2848,26 @@ const orgUi = { role: null, member: null, a: null, b: null };
 
 function orgRolesHtml(f) {
   const missing = f.roles.filter((r) => !r.count);
+  // Covered, but only by ships that aren't flyable yet (in concept / production).
+  const concept = f.roles.filter((r) => r.count && !r.ready);
+  const names = (list) => list.map((r) => OH.escapeHtml(r.label)).join(', ');
   const chips = f.roles
-    .map(
-      (r) =>
-        `<button type="button" class="role-chip ${r.count ? 'have' : 'missing'}${
-          orgUi.role === r.key ? ' open' : ''
-        }" data-role="${r.key}" aria-expanded="${orgUi.role === r.key}">${OH.escapeHtml(r.label)}${
-          r.count ? ` <b>${r.count}</b>` : ''
-        }</button>`,
-    )
+    .map((r) => {
+      const cls = !r.count ? 'missing' : r.ready ? 'have' : 'concept';
+      const tip = cls === 'concept' ? ' title="Covered by ships that are still in concept"' : '';
+      return `<button type="button" class="role-chip ${cls}${
+        orgUi.role === r.key ? ' open' : ''
+      }" data-role="${r.key}" aria-expanded="${orgUi.role === r.key}"${tip}>${OH.escapeHtml(r.label)}${
+        r.count ? ` <b>${r.count}</b>` : ''
+      }</button>`;
+    })
     .join('');
+  const notes = [
+    missing.length ? `No ships for: <strong>${names(missing)}</strong>.` : '',
+    concept.length ? `Only in-concept ships for: <strong>${names(concept)}</strong>.` : '',
+  ].filter(Boolean);
   return `<h3 class="section-title" style="margin-top:22px">Roles</h3>
-    <p class="muted org-intro">${
-      missing.length
-        ? `No ships for: <strong>${missing.map((r) => OH.escapeHtml(r.label)).join(', ')}</strong>.`
-        : 'Every role is covered.'
-    } Click a role to see what fills it.</p>
+    <p class="muted org-intro">${notes.join(' ') || 'Every role is covered.'} Click a role to see what fills it.</p>
     <div class="role-chips">${chips}</div>${orgRolePanelHtml(f)}`;
 }
 
@@ -2858,9 +2880,11 @@ function orgRolePanelHtml(f) {
       .filter((sh) => sh.role && def.re.test(sh.role))
       .map(
         (sh) =>
-          `<tr><td>${OH.escapeHtml(sh.name)}</td><td class="muted">${OH.escapeHtml(sh.role)}</td><td class="num">${
-            sh.count
-          }</td><td class="org-owners">${sh.owners
+          `<tr><td>${OH.escapeHtml(sh.name)}</td><td class="muted">${OH.escapeHtml(sh.role)}</td><td>${
+            sh.status === 'flight-ready'
+              ? '<span class="badge good">Flight ready</span>'
+              : '<span class="badge warn">In concept</span>'
+          }</td><td class="num">${sh.count}</td><td class="org-owners">${sh.owners
             .map((o) => OH.escapeHtml(o.n > 1 ? `${o.name} ×${o.n}` : o.name))
             .join(', ')}</td></tr>`,
       )
@@ -2868,7 +2892,7 @@ function orgRolePanelHtml(f) {
     return `<div class="org-panel"><div class="org-panel-head"><strong>${OH.escapeHtml(r.label)}</strong> · ${
       r.count
     } ship${r.count === 1 ? '' : 's'}<button type="button" class="org-close" data-close="role" aria-label="Close">×</button></div>
-      <table class="org-table"><thead><tr><th>Ship</th><th>Role</th><th class="num">Count</th><th>Owners</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      <table class="org-table"><thead><tr><th>Ship</th><th>Role</th><th>Status</th><th class="num">Count</th><th>Owners</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
   const options = (state.catalog || [])
     .filter((v) => v.role && def.re.test(v.role) && v.msrp)
@@ -3024,6 +3048,7 @@ async function renderOrg() {
   ensurePrices();
   const body = $('#org-body');
   const members = await loadOrg();
+  if (syncMyOrgFleet()) await saveOrg();
   if (!members.length) {
     setHTML(
       body,
@@ -3119,7 +3144,7 @@ $('#org-mine')?.addEventListener('click', async () => {
   const who = (state.owner && (state.owner.displayname || state.owner.nickname)) || 'Me';
   const r = OH.shipsFromFile({ sources: { hangar: { items: state.items } } });
   if (r.error) return orgMsg(r.error);
-  upsertMember(who, r.ships);
+  upsertMember(who, r.ships, { mine: true });
   await saveOrg();
   orgMsg(`Added your fleet (${r.ships.length} ships).`);
   renderOrg();

@@ -93,3 +93,31 @@ test('reports roles covered/missing, biggest ships and value per member', () => 
   assert.ok(f.byMember[0].store > f.byMember[1].store);
   assert.ok(f.biggest.some((s) => /carrack/i.test(s.name)));
 });
+
+test('a role held only by concept ships is covered but not ready', () => {
+  const ships = {
+    pioneer: {
+      lname: 'pioneer',
+      name: 'Pioneer',
+      role: 'Heavy Construction',
+      status: 'in-concept',
+    },
+    prospector: {
+      lname: 'prospector',
+      name: 'Prospector',
+      role: 'Light Mining',
+      status: 'flight-ready',
+    },
+  };
+  const f = OH.orgFleet(
+    [{ name: 'me', ships: [{ name: 'Pioneer' }, { name: 'Prospector' }] }],
+    (n) => ships[n.toLowerCase()],
+    () => null,
+  );
+  const construction = f.roles.find((r) => r.key === 'construction');
+  const mining = f.roles.find((r) => r.key === 'mining');
+  assert.equal(construction.count, 1);
+  assert.equal(construction.ready, 0);
+  assert.equal(mining.ready, 1);
+  assert.equal(f.ships.find((s) => s.name === 'Pioneer').status, 'in-concept');
+});

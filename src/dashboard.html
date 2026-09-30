@@ -16,6 +16,8 @@
         --accent-hover: #4493f8;
         --link: #58a6ff;
         --accent-soft: rgba(47, 129, 247, 0.14);
+        /* Comparisons: the second side of "you (blue) vs them" charts */
+        --compare: #dfe6ee;
         --shadow: 0 1px 3px rgba(1, 4, 9, 0.5);
 
         /* One color, one meaning (see "Color Key" under How to Use on Home).
@@ -3363,6 +3365,14 @@
         color: var(--text);
         margin-left: 2px;
       }
+      .role-chip.concept {
+        border-color: var(--warn-line);
+        color: var(--warn);
+      }
+      .role-chip.concept b {
+        color: var(--text);
+        margin-left: 2px;
+      }
       .role-chip.missing {
         color: var(--muted);
         border-style: dashed;
@@ -3448,7 +3458,7 @@
       }
       .sw.b,
       .pair-bar.b {
-        background: var(--muted);
+        background: var(--compare);
       }
       .pair-row {
         display: grid;
@@ -4094,6 +4104,10 @@
                 <li>
                   <span class="sw" style="background: var(--bad)"></span><b>Red</b
                   ><span class="muted">a problem, or something you excluded</span>
+                </li>
+                <li>
+                  <span class="sw" style="background: var(--compare)"></span><b>White bars</b
+                  ><span class="muted">the other side when comparing (you are blue)</span>
                 </li>
                 <li>
                   <span class="sw" style="background: var(--accent)"></span><b>Blue</b
