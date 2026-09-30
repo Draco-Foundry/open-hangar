@@ -192,8 +192,8 @@ try {
       pal: palette().good === cs.getPropertyValue('--good').trim(),
     };
   });
-  colors.key === 11 && colors.tokens && colors.whiteBal && colors.pal
-    ? ok('colors: tokens, Color Key (11), white balances, exports share the palette')
+  colors.key === 12 && colors.tokens && colors.whiteBal && colors.pal
+    ? ok('colors: tokens, Color Key (12), white balances, exports share the palette')
     : fail(`colors: ${JSON.stringify(colors)}`);
 
   // Phone width: nothing scrolls sideways.
@@ -722,6 +722,37 @@ try {
     : fail('role click opened nothing');
   await page.click('.org-mrow');
   (await page.$('.pair-row')) ? ok('member opens vs-org charts') : fail('member panel missing');
+  // Your entry follows your latest scan, and a concept-only role is amber, not missing.
+  const live = await page.evaluate(async () => {
+    const mine = orgMembers.find((m) => m.mine);
+    const before = mine.ships.length;
+    state.items = [
+      ...state.items,
+      {
+        id: 'pio-1',
+        name: 'Pioneer',
+        kind: 'ship',
+        containsShip: true,
+        insurance: 'LTI',
+        contents: [{ kind: 'Ship', label: 'Pioneer' }],
+      },
+    ];
+    await renderOrg();
+    const chip = document.querySelector('.role-chip[data-role="construction"]');
+    const res = {
+      grew: mine.ships.length === before + 1,
+      chip: chip && chip.className,
+      intro: /Only in-concept ships for: Construction/.test(
+        document.querySelector('#org-body').textContent,
+      ),
+    };
+    state.items = state.items.filter((p) => p.id !== 'pio-1');
+    await renderOrg();
+    return res;
+  });
+  live.grew && /\bconcept\b/.test(live.chip || '') && live.intro
+    ? ok('org: your fleet follows your scan; Pioneer-only Construction shows as in concept')
+    : fail(`org live/concept: ${JSON.stringify(live)}`);
   const names = await page.$$eval('.org-cmp[data-side="a"] option', (o) =>
     o.map((x) => x.value).filter(Boolean),
   );
