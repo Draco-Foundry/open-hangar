@@ -222,9 +222,14 @@ try {
       uec: uec.querySelector('b').textContent,
       uecTitle: uec.title,
       rec: bal.querySelector('.bal.rec b').textContent,
-      oneRow: tops.size === 1 && strip.height < 70,
-      settingsOpen: !menu.hidden && !!menu.querySelector('#remind-toggle'),
-      currencyInHeader: !!document.querySelector('header #currency-select'),
+      twoByTwo: tops.size === 2 && strip.height < 200,
+      settingsOpen:
+        !menu.hidden &&
+        !!menu.querySelector('#remind-toggle') &&
+        !!menu.querySelector('#streamer-toggle') &&
+        /Log Out of RSI/.test(menu.textContent),
+      currencyInMenu: !!menu.querySelector('#currency-select'),
+      scanInHeader: !!document.querySelector('header #scan-home'),
       searchOnHome: !!document.querySelector('#view-home .gsearch-home #gsearch'),
       placeholder: document.querySelector('#gsearch').placeholder,
     };
@@ -235,14 +240,15 @@ try {
   card.uec === '¤ 1.2M' &&
   card.uecTitle === '¤ 1,234,567' &&
   card.rec === '¤ 90K' &&
-  card.oneRow &&
+  card.twoByTwo &&
   card.settingsOpen &&
   card.settingsClosed &&
-  card.currencyInHeader &&
+  card.currencyInMenu &&
+  card.scanInHeader &&
   card.searchOnHome &&
   card.placeholder === 'Global Hangar Search'
     ? ok(
-        'citizen card: ¤ 1.2M / ¤ 90K on one row, settings menu, search on Home, currency in header',
+        'citizen card: ¤ 1.2M / ¤ 90K, wallet two by two, Scan in the top bar, gear menu (currency, Streamer Mode, Log Out of RSI), search on Home',
       )
     : fail(`citizen card: ${JSON.stringify(card)}`);
 
@@ -278,17 +284,43 @@ try {
     await new Promise((r) => setTimeout(r, 200));
     const nm = document.querySelector('#cc-org .cc-org-name');
     const lh = parseFloat(getComputedStyle(nm).lineHeight) || 16;
+    // Measured now: the renders below replace the element.
+    const twoLines = nm.getBoundingClientRect().height <= lh * 2 + 2;
+    const title = nm.closest('a')?.title === `Open ${long} on RSI`;
+    // No org: no org line, no watermark, no placeholder text.
+    OH.getAccount = async () => ({ ...a, org: null });
+    renderAccount();
+    await new Promise((r) => setTimeout(r, 200));
+    const noOrg =
+      document.querySelector('#cc-org').hidden &&
+      document.querySelector('#cc-water').hidden &&
+      !/affiliat/i.test(document.querySelector('.citizen-card').textContent);
+    // Streamer Mode: money turns to dots.
+    streamer.on = true;
+    renderAccount();
+    await new Promise((r) => setTimeout(r, 200));
+    const masked = document.querySelector('#home-balances .bal.store b').textContent === '••••';
+    streamer.on = false;
     OH.getAccount = real;
     renderAccount();
     return {
-      twoLines: nm.getBoundingClientRect().height <= lh * 2 + 2,
-      title: nm.title === long,
+      noOrg,
+      masked,
+      twoLines,
+      title,
       cardClean: !document.querySelector('.citizen-card #versions'),
       footer: /Open Hangar v\d/.test(document.querySelector('#footer').textContent),
     };
   });
-  tweaks.twoLines && tweaks.title && tweaks.cardClean && tweaks.footer
-    ? ok('citizen card: long org name capped at two lines; versions line in the footer')
+  tweaks.twoLines &&
+  tweaks.title &&
+  tweaks.cardClean &&
+  tweaks.footer &&
+  tweaks.noOrg &&
+  tweaks.masked
+    ? ok(
+        'citizen card: long org name wraps, links to the org; no org shows nothing; Streamer Mode hides money; versions in the footer',
+      )
     : fail(`card tweaks: ${JSON.stringify(tweaks)}`);
 
   // Phone width: nothing scrolls sideways.
@@ -497,7 +529,7 @@ try {
     // A ship you don't own isn't in your hangar: nothing to show.
     box.value = 'Idris';
     box.dispatchEvent(new Event('input'));
-    const notOwned = /Nothing matches/.test(out.textContent);
+    const notOwned = /No, you don.t have/.test(out.textContent);
     box.value = '';
     box.dispatchEvent(new Event('input'));
     const shipName = ownedShips().find((s) => /cutlass/i.test(s.label))?.label;

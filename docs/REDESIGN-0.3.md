@@ -31,9 +31,16 @@ no alternate looks; light mode stays the one scheduled option. Reference mockup:
 
 Ordered by what a viewer needs first:
 
-1. **Citizen Card** with Scan, settings and a built-in search box ("/"), and **For You**
-   beside it at a quarter of the row (owner, 2026-09-30); the card spans the row when
-   there are no alerts. Its placement and design get another pass later.
+1. **Citizen Card** ("Pilot ID", signed off 2026-09-30), with **Hangar Alerts** beside it
+   at a quarter of the row; the card spans the row when there are no alerts. No controls
+   on the card. Portrait down the left at full height (RSI's 1024px `/source/` image, the
+   165px thumbnail underneath as a fallback; initials when there's no portrait); name and
+   portrait link to the RSI citizen page. Main org only: 44px logo + name with the rank
+   under it, one plain-styled link to the org page, plus the logo as a faint watermark
+   (opacity 0.08). No org, hidden or REDACTED: nothing shown. "UEE # · Est. Aug 2017 ·
+   9 years" (full date on hover). Subscriber and Chairman's Club on one line, each only
+   when it applies. Wallet two by two: Store Credit, UEC, REC, Buy-Back Tokens ("next
+   Oct 5"). Referrals are not on the card (own Home card). Handle display: undecided.
 2. **For You**: alerts, each with **Ignore** (stays hidden until something new happens):
    wishlist ship on sale, a ship you own changes status (e.g. flight ready), buy-backs
    matching your wishlist, milestones (enlistment anniversary). No CCU nagging (players
@@ -82,11 +89,18 @@ Empty blocks disappear; the grid never leaves a card alone in a row.
 
 - **Pinned while scrolling** on every page except Home (owner, 2026-09-30), so the page
   links stay one click away on long pages like Inventory and Buy-Backs.
+- Right side: **Scan All ▾** (reads "Scan Custom" when a source is unticked; the choice is
+  remembered in `scanSources`), then the **gear menu**: currency, Streamer Mode, Rescan
+  Reminder, Updates, Developers, **Log Out of RSI** ("For switching accounts. Your saved
+  data stays."; it only clears RSI's cookies), Clear Data in red. The language picker
+  goes in the gear menu when translations land. Updates and Developers left the nav.
+- **Streamer Mode** (global, `streamerMode`): every money amount (fmtCurrency,
+  shortMoney, bigMoney, formatValue) shows as dots, hover text included; UEC/REC on the
+  card too. Its scope may grow beyond money.
 
 ## Scheduled Alongside
 
 - Light mode (Dark default / Light / Auto) after the redesign's pages exist.
 - RSI server status on Game Status (needs a CORS-safe route, e.g. via app.openhangar.space).
-- Citizen Card trim (referral code and subscriber badge placement), pending sign-off.
 - The parked draft PR #155 (first Home build) is reference only; its data functions
   (wiki events/patches, buy-back dates, stale-event guard, tests) get reused.

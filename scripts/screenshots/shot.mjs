@@ -8,6 +8,9 @@ const [out = 'shot.png', view = '#home', width = '1280'] = process.argv
   .slice(2)
   .filter((a) => !a.startsWith('--'));
 const alerts = process.argv.includes('--alerts');
+// --card gives the demo citizen a real RSI portrait and org logo (loaded from RSI),
+// to check the Citizen Card with real images.
+const realCard = process.argv.includes('--card');
 const chrome = [
   process.env.CHROME_PATH,
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -24,6 +27,27 @@ try {
   const page = await browser.newPage();
   await page.goto(`http://localhost:8323/${view}`, { waitUntil: 'networkidle0' });
   await new Promise((r) => setTimeout(r, 2500));
+  if (realCard) {
+    await page.evaluate(async () => {
+      const get = OH.getAccount;
+      OH.getAccount = async (o) => {
+        const a = await get(o);
+        return {
+          ...a,
+          avatar:
+            'https://robertsspaceindustries.com/media/lqbnzarvkibdrr/heap_infobox/4b5df976-F78d-49af-Aacb-02c07df28fa4.jpg',
+          org: {
+            ...a.org,
+            logo: 'https://robertsspaceindustries.com/media/th8jowx1j0i7sr/heap_infobox/STORMRIDE-Logo.jpg',
+          },
+        };
+      };
+      location.hash = '#inventory';
+      await new Promise((r) => setTimeout(r, 300));
+      location.hash = '#home';
+      await new Promise((r) => setTimeout(r, 2500));
+    });
+  }
   if (alerts) {
     await page.evaluate(async () => {
       OH.getShipStock = async (url) =>
