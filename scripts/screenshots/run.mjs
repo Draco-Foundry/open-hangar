@@ -119,6 +119,12 @@ async function handle(req, res) {
   }
 
   // RSI's Comm-Link list (a POST too): the saved fixture.
+  // RSI Spectrum Patch Notes (a POST too): the saved fixture.
+  if (u.pathname === '/__patchnotes.json') {
+    return res
+      .writeHead(200, { 'content-type': 'application/json' })
+      .end(fs.readFileSync(path.join(SRC, '..', 'test', 'fixtures', 'patch-notes.json')));
+  }
   if (u.pathname === '/__commlinks.json') {
     const data = fs.readFileSync(
       path.join(SRC, '..', 'test', 'fixtures', 'commlinks.html'),
@@ -145,7 +151,12 @@ async function handle(req, res) {
       .end(fs.readFileSync(path.join(SRC, '..', 'CHANGELOG.md')));
   }
 
-  const base = u.pathname.startsWith('/__demo/') ? HERE : SRC;
+  // The extension's icons sit beside src/ (the dashboard links ../icons/...).
+  const base = u.pathname.startsWith('/__demo/')
+    ? HERE
+    : u.pathname.startsWith('/icons/')
+      ? path.join(SRC, '..')
+      : SRC;
   const rel = decodeURIComponent(u.pathname.replace(/^\/__demo\//, '/'));
   const file = path.join(base, rel);
   if (!file.startsWith(base) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
@@ -184,12 +195,25 @@ try {
     await page
       .waitForFunction(() => [...document.images].every((img) => img.complete), { timeout: 20000 })
       .catch(() => console.warn(`  (${view}: some images still loading — capturing anyway)`));
-    // Home's news panel fills in after its own fetches; wait for it and its picture.
+    // Inventory and Buy-Backs show their List view (the redesigned rows).
+    if (view === 'inventory' || view === 'buybacks') {
+      await page.evaluate(() => {
+        state.layout = 'list';
+        state.bbLayout = 'list';
+        route();
+      });
+      await page
+        .waitForFunction(() => [...document.images].every((img) => img.complete), {
+          timeout: 20000,
+        })
+        .catch(() => {});
+    }
+    // Home's cards fill in after their own fetches; wait for them and their pictures.
     if (view === 'home') {
       await page
         .waitForFunction(
           () => {
-            const g = document.querySelector('.home-grid');
+            const g = document.querySelector('#oh-home');
             return (
               g &&
               g.textContent.trim().length > 50 &&

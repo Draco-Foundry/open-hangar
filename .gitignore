@@ -20,3 +20,6 @@ dist/
 # local scratch files (not for the repo)
 _dump/
 .wrangler/
+
+# built by Vite from ui/ (npm run build:ui)
+/src/ui/

@@ -31,7 +31,16 @@ no alternate looks; light mode stays the one scheduled option. Reference mockup:
 
 Ordered by what a viewer needs first:
 
-1. **Citizen Card** with Scan, settings and a built-in search box ("/").
+1. **Citizen Card** ("Pilot ID", signed off 2026-09-30), with **Hangar Alerts** beside it
+   at a quarter of the row; the card spans the row when there are no alerts. No controls
+   on the card. Portrait down the left at full height (RSI's 1024px `/source/` image, the
+   165px thumbnail underneath as a fallback; initials when there's no portrait); name and
+   portrait link to the RSI citizen page. Main org only: 44px logo + name with the rank
+   under it, one plain-styled link to the org page, plus the logo as a faint watermark
+   (opacity 0.08). No org, hidden or REDACTED: nothing shown. "UEE # · Est. Aug 2017 ·
+   9 years" (full date on hover). Subscriber and Chairman's Club on one line, each only
+   when it applies. Wallet two by two: Store Credit, UEC, REC, Buy-Back Tokens ("next
+   Oct 5"). Referrals are not on the card (own Home card). Handle display: undecided.
 2. **For You**: alerts, each with **Ignore** (stays hidden until something new happens):
    wishlist ship on sale, a ship you own changes status (e.g. flight ready), buy-backs
    matching your wishlist, milestones (enlistment anniversary). No CCU nagging (players
@@ -65,10 +74,77 @@ Empty blocks disappear; the grid never leaves a card alone in a row.
    alongside.
 4. **Beta** with a few testers, fix, release **0.3.0**.
 
+## Build Notes
+
+- Svelte sources live in `ui/`; `npm run build:ui` (Vite) compiles them into `src/ui/`
+  (generated, gitignored). `build`, `demo`, `screenshots` and `test:ui` run it first.
+- The classic `src/dashboard.js` still owns scanning, storage and the other pages. It
+  exposes read-only helpers on `window.OHApp` and fires `oh:home` when Home's data changes.
+- Fonts (Manrope, Source Sans 3) are bundled from @fontsource; no requests to Google.
+- **Firefox review note:** web-ext lint shows one warning (UNSAFE_VAR_ASSIGNMENT, innerHTML)
+  inside Svelte's runtime. It clones compile-time template markup, never user or RSI data.
+  Mention this in the AMO reviewer notes with the 0.3.0 upload (plus the source-code link).
+
+## Top Bar
+
+- **Pinned while scrolling** on every page except Home (owner, 2026-09-30), so the page
+  links stay one click away on long pages like Inventory and Buy-Backs.
+- Right side: **Scan All ▾** (reads "Scan Custom" when a source is unticked; the choice is
+  remembered in `scanSources`), then the **gear menu**: currency, Streamer Mode, Rescan
+  Reminder, Updates, Developers, **Log Out of RSI** ("For switching accounts. Your saved
+  data stays."; it only clears RSI's cookies), Clear Data in red. The language picker
+  goes in the gear menu when translations land. Updates and Developers left the nav.
+- **Streamer Mode** (global, `streamerMode`): every money amount (fmtCurrency,
+  shortMoney, bigMoney, formatValue) shows as dots, hover text included; UEC/REC on the
+  card too. Its scope may grow beyond money.
+
+## Top Menu Pass (approved and built 2026-09-30, ships tonight in 0.2.12)
+
+All ten, as mocked up ("Top Menu Pass" artifact): alerts bell with a count and a
+drop-down (every page); Scan is its own progress bar ("Scanning… 4/12", "✓ Done") with
+"Last scan…" on hover; a search box on every page that expands (or /); your RSI
+portrait replaces the gear and opens the menu (name + org at the top, then Currency,
+Streamer Mode, Rescan Reminder, How to Use, Updates, Developers, Log Out of RSI, Clear
+Data); a Streamer pill while it's on; counts beside Inventory and Buy-Backs; an update
+dot on the portrait with "Update ready: Reload" in the menu; a slim bar while
+scrolling down; a real logo mark; phone tabs you swipe.
+
+## Inventory and Buy-Backs (approved and built 2026-09-30, ships tonight in 0.2.12)
+
+- Stay two pages (different jobs: what you own vs what you could get back; 1,000+
+  buy-backs would bury a hangar). Global Hangar Search already covers both.
+- Shared new look for both: one toolbar row (search, sort, view, Export ▾), one tidy
+  chip row with Clear filters and a Hide small stuff switch (paints, add-ons; on by
+  default on Buy-Backs), a summary strip on top that follows the filters, and rows
+  with big names and prices.
+- Signed off from the "Inventory And Buy-Backs Pass" mockup: Inventory strip =
+  Pledges, Melt Value, Store Value (no LTI count: the owner doesn't want LTI
+  emphasised); saved views; "$X under store" in green; the melt planner bar when you
+  tick rows; Export of what's showing (CSV, share image, full backup). Buy-Backs strip
+  = count, tokens with the next date, below store price; identical buy-backs stack
+  ("×3") only when you turn on Stack identical (off by default: each buy-back is its own
+  item); a Below store price chip. Straight into the search bar, no insight cards.
+- Melt planner (owner): no "ticked" or "store credit if melted" wording; it says what the
+  pick buys from your wishlist, in the store or from your buy-backs (with the note that a
+  store-credit buy-back takes a token each, cash ones don't). Names in rows at 700 weight.
+- Rejected: duplicates card, CCU chains ("don't want to get into the CCU chain game"),
+  "Best use of your token" (everyone's priorities differ).
+- Already done: List rows with big names (wrap to two lines) and big prices, no small
+  contents text in the middle.
+
+## Filters Pass (picked 2026-09-30, next update after 0.2.12)
+
+B2 from the "Filters Pass" mockup, on Inventory and Buy-Backs: a compact left sidebar
+with the types as colored toggle pills at the top, then folding groups (Insurance,
+Status, Deals, Came From, Manufacturer with a search box, Size, Melt Value), each
+showing how many are picked and its own Clear. "‹ Hide Filters" folds the sidebar away
+so the list takes the full width; a "Filters (n)" button in the toolbar brings it
+back; the choice is remembered. Active filters show as pills above the list (× each,
+Clear All) either way. Picking keeps the sidebar open (never closes on a click).
+
 ## Scheduled Alongside
 
 - Light mode (Dark default / Light / Auto) after the redesign's pages exist.
 - RSI server status on Game Status (needs a CORS-safe route, e.g. via app.openhangar.space).
-- Citizen Card trim (referral code and subscriber badge placement), pending sign-off.
 - The parked draft PR #155 (first Home build) is reference only; its data functions
   (wiki events/patches, buy-back dates, stale-event guard, tests) get reused.
