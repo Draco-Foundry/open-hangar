@@ -22,12 +22,16 @@
   //   BETTER_AUTH_SECRET     required
   //   DISCORD_CLIENT_SECRET  Log in with Discord (needs DISCORD_CLIENT_ID too)
   //   RESEND_API_KEY         account emails; without it, links are logged instead
+  //   SIGNUP_ALLOWLIST       optional: comma-separated emails allowed to sign up before launch
   // BETTER_AUTH_URL is overridden to http://localhost:4321 in .dev.vars for local dev.
   "vars": {
     "BETTER_AUTH_URL": "https://app.openhangar.space",
     // Discord application ID (public). Empty = Discord login hidden.
     "DISCORD_CLIENT_ID": "1554856207179714671",
     "EMAIL_FROM": "Open Hangar <noreply@openhangar.space>",
+    // "true" opens account creation to everyone (launch day). Until then only
+    // existing accounts and emails in the SIGNUP_ALLOWLIST secret can get in.
+    "SIGNUPS_OPEN": "false",
   },
   // Served at app.openhangar.space (Cloudflare creates the DNS record and certificate).
   "routes": [{ "pattern": "app.openhangar.space", "custom_domain": true }],

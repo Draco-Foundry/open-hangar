@@ -1,10 +1,11 @@
 ---
 import Base from '../layouts/Base.astro';
-import { discordEnabled } from '../lib/auth';
+import { discordEnabled, signupsOpen } from '../lib/auth';
 
 export const prerender = false;
 if (Astro.locals.user) return Astro.redirect('/hangar');
 const discord = discordEnabled();
+const open = signupsOpen();
 ---
 
 <Base title="Create Account">
@@ -13,6 +14,14 @@ const discord = discordEnabled();
     Optional: the extension works fine without one. An account lets you sync your hangar here, see it on any
     device, and (soon) join your org.
   </p>
+  {
+    !open && (
+      <p class="notice">
+        Accounts are invite-only while we get things ready. If you're on the tester list, sign up below; otherwise
+        check back soon.
+      </p>
+    )
+  }
   <div class="card" style="max-width:460px">
     {
       discord && (
@@ -35,7 +44,7 @@ const discord = discordEnabled();
           autocomplete="new-password"
         /></label
       >
-      <button type="submit">Create account</button>
+      <button type="submit">Create Account</button>
       <div class="error" id="err" role="alert"></div>
     </form>
     <p class="muted">We'll email you a link to confirm your address.</p>
@@ -74,6 +83,13 @@ const discord = discordEnabled();
 </script>
 
 <style>
+  .notice {
+    max-width: 460px;
+    padding: 10px 14px;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  }
   .discord {
     width: 100%;
     justify-content: center;

@@ -2,13 +2,35 @@
 // Worker isolate; bindings come from `cloudflare:workers`.
 import { env } from 'cloudflare:workers';
 import { betterAuth } from 'better-auth';
+import { APIError } from 'better-auth/api';
 import { D1Dialect } from 'kysely-d1';
 import { authOptions } from './auth-options';
 import { resetPasswordEmail, verifyEmail } from './email';
 
 // DISCORD_CLIENT_ID is a plain var, DISCORD_CLIENT_SECRET a secret (`wrangler
 // secret put`). Discord login only turns on once both are set.
-type OptionalSecrets = { DISCORD_CLIENT_ID?: string; DISCORD_CLIENT_SECRET?: string };
+type OptionalSecrets = {
+  DISCORD_CLIENT_ID?: string;
+  DISCORD_CLIENT_SECRET?: string;
+  SIGNUPS_OPEN?: string;
+  SIGNUP_ALLOWLIST?: string;
+};
+
+// New accounts are closed until launch unless SIGNUPS_OPEN is "true". Testers go
+// in the SIGNUP_ALLOWLIST secret (comma-separated emails), so their addresses
+// never land in the public repo. Existing accounts always sign in.
+export const SIGNUPS_CLOSED = 'Open Hangar accounts aren’t open yet. They’re coming soon!';
+export function signupsOpen() {
+  return (env as unknown as OptionalSecrets).SIGNUPS_OPEN === 'true';
+}
+function mayCreateAccount(email: string) {
+  if (signupsOpen()) return true;
+  const allow = String((env as unknown as OptionalSecrets).SIGNUP_ALLOWLIST || '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return allow.includes(String(email || '').toLowerCase());
+}
 
 function build() {
   const extra = env as unknown as OptionalSecrets;
@@ -24,6 +46,17 @@ function build() {
     emailVerification: {
       ...authOptions.emailVerification,
       sendVerificationEmail: ({ user, url }) => verifyEmail(user.email, url),
+    },
+    // Runs for email sign-up and for a first Discord login alike.
+    databaseHooks: {
+      user: {
+        create: {
+          before: async (user) => {
+            if (!mayCreateAccount(user.email))
+              throw new APIError('FORBIDDEN', { message: SIGNUPS_CLOSED });
+          },
+        },
+      },
     },
     socialProviders:
       extra.DISCORD_CLIENT_ID && extra.DISCORD_CLIENT_SECRET
