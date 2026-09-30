@@ -1388,7 +1388,7 @@
     return out;
   }
   let catalogMem = null; // [{ lname, slug, cls, msrp }]  (wiki)
-  const CATALOG_CACHE_V = 6; // v2: class + msrp, all pages · v3: fleet fields · v4: display name · v5: + ship matrix (concept ships) · v6: manufacturer
+  const CATALOG_CACHE_V = 7; // v2: class + msrp, all pages · v3: fleet fields · v4: display name · v5: + ship matrix (concept ships) · v6: manufacturer · v7: every role (foci)
   let catalogInflight = null;
   let matrixMem = null; // [{ lname, name, img, mfr, mfrName }]  (RSI ship-matrix)
   const MATRIX_CACHE_V = 2; // v2: + display name + manufacturer (for HTF ship codes)
@@ -1489,7 +1489,10 @@
       msrp: Number(v.msrp) > 0 ? Number(v.msrp) : null, // USD store price
       // Fleet stats (Stats → Fleet): what the ship is for and how big.
       career: en(v.type) || v.career || null,
-      role: en(v.foci && v.foci[0]) || v.role || null,
+      // Every focus the wiki lists, not just the first: the Kraken is
+      // "Multi-Role / Light Carrier", and only the second makes it a carrier.
+      role:
+        (Array.isArray(v.foci) ? v.foci.map(en).filter(Boolean) : []).join(' / ') || v.role || null,
       size: en(v.size) || null,
       status: en(v.production_status) || null, // flight-ready | in-concept | …
       crew: (v.crew && Number(v.crew.max)) || null,
@@ -2852,7 +2855,7 @@
     { key: 'cargo', label: 'Cargo', re: /freight|cargo/i },
     { key: 'mining', label: 'Mining', re: /mining/i },
     { key: 'salvage', label: 'Salvage', re: /salvage/i },
-    { key: 'refining', label: 'Refining', re: /refinery/i },
+    { key: 'refining', label: 'Refining', re: /refinery|refining/i },
     { key: 'medical', label: 'Medical', re: /medical/i },
     { key: 'refuel', label: 'Refueling', re: /refuel/i },
     { key: 'repair', label: 'Repair', re: /repair/i },
@@ -2863,8 +2866,19 @@
     { key: 'bomber', label: 'Bombers', re: /bomber/i },
     { key: 'capital', label: 'Capital warships', re: /frigate|corvette|destroyer|battlecruiser/i },
     { key: 'carrier', label: 'Carriers', re: /carrier/i },
-    { key: 'passenger', label: 'Passengers', re: /passenger|touring/i },
+    { key: 'passenger', label: 'Passengers', re: /passenger|touring|transport/i },
     { key: 'construction', label: 'Construction', re: /construction/i },
+    // Combat and everything else the wiki's roles ("foci") name, so every ship
+    // lands somewhere. Labels follow the wiki's wording; nothing is invented.
+    { key: 'fighter', label: 'Fighters', re: /fighter|interceptor/i },
+    { key: 'gunship', label: 'Gunships', re: /gun ?ship/i },
+    { key: 'minelayer', label: 'Minelaying', re: /minelayer/i },
+    { key: 'ground', label: 'Ground combat', re: /anti-air|anti-vehicle|tank|^combat$|military/i },
+    { key: 'recovery', label: 'Recovery', re: /recovery/i },
+    { key: 'reporting', label: 'Reporting', re: /reporting/i },
+    { key: 'multirole', label: 'Multi-role', re: /multi-role|generalist|modular/i },
+    { key: 'starter', label: 'Starter', re: /starter/i },
+    { key: 'racing', label: 'Racing', re: /racing/i },
   ];
   const SIZE_RANK = { capital: 5, large: 4, medium: 3, small: 2, snub: 1, vehicle: 0 };
 
