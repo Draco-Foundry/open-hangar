@@ -1,5 +1,5 @@
 // Writes site/stars.css: the same drifting-stars backdrop as app.openhangar.space
-// (SpaceBackdrop.astro in the private open-hangar-app repo), so the two sites match. Stars come from a
+// (SpaceBackdrop.astro in the private open-hangar-server repo), so the two sites match. Stars come from a
 // fixed seed, so the file only changes if this script does.
 //   node scripts/site-stars.mjs
 import fs from 'node:fs';
