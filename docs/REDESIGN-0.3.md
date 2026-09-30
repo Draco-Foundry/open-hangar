@@ -9,7 +9,7 @@ small fixes; beta-tested before the stores.
 - **`lib.js`** (reading RSI, parsing, storage, value math) and its tests are reused
   as-is. Only the screens are rebuilt.
 - The extension stays a scraper and viewer ("about me, from my RSI session, now"); see
-  [WEBSITE-PLAN.md](WEBSITE-PLAN.md) for what belongs on the website.
+  the website plan (private repo Draco-Foundry/open-hangar-app, docs/WEBSITE-PLAN.md) for what belongs on the website.
 - Colour meanings (Color Key): green good news, amber worth a look, red a problem, blue
   clickable, one colour per item type. Headings in Title Case.
 
