@@ -2310,13 +2310,16 @@ if (selectBar) {
 // --- Store: your CCUs + price list -----------------------------------------
 
 const capFirst = (t) => String(t || '').replace(/^\w/, (c) => c.toUpperCase());
+// Labels (roles, sizes, chart rows): every word capitalized, "light fighter" → "Light Fighter".
+const titleCase = (t) =>
+  String(t || '').replace(/(^|[\s/(-])(\p{Ll})/gu, (_, p, c) => p + c.toUpperCase());
 
 // Production state labels. "In production" reads as "In concept": to a player
 // both mean "can't fly it yet", and the difference was hard to tell apart.
 const SHIP_STATES = [
-  ['flight-ready', 'Flight ready'],
-  ['in-production', 'In concept'],
-  ['in-concept', 'In concept'],
+  ['flight-ready', 'Flight Ready'],
+  ['in-production', 'In Concept'],
+  ['in-concept', 'In Concept'],
 ];
 // --- Store page -------------------------------------------------------------
 // Three panels: Wishlist, Your CCUs and Ship Prices. Long lists scroll inside
@@ -2522,7 +2525,7 @@ function wishlistHtml() {
   const note = unchecked
     ? `<p class="muted value-note">${unchecked} pack buy-back${unchecked === 1 ? '' : 's'} not checked yet: RSI's list only names the first item in a pack. <a href="#buybacks" data-view="buybacks">Load details</a> on the Buy-Backs page to find your wishlist ships inside every pack.</p>`
     : '';
-  return `${note}<table class="org-table wishlist"><thead><tr><th>Ship</th><th class="num">Store price</th><th>In store now</th><th>Status</th><th>Buy-backs</th><th></th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+  return `${note}<table class="org-table wishlist"><thead><tr><th>Ship</th><th class="num">Store Price</th><th>In Store Now</th><th>Status</th><th>Buy-backs</th><th></th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 // Your CCUs: identical ones stacked, searchable, all of them (not just priced).
@@ -2549,7 +2552,7 @@ function ccuPanelHtml(q) {
   searchCounts.ccu = { shown: shown.length, total: all.length };
   if (!all.length) return '<p class="muted sp-empty">No CCUs in your hangar.</p>';
   if (!shown.length) return '<p class="muted sp-empty">No CCUs match.</p>';
-  return `<table class="org-table"><thead><tr><th>Upgrade</th><th class="num">Worth</th><th class="num">You paid</th><th class="num">Stock</th></tr></thead><tbody>${shown
+  return `<table class="org-table"><thead><tr><th>Upgrade</th><th class="num">Worth</th><th class="num">You Paid</th><th class="num">Stock</th></tr></thead><tbody>${shown
     .map(
       (c) => `<tr>
         <td>${shipLink(c.from)} <span class="ccu-flow">→</span> ${shipLink(c.to)}</td>
@@ -2585,11 +2588,11 @@ function priceRowsHtml(q) {
     return '<p class="muted sp-empty">No ships match.</p>';
   }
   const statusLabel = (s) => (SHIP_STATES.find(([k]) => k === s) || [])[1] || capFirst(s || '');
-  return `<table class="org-table"><thead><tr><th>Ship</th><th class="num">Store price</th><th>Status</th><th>Role</th><th>Size</th></tr></thead><tbody>${rows
+  return `<table class="org-table"><thead><tr><th>Ship</th><th class="num">Store Price</th><th>Status</th><th>Role</th><th>Size</th></tr></thead><tbody>${rows
     .map(
       (v) =>
         `<tr><td>${shipLink(v.name || v.lname)}</td><td class="num">${dollars(v.msrp)}</td><td>${OH.escapeHtml(statusLabel(v.status))}</td><td>${OH.escapeHtml(v.role || '')}</td><td>${OH.escapeHtml(
-          capFirst(v.size),
+          titleCase(v.size),
         )}</td></tr>`,
     )
     .join('')}</tbody></table>`;
@@ -2831,7 +2834,7 @@ function orgBarsHtml(map) {
   return rows
     .map(
       ([k, n]) => `<div class="bar-row">
-        <div class="bar-label">${OH.escapeHtml(k.charAt(0).toUpperCase() + k.slice(1))}</div>
+        <div class="bar-label">${OH.escapeHtml(titleCase(k))}</div>
         <div class="bar-track"><div class="bar-fill" style="width:${Math.round((n / max) * 100)}%"></div></div>
         <div class="bar-val">${n}</div>
       </div>`,
@@ -2878,10 +2881,10 @@ function orgRolePanelHtml(f) {
       .filter((sh) => sh.role && def.re.test(sh.role))
       .map(
         (sh) =>
-          `<tr><td>${OH.escapeHtml(sh.name)}</td><td class="muted">${OH.escapeHtml(sh.role)}</td><td>${
+          `<tr><td>${OH.escapeHtml(sh.name)}</td><td class="muted">${OH.escapeHtml(titleCase(sh.role))}</td><td>${
             sh.status === 'flight-ready'
-              ? '<span class="badge good">Flight ready</span>'
-              : '<span class="badge warn">In concept</span>'
+              ? '<span class="badge good">Flight Ready</span>'
+              : '<span class="badge warn">In Concept</span>'
           }</td><td class="num">${sh.count}</td><td class="org-owners">${sh.owners
             .map((o) => OH.escapeHtml(o.n > 1 ? `${o.name} ×${o.n}` : o.name))
             .join(', ')}</td></tr>`,
@@ -2899,15 +2902,15 @@ function orgRolePanelHtml(f) {
     .sort((x, y) => (x.msrp || Infinity) - (y.msrp || Infinity))
     .map(
       (v) =>
-        `<tr><td>${OH.escapeHtml(v.name || v.lname)}</td><td class="muted">${OH.escapeHtml(v.role)}</td><td class="muted">${OH.escapeHtml(
-          v.status === 'flight-ready' ? 'Flight ready' : 'In concept',
+        `<tr><td>${OH.escapeHtml(v.name || v.lname)}</td><td class="muted">${OH.escapeHtml(titleCase(v.role))}</td><td class="muted">${OH.escapeHtml(
+          v.status === 'flight-ready' ? 'Flight Ready' : 'In Concept',
         )}</td><td class="num">${v.msrp ? dollars(v.msrp) : '—'}</td></tr>`,
     )
     .join('');
   return `<div class="org-panel"><div class="org-panel-head"><strong>${OH.escapeHtml(r.label)}</strong> · nobody has one yet<button type="button" class="org-close" data-close="role" aria-label="Close">×</button></div>
     ${
       options
-        ? `<p class="muted org-intro">Every ship that fills this role, cheapest first:</p><div class="org-scroll"><table class="org-table"><thead><tr><th>Ship</th><th>Role</th><th>Status</th><th class="num">Store price</th></tr></thead><tbody>${options}</tbody></table></div>`
+        ? `<p class="muted org-intro">Every ship that fills this role, cheapest first:</p><div class="org-scroll"><table class="org-table"><thead><tr><th>Ship</th><th>Role</th><th>Status</th><th class="num">Store Price</th></tr></thead><tbody>${options}</tbody></table></div>`
         : '<p class="muted">No ships in the ship list fill this role.</p>'
     }</div>`;
 }
@@ -2939,7 +2942,7 @@ function orgMembersHtml(f, members) {
       : '';
   return `<h3 class="section-title" style="margin-top:22px">Members</h3>
     <p class="muted org-intro">Click a member to see their fleet next to the rest of the org.</p>
-    <table class="org-table"><thead><tr><th>Member</th><th class="num">Ships</th><th class="num">LTI</th><th class="num">Fleet value</th><th class="num">Share</th></tr></thead><tbody>${rows}</tbody></table>
+    <table class="org-table"><thead><tr><th>Member</th><th class="num">Ships</th><th class="num">LTI</th><th class="num">Fleet Value</th><th class="num">Share</th></tr></thead><tbody>${rows}</tbody></table>
     ${orgMemberPanelHtml(f, members)}${compare}${orgComparePanelHtml(members)}`;
 }
 
@@ -2949,14 +2952,13 @@ function pairBarsHtml(mapA, mapB, labelA, labelB) {
     (x, y) => (mapB[y] || 0) + (mapA[y] || 0) - ((mapB[x] || 0) + (mapA[x] || 0)),
   );
   const max = Math.max(1, ...keys.map((k) => Math.max(mapA[k] || 0, mapB[k] || 0)));
-  const cap = (k) => k.charAt(0).toUpperCase() + k.slice(1);
   return `<div class="pair-legend"><span class="sw a"></span>${OH.escapeHtml(labelA)} <span class="sw b"></span>${OH.escapeHtml(
     labelB,
   )}</div>${keys
     .map(
       (
         k,
-      ) => `<div class="pair-row"><div class="bar-label">${OH.escapeHtml(cap(k))}</div><div class="pair-bars">
+      ) => `<div class="pair-row"><div class="bar-label">${OH.escapeHtml(titleCase(k))}</div><div class="pair-bars">
         <div class="pair-bar a" style="width:${Math.round(((mapA[k] || 0) / max) * 100)}%"><span>${mapA[k] || 0}</span></div>
         <div class="pair-bar b" style="width:${Math.round(((mapB[k] || 0) / max) * 100)}%"><span>${mapB[k] || 0}</span></div>
       </div></div>`,
@@ -3032,7 +3034,7 @@ function orgBiggestHtml(f) {
   const rows = f.biggest
     .map(
       (r) =>
-        `<tr><td>${OH.escapeHtml(r.name)}</td><td>${OH.escapeHtml(capFirst(r.size || ''))}</td><td class="num">${
+        `<tr><td>${OH.escapeHtml(r.name)}</td><td>${OH.escapeHtml(titleCase(r.size))}</td><td class="num">${
           r.count
         }</td><td class="num">${r.msrp ? dollars(r.msrp) : '—'}</td><td class="org-owners">${r.owners
           .map((o) => OH.escapeHtml(o.n > 1 ? `${o.name} ×${o.n}` : o.name))
@@ -3040,7 +3042,7 @@ function orgBiggestHtml(f) {
     )
     .join('');
   return `<h3 class="section-title" style="margin-top:22px">Biggest Ships</h3>
-    <table class="org-table"><thead><tr><th>Ship</th><th>Size</th><th class="num">Count</th><th class="num">Store price</th><th>Owners</th></tr></thead><tbody>${rows}</tbody></table>`;
+    <table class="org-table"><thead><tr><th>Ship</th><th>Size</th><th class="num">Count</th><th class="num">Store Price</th><th>Owners</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 async function renderOrg() {
@@ -3097,7 +3099,7 @@ async function renderOrg() {
       `<div class="fleet-cols"><div><h4 class="modal-h">By Role</h4>${orgBarsHtml(f.byCareer)}</div>` +
       `<div><h4 class="modal-h">By Size</h4>${orgBarsHtml(f.bySize)}</div></div>` +
       `<h3 class="section-title" style="margin-top:22px">Ships</h3>` +
-      `<table class="org-table"><thead><tr><th>Ship</th><th class="num">Count</th><th class="num">LTI</th><th class="num">Store price</th><th>Owners</th></tr></thead><tbody>${rows}</tbody></table>`,
+      `<table class="org-table"><thead><tr><th>Ship</th><th class="num">Count</th><th class="num">LTI</th><th class="num">Store Price</th><th>Owners</th></tr></thead><tbody>${rows}</tbody></table>`,
   );
 }
 
@@ -3282,7 +3284,7 @@ function fleetSectionHtml() {
     return rows
       .map(
         ([k, n]) => `<div class="bar-row">
-        <div class="bar-label">${OH.escapeHtml(k.charAt(0).toUpperCase() + k.slice(1))}</div>
+        <div class="bar-label">${OH.escapeHtml(titleCase(k))}</div>
         <div class="bar-track"><div class="bar-fill" style="width:${Math.round((n / max) * 100)}%"></div></div>
         <div class="bar-val">${n}</div>
       </div>`,
@@ -6834,7 +6836,7 @@ function loanersSectionHtml() {
   return `<p>You can fly <strong>${all.length}</strong> loaner${all.length === 1 ? '' : 's'}: ${all
     .map((l) => shipLink(l))
     .join(', ')}.</p>
-    <table class="org-table"><thead><tr><th>Your ship</th><th>Loaners</th></tr></thead><tbody>${rows
+    <table class="org-table"><thead><tr><th>Your Ship</th><th>Loaners</th></tr></thead><tbody>${rows
       .sort((a, b) => a.ship.localeCompare(b.ship))
       .map(
         (r) =>
@@ -6854,7 +6856,7 @@ function includedSectionHtml() {
     if (inc) rows.push({ ship: s.label, inc });
   }
   if (!rows.length) return '<p class="muted">None of your ships come with an included vessel.</p>';
-  return `<table class="org-table"><thead><tr><th>Your ship</th><th>Comes with</th></tr></thead><tbody>${rows
+  return `<table class="org-table"><thead><tr><th>Your Ship</th><th>Comes With</th></tr></thead><tbody>${rows
     .sort((a, b) => a.ship.localeCompare(b.ship))
     .map((r) => `<tr><td>${shipLink(r.ship)}</td><td>${r.inc.map(vesselLink).join(', ')}</td></tr>`)
     .join('')}</tbody></table>
@@ -6909,8 +6911,8 @@ function openShipModal(name) {
         onWishlist(title) ? 'Remove from Wishlist' : 'Add to Wishlist'
       }</button>
       ${row('Manufacturer', v && v.mfr ? esc(v.mfr) : '')}
-      ${row('Role', v && (v.role || v.career) ? esc(capFirst(v.role || v.career)) : '')}
-      ${row('Size', v && v.size ? esc(capFirst(v.size)) : '')}
+      ${row('Role', v && (v.role || v.career) ? esc(titleCase(v.role || v.career)) : '')}
+      ${row('Size', v && v.size ? esc(titleCase(v.size)) : '')}
       ${row('Crew', v && v.crew ? esc(String(v.crew)) : '')}
       ${row('Cargo', v && v.cargo ? `${esc(String(v.cargo))} SCU` : '')}
       ${row('In store now', storeOf(title) ? inStoreHtml(title) : '')}
