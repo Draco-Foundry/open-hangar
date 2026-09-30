@@ -357,15 +357,6 @@ body:not(:has(#view-home.active)) .wrap > header {
 .hdr-prefs .cc-settings {
   display: inline-flex;
 }
-.hdr-prefs .cc-gear {
-  display: inline-flex;
-  align-items: center;
-  padding: 7px 9px;
-  border: 1px solid var(--line-2);
-  border-radius: 8px;
-  background: var(--panel-2);
-  color: var(--head);
-}
 .settings-menu {
   min-width: 250px;
 }
@@ -782,7 +773,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   -webkit-box-orient: vertical;
   overflow: hidden;
   white-space: normal;
-  font: 800 18px/1.25 var(--font-head);
+  font: 700 18px/1.25 var(--font-head);
   color: var(--head);
 }
 .grid.list .val,
@@ -812,4 +803,675 @@ body:not(:has(#view-home.active)) .wrap > header {
 /* An estimated buy-back price (today's store price) stays muted next to exact ones. */
 #buybacks-body .grid.list .bb-end .val.est {
   color: var(--muted);
+}
+
+/* ---- Top menu pass (owner, 2026-09-30) ---------------------------------------- */
+/* Logo + name; links Home. */
+.wrap > header .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--head);
+  text-decoration: none;
+}
+.wrap > header .brand-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+.wrap > header .brand h1 {
+  font: 800 19px var(--font-head);
+  white-space: nowrap;
+}
+/* Counts beside Inventory and Buy-Backs. */
+nav .nav-n {
+  margin-left: 4px;
+  font: 700 11px var(--font-head);
+  color: var(--faint);
+}
+nav a.active .nav-n {
+  color: var(--muted);
+}
+nav .nav-n:empty {
+  display: none;
+}
+/* Streamer pill while Streamer Mode is on. */
+.stream-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(210, 168, 255, 0.14);
+  color: #d2a8ff;
+  font: 700 12px var(--font-head);
+  white-space: nowrap;
+}
+.stream-pill[hidden] {
+  display: none;
+}
+/* Search on every page: compact; the results open wide beneath it. */
+.hdr-prefs .top-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 150px;
+  height: 36px;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  background: var(--panel);
+  color: var(--muted);
+  transition: width 0.2s;
+}
+.hdr-prefs .top-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.hdr-prefs .top-search input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--head);
+  font: 14px var(--font-body);
+  outline: none;
+}
+.hdr-prefs .top-search .gsearch-key {
+  position: static;
+  transform: none;
+}
+.hdr-prefs .top-search:focus-within .gsearch-key {
+  display: none;
+}
+/* Results drop from the top bar, right-aligned, same look as Home's. */
+.hdr-prefs .top-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  left: auto;
+  width: min(620px, 92vw);
+  max-height: none;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(47, 129, 247, 0.55);
+  border-radius: 14px;
+  background: #232933;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.6),
+    0 0 0 100vmax rgba(5, 7, 10, 0.55);
+  z-index: 60;
+}
+.hdr-prefs .top-results .gs-title {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 8px 6px;
+}
+.hdr-prefs .top-results .gs-row.gs-rich {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 8px;
+  border-radius: 12px;
+  font-size: 14px;
+  text-decoration: none;
+}
+.hdr-prefs .top-results .gs-row.gs-rich:hover {
+  background: #2c333e;
+}
+.hdr-prefs .top-results .gs-img {
+  width: 120px;
+  height: 68px;
+}
+.hdr-prefs .top-results .gs-name {
+  font: 800 16px var(--font-head);
+  color: var(--head);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hdr-prefs .top-results .gs-where {
+  font-size: 13px;
+  white-space: normal;
+}
+.hdr-prefs .top-results .gs-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hdr-prefs .top-results .gs-side {
+  display: grid;
+  gap: 3px;
+  justify-items: end;
+  white-space: nowrap;
+}
+/* The alerts bell. */
+.bell-wrap {
+  position: relative;
+}
+.icon-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  background: var(--panel-2);
+  color: var(--head);
+  cursor: pointer;
+}
+.badge-n {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #f85149;
+  color: #fff;
+  font: 800 11px/18px var(--font-head);
+  text-align: center;
+}
+.badge-n[hidden] {
+  display: none;
+}
+.scan-menu.bell-menu {
+  width: 340px;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: #232933;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+}
+.bm-head {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 6px;
+  font: 700 11px var(--font-head);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.bm-head a {
+  color: var(--link);
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 12px;
+  text-decoration: none;
+}
+.bm-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px 8px 12px;
+  border-left: 3px solid var(--accent);
+}
+.bm-row.onsale,
+.bm-row.good {
+  border-left-color: var(--good);
+}
+.bm-row.warn {
+  border-left-color: var(--warn);
+}
+.bm-row a {
+  display: grid;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.bm-row b {
+  font: 700 14px var(--font-head);
+  color: var(--head);
+}
+.bm-row a:hover b {
+  color: var(--link);
+}
+.bm-row small {
+  font-size: 13px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bm-x {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--faint);
+  font-size: 18px;
+  cursor: pointer;
+}
+.bm-x:hover {
+  background: var(--panel-2);
+  color: var(--head);
+}
+.bm-none {
+  margin: 0;
+  padding: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+/* Scan fills as it goes. */
+.hdr-prefs .scan-split #scan-home {
+  position: relative;
+  overflow: hidden;
+  min-width: 132px;
+  white-space: nowrap;
+}
+#scan-home .scan-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: rgba(255, 255, 255, 0.22);
+  transition: width 0.4s;
+}
+#scan-home .scan-label {
+  position: relative;
+}
+#scan-home.scanning:disabled {
+  opacity: 1;
+  cursor: progress;
+}
+/* Your RSI portrait opens the menu (a gear until we know who you are). */
+.avatar-btn {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 2px solid var(--line-2);
+  border-radius: 50%;
+  background: var(--panel-2);
+  color: var(--head);
+  cursor: pointer;
+}
+.avatar-btn:hover {
+  border-color: var(--accent);
+}
+.avatar-img {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: center / cover no-repeat;
+}
+.avatar-img.has-pic svg {
+  display: none;
+}
+.upd-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  background: var(--accent);
+}
+.upd-dot[hidden],
+.menu-who[hidden],
+.menu-upd[hidden] {
+  display: none;
+}
+.menu-who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 4px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.mw-pic {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 50%;
+  background: #1b1f25 center / cover no-repeat;
+}
+.menu-who b {
+  display: block;
+  font: 800 15px var(--font-head);
+  color: var(--head);
+}
+.menu-who small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.menu-upd {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--head);
+  font-size: 13px;
+}
+.menu-upd button {
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--accent);
+  color: #fff;
+  font: 700 12px var(--font-head);
+  cursor: pointer;
+}
+/* The old full-width update banner stays hidden: the menu carries it now. */
+#update-banner {
+  display: none !important;
+}
+/* Slim while scrolling down a long page (the bar is pinned on every page but Home). */
+body.bar-slim:not(:has(#view-home.active)) .wrap > header {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand-mark {
+  width: 24px;
+  height: 24px;
+}
+body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
+  font-size: 16px;
+}
+.wrap > header,
+.wrap > header .brand-mark {
+  transition:
+    padding 0.2s,
+    width 0.2s,
+    height 0.2s;
+}
+/* Phones: the page links become pill tabs you swipe, with a fade at the edge. */
+@media (max-width: 900px) {
+  .hdr-prefs .top-search {
+    display: none;
+  }
+  nav#nav {
+    gap: 6px;
+    -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent);
+    mask-image: linear-gradient(90deg, #000 85%, transparent);
+  }
+  nav#nav a {
+    flex: none;
+    border-radius: 999px;
+    background: var(--panel);
+  }
+  nav#nav a.active {
+    background: var(--accent);
+    color: #fff;
+  }
+}
+@media (max-width: 1180px) {
+  nav .nav-n {
+    display: none;
+  }
+}
+
+/* ---- Inventory / Buy-Backs pass (owner, 2026-09-30) -------------------------- */
+/* Summary strip on top of each page; its numbers follow the filters. */
+.page-sum {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  margin: 0 0 14px;
+  padding: 18px 22px;
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+.page-sum:empty {
+  display: none;
+}
+.page-sum h2 {
+  margin: 0;
+  font: 800 26px var(--font-head);
+  color: var(--head);
+}
+.ps-note {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--link);
+}
+.ps-stats {
+  display: flex;
+  flex-wrap: wrap;
+}
+.ps-st {
+  padding: 0 18px;
+  border-left: 1px solid var(--line-2);
+}
+.ps-st:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+.ps-l {
+  font: 700 11px var(--font-head);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ps-v {
+  font: 800 22px var(--font-head);
+  color: var(--head);
+  font-variant-numeric: tabular-nums;
+}
+.ps-v small {
+  margin-left: 5px;
+  font: 600 12px var(--font-body);
+  color: var(--muted);
+}
+.ps-good {
+  color: var(--good);
+}
+/* One toolbar row: search, sort, view, Select, Export. */
+#view-inventory .controls,
+#view-buybacks .controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: stretch;
+}
+#view-inventory .controls > input,
+#view-buybacks .controls > input {
+  flex: 1 1 240px;
+  min-width: 0;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--head);
+  font: 15px var(--font-body);
+}
+#view-inventory .controls > select,
+#view-buybacks .controls > select,
+#view-inventory .controls .layout-toggle,
+#view-buybacks .controls .layout-toggle,
+#view-inventory .controls .select-toggle,
+.exp-btn {
+  height: 40px;
+  border-radius: 10px;
+}
+.exp-wrap {
+  position: relative;
+}
+.exp-btn {
+  padding: 0 14px;
+  white-space: nowrap;
+}
+.scan-menu.exp-menu {
+  width: 260px;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: #232933;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+.exp-menu .menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font: 600 14px var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.exp-menu .menu-item:hover {
+  background: #2c333e;
+}
+.exp-menu .menu-item small {
+  display: block;
+  font: 400 12px var(--font-body);
+  color: var(--muted);
+}
+/* Switches (Hide small stuff, Stack identical) at the end of the chip row. */
+.chip-row .oh-sw {
+  flex: none;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: 700 13px var(--font-head);
+  cursor: pointer;
+}
+.chip-row .oh-sw + .oh-sw {
+  margin-left: 12px;
+}
+.sw-t {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  flex: none;
+  border-radius: 10px;
+  background: var(--line-2);
+  transition: background 0.15s;
+}
+.sw-t::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.15s;
+}
+.oh-sw.on .sw-t {
+  background: var(--accent);
+}
+.oh-sw.on .sw-t::after {
+  left: 16px;
+}
+/* Saved views. */
+.views {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+.views-lbl {
+  margin-right: 4px;
+  font: 700 11px var(--font-head);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.view-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px dashed var(--line-2);
+  border-radius: 8px;
+}
+.view-chip.on {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.view-chip button,
+.view-add {
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: 700 12px var(--font-head);
+  cursor: pointer;
+}
+.view-chip .view-x {
+  padding: 0 8px 0 2px;
+  color: var(--faint);
+  font-size: 15px;
+}
+.view-chip .view-x:hover {
+  color: var(--head);
+}
+.view-add {
+  border: 1px dashed var(--line-2);
+  border-radius: 8px;
+  color: var(--link);
+}
+/* "$20 under store" in green under a price. */
+.val .under,
+.bb-end .under {
+  display: block;
+  font: 800 11px var(--font-head);
+  color: var(--good);
+  white-space: nowrap;
+}
+#buybacks-body .bb-end {
+  flex-wrap: wrap;
+}
+/* Stacked identical buy-backs: "×3". */
+.stack-n {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--link);
+  font: 800 12px var(--font-head);
+  vertical-align: 2px;
+}
+/* Melt planner line in Select mode's bar. */
+.sb-melt {
+  flex: 1 1 100%;
+  order: -1;
+  font-size: 14px;
+  color: var(--text);
+}
+.sb-melt[hidden] {
+  display: none;
+}
+.sb-melt b {
+  color: var(--head);
+}
+.sb-melt .sb-total {
+  margin-right: 6px;
+  font: 800 22px var(--font-head);
+  vertical-align: -2px;
+}
+.sb-warn {
+  color: var(--warn);
 }

@@ -98,7 +98,7 @@ Empty blocks disappear; the grid never leaves a card alone in a row.
   shortMoney, bigMoney, formatValue) shows as dots, hover text included; UEC/REC on the
   card too. Its scope may grow beyond money.
 
-## Top Menu Pass (mockup approved 2026-09-30, not built yet)
+## Top Menu Pass (approved and built 2026-09-30, branch redesign/passes)
 
 All ten, as mocked up ("Top Menu Pass" artifact): alerts bell with a count and a
 drop-down (every page); Scan is its own progress bar ("Scanning… 4/12", "✓ Done") with
@@ -109,7 +109,7 @@ Data); a Streamer pill while it's on; counts beside Inventory and Buy-Backs; an 
 dot on the portrait with "Update ready: Reload" in the menu; a slim bar while
 scrolling down; a real logo mark; phone tabs you swipe.
 
-## Inventory and Buy-Backs (approved 2026-09-30, next update; mockup first)
+## Inventory and Buy-Backs (approved and built 2026-09-30, branch redesign/passes)
 
 - Stay two pages (different jobs: what you own vs what you could get back; 1,000+
   buy-backs would bury a hangar). Global Hangar Search already covers both.
@@ -122,7 +122,11 @@ scrolling down; a real logo mark; phone tabs you swipe.
   emphasised); saved views; "$X under store" in green; the melt planner bar when you
   tick rows; Export of what's showing (CSV, share image, full backup). Buy-Backs strip
   = count, tokens with the next date, below store price; identical buy-backs stack
-  ("×3"); a Below store price chip. Straight into the search bar, no insight cards.
+  ("×3") only when you turn on Stack identical (off by default: each buy-back is its own
+  item); a Below store price chip. Straight into the search bar, no insight cards.
+- Melt planner (owner): no "ticked" or "store credit if melted" wording; it says what the
+  pick buys from your wishlist, in the store or from your buy-backs (with the note that a
+  store-credit buy-back takes a token each, cash ones don't). Names in rows at 700 weight.
 - Rejected: duplicates card, CCU chains ("don't want to get into the CCU chain game"),
   "Best use of your token" (everyone's priorities differ).
 - Already done: List rows with big names (wrap to two lines) and big prices, no small

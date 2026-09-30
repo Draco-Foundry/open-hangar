@@ -659,10 +659,85 @@ try {
     ? ok('unlabelled contents: Gear / Land Claim, no false matches')
     : fail(`content kinds: ${JSON.stringify(types)}`);
 
+  console.log('Inventory and top bar pass');
+  await go('#inventory');
+  const inv = await page.evaluate(async () => {
+    const r = {};
+    r.sum = /Pledges\s*\d+/i.test(document.querySelector('#inv-sum').textContent);
+    const all = computeShown().length;
+    document.querySelector('[data-switch="inv-hide"]').click();
+    r.hid = computeShown().length < all;
+    document.querySelector('[data-switch="inv-hide"]').click();
+    // Saved view (no prompt in the test: push one directly, then apply it).
+    state.savedViews.push({
+      name: 'Ships',
+      f: { shown: ['ship'], traits: [], query: '', hideSmall: false },
+    });
+    renderInventory();
+    document.querySelector('[data-view-apply="0"]').click();
+    r.view = computeShown().every((p) => p.kind === 'ship') && state.shown.has('ship');
+    state.savedViews = [];
+    state.shown = new Set();
+    renderInventory();
+    // Melt planner: pick two meltable pledges with a wishlist ship.
+    const keepWish = state.wishlist;
+    state.wishlist = ['Cutlass Black'];
+    setSelecting(true);
+    state.items
+      .filter(isMeltable)
+      .slice(0, 2)
+      .forEach((p) => state.selected.add(p.id));
+    renderInventory();
+    r.planner = document.querySelector('#sb-melt').textContent;
+    state.selected.clear();
+    setSelecting(false);
+    state.wishlist = keepWish;
+    // Top bar: counts, bell, search.
+    r.counts =
+      document.querySelector('#nav-n-inventory').textContent === String(state.items.length);
+    r.bell = !!document.querySelector('#bell-btn') && !!document.querySelector('#bell-menu');
+    const top = document.querySelector('#gsearch-top');
+    top.value = 'cutlass';
+    top.dispatchEvent(new Event('input'));
+    r.search = !!document.querySelector('#gsearch-top-results .gs-row');
+    top.value = '';
+    document.querySelector('#gsearch-top-results').hidden = true;
+    return r;
+  });
+  inv.sum && inv.hid && inv.view && /from your wishlist|wishlist/.test(inv.planner)
+    ? ok('inventory: summary strip, Hide small stuff, saved views, melt planner')
+    : fail(`inventory pass: ${JSON.stringify(inv)}`);
+  inv.counts && inv.bell && inv.search
+    ? ok('top bar: counts, alerts bell, search on every page')
+    : fail(`top bar: ${JSON.stringify(inv)}`);
+
   console.log('Buy-Backs');
   await go('#buybacks');
-  const tok = await page.$eval('.bb-tokens', (e) => e.textContent).catch(() => '');
-  /have 2 buy-back tokens/.test(tok) ? ok('buy-back tokens shown') : fail(`tokens: "${tok}"`);
+  const tok = await page.$eval('#bb-sum', (e) => e.textContent).catch(() => '');
+  /Tokens\s*2\s*next/i.test(tok)
+    ? ok('buy-back tokens in the summary strip')
+    : fail(`tokens: "${tok}"`);
+  // Buy-Backs pass: Hide small stuff on by default; Stack identical off by default
+  // and stacks copies when on.
+  const bbPass = await page.evaluate(async () => {
+    const rows = () => document.querySelectorAll('#buybacks-body .card').length;
+    const hideOn = state.bbHideSmall;
+    const stackOff = !state.bbStack;
+    const saved = state.buybacks;
+    state.buybacks = saved.concat(saved.slice(0, 2).map((x) => ({ ...x, id: x.id + '-copy' })));
+    renderBuybacks();
+    const flat = rows();
+    document.querySelector('[data-switch="bb-stack"]').click();
+    const stacked = rows();
+    const badges = document.querySelectorAll('#buybacks-body .stack-n').length;
+    document.querySelector('[data-switch="bb-stack"]').click();
+    state.buybacks = saved;
+    renderBuybacks();
+    return { hideOn, stackOff, flat, stacked, badges };
+  });
+  bbPass.hideOn && bbPass.stackOff && bbPass.stacked === bbPass.flat - 2 && bbPass.badges === 2
+    ? ok('buy-backs: small stuff hidden by default; Stack identical is opt-in and stacks copies')
+    : fail(`buy-backs pass: ${JSON.stringify(bbPass)}`);
   await page.select('#bb-sort', 'price-desc');
   const bbPrices = await page.$$eval('#buybacks-body .card .val', (v) =>
     v.map((e) => Number(e.textContent.replace(/[$,]/g, ''))),

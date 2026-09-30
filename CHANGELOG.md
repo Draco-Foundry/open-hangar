@@ -34,6 +34,20 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   reminder, **Log Out of RSI** (for switching accounts; your saved data stays), Clear Data, and
   the Updates and Developers pages.
 - New: **Streamer Mode** hides money amounts across Open Hangar, for streams and screenshots.
+  A "Streamer" tag shows in the top bar while it's on.
+- New: **A new top bar.** The Open Hangar logo, counts beside Inventory and Buy-Backs, a
+  search box on every page (press /), an **alerts bell** with your Hangar Alerts, and your
+  RSI portrait opens your menu. Scan shows its progress right on the button, and the bar
+  slims down while you scroll a long page. When an update is waiting, a dot on your portrait
+  and a Reload button in the menu say so.
+- New: **Inventory and Buy-Backs got the Home look:** a summary strip on top that follows
+  your filters, one tidy toolbar with **Export** (what's showing as CSV, a share image, or a
+  full backup), and **Hide small stuff** to tuck paints, add-ons and coupons away.
+- New: **Saved views** on Inventory: save a set of filters and get back to it in one click.
+- New: **Melt planner.** Pick pledges with Select and see what their melt value buys from your
+  wishlist, in the store or from your buy-backs.
+- New: prices show **"$X under store"** in green when today's store price is higher, and
+  Buy-Backs has a **Below store price** filter and an optional **Stack identical** view.
 - New: Account Value says when you last scanned ("Updated today, 9:45 AM"), and turns amber
   with a Rescan link after a week.
 - Fixed: Stats' tabs ran off the side of a phone screen; they wrap now.

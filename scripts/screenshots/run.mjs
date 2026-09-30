@@ -151,7 +151,12 @@ async function handle(req, res) {
       .end(fs.readFileSync(path.join(SRC, '..', 'CHANGELOG.md')));
   }
 
-  const base = u.pathname.startsWith('/__demo/') ? HERE : SRC;
+  // The extension's icons sit beside src/ (the dashboard links ../icons/...).
+  const base = u.pathname.startsWith('/__demo/')
+    ? HERE
+    : u.pathname.startsWith('/icons/')
+      ? path.join(SRC, '..')
+      : SRC;
   const rel = decodeURIComponent(u.pathname.replace(/^\/__demo\//, '/'));
   const file = path.join(base, rel);
   if (!file.startsWith(base) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
