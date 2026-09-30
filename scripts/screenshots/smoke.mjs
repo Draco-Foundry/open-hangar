@@ -135,6 +135,56 @@ try {
     document.body.click();
     return res;
   });
+  // Citizen Card: short balances, settings menu, the Home search, header currency.
+  const card = await page.evaluate(async () => {
+    const a = await OH.getAccount();
+    const real = OH.getAccount;
+    OH.getAccount = async () => ({
+      ...a,
+      credits: { store: { value: 123456 }, uec: { value: 1234567 }, rec: { value: 90000 } },
+    });
+    renderAccount();
+    await new Promise((r) => setTimeout(r, 200));
+    const bal = document.querySelector('#home-balances');
+    const uec = bal.querySelector('.bal.uec');
+    const strip = bal.getBoundingClientRect();
+    const tops = new Set([...bal.children].map((c) => Math.round(c.getBoundingClientRect().top)));
+    OH.getAccount = real;
+    document.querySelector('#settings-btn').click();
+    const menu = document.querySelector('#settings-menu');
+    const res = {
+      uec: uec.querySelector('b').textContent,
+      uecTitle: uec.title,
+      rec: bal.querySelector('.bal.rec b').textContent,
+      oneRow: tops.size === 1 && strip.height < 70,
+      settingsOpen: !menu.hidden && !!menu.querySelector('#remind-toggle'),
+      currencyInHeader: !!document.querySelector('header #currency-select'),
+      searchOnHome: !!document.querySelector('#view-home .gsearch-home #gsearch'),
+      placeholder: document.querySelector('#gsearch').placeholder,
+    };
+    document.body.click();
+    res.settingsClosed = menu.hidden;
+    return res;
+  });
+  card.uec === '¤1.2M' &&
+  card.uecTitle === '¤1,234,567' &&
+  card.rec === '¤90K' &&
+  card.oneRow &&
+  card.settingsOpen &&
+  card.settingsClosed &&
+  card.currencyInHeader &&
+  card.searchOnHome &&
+  card.placeholder === 'Global Hangar Search'
+    ? ok('citizen card: ¤1.2M / ¤90K on one row, settings menu, search on Home, currency in header')
+    : fail(`citizen card: ${JSON.stringify(card)}`);
+
+  // Phone width: nothing scrolls sideways.
+  await page.setViewport({ width: 390, height: 844 });
+  await new Promise((r) => setTimeout(r, 200));
+  const phone = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+  phone <= 0 ? ok('home fits a 390px phone') : fail(`home at 390px overflows by ${phone}px`);
+  await page.setViewport({ width: 1280, height: 900 });
+
   await page
     .waitForFunction(() => !!document.querySelector('#home-news .twisc-lead'), {
       timeout: 8000,
@@ -368,13 +418,23 @@ try {
     box.dispatchEvent(new Event('input'));
     const out = document.querySelector('#gsearch-results');
     const groups = [...out.querySelectorAll('.gs-title')].map((t) => t.textContent);
-    const ship = out.querySelector('.gs-row[data-ship]');
-    const shipName = ship && ship.dataset.ship;
-    ship?.click();
+    const hangarRow = !!out.querySelector('.gs-row[data-open-item]');
+    const storeRow = !!out.querySelector('.gs-row[data-ship]');
+    // A ship you don't own isn't in your hangar: nothing to show.
+    box.value = 'Idris';
+    box.dispatchEvent(new Event('input'));
+    const notOwned = /Nothing matches/.test(out.textContent);
+    box.value = '';
+    box.dispatchEvent(new Event('input'));
+    const shipName = ownedShips().find((s) => /cutlass/i.test(s.label))?.label;
+    openShipModal(shipName);
     await new Promise((r) => setTimeout(r, 300));
     const modal = document.querySelector('#modal-body');
     return {
       groups,
+      hangarRow,
+      storeRow,
+      notOwned,
       shipName,
       closed: out.hidden,
       title: modal.querySelector('.modal-name')?.textContent,
@@ -383,8 +443,8 @@ try {
     };
   });
   await page.evaluate(() => document.querySelector('#modal-close').click());
-  gs.groups.includes('Ships') && gs.groups.includes('Your Hangar') && gs.closed
-    ? ok(`search "cutlass": ${gs.groups.join(', ')}`)
+  !gs.groups.includes('Ships') && gs.hangarRow && !gs.storeRow && gs.notOwned && gs.closed
+    ? ok(`hangar search "cutlass": ${gs.groups.join(', ')}; "Idris" (not owned) finds nothing`)
     : fail(`global search: ${JSON.stringify(gs)}`);
   gs.title && gs.inHangar && gs.links >= 3
     ? ok(`ship window for ${gs.title}: specs, pledges, links`)
@@ -976,7 +1036,9 @@ try {
     const spend = document.querySelector('#stats-body').textContent;
     const bars = document.querySelectorAll('#stats-body .bar-row').length;
     // A bonus event running today shows the Home banner.
-    const today = new Date().toISOString().slice(0, 10);
+    // Local date, like the page uses (toISOString is UTC: wrong in the evening).
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     referralEvents = [
       ...referralEvents,
       { start: today, end: today, name: 'Test Expo', reward: 'Drake Dragonfly with LTI' },
