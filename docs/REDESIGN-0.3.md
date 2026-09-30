@@ -132,6 +132,16 @@ scrolling down; a real logo mark; phone tabs you swipe.
 - Already done: List rows with big names (wrap to two lines) and big prices, no small
   contents text in the middle.
 
+## Filters Pass (picked 2026-09-30, next update after 0.2.12)
+
+B2 from the "Filters Pass" mockup, on Inventory and Buy-Backs: a compact left sidebar
+with the types as colored toggle pills at the top, then folding groups (Insurance,
+Status, Deals, Came From, Manufacturer with a search box, Size, Melt Value), each
+showing how many are picked and its own Clear. "‹ Hide Filters" folds the sidebar away
+so the list takes the full width; a "Filters (n)" button in the toolbar brings it
+back; the choice is remembered. Active filters show as pills above the list (× each,
+Clear All) either way. Picking keeps the sidebar open (never closes on a click).
+
 ## Scheduled Alongside
 
 - Light mode (Dark default / Light / Auto) after the redesign's pages exist.
