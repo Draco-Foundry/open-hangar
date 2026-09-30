@@ -2899,6 +2899,7 @@
             career: (v && v.career) || null,
             role: (v && v.role) || null,
             size: (v && v.size) || null,
+            status: (v && v.status) || null, // flight-ready | in-concept | …
           };
           byShip.set(key, row);
         }
@@ -2922,12 +2923,15 @@
       .map((r) => ({ ...r, owners: [...r.owners].map(([name, n]) => ({ name, n })) }))
       .sort((a, b) => b.count - a.count || (b.msrp || 0) - (a.msrp || 0));
     // Which jobs the fleet can do, and with what (missing ones have count 0).
+    // `ready` counts only flight-ready ships: a role held only by concept ships
+    // (e.g. a Pioneer for Construction) is covered, just not flyable yet.
     const roles = OH.ORG_ROLES.map((r) => {
       const hits = ships.filter((sh) => sh.role && r.re.test(sh.role));
       return {
         key: r.key,
         label: r.label,
         count: hits.reduce((n, sh) => n + sh.count, 0),
+        ready: hits.filter((sh) => sh.status === 'flight-ready').reduce((n, sh) => n + sh.count, 0),
         ships: hits.map((sh) => sh.name),
       };
     });
