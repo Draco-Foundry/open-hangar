@@ -19,3 +19,4 @@ dist/
 
 # local scratch files (not for the repo)
 _dump/
+.wrangler/
