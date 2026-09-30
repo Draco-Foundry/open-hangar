@@ -192,7 +192,7 @@ try {
       pal: palette().good === cs.getPropertyValue('--good').trim(),
     };
   });
-  colors.key === 12 && colors.tokens && colors.whiteBal && colors.pal
+  colors.key === 13 && colors.tokens && colors.whiteBal && colors.pal
     ? ok('colors: tokens, Color Key (12), white balances, exports share the palette')
     : fail(`colors: ${JSON.stringify(colors)}`);
 
