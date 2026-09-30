@@ -981,11 +981,35 @@ try {
   const tags = await page.$$eval('.release-tag', (t) => t.map((e) => e.textContent).join('|'));
   rel >= 3 ? ok(`${rel} releases listed`) : fail(`only ${rel} releases listed`);
   /Your version/.test(tags) ? ok('current version tagged') : fail('current version not tagged');
+  const grp = await page.evaluate(() => ({
+    labels: [
+      ...new Set([...document.querySelectorAll('.release-group')].map((e) => e.textContent)),
+    ],
+    leaked: [...document.querySelectorAll('#updates-body li')].filter((li) =>
+      /^(New|Improved|Changed|Fixed)\b\s*:/i.test(li.textContent),
+    ).length,
+  }));
+  ['New', 'Improved', 'Fixed'].every((l) => grp.labels.includes(l)) && !grp.leaked
+    ? ok('releases split into New / Improved / Fixed, prefixes stripped')
+    : fail(`release groups: ${JSON.stringify(grp)}`);
   const chk = await page.evaluate(async () => {
     const btn = document.querySelector('#update-check-btn');
     const out = () => document.querySelector('#update-check-status').textContent;
-    btn.click(); // no update API in the demo = Firefox
-    const firefox = out();
+    const wait = () => new Promise((r) => setTimeout(r, 200));
+    // No update API in the demo = Firefox, which asks AMO for the latest version.
+    const realFetch = window.fetch;
+    const amo = (v) => async () =>
+      new Response(JSON.stringify({ current_version: { version: v } }));
+    window.fetch = amo('9.9.9');
+    btn.click();
+    await wait();
+    const firefoxNew = out();
+    window.fetch = amo(document.querySelector('#update-cur').textContent);
+    btn.click();
+    await wait();
+    const firefoxSame = out();
+    window.fetch = realFetch;
+    const firefox = `${firefoxNew} | ${firefoxSame}`;
     chrome.runtime.requestUpdateCheck = async () => ({
       status: 'update_available',
       version: '9.9.9',
@@ -996,8 +1020,10 @@ try {
     delete chrome.runtime.requestUpdateCheck;
     return { cur: document.querySelector('#update-cur').textContent, firefox, chrome1 };
   });
-  chk.cur && /about:addons/.test(chk.firefox) && /9\.9\.9 is downloading/.test(chk.chrome1)
-    ? ok('Check for updates: store check (Chrome) and directions (Firefox)')
+  chk.cur &&
+  /9\.9\.9 is out.*\| You're on the latest version/.test(chk.firefox) &&
+  /9\.9\.9 is downloading/.test(chk.chrome1)
+    ? ok('Check for updates: store check (Chrome) and AMO version check (Firefox)')
     : fail(`check for updates: ${JSON.stringify(chk)}`);
 
   console.log('Saved accounts');
