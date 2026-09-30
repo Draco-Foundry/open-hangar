@@ -32,39 +32,64 @@ a {
   padding: 0 16px;
 }
 
-/* Hero: the Starfarer over a planet (docs/brand/draco-foundry), darkened in
-   the middle so the title and buttons stay readable. The ship sits right of
-   centre; on phones it slides mostly out of frame, which is fine. */
+/* Hero: drawn in CSS, no photo (owner, 2026-09-30: no AI art). Deep space, a sparse
+   starfield (two offset tiles of tiny dots), and a blue planet horizon glowing up
+   from below the fold. */
 .hero {
   position: relative;
+  overflow: hidden;
   background-color: #05070f;
   background-image:
-    radial-gradient(ellipse 48% 70% at 50% 48%, rgba(5, 7, 15, 0.85), rgba(5, 7, 15, 0.2) 80%),
-    linear-gradient(180deg, rgba(5, 7, 15, 0.25), rgba(5, 7, 15, 0.1) 60%, var(--bg)),
-    url('img/hero-1920.jpg');
-  background-image:
-    radial-gradient(ellipse 48% 70% at 50% 48%, rgba(5, 7, 15, 0.85), rgba(5, 7, 15, 0.2) 80%),
-    linear-gradient(180deg, rgba(5, 7, 15, 0.25), rgba(5, 7, 15, 0.1) 60%, var(--bg)),
-    image-set(
-      url('img/hero-1920.webp') type('image/webp'),
-      url('img/hero-1920.jpg') type('image/jpeg')
-    );
-  background-size: cover;
-  background-position: 70% 55%;
+    radial-gradient(1px 1px at 23px 41px, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 131px 17px, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1.5px 1.5px at 187px 133px, rgba(200, 220, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 71px 173px, rgba(255, 255, 255, 0.45), transparent),
+    radial-gradient(1px 1px at 229px 89px, rgba(255, 255, 255, 0.55), transparent),
+    radial-gradient(1px 1px at 47px 107px, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1.5px 1.5px at 97px 59px, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 163px 211px, rgba(200, 220, 255, 0.5), transparent),
+    linear-gradient(180deg, #05070f 0%, #070b18 60%, #0a1226 100%);
+  background-size:
+    250px 250px,
+    250px 250px,
+    250px 250px,
+    250px 250px,
+    330px 330px,
+    330px 330px,
+    330px 330px,
+    330px 330px,
+    100% 100%;
   border-bottom: 1px solid var(--line);
-  padding: 96px 0 88px;
+  padding: 96px 0 120px;
   text-align: center;
 }
-@media (min-width: 1600px) {
-  .hero {
-    background-image:
-      radial-gradient(ellipse 40% 70% at 50% 48%, rgba(5, 7, 15, 0.85), rgba(5, 7, 15, 0.2) 80%),
-      linear-gradient(180deg, rgba(5, 7, 15, 0.25), rgba(5, 7, 15, 0.1) 60%, var(--bg)),
-      image-set(
-        url('img/hero-2560.webp') type('image/webp'),
-        url('img/hero-1920.jpg') type('image/jpeg')
-      );
-  }
+/* The planet: a huge circle whose top edge peeks in at the bottom, lit along its rim. */
+.hero::before,
+.hero::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: max(1800px, 160vw);
+  aspect-ratio: 1;
+  translate: -50% 0;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.hero::before {
+  top: calc(100% - 70px);
+  background: radial-gradient(circle at 50% 0%, #10244a 0%, #0b1733 18%, #070d1e 45%);
+  box-shadow:
+    0 -2px 0 rgba(88, 166, 255, 0.55),
+    0 -18px 60px rgba(47, 129, 247, 0.35),
+    0 -60px 160px rgba(47, 129, 247, 0.18);
+}
+.hero::after {
+  top: calc(100% - 72px);
+  background: radial-gradient(ellipse 30% 3% at 50% 0%, rgba(160, 205, 255, 0.55), transparent);
+}
+.hero .wrap {
+  position: relative;
+  z-index: 1;
 }
 .hero h1,
 .hero .tagline {

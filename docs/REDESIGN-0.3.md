@@ -190,6 +190,14 @@ Clear All) either way. Picking keeps the sidebar open (never closes on a click).
    "Ships $X · CCUs $Y · Other $Z · Store Credit $W". The chart and "since <month>" use
    the same rules (#4); snapshots start saving Store Credit, and older points without it
    say so in their tooltip. Update the Stats → Value note text to match.
+7. **Scan progress text breaks the Citizen Card.** "Scanning buy-backs… page 8, 800
+   items" shows as a line under the portrait, which pushes the card around and cuts
+   into the portrait (seen on first scan and on a normal rescan). Fix: the progress
+   line never lives in the Citizen Card. First scan: it goes in the middle of the
+   welcome card, big (the "Scan All Now" button becomes a progress bar with the step
+   and page count under it, e.g. "Buy-backs · page 8 · 800 items", then "Hangar",
+   etc.). Later scans: the top-bar Scan button's fill already shows progress; the detail
+   line goes in its tooltip and the ▾ menu, nothing on the page moves.
 
 ## Scheduled Alongside
 
