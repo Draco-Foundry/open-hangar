@@ -24,6 +24,20 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   version and tells you whether you're on it, instead of pointing you to about:addons.
 - Improved: the currency picker in the top right is no longer bold.
 - Fixed: Home showed a big empty box when your wishlist was empty.
+- New: **A reorganized Home page.** Your fleet value up top (ships at today's store prices,
+  what you're up vs what you paid) with counts you can click to jump into Inventory
+  already filtered.
+- New: **Events** card: the event running right now (from the Star Citizen Wiki, shown only
+  while it's actually on), any referral bonus event, and when the next buy-back token
+  arrives.
+- New: **Game Status** card with the LIVE version and whatever's on the test servers (PTU /
+  EPTU), linked to the patch notes.
+- New: **Latest Acquisitions**: your five newest pledges with picture, type, date and price;
+  click one for its details.
+- Improved: **Latest From RSI** leads with This Week in Star Citizen, then the newest
+  Comm-Links.
+- Improved: the wishlist sale alert is now one line under your fleet value, and only shows
+  up when something on your wishlist is actually on sale.
 - Improved: every word is capitalized in Org Fleet roles, sizes and charts ("Science / Data", "Capital",
   "Light Fighter"), ship statuses ("Flight Ready", "In Concept") and table headers.
 

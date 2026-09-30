@@ -958,94 +958,224 @@ async function wishlistStock({ force = false } = {}) {
   return out;
 }
 let homeWishToken = 0;
-// Home: a short summary of the newest "This Week in Star Citizen" (OH.getTwiscSummary),
-// or RSI's three newest Comm-Links if the post can't be read.
+const esc = OH.escapeHtml;
+// "today" / "tomorrow" / "in 5 days" until a timestamp.
+function daysUntil(t, now = Date.now()) {
+  const d = Math.ceil((t - now) / 86400e3);
+  return d <= 0 ? 'today' : d === 1 ? 'tomorrow' : `in ${d} days`;
+}
+// "Oct 5" this year, "Mar 16, 2025" otherwise (so older dates don't look newer).
+const shortDay = (t) =>
+  new Date(t).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    ...(new Date(t).getFullYear() !== new Date().getFullYear() && { year: 'numeric' }),
+  });
+const wikiUrl = (page) =>
+  `https://starcitizen.tools/${encodeURIComponent(page.replace(/ /g, '_'))}`;
+
+// Home: Latest From RSI. The newest "This Week in Star Citizen" as a lead row
+// (picture + first lines), then RSI's newest Comm-Links under it.
 let homeNewsToken = 0;
 function renderHomeNews() {
   const box = $('#home-news');
   if (!box) return;
   const token = ++homeNewsToken;
-  const esc = OH.escapeHtml;
-  const shell = (title, body, more) =>
-    `<h3>${title}</h3><div class="home-scroll">${body}</div><p class="home-more">${more}</p>`;
-  if (!box.dataset.filled)
-    setHTML(box, shell('This Week in Star Citizen', '<p class="muted">Loading…</p>', ''));
-  OH.getTwiscSummary().then(async (sum) => {
-    if (token !== homeNewsToken) return;
-    box.dataset.filled = '1';
-    if (sum && sum.lead) {
-      const date = (sum.title.match(/-\s*(.+)$/) || [])[1] || '';
-      setHTML(
-        box,
-        shell(
-          `This Week in Star Citizen${date ? ` <span class="muted twisc-date">${esc(date)}</span>` : ''}`,
-          `${sum.image ? `<a href="${esc(sum.url)}" target="_blank" rel="noopener"><img class="twisc-img" src="${esc(sum.image)}" alt=""></a>` : ''}<p class="twisc-lead">${esc(sum.lead)}</p>`,
-          `<a href="${esc(sum.url)}" target="_blank" rel="noopener">Read it on RSI ↗</a>`,
-        ),
+  const shell = (body) =>
+    `<h3>Latest From RSI</h3><div class="home-scroll">${body}</div><p class="home-more"><a href="https://robertsspaceindustries.com/comm-link" target="_blank" rel="noopener">More on RSI ↗</a></p>`;
+  if (!box.dataset.filled) setHTML(box, shell('<p class="muted">Loading…</p>'));
+  Promise.all([OH.getTwiscSummary().catch(() => null), OH.getRsiNews().catch(() => [])]).then(
+    ([sum, news]) => {
+      if (token !== homeNewsToken) return;
+      box.dataset.filled = '1';
+      let lead = '';
+      if (sum && sum.lead) {
+        const date = (sum.title.match(/-\s*(.+)$/) || [])[1];
+        lead = `<a class="twisc-row" href="${esc(sum.url)}" target="_blank" rel="noopener">${
+          sum.image ? `<img class="twisc-img" src="${esc(sum.image)}" alt="">` : '<span></span>'
+        }<span class="news-text"><span class="news-title">This Week in Star Citizen${
+          date ? ` <span class="muted twisc-date">${esc(date)}</span>` : ''
+        }</span><span class="twisc-lead">${esc(sum.lead)}</span></span></a>`;
+      }
+      // Skip the post already shown as the lead.
+      const rest = (news || [])
+        .filter((n) => !(sum && sum.url && n.url === sum.url))
+        .slice(0, lead ? 3 : 5);
+      const list = rest.length
+        ? `<ul class="news-list">${rest
+            .map(
+              (n) =>
+                `<li><a href="${esc(n.url)}" target="_blank" rel="noopener" title="${esc(n.title)}">${
+                  n.image
+                    ? `<img class="news-thumb" src="${esc(n.image)}" alt="" loading="lazy">`
+                    : ''
+                }<span class="news-text"><span class="news-title">${esc(n.title)}</span><span class="news-meta">${esc(
+                  [capFirst(n.type), n.when].filter(Boolean).join(' · '),
+                )}</span></span></a></li>`,
+            )
+            .join('')}</ul>`
+        : '';
+      setHTML(box, shell(lead + list || '<p class="muted">Couldn’t reach RSI right now.</p>'));
+    },
+  );
+}
+
+// Home: your newest pledges by purchase date. Click one for its details window.
+function renderHomeLatest() {
+  const box = $('#home-latest');
+  if (!box) return;
+  const dated = state.items
+    .map((p) => ({ p, t: Date.parse(p.date) }))
+    .filter((x) => Number.isFinite(x.t))
+    .sort((a, b) => b.t - a.t)
+    .slice(0, 5);
+  const row = ({ p, t }) => {
+    const img = realImage(p.image);
+    const type = pledgeType(p);
+    return `<li><button type="button" class="acq-row" data-acq-id="${esc(String(p.id))}">${
+      img
+        ? `<img class="acq-thumb" src="${esc(img)}" alt="" loading="lazy">`
+        : `<span class="acq-thumb" data-resolve="${esc(resolveImageName(p))}"></span>`
+    }<span class="acq-name"><span title="${esc(plainName(p))}">${esc(cardName(p))}</span><span class="badge ${
+      TYPE_KEYS.includes(type) ? type : ''
+    }">${esc(type)}</span></span><span class="acq-meta">${esc(shortDay(t))}${
+      Number.isFinite(p.value) ? ` · ${esc(formatValue(p))}` : ''
+    }</span></button></li>`;
+  };
+  setHTML(
+    box,
+    `<h3>Latest Acquisitions</h3><div class="home-scroll">${
+      dated.length
+        ? `<ul class="acq-list">${dated.map(row).join('')}</ul>`
+        : '<p class="muted">Scan your hangar to see your newest pledges here.</p>'
+    }</div><p class="home-more"><a href="#inventory" data-view="inventory">All pledges →</a></p>`,
+  );
+  // No RSI picture: use the ship's wiki art, like the Inventory cards do.
+  for (const ph of box.querySelectorAll('.acq-thumb[data-resolve]')) {
+    if (!ph.dataset.resolve) continue;
+    OH.getShipImage(ph.dataset.resolve).then((url) => {
+      if (!url || !ph.isConnected) return;
+      const im = document.createElement('img');
+      im.className = 'acq-thumb';
+      im.loading = 'lazy';
+      im.alt = '';
+      im.src = url;
+      ph.replaceWith(im);
+    });
+  }
+}
+
+// Home: Events. The wiki's event only while its dates say it's on (the wiki
+// card can stay up after an event ends), a running referral bonus event, and
+// the next buy-back token.
+let homeEventsToken = 0;
+function renderHomeEvents() {
+  const box = $('#home-events');
+  if (!box) return;
+  const token = ++homeEventsToken;
+  const draw = (main) => {
+    const rows = [];
+    const ev = OH.activeWikiEvent(main);
+    if (ev) {
+      const name = ev.page
+        ? `<a href="${esc(wikiUrl(ev.page))}" target="_blank" rel="noopener" class="hc-event" title="${esc(ev.text)}">${esc(ev.name)}</a>`
+        : `<span class="hc-event">${esc(ev.name)}</span>`;
+      rows.push(
+        `<div class="hc-row">${name}<span class="hc-val">ends ${esc(daysUntil(ev.ends))}</span></div>`,
       );
-      return;
     }
-    const items = (await OH.getRsiNews()).slice(0, 3);
-    if (token !== homeNewsToken) return;
-    setHTML(
-      box,
-      shell(
-        'Latest from RSI',
-        items.length
-          ? `<ul class="news-list">${items
-              .map(
-                (n) =>
-                  `<li><a href="${esc(n.url)}" target="_blank" rel="noopener" title="${esc(n.title)}">${
-                    n.image
-                      ? `<img class="news-thumb" src="${esc(n.image)}" alt="" loading="lazy">`
-                      : ''
-                  }<span class="news-text"><span class="news-title">${esc(n.title)}</span><span class="news-meta">${esc(
-                    [capFirst(n.type), n.when].filter(Boolean).join(' · '),
-                  )}</span></span></a></li>`,
-              )
-              .join('')}</ul>`
-          : '<p class="muted">Couldn’t reach RSI right now.</p>',
-        '<a href="https://robertsspaceindustries.com/comm-link" target="_blank" rel="noopener">All Comm-Links ↗</a>',
-      ),
-    );
+    const ref = runningEvent();
+    if (ref) {
+      rows.push(
+        `<div class="hc-row"><a href="#referrals" data-view="referrals" title="${esc(ref.name)}: ${esc(ref.reward)}">Referral bonus: ${esc(shortReward(ref.reward))}</a><span class="hc-val">until ${esc(shortDay(parseTs(ref.end + ' 00:00:00')))}</span></div>`,
+      );
+    }
+    if (!rows.length)
+      rows.push('<div class="hc-row"><span class="muted">No event running right now</span></div>');
+    const nextToken = OH.nextBuybackToken();
+    if (nextToken) {
+      rows.push(
+        `<div class="hc-row"><span>Buy-back token</span><span class="hc-val">${esc(shortDay(nextToken))} · ${esc(daysUntil(nextToken))}</span></div>`,
+      );
+    }
+    setHTML(box, `<h3>Events</h3>${rows.join('')}`);
+  };
+  draw(null);
+  OH.getWikiMainpage().then((main) => {
+    if (token === homeEventsToken && main) draw(main);
   });
 }
 
-function renderHomePanels() {
+// Home: Game Status. LIVE from star-citizen.wiki (same as the footer); test
+// channels (PTU / EPTU) from starcitizen.tools' main page settings.
+let homeStatusToken = 0;
+function renderHomeStatus() {
+  const box = $('#home-status');
+  if (!box) return;
+  const token = ++homeStatusToken;
+  Promise.all([OH.getScVersion().catch(() => null), OH.getWikiMainpage().catch(() => null)]).then(
+    ([v, main]) => {
+      if (token !== homeStatusToken) return;
+      const patches = (main && main.patches) || [];
+      const livePatch = patches.find((p) => p.channel === 'LIVE') || {};
+      const live =
+        (v && v.code && OH.formatScVersion(v.code).replace(/-LIVE$/i, '')) || livePatch.name;
+      const ver = (p, text) =>
+        p.page
+          ? `<a href="${esc(wikiUrl(p.page))}" target="_blank" rel="noopener">${esc(text)}</a>`
+          : esc(text);
+      const rows = [];
+      if (live)
+        rows.push(
+          `<div class="hc-row"><span><span class="hc-dot"></span>LIVE</span><span class="hc-val">${ver(livePatch, live)}</span></div>`,
+        );
+      for (const p of patches.filter((x) => x.channel !== 'LIVE'))
+        rows.push(
+          `<div class="hc-row"><span><span class="hc-dot test"></span>${esc(p.channel)}</span><span class="hc-val">${ver(p, p.name)}</span></div>`,
+        );
+      setHTML(box, rows.length ? `<h3>Game Status</h3>${rows.join('')}` : '');
+    },
+  );
+}
+
+// Home: one slim line, right under the value row, only while a wishlist ship
+// is on sale (or only in a pack). Hidden otherwise.
+function renderHomeWish() {
   const wish = $('#home-wish');
-  renderHomeNews();
   if (!wish) return;
-  // No wishlist: no box; the news panel takes the whole row.
-  const empty = !state.wishlist.length;
-  wish.hidden = empty;
-  wish.parentElement.classList.toggle('solo', empty);
-  if (empty) {
+  if (!state.wishlist.length) {
     ++homeWishToken; // drop any check still running
+    wish.hidden = true;
     return;
   }
   const token = ++homeWishToken;
-  setHTML(wish, `<h3>Wishlist: On Sale Now</h3><p class="muted">Checking RSI's store…</p>`);
   wishlistStock().then((list) => {
     if (token !== homeWishToken) return;
     const onSale = list.filter((x) => x.st && x.st.state === 'in');
     const inPack = list.filter((x) => x.st && x.st.state === 'pack');
-    const row = (x, text, cls) =>
-      `<li>${shipLink(x.name)}<span class="sale ${cls}">${OH.escapeHtml(text)}</span></li>`;
-    const items = [
-      ...onSale.map((x) =>
-        row(x, x.st.price ? `In stock ${dollars(x.st.price)}` : 'In stock', 'on'),
+    if (!onSale.length && !inPack.length) {
+      wish.hidden = true;
+      return;
+    }
+    const parts = [
+      ...onSale.map(
+        (x) => `${shipLink(x.name)}${x.st.price ? ` ${esc(dollars(x.st.price))}` : ''}`,
       ),
-      ...inPack.map((x) => row(x, 'Only in a pack', 'wb')),
+      ...inPack.map((x) => `${shipLink(x.name)} <span class="muted">(only in a pack)</span>`),
     ];
     setHTML(
       wish,
-      `<h3>Wishlist: On Sale Now <span class="market-n">${onSale.length}</span></h3><div class="home-scroll">${
-        items.length
-          ? `<ul class="home-list">${items.join('')}</ul>`
-          : `<p class="muted">None of your ${list.length} wishlist ship${list.length === 1 ? ' is' : 's are'} for sale right now.</p>`
-      }</div><p class="home-more"><a href="#store" data-view="store">Your wishlist →</a></p>`,
+      `<strong>On sale from your wishlist:</strong> ${parts.join(' <span class="muted">·</span> ')} <a class="hw-more" href="#store" data-view="store">Your wishlist →</a>`,
     );
+    wish.hidden = false;
   });
+}
+
+function renderHomePanels() {
+  renderHomeNews();
+  renderHomeLatest();
+  renderHomeStatus(); // Events: renderEventBanner (called by renderHome)
+  renderHomeWish();
 }
 
 function renderHome() {
@@ -1057,44 +1187,51 @@ function renderHome() {
   document.getElementById('view-home').classList.toggle('no-data', !has);
   if (clearBtn) clearBtn.hidden = !(state.items.length || state.scannedAt);
 
-  // Dashboard summary strip (#1) — only once there's data.
+  // Fleet value line: one big number (ships at today's store prices, or melt
+  // value until prices load), clickable counts, and what changed since the last
+  // scan. Only once there's data.
   const sum = $('#home-summary');
   if (has) {
     const count = (k) => state.items.filter((p) => p.kind === k).length;
     const ships = state.items.filter((p) => p.containsShip).length;
-    const box = (big, lbl, full) =>
-      `<div class="sum-box"${full && full !== big ? ` title="${OH.escapeHtml(full)}"` : ''}><div class="sum-big">${big}</div><div class="sum-lbl">${lbl}</div></div>`;
+    const lti = state.items.filter((p) => p.insurance === 'LTI').length;
     const melt = OH.totalValue(state.items);
-    const store = hangarValue()?.store;
+    const v = hangarValue();
+    const gap = v && v.paidPriced ? v.storePriced - v.paidPriced : null;
+    const head =
+      v && v.store
+        ? `<span class="hv-big" title="Ships at today's store prices">${esc(dollars(v.store))}</span><span class="muted">fleet value at today's store prices</span>${
+            gap != null
+              ? `<span class="hv-gap${gap >= 0 ? ' good' : ''}">${gap >= 0 ? '+' : '−'}${esc(dollars(Math.abs(gap)))} vs what you paid</span>`
+              : ''
+          }`
+        : `<span class="hv-big">${esc(money(melt))}</span><span class="muted">melt value (what you paid)</span>`;
+    const link = (n, one, many, filter) =>
+      n ? `<a href="#inventory" data-home-filter="${filter}">${n} ${n === 1 ? one : many}</a>` : '';
+    const counts = [
+      link(ships, 'ship', 'ships', 'ship'),
+      link(state.items.length, 'pledge', 'pledges', 'all'),
+      link(count('ccu'), 'CCU', 'CCUs', 'ccu'),
+      link(lti, 'LTI', 'LTI', 'lti'),
+      state.buybacks.length
+        ? `<a href="#buybacks" data-view="buybacks">${state.buybacks.length} buy-back${state.buybacks.length === 1 ? '' : 's'}</a>`
+        : '',
+      v && v.store ? `<span class="muted">Melt value ${esc(money(melt))}</span>` : '',
+    ].filter(Boolean);
+    const hist = state.history;
+    let changes = '';
+    if (hist.length >= 2) {
+      const d = OH.diffSnapshots(hist[hist.length - 2], hist[hist.length - 1]);
+      changes = `<div class="hv-changes muted">Since ${esc(fmtDay(hist[hist.length - 2].at))}: ${esc(
+        changeSummary(d),
+      )} · <a href="#stats" data-stats-tab="history">History</a></div>`;
+    }
     setHTML(
       sum,
-      box(state.items.length, 'pledges') +
-        box(shortMoney(melt, money), 'melt value', money(melt)) +
-        (store ? box(shortMoney(store, dollars), 'ships at store price', dollars(store)) : '') +
-        box(ships, 'ships') +
-        box(count('ccu'), 'CCUs') +
-        (count('paint') ? box(count('paint'), 'paints') : '') +
-        box(count('addon'), 'add-ons') +
-        (state.buybacks.length ? box(state.buybacks.length, 'buy-backs') : ''),
+      `<div class="hv-head">${head}</div><div class="hv-counts">${counts.join('')}</div>${changes}`,
     );
   } else {
     setHTML(sum, '');
-  }
-  const ch = $('#home-changes');
-  if (ch) {
-    const hist = state.history;
-    if (has && hist.length >= 2) {
-      const d = OH.diffSnapshots(hist[hist.length - 2], hist[hist.length - 1]);
-      setHTML(
-        ch,
-        `Since ${OH.escapeHtml(fmtDay(hist[hist.length - 2].at))}: ${OH.escapeHtml(
-          changeSummary(d),
-        )} · <a href="#stats" data-stats-tab="history">history</a>`,
-      );
-      ch.hidden = false;
-    } else {
-      ch.hidden = true;
-    }
   }
 
   // Scanned line: first-run prompt (#2) or scan freshness with a stale nudge (#5).
@@ -7079,25 +7216,33 @@ function spendingSectionHtml() {
 }
 
 // --- Home: event heads-up -----------------------------------------------------
-// A banner while a referral bonus event runs (they come with the big sales:
-// IAE, Invictus, CitizenCon, Luminalia…), from the wiki's event list.
+// Referral bonus events (they come with the big sales: IAE, Invictus,
+// CitizenCon, Luminalia…) show on Home's Events card; the wiki refresh calls
+// this again when newer events arrive.
 function renderEventBanner() {
-  const el = $('#event-banner');
-  if (!el) return;
   refreshReferralEvents();
-  const ev = runningEvent();
-  if (!ev) {
-    el.hidden = true;
+  renderHomeEvents();
+}
+
+// Home: a count ("14 ships", "11 LTI") opens Inventory with that filter on; a
+// Latest Acquisitions row opens the pledge's details window.
+$('#view-home')?.addEventListener('click', (e) => {
+  const f = e.target.closest('[data-home-filter]');
+  if (f) {
+    e.preventDefault();
+    const key = f.dataset.homeFilter;
+    state.shown = new Set(OH.KINDS.some((k) => k.key === key) ? [key] : []);
+    state.traits = new Map(key === 'lti' ? [['lti', 'yes']] : []);
+    location.hash = '#inventory';
+    renderInventory();
     return;
   }
-  setHTML(
-    el,
-    `<strong>${OH.escapeHtml(ev.name)}</strong> is on until ${OH.escapeHtml(
-      fmtDate(parseTs(ev.end + ' 00:00:00')),
-    )}. Referral bonus: <strong>${OH.escapeHtml(shortReward(ev.reward))}</strong> for anyone who enlists with your code and buys a game package. <a href="#referrals" data-view="referrals">Your referrals</a>`,
-  );
-  el.hidden = false;
-}
+  const row = e.target.closest('[data-acq-id]');
+  if (row) {
+    const p = state.items.find((x) => String(x.id) === row.dataset.acqId);
+    if (p) openItemModal(p);
+  }
+});
 
 // --- Global hangar search (Home) ------------------------------------------------
 // Searches what's yours: hangar pledges (names and what's inside), buy-backs

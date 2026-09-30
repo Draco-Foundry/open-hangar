@@ -193,6 +193,21 @@ Migrations in `app/migrations/`; the account, org and history tables are in
 - Rate limits on the API; payload size cap; token revocation.
 - Fan-site notice on the site (same as openhangar.space).
 
+## After Launch (scheduled, 2026-09-30)
+
+- **Wishlist sale alerts** by email or Discord DM, opt-in per account. Needs the synced
+  wishlist and a daily store check on the server.
+
+## Extension Follow-Ups (scheduled, 2026-09-30)
+
+- **RSI server status** on Home's Game Status card. status.robertsspaceindustries.com
+  sends no CORS header and isn't covered by the extension's host permission; adding it
+  would re-prompt every user. Options: read it through app.openhangar.space, or skip.
+- **Citizen Card trim** from the Home mockups (referral code and subscriber badge to the
+  settings menu / Referrals page). Not done yet: the owner hasn't signed off on moving
+  the referral code.
+- **Refresh store/site screenshots** after 0.2.12 ships (new Home).
+
 ## Launch Batch (scheduled with the items above)
 
 Owner ideas, 2026-09-30. Ship together when sign-ups open:
