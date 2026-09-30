@@ -1,0 +1,56 @@
+name: Back up databases
+
+# Every Sunday: export both D1 databases (the website's and the store stats) and
+# keep them in the private R2 bucket open-hangar-backups for a year (a lifecycle rule
+# deletes older ones). D1 itself keeps 30 days of point-in-time restore on top.
+# How to restore: docs/RESTORE.md. #ops hears about a failure.
+
+on:
+  schedule:
+    - cron: '0 10 * * 0' # Sundays, 4am Boise (MDT)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Keep backups for a year (set once)
+        run: |
+          if ! npx wrangler r2 bucket lifecycle list open-hangar-backups 2>/dev/null | grep -q expire-after-1-year; then
+            npx wrangler r2 bucket lifecycle add open-hangar-backups expire-after-1-year --expire-days 365 -y
+          fi
+      - name: Export and upload
+        run: |
+          DAY=$(date -u +%F)
+          for DB in open-hangar open-hangar-stats; do
+            npx wrangler d1 export "$DB" --remote --output "/tmp/$DB.sql"
+            gzip -9 "/tmp/$DB.sql"
+            SIZE=$(stat -c %s "/tmp/$DB.sql.gz")
+            [ "$SIZE" -gt 100 ] || { echo "$DB export looks empty ($SIZE bytes)"; exit 1; }
+            npx wrangler r2 object put "open-hangar-backups/$DB/$DAY.sql.gz" \
+              --file "/tmp/$DB.sql.gz" --content-type application/gzip --remote
+            echo "$DB: $SIZE bytes → open-hangar-backups/$DB/$DAY.sql.gz"
+          done
+      - name: Tell #ops it failed
+        if: failure()
+        env:
+          DISCORD_OPS_WEBHOOK: ${{ secrets.DISCORD_OPS_WEBHOOK }}
+        working-directory: .
+        run: >
+          node scripts/notify.mjs ops --down
+          "The weekly database backup failed:
+          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
