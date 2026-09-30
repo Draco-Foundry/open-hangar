@@ -81,15 +81,14 @@
       out.push({
         key: `sale:${x.name}`,
         kind: 'onsale',
-        icon: '$',
         title: `${x.name} is on sale`,
-        sub: `From your wishlist${x.price ? ` · ${a.dollars(x.price)} in the store` : ''}`,
+        sub: x.price ? `${a.dollars(x.price)} in the store` : 'In the store now',
         href: '#store',
       });
     const cutoff = Date.now() - READY_DAYS * 864e5;
     for (const [name, at] of Object.entries(ready))
       if (at > cutoff)
-        out.push({ key: `ready:${name}`, kind: 'good', icon: '↑', title: `${name} is flight ready`, sub: 'A ship you own changed status', href: '#inventory' });
+        out.push({ key: `ready:${name}`, kind: 'good', title: `${name} is flight ready`, sub: 'A ship you own', href: '#inventory' });
     // Buy-backs of ships on your wishlist.
     const wish = new Set((s.wishlist || []).map((w) => String(w).toLowerCase()));
     const bb = (s.buybacks || []).filter((b) => {
@@ -100,12 +99,13 @@
       out.push({
         key: `bb:${bb.map((b) => b.id).sort().join(',')}`,
         kind: 'info',
-        icon: '', // blank (owner): the title says it all
         // Opens Buy-Backs showing just these, not all of them.
         go: () => a.showBuybacks(bb.map((b) => b.id), bb.length === 1 ? 'buy-back that matches your wishlist' : 'buy-backs that match your wishlist'),
-        title:
-          bb.length === 1 ? '1 buy-back matches your wishlist' : `${bb.length} buy-backs match your wishlist`,
-        sub: [...new Set(bb.map((b) => a.cardName(b)))].slice(0, 3).join(', '),
+        title: bb.length === 1 ? 'A wishlist ship to buy back' : `${bb.length} wishlist ships to buy back`,
+        sub: (() => {
+          const names = [...new Set(bb.map((b) => a.shipOf(a.resolveImageName(b)).name))];
+          return names.slice(0, 2).join(', ') + (names.length > 2 ? ` +${names.length - 2} more` : '');
+        })(),
         href: '#buybacks',
       });
     if (enlisted) {
@@ -117,7 +117,6 @@
         out.push({
           key: `enlist:${now.getFullYear()}`,
           kind: 'warn',
-          icon: '★',
           title: `${years} year${years === 1 ? '' : 's'} since you enlisted`,
           sub: e.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }),
         });
@@ -150,7 +149,6 @@
     <div class="list">
       {#each alerts as x (x.key)}
         <div class="fy {x.kind}">
-          <span class="ic" class:blank={!x.icon} aria-hidden="true">{x.icon}</span>
           <a
             class="tx"
             href={x.href || undefined}
@@ -164,7 +162,7 @@
             <span class="t" title={x.title}>{x.title}</span>
             <span class="s" title={x.sub}>{x.sub}</span>
           </a>
-          <button type="button" class="ig" onclick={() => ignore(x.key)} aria-label="Ignore: {x.title}">Ignore</button>
+          <button type="button" class="ig" onclick={() => ignore(x.key)} title="Ignore" aria-label="Ignore: {x.title}">×</button>
         </div>
       {/each}
     </div>
@@ -186,71 +184,64 @@
   }
   .list {
     display: grid;
-    gap: 8px;
     align-content: start;
   }
+  /* One plain row per alert: a thin colour edge says what kind it is. */
   .fy {
     display: grid;
-    grid-template-columns: 28px minmax(0, 1fr) auto;
-    gap: 10px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
     align-items: center;
-    background: var(--panel-2);
-    border-radius: 11px;
-    padding: 9px 10px;
+    padding: 10px 0 10px 12px;
+    border-left: 3px solid var(--accent);
   }
-  .fy.onsale {
-    background: var(--good-soft);
+  .fy + .fy {
+    margin-top: 8px;
   }
-  .ic {
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    display: grid;
-    place-items: center;
-    font: 800 13px var(--font-head);
-    background: var(--accent-soft);
-    color: var(--link);
+  .fy.onsale,
+  .fy.good {
+    border-left-color: var(--good);
   }
-  .onsale .ic,
-  .ic.blank {
-    background: none;
-  }
-  .good .ic {
-    background: var(--good-soft);
-    color: var(--good);
-  }
-  .warn .ic {
-    background: var(--warn-soft);
-    color: var(--warn);
+  .fy.warn {
+    border-left-color: var(--warn);
   }
   .tx {
     min-width: 0;
     display: grid;
+    gap: 2px;
     text-decoration: none;
     color: inherit;
   }
-  /* The card is a quarter of the row: titles wrap to two lines instead of cutting off. */
   .t {
-    font-weight: 600;
+    font: 700 14px/1.3 var(--font-head);
     color: var(--head);
-    font-size: 14px;
-    line-height: 1.3;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
   }
   .tx:hover .t {
     color: var(--link);
   }
   .s {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--muted);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .ig,
+  .ig {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--faint);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .ig:hover {
+    background: var(--panel-2);
+    color: var(--head);
+  }
   .undo button {
     border: 1px solid var(--line-2);
     background: none;
@@ -260,7 +251,6 @@
     color: var(--muted);
     cursor: pointer;
   }
-  .ig:hover,
   .undo button:hover {
     color: var(--head);
   }
