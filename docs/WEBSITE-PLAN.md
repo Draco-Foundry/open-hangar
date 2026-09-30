@@ -257,13 +257,13 @@ Owner's goal: a robust base so updates roll out quickly. In order:
    failed store publish, later deploy/health/stats alerts). `scripts/notify.mjs`.
    Webhooks as GitHub secrets DISCORD_UPDATES_WEBHOOK / DISCORD_STATUS_WEBHOOK /
    DISCORD_OPS_WEBHOOK (owner creates them).
-3. **Staging + automatic deploys:** staging.openhangar.space on its own D1, deployed on
+3. ✅ **Staging + automatic deploys** (.github/workflows/deploy.yml): staging.openhangar.space on its own D1, deployed on
    every push to main; production by one approval in GitHub (environment protection),
    migrations in the same job after a D1 export. Needs CLOUDFLARE_API_TOKEN and
    CLOUDFLARE_ACCOUNT_ID secrets.
-4. **Health checks and alerts:** /api/health (D1 + auth), a 5-minute watchdog cron that
+4. ✅ **Health checks and alerts** (app /api/health; stats-worker/src/watchdog.js): /api/health (D1 + auth), a 5-minute watchdog cron that
    posts to #ops / #status on failure and recovery, and flags a missed stats run.
-5. **Backups:** weekly D1 exports of both databases to private R2, kept a year, plus a
+5. ✅ **Backups** (.github/workflows/backup.yml, docs/RESTORE.md; restore tested 2026-09-30): weekly D1 exports of both databases to private R2, kept a year, plus a
    tested restore note (D1 Time Travel covers the last 30 days).
 6. **Hardened API before sign-ups:** rate limits, schema-checked requests, /api/v1,
    token revocation from the site, one shared backup-format definition tested from
