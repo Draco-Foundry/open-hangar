@@ -101,7 +101,7 @@ body:not(:has(#view-home.active)) .wrap > header {
 .home-hero .cc-account {
   position: relative;
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 290px minmax(0, 1fr);
   align-items: stretch;
   gap: 0;
   min-height: 250px;
@@ -136,15 +136,19 @@ body:not(:has(#view-home.active)) .wrap > header {
 .home-hero a.cc-photo[href]:hover .cc-avatar {
   filter: brightness(1.1);
 }
+/* Big enough to bleed off the card's edges; the soft round mask hides the square
+   edge of logos that come with their own background (JPGs). */
 .home-hero .cc-water {
   position: absolute;
-  right: -40px;
+  right: -90px;
   top: 50%;
-  width: 300px;
-  height: 300px;
+  width: 520px;
+  height: 520px;
   transform: translateY(-50%);
   object-fit: contain;
-  opacity: 0.08;
+  opacity: 0.09;
+  -webkit-mask-image: radial-gradient(closest-side, #000 72%, transparent);
+  mask-image: radial-gradient(closest-side, #000 72%, transparent);
   pointer-events: none;
   z-index: 0;
 }
@@ -229,10 +233,11 @@ body:not(:has(#view-home.active)) .wrap > header {
 .home-hero .cc-meta:empty {
   display: none;
 }
-/* Subscriber + Chairman's Club, one line. */
+/* Subscriber, with Chairman's Club under it. */
 .home-hero .home-flair {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
   margin-top: 10px;
 }
@@ -347,8 +352,8 @@ body:not(:has(#view-home.active)) .wrap > header {
     white-space: normal;
   }
   .home-hero .cc-water {
-    width: 200px;
-    height: 200px;
+    width: 320px;
+    height: 320px;
   }
   .home-hero .cc-status {
     padding: 0 18px 14px;
@@ -648,4 +653,39 @@ body:not(:has(#view-home.active)) .wrap > header {
     justify-items: start;
     gap: 10px;
   }
+}
+
+/* Search results stand apart from the page (owner, 2026-09-30): a lighter panel with
+   a blue edge, and everything else dimmed while it's open (the search box stays lit). */
+.home-search .gsearch-results {
+  background: #232933;
+  border-color: rgba(47, 129, 247, 0.55);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.6),
+    0 0 0 100vmax rgba(5, 7, 10, 0.55);
+}
+.home-search .gsearch:has(.gsearch-results:not([hidden])) input {
+  position: relative;
+  z-index: 51;
+}
+.home-search .gsearch:has(.gsearch-results:not([hidden])) .gsearch-key {
+  z-index: 52;
+}
+.home-search .gs-answer {
+  border-bottom-color: #313844;
+}
+.home-search .gs-row.gs-rich + .gs-row.gs-rich {
+  box-shadow: 0 -1px 0 #313844;
+}
+.home-search .gs-row.gs-rich:hover,
+.home-search .gs-row.gs-rich:focus-visible {
+  background: #2c333e;
+}
+.home-search .gs-foot {
+  border-top-color: #313844;
+}
+.gs-none {
+  padding: 16px 18px;
+  font-size: 14px;
+  color: var(--muted);
 }
