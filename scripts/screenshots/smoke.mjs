@@ -1092,7 +1092,8 @@ try {
     document.querySelector('#ref-share-code').checked = true;
     const c = await referralShareCanvas({ withCode: true });
     document.querySelector('#ref-share').click();
-    await new Promise((r) => setTimeout(r, 1500));
+    // Drawing loads the reward pictures first, so wait for the download, not a fixed time.
+    for (let t = 0; !types && t < 100; t++) await new Promise((r) => setTimeout(r, 100));
     const px = c.getContext('2d').getImageData(0, 0, c.width, c.height);
     const qr = window.jsQR(px.data, c.width, c.height);
     return {
