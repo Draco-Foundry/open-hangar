@@ -94,8 +94,45 @@ async function checkListAlignment(label, rootSel) {
 try {
   console.log('Home');
   await go('#home');
-  const cards = await page.$$eval('#home-summary .sum-box', (e) => e.length);
-  cards ? ok(`summary shows ${cards} boxes`) : fail('home summary empty');
+  const val = await page.evaluate(() => ({
+    big: document.querySelector('#home-summary .hv-big')?.textContent || '',
+    counts: [...document.querySelectorAll('#home-summary .hv-counts a')].map((a) => a.textContent),
+  }));
+  val.big && val.counts.some((c) => /ships?$/.test(c))
+    ? ok(`value line: ${val.big}, ${val.counts.join(' · ')}`)
+    : fail(`home value line: ${JSON.stringify(val)}`);
+  // Counts open Inventory filtered; a Latest Acquisitions row opens its details.
+  const clicks = await page.evaluate(async () => {
+    document.querySelector('#home-summary [data-home-filter="lti"]').click();
+    await new Promise((r) => setTimeout(r, 200));
+    const lti = location.hash === '#inventory' && state.traits.get('lti') === 'yes';
+    state.traits = new Map();
+    location.hash = '#home';
+    await new Promise((r) => setTimeout(r, 300));
+    const rows = document.querySelectorAll('#home-latest .acq-row').length;
+    document.querySelector('#home-latest .acq-row')?.click();
+    await new Promise((r) => setTimeout(r, 200));
+    const modal = !document.querySelector('#item-modal').hidden;
+    document.querySelector('#item-modal').hidden = true;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    return { lti, rows, modal };
+  });
+  clicks.lti && clicks.rows === 5 && clicks.modal
+    ? ok('home: LTI count filters Inventory; 5 latest acquisitions, a row opens details')
+    : fail(`home clicks: ${JSON.stringify(clicks)}`);
+  const cards = await page.evaluate(async () => {
+    await new Promise((r) => setTimeout(r, 1500));
+    return {
+      events: document.querySelector('#home-events h3')?.textContent || '',
+      token: /Buy-back token/.test(document.querySelector('#home-events')?.textContent || ''),
+      status: document.querySelector('#home-status')?.textContent || '',
+    };
+  });
+  cards.events === 'Events' && cards.token && /LIVE/.test(cards.status)
+    ? ok(
+        `Events card (buy-back token) and Game Status (${cards.status.replace(/\s+/g, ' ').trim()})`,
+      )
+    : fail(`home cards: ${JSON.stringify(cards)}`);
   const home = await page.evaluate(async () => {
     OH.getShipStock = async (url) =>
       /Cutlass-Black/i.test(url)
@@ -104,12 +141,13 @@ try {
     state.wishlist = ['Cutlass Black', 'Pioneer'];
     renderHomePanels();
     await new Promise((r) => setTimeout(r, 600));
-    const wish = document.querySelector('#home-wish').textContent;
+    const wishEl = document.querySelector('#home-wish');
+    const wish = wishEl.textContent;
+    // The sale line sits right under the value row.
+    const underValue = wishEl.previousElementSibling?.classList.contains('home-top');
     state.wishlist = [];
     renderHomePanels();
-    const emptyHidden =
-      document.querySelector('#home-wish').hidden &&
-      document.querySelector('.home-grid').classList.contains('solo');
+    const emptyHidden = wishEl.hidden && underValue;
     return {
       emptyHidden,
       guide:
@@ -233,73 +271,72 @@ try {
     .catch(() => {});
   const news = await page.evaluate(async () => {
     const box = document.querySelector('#home-news');
+    const latest = document.querySelector('#home-latest');
     const wish = document.querySelector('#home-wish');
-    // Many wishlist ships on sale: the list scrolls inside a same-height panel.
+    // Many wishlist ships on sale: the one-line bar wraps instead of overflowing.
     OH.getShipStock = async () => ({ state: 'in', price: 20, packs: [] });
     state.wishlist = state.catalog.slice(0, 20).map((v) => v.name);
     renderHomePanels();
     await new Promise((r) => setTimeout(r, 800));
-    const scroll = wish.querySelector('.home-scroll');
     const res = {
-      beside: box.parentElement === wish.parentElement,
+      beside: box.parentElement === latest.parentElement,
       title: box.querySelector('h3').textContent,
       lead: box.querySelector('.twisc-lead')?.textContent || '',
       img: !!box.querySelector('.twisc-img'),
-      bullets: box.querySelectorAll('.twisc-points li').length,
+      comms: box.querySelectorAll('.news-list li').length,
       link: box.querySelector('.home-more a')?.href || '',
-      sameHeight: Math.abs(box.offsetHeight - wish.offsetHeight) <= 1,
-      scrolls: scroll ? scroll.scrollHeight > scroll.clientHeight : false,
-      linkVisible: (() => {
-        const a = wish.querySelector('.home-more a');
-        const r = a && a.getBoundingClientRect();
-        const w = wish.getBoundingClientRect();
-        return !!r && r.bottom <= w.bottom;
-      })(),
+      sameHeight: Math.abs(box.offsetHeight - latest.offsetHeight) <= 1,
+      wishFits: !wish.hidden && wish.scrollWidth <= wish.clientWidth,
     };
     state.wishlist = [];
     renderHomePanels();
     return res;
   });
   news.beside &&
-  /This Week in Star Citizen/.test(news.title) &&
+  news.title === 'Latest From RSI' &&
   /^Last week was a busy one on the testing front/.test(news.lead) &&
   news.img &&
-  news.bullets === 0 &&
+  news.comms >= 1 &&
   /comm-link/.test(news.link)
-    ? ok('home: This Week in Star Citizen post with its opening paragraph')
+    ? ok(
+        `home: Latest From RSI leads with This Week in Star Citizen, then ${news.comms} Comm-Links`,
+      )
     : fail(`home news: ${JSON.stringify(news)}`);
-  news.sameHeight && news.scrolls && news.linkVisible
-    ? ok('home: panels the same height; a long wishlist scrolls, link stays visible')
+  news.sameHeight && news.wishFits
+    ? ok('home: Latest Acquisitions and Latest From RSI the same height; a long sale line wraps')
     : fail(`home panels: ${JSON.stringify(news)}`);
+  // A large currency (CNY ×7) still fits the value line.
   const compact = await page.evaluate(() => {
     const saved = { ...fx };
     Object.assign(fx, { code: 'CNY', rate: 7 });
     renderHome();
-    const boxes = [...document.querySelectorAll('#home-summary .sum-box')];
-    const melt = boxes.find((b) => /melt value/.test(b.textContent));
+    const box = document.querySelector('#home-summary');
     const res = {
-      text: melt.querySelector('.sum-big').textContent,
-      title: melt.title,
-      fits: melt.querySelector('.sum-big').scrollWidth <= melt.clientWidth,
+      text: box.querySelector('.hv-big').textContent,
+      fits: box.scrollWidth <= box.clientWidth,
     };
     Object.assign(fx, saved);
     renderHome();
     return res;
   });
-  /K$/.test(compact.text) && /,/.test(compact.title) && compact.fits
-    ? ok(`summary: big amounts shortened (${compact.text}, hover ${compact.title})`)
-    : fail(`summary compact: ${JSON.stringify(compact)}`);
+  compact.fits
+    ? ok(`value line fits a big currency (${compact.text})`)
+    : fail(`value line overflow: ${JSON.stringify(compact)}`);
   menu.below && menu.inView && menu.visible
     ? ok('scan menu opens below the button, fully visible')
     : fail(`scan menu: ${JSON.stringify(menu)}`);
   home.guide && home.cards === 0
     ? ok('how-to guide folded into one closed dropdown; no link cards')
     : fail(`home layout: ${JSON.stringify(home)}`);
-  /On Sale Now 1/.test(home.wish) && /Cutlass Black/.test(home.wish) && !/Pioneer/.test(home.wish)
+  /On sale from your wishlist/.test(home.wish) &&
+  /Cutlass Black/.test(home.wish) &&
+  !/Pioneer/.test(home.wish)
     ? ok('home: wishlist ships on sale now')
     : fail(`home wishlist: ${home.wish}`);
   !home.glance && home.storeOpt && home.emptyHidden
-    ? ok('home: no At a Glance; empty wishlist hides its box; Scan has a Store option')
+    ? ok(
+        'home: no At a Glance; sale line under the value row, hidden when nothing is on sale; Scan has a Store option',
+      )
     : fail(`home layout: ${JSON.stringify(home)}`);
   const site = await page.$eval('#site-link', (e) => e.textContent).catch(() => '');
   /something big is coming/i.test(site) && !(await page.$('#site-link button'))
@@ -1135,7 +1172,7 @@ try {
     await new Promise((r) => setTimeout(r, 400));
     const spend = document.querySelector('#stats-body').textContent;
     const bars = document.querySelectorAll('#stats-body .bar-row').length;
-    // A bonus event running today shows the Home banner.
+    // A bonus event running today shows on Home's Events card.
     // Local date, like the page uses (toISOString is UTC: wrong in the evening).
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -1145,7 +1182,7 @@ try {
     ];
     location.hash = '#home';
     await new Promise((r) => setTimeout(r, 400));
-    const banner = document.querySelector('#event-banner');
+    const banner = document.querySelector('#home-events');
     return {
       before,
       after,
@@ -1153,7 +1190,7 @@ try {
       cleared,
       spend: /pledged in total/.test(spend),
       bars,
-      banner: !banner.hidden && /Test Expo/.test(banner.textContent),
+      banner: /Referral bonus: Drake Dragonfly/.test(banner.textContent),
     };
   });
   wse.before === 'Add to Wishlist' &&
@@ -1166,7 +1203,7 @@ try {
     ? ok(`spending tab: ${wse.bars} years`)
     : fail(`spending: ${JSON.stringify(wse)}`);
   wse.banner
-    ? ok('home banner while a bonus event runs')
+    ? ok('Events card shows a running referral bonus event')
     : fail(`event banner: ${JSON.stringify(wse)}`);
 
   for (const view of ['referrals', 'developers']) {
