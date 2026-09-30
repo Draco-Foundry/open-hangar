@@ -843,14 +843,15 @@ function renderAccount() {
     }
 
     // Balances — always rendered, with dashes when there's no data (uniform).
-    // Big amounts are shortened (¤1.2M, ¤90K) so the strip stays one row; the
+    // Big amounts are shortened (¤ 1.2M, ¤ 90K) so the strip stays one row; the
     // exact figure is in the hover text.
     if (balEl) {
       const c = a.credits || {};
       const fmt = (n) => Number(n).toLocaleString('en-US');
       const tile = (cls, label, val, full) =>
         `<span class="bal ${cls}"${full && full !== val ? ` title="${OH.escapeHtml(full)}"` : ''}><span class="bal-lbl">${label}</span><b>${val}</b></span>`;
-      const aUEC = (x) => (x ? ['¤' + compactNum(x.value), '¤' + fmt(x.value)] : [DASH]);
+      // A no-break space after ¤ so the symbol doesn't crowd the digits.
+      const aUEC = (x) => (x ? ['¤ ' + compactNum(x.value), '¤ ' + fmt(x.value)] : [DASH]);
       const store = c.store ? c.store.value / 100 : null;
       setHTML(
         balEl,
