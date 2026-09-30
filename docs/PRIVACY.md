@@ -1,6 +1,6 @@
 # Privacy Policy — Open Hangar
 
-_Last updated: 2026-06-07_
+_Last updated: 2026-09-30_
 
 Open Hangar is a source-available browser extension that reads your own Star Citizen /
 Roberts Space Industries (RSI) account data and stores it **locally in your
@@ -44,15 +44,16 @@ The extension makes a small number of outbound requests, none of which carry you
 personal data:
 
 - **robertsspaceindustries.com** — to read your own account (above), to load hangar
-  thumbnails, to list RSI's newest Comm-Links on the Home page (the same public list
-  for everyone), and to look up ship art for items RSI ships
-  without images from RSI's public ship-matrix index. No credentials are sent for the
-  ship-matrix lookup.
+  thumbnails, to show RSI's newest Comm-Links, This Week in Star Citizen and patch notes
+  on the Home page (the same public pages for everyone), to look up ship art for items
+  RSI ships without images from RSI's public ship-matrix index, and, only when you
+  choose to scan the Store, to check whether the ships on your wishlist are on sale.
+  No credentials are sent for the ship-matrix lookup.
 - **api.frankfurter.dev** (public, read-only) — only if you pick a currency other
   than USD: today's exchange rates (the same for everyone), at most once a day. No
   credentials or personal data are sent.
-- **api.star-citizen.wiki** (public, read-only) — a fallback for the current game
-  version and for ship art when the ship-matrix has no image, and the source of ship
+- **api.star-citizen.wiki** (public, read-only) — the current game version and when
+  it was released, a fallback for ship art when the ship-matrix has no image, and the source of ship
   store prices for Hangar value. Prices come from downloading the whole public
   vehicle list (the same list for everyone), so they reveal nothing about your
   hangar. Ship-art lookups, done by ship name, are cached locally and are the only
@@ -61,14 +62,20 @@ personal data:
 - **support.robertsspaceindustries.com** (public, read-only) — RSI's Loaner Ship
   Matrix and Included Vessels help articles (the same pages for everyone), at most once a week, to show
   which loaners your ships give you. No credentials or personal data are sent.
-- **starcitizen.tools** (public, read-only) — when you open the Referrals page, the
-  list of referral bonus events and the pictures of referral rewards (the same for
-  everyone), cached for a week to a month.
-  No credentials or personal data are sent.
+- **starcitizen.tools** (public, read-only) — the current game event and test-server
+  versions on the Home page, and on the Referrals page the list of referral bonus events
+  and the pictures of referral rewards (the same for everyone), cached for hours to a
+  month. No credentials or personal data are sent.
+- **addons.mozilla.org** (Firefox only, public, read-only) — when you press "Check for
+  updates", the latest published version number of Open Hangar. No credentials or
+  personal data are sent.
 
 ## Permissions and why they are used
 
 - **storage** — to save your scanned data and UI preferences locally.
+- **unlimitedStorage** — big hangars and buy-back lists, plus scan history, can outgrow
+  the browser's default 10 MB limit; this lifts the limit. Everything still stays on
+  your device.
 - **cookies** — used solely for "Log out of RSI," which clears
   robertsspaceindustries.com cookies so you can fully end your RSI session from the
   extension. Cookie values are never read or transmitted.
@@ -83,9 +90,11 @@ upload it anywhere. (Your referral code is deliberately excluded from exports.)
 
 ## Multiple accounts
 
-Scraped data is tied to the RSI account it was scanned from. If you open Open Hangar
-while signed in to a different account, it clears the previous account's data and
-prompts a fresh scan, so accounts never mix.
+Scanned data is tied to the RSI account it came from. Each account's data is kept
+separately in this browser: when you sign in to RSI with a different account, Open
+Hangar shows that account's last scan (or asks for a first scan), and the other
+account's data waits until you sign in as them again. Accounts never mix. You can see
+and remove saved accounts on the Developers page.
 
 ## Changes to this policy
 
