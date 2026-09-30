@@ -100,7 +100,9 @@
       out.push({
         key: `bb:${bb.map((b) => b.id).sort().join(',')}`,
         kind: 'info',
-        icon: '♥', // your wishlist (the ↺ "buy back" arrow read as a refresh button)
+        icon: '', // blank (owner): the title says it all
+        // Opens Buy-Backs showing just these, not all of them.
+        go: () => a.showBuybacks(bb.map((b) => b.id), bb.length === 1 ? 'buy-back that matches your wishlist' : 'buy-backs that match your wishlist'),
         title:
           bb.length === 1 ? '1 buy-back matches your wishlist' : `${bb.length} buy-backs match your wishlist`,
         sub: [...new Set(bb.map((b) => a.cardName(b)))].slice(0, 3).join(', '),
@@ -148,8 +150,17 @@
     <div class="list">
       {#each alerts as x (x.key)}
         <div class="fy {x.kind}">
-          <span class="ic" aria-hidden="true">{x.icon}</span>
-          <a class="tx" href={x.href || undefined}>
+          <span class="ic" class:blank={!x.icon} aria-hidden="true">{x.icon}</span>
+          <a
+            class="tx"
+            href={x.href || undefined}
+            onclick={x.go
+              ? (e) => {
+                  e.preventDefault();
+                  x.go();
+                }
+              : undefined}
+          >
             <span class="t" title={x.title}>{x.title}</span>
             <span class="s" title={x.sub}>{x.sub}</span>
           </a>
@@ -201,6 +212,9 @@
     color: var(--link);
   }
   .onsale .ic,
+  .ic.blank {
+    background: none;
+  }
   .good .ic {
     background: var(--good-soft);
     color: var(--good);

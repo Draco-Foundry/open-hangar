@@ -21,7 +21,6 @@ const VIEWS = [
 ];
 
 const statusEl = $('#status');
-const scannedHomeEl = $('#scanned-home');
 const chipsEl = $('#chips');
 const resultsEl = $('#results');
 const scanBtn = $('#scan-home');
@@ -635,6 +634,7 @@ function route() {
   document
     .querySelectorAll('#nav a')
     .forEach((a) => a.classList.toggle('active', a.dataset.view === v));
+  if (v !== 'buybacks') state.bbOnly = null; // an alert's filter lasts for that one visit
   if (v === 'home') renderHome();
   else if (v === 'inventory') renderInventory();
   else if (v === 'stats') renderStats();
@@ -749,6 +749,22 @@ function enhanceCardImages(container) {
   for (let w = 0; w < CONCURRENCY; w++) worker();
 }
 
+// Home's welcome screen: shown until the first scan. Signed out, the card above
+// already has the Log In button, so this just says to use it (lastLoggedOut is set
+// when the account is read).
+function renderWelcome() {
+  const el = $('#oh-welcome');
+  if (!el) return;
+  el.hidden = state.items.length > 0 || state.buybacks.length > 0;
+  $('#welcome-scan').hidden = lastLoggedOut;
+  $('#welcome-note').textContent = lastLoggedOut
+    ? 'First, log in to RSI with the button on the card above. Then come back here and scan.'
+    : 'A big hangar takes about a minute. To scan just some of it, use the ▾ next to Scan at the top.';
+}
+$('#welcome-scan')?.addEventListener('click', () => {
+  if (!scanBtn.disabled) runScan(); // everything, whatever the ▾ menu has ticked
+});
+
 // RSI account → the home Citizen Card: avatar, name, est/country/UEE record,
 // quick links, balances (Store/UEC/REC), and subscriber/concierge flair.
 function renderAccount() {
@@ -773,6 +789,7 @@ function renderAccount() {
     if (logoutBtn) logoutBtn.hidden = a.loggedIn !== true;
 
     updateSignedOutBanner(loggedOut);
+    renderWelcome();
 
     const handle = a.nickname || '';
     const citizenUrl = handle
@@ -984,97 +1001,6 @@ async function wishlistStock({ force = false } = {}) {
   }
   return out;
 }
-let homeWishToken = 0;
-// Home: a short summary of the newest "This Week in Star Citizen" (OH.getTwiscSummary),
-// or RSI's three newest Comm-Links if the post can't be read.
-let homeNewsToken = 0;
-function renderHomeNews() {
-  const box = $('#home-news');
-  if (!box) return;
-  const token = ++homeNewsToken;
-  const esc = OH.escapeHtml;
-  const shell = (title, body, more) =>
-    `<h3>${title}</h3><div class="home-scroll">${body}</div><p class="home-more">${more}</p>`;
-  if (!box.dataset.filled)
-    setHTML(box, shell('This Week in Star Citizen', '<p class="muted">Loading…</p>', ''));
-  OH.getTwiscSummary().then(async (sum) => {
-    if (token !== homeNewsToken) return;
-    box.dataset.filled = '1';
-    if (sum && sum.lead) {
-      const date = (sum.title.match(/-\s*(.+)$/) || [])[1] || '';
-      setHTML(
-        box,
-        shell(
-          `This Week in Star Citizen${date ? ` <span class="muted twisc-date">${esc(date)}</span>` : ''}`,
-          `${sum.image ? `<a href="${esc(sum.url)}" target="_blank" rel="noopener"><img class="twisc-img" src="${esc(sum.image)}" alt=""></a>` : ''}<p class="twisc-lead">${esc(sum.lead)}</p>`,
-          `<a href="${esc(sum.url)}" target="_blank" rel="noopener">Read it on RSI ↗</a>`,
-        ),
-      );
-      return;
-    }
-    const items = (await OH.getRsiNews()).slice(0, 3);
-    if (token !== homeNewsToken) return;
-    setHTML(
-      box,
-      shell(
-        'Latest from RSI',
-        items.length
-          ? `<ul class="news-list">${items
-              .map(
-                (n) =>
-                  `<li><a href="${esc(n.url)}" target="_blank" rel="noopener" title="${esc(n.title)}">${
-                    n.image
-                      ? `<img class="news-thumb" src="${esc(n.image)}" alt="" loading="lazy">`
-                      : ''
-                  }<span class="news-text"><span class="news-title">${esc(n.title)}</span><span class="news-meta">${esc(
-                    [capFirst(n.type), n.when].filter(Boolean).join(' · '),
-                  )}</span></span></a></li>`,
-              )
-              .join('')}</ul>`
-          : '<p class="muted">Couldn’t reach RSI right now.</p>',
-        '<a href="https://robertsspaceindustries.com/comm-link" target="_blank" rel="noopener">All Comm-Links ↗</a>',
-      ),
-    );
-  });
-}
-
-function renderHomePanels() {
-  const wish = $('#home-wish');
-  renderHomeNews();
-  if (!wish) return;
-  // No wishlist: no box; the news panel takes the whole row.
-  const empty = !state.wishlist.length;
-  wish.hidden = empty;
-  wish.parentElement.classList.toggle('solo', empty);
-  if (empty) {
-    ++homeWishToken; // drop any check still running
-    return;
-  }
-  const token = ++homeWishToken;
-  setHTML(wish, `<h3>Wishlist: On Sale Now</h3><p class="muted">Checking RSI's store…</p>`);
-  wishlistStock().then((list) => {
-    if (token !== homeWishToken) return;
-    const onSale = list.filter((x) => x.st && x.st.state === 'in');
-    const inPack = list.filter((x) => x.st && x.st.state === 'pack');
-    const row = (x, text, cls) =>
-      `<li>${shipLink(x.name)}<span class="sale ${cls}">${OH.escapeHtml(text)}</span></li>`;
-    const items = [
-      ...onSale.map((x) =>
-        row(x, x.st.price ? `In stock ${dollars(x.st.price)}` : 'In stock', 'on'),
-      ),
-      ...inPack.map((x) => row(x, 'Only in a pack', 'wb')),
-    ];
-    setHTML(
-      wish,
-      `<h3>Wishlist: On Sale Now <span class="market-n">${onSale.length}</span></h3><div class="home-scroll">${
-        items.length
-          ? `<ul class="home-list">${items.join('')}</ul>`
-          : `<p class="muted">None of your ${list.length} wishlist ship${list.length === 1 ? ' is' : 's are'} for sale right now.</p>`
-      }</div><p class="home-more"><a href="#store" data-view="store">Your wishlist →</a></p>`,
-    );
-  });
-}
-
 function renderHome() {
   ensurePrices();
   renderEventBanner();
@@ -1085,22 +1011,9 @@ function renderHome() {
   // Everything below the Citizen Card is the Svelte Home (ui/home); tell it to redraw.
   homeUpdated();
 
-  // Scanned line: first-run prompt (#2) or scan freshness with a stale nudge (#5).
-  scannedHomeEl.hidden = has;
-  if (!has) {
-    scannedHomeEl.textContent = 'Nothing scanned yet. Click Scan at the top to begin.';
-    return;
-  }
-  const when = state.scannedAt ? new Date(state.scannedAt).toLocaleString() : 'previously';
-  const ageDays = state.scannedAt ? (Date.now() - state.scannedAt) / 86400000 : 0;
-  if (ageDays > 7) {
-    setHTML(
-      scannedHomeEl,
-      `Scanned ${OH.escapeHtml(when)} — <span class="stale">over a week old, consider rescanning</span>`,
-    );
-  } else {
-    scannedHomeEl.textContent = `Scanned ${when}`;
-  }
+  // First run: the welcome screen instead of empty cards (when you last scanned
+  // shows on Account Value once there's data).
+  renderWelcome();
 }
 
 function link(url, label, soon) {
@@ -2332,7 +2245,6 @@ function ensureStore() {
       storeByKey.set(s.lname, s);
     }
     if (currentView() === 'store') renderStore();
-    if (currentView() === 'home') renderHomePanels();
   });
   return storeRequested;
 }
@@ -4929,6 +4841,8 @@ function computeBuybacks() {
   let list = state.bbShown.size
     ? state.buybacks.filter((b) => state.bbShown.has(b.kind))
     : state.buybacks.slice();
+  // Opened from a Hangar Alert: just the buy-backs it was about.
+  if (state.bbOnly) list = list.filter((b) => state.bbOnly.ids.has(String(b.id)));
   list = applyTraits(list, state.bbTraits, buybackFacets);
   if (q) list = list.filter((b) => `${b.name || ''} ${b.contains || ''}`.toLowerCase().includes(q));
   if (state.bbSort !== 'default') {
@@ -5006,7 +4920,12 @@ function renderBuybacks() {
     setHTML(body, '<div class="empty">No buy-backs match the current filters.</div>');
     return;
   }
+  // Opened from a Hangar Alert: say so, with a way back to everything.
+  const only = state.bbOnly
+    ? `<div class="bb-only">Showing the ${list.length} ${OH.escapeHtml(state.bbOnly.label)} <button type="button" class="btn-secondary" data-bb-all>Show all ${state.buybacks.length}</button></div>`
+    : '';
   const count =
+    only +
     tokenLineHtml() +
     bbDetailsBarHtml(list) +
     `<div class="result-count">Showing ${list.length} of ${state.buybacks.length}${when ? ` · scanned ${OH.escapeHtml(when)}` : ''}</div>`;
@@ -5015,7 +4934,8 @@ function renderBuybacks() {
   if (state.bbLayout === 'market') {
     setHTML(
       body,
-      tokenLineHtml() +
+      only +
+        tokenLineHtml() +
         bbDetailsBarHtml(list) +
         bbToolbarHtml(list, when) +
         buybackMarketHtml(list),
@@ -5894,7 +5814,14 @@ if (referralsBodyEl) {
   });
 }
 
-// Copy referral link/code button (Citizen Card pill). Uses the clipboard API with
+// Buy-Backs opened from a Hangar Alert: Show all clears the filter.
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('[data-bb-all]')) return;
+  state.bbOnly = null;
+  renderBuybacks();
+});
+
+// Copy referral link/code button (Referrals page). Uses the clipboard API with
 // a brief "Copied" confirmation; falls back silently if clipboard is unavailable.
 document.addEventListener('click', async (e) => {
   const btn = e.target.closest('.ref-copy');
@@ -5919,6 +5846,7 @@ document.addEventListener('click', async (e) => {
 async function runScan({ hangar = true, buybacks = true, referrals = true, store = true } = {}) {
   if (!hangar && !buybacks && !referrals && !store) return;
   scanBtn.disabled = true;
+  if ($('#welcome-scan')) $('#welcome-scan').disabled = true;
   if (scanSelectedBtn) scanSelectedBtn.disabled = true;
   setStatus('Scanning…');
   setScanning('Scanning…');
@@ -6010,6 +5938,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   route();
   renderAccount(); // refresh the Citizen Card pill with the new referral counts
   scanBtn.disabled = false;
+  if ($('#welcome-scan')) $('#welcome-scan').disabled = false;
   if (scanSelectedBtn) scanSelectedBtn.disabled = false;
 }
 
@@ -6033,7 +5962,7 @@ function updateScanLabel() {
   scanBtn.title = all
     ? 'Scan everything: inventory, buy-backs, referrals and your wishlist in the store'
     : on.length
-      ? `Scan ${on.map((el) => el.parentElement.textContent.trim()).join(', ')} (change with ▾)`
+      ? `Scan ${on.map((el) => el.dataset.name).join(', ')} (change with ▾)`
       : 'Nothing ticked: pick what to scan with ▾';
 }
 function scanChosen() {
@@ -6056,6 +5985,11 @@ for (const el of scanBoxes()) {
     });
   });
 }
+// "Select All" in the menu ticks everything again.
+document.querySelector('[data-scan-all]')?.addEventListener('click', () => {
+  for (const el of scanBoxes()) el.checked = true;
+  scanBoxes()[0]?.dispatchEvent(new Event('change'));
+});
 chrome.storage.local.get('scanSources').then(({ scanSources }) => {
   if (Array.isArray(scanSources)) {
     for (const el of scanBoxes()) el.checked = scanSources.includes(el.value);
@@ -7434,6 +7368,12 @@ window.OHApp = {
   openItem: (id) => {
     const p = state.items.find((x) => String(x.id) === String(id));
     if (p) openItemModal(p);
+  },
+  // Open Buy-Backs showing only these (a Hangar Alert's matches), with Show all.
+  showBuybacks: (ids, label) => {
+    state.bbOnly = { ids: new Set(ids.map(String)), label };
+    if (location.hash === '#buybacks') renderBuybacks();
+    else location.hash = '#buybacks';
   },
   // Open Inventory with one kind or trait filter on ("ship", "ccu", "lti", "all").
   showInventory: (key) => {
