@@ -43,6 +43,9 @@ for (const [name, transform] of Object.entries(targets)) {
   rmSync(`${out}/icons/icon.svg`, { force: true });
   // Release notes for the dashboard's Updates page.
   cpSync('CHANGELOG.md', `${out}/CHANGELOG.md`);
+  // License terms and third-party notices travel with every copy.
+  cpSync('LICENSE', `${out}/LICENSE`);
+  cpSync('THIRD_PARTY_NOTICES.md', `${out}/THIRD_PARTY_NOTICES.md`);
   writeFileSync(`${out}/manifest.json`, JSON.stringify(transform(base), null, 2) + '\n');
   console.log(`built ${out}`);
 }

@@ -3,7 +3,7 @@
   "version": "0.2.11",
   "private": true,
   "description": "Browser extension that reads your own Star Citizen / RSI account data into a clean, reusable local database you can build on.",
-  "license": "MIT",
+  "license": "PolyForm-Strict-1.0.0",
   "homepage": "https://github.com/Draco-Foundry/open-hangar#readme",
   "repository": {
     "type": "git",
