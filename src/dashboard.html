@@ -16,6 +16,7 @@
         --accent-hover: #4493f8;
         --link: #58a6ff;
         --accent-soft: rgba(47, 129, 247, 0.14);
+        --accent-line: rgba(47, 129, 247, 0.5);
         /* Comparisons: the second side of "you (blue) vs them" charts */
         --compare: #dfe6ee;
         --shadow: 0 1px 3px rgba(1, 4, 9, 0.5);
@@ -3700,18 +3701,26 @@
         margin: 16px 0 2px;
         padding: 4px 10px;
         border-radius: 6px;
+        border: 1px solid var(--line);
         background: var(--panel-2);
         font-size: 12px;
         font-weight: 700;
       }
-      .release-group.g-fixed {
-        color: var(--link);
-      }
+      /* Release groups follow the Color Key: green good news, blue extra info, red the problem fixed */
       .release-group.g-new {
         color: var(--good);
+        background: var(--good-soft);
+        border-color: var(--good-line);
       }
       .release-group.g-improved {
-        color: var(--text);
+        color: var(--link);
+        background: var(--accent-soft);
+        border-color: var(--accent-line);
+      }
+      .release-group.g-fixed {
+        color: var(--bad);
+        background: var(--bad-soft);
+        border-color: var(--bad-line);
       }
       .release-tag {
         font-size: 11px;
@@ -4133,6 +4142,12 @@
                 <li>
                   <span class="sw" style="background: var(--accent)"></span><b>Blue</b
                   ><span class="muted">something you can click, or extra info</span>
+                </li>
+                <li>
+                  <span class="sw" style="background: var(--good)"></span
+                  ><span class="sw" style="background: var(--accent)"></span
+                  ><span class="sw" style="background: var(--bad)"></span><b>Updates</b
+                  ><span class="muted">New, Improved and Fixed in each release</span>
                 </li>
               </ul>
             </details>
