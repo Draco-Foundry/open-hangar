@@ -1494,10 +1494,14 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
 .grid.list .foot-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
 }
 .grid.list .flags {
-  gap: 5px;
+  gap: 8px;
+}
+.grid.list .flag {
+  min-width: 72px;
+  justify-content: center;
 }
 /* The switches sit together at the end of the chip row. */
 .chip-row .sw-group {
@@ -1515,16 +1519,8 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
   color: var(--faint);
 }
 /* Section headers (Group by type) stick just under the pinned top bar. */
+/* The padding fills the gap under the bar while stuck, so rows don't peek through. */
 body:not(:has(#view-home.active)) .market-title {
-  top: var(--hdr-h, 0px);
-}
-/* Covers the strip between the bar and a stuck header so rows don't peek through. */
-body:not(:has(#view-home.active)) .market-title::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 100%;
-  height: 24px;
-  background: var(--bg);
+  top: calc(var(--hdr-h, 0px) - 12px);
+  padding-top: 20px;
 }

@@ -195,12 +195,25 @@ try {
     await page
       .waitForFunction(() => [...document.images].every((img) => img.complete), { timeout: 20000 })
       .catch(() => console.warn(`  (${view}: some images still loading — capturing anyway)`));
-    // Home's news panel fills in after its own fetches; wait for it and its picture.
+    // Inventory and Buy-Backs show their List view (the redesigned rows).
+    if (view === 'inventory' || view === 'buybacks') {
+      await page.evaluate(() => {
+        state.layout = 'list';
+        state.bbLayout = 'list';
+        route();
+      });
+      await page
+        .waitForFunction(() => [...document.images].every((img) => img.complete), {
+          timeout: 20000,
+        })
+        .catch(() => {});
+    }
+    // Home's cards fill in after their own fetches; wait for them and their pictures.
     if (view === 'home') {
       await page
         .waitForFunction(
           () => {
-            const g = document.querySelector('.home-grid');
+            const g = document.querySelector('#oh-home');
             return (
               g &&
               g.textContent.trim().length > 50 &&
