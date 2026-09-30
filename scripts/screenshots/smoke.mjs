@@ -94,30 +94,97 @@ async function checkListAlignment(label, rootSel) {
 try {
   console.log('Home');
   await go('#home');
-  const cards = await page.$$eval('#home-summary .sum-box', (e) => e.length);
-  cards ? ok(`summary shows ${cards} boxes`) : fail('home summary empty');
+  // The Svelte Home (ui/home) mounts under the Citizen Card.
+  await page.waitForSelector('#oh-home .big', { timeout: 8000 }).catch(() => {});
+  const val = await page.evaluate(() => ({
+    big: document.querySelector('#oh-home .big')?.textContent || '',
+    counts: [...document.querySelectorAll('#oh-home .counts a')].map((a) => a.textContent.trim()),
+    font: getComputedStyle(document.querySelector('#oh-home h3')).fontFamily,
+  }));
+  val.big && val.counts.some((c) => /ships?$/.test(c)) && /Manrope/.test(val.font)
+    ? ok(`value card: ${val.big}, ${val.counts.join(' · ')} (bundled Manrope)`)
+    : fail(`home value card: ${JSON.stringify(val)}`);
+  const clicks = await page.evaluate(async () => {
+    [...document.querySelectorAll('#oh-home .counts a')]
+      .find((a) => /LTI/.test(a.textContent))
+      .click();
+    await new Promise((r) => setTimeout(r, 200));
+    const lti = location.hash === '#inventory' && state.traits.get('lti') === 'yes';
+    state.traits = new Map();
+    location.hash = '#home';
+    await new Promise((r) => setTimeout(r, 300));
+    const rows = document.querySelectorAll('#oh-home .li').length;
+    document.querySelector('#oh-home .li')?.click();
+    await new Promise((r) => setTimeout(r, 200));
+    const modal = !document.querySelector('#item-modal').hidden;
+    document.querySelector('#item-modal').hidden = true;
+    return { lti, rows, modal };
+  });
+  clicks.lti && clicks.rows === 5 && clicks.modal
+    ? ok('home: LTI count filters Inventory; 5 latest acquisitions, a row opens details')
+    : fail(`home clicks: ${JSON.stringify(clicks)}`);
+  await page
+    .waitForFunction(() => /LIVE/.test(document.querySelector('#oh-home')?.textContent || ''), {
+      timeout: 8000,
+    })
+    .catch(() => {});
+  const cards = await page.evaluate(() => {
+    const txt = document.querySelector('#oh-status').textContent;
+    return {
+      events: /Next Buy-Back Token/.test(txt),
+      stale: /Last event: Pirate Week/.test(txt) || !/Pirate Week/.test(txt),
+      wave: /4\.10\.2[\s\S]{0,40}Wave 3/.test(txt) && /Released [A-Z][a-z]{2} \d+ · /.test(txt),
+      news: document.querySelectorAll('#oh-home .nl').length,
+      lead: document.querySelector('#oh-home .lead .p')?.textContent || '',
+    };
+  });
+  cards.events &&
+  cards.stale &&
+  cards.wave &&
+  cards.news >= 1 &&
+  /^Last week was a busy one/.test(cards.lead)
+    ? ok(
+        `Game Status beside the card: waves, events (ended not shown as live), next token; news lead + ${cards.news} items`,
+      )
+    : fail(`home cards: ${JSON.stringify(cards)}`);
+  // Hangar Alerts live in the top bar's bell: a wishlist sale shows with a count, and ×
+  // ignores it. The Citizen Card has the whole row on Home.
   const home = await page.evaluate(async () => {
     OH.getShipStock = async (url) =>
       /Cutlass-Black/i.test(url)
         ? { state: 'in', price: 110, packs: [] }
         : { state: 'out', price: null, packs: [] };
+    await chrome.storage.local.set({ homeIgnored: [] });
     state.wishlist = ['Cutlass Black', 'Pioneer'];
-    renderHomePanels();
-    await new Promise((r) => setTimeout(r, 600));
-    const wish = document.querySelector('#home-wish').textContent;
+    document.dispatchEvent(new CustomEvent('oh:home'));
+    await new Promise((r) => setTimeout(r, 800));
+    const bell = document.querySelector('#bell-menu');
+    const wish = bell.textContent;
+    const count = document.querySelector('#bell-n').textContent;
+    const card = document.querySelector('.citizen-card').getBoundingClientRect();
+    // Citizen Card at three quarters, Game Status beside it.
+    const side = document.querySelector('#oh-status').getBoundingClientRect();
+    const full =
+      side.left > card.right && Math.abs(side.width / (card.width + side.width) - 0.25) < 0.06;
+    const x = [...bell.querySelectorAll('.bm-row')]
+      .find((r) => /Cutlass Black/.test(r.textContent))
+      ?.querySelector('.bm-x');
+    x?.click();
+    await new Promise((r) => setTimeout(r, 150));
+    const hidden = !/Cutlass Black is on sale/.test(bell.textContent);
     state.wishlist = [];
-    renderHomePanels();
-    const emptyHidden =
-      document.querySelector('#home-wish').hidden &&
-      document.querySelector('.home-grid').classList.contains('solo');
+    document.dispatchEvent(new CustomEvent('oh:home'));
+    await chrome.storage.local.set({ homeIgnored: [] });
     return {
-      emptyHidden,
-      guide:
-        !!document.querySelector('details.howto-all') &&
-        !document.querySelector('details.howto-all').open,
-      cards: document.querySelectorAll('.home-card').length,
       wish,
-      glance: !!document.querySelector('#home-glance'),
+      count,
+      full,
+      hidden,
+      guide:
+        !document.querySelector('#view-home .howto') &&
+        !!document.querySelector('#view-guide .howto-page details') &&
+        !!document.querySelector('#settings-menu a[href="#guide"]'),
+      cards: document.querySelectorAll('.home-card').length,
       storeOpt: !!document.querySelector('.scan-src[value="store"]'),
     };
   });
@@ -156,9 +223,14 @@ try {
       uec: uec.querySelector('b').textContent,
       uecTitle: uec.title,
       rec: bal.querySelector('.bal.rec b').textContent,
-      oneRow: tops.size === 1 && strip.height < 70,
-      settingsOpen: !menu.hidden && !!menu.querySelector('#remind-toggle'),
-      currencyInHeader: !!document.querySelector('header #currency-select'),
+      compact: tops.size <= 2 && strip.height < 140,
+      settingsOpen:
+        !menu.hidden &&
+        !!menu.querySelector('#remind-toggle') &&
+        !!menu.querySelector('#streamer-toggle') &&
+        /Log Out of RSI/.test(menu.textContent),
+      currencyInMenu: !!menu.querySelector('#currency-select'),
+      scanInHeader: !!document.querySelector('header #scan-home'),
       searchOnHome: !!document.querySelector('#view-home .gsearch-home #gsearch'),
       placeholder: document.querySelector('#gsearch').placeholder,
     };
@@ -169,14 +241,15 @@ try {
   card.uec === '¤ 1.2M' &&
   card.uecTitle === '¤ 1,234,567' &&
   card.rec === '¤ 90K' &&
-  card.oneRow &&
+  card.compact &&
   card.settingsOpen &&
   card.settingsClosed &&
-  card.currencyInHeader &&
+  card.currencyInMenu &&
+  card.scanInHeader &&
   card.searchOnHome &&
   card.placeholder === 'Global Hangar Search'
     ? ok(
-        'citizen card: ¤ 1.2M / ¤ 90K on one row, settings menu, search on Home, currency in header',
+        'citizen card: ¤ 1.2M / ¤ 90K, wallet four across (two by two when narrow), Scan in the top bar, gear menu (currency, Streamer Mode, Log Out of RSI), search on Home',
       )
     : fail(`citizen card: ${JSON.stringify(card)}`);
 
@@ -188,7 +261,13 @@ try {
       tokens: ['--good', '--warn', '--bad', '--t-ship', '--t-pack', '--t-ccu'].every((n) =>
         cs.getPropertyValue(n).trim(),
       ),
-      whiteBal: bal && getComputedStyle(bal).color === getComputedStyle(document.body).color,
+      // Balances stay neutral white: body text or the heading white (Clean Pro's
+      // numbers), never a meaning colour.
+      whiteBal:
+        bal &&
+        [getComputedStyle(document.body).color, 'rgb(255, 255, 255)'].includes(
+          getComputedStyle(bal).color,
+        ),
       pal: palette().good === cs.getPropertyValue('--good').trim(),
     };
   });
@@ -206,104 +285,96 @@ try {
     await new Promise((r) => setTimeout(r, 200));
     const nm = document.querySelector('#cc-org .cc-org-name');
     const lh = parseFloat(getComputedStyle(nm).lineHeight) || 16;
+    // Measured now: the renders below replace the element.
+    const twoLines = nm.getBoundingClientRect().height <= lh * 2 + 2;
+    const title = nm.closest('a')?.title === `Open ${long} on RSI`;
+    // No org: no org line, no watermark, no placeholder text.
+    OH.getAccount = async () => ({ ...a, org: null });
+    renderAccount();
+    await new Promise((r) => setTimeout(r, 200));
+    const noOrg =
+      document.querySelector('#cc-org').hidden &&
+      document.querySelector('#cc-water').hidden &&
+      !/affiliat/i.test(document.querySelector('.citizen-card').textContent);
+    // Streamer Mode: money turns to dots.
+    streamer.on = true;
+    renderAccount();
+    await new Promise((r) => setTimeout(r, 200));
+    const masked = document.querySelector('#home-balances .bal.store b').textContent === '••••';
+    streamer.on = false;
     OH.getAccount = real;
     renderAccount();
     return {
-      twoLines: nm.getBoundingClientRect().height <= lh * 2 + 2,
-      title: nm.title === long,
+      noOrg,
+      masked,
+      twoLines,
+      title,
       cardClean: !document.querySelector('.citizen-card #versions'),
       footer: /Open Hangar v\d/.test(document.querySelector('#footer').textContent),
     };
   });
-  tweaks.twoLines && tweaks.title && tweaks.cardClean && tweaks.footer
-    ? ok('citizen card: long org name capped at two lines; versions line in the footer')
+  tweaks.twoLines &&
+  tweaks.title &&
+  tweaks.cardClean &&
+  tweaks.footer &&
+  tweaks.noOrg &&
+  tweaks.masked
+    ? ok(
+        'citizen card: long org name wraps, links to the org; no org shows nothing; Streamer Mode hides money; versions in the footer',
+      )
     : fail(`card tweaks: ${JSON.stringify(tweaks)}`);
 
   // Phone width: nothing scrolls sideways.
   await page.setViewport({ width: 390, height: 844 });
   await new Promise((r) => setTimeout(r, 200));
-  const phone = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
-  phone <= 0 ? ok('home fits a 390px phone') : fail(`home at 390px overflows by ${phone}px`);
+  // Every page, not just Home (Stats' tab row once ran 142px off a phone).
+  const phone = await page.evaluate(async () => {
+    const out = {};
+    for (const v of [
+      'home',
+      'inventory',
+      'buybacks',
+      'stats',
+      'store',
+      'org',
+      'referrals',
+      'updates',
+      'developers',
+    ]) {
+      location.hash = '#' + v;
+      await new Promise((r) => setTimeout(r, 500));
+      const over = document.documentElement.scrollWidth - innerWidth;
+      if (over > 0) out[v] = over;
+    }
+    location.hash = '#home';
+    await new Promise((r) => setTimeout(r, 300));
+    return out;
+  });
+  Object.keys(phone).length === 0
+    ? ok('every page fits a 390px phone')
+    : fail(`pages overflow at 390px: ${JSON.stringify(phone)}`);
   await page.setViewport({ width: 1280, height: 900 });
 
-  await page
-    .waitForFunction(() => !!document.querySelector('#home-news .twisc-lead'), {
-      timeout: 8000,
-    })
-    .catch(() => {});
-  const news = await page.evaluate(async () => {
-    const box = document.querySelector('#home-news');
-    const wish = document.querySelector('#home-wish');
-    // Many wishlist ships on sale: the list scrolls inside a same-height panel.
-    OH.getShipStock = async () => ({ state: 'in', price: 20, packs: [] });
-    state.wishlist = state.catalog.slice(0, 20).map((v) => v.name);
-    renderHomePanels();
-    await new Promise((r) => setTimeout(r, 800));
-    const scroll = wish.querySelector('.home-scroll');
-    const res = {
-      beside: box.parentElement === wish.parentElement,
-      title: box.querySelector('h3').textContent,
-      lead: box.querySelector('.twisc-lead')?.textContent || '',
-      img: !!box.querySelector('.twisc-img'),
-      bullets: box.querySelectorAll('.twisc-points li').length,
-      link: box.querySelector('.home-more a')?.href || '',
-      sameHeight: Math.abs(box.offsetHeight - wish.offsetHeight) <= 1,
-      scrolls: scroll ? scroll.scrollHeight > scroll.clientHeight : false,
-      linkVisible: (() => {
-        const a = wish.querySelector('.home-more a');
-        const r = a && a.getBoundingClientRect();
-        const w = wish.getBoundingClientRect();
-        return !!r && r.bottom <= w.bottom;
-      })(),
-    };
-    state.wishlist = [];
-    renderHomePanels();
-    return res;
-  });
-  news.beside &&
-  /This Week in Star Citizen/.test(news.title) &&
-  /^Last week was a busy one on the testing front/.test(news.lead) &&
-  news.img &&
-  news.bullets === 0 &&
-  /comm-link/.test(news.link)
-    ? ok('home: This Week in Star Citizen post with its opening paragraph')
-    : fail(`home news: ${JSON.stringify(news)}`);
-  news.sameHeight && news.scrolls && news.linkVisible
-    ? ok('home: panels the same height; a long wishlist scrolls, link stays visible')
-    : fail(`home panels: ${JSON.stringify(news)}`);
-  const compact = await page.evaluate(() => {
-    const saved = { ...fx };
-    Object.assign(fx, { code: 'CNY', rate: 7 });
-    renderHome();
-    const boxes = [...document.querySelectorAll('#home-summary .sum-box')];
-    const melt = boxes.find((b) => /melt value/.test(b.textContent));
-    const res = {
-      text: melt.querySelector('.sum-big').textContent,
-      title: melt.title,
-      fits: melt.querySelector('.sum-big').scrollWidth <= melt.clientWidth,
-    };
-    Object.assign(fx, saved);
-    renderHome();
-    return res;
-  });
-  /K$/.test(compact.text) && /,/.test(compact.title) && compact.fits
-    ? ok(`summary: big amounts shortened (${compact.text}, hover ${compact.title})`)
-    : fail(`summary compact: ${JSON.stringify(compact)}`);
   menu.below && menu.inView && menu.visible
     ? ok('scan menu opens below the button, fully visible')
     : fail(`scan menu: ${JSON.stringify(menu)}`);
   home.guide && home.cards === 0
-    ? ok('how-to guide folded into one closed dropdown; no link cards')
+    ? ok('how-to guide on its own page (gear menu → How to Use), off Home')
     : fail(`home layout: ${JSON.stringify(home)}`);
-  /On Sale Now 1/.test(home.wish) && /Cutlass Black/.test(home.wish) && !/Pioneer/.test(home.wish)
-    ? ok('home: wishlist ships on sale now')
-    : fail(`home wishlist: ${home.wish}`);
-  !home.glance && home.storeOpt && home.emptyHidden
-    ? ok('home: no At a Glance; empty wishlist hides its box; Scan has a Store option')
-    : fail(`home layout: ${JSON.stringify(home)}`);
+  /Cutlass Black is on sale/.test(home.wish) &&
+  !/Pioneer/.test(home.wish) &&
+  home.count === '1' &&
+  home.full
+    ? ok(
+        'Hangar Alerts in the bell: wishlist sale with a count; Game Status a quarter beside the card',
+      )
+    : fail(`For You: ${JSON.stringify(home)}`);
+  home.hidden && home.storeOpt
+    ? ok('bell: × ignores an alert; Scan has a Store option')
+    : fail(`For You ignore: ${JSON.stringify(home)}`);
   const site = await page.$eval('#site-link', (e) => e.textContent).catch(() => '');
-  /something big is coming/i.test(site) && !(await page.$('#site-link button'))
-    ? ok('website sync shows the teaser (no connect button)')
+  !site.trim() && !(await page.$('#site-link button'))
+    ? ok('website sync hidden until the site is live (no teaser, no connect button)')
     : fail(`site link: "${site}"`);
 
   // Currency: EUR converts the melt box (needs the live rates service).
@@ -464,7 +535,7 @@ try {
     // A ship you don't own isn't in your hangar: nothing to show.
     box.value = 'Idris';
     box.dispatchEvent(new Event('input'));
-    const notOwned = /Nothing matches/.test(out.textContent);
+    const notOwned = /Nothing in your hangar/.test(out.textContent);
     box.value = '';
     box.dispatchEvent(new Event('input'));
     const shipName = ownedShips().find((s) => /cutlass/i.test(s.label))?.label;
@@ -593,10 +664,85 @@ try {
     ? ok('unlabelled contents: Gear / Land Claim, no false matches')
     : fail(`content kinds: ${JSON.stringify(types)}`);
 
+  console.log('Inventory and top bar pass');
+  await go('#inventory');
+  const inv = await page.evaluate(async () => {
+    const r = {};
+    r.sum = /Pledges\s*\d+/i.test(document.querySelector('#inv-sum').textContent);
+    const all = computeShown().length;
+    document.querySelector('[data-switch="inv-hide"]').click();
+    r.hid = computeShown().length < all;
+    document.querySelector('[data-switch="inv-hide"]').click();
+    // Saved view (no prompt in the test: push one directly, then apply it).
+    state.savedViews.push({
+      name: 'Ships',
+      f: { shown: ['ship'], traits: [], query: '', hideSmall: false },
+    });
+    renderInventory();
+    document.querySelector('[data-view-apply="0"]').click();
+    r.view = computeShown().every((p) => p.kind === 'ship') && state.shown.has('ship');
+    state.savedViews = [];
+    state.shown = new Set();
+    renderInventory();
+    // Melt planner: pick two meltable pledges with a wishlist ship.
+    const keepWish = state.wishlist;
+    state.wishlist = ['Cutlass Black'];
+    setSelecting(true);
+    state.items
+      .filter(isMeltable)
+      .slice(0, 2)
+      .forEach((p) => state.selected.add(p.id));
+    renderInventory();
+    r.planner = document.querySelector('#sb-melt').textContent;
+    state.selected.clear();
+    setSelecting(false);
+    state.wishlist = keepWish;
+    // Top bar: counts, bell, search.
+    r.counts =
+      document.querySelector('#nav-n-inventory').textContent === String(state.items.length);
+    r.bell = !!document.querySelector('#bell-btn') && !!document.querySelector('#bell-menu');
+    const top = document.querySelector('#gsearch-top');
+    top.value = 'cutlass';
+    top.dispatchEvent(new Event('input'));
+    r.search = !!document.querySelector('#gsearch-top-results .gs-row');
+    top.value = '';
+    document.querySelector('#gsearch-top-results').hidden = true;
+    return r;
+  });
+  inv.sum && inv.hid && inv.view && /from your wishlist|wishlist/.test(inv.planner)
+    ? ok('inventory: summary strip, Hide small stuff, saved views, melt planner')
+    : fail(`inventory pass: ${JSON.stringify(inv)}`);
+  inv.counts && inv.bell && inv.search
+    ? ok('top bar: counts, alerts bell, search on every page')
+    : fail(`top bar: ${JSON.stringify(inv)}`);
+
   console.log('Buy-Backs');
   await go('#buybacks');
-  const tok = await page.$eval('.bb-tokens', (e) => e.textContent).catch(() => '');
-  /have 2 buy-back tokens/.test(tok) ? ok('buy-back tokens shown') : fail(`tokens: "${tok}"`);
+  const tok = await page.$eval('#bb-sum', (e) => e.textContent).catch(() => '');
+  /Tokens\s*2\s*next/i.test(tok)
+    ? ok('buy-back tokens in the summary strip')
+    : fail(`tokens: "${tok}"`);
+  // Buy-Backs pass: Hide small stuff on by default; Stack identical off by default
+  // and stacks copies when on.
+  const bbPass = await page.evaluate(async () => {
+    const rows = () => document.querySelectorAll('#buybacks-body .card').length;
+    const hideOn = state.bbHideSmall;
+    const stackOff = !state.bbStack;
+    const saved = state.buybacks;
+    state.buybacks = saved.concat(saved.slice(0, 2).map((x) => ({ ...x, id: x.id + '-copy' })));
+    renderBuybacks();
+    const flat = rows();
+    document.querySelector('[data-switch="bb-stack"]').click();
+    const stacked = rows();
+    const badges = document.querySelectorAll('#buybacks-body .stack-n').length;
+    document.querySelector('[data-switch="bb-stack"]').click();
+    state.buybacks = saved;
+    renderBuybacks();
+    return { hideOn, stackOff, flat, stacked, badges };
+  });
+  bbPass.hideOn && bbPass.stackOff && bbPass.stacked === bbPass.flat - 2 && bbPass.badges === 2
+    ? ok('buy-backs: small stuff hidden by default; Stack identical is opt-in and stacks copies')
+    : fail(`buy-backs pass: ${JSON.stringify(bbPass)}`);
   await page.select('#bb-sort', 'price-desc');
   const bbPrices = await page.$$eval('#buybacks-body .card .val', (v) =>
     v.map((e) => Number(e.textContent.replace(/[$,]/g, ''))),
@@ -1145,7 +1291,7 @@ try {
     ];
     location.hash = '#home';
     await new Promise((r) => setTimeout(r, 400));
-    const banner = document.querySelector('#event-banner');
+    const banner = document.querySelector('#oh-status');
     return {
       before,
       after,
@@ -1153,7 +1299,7 @@ try {
       cleared,
       spend: /pledged in total/.test(spend),
       bars,
-      banner: !banner.hidden && /Test Expo/.test(banner.textContent),
+      banner: /Referral bonus: Drake Dragonfly/.test(banner.textContent),
     };
   });
   wse.before === 'Add to Wishlist' &&
@@ -1166,7 +1312,7 @@ try {
     ? ok(`spending tab: ${wse.bars} years`)
     : fail(`spending: ${JSON.stringify(wse)}`);
   wse.banner
-    ? ok('home banner while a bonus event runs')
+    ? ok('Events card shows a running referral bonus event')
     : fail(`event banner: ${JSON.stringify(wse)}`);
 
   for (const view of ['referrals', 'developers']) {

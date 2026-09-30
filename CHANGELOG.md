@@ -4,9 +4,65 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- New: **A fresh look.** Open Hangar has a new, cleaner design: graphite panels, bigger and
+  clearer numbers, and colour only where it means something. More pages get their full
+  redesign in the next updates.
+- New: **A rebuilt Home page.** Your account value up top, with how much it's grown since your
+  first scan (with a small chart of every scan), how it compares to its melt value, and
+  counts you can click to jump straight into Inventory with that filter on.
+- New: **Game Status** beside your Citizen Card: the LIVE version and when it was released
+  ("14 days ago"), what's on the test servers with the PTU wave, a link to the latest patch
+  notes, the event running right now (only while it's actually on), any referral bonus
+  event, and when your next buy-back token arrives.
+- New: **Hangar Alerts** in the top bar's bell: a wishlist ship on sale, a ship you own
+  turning flight ready, buy-backs that match your wishlist, and your enlistment anniversary.
+  Ignore any you don't care about.
+- New: **Latest Acquisitions** (your five newest pledges) and **Hangar Spotlight** (a ship from
+  your fleet with its picture and specs; flip to another).
+- New: **Latest From RSI** now includes patch notes, each tagged NEWS or PATCH.
+- Improved: the top menu stays pinned while you scroll, on every page except Home.
+- New: **Global Hangar Search** has its own full-width line under the Citizen Card (press /
+  on any page, as before) and much richer results: a plain yes or no first, then each match
+  with its picture, what it's inside, its key facts and its price.
+- New: **Scan lives in the top menu** on every page. It says **Scan All**, or **Scan Custom**
+  when you untick something in its ▾ menu (which now explains each option), and it
+  remembers your choice.
+- New: **A welcome screen** on Home until your first scan, with one big **Scan All Now**.
+- Improved: the "buy-backs match your wishlist" alert opens Buy-Backs showing just those
+  buy-backs, with a Show all button.
+- New: **The gear menu** (top right) holds your currency, **Streamer Mode**, the rescan
+  reminder, **Log Out of RSI** (for switching accounts; your saved data stays), Clear Data, and
+  the Updates and Developers pages.
+- New: **Streamer Mode** hides money amounts across Open Hangar, for streams and screenshots.
+  A "Streamer" tag shows in the top bar while it's on.
+- New: **A new top bar.** The Open Hangar logo, counts beside Inventory and Buy-Backs, a
+  search box on every page (press /), an **alerts bell** with your Hangar Alerts, and your
+  RSI portrait opens your menu. Scan shows its progress right on the button, and the bar
+  slims down while you scroll a long page. When an update is waiting, a dot on your portrait
+  and a Reload button in the menu say so.
+- New: **Inventory and Buy-Backs got the Home look:** a summary strip on top that follows
+  your filters, one tidy toolbar with **Export** (what's showing as CSV, a share image, or a
+  full backup), and **Hide small stuff** to tuck paints, add-ons and coupons away.
+- New: **Saved views** on Inventory: save a set of filters and get back to it in one click.
+- New: **Melt planner.** Pick pledges with Select and see what their melt value buys from your
+  wishlist, in the store or from your buy-backs.
+- New: prices show **"$X under store"** in green when today's store price is higher, and
+  Buy-Backs has a **Below store price** filter and an optional **Stack identical** view.
+- New: Account Value says when you last scanned ("Updated today, 9:45 AM"), and turns amber
+  with a Rescan link after a week.
+- Fixed: Stats' tabs ran off the side of a phone screen; they wrap now.
+- Fixed: "vs what you paid" is now **"vs melt value"** (Home and Stats). RSI only knows a
+  pledge's original price, not what you paid for a gifted or grey-market pledge.
+- New: **A new Citizen Card**, laid out like an ID: your portrait down the side in full
+  resolution, your org's logo beside its name (and faintly behind the card), "Est. Aug 2017 ·
+  9 years", your Subscriber and Chairman's Club badges, and your wallet with the date of your
+  next buy-back token. Your name and portrait open your RSI page; the org opens its page. Not
+  in an org? Nothing shows.
+- Fixed: pictures, prices and specs for the original Auroras ("Aurora MR", "Aurora LN"…), which
+  RSI renamed "Aurora Mk I". Packages and starter packs ("Aurora MR Starter Pack") now show
+  the ship inside instead of a blank box.
 - Changed: **Open Hangar's code is now source available** (PolyForm Strict License). It stays public on GitHub so anyone can read and audit it, but it can't be copied into other versions. Earlier releases stay MIT.
-- Improved: Citizen Card: long org names wrap to two lines at most (full name on hover), and the
-  "Open Hangar vX · What's new · Star Citizen X" line moved to the page footer.
+- Improved: the "Open Hangar vX · What's new · Star Citizen X" line moved to the page footer.
 - Improved: Org Fleet: a role nobody has lists **every** ship that fills it (cheapest first, scrolling), not
   just the 10 cheapest, so big ships like the Orion show up.
 

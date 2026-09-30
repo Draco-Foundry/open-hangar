@@ -1324,7 +1324,14 @@
   // returns the cached value (or { code: null }) on any failure. Never throws.
   OH.getScVersion = async function getScVersion({ force = false } = {}) {
     const { scVersion } = await chrome.storage.local.get('scVersion');
-    if (!force && scVersion?.code && Date.now() - scVersion.fetchedAt < SC_TTL_MS) return scVersion;
+    // Entries saved before release dates were kept ('released' missing) refresh once.
+    if (
+      !force &&
+      scVersion?.code &&
+      'released' in scVersion &&
+      Date.now() - scVersion.fetchedAt < SC_TTL_MS
+    )
+      return scVersion;
     try {
       const res = await fetch(SC_VERSIONS_URL, {
         credentials: 'omit',
@@ -1336,7 +1343,9 @@
       const current = list.find((v) => v.is_default) || list[0];
       const code = current?.code || null;
       if (!code) throw new Error('no version in response');
-      const v = { code, fetchedAt: Date.now() };
+      // released_at: when this build went LIVE (Home's Game Status shows it).
+      const released = Date.parse(current.released_at || '') || null;
+      const v = { code, released, fetchedAt: Date.now() };
       await chrome.storage.local.set({ scVersion: v });
       return v;
     } catch (e) {
@@ -1655,6 +1664,17 @@
   // Score how well a catalog entry's (lowercased) name matches the query. 0 = no
   // match. Higher = better. Shared by both sources so fuzz rules stay consistent.
   function nameScore(n, q) {
+    // RSI renamed the original Auroras "Aurora Mk I …" (the Mk II is a new ship), but
+    // pledges and buy-backs still say "Aurora MR": also try the name without "Mk I".
+    // "\bmk i\b" can't match "mk ii".
+    const bare = n
+      .replace(/\bmk i\b/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    if (bare !== n && !/\bmk i\b/.test(q)) return Math.max(rawScore(n, q), rawScore(bare, q) - 1);
+    return rawScore(n, q);
+  }
+  function rawScore(n, q) {
     if (n === q) return 100; // exact
     if (n.startsWith(q + ' ')) return 80 - (n.length - q.length) * 0.1; // canonical extends query (Genesis → Genesis Starliner)
     if (q.startsWith(n + ' ')) return 70 + n.length * 0.1; // query extends canonical (PTV Buggy → PTV); prefer longer core
@@ -2214,6 +2234,135 @@
     'KRW',
   ];
   OH.ZERO_DECIMAL = ['JPY', 'KRW']; // shown without cents
+
+  // --- Game status + events (starcitizen.tools main page settings) -------------
+  // The wiki's main page reads everything it shows from one JSON page: the
+  // current event ({ name, page, text, starts, ends }) and the patches on each
+  // channel ([{ channel: 'LIVE' | 'PTU' | 'EPTU' …, name: '4.10.2', page }]).
+  // Editors update it by hand and an event card can stay up after it ends, so
+  // callers must check the dates (OH.activeWikiEvent), never just show it.
+  const WIKI_MAIN_KEY = 'wikiMainpage';
+  const WIKI_MAIN_TTL = 6 * 60 * 60 * 1000;
+  // "2026-09-9 16:00" (wiki style, UTC, unpadded day) → ms, or NaN.
+  OH.parseWikiTime = function parseWikiTime(s) {
+    const m = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/.exec(String(s || '').trim());
+    return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0)) : NaN;
+  };
+  // Keep only what Home shows, from the settings JSON. Pure.
+  OH.shapeWikiMainpage = function shapeWikiMainpage(json) {
+    const e = json && typeof json.event === 'object' ? json.event : null;
+    const patches = Array.isArray(json && json.patches) ? json.patches : [];
+    return {
+      event:
+        e && e.name
+          ? {
+              name: String(e.name),
+              page: e.page ? String(e.page) : '',
+              text: e.text ? String(e.text) : '',
+              starts: OH.parseWikiTime(e.starts),
+              ends: OH.parseWikiTime(e.ends),
+            }
+          : null,
+      patches: patches
+        .filter((p) => p && p.channel && p.name)
+        .map((p) => ({
+          channel: String(p.channel).toUpperCase(),
+          name: String(p.name),
+          page: p.page ? String(p.page) : '',
+        })),
+    };
+  };
+  // The event only while it's actually on: started (or no start given) and not
+  // yet ended. An event with no end date is never shown (can't tell it's over).
+  OH.activeWikiEvent = function activeWikiEvent(main, now = Date.now()) {
+    const e = main && main.event;
+    if (!e || !Number.isFinite(e.ends) || now >= e.ends) return null;
+    if (Number.isFinite(e.starts) && now < e.starts) return null;
+    return e;
+  };
+  OH.getWikiMainpage = async function getWikiMainpage(fetchFn = fetch) {
+    const { [WIKI_MAIN_KEY]: cached } = await chrome.storage.local.get(WIKI_MAIN_KEY);
+    if (cached && Date.now() - cached.at < WIKI_MAIN_TTL) return cached.data;
+    try {
+      const res = await fetchFn(
+        'https://starcitizen.tools/api.php?action=query&titles=Module:Mainpage/settings.json&prop=revisions&rvprop=content&rvslots=main&format=json&origin=*',
+        { credentials: 'omit' },
+      );
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const page = Object.values((await res.json())?.query?.pages || {})[0];
+      const text = page?.revisions?.[0]?.slots?.main?.['*'];
+      const data = OH.shapeWikiMainpage(JSON.parse(text));
+      await chrome.storage.local.set({ [WIKI_MAIN_KEY]: { at: Date.now(), data } });
+      return data;
+    } catch {
+      return cached ? cached.data : null; // stale beats nothing; null when never fetched
+    }
+  };
+
+  // --- Patch notes (RSI Spectrum, Patch Notes channel) --------------------------
+  // Newest threads in RSI's Patch Notes forum: PTU waves, LIVE release notes,
+  // hotfix threads. Same site as the hangar, so no new permission; no cookies sent.
+  const PATCH_KEY = 'patchNotes';
+  const PATCH_TTL = 60 * 60 * 1000;
+  const PATCH_CHANNEL = '190048';
+  // Spectrum's thread list → [{ title, label, version, url, at }], newest first.
+  // `label` is the bracketed tag RSI puts in front ("Wave 3 PTU", "Evocati NDA").
+  OH.parsePatchNotes = function parsePatchNotes(json) {
+    const threads = (json && json.data && json.data.threads) || [];
+    return threads
+      .filter((t) => t && t.subject && t.slug && Number.isFinite(+t.time_created))
+      .map((t) => {
+        const subject = String(t.subject).trim();
+        const label = (subject.match(/^\[([^\]]+)\]/) || [])[1] || '';
+        return {
+          title: subject.replace(/^\[[^\]]+\]\s*/, '').replace(/\s+\d{6,}$/, ''),
+          label,
+          version: (subject.match(/\b(\d+\.\d+(?:\.\d+)?)\b/) || [])[1] || '',
+          url: `https://robertsspaceindustries.com/spectrum/community/SC/forum/${PATCH_CHANNEL}/thread/${t.slug}`,
+          at: +t.time_created * 1000,
+        };
+      })
+      .sort((a, b) => b.at - a.at);
+  };
+  // The wave for a test version ("4.10.2" → "Wave 3"), from its newest thread.
+  OH.patchWave = function patchWave(notes, version) {
+    const hit = (notes || []).find((n) => n.version === version && /wave/i.test(n.label));
+    return hit ? (hit.label.match(/wave\s*\d+/i) || [''])[0].replace(/^w/, 'W') : '';
+  };
+  OH.getPatchNotes = async function getPatchNotes(fetchFn = fetch) {
+    const { [PATCH_KEY]: cached } = await chrome.storage.local.get(PATCH_KEY);
+    if (cached && Date.now() - cached.at < PATCH_TTL) return cached.items;
+    try {
+      const res = await fetchFn(
+        'https://robertsspaceindustries.com/api/spectrum/forum/channel/threads',
+        {
+          method: 'POST',
+          credentials: 'omit',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            channel_id: PATCH_CHANNEL,
+            page: 1,
+            sort: 'newest',
+            label_id: null,
+          }),
+        },
+      );
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const items = OH.parsePatchNotes(await res.json()).slice(0, 15);
+      await chrome.storage.local.set({ [PATCH_KEY]: { at: Date.now(), items } });
+      return items;
+    } catch {
+      return cached ? cached.items : [];
+    }
+  };
+
+  // Buy-back tokens: RSI hands out one per quarter on these dates (its published
+  // schedule). Add the next year's dates when RSI announces them.
+  OH.BUYBACK_TOKEN_DATES = ['2026-01-05', '2026-04-06', '2026-07-06', '2026-10-05'];
+  OH.nextBuybackToken = function nextBuybackToken(now = Date.now()) {
+    const t = OH.BUYBACK_TOKEN_DATES.map((d) => Date.parse(d + 'T12:00:00Z')).find((x) => x > now);
+    return Number.isFinite(t) ? t : null;
+  };
 
   // --- Referral bonus events (starcitizen.tools) ---------------------------------
   // The wiki's "Special Incentive Events" table: one row per event with start,

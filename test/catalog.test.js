@@ -107,3 +107,14 @@ test("fillCatalogSizes: special editions take their base ship's size", () => {
     ['Small', 'Small', 'Large', 'Large', null],
   );
 });
+
+test('ship lookups: "Aurora MR" finds the renamed "Aurora Mk I MR", not the Mk II', () => {
+  const list = [
+    { name: 'Aurora Mk I MR', lname: 'aurora mk i mr', slug: 'rsi-aurora-gs-mr', msrp: 25 },
+    { name: 'Aurora Mk I LN', lname: 'aurora mk i ln', slug: 'rsi-aurora-gs-ln', msrp: 40 },
+    { name: 'Aurora Mk II', lname: 'aurora mk ii', slug: 'rsi-aurora-mk2', msrp: 50 },
+  ];
+  const { shipOf } = OH.makeShipIndex(list);
+  assert.equal(shipOf('Aurora MR')?.slug, 'rsi-aurora-gs-mr');
+  assert.equal(shipOf('Aurora Mk II')?.slug, 'rsi-aurora-mk2');
+});

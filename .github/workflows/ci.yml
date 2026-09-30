@@ -11,7 +11,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm install
       - run: npm test
       - run: npm run format:check
@@ -35,3 +35,22 @@ jobs:
       - run: echo "BETTER_AUTH_SECRET=ci-only-not-a-real-secret" > .dev.vars
       - run: npx astro check
       - run: npx astro build
+
+  # Tell #ops (private Discord channel) when main goes red. Skipped until the
+  # DISCORD_OPS_WEBHOOK secret is set.
+  notify:
+    needs: [test, app]
+    if: failure() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Post to #ops
+        env:
+          DISCORD_OPS_WEBHOOK: ${{ secrets.DISCORD_OPS_WEBHOOK }}
+        run: >
+          node scripts/notify.mjs ops --down
+          "CI failed on main: ${{ github.event.head_commit.message || github.sha }}
+          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

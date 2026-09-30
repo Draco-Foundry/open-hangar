@@ -1,0 +1,1535 @@
+/*
+ * Clean Pro, the 0.3.0 look (docs/REDESIGN-0.3.md): graphite surfaces, colour only
+ * where it means something, heavy clear numbers. Loaded after dashboard.html's own
+ * styles, so these token values win everywhere; pages move to Svelte one by one.
+ * Fonts are bundled (no requests to Google).
+ */
+@import '@fontsource/manrope/latin-600.css';
+@import '@fontsource/manrope/latin-700.css';
+@import '@fontsource/manrope/latin-800.css';
+@import '@fontsource/source-sans-3/latin-400.css';
+@import '@fontsource/source-sans-3/latin-600.css';
+
+:root {
+  --bg: #0e1013;
+  --panel: #16191e;
+  --panel-2: #1d2127;
+  --line: #23272e;
+  --line-2: #30353d;
+  --text: #dfe3e8;
+  --head: #ffffff;
+  --muted: #8b939e;
+  --faint: #5f6873;
+  --accent: #2f81f7;
+  --accent-hover: #4493f8;
+  --accent-soft: rgba(47, 129, 247, 0.14);
+  --link: #6cb4ff;
+  --good-soft: rgba(63, 185, 80, 0.13);
+  --warn-soft: rgba(210, 153, 34, 0.14);
+  --bad-soft: rgba(248, 81, 73, 0.13);
+  --font-head: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-body: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --radius-lg: 14px;
+}
+body {
+  font-family: var(--font-body);
+}
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-head);
+}
+
+/* Top bar: pinned while scrolling on every page except Home (owner, 2026-09-30), so
+   the page links stay one click away on long pages. */
+body:not(:has(#view-home.active)) .wrap > header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  margin-top: -20px;
+  padding-top: 14px;
+  background: var(--bg);
+}
+
+/* Stats' eight tabs wrap onto a second line on narrow screens instead of running
+   off the side of a phone. */
+.stats-tabs {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+/* Home: the Citizen Card (3/4) with Game Status beside it (1/4); stacked on narrow
+   windows. Hangar Alerts live in the top bar's bell. */
+.home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+  align-items: stretch;
+}
+.home-hero:has(#cc-loggedout:not([hidden])) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.home-hero:has(#cc-loggedout:not([hidden])) > #oh-status {
+  display: none;
+}
+@media (max-width: 1100px) {
+  .home-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* Citizen Card: the "Pilot ID" design (owner, 2026-09-30). The portrait runs down
+   the whole left side (RSI's 1024px original); name, org, the UEE line, badges and
+   the wallet sit to its right over a faint org-logo watermark. No controls: Scan and
+   the gear menu live in the top bar. The only card styles (dashboard.html has none). */
+.home-hero .citizen-card {
+  position: relative;
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  overflow: hidden;
+}
+/* The card can be stretched taller by Game Status beside it: the portrait follows. */
+.home-hero .citizen-card {
+  display: flex;
+  flex-direction: column;
+}
+.home-hero .cc-account {
+  flex: 1;
+  position: relative;
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+  min-height: 250px;
+}
+.home-hero .cc-account[hidden] {
+  display: none;
+}
+.home-hero .cc-photo {
+  position: relative;
+  display: block;
+  min-height: 250px;
+  background: #1b1f25;
+}
+/* The portrait (or the name's initials when RSI has none); brightens on hover. */
+.home-hero .cc-avatar {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #1b1f25 center 25% / cover no-repeat;
+  font: 800 44px var(--font-head);
+  color: #cfd8e3;
+  transition: filter 0.15s;
+}
+.home-hero a.cc-photo[href]:hover .cc-avatar {
+  filter: brightness(1.1);
+}
+/* The whole org logo, faint, inside the card's right side. */
+.home-hero .cc-water {
+  position: absolute;
+  right: 28px;
+  top: 50%;
+  height: calc(100% - 48px);
+  max-height: 340px;
+  aspect-ratio: 1;
+  transform: translateY(-50%);
+  object-fit: contain;
+  opacity: 0.1;
+  pointer-events: none;
+}
+.home-hero .cc-info {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 22px 24px;
+}
+.home-hero .cc-name {
+  font: 800 30px/1.1 var(--font-head);
+  color: var(--head);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Links on the card keep the card's own colours; a thin underline on hover. */
+.home-hero .cc-plain,
+.home-hero .cc-org-link {
+  color: inherit;
+  text-decoration: none;
+}
+.home-hero .cc-plain:hover,
+.home-hero a.cc-org-link:hover .cc-org-name {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.home-hero .cc-org {
+  margin-top: 10px;
+  min-width: 0;
+}
+.home-hero .cc-org[hidden] {
+  display: none;
+}
+.home-hero .cc-org-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+}
+.home-hero .cc-org-logo {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  object-fit: contain;
+}
+.home-hero .cc-org-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  line-height: 1.25;
+}
+.home-hero .cc-org-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font: 700 16px/1.25 var(--font-head);
+  color: var(--head);
+  overflow-wrap: anywhere;
+}
+.home-hero .cc-org-rank {
+  font: 700 11px var(--font-head);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.home-hero .cc-meta {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.home-hero .cc-meta:empty {
+  display: none;
+}
+/* Subscriber, with Chairman's Club under it: plain label + value, no boxes. */
+.home-hero .home-flair {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 12px;
+}
+.home-hero .home-flair:empty,
+.home-hero .home-flair[hidden] {
+  display: none;
+}
+.home-hero .home-flair .flair {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--text);
+  font-size: 14px;
+  text-decoration: none;
+}
+.home-hero .home-flair .flair:hover b {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.home-hero .home-flair .flair-lbl {
+  font: 700 11px var(--font-head);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.home-hero .home-flair .flair.sub b {
+  color: #f0b429;
+}
+/* The wallet: no boxes, so the watermark shows through; four across with thin
+   dividers, two by two when narrow. */
+.home-hero .home-balances {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 20px;
+}
+.home-hero .home-balances .bal {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 2px 14px;
+  border-left: 1px solid var(--line-2);
+  color: inherit;
+  text-decoration: none;
+}
+.home-hero .home-balances .bal:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+.home-hero .home-balances a.bal:hover b {
+  color: var(--link);
+}
+.home-hero .home-balances .bal-lbl {
+  font: 700 11px var(--font-head);
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.home-hero .home-balances .bal b {
+  font: 800 22px var(--font-head);
+  color: var(--head);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 1100px) {
+  .home-hero .home-balances {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 14px;
+  }
+  .home-hero .home-balances .bal:nth-child(odd) {
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+/* Scan progress / first-run prompt under the card's content. */
+.home-hero .cc-status {
+  position: relative;
+  z-index: 1;
+  padding: 0 24px 16px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.home-hero .cc-status:has(#status:empty) {
+  display: none;
+}
+
+/* Phones: the portrait goes across the top; no watermark. */
+@media (max-width: 640px) {
+  .home-hero .cc-account {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .home-hero .cc-photo {
+    height: 260px;
+  }
+  .home-hero .cc-info {
+    padding: 18px;
+  }
+  .home-hero .cc-name {
+    font-size: 24px;
+    white-space: normal;
+  }
+  .home-hero .cc-water {
+    display: none;
+  }
+  .home-hero .cc-status {
+    padding: 0 18px 14px;
+  }
+}
+
+/* Top bar: Scan ▾ (every page), currency, then the gear menu. */
+.hdr-prefs .scan-split #scan-home,
+.hdr-prefs .scan-split .scan-caret {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #fff;
+  font: 700 13px var(--font-head);
+  cursor: pointer;
+}
+.hdr-prefs .scan-split #scan-home {
+  padding: 6px 14px;
+  border-radius: 8px 0 0 8px;
+}
+.hdr-prefs .scan-split .scan-caret {
+  padding: 6px 9px;
+  border-radius: 0 8px 8px 0;
+  border-left-color: rgba(255, 255, 255, 0.3);
+}
+.hdr-prefs .scan-split #scan-home:hover,
+.hdr-prefs .scan-split .scan-caret:hover {
+  background: var(--accent-hover);
+}
+.hdr-prefs .scan-split button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.hdr-prefs .cc-settings {
+  display: inline-flex;
+}
+.settings-menu {
+  min-width: 250px;
+}
+.settings-menu .scan-opt {
+  justify-content: space-between;
+  gap: 16px;
+}
+.settings-menu .menu-item {
+  display: block;
+  width: 100%;
+  padding: 7px 4px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+  color: var(--text);
+  font: 600 14px var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.settings-menu .menu-item:hover {
+  color: var(--head);
+}
+.settings-menu .menu-item small {
+  display: block;
+  margin-top: 2px;
+  font: 400 12px var(--font-body);
+  color: var(--muted);
+}
+.settings-menu .menu-danger {
+  color: #f85149;
+}
+.settings-menu .menu-danger:hover {
+  color: #ff7b72;
+}
+
+/* Global Hangar Search on its own line under the Citizen Card. */
+.home-search {
+  margin: 0 0 16px;
+}
+.home-search .gsearch,
+.home-search .gsearch-home {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+}
+.home-search input {
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  padding: 12px 44px 12px 16px;
+  color: var(--text);
+  font: 16px var(--font-body);
+}
+
+/* Gear menu extras: currency picker row, and the page links. */
+.settings-menu .menu-currency .currency-select {
+  width: auto;
+  padding: 4px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font: 600 13px var(--font-body);
+}
+.settings-menu .menu-link {
+  text-decoration: none;
+}
+/* Global Hangar Search results (0.3.0): rich rows with the ship's picture, grouped
+   by where each match lives; the list scrolls inside. The panel stands apart from the
+   page (owner): lighter, a blue edge, and everything else dimmed while it's open (the
+   search box stays lit). */
+.home-search .gsearch-results {
+  top: calc(100% + 8px);
+  max-height: none;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid rgba(47, 129, 247, 0.55);
+  border-radius: 14px;
+  background: #232933;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.6),
+    0 0 0 100vmax rgba(5, 7, 10, 0.55);
+}
+.home-search .gsearch:has(.gsearch-results:not([hidden])) input {
+  position: relative;
+  z-index: 51;
+}
+.home-search .gsearch:has(.gsearch-results:not([hidden])) .gsearch-key {
+  z-index: 52;
+}
+.gs-none {
+  padding: 16px 18px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.gs-scroll {
+  max-height: min(560px, 60vh);
+  overflow: auto;
+  padding: 4px 10px 10px;
+}
+.home-search .gs-title {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 8px 6px;
+}
+.home-search .gs-row.gs-rich {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  font-size: 14px;
+  text-decoration: none;
+}
+.home-search .gs-row.gs-rich + .gs-row.gs-rich {
+  box-shadow: 0 -1px 0 #313844;
+}
+.home-search .gs-row.gs-rich:hover,
+.home-search .gs-row.gs-rich:focus-visible {
+  background: #2c333e;
+  box-shadow: none;
+}
+.gs-img {
+  display: grid;
+  place-items: center;
+  width: 150px;
+  height: 84px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2a323d, #171b21 70%);
+}
+.gs-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gs-img span {
+  padding: 0 8px;
+  font: 700 11px var(--font-head);
+  color: var(--faint);
+  text-align: center;
+}
+.gs-info {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.home-search .gs-row .gs-name {
+  font: 800 17px var(--font-head);
+  color: var(--head);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.home-search .gs-row .gs-where {
+  font-size: 14px;
+  color: var(--text);
+  white-space: normal;
+}
+.gs-where em {
+  font-style: normal;
+  color: var(--muted);
+}
+.home-search .gs-row .gs-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  white-space: normal;
+}
+.gs-tag {
+  padding: 2px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  background: none;
+  font: 700 11px var(--font-head);
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.gs-tag.good {
+  border-color: rgba(63, 185, 80, 0.5);
+  color: var(--good);
+}
+.home-search .gs-row .gs-side {
+  display: grid;
+  gap: 3px;
+  justify-items: end;
+  text-align: right;
+  white-space: nowrap;
+}
+.gs-side b {
+  font: 800 16px var(--font-head);
+  color: var(--head);
+}
+.gs-side small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.gs-open {
+  font: 700 13px var(--font-head);
+  color: var(--link);
+}
+.gs-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 18px;
+  border-top: 1px solid #313844;
+  font-size: 12px;
+  color: var(--muted);
+}
+@media (max-width: 700px) {
+  .home-search .gs-row.gs-rich {
+    grid-template-columns: 100px minmax(0, 1fr);
+  }
+  .gs-img {
+    width: 100px;
+    height: 56px;
+  }
+  .home-search .gs-row .gs-side {
+    grid-column: 2;
+    grid-auto-flow: column;
+    justify-content: start;
+    justify-items: start;
+    gap: 10px;
+  }
+}
+
+/* Buy-Backs opened from a Hangar Alert: what's showing, and Show all. */
+.bb-only {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 1px solid rgba(47, 129, 247, 0.45);
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--head);
+  font-weight: 600;
+}
+
+/* Scan ▾ menu: heading with Select All, each source with a one-line description,
+   then Scan Now. The Scan button keeps one width so "Scan All" / "Scan Custom"
+   never nudges the page links beside it. */
+.hdr-prefs .scan-split #scan-home {
+  min-width: 124px;
+  text-align: center;
+}
+.scan-menu.sm-rich {
+  width: 300px;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: #232933;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+.sm-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px 8px;
+  font: 700 11px var(--font-head);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sm-all {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: 700 12px var(--font-head);
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+.sm-opt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.sm-opt:hover {
+  background: #2c333e;
+}
+.sm-opt input {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.sm-txt {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.sm-txt b {
+  font: 700 14px var(--font-head);
+  color: var(--head);
+}
+.sm-txt small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.scan-menu.sm-rich .scan-go {
+  margin-top: 6px;
+  padding: 9px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font: 700 14px var(--font-head);
+  cursor: pointer;
+}
+.scan-menu.sm-rich .scan-go:hover {
+  background: var(--accent-hover);
+}
+
+/* Home before the first scan: one big welcome (owner, 2026-09-30); the search and
+   the Home cards wait until there's something to show. */
+.oh-welcome {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  margin: 0 0 16px;
+  padding: 56px 24px;
+  border: 1px solid rgba(47, 129, 247, 0.35);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(60% 120% at 50% 0%, rgba(47, 129, 247, 0.18), transparent 70%), var(--panel);
+  text-align: center;
+}
+.oh-welcome[hidden] {
+  display: none;
+}
+.oh-welcome h2 {
+  margin: 0;
+  font: 800 32px var(--font-head);
+  color: var(--head);
+}
+.oh-welcome p {
+  max-width: 56ch;
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+}
+.oh-welcome .welcome-scan {
+  margin-top: 8px;
+  padding: 16px 40px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+  font: 800 20px var(--font-head);
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(47, 129, 247, 0.35);
+}
+.oh-welcome .welcome-scan:hover {
+  background: var(--accent-hover);
+}
+.oh-welcome .welcome-scan:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.oh-welcome .welcome-scan[hidden] {
+  display: none;
+}
+.oh-welcome .welcome-note {
+  font-size: 13px;
+  color: var(--muted);
+}
+#view-home:has(#oh-welcome:not([hidden])) .home-search,
+#view-home:has(#oh-welcome:not([hidden])) #oh-home {
+  display: none;
+}
+@media (max-width: 640px) {
+  .oh-welcome {
+    padding: 36px 18px;
+  }
+  .oh-welcome h2 {
+    font-size: 26px;
+  }
+}
+
+/* List view (Inventory and Buy-Backs), owner 2026-09-30: no small contents text in
+   the middle; the name gets the room (bigger, wraps to two lines instead of cutting
+   off) and the price is big. The contents are still in each item's details. */
+.grid.list .card-contents {
+  display: none;
+}
+.grid.list .card-body {
+  grid-template-columns: minmax(0, 1fr) 96px 250px 110px;
+  gap: 18px;
+  padding: 10px 18px;
+}
+#buybacks-body .grid.list .card-body {
+  grid-template-columns: minmax(0, 1fr) 80px 130px 190px;
+}
+.grid.list .card-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+  font: 600 16px/1.3 var(--font-head);
+  color: var(--head);
+}
+.grid.list .val,
+#buybacks-body .grid.list .bb-end .val {
+  font: 800 19px var(--font-head);
+  color: var(--head);
+}
+#buybacks-body .grid.list .bb-end {
+  align-items: baseline;
+}
+#buybacks-body .grid.list .bb-date {
+  font-size: 13px;
+  color: var(--muted);
+}
+@media (max-width: 700px) {
+  .grid.list .card-body,
+  #buybacks-body .grid.list .card-body {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  #buybacks-body .grid.list .bb-date {
+    display: none;
+  }
+  .grid.list .card-name {
+    font-size: 15px;
+  }
+}
+/* An estimated buy-back price (today's store price) stays muted next to exact ones. */
+#buybacks-body .grid.list .bb-end .val.est {
+  color: var(--muted);
+}
+
+/* ---- Top menu pass (owner, 2026-09-30) ---------------------------------------- */
+/* Logo + name; links Home. */
+.wrap > header .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--head);
+  text-decoration: none;
+}
+.wrap > header .brand-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+.wrap > header .brand h1 {
+  font: 800 19px var(--font-head);
+  white-space: nowrap;
+}
+/* Counts beside Inventory and Buy-Backs. */
+nav .nav-n {
+  margin-left: 4px;
+  font: 700 11px var(--font-head);
+  color: var(--faint);
+}
+nav a.active .nav-n {
+  color: var(--muted);
+}
+nav .nav-n:empty {
+  display: none;
+}
+/* Streamer pill while Streamer Mode is on. */
+.stream-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(210, 168, 255, 0.14);
+  color: #d2a8ff;
+  font: 700 12px var(--font-head);
+  white-space: nowrap;
+}
+.stream-pill[hidden] {
+  display: none;
+}
+/* Search on every page: compact; the results open wide beneath it. */
+.hdr-prefs .top-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 150px;
+  height: 36px;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  background: var(--panel);
+  color: var(--muted);
+  transition: width 0.2s;
+}
+.hdr-prefs .top-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.hdr-prefs .top-search input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--head);
+  font: 14px var(--font-body);
+  outline: none;
+}
+.hdr-prefs .top-search .gsearch-key {
+  position: static;
+  transform: none;
+}
+.hdr-prefs .top-search:focus-within .gsearch-key {
+  display: none;
+}
+/* Results drop from the top bar, right-aligned, same look as Home's. */
+.hdr-prefs .top-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  left: auto;
+  width: min(620px, 92vw);
+  max-height: none;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(47, 129, 247, 0.55);
+  border-radius: 14px;
+  background: #232933;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.6),
+    0 0 0 100vmax rgba(5, 7, 10, 0.55);
+  z-index: 60;
+}
+.hdr-prefs .top-results .gs-title {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 8px 6px;
+}
+.hdr-prefs .top-results .gs-row.gs-rich {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 8px;
+  border-radius: 12px;
+  font-size: 14px;
+  text-decoration: none;
+}
+.hdr-prefs .top-results .gs-row.gs-rich:hover {
+  background: #2c333e;
+}
+.hdr-prefs .top-results .gs-img {
+  width: 120px;
+  height: 68px;
+}
+.hdr-prefs .top-results .gs-name {
+  font: 800 16px var(--font-head);
+  color: var(--head);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hdr-prefs .top-results .gs-where {
+  font-size: 13px;
+  white-space: normal;
+}
+.hdr-prefs .top-results .gs-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hdr-prefs .top-results .gs-side {
+  display: grid;
+  gap: 3px;
+  justify-items: end;
+  white-space: nowrap;
+}
+/* The alerts bell. */
+.bell-wrap {
+  position: relative;
+}
+.icon-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  background: var(--panel-2);
+  color: var(--head);
+  cursor: pointer;
+}
+.badge-n {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #f85149;
+  color: #fff;
+  font: 800 11px/18px var(--font-head);
+  text-align: center;
+}
+.badge-n[hidden] {
+  display: none;
+}
+.scan-menu.bell-menu {
+  width: 340px;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: #232933;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+}
+.bm-head {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 6px;
+  font: 700 11px var(--font-head);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.bm-clear {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: 700 12px var(--font-head);
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+.bm-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px 8px 12px;
+  border-left: 3px solid var(--accent);
+}
+.bm-row.onsale,
+.bm-row.good {
+  border-left-color: var(--good);
+}
+.bm-row.warn {
+  border-left-color: var(--warn);
+}
+.bm-row a {
+  display: grid;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.bm-row b {
+  font: 700 14px var(--font-head);
+  color: var(--head);
+}
+.bm-row a:hover b {
+  color: var(--link);
+}
+.bm-row small {
+  font-size: 13px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bm-x {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--faint);
+  font-size: 18px;
+  cursor: pointer;
+}
+.bm-x:hover {
+  background: var(--panel-2);
+  color: var(--head);
+}
+.bm-none {
+  margin: 0;
+  padding: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+/* Scan fills as it goes. */
+.hdr-prefs .scan-split #scan-home {
+  position: relative;
+  overflow: hidden;
+  min-width: 132px;
+  white-space: nowrap;
+}
+#scan-home .scan-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: rgba(255, 255, 255, 0.22);
+  transition: width 0.4s;
+}
+#scan-home .scan-label {
+  position: relative;
+}
+#scan-home.scanning:disabled {
+  opacity: 1;
+  cursor: progress;
+}
+/* Your RSI portrait opens the menu (a gear until we know who you are). */
+.avatar-btn {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 2px solid var(--line-2);
+  border-radius: 50%;
+  background: var(--panel-2);
+  color: var(--head);
+  cursor: pointer;
+}
+.avatar-btn:hover {
+  border-color: var(--accent);
+}
+.avatar-img {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: center / cover no-repeat;
+}
+.avatar-img.has-pic svg {
+  display: none;
+}
+.upd-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  background: var(--accent);
+}
+.upd-dot[hidden],
+.menu-who[hidden],
+.menu-upd[hidden] {
+  display: none;
+}
+.menu-who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 4px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.mw-pic {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 50%;
+  background: #1b1f25 center / cover no-repeat;
+}
+.menu-who b {
+  display: block;
+  font: 800 15px var(--font-head);
+  color: var(--head);
+}
+.menu-who small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.menu-upd {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--head);
+  font-size: 13px;
+}
+.menu-upd button {
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--accent);
+  color: #fff;
+  font: 700 12px var(--font-head);
+  cursor: pointer;
+}
+/* The old full-width update banner stays hidden: the menu carries it now. */
+#update-banner {
+  display: none !important;
+}
+/* Slim while scrolling down a long page (the bar is pinned on every page but Home). */
+body.bar-slim:not(:has(#view-home.active)) .wrap > header {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand-mark {
+  width: 24px;
+  height: 24px;
+}
+body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
+  font-size: 16px;
+}
+.wrap > header,
+.wrap > header .brand-mark {
+  transition:
+    padding 0.2s,
+    width 0.2s,
+    height 0.2s;
+}
+/* Phones: the page links become pill tabs you swipe, with a fade at the edge. */
+@media (max-width: 900px) {
+  .hdr-prefs .top-search {
+    display: none;
+  }
+  nav#nav {
+    gap: 6px;
+    -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent);
+    mask-image: linear-gradient(90deg, #000 85%, transparent);
+  }
+  nav#nav a {
+    flex: none;
+    border-radius: 999px;
+    background: var(--panel);
+  }
+  nav#nav a.active {
+    background: var(--accent);
+    color: #fff;
+  }
+}
+@media (max-width: 1180px) {
+  nav .nav-n {
+    display: none;
+  }
+}
+
+/* ---- Inventory / Buy-Backs pass (owner, 2026-09-30) -------------------------- */
+/* Summary strip on top of each page; its numbers follow the filters. */
+.page-sum {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  margin: 0 0 14px;
+  padding: 18px 22px;
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+.page-sum:empty {
+  display: none;
+}
+.page-sum h2 {
+  margin: 0;
+  font: 800 26px var(--font-head);
+  color: var(--head);
+}
+.ps-note {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--link);
+}
+.ps-stats {
+  display: flex;
+  flex-wrap: wrap;
+}
+.ps-st {
+  padding: 0 18px;
+  border-left: 1px solid var(--line-2);
+}
+.ps-st:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+.ps-l {
+  font: 700 11px var(--font-head);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ps-v {
+  font: 800 22px var(--font-head);
+  color: var(--head);
+  font-variant-numeric: tabular-nums;
+}
+.ps-v small {
+  margin-left: 5px;
+  font: 600 12px var(--font-body);
+  color: var(--muted);
+}
+.ps-good {
+  color: var(--good);
+}
+/* One toolbar row: search, sort, view, Select, Export. */
+#view-inventory .controls,
+#view-buybacks .controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: stretch;
+}
+#view-inventory .controls > input,
+#view-buybacks .controls > input {
+  flex: 1 1 240px;
+  min-width: 0;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--head);
+  font: 15px var(--font-body);
+}
+#view-inventory .controls > select,
+#view-buybacks .controls > select,
+#view-inventory .controls .layout-toggle,
+#view-buybacks .controls .layout-toggle,
+#view-inventory .controls .select-toggle,
+.exp-btn {
+  height: 40px;
+  border-radius: 10px;
+}
+.exp-wrap {
+  position: relative;
+}
+.exp-btn {
+  padding: 0 14px;
+  white-space: nowrap;
+}
+.scan-menu.exp-menu {
+  width: 260px;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: #232933;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+.exp-menu .menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font: 600 14px var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.exp-menu .menu-item:hover {
+  background: #2c333e;
+}
+.exp-menu .menu-item small {
+  display: block;
+  font: 400 12px var(--font-body);
+  color: var(--muted);
+}
+/* Switches (Hide small stuff, Stack identical) at the end of the chip row. */
+.chip-row .oh-sw {
+  flex: none;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: 700 13px var(--font-head);
+  cursor: pointer;
+}
+.chip-row .oh-sw + .oh-sw {
+  margin-left: 12px;
+}
+.sw-t {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  flex: none;
+  border-radius: 10px;
+  background: var(--line-2);
+  transition: background 0.15s;
+}
+.sw-t::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.15s;
+}
+.oh-sw.on .sw-t {
+  background: var(--accent);
+}
+.oh-sw.on .sw-t::after {
+  left: 16px;
+}
+/* Saved views. */
+.views {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+.views-lbl {
+  margin-right: 4px;
+  font: 700 11px var(--font-head);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.view-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px dashed var(--line-2);
+  border-radius: 8px;
+}
+.view-chip.on {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.view-chip button,
+.view-add {
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: 700 12px var(--font-head);
+  cursor: pointer;
+}
+.view-chip .view-x {
+  padding: 0 8px 0 2px;
+  color: var(--faint);
+  font-size: 15px;
+}
+.view-chip .view-x:hover {
+  color: var(--head);
+}
+.view-add {
+  border: 1px dashed var(--line-2);
+  border-radius: 8px;
+  color: var(--link);
+}
+/* "$20 under store" in green under a price. */
+.val .under,
+.bb-end .under {
+  display: block;
+  font: 800 11px var(--font-head);
+  color: var(--good);
+  white-space: nowrap;
+}
+#buybacks-body .bb-end {
+  flex-wrap: wrap;
+}
+/* Stacked identical buy-backs: "×3". */
+.stack-n {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--link);
+  font: 800 12px var(--font-head);
+  vertical-align: 2px;
+}
+/* Melt planner line in Select mode's bar. */
+.sb-melt {
+  flex: 1 1 100%;
+  order: -1;
+  font-size: 14px;
+  color: var(--text);
+}
+.sb-melt[hidden] {
+  display: none;
+}
+.sb-melt b {
+  color: var(--head);
+}
+.sb-melt .sb-total {
+  margin-right: 6px;
+  font: 800 22px var(--font-head);
+  vertical-align: -2px;
+}
+.sb-warn {
+  color: var(--warn);
+}
+
+/* M / G spelled out in List view ("Meltable", "Giftable"); letters elsewhere. */
+.flag .fl-l {
+  display: none;
+}
+.grid.list .flag {
+  width: auto;
+  height: 20px;
+  padding: 0 7px;
+  font: 700 11px var(--font-head);
+}
+.grid.list .flag .fl-s {
+  display: none;
+}
+.grid.list .flag .fl-l {
+  display: inline;
+}
+.grid.list .foot-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.grid.list .flags {
+  gap: 8px;
+}
+.grid.list .flag {
+  min-width: 72px;
+  justify-content: center;
+}
+/* The switches sit together at the end of the chip row. */
+.chip-row .sw-group {
+  display: inline-flex;
+  gap: 16px;
+  margin-left: auto;
+}
+.chip-row .sw-group .oh-sw {
+  margin-left: 0;
+}
+/* "est." after an estimated buy-back price. */
+.val .est-l {
+  margin-left: 3px;
+  font: 600 11px var(--font-body);
+  color: var(--faint);
+}
+/* Section headers (Group by type) stick just under the pinned top bar. */
+/* The padding fills the gap under the bar while stuck, so rows don't peek through. */
+body:not(:has(#view-home.active)) .market-title {
+  top: calc(var(--hdr-h, 0px) - 12px);
+  padding-top: 20px;
+}

@@ -16,11 +16,11 @@ const VIEWS = [
   'org',
   'referrals',
   'updates',
+  'guide',
   'developers',
 ];
 
 const statusEl = $('#status');
-const scannedHomeEl = $('#scanned-home');
 const chipsEl = $('#chips');
 const resultsEl = $('#results');
 const scanBtn = $('#scan-home');
@@ -33,7 +33,6 @@ const searchEl = $('#search');
 const sortEl = $('#sort');
 const layoutEl = $('#layout');
 const buybacksBodyEl = $('#buybacks-body');
-const scanIndicator = $('#scan-indicator');
 const bbSearchEl = $('#bb-search');
 const bbSortEl = $('#bb-sort');
 const bbChipsEl = $('#bb-chips');
@@ -316,6 +315,11 @@ const state = {
   buybacks: [], // buy-back pledges (separate source)
   buybacksScannedAt: null,
   bbQuery: '',
+  bbUnder: false, // Buy-Backs: only ones below today's store price
+  bbStack: false, // Buy-Backs: stack identical ones (off: each buy-back is its own)
+  bbHideSmall: true, // Buy-Backs: paints, add-ons, coupons tucked away
+  hideSmall: false, // Inventory: same
+  savedViews: [], // Inventory saved views: { name, shown, traits, query, sort }
   bbSort: 'date-desc', // default to newest buy-backs first
   groupByType: true, // Inventory: one section per type
   bbDetails: {}, // pledge id → details read from the buy-back's own RSI page
@@ -464,40 +468,47 @@ window.addEventListener('unhandledrejection', (e) => {
   OH.log('error', 'page', `unhandled: ${(r && (r.stack || r.message)) || r}`);
 });
 
-// Global scan indicator in the header — visible from every view (the scan keeps
-// running across view switches since this is a single page). `done` shows a
-// final tick/warn that auto-hides; falsy text hides it immediately.
-let scanIndicatorTimer = null;
+// Scan progress shows in the top bar's Scan button itself (every page): it fills
+// as the chosen sources finish ("Scanning… 2/4") and says what it's on in its hover
+// text; at the end "✓ Done" (or "⚠ Finished") for a moment, then Scan All again.
+const scanProgress = { i: 0, n: 1 };
+let scanDoneTimer = null;
 function setScanning(text, done = false) {
-  if (!scanIndicator) return;
-  clearTimeout(scanIndicatorTimer);
+  const btn = $('#scan-home');
+  if (!btn) return;
+  const fill = btn.querySelector('.scan-fill');
+  const label = btn.querySelector('.scan-label');
+  clearTimeout(scanDoneTimer);
   if (!text) {
-    scanIndicator.hidden = true;
-    setHTML(scanIndicator, '');
+    btn.classList.remove('scanning');
+    if (fill) fill.style.width = '0';
+    updateScanLabel();
     return;
   }
-  // The badge stays short so it never reflows the header (a long label pushed
-  // the search box onto a second line); the detail is in its hover text and
-  // the Home status line.
-  const short = done ? (/^⚠/.test(text) ? '⚠ Scan finished' : '✓ Scan done') : 'Scanning…';
-  setHTML(
-    scanIndicator,
-    (done ? '' : '<span class="spin"></span>') + `<span>${OH.escapeHtml(short)}</span>`,
-  );
-  scanIndicator.title = text.replace(/^[✓⚠]\s*/, '');
-  scanIndicator.hidden = false;
+  btn.classList.add('scanning');
+  const clean = text.replace(/^[✓⚠]\s*/, '');
   if (done) {
-    scanIndicatorTimer = setTimeout(() => {
-      scanIndicator.hidden = true;
-      setHTML(scanIndicator, '');
-    }, 6000);
+    if (fill) fill.style.width = '100%';
+    label.textContent = /^⚠/.test(text) ? '⚠ Finished' : '✓ Done';
+    btn.title = clean;
+    scanDoneTimer = setTimeout(() => setScanning(''), 2200);
+    return;
   }
+  const { i, n } = scanProgress;
+  if (fill) fill.style.width = `${Math.max(6, (i / n) * 100)}%`;
+  label.textContent = n > 1 ? `Scanning… ${Math.min(i + 1, n)}/${n}` : 'Scanning…';
+  btn.title = `Scanning ${clean}`;
 }
 
 // Amounts are USD; `fx` converts them to the display currency (Home → Currency).
 // `rawMoney` is for numbers the user typed (My Price), which aren't converted.
 const fx = { code: 'USD', rate: 1, date: null };
+// Streamer Mode (gear menu): money amounts show as dots everywhere, hover text
+// included, for streams and screenshots. Set from storage at startup.
+const streamer = { on: false };
+const MASK = '••••';
 const fmtCurrency = (n, digits) => {
+  if (streamer.on) return MASK;
   if (OH.ZERO_DECIMAL.includes(fx.code)) digits = 0; // ¥ / ₩ have no cents
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -521,6 +532,7 @@ const compactNum = (n) => {
   return `${Math.abs(x) >= 100 ? Math.round(x) : Number(x.toFixed(1))}${u}`;
 };
 const shortMoney = (n, full) => {
+  if (streamer.on) return MASK;
   const v = n * fx.rate;
   if (Math.abs(v) < 10000) return full(n);
   return new Intl.NumberFormat('en-US', {
@@ -570,6 +582,7 @@ function storeInfo(p) {
 
 function formatValue(p) {
   if (!Number.isFinite(p.value)) return '';
+  if (streamer.on) return MASK;
   if (!p.currency || p.currency === 'USD' || !/^[A-Z]{3}$/.test(p.currency)) return money(p.value);
   const s = '$' + p.value.toFixed(2);
   // Only append a real non-USD ISO-4217 code. Guards against RSI's junk currency
@@ -627,6 +640,8 @@ function route() {
   document
     .querySelectorAll('#nav a')
     .forEach((a) => a.classList.toggle('active', a.dataset.view === v));
+  renderTopBar();
+  if (v !== 'buybacks') state.bbOnly = null; // an alert's filter lasts for that one visit
   if (v === 'home') renderHome();
   else if (v === 'inventory') renderInventory();
   else if (v === 'stats') renderStats();
@@ -641,6 +656,53 @@ function route() {
 }
 
 window.addEventListener('hashchange', route);
+
+// Top bar extras: counts beside Inventory / Buy-Backs and the Streamer pill.
+function renderTopBar() {
+  const n = (id, count) => {
+    const el = $(id);
+    if (el) el.textContent = count ? compactNum(count) : '';
+  };
+  n('#nav-n-inventory', state.items.length);
+  n('#nav-n-buybacks', state.buybacks.length);
+  const pill = $('#stream-pill');
+  if (pill) pill.hidden = !streamer.on;
+}
+
+// The bar slims down while you scroll down a long page, and comes back on the way up.
+{
+  let anchorY = 0; // where the current scroll direction started
+  let lockUntil = 0; // ignore the jump the bar's own resize causes
+  const header = document.querySelector('.wrap > header');
+  const setSlim = (on) => {
+    if (document.body.classList.contains('bar-slim') === on) return;
+    document.body.classList.toggle('bar-slim', on);
+    lockUntil = performance.now() + 350;
+  };
+  window.addEventListener(
+    'scroll',
+    () => {
+      const y = window.scrollY;
+      if (performance.now() < lockUntil) {
+        anchorY = y;
+        return;
+      }
+      if (y < 140) setSlim(false);
+      else if (y - anchorY > 48)
+        setSlim(true); // a real move down
+      else if (anchorY - y > 48)
+        setSlim(false); // a real move up
+      else return;
+      anchorY = y;
+    },
+    { passive: true },
+  );
+  if (header && 'ResizeObserver' in window) {
+    new ResizeObserver(() =>
+      document.documentElement.style.setProperty('--hdr-h', `${header.offsetHeight}px`),
+    ).observe(header);
+  }
+}
 
 // --- Home -----------------------------------------------------------------
 
@@ -689,8 +751,19 @@ function realImage(url) {
 // name. Add-ons/coupons return '' (don't fetch art for non-ships).
 function resolveImageName(p) {
   if (p.isCCU && p.ccu && p.ccu.to) return p.ccu.to;
-  if (p.kind === 'ship' || p.containsShip) return p.name || '';
-  return '';
+  if (!(p.kind === 'ship' || p.containsShip)) return '';
+  const name = p.name || '';
+  // "Package - Aurora MR Starter Pack" isn't a ship name: use the first ship inside
+  // (a pledge's contents list, or a buy-back's "Aurora MR · Star Citizen…" line).
+  if (/^(package|packs?|bundles?)\s*-|\b(pack|starter|bundle)\b/i.test(name)) {
+    const ship = (p.contents || []).find((c) => /ship|vehicle/i.test(c.kind || '') && c.label);
+    if (ship) return ship.label;
+    const first = String(p.contains || '')
+      .split('·')[0]
+      .trim();
+    if (first && !/digital download|insurance|game package/i.test(first)) return first;
+  }
+  return name;
 }
 
 // After a card grid renders, fill in missing ship art from the wiki API (lazy,
@@ -730,6 +803,22 @@ function enhanceCardImages(container) {
   for (let w = 0; w < CONCURRENCY; w++) worker();
 }
 
+// Home's welcome screen: shown until the first scan. Signed out, the card above
+// already has the Log In button, so this just says to use it (lastLoggedOut is set
+// when the account is read).
+function renderWelcome() {
+  const el = $('#oh-welcome');
+  if (!el) return;
+  el.hidden = state.items.length > 0 || state.buybacks.length > 0;
+  $('#welcome-scan').hidden = lastLoggedOut;
+  $('#welcome-note').textContent = lastLoggedOut
+    ? 'First, log in to RSI with the button on the card above. Then come back here and scan.'
+    : 'A big hangar takes about a minute. To scan just some of it, use the ▾ next to Scan at the top.';
+}
+$('#welcome-scan')?.addEventListener('click', () => {
+  if (!scanBtn.disabled) runScan(); // everything, whatever the ▾ menu has ticked
+});
+
 // RSI account → the home Citizen Card: avatar, name, est/country/UEE record,
 // quick links, balances (Store/UEC/REC), and subscriber/concierge flair.
 function renderAccount() {
@@ -748,110 +837,166 @@ function renderAccount() {
     // (A confirmed `true` is the only state that shows the normal card.)
     const loggedOut = a.loggedIn !== true;
     const acctEl = $('#cc-account'),
-      sideEl = $('#cc-side'),
       loEl = $('#cc-loggedout');
     if (acctEl) acctEl.hidden = loggedOut;
-    if (sideEl) sideEl.hidden = loggedOut;
     if (loEl) loEl.hidden = !loggedOut;
     if (logoutBtn) logoutBtn.hidden = a.loggedIn !== true;
 
     updateSignedOutBanner(loggedOut);
+    renderWelcome();
 
-    // Avatar (+ subscriber-tier ring)
+    const handle = a.nickname || '';
+    const citizenUrl = handle
+      ? `https://robertsspaceindustries.com/citizens/${encodeURIComponent(handle)}`
+      : null;
+
+    // Portrait: RSI keeps a 1024px original next to the 165px thumbnail the account
+    // page links; use it (the thumbnail stays underneath as a fallback layer).
     if (avEl) {
-      avEl.style.backgroundImage = safeBgUrl(a.avatar);
-      avEl.className =
-        'cc-avatar' +
-        (a.subscriber?.type === 'Imperator' ? ' tier-imperator' : a.subscriber ? ' tier-sub' : '');
+      const thumb = safeBgUrl(a.avatar);
+      const big = /\/heap_infobox\//.test(a.avatar || '')
+        ? safeBgUrl(a.avatar.replace('/heap_infobox/', '/source/'))
+        : '';
+      avEl.style.backgroundImage = [big, thumb].filter(Boolean).join(', ');
+      // No portrait on RSI: the name's initials instead of an empty panel.
+      const nm = a.displayname || a.nickname || '';
+      avEl.textContent = thumb
+        ? ''
+        : nm
+            .split(/[\s_-]+/)
+            .filter(Boolean)
+            .slice(0, 2)
+            .map((w) => w[0].toUpperCase())
+            .join('');
     }
-
-    // Name
-    if (nameEl) {
-      nameEl.textContent =
-        a.displayname || a.nickname || (a.loggedIn === false ? 'Not signed in' : DASH);
+    const menuAv = $('#menu-avatar');
+    if (menuAv) {
+      const thumb = a.loggedIn ? safeBgUrl(a.avatar) : '';
+      menuAv.classList.toggle('has-pic', !!thumb);
+      menuAv.style.backgroundImage = thumb;
     }
-
-    // Meta (UEE record + enlisted date) under the portrait.
-    if (metaEl) {
-      if (a.loggedIn === false) {
-        metaEl.textContent = 'Log in to scan your hangar';
-      } else if (a.loggedIn) {
-        // UEE record + enlisted date, each on its own plain line under the portrait.
+    const who = $('#menu-who');
+    if (who) {
+      who.hidden = !a.loggedIn;
+      if (a.loggedIn) {
+        const org =
+          a.org && a.org.name ? `${a.org.name}${a.org.rank ? ` · ${a.org.rank}` : ''}` : '';
         setHTML(
-          metaEl,
-          `<span class="cc-meta-line">UEE ${OH.escapeHtml(a.citizenRecord || DASH)}</span>` +
-            `<span class="cc-meta-line">Enlisted ${OH.escapeHtml(fmtEnlisted(a.enlistedSince))}</span>`,
+          who,
+          `<span class="mw-pic"></span><span><b>${OH.escapeHtml(a.displayname || a.nickname || '')}</b>${org ? `<small>${OH.escapeHtml(org)}</small>` : ''}</span>`,
         );
+        who.querySelector('.mw-pic').style.backgroundImage = safeBgUrl(a.avatar);
+      }
+    }
+    const photo = $('#cc-photo');
+    if (photo) {
+      if (citizenUrl) photo.href = citizenUrl;
+      else photo.removeAttribute('href');
+      photo.title = citizenUrl ? 'Open your RSI citizen page' : '';
+    }
+
+    // Name → the citizen page (plain white, underline on hover).
+    if (nameEl) {
+      const name = a.displayname || a.nickname || (a.loggedIn === false ? 'Not signed in' : DASH);
+      setHTML(
+        nameEl,
+        citizenUrl
+          ? `<a class="cc-plain" href="${OH.escapeHtml(citizenUrl)}" target="_blank" rel="noopener" title="Open your RSI citizen page">${OH.escapeHtml(name)}</a>`
+          : OH.escapeHtml(name),
+      );
+    }
+
+    // UEE record · Est. <month year> · <n> years (full date on hover).
+    if (metaEl) {
+      if (a.loggedIn) {
+        const d = a.enlistedSince ? new Date(a.enlistedSince) : null;
+        const ok = d && !isNaN(d.getTime());
+        const parts = [];
+        if (a.citizenRecord) parts.push(`UEE ${OH.escapeHtml(a.citizenRecord)}`);
+        if (ok) {
+          const my = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+          parts.push(
+            `<span title="Enlisted ${OH.escapeHtml(fmtEnlisted(a.enlistedSince))}">Est. ${OH.escapeHtml(my)}</span>`,
+          );
+          const now = new Date();
+          let yrs = now.getFullYear() - d.getFullYear();
+          if (
+            now.getMonth() < d.getMonth() ||
+            (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())
+          )
+            yrs--;
+          if (yrs >= 1) parts.push(`${yrs} year${yrs === 1 ? '' : 's'}`);
+        }
+        setHTML(metaEl, parts.join(' · '));
       } else {
-        metaEl.textContent = DASH;
+        setHTML(metaEl, '');
       }
     }
 
-    // Main organization (logo · name · rank), linked to the org page. Name can be
-    // long, so it wraps. When the member has no main org (or it's redacted), show
-    // a muted "No affiliation" rather than a blank gap (extension-wide convention).
+    // Main org only: logo + name (rank under it), one plain link to the org page,
+    // and the logo again as a faint watermark. No org, or a hidden/redacted one:
+    // nothing at all (owner, 2026-09-30).
+    const waterEl = $('#cc-water');
     if (orgEl) {
       const org = a.loggedIn ? a.org : null;
       if (org && org.name) {
         const logo = org.logo
           ? `<img class="cc-org-logo" src="${OH.escapeHtml(org.logo)}" alt="" loading="lazy">`
-          : `<span class="cc-org-logo cc-org-logo-ph"></span>`;
+          : '';
         const inner =
           `${logo}<span class="cc-org-text">` +
-          `<span class="cc-org-name" title="${OH.escapeHtml(org.name)}">${OH.escapeHtml(org.name)}</span>` +
+          `<span class="cc-org-name">${OH.escapeHtml(org.name)}</span>` +
           (org.rank ? `<span class="cc-org-rank">${OH.escapeHtml(org.rank)}</span>` : '') +
           `</span>`;
         setHTML(
           orgEl,
           org.sid
-            ? `<a class="cc-org-link" href="https://robertsspaceindustries.com/orgs/${encodeURIComponent(org.sid)}" target="_blank" rel="noopener">${inner}</a>`
+            ? `<a class="cc-org-link" href="https://robertsspaceindustries.com/orgs/${encodeURIComponent(org.sid)}" target="_blank" rel="noopener" title="Open ${OH.escapeHtml(org.name)} on RSI">${inner}</a>`
             : `<span class="cc-org-link">${inner}</span>`,
-        );
-        orgEl.hidden = false;
-      } else if (a.loggedIn) {
-        setHTML(
-          orgEl,
-          `<span class="cc-org-link cc-org-none"><span class="cc-org-logo cc-org-logo-ph"></span><span class="cc-org-text"><span class="cc-org-name">No affiliation</span></span></span>`,
         );
         orgEl.hidden = false;
       } else {
         setHTML(orgEl, '');
         orgEl.hidden = true;
       }
+      if (waterEl) {
+        if (org && org.logo) waterEl.src = org.logo;
+        waterEl.hidden = !(org && org.logo);
+      }
     }
 
-    // Flair (subscriber + concierge), tier-coloured; hidden when none.
+    // Subscriber + Chairman's Club on one line; each only when it applies.
     if (flairEl) {
       const parts = [];
       if (a.subscriber?.type) {
-        const tier = a.subscriber.type === 'Imperator' ? 'sub' : 'sub sub-centurion';
         parts.push(
-          `<a class="flair ${tier}" href="https://robertsspaceindustries.com/en/pledge/subscriptions" target="_blank" rel="noopener"><span class="flair-lbl">Subscriber</span> <b>${OH.escapeHtml(a.subscriber.type)}</b></a>`,
+          `<a class="flair sub" href="https://robertsspaceindustries.com/en/pledge/subscriptions" target="_blank" rel="noopener"><span class="flair-lbl">Subscriber</span> <b>${OH.escapeHtml(a.subscriber.type)}</b></a>`,
         );
       }
       if (a.concierge?.level) {
         const col = CONCIERGE_COLORS[a.concierge.level.toLowerCase()] || '#d2a8ff';
-        const pct = Number(a.concierge.percent) || 0;
-        const prog = a.concierge.next
-          ? `<span class="flair-prog"><span class="flair-bar"><span style="width:${pct}%;background:${col}"></span></span>${pct}% → ${OH.escapeHtml(a.concierge.next)}</span>`
+        const next = a.concierge.next
+          ? ` title="${Number(a.concierge.percent) || 0}% of the way to ${OH.escapeHtml(a.concierge.next)}"`
           : '';
         parts.push(
-          `<a class="flair concierge" style="border-color:${col}" href="https://robertsspaceindustries.com/en/account/concierge" target="_blank" rel="noopener"><span class="flair-lbl">Chairman's Club</span> <b style="color:${col}">${OH.escapeHtml(a.concierge.level)}</b>${prog}</a>`,
+          `<a class="flair concierge" href="https://robertsspaceindustries.com/en/account/concierge" target="_blank" rel="noopener"${next}><span class="flair-lbl">Chairman's Club</span> <b style="color:${col}">${OH.escapeHtml(a.concierge.level)}</b></a>`,
         );
       }
       setHTML(flairEl, parts.join(''));
+      flairEl.hidden = !parts.length;
     }
 
-    // Balances — always rendered, with dashes when there's no data (uniform).
-    // Big amounts are shortened (¤ 1.2M, ¤ 90K) so the strip stays one row; the
-    // exact figure is in the hover text.
+    // Wallet: Store Credit, UEC, REC, Buy-Back Tokens (the next token's date is on Game Status).
+    // Big amounts are shortened (¤ 1.2M); the exact figure is in the hover text.
+    // Streamer Mode turns the money and aUEC amounts into dots.
     if (balEl) {
       const c = a.credits || {};
       const fmt = (n) => Number(n).toLocaleString('en-US');
       const tile = (cls, label, val, full) =>
         `<span class="bal ${cls}"${full && full !== val ? ` title="${OH.escapeHtml(full)}"` : ''}><span class="bal-lbl">${label}</span><b>${val}</b></span>`;
       // A no-break space after ¤ so the symbol doesn't crowd the digits.
-      const aUEC = (x) => (x ? ['¤ ' + compactNum(x.value), '¤ ' + fmt(x.value)] : [DASH]);
+      const aUEC = (x) =>
+        !x ? [DASH] : streamer.on ? [MASK] : ['¤ ' + compactNum(x.value), '¤ ' + fmt(x.value)];
       const store = c.store ? c.store.value / 100 : null;
       setHTML(
         balEl,
@@ -865,13 +1010,11 @@ function renderAccount() {
           tile('rec', 'REC', ...aUEC(c.rec)) +
           `<a class="bal bbt" href="#buybacks" data-view="buybacks" title="${OH.escapeHtml(
             tokenTitle(),
-          )}"><span class="bal-lbl">Buy-back tokens</span><b>${
+          )}"><span class="bal-lbl">Buy-Back Tokens</span><b>${
             state.bbTokens != null ? state.bbTokens : DASH
           }</b></a>`,
       );
     }
-
-    renderReferralPill(a);
   });
 }
 
@@ -890,34 +1033,6 @@ function updateSignedOutBanner(loggedOut) {
   if (!el) return;
   const hasData = state.items.length > 0 || state.buybacks.length > 0 || state.referral != null;
   el.hidden = !(lastLoggedOut && hasData);
-}
-
-// Citizen Card referral pill: recruit count + code with a copy button. Prefers the
-// scanned referral source (full counts); falls back to just the code from the
-// account fetch (which carries it for free) so it shows even before a referral scan.
-function renderReferralPill(a) {
-  const el = $('#home-referral');
-  if (!el) return;
-  const ref = state.referral;
-  const code = ref?.code || a?.referral?.code || null;
-  if (!a || !a.loggedIn || !code) {
-    setHTML(el, '');
-    return;
-  }
-  const recruits = ref?.legacy?.recruits ?? ref?.current?.recruits ?? null;
-  const url = ref?.url || a?.referral?.url || null;
-  const countPart =
-    recruits != null
-      ? `<span class="bal-lbl">Referrals</span> <b>${recruits.toLocaleString('en-US')}</b>`
-      : `<span class="bal-lbl">Referral code</span>`;
-  setHTML(
-    el,
-    `<span class="ref-pill">${countPart}
-      <span class="ref-pill-sep"></span>
-      <span class="ref-code">${OH.escapeHtml(code)}</span>
-      <button class="ref-copy" data-copy="${OH.escapeHtml(url || code)}" title="Copy referral link">Copy</button>
-    </span>`,
-  );
 }
 
 function renderVersions() {
@@ -957,161 +1072,19 @@ async function wishlistStock({ force = false } = {}) {
   }
   return out;
 }
-let homeWishToken = 0;
-// Home: a short summary of the newest "This Week in Star Citizen" (OH.getTwiscSummary),
-// or RSI's three newest Comm-Links if the post can't be read.
-let homeNewsToken = 0;
-function renderHomeNews() {
-  const box = $('#home-news');
-  if (!box) return;
-  const token = ++homeNewsToken;
-  const esc = OH.escapeHtml;
-  const shell = (title, body, more) =>
-    `<h3>${title}</h3><div class="home-scroll">${body}</div><p class="home-more">${more}</p>`;
-  if (!box.dataset.filled)
-    setHTML(box, shell('This Week in Star Citizen', '<p class="muted">Loading…</p>', ''));
-  OH.getTwiscSummary().then(async (sum) => {
-    if (token !== homeNewsToken) return;
-    box.dataset.filled = '1';
-    if (sum && sum.lead) {
-      const date = (sum.title.match(/-\s*(.+)$/) || [])[1] || '';
-      setHTML(
-        box,
-        shell(
-          `This Week in Star Citizen${date ? ` <span class="muted twisc-date">${esc(date)}</span>` : ''}`,
-          `${sum.image ? `<a href="${esc(sum.url)}" target="_blank" rel="noopener"><img class="twisc-img" src="${esc(sum.image)}" alt=""></a>` : ''}<p class="twisc-lead">${esc(sum.lead)}</p>`,
-          `<a href="${esc(sum.url)}" target="_blank" rel="noopener">Read it on RSI ↗</a>`,
-        ),
-      );
-      return;
-    }
-    const items = (await OH.getRsiNews()).slice(0, 3);
-    if (token !== homeNewsToken) return;
-    setHTML(
-      box,
-      shell(
-        'Latest from RSI',
-        items.length
-          ? `<ul class="news-list">${items
-              .map(
-                (n) =>
-                  `<li><a href="${esc(n.url)}" target="_blank" rel="noopener" title="${esc(n.title)}">${
-                    n.image
-                      ? `<img class="news-thumb" src="${esc(n.image)}" alt="" loading="lazy">`
-                      : ''
-                  }<span class="news-text"><span class="news-title">${esc(n.title)}</span><span class="news-meta">${esc(
-                    [capFirst(n.type), n.when].filter(Boolean).join(' · '),
-                  )}</span></span></a></li>`,
-              )
-              .join('')}</ul>`
-          : '<p class="muted">Couldn’t reach RSI right now.</p>',
-        '<a href="https://robertsspaceindustries.com/comm-link" target="_blank" rel="noopener">All Comm-Links ↗</a>',
-      ),
-    );
-  });
-}
-
-function renderHomePanels() {
-  const wish = $('#home-wish');
-  renderHomeNews();
-  if (!wish) return;
-  // No wishlist: no box; the news panel takes the whole row.
-  const empty = !state.wishlist.length;
-  wish.hidden = empty;
-  wish.parentElement.classList.toggle('solo', empty);
-  if (empty) {
-    ++homeWishToken; // drop any check still running
-    return;
-  }
-  const token = ++homeWishToken;
-  setHTML(wish, `<h3>Wishlist: On Sale Now</h3><p class="muted">Checking RSI's store…</p>`);
-  wishlistStock().then((list) => {
-    if (token !== homeWishToken) return;
-    const onSale = list.filter((x) => x.st && x.st.state === 'in');
-    const inPack = list.filter((x) => x.st && x.st.state === 'pack');
-    const row = (x, text, cls) =>
-      `<li>${shipLink(x.name)}<span class="sale ${cls}">${OH.escapeHtml(text)}</span></li>`;
-    const items = [
-      ...onSale.map((x) =>
-        row(x, x.st.price ? `In stock ${dollars(x.st.price)}` : 'In stock', 'on'),
-      ),
-      ...inPack.map((x) => row(x, 'Only in a pack', 'wb')),
-    ];
-    setHTML(
-      wish,
-      `<h3>Wishlist: On Sale Now <span class="market-n">${onSale.length}</span></h3><div class="home-scroll">${
-        items.length
-          ? `<ul class="home-list">${items.join('')}</ul>`
-          : `<p class="muted">None of your ${list.length} wishlist ship${list.length === 1 ? ' is' : 's are'} for sale right now.</p>`
-      }</div><p class="home-more"><a href="#store" data-view="store">Your wishlist →</a></p>`,
-    );
-  });
-}
-
 function renderHome() {
   ensurePrices();
   renderEventBanner();
-  renderHomePanels();
   renderAccount();
   const has = state.items.length > 0;
   document.getElementById('view-home').classList.toggle('no-data', !has);
   if (clearBtn) clearBtn.hidden = !(state.items.length || state.scannedAt);
+  // Everything below the Citizen Card is the Svelte Home (ui/home); tell it to redraw.
+  homeUpdated();
 
-  // Dashboard summary strip (#1) — only once there's data.
-  const sum = $('#home-summary');
-  if (has) {
-    const count = (k) => state.items.filter((p) => p.kind === k).length;
-    const ships = state.items.filter((p) => p.containsShip).length;
-    const box = (big, lbl, full) =>
-      `<div class="sum-box"${full && full !== big ? ` title="${OH.escapeHtml(full)}"` : ''}><div class="sum-big">${big}</div><div class="sum-lbl">${lbl}</div></div>`;
-    const melt = OH.totalValue(state.items);
-    const store = hangarValue()?.store;
-    setHTML(
-      sum,
-      box(state.items.length, 'pledges') +
-        box(shortMoney(melt, money), 'melt value', money(melt)) +
-        (store ? box(shortMoney(store, dollars), 'ships at store price', dollars(store)) : '') +
-        box(ships, 'ships') +
-        box(count('ccu'), 'CCUs') +
-        (count('paint') ? box(count('paint'), 'paints') : '') +
-        box(count('addon'), 'add-ons') +
-        (state.buybacks.length ? box(state.buybacks.length, 'buy-backs') : ''),
-    );
-  } else {
-    setHTML(sum, '');
-  }
-  const ch = $('#home-changes');
-  if (ch) {
-    const hist = state.history;
-    if (has && hist.length >= 2) {
-      const d = OH.diffSnapshots(hist[hist.length - 2], hist[hist.length - 1]);
-      setHTML(
-        ch,
-        `Since ${OH.escapeHtml(fmtDay(hist[hist.length - 2].at))}: ${OH.escapeHtml(
-          changeSummary(d),
-        )} · <a href="#stats" data-stats-tab="history">history</a>`,
-      );
-      ch.hidden = false;
-    } else {
-      ch.hidden = true;
-    }
-  }
-
-  // Scanned line: first-run prompt (#2) or scan freshness with a stale nudge (#5).
-  if (!has) {
-    scannedHomeEl.textContent = 'Nothing scanned yet — click Scan to begin.';
-    return;
-  }
-  const when = state.scannedAt ? new Date(state.scannedAt).toLocaleString() : 'previously';
-  const ageDays = state.scannedAt ? (Date.now() - state.scannedAt) / 86400000 : 0;
-  if (ageDays > 7) {
-    setHTML(
-      scannedHomeEl,
-      `Scanned ${OH.escapeHtml(when)} — <span class="stale">over a week old, consider rescanning</span>`,
-    );
-  } else {
-    scannedHomeEl.textContent = `Scanned ${when}`;
-  }
+  // First run: the welcome screen instead of empty cards (when you last scanned
+  // shows on Account Value once there's data).
+  renderWelcome();
 }
 
 function link(url, label, soon) {
@@ -1195,6 +1168,9 @@ function computeShown() {
   let list = state.shown.size
     ? state.items.filter((p) => state.shown.has(p.kind))
     : state.items.slice();
+  // "Hide small stuff" tucks paints, add-ons and coupons away (unless picked).
+  if (state.hideSmall)
+    list = list.filter((p) => !SMALL_KINDS.has(p.kind) || state.shown.has(p.kind));
   // Traits narrow further: a pledge must have every selected trait.
   list = applyTraits(list, state.traits, pledgeFacets);
   if (q) list = list.filter((p) => haystack(p).includes(q));
@@ -1271,9 +1247,9 @@ const notInsurance = (c) => !/insurance/i.test(`${c.kind || ''} ${c.label || ''}
 const TRAITS = [
   {
     key: 'package',
-    label: 'Game packages',
+    label: 'Game Packages',
     title: 'Pledges that include game access (Star Citizen / Squadron 42)',
-    notLabel: 'No game package',
+    notLabel: 'No Game Package',
     test: (f) =>
       /^package\b/i.test(f.name) ||
       f.items.some((c) => /^game$/i.test(c.kind || '') || GAME_ITEM_RE.test(c.label || '')),
@@ -1284,7 +1260,7 @@ const TRAITS = [
     key: 'pack',
     label: 'Packs',
     title: 'Pledges that bundle two or more items (ships, paints, gear…)',
-    notLabel: 'Single items',
+    notLabel: 'Single Items',
     test: (f) => f.items.filter(notInsurance).length >= 2,
   },
   { key: 'lti', label: 'LTI', notLabel: 'No LTI', title: 'Lifetime insurance', test: (f) => f.lti },
@@ -1292,7 +1268,7 @@ const TRAITS = [
     key: 'giftable',
     label: 'Giftable',
     title: 'RSI shows a Gift action for this pledge',
-    notLabel: 'Not giftable',
+    notLabel: 'Not Giftable',
     test: (f) => f.giftable === true,
     neg: (f) => f.giftable === false,
   },
@@ -1300,7 +1276,7 @@ const TRAITS = [
     key: 'meltable',
     label: 'Meltable',
     title: 'RSI shows an Exchange action, so it can be melted for store credit',
-    notLabel: 'Not meltable',
+    notLabel: 'Not Meltable',
     test: (f) => f.meltable === true,
     neg: (f) => f.meltable === false,
   },
@@ -1310,24 +1286,24 @@ const TRAITS = [
     // RSI's hangar has no warbond marker, so this relies on the pledge name — some
     // warbond purchases (e.g. packs) aren't named that way and won't show here.
     title: "Pledges whose name says Warbond (RSI doesn't always include it)",
-    notLabel: 'Not warbond',
+    notLabel: 'Not Warbond',
     test: (f) => /warbond/i.test(f.name),
   },
   {
     // Catches warbonds and sales that aren't named that way (see TODO.md).
     key: 'below',
-    label: 'Below store price',
+    label: 'Below Store Price',
     title:
       "Paid less than today's store price (star-citizen.wiki): warbonds, sales, older cheaper pricing. Ship pledges and CCUs.",
-    notLabel: 'At / above store price',
+    notLabel: 'At / Above Store Price',
     test: (f) => f.below === true,
     neg: (f) => f.below === false,
   },
   {
     key: 'free',
-    label: 'Free / rewards',
+    label: 'Free / Rewards',
     title: '$0 pledges: referral, event and other rewards',
-    notLabel: 'Paid pledges',
+    notLabel: 'Paid Pledges',
     test: (f) => f.value === 0,
     neg: (f) => f.value != null && f.value > 0,
   },
@@ -1395,14 +1371,15 @@ function chipHtml(kind) {
 function flagHtml(letter, value, yes, no) {
   const state = value === true ? 'yes' : value === false ? 'no' : 'unk';
   const label = value === true ? yes : value === false ? no : `${yes}: unknown — rescan`;
-  return `<span class="flag ${state}" title="${label}" aria-label="${label}">${letter}</span>`;
+  const word = value == null ? `${yes}?` : yes; // red / green carries the yes or no
+  return `<span class="flag ${state}" title="${label}" aria-label="${label}"><span class="fl-s">${letter}</span><span class="fl-l">${word}</span></span>`;
 }
 function flagsHtml(p) {
-  return `<span class="flags">${flagHtml('M', p.meltable, 'Meltable', 'Not meltable')}${flagHtml(
+  return `<span class="flags">${flagHtml('M', p.meltable, 'Meltable', 'Not Meltable')}${flagHtml(
     'G',
     p.giftable,
     'Giftable',
-    'Not giftable',
+    'Not Giftable',
   )}</span>`;
 }
 
@@ -1451,7 +1428,7 @@ function cardHtml(p) {
       <div class="card-ins" title="Insurance">${OH.escapeHtml(insLabel(p.insurance))}</div>
       <div class="card-foot">
         <span class="foot-left"><span class="badge ${badgeClass}">${OH.escapeHtml(type)}</span>${flagsHtml(p)}</span>
-        <span class="val"${valTitle(p)}>${OH.escapeHtml(formatValue(p))}</span>
+        <span class="val"${valTitle(p)}>${OH.escapeHtml(formatValue(p))}${underStoreHtml(p)}</span>
       </div>
     </div>
   </div>`;
@@ -1968,6 +1945,158 @@ function copyMarketImage(statusEl) {
   downloadImage(marketImageCanvas(sections), marketFilename('png'), statusEl);
 }
 
+// --- Inventory / Buy-Backs pass (0.3.0) ------------------------------------------
+// Paints, add-ons and coupons: what "Hide small stuff" tucks away.
+const SMALL_KINDS = new Set(['paint', 'addon', 'coupon']);
+function switchHtml(key, label, on, title) {
+  return `<button type="button" class="oh-sw${on ? ' on' : ''}" data-switch="${key}" aria-pressed="${on}" title="${OH.escapeHtml(title)}"><span class="sw-t"></span>${OH.escapeHtml(label)}</button>`;
+}
+// Summary strip on top of Inventory: follows the filters.
+function renderInvSummary(shown) {
+  const el = $('#inv-sum');
+  if (!el) return;
+  const filtered = shown.length !== state.items.length;
+  let store = 0;
+  for (const p of shown) store += (storeInfo(p) || {}).store || 0;
+  const stat = (l, v) =>
+    `<div class="ps-st"><div class="ps-l">${l}</div><div class="ps-v">${v}</div></div>`;
+  setHTML(
+    el,
+    `<div><h2>Inventory</h2>${filtered ? `<div class="ps-note">Totals follow your filters (${shown.length} of ${state.items.length})</div>` : ''}</div><div class="ps-stats">` +
+      stat('Pledges', compactNum(shown.length)) +
+      stat('Melt Value', OHApp.bigMoney(OH.totalValue(shown))) +
+      (store ? stat('Store Value', OHApp.bigMoney(store)) : '') +
+      '</div>',
+  );
+}
+// Summary strip on top of Buy-Backs.
+function renderBbSummary() {
+  const el = $('#bb-sum');
+  if (!el) return;
+  const under = state.buybacks.filter(bbUnderStore).length;
+  const next = nextTokenDate();
+  const nextShort = next ? next.replace(/^\w+, /, '').replace(/, \d{4}$/, '') : '';
+  const stat = (l, v, t) =>
+    `<div class="ps-st"${t ? ` title="${OH.escapeHtml(t)}"` : ''}><div class="ps-l">${l}</div><div class="ps-v">${v}</div></div>`;
+  setHTML(
+    el,
+    `<div><h2>Buy-Backs</h2></div><div class="ps-stats">` +
+      stat('Buy-Backs', compactNum(state.buybacks.length)) +
+      stat(
+        'Tokens',
+        `${state.bbTokens != null ? state.bbTokens : '—'}${nextShort ? `<small>next ${OH.escapeHtml(nextShort)}</small>` : ''}`,
+        tokenTitle(),
+      ) +
+      (under
+        ? stat('Below Store Price', `<span class="ps-good">${compactNum(under)}</span>`)
+        : '') +
+      '</div>',
+  );
+}
+// "$20 under store" in green when today's store price is above what the pledge holds.
+function underStoreHtml(p) {
+  const si = storeInfo(p);
+  // Only for pledges that hold money (a $0 reward isn't a bargain on the store).
+  const gap = si && si.store && Number.isFinite(p.value) && p.value > 0 ? si.store - p.value : 0;
+  return gap >= 1 ? `<small class="under">${OH.escapeHtml(dollars(gap))} under store</small>` : '';
+}
+// A buy-back cheaper than the same ship in today's store (exact price loaded).
+function bbUnderStore(b) {
+  const d = bbDetail(b);
+  const sp = buybackStorePrice(b);
+  return !!(d && d.price != null && sp && sp - d.price >= 1);
+}
+function bbUnderHtml(b) {
+  if (!bbUnderStore(b)) return '';
+  return `<small class="under">${OH.escapeHtml(dollars(buybackStorePrice(b) - bbDetail(b).price))} under store</small>`;
+}
+// Stack identical buy-backs (same name, contents and price) into one row with a
+// count. Off by default: each buy-back is its own item.
+function stackBuybacks(list) {
+  const map = new Map();
+  for (const b of list) {
+    const key = `${b.name}|${b.contains || ''}|${bbPriceText(b)}`;
+    const got = map.get(key);
+    if (got) got._n++;
+    else map.set(key, { ...b, _n: 1 });
+  }
+  return [...map.values()];
+}
+// Saved views: one click back to a set of filters (Inventory).
+function renderSavedViews() {
+  const el = $('#inv-views');
+  if (!el) return;
+  const cur = JSON.stringify(currentView_inv());
+  setHTML(
+    el,
+    (state.savedViews.length ? '<span class="views-lbl">Saved Views</span>' : '') +
+      state.savedViews
+        .map(
+          (v, i) =>
+            `<span class="view-chip${JSON.stringify(v.f) === cur ? ' on' : ''}"><button type="button" data-view-apply="${i}">★ ${OH.escapeHtml(v.name)}</button><button type="button" class="view-x" data-view-del="${i}" title="Remove this view" aria-label="Remove ${OH.escapeHtml(v.name)}">×</button></span>`,
+        )
+        .join('') +
+      '<button type="button" class="view-add" data-view-save>+ Save This View</button>',
+  );
+}
+function currentView_inv() {
+  return {
+    shown: [...state.shown].sort(),
+    traits: [...state.traits.entries()].sort(),
+    query: state.query.trim(),
+    hideSmall: state.hideSmall,
+  };
+}
+function saveViews() {
+  chrome.storage.local.set({ savedViews: state.savedViews });
+}
+// Melt planner (Select mode): what the picked pledges give back, and which ships
+// on your wishlist that buys, in the store or from your buy-backs.
+function renderMeltPlanner() {
+  const el = $('#sb-melt');
+  if (!el) return;
+  const picked = state.items.filter((p) => state.selected.has(p.id));
+  const total = picked.reduce((a, p) => a + (isMeltable(p) ? p.value : 0), 0);
+  el.hidden = !picked.length || !total;
+  if (el.hidden) return;
+  const esc = OH.escapeHtml;
+  const wish = state.wishlist || [];
+  const priced = wish
+    .map((name) => ({ name, price: state.priceOf ? (state.priceOf(name) || {}).msrp : null }))
+    .filter((x) => x.price);
+  const fits = priced.filter((x) => x.price <= total).sort((a, b) => b.price - a.price);
+  // Wishlist ships waiting in your buy-backs at or under the total.
+  const wl = new Set(wish.map((w) => String(w).toLowerCase()));
+  const inBb = state.buybacks
+    .map((b) => ({
+      b,
+      ship: state.shipOf ? state.shipOf(resolveImageName(b)) : null,
+      price: bbPrice(b),
+    }))
+    .filter(
+      (x) => x.ship && wl.has(String(x.ship.name).toLowerCase()) && x.price && x.price <= total,
+    );
+  let buys;
+  if (!wish.length) buys = 'Add ships to your wishlist to see what this buys.';
+  else if (fits.length)
+    buys = `That buys a <b>${esc(fits[0].name)}</b> (${esc(dollars(fits[0].price))}) from your wishlist${
+      total - fits[0].price >= 1 ? `, with ${esc(dollars(total - fits[0].price))} left` : ''
+    }.`;
+  else {
+    const cheapest = priced.sort((a, b) => a.price - b.price)[0];
+    buys = cheapest
+      ? `Not enough for your wishlist yet: the cheapest is ${esc(cheapest.name)} (${esc(dollars(cheapest.price))}).`
+      : '';
+  }
+  if (inBb.length) {
+    const x = inBb.sort((a, b) => b.price - a.price)[0];
+    buys += ` Or get the <b>${esc(x.ship.name)}</b> back from your buy-backs for ${esc(dollars(x.price))} (with store credit that takes a buy-back token; cash buy-backs don't).`;
+  }
+  const lti = picked.filter((p) => p.insurance === 'LTI').length;
+  if (lti) buys += ` <span class="sb-warn">You'd lose LTI on ${lti}.</span>`;
+  setHTML(el, `<b class="sb-total">${esc(dollars(total))}</b> ${buys}`);
+}
+
 function renderInventory() {
   ensurePrices();
   updateSelectBar();
@@ -1981,10 +2110,12 @@ function renderInventory() {
   }
   setHTML(
     chipsEl,
-    `<div class="chip-row">${presentKinds().map(chipHtml).join('')}</div>` +
+    `<div class="chip-row">${presentKinds().map(chipHtml).join('')}<span class="sw-group">${switchHtml('inv-hide', 'Hide Small Stuff', state.hideSmall, 'Paints, add-ons and coupons')}</span></div>` +
       traitRowHtml(state.items, state.traits, pledgeFacets, state.shown.size || state.traits.size),
   );
+  renderSavedViews();
   const shown = computeShown();
+  renderInvSummary(shown);
   if (!shown.length) {
     setHTML(resultsEl, '<div class="empty">No pledges match the current filters.</div>');
     return;
@@ -1998,7 +2129,7 @@ function renderInventory() {
   }> Group by type</label>`;
   const head = `<div class="market-toolbar"><div class="result-count">Showing ${shown.length} of ${
     state.items.length
-  } · ${money(OH.totalValue(shown))}</div><div class="market-actions">${groupToggle}</div></div>`;
+  }</div><div class="market-actions">${groupToggle}</div></div>`;
   if (!state.groupByType) {
     setHTML(
       resultsEl,
@@ -2065,6 +2196,7 @@ function updateSelectBar() {
   }
   const n = state.selected.size;
   $('#sb-count').textContent = n ? `${n} selected` : 'Click items to select them';
+  renderMeltPlanner();
   selectBar.querySelectorAll('[data-sb="copy"],[data-sb="save"]').forEach((b) => {
     b.disabled = !n;
   });
@@ -2343,7 +2475,6 @@ function ensureStore() {
       storeByKey.set(s.lname, s);
     }
     if (currentView() === 'store') renderStore();
-    if (currentView() === 'home') renderHomePanels();
   });
   return storeRequested;
 }
@@ -3203,7 +3334,7 @@ document.addEventListener('click', async (e) => {
 
 // --- Stats ----------------------------------------------------------------
 
-// Stats → Hangar value: ships at today's store price vs what you paid, best
+// Stats → Hangar value: ships at today's store price vs their melt value, best
 // deals, and which ships couldn't be priced.
 function valueSectionHtml() {
   const v = hangarValue();
@@ -3223,7 +3354,7 @@ function valueSectionHtml() {
     (v.paidPriced
       ? box(
           `${sign}${dollars(Math.abs(gap))}`,
-          `vs what you paid${pct ? ` (${sign}${pct}%)` : ''}`,
+          `vs melt value${pct ? ` (${sign}${pct}%)` : ''}`,
           gap >= 0 ? 'good' : '',
         )
       : '') +
@@ -3264,7 +3395,7 @@ function valueSectionHtml() {
       ? `<h4 class="modal-h">Best Deals: Paid Below Today's Store Price</h4><div class="top-list">${dealRows}</div>`
       : '') +
     unpriced +
-    `<p class="muted value-note">Ships at current standalone store prices (USD, before tax) from star-citizen.wiki; a CCU's standard price is the gap between its two ships. Paints, gear and game access aren't counted; concept and limited ships often have no public price. "vs what you paid" covers ship pledges whose ships are all priced.</p>`
+    `<p class="muted value-note">Ships at current standalone store prices (USD, before tax) from star-citizen.wiki; a CCU's standard price is the gap between its two ships. Paints, gear and game access aren't counted; concept and limited ships often have no public price. "vs melt value" covers ship pledges whose ships are all priced. Melt value is the pledge's value on RSI (what it was originally bought for); for gifted or grey-market pledges that isn't what you paid.</p>`
   );
 }
 
@@ -3664,7 +3795,7 @@ function topListsHtml() {
     `<div><h3 class="section-title">Most Valuable LTI Ships</h3>${list(
       ltiShips.map((p) => itemRow(p, OH.escapeHtml(formatValue(p)))).join(''),
     )}</div></div>` +
-    `<p class="muted value-note">Click any row to open it. Savings compare what you paid with today's standard store price (warbonds, sales, CCU'd pledges).</p>`
+    `<p class="muted value-note">Click any row to open it. Savings compare melt value with today's standard store price (warbonds, sales, CCU'd pledges).</p>`
   );
 }
 
@@ -4784,14 +4915,16 @@ function buybackUrl(b) {
 function buybackCardHtml(b) {
   const ccuArt = b.ccu && b.ccu.to && !b.shipArt; // show the target ship (see cardHtml)
   const img = ccuArt ? null : realImage(b.image);
-  // A CCU resolves art from its target ship; a plain buy-back from its own name.
-  const resolve = b.ccu && b.ccu.to ? b.ccu.to : b.name; // also the broken-image fallback
+  // A CCU resolves art from its target ship; a package from the first ship in it; a
+  // plain buy-back from its own name. Also the broken-image fallback.
+  const resolve = b.ccu && b.ccu.to ? b.ccu.to : resolveImageName({ ...b, kind: 'ship' }) || b.name;
   const thumb = img
     ? `<img class="thumb" loading="lazy" src="${OH.escapeHtml(img)}" alt="">`
     : `<div class="thumb placeholder">Buy-Back</div>`;
-  const nameHtml = b.ccu
-    ? `${OH.escapeHtml(b.ccu.from)} <span class="ccu-flow">→</span> ${OH.escapeHtml(b.ccu.to)}`
-    : OH.escapeHtml(b.name || '—');
+  const nameHtml =
+    (b.ccu
+      ? `${OH.escapeHtml(b.ccu.from)} <span class="ccu-flow">→</span> ${OH.escapeHtml(b.ccu.to)}`
+      : OH.escapeHtml(b.name || '—')) + (b._n > 1 ? ` <span class="stack-n">×${b._n}</span>` : '');
   const reclaim = buybackReclaimLink(b);
   const badgeClass = TYPE_KEYS.includes(b.isCCU ? 'ccu' : b.kind) ? (b.isCCU ? 'ccu' : b.kind) : '';
   // Every cell is always emitted (empty when there's nothing) so the List view's
@@ -4804,7 +4937,7 @@ function buybackCardHtml(b) {
       <div class="card-foot">
         <span class="foot-left"><span class="badge ${badgeClass}">${OH.escapeHtml(b.kind || 'buy-back')}</span></span>
         <span class="bb-date">${OH.escapeHtml(b.date || '')}</span>
-        <span class="bb-end">${bbPriceHtml(b)}${reclaim}</span>
+        <span class="bb-end">${bbPriceHtml(b)}${bbUnderHtml(b)}${reclaim}</span>
       </div>
     </div>
   </div>`;
@@ -4846,20 +4979,6 @@ function tokenTitle() {
     next ? ` (next: ${next})` : ''
   }; they don't roll over.`;
 }
-function tokenLineHtml() {
-  const n = state.bbTokens;
-  const next = nextTokenDate();
-  const have =
-    n == null
-      ? 'Rescan to see your buy-back tokens.'
-      : `You have <strong>${n}</strong> buy-back token${n === 1 ? '' : 's'}${
-          n ? ' (one store-credit buy-back each)' : ''
-        }.`;
-  return `<div class="bb-tokens">${have} ${
-    next ? `Next token: <strong>${OH.escapeHtml(next)}</strong>.` : 'RSI adds one each quarter.'
-  } Tokens don't roll over, so use them all before the next one arrives. Cash buy-backs don't need a token.</div>`;
-}
-
 // Standard store price of what a buy-back gives back: the ship's price today
 // (from the ship list), or a CCU's price gap. RSI's actual buy-back price can
 // differ; this is for comparing and sorting. null when unknown.
@@ -4939,6 +5058,11 @@ function computeBuybacks() {
   let list = state.bbShown.size
     ? state.buybacks.filter((b) => state.bbShown.has(b.kind))
     : state.buybacks.slice();
+  // Opened from a Hangar Alert: just the buy-backs it was about.
+  if (state.bbOnly) list = list.filter((b) => state.bbOnly.ids.has(String(b.id)));
+  if (state.bbHideSmall && !state.bbOnly)
+    list = list.filter((b) => !SMALL_KINDS.has(b.kind) || state.bbShown.has(b.kind));
+  if (state.bbUnder) list = list.filter(bbUnderStore);
   list = applyTraits(list, state.bbTraits, buybackFacets);
   if (q) list = list.filter((b) => `${b.name || ''} ${b.contains || ''}`.toLowerCase().includes(q));
   if (state.bbSort !== 'default') {
@@ -4998,26 +5122,37 @@ function renderBuybacks() {
       .forEach((b) => b.classList.toggle('active', b.dataset.layout === state.bbLayout));
   }
   if (bbChipsEl) {
+    const under = state.buybacks.filter(bbUnderStore).length;
+    const underChip =
+      under || state.bbUnder
+        ? `<button type="button" class="chip trait" data-bb-under aria-pressed="${state.bbUnder}" title="Buy-backs that cost less than the ship in today's store (load details for exact prices)">Below Store Price<span class="n">${under}</span></button>`
+        : '';
     setHTML(
       bbChipsEl,
-      `<div class="chip-row">${presentBbKinds().map(bbChipHtml).join('')}</div>` +
+      `<div class="chip-row">${presentBbKinds().map(bbChipHtml).join('')}${underChip}<span class="sw-group">${switchHtml('bb-hide', 'Hide Small Stuff', state.bbHideSmall, 'Paints, add-ons and coupons')}${switchHtml('bb-stack', 'Stack Identical', state.bbStack, 'Show identical buy-backs as one row with a count')}</span></div>` +
         traitRowHtml(
           state.buybacks,
           state.bbTraits,
           buybackFacets,
-          state.bbShown.size || state.bbTraits.size,
+          state.bbShown.size || state.bbTraits.size || state.bbUnder,
         ),
     );
   }
   if (!state.priceOf) ensurePrices();
-  const list = computeBuybacks();
+  let list = computeBuybacks();
+  renderBbSummary();
+  if (state.bbStack) list = stackBuybacks(list);
   const when = state.buybacksScannedAt ? new Date(state.buybacksScannedAt).toLocaleString() : '';
   if (!list.length) {
     setHTML(body, '<div class="empty">No buy-backs match the current filters.</div>');
     return;
   }
+  // Opened from a Hangar Alert: say so, with a way back to everything.
+  const only = state.bbOnly
+    ? `<div class="bb-only">Showing the ${list.length} ${OH.escapeHtml(state.bbOnly.label)} <button type="button" class="btn-secondary" data-bb-all>Show all ${state.buybacks.length}</button></div>`
+    : '';
   const count =
-    tokenLineHtml() +
+    only +
     bbDetailsBarHtml(list) +
     `<div class="result-count">Showing ${list.length} of ${state.buybacks.length}${when ? ` · scanned ${OH.escapeHtml(when)}` : ''}</div>`;
   // Market = a table like the Inventory Market (pick, total, price, export);
@@ -5025,10 +5160,7 @@ function renderBuybacks() {
   if (state.bbLayout === 'market') {
     setHTML(
       body,
-      tokenLineHtml() +
-        bbDetailsBarHtml(list) +
-        bbToolbarHtml(list, when) +
-        buybackMarketHtml(list),
+      only + bbDetailsBarHtml(list) + bbToolbarHtml(list, when) + buybackMarketHtml(list),
     );
     return; // table has no thumbnails to enhance
   }
@@ -5097,7 +5229,7 @@ function bbPriceHtml(b) {
   if (b.price) return `<span class="val">${OH.escapeHtml(b.price)}</span>`;
   const sp = buybackStorePrice(b);
   return sp
-    ? `<span class="val est" title="Today's store price. Load details for RSI's exact buy-back price.">${dollars(sp)}</span>`
+    ? `<span class="val est" title="An estimate from today's store price. Load details for RSI's exact buy-back price.">${dollars(sp)}<small class="est-l">est.</small></span>`
     : '';
 }
 
@@ -5340,10 +5472,11 @@ if (bbSortEl) {
 if (bbChipsEl) {
   bbChipsEl.addEventListener('click', (e) => {
     const btn = e.target.closest('.chip');
-    if (!btn) return;
+    if (!btn || 'bbUnder' in btn.dataset) return; // Below store price: handled below
     if (btn.dataset.clear) {
       state.bbShown.clear();
       state.bbTraits.clear();
+      state.bbUnder = false;
     } else if (btn.dataset.trait) {
       cycleTrait(state.bbTraits, btn.dataset.trait);
     } else {
@@ -5904,7 +6037,75 @@ if (referralsBodyEl) {
   });
 }
 
-// Copy referral link/code button (Citizen Card pill). Uses the clipboard API with
+// Inventory / Buy-Backs pass: switches, Clear filters, Below store price, saved
+// views and the Export ▾ menus.
+document.addEventListener('click', (e) => {
+  const t = e.target;
+  const sw = t.closest('[data-switch]');
+  if (sw) {
+    const k = sw.dataset.switch;
+    if (k === 'inv-hide') {
+      state.hideSmall = !state.hideSmall;
+      chrome.storage.local.set({ hideSmallInv: state.hideSmall });
+      return renderInventory();
+    }
+    if (k === 'bb-hide') {
+      state.bbHideSmall = !state.bbHideSmall;
+      chrome.storage.local.set({ hideSmallBb: state.bbHideSmall });
+    } else if (k === 'bb-stack') {
+      state.bbStack = !state.bbStack;
+      chrome.storage.local.set({ bbStack: state.bbStack });
+    }
+    return renderBuybacks();
+  }
+  if (t.closest('[data-bb-under]')) {
+    state.bbUnder = !state.bbUnder;
+    return renderBuybacks();
+  }
+  const apply = t.closest('[data-view-apply]');
+  if (apply) {
+    const v = state.savedViews[+apply.dataset.viewApply];
+    if (!v) return;
+    state.shown = new Set(v.f.shown);
+    state.traits = new Map(v.f.traits);
+    state.query = v.f.query || '';
+    state.hideSmall = !!v.f.hideSmall;
+    const q = $('#search');
+    if (q) q.value = state.query;
+    return renderInventory();
+  }
+  const del = t.closest('[data-view-del]');
+  if (del) {
+    state.savedViews.splice(+del.dataset.viewDel, 1);
+    saveViews();
+    return renderSavedViews();
+  }
+  if (t.closest('[data-view-save]')) {
+    const name = (prompt('Name this view (for example "Giftable ships")') || '').trim();
+    if (!name) return;
+    state.savedViews.push({ name: name.slice(0, 40), f: currentView_inv() });
+    saveViews();
+    return renderSavedViews();
+  }
+  const ex = t.closest('[data-export]');
+  if (ex) {
+    closeCardMenus();
+    const act = ex.dataset.export;
+    if (act === 'inv-csv') exportMarketCsv($('#sb-status'));
+    else if (act === 'inv-image') setSelecting(true);
+    else if (act === 'bb-csv') exportBuybackCsv(null);
+    else if (act === 'backup') $('#export-db')?.click();
+  }
+});
+
+// Buy-Backs opened from a Hangar Alert: Show all clears the filter.
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('[data-bb-all]')) return;
+  state.bbOnly = null;
+  renderBuybacks();
+});
+
+// Copy referral link/code button (Referrals page). Uses the clipboard API with
 // a brief "Copied" confirmation; falls back silently if clipboard is unavailable.
 document.addEventListener('click', async (e) => {
   const btn = e.target.closest('.ref-copy');
@@ -5929,7 +6130,10 @@ document.addEventListener('click', async (e) => {
 async function runScan({ hangar = true, buybacks = true, referrals = true, store = true } = {}) {
   if (!hangar && !buybacks && !referrals && !store) return;
   scanBtn.disabled = true;
+  if ($('#welcome-scan')) $('#welcome-scan').disabled = true;
   if (scanSelectedBtn) scanSelectedBtn.disabled = true;
+  scanProgress.i = 0;
+  scanProgress.n = [hangar, buybacks, referrals, store].filter(Boolean).length || 1;
   setStatus('Scanning…');
   setScanning('Scanning…');
   const parts = [];
@@ -5963,6 +6167,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
     }
   }
 
+  if (hangar) scanProgress.i++;
   if (buybacks) {
     const b = await OH.scanSource('buybacks', (page, c, retry) => {
       setStatus(
@@ -5986,6 +6191,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   }
 
   // Referrals — separate source (GraphQL, not in OH.SOURCES).
+  if (buybacks) scanProgress.i++;
   if (referrals) {
     const r = await OH.getReferral((phase, n) => {
       setStatus(`Scanning referrals — ${phase}… ${n}`);
@@ -6006,6 +6212,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   // Store: re-check RSI's store for your wishlist ships (skips the 6-hour cache).
   if (store && state.wishlist.length) {
     setStatus('Checking the store for your wishlist…');
+    if (referrals) scanProgress.i++;
     setScanning('store');
     const list = await wishlistStock({ force: true });
     const n = list.filter((x) => x.st && x.st.state === 'in').length;
@@ -6020,17 +6227,77 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   route();
   renderAccount(); // refresh the Citizen Card pill with the new referral counts
   scanBtn.disabled = false;
+  if ($('#welcome-scan')) $('#welcome-scan').disabled = false;
   if (scanSelectedBtn) scanSelectedBtn.disabled = false;
 }
 
-// Primary button scans everything; the caret opens a per-source menu.
-scanBtn.addEventListener('click', () => runScan());
+// The top bar's Scan runs what's ticked in its ▾ menu: "Scan All" by default,
+// "Scan Custom" once anything is unticked (owner, 2026-09-30). Remembered.
+const SCAN_SOURCES = ['hangar', 'buybacks', 'referrals', 'store'];
+const scanBoxes = () => [...document.querySelectorAll('.scan-src')];
+function scanChoice() {
+  const on = new Set(
+    scanBoxes()
+      .filter((el) => el.checked)
+      .map((el) => el.value),
+  );
+  return Object.fromEntries(SCAN_SOURCES.map((k) => [k, on.has(k)]));
+}
+function updateScanLabel() {
+  const boxes = scanBoxes();
+  const on = boxes.filter((el) => el.checked);
+  const all = on.length === boxes.length;
+  if (scanBtn.classList.contains('scanning')) return; // the progress owns the label
+  scanBtn.querySelector('.scan-label').textContent = all ? 'Scan All' : 'Scan Custom';
+  const what = all
+    ? 'Scan everything: inventory, buy-backs, referrals and your wishlist in the store'
+    : on.length
+      ? `Scan ${on.map((el) => el.dataset.name).join(', ')} (change with ▾)`
+      : 'Nothing ticked: pick what to scan with ▾';
+  scanBtn.title = state.scannedAt
+    ? `${what}\nLast scan: ${new Date(state.scannedAt).toLocaleString()}`
+    : what;
+}
+function scanChosen() {
+  const c = scanChoice();
+  if (!Object.values(c).some(Boolean)) {
+    setStatus('Pick at least one thing to scan (the ▾ next to Scan).', true);
+    return;
+  }
+  closeCardMenus();
+  runScan(c);
+}
+scanBtn.addEventListener('click', scanChosen);
+for (const el of scanBoxes()) {
+  el.addEventListener('change', () => {
+    updateScanLabel();
+    chrome.storage.local.set({
+      scanSources: scanBoxes()
+        .filter((b) => b.checked)
+        .map((b) => b.value),
+    });
+  });
+}
+// "Select All" in the menu ticks everything again.
+document.querySelector('[data-scan-all]')?.addEventListener('click', () => {
+  for (const el of scanBoxes()) el.checked = true;
+  scanBoxes()[0]?.dispatchEvent(new Event('change'));
+});
+chrome.storage.local.get('scanSources').then(({ scanSources }) => {
+  if (Array.isArray(scanSources)) {
+    for (const el of scanBoxes()) el.checked = scanSources.includes(el.value);
+  }
+  updateScanLabel();
+});
 
 // Open below the ▾ button, right edges lined up; above it if there's no room.
 // Citizen Card pop-up menus (Scan options, Settings): pinned to the viewport
 // under their button so the card's clipped edges can't cut them off.
 const cardMenus = [
   [scanMenuBtn, scanMenu],
+  [$('#bell-btn'), $('#bell-menu')],
+  [$('#inv-exp-btn'), $('#inv-exp-menu')],
+  [$('#bb-exp-btn'), $('#bb-exp-menu')],
   [$('#settings-btn'), $('#settings-menu')],
 ].filter(([b, m]) => b && m);
 function placeMenu(btn, menu) {
@@ -6060,7 +6327,11 @@ for (const [btn, menu] of cardMenus) {
     placeMenu(btn, menu); // again now that it has a size
   });
   // Clicks inside the menu (checkboxes, the currency picker) shouldn't close it.
-  menu.addEventListener('click', (e) => e.stopPropagation());
+  menu.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // A link or action in the menu (Updates, Log Out of RSI…) closes it.
+    if (e.target.closest('a, .menu-item')) closeCardMenus();
+  });
 }
 if (cardMenus.length) {
   // Scrolling or resizing moves the buttons; just close the menus.
@@ -6069,24 +6340,7 @@ if (cardMenus.length) {
   document.addEventListener('click', closeCardMenus);
 }
 
-if (scanSelectedBtn) {
-  scanSelectedBtn.addEventListener('click', () => {
-    const checked = new Set(
-      [...document.querySelectorAll('.scan-src:checked')].map((el) => el.value),
-    );
-    if (!checked.size) {
-      setStatus('Select at least one source to scan.', true);
-      return;
-    }
-    closeCardMenus();
-    runScan({
-      hangar: checked.has('hangar'),
-      buybacks: checked.has('buybacks'),
-      referrals: checked.has('referrals'),
-      store: checked.has('store'),
-    });
-  });
-}
+scanSelectedBtn?.addEventListener('click', scanChosen);
 
 logoutBtn.addEventListener('click', async () => {
   logoutBtn.disabled = true;
@@ -6551,7 +6805,10 @@ function showUpdateBanner(version) {
   const bar = $('#update-banner');
   if (!bar || !version || OH.compareVersions(version, cur) <= 0) return;
   $('#update-text').textContent = `Open Hangar ${version} is ready. Reload to start using it.`;
-  bar.hidden = false;
+  // Shown in your menu (a dot on the portrait) rather than a banner across the page.
+  $('#upd-dot').hidden = false;
+  $('#menu-upd-text').textContent = `Update ready: ${version}`;
+  $('#menu-upd').hidden = false;
 }
 
 async function initUpdates() {
@@ -6565,6 +6822,7 @@ async function initUpdates() {
   chrome.storage.onChanged?.addListener((ch, area) => {
     if (area === 'local' && ch.updateReady) showUpdateBanner(ch.updateReady.newValue);
   });
+  $('#menu-upd-reload')?.addEventListener('click', () => $('#update-reload').click());
   $('#update-reload')?.addEventListener('click', async () => {
     $('#update-reload').disabled = true;
     await chrome.storage.local.set({ reopenAfterUpdate: true });
@@ -6607,13 +6865,10 @@ let siteWait = null; // { stop, code } while waiting for the website to confirm
 async function renderSiteLink() {
   const el = $('#site-link');
   if (!el) return;
-  // Until the website is live, show "coming soon". Developers switch it on
-  // by setting the `siteUrl` storage key (e.g. to http://localhost:4321).
+  // Nothing until the website is live (owner, 2026-09-30: no teaser). Developers
+  // switch it on by setting the `siteUrl` storage key (e.g. to http://localhost:4321).
   if (!(await OH.siteEnabled())) {
-    setHTML(
-      el,
-      '<span class="tease">🚀 <strong>Something big is coming.</strong> Your hangar on any device, your org’s fleet live, and more. Stay tuned.</span>',
-    );
+    setHTML(el, '');
     return;
   }
   const link = await OH.getSiteLink();
@@ -7085,22 +7340,60 @@ function spendingSectionHtml() {
 // A banner while a referral bonus event runs (they come with the big sales:
 // IAE, Invictus, CitizenCon, Luminalia…), from the wiki's event list.
 function renderEventBanner() {
-  const el = $('#event-banner');
-  if (!el) return;
-  refreshReferralEvents();
-  const ev = runningEvent();
-  if (!ev) {
-    el.hidden = true;
+  refreshReferralEvents(); // calls back here when newer events arrive
+  homeUpdated();
+}
+
+// --- Alerts bell (top bar) -------------------------------------------------------
+// Home's Hangar Alerts publishes its list (OHApp.alerts); the bell shows the count
+// and the same alerts in a drop-down, with × to ignore, on every page.
+function renderBell() {
+  const al = window.OHApp?.alerts;
+  const list = (al && al.list) || [];
+  const n = $('#bell-n');
+  if (n) {
+    n.hidden = !list.length;
+    n.textContent = list.length > 9 ? '9+' : String(list.length);
+  }
+  const menu = $('#bell-menu');
+  if (!menu) return;
+  const esc = OH.escapeHtml;
+  setHTML(
+    menu,
+    `<div class="bm-head"><span>${list.length ? `${list.length} alert${list.length === 1 ? '' : 's'}` : 'All caught up'}</span>${list.length ? '<button type="button" class="bm-clear" data-clear-alerts>Clear All</button>' : ''}</div>` +
+      (list.length
+        ? list
+            .map(
+              (x, i) =>
+                `<div class="bm-row ${esc(x.kind || '')}"><a href="${esc(x.href || '#home')}" data-alert="${i}"><b>${esc(x.title)}</b><small>${esc(x.sub || '')}</small></a><button type="button" class="bm-x" data-ignore="${i}" title="Ignore" aria-label="Ignore: ${esc(x.title)}">×</button></div>`,
+            )
+            .join('')
+        : '<p class="bm-none">Nothing new. Alerts show up here when a wishlist ship goes on sale, a ship you own turns flight ready, and more.</p>'),
+  );
+}
+document.addEventListener('oh:alerts', renderBell);
+$('#bell-menu')?.addEventListener('click', (e) => {
+  const list = window.OHApp?.alerts?.list || [];
+  // Clear All ignores every alert showing (each comes back if something new happens).
+  if (e.target.closest('[data-clear-alerts]')) {
+    for (const x of list) window.OHApp.alerts.ignore(x.key);
     return;
   }
-  setHTML(
-    el,
-    `<strong>${OH.escapeHtml(ev.name)}</strong> is on until ${OH.escapeHtml(
-      fmtDate(parseTs(ev.end + ' 00:00:00')),
-    )}. Referral bonus: <strong>${OH.escapeHtml(shortReward(ev.reward))}</strong> for anyone who enlists with your code and buys a game package. <a href="#referrals" data-view="referrals">Your referrals</a>`,
-  );
-  el.hidden = false;
-}
+  const ig = e.target.closest('[data-ignore]');
+  if (ig) {
+    window.OHApp.alerts.ignore(list[+ig.dataset.ignore].key);
+    return;
+  }
+  const go = e.target.closest('[data-alert]');
+  if (go) {
+    const x = list[+go.dataset.alert];
+    if (x && x.go) {
+      e.preventDefault();
+      x.go();
+    }
+    closeCardMenus();
+  }
+});
 
 // --- Global hangar search (Home) ------------------------------------------------
 // Searches what's yours: hangar pledges (names and what's inside), buy-backs
@@ -7111,6 +7404,9 @@ const gsearchOut = $('#gsearch-results');
 function closeGlobalSearch() {
   if (gsearchOut) gsearchOut.hidden = true;
 }
+// Rich results (0.3.0): a plain yes/no answer first, then one row per match with
+// its picture, full name, what it's inside, key facts and price, grouped by where
+// it lives. Rows open the pledge / buy-back details; the list scrolls in place.
 function globalSearchHtml(q) {
   const needle = q.trim().toLowerCase();
   const esc = OH.escapeHtml;
@@ -7118,34 +7414,89 @@ function globalSearchHtml(q) {
     String(s || '')
       .toLowerCase()
       .includes(needle);
-  const group = (title, rows) =>
+  // RSI dates arrive as "2015-06-08" (read as UTC so it never shifts a day) or already readable.
+  const day = (d) => {
+    const iso = /^\d{4}-\d{2}-\d{2}$/.test(d);
+    const t = Date.parse(d);
+    return isNaN(t)
+      ? d
+      : new Date(t).toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          ...(iso ? { timeZone: 'UTC' } : {}),
+        });
+  };
+  const tag = (t, cls = '') => (t ? `<span class="gs-tag ${cls}">${esc(t)}</span>` : '');
+  const pic = (img, resolve, label) =>
+    img
+      ? `<span class="gs-img"><img src="${esc(img)}" alt="" loading="lazy"></span>`
+      : `<span class="gs-img" data-resolve="${esc(resolve || '')}"><span>${esc(label || '')}</span></span>`;
+  const row = ({ attr, img, resolve, name, where, tags, val, valLbl, open }) =>
+    `<button type="button" class="gs-row gs-rich" ${attr}>${pic(img, resolve, name)}<span class="gs-info"><span class="gs-name">${esc(name)}</span><span class="gs-where">${where}</span><span class="gs-tags">${tags.join('')}</span></span><span class="gs-side">${val ? `<b>${esc(val)}</b>${valLbl ? `<small>${esc(valLbl)}</small>` : ''}` : ''}<span class="gs-open">${open}</span></span></button>`;
+  const group = (title, rows, n) =>
     rows.length
-      ? `<div class="gs-group"><div class="gs-title">${title}</div>${rows.join('')}</div>`
+      ? `<div class="gs-group"><div class="gs-title"><span>${title}</span><span>${n > rows.length ? `${rows.length} of ${n}` : n}</span></div>${rows.join('')}</div>`
       : '';
-  const pledges = state.items
-    .filter((p) => has(plainName(p)) || (p.contents || []).some((c) => has(c.label)))
-    .slice(0, 8)
-    .map(
-      (p) =>
-        `<button type="button" class="gs-row" data-open-item="${esc(String(p.id))}"><span>${esc(
-          plainName(p),
-        )}</span><span class="muted">${[
-          p.giftable ? 'giftable' : '',
-          isMeltable(p) ? 'meltable' : '',
-          formatValue(p),
+
+  const hits = state.items.filter(
+    (p) => has(plainName(p)) || (p.contents || []).some((c) => has(c.label)),
+  );
+  const pledges = hits.slice(0, 12).map((p) => {
+    // Matched a ship inside a package: lead with that ship, say what it's in.
+    const inner = !has(plainName(p)) && (p.contents || []).find((c) => has(c.label));
+    const type = pledgeType(p);
+    return row({
+      attr: `data-open-item="${esc(String(p.id))}"`,
+      img: realImage(p.image),
+      resolve: inner ? inner.label : resolveImageName(p),
+      name: inner ? inner.label : cardName(p),
+      where:
+        // The group heading already says where it is; the row says what it's inside.
+        [
+          inner ? `Inside <b>${esc(cardName(p))}</b>` : '',
+          p.date ? `<em>Pledged ${esc(day(p.date))}</em>` : '',
         ]
           .filter(Boolean)
-          .join(' · ')}</span></button>`,
-    );
-  const bbs = state.buybacks
-    .filter((b) => has(b.name) || (b.ccu && (has(b.ccu.from) || has(b.ccu.to))))
-    .slice(0, 5)
-    .map(
-      (b) =>
-        `<button type="button" class="gs-row" data-open-bb="${esc(String(b.id))}"><span>${esc(
-          b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '',
-        )}</span><span class="muted">buy-back</span></button>`,
-    );
+          .join(' <em>·</em> '),
+      tags: [
+        tag(TYPE_KEYS.includes(type) ? type.toUpperCase() : p.kind, `badge ${type}`),
+        tag(p.insurance),
+        isMeltable(p) ? tag('Meltable', 'good') : '',
+        p.giftable ? tag('Giftable', 'good') : '',
+      ],
+      val: isMeltable(p) ? formatValue(p) : '',
+      valLbl: 'melt value',
+      open: 'Details →',
+    });
+  });
+  const bbHits = state.buybacks.filter(
+    (b) => has(b.name) || has(b.contains) || (b.ccu && (has(b.ccu.from) || has(b.ccu.to))),
+  );
+  const bbs = bbHits.slice(0, 8).map((b) => {
+    const type = b.isCCU ? 'ccu' : b.kind;
+    return row({
+      attr: `data-open-bb="${esc(String(b.id))}"`,
+      img: b.ccu && b.ccu.to && !b.shipArt ? null : realImage(b.image),
+      resolve: b.ccu && b.ccu.to ? b.ccu.to : resolveImageName({ ...b, kind: 'ship' }) || b.name,
+      name: b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '',
+      where: [
+        b.contains ? esc(b.contains) : '',
+        b.date ? `<em>Melted ${esc(day(b.date))}</em>` : '',
+      ]
+        .filter(Boolean)
+        .join(' <em>·</em> '),
+      tags: [
+        tag(
+          TYPE_KEYS.includes(type) ? type.toUpperCase() : type || 'BUY-BACK',
+          `badge ${type || ''}`,
+        ),
+        tag(b.insurance),
+      ],
+      val: bbPriceText(b),
+      open: 'Details →',
+    });
+  });
   const ref = state.referral;
   const rewards = ref
     ? earnedRewards(
@@ -7154,15 +7505,43 @@ function globalSearchHtml(q) {
         (ref.legacy?.recruits ?? 0) > 0,
       )
         .filter((r) => has(r.name))
-        .slice(0, 3)
+        .slice(0, 4)
         .map(
           (r) =>
-            `<a class="gs-row" href="#referrals"><span>${esc(r.name)}</span><span class="muted">reward · ${esc(r.sub)}</span></a>`,
+            `<a class="gs-row gs-rich" href="#referrals">${pic(null, '', r.name)}<span class="gs-info"><span class="gs-name">${esc(r.name)}</span><span class="gs-where">Referral reward <em>· ${esc(r.sub)}</em></span></span><span class="gs-side"><span class="gs-open">Referrals →</span></span></a>`,
         )
     : [];
-  const html =
-    group('Your Hangar', pledges) + group('Buy-Backs', bbs) + group('Referral Rewards', rewards);
-  return html || `<div class="gs-empty muted">Nothing matches "${esc(q.trim())}".</div>`;
+
+  // The groups say where things are (owner: no yes/no line); only an empty search
+  // gets a line of its own.
+  const body =
+    group('In Your Hangar', pledges, hits.length) +
+    group('In Your Buy-Backs', bbs, bbHits.length) +
+    group('Earned Rewards', rewards, rewards.length);
+  if (!body)
+    return `<div class="gs-none">Nothing in your hangar, buy-backs or referral rewards matches "${esc(q.trim())}".</div>`;
+  const total = pledges.length + bbs.length + rewards.length;
+  return `<div class="gs-scroll">${body}</div><div class="gs-foot"><span>${total} result${total === 1 ? '' : 's'} · Enter opens the first</span><span>Searching your hangar, buy-backs and rewards</span></div>`;
+}
+// Search rows without RSI art get the ship's picture from the wiki (few at a time).
+function resolveSearchImages(root) {
+  const slots = [...root.querySelectorAll('.gs-img[data-resolve]')].filter(
+    (el) => el.dataset.resolve,
+  );
+  let i = 0;
+  const worker = async () => {
+    while (i < slots.length) {
+      const el = slots[i++];
+      const url = await OH.getShipImage(el.dataset.resolve);
+      if (!url || !el.isConnected) continue;
+      const im = document.createElement('img');
+      im.src = url;
+      im.alt = '';
+      im.loading = 'lazy';
+      el.replaceChildren(im);
+    }
+  };
+  for (let w = 0; w < 3; w++) worker();
 }
 if (gsearch && gsearchOut) {
   gsearch.addEventListener('input', () => {
@@ -7171,6 +7550,7 @@ if (gsearch && gsearchOut) {
     ensurePrices();
     setHTML(gsearchOut, globalSearchHtml(q));
     gsearchOut.hidden = false;
+    resolveSearchImages(gsearchOut);
   });
   gsearch.addEventListener('focus', () => {
     if (gsearch.value.trim().length >= 2) gsearch.dispatchEvent(new Event('input'));
@@ -7181,22 +7561,57 @@ if (gsearch && gsearchOut) {
       gsearch.blur();
     } else if (e.key === 'Enter') {
       gsearchOut.querySelector('.gs-row')?.click();
+      closeGlobalSearch();
     }
   });
   gsearchOut.addEventListener('click', (e) => {
-    if (e.target.closest('a.gs-row')) closeGlobalSearch();
+    if (e.target.closest('.gs-row')) closeGlobalSearch();
   });
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.gsearch')) closeGlobalSearch();
   });
+  // The top bar's search box: same results, shown under it, on every page.
+  const top = $('#gsearch-top');
+  const topOut = $('#gsearch-top-results');
+  if (top && topOut) {
+    top.addEventListener('input', () => {
+      const q = top.value;
+      if (q.trim().length < 2) {
+        topOut.hidden = true;
+        return;
+      }
+      ensurePrices();
+      setHTML(topOut, globalSearchHtml(q));
+      topOut.hidden = false;
+      resolveSearchImages(topOut);
+    });
+    top.addEventListener('focus', () => {
+      if (top.value.trim().length >= 2) top.dispatchEvent(new Event('input'));
+    });
+    top.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        topOut.hidden = true;
+        top.blur();
+      } else if (e.key === 'Enter') {
+        topOut.querySelector('.gs-row')?.click();
+        topOut.hidden = true;
+      }
+    });
+    topOut.addEventListener('click', (e) => {
+      if (e.target.closest('.gs-row')) topOut.hidden = true;
+    });
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#top-search')) topOut.hidden = true;
+    });
+  }
   document.addEventListener('keydown', (e) => {
     const typing =
       /^(input|textarea|select)$/i.test(e.target.tagName) || e.target.isContentEditable;
     if (e.key === '/' && !typing) {
-      // The search lives on Home: jump there from any other page.
+      // Home's big box on Home; the top bar's box everywhere else.
       e.preventDefault();
-      if (!$('#view-home').classList.contains('active')) location.hash = '#home';
-      setTimeout(() => gsearch.focus(), 60);
+      if ($('#view-home').classList.contains('active')) gsearch.focus();
+      else $('#gsearch-top')?.focus();
     }
   });
 }
@@ -7211,6 +7626,11 @@ if (gsearch && gsearchOut) {
     uiStatsTab,
     lastBackupAt,
     remindRescan,
+    streamerMode,
+    hideSmallInv,
+    hideSmallBb,
+    bbStack,
+    savedViews,
     currency,
     uiGroupByType,
     wishlist,
@@ -7221,6 +7641,11 @@ if (gsearch && gsearchOut) {
     'currency',
     'uiGroupByType',
     'remindRescan',
+    'streamerMode',
+    'hideSmallInv',
+    'hideSmallBb',
+    'bbStack',
+    'savedViews',
     'lastBackupAt',
     'uiStatsTab',
     'uiLayout',
@@ -7233,6 +7658,24 @@ if (gsearch && gsearchOut) {
   if (WISH_SORTS.some(([k]) => k === uiWishSort)) state.wishSort = uiWishSort;
   if (STATS_TABS.some(([k]) => k === uiStatsTab)) state.statsTab = uiStatsTab;
   if (Number.isFinite(lastBackupAt)) state.lastBackupAt = lastBackupAt;
+  streamer.on = streamerMode === true;
+  state.hideSmall = hideSmallInv === true;
+  state.bbHideSmall = hideSmallBb !== false; // on unless turned off
+  state.bbStack = bbStack === true;
+  if (Array.isArray(savedViews)) state.savedViews = savedViews.filter((v) => v && v.name && v.f);
+  document.documentElement.classList.toggle('streamer', streamer.on);
+  const stream = $('#streamer-toggle');
+  if (stream) {
+    stream.checked = streamer.on;
+    stream.addEventListener('change', async () => {
+      streamer.on = stream.checked;
+      document.documentElement.classList.toggle('streamer', streamer.on);
+      await chrome.storage.local.set({ streamerMode: streamer.on });
+      route(); // redraw the page with (or without) amounts
+      renderAccount();
+      homeUpdated();
+    });
+  }
   const remind = $('#remind-toggle');
   if (remind) {
     remind.checked = remindRescan !== false;
@@ -7266,3 +7709,76 @@ if (gsearch && gsearchOut) {
     applyCurrency(currency);
   }
 })();
+
+// --- Bridge for the Svelte pages (ui/) -------------------------------------------
+// ui/ is compiled by Vite into src/ui/ and loaded as a module after this script. It
+// reads the app through window.OHApp and redraws on the 'oh:home' event.
+let homeUpdateQueued = false;
+function homeUpdated() {
+  if (homeUpdateQueued) return;
+  homeUpdateQueued = true;
+  queueMicrotask(() => {
+    homeUpdateQueued = false;
+    document.dispatchEvent(new CustomEvent('oh:home'));
+  });
+}
+window.OHApp = {
+  get state() {
+    return state;
+  },
+  get recruits() {
+    return state.referral?.legacy?.recruits ?? 0;
+  },
+  hangarValue,
+  // A history snapshot's ships at today's store prices (same as Stats → History).
+  snapshotStore: (snap) => (state.priceOf ? snapshotStore(snap) : null),
+  money,
+  dollars,
+  // Whole amounts in the chosen currency: exact under 100,000, then "$1.24M" /
+  // "$184.5K" so a huge hangar never breaks a layout (exact value goes in a tooltip).
+  bigMoney: (n) => {
+    if (streamer.on) return MASK;
+    const v = n * fx.rate;
+    if (Math.abs(v) < 100000) return fmtCurrency(v, 0);
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: fx.code,
+      notation: 'compact',
+      maximumFractionDigits: Math.abs(v) >= 1e6 ? 2 : 1,
+    }).format(v);
+  },
+  fmtDay,
+  changeSummary,
+  pledgeType,
+  typeKeys: TYPE_KEYS,
+  cardName,
+  plainName,
+  realImage,
+  resolveImageName,
+  formatValue,
+  runningEvent,
+  shortReward,
+  parseTs,
+  wishlistStock,
+  tierProgress: (recruits) => tierProgress(REFERRAL_LADDER_STANDARD, recruits),
+  rewardNames,
+  openItem: (id) => {
+    const p = state.items.find((x) => String(x.id) === String(id));
+    if (p) openItemModal(p);
+  },
+  // Open Buy-Backs showing only these (a Hangar Alert's matches), with Show all.
+  showBuybacks: (ids, label) => {
+    state.bbOnly = { ids: new Set(ids.map(String)), label };
+    if (location.hash === '#buybacks') renderBuybacks();
+    else location.hash = '#buybacks';
+  },
+  // Open Inventory with one kind or trait filter on ("ship", "ccu", "lti", "all").
+  showInventory: (key) => {
+    state.shown = new Set(OH.KINDS.some((k) => k.key === key) ? [key] : []);
+    state.traits = new Map(key === 'lti' ? [['lti', 'yes']] : []);
+    location.hash = '#inventory';
+    renderInventory();
+  },
+  shipOf: (name) => (state.shipOf ? state.shipOf(name) : null),
+  priceOf: (name) => (state.priceOf ? state.priceOf(name) : null),
+};

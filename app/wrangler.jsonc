@@ -38,4 +38,29 @@
   "observability": {
     "enabled": true,
   },
+  // Staging (docs/WEBSITE-PLAN.md, Backend Foundation step 3): its own database and
+  // session store at staging.openhangar.space, deployed on every push to main by
+  // .github/workflows/deploy.yml. Sign-ups stay closed; Discord login stays hidden
+  // (no client secret) and emails are only logged (no Resend key).
+  "env": {
+    "staging": {
+      "name": "open-hangar-app-staging",
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "open-hangar-staging",
+          "database_id": "b07d57f7-09dd-4618-b5ce-04e84d4a8431",
+          "migrations_dir": "migrations",
+        },
+      ],
+      "kv_namespaces": [{ "binding": "SESSION", "id": "47d0313c015d47c5852002b2db8798ac" }],
+      "vars": {
+        "BETTER_AUTH_URL": "https://staging.openhangar.space",
+        "DISCORD_CLIENT_ID": "",
+        "EMAIL_FROM": "Open Hangar Staging <noreply@openhangar.space>",
+        "SIGNUPS_OPEN": "false",
+      },
+      "routes": [{ "pattern": "staging.openhangar.space", "custom_domain": true }],
+    },
+  },
 }
