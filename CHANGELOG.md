@@ -18,7 +18,7 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   date's length.
 - Fixed: hovering a button no longer turns it solid blue (that hid the text of outlined buttons and tabs);
   it just brightens.
-- Improved: **Updates page splits each release into New, Improved and Fixed**, so new features
+- Improved: **Updates page splits each release into New (green), Improved (blue) and Fixed (red)**, so new features
   are easy to spot.
 - Improved: **Check for Updates works on Firefox.** It asks Firefox Add-ons for the latest
   version and tells you whether you're on it, instead of pointing you to about:addons.
