@@ -4,6 +4,7 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Changed: **Open Hangar's code is now source available** (PolyForm Strict License). It stays public on GitHub so anyone can read and audit it, but it can't be copied into other versions. Earlier releases stay MIT.
 - Improved: Citizen Card: long org names wrap to two lines at most (full name on hover), and the
   "Open Hangar vX · What's new · Star Citizen X" line moved to the page footer.
 - Improved: Org Fleet: a role nobody has lists **every** ship that fills it (cheapest first, scrolling), not

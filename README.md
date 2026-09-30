@@ -2,13 +2,13 @@
 
 [![Website](https://img.shields.io/badge/Website-openhangar.space-2f81f7?style=for-the-badge)](https://openhangar.space/)
 [![Version](https://img.shields.io/badge/version-0.2.8-blue?style=for-the-badge)](manifest.json)
-[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+[![License](https://img.shields.io/badge/License-PolyForm%20Strict-blue?style=for-the-badge)](LICENSE)
 [![Roadmap](https://img.shields.io/badge/%F0%9F%97%BA%EF%B8%8F-Roadmap-orange?style=for-the-badge)](ROADMAP.md)
 
 **Your Star Citizen hangar, made useful: what your ships are worth, what you could
 melt, what your CCUs saved you, and a clean local database you can export.**
 
-Open Hangar is a free, open-source browser extension for **Chrome, Edge and Firefox**.
+Open Hangar is a free, source-available browser extension for **Chrome, Edge and Firefox**.
 It reads your own RSI account using the session you're already signed in with, and
 saves it on your machine as tidy, structured data. Browse your fleet in the built-in
 viewer, or export everything as one JSON file and build on it.
@@ -233,7 +233,11 @@ redistribute other people's data.
 
 ## License & community
 
-Code: MIT, see [LICENSE](LICENSE). Open Hangar uses no Star Citizen Fankit assets.
+Code: source available under the [PolyForm Strict License 1.0.0](LICENSE): read it, audit
+it and use Open Hangar, but don't redistribute it or publish modified versions. Releases
+before 0.2.12 were MIT. Third-party code keeps its own license
+([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)). Open Hangar uses no Star Citizen
+Fankit assets.
 Star Citizen® and related names are trademarks of Cloud Imperium Rights LLC; this is
 an unofficial fan project, not affiliated with the Cloud Imperium group of companies.
 
