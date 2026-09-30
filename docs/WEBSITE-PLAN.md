@@ -247,6 +247,29 @@ Owner ideas, 2026-09-30. Ship together when sign-ups open:
 - **"Sync after every scan"** toggle in the extension, off by default.
 - **Two-card landing page** (Private & Local vs Connected) and `SIGNUPS_OPEN=true`.
 
+## Backend Foundation (approved 2026-09-30)
+
+Owner's goal: a robust base so updates roll out quickly. In order:
+
+1. **One-command releases** ✅ `npm run release x.y.z` (scripts/release.mjs).
+2. **Discord channels** ✅ code done: `#updates` (public, every release from Publish to
+   stores), `#status` (public, outages and recoveries), `#ops` (private: CI red on main,
+   failed store publish, later deploy/health/stats alerts). `scripts/notify.mjs`.
+   Webhooks as GitHub secrets DISCORD_UPDATES_WEBHOOK / DISCORD_STATUS_WEBHOOK /
+   DISCORD_OPS_WEBHOOK (owner creates them).
+3. **Staging + automatic deploys:** staging.openhangar.space on its own D1, deployed on
+   every push to main; production by one approval in GitHub (environment protection),
+   migrations in the same job after a D1 export. Needs CLOUDFLARE_API_TOKEN and
+   CLOUDFLARE_ACCOUNT_ID secrets.
+4. **Health checks and alerts:** /api/health (D1 + auth), a 5-minute watchdog cron that
+   posts to #ops / #status on failure and recovery, and flags a missed stats run.
+5. **Backups:** weekly D1 exports of both databases to private R2, kept a year, plus a
+   tested restore note (D1 Time Travel covers the last 30 days).
+6. **Hardened API before sign-ups:** rate limits, schema-checked requests, /api/v1,
+   token revocation from the site, one shared backup-format definition tested from
+   both sides.
+7. **Discord bot** with orgs (phase 2): org roles for verified members, /fleet.
+
 ## What the owner needs to do (can't be done for you)
 
 - Approve creating the Cloudflare Pages project and D1 database.
