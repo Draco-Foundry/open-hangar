@@ -10,7 +10,7 @@ import {
   refreshShipChanges,
   rsiStatus,
 } from '../lib/live';
-import { db } from '../lib/sync';
+import { latestSnapshotForUser } from '../lib/accounts';
 
 export const prerender = false;
 const user = Astro.locals.user;
@@ -24,10 +24,7 @@ const nextToken = events.find((e) => e.name.startsWith('Buy-back'));
 // Signed in: a quick look at their synced hangar.
 let mine: { count: number; melt: number; lti: number; synced: number } | null = null;
 if (user) {
-  const row = await db()
-    .prepare('select synced_at, payload from hangar_snapshot where user_id = ?')
-    .bind(user.id)
-    .first<{ synced_at: number; payload: string }>();
+  const row = await latestSnapshotForUser(user.id);
   if (row) {
     try {
       const items: { value?: number; insurance?: string }[] = JSON.parse(row.payload)?.sources?.hangar?.items || [];
