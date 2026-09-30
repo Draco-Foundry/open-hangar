@@ -85,3 +85,25 @@ test('collectionStats: insurance mix, gift/melt split, makers owned of total', (
   assert.equal(anvil.own, 1);
   assert.equal(anvil.total, 2);
 });
+
+test('slimVehicle: the wiki\'s "undefined" size becomes Vehicle for ground vehicles, null otherwise', () => {
+  const base = { name: 'Storm', slug: 'tmbl-storm', size: { en_EN: 'undefined' } };
+  assert.equal(OH.slimVehicle({ ...base, is_vehicle: true }).size, 'Vehicle');
+  assert.equal(OH.slimVehicle({ ...base, is_vehicle: false }).size, null);
+  assert.equal(OH.slimVehicle({ ...base, size: { en_EN: 'Large' } }).size, 'Large');
+});
+
+test("fillCatalogSizes: special editions take their base ship's size", () => {
+  const list = [
+    { lname: 'f8c lightning', size: 'Small' },
+    { lname: 'f8c lightning wikelo war special', size: 'undefined' },
+    { lname: 'corsair', size: 'Large' },
+    { lname: 'corsair pyam exec', size: null },
+    { lname: 'geotack planetary beacon', size: null },
+  ];
+  OH.fillCatalogSizes(list);
+  assert.deepEqual(
+    list.map((v) => v.size),
+    ['Small', 'Small', 'Large', 'Large', null],
+  );
+});
