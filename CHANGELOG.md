@@ -4,6 +4,11 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **Org Fleet:** your own entry now follows your latest scan (Add my fleet used to be a one-off
+  copy, so ships bought later never showed). A role covered only by in-concept ships (a Pioneer for
+  Construction) shows in amber as covered, not missing, and the role panel lists each ship's status.
+  Comparison charts draw the other side in bright white instead of grey, so it stands apart from
+  your blue.
 - **One color, one meaning, on every page.** Item types (ship, pack, package, CCU, paint,
   add-on, coupon) each have their own color and nothing else uses it, now also in filter chips,
   the buy-back window and Stats charts. Green is good news, amber is worth a look, red is a
