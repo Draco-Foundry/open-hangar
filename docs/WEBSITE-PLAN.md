@@ -193,6 +193,20 @@ Migrations in `app/migrations/`; the account, org and history tables are in
 - Rate limits on the API; payload size cap; token revocation.
 - Fan-site notice on the site (same as openhangar.space).
 
+## Launch Batch (scheduled with the items above)
+
+Owner ideas, 2026-09-30. Ship together when sign-ups open:
+
+- **One-click Connect.** The extension's Connect opens app.openhangar.space/link in a
+  new tab with the code prefilled; signed in → one **Approve** click, signed out →
+  sign in (Discord or email) and it links right after. No typing codes. Never a
+  silent link: the extension can't see the site's login without new permissions,
+  and linking without a click breaks the opt-in promise.
+- **Discord login stays on the website.** The Connect tab gives the extension
+  Discord login for free; no auth code or new permissions in the extension.
+- **"Sync after every scan"** toggle in the extension, off by default.
+- **Two-card landing page** (Private & Local vs Connected) and `SIGNUPS_OPEN=true`.
+
 ## What the owner needs to do (can't be done for you)
 
 - Approve creating the Cloudflare Pages project and D1 database.
