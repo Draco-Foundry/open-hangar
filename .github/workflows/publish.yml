@@ -172,3 +172,23 @@ jobs:
           node-version: 22
       - name: Post the release to Discord
         run: node scripts/discord-post.mjs "$VERSION"
+
+  # A store upload failed: tell #ops (private). Skipped until DISCORD_OPS_WEBHOOK is set.
+  ops:
+    needs: [build, firefox, edge, chrome]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Post to #ops
+        env:
+          DISCORD_OPS_WEBHOOK: ${{ secrets.DISCORD_OPS_WEBHOOK }}
+        run: >
+          node scripts/notify.mjs ops --down
+          "Publishing ${{ github.event.inputs.tag }} (${{ github.event.inputs.store }}) failed:
+          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
