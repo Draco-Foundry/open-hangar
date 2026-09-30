@@ -3,14 +3,14 @@
 import type { APIRoute } from 'astro';
 import { getAuth } from '../../lib/auth';
 import { db } from '../../lib/sync';
-import { readTheme } from '../../lib/theme';
+import { readTheme, themeValue } from '../../lib/theme';
 
 export const prerender = false;
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   const body = (await request.json().catch(() => ({}))) as { theme?: string };
   const t = readTheme(body.theme);
-  const value = `${t.palette}.${t.font}.${t.style}`;
+  const value = themeValue(t);
   cookies.set('oh_theme', value, { path: '/', maxAge: 31536000, sameSite: 'lax' });
   const got = await getAuth().api.getSession({ headers: request.headers });
   if (got?.user) {

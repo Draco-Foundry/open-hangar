@@ -1,6 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
-import { discordEnabled } from '../lib/auth';
+import { discordEnabled, SIGNUPS_CLOSED } from '../lib/auth';
 
 export const prerender = false;
 // Only same-site paths after sign-in (no open redirects).
@@ -11,7 +11,9 @@ const discord = discordEnabled();
 // Better Auth sends failed Discord logins back here with ?error=.
 const oauthError = Astro.url.searchParams.get('error');
 const oauthMessage =
-  oauthError === 'account_not_linked'
+  oauthError && /unable_to_create_user|signup|forbidden/i.test(oauthError)
+    ? SIGNUPS_CLOSED
+    : oauthError === 'account_not_linked'
     ? 'That Discord email already has an account here. Sign in with your password, confirm your email, then try Discord again.'
     : oauthError
       ? 'Discord login didn’t work. Try again, or use your email.'
