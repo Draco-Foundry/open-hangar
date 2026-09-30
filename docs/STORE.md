@@ -121,19 +121,25 @@ install prompt only names robertsspaceindustries.com.)_
 
 **Detailed description:**
 
-> Open Hangar is a free companion for your Star Citizen account, with public source code. It reads
-> what RSI already shows you (your hangar, buy-backs, balances, org and referrals) and
-> turns it into something you can actually use.
+> Open Hangar is a free companion for your Star Citizen account. It reads what RSI
+> already shows you (your hangar, buy-backs, balances, org and referrals) and turns it
+> into something you can actually use.
 >
 > What you get:
-> • Hangar value: what your ships sell for at today's store prices, and what you paid
-> • Melt candidates, CCU savings, and the pledges you got for less than store price
+> • A clean home page: your account value and how it's changed over time, game
+> status and events, your newest pledges, and the latest from RSI
+> • Hangar value: what your ships sell for at today's store prices, next to their
+> melt value
+> • Hangar alerts: a wishlist ship on sale, a ship you own turning flight ready, and more
+> • Search your whole hangar, buy-backs and rewards from any page
+> • Melt planner: pick pledges and see what their melt value buys from your wishlist
+> • Filters for everything, plus saved views: LTI, giftable, meltable, packs, below
+> store price and more
 > • Fleet stats: cargo, crew seats, roles, and how much of your fleet is flight ready
-> • Filters for everything: LTI, giftable, meltable, packs, warbonds and more
-> • History: see what changed since your last scan, and back it all up to a file
-> • Fleet images: pick the items you want and copy a clean picture for a sale post
 > • Buy-backs with direct reclaim links, and a full referrals dashboard
-> • Export to JSON, or to FleetYards and other tools (Hangar Transfer Format)
+> • Streamer Mode hides your money amounts for streams and screenshots
+> • History: see what changed since your last scan, and back it all up to a file
+> • Export to CSV, JSON, or FleetYards and other tools (Hangar Transfer Format)
 >
 > Private by design: it runs entirely in your browser, using the RSI session you're
 > already signed in with. No password, no account, no server. Nothing leaves your
