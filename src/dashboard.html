@@ -3895,42 +3895,108 @@
           <a href="#store" data-view="store">Store</a>
           <a href="#org" data-view="org">Org Fleet</a>
           <a href="#referrals" data-view="referrals">Referrals</a>
-          <span class="nav-sep" aria-hidden="true"></span>
-          <a href="#updates" data-view="updates" class="nav-minor">Updates</a>
-          <a href="#developers" data-view="developers" class="nav-minor">Developers</a>
         </nav>
         <div class="hdr-prefs">
           <!-- Language flags go here once the dashboard is translated (TODO.md). -->
-          <!-- Scan from any page (same as the Citizen Card's Scan). -->
-          <button
-            id="scan-top"
-            class="scan-top"
-            type="button"
-            title="Scan your hangar, buy-backs and referrals"
-          >
-            Scan
-          </button>
-          <select
-            id="currency-select"
-            class="currency-select"
-            aria-label="Currency"
-            title="Show amounts in your currency (converted from USD)"
-          >
-            <option value="USD">USD $</option>
-            <option value="EUR">EUR €</option>
-            <option value="GBP">GBP £</option>
-            <option value="CAD">CAD $</option>
-            <option value="AUD">AUD $</option>
-            <option value="NZD">NZD $</option>
-            <option value="CHF">CHF</option>
-            <option value="SEK">SEK kr</option>
-            <option value="PLN">PLN zł</option>
-            <option value="CZK">CZK Kč</option>
-            <option value="BRL">BRL R$</option>
-            <option value="CNY">CNY ¥</option>
-            <option value="JPY">JPY ¥</option>
-            <option value="KRW">KRW ₩</option>
-          </select>
+          <!-- Scan ▾ (every page), then the gear menu: currency, Streamer Mode, rescan
+               reminder, Log Out of RSI, Clear Data, Updates, Developers (0.3.0). -->
+          <div class="scan-split">
+            <button id="scan-home">Scan All</button>
+            <button
+              id="scan-menu-btn"
+              class="scan-caret"
+              aria-haspopup="true"
+              aria-expanded="false"
+              aria-label="Scan options"
+              title="Choose what to scan"
+            >
+              ▾
+            </button>
+            <div id="scan-menu" class="scan-menu" hidden>
+              <label class="scan-opt"
+                ><input type="checkbox" class="scan-src" value="hangar" checked /> Inventory</label
+              >
+              <label class="scan-opt"
+                ><input type="checkbox" class="scan-src" value="buybacks" checked />
+                Buy-Backs</label
+              >
+              <label class="scan-opt"
+                ><input type="checkbox" class="scan-src" value="referrals" checked />
+                Referrals</label
+              >
+              <label
+                class="scan-opt"
+                title="Is each ship on your wishlist in RSI's store right now?"
+                ><input type="checkbox" class="scan-src" value="store" checked /> Store
+                (wishlist)</label
+              >
+              <button id="scan-selected" class="scan-go">Scan Now</button>
+            </div>
+          </div>
+          <div class="cc-settings">
+            <button
+              id="settings-btn"
+              class="btn-secondary cc-gear"
+              aria-haspopup="true"
+              aria-expanded="false"
+              aria-label="Settings"
+              title="Settings"
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M19.14 12.94a7.4 7.4 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7 7 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2.4h-3.8a.5.5 0 0 0-.49.42l-.36 2.54a7 7 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.88a.5.5 0 0 0 .12.64l2.03 1.58a7.4 7.4 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.39 1.05.7 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.8a.5.5 0 0 0 .49-.42l.36-2.54a7 7 0 0 0 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"
+                />
+              </svg>
+            </button>
+            <div id="settings-menu" class="scan-menu settings-menu" hidden>
+              <!-- Language picker goes here once the dashboard is translated (TODO.md). -->
+              <label class="scan-opt menu-currency"
+                ><span>Currency</span>
+                <select
+                  id="currency-select"
+                  class="currency-select"
+                  aria-label="Currency"
+                  title="Show amounts in your currency (converted from USD)"
+                >
+                  <option value="USD">USD $</option>
+                  <option value="EUR">EUR €</option>
+                  <option value="GBP">GBP £</option>
+                  <option value="CAD">CAD $</option>
+                  <option value="AUD">AUD $</option>
+                  <option value="NZD">NZD $</option>
+                  <option value="CHF">CHF</option>
+                  <option value="SEK">SEK kr</option>
+                  <option value="PLN">PLN zł</option>
+                  <option value="CZK">CZK Kč</option>
+                  <option value="BRL">BRL R$</option>
+                  <option value="CNY">CNY ¥</option>
+                  <option value="JPY">JPY ¥</option>
+                  <option value="KRW">KRW ₩</option>
+                </select>
+              </label>
+              <label
+                class="scan-opt"
+                title="Hides money amounts across Open Hangar, for streams and screenshots"
+                ><span>Streamer Mode</span><input type="checkbox" id="streamer-toggle"
+              /></label>
+              <label
+                class="scan-opt"
+                title="Shows an amber ! on the toolbar icon when your last scan is a week old"
+                ><span>Rescan Reminder</span><input type="checkbox" id="remind-toggle" checked
+              /></label>
+              <a class="menu-item menu-link" href="#updates" data-view="updates">Updates</a>
+              <a class="menu-item menu-link" href="#developers" data-view="developers"
+                >Developers</a
+              >
+              <button id="logout-home" class="menu-item" type="button" hidden>
+                Log Out of RSI<small>For switching accounts. Your saved data stays.</small>
+              </button>
+              <button id="clear-home" class="menu-item menu-danger" type="button" hidden>
+                Clear Data
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -3957,91 +4023,27 @@
         <div id="updated-note" class="updated-note" hidden></div>
         <div class="home-hero">
           <div class="citizen-card">
+            <!-- Pilot ID card (owner, 2026-09-30): portrait down the left; name, org,
+                 UEE line, badges and wallet to its right; the org logo as a faint
+                 watermark. Scan and the gear menu live in the top bar. -->
             <div class="cc-account" id="cc-account">
-              <div class="cc-portrait">
-                <div class="cc-avatar" id="cc-avatar"></div>
-                <div class="cc-meta" id="cc-meta"></div>
-              </div>
+              <a class="cc-photo" id="cc-photo" target="_blank" rel="noopener"
+                ><span class="cc-avatar" id="cc-avatar"></span
+              ></a>
+              <img class="cc-water" id="cc-water" alt="" hidden />
               <div class="cc-info">
                 <div class="cc-name" id="cc-name">Open Hangar</div>
-                <div class="cc-org" id="cc-org"></div>
+                <div class="cc-org" id="cc-org" hidden></div>
+                <div class="cc-meta" id="cc-meta"></div>
+                <div class="home-flair" id="home-flair"></div>
                 <div class="home-balances" id="home-balances"></div>
-                <div class="cc-chips">
-                  <div class="home-referral" id="home-referral"></div>
-                  <div class="home-flair" id="home-flair"></div>
-                </div>
               </div>
             </div>
-            <div class="cc-side" id="cc-side">
-              <div class="cc-side-bottom">
-                <div class="scanned" id="scanned-home"></div>
-                <div id="status"></div>
-                <div class="cc-actions">
-                  <div class="scan-split">
-                    <button id="scan-home">Scan</button>
-                    <button
-                      id="scan-menu-btn"
-                      class="scan-caret"
-                      aria-haspopup="true"
-                      aria-expanded="false"
-                      aria-label="Scan options"
-                      title="Choose what to scan"
-                    >
-                      ▾
-                    </button>
-                    <div id="scan-menu" class="scan-menu" hidden>
-                      <label class="scan-opt"
-                        ><input type="checkbox" class="scan-src" value="hangar" checked />
-                        Inventory</label
-                      >
-                      <label class="scan-opt"
-                        ><input type="checkbox" class="scan-src" value="buybacks" checked />
-                        Buy-Backs</label
-                      >
-                      <label class="scan-opt"
-                        ><input type="checkbox" class="scan-src" value="referrals" checked />
-                        Referrals</label
-                      >
-                      <label
-                        class="scan-opt"
-                        title="Is each ship on your wishlist in RSI's store right now?"
-                        ><input type="checkbox" class="scan-src" value="store" checked /> Store
-                        (wishlist)</label
-                      >
-                      <button id="scan-selected" class="scan-go">Scan selected</button>
-                    </div>
-                  </div>
-                  <button id="logout-home" class="btn-secondary" hidden>Log out</button>
-                  <div class="cc-settings">
-                    <button
-                      id="settings-btn"
-                      class="btn-secondary cc-gear"
-                      aria-haspopup="true"
-                      aria-expanded="false"
-                      aria-label="Settings"
-                      title="Settings"
-                    >
-                      <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-                        <path
-                          fill="currentColor"
-                          d="M19.14 12.94a7.4 7.4 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7 7 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2.4h-3.8a.5.5 0 0 0-.49.42l-.36 2.54a7 7 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.88a.5.5 0 0 0 .12.64l2.03 1.58a7.4 7.4 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.39 1.05.7 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.8a.5.5 0 0 0 .49-.42l.36-2.54a7 7 0 0 0 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"
-                        />
-                      </svg>
-                    </button>
-                    <div id="settings-menu" class="scan-menu settings-menu" hidden>
-                      <label
-                        class="scan-opt"
-                        title="Shows an amber ! on the toolbar icon when your last scan is a week old"
-                        ><input type="checkbox" id="remind-toggle" checked /> Weekly rescan
-                        reminder</label
-                      >
-                      <button id="clear-home" class="btn-secondary scan-go" hidden>
-                        Clear Data
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <div class="cc-side" id="cc-side" hidden></div>
+            <!-- Scan progress and messages (kept outside cc-account so they show signed out too). -->
+            <div class="cc-status">
+              <div class="scanned" id="scanned-home" hidden></div>
+              <div id="status"></div>
             </div>
             <!-- Shown instead of the card content when signed out of RSI -->
             <div class="cc-loggedout" id="cc-loggedout" hidden>

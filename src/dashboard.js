@@ -498,7 +498,12 @@ function setScanning(text, done = false) {
 // Amounts are USD; `fx` converts them to the display currency (Home → Currency).
 // `rawMoney` is for numbers the user typed (My Price), which aren't converted.
 const fx = { code: 'USD', rate: 1, date: null };
+// Streamer Mode (gear menu): money amounts show as dots everywhere, hover text
+// included, for streams and screenshots. Set from storage at startup.
+const streamer = { on: false };
+const MASK = '••••';
 const fmtCurrency = (n, digits) => {
+  if (streamer.on) return MASK;
   if (OH.ZERO_DECIMAL.includes(fx.code)) digits = 0; // ¥ / ₩ have no cents
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -522,6 +527,7 @@ const compactNum = (n) => {
   return `${Math.abs(x) >= 100 ? Math.round(x) : Number(x.toFixed(1))}${u}`;
 };
 const shortMoney = (n, full) => {
+  if (streamer.on) return MASK;
   const v = n * fx.rate;
   if (Math.abs(v) < 10000) return full(n);
   return new Intl.NumberFormat('en-US', {
@@ -571,6 +577,7 @@ function storeInfo(p) {
 
 function formatValue(p) {
   if (!Number.isFinite(p.value)) return '';
+  if (streamer.on) return MASK;
   if (!p.currency || p.currency === 'USD' || !/^[A-Z]{3}$/.test(p.currency)) return money(p.value);
   const s = '$' + p.value.toFixed(2);
   // Only append a real non-USD ISO-4217 code. Guards against RSI's junk currency
@@ -769,102 +776,142 @@ function renderAccount() {
 
     updateSignedOutBanner(loggedOut);
 
-    // Avatar (+ subscriber-tier ring)
+    const handle = a.nickname || '';
+    const citizenUrl = handle
+      ? `https://robertsspaceindustries.com/citizens/${encodeURIComponent(handle)}`
+      : null;
+
+    // Portrait: RSI keeps a 1024px original next to the 165px thumbnail the account
+    // page links; use it (the thumbnail stays underneath as a fallback layer).
     if (avEl) {
-      avEl.style.backgroundImage = safeBgUrl(a.avatar);
-      avEl.className =
-        'cc-avatar' +
-        (a.subscriber?.type === 'Imperator' ? ' tier-imperator' : a.subscriber ? ' tier-sub' : '');
+      const thumb = safeBgUrl(a.avatar);
+      const big = /\/heap_infobox\//.test(a.avatar || '')
+        ? safeBgUrl(a.avatar.replace('/heap_infobox/', '/source/'))
+        : '';
+      avEl.style.backgroundImage = [big, thumb].filter(Boolean).join(', ');
+      // No portrait on RSI: the name's initials instead of an empty panel.
+      const nm = a.displayname || a.nickname || '';
+      avEl.textContent = thumb
+        ? ''
+        : nm
+            .split(/[\s_-]+/)
+            .filter(Boolean)
+            .slice(0, 2)
+            .map((w) => w[0].toUpperCase())
+            .join('');
+    }
+    const photo = $('#cc-photo');
+    if (photo) {
+      if (citizenUrl) photo.href = citizenUrl;
+      else photo.removeAttribute('href');
+      photo.title = citizenUrl ? 'Open your RSI citizen page' : '';
     }
 
-    // Name
+    // Name → the citizen page (plain white, underline on hover).
     if (nameEl) {
-      nameEl.textContent =
-        a.displayname || a.nickname || (a.loggedIn === false ? 'Not signed in' : DASH);
+      const name = a.displayname || a.nickname || (a.loggedIn === false ? 'Not signed in' : DASH);
+      setHTML(
+        nameEl,
+        citizenUrl
+          ? `<a class="cc-plain" href="${OH.escapeHtml(citizenUrl)}" target="_blank" rel="noopener" title="Open your RSI citizen page">${OH.escapeHtml(name)}</a>`
+          : OH.escapeHtml(name),
+      );
     }
 
-    // Meta (UEE record + enlisted date) under the portrait.
+    // UEE record · Est. <month year> · <n> years (full date on hover).
     if (metaEl) {
-      if (a.loggedIn === false) {
-        metaEl.textContent = 'Log in to scan your hangar';
-      } else if (a.loggedIn) {
-        // UEE record + enlisted date, each on its own plain line under the portrait.
-        setHTML(
-          metaEl,
-          `<span class="cc-meta-line">UEE ${OH.escapeHtml(a.citizenRecord || DASH)}</span>` +
-            `<span class="cc-meta-line">Enlisted ${OH.escapeHtml(fmtEnlisted(a.enlistedSince))}</span>`,
-        );
+      if (a.loggedIn) {
+        const d = a.enlistedSince ? new Date(a.enlistedSince) : null;
+        const ok = d && !isNaN(d.getTime());
+        const parts = [];
+        if (a.citizenRecord) parts.push(`UEE ${OH.escapeHtml(a.citizenRecord)}`);
+        if (ok) {
+          const my = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+          parts.push(
+            `<span title="Enlisted ${OH.escapeHtml(fmtEnlisted(a.enlistedSince))}">Est. ${OH.escapeHtml(my)}</span>`,
+          );
+          const now = new Date();
+          let yrs = now.getFullYear() - d.getFullYear();
+          if (
+            now.getMonth() < d.getMonth() ||
+            (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())
+          )
+            yrs--;
+          if (yrs >= 1) parts.push(`${yrs} year${yrs === 1 ? '' : 's'}`);
+        }
+        setHTML(metaEl, parts.join(' · '));
       } else {
-        metaEl.textContent = DASH;
+        setHTML(metaEl, '');
       }
     }
 
-    // Main organization (logo · name · rank), linked to the org page. Name can be
-    // long, so it wraps. When the member has no main org (or it's redacted), show
-    // a muted "No affiliation" rather than a blank gap (extension-wide convention).
+    // Main org only: logo + name (rank under it), one plain link to the org page,
+    // and the logo again as a faint watermark. No org, or a hidden/redacted one:
+    // nothing at all (owner, 2026-09-30).
+    const waterEl = $('#cc-water');
     if (orgEl) {
       const org = a.loggedIn ? a.org : null;
       if (org && org.name) {
         const logo = org.logo
           ? `<img class="cc-org-logo" src="${OH.escapeHtml(org.logo)}" alt="" loading="lazy">`
-          : `<span class="cc-org-logo cc-org-logo-ph"></span>`;
+          : '';
         const inner =
           `${logo}<span class="cc-org-text">` +
-          `<span class="cc-org-name" title="${OH.escapeHtml(org.name)}">${OH.escapeHtml(org.name)}</span>` +
+          `<span class="cc-org-name">${OH.escapeHtml(org.name)}</span>` +
           (org.rank ? `<span class="cc-org-rank">${OH.escapeHtml(org.rank)}</span>` : '') +
           `</span>`;
         setHTML(
           orgEl,
           org.sid
-            ? `<a class="cc-org-link" href="https://robertsspaceindustries.com/orgs/${encodeURIComponent(org.sid)}" target="_blank" rel="noopener">${inner}</a>`
+            ? `<a class="cc-org-link" href="https://robertsspaceindustries.com/orgs/${encodeURIComponent(org.sid)}" target="_blank" rel="noopener" title="Open ${OH.escapeHtml(org.name)} on RSI">${inner}</a>`
             : `<span class="cc-org-link">${inner}</span>`,
-        );
-        orgEl.hidden = false;
-      } else if (a.loggedIn) {
-        setHTML(
-          orgEl,
-          `<span class="cc-org-link cc-org-none"><span class="cc-org-logo cc-org-logo-ph"></span><span class="cc-org-text"><span class="cc-org-name">No affiliation</span></span></span>`,
         );
         orgEl.hidden = false;
       } else {
         setHTML(orgEl, '');
         orgEl.hidden = true;
       }
+      if (waterEl) {
+        if (org && org.logo) waterEl.src = org.logo;
+        waterEl.hidden = !(org && org.logo);
+      }
     }
 
-    // Flair (subscriber + concierge), tier-coloured; hidden when none.
+    // Subscriber + Chairman's Club on one line; each only when it applies.
     if (flairEl) {
       const parts = [];
       if (a.subscriber?.type) {
-        const tier = a.subscriber.type === 'Imperator' ? 'sub' : 'sub sub-centurion';
         parts.push(
-          `<a class="flair ${tier}" href="https://robertsspaceindustries.com/en/pledge/subscriptions" target="_blank" rel="noopener"><span class="flair-lbl">Subscriber</span> <b>${OH.escapeHtml(a.subscriber.type)}</b></a>`,
+          `<a class="flair sub" href="https://robertsspaceindustries.com/en/pledge/subscriptions" target="_blank" rel="noopener"><span class="flair-lbl">Subscriber</span> <b>${OH.escapeHtml(a.subscriber.type)}</b></a>`,
         );
       }
       if (a.concierge?.level) {
         const col = CONCIERGE_COLORS[a.concierge.level.toLowerCase()] || '#d2a8ff';
-        const pct = Number(a.concierge.percent) || 0;
-        const prog = a.concierge.next
-          ? `<span class="flair-prog"><span class="flair-bar"><span style="width:${pct}%;background:${col}"></span></span>${pct}% → ${OH.escapeHtml(a.concierge.next)}</span>`
+        const next = a.concierge.next
+          ? ` title="${Number(a.concierge.percent) || 0}% of the way to ${OH.escapeHtml(a.concierge.next)}"`
           : '';
         parts.push(
-          `<a class="flair concierge" style="border-color:${col}" href="https://robertsspaceindustries.com/en/account/concierge" target="_blank" rel="noopener"><span class="flair-lbl">Chairman's Club</span> <b style="color:${col}">${OH.escapeHtml(a.concierge.level)}</b>${prog}</a>`,
+          `<a class="flair concierge" href="https://robertsspaceindustries.com/en/account/concierge" target="_blank" rel="noopener"${next}><span class="flair-lbl">Chairman's Club</span> <b style="color:${col}">${OH.escapeHtml(a.concierge.level)}</b></a>`,
         );
       }
       setHTML(flairEl, parts.join(''));
+      flairEl.hidden = !parts.length;
     }
 
-    // Balances — always rendered, with dashes when there's no data (uniform).
-    // Big amounts are shortened (¤ 1.2M, ¤ 90K) so the strip stays one row; the
-    // exact figure is in the hover text.
+    // Wallet: Store Credit, UEC, REC, Buy-Back Tokens (with the next token's date).
+    // Big amounts are shortened (¤ 1.2M); the exact figure is in the hover text.
+    // Streamer Mode turns the money and aUEC amounts into dots.
     if (balEl) {
       const c = a.credits || {};
       const fmt = (n) => Number(n).toLocaleString('en-US');
       const tile = (cls, label, val, full) =>
         `<span class="bal ${cls}"${full && full !== val ? ` title="${OH.escapeHtml(full)}"` : ''}><span class="bal-lbl">${label}</span><b>${val}</b></span>`;
       // A no-break space after ¤ so the symbol doesn't crowd the digits.
-      const aUEC = (x) => (x ? ['¤ ' + compactNum(x.value), '¤ ' + fmt(x.value)] : [DASH]);
+      const aUEC = (x) =>
+        !x ? [DASH] : streamer.on ? [MASK] : ['¤ ' + compactNum(x.value), '¤ ' + fmt(x.value)];
       const store = c.store ? c.store.value / 100 : null;
+      const next = nextTokenDate();
+      const nextShort = next ? next.replace(/^\w+, /, '').replace(/, \d{4}$/, '') : '';
       setHTML(
         balEl,
         tile(
@@ -877,19 +924,11 @@ function renderAccount() {
           tile('rec', 'REC', ...aUEC(c.rec)) +
           `<a class="bal bbt" href="#buybacks" data-view="buybacks" title="${OH.escapeHtml(
             tokenTitle(),
-          )}"><span class="bal-lbl">Buy-back tokens</span><b>${
+          )}"><span class="bal-lbl">Buy-Back Tokens</span><b>${
             state.bbTokens != null ? state.bbTokens : DASH
-          }</b></a>` +
-          (() => {
-            const r = state.referral?.legacy?.recruits ?? state.referral?.current?.recruits;
-            return r != null
-              ? `<a class="bal recruits" href="#referrals" data-view="referrals"><span class="bal-lbl">Recruits</span><b>${OH.escapeHtml(compactNum(r))}</b></a>`
-              : '';
-          })(),
+          }${nextShort ? `<span class="bal-next">next ${OH.escapeHtml(nextShort)}</span>` : ''}</b></a>`,
       );
     }
-
-    renderReferralPill(a);
   });
 }
 
@@ -908,31 +947,6 @@ function updateSignedOutBanner(loggedOut) {
   if (!el) return;
   const hasData = state.items.length > 0 || state.buybacks.length > 0 || state.referral != null;
   el.hidden = !(lastLoggedOut && hasData);
-}
-
-// Citizen Card referral pill: recruit count + code with a copy button. Prefers the
-// scanned referral source (full counts); falls back to just the code from the
-// account fetch (which carries it for free) so it shows even before a referral scan.
-function renderReferralPill(a) {
-  const el = $('#home-referral');
-  if (!el) return;
-  const ref = state.referral;
-  const code = ref?.code || a?.referral?.code || null;
-  if (!a || !a.loggedIn || !code) {
-    setHTML(el, '');
-    return;
-  }
-  const url = ref?.url || a?.referral?.url || null;
-  // The recruit count is in the card's numbers row (Banner card, 0.3.0).
-  const countPart = `<span class="bal-lbl">Referral Code</span>`;
-  setHTML(
-    el,
-    `<span class="ref-pill">${countPart}
-      <span class="ref-pill-sep"></span>
-      <span class="ref-code">${OH.escapeHtml(code)}</span>
-      <button class="ref-copy" data-copy="${OH.escapeHtml(url || code)}" title="Copy referral link">Copy</button>
-    </span>`,
-  );
 }
 
 function renderVersions() {
@@ -1074,8 +1088,9 @@ function renderHome() {
   homeUpdated();
 
   // Scanned line: first-run prompt (#2) or scan freshness with a stale nudge (#5).
+  scannedHomeEl.hidden = has;
   if (!has) {
-    scannedHomeEl.textContent = 'Nothing scanned yet — click Scan to begin.';
+    scannedHomeEl.textContent = 'Nothing scanned yet. Click Scan at the top to begin.';
     return;
   }
   const when = state.scannedAt ? new Date(state.scannedAt).toLocaleString() : 'previously';
@@ -6002,11 +6017,54 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   if (scanSelectedBtn) scanSelectedBtn.disabled = false;
 }
 
-// Primary button scans everything; the caret opens a per-source menu.
-scanBtn.addEventListener('click', () => runScan());
-// The top bar's Scan (every page) runs the same scan.
-scanTopBtn?.addEventListener('click', () => {
-  if (!scanBtn.disabled) runScan();
+// The top bar's Scan runs what's ticked in its ▾ menu: "Scan All" by default,
+// "Scan Custom" once anything is unticked (owner, 2026-09-30). Remembered.
+const SCAN_SOURCES = ['hangar', 'buybacks', 'referrals', 'store'];
+const scanBoxes = () => [...document.querySelectorAll('.scan-src')];
+function scanChoice() {
+  const on = new Set(
+    scanBoxes()
+      .filter((el) => el.checked)
+      .map((el) => el.value),
+  );
+  return Object.fromEntries(SCAN_SOURCES.map((k) => [k, on.has(k)]));
+}
+function updateScanLabel() {
+  const boxes = scanBoxes();
+  const on = boxes.filter((el) => el.checked);
+  const all = on.length === boxes.length;
+  scanBtn.textContent = all ? 'Scan All' : 'Scan Custom';
+  scanBtn.title = all
+    ? 'Scan everything: inventory, buy-backs, referrals and your wishlist in the store'
+    : on.length
+      ? `Scan ${on.map((el) => el.parentElement.textContent.trim()).join(', ')} (change with ▾)`
+      : 'Nothing ticked: pick what to scan with ▾';
+}
+function scanChosen() {
+  const c = scanChoice();
+  if (!Object.values(c).some(Boolean)) {
+    setStatus('Pick at least one thing to scan (the ▾ next to Scan).', true);
+    return;
+  }
+  closeCardMenus();
+  runScan(c);
+}
+scanBtn.addEventListener('click', scanChosen);
+for (const el of scanBoxes()) {
+  el.addEventListener('change', () => {
+    updateScanLabel();
+    chrome.storage.local.set({
+      scanSources: scanBoxes()
+        .filter((b) => b.checked)
+        .map((b) => b.value),
+    });
+  });
+}
+chrome.storage.local.get('scanSources').then(({ scanSources }) => {
+  if (Array.isArray(scanSources)) {
+    for (const el of scanBoxes()) el.checked = scanSources.includes(el.value);
+  }
+  updateScanLabel();
 });
 
 // Open below the ▾ button, right edges lined up; above it if there's no room.
@@ -6043,7 +6101,11 @@ for (const [btn, menu] of cardMenus) {
     placeMenu(btn, menu); // again now that it has a size
   });
   // Clicks inside the menu (checkboxes, the currency picker) shouldn't close it.
-  menu.addEventListener('click', (e) => e.stopPropagation());
+  menu.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // A link or action in the menu (Updates, Log Out of RSI…) closes it.
+    if (e.target.closest('a, .menu-item')) closeCardMenus();
+  });
 }
 if (cardMenus.length) {
   // Scrolling or resizing moves the buttons; just close the menus.
@@ -6052,24 +6114,7 @@ if (cardMenus.length) {
   document.addEventListener('click', closeCardMenus);
 }
 
-if (scanSelectedBtn) {
-  scanSelectedBtn.addEventListener('click', () => {
-    const checked = new Set(
-      [...document.querySelectorAll('.scan-src:checked')].map((el) => el.value),
-    );
-    if (!checked.size) {
-      setStatus('Select at least one source to scan.', true);
-      return;
-    }
-    closeCardMenus();
-    runScan({
-      hangar: checked.has('hangar'),
-      buybacks: checked.has('buybacks'),
-      referrals: checked.has('referrals'),
-      store: checked.has('store'),
-    });
-  });
-}
+scanSelectedBtn?.addEventListener('click', scanChosen);
 
 logoutBtn.addEventListener('click', async () => {
   logoutBtn.disabled = true;
@@ -7081,6 +7126,9 @@ const gsearchOut = $('#gsearch-results');
 function closeGlobalSearch() {
   if (gsearchOut) gsearchOut.hidden = true;
 }
+// Rich results (0.3.0): a plain yes/no answer first, then one row per match with
+// its picture, full name, what it's inside, key facts and price, grouped by where
+// it lives. Rows open the pledge / buy-back details; the list scrolls in place.
 function globalSearchHtml(q) {
   const needle = q.trim().toLowerCase();
   const esc = OH.escapeHtml;
@@ -7088,34 +7136,80 @@ function globalSearchHtml(q) {
     String(s || '')
       .toLowerCase()
       .includes(needle);
+  // RSI dates arrive as "2015-06-08" (read as UTC so it never shifts a day) or already readable.
+  const day = (d) => {
+    const iso = /^\d{4}-\d{2}-\d{2}$/.test(d);
+    const t = Date.parse(d);
+    return isNaN(t)
+      ? d
+      : new Date(t).toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          ...(iso ? { timeZone: 'UTC' } : {}),
+        });
+  };
+  const tag = (t, cls = '') => (t ? `<span class="gs-tag ${cls}">${esc(t)}</span>` : '');
+  const pic = (img, resolve, label) =>
+    img
+      ? `<span class="gs-img"><img src="${esc(img)}" alt="" loading="lazy"></span>`
+      : `<span class="gs-img" data-resolve="${esc(resolve || '')}"><span>${esc(label || '')}</span></span>`;
+  const row = ({ attr, img, resolve, name, where, tags, val, valLbl, open }) =>
+    `<button type="button" class="gs-row gs-rich" ${attr}>${pic(img, resolve, name)}<span class="gs-info"><span class="gs-name">${esc(name)}</span><span class="gs-where">${where}</span><span class="gs-tags">${tags.join('')}</span></span><span class="gs-side">${val ? `<b>${esc(val)}</b><small>${esc(valLbl)}</small>` : ''}<span class="gs-open">${open}</span></span></button>`;
   const group = (title, rows) =>
     rows.length
-      ? `<div class="gs-group"><div class="gs-title">${title}</div>${rows.join('')}</div>`
+      ? `<div class="gs-group"><div class="gs-title"><span>${title}</span><span>${rows.length}</span></div>${rows.join('')}</div>`
       : '';
-  const pledges = state.items
-    .filter((p) => has(plainName(p)) || (p.contents || []).some((c) => has(c.label)))
-    .slice(0, 8)
-    .map(
-      (p) =>
-        `<button type="button" class="gs-row" data-open-item="${esc(String(p.id))}"><span>${esc(
-          plainName(p),
-        )}</span><span class="muted">${[
-          p.giftable ? 'giftable' : '',
-          isMeltable(p) ? 'meltable' : '',
-          formatValue(p),
-        ]
-          .filter(Boolean)
-          .join(' · ')}</span></button>`,
-    );
-  const bbs = state.buybacks
-    .filter((b) => has(b.name) || (b.ccu && (has(b.ccu.from) || has(b.ccu.to))))
-    .slice(0, 5)
-    .map(
-      (b) =>
-        `<button type="button" class="gs-row" data-open-bb="${esc(String(b.id))}"><span>${esc(
-          b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '',
-        )}</span><span class="muted">buy-back</span></button>`,
-    );
+
+  const hits = state.items.filter(
+    (p) => has(plainName(p)) || (p.contents || []).some((c) => has(c.label)),
+  );
+  const pledges = hits.slice(0, 12).map((p) => {
+    // Matched a ship inside a package: lead with that ship, say what it's in.
+    const inner = !has(plainName(p)) && (p.contents || []).find((c) => has(c.label));
+    const type = pledgeType(p);
+    return row({
+      attr: `data-open-item="${esc(String(p.id))}"`,
+      img: realImage(p.image),
+      resolve: inner ? inner.label : resolveImageName(p),
+      name: inner ? inner.label : cardName(p),
+      where:
+        (inner ? `Inside <b>${esc(cardName(p))}</b>` : 'In your hangar') +
+        (p.date ? ` <em>· pledged ${esc(day(p.date))}</em>` : ''),
+      tags: [
+        tag(TYPE_KEYS.includes(type) ? type.toUpperCase() : p.kind, `badge ${type}`),
+        tag(p.insurance),
+        isMeltable(p) ? tag('Meltable', 'good') : '',
+        p.giftable ? tag('Giftable', 'good') : '',
+      ],
+      val: isMeltable(p) ? formatValue(p) : '',
+      valLbl: 'melt value',
+      open: 'Details →',
+    });
+  });
+  const bbHits = state.buybacks.filter(
+    (b) => has(b.name) || has(b.contains) || (b.ccu && (has(b.ccu.from) || has(b.ccu.to))),
+  );
+  const bbs = bbHits.slice(0, 8).map((b) => {
+    const type = b.isCCU ? 'ccu' : b.kind;
+    return row({
+      attr: `data-open-bb="${esc(String(b.id))}"`,
+      img: b.ccu && b.ccu.to && !b.shipArt ? null : realImage(b.image),
+      resolve: b.ccu && b.ccu.to ? b.ccu.to : resolveImageName({ ...b, kind: 'ship' }) || b.name,
+      name: b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '',
+      where: `${b.contains ? esc(b.contains) : 'Buy-back'}${b.date ? ` <em>· melted ${esc(day(b.date))}</em>` : ''}`,
+      tags: [
+        tag(
+          TYPE_KEYS.includes(type) ? type.toUpperCase() : type || 'BUY-BACK',
+          `badge ${type || ''}`,
+        ),
+        tag(b.insurance),
+      ],
+      val: bbPriceText(b),
+      valLbl: 'buy-back price',
+      open: 'Details →',
+    });
+  });
   const ref = state.referral;
   const rewards = ref
     ? earnedRewards(
@@ -7124,15 +7218,53 @@ function globalSearchHtml(q) {
         (ref.legacy?.recruits ?? 0) > 0,
       )
         .filter((r) => has(r.name))
-        .slice(0, 3)
+        .slice(0, 4)
         .map(
           (r) =>
-            `<a class="gs-row" href="#referrals"><span>${esc(r.name)}</span><span class="muted">reward · ${esc(r.sub)}</span></a>`,
+            `<a class="gs-row gs-rich" href="#referrals">${pic(null, '', r.name)}<span class="gs-info"><span class="gs-name">${esc(r.name)}</span><span class="gs-where">Referral reward <em>· ${esc(r.sub)}</em></span></span><span class="gs-side"><span class="gs-open">Referrals →</span></span></a>`,
         )
     : [];
-  const html =
-    group('Your Hangar', pledges) + group('Buy-Backs', bbs) + group('Referral Rewards', rewards);
-  return html || `<div class="gs-empty muted">Nothing matches "${esc(q.trim())}".</div>`;
+
+  const nH = hits.length;
+  const nB = bbHits.length;
+  const nR = rewards.length;
+  const bits = [
+    nH ? `${nH} in your hangar` : '',
+    nB ? `${nB} in your buy-backs` : '',
+    nR ? `${nR} earned reward${nR === 1 ? '' : 's'}` : '',
+  ].filter(Boolean);
+  const answer = bits.length
+    ? `<div class="gs-answer yes"><span class="gs-mark" aria-hidden="true">✓</span><span><b>Yes, you have "${esc(q.trim())}"</b><small>${bits.join(' · ')}</small></span></div>`
+    : `<div class="gs-answer no"><span class="gs-mark" aria-hidden="true">✕</span><span><b>No, you don't have "${esc(q.trim())}"</b><small>Nothing in your hangar, buy-backs or referral rewards matches.</small></span></div>`;
+  const body =
+    group('In Your Hangar', pledges) +
+    group('In Your Buy-Backs', bbs) +
+    group('Earned Rewards', rewards);
+  const total = pledges.length + bbs.length + rewards.length;
+  const foot = total
+    ? `<div class="gs-foot"><span>${total} result${total === 1 ? '' : 's'} · Enter opens the first</span><span>Searching your hangar, buy-backs and rewards</span></div>`
+    : '';
+  return answer + (body ? `<div class="gs-scroll">${body}</div>` : '') + foot;
+}
+// Search rows without RSI art get the ship's picture from the wiki (few at a time).
+function resolveSearchImages(root) {
+  const slots = [...root.querySelectorAll('.gs-img[data-resolve]')].filter(
+    (el) => el.dataset.resolve,
+  );
+  let i = 0;
+  const worker = async () => {
+    while (i < slots.length) {
+      const el = slots[i++];
+      const url = await OH.getShipImage(el.dataset.resolve);
+      if (!url || !el.isConnected) continue;
+      const im = document.createElement('img');
+      im.src = url;
+      im.alt = '';
+      im.loading = 'lazy';
+      el.replaceChildren(im);
+    }
+  };
+  for (let w = 0; w < 3; w++) worker();
 }
 if (gsearch && gsearchOut) {
   gsearch.addEventListener('input', () => {
@@ -7141,6 +7273,7 @@ if (gsearch && gsearchOut) {
     ensurePrices();
     setHTML(gsearchOut, globalSearchHtml(q));
     gsearchOut.hidden = false;
+    resolveSearchImages(gsearchOut);
   });
   gsearch.addEventListener('focus', () => {
     if (gsearch.value.trim().length >= 2) gsearch.dispatchEvent(new Event('input'));
@@ -7151,10 +7284,11 @@ if (gsearch && gsearchOut) {
       gsearch.blur();
     } else if (e.key === 'Enter') {
       gsearchOut.querySelector('.gs-row')?.click();
+      closeGlobalSearch();
     }
   });
   gsearchOut.addEventListener('click', (e) => {
-    if (e.target.closest('a.gs-row')) closeGlobalSearch();
+    if (e.target.closest('.gs-row')) closeGlobalSearch();
   });
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.gsearch')) closeGlobalSearch();
@@ -7181,6 +7315,7 @@ if (gsearch && gsearchOut) {
     uiStatsTab,
     lastBackupAt,
     remindRescan,
+    streamerMode,
     currency,
     uiGroupByType,
     wishlist,
@@ -7191,6 +7326,7 @@ if (gsearch && gsearchOut) {
     'currency',
     'uiGroupByType',
     'remindRescan',
+    'streamerMode',
     'lastBackupAt',
     'uiStatsTab',
     'uiLayout',
@@ -7203,6 +7339,20 @@ if (gsearch && gsearchOut) {
   if (WISH_SORTS.some(([k]) => k === uiWishSort)) state.wishSort = uiWishSort;
   if (STATS_TABS.some(([k]) => k === uiStatsTab)) state.statsTab = uiStatsTab;
   if (Number.isFinite(lastBackupAt)) state.lastBackupAt = lastBackupAt;
+  streamer.on = streamerMode === true;
+  document.documentElement.classList.toggle('streamer', streamer.on);
+  const stream = $('#streamer-toggle');
+  if (stream) {
+    stream.checked = streamer.on;
+    stream.addEventListener('change', async () => {
+      streamer.on = stream.checked;
+      document.documentElement.classList.toggle('streamer', streamer.on);
+      await chrome.storage.local.set({ streamerMode: streamer.on });
+      route(); // redraw the page with (or without) amounts
+      renderAccount();
+      homeUpdated();
+    });
+  }
   const remind = $('#remind-toggle');
   if (remind) {
     remind.checked = remindRescan !== false;
@@ -7264,6 +7414,7 @@ window.OHApp = {
   // Whole amounts in the chosen currency: exact under 100,000, then "$1.24M" /
   // "$184.5K" so a huge hangar never breaks a layout (exact value goes in a tooltip).
   bigMoney: (n) => {
+    if (streamer.on) return MASK;
     const v = n * fx.rate;
     if (Math.abs(v) < 100000) return fmtCurrency(v, 0);
     return new Intl.NumberFormat('en-US', {

@@ -26,6 +26,7 @@
       changes = `Since ${a.fmtDay(hist[hist.length - 2].at)}: ${a.changeSummary(diff)}`;
     }
     return {
+      scannedAt: s.scannedAt || null,
       store: v && v.store ? v.store : null,
       melt,
       vsPaid: v && v.paidPriced ? v.storePriced - v.paidPriced : null,
@@ -45,6 +46,30 @@
   const signed = (n) => (n >= 0 ? '+' : '−') + a.bigMoney(Math.abs(n));
   const exact = (n) => (n < 0 ? '−' : '') + a.dollars(Math.abs(n));
 
+  // "Updated today, 9:45 AM"; after a week it turns amber: "Updated 8 days ago · Rescan?".
+  const upd = $derived.by(() => {
+    if (!d.scannedAt) return null;
+    const t = new Date(d.scannedAt);
+    const days = Math.floor((Date.now() - d.scannedAt) / 86400000);
+    const time = t.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    const day0 = new Date();
+    day0.setHours(0, 0, 0, 0);
+    const cal = Math.round((day0 - new Date(t.getFullYear(), t.getMonth(), t.getDate())) / 86400000);
+    if (days >= 7) return { text: `Updated ${days} days ago`, stale: true, full: t.toLocaleString() };
+    const when =
+      cal <= 0
+        ? 'today'
+        : cal === 1
+          ? 'yesterday'
+          : t.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return { text: `Updated ${when}, ${time}`, stale: false, full: t.toLocaleString() };
+  });
+  // The top bar's Scan button (runs whatever its menu has ticked).
+  const rescan = (e) => {
+    e.preventDefault();
+    document.getElementById('scan-home')?.click();
+  };
+
   function open(c, e) {
     e.preventDefault();
     if (c.key === 'buybacks') location.hash = '#buybacks';
@@ -53,7 +78,15 @@
 </script>
 
 <section class="oh-p oh-wide value">
-  <div class="oh-lbl">{d.store != null ? 'Account Value' : 'Melt Value'}</div>
+  <div class="top">
+    <div class="oh-lbl">{d.store != null ? 'Account Value' : 'Melt Value'}</div>
+    {#if upd}
+      <div class="upd" class:stale={upd.stale} title="Last scan: {upd.full}">
+        {upd.text}{#if upd.stale}
+          · <a href="#home" onclick={rescan}>Rescan?</a>{/if}
+      </div>
+    {/if}
+  </div>
   {#if d.store != null}
     <div class="big" title={a.dollars(d.store)}>{a.bigMoney(d.store)}</div>
   {:else}
@@ -87,6 +120,24 @@
 </section>
 
 <style>
+  .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .upd {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .upd.stale {
+    color: var(--warn);
+  }
+  .upd a {
+    color: var(--warn);
+    font-weight: 700;
+  }
   .big {
     font: 800 46px/1.05 var(--font-head);
     color: var(--head);

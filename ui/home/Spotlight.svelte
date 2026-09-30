@@ -1,5 +1,5 @@
 <script>
-  // Ship Spotlight: one ship from your own fleet per visit, with its art and key
+  // Hangar Spotlight: one ship from your own fleet per visit, with its art and key
   // numbers; "Another ship" flips to the next.
   import { app, OH, version } from '../lib/app.svelte.js';
 
@@ -67,7 +67,7 @@
 {#if ship}
   <section class="oh-p spot">
     <div class="oh-ph">
-      <h3>Ship Spotlight</h3>
+      <h3>Hangar Spotlight</h3>
       {#if ships.length > 1}<button type="button" class="next" onclick={() => i++}>Another ship ↻</button>{/if}
     </div>
     <div class="art">
