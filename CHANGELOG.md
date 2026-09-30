@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.2.11 — 2026-09-29
+
 - **Org Fleet:** your own entry now follows your latest scan (Add my fleet used to be a one-off
   copy, so ships bought later never showed). A role covered only by in-concept ships (a Pioneer for
   Construction) shows in amber as covered, not missing, and the role panel lists each ship's status.
