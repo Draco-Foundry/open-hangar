@@ -298,7 +298,9 @@
     loggedIn: true,
     nickname: 'Demo_Citizen',
     displayname: 'Demo Citizen',
-    avatar: null,
+    // RSI's default portrait (every new account starts with it) and a made-up org
+    // emblem, so store screenshots never show a real player.
+    avatar: 'https://cdn.robertsspaceindustries.com/static/images/account/avatar_default_big.jpg',
     enlistedSince: '2016-11-04T00:00:00.000Z',
     countryName: 'United States',
     credits: {
@@ -309,7 +311,12 @@
     subscriber: { type: 'Centurion', frequency: 'monthly' },
     concierge: null,
     citizenRecord: 'n/a',
-    org: { name: 'Demo Fleet Collective', sid: 'DEMOFLT', rank: 'Admiral', logo: null },
+    org: {
+      name: 'Demo Fleet Collective',
+      sid: 'DEMOFLT',
+      rank: 'Admiral',
+      logo: '/__demo/demo-org.svg',
+    },
     referral: { code: referral.code, url: referral.url, referrerCode: null },
     fetchedAt: now,
   };
