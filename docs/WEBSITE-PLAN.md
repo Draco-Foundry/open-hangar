@@ -207,6 +207,10 @@ Migrations in `app/migrations/`; the account, org and history tables are in
   settings menu / Referrals page). Not done yet: the owner hasn't signed off on moving
   the referral code.
 - **Refresh store/site screenshots** after 0.2.12 ships (new Home).
+- **Light mode** (after the Home redesign): Dark (default) / Light / Auto toggle next to
+  the currency picker. Colours are ~515 token uses and ~83 hardcoded values to clean up;
+  keep the colour meanings, darker shades on white. Share images stay dark. Check every
+  page and chart.
 
 ## Launch Batch (scheduled with the items above)
 
