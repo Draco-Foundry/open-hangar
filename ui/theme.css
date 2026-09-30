@@ -79,42 +79,241 @@ body:not(:has(#view-home.active)) .wrap > header {
 .home-hero > #oh-foryou:empty {
   display: none;
 }
-/* The card in Clean Pro: plain panel, no texture; overflow stays visible so the
-   search results and the Scan / settings menus can drop below it. */
+/* Citizen Card: the "Banner" design (owner's pick, 2026-09-30). One grid:
+     banner strip across the top, portrait overlapping it; name, org and the UEE /
+     enlisted line beside it with Scan / Log out / settings on the right; one row of
+     numbers (balances + recruits); badges along the bottom with the scan time.
+   The card's inner wrappers use display: contents so their children (which keep
+   the ids dashboard.js fills) sit directly on this grid. Overflow stays visible so
+   the Scan and settings menus can drop below the card. */
 .home-hero .citizen-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) auto;
+  grid-template-areas:
+    'av    name  act'
+    'av    org   act'
+    'av    meta  act'
+    'stats stats stats'
+    'chips chips scan'
+    'stat  stat  stat';
+  column-gap: 18px;
+  row-gap: 0;
+  align-items: center;
   margin-bottom: 0;
   min-height: 0;
+  padding: 58px 22px 18px;
   border: 0;
   border-radius: var(--radius-lg);
   background: var(--panel);
   overflow: visible;
 }
-.home-hero .citizen-card::before,
 .home-hero .citizen-card::after {
   display: none;
 }
-.cc-name {
-  font-family: var(--font-head);
-  font-weight: 800;
+/* The banner: a soft wash across the top of the card, behind the portrait. */
+.home-hero .citizen-card::before {
+  content: '';
+  display: block;
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 92px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background:
+    radial-gradient(70% 140% at 85% 0%, rgba(47, 129, 247, 0.32), transparent 60%),
+    radial-gradient(50% 120% at 10% 100%, rgba(210, 168, 255, 0.16), transparent 60%),
+    linear-gradient(180deg, #1c2330, #16191e);
+  pointer-events: none;
 }
-/* With For You beside it the card has 3/4 of the row: stack it (identity and
-   balances on top, then Scan / Log out / settings / search in one row) so nothing
-   squeezes or overlaps. The card gets its full Clean Pro redesign later in 0.3.0. */
-.home-hero:not(:has(> #oh-foryou:empty)) .citizen-card {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 16px;
+.home-hero .citizen-card > *,
+.home-hero .cc-portrait,
+.home-hero .cc-info,
+.home-hero .cc-side,
+.home-hero .cc-side-bottom,
+.home-hero .cc-chips {
+  position: relative;
 }
-.home-hero:not(:has(> #oh-foryou:empty)) .cc-side {
-  align-items: stretch;
+/* Everything on the card paints above the banner wash (::before). */
+.home-hero #cc-avatar,
+.home-hero #cc-name,
+.home-hero #cc-org,
+.home-hero #cc-meta,
+.home-hero .cc-actions,
+.home-hero #home-balances,
+.home-hero .cc-chips,
+.home-hero #scanned-home,
+.home-hero #status,
+.home-hero #cc-loggedout {
+  position: relative;
+  z-index: 1;
+}
+.home-hero .cc-account,
+.home-hero .cc-portrait,
+.home-hero .cc-info,
+.home-hero .cc-side,
+.home-hero .cc-side-bottom {
+  display: contents;
+}
+/* display: contents would override [hidden]: keep signed-out hiding working. */
+.home-hero .cc-account[hidden],
+.home-hero .cc-side[hidden],
+.home-hero .cc-account[hidden] *,
+.home-hero .cc-side[hidden] * {
+  display: none !important;
+}
+.home-hero .citizen-card:has(#cc-loggedout:not([hidden])) {
+  display: block;
+  padding-top: 22px;
+}
+
+.home-hero .cc-avatar {
+  grid-area: av;
+  align-self: end;
+  width: 104px;
+  height: 104px;
+  margin-top: -46px;
+  border: 4px solid var(--panel);
+  border-radius: 20px;
+  z-index: 1;
+}
+.home-hero .cc-name {
+  grid-area: name;
+  font: 800 30px/1.1 var(--font-head);
+  color: var(--head);
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-hero .cc-org {
+  grid-area: org;
+  margin-top: 6px;
+  min-width: 0;
+}
+.home-hero .cc-meta {
+  grid-area: meta;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  width: auto;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
   text-align: left;
 }
-.home-hero:not(:has(> #oh-foryou:empty)) .cc-side-bottom {
-  align-items: flex-start;
+.home-hero .cc-meta-line {
+  display: inline;
+  flex: none;
+  width: auto;
 }
-.home-hero:not(:has(> #oh-foryou:empty)) .cc-actions {
-  justify-content: flex-start;
-  align-items: center;
+.home-hero .cc-meta-line + .cc-meta-line::before {
+  content: '·';
+  margin-right: 12px;
+}
+.home-hero .cc-actions {
+  grid-area: act;
+  align-self: start;
+  flex-wrap: nowrap;
+}
+
+/* One row of numbers: Store Credit, UEC, REC, Buy-Back Tokens, Recruits. */
+.home-hero .home-balances {
+  grid-area: stats;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 0;
+  margin: 18px 0 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.home-hero .home-balances .bal {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: 0 0 0 0.5px var(--line);
+  text-decoration: none;
+  color: inherit;
+}
+.home-hero .home-balances .bal-lbl {
+  font: 700 11px var(--font-head);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.home-hero .home-balances .bal b {
+  font: 800 20px var(--font-head);
+  color: var(--head);
+  font-variant-numeric: tabular-nums;
+}
+.home-hero .home-balances .bal.recruits b {
+  color: var(--good);
+}
+.home-hero .home-balances a.bal:hover {
+  background: var(--panel-2);
+}
+
+.home-hero .cc-chips {
+  grid-area: chips;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  min-width: 0;
+}
+.home-hero .cc-side .scanned {
+  grid-area: scan;
+  align-self: end;
+  justify-self: end;
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.home-hero #status {
+  grid-area: stat;
+}
+.home-hero #status:empty {
+  display: none;
+}
+
+/* Narrow (Hangar Alerts drop below at 980px; phones): stack the actions and the
+   scan time under the name block. */
+@media (max-width: 640px) {
+  .home-hero .citizen-card {
+    grid-template-columns: 84px minmax(0, 1fr);
+    grid-template-areas:
+      'av    name'
+      'av    org'
+      'meta  meta'
+      'act   act'
+      'stats stats'
+      'chips chips'
+      'scan  scan'
+      'stat  stat';
+  }
+  .home-hero .cc-avatar {
+    width: 84px;
+    height: 84px;
+  }
+  .home-hero .cc-name {
+    font-size: 24px;
+  }
+  .home-hero .cc-actions {
+    margin-top: 12px;
+    justify-content: flex-start;
+  }
+  .home-hero .cc-side .scanned {
+    justify-self: start;
+  }
 }
 
 /* Top bar Scan button (every page). */

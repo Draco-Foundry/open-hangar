@@ -1,6 +1,8 @@
 <script>
-  // Latest Acquisitions: your newest pledges by purchase date, with picture, type,
-  // insurance, price and date. A row opens the pledge's details window.
+  // Latest Acquisitions: your newest pledges by the date they reached your hangar
+  // (RSI's pledge date: gifts and grey-market pledges count when they arrive), with
+  // picture, type, insurance and melt value (not "what you paid": RSI can't know
+  // that for gifted pledges). A row opens the pledge's details window.
   import { SvelteMap } from 'svelte/reactivity';
   import { app, OH, version } from '../lib/app.svelte.js';
   import { shortDay } from '../lib/format.js';
@@ -55,7 +57,7 @@
         <span class="n">{r.name}</span>
         <span class="sub"><span class="badge {r.typeClass}">{r.type}</span>{#if r.ins}<span class="ins">{r.ins}</span>{/if}</span>
       </span>
-      <span class="meta">{#if r.price}<b>{r.price}</b>{/if}{r.day}</span>
+      <span class="meta">{#if r.price}<b title="Melt value">{r.price}</b>{/if}Added {r.day}</span>
     </button>
   {/each}
   <a class="oh-more" href="#inventory">All pledges →</a>

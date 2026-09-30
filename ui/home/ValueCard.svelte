@@ -1,6 +1,7 @@
 <script>
   // Account Value: today's value, two small stats (trend since the first scan, and
-  // vs what you paid), clickable counts that open Inventory filtered, and what
+  // vs melt value: not "what you paid", which RSI can't know for gifted or
+  // grey-market pledges), clickable counts that open Inventory filtered, and what
   // changed since the last scan. No chart here; Stats → History has it.
   import { app, OH, version } from '../lib/app.svelte.js';
   import { exactCount, monthName, plural, shortCount } from '../lib/format.js';
@@ -66,7 +67,7 @@
     {/if}
     {#if d.vsPaid != null}
       <span class="pill" class:down={d.vsPaid < 0} title={exact(d.vsPaid)}
-        >{signed(d.vsPaid)} vs what you paid</span
+        >{signed(d.vsPaid)} vs melt value</span
       >
     {/if}
     {#if d.fresh}
