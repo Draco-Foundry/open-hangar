@@ -207,6 +207,16 @@ free for everyone; nothing is ever locked behind support.
   favourite ship (with its picture); the list lives on the website, the extension shows
   it. Plus a cosmetic "Supporter" badge on website profiles. No perks that lock features.
 - Check CIG's fan-content guidelines before launching donations.
+- **Money handling (not legal or tax advice; check with a tax preparer before launch):**
+  donations to the owner personally are usually taxable income, offset by running costs.
+  Start with a separate bank account used only for Open Hangar; consider an LLC once
+  donations are regular; a nonprofit is overkill. Open Collective's usual host (Open
+  Source Collective) needs an OSI licence, which PolyForm Strict isn't, so donations go
+  direct (Ko-fi / Patreon / GitHub Sponsors) and the Costs page is the ledger.
+- **Surplus policy, published before the first donation:** keep a reserve of about 12
+  months of costs; once it's full, show "Fully funded, thank you" and stop asking;
+  anything beyond goes to a named Star Citizen community cause (e.g. starcitizen.tools,
+  whose data Open Hangar uses, or a charity drive), with every transfer published.
 
 ## License and Repo (awaiting owner's go, 2026-09-30)
 
