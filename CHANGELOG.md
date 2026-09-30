@@ -23,6 +23,7 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 - Improved: **Check for Updates works on Firefox.** It asks Firefox Add-ons for the latest
   version and tells you whether you're on it, instead of pointing you to about:addons.
 - Improved: the currency picker in the top right is no longer bold.
+- Fixed: Home showed a big empty box when your wishlist was empty.
 
 ## 0.2.11 — 2026-09-29
 

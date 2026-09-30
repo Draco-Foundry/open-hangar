@@ -5,7 +5,7 @@
 > | --- | --- | --- |
 > | Chrome Web Store | **live** v0.2.8; v0.2.9 in review (0.2.10 goes up once it clears; Chrome refuses uploads while a review is pending) (publisher `dracofoundry@gmail.com`) | item `aeabioadfphghjennmdbnpelojlhndjl` · [listing](https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl) |
 > | Firefox AMO | **live** v0.2.9 (approved 2026-09-28); v0.2.10 submitted 2026-09-29 | [listing](https://addons.mozilla.org/en-US/firefox/addon/open-hangar/) · gecko id `open-hangar@draco-foundry` |
-> | Microsoft Edge | in review (~7 business days) | CRX `fmcnemfepnifokjelgjacgdhoodaiicl` · Store ID `0RDCKFFGW5QL` |
+> | Microsoft Edge | **live** v0.2.11 (confirmed 2026-09-30) | [listing](https://microsoftedge.microsoft.com/addons/detail/fmcnemfepnifokjelgjacgdhoodaiicl) · CRX `fmcnemfepnifokjelgjacgdhoodaiicl` · Store ID `0RDCKFFGW5QL` |
 >
 > When each goes live, set that button's `data-status="live"` and `data-url` in
 > `site/index.html`; the "in review" line disappears once none are pending.
@@ -156,7 +156,7 @@ install prompt only names robertsspaceindustries.com.)_
 - ✅ Register at [Partner Center → Edge](https://partner.microsoft.com/dashboard/microsoftedge/overview) — **free**.
 - ✅ Upload `open-hangar-chrome-<version>.zip`; reuse the §3 assets, §5
   justifications, §6 copy, and the privacy-policy URL.
-- ✅ Submitted (v0.2.7). Review is typically up to ~7 business days. Edge wants a
+- ✅ Live (v0.2.11 as of 2026-09-30). Review is typically up to ~7 business days. Edge wants a
   300×300 logo: `docs/store-assets/logo-300.png`.
 
 ## 9. Firefox Add-ons (AMO)
