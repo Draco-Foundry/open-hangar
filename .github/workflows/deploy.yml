@@ -49,11 +49,13 @@ jobs:
       - name: Migrate the staging database
         run: npx wrangler d1 migrations apply open-hangar-staging --remote --env staging
       - name: Deploy to staging.openhangar.space
-        run: npx wrangler deploy
+        run: npx wrangler deploy # the build baked in the staging env (CLOUDFLARE_ENV above)
       - name: Staging secrets
         env:
           SECRET: ${{ secrets.STAGING_BETTER_AUTH_SECRET }}
-        run: echo "$SECRET" | npx wrangler secret put BETTER_AUTH_SECRET
+        # --env staging is essential: without it wrangler targets the top-level
+        # (production) Worker. Every wrangler command in this job names its env.
+        run: echo "$SECRET" | npx wrangler secret put BETTER_AUTH_SECRET --env staging
       - name: Smoke test
         run: |
           for i in $(seq 1 18); do # a new domain can take a few minutes
