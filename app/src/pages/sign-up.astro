@@ -18,9 +18,9 @@ const discord = discordEnabled();
       discord && (
         <>
           <button type="button" class="discord" data-social="discord">
-            Continue with Discord
+            Log in with Discord
           </button>
-          <p class="or muted">or with email</p>
+          <p class="or muted">Or use your email</p>
         </>
       )
     }
@@ -38,6 +38,7 @@ const discord = discordEnabled();
       <button type="submit">Create account</button>
       <div class="error" id="err" role="alert"></div>
     </form>
+    <p class="muted">We'll email you a link to confirm your address.</p>
     <p class="muted">Already have one? <a href="/sign-in">Sign in</a></p>
   </div>
 </Base>
@@ -57,12 +58,18 @@ const discord = discordEnabled();
       name: email.split('@')[0],
       email,
       password: String(d.get('password')),
+      // Where the link in the confirmation email lands.
+      callbackURL: '/account?verified=1',
     });
     if (error) err.textContent = error.message || 'Could not create the account.';
     else location.href = '/account?welcome=1';
   });
   document.querySelector('[data-social="discord"]')?.addEventListener('click', () =>
-    authClient.signIn.social({ provider: 'discord', callbackURL: '/hangar' }),
+    authClient.signIn.social({
+      provider: 'discord',
+      callbackURL: '/hangar',
+      errorCallbackURL: '/sign-in',
+    }),
   );
 </script>
 
