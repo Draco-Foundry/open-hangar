@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- Made-up emblem for the demo account's org ("Demo Fleet Collective"). -->
+  <defs>
+    <linearGradient id="bg" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#16233a"/>
+      <stop offset="1" stop-color="#0b111c"/>
+    </linearGradient>
+  </defs>
+  <path d="M100 8 L178 44 L178 108 C178 150 142 178 100 192 C58 178 22 150 22 108 L22 44 Z" fill="url(#bg)" stroke="#2f81f7" stroke-width="6"/>
+  <path d="M100 40 L140 130 L100 112 L60 130 Z" fill="#6cb4ff"/>
+  <path d="M100 40 L100 112 L60 130 Z" fill="#4493f8"/>
+  <circle cx="100" cy="86" r="9" fill="#0b111c"/>
+  <path d="M58 152 H142" stroke="#dfe3e8" stroke-width="8" stroke-linecap="round"/>
+  <path d="M74 166 H126" stroke="#8b939e" stroke-width="6" stroke-linecap="round"/>
+</svg>
