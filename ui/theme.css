@@ -734,3 +734,39 @@ body:not(:has(#view-home.active)) .wrap > header {
     border-left: 0;
   }
 }
+
+/* Round 3 (owner, 2026-09-30): the whole org logo sits inside the card, a bit
+   smaller; Subscriber / Chairman's Club drop their boxes like the wallet does; no
+   watermark on phones. */
+.home-hero .cc-water {
+  right: 28px;
+  width: auto;
+  height: calc(100% - 48px);
+  max-height: 340px;
+  aspect-ratio: 1;
+  opacity: 0.1;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+.home-hero .home-flair {
+  gap: 4px;
+  margin-top: 12px;
+}
+.home-hero .home-flair .flair {
+  padding: 0;
+  background: none;
+  border-radius: 0;
+  font-size: 14px;
+}
+.home-hero .home-flair .flair:hover {
+  background: none;
+}
+.home-hero .home-flair .flair:hover b {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (max-width: 640px) {
+  .home-hero .cc-water {
+    display: none;
+  }
+}
