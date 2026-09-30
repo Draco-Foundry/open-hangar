@@ -84,7 +84,7 @@ personal data:
 
 ## Data export
 
-Open Hangar lets you export your database as a JSON file that you choose to save.
+Open Hangar lets you export your database as a JSON file (or a CSV of what a page shows) that you choose to save.
 That file is created locally and handled entirely by you; the extension does not
 upload it anywhere. (Your referral code is deliberately excluded from exports.)
 
