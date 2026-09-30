@@ -39,9 +39,16 @@
         "url": "https://openhangar.space/"
       }
     </script>
+    <link rel="stylesheet" href="stars.css" />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
+    <div class="space" aria-hidden="true">
+      <div class="nebula"></div>
+      <div class="layer far"></div>
+      <div class="layer mid"></div>
+      <div class="layer near"></div>
+    </div>
     <header class="hero">
       <div class="wrap">
         <img class="logo" src="icon.svg" alt="" width="72" height="72" />
@@ -106,36 +113,36 @@
         <figure class="tour-stage">
           <img
             id="tour-img"
-            src="img/screens/screenshot-1-inventory.jpg"
+            src="img/screens/screenshot-2-home.jpg"
             width="1280"
             height="800"
-            alt="Inventory: your fleet as a searchable gallery with insurance and value"
+            alt="Home: your Citizen Card, account value, game status and search"
           />
           <figcaption id="tour-caption">
-            <strong>Inventory:</strong> your whole fleet as a searchable, filterable gallery, with
-            insurance, value and pledge dates.
+            <strong>Home:</strong> your Citizen Card with balances, what your account is worth and
+            how it has changed, game status, and one search box for everything you own.
           </figcaption>
         </figure>
         <div class="tour-thumbs" role="tablist" aria-label="Screenshots">
           <button
             role="tab"
             aria-selected="true"
+            data-src="img/screens/screenshot-2-home.jpg"
+            data-title="Home"
+            data-text="your Citizen Card with balances, what your account is worth and how it has changed, game status, and one search box for everything you own."
+          >
+            <img src="img/screens/screenshot-2-home.jpg" alt="" loading="lazy" />
+            <span>Home</span>
+          </button>
+          <button
+            role="tab"
+            aria-selected="false"
             data-src="img/screens/screenshot-1-inventory.jpg"
             data-title="Inventory"
             data-text="your whole fleet as a searchable, filterable gallery, with insurance, value and pledge dates."
           >
             <img src="img/screens/screenshot-1-inventory.jpg" alt="" loading="lazy" />
             <span>Inventory</span>
-          </button>
-          <button
-            role="tab"
-            aria-selected="false"
-            data-src="img/screens/screenshot-2-home.jpg"
-            data-title="Home"
-            data-text="your Citizen Card with balances and referrals, one search box for everything you own, and This Week in Star Citizen."
-          >
-            <img src="img/screens/screenshot-2-home.jpg" alt="" loading="lazy" />
-            <span>Home</span>
           </button>
           <button
             role="tab"
