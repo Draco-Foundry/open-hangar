@@ -2,6 +2,14 @@
 
 ## Ideas parked for a decision (not yet committed to a direction)
 
+- **Wishlist insurance wants (owner, 2026-09-30).** Let a wishlist entry say what
+  insurance you want: LTI, 120 months, or either. Hangar Alerts (and later the
+  website's email/Discord alerts) fire when it's available that way: in RSI's store
+  (the store scan already reads ship pages; each SKU lists its insurance), or in your
+  own buy-backs (already scanned, insurance known). Mock up first: where the choice
+  lives (the ship window's wishlist button, the Store page's wishlist list) and how
+  the alert reads ("Cutlass Black with LTI is in your buy-backs").
+
 - **Translate the dashboard (planned).** Same 11 languages as the store listings
   (English, 简体中文, Français, 한국어, Español, Português Brasileiro, Deutsch,
   Українська, Italiano, Čeština, Русский; ccugame.app offers these). Store summaries
