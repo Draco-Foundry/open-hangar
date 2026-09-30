@@ -1,0 +1,86 @@
+<!doctype html>
+<!-- Draco Foundry org banner (github.com/Draco-Foundry profile README), 1600×520.
+     No AI art: the app's starfield (site/stars.css), a wordmark, and the real Open Hangar
+     Home screen from the demo account. Rendered by scripts/og/render.mjs --org. -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../site/stars.css" />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      html {
+        background: #05070f;
+      }
+      body {
+        width: 1600px;
+        height: 520px;
+        overflow: hidden;
+        font-family: 'Bahnschrift', 'Segoe UI', system-ui, sans-serif;
+        color: #e6edf3;
+        position: relative;
+        background: transparent;
+      }
+      .space .layer {
+        animation: none;
+      }
+      .space .nebula {
+        opacity: 0.35;
+        animation: none;
+      }
+      .left {
+        position: absolute;
+        left: 96px;
+        top: 0;
+        bottom: 0;
+        width: 760px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      h1 {
+        font: 700 108px/0.95 'Bahnschrift', 'Segoe UI', system-ui, sans-serif;
+        letter-spacing: 0.08em;
+      }
+      .rule {
+        margin: 34px 0 26px;
+        height: 3px;
+        width: 560px;
+        background: linear-gradient(90deg, #2f81f7, rgba(47, 129, 247, 0));
+      }
+      p {
+        font: 600 22px "Bahnschrift", "Segoe UI", system-ui, sans-serif;
+        white-space: nowrap;
+        letter-spacing: 0.16em;
+        color: #c9d1d9;
+      }
+      .shot {
+        position: absolute;
+        left: 860px;
+        top: 64px;
+        width: 860px;
+        border-radius: 14px;
+        border: 1px solid #2a3139;
+        box-shadow:
+          0 30px 80px rgba(0, 0, 0, 0.6),
+          0 0 0 6px rgba(47, 129, 247, 0.08);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="space" aria-hidden="true">
+      <div class="nebula"></div>
+      <div class="layer far"></div>
+      <div class="layer mid"></div>
+      <div class="layer near"></div>
+    </div>
+    <div class="left">
+      <h1>DRACO<br />FOUNDRY</h1>
+      <div class="rule"></div>
+      <p>FREE TOOLS FOR STAR CITIZEN PLAYERS</p>
+    </div>
+    <img class="shot" src="../../docs/store-assets/screenshot-2-home.png" alt="" />
+  </body>
+</html>
