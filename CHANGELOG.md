@@ -8,8 +8,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   clearer numbers, and colour only where it means something. More pages get their full
   redesign in the next updates.
 - New: **A rebuilt Home page.** Your account value up top, with how much it's grown since your
-  first scan and how it compares to its melt value, plus counts you can click to jump
-  straight into Inventory with that filter on.
+  first scan (with a small chart of every scan), how it compares to its melt value, and
+  counts you can click to jump straight into Inventory with that filter on.
 - New: **Game Status** beside your Citizen Card: the LIVE version and when it was released
   ("14 days ago"), what's on the test servers with the PTU wave, a link to the latest patch
   notes, the event running right now (only while it's actually on), any referral bonus
