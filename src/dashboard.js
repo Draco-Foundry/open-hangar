@@ -671,16 +671,37 @@ function renderTopBar() {
 
 // The bar slims down while you scroll down a long page, and comes back on the way up.
 {
-  let lastY = 0;
+  let anchorY = 0; // where the current scroll direction started
+  let lockUntil = 0; // ignore the jump the bar's own resize causes
+  const header = document.querySelector('.wrap > header');
+  const setSlim = (on) => {
+    if (document.body.classList.contains('bar-slim') === on) return;
+    document.body.classList.toggle('bar-slim', on);
+    lockUntil = performance.now() + 350;
+  };
   window.addEventListener(
     'scroll',
     () => {
       const y = window.scrollY;
-      document.body.classList.toggle('bar-slim', y > 140 && y > lastY);
-      lastY = y;
+      if (performance.now() < lockUntil) {
+        anchorY = y;
+        return;
+      }
+      if (y < 140) setSlim(false);
+      else if (y - anchorY > 48)
+        setSlim(true); // a real move down
+      else if (anchorY - y > 48)
+        setSlim(false); // a real move up
+      else return;
+      anchorY = y;
     },
     { passive: true },
   );
+  if (header && 'ResizeObserver' in window) {
+    new ResizeObserver(() =>
+      document.documentElement.style.setProperty('--hdr-h', `${header.offsetHeight}px`),
+    ).observe(header);
+  }
 }
 
 // --- Home -----------------------------------------------------------------
@@ -1352,14 +1373,15 @@ function chipHtml(kind) {
 function flagHtml(letter, value, yes, no) {
   const state = value === true ? 'yes' : value === false ? 'no' : 'unk';
   const label = value === true ? yes : value === false ? no : `${yes}: unknown — rescan`;
-  return `<span class="flag ${state}" title="${label}" aria-label="${label}">${letter}</span>`;
+  const word = value === true ? yes : value === false ? no : `${yes}?`;
+  return `<span class="flag ${state}" title="${label}" aria-label="${label}"><span class="fl-s">${letter}</span><span class="fl-l">${word}</span></span>`;
 }
 function flagsHtml(p) {
-  return `<span class="flags">${flagHtml('M', p.meltable, 'Meltable', 'Not meltable')}${flagHtml(
+  return `<span class="flags">${flagHtml('M', p.meltable, 'Meltable', 'Not Meltable')}${flagHtml(
     'G',
     p.giftable,
     'Giftable',
-    'Not giftable',
+    'Not Giftable',
   )}</span>`;
 }
 
@@ -1960,7 +1982,7 @@ function renderBbSummary() {
     `<div class="ps-st"${t ? ` title="${OH.escapeHtml(t)}"` : ''}><div class="ps-l">${l}</div><div class="ps-v">${v}</div></div>`;
   setHTML(
     el,
-    `<div><h2>Buy-Backs</h2>${state.bbHideSmall ? '<div class="ps-note">Hide small stuff is on: paints, add-ons and coupons are tucked away</div>' : ''}</div><div class="ps-stats">` +
+    `<div><h2>Buy-Backs</h2></div><div class="ps-stats">` +
       stat('Buy-Backs', compactNum(state.buybacks.length)) +
       stat(
         'Tokens',
@@ -2016,7 +2038,7 @@ function renderSavedViews() {
             `<span class="view-chip${JSON.stringify(v.f) === cur ? ' on' : ''}"><button type="button" data-view-apply="${i}">★ ${OH.escapeHtml(v.name)}</button><button type="button" class="view-x" data-view-del="${i}" title="Remove this view" aria-label="Remove ${OH.escapeHtml(v.name)}">×</button></span>`,
         )
         .join('') +
-      '<button type="button" class="view-add" data-view-save>+ Save this view</button>',
+      '<button type="button" class="view-add" data-view-save>+ Save This View</button>',
   );
 }
 function currentView_inv() {
@@ -2090,7 +2112,7 @@ function renderInventory() {
   }
   setHTML(
     chipsEl,
-    `<div class="chip-row">${presentKinds().map(chipHtml).join('')}${switchHtml('inv-hide', 'Hide small stuff', state.hideSmall, 'Paints, add-ons and coupons')}</div>` +
+    `<div class="chip-row">${presentKinds().map(chipHtml).join('')}<span class="sw-group">${switchHtml('inv-hide', 'Hide Small Stuff', state.hideSmall, 'Paints, add-ons and coupons')}</span></div>` +
       traitRowHtml(state.items, state.traits, pledgeFacets, state.shown.size || state.traits.size),
   );
   renderSavedViews();
@@ -5105,11 +5127,11 @@ function renderBuybacks() {
     const under = state.buybacks.filter(bbUnderStore).length;
     const underChip =
       under || state.bbUnder
-        ? `<button type="button" class="chip trait" data-bb-under aria-pressed="${state.bbUnder}" title="Buy-backs that cost less than the ship in today's store (load details for exact prices)">Below store price<span class="n">${under}</span></button>`
+        ? `<button type="button" class="chip trait" data-bb-under aria-pressed="${state.bbUnder}" title="Buy-backs that cost less than the ship in today's store (load details for exact prices)">Below Store Price<span class="n">${under}</span></button>`
         : '';
     setHTML(
       bbChipsEl,
-      `<div class="chip-row">${presentBbKinds().map(bbChipHtml).join('')}${underChip}${switchHtml('bb-hide', 'Hide small stuff', state.bbHideSmall, 'Paints, add-ons and coupons')}${switchHtml('bb-stack', 'Stack identical', state.bbStack, 'Show identical buy-backs as one row with a count')}</div>` +
+      `<div class="chip-row">${presentBbKinds().map(bbChipHtml).join('')}${underChip}<span class="sw-group">${switchHtml('bb-hide', 'Hide Small Stuff', state.bbHideSmall, 'Paints, add-ons and coupons')}${switchHtml('bb-stack', 'Stack Identical', state.bbStack, 'Show identical buy-backs as one row with a count')}</span></div>` +
         traitRowHtml(
           state.buybacks,
           state.bbTraits,
@@ -5209,7 +5231,7 @@ function bbPriceHtml(b) {
   if (b.price) return `<span class="val">${OH.escapeHtml(b.price)}</span>`;
   const sp = buybackStorePrice(b);
   return sp
-    ? `<span class="val est" title="Today's store price. Load details for RSI's exact buy-back price.">${dollars(sp)}</span>`
+    ? `<span class="val est" title="An estimate from today's store price. Load details for RSI's exact buy-back price.">${dollars(sp)}<small class="est-l">est.</small></span>`
     : '';
 }
 
