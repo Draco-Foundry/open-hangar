@@ -1,11 +1,11 @@
 # Chrome Web Store — Launch Checklist & Listing
 
-> **Submission status (2026-09-29):**
+> **Submission status (2026-09-30):**
 > | Store | Status | IDs / links |
 > | --- | --- | --- |
-> | Chrome Web Store | **live** v0.2.8; v0.2.9 in review (0.2.10 goes up once it clears; Chrome refuses uploads while a review is pending) (publisher `dracofoundry@gmail.com`) | item `aeabioadfphghjennmdbnpelojlhndjl` · [listing](https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl) |
-> | Firefox AMO | **live** v0.2.9 (approved 2026-09-28); v0.2.10 submitted 2026-09-29 | [listing](https://addons.mozilla.org/en-US/firefox/addon/open-hangar/) · gecko id `open-hangar@draco-foundry` |
-> | Microsoft Edge | **live** v0.2.11 (confirmed 2026-09-30) | [listing](https://microsoftedge.microsoft.com/addons/detail/fmcnemfepnifokjelgjacgdhoodaiicl) · CRX `fmcnemfepnifokjelgjacgdhoodaiicl` · Store ID `0RDCKFFGW5QL` |
+> | Chrome Web Store | **live** v0.2.11; **v0.2.12 in review** (submitted 2026-09-30, new listing: description, screenshots, category Games, official URL openhangar.space) (publisher `dracofoundry@gmail.com`) | item `aeabioadfphghjennmdbnpelojlhndjl` · [listing](https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl) |
+> | Firefox AMO | v0.2.12 submitted 2026-09-30 (listing still to update: description, screenshots, license All Rights Reserved) | [listing](https://addons.mozilla.org/en-US/firefox/addon/open-hangar/) · gecko id `open-hangar@draco-foundry` |
+> | Microsoft Edge | v0.2.12 submitted 2026-09-30 (listing still to update: description, screenshots) | [listing](https://microsoftedge.microsoft.com/addons/detail/fmcnemfepnifokjelgjacgdhoodaiicl) · CRX `fmcnemfepnifokjelgjacgdhoodaiicl` · Store ID `0RDCKFFGW5QL` |
 >
 > When each goes live, set that button's `data-status="live"` and `data-url` in
 > `site/index.html`; the "in review" line disappears once none are pending.
