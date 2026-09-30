@@ -1388,7 +1388,7 @@
     return out;
   }
   let catalogMem = null; // [{ lname, slug, cls, msrp }]  (wiki)
-  const CATALOG_CACHE_V = 7; // v2: class + msrp, all pages · v3: fleet fields · v4: display name · v5: + ship matrix (concept ships) · v6: manufacturer · v7: every role (foci)
+  const CATALOG_CACHE_V = 8; // v2: class + msrp, all pages · v3: fleet fields · v4: display name · v5: + ship matrix (concept ships) · v6: manufacturer · v7: every role (foci) · v8: sizes filled (ground vehicles, special editions)
   let catalogInflight = null;
   let matrixMem = null; // [{ lname, name, img, mfr, mfrName }]  (RSI ship-matrix)
   const MATRIX_CACHE_V = 2; // v2: + display name + manufacturer (for HTF ship codes)
@@ -1477,6 +1477,11 @@
     return typeof x.en_EN === 'string' ? x.en_EN : null;
   }
 
+  // The wiki's size, or null. Its API sends the word "undefined" (and translations
+  // of it) when a vehicle has no size class, e.g. ground vehicles like the Storm.
+  const cleanSize = (s) =>
+    s && !/^(undefined|null|none|n\/a)$/i.test(String(s).trim()) ? String(s).trim() : null;
+
   // One wiki vehicle record → the slim entry we keep. Shared with
   // scripts/update-ship-catalog.mjs so the bundled snapshot has the same shape.
   OH.slimVehicle = function slimVehicle(v) {
@@ -1493,7 +1498,8 @@
       // "Multi-Role / Light Carrier", and only the second makes it a carrier.
       role:
         (Array.isArray(v.foci) ? v.foci.map(en).filter(Boolean) : []).join(' / ') || v.role || null,
-      size: en(v.size) || null,
+      // Ground vehicles have no size class on the wiki; call them "Vehicle".
+      size: cleanSize(en(v.size)) || (v.is_vehicle === true ? 'Vehicle' : null),
       status: en(v.production_status) || null, // flight-ready | in-concept | …
       crew: (v.crew && Number(v.crew.max)) || null,
       cargo: Number(v.cargo_capacity) || 0, // SCU
@@ -1539,6 +1545,28 @@
     return OH.mergeCatalogs(list, matrix);
   };
 
+  // Fill missing sizes in place: a leftover "undefined" becomes null, and a special
+  // edition ("F8C Lightning Wikelo War Special", "Corsair PYAM Exec") takes the size
+  // of its base ship (the longest other name it starts with). Pure, returns list.
+  OH.fillCatalogSizes = function fillCatalogSizes(list) {
+    for (const v of list || []) v.size = cleanSize(v.size);
+    const sized = (list || []).filter((v) => v.size && v.lname);
+    for (const v of list || []) {
+      if (v.size || !v.lname) continue;
+      let base = null;
+      for (const b of sized) {
+        if (
+          b !== v &&
+          v.lname.startsWith(b.lname + ' ') &&
+          (!base || b.lname.length > base.lname.length)
+        )
+          base = b;
+      }
+      if (base) v.size = base.size;
+    }
+    return list;
+  };
+
   // Game-file list + ship-matrix list → one list. Pure.
   OH.mergeCatalogs = function mergeCatalogs(list, matrix) {
     const out = list.map((v) => ({ ...v }));
@@ -1561,7 +1589,7 @@
       if (!hit.cargo && m.cargo) hit.cargo = m.cargo;
       if (!hit.name && m.name) hit.name = m.name;
     }
-    return out;
+    return OH.fillCatalogSizes(out);
   };
 
   // The ship list that ships inside the extension (src/data/ship-catalog.json,
@@ -1570,7 +1598,9 @@
     try {
       const res = await fetch(chrome.runtime.getURL('src/data/ship-catalog.json'));
       const json = res.ok ? await res.json() : null;
-      return json && Array.isArray(json.list) && json.list.length ? json.list : null;
+      return json && Array.isArray(json.list) && json.list.length
+        ? OH.fillCatalogSizes(json.list)
+        : null;
     } catch {
       return null;
     }
