@@ -16,6 +16,7 @@ const VIEWS = [
   'org',
   'referrals',
   'updates',
+  'guide',
   'developers',
 ];
 
@@ -6635,13 +6636,10 @@ let siteWait = null; // { stop, code } while waiting for the website to confirm
 async function renderSiteLink() {
   const el = $('#site-link');
   if (!el) return;
-  // Until the website is live, show "coming soon". Developers switch it on
-  // by setting the `siteUrl` storage key (e.g. to http://localhost:4321).
+  // Nothing until the website is live (owner, 2026-09-30: no teaser). Developers
+  // switch it on by setting the `siteUrl` storage key (e.g. to http://localhost:4321).
   if (!(await OH.siteEnabled())) {
-    setHTML(
-      el,
-      '<span class="tease">🚀 <strong>Something big is coming.</strong> Your hangar on any device, your org’s fleet live, and more. Stay tuned.</span>',
-    );
+    setHTML(el, '');
     return;
   }
   const link = await OH.getSiteLink();
