@@ -357,6 +357,8 @@
     const url = typeof input === 'string' ? input : input.url;
     if (/\/pledge-store\/api\/upgrade\/graphql/.test(url)) return realFetch('/__store-ships.json');
     if (/\/api\/hub\/getCommlinkItems/.test(url)) return realFetch('/__commlinks.json');
+    if (/\/api\/spectrum\/forum\/channel\/threads/.test(url))
+      return realFetch('/__patchnotes.json');
     if (/robertsspaceindustries\.com\/comm-link\/transmission\//.test(url))
       return realFetch('/__twisc-page.html');
     if (/robertsspaceindustries\.com\/alexandria\/html\//.test(url))

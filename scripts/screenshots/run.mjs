@@ -119,6 +119,12 @@ async function handle(req, res) {
   }
 
   // RSI's Comm-Link list (a POST too): the saved fixture.
+  // RSI Spectrum Patch Notes (a POST too): the saved fixture.
+  if (u.pathname === '/__patchnotes.json') {
+    return res
+      .writeHead(200, { 'content-type': 'application/json' })
+      .end(fs.readFileSync(path.join(SRC, '..', 'test', 'fixtures', 'patch-notes.json')));
+  }
   if (u.pathname === '/__commlinks.json') {
     const data = fs.readFileSync(
       path.join(SRC, '..', 'test', 'fixtures', 'commlinks.html'),

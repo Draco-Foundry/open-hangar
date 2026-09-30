@@ -94,30 +94,96 @@ async function checkListAlignment(label, rootSel) {
 try {
   console.log('Home');
   await go('#home');
-  const cards = await page.$$eval('#home-summary .sum-box', (e) => e.length);
-  cards ? ok(`summary shows ${cards} boxes`) : fail('home summary empty');
+  // The Svelte Home (ui/home) mounts under the Citizen Card.
+  await page.waitForSelector('#oh-home .big', { timeout: 8000 }).catch(() => {});
+  const val = await page.evaluate(() => ({
+    big: document.querySelector('#oh-home .big')?.textContent || '',
+    counts: [...document.querySelectorAll('#oh-home .counts a')].map((a) => a.textContent.trim()),
+    font: getComputedStyle(document.querySelector('#oh-home h3')).fontFamily,
+  }));
+  val.big && val.counts.some((c) => /ships?$/.test(c)) && /Manrope/.test(val.font)
+    ? ok(`value card: ${val.big}, ${val.counts.join(' · ')} (bundled Manrope)`)
+    : fail(`home value card: ${JSON.stringify(val)}`);
+  const clicks = await page.evaluate(async () => {
+    [...document.querySelectorAll('#oh-home .counts a')]
+      .find((a) => /LTI/.test(a.textContent))
+      .click();
+    await new Promise((r) => setTimeout(r, 200));
+    const lti = location.hash === '#inventory' && state.traits.get('lti') === 'yes';
+    state.traits = new Map();
+    location.hash = '#home';
+    await new Promise((r) => setTimeout(r, 300));
+    const rows = document.querySelectorAll('#oh-home .li').length;
+    document.querySelector('#oh-home .li')?.click();
+    await new Promise((r) => setTimeout(r, 200));
+    const modal = !document.querySelector('#item-modal').hidden;
+    document.querySelector('#item-modal').hidden = true;
+    return { lti, rows, modal };
+  });
+  clicks.lti && clicks.rows === 5 && clicks.modal
+    ? ok('home: LTI count filters Inventory; 5 latest acquisitions, a row opens details')
+    : fail(`home clicks: ${JSON.stringify(clicks)}`);
+  await page
+    .waitForFunction(() => /LIVE/.test(document.querySelector('#oh-home')?.textContent || ''), {
+      timeout: 8000,
+    })
+    .catch(() => {});
+  const cards = await page.evaluate(() => {
+    const txt = document.querySelector('#oh-home').textContent;
+    return {
+      events: /Events/.test(txt) && /Buy-Back Token/.test(txt),
+      stale: /Last: Pirate Week/.test(txt) || !/Pirate Week/.test(txt),
+      wave: /4\.10\.2\s*·\s*Wave 3/.test(txt),
+      news: document.querySelectorAll('#oh-home .nl').length,
+      lead: document.querySelector('#oh-home .lead .p')?.textContent || '',
+    };
+  });
+  cards.events &&
+  cards.stale &&
+  cards.wave &&
+  cards.news >= 1 &&
+  /^Last week was a busy one/.test(cards.lead)
+    ? ok(
+        `Events (ended event not shown as live), Game Status wave, news lead + ${cards.news} items`,
+      )
+    : fail(`home cards: ${JSON.stringify(cards)}`);
+  // For You: a wishlist sale shows beside the card (3/4 + 1/4); Ignore hides it, Undo restores.
   const home = await page.evaluate(async () => {
     OH.getShipStock = async (url) =>
       /Cutlass-Black/i.test(url)
         ? { state: 'in', price: 110, packs: [] }
         : { state: 'out', price: null, packs: [] };
+    await chrome.storage.local.set({ homeIgnored: [] });
     state.wishlist = ['Cutlass Black', 'Pioneer'];
-    renderHomePanels();
-    await new Promise((r) => setTimeout(r, 600));
-    const wish = document.querySelector('#home-wish').textContent;
+    document.dispatchEvent(new CustomEvent('oh:home'));
+    await new Promise((r) => setTimeout(r, 800));
+    const fy = document.querySelector('#oh-foryou');
+    const wish = fy.textContent;
+    const card = document.querySelector('.citizen-card').getBoundingClientRect();
+    const side = fy.getBoundingClientRect();
+    const quarter =
+      side.left > card.right && Math.abs(side.width / (card.width + side.width) - 0.25) < 0.06;
+    const saleIgnore = [...fy.querySelectorAll('.fy')]
+      .find((x) => /Cutlass Black/.test(x.textContent))
+      ?.querySelector('.ig');
+    saleIgnore?.click();
+    await new Promise((r) => setTimeout(r, 100));
+    const hidden = !/Cutlass Black is on sale/.test(fy.textContent);
+    fy.querySelector('.undo button')?.click();
+    await new Promise((r) => setTimeout(r, 100));
+    const undone = /Cutlass Black is on sale/.test(fy.textContent);
     state.wishlist = [];
-    renderHomePanels();
-    const emptyHidden =
-      document.querySelector('#home-wish').hidden &&
-      document.querySelector('.home-grid').classList.contains('solo');
+    document.dispatchEvent(new CustomEvent('oh:home'));
+    await chrome.storage.local.set({ homeIgnored: [] });
     return {
-      emptyHidden,
+      wish,
+      quarter,
+      hidden,
+      undone,
       guide:
         !!document.querySelector('details.howto-all') &&
         !document.querySelector('details.howto-all').open,
       cards: document.querySelectorAll('.home-card').length,
-      wish,
-      glance: !!document.querySelector('#home-glance'),
       storeOpt: !!document.querySelector('.scan-src[value="store"]'),
     };
   });
@@ -174,7 +240,7 @@ try {
   card.settingsClosed &&
   card.currencyInHeader &&
   card.searchOnHome &&
-  card.placeholder === 'Global Hangar Search'
+  card.placeholder === 'Search your hangar'
     ? ok(
         'citizen card: ¤ 1.2M / ¤ 90K on one row, settings menu, search on Home, currency in header',
       )
@@ -226,81 +292,18 @@ try {
   phone <= 0 ? ok('home fits a 390px phone') : fail(`home at 390px overflows by ${phone}px`);
   await page.setViewport({ width: 1280, height: 900 });
 
-  await page
-    .waitForFunction(() => !!document.querySelector('#home-news .twisc-lead'), {
-      timeout: 8000,
-    })
-    .catch(() => {});
-  const news = await page.evaluate(async () => {
-    const box = document.querySelector('#home-news');
-    const wish = document.querySelector('#home-wish');
-    // Many wishlist ships on sale: the list scrolls inside a same-height panel.
-    OH.getShipStock = async () => ({ state: 'in', price: 20, packs: [] });
-    state.wishlist = state.catalog.slice(0, 20).map((v) => v.name);
-    renderHomePanels();
-    await new Promise((r) => setTimeout(r, 800));
-    const scroll = wish.querySelector('.home-scroll');
-    const res = {
-      beside: box.parentElement === wish.parentElement,
-      title: box.querySelector('h3').textContent,
-      lead: box.querySelector('.twisc-lead')?.textContent || '',
-      img: !!box.querySelector('.twisc-img'),
-      bullets: box.querySelectorAll('.twisc-points li').length,
-      link: box.querySelector('.home-more a')?.href || '',
-      sameHeight: Math.abs(box.offsetHeight - wish.offsetHeight) <= 1,
-      scrolls: scroll ? scroll.scrollHeight > scroll.clientHeight : false,
-      linkVisible: (() => {
-        const a = wish.querySelector('.home-more a');
-        const r = a && a.getBoundingClientRect();
-        const w = wish.getBoundingClientRect();
-        return !!r && r.bottom <= w.bottom;
-      })(),
-    };
-    state.wishlist = [];
-    renderHomePanels();
-    return res;
-  });
-  news.beside &&
-  /This Week in Star Citizen/.test(news.title) &&
-  /^Last week was a busy one on the testing front/.test(news.lead) &&
-  news.img &&
-  news.bullets === 0 &&
-  /comm-link/.test(news.link)
-    ? ok('home: This Week in Star Citizen post with its opening paragraph')
-    : fail(`home news: ${JSON.stringify(news)}`);
-  news.sameHeight && news.scrolls && news.linkVisible
-    ? ok('home: panels the same height; a long wishlist scrolls, link stays visible')
-    : fail(`home panels: ${JSON.stringify(news)}`);
-  const compact = await page.evaluate(() => {
-    const saved = { ...fx };
-    Object.assign(fx, { code: 'CNY', rate: 7 });
-    renderHome();
-    const boxes = [...document.querySelectorAll('#home-summary .sum-box')];
-    const melt = boxes.find((b) => /melt value/.test(b.textContent));
-    const res = {
-      text: melt.querySelector('.sum-big').textContent,
-      title: melt.title,
-      fits: melt.querySelector('.sum-big').scrollWidth <= melt.clientWidth,
-    };
-    Object.assign(fx, saved);
-    renderHome();
-    return res;
-  });
-  /K$/.test(compact.text) && /,/.test(compact.title) && compact.fits
-    ? ok(`summary: big amounts shortened (${compact.text}, hover ${compact.title})`)
-    : fail(`summary compact: ${JSON.stringify(compact)}`);
   menu.below && menu.inView && menu.visible
     ? ok('scan menu opens below the button, fully visible')
     : fail(`scan menu: ${JSON.stringify(menu)}`);
   home.guide && home.cards === 0
     ? ok('how-to guide folded into one closed dropdown; no link cards')
     : fail(`home layout: ${JSON.stringify(home)}`);
-  /On Sale Now 1/.test(home.wish) && /Cutlass Black/.test(home.wish) && !/Pioneer/.test(home.wish)
-    ? ok('home: wishlist ships on sale now')
-    : fail(`home wishlist: ${home.wish}`);
-  !home.glance && home.storeOpt && home.emptyHidden
-    ? ok('home: no At a Glance; empty wishlist hides its box; Scan has a Store option')
-    : fail(`home layout: ${JSON.stringify(home)}`);
+  /Cutlass Black is on sale/.test(home.wish) && !/Pioneer/.test(home.wish) && home.quarter
+    ? ok('For You: wishlist sale alert, a quarter of the row beside the Citizen Card')
+    : fail(`For You: ${JSON.stringify(home)}`);
+  home.hidden && home.undone && home.storeOpt
+    ? ok('For You: Ignore hides an alert, Undo brings it back; Scan has a Store option')
+    : fail(`For You ignore: ${JSON.stringify(home)}`);
   const site = await page.$eval('#site-link', (e) => e.textContent).catch(() => '');
   /something big is coming/i.test(site) && !(await page.$('#site-link button'))
     ? ok('website sync shows the teaser (no connect button)')
@@ -1145,7 +1148,7 @@ try {
     ];
     location.hash = '#home';
     await new Promise((r) => setTimeout(r, 400));
-    const banner = document.querySelector('#event-banner');
+    const banner = document.querySelector('#oh-home');
     return {
       before,
       after,
@@ -1153,7 +1156,7 @@ try {
       cleared,
       spend: /pledged in total/.test(spend),
       bars,
-      banner: !banner.hidden && /Test Expo/.test(banner.textContent),
+      banner: /Referral bonus: Drake Dragonfly/.test(banner.textContent),
     };
   });
   wse.before === 'Add to Wishlist' &&
@@ -1166,7 +1169,7 @@ try {
     ? ok(`spending tab: ${wse.bars} years`)
     : fail(`spending: ${JSON.stringify(wse)}`);
   wse.banner
-    ? ok('home banner while a bonus event runs')
+    ? ok('Events card shows a running referral bonus event')
     : fail(`event banner: ${JSON.stringify(wse)}`);
 
   for (const view of ['referrals', 'developers']) {
