@@ -4,6 +4,7 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Changed: **Open Hangar's code is now source available** (PolyForm Strict License). It stays public on GitHub so anyone can read and audit it, but it can't be copied into other versions. Earlier releases stay MIT.
 - Improved: Citizen Card: long org names wrap to two lines at most (full name on hover), and the
   "Open Hangar vX · What's new · Star Citizen X" line moved to the page footer.
 - Improved: Org Fleet: a role nobody has lists **every** ship that fills it (cheapest first, scrolling), not
@@ -26,6 +27,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 - Fixed: Home showed a big empty box when your wishlist was empty.
 - Improved: every word is capitalized in Org Fleet roles, sizes and charts ("Science / Data", "Capital",
   "Light Fighter"), ship statuses ("Flight Ready", "In Concept") and table headers.
+- Fixed: ship sizes that showed as "undefined". Ground vehicles (Storm, Nova, Spartan, Ursa…)
+  now say Vehicle, and special editions (Wikelo Specials, PYAM Exec…) use their base ship's size.
 
 ## 0.2.11 — 2026-09-29
 
