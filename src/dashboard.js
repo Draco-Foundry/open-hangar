@@ -6424,42 +6424,62 @@ const releaseDate = (d) =>
       })
     : d;
 
-// Split a release's bullets into "New & improved" and "Fixed" (bullets that
-// start with "Fixed"/"Fix:"), ccugame-changelog style.
+// Split a release's bullets into New / Improved / Fixed by their CHANGELOG
+// prefix ("New:", "Improved:", "Changed:", "Fixed:"). Untagged bullets count
+// as Improved.
+const RELEASE_TAG = /^(\*\*)?(new|improved|changed|fix(?:ed)?)\b\s*:?\s*/i;
+const releaseKind = (t) => {
+  const tag = (t.match(RELEASE_TAG)?.[2] || '').toLowerCase();
+  return tag === 'new' ? 'new' : tag.startsWith('fix') ? 'fixed' : 'improved';
+};
 function releaseGroupsHtml(items) {
-  const isFix = (t) => /^(\*\*)?fix(ed)?\b/i.test(t);
   const groups = [
-    ['new', 'New & improved', items.filter((t) => !isFix(t))],
-    ['fixed', 'Fixed', items.filter(isFix)],
+    ['new', 'New'],
+    ['improved', 'Improved'],
+    ['fixed', 'Fixed'],
   ];
   return groups
+    .map(([k, label]) => [k, label, items.filter((t) => releaseKind(t) === k)])
     .filter(([, , list]) => list.length)
     .map(
       ([k, label, list]) =>
         `<span class="release-group g-${k}">${label}</span><ul>${list
-          .map(
-            (t) =>
-              `<li>${OH.inlineMarkdown(capFirst(t.replace(/^(\*\*)?fix(ed)?\s*:?\s*/i, '$1')))}</li>`,
-          )
+          .map((t) => `<li>${OH.inlineMarkdown(capFirst(t.replace(RELEASE_TAG, '$1')))}</li>`)
           .join('')}</ul>`,
     )
     .join('');
 }
 
 // Updates page: "Check for updates". Chrome and Edge can ask their store right
-// now (a found update downloads, then the Reload bar appears); Firefox only
-// checks on its own schedule, so it gets directions to about:addons instead.
+// now (a found update downloads, then the Reload bar appears); Firefox can't,
+// so it asks the public AMO API (CORS-open, no permission needed) for the
+// latest published version and compares.
+const AMO_ADDON_API = 'https://addons.mozilla.org/api/v5/addons/addon/open-hangar/';
 {
   const btn = $('#update-check-btn');
   const out = $('#update-check-status');
   const curEl = $('#update-cur');
-  if (curEl) curEl.textContent = chrome.runtime.getManifest().version;
+  const cur = chrome.runtime.getManifest().version;
+  if (curEl) curEl.textContent = cur;
   btn?.addEventListener('click', async () => {
     // Looked up by name so Firefox's linter doesn't flag it (see initUpdates).
     const check = chrome.runtime[['request', 'Update', 'Check'].join('')];
     if (typeof check !== 'function') {
-      out.textContent =
-        'Firefox checks by itself. To check now, open about:addons, click the gear, then Check for Updates.';
+      btn.disabled = true;
+      out.textContent = 'Checking…';
+      try {
+        const res = await fetch(AMO_ADDON_API, { credentials: 'omit', cache: 'no-store' });
+        const latest = res.ok ? (await res.json())?.current_version?.version : null;
+        if (!latest) throw new Error('no version');
+        chrome.storage.local.set({ lastUpdateCheck: Date.now() });
+        out.textContent =
+          OH.compareVersions(latest, cur) > 0
+            ? `Open Hangar ${latest} is out. Firefox installs it on its own within a day, or get it now: about:addons, gear icon, Check for Updates.`
+            : "You're on the latest version.";
+      } catch {
+        out.textContent = "Couldn't reach Firefox Add-ons to check. Try again in a bit.";
+      }
+      btn.disabled = false;
       return;
     }
     btn.disabled = true;
