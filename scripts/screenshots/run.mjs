@@ -184,6 +184,22 @@ try {
     await page
       .waitForFunction(() => [...document.images].every((img) => img.complete), { timeout: 20000 })
       .catch(() => console.warn(`  (${view}: some images still loading — capturing anyway)`));
+    // Home's news panel fills in after its own fetches; wait for it and its picture.
+    if (view === 'home') {
+      await page
+        .waitForFunction(
+          () => {
+            const g = document.querySelector('.home-grid');
+            return (
+              g &&
+              g.textContent.trim().length > 50 &&
+              [...g.querySelectorAll('img')].every((i) => i.complete)
+            );
+          },
+          { timeout: 20000 },
+        )
+        .catch(() => console.warn('  (home: news panel still loading — capturing anyway)'));
+    }
     await new Promise((r) => setTimeout(r, 500));
     const file = path.join(OUT, `screenshot-${i + 1}-${view}.jpg`);
     await page.screenshot({ path: file, type: 'jpeg', quality: 92 });
