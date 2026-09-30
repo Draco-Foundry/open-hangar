@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.2.12 — 2026-09-30
+
 - New: **A fresh look.** Open Hangar has a new, cleaner design: graphite panels, bigger and
   clearer numbers, and colour only where it means something. More pages get their full
   redesign in the next updates.
