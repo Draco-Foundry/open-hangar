@@ -24,6 +24,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   version and tells you whether you're on it, instead of pointing you to about:addons.
 - Improved: the currency picker in the top right is no longer bold.
 - Fixed: Home showed a big empty box when your wishlist was empty.
+- Improved: every word is capitalized in Org Fleet roles, sizes and charts ("Science / Data", "Capital",
+  "Light Fighter"), ship statuses ("Flight Ready", "In Concept") and table headers.
 
 ## 0.2.11 — 2026-09-29
 
