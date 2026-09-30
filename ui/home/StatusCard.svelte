@@ -2,9 +2,30 @@
   // Game Status: LIVE from star-citizen.wiki (with its release date, "13 days ago");
   // test channels (PTU / EPTU) from the starcitizen.tools main page, with the wave
   // and date of its newest notes from RSI's Patch Notes forum; a link to the newest
-  // patch notes thread.
-  import { live, OH } from '../lib/app.svelte.js';
-  import { daysAgo, daysAgoUTC, shortDateUTC, wikiUrl } from '../lib/format.js';
+  // patch notes thread. Under them (0.3.0, beside the Citizen Card): the event on now
+  // (or the last one), a running referral bonus event, and the next buy-back token.
+  import { app, live, OH, version } from '../lib/app.svelte.js';
+  import { daysAgo, daysAgoUTC, daysUntil, shortDateUTC, shortDay, wikiUrl } from '../lib/format.js';
+
+  const ev = $derived.by(() => {
+    version.n;
+    const a = app();
+    const lib = OH();
+    const main = live.main;
+    const now = Date.now();
+    const on = lib.activeWikiEvent(main, now);
+    const e = main && main.event;
+    const ended = !on && e && Number.isFinite(e.ends) && e.ends <= now ? e : null;
+    const ref = a.runningEvent();
+    return {
+      on,
+      ended,
+      ref: ref
+        ? { name: ref.name, reward: a.shortReward(ref.reward), full: ref.reward, end: a.parseTs(ref.end + ' 00:00:00') }
+        : null,
+      token: lib.nextBuybackToken(now),
+    };
+  });
 
   const d = $derived.by(() => {
     const patches = (live.main && live.main.patches) || [];
@@ -56,9 +77,73 @@
   {#if !live.loaded}
     <div class="row"><span class="oh-muted">Loading…</span></div>
   {/if}
+  <div class="evs">
+    {#if ev.on}
+      <div class="kv">
+        <a class="evn" href={ev.on.page ? wikiUrl(ev.on.page) : undefined} target="_blank" rel="noopener" title={ev.on.text}
+          >{ev.on.name}</a
+        >
+        <span class="v">ends <b>{daysUntil(ev.on.ends)}</b></span>
+      </div>
+    {:else if ev.ended}
+      <div class="kv"><span class="oh-muted">Last event: {ev.ended.name}</span><span class="v">ended {shortDay(ev.ended.ends)}</span></div>
+    {:else}
+      <div class="kv"><span class="oh-muted">No event running right now</span></div>
+    {/if}
+    {#if ev.ref}
+      <div class="kv">
+        <a href="#referrals" title="{ev.ref.name}: {ev.ref.full}">Referral bonus: {ev.ref.reward}</a>
+        <span class="v">until {shortDay(ev.ref.end)}</span>
+      </div>
+    {/if}
+    {#if ev.token}
+      <div class="kv">
+        <span>Next Buy-Back Token</span>
+        <span class="v">{shortDay(ev.token)} · <b>{daysUntil(ev.token)}</b></span>
+      </div>
+    {/if}
+  </div>
 </section>
 
 <style>
+  section {
+    height: 100%;
+  }
+  .evs {
+    margin-top: 10px;
+    padding-top: 6px;
+    border-top: 1px solid var(--line);
+  }
+  .kv {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    padding: 7px 0;
+    font-size: 14px;
+  }
+  .kv + .kv {
+    border-top: 1px solid var(--line);
+  }
+  .kv a {
+    color: var(--text);
+    text-decoration: none;
+  }
+  .kv a:hover {
+    color: var(--link);
+  }
+  .evn {
+    font-weight: 600;
+    color: var(--head) !important;
+  }
+  .v {
+    white-space: nowrap;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .v b {
+    color: var(--head);
+  }
   .row {
     padding: 8px 0;
   }

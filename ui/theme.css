@@ -59,12 +59,25 @@ body:not(:has(#view-home.active)) .wrap > header {
   max-width: 100%;
 }
 
-/* Home: the Citizen Card takes the full row (Hangar Alerts live in the top bar's bell). */
+/* Home: the Citizen Card (3/4) with Game Status beside it (1/4); stacked on narrow
+   windows. Hangar Alerts live in the top bar's bell. */
 .home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  gap: 16px;
   margin-bottom: 16px;
+  align-items: stretch;
 }
-.home-hero > #oh-foryou {
+.home-hero:has(#cc-loggedout:not([hidden])) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.home-hero:has(#cc-loggedout:not([hidden])) > #oh-status {
   display: none;
+}
+@media (max-width: 1100px) {
+  .home-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 /* Citizen Card: the "Pilot ID" design (owner, 2026-09-30). The portrait runs down
    the whole left side (RSI's 1024px original); name, org, the UEE line, badges and
@@ -171,7 +184,11 @@ body:not(:has(#view-home.active)) .wrap > header {
   line-height: 1.25;
 }
 .home-hero .cc-org-name {
-  font: 700 16px var(--font-head);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font: 700 16px/1.25 var(--font-head);
   color: var(--head);
   overflow-wrap: anywhere;
 }
@@ -264,11 +281,6 @@ body:not(:has(#view-home.active)) .wrap > header {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.home-hero .home-balances .bal-next {
-  display: block;
-  font: 600 12px var(--font-body);
-  color: var(--muted);
 }
 @media (max-width: 1100px) {
   .home-hero .home-balances {
