@@ -24,6 +24,7 @@ const scannedHomeEl = $('#scanned-home');
 const chipsEl = $('#chips');
 const resultsEl = $('#results');
 const scanBtn = $('#scan-home');
+const scanTopBtn = $('#scan-top');
 const scanMenuBtn = $('#scan-menu-btn');
 const scanMenu = $('#scan-menu');
 const scanSelectedBtn = $('#scan-selected');
@@ -5902,6 +5903,7 @@ document.addEventListener('click', async (e) => {
 async function runScan({ hangar = true, buybacks = true, referrals = true, store = true } = {}) {
   if (!hangar && !buybacks && !referrals && !store) return;
   scanBtn.disabled = true;
+  if (scanTopBtn) scanTopBtn.disabled = true;
   if (scanSelectedBtn) scanSelectedBtn.disabled = true;
   setStatus('Scanning…');
   setScanning('Scanning…');
@@ -5993,11 +5995,16 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   route();
   renderAccount(); // refresh the Citizen Card pill with the new referral counts
   scanBtn.disabled = false;
+  if (scanTopBtn) scanTopBtn.disabled = false;
   if (scanSelectedBtn) scanSelectedBtn.disabled = false;
 }
 
 // Primary button scans everything; the caret opens a per-source menu.
 scanBtn.addEventListener('click', () => runScan());
+// The top bar's Scan (every page) runs the same scan.
+scanTopBtn?.addEventListener('click', () => {
+  if (!scanBtn.disabled) runScan();
+});
 
 // Open below the ▾ button, right edges lined up; above it if there's no room.
 // Citizen Card pop-up menus (Scan options, Settings): pinned to the viewport

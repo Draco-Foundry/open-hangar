@@ -1324,7 +1324,14 @@
   // returns the cached value (or { code: null }) on any failure. Never throws.
   OH.getScVersion = async function getScVersion({ force = false } = {}) {
     const { scVersion } = await chrome.storage.local.get('scVersion');
-    if (!force && scVersion?.code && Date.now() - scVersion.fetchedAt < SC_TTL_MS) return scVersion;
+    // Entries saved before release dates were kept ('released' missing) refresh once.
+    if (
+      !force &&
+      scVersion?.code &&
+      'released' in scVersion &&
+      Date.now() - scVersion.fetchedAt < SC_TTL_MS
+    )
+      return scVersion;
     try {
       const res = await fetch(SC_VERSIONS_URL, {
         credentials: 'omit',
@@ -1336,7 +1343,9 @@
       const current = list.find((v) => v.is_default) || list[0];
       const code = current?.code || null;
       if (!code) throw new Error('no version in response');
-      const v = { code, fetchedAt: Date.now() };
+      // released_at: when this build went LIVE (Home's Game Status shows it).
+      const released = Date.parse(current.released_at || '') || null;
+      const v = { code, released, fetchedAt: Date.now() };
       await chrome.storage.local.set({ scVersion: v });
       return v;
     } catch (e) {

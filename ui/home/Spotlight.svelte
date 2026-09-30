@@ -65,7 +65,7 @@
 </script>
 
 {#if ship}
-  <section class="oh-p">
+  <section class="oh-p spot">
     <div class="oh-ph">
       <h3>Ship Spotlight</h3>
       {#if ships.length > 1}<button type="button" class="next" onclick={() => i++}>Another ship ↻</button>{/if}
@@ -97,9 +97,16 @@
   .next:hover {
     color: var(--head);
   }
+  /* The card stretches to its row (beside Latest Acquisitions); the picture takes
+     the spare height so there's no empty band at the bottom. */
+  .spot {
+    display: flex;
+    flex-direction: column;
+  }
   .art {
     position: relative;
-    height: 180px;
+    flex: 1 1 auto;
+    min-height: 180px;
     border-radius: 12px;
     overflow: hidden;
     background: linear-gradient(135deg, #1d2430, #0f1319);

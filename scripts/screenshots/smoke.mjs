@@ -133,7 +133,7 @@ try {
     return {
       events: /Events/.test(txt) && /Buy-Back Token/.test(txt),
       stale: /Last: Pirate Week/.test(txt) || !/Pirate Week/.test(txt),
-      wave: /4\.10\.2\s*·\s*Wave 3/.test(txt),
+      wave: /4\.10\.2[\s\S]{0,40}Wave 3/.test(txt) && /Released [A-Z][a-z]{2} \d+ · /.test(txt),
       news: document.querySelectorAll('#oh-home .nl').length,
       lead: document.querySelector('#oh-home .lead .p')?.textContent || '',
     };
@@ -240,7 +240,7 @@ try {
   card.settingsClosed &&
   card.currencyInHeader &&
   card.searchOnHome &&
-  card.placeholder === 'Search your hangar'
+  card.placeholder === 'Global Hangar Search'
     ? ok(
         'citizen card: ¤ 1.2M / ¤ 90K on one row, settings menu, search on Home, currency in header',
       )

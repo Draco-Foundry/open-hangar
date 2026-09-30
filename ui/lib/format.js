@@ -29,3 +29,22 @@ export function shortDay(t) {
 export const monthName = (t) => new Date(t).toLocaleDateString(undefined, { month: 'long' });
 export const wikiUrl = (page) =>
   `https://starcitizen.tools/${encodeURIComponent(String(page).replace(/ /g, '_'))}`;
+// "today" / "yesterday" / "13 days ago", counted in calendar days (not 24h blocks).
+export function daysAgo(t, now = Date.now()) {
+  const day = (x) => {
+    const d = new Date(x);
+    return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  };
+  const n = Math.round((day(now) - day(t)) / 864e5);
+  return n <= 0 ? 'today' : n === 1 ? 'yesterday' : `${n} days ago`;
+}
+// A date-only value ("2026-09-16", stored as UTC midnight) shown as that same day,
+// not shifted into the day before by the local time zone.
+export const shortDateUTC = (t) =>
+  new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+// Calendar days since a date-only value (UTC midnight), from the viewer's local today.
+export function daysAgoUTC(t, now = Date.now()) {
+  const d = new Date(now);
+  const n = Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - t) / 864e5);
+  return n <= 0 ? 'today' : n === 1 ? 'yesterday' : `${n} days ago`;
+}

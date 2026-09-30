@@ -1,7 +1,7 @@
 <script>
   // Latest From RSI: This Week in Star Citizen as the lead, then Comm-Links and
-  // patch notes, newest first, with All · News · Patch Notes filters. Older weekly
-  // posts are left out (the lead is the newest one).
+  // patch notes, newest first, each tagged NEWS or PATCH (no filters: the owner
+  // wants simply the latest). Older weekly posts are left out (the lead is newest).
   import { live } from '../lib/app.svelte.js';
   import { shortDay } from '../lib/format.js';
 
@@ -14,12 +14,6 @@
     const unit = { minute: 6e4, hour: 36e5, day: 864e5, week: 6048e5, month: 2592e6, year: 31536e6 }[m[2].toLowerCase()];
     return Date.now() - n * unit;
   }
-  const FILTERS = [
-    ['all', 'All'],
-    ['NEWS', 'News'],
-    ['PATCH', 'Patch Notes'],
-  ];
-  let filter = $state('all');
 
   const d = $derived.by(() => {
     const lead = live.twisc && live.twisc.lead ? live.twisc : null;
@@ -37,19 +31,12 @@
     const leadDate = lead ? (lead.title.match(/-\s*(.+)$/) || [])[1] || '' : '';
     return { lead, leadDate, all };
   });
-  const list = $derived(d.all.filter((n) => filter === 'all' || n.tag === filter).slice(0, 5));
-  const showLead = $derived(d.lead && (filter === 'all' || filter === 'NEWS'));
+  const list = $derived(d.all.slice(0, 5));
+  const showLead = $derived(!!d.lead);
 </script>
 
 <section class="oh-p">
-  <div class="oh-ph">
-    <h3>Latest From RSI</h3>
-    <div class="chips" role="group" aria-label="Filter news">
-      {#each FILTERS as [key, label] (key)}
-        <button type="button" aria-pressed={filter === key} onclick={() => (filter = key)}>{label}</button>
-      {/each}
-    </div>
-  </div>
+  <div class="oh-ph"><h3>Latest From RSI</h3></div>
   {#if showLead}
     <a class="lead" href={d.lead.url} target="_blank" rel="noopener">
       {#if d.lead.image}<img src={d.lead.image} alt="" />{:else}<span class="ph"></span>{/if}
@@ -72,25 +59,6 @@
 </section>
 
 <style>
-  .chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .chips button {
-    border: 1px solid var(--line-2);
-    background: none;
-    border-radius: 999px;
-    padding: 4px 11px;
-    font-size: 13px;
-    color: var(--muted);
-    cursor: pointer;
-  }
-  .chips button[aria-pressed='true'] {
-    background: var(--accent-soft);
-    border-color: var(--accent);
-    color: var(--link);
-  }
   .lead {
     display: grid;
     grid-template-columns: 132px minmax(0, 1fr);

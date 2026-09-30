@@ -12,16 +12,17 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   straight into Inventory with that filter on.
 - New: **Events** card: the event running right now (only while it's actually on), the last
   one, any referral bonus event, and when your next buy-back token arrives.
-- New: **Game Status** card: the LIVE version and what's on the test servers, including
-  which PTU wave, with a link to the latest patch notes.
-- New: **For You** alerts beside your Citizen Card: a wishlist ship on sale, a ship you own
+- New: **Game Status** card: the LIVE version and when it was released ("14 days ago"), and
+  what's on the test servers with the PTU wave, plus a link to the latest patch notes.
+- New: **Hangar Alerts** beside your Citizen Card: a wishlist ship on sale, a ship you own
   turning flight ready, buy-backs that match your wishlist, and your enlistment anniversary.
   Ignore any you don't care about.
 - New: **Latest Acquisitions** (your five newest pledges) and **Ship Spotlight** (a ship from
   your fleet with its picture and specs; flip to another).
-- New: **Latest From RSI** now includes patch notes, with All / News / Patch Notes filters.
+- New: **Latest From RSI** now includes patch notes, each tagged NEWS or PATCH.
 - Improved: the top menu stays pinned while you scroll, on every page except Home.
-- Improved: search moved into the Citizen Card (press / on any page, as before).
+- Improved: **Global Hangar Search** has its own full-width line under the Citizen Card
+  (press / on any page, as before), and there's a **Scan** button in the top menu on every page.
 - Fixed: Stats' tabs ran off the side of a phone screen; they wrap now.
 - Fixed: pictures, prices and specs for the original Auroras ("Aurora MR", "Aurora LN"…), which
   RSI renamed "Aurora Mk I". Packages and starter packs ("Aurora MR Starter Pack") now show
