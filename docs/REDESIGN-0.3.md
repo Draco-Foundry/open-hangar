@@ -181,6 +181,15 @@ Clear All) either way. Picking keeps the sidebar open (never closes on a click).
    the two pills sit on the big number's line, to its right, and wrap under it when
    narrow; the chart gets the height back. Option B: counts spread full width plus a
    small value breakdown (ships · packs · CCUs). Mock A before building.
+   (Superseded by #6 if the owner agrees: the breakdown line fills this space.)
+6. **Account Value counts everything (owner, 2026-09-30).** Today it is ships at store
+   price only. New total: ships at today's store price + CCUs at their standard price
+   (the gap) + every other pledge (paints, gear, add-ons, hangars, game packages) at
+   melt value + Store Credit at face value. Not counted: buy-backs (you'd pay to
+   reclaim them), UEC and REC (in-game money). A breakdown line under the number:
+   "Ships $X · CCUs $Y · Other $Z · Store Credit $W". The chart and "since <month>" use
+   the same rules (#4); snapshots start saving Store Credit, and older points without it
+   say so in their tooltip. Update the Stats → Value note text to match.
 
 ## Scheduled Alongside
 
