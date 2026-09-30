@@ -158,6 +158,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  gap: 0;
   min-width: 0;
   margin: 0;
   padding: 22px 24px;
@@ -688,4 +689,48 @@ body:not(:has(#view-home.active)) .wrap > header {
   padding: 16px 18px;
   font-size: 14px;
   color: var(--muted);
+}
+
+/* Wallet, condensed (owner, 2026-09-30): no boxes and no backing panel, so the org
+   watermark shows through; four across with thin dividers, two by two when narrow. */
+.home-hero .home-balances {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin-top: 20px;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.home-hero .home-balances .bal {
+  padding: 2px 16px;
+  border-radius: 0;
+  background: none;
+  border-left: 1px solid var(--line-2);
+}
+.home-hero .home-balances .bal:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+.home-hero .home-balances a.bal:hover {
+  background: none;
+}
+.home-hero .home-balances a.bal:hover b {
+  color: var(--link);
+}
+.home-hero .home-balances .bal-next {
+  display: block;
+  margin: 0;
+  font-size: 12px;
+}
+@media (max-width: 1100px) {
+  .home-hero .home-balances {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 14px;
+  }
+  .home-hero .home-balances .bal:nth-child(odd) {
+    padding-left: 0;
+    border-left: 0;
+  }
 }

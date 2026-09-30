@@ -181,8 +181,9 @@ try {
       hidden,
       undone,
       guide:
-        !!document.querySelector('details.howto-all') &&
-        !document.querySelector('details.howto-all').open,
+        !document.querySelector('#view-home .howto') &&
+        !!document.querySelector('#view-guide .howto-page details') &&
+        !!document.querySelector('#settings-menu a[href="#guide"]'),
       cards: document.querySelectorAll('.home-card').length,
       storeOpt: !!document.querySelector('.scan-src[value="store"]'),
     };
@@ -222,7 +223,7 @@ try {
       uec: uec.querySelector('b').textContent,
       uecTitle: uec.title,
       rec: bal.querySelector('.bal.rec b').textContent,
-      twoByTwo: tops.size === 2 && strip.height < 200,
+      compact: tops.size <= 2 && strip.height < 140,
       settingsOpen:
         !menu.hidden &&
         !!menu.querySelector('#remind-toggle') &&
@@ -240,7 +241,7 @@ try {
   card.uec === '¤ 1.2M' &&
   card.uecTitle === '¤ 1,234,567' &&
   card.rec === '¤ 90K' &&
-  card.twoByTwo &&
+  card.compact &&
   card.settingsOpen &&
   card.settingsClosed &&
   card.currencyInMenu &&
@@ -248,7 +249,7 @@ try {
   card.searchOnHome &&
   card.placeholder === 'Global Hangar Search'
     ? ok(
-        'citizen card: ¤ 1.2M / ¤ 90K, wallet two by two, Scan in the top bar, gear menu (currency, Streamer Mode, Log Out of RSI), search on Home',
+        'citizen card: ¤ 1.2M / ¤ 90K, wallet four across (two by two when narrow), Scan in the top bar, gear menu (currency, Streamer Mode, Log Out of RSI), search on Home',
       )
     : fail(`citizen card: ${JSON.stringify(card)}`);
 
@@ -358,7 +359,7 @@ try {
     ? ok('scan menu opens below the button, fully visible')
     : fail(`scan menu: ${JSON.stringify(menu)}`);
   home.guide && home.cards === 0
-    ? ok('how-to guide folded into one closed dropdown; no link cards')
+    ? ok('how-to guide on its own page (gear menu → How to Use), off Home')
     : fail(`home layout: ${JSON.stringify(home)}`);
   /Cutlass Black is on sale/.test(home.wish) && !/Pioneer/.test(home.wish) && home.quarter
     ? ok('For You: wishlist sale alert, a quarter of the row beside the Citizen Card')
@@ -367,8 +368,8 @@ try {
     ? ok('For You: Ignore hides an alert, Undo brings it back; Scan has a Store option')
     : fail(`For You ignore: ${JSON.stringify(home)}`);
   const site = await page.$eval('#site-link', (e) => e.textContent).catch(() => '');
-  /something big is coming/i.test(site) && !(await page.$('#site-link button'))
-    ? ok('website sync shows the teaser (no connect button)')
+  !site.trim() && !(await page.$('#site-link button'))
+    ? ok('website sync hidden until the site is live (no teaser, no connect button)')
     : fail(`site link: "${site}"`);
 
   // Currency: EUR converts the melt box (needs the live rates service).

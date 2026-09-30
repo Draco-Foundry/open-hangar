@@ -3985,6 +3985,7 @@
                 title="Shows an amber ! on the toolbar icon when your last scan is a week old"
                 ><span>Rescan Reminder</span><input type="checkbox" id="remind-toggle" checked
               /></label>
+              <a class="menu-item menu-link" href="#guide" data-view="guide">How to Use</a>
               <a class="menu-item menu-link" href="#updates" data-view="updates">Updates</a>
               <a class="menu-item menu-link" href="#developers" data-view="developers"
                 >Developers</a
@@ -4081,19 +4082,193 @@
         <div id="oh-home"></div>
         <!-- openhangar.space connect/sync: always visible (even signed out of RSI). -->
         <div class="site-link" id="site-link"></div>
-        <details class="home-about howto howto-all">
-          <summary>How to Use Open Hangar</summary>
+      </section>
 
+      <!-- INVENTORY -->
+      <section class="view" id="view-inventory">
+        <h2 class="section-title">Inventory</h2>
+        <div class="controls">
+          <input id="search" type="search" placeholder="Search by name…" autocomplete="off" />
+          <select id="sort">
+            <option value="default">Sort: Hangar order</option>
+            <option value="date-desc">Pledged: newest first</option>
+            <option value="date-asc">Pledged: oldest first</option>
+            <option value="value-desc">Value: high → low</option>
+            <option value="value-asc">Value: low → high</option>
+            <option value="store-desc">Store price: high → low</option>
+            <option value="name-asc">Name: A → Z</option>
+            <option value="name-desc">Name: Z → A</option>
+          </select>
+          <div class="layout-toggle" id="layout">
+            <button data-layout="gallery">Gallery</button>
+            <button data-layout="compact">Compact</button>
+            <button data-layout="list">List</button>
+            <button data-layout="market">Market</button>
+          </div>
+          <button
+            id="select-toggle"
+            class="mk-btn select-toggle"
+            type="button"
+            aria-pressed="false"
+            title="Pick items to make a fleet image (e.g. a sale post)"
+          >
+            Select
+          </button>
+        </div>
+        <div class="chips" id="chips"></div>
+        <div id="results"></div>
+        <div class="select-bar" id="select-bar" hidden>
+          <span class="sb-count" id="sb-count"></span>
+          <button class="mk-btn" type="button" data-sb="all">Select all shown</button>
+          <button class="mk-btn" type="button" data-sb="none">Clear</button>
+          <span class="sb-sep"></span>
+          <input
+            id="sb-title"
+            class="sb-title"
+            type="text"
+            maxlength="60"
+            placeholder="My hangar"
+            aria-label="Image title"
+          />
+          <select id="sb-price" aria-label="Prices on the image">
+            <option value="melt">Melt value</option>
+            <option value="mine">My price (Market)</option>
+            <option value="store">Store price</option>
+            <option value="none">No prices</option>
+          </select>
+          <button class="mk-btn primary" type="button" data-sb="save">Download image</button>
+          <span class="mk-export-status" id="sb-status" aria-live="polite"></span>
+          <button class="mk-btn" type="button" data-sb="done">Done</button>
+        </div>
+      </section>
+
+      <!-- STATS -->
+      <section class="view" id="view-stats">
+        <h2 class="section-title">Stats</h2>
+        <div id="stats-body"></div>
+      </section>
+
+      <!-- REFERRALS -->
+      <section class="view" id="view-referrals">
+        <h2 class="section-title">Referrals</h2>
+        <div id="referrals-body"></div>
+      </section>
+
+      <!-- BUY-BACKS -->
+      <section class="view" id="view-buybacks">
+        <h2 class="section-title">Buy-Backs</h2>
+        <div class="controls" id="bb-controls" hidden>
+          <input id="bb-search" type="search" placeholder="Search buy-backs…" autocomplete="off" />
+          <select id="bb-sort">
+            <option value="date-desc">Date: newest first</option>
+            <option value="date-asc">Date: oldest first</option>
+            <option value="price-desc">Price: high to low</option>
+            <option value="price-asc">Price: low to high</option>
+            <option value="name-asc">Name: A → Z</option>
+            <option value="name-desc">Name: Z → A</option>
+            <option value="default">Scan order</option>
+          </select>
+          <div class="layout-toggle" id="bb-layout">
+            <button data-layout="gallery">Gallery</button>
+            <button data-layout="compact">Compact</button>
+            <button data-layout="list">List</button>
+            <button data-layout="market">Market</button>
+          </div>
+        </div>
+        <div class="chips" id="bb-chips"></div>
+        <div id="buybacks-body"></div>
+      </section>
+
+      <!-- STORE -->
+      <!-- ORG FLEET -->
+      <section class="view" id="view-org">
+        <h2 class="section-title">Org Fleet</h2>
+        <p class="muted org-intro">
+          Put your org's hangars together into one fleet. Each member opens Open Hangar, goes to
+          <strong>Developers → Export HTF</strong> (ships only, nothing personal) and sends you the
+          file. Import them here. Full backups work too, but only the ships are read. Everything
+          stays in this browser.
+        </p>
+        <div class="org-actions">
+          <button id="org-import" type="button">Import member files…</button>
+          <button id="org-mine" type="button" class="btn-secondary">Add my fleet</button>
+          <button id="org-csv" type="button" class="btn-secondary">Export CSV</button>
+          <input id="org-file" type="file" accept="application/json,.json" multiple hidden />
+          <span id="org-msg" class="muted" aria-live="polite"></span>
+        </div>
+        <div id="org-body"></div>
+      </section>
+
+      <section class="view" id="view-store">
+        <h2 class="section-title">Store</h2>
+
+        <div class="store-panel">
+          <div class="sp-head">
+            <h3>Wishlist <span class="market-n" id="wish-n"></span></h3>
+            <label class="wish-sort-label"
+              >Sort
+              <select id="wish-sort" aria-label="Sort wishlist"></select
+            ></label>
+          </div>
+          <div class="wish-undo" id="wish-undo" role="status" hidden></div>
+          <div class="sp-scroll" id="wishlist"></div>
+        </div>
+
+        <div class="store-panel">
+          <div class="sp-head">
+            <h3>Your CCUs <span class="market-n" id="ccu-n"></span></h3>
+            <span class="sp-count" id="ccu-search-count" aria-live="polite"></span>
+            <input id="ccu-search" type="search" placeholder="Search CCUs…" autocomplete="off" />
+          </div>
+          <div class="sp-scroll" id="ccu-owned"></div>
+        </div>
+
+        <div class="store-panel">
+          <div class="sp-head">
+            <h3>Ship Prices</h3>
+            <div class="layout-toggle sp-tabs" id="price-tabs" role="tablist"></div>
+            <span class="sp-count" id="price-search-count" aria-live="polite"></span>
+            <input id="price-search" type="search" placeholder="Search ships…" autocomplete="off" />
+          </div>
+          <p class="currency-note muted store-intro" hidden></p>
+          <div class="sp-scroll tall" id="price-table"></div>
+          <p class="muted value-note">
+            Standard store prices (USD, before tax). To see if a ship is in RSI's store right now,
+            open it (or add it to your wishlist): that checks its RSI store page.
+          </p>
+        </div>
+      </section>
+
+      <!-- UPDATES -->
+      <section class="view" id="view-updates">
+        <h2 class="section-title">Updates</h2>
+        <p class="muted store-intro">
+          Every Open Hangar release and what changed. Your browser installs new versions on its own;
+          when one is ready you'll see a bar at the top with a Reload button.
+        </p>
+        <div class="update-check">
+          <span>You're on <strong id="update-cur"></strong></span>
+          <button type="button" class="mk-btn" id="update-check-btn">Check for updates</button>
+          <span class="muted" id="update-check-status" aria-live="polite"></span>
+        </div>
+        <div id="updates-body"></div>
+      </section>
+
+      <!-- DEVELOPERS -->
+      <!-- HOW TO USE (gear menu → How to Use) -->
+      <section class="view" id="view-guide">
+        <h2 class="section-title">How to Use Open Hangar</h2>
+        <div class="home-about howto howto-page">
           <details open>
             <summary>Getting Started</summary>
             <ol>
               <li>
                 Sign in at <strong>robertsspaceindustries.com</strong> in this browser. If you're
-                signed out, the card above shows a Log In button.
+                signed out, Home shows a Log In button.
               </li>
               <li>
-                Hit <strong>Scan</strong>. The little ▾ arrow next to it lets you scan just
-                Inventory, Buy-Backs or Referrals.
+                Hit <strong>Scan All</strong> at the top right. The little ▾ arrow next to it lets
+                you pick what to scan (it then says <strong>Scan Custom</strong>).
               </li>
               <li>
                 Give it a moment. Big hangars take a minute, and if RSI hiccups, Open Hangar retries
@@ -4102,7 +4277,7 @@
               <li>
                 Rescan whenever your hangar changes. Open Hangar remembers what changed since last
                 time, and puts an amber <strong>!</strong> on its toolbar icon when your last scan
-                is a week old.
+                is a week old (turn that off in the gear menu).
               </li>
             </ol>
 
@@ -4319,180 +4494,9 @@
               </li>
             </ul>
           </details>
-        </details>
-      </section>
-
-      <!-- INVENTORY -->
-      <section class="view" id="view-inventory">
-        <h2 class="section-title">Inventory</h2>
-        <div class="controls">
-          <input id="search" type="search" placeholder="Search by name…" autocomplete="off" />
-          <select id="sort">
-            <option value="default">Sort: Hangar order</option>
-            <option value="date-desc">Pledged: newest first</option>
-            <option value="date-asc">Pledged: oldest first</option>
-            <option value="value-desc">Value: high → low</option>
-            <option value="value-asc">Value: low → high</option>
-            <option value="store-desc">Store price: high → low</option>
-            <option value="name-asc">Name: A → Z</option>
-            <option value="name-desc">Name: Z → A</option>
-          </select>
-          <div class="layout-toggle" id="layout">
-            <button data-layout="gallery">Gallery</button>
-            <button data-layout="compact">Compact</button>
-            <button data-layout="list">List</button>
-            <button data-layout="market">Market</button>
-          </div>
-          <button
-            id="select-toggle"
-            class="mk-btn select-toggle"
-            type="button"
-            aria-pressed="false"
-            title="Pick items to make a fleet image (e.g. a sale post)"
-          >
-            Select
-          </button>
-        </div>
-        <div class="chips" id="chips"></div>
-        <div id="results"></div>
-        <div class="select-bar" id="select-bar" hidden>
-          <span class="sb-count" id="sb-count"></span>
-          <button class="mk-btn" type="button" data-sb="all">Select all shown</button>
-          <button class="mk-btn" type="button" data-sb="none">Clear</button>
-          <span class="sb-sep"></span>
-          <input
-            id="sb-title"
-            class="sb-title"
-            type="text"
-            maxlength="60"
-            placeholder="My hangar"
-            aria-label="Image title"
-          />
-          <select id="sb-price" aria-label="Prices on the image">
-            <option value="melt">Melt value</option>
-            <option value="mine">My price (Market)</option>
-            <option value="store">Store price</option>
-            <option value="none">No prices</option>
-          </select>
-          <button class="mk-btn primary" type="button" data-sb="save">Download image</button>
-          <span class="mk-export-status" id="sb-status" aria-live="polite"></span>
-          <button class="mk-btn" type="button" data-sb="done">Done</button>
         </div>
       </section>
 
-      <!-- STATS -->
-      <section class="view" id="view-stats">
-        <h2 class="section-title">Stats</h2>
-        <div id="stats-body"></div>
-      </section>
-
-      <!-- REFERRALS -->
-      <section class="view" id="view-referrals">
-        <h2 class="section-title">Referrals</h2>
-        <div id="referrals-body"></div>
-      </section>
-
-      <!-- BUY-BACKS -->
-      <section class="view" id="view-buybacks">
-        <h2 class="section-title">Buy-Backs</h2>
-        <div class="controls" id="bb-controls" hidden>
-          <input id="bb-search" type="search" placeholder="Search buy-backs…" autocomplete="off" />
-          <select id="bb-sort">
-            <option value="date-desc">Date: newest first</option>
-            <option value="date-asc">Date: oldest first</option>
-            <option value="price-desc">Price: high to low</option>
-            <option value="price-asc">Price: low to high</option>
-            <option value="name-asc">Name: A → Z</option>
-            <option value="name-desc">Name: Z → A</option>
-            <option value="default">Scan order</option>
-          </select>
-          <div class="layout-toggle" id="bb-layout">
-            <button data-layout="gallery">Gallery</button>
-            <button data-layout="compact">Compact</button>
-            <button data-layout="list">List</button>
-            <button data-layout="market">Market</button>
-          </div>
-        </div>
-        <div class="chips" id="bb-chips"></div>
-        <div id="buybacks-body"></div>
-      </section>
-
-      <!-- STORE -->
-      <!-- ORG FLEET -->
-      <section class="view" id="view-org">
-        <h2 class="section-title">Org Fleet</h2>
-        <p class="muted org-intro">
-          Put your org's hangars together into one fleet. Each member opens Open Hangar, goes to
-          <strong>Developers → Export HTF</strong> (ships only, nothing personal) and sends you the
-          file. Import them here. Full backups work too, but only the ships are read. Everything
-          stays in this browser.
-        </p>
-        <div class="org-actions">
-          <button id="org-import" type="button">Import member files…</button>
-          <button id="org-mine" type="button" class="btn-secondary">Add my fleet</button>
-          <button id="org-csv" type="button" class="btn-secondary">Export CSV</button>
-          <input id="org-file" type="file" accept="application/json,.json" multiple hidden />
-          <span id="org-msg" class="muted" aria-live="polite"></span>
-        </div>
-        <div id="org-body"></div>
-      </section>
-
-      <section class="view" id="view-store">
-        <h2 class="section-title">Store</h2>
-
-        <div class="store-panel">
-          <div class="sp-head">
-            <h3>Wishlist <span class="market-n" id="wish-n"></span></h3>
-            <label class="wish-sort-label"
-              >Sort
-              <select id="wish-sort" aria-label="Sort wishlist"></select
-            ></label>
-          </div>
-          <div class="wish-undo" id="wish-undo" role="status" hidden></div>
-          <div class="sp-scroll" id="wishlist"></div>
-        </div>
-
-        <div class="store-panel">
-          <div class="sp-head">
-            <h3>Your CCUs <span class="market-n" id="ccu-n"></span></h3>
-            <span class="sp-count" id="ccu-search-count" aria-live="polite"></span>
-            <input id="ccu-search" type="search" placeholder="Search CCUs…" autocomplete="off" />
-          </div>
-          <div class="sp-scroll" id="ccu-owned"></div>
-        </div>
-
-        <div class="store-panel">
-          <div class="sp-head">
-            <h3>Ship Prices</h3>
-            <div class="layout-toggle sp-tabs" id="price-tabs" role="tablist"></div>
-            <span class="sp-count" id="price-search-count" aria-live="polite"></span>
-            <input id="price-search" type="search" placeholder="Search ships…" autocomplete="off" />
-          </div>
-          <p class="currency-note muted store-intro" hidden></p>
-          <div class="sp-scroll tall" id="price-table"></div>
-          <p class="muted value-note">
-            Standard store prices (USD, before tax). To see if a ship is in RSI's store right now,
-            open it (or add it to your wishlist): that checks its RSI store page.
-          </p>
-        </div>
-      </section>
-
-      <!-- UPDATES -->
-      <section class="view" id="view-updates">
-        <h2 class="section-title">Updates</h2>
-        <p class="muted store-intro">
-          Every Open Hangar release and what changed. Your browser installs new versions on its own;
-          when one is ready you'll see a bar at the top with a Reload button.
-        </p>
-        <div class="update-check">
-          <span>You're on <strong id="update-cur"></strong></span>
-          <button type="button" class="mk-btn" id="update-check-btn">Check for updates</button>
-          <span class="muted" id="update-check-status" aria-live="polite"></span>
-        </div>
-        <div id="updates-body"></div>
-      </section>
-
-      <!-- DEVELOPERS -->
       <section class="view" id="view-developers">
         <h2 class="section-title">For Developers</h2>
         <div class="prose">
