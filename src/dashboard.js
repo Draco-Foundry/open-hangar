@@ -798,7 +798,7 @@ function renderAccount() {
           : `<span class="cc-org-logo cc-org-logo-ph"></span>`;
         const inner =
           `${logo}<span class="cc-org-text">` +
-          `<span class="cc-org-name">${OH.escapeHtml(org.name)}</span>` +
+          `<span class="cc-org-name" title="${OH.escapeHtml(org.name)}">${OH.escapeHtml(org.name)}</span>` +
           (org.rank ? `<span class="cc-org-rank">${OH.escapeHtml(org.rank)}</span>` : '') +
           `</span>`;
         setHTML(
@@ -1052,7 +1052,6 @@ function renderHome() {
   ensurePrices();
   renderEventBanner();
   renderHomePanels();
-  renderVersions();
   renderAccount();
   const has = state.items.length > 0;
   document.getElementById('view-home').classList.toggle('no-data', !has);
@@ -1122,14 +1121,13 @@ function link(url, label, soon) {
 }
 
 function renderFooter() {
-  const v = chrome.runtime.getManifest().version;
   const gh = link(REPO_URL, 'GitHub');
   const dc = link(DISCORD_URL, 'Discord');
   const ideas = link(IDEAS_URL, 'Suggest a feature');
-  setHTML(
-    $('#footer'),
-    `${gh} · ${dc} · ${ideas} · MIT License · <a href="#updates" data-view="updates">v${v}</a>`,
-  );
+  // The versions line (Open Hangar vX · What's new · Star Citizen X) lives here,
+  // not on the Citizen Card: it's reference info, not about your character.
+  setHTML($('#footer'), `${gh} · ${dc} · ${ideas} · MIT License · <span id="versions"></span>`);
+  renderVersions();
   const dev = $('#dev-links');
   if (dev)
     setHTML(
@@ -2895,20 +2893,21 @@ function orgRolePanelHtml(f) {
       <table class="org-table"><thead><tr><th>Ship</th><th>Role</th><th>Status</th><th class="num">Count</th><th>Owners</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
   const options = (state.catalog || [])
-    .filter((v) => v.role && def.re.test(v.role) && v.msrp)
-    .sort((x, y) => x.msrp - y.msrp)
-    .slice(0, 10)
+    // Every ship that fills the role (big ones like the Orion used to fall off
+    // a top-10 list), cheapest first; unpriced concepts last.
+    .filter((v) => v.role && def.re.test(v.role))
+    .sort((x, y) => (x.msrp || Infinity) - (y.msrp || Infinity))
     .map(
       (v) =>
         `<tr><td>${OH.escapeHtml(v.name || v.lname)}</td><td class="muted">${OH.escapeHtml(v.role)}</td><td class="muted">${OH.escapeHtml(
           v.status === 'flight-ready' ? 'Flight ready' : 'In concept',
-        )}</td><td class="num">${dollars(v.msrp)}</td></tr>`,
+        )}</td><td class="num">${v.msrp ? dollars(v.msrp) : '—'}</td></tr>`,
     )
     .join('');
   return `<div class="org-panel"><div class="org-panel-head"><strong>${OH.escapeHtml(r.label)}</strong> · nobody has one yet<button type="button" class="org-close" data-close="role" aria-label="Close">×</button></div>
     ${
       options
-        ? `<p class="muted org-intro">Ships that fill this role, cheapest first:</p><table class="org-table"><thead><tr><th>Ship</th><th>Role</th><th>Status</th><th class="num">Store price</th></tr></thead><tbody>${options}</tbody></table>`
+        ? `<p class="muted org-intro">Every ship that fills this role, cheapest first:</p><div class="org-scroll"><table class="org-table"><thead><tr><th>Ship</th><th>Role</th><th>Status</th><th class="num">Store price</th></tr></thead><tbody>${options}</tbody></table></div>`
         : '<p class="muted">No ships in the ship list fill this role.</p>'
     }</div>`;
 }
