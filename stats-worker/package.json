@@ -10,5 +10,6 @@
   },
   "devDependencies": {
     "wrangler": "^4.143.0"
-  }
+  },
+  "license": "PolyForm-Strict-1.0.0"
 }

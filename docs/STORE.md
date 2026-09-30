@@ -121,7 +121,7 @@ install prompt only names robertsspaceindustries.com.)_
 
 **Detailed description:**
 
-> Open Hangar is a free, open-source companion for your Star Citizen account. It reads
+> Open Hangar is a free companion for your Star Citizen account, with public source code. It reads
 > what RSI already shows you (your hangar, buy-backs, balances, org and referrals) and
 > turns it into something you can actually use.
 >
@@ -139,7 +139,7 @@ install prompt only names robertsspaceindustries.com.)_
 > already signed in with. No password, no account, no server. Nothing leaves your
 > device.
 >
-> MIT-licensed and open source on GitHub. Ideas and bug reports are always welcome.
+> Source available on GitHub. Ideas and bug reports are always welcome.
 >
 > Unofficial and fan-made. Not affiliated with Cloud Imperium Games or RSI.
 
