@@ -276,7 +276,7 @@ Carry-overs (2026-10-01):
   secret had landed on production by mistake), so stored 2FA keys no longer decrypt.
   Clear `twoFactor` rows and set `twoFactorEnabled = 0` for the invite-only users; the
   owner OKs the production write. Everyone signs in again.
-- **Node 20 warning** on the production deploy job (an artifact action still targets
+- **Node 20 warning** ([#172](https://github.com/Draco-Foundry/open-hangar/issues/172)) on the production deploy job (an artifact action still targets
   Node 20): bump it.
 
 ## What the owner needs to do (can't be done for you)
