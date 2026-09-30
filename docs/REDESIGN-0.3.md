@@ -163,6 +163,12 @@ Clear All) either way. Picking keeps the sidebar open (never closes on a click).
    belong to the scroller, `overscroll-behavior: contain` so reaching the end doesn't
    hand the scroll to the page, and the page behind (already dimmed) doesn't scroll.
    Check with the mouse over the gaps, the group titles and the panel edges.
+3. **Search results in type order: Pack › Ship › Paint › CCU › the rest.** Inside
+   both the hangar and buy-back groups, sort hits by `pledgeType` (buy-backs by their
+   kind): pack, package (game packages sit next to packs), ship, paint, ccu, then
+   add-ons, coupons and anything else. Within a type keep today's order. A ship found
+   inside a pack is a pack row (it's the pack you'd open or reclaim). The 12/8 row caps
+   apply after sorting, so packs are never cut in favour of add-ons.
 
 ## Scheduled Alongside
 
