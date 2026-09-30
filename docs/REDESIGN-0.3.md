@@ -142,6 +142,18 @@ so the list takes the full width; a "Filters (n)" button in the toolbar brings i
 back; the choice is remembered. Active filters show as pills above the list (× each,
 Clear All) either way. Picking keeps the sidebar open (never closes on a click).
 
+## Owner's Fix List (notes from 2026-09-30, next update)
+
+1. **Global Hangar Search misses ships inside buy-back packs.** Searching "400i" finds
+   the standalone buy-back but not the Origin Complete Pack that contains it. Search
+   (`globalSearchHtml` in src/dashboard.js) only checks a buy-back's name, `contains`
+   and CCU from/to; the ships in a pack live in `state.bbDetails[id].ships`, which it
+   never reads. Fix: also match `bbDetail(b).ships`, and show a hit as "400i, inside
+   Origin Complete Pack" like hangar packages do. Packs whose details were never
+   fetched can't be matched (details stay opt-in: scans stay fast): when some
+   packs are unchecked, add a quiet line under the Buy-Backs group, "N packs not
+   checked yet · Get Details".
+
 ## Scheduled Alongside
 
 - Light mode (Dark default / Light / Auto) after the redesign's pages exist.
