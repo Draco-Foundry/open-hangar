@@ -4,6 +4,25 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- New: **A fresh look.** Open Hangar has a new, cleaner design: graphite panels, bigger and
+  clearer numbers, and colour only where it means something. More pages get their full
+  redesign in the next updates.
+- New: **A rebuilt Home page.** Your account value up top, with how much it's grown since your
+  first scan and how it compares to what you paid, plus counts you can click to jump
+  straight into Inventory with that filter on.
+- New: **Events** card: the event running right now (only while it's actually on), the last
+  one, any referral bonus event, and when your next buy-back token arrives.
+- New: **Game Status** card: the LIVE version and what's on the test servers, including
+  which PTU wave, with a link to the latest patch notes.
+- New: **For You** alerts beside your Citizen Card: a wishlist ship on sale, a ship you own
+  turning flight ready, buy-backs that match your wishlist, and your enlistment anniversary.
+  Ignore any you don't care about.
+- New: **Latest Acquisitions** (your five newest pledges) and **Ship Spotlight** (a ship from
+  your fleet with its picture and specs; flip to another).
+- New: **Latest From RSI** now includes patch notes, with All / News / Patch Notes filters.
+- Improved: the top menu stays pinned while you scroll, on every page except Home.
+- Improved: search moved into the Citizen Card (press / on any page, as before).
+- Fixed: Stats' tabs ran off the side of a phone screen; they wrap now.
 - Changed: **Open Hangar's code is now source available** (PolyForm Strict License). It stays public on GitHub so anyone can read and audit it, but it can't be copied into other versions. Earlier releases stay MIT.
 - Improved: Citizen Card: long org names wrap to two lines at most (full name on hover), and the
   "Open Hangar vX · What's new · Star Citizen X" line moved to the page footer.

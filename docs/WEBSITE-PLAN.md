@@ -239,6 +239,9 @@ Owner ideas, 2026-09-30. Ship together when sign-ups open:
   sign in (Discord or email) and it links right after. No typing codes. Never a
   silent link: the extension can't see the site's login without new permissions,
   and linking without a click breaks the opt-in promise.
+- **The Connect button is obvious** (owner, 2026-09-30): a prominent button on the Citizen
+  Card, not tucked away on Developers; once linked it reads "Connected as <name>" with
+  Sync and Disconnect beside it.
 - **Discord login stays on the website.** The Connect tab gives the extension
   Discord login for free; no auth code or new permissions in the extension.
 - **"Sync after every scan"** toggle in the extension, off by default.
