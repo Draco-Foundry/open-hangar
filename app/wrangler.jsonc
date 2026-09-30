@@ -17,8 +17,15 @@
       "migrations_dir": "migrations",
     },
   ],
+  // Secrets (`wrangler secret put NAME`; locally in .dev.vars):
+  //   BETTER_AUTH_SECRET     required
+  //   DISCORD_CLIENT_SECRET  Log in with Discord (needs DISCORD_CLIENT_ID too)
+  //   RESEND_API_KEY         account emails; without it, links are logged instead
   "vars": {
     "BETTER_AUTH_URL": "http://localhost:4321",
+    // Discord application ID (public). Empty = Discord login hidden.
+    "DISCORD_CLIENT_ID": "",
+    "EMAIL_FROM": "Open Hangar <noreply@openhangar.space>",
   },
   "observability": {
     "enabled": true,

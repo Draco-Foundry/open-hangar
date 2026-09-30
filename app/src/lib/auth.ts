@@ -4,9 +4,10 @@ import { env } from 'cloudflare:workers';
 import { betterAuth } from 'better-auth';
 import { D1Dialect } from 'kysely-d1';
 import { authOptions } from './auth-options';
+import { resetPasswordEmail, verifyEmail } from './email';
 
-// Optional secrets (set with `wrangler secret put`); Discord login only turns on
-// once both exist.
+// DISCORD_CLIENT_ID is a plain var, DISCORD_CLIENT_SECRET a secret (`wrangler
+// secret put`). Discord login only turns on once both are set.
 type OptionalSecrets = { DISCORD_CLIENT_ID?: string; DISCORD_CLIENT_SECRET?: string };
 
 function build() {
@@ -16,6 +17,14 @@ function build() {
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
     database: { dialect: new D1Dialect({ database: env.DB }), type: 'sqlite' },
+    emailAndPassword: {
+      ...authOptions.emailAndPassword,
+      sendResetPassword: ({ user, url }) => resetPasswordEmail(user.email, url),
+    },
+    emailVerification: {
+      ...authOptions.emailVerification,
+      sendVerificationEmail: ({ user, url }) => verifyEmail(user.email, url),
+    },
     socialProviders:
       extra.DISCORD_CLIENT_ID && extra.DISCORD_CLIENT_SECRET
         ? {
@@ -42,7 +51,7 @@ export function getAuth() {
   return instance;
 }
 
-export const discordEnabled = () => {
+export function discordEnabled() {
   const extra = env as unknown as OptionalSecrets;
   return Boolean(extra.DISCORD_CLIENT_ID && extra.DISCORD_CLIENT_SECRET);
-};
+}

@@ -196,8 +196,13 @@ Migrations in `app/migrations/`; the account, org and history tables are in
 ## What the owner needs to do (can't be done for you)
 
 - Approve creating the Cloudflare Pages project and D1 database.
-- Create a **Discord application** (Developer Portal) for "Log in with Discord" and add
-  its client ID/secret as Cloudflare secrets.
-- Create a **Resend** account, verify the openhangar.space domain (DNS records at
-  Porkbun), and add the API key as a Cloudflare secret.
+- **Discord login:** put the application's client ID in `DISCORD_CLIENT_ID` under
+  `vars` in `app/wrangler.jsonc` (it's public), and add the client secret with
+  `wrangler secret put DISCORD_CLIENT_SECRET`. The button stays hidden until both are
+  set. Redirects already registered: `/api/auth/callback/discord` on the live site and
+  localhost:4321.
+- **Email (Resend):** verify the openhangar.space domain in Resend (DNS records at
+  Porkbun), then `wrangler secret put RESEND_API_KEY`. The sender is `EMAIL_FROM` in
+  `wrangler.jsonc`. Without the key, verify/reset links are only logged.
+- For local testing of either, add the same names to `app/.dev.vars`.
 - Add the `app` CNAME at Porkbun when the site is ready.
