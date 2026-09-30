@@ -270,6 +270,15 @@ Owner's goal: a robust base so updates roll out quickly. In order:
    both sides.
 7. **Discord bot** with orgs (phase 2): org roles for verified members, /fleet.
 
+Carry-overs (2026-10-01):
+
+- **2FA reset on production:** BETTER_AUTH_SECRET was rotated 2026-09-30 (the staging
+  secret had landed on production by mistake), so stored 2FA keys no longer decrypt.
+  Clear `twoFactor` rows and set `twoFactorEnabled = 0` for the invite-only users; the
+  owner OKs the production write. Everyone signs in again.
+- **Node 20 warning** on the production deploy job (an artifact action still targets
+  Node 20): bump it.
+
 ## What the owner needs to do (can't be done for you)
 
 - Approve creating the Cloudflare Pages project and D1 database.
