@@ -770,3 +770,7 @@ body:not(:has(#view-home.active)) .wrap > header {
     display: none;
   }
 }
+/* The portrait stays put on hover (the old avatar's lift is off); it only brightens. */
+.home-hero .cc-avatar:hover {
+  transform: none;
+}
