@@ -8,7 +8,7 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   clearer numbers, and colour only where it means something. More pages get their full
   redesign in the next updates.
 - New: **A rebuilt Home page.** Your account value up top, with how much it's grown since your
-  first scan and how it compares to what you paid, plus counts you can click to jump
+  first scan and how it compares to its melt value, plus counts you can click to jump
   straight into Inventory with that filter on.
 - New: **Events** card: the event running right now (only while it's actually on), the last
   one, any referral bonus event, and when your next buy-back token arrives.
@@ -24,6 +24,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 - Improved: **Global Hangar Search** has its own full-width line under the Citizen Card
   (press / on any page, as before), and there's a **Scan** button in the top menu on every page.
 - Fixed: Stats' tabs ran off the side of a phone screen; they wrap now.
+- Fixed: "vs what you paid" is now **"vs melt value"** (Home and Stats). RSI only knows a
+  pledge's original price, not what you paid for a gifted or grey-market pledge.
+- New: **A new Citizen Card:** your portrait over a banner, one row of numbers (balances and
+  recruits) and your badges underneath.
 - Fixed: pictures, prices and specs for the original Auroras ("Aurora MR", "Aurora LN"…), which
   RSI renamed "Aurora Mk I". Packages and starter packs ("Aurora MR Starter Pack") now show
   the ship inside instead of a blank box.

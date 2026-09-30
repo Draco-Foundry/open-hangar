@@ -879,7 +879,13 @@ function renderAccount() {
             tokenTitle(),
           )}"><span class="bal-lbl">Buy-back tokens</span><b>${
             state.bbTokens != null ? state.bbTokens : DASH
-          }</b></a>`,
+          }</b></a>` +
+          (() => {
+            const r = state.referral?.legacy?.recruits ?? state.referral?.current?.recruits;
+            return r != null
+              ? `<a class="bal recruits" href="#referrals" data-view="referrals"><span class="bal-lbl">Recruits</span><b>${OH.escapeHtml(compactNum(r))}</b></a>`
+              : '';
+          })(),
       );
     }
 
@@ -916,12 +922,9 @@ function renderReferralPill(a) {
     setHTML(el, '');
     return;
   }
-  const recruits = ref?.legacy?.recruits ?? ref?.current?.recruits ?? null;
   const url = ref?.url || a?.referral?.url || null;
-  const countPart =
-    recruits != null
-      ? `<span class="bal-lbl">Referrals</span> <b>${recruits.toLocaleString('en-US')}</b>`
-      : `<span class="bal-lbl">Referral code</span>`;
+  // The recruit count is in the card's numbers row (Banner card, 0.3.0).
+  const countPart = `<span class="bal-lbl">Referral Code</span>`;
   setHTML(
     el,
     `<span class="ref-pill">${countPart}
@@ -3176,7 +3179,7 @@ document.addEventListener('click', async (e) => {
 
 // --- Stats ----------------------------------------------------------------
 
-// Stats → Hangar value: ships at today's store price vs what you paid, best
+// Stats → Hangar value: ships at today's store price vs their melt value, best
 // deals, and which ships couldn't be priced.
 function valueSectionHtml() {
   const v = hangarValue();
@@ -3196,7 +3199,7 @@ function valueSectionHtml() {
     (v.paidPriced
       ? box(
           `${sign}${dollars(Math.abs(gap))}`,
-          `vs what you paid${pct ? ` (${sign}${pct}%)` : ''}`,
+          `vs melt value${pct ? ` (${sign}${pct}%)` : ''}`,
           gap >= 0 ? 'good' : '',
         )
       : '') +
@@ -3237,7 +3240,7 @@ function valueSectionHtml() {
       ? `<h4 class="modal-h">Best Deals: Paid Below Today's Store Price</h4><div class="top-list">${dealRows}</div>`
       : '') +
     unpriced +
-    `<p class="muted value-note">Ships at current standalone store prices (USD, before tax) from star-citizen.wiki; a CCU's standard price is the gap between its two ships. Paints, gear and game access aren't counted; concept and limited ships often have no public price. "vs what you paid" covers ship pledges whose ships are all priced.</p>`
+    `<p class="muted value-note">Ships at current standalone store prices (USD, before tax) from star-citizen.wiki; a CCU's standard price is the gap between its two ships. Paints, gear and game access aren't counted; concept and limited ships often have no public price. "vs melt value" covers ship pledges whose ships are all priced. Melt value is the pledge's value on RSI (what it was originally bought for); for gifted or grey-market pledges that isn't what you paid.</p>`
   );
 }
 
@@ -3637,7 +3640,7 @@ function topListsHtml() {
     `<div><h3 class="section-title">Most Valuable LTI Ships</h3>${list(
       ltiShips.map((p) => itemRow(p, OH.escapeHtml(formatValue(p)))).join(''),
     )}</div></div>` +
-    `<p class="muted value-note">Click any row to open it. Savings compare what you paid with today's standard store price (warbonds, sales, CCU'd pledges).</p>`
+    `<p class="muted value-note">Click any row to open it. Savings compare melt value with today's standard store price (warbonds, sales, CCU'd pledges).</p>`
   );
 }
 

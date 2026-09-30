@@ -254,7 +254,13 @@ try {
       tokens: ['--good', '--warn', '--bad', '--t-ship', '--t-pack', '--t-ccu'].every((n) =>
         cs.getPropertyValue(n).trim(),
       ),
-      whiteBal: bal && getComputedStyle(bal).color === getComputedStyle(document.body).color,
+      // Balances stay neutral white: body text or the heading white (Clean Pro's
+      // numbers), never a meaning colour.
+      whiteBal:
+        bal &&
+        [getComputedStyle(document.body).color, 'rgb(255, 255, 255)'].includes(
+          getComputedStyle(bal).color,
+        ),
       pal: palette().good === cs.getPropertyValue('--good').trim(),
     };
   });
