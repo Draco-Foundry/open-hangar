@@ -98,7 +98,7 @@ Empty blocks disappear; the grid never leaves a card alone in a row.
   shortMoney, bigMoney, formatValue) shows as dots, hover text included; UEC/REC on the
   card too. Its scope may grow beyond money.
 
-## Top Menu Pass (approved and built 2026-09-30, branch redesign/passes)
+## Top Menu Pass (approved and built 2026-09-30, ships tonight in 0.2.12)
 
 All ten, as mocked up ("Top Menu Pass" artifact): alerts bell with a count and a
 drop-down (every page); Scan is its own progress bar ("Scanning… 4/12", "✓ Done") with
@@ -109,7 +109,7 @@ Data); a Streamer pill while it's on; counts beside Inventory and Buy-Backs; an 
 dot on the portrait with "Update ready: Reload" in the menu; a slim bar while
 scrolling down; a real logo mark; phone tabs you swipe.
 
-## Inventory and Buy-Backs (approved and built 2026-09-30, branch redesign/passes)
+## Inventory and Buy-Backs (approved and built 2026-09-30, ships tonight in 0.2.12)
 
 - Stay two pages (different jobs: what you own vs what you could get back; 1,000+
   buy-backs would bury a hangar). Global Hangar Search already covers both.
