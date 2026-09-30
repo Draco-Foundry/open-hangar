@@ -15,7 +15,52 @@
         --accent: #2f81f7;
         --accent-hover: #4493f8;
         --link: #58a6ff;
+        --accent-soft: rgba(47, 129, 247, 0.14);
         --shadow: 0 1px 3px rgba(1, 4, 9, 0.5);
+
+        /* One color, one meaning (see "Color Key" under How to Use on Home).
+           Blue (--accent/--link) = something you can click, or info. */
+        /* Status: good news / needs attention / problem */
+        --good: #3fb950;
+        --good-line: rgba(63, 185, 80, 0.5);
+        --good-soft: rgba(63, 185, 80, 0.12);
+        --warn: #d29922;
+        --warn-line: rgba(210, 153, 34, 0.5);
+        --warn-soft: rgba(210, 153, 34, 0.12);
+        --bad: #f85149;
+        --bad-line: rgba(248, 81, 73, 0.5);
+        --bad-soft: rgba(248, 81, 73, 0.12);
+
+        /* Item types: badges, filter chips, charts. Used for nothing else. */
+        --t-ship: #7ee787;
+        --t-ship-line: #2ea043;
+        --t-ship-soft: rgba(46, 160, 67, 0.14);
+        --t-ccu: #d2a8ff;
+        --t-ccu-line: #6e40c9;
+        --t-ccu-soft: rgba(110, 64, 201, 0.16);
+        --t-paint: #ff9bd4;
+        --t-paint-line: #c14b8a;
+        --t-paint-soft: rgba(193, 75, 138, 0.14);
+        --t-addon: #79c0ff;
+        --t-addon-line: #1f6feb;
+        --t-addon-soft: rgba(31, 111, 235, 0.14);
+        --t-coupon: #f0883e;
+        --t-coupon-line: #bd561d;
+        --t-coupon-soft: rgba(189, 86, 29, 0.14);
+        --t-pack: #e3b341;
+        --t-pack-line: #d29922;
+        --t-pack-soft: rgba(210, 153, 34, 0.14);
+        --t-package: #56d4dd;
+        --t-package-line: #1b9aaa;
+        --t-package-soft: rgba(27, 154, 170, 0.14);
+
+        /* RSI's own account colors (Subscriber tiers, Chairman's Club) */
+        --rsi-gold: #f0b429;
+        --rsi-gold-line: #bd8b1d;
+        --rsi-silver: #b8c2cf;
+        --rsi-silver-line: #7d8590;
+        --rsi-club: #d2a8ff;
+        --rsi-club-line: #6e40c9;
       }
       * {
         box-sizing: border-box;
@@ -135,7 +180,7 @@
         border: 1px solid var(--line);
         border-radius: 12px;
         background:
-          radial-gradient(ellipse 50% 140% at 50% 0%, rgba(47, 129, 247, 0.14), transparent 70%),
+          radial-gradient(ellipse 50% 140% at 50% 0%, var(--accent-soft), transparent 70%),
           var(--panel);
         box-shadow: var(--shadow);
       }
@@ -457,7 +502,7 @@
         min-height: 18px;
       }
       #status.error {
-        color: #f85149;
+        color: var(--bad);
       }
       .scanned {
         color: var(--muted);
@@ -704,10 +749,10 @@
         transform: translateY(-2px);
       }
       .cc-avatar.tier-sub {
-        border-color: #b8c2cf;
+        border-color: var(--rsi-silver);
       }
       .cc-avatar.tier-imperator {
-        border-color: #f0b429;
+        border-color: var(--rsi-gold);
         box-shadow:
           0 0 0 4px rgba(240, 180, 41, 0.22),
           0 6px 22px rgba(0, 0, 0, 0.6);
@@ -743,7 +788,7 @@
         line-height: 1.4;
       }
       .cc-meta a {
-        color: #58a6ff;
+        color: var(--link);
         text-decoration: none;
         font-weight: 600;
       }
@@ -1015,10 +1060,10 @@
         letter-spacing: 0.03em;
       }
       .flair.sub {
-        border-color: #bd8b1d;
+        border-color: var(--rsi-gold-line);
       }
       .flair.sub b {
-        color: #f0b429;
+        color: var(--rsi-gold);
       } /* Imperator → gold */
       .flair.sub-centurion {
         border-color: #7d8590;
@@ -1027,10 +1072,10 @@
         color: #b8c2cf;
       } /* Centurion → silver */
       .flair.concierge {
-        border-color: #6e40c9;
+        border-color: var(--rsi-club-line);
       }
       .flair.concierge b {
-        color: #d2a8ff;
+        color: var(--rsi-club);
       }
       .flair-prog {
         display: inline-flex;
@@ -1050,7 +1095,7 @@
       .flair-bar > span {
         display: block;
         height: 100%;
-        background: #d2a8ff;
+        background: var(--rsi-club);
       }
 
       /* Account balances row (Store Credit / UEC / REC) */
@@ -1080,20 +1125,20 @@
         font-variant-numeric: tabular-nums;
       }
       .bal.store b {
-        color: #f0b429;
+        color: var(--text);
       }
       .bal.uec b {
-        color: #2dd4bf;
+        color: var(--text);
       }
       .bal.rec b {
-        color: #d2a8ff;
+        color: var(--text);
       }
       a.bal.bbt {
         text-decoration: none;
         color: inherit;
       }
       .bal.bbt b {
-        color: #58a6ff;
+        color: var(--text);
       }
       .inv-section + .inv-section {
         margin-top: 22px;
@@ -1178,7 +1223,7 @@
       }
       .ref-pill b {
         font-variant-numeric: tabular-nums;
-        color: #7ee787;
+        color: var(--good);
       }
       /* Vertical divider between the recruit count and the referral code */
       .ref-pill-sep {
@@ -1208,8 +1253,8 @@
         border-color: rgba(255, 255, 255, 0.4);
       }
       .ref-copy.copied {
-        color: #7ee787;
-        border-color: #7ee787;
+        color: var(--good);
+        border-color: var(--good);
       }
 
       /* Referrals view */
@@ -1217,7 +1262,7 @@
         grid-column: span 2;
       }
       .ref-totals .stat-box.span2 .big {
-        color: #7ee787;
+        color: var(--good);
       }
       /* Referrals: progress hero */
       .ref-hero {
@@ -1246,7 +1291,7 @@
       }
       .ref-hero-rank {
         margin-top: 6px;
-        color: #e3b341;
+        color: var(--text);
         font-weight: 700;
         letter-spacing: 0.06em;
         text-transform: uppercase;
@@ -1272,7 +1317,7 @@
         height: 100%;
         min-width: 12px;
         border-radius: 6px;
-        background: linear-gradient(90deg, #2ea043, #7ee787);
+        background: linear-gradient(90deg, var(--good), var(--good));
       }
       .ref-hero-bar-ends {
         display: flex;
@@ -1322,12 +1367,12 @@
         border: 2px solid var(--line);
       }
       .rt-step.on .rt-dot {
-        background: #3fb950;
-        border-color: #3fb950;
+        background: var(--good);
+        border-color: var(--good);
       }
       .rt-step.next .rt-dot {
-        border-color: #7ee787;
-        box-shadow: 0 0 0 4px rgba(126, 231, 135, 0.18);
+        border-color: var(--good);
+        box-shadow: 0 0 0 4px var(--good-soft);
       }
       .rt-at {
         margin-top: 4px;
@@ -1390,7 +1435,7 @@
         width: 12px;
         height: 12px;
         border-radius: 50%;
-        background: #3fb950;
+        background: var(--good);
         border: 2px solid var(--bg);
       }
       .rtl-head {
@@ -1420,8 +1465,8 @@
         font-size: 13px;
       }
       .ref-event-banner.live {
-        border-color: rgba(63, 185, 80, 0.5);
-        background: rgba(63, 185, 80, 0.08);
+        border-color: var(--good-line);
+        background: var(--good-soft);
       }
       .wish-btn {
         margin: 2px 0 10px;
@@ -1486,10 +1531,10 @@
         white-space: nowrap;
       }
       .sale.on {
-        color: #3fb950;
+        color: var(--good);
       }
       .sale.wb {
-        color: #e3b341;
+        color: var(--t-pack);
       }
       .sale.off {
         color: var(--muted);
@@ -1538,8 +1583,8 @@
         opacity: 1;
       }
       .wish-x:hover {
-        background: rgba(248, 81, 73, 0.15);
-        color: #f85149;
+        background: var(--bad-soft);
+        color: var(--bad);
       }
       .wish-undo {
         margin: 0 0 10px;
@@ -1619,15 +1664,15 @@
         stroke-width: 1;
       }
       .ref-chart .area {
-        fill: rgba(126, 231, 135, 0.15);
+        fill: var(--good-soft);
       }
       .ref-chart .line {
         fill: none;
-        stroke: #7ee787;
+        stroke: var(--good);
         stroke-width: 2;
       }
       .ref-chart .bar {
-        fill: #3fb6d8;
+        fill: var(--link);
       }
       .ref-chart .tick {
         fill: var(--muted);
@@ -1641,7 +1686,7 @@
         border: 1px solid var(--line);
       }
       .ref-conv-bar .seg-conv {
-        background: #7ee787;
+        background: var(--good);
       }
       .ref-conv-bar .seg-rest {
         background: rgba(255, 255, 255, 0.1);
@@ -1702,8 +1747,8 @@
       }
       .ref-tab.active {
         color: #fff;
-        border-color: #7ee787;
-        background: rgba(126, 231, 135, 0.08);
+        border-color: var(--good);
+        background: var(--good-soft);
       }
       /* Cap the (potentially 1000s-long) list and scroll within it; the header
          stays pinned so columns stay labelled while scrolling. */
@@ -1760,12 +1805,12 @@
         color: var(--muted);
       }
       .ref-badge.current {
-        color: #7ee787;
-        border-color: rgba(126, 231, 135, 0.5);
+        color: var(--good);
+        border-color: var(--good-line);
       }
       .ref-badge.legacy {
-        color: #f0b429;
-        border-color: rgba(240, 180, 41, 0.5);
+        color: var(--muted);
+        border-color: var(--line);
       }
 
       /* Referral reward ladders */
@@ -1798,7 +1843,7 @@
       .reward-progress {
         font-size: 11px;
         font-weight: 600;
-        color: #7ee787;
+        color: var(--good);
       }
       .reward-note {
         font-size: 11px;
@@ -1830,16 +1875,16 @@
         font-variant-numeric: tabular-nums;
       }
       .reward-unlocked .reward-mark {
-        color: #7ee787;
+        color: var(--good);
       }
       .reward-unlocked .reward-name {
         color: var(--text);
       }
       .reward-next {
-        background: rgba(63, 182, 216, 0.08);
+        background: var(--accent-soft);
       }
       .reward-next .reward-mark {
-        color: #3fb6d8;
+        color: var(--link);
       }
       .reward-next .reward-name {
         color: #fff;
@@ -1850,13 +1895,13 @@
       }
       .reward-togo {
         font-size: 10px;
-        color: #3fb6d8;
+        color: var(--link);
         margin-left: 6px;
         white-space: nowrap;
       }
       /* ★ marker on recruits who converted during a bonus event */
       .ref-event {
-        color: #f0c040;
+        color: var(--warn);
         margin-left: 4px;
       }
       /* Individual reward items (each links out; ships also hover-preview art) */
@@ -1868,7 +1913,7 @@
         text-decoration: underline;
       }
       .reward-item.ship {
-        color: #7ee787;
+        color: var(--t-ship);
       }
       .reward-sep {
         color: var(--muted);
@@ -1898,7 +1943,7 @@
         font-size: 13px;
       }
       .event-check {
-        color: #7ee787;
+        color: var(--good);
       }
       .event-text {
         flex: 1;
@@ -1952,10 +1997,10 @@
       }
       /* First-run: emphasize Scan, de-emphasize data-dependent cards */
       .no-data #scan-home {
-        box-shadow: 0 0 0 3px rgba(28, 108, 255, 0.25);
+        box-shadow: 0 0 0 3px rgba(47, 129, 247, 0.25);
       }
       .stale {
-        color: #d29922;
+        color: var(--warn);
       }
       /* Keyboard focus visibility (a11y) */
       a:focus-visible,
@@ -2036,10 +2081,10 @@
         font-variant-numeric: tabular-nums;
       }
       .gain {
-        color: #3fb950;
+        color: var(--good);
       }
       .stat-box.good .big {
-        color: #3fb950;
+        color: var(--good);
       }
       .mr-sub {
         color: var(--muted);
@@ -2061,7 +2106,7 @@
       /* Select mode + fleet image bar */
       .select-toggle[aria-pressed='true'] {
         border-color: var(--accent);
-        background: rgba(47, 129, 247, 0.14);
+        background: var(--accent-soft);
       }
       .card.selected {
         border-color: var(--accent);
@@ -2207,7 +2252,7 @@
       }
       .howto a,
       .home-changes a {
-        color: #58a6ff;
+        color: var(--link);
       }
       .currency-select {
         padding: 2px 6px;
@@ -2236,7 +2281,7 @@
         display: none;
       }
       .site-link .ok {
-        color: #3fb950;
+        color: var(--good);
         font-weight: 600;
       }
       .site-link button {
@@ -2304,10 +2349,10 @@
         list-style: none;
       }
       ul.changes .add {
-        color: #3fb950;
+        color: var(--good);
       }
       ul.changes .del {
-        color: #f85149;
+        color: var(--bad);
       }
       ul.changes .chg {
         color: var(--muted);
@@ -2547,7 +2592,7 @@
         font-weight: 600;
       }
       .mk-gift.gift-yes {
-        color: #2ea043;
+        color: var(--good);
       }
       .mk-gift.gift-no {
         color: var(--muted);
@@ -2584,11 +2629,11 @@
         color: var(--muted);
       }
       .mk-vs.gain {
-        color: #2ea043;
+        color: var(--good);
         font-weight: 600;
       }
       .market-table tr.picked td {
-        background: rgba(56, 139, 253, 0.1);
+        background: var(--accent-soft);
       }
       .mk-selcount {
         color: var(--muted);
@@ -2641,30 +2686,30 @@
         background: rgba(47, 129, 247, 0.22);
       }
       .chip.k-ship[aria-pressed='true'] {
-        border-color: #2ea043;
+        border-color: var(--t-ship-line);
       }
       .chip.k-ccu[aria-pressed='true'] {
-        border-color: #6e40c9;
+        border-color: var(--t-ccu-line);
       }
       .chip.k-addon[aria-pressed='true'] {
-        border-color: #1f6feb;
+        border-color: var(--t-addon-line);
       }
       .chip.k-pack[aria-pressed='true'] {
-        border-color: #d29922;
+        border-color: var(--t-pack-line);
       }
       .chip.k-package[aria-pressed='true'] {
-        border-color: #1b9aaa;
+        border-color: var(--t-package-line);
       }
       .chip.trait.k-pack[aria-pressed='true'] {
-        border-color: #d29922;
-        background: rgba(210, 153, 34, 0.14);
+        border-color: var(--t-pack-line);
+        background: var(--t-pack-soft);
       }
       .chip.trait.k-package[aria-pressed='true'] {
-        border-color: #1b9aaa;
-        background: rgba(27, 154, 170, 0.14);
+        border-color: var(--t-package-line);
+        background: var(--t-package-soft);
       }
       .chip.k-coupon[aria-pressed='true'] {
-        border-color: #bd561d;
+        border-color: var(--t-coupon-line);
       }
       .chip[aria-pressed='false'] {
         opacity: 0.5;
@@ -2679,13 +2724,13 @@
       .chip.trait[aria-pressed='true'] {
         border-style: solid;
         border-color: var(--accent);
-        background: rgba(47, 129, 247, 0.14);
+        background: var(--accent-soft);
       }
       /* Excluding ("Not giftable"): red outline. */
       .chip.trait[data-mode='no'] {
         border-style: solid;
-        border-color: #f85149;
-        background: rgba(248, 81, 73, 0.12);
+        border-color: var(--bad);
+        background: var(--bad-soft);
       }
       .chip.chip-clear {
         opacity: 1;
@@ -3047,14 +3092,14 @@
         cursor: default;
       }
       .flag.yes {
-        color: #7ee787;
-        border-color: #2ea043;
-        background: rgba(46, 160, 67, 0.15);
+        color: var(--good);
+        border-color: var(--good);
+        background: var(--good-soft);
       }
       .flag.no {
-        color: #ff7b72;
-        border-color: #f85149;
-        background: rgba(248, 81, 73, 0.12);
+        color: var(--bad);
+        border-color: var(--bad);
+        background: var(--bad-soft);
       }
 
       .badge {
@@ -3070,37 +3115,37 @@
         white-space: nowrap;
       }
       .badge.ccu {
-        color: #d2a8ff;
-        border-color: #6e40c9;
+        color: var(--t-ccu);
+        border-color: var(--t-ccu-line);
       }
       .badge.ship {
-        color: #7ee787;
-        border-color: #2ea043;
+        color: var(--t-ship);
+        border-color: var(--t-ship-line);
       }
       .badge.addon {
-        color: #79c0ff;
-        border-color: #1f6feb;
+        color: var(--t-addon);
+        border-color: var(--t-addon-line);
       }
       .badge.coupon {
-        color: #f0883e;
-        border-color: #bd561d;
+        color: var(--t-coupon);
+        border-color: var(--t-coupon-line);
       }
       .badge.paint {
-        color: #ff9bd4;
-        border-color: #c14b8a;
+        color: var(--t-paint);
+        border-color: var(--t-paint-line);
       }
       /* Type colors, the same on every page: ship green, CCU purple, paint pink,
          add-on blue, coupon orange, pack gold, game package teal. */
       .badge.pack {
-        color: #e3b341;
-        border-color: #d29922;
+        color: var(--t-pack);
+        border-color: var(--t-pack-line);
       }
       .badge.package {
-        color: #56d4dd;
-        border-color: #1b9aaa;
+        color: var(--t-package);
+        border-color: var(--t-package-line);
       }
       .chip.k-paint[aria-pressed='true'] {
-        border-color: #c14b8a;
+        border-color: var(--t-paint-line);
       }
       .bb-reclaim {
         color: var(--link);
@@ -3206,7 +3251,7 @@
         margin-bottom: 8px;
       }
       #data-msg.error {
-        color: #f85149;
+        color: var(--bad);
       }
       .profiles {
         margin: 8px 0 18px;
@@ -3263,7 +3308,7 @@
         padding: 0 6px;
       }
       .org-member button:hover {
-        color: #f85149;
+        color: var(--bad);
       }
       .org-table {
         width: 100%;
@@ -3307,8 +3352,8 @@
         background: var(--panel-2);
       }
       .role-chip.have {
-        border-color: rgba(63, 185, 80, 0.5);
-        color: #3fb950;
+        border-color: var(--good-line);
+        color: var(--good);
       }
       .role-chip.open {
         outline: 2px solid var(--accent);
@@ -3353,7 +3398,7 @@
         cursor: pointer;
       }
       .org-mrow.open td {
-        background: rgba(56, 139, 253, 0.1);
+        background: var(--accent-soft);
       }
       .org-compare-bar {
         display: flex;
@@ -3399,11 +3444,11 @@
       }
       .sw.a,
       .pair-bar.a {
-        background: #2f81f7;
+        background: var(--accent);
       }
       .sw.b,
       .pair-bar.b {
-        background: #d29922;
+        background: var(--muted);
       }
       .pair-row {
         display: grid;
@@ -3526,10 +3571,10 @@
         border-color: var(--accent);
       }
       .sup-chip.booster {
-        border-color: #6e40c9;
+        border-color: var(--line);
       }
       .sup-chip.booster b {
-        color: #d2a8ff;
+        color: var(--text);
       }
       .dev-linkbox {
         float: right;
@@ -3566,8 +3611,8 @@
         gap: 12px;
         margin: 0 0 18px;
         padding: 8px 8px 8px 14px;
-        border: 1px solid rgba(63, 185, 80, 0.45);
-        background: rgba(63, 185, 80, 0.1);
+        border: 1px solid var(--good-line);
+        background: var(--good-soft);
         border-radius: 8px;
         font-size: 13px;
       }
@@ -3631,10 +3676,10 @@
         font-weight: 700;
       }
       .release-group.g-fixed {
-        color: #f0b429;
+        color: var(--link);
       }
       .release-group.g-new {
-        color: #3fb950;
+        color: var(--good);
       }
       .release-tag {
         font-size: 11px;
@@ -3645,8 +3690,8 @@
         color: var(--muted);
       }
       .release-tag.new {
-        border-color: rgba(63, 185, 80, 0.6);
-        color: #3fb950;
+        border-color: var(--good-line);
+        color: var(--good);
       }
       .release p {
         margin: 8px 0 0;
@@ -3667,8 +3712,8 @@
       .signedout-banner {
         margin: 0 0 18px;
         padding: 8px 14px;
-        border: 1px solid rgba(240, 180, 41, 0.4);
-        background: rgba(240, 180, 41, 0.1);
+        border: 1px solid var(--warn-line);
+        background: var(--warn-soft);
         border-radius: 8px;
         font-size: 13px;
         color: var(--text);
@@ -3707,6 +3752,87 @@
       .group,
       .placeholder-view {
         box-shadow: var(--shadow);
+      }
+      .chip.k-ship[aria-pressed='true'] {
+        border-color: var(--t-ship-line);
+        background: var(--t-ship-soft);
+      }
+      .chip.k-ccu[aria-pressed='true'] {
+        border-color: var(--t-ccu-line);
+        background: var(--t-ccu-soft);
+      }
+      .chip.k-paint[aria-pressed='true'] {
+        border-color: var(--t-paint-line);
+        background: var(--t-paint-soft);
+      }
+      .chip.k-addon[aria-pressed='true'] {
+        border-color: var(--t-addon-line);
+        background: var(--t-addon-soft);
+      }
+      .chip.k-coupon[aria-pressed='true'] {
+        border-color: var(--t-coupon-line);
+        background: var(--t-coupon-soft);
+      }
+      .chip.k-pack[aria-pressed='true'] {
+        border-color: var(--t-pack-line);
+        background: var(--t-pack-soft);
+      }
+      .chip.k-package[aria-pressed='true'] {
+        border-color: var(--t-package-line);
+        background: var(--t-package-soft);
+      }
+      .badge.good {
+        color: var(--good);
+        border-color: var(--good-line);
+      }
+      .badge.warn {
+        color: var(--warn);
+        border-color: var(--warn-line);
+      }
+      .badge.muted {
+        color: var(--muted);
+      }
+      .bar-fill.t-ship {
+        background: var(--t-ship-line);
+      }
+      .bar-fill.t-ccu {
+        background: var(--t-ccu-line);
+      }
+      .bar-fill.t-paint {
+        background: var(--t-paint-line);
+      }
+      .bar-fill.t-addon {
+        background: var(--t-addon-line);
+      }
+      .bar-fill.t-coupon {
+        background: var(--t-coupon-line);
+      }
+      .bar-fill.t-pack {
+        background: var(--t-pack-line);
+      }
+      .bar-fill.t-package {
+        background: var(--t-package-line);
+      }
+      /* Home → How to Use → Color Key */
+      .color-key {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        gap: 8px 18px;
+        margin: 6px 0 4px;
+        padding: 0;
+        list-style: none;
+      }
+      .color-key li {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+      }
+      .color-key .sw {
+        width: 12px;
+        height: 12px;
+        flex: 0 0 12px;
+        border-radius: 3px;
       }
     </style>
   </head>
@@ -3921,6 +4047,60 @@
                 is a week old.
               </li>
             </ol>
+
+            <details>
+              <summary>Color Key</summary>
+              <p class="muted">
+                Every page uses the same colors for the same things. Item types always have their
+                own color; nothing else uses those.
+              </p>
+              <ul class="color-key">
+                <li>
+                  <span class="sw" style="background: var(--t-ship-line)"></span><b>Ship</b
+                  ><span class="muted">a pledge or buy-back with one ship</span>
+                </li>
+                <li>
+                  <span class="sw" style="background: var(--t-pack-line)"></span><b>Pack</b
+                  ><span class="muted">several ships in one pledge</span>
+                </li>
+                <li>
+                  <span class="sw" style="background: var(--t-package-line)"></span><b>Package</b
+                  ><span class="muted">a game package (a ship plus the game)</span>
+                </li>
+                <li>
+                  <span class="sw" style="background: var(--t-ccu-line)"></span><b>CCU</b
+                  ><span class="muted">a ship upgrade</span>
+                </li>
+                <li>
+                  <span class="sw" style="background: var(--t-paint-line)"></span><b>Paint</b
+                  ><span class="muted">a ship skin</span>
+                </li>
+                <li>
+                  <span class="sw" style="background: var(--t-addon-line)"></span><b>Add-On</b
+                  ><span class="muted">gear, hangars, flair and other extras</span>
+                </li>
+                <li>
+                  <span class="sw" style="background: var(--t-coupon-line)"></span><b>Coupon</b
+                  ><span class="muted">store credit coupons and vouchers</span>
+                </li>
+                <li>
+                  <span class="sw" style="background: var(--good)"></span><b>Green text</b
+                  ><span class="muted">good news: gains, in stock, done, earned</span>
+                </li>
+                <li>
+                  <span class="sw" style="background: var(--warn)"></span><b>Amber</b
+                  ><span class="muted">worth a look: old scan, time-limited, only in a pack</span>
+                </li>
+                <li>
+                  <span class="sw" style="background: var(--bad)"></span><b>Red</b
+                  ><span class="muted">a problem, or something you excluded</span>
+                </li>
+                <li>
+                  <span class="sw" style="background: var(--accent)"></span><b>Blue</b
+                  ><span class="muted">something you can click, or extra info</span>
+                </li>
+              </ul>
+            </details>
           </details>
 
           <details>
