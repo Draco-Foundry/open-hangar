@@ -98,6 +98,17 @@ Empty blocks disappear; the grid never leaves a card alone in a row.
   shortMoney, bigMoney, formatValue) shows as dots, hover text included; UEC/REC on the
   card too. Its scope may grow beyond money.
 
+## Top Menu Pass (mockup approved 2026-09-30, not built yet)
+
+All ten, as mocked up ("Top Menu Pass" artifact): alerts bell with a count and a
+drop-down (every page); Scan is its own progress bar ("Scanning… 4/12", "✓ Done") with
+"Last scan…" on hover; a search box on every page that expands (or /); your RSI
+portrait replaces the gear and opens the menu (name + org at the top, then Currency,
+Streamer Mode, Rescan Reminder, How to Use, Updates, Developers, Log Out of RSI, Clear
+Data); a Streamer pill while it's on; counts beside Inventory and Buy-Backs; an update
+dot on the portrait with "Update ready: Reload" in the menu; a slim bar while
+scrolling down; a real logo mark; phone tabs you swipe.
+
 ## Inventory and Buy-Backs (approved 2026-09-30, next update; mockup first)
 
 - Stay two pages (different jobs: what you own vs what you could get back; 1,000+
