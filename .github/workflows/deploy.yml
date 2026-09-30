@@ -47,7 +47,7 @@ jobs:
         env:
           CLOUDFLARE_ENV: staging
       - name: Migrate the staging database
-        run: npx wrangler d1 migrations apply open-hangar-staging --remote
+        run: npx wrangler d1 migrations apply open-hangar-staging --remote --env staging
       - name: Deploy to staging.openhangar.space
         run: npx wrangler deploy
       - name: Staging secrets
