@@ -25,7 +25,6 @@ const scannedHomeEl = $('#scanned-home');
 const chipsEl = $('#chips');
 const resultsEl = $('#results');
 const scanBtn = $('#scan-home');
-const scanTopBtn = $('#scan-top');
 const scanMenuBtn = $('#scan-menu-btn');
 const scanMenu = $('#scan-menu');
 const scanSelectedBtn = $('#scan-selected');
@@ -768,10 +767,8 @@ function renderAccount() {
     // (A confirmed `true` is the only state that shows the normal card.)
     const loggedOut = a.loggedIn !== true;
     const acctEl = $('#cc-account'),
-      sideEl = $('#cc-side'),
       loEl = $('#cc-loggedout');
     if (acctEl) acctEl.hidden = loggedOut;
-    if (sideEl) sideEl.hidden = loggedOut;
     if (loEl) loEl.hidden = !loggedOut;
     if (logoutBtn) logoutBtn.hidden = a.loggedIn !== true;
 
@@ -5922,7 +5919,6 @@ document.addEventListener('click', async (e) => {
 async function runScan({ hangar = true, buybacks = true, referrals = true, store = true } = {}) {
   if (!hangar && !buybacks && !referrals && !store) return;
   scanBtn.disabled = true;
-  if (scanTopBtn) scanTopBtn.disabled = true;
   if (scanSelectedBtn) scanSelectedBtn.disabled = true;
   setStatus('Scanning…');
   setScanning('Scanning…');
@@ -6014,7 +6010,6 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   route();
   renderAccount(); // refresh the Citizen Card pill with the new referral counts
   scanBtn.disabled = false;
-  if (scanTopBtn) scanTopBtn.disabled = false;
   if (scanSelectedBtn) scanSelectedBtn.disabled = false;
 }
 
