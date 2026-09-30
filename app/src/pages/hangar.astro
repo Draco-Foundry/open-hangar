@@ -1,6 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
-import { db } from '../lib/sync';
+import { latestSnapshotForUser } from '../lib/accounts';
 
 export const prerender = false;
 const user = Astro.locals.user!;
@@ -14,10 +14,7 @@ type Item = {
   giftable?: boolean;
   date?: string;
 };
-const row = await db()
-  .prepare('select synced_at, payload from hangar_snapshot where user_id = ?')
-  .bind(user.id)
-  .first<{ synced_at: number; payload: string }>();
+const row = await latestSnapshotForUser(user.id);
 let items: Item[] = [];
 let buybacks = 0;
 if (row) {
