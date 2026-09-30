@@ -34,6 +34,7 @@ try {
         const a = await get(o);
         return {
           ...a,
+          concierge: { level: 'Wing Commander', next: 'Praetorian', percent: 40 },
           avatar:
             'https://robertsspaceindustries.com/media/lqbnzarvkibdrr/heap_infobox/4b5df976-F78d-49af-Aacb-02c07df28fa4.jpg',
           org: {

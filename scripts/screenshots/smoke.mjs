@@ -529,7 +529,7 @@ try {
     // A ship you don't own isn't in your hangar: nothing to show.
     box.value = 'Idris';
     box.dispatchEvent(new Event('input'));
-    const notOwned = /No, you don.t have/.test(out.textContent);
+    const notOwned = /Nothing in your hangar/.test(out.textContent);
     box.value = '';
     box.dispatchEvent(new Event('input'));
     const shipName = ownedShips().find((s) => /cutlass/i.test(s.label))?.label;

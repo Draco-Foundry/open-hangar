@@ -7155,10 +7155,10 @@ function globalSearchHtml(q) {
       ? `<span class="gs-img"><img src="${esc(img)}" alt="" loading="lazy"></span>`
       : `<span class="gs-img" data-resolve="${esc(resolve || '')}"><span>${esc(label || '')}</span></span>`;
   const row = ({ attr, img, resolve, name, where, tags, val, valLbl, open }) =>
-    `<button type="button" class="gs-row gs-rich" ${attr}>${pic(img, resolve, name)}<span class="gs-info"><span class="gs-name">${esc(name)}</span><span class="gs-where">${where}</span><span class="gs-tags">${tags.join('')}</span></span><span class="gs-side">${val ? `<b>${esc(val)}</b><small>${esc(valLbl)}</small>` : ''}<span class="gs-open">${open}</span></span></button>`;
-  const group = (title, rows) =>
+    `<button type="button" class="gs-row gs-rich" ${attr}>${pic(img, resolve, name)}<span class="gs-info"><span class="gs-name">${esc(name)}</span><span class="gs-where">${where}</span><span class="gs-tags">${tags.join('')}</span></span><span class="gs-side">${val ? `<b>${esc(val)}</b>${valLbl ? `<small>${esc(valLbl)}</small>` : ''}` : ''}<span class="gs-open">${open}</span></span></button>`;
+  const group = (title, rows, n) =>
     rows.length
-      ? `<div class="gs-group"><div class="gs-title"><span>${title}</span><span>${rows.length}</span></div>${rows.join('')}</div>`
+      ? `<div class="gs-group"><div class="gs-title"><span>${title}</span><span>${n > rows.length ? `${rows.length} of ${n}` : n}</span></div>${rows.join('')}</div>`
       : '';
 
   const hits = state.items.filter(
@@ -7174,8 +7174,13 @@ function globalSearchHtml(q) {
       resolve: inner ? inner.label : resolveImageName(p),
       name: inner ? inner.label : cardName(p),
       where:
-        (inner ? `Inside <b>${esc(cardName(p))}</b>` : 'In your hangar') +
-        (p.date ? ` <em>· pledged ${esc(day(p.date))}</em>` : ''),
+        // The group heading already says where it is; the row says what it's inside.
+        [
+          inner ? `Inside <b>${esc(cardName(p))}</b>` : '',
+          p.date ? `<em>Pledged ${esc(day(p.date))}</em>` : '',
+        ]
+          .filter(Boolean)
+          .join(' <em>·</em> '),
       tags: [
         tag(TYPE_KEYS.includes(type) ? type.toUpperCase() : p.kind, `badge ${type}`),
         tag(p.insurance),
@@ -7197,7 +7202,12 @@ function globalSearchHtml(q) {
       img: b.ccu && b.ccu.to && !b.shipArt ? null : realImage(b.image),
       resolve: b.ccu && b.ccu.to ? b.ccu.to : resolveImageName({ ...b, kind: 'ship' }) || b.name,
       name: b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '',
-      where: `${b.contains ? esc(b.contains) : 'Buy-back'}${b.date ? ` <em>· melted ${esc(day(b.date))}</em>` : ''}`,
+      where: [
+        b.contains ? esc(b.contains) : '',
+        b.date ? `<em>Melted ${esc(day(b.date))}</em>` : '',
+      ]
+        .filter(Boolean)
+        .join(' <em>·</em> '),
       tags: [
         tag(
           TYPE_KEYS.includes(type) ? type.toUpperCase() : type || 'BUY-BACK',
@@ -7206,7 +7216,6 @@ function globalSearchHtml(q) {
         tag(b.insurance),
       ],
       val: bbPriceText(b),
-      valLbl: 'buy-back price',
       open: 'Details →',
     });
   });
@@ -7225,26 +7234,16 @@ function globalSearchHtml(q) {
         )
     : [];
 
-  const nH = hits.length;
-  const nB = bbHits.length;
-  const nR = rewards.length;
-  const bits = [
-    nH ? `${nH} in your hangar` : '',
-    nB ? `${nB} in your buy-backs` : '',
-    nR ? `${nR} earned reward${nR === 1 ? '' : 's'}` : '',
-  ].filter(Boolean);
-  const answer = bits.length
-    ? `<div class="gs-answer yes"><span class="gs-mark" aria-hidden="true">✓</span><span><b>Yes, you have "${esc(q.trim())}"</b><small>${bits.join(' · ')}</small></span></div>`
-    : `<div class="gs-answer no"><span class="gs-mark" aria-hidden="true">✕</span><span><b>No, you don't have "${esc(q.trim())}"</b><small>Nothing in your hangar, buy-backs or referral rewards matches.</small></span></div>`;
+  // The groups say where things are (owner: no yes/no line); only an empty search
+  // gets a line of its own.
   const body =
-    group('In Your Hangar', pledges) +
-    group('In Your Buy-Backs', bbs) +
-    group('Earned Rewards', rewards);
+    group('In Your Hangar', pledges, hits.length) +
+    group('In Your Buy-Backs', bbs, bbHits.length) +
+    group('Earned Rewards', rewards, rewards.length);
+  if (!body)
+    return `<div class="gs-none">Nothing in your hangar, buy-backs or referral rewards matches "${esc(q.trim())}".</div>`;
   const total = pledges.length + bbs.length + rewards.length;
-  const foot = total
-    ? `<div class="gs-foot"><span>${total} result${total === 1 ? '' : 's'} · Enter opens the first</span><span>Searching your hangar, buy-backs and rewards</span></div>`
-    : '';
-  return answer + (body ? `<div class="gs-scroll">${body}</div>` : '') + foot;
+  return `<div class="gs-scroll">${body}</div><div class="gs-foot"><span>${total} result${total === 1 ? '' : 's'} · Enter opens the first</span><span>Searching your hangar, buy-backs and rewards</span></div>`;
 }
 // Search rows without RSI art get the ship's picture from the wiki (few at a time).
 function resolveSearchImages(root) {
