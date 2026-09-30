@@ -98,6 +98,16 @@ Empty blocks disappear; the grid never leaves a card alone in a row.
   shortMoney, bigMoney, formatValue) shows as dots, hover text included; UEC/REC on the
   card too. Its scope may grow beyond money.
 
+## Inventory and Buy-Backs (approved 2026-09-30, next update; mockup first)
+
+- Stay two pages (different jobs: what you own vs what you could get back; 1,000+
+  buy-backs would bury a hangar). Global Hangar Search already covers both.
+- Shared new look for both: one toolbar row (search, sort, view), one tidy chip row
+  with Clear filters, a summary strip on top (count, value, LTI) that follows the
+  filters, and cards matching the rich search rows.
+- Already done: List rows with big names (wrap to two lines) and big prices, no small
+  contents text in the middle.
+
 ## Scheduled Alongside
 
 - Light mode (Dark default / Light / Auto) after the redesign's pages exist.
