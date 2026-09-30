@@ -113,9 +113,18 @@ scrolling down; a real logo mark; phone tabs you swipe.
 
 - Stay two pages (different jobs: what you own vs what you could get back; 1,000+
   buy-backs would bury a hangar). Global Hangar Search already covers both.
-- Shared new look for both: one toolbar row (search, sort, view), one tidy chip row
-  with Clear filters, a summary strip on top (count, value, LTI) that follows the
-  filters, and cards matching the rich search rows.
+- Shared new look for both: one toolbar row (search, sort, view, Export ▾), one tidy
+  chip row with Clear filters and a Hide small stuff switch (paints, add-ons; on by
+  default on Buy-Backs), a summary strip on top that follows the filters, and rows
+  with big names and prices.
+- Signed off from the "Inventory And Buy-Backs Pass" mockup: Inventory strip =
+  Pledges, Melt Value, Store Value (no LTI count: the owner doesn't want LTI
+  emphasised); saved views; "$X under store" in green; the melt planner bar when you
+  tick rows; Export of what's showing (CSV, share image, full backup). Buy-Backs strip
+  = count, tokens with the next date, below store price; identical buy-backs stack
+  ("×3"); a Below store price chip. Straight into the search bar, no insight cards.
+- Rejected: duplicates card, CCU chains ("don't want to get into the CCU chain game"),
+  "Best use of your token" (everyone's priorities differ).
 - Already done: List rows with big names (wrap to two lines) and big prices, no small
   contents text in the middle.
 
