@@ -166,16 +166,18 @@ try {
     res.settingsClosed = menu.hidden;
     return res;
   });
-  card.uec === '¤1.2M' &&
-  card.uecTitle === '¤1,234,567' &&
-  card.rec === '¤90K' &&
+  card.uec === '¤ 1.2M' &&
+  card.uecTitle === '¤ 1,234,567' &&
+  card.rec === '¤ 90K' &&
   card.oneRow &&
   card.settingsOpen &&
   card.settingsClosed &&
   card.currencyInHeader &&
   card.searchOnHome &&
   card.placeholder === 'Global Hangar Search'
-    ? ok('citizen card: ¤1.2M / ¤90K on one row, settings menu, search on Home, currency in header')
+    ? ok(
+        'citizen card: ¤ 1.2M / ¤ 90K on one row, settings menu, search on Home, currency in header',
+      )
     : fail(`citizen card: ${JSON.stringify(card)}`);
 
   // Phone width: nothing scrolls sideways.
