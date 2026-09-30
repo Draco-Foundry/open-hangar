@@ -511,6 +511,15 @@ const dollars = (n) => fmtCurrency(Math.round(n * fx.rate), 0);
 const rawMoney = (n) => fmtCurrency(n, 2);
 // For tight boxes: 10,000 and up in short form ("CN¥13.7K"); the caller puts
 // the full amount on hover.
+// 1,234,567 → "1.2M", 90,000 → "90K"; under 10,000 stays exact ("9,500").
+const compactNum = (n) => {
+  const v = Number(n) || 0;
+  const a = Math.abs(v);
+  if (a < 10000) return v.toLocaleString('en-US');
+  const [d, u] = a >= 1e9 ? [1e9, 'B'] : a >= 1e6 ? [1e6, 'M'] : [1e3, 'K'];
+  const x = v / d;
+  return `${Math.abs(x) >= 100 ? Math.round(x) : Number(x.toFixed(1))}${u}`;
+};
 const shortMoney = (n, full) => {
   const v = n * fx.rate;
   if (Math.abs(v) < 10000) return full(n);
@@ -834,19 +843,28 @@ function renderAccount() {
     }
 
     // Balances — always rendered, with dashes when there's no data (uniform).
+    // Big amounts are shortened (¤1.2M, ¤90K) so the strip stays one row; the
+    // exact figure is in the hover text.
     if (balEl) {
       const c = a.credits || {};
       const fmt = (n) => Number(n).toLocaleString('en-US');
-      const pill = (cls, label, val) =>
-        `<span class="bal ${cls}"><span class="bal-lbl">${label}</span> <b>${val}</b></span>`;
+      const tile = (cls, label, val, full) =>
+        `<span class="bal ${cls}"${full && full !== val ? ` title="${OH.escapeHtml(full)}"` : ''}><span class="bal-lbl">${label}</span><b>${val}</b></span>`;
+      const aUEC = (x) => (x ? ['¤' + compactNum(x.value), '¤' + fmt(x.value)] : [DASH]);
+      const store = c.store ? c.store.value / 100 : null;
       setHTML(
         balEl,
-        pill('store', 'Store Credit', c.store ? money(c.store.value / 100) : DASH) +
-          pill('uec', 'UEC', c.uec ? '¤' + fmt(c.uec.value) : DASH) +
-          pill('rec', 'REC', c.rec ? '¤' + fmt(c.rec.value) : DASH) +
+        tile(
+          'store',
+          'Store Credit',
+          store != null ? shortMoney(store, money) : DASH,
+          store != null ? money(store) : '',
+        ) +
+          tile('uec', 'UEC', ...aUEC(c.uec)) +
+          tile('rec', 'REC', ...aUEC(c.rec)) +
           `<a class="bal bbt" href="#buybacks" data-view="buybacks" title="${OH.escapeHtml(
             tokenTitle(),
-          )}"><span class="bal-lbl">Buy-back tokens</span> <b>${
+          )}"><span class="bal-lbl">Buy-back tokens</span><b>${
             state.bbTokens != null ? state.bbTokens : DASH
           }</b></a>`,
       );
@@ -5951,7 +5969,9 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   }
 
   const summary = parts.join(' · ') || 'Nothing scanned';
-  setStatus(summary, anyErr);
+  // The counts are already on Home (the summary boxes), so only a problem is
+  // spelled out here; the header badge carries the full recap on hover.
+  setStatus(anyErr ? summary : '', anyErr);
   setScanning(`${anyErr ? '⚠ ' : '✓ '}${summary}`, true);
   route();
   renderAccount(); // refresh the Citizen Card pill with the new referral counts
@@ -5963,34 +5983,46 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
 scanBtn.addEventListener('click', () => runScan());
 
 // Open below the ▾ button, right edges lined up; above it if there's no room.
-function placeScanMenu() {
-  const b = scanMenuBtn.getBoundingClientRect();
-  const h = scanMenu.offsetHeight || 0;
+// Citizen Card pop-up menus (Scan options, Settings): pinned to the viewport
+// under their button so the card's clipped edges can't cut them off.
+const cardMenus = [
+  [scanMenuBtn, scanMenu],
+  [$('#settings-btn'), $('#settings-menu')],
+].filter(([b, m]) => b && m);
+function placeMenu(btn, menu) {
+  const b = btn.getBoundingClientRect();
+  const h = menu.offsetHeight || 0;
   const below = b.bottom + 6 + h <= window.innerHeight - 8;
-  scanMenu.style.right = `${Math.max(8, window.innerWidth - b.right)}px`;
-  scanMenu.style.top = below ? `${b.bottom + 6}px` : `${Math.max(8, b.top - 6 - h)}px`;
+  menu.style.right = `${Math.max(8, window.innerWidth - b.right)}px`;
+  menu.style.top = below ? `${b.bottom + 6}px` : `${Math.max(8, b.top - 6 - h)}px`;
 }
-function closeScanMenu() {
-  if (!scanMenu || scanMenu.hidden) return;
-  scanMenu.hidden = true;
-  if (scanMenuBtn) scanMenuBtn.setAttribute('aria-expanded', 'false');
+function closeCardMenus() {
+  for (const [btn, menu] of cardMenus) {
+    if (menu.hidden) continue;
+    menu.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+  }
 }
 
-if (scanMenuBtn && scanMenu) {
-  scanMenuBtn.addEventListener('click', (e) => {
+for (const [btn, menu] of cardMenus) {
+  btn.addEventListener('click', (e) => {
     e.stopPropagation(); // don't let the document handler immediately re-close it
-    const open = scanMenu.hidden;
-    if (open) placeScanMenu();
-    scanMenu.hidden = !open;
-    scanMenuBtn.setAttribute('aria-expanded', String(open));
-    if (open) placeScanMenu(); // again now that it has a size
+    const open = menu.hidden;
+    closeCardMenus();
+    if (!open) return;
+    placeMenu(btn, menu);
+    menu.hidden = false;
+    btn.setAttribute('aria-expanded', 'true');
+    placeMenu(btn, menu); // again now that it has a size
   });
-  // Scrolling or resizing moves the button; just close the menu.
-  window.addEventListener('resize', closeScanMenu);
-  window.addEventListener('scroll', closeScanMenu, { passive: true });
-  // Clicks inside the menu (toggling checkboxes) shouldn't close it.
-  scanMenu.addEventListener('click', (e) => e.stopPropagation());
-  document.addEventListener('click', closeScanMenu);
+  // Clicks inside the menu (checkboxes, the currency picker) shouldn't close it.
+  menu.addEventListener('click', (e) => e.stopPropagation());
+}
+if (cardMenus.length) {
+  // Scrolling or resizing moves the buttons; just close the menus.
+  window.addEventListener('resize', closeCardMenus);
+  window.addEventListener('scroll', closeCardMenus, { passive: true });
+  document.addEventListener('click', closeCardMenus);
 }
 
 if (scanSelectedBtn) {
@@ -6002,7 +6034,7 @@ if (scanSelectedBtn) {
       setStatus('Select at least one source to scan.', true);
       return;
     }
-    closeScanMenu();
+    closeCardMenus();
     runScan({
       hangar: checked.has('hangar'),
       buybacks: checked.has('buybacks'),
@@ -6599,6 +6631,8 @@ function renderCurrencyNote() {
     el.textContent = currencyNote();
     el.hidden = !el.textContent;
   });
+  const sel = $('#currency-select');
+  if (sel) sel.title = currencyNote() || 'Show amounts in your currency (converted from USD)';
 }
 async function applyCurrency(code) {
   const want = OH.CURRENCIES.includes(code) ? code : 'USD';
@@ -7108,8 +7142,10 @@ if (gsearch && gsearchOut) {
     const typing =
       /^(input|textarea|select)$/i.test(e.target.tagName) || e.target.isContentEditable;
     if (e.key === '/' && !typing) {
+      // The search lives on Home: jump there from any other page.
       e.preventDefault();
-      gsearch.focus();
+      if (!$('#view-home').classList.contains('active')) location.hash = '#home';
+      setTimeout(() => gsearch.focus(), 60);
     }
   });
 }

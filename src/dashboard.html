@@ -95,11 +95,86 @@
         margin-left: auto;
         flex-wrap: wrap;
       }
+      .hdr-prefs {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      /* Tablets and phones: name + currency on top, the nav as one swipeable row */
+      @media (max-width: 900px) {
+        .hdr-prefs {
+          order: 1;
+          margin-left: auto;
+        }
+        nav {
+          order: 2;
+          flex: 1 0 100%;
+          margin-left: 0;
+          flex-wrap: nowrap;
+          overflow-x: auto;
+          scrollbar-width: none;
+        }
+        nav a {
+          white-space: nowrap;
+        }
+      }
+      .hdr-prefs .currency-select {
+        padding: 5px 6px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
       .gsearch {
         position: relative;
       }
+      /* Home: one big search bar, centered under the Citizen Card */
+      /* Full-width band (lines up with the panels below); the bar stays centered */
+      .gsearch-band {
+        margin: 0 0 22px;
+        padding: 20px 16px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background:
+          radial-gradient(ellipse 50% 140% at 50% 0%, rgba(47, 129, 247, 0.14), transparent 70%),
+          var(--panel);
+        box-shadow: var(--shadow);
+      }
+      .gsearch-home {
+        width: min(680px, 100%);
+        margin: 0 auto;
+      }
+      .gsearch.gsearch-home input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 14px 48px 14px 20px;
+        font-size: 17px;
+        border-radius: 12px;
+        background: var(--bg);
+      }
+      .gsearch.gsearch-home input:focus {
+        box-shadow: 0 0 0 3px rgba(47, 129, 247, 0.25);
+      }
+      .gsearch-key {
+        position: absolute;
+        right: 14px;
+        top: 13px;
+        padding: 2px 8px;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        color: var(--muted);
+        font:
+          12px ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+        pointer-events: none;
+      }
+      .gsearch-home .gsearch-results {
+        left: 0;
+        right: 0;
+        width: auto;
+      }
       .gsearch input {
-        width: 190px;
         padding: 6px 10px;
         font-size: 13px;
         color: var(--text);
@@ -787,8 +862,48 @@
       .citizen-card .bal:first-child {
         border-left: 0;
       }
+      .citizen-card .bal {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 7px 16px;
+        white-space: nowrap;
+      }
       .citizen-card .bal b {
-        font-size: 15px;
+        font-size: 16px;
+        line-height: 1.2;
+      }
+      .citizen-card .bal-lbl {
+        font-size: 10px;
+      }
+      /* Referral + Subscriber + Chairman's Club share one wrapping row */
+      .cc-chips {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+      .cc-chips > div {
+        display: contents;
+      }
+      .cc-chips:not(:has(> div:not(:empty))) {
+        display: none;
+      }
+      .cc-settings {
+        display: inline-flex;
+      }
+      .cc-gear {
+        display: inline-flex;
+        align-items: center;
+        padding: 7px 9px;
+      }
+      .settings-menu {
+        min-width: 220px;
+        gap: 11px;
+      }
+      .settings-menu .scan-opt {
+        justify-content: space-between;
+        font-weight: 500;
       }
       .citizen-card .flair {
         background: rgba(255, 255, 255, 0.08);
@@ -803,6 +918,49 @@
       .citizen-card .flair-bar {
         width: 84px;
         height: 7px;
+      }
+      @media (max-width: 600px) {
+        .citizen-card {
+          padding: 18px 16px;
+        }
+        .cc-account {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 16px;
+        }
+        .cc-portrait {
+          flex-direction: row;
+          flex-basis: auto;
+          align-self: flex-start;
+          gap: 14px;
+        }
+        .cc-avatar {
+          width: 76px;
+          height: 76px;
+          flex-basis: 76px;
+        }
+        .cc-meta {
+          width: auto;
+          align-items: flex-start;
+          text-align: left;
+        }
+        .cc-info {
+          width: 100%;
+        }
+        .citizen-card .home-balances {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          align-self: stretch;
+        }
+        .citizen-card .bal:nth-child(3) {
+          border-left: 0;
+        }
+        .citizen-card .bal:nth-child(n + 3) {
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .citizen-card .flair {
+          flex-wrap: wrap;
+        }
       }
       @media (max-width: 820px) {
         .citizen-card {
@@ -1766,8 +1924,8 @@
 
       /* Home dashboard summary strip */
       .home-summary {
-        display: flex;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
         gap: 10px;
         margin-bottom: 22px;
       }
@@ -2058,12 +2216,6 @@
         background: var(--panel-2);
         color: var(--text);
         font-size: 12px;
-      }
-      .cc-side .currency-note {
-        max-width: 260px;
-        margin: 6px 0 0 auto;
-        font-size: 11px;
-        text-align: right;
       }
       .site-link {
         display: flex;
@@ -3575,15 +3727,29 @@
           <a href="#updates" data-view="updates" class="nav-minor">Updates</a>
           <a href="#developers" data-view="developers" class="nav-minor">Developers</a>
         </nav>
-        <div class="gsearch">
-          <input
-            id="gsearch"
-            type="search"
-            placeholder="Global hangar search  /"
-            autocomplete="off"
-            aria-label="Search ships, hangar, buy-backs and rewards"
-          />
-          <div id="gsearch-results" class="gsearch-results" hidden></div>
+        <div class="hdr-prefs">
+          <!-- Language flags go here once the dashboard is translated (TODO.md). -->
+          <select
+            id="currency-select"
+            class="currency-select"
+            aria-label="Currency"
+            title="Show amounts in your currency (converted from USD)"
+          >
+            <option value="USD">USD $</option>
+            <option value="EUR">EUR €</option>
+            <option value="GBP">GBP £</option>
+            <option value="CAD">CAD $</option>
+            <option value="AUD">AUD $</option>
+            <option value="NZD">NZD $</option>
+            <option value="CHF">CHF</option>
+            <option value="SEK">SEK kr</option>
+            <option value="PLN">PLN zł</option>
+            <option value="CZK">CZK Kč</option>
+            <option value="BRL">BRL R$</option>
+            <option value="CNY">CNY ¥</option>
+            <option value="JPY">JPY ¥</option>
+            <option value="KRW">KRW ₩</option>
+          </select>
         </div>
       </header>
 
@@ -3618,8 +3784,10 @@
               <div class="cc-name" id="cc-name">Open Hangar</div>
               <div class="cc-org" id="cc-org"></div>
               <div class="home-balances" id="home-balances"></div>
-              <div class="home-referral" id="home-referral"></div>
-              <div class="home-flair" id="home-flair"></div>
+              <div class="cc-chips">
+                <div class="home-referral" id="home-referral"></div>
+                <div class="home-flair" id="home-flair"></div>
+              </div>
             </div>
           </div>
           <div class="cc-side" id="cc-side">
@@ -3663,37 +3831,33 @@
                   </div>
                 </div>
                 <button id="logout-home" class="btn-secondary" hidden>Log out</button>
-                <button id="clear-home" class="btn-secondary" hidden>Clear Data</button>
+                <div class="cc-settings">
+                  <button
+                    id="settings-btn"
+                    class="btn-secondary cc-gear"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    aria-label="Settings"
+                    title="Settings"
+                  >
+                    <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                      <path
+                        fill="currentColor"
+                        d="M19.14 12.94a7.4 7.4 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7 7 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2.4h-3.8a.5.5 0 0 0-.49.42l-.36 2.54a7 7 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.88a.5.5 0 0 0 .12.64l2.03 1.58a7.4 7.4 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.39 1.05.7 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.8a.5.5 0 0 0 .49-.42l.36-2.54a7 7 0 0 0 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"
+                      />
+                    </svg>
+                  </button>
+                  <div id="settings-menu" class="scan-menu settings-menu" hidden>
+                    <label
+                      class="scan-opt"
+                      title="Shows an amber ! on the toolbar icon when your last scan is a week old"
+                      ><input type="checkbox" id="remind-toggle" checked /> Weekly rescan
+                      reminder</label
+                    >
+                    <button id="clear-home" class="btn-secondary scan-go" hidden>Clear Data</button>
+                  </div>
+                </div>
               </div>
-              <label
-                class="remind-toggle"
-                title="Shows an amber ! on the toolbar icon when your last scan is a week old"
-              >
-                <input type="checkbox" id="remind-toggle" checked /> Weekly rescan reminder
-              </label>
-              <label
-                class="remind-toggle"
-                title="Show amounts in your currency (converted from USD)"
-              >
-                Currency
-                <select id="currency-select" class="currency-select">
-                  <option value="USD">USD $</option>
-                  <option value="EUR">EUR €</option>
-                  <option value="GBP">GBP £</option>
-                  <option value="CAD">CAD $</option>
-                  <option value="AUD">AUD $</option>
-                  <option value="NZD">NZD $</option>
-                  <option value="CHF">CHF</option>
-                  <option value="SEK">SEK kr</option>
-                  <option value="PLN">PLN zł</option>
-                  <option value="CZK">CZK Kč</option>
-                  <option value="BRL">BRL R$</option>
-                  <option value="CNY">CNY ¥</option>
-                  <option value="JPY">JPY ¥</option>
-                  <option value="KRW">KRW ₩</option>
-                </select>
-              </label>
-              <p class="currency-note muted" hidden></p>
             </div>
           </div>
           <!-- Shown instead of the card content when signed out of RSI -->
@@ -3709,6 +3873,19 @@
                 >Log In to RSI ↗</a
               >
             </div>
+          </div>
+        </div>
+        <div class="gsearch-band">
+          <div class="gsearch gsearch-home">
+            <input
+              id="gsearch"
+              type="search"
+              placeholder="Global Hangar Search"
+              autocomplete="off"
+              aria-label="Search ships, hangar, buy-backs and rewards"
+            />
+            <kbd class="gsearch-key" title="Press / on any page to search">/</kbd>
+            <div id="gsearch-results" class="gsearch-results" hidden></div>
           </div>
         </div>
         <!-- openhangar.space connect/sync: always visible (even signed out of RSI). -->
