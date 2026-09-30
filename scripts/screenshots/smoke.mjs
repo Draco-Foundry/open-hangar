@@ -180,6 +180,22 @@ try {
       )
     : fail(`citizen card: ${JSON.stringify(card)}`);
 
+  const colors = await page.evaluate(() => {
+    const cs = getComputedStyle(document.documentElement);
+    const bal = document.querySelector('#home-balances .bal.uec b');
+    return {
+      key: document.querySelectorAll('.color-key li').length,
+      tokens: ['--good', '--warn', '--bad', '--t-ship', '--t-pack', '--t-ccu'].every((n) =>
+        cs.getPropertyValue(n).trim(),
+      ),
+      whiteBal: bal && getComputedStyle(bal).color === getComputedStyle(document.body).color,
+      pal: palette().good === cs.getPropertyValue('--good').trim(),
+    };
+  });
+  colors.key === 11 && colors.tokens && colors.whiteBal && colors.pal
+    ? ok('colors: tokens, Color Key (11), white balances, exports share the palette')
+    : fail(`colors: ${JSON.stringify(colors)}`);
+
   // Phone width: nothing scrolls sideways.
   await page.setViewport({ width: 390, height: 844 });
   await new Promise((r) => setTimeout(r, 200));

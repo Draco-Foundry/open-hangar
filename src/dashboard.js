@@ -1835,10 +1835,27 @@ const MK_IMG_COLS = [
 
 // Render the sale sheet to a canvas — drawn cell-by-cell (no external lib, no
 // images, so nothing taints the canvas) using the dashboard's dark palette.
+// The page's color tokens, for canvas drawings (image exports) so they match.
+function palette() {
+  const cs = getComputedStyle(document.documentElement);
+  const v = (n) => cs.getPropertyValue(n).trim();
+  return {
+    bg: v('--bg'),
+    card: v('--panel'),
+    card2: v('--panel-2'),
+    line: v('--line'),
+    text: v('--text'),
+    muted: v('--muted'),
+    good: v('--good'),
+    bad: v('--bad'),
+  };
+}
+
 function marketImageCanvas(
   sections,
   { title = '', cols = MK_IMG_COLS, cellsOf = marketImageCells } = {},
 ) {
+  const P = palette();
   const SCALE = 2; // crisp on hi-dpi
   const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
   const PAD = 24;
@@ -1875,7 +1892,7 @@ function marketImageCanvas(
   ctx.scale(SCALE, SCALE);
   ctx.textBaseline = 'middle';
 
-  ctx.fillStyle = '#0d1117';
+  ctx.fillStyle = P.bg;
   ctx.fillRect(0, 0, W, H);
 
   const colX = [];
@@ -1894,10 +1911,10 @@ function marketImageCanvas(
 
   let y = PAD;
   if (title) {
-    ctx.fillStyle = '#e6edf3';
+    ctx.fillStyle = P.text;
     ctx.font = f(700, 22);
     ctx.fillText(clip(title, tableW), PAD, y + 16);
-    ctx.fillStyle = '#8b949e';
+    ctx.fillStyle = P.muted;
     ctx.font = f(400, 12);
     ctx.textAlign = 'right';
     ctx.fillText('Open Hangar · openhangar.space', PAD + tableW, y + 16);
@@ -1905,24 +1922,24 @@ function marketImageCanvas(
     y += HEADER_H;
   }
   for (const { section, groups } of sections) {
-    ctx.fillStyle = '#e6edf3';
+    ctx.fillStyle = P.text;
     ctx.font = f(600, 16);
     ctx.fillText(`${section.label}  (${groups.length})`, PAD, y + TITLE_H / 2);
     y += TITLE_H;
 
-    ctx.fillStyle = '#1c222b';
+    ctx.fillStyle = P.card2;
     ctx.fillRect(PAD, y, tableW, HEAD_H);
-    ctx.fillStyle = '#e6edf3';
+    ctx.fillStyle = P.text;
     ctx.font = f(600, 13);
     cols.forEach((c, i) => ctx.fillText(c.label, colX[i] + CELL_X, y + HEAD_H / 2));
     y += HEAD_H;
 
     groups.forEach((g, ri) => {
       if (ri % 2 === 1) {
-        ctx.fillStyle = '#161b22';
+        ctx.fillStyle = P.card;
         ctx.fillRect(PAD, y, tableW, ROW_H);
       }
-      ctx.strokeStyle = '#2a3139';
+      ctx.strokeStyle = P.line;
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(PAD, y + ROW_H + 0.5);
@@ -1931,9 +1948,9 @@ function marketImageCanvas(
 
       const cells = cellsOf(g);
       cols.forEach((c, i) => {
-        if (c.key === 'name' || c.key === 'price') ctx.fillStyle = '#e6edf3';
-        else if (c.key === 'gift') ctx.fillStyle = g.giftable === 0 ? '#8b949e' : '#2ea043';
-        else ctx.fillStyle = '#8b949e';
+        if (c.key === 'name' || c.key === 'price') ctx.fillStyle = P.text;
+        else if (c.key === 'gift') ctx.fillStyle = g.giftable === 0 ? P.muted : P.good;
+        else ctx.fillStyle = P.muted;
         ctx.font = f(c.key === 'gift' && g.giftable !== 0 ? 600 : 400, 13);
         ctx.fillText(clip(cells[c.key], widths[i] - CELL_X * 2), colX[i] + CELL_X, y + ROW_H / 2);
       });
@@ -2112,16 +2129,8 @@ async function fleetImageCanvas(list, { title, price }) {
   const SCALE = 2;
   const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
   const f = (w, px) => `${w} ${px}px ${FONT}`;
-  const C = {
-    bg: '#0d1117',
-    card: '#161b22',
-    line: '#30363d',
-    text: '#e6edf3',
-    muted: '#8b949e',
-    ph: '#21262d',
-    good: '#3fb950',
-    bad: '#f85149',
-  };
+  const P = palette();
+  const C = { ...P, ph: P.card2 };
   const PAD = 28,
     GAP = 16,
     CW = 300,
@@ -3470,9 +3479,10 @@ function sBars(rows, fmt = (n) => n) {
         label,
         n,
         title,
+        type,
       ]) => `<div class="bar-row"${title ? ` title="${OH.escapeHtml(title)}"` : ''}>
         <div class="bar-label">${OH.escapeHtml(label)}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((n / max) * 100)}%"></div></div>
+        <div class="bar-track"><div class="bar-fill${type ? ` t-${type}` : ''}" style="width:${Math.round((n / max) * 100)}%"></div></div>
         <div class="bar-val">${fmt(n)}</div>
       </div>`,
     )
@@ -3525,9 +3535,12 @@ function buybackStatsHtml() {
   const bbs = state.buybacks;
   if (!bbs.length) return '<p class="muted">No buy-backs yet. Scan from Home to include them.</p>';
   if (!state.priceOf) ensurePrices();
-  const byKind = BB_KINDS.map((k) => [k.label, bbs.filter((b) => b.kind === k.key).length]).filter(
-    (r) => r[1],
-  );
+  const byKind = BB_KINDS.map((k) => [
+    k.label,
+    bbs.filter((b) => b.kind === k.key).length,
+    '',
+    TYPE_KEYS.includes(k.key) ? k.key : '',
+  ]).filter((r) => r[1]);
   const priced = bbs.map((b) => ({ b, v: bbPrice(b) })).filter((x) => x.v);
   const total = priced.reduce((a, x) => a + x.v, 0);
   const real = bbs.filter((b) => bbDetail(b)).length;
@@ -3768,7 +3781,7 @@ function conversionHtml(ref) {
       <div class="seg-rest" style="width:${restPct.toFixed(2)}%"></div>
     </div>
     <div class="ref-conv-legend">
-      <span><span class="dot" style="background:#7ee787"></span>${recruits.toLocaleString('en-US')} recruits</span>
+      <span><span class="dot" style="background:var(--good)"></span>${recruits.toLocaleString('en-US')} recruits</span>
       <span><span class="dot" style="background:rgba(255,255,255,0.1)"></span>${(prospects - recruits).toLocaleString('en-US')} prospects</span>
     </div>`;
 }
@@ -4310,6 +4323,7 @@ function eventBannerHtml() {
 
 // --- Share card -----------------------------------------------------------
 async function referralShareCanvas({ withCode }) {
+  const P = palette();
   const ref = state.referral;
   const recruits = ref.legacy?.recruits ?? 0;
   const prospects = ref.prospects ?? 0;
@@ -4351,14 +4365,14 @@ async function referralShareCanvas({ withCode }) {
   const ctx = canvas.getContext('2d');
   ctx.scale(SCALE, SCALE);
   const bg = ctx.createLinearGradient(0, 0, W, H);
-  bg.addColorStop(0, '#0d1117');
+  bg.addColorStop(0, P.bg);
   bg.addColorStop(1, '#131c2b');
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
   ctx.textBaseline = 'alphabetic';
 
   let y = PAD + 22;
-  ctx.fillStyle = '#8b949e';
+  ctx.fillStyle = P.muted;
   ctx.font = f(600, 15);
   ctx.fillText(who ? `${who.toUpperCase()} · REFERRALS` : 'REFERRALS', PAD, y);
   ctx.textAlign = 'right';
@@ -4366,23 +4380,23 @@ async function referralShareCanvas({ withCode }) {
   ctx.textAlign = 'left';
 
   y += 72;
-  ctx.fillStyle = '#e6edf3';
+  ctx.fillStyle = P.text;
   ctx.font = f(800, 72);
   const nText = recruits.toLocaleString('en-US');
   ctx.fillText(nText, PAD, y);
   const nW = ctx.measureText(nText).width;
   ctx.font = f(600, 24);
-  ctx.fillStyle = '#8b949e';
+  ctx.fillStyle = P.muted;
   ctx.fillText(recruits === 1 ? 'recruit' : 'recruits', PAD + nW + 12, y);
   if (rank) {
-    ctx.fillStyle = '#e3b341';
+    ctx.fillStyle = P.text;
     ctx.font = f(700, 18);
     ctx.fillText(rank.toUpperCase(), PAD, y + 30);
   }
 
   // Progress to the next tier.
   y += rank ? 70 : 50;
-  ctx.fillStyle = '#e6edf3';
+  ctx.fillStyle = P.text;
   ctx.font = f(600, 17);
   const next = p.next
     ? `${(p.next.at - recruits).toLocaleString('en-US')} more to ${rewardNames(p.next.items)}`
@@ -4390,15 +4404,15 @@ async function referralShareCanvas({ withCode }) {
   ctx.fillText(next, PAD, y);
   y += 14;
   const barW = W - PAD * 2;
-  ctx.fillStyle = '#21262d';
+  ctx.fillStyle = P.card2;
   ctx.beginPath();
   ctx.roundRect(PAD, y, barW, 14, 7);
   ctx.fill();
-  ctx.fillStyle = '#3fb950';
+  ctx.fillStyle = P.good;
   ctx.beginPath();
   ctx.roundRect(PAD, y, Math.max(14, barW * p.pct), 14, 7);
   ctx.fill();
-  ctx.fillStyle = '#8b949e';
+  ctx.fillStyle = P.muted;
   ctx.font = f(400, 13);
   y += 32;
   ctx.fillText(p.from.toLocaleString('en-US'), PAD, y);
@@ -4419,14 +4433,14 @@ async function referralShareCanvas({ withCode }) {
   const boxW = (barW - 3 * 12) / 4;
   stats.forEach(([big, lbl], i) => {
     const x = PAD + i * (boxW + 12);
-    ctx.fillStyle = '#161b22';
+    ctx.fillStyle = P.card;
     ctx.beginPath();
     ctx.roundRect(x, y, boxW, 78, 10);
     ctx.fill();
-    ctx.fillStyle = '#e6edf3';
+    ctx.fillStyle = P.text;
     ctx.font = f(700, 26);
     ctx.fillText(big, x + 16, y + 38);
-    ctx.fillStyle = '#8b949e';
+    ctx.fillStyle = P.muted;
     ctx.font = f(400, 13);
     ctx.fillText(lbl, x + 16, y + 62);
   });
@@ -4435,7 +4449,7 @@ async function referralShareCanvas({ withCode }) {
   // Ship rewards earned.
   if (ships.length) {
     y += 34;
-    ctx.fillStyle = '#e6edf3';
+    ctx.fillStyle = P.text;
     ctx.font = f(600, 16);
     ctx.fillText(
       `Rewards earned: ${earned.length}${earned.length > ships.length ? ` (latest ${ships.length})` : ''}`,
@@ -4447,7 +4461,7 @@ async function referralShareCanvas({ withCode }) {
     const th = tw * 0.6;
     ships.forEach((r, i) => {
       const x = PAD + i * (tw + 12);
-      ctx.fillStyle = '#161b22';
+      ctx.fillStyle = P.card;
       ctx.beginPath();
       ctx.roundRect(x, y, tw, th, 8);
       ctx.fill();
@@ -4467,7 +4481,7 @@ async function referralShareCanvas({ withCode }) {
         );
         ctx.restore();
       }
-      ctx.fillStyle = '#c9d1d9';
+      ctx.fillStyle = P.text;
       ctx.font = f(500, 12);
       let label = r.name;
       while (label.length > 3 && ctx.measureText(label).width > tw) label = label.slice(0, -2);
@@ -4491,10 +4505,10 @@ async function referralShareCanvas({ withCode }) {
       for (let c = 0; c < qr.size; c++)
         if (qr.modules[r][c])
           ctx.fillRect(qx + (c + 3) * cell, qy + (r + 3) * cell, cell + 0.3, cell + 0.3);
-    ctx.fillStyle = '#e6edf3';
+    ctx.fillStyle = P.text;
     ctx.font = f(700, 18);
     ctx.fillText(`Enlist with my code: ${ref.code}`, PAD, footY - 22);
-    ctx.fillStyle = '#8b949e';
+    ctx.fillStyle = P.muted;
     ctx.font = f(400, 13);
     ctx.fillText(
       'Scan the QR code, or enter the code when you sign up at robertsspaceindustries.com',
@@ -4502,7 +4516,7 @@ async function referralShareCanvas({ withCode }) {
       footY,
     );
   } else {
-    ctx.fillStyle = '#8b949e';
+    ctx.fillStyle = P.muted;
     ctx.font = f(400, 13);
     ctx.fillText('Made with Open Hangar · openhangar.space', PAD, footY);
   }
@@ -5722,7 +5736,7 @@ function openBuybackModal(b) {
     img +
       `<div class="modal-info">
       <h3 class="modal-name">${b.ccu ? `${OH.escapeHtml(b.ccu.from)} → ${OH.escapeHtml(b.ccu.to)}` : OH.escapeHtml(b.name || '—')}</h3>
-      <div class="modal-meta"><span class="badge">buy-back</span>${bbPriceHtml(b) ? `<span class="modal-val">${bbPriceHtml(b)}</span>` : ''}</div>
+      <div class="modal-meta"><span class="badge ${b.isCCU ? 'ccu' : TYPE_KEYS.includes(b.kind) ? b.kind : ''}">${OH.escapeHtml(b.isCCU ? 'CCU' : b.kind || 'buy-back')}</span><span class="badge muted">buy-back</span>${bbPriceHtml(b) ? `<span class="modal-val">${bbPriceHtml(b)}</span>` : ''}</div>
       ${b.ccu ? row('Upgrade', OH.escapeHtml(`${b.ccu.from} → ${b.ccu.to}`)) : ''}
       ${b.isCCU ? '' : row('Insurance', OH.escapeHtml(bbInsurance(b)))}
       ${b.date ? row('Melted', OH.escapeHtml(b.date)) : ''}
@@ -6328,7 +6342,7 @@ async function renderProfiles() {
         const name = OH.escapeHtml(p.displayname || p.nickname);
         const when = p.scannedAt ? new Date(p.scannedAt).toLocaleDateString() : 'never scanned';
         const tail = p.active
-          ? '<span class="badge ship">signed in</span>'
+          ? '<span class="badge good">signed in</span>'
           : `<button class="btn-secondary profile-remove" data-nick="${OH.escapeHtml(p.nickname)}">Remove</button>`;
         return `<div class="profile-row"><span class="profile-name">${name}</span><span class="muted">${p.pledges} pledges · ${when}</span>${tail}</div>`;
       })
@@ -6844,7 +6858,7 @@ function openShipModal(name) {
     `<div class="modal-img placeholder">Ship</div>
     <div class="modal-info">
       <h3 class="modal-name">${esc(title)}</h3>
-      <div class="modal-meta">${status ? `<span class="badge ship">${esc(status)}</span>` : ''}${
+      <div class="modal-meta">${status ? `<span class="badge ${v.status === 'flight-ready' ? 'good' : 'warn'}">${esc(status)}</span>` : ''}${
         v && v.msrp ? `<span class="modal-val">${dollars(v.msrp)}</span>` : ''
       }</div>
       <button type="button" class="mk-btn wish-btn" data-wish-toggle="${esc(title)}">${

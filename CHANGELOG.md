@@ -4,6 +4,11 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- **One color, one meaning, on every page.** Item types (ship, pack, package, CCU, paint,
+  add-on, coupon) each have their own color and nothing else uses it, now also in filter chips,
+  the buy-back window and Stats charts. Green is good news, amber is worth a look, red is a
+  problem, blue is clickable. Balances are plain white. A **Color Key** is under How to Use on
+  Home, and image exports use the same palette.
 - **Home redesign bits:** a big **Global Hangar Search** sits centered under the Citizen Card
   (press / on any page to jump to it). It searches only what's yours (pledges, buy-backs, earned
   rewards), not the store. The currency picker moved to the top right of every page.

@@ -161,6 +161,14 @@ buy-back scan), thread it through `state`, and add the pill in `renderAccount`
 
 ## Multi-account caching + character switcher (needs research first)
 
+**Update 2026-09-29 (owner question, parked):** per-account saved data now exists
+(Developers → Saved accounts): each RSI account's scan is kept, and the dashboard shows
+whichever account is **signed in to RSI**. There's no way to pick a "primary" account to
+track, or to view/compare another saved one without signing in as it. Figure out what
+multi-account owners actually want: choose which account the dashboard follows, a
+switcher to browse saved accounts, and/or side-by-side comparison (combined fleet across
+alts). The notes below predate saved accounts; revisit them with that in mind.
+
 Today the model is **single-account by design**: the DB holds one account's data,
 and `reconcileAccount` (dashboard.js) **wipes** it when a different RSI account signs
 in, so accounts never mix. Idea: instead of wiping, **cache each account's scan
