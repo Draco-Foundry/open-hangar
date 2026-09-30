@@ -100,7 +100,7 @@
       out.push({
         key: `bb:${bb.map((b) => b.id).sort().join(',')}`,
         kind: 'info',
-        icon: '↺',
+        icon: '♥', // your wishlist (the ↺ "buy back" arrow read as a refresh button)
         title:
           bb.length === 1 ? '1 buy-back matches your wishlist' : `${bb.length} buy-backs match your wishlist`,
         sub: [...new Set(bb.map((b) => a.cardName(b)))].slice(0, 3).join(', '),
