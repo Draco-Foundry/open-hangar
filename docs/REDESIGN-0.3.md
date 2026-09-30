@@ -78,6 +78,11 @@ Empty blocks disappear; the grid never leaves a card alone in a row.
   inside Svelte's runtime. It clones compile-time template markup, never user or RSI data.
   Mention this in the AMO reviewer notes with the 0.3.0 upload (plus the source-code link).
 
+## Top Bar
+
+- **Pinned while scrolling** on every page except Home (owner, 2026-09-30), so the page
+  links stay one click away on long pages like Inventory and Buy-Backs.
+
 ## Scheduled Alongside
 
 - Light mode (Dark default / Light / Auto) after the redesign's pages exist.
