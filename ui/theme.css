@@ -41,6 +41,17 @@ h4 {
   font-family: var(--font-head);
 }
 
+/* Top bar: pinned while scrolling on every page except Home (owner, 2026-09-30), so
+   the page links stay one click away on long pages. */
+body:not(:has(#view-home.active)) .wrap > header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  margin-top: -20px;
+  padding-top: 14px;
+  background: var(--bg);
+}
+
 /* Home: Citizen Card (3/4) beside For You (1/4); the card spans the row when there
    are no alerts, and on narrow windows For You drops under it. */
 .home-hero {
