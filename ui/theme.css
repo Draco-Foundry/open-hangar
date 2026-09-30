@@ -89,7 +89,13 @@ body:not(:has(#view-home.active)) .wrap > header {
   background: var(--panel);
   overflow: hidden;
 }
+/* The card can be stretched taller by Game Status beside it: the portrait follows. */
+.home-hero .citizen-card {
+  display: flex;
+  flex-direction: column;
+}
 .home-hero .cc-account {
+  flex: 1;
   position: relative;
   display: grid;
   grid-template-columns: 290px minmax(0, 1fr);
