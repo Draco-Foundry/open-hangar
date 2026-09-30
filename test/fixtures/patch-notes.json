@@ -1,0 +1,55 @@
+{
+ "success": 1,
+ "data": {
+  "threads": [
+   {
+    "id": "571959",
+    "slug": "star-citizen-alpha-4-10-2-ptu-patch-notes-2",
+    "subject": "[Wave 3 PTU] Star Citizen Alpha 4.10.2 PTU Patch Notes 12811422",
+    "time_created": 1790709102
+   },
+   {
+    "id": "571643",
+    "slug": "star-citizen-alpha-4-10-2-ptu-patch-notes-1",
+    "subject": "[Wave 1] Star Citizen Alpha 4.10.2 PTU Patch Notes 12770507",
+    "time_created": 1790367636
+   },
+   {
+    "id": "571266",
+    "slug": "star-citizen-alpha-4-10-2-ptu-patch-notes",
+    "subject": "[Evocati NDA] Star Citizen Alpha 4.10.2 PTU Patch Notes 12702947",
+    "time_created": 1790001420
+   },
+   {
+    "id": "570710",
+    "slug": "star-citizen-alpha-4-10-1-live-release-notes",
+    "subject": "Star Citizen Alpha 4.10.1 LIVE Release Notes",
+    "time_created": 1789570422
+   },
+   {
+    "id": "568266",
+    "slug": "star-citizen-alpha-4-10-live-hotfix-central",
+    "subject": "Star Citizen Alpha 4.10.1 LIVE - Hotfix Central  (Updated 9.22.2026)",
+    "time_created": 1787845815
+   },
+   {
+    "id": "568009",
+    "slug": "star-citizen-alpha-4-10-live-release-notes",
+    "subject": "Star Citizen Alpha 4.10 LIVE Release Notes",
+    "time_created": 1787748488
+   },
+   {
+    "id": "570869",
+    "slug": "ttk-tdd-balance-test-tech-preview-3",
+    "subject": "[All Backer] TTK TTD Balance Test Tech-Preview #3",
+    "time_created": 1789656220
+   },
+   {
+    "id": "570551",
+    "slug": "star-citizen-alpha-4-10-1-ptu-patch-notes-2",
+    "subject": "[All Waves] Star Citizen Alpha 4.10.1 PTU RC1 Patch Notes 12650677",
+    "time_created": 1789406700
+   }
+  ]
+ }
+}

@@ -1051,51 +1051,12 @@ function renderHomePanels() {
 function renderHome() {
   ensurePrices();
   renderEventBanner();
-  renderHomePanels();
   renderAccount();
   const has = state.items.length > 0;
   document.getElementById('view-home').classList.toggle('no-data', !has);
   if (clearBtn) clearBtn.hidden = !(state.items.length || state.scannedAt);
-
-  // Dashboard summary strip (#1) — only once there's data.
-  const sum = $('#home-summary');
-  if (has) {
-    const count = (k) => state.items.filter((p) => p.kind === k).length;
-    const ships = state.items.filter((p) => p.containsShip).length;
-    const box = (big, lbl, full) =>
-      `<div class="sum-box"${full && full !== big ? ` title="${OH.escapeHtml(full)}"` : ''}><div class="sum-big">${big}</div><div class="sum-lbl">${lbl}</div></div>`;
-    const melt = OH.totalValue(state.items);
-    const store = hangarValue()?.store;
-    setHTML(
-      sum,
-      box(state.items.length, 'pledges') +
-        box(shortMoney(melt, money), 'melt value', money(melt)) +
-        (store ? box(shortMoney(store, dollars), 'ships at store price', dollars(store)) : '') +
-        box(ships, 'ships') +
-        box(count('ccu'), 'CCUs') +
-        (count('paint') ? box(count('paint'), 'paints') : '') +
-        box(count('addon'), 'add-ons') +
-        (state.buybacks.length ? box(state.buybacks.length, 'buy-backs') : ''),
-    );
-  } else {
-    setHTML(sum, '');
-  }
-  const ch = $('#home-changes');
-  if (ch) {
-    const hist = state.history;
-    if (has && hist.length >= 2) {
-      const d = OH.diffSnapshots(hist[hist.length - 2], hist[hist.length - 1]);
-      setHTML(
-        ch,
-        `Since ${OH.escapeHtml(fmtDay(hist[hist.length - 2].at))}: ${OH.escapeHtml(
-          changeSummary(d),
-        )} · <a href="#stats" data-stats-tab="history">history</a>`,
-      );
-      ch.hidden = false;
-    } else {
-      ch.hidden = true;
-    }
-  }
+  // Everything below the Citizen Card is the Svelte Home (ui/home); tell it to redraw.
+  homeUpdated();
 
   // Scanned line: first-run prompt (#2) or scan freshness with a stale nudge (#5).
   if (!has) {
@@ -7082,21 +7043,8 @@ function spendingSectionHtml() {
 // A banner while a referral bonus event runs (they come with the big sales:
 // IAE, Invictus, CitizenCon, Luminalia…), from the wiki's event list.
 function renderEventBanner() {
-  const el = $('#event-banner');
-  if (!el) return;
-  refreshReferralEvents();
-  const ev = runningEvent();
-  if (!ev) {
-    el.hidden = true;
-    return;
-  }
-  setHTML(
-    el,
-    `<strong>${OH.escapeHtml(ev.name)}</strong> is on until ${OH.escapeHtml(
-      fmtDate(parseTs(ev.end + ' 00:00:00')),
-    )}. Referral bonus: <strong>${OH.escapeHtml(shortReward(ev.reward))}</strong> for anyone who enlists with your code and buys a game package. <a href="#referrals" data-view="referrals">Your referrals</a>`,
-  );
-  el.hidden = false;
+  refreshReferralEvents(); // calls back here when newer events arrive
+  homeUpdated();
 }
 
 // --- Global hangar search (Home) ------------------------------------------------
@@ -7263,3 +7211,69 @@ if (gsearch && gsearchOut) {
     applyCurrency(currency);
   }
 })();
+
+// --- Bridge for the Svelte pages (ui/) -------------------------------------------
+// ui/ is compiled by Vite into src/ui/ and loaded as a module after this script. It
+// reads the app through window.OHApp and redraws on the 'oh:home' event.
+let homeUpdateQueued = false;
+function homeUpdated() {
+  if (homeUpdateQueued) return;
+  homeUpdateQueued = true;
+  queueMicrotask(() => {
+    homeUpdateQueued = false;
+    document.dispatchEvent(new CustomEvent('oh:home'));
+  });
+}
+window.OHApp = {
+  get state() {
+    return state;
+  },
+  get recruits() {
+    return state.referral?.legacy?.recruits ?? 0;
+  },
+  hangarValue,
+  // A history snapshot's ships at today's store prices (same as Stats → History).
+  snapshotStore: (snap) => (state.priceOf ? snapshotStore(snap) : null),
+  money,
+  dollars,
+  // Whole amounts in the chosen currency: exact under 100,000, then "$1.24M" /
+  // "$184.5K" so a huge hangar never breaks a layout (exact value goes in a tooltip).
+  bigMoney: (n) => {
+    const v = n * fx.rate;
+    if (Math.abs(v) < 100000) return fmtCurrency(v, 0);
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: fx.code,
+      notation: 'compact',
+      maximumFractionDigits: Math.abs(v) >= 1e6 ? 2 : 1,
+    }).format(v);
+  },
+  fmtDay,
+  changeSummary,
+  pledgeType,
+  typeKeys: TYPE_KEYS,
+  cardName,
+  plainName,
+  realImage,
+  resolveImageName,
+  formatValue,
+  runningEvent,
+  shortReward,
+  parseTs,
+  wishlistStock,
+  tierProgress: (recruits) => tierProgress(REFERRAL_LADDER_STANDARD, recruits),
+  rewardNames,
+  openItem: (id) => {
+    const p = state.items.find((x) => String(x.id) === String(id));
+    if (p) openItemModal(p);
+  },
+  // Open Inventory with one kind or trait filter on ("ship", "ccu", "lti", "all").
+  showInventory: (key) => {
+    state.shown = new Set(OH.KINDS.some((k) => k.key === key) ? [key] : []);
+    state.traits = new Map(key === 'lti' ? [['lti', 'yes']] : []);
+    location.hash = '#inventory';
+    renderInventory();
+  },
+  shipOf: (name) => (state.shipOf ? state.shipOf(name) : null),
+  priceOf: (name) => (state.priceOf ? state.priceOf(name) : null),
+};

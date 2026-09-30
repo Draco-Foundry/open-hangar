@@ -31,7 +31,9 @@ no alternate looks; light mode stays the one scheduled option. Reference mockup:
 
 Ordered by what a viewer needs first:
 
-1. **Citizen Card** with Scan, settings and a built-in search box ("/").
+1. **Citizen Card** with Scan, settings and a built-in search box ("/"), and **For You**
+   beside it at a quarter of the row (owner, 2026-09-30); the card spans the row when
+   there are no alerts. Its placement and design get another pass later.
 2. **For You**: alerts, each with **Ignore** (stays hidden until something new happens):
    wishlist ship on sale, a ship you own changes status (e.g. flight ready), buy-backs
    matching your wishlist, milestones (enlistment anniversary). No CCU nagging (players
@@ -64,6 +66,17 @@ Empty blocks disappear; the grid never leaves a card alone in a row.
 3. **Rebuild page by page** from the signed-off mockups; rewrite the UI smoke tests
    alongside.
 4. **Beta** with a few testers, fix, release **0.3.0**.
+
+## Build Notes
+
+- Svelte sources live in `ui/`; `npm run build:ui` (Vite) compiles them into `src/ui/`
+  (generated, gitignored). `build`, `demo`, `screenshots` and `test:ui` run it first.
+- The classic `src/dashboard.js` still owns scanning, storage and the other pages. It
+  exposes read-only helpers on `window.OHApp` and fires `oh:home` when Home's data changes.
+- Fonts (Manrope, Source Sans 3) are bundled from @fontsource; no requests to Google.
+- **Firefox review note:** web-ext lint shows one warning (UNSAFE_VAR_ASSIGNMENT, innerHTML)
+  inside Svelte's runtime. It clones compile-time template markup, never user or RSI data.
+  Mention this in the AMO reviewer notes with the 0.3.0 upload (plus the source-code link).
 
 ## Scheduled Alongside
 

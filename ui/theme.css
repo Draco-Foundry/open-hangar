@@ -1,0 +1,121 @@
+/*
+ * Clean Pro, the 0.3.0 look (docs/REDESIGN-0.3.md): graphite surfaces, colour only
+ * where it means something, heavy clear numbers. Loaded after dashboard.html's own
+ * styles, so these token values win everywhere; pages move to Svelte one by one.
+ * Fonts are bundled (no requests to Google).
+ */
+@import '@fontsource/manrope/latin-600.css';
+@import '@fontsource/manrope/latin-700.css';
+@import '@fontsource/manrope/latin-800.css';
+@import '@fontsource/source-sans-3/latin-400.css';
+@import '@fontsource/source-sans-3/latin-600.css';
+
+:root {
+  --bg: #0e1013;
+  --panel: #16191e;
+  --panel-2: #1d2127;
+  --line: #23272e;
+  --line-2: #30353d;
+  --text: #dfe3e8;
+  --head: #ffffff;
+  --muted: #8b939e;
+  --faint: #5f6873;
+  --accent: #2f81f7;
+  --accent-hover: #4493f8;
+  --accent-soft: rgba(47, 129, 247, 0.14);
+  --link: #6cb4ff;
+  --good-soft: rgba(63, 185, 80, 0.13);
+  --warn-soft: rgba(210, 153, 34, 0.14);
+  --bad-soft: rgba(248, 81, 73, 0.13);
+  --font-head: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-body: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --radius-lg: 14px;
+}
+body {
+  font-family: var(--font-body);
+}
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-head);
+}
+
+/* Home: Citizen Card (3/4) beside For You (1/4); the card spans the row when there
+   are no alerts, and on narrow windows For You drops under it. */
+.home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+  align-items: stretch;
+}
+.home-hero:has(> #oh-foryou:empty) {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (max-width: 980px) {
+  .home-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.home-hero > #oh-foryou:empty {
+  display: none;
+}
+/* The card in Clean Pro: plain panel, no texture; overflow stays visible so the
+   search results and the Scan / settings menus can drop below it. */
+.home-hero .citizen-card {
+  margin-bottom: 0;
+  min-height: 0;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  overflow: visible;
+}
+.home-hero .citizen-card::before,
+.home-hero .citizen-card::after {
+  display: none;
+}
+.cc-name {
+  font-family: var(--font-head);
+  font-weight: 800;
+}
+.cc-search {
+  width: 260px;
+  max-width: 100%;
+}
+/* With For You beside it the card has 3/4 of the row: stack it (identity and
+   balances on top, then Scan / Log out / settings / search in one row) so nothing
+   squeezes or overlaps. The card gets its full Clean Pro redesign later in 0.3.0. */
+.home-hero:not(:has(> #oh-foryou:empty)) .citizen-card {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+}
+.home-hero:not(:has(> #oh-foryou:empty)) .cc-side {
+  align-items: stretch;
+  text-align: left;
+}
+.home-hero:not(:has(> #oh-foryou:empty)) .cc-side-bottom {
+  align-items: flex-start;
+}
+.home-hero:not(:has(> #oh-foryou:empty)) .cc-actions {
+  justify-content: flex-start;
+  align-items: center;
+}
+.home-hero:not(:has(> #oh-foryou:empty)) .cc-search {
+  flex: 1 1 220px;
+}
+.cc-search input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  padding: 8px 40px 8px 12px;
+  color: var(--text);
+  font: 15px var(--font-body);
+}
+@media (max-width: 640px) {
+  .cc-search {
+    width: 100%;
+  }
+}
