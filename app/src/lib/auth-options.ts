@@ -9,11 +9,17 @@ export const authOptions = {
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 10,
+    // A used reset link signs out every other session.
+    revokeSessionsOnPasswordReset: true,
   },
+  // Senders live in auth.ts (they need secrets); the switches live here.
+  emailVerification: { sendOnSignUp: true, autoSignInAfterVerification: true },
+  // Discord and email can share one account. Discord isn't in trustedProviders,
+  // so Better Auth only links it when Discord says the email is verified (and
+  // the local email is verified too, its default).
+  account: { accountLinking: { enabled: true } },
   // "Delete my account" on /account. Rows in our own tables go with it
   // (foreign keys cascade on user deletion).
   user: { deleteUser: { enabled: true } },
-  plugins: [
-    twoFactor({ issuer: 'Open Hangar' }),
-  ],
+  plugins: [twoFactor({ issuer: 'Open Hangar' })],
 } satisfies BetterAuthOptions;

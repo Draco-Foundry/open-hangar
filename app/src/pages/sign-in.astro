@@ -8,18 +8,29 @@ const raw = Astro.url.searchParams.get('next') || '/hangar';
 const next = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/hangar';
 if (Astro.locals.user) return Astro.redirect(next);
 const discord = discordEnabled();
+// Better Auth sends failed Discord logins back here with ?error=.
+const oauthError = Astro.url.searchParams.get('error');
+const oauthMessage =
+  oauthError === 'account_not_linked'
+    ? 'That Discord email already has an account here. Sign in with your password, confirm your email, then try Discord again.'
+    : oauthError
+      ? 'Discord login didn’t work. Try again, or use your email.'
+      : '';
+const reset = Astro.url.searchParams.has('reset');
 ---
 
 <Base title="Sign In">
   <h1>Sign In</h1>
+  {reset && <p class="ok">Password changed. Sign in with the new one.</p>}
+  {oauthMessage && <p class="error">{oauthMessage}</p>}
   <div class="card" style="max-width:460px">
     {
       discord && (
         <>
           <button type="button" class="discord" data-social="discord">
-            Continue with Discord
+            Log in with Discord
           </button>
-          <p class="or muted">or with email</p>
+          <p class="or muted">Or use your email</p>
         </>
       )
     }
@@ -29,6 +40,7 @@ const discord = discordEnabled();
       <button type="submit">Sign in</button>
       <div class="error" id="err" role="alert"></div>
     </form>
+    <p class="muted"><a href="/forgot-password">Forgot password?</a></p>
     <p class="muted">New here? <a href="/sign-up">Create an account</a></p>
   </div>
 </Base>
@@ -54,7 +66,7 @@ const discord = discordEnabled();
     if (!(data as { twoFactorRedirect?: boolean })?.twoFactorRedirect) location.href = next;
   });
   document.querySelector('[data-social="discord"]')?.addEventListener('click', () =>
-    authClient.signIn.social({ provider: 'discord', callbackURL: next }),
+    authClient.signIn.social({ provider: 'discord', callbackURL: next, errorCallbackURL: '/sign-in' }),
   );
 </script>
 
