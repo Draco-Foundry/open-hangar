@@ -169,6 +169,18 @@ Clear All) either way. Picking keeps the sidebar open (never closes on a click).
    add-ons, coupons and anything else. Within a type keep today's order. A ship found
    inside a pack is a pack row (it's the pack you'd open or reclaim). The 12/8 row caps
    apply after sorting, so packs are never cut in favour of add-ons.
+4. **Account Value chart disagrees with the headline.** Owner's card: headline $3,270,
+   chart "$3,600 to $4,600" with today's point near $4,500. `snapshotStore()`
+   (src/dashboard.js) uses `hangarValue().pledges` when a pledge is still owned, but
+   anything without ship contents (paints, gear, add-ons, rewards) falls through to a
+   by-name price guess that the headline never makes. Fix: pledges still owned count
+   exactly as the headline does (nothing extra); the name guess only for pledges that
+   are gone, and it skips non-ship kinds. Test: the last point equals the headline, and
+   "+$X since <month>" is last minus first on the fixed numbers.
+5. **Account Value: empty space on the right of the top half.** Option A (default):
+   the two pills sit on the big number's line, to its right, and wrap under it when
+   narrow; the chart gets the height back. Option B: counts spread full width plus a
+   small value breakdown (ships · packs · CCUs). Mock A before building.
 
 ## Scheduled Alongside
 
