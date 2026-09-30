@@ -91,8 +91,19 @@ run('npx prettier --write CHANGELOG.md manifest.json package.json');
 run('git add CHANGELOG.md manifest.json package.json');
 run(`git commit -m "release: ${version}"`);
 run(`git tag -a v${version} -m "Open Hangar ${version}"`);
-run('git push origin main', { stdio: 'inherit' });
-run(`git push origin v${version}`, { stdio: 'inherit' });
+// Pushes retry: a push can hit a one-off network hiccup (seen with 0.2.12).
+const push = (ref) => {
+  for (let i = 1; ; i++) {
+    try {
+      return run(`git push origin ${ref}`, { stdio: 'inherit' });
+    } catch {
+      if (i === 3) fail(`couldn't push ${ref}: run "git push origin ${ref}" by hand`);
+      console.log(`Push of ${ref} failed, retrying (${i}/2)…`);
+    }
+  }
+};
+push('main');
+push(`v${version}`);
 console.log(`\n✔ Released v${version}. The GitHub Release is building now.`);
 console.log(
   '  Next: Actions → Publish to stores → Run workflow (tag v' + version + ', store: all).',
