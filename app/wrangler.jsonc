@@ -24,7 +24,7 @@
   "vars": {
     "BETTER_AUTH_URL": "http://localhost:4321",
     // Discord application ID (public). Empty = Discord login hidden.
-    "DISCORD_CLIENT_ID": "",
+    "DISCORD_CLIENT_ID": "1554856207179714671",
     "EMAIL_FROM": "Open Hangar <noreply@openhangar.space>",
   },
   "observability": {
