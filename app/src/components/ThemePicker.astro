@@ -1,7 +1,7 @@
 ---
-// Appearance picker: colours (grouped), font, style. Applies instantly and
+// Appearance picker: colours (grouped), font, style, backdrop. Applies instantly and
 // saves via /api/theme (cookie, plus the account when signed in).
-import { FONTS, PALETTES, STYLES, readTheme } from '../lib/theme';
+import { BACKDROPS, FONTS, PALETTES, STYLES, readTheme } from '../lib/theme';
 
 const t = readTheme(Astro.locals.themePref ?? Astro.cookies.get('oh_theme')?.value);
 const groups = [...new Set(PALETTES.map((p) => p.group))];
@@ -61,12 +61,26 @@ const groups = [...new Set(PALETTES.map((p) => p.group))];
       }
     </div>
   </div>
+  <div class="picker">
+    <h3>Backdrop</h3>
+    <div class="opts" data-axis="backdrop">
+      {
+        BACKDROPS.map((b) => (
+          <button type="button" class="opt" data-id={b.id} aria-pressed={b.id === t.backdrop}>
+            {b.label}
+            <small class="muted">{b.note}</small>
+          </button>
+        ))
+      }
+    </div>
+    <p class="muted note">Light colours always use Plain.</p>
+  </div>
   <p class="muted status" aria-live="polite"></p>
 </div>
 
 <script>
   const html = document.documentElement;
-  const axes = ['palette', 'font', 'style'] as const;
+  const axes = ['palette', 'font', 'style', 'backdrop'] as const;
   const current = () => axes.map((a) => html.dataset[a]).join('.');
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   document.querySelectorAll<HTMLElement>('.pickers').forEach((root) => {
@@ -148,6 +162,10 @@ const groups = [...new Set(PALETTES.map((p) => p.group))];
     height: 12px;
     border-radius: 3px;
     border: 1px solid rgba(128, 128, 128, 0.4);
+  }
+  .note {
+    margin: 6px 0 0;
+    font-size: 13px;
   }
   .status {
     min-height: 1.4em;

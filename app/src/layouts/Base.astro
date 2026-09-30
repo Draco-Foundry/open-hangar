@@ -2,6 +2,7 @@
 import '../styles/global.css';
 import '../styles/themes.css';
 import { ALL_FONT_IDS, fontHref, readTheme } from '../lib/theme';
+import SpaceBackdrop from '../components/SpaceBackdrop.astro';
 
 interface Props {
   title?: string;
@@ -22,7 +23,9 @@ const nav = user
   : [];
 ---
 
-<html lang="en" data-palette={theme.palette} data-font={theme.font} data-style={theme.style}>
+<html lang="en" data-palette={theme.palette} data-font={theme.font} data-style={theme.style}
+  data-backdrop={theme.backdrop}
+>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -32,6 +35,7 @@ const nav = user
     <title>{title ? `${title} · Open Hangar` : 'Open Hangar'}</title>
   </head>
   <body>
+    <SpaceBackdrop />
     <header class="top">
       <div class="wrap bar">
         <a class="brand" href="/" aria-label="Open Hangar home"><img src="/favicon.svg" alt="" width="26" height="26" /> <span>Open Hangar</span></a>
