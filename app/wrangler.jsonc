@@ -16,6 +16,8 @@
       "migrations_dir": "migrations",
     },
   ],
+  // Astro sessions (created by the first deploy).
+  "kv_namespaces": [{ "binding": "SESSION", "id": "377406e2d7c043c499c92620a14d68da" }],
   // Secrets (`wrangler secret put NAME`; locally in .dev.vars):
   //   BETTER_AUTH_SECRET     required
   //   DISCORD_CLIENT_SECRET  Log in with Discord (needs DISCORD_CLIENT_ID too)
