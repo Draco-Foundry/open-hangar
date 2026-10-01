@@ -644,6 +644,16 @@ body:not(:has(#view-home.active)) .wrap > header {
   background: #232933;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
 }
+.sm-progress {
+  padding: 6px 8px 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line-2);
+  font-size: 12px;
+  color: var(--text);
+}
+.sm-progress[hidden] {
+  display: none;
+}
 .sm-head {
   display: flex;
   justify-content: space-between;
@@ -759,6 +769,33 @@ body:not(:has(#view-home.active)) .wrap > header {
 }
 .oh-welcome .welcome-scan[hidden] {
   display: none;
+}
+/* The first scan: the button turns into a progress bar with the step under it. */
+.oh-welcome .welcome-progress {
+  width: min(420px, 100%);
+  margin-top: 8px;
+}
+.oh-welcome .welcome-progress[hidden] {
+  display: none;
+}
+.oh-welcome .wp-bar {
+  height: 14px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: var(--panel-2, #232933);
+}
+.oh-welcome .wp-fill {
+  display: block;
+  width: 4%;
+  height: 100%;
+  border-radius: 7px;
+  background: var(--accent);
+  transition: width 0.4s ease;
+}
+.oh-welcome .wp-text {
+  margin-top: 10px;
+  font: 600 15px var(--font-head);
+  color: var(--text);
 }
 .oh-welcome .welcome-note {
   font-size: 13px;
