@@ -75,7 +75,7 @@
     >
   {/if}
   {#if !live.loaded}
-    <div class="row"><span class="oh-muted">Loading…</span></div>
+    <div class="row"><span class="oh-muted">{window.OH?.quip?.('loading') || 'Loading…'}</span></div>
   {/if}
   <div class="evs">
     {#if ev.on}
