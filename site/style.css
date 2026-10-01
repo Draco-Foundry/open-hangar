@@ -39,7 +39,7 @@ a {
    stars from stars.css, the same sky as app.openhangar.space, so the hero is just
    spacing over it. */
 .hero {
-  padding: 96px 0 72px;
+  padding: 96px 0 36px;
   text-align: center;
 }
 .hero h1,
@@ -148,7 +148,7 @@ h1 {
 
 /* Screenshot tour */
 .tour {
-  margin: 36px 0 0;
+  margin: 24px 0 0;
 }
 .tour h2 {
   font-size: 1.25rem;
