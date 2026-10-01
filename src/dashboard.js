@@ -1035,6 +1035,17 @@ function updateSignedOutBanner(loggedOut) {
   el.hidden = !(lastLoggedOut && hasData);
 }
 
+// Notice from our status file (the kill switch, see OH.getRemoteStatus). Text
+// only, never HTML: it comes from the network.
+async function renderSiteNotice() {
+  const el = $('#site-notice');
+  if (!el) return;
+  const { banner } = await OH.getRemoteStatus();
+  el.textContent = banner ? banner.message : '';
+  el.classList.toggle('info', banner?.level === 'info');
+  el.hidden = !banner;
+}
+
 function renderVersions() {
   const el = $('#versions');
   if (!el) return;
@@ -6226,6 +6237,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   setScanning(`${anyErr ? '⚠ ' : '✓ '}${summary}`, true);
   route();
   renderAccount(); // refresh the Citizen Card pill with the new referral counts
+  renderSiteNotice();
   scanBtn.disabled = false;
   if ($('#welcome-scan')) $('#welcome-scan').disabled = false;
   if (scanSelectedBtn) scanSelectedBtn.disabled = false;
@@ -7702,6 +7714,7 @@ if (gsearch && gsearchOut) {
   renderFooter();
   renderSupporters();
   initUpdates();
+  renderSiteNotice();
   renderSiteLink();
   if (currency && currency !== 'USD') {
     const sel = $('#currency-select');

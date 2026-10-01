@@ -4,6 +4,40 @@ RSI has no public API, so Open Hangar reads the same pages you see. When RSI
 redesigns something, part of a scan can break overnight. This is the playbook for
 getting a fix out fast.
 
+## 0. Pause the broken scan (minutes, no release)
+
+Edit `site/status.json` on `main`; the Pages workflow publishes it to
+`https://openhangar.space/status.json`. Extensions read it at most every 6 hours, so
+most users see it within a few hours.
+
+```json
+{
+  "sources": {
+    "hangar": {
+      "enabled": false,
+      "message": "RSI changed their hangar page. Scans are paused while a fix is on the way. Your saved data is safe."
+    }
+  },
+  "banner": {
+    "message": "RSI changed their site, hangar scans are paused. A fix is coming.",
+    "level": "warn",
+    "until": "2026-10-08"
+  }
+}
+```
+
+- `sources`: `hangar`, `buybacks` or `referrals`. `"enabled": false` pauses it;
+  `"minVersion": "0.2.13"` pauses it only on older versions (use this once the fix
+  is out, so people on the fix keep scanning). `message` is optional (300 characters,
+  plain text).
+- `banner`: a notice across the top of the dashboard. `level` is `warn` or `info`;
+  `until` (a date) hides it automatically after that day.
+- When the fix is out everywhere, put the file back to
+  `{ "sources": {}, "banner": null }`.
+
+A mistake in the file can't break anyone: a missing or unreadable file means "scan
+as normal". Paused scans never touch RSI and never change saved data.
+
 ## 1. Spot it
 
 Usual signs:
