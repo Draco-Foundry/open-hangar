@@ -9,8 +9,8 @@ but not to redistribute it or publish changed versions.
 - **Bug reports and ideas are always welcome.** Open an
   [issue](https://github.com/Draco-Foundry/open-hangar/issues) or post in
   [Ideas](https://github.com/Draco-Foundry/open-hangar/discussions/categories/ideas).
-- **Unsolicited code changes (pull requests) aren't accepted.** If you've found a fix,
-  describe it in an issue instead; if a code change is wanted, you'll be asked first.
+- **Pull requests are welcome too.** For anything bigger than a small fix, open an
+  issue first so we can agree on the approach. See [PRs](#prs) below.
 
 The notes below document how the extension works, for anyone auditing it.
 
@@ -19,7 +19,7 @@ The notes below document how the extension works, for anyone auditing it.
 The most important part to keep working is `src/scraper/parser.js`, because RSI
 changes their site and the rest of the extension depends on this layer staying honest.
 
-## How auth works
+## How Auth Works
 
 The scan runs in the extension's own dashboard page, not in a content
 script. The extension's `host_permissions` for `robertsspaceindustries.com` let
@@ -32,7 +32,7 @@ comes back logged-out. The fallback would be to scan via a hidden RSI tab
 (`chrome.tabs.create` → content script) — not implemented while the direct fetch
 works.
 
-## Rediscovering the data source
+## Rediscovering the Data Source
 
 When a scan returns nothing (or garbage), RSI probably changed something. For the
 whole triage, fix and release playbook see [docs/RSI-CHANGES.md](docs/RSI-CHANGES.md).
@@ -70,7 +70,7 @@ template you can paste into the console and tweak. The verification snippets in
 the PR/commit history are a fast way to confirm selectors against a live hangar
 before committing parser changes.
 
-## Adding a data source
+## Adding a Data Source
 
 Sources are declared in `OH.SOURCES` (`src/lib.js`). To add one:
 
@@ -90,8 +90,10 @@ The scan is persisted automatically under `storage.db.sources[id]`, and
 the old shape. Every load is checked: anything that fails is set aside under
 `dbCorrupt` (never deleted) and the dashboard offers to restore a backup. The backup
 file format has its own number, `EXPORT_VERSION`; only bump it when the file itself
-changes, since older versions refuse newer files. Today only `html` is implemented; buy-backs
-(GraphQL) and store data (API) are the next pipelines — see ROADMAP.md / TODO.md.
+changes, since older versions refuse newer files. Today `OH.SOURCES` holds two `html`
+sources, the hangar and buy-backs (RSI renders buy-backs as the same server-side HTML as
+pledges). Referrals come from RSI's GraphQL API through their own fetch in `lib.js`,
+outside `OH.SOURCES`. Store data (API) is the next pipeline; see ROADMAP.md.
 
 ## Versioning
 
@@ -111,7 +113,7 @@ features and **patch** (`0.2.7`…) for fixes; `1.0.0` is reserved for the first
   documented, and ideally self-hostable. Keep it out of the core scraper.
 - **No credential handling.** We rely on the existing session cookie only.
 
-## Local testing without RSI
+## Local Testing Without RSI
 
 You can unit-test `parser.js` in isolation by feeding it saved sample payloads
 (scrub anything personal first). Capturing a real response from DevTools and
@@ -123,7 +125,7 @@ fails if `app.openhangar.space` is left anywhere in them. To test sync locally, 
 with `OH_SYNC=1 npm run build` and set the `siteUrl` storage key to your local site.
 Mark any new sync code the same way.
 
-## Firefox notes
+## Firefox Notes
 
 Firefox MV3 runs an event page rather than a service worker. `manifest.json` stays
 Chrome-shaped; `npm run build` writes `dist/firefox/manifest.json` with the
@@ -133,7 +135,7 @@ Firefox-only keys added (`background.scripts`, the gecko add-on id, and
 calls work via Firefox's compatibility shim; if you hit an API difference, that's the
 first place to look.
 
-## Safari notes
+## Safari Notes
 
 A Safari build is on the roadmap and is a **port, not a drop-in load**. Safari Web
 Extensions are packaged inside a macOS/iOS app via Xcode — start from Apple's
@@ -141,6 +143,25 @@ Extensions are packaged inside a macOS/iOS app via Xcode — start from Apple's
 doesn't support `externally_connectable` (so the planned approved-sites API needs a
 Safari-specific path, or export/import only there), and the `cookies` permission and
 host permissions behave differently than on Chrome. See ROADMAP.md.
+
+## GitHub Workflows
+
+Everything automated lives in `.github/workflows/`:
+
+- **CI** (`ci.yml`): on every push and PR, runs the unit tests, the Prettier check, the
+  dashboard UI test, builds the store zips through Firefox's store linter, and checks the
+  workflow files themselves. Tells #ops on Discord when `main` goes red.
+- **Pages** (`pages.yml`): deploys the website in `site/` to Cloudflare when it changes
+  on `main`, and once a day to refresh the exchange rates.
+- **Release** (`release.yml`): a pushed `v*` tag builds the Chrome and Firefox zips and
+  publishes a GitHub Release with that version's CHANGELOG notes.
+- **Publish to stores** (`publish.yml`): run by hand after a release to upload a tag to
+  Chrome, Edge and Firefox, then announce it on Discord. Never runs on its own; a dry run
+  checks it on PRs that touch publishing. See [docs/STORE.md](docs/STORE.md).
+- **Ship catalog** (`ship-catalog.yml`): weekly refresh of `src/data/ship-catalog.json`,
+  committed to `main` only when it changed.
+- **RSI canary** (`canary.yml`): once a day, runs the real parsers on RSI's public pages
+  and tells #ops if something changed. See [docs/RSI-CHANGES.md](docs/RSI-CHANGES.md).
 
 ## PRs
 
