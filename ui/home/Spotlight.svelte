@@ -68,7 +68,7 @@
   <section class="oh-p spot">
     <div class="oh-ph">
       <h3>Hangar Spotlight</h3>
-      {#if ships.length > 1}<button type="button" class="next" onclick={() => i++}>Another ship ↻</button>{/if}
+      {#if ships.length > 1}<button type="button" class="next" onclick={() => i++}>Another Ship ↻</button>{/if}
     </div>
     <div class="art">
       {#if art}<img src={art} alt="" />{/if}

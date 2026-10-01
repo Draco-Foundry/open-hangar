@@ -71,7 +71,7 @@
   {/each}
   {#if d.newest}
     <a class="oh-more" href={d.newest.url} target="_blank" rel="noopener" title={d.newest.title}
-      >Latest patch notes →</a
+      >Latest Patch Notes →</a
     >
   {/if}
   {#if !live.loaded}
