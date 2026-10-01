@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Troubleshooting | Open Hangar</title>
+    <meta
+      name="description"
+      content="Open Hangar troubleshooting: signed out, a scan that stopped early, RSI site changes, and how to send an error report."
+    />
+    <link rel="canonical" href="https://openhangar.space/help.html" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="stars.css" />
+    <link rel="stylesheet" href="style.css" />
+    <meta property="og:title" content="Troubleshooting | Open Hangar" />
+    <meta property="og:image" content="https://openhangar.space/img/og.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <div class="space" aria-hidden="true">
+      <div class="nebula"></div>
+      <div class="layer far"></div>
+      <div class="layer mid"></div>
+      <div class="layer near"></div>
+    </div>
+    <!-- Linked from the GitHub issue chooser (.github/ISSUE_TEMPLATE/config.yml, #195). -->
+    <main class="wrap doc">
+      <p><a href="./">← Open Hangar</a></p>
+      <h1>Ship Exploded? <span class="hint">(troubleshooting)</span></h1>
+      <p>
+        Most hiccups have a quick fix. Find yours below, and if it's still broken, send us a beacon
+        (an error report) and we'll take a look.
+      </p>
+
+      <h2>It Says I'm Signed Out <span class="hint">(log in)</span></h2>
+      <p>
+        Open Hangar uses the RSI login you already have in this browser, so it can only scan while
+        you're signed in at robertsspaceindustries.com. Hit <strong>Log In to RSI</strong> on Home,
+        sign in as usual, then come back and hit <strong>Scan</strong>. Your last scan stays visible
+        while you're signed out.
+      </p>
+      <p>
+        Using another browser profile or a private window? Each one has its own RSI login and its
+        own saved data.
+      </p>
+
+      <h2>A Scan Stopped Early <span class="hint">(partial scan)</span></h2>
+      <p>
+        Big hangars mean lots of pages, and now and then RSI drops one (a classic 30k). Open Hangar
+        retries on its own. If a page still won't load, the scan says where it stopped and
+        <strong>keeps your previous scan</strong>: a partial scan never overwrites a bigger one.
+        Wait a minute and scan again.
+      </p>
+
+      <h2>RSI Changed Something <span class="hint">(scan broken for everyone)</span></h2>
+      <p>
+        RSI updates their site now and then, and part of a scan can break overnight. When that
+        happens we can pause just that scan, and Open Hangar shows a short notice instead of an
+        error while the fix is on its way. Your saved data is never touched.
+      </p>
+      <ul>
+        <li>
+          Check the
+          <a
+            href="https://github.com/Draco-Foundry/open-hangar/issues?q=is%3Aopen+label%3Ascan-broken"
+            >Open Scan-Broken Issues</a
+          >. If yours is there, a 👍 helps more than a new report.
+        </li>
+        <li>
+          Fixes go out as a store update. Most browsers install it on their own within a day, or use
+          <strong>Check for Updates</strong> on the Updates page.
+        </li>
+      </ul>
+
+      <h2>Moving Browsers or Computers <span class="hint">(backups)</span></h2>
+      <p>
+        Your data lives in this browser only, so a new browser or computer starts empty. First go to
+        <strong>Stats → History → Download Backup</strong>. On the new one, open
+        <strong>Developers → Import JSON</strong> and pick the file. Insurance claim complete.
+      </p>
+
+      <h2>Send an Error Report <span class="hint">(still broken)</span></h2>
+      <ol>
+        <li>
+          Click <strong>Copy Error Report</strong> next to the error. It's also on the Developers
+          page.
+        </li>
+        <li>
+          Paste it in #bug-reports on <a href="https://discord.gg/FF8Wm5HdnV">Discord</a>, or in a
+          <a href="https://github.com/Draco-Foundry/open-hangar/issues/new/choose">GitHub Issue</a>.
+        </li>
+      </ol>
+      <p>
+        The report has no personal info in it: no handle, referral code or item names. Please don't
+        paste those yourself either. Screenshots are fine if you crop them.
+      </p>
+      <p>
+        No GitHub account? Email
+        <a href="mailto:support@openhangar.space">support@openhangar.space</a>. o7
+      </p>
+    </main>
+    <footer class="wrap">
+      <div class="notices">
+        <div>
+          <p>
+            <strong
+              >This is an unofficial Star Citizen fan site, not affiliated with the Cloud Imperium
+              group of companies. All content on this site not authored by its host or users are
+              property of their respective owners.</strong
+            >
+          </p>
+          <p>
+            Star Citizen®, Squadron 42®, Roberts Space Industries® and Cloud Imperium® are
+            registered trademarks of Cloud Imperium Rights LLC. The official Star Citizen site is
+            <a href="https://robertsspaceindustries.com/">robertsspaceindustries.com</a>.
+          </p>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
