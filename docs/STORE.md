@@ -1,69 +1,72 @@
-# Chrome Web Store — Launch Checklist & Listing
+# Store Launch Checklist & Listing
 
 > **Submission status (2026-09-30):**
 > | Store | Status | IDs / links |
 > | --- | --- | --- |
 > | Chrome Web Store | **live** v0.2.11; **v0.2.12 in review** (submitted 2026-09-30, new listing: description, screenshots, category Games, official URL openhangar.space) (publisher `dracofoundry@gmail.com`) | item `aeabioadfphghjennmdbnpelojlhndjl` · [listing](https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl) |
-> | Firefox AMO | **live** v0.2.12 (approved 2026-09-30; new listing, screenshots, license All Rights Reserved, privacy policy 2026-09-30) | [listing](https://addons.mozilla.org/en-US/firefox/addon/open-hangar/) · gecko id `open-hangar@draco-foundry` |
+> | Firefox AMO | **live** v0.2.12 (approved 2026-09-30; new listing, screenshots, AMO license field All Rights Reserved (repo LICENSE: PolyForm Strict 1.0.0), privacy policy 2026-09-30) | [listing](https://addons.mozilla.org/en-US/firefox/addon/open-hangar/) · gecko id `open-hangar@draco-foundry` |
 > | Microsoft Edge | v0.2.12 in review with the new listing (resubmitted 2026-09-30, category Entertainment, test notes for reviewers) | [listing](https://microsoftedge.microsoft.com/addons/detail/fmcnemfepnifokjelgjacgdhoodaiicl) · CRX `fmcnemfepnifokjelgjacgdhoodaiicl` · Store ID `0RDCKFFGW5QL` |
 >
 > When each goes live, set that button's `data-status="live"` and `data-url` in
 > `site/index.html`; the "in review" line disappears once none are pending.
+>
+> This table is the single source of truth for store status. Other docs link here
+> instead of repeating it.
 
-Everything needed to submit **Open Hangar** to the Chrome Web Store. Work top to
-bottom. Items marked ✅ are ready in the repo; ⬜ need you to do them.
+Everything needed to submit **Open Hangar** to the Chrome Web Store, Edge Add-ons and
+Firefox Add-ons. Work top to bottom. Items marked ✅ are ready in the repo; ⬜ need you to do them.
 
 > See `docs/COMPLIANCE.md` for the full Compliance & Risk Statement (single purpose,
 > per-permission justification, data handling, and the established-precedent peers).
-> Short version: this is a well-precedented, credential-free, non-commercial,
-> open-source class of tool, so a normal public listing is fine — keep the brand out
+> Short version: this is a well-precedented, credential-free, non-commercial class of
+> tool, and ours is source-available, so a normal public listing is fine — keep the brand out
 > of the title and use your own art (covered below). The statement is written to be
 > pasted/linked for a reviewer if questions arise.
 
 ---
 
-## 1. Developer account (one-time, ~30 min)
+## 1. Developer Account (One-Time, ~30 Min)
 
 - ✅ Chrome Web Store account: `dracofoundry@gmail.com` (publisher **Draco Foundry**).
 - ⬜ Public **contact email** on every store: `support@openhangar.space` (Porkbun
   forward → the maintainer's inbox). Verify it in each dashboard.
 
-- ⬜ Register at the [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole) — **$5 one-time fee**.
-- ⬜ Verify the account (email + payment).
-- ⬜ Consider publishing under the **Draco-Foundry** brand (group publisher) rather
-  than a personal account, so it matches the GitHub org.
+- ✅ Register at the [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole): **$5 one-time fee**.
+- ✅ Verify the account (email + payment).
+- ✅ Publish under the **Draco Foundry** brand rather than a personal account, so it
+  matches the GitHub org.
 
-## 2. Package the extension
+## 2. Package the Extension
 
 - ✅ Valid MV3 `manifest.json` (loads unpacked today).
-- ✅ **`npm run pack`** builds both store zips into `dist/` (runtime files only —
-  `manifest.json`, `icons/`, `src/`):
-  - `open-hangar-chrome-<version>.zip` — Chrome Web Store **and** Edge Add-ons.
-  - `open-hangar-firefox-<version>.zip` — Firefox AMO. `scripts/pack.mjs` adds the
+- ✅ **`npm run pack`** builds both store zips into `dist/` (runtime files only:
+  `manifest.json`, `_locales/`, `icons/`, `src/`, plus `CHANGELOG.md`, `LICENSE` and
+  `THIRD_PARTY_NOTICES.md`):
+  - `open-hangar-chrome-<version>.zip`: Chrome Web Store **and** Edge Add-ons.
+  - `open-hangar-firefox-<version>.zip`: Firefox AMO. `scripts/pack.mjs` adds the
     Firefox-only manifest keys (event-page `background.scripts`, gecko add-on id,
-    `data_collection_permissions: none`). Validate with `npm run lint:firefox`.
+    `data_collection_permissions: none`, and `gecko_android` for Firefox for Android
+    142+). Validate with `npm run lint:firefox`.
 - ✅ Icons: 128px declared (required). 16/32/48 also added to the manifest.
 
-## 3. Store listing assets
+## 3. Store Listing Assets
 
-- ✅ **Screenshots** (1–5 required), **1280×800** or 640×400 PNG/JPG — `docs/store-assets/screenshot-1…5-*.jpg` — regenerate with `npm run screenshots` (real UI, fictional demo account). Capture with
-  real data, looking polished:
-  1. Home / Citizen Card (identity + balances)
-  2. Inventory (fleet gallery)
-  3. Referrals page (stats + charts) — a standout, show it off
-  4. Stats
-  5. Developers (export/import) — signals the "data tool" angle
-     Tip: a clean browser window, dark theme, no personal email visible.
+- ✅ **Screenshots** (1–5 required), **1280×800** or 640×400 PNG/JPG: `docs/store-assets/screenshot-1…5-*.jpg`. Regenerate with `npm run screenshots` (real UI, fictional demo account):
+  1. Inventory (fleet gallery)
+  2. Home
+  3. Referrals page (stats + charts)
+  4. Buy-backs
+  5. Stats
 - ✅ **Small promo tile**: **440×280** PNG (required) — `docs/store-assets/promo-small-440x280.png`. Can be the logo on a dark
   background. (`icons/icon.svg` + the banner in `src/assets/` are starting points.)
 - ✅ (Optional) Marquee promo: 1400×560 — `docs/store-assets/promo-marquee-1400x560.png`.
 - ✅ **Listing title**: `Open Hangar` (≤ 75 chars).
 - ✅ **Summary / short description** (≤ 132 chars) — see §6.
 - ✅ **Detailed description** — see §6.
-- ⬜ **Category**: Developer Tools (fits the primary audience) or Productivity.
+- ✅ **Category**: Games on Chrome, Entertainment on Edge (see the status table).
 - ⬜ **Language**: English.
 
-## 4. Privacy & compliance (the part that gets extensions rejected)
+## 4. Privacy & Compliance (the Part That Gets Extensions Rejected)
 
 - ✅ **Privacy policy hosted** — paste this URL in each store dashboard:
   **`https://openhangar.space/privacy.html`** (source: `site/privacy.html`, mirrors
@@ -77,7 +80,7 @@ bottom. Items marked ✅ are ready in the repo; ⬜ need you to do them.
   - ☑ "I do not use/transfer data to determine creditworthiness / for lending."
   - Local-only with no server is a strong position — state it plainly.
 
-## 5. Permission justifications (paste into the dashboard)
+## 5. Permission Justifications (Paste Into the Dashboard)
 
 **`storage`**
 
@@ -108,7 +111,7 @@ _(Since 0.2.8 there is no `api.star-citizen.wiki` host permission: that public A
 sends `Access-Control-Allow-Origin: *` and we fetch it without credentials, so the
 install prompt only names robertsspaceindustries.com.)_
 
-## 6. Listing copy (ready to paste)
+## 6. Listing Copy (Ready to Paste)
 
 **Single purpose:**
 
@@ -149,43 +152,46 @@ install prompt only names robertsspaceindustries.com.)_
 >
 > Unofficial and fan-made. Not affiliated with Cloud Imperium Games or RSI.
 
-## 7. Submit & review
+## 7. Submit & Review
 
-- ⬜ Upload zip, fill listing, set visibility to **Public** (or Unlisted if you'd
-  rather soft-launch by link first — optional, not required).
-- ⬜ Submit. First review with the `cookies` permission can take **several days to
+- ✅ Upload zip, fill listing, set visibility to **Public**.
+- ✅ Submit. First review with the `cookies` permission can take **several days to
   ~2 weeks**; have the §5 justifications ready in case of a clarification email.
-- ⬜ Tag the release: `git tag v0.2.8 && git push origin v0.2.8`. The Release workflow builds the zips and publishes the GitHub Release with the CHANGELOG notes.
+- ✅ Tag the release: `git tag v0.2.8 && git push origin v0.2.8`. The Release workflow builds the zips and publishes the GitHub Release with the CHANGELOG notes.
 
-## 8. Microsoft Edge Add-ons (after Chrome — same zip)
+## 8. Microsoft Edge Add-ons (After Chrome, Same Zip)
 
 - ✅ Register at [Partner Center → Edge](https://partner.microsoft.com/dashboard/microsoftedge/overview) — **free**.
 - ✅ Upload `open-hangar-chrome-<version>.zip`; reuse the §3 assets, §5
   justifications, §6 copy, and the privacy-policy URL.
-- ✅ Live (v0.2.11 as of 2026-09-30). Review is typically up to ~7 business days. Edge wants a
-  300×300 logo: `docs/store-assets/logo-300.png`.
+- ✅ Live; current version and review state are in the status table at the top. Review
+  is typically up to ~7 business days. Edge wants a 300×300 logo:
+  `docs/store-assets/logo-300.png`.
 
 ## 9. Firefox Add-ons (AMO)
 
 - ✅ Sign in at [addons.mozilla.org/developers](https://addons.mozilla.org/developers/) — **free**.
-- ✅ Upload `open-hangar-firefox-<version>.zip` as a **listed** add-on (desktop only).
-- ⬜ AMO requires **source code** only for minified/bundled code — ours ships
-  unminified, so none is needed.
-- ⬜ Reuse the §6 copy + privacy-policy URL; category: _Other_ or _Games &
+- ✅ Upload `open-hangar-firefox-<version>.zip` as a **listed** add-on. The manifest
+  declares both desktop Firefox (140+) and Firefox for Android (142+, `gecko_android` in
+  `scripts/pack.mjs`).
+- ✅ AMO needs the **source code**, because the Svelte UI is compiled with Vite. The
+  Publish workflow attaches the tag's source to every upload, and
+  [AMO-SOURCE.md](AMO-SOURCE.md) tells reviewers how to rebuild it.
+- ✅ Reuse the §6 copy + privacy-policy URL; category: _Other_ or _Games &
   Entertainment_.
-- ⬜ Automated validation is instant; human review can follow after listing.
+- ✅ Automated validation is instant; human review can follow after listing.
 
-## 10. Safari (deferred)
+## 10. Safari (Deferred)
 
 Needs a Mac with Xcode and the **$99/yr** Apple Developer Program. See
-CONTRIBUTING "Safari notes" — revisit after the other three stores are live.
+CONTRIBUTING "Safari Notes". The other three stores are live, so this is the one left.
 
-## 11. Post-launch
+## 11. Post-Launch
 
-- ⬜ Add the store link to the README + org profile.
+- ✅ Add the store links to the README. ⬜ Org profile.
 - ⬜ Watch the dashboard for policy notices; respond promptly to any review query.
 
-## 12. Publishing updates from GitHub
+## 12. Publishing Updates From GitHub
 
 1. Bump `manifest.json` / `package.json`, move the CHANGELOG's Unreleased notes under
    the new version, merge, then push a tag (`git tag v0.2.9 && git push origin v0.2.9`).
@@ -193,7 +199,9 @@ CONTRIBUTING "Safari notes" — revisit after the other three stores are live.
 2. **Actions → Publish to stores → Run workflow**, enter the tag, pick a store (or all).
    It uploads and submits for review; each store still reviews before it goes live.
 
-A store with no secrets is skipped. Secrets (repo Settings → Secrets → Actions):
-`AMO_JWT_ISSUER`, `AMO_JWT_SECRET` (set), `EDGE_PRODUCT_ID`, `EDGE_CLIENT_ID`,
+Picking a single store whose secrets aren't set skips it; picking **all** fails
+instead, so Discord never announces a store that got nothing. Secrets (repo Settings → Secrets → Actions),
+all set as of 2026-10-01:
+`AMO_JWT_ISSUER`, `AMO_JWT_SECRET`, `EDGE_PRODUCT_ID`, `EDGE_CLIENT_ID`,
 `EDGE_API_KEY`, `CWS_EXTENSION_ID`, `CWS_CLIENT_ID`, `CWS_CLIENT_SECRET`,
-`CWS_REFRESH_TOKEN`.
+`CWS_REFRESH_TOKEN`, and `DISCORD_UPDATES_WEBHOOK` for the #updates post.
