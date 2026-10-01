@@ -770,6 +770,22 @@ body:not(:has(#view-home.active)) .wrap > header {
 .oh-welcome .welcome-scan[hidden] {
   display: none;
 }
+/* "Some saved data couldn't be read" (#184): text, then its three buttons. */
+.db-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+.db-notice[hidden] {
+  display: none;
+}
+.db-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 /* The first scan: the button turns into a progress bar with the step under it. */
 .oh-welcome .welcome-progress {
   width: min(420px, 100%);

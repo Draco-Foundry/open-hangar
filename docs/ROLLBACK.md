@@ -23,7 +23,10 @@ Every release's exact store packages are on the
 Chrome and Edge only install a version **higher** than the one users have, so
 "rolling back" there means shipping the old code again as a new patch version.
 
-1. Branch from the last good tag: `git checkout -b rollback v0.2.12`.
+1. Branch from the last good tag: `git checkout -b rollback v0.2.12`. Saved data
+   survives the trip: an older version simply ignores what it doesn't know (after
+   0.2.12 the scan history moved to its own storage key), and on the next upgrade
+   anything it wrote is merged back in (`test/db.test.js`, "after a rollback").
 2. Bump the patch version past the bad one (bad 0.2.13 → ship 0.2.14) in
    `manifest.json` and `package.json`, and add a CHANGELOG entry
    ("Fixed: undid 0.2.13's … while we fix it").
