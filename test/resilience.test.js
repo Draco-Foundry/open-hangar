@@ -23,6 +23,8 @@ global.chrome = {
 };
 require('../src/lib.js');
 const OH = globalThis.OH;
+// Each test simulates its own outages: forget the last test's 'site is down'.
+test.beforeEach(() => delete store.netDown);
 
 test('fetchShipCatalog throws when any page fails (so nothing half-empty is cached)', async () => {
   const page = (data, last) => ({
@@ -34,6 +36,7 @@ test('fetchShipCatalog throws when any page fails (so nothing half-empty is cach
   const matrixDown = async (url) =>
     /shipmatrix/.test(url) ? { ok: false, status: 503 } : page([ship], 1);
   await assert.rejects(OH.fetchShipCatalog(matrixDown), /HTTP 503/);
+  delete store.netDown; // a new outage below, not the one above
   // Second page of the game-file list fails.
   const midWalk = async (url) =>
     /number%5D=2/.test(url) && !/shipmatrix/.test(url)
@@ -59,6 +62,10 @@ test('wikiImageUrls caches nothing when the request fails', async () => {
       }),
     };
   };
+  // Right after an outage the site is left alone for a while: no request at all.
+  assert.deepEqual(await OH.wikiImageUrls(['Referral Pulse.jpg'], up), {});
+  assert.equal(calls, 0);
+  delete store.netDown; // ten minutes later
   assert.deepEqual(await OH.wikiImageUrls(['Referral Pulse.jpg'], up), {
     'Referral Pulse.jpg': 'u',
   });
