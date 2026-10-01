@@ -439,7 +439,7 @@ function setStatus(text, isError = false) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'link-btn';
-    btn.textContent = 'Copy error report';
+    btn.textContent = 'Copy Error Report';
     btn.addEventListener('click', () => copyErrorReport(btn));
     statusEl.append(' ', btn);
   }
@@ -1278,7 +1278,7 @@ function renderVersions() {
   const oh = REPO_URL
     ? `<a href="${REPO_URL}/releases" target="_blank" rel="noopener">Open Hangar v${ext}</a>`
     : `Open Hangar v${ext}`;
-  const news = '<a href="#updates" data-view="updates">What’s new</a>';
+  const news = '<a href="#updates" data-view="updates">What’s New</a>';
   setHTML(el, `${oh} · ${news} · Star Citizen …`);
   OH.getScVersion().then((v) => {
     let sc = 'Star Citizen n/a';
@@ -1933,9 +1933,9 @@ function marketToolbarHtml(shown) {
     <div class="market-actions">
       <label class="mk-toggle"><input type="checkbox" class="mk-giftable-only" ${
         state.marketGiftableOnly ? 'checked' : ''
-      }> Giftable only</label>
+      }> Giftable Only</label>
       <button class="mk-btn mk-export-csv" type="button">Export CSV</button>
-      <button class="mk-btn mk-export-img" type="button">Download image</button>
+      <button class="mk-btn mk-export-img" type="button">Download Image</button>
       <span class="mk-export-status" aria-live="polite"></span>
     </div>
   </div>`;
@@ -1974,9 +1974,9 @@ function downloadBlob(blob, filename) {
 // downloads as a PNG.
 function downloadImage(canvas, filename, statusEl) {
   canvas.toBlob((blob) => {
-    if (!blob) return setExportStatus(statusEl, 'Image failed');
+    if (!blob) return setExportStatus(statusEl, 'Image didn’t render. Try again?');
     downloadBlob(blob, filename);
-    setExportStatus(statusEl, 'Downloaded');
+    setExportStatus(statusEl, 'Downloaded. Go show off that fleet.');
   }, 'image/png');
 }
 
@@ -2037,12 +2037,12 @@ function marketExportShown() {
 
 function exportMarketCsv(statusEl) {
   const sections = computeMarketSections(marketExportShown());
-  if (!sections.length) return setExportStatus(statusEl, 'Nothing to export');
+  if (!sections.length) return setExportStatus(statusEl, 'Nothing to export. Empty cargo hold.');
   downloadBlob(
     new Blob([marketCsv(sections)], { type: 'text/csv;charset=utf-8' }),
     marketFilename('csv'),
   );
-  setExportStatus(statusEl, 'Saved CSV');
+  setExportStatus(statusEl, 'CSV saved. Spreadsheet pilots, rejoice.');
 }
 
 // Text values for one row of the image (mirrors the table, price prefixed "$").
@@ -2199,7 +2199,7 @@ function marketImageCanvas(
 
 function copyMarketImage(statusEl) {
   const sections = computeMarketSections(marketExportShown());
-  if (!sections.length) return setExportStatus(statusEl, 'Nothing to export');
+  if (!sections.length) return setExportStatus(statusEl, 'Nothing to export. Empty cargo hold.');
   downloadImage(marketImageCanvas(sections), marketFilename('png'), statusEl);
 }
 
@@ -2454,7 +2454,7 @@ function updateSelectBar() {
   if (live) live.textContent = marketSelText();
   if (selectToggle) {
     selectToggle.setAttribute('aria-pressed', String(state.selecting));
-    selectToggle.textContent = state.selecting ? 'Done selecting' : 'Select';
+    selectToggle.textContent = state.selecting ? 'Done Selecting' : 'Select';
   }
   const n = state.selected.size;
   $('#sb-count').textContent = n ? `${n} selected` : 'Click items to select them';
@@ -2668,9 +2668,10 @@ async function fleetImageCanvas(list, { title, price }) {
 async function makeFleetImage(action) {
   const status = $('#sb-status');
   const list = selectedItems();
-  if (!list.length) return setExportStatus(status, 'Select some items first');
-  if (list.length > 80) return setExportStatus(status, 'Pick 80 or fewer for one image');
-  setExportStatus(status, 'Drawing…');
+  if (!list.length) return setExportStatus(status, 'Pick some ships first, pilot.');
+  if (list.length > 80)
+    return setExportStatus(status, 'Pick 80 or fewer for one image. Even a Javelin has limits.');
+  setExportStatus(status, 'Painting your fleet…');
   const titleEl = $('#sb-title');
   const title = (titleEl.value || titleEl.placeholder || 'My hangar').trim();
   // In Market view the picture is the table itself (rows are easy to scan);
@@ -2857,7 +2858,7 @@ function wishlistOrder() {
 // upgrade to it) open underneath with dates, pledge IDs and Reclaim links.
 function wishlistHtml() {
   if (!state.wishlist.length) {
-    return '<p class="muted sp-empty">Open any ship (search at the top, or a name in Ship Prices) and press <strong>Add to Wishlist</strong>.</p>';
+    return '<p class="muted sp-empty">Your wishlist is emptier than a Hull C on launch day. Open any ship (search at the top, or a name in Ship Prices) and press <strong>Add to Wishlist</strong>.</p>';
   }
   const owned = new Map(ownedShips().map((s) => [shipKey(s.label), s.pledges.length]));
   const esc = OH.escapeHtml;
@@ -2919,7 +2920,7 @@ function wishlistHtml() {
     .join('');
   const unchecked = uncheckedPacks();
   const note = unchecked
-    ? `<p class="muted value-note">${unchecked} pack buy-back${unchecked === 1 ? '' : 's'} not checked yet: RSI's list only names the first item in a pack. <a href="#buybacks" data-view="buybacks">Load details</a> on the Buy-Backs page to find your wishlist ships inside every pack.</p>`
+    ? `<p class="muted value-note">${unchecked} pack buy-back${unchecked === 1 ? '' : 's'} not checked yet: RSI's list only names the first item in a pack. <a href="#buybacks" data-view="buybacks">Load Details</a> on the Buy-Backs page to find your wishlist ships inside every pack.</p>`
     : '';
   return `${note}<table class="org-table wishlist"><thead><tr><th>Ship</th><th class="num">Store Price</th><th>In Store Now</th><th>Status</th><th>Buy-backs</th><th></th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
@@ -2946,8 +2947,9 @@ function ccuPanelHtml(q) {
     .filter((c) => !needle || `${c.from} ${c.to}`.toLowerCase().includes(needle))
     .sort((a, b) => (b.worth || 0) - (a.worth || 0));
   searchCounts.ccu = { shown: shown.length, total: all.length };
-  if (!all.length) return '<p class="muted sp-empty">No CCUs in your hangar.</p>';
-  if (!shown.length) return '<p class="muted sp-empty">No CCUs match.</p>';
+  if (!all.length)
+    return '<p class="muted sp-empty">No CCUs in your hangar. Chain-free living.</p>';
+  if (!shown.length) return '<p class="muted sp-empty">No CCUs match that search.</p>';
   return `<table class="org-table"><thead><tr><th>Upgrade</th><th class="num">Worth</th><th class="num">You Paid</th><th class="num">Stock</th></tr></thead><tbody>${shown
     .map(
       (c) => `<tr>
@@ -2981,7 +2983,7 @@ function priceRowsHtml(q) {
     .sort((a, b) => (a.name || a.lname).localeCompare(b.name || b.lname));
   searchCounts.price = { shown: rows.length, total: inTab.length };
   if (!rows.length) {
-    return '<p class="muted sp-empty">No ships match.</p>';
+    return '<p class="muted sp-empty">No ships match. Maybe it’s still a JPEG?</p>';
   }
   const statusLabel = (s) => (SHIP_STATES.find(([k]) => k === s) || [])[1] || capFirst(s || '');
   return `<table class="org-table"><thead><tr><th>Ship</th><th class="num">Store Price</th><th>Status</th><th>Role</th><th>Size</th></tr></thead><tbody>${rows
@@ -3449,7 +3451,7 @@ async function renderOrg() {
   if (!members.length) {
     setHTML(
       body,
-      '<div class="empty">No fleets yet. Import member files, or start with <strong>Add my fleet</strong>.</div>',
+      '<div class="empty">No org fleet assembled yet. Import member files, or start with <strong>Add My Fleet</strong>.</div>',
     );
     return;
   }
@@ -3536,7 +3538,8 @@ $('#org-file')?.addEventListener('change', async (e) => {
   renderOrg();
 });
 $('#org-mine')?.addEventListener('click', async () => {
-  if (!state.items.length) return orgMsg('Scan your hangar first.');
+  if (!state.items.length)
+    return orgMsg('Scan your hangar first, then bring your ships to the party.');
   await loadOrg();
   const who = (state.owner && (state.owner.displayname || state.owner.nickname)) || 'Me';
   const r = OH.shipsFromFile({ sources: { hangar: { items: state.items } } });
@@ -3548,7 +3551,7 @@ $('#org-mine')?.addEventListener('click', async () => {
 });
 $('#org-csv')?.addEventListener('click', async () => {
   const members = await loadOrg();
-  if (!members.length || !state.shipOf) return orgMsg('Nothing to export yet.');
+  if (!members.length || !state.shipOf) return orgMsg('Nothing to export yet. Empty hangar bay.');
   const f = OH.orgFleet(members, state.shipOf, state.priceOf);
   const lines = [['Ship', 'Count', 'LTI', 'Store price (USD)', 'Owners']].concat(
     f.ships.map((r) => [
@@ -3563,7 +3566,7 @@ $('#org-csv')?.addEventListener('click', async () => {
     new Blob([lines.map((l) => l.map(csvCell).join(',')).join('\n')], { type: 'text/csv' }),
     `open-hangar-org-fleet-${new Date().toISOString().slice(0, 10)}.csv`,
   );
-  orgMsg('Saved CSV.');
+  orgMsg('CSV saved. Time for the org meeting.');
 });
 $('#org-body')?.addEventListener('click', (e) => {
   const role = e.target.closest('[data-role]');
@@ -3872,7 +3875,7 @@ function renderStats() {
     spending: () => spendingSectionHtml(),
     history: () =>
       (historySectionHtml() ||
-        '<p class="muted">History starts with your next scan — each scan that finds changes is kept here.</p>') +
+        '<p class="muted">Your flight log starts with your next scan: every scan that finds changes gets logged here.</p>') +
       backupRowHtml(),
   };
   const tab = tabs[state.statsTab] ? state.statsTab : 'overview';
@@ -4071,7 +4074,7 @@ function backupRowHtml() {
       ? `<span class="stale">last backup ${fmtDay(t)}</span>`
       : `last backup ${fmtDay(t)}`;
   return `<div class="backup-row">
-    <button class="mk-btn" type="button" data-backup>Download backup</button>
+    <button class="mk-btn" type="button" data-backup>Download Backup</button>
     <span class="muted">${when} · Your scans and this history live only in this browser — uninstalling the extension or moving to another browser loses them. Keep the file somewhere safe (a Drive or OneDrive folder works) and restore it with Developers → Import JSON.</span>
   </div>`;
 }
@@ -4536,8 +4539,8 @@ function refHeroHtml(ref, recruits, projection, hasLegacy) {
         ${rank ? `<div class="ref-hero-rank">${OH.escapeHtml(rank)}</div>` : ''}
       </div>
       <div class="ref-share">
-        <label class="mk-toggle" title="Adds your referral code and a QR code people can scan"><input type="checkbox" id="ref-share-code"> Include my code</label>
-        <button type="button" class="mk-btn" id="ref-share">Download image</button>
+        <label class="mk-toggle" title="Adds your referral code and a QR code people can scan"><input type="checkbox" id="ref-share-code"> Include My Code</label>
+        <button type="button" class="mk-btn" id="ref-share">Download Image</button>
         <span class="mk-export-status" id="ref-share-status" aria-live="polite"></span>
       </div>
     </div>
@@ -4606,7 +4609,7 @@ function shortReward(text) {
 }
 function rewardsGalleryHtml(list) {
   if (!list.length)
-    return '<p class="muted">No rewards yet. Your first recruit unlocks the GCD-Army armor.</p>';
+    return '<p class="muted">No rewards yet. Your first recruit unlocks the GCD-Army armor. Go recruit a wingman.</p>';
   const attr = (k, v) => (v ? ` data-${k}="${OH.escapeHtml(v)}"` : '');
   return `<div class="ref-gallery">${list
     .map(
@@ -4969,7 +4972,7 @@ async function referralShareCanvas({ withCode }) {
 async function shareReferralImage() {
   const status = $('#ref-share-status');
   const withCode = !!$('#ref-share-code')?.checked;
-  setExportStatus(status, 'Drawing…');
+  setExportStatus(status, 'Painting your fleet…');
   const canvas = await referralShareCanvas({ withCode });
   downloadImage(canvas, marketFilename('png').replace('sale-sheet', 'referrals'), status);
 }
@@ -5082,7 +5085,7 @@ function renderReferrals() {
   const code = ref.code
     ? `<div class="ref-code-banner">Your referral code:
         <span class="ref-code">${OH.escapeHtml(ref.code)}</span>
-        <button class="ref-copy" data-copy="${OH.escapeHtml(ref.url || ref.code)}" title="Copy referral link">Copy link</button>
+        <button class="ref-copy" data-copy="${OH.escapeHtml(ref.url || ref.code)}" title="Copy referral link">Copy Link</button>
       </div>`
     : '';
 
@@ -5308,7 +5311,7 @@ function bbDetailsBarHtml(list) {
     need.length > 100
       ? ` Reading this many pages can make RSI slow you down for a while; if it does, we stop and keep what's read.`
       : '';
-  return `<div class="bb-details-bar">${have ? `${have} of ${list.length} have details. ` : ''}Insurance, real prices and pack contents come from each buy-back's own RSI page. Opening a buy-back loads just that one. <button type="button" class="mk-btn primary" id="bbd-load">Load details for ${need.length}</button> <span class="muted">(about ${mins} min, one page at a time; you can keep browsing.${big})</span></div>`;
+  return `<div class="bb-details-bar">${have ? `${have} of ${list.length} have details. ` : ''}Insurance, real prices and pack contents come from each buy-back's own RSI page. Opening a buy-back loads just that one. <button type="button" class="mk-btn primary" id="bbd-load">Load Details for ${need.length}</button> <span class="muted">(about ${mins} min, one page at a time; you can keep browsing.${big})</span></div>`;
 }
 // packsOnly: just the packs whose contents are unread (search's "Get Details").
 async function loadBuybackDetails({ packsOnly = false } = {}) {
@@ -5336,7 +5339,7 @@ async function loadBuybackDetails({ packsOnly = false } = {}) {
   if (res.rateLimited) {
     const mins = Math.max(1, Math.ceil((res.retryAt - Date.now()) / 60e3));
     setStatus(
-      `RSI asked us to slow down, so we stopped${res.done ? ` after ${res.done} pages (kept)` : ''}. Try again in about ${mins} min. Opening a single buy-back still works.`,
+      `RSI asked us to slow down, so we stopped${res.done ? ` after ${res.done} pages (kept)` : ''}. Give it about ${mins} min to cool off. Opening a single buy-back still works.`,
       true,
     );
   } else if (res.errors)
@@ -5446,7 +5449,7 @@ function renderBuybacks() {
   }
   // Opened from a Hangar Alert: say so, with a way back to everything.
   const only = state.bbOnly
-    ? `<div class="bb-only">Showing the ${list.length} ${OH.escapeHtml(state.bbOnly.label)} <button type="button" class="btn-secondary" data-bb-all>Show all ${state.buybacks.length}</button></div>`
+    ? `<div class="bb-only">Showing the ${list.length} ${OH.escapeHtml(state.bbOnly.label)} <button type="button" class="btn-secondary" data-bb-all>Show All ${state.buybacks.length}</button></div>`
     : '';
   const count =
     only +
@@ -5646,7 +5649,7 @@ function bbToolbarHtml(list, when) {
     }<span class="mk-selcount">${OH.escapeHtml(bbSelText())}</span></div>
     <div class="market-actions">
       <button class="mk-btn bb-export-csv" type="button">Export CSV</button>
-      <button class="mk-btn bb-export-img" type="button">Download image</button>
+      <button class="mk-btn bb-export-img" type="button">Download Image</button>
       <span class="mk-export-status" aria-live="polite"></span>
     </div>
   </div>`;
@@ -5670,7 +5673,7 @@ function bbFilename(ext) {
 }
 function exportBuybackCsv(statusEl) {
   const sections = bbExportSections();
-  if (!sections.length) return setExportStatus(statusEl, 'Nothing to export');
+  if (!sections.length) return setExportStatus(statusEl, 'Nothing to export. Empty cargo hold.');
   const lines = [
     [
       'Category',
@@ -5700,7 +5703,7 @@ function exportBuybackCsv(statusEl) {
   }
   const csv = lines.map((r) => r.map(csvCell).join(',')).join('\r\n');
   downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), bbFilename('csv'));
-  setExportStatus(statusEl, 'Saved CSV');
+  setExportStatus(statusEl, 'CSV saved. Spreadsheet pilots, rejoice.');
 }
 const BB_IMG_COLS = [
   { key: 'name', label: 'Items Name' },
@@ -5722,7 +5725,7 @@ function bbImageCells(b) {
 }
 function copyBuybackImage(statusEl) {
   const sections = bbExportSections();
-  if (!sections.length) return setExportStatus(statusEl, 'Nothing to export');
+  if (!sections.length) return setExportStatus(statusEl, 'Nothing to export. Empty cargo hold.');
   const canvas = marketImageCanvas(sections, { cols: BB_IMG_COLS, cellsOf: bbImageCells });
   downloadImage(canvas, bbFilename('png'), statusEl);
 }
@@ -6765,7 +6768,7 @@ if (restoreBtn) {
   restoreBtn.addEventListener('click', async () => {
     const db = await OH.recoverData();
     if (!db) {
-      setDataMsg('Nothing to restore.', true);
+      setDataMsg('Nothing to restore. That hangar’s already clean.', true);
       restoreBtn.hidden = true;
       return;
     }
@@ -6817,7 +6820,7 @@ if (exportHtfBtn) {
   exportHtfBtn.addEventListener('click', async () => {
     const { ships, unmatched } = await OH.exportHTF();
     if (!ships.length) {
-      setDataMsg('No ships to export yet — scan your hangar first.');
+      setDataMsg('No ships to export yet. Scan your hangar first.');
       return;
     }
     const date = new Date().toISOString().slice(0, 10);
@@ -6853,7 +6856,7 @@ if (importBtn && importFile) {
     try {
       obj = JSON.parse(await file.text());
     } catch {
-      setDataMsg('Could not parse that file as JSON.', true);
+      setDataMsg('That file isn’t valid JSON. Is it really an Open Hangar backup?', true);
       return;
     }
     const res = await OH.importDB(obj);
@@ -6955,7 +6958,10 @@ async function renderProfiles() {
   if (!box) return;
   const list = await OH.listProfiles();
   if (!list.length) {
-    setHTML(box, '<p class="muted">No saved accounts yet. Scan to save one.</p>');
+    setHTML(
+      box,
+      '<p class="muted">No saved accounts yet. Scan and your hangar gets parked here.</p>',
+    );
     return;
   }
   setHTML(
@@ -7078,9 +7084,10 @@ const AMO_ADDON_API = 'https://addons.mozilla.org/api/v5/addons/addon/open-hanga
         out.textContent =
           OH.compareVersions(latest, cur) > 0
             ? `Open Hangar ${latest} is out. Firefox installs it on its own within a day, or get it now: about:addons, gear icon, Check for Updates.`
-            : "You're on the latest version.";
+            : 'You’re on the latest version. Fly safe.';
       } catch {
-        out.textContent = "Couldn't reach Firefox Add-ons to check. Try again in a bit.";
+        out.textContent =
+          'Couldn’t reach Firefox Add-ons. Probably a 30k on their end, try again in a bit.';
       }
       btn.disabled = false;
       return;
@@ -7096,7 +7103,7 @@ const AMO_ADDON_API = 'https://addons.mozilla.org/api/v5/addons/addon/open-hanga
           ? `Open Hangar ${(r && r.version) || ''} is downloading. A Reload bar appears at the top when it's ready.`
           : status === 'throttled'
             ? 'Checked a moment ago. Try again in a few minutes.'
-            : "You're on the latest version.";
+            : 'You’re on the latest version. Fly safe.';
     } catch {
       out.textContent =
         "Couldn't check. Developer builds (loaded unpacked) don't update from the store.";
@@ -7177,7 +7184,7 @@ async function initUpdates() {
   if (note && justUpdated && justUpdated.to === cur && !justUpdated.seen) {
     setHTML(
       note,
-      `<span>Patch landed: Open Hangar ${OH.escapeHtml(cur)}. <a href="#updates" data-view="updates">See what’s new</a></span><button type="button" class="note-close" aria-label="Dismiss">×</button>`,
+      `<span>Patch landed: Open Hangar ${OH.escapeHtml(cur)}. <a href="#updates" data-view="updates">See What’s New</a></span><button type="button" class="note-close" aria-label="Dismiss">×</button>`,
     );
     note.hidden = false;
     const seen = () => {
@@ -7236,7 +7243,7 @@ async function renderSiteLink() {
     : 'not synced yet';
   setHTML(
     el,
-    `<span class="ok">✓ Connected</span><span class="muted">${OH.escapeHtml(link.name || 'openhangar.space')} · ${OH.escapeHtml(when)}</span><button type="button" data-site="sync">Sync now</button><button type="button" class="btn-secondary" data-site="open">Open</button><button type="button" class="btn-secondary" data-site="disconnect">Disconnect</button>`,
+    `<span class="ok">✓ Connected</span><span class="muted">${OH.escapeHtml(link.name || 'openhangar.space')} · ${OH.escapeHtml(when)}</span><button type="button" data-site="sync">Sync Now</button><button type="button" class="btn-secondary" data-site="open">Open</button><button type="button" class="btn-secondary" data-site="disconnect">Disconnect</button>`,
   );
 }
 $('#site-link')?.addEventListener('click', async (e) => {
@@ -7435,7 +7442,7 @@ function loanersSectionHtml() {
     if (row) rows.push({ ship: s.label, loaners: row.loaners });
   }
   if (!rows.length)
-    return '<p class="muted">Every ship you own is flight ready, so you have no loaners. Loaners are only given for ships you can&#39;t fly in the game yet.</p>';
+    return '<p class="muted">Every ship you own is flight ready, so no loaners for you. Loaners only come with ships you can&#39;t fly in the game yet.</p>';
   const all = [...new Set(rows.flatMap((r) => r.loaners))].sort((a, b) => a.localeCompare(b));
   return `<p>You can fly <strong>${all.length}</strong> loaner${all.length === 1 ? '' : 's'}: ${all
     .map((l) => shipLink(l))
@@ -7459,7 +7466,8 @@ function includedSectionHtml() {
     const inc = includedOf(s.label);
     if (inc) rows.push({ ship: s.label, inc });
   }
-  if (!rows.length) return '<p class="muted">None of your ships come with an included vessel.</p>';
+  if (!rows.length)
+    return '<p class="muted">None of your ships come with a snub or ground vehicle tucked inside.</p>';
   return `<table class="org-table"><thead><tr><th>Your Ship</th><th>Comes With</th></tr></thead><tbody>${rows
     .sort((a, b) => a.ship.localeCompare(b.ship))
     .map((r) => `<tr><td>${shipLink(r.ship)}</td><td>${r.inc.map(vesselLink).join(', ')}</td></tr>`)
@@ -7644,7 +7652,8 @@ function spendingSectionHtml() {
     cur.sum += v;
     byYear.set(y[1], cur);
   }
-  if (!byYear.size) return '<p class="muted">No dated pledges yet. Scan your hangar first.</p>';
+  if (!byYear.size)
+    return '<p class="muted">No dated pledges yet. Hit Scan at the top and we’ll do the math on your spending (gently).</p>';
   const years = [...byYear.keys()].sort();
   const first = Number(years[0]);
   const last = Number(years[years.length - 1]);
