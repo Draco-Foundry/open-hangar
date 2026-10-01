@@ -5,11 +5,6 @@ package-lock.json
 test/fixtures/*.json
 src/data/ship-catalog.json
 test/fixtures/*.html
-app/dist
-app/.astro
-app/.wrangler
-app/worker-configuration.d.ts
-app/.vscode
 test/fixtures/referral-events.wikitext
 test/fixtures/loaner-matrix.html
 test/fixtures/included-vessels.html
@@ -20,5 +15,4 @@ test/fixtures/ship-page-pack.html
 test/fixtures/commlinks.html
 test/fixtures/twisc-body.html
 test/fixtures/twisc-page.html
-stats-worker/.wrangler
 src/ui

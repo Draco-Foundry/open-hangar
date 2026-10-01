@@ -1,4 +1,4 @@
-// One-command release (docs/WEBSITE-PLAN.md → backend foundation, step 1):
+// One-command release (backend foundation step 1, in the private website plan):
 //
 //   npm run release 0.2.12            cut the release and push it
 //   npm run release 0.2.12 --dry-run  show what would happen, change nothing
