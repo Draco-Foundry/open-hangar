@@ -12,7 +12,9 @@ but not to redistribute it or publish changed versions.
 - **Pull requests are welcome too.** For anything bigger than a small fix, open an
   issue first so we can agree on the approach. See [PRs](#prs) below.
 
-The notes below document how the extension works, for anyone auditing it.
+The notes below document how the extension works, for anyone auditing it. For the big
+picture, start with [ARCHITECTURE.md](ARCHITECTURE.md); the reasons behind the big
+decisions are in [docs/decisions/](docs/decisions/README.md).
 
 ## Keeping the Parser Honest
 

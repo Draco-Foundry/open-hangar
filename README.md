@@ -222,7 +222,8 @@ notes in [CHANGELOG.md](CHANGELOG.md).
 ## Contributing
 
 The most valuable contribution is keeping `parser.js` working when RSI updates their
-site. See [CONTRIBUTING.md](CONTRIBUTING.md).
+site. See [CONTRIBUTING.md](CONTRIBUTING.md). New here? [ARCHITECTURE.md](ARCHITECTURE.md)
+is a ten-minute tour of how it all fits together.
 
 ## Terms & fair use
 
