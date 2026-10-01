@@ -1366,7 +1366,7 @@ function renderSupporters() {
       c,
       CONTRIBUTORS.length
         ? CONTRIBUTORS.map((s) => chip(s)).join('')
-        : `<span class="muted">Be the first — ${link(REPO_URL, 'contributions welcome')}.</span>`,
+        : `<span class="muted">Empty crew roster. Be the first: ${link(REPO_URL, 'contributions welcome')}.</span>`,
     );
   }
   const b = $('#sup-boosters');
@@ -1375,7 +1375,7 @@ function renderSupporters() {
       b,
       BOOSTERS.length
         ? BOOSTERS.map((s) => chip(s, 'booster')).join('')
-        : `<span class="muted">Boosters will be thanked here — ${link(DISCORD_URL, 'join the Discord')}.</span>`,
+        : `<span class="muted">Boosters get their names up in lights here. ${link(DISCORD_URL, 'Join the Discord')}.</span>`,
     );
   }
 }
@@ -3801,7 +3801,7 @@ function historySectionHtml() {
         `<p class="muted value-note tight">Everything you held at each scan, valued like Account Value today: ships at today's store prices, CCUs at standard price, everything else at melt value, plus Store Credit from scans that recorded it. Pledges you've since melted are estimated from their names.</p>`
       : '<p class="muted">Loading ship prices…</p>') +
     `<div class="hist-list">${steps.join('')}</div>` +
-    `<p class="muted value-note">A snapshot is kept each time a full scan finds changes — ${hist.length} so far, up to the last 100.</p>`
+    `<p class="muted value-note">A snapshot is kept each time a full scan finds changes: ${hist.length} so far, up to the last 100.</p>`
   );
 }
 
@@ -3947,10 +3947,11 @@ function collectionSectionHtml() {
       sBox(c.meltable, 'meltable') +
       sBox(c.makers.length, 'manufacturers')
     }</div>` +
-    `<h3 class="section-title">Insurance</h3>${ins.length ? sBars(ins) : '<p class="muted">No insurance found in your pledges.</p>'}` +
+    `<h3 class="section-title">Insurance</h3>${ins.length ? sBars(ins) : '<p class="muted">No insurance found in your pledges. Fly carefully out there.</p>'}` +
     `<h3 class="section-title" style="margin-top:26px">Collection by Manufacturer</h3>` +
     `<p class="muted value-note tight">How many of each maker's ship models you own (out of the ones with a store price). Hover a row to see which.</p>` +
-    (makers || '<p class="muted">No ships matched the ship list yet.</p>')
+    (makers ||
+      '<p class="muted">No ships matched the ship list yet. Scan and they’ll roll out of the hangar.</p>')
   );
 }
 
@@ -4154,7 +4155,8 @@ function recruitsOverTimeSvg(rows) {
     .map(recruitDate)
     .filter(Boolean)
     .sort((a, b) => a - b);
-  if (dated.length < 2) return '<p class="muted">Not enough dated recruits to chart yet.</p>';
+  if (dated.length < 2)
+    return '<p class="muted">Not enough dated recruits to chart yet. Recruit a few more and this lights up.</p>';
   // Bucket by month.
   const counts = new Map();
   for (const d of dated) counts.set(monthKey(d), (counts.get(monthKey(d)) || 0) + 1);
@@ -4344,9 +4346,12 @@ function eventRewardsHtml(recruitsRows) {
   const earned = [...hits.values()].sort((a, b) => parseTs(b.ev.start) - parseTs(a.ev.start));
   const intro = `<p class="muted" style="font-size:12px;margin:0 0 12px">
     A recruit who <strong>converted</strong> during a special-incentive event earns you that
-    event's bonus reward — once per event. The event list refreshes weekly from the Star Citizen wiki.</p>`;
+    event's bonus reward, once per event. The event list refreshes weekly from the Star Citizen wiki.</p>`;
   if (!earned.length) {
-    return intro + '<p class="muted">No recruits converted during a tracked bonus event.</p>';
+    return (
+      intro +
+      '<p class="muted">No recruits converted during a tracked bonus event. Next IAE, maybe.</p>'
+    );
   }
   const items = earned
     .map(
@@ -4672,7 +4677,8 @@ function milestonesHtml(recruits, recruitsRows, hasLegacy) {
     byAt.set(t.at, cur);
   }
   const rows = [...byAt.values()].sort((a, b) => b.at - a.at);
-  if (!rows.length) return '<p class="muted">Your first milestone is 1 recruit.</p>';
+  if (!rows.length)
+    return '<p class="muted">Your first milestone is 1 recruit. Every fleet starts with a wingman.</p>';
   return `<ol class="ref-timeline">${rows
     .map((m) => {
       const d = dates[m.at - 1 - offset];
@@ -4720,7 +4726,7 @@ function prospectInsightsHtml(ref) {
     })
     .filter((x) => x != null)
     .sort((a, b) => a - b);
-  let speed = '<p class="muted">No recruits with both dates yet.</p>';
+  let speed = '<p class="muted">No recruits with both dates yet. Still waiting on comms.</p>';
   if (waits.length) {
     const median = waits[Math.floor(waits.length / 2)];
     const within = (days) =>
@@ -4736,7 +4742,7 @@ function prospectInsightsHtml(ref) {
   }
   return `<div class="ref-charts">
     <div class="ref-chart"><h4>Waiting Prospects by Age</h4>${bars}
-      <p class="muted ref-small">People who signed up with your code but haven't bought a game package yet. RSI doesn't share a way to contact them.</p></div>
+      <p class="muted ref-small">People who signed up with your code but haven't bought a game package yet. Still in the lobby. RSI doesn't share a way to contact them.</p></div>
     <div class="ref-chart"><h4>How Fast Recruits Bought</h4>${speed}</div>
   </div>`;
 }
@@ -4987,8 +4993,8 @@ function renderReferrals() {
     setHTML(
       body,
       `<div class="placeholder-view">
-      <p class="muted">No recruits on the roster yet. Hit <strong>Scan</strong> at the top to pull
-        your recruits and prospects from your
+      <p class="muted">No recruits on the roster yet. Your wingmen are out there somewhere. Hit
+        <strong>Scan</strong> at the top to pull your recruits and prospects from your
         <a href="https://robertsspaceindustries.com/en/referral" target="_blank" rel="noopener">RSI Referral Rewards</a> page.</p>
     </div>`,
     );

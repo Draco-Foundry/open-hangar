@@ -1458,6 +1458,13 @@
         text-align: center;
       }
       /* Home: what changed since the last scan */
+      /* A quiet plain-words hint after a playful heading (#256) */
+      .btn-hint {
+        font-size: 0.78em;
+        font-weight: 400;
+        color: var(--muted);
+        margin-left: 4px;
+      }
       /* Home: "How to use" accordion */
       .howto details {
         border: 1px solid var(--line);
@@ -3666,10 +3673,10 @@
       <!-- DEVELOPERS -->
       <!-- HOW TO USE (gear menu → How to Use) -->
       <section class="view" id="view-guide">
-        <h2 class="section-title">How to Use Open Hangar</h2>
+        <h2 class="section-title">Pilot’s Handbook <span class="btn-hint">(how to use)</span></h2>
         <div class="home-about howto howto-page">
           <details open>
-            <summary>Getting Started</summary>
+            <summary>Pre-Flight Checklist <span class="btn-hint">(getting started)</span></summary>
             <ol>
               <li>
                 Sign in at <strong>robertsspaceindustries.com</strong> in this browser. If you're
@@ -3680,8 +3687,8 @@
                 you pick what to scan (it then says <strong>Scan Custom</strong>).
               </li>
               <li>
-                Give it a moment. Big hangars take a minute, and if RSI hiccups, Open Hangar retries
-                on its own.
+                Give it a moment. Big hangars take a minute, and if RSI throws a 30k, Open Hangar
+                retries on its own.
               </li>
               <li>
                 Rescan whenever your hangar changes. Open Hangar remembers what changed since last
@@ -3756,7 +3763,7 @@
           </details>
 
           <details>
-            <summary>Browsing Your Hangar</summary>
+            <summary>Touring the Hangar <span class="btn-hint">(browsing)</span></summary>
             <ul>
               <li>
                 <a href="#inventory" data-view="inventory">Inventory</a> shows every pledge. Search,
@@ -3775,7 +3782,7 @@
           </details>
 
           <details>
-            <summary>What's My Hangar Worth?</summary>
+            <summary>What's My Fleet Worth? <span class="btn-hint">(value)</span></summary>
             <ul>
               <li>
                 <a href="#stats" data-view="stats">Stats</a> → <strong>Value</strong> shows your
@@ -3795,12 +3802,12 @@
           </details>
 
           <details>
-            <summary>Selling or Showing Off Your Fleet</summary>
+            <summary>Flexing Your Fleet <span class="btn-hint">(share or sell)</span></summary>
             <ul>
               <li>
                 In Inventory, hit <strong>Select</strong>, click the items you want, give it a title
                 and pick which price to show. Then <strong>Download Image</strong> and post it in
-                Discord or a forum.
+                Discord or a forum. Flex responsibly.
               </li>
               <li>
                 The <strong>Market</strong> view is a sale sheet with a "My price" column you fill
@@ -3810,7 +3817,7 @@
           </details>
 
           <details>
-            <summary>Your Org's Combined Fleet</summary>
+            <summary>Org Muster <span class="btn-hint">(combined org fleet)</span></summary>
             <ul>
               <li>
                 Ask members to open Open Hangar and use <strong>Developers → Export HTF</strong>.
@@ -3825,17 +3832,19 @@
           </details>
 
           <details>
-            <summary>Backups and Switching Browsers</summary>
+            <summary>
+              Insurance Claims <span class="btn-hint">(backups, switching browsers)</span>
+            </summary>
             <ul>
-              <li>Your data stays put when Open Hangar updates.</li>
+              <li>Your data stays put when Open Hangar updates. No wipe, ever.</li>
               <li>
                 Got alts? Each RSI account keeps its own data. Sign in as the other account and Open
                 Hangar switches over; switch back and your first account's data returns.
               </li>
               <li>
-                Uninstalling, or moving to another browser or computer, starts you from empty. So
-                first go to <a href="#stats" data-view="stats">Stats</a> →
-                <strong>History</strong> → <strong>Download backup</strong>.
+                Uninstalling, or moving to another browser or computer, starts you from empty (a
+                full wipe, no claim). So first go to <a href="#stats" data-view="stats">Stats</a> →
+                <strong>History</strong> → <strong>Download Backup</strong>.
               </li>
               <li>
                 To restore, open <a href="#developers" data-view="developers">Developers</a> →
@@ -3845,7 +3854,7 @@
           </details>
 
           <details>
-            <summary>Something Not Working?</summary>
+            <summary>Ship Exploded? <span class="btn-hint">(something not working)</span></summary>
             <ul>
               <li>
                 Click <strong>Copy Error Report</strong> next to the error (it's also on the
@@ -3869,7 +3878,7 @@
                 >. It has no personal info in it.
               </li>
               <li>
-                Got an idea instead? Post it on the
+                Got a GIB instead? Post your idea on the
                 <a
                   href="https://github.com/Draco-Foundry/open-hangar/discussions/categories/ideas"
                   target="_blank"
