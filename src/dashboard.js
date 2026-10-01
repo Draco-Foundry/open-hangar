@@ -1491,8 +1491,11 @@ const TRAITS = [
     label: 'Packs',
     title: 'Pledges named "Pack", or that bundle two or more items (ships, paints, gear…)',
     notLabel: 'Single Items',
-    // Owner's rule: "Pack" in the name makes it a pack, even with one item listed.
-    test: (f) => /\bpacks?\b/i.test(f.name) || f.items.filter(notInsurance).length >= 2,
+    // Owner's rules: "Pack" in the name makes it a pack, even with one item listed;
+    // anything with game access is a Package (the chip above), never a Pack.
+    test: (f) =>
+      !TRAITS[0].test(f) &&
+      (/\bpacks?\b/i.test(f.name) || f.items.filter(notInsurance).length >= 2),
   },
   { key: 'lti', label: 'LTI', notLabel: 'No LTI', title: 'Lifetime insurance', test: (f) => f.lti },
   {
@@ -1764,10 +1767,14 @@ function meltLabel(p) {
 // The type shown on a pledge's badge (and its color, same everywhere):
 // ccu · package (game access) · pack · ship · paint · addon · coupon.
 const TYPE_KEYS = ['ccu', 'ship', 'pack', 'package', 'paint', 'addon', 'coupon'];
+// Owner's definitions (2026-10-01): a PACKAGE includes game access (Star Citizen or
+// Squadron 42), e.g. Mustang Alpha Starter Pack; a PACK is a bundle without the game,
+// e.g. Nine Tails Shogun Pack, or anything with "Pack" in its name. Separate types,
+// separate sections, apart from ships, CCUs and add-ons.
+const hasGameAccess = (p) => TRAITS[0].test(pledgeFacets(p));
 function pledgeType(p) {
   if (p.isCCU) return 'ccu';
-  if (p.containsShip && TRAITS[0].test(pledgeFacets(p))) return 'package';
-  // Owner's rule: "Pack" in the name makes it a pack (a one-ship pack, a paint pack).
+  if (hasGameAccess(p)) return 'package';
   if (/\bpacks?\b/i.test(p.name || '')) return 'pack';
   if (isPack(p)) return 'pack';
   return p.kind;
@@ -1794,8 +1801,15 @@ function isLandClaim(p) {
 }
 
 const MARKET_SECTIONS = [
-  { key: 'ship', label: 'Standalone Ships', test: (p) => p.containsShip && !isPack(p) },
-  { key: 'pack', label: 'Packs', test: (p) => isPack(p) },
+  // Same rule as the type badge (pledgeType): a pack that holds one ship belongs
+  // under Packs, a starter pack with the game under Packages, never Standalone Ships.
+  {
+    key: 'ship',
+    label: 'Standalone Ships',
+    test: (p) => p.containsShip && !['ccu', 'pack', 'package'].includes(pledgeType(p)),
+  },
+  { key: 'pack', label: 'Packs', test: (p) => pledgeType(p) === 'pack' },
+  { key: 'package', label: 'Packages', test: (p) => pledgeType(p) === 'package' },
   { key: 'ccu', label: 'Upgrades', test: (p) => p.isCCU },
   { key: 'landclaim', label: 'Land Claims', test: (p) => isLandClaim(p) },
   { key: 'hangar', label: 'Hangars', test: (p) => isHangar(p) },
