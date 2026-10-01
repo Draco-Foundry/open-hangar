@@ -7946,7 +7946,12 @@ function resolveSearchImages(root) {
 if (gsearch && gsearchOut) {
   gsearch.addEventListener('input', () => {
     const q = gsearch.value;
-    if (q.trim().length < 2) return closeGlobalSearch();
+    // Too short to search: hide the results but keep what's typed (closing
+    // would also clear the box and eat the first letter).
+    if (q.trim().length < 2) {
+      gsearchOut.hidden = true;
+      return;
+    }
     ensurePrices();
     setHTML(gsearchOut, globalSearchHtml(q));
     gsearchOut.hidden = false;

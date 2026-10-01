@@ -531,6 +531,21 @@ try {
       timeout: 15000,
     })
     .catch(() => {});
+  // Typed key by key, as a person does: the first letter must survive (0.2.13
+  // cleared the box on every keystroke under 2 letters, so nothing could be typed).
+  for (const sel of ['#gsearch', '#gsearch-top']) {
+    await page.$eval(sel, (b) => {
+      b.value = '';
+      b.blur();
+    });
+    await page.click(sel);
+    await page.keyboard.type('cutlass', { delay: 15 });
+    const typed = await page.$eval(sel, (b) => b.value);
+    typed === 'cutlass'
+      ? ok(`${sel}: typing key by key keeps every letter`)
+      : fail(`${sel}: typed "cutlass", box holds "${typed}"`);
+    await page.keyboard.press('Escape');
+  }
   const gs = await page.evaluate(async () => {
     const box = document.querySelector('#gsearch');
     box.value = 'cutlass';
