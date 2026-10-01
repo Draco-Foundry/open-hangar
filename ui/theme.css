@@ -19,8 +19,8 @@
   --text: #dfe3e8;
   --head: #ffffff;
   --muted: #8b939e;
-  --faint: #5f6873;
-  --accent: #2f81f7;
+  --faint: #808994; /* 4.5:1 on panels (WCAG AA) */
+  --accent: #2372e0; /* white button text reads at 4.6:1 */
   --accent-hover: #4493f8;
   --accent-soft: rgba(47, 129, 247, 0.14);
   --link: #6cb4ff;
@@ -1051,7 +1051,7 @@ nav .nav-n:empty {
   height: 18px;
   padding: 0 5px;
   border-radius: 9px;
-  background: #f85149;
+  background: #da3633;
   color: #fff;
   font: 800 11px/18px var(--font-head);
   text-align: center;

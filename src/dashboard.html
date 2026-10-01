@@ -12,7 +12,7 @@
         --line: #2a3139;
         --text: #e6edf3;
         --muted: #8b949e;
-        --accent: #2f81f7;
+        --accent: #2372e0;
         --accent-hover: #4493f8;
         --link: #58a6ff;
         --accent-soft: rgba(47, 129, 247, 0.14);
@@ -838,9 +838,10 @@
         border-radius: 4px;
         font-size: 12px;
         color: var(--muted);
-        opacity: 0.55;
+        opacity: 0.7;
       }
-      .wishlist tr:hover .wish-x {
+      .wishlist tr:hover .wish-x,
+      .wish-x:focus-visible {
         opacity: 1;
       }
       .wish-x:hover {
@@ -1235,7 +1236,12 @@
       .stale {
         color: var(--warn);
       }
-      /* Keyboard focus visibility (a11y) */
+      /* Keyboard focus visibility (a11y): anything you can Tab to gets a blue ring.
+         Text boxes that turn their outline off show a blue border instead. */
+      :focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
       a:focus-visible,
       button:focus-visible,
       .chip:focus-visible {
@@ -1964,14 +1970,14 @@
         border-color: var(--t-coupon-line);
       }
       .chip[aria-pressed='false'] {
-        opacity: 0.5;
+        opacity: 0.88;
       }
       /* Trait chips (second row): dashed until picked. */
       .chip.trait {
         border-style: dashed;
       }
       .chip.trait[aria-pressed='false'] {
-        opacity: 0.85;
+        opacity: 0.88;
       }
       .chip.trait[aria-pressed='true'] {
         border-style: solid;
@@ -3411,7 +3417,12 @@
                  UEE line, badges and wallet to its right; the org logo as a faint
                  watermark. Scan and the gear menu live in the top bar. -->
             <div class="cc-account" id="cc-account">
-              <a class="cc-photo" id="cc-photo" target="_blank" rel="noopener"
+              <a
+                class="cc-photo"
+                id="cc-photo"
+                target="_blank"
+                rel="noopener"
+                aria-label="Open Your RSI Citizen Page"
                 ><span class="cc-avatar" id="cc-avatar"></span
               ></a>
               <img class="cc-water" id="cc-water" alt="" hidden />
@@ -3493,8 +3504,14 @@
       <section class="view" id="view-inventory">
         <div class="page-sum" id="inv-sum"></div>
         <div class="controls">
-          <input id="search" type="search" placeholder="Search by name…" autocomplete="off" />
-          <select id="sort">
+          <input
+            id="search"
+            type="search"
+            placeholder="Search by name…"
+            autocomplete="off"
+            aria-label="Search Inventory"
+          />
+          <select id="sort" aria-label="Sort Inventory">
             <option value="default">Sort: Hangar order</option>
             <option value="date-desc">Pledged: newest first</option>
             <option value="date-asc">Pledged: oldest first</option>
@@ -3587,8 +3604,14 @@
       <section class="view" id="view-buybacks">
         <div class="page-sum" id="bb-sum"></div>
         <div class="controls" id="bb-controls" hidden>
-          <input id="bb-search" type="search" placeholder="Search buy-backs…" autocomplete="off" />
-          <select id="bb-sort">
+          <input
+            id="bb-search"
+            type="search"
+            placeholder="Search buy-backs…"
+            autocomplete="off"
+            aria-label="Search Buy-Backs"
+          />
+          <select id="bb-sort" aria-label="Sort Buy-Backs">
             <option value="date-desc">Date: newest first</option>
             <option value="date-asc">Date: oldest first</option>
             <option value="price-desc">Price: high to low</option>
@@ -3666,7 +3689,13 @@
           <div class="sp-head">
             <h3>Your CCUs <span class="market-n" id="ccu-n"></span></h3>
             <span class="sp-count" id="ccu-search-count" aria-live="polite"></span>
-            <input id="ccu-search" type="search" placeholder="Search CCUs…" autocomplete="off" />
+            <input
+              id="ccu-search"
+              type="search"
+              placeholder="Search CCUs…"
+              autocomplete="off"
+              aria-label="Search Your CCUs"
+            />
           </div>
           <div class="sp-scroll" id="ccu-owned"></div>
         </div>
@@ -3676,7 +3705,13 @@
             <h3>Ship Prices</h3>
             <div class="layout-toggle sp-tabs" id="price-tabs" role="tablist"></div>
             <span class="sp-count" id="price-search-count" aria-live="polite"></span>
-            <input id="price-search" type="search" placeholder="Search ships…" autocomplete="off" />
+            <input
+              id="price-search"
+              type="search"
+              placeholder="Search ships…"
+              autocomplete="off"
+              aria-label="Search Ship Prices"
+            />
           </div>
           <p class="currency-note muted store-intro" hidden></p>
           <div class="sp-scroll tall" id="price-table"></div>
@@ -4228,7 +4263,7 @@
 
     <!-- Inventory item detail modal -->
     <div class="modal-overlay" id="item-modal" hidden>
-      <div class="modal-card">
+      <div class="modal-card" role="dialog" aria-modal="true" aria-label="Details">
         <button class="modal-close" id="modal-close" aria-label="Close">&times;</button>
         <div class="modal-body" id="modal-body"></div>
       </div>
