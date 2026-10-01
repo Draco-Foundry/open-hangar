@@ -3262,10 +3262,14 @@
         .replace(/\s+/g, ' ')
         .replace(/\s+([.,!?;:])/g, '$1')
         .trim();
-    const src = String(html || '').replace(
-      /<script\b[\s\S]*?<\/script\s*>|<style\b[\s\S]*?<\/style\s*>/gi,
-      '',
-    );
+    // Drop script/style blocks, repeating until nothing changes, then any stray
+    // opening or closing tag of either (CodeQL js/bad-tag-filter, #285).
+    let src = String(html || '');
+    for (let prev = ''; prev !== src;) {
+      prev = src;
+      src = src.replace(/<(script|style)\b[\s\S]*?<\/\1\b[^>]*>/gi, '');
+    }
+    src = src.replace(/<\/?(?:script|style)\b[^>]*>?/gi, '');
     const cut = src.search(/<h[1-6][^>]*>[^<]*Weekly Community Content Schedule/i);
     const intro = cut >= 0 ? src.slice(0, cut) : src;
     const rest = cut >= 0 ? src.slice(cut) : '';
