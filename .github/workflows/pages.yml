@@ -52,10 +52,10 @@ jobs:
           grep -E 'data-version|data-updated' site/index.html
           echo "Stamped v${VERSION}, updated ${HUMAN}"
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
-      # What actions/upload-pages-artifact does, with its inner upload pinned too.
+      # What actions/upload-pages-artifact does, with its upload pinned like everywhere else.
       - name: Archive the site
         run: tar --dereference --hard-dereference --directory site -cvf "$RUNNER_TEMP/artifact.tar" --exclude=.git --exclude=.github .
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2 (Pages needs v4)
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: github-pages
           path: ${{ runner.temp }}/artifact.tar

@@ -1,12 +1,18 @@
 # Keeps the commit-pinned GitHub Actions current (each pin carries its version in a
-# comment, which Dependabot updates along with it). Security updates for npm
-# packages come from Dependabot alerts, separately.
+# comment, which Dependabot updates along with it). Only minor and patch updates
+# arrive automatically: a new major version is upgraded on purpose and tested end to
+# end, because PR CI doesn't run the publish, release and deploy workflows
+# (Draco-Foundry/open-hangar#218). Security updates for npm packages come from
+# Dependabot alerts, separately.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
     groups:
       actions:
         patterns: ['*']
