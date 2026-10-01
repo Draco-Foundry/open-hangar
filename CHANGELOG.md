@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.2.15 — 2026-10-01
+
 - New: **Open Hangar talks like a fellow Citizen now.** Scans, errors, empty pages and
   tips got a Star Citizen voice ("That one felt like a 30k"), with a plain hint wherever a
   joke could hide what something does. Warnings, numbers and prices stay straight.
