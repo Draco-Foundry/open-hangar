@@ -431,7 +431,7 @@ function setHTML(el, html) {
   el.replaceChildren(...root.childNodes);
 }
 
-function setStatus(text, isError = false) {
+function setStatus(text, isError = false, { scan = false } = {}) {
   statusEl.textContent = text;
   statusEl.classList.toggle('error', isError);
   if (isError) {
@@ -443,7 +443,35 @@ function setStatus(text, isError = false) {
     btn.textContent = 'Copy Error Report';
     btn.addEventListener('click', () => copyErrorReport(btn));
     statusEl.append(' ', btn);
+    if (scan) {
+      // A failed or partial scan: open a prefilled Scan Broken issue (#250).
+      const rep = document.createElement('button');
+      rep.type = 'button';
+      rep.className = 'link-btn';
+      rep.textContent = 'Report a Scan Problem';
+      rep.title =
+        'Opens a GitHub issue with the error report filled in. Nothing is sent until you submit it.';
+      rep.addEventListener('click', () => openScanReport(text));
+      statusEl.append(' · ', rep);
+    }
   }
+}
+
+// Open the prefilled Scan Broken issue in a new tab (#250). Counts and the
+// error report only; the person reviews it on GitHub before anything is sent.
+async function openScanReport(summary) {
+  let version = '';
+  try {
+    version = chrome.runtime.getManifest().version;
+  } catch {
+    /* not in an extension page */
+  }
+  const url = OH.scanProblemUrl({
+    summary,
+    report: await OH.errorReport({ maxLines: 25 }),
+    version,
+  });
+  window.open(url, '_blank', 'noopener');
 }
 
 // Copy OH.errorReport() to the clipboard; `el` shows the outcome briefly.
@@ -6565,7 +6593,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   // The counts are already on Home (the summary boxes), so only a problem is
   // spelled out here; the header badge carries the full recap on hover.
   scanDetail('');
-  setStatus(anyErr ? summary : '', anyErr);
+  setStatus(anyErr ? summary : '', anyErr, { scan: true });
   setScanning(`${anyErr ? '⚠ ' : '✓ '}${summary}`, true);
   route();
   renderAccount(); // refresh the Citizen Card pill with the new referral counts

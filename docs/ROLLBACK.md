@@ -46,8 +46,25 @@ Per store:
   already updated keep the bad one until the bumped version is approved, so ship it
   too.
 
-Normally the stores get at most one update a day; decide whether a rollback is worth
-a second one that day.
+Normally the stores get at most one update a day, and Publish to stores enforces it: a
+real run fails if another one sent something to the stores in the last 24 hours. If
+the rollback is worth a second update that day, tick **Hotfix: allow a second store
+update within 24h** when you run it. Finishing the same tag one store at a time (say
+store: chrome after Chrome was still reviewing the last version) doesn't need the box.
+
+## Staged Rollout (Chrome, Later)
+
+Chrome sends an approved update to 100% of users at once (`--auto-publish` in
+`scripts/publish/chrome.mjs`). The Chrome Web Store only offers a partial rollout
+(`deployPercentage`) to items with **10,000+ users**, and Open Hangar is well below
+that, so there's nothing to set yet. Once it passes 10,000 users:
+
+1. In `scripts/publish/chrome.mjs`, upload without `--auto-publish`, then publish
+   with a `deployPercentage` of 10.
+2. Add a way to raise it to 100 (a `store: chrome-100` choice or a small script)
+   after a day of clean reports.
+3. A bad version then only reaches 10%: don't raise it (Google doesn't let the
+   percentage go back down), and ship the fix as in step 3 above.
 
 ## 4. Afterwards
 

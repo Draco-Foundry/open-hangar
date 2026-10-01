@@ -55,6 +55,62 @@ Error: ITEM_NOT_UPDATABLE
   assert.equal(chromeOutcome("uploadState: 'FAILURE'", 0), 'failed');
 });
 
+test('parseRunName: reads the tag, store and dry run back from a run name', async () => {
+  const { parseRunName } = await lib();
+  assert.deepEqual(parseRunName('Publish v0.2.13 to all'), {
+    tag: 'v0.2.13',
+    store: 'all',
+    dry: false,
+  });
+  assert.deepEqual(parseRunName('Publish v0.2.13 to chrome (dry run)'), {
+    tag: 'v0.2.13',
+    store: 'chrome',
+    dry: true,
+  });
+  assert.equal(parseRunName('Publish to stores'), null); // runs from before #183
+  assert.equal(parseRunName(undefined), null);
+});
+
+test('dailyGate: one store update a day, unless it finishes the same release', async () => {
+  const { dailyGate } = await lib();
+  const ok = (name) => ({ name, conclusion: 'success', uploaded: false });
+  const today = [ok('Publish v0.2.13 to all')];
+  // Nothing earlier, or only dry runs and Discord posts: go.
+  assert.equal(dailyGate({ runs: [], tag: 'v0.2.14', store: 'all' }), null);
+  assert.equal(
+    dailyGate({
+      runs: [ok('Publish v0.2.13 to all (dry run)'), ok('Publish v0.2.13 to discord')],
+      tag: 'v0.2.14',
+      store: 'all',
+    }),
+    null,
+  );
+  // A second release the same day is held back...
+  assert.match(dailyGate({ runs: today, tag: 'v0.2.14', store: 'all' }), /v0\.2\.13/);
+  assert.ok(dailyGate({ runs: today, tag: 'v0.2.14', store: 'chrome' }));
+  // ...and so is sending the same tag to every store again.
+  assert.ok(dailyGate({ runs: today, tag: 'v0.2.13', store: 'all' }));
+  // Finishing today's release one store at a time is fine, v-prefix or not.
+  assert.equal(dailyGate({ runs: today, tag: 'v0.2.13', store: 'chrome' }), null);
+  assert.equal(dailyGate({ runs: today, tag: '0.2.13', store: 'firefox' }), null);
+  // Discord-only runs upload nothing, and the Hotfix box lets anything through.
+  assert.equal(dailyGate({ runs: today, tag: 'v0.2.14', store: 'discord' }), null);
+  assert.equal(dailyGate({ runs: today, tag: 'v0.2.14', store: 'all', allow: true }), null);
+});
+
+test('dailyGate: a failed run counts only if a store got the upload', async () => {
+  const { dailyGate } = await lib();
+  const failed = (uploaded) => [
+    { name: 'Publish v0.2.13 to all', conclusion: 'failure', uploaded },
+  ];
+  assert.equal(dailyGate({ runs: failed(false), tag: 'v0.2.14', store: 'all' }), null);
+  assert.ok(dailyGate({ runs: failed(true), tag: 'v0.2.14', store: 'all' }));
+  assert.equal(dailyGate({ runs: failed(true), tag: 'v0.2.13', store: 'edge' }), null);
+  // A run from before run names carried the tag: can't tell, so it counts.
+  const old = [{ name: 'Publish to stores', conclusion: 'success', uploaded: false }];
+  assert.match(dailyGate({ runs: old, tag: 'v0.2.13', store: 'chrome' }), /tag is unknown/);
+});
+
 const discord = () => import('../scripts/discord-post.mjs');
 const changelog = fs.readFileSync(path.join(__dirname, '../CHANGELOG.md'), 'utf8');
 const embedsOf = (messages) => messages.flatMap((m) => m.embeds);
