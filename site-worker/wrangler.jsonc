@@ -1,0 +1,16 @@
+{
+  // openhangar.space on Cloudflare (open-hangar#201): the static site in ../site,
+  // served as Workers static assets, so it gets Cloudflare's proxy, WAF, caching
+  // and analytics like app.openhangar.space. Deployed by .github/workflows/pages.yml.
+  // No script: assets only, which costs no Worker requests.
+  "name": "openhangar-site",
+  "compatibility_date": "2026-09-26",
+  "assets": {
+    "directory": "../site",
+    "html_handling": "none", // keep /privacy.html as it is (store listings link it)
+  },
+  // Until the cutover (docs/SITE-CLOUDFLARE.md) it's only on workers.dev, for
+  // checking. The cutover adds:
+  //   "routes": [{ "pattern": "openhangar.space", "custom_domain": true }],
+  "workers_dev": true,
+}
