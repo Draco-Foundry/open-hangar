@@ -2958,15 +2958,15 @@
   // end, name and the rewards. Returns [{ start, end, name, reward }] where
   // `reward` is what the referrer ("You") gets, as plain text.
   function wikiPlain(s) {
-    return String(s || '')
+    const text = String(s || '')
       .replace(/<ref[^>]*\/>/gi, '')
-      .replace(/<ref[\s\S]*?<\/ref>/gi, '')
+      .replace(/<ref[\s\S]*?<\/ref\s*>/gi, '')
       .replace(/\[\[(?:File|Image):[^\]]*\]\]/gi, '')
       .replace(/\[\[[^\]|]*\|([^\]]*)\]\]/g, '$1')
       .replace(/\[\[([^\]]*)\]\]/g, '$1')
       .replace(/\{\{[\s\S]*?\}\}/g, '')
-      .replace(/'{2,}/g, '')
-      .replace(/<[^>]+>/g, '')
+      .replace(/'{2,}/g, '');
+    return stripTags(text, '')
       .replace(/�/g, '"')
       .replace(/[ \t]+/g, ' ')
       .trim();
@@ -3258,12 +3258,12 @@
   // Post body HTML → { points: [..], schedule: [{ day, items: [..] }] }. Pure.
   OH.parseTwisc = function parseTwisc(html) {
     const clean = (s) =>
-      decodeEntities(String(s || '').replace(/<[^>]+>/g, ' '))
+      decodeEntities(stripTags(s))
         .replace(/\s+/g, ' ')
         .replace(/\s+([.,!?;:])/g, '$1')
         .trim();
     const src = String(html || '').replace(
-      /<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi,
+      /<script\b[\s\S]*?<\/script\s*>|<style\b[\s\S]*?<\/style\s*>/gi,
       '',
     );
     const cut = src.search(/<h[1-6][^>]*>[^<]*Weekly Community Content Schedule/i);
@@ -3350,20 +3350,41 @@
   // A public help-center article with one table row per not-yet-flyable ship:
   // "YOUR SHIP" → "OUR LOANER(S)". Row names use shorthand ("Hull D, E",
   // "Idris-M & P", "Pulse (+ LX)", "Cyclone Variants"), expanded into patterns.
+  // One pass, so "&amp;quot;" stays the text "&quot;" instead of being decoded
+  // twice (CodeQL js/double-escaping, #285). The result is plain text: every
+  // caller escapes it again before showing it.
+  const ENTITIES = {
+    nbsp: ' ',
+    amp: '&',
+    '#39': "'",
+    rsquo: "'",
+    lsquo: "'",
+    quot: '"',
+    lt: '<',
+    gt: '>',
+  };
+  const codePoint = (n) =>
+    Number.isInteger(n) && n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : '';
   const decodeEntities = (s) =>
     String(s || '')
-      .replace(/&nbsp;| /g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&#39;|&rsquo;|&lsquo;/g, "'")
-      .replace(/&quot;/g, '"')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&#x([0-9a-f]+);/gi, (m, h) => String.fromCodePoint(parseInt(h, 16)))
-      .replace(/&#(\d+);/g, (m, d) => String.fromCodePoint(Number(d)));
-  const cellText = (h) =>
-    decodeEntities(String(h).replace(/<[^>]+>/g, ' '))
-      .replace(/\s+/g, ' ')
-      .trim();
+      .replace(/ /g, ' ')
+      .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+|#39);/gi, (m, e) => {
+        if (/^#x/i.test(e)) return codePoint(parseInt(e.slice(2), 16));
+        if (/^#\d+$/.test(e) && e !== '#39') return codePoint(Number(e.slice(1)));
+        const k = e.toLowerCase();
+        return Object.prototype.hasOwnProperty.call(ENTITIES, k) ? ENTITIES[k] : m;
+      });
+  // Markup → text. Repeats until nothing changes, so a nested "<<b>x>" can't
+  // leave a tag behind (CodeQL js/incomplete-multi-character-sanitization).
+  const stripTags = (s, by = ' ') => {
+    let out = String(s || '');
+    for (let prev = ''; prev !== out;) {
+      prev = out;
+      out = out.replace(/<[^>]*>/g, by);
+    }
+    return out;
+  };
+  const cellText = (h) => decodeEntities(stripTags(h)).replace(/\s+/g, ' ').trim();
   // Row names compared the same way as the ships they're matched against.
   const normPattern = (n) =>
     OH.normShipName(
