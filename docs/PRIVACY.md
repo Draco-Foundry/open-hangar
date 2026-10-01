@@ -71,6 +71,9 @@ personal data:
   file for everyone), at most once a day. Nothing is sent. The site is
   hosted on Cloudflare, which, like any website host, sees the request's IP address; we
   receive nothing.
+- **api.github.com** (public, read-only): only when you open the Known Issues page, the
+  list of open bug reports for Open Hangar (the same list for everyone), cached for an
+  hour. No credentials or personal data are sent.
 - **addons.mozilla.org** (Firefox only, public, read-only) — when you press "Check for
   updates", the latest published version number of Open Hangar. No credentials or
   personal data are sent.

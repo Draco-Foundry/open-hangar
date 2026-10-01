@@ -11,6 +11,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   random and never the same one twice in a row.
 - Improved: **every link and button label is in Title Case**, so they're easier to spot.
 - Improved: How to Use is now the **Pilot's Handbook**, with clearer section names.
+- New: **Known Issues** in the menu shows the bugs we're already working on, straight
+  from GitHub, so you can see if yours is on the list before reporting it. It's only
+  fetched when you open the page; nothing about you is sent.
 - Fixed: one unreadable buy-back page no longer stops the rest of your buy-backs from
   loading. That page is skipped and the others come through.
 
