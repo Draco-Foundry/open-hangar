@@ -13,7 +13,7 @@
         --text: #e6edf3;
         --muted: #8b949e;
         --accent: #2372e0;
-        --accent-hover: #4493f8;
+        --accent-hover: #1b5fc2; /* darker on hover keeps white text readable (#200) */
         --link: #58a6ff;
         --accent-soft: rgba(47, 129, 247, 0.14);
         --accent-line: rgba(47, 129, 247, 0.5);
@@ -282,10 +282,11 @@
         font-size: 13px;
         cursor: pointer;
       }
-      /* Hover brightens a button's own colors. (It used to repaint every button
-         blue, which hid the text of outlined buttons and tabs.) */
+      /* Hover darkens a button's own colors a little, so white text stays readable
+         (#200; lightening dropped it below 4.5:1). It used to repaint every button
+         blue, which hid the text of outlined buttons and tabs. */
       button:hover {
-        filter: brightness(1.15);
+        filter: brightness(0.88);
       }
       button:disabled:hover {
         filter: none;
