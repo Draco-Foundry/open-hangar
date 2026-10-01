@@ -3,7 +3,7 @@
   "name": "__MSG_extName__",
   "description": "__MSG_extDescription__",
   "default_locale": "en",
-  "version": "0.2.14",
+  "version": "0.2.15",
   "author": "Draco Foundry",
   "homepage_url": "https://github.com/Draco-Foundry/open-hangar",
   "permissions": ["storage", "unlimitedStorage", "cookies"],
