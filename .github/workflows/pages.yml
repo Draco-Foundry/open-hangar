@@ -11,7 +11,12 @@ on:
         'manifest.json',
         'docs/store-assets/screenshot-*',
         '.github/workflows/pages.yml',
+        'scripts/update-rates.mjs',
       ]
+  # Daily, after the ECB publishes (about 16:00 CET on working days), so
+  # rates.json stays fresh even when nothing else on the site changes.
+  schedule:
+    - cron: '30 15 * * *'
   workflow_dispatch:
 
 permissions:
@@ -51,6 +56,8 @@ jobs:
             site/index.html
           grep -E 'data-version|data-updated' site/index.html
           echo "Stamped v${VERSION}, updated ${HUMAN}"
+      # The extension's exchange rates (#243): built here, never committed.
+      - run: node scripts/update-rates.mjs site/rates.json
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
       # What actions/upload-pages-artifact does, with its upload pinned like everywhere else.
       - name: Archive the site

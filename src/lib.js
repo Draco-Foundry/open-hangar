@@ -2737,9 +2737,11 @@
   // --- Display currency -----------------------------------------------------------
   // RSI prices everything in USD. Users can view amounts in one of a few big
   // currencies, converted at the day's rate (before tax). Rates are the ECB's,
-  // via Frankfurter (api.frankfurter.dev: public, no key, CORS open), fetched
-  // at most once a day and cached. Nothing about the user is sent.
-  // Every one must be in the ECB set Frankfurter serves (no UAH / RUB there).
+  // published by our own site as openhangar.space/rates.json (the same file for
+  // everyone, built daily by scripts/update-rates.mjs), fetched at most once a day
+  // and cached. Nothing about the user is sent.
+  // Every one must be in the ECB set (no UAH / RUB there), and in WANT in
+  // scripts/update-rates.mjs.
   OH.CURRENCIES = [
     'USD',
     'EUR',
@@ -3420,6 +3422,7 @@
 
   const FX_KEY = 'fxRates';
   const FX_TTL = 24 * 3600e3;
+  const RATES_URL = 'https://openhangar.space/rates.json';
   OH.getFxRates = async function getFxRates(fetchFn = fetch) {
     const want = OH.CURRENCIES.filter((c) => c !== 'USD').join(',');
     const { [FX_KEY]: cached } = await chrome.storage.local.get(FX_KEY);
@@ -3427,20 +3430,20 @@
     const fits = cached && (cached.want == null ? false : cached.want === want);
     if (fits && cached.rates && Date.now() - cached.at < FX_TTL) return cached;
     try {
-      const res = await OH.guarded(fetchFn)(
-        `https://api.frankfurter.dev/v1/latest?base=USD&symbols=${want}`,
-        {
-          credentials: 'omit',
-          headers: { Accept: 'application/json' },
-        },
-      );
+      const res = await OH.guarded(fetchFn)(RATES_URL, {
+        credentials: 'omit',
+        headers: { Accept: 'application/json' },
+      });
       const json = res.ok ? await res.json() : null;
-      if (json && json.rates) {
+      const all = json && json.base === 'USD' && json.rates;
+      // Only the currencies we offer, and only if every one of them is there.
+      const picked = all ? OH.CURRENCIES.filter((c) => c !== 'USD').map((c) => [c, all[c]]) : [];
+      if (picked.length && picked.every(([, r]) => typeof r === 'number' && r > 0)) {
         const fresh = {
           at: Date.now(),
           want,
           date: json.date || null,
-          rates: { USD: 1, ...json.rates },
+          rates: { USD: 1, ...Object.fromEntries(picked) },
         };
         await chrome.storage.local.set({ [FX_KEY]: fresh });
         return fresh;

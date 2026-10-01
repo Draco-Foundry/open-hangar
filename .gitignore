@@ -16,6 +16,7 @@ dist/
 /site/banner.svg
 /.claude/launch.json
 /site/img/screens/
+/site/rates.json
 
 # local scratch files (not for the repo)
 _dump/

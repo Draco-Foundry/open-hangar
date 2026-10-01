@@ -6,6 +6,7 @@
  *
  * Run by .github/workflows/canary.yml, or by hand: `npm run canary`.
  * Logged-in pages (hangar, buy-backs, referrals) can't be checked from here.
+ * Also checks our own exchange-rates file is live and fresh (#243).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -114,6 +115,22 @@ const checks = [
     },
   },
   {
+    // Not RSI: our own rates file (#243). Weekends and holidays have no new ECB
+    // rates, so up to 5 days old is normal.
+    name: 'Exchange rates (openhangar.space/rates.json)',
+    host: 'openhangar.space',
+    own: true,
+    async run() {
+      const res = await fetchLogged('https://openhangar.space/rates.json');
+      if (!res.ok) return `answered HTTP ${res.status}`;
+      const file = await res.json();
+      const missing = OH.CURRENCIES.filter((c) => !(file?.rates?.[c] > 0));
+      if (missing.length) return `missing ${missing.join(', ')}`;
+      const age = (Date.now() - Date.parse(file.date)) / 86400e3;
+      return age > 5 ? `rates are from ${file.date} (the daily Pages run may be failing)` : null;
+    },
+  },
+  {
     name: 'Included Vessels (help center)',
     host: 'support.robertsspaceindustries.com',
     async run() {
@@ -125,6 +142,7 @@ const checks = [
 
 const broken = [];
 const down = [];
+const ours = [];
 for (const c of checks) {
   let problem;
   try {
@@ -137,7 +155,8 @@ for (const c of checks) {
   } else if (problem) {
     // Can't tell a broken parser from a page we never got: say which.
     const line = `${c.name}: ${problem}`;
-    if (reachable(c.host)) broken.push(line);
+    if (c.own) ours.push(`${line} (${c.host}: ${lastHttp.get(c.host) || 'no answer'})`);
+    else if (reachable(c.host)) broken.push(line);
     else down.push(`${line} (${c.host}: ${lastHttp.get(c.host) || 'no answer'})`);
     console.log(`✘ ${line}`);
   } else {
@@ -145,8 +164,9 @@ for (const c of checks) {
   }
 }
 
-if (broken.length || down.length) {
+if (broken.length || down.length || ours.length) {
   const parts = [];
+  if (ours.length) parts.push(`**Our own files need a look:**\n- ${ours.join('\n- ')}`);
   if (broken.length) {
     parts.push(
       `**RSI may have changed their site.** These parsers need a look:\n- ${broken.join('\n- ')}`,
@@ -154,7 +174,7 @@ if (broken.length || down.length) {
   }
   if (down.length)
     parts.push(`**Couldn't reach RSI** (down, or blocking us):\n- ${down.join('\n- ')}`);
-  parts.push('Playbook: docs/RSI-CHANGES.md');
+  if (broken.length || down.length) parts.push('Playbook: docs/RSI-CHANGES.md');
   const report = parts.join('\n\n');
   console.log('\n' + report);
   // The workflow posts this to #ops.

@@ -377,7 +377,7 @@ try {
     ? ok('website sync hidden until the site is live (no teaser, no connect button)')
     : fail(`site link: "${site}"`);
 
-  // Currency: EUR converts the melt box (needs the live rates service).
+  // Currency: EUR converts the melt box (rates come from the demo's fixed file).
   const rates = await page.evaluate(async () => {
     try {
       return JSON.stringify(await OH.getFxRates());

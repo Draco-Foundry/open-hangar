@@ -49,9 +49,7 @@ personal data:
   RSI ships without images from RSI's public ship-matrix index, and, only when you
   choose to scan the Store, to check whether the ships on your wishlist are on sale.
   No credentials are sent for the ship-matrix lookup.
-- **api.frankfurter.dev** (public, read-only) — only if you pick a currency other
-  than USD: today's exchange rates (the same for everyone), at most once a day. No
-  credentials or personal data are sent.
+
 - **api.star-citizen.wiki** (public, read-only) — the current game version and when
   it was released, a fallback for ship art when the ship-matrix has no image, and the source of ship
   store prices for Hangar value. Prices come from downloading the whole public
@@ -68,7 +66,9 @@ personal data:
   month. No credentials or personal data are sent.
 - **openhangar.space** (our own site, public, read-only): a small status file (the same
   for everyone), at most every few hours, so we can pause a scan that RSI's site changes
-  have broken and show a short notice until a fix is out. Nothing is sent. The site is
+  have broken and show a short notice until a fix is out; and, only if you pick a
+  currency other than USD, today's exchange rates (the European Central Bank's, the same
+  file for everyone), at most once a day. Nothing is sent. The site is
   hosted on GitHub Pages, which, like any website, sees the request's IP address; we
   receive nothing.
 - **addons.mozilla.org** (Firefox only, public, read-only) — when you press "Check for
