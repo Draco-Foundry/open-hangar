@@ -18,6 +18,10 @@ name: Publish to stores
 #
 # Before anything is uploaded, the build job checks the tag's commit passed CI on
 # GitHub and runs the unit tests, the dashboard UI test and Firefox's store linter.
+# One store update a day: a real run fails if another real run sent something to the
+# stores in the last 24 hours. Finishing the same tag with one store (store: chrome
+# after Chrome's "still in review") is fine; anything else needs the Hotfix box.
+# Chrome goes to 100% once approved: staged rollout needs 10,000+ users (ROLLBACK.md).
 # Dry run (the checkbox, and on every PR that touches publishing): everything but
 # the uploads and posts. A PR's dry run publishes the latest released tag with the
 # PR's tooling, exactly like a real run after the PR merges.
@@ -25,6 +29,12 @@ name: Publish to stores
 # The tag's code is what gets built; the scripts that publish it (scripts/publish,
 # discord-post, notify) always come from this workflow's own commit, in .tools/,
 # so an older tag never runs older or missing publishing code. Rolling back a bad version: docs/ROLLBACK.md.
+
+# Manual runs are named "Publish <tag> to <store>" (plus " (dry run)"): the one-a-day
+# check (scripts/publish/daily-gate.mjs) reads earlier runs' tag and store from it.
+run-name: >-
+  ${{ github.event_name == 'pull_request' && github.event.pull_request.title ||
+  format('Publish {0} to {1}{2}', inputs.tag, inputs.store, inputs.dry_run && ' (dry run)' || '') }}
 
 on:
   workflow_dispatch:
@@ -39,6 +49,10 @@ on:
         default: all
       dry_run:
         description: 'Dry run: build and check everything, upload nothing'
+        type: boolean
+        default: false
+      allow_second_today:
+        description: 'Hotfix: allow a second store update within 24h'
         type: boolean
         default: false
   pull_request:
@@ -88,6 +102,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node .tools/scripts/publish/ci-gate.mjs
+      # The owner's rule: at most one store update a day (#183). Dry runs and PRs skip it.
+      - name: One store update a day
+        if: env.DRY != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ref.outputs.ref }}
+          ALLOW: ${{ github.event.inputs.allow_second_today }}
+        run: node .tools/scripts/publish/daily-gate.mjs
       - run: npm test
       # The real dashboard in Chrome, as CI runs it. Chrome on the runners now and
       # then fails to start, so a failed run gets one retry.
@@ -164,7 +186,8 @@ jobs:
       CLIENT: ${{ secrets.EDGE_CLIENT_ID }}
       KEY: ${{ secrets.EDGE_API_KEY }}
       VERSION: ${{ needs.build.outputs.version }}
-      NOTES: 'Open Hangar ${{ needs.build.outputs.version }}. Changes: https://github.com/${{ github.repository }}/blob/v${{ needs.build.outputs.version }}/CHANGELOG.md'
+      # The tag's CHANGELOG (not main's), so the notes match what shipped.
+      NOTES: 'Open Hangar ${{ needs.build.outputs.version }}. Changes: https://github.com/${{ github.repository }}/blob/${{ needs.build.outputs.ref }}/CHANGELOG.md'
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -252,13 +275,20 @@ jobs:
         with:
           path: .tools
           sparse-checkout: scripts
+      # The post is the tag's own CHANGELOG section, so it describes what shipped.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.build.outputs.ref }}
+          path: tag
+          sparse-checkout: CHANGELOG.md
+          sparse-checkout-cone-mode: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
       - name: Post the release to Discord
         run: |
-          if [ "$DRY" = true ]; then node .tools/scripts/discord-post.mjs "$VERSION" --dry-run; exit 0; fi
-          node .tools/scripts/discord-post.mjs "$VERSION"
+          if [ "$DRY" = true ]; then node .tools/scripts/discord-post.mjs "$VERSION" --changelog=tag/CHANGELOG.md --dry-run; exit 0; fi
+          node .tools/scripts/discord-post.mjs "$VERSION" --changelog=tag/CHANGELOG.md
 
   # Something failed: tell #ops (private) which part. Skipped until DISCORD_OPS_WEBHOOK
   # is set, and on dry runs.

@@ -2909,6 +2909,37 @@
         font-size: 16px;
         padding: 0 6px;
       }
+      /* Known Issues page (#175) */
+      .known-issues {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        max-width: 860px;
+      }
+      .known-issues li {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel);
+        padding: 10px 14px;
+        margin-bottom: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .known-issues a {
+        color: var(--link);
+        font-weight: 600;
+        text-decoration: none;
+      }
+      .known-issues a:hover {
+        text-decoration: underline;
+      }
+      .known-issues .muted {
+        font-size: 12px;
+      }
+      .ki-scan {
+        color: var(--warn);
+      }
       .release {
         border: 1px solid var(--line);
         border-radius: 10px;
@@ -3323,6 +3354,7 @@
               /></label>
               <a class="menu-item menu-link" href="#guide" data-view="guide">How to Use</a>
               <a class="menu-item menu-link" href="#updates" data-view="updates">Updates</a>
+              <a class="menu-item menu-link" href="#issues" data-view="issues">Known Issues</a>
               <a class="menu-item menu-link" href="#developers" data-view="developers"
                 >Developers</a
               >
@@ -3703,6 +3735,28 @@
           <span class="muted" id="update-check-status" aria-live="polite"></span>
         </div>
         <div id="updates-body"></div>
+      </section>
+
+      <!-- KNOWN ISSUES (gear menu → Known Issues, #175) -->
+      <section class="view" id="view-issues">
+        <h2 class="section-title">
+          Bugs on the Radar <span class="btn-hint">(known issues)</span>
+        </h2>
+        <p class="muted store-intro">
+          Bugs we've already spotted and are squashing. Yours on the list? A 👍 on the issue helps
+          more than a new report. The list comes from GitHub's public issue tracker; nothing about
+          you is sent.
+        </p>
+        <p>
+          <a
+            class="mk-btn"
+            href="https://github.com/Draco-Foundry/open-hangar/issues/new/choose"
+            target="_blank"
+            rel="noopener"
+            >Report a Bug</a
+          >
+        </p>
+        <div id="issues-body"></div>
       </section>
 
       <!-- DEVELOPERS -->

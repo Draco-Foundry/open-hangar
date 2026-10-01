@@ -16,6 +16,7 @@ const VIEWS = [
   'org',
   'referrals',
   'updates',
+  'issues',
   'guide',
   'developers',
 ];
@@ -453,7 +454,7 @@ function setHTML(el, html) {
   el.replaceChildren(...root.childNodes);
 }
 
-function setStatus(text, isError = false) {
+function setStatus(text, isError = false, { scan = false } = {}) {
   statusEl.textContent = text;
   statusEl.classList.toggle('error', isError);
   if (isError) {
@@ -465,7 +466,35 @@ function setStatus(text, isError = false) {
     btn.textContent = 'Copy Error Report';
     btn.addEventListener('click', () => copyErrorReport(btn));
     statusEl.append(' ', btn);
+    if (scan) {
+      // A failed or partial scan: open a prefilled Scan Broken issue (#250).
+      const rep = document.createElement('button');
+      rep.type = 'button';
+      rep.className = 'link-btn';
+      rep.textContent = 'Report a Scan Problem';
+      rep.title =
+        'Opens a GitHub issue with the error report filled in. Nothing is sent until you submit it.';
+      rep.addEventListener('click', () => openScanReport(text));
+      statusEl.append(' · ', rep);
+    }
   }
+}
+
+// Open the prefilled Scan Broken issue in a new tab (#250). Counts and the
+// error report only; the person reviews it on GitHub before anything is sent.
+async function openScanReport(summary) {
+  let version = '';
+  try {
+    version = chrome.runtime.getManifest().version;
+  } catch {
+    /* not in an extension page */
+  }
+  const url = OH.scanProblemUrl({
+    summary,
+    report: await OH.errorReport({ maxLines: 25 }),
+    version,
+  });
+  window.open(url, '_blank', 'noopener');
 }
 
 // Copy OH.errorReport() to the clipboard; `el` shows the outcome briefly.
@@ -723,6 +752,7 @@ function route() {
   else if (v === 'org') renderOrg();
   else if (v === 'store') renderStore();
   else if (v === 'updates') renderUpdates();
+  else if (v === 'issues') renderKnownIssues();
   // 'store' is static markup; About now lives on Home.
   updateSignedOutBanner(); // re-apply the cached signed-out banner state on this view
 }
@@ -1354,7 +1384,7 @@ function link(url, label, soon) {
 function renderFooter() {
   const gh = link(REPO_URL, 'GitHub');
   const dc = link(DISCORD_URL, 'Discord');
-  const ideas = link(IDEAS_URL, 'Suggest a feature');
+  const ideas = link(IDEAS_URL, 'Suggest a Feature');
   // The versions line (Open Hangar vX · What's new · Star Citizen X) lives here,
   // not on the Citizen Card: it's reference info, not about your character.
   setHTML(
@@ -1368,7 +1398,7 @@ function renderFooter() {
       dev,
       link(REPO_URL, 'GitHub') +
         link(DISCORD_URL, 'Discord') +
-        link(IDEAS_URL, 'Suggest a feature') +
+        link(IDEAS_URL, 'Suggest a Feature') +
         link(KOFI_URL, 'Tip on Ko-fi') +
         link(PATREON_URL, 'Support on Patreon'),
     );
@@ -6638,7 +6668,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   // The counts are already on Home (the summary boxes), so only a problem is
   // spelled out here; the header badge carries the full recap on hover.
   scanDetail('');
-  setStatus(anyErr ? summary : '', anyErr);
+  setStatus(anyErr ? summary : '', anyErr, { scan: true });
   setScanning(`${anyErr ? '⚠ ' : '✓ '}${summary}`, true);
   route();
   renderAccount(); // refresh the Citizen Card pill with the new referral counts
@@ -7203,6 +7233,62 @@ const AMO_ADDON_API = 'https://addons.mozilla.org/api/v5/addons/addon/open-hanga
     }
     btn.disabled = false;
   });
+}
+
+// Known Issues (#175): open bugs from the public GitHub tracker, fetched only when
+// this page opens and cached for an hour. No sign-in, nothing about the user sent.
+const ISSUES_API =
+  'https://api.github.com/repos/Draco-Foundry/open-hangar/issues?state=open&per_page=100';
+const ISSUES_TTL = 60 * 60 * 1000;
+
+async function loadKnownIssues() {
+  const { knownIssues } = await chrome.storage.local.get('knownIssues');
+  if (knownIssues && Date.now() - knownIssues.at < ISSUES_TTL) return knownIssues.list;
+  const res = await fetch(ISSUES_API, {
+    credentials: 'omit',
+    headers: { Accept: 'application/vnd.github+json' },
+  });
+  if (!res.ok) throw new Error(`GitHub said ${res.status}`);
+  const list = OH.parseKnownIssues(await res.json());
+  await chrome.storage.local.set({ knownIssues: { at: Date.now(), list } });
+  return list;
+}
+
+async function renderKnownIssues() {
+  const body = $('#issues-body');
+  if (!body) return;
+  setHTML(body, `<p class="muted">${OH.quip('loading')}</p>`);
+  let list;
+  try {
+    list = await loadKnownIssues();
+  } catch {
+    setHTML(
+      body,
+      `<p class="muted">Couldn't reach GitHub's comm relay. See the list <a href="${REPO_URL}/issues?q=is%3Aopen+label%3Abug" target="_blank" rel="noopener">on GitHub</a>.</p>`,
+    );
+    return;
+  }
+  if (!list.length) {
+    setHTML(body, '<p class="muted">No known bugs right now. Clear skies, Citizen.</p>');
+    return;
+  }
+  const days = (t) => {
+    const d = Math.floor((Date.now() - Date.parse(t)) / 86400000);
+    return d < 1 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`;
+  };
+  setHTML(
+    body,
+    `<ul class="known-issues">${list
+      .map(
+        (i) => `<li>
+          <a href="${OH.escapeHtml(i.url)}" target="_blank" rel="noopener">${OH.escapeHtml(i.title)}</a>
+          <span class="muted">#${i.number} · opened ${days(i.createdAt)}${
+            i.labels.includes('scan-broken') ? ' · <span class="ki-scan">Scan broken</span>' : ''
+          }</span>
+        </li>`,
+      )
+      .join('')}</ul>`,
+  );
 }
 
 async function renderUpdates() {
