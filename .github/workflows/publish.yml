@@ -2,7 +2,7 @@ name: Publish to stores
 
 # Uploads a released version to the extension stores. Run it by hand
 # (Actions → Publish to stores → Run workflow) after the Release workflow has
-# built that tag. Nothing here runs on its own: publishing is always a choice.
+# built that tag. Nothing here uploads on its own: publishing is always a choice.
 #
 # A single store is skipped (not failed) until its secrets exist; a full release
 # (store: all) fails instead, so Discord never announces a store that got nothing:
@@ -10,27 +10,47 @@ name: Publish to stores
 #   Edge:    EDGE_PRODUCT_ID, EDGE_CLIENT_ID, EDGE_API_KEY
 #   Chrome:  CWS_EXTENSION_ID, CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN
 #   Discord: DISCORD_UPDATES_WEBHOOK (posts the release to #updates after "all")
-# Every store still reviews the upload before it goes live.
+# Every store still reviews the upload before it goes live. Chrome refuses a new
+# version while the last one is in review: that's a warning, rerun with store: chrome.
+# store: discord only posts the announcement (e.g. after fixing a failed run).
 #
 # Before anything is uploaded, the build job checks the tag's commit passed CI on
 # GitHub and runs the unit tests, the dashboard UI test and Firefox's store linter.
-# Rolling back a bad version: docs/ROLLBACK.md.
+# Dry run (the checkbox, and on every PR that touches publishing): everything but
+# the uploads and posts. Rolling back a bad version: docs/ROLLBACK.md.
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to publish, e.g. v0.2.9'
+        description: 'Tag to publish, e.g. v0.2.13'
         required: true
       store:
         description: 'Which store'
         type: choice
-        options: [firefox, edge, chrome, all]
+        options: [all, firefox, edge, chrome, discord]
         default: all
+      dry_run:
+        description: 'Dry run: build and check everything, upload nothing'
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - .github/workflows/publish.yml
+      - scripts/publish/**
+      - scripts/discord-post.mjs
+      - scripts/notify.mjs
+      - scripts/pack.mjs
 
 permissions:
   contents: read
   actions: read # to check the tag's commit passed CI
+
+env:
+  # A PR run is always a dry run of a full release from the PR's code.
+  REF: ${{ github.event.inputs.tag || github.sha }}
+  STORE: ${{ github.event.inputs.store || 'all' }}
+  DRY: ${{ github.event_name == 'pull_request' || github.event.inputs.dry_run == 'true' }}
 
 jobs:
   build:
@@ -40,23 +60,17 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          ref: ${{ github.event.inputs.tag }}
+          ref: ${{ env.REF }}
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
       - run: npm install
+      # A PR's own CI runs alongside this, so the gate only applies to real tags.
       - name: Only publish a commit that passed CI
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          SHA=$(git rev-parse HEAD)
-          RUNS=$(gh run list -R "$GITHUB_REPOSITORY" --workflow CI --commit "$SHA" \
-            --json status,conclusion -q '[.[] | "\(.status)/\(.conclusion)"] | join(" ")')
-          echo "CI runs for $SHA: ${RUNS:-none}"
-          case " $RUNS " in
-            *" completed/success "*) ;;
-            *) echo "::error::$SHA has no passing CI run yet. Wait for CI on main (or rerun it), then publish."; exit 1 ;;
-          esac
+        run: node scripts/publish/ci-gate.mjs
       - run: npm test
       # The real dashboard in Chrome, as CI runs it. Chrome on the runners now and
       # then fails to start, so a failed run gets one retry.
@@ -67,8 +81,10 @@ jobs:
         id: v
         run: |
           V=$(node -p "require('./manifest.json').version")
-          T="${{ github.event.inputs.tag }}"
-          if [ "$V" != "${T#v}" ]; then echo "manifest.json is $V but the tag is $T"; exit 1; fi
+          if [ "${{ github.event_name }}" != pull_request ] &&
+            ! node -e "import('./scripts/publish/lib.mjs').then(m => process.exit(m.tagMatches(process.argv[1], process.argv[2]) ? 0 : 1))" "$REF" "$V"; then
+            echo "::error::manifest.json is $V but the tag is $REF"; exit 1
+          fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
       - run: npm run pack
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
@@ -80,16 +96,15 @@ jobs:
 
   firefox:
     needs: build
-    if: github.event.inputs.store == 'firefox' || github.event.inputs.store == 'all'
+    if: github.event.inputs.store == 'firefox' || github.event.inputs.store == 'all' || github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     env:
-      STORE: ${{ github.event.inputs.store }}
       AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
       AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          ref: ${{ github.event.inputs.tag }}
+          ref: ${{ env.REF }}
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
@@ -99,6 +114,8 @@ jobs:
           path: dist
       - name: Submit to addons.mozilla.org
         run: |
+          test -f dist/firefox/manifest.json
+          if [ "$DRY" = true ]; then echo "::notice::Dry run: Firefox package ready, not uploaded"; exit 0; fi
           if [ -z "$AMO_JWT_ISSUER" ] || [ -z "$AMO_JWT_SECRET" ]; then
             if [ "$STORE" = all ]; then echo "::error::Firefox: AMO secrets not set, so a full release can't reach Firefox"; exit 1; fi
             echo "::notice::Firefox skipped: AMO secrets not set"; exit 0
@@ -116,14 +133,14 @@ jobs:
 
   edge:
     needs: build
-    if: github.event.inputs.store == 'edge' || github.event.inputs.store == 'all'
+    if: github.event.inputs.store == 'edge' || github.event.inputs.store == 'all' || github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     env:
-      STORE: ${{ github.event.inputs.store }}
       PRODUCT: ${{ secrets.EDGE_PRODUCT_ID }}
       CLIENT: ${{ secrets.EDGE_CLIENT_ID }}
       KEY: ${{ secrets.EDGE_API_KEY }}
       VERSION: ${{ needs.build.outputs.version }}
+      NOTES: 'Open Hangar ${{ needs.build.outputs.version }}. Changes: https://github.com/${{ github.repository }}/blob/v${{ needs.build.outputs.version }}/CHANGELOG.md'
     steps:
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
@@ -131,6 +148,9 @@ jobs:
           path: dist
       - name: Submit to Edge Add-ons
         run: |
+          ZIP="dist/open-hangar-chrome-$VERSION.zip"
+          test -f "$ZIP"
+          if [ "$DRY" = true ]; then echo "::notice::Dry run: Edge package $ZIP ready, not uploaded"; exit 0; fi
           if [ -z "$PRODUCT" ] || [ -z "$CLIENT" ] || [ -z "$KEY" ]; then
             if [ "$STORE" = all ]; then echo "::error::Edge: Edge secrets not set, so a full release can't reach Edge"; exit 1; fi
             echo "::notice::Edge skipped: Edge secrets not set"; exit 0
@@ -139,33 +159,35 @@ jobs:
           H=(-H "Authorization: ApiKey $KEY" -H "X-ClientID: $CLIENT")
           # 1) upload the package to the draft, 2) wait for it, 3) submit.
           OP=$(curl -sS -D - -o /dev/null "${H[@]}" -H "Content-Type: application/zip" \
-            -X POST "$API/draft/package" --data-binary "@dist/open-hangar-chrome-$VERSION.zip" \
+            -X POST "$API/draft/package" --data-binary "@$ZIP" \
             | awk -F': ' 'tolower($1)=="location"{print $2}' | tr -d '\r')
-          [ -n "$OP" ] || { echo "Upload was not accepted"; exit 1; }
-          for i in $(seq 1 30); do
+          [ -n "$OP" ] || { echo "::error::Edge didn't accept the upload"; exit 1; }
+          for _ in $(seq 1 30); do
             R=$(curl -sS "${H[@]}" "$API/draft/package/operations/$OP")
             S=$(echo "$R" | jq -r .status)
             echo "upload: $S"
             [ "$S" = "Succeeded" ] && break
-            [ "$S" = "Failed" ] && { echo "$R"; exit 1; }
+            [ "$S" = "Failed" ] && { echo "$R"; echo "::error::Edge rejected the package (details above)"; exit 1; }
             sleep 10
           done
-          [ "$S" = "Succeeded" ] || { echo "Upload still processing, check Partner Center"; exit 1; }
+          [ "$S" = "Succeeded" ] || { echo "::error::Edge upload still processing, check Partner Center"; exit 1; }
           curl -sS -f "${H[@]}" -H "Content-Type: application/json" -X POST "$API" \
-            -d "{\"notes\":\"Open Hangar $VERSION. Changes: https://github.com/${{ github.repository }}/blob/${{ github.event.inputs.tag }}/CHANGELOG.md\"}"
+            -d "$(jq -n --arg n "$NOTES" '{notes: $n}')"
 
   chrome:
     needs: build
-    if: github.event.inputs.store == 'chrome' || github.event.inputs.store == 'all'
+    if: github.event.inputs.store == 'chrome' || github.event.inputs.store == 'all' || github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     env:
-      STORE: ${{ github.event.inputs.store }}
       EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
       CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
       CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
       REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
       VERSION: ${{ needs.build.outputs.version }}
     steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ env.REF }}
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
@@ -175,19 +197,24 @@ jobs:
           path: dist
       - name: Submit to the Chrome Web Store
         run: |
+          ZIP="dist/open-hangar-chrome-$VERSION.zip"
+          test -f "$ZIP"
+          if [ "$DRY" = true ]; then echo "::notice::Dry run: Chrome package $ZIP ready, not uploaded"; exit 0; fi
           if [ -z "$EXTENSION_ID" ] || [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ] || [ -z "$REFRESH_TOKEN" ]; then
             if [ "$STORE" = all ]; then echo "::error::Chrome: Chrome Web Store secrets not set, so a full release can't reach Chrome"; exit 1; fi
             echo "::notice::Chrome skipped: Chrome Web Store secrets not set"; exit 0
           fi
           # Upload, then submit for review (publishes once Google approves).
-          npx --yes chrome-webstore-upload-cli@3 upload --auto-publish \
-            --source "dist/open-hangar-chrome-$VERSION.zip"
+          node scripts/publish/chrome.mjs "$ZIP"
 
-  # Tell the Discord #updates channel, once every store upload went through.
-  # Only for a full release (store: all). Skipped until DISCORD_UPDATES_WEBHOOK is set.
+  # Tell the Discord #updates channel, once every store upload went through: after
+  # a full release (store: all), or on its own with store: discord. Skipped until
+  # DISCORD_UPDATES_WEBHOOK is set. A dry run prints the message instead.
   discord:
     needs: [build, firefox, edge, chrome]
-    if: github.event.inputs.store == 'all' && !cancelled() && !failure()
+    if: >
+      !cancelled() && !failure() &&
+      (github.event.inputs.store == 'all' || github.event.inputs.store == 'discord' || github.event_name == 'pull_request')
     runs-on: ubuntu-24.04
     env:
       DISCORD_UPDATES_WEBHOOK: ${{ secrets.DISCORD_UPDATES_WEBHOOK }}
@@ -195,29 +222,34 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          ref: ${{ github.event.inputs.tag }}
+          ref: ${{ env.REF }}
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
       - name: Post the release to Discord
-        run: node scripts/discord-post.mjs "$VERSION"
+        run: |
+          if [ "$DRY" = true ]; then node scripts/discord-post.mjs "$VERSION" --dry-run; exit 0; fi
+          node scripts/discord-post.mjs "$VERSION"
 
-  # A store upload failed: tell #ops (private). Skipped until DISCORD_OPS_WEBHOOK is set.
+  # Something failed: tell #ops (private) which part. Skipped until DISCORD_OPS_WEBHOOK
+  # is set, and on dry runs.
   ops:
-    needs: [build, firefox, edge, chrome]
-    if: failure()
+    needs: [build, firefox, edge, chrome, discord]
+    if: failure() && github.event_name != 'pull_request' && github.event.inputs.dry_run != 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          ref: ${{ github.event.inputs.tag }}
+          ref: ${{ env.REF }}
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
       - name: Post to #ops
         env:
           DISCORD_OPS_WEBHOOK: ${{ secrets.DISCORD_OPS_WEBHOOK }}
-        run: >
-          node scripts/notify.mjs ops --down
-          "Publishing ${{ github.event.inputs.tag }} (${{ github.event.inputs.store }}) failed:
-          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          RESULTS: >-
+            Checks: ${{ needs.build.result }} · Firefox: ${{ needs.firefox.result }} ·
+            Edge: ${{ needs.edge.result }} · Chrome: ${{ needs.chrome.result }} ·
+            Discord: ${{ needs.discord.result }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/notify.mjs ops --down "Publishing $REF ($STORE) had a failure. $RESULTS $RUN"
