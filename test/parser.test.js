@@ -116,7 +116,8 @@ test('classifyBuyback maps the store-category prefix (not everything is a ship)'
   const c = OpenHangar.classifyBuyback;
   assert.equal(c('Subscribers Store - Chance Cube'), 'other'); // the reported bug
   assert.equal(c('Standalone Ships - Pitbull plus Aquamarine Paint'), 'ship');
-  assert.equal(c('Paints - Wolf - 8 Paint Pack'), 'paint');
+  assert.equal(c('Paints - Wolf - 8 Paint Pack'), 'pack'); // "Pack" in the name wins (owner)
+  assert.equal(c('Paints - Wolf - Paint'), 'paint');
   assert.equal(c('Gear - Monde Keystone Armor Set'), 'addon');
   assert.equal(c('Upgrade - Aurora MR to Avenger Titan'), 'ccu');
   assert.equal(c('Drake Cutlass Black'), 'ship'); // no prefix → ship fallback
@@ -204,4 +205,19 @@ test('parseBuybackDetail reads price, ships and insurance from a buy-back page',
   assert.equal(d.insurance, 'LTI');
   assert.equal(P.classifyBuyback('Packs - Origin Complete Pack - 2951', ''), 'pack');
   assert.equal(P.classifyBuyback('Package - C8X Pisces Expedition - Starter Pack', ''), 'package');
+});
+
+test('classifyBuyback: "Pack" in the name makes it a pack (owner, #229)', () => {
+  const c = OpenHangar.classifyBuyback;
+  assert.equal(c('Standalone Ships - Nine Tails Shogun Pack'), 'pack');
+  assert.equal(c("Freelancer MAX & 'Big Brands' Paint Pack - Referral Reward"), 'pack');
+  assert.equal(c('Origin Complete Pack'), 'pack');
+  assert.equal(c('Packs - Arena Commander Packs'), 'pack');
+  // Game packages stay packages; "Package" alone isn't "Pack".
+  assert.equal(c('Package - Aurora MR Starter Pack'), 'package');
+  assert.equal(c('Package - Squadron 42 Digital Download'), 'package');
+  // Unchanged: CCUs, plain ships, a word that only contains "pack".
+  assert.equal(c('Upgrade - Cutlass Black to Nine Tails Pack Ship'), 'ccu');
+  assert.equal(c('Standalone Ships - Drake Cutlass Black'), 'ship');
+  assert.equal(c('Gear - Backpack Mule Edition'), 'addon');
 });

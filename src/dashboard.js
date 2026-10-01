@@ -1469,9 +1469,10 @@ const TRAITS = [
     // 1 vehicle + 1 paint + 8 gear items), so count every item, not just ships.
     key: 'pack',
     label: 'Packs',
-    title: 'Pledges that bundle two or more items (ships, paints, gear…)',
+    title: 'Pledges named "Pack", or that bundle two or more items (ships, paints, gear…)',
     notLabel: 'Single Items',
-    test: (f) => f.items.filter(notInsurance).length >= 2,
+    // Owner's rule: "Pack" in the name makes it a pack, even with one item listed.
+    test: (f) => /\bpacks?\b/i.test(f.name) || f.items.filter(notInsurance).length >= 2,
   },
   { key: 'lti', label: 'LTI', notLabel: 'No LTI', title: 'Lifetime insurance', test: (f) => f.lti },
   {
@@ -1746,6 +1747,8 @@ const TYPE_KEYS = ['ccu', 'ship', 'pack', 'package', 'paint', 'addon', 'coupon']
 function pledgeType(p) {
   if (p.isCCU) return 'ccu';
   if (p.containsShip && TRAITS[0].test(pledgeFacets(p))) return 'package';
+  // Owner's rule: "Pack" in the name makes it a pack (a one-ship pack, a paint pack).
+  if (/\bpacks?\b/i.test(p.name || '')) return 'pack';
   if (isPack(p)) return 'pack';
   return p.kind;
 }

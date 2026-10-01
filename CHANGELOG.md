@@ -41,6 +41,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 - Improved: Home loads even when one of the outside sites (the wiki, exchange rates, RSI's
   news) is down: requests give up after a few seconds and a site that's down is left alone
   for a bit.
+- Fixed: anything with "Pack" in its name now counts as a pack (e.g. Nine Tails Shogun Pack, or a
+  Paint Pack referral reward), in Inventory and Buy-Backs. Game packages stay packages.
 - Fixed: scrolling over the gaps in the search results scrolled the page behind them.
 - Fixed: the scan progress line pushed the Citizen Card around.
 - Fixed: with Streamer Mode on, the top bar wrapped onto two rows.
