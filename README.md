@@ -151,7 +151,7 @@ src/
   scraper/parser.js     RSI HTML -> normalized model   (the layer to maintain)
   dashboard.html / .js  the viewer
 scripts/pack.mjs        builds per-browser bundles into dist/
-site/                   the public website (GitHub Pages)
+site/                   the public website (Cloudflare, site-worker/)
 ```
 
 ## For developers

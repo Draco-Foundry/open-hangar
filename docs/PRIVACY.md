@@ -69,7 +69,7 @@ personal data:
   have broken and show a short notice until a fix is out; and, only if you pick a
   currency other than USD, today's exchange rates (the European Central Bank's, the same
   file for everyone), at most once a day. Nothing is sent. The site is
-  hosted on GitHub Pages, which, like any website, sees the request's IP address; we
+  hosted on Cloudflare, which, like any website host, sees the request's IP address; we
   receive nothing.
 - **addons.mozilla.org** (Firefox only, public, read-only) — when you press "Check for
   updates", the latest published version number of Open Hangar. No credentials or
