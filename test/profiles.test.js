@@ -75,3 +75,51 @@ test('an old restore snapshot becomes a saved account', async () => {
   assert.equal(mem.dbRecovery, undefined);
   assert.equal(mem['profile:main'].sources.hangar.items.length, 4);
 });
+
+test('round trips through many big accounts lose nothing and mix nothing (#199)', async () => {
+  const N = 5;
+  const PLEDGES = 1500;
+  const SNAPS = 60;
+  const nick = (k) => `Pilot${k}`;
+  const items = (k) =>
+    Array.from({ length: PLEDGES }, (_, i) => ({
+      id: `${k}-${i}`,
+      name: `Ship ${k}/${i}`,
+      value: i % 400,
+      insurance: i % 3 ? '120 months' : 'LTI',
+    }));
+  const history = (k) =>
+    Array.from({ length: SNAPS }, (_, t) => ({
+      at: 1e12 + t * 86400e3 + k,
+      items: items(k)
+        .slice(0, PLEDGES - t)
+        .map((p) => [p.id, p.name, p.value]),
+    }));
+  const scanned = (k) => ({
+    schemaVersion: 3,
+    owner: { nickname: nick(k), displayname: `${nick(k)} D` },
+    sources: {
+      hangar: { items: items(k), scannedAt: 1000 + k },
+      buybacks: { items: items(k).slice(0, 200), scannedAt: 2000 + k, meta: { tokens: k } },
+    },
+  });
+
+  // Each account signs in once and scans.
+  mem = { db: scanned(0), dbHistory: history(0) };
+  for (let k = 1; k < N; k++) {
+    await OH.switchProfile(nick(k), `${nick(k)} D`);
+    mem.db = scanned(k);
+    mem.dbHistory = history(k);
+  }
+  // Then hop between them in a scrambled order, twice over.
+  for (const k of [2, 0, 4, 1, 3, 0, 2, 4, 3, 1]) {
+    await OH.switchProfile(nick(k).toUpperCase()); // handles match in any case
+    const db = await OH.loadDB();
+    assert.equal(db.owner.nickname, nick(k));
+    assert.deepEqual(db.sources, scanned(k).sources, `${nick(k)} sources`);
+    assert.deepEqual(db.history, history(k), `${nick(k)} history`);
+  }
+  const list = await OH.listProfiles();
+  assert.equal(list.length, N);
+  assert.ok(list.every((p) => p.pledges === PLEDGES));
+});
