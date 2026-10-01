@@ -690,8 +690,14 @@ function renderTopBar() {
   };
   n('#nav-n-inventory', state.items.length);
   n('#nav-n-buybacks', state.buybacks.length);
-  const pill = $('#stream-pill');
-  if (pill) pill.hidden = !streamer.on;
+  const dot = $('#stream-dot');
+  if (dot) dot.hidden = !streamer.on;
+  const me = $('#settings-btn');
+  if (me) {
+    const tip = streamer.on ? 'Your menu · Streamer Mode is on: money is hidden' : 'Your menu';
+    me.title = tip;
+    me.setAttribute('aria-label', tip);
+  }
 }
 
 // The bar slims down while you scroll down a long page, and comes back on the way up.

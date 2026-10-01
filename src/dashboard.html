@@ -3119,13 +3119,6 @@
           <!-- Language flags go here once the dashboard is translated (TODO.md). -->
           <!-- Scan ▾ (every page), then the gear menu: currency, Streamer Mode, rescan
                reminder, Log Out of RSI, Clear Data, Updates, Developers (0.3.0). -->
-          <span
-            class="stream-pill"
-            id="stream-pill"
-            hidden
-            title="Streamer Mode is on: money is hidden"
-            >● Streamer</span
-          >
           <!-- Search your hangar from any page (/ focuses it). -->
           <div class="gsearch top-search" id="top-search">
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
@@ -3248,7 +3241,10 @@
                     fill="currentColor"
                     d="M19.14 12.94a7.4 7.4 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7 7 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2.4h-3.8a.5.5 0 0 0-.49.42l-.36 2.54a7 7 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.88a.5.5 0 0 0 .12.64l2.03 1.58a7.4 7.4 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.39 1.05.7 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.8a.5.5 0 0 0 .49-.42l.36-2.54a7 7 0 0 0 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"
                   /></svg></span
-              ><span class="upd-dot" id="upd-dot" hidden></span>
+              ><span class="upd-dot" id="upd-dot" hidden></span
+              ><!-- Streamer Mode on: a badge on the portrait, not a pill in the bar,
+                   so the bar keeps one row (#174). -->
+              <span class="stream-dot" id="stream-dot" hidden></span>
             </button>
             <div id="settings-menu" class="scan-menu settings-menu" hidden>
               <div class="menu-who" id="menu-who" hidden></div>
