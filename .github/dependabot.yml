@@ -16,3 +16,15 @@ updates:
     groups:
       actions:
         patterns: ['*']
+  # npm packages, minor and patch only, as one weekly PR that CI tests (#191).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+    groups:
+      npm:
+        patterns: ['*']
