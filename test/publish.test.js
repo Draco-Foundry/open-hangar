@@ -4,8 +4,8 @@
 // Run: `npm test`.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { execFileSync } = require('node:child_process');
 const path = require('node:path');
+const fs = require('node:fs');
 
 const lib = () => import('../scripts/publish/lib.mjs');
 
@@ -55,26 +55,48 @@ Error: ITEM_NOT_UPDATABLE
   assert.equal(chromeOutcome("uploadState: 'FAILURE'", 0), 'failed');
 });
 
-const post = (version) =>
-  JSON.parse(
-    execFileSync(
-      process.execPath,
-      [path.join(__dirname, '../scripts/discord-post.mjs'), version, '--dry-run'],
-      {
-        encoding: 'utf8',
-      },
-    ),
-  ).embeds[0].description;
+const discord = () => import('../scripts/discord-post.mjs');
+const changelog = fs.readFileSync(path.join(__dirname, '../CHANGELOG.md'), 'utf8');
+const embedsOf = (messages) => messages.flatMap((m) => m.embeds);
 
-test('Discord post: a release with "New" items leads with them', () => {
-  const text = post('0.2.12');
-  assert.match(text, /^• /);
-  assert.doesNotMatch(text, /—/); // house style: no em dashes in public posts
+// Discord's limits: 4096 per description, 6000 per message, 10 embeds per message.
+const withinLimits = (messages) =>
+  messages.every(
+    (m) =>
+      m.embeds.length <= 10 &&
+      m.embeds.reduce((n, e) => n + (e.title || '').length + e.description.length, 0) <= 6000 &&
+      m.embeds.every((e) => e.description.length <= 4096) &&
+      m.allowed_mentions.parse.length === 0,
+  );
+
+test('Discord post: the whole release, grouped like the Updates page', async () => {
+  const { buildMessages, releaseSection } = await discord();
+  const messages = buildMessages(changelog, '0.2.13');
+  const embeds = embedsOf(messages);
+  assert.equal(embeds[0].title, 'Open Hangar 0.2.13 is on the way');
+  const titles = embeds.map((e) => e.title).filter(Boolean);
+  assert.deepEqual(titles.slice(1), ['Improved', 'Fixed']); // 0.2.13 has no New items
+  const items = embeds.slice(1).flatMap((e) => e.description.split('\n'));
+  assert.equal(items.length, releaseSection(changelog, '0.2.13').bullets.length);
+  for (const it of items) {
+    assert.match(it, /^• (\*\*)?[A-Z0-9"]/); // prefix gone, first letter capitalized
+    assert.doesNotMatch(it, /^• (\*\*)?(New|Improved|Changed|Fixed):/);
+  }
+  assert.doesNotMatch(JSON.stringify(messages), /—/); // house style: no em dashes
+  assert.ok(withinLimits(messages));
 });
 
-test('Discord post: a fixes-only release still lists highlights', () => {
-  const text = post('0.2.13');
-  assert.match(text, /^• /);
-  assert.doesNotMatch(text, /Fixes and polish all over/);
-  assert.doesNotMatch(text, /—/);
+test('Discord post: a big release splits across embeds and messages, losing nothing', async () => {
+  const { buildMessages } = await discord();
+  const long = 'x'.repeat(380);
+  const bullets = Array.from({ length: 60 }, (_, i) => `- Improved: **Item ${i}** ${long}`);
+  const log = `## 9.9.9 — 2026-12-31\n\n${bullets.join('\n')}\n\n## 9.9.8 — 2026-12-30\n`;
+  const messages = buildMessages(log, '9.9.9');
+  assert.ok(messages.length > 1);
+  assert.ok(withinLimits(messages));
+  const text = embedsOf(messages)
+    .map((e) => e.description)
+    .join('\n');
+  for (let i = 0; i < 60; i++) assert.ok(text.includes(`**Item ${i}**`), `item ${i} kept`);
+  assert.equal(buildMessages(log, '1.0.0'), null);
 });
