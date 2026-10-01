@@ -8,6 +8,11 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   that scan and show a short notice ("a fix is coming") instead of an error, without waiting
   for a store update. Your saved data is never touched. It reads a small status file from
   openhangar.space every few hours; nothing is sent.
+- Fixed: **Damaged saved data no longer stops Open Hangar from opening.** Anything that can't
+  be read is set aside (never deleted), everything readable is kept, and a notice offers to
+  restore your last backup file.
+- Improved: saving a scan is lighter on big accounts: your scan history is stored on its own,
+  so it isn't rewritten every time buy-backs or referrals are saved.
 
 ## 0.2.12 — 2026-09-30
 

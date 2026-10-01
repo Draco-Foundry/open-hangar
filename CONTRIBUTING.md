@@ -82,7 +82,15 @@ Sources are declared in `OH.SOURCES` (`src/lib.js`). To add one:
    `OH.scanSource()`.
 
 The scan is persisted automatically under `storage.db.sources[id]`, and
-`OH.loadSource(id)` reads it back. Today only `html` is implemented; buy-backs
+`OH.loadSource(id)` reads it back.
+
+**Changing how the database is stored** (the `db` / `dbHistory` keys): bump
+`DB_VERSION` in `src/lib.js`, add a `MIGRATIONS` step from the old version, teach
+`OH.checkDB` the new shape, and add a test in `test/db.test.js` that loads a DB in
+the old shape. Every load is checked: anything that fails is set aside under
+`dbCorrupt` (never deleted) and the dashboard offers to restore a backup. The backup
+file format has its own number, `EXPORT_VERSION`; only bump it when the file itself
+changes, since older versions refuse newer files. Today only `html` is implemented; buy-backs
 (GraphQL) and store data (API) are the next pipelines — see ROADMAP.md / TODO.md.
 
 ## Versioning

@@ -1147,6 +1147,31 @@ function updateSignedOutBanner(loggedOut) {
   el.hidden = !(lastLoggedOut && hasData);
 }
 
+// Saved data that failed its check on load was set aside (OH.getDamaged): say so
+// until dismissed, with a way back (restore a backup file) and a copy of the
+// original for a bug report.
+async function renderDbNotice() {
+  const el = $('#db-notice');
+  if (!el) return;
+  const damaged = await OH.getDamaged();
+  el.hidden = !damaged.some((d) => !d.seen);
+}
+$('#db-restore')?.addEventListener('click', () => $('#import-file')?.click());
+$('#db-save-damaged')?.addEventListener('click', async () => {
+  const copies = await OH.exportDamaged();
+  const date = new Date().toISOString().slice(0, 10);
+  downloadBlob(
+    new Blob([JSON.stringify({ app: 'open-hangar', damaged: copies }, null, 2)], {
+      type: 'application/json',
+    }),
+    `open-hangar-damaged-${date}.json`,
+  );
+});
+$('#db-dismiss')?.addEventListener('click', async () => {
+  await OH.dismissDamaged();
+  renderDbNotice();
+});
+
 // Notice from our status file (the kill switch, see OH.getRemoteStatus). Text
 // only, never HTML: it comes from the network.
 async function renderSiteNotice() {
@@ -6724,6 +6749,8 @@ if (importBtn && importFile) {
         ? OH.normalizeReferral(refSrc.items)
         : null;
     state.owner = null; // imports aren't attributed to an account (see importDB)
+    await OH.dismissDamaged(); // restored from a backup: the damage notice has done its job
+    renderDbNotice();
     state.shown = new Set(); // default: no filter selected = show all
     state.traits = new Map();
     state.bbShown = new Set(); // default: no filter selected = show all
@@ -7962,6 +7989,7 @@ if (gsearch && gsearchOut) {
   renderSupporters();
   initUpdates();
   renderSiteNotice();
+  renderDbNotice();
   // @sync-start
   renderSiteLink();
   // @sync-end
