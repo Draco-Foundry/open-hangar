@@ -95,4 +95,4 @@ what's collected:
 6. **Dashboard source switcher** + full-DB export.
 7. Optional sources (org, profile) and opt-in PII sources as needed.
 
-The first logo and the public website (`site/`, GitHub Pages) are done; store-listing screenshots + promo tile come with the store submission.
+The first logo and the public website (`site/`, on Cloudflare) are done; store-listing screenshots + promo tile come with the store submission.
