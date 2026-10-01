@@ -19,6 +19,8 @@ global.chrome = {
 };
 require('../src/lib.js');
 const OH = globalThis.OH;
+// Each test simulates its own outages: forget the last test's 'site is down'.
+test.beforeEach(() => delete store.netDown);
 
 const raw = JSON.parse(
   fs.readFileSync(path.join(__dirname, 'fixtures', 'store-ships.json'), 'utf8'),

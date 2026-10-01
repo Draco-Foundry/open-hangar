@@ -38,6 +38,53 @@
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+  // --- Outbound requests: a time limit and "that site is down" memory ----------
+  // Requests to other sites (wiki, exchange rates, RSI's public feeds) go through
+  // OH.guarded(fetchFn): it gives up after 8 seconds, and once a site times out,
+  // can't be reached or answers 429/5xx, further calls to it fail at once for 10
+  // minutes (remembered across page loads) instead of each waiting on it again.
+  // Every caller already falls back to its cached copy when a request throws.
+  // RSI scans don't use this: they have their own retries (fetchPage).
+  const NET_TIMEOUT_MS = 8000;
+  const NET_DOWN_MS = 10 * 60e3;
+  const NET_KEY = 'netDown';
+  const hostOf = (url) => {
+    try {
+      return new URL(String(url)).host;
+    } catch {
+      return '';
+    }
+  };
+  OH.guarded = function guarded(fetchFn = fetch, { timeout = NET_TIMEOUT_MS } = {}) {
+    return async (url, init = {}) => {
+      const host = hostOf(url);
+      const { [NET_KEY]: down = {} } = await chrome.storage.local.get(NET_KEY);
+      if (host && Date.now() - (down[host] || 0) < NET_DOWN_MS) {
+        throw new Error(`${host} didn't answer recently; trying again in a few minutes`);
+      }
+      const markDown = () =>
+        host &&
+        mutateStored(NET_KEY, (cur = {}) => {
+          const now = Date.now();
+          const out = {};
+          for (const [h, at] of Object.entries(cur)) if (now - at < NET_DOWN_MS) out[h] = at;
+          out[host] = now;
+          return out;
+        }).catch(() => {});
+      try {
+        const res = await fetchFn(url, {
+          ...init,
+          signal: init.signal || AbortSignal.timeout(timeout),
+        });
+        if (res.status === 429 || res.status >= 500) await markDown();
+        return res;
+      } catch (e) {
+        await markDown();
+        throw e;
+      }
+    };
+  };
+
   // --- Source registry ------------------------------------------------------
   // type 'html'  → paginated server-rendered HTML, parsed by `parse(html)`.
   // (future) type 'graphql' → POST /graphql, parsed from JSON. See ROADMAP.md.
@@ -764,7 +811,7 @@
       }
       let res;
       try {
-        res = await fetch(url, { credentials: 'include' });
+        res = await fetch(url, { credentials: 'include', signal: AbortSignal.timeout(30000) });
       } catch (e) {
         lastError = {
           msg: `Couldn't reach RSI (${e.message})`,
@@ -1090,7 +1137,10 @@
       return account;
     }
     try {
-      const res = await fetch(ACCOUNT_URL, { credentials: 'include' });
+      const res = await fetch(ACCOUNT_URL, {
+        credentials: 'include',
+        signal: AbortSignal.timeout(20000),
+      });
       const html = res.ok ? await res.text() : '';
       const obj = extractAccount(html);
       if (!obj) {
@@ -1148,7 +1198,7 @@
         try {
           const cres = await fetch(
             `https://robertsspaceindustries.com/en/citizens/${encodeURIComponent(out.nickname)}`,
-            { credentials: 'omit' },
+            { credentials: 'omit', signal: AbortSignal.timeout(20000) },
           );
           if (cres.ok) {
             const cdoc = new DOMParser().parseFromString(await cres.text(), 'text/html');
@@ -1197,6 +1247,7 @@
     try {
       res = await fetch(GRAPHQL_URL, {
         method: 'POST',
+        signal: AbortSignal.timeout(20000),
         credentials: 'include',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -1431,7 +1482,7 @@
     )
       return scVersion;
     try {
-      const res = await fetch(SC_VERSIONS_URL, {
+      const res = await OH.guarded()(SC_VERSIONS_URL, {
         credentials: 'omit',
         headers: { Accept: 'application/json' },
       });
@@ -1537,7 +1588,7 @@
     matrixInflight = (async () => {
       const list = [];
       try {
-        const res = await fetch(SHIP_MATRIX_URL, {
+        const res = await OH.guarded()(SHIP_MATRIX_URL, {
           credentials: 'omit',
           headers: { Accept: 'application/json' },
         });
@@ -1619,10 +1670,13 @@
   async function fetchAllPages(path, fetchFn) {
     const list = [];
     for (let page = 1; page <= 12; page++) {
-      const res = await fetchFn(`${SC_API}/${path}?page%5Bsize%5D=200&page%5Bnumber%5D=${page}`, {
-        credentials: 'omit',
-        headers: { Accept: 'application/json' },
-      });
+      const res = await OH.guarded(fetchFn)(
+        `${SC_API}/${path}?page%5Bsize%5D=200&page%5Bnumber%5D=${page}`,
+        {
+          credentials: 'omit',
+          headers: { Accept: 'application/json' },
+        },
+      );
       // A failed page means an incomplete list: throw, so nobody caches it
       // (getCatalog keeps the previous or bundled list instead).
       if (!res.ok) throw new Error(`${path} page ${page}: HTTP ${res.status}`);
@@ -1821,10 +1875,13 @@
   // Fetch a single vehicle's store image by slug (exact, reliable). ~600px webp.
   async function fetchVehicleImage(slug) {
     try {
-      const res = await fetch(`${SC_API}/vehicles/${encodeURIComponent(slug)}?include=images`, {
-        credentials: 'omit',
-        headers: { Accept: 'application/json' },
-      });
+      const res = await OH.guarded()(
+        `${SC_API}/vehicles/${encodeURIComponent(slug)}?include=images`,
+        {
+          credentials: 'omit',
+          headers: { Accept: 'application/json' },
+        },
+      );
       if (!res.ok) return null;
       const json = await res.json();
       const v = Array.isArray(json.data) ? json.data[0] : json.data;
@@ -2382,7 +2439,7 @@
     const { [WIKI_MAIN_KEY]: cached } = await chrome.storage.local.get(WIKI_MAIN_KEY);
     if (cached && Date.now() - cached.at < WIKI_MAIN_TTL) return cached.data;
     try {
-      const res = await fetchFn(
+      const res = await OH.guarded(fetchFn)(
         'https://starcitizen.tools/api.php?action=query&titles=Module:Mainpage/settings.json&prop=revisions&rvprop=content&rvslots=main&format=json&origin=*',
         { credentials: 'omit' },
       );
@@ -2431,7 +2488,7 @@
     const { [PATCH_KEY]: cached } = await chrome.storage.local.get(PATCH_KEY);
     if (cached && Date.now() - cached.at < PATCH_TTL) return cached.items;
     try {
-      const res = await fetchFn(
+      const res = await OH.guarded(fetchFn)(
         'https://robertsspaceindustries.com/api/spectrum/forum/channel/threads',
         {
           method: 'POST',
@@ -2532,7 +2589,7 @@
       const batch = missing.slice(i, i + 50);
       try {
         const titles = batch.map((f) => 'File:' + wikiTitle(f)).join('|');
-        const res = await fetchFn(
+        const res = await OH.guarded(fetchFn)(
           `https://starcitizen.tools/api.php?action=query&prop=imageinfo&iiprop=url&iiurlwidth=400&format=json&origin=*&titles=${encodeURIComponent(titles)}`,
           { credentials: 'omit', headers: { Accept: 'application/json' } },
         );
@@ -2606,7 +2663,7 @@
     const { [STORE_KEY]: cached } = await chrome.storage.local.get(STORE_KEY);
     if (!force && cached && Date.now() - cached.at < STORE_TTL) return cached;
     try {
-      const res = await fetchFn(STORE_URL, {
+      const res = await OH.guarded(fetchFn)(STORE_URL, {
         method: 'POST',
         credentials: 'omit',
         headers: { 'content-type': 'application/json', Accept: 'application/json' },
@@ -2683,7 +2740,7 @@
     if (!force && hit && Date.now() - hit.at < STOCK_TTL) return hit.s;
     let s = null;
     try {
-      const res = await fetchFn(url, { credentials: 'omit' });
+      const res = await OH.guarded(fetchFn)(url, { credentials: 'omit' });
       if (res.status === 404) s = { state: 'out', price: null, packs: [] };
       else if (res.ok) s = OH.parseShipStock(await res.text());
     } catch (e) {
@@ -2731,19 +2788,22 @@
     const { [NEWS_KEY]: cached } = await chrome.storage.local.get(NEWS_KEY);
     if (cached && Date.now() - cached.at < NEWS_TTL) return cached.items;
     try {
-      const res = await fetchFn('https://robertsspaceindustries.com/api/hub/getCommlinkItems', {
-        method: 'POST',
-        credentials: 'omit',
-        headers: { 'content-type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-          channel: '',
-          series: '',
-          type: '',
-          text: '',
-          sort: 'publish_new',
-          page: 1,
-        }),
-      });
+      const res = await OH.guarded(fetchFn)(
+        'https://robertsspaceindustries.com/api/hub/getCommlinkItems',
+        {
+          method: 'POST',
+          credentials: 'omit',
+          headers: { 'content-type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            channel: '',
+            series: '',
+            type: '',
+            text: '',
+            sort: 'publish_new',
+            page: 1,
+          }),
+        },
+      );
       const json = res.ok ? await res.json() : null;
       const items = OH.parseCommLinks(json && json.data);
       if (items.length) {
@@ -2820,9 +2880,9 @@
     const { [TWISC_KEY]: cached } = await chrome.storage.local.get(TWISC_KEY);
     if (cached && cached.url === post.url && cached.lead) return cached;
     try {
-      const page = await fetchFn(post.url, { credentials: 'omit' });
+      const page = await OH.guarded(fetchFn)(post.url, { credentials: 'omit' });
       const bodyUrl = page.ok ? OH.twiscBodyUrl(await page.text()) : null;
-      const body = bodyUrl ? await fetchFn(bodyUrl, { credentials: 'omit' }) : null;
+      const body = bodyUrl ? await OH.guarded(fetchFn)(bodyUrl, { credentials: 'omit' }) : null;
       if (body && body.ok) {
         const sum = {
           title: post.title,
@@ -2943,7 +3003,7 @@
     const { [key]: cached } = await chrome.storage.local.get(key);
     if (cached && Date.now() - cached.at < HELP_TTL) return cached.rows;
     try {
-      const res = await fetchFn(
+      const res = await OH.guarded(fetchFn)(
         `https://support.robertsspaceindustries.com/api/v2/help_center/en-us/articles/${id}.json`,
         { credentials: 'omit', headers: { Accept: 'application/json' } },
       );
@@ -2974,7 +3034,7 @@
     const { [REF_EVENTS_KEY]: cached } = await chrome.storage.local.get(REF_EVENTS_KEY);
     if (cached && Date.now() - cached.at < REF_EVENTS_TTL) return cached.events;
     try {
-      const res = await fetchFn(
+      const res = await OH.guarded(fetchFn)(
         'https://starcitizen.tools/api.php?action=parse&page=Referral_program&prop=wikitext&section=5&format=json&origin=*',
         { credentials: 'omit', headers: { Accept: 'application/json' } },
       );
@@ -2999,10 +3059,13 @@
     const fits = cached && (cached.want == null ? false : cached.want === want);
     if (fits && cached.rates && Date.now() - cached.at < FX_TTL) return cached;
     try {
-      const res = await fetchFn(`https://api.frankfurter.dev/v1/latest?base=USD&symbols=${want}`, {
-        credentials: 'omit',
-        headers: { Accept: 'application/json' },
-      });
+      const res = await OH.guarded(fetchFn)(
+        `https://api.frankfurter.dev/v1/latest?base=USD&symbols=${want}`,
+        {
+          credentials: 'omit',
+          headers: { Accept: 'application/json' },
+        },
+      );
       const json = res.ok ? await res.json() : null;
       if (json && json.rates) {
         const fresh = {

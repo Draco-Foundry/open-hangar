@@ -6739,7 +6739,11 @@ const AMO_ADDON_API = 'https://addons.mozilla.org/api/v5/addons/addon/open-hanga
       btn.disabled = true;
       out.textContent = 'Checking…';
       try {
-        const res = await fetch(AMO_ADDON_API, { credentials: 'omit', cache: 'no-store' });
+        const res = await fetch(AMO_ADDON_API, {
+          credentials: 'omit',
+          cache: 'no-store',
+          signal: AbortSignal.timeout(8000),
+        });
         const latest = res.ok ? (await res.json())?.current_version?.version : null;
         if (!latest) throw new Error('no version');
         chrome.storage.local.set({ lastUpdateCheck: Date.now() });
