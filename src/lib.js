@@ -73,6 +73,94 @@
 
   OH.getSource = (id) => OH.SOURCES.find((s) => s.id === id) || null;
 
+  // --- Remote status (kill switch) -------------------------------------------
+  // When RSI changes a page, every copy of the extension breaks until a fix clears
+  // store review. This small file on our own site lets us pause a broken scan (or
+  // require the fixed version) and show a notice, without a release. Read-only:
+  // nothing is sent. Cached for a few hours. Fails open: no file, a bad file or
+  // no connection = scan as normal.
+  //   { "sources": { "hangar": { "enabled": false, "message": "…" },
+  //                  "buybacks": { "minVersion": "0.2.13" } },
+  //     "banner": { "message": "…", "level": "warn", "until": "2026-10-08" } }
+  // Source ids: hangar, buybacks, referrals.
+  const STATUS_URL = 'https://openhangar.space/status.json';
+  const STATUS_KEY = 'remoteStatus';
+  const STATUS_TTL = 6 * 3600e3;
+  const STATUS_MSG_MAX = 300;
+  const statusText = (s) =>
+    typeof s === 'string' && s.trim() ? s.trim().slice(0, STATUS_MSG_MAX) : '';
+
+  // Raw status.json + this version → { paused: { [id]: message }, banner }. Pure.
+  OH.evalStatus = function evalStatus(data, version, now = Date.now()) {
+    const out = { paused: {}, banner: null };
+    if (!data || typeof data !== 'object') return out;
+    const sources = data.sources && typeof data.sources === 'object' ? data.sources : {};
+    for (const [id, s] of Object.entries(sources)) {
+      if (!s || typeof s !== 'object') continue;
+      const tooOld =
+        typeof s.minVersion === 'string' &&
+        version &&
+        OH.compareVersions(version, s.minVersion) < 0;
+      if (s.enabled === false) {
+        out.paused[id] =
+          statusText(s.message) ||
+          'RSI changed their site and this scan is paused while a fix is on the way. Your saved data is safe.';
+      } else if (tooOld) {
+        out.paused[id] =
+          statusText(s.message) ||
+          `RSI changed their site. Open Hangar ${s.minVersion} fixes this scan: update to keep scanning. Your saved data is safe.`;
+      }
+    }
+    const b = data.banner;
+    const until = b && typeof b.until === 'string' ? Date.parse(b.until) : NaN;
+    if (b && statusText(b.message) && !(until <= now)) {
+      out.banner = { message: statusText(b.message), level: b.level === 'info' ? 'info' : 'warn' };
+    }
+    return out;
+  };
+
+  let statusInflight = null;
+  async function loadStatus(fetchFn, force) {
+    const { [STATUS_KEY]: cached } = await chrome.storage.local.get(STATUS_KEY);
+    if (!force && cached && Date.now() - cached.at < STATUS_TTL) return cached.data;
+    let data = cached ? cached.data : null;
+    let at = Date.now();
+    try {
+      const res = await fetchFn(STATUS_URL, {
+        credentials: 'omit',
+        cache: 'no-cache',
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) data = await res.json();
+      else if (res.status === 404)
+        data = null; // no file = nothing paused
+      else throw new Error('HTTP ' + res.status);
+    } catch {
+      // Offline, blocked or a bad file: keep the last copy, try again in 30 minutes.
+      at = Date.now() - STATUS_TTL + 30 * 60e3;
+    }
+    await chrome.storage.local.set({ [STATUS_KEY]: { at, data } });
+    return data;
+  }
+
+  // → evalStatus(…) for the running version, from cache or the site.
+  OH.getRemoteStatus = async function getRemoteStatus(fetchFn = fetch, { force = false } = {}) {
+    const version = chrome.runtime?.getManifest?.().version || null;
+    if (!statusInflight) {
+      statusInflight = loadStatus(fetchFn, force).finally(() => (statusInflight = null));
+    }
+    return OH.evalStatus(await statusInflight, version);
+  };
+
+  // The pause message for a source, or '' to scan. Never throws.
+  OH.sourcePaused = async function sourcePaused(id) {
+    try {
+      return (await OH.getRemoteStatus()).paused[id] || '';
+    } catch {
+      return '';
+    }
+  };
+
   // --- Error log --------------------------------------------------------------
   // A small rolling log (last LOG_MAX entries) of errors, failed/partial scans and
   // RSI retries, so a user can copy a report into a bug post. Stays local like
@@ -798,6 +886,11 @@
     if (src.type === 'html' && !(window.OpenHangar && OpenHangar.parsePledges)) {
       return { ok: false, error: 'Parser not loaded on this page.' };
     }
+    const paused = await OH.sourcePaused(src.id);
+    if (paused) {
+      OH.log('warn', src.id, 'scan paused by remote status');
+      return { ok: false, paused: true, error: paused };
+    }
     try {
       let result;
       if (src.type === 'html') result = await scanHtmlSource(src, onProgress);
@@ -1184,6 +1277,11 @@
   // `campaign` tag per row ('current'|'legacy') since legacy is a superset.
   // Returns { ok, referral?, scannedAt?, error? }. Never throws.
   OH.getReferral = async function getReferral(onProgress) {
+    const paused = await OH.sourcePaused('referrals');
+    if (paused) {
+      OH.log('warn', 'referrals', 'scan paused by remote status');
+      return { ok: false, paused: true, error: paused };
+    }
     try {
       // Code/url come free from the account fetch (already cached/fetched there).
       const acct = await OH.getAccount();

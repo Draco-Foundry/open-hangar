@@ -2974,6 +2974,10 @@
       .signedout-banner[hidden] {
         display: none;
       }
+      .signedout-banner.info {
+        border-color: var(--good-line);
+        background: var(--good-soft);
+      }
       .signedout-banner a {
         color: var(--link);
         text-decoration: none;
@@ -3312,6 +3316,10 @@
           to refresh.</span
         >
       </div>
+
+      <!-- A notice from openhangar.space/status.json (e.g. "RSI changed their site,
+           a fix is coming"). Plain text only; see OH.getRemoteStatus. -->
+      <div id="site-notice" class="signedout-banner" role="status" hidden></div>
 
       <!-- A new version has downloaded and is waiting for a reload. -->
       <div id="update-banner" class="update-banner" role="status" hidden>
