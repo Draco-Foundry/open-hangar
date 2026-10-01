@@ -1385,6 +1385,69 @@ try {
     ? ok('Events card shows a running referral bonus event')
     : fail(`event banner: ${JSON.stringify(wse)}`);
 
+  // Keyboard (#200): cards open with Enter and Space, the pop-up keeps and returns
+  // focus, chips keep focus when they redraw, menus close on Escape.
+  console.log('Keyboard');
+  await go('#inventory');
+  await page.click('#layout [data-layout="gallery"]');
+  const active = () =>
+    page.evaluate(() => {
+      const a = document.activeElement;
+      return {
+        id: a.id,
+        card: a.classList.contains('card') ? a.dataset.id : null,
+        chip: a.dataset.key || null,
+        inModal: !!a.closest('#item-modal'),
+        inMenu: !!a.closest('#settings-menu'),
+        ring: getComputedStyle(a).outlineStyle,
+      };
+    });
+  const modalOpen = () => page.$eval('#item-modal', (m) => !m.hidden);
+  await page.focus('.card[data-id]');
+  const cardId = (await active()).card;
+  await page.keyboard.press('Enter');
+  const afterEnter = { open: await modalOpen(), ...(await active()) };
+  for (let i = 0; i < 12; i++) await page.keyboard.press('Tab');
+  const trapped = (await active()).inModal;
+  await page.keyboard.press('Escape');
+  const back = { open: await modalOpen(), ...(await active()) };
+  afterEnter.open &&
+  afterEnter.id === 'modal-close' &&
+  trapped &&
+  !back.open &&
+  back.card === cardId
+    ? ok('card opens with Enter, focus stays in the pop-up, Escape returns to the card')
+    : fail(`card keyboard: ${JSON.stringify({ afterEnter, trapped, back })}`);
+  back.ring === 'solid' ? ok('focused card shows a focus ring') : fail(`no ring: ${back.ring}`);
+  await page.keyboard.press('Space');
+  await new Promise((r) => setTimeout(r, 100));
+  (await modalOpen())
+    ? ok('Space opens the card and the pop-up stays open')
+    : fail('Space did not open (or instantly closed) the pop-up');
+  await page.keyboard.press('Escape');
+  await page.focus('#chips .chip[data-key]');
+  const chip = await active();
+  // Picking one kind dims the others, so count the kinds still pressed.
+  const pressed = () =>
+    page.$$eval('#chips .chip[data-key][aria-pressed="true"]', (cs) => cs.length);
+  const p0 = await pressed();
+  await page.keyboard.press('Enter');
+  const p1 = await pressed();
+  const chipAfter = await active();
+  await page.keyboard.press('Enter');
+  p0 !== p1 && chipAfter.chip === chip.chip && (await pressed()) === p0
+    ? ok('filter chip toggles with Enter and keeps focus after redrawing')
+    : fail(`chip keyboard: ${JSON.stringify({ p0, p1, chip, chipAfter })}`);
+  await page.focus('#settings-btn');
+  await page.keyboard.press('Enter');
+  const inMenu = (await active()).inMenu;
+  await page.keyboard.press('Escape');
+  const menuBack = await active();
+  const menuHidden = await page.$eval('#settings-menu', (m) => m.hidden);
+  inMenu && menuHidden && menuBack.id === 'settings-btn'
+    ? ok('gear menu: focus moves in, Escape closes it and returns to the gear')
+    : fail(`gear menu keyboard: ${JSON.stringify({ inMenu, menuHidden, menuBack })}`);
+
   for (const view of ['referrals', 'developers']) {
     console.log(view[0].toUpperCase() + view.slice(1));
     await go('#' + view);
