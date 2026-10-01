@@ -1,5 +1,5 @@
-# Response headers when openhangar.space is served by Cloudflare (site-worker/,
-# open-hangar#201). GitHub Pages ignores this file.
+# Response headers for openhangar.space, served by Cloudflare (site-worker/,
+# open-hangar#201).
 /*
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   X-Content-Type-Options: nosniff
