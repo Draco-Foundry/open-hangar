@@ -5119,8 +5119,14 @@ function bbDetailsBarHtml(list) {
       : '';
   return `<div class="bb-details-bar">${have ? `${have} of ${list.length} have details. ` : ''}Insurance, real prices and pack contents come from each buy-back's own RSI page. Opening a buy-back loads just that one. <button type="button" class="mk-btn primary" id="bbd-load">Load details for ${need.length}</button> <span class="muted">(about ${mins} min, one page at a time; you can keep browsing.${big})</span></div>`;
 }
-async function loadBuybackDetails() {
-  const list = computeBuybacks().filter((b) => !b.isCCU && !state.bbDetails[b.id]);
+// packsOnly: just the packs whose contents are unread (search's "Get Details").
+async function loadBuybackDetails({ packsOnly = false } = {}) {
+  const list = (packsOnly ? state.buybacks : computeBuybacks()).filter(
+    (b) =>
+      !b.isCCU &&
+      !state.bbDetails[b.id] &&
+      (!packsOnly || b.kind === 'pack' || b.kind === 'package'),
+  );
   bbLoading = { stop: false };
   renderBuybacks();
   const res = await OH.fetchBuybackDetails(
@@ -7525,9 +7531,51 @@ $('#bell-menu')?.addEventListener('click', (e) => {
 // finds nothing. "/" focuses it; Esc closes.
 const gsearch = $('#gsearch');
 const gsearchOut = $('#gsearch-results');
+// Both global searches start empty every time (#178): leaving one (click away,
+// Escape, a result, another page) clears it. The page filters on Inventory and
+// Buy-Backs are different: they stay.
 function closeGlobalSearch() {
   if (gsearchOut) gsearchOut.hidden = true;
+  if (gsearch) gsearch.value = '';
 }
+function closeTopSearch() {
+  const out = $('#gsearch-top-results');
+  if (out) out.hidden = true;
+  const box = $('#gsearch-top');
+  if (box) box.value = '';
+}
+// While results are open the wheel scrolls them, wherever the mouse is over the
+// panel (gaps, titles, footer, edges), and never hands the scroll to the page
+// (#168). lockPage: the page behind is dimmed, so it doesn't scroll either.
+function wheelStaysInResults(panel, { lockPage = false } = {}) {
+  document.addEventListener(
+    'wheel',
+    (e) => {
+      if (panel.hidden) return;
+      const inside = panel.contains(e.target);
+      if (!inside && !lockPage) return;
+      e.preventDefault();
+      const list = panel.querySelector('.gs-scroll');
+      if (list && inside) list.scrollTop += e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+    },
+    { passive: false },
+  );
+}
+// A click in either results panel: "Get Details" reads the unchecked packs'
+// pages; any row opens (handled further down), then the search clears.
+function onResultsClick(e, close) {
+  if (e.target.closest('[data-gs-bbdetails]')) {
+    close();
+    location.hash = '#buybacks';
+    loadBuybackDetails({ packsOnly: true });
+    return;
+  }
+  if (e.target.closest('.gs-row')) close();
+}
+window.addEventListener('hashchange', () => {
+  closeGlobalSearch();
+  closeTopSearch();
+});
 // Rich results (0.3.0): a plain yes/no answer first, then one row per match with
 // its picture, full name, what it's inside, key facts and price, grouped by where
 // it lives. Rows open the pledge / buy-back details; the list scrolls in place.
@@ -7563,9 +7611,16 @@ function globalSearchHtml(q) {
       ? `<div class="gs-group"><div class="gs-title"><span>${title}</span><span>${n > rows.length ? `${rows.length} of ${n}` : n}</span></div>${rows.join('')}</div>`
       : '';
 
-  const hits = state.items.filter(
-    (p) => has(plainName(p)) || (p.contents || []).some((c) => has(c.label)),
-  );
+  // Type order inside each group (owner, #169): packs first (a ship found inside a
+  // pack is the pack's row), then packages, ships, paints, CCUs, the rest. Sorted
+  // before the row caps, so packs never get cut for add-ons. sort() keeps today's
+  // order within a type.
+  const TYPE_RANK = { pack: 0, package: 1, ship: 2, paint: 3, ccu: 4 };
+  const byType = (typeOf) => (a, b) => (TYPE_RANK[typeOf(a)] ?? 5) - (TYPE_RANK[typeOf(b)] ?? 5);
+
+  const hits = state.items
+    .filter((p) => has(plainName(p)) || (p.contents || []).some((c) => has(c.label)))
+    .sort(byType(pledgeType));
   const pledges = hits.slice(0, 12).map((p) => {
     // Matched a ship inside a package: lead with that ship, say what it's in.
     const inner = !has(plainName(p)) && (p.contents || []).find((c) => has(c.label));
@@ -7594,18 +7649,34 @@ function globalSearchHtml(q) {
       open: 'Details →',
     });
   });
-  const bbHits = state.buybacks.filter(
-    (b) => has(b.name) || has(b.contains) || (b.ccu && (has(b.ccu.from) || has(b.ccu.to))),
-  );
+  // A buy-back pack also matches on the ships inside it, once its details have
+  // been read (#167). Each pack stays its own row, never merged with the ship.
+  const bbInner = (b) =>
+    has(b.name) ? null : ((bbDetail(b) || {}).ships || []).find((x) => has(x.name)) || null;
+  const bbType = (b) => (b.isCCU ? 'ccu' : b.kind);
+  const bbHits = state.buybacks
+    .filter(
+      (b) =>
+        has(b.name) ||
+        has(b.contains) ||
+        (b.ccu && (has(b.ccu.from) || has(b.ccu.to))) ||
+        bbInner(b),
+    )
+    .sort(byType(bbType));
   const bbs = bbHits.slice(0, 8).map((b) => {
-    const type = b.isCCU ? 'ccu' : b.kind;
+    const type = bbType(b);
+    const inner = bbInner(b);
     return row({
       attr: `data-open-bb="${esc(String(b.id))}"`,
-      img: b.ccu && b.ccu.to && !b.shipArt ? null : realImage(b.image),
-      resolve: b.ccu && b.ccu.to ? b.ccu.to : resolveImageName({ ...b, kind: 'ship' }) || b.name,
-      name: b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '',
+      img: inner || (b.ccu && b.ccu.to && !b.shipArt) ? null : realImage(b.image),
+      resolve: inner
+        ? inner.name
+        : b.ccu && b.ccu.to
+          ? b.ccu.to
+          : resolveImageName({ ...b, kind: 'ship' }) || b.name,
+      name: inner ? inner.name : b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '',
       where: [
-        b.contains ? esc(b.contains) : '',
+        inner ? `Inside <b>${esc(b.name)}</b>` : b.contains ? esc(b.contains) : '',
         b.date ? `<em>Melted ${esc(day(b.date))}</em>` : '',
       ]
         .filter(Boolean)
@@ -7638,12 +7709,19 @@ function globalSearchHtml(q) {
 
   // The groups say where things are (owner: no yes/no line); only an empty search
   // gets a line of its own.
+  // Packs whose contents were never read can't match on what's inside them; say
+  // so quietly, with a way to read just those (details stay opt-in: scans stay fast).
+  const unchecked = uncheckedPacks();
+  const packNote = unchecked
+    ? `<div class="gs-note">${unchecked} buy-back pack${unchecked === 1 ? '' : 's'} not checked yet · <button type="button" class="gs-note-btn" data-gs-bbdetails>Get Details</button></div>`
+    : '';
   const body =
     group('In Your Hangar', pledges, hits.length) +
     group('In Your Buy-Backs', bbs, bbHits.length) +
+    packNote +
     group('Earned Rewards', rewards, rewards.length);
-  if (!body)
-    return `<div class="gs-none">Nothing in your hangar, buy-backs or referral rewards matches "${esc(q.trim())}".</div>`;
+  if (!pledges.length && !bbs.length && !rewards.length)
+    return `<div class="gs-none">Nothing in your hangar, buy-backs or referral rewards matches "${esc(q.trim())}".</div>${packNote}`;
   const total = pledges.length + bbs.length + rewards.length;
   return `<div class="gs-scroll">${body}</div><div class="gs-foot"><span>${total} result${total === 1 ? '' : 's'} · Enter opens the first</span><span>Searching your hangar, buy-backs and rewards</span></div>`;
 }
@@ -7684,16 +7762,14 @@ if (gsearch && gsearchOut) {
       closeGlobalSearch();
       gsearch.blur();
     } else if (e.key === 'Enter') {
-      gsearchOut.querySelector('.gs-row')?.click();
-      closeGlobalSearch();
+      gsearchOut.querySelector('.gs-row')?.click(); // opens it, then clears
     }
   });
-  gsearchOut.addEventListener('click', (e) => {
-    if (e.target.closest('.gs-row')) closeGlobalSearch();
-  });
+  gsearchOut.addEventListener('click', (e) => onResultsClick(e, closeGlobalSearch));
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('.gsearch')) closeGlobalSearch();
+    if (!e.target.closest('.gsearch') && (gsearch.value || !gsearchOut.hidden)) closeGlobalSearch();
   });
+  wheelStaysInResults(gsearchOut, { lockPage: true });
   // The top bar's search box: same results, shown under it, on every page.
   const top = $('#gsearch-top');
   const topOut = $('#gsearch-top-results');
@@ -7714,19 +7790,17 @@ if (gsearch && gsearchOut) {
     });
     top.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        topOut.hidden = true;
+        closeTopSearch();
         top.blur();
       } else if (e.key === 'Enter') {
-        topOut.querySelector('.gs-row')?.click();
-        topOut.hidden = true;
+        topOut.querySelector('.gs-row')?.click(); // opens it, then clears
       }
     });
-    topOut.addEventListener('click', (e) => {
-      if (e.target.closest('.gs-row')) topOut.hidden = true;
-    });
+    topOut.addEventListener('click', (e) => onResultsClick(e, closeTopSearch));
     document.addEventListener('click', (e) => {
-      if (!e.target.closest('#top-search')) topOut.hidden = true;
+      if (!e.target.closest('#top-search') && (top.value || !topOut.hidden)) closeTopSearch();
     });
+    wheelStaysInResults(topOut);
   }
   document.addEventListener('keydown', (e) => {
     const typing =
