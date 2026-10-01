@@ -33,7 +33,7 @@
         : /Safari\//.test(ua)
           ? 'safari'
           : null;
-  var LABELS = { review: 'In review', planned: 'Planned' };
+  var LABELS = { review: 'In Review', planned: 'Soon™' };
   var box = document.getElementById('installs');
   var allLive = true;
   box.querySelectorAll('.install').forEach(function (a) {
@@ -47,7 +47,7 @@
     } else {
       a.classList.add('soon', 'status-' + status);
       a.setAttribute('aria-disabled', 'true');
-      note.textContent = LABELS[status] || 'Coming soon';
+      note.textContent = LABELS[status] || 'Coming Soon';
       if (status === 'review') allLive = false;
     }
     if (a.getAttribute('data-browser') === mine) {
