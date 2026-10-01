@@ -4,6 +4,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- New: **Support Open Hangar** if you like: Ko-fi and Patreon links in the footer and on the
+  Developers page. Open Hangar stays free, with no ads and nothing locked.
+
 ## 0.2.13 — 2026-10-01
 
 - Improved: **When RSI changes their site and breaks a scan**, Open Hangar can now pause just

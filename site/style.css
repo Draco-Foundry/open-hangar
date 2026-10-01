@@ -286,6 +286,25 @@ footer nav {
   flex-wrap: wrap;
   gap: 20px;
 }
+.support-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+.support-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text);
+  text-decoration: none;
+}
+.support-links a:hover {
+  border-color: var(--link);
+}
 .disclaimer {
   margin: 12px 0 0;
 }
