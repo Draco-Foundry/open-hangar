@@ -11,6 +11,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   random and never the same one twice in a row.
 - Improved: **every link and button label is in Title Case**, so they're easier to spot.
 - Improved: How to Use is now the **Pilot's Handbook**, with clearer section names.
+- New: **Report a Scan Problem.** When a scan fails, one click opens a GitHub issue with
+  the error report already filled in. You read it and submit it yourself; nothing is sent
+  in the background, and it has nothing about your account.
 - Fixed: one unreadable buy-back page no longer stops the rest of your buy-backs from
   loading. That page is skipped and the others come through.
 
