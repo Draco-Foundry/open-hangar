@@ -319,6 +319,52 @@ test('a backup file keeps export format v2 and round-trips the history', async (
   assert.equal(mem.db.history, undefined);
 });
 
+test('old backup files still restore: export v1, no version at all, a referral object (#199)', async () => {
+  // Export v1: sources only, no account block, no history.
+  reset({ db: { schemaVersion: 3, sources: {} }, dbHistory: [snap(5, 1)] });
+  let res = await OH.importDB({
+    app: 'open-hangar',
+    schemaVersion: 1,
+    exportedAt: '2026-05-01T00:00:00Z',
+    sources: {
+      hangar: { items: rows(3), scannedAt: 2 },
+      buybacks: { items: rows(2, 'b'), scannedAt: 3, meta: { tokens: 2 } },
+      referral: { items: { count: 4, recruits: [] }, scannedAt: 4 },
+    },
+  });
+  assert.equal(res.ok, true);
+  await settle();
+  assert.deepEqual(mem.db.sources.hangar.items, rows(3));
+  assert.deepEqual(mem.db.sources.buybacks.meta, { tokens: 2 });
+  assert.equal(mem.db.sources.referral.items.count, 4);
+  assert.equal(mem.dbHistory.length, 1); // this browser's history is kept
+
+  // Older still: no schemaVersion, hand-trimmed.
+  reset({});
+  res = await OH.importDB({ sources: { hangar: { items: [...rows(2), null, 7] } } });
+  assert.equal(res.ok, true);
+  assert.equal(mem.db.sources.hangar.items.length, 2); // junk rows dropped, real ones kept
+});
+
+test('restoring a backup merges history both ways: nothing newer or older is lost (#199)', async () => {
+  reset({
+    db: { schemaVersion: 3, sources: { hangar: { items: rows(2), scannedAt: 30 } } },
+    dbHistory: [snap(20, 2), snap(30, 3)],
+  });
+  const res = await OH.importDB({
+    app: 'open-hangar',
+    schemaVersion: 2,
+    sources: { hangar: { items: rows(1), scannedAt: 10 } },
+    history: [snap(10, 1), snap(20, 2)],
+  });
+  assert.equal(res.ok, true);
+  await settle();
+  assert.deepEqual(
+    mem.dbHistory.map((x) => x.at),
+    [10, 20, 30],
+  );
+});
+
 test('import refuses a backup format it does not know, but takes a stored DB', async () => {
   reset({});
   const future = await OH.importDB({ app: 'open-hangar', schemaVersion: 3, sources: {} });

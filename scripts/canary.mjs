@@ -6,7 +6,9 @@
  *
  * Run by .github/workflows/canary.yml, or by hand: `npm run canary`.
  * Logged-in pages (hangar, buy-backs, referrals) can't be checked from here.
- * Also checks our own exchange-rates file is live and fresh (#243).
+ * Also checks our own exchange-rates file is live and fresh (#243), and that
+ * the saved copies the tests read (test/fixtures) still look like the live
+ * pages (#199).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,6 +29,8 @@ const OH = globalThis.OH;
 // Remember the last HTTP answer per host, to tell "RSI is down or blocking us"
 // from "RSI changed the page".
 const lastHttp = new Map();
+// Every OK answer, kept for the fixture check below.
+const answers = [];
 const UA = 'OpenHangar-canary (+https://openhangar.space)';
 const fetchLogged = async (url, init = {}) => {
   const host = new URL(url).host;
@@ -37,6 +41,7 @@ const fetchLogged = async (url, init = {}) => {
       signal: AbortSignal.timeout(30000),
     });
     lastHttp.set(host, `HTTP ${res.status}`);
+    if (res.ok) answers.push([String(url), res.clone()]);
     return res;
   } catch (e) {
     lastHttp.set(host, e?.name === 'TimeoutError' ? 'timed out' : 'no connection');
@@ -140,6 +145,57 @@ const checks = [
   },
 ];
 
+// --- Saved test pages (#199) -------------------------------------------------
+// The tests run the parsers on saved copies of these pages (test/fixtures). If
+// the live page gives different fields than the saved copy, the tests are
+// passing on a page RSI no longer serves: save a fresh copy and update the
+// test's numbers. Uses the answers the checks above already downloaded.
+const fixture = (file) => fs.readFileSync(path.join(ROOT, 'test/fixtures', file), 'utf8');
+const liveJson = async (re) => {
+  const hit = answers.find(([u]) => re.test(u));
+  return hit ? hit[1].clone().json() : null;
+};
+// Fields set in at least half the rows, so one odd row doesn't count.
+function commonFields(rows) {
+  const list = (Array.isArray(rows) ? rows : []).filter((r) => r && typeof r === 'object');
+  const seen = new Map();
+  for (const r of list)
+    for (const [k, v] of Object.entries(r))
+      if (v != null && v !== '') seen.set(k, (seen.get(k) || 0) + 1);
+  return [...seen]
+    .filter(([, n]) => n * 2 >= list.length)
+    .map(([k]) => k)
+    .sort();
+}
+const savedPages = [
+  {
+    file: 'store-ships.json',
+    live: async () => OH.parseStoreShips(await liveJson(/upgrade\/graphql/)),
+    saved: () => OH.parseStoreShips(JSON.parse(fixture('store-ships.json'))),
+  },
+  {
+    file: 'commlinks.html',
+    live: async () => OH.parseCommLinks((await liveJson(/getCommlinkItems/))?.data),
+    saved: () => OH.parseCommLinks(fixture('commlinks.html')),
+  },
+  {
+    file: 'patch-notes.json',
+    live: async () => OH.parsePatchNotes(await liveJson(/forum\/channel\/threads/)),
+    saved: () => OH.parsePatchNotes(JSON.parse(fixture('patch-notes.json'))),
+  },
+  {
+    file: 'loaner-matrix.html',
+    live: async () =>
+      OH.parseLoanerMatrix((await liveJson(/articles\/360003093114/))?.article?.body),
+    saved: () => OH.parseLoanerMatrix(fixture('loaner-matrix.html')),
+  },
+  {
+    file: 'included-vessels.html',
+    live: async () =>
+      OH.parseLoanerMatrix((await liveJson(/articles\/4408770370455/))?.article?.body),
+    saved: () => OH.parseLoanerMatrix(fixture('included-vessels.html')),
+  },
+];
 const broken = [];
 const down = [];
 const ours = [];
@@ -162,6 +218,29 @@ for (const c of checks) {
   } else {
     console.log(`✔ ${c.name}`);
   }
+}
+
+for (const p of savedPages) {
+  let live;
+  try {
+    live = commonFields(await p.live());
+  } catch {
+    continue; // no live answer: the check above already said so
+  }
+  if (!live.length) continue;
+  const saved = commonFields(p.saved());
+  const gone = saved.filter((k) => !live.includes(k));
+  const added = live.filter((k) => !saved.includes(k));
+  if (gone.length || added.length) {
+    const what = [
+      added.length && `live now has ${added.join(', ')}`,
+      gone.length && `live no longer has ${gone.join(', ')}`,
+    ];
+    ours.push(
+      `Saved test page out of date: test/fixtures/${p.file}: ${what.filter(Boolean).join('; ')}`,
+    );
+    console.log(`✘ saved copy ${p.file} is out of date`);
+  } else console.log(`✔ saved copy ${p.file}`);
 }
 
 if (broken.length || down.length || ours.length) {

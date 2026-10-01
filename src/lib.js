@@ -2590,7 +2590,14 @@
     if (got.error) return { error: got.error };
     if (!got.res.ok) return { error: `RSI responded ${got.res.status}.` };
     const html = await got.res.text();
-    const d = window.OpenHangar.parseBuybackDetail(html);
+    // A page the parser chokes on is skipped like an unreadable one, so one odd
+    // buy-back can't stop the whole batch (#199).
+    let d = null;
+    try {
+      d = window.OpenHangar.parseBuybackDetail(html);
+    } catch (e) {
+      OH.log('warn', 'buybacks', `buy-back page ${id} didn't parse: ${e?.message || e}`);
+    }
     if (!d || d.price == null) {
       return looksLoggedOut(got.res, html)
         ? { error: 'Not signed in to RSI.' }
