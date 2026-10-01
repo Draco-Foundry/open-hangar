@@ -5038,8 +5038,13 @@ function bbDetailsBarHtml(list) {
     return `<div class="bb-details-bar"><span id="bbd-progress">Reading buy-back pages…</span> <button type="button" class="mk-btn" id="bbd-stop">Stop</button></div>`;
   }
   if (!need.length) return have ? '' : '';
-  const mins = Math.max(1, Math.round((need.length * 1.3) / 60));
-  return `<div class="bb-details-bar">${have ? `${have} of ${list.length} have details. ` : ''}Insurance, real prices and pack contents come from each buy-back's own RSI page. <button type="button" class="mk-btn primary" id="bbd-load">Load details for ${need.length}</button> <span class="muted">(about ${mins} min, one page at a time; you can keep browsing)</span></div>`;
+  const mins = Math.max(1, Math.round((need.length * 1.6) / 60));
+  // Big lists get a heads-up: hundreds of pages in a row is what makes RSI throttle.
+  const big =
+    need.length > 100
+      ? ` Reading this many pages can make RSI slow you down for a while; if it does, we stop and keep what's read.`
+      : '';
+  return `<div class="bb-details-bar">${have ? `${have} of ${list.length} have details. ` : ''}Insurance, real prices and pack contents come from each buy-back's own RSI page. Opening a buy-back loads just that one. <button type="button" class="mk-btn primary" id="bbd-load">Load details for ${need.length}</button> <span class="muted">(about ${mins} min, one page at a time; you can keep browsing.${big})</span></div>`;
 }
 async function loadBuybackDetails() {
   const list = computeBuybacks().filter((b) => !b.isCCU && !state.bbDetails[b.id]);
@@ -5058,7 +5063,13 @@ async function loadBuybackDetails() {
   );
   bbLoading = null;
   state.bbDetails = { ...(await OH.getBuybackDetails()) };
-  if (res.errors)
+  if (res.rateLimited) {
+    const mins = Math.max(1, Math.ceil((res.retryAt - Date.now()) / 60e3));
+    setStatus(
+      `RSI asked us to slow down, so we stopped${res.done ? ` after ${res.done} pages (kept)` : ''}. Try again in about ${mins} min. Opening a single buy-back still works.`,
+      true,
+    );
+  } else if (res.errors)
     setStatus(`Read ${res.done - res.errors} buy-back pages; ${res.errors} couldn't be read.`);
   if (currentView() === 'buybacks') renderBuybacks();
 }

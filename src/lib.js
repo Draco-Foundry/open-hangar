@@ -806,7 +806,9 @@
   // Returns { res } or { error, transient }.
   const RETRIES = 3;
   const MAX_RETRY_WAIT_MS = 15000;
-  async function fetchPage(url, onRetry) {
+  // opts.retryRateLimit: false = a 429 comes straight back as { rateLimited }, for
+  // batches that should stop rather than push on (buy-back details).
+  async function fetchPage(url, onRetry, { retryRateLimit = true } = {}) {
     let lastError = null;
     for (let attempt = 0; attempt <= RETRIES; attempt++) {
       if (attempt > 0) {
@@ -822,6 +824,9 @@
           wait: DELAY_MS * 2 ** (attempt + 1),
         };
         continue;
+      }
+      if (res.status === 429 && !retryRateLimit) {
+        return { error: 'RSI asked us to slow down', rateLimited: true };
       }
       if (res.status === 429 || res.status >= 500) {
         const after = Number(res.headers.get('retry-after')) * 1000;
@@ -2245,7 +2250,12 @@
     const all = await OH.getBuybackDetails();
     if (all[id]) return all[id];
     if (!/^\d+$/.test(String(id))) return { error: 'No RSI page for this buy-back.' };
-    const got = await fetchPage(`https://robertsspaceindustries.com/pledge/buyback/${id}`);
+    const got = await fetchPage(`https://robertsspaceindustries.com/pledge/buyback/${id}`, null, {
+      retryRateLimit: false,
+    });
+    if (got.rateLimited || got.res?.status === 403) {
+      return { error: 'RSI asked us to slow down.', rateLimited: true };
+    }
     if (got.error) return { error: got.error };
     if (!got.res.ok) return { error: `RSI responded ${got.res.status}.` };
     const html = await got.res.text();
@@ -2259,8 +2269,13 @@
     saveBuybackDetails();
     return all[id];
   };
-  // Read many, politely (one at a time, RSI's usual delay between). onProgress
-  // (done, total); stop by returning false from shouldGo(). → { done, errors }.
+  // Read many, politely: one at a time with a random pause between pages, and at
+  // RSI's first "slow down" (429, or a 403 block) the whole batch stops and batches
+  // are held off for BBD_COOLDOWN_MS, rather than pushing on page by page. What was
+  // read is kept. onProgress(done, total); stop by returning false from shouldGo().
+  // → { done, errors, total, rateLimited?, retryAt? }.
+  const BBD_COOLDOWN_MS = 15 * 60e3;
+  const BBD_SLOW_KEY = 'bbdSlowDownUntil';
   OH.fetchBuybackDetails = async function fetchBuybackDetails(
     ids,
     onProgress,
@@ -2268,18 +2283,32 @@
   ) {
     const all = await OH.getBuybackDetails();
     const todo = ids.filter((id) => !all[id] && /^\d+$/.test(String(id)));
+    const { [BBD_SLOW_KEY]: until = 0 } = await chrome.storage.local.get(BBD_SLOW_KEY);
+    if (until > Date.now()) {
+      return { done: 0, errors: 0, total: todo.length, rateLimited: true, retryAt: until };
+    }
     let done = 0;
     let errors = 0;
     for (const id of todo) {
       if (!shouldGo()) break;
       const r = await OH.fetchBuybackDetail(id);
+      if (r.rateLimited) {
+        const retryAt = Date.now() + BBD_COOLDOWN_MS;
+        await chrome.storage.local.set({ [BBD_SLOW_KEY]: retryAt });
+        OH.log(
+          'warn',
+          'buybacks',
+          `details stopped after ${done} pages: RSI asked us to slow down`,
+        );
+        return { done, errors, total: todo.length, rateLimited: true, retryAt };
+      }
       if (r.error) {
         errors++;
         if (/signed in/i.test(r.error)) break;
       }
       done++;
       onProgress?.(done, todo.length);
-      await sleep(DELAY_MS);
+      await sleep(DELAY_MS + Math.random() * DELAY_MS * 1.5); // 0.4 to 1 s, not a fixed beat
     }
     return { done, errors, total: todo.length };
   };
