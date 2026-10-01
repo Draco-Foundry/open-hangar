@@ -6902,6 +6902,7 @@ async function initUpdates() {
   }
 }
 
+// @sync-start: cut from store builds until sync launches (scripts/pack.mjs, #187)
 // --- openhangar.space: connect + sync (optional) -----------------------------
 let siteWait = null; // { stop, code } while waiting for the website to confirm
 async function renderSiteLink() {
@@ -6980,6 +6981,7 @@ $('#site-link')?.addEventListener('click', async (e) => {
   }
   renderSiteLink();
 });
+// @sync-end
 
 // --- Display currency -------------------------------------------------------
 function currencyNote() {
@@ -7745,7 +7747,9 @@ if (gsearch && gsearchOut) {
   renderSupporters();
   initUpdates();
   renderSiteNotice();
+  // @sync-start
   renderSiteLink();
+  // @sync-end
   if (currency && currency !== 'USD') {
     const sel = $('#currency-select');
     if (sel) sel.value = currency;

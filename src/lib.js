@@ -2313,6 +2313,7 @@
     return { done, errors, total: todo.length };
   };
 
+  // @sync-start: cut from store builds until sync launches (scripts/pack.mjs, #187)
   // --- openhangar.space (optional sync) -------------------------------------------
   // Nothing leaves the browser unless the user connects AND presses Sync now.
   // Connecting uses a device code: the site confirms it while signed in, then
@@ -2400,6 +2401,7 @@
     }
     await chrome.storage.local.remove('siteLink');
   };
+  // @sync-end
 
   // --- Display currency -----------------------------------------------------------
   // RSI prices everything in USD. Users can view amounts in one of a few big

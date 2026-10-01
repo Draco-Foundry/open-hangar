@@ -12,9 +12,44 @@
  * Kept out of manifest.json itself so Chrome doesn't warn about unknown keys.
  */
 
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 
 const RUNTIME = ['_locales', 'icons', 'src'];
+
+// Sync to app.openhangar.space isn't launched, and the privacy policy says nothing
+// leaves your device, so store builds don't carry its code at all (#187). Lines from
+// a "@sync-start" marker through "@sync-end" are cut. OH_SYNC=1 keeps them, for
+// developers testing sync locally (with the `siteUrl` storage key).
+const KEEP_SYNC = process.env.OH_SYNC === '1';
+const SYNC_FILES = ['src/lib.js', 'src/dashboard.js', 'src/dashboard.html'];
+function stripSync(file) {
+  const out = [];
+  let inside = false;
+  for (const line of readFileSync(file, 'utf8').split('\n')) {
+    if (line.includes('@sync-start')) {
+      if (inside) throw new Error(`${file}: @sync-start inside another sync block`);
+      inside = true;
+    } else if (line.includes('@sync-end')) {
+      if (!inside) throw new Error(`${file}: @sync-end without @sync-start`);
+      inside = false;
+    } else if (!inside) out.push(line);
+  }
+  if (inside) throw new Error(`${file}: @sync-start never closed`);
+  writeFileSync(file, out.join('\n'));
+}
+// Belt and braces: no store build may still talk to the sync site.
+function assertNoSyncHost(dir) {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = `${dir}/${e.name}`;
+    if (e.isDirectory()) assertNoSyncHost(p);
+    else if (
+      /\.(js|html|json)$/.test(e.name) &&
+      readFileSync(p, 'utf8').includes('app.openhangar.space')
+    ) {
+      throw new Error(`${p} still mentions app.openhangar.space; wrap it in @sync-start/@sync-end`);
+    }
+  }
+}
 const base = JSON.parse(readFileSync('manifest.json', 'utf8'));
 
 const targets = {
@@ -47,5 +82,9 @@ for (const [name, transform] of Object.entries(targets)) {
   cpSync('LICENSE', `${out}/LICENSE`);
   cpSync('THIRD_PARTY_NOTICES.md', `${out}/THIRD_PARTY_NOTICES.md`);
   writeFileSync(`${out}/manifest.json`, JSON.stringify(transform(base), null, 2) + '\n');
-  console.log(`built ${out}`);
+  if (!KEEP_SYNC) {
+    for (const f of SYNC_FILES) stripSync(`${out}/${f}`);
+    assertNoSyncHost(`${out}/src`);
+  }
+  console.log(`built ${out}${KEEP_SYNC ? ' (with sync, OH_SYNC=1)' : ''}`);
 }
