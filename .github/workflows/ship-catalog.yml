@@ -1,8 +1,8 @@
 name: Ship catalog
 
 # Weekly refresh of src/data/ship-catalog.json (ship prices and stats bundled
-# with the extension). Commits to main only when the list changed; the next
-# release picks it up.
+# with the extension). Commits to main only when the list changed and the tests
+# still pass with it (#194); the next release picks it up.
 
 on:
   schedule:
@@ -19,8 +19,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 20
+          node-version: 22
+      - run: npm ci
       - run: node scripts/update-ship-catalog.mjs
+      - name: Test with the new catalog
+        run: npm test
       - name: Commit if changed
         run: |
           if git diff --quiet -- src/data/ship-catalog.json; then
