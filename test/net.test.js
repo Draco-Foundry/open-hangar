@@ -30,8 +30,12 @@ test('a hung request is cut off at the time limit', async () => {
     new Promise((_, reject) =>
       init.signal.addEventListener('abort', () => reject(init.signal.reason)),
     );
+  // Node doesn't stay alive for AbortSignal.timeout alone (browsers don't care):
+  // hold the event loop open while the request "hangs".
+  const keepAlive = setTimeout(() => {}, 5000);
   const t0 = Date.now();
   await assert.rejects(OH.guarded(hang, { timeout: 50 })(A), { name: 'TimeoutError' });
+  clearTimeout(keepAlive);
   assert.ok(Date.now() - t0 < 2000);
   assert.ok(store.netDown['api.example.test']); // remembered as down
 });
