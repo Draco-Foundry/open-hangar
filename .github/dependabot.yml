@@ -1,0 +1,12 @@
+# Keeps the commit-pinned GitHub Actions current (each pin carries its version in a
+# comment, which Dependabot updates along with it). Security updates for npm
+# packages come from Dependabot alerts, separately.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
