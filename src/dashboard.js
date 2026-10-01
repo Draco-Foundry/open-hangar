@@ -473,6 +473,31 @@ window.addEventListener('unhandledrejection', (e) => {
 // text; at the end "✓ Done" (or "⚠ Finished") for a moment, then Scan All again.
 const scanProgress = { i: 0, n: 1 };
 let scanDoneTimer = null;
+// What the scan is on right now ("Buy-backs · page 8 · 800 items"). Never in the
+// Citizen Card, where a growing line pushed the card around (#170): the Scan
+// button's hover text and its ▾ menu, and on the first scan (the welcome card is
+// up) a big progress bar in place of Scan All Now. '' = the scan ended.
+function scanDetail(text) {
+  const btn = $('#scan-home');
+  if (btn && text) btn.title = text;
+  const line = $('#scan-menu-progress');
+  if (line) {
+    line.textContent = text ? `Scanning: ${text}` : '';
+    line.hidden = !text;
+  }
+  const welcome = $('#oh-welcome');
+  const prog = $('#welcome-progress');
+  const go = $('#welcome-scan');
+  if (!prog || !go) return;
+  const first = !!welcome && !welcome.hidden;
+  prog.hidden = !(first && text);
+  go.hidden = first && !!text;
+  if (first && text) {
+    const { i, n } = scanProgress;
+    $('#wp-fill').style.width = `${Math.max(4, Math.min(100, ((i + 0.5) / n) * 100))}%`;
+    $('#wp-text').textContent = text;
+  }
+}
 function setScanning(text, done = false) {
   const btn = $('#scan-home');
   if (!btn) return;
@@ -6273,8 +6298,8 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   if (scanSelectedBtn) scanSelectedBtn.disabled = true;
   scanProgress.i = 0;
   scanProgress.n = [hangar, buybacks, referrals, store].filter(Boolean).length || 1;
-  setStatus('Scanning…');
   setScanning('Scanning…');
+  scanDetail('Starting…');
   const parts = [];
   let anyErr = false;
   // One account lookup for the whole scan; every save reuses it (each lookup is
@@ -6287,12 +6312,12 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
     const h = await OH.scanSource(
       'hangar',
       (page, c, retry) => {
-        setStatus(
-          retry
-            ? `RSI hiccup on hangar page ${page} — retrying (${retry.attempt}/${retry.of})…`
-            : `Scanning hangar… page ${page}, ${c} items`,
-        );
         setScanning(retry ? `hangar… retrying` : `hangar… ${c}`);
+        scanDetail(
+          retry
+            ? `Inventory · RSI hiccup on page ${page}, retrying (${retry.attempt}/${retry.of})`
+            : `Inventory · page ${page} · ${c} items`,
+        );
       },
       { account },
     );
@@ -6319,12 +6344,12 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
     const b = await OH.scanSource(
       'buybacks',
       (page, c, retry) => {
-        setStatus(
-          retry
-            ? `RSI hiccup on buy-backs page ${page} — retrying (${retry.attempt}/${retry.of})…`
-            : `Scanning buy-backs… page ${page}, ${c} items`,
-        );
         setScanning(retry ? `buy-backs… retrying` : `buy-backs… ${c}`);
+        scanDetail(
+          retry
+            ? `Buy-backs · RSI hiccup on page ${page}, retrying (${retry.attempt}/${retry.of})`
+            : `Buy-backs · page ${page} · ${c} items`,
+        );
       },
       { account },
     );
@@ -6346,8 +6371,8 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   if (referrals) {
     const r = await OH.getReferral(
       (phase, n) => {
-        setStatus(`Scanning referrals — ${phase}… ${n}`);
         setScanning(`referrals ${phase}… ${n}`);
+        scanDetail(`Referrals · ${phase} · ${n}`);
       },
       { account },
     );
@@ -6365,9 +6390,9 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
 
   // Store: re-check RSI's store for your wishlist ships (skips the 6-hour cache).
   if (store && state.wishlist.length) {
-    setStatus('Checking the store for your wishlist…');
     if (referrals) scanProgress.i++;
     setScanning('store');
+    scanDetail('Store · checking your wishlist');
     const list = await wishlistStock({ force: true });
     const n = list.filter((x) => x.st && x.st.state === 'in').length;
     parts.push(`${n} wishlist ship${n === 1 ? '' : 's'} on sale`);
@@ -6376,6 +6401,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   const summary = parts.join(' · ') || 'Nothing scanned';
   // The counts are already on Home (the summary boxes), so only a problem is
   // spelled out here; the header badge carries the full recap on hover.
+  scanDetail('');
   setStatus(anyErr ? summary : '', anyErr);
   setScanning(`${anyErr ? '⚠ ' : '✓ '}${summary}`, true);
   route();

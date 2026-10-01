@@ -3179,6 +3179,8 @@
               ▾
             </button>
             <div id="scan-menu" class="scan-menu sm-rich" hidden>
+              <!-- While a scan runs: what it's on (#170). -->
+              <div class="sm-progress" id="scan-menu-progress" role="status" hidden></div>
               <div class="sm-head">
                 <span>What to Scan</span
                 ><button type="button" class="sm-all" data-scan-all>Select All</button>
@@ -3379,6 +3381,11 @@
             referrals and more. Everything stays on this computer.
           </p>
           <button type="button" class="welcome-scan" id="welcome-scan">Scan All Now</button>
+          <!-- The first scan's progress, in place of the button (#170). -->
+          <div class="welcome-progress" id="welcome-progress" role="status" hidden>
+            <div class="wp-bar"><span class="wp-fill" id="wp-fill"></span></div>
+            <div class="wp-text" id="wp-text"></div>
+          </div>
           <p class="welcome-note" id="welcome-note">
             A big hangar takes about a minute. To scan just some of it, use the ▾ next to Scan at
             the top.
