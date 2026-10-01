@@ -1189,7 +1189,7 @@ try {
     return { cur: document.querySelector('#update-cur').textContent, firefox, chrome1 };
   });
   chk.cur &&
-  /9\.9\.9 is out.*\| You're on the latest version/.test(chk.firefox) &&
+  /9\.9\.9 is out.*\| You['’]re on the latest version/.test(chk.firefox) &&
   /9\.9\.9 is downloading/.test(chk.chrome1)
     ? ok('Check for updates: store check (Chrome) and AMO version check (Firefox)')
     : fail(`check for updates: ${JSON.stringify(chk)}`);
