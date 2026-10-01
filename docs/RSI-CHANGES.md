@@ -86,14 +86,18 @@ request and markup in DevTools.
    and a CHANGELOG entry ("Fixed: scans after RSI's … change").
 2. Merge, then tag: `git tag v0.2.9 && git push origin v0.2.9`. The Release
    workflow builds the zips and publishes the GitHub Release.
-3. Upload `open-hangar-chrome-*.zip` to Chrome and Edge, and
-   `open-hangar-firefox-*.zip` to Firefox. In the review notes, say it's a fix for
-   a site change on RSI's side; small fixes usually clear quickly.
-4. Post in Discord #announcements: what broke, that a fix is in review, and that
-   people can load it from source (README → Install) if they can't wait.
+3. Run **Actions → Publish to stores** with that tag and `store: all`, then
+   Approve the `stores` environment when the run asks. It uploads to Firefox, Edge
+   and Chrome and posts to Discord #updates. If Chrome is still reviewing the last
+   version, rerun later with `store: chrome`. Small fixes for a change on RSI's side
+   usually clear review quickly.
+4. Post in Discord #status: what broke, that a fix is in review, and that people
+   can load it from source (README → Install) if they can't wait.
 
 ## 5. Tell people while you work
 
-Pin a short message in #help ("RSI changed their hangar page; scans are broken, a
-fix is on the way") so the same report doesn't come in 30 times. Your data isn't
+Open an issue from the **Outage Notice** template, pin it, and link it in Discord
+#status ("RSI changed their hangar page; scans are broken, a fix is on the way") so
+the same report doesn't come in 30 times. People who file anyway use the **Scan
+Broken** template, which points them at the open `scan-broken` issues first. Your data isn't
 lost: a failed or partial scan never overwrites a bigger earlier one.
