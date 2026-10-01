@@ -43,6 +43,11 @@
   // They carry no contents and no value — neither ship nor add-on.
   const COUPON_NAME_RE = /\bcoupon\b/i;
 
+  // Game access ("Star Citizen Digital Download", "Squadron 42 Digital Game", …):
+  // anything carrying it is a package, not a pack (owner, 2026-10-01). Same test as
+  // the dashboard's Game Packages chip (GAME_ITEM_RE).
+  const GAME_ACCESS_RE = /\b(star citizen|squadron 42)\b.*\b(digital|download|game|package)\b/i;
+
   // Paints / skins / liveries — a common reward & buy-back type RSI doesn't tag.
   const PAINT_NAME_RE = /\b(paint|skin|livery|liveries|camo)\b/i;
 
@@ -75,6 +80,10 @@
 
     const prefix = ns.buybackCategoryPrefix(name);
     if (/^(packages?|game\s+packages?)$/i.test(prefix)) return 'package';
+    // Owner: a package is anything with game access (Star Citizen or Squadron 42),
+    // whatever it's called ("Mustang Alpha Starter Pack" + "Star Citizen Digital
+    // Download" in its items line).
+    if (GAME_ACCESS_RE.test(hay)) return 'package';
     // Owner's rule: "Pack" in the name makes it a pack, whatever the label in front
     // says ("Standalone Ships - Nine Tails Shogun Pack", "Paints - Wolf - 8 Paint
     // Pack", "… Paint Pack - Referral Reward"). Game packages ("Package - … Starter

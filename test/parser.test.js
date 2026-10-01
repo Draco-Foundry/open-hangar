@@ -221,3 +221,18 @@ test('classifyBuyback: "Pack" in the name makes it a pack (owner, #229)', () => 
   assert.equal(c('Standalone Ships - Drake Cutlass Black'), 'ship');
   assert.equal(c('Gear - Backpack Mule Edition'), 'addon');
 });
+
+test('classifyBuyback: game access makes it a package; no game, a pack (owner, #231)', () => {
+  const c = OpenHangar.classifyBuyback;
+  assert.equal(
+    c('Mustang Alpha Starter Pack', 'Mustang Alpha · Star Citizen Digital Download · LTI'),
+    'package',
+  );
+  assert.equal(c('Package - Aurora MR Starter Pack', 'Aurora MR · 6 Month Insurance'), 'package');
+  assert.equal(c('Squadron 42 Digital Game Package', ''), 'package');
+  assert.equal(
+    c('Standalone Ships - Nine Tails Shogun Pack', 'Nine Tails Shogun · Paint · Armor'),
+    'pack',
+  );
+  assert.equal(c('Standalone Ships - Drake Cutlass Black', 'Cutlass Black · LTI'), 'ship');
+});
