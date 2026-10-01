@@ -160,6 +160,29 @@ test('mergeHistory unions by time, collapses repeats, drops junk', () => {
   assert.equal(OH.mergeHistory(many, []).length, 100);
 });
 
+test('mergeHistory: same moment in both keeps this browser’s copy; order never matters (#199)', () => {
+  const s = (at, items) => OH.snapshotOf(items, at);
+  const a = [{ id: 1, name: 'A', value: 10 }];
+  const b = [{ id: 1, name: 'A', value: 99 }];
+  const mine = [s(300, b), s(100, a)]; // out of order on purpose
+  const backup = [s(200, b), s(100, b)]; // same moment as mine, different contents
+  const m = OH.mergeHistory(mine, backup);
+  assert.deepEqual(
+    m.map((x) => [x.at, x.items[0][2]]),
+    [
+      [100, 10],
+      [200, 99],
+    ],
+  ); // 100 is mine; 300 matched 200 and folded in
+  assert.equal(m[1].checkedAt, 300);
+  // Trimming keeps the newest, wherever they came from.
+  const old = Array.from({ length: 120 }, (_, i) => s(i, [{ id: i, name: 'x', value: i }]));
+  const kept = OH.mergeHistory([], old.slice().reverse());
+  assert.equal(kept.length, 100);
+  assert.equal(kept[0].at, 20);
+  assert.equal(kept[99].at, 119);
+});
+
 // Our rates file (openhangar.space/rates.json, #243): USD based, every offered currency.
 const ratesFile = (over = {}) => ({
   base: 'USD',
