@@ -44,15 +44,19 @@ jobs:
       - name: Release notes from CHANGELOG
         run: |
           V="${{ steps.tag.outputs.version }}"
-          # Notes come from main's CHANGELOG (it covers every version, and older
-          # tags may predate the file).
-          git fetch --depth=1 origin main
-          git show FETCH_HEAD:CHANGELOG.md > CHANGELOG.main.md
-          awk -v v="$V" '
+          # Notes come from the tag's own CHANGELOG, so they describe exactly what
+          # was released. Older tags may predate the file or its section: then main's.
+          section() { awk -v v="$V" '
             index($0, "## " v " ") == 1 { on = 1; next }
             on && /^## / { exit }
             on { print }
-          ' CHANGELOG.main.md > notes.md
+          ' "$1"; }
+          [ -f CHANGELOG.md ] && section CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            git fetch --depth=1 origin main
+            git show FETCH_HEAD:CHANGELOG.md > CHANGELOG.main.md
+            section CHANGELOG.main.md > notes.md
+          fi
           if [ ! -s notes.md ]; then echo "See CHANGELOG.md." > notes.md; fi
           printf '\n---\n**Install:** [openhangar.space](https://openhangar.space/). The zips below are the exact store packages.\n' >> notes.md
       - name: Publish release
