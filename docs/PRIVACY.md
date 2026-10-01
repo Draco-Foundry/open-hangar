@@ -75,6 +75,10 @@ personal data:
   updates", the latest published version number of Open Hangar. No credentials or
   personal data are sent.
 
+The footer also links to Ko-fi and Patreon, where you can choose to support the project.
+They are plain links: nothing is loaded from either site, and nothing is sent unless you
+click one and use that site yourself.
+
 ## Permissions and why they are used
 
 - **storage** — to save your scanned data and UI preferences locally.
