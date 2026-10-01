@@ -458,7 +458,7 @@ async function copyErrorReport(el) {
   if (el) {
     const was = el.textContent;
     el.textContent = ok
-      ? 'Copied! Paste it in #bug-reports or a GitHub issue'
+      ? 'Copied! Beam it to #bug-reports on Discord or a GitHub issue'
       : 'Copy failed. See Developers → Error report';
     setTimeout(() => {
       el.textContent = was;
@@ -523,7 +523,7 @@ function setScanning(text, done = false) {
   const clean = text.replace(/^[✓⚠]\s*/, '');
   if (done) {
     if (fill) fill.style.width = '100%';
-    label.textContent = /^⚠/.test(text) ? '⚠ Finished' : '✓ Done';
+    label.textContent = /^⚠/.test(text) ? '⚠ Rough Landing' : '✓ Landed';
     btn.title = clean;
     scanDoneTimer = setTimeout(() => setScanning(''), 2200);
     return;
@@ -1007,8 +1007,8 @@ function renderWelcome() {
   el.hidden = state.items.length > 0 || state.buybacks.length > 0;
   $('#welcome-scan').hidden = lastLoggedOut;
   $('#welcome-note').textContent = lastLoggedOut
-    ? 'First, log in to RSI with the button on the card above. Then come back here and scan.'
-    : 'A big hangar takes about a minute. To scan just some of it, use the ▾ next to Scan at the top.';
+    ? 'First, log in to RSI with the button on the card above, then come back and hit Scan. Your hangar’s waiting.'
+    : 'A big hangar takes about a minute, still faster than a Lorville elevator. To scan just part of it, use the ▾ next to Scan.';
 }
 $('#welcome-scan')?.addEventListener('click', () => {
   if (!scanBtn.disabled) runScan(); // everything, whatever the ▾ menu has ticked
@@ -2363,7 +2363,10 @@ function renderInventory() {
     .forEach((b) => b.classList.toggle('active', b.dataset.layout === state.layout));
   if (!state.items.length) {
     setHTML(chipsEl, '');
-    setHTML(resultsEl, '<div class="empty">No hangar data yet. Scan from the Home tab.</div>');
+    setHTML(
+      resultsEl,
+      '<div class="empty">Your hangar’s empty. Not even a starter ship. Hit Scan at the top to fill it.</div>',
+    );
     return;
   }
   setHTML(
@@ -2375,7 +2378,10 @@ function renderInventory() {
   const shown = computeShown();
   renderInvSummary(shown);
   if (!shown.length) {
-    setHTML(resultsEl, '<div class="empty">No pledges match the current filters.</div>');
+    setHTML(
+      resultsEl,
+      '<div class="empty">Nothing in your hangar matches those filters. Loosen them up, pilot.</div>',
+    );
     return;
   }
   if (state.layout === 'market') {
@@ -3800,7 +3806,10 @@ function renderStats() {
   ensurePrices();
   const body = $('#stats-body');
   if (!state.items.length) {
-    setHTML(body, '<div class="empty">No hangar data yet. Scan from the Home tab.</div>');
+    setHTML(
+      body,
+      '<div class="empty">Your hangar’s empty. Not even a starter ship. Hit Scan at the top to fill it.</div>',
+    );
     return;
   }
   const items = state.items;
@@ -3944,7 +3953,8 @@ function collectionSectionHtml() {
 
 function buybackStatsHtml() {
   const bbs = state.buybacks;
-  if (!bbs.length) return '<p class="muted">No buy-backs yet. Scan from Home to include them.</p>';
+  if (!bbs.length)
+    return '<p class="muted">No buy-backs yet. Hit Scan at the top to pull them in.</p>';
   if (!state.priceOf) ensurePrices();
   const byKind = BB_KINDS.map((k) => [
     k.label,
@@ -4974,7 +4984,7 @@ function renderReferrals() {
     setHTML(
       body,
       `<div class="placeholder-view">
-      <p class="muted">No referral data yet. Click <strong>Scan</strong> on the Home page to pull
+      <p class="muted">No recruits on the roster yet. Hit <strong>Scan</strong> at the top to pull
         your recruits and prospects from your
         <a href="https://robertsspaceindustries.com/en/referral" target="_blank" rel="noopener">RSI Referral Rewards</a> page.</p>
     </div>`,
@@ -5388,11 +5398,11 @@ function renderBuybacks() {
       body,
       `<div class="placeholder-view">
       <h2>Buy-Back Pledges</h2>
-      <p class="muted">Your melted pledges that you can re-acquire from RSI. Click
-        <strong>Scan</strong> on the Home page to pull them in alongside your hangar.</p>
+      <p class="muted">Melted something you miss? Your buy-backs show up here so you can claim them back. Hit
+        <strong>Scan</strong> at the top to pull them in with your hangar.</p>
       <p class="muted">Buy-backs are read from
         <a href="https://robertsspaceindustries.com/account/buy-back-pledges" target="_blank" rel="noopener">RSI › Account › Buy-Back Pledges</a>
-        — the same server-rendered pages as the hangar.</p>
+        , the same pages as your hangar.</p>
     </div>`,
     );
     return;
@@ -5428,7 +5438,10 @@ function renderBuybacks() {
   if (state.bbStack) list = stackBuybacks(list);
   const when = state.buybacksScannedAt ? new Date(state.buybacksScannedAt).toLocaleString() : '';
   if (!list.length) {
-    setHTML(body, '<div class="empty">No buy-backs match the current filters.</div>');
+    setHTML(
+      body,
+      '<div class="empty">No buy-backs match those filters. Loosen them up, pilot.</div>',
+    );
     return;
   }
   // Opened from a Hangar Alert: say so, with a way back to everything.
@@ -6438,7 +6451,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   scanProgress.i = 0;
   scanProgress.n = [hangar, buybacks, referrals, store].filter(Boolean).length || 1;
   setScanning('Scanning…');
-  scanDetail('Starting…');
+  scanDetail('Spooling quantum drive…');
   const parts = [];
   let anyErr = false;
   // One account lookup for the whole scan; every save reuses it (each lookup is
@@ -6583,7 +6596,7 @@ function updateScanLabel() {
 function scanChosen() {
   const c = scanChoice();
   if (!Object.values(c).some(Boolean)) {
-    setStatus('Pick at least one thing to scan (the ▾ next to Scan).', true);
+    setStatus('Nothing ticked, nothing to scan. Pick at least one with the ▾ next to Scan.', true);
     return;
   }
   closeCardMenus();
@@ -6669,10 +6682,13 @@ logoutBtn.addEventListener('click', async () => {
   setStatus('Signing out of RSI…');
   const res = await OH.logout();
   if (!res.ok) {
-    setStatus(res.error || 'Could not sign out of RSI.', true);
+    setStatus(
+      res.error || 'Couldn’t sign out of RSI. Try again, or log out on robertsspaceindustries.com.',
+      true,
+    );
   } else {
     await OH.getAccount({ force: true }); // refresh the now signed-out state
-    setStatus('Signed out of RSI.');
+    setStatus('Signed out of RSI. Hangar doors closed, fly safe.');
     renderHome(); // flips the card to the signed-out wall
   }
   logoutBtn.disabled = false;
@@ -6698,7 +6714,7 @@ clearBtn.addEventListener('click', async () => {
   state.bbShown = new Set();
   state.bbTraits = new Map();
   state.referral = null;
-  setStatus('Local data cleared.');
+  setStatus('Local data cleared. Clean hangar, fresh start.');
   renderAccount(); // clear the referral pill too
   refreshRecoveryUI(); // a full manual wipe also drops any recovery snapshot
   route();
@@ -6924,11 +6940,11 @@ async function reconcileAccount() {
     await OH.getAccount({ force: true }); // re-cache the new account
     renderAccount();
     const kept = parked
-      ? ` ${parked}'s data is saved and comes back when you sign in as them.`
+      ? ` ${parked}'s hangar is parked safely and comes back when you sign in as them.`
       : '';
     return restored
-      ? `Switched to ${who}: loaded your last scan.${kept}`
-      : `Switched to ${who}. Hit Scan to load this account.${kept}`;
+      ? `Welcome back, ${who}: your last scan is loaded.${kept}`
+      : `Switched to ${who}. Hit Scan to load this hangar.${kept}`;
   }
   return '';
 }
@@ -7132,7 +7148,7 @@ function showUpdateBanner(version) {
   const cur = chrome.runtime.getManifest().version;
   const bar = $('#update-banner');
   if (!bar || !version || OH.compareVersions(version, cur) <= 0) return;
-  $('#update-text').textContent = `Open Hangar ${version} is ready. Reload to start using it.`;
+  $('#update-text').textContent = `Open Hangar ${version} has landed. Reload to start using it.`;
   // Shown in your menu (a dot on the portrait) rather than a banner across the page.
   $('#upd-dot').hidden = false;
   $('#menu-upd-text').textContent = `Update ready: ${version}`;
@@ -7161,7 +7177,7 @@ async function initUpdates() {
   if (note && justUpdated && justUpdated.to === cur && !justUpdated.seen) {
     setHTML(
       note,
-      `<span>Open Hangar updated to ${OH.escapeHtml(cur)}. <a href="#updates" data-view="updates">See what’s new</a></span><button type="button" class="note-close" aria-label="Dismiss">×</button>`,
+      `<span>Patch landed: Open Hangar ${OH.escapeHtml(cur)}. <a href="#updates" data-view="updates">See what’s new</a></span><button type="button" class="note-close" aria-label="Dismiss">×</button>`,
     );
     note.hidden = false;
     const seen = () => {
@@ -7696,7 +7712,7 @@ function renderBell() {
                 `<div class="bm-row ${esc(x.kind || '')}"><a href="${esc(x.href || '#home')}" data-alert="${i}"><b>${esc(x.title)}</b><small>${esc(x.sub || '')}</small></a><button type="button" class="bm-x" data-ignore="${i}" title="Ignore" aria-label="Ignore: ${esc(x.title)}">×</button></div>`,
             )
             .join('')
-        : '<p class="bm-none">Nothing new. Alerts show up here when a wishlist ship goes on sale, a ship you own turns flight ready, and more.</p>'),
+        : '<p class="bm-none">Comms are quiet. Alerts land here when a wishlist ship goes on sale, a ship you own turns flight ready, and more.</p>'),
   );
 }
 document.addEventListener('oh:alerts', renderBell);

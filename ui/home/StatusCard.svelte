@@ -88,7 +88,7 @@
     {:else if ev.ended}
       <div class="kv"><span class="oh-muted">Last event: {ev.ended.name}</span><span class="v">ended {shortDay(ev.ended.ends)}</span></div>
     {:else}
-      <div class="kv"><span class="oh-muted">No event running right now</span></div>
+      <div class="kv"><span class="oh-muted">No event running. Enjoy the quiet, Citizen.</span></div>
     {/if}
     {#if ev.ref}
       <div class="kv">
