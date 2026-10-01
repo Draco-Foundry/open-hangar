@@ -160,11 +160,11 @@
       if (s.enabled === false) {
         out.paused[id] =
           statusText(s.message) ||
-          'RSI changed their site and this scan is paused while a fix is on the way. Your saved data is safe.';
+          'RSI changed their site, so this scan is paused while we patch it. Your saved data is safe.';
       } else if (tooOld) {
         out.paused[id] =
           statusText(s.message) ||
-          `RSI changed their site. Open Hangar ${s.minVersion} fixes this scan: update to keep scanning. Your saved data is safe.`;
+          `RSI changed their site. Open Hangar ${s.minVersion} has the fix: update to keep scanning. Your saved data is safe.`;
       }
     }
     const b = data.banner;
@@ -1111,13 +1111,14 @@
         onProgress?.(page, all.length, { attempt, of });
       });
       if (got.error) {
-        if (page === 1) return { error: `${got.error}. Check your connection and try again.` };
+        if (page === 1)
+          return { error: `${got.error}. Felt like a 30k: check your connection and try again.` };
         return { items: all, meta, partial: { page, reason: got.error } };
       }
       const res = got.res;
       if (res.status === 401 || res.status === 403) {
         return {
-          error: 'RSI rejected the request — your session may have expired. Sign in again.',
+          error: 'Keycard rejected by RSI: your session may have expired. Sign in to RSI again.',
         };
       }
       if (!res.ok) return { error: `RSI responded ${res.status} on page ${page}.` };
@@ -1136,7 +1137,7 @@
         if (looksLoggedOut(res, html)) {
           return {
             error:
-              'Not signed in to RSI. Open robertsspaceindustries.com, log in, then scan again.',
+              'You’re not signed in to RSI. Log in at robertsspaceindustries.com, then scan again.',
           };
         }
         // A source can declare how an *intentionally* empty list reads.
@@ -1145,14 +1146,14 @@
         // the parser couldn't read them → RSI likely changed their markup.
         if (src.marker && src.marker.test(html)) {
           return {
-            error: `Signed in, but couldn't read any ${src.label.toLowerCase()} — RSI may have changed their page markup. See CONTRIBUTING.md ("Rediscovering the data source").`,
+            error: `Signed in, but couldn't read any ${src.label.toLowerCase()}. RSI may have changed their site. Copy the error report and drop it in #bug-reports, we'll patch it.`,
           };
         }
         // Sources that need server-rendered HTML but got none (e.g. a client-side
         // SPA shell) say so, rather than silently reporting "empty".
         if (src.requiresRender) {
           return {
-            error: `Couldn't read ${src.label.toLowerCase()} — RSI returned no server-rendered content (this page may load via JavaScript). See TODO.md.`,
+            error: `Couldn't read ${src.label.toLowerCase()}: RSI sent back an empty page. Copy the error report and drop it in #bug-reports, we'll patch it.`,
           };
         }
         break; // logged in, source is genuinely empty
@@ -1223,7 +1224,7 @@
         if (prevCount > result.items.length) {
           return {
             ok: false,
-            error: `RSI stopped responding at page ${page} (${reason}) — kept your previous scan of ${prevCount}. Try again in a minute.`,
+            error: `RSI stopped responding at page ${page} (${reason}), so we kept your previous scan of ${prevCount}. Try again in a minute.`,
           };
         }
         const scannedAt = await saveSource(src.id, result.items, { meta: result.meta, account });
@@ -1231,7 +1232,7 @@
           ok: true,
           items: result.items,
           scannedAt,
-          partial: `stopped at page ${page} (${reason}) — rescan to get the rest`,
+          partial: `stopped at page ${page} (${reason}); rescan to get the rest`,
         };
       }
 

@@ -29,7 +29,7 @@ async function updateReminder() {
     await chrome.action.setBadgeText({ text: '!' });
     await chrome.action.setBadgeBackgroundColor({ color: '#d29922' });
     await chrome.action.setTitle({
-      title: `Open Hangar: your last scan was ${Math.floor(days)} days ago. Click to rescan.`,
+      title: `Open Hangar: your hangar scan is ${Math.floor(days)} days old. Click to rescan.`,
     });
   } else {
     await chrome.action.setBadgeText({ text: '' });

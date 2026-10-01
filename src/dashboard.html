@@ -3328,7 +3328,7 @@
            the user is logged out of RSI but local scanned data is still displayed. -->
       <div id="signedout-banner" class="signedout-banner" hidden>
         <span
-          >Signed out of RSI — showing your last saved scan.
+          >Signed out of RSI, so this is your last saved scan.
           <a href="https://robertsspaceindustries.com/connect" target="_blank" rel="noopener"
             >Log in to RSI ↗</a
           >
@@ -3392,7 +3392,9 @@
             <div class="cc-loggedout" id="cc-loggedout" hidden>
               <div class="cc-lo-inner">
                 <div class="cc-lo-title">Open Hangar</div>
-                <p class="cc-lo-sub">Sign in to RSI to scan and view your hangar.</p>
+                <p class="cc-lo-sub">
+                  Log in to RSI to scan your hangar. Your ships are waiting on the pad.
+                </p>
                 <a
                   class="btn-login cc-lo-btn"
                   href="https://robertsspaceindustries.com/connect"
@@ -3409,20 +3411,20 @@
         <!-- First run (nothing scanned yet): a big welcome with Scan All Now; the
              search and the Home cards show once there's something to show. -->
         <section class="oh-welcome" id="oh-welcome" hidden>
-          <h2>Welcome to Open Hangar</h2>
+          <h2>Welcome to Open Hangar, Citizen</h2>
           <p>
             Your whole Star Citizen hangar in one place: what it's worth, your buy-backs, your
-            referrals and more. Everything stays on this computer.
+            referrals and more. Everything stays on this computer, locked in your own hangar.
           </p>
-          <button type="button" class="welcome-scan" id="welcome-scan">Scan All Now</button>
+          <button type="button" class="welcome-scan" id="welcome-scan">Scan My Hangar</button>
           <!-- The first scan's progress, in place of the button (#170). -->
           <div class="welcome-progress" id="welcome-progress" role="status" hidden>
             <div class="wp-bar"><span class="wp-fill" id="wp-fill"></span></div>
             <div class="wp-text" id="wp-text"></div>
           </div>
           <p class="welcome-note" id="welcome-note">
-            A big hangar takes about a minute. To scan just some of it, use the ▾ next to Scan at
-            the top.
+            A big hangar takes about a minute, still faster than a Lorville elevator. To scan just
+            part of it, use the ▾ next to Scan.
           </p>
         </section>
         <!-- Global Hangar Search: its own line under the card (owner, 2026-09-30); the
