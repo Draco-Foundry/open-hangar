@@ -17,6 +17,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 - New: **Report a Scan Problem.** When a scan fails, one click opens a GitHub issue with
   the error report already filled in. You read it and submit it yourself; nothing is sent
   in the background, and it has nothing about your account.
+- Improved: **keyboard and screen reader support.** Tab and Enter now reach every card,
+  filter chip, menu and pop-up, with a clear blue ring on whatever has focus, Escape closes
+  menus and pop-ups, icon buttons and search boxes have names, and dim text is easier to read.
 - Fixed: one unreadable buy-back page no longer stops the rest of your buy-backs from
   loading. That page is skipped and the others come through.
 

@@ -392,6 +392,29 @@ const SAFE_ATTRS = new Set(
   ).split(' '),
 );
 const SAFE_URL = /^(https?:|mailto:|#|\/|\.|[^:]*$)/i;
+// Re-rendering a row of chips or toggles swaps out its buttons. If one of them had
+// keyboard focus, put focus back on the same control (or the row's first button when
+// it's gone, like Clear) so filtering by keyboard doesn't drop you at the page top.
+const FOCUS_KEYS = [
+  'key',
+  'trait',
+  'clear',
+  'switch',
+  'bbUnder',
+  'viewApply',
+  'viewDel',
+  'viewSave',
+];
+function setHTMLKeepFocus(el, html) {
+  const had = document.activeElement;
+  const inside = !!(el && had && had !== el && el.contains(had));
+  const k = inside ? FOCUS_KEYS.find((a) => a in had.dataset) : null;
+  const val = k ? had.dataset[k] : null;
+  setHTML(el, html);
+  if (!inside) return;
+  const same = k && [...el.querySelectorAll('button')].find((b) => b.dataset[k] === val);
+  (same || el.querySelector('button'))?.focus({ preventScroll: true });
+}
 function setHTML(el, html) {
   if (!el) return;
   if (html == null || html === '') {
@@ -1695,7 +1718,7 @@ function cardHtml(p) {
   const badgeClass = TYPE_KEYS.includes(type) ? type : '';
   const sel = state.selecting && state.selected.has(String(p.id)) ? ' selected' : '';
   const rsiImg = ccuArt ? realImage(p.image) || '' : '';
-  return `<div class="card${sel}" data-id="${OH.escapeHtml(String(p.id || ''))}" data-image="${OH.escapeHtml(img || '')}" data-resolve="${OH.escapeHtml(resolve)}" data-rsi-image="${OH.escapeHtml(rsiImg)}">
+  return `<div class="card${sel}" tabindex="0" role="button" data-id="${OH.escapeHtml(String(p.id || ''))}" data-image="${OH.escapeHtml(img || '')}" data-resolve="${OH.escapeHtml(resolve)}" data-rsi-image="${OH.escapeHtml(rsiImg)}">
     ${thumb}
     <div class="card-body">
       <div class="card-name" title="${OH.escapeHtml(plainName(p))}">${nameHtml}</div>
@@ -2315,7 +2338,7 @@ function renderSavedViews() {
   const el = $('#inv-views');
   if (!el) return;
   const cur = JSON.stringify(currentView_inv());
-  setHTML(
+  setHTMLKeepFocus(
     el,
     (state.savedViews.length ? '<span class="views-lbl">Saved Views</span>' : '') +
       state.savedViews
@@ -2399,7 +2422,7 @@ function renderInventory() {
     );
     return;
   }
-  setHTML(
+  setHTMLKeepFocus(
     chipsEl,
     `<div class="chip-row">${presentKinds().map(chipHtml).join('')}<span class="sw-group">${switchHtml('inv-hide', 'Hide Small Stuff', state.hideSmall, 'Paints, add-ons and coupons')}</span></div>` +
       traitRowHtml(state.items, state.traits, pledgeFacets, state.shown.size || state.traits.size),
@@ -3060,7 +3083,7 @@ function renderStore() {
       tabs,
       PRICE_TABS.map(
         ([k, label]) =>
-          `<button type="button" data-price-tab="${k}" class="${state.priceTab === k ? 'active' : ''}">${label}</button>`,
+          `<button type="button" role="tab" aria-selected="${state.priceTab === k}" data-price-tab="${k}" class="${state.priceTab === k ? 'active' : ''}">${label}</button>`,
       ).join(''),
     );
   }
@@ -3364,9 +3387,9 @@ function orgMembersHtml(f, members) {
       .join('');
   const compare =
     members.length >= 2
-      ? `<div class="org-compare-bar">Compare <select class="org-cmp" data-side="a"><option value="">pick a member</option>${opts(
+      ? `<div class="org-compare-bar">Compare <select class="org-cmp" data-side="a" aria-label="First Member to Compare"><option value="">pick a member</option>${opts(
           orgUi.a,
-        )}</select> with <select class="org-cmp" data-side="b"><option value="">pick a member</option>${opts(orgUi.b)}</select></div>`
+        )}</select> with <select class="org-cmp" data-side="b" aria-label="Second Member to Compare"><option value="">pick a member</option>${opts(orgUi.b)}</select></div>`
       : '';
   return `<h3 class="section-title" style="margin-top:22px">Members</h3>
     <p class="muted org-intro">Click a member to see their fleet next to the rest of the org.</p>
@@ -3942,11 +3965,11 @@ function sBars(rows, fmt = (n) => n) {
     .join('');
 }
 const itemRow = (p, right) =>
-  `<div class="row clickable" data-open-item="${OH.escapeHtml(String(p.id))}"><div class="nm">${OH.escapeHtml(
+  `<div class="row clickable" tabindex="0" role="button" data-open-item="${OH.escapeHtml(String(p.id))}"><div class="nm">${OH.escapeHtml(
     plainName(p),
   )}</div><div class="vl">${right}</div></div>`;
 const bbRow = (b, right) =>
-  `<div class="row clickable" data-open-bb="${OH.escapeHtml(String(b.id))}"><div class="nm">${OH.escapeHtml(
+  `<div class="row clickable" tabindex="0" role="button" data-open-bb="${OH.escapeHtml(String(b.id))}"><div class="nm">${OH.escapeHtml(
     buybackName(b),
   )}</div><div class="vl">${right}</div></div>`;
 
@@ -5170,8 +5193,8 @@ function renderReferrals() {
         ${tab('recruits', 'Recruits', recruits)}
         ${tab('prospects', 'Prospects', prospects)}
       </div>
-      <input id="ref-search" class="ref-search" type="search" placeholder="Search handle / moniker…" value="${OH.escapeHtml(state.refQuery)}" />
-      <select id="ref-sort" class="ref-sort">
+      <input id="ref-search" class="ref-search" type="search" placeholder="Search handle / moniker…" aria-label="Search Referrals" value="${OH.escapeHtml(state.refQuery)}" />
+      <select id="ref-sort" class="ref-sort" aria-label="Sort Referrals">
         <option value="newest"${state.refSort === 'newest' ? ' selected' : ''}>Newest first</option>
         <option value="oldest"${state.refSort === 'oldest' ? ' selected' : ''}>Oldest first</option>
         <option value="name"${state.refSort === 'name' ? ' selected' : ''}>Name (A–Z)</option>
@@ -5243,7 +5266,7 @@ function buybackCardHtml(b) {
   const badgeClass = TYPE_KEYS.includes(b.isCCU ? 'ccu' : b.kind) ? (b.isCCU ? 'ccu' : b.kind) : '';
   // Every cell is always emitted (empty when there's nothing) so the List view's
   // fixed column grid lines up across rows, as in the Inventory cards.
-  return `<div class="card" data-id="${OH.escapeHtml(String(b.id || ''))}" data-image="${OH.escapeHtml(img || '')}" data-resolve="${OH.escapeHtml(resolve)}" data-rsi-image="${OH.escapeHtml(ccuArt ? realImage(b.image) || '' : '')}">
+  return `<div class="card" tabindex="0" role="group" aria-label="${OH.escapeHtml(bbFullName(b))}" data-id="${OH.escapeHtml(String(b.id || ''))}" data-image="${OH.escapeHtml(img || '')}" data-resolve="${OH.escapeHtml(resolve)}" data-rsi-image="${OH.escapeHtml(ccuArt ? realImage(b.image) || '' : '')}">
     ${thumb}
     <div class="card-body">
       <div class="card-name" title="${OH.escapeHtml(bbFullName(b))}">${nameHtml}</div>
@@ -5458,7 +5481,7 @@ function renderBuybacks() {
       under || state.bbUnder
         ? `<button type="button" class="chip trait" data-bb-under aria-pressed="${state.bbUnder}" title="Buy-backs that cost less than the ship in today's store (load details for exact prices)">Below Store Price<span class="n">${under}</span></button>`
         : '';
-    setHTML(
+    setHTMLKeepFocus(
       bbChipsEl,
       `<div class="chip-row">${presentBbKinds().map(bbChipHtml).join('')}${underChip}<span class="sw-group">${switchHtml('bb-hide', 'Hide Small Stuff', state.bbHideSmall, 'Paints, add-ons and coupons')}${switchHtml('bb-stack', 'Stack Identical', state.bbStack, 'Show identical buy-backs as one row with a count')}</span></div>` +
         traitRowHtml(
@@ -6209,12 +6232,32 @@ function openItemModal(p) {
       ${contentsHtml}
     </div>`,
   );
-  itemModal.hidden = false;
+  showItemModal();
   fillModalArt(real, resolveImageName(p), p.isCCU && !p.shipArt);
+}
+// The detail pop-up is a dialog: focus moves to its Close button when it opens, Tab
+// stays inside it, Escape closes it, and focus goes back to whatever opened it.
+let modalOpener = null;
+function showItemModal() {
+  if (itemModal.hidden) modalOpener = document.activeElement;
+  itemModal.hidden = false;
+  const name = modalBody.querySelector('.modal-name');
+  modalClose
+    .closest('.modal-card')
+    ?.setAttribute('aria-label', name?.textContent.trim() || 'Details');
+  modalClose.focus({ preventScroll: true });
 }
 function closeItemModal() {
   itemModal.hidden = true;
   setHTML(modalBody, '');
+  let back = modalOpener;
+  modalOpener = null;
+  // A list redrawn while the pop-up was open replaced the card: find its twin.
+  if (back && !back.isConnected && back.classList?.contains('card') && back.dataset.id) {
+    const id = back.dataset.id;
+    back = [...document.querySelectorAll('.card[data-id]')].find((c) => c.dataset.id === id);
+  }
+  if (back && back.isConnected && back !== document.body) back.focus({ preventScroll: true });
 }
 
 // Buy-back detail modal (reuses the inventory modal shell).
@@ -6262,7 +6305,7 @@ function openBuybackModal(b) {
       ${contents}
     </div>`,
   );
-  itemModal.hidden = false;
+  showItemModal();
   const shipish = b.ccu || ['ship', 'pack', 'package'].includes(b.kind);
   fillModalArt(real, b.ccu && b.ccu.to ? b.ccu.to : shipish ? b.name : '', !!b.ccu && !b.shipArt);
   if (!d && !b.isCCU && /^\d+$/.test(String(b.id))) {
@@ -6358,7 +6401,39 @@ itemModal.addEventListener('click', (e) => {
   if (e.target === itemModal) closeItemModal();
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !itemModal.hidden) closeItemModal();
+  if (itemModal.hidden) return;
+  if (e.key === 'Escape') return void closeItemModal();
+  if (e.key !== 'Tab') return;
+  const stops = [
+    ...itemModal.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex="0"]',
+    ),
+  ].filter((el) => el.getClientRects().length);
+  if (!stops.length) return;
+  const first = stops[0];
+  const last = stops[stops.length - 1];
+  const at = document.activeElement;
+  if (!itemModal.contains(at) || (e.shiftKey && at === first) || (!e.shiftKey && at === last)) {
+    e.preventDefault();
+    (e.shiftKey ? last : first).focus();
+  }
+});
+
+// Keyboard: Enter or Space on a clickable card or row that isn't a real button or
+// link (Inventory and Buy-Back cards, Stats rows) does what a click does. Like a real
+// button, Enter fires on the way down and Space on the way up (so the pop-up it opens
+// doesn't catch the same Space on its Close button).
+const kbdClickable = (el) =>
+  el instanceof HTMLElement &&
+  el.matches('.card[tabindex], [role="button"]:not(button, a, input, select, textarea)');
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (e.altKey || e.ctrlKey || e.metaKey || !kbdClickable(e.target)) return;
+  e.preventDefault(); // Space would scroll the page
+  if (e.key === 'Enter' && !e.repeat) e.target.click();
+});
+document.addEventListener('keyup', (e) => {
+  if (e.key === ' ' && kbdClickable(e.target)) e.target.click();
 });
 
 // Referral list tab switching (Recruits / Prospects) + reward-item hover preview.
@@ -6699,6 +6774,10 @@ for (const [btn, menu] of cardMenus) {
     menu.hidden = false;
     btn.setAttribute('aria-expanded', 'true');
     placeMenu(btn, menu); // again now that it has a size
+    // Into the menu, on its first control you can see (no scrolling: that closes it).
+    [...menu.querySelectorAll('a[href], button:not([disabled]), input, select')]
+      .find((el) => el.getClientRects().length)
+      ?.focus({ preventScroll: true });
   });
   // Clicks inside the menu (checkboxes, the currency picker) shouldn't close it.
   menu.addEventListener('click', (e) => {
@@ -6712,6 +6791,14 @@ if (cardMenus.length) {
   window.addEventListener('resize', closeCardMenus);
   window.addEventListener('scroll', closeCardMenus, { passive: true });
   document.addEventListener('click', closeCardMenus);
+  // Escape closes an open menu and puts focus back on its button.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const open = cardMenus.find(([, m]) => !m.hidden);
+    if (!open) return;
+    closeCardMenus();
+    open[0].focus({ preventScroll: true });
+  });
 }
 
 scanSelectedBtn?.addEventListener('click', scanChosen);
@@ -7634,7 +7721,7 @@ function openShipModal(name) {
       ${v ? '' : '<p class="muted">No ship data for this name yet.</p>'}
     </div>`,
   );
-  itemModal.hidden = false;
+  showItemModal();
   fillModalArt(null, title, true);
   if (!loanerMatrix) ensureLoaners();
   ensureStore();
