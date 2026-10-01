@@ -766,41 +766,116 @@ function resolveImageName(p) {
   return name;
 }
 
-// After a card grid renders, fill in missing ship art from the wiki API (lazy,
-// concurrency-capped). Updates the card thumbnail, its data-image (for the hover
-// preview), and the backing item (so the detail modal shows it too).
+// After a card grid renders, fill in missing ship art from the wiki API: only for
+// cards on (or near) the screen, three at a time, so a 1,000-card page doesn't
+// look up a thousand pictures nobody scrolled to. Updates the card thumbnail, its
+// data-image (for the hover preview), and the backing item (so the detail modal
+// shows it too).
+const ART_CONCURRENCY = 3;
+const artQueue = [];
+let artActive = 0;
+let artObserver = null;
+// id → item, rebuilt only when the lists themselves are replaced (a scan).
+let itemIndex = { items: null, buybacks: null, map: new Map() };
+function itemById(id) {
+  if (itemIndex.items !== state.items || itemIndex.buybacks !== state.buybacks) {
+    const map = new Map();
+    for (const b of state.buybacks) map.set(String(b.id), b);
+    for (const p of state.items) map.set(String(p.id), p); // pledges win, as before
+    itemIndex = { items: state.items, buybacks: state.buybacks, map };
+  }
+  return itemIndex.map.get(String(id));
+}
+async function resolveCardArt(card) {
+  const art = await OH.getShipImage(card.dataset.resolve);
+  const url = art || card.dataset.rsiImage;
+  if (!url) return;
+  card.dataset.image = url;
+  const item = itemById(card.dataset.id);
+  if (item) {
+    item.image = url;
+    if (art) item.shipArt = true; // a CCU's target art is in hand now
+  }
+  const ph = card.querySelector('.thumb.placeholder');
+  if (ph) {
+    const im = document.createElement('img');
+    im.className = 'thumb';
+    im.loading = 'lazy';
+    im.src = url;
+    ph.replaceWith(im);
+  }
+}
+function pumpArt() {
+  while (artActive < ART_CONCURRENCY && artQueue.length) {
+    const card = artQueue.shift();
+    if (!card.isConnected) continue; // re-rendered away while waiting
+    artActive++;
+    resolveCardArt(card)
+      .catch(() => {})
+      .finally(() => {
+        artActive--;
+        pumpArt();
+      });
+  }
+}
 function enhanceCardImages(container) {
-  const cards = [...container.querySelectorAll('.card[data-resolve]')].filter(
+  const cards = [...container.querySelectorAll('.card[data-resolve]:not([data-art-watch])')].filter(
     (c) => c.dataset.resolve && !c.querySelector('img.thumb'),
   );
-  let i = 0;
-  const CONCURRENCY = 3;
-  const worker = async () => {
-    while (i < cards.length) {
-      const card = cards[i++];
-      const art = await OH.getShipImage(card.dataset.resolve);
-      const url = art || card.dataset.rsiImage;
-      if (!url) continue;
-      card.dataset.image = url;
-      const id = card.dataset.id;
-      const item =
-        state.items.find((p) => String(p.id) === id) ||
-        state.buybacks.find((b) => String(b.id) === id);
-      if (item) {
-        item.image = url;
-        if (art) item.shipArt = true; // a CCU's target art is in hand now
+  if (typeof IntersectionObserver === 'undefined') {
+    artQueue.push(...cards);
+    pumpArt();
+    return;
+  }
+  artObserver ||= new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        artObserver.unobserve(e.target);
+        artQueue.push(e.target);
       }
-      const ph = card.querySelector('.thumb.placeholder');
-      if (ph) {
-        const im = document.createElement('img');
-        im.className = 'thumb';
-        im.loading = 'lazy';
-        im.src = url;
-        ph.replaceWith(im);
-      }
-    }
+      pumpArt();
+    },
+    { rootMargin: '800px 0px' }, // start a little before a card scrolls into view
+  );
+  for (const c of cards) {
+    c.dataset.artWatch = '1';
+    artObserver.observe(c);
+  }
+}
+
+// Draw a card grid: the first screenful now, the rest a chunk at a time in the
+// background, so a page of 1,000 buy-backs responds at once. A newer render of the
+// same container cancels the chunks an older one still had queued.
+const FIRST_CARDS = 120;
+const CARD_CHUNK = 200;
+const gridJobs = new WeakMap(); // container → token of its latest render
+function renderCardGrid(container, head, layout, list, cardHtml) {
+  const token = {};
+  gridJobs.set(container, token);
+  setHTML(
+    container,
+    `${head}<div class="grid ${layout}">${list.slice(0, FIRST_CARDS).map(cardHtml).join('')}</div>`,
+  );
+  enhanceCardImages(container);
+  const grid = container.lastElementChild;
+  let at = FIRST_CARDS;
+  const next = () => {
+    if (gridJobs.get(container) !== token || !grid?.isConnected || at >= list.length) return;
+    const holder = document.createElement('div');
+    setHTML(
+      holder,
+      list
+        .slice(at, at + CARD_CHUNK)
+        .map(cardHtml)
+        .join(''),
+    );
+    grid.append(...holder.childNodes);
+    at += CARD_CHUNK;
+    enhanceCardImages(grid);
+    setTimeout(next, 0);
   };
-  for (let w = 0; w < CONCURRENCY; w++) worker();
+  if (at < list.length) setTimeout(next, 0);
 }
 
 // Home's welcome screen: shown until the first scan. Signed out, the card above
@@ -2142,10 +2217,8 @@ function renderInventory() {
     state.items.length
   }</div><div class="market-actions">${groupToggle}</div></div>`;
   if (!state.groupByType) {
-    setHTML(
-      resultsEl,
-      head + `<div class="grid ${state.layout}">${shown.map(cardHtml).join('')}</div>`,
-    );
+    renderCardGrid(resultsEl, head, state.layout, shown, cardHtml);
+    return;
   } else {
     // One section per type (sort order kept inside each), sticky titles like Market.
     const buckets = new Map(INV_SECTIONS.map((x) => [x.key, []]));
@@ -5186,11 +5259,7 @@ function renderBuybacks() {
     );
     return; // table has no thumbnails to enhance
   }
-  setHTML(
-    body,
-    count + `<div class="grid ${state.bbLayout}">${list.map(buybackCardHtml).join('')}</div>`,
-  );
-  enhanceCardImages(body);
+  renderCardGrid(body, count, state.bbLayout, list, buybackCardHtml);
 }
 
 // Buy-back "Market": one reclaim table per kind (Ships, CCUs, Paints, …), with
@@ -5469,9 +5538,19 @@ chipsEl.addEventListener('click', (e) => {
   renderInventory();
 });
 
+// Typing waits for a short pause before redrawing, so a big list doesn't redraw on
+// every letter.
+const debounce = (fn, ms = 150) => {
+  let t;
+  return (...a) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...a), ms);
+  };
+};
+const renderInventorySoon = debounce(() => renderInventory());
 searchEl.addEventListener('input', () => {
   state.query = searchEl.value;
-  renderInventory();
+  renderInventorySoon();
 });
 
 sortEl.addEventListener('change', () => {
@@ -5480,9 +5559,10 @@ sortEl.addEventListener('change', () => {
 });
 
 if (bbSearchEl) {
+  const renderBuybacksSoon = debounce(() => renderBuybacks());
   bbSearchEl.addEventListener('input', () => {
     state.bbQuery = bbSearchEl.value;
-    renderBuybacks();
+    renderBuybacksSoon();
   });
 }
 if (bbSortEl) {
