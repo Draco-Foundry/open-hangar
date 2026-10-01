@@ -56,3 +56,11 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Manrope and Source Sans 3 are bundled from [Fontsource](https://fontsource.org) and are
 licensed under the SIL Open Font License 1.1.
+
+## Ko-fi and Patreon Logos
+
+`src/assets/kofi-symbol.svg` and `src/assets/patreon-symbol.svg` (also in `site/img/`) are
+the official, unmodified Ko-fi symbol and Patreon symbol, used only to link to Draco
+Foundry's own Ko-fi and Patreon pages, as both brands' guidelines allow. Ko-fi is a
+trademark of Ko-fi Labs Limited; Patreon is a trademark of Patreon, Inc. They are not part
+of the PolyForm license.
