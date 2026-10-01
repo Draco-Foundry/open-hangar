@@ -335,6 +335,31 @@
     return lines.join('\n');
   };
 
+  // Known Issues page (#175): GitHub's open-issues list → the bugs worth showing.
+  // The issues API also returns pull requests (they carry `pull_request`); only
+  // issues labelled bug or scan-broken are kept, scan-broken first, then newest.
+  // Pure, so it's tested directly.
+  OH.KNOWN_ISSUE_LABELS = ['scan-broken', 'bug'];
+  OH.parseKnownIssues = function parseKnownIssues(list) {
+    if (!Array.isArray(list)) return [];
+    return list
+      .filter((i) => i && !i.pull_request && Number.isInteger(i.number))
+      .map((i) => ({
+        number: i.number,
+        title: String(i.title || ''),
+        url: String(i.html_url || ''),
+        createdAt: String(i.created_at || ''),
+        labels: (i.labels || []).map((l) => (typeof l === 'string' ? l : l && l.name)),
+      }))
+      .filter((i) => i.labels.some((l) => OH.KNOWN_ISSUE_LABELS.includes(l)))
+      .filter((i) => /^https:\/\/github\.com\//.test(i.url))
+      .sort(
+        (a, b) =>
+          b.labels.includes('scan-broken') - a.labels.includes('scan-broken') ||
+          Date.parse(b.createdAt) - Date.parse(a.createdAt),
+      );
+  };
+
   // --- Storage (versioned multi-source DB) ----------------------------------
 
   // Every load is checked (OH.checkDB): a malformed DB never crashes the dashboard.
