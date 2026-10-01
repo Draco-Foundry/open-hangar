@@ -299,6 +299,11 @@ const DISCORD_URL = 'https://discord.gg/FF8Wm5HdnV';
 // Feature ideas live in GitHub Discussions → Ideas (upvotable); Discord covers
 // people without a GitHub account.
 const IDEAS_URL = `${REPO_URL}/discussions/categories/ideas`;
+// Optional support (#240): one-off tips on Ko-fi, monthly on Patreon. Plain links,
+// opened only when clicked; nothing is loaded from either site. The footer's own
+// support line (logo buttons) is static in dashboard.html.
+const KOFI_URL = 'https://ko-fi.com/dracofoundry';
+const PATREON_URL = 'https://www.patreon.com/DracoFoundry';
 
 // Supporters shown on the Developers page. Each entry is { name, url? }.
 // Empty arrays render a friendly placeholder. When the GitHub repo is public
@@ -1340,7 +1345,9 @@ function renderFooter() {
       dev,
       link(REPO_URL, 'GitHub') +
         link(DISCORD_URL, 'Discord') +
-        link(IDEAS_URL, 'Suggest a feature'),
+        link(IDEAS_URL, 'Suggest a feature') +
+        link(KOFI_URL, 'Tip on Ko-fi') +
+        link(PATREON_URL, 'Support on Patreon'),
     );
 }
 
