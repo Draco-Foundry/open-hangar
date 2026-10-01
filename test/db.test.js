@@ -366,3 +366,36 @@ test('saved accounts with a damaged copy are listed, not a crash', async () => {
     ],
   );
 });
+
+test('an account switch on a not-yet-upgraded DB never brings the old account back', async () => {
+  reset({
+    db: {
+      schemaVersion: 2,
+      owner: { nickname: 'Main' },
+      sources: { hangar: { items: rows(3), scannedAt: 1 } },
+      history: [snap(1, 3)],
+    },
+  });
+  await OH.switchProfile('Alt', 'Alt D');
+  await settle();
+  assert.equal(mem.db.owner.nickname, 'Alt');
+  assert.deepEqual(mem.db.sources, {});
+  assert.deepEqual(mem.dbHistory, []);
+  assert.equal(mem['profile:main'].sources.hangar.items.length, 3);
+  assert.equal(mem['profile:main'].history.length, 1);
+});
+
+test('Clear Data right after loading a not-yet-upgraded DB stays cleared', async () => {
+  reset({
+    db: {
+      schemaVersion: 2,
+      sources: { hangar: { items: rows(2), scannedAt: 1 } },
+      history: [snap(1, 2)],
+    },
+  });
+  await OH.loadDB(); // queues the upgrade write
+  await OH.clearData();
+  await settle();
+  assert.equal(mem.db, undefined);
+  assert.equal(mem.dbHistory, undefined);
+});

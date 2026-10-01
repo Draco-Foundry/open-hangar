@@ -553,15 +553,13 @@
   function queueFixUp() {
     if (fixUpQueued) return;
     fixUpQueued = true;
-    saveChain = saveChain
-      .then(async () => {
-        fixUpQueued = false;
-        const { db, needsWrite } = await readDB();
-        if (needsWrite) await writeDB(db);
-      })
-      .catch(() => {
-        fixUpQueued = false;
-      });
+    exclusive(async () => {
+      fixUpQueued = false;
+      const { db, needsWrite } = await readDB();
+      if (needsWrite) await writeDB(db);
+    }).catch(() => {
+      fixUpQueued = false;
+    });
   }
   // Resolves once every queued save and fix-up has run (tests, Clear Data).
   OH.storageSettled = () => saveChain.then(() => {});
@@ -571,14 +569,19 @@
     return db.sources[id] || { items: [], scannedAt: null };
   };
 
-  // Saves are queued, and the DB is read right before it's written (the account
-  // lookup happens first), so a save can't write back a stale copy over another
-  // save or an account switch that happened while it was waiting.
+  // Everything that writes the live DB (scan saves, fix-ups, Clear Data, restores,
+  // account switches, imports) runs one at a time in this queue, and reads storage
+  // right before it writes, so nothing can write back a stale copy over another.
   let saveChain = Promise.resolve();
+  function exclusive(fn) {
+    const run = saveChain.then(fn);
+    saveChain = run.catch(() => {});
+    return run;
+  }
   // `account`: the RSI account the caller already looked up for this scan. Pass it
   // so a save never costs extra RSI requests; without it the save looks it up.
   function saveSource(id, items, { record = false, meta, account } = {}) {
-    const run = saveChain.then(async () => {
+    return exclusive(async () => {
       // Stamp which RSI account this data belongs to, so the UI can detect when a
       // different account signs in later and clear the stale data (multi-account
       // safety). Best-effort: if we can't read the account, leave owner untouched.
@@ -603,8 +606,6 @@
       await chrome.storage.local.remove(['hangar', 'scannedAt']); // drop legacy keys
       return scannedAt;
     });
-    saveChain = run.catch(() => {});
-    return run;
   }
 
   // Recovery slot. When data is auto-cleared because a *different* RSI account
@@ -620,10 +621,10 @@
   //   { backup: true }  → snapshot the current DB to the recovery slot first
   //                       (the auto-clear path; recoverable via OH.recoverData).
   //   { backup: false } → full wipe, including any recovery snapshot (manual).
-  OH.clearData = async function clearData({ backup = false } = {}) {
-    await OH.storageSettled(); // no queued save may write it back afterwards
+  OH.clearData = ({ backup = false } = {}) => exclusive(() => clearDataNow(backup));
+  async function clearDataNow(backup) {
     if (backup) {
-      const db = await OH.loadDB(); // history rides inside the recovery copy
+      const { db } = await readDB(); // history rides inside the recovery copy
       const hasData =
         db &&
         (db.owner ||
@@ -644,7 +645,7 @@
       RECOVERY_KEY,
       LOG_KEY,
     ]);
-  };
+  }
 
   // The most recent auto-cleared snapshot ({ at, db }), or null. Lets the UI
   // offer a one-click restore after a different-account auto-clear.
@@ -657,14 +658,15 @@
   // Restore a previously auto-cleared snapshot back into the live DB (history
   // included) and drop the recovery slot. Returns the restored DB, or null if
   // there was nothing to restore.
-  OH.recoverData = async function recoverData() {
-    const rec = await OH.getRecovery();
-    if (!rec) return null;
-    const db = fromStored(rec.db);
-    await writeDB(db);
-    await chrome.storage.local.remove(RECOVERY_KEY);
-    return db;
-  };
+  OH.recoverData = () =>
+    exclusive(async () => {
+      const rec = await OH.getRecovery();
+      if (!rec) return null;
+      const db = fromStored(rec.db);
+      await writeDB(db);
+      await chrome.storage.local.remove(RECOVERY_KEY);
+      return db;
+    });
 
   // --- Saved accounts (multi-account) ---------------------------------------
   // The live DB (DB_KEY) always belongs to the RSI account that's signed in.
@@ -681,9 +683,10 @@
   // Make `nickname` the live account: park the current DB under its owner, then
   // load the new account's parked DB (if any). A parked DB keeps its scan history
   // inside it, so each account's history travels with it. Returns { restored, parked }.
-  OH.switchProfile = async function switchProfile(nickname, displayname = null) {
-    await OH.storageSettled(); // a queued save must land on the account it belongs to
-    const cur = await OH.loadDB();
+  OH.switchProfile = (nickname, displayname = null) =>
+    exclusive(() => switchProfileNow(nickname, displayname));
+  async function switchProfileNow(nickname, displayname) {
+    const { db: cur } = await readDB(); // a save queued before this landed already
     let parked = null;
     if (cur.owner && cur.owner.nickname && dbHasData(cur)) {
       if (cur.owner.nickname.toLowerCase() === String(nickname).toLowerCase()) {
@@ -701,7 +704,7 @@
     await writeDB(next);
     await chrome.storage.local.remove([key, 'account']); // live now; account cache is stale
     return { restored, parked };
-  };
+  }
 
   // Every account with data in this browser: the live one plus parked ones.
   //   [{ nickname, displayname, pledges, scannedAt, active }]
@@ -1009,11 +1012,13 @@
         error: `This file is format v${obj.schemaVersion}; this version of Open Hangar reads up to v${newest}. Update the extension first.`,
       };
     }
-    await OH.storageSettled(); // a queued save mustn't land on top of the restore
+    return exclusive(() => importNow(obj));
+  };
+  async function importNow(obj) {
     const db = { schemaVersion: DB_VERSION, sources: {} };
     // History is merged, never replaced: restoring an old backup must not throw
     // away snapshots taken since, and vice versa.
-    const current = await OH.loadDB();
+    const { db: current } = await readDB();
     db.history = OH.mergeHistory(current.history, obj.history);
     for (const [id, src] of Object.entries(obj.sources)) {
       // Most sources store an array of items (hangar, buybacks); the referral
@@ -1033,7 +1038,7 @@
     await writeDB(db);
     await chrome.storage.local.remove(['hangar', 'scannedAt']); // drop legacy keys
     return { ok: true, db };
-  };
+  }
 
   // --- Scanning -------------------------------------------------------------
 
