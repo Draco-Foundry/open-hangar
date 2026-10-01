@@ -366,6 +366,34 @@
     if (/\/api\/hub\/getCommlinkItems/.test(url)) return realFetch('/__commlinks.json');
     if (/\/api\/spectrum\/forum\/channel\/threads/.test(url))
       return realFetch('/__patchnotes.json');
+    // Fixed exchange rates, so the demo and the UI test never wait on the live file.
+    if (url === 'https://openhangar.space/rates.json')
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            base: 'USD',
+            date: '2026-09-30',
+            source: 'demo',
+            rates: {
+              USD: 1,
+              EUR: 0.880669,
+              GBP: 0.752646,
+              CAD: 1.41832,
+              AUD: 1.43523,
+              NZD: 1.77147,
+              CHF: 0.834698,
+              SEK: 9.97886,
+              PLN: 3.84764,
+              CZK: 21.5236,
+              BRL: 5.20273,
+              CNY: 6.70454,
+              JPY: 156.997,
+              KRW: 1355.4,
+            },
+          }),
+          { headers: { 'content-type': 'application/json' } },
+        ),
+      );
     if (/robertsspaceindustries\.com\/comm-link\/transmission\//.test(url))
       return realFetch('/__twisc-page.html');
     if (/robertsspaceindustries\.com\/alexandria\/html\//.test(url))
