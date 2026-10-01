@@ -9,9 +9,11 @@
  * service worker.
  *
  * Every data source is declared in OH.SOURCES. Adding a source = adding one
- * entry (+ a parser). The whole account is stored as one versioned database:
- *   { schemaVersion, sources: { hangar: { items, scannedAt }, … }, owner }
- * Exposed on window.OH.
+ * entry (+ a parser). The whole account is stored as one versioned database,
+ * with its scan history in a key of its own:
+ *   db:        { schemaVersion, sources: { hangar: { items, scannedAt }, … }, owner }
+ *   dbHistory: [ { at, items: [[id, name, value]] } ]
+ * OH.loadDB() returns both together ({ …db, history }). Exposed on window.OH.
  *
  * EXPORT shape (what a backend/consumer sees) is that same DB plus provenance
  * and a flattened identity block, ordered identity-first → holdings:
@@ -30,11 +32,18 @@
   const DELAY_MS = 400; // politeness throttle between pages
   const MAX_PAGES = 1000; // safety cap: 10,000 pledges at RSI's 10 per page
   const DB_KEY = 'db';
-  // v2 added the exported `account` block (identity + org/rank + balances).
-  // The stored `sources` items shape is unchanged from v1, so a v1 DB in storage
-  // loads as-is with no migration; only consumers that key on the export's
-  // schemaVersion need to know v2 carries account data.
-  const SCHEMA_VERSION = 2;
+  const HISTORY_KEY = 'dbHistory';
+  const CORRUPT_KEY = 'dbCorrupt';
+  // Two version numbers (they were one, 2, until storage v3):
+  //   DB_VERSION is how the database is stored in this browser. Changing that
+  //   shape needs a MIGRATIONS step (see the Storage section).
+  //     v1 → v2: unchanged (only the export gained `account`)
+  //     v2 → v3: scan history moved out of `db` into its own key
+  //   EXPORT_VERSION is the backup-file format (OH.exportDB / OH.importDB).
+  //     v2 added the `account` block (identity, org/rank, balances); v1 had
+  //     sources only. Keeping it at 2 lets older versions import new backups.
+  const DB_VERSION = 3;
+  const EXPORT_VERSION = 2;
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -308,6 +317,7 @@
     const cat = store.shipCatalog || {};
     const mat = store.shipMatrix || {};
     const log = await OH.getLog();
+    const damaged = await OH.getDamaged();
     const lines = [
       '```',
       'Open Hangar error report',
@@ -316,6 +326,7 @@
       `Hangar:    ${count(src('hangar'))} items, scanned ${ago(src('hangar').scannedAt)}`,
       `Buy-backs: ${count(src('buybacks'))} items, scanned ${ago(src('buybacks').scannedAt)}`,
       `History:   ${Array.isArray(db.history) ? db.history.length : 0} snapshots`,
+      `Set aside: ${damaged.length ? damaged.map((d) => `${d.what} (${d.problems.slice(0, 3).join('; ')})`).join(', ') : 'nothing'}`,
       `Catalog:   ${Array.isArray(cat.list) ? cat.list.length : 0} ships (v${cat.v || '?'}, ${ago(cat.at)}) · ship matrix ${Array.isArray(mat.list) ? mat.list.length : 0}`,
       `Log:       ${log.length ? `last ${Math.min(maxLines, log.length)} of ${log.length}` : 'empty'}`,
       ...log.slice(-maxLines).map(OH.formatLogLine),
@@ -326,18 +337,234 @@
 
   // --- Storage (versioned multi-source DB) ----------------------------------
 
-  const emptyDB = () => ({ schemaVersion: SCHEMA_VERSION, sources: {} });
+  // Every load is checked (OH.checkDB): a malformed DB never crashes the dashboard.
+  // The original is set aside untouched under `dbCorrupt` first (OH.getDamaged),
+  // whatever is still valid is kept, and the dashboard offers "Restore from backup
+  // file". Older stored versions go through MIGRATIONS. Any fix-up is written back
+  // through the save queue, which reads storage again first, so it can never
+  // overwrite a scan that saved in the meantime.
 
-  // Load the whole DB, migrating the legacy { hangar, scannedAt } shape.
-  OH.loadDB = async function loadDB() {
-    const raw = await chrome.storage.local.get([DB_KEY, 'hangar', 'scannedAt']);
-    if (raw[DB_KEY] && raw[DB_KEY].schemaVersion) return raw[DB_KEY];
-    const db = emptyDB();
-    if (Array.isArray(raw.hangar)) {
-      db.sources.hangar = { items: raw.hangar, scannedAt: raw.scannedAt || null };
+  const emptyDB = () => ({ schemaVersion: DB_VERSION, sources: {} });
+  const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
+  const okTime = (t) =>
+    Number.isFinite(t) || (typeof t === 'string' && t !== '' && !isNaN(Date.parse(t)));
+
+  // Raw stored DB → { db, problems }. `db` always has the shape the rest of the
+  // extension relies on; `problems` says what had to be dropped (empty = it was
+  // fine). History embedded in the DB (before v3, or written by an older version
+  // after a rollback) comes back as db.history. Pure.
+  OH.checkDB = function checkDB(raw) {
+    const problems = [];
+    if (!isObj(raw)) return { db: emptyDB(), problems: ['not an object'] };
+    let version = raw.schemaVersion;
+    if (!Number.isInteger(version) || version < 1) {
+      problems.push('no schema version');
+      version = DB_VERSION;
+    } else if (version > DB_VERSION) {
+      problems.push(`made by a newer version of Open Hangar (v${version})`);
+      version = DB_VERSION;
     }
+    const db = { schemaVersion: version, sources: {} };
+    if (!isObj(raw.sources)) problems.push('no sources');
+    else {
+      for (const [id, src] of Object.entries(raw.sources)) {
+        if (!isObj(src)) {
+          problems.push(`${id}: unreadable`);
+          continue;
+        }
+        let items;
+        if (Array.isArray(src.items)) {
+          items = src.items.filter(isObj);
+          const bad = src.items.length - items.length;
+          if (bad) problems.push(`${id}: ${bad} unreadable row${bad === 1 ? '' : 's'}`);
+        } else if (isObj(src.items)) {
+          items = src.items; // the referral source is one object
+        } else {
+          problems.push(`${id}: no items`);
+          continue;
+        }
+        const out = { items, scannedAt: okTime(src.scannedAt) ? src.scannedAt : null };
+        if (src.scannedAt != null && out.scannedAt == null) problems.push(`${id}: bad scan time`);
+        if (isObj(src.meta)) out.meta = src.meta;
+        else if (src.meta !== undefined) problems.push(`${id}: bad meta`);
+        db.sources[id] = out;
+      }
+    }
+    if (raw.owner != null) {
+      if (isObj(raw.owner) && typeof raw.owner.nickname === 'string' && raw.owner.nickname) {
+        db.owner = {
+          nickname: raw.owner.nickname,
+          displayname: typeof raw.owner.displayname === 'string' ? raw.owner.displayname : null,
+        };
+      } else problems.push('unreadable owner');
+    }
+    if (raw.history !== undefined) {
+      if (Array.isArray(raw.history)) {
+        db.history = raw.history.map(cleanSnapshot).filter(Boolean);
+        const bad = raw.history.length - db.history.length;
+        if (bad) problems.push(`history: ${bad} unreadable snapshot${bad === 1 ? '' : 's'}`);
+      } else problems.push('unreadable history');
+    }
+    return { db, problems };
+  };
+
+  // Storage migrations: MIGRATIONS[n] turns a v(n) DB into v(n+1). Add one with
+  // every DB_VERSION bump, and a test (test/db.test.js). Scan history is never
+  // touched here: it's split out of the DB on every load (readDB), which also
+  // covers a DB that an older version wrote after a rollback.
+  const MIGRATIONS = {
+    1: (db) => db, // v1 → v2: stored shape unchanged (only the export gained `account`)
+    2: (db) => db, // v2 → v3: history moves to its own key (writeDB stores it there)
+  };
+  OH.migrateDB = function migrateDB(db) {
+    let out = db;
+    while (out.schemaVersion < DB_VERSION) {
+      const step = MIGRATIONS[out.schemaVersion];
+      if (!step) throw new Error(`No migration from database v${out.schemaVersion}`);
+      out = { ...step(out), schemaVersion: out.schemaVersion + 1 };
+    }
+    return out;
+  };
+
+  // A stored blob that isn't the live DB (a parked account, the recovery slot):
+  // checked and migrated like the live one, history kept inside. Pure.
+  const fromStored = (blob) => {
+    const db = OH.migrateDB(OH.checkDB(blob).db);
+    if (!db.history) db.history = [];
     return db;
   };
+
+  // --- Damaged data, set aside ------------------------------------------------
+  // Up to three originals that failed the check, newest last, kept until the
+  // user clears their data: { id, at, what: 'db' | 'history', problems, raw }.
+  // `id` is a hash of the content, so the same damage is only kept once.
+  const CORRUPT_MAX = 3;
+  function hashText(s) {
+    let h = 0x811c9dc5; // FNV-1a
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193);
+    return (h >>> 0).toString(16);
+  }
+  let asideChain = Promise.resolve();
+  function setAside(what, raw, problems) {
+    const run = asideChain.then(async () => {
+      let id;
+      try {
+        id = hashText(JSON.stringify(raw) ?? String(raw));
+      } catch {
+        id = `t${Date.now()}`; // not even serialisable
+      }
+      const { [CORRUPT_KEY]: cur } = await chrome.storage.local.get(CORRUPT_KEY);
+      const list = Array.isArray(cur) ? cur : [];
+      if (list.some((x) => x && x.id === id)) return;
+      list.push({ id, at: Date.now(), what, problems: problems.slice(0, 20), raw });
+      await chrome.storage.local.set({ [CORRUPT_KEY]: list.slice(-CORRUPT_MAX) });
+      OH.log('error', 'storage', `${what} set aside: ${problems.slice(0, 5).join('; ')}`);
+    });
+    asideChain = run.catch(() => {});
+    return run;
+  }
+  // What was set aside, without the data itself: [{ id, at, what, problems, seen }].
+  OH.getDamaged = async function getDamaged() {
+    const { [CORRUPT_KEY]: cur } = await chrome.storage.local.get(CORRUPT_KEY);
+    return (Array.isArray(cur) ? cur : [])
+      .filter(isObj)
+      .map(({ id, at, what, problems, seen }) => ({ id, at, what, problems, seen: !!seen }));
+  };
+  // The originals, to save as a file for a bug report.
+  OH.exportDamaged = async function exportDamaged() {
+    const { [CORRUPT_KEY]: cur } = await chrome.storage.local.get(CORRUPT_KEY);
+    return Array.isArray(cur) ? cur : [];
+  };
+  // Hide the notice for what's set aside now (the copies stay until Clear Data).
+  OH.dismissDamaged = async function dismissDamaged() {
+    const { [CORRUPT_KEY]: cur } = await chrome.storage.local.get(CORRUPT_KEY);
+    if (!Array.isArray(cur) || !cur.length) return;
+    await chrome.storage.local.set({
+      [CORRUPT_KEY]: cur.map((x) => (isObj(x) ? { ...x, seen: true } : x)),
+    });
+  };
+
+  // Read and check the stored DB and its history. → { db (with .history),
+  // needsWrite }. needsWrite: storage isn't in today's shape yet (damage set aside,
+  // a migration, or history still inside the DB) and should be written back.
+  async function readDB() {
+    const raw = await chrome.storage.local.get([DB_KEY, HISTORY_KEY, 'hangar', 'scannedAt']);
+    let db;
+    let needsWrite = false;
+    if (raw[DB_KEY] === undefined) {
+      db = emptyDB();
+      // Before the versioned DB: { hangar, scannedAt } at the top level.
+      if (Array.isArray(raw.hangar)) {
+        db.sources.hangar = {
+          items: raw.hangar.filter(isObj),
+          scannedAt: okTime(raw.scannedAt) ? raw.scannedAt : null,
+        };
+      }
+    } else {
+      const checked = OH.checkDB(raw[DB_KEY]);
+      db = checked.db;
+      if (checked.problems.length) {
+        await setAside('db', raw[DB_KEY], checked.problems); // before anything can overwrite it
+        needsWrite = true;
+      }
+      if (db.schemaVersion < DB_VERSION) {
+        db = OH.migrateDB(db);
+        needsWrite = true;
+      }
+    }
+    let kept = [];
+    const h = raw[HISTORY_KEY];
+    if (Array.isArray(h)) {
+      kept = h.filter((s) => isObj(s) && Number.isFinite(s.at) && Array.isArray(s.items));
+      if (kept.length !== h.length) {
+        await setAside('history', h, [`${h.length - kept.length} unreadable snapshot(s)`]);
+        needsWrite = true;
+      }
+    } else if (h !== undefined) {
+      await setAside('history', h, ['unreadable history']);
+      needsWrite = true;
+    }
+    if (db.history) {
+      db.history = OH.mergeHistory(kept, db.history);
+      needsWrite = true;
+    } else db.history = kept;
+    return { db, needsWrite };
+  }
+
+  // Store a DB as loadDB returns it: the DB under `db`, its history under its own
+  // key, in one storage write. `history: false` leaves the stored history alone
+  // (it didn't change), so a buy-back save doesn't rewrite megabytes of history.
+  async function writeDB(db, { history = true } = {}) {
+    const { history: hist, ...rest } = db;
+    const out = { [DB_KEY]: { ...rest, schemaVersion: DB_VERSION } };
+    if (history) out[HISTORY_KEY] = Array.isArray(hist) ? hist : [];
+    await chrome.storage.local.set(out);
+  }
+
+  // Load the whole DB (with .history). Always the expected shape.
+  OH.loadDB = async function loadDB() {
+    const { db, needsWrite } = await readDB();
+    if (needsWrite) queueFixUp();
+    return db;
+  };
+  // Write the checked/migrated DB back, in the save queue: it reads storage again
+  // there, so a scan saved in between is never overwritten.
+  let fixUpQueued = false;
+  function queueFixUp() {
+    if (fixUpQueued) return;
+    fixUpQueued = true;
+    saveChain = saveChain
+      .then(async () => {
+        fixUpQueued = false;
+        const { db, needsWrite } = await readDB();
+        if (needsWrite) await writeDB(db);
+      })
+      .catch(() => {
+        fixUpQueued = false;
+      });
+  }
+  // Resolves once every queued save and fix-up has run (tests, Clear Data).
+  OH.storageSettled = () => saveChain.then(() => {});
 
   OH.loadSource = async function loadSource(id) {
     const db = await OH.loadDB();
@@ -363,14 +590,16 @@
           /* owner stamp is optional */
         }
       }
-      const db = await OH.loadDB();
+      const { db, needsWrite } = await readDB();
       const scannedAt = Date.now();
       if (record) recordHistory(db, db.sources[id], items, scannedAt);
       db.sources[id] = meta ? { items, scannedAt, meta } : { items, scannedAt };
       if (acct && acct.loggedIn && acct.nickname) {
         db.owner = { nickname: acct.nickname, displayname: acct.displayname || null };
       }
-      await chrome.storage.local.set({ [DB_KEY]: db });
+      // History is only rewritten when it changed: a new snapshot, or it was just
+      // moved out of the DB (needsWrite) and must not be lost with it.
+      await writeDB(db, { history: record || needsWrite });
       await chrome.storage.local.remove(['hangar', 'scannedAt']); // drop legacy keys
       return scannedAt;
     });
@@ -392,8 +621,9 @@
   //                       (the auto-clear path; recoverable via OH.recoverData).
   //   { backup: false } → full wipe, including any recovery snapshot (manual).
   OH.clearData = async function clearData({ backup = false } = {}) {
+    await OH.storageSettled(); // no queued save may write it back afterwards
     if (backup) {
-      const db = await OH.loadDB();
+      const db = await OH.loadDB(); // history rides inside the recovery copy
       const hasData =
         db &&
         (db.owner ||
@@ -401,11 +631,13 @@
             (s) => s && Array.isArray(s.items) && s.items.length,
           ));
       if (hasData) await chrome.storage.local.set({ [RECOVERY_KEY]: { at: Date.now(), db } });
-      await chrome.storage.local.remove([DB_KEY, 'hangar', 'scannedAt', 'account']);
+      await chrome.storage.local.remove([DB_KEY, HISTORY_KEY, 'hangar', 'scannedAt', 'account']);
       return;
     }
     await chrome.storage.local.remove([
       DB_KEY,
+      HISTORY_KEY,
+      CORRUPT_KEY,
       'hangar',
       'scannedAt',
       'account',
@@ -419,17 +651,19 @@
   OH.getRecovery = async function getRecovery() {
     const raw = await chrome.storage.local.get(RECOVERY_KEY);
     const rec = raw[RECOVERY_KEY];
-    return rec && rec.db && rec.db.schemaVersion ? rec : null;
+    return rec && isObj(rec.db) && rec.db.schemaVersion ? rec : null;
   };
 
-  // Restore a previously auto-cleared snapshot back into the live DB and drop the
-  // recovery slot. Returns the restored DB, or null if there was nothing to restore.
+  // Restore a previously auto-cleared snapshot back into the live DB (history
+  // included) and drop the recovery slot. Returns the restored DB, or null if
+  // there was nothing to restore.
   OH.recoverData = async function recoverData() {
     const rec = await OH.getRecovery();
     if (!rec) return null;
-    await chrome.storage.local.set({ [DB_KEY]: rec.db });
+    const db = fromStored(rec.db);
+    await writeDB(db);
     await chrome.storage.local.remove(RECOVERY_KEY);
-    return rec.db;
+    return db;
   };
 
   // --- Saved accounts (multi-account) ---------------------------------------
@@ -445,8 +679,10 @@
     );
 
   // Make `nickname` the live account: park the current DB under its owner, then
-  // load the new account's parked DB (if any). Returns { restored, parked }.
+  // load the new account's parked DB (if any). A parked DB keeps its scan history
+  // inside it, so each account's history travels with it. Returns { restored, parked }.
   OH.switchProfile = async function switchProfile(nickname, displayname = null) {
+    await OH.storageSettled(); // a queued save must land on the account it belongs to
     const cur = await OH.loadDB();
     let parked = null;
     if (cur.owner && cur.owner.nickname && dbHasData(cur)) {
@@ -458,13 +694,13 @@
     }
     const key = profileKey(nickname);
     const saved = (await chrome.storage.local.get(key))[key];
-    const next =
-      saved && saved.schemaVersion
-        ? saved
-        : { ...emptyDB(), owner: { nickname, displayname: displayname || null } };
-    await chrome.storage.local.set({ [DB_KEY]: next });
+    const restored = isObj(saved) && !!saved.schemaVersion;
+    const next = restored
+      ? fromStored(saved)
+      : { ...emptyDB(), owner: { nickname, displayname: displayname || null }, history: [] };
+    await writeDB(next);
     await chrome.storage.local.remove([key, 'account']); // live now; account cache is stale
-    return { restored: !!(saved && saved.schemaVersion), parked };
+    return { restored, parked };
   };
 
   // Every account with data in this browser: the live one plus parked ones.
@@ -479,10 +715,13 @@
       active,
     });
     const out = [];
-    const live = all[DB_KEY];
+    // Checked first: a damaged copy shows as an account with no pledges, not a crash.
+    const live = all[DB_KEY] === undefined ? null : OH.checkDB(all[DB_KEY]).db;
     if (live && live.owner && live.owner.nickname) out.push(row(live, true));
     for (const [k, v] of Object.entries(all)) {
-      if (k.startsWith(PROFILE_PREFIX) && v && v.schemaVersion && v.owner) out.push(row(v, false));
+      if (!k.startsWith(PROFILE_PREFIX) || !isObj(v) || !v.schemaVersion) continue;
+      const db = OH.checkDB(v).db;
+      if (db.owner) out.push(row(db, false));
     }
     return out;
   };
@@ -607,7 +846,7 @@
       app: 'open-hangar',
       appVersion,
       exportedAt: new Date().toISOString(),
-      schemaVersion: SCHEMA_VERSION,
+      schemaVersion: EXPORT_VERSION,
       account: shapeAccountForExport(account, db.owner),
       sources: sanitizeSourcesForExport(db.sources),
       // Scan history rides along so a backup file is a complete restore point.
@@ -761,13 +1000,17 @@
     if (!obj.sources || typeof obj.sources !== 'object') {
       return { ok: false, error: 'Missing "sources" — this is not an Open Hangar export.' };
     }
-    if (obj.schemaVersion && obj.schemaVersion > SCHEMA_VERSION) {
+    // A backup file says app: 'open-hangar' and carries the export version; a bare
+    // stored DB carries the storage version.
+    const newest = obj.app === 'open-hangar' ? EXPORT_VERSION : DB_VERSION;
+    if (obj.schemaVersion && obj.schemaVersion > newest) {
       return {
         ok: false,
-        error: `Export is schema v${obj.schemaVersion}; this extension supports v${SCHEMA_VERSION}. Update the extension first.`,
+        error: `This file is format v${obj.schemaVersion}; this version of Open Hangar reads up to v${newest}. Update the extension first.`,
       };
     }
-    const db = { schemaVersion: SCHEMA_VERSION, sources: {} };
+    await OH.storageSettled(); // a queued save mustn't land on top of the restore
+    const db = { schemaVersion: DB_VERSION, sources: {} };
     // History is merged, never replaced: restoring an old backup must not throw
     // away snapshots taken since, and vice versa.
     const current = await OH.loadDB();
@@ -787,7 +1030,7 @@
           db.sources[id].meta = src.meta;
       }
     }
-    await chrome.storage.local.set({ [DB_KEY]: db });
+    await writeDB(db);
     await chrome.storage.local.remove(['hangar', 'scannedAt']); // drop legacy keys
     return { ok: true, db };
   };

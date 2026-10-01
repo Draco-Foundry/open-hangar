@@ -3319,6 +3319,23 @@
            a fix is coming"). Plain text only; see OH.getRemoteStatus. -->
       <div id="site-notice" class="signedout-banner" role="status" hidden></div>
 
+      <!-- Saved data that couldn't be read was set aside (OH.getDamaged, #184). -->
+      <div id="db-notice" class="signedout-banner db-notice" role="alert" hidden>
+        <span
+          >Some of your saved data couldn't be read, so it was set aside and everything readable was
+          kept. If something is missing, restore your last backup file.</span
+        >
+        <span class="db-notice-actions">
+          <button type="button" class="mk-btn primary" id="db-restore">
+            Restore from backup file
+          </button>
+          <button type="button" class="mk-btn" id="db-save-damaged" title="For a bug report">
+            Save the damaged copy
+          </button>
+          <button type="button" class="mk-btn" id="db-dismiss">Dismiss</button>
+        </span>
+      </div>
+
       <!-- A new version has downloaded and is waiting for a reload. -->
       <div id="update-banner" class="update-banner" role="status" hidden>
         <span id="update-text"></span>
