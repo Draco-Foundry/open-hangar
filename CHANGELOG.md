@@ -13,6 +13,35 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   restore your last backup file.
 - Improved: saving a scan is lighter on big accounts: your scan history is stored on its own,
   so it isn't rewritten every time buy-backs or referrals are saved.
+- Improved: **Global Hangar Search finds ships inside buy-back packs** (once a pack's details
+  are loaded), shown as "400i, inside Origin Complete Pack". Packs whose contents haven't been
+  read yet get a quiet "Get Details" link right in the results.
+- Improved: search results are sorted by type, packs first, then packages, ships, paints and
+  CCUs, so the big stuff is never cut off by add-ons.
+- Improved: both global searches start empty: clicking away, pressing Esc, opening a result or
+  changing page clears them.
+- Improved: **shorter buy-back titles**: no more "Standalone Ship -", "Package -",
+  "Subscriber Store -", Warbond or Standard Edition in the list. The full RSI name is still in
+  the tooltip, the details window and your exports, and the Warbond filter is gone from
+  Buy-Backs (it still lives in Inventory).
+- Improved: **big accounts are much snappier.** Buy-Backs with a thousand items opens
+  straight away, search waits for you to stop typing, and ship pictures only load for what's
+  on screen.
+- Improved: the first scan shows a proper progress bar on the welcome card, and later scans
+  show what they're on in the Scan button's tooltip and menu.
+- Improved: Streamer Mode shows as a small purple dot on your portrait instead of a pill in
+  the top bar.
+- Improved: the referral share image now says which month was your best ("best month · Mar
+  2024").
+- Improved: loading buy-back details is gentler on RSI: if RSI asks to slow down, it stops
+  right away, keeps everything it already read and tells you when to try again.
+- Improved: Home loads even when one of the outside sites (the wiki, exchange rates, RSI's
+  news) is down: requests give up after a few seconds and a site that's down is left alone
+  for a bit.
+- Fixed: scrolling over the gaps in the search results scrolled the page behind them.
+- Fixed: the scan progress line pushed the Citizen Card around.
+- Fixed: with Streamer Mode on, the top bar wrapped onto two rows.
+- Fixed: a gap opened between the slim top bar and the sticky section titles on Inventory.
 
 ## 0.2.12 — 2026-09-30
 
