@@ -9,8 +9,8 @@
     "directory": "../site",
     "html_handling": "none", // keep /privacy.html as it is (store listings link it)
   },
-  // Until the cutover (docs/SITE-CLOUDFLARE.md) it's only on workers.dev, for
-  // checking. The cutover adds:
-  //   "routes": [{ "pattern": "openhangar.space", "custom_domain": true }],
+  // openhangar.space itself (switched from GitHub Pages, docs/SITE-CLOUDFLARE.md).
+  // www is a proxied record plus a "www to root" redirect rule in the dashboard.
+  "routes": [{ "pattern": "openhangar.space", "custom_domain": true }],
   "workers_dev": true,
 }
