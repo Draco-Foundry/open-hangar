@@ -60,7 +60,7 @@
       <span class="meta">{#if r.price}<b title="Melt value">{r.price}</b>{/if}Added {r.day}</span>
     </button>
   {/each}
-  <a class="oh-more" href="#inventory">All pledges →</a>
+  <a class="oh-more" href="#inventory">All Pledges →</a>
 </section>
 
 <style>
