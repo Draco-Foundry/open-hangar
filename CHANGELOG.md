@@ -29,6 +29,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   on screen.
 - Improved: the first scan shows a proper progress bar on the welcome card, and later scans
   show what they're on in the Scan button's tooltip and menu.
+- Improved: **sharper ship pictures on high-res screens**, loaded once at the right size with no
+  blurry-then-sharp jump, and the first screen of Inventory and Buy-Backs is ready right after
+  a scan.
 - Improved: Streamer Mode shows as a small purple dot on your portrait instead of a pill in
   the top bar.
 - Improved: the referral share image now says which month was your best ("best month · Mar
