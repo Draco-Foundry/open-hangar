@@ -3267,9 +3267,10 @@
     let src = String(html || '');
     for (let prev = ''; prev !== src;) {
       prev = src;
-      src = src.replace(/<(script|style)\b[\s\S]*?<\/\1\b[^>]*>/gi, '');
+      src = src
+        .replace(/<(script|style)\b[\s\S]*?<\/\1\b[^>]*>/gi, '')
+        .replace(/<\/?(?:script|style)\b[^>]*>?/gi, '');
     }
-    src = src.replace(/<\/?(?:script|style)\b[^>]*>?/gi, '');
     const cut = src.search(/<h[1-6][^>]*>[^<]*Weekly Community Content Schedule/i);
     const intro = cut >= 0 ? src.slice(0, cut) : src;
     const rest = cut >= 0 ? src.slice(cut) : '';
