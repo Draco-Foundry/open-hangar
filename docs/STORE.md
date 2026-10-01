@@ -205,6 +205,10 @@ Picking a single store whose secrets aren't set skips it; picking **all** fails
 instead, so Discord never announces a store that got nothing. See Store Keys below for
 the secrets.
 
+One store update a day: a real run fails if another one sent something to the stores
+in the last 24 hours, unless it finishes the same tag one store at a time or the
+**Hotfix** box is ticked ([ROLLBACK.md](ROLLBACK.md)).
+
 ## 13. Store Keys
 
 The upload keys are secrets in the `stores` environment (repo Settings → Environments →

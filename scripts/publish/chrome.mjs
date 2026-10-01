@@ -6,12 +6,16 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import { chromeOutcome } from './lib.mjs';
 
+// Pinned to an exact version: this step holds the Chrome refresh token.
+// --auto-publish = 100% once approved. Staged rollout needs 10,000+ users
+// (docs/ROLLBACK.md, "Staged Rollout").
+const CLI = 'chrome-webstore-upload-cli@3.5.0';
+
 const zip = process.argv[2];
-const r = spawnSync(
-  'npx',
-  ['--yes', 'chrome-webstore-upload-cli@3', 'upload', '--auto-publish', '--source', zip],
-  { encoding: 'utf8', shell: process.platform === 'win32' },
-);
+const r = spawnSync('npx', ['--yes', CLI, 'upload', '--auto-publish', '--source', zip], {
+  encoding: 'utf8',
+  shell: process.platform === 'win32',
+});
 const output = `${r.stdout || ''}${r.stderr || ''}`;
 process.stdout.write(output);
 
