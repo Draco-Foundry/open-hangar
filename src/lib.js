@@ -3262,15 +3262,11 @@
         .replace(/\s+/g, ' ')
         .replace(/\s+([.,!?;:])/g, '$1')
         .trim();
-    // Drop script/style blocks, repeating until nothing changes, then any stray
-    // opening or closing tag of either (CodeQL js/bad-tag-filter, #285).
-    let src = String(html || '');
-    for (let prev = ''; prev !== src;) {
-      prev = src;
-      src = src
-        .replace(/<(script|style)\b[\s\S]*?<\/\1\b[^>]*>/gi, '')
-        .replace(/<\/?(?:script|style)\b[^>]*>?/gi, '');
-    }
+    // Script and style tags are defused, not cut out: their "<" becomes text, so
+    // nothing below can ever read them as a tag (CodeQL #285 flags any regex
+    // that tries to cut blocks out). Only <p>, <h4> and <li> text is read later,
+    // and every bit of it is escaped again before it's shown.
+    const src = String(html || '').replace(/<(?=\/?(?:script|style)\b)/gi, '&lt;');
     const cut = src.search(/<h[1-6][^>]*>[^<]*Weekly Community Content Schedule/i);
     const intro = cut >= 0 ? src.slice(0, cut) : src;
     const rest = cut >= 0 ? src.slice(cut) : '';
