@@ -11,6 +11,12 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   random and never the same one twice in a row.
 - Improved: **every link and button label is in Title Case**, so they're easier to spot.
 - Improved: How to Use is now the **Pilot's Handbook**, with clearer section names.
+- New: **Known Issues** in the menu shows the bugs we're already working on, straight
+  from GitHub, so you can see if yours is on the list before reporting it. It's only
+  fetched when you open the page; nothing about you is sent.
+- New: **Report a Scan Problem.** When a scan fails, one click opens a GitHub issue with
+  the error report already filled in. You read it and submit it yourself; nothing is sent
+  in the background, and it has nothing about your account.
 - Improved: **keyboard and screen reader support.** Tab and Enter now reach every card,
   filter chip, menu and pop-up, with a clear blue ring on whatever has focus, Escape closes
   menus and pop-ups, icon buttons and search boxes have names, and dim text is easier to read.

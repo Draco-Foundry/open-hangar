@@ -335,6 +335,62 @@
     return lines.join('\n');
   };
 
+  // Known Issues page (#175): GitHub's open-issues list → the bugs worth showing.
+  // The issues API also returns pull requests (they carry `pull_request`); only
+  // issues labelled bug or scan-broken are kept, scan-broken first, then newest.
+  // Pure, so it's tested directly.
+  OH.KNOWN_ISSUE_LABELS = ['scan-broken', 'bug'];
+  OH.parseKnownIssues = function parseKnownIssues(list) {
+    if (!Array.isArray(list)) return [];
+    return list
+      .filter((i) => i && !i.pull_request && Number.isInteger(i.number))
+      .map((i) => ({
+        number: i.number,
+        title: String(i.title || ''),
+        url: String(i.html_url || ''),
+        createdAt: String(i.created_at || ''),
+        labels: (i.labels || []).map((l) => (typeof l === 'string' ? l : l && l.name)),
+      }))
+      .filter((i) => i.labels.some((l) => OH.KNOWN_ISSUE_LABELS.includes(l)))
+      .filter((i) => /^https:\/\/github\.com\//.test(i.url))
+      .sort(
+        (a, b) =>
+          b.labels.includes('scan-broken') - a.labels.includes('scan-broken') ||
+          Date.parse(b.createdAt) - Date.parse(a.createdAt),
+      );
+  };
+
+  // "Report a Scan Problem" (#250): a new GitHub issue from the Scan Broken
+  // template (.github/ISSUE_TEMPLATE/scan_broken.yml), prefilled through its
+  // field ids. Only the scan summary (counts) and the error report go in, nothing
+  // about the account, and nothing is sent: the person reads it on GitHub and
+  // submits it themselves. Log lines are dropped from the top until the URL fits
+  // GitHub's limit. Pure, so it's tested directly.
+  OH.SCAN_REPORT_MAX_URL = 7000;
+  OH.scanProblemUrl = function scanProblemUrl({ summary = '', report = '', version = '' } = {}) {
+    const base = 'https://github.com/Draco-Foundry/open-hangar/issues/new';
+    const build = (rep) =>
+      `${base}?${new URLSearchParams({
+        template: 'scan_broken.yml',
+        title: 'Scan broken: ',
+        what: `The scan said: ${summary}`,
+        report: rep,
+        version: version ? `v${version}` : '',
+      })}`;
+    const lines = String(report).split('\n');
+    // Keep the header (first 10 lines: fence, title, counts, "Log:"), the newest
+    // log lines and the closing fence; trim the oldest log lines first.
+    const head = lines.slice(0, 10);
+    const tail = lines.slice(-1);
+    let log = lines.slice(10, -1);
+    let url = build(lines.join('\n'));
+    while (url.length > OH.SCAN_REPORT_MAX_URL && log.length) {
+      log = log.slice(Math.ceil(log.length / 4) || 1);
+      url = build([...head, '(older log lines trimmed)', ...log, ...tail].join('\n'));
+    }
+    return url;
+  };
+
   // --- Storage (versioned multi-source DB) ----------------------------------
 
   // Every load is checked (OH.checkDB): a malformed DB never crashes the dashboard.
