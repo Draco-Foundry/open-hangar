@@ -8,6 +8,11 @@ getting a fix out fast.
 
 Usual signs:
 
+- A red **RSI canary** post in #ops. Every day `.github/workflows/canary.yml` runs
+  the real parsers on RSI's public pages (store, ship matrix, Comm-Links, patch notes,
+  loaner help articles) and says which one broke, or that RSI couldn't be reached.
+  Run it yourself any time: `npm run canary`. It can't see logged-in pages (hangar,
+  buy-backs, referrals).
 - A scan error like _"Signed in, but couldn't read any hangar"_ (the page still
   has pledge markers but the parser found nothing: markup changed).
 - A scan that finishes but with missing fields (no dates, no values, every item
