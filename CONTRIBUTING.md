@@ -130,5 +130,8 @@ host permissions behave differently than on Chrome. See ROADMAP.md.
 
 ## PRs
 
+Found a security problem? Don't open a PR or issue for it; report it privately as
+described in [SECURITY.md](SECURITY.md).
+
 Small, focused PRs are easier to review. If you're fixing the parser after an
 RSI change, mention the date and what changed — it helps the next person.

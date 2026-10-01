@@ -244,3 +244,4 @@ an unofficial fan project, not affiliated with the Cloud Imperium group of compa
 - **Website:** [openhangar.space](https://openhangar.space/)
 - **Discord:** [Draco Foundry](https://discord.gg/FF8Wm5HdnV)
 - **Email:** [support@openhangar.space](mailto:support@openhangar.space)
+- **Security issues:** please report privately, see [SECURITY.md](SECURITY.md).
