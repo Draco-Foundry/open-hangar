@@ -46,8 +46,8 @@ Here's how to find the new shape:
 4. For the request that returns your pledges, note:
    - **URL** and **method** — today it's a `GET` to
      `https://robertsspaceindustries.com/account/pledges?page=N&pagesize=10`,
-     returning server-rendered HTML. `OH.scanHangar()` in `lib.js` builds this
-     (the `PLEDGES_URL` / `PAGE_SIZE` constants); update it if the URL shape or
+     returning server-rendered HTML. The `hangar` entry in `OH.SOURCES` (`lib.js`)
+     holds this (`url`, and `pageSize` from `PAGE_SIZE`); update it if the URL shape or
      method changes (e.g. if RSI moves to a JSON/POST endpoint).
    - **Response** — currently an HTML page. Each pledge is a `.row` card holding
      hidden inputs (`.js-pledge-id`, `.js-pledge-name`, `.js-pledge-value`,
@@ -63,7 +63,7 @@ Here's how to find the new shape:
      action would re-introduce a token reader — RSI exposes the token via a `<meta>`
      tag, cookie, or JS global.
 5. Confirm how "no more pages" is signaled. RSI clamps an out-of-range `?page=`
-   to the last page rather than returning empty, so `OH.scanHangar()` terminates
+   to the last page rather than returning empty, so `OH.scanSource()` terminates
    when a page yields **no new pledge IDs** (dedup-based), not on an empty
    response. Preserve that behavior if you change the loop.
 
