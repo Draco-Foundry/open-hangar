@@ -836,7 +836,7 @@ try {
     return {
       title: [...document.querySelectorAll('#stats-body h3')].map((h) => h.textContent).join('|'),
       store: snapshotStore(last),
-      now: hangarValue().store,
+      now: accountValue().total,
       tip: document.querySelector('.hist-chart circle:last-of-type title')?.textContent || '',
     };
   });

@@ -1,5 +1,7 @@
 <script>
-  // Account Value: today's value, two small stats (trend since the first scan, and
+  // Account Value: everything you own (OH.accountValue: ships at store price, CCUs at
+  // standard price, everything else at melt value, plus Store Credit), what it's made
+  // of, two small stats (trend since the first scan, and
   // vs melt value: not "what you paid", which RSI can't know for gifted or
   // grey-market pledges), clickable counts that open Inventory filtered, and what
   // changed since the last scan. At the bottom, a small chart of the account's value
@@ -14,6 +16,7 @@
     const s = a.state;
     const items = s.items;
     const v = a.hangarValue();
+    const acct = a.accountValue();
     const melt = OH().totalValue(items);
     const hist = s.history || [];
     let since = null;
@@ -29,12 +32,21 @@
     }
     // One point per scan, oldest first (same numbers as Stats → History).
     const trend = hist
-      .map((h) => ({ at: h.at, v: a.snapshotStore(h) }))
+      .map((h) => ({ at: h.at, v: a.snapshotStore(h), note: a.creditNote(h) }))
       .filter((p) => p.v != null && Number.isFinite(p.at));
     return {
       trend: trend.length >= 2 ? trend : null,
       scannedAt: s.scannedAt || null,
-      store: v && v.store ? v.store : null,
+      store: acct && acct.total ? acct.total : null,
+      // What the total is made of; parts that are $0 are left out.
+      parts: acct
+        ? [
+            ['Ships', acct.ships],
+            ['CCUs', acct.ccus],
+            ['Other', acct.other],
+            ['Store Credit', acct.credit],
+          ].filter(([, n]) => n >= 0.5)
+        : [],
       melt,
       vsPaid: v && v.paidPriced ? v.storePriced - v.paidPriced : null,
       since,
@@ -132,6 +144,11 @@
   {:else}
     <div class="big" title={a.money(d.melt)}>{a.bigMoney(d.melt)}</div>
   {/if}
+  {#if d.store != null && d.parts.length > 1}
+    <div class="parts" title="Ships at today's store price, CCUs at standard price, everything else at melt value, plus Store Credit. Buy-backs, UEC and REC aren't counted.">
+      {#each d.parts as [label, n], i (label)}{#if i}<span class="sep">·</span>{/if}<span>{label} <b>{a.bigMoney(n)}</b></span>{/each}
+    </div>
+  {/if}
   <div class="pills">
     {#if d.since}
       <span class="pill" class:down={d.since.delta < 0} title={exact(d.since.delta)}
@@ -170,7 +187,7 @@
         <path d={chart.area} fill="url(#oh-trend-fill)" />
         <path d={chart.line} fill="none" stroke="currentColor" stroke-width="2.5" vector-effect="non-scaling-stroke" />
         {#each chart.pts as p (p.at)}
-          <circle cx={p.x} cy={p.y} r="9" fill="transparent"><title>{a.fmtDay(p.at)}: {a.bigMoney(p.v)}</title></circle>
+          <circle cx={p.x} cy={p.y} r="9" fill="transparent"><title>{a.fmtDay(p.at)}: {a.bigMoney(p.v)}{p.note}</title></circle>
         {/each}
       </svg>
       <div class="tr-foot"><span>{chart.from}</span><span>Today</span></div>
@@ -243,6 +260,21 @@
     margin-top: 6px;
     font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
+  }
+  .parts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .parts b {
+    color: var(--text);
+    font-weight: 700;
+  }
+  .parts .sep {
+    opacity: 0.6;
   }
   .pills {
     display: flex;

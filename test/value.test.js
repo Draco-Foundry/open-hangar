@@ -199,3 +199,87 @@ test('getFxRates refetches a cache saved before a currency was added', async () 
   assert.equal(calls, 1);
   assert.equal(r.rates.KRW, 1357);
 });
+
+// Account Value (#164, #165): everything owned, one rule set for today and history.
+test('accountValue counts ships, CCUs, other pledges at melt and Store Credit', () => {
+  const items = [
+    {
+      id: 'a',
+      name: 'Standalone Ship - Carrack',
+      value: 500,
+      contents: [{ kind: 'Ship', label: 'Carrack' }],
+    },
+    {
+      id: 'b',
+      name: 'Upgrade - Cutlass Black to Carrack',
+      value: 400,
+      isCCU: true,
+      kind: 'ccu',
+      ccu: { from: 'Cutlass Black', to: 'Carrack' },
+    },
+    {
+      id: 'c',
+      name: 'Paint - Carrack Pathfinder',
+      value: 12,
+      contents: [{ kind: 'Skin', label: 'Pathfinder' }],
+    },
+    {
+      id: 'd',
+      name: 'Standalone Ship - Mystery One',
+      value: 75,
+      contents: [{ kind: 'Ship', label: 'Totally Unknown Ship' }],
+    },
+  ];
+  const v = OH.accountValue(items, priceOf, 42.5);
+  assert.equal(v.ships, 600 + 75); // Carrack at store, the unpriced ship at melt
+  assert.equal(v.ccus, 600 - 110); // standard price, the gap between the ships
+  assert.equal(v.other, 12); // paint at melt
+  assert.equal(v.credit, 42.5);
+  assert.equal(v.total, 675 + 490 + 12 + 42.5);
+  assert.equal(v.byId.c, 12);
+});
+
+test('the latest snapshot of the same hangar values exactly like today', () => {
+  const items = [
+    {
+      id: 'a',
+      name: 'Standalone Ship - Carrack',
+      value: 500,
+      contents: [{ kind: 'Ship', label: 'Carrack' }],
+    },
+    {
+      id: 'c',
+      name: 'Paint - Carrack Pathfinder',
+      value: 12,
+      contents: [{ kind: 'Skin', label: 'Pathfinder' }],
+    },
+  ];
+  const v = OH.accountValue(items, priceOf, 10);
+  const snap = OH.snapshotOf(items, 1, 10);
+  assert.equal(OH.snapshotValue(snap, v, priceOf), v.total);
+});
+
+test('gone pledges: ships from their name, anything else at melt; old snapshots skip credit', () => {
+  const v = OH.accountValue([], priceOf, 0);
+  const snap = {
+    at: 1,
+    items: [
+      ['x', 'Standalone Ship - Cutlass Black - LTI', 90],
+      ['y', 'Paint - Some Livery', 8],
+      ['z', 'Upgrade - A to B', 20],
+      ['w', 'Hangar Decoration - Plush', 5],
+    ],
+  };
+  assert.equal(OH.snapshotValue(snap, v, priceOf), 110 + 8 + 20 + 5);
+  assert.equal(OH.snapshotValue({ ...snap, credit: 30 }, v, priceOf), 110 + 8 + 20 + 5 + 30);
+});
+
+test('a scan that only changes Store Credit keeps a new snapshot', () => {
+  const items = [{ id: 'a', name: 'Carrack', value: 500 }];
+  const a = OH.snapshotOf(items, 1, 10);
+  const b = OH.snapshotOf(items, 2, 25);
+  const c = OH.snapshotOf(items, 3, 25);
+  const merged = OH.mergeHistory([a, b], [c]);
+  assert.equal(merged.length, 2);
+  assert.equal(merged[1].credit, 25);
+});

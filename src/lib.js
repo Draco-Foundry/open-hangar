@@ -595,7 +595,10 @@
       }
       const { db, needsWrite } = await readDB();
       const scannedAt = Date.now();
-      if (record) recordHistory(db, db.sources[id], items, scannedAt);
+      // Store Credit in dollars (RSI reports cents), for the value chart.
+      const cents = acct && acct.loggedIn ? acct.credits?.store?.value : null;
+      const credit = Number.isFinite(cents) ? cents / 100 : undefined;
+      if (record) recordHistory(db, db.sources[id], items, scannedAt, credit);
       db.sources[id] = meta ? { items, scannedAt, meta } : { items, scannedAt };
       if (acct && acct.loggedIn && acct.nickname) {
         db.owner = { nickname: acct.nickname, displayname: acct.displayname || null };
@@ -2379,6 +2382,69 @@
     };
   };
 
+  // Account value: everything you own, one number (owner, 2026-09-30). Pure.
+  //  ships: pledges with ships, at today's store price (melt value when none of
+  //         their ships has a public price)
+  //  ccus:  CCUs at standard price, the gap between the two ships (melt value when
+  //         either ship is unpriced)
+  //  other: paints, gear, add-ons, hangars, game packages, at melt value
+  //  credit: Store Credit, dollars
+  // Buy-backs, UEC and REC don't count. `byId[id]` is each pledge's share, so a
+  // history snapshot can be valued with exactly the same numbers.
+  OH.accountValue = function accountValue(items, priceOf, credit, hv) {
+    const v = hv || OH.hangarValue(items, priceOf);
+    const out = { ships: 0, ccus: 0, other: 0, credit: 0, total: 0, byId: {} };
+    for (const p of items || []) {
+      const si = v.pledges[p.id];
+      const melt = Number.isFinite(p.value) ? p.value : 0;
+      let amt;
+      let bucket;
+      if (si && si.ccu) {
+        amt = si.store != null ? si.store : melt;
+        bucket = 'ccus';
+      } else if (si) {
+        amt = si.store != null ? si.store : melt;
+        bucket = 'ships';
+      } else {
+        amt = melt;
+        bucket = 'other';
+      }
+      out[bucket] += amt;
+      out.byId[p.id] = amt;
+    }
+    out.credit = Number.isFinite(credit) && credit > 0 ? credit : 0;
+    out.total = out.ships + out.ccus + out.other + out.credit;
+    return out;
+  };
+
+  // Value of a history snapshot ({ items: [[id, name, melt]], credit? }) on the
+  // same rules. Pledges still owned count exactly as in `acct.byId`; ones since
+  // melted or gifted: a ship pledge is priced from its name ("Standalone Ship -
+  // Cutlass Black" → Cutlass Black), anything else at the melt value it had.
+  // Store Credit only when the snapshot recorded it (older ones didn't). Pure.
+  OH.snapshotValue = function snapshotValue(snap, acct, priceOf) {
+    let sum = 0;
+    for (const [id, name, melt] of snap.items) {
+      if (acct && id in acct.byId) {
+        sum += acct.byId[id];
+        continue;
+      }
+      const m = Number(melt) || 0;
+      if (/\bupgrade\b|\bccu\b|\s→\s|\bpaint\b|\bskin\b|\blivery\b/i.test(name || '')) {
+        sum += m;
+        continue;
+      }
+      const bare = String(name || '').replace(/^\s*[^-–]+?\s*[-–]\s/, '');
+      const base = bare.replace(
+        /\s*[-–]\s*(lti|iae|ilw|warbond|standard edition|\d+\s*(months?|years?).*)$/i,
+        '',
+      );
+      const hit = priceOf && (priceOf(base) || priceOf(bare));
+      sum += hit && hit.msrp ? hit.msrp : m;
+    }
+    return sum + (Number.isFinite(snap.credit) ? snap.credit : 0);
+  };
+
   // Fleet stats from the wiki's per-ship data: every ship in every pledge (a
   // pack with two ships counts two). Pure.
   OH.fleetStats = function fleetStats(items, shipOf) {
@@ -3624,8 +3690,10 @@
     while (out.length > 2 && bytes > HISTORY_MAX_BYTES) bytes -= JSON.stringify(out.shift()).length;
     return out;
   };
-  OH.snapshotOf = function snapshotOf(items, at) {
-    return {
+  // `credit` (Store Credit in dollars) is kept when known, so the value chart can
+  // count it; snapshots from before 0.2.13 don't have it.
+  OH.snapshotOf = function snapshotOf(items, at, credit) {
+    const snap = {
       at,
       items: (items || []).map((p) => [
         String(p.id ?? ''),
@@ -3633,7 +3701,18 @@
         Number.isFinite(p.value) ? p.value : 0,
       ]),
     };
+    if (Number.isFinite(credit)) snap.credit = credit;
+    return snap;
   };
+  // Same pledges and the same Store Credit (credit unknown on either side counts
+  // as the same, so old snapshots don't all look changed).
+  const sameSnapshot = (a, b, d) =>
+    !d.added.length &&
+    !d.removed.length &&
+    !d.changed.length &&
+    (!Number.isFinite(a.credit) ||
+      !Number.isFinite(b.credit) ||
+      Math.abs(a.credit - b.credit) < 0.01);
   const meltOf = (snap) => snap.items.reduce((a, x) => a + (x[2] || 0), 0);
   OH.snapshotMelt = meltOf;
 
@@ -3658,16 +3737,19 @@
   // Append a snapshot to db.history unless nothing changed (then just note when
   // it was last confirmed). Seeds the history from the previous scan first, so
   // the very first scan after this feature shipped already has a "before".
-  function recordHistory(db, prevHangar, items, at) {
+  function recordHistory(db, prevHangar, items, at, credit) {
     const hist = Array.isArray(db.history) ? db.history : [];
     if (!hist.length && prevHangar && Array.isArray(prevHangar.items) && prevHangar.items.length) {
       hist.push(OH.snapshotOf(prevHangar.items, prevHangar.scannedAt || at - 1));
     }
-    const snap = OH.snapshotOf(items, at);
+    const snap = OH.snapshotOf(items, at, credit);
     const last = hist[hist.length - 1];
     const d = last && OH.diffSnapshots(last, snap);
-    if (d && !d.added.length && !d.removed.length && !d.changed.length) last.checkedAt = at;
-    else hist.push(snap);
+    if (d && sameSnapshot(last, snap, d)) {
+      last.checkedAt = at;
+      // First scan that knows the credit: fill it in rather than add a snapshot.
+      if (!Number.isFinite(last.credit) && Number.isFinite(credit)) last.credit = credit;
+    } else hist.push(snap);
     db.history = OH.trimHistory(hist);
   }
 
@@ -3678,6 +3760,7 @@
       .filter((r) => Array.isArray(r) && r.length >= 3)
       .map((r) => [String(r[0]), String(r[1]), Number(r[2]) || 0]);
     const out = { at: x.at, items };
+    if (Number.isFinite(x.credit)) out.credit = x.credit;
     if (Number.isFinite(x.checkedAt)) out.checkedAt = x.checkedAt;
     return out;
   }
@@ -3695,7 +3778,7 @@
     for (const snap of [...byAt.values()].sort((x, y) => x.at - y.at)) {
       const last = out[out.length - 1];
       const d = last && OH.diffSnapshots(last, snap);
-      if (d && !d.added.length && !d.removed.length && !d.changed.length) {
+      if (d && sameSnapshot(last, snap, d)) {
         last.checkedAt = Math.max(last.checkedAt || last.at, snap.checkedAt || snap.at);
       } else out.push(snap);
     }
