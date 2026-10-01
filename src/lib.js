@@ -335,6 +335,37 @@
     return lines.join('\n');
   };
 
+  // "Report a Scan Problem" (#250): a new GitHub issue from the Scan Broken
+  // template (.github/ISSUE_TEMPLATE/scan_broken.yml), prefilled through its
+  // field ids. Only the scan summary (counts) and the error report go in, nothing
+  // about the account, and nothing is sent: the person reads it on GitHub and
+  // submits it themselves. Log lines are dropped from the top until the URL fits
+  // GitHub's limit. Pure, so it's tested directly.
+  OH.SCAN_REPORT_MAX_URL = 7000;
+  OH.scanProblemUrl = function scanProblemUrl({ summary = '', report = '', version = '' } = {}) {
+    const base = 'https://github.com/Draco-Foundry/open-hangar/issues/new';
+    const build = (rep) =>
+      `${base}?${new URLSearchParams({
+        template: 'scan_broken.yml',
+        title: 'Scan broken: ',
+        what: `The scan said: ${summary}`,
+        report: rep,
+        version: version ? `v${version}` : '',
+      })}`;
+    const lines = String(report).split('\n');
+    // Keep the header (first 10 lines: fence, title, counts, "Log:"), the newest
+    // log lines and the closing fence; trim the oldest log lines first.
+    const head = lines.slice(0, 10);
+    const tail = lines.slice(-1);
+    let log = lines.slice(10, -1);
+    let url = build(lines.join('\n'));
+    while (url.length > OH.SCAN_REPORT_MAX_URL && log.length) {
+      log = log.slice(Math.ceil(log.length / 4) || 1);
+      url = build([...head, '(older log lines trimmed)', ...log, ...tail].join('\n'));
+    }
+    return url;
+  };
+
   // --- Storage (versioned multi-source DB) ----------------------------------
 
   // Every load is checked (OH.checkDB): a malformed DB never crashes the dashboard.
