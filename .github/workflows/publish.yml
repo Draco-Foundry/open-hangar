@@ -50,7 +50,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           SHA=$(git rev-parse HEAD)
-          RUNS=$(gh run list -R "$GITHUB_REPOSITORY" --workflow CI --commit "$SHA"             --json status,conclusion -q '[.[] | "(.status)/(.conclusion)"] | join(" ")')
+          RUNS=$(gh run list -R "$GITHUB_REPOSITORY" --workflow CI --commit "$SHA" \
+            --json status,conclusion -q '[.[] | "\(.status)/\(.conclusion)"] | join(" ")')
           echo "CI runs for $SHA: ${RUNS:-none}"
           case " $RUNS " in
             *" completed/success "*) ;;
