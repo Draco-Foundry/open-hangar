@@ -40,7 +40,8 @@
     var url = a.getAttribute('data-url');
     var status = a.getAttribute('data-status') || 'planned';
     var note = a.querySelector('.b-note');
-    if (status === 'live' && url) {
+    // Only real store links (https) become hrefs (CodeQL #285).
+    if (status === 'live' && url && /^https:\/\//.test(url)) {
       a.href = url;
       a.classList.add('live');
       note.textContent = 'Add to ' + a.querySelector('.b-name').textContent;

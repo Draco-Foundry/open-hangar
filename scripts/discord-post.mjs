@@ -42,7 +42,9 @@ const plain = (t) => t.replace(/\s*—\s*/g, ': ');
 
 // The version's section of CHANGELOG.md → { intro: [text], bullets: [text] }. Pure.
 export function releaseSection(log, version) {
-  const start = log.search(new RegExp(`^## ${version.replace(/\./g, '\\.')}\\b`, 'm'));
+  // Every regex character in the version is escaped, not only dots (CodeQL #285).
+  const v = String(version).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const start = log.search(new RegExp(`^## ${v}\\b`, 'm'));
   if (start < 0) return null;
   const rest = log.slice(start + 3);
   const end = rest.search(/^## /m);
