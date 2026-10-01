@@ -45,11 +45,14 @@ const highlight = (b) => {
   const bold = /\*\*(.+?)\*\*/.exec(b);
   const text = (bold ? bold[1] : b.replace(/^(New|Improved|Changed|Fixed):\s*/, ''))
     .replace(/[.:]+$/, '')
-    .replace(/\s+—\s+/g, ': '); // house style: no em dashes in public posts
+    .replace(/\s+—\s+/g, ': ') // house style: no em dashes in public posts
+    .replace(/^./, (c) => c.toUpperCase());
   return text.length > 90 ? text.slice(0, 87).trimEnd() + '…' : text;
 };
 const news = bullets.filter((b) => /^New:/.test(b)).map(highlight);
-const shown = news.slice(0, 8);
+// A release with no "New" items (all fixes and polish) leads with its bold ones instead.
+const picked = news.length ? news : bullets.filter((b) => /\*\*/.test(b)).map(highlight);
+const shown = picked.slice(0, 8);
 const others = bullets.length - shown.length;
 
 const changelog = `https://github.com/${repo}/blob/main/CHANGELOG.md`;

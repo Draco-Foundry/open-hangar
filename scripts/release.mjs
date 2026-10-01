@@ -105,6 +105,8 @@ const push = (ref) => {
 push('main');
 push(`v${version}`);
 console.log(`\n✔ Released v${version}. The GitHub Release is building now.`);
-console.log(
-  '  Next: Actions → Publish to stores → Run workflow (tag v' + version + ', store: all).',
-);
+console.log(`
+  Next, publish it to the stores:
+    1. Open https://github.com/Draco-Foundry/open-hangar/actions/workflows/publish.yml
+    2. Run workflow → Tag to publish: v${version} → Which store: all → Run workflow
+    (Leaving the tag empty does nothing: the form just closes.)`);

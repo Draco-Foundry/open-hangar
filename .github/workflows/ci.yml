@@ -21,11 +21,22 @@ jobs:
       # Click through the real dashboard with the demo account (Chrome is
       # preinstalled on GitHub's Ubuntu runners).
       - run: npm run test:ui
+      # The exact store zips, through Firefox's store linter, so a dependency bump
+      # that breaks packaging fails here and not on release day.
+      - run: npm run pack
+      - run: npx web-ext lint --source-dir dist/firefox
+
+  # Every workflow file checked, so a typo fails the PR instead of a release (#235).
+  workflows:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - run: bash scripts/actionlint.sh
 
   # Tell #ops (private Discord channel) when main goes red. Skipped until the
   # DISCORD_OPS_WEBHOOK secret is set.
   notify:
-    needs: [test]
+    needs: [test, workflows]
     if: failure() && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     steps:
@@ -36,7 +47,8 @@ jobs:
       - name: Post to #ops
         env:
           DISCORD_OPS_WEBHOOK: ${{ secrets.DISCORD_OPS_WEBHOOK }}
-        run: >
-          node scripts/notify.mjs ops --down
-          "CI failed on main: ${{ github.event.head_commit.message || github.sha }}
-          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          # Through env, never pasted into the script: a commit message is untrusted.
+          MSG: ${{ github.event.head_commit.message || github.sha }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          node scripts/notify.mjs ops --down "CI failed on main: $MSG $RUN"
