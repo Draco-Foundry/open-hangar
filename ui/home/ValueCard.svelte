@@ -139,31 +139,35 @@
       </div>
     {/if}
   </div>
-  {#if d.store != null}
-    <div class="big" title={a.dollars(d.store)}>{a.bigMoney(d.store)}</div>
-  {:else}
-    <div class="big" title={a.money(d.melt)}>{a.bigMoney(d.melt)}</div>
-  {/if}
+  <!-- The number with its two pills beside it, on one line (owner picked Option A,
+       #166); the pills wrap under the number when the card is narrow. -->
+  <div class="headline">
+    {#if d.store != null}
+      <div class="big" title={a.dollars(d.store)}>{a.bigMoney(d.store)}</div>
+    {:else}
+      <div class="big" title={a.money(d.melt)}>{a.bigMoney(d.melt)}</div>
+    {/if}
+    <div class="pills">
+      {#if d.since}
+        <span class="pill" class:down={d.since.delta < 0} title={exact(d.since.delta)}
+          >{signed(d.since.delta)} since {monthName(d.since.from)}</span
+        >
+      {/if}
+      {#if d.vsPaid != null}
+        <span class="pill" class:down={d.vsPaid < 0} title={exact(d.vsPaid)}
+          >{signed(d.vsPaid)} vs melt value</span
+        >
+      {/if}
+      {#if d.fresh}
+        <span class="pill info">Your value trend shows after your next scan</span>
+      {/if}
+    </div>
+  </div>
   {#if d.store != null && d.parts.length > 1}
     <div class="parts" title="Ships at today's store price, CCUs at standard price, everything else at melt value, plus Store Credit. Buy-backs, UEC and REC aren't counted.">
       {#each d.parts as [label, n], i (label)}{#if i}<span class="sep">·</span>{/if}<span>{label} <b>{a.bigMoney(n)}</b></span>{/each}
     </div>
   {/if}
-  <div class="pills">
-    {#if d.since}
-      <span class="pill" class:down={d.since.delta < 0} title={exact(d.since.delta)}
-        >{signed(d.since.delta)} since {monthName(d.since.from)}</span
-      >
-    {/if}
-    {#if d.vsPaid != null}
-      <span class="pill" class:down={d.vsPaid < 0} title={exact(d.vsPaid)}
-        >{signed(d.vsPaid)} vs melt value</span
-      >
-    {/if}
-    {#if d.fresh}
-      <span class="pill info">Your value trend shows after your next scan</span>
-    {/if}
-  </div>
   <div class="counts">
     {#each d.counts as c (c.key)}
       <a href={c.key === 'buybacks' ? '#buybacks' : '#inventory'} title="{exactCount(c.n)} {plural(c.n, c.one, c.many)}" onclick={(e) => open(c, e)}
@@ -276,11 +280,21 @@
   .parts .sep {
     opacity: 0.6;
   }
+  .headline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 16px;
+    margin-top: 6px;
+  }
+  .headline .big {
+    margin-top: 0;
+  }
   .pills {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin-top: 14px;
   }
   .pills:empty {
     display: none;

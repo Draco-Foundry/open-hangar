@@ -52,6 +52,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 - Improved: **Account Value counts everything you own.** Ships at today's store price, CCUs at
   their standard price, everything else (paints, gear, add-ons) at melt value, plus your
   Store Credit, with a line showing what it's made of. Buy-backs, UEC and REC aren't counted.
+- Improved: on Home, the Account Value trend pills now sit right beside the big number, so the
+  card is tidier and the chart gets the room.
 - Fixed: the value chart and "since" amount on Home now match the Account Value number.
 
 ## 0.2.12 — 2026-09-30
