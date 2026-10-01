@@ -378,7 +378,7 @@ const SAFE_ATTRS = new Set(
   (
     'alt checked class colspan datetime disabled draggable height hidden href id inputmode loading ' +
     'maxlength name placeholder rel role rowspan selected src style tabindex target title type ' +
-    'value width ' +
+    'value width srcset sizes ' +
     'cx cy d dominant-baseline fill fill-opacity font-size font-weight offset opacity points ' +
     'preserveaspectratio r rx ry stop-color stroke stroke-dasharray stroke-linecap ' +
     'stroke-linejoin stroke-opacity stroke-width text-anchor transform viewbox x x1 x2 xmlns y y1 y2'
@@ -410,7 +410,10 @@ function setHTML(el, html) {
     for (const a of [...node.attributes]) {
       const an = a.name.toLowerCase();
       const known = SAFE_ATTRS.has(an) || an.startsWith('data-') || an.startsWith('aria-');
-      const badUrl = (an === 'href' || an === 'src') && !SAFE_URL.test(a.value.trim());
+      const badUrl =
+        ((an === 'href' || an === 'src') && !SAFE_URL.test(a.value.trim())) ||
+        (an === 'srcset' &&
+          a.value.split(',').some((c) => !SAFE_URL.test(c.trim().split(/\s+/)[0] || '')));
       const badStyle = an === 'style' && /url\s*\(|expression|javascript:/i.test(a.value);
       if (!known || badUrl || badStyle) {
         console.warn(`[setHTML] dropped ${an}= on <${name}>`);
@@ -784,6 +787,64 @@ function realImage(url) {
     : url;
 }
 
+// One right-sized picture per card, never a swap (#179): RSI's store_small (351 px)
+// plus the same picture's slideshow size (648 px), so the browser downloads only the
+// one the screen needs (a 2x screen gets the sharp one). Only for URLs in RSI's
+// store_small form (both of RSI's URL shapes); anything else keeps its one src.
+// The size hints are the cards' rough widths; "auto" (lazy images) measures exactly.
+const CARD_SIZES = { gallery: '220px', compact: '160px', list: '110px' };
+function srcsetFor(url) {
+  if (!url) return '';
+  let big = null;
+  if (/^https:\/\/media\.robertsspaceindustries\.com\/[^/]+\/store_small\.\w+(\?.*)?$/.test(url)) {
+    big = url.replace('/store_small.', '/slideshow.');
+  } else if (
+    /^https:\/\/robertsspaceindustries\.com\/media\/[^/]+\/store_small\/[^/?]+(\?.*)?$/.test(url)
+  ) {
+    big = url.replace('/store_small/', '/slideshow/');
+  }
+  return big ? `${url} 351w, ${big} 648w` : '';
+}
+const cardSizes = (layout) => `auto, ${CARD_SIZES[layout] || CARD_SIZES.gallery}`;
+// Attributes for a card <img> in markup ('' when the URL has no sizes).
+function thumbSizeAttrs(url, layout) {
+  const set = srcsetFor(url);
+  return set ? ` srcset="${OH.escapeHtml(set)}" sizes="${OH.escapeHtml(cardSizes(layout))}"` : '';
+}
+// The same for an <img> built in code, inside a card grid of some layout.
+function setThumbSizes(im, url, grid) {
+  const set = srcsetFor(url);
+  if (!set) return;
+  const layout = ['gallery', 'compact', 'list'].find((l) => grid?.classList.contains(l));
+  im.sizes = cardSizes(layout);
+  im.srcset = set;
+}
+
+// After a scan, fetch the first screenful of pictures for Inventory and Buy-Backs
+// in the background, at low priority and at the size the cards will ask for, so
+// the first visit shows them at once (#179). Missing art is looked up too (those
+// answers are cached). The scan itself never waits for this.
+const WARM_CARDS = 24;
+function warmPictures(list, layout) {
+  for (const x of list.slice(0, WARM_CARDS)) {
+    const url = x.ccu && x.ccu.to && !x.shipArt ? null : realImage(x.image);
+    if (!url) {
+      const name = x.ccu && x.ccu.to ? x.ccu.to : resolveImageName(x);
+      if (name) OH.getShipImage(name).catch(() => {});
+      continue;
+    }
+    const im = new Image();
+    im.fetchPriority = 'low';
+    im.decoding = 'async';
+    const set = srcsetFor(url);
+    if (set) {
+      im.sizes = CARD_SIZES[layout] || CARD_SIZES.gallery; // no "auto" off-screen
+      im.srcset = set;
+    }
+    im.src = url;
+  }
+}
+
 // The ship name to look an image up by: a CCU's target ship, else a ship's own
 // name. Add-ons/coupons return '' (don't fetch art for non-ships).
 function resolveImageName(p) {
@@ -838,6 +899,7 @@ async function resolveCardArt(card) {
     const im = document.createElement('img');
     im.className = 'thumb';
     im.loading = 'lazy';
+    setThumbSizes(im, url, card.closest('.grid'));
     im.src = url;
     ph.replaceWith(im);
   }
@@ -1553,7 +1615,7 @@ function cardHtml(p) {
   // RSI's image link turns out to be broken (see onThumbError).
   const resolve = resolveImageName(p);
   const thumb = img
-    ? `<img class="thumb" loading="lazy" data-kind="${OH.escapeHtml(p.kind)}" src="${OH.escapeHtml(img)}" alt="">`
+    ? `<img class="thumb" loading="lazy" data-kind="${OH.escapeHtml(p.kind)}" src="${OH.escapeHtml(img)}"${thumbSizeAttrs(img, state.layout)} alt="">`
     : `<div class="thumb placeholder">${OH.escapeHtml(p.kind)}</div>`;
   const nameHtml =
     p.isCCU && p.ccu
@@ -5083,7 +5145,7 @@ function buybackCardHtml(b) {
   // plain buy-back from its own name. Also the broken-image fallback.
   const resolve = b.ccu && b.ccu.to ? b.ccu.to : resolveImageName({ ...b, kind: 'ship' }) || b.name;
   const thumb = img
-    ? `<img class="thumb" loading="lazy" src="${OH.escapeHtml(img)}" alt="">`
+    ? `<img class="thumb" loading="lazy" src="${OH.escapeHtml(img)}"${thumbSizeAttrs(img, state.bbLayout)} alt="">`
     : `<div class="thumb placeholder">Buy-Back</div>`;
   const nameHtml =
     (b.ccu
@@ -5706,6 +5768,12 @@ layoutEl.addEventListener('click', (e) => {
 function onThumbError(e) {
   const img = e.target;
   if (img.tagName !== 'IMG' || !img.classList.contains('thumb')) return;
+  // The browser picked the bigger size and it failed: drop to the plain src.
+  if (img.hasAttribute('srcset')) {
+    img.removeAttribute('srcset');
+    img.removeAttribute('sizes');
+    return;
+  }
   // RSI's image server sometimes drops a request: try the same picture once
   // more before giving up on it (a refresh used to be the only retry).
   if (!img.dataset.retried && /^https?:/.test(img.src)) {
@@ -5729,6 +5797,7 @@ function onThumbError(e) {
     fresh.className = 'thumb';
     fresh.loading = 'lazy';
     fresh.alt = '';
+    setThumbSizes(fresh, url, card.closest('.grid'));
     fresh.src = url;
     ph.replaceWith(fresh);
     card.dataset.image = url;
@@ -6438,6 +6507,8 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   route();
   renderAccount(); // refresh the Citizen Card pill with the new referral counts
   renderSiteNotice();
+  if (hangar) warmPictures(computeShown(), state.layout);
+  if (buybacks) warmPictures(computeBuybacks(), state.bbLayout);
   scanBtn.disabled = false;
   if ($('#welcome-scan')) $('#welcome-scan').disabled = false;
   if (scanSelectedBtn) scanSelectedBtn.disabled = false;

@@ -409,8 +409,12 @@ try {
       (c) => c.querySelector('img.thumb') && c.dataset.resolve,
     );
     if (!card) return null;
-    card.querySelector('img.thumb').src =
-      'https://robertsspaceindustries.com/media/open-hangar-missing/broken.jpg';
+    // A broken RSI link breaks both sizes (they share the same base).
+    const img = card.querySelector('img.thumb');
+    if (img.hasAttribute('srcset'))
+      img.srcset =
+        'https://robertsspaceindustries.com/media/open-hangar-missing/store_small/b.jpg 351w, https://robertsspaceindustries.com/media/open-hangar-missing/slideshow/b.jpg 648w';
+    img.src = 'https://robertsspaceindustries.com/media/open-hangar-missing/broken.jpg';
     return card.dataset.id;
   });
   if (broken) {
@@ -496,7 +500,10 @@ try {
   const thumb = await page.evaluate(async () => {
     const img = document.querySelector('#results .card img.thumb');
     const card = img.closest('.card');
-    img.src = `${location.origin}/missing-${Date.now()}.jpg`; // 404
+    const missing = `${location.origin}/missing-${Date.now()}`;
+    // Both sizes break together, as they would for a dead RSI link.
+    if (img.hasAttribute('srcset')) img.srcset = `${missing}-s.jpg 351w, ${missing}-l.jpg 648w`;
+    img.src = `${missing}.jpg`; // 404
     await new Promise((r) => setTimeout(r, 800));
     const retried = img.dataset.retried === '1' && img.isConnected; // waiting to retry
     await new Promise((r) => setTimeout(r, 2500));
@@ -1197,6 +1204,28 @@ try {
   notice.off.hidden
     ? ok('status notice: warn and info shown as plain text, hidden when cleared')
     : fail(`status notice: ${JSON.stringify(notice)}`);
+
+  // Card pictures offer two sizes (store_small + slideshow) so the browser picks
+  // one sharp image and never swaps (#179); markup survives the sanitizer.
+  const sizes = await page.evaluate(() => {
+    const url = 'https://media.robertsspaceindustries.com/abc123/store_small.jpg';
+    const box = document.createElement('div');
+    setHTML(box, `<img class="thumb" src="${url}"${thumbSizeAttrs(url, 'gallery')} alt="">`);
+    const im = box.querySelector('img');
+    return {
+      srcset: im.getAttribute('srcset'),
+      sizes: im.getAttribute('sizes'),
+      folder: srcsetFor('https://robertsspaceindustries.com/media/abc/store_small/a.jpg'),
+      other: srcsetFor('https://robertsspaceindustries.com/media/abc/store_hub_small/a.jpg'),
+    };
+  });
+  sizes.srcset ===
+    'https://media.robertsspaceindustries.com/abc123/store_small.jpg 351w, https://media.robertsspaceindustries.com/abc123/slideshow.jpg 648w' &&
+  sizes.sizes === 'auto, 220px' &&
+  /\/slideshow\/a\.jpg 648w$/.test(sizes.folder) &&
+  sizes.other === ''
+    ? ok('card pictures: two sizes in both RSI URL shapes, others untouched')
+    : fail(`card picture sizes: ${JSON.stringify(sizes)}`);
 
   console.log('Saved accounts');
   await go('#developers');
