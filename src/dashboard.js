@@ -674,11 +674,17 @@ function renderTopBar() {
   let anchorY = 0; // where the current scroll direction started
   let lockUntil = 0; // ignore the jump the bar's own resize causes
   const header = document.querySelector('.wrap > header');
+  // Stuck section headers sit right under the bar (--hdr-h, ui/theme.css), so it
+  // has to follow the bar's real height as it slims (#177).
+  const syncHeight = () =>
+    header && document.documentElement.style.setProperty('--hdr-h', `${header.offsetHeight}px`);
   const setSlim = (on) => {
     if (document.body.classList.contains('bar-slim') === on) return;
     document.body.classList.toggle('bar-slim', on);
     lockUntil = performance.now() + 350;
+    syncHeight();
   };
+  header?.addEventListener('transitionend', syncHeight);
   window.addEventListener(
     'scroll',
     () => {
@@ -697,10 +703,10 @@ function renderTopBar() {
     },
     { passive: true },
   );
+  // Border box: slimming only changes the bar's padding, which a content-box
+  // observer never sees.
   if (header && 'ResizeObserver' in window) {
-    new ResizeObserver(() =>
-      document.documentElement.style.setProperty('--hdr-h', `${header.offsetHeight}px`),
-    ).observe(header);
+    new ResizeObserver(syncHeight).observe(header, { box: 'border-box' });
   }
 }
 
@@ -1419,24 +1425,28 @@ function applyTraits(list, selected, facets) {
 }
 
 // Second chip row: traits present in `list`, plus Clear when anything is picked.
-function traitRowHtml(list, selected, facets, anyFilter) {
+// `skip`: trait keys that make no sense on this page.
+function traitRowHtml(list, selected, facets, anyFilter, skip = []) {
   const all = list.map(facets);
-  const chips = TRAITS.map((t) => {
-    const mode = selected.get(t.key);
-    const yes = all.filter(t.test).length;
-    const no = all.filter(traitNeg(t)).length;
-    // Offer a trait only when it splits the list (some have it, some are known
-    // not to) — or when it's already picked, so it can still be cleared.
-    if (!mode && (!yes || yes === all.length)) return '';
-    const label = mode === 'no' ? t.notLabel || `Not ${t.label}` : t.label;
-    const n = mode === 'no' ? no : yes;
-    const hint = mode === 'yes' ? 'Click again to exclude' : mode === 'no' ? 'Click to clear' : '';
-    const title = hint ? `${t.title} · ${hint}` : t.title;
-    const k = t.key === 'pack' || t.key === 'package' ? ` k-${t.key}` : '';
-    return `<button class="chip trait${k}" data-trait="${t.key}" data-mode="${mode || ''}" aria-pressed="${!!mode}" title="${OH.escapeHtml(title)}">${OH.escapeHtml(
-      label,
-    )}<span class="n">${n}</span></button>`;
-  }).join('');
+  const chips = TRAITS.filter((t) => !skip.includes(t.key))
+    .map((t) => {
+      const mode = selected.get(t.key);
+      const yes = all.filter(t.test).length;
+      const no = all.filter(traitNeg(t)).length;
+      // Offer a trait only when it splits the list (some have it, some are known
+      // not to) — or when it's already picked, so it can still be cleared.
+      if (!mode && (!yes || yes === all.length)) return '';
+      const label = mode === 'no' ? t.notLabel || `Not ${t.label}` : t.label;
+      const n = mode === 'no' ? no : yes;
+      const hint =
+        mode === 'yes' ? 'Click again to exclude' : mode === 'no' ? 'Click to clear' : '';
+      const title = hint ? `${t.title} · ${hint}` : t.title;
+      const k = t.key === 'pack' || t.key === 'package' ? ` k-${t.key}` : '';
+      return `<button class="chip trait${k}" data-trait="${t.key}" data-mode="${mode || ''}" aria-pressed="${!!mode}" title="${OH.escapeHtml(title)}">${OH.escapeHtml(
+        label,
+      )}<span class="n">${n}</span></button>`;
+    })
+    .join('');
   const clear = anyFilter ? '<button class="chip chip-clear" data-clear="1">Clear</button>' : '';
   return chips || clear ? `<div class="chip-row chip-row-traits">${chips}${clear}</div>` : '';
 }
@@ -2715,7 +2725,7 @@ function wishlistHtml() {
             .map(
               (b) => `<tr>
                 <td><span class="badge ${bbType(b).toLowerCase()}">${bbType(b)}</span></td>
-                <td>${esc(b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '')}</td>
+                <td title="${esc(bbFullName(b))}">${esc(buybackName(b))}</td>
                 <td>${esc(b.date || '')}</td>
                 <td>${/^\d+$/.test(String(b.id)) ? esc(String(b.id)) : '<span class="muted">—</span>'}</td>
                 <td class="num">${esc(bbPriceText(b)) || '<span class="muted">—</span>'}</td>
@@ -3937,6 +3947,23 @@ function parseTs(s) {
 // any older row missing it). Prospects never converted, so they use enlistedOn.
 const recruitDate = (r) => parseTs(r.convertedOn) || parseTs(r.enlistedOn);
 const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+// The month with the most recruits → { k: '2024-03', n, label: 'Mar 2024' }, or
+// null. A tie goes to the most recent month.
+function bestMonth(dates) {
+  const byMonth = new Map();
+  for (const d of dates) byMonth.set(monthKey(d), (byMonth.get(monthKey(d)) || 0) + 1);
+  let best = null;
+  for (const [k, n] of byMonth)
+    if (!best || n > best.n || (n === best.n && k > best.k)) best = { k, n };
+  if (!best) return null;
+  const [y, m] = best.k.split('-').map(Number);
+  best.label = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-US', {
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  return best;
+}
 
 // Return the bonus event whose [start,end] window contains date `d`, or null.
 // Compared at day granularity (inclusive of the end day).
@@ -4584,9 +4611,7 @@ async function referralShareCanvas({ withCode }) {
 
   const dates = rows.map(recruitDate).filter(Boolean);
   const last30 = dates.filter((d) => Date.now() - d < 30 * 86400000).length;
-  const byMonth = new Map();
-  for (const d of dates) byMonth.set(monthKey(d), (byMonth.get(monthKey(d)) || 0) + 1);
-  const best = Math.max(0, ...byMonth.values());
+  const best = bestMonth(dates);
 
   const files = await OH.wikiImageUrls(ships.map((r) => r.file).filter(Boolean));
   const imgs = await Promise.all(
@@ -4672,7 +4697,7 @@ async function referralShareCanvas({ withCode }) {
     [prospects.toLocaleString('en-US'), 'prospects'],
     [prospects ? `${((recruits / prospects) * 100).toFixed(1)}%` : '—', 'conversion'],
     [String(last30), 'last 30 days'],
-    [String(best), 'best month'],
+    [best ? String(best.n) : '0', best ? `best month · ${best.label}` : 'best month'],
   ];
   const boxW = (barW - 3 * 12) / 4;
   stats.forEach(([big, lbl], i) => {
@@ -4685,7 +4710,9 @@ async function referralShareCanvas({ withCode }) {
     ctx.font = f(700, 26);
     ctx.fillText(big, x + 16, y + 38);
     ctx.fillStyle = P.muted;
-    ctx.font = f(400, 13);
+    let size = 13;
+    ctx.font = f(400, size);
+    while (size > 10 && ctx.measureText(lbl).width > boxW - 24) ctx.font = f(400, --size);
     ctx.fillText(lbl, x + 16, y + 62);
   });
   y += 78;
@@ -4808,10 +4835,7 @@ function renderReferrals() {
 
   // Date-derived stats from recruit CONVERSION dates (when they actually counted).
   const dates = recruitsRows.map(recruitDate).filter(Boolean);
-  const byMonth = new Map();
-  for (const d of dates) byMonth.set(monthKey(d), (byMonth.get(monthKey(d)) || 0) + 1);
-  let best = null;
-  for (const [k, n] of byMonth) if (!best || n > best.n) best = { k, n };
+  const best = bestMonth(dates);
   const convRate = prospects > 0 ? `${((recruits / prospects) * 100).toFixed(1)}%` : '—';
 
   // --- Richer, referral-specific stats ------------------------------------
@@ -4878,7 +4902,7 @@ function renderReferrals() {
 
   const pipeline =
     box(pending.toLocaleString('en-US'), 'pending prospects') +
-    box(best ? `${best.n}` : '—', best ? `best month (${best.k})` : 'best month') +
+    box(best ? `${best.n}` : '—', best ? `best month (${best.label})` : 'best month') +
     box(first, 'first conversion') +
     box(
       nextTier ? projection : '—',
@@ -5007,8 +5031,8 @@ function buybackCardHtml(b) {
     : `<div class="thumb placeholder">Buy-Back</div>`;
   const nameHtml =
     (b.ccu
-      ? `${OH.escapeHtml(b.ccu.from)} <span class="ccu-flow">→</span> ${OH.escapeHtml(b.ccu.to)}`
-      : OH.escapeHtml(b.name || '—')) + (b._n > 1 ? ` <span class="stack-n">×${b._n}</span>` : '');
+      ? `${OH.escapeHtml(OH.shortBuybackName(b.ccu.from))} <span class="ccu-flow">→</span> ${OH.escapeHtml(OH.shortBuybackName(b.ccu.to))}`
+      : OH.escapeHtml(buybackName(b))) + (b._n > 1 ? ` <span class="stack-n">×${b._n}</span>` : '');
   const reclaim = buybackReclaimLink(b);
   const badgeClass = TYPE_KEYS.includes(b.isCCU ? 'ccu' : b.kind) ? (b.isCCU ? 'ccu' : b.kind) : '';
   // Every cell is always emitted (empty when there's nothing) so the List view's
@@ -5016,7 +5040,7 @@ function buybackCardHtml(b) {
   return `<div class="card" data-id="${OH.escapeHtml(String(b.id || ''))}" data-image="${OH.escapeHtml(img || '')}" data-resolve="${OH.escapeHtml(resolve)}" data-rsi-image="${OH.escapeHtml(ccuArt ? realImage(b.image) || '' : '')}">
     ${thumb}
     <div class="card-body">
-      <div class="card-name">${nameHtml}</div>
+      <div class="card-name" title="${OH.escapeHtml(bbFullName(b))}">${nameHtml}</div>
       <div class="card-contents">${OH.escapeHtml(b.contains || '')}</div>
       <div class="card-foot">
         <span class="foot-left"><span class="badge ${badgeClass}">${OH.escapeHtml(b.kind || 'buy-back')}</span></span>
@@ -5236,6 +5260,8 @@ function renderBuybacks() {
           state.bbTraits,
           buybackFacets,
           state.bbShown.size || state.bbTraits.size || state.bbUnder,
+          // Warbond only mattered for the price paid; reclaiming costs the same (#176).
+          ['warbond'],
         ),
     );
   }
@@ -5272,9 +5298,14 @@ function renderBuybacks() {
 // the columns a buy-back has — name, reclaim cost, quantity, and a reclaim link.
 // Identical copies are stacked into one row with a Qty count, mirroring the
 // inventory Market's per-category stacked tables.
+// A buy-back's title as shown in lists: without the type label and Warbond /
+// Standard Edition (OH.shortBuybackName, #176). The details window's title and
+// exports keep RSI's full name; the card's tooltip shows it too.
 function buybackName(b) {
-  return b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '—';
+  const s = OH.shortBuybackName;
+  return b.ccu ? `${s(b.ccu.from)} → ${s(b.ccu.to)}` : s(b.name) || '—';
 }
+const bbFullName = (b) => (b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '');
 
 // The buy-back list DOES honour pagesize=1 (unlike the hangar), so page N is
 // exactly the Nth buy-back in scan order. Right until your buy-backs change.
@@ -5364,8 +5395,8 @@ function bbPriceText(b) {
 
 function buybackRowHtml(b) {
   const name = b.ccu
-    ? `${OH.escapeHtml(b.ccu.from)} <span class="ccu-flow">→</span> ${OH.escapeHtml(b.ccu.to)}`
-    : OH.escapeHtml(b.name || '—');
+    ? `${OH.escapeHtml(OH.shortBuybackName(b.ccu.from))} <span class="ccu-flow">→</span> ${OH.escapeHtml(OH.shortBuybackName(b.ccu.to))}`
+    : OH.escapeHtml(buybackName(b));
   const key = bbKey(b);
   const saved = state.market[key];
   const price = bbPrice(b);
@@ -7281,9 +7312,7 @@ function openShipModal(name) {
     ? `<h4 class="modal-h">In Your Buy-Backs (${bbs.length})</h4><table class="modal-contents"><tbody>${bbs
         .map(
           (b) =>
-            `<tr><td><button type="button" class="ship-link" data-open-bb="${esc(String(b.id))}">${esc(
-              b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '',
-            )}</button></td><td class="num">${buybackReclaimLink(b)}</td></tr>`,
+            `<tr><td><button type="button" class="ship-link" data-open-bb="${esc(String(b.id))}">${esc(buybackName(b))}</button></td><td class="num">${buybackReclaimLink(b)}</td></tr>`,
         )
         .join('')}</tbody></table>`
     : '';
@@ -7674,9 +7703,9 @@ function globalSearchHtml(q) {
         : b.ccu && b.ccu.to
           ? b.ccu.to
           : resolveImageName({ ...b, kind: 'ship' }) || b.name,
-      name: inner ? inner.name : b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '',
+      name: inner ? inner.name : buybackName(b),
       where: [
-        inner ? `Inside <b>${esc(b.name)}</b>` : b.contains ? esc(b.contains) : '',
+        inner ? `Inside <b>${esc(buybackName(b))}</b>` : b.contains ? esc(b.contains) : '',
         b.date ? `<em>Melted ${esc(day(b.date))}</em>` : '',
       ]
         .filter(Boolean)
