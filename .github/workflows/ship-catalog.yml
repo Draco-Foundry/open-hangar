@@ -1,8 +1,13 @@
 name: Ship catalog
 
 # Weekly refresh of src/data/ship-catalog.json (ship prices and stats bundled
-# with the extension). Commits to main only when the list changed and the tests
-# still pass with it (#194); the next release picks it up.
+# with the extension). When the list changed and the tests still pass with it
+# (#194), it opens a PR from the bot/ship-catalog branch (main is protected, #193);
+# merge it and the next release picks it up. PRs made with the workflow token
+# don't start CI on their own, but this job already ran the tests: merge with the
+# admin bypass, or close and reopen the PR to run CI.
+# Needs Settings → Actions → General → "Allow GitHub Actions to create and approve
+# pull requests". Without it the branch is still pushed and the run says so.
 
 on:
   schedule:
@@ -11,6 +16,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   refresh:
@@ -24,13 +30,24 @@ jobs:
       - run: node scripts/update-ship-catalog.mjs
       - name: Test with the new catalog
         run: npm test
-      - name: Commit if changed
+      - name: Open a PR if changed
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           if git diff --quiet -- src/data/ship-catalog.json; then
             echo "No changes."; exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c bot/ship-catalog
           git add src/data/ship-catalog.json
           git commit -m "data: weekly ship catalog refresh"
-          git push
+          git push --force origin bot/ship-catalog
+          if gh pr view bot/ship-catalog --json state -q .state 2>/dev/null | grep -q OPEN; then
+            echo "Updated the open catalog PR."; exit 0
+          fi
+          RUN="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          gh pr create --base main --head bot/ship-catalog \
+            --title "data: weekly ship catalog refresh" \
+            --body "Ship prices and stats from star-citizen.wiki. The tests passed with this catalog in the [refresh run]($RUN)." \
+            || echo "::warning::Couldn't open the PR (allow Actions to create PRs in Settings → Actions → General). The branch bot/ship-catalog is pushed: open the PR by hand."
