@@ -34,9 +34,13 @@ global.setTimeout = (fn) => (queueMicrotask(fn), 0);
 const PLEDGES = /\/account\/pledges\?page=(\d+)/;
 let script; // (page, callNo) => { status, body } | 'network'
 let calls;
+let other = []; // every non-pledge request (account lookups etc.)
 global.fetch = async (url) => {
   const m = String(url).match(PLEDGES);
-  if (!m) return new Response('', { status: 404 }); // account lookups etc.
+  if (!m) {
+    other.push(String(url));
+    return new Response('', { status: 404 });
+  }
   const page = Number(m[1]);
   calls[page] = (calls[page] || 0) + 1;
   const r = script(page, calls[page]);
@@ -55,6 +59,7 @@ const healthy = (page) => ({ body: items(Math.min(page, 3)) });
 async function reset(prevItems) {
   for (const k of Object.keys(store)) delete store[k];
   calls = {};
+  other = [];
   if (prevItems) {
     store.db = { schemaVersion: 2, sources: { hangar: { items: prevItems, scannedAt: 1 } } };
   }
@@ -131,4 +136,24 @@ test('429 is retried (rate limit)', async () => {
   const r = await OH.scanSource('hangar');
   assert.equal(r.ok, true);
   assert.equal(calls[1], 2);
+});
+
+test('a scan given the account makes no account requests and stamps the owner', async () => {
+  await reset();
+  script = healthy;
+  const account = { loggedIn: true, nickname: 'DemoCitizen', displayname: 'Demo Citizen' };
+  const r = await OH.scanSource('hangar', null, { account });
+  assert.equal(r.ok, true);
+  assert.deepEqual(
+    other.filter((u) => /\/account\/dashboard|\/citizens\//.test(u)),
+    [],
+  );
+  assert.deepEqual(store.db.owner, { nickname: 'DemoCitizen', displayname: 'Demo Citizen' });
+});
+
+test('without the account, the save still looks it up itself', async () => {
+  await reset();
+  script = healthy;
+  await OH.scanSource('hangar');
+  assert.ok(other.some((u) => /\/account\/dashboard/.test(u)));
 });

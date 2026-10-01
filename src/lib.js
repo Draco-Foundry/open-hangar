@@ -348,16 +348,20 @@
   // lookup happens first), so a save can't write back a stale copy over another
   // save or an account switch that happened while it was waiting.
   let saveChain = Promise.resolve();
-  function saveSource(id, items, { record = false, meta } = {}) {
+  // `account`: the RSI account the caller already looked up for this scan. Pass it
+  // so a save never costs extra RSI requests; without it the save looks it up.
+  function saveSource(id, items, { record = false, meta, account } = {}) {
     const run = saveChain.then(async () => {
       // Stamp which RSI account this data belongs to, so the UI can detect when a
       // different account signs in later and clear the stale data (multi-account
       // safety). Best-effort: if we can't read the account, leave owner untouched.
-      let acct = null;
-      try {
-        acct = await OH.getAccount();
-      } catch {
-        /* owner stamp is optional */
+      let acct = account === undefined ? null : account;
+      if (account === undefined) {
+        try {
+          acct = await OH.getAccount();
+        } catch {
+          /* owner stamp is optional */
+        }
       }
       const db = await OH.loadDB();
       const scannedAt = Date.now();
@@ -927,7 +931,8 @@
   }
 
   // Scan one source by id and persist it. Returns { ok, items?, scannedAt?, error? }.
-  OH.scanSource = async function scanSource(sourceId, onProgress) {
+  // opts.account: the account already fetched for this scan (see saveSource).
+  OH.scanSource = async function scanSource(sourceId, onProgress, { account } = {}) {
     const src = OH.getSource(sourceId);
     if (!src) return { ok: false, error: `Unknown source: ${sourceId}` };
     if (src.type === 'html' && !(window.OpenHangar && OpenHangar.parsePledges)) {
@@ -965,7 +970,7 @@
             error: `RSI stopped responding at page ${page} (${reason}) — kept your previous scan of ${prevCount}. Try again in a minute.`,
           };
         }
-        const scannedAt = await saveSource(src.id, result.items, { meta: result.meta });
+        const scannedAt = await saveSource(src.id, result.items, { meta: result.meta, account });
         return {
           ok: true,
           items: result.items,
@@ -979,6 +984,7 @@
       const scannedAt = await saveSource(src.id, result.items, {
         record: src.id === 'hangar',
         meta: result.meta,
+        account,
       });
       OH.log('info', src.id, `scan ok, ${result.items.length} items`);
       // A complete buy-back list: drop cached details for ones since reclaimed.
@@ -1327,7 +1333,7 @@
   //          recruitsList:[...], prospectsList:[...] }. recruitsList carries a
   // `campaign` tag per row ('current'|'legacy') since legacy is a superset.
   // Returns { ok, referral?, scannedAt?, error? }. Never throws.
-  OH.getReferral = async function getReferral(onProgress) {
+  OH.getReferral = async function getReferral(onProgress, { account } = {}) {
     const paused = await OH.sourcePaused('referrals');
     if (paused) {
       OH.log('warn', 'referrals', 'scan paused by remote status');
@@ -1335,7 +1341,7 @@
     }
     try {
       // Code/url come free from the account fetch (already cached/fetched there).
-      const acct = await OH.getAccount();
+      const acct = account === undefined ? await OH.getAccount() : account;
       if (acct && acct.loggedIn === false) return { ok: false, error: 'Not signed in to RSI.' };
       const code = acct?.referral?.code || null;
       const url = acct?.referral?.url || null;
@@ -1408,7 +1414,7 @@
         prospectsList: prospectItems,
       };
 
-      const scannedAt = await saveSource('referral', referral);
+      const scannedAt = await saveSource('referral', referral, { account: acct || undefined });
       return { ok: true, referral, scannedAt, partial: partial.length ? partial.join(', ') : null };
     } catch (err) {
       return { ok: false, error: String(err?.message || err) };
