@@ -17,7 +17,12 @@ name: Publish to stores
 # Before anything is uploaded, the build job checks the tag's commit passed CI on
 # GitHub and runs the unit tests, the dashboard UI test and Firefox's store linter.
 # Dry run (the checkbox, and on every PR that touches publishing): everything but
-# the uploads and posts. Rolling back a bad version: docs/ROLLBACK.md.
+# the uploads and posts. A PR's dry run publishes the latest released tag with the
+# PR's tooling, exactly like a real run after the PR merges.
+#
+# The tag's code is what gets built; the scripts that publish it (scripts/publish,
+# discord-post, notify) always come from this workflow's own commit, in .tools/,
+# so an older tag never runs older or missing publishing code. Rolling back a bad version: docs/ROLLBACK.md.
 
 on:
   workflow_dispatch:
@@ -47,8 +52,6 @@ permissions:
   actions: read # to check the tag's commit passed CI
 
 env:
-  # A PR run is always a dry run of a full release from the PR's code.
-  REF: ${{ github.event.inputs.tag || github.sha }}
   STORE: ${{ github.event.inputs.store || 'all' }}
   DRY: ${{ github.event_name == 'pull_request' || github.event.inputs.dry_run == 'true' }}
 
@@ -56,21 +59,33 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     outputs:
+      ref: ${{ steps.ref.outputs.ref }}
       version: ${{ steps.v.outputs.version }}
     steps:
+      - name: Which tag
+        id: ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag }}
+        run: |
+          if [ -z "$TAG" ]; then TAG=$(gh release view -R "$GITHUB_REPOSITORY" --json tagName -q .tagName); fi
+          echo "Publishing $TAG"
+          echo "ref=$TAG" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          ref: ${{ env.REF }}
+          ref: ${{ steps.ref.outputs.ref }}
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          path: .tools
+          sparse-checkout: scripts
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
       - run: npm install
-      # A PR's own CI runs alongside this, so the gate only applies to real tags.
       - name: Only publish a commit that passed CI
-        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/publish/ci-gate.mjs
+        run: node .tools/scripts/publish/ci-gate.mjs
       - run: npm test
       # The real dashboard in Chrome, as CI runs it. Chrome on the runners now and
       # then fails to start, so a failed run gets one retry.
@@ -79,10 +94,11 @@ jobs:
       - run: npm run lint:firefox
       - name: Check the tag matches manifest.json
         id: v
+        env:
+          REF: ${{ steps.ref.outputs.ref }}
         run: |
           V=$(node -p "require('./manifest.json').version")
-          if [ "${{ github.event_name }}" != pull_request ] &&
-            ! node -e "import('./scripts/publish/lib.mjs').then(m => process.exit(m.tagMatches(process.argv[1], process.argv[2]) ? 0 : 1))" "$REF" "$V"; then
+          if ! node -e "import('./.tools/scripts/publish/lib.mjs').then(m => process.exit(m.tagMatches(process.argv[1], process.argv[2]) ? 0 : 1))" "$REF" "$V"; then
             echo "::error::manifest.json is $V but the tag is $REF"; exit 1
           fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
@@ -104,7 +120,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          ref: ${{ env.REF }}
+          ref: ${{ needs.build.outputs.ref }}
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
@@ -187,7 +203,8 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          ref: ${{ env.REF }}
+          path: .tools
+          sparse-checkout: scripts
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
@@ -205,7 +222,7 @@ jobs:
             echo "::notice::Chrome skipped: Chrome Web Store secrets not set"; exit 0
           fi
           # Upload, then submit for review (publishes once Google approves).
-          node scripts/publish/chrome.mjs "$ZIP"
+          node .tools/scripts/publish/chrome.mjs "$ZIP"
 
   # Tell the Discord #updates channel, once every store upload went through: after
   # a full release (store: all), or on its own with store: discord. Skipped until
@@ -222,14 +239,15 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          ref: ${{ env.REF }}
+          path: .tools
+          sparse-checkout: scripts
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
       - name: Post the release to Discord
         run: |
-          if [ "$DRY" = true ]; then node scripts/discord-post.mjs "$VERSION" --dry-run; exit 0; fi
-          node scripts/discord-post.mjs "$VERSION"
+          if [ "$DRY" = true ]; then node .tools/scripts/discord-post.mjs "$VERSION" --dry-run; exit 0; fi
+          node .tools/scripts/discord-post.mjs "$VERSION"
 
   # Something failed: tell #ops (private) which part. Skipped until DISCORD_OPS_WEBHOOK
   # is set, and on dry runs.
@@ -240,7 +258,8 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          ref: ${{ env.REF }}
+          path: .tools
+          sparse-checkout: scripts
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
@@ -251,5 +270,6 @@ jobs:
             Checks: ${{ needs.build.result }} · Firefox: ${{ needs.firefox.result }} ·
             Edge: ${{ needs.edge.result }} · Chrome: ${{ needs.chrome.result }} ·
             Discord: ${{ needs.discord.result }}
+          REF: ${{ needs.build.outputs.ref || github.event.inputs.tag }}
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: node scripts/notify.mjs ops --down "Publishing $REF ($STORE) had a failure. $RESULTS $RUN"
+        run: node .tools/scripts/notify.mjs ops --down "Publishing $REF ($STORE) had a failure. $RESULTS $RUN"
