@@ -1,6 +1,6 @@
 # Privacy Policy — Open Hangar
 
-_Last updated: 2026-09-30_
+_Last updated: 2026-10-01_
 
 Open Hangar is a source-available browser extension that reads your own Star Citizen /
 Roberts Space Industries (RSI) account data and stores it **locally in your
@@ -66,6 +66,11 @@ personal data:
   versions on the Home page, and on the Referrals page the list of referral bonus events
   and the pictures of referral rewards (the same for everyone), cached for hours to a
   month. No credentials or personal data are sent.
+- **openhangar.space** (our own site, public, read-only): a small status file (the same
+  for everyone), at most every few hours, so we can pause a scan that RSI's site changes
+  have broken and show a short notice until a fix is out. Nothing is sent. The site is
+  hosted on GitHub Pages, which, like any website, sees the request's IP address; we
+  receive nothing.
 - **addons.mozilla.org** (Firefox only, public, read-only) — when you press "Check for
   updates", the latest published version number of Open Hangar. No credentials or
   personal data are sent.

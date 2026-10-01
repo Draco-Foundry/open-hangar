@@ -1172,6 +1172,32 @@ try {
     ? ok('Check for updates: store check (Chrome) and AMO version check (Firefox)')
     : fail(`check for updates: ${JSON.stringify(chk)}`);
 
+  // Kill switch notice: shown from the cached status file, as text (never HTML).
+  const notice = await page.evaluate(async () => {
+    const el = document.querySelector('#site-notice');
+    const show = async (banner) => {
+      await chrome.storage.local.set({ remoteStatus: { at: Date.now(), data: { banner } } });
+      await renderSiteNotice();
+      return {
+        hidden: el.hidden,
+        text: el.textContent,
+        html: el.innerHTML,
+        info: el.classList.contains('info'),
+      };
+    };
+    const warn = await show({ message: '<b>RSI</b> changed their site.' });
+    const info = await show({ message: 'All good again.', level: 'info' });
+    const off = await show(null);
+    return { warn, info, off };
+  });
+  !notice.warn.hidden &&
+  notice.warn.text === '<b>RSI</b> changed their site.' &&
+  !notice.warn.html.includes('<b>') &&
+  notice.info.info &&
+  notice.off.hidden
+    ? ok('status notice: warn and info shown as plain text, hidden when cleared')
+    : fail(`status notice: ${JSON.stringify(notice)}`);
+
   console.log('Saved accounts');
   await go('#developers');
   const prof = await page.$$eval('#profiles .profile-row', (r) => r.map((e) => e.textContent));

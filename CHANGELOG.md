@@ -4,6 +4,11 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Improved: **When RSI changes their site and breaks a scan**, Open Hangar can now pause just
+  that scan and show a short notice ("a fix is coming") instead of an error, without waiting
+  for a store update. Your saved data is never touched. It reads a small status file from
+  openhangar.space every few hours; nothing is sent.
+
 ## 0.2.12 — 2026-09-30
 
 - New: **A fresh look.** Open Hangar has a new, cleaner design: graphite panels, bigger and
