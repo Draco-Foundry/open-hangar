@@ -1,6 +1,9 @@
-blank_issues_enabled: true
+blank_issues_enabled: false
 contact_links:
-  - name: 💡 Suggest an idea (vote on others)
+  - name: 🛟 Troubleshooting (check here first)
+    url: https://openhangar.space/help.html
+    about: Signed out, a scan stopped early, or RSI changed something? Most fixes are here.
+  - name: 💡 Suggest an Idea (vote on others)
     url: https://github.com/Draco-Foundry/open-hangar/discussions/categories/ideas
     about: Post feature ideas in Discussions → Ideas, and upvote the ones you want most.
   - name: 💬 Chat on Discord
