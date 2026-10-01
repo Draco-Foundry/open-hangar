@@ -1,6 +1,6 @@
 # Moving openhangar.space to Cloudflare
 
-openhangar.space moves off GitHub Pages onto Cloudflare (#201). It's served as Workers static assets
+openhangar.space moved off GitHub Pages onto Cloudflare on 2026-10-01 (#201). It's served as Workers static assets
 (`site-worker/`), so it gets the same proxy, WAF, caching and analytics as app.openhangar.space.
 `pages.yml` builds the site once and deploys it to both places until the switch.
 
