@@ -300,7 +300,8 @@ const DISCORD_URL = 'https://discord.gg/FF8Wm5HdnV';
 // people without a GitHub account.
 const IDEAS_URL = `${REPO_URL}/discussions/categories/ideas`;
 // Optional support (#240): one-off tips on Ko-fi, monthly on Patreon. Plain links,
-// opened only when clicked; nothing is loaded from either site.
+// opened only when clicked; nothing is loaded from either site. The footer's own
+// support line (logo buttons) is static in dashboard.html.
 const KOFI_URL = 'https://ko-fi.com/dracofoundry';
 const PATREON_URL = 'https://www.patreon.com/DracoFoundry';
 
@@ -1331,12 +1332,11 @@ function renderFooter() {
   const gh = link(REPO_URL, 'GitHub');
   const dc = link(DISCORD_URL, 'Discord');
   const ideas = link(IDEAS_URL, 'Suggest a feature');
-  const support = `Support: ${link(KOFI_URL, 'Ko-fi')} / ${link(PATREON_URL, 'Patreon')}`;
   // The versions line (Open Hangar vX · What's new · Star Citizen X) lives here,
   // not on the Citizen Card: it's reference info, not about your character.
   setHTML(
     $('#footer'),
-    `${gh} · ${dc} · ${ideas} · ${support} · Source Available · <span id="versions"></span>`,
+    `${gh} · ${dc} · ${ideas} · Source Available · <span id="versions"></span>`,
   );
   renderVersions();
   const dev = $('#dev-links');

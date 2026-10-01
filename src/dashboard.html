@@ -1259,6 +1259,27 @@
       .site-footer a:hover {
         text-decoration: underline;
       }
+      .support-links {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .support-links a {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 14px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--text);
+        font-size: 12px;
+        text-decoration: none;
+      }
+      .support-links a:hover {
+        border-color: var(--accent);
+      }
 
       /* Stats */
       .stat-grid {
@@ -4122,6 +4143,16 @@
       </section>
 
       <footer class="site-footer" id="footer"></footer>
+      <!-- Optional support (#240). Official Ko-fi / Patreon symbols, bundled locally. -->
+      <div class="support-links">
+        <a href="https://www.patreon.com/DracoFoundry" target="_blank" rel="noopener"
+          ><img src="assets/patreon-symbol.svg" alt="" width="14" height="14" />Support on
+          Patreon</a
+        >
+        <a href="https://ko-fi.com/dracofoundry" target="_blank" rel="noopener"
+          ><img src="assets/kofi-symbol.svg" alt="" width="18" height="14" />Tip on Ko-fi</a
+        >
+      </div>
     </div>
 
     <!-- Inventory hover preview -->
