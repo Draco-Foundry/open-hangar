@@ -10,6 +10,8 @@ name: Publish to stores
 #   Edge:    EDGE_PRODUCT_ID, EDGE_CLIENT_ID, EDGE_API_KEY
 #   Chrome:  CWS_EXTENSION_ID, CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN
 #   Discord: DISCORD_UPDATES_WEBHOOK (posts the release to #updates after "all")
+# The store keys are environment secrets (environment 'stores'): each upload job
+# waits for the owner to Approve it in the run before it can read them.
 # Every store still reviews the upload before it goes live. Chrome refuses a new
 # version while the last one is in review: that's a warning, rerun with store: chrome.
 # store: discord only posts the announcement (e.g. after fixing a failed run).
@@ -81,7 +83,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
-      - run: npm install
+      - run: npm ci
       - name: Only publish a commit that passed CI
         env:
           GH_TOKEN: ${{ github.token }}
@@ -114,6 +116,9 @@ jobs:
     needs: build
     if: github.event.inputs.store == 'firefox' || github.event.inputs.store == 'all' || github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
+    # Store keys live in the 'stores' environment, which waits for the owner's
+    # Approve click before a real upload (#192). Dry runs skip it: no keys needed.
+    environment: ${{ (github.event_name != 'pull_request' && !inputs.dry_run) && 'stores' || '' }}
     env:
       AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
       AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
@@ -136,7 +141,7 @@ jobs:
             if [ "$STORE" = all ]; then echo "::error::Firefox: AMO secrets not set, so a full release can't reach Firefox"; exit 1; fi
             echo "::notice::Firefox skipped: AMO secrets not set"; exit 0
           fi
-          npm install --no-save web-ext
+          npm install --no-save web-ext@10.7.0 # pinned: this step holds the AMO keys
           # The Svelte pages (ui/) are compiled by Vite, so AMO needs the source
           # and build steps: attach this exact commit's source (docs/AMO-SOURCE.md
           # explains how to rebuild it).
@@ -151,6 +156,9 @@ jobs:
     needs: build
     if: github.event.inputs.store == 'edge' || github.event.inputs.store == 'all' || github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
+    # Store keys live in the 'stores' environment, which waits for the owner's
+    # Approve click before a real upload (#192). Dry runs skip it: no keys needed.
+    environment: ${{ (github.event_name != 'pull_request' && !inputs.dry_run) && 'stores' || '' }}
     env:
       PRODUCT: ${{ secrets.EDGE_PRODUCT_ID }}
       CLIENT: ${{ secrets.EDGE_CLIENT_ID }}
@@ -194,6 +202,9 @@ jobs:
     needs: build
     if: github.event.inputs.store == 'chrome' || github.event.inputs.store == 'all' || github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
+    # Store keys live in the 'stores' environment, which waits for the owner's
+    # Approve click before a real upload (#192). Dry runs skip it: no keys needed.
+    environment: ${{ (github.event_name != 'pull_request' && !inputs.dry_run) && 'stores' || '' }}
     env:
       EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
       CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
