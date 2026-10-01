@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.2.14 — 2026-10-01
+
 - Fixed: **you can type in Home's Global Hangar Search again.** In 0.2.13 the box cleared
   itself after the first letter, so nothing could be typed (the top bar's search was fine).
 - New: **Support Open Hangar** if you like: Ko-fi and Patreon links in the footer and on the
