@@ -6,6 +6,7 @@ on:
     paths:
       [
         'site/**',
+        'site-worker/**',
         'icons/icon.svg',
         'src/assets/banner.svg',
         'manifest.json',
@@ -70,3 +71,16 @@ jobs:
           if-no-files-found: error
       - id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+      # The same files to Cloudflare (open-hangar#201): on workers.dev until the
+      # cutover (docs/SITE-CLOUDFLARE.md), then openhangar.space itself. Skipped
+      # until this repo has the Cloudflare secrets.
+      - name: Deploy to Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "No Cloudflare secrets yet: skipped"
+            exit 0
+          fi
+          npx --yes wrangler@4.143.0 deploy --config site-worker/wrangler.jsonc

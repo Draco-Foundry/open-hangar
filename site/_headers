@@ -1,0 +1,19 @@
+# Response headers when openhangar.space is served by Cloudflare (site-worker/,
+# open-hangar#201). GitHub Pages ignores this file.
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Content-Security-Policy: default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+
+# The extension reads these two from its own pages (no host permission for this
+# site), so they need CORS, as GitHub Pages always sent. Short cache: the kill
+# switch must reach everyone within minutes.
+/status.json
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=300
+/rates.json
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=3600
