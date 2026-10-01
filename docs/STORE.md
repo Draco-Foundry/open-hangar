@@ -198,10 +198,52 @@ CONTRIBUTING "Safari Notes". The other three stores are live, so this is the one
    The **Release** workflow builds the zips and the GitHub Release.
 2. **Actions → Publish to stores → Run workflow**, enter the tag, pick a store (or all).
    It uploads and submits for review; each store still reviews before it goes live.
+   Each upload job waits for you to **Approve** the `stores` environment in the run
+   (Review deployments).
 
 Picking a single store whose secrets aren't set skips it; picking **all** fails
-instead, so Discord never announces a store that got nothing. Secrets (repo Settings → Secrets → Actions),
-all set as of 2026-10-01:
-`AMO_JWT_ISSUER`, `AMO_JWT_SECRET`, `EDGE_PRODUCT_ID`, `EDGE_CLIENT_ID`,
-`EDGE_API_KEY`, `CWS_EXTENSION_ID`, `CWS_CLIENT_ID`, `CWS_CLIENT_SECRET`,
-`CWS_REFRESH_TOKEN`, and `DISCORD_UPDATES_WEBHOOK` for the #updates post.
+instead, so Discord never announces a store that got nothing. See Store Keys below for
+the secrets.
+
+## 13. Store Keys
+
+The upload keys are secrets in the `stores` environment (repo Settings → Environments →
+stores), which needs your approval before any job can read them (#192). Keys not moved
+there yet still work from repo Settings → Secrets → Actions. `DISCORD_UPDATES_WEBHOOK`
+stays at repo level.
+
+**Save every key in Bitwarden the moment you create it.** GitHub never shows a secret
+again, and most of these are only shown once by the store too, so a key that isn't saved
+can only be replaced, not recovered.
+
+| Secret              | Where it comes from                                                                           | Shown again? |
+| ------------------- | --------------------------------------------------------------------------------------------- | ------------ |
+| `AMO_JWT_ISSUER`    | addons.mozilla.org → Developer Hub → Manage API Keys (`user:…`)                               | Yes          |
+| `AMO_JWT_SECRET`    | Same page, when you generate credentials                                                      | No           |
+| `EDGE_PRODUCT_ID`   | Partner Center → Microsoft Edge → Open Hangar → Extension overview (a GUID, not the store ID) | Yes          |
+| `EDGE_CLIENT_ID`    | Partner Center → Microsoft Edge → Publish API                                                 | Yes          |
+| `EDGE_API_KEY`      | Same page, Create API credentials                                                             | No           |
+| `CWS_EXTENSION_ID`  | `aeabioadfphghjennmdbnpelojlhndjl` (public, from the store link)                              | Yes          |
+| `CWS_CLIENT_ID`     | Google Cloud Console → APIs & Services → Credentials → the OAuth client                       | Yes          |
+| `CWS_CLIENT_SECRET` | Same client, Add secret                                                                       | No           |
+| `CWS_REFRESH_TOKEN` | OAuth Playground (below)                                                                      | No           |
+
+**Regenerating revokes the old key.** AMO and Edge keys stop working the moment new ones
+are made, so update the secret straight away. A Google client can hold two secrets at
+once: add the new one, confirm a Chrome upload works, then delete the old one.
+
+**Expiry.** Edge API keys expire; Partner Center shows the date. Put it in the Bitwarden
+note and renew before it lapses. Google refresh tokens expire after 7 days if the OAuth
+consent screen is in **Testing**, so keep it **In production** (APIs & Services → OAuth
+consent screen → Publish app). It's only your own tool, so no Google review is needed.
+
+**New Chrome refresh token:**
+
+1. On the OAuth client (a Web application), add the redirect URI
+   `https://developers.google.com/oauthplayground`.
+2. Open developers.google.com/oauthplayground → gear icon → Use your own OAuth
+   credentials, and paste the client ID and secret.
+3. Step 1: scope `https://www.googleapis.com/auth/chromewebstore` → Authorize APIs, and
+   sign in with the Google account that owns the Chrome Web Store listing.
+4. Step 2: Exchange authorization code for tokens, and copy the refresh token into
+   Bitwarden and into `CWS_REFRESH_TOKEN`.
