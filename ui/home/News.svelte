@@ -53,7 +53,7 @@
       <span class="w">{n.when}</span>
     </a>
   {:else}
-    {#if !live.loaded}<p class="oh-muted">Loading…</p>{:else if !showLead}<p class="oh-muted">Comm-Link’s quiet right now. Probably a 30k on the relay.</p>{/if}
+    {#if !live.loaded}<p class="oh-muted">{window.OH?.quip?.('loading') || 'Loading…'}</p>{:else if !showLead}<p class="oh-muted">Comm-Link’s quiet right now. Probably a 30k on the relay.</p>{/if}
   {/each}
   <a class="oh-more" href="https://robertsspaceindustries.com/comm-link" target="_blank" rel="noopener">More on RSI ↗</a>
 </section>
