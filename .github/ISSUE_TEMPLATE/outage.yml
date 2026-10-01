@@ -1,0 +1,29 @@
+name: 📌 Outage Notice (maintainers)
+description: A pinned notice while a scan is broken for everyone. Maintainers only; please use Scan Broken instead.
+title: 'Known issue: '
+labels: [scan-broken]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Pin this issue, link it from Discord #status, and close it when the fix is live on every store.
+        Playbook: docs/RSI-CHANGES.md.
+  - type: textarea
+    id: notice
+    attributes:
+      label: What's broken
+      description: Plain words, for players. What stopped working, and since when.
+      value: |
+        RSI changed their ___ page, so the ___ scan isn't working right now. Your saved data is safe: a failed scan never overwrites a good one.
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: Status
+      value: |
+        - [ ] Scan paused via status.json
+        - [ ] Fix merged
+        - [ ] Firefox live
+        - [ ] Edge live
+        - [ ] Chrome live

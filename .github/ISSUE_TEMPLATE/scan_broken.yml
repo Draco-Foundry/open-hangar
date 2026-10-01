@@ -1,0 +1,43 @@
+name: 🛰️ Scan Broken (RSI changed something)
+description: A scan that used to work now fails or comes back empty for everyone, not just you.
+title: 'Scan broken: '
+labels: [scan-broken]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        RSI updates their site now and then, and part of a scan can break overnight. Before filing,
+        check the [open scan-broken issues](https://github.com/Draco-Foundry/open-hangar/issues?q=is%3Aopen+label%3Ascan-broken):
+        if it's already there, a 👍 on it helps more than a new issue.
+
+        Please **don't paste personal data** (referral codes, emails, order numbers). The error report is safe: it has none.
+  - type: dropdown
+    id: part
+    attributes:
+      label: Which scan?
+      options:
+        [Hangar (pledges), Buy-backs, Referrals, Account and balances, Store prices, Not sure]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens?
+      description: An error, an empty list, wrong numbers? When did it start?
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Error report
+      description: In Open Hangar, click Copy Error Report next to the error (also on the Developers page) and paste it here.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Open Hangar version
+      description: Shown at the bottom of the dashboard (e.g. v0.2.14).
+    validations:
+      required: true
