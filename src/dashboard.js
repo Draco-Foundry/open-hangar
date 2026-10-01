@@ -524,7 +524,7 @@ function setScanning(text, done = false) {
   if (done) {
     if (fill) fill.style.width = '100%';
     label.textContent = /^⚠/.test(text) ? '⚠ Rough Landing' : '✓ Landed';
-    btn.title = clean;
+    btn.title = /^⚠/.test(text) ? clean : `${OH.quip('scanDone')} ${clean}`;
     scanDoneTimer = setTimeout(() => setScanning(''), 2200);
     return;
   }
@@ -2365,7 +2365,7 @@ function renderInventory() {
     setHTML(chipsEl, '');
     setHTML(
       resultsEl,
-      '<div class="empty">Your hangar’s empty. Not even a starter ship. Hit Scan at the top to fill it.</div>',
+      `<div class="empty">${OH.quip('emptyHangar')} Hit Scan at the top to fill it.</div>`,
     );
     return;
   }
@@ -3040,7 +3040,7 @@ function renderStore() {
   fillStock($('#wishlist'));
   if (!state.catalog) {
     setHTML($('#price-table'), '<p class="muted sp-empty">Loading ship prices…</p>');
-    setHTML($('#ccu-owned'), '<p class="muted sp-empty">Loading…</p>');
+    setHTML($('#ccu-owned'), `<p class="muted sp-empty">${OH.quip('loading')}</p>`);
     return;
   }
   setHTML($('#price-table'), priceRowsHtml($('#price-search').value));
@@ -3811,7 +3811,7 @@ function renderStats() {
   if (!state.items.length) {
     setHTML(
       body,
-      '<div class="empty">Your hangar’s empty. Not even a starter ship. Hit Scan at the top to fill it.</div>',
+      `<div class="empty">${OH.quip('emptyHangar')} Hit Scan at the top to fill it.</div>`,
     );
     return;
   }
@@ -6454,7 +6454,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   scanProgress.i = 0;
   scanProgress.n = [hangar, buybacks, referrals, store].filter(Boolean).length || 1;
   setScanning('Scanning…');
-  scanDetail('Spooling quantum drive…');
+  scanDetail(OH.quip('scan'));
   const parts = [];
   let anyErr = false;
   // One account lookup for the whole scan; every save reuses it (each lookup is
@@ -6691,7 +6691,7 @@ logoutBtn.addEventListener('click', async () => {
     );
   } else {
     await OH.getAccount({ force: true }); // refresh the now signed-out state
-    setStatus('Signed out of RSI. Hangar doors closed, fly safe.');
+    setStatus(`Signed out of RSI. ${OH.quip('signedOut')}`);
     renderHome(); // flips the card to the signed-out wall
   }
   logoutBtn.disabled = false;
@@ -7721,7 +7721,7 @@ function renderBell() {
                 `<div class="bm-row ${esc(x.kind || '')}"><a href="${esc(x.href || '#home')}" data-alert="${i}"><b>${esc(x.title)}</b><small>${esc(x.sub || '')}</small></a><button type="button" class="bm-x" data-ignore="${i}" title="Ignore" aria-label="Ignore: ${esc(x.title)}">×</button></div>`,
             )
             .join('')
-        : '<p class="bm-none">Comms are quiet. Alerts land here when a wishlist ship goes on sale, a ship you own turns flight ready, and more.</p>'),
+        : `<p class="bm-none">${OH.quip('caughtUp')} Alerts land here when a wishlist ship goes on sale, a ship you own turns flight ready, and more.</p>`),
   );
 }
 document.addEventListener('oh:alerts', renderBell);
