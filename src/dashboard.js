@@ -6149,16 +6149,25 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   setScanning('Scanning…');
   const parts = [];
   let anyErr = false;
+  // One account lookup for the whole scan; every save reuses it (each lookup is
+  // two RSI requests once the 10-minute cache runs out). If it fails, each save
+  // looks it up itself, as before.
+  const account =
+    (hangar || buybacks || referrals ? await OH.getAccount().catch(() => null) : null) || undefined;
 
   if (hangar) {
-    const h = await OH.scanSource('hangar', (page, c, retry) => {
-      setStatus(
-        retry
-          ? `RSI hiccup on hangar page ${page} — retrying (${retry.attempt}/${retry.of})…`
-          : `Scanning hangar… page ${page}, ${c} items`,
-      );
-      setScanning(retry ? `hangar… retrying` : `hangar… ${c}`);
-    });
+    const h = await OH.scanSource(
+      'hangar',
+      (page, c, retry) => {
+        setStatus(
+          retry
+            ? `RSI hiccup on hangar page ${page} — retrying (${retry.attempt}/${retry.of})…`
+            : `Scanning hangar… page ${page}, ${c} items`,
+        );
+        setScanning(retry ? `hangar… retrying` : `hangar… ${c}`);
+      },
+      { account },
+    );
     if (h.ok) {
       state.items = h.items;
       state.scannedAt = h.scannedAt;
@@ -6166,9 +6175,8 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
       state.selected.clear();
       state.shown = new Set(); // default: no filter selected = show all
       state.traits = new Map();
-      const acct = await OH.getAccount();
-      if (acct.loggedIn && acct.nickname) {
-        state.owner = { nickname: acct.nickname, displayname: acct.displayname || null };
+      if (account?.loggedIn && account.nickname) {
+        state.owner = { nickname: account.nickname, displayname: account.displayname || null };
       }
       parts.push(`${h.items.length} pledges${h.partial ? ` (partial: ${h.partial})` : ''}`);
       if (h.partial) anyErr = true;
@@ -6180,14 +6188,18 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
 
   if (hangar) scanProgress.i++;
   if (buybacks) {
-    const b = await OH.scanSource('buybacks', (page, c, retry) => {
-      setStatus(
-        retry
-          ? `RSI hiccup on buy-backs page ${page} — retrying (${retry.attempt}/${retry.of})…`
-          : `Scanning buy-backs… page ${page}, ${c} items`,
-      );
-      setScanning(retry ? `buy-backs… retrying` : `buy-backs… ${c}`);
-    });
+    const b = await OH.scanSource(
+      'buybacks',
+      (page, c, retry) => {
+        setStatus(
+          retry
+            ? `RSI hiccup on buy-backs page ${page} — retrying (${retry.attempt}/${retry.of})…`
+            : `Scanning buy-backs… page ${page}, ${c} items`,
+        );
+        setScanning(retry ? `buy-backs… retrying` : `buy-backs… ${c}`);
+      },
+      { account },
+    );
     if (b.ok) {
       state.buybacks = b.items;
       state.buybacksScannedAt = b.scannedAt;
@@ -6204,10 +6216,13 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   // Referrals — separate source (GraphQL, not in OH.SOURCES).
   if (buybacks) scanProgress.i++;
   if (referrals) {
-    const r = await OH.getReferral((phase, n) => {
-      setStatus(`Scanning referrals — ${phase}… ${n}`);
-      setScanning(`referrals ${phase}… ${n}`);
-    });
+    const r = await OH.getReferral(
+      (phase, n) => {
+        setStatus(`Scanning referrals — ${phase}… ${n}`);
+        setScanning(`referrals ${phase}… ${n}`);
+      },
+      { account },
+    );
     if (r?.ok) {
       state.referral = r.referral;
       parts.push(
