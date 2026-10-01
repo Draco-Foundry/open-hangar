@@ -5,6 +5,9 @@
 //
 //   DISCORD_UPDATES_WEBHOOK=<url> node scripts/discord-post.mjs 0.2.12
 //   node scripts/discord-post.mjs 0.2.12 --dry-run   (prints the messages instead)
+//   node scripts/discord-post.mjs 0.2.12 --changelog=tag/CHANGELOG.md
+// The workflow passes the released tag's CHANGELOG, so the post describes exactly
+// what shipped; without --changelog it reads the one next to this script.
 //
 // Skips quietly (exit 0) when the webhook isn't set, like the store jobs do.
 import fs from 'node:fs';
@@ -133,10 +136,11 @@ async function main() {
     console.log('::notice::Discord skipped: DISCORD_UPDATES_WEBHOOK not set');
     return;
   }
-  const log = fs.readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
+  const file = process.argv.find((a) => a.startsWith('--changelog='))?.slice(12);
+  const log = fs.readFileSync(file || new URL('../CHANGELOG.md', import.meta.url), 'utf8');
   const messages = buildMessages(log, version);
   if (!messages) {
-    console.error(`No "## ${version}" section in CHANGELOG.md`);
+    console.error(`No "## ${version}" section in ${file || 'CHANGELOG.md'}`);
     process.exit(1);
   }
   if (dry) {

@@ -82,6 +82,11 @@ The footer also links to Ko-fi and Patreon, where you can choose to support the 
 They are plain links: nothing is loaded from either site, and nothing is sent unless you
 click one and use that site yourself.
 
+When a scan fails, **Report a Scan Problem** opens a new GitHub issue in your browser with
+the scan summary (counts only) and the error report filled in: version, browser, item
+counts and the recent log, with no handle, referral code or item names. Nothing is sent by
+the extension. You read it on GitHub and decide whether to submit it.
+
 ## Permissions and why they are used
 
 - **storage** — to save your scanned data and UI preferences locally.

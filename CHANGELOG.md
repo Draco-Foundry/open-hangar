@@ -14,6 +14,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 - New: **Known Issues** in the menu shows the bugs we're already working on, straight
   from GitHub, so you can see if yours is on the list before reporting it. It's only
   fetched when you open the page; nothing about you is sent.
+- New: **Report a Scan Problem.** When a scan fails, one click opens a GitHub issue with
+  the error report already filled in. You read it and submit it yourself; nothing is sent
+  in the background, and it has nothing about your account.
 - Fixed: one unreadable buy-back page no longer stops the rest of your buy-backs from
   loading. That page is skipped and the others come through.
 
