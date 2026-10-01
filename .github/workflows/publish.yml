@@ -4,12 +4,17 @@ name: Publish to stores
 # (Actions → Publish to stores → Run workflow) after the Release workflow has
 # built that tag. Nothing here runs on its own: publishing is always a choice.
 #
-# Each store is skipped (not failed) until its secrets exist:
+# A single store is skipped (not failed) until its secrets exist; a full release
+# (store: all) fails instead, so Discord never announces a store that got nothing:
 #   Firefox: AMO_JWT_ISSUER, AMO_JWT_SECRET
 #   Edge:    EDGE_PRODUCT_ID, EDGE_CLIENT_ID, EDGE_API_KEY
 #   Chrome:  CWS_EXTENSION_ID, CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN
 #   Discord: DISCORD_UPDATES_WEBHOOK (posts the release to #updates after "all")
 # Every store still reviews the upload before it goes live.
+#
+# Before anything is uploaded, the build job checks the tag's commit passed CI on
+# GitHub and runs the unit tests, the dashboard UI test and Firefox's store linter.
+# Rolling back a bad version: docs/ROLLBACK.md.
 
 on:
   workflow_dispatch:
@@ -25,6 +30,7 @@ on:
 
 permissions:
   contents: read
+  actions: read # to check the tag's commit passed CI
 
 jobs:
   build:
@@ -39,7 +45,23 @@ jobs:
         with:
           node-version: 22
       - run: npm install
+      - name: Only publish a commit that passed CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA=$(git rev-parse HEAD)
+          RUNS=$(gh run list -R "$GITHUB_REPOSITORY" --workflow CI --commit "$SHA"             --json status,conclusion -q '[.[] | "(.status)/(.conclusion)"] | join(" ")')
+          echo "CI runs for $SHA: ${RUNS:-none}"
+          case " $RUNS " in
+            *" completed/success "*) ;;
+            *) echo "::error::$SHA has no passing CI run yet. Wait for CI on main (or rerun it), then publish."; exit 1 ;;
+          esac
       - run: npm test
+      # The real dashboard in Chrome, as CI runs it. Chrome on the runners now and
+      # then fails to start, so a failed run gets one retry.
+      - run: npm run test:ui || npm run test:ui
+      # AMO's own checks, so a rejection shows up here and not in review.
+      - run: npm run lint:firefox
       - name: Check the tag matches manifest.json
         id: v
         run: |
@@ -60,6 +82,7 @@ jobs:
     if: github.event.inputs.store == 'firefox' || github.event.inputs.store == 'all'
     runs-on: ubuntu-24.04
     env:
+      STORE: ${{ github.event.inputs.store }}
       AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
       AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
     steps:
@@ -76,6 +99,7 @@ jobs:
       - name: Submit to addons.mozilla.org
         run: |
           if [ -z "$AMO_JWT_ISSUER" ] || [ -z "$AMO_JWT_SECRET" ]; then
+            if [ "$STORE" = all ]; then echo "::error::Firefox: AMO secrets not set, so a full release can't reach Firefox"; exit 1; fi
             echo "::notice::Firefox skipped: AMO secrets not set"; exit 0
           fi
           npm install --no-save web-ext
@@ -94,6 +118,7 @@ jobs:
     if: github.event.inputs.store == 'edge' || github.event.inputs.store == 'all'
     runs-on: ubuntu-24.04
     env:
+      STORE: ${{ github.event.inputs.store }}
       PRODUCT: ${{ secrets.EDGE_PRODUCT_ID }}
       CLIENT: ${{ secrets.EDGE_CLIENT_ID }}
       KEY: ${{ secrets.EDGE_API_KEY }}
@@ -106,6 +131,7 @@ jobs:
       - name: Submit to Edge Add-ons
         run: |
           if [ -z "$PRODUCT" ] || [ -z "$CLIENT" ] || [ -z "$KEY" ]; then
+            if [ "$STORE" = all ]; then echo "::error::Edge: Edge secrets not set, so a full release can't reach Edge"; exit 1; fi
             echo "::notice::Edge skipped: Edge secrets not set"; exit 0
           fi
           API="https://api.addons.microsoftedge.microsoft.com/v1/products/$PRODUCT/submissions"
@@ -125,13 +151,14 @@ jobs:
           done
           [ "$S" = "Succeeded" ] || { echo "Upload still processing, check Partner Center"; exit 1; }
           curl -sS -f "${H[@]}" -H "Content-Type: application/json" -X POST "$API" \
-            -d "{\"notes\":\"Open Hangar $VERSION. Changes: https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md\"}"
+            -d "{\"notes\":\"Open Hangar $VERSION. Changes: https://github.com/${{ github.repository }}/blob/${{ github.event.inputs.tag }}/CHANGELOG.md\"}"
 
   chrome:
     needs: build
     if: github.event.inputs.store == 'chrome' || github.event.inputs.store == 'all'
     runs-on: ubuntu-24.04
     env:
+      STORE: ${{ github.event.inputs.store }}
       EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
       CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
       CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
@@ -148,6 +175,7 @@ jobs:
       - name: Submit to the Chrome Web Store
         run: |
           if [ -z "$EXTENSION_ID" ] || [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ] || [ -z "$REFRESH_TOKEN" ]; then
+            if [ "$STORE" = all ]; then echo "::error::Chrome: Chrome Web Store secrets not set, so a full release can't reach Chrome"; exit 1; fi
             echo "::notice::Chrome skipped: Chrome Web Store secrets not set"; exit 0
           fi
           # Upload, then submit for review (publishes once Google approves).
