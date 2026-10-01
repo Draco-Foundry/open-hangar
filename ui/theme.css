@@ -462,7 +462,26 @@ body:not(:has(#view-home.active)) .wrap > header {
 .gs-scroll {
   max-height: min(560px, 60vh);
   overflow: auto;
+  overscroll-behavior: contain; /* reaching the end never scrolls the page (#168) */
   padding: 4px 10px 10px;
+}
+/* "N buy-back packs not checked yet · Get Details" under the buy-back results. */
+.gs-note {
+  padding: 6px 8px 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.gs-note-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--link);
+  cursor: pointer;
+}
+.gs-note-btn:hover {
+  text-decoration: underline;
 }
 .home-search .gs-title {
   display: flex;
