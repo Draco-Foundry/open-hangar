@@ -74,13 +74,18 @@
     if (COUPON_NAME_RE.test(hay)) return 'coupon';
 
     const prefix = ns.buybackCategoryPrefix(name);
+    if (/^(packages?|game\s+packages?)$/i.test(prefix)) return 'package';
+    // Owner's rule: "Pack" in the name makes it a pack, whatever the label in front
+    // says ("Standalone Ships - Nine Tails Shogun Pack", "Paints - Wolf - 8 Paint
+    // Pack", "… Paint Pack - Referral Reward"). Game packages ("Package - … Starter
+    // Pack") stay packages, just above.
+    if (/\bpacks?\b/i.test(name || '')) return 'pack';
     if (/^(paints?|skins?|liver(y|ies))$/i.test(prefix)) return 'paint';
     if (/^(gear|armou?r|weapons?|components?|fps)$/i.test(prefix)) return 'addon';
     if (/^subscribers?\s+(store|vault)$/i.test(prefix)) return 'other';
     if (/^(add[-\s]?ons?|decorations?|posters?|flair|model\s+ships?)$/i.test(prefix))
       return 'addon';
     if (/^(packs?|combos?|bundles?)$/i.test(prefix)) return 'pack';
-    if (/^(packages?|game\s+packages?)$/i.test(prefix)) return 'package';
     if (/^(standalone\s+ships?|ships?|warbonds?)$/i.test(prefix)) return 'ship';
 
     if (PAINT_NAME_RE.test(hay)) return 'paint';
