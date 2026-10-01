@@ -170,7 +170,8 @@ async function handle(req, res) {
 }
 
 const server = http.createServer(handle);
-await new Promise((ok) => server.listen(PORT, ok));
+// This computer only: the demo proxy is for local screenshots and tests (#285).
+await new Promise((ok) => server.listen(PORT, '127.0.0.1', ok));
 console.log(`demo dashboard on http://localhost:${PORT}`);
 
 // `npm run demo` (--serve): just keep the demo dashboard running for manual
