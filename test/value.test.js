@@ -160,44 +160,79 @@ test('mergeHistory unions by time, collapses repeats, drops junk', () => {
   assert.equal(OH.mergeHistory(many, []).length, 100);
 });
 
-test('getFxRates fetches USD-based rates once and caches them', async () => {
-  const store = {};
+// Our rates file (openhangar.space/rates.json, #243): USD based, every offered currency.
+const ratesFile = (over = {}) => ({
+  base: 'USD',
+  date: '2026-09-30',
+  source: 'ECB',
+  rates: {
+    USD: 1,
+    EUR: 0.88,
+    GBP: 0.75,
+    CAD: 1.42,
+    AUD: 1.44,
+    NZD: 1.77,
+    CHF: 0.83,
+    SEK: 9.98,
+    PLN: 3.85,
+    CZK: 21.5,
+    BRL: 5.2,
+    CNY: 6.7,
+    JPY: 157,
+    KRW: 1355,
+    HUF: 322,
+    ...over,
+  },
+});
+const fxStore = (store) => {
   global.chrome.storage.local.get = async (k) => ({ [k]: store[k] });
   global.chrome.storage.local.set = async (o) => Object.assign(store, o);
+};
+
+test('getFxRates reads our rates file once and caches the offered currencies', async () => {
+  fxStore({});
   let calls = 0;
   const fetchFn = async (url) => {
     calls++;
-    assert.match(url, /base=USD/);
-    return {
-      ok: true,
-      json: async () => ({ date: '2026-09-28', rates: { EUR: 0.88, GBP: 0.75 } }),
-    };
+    assert.equal(url, 'https://openhangar.space/rates.json');
+    return { ok: true, json: async () => ratesFile() };
   };
   const r1 = await OH.getFxRates(fetchFn);
   const r2 = await OH.getFxRates(fetchFn);
   assert.equal(r1.rates.EUR, 0.88);
   assert.equal(r1.rates.USD, 1);
-  assert.equal(r2.rates.GBP, 0.75);
+  assert.equal(r1.date, '2026-09-30');
+  assert.equal(r2.rates.KRW, 1355);
+  assert.equal(r1.rates.HUF, undefined); // not offered, not kept
   assert.equal(calls, 1);
 });
 
 test('getFxRates refetches a cache saved before a currency was added', async () => {
-  const store = {
+  fxStore({
     fxRates: { at: Date.now(), date: '2026-09-27', rates: { USD: 1, EUR: 0.9 } }, // no `want`
-  };
-  global.chrome.storage.local.get = async (k) => ({ [k]: store[k] });
-  global.chrome.storage.local.set = async (o) => Object.assign(store, o);
+  });
   let calls = 0;
   const fetchFn = async () => {
     calls++;
-    return {
-      ok: true,
-      json: async () => ({ date: '2026-09-28', rates: { EUR: 0.88, KRW: 1357 } }),
-    };
+    return { ok: true, json: async () => ratesFile({ KRW: 1357 }) };
   };
   const r = await OH.getFxRates(fetchFn);
   assert.equal(calls, 1);
   assert.equal(r.rates.KRW, 1357);
+});
+
+test('getFxRates keeps the saved rates when the file is incomplete or unreachable', async () => {
+  const old = { at: 0, want: 'stale', date: '2026-09-01', rates: { USD: 1, EUR: 0.9 } };
+  for (const answer of [
+    { ok: true, json: async () => ratesFile({ JPY: undefined }) }, // a currency missing
+    { ok: true, json: async () => ({ ...ratesFile(), base: 'EUR' }) }, // wrong base
+    { ok: false, status: 503, json: async () => ({}) },
+  ]) {
+    fxStore({ fxRates: { ...old } });
+    const r = await OH.getFxRates(async () => answer);
+    assert.equal(r.date, '2026-09-01');
+    assert.equal(r.rates.EUR, 0.9);
+  }
 });
 
 // Account Value (#164, #165): everything owned, one rule set for today and history.

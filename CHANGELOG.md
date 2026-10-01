@@ -6,6 +6,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 - New: **Support Open Hangar** if you like: Ko-fi and Patreon links in the footer and on the
   Developers page. Open Hangar stays free, with no ads and nothing locked.
+- Improved: **currency conversion no longer depends on an outside rates service.** The
+  day's European Central Bank rates now come from openhangar.space itself, so they load
+  fast and keep working when a third-party site is slow or down. One less outside site in
+  the privacy policy.
 
 ## 0.2.13 — 2026-10-01
 
