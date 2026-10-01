@@ -2238,6 +2238,23 @@
     });
   }
   // Forget details of buy-backs that are gone (reclaimed). `ids` = current list.
+  // A buy-back's title without words that mean nothing once it's a buy-back (owner,
+  // #176): the "Standalone Ship -" / "Package -" / "Subscriber Store -" label in front
+  // (the type chip says it), and Warbond / Standard Edition (a warbond and a standard
+  // buy-back cost the same to reclaim). For CCUs, run it on each ship name. The full
+  // RSI name stays in tooltips, the details window and exports. Pure.
+  OH.shortBuybackName = function shortBuybackName(name) {
+    const full = String(name || '').trim();
+    const short = full
+      .replace(/^(?:standalone\s+ships?|packs?|package|subscriber\s+store)\s*[-–:]\s*/i, '')
+      .replace(/\s*\(\s*(?:warbond|standard)(?:\s+edition)?\s*\)/gi, '')
+      .replace(/\s*[-–]?\s*\b(?:warbond|standard)\s+edition\b/gi, '')
+      .replace(/\s*[-–]?\s+warbond\s*$/i, '')
+      .replace(/\s*[-–]\s*$/, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    return short || full;
+  };
   OH.pruneBuybackDetails = async function pruneBuybackDetails(ids) {
     const keep = new Set(ids.map(String));
     const next = await mutateStored(BBD_KEY, (cur = {}) =>
