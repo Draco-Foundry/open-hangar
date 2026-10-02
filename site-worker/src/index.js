@@ -1,6 +1,7 @@
 // openhangar.space: the static site in ../site, except the home page, which the
 // website Worker (open-hangar-server, app.openhangar.space) renders with live
-// Star Citizen data. Only the paths below reach this script (run_worker_first in
+// Star Citizen data, and the Store (/store and the data it loads, /api/store/*).
+// Only the paths below reach this script (run_worker_first in
 // wrangler.jsonc); everything else, including the extension's status.json kill
 // switch and rates.json, is served straight from the static files as before.
 //
