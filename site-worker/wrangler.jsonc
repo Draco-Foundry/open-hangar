@@ -2,15 +2,34 @@
   // openhangar.space on Cloudflare (open-hangar#201): the static site in ../site,
   // served as Workers static assets, so it gets Cloudflare's proxy, WAF, caching
   // and analytics like app.openhangar.space. Deployed by .github/workflows/pages.yml.
-  // No script: assets only, which costs no Worker requests.
+  //
+  // The home page and the files it loads come from the website Worker
+  // (open-hangar-server, which also serves app.openhangar.space) through the
+  // small script in src/index.js. Every other path never runs the script: the
+  // extension's status.json and rates.json, help and privacy are plain files as
+  // before. If the website Worker fails, the old static home page is served.
   "name": "openhangar-site",
+  "main": "src/index.js",
   "compatibility_date": "2026-09-26",
   "assets": {
     "directory": "../site",
+    "binding": "ASSETS",
     "html_handling": "none", // keep /privacy.html as it is (store listings link it)
+    "run_worker_first": ["/", "/_astro/*", "/fonts/*", "/favicon.svg"],
   },
+  "services": [{ "binding": "APP", "service": "open-hangar-server" }],
   // openhangar.space itself (switched from GitHub Pages, docs/SITE-CLOUDFLARE.md).
   // www is a proxied record plus a "www to root" redirect rule in the dashboard.
   "routes": [{ "pattern": "openhangar.space", "custom_domain": true }],
   "workers_dev": true,
+  "env": {
+    // A copy wired to the staging website, on workers.dev only, to check changes
+    // before they reach openhangar.space.
+    "staging": {
+      "name": "openhangar-site-staging",
+      "routes": [],
+      "workers_dev": true,
+      "services": [{ "binding": "APP", "service": "open-hangar-server-staging" }],
+    },
+  },
 }
