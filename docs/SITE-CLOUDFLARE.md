@@ -50,3 +50,16 @@ back the A and AAAA records, and turn Pages back on.
 - **Archive, don't enable:** Bot Fight Mode / Super Bot Fight Mode (they'd block the extension's
   sync on the free plan) and AI Labyrinth.
 - **Unproxied and dangling record insights** go away after step 2.
+
+## 4. Home Page From the Website (2026-10-02)
+
+openhangar.space's home page now comes from the website Worker (open-hangar-server), so it shows live
+store, patch and status data. `site-worker/src/index.js` hands only `/`, `/_astro/*`, `/fonts/*` and
+`/favicon.svg` to it through a service binding; every other path (`status.json`, `rates.json`, help,
+privacy) is still a plain file and never runs the script. The home page is cached at the edge for a
+minute. If the website Worker fails, the old `site/index.html` is served instead.
+
+Staging copy, wired to staging.openhangar.space, on workers.dev only:
+`npx wrangler deploy --config site-worker/wrangler.jsonc --env staging`.
+
+Rollback: revert the PR and run **Pages**; the site goes back to the static home page.
