@@ -236,3 +236,44 @@ test('classifyBuyback: game access makes it a package; no game, a pack (owner, #
   );
   assert.equal(c('Standalone Ships - Drake Cutlass Black', 'Cutlass Black · LTI'), 'ship');
 });
+
+// #296: RSI sometimes leaves an item's type off; read it from the name when safe.
+test('untyped items get a type from their name when it is safe (#296)', () => {
+  const p = OpenHangar.normalizePledge({
+    id: '9',
+    name: 'Standalone Ships - Arrow Warbond',
+    contents: [
+      { kind: '', label: 'Arrow' },
+      { kind: '', label: 'Lifetime Insurance' },
+      { kind: '', label: 'Arrow Ghoulish Green Paint' },
+      { kind: '', label: 'Hangar Poster' },
+    ],
+  });
+  assert.deepEqual(
+    p.contents.map((c) => [c.label, c.kind, !!c.guessed]),
+    [
+      ['Arrow', 'Ship', true],
+      ['Lifetime Insurance', 'Insurance', true],
+      ['Arrow Ghoulish Green Paint', 'Paint', true],
+      ['Hangar Poster', '', false],
+    ],
+  );
+  assert.equal(p.kind, 'ship');
+  assert.equal(p.containsShip, true);
+  assert.equal(p.insurance, 'LTI');
+});
+
+test('a type RSI did give is never overwritten, and gear bundles stay add-ons (#296)', () => {
+  const tagged = OpenHangar.normalizePledge({
+    name: 'Standalone Ships - Arrow',
+    contents: [{ kind: 'Skin', label: 'Arrow' }],
+  });
+  assert.equal(tagged.contents[0].kind, 'Skin');
+  assert.equal(tagged.contents[0].guessed, undefined);
+  const gear = OpenHangar.normalizePledge({
+    name: 'Gear - Arrow Flight Suit',
+    contents: [{ kind: '', label: 'Arrow Flight Suit' }],
+  });
+  assert.equal(gear.containsShip, false);
+  assert.equal(gear.kind, 'addon');
+});

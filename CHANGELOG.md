@@ -7,6 +7,12 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 - Improved: **scans ride out a busy RSI.** When RSI asks us to slow down, Open Hangar now
   waits a little longer each time (up to five tries) instead of giving up, and tells you
   it's retrying while it waits.
+- Improved: **items RSI forgets to label still land in the right group.** When RSI leaves
+  an item's type off, Open Hangar reads it from the name where that's safe (insurance,
+  paints, and the ship a Standalone Ships pledge is named after).
+- New: **an early warning when RSI changes its hangar page.** Each scan notes how much it
+  could read, and the error report says so if dates, values, item lists or pictures
+  suddenly stop coming through, so we can patch it before your data looks wrong.
 
 ## 0.2.15 — 2026-10-01
 

@@ -190,3 +190,40 @@ test('429: after 5 tries the scan gives up instead of pushing on (#298)', async 
   assert.equal(calls[1], 6);
 });
 
+test('scanShape: how completely a scan read the page, and untyped items (#295, #296)', () => {
+  const s = OH.scanShape([
+    { date: '2020-01-01', value: 10, image: 'x', contents: [{ kind: 'Ship' }, { kind: '' }] },
+    { date: null, value: 0, image: null, contents: [{ kind: 'Ship', guessed: true }] },
+  ]);
+  assert.deepEqual(s, {
+    n: 2,
+    date: 0.5,
+    value: 1,
+    contents: 1,
+    image: 0.5,
+    tiles: 3,
+    untyped: 2,
+    guessed: 1,
+  });
+});
+
+test('shapeDrops: flags a field that went from most pledges to none (#295)', () => {
+  const prev = { n: 40, date: 0.98, value: 1, contents: 0.9, image: 0.95 };
+  assert.deepEqual(OH.shapeDrops(prev, { ...prev, date: 0 }), [
+    { field: 'date', label: 'pledge dates', was: 0.98 },
+  ]);
+  assert.deepEqual(OH.shapeDrops(prev, { ...prev, date: 0.4 }), [], 'a dip is not a drop');
+  assert.deepEqual(OH.shapeDrops(prev, { ...prev, n: 3, date: 0 }), [], 'too small to tell');
+  assert.deepEqual(OH.shapeDrops(null, { ...prev, date: 0 }), [], 'first scan');
+});
+
+test('a hangar scan keeps its shape and warns when RSI stops giving dates (#295)', async () => {
+  await reset(Array.from({ length: 25 }, (_, i) => ({ id: `old${i}`, name: 'Old' })));
+  store.db.sources.hangar.meta = { shape: { n: 25, date: 0.96, value: 1, contents: 1, image: 1 } };
+  script = healthy;
+  const r = await OH.scanSource('hangar');
+  assert.equal(r.ok, true);
+  assert.equal(store.db.sources.hangar.meta.shape.n, 30);
+  const log = await OH.getLog();
+  assert.ok(log.some((l) => /read no pledge dates/.test(l.msg || l.message || JSON.stringify(l))));
+});

@@ -299,6 +299,17 @@
     return `${m[0]} ${m[1]} on ${os}`.replace('  ', ' ');
   }
 
+  // The error report's "Read:" line: how completely the last hangar scan read RSI's
+  // page (#295, #296). Percentages and counts only.
+  function shapeLine(s) {
+    if (!s || !s.n) return 'no complete hangar scan yet';
+    const pct = (x) => `${Math.round(x * 100)}%`;
+    return (
+      `${pct(s.date)} dates · ${pct(s.value)} values · ${pct(s.contents)} item lists · ${pct(s.image)} pictures` +
+      ` · ${s.untyped} of ${s.tiles} items untyped (${s.guessed} placed by name)`
+    );
+  }
+
   // A copy-paste report for bug posts: version, browser, data counts, cache
   // state and the recent log. Wrapped in a code block so Discord/GitHub keep
   // the columns. Contains counts and dates only — no handle, codes or names.
@@ -325,6 +336,7 @@
       `Browser:   ${browserLabel((globalThis.navigator && globalThis.navigator.userAgent) || '')}`,
       `Hangar:    ${count(src('hangar'))} items, scanned ${ago(src('hangar').scannedAt)}`,
       `Buy-backs: ${count(src('buybacks'))} items, scanned ${ago(src('buybacks').scannedAt)}`,
+      `Read:      ${shapeLine(src('hangar').meta?.shape)}`,
       `History:   ${Array.isArray(db.history) ? db.history.length : 0} snapshots`,
       `Set aside: ${damaged.length ? damaged.map((d) => `${d.what} (${d.problems.slice(0, 3).join('; ')})`).join(', ') : 'nothing'}`,
       `Catalog:   ${Array.isArray(cat.list) ? cat.list.length : 0} ships (v${cat.v || '?'}, ${ago(cat.at)}) · ship matrix ${Array.isArray(mat.list) ? mat.list.length : 0}`,
@@ -1148,7 +1160,10 @@
         if (++slowDowns > RATE_LIMIT_RETRIES) return { error: msg, transient: true };
         retry = {
           msg,
-          wait: Math.min(Math.max(after > 0 ? after : 0, RATE_LIMIT_STEP_MS * slowDowns), MAX_RATE_LIMIT_WAIT_MS),
+          wait: Math.min(
+            Math.max(after > 0 ? after : 0, RATE_LIMIT_STEP_MS * slowDowns),
+            MAX_RATE_LIMIT_WAIT_MS,
+          ),
           attempt: slowDowns,
           of: RATE_LIMIT_RETRIES,
         };
@@ -1264,6 +1279,43 @@
     return { items: all, meta };
   }
 
+  // How completely a hangar scan read RSI's page (#295, #296): the share of pledges
+  // with a date, a value, an item list and a picture, and how many contained items
+  // came without a type (and how many of those were placed by name). Kept with the
+  // scan, shown in the error report, and compared scan to scan. Pure, so it's
+  // tested directly.
+  OH.scanShape = function scanShape(items) {
+    const list = Array.isArray(items) ? items : [];
+    const n = list.length;
+    const share = (f) => (n ? Math.round((list.filter(f).length / n) * 100) / 100 : 0);
+    const tiles = list.flatMap((p) => (Array.isArray(p?.contents) ? p.contents : []));
+    return {
+      n,
+      date: share((p) => !!p?.date),
+      value: share((p) => p?.value != null),
+      contents: share((p) => Array.isArray(p?.contents) && p.contents.length > 0),
+      image: share((p) => !!p?.image),
+      tiles: tiles.length,
+      untyped: tiles.filter((c) => !(c?.kind || '').trim() || c?.guessed).length,
+      guessed: tiles.filter((c) => c?.guessed).length,
+    };
+  };
+  const SHAPE_LABELS = {
+    date: 'pledge dates',
+    value: 'values',
+    contents: 'item lists',
+    image: 'pictures',
+  };
+  // What a scan suddenly stopped reading (#295): a field most pledges had last time
+  // and none have now usually means RSI moved things around on the hangar page.
+  // Only for hangars big enough to tell (5+ pledges).
+  OH.shapeDrops = function shapeDrops(prev, next) {
+    if (!prev || !next || next.n < 5) return [];
+    return Object.keys(SHAPE_LABELS)
+      .filter((k) => prev[k] >= 0.5 && next[k] === 0)
+      .map((k) => ({ field: k, label: SHAPE_LABELS[k], was: prev[k] }));
+  };
+
   // Scan one source by id and persist it. Returns { ok, items?, scannedAt?, error? }.
   // opts.account: the account already fetched for this scan (see saveSource).
   OH.scanSource = async function scanSource(sourceId, onProgress, { account } = {}) {
@@ -1313,11 +1365,32 @@
         };
       }
 
+      // A complete hangar scan records how completely it read the page, and warns
+      // when that suddenly drops (#295) or when RSI left types off (#296).
+      let meta = result.meta;
+      if (src.id === 'hangar') {
+        const shape = OH.scanShape(result.items);
+        const prev = await OH.loadSource(src.id);
+        for (const d of OH.shapeDrops(prev.meta?.shape, shape))
+          OH.log(
+            'warn',
+            src.id,
+            `read no ${d.label} this time (${Math.round(d.was * 100)}% last scan): RSI may have changed the hangar page`,
+          );
+        if (shape.untyped)
+          OH.log(
+            'info',
+            src.id,
+            `${shape.untyped} of ${shape.tiles} items came without a type from RSI, ${shape.guessed} placed by name`,
+          );
+        meta = { ...(meta || {}), shape };
+      }
+
       // Only complete hangar scans go into the history (a partial one would read
       // as pledges disappearing).
       const scannedAt = await saveSource(src.id, result.items, {
         record: src.id === 'hangar',
-        meta: result.meta,
+        meta,
         account,
       });
       OH.log('info', src.id, `scan ok, ${result.items.length} items`);
