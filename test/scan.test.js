@@ -29,7 +29,9 @@ global.chrome = {
 };
 // Pages are served as JSON arrays; "parse" just reads them back.
 global.OpenHangar = { parsePledges: (html) => JSON.parse(html || '[]') };
-global.setTimeout = (fn) => (queueMicrotask(fn), 0);
+// Backoff sleeps run at once; their lengths are kept in `waits` to check them.
+let waits = [];
+global.setTimeout = (fn, ms) => (waits.push(ms), queueMicrotask(fn), 0);
 
 const PLEDGES = /\/account\/pledges\?page=(\d+)/;
 let script; // (page, callNo) => { status, body } | 'network'
@@ -45,7 +47,7 @@ global.fetch = async (url) => {
   calls[page] = (calls[page] || 0) + 1;
   const r = script(page, calls[page]);
   if (r === 'network') throw new TypeError('Failed to fetch');
-  return new Response(r.body ?? '[]', { status: r.status ?? 200 });
+  return new Response(r.body ?? '[]', { status: r.status ?? 200, headers: r.headers });
 };
 
 require('../src/lib.js');
@@ -60,6 +62,7 @@ async function reset(prevItems) {
   for (const k of Object.keys(store)) delete store[k];
   calls = {};
   other = [];
+  waits = [];
   if (prevItems) {
     store.db = { schemaVersion: 2, sources: { hangar: { items: prevItems, scannedAt: 1 } } };
   }
@@ -157,3 +160,33 @@ test('without the account, the save still looks it up itself', async () => {
   await OH.scanSource('hangar');
   assert.ok(other.some((u) => /\/account\/dashboard/.test(u)));
 });
+
+test('429: RSI gets 5 s, 10 s, 15 s... of breathing room, then the scan completes (#298)', async () => {
+  await reset();
+  script = (page, n) => (page === 1 && n <= 4 ? { status: 429 } : healthy(page));
+  const r = await OH.scanSource('hangar');
+  assert.equal(r.ok, true);
+  assert.equal(calls[1], 5);
+  assert.deepEqual(
+    waits.filter((ms) => ms >= 5000),
+    [5000, 10000, 15000, 20000],
+  );
+});
+
+test('429: a longer Retry-After from RSI is honoured, up to 30 s (#298)', async () => {
+  await reset();
+  script = (page, n) =>
+    page === 1 && n === 1 ? { status: 429, headers: { 'retry-after': '20' } } : healthy(page);
+  await OH.scanSource('hangar');
+  assert.ok(waits.includes(20000));
+});
+
+test('429: after 5 tries the scan gives up instead of pushing on (#298)', async () => {
+  await reset();
+  script = (page) => (page === 1 ? { status: 429 } : healthy(page));
+  const r = await OH.scanSource('hangar');
+  assert.equal(r.ok, false);
+  assert.match(r.error, /slow down/);
+  assert.equal(calls[1], 6);
+});
+

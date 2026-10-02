@@ -1109,43 +1109,64 @@
   }
 
   // Fetch one page, retrying only *transient* failures (network error, 5xx, 429)
-  // with a small, polite backoff. Auth failures and other 4xx return at once.
+  // with a polite backoff. Auth failures and other 4xx return at once.
   // Returns { res } or { error, transient }.
+  // Network errors and 5xx: up to 3 retries, quick exponential backoff.
+  // RSI's "slow down" (429, #298): up to 5 retries, waiting 5 s, 10 s, 15 s, 20 s,
+  // 25 s (or longer when RSI's Retry-After asks, up to 30 s), so a busy RSI gets
+  // real breathing room instead of a scan that fails.
   const RETRIES = 3;
   const MAX_RETRY_WAIT_MS = 15000;
+  const RATE_LIMIT_RETRIES = 5;
+  const RATE_LIMIT_STEP_MS = 5000;
+  const MAX_RATE_LIMIT_WAIT_MS = 30000;
   // opts.retryRateLimit: false = a 429 comes straight back as { rateLimited }, for
   // batches that should stop rather than push on (buy-back details).
   async function fetchPage(url, onRetry, { retryRateLimit = true } = {}) {
-    let lastError = null;
-    for (let attempt = 0; attempt <= RETRIES; attempt++) {
-      if (attempt > 0) {
-        await sleep(lastError.wait);
-        onRetry?.(attempt, RETRIES, lastError.msg);
+    let errors = 0;
+    let slowDowns = 0;
+    let retry = null; // { msg, wait, attempt, of } for the next try
+    for (;;) {
+      if (retry) {
+        // Said before the wait, so a long pause reads as "retrying", not stuck.
+        onRetry?.(retry.attempt, retry.of, retry.msg);
+        await sleep(retry.wait);
       }
       let res;
       try {
         res = await fetch(url, { credentials: 'include', signal: AbortSignal.timeout(30000) });
       } catch (e) {
-        lastError = {
-          msg: `Couldn't reach RSI (${e.message})`,
-          wait: DELAY_MS * 2 ** (attempt + 1),
+        const msg = `Couldn't reach RSI (${e.message})`;
+        if (++errors > RETRIES) return { error: msg, transient: true };
+        retry = { msg, wait: DELAY_MS * 2 ** errors, attempt: errors, of: RETRIES };
+        continue;
+      }
+      const after = Number(res.headers.get('retry-after')) * 1000;
+      if (res.status === 429) {
+        if (!retryRateLimit) return { error: 'RSI asked us to slow down', rateLimited: true };
+        const msg = 'RSI asked us to slow down';
+        if (++slowDowns > RATE_LIMIT_RETRIES) return { error: msg, transient: true };
+        retry = {
+          msg,
+          wait: Math.min(Math.max(after > 0 ? after : 0, RATE_LIMIT_STEP_MS * slowDowns), MAX_RATE_LIMIT_WAIT_MS),
+          attempt: slowDowns,
+          of: RATE_LIMIT_RETRIES,
         };
         continue;
       }
-      if (res.status === 429 && !retryRateLimit) {
-        return { error: 'RSI asked us to slow down', rateLimited: true };
-      }
-      if (res.status === 429 || res.status >= 500) {
-        const after = Number(res.headers.get('retry-after')) * 1000;
-        lastError = {
-          msg: `RSI responded ${res.status}`,
-          wait: Math.min(after > 0 ? after : DELAY_MS * 2 ** (attempt + 1), MAX_RETRY_WAIT_MS),
+      if (res.status >= 500) {
+        const msg = `RSI responded ${res.status}`;
+        if (++errors > RETRIES) return { error: msg, transient: true };
+        retry = {
+          msg,
+          wait: Math.min(after > 0 ? after : DELAY_MS * 2 ** errors, MAX_RETRY_WAIT_MS),
+          attempt: errors,
+          of: RETRIES,
         };
         continue;
       }
       return { res };
     }
-    return { error: lastError.msg, transient: true };
   }
 
   // Paginated HTML source: fetch ?page=N&pagesize=…, parse, dedupe by id, stop
