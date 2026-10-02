@@ -299,6 +299,17 @@
     return `${m[0]} ${m[1]} on ${os}`.replace('  ', ' ');
   }
 
+  // The error report's "Read:" line: how completely the last hangar scan read RSI's
+  // page (#295, #296). Percentages and counts only.
+  function shapeLine(s) {
+    if (!s || !s.n) return 'no complete hangar scan yet';
+    const pct = (x) => `${Math.round(x * 100)}%`;
+    return (
+      `${pct(s.date)} dates · ${pct(s.value)} values · ${pct(s.contents)} item lists · ${pct(s.image)} pictures` +
+      ` · ${s.untyped} of ${s.tiles} items untyped (${s.guessed} placed by name)`
+    );
+  }
+
   // A copy-paste report for bug posts: version, browser, data counts, cache
   // state and the recent log. Wrapped in a code block so Discord/GitHub keep
   // the columns. Contains counts and dates only — no handle, codes or names.
@@ -325,6 +336,7 @@
       `Browser:   ${browserLabel((globalThis.navigator && globalThis.navigator.userAgent) || '')}`,
       `Hangar:    ${count(src('hangar'))} items, scanned ${ago(src('hangar').scannedAt)}`,
       `Buy-backs: ${count(src('buybacks'))} items, scanned ${ago(src('buybacks').scannedAt)}`,
+      `Read:      ${shapeLine(src('hangar').meta?.shape)}`,
       `History:   ${Array.isArray(db.history) ? db.history.length : 0} snapshots`,
       `Set aside: ${damaged.length ? damaged.map((d) => `${d.what} (${d.problems.slice(0, 3).join('; ')})`).join(', ') : 'nothing'}`,
       `Catalog:   ${Array.isArray(cat.list) ? cat.list.length : 0} ships (v${cat.v || '?'}, ${ago(cat.at)}) · ship matrix ${Array.isArray(mat.list) ? mat.list.length : 0}`,
@@ -1109,43 +1121,67 @@
   }
 
   // Fetch one page, retrying only *transient* failures (network error, 5xx, 429)
-  // with a small, polite backoff. Auth failures and other 4xx return at once.
+  // with a polite backoff. Auth failures and other 4xx return at once.
   // Returns { res } or { error, transient }.
+  // Network errors and 5xx: up to 3 retries, quick exponential backoff.
+  // RSI's "slow down" (429, #298): up to 5 retries, waiting 5 s, 10 s, 15 s, 20 s,
+  // 25 s (or longer when RSI's Retry-After asks, up to 30 s), so a busy RSI gets
+  // real breathing room instead of a scan that fails.
   const RETRIES = 3;
   const MAX_RETRY_WAIT_MS = 15000;
+  const RATE_LIMIT_RETRIES = 5;
+  const RATE_LIMIT_STEP_MS = 5000;
+  const MAX_RATE_LIMIT_WAIT_MS = 30000;
   // opts.retryRateLimit: false = a 429 comes straight back as { rateLimited }, for
   // batches that should stop rather than push on (buy-back details).
   async function fetchPage(url, onRetry, { retryRateLimit = true } = {}) {
-    let lastError = null;
-    for (let attempt = 0; attempt <= RETRIES; attempt++) {
-      if (attempt > 0) {
-        await sleep(lastError.wait);
-        onRetry?.(attempt, RETRIES, lastError.msg);
+    let errors = 0;
+    let slowDowns = 0;
+    let retry = null; // { msg, wait, attempt, of } for the next try
+    for (;;) {
+      if (retry) {
+        // Said before the wait, so a long pause reads as "retrying", not stuck.
+        onRetry?.(retry.attempt, retry.of, retry.msg);
+        await sleep(retry.wait);
       }
       let res;
       try {
         res = await fetch(url, { credentials: 'include', signal: AbortSignal.timeout(30000) });
       } catch (e) {
-        lastError = {
-          msg: `Couldn't reach RSI (${e.message})`,
-          wait: DELAY_MS * 2 ** (attempt + 1),
+        const msg = `Couldn't reach RSI (${e.message})`;
+        if (++errors > RETRIES) return { error: msg, transient: true };
+        retry = { msg, wait: DELAY_MS * 2 ** errors, attempt: errors, of: RETRIES };
+        continue;
+      }
+      const after = Number(res.headers.get('retry-after')) * 1000;
+      if (res.status === 429) {
+        if (!retryRateLimit) return { error: 'RSI asked us to slow down', rateLimited: true };
+        const msg = 'RSI asked us to slow down';
+        if (++slowDowns > RATE_LIMIT_RETRIES) return { error: msg, transient: true };
+        retry = {
+          msg,
+          wait: Math.min(
+            Math.max(after > 0 ? after : 0, RATE_LIMIT_STEP_MS * slowDowns),
+            MAX_RATE_LIMIT_WAIT_MS,
+          ),
+          attempt: slowDowns,
+          of: RATE_LIMIT_RETRIES,
         };
         continue;
       }
-      if (res.status === 429 && !retryRateLimit) {
-        return { error: 'RSI asked us to slow down', rateLimited: true };
-      }
-      if (res.status === 429 || res.status >= 500) {
-        const after = Number(res.headers.get('retry-after')) * 1000;
-        lastError = {
-          msg: `RSI responded ${res.status}`,
-          wait: Math.min(after > 0 ? after : DELAY_MS * 2 ** (attempt + 1), MAX_RETRY_WAIT_MS),
+      if (res.status >= 500) {
+        const msg = `RSI responded ${res.status}`;
+        if (++errors > RETRIES) return { error: msg, transient: true };
+        retry = {
+          msg,
+          wait: Math.min(after > 0 ? after : DELAY_MS * 2 ** errors, MAX_RETRY_WAIT_MS),
+          attempt: errors,
+          of: RETRIES,
         };
         continue;
       }
       return { res };
     }
-    return { error: lastError.msg, transient: true };
   }
 
   // Paginated HTML source: fetch ?page=N&pagesize=…, parse, dedupe by id, stop
@@ -1243,6 +1279,43 @@
     return { items: all, meta };
   }
 
+  // How completely a hangar scan read RSI's page (#295, #296): the share of pledges
+  // with a date, a value, an item list and a picture, and how many contained items
+  // came without a type (and how many of those were placed by name). Kept with the
+  // scan, shown in the error report, and compared scan to scan. Pure, so it's
+  // tested directly.
+  OH.scanShape = function scanShape(items) {
+    const list = Array.isArray(items) ? items : [];
+    const n = list.length;
+    const share = (f) => (n ? Math.round((list.filter(f).length / n) * 100) / 100 : 0);
+    const tiles = list.flatMap((p) => (Array.isArray(p?.contents) ? p.contents : []));
+    return {
+      n,
+      date: share((p) => !!p?.date),
+      value: share((p) => p?.value != null),
+      contents: share((p) => Array.isArray(p?.contents) && p.contents.length > 0),
+      image: share((p) => !!p?.image),
+      tiles: tiles.length,
+      untyped: tiles.filter((c) => !(c?.kind || '').trim() || c?.guessed).length,
+      guessed: tiles.filter((c) => c?.guessed).length,
+    };
+  };
+  const SHAPE_LABELS = {
+    date: 'pledge dates',
+    value: 'values',
+    contents: 'item lists',
+    image: 'pictures',
+  };
+  // What a scan suddenly stopped reading (#295): a field most pledges had last time
+  // and none have now usually means RSI moved things around on the hangar page.
+  // Only for hangars big enough to tell (5+ pledges).
+  OH.shapeDrops = function shapeDrops(prev, next) {
+    if (!prev || !next || next.n < 5) return [];
+    return Object.keys(SHAPE_LABELS)
+      .filter((k) => prev[k] >= 0.5 && next[k] === 0)
+      .map((k) => ({ field: k, label: SHAPE_LABELS[k], was: prev[k] }));
+  };
+
   // Scan one source by id and persist it. Returns { ok, items?, scannedAt?, error? }.
   // opts.account: the account already fetched for this scan (see saveSource).
   OH.scanSource = async function scanSource(sourceId, onProgress, { account } = {}) {
@@ -1292,11 +1365,32 @@
         };
       }
 
+      // A complete hangar scan records how completely it read the page, and warns
+      // when that suddenly drops (#295) or when RSI left types off (#296).
+      let meta = result.meta;
+      if (src.id === 'hangar') {
+        const shape = OH.scanShape(result.items);
+        const prev = await OH.loadSource(src.id);
+        for (const d of OH.shapeDrops(prev.meta?.shape, shape))
+          OH.log(
+            'warn',
+            src.id,
+            `read no ${d.label} this time (${Math.round(d.was * 100)}% last scan): RSI may have changed the hangar page`,
+          );
+        if (shape.untyped)
+          OH.log(
+            'info',
+            src.id,
+            `${shape.untyped} of ${shape.tiles} items came without a type from RSI, ${shape.guessed} placed by name`,
+          );
+        meta = { ...(meta || {}), shape };
+      }
+
       // Only complete hangar scans go into the history (a partial one would read
       // as pledges disappearing).
       const scannedAt = await saveSource(src.id, result.items, {
         record: src.id === 'hangar',
-        meta: result.meta,
+        meta,
         account,
       });
       OH.log('info', src.id, `scan ok, ${result.items.length} items`);

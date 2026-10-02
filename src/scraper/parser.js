@@ -133,9 +133,34 @@
     return label || null; // unrecognized phrasing — surface RSI's text verbatim
   };
 
+  // RSI leaves the type off some contained items (#296; other tools see about 1 in
+  // 6). When it's missing, read it from the item's own name where that's safe:
+  // insurance and paints say so, and the ship in a "Standalone Ships - …" pledge
+  // is the item the pledge is named after. Anything else stays untyped ('').
+  const SHIP_STORE_RE = /^(standalone\s+ships?|ships?|warbonds?)$/i;
+  ns.inferKind = function inferKind(label, pledgeName) {
+    const l = String(label || '').trim();
+    if (!l) return '';
+    if (/\binsurance\b/i.test(l)) return 'Insurance';
+    if (PAINT_NAME_RE.test(l)) return 'Paint';
+    const n = String(pledgeName || '');
+    if (
+      SHIP_STORE_RE.test(ns.buybackCategoryPrefix(n)) &&
+      n.toLowerCase().includes(l.toLowerCase())
+    )
+      return 'Ship';
+    return '';
+  };
+
   ns.normalizePledge = function normalizePledge(raw) {
     const name = (raw.name ?? '').trim();
-    const contents = Array.isArray(raw.contents) ? raw.contents : [];
+    // Untyped items get a type from their name when it's safe (see inferKind),
+    // marked `guessed` so it's never mistaken for what RSI said.
+    const contents = (Array.isArray(raw.contents) ? raw.contents : []).map((c) => {
+      if (!c || (c.kind || '').trim()) return c;
+      const kind = ns.inferKind(c.label, name);
+      return kind ? { ...c, kind, guessed: true } : c;
+    });
     const containsShip = contents.some((c) => (c.kind || '').trim().toLowerCase() === 'ship');
 
     const ccu = ns.detectCCU(name);
