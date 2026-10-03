@@ -2708,6 +2708,31 @@
   // (the type chip says it), and Warbond / Standard Edition (a warbond and a standard
   // buy-back cost the same to reclaim). For CCUs, run it on each ship name. The full
   // RSI name stays in tooltips, the details window and exports. Pure.
+  // Retired ships (#306): RSI retired the Aurora Mk I (Sep 30, 2026) and the Hornet
+  // Mk I (2024). Buy-backs of the ships themselves, packs holding them and upgrades
+  // to or from them can't be reclaimed any more; their paints still can. Old pledges
+  // use the old names ("Aurora MR", "F7C Hornet"), so any Aurora that isn't a Mk II
+  // and any Hornet that isn't a Mk II counts. Returns a short note, or null. Pure.
+  const RETIRED_SHIPS = [
+    {
+      re: /\baurora\b(?!\s*mk\s*ii\b)/i,
+      note: 'RSI retired the Aurora Mk I on Sep 30, 2026, so it can no longer be bought back.',
+    },
+    {
+      re: /\b(f7c[a-z-]*|hornet)\b(?![^,;|]*\bmk\s*ii\b)/i,
+      note: 'RSI retired the Hornet Mk I, so it can no longer be bought back.',
+    },
+  ];
+  OH.retiredBuyback = function retiredBuyback(b) {
+    if (!b || b.kind === 'paint') return null;
+    const names = [b.name, b.ccu && b.ccu.from, b.ccu && b.ccu.to, b.contains]
+      .filter(Boolean)
+      .join(' | ');
+    if (/\b(paint|livery|skin)\b/i.test(String(b.name || '')) && !b.ccu) return null;
+    for (const r of RETIRED_SHIPS) if (r.re.test(names)) return r.note;
+    return null;
+  };
+
   OH.shortBuybackName = function shortBuybackName(name) {
     const full = String(name || '').trim();
     const short = full

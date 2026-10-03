@@ -5556,6 +5556,9 @@ function buybackViewUrl(b) {
 // have no page of their own; RSI reclaims them in a pop-up) the one-item
 // buy-back list entry where that button is.
 function buybackReclaimLink(b) {
+  // Retired ships (#306) can't be reclaimed: say so instead of a dead link.
+  const retired = OH.retiredBuyback(b);
+  if (retired) return `<span class="bb-retired" title="${OH.escapeHtml(retired)}">Retired</span>`;
   const direct = buybackUrl(b);
   const url = direct || buybackViewUrl(b);
   if (!url) return '';
