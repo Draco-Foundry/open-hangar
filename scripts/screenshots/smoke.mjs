@@ -778,7 +778,8 @@ try {
     rows: document.querySelectorAll('#buybacks-body .market-table tbody tr').length,
     cards: window.state ? null : null,
     reclaim: [...document.querySelectorAll('#buybacks-body .market-table tbody tr')].every((r) =>
-      /Reclaim/.test(r.textContent),
+      // Retired ships (#306) show a Retired label instead of the link.
+      /Reclaim|Retired/.test(r.textContent),
     ),
     ins: !!document.querySelector('#buybacks-body .market-table .mk-ins'),
   }));
