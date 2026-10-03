@@ -8,6 +8,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   last scan, Open Hangar spots it from your first and last hangar pages and skips the
   rest: "hangar's exactly how you left it." Anything new, melted, gifted or upgraded
   away means a full scan as usual, and it reads everything again at least once a day.
+- New: **full-size pictures.** Click the picture in any detail window (Inventory,
+  Buy-Backs or a ship) to see it big, at the original size RSI keeps on file. The big
+  copy only loads when you open it, one at a time, so lists stay quick. Escape or the
+  close button takes you back.
 - Improved: **retired ships say so on Buy-Backs.** RSI retired the Aurora Mk I and the
   Hornet Mk I, so their ships, the packs that hold them and upgrades to or from them can't
   be reclaimed any more. Those now show a Retired label instead of a Reclaim link. Their
