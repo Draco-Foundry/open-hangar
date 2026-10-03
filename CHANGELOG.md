@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.2.16 — 2026-10-02
+
 - Improved: **scans ride out a busy RSI.** When RSI asks us to slow down, Open Hangar now
   waits a little longer each time (up to five tries) instead of giving up, and tells you
   it's retrying while it waits.
