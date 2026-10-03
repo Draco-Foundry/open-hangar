@@ -4,6 +4,12 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Improved: **retired ships say so on Buy-Backs.** RSI retired the Aurora Mk I and the
+  Hornet Mk I, so their ships, the packs that hold them and upgrades to or from them can't
+  be reclaimed any more. Those now show a Retired label instead of a Reclaim link. Their
+  paints keep the link, since RSI still lets you buy those back. (Also: the About page
+  now thanks the Star Citizen Wiki for its ship data.)
+
 ## 0.2.16 — 2026-10-02
 
 - Improved: **scans ride out a busy RSI.** When RSI asks us to slow down, Open Hangar now
