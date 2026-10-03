@@ -2369,6 +2369,36 @@
     return out;
   }
 
+  // The original, full-size copy of a picture we show as a thumbnail (#299), or null
+  // when there's no bigger one to ask for (unknown host, or already the original).
+  // RSI keeps every upload under named sizes in the same file type, in two URL shapes:
+  //   media.robertsspaceindustries.com/<id>/<size>.<ext>
+  //   robertsspaceindustries.com/media/<id>/<size>/<file>
+  // and the original is the "source" size. Wiki (MediaWiki) thumbnails live at
+  //   …/thumb/<path>/<file>/<N>px-<file>, the original at …/<path>/<file>.
+  // Only ever fetched when someone asks for the full-size view.
+  OH.fullSizeImage = function fullSizeImage(url) {
+    if (typeof url !== 'string' || !/^https:\/\//.test(url)) return null;
+    const ORIGINAL = /^(source|wallpaper_\d+x\d+)$/;
+    const dir = url.match(
+      /^(https:\/\/robertsspaceindustries\.com\/media\/[^/]+\/)([^/]+)(\/[^/?#]+)(\?[^#]*)?$/,
+    );
+    if (dir) {
+      const [, base, size, file, query = ''] = dir;
+      return ORIGINAL.test(size) ? null : `${base}source${file}${query}`;
+    }
+    const flat = url.match(
+      /^(https:\/\/media\.robertsspaceindustries\.com\/[^/]+\/)([^/.?#]+)\.(\w+)(\?[^#]*)?$/,
+    );
+    if (flat) {
+      const [, base, size, ext, query = ''] = flat;
+      return ORIGINAL.test(size) ? null : `${base}source.${ext}${query}`;
+    }
+    const wiki = url.match(/^(https:\/\/[^/]+\/(?:[^?#]*\/)?)thumb\/([^?#]+)\/\d+px-[^/?#]+$/);
+    if (wiki) return `${wiki[1]}${wiki[2]}`;
+    return null;
+  };
+
   // Fetch a single vehicle's store image by slug (exact, reliable). ~600px webp.
   async function fetchVehicleImage(slug) {
     try {
