@@ -19,14 +19,20 @@ export default defineConfig({
     // Fonts ship as files next to the bundle, never inlined or fetched remotely.
     assetsInlineLimit: 0,
     modulePreload: false,
+    // One bundle per page (0.3.0 rebuild): ui/<page>/main.js → src/ui/<page>.js and
+    // <page>.css. Add a page here as it moves from dashboard.js to Svelte.
     rollupOptions: {
-      input: 'ui/home/main.js',
+      input: {
+        home: 'ui/home/main.js',
+      },
       output: {
         format: 'es',
-        entryFileNames: 'home.js',
+        entryFileNames: '[name].js',
+        // Code two pages share (Svelte's runtime, ui/lib) goes in one shared file.
+        chunkFileNames: '[name].js',
         assetFileNames: (a) =>
           (a.names || [a.name || '']).some((n) => /\.css$/.test(n))
-            ? 'home.css'
+            ? '[name][extname]'
             : 'fonts/[name][extname]',
       },
     },
