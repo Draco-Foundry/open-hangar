@@ -6181,10 +6181,23 @@ function fillModalArt(real, resolve, preferShip) {
   const show = (url) => {
     const slot = modalBody.querySelector('.modal-img');
     if (!url || !slot) return;
+    const name = modalBody.querySelector('.modal-name')?.textContent.trim() || '';
+    // The picture is a button: click (or Enter) opens it full size (#299).
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'modal-img-btn';
+    btn.title = 'View Full Size';
+    btn.setAttribute('aria-label', name ? `View Full Size: ${name}` : 'View Full Size');
     const im = document.createElement('img');
     im.className = 'modal-img';
-    im.alt = '';
-    slot.replaceWith(im);
+    im.alt = name;
+    const hint = document.createElement('span');
+    hint.className = 'modal-img-hint';
+    hint.setAttribute('aria-hidden', 'true');
+    hint.textContent = 'Full Size';
+    btn.append(im, hint);
+    btn.addEventListener('click', () => openLightbox(im.currentSrc || im.src, url, name, btn));
+    slot.replaceWith(btn);
     progressiveImage(im, url);
   };
   if (!resolve || (real && !preferShip)) return show(real);
@@ -6251,6 +6264,7 @@ function showItemModal() {
   modalClose.focus({ preventScroll: true });
 }
 function closeItemModal() {
+  closeLightbox();
   itemModal.hidden = true;
   setHTML(modalBody, '');
   let back = modalOpener;
@@ -6261,6 +6275,68 @@ function closeItemModal() {
     back = [...document.querySelectorAll('.card[data-id]')].find((c) => c.dataset.id === id);
   }
   if (back && back.isConnected && back !== document.body) back.focus({ preventScroll: true });
+}
+
+// Full-size picture viewer (#299), on top of the detail pop-up. Shows the sharp copy
+// already on screen at once, then fetches RSI's original ("source", or the wiki's
+// original) only now, one picture, because someone asked for it. Escape or the close
+// button closes it and focus goes back to the picture that opened it.
+const lightbox = $('#lightbox');
+const lightboxImg = $('#lightbox-img');
+const lightboxClose = $('#lightbox-close');
+const lightboxStatus = $('#lightbox-status');
+let lightboxOpener = null;
+let lightboxFor = 0; // bumps on every open, so a slow load can't land on the next picture
+function openLightbox(shown, thumb, name, opener) {
+  if (!lightbox) return;
+  const ticket = ++lightboxFor;
+  lightboxOpener = opener || document.activeElement;
+  lightboxImg.alt = name || 'Ship picture';
+  lightboxImg.src = shown;
+  lightbox.setAttribute('aria-label', name ? `${name}, Full Size` : 'Full Size Picture');
+  const full = OH.fullSizeImage(thumb);
+  lightboxStatus.hidden = !full;
+  lightboxStatus.textContent = full ? 'Zooming in for the full-res shot…' : '';
+  lightbox.hidden = false;
+  lightboxClose.focus({ preventScroll: true });
+  if (!full) return;
+  loadImage(full).then((ok) => {
+    if (ticket !== lightboxFor || lightbox.hidden) return;
+    if (ok) lightboxImg.src = full;
+    lightboxStatus.hidden = true;
+  });
+}
+function closeLightbox() {
+  if (!lightbox || lightbox.hidden) return;
+  lightboxFor++;
+  lightbox.hidden = true;
+  lightboxImg.removeAttribute('src');
+  const back = lightboxOpener;
+  lightboxOpener = null;
+  if (back && back.isConnected) back.focus({ preventScroll: true });
+}
+if (lightbox) {
+  lightboxClose.addEventListener('click', closeLightbox);
+  lightbox.addEventListener('click', (e) => {
+    if (e.target === lightbox || e.target === lightboxImg) closeLightbox();
+  });
+  // Capture phase, so the detail pop-up under it doesn't also close on Escape.
+  document.addEventListener(
+    'keydown',
+    (e) => {
+      if (lightbox.hidden) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        closeLightbox();
+      } else if (e.key === 'Tab') {
+        e.preventDefault(); // the close button is the only stop
+        e.stopImmediatePropagation();
+        lightboxClose.focus({ preventScroll: true });
+      }
+    },
+    true,
+  );
 }
 
 // Buy-back detail modal (reuses the inventory modal shell).

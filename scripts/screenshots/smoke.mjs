@@ -1425,6 +1425,32 @@ try {
   (await modalOpen())
     ? ok('Space opens the card and the pop-up stays open')
     : fail('Space did not open (or instantly closed) the pop-up');
+  // Full-size picture (#299): the pop-up's picture opens the viewer, Escape closes
+  // only the viewer and focus goes back to the picture.
+  const picBtn = await page.waitForSelector('#modal-body .modal-img-btn', { timeout: 10000 });
+  await picBtn.focus();
+  await page.keyboard.press('Enter');
+  const lb = () =>
+    page.evaluate(() => ({
+      open: !document.getElementById('lightbox').hidden,
+      onClose: document.activeElement.id === 'lightbox-close',
+      onPic: document.activeElement.classList.contains('modal-img-btn'),
+      alt: document.getElementById('lightbox-img').alt,
+    }));
+  const lbOpen = await lb();
+  await page.keyboard.press('Tab');
+  const lbTrapped = (await lb()).onClose;
+  await page.keyboard.press('Escape');
+  const lbBack = { ...(await lb()), modal: await modalOpen() };
+  lbOpen.open &&
+  lbOpen.onClose &&
+  lbOpen.alt &&
+  lbTrapped &&
+  !lbBack.open &&
+  lbBack.modal &&
+  lbBack.onPic
+    ? ok('picture opens full size, Escape closes just the viewer and returns to the picture')
+    : fail(`full-size viewer: ${JSON.stringify({ lbOpen, lbTrapped, lbBack })}`);
   await page.keyboard.press('Escape');
   await page.focus('#chips .chip[data-key]');
   const chip = await active();
