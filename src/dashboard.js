@@ -4336,7 +4336,7 @@ function rewardLadderHtml(ladder, recruits, title, note) {
       const isUnlocked = recruits >= t.at;
       const isNext = next && t.at === next.at;
       const cls = isUnlocked ? 'reward-unlocked' : isNext ? 'reward-next' : 'reward-locked';
-      const mark = isUnlocked ? '✓' : isNext ? '◷' : '🔒';
+      const mark = isUnlocked ? '✓' : isNext ? '◷' : '○';
       const need = isNext
         ? ` <span class="reward-togo">${(t.at - recruits).toLocaleString('en-US')} to go</span>`
         : '';
@@ -4351,7 +4351,7 @@ function rewardLadderHtml(ladder, recruits, title, note) {
   const nextItems = next ? rewardItemsHtml(next.items) : '';
   const nextLine = next
     ? `Next: ${nextItems} at ${next.at.toLocaleString('en-US')} (${(next.at - recruits).toLocaleString('en-US')} more)`
-    : 'All tiers unlocked 🎉';
+    : 'All tiers unlocked';
   return `<div class="reward-ladder">
     <h4>${OH.escapeHtml(title)} <span class="reward-progress">${unlocked}/${ladder.length} unlocked</span></h4>
     ${note ? `<p class="muted reward-note">${note}</p>` : ''}
@@ -4583,10 +4583,10 @@ function refHeroHtml(ref, recruits, projection, hasLegacy) {
           ? ` <span class="muted">· at your pace ${OH.escapeHtml(projection)}</span>`
           : ''
       }`
-    : 'Every standard reward unlocked 🎉';
+    : 'Every standard reward unlocked';
   const running = runningEvent();
   const eventPill = running
-    ? `<div class="ref-hero-event">🎁 Bonus event on now: <strong>${OH.escapeHtml(running.name)}</strong>, until ${OH.escapeHtml(
+    ? `<div class="ref-hero-event">Bonus event on now: <strong>${OH.escapeHtml(running.name)}</strong>, until ${OH.escapeHtml(
         fmtDate(parseTs(running.end + ' 00:00:00')),
       )}</div>`
     : '';
@@ -4808,7 +4808,7 @@ function runningEvent() {
 function eventBannerHtml() {
   const running = runningEvent();
   if (running) {
-    return `<div class="ref-event-banner live">🎁 <strong>${OH.escapeHtml(running.name)}</strong> is on until ${OH.escapeHtml(
+    return `<div class="ref-event-banner live"><strong>${OH.escapeHtml(running.name)}</strong> is on until ${OH.escapeHtml(
       fmtDate(parseTs(running.end + ' 00:00:00')),
     )}. Anyone who enlists with your code and buys a game package gets you: <strong>${OH.escapeHtml(running.reward)}</strong>.</div>`;
   }
