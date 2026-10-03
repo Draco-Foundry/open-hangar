@@ -31,6 +31,10 @@
   const PAGE_SIZE = 10;
   const DELAY_MS = 400; // politeness throttle between pages
   const MAX_PAGES = 1000; // safety cap: 10,000 pledges at RSI's 10 per page
+  // Skipping an unchanged hangar (#294): only within a day of the last full scan,
+  // and only when the probe (3 pages at most) saves real work.
+  const PROBE_MAX_AGE_MS = 24 * 3600e3;
+  const PROBE_MIN_PAGES = 3;
   const DB_KEY = 'db';
   const HISTORY_KEY = 'dbHistory';
   const CORRUPT_KEY = 'dbCorrupt';
@@ -107,6 +111,8 @@
       // If this marker is present in a signed-in page but parsing yields nothing,
       // RSI changed their markup (vs. a genuinely empty hangar). See scanHtmlSource.
       marker: /js-pledge-id/,
+      // Rescans first check whether anything changed (#294). See unchangedSince.
+      probe: true,
       parse: (html) => window.OpenHangar.parsePledges(html),
     },
     {
@@ -1188,13 +1194,18 @@
   // when a page yields no NEW ids (RSI clamps out-of-range pages to the last).
   // onProgress(page, count, retry?) — retry = { attempt, of } while retrying.
   // If RSI keeps failing mid-scan, returns what was gathered as { items, partial }.
-  async function scanHtmlSource(src, onProgress) {
+  // `prev`: the saved scan, for sources that probe for changes first (#294). When
+  // it's still current, returns { unchanged: true } after a few requests.
+  // A complete result says `aligned` when every page brought only new items, so
+  // item k sits on page floor(k / size) + 1 (what a later probe relies on).
+  async function scanHtmlSource(src, onProgress, prev) {
     const seen = new Set();
     const all = [];
     const size = src.pageSize || PAGE_SIZE;
     let meta;
     let lastPage = 0;
     let lastAdded = 0;
+    let aligned = true;
 
     for (let page = 1; page <= MAX_PAGES; page++) {
       const url = `${src.url}?page=${page}&pagesize=${size}`;
@@ -1253,11 +1264,11 @@
       if (!items.length) break;
 
       let added = 0;
-      items.forEach((it, i) => {
-        // Rows without an id (e.g. a buy-back with no reclaim button) get one
-        // from their position, so identical copies stay separate.
-        if (it.id == null || it.id === '') it.id = `${src.id}-p${page}-${i}`;
-      });
+      fillIds(src, items, page);
+      if (page === 1 && prev && (await unchangedSince(src, prev, items, size))) {
+        onProgress?.(page, prev.items.length);
+        return { unchanged: true };
+      }
       for (const it of items) {
         const key = it.id;
         if (seen.has(key)) continue;
@@ -1269,6 +1280,7 @@
       lastPage = page;
       lastAdded = added;
       if (added === 0) break;
+      if (added !== items.length) aligned = false;
       await sleep(DELAY_MS);
     }
     // Still finding new items on the last allowed page: the list goes on, so
@@ -1276,7 +1288,58 @@
     if (lastPage === MAX_PAGES && lastAdded > 0) {
       return { items: all, meta, partial: { page: MAX_PAGES + 1, reason: 'page limit reached' } };
     }
-    return { items: all, meta };
+    return { items: all, meta, aligned };
+  }
+
+  // Rows without an id (e.g. a buy-back with no reclaim button) get one from
+  // their position, so identical copies stay separate.
+  function fillIds(src, items, page) {
+    items.forEach((it, i) => {
+      if (it.id == null || it.id === '') it.id = `${src.id}-p${page}-${i}`;
+    });
+    return items;
+  }
+
+  const appVersion = () => chrome.runtime?.getManifest?.().version || null;
+
+  // Is the saved scan still what RSI shows (#294)? RSI lists pledges in a fixed
+  // order, so anything bought, melted, gifted, reclaimed or upgraded away shifts
+  // the first page or the last one. Same page 1 (already read by the caller),
+  // same last page and, when that one is full, nothing after it: the hangar is
+  // exactly as saved. Trusted only within a day of a complete scan by this same
+  // version (so a parser fix or a change deep in the middle still gets read);
+  // anything off, or any hiccup, means a normal full scan. At most 2 requests.
+  async function unchangedSince(src, prev, first, size) {
+    try {
+      const probe = prev.meta?.probe;
+      const saved = Array.isArray(prev.items) ? prev.items : [];
+      const last = Math.ceil(saved.length / size);
+      const age = Date.now() - (probe?.at || 0);
+      if (
+        !probe ||
+        probe.n !== saved.length ||
+        probe.v !== appVersion() ||
+        !(age >= 0 && age < PROBE_MAX_AGE_MS) ||
+        last < PROBE_MIN_PAGES
+      )
+        return false;
+      const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+      if (!same(first, saved.slice(0, size))) return false;
+      const read = async (page) => {
+        await sleep(DELAY_MS);
+        const got = await fetchPage(`${src.url}?page=${page}&pagesize=${size}`);
+        if (got.error || !got.res.ok) return null;
+        return fillIds(src, src.parse(await got.res.text()), page);
+      };
+      const tail = saved.slice((last - 1) * size);
+      if (!same(await read(last), tail)) return false;
+      if (tail.length < size) return true; // a short last page is the end
+      // A full last page: the page after it must be RSI clamping back to it.
+      const after = await read(last + 1);
+      return !!after && (!after.length || same(after, tail));
+    } catch {
+      return false;
+    }
   }
 
   // How completely a hangar scan read RSI's page (#295, #296): the share of pledges
@@ -1331,12 +1394,26 @@
     }
     try {
       let result;
-      if (src.type === 'html') result = await scanHtmlSource(src, onProgress);
+      const saved = src.probe ? await OH.loadSource(src.id) : null;
+      if (src.type === 'html') result = await scanHtmlSource(src, onProgress, saved);
       else return { ok: false, error: `Source type '${src.type}' is not implemented yet.` };
 
       if (result.error) {
         OH.log('error', src.id, result.error);
         return { ok: false, error: result.error };
+      }
+
+      // Nothing changed since the last full scan (#294): keep the saved items and
+      // their probe (so the next full read is still due a day after the last one),
+      // and stamp the check in the history like any unchanged scan.
+      if (result.unchanged) {
+        const scannedAt = await saveSource(src.id, saved.items, {
+          record: src.id === 'hangar',
+          meta: saved.meta,
+          account,
+        });
+        OH.log('info', src.id, `unchanged since the last scan, ${saved.items.length} items kept`);
+        return { ok: true, items: saved.items, scannedAt, unchanged: true };
       }
 
       // A scan cut short by RSI never *shrinks* your data: if an earlier scan
@@ -1384,6 +1461,13 @@
             `${shape.untyped} of ${shape.tiles} items came without a type from RSI, ${shape.guessed} placed by name`,
           );
         meta = { ...(meta || {}), shape };
+      }
+      // What the next scan checks against to skip an unchanged hangar (#294).
+      if (src.probe && result.aligned) {
+        meta = {
+          ...(meta || {}),
+          probe: { at: Date.now(), n: result.items.length, v: appVersion() },
+        };
       }
 
       // Only complete hangar scans go into the history (a partial one would read

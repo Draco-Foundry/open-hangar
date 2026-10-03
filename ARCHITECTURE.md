@@ -63,6 +63,13 @@ Scanning runs in the dashboard page itself. `dashboard.html` loads, in order,
    Items are de-duplicated by id, and the loop stops when a page adds no new ids (RSI
    returns the last page again for out-of-range page numbers). `MAX_PAGES` (1000) is a
    safety cap.
+   **Skipping an unchanged hangar.** Sources with `probe: true` (the hangar) check page 1
+   against the saved scan first. If it matches, `unchangedSince()` reads only the last
+   page (and, when that one is full, the page after it, which RSI should clamp back) and
+   compares them too. All equal means nothing was added, removed or moved, so the saved
+   items are kept and the rest of the pages aren't fetched. It's only trusted within a
+   day of a complete scan by the same version (`meta.probe`), for hangars of 3+ pages;
+   anything off or any hiccup means the normal full scan.
 5. **Tell empty from broken.** On page 1 with no items, `scanHtmlSource` checks, in
    order: signed out (`looksLoggedOut()`), a genuinely empty list (`emptyMarker`), data
    markers present but nothing parsed, meaning RSI changed their markup (`marker`), or
