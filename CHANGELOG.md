@@ -4,6 +4,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Improved: **rescans of a quiet hangar are way faster.** If nothing changed since your
+  last scan, Open Hangar spots it from your first and last hangar pages and skips the
+  rest: "hangar's exactly how you left it." Anything new, melted, gifted or upgraded
+  away means a full scan as usual, and it reads everything again at least once a day.
 - Improved: **retired ships say so on Buy-Backs.** RSI retired the Aurora Mk I and the
   Hornet Mk I, so their ships, the packs that hold them and upgrades to or from them can't
   be reclaimed any more. Those now show a Retired label instead of a Reclaim link. Their

@@ -227,3 +227,132 @@ test('a hangar scan keeps its shape and warns when RSI stops giving dates (#295)
   const log = await OH.getLog();
   assert.ok(log.some((l) => /read no pledge dates/.test(l.msg || l.message || JSON.stringify(l))));
 });
+
+// --- Skipping an unchanged hangar (#294) -----------------------------------
+// A hangar served from a list, 10 per page, clamping past the end like RSI does.
+const pledges = (n, from = 0) =>
+  Array.from({ length: n }, (_, i) => ({ id: `h${from + i}`, name: `Pledge ${from + i}` }));
+const serve = (list) => (page) => {
+  const last = Math.max(1, Math.ceil(list.length / 10));
+  const p = Math.min(page, last);
+  return { body: JSON.stringify(list.slice((p - 1) * 10, p * 10)) };
+};
+// A first full scan, then a fresh request count for the rescan.
+async function scannedOnce(list) {
+  await reset();
+  script = serve(list);
+  const first = await OH.scanSource('hangar');
+  assert.equal(first.ok, true);
+  calls = {};
+}
+
+test('an unchanged hangar is checked with 3 requests, not every page (#294)', async () => {
+  const list = pledges(50);
+  await scannedOnce(list);
+  assert.equal(store.db.sources.hangar.meta.probe.n, 50);
+  const snaps = store.dbHistory.length;
+  const r = await OH.scanSource('hangar');
+  assert.equal(r.ok, true);
+  assert.equal(r.unchanged, true);
+  assert.deepEqual(r.items, list);
+  assert.deepEqual(calls, { 1: 1, 5: 1, 6: 1 }); // first, last, and RSI clamping after it
+  assert.equal(store.dbHistory.length, snaps); // same snapshot, just re-checked
+  assert.ok(store.dbHistory.at(-1).checkedAt);
+});
+
+test('a short last page needs no clamp check (#294)', async () => {
+  await scannedOnce(pledges(45));
+  const r = await OH.scanSource('hangar');
+  assert.equal(r.unchanged, true);
+  assert.deepEqual(calls, { 1: 1, 5: 1 });
+});
+
+test('a new pledge on top means a full scan (#294)', async () => {
+  const list = pledges(50);
+  await scannedOnce(list);
+  script = serve([{ id: 'new', name: 'Fresh Pledge' }, ...list]);
+  const r = await OH.scanSource('hangar');
+  assert.equal(r.unchanged, undefined);
+  assert.equal(r.items.length, 51);
+  assert.equal(calls[2], 1);
+});
+
+test('a pledge melted deep in the hangar means a full scan (#294)', async () => {
+  const list = pledges(50);
+  await scannedOnce(list);
+  script = serve(list.filter((p) => p.id !== 'h23'));
+  const r = await OH.scanSource('hangar');
+  assert.equal(r.unchanged, undefined);
+  assert.equal(r.items.length, 49);
+  assert.ok(!r.items.some((p) => p.id === 'h23'));
+});
+
+test('a pledge added after a full last page means a full scan (#294)', async () => {
+  const list = pledges(50);
+  await scannedOnce(list);
+  script = serve([...list, { id: 'old', name: 'Reclaimed Oldie' }]);
+  const r = await OH.scanSource('hangar');
+  assert.equal(r.unchanged, undefined);
+  assert.equal(r.items.length, 51);
+});
+
+test('a changed pledge on the last page means a full scan (#294)', async () => {
+  const list = pledges(45);
+  await scannedOnce(list);
+  script = serve(list.map((p) => (p.id === 'h44' ? { ...p, name: 'Upgraded' } : p)));
+  const r = await OH.scanSource('hangar');
+  assert.equal(r.unchanged, undefined);
+  assert.equal(r.items.at(-1).name, 'Upgraded');
+});
+
+test('a day after the last full scan, the hangar is read in full again (#294)', async () => {
+  await scannedOnce(pledges(50));
+  store.db.sources.hangar.meta.probe.at -= 25 * 3600e3;
+  const r = await OH.scanSource('hangar');
+  assert.equal(r.unchanged, undefined);
+  assert.equal(calls[2], 1);
+  // That full scan starts a fresh day: the next rescan can skip again.
+  calls = {};
+  assert.equal((await OH.scanSource('hangar')).unchanged, true);
+});
+
+test('saved data the probe does not vouch for gets a full scan (#294)', async () => {
+  // Made by another version (maybe an older parser).
+  await scannedOnce(pledges(50));
+  store.db.sources.hangar.meta.probe.v = '0.0.1';
+  assert.equal((await OH.scanSource('hangar')).unchanged, undefined);
+  // Saved items swapped out (say, a backup restored) since that scan.
+  await scannedOnce(pledges(50));
+  store.db.sources.hangar.items[3].name = 'Edited';
+  assert.equal((await OH.scanSource('hangar')).unchanged, undefined);
+  // An earlier version's scan, with no probe at all.
+  await scannedOnce(pledges(50));
+  delete store.db.sources.hangar.meta.probe;
+  assert.equal((await OH.scanSource('hangar')).unchanged, undefined);
+});
+
+test('small hangars always get the full scan, it is just as quick (#294)', async () => {
+  await scannedOnce(pledges(20));
+  const r = await OH.scanSource('hangar');
+  assert.equal(r.unchanged, undefined);
+  assert.equal(calls[2], 1);
+});
+
+test('a hiccup while checking falls back to the full scan (#294)', async () => {
+  const list = pledges(50);
+  await scannedOnce(list);
+  script = (page, n) => (page === 5 && n === 1 ? { status: 403 } : serve(list)(page));
+  const r = await OH.scanSource('hangar');
+  assert.equal(r.ok, true);
+  assert.equal(r.unchanged, undefined);
+  assert.equal(r.items.length, 50);
+});
+
+test('a partial scan leaves nothing for the next one to skip on (#294)', async () => {
+  const list = pledges(50);
+  await reset();
+  script = (page) => (page === 4 ? { status: 502 } : serve(list)(page));
+  const r = await OH.scanSource('hangar');
+  assert.ok(r.partial);
+  assert.equal(store.db.sources.hangar.meta?.probe, undefined);
+});

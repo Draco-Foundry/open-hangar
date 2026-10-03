@@ -6594,13 +6594,20 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
       state.items = h.items;
       state.scannedAt = h.scannedAt;
       state.history = await OH.getHistory();
-      state.selected.clear();
-      state.shown = new Set(); // default: no filter selected = show all
-      state.traits = new Map();
+      // Same hangar as before (#294): your selection and filters still fit, keep them.
+      if (!h.unchanged) {
+        state.selected.clear();
+        state.shown = new Set(); // default: no filter selected = show all
+        state.traits = new Map();
+      }
       if (account?.loggedIn && account.nickname) {
         state.owner = { nickname: account.nickname, displayname: account.displayname || null };
       }
-      parts.push(`${h.items.length} pledges${h.partial ? ` (partial: ${h.partial})` : ''}`);
+      parts.push(
+        h.unchanged
+          ? `${h.items.length} pledges (hangar's exactly how you left it)`
+          : `${h.items.length} pledges${h.partial ? ` (partial: ${h.partial})` : ''}`,
+      );
       if (h.partial) anyErr = true;
     } else {
       parts.push(`hangar: ${h.error}`);
