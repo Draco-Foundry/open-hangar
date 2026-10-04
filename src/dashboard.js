@@ -1196,45 +1196,6 @@ function renderFooter() {
     `${gh} · ${dc} · ${ideas} · Source Available · <span id="versions"></span>`,
   );
   renderVersions();
-  const dev = $('#dev-links');
-  if (dev)
-    setHTML(
-      dev,
-      link(REPO_URL, 'GitHub') +
-        link(DISCORD_URL, 'Discord') +
-        link(IDEAS_URL, 'Suggest a Feature') +
-        link(KOFI_URL, 'Tip on Ko-fi') +
-        link(PATREON_URL, 'Support on Patreon'),
-    );
-}
-
-// Developers page "Thanks & supporters": render contributor / booster chips,
-// or a friendly placeholder while the lists (and Discord) aren't set up yet.
-function renderSupporters() {
-  const chip = (s, cls = '') => {
-    const label = OH.escapeHtml(s.name);
-    return s.url
-      ? `<a class="sup-chip ${cls}" href="${s.url}" target="_blank" rel="noopener">${label}</a>`
-      : `<span class="sup-chip ${cls}">${label}</span>`;
-  };
-  const c = $('#sup-contributors');
-  if (c) {
-    setHTML(
-      c,
-      CONTRIBUTORS.length
-        ? CONTRIBUTORS.map((s) => chip(s)).join('')
-        : `<span class="muted">Empty crew roster. Be the first: ${link(REPO_URL, 'contributions welcome')}.</span>`,
-    );
-  }
-  const b = $('#sup-boosters');
-  if (b) {
-    setHTML(
-      b,
-      BOOSTERS.length
-        ? BOOSTERS.map((s) => chip(s, 'booster')).join('')
-        : `<span class="muted">Boosters get their names up in lights here. ${link(DISCORD_URL, 'Join the Discord')}.</span>`,
-    );
-  }
 }
 
 // --- Inventory (fleet gallery) -------------------------------------------
@@ -5013,58 +4974,35 @@ clearBtn.addEventListener('click', async () => {
 });
 
 // --- Developers: export / import -----------------------------------------
-const exportBtn = $('#export-db');
-const importBtn = $('#import-db');
-const importFile = $('#import-file');
-const restoreBtn = $('#restore-db');
-const dataMsg = $('#data-msg');
+// The page is Svelte (ui/developers, mounted into #view-developers). These are its
+// actions, published on window.OHApp.dev; the note under the buttons, the restore
+// button and the saved accounts live in `dev` so a redraw ('oh:home') shows them.
+const dev = { msg: '', msgError: false, recovery: false, profiles: null };
 
 function setDataMsg(text, isError = false) {
-  if (!dataMsg) return;
-  dataMsg.textContent = text;
-  dataMsg.classList.toggle('error', isError);
+  dev.msg = text;
+  dev.msgError = isError;
   if (isError) OH.log('error', 'data', text);
-}
-
-// Developers → Error report: copy, clear, and a preview of exactly what's in it.
-const reportPreview = $('#report-preview');
-async function refreshReportPreview() {
-  const pre = $('#report-text');
-  if (pre && reportPreview && reportPreview.open) pre.textContent = await OH.errorReport();
-}
-if (reportPreview) {
-  reportPreview.addEventListener('toggle', refreshReportPreview);
-  $('#copy-report').addEventListener('click', async (e) => {
-    await copyErrorReport(e.currentTarget);
-    refreshReportPreview();
-  });
-  $('#clear-log').addEventListener('click', async () => {
-    await OH.clearLog();
-    $('#report-msg').textContent = 'Log cleared.';
-    refreshReportPreview();
-  });
+  homeUpdated();
 }
 
 // Show the "Restore previous hangar" button only when an auto-cleared snapshot
 // exists (i.e. a different RSI account triggered a backup-and-clear).
 async function refreshRecoveryUI() {
-  if (!restoreBtn) return;
-  const rec = await OH.getRecovery();
-  restoreBtn.hidden = !rec;
+  dev.recovery = !!(await OH.getRecovery());
+  homeUpdated();
 }
 
-if (restoreBtn) {
-  restoreBtn.addEventListener('click', async () => {
-    const db = await OH.recoverData();
-    if (!db) {
-      setDataMsg('Nothing to restore. That hangar’s already clean.', true);
-      restoreBtn.hidden = true;
-      return;
-    }
-    // Reload from the restored DB via the normal init path — guarantees state,
-    // pills, and views all reflect the recovered data consistently.
-    location.reload();
-  });
+async function restoreBackup() {
+  const db = await OH.recoverData();
+  if (!db) {
+    dev.recovery = false;
+    setDataMsg('Nothing to restore. That hangar’s already clean.', true);
+    return;
+  }
+  // Reload from the restored DB via the normal init path — guarantees state,
+  // pills, and views all reflect the recovered data consistently.
+  location.reload();
 }
 
 const sourceItemCount = (sources) =>
@@ -5088,13 +5026,12 @@ async function downloadBackup() {
   return data;
 }
 
-if (exportBtn) {
-  exportBtn.addEventListener('click', async () => {
-    const data = await downloadBackup();
-    setDataMsg(
-      `Exported ${sourceItemCount(data.sources)} item(s) and ${data.history.length} history snapshot(s).`,
-    );
-  });
+// Developers → Export JSON (#export-db; the card menus' Backup item clicks it too).
+async function exportJson() {
+  const data = await downloadBackup();
+  setDataMsg(
+    `Exported ${sourceItemCount(data.sources)} item(s) and ${data.history.length} history snapshot(s).`,
+  );
 }
 document.addEventListener('click', async (e) => {
   if (!e.target.closest('[data-backup]')) return;
@@ -5104,82 +5041,76 @@ document.addEventListener('click', async (e) => {
 
 // Hangar Transfer Format: ships only, one entry per ship — the file FleetYards
 // (Hangar → Import) and other community tools read.
-const exportHtfBtn = $('#export-htf');
-if (exportHtfBtn) {
-  exportHtfBtn.addEventListener('click', async () => {
-    const { ships, unmatched } = await OH.exportHTF();
-    if (!ships.length) {
-      setDataMsg('No ships to export yet. Scan your hangar first.');
-      return;
-    }
-    const date = new Date().toISOString().slice(0, 10);
-    downloadBlob(
-      new Blob([JSON.stringify(ships, null, 2)], { type: 'application/json' }),
-      `open-hangar-htf-${(state.owner && state.owner.nickname) || 'me'}-${date}.json`.replace(
-        /[^\w.-]+/g,
-        '_',
-      ),
-    );
-    setDataMsg(
-      `Exported ${ships.length} ship(s) in Hangar Transfer Format` +
-        (unmatched ? ` · ${unmatched} without a ship code (kept by name)` : '') +
-        '. Import it at FleetYards → Hangar → Import.',
-    );
-  });
+async function exportHtf() {
+  const { ships, unmatched } = await OH.exportHTF();
+  if (!ships.length) {
+    setDataMsg('No ships to export yet. Scan your hangar first.');
+    return;
+  }
+  const date = new Date().toISOString().slice(0, 10);
+  downloadBlob(
+    new Blob([JSON.stringify(ships, null, 2)], { type: 'application/json' }),
+    `open-hangar-htf-${(state.owner && state.owner.nickname) || 'me'}-${date}.json`.replace(
+      /[^\w.-]+/g,
+      '_',
+    ),
+  );
+  setDataMsg(
+    `Exported ${ships.length} ship(s) in Hangar Transfer Format` +
+      (unmatched ? ` · ${unmatched} without a ship code (kept by name)` : '') +
+      '. Import it at FleetYards → Hangar → Import.',
+  );
 }
 
-if (importBtn && importFile) {
-  importBtn.addEventListener('click', () => importFile.click());
-  importFile.addEventListener('change', async () => {
-    const file = importFile.files?.[0];
-    importFile.value = ''; // allow re-importing the same file later
-    if (!file) return;
-    if (
-      (state.items.length || state.scannedAt) &&
-      !confirm(
-        'Importing replaces your current data. Your scan history is kept and merged with the file’s. Continue?',
-      )
+// Developers → Import JSON: the file picked in #import-file (the damaged-database
+// notice's Restore button opens that picker too).
+async function importBackup(file) {
+  if (!file) return;
+  if (
+    (state.items.length || state.scannedAt) &&
+    !confirm(
+      'Importing replaces your current data. Your scan history is kept and merged with the file’s. Continue?',
     )
-      return;
-    let obj;
-    try {
-      obj = JSON.parse(await file.text());
-    } catch {
-      setDataMsg('That file isn’t valid JSON. Is it really an Open Hangar backup?', true);
-      return;
-    }
-    const res = await OH.importDB(obj);
-    if (!res.ok) {
-      setDataMsg(res.error, true);
-      return;
-    }
-    const hangar = res.db.sources.hangar || { items: [], scannedAt: null };
-    state.items = hangar.items || [];
-    state.scannedAt = hangar.scannedAt || null;
-    state.history = Array.isArray(res.db.history) ? res.db.history : [];
-    state.selected.clear();
-    const bb = res.db.sources.buybacks || { items: [], scannedAt: null };
-    state.buybacks = bb.items || [];
-    state.buybacksScannedAt = bb.scannedAt || null;
-    const refSrc = res.db.sources.referral;
-    state.referral =
-      refSrc && refSrc.items && !Array.isArray(refSrc.items)
-        ? OH.normalizeReferral(refSrc.items)
-        : null;
-    state.owner = null; // imports aren't attributed to an account (see importDB)
-    await OH.dismissDamaged(); // restored from a backup: the damage notice has done its job
-    renderDbNotice();
-    state.shown = new Set(); // default: no filter selected = show all
-    state.traits = new Map();
-    state.meltMax = null;
-    state.bbShown = new Set(); // default: no filter selected = show all
-    state.bbTraits = new Map();
-    state.bbPriceMax = null;
-    renderAccount(); // reflect imported referral in the pill
-    setDataMsg(
-      `Imported ${sourceItemCount(res.db.sources)} item(s) — open Inventory / Buy-Backs / Stats to view.`,
-    );
-  });
+  )
+    return;
+  let obj;
+  try {
+    obj = JSON.parse(await file.text());
+  } catch {
+    setDataMsg('That file isn’t valid JSON. Is it really an Open Hangar backup?', true);
+    return;
+  }
+  const res = await OH.importDB(obj);
+  if (!res.ok) {
+    setDataMsg(res.error, true);
+    return;
+  }
+  const hangar = res.db.sources.hangar || { items: [], scannedAt: null };
+  state.items = hangar.items || [];
+  state.scannedAt = hangar.scannedAt || null;
+  state.history = Array.isArray(res.db.history) ? res.db.history : [];
+  state.selected.clear();
+  const bb = res.db.sources.buybacks || { items: [], scannedAt: null };
+  state.buybacks = bb.items || [];
+  state.buybacksScannedAt = bb.scannedAt || null;
+  const refSrc = res.db.sources.referral;
+  state.referral =
+    refSrc && refSrc.items && !Array.isArray(refSrc.items)
+      ? OH.normalizeReferral(refSrc.items)
+      : null;
+  state.owner = null; // imports aren't attributed to an account (see importDB)
+  await OH.dismissDamaged(); // restored from a backup: the damage notice has done its job
+  renderDbNotice();
+  state.shown = new Set(); // default: no filter selected = show all
+  state.traits = new Map();
+  state.meltMax = null;
+  state.bbShown = new Set(); // default: no filter selected = show all
+  state.bbTraits = new Map();
+  state.bbPriceMax = null;
+  renderAccount(); // reflect imported referral in the pill
+  setDataMsg(
+    `Imported ${sourceItemCount(res.db.sources)} item(s). Open Inventory, Buy-Backs or Stats to view.`,
+  );
 }
 
 // Fill `state` from a stored DB (init, account switches, restores).
@@ -5245,39 +5176,17 @@ async function reconcileAccount() {
   return '';
 }
 
-// Developers → Saved accounts: every account with data in this browser.
+// Developers → Saved accounts: every account with data in this browser. Loads the
+// list for ui/developers and tells it to redraw.
 async function renderProfiles() {
-  const box = $('#profiles');
-  if (!box) return;
-  const list = await OH.listProfiles();
-  if (!list.length) {
-    setHTML(
-      box,
-      '<p class="muted">No saved accounts yet. Scan and your hangar gets parked here.</p>',
-    );
-    return;
-  }
-  setHTML(
-    box,
-    list
-      .map((p) => {
-        const name = OH.escapeHtml(p.displayname || p.nickname);
-        const when = p.scannedAt ? new Date(p.scannedAt).toLocaleDateString() : 'never scanned';
-        const tail = p.active
-          ? '<span class="badge good">signed in</span>'
-          : `<button class="btn-secondary profile-remove" data-nick="${OH.escapeHtml(p.nickname)}">Remove</button>`;
-        return `<div class="profile-row"><span class="profile-name">${name}</span><span class="muted">${p.pledges} pledges · ${when}</span>${tail}</div>`;
-      })
-      .join(''),
-  );
+  dev.profiles = await OH.listProfiles();
+  homeUpdated();
 }
-document.addEventListener('click', async (e) => {
-  const b = e.target.closest('.profile-remove');
-  if (!b) return;
-  if (!confirm(`Remove the saved data for ${b.dataset.nick} from this browser?`)) return;
-  await OH.deleteProfile(b.dataset.nick);
+async function removeProfile(nick) {
+  if (!confirm(`Remove the saved data for ${nick} from this browser?`)) return;
+  await OH.deleteProfile(nick);
   renderProfiles();
-});
+}
 
 // Returning to the tab (e.g. after logging in/out on RSI in another tab)
 // re-checks the account so the UI reflects it without a manual reload. Debounced
@@ -6280,7 +6189,6 @@ if (gsearch && gsearchOut) {
   await refreshRecoveryUI();
   renderProfiles();
   renderFooter();
-  renderSupporters();
   initUpdates();
   renderSiteNotice();
   renderDbNotice();
@@ -6693,5 +6601,35 @@ window.OHApp = {
       state.priceTab = key;
       renderStore();
     },
+  },
+  // For Developers (ui/developers): its links, supporters, the data tools' state
+  // (note under the buttons, restore button, saved accounts) and their actions.
+  dev: {
+    links: [
+      [REPO_URL, 'GitHub'],
+      [DISCORD_URL, 'Discord'],
+      [IDEAS_URL, 'Suggest a Feature'],
+      [KOFI_URL, 'Tip on Ko-fi'],
+      [PATREON_URL, 'Support on Patreon'],
+    ],
+    repoUrl: REPO_URL,
+    discordUrl: DISCORD_URL,
+    contributors: CONTRIBUTORS,
+    boosters: BOOSTERS,
+    get msg() {
+      return { text: dev.msg, error: dev.msgError };
+    },
+    get recovery() {
+      return dev.recovery;
+    },
+    get profiles() {
+      return dev.profiles;
+    },
+    exportJson,
+    exportHtf,
+    importBackup,
+    restoreBackup,
+    removeProfile,
+    copyErrorReport: () => copyErrorReport(null),
   },
 };
