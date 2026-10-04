@@ -255,12 +255,12 @@
   }
   .upd a {
     color: var(--warn);
-    font-weight: 700;
+    font-weight: 600;
   }
   .big {
-    font: 800 46px/1.05 var(--font-head);
+    font: 500 46px/1.05 var(--font-data);
     color: var(--head);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.03em;
     margin-top: 6px;
     font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
@@ -275,7 +275,7 @@
   }
   .parts b {
     color: var(--text);
-    font-weight: 700;
+    font-weight: 600;
   }
   .parts .sep {
     opacity: 0.6;
@@ -300,7 +300,7 @@
     display: none;
   }
   .pill {
-    font: 700 13px var(--font-head);
+    font: 600 13px var(--font-head);
     border-radius: 999px;
     padding: 5px 12px;
     background: var(--good-soft);
@@ -332,7 +332,7 @@
     white-space: nowrap;
   }
   .counts a b {
-    font: 800 15px var(--font-head);
+    font: 600 15px var(--font-head);
     color: var(--head);
   }
   .counts a:hover {

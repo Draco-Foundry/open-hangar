@@ -158,7 +158,7 @@
     font-size: 14px;
   }
   .ver {
-    font: 700 15px var(--font-head);
+    font: 600 15px var(--font-head);
     color: var(--head) !important;
     text-decoration: none;
   }

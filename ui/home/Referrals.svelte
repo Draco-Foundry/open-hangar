@@ -52,7 +52,7 @@
     text-decoration: none;
   }
   .n {
-    font: 800 26px var(--font-head);
+    font: 500 26px var(--font-data);
     color: var(--head);
   }
   .n span {
@@ -82,7 +82,7 @@
     flex: 1 1 auto;
     min-height: 110px;
     margin-top: 12px;
-    border-radius: 10px;
+    border-radius: var(--r-md);
     overflow: hidden;
     position: relative;
   }
