@@ -839,43 +839,83 @@ try {
   await checkListAlignment('Buy-Backs', '#buybacks-body');
 
   console.log('Stats');
+  // Stats is the Svelte page in ui/stats, mounted into #stats-body.
   await go('#stats');
-  for (const tab of ['overview', 'value', 'fleet', 'history']) {
-    // the tab row re-renders on every click, so click via the DOM
+  const tabs = await page.$$eval('#stats-body [data-stats-tab]', (b) =>
+    b.map((x) => x.dataset.statsTab),
+  );
+  tabs.length === 8 ? ok('stats: 8 tabs') : fail(`stats tabs: ${tabs.join(',')}`);
+  for (const tab of tabs) {
     await page.$eval(`[data-stats-tab="${tab}"]`, (b) => b.click());
     await new Promise((r) => setTimeout(r, 200));
-    const text = await page.$eval('#stats-body', (e) => e.textContent.trim().length);
-    text > 40 ? ok(`${tab} tab renders`) : fail(`${tab} tab is empty`);
+    const t = await page.$eval('#stats-body', (e) => ({
+      text: e.textContent.trim().length,
+      picked: e.querySelector('[aria-selected="true"]')?.dataset.statsTab,
+    }));
+    t.text > 40 && t.picked === tab
+      ? ok(`${tab} tab renders`)
+      : fail(`${tab} tab: ${JSON.stringify(t)}`);
   }
+  await page.$eval('[data-stats-tab="history"]', (b) => b.click());
+  await new Promise((r) => setTimeout(r, 200));
   const acct = await page.evaluate(() => {
     const last = state.history[state.history.length - 1];
     return {
       title: [...document.querySelectorAll('#stats-body h3')].map((h) => h.textContent).join('|'),
       store: snapshotStore(last),
       now: accountValue().total,
+      dots: document.querySelectorAll('.hist-chart circle').length,
+      steps: document.querySelectorAll('#stats-body .hist-step').length,
       tip: document.querySelector('.hist-chart circle:last-of-type title')?.textContent || '',
     };
   });
   /Account Value Over Time/.test(acct.title) &&
   acct.store > 0 &&
-  Math.abs(acct.store - acct.now) < 1
+  Math.abs(acct.store - acct.now) < 1 &&
+  acct.dots >= 2 &&
+  acct.steps >= 1
     ? ok(`history charts account value (latest ${acct.tip})`)
     : fail(`account value: ${JSON.stringify(acct)}`);
+  // Download Backup (the classic [data-backup] handler) updates the line beside it.
+  const backup = await page.evaluate(async () => {
+    const before = document.querySelector('#stats-body .backup-row').textContent;
+    document.querySelector('#stats-body [data-backup]').click();
+    await new Promise((r) => setTimeout(r, 400));
+    return { before, after: document.querySelector('#stats-body .backup-row').textContent };
+  });
+  /never backed up/.test(backup.before) && /last backup/.test(backup.after)
+    ? ok('download backup updates the last backup line')
+    : fail(`backup row: ${JSON.stringify(backup)}`);
 
   for (const [tab, sel] of [
+    ['fleet', '#stats-body .fleet-cols .bar-row'],
     ['collection', '#stats-body .bar-row'],
-    ['buybacks', '#stats-body .stat-box'],
-    ['top', '#stats-body .row.clickable'],
+    ['buybacks', '#stats-body .row.clickable[data-open-bb]'],
+    ['top', '#stats-body .row.clickable[data-open-item]'],
   ]) {
     await page.evaluate((t) => document.querySelector(`[data-stats-tab="${t}"]`).click(), tab);
     await page.waitForSelector(sel, { timeout: 8000 }).catch(() => {});
-    (await page.$(sel)) ? ok(`${tab} tab renders`) : fail(`${tab} tab empty`);
+    (await page.$(sel)) ? ok(`${tab} tab has its rows`) : fail(`${tab} tab empty`);
   }
   await page.click('#stats-body .row.clickable');
   (await page.$eval('#item-modal', (m) => !m.hidden))
     ? ok('top list row opens the pledge')
     : fail('top list row did not open');
   await page.keyboard.press('Escape');
+  // Streamer Mode hides every amount on the page.
+  const masked = await page.evaluate(async () => {
+    streamer.on = true;
+    route();
+    await new Promise((r) => setTimeout(r, 200));
+    const text = document.querySelector('#stats-body').textContent;
+    streamer.on = false;
+    route();
+    await new Promise((r) => setTimeout(r, 200));
+    return { dots: /••••/.test(text), money: /\$\d/.test(text) };
+  });
+  masked.dots && !masked.money
+    ? ok('streamer mode hides stats amounts')
+    : fail(`stats streamer mode: ${JSON.stringify(masked)}`);
 
   console.log('Org Fleet');
   await go('#org');
