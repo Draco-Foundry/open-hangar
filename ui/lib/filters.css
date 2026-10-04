@@ -148,7 +148,7 @@
   border-radius: 9px;
   background: var(--accent);
   color: #fff;
-  font: 700 10px var(--font-head);
+  font: 500 10px var(--font-data);
   letter-spacing: 0;
 }
 .oh-gc {
@@ -162,7 +162,7 @@
   margin: 0 0 6px;
   padding: 0 9px;
   border: 1px solid var(--line-2);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--bg);
   color: var(--head);
   font: 13px var(--font-body);
@@ -179,7 +179,7 @@
   width: 100%;
   padding: 5px 6px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--r-sm);
   background: none;
   color: var(--text);
   font: 400 14px var(--font-body);
@@ -232,7 +232,7 @@
   align-items: center;
   gap: 8px;
   height: 40px;
-  border-radius: 10px;
+  border-radius: var(--r-md);
 }
 
 /* Active filters above the list. */
@@ -249,7 +249,7 @@
   gap: 6px;
   height: 28px;
   padding: 0 6px 0 11px;
-  border: 1px solid rgba(47, 129, 247, 0.45);
+  border: 1px solid var(--accent-line);
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--head);
