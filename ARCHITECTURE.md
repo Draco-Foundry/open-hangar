@@ -212,8 +212,15 @@ is moving pages to Svelte one at a time; every page is on it now (the popup isn'
   `oh:close-menus`). The scan, its progress (`topBar`, set by `setScanning()` and
   `scanDetail()`) and what the menu does stay in `src/dashboard.js` behind
   `window.OHApp.top` (`bar`, `view`, `scan`, `setSources`, `setCurrency`, `setStreamer`,
-  `setRemind`, `logOut`, `clearData`, `reload`). Global Hangar Search is still classic:
-  `#top-search` sits in the header's markup and the bar moves it into place once.
+  `setRemind`, `logOut`, `clearData`, `reload`). The search box (`#top-search`) sits in
+  the header's markup and the bar moves it into place once.
+- **Global Hangar Search.** `ui/search/main.js` (built into `src/ui/search.js`) mounts
+  `GlobalSearch` twice: into Home's `.gsearch-home` under the Citizen Card and into the
+  top bar's `#top-search`, and handles the `/` shortcut. What matches stays in
+  `src/dashboard.js` (`searchResults()`, behind `window.OHApp.search`: `results(q)`
+  and `getDetails()` for the unchecked buy-back packs). Rows open with
+  `data-open-item` / `data-open-bb` (the shared click handler), which fires
+  `oh:close-search` so both boxes start empty again.
 - **Inventory.** `ui/inventory/main.js` (built to `src/ui/inventory.js`) mounts the page around the list into `#oh-inventory`: summary
   strip, toolbar, the filter sidebar (Filters Pass), active-filter pills and saved
   views, plus the melt planner in Select mode's bar. It moves `#results` into its
