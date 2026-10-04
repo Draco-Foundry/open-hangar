@@ -838,14 +838,46 @@ try {
   await page.click('#bb-layout [data-layout="list"]');
   await checkListAlignment('Buy-Backs', '#buybacks-body');
 
+  // Stats is the Svelte page in ui/stats (mounted into #stats-body).
   console.log('Stats');
   await go('#stats');
-  for (const tab of ['overview', 'value', 'fleet', 'history']) {
-    // the tab row re-renders on every click, so click via the DOM
-    await page.$eval(`[data-stats-tab="${tab}"]`, (b) => b.click());
-    await new Promise((r) => setTimeout(r, 200));
-    const text = await page.$eval('#stats-body', (e) => e.textContent.trim().length);
-    text > 40 ? ok(`${tab} tab renders`) : fail(`${tab} tab is empty`);
+  // How much text is under the tab row (the tab labels alone are ~70 characters).
+  const statsText = () =>
+    page.evaluate(() => {
+      const body = document.querySelector('#stats-body');
+      const tabs = body.querySelector('[role="tablist"]');
+      return body.textContent.trim().length - (tabs ? tabs.textContent.length : 0);
+    });
+  for (const tab of [
+    'overview',
+    'value',
+    'fleet',
+    'collection',
+    'buybacks',
+    'top',
+    'spending',
+    'history',
+  ]) {
+    await page.click(`#stats-body [data-stats-tab="${tab}"]`);
+    await page
+      .waitForFunction(
+        (t) =>
+          document.querySelector(`#stats-body [data-stats-tab="${t}"]`)?.ariaSelected === 'true',
+        { timeout: 4000 },
+        tab,
+      )
+      .catch(() => {});
+    await new Promise((r) => setTimeout(r, 150));
+    const t = await page.evaluate(() => ({
+      on: [...document.querySelectorAll('#stats-body [role="tab"]')]
+        .filter((b) => b.getAttribute('aria-selected') === 'true' && b.classList.contains('active'))
+        .map((b) => b.dataset.statsTab),
+      saved: state.statsTab,
+    }));
+    const text = await statsText();
+    text > 40 && t.on.length === 1 && t.on[0] === tab && t.saved === tab
+      ? ok(`${tab} tab renders`)
+      : fail(`${tab} tab: ${JSON.stringify({ text, ...t })}`);
   }
   const acct = await page.evaluate(() => {
     const last = state.history[state.history.length - 1];
@@ -854,28 +886,101 @@ try {
       store: snapshotStore(last),
       now: accountValue().total,
       tip: document.querySelector('.hist-chart circle:last-of-type title')?.textContent || '',
+      steps: document.querySelectorAll('#stats-body .hist-step').length,
+      backup: !!document.querySelector('#stats-body .backup-row [data-backup]'),
     };
   });
   /Account Value Over Time/.test(acct.title) &&
   acct.store > 0 &&
-  Math.abs(acct.store - acct.now) < 1
-    ? ok(`history charts account value (latest ${acct.tip})`)
+  Math.abs(acct.store - acct.now) < 1 &&
+  acct.steps > 0 &&
+  acct.backup
+    ? ok(`history charts account value (latest ${acct.tip}), change log, backup button`)
     : fail(`account value: ${JSON.stringify(acct)}`);
+
+  // It redraws when the dashboard says so: Streamer Mode hides the chart's money.
+  const masked = await page.evaluate(async () => {
+    streamer.on = true;
+    renderStats();
+    await new Promise((r) => setTimeout(r, 100));
+    const on = [...document.querySelectorAll('.hist-chart text')]
+      .slice(0, 2)
+      .map((t) => t.textContent);
+    streamer.on = false;
+    renderStats();
+    await new Promise((r) => setTimeout(r, 100));
+    return { on, off: document.querySelector('.hist-chart text')?.textContent };
+  });
+  masked.on.length === 2 && masked.on.every((t) => t === '••••') && /\d/.test(masked.off || '')
+    ? ok('stats redraw when Streamer Mode changes')
+    : fail(`streamer mode on stats: ${JSON.stringify(masked)}`);
 
   for (const [tab, sel] of [
     ['collection', '#stats-body .bar-row'],
     ['buybacks', '#stats-body .stat-box'],
     ['top', '#stats-body .row.clickable'],
   ]) {
-    await page.evaluate((t) => document.querySelector(`[data-stats-tab="${t}"]`).click(), tab);
+    await page.click(`#stats-body [data-stats-tab="${tab}"]`);
     await page.waitForSelector(sel, { timeout: 8000 }).catch(() => {});
-    (await page.$(sel)) ? ok(`${tab} tab renders`) : fail(`${tab} tab empty`);
+    (await page.$(sel)) ? ok(`${tab} tab has its rows`) : fail(`${tab} tab empty`);
   }
   await page.click('#stats-body .row.clickable');
   (await page.$eval('#item-modal', (m) => !m.hidden))
     ? ok('top list row opens the pledge')
     : fail('top list row did not open');
   await page.keyboard.press('Escape');
+
+  await page.click('#stats-body [data-stats-tab="buybacks"]');
+  await page.waitForSelector('#stats-body [data-open-bb]', { timeout: 4000 }).catch(() => {});
+  await page.focus('#stats-body [data-open-bb]').catch(() => {});
+  await page.keyboard.press('Enter');
+  (await page.$eval('#item-modal', (m) => !m.hidden))
+    ? ok('buy-back row opens the buy-back (keyboard)')
+    : fail('buy-back row did not open');
+  await page.keyboard.press('Escape');
+
+  // Fleet: RSI's included-vessels list, as a table whose names open the ship.
+  await page.click('#stats-body [data-stats-tab="fleet"]');
+  const fleet = await page.evaluate(async () => {
+    const own = ownedShips()[0].label;
+    includedVessels = OH.parseLoanerMatrix(
+      `<table><tr><td>${own}</td><td>URSA Rover (currently Cyclone)</td></tr></table>`,
+    );
+    renderStats();
+    await new Promise((r) => setTimeout(r, 100));
+    const link = [...document.querySelectorAll('#stats-body .org-table .ship-link')].find(
+      (b) => b.textContent === 'URSA Rover (currently Cyclone)',
+    );
+    link?.click();
+    await new Promise((r) => setTimeout(r, 100));
+    return {
+      link: link?.dataset.ship,
+      open: !document.querySelector('#item-modal').hidden,
+      title: document.querySelector('#modal-body .modal-name')?.textContent,
+    };
+  });
+  fleet.link === 'URSA Rover' && fleet.open && fleet.title
+    ? ok(`fleet tab lists included vessels; a name opens the ship (${fleet.title})`)
+    : fail(`included vessels: ${JSON.stringify(fleet)}`);
+  await page.keyboard.press('Escape');
+
+  // No pledges yet: the empty hangar line instead of tabs.
+  const empty = await page.evaluate(async () => {
+    const saved = state.items;
+    state.items = [];
+    renderStats();
+    await new Promise((r) => setTimeout(r, 100));
+    const out = {
+      empty: !!document.querySelector('#stats-body .empty'),
+      tabs: !!document.querySelector('#stats-body [role="tablist"]'),
+    };
+    state.items = saved;
+    renderStats();
+    return out;
+  });
+  empty.empty && !empty.tabs
+    ? ok('empty hangar shows the scan hint')
+    : fail(`empty stats: ${JSON.stringify(empty)}`);
 
   console.log('Org Fleet');
   await go('#org');
