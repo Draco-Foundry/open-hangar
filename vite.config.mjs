@@ -28,6 +28,7 @@ export default defineConfig({
         stats: 'ui/stats/main.js',
         referrals: 'ui/referrals/main.js',
         org: 'ui/org/main.js',
+        updates: 'ui/updates/main.js',
         developers: 'ui/developers/main.js',
       },
       output: {
