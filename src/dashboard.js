@@ -8430,6 +8430,32 @@ function homeUpdated() {
     document.dispatchEvent(new CustomEvent('oh:home'));
   });
 }
+// Soft launch notice until the November 10 release (owner, 2026-10-04): the card
+// in dashboard.html, shown until it's closed (remembered here) and never after
+// release day. Remove with the card after the release.
+(function () {
+  const note = document.getElementById('beta-note');
+  const close = document.getElementById('beta-close');
+  if (!note || !close) return;
+  const KEY = 'ohBetaNoteClosed';
+  let closed = false;
+  try {
+    closed = localStorage.getItem(KEY) === '1';
+  } catch {
+    // Storage blocked: show it.
+  }
+  if (closed || Date.now() > Date.parse('2026-11-11')) return;
+  note.hidden = false;
+  close.addEventListener('click', () => {
+    note.hidden = true;
+    try {
+      localStorage.setItem(KEY, '1');
+    } catch {
+      // Not remembered; it just shows again next time.
+    }
+  });
+})();
+
 window.OHApp = {
   get state() {
     return state;
