@@ -3259,7 +3259,9 @@
       }
     </style>
     <link rel="stylesheet" href="ui/home.css" />
+    <link rel="stylesheet" href="ui/inventory.css" />
     <script type="module" src="ui/home.js"></script>
+    <script type="module" src="ui/inventory.js"></script>
   </head>
   <body>
     <div class="wrap">
@@ -3603,69 +3605,14 @@
 
       <!-- INVENTORY -->
       <section class="view" id="view-inventory">
-        <div class="page-sum" id="inv-sum"></div>
-        <div class="controls">
-          <input
-            id="search"
-            type="search"
-            placeholder="Search by name…"
-            autocomplete="off"
-            aria-label="Search Inventory"
-          />
-          <select id="sort" aria-label="Sort Inventory">
-            <option value="default">Sort: Hangar order</option>
-            <option value="date-desc">Pledged: newest first</option>
-            <option value="date-asc">Pledged: oldest first</option>
-            <option value="value-desc">Value: high → low</option>
-            <option value="value-asc">Value: low → high</option>
-            <option value="store-desc">Store price: high → low</option>
-            <option value="name-asc">Name: A → Z</option>
-            <option value="name-desc">Name: Z → A</option>
-          </select>
-          <div class="layout-toggle" id="layout">
-            <button data-layout="gallery">Gallery</button>
-            <button data-layout="compact">Compact</button>
-            <button data-layout="list">List</button>
-            <button data-layout="market">Market</button>
-          </div>
-          <button
-            id="select-toggle"
-            class="mk-btn select-toggle"
-            type="button"
-            aria-pressed="false"
-            title="Pick items to make a fleet image (e.g. a sale post)"
-          >
-            Select
-          </button>
-          <div class="exp-wrap">
-            <button
-              id="inv-exp-btn"
-              class="mk-btn exp-btn"
-              type="button"
-              aria-haspopup="true"
-              aria-expanded="false"
-            >
-              Export ▾
-            </button>
-            <div id="inv-exp-menu" class="scan-menu exp-menu" hidden>
-              <button type="button" class="menu-item" data-export="inv-csv">
-                CSV of What's Showing<small>Just the rows your filters show</small>
-              </button>
-              <button type="button" class="menu-item" data-export="inv-image">
-                Share Image<small>Pick items, then Download Image</small>
-              </button>
-              <button type="button" class="menu-item" data-export="backup">
-                Everything (JSON)<small>Your full backup</small>
-              </button>
-            </div>
-          </div>
-        </div>
-        <div class="chips" id="chips"></div>
-        <div class="views" id="inv-views"></div>
+        <!-- ui/inventory (Svelte) mounts here: summary strip, toolbar, the filter sidebar,
+             active filters and saved views. It moves #results (the cards or the Market
+             sale sheet, still drawn by dashboard.js) into its list column. -->
+        <div id="oh-inventory"></div>
         <div id="results"></div>
         <div class="select-bar" id="select-bar" hidden>
           <span class="sb-count" id="sb-count"></span>
-          <span class="sb-melt" id="sb-melt" hidden></span>
+          <!-- The melt planner (ui/inventory/MeltPlanner.svelte) mounts here. -->
           <button class="mk-btn" type="button" data-sb="all">Select All Shown</button>
           <button class="mk-btn" type="button" data-sb="none">Clear</button>
           <span class="sb-sep"></span>
