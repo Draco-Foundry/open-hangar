@@ -1767,3 +1767,175 @@ body:not(:has(#view-home.active)) .market-title {
   top: calc(var(--hdr-h, 0px) - 12px);
   padding-top: 20px;
 }
+
+/* The website Connect card (ui/site/SiteConnect.svelte): top right of the Citizen Card,
+   over the org watermark; under the card's text on narrow screens. */
+.home-hero .citizen-card .site-connect {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 2;
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  max-width: 300px;
+  text-align: right;
+}
+.sc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  background: var(--panel-2);
+  color: var(--head);
+  font: 500 14px var(--font-body);
+  cursor: pointer;
+}
+.sc-btn:hover {
+  border-color: var(--faint);
+}
+.sc-btn.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+.sc-btn.primary:hover {
+  background: var(--accent-hover);
+}
+.sc-btn.quiet {
+  padding-inline: 4px;
+  border-color: transparent;
+  background: none;
+  color: var(--link);
+}
+.sc-btn:disabled {
+  cursor: progress;
+  opacity: 0.85;
+}
+.sc-hint,
+.sc-msg {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.sc-msg {
+  color: #f2c14e;
+}
+.sc-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+}
+.sc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--good-soft);
+  color: var(--head);
+  font-size: 14px;
+}
+.sc-chip svg {
+  color: #3fb950;
+}
+.sc-code {
+  padding: 6px 12px;
+  border: 1px dashed rgba(47, 129, 247, 0.55);
+  border-radius: 10px;
+  background: #232933;
+  color: var(--head);
+  font: 600 20px var(--font-head);
+  letter-spacing: 0.12em;
+}
+.sc-confirm {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(47, 129, 247, 0.55);
+  border-radius: 12px;
+  background: #232933;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+  text-align: left;
+}
+.sc-confirm b {
+  color: var(--head);
+  font: 600 15px var(--font-head);
+}
+.sc-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.sc-toggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.sc-switch {
+  position: relative;
+  width: 30px;
+  height: 17px;
+  border-radius: 999px;
+  background: var(--line-2);
+  transition: background 0.15s;
+}
+.sc-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+.sc-toggle input:checked + .sc-switch {
+  background: var(--accent);
+}
+.sc-toggle input:checked + .sc-switch::after {
+  transform: translateX(13px);
+}
+.sc-toggle input:focus-visible + .sc-switch {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+.sc-spin {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sc-spin {
+    animation: sc-spin 0.8s linear infinite;
+  }
+  @keyframes sc-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+}
+@media (max-width: 760px) {
+  .home-hero .citizen-card .site-connect {
+    position: static;
+    justify-items: start;
+    max-width: none;
+    padding: 0 22px 20px;
+    text-align: left;
+  }
+  .site-connect .sc-row {
+    justify-content: flex-start;
+  }
+}

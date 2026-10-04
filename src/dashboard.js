@@ -4205,6 +4205,10 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   if (buybacks) warmPictures(computeBuybacks(), state.bbLayout);
   topBar.busy = false;
   homeUpdated(); // the welcome card and the top bar follow topBar.busy
+  // @sync-start
+  // Sync After Every Scan (off unless you turned it on): what was just saved.
+  if (site.autoSync && site.link && !signedOut) siteSyncNow();
+  // @sync-end
 }
 
 // The top bar's Scan runs what's ticked in its ▾ menu: "Scan All" by default,
@@ -4683,83 +4687,81 @@ async function initUpdates() {
 
 // @sync-start: cut from store builds until sync launches (scripts/pack.mjs, #187)
 // --- openhangar.space: connect + sync (optional) -----------------------------
-let siteWait = null; // { stop, code } while waiting for the website to confirm
-async function renderSiteLink() {
-  const el = $('#site-link');
-  if (!el) return;
-  // Nothing until the website is live (owner, 2026-09-30: no teaser). Developers
-  // switch it on by setting the `siteUrl` storage key (e.g. to http://localhost:4321).
-  if (!(await OH.siteEnabled())) {
-    setHTML(el, '');
-    return;
-  }
-  const link = await OH.getSiteLink();
-  if (siteWait) {
-    setHTML(
-      el,
-      `<span>Waiting for you to confirm on openhangar.space · code <code>${OH.escapeHtml(siteWait.code)}</code></span><button type="button" class="btn-secondary" data-site="cancel">Cancel</button>`,
-    );
-    return;
-  }
-  if (!link) {
-    setHTML(
-      el,
-      `<span class="muted">openhangar.space: not connected (optional)</span><button type="button" class="btn-secondary" data-site="connect" title="Sync your hangar to the website to see it on any device. Nothing is sent until you press Sync now.">Connect</button>`,
-    );
-    return;
-  }
-  const when = link.lastSync
-    ? `synced ${new Date(link.lastSync).toLocaleString()}`
-    : 'not synced yet';
-  setHTML(
-    el,
-    `<span class="ok">✓ Connected</span><span class="muted">${OH.escapeHtml(link.name || 'openhangar.space')} · ${OH.escapeHtml(when)}</span><button type="button" data-site="sync">Sync Now</button><button type="button" class="btn-secondary" data-site="open">Open</button><button type="button" class="btn-secondary" data-site="disconnect">Disconnect</button>`,
-  );
+// The Connect card in the Citizen Card's corner is Svelte (ui/site, owner sign-off
+// 2026-10-04); this holds its state and does what it asks. Hidden for everyone until
+// the website launches: developers switch it on with the `siteUrl` storage key (e.g.
+// https://staging.openhangar.space). Nothing is sent until you press Sync Now, or
+// turn on Sync After Every Scan.
+const site = {
+  enabled: false,
+  link: null, // { name, connectedAt, lastSync } once connected (the token stays in lib.js)
+  waiting: null, // { code, url, stop } while the website hasn't approved the code yet
+  syncing: false,
+  autoSync: false, // Sync After Every Scan (siteAutoSync), off until you turn it on
+  msg: '', // the last thing that went wrong, or ''
+};
+async function refreshSite() {
+  site.enabled = await OH.siteEnabled();
+  const link = site.enabled ? await OH.getSiteLink() : null;
+  site.link = link && { name: link.name, connectedAt: link.connectedAt, lastSync: link.lastSync };
+  site.autoSync = !!(await chrome.storage.local.get('siteAutoSync')).siteAutoSync;
+  homeUpdated();
 }
-$('#site-link')?.addEventListener('click', async (e) => {
-  const act = e.target.closest('[data-site]')?.dataset.site;
-  if (!act) return;
+function siteProblem(err) {
+  site.msg = String(err?.message || err);
+  OH.log('warn', 'site', site.msg);
+}
+// Connect: a code, the website's link page in a new tab (code filled in, one Approve
+// click), then wait here until it's approved, expires or you cancel.
+async function siteConnect() {
+  if (site.waiting) return;
+  site.msg = '';
   try {
-    if (act === 'connect') {
-      const start = await OH.siteLinkStart();
-      siteWait = { stop: false, code: start.user_code };
-      renderSiteLink();
-      chrome.tabs.create({
-        url: `${start.verification_uri}?code=${encodeURIComponent(start.user_code)}`,
-      });
-      const token = await OH.siteLinkWait(start, () => siteWait && !siteWait.stop);
-      siteWait = null;
-      setStatus(
-        token
-          ? 'Connected to openhangar.space. Press Sync now to send your hangar.'
-          : 'Not connected.',
-      );
-    } else if (act === 'cancel') {
-      if (siteWait) siteWait.stop = true;
-      siteWait = null;
-    } else if (act === 'sync') {
-      setStatus('Syncing to openhangar.space…');
-      await OH.siteSync();
-      setStatus('Synced to openhangar.space.');
-    } else if (act === 'open') {
-      chrome.tabs.create({ url: `${await OH.siteUrl()}/hangar` });
-    } else if (act === 'disconnect') {
-      if (
-        !confirm(
-          'Disconnect from openhangar.space? Your synced copy stays on the website until you delete it there.',
-        )
-      )
-        return;
-      await OH.siteDisconnect();
-      setStatus('Disconnected from openhangar.space.');
-    }
+    const start = await OH.siteLinkStart();
+    const w = {
+      code: start.user_code,
+      url: `${start.verification_uri}?code=${encodeURIComponent(start.user_code)}`,
+      stop: false,
+    };
+    site.waiting = w;
+    homeUpdated();
+    chrome.tabs.create({ url: w.url });
+    const link = await OH.siteLinkWait(start, () => site.waiting === w && !w.stop);
+    if (site.waiting === w) site.waiting = null;
+    if (!link && !w.stop) site.msg = 'That code expired before it was approved. Connect again.';
   } catch (err) {
-    siteWait = null;
-    setStatus(String(err?.message || err));
-    OH.log('warn', 'site', String(err?.message || err));
+    site.waiting = null;
+    siteProblem(err);
   }
-  renderSiteLink();
-});
+  await refreshSite();
+}
+function siteCancel() {
+  if (site.waiting) site.waiting.stop = true;
+  site.waiting = null;
+  homeUpdated();
+}
+async function siteSyncNow() {
+  if (site.syncing || !site.link) return;
+  site.syncing = true;
+  site.msg = '';
+  homeUpdated();
+  try {
+    await OH.siteSync();
+  } catch (err) {
+    siteProblem(err);
+  }
+  site.syncing = false;
+  await refreshSite();
+}
+async function siteDisconnect() {
+  site.msg = '';
+  try {
+    await OH.siteDisconnect();
+  } catch (err) {
+    siteProblem(err);
+  }
+  await refreshSite();
+}
 // @sync-end
 
 // --- Display currency -------------------------------------------------------
@@ -5229,7 +5231,7 @@ function searchResults(q) {
   renderSiteNotice();
   renderDbNotice();
   // @sync-start
-  renderSiteLink();
+  refreshSite();
   // @sync-end
   if (currency && currency !== 'USD') {
     topBar.currency = currency;
@@ -5759,6 +5761,25 @@ window.OHApp = {
     hiRes: (thumb) => (hiResCandidates(thumb).length ? loadHiRes(thumb) : Promise.resolve(null)),
     loadImage,
   },
+  // @sync-start
+  // The Connect card (ui/site): its state and actions. Cut from store builds.
+  site: {
+    get state() {
+      return site;
+    },
+    connect: siteConnect,
+    cancel: siteCancel,
+    reopen: () => site.waiting && chrome.tabs.create({ url: site.waiting.url }),
+    sync: siteSyncNow,
+    open: async () => chrome.tabs.create({ url: `${await OH.siteUrl()}/hangar` }),
+    disconnect: siteDisconnect,
+    setAutoSync: async (on) => {
+      site.autoSync = !!on;
+      homeUpdated();
+      await chrome.storage.local.set({ siteAutoSync: site.autoSync });
+    },
+  },
+  // @sync-end
   // Global Hangar Search (ui/search): what matches (see searchResults), and its
   // one action, reading the buy-back packs never checked (opt-in, on Buy-Backs).
   search: {

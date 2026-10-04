@@ -288,7 +288,12 @@ timeout, and a site that timed out or answered 429/5xx is skipped for 10 minutes
 Code for the optional sync to app.openhangar.space sits between `@sync-start` and
 `@sync-end` markers in `src/lib.js`, `src/dashboard.js` and `src/dashboard.html`. It is
 off unless a developer sets the `siteUrl` key, and `scripts/pack.mjs` cuts it out of
-store builds (see [Build and Packaging](#build-and-packaging)).
+store builds (see [Build and Packaging](#build-and-packaging)). Its screen is the
+Connect card in the Citizen Card's corner (`ui/site`, built into `src/ui/site.js`,
+whose script tag is itself inside a sync block): Connect (a device code, approved on
+the website's `/link` page), Sync Now, Open, Disconnect (asked on the card) and Sync
+After Every Scan (`siteAutoSync`, off by default). Its state and actions are `site`
+in `src/dashboard.js`, behind `window.OHApp.site`.
 
 ## The Kill Switch
 
