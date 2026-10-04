@@ -435,10 +435,108 @@ try {
   home.hidden && home.storeOpt
     ? ok('bell: × ignores an alert; Scan has a Store option')
     : fail(`For You ignore: ${JSON.stringify(home)}`);
-  const site = await page.$eval('#site-link', (e) => e.textContent).catch(() => '');
-  !site.trim() && !(await page.$('#site-link button'))
+  !(await page.$('#site-connect'))
     ? ok('website sync hidden until the site is live (no teaser, no connect button)')
-    : fail(`site link: "${site}"`);
+    : fail('site connect card shows without siteUrl');
+
+  // The Connect card (owner sign-off, 2026-10-04), switched on with siteUrl and the
+  // website stubbed: Connect → the code to approve → Connected as → Sync Now → Sync
+  // After Every Scan → Disconnect (asked on the card) → Connect again.
+  const sc = await page.evaluate(async () => {
+    const wait = (ms = 80) => new Promise((r) => setTimeout(r, ms));
+    const card = () => document.querySelector('#view-home .citizen-card #site-connect');
+    const text = () => card()?.textContent.replace(/\s+/g, ' ').trim() || '';
+    const btn = (label) =>
+      [...card().querySelectorAll('button')].find((b) => b.textContent.includes(label));
+    const keep = {
+      start: OH.siteLinkStart,
+      wait: OH.siteLinkWait,
+      sync: OH.siteSync,
+      get: OH.getSiteLink,
+      off: OH.siteDisconnect,
+      tabs: chrome.tabs?.create,
+    };
+    const r = {};
+    let link = null;
+    let approve;
+    const opened = [];
+    try {
+      await chrome.storage.local.set({ siteUrl: 'https://staging.example.test' });
+      chrome.tabs = chrome.tabs || {};
+      chrome.tabs.create = (o) => opened.push(o.url);
+      OH.getSiteLink = async () => link;
+      OH.siteLinkStart = async () => ({
+        device_code: 'd',
+        user_code: 'K7Q-4PX',
+        verification_uri: 'https://staging.example.test/link',
+        expires_in: 600,
+        interval: 1,
+      });
+      OH.siteLinkWait = () =>
+        new Promise((res) => {
+          approve = () => {
+            link = { token: 't', name: 'ExamplePilot', connectedAt: Date.now(), lastSync: null };
+            res(link);
+          };
+        });
+      OH.siteSync = async () => {
+        link = { ...link, lastSync: Date.now() };
+        return { synced_at: link.lastSync };
+      };
+      OH.siteDisconnect = async () => {
+        link = null;
+      };
+      await refreshSite();
+      await wait();
+      r.off = text();
+      btn('Connect').click();
+      await wait();
+      r.wait = text();
+      r.opened = opened[0];
+      approve();
+      await wait(150);
+      r.on = text();
+      btn('Sync Now').click();
+      await wait(150);
+      r.synced = text();
+      card().querySelector('#site-auto-sync').click();
+      await wait();
+      r.auto = (await chrome.storage.local.get('siteAutoSync')).siteAutoSync;
+      btn('Disconnect').click();
+      await wait();
+      r.ask = text();
+      btn('Disconnect').click();
+      await wait(150);
+      r.back = text();
+    } finally {
+      Object.assign(OH, {
+        siteLinkStart: keep.start,
+        siteLinkWait: keep.wait,
+        siteSync: keep.sync,
+        getSiteLink: keep.get,
+        siteDisconnect: keep.off,
+      });
+      if (keep.tabs) chrome.tabs.create = keep.tabs;
+      await chrome.storage.local.remove(['siteUrl', 'siteAutoSync']);
+      await refreshSite();
+      await wait();
+    }
+    r.hiddenAgain = !card();
+    return r;
+  });
+  /Connect to openhangar\.space/.test(sc.off) &&
+  /Nothing is sent until you press Sync/.test(sc.off) &&
+  /K7Q-4PX/.test(sc.wait) &&
+  /\/link\?code=K7Q-4PX$/.test(sc.opened || '') &&
+  /Connected as ExamplePilot/.test(sc.on) &&
+  /Not synced yet/.test(sc.on) &&
+  /Last synced today/.test(sc.synced) &&
+  sc.auto === true &&
+  /Disconnect From the Website\?/.test(sc.ask) &&
+  /Connect to openhangar\.space/.test(sc.back) &&
+  sc.hiddenAgain
+    ? ok('connect card: connect, approve the code, sync, sync after scans, disconnect')
+    : fail(`connect card: ${JSON.stringify(sc)}`);
 
   // Currency: EUR converts the melt box (rates come from the demo's fixed file).
   const rates = await page.evaluate(async () => {

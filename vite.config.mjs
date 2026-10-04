@@ -35,6 +35,7 @@ export default defineConfig({
         topbar: 'ui/topbar/main.js',
         search: 'ui/search/main.js',
         details: 'ui/details/main.js',
+        site: 'ui/site/main.js',
       },
       output: {
         format: 'es',

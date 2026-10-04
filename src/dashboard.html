@@ -957,34 +957,6 @@
         color: var(--text);
         font-size: 12px;
       }
-      .site-link {
-        display: flex;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin: 14px 0 16px;
-        padding: 10px 14px;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        background: var(--panel);
-        font-size: 13px;
-      }
-
-      .site-link:empty {
-        display: none;
-      }
-      .site-link .ok {
-        color: var(--good);
-        font-weight: 600;
-      }
-      .site-link button {
-        padding: 4px 10px;
-        font-size: 12px;
-      }
-      .site-link code {
-        font-size: 13px;
-        letter-spacing: 2px;
-      }
       .remind-toggle {
         display: flex;
         align-items: center;
@@ -2700,6 +2672,9 @@
     <script type="module" src="ui/topbar.js"></script>
     <script type="module" src="ui/search.js"></script>
     <script type="module" src="ui/details.js"></script>
+    <!-- @sync-start: the website Connect card (ui/site), cut from store builds (#187) -->
+    <script type="module" src="ui/site.js"></script>
+    <!-- @sync-end -->
   </head>
   <body>
     <div class="wrap">
@@ -2775,10 +2750,6 @@
         </div>
         <!-- Everything under the card is the Svelte Home (ui/home, built into ui/). -->
         <div id="oh-home"></div>
-        <!-- @sync-start: cut from store builds until sync launches (#187) -->
-        <!-- openhangar.space connect/sync: always visible (even signed out of RSI). -->
-        <div class="site-link" id="site-link"></div>
-        <!-- @sync-end -->
       </section>
 
       <!-- INVENTORY -->
