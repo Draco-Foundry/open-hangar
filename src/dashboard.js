@@ -4770,9 +4770,30 @@ async function siteConnectWindow() {
   await chrome.storage.local.set({ siteLink: link });
   return { link, sync: answer.get('sync') === '1' };
 }
+// Firefox asks before an extension sends anything off the device: the Firefox
+// manifest lists what sync sends as optional data collection (scripts/pack.mjs,
+// SYNC_DATA), so the first Connect or Sync Now shows Firefox's own prompt. Called
+// first thing in a click, before any await, so Firefox can show it. Other browsers:
+// always yes. Outside a click (Sync After Every Scan) it only checks.
+const SITE_DATA = {
+  data_collection: ['personallyIdentifyingInfo', 'financialAndPaymentInfo', 'websiteContent'],
+};
+function siteDataOk() {
+  if (!chrome.runtime.getManifest().browser_specific_settings?.gecko) return Promise.resolve(true);
+  return chrome.permissions
+    .request(SITE_DATA)
+    .catch(() => chrome.permissions.contains(SITE_DATA).catch(() => false));
+}
+function siteDataNo() {
+  site.msg =
+    'No problem. Sync stays off until you let Firefox share your hangar with openhangar.space.';
+  homeUpdated();
+}
+
 async function siteConnect() {
   if (site.waiting) return;
   site.msg = '';
+  if (!(await siteDataOk())) return void siteDataNo();
   try {
     site.waiting = { window: true };
     homeUpdated();
@@ -4827,6 +4848,7 @@ function siteCancel() {
 }
 async function siteSyncNow() {
   if (site.syncing || !site.link) return;
+  if (!(await siteDataOk())) return void siteDataNo();
   site.syncing = true;
   site.msg = '';
   homeUpdated();
