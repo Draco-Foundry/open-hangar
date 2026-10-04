@@ -348,3 +348,70 @@ footer nav {
 .doc .updated {
   color: var(--muted);
 }
+
+/* Open beta notice (index.html, until the November 10 release). */
+.beta-note {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 50;
+  width: min(340px, calc(100vw - 32px));
+  padding: 18px 20px;
+  border: 1px solid rgba(47, 129, 247, 0.55);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+  color: var(--text);
+}
+.beta-note[hidden] {
+  display: none;
+}
+.beta-note h2 {
+  margin: 2px 0 6px;
+  font-size: 18px;
+  font-weight: 600;
+  text-wrap: balance;
+}
+.beta-note p {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+.beta-note .beta-tag {
+  margin: 0;
+  color: var(--link);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.beta-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 4px 6px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.beta-close:hover,
+.beta-close:focus-visible {
+  color: var(--text);
+}
+.beta-link {
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.beta-link:hover {
+  background: var(--accent-hover);
+}
