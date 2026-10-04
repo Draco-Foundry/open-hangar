@@ -2088,3 +2088,45 @@ button,
 .market-table th:last-child {
   border-top-right-radius: var(--r-sm);
 }
+
+/* ---- Stats in Hangar Cobalt (styling pass, 2026-10-04) ------------------------- */
+.section-title {
+  font-family: var(--font-head);
+  font-weight: 600;
+  color: var(--head);
+  text-wrap: balance;
+}
+.stat-box {
+  border-radius: var(--r-md);
+}
+/* Big numbers and bar values read like instrument readouts. */
+.stat-box .big {
+  font: 500 26px var(--font-data);
+  letter-spacing: -0.02em;
+  color: var(--head);
+}
+.stat-box.good .big {
+  color: var(--good);
+}
+.bar-val,
+.top-list .row .vl {
+  font-family: var(--font-data);
+  letter-spacing: -0.01em;
+}
+.bar-track {
+  height: 14px;
+  border-radius: 999px;
+}
+.bar-fill {
+  border-radius: 999px;
+}
+.top-list {
+  border-radius: var(--r-md);
+}
+/* Tabs and view switches are buttons: weight 500. */
+.layout-toggle {
+  border-radius: var(--r-sm);
+}
+.layout-toggle button {
+  font-weight: 500;
+}
