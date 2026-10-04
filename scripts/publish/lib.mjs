@@ -71,6 +71,18 @@ export function updateCheckVersion(xml) {
   return m ? m[1] : null;
 }
 
+// The version in Edge Add-ons' product details for a listing (JSON, the page's
+// own data), or null. The fallback when Edge's update check doesn't answer.
+export function edgeDetailsVersion(json) {
+  let v;
+  try {
+    v = JSON.parse(String(json || '')).version;
+  } catch {
+    return null;
+  }
+  return typeof v === 'string' && /^\d+(?:\.\d+){0,3}$/.test(v) ? v : null;
+}
+
 // True when version a is newer than b ("0.2.10" > "0.2.9"). A missing b counts
 // as older; a missing a never wins.
 export function versionNewer(a, b) {
