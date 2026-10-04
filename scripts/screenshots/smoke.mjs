@@ -524,7 +524,16 @@ try {
   console.log('Broken thumbnails');
   await go('#inventory');
   const thumb = await page.evaluate(async () => {
-    const img = document.querySelector('#results .card img.thumb');
+    let img = document.querySelector('#results .card img.thumb');
+    if (!img) {
+      // Offline (no RSI or wiki pictures), every card shows its placeholder: give
+      // the first one a picture the way the art lookup does, then break it.
+      const ph = document.querySelector('#results .card .thumb.placeholder');
+      img = document.createElement('img');
+      img.className = 'thumb';
+      img.alt = '';
+      ph.replaceWith(img);
+    }
     const card = img.closest('.card');
     const missing = `${location.origin}/missing-${Date.now()}`;
     // Both sizes break together, as they would for a dead RSI link.
@@ -1459,6 +1468,13 @@ try {
       };
     });
   const modalOpen = () => page.$eval('#item-modal', (m) => !m.hidden);
+  // The pop-up's picture comes from RSI or the wiki; offline neither answers, so
+  // give the first card's item a local picture to fall back on (a real RSI image).
+  await page.evaluate(() => {
+    const id = document.querySelector('.card[data-id]').dataset.id;
+    const item = state.items.find((x) => String(x.id) === id);
+    if (item && !item.image) item.image = `${location.origin}/icons/icon128.png`;
+  });
   await page.focus('.card[data-id]');
   const cardId = (await active()).card;
   await page.keyboard.press('Enter');
