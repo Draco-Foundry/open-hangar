@@ -6652,6 +6652,17 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   // looks it up itself, as before.
   const account =
     (hangar || buybacks || referrals ? await OH.getAccount().catch(() => null) : null) || undefined;
+  // Signed out of RSI: its signed-out pages can read as an empty hangar or buy-back
+  // list, and a complete scan of nothing would be saved over your data. Skip what
+  // needs your account (the store check still runs) and say so.
+  const signedOut = account?.loggedIn === false && (hangar || buybacks || referrals);
+  if (signedOut) {
+    hangar = buybacks = referrals = false;
+    parts.push(
+      "You're not signed in to RSI, so there was nothing to scan. Log in at robertsspaceindustries.com, then scan again. Your last scan is untouched.",
+    );
+    anyErr = true;
+  }
 
   if (hangar) {
     const h = await OH.scanSource(
@@ -6754,7 +6765,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   // The counts are already on Home (the summary boxes), so only a problem is
   // spelled out here; the header badge carries the full recap on hover.
   scanDetail('');
-  setStatus(anyErr ? summary : '', anyErr, { scan: true });
+  setStatus(anyErr ? summary : '', anyErr, { scan: !signedOut });
   setScanning(`${anyErr ? '⚠ ' : '✓ '}${summary}`, true);
   route();
   renderAccount(); // refresh the Citizen Card pill with the new referral counts

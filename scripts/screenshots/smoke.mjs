@@ -1414,6 +1414,35 @@ try {
 
   // Keyboard (#200): cards open with Enter and Space, the pop-up keeps and returns
   // focus, chips keep focus when they redraw, menus close on Escape.
+  console.log('Signed out');
+  // Signed out of RSI, a scan reads nothing and saves nothing: the hangar and
+  // buy-backs you had stay, and the status says to log in.
+  const out = await page.evaluate(async () => {
+    const keep = { acct: OH.getAccount, scan: OH.scanSource, ref: OH.getReferral };
+    const before = { items: state.items.length, bbs: state.buybacks.length };
+    let asked = 0;
+    OH.getAccount = async () => ({ loggedIn: false, fetchedAt: Date.now() });
+    OH.scanSource = async () => (asked++, { ok: true, items: [], scannedAt: Date.now() });
+    OH.getReferral = async () => (asked++, { ok: false, error: 'Not signed in to RSI.' });
+    try {
+      await runScan({ store: false });
+    } finally {
+      Object.assign(OH, { getAccount: keep.acct, scanSource: keep.scan, getReferral: keep.ref });
+    }
+    const status = document.querySelector('#status');
+    return {
+      asked,
+      kept: state.items.length === before.items && state.buybacks.length === before.bbs,
+      before,
+      said: /not signed in to RSI/.test(status.textContent),
+      noReport: !/Report a Scan Problem/.test(status.textContent),
+    };
+  });
+  out.asked === 0 && out.kept && out.before.items > 0 && out.said && out.noReport
+    ? ok('signed out: the scan reads nothing, keeps your hangar and says to log in')
+    : fail(`signed-out scan: ${JSON.stringify(out)}`);
+  await page.evaluate(() => setStatus(''));
+
   console.log('Keyboard');
   await go('#inventory');
   await page.click('#layout [data-layout="gallery"]');
