@@ -27,6 +27,9 @@ export default defineConfig({
         inventory: 'ui/inventory/main.js',
         buybacks: 'ui/buybacks/main.js',
         stats: 'ui/stats/main.js',
+        referrals: 'ui/referrals/main.js',
+        org: 'ui/org/main.js',
+        updates: 'ui/updates/main.js',
       },
       output: {
         format: 'es',

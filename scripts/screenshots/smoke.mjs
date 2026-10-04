@@ -1117,8 +1117,24 @@ try {
     : fail(`stats streamer mode: ${JSON.stringify(masked)}`);
 
   console.log('Org Fleet');
+  // The page is Svelte (ui/org); it redraws a microtask after each change.
+  const orgTick = () => new Promise((r) => setTimeout(r, 150));
   await go('#org');
+  (await page.$('#oh-org .org-actions #org-import'))
+    ? ok('org page mounts with its buttons')
+    : fail('org page did not mount');
   await page.click('#org-mine');
+  await page
+    .waitForFunction(
+      () => /Added your fleet/.test(document.querySelector('#org-msg').textContent),
+      {
+        timeout: 8000,
+      },
+    )
+    .catch(() => {});
+  (await page.$eval('#org-msg', (m) => /Added your fleet \(\d+ ships\)/.test(m.textContent)))
+    ? ok('Add My Fleet says what it added')
+    : fail(`Add My Fleet message: ${await page.$eval('#org-msg', (m) => m.textContent)}`);
   const buddy = path.join(os.tmpdir(), 'open-hangar-htf-Buddy-2026-01-01.json');
   fs.writeFileSync(
     buddy,
@@ -1138,8 +1154,9 @@ try {
   const org = await page.evaluate(() => ({
     members: document.querySelectorAll('.org-member').length,
     rows: document.querySelectorAll('.org-table tbody tr').length,
+    msg: document.querySelector('#org-msg').textContent,
   }));
-  org.members === 2 && org.rows > 0
+  org.members === 2 && org.rows > 0 && /Added 1 fleet\./.test(org.msg)
     ? ok(`org fleet: ${org.members} members, ${org.rows} ship types`)
     : fail(`org fleet: ${JSON.stringify(org)}`);
   const roleChips = await page.$$eval('.role-chip', (c) => c.length);
@@ -1149,14 +1166,24 @@ try {
     ? ok(`org roles (${roleChips}) + biggest ships + members`)
     : fail(`org extras: ${roleChips} role chips, ${memberRows} tables`);
   await page.click('.role-chip.missing');
-  (await page.$('.org-panel'))
+  await orgTick();
+  const rolePanel = await page.evaluate(() => ({
+    panel: !!document.querySelector('.org-panel'),
+    open: document.querySelector('.role-chip.missing.open')?.getAttribute('aria-expanded'),
+  }));
+  rolePanel.panel && rolePanel.open === 'true'
     ? ok('missing role opens suggestions')
-    : fail('role click opened nothing');
+    : fail(`role click: ${JSON.stringify(rolePanel)}`);
+  await page.click('.org-close[data-close="role"]');
+  await orgTick();
+  (await page.$('.org-panel')) ? fail('role panel did not close') : ok('role panel closes');
   await page.click('.org-mrow');
+  await orgTick();
   (await page.$('.pair-row')) ? ok('member opens vs-org charts') : fail('member panel missing');
   // Your entry follows your latest scan, and a concept-only role is amber, not missing.
   const live = await page.evaluate(async () => {
-    const mine = orgMembers.find((m) => m.mine);
+    const tick = () => new Promise((r) => setTimeout(r, 50));
+    const mine = OHApp.org.members.find((m) => m.mine);
     const before = mine.ships.length;
     state.items = [
       ...state.items,
@@ -1170,6 +1197,7 @@ try {
       },
     ];
     await renderOrg();
+    await tick();
     const chip = document.querySelector('.role-chip[data-role="construction"]');
     const res = {
       grew: mine.ships.length === before + 1,
@@ -1180,6 +1208,7 @@ try {
     };
     state.items = state.items.filter((p) => p.id !== 'pio-1');
     await renderOrg();
+    await tick();
     return res;
   });
   live.grew && /\bconcept\b/.test(live.chip || '') && live.intro
@@ -1190,7 +1219,25 @@ try {
   );
   await page.select('.org-cmp[data-side="a"]', names[0]);
   await page.select('.org-cmp[data-side="b"]', names[1]);
+  await orgTick();
   (await page.$('.cmp-cols')) ? ok('compare two members') : fail('compare panel missing');
+  // Remove a member: its chip goes, the rest stays (and so does what's saved).
+  await page.click('.org-remove[data-name="Buddy"]');
+  await page
+    .waitForFunction(() => document.querySelectorAll('.org-member').length === 1, {
+      timeout: 5000,
+    })
+    .catch(() => {});
+  const removed = await page.evaluate(async () => ({
+    chips: document.querySelectorAll('.org-member').length,
+    saved: ((await chrome.storage.local.get('orgFleet')).orgFleet?.members || []).map(
+      (m) => m.name,
+    ),
+    compare: !!document.querySelector('.org-compare-bar'),
+  }));
+  removed.chips === 1 && !removed.saved.includes('Buddy') && !removed.compare
+    ? ok('remove a member')
+    : fail(`remove member: ${JSON.stringify(removed)}`);
 
   console.log('Store');
   await go('#store');
@@ -1433,6 +1480,78 @@ try {
   /9\.9\.9 is downloading/.test(chk.chrome1)
     ? ok('Check for updates: store check (Chrome) and AMO version check (Firefox)')
     : fail(`check for updates: ${JSON.stringify(chk)}`);
+  const md = await page.evaluate(() => ({
+    // Release notes are Svelte nodes, never markup strings: no stray ** or `.
+    raw: [...document.querySelectorAll('#updates-body li, #updates-body p')].filter((e) =>
+      /\*\*|`/.test(e.textContent),
+    ).length,
+    links: document.querySelectorAll('#updates-body .release a[target="_blank"]').length,
+  }));
+  !md.raw
+    ? ok(`release notes markdown drawn (${md.links} links)`)
+    : fail(`release notes markdown: ${JSON.stringify(md)}`);
+
+  console.log('Known Issues');
+  const ki = await page.evaluate(async () => {
+    const wait = (ms = 300) => new Promise((r) => setTimeout(r, ms));
+    const body = () => document.querySelector('#issues-body');
+    const open = async () => {
+      location.hash = '#home';
+      await wait(100);
+      location.hash = '#issues';
+      await wait();
+    };
+    // From the hour-long cache: no request to GitHub.
+    await chrome.storage.local.set({
+      knownIssues: {
+        at: Date.now(),
+        list: [
+          {
+            number: 7,
+            title: 'Test bug <b>not bold</b>',
+            url: 'https://github.com/Draco-Foundry/open-hangar/issues/7',
+            createdAt: new Date().toISOString(),
+            labels: ['bug', 'scan-broken'],
+          },
+          {
+            number: 8,
+            title: 'Older bug',
+            url: 'https://github.com/Draco-Foundry/open-hangar/issues/8',
+            createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+            labels: ['bug'],
+          },
+        ],
+      },
+    });
+    await open();
+    const rows = [...body().querySelectorAll('.known-issues li')].map((li) =>
+      li.textContent.replace(/\s+/g, ' ').trim(),
+    );
+    const bold = !!body().querySelector('.known-issues b');
+    // Cache gone and GitHub unreachable: the fallback link.
+    const realFetch = window.fetch;
+    window.fetch = async () => {
+      throw new Error('offline');
+    };
+    await chrome.storage.local.set({ knownIssues: { at: 0, list: [] } });
+    await open();
+    const err = body().textContent.replace(/\s+/g, ' ').trim();
+    // An empty list (fresh from GitHub).
+    window.fetch = async () => new Response('[]');
+    await open();
+    const empty = body().textContent.trim();
+    window.fetch = realFetch;
+    await chrome.storage.local.remove('knownIssues');
+    return { rows, bold, err, empty };
+  });
+  ki.rows.length === 2 &&
+  /^Test bug <b>not bold<\/b> #7 · opened today · Scan broken$/.test(ki.rows[0]) &&
+  /^Older bug #8 · opened 3 days ago$/.test(ki.rows[1]) &&
+  !ki.bold &&
+  /^Couldn't reach GitHub's comm relay\. See the list on GitHub\.$/.test(ki.err) &&
+  /^No known bugs right now/.test(ki.empty)
+    ? ok('Known Issues: cached list, Scan broken tag, offline fallback, empty list')
+    : fail(`known issues: ${JSON.stringify(ki)}`);
 
   // Kill switch notice: shown from the cached status file, as text (never HTML).
   const notice = await page.evaluate(async () => {
@@ -1538,6 +1657,46 @@ try {
         `gallery ${refUi.gallery} rewards, ${refUi.timeline} milestones, prospect ages, event banner`,
       )
     : fail(`referral sections: ${JSON.stringify(refUi)}`);
+  // People list (Svelte): tabs swap the list and clear the search, search filters
+  // live, sort reorders.
+  const people = await page.evaluate(async () => {
+    const wait = () => new Promise((r) => setTimeout(r, 50));
+    const rows = () => [...document.querySelectorAll('#ref-tbody tr')];
+    const count = () => document.querySelector('#ref-count').textContent;
+    const search = document.querySelector('#ref-search');
+    const out = { recruits: rows().length, count: count() };
+    const first = rows()[0]?.querySelector('td').textContent.trim() || '';
+    search.value = first;
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await wait();
+    out.searched = rows().length;
+    document.querySelector('[data-reftab="prospects"]').click();
+    await wait();
+    out.prospects = rows().length;
+    out.cleared = search.value === '';
+    out.dateCol = document.querySelector('#ref-date-col').textContent;
+    const sort = document.querySelector('#ref-sort');
+    sort.value = 'name';
+    sort.dispatchEvent(new Event('change', { bubbles: true }));
+    await wait();
+    const names = rows().map((r) => r.querySelector('td').textContent.trim());
+    out.sorted = names.every((n, i) => !i || names[i - 1].localeCompare(n) <= 0);
+    document.querySelector('[data-reftab="recruits"]').click();
+    sort.value = 'newest';
+    sort.dispatchEvent(new Event('change', { bubbles: true }));
+    await wait();
+    return out;
+  });
+  people.recruits > 1 &&
+  /^Showing \d+ of \d+$/.test(people.count) &&
+  people.searched >= 1 &&
+  people.searched < people.recruits &&
+  people.prospects > 0 &&
+  people.cleared &&
+  people.dateCol === 'Enlisted' &&
+  people.sorted
+    ? ok(`people list: tabs, search (${people.searched} of ${people.recruits}), sort by name`)
+    : fail(`people list: ${JSON.stringify(people)}`);
   // jsQR (dev-only) reads the QR back out of the finished image.
   await page.addScriptTag({ path: 'node_modules/jsqr/dist/jsQR.js' });
   const share = await page.evaluate(async () => {
