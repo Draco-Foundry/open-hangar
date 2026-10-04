@@ -878,8 +878,24 @@ try {
   await page.keyboard.press('Escape');
 
   console.log('Org Fleet');
+  // The page is Svelte (ui/org); it redraws a microtask after each change.
+  const orgTick = () => new Promise((r) => setTimeout(r, 150));
   await go('#org');
+  (await page.$('#oh-org .org-actions #org-import'))
+    ? ok('org page mounts with its buttons')
+    : fail('org page did not mount');
   await page.click('#org-mine');
+  await page
+    .waitForFunction(
+      () => /Added your fleet/.test(document.querySelector('#org-msg').textContent),
+      {
+        timeout: 8000,
+      },
+    )
+    .catch(() => {});
+  (await page.$eval('#org-msg', (m) => /Added your fleet \(\d+ ships\)/.test(m.textContent)))
+    ? ok('Add My Fleet says what it added')
+    : fail(`Add My Fleet message: ${await page.$eval('#org-msg', (m) => m.textContent)}`);
   const buddy = path.join(os.tmpdir(), 'open-hangar-htf-Buddy-2026-01-01.json');
   fs.writeFileSync(
     buddy,
@@ -899,8 +915,9 @@ try {
   const org = await page.evaluate(() => ({
     members: document.querySelectorAll('.org-member').length,
     rows: document.querySelectorAll('.org-table tbody tr').length,
+    msg: document.querySelector('#org-msg').textContent,
   }));
-  org.members === 2 && org.rows > 0
+  org.members === 2 && org.rows > 0 && /Added 1 fleet\./.test(org.msg)
     ? ok(`org fleet: ${org.members} members, ${org.rows} ship types`)
     : fail(`org fleet: ${JSON.stringify(org)}`);
   const roleChips = await page.$$eval('.role-chip', (c) => c.length);
@@ -910,14 +927,24 @@ try {
     ? ok(`org roles (${roleChips}) + biggest ships + members`)
     : fail(`org extras: ${roleChips} role chips, ${memberRows} tables`);
   await page.click('.role-chip.missing');
-  (await page.$('.org-panel'))
+  await orgTick();
+  const rolePanel = await page.evaluate(() => ({
+    panel: !!document.querySelector('.org-panel'),
+    open: document.querySelector('.role-chip.missing.open')?.getAttribute('aria-expanded'),
+  }));
+  rolePanel.panel && rolePanel.open === 'true'
     ? ok('missing role opens suggestions')
-    : fail('role click opened nothing');
+    : fail(`role click: ${JSON.stringify(rolePanel)}`);
+  await page.click('.org-close[data-close="role"]');
+  await orgTick();
+  (await page.$('.org-panel')) ? fail('role panel did not close') : ok('role panel closes');
   await page.click('.org-mrow');
+  await orgTick();
   (await page.$('.pair-row')) ? ok('member opens vs-org charts') : fail('member panel missing');
   // Your entry follows your latest scan, and a concept-only role is amber, not missing.
   const live = await page.evaluate(async () => {
-    const mine = orgMembers.find((m) => m.mine);
+    const tick = () => new Promise((r) => setTimeout(r, 50));
+    const mine = OHApp.org.members.find((m) => m.mine);
     const before = mine.ships.length;
     state.items = [
       ...state.items,
@@ -931,6 +958,7 @@ try {
       },
     ];
     await renderOrg();
+    await tick();
     const chip = document.querySelector('.role-chip[data-role="construction"]');
     const res = {
       grew: mine.ships.length === before + 1,
@@ -941,6 +969,7 @@ try {
     };
     state.items = state.items.filter((p) => p.id !== 'pio-1');
     await renderOrg();
+    await tick();
     return res;
   });
   live.grew && /\bconcept\b/.test(live.chip || '') && live.intro
@@ -951,7 +980,25 @@ try {
   );
   await page.select('.org-cmp[data-side="a"]', names[0]);
   await page.select('.org-cmp[data-side="b"]', names[1]);
+  await orgTick();
   (await page.$('.cmp-cols')) ? ok('compare two members') : fail('compare panel missing');
+  // Remove a member: its chip goes, the rest stays (and so does what's saved).
+  await page.click('.org-remove[data-name="Buddy"]');
+  await page
+    .waitForFunction(() => document.querySelectorAll('.org-member').length === 1, {
+      timeout: 5000,
+    })
+    .catch(() => {});
+  const removed = await page.evaluate(async () => ({
+    chips: document.querySelectorAll('.org-member').length,
+    saved: ((await chrome.storage.local.get('orgFleet')).orgFleet?.members || []).map(
+      (m) => m.name,
+    ),
+    compare: !!document.querySelector('.org-compare-bar'),
+  }));
+  removed.chips === 1 && !removed.saved.includes('Buddy') && !removed.compare
+    ? ok('remove a member')
+    : fail(`remove member: ${JSON.stringify(removed)}`);
 
   console.log('Store');
   await go('#store');
