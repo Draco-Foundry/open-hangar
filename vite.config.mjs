@@ -24,6 +24,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         home: 'ui/home/main.js',
+        developers: 'ui/developers/main.js',
       },
       output: {
         format: 'es',

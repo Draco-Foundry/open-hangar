@@ -179,6 +179,12 @@ is moving pages to Svelte one at a time; today that's the Home page cards.
   (`version.n`); components read `app()` (that is, `window.OHApp`) inside `$derived`
   blocks that also read `version.n`, so they redraw. `loadLive()` loads outside data
   (wiki, RSI news, patch notes) once per page view through `window.OH`.
+- **Developers.** `ui/developers/main.js` mounts the whole page into
+  `#view-developers`, always (the card menus click `#export-db`, the damaged-database
+  notice opens `#import-file`). The data tools stay in `src/dashboard.js` because they
+  change `state`: the page calls them through `window.OHApp.dev` (`exportJson`,
+  `exportHtf`, `importBackup`, `restoreBackup`, `removeProfile`) and reads the note,
+  the restore button and the saved accounts from it.
 - **Svelte to classic.** `ui/home/ForYou.svelte` sets `window.OHApp.alerts` to
   `{ list, ignore }`, which the bell in `src/dashboard.js` reads.
 
