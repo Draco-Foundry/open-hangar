@@ -24,6 +24,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         home: 'ui/home/main.js',
+        inventory: 'ui/inventory/main.js',
+        stats: 'ui/stats/main.js',
         referrals: 'ui/referrals/main.js',
       },
       output: {

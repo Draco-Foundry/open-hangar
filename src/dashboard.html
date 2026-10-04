@@ -2686,7 +2686,10 @@
       }
     </style>
     <link rel="stylesheet" href="ui/home.css" />
+    <link rel="stylesheet" href="ui/inventory.css" />
     <script type="module" src="ui/home.js"></script>
+    <script type="module" src="ui/inventory.js"></script>
+    <script type="module" src="ui/stats.js"></script>
     <link rel="stylesheet" href="ui/referrals.css" />
     <script type="module" src="ui/referrals.js"></script>
   </head>
@@ -2943,70 +2946,19 @@
         <div id="updated-note" class="updated-note" hidden></div>
         <div class="home-hero">
           <div class="citizen-card">
-            <!-- Pilot ID card (owner, 2026-09-30): portrait down the left; name, org,
-                 UEE line, badges and wallet to its right; the org logo as a faint
-                 watermark. Scan and the gear menu live in the top bar. -->
-            <div class="cc-account" id="cc-account">
-              <a
-                class="cc-photo"
-                id="cc-photo"
-                target="_blank"
-                rel="noopener"
-                aria-label="Open Your RSI Citizen Page"
-                ><span class="cc-avatar" id="cc-avatar"></span
-              ></a>
-              <img class="cc-water" id="cc-water" alt="" hidden />
-              <div class="cc-info">
-                <div class="cc-name" id="cc-name">Open Hangar</div>
-                <div class="cc-org" id="cc-org" hidden></div>
-                <div class="cc-meta" id="cc-meta"></div>
-                <div class="home-flair" id="home-flair"></div>
-                <div class="home-balances" id="home-balances"></div>
-              </div>
-            </div>
+            <!-- Pilot ID card (owner, 2026-09-30): ui/home/CitizenCard.svelte mounts here,
+                 before the status line; ui/home/SignedOut.svelte (the Log In wall) after it. -->
             <!-- Scan progress and messages (kept outside cc-account so they show signed out too). -->
             <div class="cc-status">
               <div id="status"></div>
-            </div>
-            <!-- Shown instead of the card content when signed out of RSI -->
-            <div class="cc-loggedout" id="cc-loggedout" hidden>
-              <div class="cc-lo-inner">
-                <div class="cc-lo-title">Open Hangar</div>
-                <p class="cc-lo-sub">
-                  Log in to RSI to scan your hangar. Your ships are waiting on the pad.
-                </p>
-                <a
-                  class="btn-login cc-lo-btn"
-                  href="https://robertsspaceindustries.com/connect"
-                  target="_blank"
-                  rel="noopener"
-                  >Log In to RSI ↗</a
-                >
-              </div>
             </div>
           </div>
           <aside id="oh-status" aria-label="Game Status"></aside>
           <div id="oh-foryou" hidden></div>
         </div>
-        <!-- First run (nothing scanned yet): a big welcome with Scan All Now; the
-             search and the Home cards show once there's something to show. -->
-        <section class="oh-welcome" id="oh-welcome" hidden>
-          <h2>Welcome to Open Hangar, Citizen</h2>
-          <p>
-            Your whole Star Citizen hangar in one place: what it's worth, your buy-backs, your
-            referrals and more. Everything stays on this computer, locked in your own hangar.
-          </p>
-          <button type="button" class="welcome-scan" id="welcome-scan">Scan My Hangar</button>
-          <!-- The first scan's progress, in place of the button (#170). -->
-          <div class="welcome-progress" id="welcome-progress" role="status" hidden>
-            <div class="wp-bar"><span class="wp-fill" id="wp-fill"></span></div>
-            <div class="wp-text" id="wp-text"></div>
-          </div>
-          <p class="welcome-note" id="welcome-note">
-            A big hangar takes about a minute, still faster than a Lorville elevator. To scan just
-            part of it, use the ▾ next to Scan.
-          </p>
-        </section>
+        <!-- First run (nothing scanned yet): ui/home/Welcome.svelte mounts here, a big
+             welcome with Scan My Hangar; the search and the Home cards show once there's
+             something to show. -->
         <!-- Global Hangar Search: its own line under the card (owner, 2026-09-30); the
              right quarter is kept for the website Connect button at launch. -->
         <div class="home-search">
@@ -3032,69 +2984,14 @@
 
       <!-- INVENTORY -->
       <section class="view" id="view-inventory">
-        <div class="page-sum" id="inv-sum"></div>
-        <div class="controls">
-          <input
-            id="search"
-            type="search"
-            placeholder="Search by name…"
-            autocomplete="off"
-            aria-label="Search Inventory"
-          />
-          <select id="sort" aria-label="Sort Inventory">
-            <option value="default">Sort: Hangar order</option>
-            <option value="date-desc">Pledged: newest first</option>
-            <option value="date-asc">Pledged: oldest first</option>
-            <option value="value-desc">Value: high → low</option>
-            <option value="value-asc">Value: low → high</option>
-            <option value="store-desc">Store price: high → low</option>
-            <option value="name-asc">Name: A → Z</option>
-            <option value="name-desc">Name: Z → A</option>
-          </select>
-          <div class="layout-toggle" id="layout">
-            <button data-layout="gallery">Gallery</button>
-            <button data-layout="compact">Compact</button>
-            <button data-layout="list">List</button>
-            <button data-layout="market">Market</button>
-          </div>
-          <button
-            id="select-toggle"
-            class="mk-btn select-toggle"
-            type="button"
-            aria-pressed="false"
-            title="Pick items to make a fleet image (e.g. a sale post)"
-          >
-            Select
-          </button>
-          <div class="exp-wrap">
-            <button
-              id="inv-exp-btn"
-              class="mk-btn exp-btn"
-              type="button"
-              aria-haspopup="true"
-              aria-expanded="false"
-            >
-              Export ▾
-            </button>
-            <div id="inv-exp-menu" class="scan-menu exp-menu" hidden>
-              <button type="button" class="menu-item" data-export="inv-csv">
-                CSV of What's Showing<small>Just the rows your filters show</small>
-              </button>
-              <button type="button" class="menu-item" data-export="inv-image">
-                Share Image<small>Pick items, then Download Image</small>
-              </button>
-              <button type="button" class="menu-item" data-export="backup">
-                Everything (JSON)<small>Your full backup</small>
-              </button>
-            </div>
-          </div>
-        </div>
-        <div class="chips" id="chips"></div>
-        <div class="views" id="inv-views"></div>
+        <!-- ui/inventory (Svelte) mounts here: summary strip, toolbar, the filter sidebar,
+             active filters and saved views. It moves #results (the cards or the Market
+             sale sheet, still drawn by dashboard.js) into its list column. -->
+        <div id="oh-inventory"></div>
         <div id="results"></div>
         <div class="select-bar" id="select-bar" hidden>
           <span class="sb-count" id="sb-count"></span>
-          <span class="sb-melt" id="sb-melt" hidden></span>
+          <!-- The melt planner (ui/inventory/MeltPlanner.svelte) mounts here. -->
           <button class="mk-btn" type="button" data-sb="all">Select All Shown</button>
           <button class="mk-btn" type="button" data-sb="none">Clear</button>
           <span class="sb-sep"></span>
