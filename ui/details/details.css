@@ -1,0 +1,31 @@
+/* Detail windows in Hangar Cobalt (styling pass, 2026-10-04). Every page bundle loads
+   on the one dashboard page, so these rules sit on top of dashboard.html's classic
+   modal styles. */
+.modal-card {
+  border-radius: var(--r-lg);
+}
+.modal-close {
+  border-radius: var(--r-sm);
+}
+.modal-img {
+  background: var(--bg);
+}
+.modal-name {
+  font: 600 20px/1.25 var(--font-head);
+  color: var(--head);
+  text-wrap: balance;
+}
+/* The price and the key/value numbers read like instrument readouts. */
+.modal-val {
+  font: 500 16px var(--font-data);
+  color: var(--head);
+  letter-spacing: -0.01em;
+}
+.mr-v {
+  font-family: var(--font-data);
+}
+/* Section labels (Contents, Specs…): tiny all-caps, Clean Pro style. */
+.modal-h {
+  font: 700 11px var(--font-head);
+  letter-spacing: 0.08em;
+}
