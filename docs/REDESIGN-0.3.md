@@ -79,7 +79,7 @@ Empty blocks disappear; the grid never leaves a card alone in a row.
 - Svelte sources live in `ui/`; `npm run build:ui` (Vite) compiles them into `src/ui/`
   (generated, gitignored). `build`, `demo`, `screenshots` and `test:ui` run it first.
 - The classic `src/dashboard.js` still owns scanning, storage and the other pages. It
-  exposes read-only helpers on `window.OHApp` and fires `oh:home` when Home's data changes.
+  exposes read-only helpers on `window.OHApp` and fires `oh:home` when Home's or Stats' data changes. Svelte so far: Home, Stats.
 - Fonts (Manrope, Source Sans 3) are bundled from @fontsource; no requests to Google.
 - **Firefox review note:** web-ext lint shows one warning (UNSAFE_VAR_ASSIGNMENT, innerHTML)
   inside Svelte's runtime. It clones compile-time template markup, never user or RSI data.
