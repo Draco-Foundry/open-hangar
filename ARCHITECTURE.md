@@ -181,6 +181,15 @@ is moving pages to Svelte one at a time; today that's the Home page cards.
   (wiki, RSI news, patch notes) once per page view through `window.OH`.
 - **Svelte to classic.** `ui/home/ForYou.svelte` sets `window.OHApp.alerts` to
   `{ list, ignore }`, which the bell in `src/dashboard.js` reads.
+- **Inventory.** `ui/inventory/main.js` (built to `src/ui/inventory.js` and
+  `inventory.css`) mounts the page around the list into `#oh-inventory`: summary
+  strip, toolbar, the filter sidebar (Filters Pass), active-filter pills and saved
+  views, plus the melt planner in Select mode's bar. It moves `#results` into its
+  list column; the cards and the Market sale sheet in it are still drawn by
+  `renderInventory()`. The filters live in `src/dashboard.js` (`INV_GROUPS`,
+  `computeShown()`), because the list, Select All and the exports read them too;
+  the Svelte controls call `window.OHApp.inv`. The toolbar, sidebar, pills, summary
+  strip and Export menu are shared components in `ui/lib/` for Buy-Backs to reuse.
 
 ## Outbound Requests
 
