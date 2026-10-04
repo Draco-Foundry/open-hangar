@@ -3767,108 +3767,6 @@ document.addEventListener('click', async (e) => {
 
 // --- Stats ----------------------------------------------------------------
 
-// Stats → Hangar value: ships at today's store price vs their melt value, best
-// deals, and which ships couldn't be priced.
-function valueSectionHtml() {
-  const v = hangarValue();
-  if (!v) {
-    const msg = pricesLoading ? 'Loading store prices…' : 'Store prices unavailable (offline?).';
-    return `<h3 class="section-title">Hangar Value</h3><p class="muted">${msg}</p>`;
-  }
-  if (!v.ships) return '';
-  const box = (big, lbl, cls = '') =>
-    `<div class="stat-box ${cls}"><div class="big">${big}</div><div class="lbl">${lbl}</div></div>`;
-  const gap = v.storePriced - v.paidPriced;
-  const sign = gap >= 0 ? '+' : '−';
-  const pct = v.paidPriced ? Math.round((Math.abs(gap) / v.paidPriced) * 100) : 0;
-  const boxes =
-    box(dollars(v.store), 'ships at store price') +
-    box(`${v.priced} / ${v.ships}`, 'ships priced') +
-    (v.paidPriced
-      ? box(
-          `${sign}${dollars(Math.abs(gap))}`,
-          `vs melt value${pct ? ` (${sign}${pct}%)` : ''}`,
-          gap >= 0 ? 'good' : '',
-        )
-      : '') +
-    (v.ccu.priced
-      ? box(
-          dollars(v.ccu.store),
-          `${v.ccu.priced} CCU${v.ccu.priced === 1 ? '' : 's'} at standard price (paid ${dollars(
-            v.ccu.paid,
-          )})`,
-          v.ccu.store > v.ccu.paid ? 'good' : '',
-        )
-      : '');
-  const deals = state.items
-    .map((p) => ({ p, si: v.pledges[p.id] }))
-    .filter((x) => x.si && x.si.below)
-    .sort((a, b) => b.si.store - b.si.paid - (a.si.store - a.si.paid))
-    .slice(0, 10);
-  const dealRows = deals
-    .map(
-      ({ p, si }) =>
-        `<div class="row"><div class="nm">${OH.escapeHtml(plainName(p))}</div><div class="vl">${dollars(
-          si.paid,
-        )} → ${dollars(si.store)} <span class="gain">+${dollars(si.store - si.paid)}</span></div></div>`,
-    )
-    .join('');
-  const missing = v.ships - v.priced;
-  const unpriced = v.unpriced.length
-    ? `<details class="unpriced"><summary>${missing} ship${
-        missing === 1 ? '' : 's'
-      } without a public price</summary><p class="muted">${v.unpriced
-        .map((u) => OH.escapeHtml(u.n > 1 ? `${u.name} ×${u.n}` : u.name))
-        .join(' · ')}</p></details>`
-    : '';
-  return (
-    `<h3 class="section-title">Hangar Value</h3>` +
-    `<div class="stat-grid">${boxes}</div>` +
-    (dealRows
-      ? `<h4 class="modal-h">Best Deals: Paid Below Today's Store Price</h4><div class="top-list">${dealRows}</div>`
-      : '') +
-    unpriced +
-    `<p class="muted value-note">Ships at current standalone store prices (USD, before tax) from star-citizen.wiki; a CCU's standard price is the gap between its two ships. Paints, gear and game access aren't counted; concept and limited ships often have no public price. "vs melt value" covers ship pledges whose ships are all priced. Account Value on Home adds CCUs at standard price, everything else at melt value, and your Store Credit; buy-backs, UEC and REC aren't counted. Melt value is the pledge's value on RSI (what it was originally bought for); for gifted or grey-market pledges that isn't what you paid.</p>`
-  );
-}
-
-// Stats → Fleet: what your ships are for, how big, how many fly today.
-function fleetSectionHtml() {
-  if (!state.shipOf) return '';
-  const f = OH.fleetStats(state.items, state.shipOf);
-  if (!f.ships) return '';
-  const box = (big, lbl) =>
-    `<div class="stat-box"><div class="big">${big}</div><div class="lbl">${lbl}</div></div>`;
-  const flying = f.byStatus['flight-ready'] || 0;
-  const boxes =
-    box(f.ships, 'ships & vehicles') +
-    box(`${flying} / ${f.known}`, 'flight ready') +
-    box(Math.round(f.cargo).toLocaleString('en-US'), 'cargo (SCU)') +
-    box(f.crew.toLocaleString('en-US'), 'crew seats');
-  const bars = (map) => {
-    const rows = Object.entries(map).sort((a, b) => b[1] - a[1]);
-    const max = Math.max(1, ...rows.map((r) => r[1]));
-    return rows
-      .map(
-        ([k, n]) => `<div class="bar-row">
-        <div class="bar-label">${OH.escapeHtml(titleCase(k))}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((n / max) * 100)}%"></div></div>
-        <div class="bar-val">${n}</div>
-      </div>`,
-      )
-      .join('');
-  };
-  const unknown = f.ships - f.known;
-  return (
-    `<div class="stat-grid">${boxes}</div>` +
-    `<div class="fleet-cols"><div><h4 class="modal-h">By Role</h4>${bars(f.byCareer)}</div>` +
-    `<div><h4 class="modal-h">By Size</h4>${bars(f.bySize)}</div></div>` +
-    `<p class="muted value-note">Ship data from star-citizen.wiki${
-      unknown ? ` · ${unknown} ship${unknown === 1 ? '' : 's'} not matched` : ''
-    }. Crew seats = each ship's maximum crew.</p>`
-  );
-}
-
 // One line per history step: what changed between two snapshots.
 function changeSummary(d) {
   const parts = [];
@@ -3878,16 +3776,6 @@ function changeSummary(d) {
   if (Math.abs(d.melt) >= 0.01)
     parts.push(`melt value ${d.melt > 0 ? '+' : '−'}${money(Math.abs(d.melt))}`);
   return parts.join(' · ') || 'no changes';
-}
-function changeDetails(d) {
-  const li = (cls, text) => `<li class="${cls}">${OH.escapeHtml(text)}</li>`;
-  return `<ul class="changes">${[
-    ...d.added.map((x) => li('add', `+ ${x.name} (${money(x.value)})`)),
-    ...d.removed.map((x) => li('del', `− ${x.name} (${money(x.value)})`)),
-    ...d.changed.map((x) =>
-      li('chg', `~ ${x.from} → ${x.to} (${money(x.fromValue)} → ${money(x.toValue)})`),
-    ),
-  ].join('')}</ul>`;
 }
 const fmtDay = (t) => new Date(t).toLocaleDateString(undefined, { dateStyle: 'medium' });
 
@@ -3913,339 +3801,12 @@ function creditNote(snap) {
     : ' (Store Credit not recorded)';
 }
 
-function historySvg(hist) {
-  const pts = hist.map((h) => ({ t: h.at, v: snapshotStore(h), note: creditNote(h) }));
-  const W = 560,
-    H = 150,
-    L = 56,
-    R = 10,
-    T = 10,
-    B = 22;
-  const t0 = pts[0].t,
-    t1 = pts[pts.length - 1].t || t0 + 1;
-  const vmin = Math.min(...pts.map((p) => p.v)),
-    vmax = Math.max(...pts.map((p) => p.v));
-  const span = vmax - vmin || 1;
-  const x = (t) => L + ((t - t0) / (t1 - t0 || 1)) * (W - L - R);
-  const y = (v) => T + (1 - (v - vmin) / span) * (H - T - B);
-  const line = pts.map((p) => `${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
-  const dots = pts
-    .map(
-      (p) =>
-        `<circle cx="${x(p.t).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="3"><title>${fmtDay(p.t)}: ${dollars(p.v)}${p.note}</title></circle>`,
-    )
-    .join('');
-  return `<svg class="hist-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Account value over time">
-    <text x="${L - 6}" y="${T + 8}" text-anchor="end">${dollars(vmax)}</text>
-    <text x="${L - 6}" y="${H - B}" text-anchor="end">${dollars(vmin)}</text>
-    <text x="${L}" y="${H - 4}">${fmtDay(t0)}</text>
-    <text x="${W - R}" y="${H - 4}" text-anchor="end">${fmtDay(t1)}</text>
-    <polyline points="${line}" fill="none" stroke="currentColor" stroke-width="2"/>${dots}
-  </svg>`;
-}
-
-// Stats → History: account value over time + a log of what changed per scan.
-function historySectionHtml() {
-  const hist = state.history;
-  if (!hist.length) return '';
-  if (hist.length < 2) {
-    return `<p class="muted">Tracking since ${fmtDay(
-      hist[0].at,
-    )}. Rescan after your hangar changes and each change shows up here.</p>`;
-  }
-  const steps = [];
-  for (let i = hist.length - 1; i > 0 && steps.length < 12; i--) {
-    const d = OH.diffSnapshots(hist[i - 1], hist[i]);
-    steps.push(
-      `<details class="hist-step"><summary><span class="hist-date">${fmtDay(hist[i].at)}</span> ${OH.escapeHtml(
-        changeSummary(d),
-      )}</summary>${changeDetails(d)}</details>`,
-    );
-  }
-  return (
-    `<h3 class="section-title" id="history">Account Value Over Time</h3>` +
-    (state.priceOf
-      ? historySvg(hist) +
-        `<p class="muted value-note tight">Everything you held at each scan, valued like Account Value today: ships at today's store prices, CCUs at standard price, everything else at melt value, plus Store Credit from scans that recorded it. Pledges you've since melted are estimated from their names.</p>`
-      : '<p class="muted">Loading ship prices…</p>') +
-    `<div class="hist-list">${steps.join('')}</div>` +
-    `<p class="muted value-note">A snapshot is kept each time a full scan finds changes: ${hist.length} so far, up to the last 100.</p>`
-  );
-}
-
+// Stats is the Svelte page in ui/stats (mounted into #stats-body); this only loads
+// what it needs and tells it to redraw.
 function renderStats() {
   ensurePrices();
-  const body = $('#stats-body');
-  if (!state.items.length) {
-    setHTML(
-      body,
-      `<div class="empty">${OH.quip('emptyHangar')} Hit Scan at the top to fill it.</div>`,
-    );
-    return;
-  }
-  const items = state.items;
-  const count = (k) => items.filter((p) => p.kind === k).length;
-  const ships = items.filter((p) => p.containsShip).length;
-
-  const box = (big, lbl) =>
-    `<div class="stat-box"><div class="big">${big}</div><div class="lbl">${lbl}</div></div>`;
-  const stats =
-    box(items.length, 'pledges') +
-    box(money(OH.totalValue(items)), 'melt value') +
-    box(ships, 'with ships') +
-    box(count('ccu'), 'CCUs') +
-    box(count('addon'), 'add-ons') +
-    box(count('coupon'), 'coupons');
-
-  // Breakdown by kind (count + subtotal), as bars scaled to the largest count.
-  const present = presentKinds();
-  const maxN = Math.max(1, ...present.map((k) => count(k.key)));
-  const bars = present
-    .map((k) => {
-      const n = count(k.key);
-      const sub = OH.totalValue(items.filter((p) => p.kind === k.key));
-      const pct = Math.round((n / maxN) * 100);
-      return `<div class="bar-row">
-        <div class="bar-label">${OH.escapeHtml(k.label)}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
-        <div class="bar-val">${n} · ${money(sub)}</div>
-      </div>`;
-    })
-    .join('');
-
-  // Top items by value.
-  const top = items
-    .filter((p) => Number.isFinite(p.value))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 10);
-  const topRows = top
-    .map(
-      (p) =>
-        `<div class="row"><div class="nm">${OH.escapeHtml(plainName(p))}</div><div class="vl">${OH.escapeHtml(formatValue(p))}</div></div>`,
-    )
-    .join('');
-
-  const tabs = {
-    overview: () =>
-      `<div class="stat-grid">${stats}</div>` +
-      `<h3 class="section-title">By Category</h3>${bars}` +
-      `<h3 class="section-title" style="margin-top:26px">Top Pledges by Value</h3>` +
-      `<div class="top-list">${topRows || '<div class="row muted">No priced pledges.</div>'}</div>`,
-    value: () => valueSectionHtml(),
-    fleet: () =>
-      (fleetSectionHtml() ||
-        `<p class="muted">${pricesLoading ? 'Loading ship data…' : 'Ship data unavailable (offline?).'}</p>`) +
-      `<h3 class="section-title" style="margin-top:26px">Loaners</h3>${loanersSectionHtml()}` +
-      `<h3 class="section-title" style="margin-top:26px">Included Vessels</h3>${includedSectionHtml()}`,
-    collection: () => collectionSectionHtml(),
-    buybacks: () => buybackStatsHtml(),
-    top: () => topListsHtml(),
-    spending: () => spendingSectionHtml(),
-    history: () =>
-      (historySectionHtml() ||
-        '<p class="muted">Your flight log starts with your next scan: every scan that finds changes gets logged here.</p>') +
-      backupRowHtml(),
-  };
-  const tab = tabs[state.statsTab] ? state.statsTab : 'overview';
-  setHTML(
-    body,
-    `<div class="layout-toggle stats-tabs" role="tablist">${STATS_TABS.map(
-      ([key, label]) =>
-        `<button role="tab" data-stats-tab="${key}" aria-selected="${key === tab}" class="${
-          key === tab ? 'active' : ''
-        }">${label}</button>`,
-    ).join('')}</div>` + tabs[tab](),
-  );
-}
-
-// --- Stats: Collection / Buy-backs / Top lists --------------------------------
-// Rows with data-open-item / data-open-bb open that pledge or buy-back.
-const sBox = (big, lbl, cls = '') =>
-  `<div class="stat-box ${cls}"><div class="big">${big}</div><div class="lbl">${lbl}</div></div>`;
-function sBars(rows, fmt = (n) => n) {
-  const max = Math.max(1, ...rows.map((r) => r[1]));
-  return rows
-    .map(
-      ([
-        label,
-        n,
-        title,
-        type,
-      ]) => `<div class="bar-row"${title ? ` title="${OH.escapeHtml(title)}"` : ''}>
-        <div class="bar-label">${OH.escapeHtml(label)}</div>
-        <div class="bar-track"><div class="bar-fill${type ? ` t-${type}` : ''}" style="width:${Math.round((n / max) * 100)}%"></div></div>
-        <div class="bar-val">${fmt(n)}</div>
-      </div>`,
-    )
-    .join('');
-}
-const itemRow = (p, right) =>
-  `<div class="row clickable" tabindex="0" role="button" data-open-item="${OH.escapeHtml(String(p.id))}"><div class="nm">${OH.escapeHtml(
-    plainName(p),
-  )}</div><div class="vl">${right}</div></div>`;
-const bbRow = (b, right) =>
-  `<div class="row clickable" tabindex="0" role="button" data-open-bb="${OH.escapeHtml(String(b.id))}"><div class="nm">${OH.escapeHtml(
-    buybackName(b),
-  )}</div><div class="vl">${right}</div></div>`;
-
-function collectionSectionHtml() {
-  if (!state.shipOf)
-    return `<p class="muted">${pricesLoading ? 'Loading ship data…' : 'Ship data unavailable (offline?).'}</p>`;
-  const c = OH.collectionStats(state.items, state.shipOf, state.catalog || []);
-  const insOrder = (t) => (t === 'LTI' ? 1e6 : parseInt(t, 10) * (/y/i.test(t) ? 12 : 1) || 0);
-  const ins = Object.entries(c.insurance)
-    .sort((a, b) => insOrder(b[0]) - insOrder(a[0]))
-    .map(([t, n]) => [insLabel(t), n]);
-  const withIns = ins.reduce((a, r) => a + r[1], 0);
-  const lti = c.insurance.LTI || 0;
-  const makers = c.makers
-    .map(
-      (m) => `<div class="bar-row" title="${OH.escapeHtml(m.models.join(', '))}">
-        <div class="bar-label">${OH.escapeHtml(m.name)}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((m.own / m.total) * 100)}%"></div></div>
-        <div class="bar-val">${m.own} of ${m.total}</div>
-      </div>`,
-    )
-    .join('');
-  return (
-    `<div class="stat-grid">${
-      sBox(withIns ? `${Math.round((lti / withIns) * 100)}%` : '—', 'of insured pledges are LTI') +
-      sBox(c.giftable, 'giftable') +
-      sBox(c.notGiftable, 'not giftable') +
-      sBox(c.meltable, 'meltable') +
-      sBox(c.makers.length, 'manufacturers')
-    }</div>` +
-    `<h3 class="section-title">Insurance</h3>${ins.length ? sBars(ins) : '<p class="muted">No insurance found in your pledges. Fly carefully out there.</p>'}` +
-    `<h3 class="section-title" style="margin-top:26px">Collection by Manufacturer</h3>` +
-    `<p class="muted value-note tight">How many of each maker's ship models you own (out of the ones with a store price). Hover a row to see which.</p>` +
-    (makers ||
-      '<p class="muted">No ships matched the ship list yet. Scan and they’ll roll out of the hangar.</p>')
-  );
-}
-
-function buybackStatsHtml() {
-  const bbs = state.buybacks;
-  if (!bbs.length)
-    return '<p class="muted">No buy-backs yet. Hit Scan at the top to pull them in.</p>';
-  if (!state.priceOf) ensurePrices();
-  const byKind = BB_KINDS.map((k) => [
-    k.label,
-    bbs.filter((b) => b.kind === k.key).length,
-    '',
-    TYPE_KEYS.includes(k.key) ? k.key : '',
-  ]).filter((r) => r[1]);
-  const priced = bbs.map((b) => ({ b, v: bbPrice(b) })).filter((x) => x.v);
-  const total = priced.reduce((a, x) => a + x.v, 0);
-  const real = bbs.filter((b) => bbDetail(b)).length;
-  // Most-melted: same ship melted again and again.
-  const counts = new Map();
-  for (const b of bbs) {
-    if (b.isCCU) continue;
-    const k = String(b.name || '')
-      .replace(/^\s*.+?\s+[-–]\s/, '')
-      .trim();
-    if (k) counts.set(k, (counts.get(k) || 0) + 1);
-  }
-  const most = [...counts]
-    .filter((r) => r[1] > 1)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10);
-  const top = priced.sort((a, b) => b.v - a.v).slice(0, 10);
-  const next = nextTokenDate();
-  return (
-    `<div class="stat-grid">${
-      sBox(bbs.length, 'buy-backs') +
-      sBox(
-        dollars(total),
-        `to buy all back${real < bbs.length ? ' (≈, load details for real prices)' : ''}`,
-      ) +
-      sBox(state.bbTokens != null ? state.bbTokens : '—', 'buy-back tokens') +
-      sBox(next || '—', 'next token') +
-      sBox(`${real} / ${bbs.length}`, 'with details loaded')
-    }</div>` +
-    `<h3 class="section-title">By Type</h3>${sBars(byKind)}` +
-    `<h3 class="section-title" style="margin-top:26px">Most Valuable to Buy Back</h3>` +
-    `<div class="top-list">${top.map(({ b, v }) => bbRow(b, dollars(v))).join('') || '<div class="row muted">No prices yet.</div>'}</div>` +
-    (most.length
-      ? `<h3 class="section-title" style="margin-top:26px">Melted Most Often</h3><div class="top-list">${most
-          .map(
-            ([n, k]) =>
-              `<div class="row"><div class="nm">${OH.escapeHtml(n)}</div><div class="vl">×${k}</div></div>`,
-          )
-          .join('')}</div>`
-      : '')
-  );
-}
-
-function topListsHtml() {
-  const items = state.items;
-  const byValue = items
-    .filter((p) => Number.isFinite(p.value) && p.value > 0)
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 10);
-  const dt = (p) => {
-    const t = Date.parse(p.date);
-    return Number.isNaN(t) ? null : t;
-  };
-  const oldest = items
-    .filter((p) => dt(p) != null)
-    .sort((a, b) => dt(a) - dt(b))
-    .slice(0, 10);
-  const v = hangarValue();
-  const savings = v
-    ? items
-        .map((p) => ({ p, si: v.pledges[p.id] }))
-        .filter(
-          // paid > 0: free rewards aren't savings
-          (x) => x.si && x.si.store && x.si.paid > 0 && x.si.store - x.si.paid >= 1,
-        )
-        .sort((a, b) => b.si.store - b.si.paid - (a.si.store - a.si.paid))
-        .slice(0, 10)
-    : [];
-  const ltiShips = items
-    .filter((p) => p.insurance === 'LTI' && p.containsShip && Number.isFinite(p.value))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 10);
-  const list = (rows) =>
-    `<div class="top-list">${rows || '<div class="row muted">Nothing here yet.</div>'}</div>`;
-  return (
-    `<div class="top-cols"><div><h3 class="section-title">Most Valuable Pledges</h3>${list(
-      byValue.map((p) => itemRow(p, OH.escapeHtml(formatValue(p)))).join(''),
-    )}</div>` +
-    `<div><h3 class="section-title">Biggest Savings vs Store Price</h3>${list(
-      savings
-        .map(({ p, si }) =>
-          itemRow(
-            p,
-            `${dollars(si.paid)} → ${dollars(si.store)} <span class="gain">+${dollars(si.store - si.paid)}</span>`,
-          ),
-        )
-        .join(''),
-    )}</div>` +
-    `<div><h3 class="section-title">Oldest Pledges</h3>${list(
-      oldest.map((p) => itemRow(p, OH.escapeHtml(p.date))).join(''),
-    )}</div>` +
-    `<div><h3 class="section-title">Most Valuable LTI Ships</h3>${list(
-      ltiShips.map((p) => itemRow(p, OH.escapeHtml(formatValue(p)))).join(''),
-    )}</div></div>` +
-    `<p class="muted value-note">Click any row to open it. Savings compare melt value with today's standard store price (warbonds, sales, CCU'd pledges).</p>`
-  );
-}
-
-// History lives only in this browser, so the History tab offers a backup file
-// (scans + history) and says how old the last one is.
-function backupRowHtml() {
-  const t = state.lastBackupAt;
-  const days = t ? Math.floor((Date.now() - t) / 86400000) : null;
-  const when = !t
-    ? '<span class="stale">never backed up</span>'
-    : days > 60
-      ? `<span class="stale">last backup ${fmtDay(t)}</span>`
-      : `last backup ${fmtDay(t)}`;
-  return `<div class="backup-row">
-    <button class="mk-btn" type="button" data-backup>Download Backup</button>
-    <span class="muted">${when} · Your scans and this history live only in this browser — uninstalling the extension or moving to another browser loses them. Keep the file somewhere safe (a Drive or OneDrive folder works) and restore it with Developers → Import JSON.</span>
-  </div>`;
+  if (state.statsTab === 'fleet') ensureLoaners();
+  homeUpdated();
 }
 
 // Stats is split into tabs; the choice is remembered like the Inventory layout.
@@ -7711,49 +7272,6 @@ function loanersOf(name) {
 const shipLink = (name, text = name) =>
   `<button type="button" class="ship-link" data-ship="${OH.escapeHtml(name)}">${OH.escapeHtml(text)}</button>`;
 
-// Stats → Fleet: the loaners your not-yet-flyable ships give you.
-function loanersSectionHtml() {
-  ensureLoaners();
-  if (!loanerMatrix) return '<p class="muted">Loading RSI\'s loaner list…</p>';
-  const rows = [];
-  for (const s of ownedShips()) {
-    const row = loanersOf(s.label);
-    if (row) rows.push({ ship: s.label, loaners: row.loaners });
-  }
-  if (!rows.length)
-    return '<p class="muted">Every ship you own is flight ready, so no loaners for you. Loaners only come with ships you can&#39;t fly in the game yet.</p>';
-  const all = [...new Set(rows.flatMap((r) => r.loaners))].sort((a, b) => a.localeCompare(b));
-  return `<p>You can fly <strong>${all.length}</strong> loaner${all.length === 1 ? '' : 's'}: ${all
-    .map((l) => shipLink(l))
-    .join(', ')}.</p>
-    <table class="org-table"><thead><tr><th>Your Ship</th><th>Loaners</th></tr></thead><tbody>${rows
-      .sort((a, b) => a.ship.localeCompare(b.ship))
-      .map(
-        (r) =>
-          `<tr><td>${shipLink(r.ship)}</td><td>${r.loaners.map((l) => shipLink(l)).join(', ')}</td></tr>`,
-      )
-      .join('')}</tbody></table>
-    <p class="muted value-note">From RSI's <a href="https://support.robertsspaceindustries.com/hc/en-us/articles/360003093114" target="_blank" rel="noopener">Loaner Ship Matrix</a>. Loaners are only given while a ship isn't flyable in the game yet (they go away once it's flight ready), need a game package on the account, and don't stack.</p>`;
-}
-
-// Stats → Fleet: snubs and rovers your ships come with permanently.
-function includedSectionHtml() {
-  ensureLoaners();
-  if (!includedVessels) return '<p class="muted">Loading RSI&#39;s included-vessels list…</p>';
-  const rows = [];
-  for (const s of ownedShips()) {
-    const inc = includedOf(s.label);
-    if (inc) rows.push({ ship: s.label, inc });
-  }
-  if (!rows.length)
-    return '<p class="muted">None of your ships come with a snub or ground vehicle tucked inside.</p>';
-  return `<table class="org-table"><thead><tr><th>Your Ship</th><th>Comes With</th></tr></thead><tbody>${rows
-    .sort((a, b) => a.ship.localeCompare(b.ship))
-    .map((r) => `<tr><td>${shipLink(r.ship)}</td><td>${r.inc.map(vesselLink).join(', ')}</td></tr>`)
-    .join('')}</tbody></table>
-    <p class="muted value-note">From RSI's <a href="https://support.robertsspaceindustries.com/hc/en-us/articles/4408770370455" target="_blank" rel="noopener">Included Vessels</a> list. Unlike loaners, these are yours to keep.</p>`;
-}
-
 function openShipModal(name) {
   hidePreview();
   const v = shipEntry(name);
@@ -7910,62 +7428,6 @@ function hideWishUndo() {
   wishUndo = null;
   const bar = $('#wish-undo');
   if (bar) bar.hidden = true;
-}
-
-// --- Stats → Spending ---------------------------------------------------------
-// What you've pledged per year (by pledge date) and the running total. Uses
-// each pledge's melt value, the store credit you'd get back, so gifts and
-// rewards count as $0 and upgrades count what they added.
-function spendingSectionHtml() {
-  const byYear = new Map();
-  let undated = 0;
-  for (const p of state.items) {
-    const y = /^(\d{4})/.exec(p.date || '');
-    const v = Number.isFinite(p.value) ? p.value : 0;
-    if (!y) {
-      undated += v;
-      continue;
-    }
-    const cur = byYear.get(y[1]) || { n: 0, sum: 0 };
-    cur.n++;
-    cur.sum += v;
-    byYear.set(y[1], cur);
-  }
-  if (!byYear.size)
-    return '<p class="muted">No dated pledges yet. Hit Scan at the top and we’ll do the math on your spending (gently).</p>';
-  const years = [...byYear.keys()].sort();
-  const first = Number(years[0]);
-  const last = Number(years[years.length - 1]);
-  const all = [];
-  for (let y = first; y <= last; y++)
-    all.push([String(y), byYear.get(String(y)) || { n: 0, sum: 0 }]);
-  const total = all.reduce((a, [, r]) => a + r.sum, 0) + undated;
-  const max = Math.max(1, ...all.map(([, r]) => r.sum));
-  const best = all.reduce((b, cur) => (cur[1].sum > b[1].sum ? cur : b));
-  let running = 0;
-  const box = (big, lbl) =>
-    `<div class="stat-box"><div class="big">${big}</div><div class="lbl">${lbl}</div></div>`;
-  const bars = all
-    .map(([y, r]) => {
-      running += r.sum;
-      return `<div class="bar-row">
-        <div class="bar-label">${y}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((r.sum / max) * 100)}%"></div></div>
-        <div class="bar-val spend-val">${money(r.sum)} <span class="muted">· ${r.n} pledge${r.n === 1 ? '' : 's'} · total ${money(running)}</span></div>
-      </div>`;
-    })
-    .join('');
-  return `<div class="stat-grid">
-      ${box(money(total), 'pledged in total')}
-      ${box(`${all.length}`, `years (${first} to ${last})`)}
-      ${box(money(total / all.length), 'average per year')}
-      ${box(best[0], `biggest year (${money(best[1].sum)})`)}
-    </div>
-    <h3 class="section-title" style="margin-top:22px">By Year</h3>
-    ${bars}
-    <p class="muted value-note">By pledge date, using each pledge's melt value (the store credit it would return), so gifts and rewards count as $0 and upgrades count only what they added.${
-      undated ? ` ${money(undated)} of pledges have no date.` : ''
-    } Stays on your PC like everything else.</p>`;
 }
 
 // --- Home: event heads-up -----------------------------------------------------
@@ -8690,4 +8152,27 @@ window.OHApp = {
   },
   shipOf: (name) => (state.shipOf ? state.shipOf(name) : null),
   priceOf: (name) => (state.priceOf ? state.priceOf(name) : null),
+  // For Stats (ui/stats): which page is showing, what's still loading, and the
+  // helpers its tabs share with the classic pages.
+  get view() {
+    return currentView();
+  },
+  get pricesLoading() {
+    return !!pricesLoading;
+  },
+  get loanersLoaded() {
+    return { matrix: !!loanerMatrix, included: !!includedVessels };
+  },
+  statsTabs: STATS_TABS,
+  bbKinds: BB_KINDS,
+  presentKinds,
+  insLabel,
+  titleCase,
+  nextTokenDate,
+  buybackName,
+  bbDetail,
+  bbPrice,
+  ownedShips,
+  loanersOf,
+  includedOf,
 };
