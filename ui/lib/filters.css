@@ -1,0 +1,300 @@
+/* Inventory and Buy-Backs (0.3.0): the page grid with the filter sidebar (Filters
+   Pass, B2), the toolbar's Filters button, and the active-filter pills. Shared by
+   both pages; Clean Pro tokens from ui/theme.css. Weights per CLAUDE.md: buttons
+   500, headings 600, only tiny all-caps labels 700. */
+
+/* Sidebar + list. Folded: the list takes the full width. */
+.oh-side {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 18px;
+  margin-top: 14px;
+}
+.oh-side.folded {
+  grid-template-columns: minmax(0, 1fr);
+}
+.oh-side.folded .oh-fbar {
+  display: none;
+}
+.oh-main {
+  min-width: 0;
+}
+
+/* The sidebar: pinned under the top bar while the list scrolls. */
+.oh-fbar {
+  position: sticky;
+  top: calc(var(--hdr-h, 0px) + 12px);
+  align-self: start;
+  max-height: calc(100vh - var(--hdr-h, 0px) - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px;
+  border-radius: var(--radius-lg, 14px);
+  background: var(--panel);
+}
+.oh-fbar-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.oh-fbar-top h3 {
+  margin: 0;
+  font: 600 15px var(--font-head);
+  color: var(--head);
+}
+.oh-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: 500 13px var(--font-head);
+  cursor: pointer;
+}
+.oh-link:hover {
+  background: none;
+  text-decoration: underline;
+}
+
+/* Type pills, each in its type's color when on. */
+.oh-tpills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.oh-tp {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font: 500 12px var(--font-head);
+  cursor: pointer;
+}
+.oh-tp:hover {
+  background: var(--panel-2);
+  color: var(--text);
+}
+.oh-tp[aria-pressed='true'] {
+  border-color: var(--c);
+  color: var(--head);
+  background: color-mix(in srgb, var(--c) 18%, transparent);
+}
+.oh-tp i {
+  font-style: normal;
+  color: var(--faint);
+}
+.oh-tdot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--c);
+}
+.oh-fbar > .oh-sw {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: 500 13px var(--font-head);
+  cursor: pointer;
+}
+
+/* Folding groups. */
+.oh-fg {
+  border-top: 1px solid var(--line);
+}
+.oh-fg summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 2px;
+  list-style: none;
+  cursor: pointer;
+  font: 700 11px var(--font-head);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.oh-fg summary::-webkit-details-marker {
+  display: none;
+}
+.oh-fg summary::after {
+  content: '▸';
+  margin-left: auto;
+  color: var(--faint);
+  font-size: 12px;
+  transition: transform 0.15s;
+}
+.oh-fg[open] summary::after {
+  transform: rotate(90deg);
+}
+.oh-sn,
+.oh-cnt {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font: 700 10px var(--font-head);
+  letter-spacing: 0;
+}
+.oh-gc {
+  display: block;
+  padding: 0 0 6px 2px;
+  font-size: 12px;
+}
+.oh-fsearch {
+  width: 100%;
+  height: 30px;
+  margin: 0 0 6px;
+  padding: 0 9px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--head);
+  font: 13px var(--font-body);
+  outline: none;
+}
+.oh-opts {
+  display: grid;
+  padding-bottom: 8px;
+}
+.oh-opt {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--text);
+  font: 400 14px var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.oh-opt:hover {
+  background: var(--panel-2);
+  color: var(--text);
+}
+.oh-box {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border: 1.5px solid var(--line-2);
+  border-radius: 4px;
+  color: #fff;
+}
+.oh-opt[aria-pressed='true'] .oh-box {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.oh-opt i {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--faint);
+}
+.oh-range {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 10px;
+}
+.oh-range-vals {
+  display: flex;
+  justify-content: space-between;
+  font: 600 13px var(--font-head);
+  color: var(--head);
+}
+.oh-range input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+/* Toolbar: Filters (n) while the sidebar is folded away. */
+.oh-fbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  border-radius: 10px;
+}
+
+/* Active filters above the list. */
+.oh-active {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+.oh-af {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 6px 0 11px;
+  border: 1px solid rgba(47, 129, 247, 0.45);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--head);
+  font: 500 12px var(--font-head);
+}
+.oh-af i {
+  font-style: normal;
+  color: var(--muted);
+}
+.oh-af button {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+.oh-af button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--head);
+}
+.oh-clearall {
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: 500 12px var(--font-head);
+  cursor: pointer;
+}
+.oh-clearall:hover {
+  background: none;
+  text-decoration: underline;
+}
+
+/* Phones and narrow windows: the sidebar sits above the list, not beside it. */
+@media (max-width: 900px) {
+  .oh-side {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .oh-fbar {
+    position: static;
+    max-height: none;
+  }
+}
