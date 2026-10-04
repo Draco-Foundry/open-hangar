@@ -6854,6 +6854,7 @@ window.OHApp = {
     addMine: addMyOrgFleet,
     exportCsv: exportOrgCsv,
     remove: removeOrgMember,
+  },
   // For Developers (ui/developers): its links, supporters, the data tools' state
   // (note under the buttons, restore button, saved accounts) and their actions.
   dev: {
