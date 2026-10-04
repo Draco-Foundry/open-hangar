@@ -656,6 +656,23 @@ try {
   !gs.groups.includes('Ships') && gs.hangarRow && !gs.storeRow && gs.notOwned && gs.closed
     ? ok(`hangar search "cutlass": ${gs.groups.join(', ')}; "Idris" (not owned) finds nothing`)
     : fail(`global search: ${JSON.stringify(gs)}`);
+  // A result opens its pledge, and both searches start empty again (#178).
+  const pick = await page.evaluate(async () => {
+    const box = document.querySelector('#gsearch-top');
+    box.value = 'cutlass';
+    box.dispatchEvent(new Event('input'));
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    await new Promise((r) => setTimeout(r, 300));
+    const res = {
+      modal: !document.querySelector('#item-modal').hidden,
+      cleared: box.value === '' && document.querySelector('#gsearch-top-results').hidden,
+    };
+    document.querySelector('#modal-close').click();
+    return res;
+  });
+  pick.modal && pick.cleared
+    ? ok('search: Enter opens the first result and the box starts empty again')
+    : fail(`search pick: ${JSON.stringify(pick)}`);
   gs.title && gs.inHangar && gs.links >= 3
     ? ok(`ship window for ${gs.title}: specs, pledges, links`)
     : fail(`ship window: ${JSON.stringify(gs)}`);
@@ -816,8 +833,7 @@ try {
     top.value = 'cutlass';
     top.dispatchEvent(new Event('input'));
     r.search = !!document.querySelector('#gsearch-top-results .gs-row');
-    top.value = '';
-    document.querySelector('#gsearch-top-results').hidden = true;
+    top.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     return r;
   });
   inv.sum && inv.hid && inv.view && inv.oldView && /from your wishlist|wishlist/.test(inv.planner)

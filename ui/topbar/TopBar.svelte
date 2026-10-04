@@ -30,8 +30,8 @@
     };
   });
 
-  // The search box is still classic (dashboard.js binds it at load): it stays in the
-  // page's <header> until this moves it into its place in the bar, once.
+  // The search box (ui/search) mounts into #top-search in the page's <header>; this
+  // moves it into its place in the bar, once.
   function adopt(node) {
     const box = document.getElementById('top-search');
     if (box) node.appendChild(box);
