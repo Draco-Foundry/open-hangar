@@ -1578,6 +1578,46 @@ try {
         `gallery ${refUi.gallery} rewards, ${refUi.timeline} milestones, prospect ages, event banner`,
       )
     : fail(`referral sections: ${JSON.stringify(refUi)}`);
+  // People list (Svelte): tabs swap the list and clear the search, search filters
+  // live, sort reorders.
+  const people = await page.evaluate(async () => {
+    const wait = () => new Promise((r) => setTimeout(r, 50));
+    const rows = () => [...document.querySelectorAll('#ref-tbody tr')];
+    const count = () => document.querySelector('#ref-count').textContent;
+    const search = document.querySelector('#ref-search');
+    const out = { recruits: rows().length, count: count() };
+    const first = rows()[0]?.querySelector('td').textContent.trim() || '';
+    search.value = first;
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await wait();
+    out.searched = rows().length;
+    document.querySelector('[data-reftab="prospects"]').click();
+    await wait();
+    out.prospects = rows().length;
+    out.cleared = search.value === '';
+    out.dateCol = document.querySelector('#ref-date-col').textContent;
+    const sort = document.querySelector('#ref-sort');
+    sort.value = 'name';
+    sort.dispatchEvent(new Event('change', { bubbles: true }));
+    await wait();
+    const names = rows().map((r) => r.querySelector('td').textContent.trim());
+    out.sorted = names.every((n, i) => !i || names[i - 1].localeCompare(n) <= 0);
+    document.querySelector('[data-reftab="recruits"]').click();
+    sort.value = 'newest';
+    sort.dispatchEvent(new Event('change', { bubbles: true }));
+    await wait();
+    return out;
+  });
+  people.recruits > 1 &&
+  /^Showing \d+ of \d+$/.test(people.count) &&
+  people.searched >= 1 &&
+  people.searched < people.recruits &&
+  people.prospects > 0 &&
+  people.cleared &&
+  people.dateCol === 'Enlisted' &&
+  people.sorted
+    ? ok(`people list: tabs, search (${people.searched} of ${people.recruits}), sort by name`)
+    : fail(`people list: ${JSON.stringify(people)}`);
   // jsQR (dev-only) reads the QR back out of the finished image.
   await page.addScriptTag({ path: 'node_modules/jsqr/dist/jsQR.js' });
   const share = await page.evaluate(async () => {
