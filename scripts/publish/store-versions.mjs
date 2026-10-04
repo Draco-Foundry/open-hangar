@@ -1,5 +1,6 @@
 // Stamps each store's live version, and a newer one waiting in review, onto the
-// install buttons of openhangar.space/extension (rules in lib.mjs). Run at deploy
+// install buttons of openhangar.space/extension (rules in lib.mjs), and writes the
+// same facts plus the latest version as versions.json beside it. Run at deploy
 // and daily by .github/workflows/pages.yml:
 //   GH_TOKEN=… GITHUB_REPOSITORY=Draco-Foundry/open-hangar node scripts/publish/store-versions.mjs site/index.html
 // Live versions come from the stores' public update checks (what browsers ask)
@@ -8,8 +9,15 @@
 // to that store, when it's newer than the live one. Anything that can't be read
 // is left blank, never guessed; the page then just shows the buttons.
 import fs from 'node:fs';
+import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { stampStoreVersions, storeLine, submittedVersions, updateCheckVersion } from './lib.mjs';
+import {
+  stampStoreVersions,
+  storeLine,
+  submittedVersions,
+  updateCheckVersion,
+  versionsJson,
+} from './lib.mjs';
 
 const file = process.argv[2] || 'site/index.html';
 const repo = process.env.GITHUB_REPOSITORY || 'Draco-Foundry/open-hangar';
@@ -82,5 +90,24 @@ const lines = Object.fromEntries(
   ['chrome', 'edge', 'firefox'].map((s) => [s, storeLine(live[s], submitted[s])]),
 );
 fs.writeFileSync(file, stampStoreVersions(fs.readFileSync(file, 'utf8'), lines));
+// The same, plus the latest version and its date, as versions.json next to the page.
+let updated = null;
+try {
+  updated =
+    execFileSync('git', ['log', '-1', '--format=%cs', '-G"version"', '--', 'manifest.json'], {
+      encoding: 'utf8',
+    }).trim() || null;
+} catch {
+  // A shallow checkout: the date stays empty.
+}
+const version = JSON.parse(fs.readFileSync('manifest.json', 'utf8')).version;
+fs.writeFileSync(
+  path.join(path.dirname(file), 'versions.json'),
+  JSON.stringify(
+    versionsJson({ version, updated, lines, checkedAt: new Date().toISOString() }),
+    null,
+    2,
+  ) + '\n',
+);
 for (const [s, l] of Object.entries(lines))
   console.log(`${s}: live ${l.live || '?'}${l.pending ? `, ${l.pending} in review` : ''}`);
