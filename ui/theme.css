@@ -507,7 +507,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   max-height: none;
   overflow: hidden;
   padding: 0;
-  border: 1px solid rgba(47, 129, 247, 0.55);
+  border: 1px solid rgba(77, 124, 255, 0.55);
   border-radius: 14px;
   background: #232933;
   box-shadow:
@@ -688,7 +688,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   flex-wrap: wrap;
   margin: 0 0 12px;
   padding: 10px 14px;
-  border: 1px solid rgba(47, 129, 247, 0.45);
+  border: 1px solid rgba(77, 124, 255, 0.45);
   border-radius: 10px;
   background: var(--accent-soft);
   color: var(--head);
@@ -795,7 +795,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   gap: 14px;
   margin: 0 0 16px;
   padding: 56px 24px;
-  border: 1px solid rgba(47, 129, 247, 0.35);
+  border: 1px solid rgba(77, 124, 255, 0.35);
   border-radius: var(--radius-lg);
   background:
     radial-gradient(60% 120% at 50% 0%, rgba(77, 124, 255, 0.16), transparent 70%), var(--panel);
@@ -923,7 +923,7 @@ body:not(:has(#view-home.active)) .wrap > header {
 }
 .grid.list .val,
 #buybacks-body .grid.list .bb-end .val {
-  font: 800 19px var(--font-head);
+  font: 500 18px var(--font-data);
   color: var(--head);
 }
 #buybacks-body .grid.list .bb-end {
@@ -1042,7 +1042,7 @@ nav .nav-n:empty {
   max-height: none;
   padding: 0;
   overflow: hidden;
-  border: 1px solid rgba(47, 129, 247, 0.55);
+  border: 1px solid rgba(77, 124, 255, 0.55);
   border-radius: 14px;
   background: #232933;
   box-shadow:
@@ -1249,7 +1249,7 @@ nav .nav-n:empty {
   width: min(420px, calc(100vw - 32px));
   gap: 12px;
   padding: 18px;
-  border: 1px solid rgba(47, 129, 247, 0.55);
+  border: 1px solid rgba(77, 124, 255, 0.55);
   border-radius: 14px;
   background: #232933;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
@@ -1545,7 +1545,7 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
 }
 .page-sum h2 {
   margin: 0;
-  font: 800 26px var(--font-head);
+  font: 600 26px var(--font-head);
   color: var(--head);
 }
 .ps-note {
@@ -1572,7 +1572,8 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
   color: var(--muted);
 }
 .ps-v {
-  font: 800 22px var(--font-head);
+  font: 500 22px var(--font-data);
+  letter-spacing: -0.01em;
   color: var(--head);
   font-variant-numeric: tabular-nums;
 }
@@ -1712,7 +1713,7 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
   display: inline-flex;
   align-items: center;
   border: 1px dashed var(--line-2);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
 }
 .view-chip.on {
   border-style: solid;
@@ -1746,7 +1747,7 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
 .val .under,
 .bb-end .under {
   display: block;
-  font: 800 11px var(--font-head);
+  font: 600 11px var(--font-head);
   color: var(--good);
   white-space: nowrap;
 }
@@ -1758,10 +1759,10 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
   display: inline-block;
   margin-left: 6px;
   padding: 1px 7px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   background: var(--panel-2);
   color: var(--link);
-  font: 800 12px var(--font-head);
+  font: 500 12px var(--font-data);
   vertical-align: 2px;
 }
 /* Melt planner line in Select mode's bar. */
@@ -1779,7 +1780,7 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
 }
 .sb-melt .sb-total {
   margin-right: 6px;
-  font: 800 22px var(--font-head);
+  font: 500 22px var(--font-data);
   vertical-align: -2px;
 }
 .sb-warn {
@@ -1917,7 +1918,7 @@ body:not(:has(#view-home.active)) .market-title {
 }
 .sc-code {
   padding: 6px 12px;
-  border: 1px dashed rgba(47, 129, 247, 0.55);
+  border: 1px dashed rgba(77, 124, 255, 0.55);
   border-radius: 10px;
   background: #232933;
   color: var(--head);
@@ -1928,7 +1929,7 @@ body:not(:has(#view-home.active)) .market-title {
   display: grid;
   gap: 8px;
   padding: 12px 14px;
-  border: 1px solid rgba(47, 129, 247, 0.55);
+  border: 1px solid rgba(77, 124, 255, 0.55);
   border-radius: 12px;
   background: #232933;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
@@ -2054,4 +2055,36 @@ button,
 .btn {
   border-radius: var(--r-sm);
   font-weight: 500;
+}
+
+/* ---- Inventory and Buy-Backs in Hangar Cobalt (styling pass, 2026-10-04) ------ */
+/* Cards: rounded, and on hover they lift and light their edge in cobalt. */
+.card {
+  border-radius: var(--r-md);
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease,
+    transform 0.12s ease;
+}
+.card:hover {
+  border-color: var(--accent-line);
+  box-shadow:
+    0 0 0 1px var(--accent-line),
+    0 10px 24px rgba(0, 0, 0, 0.35);
+}
+/* Prices read like instrument readouts. */
+.val {
+  font-family: var(--font-data);
+  font-weight: 500;
+  color: var(--head);
+  letter-spacing: -0.01em;
+}
+.market-table th {
+  font-weight: 600;
+}
+.market-table th:first-child {
+  border-top-left-radius: var(--r-sm);
+}
+.market-table th:last-child {
+  border-top-right-radius: var(--r-sm);
 }
