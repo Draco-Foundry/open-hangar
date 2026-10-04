@@ -22,12 +22,6 @@ const VIEWS = [
 ];
 
 const statusEl = $('#status');
-const scanBtn = $('#scan-home');
-const scanMenuBtn = $('#scan-menu-btn');
-const scanMenu = $('#scan-menu');
-const scanSelectedBtn = $('#scan-selected');
-const logoutBtn = $('#logout-home');
-const clearBtn = $('#clear-home');
 
 // Buy-back kind labels (buy-backs classify into a slightly different set than
 // the hangar — notably 'paint'). Order = display order.
@@ -498,9 +492,29 @@ window.addEventListener('unhandledrejection', (e) => {
   OH.log('error', 'page', `unhandled: ${(r && (r.stack || r.message)) || r}`);
 });
 
+// The top bar is Svelte (ui/topbar, mounted into the page's <header>). It reads
+// `topBar` through window.OHApp.top and redraws on 'oh:home'; scanning, storage and
+// what its menus do stay here.
+const SCAN_SOURCES = ['hangar', 'buybacks', 'referrals', 'store'];
+const topBar = {
+  busy: false, // a scan is running: Scan and Scan Now are disabled
+  // While `scanning`, the Scan button shows the progress below (label, fill %, hover
+  // text) instead of "Scan All" / "Scan Custom", until the end flash fades.
+  scanning: false,
+  label: '',
+  fill: 0,
+  title: '',
+  detail: '', // what the scan is on right now, for the ▾ menu
+  sources: [...SCAN_SOURCES], // ticked in the ▾ menu (remembered in scanSources)
+  update: null, // a newer version waiting for a reload ("Update ready")
+  currency: 'USD', // the gear menu's pick (fx follows once the rates load)
+  remind: true, // Rescan Reminder
+  loggingOut: false,
+};
+
 // Scan progress shows in the top bar's Scan button itself (every page): it fills
 // as the chosen sources finish ("Scanning… 2/4") and says what it's on in its hover
-// text; at the end "✓ Done" (or "⚠ Finished") for a moment, then Scan All again.
+// text; at the end "✓ Landed" (or "⚠ Rough Landing") for a moment, then Scan All.
 const scanProgress = { i: 0, n: 1 };
 let scanDoneTimer = null;
 // What the scan is on right now ("Buy-backs · page 8 · 800 items"). Never in the
@@ -508,43 +522,34 @@ let scanDoneTimer = null;
 // button's hover text and its ▾ menu, and on the first scan (the welcome card is
 // up) a big progress bar in place of Scan All Now. '' = the scan ended.
 function scanDetail(text) {
-  const btn = $('#scan-home');
-  if (btn && text) btn.title = text;
-  const line = $('#scan-menu-progress');
-  if (line) {
-    line.textContent = text ? `Scanning: ${text}` : '';
-    line.hidden = !text;
-  }
+  if (text) topBar.title = text;
+  topBar.detail = text || '';
   // The welcome card (ui/home/Welcome.svelte) shows it while it's up.
   const { i, n } = scanProgress;
   homeCard.scan = { text, pct: Math.max(4, Math.min(100, ((i + 0.5) / n) * 100)) };
   homeUpdated();
 }
 function setScanning(text, done = false) {
-  const btn = $('#scan-home');
-  if (!btn) return;
-  const fill = btn.querySelector('.scan-fill');
-  const label = btn.querySelector('.scan-label');
   clearTimeout(scanDoneTimer);
+  homeUpdated();
   if (!text) {
-    btn.classList.remove('scanning');
-    if (fill) fill.style.width = '0';
-    updateScanLabel();
+    topBar.scanning = false;
+    topBar.fill = 0;
     return;
   }
-  btn.classList.add('scanning');
+  topBar.scanning = true;
   const clean = text.replace(/^[✓⚠]\s*/, '');
   if (done) {
-    if (fill) fill.style.width = '100%';
-    label.textContent = /^⚠/.test(text) ? '⚠ Rough Landing' : '✓ Landed';
-    btn.title = /^⚠/.test(text) ? clean : `${OH.quip('scanDone')} ${clean}`;
+    topBar.fill = 100;
+    topBar.label = /^⚠/.test(text) ? '⚠ Rough Landing' : '✓ Landed';
+    topBar.title = /^⚠/.test(text) ? clean : `${OH.quip('scanDone')} ${clean}`;
     scanDoneTimer = setTimeout(() => setScanning(''), 2200);
     return;
   }
   const { i, n } = scanProgress;
-  if (fill) fill.style.width = `${Math.max(6, (i / n) * 100)}%`;
-  label.textContent = n > 1 ? `Scanning… ${Math.min(i + 1, n)}/${n}` : 'Scanning…';
-  btn.title = `Scanning ${clean}`;
+  topBar.fill = Math.max(6, (i / n) * 100);
+  topBar.label = n > 1 ? `Scanning… ${Math.min(i + 1, n)}/${n}` : 'Scanning…';
+  topBar.title = `Scanning ${clean}`;
 }
 
 // Amounts are USD; `fx` converts them to the display currency (Home → Currency).
@@ -699,10 +704,7 @@ function route() {
   document
     .querySelectorAll('.view')
     .forEach((s) => s.classList.toggle('active', s.id === 'view-' + v));
-  document
-    .querySelectorAll('#nav a')
-    .forEach((a) => a.classList.toggle('active', a.dataset.view === v));
-  renderTopBar();
+  homeUpdated(); // the top bar (ui/topbar) marks this page in its nav
   if (v !== 'buybacks') state.bbOnly = null; // an alert's filter lasts for that one visit
   if (v === 'home') renderHome();
   else if (v === 'inventory') renderInventory();
@@ -719,65 +721,6 @@ function route() {
 }
 
 window.addEventListener('hashchange', route);
-
-// Top bar extras: counts beside Inventory / Buy-Backs and the Streamer pill.
-function renderTopBar() {
-  const n = (id, count) => {
-    const el = $(id);
-    if (el) el.textContent = count ? compactNum(count) : '';
-  };
-  n('#nav-n-inventory', state.items.length);
-  n('#nav-n-buybacks', state.buybacks.length);
-  const dot = $('#stream-dot');
-  if (dot) dot.hidden = !streamer.on;
-  const me = $('#settings-btn');
-  if (me) {
-    const tip = streamer.on ? 'Your menu · Streamer Mode is on: money is hidden' : 'Your menu';
-    me.title = tip;
-    me.setAttribute('aria-label', tip);
-  }
-}
-
-// The bar slims down while you scroll down a long page, and comes back on the way up.
-{
-  let anchorY = 0; // where the current scroll direction started
-  let lockUntil = 0; // ignore the jump the bar's own resize causes
-  const header = document.querySelector('.wrap > header');
-  // Stuck section headers sit right under the bar (--hdr-h, ui/theme.css), so it
-  // has to follow the bar's real height as it slims (#177).
-  const syncHeight = () =>
-    header && document.documentElement.style.setProperty('--hdr-h', `${header.offsetHeight}px`);
-  const setSlim = (on) => {
-    if (document.body.classList.contains('bar-slim') === on) return;
-    document.body.classList.toggle('bar-slim', on);
-    lockUntil = performance.now() + 350;
-    syncHeight();
-  };
-  header?.addEventListener('transitionend', syncHeight);
-  window.addEventListener(
-    'scroll',
-    () => {
-      const y = window.scrollY;
-      if (performance.now() < lockUntil) {
-        anchorY = y;
-        return;
-      }
-      if (y < 140) setSlim(false);
-      else if (y - anchorY > 48)
-        setSlim(true); // a real move down
-      else if (anchorY - y > 48)
-        setSlim(false); // a real move up
-      else return;
-      anchorY = y;
-    },
-    { passive: true },
-  );
-  // Border box: slimming only changes the bar's padding, which a content-box
-  // observer never sees.
-  if (header && 'ResizeObserver' in window) {
-    new ResizeObserver(syncHeight).observe(header, { box: 'border-box' });
-  }
-}
 
 // --- Home -----------------------------------------------------------------
 
@@ -904,40 +847,20 @@ function renderWelcome() {
   homeUpdated();
 }
 
-// RSI account → the home Citizen Card (drawn by ui/home/CitizenCard.svelte), plus
-// the bits of the page outside the card that follow the account: the gear menu's
-// portrait and name, Log Out, the signed-out banner and Store Credit.
+// RSI account → the home Citizen Card (drawn by ui/home/CitizenCard.svelte) and the
+// top bar's portrait, name and Log Out (ui/topbar), which read homeCard.account; plus
+// the signed-out banner and Store Credit.
 function renderAccount() {
   OH.getAccount().then((a) => {
     // Signed out → the card shows the centred "Log In to RSI" wall instead.
     // Anything but a confirmed login (false = logged out, null = couldn't tell)
     // counts as signed out: there's no live account data either way.
     const loggedOut = a.loggedIn !== true;
+    // The top bar's portrait, name and Log Out read it too (ui/topbar).
     homeCard.account = a;
-    if (logoutBtn) logoutBtn.hidden = a.loggedIn !== true;
 
     updateSignedOutBanner(loggedOut);
     renderWelcome();
-
-    const menuAv = $('#menu-avatar');
-    if (menuAv) {
-      const thumb = a.loggedIn ? safeBgUrl(a.avatar) : '';
-      menuAv.classList.toggle('has-pic', !!thumb);
-      menuAv.style.backgroundImage = thumb;
-    }
-    const who = $('#menu-who');
-    if (who) {
-      who.hidden = !a.loggedIn;
-      if (a.loggedIn) {
-        const org =
-          a.org && a.org.name ? `${a.org.name}${a.org.rank ? ` · ${a.org.rank}` : ''}` : '';
-        setHTML(
-          who,
-          `<span class="mw-pic"></span><span><b>${OH.escapeHtml(a.displayname || a.nickname || '')}</b>${org ? `<small>${OH.escapeHtml(org)}</small>` : ''}</span>`,
-        );
-        who.querySelector('.mw-pic').style.backgroundImage = safeBgUrl(a.avatar);
-      }
-    }
 
     // Store Credit counts toward Account Value.
     const c = a.credits || {};
@@ -1043,7 +966,6 @@ function renderHome() {
   renderAccount();
   const has = state.items.length > 0;
   document.getElementById('view-home').classList.toggle('no-data', !has);
-  if (clearBtn) clearBtn.hidden = !(state.items.length || state.scannedAt);
   // Everything below the Citizen Card is the Svelte Home (ui/home); tell it to redraw.
   homeUpdated();
 
@@ -4290,8 +4212,7 @@ document.addEventListener('click', (e) => {
 // of your data untouched; a failure in one still keeps the others' results.
 async function runScan({ hangar = true, buybacks = true, referrals = true, store = true } = {}) {
   if (!hangar && !buybacks && !referrals && !store) return;
-  scanBtn.disabled = true;
-  if (scanSelectedBtn) scanSelectedBtn.disabled = true;
+  topBar.busy = true;
   scanProgress.i = 0;
   scanProgress.n = [hangar, buybacks, referrals, store].filter(Boolean).length || 1;
   setScanning('Scanning…');
@@ -4414,37 +4335,20 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   renderSiteNotice();
   if (hangar) warmPictures(computeShown(), state.layout);
   if (buybacks) warmPictures(computeBuybacks(), state.bbLayout);
-  scanBtn.disabled = false;
-  homeUpdated(); // the welcome card's button follows scanBtn.disabled
-  if (scanSelectedBtn) scanSelectedBtn.disabled = false;
+  topBar.busy = false;
+  homeUpdated(); // the welcome card and the top bar follow topBar.busy
 }
 
 // The top bar's Scan runs what's ticked in its ▾ menu: "Scan All" by default,
 // "Scan Custom" once anything is unticked (owner, 2026-09-30). Remembered.
-const SCAN_SOURCES = ['hangar', 'buybacks', 'referrals', 'store'];
-const scanBoxes = () => [...document.querySelectorAll('.scan-src')];
 function scanChoice() {
-  const on = new Set(
-    scanBoxes()
-      .filter((el) => el.checked)
-      .map((el) => el.value),
-  );
+  const on = new Set(topBar.sources);
   return Object.fromEntries(SCAN_SOURCES.map((k) => [k, on.has(k)]));
 }
-function updateScanLabel() {
-  const boxes = scanBoxes();
-  const on = boxes.filter((el) => el.checked);
-  const all = on.length === boxes.length;
-  if (scanBtn.classList.contains('scanning')) return; // the progress owns the label
-  scanBtn.querySelector('.scan-label').textContent = all ? 'Scan All' : 'Scan Custom';
-  const what = all
-    ? 'Scan everything: inventory, buy-backs, referrals and your wishlist in the store'
-    : on.length
-      ? `Scan ${on.map((el) => el.dataset.name).join(', ')} (change with ▾)`
-      : 'Nothing ticked: pick what to scan with ▾';
-  scanBtn.title = state.scannedAt
-    ? `${what}\nLast scan: ${new Date(state.scannedAt).toLocaleString()}`
-    : what;
+function setScanSources(list) {
+  topBar.sources = SCAN_SOURCES.filter((k) => list.includes(k));
+  chrome.storage.local.set({ scanSources: topBar.sources });
+  homeUpdated();
 }
 function scanChosen() {
   const c = scanChoice();
@@ -4455,95 +4359,23 @@ function scanChosen() {
   closeCardMenus();
   runScan(c);
 }
-scanBtn.addEventListener('click', scanChosen);
-for (const el of scanBoxes()) {
-  el.addEventListener('change', () => {
-    updateScanLabel();
-    chrome.storage.local.set({
-      scanSources: scanBoxes()
-        .filter((b) => b.checked)
-        .map((b) => b.value),
-    });
-  });
-}
-// "Select All" in the menu ticks everything again.
-document.querySelector('[data-scan-all]')?.addEventListener('click', () => {
-  for (const el of scanBoxes()) el.checked = true;
-  scanBoxes()[0]?.dispatchEvent(new Event('change'));
-});
 chrome.storage.local.get('scanSources').then(({ scanSources }) => {
   if (Array.isArray(scanSources)) {
-    for (const el of scanBoxes()) el.checked = scanSources.includes(el.value);
+    topBar.sources = SCAN_SOURCES.filter((k) => scanSources.includes(k));
   }
-  updateScanLabel();
+  homeUpdated();
 });
 
-// Open below the ▾ button, right edges lined up; above it if there's no room.
-// Citizen Card pop-up menus (Scan options, Settings): pinned to the viewport
-// under their button so the card's clipped edges can't cut them off.
-const cardMenus = [
-  [scanMenuBtn, scanMenu],
-  [$('#bell-btn'), $('#bell-menu')],
-  [$('#inv-exp-btn'), $('#inv-exp-menu')],
-  [$('#bb-exp-btn'), $('#bb-exp-menu')],
-  [$('#settings-btn'), $('#settings-menu')],
-].filter(([b, m]) => b && m);
-function placeMenu(btn, menu) {
-  const b = btn.getBoundingClientRect();
-  const h = menu.offsetHeight || 0;
-  const below = b.bottom + 6 + h <= window.innerHeight - 8;
-  menu.style.right = `${Math.max(8, window.innerWidth - b.right)}px`;
-  menu.style.top = below ? `${b.bottom + 6}px` : `${Math.max(8, b.top - 6 - h)}px`;
-}
+// The top bar's menus (Scan options, Hangar Alerts, your menu) are Svelte
+// (ui/topbar/menus.svelte.js); this closes whichever one is open.
 function closeCardMenus() {
-  for (const [btn, menu] of cardMenus) {
-    if (menu.hidden) continue;
-    menu.hidden = true;
-    btn.setAttribute('aria-expanded', 'false');
-  }
+  document.dispatchEvent(new CustomEvent('oh:close-menus'));
 }
 
-for (const [btn, menu] of cardMenus) {
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation(); // don't let the document handler immediately re-close it
-    const open = menu.hidden;
-    closeCardMenus();
-    if (!open) return;
-    placeMenu(btn, menu);
-    menu.hidden = false;
-    btn.setAttribute('aria-expanded', 'true');
-    placeMenu(btn, menu); // again now that it has a size
-    // Into the menu, on its first control you can see (no scrolling: that closes it).
-    [...menu.querySelectorAll('a[href], button:not([disabled]), input, select')]
-      .find((el) => el.getClientRects().length)
-      ?.focus({ preventScroll: true });
-  });
-  // Clicks inside the menu (checkboxes, the currency picker) shouldn't close it.
-  menu.addEventListener('click', (e) => {
-    e.stopPropagation();
-    // A link or action in the menu (Updates, Log Out of RSI…) closes it.
-    if (e.target.closest('a, .menu-item')) closeCardMenus();
-  });
-}
-if (cardMenus.length) {
-  // Scrolling or resizing moves the buttons; just close the menus.
-  window.addEventListener('resize', closeCardMenus);
-  window.addEventListener('scroll', closeCardMenus, { passive: true });
-  document.addEventListener('click', closeCardMenus);
-  // Escape closes an open menu and puts focus back on its button.
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    const open = cardMenus.find(([, m]) => !m.hidden);
-    if (!open) return;
-    closeCardMenus();
-    open[0].focus({ preventScroll: true });
-  });
-}
-
-scanSelectedBtn?.addEventListener('click', scanChosen);
-
-logoutBtn.addEventListener('click', async () => {
-  logoutBtn.disabled = true;
+// Your menu → Log Out of RSI: only clears RSI's cookies, the saved data stays.
+async function logOut() {
+  topBar.loggingOut = true;
+  homeUpdated();
   setStatus('Signing out of RSI…');
   const res = await OH.logout();
   if (!res.ok) {
@@ -4556,10 +4388,12 @@ logoutBtn.addEventListener('click', async () => {
     setStatus(`Signed out of RSI. ${OH.quip('signedOut')}`);
     renderHome(); // flips the card to the signed-out wall
   }
-  logoutBtn.disabled = false;
-});
+  topBar.loggingOut = false;
+  homeUpdated();
+}
 
-clearBtn.addEventListener('click', async () => {
+// Your menu → Clear Data.
+async function clearData() {
   if (
     !confirm(
       "Clear this account's scanned data from this browser? Other saved accounts are kept. You can re-scan at any time.",
@@ -4585,7 +4419,7 @@ clearBtn.addEventListener('click', async () => {
   renderAccount(); // clear the referral pill too
   refreshRecoveryUI(); // a full manual wipe also drops any recovery snapshot
   route();
-});
+}
 
 // --- Developers: export / import -----------------------------------------
 // The page is Svelte (ui/developers, mounted into #view-developers). These are its
@@ -4808,7 +4642,7 @@ async function removeProfile(nick) {
 let lastFocusCheck = 0;
 document.addEventListener('visibilitychange', async () => {
   if (document.visibilityState !== 'visible') return;
-  if (scanBtn.disabled) return; // mid-scan: switching accounts now would race the scan's saves
+  if (topBar.busy) return; // mid-scan: switching accounts now would race the scan's saves
   const now = Date.now();
   if (now - lastFocusCheck < 3000) return;
   lastFocusCheck = now;
@@ -4925,10 +4759,10 @@ function showUpdateBanner(version) {
   const bar = $('#update-banner');
   if (!bar || !version || OH.compareVersions(version, cur) <= 0) return;
   $('#update-text').textContent = `Open Hangar ${version} has landed. Reload to start using it.`;
-  // Shown in your menu (a dot on the portrait) rather than a banner across the page.
-  $('#upd-dot').hidden = false;
-  $('#menu-upd-text').textContent = `Update ready: ${version}`;
-  $('#menu-upd').hidden = false;
+  // Shown in your menu (a dot on the portrait, "Update ready" in the menu, drawn by
+  // ui/topbar) rather than a banner across the page.
+  topBar.update = version;
+  homeUpdated();
 }
 
 async function initUpdates() {
@@ -4942,7 +4776,6 @@ async function initUpdates() {
   chrome.storage.onChanged?.addListener((ch, area) => {
     if (area === 'local' && ch.updateReady) showUpdateBanner(ch.updateReady.newValue);
   });
-  $('#menu-upd-reload')?.addEventListener('click', () => $('#update-reload').click());
   $('#update-reload')?.addEventListener('click', async () => {
     $('#update-reload').disabled = true;
     await chrome.storage.local.set({ reopenAfterUpdate: true });
@@ -5072,8 +4905,7 @@ function renderCurrencyNote() {
     el.textContent = currencyNote();
     el.hidden = !el.textContent;
   });
-  const sel = $('#currency-select');
-  if (sel) sel.title = currencyNote() || 'Show amounts in your currency (converted from USD)';
+  homeUpdated(); // the top bar's Currency picker shows the note on hover
 }
 async function applyCurrency(code) {
   const want = OH.CURRENCIES.includes(code) ? code : 'USD';
@@ -5096,14 +4928,12 @@ async function applyCurrency(code) {
   renderCurrencyNote();
   route(); // re-render the current view in the new currency
 }
-{
-  const sel = $('#currency-select');
-  if (sel) {
-    sel.addEventListener('change', async () => {
-      await chrome.storage.local.set({ currency: sel.value });
-      applyCurrency(sel.value);
-    });
-  }
+// Your menu → Currency (ui/topbar).
+async function pickCurrency(code) {
+  topBar.currency = code;
+  homeUpdated();
+  await chrome.storage.local.set({ currency: code });
+  applyCurrency(code);
 }
 
 // --- Ships: details window, loaners, global search ------------------------
@@ -5359,57 +5189,6 @@ function renderEventBanner() {
   refreshReferralEvents(); // calls back here when newer events arrive
   homeUpdated();
 }
-
-// --- Alerts bell (top bar) -------------------------------------------------------
-// Home's Hangar Alerts publishes its list (OHApp.alerts); the bell shows the count
-// and the same alerts in a drop-down, with × to ignore, on every page.
-function renderBell() {
-  const al = window.OHApp?.alerts;
-  const list = (al && al.list) || [];
-  const n = $('#bell-n');
-  if (n) {
-    n.hidden = !list.length;
-    n.textContent = list.length > 9 ? '9+' : String(list.length);
-  }
-  const menu = $('#bell-menu');
-  if (!menu) return;
-  const esc = OH.escapeHtml;
-  setHTML(
-    menu,
-    `<div class="bm-head"><span>${list.length ? `${list.length} alert${list.length === 1 ? '' : 's'}` : 'All caught up'}</span>${list.length ? '<button type="button" class="bm-clear" data-clear-alerts>Clear All</button>' : ''}</div>` +
-      (list.length
-        ? list
-            .map(
-              (x, i) =>
-                `<div class="bm-row ${esc(x.kind || '')}"><a href="${esc(x.href || '#home')}" data-alert="${i}"><b>${esc(x.title)}</b><small>${esc(x.sub || '')}</small></a><button type="button" class="bm-x" data-ignore="${i}" title="Ignore" aria-label="Ignore: ${esc(x.title)}">×</button></div>`,
-            )
-            .join('')
-        : `<p class="bm-none">${OH.quip('caughtUp')} Alerts land here when a wishlist ship goes on sale, a ship you own turns flight ready, and more.</p>`),
-  );
-}
-document.addEventListener('oh:alerts', renderBell);
-$('#bell-menu')?.addEventListener('click', (e) => {
-  const list = window.OHApp?.alerts?.list || [];
-  // Clear All ignores every alert showing (each comes back if something new happens).
-  if (e.target.closest('[data-clear-alerts]')) {
-    for (const x of list) window.OHApp.alerts.ignore(x.key);
-    return;
-  }
-  const ig = e.target.closest('[data-ignore]');
-  if (ig) {
-    window.OHApp.alerts.ignore(list[+ig.dataset.ignore].key);
-    return;
-  }
-  const go = e.target.closest('[data-alert]');
-  if (go) {
-    const x = list[+go.dataset.alert];
-    if (x && x.go) {
-      e.preventDefault();
-      x.go();
-    }
-    closeCardMenus();
-  }
-});
 
 // --- Global hangar search (Home) ------------------------------------------------
 // Searches what's yours: hangar pledges (names and what's inside), buy-backs
@@ -5765,25 +5544,9 @@ if (gsearch && gsearchOut) {
   state.bbStack = bbStack === true;
   if (Array.isArray(savedViews)) state.savedViews = savedViews.filter((v) => v && v.name && v.f);
   document.documentElement.classList.toggle('streamer', streamer.on);
-  const stream = $('#streamer-toggle');
-  if (stream) {
-    stream.checked = streamer.on;
-    stream.addEventListener('change', async () => {
-      streamer.on = stream.checked;
-      document.documentElement.classList.toggle('streamer', streamer.on);
-      await chrome.storage.local.set({ streamerMode: streamer.on });
-      route(); // redraw the page with (or without) amounts
-      renderAccount();
-      homeUpdated();
-    });
-  }
-  const remind = $('#remind-toggle');
-  if (remind) {
-    remind.checked = remindRescan !== false;
-    remind.addEventListener('change', () =>
-      chrome.storage.local.set({ remindRescan: remind.checked }),
-    );
-  }
+  // Your menu's Streamer Mode and Rescan Reminder switches (ui/topbar) read these.
+  topBar.remind = remindRescan !== false;
+  homeUpdated();
   if (LAYOUTS.includes(bbLayout)) state.bbLayout = bbLayout;
   if (marketAnnotations && typeof marketAnnotations === 'object') state.market = marketAnnotations;
 
@@ -5810,8 +5573,7 @@ if (gsearch && gsearchOut) {
   renderSiteLink();
   // @sync-end
   if (currency && currency !== 'USD') {
-    const sel = $('#currency-select');
-    if (sel) sel.value = currency;
+    topBar.currency = currency;
     applyCurrency(currency);
   }
 })();
@@ -5847,7 +5609,7 @@ window.OHApp = {
     return lastLoggedOut;
   },
   get scanning() {
-    return !!scanBtn?.disabled;
+    return topBar.busy;
   },
   get scanDetail() {
     return homeCard.scan;
@@ -5856,7 +5618,7 @@ window.OHApp = {
     return streamer.on;
   },
   scanAll: () => {
-    if (!scanBtn.disabled) runScan(); // everything, whatever the ▾ menu has ticked
+    if (!topBar.busy) runScan(); // everything, whatever the ▾ menu has ticked
   },
   safeBgUrl,
   fmtEnlisted,
@@ -6285,6 +6047,40 @@ window.OHApp = {
   },
   // For Developers (ui/developers): its links, supporters, the data tools' state
   // (note under the buttons, restore button, saved accounts) and their actions.
+  // The top bar (ui/topbar): the Scan button and its ▾ menu, your menu's switches
+  // and actions. The page links' counts, the account, Streamer Mode and the alerts
+  // come from the getters above (state, account, streamer, alerts).
+  top: {
+    get bar() {
+      return topBar;
+    },
+    get view() {
+      return currentView();
+    },
+    get currencyNote() {
+      return currencyNote();
+    },
+    scan: scanChosen,
+    setSources: setScanSources,
+    setCurrency: pickCurrency,
+    setStreamer: async (on) => {
+      streamer.on = !!on;
+      document.documentElement.classList.toggle('streamer', streamer.on);
+      homeUpdated();
+      await chrome.storage.local.set({ streamerMode: streamer.on });
+      route(); // redraw the page with (or without) amounts
+      renderAccount();
+    },
+    setRemind: (on) => {
+      topBar.remind = !!on;
+      homeUpdated();
+      chrome.storage.local.set({ remindRescan: topBar.remind });
+    },
+    logOut,
+    clearData,
+    reload: () => $('#update-reload')?.click(),
+    closeMenus: closeCardMenus,
+  },
   dev: {
     links: [
       [REPO_URL, 'GitHub'],

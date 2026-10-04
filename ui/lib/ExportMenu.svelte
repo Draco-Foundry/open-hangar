@@ -3,6 +3,8 @@
   // [data-export] button, handled by the classic click handler in dashboard.js.
   // The menu is pinned under its button (right edges lined up), above it when
   // there's no room below, and closes on a click outside or Escape.
+  import { placeUnder } from './place.js';
+
   let { ids = {}, items = [] } = $props();
   let open = $state(false);
   let btn = $state();
@@ -10,13 +12,7 @@
   let pos = $state({ right: 8, top: 0 });
 
   function place() {
-    const b = btn.getBoundingClientRect();
-    const h = menu?.offsetHeight || 0;
-    const below = b.bottom + 6 + h <= window.innerHeight - 8;
-    pos = {
-      right: Math.max(8, window.innerWidth - b.right),
-      top: below ? b.bottom + 6 : Math.max(8, b.top - 6 - h),
-    };
+    pos = placeUnder(btn, menu);
   }
   async function toggle(e) {
     e.stopPropagation();
