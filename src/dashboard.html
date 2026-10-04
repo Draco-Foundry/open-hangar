@@ -2698,30 +2698,15 @@
     <script type="module" src="ui/store.js"></script>
     <script type="module" src="ui/developers.js"></script>
     <script type="module" src="ui/topbar.js"></script>
+    <script type="module" src="ui/search.js"></script>
   </head>
   <body>
     <div class="wrap">
       <header>
         <!-- The top bar is Svelte (ui/topbar): the logo, the page links, the alerts
-             bell, Scan ▾ and your menu. The search box below is still classic
-             (dashboard.js binds it at load); the bar moves it into its place. -->
-        <div class="gsearch top-search" id="top-search">
-          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-            <path
-              fill="currentColor"
-              d="M10 3a7 7 0 0 1 5.6 11.2l4.6 4.6-1.4 1.4-4.6-4.6A7 7 0 1 1 10 3Zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z"
-            />
-          </svg>
-          <input
-            id="gsearch-top"
-            type="search"
-            placeholder="Search"
-            autocomplete="off"
-            aria-label="Search your hangar, buy-backs and rewards"
-          />
-          <kbd class="gsearch-key">/</kbd>
-          <div id="gsearch-top-results" class="gsearch-results top-results" hidden></div>
-        </div>
+             bell, Scan ▾ and your menu. The search box (ui/search) mounts in here and
+             the bar moves it into its place. -->
+        <div class="gsearch top-search" id="top-search"></div>
       </header>
 
       <!-- Global "signed out, showing cached scan" banner. Shown on every view when
@@ -2784,17 +2769,8 @@
         <!-- Global Hangar Search: its own line under the card (owner, 2026-09-30); the
              right quarter is kept for the website Connect button at launch. -->
         <div class="home-search">
-          <div class="gsearch gsearch-home">
-            <input
-              id="gsearch"
-              type="search"
-              placeholder="Global Hangar Search"
-              autocomplete="off"
-              aria-label="Search ships, hangar, buy-backs and rewards"
-            />
-            <kbd class="gsearch-key" title="Press / on any page to search">/</kbd>
-            <div id="gsearch-results" class="gsearch-results" hidden></div>
-          </div>
+          <!-- Svelte (ui/search): the box and its results. -->
+          <div class="gsearch gsearch-home"></div>
         </div>
         <!-- Everything under the card is the Svelte Home (ui/home, built into ui/). -->
         <div id="oh-home"></div>
