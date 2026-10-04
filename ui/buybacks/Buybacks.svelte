@@ -3,8 +3,8 @@
   // store price), one toolbar row, the filter sidebar (Filters Pass, B2) beside the
   // list, and the active filters as pills. Same shared parts as Inventory (ui/lib).
   // The list itself (#buybacks-body: cards or the Market reclaim sheet, the Load
-  // Details bar, a Hangar Alert's "Showing the…" line) is still drawn by
-  // renderBuybacks() in src/dashboard.js; this page moves it into its list column
+  // Details bar, a Hangar Alert's "Showing the…" line) is BuybacksList.svelte,
+  // mounted into #buybacks-body by main.js; this page moves it into its list column
   // once, on mount. State lives in dashboard.js (OHApp.bb): the list and the CSV
   // export read the same filters. Buy-back details stay opt-in (never part of Scan).
   import { app, version } from '../lib/app.svelte.js';
@@ -63,7 +63,7 @@
     };
   });
 
-  // Moves the classic list (#buybacks-body) into the list column, once.
+  // Moves the list (#buybacks-body) into the list column, once.
   function adopt(node) {
     const body = document.getElementById('buybacks-body');
     if (body) node.appendChild(body);
