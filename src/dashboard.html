@@ -2686,9 +2686,10 @@
       }
     </style>
     <link rel="stylesheet" href="ui/home.css" />
-    <link rel="stylesheet" href="ui/inventory.css" />
+    <link rel="stylesheet" href="ui/shared.css" />
     <script type="module" src="ui/home.js"></script>
     <script type="module" src="ui/inventory.js"></script>
+    <script type="module" src="ui/buybacks.js"></script>
     <script type="module" src="ui/stats.js"></script>
     <link rel="stylesheet" href="ui/referrals.css" />
     <script type="module" src="ui/referrals.js"></script>
@@ -3034,51 +3035,10 @@
 
       <!-- BUY-BACKS -->
       <section class="view" id="view-buybacks">
-        <div class="page-sum" id="bb-sum"></div>
-        <div class="controls" id="bb-controls" hidden>
-          <input
-            id="bb-search"
-            type="search"
-            placeholder="Search buy-backs…"
-            autocomplete="off"
-            aria-label="Search Buy-Backs"
-          />
-          <select id="bb-sort" aria-label="Sort Buy-Backs">
-            <option value="date-desc">Date: newest first</option>
-            <option value="date-asc">Date: oldest first</option>
-            <option value="price-desc">Price: high to low</option>
-            <option value="price-asc">Price: low to high</option>
-            <option value="name-asc">Name: A → Z</option>
-            <option value="name-desc">Name: Z → A</option>
-            <option value="default">Scan order</option>
-          </select>
-          <div class="layout-toggle" id="bb-layout">
-            <button data-layout="gallery">Gallery</button>
-            <button data-layout="compact">Compact</button>
-            <button data-layout="list">List</button>
-            <button data-layout="market">Market</button>
-          </div>
-          <div class="exp-wrap">
-            <button
-              id="bb-exp-btn"
-              class="mk-btn exp-btn"
-              type="button"
-              aria-haspopup="true"
-              aria-expanded="false"
-            >
-              Export ▾
-            </button>
-            <div id="bb-exp-menu" class="scan-menu exp-menu" hidden>
-              <button type="button" class="menu-item" data-export="bb-csv">
-                CSV of What's Showing<small>Just the rows your filters show</small>
-              </button>
-              <button type="button" class="menu-item" data-export="backup">
-                Everything (JSON)<small>Your full backup</small>
-              </button>
-            </div>
-          </div>
-        </div>
-        <div class="chips" id="bb-chips"></div>
+        <!-- ui/buybacks (Svelte) mounts here: summary strip, toolbar, the filter sidebar
+             and active filters. It moves #buybacks-body (the cards or the Market reclaim
+             sheet, still drawn by dashboard.js) into its list column. -->
+        <div id="oh-buybacks"></div>
         <div id="buybacks-body"></div>
       </section>
 

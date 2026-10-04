@@ -82,12 +82,11 @@
   {#if !d.empty}
     <FilterSidebar
       f={d.f}
-      smallSwitch="inv-hide"
       fmtMoney={d.dollars}
       onType={(k) => inv().toggleType(k)}
       onOption={(g, k) => inv().toggleOption(g, k)}
       onClearGroup={(g) => inv().clearGroup(g)}
-      onMelt={(v) => inv().setMeltMax(v)}
+      onCap={(v) => inv().setMeltMax(v)}
       onFold={(on) => inv().setFolded(on)}
       onGroupToggle={(g, open) => inv().setGroupOpen(g, open)}
     />
