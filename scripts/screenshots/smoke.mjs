@@ -494,6 +494,32 @@ try {
   const sel = await page.$eval('#sb-count', (e) => e.textContent);
   /2 selected/.test(sel) ? ok('select mode picks items') : fail(`select mode: "${sel}"`);
   await page.click('[data-sb="done"]');
+  // Export ▾ items run (the menu used to swallow their clicks): Share Image starts
+  // Select mode, and Buy-Backs' CSV item reaches its handler too.
+  await page.click('#inv-exp-btn');
+  await page.click('#inv-exp-menu [data-export="inv-image"]');
+  const exp = await page.evaluate(async () => {
+    const r = {
+      selecting: state.selecting,
+      menuClosed: document.querySelector('#inv-exp-menu').hidden,
+    };
+    setSelecting(false);
+    const real = exportBuybackCsv;
+    let called = false;
+    exportBuybackCsv = () => (called = true);
+    location.hash = '#buybacks';
+    await new Promise((res) => setTimeout(res, 300));
+    document.querySelector('#bb-exp-btn').click();
+    document.querySelector('#bb-exp-menu [data-export="bb-csv"]').click();
+    exportBuybackCsv = real;
+    r.bbCsv = called;
+    location.hash = '#inventory';
+    await new Promise((res) => setTimeout(res, 300));
+    return r;
+  });
+  exp.selecting && exp.menuClosed && exp.bbCsv
+    ? ok('Export menu items run (Share Image starts Select mode, Buy-Backs CSV)')
+    : fail(`export menu: ${JSON.stringify(exp)}`);
 
   console.log('Broken thumbnails');
   await go('#inventory');
