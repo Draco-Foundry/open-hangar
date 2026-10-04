@@ -4809,6 +4809,17 @@ async function siteConnect() {
   }
   await refreshSite();
 }
+// "Sync My Hangar Now" from the website's Connect This Browser (background.js sets
+// siteSyncRequested): once, in the dashboard that opened.
+let siteSyncAsked = false;
+async function siteSyncIfAsked() {
+  const { siteSyncRequested } = await chrome.storage.local.get('siteSyncRequested');
+  if (!siteSyncRequested || siteSyncAsked) return;
+  siteSyncAsked = true;
+  await chrome.storage.local.remove('siteSyncRequested');
+  siteSyncAsked = false;
+  if (Date.now() - siteSyncRequested < 10 * 60e3) await siteSyncNow();
+}
 function siteCancel() {
   if (site.waiting) site.waiting.stop = true;
   site.waiting = null;
@@ -5305,7 +5316,13 @@ function searchResults(q) {
   renderSiteNotice();
   renderDbNotice();
   // @sync-start
-  refreshSite();
+  refreshSite().then(siteSyncIfAsked);
+  // Connected from the website (background.js): the card follows, and "Sync My
+  // Hangar Now" there runs here.
+  chrome.storage.onChanged?.addListener((ch, area) => {
+    if (area !== 'local' || !(ch.siteLink || ch.siteUrl || ch.siteSyncRequested)) return;
+    refreshSite().then(siteSyncIfAsked);
+  });
   // @sync-end
   if (currency && currency !== 'USD') {
     topBar.currency = currency;
