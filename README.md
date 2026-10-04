@@ -13,7 +13,9 @@ It reads your own RSI account using the session you're already signed in with, a
 saves it on your machine as tidy, structured data. Browse your fleet in the built-in
 viewer, or export everything as one JSON file and build on it.
 
-- **No password, no account, no server.** Nothing leaves your browser.
+- **No password, no account needed.** Your hangar stays in your browser. Want it on the
+  web too? Connect [openhangar.space](https://openhangar.space) (optional, in closed beta):
+  only then, and only when you sync, does a copy go there.
 - **For players:** hangar value at today's store prices, melt candidates, fleet
   stats, history between scans, buy-backs, referrals, and fleet images to share.
 - **For developers:** the data layer RSI doesn't offer. There's no public API, so
@@ -136,7 +138,7 @@ ordered _who → what they own_ so it drops straight into a backend table:
 
 RSI authenticates with a **session cookie**. Because the extension has host
 permission for `robertsspaceindustries.com`, its own `fetch` requests carry your
-existing session — no password, no RSI tab open, no server. Pages are fetched and
+existing session (no password, no RSI tab open). Pages are fetched and
 parsed locally (referrals come from RSI's GraphQL API). Scans are read-only and
 rate-limited.
 
@@ -187,10 +189,13 @@ To add a data source, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Privacy
 
-No credentials — only the session you already have. No server; your data never
-leaves your browser. The only outbound requests carry no personal data: thumbnails
-and the banner from RSI's media servers, the current game version from the public
-star-citizen.wiki API, and — for items RSI ships without art — ship images looked up
+No credentials, only the session you already have. Your data stays in your browser
+unless you connect openhangar.space. Then Sync Now (or Sync After Every Scan, if you
+turn it on) sends the same data as the JSON export to your account there; Disconnect
+stops it and the website lets you download or delete everything. Details:
+[PRIVACY.md](docs/PRIVACY.md). Every other outbound request carries no personal data:
+thumbnails and the banner from RSI's media servers, the current game version from the
+public star-citizen.wiki API, and (for items RSI ships without art) ship images looked up
 by **name** from RSI's public ship-matrix (with star-citizen.wiki as a fallback).
 Those lookups are cached and weakly reveal which ships you're viewing.
 
