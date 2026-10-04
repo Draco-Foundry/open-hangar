@@ -31,6 +31,7 @@ export default defineConfig({
         org: 'ui/org/main.js',
         updates: 'ui/updates/main.js',
         store: 'ui/store/main.js',
+        developers: 'ui/developers/main.js',
       },
       output: {
         format: 'es',
