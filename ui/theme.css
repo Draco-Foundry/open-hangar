@@ -2130,3 +2130,25 @@ button,
 .layout-toggle button {
   font-weight: 500;
 }
+
+/* ---- Store in Hangar Cobalt (styling pass, 2026-10-04) ------------------------- */
+.store-panel {
+  border-radius: var(--r-lg);
+}
+.sp-head h3 {
+  font-family: var(--font-head);
+  font-weight: 600;
+  color: var(--head);
+}
+.sp-scroll {
+  border-radius: var(--r-sm);
+}
+/* Prices and counts in tables (Store, Org Fleet) read like instrument readouts. */
+.org-table td.num {
+  font-family: var(--font-data);
+  letter-spacing: -0.01em;
+}
+/* Warbond deals glow in the beacon colour: worth a look. */
+.sale.wb {
+  color: var(--beacon);
+}
