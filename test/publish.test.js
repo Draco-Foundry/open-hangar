@@ -166,6 +166,14 @@ test('updateCheckVersion: reads the version from a Chrome or Edge update check',
   assert.equal(updateCheckVersion(null), null);
 });
 
+test('edgeDetailsVersion: reads the version from Edge Add-ons product details', async () => {
+  const { edgeDetailsVersion } = await lib();
+  assert.equal(edgeDetailsVersion('{"name":"Open Hangar","version":"0.2.16"}'), '0.2.16');
+  assert.equal(edgeDetailsVersion('{"version":"<b>1</b>"}'), null);
+  assert.equal(edgeDetailsVersion('not json'), null);
+  assert.equal(edgeDetailsVersion(null), null);
+});
+
 test('versionNewer compares numerically', async () => {
   const { versionNewer } = await lib();
   assert.equal(versionNewer('0.2.10', '0.2.9'), true);
