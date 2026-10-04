@@ -52,6 +52,12 @@ function assertNoSyncHost(dir) {
 }
 const base = JSON.parse(readFileSync('manifest.json', 'utf8'));
 
+// What sync sends (the same payload as the JSON backup: RSI handle and org, balances
+// and pledge prices, hangar and buy-back contents), in Firefox's data-collection
+// categories. Optional, because sync is opt-in: Firefox asks on the first Connect
+// (src/dashboard.js, siteDataOk). Keep the two lists the same (test/firefox-data.test.js).
+const SYNC_DATA = ['personallyIdentifyingInfo', 'financialAndPaymentInfo', 'websiteContent'];
+
 const targets = {
   chrome: (m) => m,
   firefox: (m) => ({
@@ -62,7 +68,9 @@ const targets = {
         id: 'open-hangar@draco-foundry',
         // data_collection_permissions landed in Firefox 140 (Android 142).
         strict_min_version: '140.0',
-        data_collection_permissions: { required: ['none'] },
+        data_collection_permissions: KEEP_SYNC
+          ? { required: ['none'], optional: SYNC_DATA }
+          : { required: ['none'] },
       },
       gecko_android: { strict_min_version: '142.0' },
     },
