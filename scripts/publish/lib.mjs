@@ -61,3 +61,74 @@ export function dailyGate({ runs, tag, store, allow }) {
   }
   return null;
 }
+
+// ---- Store versions on openhangar.space/extension (store-versions.mjs) --------
+
+// The version in a Chrome or Edge update check reply (the same XML the browsers
+// read to update extensions), or null.
+export function updateCheckVersion(xml) {
+  const m = /<updatecheck\b[^>]*\bversion="(\d+(?:\.\d+){0,3})"/.exec(String(xml || ''));
+  return m ? m[1] : null;
+}
+
+// True when version a is newer than b ("0.2.10" > "0.2.9"). A missing b counts
+// as older; a missing a never wins.
+export function versionNewer(a, b) {
+  if (!a) return false;
+  if (!b) return true;
+  const pa = String(a).split('.').map(Number);
+  const pb = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d) return d > 0;
+  }
+  return false;
+}
+
+// What each store was last sent, from Publish to stores runs. `runs` is
+// [{ title: 'Publish v0.2.13 to all', jobs: [{ name, conclusion, notes: [] }] }],
+// notes being the job's annotation messages. Dry runs are skipped by their title;
+// a green job whose notes say nothing went out (Chrome still reviewing the last
+// version, missing secrets) doesn't count. Returns { chrome: '0.2.13', ... }.
+export function submittedVersions(runs) {
+  const out = {};
+  for (const r of runs || []) {
+    const m = /^Publish v(\d+(?:\.\d+)*) to (all|chrome|edge|firefox)$/.exec(r.title || '');
+    if (!m) continue;
+    for (const j of r.jobs || []) {
+      if (!['chrome', 'edge', 'firefox'].includes(j.name) || j.conclusion !== 'success') continue;
+      if ((j.notes || []).some((n) => /not sent|still reviewing|skipped|dry run/i.test(n)))
+        continue;
+      if (versionNewer(m[1], out[j.name])) out[j.name] = m[1];
+    }
+  }
+  return out;
+}
+
+// One store's line: the live version, and a newer submitted one as pending.
+export function storeLine(live, submitted) {
+  return {
+    live: live || null,
+    pending: live && versionNewer(submitted, live) ? submitted : null,
+  };
+}
+
+// Fills each install button's version spans in the landing page:
+//   <span class="b-ver" data-ver="chrome"></span>
+//   <span class="b-pend" data-pend="chrome"></span>
+// Empty spans stay empty (and hidden), so a store we couldn't read shows nothing.
+export function stampStoreVersions(html, lines) {
+  let out = String(html);
+  for (const [store, { live, pending }] of Object.entries(lines || {})) {
+    out = out
+      .replace(
+        new RegExp(`(<span class="b-ver" data-ver="${store}">)[^<]*(</span\\s*>)`),
+        `$1${live ? `v${live}` : ''}$2`,
+      )
+      .replace(
+        new RegExp(`(<span class="b-pend" data-pend="${store}">)[^<]*(</span\\s*>)`),
+        `$1${pending ? `v${pending} in review` : ''}$2`,
+      );
+  }
+  return out;
+}

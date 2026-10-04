@@ -121,6 +121,34 @@ h1 {
 .install.live .b-note::before {
   background: #3fb950;
 }
+/* Each store's live version, and a newer one waiting in its review queue. */
+.b-vers {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px 8px;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.b-vers:has(.b-ver:empty):has(.b-pend:empty) {
+  display: none;
+}
+.b-ver {
+  color: #8b949e;
+}
+
+.b-pend {
+  color: #e3b341;
+}
+.install.mine .b-ver,
+.install.mine .b-pend {
+  color: #fff;
+}
+.b-ver:empty,
+.b-pend:empty {
+  display: none;
+}
 .also a {
   color: var(--link);
 }
@@ -287,10 +315,31 @@ footer {
 .maker:hover strong {
   color: var(--link);
 }
-footer nav {
+/* Footer links in two quiet rows: help and community, then legal and contact.
+   Underlined only on hover, so the rows read as a menu, not a wall of links. */
+.foot-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 8px 22px;
+}
+.foot-links + .foot-links {
+  margin-top: 8px;
+}
+.foot-links a {
+  color: var(--text);
+  text-decoration: none;
+}
+.foot-links a:hover,
+.foot-links a:focus-visible {
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.foot-small {
+  font-size: 0.8125rem;
+}
+.foot-small a {
+  color: var(--muted);
 }
 .support-links {
   display: flex;
