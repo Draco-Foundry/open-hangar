@@ -505,14 +505,19 @@ try {
   await checkListAlignment('Inventory', '#results');
   await page.click('#layout [data-layout="market"]');
   (await page.$('.market-table')) ? ok('Market view renders') : fail('Market view empty');
-  // Tick a row without Select mode; % and price stay linked.
+  // Tick a row without Select mode; % and price stay linked. The list is Svelte
+  // (ui/inventory): it redraws a moment after each change.
   await page.click('.market-table .mk-pick');
-  const mk = await page.evaluate(() => {
+  const mk = await page.evaluate(async () => {
     const row = document.querySelector('.market-table .mk-row');
     const pct = row.querySelector('.mk-pct-in');
+    pct.focus();
     pct.value = '50';
     pct.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 60));
     return {
+      // Typing keeps the field (and its focus): the row isn't redrawn under the cursor.
+      kept: document.activeElement === pct && pct.isConnected && pct.value === '50',
       count: document.querySelector('.mk-selcount').textContent,
       bar: !document.querySelector('#select-bar').hidden,
       price: Number(row.querySelector('.mk-price').value),
@@ -522,6 +527,7 @@ try {
   /1 picked/.test(mk.count) && mk.bar
     ? ok('market rows tick without Select mode')
     : fail(`market tick: ${JSON.stringify(mk)}`);
+  mk.kept ? ok('typing a % keeps focus in the field') : fail(`market focus: ${JSON.stringify(mk)}`);
   Math.abs(mk.price - mk.melt / 2) < 0.01
     ? ok(`50% of melt → $${mk.price}`)
     : fail(`% of melt: ${JSON.stringify(mk)}`);
@@ -533,16 +539,19 @@ try {
   });
   await page.click('.market-table .mk-pick');
   // Typing a % ticks the row on its own.
-  const autoTick = await page.evaluate(() => {
+  const autoTick = await page.evaluate(async () => {
+    const tick = () => new Promise((r) => setTimeout(r, 60));
     const row = document.querySelectorAll('.market-table .mk-row')[1];
     const pct = row.querySelector('.mk-pct-in');
     pct.value = '60';
     pct.dispatchEvent(new Event('input', { bubbles: true }));
-    const ticked = row.querySelector('.mk-pick').checked;
+    await tick();
+    const ticked = row.querySelector('.mk-pick').checked && row.classList.contains('picked');
     const store = row.querySelector('.mk-store').textContent.trim();
     pct.value = '';
     pct.dispatchEvent(new Event('input', { bubbles: true }));
     row.querySelector('.mk-pick').click();
+    await tick();
     return { ticked, store };
   });
   autoTick.ticked ? ok('typing a % ticks the row') : fail('typing a % did not tick the row');
@@ -554,8 +563,12 @@ try {
   const [c1, c2] = await page.$$('#results .card');
   await c1.click();
   await c2.click();
+  await new Promise((r) => setTimeout(r, 60));
   const sel = await page.$eval('#sb-count', (e) => e.textContent);
-  /2 selected/.test(sel) ? ok('select mode picks items') : fail(`select mode: "${sel}"`);
+  const marked = await page.$$eval('#results .card.selected', (e) => e.length);
+  /2 selected/.test(sel) && marked === 2
+    ? ok('select mode picks items')
+    : fail(`select mode: "${sel}", ${marked} marked`);
   await page.click('[data-sb="done"]');
 
   console.log('Broken thumbnails');
@@ -910,19 +923,24 @@ try {
   // Buy-Backs pass: Hide small stuff on by default; Stack identical off by default
   // and stacks copies when on.
   const bbPass = await page.evaluate(async () => {
+    // The list is Svelte (ui/buybacks): it redraws a moment after each change.
+    const tick = () => new Promise((res) => setTimeout(res, 60));
     const rows = () => document.querySelectorAll('#buybacks-body .card').length;
     const hideOn = state.bbHideSmall;
     const stackOff = !state.bbStack;
     const saved = state.buybacks;
     state.buybacks = saved.concat(saved.slice(0, 2).map((x) => ({ ...x, id: x.id + '-copy' })));
     renderBuybacks();
+    await tick();
     const flat = rows();
     document.querySelector('[data-switch="bb-stack"]').click();
+    await tick();
     const stacked = rows();
     const badges = document.querySelectorAll('#buybacks-body .stack-n').length;
     document.querySelector('[data-switch="bb-stack"]').click();
     state.buybacks = saved;
     renderBuybacks();
+    await tick();
     return { hideOn, stackOff, flat, stacked, badges };
   });
   bbPass.hideOn && bbPass.stackOff && bbPass.stacked === bbPass.flat - 2 && bbPass.badges === 2
@@ -989,11 +1007,12 @@ try {
     ? ok(`buy-back market: ${bbm.rows} rows, one each, Reclaim + Insurance`)
     : fail(`buy-back market: ${JSON.stringify(bbm)} vs ${bbTotal}`);
   // Market tools: pricing a row ticks it; picked rows are totalled.
-  const bbTools = await page.evaluate(() => {
+  const bbTools = await page.evaluate(async () => {
     const row = document.querySelector('#buybacks-body .market-table tbody tr');
     const pct = row.querySelector('.mk-pct-in');
     pct.value = '50';
     pct.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 60));
     return {
       picked: row.querySelector('.mk-pick').checked,
       price: row.querySelector('.mk-price').value,
@@ -1010,13 +1029,14 @@ try {
   bbTools.store
     ? ok(`buy-back market tools: pick, % → price, total ("${bbTools.sel.trim()}"), exports`)
     : fail(`buy-back market tools: ${JSON.stringify(bbTools)}`);
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     const box = document.querySelector('#buybacks-body .mk-pick');
     box.click(); // untick so later checks start clean
     const row = box.closest('tr');
     const price = row.querySelector('.mk-price');
     price.value = '';
     price.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 60));
   });
   // Click a name: the details window reads the buy-back's own page.
   await page.click('#buybacks-body .bb-open');
@@ -1581,14 +1601,23 @@ try {
 
   // Card pictures offer two sizes (store_small + slideshow) so the browser picks
   // one sharp image and never swaps (#179); markup survives the sanitizer.
-  const sizes = await page.evaluate(() => {
+  // The cards are Svelte (ui/lib/Thumb.svelte); Inventory is hidden here, so the
+  // lazy picture isn't fetched while we look.
+  const sizes = await page.evaluate(async () => {
     const url = 'https://media.robertsspaceindustries.com/abc123/store_small.jpg';
-    const box = document.createElement('div');
-    setHTML(box, `<img class="thumb" src="${url}"${thumbSizeAttrs(url, 'gallery')} alt="">`);
-    const im = box.querySelector('img');
+    const p = state.items.find((x) => !x.isCCU);
+    const keep = { image: p.image, layout: state.layout };
+    p.image = url;
+    state.layout = 'gallery';
+    renderInventory();
+    await new Promise((r) => setTimeout(r, 60));
+    const im = document.querySelector(`#results .card[data-id="${p.id}"] img.thumb`);
+    const got = { srcset: im?.getAttribute('srcset'), sizes: im?.getAttribute('sizes') };
+    p.image = keep.image;
+    state.layout = keep.layout;
+    renderInventory();
     return {
-      srcset: im.getAttribute('srcset'),
-      sizes: im.getAttribute('sizes'),
+      ...got,
       folder: srcsetFor('https://robertsspaceindustries.com/media/abc/store_small/a.jpg'),
       other: srcsetFor('https://robertsspaceindustries.com/media/abc/store_hub_small/a.jpg'),
     };
