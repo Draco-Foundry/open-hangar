@@ -107,9 +107,9 @@
     position: relative;
     flex: 1 1 auto;
     min-height: 180px;
-    border-radius: 12px;
+    border-radius: var(--r-md);
     overflow: hidden;
-    background: linear-gradient(135deg, #1d2430, #0f1319);
+    background: linear-gradient(135deg, var(--panel-2), var(--bg));
   }
   .art img {
     position: absolute;
@@ -136,7 +136,7 @@
     gap: 10px;
   }
   .cap b {
-    font: 800 22px var(--font-head);
+    font: 600 22px var(--font-head);
     color: #fff;
     text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
     min-width: 0;
@@ -149,7 +149,7 @@
     font-size: 12px;
     color: #e6ecf2;
     background: rgba(0, 0, 0, 0.5);
-    border-radius: 6px;
+    border-radius: var(--r-sm);
     padding: 2px 8px;
   }
   .meta {
@@ -165,7 +165,7 @@
   }
   .specs div {
     background: var(--panel-2);
-    border-radius: 10px;
+    border-radius: var(--r-md);
     padding: 8px 10px;
     font-size: 12px;
     color: var(--muted);
@@ -173,7 +173,7 @@
   }
   .specs b {
     display: block;
-    font: 800 17px var(--font-head);
+    font: 600 17px var(--font-head);
     color: var(--head);
     overflow: hidden;
     text-overflow: ellipsis;

@@ -73,7 +73,7 @@
     margin-inline: -8px;
     padding: 9px 8px;
     border: 0;
-    border-radius: 10px;
+    border-radius: var(--r-sm);
     background: none;
     color: var(--text);
     font: inherit;
@@ -89,7 +89,7 @@
   .th {
     width: 64px;
     height: 40px;
-    border-radius: 8px;
+    border-radius: var(--r-sm);
     object-fit: cover;
     background: var(--panel-2);
   }
