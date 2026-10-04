@@ -132,3 +132,19 @@ export function stampStoreVersions(html, lines) {
   }
   return out;
 }
+
+// The same facts as a small public JSON file (openhangar.space/versions.json), for
+// pages that aren't stamped at deploy (the website's /extension page reads it).
+export function versionsJson({ version, updated, lines, checkedAt }) {
+  return {
+    version: version || null,
+    updated: updated || null,
+    stores: Object.fromEntries(
+      ['chrome', 'edge', 'firefox'].map((s) => [
+        s,
+        { live: lines?.[s]?.live ?? null, pending: lines?.[s]?.pending ?? null },
+      ]),
+    ),
+    checkedAt,
+  };
+}
