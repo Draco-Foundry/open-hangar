@@ -1,5 +1,6 @@
 <script>
-  // Connect, wait for approval (the code shown big, to match the website tab), then
+  // Connect (the browser's sign-in window: Approve there and it closes by itself; or,
+  // as a fallback, the code shown big to match the website tab), then
   // Connected as <name> with Sync Now, Open ↗, Disconnect (asked once, right here) and
   // Sync After Every Scan. Hidden until the website is switched on (OH.siteEnabled).
   import { app, version } from '../lib/app.svelte.js';
@@ -10,7 +11,9 @@
     return {
       enabled: s.enabled,
       link: s.link,
-      waiting: s.waiting ? s.waiting.code : '',
+      waiting: s.waiting ? s.waiting.code || '' : '',
+      // The browser's sign-in window is open (the usual way to connect).
+      inWindow: !!(s.waiting && s.waiting.window),
       syncing: s.syncing,
       autoSync: s.autoSync,
       msg: s.msg,
@@ -47,7 +50,12 @@
 
 {#if d.enabled}
   <div class="site-connect" id="site-connect" aria-live="polite">
-    {#if d.waiting}
+    {#if d.inWindow}
+      <span class="sc-chip wait"><span class="sc-spin" aria-hidden="true"></span>Docking…</span>
+      <p class="sc-hint">
+        Finish connecting in the window that opened: sign in if asked, then press Approve.
+      </p>
+    {:else if d.waiting}
       <span class="sc-hint">Approve this code on openhangar.space</span>
       <span class="sc-code">{d.waiting}</span>
       <div class="sc-row">
