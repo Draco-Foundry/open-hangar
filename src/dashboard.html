@@ -2697,213 +2697,30 @@
     <script type="module" src="ui/updates.js"></script>
     <script type="module" src="ui/store.js"></script>
     <script type="module" src="ui/developers.js"></script>
+    <script type="module" src="ui/topbar.js"></script>
   </head>
   <body>
     <div class="wrap">
       <header>
-        <a class="brand" href="#home" data-view="home"
-          ><img class="brand-mark" src="../icons/icon128.png" alt="" />
-          <h1>Open Hangar</h1></a
-        >
-        <nav id="nav">
-          <a href="#home" data-view="home">Home</a>
-          <a href="#inventory" data-view="inventory"
-            >Inventory <span class="nav-n" id="nav-n-inventory"></span
-          ></a>
-          <a href="#buybacks" data-view="buybacks"
-            >Buy-Backs <span class="nav-n" id="nav-n-buybacks"></span
-          ></a>
-          <a href="#stats" data-view="stats">Stats</a>
-          <a href="#store" data-view="store">Store</a>
-          <a href="#org" data-view="org">Org Fleet</a>
-          <a href="#referrals" data-view="referrals">Referrals</a>
-        </nav>
-        <div class="hdr-prefs">
-          <!-- Language flags go here once the dashboard is translated (TODO.md). -->
-          <!-- Scan ▾ (every page), then the gear menu: currency, Streamer Mode, rescan
-               reminder, Log Out of RSI, Clear Data, Updates, Developers (0.3.0). -->
-          <!-- Search your hangar from any page (/ focuses it). -->
-          <div class="gsearch top-search" id="top-search">
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-              <path
-                fill="currentColor"
-                d="M10 3a7 7 0 0 1 5.6 11.2l4.6 4.6-1.4 1.4-4.6-4.6A7 7 0 1 1 10 3Zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z"
-              />
-            </svg>
-            <input
-              id="gsearch-top"
-              type="search"
-              placeholder="Search"
-              autocomplete="off"
-              aria-label="Search your hangar, buy-backs and rewards"
+        <!-- The top bar is Svelte (ui/topbar): the logo, the page links, the alerts
+             bell, Scan ▾ and your menu. The search box below is still classic
+             (dashboard.js binds it at load); the bar moves it into its place. -->
+        <div class="gsearch top-search" id="top-search">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M10 3a7 7 0 0 1 5.6 11.2l4.6 4.6-1.4 1.4-4.6-4.6A7 7 0 1 1 10 3Zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z"
             />
-            <kbd class="gsearch-key">/</kbd>
-            <div id="gsearch-top-results" class="gsearch-results top-results" hidden></div>
-          </div>
-          <!-- Hangar Alerts from any page. -->
-          <div class="bell-wrap">
-            <button
-              id="bell-btn"
-              class="icon-btn"
-              type="button"
-              aria-haspopup="true"
-              aria-expanded="false"
-              aria-label="Hangar Alerts"
-              title="Hangar Alerts"
-            >
-              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                <path
-                  fill="currentColor"
-                  d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5.5-6.84V3.5a1.5 1.5 0 0 0-3 0v.66A7 7 0 0 0 5 11v5l-2 2v1h18v-1Z"
-                /></svg
-              ><span class="badge-n" id="bell-n" hidden></span>
-            </button>
-            <div id="bell-menu" class="scan-menu bell-menu" hidden></div>
-          </div>
-          <div class="scan-split">
-            <button id="scan-home">
-              <span class="scan-fill"></span><span class="scan-label">Scan All</span>
-            </button>
-            <button
-              id="scan-menu-btn"
-              class="scan-caret"
-              aria-haspopup="true"
-              aria-expanded="false"
-              aria-label="Scan options"
-              title="Choose what to scan"
-            >
-              ▾
-            </button>
-            <div id="scan-menu" class="scan-menu sm-rich" hidden>
-              <!-- While a scan runs: what it's on (#170). -->
-              <div class="sm-progress" id="scan-menu-progress" role="status" hidden></div>
-              <div class="sm-head">
-                <span>What to Scan</span
-                ><button type="button" class="sm-all" data-scan-all>Select All</button>
-              </div>
-              <label class="sm-opt"
-                ><input
-                  type="checkbox"
-                  class="scan-src"
-                  value="hangar"
-                  data-name="Inventory"
-                  checked
-                /><span class="sm-txt"
-                  ><b>Inventory</b><small>Your pledges, ships and upgrades</small></span
-                ></label
-              >
-              <label class="sm-opt"
-                ><input
-                  type="checkbox"
-                  class="scan-src"
-                  value="buybacks"
-                  data-name="Buy-Backs"
-                  checked
-                /><span class="sm-txt"
-                  ><b>Buy-Backs</b><small>Melted pledges you can get back</small></span
-                ></label
-              >
-              <label class="sm-opt"
-                ><input
-                  type="checkbox"
-                  class="scan-src"
-                  value="referrals"
-                  data-name="Referrals"
-                  checked
-                /><span class="sm-txt"
-                  ><b>Referrals</b><small>Recruits and the rewards you've earned</small></span
-                ></label
-              >
-              <label class="sm-opt"
-                ><input
-                  type="checkbox"
-                  class="scan-src"
-                  value="store"
-                  data-name="Store"
-                  checked
-                /><span class="sm-txt"
-                  ><b>Store</b><small>Is anything on your wishlist for sale?</small></span
-                ></label
-              >
-              <button id="scan-selected" class="scan-go">Scan Now</button>
-            </div>
-          </div>
-          <div class="cc-settings">
-            <button
-              id="settings-btn"
-              class="avatar-btn"
-              type="button"
-              aria-haspopup="true"
-              aria-expanded="false"
-              aria-label="Your menu"
-              title="Your menu"
-            >
-              <span class="avatar-img" id="menu-avatar"
-                ><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-                  <path
-                    fill="currentColor"
-                    d="M19.14 12.94a7.4 7.4 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7 7 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2.4h-3.8a.5.5 0 0 0-.49.42l-.36 2.54a7 7 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.88a.5.5 0 0 0 .12.64l2.03 1.58a7.4 7.4 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.39 1.05.7 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.8a.5.5 0 0 0 .49-.42l.36-2.54a7 7 0 0 0 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"
-                  /></svg></span
-              ><span class="upd-dot" id="upd-dot" hidden></span
-              ><!-- Streamer Mode on: a badge on the portrait, not a pill in the bar,
-                   so the bar keeps one row (#174). -->
-              <span class="stream-dot" id="stream-dot" hidden></span>
-            </button>
-            <div id="settings-menu" class="scan-menu settings-menu" hidden>
-              <div class="menu-who" id="menu-who" hidden></div>
-              <div class="menu-upd" id="menu-upd" hidden>
-                <span id="menu-upd-text"></span
-                ><button type="button" id="menu-upd-reload">Reload</button>
-              </div>
-              <!-- Language picker goes here once the dashboard is translated (TODO.md). -->
-              <label class="scan-opt menu-currency"
-                ><span>Currency</span>
-                <select
-                  id="currency-select"
-                  class="currency-select"
-                  aria-label="Currency"
-                  title="Show amounts in your currency (converted from USD)"
-                >
-                  <option value="USD">USD $</option>
-                  <option value="EUR">EUR €</option>
-                  <option value="GBP">GBP £</option>
-                  <option value="CAD">CAD $</option>
-                  <option value="AUD">AUD $</option>
-                  <option value="NZD">NZD $</option>
-                  <option value="CHF">CHF</option>
-                  <option value="SEK">SEK kr</option>
-                  <option value="PLN">PLN zł</option>
-                  <option value="CZK">CZK Kč</option>
-                  <option value="BRL">BRL R$</option>
-                  <option value="CNY">CNY ¥</option>
-                  <option value="JPY">JPY ¥</option>
-                  <option value="KRW">KRW ₩</option>
-                </select>
-              </label>
-              <label
-                class="scan-opt"
-                title="Hides money amounts across Open Hangar, for streams and screenshots"
-                ><span>Streamer Mode</span><input type="checkbox" id="streamer-toggle"
-              /></label>
-              <label
-                class="scan-opt"
-                title="Shows an amber ! on the toolbar icon when your last scan is a week old"
-                ><span>Rescan Reminder</span><input type="checkbox" id="remind-toggle" checked
-              /></label>
-              <a class="menu-item menu-link" href="#guide" data-view="guide">How to Use</a>
-              <a class="menu-item menu-link" href="#updates" data-view="updates">Updates</a>
-              <a class="menu-item menu-link" href="#issues" data-view="issues">Known Issues</a>
-              <a class="menu-item menu-link" href="#developers" data-view="developers"
-                >Developers</a
-              >
-              <button id="logout-home" class="menu-item" type="button" hidden>
-                Log Out of RSI<small>For switching accounts. Your saved data stays.</small>
-              </button>
-              <button id="clear-home" class="menu-item menu-danger" type="button" hidden>
-                Clear Data
-              </button>
-            </div>
-          </div>
+          </svg>
+          <input
+            id="gsearch-top"
+            type="search"
+            placeholder="Search"
+            autocomplete="off"
+            aria-label="Search your hangar, buy-backs and rewards"
+          />
+          <kbd class="gsearch-key">/</kbd>
+          <div id="gsearch-top-results" class="gsearch-results top-results" hidden></div>
         </div>
       </header>
 

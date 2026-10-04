@@ -200,7 +200,20 @@ is moving pages to Svelte one at a time; every page is on it now (the popup isn'
   `exportHtf`, `importBackup`, `restoreBackup`, `removeProfile`) and reads the note,
   the restore button and the saved accounts from it.
 - **Svelte to classic.** `ui/home/ForYou.svelte` sets `window.OHApp.alerts` to
-  `{ list, ignore }`, which the bell in `src/dashboard.js` reads.
+  `{ list, ignore }` and fires `oh:alerts`; the top bar's bell (`ui/topbar/Bell.svelte`)
+  reads it.
+- **Top Bar.** `ui/topbar/main.js` (built into `src/ui/topbar.js`) mounts `TopBar` into
+  the page's `<header>` on every page: the logo, the page links with their counts, the
+  bell, Scan ▾ (progress fill and label, the source checkboxes, Scan Now) and your menu
+  (portrait, name and org, Currency, Streamer Mode, Rescan Reminder, the page links,
+  Log Out of RSI, Clear Data, the update dot), plus the slim bar while scrolling. The
+  menus share `ui/topbar/menus.svelte.js` (one open at a time, placed by
+  `ui/lib/place.js`, Escape back to the button; `closeCardMenus()` in dashboard.js fires
+  `oh:close-menus`). The scan, its progress (`topBar`, set by `setScanning()` and
+  `scanDetail()`) and what the menu does stay in `src/dashboard.js` behind
+  `window.OHApp.top` (`bar`, `view`, `scan`, `setSources`, `setCurrency`, `setStreamer`,
+  `setRemind`, `logOut`, `clearData`, `reload`). Global Hangar Search is still classic:
+  `#top-search` sits in the header's markup and the bar moves it into place once.
 - **Inventory.** `ui/inventory/main.js` (built to `src/ui/inventory.js`) mounts the page around the list into `#oh-inventory`: summary
   strip, toolbar, the filter sidebar (Filters Pass), active-filter pills and saved
   views, plus the melt planner in Select mode's bar. It moves `#results` into its
