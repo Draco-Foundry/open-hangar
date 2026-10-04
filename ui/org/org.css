@@ -1,0 +1,26 @@
+/* Org Fleet in Hangar Cobalt (styling pass, 2026-10-04). Every page bundle loads on
+   the one dashboard page, so these rules sit on top of dashboard.html's classic ones. */
+.org-panel {
+  border-radius: var(--r-md);
+}
+/* Role chips are buttons: weight 500, counts in the data font. */
+.role-chip {
+  font-weight: 500;
+}
+.role-chip b {
+  font-family: var(--font-data);
+  font-weight: 500;
+}
+.role-chip.open {
+  outline-color: var(--accent-line);
+}
+.org-compare-bar select {
+  border-radius: var(--r-sm);
+}
+.pair-bar {
+  border-radius: 999px;
+}
+.pair-bar span,
+.cmp-kv b {
+  font-family: var(--font-data);
+}
