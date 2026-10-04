@@ -26,6 +26,7 @@ export default defineConfig({
         home: 'ui/home/main.js',
         inventory: 'ui/inventory/main.js',
         stats: 'ui/stats/main.js',
+        referrals: 'ui/referrals/main.js',
         org: 'ui/org/main.js',
       },
       output: {
