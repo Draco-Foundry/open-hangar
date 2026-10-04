@@ -81,7 +81,11 @@ for (const [name, transform] of Object.entries(targets)) {
   // License terms and third-party notices travel with every copy.
   cpSync('LICENSE', `${out}/LICENSE`);
   cpSync('THIRD_PARTY_NOTICES.md', `${out}/THIRD_PARTY_NOTICES.md`);
-  writeFileSync(`${out}/manifest.json`, JSON.stringify(transform(base), null, 2) + '\n');
+  const manifest = { ...transform(base) }; // a copy: chrome returns `base` itself
+  // Sync's sign-in window (identity.launchWebAuthFlow) needs "identity": only builds
+  // that carry sync ask for it, so store builds' permissions don't change before launch.
+  if (KEEP_SYNC) manifest.permissions = [...manifest.permissions, 'identity'];
+  writeFileSync(`${out}/manifest.json`, JSON.stringify(manifest, null, 2) + '\n');
   if (!KEEP_SYNC) {
     for (const f of SYNC_FILES) stripSync(`${out}/${f}`);
     assertNoSyncHost(`${out}/src`);

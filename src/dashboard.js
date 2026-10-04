@@ -4711,11 +4711,85 @@ function siteProblem(err) {
   site.msg = String(err?.message || err);
   OH.log('warn', 'site', site.msg);
 }
-// Connect: a code, the website's link page in a new tab (code filled in, one Approve
-// click), then wait here until it's approved, expires or you cancel.
+// Connect (owner, 2026-10-04): the browser's sign-in window opens the website's
+// /connect page; you sign in if needed and press Approve, and the window closes by
+// itself. It hands back a one-time code, traded for the sync token with PKCE (proof
+// that this extension is the one that asked). "Sync My Hangar Now" there (on by
+// default) sends the first sync right away. Without the window (no identity
+// permission, or it couldn't open), the device code below is the fallback.
+const b64url = (bytes) =>
+  btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+const randomB64 = (n) => b64url(crypto.getRandomValues(new Uint8Array(n)));
+// → { link, sync } once approved, { cancelled: true } if the window was closed or
+// Cancel pressed, or null when the window can't be used (then: the code).
+async function siteConnectWindow() {
+  const identity = globalThis.chrome?.identity || globalThis.browser?.identity;
+  if (!identity?.launchWebAuthFlow || !identity.getRedirectURL) return null;
+  const redirect = identity.getRedirectURL();
+  const verifier = randomB64(32);
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  const state = randomB64(16);
+  const base = await OH.siteUrl();
+  const url = `${base}/connect?${new URLSearchParams({
+    response_type: 'code',
+    code_challenge: b64url(new Uint8Array(digest)),
+    code_challenge_method: 'S256',
+    state,
+    redirect_uri: redirect,
+  })}`;
+  let back;
+  try {
+    back = await identity.launchWebAuthFlow({ url, interactive: true });
+  } catch (err) {
+    // Closing the window reads as "did not approve" (Chrome) or "cancelled" (Firefox).
+    if (/approve|cancel|denied|closed/i.test(String(err?.message || err)))
+      return { cancelled: true };
+    OH.log('warn', 'site', `sign-in window: ${err?.message || err}`);
+    return null;
+  }
+  const answer = new URL(back).searchParams;
+  if (answer.get('state') !== state)
+    throw new Error('That connect attempt got crossed. Connect again.');
+  if (answer.get('error') || !answer.get('code')) return { cancelled: true };
+  const res = await fetch(`${base}/api/link/token`, {
+    method: 'POST',
+    credentials: 'omit',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      code: answer.get('code'),
+      code_verifier: verifier,
+      redirect_uri: redirect,
+    }),
+  });
+  if (!res.ok) throw new Error("openhangar.space couldn't finish connecting. Connect again.");
+  const j = await res.json();
+  const link = { token: j.token, name: j.name || '', connectedAt: Date.now(), lastSync: null };
+  await chrome.storage.local.set({ siteLink: link });
+  return { link, sync: answer.get('sync') === '1' };
+}
 async function siteConnect() {
   if (site.waiting) return;
   site.msg = '';
+  try {
+    site.waiting = { window: true };
+    homeUpdated();
+    const got = await siteConnectWindow();
+    site.waiting = null;
+    if (got) {
+      await refreshSite();
+      if (got.sync) await siteSyncNow(); // "Sync My Hangar Now" on the Approve page
+      return;
+    }
+  } catch (err) {
+    site.waiting = null;
+    siteProblem(err);
+    return void (await refreshSite());
+  }
+  // Fallback: a code, the website's link page in a new tab (code filled in, one
+  // Approve click), then wait here until it's approved, expires or you cancel.
   try {
     const start = await OH.siteLinkStart();
     const w = {
