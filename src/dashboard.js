@@ -22,7 +22,6 @@ const VIEWS = [
 ];
 
 const statusEl = $('#status');
-const chipsEl = $('#chips');
 const resultsEl = $('#results');
 const scanBtn = $('#scan-home');
 const scanMenuBtn = $('#scan-menu-btn');
@@ -30,9 +29,6 @@ const scanMenu = $('#scan-menu');
 const scanSelectedBtn = $('#scan-selected');
 const logoutBtn = $('#logout-home');
 const clearBtn = $('#clear-home');
-const searchEl = $('#search');
-const sortEl = $('#sort');
-const layoutEl = $('#layout');
 const buybacksBodyEl = $('#buybacks-body');
 const bbSearchEl = $('#bb-search');
 const bbSortEl = $('#bb-sort');
@@ -325,6 +321,9 @@ const state = {
   bbStack: false, // Buy-Backs: stack identical ones (off: each buy-back is its own)
   bbHideSmall: true, // Buy-Backs: paints, add-ons, coupons tucked away
   hideSmall: false, // Inventory: same
+  meltMax: null, // Inventory filter: melt value cap in dollars (null = no cap)
+  invFolded: false, // Inventory: filter sidebar folded away ("‹ Hide Filters")
+  invClosed: new Set(['from', 'size']), // Inventory: filter groups folded shut
   savedViews: [], // Inventory saved views: { name, shown, traits, query, sort }
   bbSort: 'date-desc', // default to newest buy-backs first
   groupByType: true, // Inventory: one section per type
@@ -335,7 +334,7 @@ const state = {
   owner: null, // { nickname, displayname } the stored data was scanned from
   storeCredit: null, // dollars, from the RSI account (counts in Account Value)
   shown: new Set(), // inventory kind filter
-  traits: new Map(), // inventory trait filter (AND): key → 'yes' | 'no' (exclude)
+  traits: new Map(), // inventory filter picks: group key → Set of option keys (INV_GROUPS)
   priceOf: null, // ship name → { msrp } resolver (OH.getShipIndex), once loaded
   catalog: null, // slim wiki ship list for the Store page (OH.getShipCatalog)
   shipOf: null, // ship name → wiki catalog entry (role, size, cargo…), once loaded
@@ -395,16 +394,7 @@ const SAFE_URL = /^(https?:|mailto:|#|\/|\.|[^:]*$)/i;
 // Re-rendering a row of chips or toggles swaps out its buttons. If one of them had
 // keyboard focus, put focus back on the same control (or the row's first button when
 // it's gone, like Clear) so filtering by keyboard doesn't drop you at the page top.
-const FOCUS_KEYS = [
-  'key',
-  'trait',
-  'clear',
-  'switch',
-  'bbUnder',
-  'viewApply',
-  'viewDel',
-  'viewSave',
-];
+const FOCUS_KEYS = ['key', 'trait', 'clear', 'switch', 'bbUnder'];
 function setHTMLKeepFocus(el, html) {
   const had = document.activeElement;
   const inside = !!(el && had && had !== el && el.contains(had));
@@ -1461,8 +1451,8 @@ function computeShown() {
   // "Hide small stuff" tucks paints, add-ons and coupons away (unless picked).
   if (state.hideSmall)
     list = list.filter((p) => !SMALL_KINDS.has(p.kind) || state.shown.has(p.kind));
-  // Traits narrow further: a pledge must have every selected trait.
-  list = applyTraits(list, state.traits, pledgeFacets);
+  // The sidebar's groups narrow further (see INV_GROUPS).
+  list = applyInvFilters(list);
   if (q) list = list.filter((p) => haystack(p).includes(q));
   if (state.sort !== 'default') {
     const byName = (a, b) => (a.name || '').localeCompare(b.name || '');
@@ -1626,6 +1616,189 @@ function applyTraits(list, selected, facets) {
   });
 }
 
+// --- Inventory filters (Filters Pass, B2) -------------------------------------
+// The sidebar's groups (ui/inventory). Inside a group any picked option matches;
+// across groups every group with picks must match, so "MISC + Meltable" is a
+// meltable MISC ship. state.traits holds the picks (group key → Set of option
+// keys) and state.meltMax caps melt value. computeShown() applies both, so the
+// list, the summary, Select All and the exports all follow the same filters.
+// Ships in a pledge (a CCU: the ship it upgrades to), as ship-list entries.
+function pledgeShips(p) {
+  if (!state.shipOf) return [];
+  const names =
+    p.isCCU && p.ccu
+      ? [p.ccu.to]
+      : (p.contents || []).filter((c) => /^ship$/i.test(c.kind || '')).map((c) => c.label);
+  return names.map((n) => state.shipOf(n)).filter(Boolean);
+}
+// Where a pledge came from: a game package, a $0 reward, a pack, or on its own.
+function cameFrom(p) {
+  const f = pledgeFacets(p);
+  if (TRAITS[0].test(f)) return 'package';
+  if (f.value === 0) return 'reward';
+  if (TRAITS[1].test(f)) return 'pack';
+  return 'standalone';
+}
+const SIZE_ORDER = ['vehicle', 'snub', 'small', 'medium', 'large', 'capital'];
+const insMonths = (l) => (l === 'LTI' ? 1e6 : parseInt(l, 10) || 0);
+const INV_GROUPS = [
+  {
+    key: 'ins',
+    title: 'Insurance',
+    of: (p) => (p.insurance ? [insLabel(p.insurance)] : []),
+    order: (a, b) => insMonths(b) - insMonths(a),
+  },
+  {
+    key: 'status',
+    title: 'Status',
+    fixed: [
+      ['meltable', 'Meltable', (p) => p.meltable === true],
+      ['notMeltable', 'Not Meltable', (p) => p.meltable === false],
+      ['giftable', 'Giftable', (p) => p.giftable === true],
+      ['notGiftable', 'Not Giftable', (p) => p.giftable === false],
+    ],
+  },
+  {
+    key: 'deals',
+    title: 'Deals',
+    fixed: [
+      ['below', 'Below Store Price', (p) => storeInfo(p)?.below === true],
+      ['warbond', 'Warbond', (p) => /warbond/i.test(p.name || '')],
+      ['free', 'Rewards ($0)', (p) => p.value === 0],
+    ],
+  },
+  {
+    key: 'from',
+    title: 'Came From',
+    fixed: [
+      ['standalone', 'Standalone'],
+      ['pack', 'Pack'],
+      ['package', 'Package'],
+      ['reward', 'Reward'],
+    ].map(([k, l]) => [k, l, (p) => cameFrom(p) === k]),
+  },
+  {
+    key: 'mfr',
+    title: 'Manufacturer',
+    search: true,
+    of: (p) => pledgeShips(p).map((v) => v.mfr),
+    order: (a, b) => a.localeCompare(b),
+  },
+  {
+    key: 'size',
+    title: 'Size',
+    of: (p) => pledgeShips(p).map((v) => v.size && titleCase(v.size)),
+    order: (a, b) => SIZE_ORDER.indexOf(a.toLowerCase()) - SIZE_ORDER.indexOf(b.toLowerCase()),
+  },
+];
+function invOptionTest(g, key) {
+  if (g.fixed) return (g.fixed.find(([k]) => k === key) || [])[2] || (() => false);
+  return (p) => g.of(p).includes(key);
+}
+function applyInvFilters(list) {
+  for (const g of INV_GROUPS) {
+    const sel = state.traits.get(g.key);
+    if (!(sel instanceof Set) || !sel.size) continue;
+    const tests = [...sel].map((k) => invOptionTest(g, k));
+    list = list.filter((p) => tests.some((t) => t(p)));
+  }
+  if (state.meltMax != null)
+    list = list.filter((p) => Number.isFinite(p.value) && p.value <= state.meltMax);
+  return list;
+}
+// Everything the sidebar draws: type pills, each group's options with how many
+// pledges have them (an option nobody has is left out unless it's picked), the
+// Melt Value range, and the active filters as pills.
+function invFilters() {
+  const items = state.items;
+  const types = presentKinds().map((k) => ({
+    key: k.key,
+    label: k.label,
+    n: items.filter((p) => p.kind === k.key).length,
+    on: state.shown.has(k.key),
+  }));
+  const groups = INV_GROUPS.map((g) => {
+    const sel = state.traits.get(g.key);
+    const picked = sel instanceof Set ? sel : new Set();
+    let opts;
+    if (g.fixed)
+      opts = g.fixed.map(([k, label, test]) => ({ key: k, label, n: items.filter(test).length }));
+    else {
+      const counts = new Map();
+      for (const p of items)
+        for (const k of new Set(g.of(p).filter(Boolean))) counts.set(k, (counts.get(k) || 0) + 1);
+      for (const k of picked) if (!counts.has(k)) counts.set(k, 0);
+      opts = [...counts.keys()].sort(g.order).map((k) => ({ key: k, label: k, n: counts.get(k) }));
+    }
+    const options = opts
+      .filter((o) => o.n || picked.has(o.key))
+      .map((o) => ({ ...o, on: picked.has(o.key) }));
+    return { key: g.key, title: g.title, search: !!g.search, picked: picked.size, options };
+  }).filter((g) => g.options.length);
+  const values = items.map((p) => p.value).filter(Number.isFinite);
+  const top = values.length ? Math.max(5, Math.ceil(Math.max(...values) / 5) * 5) : 0;
+  const active = [
+    ...types
+      .filter((t) => t.on)
+      .map((t) => ({ group: 'type', key: t.key, label: t.label, title: 'Type' })),
+    ...groups.flatMap((g) =>
+      g.options
+        .filter((o) => o.on)
+        .map((o) => ({ group: g.key, key: o.key, label: o.label, title: g.title })),
+    ),
+  ];
+  if (state.meltMax != null)
+    active.push({
+      group: 'melt',
+      key: '',
+      label: `Up to ${dollars(state.meltMax)}`,
+      title: 'Melt',
+    });
+  return {
+    types,
+    hideSmall: state.hideSmall,
+    groups,
+    melt: { top, value: state.meltMax },
+    active,
+    closed: [...state.invClosed],
+    folded: state.invFolded,
+  };
+}
+function resetInvFilters() {
+  state.shown = new Set();
+  state.traits = new Map();
+  state.meltMax = null;
+}
+// Saved views from before the sidebar stored traits as [key, 'yes' | 'no']: read
+// them as the matching sidebar options (anything with no match is dropped).
+const OLD_TRAITS = {
+  'lti:yes': ['ins', 'LTI'],
+  'giftable:yes': ['status', 'giftable'],
+  'giftable:no': ['status', 'notGiftable'],
+  'meltable:yes': ['status', 'meltable'],
+  'meltable:no': ['status', 'notMeltable'],
+  'warbond:yes': ['deals', 'warbond'],
+  'below:yes': ['deals', 'below'],
+  'free:yes': ['deals', 'free'],
+  'package:yes': ['from', 'package'],
+  'pack:yes': ['from', 'pack'],
+};
+function invTraitsFrom(entries) {
+  const map = new Map();
+  for (const [g, v] of entries || []) {
+    const pairs = Array.isArray(v)
+      ? v.map((k) => [g, k])
+      : OLD_TRAITS[`${g}:${v}`]
+        ? [OLD_TRAITS[`${g}:${v}`]]
+        : [];
+    for (const [gg, k] of pairs) {
+      if (!map.has(gg)) map.set(gg, new Set());
+      map.get(gg).add(k);
+    }
+  }
+  return map;
+}
+
 // Second chip row: traits present in `list`, plus Clear when anything is picked.
 // `skip`: trait keys that make no sense on this page.
 function traitRowHtml(list, selected, facets, anyFilter, skip = []) {
@@ -1651,16 +1824,6 @@ function traitRowHtml(list, selected, facets, anyFilter, skip = []) {
     .join('');
   const clear = anyFilter ? '<button class="chip chip-clear" data-clear="1">Clear</button>' : '';
   return chips || clear ? `<div class="chip-row chip-row-traits">${chips}${clear}</div>` : '';
-}
-
-function chipHtml(kind) {
-  const n = state.items.filter((p) => p.kind === kind.key).length;
-  // With no selection everything shows, so every chip reads as active; once any
-  // chip is picked only the picked ones stay active (the rest dim via CSS).
-  const active = state.shown.size === 0 || state.shown.has(kind.key);
-  return `<button class="chip k-${kind.key}" data-key="${kind.key}" aria-pressed="${active}">${OH.escapeHtml(
-    kind.label,
-  )}<span class="n">${n}</span></button>`;
 }
 
 // M / G tags on a card: green = RSI says yes, red = no, grey = unknown (scans
@@ -2262,24 +2425,6 @@ const SMALL_KINDS = new Set(['paint', 'addon', 'coupon']);
 function switchHtml(key, label, on, title) {
   return `<button type="button" class="oh-sw${on ? ' on' : ''}" data-switch="${key}" aria-pressed="${on}" title="${OH.escapeHtml(title)}"><span class="sw-t"></span>${OH.escapeHtml(label)}</button>`;
 }
-// Summary strip on top of Inventory: follows the filters.
-function renderInvSummary(shown) {
-  const el = $('#inv-sum');
-  if (!el) return;
-  const filtered = shown.length !== state.items.length;
-  let store = 0;
-  for (const p of shown) store += (storeInfo(p) || {}).store || 0;
-  const stat = (l, v) =>
-    `<div class="ps-st"><div class="ps-l">${l}</div><div class="ps-v">${v}</div></div>`;
-  setHTML(
-    el,
-    `<div><h2>Inventory</h2>${filtered ? `<div class="ps-note">Totals follow your filters (${shown.length} of ${state.items.length})</div>` : ''}</div><div class="ps-stats">` +
-      stat('Pledges', compactNum(shown.length)) +
-      stat('Melt Value', OHApp.bigMoney(OH.totalValue(shown))) +
-      (store ? stat('Store Value', OHApp.bigMoney(store)) : '') +
-      '</div>',
-  );
-}
 // Summary strip on top of Buy-Backs.
 function renderBbSummary() {
   const el = $('#bb-sum');
@@ -2333,103 +2478,40 @@ function stackBuybacks(list) {
   }
   return [...map.values()];
 }
-// Saved views: one click back to a set of filters (Inventory).
-function renderSavedViews() {
-  const el = $('#inv-views');
-  if (!el) return;
-  const cur = JSON.stringify(currentView_inv());
-  setHTMLKeepFocus(
-    el,
-    (state.savedViews.length ? '<span class="views-lbl">Saved Views</span>' : '') +
-      state.savedViews
-        .map(
-          (v, i) =>
-            `<span class="view-chip${JSON.stringify(v.f) === cur ? ' on' : ''}"><button type="button" data-view-apply="${i}">★ ${OH.escapeHtml(v.name)}</button><button type="button" class="view-x" data-view-del="${i}" title="Remove this view" aria-label="Remove ${OH.escapeHtml(v.name)}">×</button></span>`,
-        )
-        .join('') +
-      '<button type="button" class="view-add" data-view-save>+ Save This View</button>',
-  );
-}
+// Saved views: one click back to a set of filters (Inventory). The chips are drawn
+// by ui/inventory; the [data-view-*] click handlers below do the work.
 function currentView_inv() {
   return {
     shown: [...state.shown].sort(),
-    traits: [...state.traits.entries()].sort(),
+    traits: [...state.traits]
+      .filter(([, sel]) => sel instanceof Set && sel.size)
+      .map(([g, sel]) => [g, [...sel].sort()])
+      .sort(),
     query: state.query.trim(),
     hideSmall: state.hideSmall,
+    ...(state.meltMax != null && { meltMax: state.meltMax }),
   };
 }
 function saveViews() {
   chrome.storage.local.set({ savedViews: state.savedViews });
 }
-// Melt planner (Select mode): what the picked pledges give back, and which ships
-// on your wishlist that buys, in the store or from your buy-backs.
-function renderMeltPlanner() {
-  const el = $('#sb-melt');
-  if (!el) return;
-  const picked = state.items.filter((p) => state.selected.has(p.id));
-  const total = picked.reduce((a, p) => a + (isMeltable(p) ? p.value : 0), 0);
-  el.hidden = !picked.length || !total;
-  if (el.hidden) return;
-  const esc = OH.escapeHtml;
-  const wish = state.wishlist || [];
-  const priced = wish
-    .map((name) => ({ name, price: state.priceOf ? (state.priceOf(name) || {}).msrp : null }))
-    .filter((x) => x.price);
-  const fits = priced.filter((x) => x.price <= total).sort((a, b) => b.price - a.price);
-  // Wishlist ships waiting in your buy-backs at or under the total.
-  const wl = new Set(wish.map((w) => String(w).toLowerCase()));
-  const inBb = state.buybacks
-    .map((b) => ({
-      b,
-      ship: state.shipOf ? state.shipOf(resolveImageName(b)) : null,
-      price: bbPrice(b),
-    }))
-    .filter(
-      (x) => x.ship && wl.has(String(x.ship.name).toLowerCase()) && x.price && x.price <= total,
-    );
-  let buys;
-  if (!wish.length) buys = 'Add ships to your wishlist to see what this buys.';
-  else if (fits.length)
-    buys = `That buys a <b>${esc(fits[0].name)}</b> (${esc(dollars(fits[0].price))}) from your wishlist${
-      total - fits[0].price >= 1 ? `, with ${esc(dollars(total - fits[0].price))} left` : ''
-    }.`;
-  else {
-    const cheapest = priced.sort((a, b) => a.price - b.price)[0];
-    buys = cheapest
-      ? `Not enough for your wishlist yet: the cheapest is ${esc(cheapest.name)} (${esc(dollars(cheapest.price))}).`
-      : '';
-  }
-  if (inBb.length) {
-    const x = inBb.sort((a, b) => b.price - a.price)[0];
-    buys += ` Or get the <b>${esc(x.ship.name)}</b> back from your buy-backs for ${esc(dollars(x.price))} (with store credit that takes a buy-back token; cash buy-backs don't).`;
-  }
-  const lti = picked.filter((p) => p.insurance === 'LTI').length;
-  if (lti) buys += ` <span class="sb-warn">You'd lose LTI on ${lti}.</span>`;
-  setHTML(el, `<b class="sb-total">${esc(dollars(total))}</b> ${buys}`);
-}
 
+// Inventory: the page around the list (summary strip, toolbar, filter sidebar,
+// active filters, saved views, melt planner) is Svelte (ui/inventory) and redraws on
+// 'oh:home'. The list itself (cards, or the Market sale sheet) is still drawn here,
+// into #results, which the Svelte page places in its list column.
 function renderInventory() {
   ensurePrices();
   updateSelectBar();
-  layoutEl
-    .querySelectorAll('button')
-    .forEach((b) => b.classList.toggle('active', b.dataset.layout === state.layout));
+  homeUpdated();
   if (!state.items.length) {
-    setHTML(chipsEl, '');
     setHTML(
       resultsEl,
       `<div class="empty">${OH.quip('emptyHangar')} Hit Scan at the top to fill it.</div>`,
     );
     return;
   }
-  setHTMLKeepFocus(
-    chipsEl,
-    `<div class="chip-row">${presentKinds().map(chipHtml).join('')}<span class="sw-group">${switchHtml('inv-hide', 'Hide Small Stuff', state.hideSmall, 'Paints, add-ons and coupons')}</span></div>` +
-      traitRowHtml(state.items, state.traits, pledgeFacets, state.shown.size || state.traits.size),
-  );
-  renderSavedViews();
   const shown = computeShown();
-  renderInvSummary(shown);
   if (!shown.length) {
     setHTML(
       resultsEl,
@@ -2483,7 +2565,6 @@ const INV_SECTIONS = [
 // — for a sale post, a fleet brag, a "what should I melt" thread. Drawn on a
 // canvas locally; downloaded as a PNG, never uploaded.
 const selectBar = $('#select-bar');
-const selectToggle = $('#select-toggle');
 
 function toggleSelected(ids) {
   for (const id of ids) {
@@ -2505,13 +2586,9 @@ function updateSelectBar() {
   if (done) done.hidden = !state.selecting; // Market has no mode to leave
   const live = resultsEl.querySelector('.mk-selcount');
   if (live) live.textContent = marketSelText();
-  if (selectToggle) {
-    selectToggle.setAttribute('aria-pressed', String(state.selecting));
-    selectToggle.textContent = state.selecting ? 'Done Selecting' : 'Select';
-  }
   const n = state.selected.size;
   $('#sb-count').textContent = n ? `${n} selected` : 'Click items to select them';
-  renderMeltPlanner();
+  homeUpdated(); // the Select button and the melt planner (ui/inventory)
   selectBar.querySelectorAll('[data-sb="copy"],[data-sb="save"]').forEach((b) => {
     b.disabled = !n;
   });
@@ -2737,7 +2814,6 @@ async function makeFleetImage(action) {
   downloadImage(canvas, `open-hangar-fleet-${who}.png`.replace(/[^\w.-]+/g, '_'), status);
 }
 
-if (selectToggle) selectToggle.addEventListener('click', () => setSelecting(!state.selecting));
 if (selectBar) {
   selectBar.addEventListener('click', (e) => {
     const b = e.target.closest('[data-sb]');
@@ -5355,22 +5431,6 @@ function copyBuybackImage(statusEl) {
 
 // --- Events ---------------------------------------------------------------
 
-chipsEl.addEventListener('click', (e) => {
-  const btn = e.target.closest('.chip');
-  if (!btn) return;
-  if (btn.dataset.clear) {
-    state.shown.clear();
-    state.traits.clear();
-  } else if (btn.dataset.trait) {
-    cycleTrait(state.traits, btn.dataset.trait);
-  } else {
-    const key = btn.dataset.key;
-    if (state.shown.has(key)) state.shown.delete(key);
-    else state.shown.add(key);
-  }
-  renderInventory();
-});
-
 // Typing waits for a short pause before redrawing, so a big list doesn't redraw on
 // every letter.
 const debounce = (fn, ms = 150) => {
@@ -5381,16 +5441,6 @@ const debounce = (fn, ms = 150) => {
   };
 };
 const renderInventorySoon = debounce(() => renderInventory());
-searchEl.addEventListener('input', () => {
-  state.query = searchEl.value;
-  renderInventorySoon();
-});
-
-sortEl.addEventListener('change', () => {
-  state.sort = sortEl.value;
-  renderInventory();
-});
-
 if (bbSearchEl) {
   const renderBuybacksSoon = debounce(() => renderBuybacks());
   bbSearchEl.addEventListener('input', () => {
@@ -5431,14 +5481,6 @@ if (bbLayoutEl) {
     renderBuybacks();
   });
 }
-
-layoutEl.addEventListener('click', (e) => {
-  const b = e.target.closest('button[data-layout]');
-  if (!b) return;
-  state.layout = b.dataset.layout;
-  chrome.storage.local.set({ uiLayout: state.layout });
-  renderInventory();
-});
 
 // Broken thumbnails → placeholder (error events don't bubble; capture phase).
 // A thumbnail failed to load (RSI sometimes serves broken image links): show
@@ -6137,25 +6179,24 @@ document.addEventListener('click', (e) => {
     const v = state.savedViews[+apply.dataset.viewApply];
     if (!v) return;
     state.shown = new Set(v.f.shown);
-    state.traits = new Map(v.f.traits);
+    state.traits = invTraitsFrom(v.f.traits);
+    state.meltMax = Number.isFinite(v.f.meltMax) ? v.f.meltMax : null;
     state.query = v.f.query || '';
     state.hideSmall = !!v.f.hideSmall;
-    const q = $('#search');
-    if (q) q.value = state.query;
     return renderInventory();
   }
   const del = t.closest('[data-view-del]');
   if (del) {
     state.savedViews.splice(+del.dataset.viewDel, 1);
     saveViews();
-    return renderSavedViews();
+    return renderInventory();
   }
   if (t.closest('[data-view-save]')) {
     const name = (prompt('Name this view (for example "Giftable ships")') || '').trim();
     if (!name) return;
     state.savedViews.push({ name: name.slice(0, 40), f: currentView_inv() });
     saveViews();
-    return renderSavedViews();
+    return renderInventory();
   }
   const ex = t.closest('[data-export]');
   if (ex) {
@@ -6236,6 +6277,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
         state.selected.clear();
         state.shown = new Set(); // default: no filter selected = show all
         state.traits = new Map();
+        state.meltMax = null;
       }
       if (account?.loggedIn && account.nickname) {
         state.owner = { nickname: account.nickname, displayname: account.displayname || null };
@@ -6484,6 +6526,7 @@ clearBtn.addEventListener('click', async () => {
   state.owner = null;
   state.shown = new Set();
   state.traits = new Map();
+  state.meltMax = null;
   state.bbShown = new Set();
   state.bbTraits = new Map();
   state.referral = null;
@@ -6652,6 +6695,7 @@ if (importBtn && importFile) {
     renderDbNotice();
     state.shown = new Set(); // default: no filter selected = show all
     state.traits = new Map();
+    state.meltMax = null;
     state.bbShown = new Set(); // default: no filter selected = show all
     state.bbTraits = new Map();
     renderAccount(); // reflect imported referral in the pill
@@ -6686,6 +6730,7 @@ function loadStateFromDB(db) {
   state.selected.clear();
   state.shown = new Set();
   state.traits = new Map();
+  state.meltMax = null;
   state.bbShown = new Set();
   state.bbTraits = new Map();
 }
@@ -7781,6 +7826,8 @@ if (gsearch && gsearchOut) {
     remindRescan,
     streamerMode,
     hideSmallInv,
+    invFiltersFolded,
+    invClosedGroups,
     hideSmallBb,
     bbStack,
     savedViews,
@@ -7796,6 +7843,8 @@ if (gsearch && gsearchOut) {
     'remindRescan',
     'streamerMode',
     'hideSmallInv',
+    'invFiltersFolded',
+    'invClosedGroups',
     'hideSmallBb',
     'bbStack',
     'savedViews',
@@ -7813,6 +7862,8 @@ if (gsearch && gsearchOut) {
   if (Number.isFinite(lastBackupAt)) state.lastBackupAt = lastBackupAt;
   streamer.on = streamerMode === true;
   state.hideSmall = hideSmallInv === true;
+  state.invFolded = invFiltersFolded === true;
+  if (Array.isArray(invClosedGroups)) state.invClosed = new Set(invClosedGroups);
   state.bbHideSmall = hideSmallBb !== false; // on unless turned off
   state.bbStack = bbStack === true;
   if (Array.isArray(savedViews)) state.savedViews = savedViews.filter((v) => v && v.name && v.f);
@@ -7846,6 +7897,7 @@ if (gsearch && gsearchOut) {
   const notice = await reconcileAccount();
   state.shown = new Set(); // default: no filter selected = show all
   state.traits = new Map();
+  state.meltMax = null;
   state.bbShown = new Set(); // default: no filter selected = show all
   state.bbTraits = new Map();
   route();
@@ -7922,6 +7974,103 @@ window.OHApp = {
   wishlistStock,
   tierProgress: (recruits) => tierProgress(REFERRAL_LADDER_STANDARD, recruits),
   rewardNames,
+  // Inventory (ui/inventory): what the page around the list shows, and the actions
+  // its controls call. Each action updates state and redraws through renderInventory().
+  inv: {
+    get empty() {
+      return !state.items.length;
+    },
+    get query() {
+      return state.query;
+    },
+    get sort() {
+      return state.sort;
+    },
+    get layout() {
+      return state.layout;
+    },
+    get selecting() {
+      return state.selecting;
+    },
+    get savedViews() {
+      return state.savedViews;
+    },
+    // The current filters as a saved view's `f`, to mark the matching chip.
+    viewKey: () => JSON.stringify(currentView_inv()),
+    filters: invFilters,
+    // Summary strip: totals follow the filters.
+    summary: () => {
+      const shown = computeShown();
+      let store = 0;
+      for (const p of shown) store += (storeInfo(p) || {}).store || 0;
+      return {
+        n: shown.length,
+        nText: compactNum(shown.length),
+        total: state.items.length,
+        melt: OH.totalValue(shown),
+        store,
+      };
+    },
+    // Melt planner (Select mode): the picked pledges and what melting them gives back.
+    picked: () => state.items.filter((p) => state.selected.has(p.id)),
+    isMeltable,
+    bbPrice,
+    setQuery: (q) => {
+      state.query = q;
+      renderInventorySoon();
+    },
+    setSort: (v) => {
+      state.sort = v;
+      renderInventory();
+    },
+    setLayout: (v) => {
+      if (!LAYOUTS.includes(v)) return;
+      state.layout = v;
+      chrome.storage.local.set({ uiLayout: state.layout });
+      renderInventory();
+    },
+    toggleSelecting: () => setSelecting(!state.selecting),
+    toggleType: (k) => {
+      if (state.shown.has(k)) state.shown.delete(k);
+      else state.shown.add(k);
+      renderInventory();
+    },
+    toggleOption: (g, k) => {
+      if (!(state.traits.get(g) instanceof Set)) state.traits.set(g, new Set());
+      const sel = state.traits.get(g);
+      if (sel.has(k)) sel.delete(k);
+      else sel.add(k);
+      renderInventory();
+    },
+    remove: (g, k) => {
+      if (g === 'type') state.shown.delete(k);
+      else if (g === 'melt') state.meltMax = null;
+      else state.traits.get(g)?.delete(k);
+      renderInventory();
+    },
+    clearGroup: (g) => {
+      state.traits.delete(g);
+      renderInventory();
+    },
+    clearAll: () => {
+      resetInvFilters();
+      renderInventory();
+    },
+    setMeltMax: (v) => {
+      state.meltMax = v == null ? null : Number(v);
+      renderInventorySoon();
+    },
+    setFolded: (on) => {
+      state.invFolded = !!on;
+      chrome.storage.local.set({ invFiltersFolded: state.invFolded });
+      homeUpdated();
+    },
+    setGroupOpen: (g, open) => {
+      if (open) state.invClosed.delete(g);
+      else state.invClosed.add(g);
+      chrome.storage.local.set({ invClosedGroups: [...state.invClosed] });
+    },
+  },
   openItem: (id) => {
     const p = state.items.find((x) => String(x.id) === String(id));
     if (p) openItemModal(p);
@@ -7935,7 +8084,8 @@ window.OHApp = {
   // Open Inventory with one kind or trait filter on ("ship", "ccu", "lti", "all").
   showInventory: (key) => {
     state.shown = new Set(OH.KINDS.some((k) => k.key === key) ? [key] : []);
-    state.traits = new Map(key === 'lti' ? [['lti', 'yes']] : []);
+    state.traits = new Map(key === 'lti' ? [['ins', new Set(['LTI'])]] : []);
+    state.meltMax = null;
     location.hash = '#inventory';
     renderInventory();
   },
