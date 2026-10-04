@@ -189,6 +189,10 @@ is moving pages to Svelte one at a time; today that's the Home page cards and St
   (`version.n`); components read `app()` (that is, `window.OHApp`) inside `$derived`
   blocks that also read `version.n`, so they redraw. `loadLive()` loads outside data
   (wiki, RSI news, patch notes) once per page view through `window.OH`.
+- **Org Fleet.** `ui/org/main.js` (built into `src/ui/org.js`) mounts the whole page
+  into `#oh-org`. The stored member list and the button work (import, Add My Fleet,
+  CSV, remove) stay in `src/dashboard.js` behind `window.OHApp.org`; `renderOrg()` only
+  loads the list, keeps your own entry in step with your scan and calls `homeUpdated()`.
 - **Developers.** `ui/developers/main.js` mounts the whole page into
   `#view-developers`, always (the card menus click `#export-db`, the damaged-database
   notice opens `#import-file`). The data tools stay in `src/dashboard.js` because they
