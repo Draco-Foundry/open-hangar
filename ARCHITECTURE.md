@@ -161,7 +161,7 @@ the community Hangar Transfer Format (one entry per ship).
 ## The Svelte and Classic Bridge
 
 The dashboard is mostly classic JavaScript. The 0.3.0 redesign (docs/REDESIGN-0.3.md)
-is moving pages to Svelte one at a time; today that's the Home page cards and Stats.
+is moving pages to Svelte one at a time; every page is on it now (the popup isn't built yet).
 
 - **Build.** `vite.config.mjs` builds each page's `ui/<page>/main.js` into
   `src/ui/<page>.js` (Home also gets `src/ui/home.css`), code the pages share into
@@ -193,6 +193,12 @@ is moving pages to Svelte one at a time; today that's the Home page cards and St
   into `#oh-org`. The stored member list and the button work (import, Add My Fleet,
   CSV, remove) stay in `src/dashboard.js` behind `window.OHApp.org`; `renderOrg()` only
   loads the list, keeps your own entry in step with your scan and calls `homeUpdated()`.
+- **Developers.** `ui/developers/main.js` mounts the whole page into
+  `#view-developers`, always (the card menus click `#export-db`, the damaged-database
+  notice opens `#import-file`). The data tools stay in `src/dashboard.js` because they
+  change `state`: the page calls them through `window.OHApp.dev` (`exportJson`,
+  `exportHtf`, `importBackup`, `restoreBackup`, `removeProfile`) and reads the note,
+  the restore button and the saved accounts from it.
 - **Svelte to classic.** `ui/home/ForYou.svelte` sets `window.OHApp.alerts` to
   `{ list, ignore }`, which the bell in `src/dashboard.js` reads.
 - **Inventory.** `ui/inventory/main.js` (built to `src/ui/inventory.js`) mounts the page around the list into `#oh-inventory`: summary
@@ -227,6 +233,12 @@ is moving pages to Svelte one at a time; today that's the Home page cards and St
 - **Shared chunk.** Code pages share (Svelte's runtime and `ui/lib/`) builds into
   `src/ui/shared.js` and `shared.css` (`manualChunks` in `vite.config.mjs`), so
   `dashboard.html` links one fixed stylesheet however many pages share it.
+- **Store.** `ui/store/main.js` (built into `src/ui/store.js`) mounts the Store page
+  into `#oh-store`. `renderStore()` only loads ship prices and RSI's store feed and
+  calls `homeUpdated()`. The page reads and acts through `window.OHApp.store`
+  (wishlist order, store-page stock checks, sort, tab and drag order); removing a
+  ship and its Undo bar still go through the classic `[data-wish-remove]` and
+  `[data-wish-undo]` click handlers.
 
 ## Outbound Requests
 
