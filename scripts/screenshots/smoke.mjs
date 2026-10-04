@@ -327,6 +327,66 @@ try {
       )
     : fail(`card tweaks: ${JSON.stringify(tweaks)}`);
 
+  // The card is Svelte (ui/home/CitizenCard.svelte, SignedOut.svelte, Welcome.svelte).
+  // Signed out: the Log In wall replaces the card, after the status line.
+  const wall = await page.evaluate(async () => {
+    const a = await OH.getAccount();
+    const real = OH.getAccount;
+    OH.getAccount = async () => ({ ...a, loggedIn: false });
+    renderAccount();
+    await new Promise((r) => setTimeout(r, 200));
+    const lo = document.querySelector('#cc-loggedout');
+    const res = {
+      wall: !lo.hidden && lo.getBoundingClientRect().height > 0,
+      cardHidden: document.querySelector('#cc-account').hidden,
+      afterStatus: !!document.querySelector('.cc-status ~ #cc-loggedout'),
+      login: /Log In to RSI/.test(lo.textContent),
+    };
+    OH.getAccount = real;
+    renderAccount();
+    await new Promise((r) => setTimeout(r, 200));
+    res.back = !document.querySelector('#cc-account').hidden && lo.hidden;
+    return res;
+  });
+  Object.values(wall).every(Boolean)
+    ? ok('signed out: the Log In wall replaces the card, and the card comes back')
+    : fail(`signed-out wall: ${JSON.stringify(wall)}`);
+  // First run (nothing scanned): the welcome card, its button, then the first
+  // scan's progress in place of the button.
+  const welcome = await page.evaluate(async () => {
+    const keep = { items: state.items, buybacks: state.buybacks };
+    state.items = [];
+    state.buybacks = [];
+    homeUpdated();
+    await new Promise((r) => setTimeout(r, 100));
+    const el = () => document.querySelector('#oh-welcome');
+    const shown = !!el() && !document.querySelector('#welcome-scan').hidden;
+    scanProgress.i = 1;
+    scanProgress.n = 4;
+    scanDetail('Buy-backs · page 2 · 200 items');
+    await new Promise((r) => setTimeout(r, 100));
+    const prog = document.querySelector('#welcome-progress');
+    const progress = {
+      shown: !prog.hidden,
+      button: document.querySelector('#welcome-scan').hidden,
+      text: document.querySelector('#wp-text').textContent,
+      width: document.querySelector('#wp-fill').style.width,
+    };
+    scanDetail('');
+    Object.assign(state, keep);
+    homeUpdated();
+    await new Promise((r) => setTimeout(r, 100));
+    return { shown, progress, gone: !el() };
+  });
+  welcome.shown &&
+  welcome.progress.shown &&
+  welcome.progress.button &&
+  /page 2/.test(welcome.progress.text) &&
+  welcome.progress.width === '37.5%' &&
+  welcome.gone
+    ? ok('welcome card: Scan My Hangar, then the first scan as a progress bar; gone with data')
+    : fail(`welcome card: ${JSON.stringify(welcome)}`);
+
   // Phone width: nothing scrolls sideways.
   await page.setViewport({ width: 390, height: 844 });
   await new Promise((r) => setTimeout(r, 200));

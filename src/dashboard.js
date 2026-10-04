@@ -520,18 +520,10 @@ function scanDetail(text) {
     line.textContent = text ? `Scanning: ${text}` : '';
     line.hidden = !text;
   }
-  const welcome = $('#oh-welcome');
-  const prog = $('#welcome-progress');
-  const go = $('#welcome-scan');
-  if (!prog || !go) return;
-  const first = !!welcome && !welcome.hidden;
-  prog.hidden = !(first && text);
-  go.hidden = first && !!text;
-  if (first && text) {
-    const { i, n } = scanProgress;
-    $('#wp-fill').style.width = `${Math.max(4, Math.min(100, ((i + 0.5) / n) * 100))}%`;
-    $('#wp-text').textContent = text;
-  }
+  // The welcome card (ui/home/Welcome.svelte) shows it while it's up.
+  const { i, n } = scanProgress;
+  homeCard.scan = { text, pct: Math.max(4, Math.min(100, ((i + 0.5) / n) * 100)) };
+  homeUpdated();
 }
 function setScanning(text, done = false) {
   const btn = $('#scan-home');
@@ -1025,72 +1017,38 @@ function renderCardGrid(container, head, layout, list, cardHtml) {
   if (at < list.length) setTimeout(next, 0);
 }
 
+// Home's Citizen Card and first-run welcome are Svelte (ui/home/CitizenCard.svelte,
+// SignedOut.svelte, Welcome.svelte). They read `homeCard` through window.OHApp and
+// redraw on 'oh:home'.
+const homeCard = {
+  account: null, // the last OH.getAccount() result, null until it's read
+  welcomeReady: false, // the welcome card waits for the first route() after loading
+  scan: { text: '', pct: 0 }, // the first scan's progress, shown on the welcome card
+};
+
 // Home's welcome screen: shown until the first scan. Signed out, the card above
-// already has the Log In button, so this just says to use it (lastLoggedOut is set
+// already has the Log In button, so it just says to use it (lastLoggedOut is set
 // when the account is read).
 function renderWelcome() {
-  const el = $('#oh-welcome');
-  if (!el) return;
-  el.hidden = state.items.length > 0 || state.buybacks.length > 0;
-  $('#welcome-scan').hidden = lastLoggedOut;
-  $('#welcome-note').textContent = lastLoggedOut
-    ? 'First, log in to RSI with the button on the card above, then come back and hit Scan. Your hangar’s waiting.'
-    : 'A big hangar takes about a minute, still faster than a Lorville elevator. To scan just part of it, use the ▾ next to Scan.';
+  homeCard.welcomeReady = true;
+  homeUpdated();
 }
-$('#welcome-scan')?.addEventListener('click', () => {
-  if (!scanBtn.disabled) runScan(); // everything, whatever the ▾ menu has ticked
-});
 
-// RSI account → the home Citizen Card: avatar, name, est/country/UEE record,
-// quick links, balances (Store/UEC/REC), and subscriber/concierge flair.
+// RSI account → the home Citizen Card (drawn by ui/home/CitizenCard.svelte), plus
+// the bits of the page outside the card that follow the account: the gear menu's
+// portrait and name, Log Out, the signed-out banner and Store Credit.
 function renderAccount() {
-  const nameEl = $('#cc-name'),
-    metaEl = $('#cc-meta'),
-    avEl = $('#cc-avatar');
-  const orgEl = $('#cc-org');
-  const balEl = $('#home-balances'),
-    flairEl = $('#home-flair');
-
   OH.getAccount().then((a) => {
-    // Signed out → replace the whole card with the centred "Log In to RSI" wall.
-    // Show the wall whenever we DON'T have a confirmed login (false = logged out,
-    // null = couldn't determine): in both cases there's no live account data, so a
-    // dashed card with no prompt is confusing — better to guide the user to log in.
-    // (A confirmed `true` is the only state that shows the normal card.)
+    // Signed out → the card shows the centred "Log In to RSI" wall instead.
+    // Anything but a confirmed login (false = logged out, null = couldn't tell)
+    // counts as signed out: there's no live account data either way.
     const loggedOut = a.loggedIn !== true;
-    const acctEl = $('#cc-account'),
-      loEl = $('#cc-loggedout');
-    if (acctEl) acctEl.hidden = loggedOut;
-    if (loEl) loEl.hidden = !loggedOut;
+    homeCard.account = a;
     if (logoutBtn) logoutBtn.hidden = a.loggedIn !== true;
 
     updateSignedOutBanner(loggedOut);
     renderWelcome();
 
-    const handle = a.nickname || '';
-    const citizenUrl = handle
-      ? `https://robertsspaceindustries.com/citizens/${encodeURIComponent(handle)}`
-      : null;
-
-    // Portrait: RSI keeps a 1024px original next to the 165px thumbnail the account
-    // page links; use it (the thumbnail stays underneath as a fallback layer).
-    if (avEl) {
-      const thumb = safeBgUrl(a.avatar);
-      const big = /\/heap_infobox\//.test(a.avatar || '')
-        ? safeBgUrl(a.avatar.replace('/heap_infobox/', '/source/'))
-        : '';
-      avEl.style.backgroundImage = [big, thumb].filter(Boolean).join(', ');
-      // No portrait on RSI: the name's initials instead of an empty panel.
-      const nm = a.displayname || a.nickname || '';
-      avEl.textContent = thumb
-        ? ''
-        : nm
-            .split(/[\s_-]+/)
-            .filter(Boolean)
-            .slice(0, 2)
-            .map((w) => w[0].toUpperCase())
-            .join('');
-    }
     const menuAv = $('#menu-avatar');
     if (menuAv) {
       const thumb = a.loggedIn ? safeBgUrl(a.avatar) : '';
@@ -1110,137 +1068,12 @@ function renderAccount() {
         who.querySelector('.mw-pic').style.backgroundImage = safeBgUrl(a.avatar);
       }
     }
-    const photo = $('#cc-photo');
-    if (photo) {
-      if (citizenUrl) photo.href = citizenUrl;
-      else photo.removeAttribute('href');
-      photo.title = citizenUrl ? 'Open your RSI citizen page' : '';
-    }
 
-    // Name → the citizen page (plain white, underline on hover).
-    if (nameEl) {
-      const name = a.displayname || a.nickname || (a.loggedIn === false ? 'Not signed in' : DASH);
-      setHTML(
-        nameEl,
-        citizenUrl
-          ? `<a class="cc-plain" href="${OH.escapeHtml(citizenUrl)}" target="_blank" rel="noopener" title="Open your RSI citizen page">${OH.escapeHtml(name)}</a>`
-          : OH.escapeHtml(name),
-      );
-    }
-
-    // UEE record · Est. <month year> · <n> years (full date on hover).
-    if (metaEl) {
-      if (a.loggedIn) {
-        const d = a.enlistedSince ? new Date(a.enlistedSince) : null;
-        const ok = d && !isNaN(d.getTime());
-        const parts = [];
-        if (a.citizenRecord) parts.push(`UEE ${OH.escapeHtml(a.citizenRecord)}`);
-        if (ok) {
-          const my = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-          parts.push(
-            `<span title="Enlisted ${OH.escapeHtml(fmtEnlisted(a.enlistedSince))}">Est. ${OH.escapeHtml(my)}</span>`,
-          );
-          const now = new Date();
-          let yrs = now.getFullYear() - d.getFullYear();
-          if (
-            now.getMonth() < d.getMonth() ||
-            (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())
-          )
-            yrs--;
-          if (yrs >= 1) parts.push(`${yrs} year${yrs === 1 ? '' : 's'}`);
-        }
-        setHTML(metaEl, parts.join(' · '));
-      } else {
-        setHTML(metaEl, '');
-      }
-    }
-
-    // Main org only: logo + name (rank under it), one plain link to the org page,
-    // and the logo again as a faint watermark. No org, or a hidden/redacted one:
-    // nothing at all (owner, 2026-09-30).
-    const waterEl = $('#cc-water');
-    if (orgEl) {
-      const org = a.loggedIn ? a.org : null;
-      if (org && org.name) {
-        const logo = org.logo
-          ? `<img class="cc-org-logo" src="${OH.escapeHtml(org.logo)}" alt="" loading="lazy">`
-          : '';
-        const inner =
-          `${logo}<span class="cc-org-text">` +
-          `<span class="cc-org-name">${OH.escapeHtml(org.name)}</span>` +
-          (org.rank ? `<span class="cc-org-rank">${OH.escapeHtml(org.rank)}</span>` : '') +
-          `</span>`;
-        setHTML(
-          orgEl,
-          org.sid
-            ? `<a class="cc-org-link" href="https://robertsspaceindustries.com/orgs/${encodeURIComponent(org.sid)}" target="_blank" rel="noopener" title="Open ${OH.escapeHtml(org.name)} on RSI">${inner}</a>`
-            : `<span class="cc-org-link">${inner}</span>`,
-        );
-        orgEl.hidden = false;
-      } else {
-        setHTML(orgEl, '');
-        orgEl.hidden = true;
-      }
-      if (waterEl) {
-        if (org && org.logo) waterEl.src = org.logo;
-        waterEl.hidden = !(org && org.logo);
-      }
-    }
-
-    // Subscriber + Chairman's Club on one line; each only when it applies.
-    if (flairEl) {
-      const parts = [];
-      if (a.subscriber?.type) {
-        parts.push(
-          `<a class="flair sub" href="https://robertsspaceindustries.com/en/pledge/subscriptions" target="_blank" rel="noopener"><span class="flair-lbl">Subscriber</span> <b>${OH.escapeHtml(a.subscriber.type)}</b></a>`,
-        );
-      }
-      if (a.concierge?.level) {
-        const col = CONCIERGE_COLORS[a.concierge.level.toLowerCase()] || '#d2a8ff';
-        const next = a.concierge.next
-          ? ` title="${Number(a.concierge.percent) || 0}% of the way to ${OH.escapeHtml(a.concierge.next)}"`
-          : '';
-        parts.push(
-          `<a class="flair concierge" href="https://robertsspaceindustries.com/en/account/concierge" target="_blank" rel="noopener"${next}><span class="flair-lbl">Chairman's Club</span> <b style="color:${col}">${OH.escapeHtml(a.concierge.level)}</b></a>`,
-        );
-      }
-      setHTML(flairEl, parts.join(''));
-      flairEl.hidden = !parts.length;
-    }
-
-    // Wallet: Store Credit, UEC, REC, Buy-Back Tokens (the next token's date is on Game Status).
-    // Big amounts are shortened (¤ 1.2M); the exact figure is in the hover text.
-    // Streamer Mode turns the money and aUEC amounts into dots.
-    if (balEl) {
-      const c = a.credits || {};
-      const fmt = (n) => Number(n).toLocaleString('en-US');
-      const tile = (cls, label, val, full) =>
-        `<span class="bal ${cls}"${full && full !== val ? ` title="${OH.escapeHtml(full)}"` : ''}><span class="bal-lbl">${label}</span><b>${val}</b></span>`;
-      // A no-break space after ¤ so the symbol doesn't crowd the digits.
-      const aUEC = (x) =>
-        !x ? [DASH] : streamer.on ? [MASK] : ['¤ ' + compactNum(x.value), '¤ ' + fmt(x.value)];
-      const store = c.store ? c.store.value / 100 : null;
-      if (store !== state.storeCredit) {
-        state.storeCredit = store;
-        homeUpdated();
-      }
-      setHTML(
-        balEl,
-        tile(
-          'store',
-          'Store Credit',
-          store != null ? shortMoney(store, money) : DASH,
-          store != null ? money(store) : '',
-        ) +
-          tile('uec', 'UEC', ...aUEC(c.uec)) +
-          tile('rec', 'REC', ...aUEC(c.rec)) +
-          `<a class="bal bbt" href="#buybacks" data-view="buybacks" title="${OH.escapeHtml(
-            tokenTitle(),
-          )}"><span class="bal-lbl">Buy-Back Tokens</span><b>${
-            state.bbTokens != null ? state.bbTokens : DASH
-          }</b></a>`,
-      );
-    }
+    // Store Credit counts toward Account Value.
+    const c = a.credits || {};
+    const store = c.store ? c.store.value / 100 : null;
+    if (store !== state.storeCredit) state.storeCredit = store;
+    homeUpdated();
   });
 }
 
@@ -6206,7 +6039,6 @@ document.addEventListener('click', async (e) => {
 async function runScan({ hangar = true, buybacks = true, referrals = true, store = true } = {}) {
   if (!hangar && !buybacks && !referrals && !store) return;
   scanBtn.disabled = true;
-  if ($('#welcome-scan')) $('#welcome-scan').disabled = true;
   if (scanSelectedBtn) scanSelectedBtn.disabled = true;
   scanProgress.i = 0;
   scanProgress.n = [hangar, buybacks, referrals, store].filter(Boolean).length || 1;
@@ -6331,7 +6163,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   if (hangar) warmPictures(computeShown(), state.layout);
   if (buybacks) warmPictures(computeBuybacks(), state.bbLayout);
   scanBtn.disabled = false;
-  if ($('#welcome-scan')) $('#welcome-scan').disabled = false;
+  homeUpdated(); // the welcome card's button follows scanBtn.disabled
   if (scanSelectedBtn) scanSelectedBtn.disabled = false;
 }
 
@@ -7914,6 +7746,35 @@ window.OHApp = {
   get recruits() {
     return state.referral?.legacy?.recruits ?? 0;
   },
+  // Citizen Card and welcome card (ui/home): the RSI account, the first scan's
+  // progress, and the formatting the card shares with the classic pages.
+  get account() {
+    return homeCard.account;
+  },
+  get welcomeReady() {
+    return homeCard.welcomeReady;
+  },
+  get loggedOut() {
+    return lastLoggedOut;
+  },
+  get scanning() {
+    return !!scanBtn?.disabled;
+  },
+  get scanDetail() {
+    return homeCard.scan;
+  },
+  get streamer() {
+    return streamer.on;
+  },
+  scanAll: () => {
+    if (!scanBtn.disabled) runScan(); // everything, whatever the ▾ menu has ticked
+  },
+  safeBgUrl,
+  fmtEnlisted,
+  conciergeColor: (level) => CONCIERGE_COLORS[String(level).toLowerCase()] || '#d2a8ff',
+  compactNum,
+  shortMoney: (n) => shortMoney(n, money),
+  tokenTitle,
   hangarValue,
   // A history snapshot's ships at today's store prices (same as Stats → History).
   accountValue,
