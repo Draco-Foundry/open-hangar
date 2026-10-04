@@ -1211,11 +1211,15 @@ try {
   const prices = await page.$$eval('#price-table tbody tr', (r) => r.length);
   prices > 50 ? ok(`price list: ${prices} ships`) : fail(`price list only ${prices} rows`);
   const st = await page.evaluate(async () => {
+    // The Store is Svelte (ui/store): it redraws a tick after a change.
+    const tick = (ms = 50) => new Promise((r) => setTimeout(r, ms));
     const rows = () => document.querySelectorAll('#price-table tbody tr').length;
     const flying = rows(); // default tab: Flight Ready
     document.querySelector('[data-price-tab="all"]').click();
+    await tick();
     const all = rows();
     document.querySelector('[data-price-tab="in-concept"]').click();
+    await tick();
     const concept = rows();
     const ccus = document.querySelectorAll('#ccu-owned tbody tr').length;
     // "In store now" comes from each ship's own store page (stubbed here):
@@ -1235,6 +1239,7 @@ try {
     });
     state.bbDetails['999001'] = { ships: [{ name: 'Carrack' }], also: [] };
     renderStore();
+    await tick();
     const packRow = [...document.querySelectorAll('#wishlist tbody tr')].find((r) =>
       /^Carrack/.test(r.textContent.trim()),
     );
@@ -1244,7 +1249,8 @@ try {
     renderStore();
     await new Promise((r) => setTimeout(r, 300));
     const stock = [...document.querySelectorAll('#wishlist .sale')].map((e) => e.textContent);
-    document.querySelector('[data-wish-bbs]')?.click();
+    document.querySelector('#wishlist .wish-open')?.click();
+    await tick();
     const sub = document.querySelector('.wish-bbs');
     const res = {
       flying,
@@ -1263,6 +1269,7 @@ try {
     };
     state.wishlist = [];
     state.priceTab = 'flight-ready';
+    renderStore();
     return res;
   });
   st.panels === 3 &&
@@ -1301,7 +1308,7 @@ try {
     const pick = async (v) => {
       const sel = document.querySelector('#wish-sort');
       sel.value = v;
-      sel.dispatchEvent(new Event('change'));
+      sel.dispatchEvent(new Event('change', { bubbles: true })); // as a real pick does
       await new Promise((r) => setTimeout(r, 300));
       return order().join(',');
     };
@@ -1313,7 +1320,8 @@ try {
       mineBefore: await pick('mine'),
       grips: document.querySelectorAll('#wishlist .wish-grip').length,
     };
-    moveWishlist('Carrack', 'Pioneer');
+    OHApp.store.setWishOrder(['Carrack', 'Pioneer', 'Cutlass Black']);
+    await new Promise((r) => setTimeout(r, 50));
     res.mineAfter = order().join(',');
     state.wishlist = [];
     state.wishSort = 'name';
@@ -1370,13 +1378,17 @@ try {
   // Panel searches: counts in the placeholder, "N of M" while typing, no CCU
   // search for a handful of CCUs.
   const sm = await page.evaluate(async () => {
+    const tick = () => new Promise((r) => setTimeout(r, 50));
+    await tick();
     const box = document.querySelector('#price-search');
     const placeholder = box.placeholder;
     box.value = 'cutlass';
     box.dispatchEvent(new Event('input'));
+    await tick();
     const count = document.querySelector('#price-search-count').textContent;
     box.value = '';
     box.dispatchEvent(new Event('input'));
+    await tick();
     return {
       placeholder,
       count,
@@ -1700,12 +1712,19 @@ try {
     location.hash = '#store';
     await new Promise((r) => setTimeout(r, 400));
     const wish = document.querySelector('#wishlist').textContent;
+    const tick = () => new Promise((r) => setTimeout(r, 50));
     document.querySelector('[data-wish-remove]')?.click();
+    await tick();
     const undoBar = document.querySelector('#wish-undo');
     const undoShown = !undoBar.hidden && /Removed Carrack/.test(undoBar.textContent);
     undoBar.querySelector('[data-wish-undo]').click();
-    const restored = state.wishlist.length === 1 && undoBar.hidden;
+    await tick();
+    const restored =
+      state.wishlist.length === 1 &&
+      undoBar.hidden &&
+      /Carrack/.test(document.querySelector('#wishlist').textContent);
     document.querySelector('[data-wish-remove]')?.click();
+    await tick();
     const cleared = !state.wishlist.length && undoShown && restored;
     setStatsTab('spending');
     location.hash = '#stats';
