@@ -228,3 +228,28 @@ test('storeLine and stampStoreVersions fill the install buttons', async () => {
   // Stamping twice (a daily redeploy) gives the same page.
   assert.equal(stampStoreVersions(out, { chrome: { live: '0.2.7', pending: '0.2.8' } }), out);
 });
+
+test('versionsJson: one shape, blanks as null', async () => {
+  const { versionsJson } = await lib();
+  assert.deepEqual(
+    versionsJson({
+      version: '0.3.0',
+      updated: '2026-11-10',
+      lines: {
+        chrome: { live: '0.3.0', pending: null },
+        firefox: { live: '0.2.16', pending: '0.3.0' },
+      },
+      checkedAt: 'T',
+    }),
+    {
+      version: '0.3.0',
+      updated: '2026-11-10',
+      stores: {
+        chrome: { live: '0.3.0', pending: null },
+        edge: { live: null, pending: null },
+        firefox: { live: '0.2.16', pending: '0.3.0' },
+      },
+      checkedAt: 'T',
+    },
+  );
+});
