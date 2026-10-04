@@ -181,6 +181,12 @@ is moving pages to Svelte one at a time; today that's the Home page cards.
   (wiki, RSI news, patch notes) once per page view through `window.OH`.
 - **Svelte to classic.** `ui/home/ForYou.svelte` sets `window.OHApp.alerts` to
   `{ list, ignore }`, which the bell in `src/dashboard.js` reads.
+- **Store.** `ui/store/main.js` (built into `src/ui/store.js`) mounts the Store page
+  into `#oh-store`. `renderStore()` only loads ship prices and RSI's store feed and
+  calls `homeUpdated()`. The page reads and acts through `window.OHApp.store`
+  (wishlist order, store-page stock checks, sort, tab and drag order); removing a
+  ship and its Undo bar still go through the classic `[data-wish-remove]` and
+  `[data-wish-undo]` click handlers.
 
 ## Outbound Requests
 
