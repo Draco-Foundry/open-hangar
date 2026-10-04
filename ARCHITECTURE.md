@@ -221,6 +221,14 @@ is moving pages to Svelte one at a time; every page is on it now (the popup isn'
   and `getDetails()` for the unchecked buy-back packs). Rows open with
   `data-open-item` / `data-open-bb` (the shared click handler), which fires
   `oh:close-search` so both boxes start empty again.
+- **Detail windows.** `ui/details/main.js` (built into `src/ui/details.js`) mounts
+  `Details` into `#oh-details`: one dialog (`#item-modal`) showing a pledge, a buy-back
+  or a ship, and the full-size picture viewer (`#lightbox`) on top. `openItemModal()`,
+  `openBuybackModal()`, `openShipModal()` and `closeItemModal()` in `src/dashboard.js`
+  (and the shared `data-open-item` / `data-open-bb` / `data-ship` click handler) fire
+  `oh:detail`. What each window shows comes from `window.OHApp.detail` (`item`, `bb`
+  and `ship` views, `loadBb` to read a buy-back's page when its window opens,
+  `toggleWish`, `hiRes` for the sharper picture).
 - **Inventory.** `ui/inventory/main.js` (built to `src/ui/inventory.js`) mounts the page around the list into `#oh-inventory`: summary
   strip, toolbar, the filter sidebar (Filters Pass), active-filter pills and saved
   views, plus the melt planner in Select mode's bar. It moves `#results` into its
