@@ -259,6 +259,14 @@ try {
   const colors = await page.evaluate(() => {
     const cs = getComputedStyle(document.documentElement);
     const bal = document.querySelector('#home-balances .bal.uec b');
+    const headWhite = () => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--head)';
+      document.body.append(probe);
+      const c = getComputedStyle(probe).color;
+      probe.remove();
+      return c;
+    };
     return {
       key: document.querySelectorAll('.color-key li').length,
       tokens: ['--good', '--warn', '--bad', '--t-ship', '--t-pack', '--t-ccu'].every((n) =>
@@ -268,9 +276,7 @@ try {
       // numbers), never a meaning colour.
       whiteBal:
         bal &&
-        [getComputedStyle(document.body).color, 'rgb(255, 255, 255)'].includes(
-          getComputedStyle(bal).color,
-        ),
+        [getComputedStyle(document.body).color, headWhite()].includes(getComputedStyle(bal).color),
       pal: palette().good === cs.getPropertyValue('--good').trim(),
     };
   });

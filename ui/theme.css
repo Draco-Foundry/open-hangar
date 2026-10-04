@@ -1,35 +1,101 @@
 /*
- * Clean Pro, the 0.3.0 look (docs/REDESIGN-0.3.md): graphite surfaces, colour only
- * where it means something, heavy clear numbers. Loaded after dashboard.html's own
- * styles, so these token values win everywhere; pages move to Svelte one by one.
- * Fonts are bundled (no requests to Google).
+ * Clean Pro, the 0.3.0 look (docs/REDESIGN-0.3.md), in Hangar Cobalt (owner, 2026-10-04):
+ * deep blue-graphite surfaces, one cobalt accent, a warm beacon for live and new
+ * things, and colour only where it means something. Rounded corners, tight spacing.
+ * Loaded after dashboard.html's own styles, so these token values win everywhere;
+ * pages move to Svelte one by one. Fonts are bundled (no requests to Google), with
+ * Latin Extended, Cyrillic and Greek so pilots everywhere see their names right
+ * (each subset loads only when a page uses its characters). Manrope 800 stays until
+ * the page restyles bring the last big numbers down to 600.
  */
 @import '@fontsource/manrope/latin-600.css';
 @import '@fontsource/manrope/latin-700.css';
 @import '@fontsource/manrope/latin-800.css';
+@import '@fontsource/manrope/latin-ext-600.css';
+@import '@fontsource/manrope/latin-ext-700.css';
+@import '@fontsource/manrope/latin-ext-800.css';
+@import '@fontsource/manrope/cyrillic-600.css';
+@import '@fontsource/manrope/cyrillic-700.css';
+@import '@fontsource/manrope/cyrillic-800.css';
+@import '@fontsource/manrope/greek-600.css';
+@import '@fontsource/manrope/greek-700.css';
+@import '@fontsource/manrope/greek-800.css';
 @import '@fontsource/source-sans-3/latin-400.css';
 @import '@fontsource/source-sans-3/latin-600.css';
+@import '@fontsource/source-sans-3/latin-ext-400.css';
+@import '@fontsource/source-sans-3/latin-ext-600.css';
+@import '@fontsource/source-sans-3/cyrillic-400.css';
+@import '@fontsource/source-sans-3/cyrillic-600.css';
+@import '@fontsource/source-sans-3/greek-400.css';
+@import '@fontsource/source-sans-3/greek-600.css';
+@import '@fontsource/jetbrains-mono/latin-500.css';
+@import '@fontsource/jetbrains-mono/latin-ext-500.css';
+@import '@fontsource/jetbrains-mono/cyrillic-500.css';
+@import '@fontsource/jetbrains-mono/greek-500.css';
 
 :root {
-  --bg: #0e1013;
-  --panel: #16191e;
-  --panel-2: #1d2127;
-  --line: #23272e;
-  --line-2: #30353d;
-  --text: #dfe3e8;
-  --head: #ffffff;
-  --muted: #8b939e;
-  --faint: #808994; /* 4.5:1 on panels (WCAG AA) */
-  --accent: #2372e0; /* white button text reads at 4.6:1 */
-  --accent-hover: #1b5fc2; /* darker on hover keeps white text readable (#200) */
-  --accent-soft: rgba(47, 129, 247, 0.14);
-  --link: #6cb4ff;
-  --good-soft: rgba(63, 185, 80, 0.13);
-  --warn-soft: rgba(210, 153, 34, 0.14);
-  --bad-soft: rgba(248, 81, 73, 0.13);
+  /* Surfaces, darkest to lightest. */
+  --bg: #0b0e13;
+  --panel: #171c24;
+  --panel-2: #1f2530;
+  --line: #2a313d;
+  --line-2: #3a4352;
+  --text: #d6dbe3;
+  --head: #f4f6fa;
+  --muted: #8c95a3;
+  --faint: #858e9c; /* 5.2:1 on panels, 4.6:1 on raised (WCAG AA) */
+  /* Cobalt. The button shade keeps white text at 4.7:1 (5.5:1 on hover); links use
+     the lighter shade, 6.6:1 on panels. */
+  --accent: #3b6aed;
+  --accent-hover: #335fe0;
+  --accent-soft: rgba(77, 124, 255, 0.14);
+  --accent-line: rgba(77, 124, 255, 0.5);
+  --link: #7b9dff;
+  /* Beacon: live, new and attention, used sparingly. */
+  --beacon: #f5b544;
+  --beacon-soft: rgba(245, 181, 68, 0.13);
+  --good: #3fb97a;
+  --good-line: rgba(63, 185, 122, 0.5);
+  --good-soft: rgba(63, 185, 122, 0.14);
+  --warn: #e8a33c;
+  --warn-line: rgba(232, 163, 60, 0.5);
+  --warn-soft: rgba(232, 163, 60, 0.14);
+  --bad: #ef5d5d;
+  --bad-line: rgba(239, 93, 93, 0.5);
+  --bad-soft: rgba(239, 93, 93, 0.14);
+  /* Type colours, the same on every page and the website: ship sky, pack violet,
+     game package orchid, CCU teal, paint pink, add-on sand, coupon copper. Each has an
+     opaque -line shade (borders, chart bars) and a -soft wash (tag backgrounds). */
+  --t-ship: #5cc8ff;
+  --t-ship-line: #3d7b9c;
+  --t-ship-soft: rgba(92, 200, 255, 0.13);
+  --t-pack: #b48cff;
+  --t-pack-line: #6d5a9c;
+  --t-pack-soft: rgba(180, 140, 255, 0.13);
+  --t-package: #e08cf0;
+  --t-package-line: #865a94;
+  --t-package-soft: rgba(224, 140, 240, 0.13);
+  --t-ccu: #3fd0b0;
+  --t-ccu-line: #2d7f71;
+  --t-ccu-soft: rgba(63, 208, 176, 0.13);
+  --t-paint: #ff8fb1;
+  --t-paint-line: #975b72;
+  --t-paint-soft: rgba(255, 143, 177, 0.13);
+  --t-addon: #d4b48c;
+  --t-addon-line: #7f705d;
+  --t-addon-soft: rgba(212, 180, 140, 0.13);
+  --t-coupon: #e8925a;
+  --t-coupon-line: #8a5d42;
+  --t-coupon-soft: rgba(232, 146, 90, 0.13);
   --font-head: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-body: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --radius-lg: 14px;
+  --font-data: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  /* Rounded and tight. */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --radius-lg: var(--r-lg);
+  --pad: 12px;
 }
 body {
   font-family: var(--font-body);
@@ -1941,4 +2007,49 @@ body:not(:has(#view-home.active)) .market-title {
   .site-connect .sc-row {
     justify-content: flex-start;
   }
+}
+
+/* Type tags: tiny all-caps pills in the item's type colour on a soft wash of it. */
+.badge {
+  padding: 2px 8px;
+  border-color: currentColor;
+  font-family: var(--font-head);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1.4;
+}
+.badge.ship {
+  background: var(--t-ship-soft);
+}
+.badge.ccu {
+  background: var(--t-ccu-soft);
+}
+.badge.paint {
+  background: var(--t-paint-soft);
+}
+.badge.addon {
+  background: var(--t-addon-soft);
+}
+.badge.coupon {
+  background: var(--t-coupon-soft);
+}
+.badge.pack {
+  background: var(--t-pack-soft);
+}
+.badge.package {
+  background: var(--t-package-soft);
+}
+.badge.good {
+  background: var(--good-soft);
+}
+.badge.warn {
+  background: var(--warn-soft);
+}
+
+/* Buttons: weight 500 (CLAUDE.md) and the rounded corner. Classed buttons (tabs,
+   chips, pills) keep their own shapes. */
+button,
+.btn {
+  border-radius: var(--r-sm);
+  font-weight: 500;
 }
