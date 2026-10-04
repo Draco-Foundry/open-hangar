@@ -2694,6 +2694,7 @@
     <script type="module" src="ui/referrals.js"></script>
     <script type="module" src="ui/org.js"></script>
     <script type="module" src="ui/updates.js"></script>
+    <script type="module" src="ui/store.js"></script>
     <script type="module" src="ui/developers.js"></script>
   </head>
   <body>
@@ -3090,54 +3091,8 @@
 
       <section class="view" id="view-store">
         <h2 class="section-title">Store</h2>
-
-        <div class="store-panel">
-          <div class="sp-head">
-            <h3>Wishlist <span class="market-n" id="wish-n"></span></h3>
-            <label class="wish-sort-label"
-              >Sort
-              <select id="wish-sort" aria-label="Sort wishlist"></select
-            ></label>
-          </div>
-          <div class="wish-undo" id="wish-undo" role="status" hidden></div>
-          <div class="sp-scroll" id="wishlist"></div>
-        </div>
-
-        <div class="store-panel">
-          <div class="sp-head">
-            <h3>Your CCUs <span class="market-n" id="ccu-n"></span></h3>
-            <span class="sp-count" id="ccu-search-count" aria-live="polite"></span>
-            <input
-              id="ccu-search"
-              type="search"
-              placeholder="Search CCUs…"
-              autocomplete="off"
-              aria-label="Search Your CCUs"
-            />
-          </div>
-          <div class="sp-scroll" id="ccu-owned"></div>
-        </div>
-
-        <div class="store-panel">
-          <div class="sp-head">
-            <h3>Ship Prices</h3>
-            <div class="layout-toggle sp-tabs" id="price-tabs" role="tablist"></div>
-            <span class="sp-count" id="price-search-count" aria-live="polite"></span>
-            <input
-              id="price-search"
-              type="search"
-              placeholder="Search ships…"
-              autocomplete="off"
-              aria-label="Search Ship Prices"
-            />
-          </div>
-          <p class="currency-note muted store-intro" hidden></p>
-          <div class="sp-scroll tall" id="price-table"></div>
-          <p class="muted value-note">
-            Standard store prices (USD, before tax). To see if a ship is in RSI's store right now,
-            open it (or add it to your wishlist): that checks its RSI store page.
-          </p>
-        </div>
+        <!-- Wishlist, Your CCUs and Ship Prices are the Svelte Store (ui/store). -->
+        <div id="oh-store"></div>
       </section>
 
       <!-- UPDATES -->
