@@ -6673,6 +6673,7 @@ window.OHApp = {
     addMine: addMyOrgFleet,
     exportCsv: exportOrgCsv,
     remove: removeOrgMember,
+  },
   // For the Store page (ui/store): what it reads, and the few actions it takes.
   store: {
     get active() {
