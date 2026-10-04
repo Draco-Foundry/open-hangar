@@ -2692,6 +2692,7 @@
     <script type="module" src="ui/stats.js"></script>
     <link rel="stylesheet" href="ui/referrals.css" />
     <script type="module" src="ui/referrals.js"></script>
+    <script type="module" src="ui/org.js"></script>
     <script type="module" src="ui/updates.js"></script>
   </head>
   <body>
@@ -3082,21 +3083,8 @@
       <!-- STORE -->
       <!-- ORG FLEET -->
       <section class="view" id="view-org">
-        <h2 class="section-title">Org Fleet</h2>
-        <p class="muted org-intro">
-          Put your org's hangars together into one fleet. Each member opens Open Hangar, goes to
-          <strong>Developers → Export HTF</strong> (ships only, nothing personal) and sends you the
-          file. Import them here. Full backups work too, but only the ships are read. Everything
-          stays in this browser.
-        </p>
-        <div class="org-actions">
-          <button id="org-import" type="button">Import Member Files…</button>
-          <button id="org-mine" type="button" class="btn-secondary">Add My Fleet</button>
-          <button id="org-csv" type="button" class="btn-secondary">Export CSV</button>
-          <input id="org-file" type="file" accept="application/json,.json" multiple hidden />
-          <span id="org-msg" class="muted" aria-live="polite"></span>
-        </div>
-        <div id="org-body"></div>
+        <!-- Org Fleet is Svelte (ui/org, built into ui/); it mounts here. -->
+        <div id="oh-org"></div>
       </section>
 
       <section class="view" id="view-store">
