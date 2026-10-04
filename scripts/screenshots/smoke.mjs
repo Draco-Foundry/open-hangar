@@ -440,8 +440,9 @@ try {
     : fail('site connect card shows without siteUrl');
 
   // The Connect card (owner sign-off, 2026-10-04), switched on with siteUrl and the
-  // website stubbed: Connect → the code to approve → Connected as → Sync Now → Sync
-  // After Every Scan → Disconnect (asked on the card) → Connect again.
+  // website stubbed. Without the sign-in window (no identity permission), the code
+  // fallback: Connect → the code to approve → Connected as → Sync Now → Sync After
+  // Every Scan → Disconnect (asked on the card) → Connect again.
   const sc = await page.evaluate(async () => {
     const wait = (ms = 80) => new Promise((r) => setTimeout(r, ms));
     const card = () => document.querySelector('#view-home .citizen-card #site-connect');
@@ -455,12 +456,14 @@ try {
       get: OH.getSiteLink,
       off: OH.siteDisconnect,
       tabs: chrome.tabs?.create,
+      identity: chrome.identity,
     };
     const r = {};
     let link = null;
     let approve;
     const opened = [];
     try {
+      chrome.identity = undefined;
       await chrome.storage.local.set({ siteUrl: 'https://staging.example.test' });
       chrome.tabs = chrome.tabs || {};
       chrome.tabs.create = (o) => opened.push(o.url);
@@ -517,6 +520,7 @@ try {
         siteDisconnect: keep.off,
       });
       if (keep.tabs) chrome.tabs.create = keep.tabs;
+      chrome.identity = keep.identity;
       await chrome.storage.local.remove(['siteUrl', 'siteAutoSync']);
       await refreshSite();
       await wait();
@@ -537,6 +541,78 @@ try {
   sc.hiddenAgain
     ? ok('connect card: connect, approve the code, sync, sync after scans, disconnect')
     : fail(`connect card: ${JSON.stringify(sc)}`);
+
+  // The usual way (owner, 2026-10-04): the browser's sign-in window opens the website's
+  // /connect page; Approve hands back a one-time code, traded for the token with the
+  // PKCE verifier, and "Sync My Hangar Now" sends the first sync right away.
+  const win = await page.evaluate(async () => {
+    const wait = (ms = 80) => new Promise((r) => setTimeout(r, ms));
+    const card = () => document.querySelector('#view-home .citizen-card #site-connect');
+    const text = () => card()?.textContent.replace(/\s+/g, ' ').trim() || '';
+    const keep = { identity: chrome.identity, fetch: window.fetch, sync: OH.siteSync };
+    const REDIRECT = 'https://aeabioadfphghjennmdbnpelojlhndjl.chromiumapp.org/';
+    const r = {};
+    let finish;
+    try {
+      await chrome.storage.local.set({ siteUrl: 'https://staging.example.test' });
+      chrome.identity = {
+        getRedirectURL: () => REDIRECT,
+        launchWebAuthFlow: ({ url }) =>
+          new Promise((res) => {
+            r.url = url;
+            const q = new URL(url).searchParams;
+            finish = () => res(`${REDIRECT}?state=${q.get('state')}&code=one-time&sync=1`);
+          }),
+      };
+      window.fetch = async (u, init) => {
+        if (!String(u).endsWith('/api/link/token')) return keep.fetch(u, init);
+        const body = JSON.parse(init.body);
+        const d = await crypto.subtle.digest(
+          'SHA-256',
+          new TextEncoder().encode(body.code_verifier),
+        );
+        const challenge = btoa(String.fromCharCode(...new Uint8Array(d)))
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
+        r.pkce = challenge === new URL(r.url).searchParams.get('code_challenge');
+        r.traded = body.code === 'one-time' && body.redirect_uri === REDIRECT;
+        return new Response(JSON.stringify({ token: 'oht_x', name: 'ExamplePilot' }));
+      };
+      OH.siteSync = async () => {
+        r.synced = true;
+        const { siteLink } = await chrome.storage.local.get('siteLink');
+        await chrome.storage.local.set({ siteLink: { ...siteLink, lastSync: Date.now() } });
+        return { synced_at: Date.now() };
+      };
+      await refreshSite();
+      await wait();
+      [...card().querySelectorAll('button')].find((b) => /Connect/.test(b.textContent)).click();
+      await wait();
+      r.waiting = text();
+      finish();
+      await wait(250);
+      r.on = text();
+      r.page = new URL(r.url).pathname;
+    } finally {
+      chrome.identity = keep.identity;
+      window.fetch = keep.fetch;
+      OH.siteSync = keep.sync;
+      await chrome.storage.local.remove(['siteUrl', 'siteLink']);
+      await refreshSite();
+      await wait();
+    }
+    return r;
+  });
+  win.page === '/connect' &&
+  /Finish connecting in the window that opened/.test(win.waiting) &&
+  win.pkce &&
+  win.traded &&
+  win.synced &&
+  /Connected as ExamplePilot/.test(win.on) &&
+  /Last synced today/.test(win.on)
+    ? ok('connect card: the sign-in window, PKCE, and the first sync right after Approve')
+    : fail(`connect window: ${JSON.stringify(win)}`);
 
   // Currency: EUR converts the melt box (rates come from the demo's fixed file).
   const rates = await page.evaluate(async () => {

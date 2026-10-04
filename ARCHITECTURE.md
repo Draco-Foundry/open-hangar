@@ -290,10 +290,14 @@ Code for the optional sync to app.openhangar.space sits between `@sync-start` an
 off unless a developer sets the `siteUrl` key, and `scripts/pack.mjs` cuts it out of
 store builds (see [Build and Packaging](#build-and-packaging)). Its screen is the
 Connect card in the Citizen Card's corner (`ui/site`, built into `src/ui/site.js`,
-whose script tag is itself inside a sync block): Connect (a device code, approved on
-the website's `/link` page), Sync Now, Open, Disconnect (asked on the card) and Sync
+whose script tag is itself inside a sync block): Connect (the browser's sign-in window,
+`identity.launchWebAuthFlow`, opens the website's `/connect`; Approve hands back a
+one-time code traded for the token with PKCE at `/api/link/token`, and Sync My Hangar
+Now sends the first sync; without the window, a device code approved on `/link`), Sync
+Now, Open, Disconnect (asked on the card) and Sync
 After Every Scan (`siteAutoSync`, off by default). Its state and actions are `site`
-in `src/dashboard.js`, behind `window.OHApp.site`.
+in `src/dashboard.js`, behind `window.OHApp.site`. The `identity` permission is added by
+`scripts/pack.mjs` only to builds that keep sync (`OH_SYNC=1`).
 
 ## The Kill Switch
 
