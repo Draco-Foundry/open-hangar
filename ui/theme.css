@@ -260,7 +260,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  font: 700 16px/1.25 var(--font-head);
+  font: 600 16px/1.25 var(--font-head);
   color: var(--head);
   overflow-wrap: anywhere;
 }
@@ -406,7 +406,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   background: var(--accent);
   border: 1px solid var(--accent);
   color: #fff;
-  font: 700 13px var(--font-head);
+  font: 500 13px var(--font-head);
   cursor: pointer;
 }
 .hdr-prefs .scan-split #scan-home {
@@ -589,7 +589,7 @@ body:not(:has(#view-home.active)) .wrap > header {
 }
 .gs-img span {
   padding: 0 8px;
-  font: 700 11px var(--font-head);
+  font: 600 11px var(--font-head);
   color: var(--faint);
   text-align: center;
 }
@@ -599,7 +599,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   min-width: 0;
 }
 .home-search .gs-row .gs-name {
-  font: 800 17px var(--font-head);
+  font: 600 17px var(--font-head);
   color: var(--head);
   white-space: nowrap;
   overflow: hidden;
@@ -625,7 +625,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   border: 1px solid var(--line-2);
   border-radius: 6px;
   background: none;
-  font: 700 11px var(--font-head);
+  font: 600 11px var(--font-head);
   letter-spacing: 0.04em;
   color: var(--muted);
 }
@@ -641,7 +641,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   white-space: nowrap;
 }
 .gs-side b {
-  font: 800 16px var(--font-head);
+  font: 600 16px var(--font-head);
   color: var(--head);
 }
 .gs-side small {
@@ -649,7 +649,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   color: var(--muted);
 }
 .gs-open {
-  font: 700 13px var(--font-head);
+  font: 600 13px var(--font-head);
   color: var(--link);
 }
 .gs-foot {
@@ -736,7 +736,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   border: 0;
   background: none;
   color: var(--link);
-  font: 700 12px var(--font-head);
+  font: 500 12px var(--font-head);
   letter-spacing: 0;
   text-transform: none;
   cursor: pointer;
@@ -766,7 +766,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   min-width: 0;
 }
 .sm-txt b {
-  font: 700 14px var(--font-head);
+  font: 600 14px var(--font-head);
   color: var(--head);
 }
 .sm-txt small {
@@ -780,7 +780,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   border-radius: 8px;
   background: var(--accent);
   color: #fff;
-  font: 700 14px var(--font-head);
+  font: 500 14px var(--font-head);
   cursor: pointer;
 }
 .scan-menu.sm-rich .scan-go:hover {
@@ -965,13 +965,13 @@ body:not(:has(#view-home.active)) .wrap > header {
   border-radius: 8px;
 }
 .wrap > header .brand h1 {
-  font: 800 19px var(--font-head);
+  font: 600 19px var(--font-head);
   white-space: nowrap;
 }
 /* Counts beside Inventory and Buy-Backs. */
 nav .nav-n {
   margin-left: 4px;
-  font: 700 11px var(--font-head);
+  font: 600 11px var(--font-head);
   color: var(--faint);
 }
 nav a.active .nav-n {
@@ -1073,7 +1073,7 @@ nav .nav-n:empty {
   height: 68px;
 }
 .hdr-prefs .top-results .gs-name {
-  font: 800 16px var(--font-head);
+  font: 600 16px var(--font-head);
   color: var(--head);
   white-space: nowrap;
   overflow: hidden;
@@ -1121,7 +1121,7 @@ nav .nav-n:empty {
   border-radius: 9px;
   background: #da3633;
   color: #fff;
-  font: 800 11px/18px var(--font-head);
+  font: 600 11px/18px var(--font-head);
   text-align: center;
 }
 .badge-n[hidden] {
@@ -1150,7 +1150,7 @@ nav .nav-n:empty {
   border: 0;
   background: none;
   color: var(--link);
-  font: 700 12px var(--font-head);
+  font: 500 12px var(--font-head);
   letter-spacing: 0;
   text-transform: none;
   cursor: pointer;
@@ -1177,7 +1177,7 @@ nav .nav-n:empty {
   text-decoration: none;
 }
 .bm-row b {
-  font: 700 14px var(--font-head);
+  font: 600 14px var(--font-head);
   color: var(--head);
 }
 .bm-row a:hover b {
@@ -1451,7 +1451,7 @@ nav .nav-n:empty {
 }
 .menu-who b {
   display: block;
-  font: 800 15px var(--font-head);
+  font: 600 15px var(--font-head);
   color: var(--head);
 }
 .menu-who small {
@@ -1475,7 +1475,7 @@ nav .nav-n:empty {
   border-radius: 7px;
   background: var(--accent);
   color: #fff;
-  font: 700 12px var(--font-head);
+  font: 500 12px var(--font-head);
   cursor: pointer;
 }
 /* The old full-width update banner stays hidden: the menu carries it now. */
@@ -1662,7 +1662,7 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
   border: 0;
   background: none;
   color: var(--text);
-  font: 700 13px var(--font-head);
+  font: 600 13px var(--font-head);
   cursor: pointer;
 }
 .chip-row .oh-sw + .oh-sw {
@@ -1727,7 +1727,7 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
   border: 0;
   background: none;
   color: var(--text);
-  font: 700 12px var(--font-head);
+  font: 600 12px var(--font-head);
   cursor: pointer;
 }
 .view-chip .view-x {
@@ -1795,7 +1795,7 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
   width: auto;
   height: 20px;
   padding: 0 7px;
-  font: 700 11px var(--font-head);
+  font: 600 11px var(--font-head);
 }
 .grid.list .flag .fl-s {
   display: none;
