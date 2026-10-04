@@ -34,6 +34,7 @@ export default defineConfig({
         developers: 'ui/developers/main.js',
         topbar: 'ui/topbar/main.js',
         search: 'ui/search/main.js',
+        details: 'ui/details/main.js',
       },
       output: {
         format: 'es',
