@@ -28,6 +28,10 @@
       .then((found) => {
         const u = found || (fallback ? rsiImage : '');
         if (!u) return;
+        // The art is often the very picture that just failed (art found earlier is
+        // kept as the card's picture): give it a fresh start, like a new <img>.
+        delete tries[u];
+        delete retry[u];
         art = u;
         onArt?.(u, !!found);
       });
