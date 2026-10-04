@@ -29,6 +29,7 @@
     "canary": "node scripts/canary.mjs"
   },
   "devDependencies": {
+    "@fontsource/jetbrains-mono": "5.3.0",
     "@fontsource/manrope": "5.3.0",
     "@fontsource/source-sans-3": "5.3.0",
     "@sveltejs/vite-plugin-svelte": "7.3.1",
