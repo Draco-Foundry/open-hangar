@@ -6,7 +6,7 @@
     <title>Privacy Policy | Open Hangar</title>
     <meta
       name="description"
-      content="Open Hangar's privacy policy: no account, no server, and no personal data collected. Your data stays in your browser."
+      content="Open Hangar's privacy policy: no account needed, and your data stays in your browser unless you choose to sync it to openhangar.space."
     />
     <link rel="canonical" href="https://openhangar.space/privacy.html" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
@@ -27,7 +27,7 @@
     <main class="wrap doc">
       <p><a href="./">← Open Hangar</a></p>
       <h1>Privacy Policy</h1>
-      <p class="updated"><em>Last updated: 2026-10-01</em></p>
+      <p class="updated"><em>Last updated: 2026-11-10</em></p>
 
       <p>
         Open Hangar is a source-available browser extension that reads your own Star Citizen /
@@ -39,14 +39,19 @@
       <h2>The Short Version</h2>
       <ul>
         <li>
-          <strong>No account, no password, no sign-up.</strong> Open Hangar uses the RSI session you
-          are already signed in with in your browser.
+          <strong>No account, no password, no sign-up needed.</strong> Open Hangar uses the RSI
+          session you are already signed in with in your browser, and works fully on its own.
         </li>
         <li>
-          <strong>No server. Nothing is sent to us. We have no server to send it to.</strong>
-          Your scraped data never leaves your device.
+          <strong>Your data stays on your device unless you choose to sync.</strong> Syncing to our
+          website, app.openhangar.space, is optional and off until you connect an account and press
+          Sync. Until then nothing is sent to us.
         </li>
-        <li><strong>We do not collect, sell, transfer, or share any personal data.</strong></li>
+        <li>
+          <strong>We do not sell or share your personal data.</strong> Without sync we collect
+          nothing; with sync we keep only what you send (see
+          <a href="#optional-sync">Optional Sync</a>).
+        </li>
       </ul>
 
       <h2>What Data Is Accessed and Where It Is Stored</h2>
@@ -78,8 +83,8 @@
       </ul>
       <p>
         All of this is stored <strong>only</strong> in your browser's local extension storage
-        (<code>chrome.storage.local</code>). It is never transmitted to the developer or any third
-        party. You can remove it at any time with <strong>Clear Data</strong>
+        (<code>chrome.storage.local</code>). It is only sent anywhere if you turn on sync (below),
+        and never to anyone else. You can remove it at any time with <strong>Clear Data</strong>
         in the settings menu (click your portrait), or by uninstalling the extension (which deletes
         all stored data).
       </p>
@@ -149,6 +154,46 @@
         Nothing is sent by the extension. You read it on GitHub and decide whether to submit it.
       </p>
 
+      <h2 id="optional-sync">Optional Sync to openhangar.space</h2>
+      <p>
+        Sync lets you see your hangar on any device. It is off until you turn it on, and the
+        extension works the same without it.
+      </p>
+      <ul>
+        <li>
+          <strong>Connecting:</strong> press <strong>Connect to openhangar.space</strong> on the
+          Home page, then sign in on app.openhangar.space and approve the code it shows. The
+          extension then keeps a sync token in its local storage. Connecting sends nothing about
+          your hangar.
+        </li>
+        <li>
+          <strong>What is sent, and when:</strong> only when you press <strong>Sync Now</strong>, or
+          after each scan if you turn on <strong>Sync After Every Scan</strong> (off by default),
+          the extension sends the same data as its JSON backup file: your hangar, buy-backs, scan
+          history, account identity and balances (handle, display name, org, rank, Store Credit,
+          UEC, REC) and your referral recruits list. Your referral code is never sent, and neither
+          is your RSI password or any RSI cookie.
+        </li>
+        <li>
+          <strong>No extra RSI requests:</strong> sync sends what the extension already has; it
+          never reads anything more from RSI.
+        </li>
+        <li>
+          <strong>Requests while connected:</strong> only to app.openhangar.space, to connect (a
+          short code, then checks until you approve it), to sync, and to disconnect.
+        </li>
+        <li>
+          <strong>Disconnecting:</strong> <strong>Disconnect</strong> on the Home page stops syncing
+          and cancels this extension's token. The copy already synced stays on the website until you
+          delete it there; your Account page on the website can download or delete everything.
+        </li>
+        <li>
+          <strong>What the website keeps and for how long:</strong> see the website's own
+          <a href="https://app.openhangar.space/privacy">privacy policy</a>. The website is run by
+          Draco Foundry, LLC and hosted on Cloudflare.
+        </li>
+      </ul>
+
       <h2>Permissions and Why They Are Used</h2>
       <ul>
         <li><strong>storage</strong>: to save your scanned data and UI preferences locally.</li>
@@ -172,8 +217,8 @@
       <p>
         Open Hangar lets you export your database as a JSON file (or a CSV of what a page shows)
         that you choose to save. That file is created locally and handled entirely by you; the
-        extension does not upload it anywhere. (Your referral code is deliberately excluded from
-        exports.)
+        extension does not upload it anywhere. (Only Sync sends the same data, and only if you
+        turned sync on. Your referral code is deliberately excluded from exports.)
       </p>
 
       <h2>Multiple Accounts</h2>
