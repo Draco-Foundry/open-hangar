@@ -1164,6 +1164,168 @@ nav .nav-n:empty {
   opacity: 1;
   cursor: progress;
 }
+/* After a scan with a problem: Rough Landing, with a drawn warning sign. */
+#scan-home .scan-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+#scan-home .scan-warn {
+  color: #f2c14e;
+  flex: none;
+}
+
+/* The scan report (ui/topbar/ScanReport.svelte), dropped from the Scan button: same
+   panel as Home's search results (lighter, a blue edge). */
+.scan-menu.scan-report {
+  width: min(420px, calc(100vw - 32px));
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid rgba(47, 129, 247, 0.55);
+  border-radius: 14px;
+  background: #232933;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  color: var(--text);
+  font: 15px/1.45 var(--font-body);
+  text-align: left;
+  white-space: normal;
+}
+.sr-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.sr-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--warn-soft);
+  color: #f2c14e;
+}
+.sr-titles {
+  min-width: 0;
+}
+.sr-titles h3 {
+  margin: 0;
+  font: 600 17px var(--font-head);
+  color: var(--head);
+  text-wrap: balance;
+}
+.sr-titles p {
+  margin: 2px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.sr-x {
+  margin-left: auto;
+  padding: 2px 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.sr-x:hover {
+  color: var(--head);
+}
+.sr-rows {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sr-rows li {
+  display: grid;
+  grid-template-columns: 18px 84px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  font-size: 14px;
+}
+.sr-rows li.bad {
+  background: var(--warn-soft);
+}
+.sr-ok,
+.sr-warn {
+  display: flex;
+  padding-top: 2px;
+}
+.sr-ok {
+  color: #3fb950;
+}
+.sr-warn {
+  color: #f2c14e;
+}
+.sr-src {
+  font-weight: 600;
+  color: var(--head);
+}
+.sr-what {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+  font-variant-numeric: tabular-nums;
+}
+.sr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.sr-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  background: var(--panel-2);
+  color: var(--head);
+  font: 500 14px var(--font-body);
+  text-decoration: none;
+  cursor: pointer;
+}
+.sr-btn:hover {
+  border-color: var(--faint);
+}
+.sr-btn.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+.sr-btn.primary:hover {
+  background: var(--accent-hover);
+}
+.sr-btn.link {
+  padding: 8px 4px;
+  border: 0;
+  background: none;
+  color: var(--link);
+}
+.sr-hint,
+.sr-kept {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.sr-kept {
+  padding-top: 10px;
+  border-top: 1px solid var(--line-2);
+}
+@media (max-width: 560px) {
+  .sr-rows li {
+    grid-template-columns: 18px minmax(0, 1fr);
+  }
+  .sr-what {
+    grid-column: 2;
+  }
+}
 /* Your RSI portrait opens the menu (a gear until we know who you are). */
 .avatar-btn {
   position: relative;

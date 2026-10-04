@@ -2,10 +2,20 @@
   // Scan ▾ on every page. The button runs what's ticked in the ▾ menu ("Scan All",
   // or "Scan Custom" once a source is unticked; remembered in scanSources) and is
   // its own progress bar while a scan runs ("Scanning… 2/4", then "✓ Landed"), with
-  // what it's on in its hover text and at the top of the menu (#170). The scan
-  // itself, and the progress, live in dashboard.js (window.OHApp.top).
+  // what it's on in its hover text and at the top of the menu (#170). A scan that
+  // ends with a problem leaves "Rough Landing" and its report (ScanReport.svelte)
+  // until the next scan. The scan itself, and the progress, live in dashboard.js
+  // (window.OHApp.top).
   import { app, version } from '../lib/app.svelte.js';
-  import { menus, register, toggleMenu, menuClick } from './menus.svelte.js';
+  import {
+    menus,
+    register,
+    toggleMenu,
+    openMenu,
+    closeMenus,
+    menuClick,
+  } from './menus.svelte.js';
+  import ScanReport from './ScanReport.svelte';
 
   const SOURCES = [
     { value: 'hangar', name: 'Inventory', hint: 'Your pledges, ships and upgrades' },
@@ -26,17 +36,23 @@
         ? `Scan ${on.map((s) => s.name).join(', ')} (change with ▾)`
         : 'Nothing ticked: pick what to scan with ▾';
     const at = a.state.scannedAt;
+    // After a scan with a problem the button says Rough Landing and opens the report.
+    const report = bar.busy ? null : bar.report;
     return {
       busy: bar.busy,
       scanning: bar.scanning,
       fill: bar.scanning ? bar.fill : 0,
-      label: bar.scanning ? bar.label : all ? 'Scan All' : 'Scan Custom',
+      report,
+      rough: !!report,
+      label: bar.scanning ? bar.label : report ? 'Rough Landing' : all ? 'Scan All' : 'Scan Custom',
       // The progress owns the hover text while it shows.
       title: bar.scanning
         ? bar.title
-        : at
-          ? `${what}\nLast scan: ${new Date(at).toLocaleString()}`
-          : what,
+        : report
+          ? 'See how the last scan went'
+          : at
+            ? `${what}\nLast scan: ${new Date(at).toLocaleString()}`
+            : what,
       detail: bar.detail,
       sources: [...bar.sources],
     };
@@ -44,7 +60,30 @@
 
   let btn = $state();
   let menu = $state();
+  let scanBtn = $state();
+  let reportPanel = $state();
   $effect(() => register('scan', btn, menu));
+  $effect(() => {
+    if (reportPanel) register('report', scanBtn, reportPanel);
+  });
+  // A new report opens by itself, wherever you are (focus stays where it was).
+  let shownN = 0;
+  $effect(() => {
+    const n = d.report && d.report.n;
+    if (!n || n === shownN || !reportPanel) return;
+    shownN = n;
+    // After this update settles (opening redraws the page right away).
+    queueMicrotask(() => openMenu('report', { focus: false }));
+  });
+
+  function onScan(e) {
+    if (d.report) toggleMenu('report', e);
+    else app().top.scan();
+  }
+  function closeReport() {
+    closeMenus();
+    scanBtn?.focus({ preventScroll: true });
+  }
 
   function tick(value, on) {
     const list = d.sources.filter((v) => v !== value);
@@ -54,13 +93,37 @@
 
 <div class="scan-split">
   <button
+    bind:this={scanBtn}
     id="scan-home"
     class:scanning={d.scanning}
+    class:rough={d.rough || d.label === 'Rough Landing'}
     disabled={d.busy}
     title={d.title}
-    onclick={() => app().top.scan()}
+    aria-haspopup={d.report ? 'dialog' : undefined}
+    aria-expanded={d.report ? menus.open === 'report' : undefined}
+    onclick={onScan}
   >
-    <span class="scan-fill" style:width="{d.fill}%"></span><span class="scan-label">{d.label}</span>
+    <span class="scan-fill" style:width="{d.fill}%"></span><span class="scan-label"
+      >{#if d.rough || d.label === 'Rough Landing'}<svg
+          class="scan-warn"
+          width="14"
+          height="14"
+          viewBox="0 0 16 16"
+          aria-hidden="true"
+          ><path
+            d="M8 1.5 15 14H1L8 1.5Z"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linejoin="round"
+          /><path
+            d="M8 6v3.6M8 11.6v.2"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+          /></svg
+        >{/if}{d.label}</span
+    >
   </button>
   <button
     bind:this={btn}
@@ -111,4 +174,7 @@
       >Scan Now</button
     >
   </div>
+  {#if d.report}
+    <ScanReport r={d.report} bind:panel={reportPanel} onClose={closeReport} />
+  {/if}
 </div>

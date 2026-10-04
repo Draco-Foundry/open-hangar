@@ -26,13 +26,20 @@ export function toggleMenu(name, e) {
   const was = menus.open === name;
   closeMenus();
   if (was) return;
+  openMenu(name);
+}
+
+// Open a menu under its button. `focus`: move into it, on its first control you can
+// see (no scrolling: that closes it); off when it opens by itself (the scan report).
+export function openMenu(name, { focus = true } = {}) {
+  closeMenus();
   const { btn, menu } = parts.get(name) || {};
   if (!btn || !menu) return;
   flushSync(() => (menus.open = name));
   const pos = placeUnder(btn, menu); // now that it has a size
   menu.style.right = `${pos.right}px`;
   menu.style.top = `${pos.top}px`;
-  // Into the menu, on its first control you can see (no scrolling: that closes it).
+  if (!focus) return;
   [...menu.querySelectorAll('a[href], button:not([disabled]), input, select')]
     .find((el) => el.getClientRects().length)
     ?.focus({ preventScroll: true });
