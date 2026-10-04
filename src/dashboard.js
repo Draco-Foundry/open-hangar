@@ -2449,6 +2449,7 @@ function ensureStore() {
       storeByKey.set(s.lname, s);
     }
     if (currentView() === 'store') renderStore();
+    homeUpdated(); // an open ship window shows In Store Now
   });
   return storeRequested;
 }
@@ -2489,13 +2490,6 @@ function storeOf(name) {
     null;
   return hit && specialEdition(hit.name) === specialEdition(name) ? hit : null;
 }
-// The "In store now" cell: a placeholder that fillStock() fills in from the
-// ship's own store page ("In stock" / "Not in store").
-function inStoreHtml(name) {
-  const s = storeOf(name);
-  if (!s || !s.link) return storeData ? '<span class="muted">—</span>' : '';
-  return `<a class="sale" href="${OH.escapeHtml(s.link)}" target="_blank" rel="noopener" data-stock-url="${OH.escapeHtml(s.link)}">Checking…</a>`;
-}
 const stockMem = new Map(); // store page URL → 'in' | 'pack' | 'out' (this session)
 // What a ship's store page said, as the "In Store Now" cell shows it.
 function stockLabel(st) {
@@ -2520,20 +2514,6 @@ function stockLabel(st) {
     return { cls, text: 'Not in store', title: "Not for sale on RSI's store right now" };
   }
   return { cls, text: 'Unknown', title: "Couldn't read RSI's store page" };
-}
-function fillStock(container) {
-  if (!container) return;
-  for (const el of container.querySelectorAll('[data-stock-url]')) {
-    if (el.dataset.stockDone) continue;
-    el.dataset.stockDone = '1';
-    OH.getShipStock(el.dataset.stockUrl).then((st) => {
-      if (st && st.state) stockMem.set(el.dataset.stockUrl, st.state);
-      const l = stockLabel(st);
-      el.classList.add(l.cls);
-      el.textContent = l.text;
-      el.title = l.title;
-    });
-  }
 }
 
 // Wishlist order: the saved order ("My order", drag to change) or a sort.
@@ -3467,13 +3447,6 @@ function reclaimOf(b) {
     : "Opens just this CCU in RSI's buy-back list, where its reclaim button is";
   return { url, tip };
 }
-function buybackReclaimLink(b) {
-  const r = reclaimOf(b);
-  if (!r) return '';
-  if (r.retired)
-    return `<span class="bb-retired" title="${OH.escapeHtml(r.retired)}">Retired</span>`;
-  return `<a class="bb-reclaim" href="${OH.escapeHtml(r.url)}" target="_blank" rel="noopener" title="${OH.escapeHtml(r.tip)}">Reclaim ↗</a>`;
-}
 function bbDetail(b) {
   return state.bbDetails[b.id] || null;
 }
@@ -3506,14 +3479,6 @@ function bbPriceData(b) {
         est: true,
       }
     : null;
-}
-function bbPriceHtml(b) {
-  const x = bbPriceData(b);
-  if (!x) return '';
-  const title = x.title ? ` title="${OH.escapeHtml(x.title)}"` : '';
-  return `<span class="val${x.est ? ' est' : ''}"${title}>${OH.escapeHtml(x.text)}${
-    x.est ? '<small class="est-l">est.</small>' : ''
-  }</span>`;
 }
 
 // --- Buy-Backs Market -------------------------------------------------------
@@ -3698,9 +3663,6 @@ const renderBuybacksSoon = debounce(() => renderBuybacks());
 // --- Inventory: hover preview + click detail modal ------------------------
 const itemPreview = $('#item-preview');
 const itemPreviewImg = itemPreview ? itemPreview.querySelector('img') : null;
-const itemModal = $('#item-modal');
-const modalBody = $('#modal-body');
-const modalClose = $('#modal-close');
 let previewId = null;
 
 // Sharper versions of an RSI media thumbnail (store_small ≈ 350px), best first.
@@ -3869,255 +3831,125 @@ function contentKind(c) {
   return '—';
 }
 
-// The detail window's picture: RSI's art, except a CCU shows the ship it
-// upgrades to; with no RSI art, look the ship up by name. Starts as the
-// placeholder and swaps in whichever picture turns up.
-function fillModalArt(real, resolve, preferShip) {
-  const show = (url) => {
-    const slot = modalBody.querySelector('.modal-img');
-    if (!url || !slot) return;
-    const name = modalBody.querySelector('.modal-name')?.textContent.trim() || '';
-    // The picture is a button: click (or Enter) opens it full size (#299).
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'modal-img-btn';
-    btn.title = 'View Full Size';
-    btn.setAttribute('aria-label', name ? `View Full Size: ${name}` : 'View Full Size');
-    const im = document.createElement('img');
-    im.className = 'modal-img';
-    im.alt = name;
-    const hint = document.createElement('span');
-    hint.className = 'modal-img-hint';
-    hint.setAttribute('aria-hidden', 'true');
-    hint.textContent = 'Full Size';
-    btn.append(im, hint);
-    btn.addEventListener('click', () => openLightbox(im.currentSrc || im.src, url, name, btn));
-    slot.replaceWith(btn);
-    progressiveImage(im, url);
-  };
-  if (!resolve || (real && !preferShip)) return show(real);
-  const opened = modalBody.firstElementChild;
-  OH.getShipImage(resolve).then((art) => {
-    if (modalBody.firstElementChild === opened) show(art || real);
-  });
-}
-
-function openItemModal(p) {
+// --- Detail windows ---------------------------------------------------------
+// The pledge, buy-back and ship windows are Svelte (ui/details: one window, and the
+// full-size picture viewer on top of it). These open or close it; it reads what to
+// show from window.OHApp.detail (itemView, bbView and shipView below), redrawing
+// whenever the data changes.
+function openDetail(what) {
   hidePreview();
-  const real = realImage(p.image);
-  // The picture is filled in by fillModalArt() below.
-  const img = `<div class="modal-img placeholder">${OH.escapeHtml(p.kind)}</div>`;
-  const type = pledgeType(p);
-  const badgeClass = TYPE_KEYS.includes(type) ? type : '';
-  const contents = p.contents || [];
-  const contentsHtml = contents.length
-    ? `<table class="modal-contents"><tbody>${contents
-        .map(
-          (c) =>
-            `<tr><td>${OH.escapeHtml(contentKind(c))}</td><td>${
-              /^ship$/i.test(c.kind || '') && c.label
-                ? shipLink(c.label)
-                : OH.escapeHtml(c.label || '')
-            }</td></tr>`,
-        )
-        .join('')}</tbody></table>`
-    : '<p class="muted">No itemized contents.</p>';
-  const row = (k, v) =>
-    `<div class="mr"><span class="mr-k">${k}</span><span class="mr-v">${v}</span></div>`;
-  setHTML(
-    modalBody,
-    img +
-      `<div class="modal-info">
-      <h3 class="modal-name">${OH.escapeHtml(plainName(p))}</h3>
-      <div class="modal-meta"><span class="badge ${badgeClass}">${OH.escapeHtml(type)}</span><span class="modal-val">${OH.escapeHtml(formatValue(p))}</span></div>
-      ${row('ID', OH.escapeHtml(p.id || '—'))}
-      ${p.date ? row('Pledged', OH.escapeHtml(p.date)) : ''}
-      ${row('Giftable', p.giftable ? 'Yes' : 'No')}
-      ${p.meltable === undefined ? '' : row('Meltable', p.meltable ? 'Yes' : 'No')}
-      ${storeRow(p, row)}
-      ${p.currency ? row('Currency', OH.escapeHtml(p.currency)) : ''}
-      ${p.isCCU && p.ccu ? row('Upgrade', OH.escapeHtml(`${p.ccu.from} → ${p.ccu.to}`)) : ''}
-      ${hangarSpot(p) ? row('On RSI', viewOnRsiLink(p)) : ''}
-      ${row('Scanned', OH.escapeHtml(fmtScan()))}
-      <h4 class="modal-h">Contents (${contents.length})</h4>
-      ${contentsHtml}
-    </div>`,
-  );
-  showItemModal();
-  fillModalArt(real, resolveImageName(p), p.isCCU && !p.shipArt);
+  document.dispatchEvent(new CustomEvent('oh:detail', { detail: what }));
 }
-// The detail pop-up is a dialog: focus moves to its Close button when it opens, Tab
-// stays inside it, Escape closes it, and focus goes back to whatever opened it.
-let modalOpener = null;
-function showItemModal() {
-  if (itemModal.hidden) modalOpener = document.activeElement;
-  itemModal.hidden = false;
-  const name = modalBody.querySelector('.modal-name');
-  modalClose
-    .closest('.modal-card')
-    ?.setAttribute('aria-label', name?.textContent.trim() || 'Details');
-  modalClose.focus({ preventScroll: true });
+function openItemModal(p) {
+  openDetail({ kind: 'item', item: p });
+}
+function openBuybackModal(b) {
+  openDetail({ kind: 'bb', item: b });
 }
 function closeItemModal() {
-  closeLightbox();
-  itemModal.hidden = true;
-  setHTML(modalBody, '');
-  let back = modalOpener;
-  modalOpener = null;
-  // A list redrawn while the pop-up was open replaced the card: find its twin.
-  if (back && !back.isConnected && back.classList?.contains('card') && back.dataset.id) {
-    const id = back.dataset.id;
-    back = [...document.querySelectorAll('.card[data-id]')].find((c) => c.dataset.id === id);
-  }
-  if (back && back.isConnected && back !== document.body) back.focus({ preventScroll: true });
+  openDetail(null);
 }
 
-// Full-size picture viewer (#299), on top of the detail pop-up. Shows the sharp copy
-// already on screen at once, then fetches RSI's original ("source", or the wiki's
-// original) only now, one picture, because someone asked for it. Escape or the close
-// button closes it and focus goes back to the picture that opened it.
-const lightbox = $('#lightbox');
-const lightboxImg = $('#lightbox-img');
-const lightboxClose = $('#lightbox-close');
-const lightboxStatus = $('#lightbox-status');
-let lightboxOpener = null;
-let lightboxFor = 0; // bumps on every open, so a slow load can't land on the next picture
-function openLightbox(shown, thumb, name, opener) {
-  if (!lightbox) return;
-  const ticket = ++lightboxFor;
-  lightboxOpener = opener || document.activeElement;
-  lightboxImg.alt = name || 'Ship picture';
-  lightboxImg.src = shown;
-  lightbox.setAttribute('aria-label', name ? `${name}, Full Size` : 'Full Size Picture');
-  const full = OH.fullSizeImage(thumb);
-  lightboxStatus.hidden = !full;
-  lightboxStatus.textContent = full ? 'Zooming in for the full-res shot…' : '';
-  lightbox.hidden = false;
-  lightboxClose.focus({ preventScroll: true });
-  if (!full) return;
-  loadImage(full).then((ok) => {
-    if (ticket !== lightboxFor || lightbox.hidden) return;
-    if (ok) lightboxImg.src = full;
-    lightboxStatus.hidden = true;
-  });
-}
-function closeLightbox() {
-  if (!lightbox || lightbox.hidden) return;
-  lightboxFor++;
-  lightbox.hidden = true;
-  lightboxImg.removeAttribute('src');
-  const back = lightboxOpener;
-  lightboxOpener = null;
-  if (back && back.isConnected) back.focus({ preventScroll: true });
-}
-if (lightbox) {
-  lightboxClose.addEventListener('click', closeLightbox);
-  lightbox.addEventListener('click', (e) => {
-    if (e.target === lightbox || e.target === lightboxImg) closeLightbox();
-  });
-  // Capture phase, so the detail pop-up under it doesn't also close on Escape.
-  document.addEventListener(
-    'keydown',
-    (e) => {
-      if (lightbox.hidden) return;
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        closeLightbox();
-      } else if (e.key === 'Tab') {
-        e.preventDefault(); // the close button is the only stop
-        e.stopImmediatePropagation();
-        lightboxClose.focus({ preventScroll: true });
-      }
+// A pledge's window: its facts, store price, where it is on RSI, what's inside.
+function itemView(p) {
+  const type = pledgeType(p);
+  // "Store price": the ships' current price, the gap to what was paid, and per-ship
+  // prices when there's more than one.
+  const si = storeInfo(p);
+  let store = null;
+  if (si && si.store) {
+    store = { text: dollars(si.store) + (si.ccu ? ' standard' : ''), note: null, sub: '' };
+    if (si.unpriced) store.text += ` + ${si.unpriced} unpriced`;
+    else if (si.paid != null && si.paid > 0) {
+      const d = si.store - si.paid;
+      if (d >= 1) store.note = { text: `(paid ${dollars(d)} less)`, cls: 'gain' };
+      else if (d <= -1)
+        store.note = { text: `(paid ${dollars(-d)} more, likely extras)`, cls: 'muted' };
+    }
+    store.sub = si.ccu
+      ? `${dollars(si.from)} → ${dollars(si.to)} ships`
+      : si.ships.length > 1
+        ? si.ships.map((x) => `${x.label} ${x.msrp ? dollars(x.msrp) : '—'}`).join(' · ')
+        : '';
+  }
+  const spot = hangarSpot(p);
+  return {
+    name: plainName(p),
+    type,
+    badge: TYPE_KEYS.includes(type) ? type : '',
+    value: formatValue(p),
+    id: p.id || '—',
+    date: p.date || '',
+    giftable: !!p.giftable,
+    meltable: p.meltable,
+    store,
+    currency: p.currency || '',
+    upgrade: p.isCCU && p.ccu ? `${p.ccu.from} → ${p.ccu.to}` : '',
+    // RSI has no per-pledge address: link the page it's on and say where on it.
+    spot: spot && {
+      url: spot.url,
+      title: `Opens page ${spot.page} of your RSI hangar; it's number ${spot.pos} on that page (as of your last scan)`,
     },
-    true,
-  );
+    scanned: fmtScan(),
+    contents: (p.contents || []).map((c) => ({
+      kind: contentKind(c),
+      label: c.label || '',
+      ship: /^ship$/i.test(c.kind || '') && !!c.label,
+    })),
+    // RSI's art, except a CCU shows the ship it upgrades to.
+    art: {
+      real: realImage(p.image),
+      resolve: resolveImageName(p),
+      preferShip: !!(p.isCCU && !p.shipArt),
+      placeholder: p.kind || '',
+    },
+  };
 }
 
-// Buy-back detail modal (reuses the inventory modal shell).
-function openBuybackModal(b) {
-  hidePreview();
-  const real = realImage(b.image);
-  const img = `<div class="modal-img placeholder">Buy-Back</div>`; // see fillModalArt
-  const url = buybackReclaimLink(b);
-  const row = (k, v) =>
-    `<div class="mr"><span class="mr-k">${k}</span><span class="mr-v">${v}</span></div>`;
+// A buy-back's window. What's inside comes from its own RSI page, read when the
+// window opens (one page, because someone asked) and kept.
+function bbView(b) {
   const d = bbDetail(b);
-  const contents = d
-    ? `${
-        d.ships.length
-          ? `<h4 class="modal-h">Ships (${d.ships.length})</h4><table class="modal-contents"><tbody>${d.ships
-              .map(
-                (x) =>
-                  `<tr><td>${OH.escapeHtml(x.name)}</td><td class="muted">${OH.escapeHtml(
-                    [x.manufacturer, x.focus].filter(Boolean).join(' · '),
-                  )}</td></tr>`,
-              )
-              .join('')}</tbody></table>`
-          : ''
-      }${
-        d.also.length
-          ? `<h4 class="modal-h">Also Contains</h4><table class="modal-contents"><tbody>${d.also
-              .map((x) => `<tr><td>${OH.escapeHtml(x)}</td></tr>`)
-              .join('')}</tbody></table>`
-          : ''
-      }`
-    : b.isCCU || !/^\d+$/.test(String(b.id))
-      ? ''
-      : '<p class="muted" id="bbd-modal-loading">Loading what’s in it from RSI…</p>';
-  setHTML(
-    modalBody,
-    img +
-      `<div class="modal-info">
-      <h3 class="modal-name">${b.ccu ? `${OH.escapeHtml(b.ccu.from)} → ${OH.escapeHtml(b.ccu.to)}` : OH.escapeHtml(b.name || '—')}</h3>
-      <div class="modal-meta"><span class="badge ${b.isCCU ? 'ccu' : TYPE_KEYS.includes(b.kind) ? b.kind : ''}">${OH.escapeHtml(b.isCCU ? 'CCU' : b.kind || 'buy-back')}</span><span class="badge muted">buy-back</span>${bbPriceHtml(b) ? `<span class="modal-val">${bbPriceHtml(b)}</span>` : ''}</div>
-      ${b.ccu ? row('Upgrade', OH.escapeHtml(`${b.ccu.from} → ${b.ccu.to}`)) : ''}
-      ${b.isCCU ? '' : row('Insurance', OH.escapeHtml(bbInsurance(b)))}
-      ${b.date ? row('Melted', OH.escapeHtml(b.date)) : ''}
-      ${b.id ? row('Pledge ID', OH.escapeHtml(b.id)) : ''}
-      ${url ? row('Reclaim', url) : ''}
-      ${contents}
-    </div>`,
-  );
-  showItemModal();
   const shipish = b.ccu || ['ship', 'pack', 'package'].includes(b.kind);
-  fillModalArt(real, b.ccu && b.ccu.to ? b.ccu.to : shipish ? b.name : '', !!b.ccu && !b.shipArt);
-  if (!d && !b.isCCU && /^\d+$/.test(String(b.id))) {
-    OH.fetchBuybackDetail(String(b.id)).then(async (r) => {
-      if (itemModal.hidden) return;
-      if (r.error) {
-        const el = $('#bbd-modal-loading');
-        if (el) el.textContent = `Couldn't load the contents: ${r.error}`;
-        return;
-      }
-      state.bbDetails = { ...(await OH.getBuybackDetails()) };
-      openBuybackModal(b); // re-draw with the contents
-      if (currentView() === 'buybacks') renderBuybacks();
-    });
-  }
+  return {
+    name: b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '—',
+    badge: {
+      cls: b.isCCU ? 'ccu' : TYPE_KEYS.includes(b.kind) ? b.kind : '',
+      text: b.isCCU ? 'CCU' : b.kind || 'buy-back',
+    },
+    price: bbPriceData(b),
+    upgrade: b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : '',
+    insurance: b.isCCU ? '' : bbInsurance(b),
+    date: b.date || '',
+    id: b.id ? String(b.id) : '',
+    reclaim: reclaimOf(b),
+    contents: d
+      ? {
+          ships: d.ships.map((x) => ({
+            name: x.name,
+            sub: [x.manufacturer, x.focus].filter(Boolean).join(' · '),
+          })),
+          also: d.also,
+        }
+      : null,
+    canLoad: !d && !b.isCCU && /^\d+$/.test(String(b.id)),
+    art: {
+      real: realImage(b.image),
+      resolve: b.ccu && b.ccu.to ? b.ccu.to : shipish ? b.name : '',
+      preferShip: !!b.ccu && !b.shipArt,
+      placeholder: 'Buy-Back',
+    },
+  };
 }
-modalClose.addEventListener('click', closeItemModal);
-itemModal.addEventListener('click', (e) => {
-  if (e.target === itemModal) closeItemModal();
-});
-document.addEventListener('keydown', (e) => {
-  if (itemModal.hidden) return;
-  if (e.key === 'Escape') return void closeItemModal();
-  if (e.key !== 'Tab') return;
-  const stops = [
-    ...itemModal.querySelectorAll(
-      'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex="0"]',
-    ),
-  ].filter((el) => el.getClientRects().length);
-  if (!stops.length) return;
-  const first = stops[0];
-  const last = stops[stops.length - 1];
-  const at = document.activeElement;
-  if (!itemModal.contains(at) || (e.shiftKey && at === first) || (!e.shiftKey && at === last)) {
-    e.preventDefault();
-    (e.shiftKey ? last : first).focus();
-  }
-});
+// Reads a buy-back's page for its window: null when done, else what went wrong.
+async function loadBbContents(b) {
+  const r = await OH.fetchBuybackDetail(String(b.id));
+  if (r.error) return r.error;
+  state.bbDetails = { ...(await OH.getBuybackDetails()) };
+  if (currentView() === 'buybacks') renderBuybacks();
+  homeUpdated();
+  return null;
+}
 
 // Keyboard: Enter or Space on a clickable card or row that isn't a real button or
 // link (Inventory and Buy-Back cards, Stats rows) does what a click does. Like a real
@@ -4952,6 +4784,7 @@ function ensureLoaners() {
     if (m) loanerMatrix = m;
     if (inc) includedVessels = inc;
     if ((m || inc) && currentView() === 'stats') renderStats();
+    if (m || inc) homeUpdated(); // an open ship window shows them
   });
 }
 // What a ship comes with for keeps ("G12* (currently Cyclone)" → clean text).
@@ -4959,7 +4792,6 @@ function includedOf(name) {
   const row = includedVessels && OH.loanersFor(name, includedVessels);
   return row ? row.loaners.map((t) => t.replace(/\*/g, '').trim()) : null;
 }
-const vesselLink = (t) => shipLink(t.replace(/\s*\(.*\)\s*$/, '').trim(), t);
 
 const shipKey = (name) => OH.normShipName(name || '').toLowerCase();
 // The catalog entry for a ship name, or null.
@@ -5028,11 +4860,15 @@ function loanersOf(name) {
   if (v && v.status === 'flight-ready') return null;
   return OH.loanersFor(name, loanerMatrix);
 }
-const shipLink = (name, text = name) =>
-  `<button type="button" class="ship-link" data-ship="${OH.escapeHtml(name)}">${OH.escapeHtml(text)}</button>`;
 
 function openShipModal(name) {
-  hidePreview();
+  openDetail({ kind: 'ship', name });
+  if (!loanerMatrix) ensureLoaners();
+  ensureStore();
+}
+// A ship's window: its specs, the store, what it comes with, loaners, links, and
+// your copies of it (pledges and buy-backs).
+function shipView(name) {
   const v = shipEntry(name);
   const title = (v && v.name) || name;
   const pledges = state.items.filter((p) =>
@@ -5041,68 +4877,29 @@ function openShipModal(name) {
   const bbs = state.buybacks.filter((b) => buybackHasShip(b, title));
   const status = v && (SHIP_STATES.find(([k]) => k === v.status) || [])[1];
   const loan = loanersOf(title);
-  const row = (k, val) =>
-    val
-      ? `<div class="mr"><span class="mr-k">${k}</span><span class="mr-v">${val}</span></div>`
-      : '';
-  const esc = OH.escapeHtml;
-  const q = encodeURIComponent(title);
-  const pledgeRows = pledges.length
-    ? `<table class="modal-contents"><tbody>${pledges
-        .map(
-          (p) =>
-            `<tr><td><button type="button" class="ship-link" data-open-item="${esc(String(p.id))}">${esc(
-              plainName(p),
-            )}</button></td><td class="num">${esc(formatValue(p))}</td></tr>`,
-        )
-        .join('')}</tbody></table>`
-    : '<p class="muted">Not in your hangar.</p>';
-  const bbRows = bbs.length
-    ? `<h4 class="modal-h">In Your Buy-Backs (${bbs.length})</h4><table class="modal-contents"><tbody>${bbs
-        .map(
-          (b) =>
-            `<tr><td><button type="button" class="ship-link" data-open-bb="${esc(String(b.id))}">${esc(buybackName(b))}</button></td><td class="num">${buybackReclaimLink(b)}</td></tr>`,
-        )
-        .join('')}</tbody></table>`
-    : '';
-  setHTML(
-    modalBody,
-    `<div class="modal-img placeholder">Ship</div>
-    <div class="modal-info">
-      <h3 class="modal-name">${esc(title)}</h3>
-      <div class="modal-meta">${status ? `<span class="badge ${v.status === 'flight-ready' ? 'good' : 'warn'}">${esc(status)}</span>` : ''}${
-        v && v.msrp ? `<span class="modal-val">${dollars(v.msrp)}</span>` : ''
-      }</div>
-      <button type="button" class="mk-btn wish-btn" data-wish-toggle="${esc(title)}">${
-        onWishlist(title) ? 'Remove from Wishlist' : 'Add to Wishlist'
-      }</button>
-      ${row('Manufacturer', v && v.mfr ? esc(v.mfr) : '')}
-      ${row('Role', v && (v.role || v.career) ? esc(titleCase(v.role || v.career)) : '')}
-      ${row('Size', v && v.size ? esc(titleCase(v.size)) : '')}
-      ${row('Crew', v && v.crew ? esc(String(v.crew)) : '')}
-      ${row('Cargo', v && v.cargo ? `${esc(String(v.cargo))} SCU` : '')}
-      ${row('In store now', storeOf(title) ? inStoreHtml(title) : '')}
-      ${row('Comes with', includedOf(title) ? includedOf(title).map(vesselLink).join(', ') : '')}
-      ${row('Loaners', loan ? loan.loaners.map((l) => shipLink(l)).join(', ') : '')}
-      ${row(
-        'Links',
-        [
-          `<a href="https://robertsspaceindustries.com/ship-matrix/search?q=${q}" target="_blank" rel="noopener" class="bb-reclaim">RSI ↗</a>`,
-          `<a href="https://starcitizen.tools/index.php?search=${q}" target="_blank" rel="noopener" class="bb-reclaim">Wiki ↗</a>`,
-          '<a href="https://www.erkul.games/live/calculator" target="_blank" rel="noopener" class="bb-reclaim">Erkul ↗</a>',
-        ].join(' · '),
-      )}
-      <h4 class="modal-h">In Your Hangar (${pledges.length})</h4>
-      ${pledgeRows}
-      ${bbRows}
-      ${v ? '' : '<p class="muted">No ship data for this name yet.</p>'}
-    </div>`,
-  );
-  showItemModal();
-  fillModalArt(null, title, true);
-  if (!loanerMatrix) ensureLoaners();
-  ensureStore();
-  fillStock(modalBody);
+  const inc = includedOf(title);
+  const st = storeOf(title);
+  return {
+    title,
+    known: !!v,
+    status: status ? { text: status, cls: v.status === 'flight-ready' ? 'good' : 'warn' } : null,
+    msrp: v && v.msrp ? dollars(v.msrp) : '',
+    wished: onWishlist(title),
+    mfr: (v && v.mfr) || '',
+    role: v && (v.role || v.career) ? titleCase(v.role || v.career) : '',
+    size: v && v.size ? titleCase(v.size) : '',
+    crew: v && v.crew ? String(v.crew) : '',
+    cargo: v && v.cargo ? `${v.cargo} SCU` : '',
+    // In Store Now: the ship's own store page (asked once it shows), "—" with none.
+    store: !st ? null : st.link ? { link: st.link } : storeData ? { none: true } : null,
+    comesWith: inc
+      ? inc.map((t) => ({ name: t.replace(/\s*\(.*\)\s*$/, '').trim(), text: t }))
+      : null,
+    loaners: loan ? loan.loaners : null,
+    q: encodeURIComponent(title),
+    pledges: pledges.map((p) => ({ id: String(p.id), name: plainName(p), value: formatValue(p) })),
+    bbs: bbs.map((b) => ({ id: String(b.id), name: buybackName(b), reclaim: reclaimOf(b) })),
+  };
 }
 
 // One click handler for ship / pledge / buy-back links anywhere on the page.
@@ -5142,13 +4939,6 @@ function toggleWishlist(name) {
   chrome.storage.local.set({ wishlist: state.wishlist });
 }
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('[data-wish-toggle]');
-  if (t) {
-    toggleWishlist(t.dataset.wishToggle);
-    t.textContent = onWishlist(t.dataset.wishToggle) ? 'Remove from Wishlist' : 'Add to Wishlist';
-    if (currentView() === 'store') renderStore();
-    return;
-  }
   const r = e.target.closest('[data-wish-remove]');
   if (r) {
     // One click removes; an Undo bar brings it back (same spot) for 8 seconds.
@@ -5913,6 +5703,21 @@ window.OHApp = {
     clearData,
     reload: () => $('#update-reload')?.click(),
     closeMenus: closeCardMenus,
+  },
+  // The detail windows (ui/details): what each shows, and what they do.
+  detail: {
+    item: itemView,
+    bb: bbView,
+    ship: shipView,
+    loadBb: loadBbContents,
+    toggleWish: (name) => {
+      toggleWishlist(name);
+      if (currentView() === 'store') renderStore();
+      homeUpdated();
+    },
+    // A thumbnail's sharper copy (resolved once, shared): a promise of its URL or null.
+    hiRes: (thumb) => (hiResCandidates(thumb).length ? loadHiRes(thumb) : Promise.resolve(null)),
+    loadImage,
   },
   // Global Hangar Search (ui/search): what matches (see searchResults), and its
   // one action, reading the buy-back packs never checked (opt-in, on Buy-Backs).

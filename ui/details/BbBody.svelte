@@ -1,0 +1,51 @@
+<script>
+  // A buy-back's window. What's inside comes from its own RSI page, read when the
+  // window opens (Details.svelte asks) and kept.
+  import Row from './Row.svelte';
+  import Reclaim from './Reclaim.svelte';
+
+  let { v, error = '' } = $props();
+</script>
+
+<div class="modal-info">
+  <h3 class="modal-name">{v.name}</h3>
+  <div class="modal-meta">
+    <span class="badge {v.badge.cls}">{v.badge.text}</span><span class="badge muted">buy-back</span
+    >{#if v.price}<span class="modal-val"
+        ><span class="val" class:est={v.price.est} title={v.price.title || undefined}
+          >{v.price.text}{#if v.price.est}<small class="est-l">est.</small>{/if}</span
+        ></span
+      >{/if}
+  </div>
+  {#if v.upgrade}<Row k="Upgrade">{v.upgrade}</Row>{/if}
+  {#if v.insurance}<Row k="Insurance">{v.insurance}</Row>{/if}
+  {#if v.date}<Row k="Melted">{v.date}</Row>{/if}
+  {#if v.id}<Row k="Pledge ID">{v.id}</Row>{/if}
+  {#if v.reclaim}<Row k="Reclaim"><Reclaim r={v.reclaim} /></Row>{/if}
+  {#if v.contents}
+    {#if v.contents.ships.length}
+      <h4 class="modal-h">Ships ({v.contents.ships.length})</h4>
+      <table class="modal-contents">
+        <tbody>
+          {#each v.contents.ships as x, i (i)}
+            <tr><td>{x.name}</td><td class="muted">{x.sub}</td></tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
+    {#if v.contents.also.length}
+      <h4 class="modal-h">Also Contains</h4>
+      <table class="modal-contents">
+        <tbody>
+          {#each v.contents.also as x, i (i)}
+            <tr><td>{x}</td></tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
+  {:else if v.canLoad}
+    <p class="muted" id="bbd-modal-loading">
+      {error ? `Couldn't load the contents: ${error}` : 'Loading what’s in it from RSI…'}
+    </p>
+  {/if}
+</div>
