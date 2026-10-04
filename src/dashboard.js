@@ -502,6 +502,10 @@ const topBar = {
   // text) instead of "Scan All" / "Scan Custom", until the end flash fades.
   scanning: false,
   label: '',
+  // The last scan's report when it ended with a problem (ui/topbar/ScanReport.svelte):
+  // { kind: 'out' | 'part' | 'none', rows: [{ name, ok, text }], summary, last, n }.
+  // Cleared when the next scan starts; the button says Rough Landing till then.
+  report: null,
   fill: 0,
   title: '',
   detail: '', // what the scan is on right now, for the ▾ menu
@@ -541,7 +545,7 @@ function setScanning(text, done = false) {
   const clean = text.replace(/^[✓⚠]\s*/, '');
   if (done) {
     topBar.fill = 100;
-    topBar.label = /^⚠/.test(text) ? '⚠ Rough Landing' : '✓ Landed';
+    topBar.label = /^⚠/.test(text) ? 'Rough Landing' : '✓ Landed';
     topBar.title = /^⚠/.test(text) ? clean : `${OH.quip('scanDone')} ${clean}`;
     scanDoneTimer = setTimeout(() => setScanning(''), 2200);
     return;
@@ -4045,6 +4049,7 @@ document.addEventListener('click', (e) => {
 async function runScan({ hangar = true, buybacks = true, referrals = true, store = true } = {}) {
   if (!hangar && !buybacks && !referrals && !store) return;
   topBar.busy = true;
+  topBar.report = null;
   scanProgress.i = 0;
   scanProgress.n = [hangar, buybacks, referrals, store].filter(Boolean).length || 1;
   setScanning('Scanning…');
@@ -4056,6 +4061,17 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   // looks it up itself, as before.
   const account =
     (hangar || buybacks || referrals ? await OH.getAccount().catch(() => null) : null) || undefined;
+  // Signed out of RSI: its signed-out pages can read as an empty hangar or buy-back
+  // list, and a complete scan of nothing would be saved over your data. Skip what
+  // needs your account (the store check still runs) and say so.
+  const signedOut = account?.loggedIn === false && (hangar || buybacks || referrals);
+  if (signedOut) {
+    hangar = buybacks = referrals = false;
+    parts.push("You're not signed in to RSI, so there was nothing to scan");
+    anyErr = true;
+  }
+  // One row per source for the scan report: what came home, or what went wrong.
+  const rows = [];
 
   if (hangar) {
     const h = await OH.scanSource(
@@ -4084,14 +4100,15 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
       if (account?.loggedIn && account.nickname) {
         state.owner = { nickname: account.nickname, displayname: account.displayname || null };
       }
-      parts.push(
-        h.unchanged
-          ? `${h.items.length} pledges (hangar's exactly how you left it)`
-          : `${h.items.length} pledges${h.partial ? ` (partial: ${h.partial})` : ''}`,
-      );
+      const text = h.unchanged
+        ? `${h.items.length} pledges (hangar's exactly how you left it)`
+        : `${h.items.length} pledges${h.partial ? ` (partial: ${h.partial})` : ''}`;
+      parts.push(text);
+      rows.push({ name: 'Hangar', ok: !h.partial, text });
       if (h.partial) anyErr = true;
     } else {
       parts.push(`hangar: ${h.error}`);
+      rows.push({ name: 'Hangar', ok: false, text: h.error });
       anyErr = true;
     }
   }
@@ -4116,10 +4133,13 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
       state.bbShown = new Set(); // default: no filter selected = show all
       state.bbTraits = new Map();
       state.bbPriceMax = null;
-      parts.push(`${b.items.length} buy-backs${b.partial ? ` (partial: ${b.partial})` : ''}`);
+      const text = `${b.items.length} buy-backs${b.partial ? ` (partial: ${b.partial})` : ''}`;
+      parts.push(text);
+      rows.push({ name: 'Buy-Backs', ok: !b.partial, text });
       if (b.partial) anyErr = true;
     } else {
       parts.push(`buy-backs: ${b.error}`);
+      rows.push({ name: 'Buy-Backs', ok: false, text: b.error });
       anyErr = true;
     }
   }
@@ -4136,12 +4156,13 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
     );
     if (r?.ok) {
       state.referral = r.referral;
-      parts.push(
-        `${r.referral.legacy?.recruits ?? 0} recruits${r.partial ? ` (kept last scan's ${r.partial}: RSI didn't answer)` : ''}`,
-      );
+      const text = `${r.referral.legacy?.recruits ?? 0} recruits${r.partial ? ` (kept last scan's ${r.partial}: RSI didn't answer)` : ''}`;
+      parts.push(text);
+      rows.push({ name: 'Referrals', ok: !r.partial, text });
       if (r.partial) anyErr = true;
     } else if (r) {
       parts.push(`referrals: ${r.error}`);
+      rows.push({ name: 'Referrals', ok: false, text: r.error });
       anyErr = true;
     }
   }
@@ -4153,14 +4174,29 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
     scanDetail('Store · checking your wishlist');
     const list = await wishlistStock({ force: true });
     const n = list.filter((x) => x.st && x.st.state === 'in').length;
-    parts.push(`${n} wishlist ship${n === 1 ? '' : 's'} on sale`);
+    const text = `${n} wishlist ship${n === 1 ? '' : 's'} on sale`;
+    parts.push(text);
+    rows.push({ name: 'Store', ok: true, text });
   }
 
   const summary = parts.join(' · ') || 'Nothing scanned';
   // The counts are already on Home (the summary boxes), so only a problem is
-  // spelled out here; the header badge carries the full recap on hover.
+  // spelled out: in the scan report under the Scan button, on every page. The
+  // button carries the full recap on hover.
   scanDetail('');
-  setStatus(anyErr ? summary : '', anyErr, { scan: true });
+  setStatus('');
+  if (anyErr) {
+    const bad = rows.filter((x) => !x.ok).length;
+    topBar.report = {
+      kind: signedOut ? 'out' : bad && bad === rows.length ? 'none' : 'part',
+      rows: signedOut ? [] : rows,
+      bad,
+      summary,
+      last: state.scannedAt ? fmtDay(state.scannedAt) : '',
+      n: Date.now(), // a new report, so the top bar opens it
+    };
+    OH.log('error', 'status', summary);
+  }
   setScanning(`${anyErr ? '⚠ ' : '✓ '}${summary}`, true);
   route();
   renderAccount(); // refresh the Citizen Card pill with the new referral counts
@@ -5703,6 +5739,10 @@ window.OHApp = {
     clearData,
     reload: () => $('#update-reload')?.click(),
     closeMenus: closeCardMenus,
+    // The scan report's buttons: the error report to the clipboard (`el` shows how
+    // it went), and a prefilled Scan Broken issue (#250).
+    copyReport: (el) => copyErrorReport(el),
+    reportProblem: () => topBar.report && openScanReport(topBar.report.summary),
   },
   // The detail windows (ui/details): what each shows, and what they do.
   detail: {

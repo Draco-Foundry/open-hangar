@@ -2005,6 +2005,94 @@ try {
 
   // Keyboard (#200): cards open with Enter and Space, the pop-up keeps and returns
   // focus, chips keep focus when they redraw, menus close on Escape.
+  // Scan report (owner sign-off, 2026-10-04): a scan that ends with a problem opens a
+  // report under the Scan button on any page, and Home has no line of text for it.
+  // Signed out of RSI, the scan reads and saves nothing.
+  console.log('Scan report');
+  await go('#inventory');
+  const rep = await page.evaluate(async () => {
+    const wait = (ms = 120) => new Promise((r) => setTimeout(r, ms));
+    const keep = { acct: OH.getAccount, scan: OH.scanSource, ref: OH.getReferral };
+    const panel = () => document.querySelector('#scan-report');
+    const btn = document.querySelector('#scan-home');
+    const r = { before: { items: state.items.length, bbs: state.buybacks.length } };
+    let asked = 0;
+    try {
+      OH.getAccount = async () => ({ loggedIn: false, fetchedAt: Date.now() });
+      OH.scanSource = async () => (asked++, { ok: true, items: [], scannedAt: Date.now() });
+      OH.getReferral = async () => (asked++, { ok: false, error: 'Not signed in to RSI.' });
+      await runScan({ store: false });
+      await wait();
+      r.out = {
+        asked,
+        kept: state.items.length === r.before.items && state.buybacks.length === r.before.bbs,
+        open: !!panel() && !panel().hidden,
+        title: panel()?.querySelector('h3')?.textContent,
+        login: !!panel()?.querySelector('a[href*="robertsspaceindustries.com/connect"]'),
+        label: btn.textContent.trim(),
+        homeLine: document.querySelector('#status').textContent,
+      };
+      panel().querySelector('.sr-x').click();
+      await wait(60);
+      r.closed = panel().hidden;
+      btn.click();
+      await wait(60);
+      r.reopened = !panel().hidden;
+      document.body.click();
+      await wait(60);
+
+      // Part of it failed: one row per source, the failed one marked.
+      OH.getAccount = keep.acct;
+      OH.scanSource = async (id) =>
+        id === 'hangar'
+          ? { ok: true, items: state.items, scannedAt: Date.now(), unchanged: true }
+          : {
+              ok: false,
+              error: 'RSI stopped responding at page 8, so we kept your previous scan.',
+            };
+      OH.getReferral = async () => ({ ok: true, referral: state.referral });
+      await runScan({ store: false });
+      await wait();
+      r.part = {
+        open: !panel().hidden,
+        title: panel().querySelector('h3').textContent,
+        rows: [...panel().querySelectorAll('.sr-rows li')].map(
+          (li) => `${li.querySelector('.sr-src').textContent}:${li.classList.contains('bad')}`,
+        ),
+        actions: [...panel().querySelectorAll('.sr-btn')].map((b) => b.textContent.trim()),
+      };
+    } finally {
+      Object.assign(OH, { getAccount: keep.acct, scanSource: keep.scan, getReferral: keep.ref });
+      topBar.report = null;
+      setScanning(''); // the button's "done" moment, over now
+      document.body.click();
+      await wait();
+    }
+    r.cleared = !document.querySelector('#scan-report') && !/Rough/.test(btn.textContent);
+    return r;
+  });
+  rep.out &&
+  rep.out.asked === 0 &&
+  rep.out.kept &&
+  rep.out.open &&
+  rep.out.title === 'Hangar Doors Are Locked' &&
+  rep.out.login &&
+  /Rough Landing/.test(rep.out.label) &&
+  !rep.out.homeLine
+    ? ok('signed out: the scan reads nothing, keeps your hangar, and the report says to log in')
+    : fail(`signed-out scan report: ${JSON.stringify(rep)}`);
+  rep.closed && rep.reopened
+    ? ok('scan report: ✕ closes it, Rough Landing opens it again')
+    : fail(`scan report close/reopen: ${JSON.stringify(rep)}`);
+  rep.part &&
+  rep.part.open &&
+  rep.part.title === 'Rough Landing' &&
+  rep.part.rows.join() === 'Hangar:false,Buy-Backs:true,Referrals:false' &&
+  rep.part.actions.join() === 'Scan Again,Copy Error Report,Report a Scan Problem' &&
+  rep.cleared
+    ? ok('scan report: one row per source with the failed one marked, and its buttons')
+    : fail(`partial scan report: ${JSON.stringify(rep)}`);
+
   console.log('Keyboard');
   await go('#inventory');
   await page.click('#layout [data-layout="gallery"]');
