@@ -3,15 +3,17 @@
 // same facts plus the latest version as versions.json beside it. Run at deploy
 // and daily by .github/workflows/pages.yml:
 //   GH_TOKEN=… GITHUB_REPOSITORY=Draco-Foundry/open-hangar node scripts/publish/store-versions.mjs site/index.html
-// Live versions come from the stores' public update checks (what browsers ask)
-// and the Firefox add-ons API: one request each, one at a time, with an honest
-// User-Agent. "In review" = the newest version our Publish runs actually sent
-// to that store, when it's newer than the live one. Anything that can't be read
+// Live versions come from the stores' public update checks (what browsers ask;
+// Edge Add-ons' listing details when Edge's doesn't answer) and the Firefox
+// add-ons API: one request each, one at a time, with an honest User-Agent.
+// "In review" = the newest version our Publish runs actually sent to that
+// store, when it's newer than the live one. Anything that can't be read
 // is left blank, never guessed; the page then just shows the buttons.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import {
+  edgeDetailsVersion,
   stampStoreVersions,
   storeLine,
   submittedVersions,
@@ -54,6 +56,13 @@ const live = {
   ),
   firefox: null,
 };
+// Edge's update check sometimes answers 500; then ask Edge Add-ons for the
+// listing's details instead (one more request, only when needed).
+if (!live.edge) {
+  live.edge = edgeDetailsVersion(
+    await get(`https://microsoftedge.microsoft.com/addons/getproductdetailsbycrxid/${EDGE_ID}`),
+  );
+}
 try {
   const amo = await get(`https://addons.mozilla.org/api/v5/addons/addon/${AMO_SLUG}/`);
   live.firefox = amo ? JSON.parse(amo).current_version?.version || null : null;
