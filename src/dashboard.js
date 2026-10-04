@@ -2784,42 +2784,41 @@ function inStoreHtml(name) {
   return `<a class="sale" href="${OH.escapeHtml(s.link)}" target="_blank" rel="noopener" data-stock-url="${OH.escapeHtml(s.link)}">Checking…</a>`;
 }
 const stockMem = new Map(); // store page URL → 'in' | 'pack' | 'out' (this session)
+// What a ship's store page said, as the "In Store Now" cell shows it.
+function stockLabel(st) {
+  const state = st && st.state;
+  const cls = state === 'in' ? 'on' : state === 'pack' ? 'wb' : 'off';
+  const packList = st && st.packs && st.packs.length ? st.packs.map((p) => p.name).join(', ') : '';
+  if (state === 'in') {
+    return {
+      cls,
+      text: st.price ? `In stock (${dollars(st.price)})` : 'In stock',
+      title: `Sold on its own in RSI's store right now${packList ? `. Also in: ${packList}` : ''}`,
+    };
+  }
+  if (state === 'pack') {
+    return {
+      cls,
+      text: 'Only in a pack',
+      title: `Not sold on its own right now; comes in: ${packList}`,
+    };
+  }
+  if (state === 'out') {
+    return { cls, text: 'Not in store', title: "Not for sale on RSI's store right now" };
+  }
+  return { cls, text: 'Unknown', title: "Couldn't read RSI's store page" };
+}
 function fillStock(container) {
   if (!container) return;
-  const pending = [];
-  let fresh = false; // any answer we didn't have yet (so a stock sort can change)
   for (const el of container.querySelectorAll('[data-stock-url]')) {
     if (el.dataset.stockDone) continue;
     el.dataset.stockDone = '1';
-    const req = OH.getShipStock(el.dataset.stockUrl).then((st) => {
-      const state = st && st.state;
-      if (state && stockMem.get(el.dataset.stockUrl) !== state) {
-        stockMem.set(el.dataset.stockUrl, state);
-        fresh = true;
-      }
-      el.classList.add(state === 'in' ? 'on' : state === 'pack' ? 'wb' : 'off');
-      const packList = st && st.packs.length ? st.packs.map((p) => p.name).join(', ') : '';
-      if (state === 'in') {
-        el.textContent = st.price ? `In stock (${dollars(st.price)})` : 'In stock';
-        el.title = `Sold on its own in RSI's store right now${packList ? `. Also in: ${packList}` : ''}`;
-      } else if (state === 'pack') {
-        el.textContent = 'Only in a pack';
-        el.title = `Not sold on its own right now; comes in: ${packList}`;
-      } else if (state === 'out') {
-        el.textContent = 'Not in store';
-        el.title = "Not for sale on RSI's store right now";
-      } else {
-        el.textContent = 'Unknown';
-        el.title = "Couldn't read RSI's store page";
-      }
-    });
-    pending.push(req);
-  }
-  if (pending.length && container.id === 'wishlist' && state.wishSort === 'stock') {
-    Promise.all(pending).then(() => {
-      if (!fresh || currentView() !== 'store') return;
-      setHTML($('#wishlist'), wishlistHtml());
-      fillStock($('#wishlist'));
+    OH.getShipStock(el.dataset.stockUrl).then((st) => {
+      if (st && st.state) stockMem.set(el.dataset.stockUrl, st.state);
+      const l = stockLabel(st);
+      el.classList.add(l.cls);
+      el.textContent = l.text;
+      el.title = l.title;
     });
   }
 }
@@ -2839,7 +2838,7 @@ function wishlistOrder() {
   const label = (n) => ((shipEntry(n) || {}).name || n).toLowerCase();
   const stockRank = (n) => {
     const st = storeOf(n);
-    const s = st && stockMem.get(st.link);
+    const s = st && (stockPending ? stockRankSnap : stockMem).get(st.link);
     return s === 'in' ? 0 : s === 'pack' ? 1 : s === 'out' ? 2 : 3;
   };
   const byName = (a, b) => label(a).localeCompare(label(b));
@@ -2852,334 +2851,61 @@ function wishlistOrder() {
     }[state.wishSort] || byName;
   return list.sort(cmp);
 }
-// Wishlist: one row per ship; its buy-backs (standalone copies, and CCUs that
-// upgrade to it) open underneath with dates, pledge IDs and Reclaim links.
-function wishlistHtml() {
-  if (!state.wishlist.length) {
-    return '<p class="muted sp-empty">Your wishlist is emptier than a Hull C on launch day. Open any ship (search at the top, or a name in Ship Prices) and press <strong>Add to Wishlist</strong>.</p>';
-  }
-  const owned = new Map(ownedShips().map((s) => [shipKey(s.label), s.pledges.length]));
-  const esc = OH.escapeHtml;
-  const mine = state.wishSort === 'mine';
-  const rows = wishlistOrder()
-    .map((name, i) => {
-      const v = shipEntry(name);
-      const title = (v && v.name) || name;
-      // Ships and packs first, then CCUs; newest melt first within each.
-      const bbRank = (b) => (b.ccu ? 2 : b.kind === 'ship' ? 0 : 1);
-      const bbType = (b) =>
-        b.ccu ? 'CCU' : b.kind === 'package' ? 'Package' : b.kind === 'pack' ? 'Pack' : 'Ship';
-      const bbs = state.buybacks
-        .filter((b) => buybackHasShip(b, title))
-        .sort(
-          (a, b) =>
-            bbRank(a) - bbRank(b) || String(b.date || '').localeCompare(String(a.date || '')),
-        );
-      const ships = bbs.filter((b) => !b.ccu && b.kind === 'ship').length;
-      const packs = bbs.filter((b) => !b.ccu && b.kind !== 'ship').length;
-      const ccus = bbs.filter((b) => b.ccu).length;
-      const have = owned.get(shipKey(title));
-      const status = v && (SHIP_STATES.find(([k]) => k === v.status) || [])[1];
-      const summary = [
-        ships ? `${ships} ship${ships === 1 ? '' : 's'}` : '',
-        packs ? `${packs} pack${packs === 1 ? '' : 's'}` : '',
-        ccus ? `${ccus} CCU${ccus === 1 ? '' : 's'}` : '',
-      ]
-        .filter(Boolean)
-        .join(' · ');
-      const detail = bbs.length
-        ? `<tr class="wish-bbs" id="wish-bbs-${i}" hidden><td colspan="7"><table class="org-table inner"><thead><tr><th>Type</th><th>Buy-back</th><th>Melted</th><th>Pledge ID</th><th class="num">Price</th><th></th></tr></thead><tbody>${bbs
-            .map(
-              (b) => `<tr>
-                <td><span class="badge ${bbType(b).toLowerCase()}">${bbType(b)}</span></td>
-                <td title="${esc(bbFullName(b))}">${esc(buybackName(b))}</td>
-                <td>${esc(b.date || '')}</td>
-                <td>${/^\d+$/.test(String(b.id)) ? esc(String(b.id)) : '<span class="muted">—</span>'}</td>
-                <td class="num">${esc(bbPriceText(b)) || '<span class="muted">—</span>'}</td>
-                <td class="num">${buybackReclaimLink(b)}</td>
-              </tr>`,
-            )
-            .join('')}</tbody></table></td></tr>`
-        : '';
-      return `<tr${mine ? ` class="wish-drag" data-wish-name="${esc(name)}"` : ''}>
-        <td>${mine ? '<span class="wish-grip" title="Drag to reorder" aria-hidden="true">⠿</span>' : ''}${shipLink(title)}</td>
-        <td class="num">${v && v.msrp ? dollars(v.msrp) : '<span class="muted">—</span>'}</td>
-        <td>${inStoreHtml(title)}</td>
-        <td>${esc(status || '')}</td>
-        <td>${
-          bbs.length
-            ? `<button type="button" class="ship-link wish-open" data-wish-bbs="${i}" aria-expanded="false">${esc(summary)} ▾</button>`
-            : '<span class="muted">none</span>'
-        }</td>
-        <td>${have ? `you own ${have}` : ''}</td>
-        <td class="num"><button type="button" class="wish-x" data-wish-remove="${esc(name)}" title="Remove from wishlist" aria-label="Remove ${esc(title)} from wishlist">✕</button></td>
-      </tr>${detail}`;
-    })
-    .join('');
-  const unchecked = uncheckedPacks();
-  const note = unchecked
-    ? `<p class="muted value-note">${unchecked} pack buy-back${unchecked === 1 ? '' : 's'} not checked yet: RSI's list only names the first item in a pack. <a href="#buybacks" data-view="buybacks">Load Details</a> on the Buy-Backs page to find your wishlist ships inside every pack.</p>`
-    : '';
-  return `${note}<table class="org-table wishlist"><thead><tr><th>Ship</th><th class="num">Store Price</th><th>In Store Now</th><th>Status</th><th>Buy-backs</th><th></th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
-}
-
-// Your CCUs: identical ones stacked, searchable, all of them (not just priced).
-function ccuPanelHtml(q) {
-  const v = hangarValue();
-  const needle = q.trim().toLowerCase();
-  const stacks = new Map();
-  for (const p of state.items) {
-    if (!p.isCCU || !p.ccu) continue;
-    const from = OH.htfShipName(p.ccu.from) || p.ccu.from;
-    const to = OH.htfShipName(p.ccu.to) || p.ccu.to;
-    const key = `${from}→${to}`.toLowerCase();
-    const si = v && v.pledges[p.id];
-    const st = stacks.get(key) || { from, to, n: 0, paid: 0, worth: null };
-    st.n++;
-    st.paid += Number.isFinite(p.value) ? p.value : 0;
-    if (si && si.from && si.to) st.worth = si.to - si.from;
-    stacks.set(key, st);
-  }
-  const all = [...stacks.values()];
-  const shown = all
-    .filter((c) => !needle || `${c.from} ${c.to}`.toLowerCase().includes(needle))
-    .sort((a, b) => (b.worth || 0) - (a.worth || 0));
-  searchCounts.ccu = { shown: shown.length, total: all.length };
-  if (!all.length)
-    return '<p class="muted sp-empty">No CCUs in your hangar. Chain-free living.</p>';
-  if (!shown.length) return '<p class="muted sp-empty">No CCUs match that search.</p>';
-  return `<table class="org-table"><thead><tr><th>Upgrade</th><th class="num">Worth</th><th class="num">You Paid</th><th class="num">Stock</th></tr></thead><tbody>${shown
-    .map(
-      (c) => `<tr>
-        <td>${shipLink(c.from)} <span class="ccu-flow">→</span> ${shipLink(c.to)}</td>
-        <td class="num">${c.worth != null ? dollars(c.worth) : '<span class="muted">—</span>'}</td>
-        <td class="num">${money(c.paid)}</td>
-        <td class="num">${c.n}</td>
-      </tr>`,
-    )
-    .join('')}</tbody></table>`;
-}
-
 // Ship Prices: tabs (Flight Ready, In Concept incl. in production, All).
 const PRICE_TABS = [
   ['flight-ready', 'Flight Ready'],
   ['in-concept', 'In Concept'],
   ['all', 'All'],
 ];
-function priceRowsHtml(q) {
-  const needle = q.trim().toLowerCase();
-  const tab = state.priceTab;
-  const inTab = (state.catalog || [])
-    .filter((v) => v.msrp)
-    .filter((v) => {
-      if (tab === 'all') return true;
-      if (tab === 'in-concept') return v.status === 'in-concept' || v.status === 'in-production';
-      return v.status === tab;
-    });
-  const rows = inTab
-    .filter((v) => !needle || v.lname.includes(needle))
-    .sort((a, b) => (a.name || a.lname).localeCompare(b.name || b.lname));
-  searchCounts.price = { shown: rows.length, total: inTab.length };
-  if (!rows.length) {
-    return '<p class="muted sp-empty">No ships match. Maybe it’s still a JPEG?</p>';
-  }
-  const statusLabel = (s) => (SHIP_STATES.find(([k]) => k === s) || [])[1] || capFirst(s || '');
-  return `<table class="org-table"><thead><tr><th>Ship</th><th class="num">Store Price</th><th>Status</th><th>Role</th><th>Size</th></tr></thead><tbody>${rows
-    .map(
-      (v) =>
-        `<tr><td>${shipLink(v.name || v.lname)}</td><td class="num">${dollars(v.msrp)}</td><td>${OH.escapeHtml(statusLabel(v.status))}</td><td>${OH.escapeHtml(v.role || '')}</td><td>${OH.escapeHtml(
-          titleCase(v.size),
-        )}</td></tr>`,
-    )
-    .join('')}</tbody></table>`;
-}
 
-// Panel searches: "Search 221 ships…" placeholders, a live "12 of 221" while
-// typing, and no CCU search when there are only a few to look through.
-const searchCounts = { price: null, ccu: null };
-function updateSearchMeta() {
-  const meta = (input, count, noun) => {
-    const box = $(input);
-    const out = $(`${input}-count`);
-    if (!box || !count) return;
-    box.placeholder = `Search ${count.total.toLocaleString('en-US')} ${noun}${count.total === 1 ? '' : 's'}…`;
-    if (out) {
-      out.textContent = box.value.trim()
-        ? `${count.shown.toLocaleString('en-US')} of ${count.total.toLocaleString('en-US')}`
-        : '';
-    }
-  };
-  meta('#price-search', searchCounts.price, 'ship');
-  meta('#ccu-search', searchCounts.ccu, 'CCU');
-  const ccuBox = $('#ccu-search');
-  if (ccuBox && searchCounts.ccu) {
-    const few = searchCounts.ccu.total <= 8 && !ccuBox.value.trim();
-    ccuBox.hidden = few;
-    if ($('#ccu-search-count')) $('#ccu-search-count').hidden = few;
-  }
-}
-
+// The Store page is Svelte (ui/store, mounted into #oh-store); this loads what it
+// needs (ship prices, RSI's store feed) and tells it to redraw. Each call also
+// lets the wishlist ask its ships' store pages again (lib.js caches them).
 function renderStore() {
   ensurePrices();
   ensureStore();
-  const tabs = $('#price-tabs');
-  if (tabs) {
-    setHTML(
-      tabs,
-      PRICE_TABS.map(
-        ([k, label]) =>
-          `<button type="button" role="tab" aria-selected="${state.priceTab === k}" data-price-tab="${k}" class="${state.priceTab === k ? 'active' : ''}">${label}</button>`,
-      ).join(''),
-    );
-  }
-  setHTML($('#wish-n'), state.wishlist.length ? String(state.wishlist.length) : '');
-  if ($('#wish-sort')) $('#wish-sort').value = state.wishSort;
-  setHTML($('#wishlist'), wishlistHtml());
-  fillStock($('#wishlist'));
-  if (!state.catalog) {
-    setHTML($('#price-table'), '<p class="muted sp-empty">Loading ship prices…</p>');
-    setHTML($('#ccu-owned'), `<p class="muted sp-empty">${OH.quip('loading')}</p>`);
-    return;
-  }
-  setHTML($('#price-table'), priceRowsHtml($('#price-search').value));
-  setHTML($('#ccu-owned'), ccuPanelHtml($('#ccu-search').value));
-  updateSearchMeta();
-  const ccuN = state.items.filter((p) => p.isCCU).length;
-  setHTML($('#ccu-n'), ccuN ? String(ccuN) : '');
+  stockAsked.clear();
+  homeUpdated();
 }
 
-{
-  const sel = $('#wish-sort');
-  if (sel) {
-    setHTML(sel, WISH_SORTS.map(([k, l]) => `<option value="${k}">${l}</option>`).join(''));
-    sel.addEventListener('change', () => {
-      state.wishSort = sel.value;
-      chrome.storage.local.set({ uiWishSort: sel.value });
-      renderStore();
-    });
-  }
-  // "My order": press a row and drag it; the row lifts and follows the pointer,
-  // and the rows it passes slide out of the way (animated). Let go to save.
-  // Pointer events rather than native drag-and-drop, so there's no ghost image.
-  const list = $('#wishlist');
-  let drag = null; // { row, detail, startY, pointerId, moved }
-  const shipRows = () => [...list.querySelectorAll('.wishlist > tbody > tr[data-wish-name]')];
-  // A row's buy-back sub-row (if any) travels with it.
-  const detailOf = (row) =>
-    row.nextElementSibling && row.nextElementSibling.classList.contains('wish-bbs')
-      ? row.nextElementSibling
-      : null;
-  // Move rows in the DOM and animate everyone from where they were (FLIP).
-  function flipMove(mutate) {
-    const all = [...list.querySelectorAll('.wishlist > tbody > tr')];
-    const before = new Map(all.map((r) => [r, r.getBoundingClientRect().top]));
-    mutate();
-    for (const r of all) {
-      if (drag && (r === drag.row || r === drag.detail)) continue;
-      const dy = before.get(r) - r.getBoundingClientRect().top;
-      if (!dy) continue;
-      r.style.transition = 'none';
-      r.style.transform = `translateY(${dy}px)`;
-      requestAnimationFrame(() => {
-        r.style.transition = 'transform 160ms ease';
-        r.style.transform = '';
+// "In Store Now" for the Svelte wishlist: each ship's store page, asked once per
+// renderStore(). While answers are still coming in, "In stock first" keeps the
+// order it had, then sorts once they're all in (no rows hopping about).
+const stockInfo = new Map(); // store page URL → OH.getShipStock answer (or null)
+const stockAsked = new Set();
+const stockAsking = new Set(); // still waiting: never asked twice at once
+let stockPending = 0;
+let stockRankSnap = new Map();
+function checkStock(links) {
+  for (const url of links) {
+    if (!url || stockAsked.has(url) || stockAsking.has(url)) continue;
+    stockAsked.add(url);
+    stockAsking.add(url);
+    if (!stockPending++) stockRankSnap = new Map(stockMem);
+    OH.getShipStock(url)
+      .catch(() => null)
+      .then((st) => {
+        stockInfo.set(url, st || null);
+        if (st && st.state) stockMem.set(url, st.state);
+        stockAsking.delete(url);
+        stockPending--;
+        homeUpdated();
       });
-    }
   }
-  list?.addEventListener('pointerdown', (e) => {
-    const row = e.target.closest('tr[data-wish-name]');
-    if (!row || state.wishSort !== 'mine' || e.button !== 0) return;
-    if (e.target.closest('a, button, input, select') && !e.target.closest('.wish-grip')) return;
-    e.preventDefault();
-    drag = {
-      row,
-      detail: detailOf(row),
-      startY: e.clientY,
-      grab: e.clientY - row.getBoundingClientRect().top, // where on the row it was held
-      pointerId: e.pointerId,
-      moved: false,
-    };
-    row.setPointerCapture(e.pointerId);
-    row.classList.add('lifted');
-  });
-  list?.addEventListener('pointermove', (e) => {
-    if (!drag || e.pointerId !== drag.pointerId) return;
-    drag.moved = drag.moved || Math.abs(e.clientY - drag.startY) > 3;
-    // The first other row whose middle is below the pointer: drop in front of it.
-    const others = shipRows().filter((r) => r !== drag.row);
-    const target = others.find((r) => {
-      const b = r.getBoundingClientRect();
-      return e.clientY < b.top + b.height / 2;
-    });
-    const tbody = drag.row.parentElement;
-    const want = target || null; // null = the end
-    const nextShip = (() => {
-      let n = (drag.detail || drag.row).nextElementSibling;
-      while (n && !n.dataset.wishName) n = n.nextElementSibling;
-      return n || null;
-    })();
-    if (want !== nextShip) {
-      flipMove(() => {
-        tbody.insertBefore(drag.row, want);
-        if (drag.detail) tbody.insertBefore(drag.detail, drag.row.nextElementSibling);
-      });
-    }
-    // Keep the held row under the pointer (offset from its slot in the list).
-    drag.row.style.transform = '';
-    const slot = drag.row.getBoundingClientRect().top;
-    const dy = e.clientY - drag.grab - slot;
-    for (const r of [drag.row, drag.detail]) if (r) r.style.transform = `translateY(${dy}px)`;
-  });
-  const endDrag = (e) => {
-    if (!drag || (e && e.pointerId !== drag.pointerId)) return;
-    const { row, detail, moved } = drag;
-    row.classList.remove('lifted');
-    for (const r of [row, detail]) if (r) r.style.transform = '';
-    drag = null;
-    if (!moved) return;
-    const order = shipRows().map((r) => r.dataset.wishName);
-    if (JSON.stringify(order) !== JSON.stringify(state.wishlist)) {
-      state.wishlist = order;
-      chrome.storage.local.set({ wishlist: state.wishlist });
-    }
-    renderStore();
-  };
-  list?.addEventListener('pointerup', endDrag);
-  list?.addEventListener('pointercancel', endDrag);
 }
-function moveWishlist(name, beforeName) {
-  if (name === beforeName) return;
-  const from = state.wishlist.indexOf(name);
-  const to = state.wishlist.indexOf(beforeName);
-  if (from < 0 || to < 0) return;
-  state.wishlist.splice(from, 1);
-  state.wishlist.splice(to, 0, name);
+function setWishSort(key) {
+  if (!WISH_SORTS.some(([k]) => k === key)) return;
+  state.wishSort = key;
+  chrome.storage.local.set({ uiWishSort: key });
+  renderStore();
+}
+// "My order" after a drag: the wishlist's names in their new order.
+function setWishOrder(order) {
+  if (JSON.stringify(order) === JSON.stringify(state.wishlist)) return;
+  state.wishlist = order.slice();
   chrome.storage.local.set({ wishlist: state.wishlist });
   renderStore();
 }
-
-$('#price-search')?.addEventListener('input', (e) => {
-  setHTML($('#price-table'), priceRowsHtml(e.target.value));
-  updateSearchMeta();
-});
-$('#ccu-search')?.addEventListener('input', (e) => {
-  setHTML($('#ccu-owned'), ccuPanelHtml(e.target.value));
-  updateSearchMeta();
-});
-$('#view-store')?.addEventListener('click', (e) => {
-  const tab = e.target.closest('[data-price-tab]');
-  if (tab) {
-    state.priceTab = tab.dataset.priceTab;
-    return void renderStore();
-  }
-  const open = e.target.closest('[data-wish-bbs]');
-  if (open) {
-    const sub = $(`#wish-bbs-${open.dataset.wishBbs}`);
-    if (!sub) return;
-    sub.hidden = !sub.hidden;
-    open.setAttribute('aria-expanded', String(!sub.hidden));
-  }
-});
 
 // --- Org fleet ------------------------------------------------------------
 // Members' ship lists (from HTF exports or backups) combined into one fleet.
@@ -4026,17 +3752,25 @@ function buybackViewUrl(b) {
 // One "Reclaim" link for every buy-back: RSI's reclaim page, or for CCUs (which
 // have no page of their own; RSI reclaims them in a pop-up) the one-item
 // buy-back list entry where that button is.
-function buybackReclaimLink(b) {
+// Where a buy-back's Reclaim link goes: { retired } | { url, tip } | null.
+function reclaimOf(b) {
   // Retired ships (#306) can't be reclaimed: say so instead of a dead link.
   const retired = OH.retiredBuyback(b);
-  if (retired) return `<span class="bb-retired" title="${OH.escapeHtml(retired)}">Retired</span>`;
+  if (retired) return { retired };
   const direct = buybackUrl(b);
   const url = direct || buybackViewUrl(b);
-  if (!url) return '';
+  if (!url) return null;
   const tip = direct
     ? 'Open the buy-back page on RSI'
     : "Opens just this CCU in RSI's buy-back list, where its reclaim button is";
-  return `<a class="bb-reclaim" href="${OH.escapeHtml(url)}" target="_blank" rel="noopener" title="${tip}">Reclaim ↗</a>`;
+  return { url, tip };
+}
+function buybackReclaimLink(b) {
+  const r = reclaimOf(b);
+  if (!r) return '';
+  if (r.retired)
+    return `<span class="bb-retired" title="${OH.escapeHtml(r.retired)}">Retired</span>`;
+  return `<a class="bb-reclaim" href="${OH.escapeHtml(r.url)}" target="_blank" rel="noopener" title="${r.tip}">Reclaim ↗</a>`;
 }
 function bbDetail(b) {
   return state.bbDetails[b.id] || null;
@@ -6082,24 +5816,17 @@ document.addEventListener('click', (e) => {
     renderStore();
   }
 });
+// The Undo bar on the Store page (ui/store) shows while this is set.
 let wishUndo = null; // { name, at, timer }
 function showWishUndo(name, at) {
-  const bar = $('#wish-undo');
-  if (!bar) return;
   clearTimeout(wishUndo && wishUndo.timer);
   wishUndo = { name, at, timer: setTimeout(hideWishUndo, 8000) };
-  const v = shipEntry(name);
-  setHTML(
-    bar,
-    `Removed ${OH.escapeHtml((v && v.name) || name)} from your wishlist. <button type="button" class="ship-link wish-undo-btn" data-wish-undo>Undo</button>`,
-  );
-  bar.hidden = false;
+  homeUpdated();
 }
 function hideWishUndo() {
   clearTimeout(wishUndo && wishUndo.timer);
   wishUndo = null;
-  const bar = $('#wish-undo');
-  if (bar) bar.hidden = true;
+  homeUpdated();
 }
 
 // --- Home: event heads-up -----------------------------------------------------
@@ -6924,5 +6651,47 @@ window.OHApp = {
     addMine: addMyOrgFleet,
     exportCsv: exportOrgCsv,
     remove: removeOrgMember,
+  },
+  // For the Store page (ui/store): what it reads, and the few actions it takes.
+  store: {
+    get active() {
+      return currentView() === 'store';
+    },
+    // RSI's store feed has loaded (so a ship without a store page shows "—").
+    get feedLoaded() {
+      return !!storeData;
+    },
+    get undo() {
+      if (!wishUndo) return null;
+      const v = shipEntry(wishUndo.name);
+      return { name: (v && v.name) || wishUndo.name };
+    },
+    wishSorts: WISH_SORTS,
+    priceTabs: PRICE_TABS,
+    shipStates: SHIP_STATES,
+    wishlistOrder,
+    shipEntry,
+    shipKey,
+    ownedShips,
+    storeOf,
+    // A store page's answer as the "In Store Now" cell shows it, or null (not yet).
+    stock: (url) => (stockInfo.has(url) ? stockLabel(stockInfo.get(url)) : null),
+    checkStock,
+    buybackHasShip,
+    buybackName,
+    bbFullName,
+    bbPriceText,
+    reclaimOf,
+    uncheckedPacks,
+    currencyNote,
+    titleCase,
+    capFirst,
+    setWishSort,
+    setWishOrder,
+    setPriceTab: (key) => {
+      if (!PRICE_TABS.some(([k]) => k === key)) return;
+      state.priceTab = key;
+      renderStore();
+    },
   },
 };

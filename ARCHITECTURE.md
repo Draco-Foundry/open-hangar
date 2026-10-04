@@ -209,6 +209,12 @@ is moving pages to Svelte one at a time; today that's the Home page cards and St
 - **Shared chunk.** Code pages share (Svelte's runtime and `ui/lib/`) builds into
   `src/ui/shared.js` and `shared.css` (`manualChunks` in `vite.config.mjs`), so
   `dashboard.html` links one fixed stylesheet however many pages share it.
+- **Store.** `ui/store/main.js` (built into `src/ui/store.js`) mounts the Store page
+  into `#oh-store`. `renderStore()` only loads ship prices and RSI's store feed and
+  calls `homeUpdated()`. The page reads and acts through `window.OHApp.store`
+  (wishlist order, store-page stock checks, sort, tab and drag order); removing a
+  ship and its Undo bar still go through the classic `[data-wish-remove]` and
+  `[data-wish-undo]` click handlers.
 
 ## Outbound Requests
 
