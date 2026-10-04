@@ -161,20 +161,26 @@ the community Hangar Transfer Format (one entry per ship).
 ## The Svelte and Classic Bridge
 
 The dashboard is mostly classic JavaScript. The 0.3.0 redesign (docs/REDESIGN-0.3.md)
-is moving pages to Svelte one at a time; today that's the Home page cards.
+is moving pages to Svelte one at a time; today that's the Home page cards and Stats.
 
-- **Build.** `vite.config.mjs` builds `ui/home/main.js` into `src/ui/home.js`,
-  `src/ui/home.css` and `src/ui/fonts/`. Output is not minified, because store
+- **Build.** `vite.config.mjs` builds each page's `ui/<page>/main.js` into
+  `src/ui/<page>.js` (Home also gets `src/ui/home.css`), code the pages share into
+  `src/ui/app.svelte.js`, and fonts into `src/ui/fonts/`. Output is not minified, because store
   reviewers read it. `src/ui/` is generated and git-ignored: run `npm run build:ui`
   (or `npm run dev:ui` to watch).
-- **Loading.** `src/dashboard.html` links `ui/home.css` and loads `ui/home.js` as a
-  module. `ui/home/main.js` mounts `Home` into `#oh-home`, `ForYou` into `#oh-foryou`
-  and `StatusCard` into `#oh-status`, but only when `window.OHApp` exists.
+- **Loading.** `src/dashboard.html` links `ui/home.css` and loads `ui/home.js` and
+  `ui/stats.js` as modules. `ui/home/main.js` mounts `Home` into `#oh-home`, `ForYou`
+  into `#oh-foryou` and `StatusCard` into `#oh-status`; `ui/stats/main.js` mounts
+  `Stats` into `#stats-body`. Both only when `window.OHApp` exists.
 - **Classic to Svelte.** `src/dashboard.js` owns scanning, storage and state. At the
   end of the file it publishes `window.OHApp`: a getter for `state` plus read-only
   helpers (`hangarValue`, `accountValue`, `bigMoney`, `priceOf`, …) and a few actions
   that switch views (`openItem`, `showInventory`, `showBuybacks`). When Home's data
   changes it calls `homeUpdated()`, which fires one `oh:home` event per microtask.
+  `renderStats()` only loads ship prices (and loaners on the Fleet tab) and calls
+  `homeUpdated()` too. Links and buttons in Svelte markup reuse the classic
+  document-level click handlers (`data-stats-tab`, `data-open-item`, `data-open-bb`,
+  `data-ship`, `data-backup`).
 - **In Svelte.** `ui/lib/app.svelte.js` turns `oh:home` into a reactive counter
   (`version.n`); components read `app()` (that is, `window.OHApp`) inside `$derived`
   blocks that also read `version.n`, so they redraw. `loadLive()` loads outside data
