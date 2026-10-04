@@ -210,6 +210,12 @@ is moving pages to Svelte one at a time; today that's the Home page cards and St
   `computeShown()`), because the list, Select All and the exports read them too;
   the Svelte controls call `window.OHApp.inv`. The toolbar, sidebar, pills, summary
   strip and Export menu are shared components in `ui/lib/` for Buy-Backs to reuse.
+- **Store.** `ui/store/main.js` (built into `src/ui/store.js`) mounts the Store page
+  into `#oh-store`. `renderStore()` only loads ship prices and RSI's store feed and
+  calls `homeUpdated()`. The page reads and acts through `window.OHApp.store`
+  (wishlist order, store-page stock checks, sort, tab and drag order); removing a
+  ship and its Undo bar still go through the classic `[data-wish-remove]` and
+  `[data-wish-undo]` click handlers.
 
 ## Outbound Requests
 
