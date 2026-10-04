@@ -60,7 +60,9 @@
 
         <div class="installs" id="installs">
           <!-- Per-store status. When a listing goes live: set data-status="live" and
-               data-url to the store page. Other values: "review", "planned". -->
+               data-url to the store page. Other values: "review", "planned".
+               The version spans are filled at deploy and daily with each store's live
+               version and a newer one in review (scripts/publish/store-versions.mjs). -->
           <a
             class="install"
             data-browser="chrome"
@@ -68,6 +70,10 @@
             data-url="https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl"
           >
             <span class="b-name">Chrome</span><span class="b-note">Add to Chrome</span>
+            <span class="b-vers"
+              ><span class="b-ver" data-ver="chrome"></span
+              ><span class="b-pend" data-pend="chrome"></span
+            ></span>
           </a>
           <a
             class="install"
@@ -76,6 +82,10 @@
             data-url="https://microsoftedge.microsoft.com/addons/detail/fmcnemfepnifokjelgjacgdhoodaiicl"
           >
             <span class="b-name">Edge</span><span class="b-note">Add to Edge</span>
+            <span class="b-vers"
+              ><span class="b-ver" data-ver="edge"></span
+              ><span class="b-pend" data-pend="edge"></span
+            ></span>
           </a>
           <a
             class="install"
@@ -84,6 +94,10 @@
             data-url="https://addons.mozilla.org/en-US/firefox/addon/open-hangar/"
           >
             <span class="b-name">Firefox</span><span class="b-note">Add to Firefox</span>
+            <span class="b-vers"
+              ><span class="b-ver" data-ver="firefox"></span
+              ><span class="b-pend" data-pend="firefox"></span
+            ></span>
           </a>
           <a class="install" data-browser="safari" data-status="planned" data-url="">
             <span class="b-name">Safari</span><span class="b-note">Soon™</span>
@@ -241,16 +255,18 @@
         <img src="img/draco-foundry-64.png" alt="" width="32" height="32" />
         <span>Made by <strong>Draco Foundry</strong></span>
       </a>
-      <nav>
-        <a href="https://github.com/Draco-Foundry/open-hangar">Source on GitHub</a>
-        <a href="privacy.html">Privacy Policy</a>
-        <a href="https://app.openhangar.space/legal" rel="nofollow">Legal Notice</a>
+      <nav class="foot-links" aria-label="Help and community">
+        <a href="https://discord.gg/FF8Wm5HdnV">Discord</a>
+        <a href="help.html">Troubleshooting</a>
         <a href="https://github.com/Draco-Foundry/open-hangar/discussions/categories/ideas"
           >Suggest a Feature</a
         >
-        <a href="help.html">Troubleshooting</a>
-        <a href="https://discord.gg/FF8Wm5HdnV">Discord</a>
         <a href="https://github.com/Draco-Foundry/open-hangar/issues">Report an Issue</a>
+        <a href="https://github.com/Draco-Foundry/open-hangar">Source on GitHub</a>
+      </nav>
+      <nav class="foot-links foot-small" aria-label="Legal and contact">
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="https://app.openhangar.space/legal" rel="nofollow">Legal Notice</a>
         <a href="mailto:support@openhangar.space">support@openhangar.space</a>
       </nav>
       <div class="support-links">
