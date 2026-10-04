@@ -8479,4 +8479,38 @@ window.OHApp = {
   },
   shipOf: (name) => (state.shipOf ? state.shipOf(name) : null),
   priceOf: (name) => (state.priceOf ? state.priceOf(name) : null),
+  // --- Stats (ui/stats) ---
+  // The page showing now ('home', 'stats'…): Stats only draws while it's open.
+  get view() {
+    return currentView();
+  },
+  // True while the ship list (store prices, ship data) is still loading.
+  get pricesLoading() {
+    return !!pricesLoading;
+  },
+  ensureLoaners,
+  statsTabs: STATS_TABS,
+  presentKinds,
+  bbKinds: BB_KINDS,
+  titleCase,
+  insLabel,
+  buybackName,
+  bbPrice,
+  bbDetail,
+  nextTokenDate,
+  // Your ships that come with loaners / included vessels ([{ ship, list }]), or
+  // null until RSI's list has loaded (ensureLoaners fetches it).
+  loanerRows: () =>
+    loanerMatrix
+      ? ownedShips()
+          .map((s) => ({ ship: s.label, row: loanersOf(s.label) }))
+          .filter((r) => r.row)
+          .map((r) => ({ ship: r.ship, list: r.row.loaners }))
+      : null,
+  includedRows: () =>
+    includedVessels
+      ? ownedShips()
+          .map((s) => ({ ship: s.label, list: includedOf(s.label) }))
+          .filter((r) => r.list)
+      : null,
 };
