@@ -26,3 +26,17 @@ space left of the ship). Rebuild with `python docs/brand/draco-foundry/banner.py
 | `invite-splash-1920x1080.jpg` | Discord invite background without text            |
 | `banner-3840x2160.jpg`        | Master                                            |
 | `banner-scene.jpg`            | The Dreamina scene on its own                     |
+
+## Letterhead and Envelope
+
+The logo badge (`logo-512.png`, round crop) beside the wordmark in Manrope 700, with
+a Hangar Cobalt rule (#3b6aed). No CIG ship art, so they're safe on letters to CIG.
+
+| File                            | Use                                                 |
+| ------------------------------- | --------------------------------------------------- |
+| `envelope-743x150.png`          | Envelope logo above the return address (no tagline) |
+| `envelope-743x150.jpg`          | Same, for upload forms that want JPG                |
+| `letterhead-light-2972x600.png` | Printed letterhead, top of the page about 6.5" wide |
+| `letterhead-light-743x150.png`  | Same at screen size                                 |
+| `letterhead-dark-2972x600.png`  | Email signatures, digital PDFs                      |
+| `letterhead-dark-743x150.png`   | Same at screen size                                 |
