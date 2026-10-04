@@ -8,7 +8,7 @@
       name="description"
       content="Open Hangar is a free, source-available browser extension that reads your own Star Citizen / RSI hangar, buy-backs, balances and referrals into a clean, local, exportable database. No password, no server."
     />
-    <link rel="canonical" href="https://openhangar.space/" />
+    <link rel="canonical" href="https://openhangar.space/extension" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Open Hangar" />
@@ -16,7 +16,7 @@
       property="og:description"
       content="Read your own Star Citizen / RSI hangar into a clean, local, exportable database. Free, with public source code."
     />
-    <meta property="og:url" content="https://openhangar.space/" />
+    <meta property="og:url" content="https://openhangar.space/extension" />
     <meta property="og:site_name" content="Open Hangar" />
     <meta property="og:image" content="https://openhangar.space/img/og.jpg" />
     <meta property="og:image:width" content="1200" />
@@ -278,6 +278,19 @@
         </div>
       </div>
     </footer>
+
+    <!-- Open beta notice until the November 10 release (owner, 2026-10-04). Shown by
+         main.js unless closed before; remove after the release. -->
+    <aside class="beta-note" id="beta-note" role="status" aria-labelledby="beta-note-title" hidden>
+      <button type="button" class="beta-close" id="beta-close" aria-label="Close">✕</button>
+      <p class="beta-tag">Open Beta</p>
+      <h2 id="beta-note-title">Still Spooling Up</h2>
+      <p>
+        Open Hangar is a work in progress, with the official release set for
+        <strong>November 10</strong>. Questions, ideas or a bug to report? Come find us on Discord.
+      </p>
+      <a class="beta-link" href="https://discord.gg/FF8Wm5HdnV">Join the Discord ↗</a>
+    </aside>
 
     <script src="main.js"></script>
   </body>
