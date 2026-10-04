@@ -1910,6 +1910,83 @@ try {
     ? ok('Events card shows a running referral bonus event')
     : fail(`event banner: ${JSON.stringify(wse)}`);
 
+  // Top bar (ui/topbar, Svelte: it redraws a tick after a change). The page link is
+  // marked; unticking a source reads "Scan Custom" (remembered) and keeps the ▾ menu
+  // open; the scan's progress shows on the button and in the menu; Streamer Mode puts
+  // a badge on the portrait; a waiting update puts a dot on it and a line in the menu.
+  console.log('Top bar');
+  await go('#inventory');
+  const bar = await page.evaluate(async () => {
+    const tick = () => new Promise((r) => setTimeout(r, 50));
+    const btn = document.querySelector('#scan-home');
+    const label = () => btn.querySelector('.scan-label').textContent;
+    const r = { active: document.querySelector('#nav a.active')?.dataset.view };
+    document.querySelector('#scan-menu-btn').click();
+    document.querySelector('.scan-src[value="store"]').click();
+    await tick();
+    r.stillOpen = !document.querySelector('#scan-menu').hidden;
+    r.custom = label();
+    r.saved = (await chrome.storage.local.get('scanSources')).scanSources.join(',');
+    document.querySelector('[data-scan-all]').click();
+    await tick();
+    r.all = label();
+    document.body.click();
+    r.closed = document.querySelector('#scan-menu').hidden;
+    scanProgress.i = 1;
+    scanProgress.n = 4;
+    setScanning('buy-backs… 200');
+    scanDetail('Buy-backs · page 2 · 200 items');
+    await tick();
+    r.progress = {
+      label: label(),
+      fill: btn.querySelector('.scan-fill').style.width,
+      title: btn.title,
+      line: document.querySelector('#scan-menu-progress').textContent,
+      bar: btn.classList.contains('scanning'),
+    };
+    scanDetail('');
+    setScanning('');
+    await tick();
+    r.idle = label() === 'Scan All' && !btn.classList.contains('scanning');
+    await OHApp.top.setStreamer(true);
+    await tick();
+    r.badge =
+      !document.querySelector('#stream-dot').hidden &&
+      /Streamer Mode is on/.test(document.querySelector('#settings-btn').title) &&
+      document.querySelector('#streamer-toggle').checked;
+    await OHApp.top.setStreamer(false);
+    await tick();
+    r.badgeOff = document.querySelector('#stream-dot').hidden;
+    showUpdateBanner('99.0.0');
+    await tick();
+    r.update =
+      !document.querySelector('#upd-dot').hidden &&
+      document.querySelector('#menu-upd-text').textContent === 'Update ready: 99.0.0';
+    topBar.update = null;
+    homeUpdated();
+    await tick();
+    return r;
+  });
+  bar.active === 'inventory' &&
+  bar.stillOpen &&
+  bar.custom === 'Scan Custom' &&
+  bar.saved === 'hangar,buybacks,referrals' &&
+  bar.all === 'Scan All' &&
+  bar.closed
+    ? ok('top bar: page marked; Scan Custom once a source is unticked (remembered), Select All')
+    : fail(`top bar scan menu: ${JSON.stringify(bar)}`);
+  bar.progress.label === 'Scanning… 2/4' &&
+  bar.progress.fill === '25%' &&
+  bar.progress.title === 'Buy-backs · page 2 · 200 items' &&
+  bar.progress.line === 'Scanning: Buy-backs · page 2 · 200 items' &&
+  bar.progress.bar &&
+  bar.idle
+    ? ok('top bar: Scan fills with the progress, the ▾ menu says what it is on, then Scan All')
+    : fail(`top bar scan progress: ${JSON.stringify(bar)}`);
+  bar.badge && bar.badgeOff && bar.update
+    ? ok('top bar: Streamer Mode badge on the portrait; update dot and "Update ready" line')
+    : fail(`top bar portrait: ${JSON.stringify(bar)}`);
+
   // Keyboard (#200): cards open with Enter and Space, the pop-up keeps and returns
   // focus, chips keep focus when they redraw, menus close on Escape.
   console.log('Keyboard');
