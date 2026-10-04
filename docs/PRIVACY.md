@@ -1,6 +1,6 @@
 # Privacy Policy — Open Hangar
 
-_Last updated: 2026-10-01_
+_Last updated: 2026-11-10_
 
 Open Hangar is a source-available browser extension that reads your own Star Citizen /
 Roberts Space Industries (RSI) account data and stores it **locally in your
@@ -8,11 +8,13 @@ browser**. This policy explains exactly what it does and does not do with data.
 
 ## The short version
 
-- **No account, no password, no sign-up.** Open Hangar uses the RSI session you are
-  already signed in with in your browser.
-- **No server. Nothing is sent to us — we have no server to send it to.** Your
-  scraped data never leaves your device.
-- **We do not collect, sell, transfer, or share any personal data.**
+- **No account, no password, no sign-up needed.** Open Hangar uses the RSI session you
+  are already signed in with in your browser, and works fully on its own.
+- **Your data stays on your device unless you choose to sync.** Syncing to our website,
+  app.openhangar.space, is optional and off until you connect an account and press
+  Sync. Until then nothing is sent to us.
+- **We do not sell or share your personal data.** Without sync we collect nothing; with
+  sync we keep only what you send (see [Optional Sync](#optional-sync-to-openhangarspace)).
 
 ## What data is accessed and where it is stored
 
@@ -34,8 +36,8 @@ parses the results locally. This may include:
 - Your referral code and your recruits/prospects (handles, monikers, dates)
 
 All of this is stored **only** in your browser's local extension storage
-(`chrome.storage.local`). It is never transmitted to the developer or any third
-party. You can remove it at any time with **Clear Data** in the settings menu (click your portrait), or by
+(`chrome.storage.local`). It is only sent anywhere if you turn on sync (below), and
+never to anyone else. You can remove it at any time with **Clear Data** in the settings menu (click your portrait), or by
 uninstalling the extension (which deletes all stored data).
 
 ## Outbound network requests
@@ -87,6 +89,31 @@ the scan summary (counts only) and the error report filled in: version, browser,
 counts and the recent log, with no handle, referral code or item names. Nothing is sent by
 the extension. You read it on GitHub and decide whether to submit it.
 
+## Optional Sync to openhangar.space
+
+Sync lets you see your hangar on any device. It is off until you turn it on, and the
+extension works the same without it.
+
+- **Connecting:** press **Connect to openhangar.space** on the Home page, then sign in on
+  app.openhangar.space and approve the code it shows. The extension then keeps a sync
+  token in its local storage. Connecting sends nothing about your hangar.
+- **What is sent, and when:** only when you press **Sync Now**, or after each scan if you
+  turn on **Sync After Every Scan** (off by default), the extension sends the same data
+  as its JSON backup file: your hangar, buy-backs, scan history, account identity and
+  balances (handle, display name, org, rank, Store Credit, UEC, REC) and your referral
+  recruits list. Your referral code is never sent, and neither is your RSI password or
+  any RSI cookie.
+- **No extra RSI requests:** sync sends what the extension already has; it never reads
+  anything more from RSI.
+- **Requests while connected:** only to app.openhangar.space, to connect (a short code,
+  then checks until you approve it), to sync, and to disconnect.
+- **Disconnecting:** **Disconnect** on the Home page stops syncing and cancels this
+  extension's token. The copy already synced stays on the website until you delete it
+  there; your Account page on the website can download or delete everything.
+- **What the website keeps and for how long:** see the website's own privacy policy,
+  https://app.openhangar.space/privacy. The website is run by Draco Foundry, LLC and
+  hosted on Cloudflare.
+
 ## Permissions and why they are used
 
 - **storage** — to save your scanned data and UI preferences locally.
@@ -103,7 +130,7 @@ the extension. You read it on GitHub and decide whether to submit it.
 
 Open Hangar lets you export your database as a JSON file (or a CSV of what a page shows) that you choose to save.
 That file is created locally and handled entirely by you; the extension does not
-upload it anywhere. (Your referral code is deliberately excluded from exports.)
+upload it anywhere. (Only Sync sends the same data, and only if you turned sync on.) (Your referral code is deliberately excluded from exports.)
 
 ## Multiple accounts
 
