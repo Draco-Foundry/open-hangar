@@ -24,6 +24,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         home: 'ui/home/main.js',
+        referrals: 'ui/referrals/main.js',
       },
       output: {
         format: 'es',
