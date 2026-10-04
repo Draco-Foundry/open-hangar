@@ -24,6 +24,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         home: 'ui/home/main.js',
+        updates: 'ui/updates/main.js',
       },
       output: {
         format: 'es',

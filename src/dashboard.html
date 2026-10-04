@@ -3260,6 +3260,7 @@
     </style>
     <link rel="stylesheet" href="ui/home.css" />
     <script type="module" src="ui/home.js"></script>
+    <script type="module" src="ui/updates.js"></script>
   </head>
   <body>
     <div class="wrap">
@@ -3830,11 +3831,7 @@
           Every Open Hangar release and what changed. Your browser installs new versions on its own;
           when one is ready you'll see a bar at the top with a Reload button.
         </p>
-        <div class="update-check">
-          <span>You're on <strong id="update-cur"></strong></span>
-          <button type="button" class="mk-btn" id="update-check-btn">Check for Updates</button>
-          <span class="muted" id="update-check-status" aria-live="polite"></span>
-        </div>
+        <!-- Check for Updates and the release notes: Svelte (ui/updates/Updates.svelte) -->
         <div id="updates-body"></div>
       </section>
 
@@ -3857,6 +3854,7 @@
             >Report a Bug</a
           >
         </p>
+        <!-- The list: Svelte (ui/updates/KnownIssues.svelte) -->
         <div id="issues-body"></div>
       </section>
 

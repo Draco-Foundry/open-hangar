@@ -1194,6 +1194,78 @@ try {
   /9\.9\.9 is downloading/.test(chk.chrome1)
     ? ok('Check for updates: store check (Chrome) and AMO version check (Firefox)')
     : fail(`check for updates: ${JSON.stringify(chk)}`);
+  const md = await page.evaluate(() => ({
+    // Release notes are Svelte nodes, never markup strings: no stray ** or `.
+    raw: [...document.querySelectorAll('#updates-body li, #updates-body p')].filter((e) =>
+      /\*\*|`/.test(e.textContent),
+    ).length,
+    links: document.querySelectorAll('#updates-body .release a[target="_blank"]').length,
+  }));
+  !md.raw
+    ? ok(`release notes markdown drawn (${md.links} links)`)
+    : fail(`release notes markdown: ${JSON.stringify(md)}`);
+
+  console.log('Known Issues');
+  const ki = await page.evaluate(async () => {
+    const wait = (ms = 300) => new Promise((r) => setTimeout(r, ms));
+    const body = () => document.querySelector('#issues-body');
+    const open = async () => {
+      location.hash = '#home';
+      await wait(100);
+      location.hash = '#issues';
+      await wait();
+    };
+    // From the hour-long cache: no request to GitHub.
+    await chrome.storage.local.set({
+      knownIssues: {
+        at: Date.now(),
+        list: [
+          {
+            number: 7,
+            title: 'Test bug <b>not bold</b>',
+            url: 'https://github.com/Draco-Foundry/open-hangar/issues/7',
+            createdAt: new Date().toISOString(),
+            labels: ['bug', 'scan-broken'],
+          },
+          {
+            number: 8,
+            title: 'Older bug',
+            url: 'https://github.com/Draco-Foundry/open-hangar/issues/8',
+            createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+            labels: ['bug'],
+          },
+        ],
+      },
+    });
+    await open();
+    const rows = [...body().querySelectorAll('.known-issues li')].map((li) =>
+      li.textContent.replace(/\s+/g, ' ').trim(),
+    );
+    const bold = !!body().querySelector('.known-issues b');
+    // Cache gone and GitHub unreachable: the fallback link.
+    const realFetch = window.fetch;
+    window.fetch = async () => {
+      throw new Error('offline');
+    };
+    await chrome.storage.local.set({ knownIssues: { at: 0, list: [] } });
+    await open();
+    const err = body().textContent.replace(/\s+/g, ' ').trim();
+    // An empty list (fresh from GitHub).
+    window.fetch = async () => new Response('[]');
+    await open();
+    const empty = body().textContent.trim();
+    window.fetch = realFetch;
+    await chrome.storage.local.remove('knownIssues');
+    return { rows, bold, err, empty };
+  });
+  ki.rows.length === 2 &&
+  /^Test bug <b>not bold<\/b> #7 · opened today · Scan broken$/.test(ki.rows[0]) &&
+  /^Older bug #8 · opened 3 days ago$/.test(ki.rows[1]) &&
+  !ki.bold &&
+  /^Couldn't reach GitHub's comm relay\. See the list on GitHub\.$/.test(ki.err) &&
+  /^No known bugs right now/.test(ki.empty)
+    ? ok('Known Issues: cached list, Scan broken tag, offline fallback, empty list')
+    : fail(`known issues: ${JSON.stringify(ki)}`);
 
   // Kill switch notice: shown from the cached status file, as text (never HTML).
   const notice = await page.evaluate(async () => {

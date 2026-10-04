@@ -7227,98 +7227,45 @@ async function loadChangelog() {
   return changelog;
 }
 
-// "2026-09-28" → "Sep 28, 2026"; anything else (e.g. "June 2026") as written.
-const releaseDate = (d) =>
-  /^\d{4}-\d{2}-\d{2}$/.test(d)
-    ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        timeZone: 'UTC',
-      })
-    : d;
-
-// Split a release's bullets into New / Improved / Fixed by their CHANGELOG
-// prefix ("New:", "Improved:", "Changed:", "Fixed:"). Untagged bullets count
-// as Improved.
-const RELEASE_TAG = /^(\*\*)?(new|improved|changed|fix(?:ed)?)\b\s*:?\s*/i;
-const releaseKind = (t) => {
-  const tag = (t.match(RELEASE_TAG)?.[2] || '').toLowerCase();
-  return tag === 'new' ? 'new' : tag.startsWith('fix') ? 'fixed' : 'improved';
-};
-function releaseGroupsHtml(items) {
-  const groups = [
-    ['new', 'New'],
-    ['improved', 'Improved'],
-    ['fixed', 'Fixed'],
-  ];
-  return groups
-    .map(([k, label]) => [k, label, items.filter((t) => releaseKind(t) === k)])
-    .filter(([, , list]) => list.length)
-    .map(
-      ([k, label, list]) =>
-        `<span class="release-group g-${k}">${label}</span><ul>${list
-          .map((t) => `<li>${OH.inlineMarkdown(capFirst(t.replace(RELEASE_TAG, '$1')))}</li>`)
-          .join('')}</ul>`,
-    )
-    .join('');
-}
-
-// Updates page: "Check for updates". Chrome and Edge can ask their store right
-// now (a found update downloads, then the Reload bar appears); Firefox can't,
-// so it asks the public AMO API (CORS-open, no permission needed) for the
-// latest published version and compares.
+// Updates page: "Check for Updates" (ui/updates/Updates.svelte shows the result).
+// Chrome and Edge can ask their store right now (a found update downloads, then
+// the Reload bar appears); Firefox can't, so it asks the public AMO API (CORS-open,
+// no permission needed) for the latest published version and compares. Resolves
+// to the line to show under the button.
 const AMO_ADDON_API = 'https://addons.mozilla.org/api/v5/addons/addon/open-hangar/';
-{
-  const btn = $('#update-check-btn');
-  const out = $('#update-check-status');
-  const curEl = $('#update-cur');
+async function checkForUpdates() {
   const cur = chrome.runtime.getManifest().version;
-  if (curEl) curEl.textContent = cur;
-  btn?.addEventListener('click', async () => {
-    // Looked up by name so Firefox's linter doesn't flag it (see initUpdates).
-    const check = chrome.runtime[['request', 'Update', 'Check'].join('')];
-    if (typeof check !== 'function') {
-      btn.disabled = true;
-      out.textContent = 'Checking…';
-      try {
-        const res = await fetch(AMO_ADDON_API, {
-          credentials: 'omit',
-          cache: 'no-store',
-          signal: AbortSignal.timeout(8000),
-        });
-        const latest = res.ok ? (await res.json())?.current_version?.version : null;
-        if (!latest) throw new Error('no version');
-        chrome.storage.local.set({ lastUpdateCheck: Date.now() });
-        out.textContent =
-          OH.compareVersions(latest, cur) > 0
-            ? `Open Hangar ${latest} is out. Firefox installs it on its own within a day, or get it now: about:addons, gear icon, Check for Updates.`
-            : 'You’re on the latest version. Fly safe.';
-      } catch {
-        out.textContent =
-          'Couldn’t reach Firefox Add-ons. Probably a 30k on their end, try again in a bit.';
-      }
-      btn.disabled = false;
-      return;
-    }
-    btn.disabled = true;
-    out.textContent = 'Checking…';
+  // Looked up by name so Firefox's linter doesn't flag it (see initUpdates).
+  const check = chrome.runtime[['request', 'Update', 'Check'].join('')];
+  if (typeof check !== 'function') {
     try {
-      const r = await check.call(chrome.runtime);
-      const status = (r && r.status) || r;
+      const res = await fetch(AMO_ADDON_API, {
+        credentials: 'omit',
+        cache: 'no-store',
+        signal: AbortSignal.timeout(8000),
+      });
+      const latest = res.ok ? (await res.json())?.current_version?.version : null;
+      if (!latest) throw new Error('no version');
       chrome.storage.local.set({ lastUpdateCheck: Date.now() });
-      out.textContent =
-        status === 'update_available'
-          ? `Open Hangar ${(r && r.version) || ''} is downloading. A Reload bar appears at the top when it's ready.`
-          : status === 'throttled'
-            ? 'Checked a moment ago. Try again in a few minutes.'
-            : 'You’re on the latest version. Fly safe.';
+      return OH.compareVersions(latest, cur) > 0
+        ? `Open Hangar ${latest} is out. Firefox installs it on its own within a day, or get it now: about:addons, gear icon, Check for Updates.`
+        : 'You’re on the latest version. Fly safe.';
     } catch {
-      out.textContent =
-        "Couldn't check. Developer builds (loaded unpacked) don't update from the store.";
+      return 'Couldn’t reach Firefox Add-ons. Probably a 30k on their end, try again in a bit.';
     }
-    btn.disabled = false;
-  });
+  }
+  try {
+    const r = await check.call(chrome.runtime);
+    const status = (r && r.status) || r;
+    chrome.storage.local.set({ lastUpdateCheck: Date.now() });
+    return status === 'update_available'
+      ? `Open Hangar ${(r && r.version) || ''} is downloading. A Reload bar appears at the top when it's ready.`
+      : status === 'throttled'
+        ? 'Checked a moment ago. Try again in a few minutes.'
+        : 'You’re on the latest version. Fly safe.';
+  } catch {
+    return "Couldn't check. Developer builds (loaded unpacked) don't update from the store.";
+  }
 }
 
 // Known Issues (#175): open bugs from the public GitHub tracker, fetched only when
@@ -7340,80 +7287,30 @@ async function loadKnownIssues() {
   return list;
 }
 
+// What the Svelte Updates and Known Issues pages (ui/updates) draw. These two
+// load it each time the page opens and fire 'oh:home' so the pages redraw.
+const updatesPage = { from: null, releases: null };
+const issuesPage = { status: 'loading', quip: '', list: [] };
+
 async function renderKnownIssues() {
-  const body = $('#issues-body');
-  if (!body) return;
-  setHTML(body, `<p class="muted">${OH.quip('loading')}</p>`);
-  let list;
+  issuesPage.status = 'loading';
+  issuesPage.quip = OH.quip('loading');
+  homeUpdated();
   try {
-    list = await loadKnownIssues();
+    issuesPage.list = await loadKnownIssues();
+    issuesPage.status = 'ok';
   } catch {
-    setHTML(
-      body,
-      `<p class="muted">Couldn't reach GitHub's comm relay. See the list <a href="${REPO_URL}/issues?q=is%3Aopen+label%3Abug" target="_blank" rel="noopener">on GitHub</a>.</p>`,
-    );
-    return;
+    issuesPage.status = 'error';
   }
-  if (!list.length) {
-    setHTML(body, '<p class="muted">No known bugs right now. Clear skies, Citizen.</p>');
-    return;
-  }
-  const days = (t) => {
-    const d = Math.floor((Date.now() - Date.parse(t)) / 86400000);
-    return d < 1 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`;
-  };
-  setHTML(
-    body,
-    `<ul class="known-issues">${list
-      .map(
-        (i) => `<li>
-          <a href="${OH.escapeHtml(i.url)}" target="_blank" rel="noopener">${OH.escapeHtml(i.title)}</a>
-          <span class="muted">#${i.number} · opened ${days(i.createdAt)}${
-            i.labels.includes('scan-broken') ? ' · <span class="ki-scan">Scan broken</span>' : ''
-          }</span>
-        </li>`,
-      )
-      .join('')}</ul>`,
-  );
+  homeUpdated();
 }
 
 async function renderUpdates() {
-  const body = $('#updates-body');
   const cur = chrome.runtime.getManifest().version;
   const { justUpdated } = await chrome.storage.local.get('justUpdated');
-  const from = justUpdated && justUpdated.to === cur ? justUpdated.from : null;
-  const list = await loadChangelog();
-  if (!list.length) {
-    setHTML(
-      body,
-      `<p class="muted">Release notes aren't bundled in this build. See them <a href="${REPO_URL}/blob/main/CHANGELOG.md" target="_blank" rel="noopener">on GitHub</a>.</p>`,
-    );
-    return;
-  }
-  setHTML(
-    body,
-    list
-      .map((r) => {
-        const isCur = OH.compareVersions(r.version, cur) === 0;
-        const isNew =
-          from &&
-          OH.compareVersions(r.version, from) > 0 &&
-          OH.compareVersions(r.version, cur) <= 0;
-        const tag = isCur
-          ? `<span class="release-tag${isNew ? ' new' : ''}">${isNew ? 'New · ' : ''}Your version</span>`
-          : isNew
-            ? '<span class="release-tag new">New</span>'
-            : '';
-        return `<section class="release">
-          <div class="release-head"><h3>${OH.escapeHtml(r.title)}</h3>${
-            r.date ? `<span class="release-date">${OH.escapeHtml(releaseDate(r.date))}</span>` : ''
-          }${tag}</div>
-          ${r.intro.map((t) => `<p>${OH.inlineMarkdown(t)}</p>`).join('')}
-          ${releaseGroupsHtml(r.items)}
-        </section>`;
-      })
-      .join(''),
-  );
+  updatesPage.from = justUpdated && justUpdated.to === cur ? justUpdated.from : null;
+  updatesPage.releases = await loadChangelog();
+  homeUpdated();
 }
 
 function showUpdateBanner(version) {
@@ -8478,5 +8375,25 @@ window.OHApp = {
     renderInventory();
   },
   shipOf: (name) => (state.shipOf ? state.shipOf(name) : null),
+  // Updates and Known Issues pages (ui/updates).
+  repoUrl: REPO_URL,
+  updates: {
+    get current() {
+      return chrome.runtime.getManifest().version;
+    },
+    // Releases from the bundled CHANGELOG.md (null until loaded, [] if missing).
+    get releases() {
+      return updatesPage.releases;
+    },
+    // The version you updated from, when this install is fresh from an update.
+    get from() {
+      return updatesPage.from;
+    },
+    check: checkForUpdates,
+  },
+  // { status: 'loading' | 'ok' | 'error', quip, list }
+  get knownIssues() {
+    return issuesPage;
+  },
   priceOf: (name) => (state.priceOf ? state.priceOf(name) : null),
 };
