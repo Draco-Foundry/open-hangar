@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.2.17 — 2026-10-04
+
 - New: **an Open Beta note.** Open Hangar is still spooling up for its official release
   on November 10, so a small card on the dashboard says so, with a link to our Discord for
   questions, ideas and bug reports. Close it once and it stays closed; it leaves on its own
