@@ -73,7 +73,7 @@
   .lead .ph {
     width: 132px;
     height: 80px;
-    border-radius: 10px;
+    border-radius: var(--r-md);
     object-fit: cover;
     background: var(--panel-2);
   }
@@ -84,7 +84,7 @@
     align-content: start;
   }
   .h {
-    font: 700 16px var(--font-head);
+    font: 600 16px var(--font-head);
     color: var(--head);
   }
   .lead:hover .h {
