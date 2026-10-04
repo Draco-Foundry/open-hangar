@@ -13,6 +13,10 @@ const HOME_TTL_S = 60; // the home page is cached at the edge for a minute
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    // The extension's own page (owner, 2026-10-04): the big logo, the store
+    // buttons and the tour (site/index.html, also the home page's fallback). The
+    // news home's "Get the Extension" links come here.
+    if (url.pathname === '/extension') return staticHome(request, env);
     const home = url.pathname === '/';
 
     // The home page is the same for every visitor (always signed out here), so
