@@ -2988,8 +2988,8 @@
       <!-- INVENTORY -->
       <section class="view" id="view-inventory">
         <!-- ui/inventory (Svelte) mounts here: summary strip, toolbar, the filter sidebar,
-             active filters and saved views. It moves #results (the cards or the Market
-             sale sheet, still drawn by dashboard.js) into its list column. -->
+             active filters and saved views. It moves #results into its list column; the
+             list in it (the cards or the Market sale sheet) is Svelte too. -->
         <div id="oh-inventory"></div>
         <div id="results"></div>
         <div class="select-bar" id="select-bar" hidden>
@@ -3034,8 +3034,8 @@
       <!-- BUY-BACKS -->
       <section class="view" id="view-buybacks">
         <!-- ui/buybacks (Svelte) mounts here: summary strip, toolbar, the filter sidebar
-             and active filters. It moves #buybacks-body (the cards or the Market reclaim
-             sheet, still drawn by dashboard.js) into its list column. -->
+             and active filters. It moves #buybacks-body into its list column; the list in
+             it (the cards or the Market reclaim sheet) is Svelte too. -->
         <div id="oh-buybacks"></div>
         <div id="buybacks-body"></div>
       </section>

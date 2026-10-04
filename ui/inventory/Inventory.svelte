@@ -1,10 +1,10 @@
 <script>
   // Inventory (0.3.0): the summary strip, one toolbar row, the filter sidebar
   // (Filters Pass, B2) beside the list, the active filters as pills, and saved
-  // views. The list itself (#results: cards, or the Market sale sheet) is still
-  // drawn by renderInventory() in src/dashboard.js; this page moves it into its
-  // list column once, on mount. State lives in dashboard.js (OHApp.inv), because
-  // the list, Select All and the exports all read the same filters.
+  // views. The list itself (#results: cards, or the Market sale sheet) is
+  // InventoryList.svelte, mounted into #results by main.js; this page moves #results
+  // into its list column once, on mount. State lives in dashboard.js (OHApp.inv),
+  // because the list, Select All and the exports all read the same filters.
   import { app, version } from '../lib/app.svelte.js';
   import SummaryStrip from '../lib/SummaryStrip.svelte';
   import Toolbar from '../lib/Toolbar.svelte';
@@ -66,7 +66,7 @@
     };
   });
 
-  // Moves the classic list (#results) into the list column, once.
+  // Moves the list (#results) into the list column, once.
   function adopt(node) {
     const results = document.getElementById('results');
     if (results) node.appendChild(results);

@@ -198,14 +198,32 @@ is moving pages to Svelte one at a time; today that's the Home page cards and St
 - **Inventory.** `ui/inventory/main.js` (built to `src/ui/inventory.js`) mounts the page around the list into `#oh-inventory`: summary
   strip, toolbar, the filter sidebar (Filters Pass), active-filter pills and saved
   views, plus the melt planner in Select mode's bar. It moves `#results` into its
-  list column; the cards and the Market sale sheet in it are still drawn by
-  `renderInventory()`. The filters live in `src/dashboard.js` (`INV_GROUPS`,
-  `computeShown()`), because the list, Select All and the exports read them too;
-  the Svelte controls call `window.OHApp.inv`. The toolbar, sidebar, pills, summary
-  strip and Export menu are shared components in `ui/lib/`.
+  list column. The list in `#results` is Svelte too (`InventoryList.svelte`, mounted
+  there by `main.js`): the cards (Gallery / Compact / List, in sections when Group by
+  Type is on) and the Market sale sheet (`Market.svelte`, `MarketRow.svelte`). The
+  filters live in `src/dashboard.js` (`INV_GROUPS`, `computeShown()`), because the
+  list, Select All and the exports read them too; the Svelte parts read and call
+  `window.OHApp.inv` (`list()`, `card(p)`, `market()`, `click(id)`, `pick(ids, on)`,
+  …). `renderInventory()` only loads prices, updates the Select bar and calls
+  `homeUpdated()`. The toolbar, sidebar, pills, summary strip and Export menu are
+  shared components in `ui/lib/`.
 - **Buy-Backs.** `ui/buybacks/main.js` does the same for Buy-Backs (`#oh-buybacks`,
-  moving `#buybacks-body`), with its own groups (`BB_GROUPS`, applied by
-  `computeBuybacks()`) and `window.OHApp.bb`.
+  moving `#buybacks-body`, with `BuybacksList.svelte` mounted in it: a Hangar Alert's
+  "Showing the…" line, the Load Details bar, the cards or the Market reclaim sheet),
+  with its own groups (`BB_GROUPS`, applied by `computeBuybacks()`) and
+  `window.OHApp.bb`. Load Details stays in `src/dashboard.js`
+  (`loadBuybackDetails()`): opt-in, one page at a time, with Stop.
+- **Card lists.** Both pages share `ui/lib/CardGrid.svelte` and `Card.svelte` (a
+  pledge or a buy-back) with the classic CSS classes and `data-*` attributes, so the
+  document-level handlers still apply (Enter / Space on a card, focus back to the
+  card after the details pop-up). Big lists draw 120 cards, then 200 more per tick
+  (`progress.svelte.js`), restarting when the list changes. Pictures are
+  `Thumb.svelte`: RSI's two sizes (`OHApp.srcsetFor`), on error the plain src, one
+  retry after 1.5 s, then the placeholder and one ship-art lookup by name. Cards with
+  no picture look their art up only near the screen, three at a time
+  (`ui/lib/art.js`); a CCU shows its target ship. The Market price cells
+  (`PriceCells.svelte`) keep their own text, so typing never redraws the field.
+  `warmPictures()` (after a scan) stays classic.
 - **Shared chunk.** Code pages share (Svelte's runtime and `ui/lib/`) builds into
   `src/ui/shared.js` and `shared.css` (`manualChunks` in `vite.config.mjs`), so
   `dashboard.html` links one fixed stylesheet however many pages share it.

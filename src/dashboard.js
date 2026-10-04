@@ -22,14 +22,12 @@ const VIEWS = [
 ];
 
 const statusEl = $('#status');
-const resultsEl = $('#results');
 const scanBtn = $('#scan-home');
 const scanMenuBtn = $('#scan-menu-btn');
 const scanMenu = $('#scan-menu');
 const scanSelectedBtn = $('#scan-selected');
 const logoutBtn = $('#logout-home');
 const clearBtn = $('#clear-home');
-const buybacksBodyEl = $('#buybacks-body');
 
 // Buy-back kind labels (buy-backs classify into a slightly different set than
 // the hangar — notably 'paint'). Order = display order.
@@ -842,20 +840,8 @@ function srcsetFor(url) {
   }
   return big ? `${url} 351w, ${big} 648w` : '';
 }
+// A card <img>'s sizes for a layout (the Svelte lists' Thumb, ui/lib/Thumb.svelte).
 const cardSizes = (layout) => `auto, ${CARD_SIZES[layout] || CARD_SIZES.gallery}`;
-// Attributes for a card <img> in markup ('' when the URL has no sizes).
-function thumbSizeAttrs(url, layout) {
-  const set = srcsetFor(url);
-  return set ? ` srcset="${OH.escapeHtml(set)}" sizes="${OH.escapeHtml(cardSizes(layout))}"` : '';
-}
-// The same for an <img> built in code, inside a card grid of some layout.
-function setThumbSizes(im, url, grid) {
-  const set = srcsetFor(url);
-  if (!set) return;
-  const layout = ['gallery', 'compact', 'list'].find((l) => grid?.classList.contains(l));
-  im.sizes = cardSizes(layout);
-  im.srcset = set;
-}
 
 // After a scan, fetch the first screenful of pictures for Inventory and Buy-Backs
 // in the background, at low priority and at the size the cards will ask for, so
@@ -899,119 +885,6 @@ function resolveImageName(p) {
     if (first && !/digital download|insurance|game package/i.test(first)) return first;
   }
   return name;
-}
-
-// After a card grid renders, fill in missing ship art from the wiki API: only for
-// cards on (or near) the screen, three at a time, so a 1,000-card page doesn't
-// look up a thousand pictures nobody scrolled to. Updates the card thumbnail, its
-// data-image (for the hover preview), and the backing item (so the detail modal
-// shows it too).
-const ART_CONCURRENCY = 3;
-const artQueue = [];
-let artActive = 0;
-let artObserver = null;
-// id → item, rebuilt only when the lists themselves are replaced (a scan).
-let itemIndex = { items: null, buybacks: null, map: new Map() };
-function itemById(id) {
-  if (itemIndex.items !== state.items || itemIndex.buybacks !== state.buybacks) {
-    const map = new Map();
-    for (const b of state.buybacks) map.set(String(b.id), b);
-    for (const p of state.items) map.set(String(p.id), p); // pledges win, as before
-    itemIndex = { items: state.items, buybacks: state.buybacks, map };
-  }
-  return itemIndex.map.get(String(id));
-}
-async function resolveCardArt(card) {
-  const art = await OH.getShipImage(card.dataset.resolve);
-  const url = art || card.dataset.rsiImage;
-  if (!url) return;
-  card.dataset.image = url;
-  const item = itemById(card.dataset.id);
-  if (item) {
-    item.image = url;
-    if (art) item.shipArt = true; // a CCU's target art is in hand now
-  }
-  const ph = card.querySelector('.thumb.placeholder');
-  if (ph) {
-    const im = document.createElement('img');
-    im.className = 'thumb';
-    im.loading = 'lazy';
-    setThumbSizes(im, url, card.closest('.grid'));
-    im.src = url;
-    ph.replaceWith(im);
-  }
-}
-function pumpArt() {
-  while (artActive < ART_CONCURRENCY && artQueue.length) {
-    const card = artQueue.shift();
-    if (!card.isConnected) continue; // re-rendered away while waiting
-    artActive++;
-    resolveCardArt(card)
-      .catch(() => {})
-      .finally(() => {
-        artActive--;
-        pumpArt();
-      });
-  }
-}
-function enhanceCardImages(container) {
-  const cards = [...container.querySelectorAll('.card[data-resolve]:not([data-art-watch])')].filter(
-    (c) => c.dataset.resolve && !c.querySelector('img.thumb'),
-  );
-  if (typeof IntersectionObserver === 'undefined') {
-    artQueue.push(...cards);
-    pumpArt();
-    return;
-  }
-  artObserver ||= new IntersectionObserver(
-    (entries) => {
-      for (const e of entries) {
-        if (!e.isIntersecting) continue;
-        artObserver.unobserve(e.target);
-        artQueue.push(e.target);
-      }
-      pumpArt();
-    },
-    { rootMargin: '800px 0px' }, // start a little before a card scrolls into view
-  );
-  for (const c of cards) {
-    c.dataset.artWatch = '1';
-    artObserver.observe(c);
-  }
-}
-
-// Draw a card grid: the first screenful now, the rest a chunk at a time in the
-// background, so a page of 1,000 buy-backs responds at once. A newer render of the
-// same container cancels the chunks an older one still had queued.
-const FIRST_CARDS = 120;
-const CARD_CHUNK = 200;
-const gridJobs = new WeakMap(); // container → token of its latest render
-function renderCardGrid(container, head, layout, list, cardHtml) {
-  const token = {};
-  gridJobs.set(container, token);
-  setHTML(
-    container,
-    `${head}<div class="grid ${layout}">${list.slice(0, FIRST_CARDS).map(cardHtml).join('')}</div>`,
-  );
-  enhanceCardImages(container);
-  const grid = container.lastElementChild;
-  let at = FIRST_CARDS;
-  const next = () => {
-    if (gridJobs.get(container) !== token || !grid?.isConnected || at >= list.length) return;
-    const holder = document.createElement('div');
-    setHTML(
-      holder,
-      list
-        .slice(at, at + CARD_CHUNK)
-        .map(cardHtml)
-        .join(''),
-    );
-    grid.append(...holder.childNodes);
-    at += CARD_CHUNK;
-    enhanceCardImages(grid);
-    setTimeout(next, 0);
-  };
-  if (at < list.length) setTimeout(next, 0);
 }
 
 // Home's Citizen Card and first-run welcome are Svelte (ui/home/CitizenCard.svelte,
@@ -1723,72 +1596,69 @@ function invTraitsFrom(entries) {
 }
 
 // M / G tags on a card: green = RSI says yes, red = no, grey = unknown (scans
-// made before meltability was read). Colour isn't the only signal — the
+// made before meltability was read). Colour isn't the only signal: the
 // tooltip and aria-label spell it out.
-function flagHtml(letter, value, yes, no) {
-  const state = value === true ? 'yes' : value === false ? 'no' : 'unk';
-  const label = value === true ? yes : value === false ? no : `${yes}: unknown — rescan`;
-  const word = value == null ? `${yes}?` : yes; // red / green carries the yes or no
-  return `<span class="flag ${state}" title="${label}" aria-label="${label}"><span class="fl-s">${letter}</span><span class="fl-l">${word}</span></span>`;
-}
-function flagsHtml(p) {
-  return `<span class="flags">${flagHtml('M', p.meltable, 'Meltable', 'Not Meltable')}${flagHtml(
-    'G',
-    p.giftable,
-    'Giftable',
-    'Not Giftable',
-  )}</span>`;
+function cardFlag(letter, value, yes, no) {
+  return {
+    letter,
+    state: value === true ? 'yes' : value === false ? 'no' : 'unk',
+    label: value === true ? yes : value === false ? no : `${yes}: unknown (rescan)`,
+    word: value == null ? `${yes}?` : yes, // red / green carries the yes or no
+  };
 }
 
-// Hover text on a card's price: what the ships in it sell for today.
-function valTitle(p) {
-  const si = storeInfo(p);
-  if (!si || !si.store) return '';
-  const tail = si.unpriced ? ` (+${si.unpriced} unpriced)` : '';
-  return ` title="Ships at today's store price: ${dollars(si.store)}${tail}"`;
+// Card data is read for every card (up to thousands) on each redraw, so each card's
+// is kept until something it depends on changes: the item's picture, store prices,
+// the currency, Streamer Mode, buy-back details. Same data back = no redraw.
+const cardMemo = new WeakMap(); // item → { deps, data }
+function memoCard(x, deps, make) {
+  const hit = cardMemo.get(x);
+  if (hit && hit.deps.every((d, i) => d === deps[i])) return hit.data;
+  const data = make(x);
+  cardMemo.set(x, { deps, data });
+  return data;
 }
+const pledgeCard = (p) =>
+  memoCard(p, [hangarValue(), fx.code, fx.rate, streamer.on, p.image, p.shipArt], pledgeCardData);
 
-function cardHtml(p) {
+// What an Inventory card shows (drawn by ui/lib/Card.svelte). A CCU shows the ship
+// it upgrades to (looked up by the card's picture); RSI's own art for it is a
+// generic upgrade picture, kept only as the fallback (rsiImage).
+function pledgeCardData(p) {
   const contents = extraContents(p);
-  // A CCU shows the ship it upgrades to (looked up by enhanceCardImages); RSI's
-  // own art for it is a generic upgrade picture, kept only as the fallback.
   const ccuArt = p.isCCU && p.ccu && p.ccu.to && !p.shipArt;
-  const img = ccuArt ? null : realImage(p.image);
-  // Ship name for art lookup: used when RSI gives no image, and as a fallback if
-  // RSI's image link turns out to be broken (see onThumbError).
-  const resolve = resolveImageName(p);
-  const thumb = img
-    ? `<img class="thumb" loading="lazy" data-kind="${OH.escapeHtml(p.kind)}" src="${OH.escapeHtml(img)}"${thumbSizeAttrs(img, state.layout)} alt="">`
-    : `<div class="thumb placeholder">${OH.escapeHtml(p.kind)}</div>`;
-  const nameHtml =
-    p.isCCU && p.ccu
-      ? `${OH.escapeHtml(p.ccu.from)} <span class="ccu-flow">→</span> ${OH.escapeHtml(p.ccu.to)}`
-      : OH.escapeHtml(cardName(p));
-  // Always emit the contents cell (empty when there's nothing) so the List view's
-  // fixed column grid stays aligned across rows — items with vs. without contents
-  // must occupy the same number of grid cells. Gallery/compact hide empties via CSS.
-  let contentsLine = '<div class="card-contents"></div>';
-  if (!p.isCCU && contents.length) {
-    const head = contents.slice(0, 4).join(' · ');
-    const more = contents.length > 4 ? ` +${contents.length - 4}` : '';
-    contentsLine = `<div class="card-contents">${OH.escapeHtml(head)}${more}</div>`;
-  }
   const type = pledgeType(p);
-  const badgeClass = TYPE_KEYS.includes(type) ? type : '';
-  const sel = state.selecting && state.selected.has(String(p.id)) ? ' selected' : '';
-  const rsiImg = ccuArt ? realImage(p.image) || '' : '';
-  return `<div class="card${sel}" tabindex="0" role="button" data-id="${OH.escapeHtml(String(p.id || ''))}" data-image="${OH.escapeHtml(img || '')}" data-resolve="${OH.escapeHtml(resolve)}" data-rsi-image="${OH.escapeHtml(rsiImg)}">
-    ${thumb}
-    <div class="card-body">
-      <div class="card-name" title="${OH.escapeHtml(plainName(p))}">${nameHtml}</div>
-      ${contentsLine}
-      <div class="card-ins" title="Insurance">${OH.escapeHtml(insLabel(p.insurance))}</div>
-      <div class="card-foot">
-        <span class="foot-left"><span class="badge ${badgeClass}">${OH.escapeHtml(type)}</span>${flagsHtml(p)}</span>
-        <span class="val"${valTitle(p)}>${OH.escapeHtml(formatValue(p))}${underStoreHtml(p)}</span>
-      </div>
-    </div>
-  </div>`;
+  const si = storeInfo(p);
+  const tail = si && si.unpriced ? ` (+${si.unpriced} unpriced)` : '';
+  return {
+    id: String(p.id || ''),
+    image: (ccuArt ? null : realImage(p.image)) || '',
+    // Ship name for art lookup: used when RSI gives no image, and as a fallback if
+    // RSI's image link turns out to be broken.
+    resolve: resolveImageName(p),
+    rsiImage: (ccuArt && realImage(p.image)) || '',
+    kind: p.kind || '',
+    ccu: p.isCCU && p.ccu ? { from: p.ccu.from, to: p.ccu.to } : null,
+    name: cardName(p),
+    title: plainName(p),
+    // The contents cell is always drawn (empty when there's nothing) so the List
+    // view's fixed column grid stays aligned; Gallery/Compact hide empties via CSS.
+    contents:
+      !p.isCCU && contents.length
+        ? contents.slice(0, 4).join(' · ') + (contents.length > 4 ? ` +${contents.length - 4}` : '')
+        : '',
+    ins: insLabel(p.insurance),
+    type,
+    badge: TYPE_KEYS.includes(type) ? type : '',
+    flags: [
+      cardFlag('M', p.meltable, 'Meltable', 'Not Meltable'),
+      cardFlag('G', p.giftable, 'Giftable', 'Not Giftable'),
+    ],
+    val: formatValue(p),
+    // Hover text on the price: what the ships in it sell for today.
+    valTitle: si && si.store ? `Ships at today's store price: ${dollars(si.store)}${tail}` : '',
+    under: underStoreText(p),
+  };
 }
 
 // --- Market (sale-sheet) view --------------------------------------------
@@ -1941,44 +1811,31 @@ function marketSectionOf(p) {
   return MARKET_SECTIONS.find((s) => s.test(p)) || MARKET_SECTIONS[MARKET_SECTIONS.length - 1];
 }
 
-// One stacked row. `g` is { key, rep, stock } — a representative pledge plus how
-// many identical copies were merged into it (the Stock).
-function marketRowHtml(g) {
+// One stacked row of the Market sale sheet (drawn by ui/inventory/MarketRow.svelte).
+// `g` is { key, rep, stock, ids }: a representative pledge plus how many identical
+// copies were merged into it (the Stock).
+function marketRow(g) {
   const p = g.rep;
-  const key = OH.escapeHtml(g.key);
-  const melt = meltLabel(p);
   const saved = state.market[g.key];
-  const price = saved && saved.price != null ? OH.escapeHtml(String(saved.price)) : '';
-  const gift = giftableLabel(g);
-  const picked = g.ids.every((id) => state.selected.has(id));
-  const pct = OH.escapeHtml(pctOfMelt(saved && saved.price, p.value * fx.rate));
-  return `<tr class="mk-row${picked ? ' picked' : ''}" data-key="${key}" data-melt="${Number.isFinite(p.value) ? p.value * fx.rate : ''}">
-    <td class="mk-sel"><input type="checkbox" class="mk-pick" ${picked ? 'checked' : ''} aria-label="Pick for export"></td>
-    <td class="mk-name">${OH.escapeHtml(plainName(p))}</td>
-    <td class="mk-ins">${OH.escapeHtml(marketInsurance(p))}</td>
-    <td class="mk-gift gift-${g.giftable === 0 ? 'no' : 'yes'}">${gift}</td>
-    <td class="mk-melt">${OH.escapeHtml(melt)}</td>
-    <td class="mk-store">${OH.escapeHtml(marketStore(p)) || '<span class="muted">—</span>'}</td>
-    <td class="mk-pct"><input class="mk-pct-in" type="text" inputmode="decimal" value="${pct}" placeholder="%" aria-label="Percent of melt"></td>
-    <td class="mk-mine"><input class="mk-price" type="text" inputmode="decimal" value="${price}" placeholder="$" aria-label="My price"></td>
-    <td class="mk-stock">${g.stock}</td>
-    <td class="mk-view">${viewOnRsiLink(p)}</td>
-  </tr>`;
-}
-
-function marketTableHtml(section, groups) {
-  return `<section class="market-section">
-    <h3 class="market-title">${OH.escapeHtml(section.label)}<span class="market-n">${groups.length}</span></h3>
-    <table class="market-table">
-      <thead><tr>
-        <th class="mk-sel"><input type="checkbox" class="mk-pick-all" aria-label="Pick all in ${OH.escapeHtml(section.label)}" ${
-          groups.every((g) => g.ids.every((id) => state.selected.has(id))) ? 'checked' : ''
-        }></th><th>Items Name</th><th>Insurance</th><th>Giftable</th><th>Melt Price</th><th title="Today's standard store price (ships, or a CCU's price gap)">Store Price</th>
-        <th title="Your price as a percent of melt value">% of Melt</th><th>My Price</th><th>Stock</th><th title="Open the pledge in your RSI hangar, e.g. to screenshot its details">RSI</th>
-      </tr></thead>
-      <tbody>${groups.map(marketRowHtml).join('')}</tbody>
-    </table>
-  </section>`;
+  const spot = hangarSpot(p);
+  return {
+    key: g.key,
+    ids: g.ids,
+    melt: Number.isFinite(p.value) ? p.value * fx.rate : '',
+    name: plainName(p),
+    ins: marketInsurance(p),
+    gift: giftableLabel(g),
+    giftNo: g.giftable === 0,
+    meltText: meltLabel(p),
+    store: marketStore(p),
+    price: saved && saved.price != null ? String(saved.price) : '',
+    stock: g.stock,
+    picked: g.ids.every((id) => state.selected.has(id)),
+    view: spot && {
+      url: spot.url,
+      title: `Opens page ${spot.page} of your RSI hangar; it's number ${spot.pos} on that page (as of your last scan)`,
+    },
+  };
 }
 
 // Stack identical pledges (same marketKey) within a section into one group,
@@ -2039,27 +1896,22 @@ function marketSelText() {
     : ' · tick rows to export just those';
 }
 
-function marketToolbarHtml(shown) {
-  return `<div class="market-toolbar">
-    <div class="result-count">Showing ${shown.length} of ${state.items.length} · Melt ${money(OH.totalValue(shown))}<span class="mk-selcount">${marketSelText()}</span></div>
-    <div class="market-actions">
-      <label class="mk-toggle"><input type="checkbox" class="mk-giftable-only" ${
-        state.marketGiftableOnly ? 'checked' : ''
-      }> Giftable Only</label>
-      <button class="mk-btn mk-export-csv" type="button">Export CSV</button>
-      <button class="mk-btn mk-export-img" type="button">Download Image</button>
-      <span class="mk-export-status" aria-live="polite"></span>
-    </div>
-  </div>`;
-}
-
-function renderMarket() {
+// The Market sale sheet (ui/inventory/Market.svelte): its toolbar line and one table
+// per section.
+function marketView() {
   const shown = marketShown();
-  const sections = computeMarketSections(shown);
-  const body = sections.length
-    ? `<div class="market">${sections.map(({ section, groups }) => marketTableHtml(section, groups)).join('')}</div>`
-    : '<div class="empty">No meltable pledges match the current filters.</div>';
-  setHTML(resultsEl, marketToolbarHtml(shown) + body);
+  return {
+    n: shown.length,
+    total: state.items.length,
+    melt: money(OH.totalValue(shown)),
+    sel: marketSelText(),
+    giftableOnly: state.marketGiftableOnly,
+    sections: computeMarketSections(shown).map(({ section, groups }) => ({
+      key: section.key,
+      label: section.label,
+      rows: groups.map(marketRow),
+    })),
+  };
 }
 
 // --- Market export (CSV / image) -----------------------------------------
@@ -2318,12 +2170,13 @@ function copyMarketImage(statusEl) {
 // --- Inventory / Buy-Backs pass (0.3.0) ------------------------------------------
 // Paints, add-ons and coupons: what "Hide small stuff" tucks away.
 const SMALL_KINDS = new Set(['paint', 'addon', 'coupon']);
-// "$20 under store" in green when today's store price is above what the pledge holds.
-function underStoreHtml(p) {
+// "$20" (a card shows "$20 under store" in green) when today's store price is above
+// what the pledge holds, else ''.
+function underStoreText(p) {
   const si = storeInfo(p);
   // Only for pledges that hold money (a $0 reward isn't a bargain on the store).
   const gap = si && si.store && Number.isFinite(p.value) && p.value > 0 ? si.store - p.value : 0;
-  return gap >= 1 ? `<small class="under">${OH.escapeHtml(dollars(gap))} under store</small>` : '';
+  return gap >= 1 ? dollars(gap) : '';
 }
 // A buy-back cheaper than the same ship in today's store (exact price loaded).
 function bbUnderStore(b) {
@@ -2331,9 +2184,8 @@ function bbUnderStore(b) {
   const sp = buybackStorePrice(b);
   return !!(d && d.price != null && sp && sp - d.price >= 1);
 }
-function bbUnderHtml(b) {
-  if (!bbUnderStore(b)) return '';
-  return `<small class="under">${OH.escapeHtml(dollars(buybackStorePrice(b) - bbDetail(b).price))} under store</small>`;
+function bbUnderText(b) {
+  return bbUnderStore(b) ? dollars(buybackStorePrice(b) - bbDetail(b).price) : '';
 }
 // Stack identical buy-backs (same name, contents and price) into one row with a
 // count. Off by default: each buy-back is its own item.
@@ -2365,60 +2217,40 @@ function saveViews() {
   chrome.storage.local.set({ savedViews: state.savedViews });
 }
 
-// Inventory: the page around the list (summary strip, toolbar, filter sidebar,
-// active filters, saved views, melt planner) is Svelte (ui/inventory) and redraws on
-// 'oh:home'. The list itself (cards, or the Market sale sheet) is still drawn here,
-// into #results, which the Svelte page places in its list column.
+// Inventory is Svelte (ui/inventory): the page around the list (summary strip,
+// toolbar, filter sidebar, active filters, saved views, melt planner) and the list in
+// #results (cards in Gallery / Compact / List, or the Market sale sheet). Both redraw
+// on 'oh:home'; this keeps the state they read up to date and tells them.
 function renderInventory() {
   ensurePrices();
   updateSelectBar();
   homeUpdated();
-  if (!state.items.length) {
-    setHTML(
-      resultsEl,
-      `<div class="empty">${OH.quip('emptyHangar')} Hit Scan at the top to fill it.</div>`,
-    );
-    return;
-  }
+}
+
+// What Inventory's list shows (ui/inventory/InventoryList.svelte): nothing scanned,
+// nothing matching, the cards (in sections when grouped by type) or the Market.
+function invList() {
+  if (!state.items.length) return { empty: true };
   const shown = computeShown();
-  if (!shown.length) {
-    setHTML(
-      resultsEl,
-      '<div class="empty">Nothing in your hangar matches those filters. Loosen them up, pilot.</div>',
-    );
-    return;
-  }
-  if (state.layout === 'market') {
-    renderMarket();
-    return;
-  }
-  const groupToggle = `<label class="mk-toggle inv-group-toggle"><input type="checkbox" class="inv-group" ${
-    state.groupByType ? 'checked' : ''
-  }> Group by type</label>`;
-  const head = `<div class="market-toolbar"><div class="result-count">Showing ${shown.length} of ${
-    state.items.length
-  }</div><div class="market-actions">${groupToggle}</div></div>`;
-  if (!state.groupByType) {
-    renderCardGrid(resultsEl, head, state.layout, shown, cardHtml);
-    return;
-  } else {
+  const out = {
+    empty: false,
+    shown,
+    total: state.items.length,
+    layout: state.layout,
+    group: state.groupByType,
+    sections: null,
+  };
+  if (shown.length && state.groupByType && state.layout !== 'market') {
     // One section per type (sort order kept inside each), sticky titles like Market.
     const buckets = new Map(INV_SECTIONS.map((x) => [x.key, []]));
     for (const p of shown) buckets.get(INV_SECTIONS.find((x) => x.test(p)).key).push(p);
-    setHTML(
-      resultsEl,
-      head +
-        INV_SECTIONS.filter((x) => buckets.get(x.key).length)
-          .map(
-            (x) =>
-              `<section class="inv-section"><h3 class="market-title">${OH.escapeHtml(x.label)}<span class="market-n">${
-                buckets.get(x.key).length
-              }</span></h3><div class="grid ${state.layout}">${buckets.get(x.key).map(cardHtml).join('')}</div></section>`,
-          )
-          .join(''),
-    );
+    out.sections = INV_SECTIONS.filter((x) => buckets.get(x.key).length).map((x) => ({
+      key: x.key,
+      label: x.label,
+      items: buckets.get(x.key),
+    }));
   }
-  enhanceCardImages(resultsEl);
+  return out;
 }
 
 // Inventory sections (Group by type): the Market's, plus Coupons on their own.
@@ -2453,11 +2285,9 @@ function updateSelectBar() {
   if (priceSel) priceSel.hidden = inMarket; // the table shows melt, store and your price
   const done = selectBar.querySelector('[data-sb="done"]');
   if (done) done.hidden = !state.selecting; // Market has no mode to leave
-  const live = resultsEl.querySelector('.mk-selcount');
-  if (live) live.textContent = marketSelText();
   const n = state.selected.size;
   $('#sb-count').textContent = n ? `${n} selected` : 'Click items to select them';
-  homeUpdated(); // the Select button and the melt planner (ui/inventory)
+  homeUpdated(); // the Select button, the melt planner and the list (ui/inventory)
   selectBar.querySelectorAll('[data-sb="copy"],[data-sb="save"]').forEach((b) => {
     b.disabled = !n;
   });
@@ -3750,35 +3580,46 @@ function buybackUrl(b) {
   }
 }
 
-function buybackCardHtml(b) {
-  const ccuArt = b.ccu && b.ccu.to && !b.shipArt; // show the target ship (see cardHtml)
-  const img = ccuArt ? null : realImage(b.image);
-  // A CCU resolves art from its target ship; a package from the first ship in it; a
-  // plain buy-back from its own name. Also the broken-image fallback.
-  const resolve = b.ccu && b.ccu.to ? b.ccu.to : resolveImageName({ ...b, kind: 'ship' }) || b.name;
-  const thumb = img
-    ? `<img class="thumb" loading="lazy" src="${OH.escapeHtml(img)}"${thumbSizeAttrs(img, state.bbLayout)} alt="">`
-    : `<div class="thumb placeholder">Buy-Back</div>`;
-  const nameHtml =
-    (b.ccu
-      ? `${OH.escapeHtml(OH.shortBuybackName(b.ccu.from))} <span class="ccu-flow">→</span> ${OH.escapeHtml(OH.shortBuybackName(b.ccu.to))}`
-      : OH.escapeHtml(buybackName(b))) + (b._n > 1 ? ` <span class="stack-n">×${b._n}</span>` : '');
-  const reclaim = buybackReclaimLink(b);
-  const badgeClass = TYPE_KEYS.includes(b.isCCU ? 'ccu' : b.kind) ? (b.isCCU ? 'ccu' : b.kind) : '';
-  // Every cell is always emitted (empty when there's nothing) so the List view's
-  // fixed column grid lines up across rows, as in the Inventory cards.
-  return `<div class="card" tabindex="0" role="group" aria-label="${OH.escapeHtml(bbFullName(b))}" data-id="${OH.escapeHtml(String(b.id || ''))}" data-image="${OH.escapeHtml(img || '')}" data-resolve="${OH.escapeHtml(resolve)}" data-rsi-image="${OH.escapeHtml(ccuArt ? realImage(b.image) || '' : '')}">
-    ${thumb}
-    <div class="card-body">
-      <div class="card-name" title="${OH.escapeHtml(bbFullName(b))}">${nameHtml}</div>
-      <div class="card-contents">${OH.escapeHtml(b.contains || '')}</div>
-      <div class="card-foot">
-        <span class="foot-left"><span class="badge ${badgeClass}">${OH.escapeHtml(b.kind || 'buy-back')}</span></span>
-        <span class="bb-date">${OH.escapeHtml(b.date || '')}</span>
-        <span class="bb-end">${bbPriceHtml(b)}${bbUnderHtml(b)}${reclaim}</span>
-      </div>
-    </div>
-  </div>`;
+const buybackCard = (b) =>
+  memoCard(
+    b,
+    [
+      state.bbDetails,
+      state.priceOf,
+      state.buybacks,
+      fx.code,
+      fx.rate,
+      streamer.on,
+      b.image,
+      b.shipArt,
+    ],
+    buybackCardData,
+  );
+// What a Buy-Backs card shows (drawn by ui/lib/Card.svelte, like the Inventory cards).
+function buybackCardData(b) {
+  const ccuArt = b.ccu && b.ccu.to && !b.shipArt; // show the target ship (see pledgeCard)
+  const s = OH.shortBuybackName;
+  const kind = b.isCCU ? 'ccu' : b.kind;
+  return {
+    id: String(b.id || ''),
+    image: (ccuArt ? null : realImage(b.image)) || '',
+    // A CCU resolves art from its target ship; a package from the first ship in it; a
+    // plain buy-back from its own name. Also the broken-image fallback.
+    resolve:
+      b.ccu && b.ccu.to ? b.ccu.to : resolveImageName({ ...b, kind: 'ship' }) || b.name || '',
+    rsiImage: (ccuArt && realImage(b.image)) || '',
+    label: bbFullName(b),
+    ccu: b.ccu ? { from: s(b.ccu.from), to: s(b.ccu.to) } : null,
+    name: buybackName(b),
+    n: b._n || 1,
+    contents: b.contains || '',
+    badge: TYPE_KEYS.includes(kind) ? kind : '',
+    type: b.kind || 'buy-back',
+    date: b.date || '',
+    price: bbPriceData(b),
+    under: bbUnderText(b),
+    reclaim: bbReclaimData(b),
+  };
 }
 
 // Buy-back kinds actually present in the scanned data, in BB_KINDS order.
@@ -3849,21 +3690,23 @@ function buybackStorePrice(b) {
 
 // "Load details" reads each shown buy-back's own page (price, contents,
 // insurance), one at a time. Cached for good, so it's a one-off per buy-back.
-let bbLoading = null; // { stop: bool }
-function bbDetailsBarHtml(list) {
+let bbLoading = null; // { stop: bool, done, total }
+// The Load Details bar above the list (ui/buybacks/DetailsBar.svelte): while
+// reading, the progress and Stop; else how many could be read and how long it
+// takes; null when there's nothing left to read.
+function bbDetailsInfo(list) {
+  if (bbLoading) return { loading: true, done: bbLoading.done, total: bbLoading.total };
   const need = list.filter((b) => !b.isCCU && /^\d+$/.test(String(b.id)) && !state.bbDetails[b.id]);
-  const have = list.filter((b) => state.bbDetails[b.id]).length;
-  if (bbLoading) {
-    return `<div class="bb-details-bar"><span id="bbd-progress">Reading buy-back pages…</span> <button type="button" class="mk-btn" id="bbd-stop">Stop</button></div>`;
-  }
-  if (!need.length) return have ? '' : '';
-  const mins = Math.max(1, Math.round((need.length * 1.6) / 60));
-  // Big lists get a heads-up: hundreds of pages in a row is what makes RSI throttle.
-  const big =
-    need.length > 100
-      ? ` Reading this many pages can make RSI slow you down for a while; if it does, we stop and keep what's read.`
-      : '';
-  return `<div class="bb-details-bar">${have ? `${have} of ${list.length} have details. ` : ''}Insurance, real prices and pack contents come from each buy-back's own RSI page. Opening a buy-back loads just that one. <button type="button" class="mk-btn primary" id="bbd-load">Load Details for ${need.length}</button> <span class="muted">(about ${mins} min, one page at a time; you can keep browsing.${big})</span></div>`;
+  if (!need.length) return null;
+  return {
+    loading: false,
+    need: need.length,
+    have: list.filter((b) => state.bbDetails[b.id]).length,
+    of: list.length,
+    mins: Math.max(1, Math.round((need.length * 1.6) / 60)),
+    // Big lists get a heads-up: hundreds of pages in a row is what makes RSI throttle.
+    big: need.length > 100,
+  };
 }
 // packsOnly: just the packs whose contents are unread (search's "Get Details").
 async function loadBuybackDetails({ packsOnly = false } = {}) {
@@ -3873,16 +3716,17 @@ async function loadBuybackDetails({ packsOnly = false } = {}) {
       !state.bbDetails[b.id] &&
       (!packsOnly || b.kind === 'pack' || b.kind === 'package'),
   );
-  bbLoading = { stop: false };
+  bbLoading = { stop: false, done: 0, total: 0 };
   renderBuybacks();
   const res = await OH.fetchBuybackDetails(
     list.map((b) => String(b.id)),
     (done, total) => {
-      const el = $('#bbd-progress');
-      if (el) el.textContent = `Reading buy-back pages… ${done} of ${total}`;
+      bbLoading.done = done;
+      bbLoading.total = total;
       if (done % 10 === 0 && currentView() === 'buybacks') {
         state.bbDetails = { ...state.bbDetails };
       }
+      homeUpdated(); // the progress line (ui/buybacks)
     },
     () => !bbLoading.stop,
   );
@@ -3947,54 +3791,29 @@ function computeBuybacks() {
   return list;
 }
 
+// Buy-Backs is Svelte (ui/buybacks): the page around the list and the list in
+// #buybacks-body (cards, or the Market reclaim sheet, with the Load Details bar and
+// a Hangar Alert's "Showing the…" line). Both redraw on 'oh:home'.
 function renderBuybacks() {
-  const body = $('#buybacks-body');
-  if (!body) return;
-  // The page around the list is Svelte (ui/buybacks); tell it to redraw.
+  if (state.buybacks.length && !state.priceOf) ensurePrices();
   homeUpdated();
-  if (!state.buybacks.length) {
-    setHTML(
-      body,
-      `<div class="placeholder-view">
-      <h2>Buy-Back Pledges</h2>
-      <p class="muted">Melted something you miss? Your buy-backs show up here so you can claim them back. Hit
-        <strong>Scan</strong> at the top to pull them in with your hangar.</p>
-      <p class="muted">Buy-backs are read from
-        <a href="https://robertsspaceindustries.com/account/buy-back-pledges" target="_blank" rel="noopener">RSI › Account › Buy-Back Pledges</a>
-        , the same pages as your hangar.</p>
-    </div>`,
-    );
-    return;
-  }
-  if (!state.priceOf) ensurePrices();
+}
+
+// What the Buy-Backs list shows (ui/buybacks/BuybacksList.svelte).
+function bbList() {
+  if (!state.buybacks.length) return { empty: true };
   let list = computeBuybacks();
   if (state.bbStack) list = stackBuybacks(list);
-  const when = state.buybacksScannedAt ? new Date(state.buybacksScannedAt).toLocaleString() : '';
-  if (!list.length) {
-    setHTML(
-      body,
-      '<div class="empty">No buy-backs match those filters. Loosen them up, pilot.</div>',
-    );
-    return;
-  }
-  // Opened from a Hangar Alert: say so, with a way back to everything.
-  const only = state.bbOnly
-    ? `<div class="bb-only">Showing the ${list.length} ${OH.escapeHtml(state.bbOnly.label)} <button type="button" class="btn-secondary" data-bb-all>Show All ${state.buybacks.length}</button></div>`
-    : '';
-  const count =
-    only +
-    bbDetailsBarHtml(list) +
-    `<div class="result-count">Showing ${list.length} of ${state.buybacks.length}${when ? ` · scanned ${OH.escapeHtml(when)}` : ''}</div>`;
-  // Market = a table like the Inventory Market (pick, total, price, export);
-  // the other layouts reuse the shared card grid like the inventory.
-  if (state.bbLayout === 'market') {
-    setHTML(
-      body,
-      only + bbDetailsBarHtml(list) + bbToolbarHtml(list, when) + buybackMarketHtml(list),
-    );
-    return; // table has no thumbnails to enhance
-  }
-  renderCardGrid(body, count, state.bbLayout, list, buybackCardHtml);
+  return {
+    empty: false,
+    list,
+    total: state.buybacks.length,
+    when: state.buybacksScannedAt ? new Date(state.buybacksScannedAt).toLocaleString() : '',
+    layout: state.bbLayout,
+    // Opened from a Hangar Alert: say so, with a way back to everything.
+    only: state.bbOnly ? state.bbOnly.label : null,
+    details: list.length ? bbDetailsInfo(list) : null,
+  };
 }
 
 // Buy-back "Market": one reclaim table per kind (Ships, CCUs, Paints, …), with
@@ -4025,18 +3844,25 @@ function buybackViewUrl(b) {
 
 // One "Reclaim" link for every buy-back: RSI's reclaim page, or for CCUs (which
 // have no page of their own; RSI reclaims them in a pop-up) the one-item
-// buy-back list entry where that button is.
-function buybackReclaimLink(b) {
+// buy-back list entry where that button is. { retired } | { url, tip } | null.
+function bbReclaimData(b) {
   // Retired ships (#306) can't be reclaimed: say so instead of a dead link.
   const retired = OH.retiredBuyback(b);
-  if (retired) return `<span class="bb-retired" title="${OH.escapeHtml(retired)}">Retired</span>`;
+  if (retired) return { retired };
   const direct = buybackUrl(b);
   const url = direct || buybackViewUrl(b);
-  if (!url) return '';
+  if (!url) return null;
   const tip = direct
     ? 'Open the buy-back page on RSI'
     : "Opens just this CCU in RSI's buy-back list, where its reclaim button is";
-  return `<a class="bb-reclaim" href="${OH.escapeHtml(url)}" target="_blank" rel="noopener" title="${tip}">Reclaim ↗</a>`;
+  return { url, tip };
+}
+function buybackReclaimLink(b) {
+  const r = bbReclaimData(b);
+  if (!r) return '';
+  if (r.retired)
+    return `<span class="bb-retired" title="${OH.escapeHtml(r.retired)}">Retired</span>`;
+  return `<a class="bb-reclaim" href="${OH.escapeHtml(r.url)}" target="_blank" rel="noopener" title="${OH.escapeHtml(r.tip)}">Reclaim ↗</a>`;
 }
 function bbDetail(b) {
   return state.bbDetails[b.id] || null;
@@ -4056,15 +3882,28 @@ function bbPrice(b) {
   if (d && d.price != null) return d.price;
   return buybackStorePrice(b);
 }
-function bbPriceHtml(b) {
+// The price a buy-back card or row shows: { text, title, est } or null.
+function bbPriceData(b) {
   const d = bbDetail(b);
   if (d && d.price != null)
-    return `<span class="val" title="Buy-back price on RSI">${money(d.price)}</span>`;
-  if (b.price) return `<span class="val">${OH.escapeHtml(b.price)}</span>`;
+    return { text: money(d.price), title: 'Buy-back price on RSI', est: false };
+  if (b.price) return { text: String(b.price), title: '', est: false };
   const sp = buybackStorePrice(b);
   return sp
-    ? `<span class="val est" title="An estimate from today's store price. Load details for RSI's exact buy-back price.">${dollars(sp)}<small class="est-l">est.</small></span>`
-    : '';
+    ? {
+        text: dollars(sp),
+        title: "An estimate from today's store price. Load details for RSI's exact buy-back price.",
+        est: true,
+      }
+    : null;
+}
+function bbPriceHtml(b) {
+  const x = bbPriceData(b);
+  if (!x) return '';
+  const title = x.title ? ` title="${OH.escapeHtml(x.title)}"` : '';
+  return `<span class="val${x.est ? ' est' : ''}"${title}>${OH.escapeHtml(x.text)}${
+    x.est ? '<small class="est-l">est.</small>' : ''
+  }</span>`;
 }
 
 // --- Buy-Backs Market -------------------------------------------------------
@@ -4099,29 +3938,27 @@ function bbPriceText(b) {
   return sp ? dollars(sp) : '';
 }
 
-function buybackRowHtml(b) {
-  const name = b.ccu
-    ? `${OH.escapeHtml(OH.shortBuybackName(b.ccu.from))} <span class="ccu-flow">→</span> ${OH.escapeHtml(OH.shortBuybackName(b.ccu.to))}`
-    : OH.escapeHtml(buybackName(b));
-  const key = bbKey(b);
-  const saved = state.market[key];
+// One row of the Buy-Backs Market (drawn by ui/buybacks/BbRow.svelte).
+function bbRow(b) {
+  const s = OH.shortBuybackName;
+  const saved = state.market[bbKey(b)];
   const price = bbPrice(b);
-  const base = price ? price * fx.rate : '';
-  const mine = saved && saved.price != null ? OH.escapeHtml(String(saved.price)) : '';
-  const pct = OH.escapeHtml(pctOfMelt(saved && saved.price, base));
-  const picked = state.bbPicked.has(String(b.id));
   const vs = bbVsStore(b);
-  return `<tr class="mk-row${picked ? ' picked' : ''}" data-id="${OH.escapeHtml(String(b.id || ''))}" data-key="${OH.escapeHtml(key)}" data-melt="${base}">
-    <td class="mk-sel"><input type="checkbox" class="mk-pick" ${picked ? 'checked' : ''} aria-label="Pick for total and export"></td>
-    <td class="mk-name"><button type="button" class="bb-open" title="See what's in it">${name}</button></td>
-    <td class="mk-ins">${OH.escapeHtml(bbInsurance(b))}</td>
-    <td class="mk-melt">${bbPriceHtml(b) || '—'}</td>
-    <td class="mk-store">${OH.escapeHtml(bbStoreText(b)) || '<span class="muted">—</span>'}</td>
-    <td class="mk-vs${vs != null && vs >= 1 ? ' gain' : ''}">${OH.escapeHtml(bbVsStoreText(b)) || '<span class="muted">—</span>'}</td>
-    <td class="mk-pct"><input class="mk-pct-in" type="text" inputmode="decimal" value="${pct}" placeholder="%" aria-label="Percent of buy-back price"></td>
-    <td class="mk-mine"><input class="mk-price" type="text" inputmode="decimal" value="${mine}" placeholder="$" aria-label="My price"></td>
-    <td class="mk-view">${buybackReclaimLink(b) || '—'}</td>
-  </tr>`;
+  return {
+    id: String(b.id || ''),
+    key: bbKey(b),
+    melt: price ? price * fx.rate : '',
+    ccu: b.ccu ? { from: s(b.ccu.from), to: s(b.ccu.to) } : null,
+    name: buybackName(b),
+    ins: bbInsurance(b),
+    price: bbPriceData(b),
+    store: bbStoreText(b),
+    vs: bbVsStoreText(b),
+    gain: vs != null && vs >= 1,
+    mine: saved && saved.price != null ? String(saved.price) : '',
+    picked: state.bbPicked.has(String(b.id)),
+    reclaim: bbReclaimData(b),
+  };
 }
 
 // [{ section, groups }] per buy-back kind (groups = the buy-backs themselves),
@@ -4135,23 +3972,13 @@ function bbMarketSections(list) {
   }));
 }
 
-function buybackMarketHtml(list) {
-  const sections = bbMarketSections(list).map(({ section, groups }) => {
-    const all = groups.every((b) => state.bbPicked.has(String(b.id)));
-    return `<section class="market-section">
-      <h3 class="market-title">${OH.escapeHtml(section.label)}<span class="market-n">${groups.length}</span></h3>
-      <table class="market-table">
-        <thead><tr>
-          <th class="mk-sel"><input type="checkbox" class="mk-pick-all" aria-label="Pick all in ${OH.escapeHtml(section.label)}" ${all ? 'checked' : ''}></th>
-          <th>Items Name</th><th>Insurance</th><th title="RSI's buy-back price once Load details has read it; before that, today's store price">Buy-Back Price</th>
-          <th title="Today's store price of every ship inside (packs need Load details), or a CCU's price gap">Store Price</th><th title="Store price minus the buy-back price (needs Load details)">vs Store</th>
-          <th title="Your price as a percent of the buy-back price">% of Price</th><th>My Price</th><th>Reclaim</th>
-        </tr></thead>
-        <tbody>${groups.map(buybackRowHtml).join('')}</tbody>
-      </table>
-    </section>`;
-  });
-  return `<div class="market">${sections.join('')}</div>`;
+// The Buy-Backs Market (ui/buybacks/BbMarket.svelte): one reclaim table per kind.
+function bbMarketView(list) {
+  return bbMarketSections(list).map(({ section, groups }) => ({
+    key: section.key,
+    label: section.label,
+    rows: groups.map(bbRow),
+  }));
 }
 
 // " · 3 picked · $420 · 3 tokens with store credit (you have 2)".
@@ -4170,24 +3997,6 @@ function bbSelText() {
       : '';
   return ` · ${n} picked · ${money(total)}${tokens}`;
 }
-function updateBbSelText() {
-  const el = buybacksBodyEl && buybacksBodyEl.querySelector('.mk-selcount');
-  if (el) el.textContent = bbSelText();
-}
-
-function bbToolbarHtml(list, when) {
-  return `<div class="market-toolbar">
-    <div class="result-count">Showing ${list.length} of ${state.buybacks.length}${
-      when ? ` · scanned ${OH.escapeHtml(when)}` : ''
-    }<span class="mk-selcount">${OH.escapeHtml(bbSelText())}</span></div>
-    <div class="market-actions">
-      <button class="mk-btn bb-export-csv" type="button">Export CSV</button>
-      <button class="mk-btn bb-export-img" type="button">Download Image</button>
-      <span class="mk-export-status" aria-live="polite"></span>
-    </div>
-  </div>`;
-}
-
 // Exports cover the view, narrowed to the picked rows if any.
 function bbExportSections() {
   const list = computeBuybacks();
@@ -4276,105 +4085,6 @@ const debounce = (fn, ms = 150) => {
 };
 const renderInventorySoon = debounce(() => renderInventory());
 const renderBuybacksSoon = debounce(() => renderBuybacks());
-// Broken thumbnails → placeholder (error events don't bubble; capture phase).
-// A thumbnail failed to load (RSI sometimes serves broken image links): show
-// the placeholder, then try the ship-art lookup once by the card's ship name.
-function onThumbError(e) {
-  const img = e.target;
-  if (img.tagName !== 'IMG' || !img.classList.contains('thumb')) return;
-  // The browser picked the bigger size and it failed: drop to the plain src.
-  if (img.hasAttribute('srcset')) {
-    img.removeAttribute('srcset');
-    img.removeAttribute('sizes');
-    return;
-  }
-  // RSI's image server sometimes drops a request: try the same picture once
-  // more before giving up on it (a refresh used to be the only retry).
-  if (!img.dataset.retried && /^https?:/.test(img.src)) {
-    img.dataset.retried = '1';
-    const src = img.src;
-    setTimeout(() => {
-      if (img.isConnected) img.src = src + (src.includes('?') ? '&' : '?') + 'retry=1';
-    }, 1500);
-    return;
-  }
-  const card = img.closest('.card');
-  const ph = document.createElement('div');
-  ph.className = 'thumb placeholder';
-  ph.textContent = img.dataset.kind || '';
-  img.replaceWith(ph);
-  if (!card || !card.dataset.resolve || card.dataset.fallback) return;
-  card.dataset.fallback = '1'; // one retry only, never a loop
-  OH.getShipImage(card.dataset.resolve).then((url) => {
-    if (!url || !ph.isConnected) return;
-    const fresh = document.createElement('img');
-    fresh.className = 'thumb';
-    fresh.loading = 'lazy';
-    fresh.alt = '';
-    setThumbSizes(fresh, url, card.closest('.grid'));
-    fresh.src = url;
-    ph.replaceWith(fresh);
-    card.dataset.image = url;
-    const id = card.dataset.id;
-    const item =
-      state.items.find((x) => String(x.id) === id) ||
-      state.buybacks.find((x) => String(x.id) === id);
-    if (item) item.image = url; // hover preview + details use it too
-  });
-}
-resultsEl.addEventListener('error', onThumbError, true);
-
-// Market sale-sheet: persist My Price as it's typed. We update state + storage
-// WITHOUT re-rendering so the field keeps focus; the price is keyed by item
-// (data-key) so it sticks to that item across re-scans.
-// My Price and % of Melt are two views of one number: typing either fills in
-// the other (price is what's stored).
-function onMarketPriceInput(e) {
-  const el = e.target;
-  if (!el.classList) return;
-  const isPrice = el.classList.contains('mk-price');
-  const isPct = el.classList.contains('mk-pct-in');
-  if (!isPrice && !isPct) return;
-  const row = el.closest('.mk-row');
-  if (!row) return;
-  const melt = Number(row.dataset.melt);
-  if (isPrice) {
-    setMarketPrice(row.dataset.key, el.value.trim());
-    row.querySelector('.mk-pct-in').value = pctOfMelt(el.value.trim(), melt);
-  } else {
-    const price = priceAtPct(el.value.trim(), melt);
-    setMarketPrice(row.dataset.key, price);
-    row.querySelector('.mk-price').value = price;
-  }
-  // Pricing a row means you're selling it: tick it (never auto-untick).
-  const box = row.querySelector('.mk-pick');
-  if (el.value.trim() && box && !box.checked) {
-    box.checked = true;
-    box.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-}
-resultsEl.addEventListener('input', onMarketPriceInput);
-if (buybacksBodyEl) buybacksBodyEl.addEventListener('input', onMarketPriceInput);
-
-// Market toolbar: "Giftable only" filter re-renders; CSV / image export the view.
-resultsEl.addEventListener('change', (e) => {
-  if (!e.target.classList || !e.target.classList.contains('inv-group')) return;
-  state.groupByType = e.target.checked;
-  chrome.storage.local.set({ uiGroupByType: state.groupByType });
-  renderInventory();
-});
-resultsEl.addEventListener('change', (e) => {
-  if (!e.target.classList || !e.target.classList.contains('mk-giftable-only')) return;
-  state.marketGiftableOnly = e.target.checked;
-  renderInventory();
-});
-resultsEl.addEventListener('click', (e) => {
-  const status = resultsEl.querySelector('.mk-export-status');
-  if (e.target.closest('.mk-export-csv')) exportMarketCsv(status);
-  else if (e.target.closest('.mk-export-img')) copyMarketImage(status);
-});
-if (buybacksBodyEl) buybacksBodyEl.addEventListener('error', onThumbError, true);
-
 // --- Inventory: hover preview + click detail modal ------------------------
 const itemPreview = $('#item-preview');
 const itemPreviewImg = itemPreview ? itemPreview.querySelector('img') : null;
@@ -4459,21 +4169,6 @@ function progressiveImage(imgEl, thumb, isCurrent = () => imgEl.isConnected) {
     if (hi && isCurrent()) imgEl.src = hi;
   });
 }
-
-// Cards: no hover popup (the card already shows the art). Resting on a card
-// quietly starts its full-res download so the detail modal opens sharp.
-let hoverCardId = null;
-let hoverTimer = null;
-function onCardHover(e) {
-  const card = e.target.closest('.card');
-  const id = card && card.dataset.image ? card.dataset.id : null;
-  if (id === hoverCardId) return;
-  hoverCardId = id;
-  clearTimeout(hoverTimer);
-  if (id) hoverTimer = setTimeout(() => loadHiRes(card.dataset.image), 120);
-}
-resultsEl.addEventListener('mousemove', onCardHover);
-if (buybacksBodyEl) buybacksBodyEl.addEventListener('mousemove', onCardHover);
 
 // Hover preview for reward items (ship art) — these are text links with no
 // picture, so the popup is the only way to see the ship. Keyed on the item's
@@ -4790,80 +4485,6 @@ function openBuybackModal(b) {
       if (currentView() === 'buybacks') renderBuybacks();
     });
   }
-}
-resultsEl.addEventListener('click', (e) => {
-  const card = e.target.closest('.card');
-  if (!card) return;
-  if (state.selecting) {
-    toggleSelected([card.dataset.id]);
-    card.classList.toggle('selected', state.selected.has(card.dataset.id));
-    return;
-  }
-  const p = state.items.find((it) => String(it.id) === card.dataset.id);
-  if (p) openItemModal(p);
-});
-resultsEl.addEventListener('change', (e) => {
-  const box = e.target.closest('.mk-pick, .mk-pick-all');
-  if (!box) return;
-  const groups = computeMarketSections(marketShown()).flatMap((x) => x.groups);
-  const byKey = new Map(groups.map((g) => [g.key, g]));
-  const rows = box.classList.contains('mk-pick-all')
-    ? [...box.closest('table').querySelectorAll('tbody .mk-row')]
-    : [box.closest('.mk-row')];
-  for (const row of rows) {
-    const g = byKey.get(row.dataset.key);
-    if (!g) continue;
-    for (const id of g.ids) box.checked ? state.selected.add(id) : state.selected.delete(id);
-    row.classList.toggle('picked', box.checked);
-    const cb = row.querySelector('.mk-pick');
-    if (cb) cb.checked = box.checked;
-  }
-  const table = box.closest('table');
-  const all = table && table.querySelector('.mk-pick-all');
-  if (all) all.checked = [...table.querySelectorAll('tbody .mk-pick')].every((c) => c.checked);
-  updateSelectBar();
-});
-if (buybacksBodyEl) {
-  buybacksBodyEl.addEventListener('change', (e) => {
-    const box = e.target.closest('.mk-pick, .mk-pick-all');
-    if (!box) return;
-    const rows = box.classList.contains('mk-pick-all')
-      ? [...box.closest('table').querySelectorAll('tbody .mk-row')]
-      : [box.closest('.mk-row')];
-    for (const row of rows) {
-      if (box.checked) state.bbPicked.add(row.dataset.id);
-      else state.bbPicked.delete(row.dataset.id);
-      row.classList.toggle('picked', box.checked);
-      const cb = row.querySelector('.mk-pick');
-      if (cb) cb.checked = box.checked;
-    }
-    const table = box.closest('table');
-    const all = table && table.querySelector('.mk-pick-all');
-    if (all) all.checked = [...table.querySelectorAll('tbody .mk-pick')].every((c) => c.checked);
-    updateBbSelText();
-  });
-  buybacksBodyEl.addEventListener('click', (e) => {
-    const status = buybacksBodyEl.querySelector('.mk-export-status');
-    if (e.target.closest('.bb-export-csv')) return void exportBuybackCsv(status);
-    if (e.target.closest('.bb-export-img')) return void copyBuybackImage(status);
-    if (e.target.closest('#bbd-load')) return void loadBuybackDetails();
-    if (e.target.closest('#bbd-stop')) {
-      if (bbLoading) bbLoading.stop = true;
-      return;
-    }
-    const open = e.target.closest('.bb-open');
-    if (open) {
-      const id = open.closest('.mk-row')?.dataset.id;
-      const bb = state.buybacks.find((it) => String(it.id) === id);
-      if (bb) openBuybackModal(bb);
-      return;
-    }
-    if (e.target.closest('a')) return; // let links (Reclaim) work normally
-    const card = e.target.closest('.card');
-    if (!card) return;
-    const b = state.buybacks.find((it) => String(it.id) === card.dataset.id);
-    if (b) openBuybackModal(b);
-  });
 }
 modalClose.addEventListener('click', closeItemModal);
 itemModal.addEventListener('click', (e) => {
@@ -6760,6 +6381,34 @@ window.OHApp = {
       else state.invClosed.add(g);
       chrome.storage.local.set({ invClosedGroups: [...state.invClosed] });
     },
+    // The list (ui/inventory/InventoryList.svelte): cards and the Market sale sheet.
+    list: invList,
+    card: pledgeCard,
+    isSelected: (id) => state.selecting && state.selected.has(id),
+    market: marketView,
+    emptyQuip: () => OH.quip('emptyHangar'),
+    setGroupByType: (on) => {
+      state.groupByType = !!on;
+      chrome.storage.local.set({ uiGroupByType: state.groupByType });
+      renderInventory();
+    },
+    setGiftableOnly: (on) => {
+      state.marketGiftableOnly = !!on;
+      renderInventory();
+    },
+    // A card click: a pick in Select mode, else the details pop-up.
+    click: (id) => {
+      if (state.selecting) return toggleSelected([id]);
+      const p = state.items.find((it) => String(it.id) === id);
+      if (p) openItemModal(p);
+    },
+    // Market ticks (no Select mode needed): every copy in a stacked row.
+    pick: (ids, on) => {
+      for (const id of ids) on ? state.selected.add(id) : state.selected.delete(id);
+      updateSelectBar();
+    },
+    exportCsv: exportMarketCsv,
+    exportImage: copyMarketImage,
   },
   // Buy-Backs (ui/buybacks): like `inv`, for the page around the buy-back list.
   bb: {
@@ -6845,6 +6494,45 @@ window.OHApp = {
       else state.bbClosed.add(g);
       chrome.storage.local.set({ bbClosedGroups: [...state.bbClosed] });
     },
+    // The list (ui/buybacks/BuybacksList.svelte): cards, or the Market reclaim sheet.
+    list: bbList,
+    card: buybackCard,
+    market: bbMarketView,
+    selText: bbSelText,
+    open: (id) => {
+      const b = state.buybacks.find((it) => String(it.id) === id);
+      if (b) openBuybackModal(b);
+    },
+    pick: (ids, on) => {
+      for (const id of ids) on ? state.bbPicked.add(id) : state.bbPicked.delete(id);
+      homeUpdated();
+    },
+    exportCsv: exportBuybackCsv,
+    exportImage: copyBuybackImage,
+    // Load Details stays opt-in: one page at a time, with Stop (OH.fetchBuybackDetails).
+    loadDetails: () => loadBuybackDetails(),
+    stopDetails: () => {
+      if (bbLoading) bbLoading.stop = true;
+    },
+  },
+  // Market My Price (both pages): saved as it's typed, without a redraw, so the field
+  // keeps focus; % of the melt (or buy-back) price and back.
+  setMarketPrice,
+  pctOf: pctOfMelt,
+  priceAt: priceAtPct,
+  // Card pictures (ui/lib/Thumb.svelte): the two RSI sizes and the sizes hint, the
+  // sharp copy started on hover (so the details pop-up opens sharp), and art found
+  // for a card kept on its item (the details pop-up and the hover use it too).
+  srcsetFor,
+  cardSizes,
+  preloadPicture: (url) => {
+    if (url) loadHiRes(url);
+  },
+  setArt: (list, id, url, isArt) => {
+    const item = (list === 'bb' ? state.buybacks : state.items).find((x) => String(x.id) === id);
+    if (!item || !url) return;
+    item.image = url;
+    if (isArt) item.shipArt = true; // a CCU's target art is in hand now
   },
   openItem: (id) => {
     const p = state.items.find((x) => String(x.id) === String(id));
