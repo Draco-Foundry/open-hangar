@@ -4,6 +4,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- New: **an Open Beta note.** Open Hangar is still spooling up for its official release
+  on November 10, so a small card on the dashboard says so, with a link to our Discord for
+  questions, ideas and bug reports. Close it once and it stays closed; it leaves on its own
+  after release day.
 - Improved: **rescans of a quiet hangar are way faster.** If nothing changed since your
   last scan, Open Hangar spots it from your first and last hangar pages and skips the
   rest: "hangar's exactly how you left it." Anything new, melted, gifted or upgraded
