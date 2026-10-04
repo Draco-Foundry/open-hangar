@@ -30,7 +30,7 @@ space left of the ship). Rebuild with `python docs/brand/draco-foundry/banner.py
 ## Letterhead and Envelope
 
 The logo badge (`logo-512.png`, round crop) beside the wordmark in Manrope 700, with
-a Hangar Cobalt rule (#3b6aed). No CIG ship art, so they're safe on letters to CIG.
+a Hangar Cobalt rule (#3b6aed). No CIG ship art, so they suit any business mail.
 
 | File                            | Use                                                 |
 | ------------------------------- | --------------------------------------------------- |
