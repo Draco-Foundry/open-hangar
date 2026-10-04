@@ -156,3 +156,75 @@ test('Discord post: a big release splits across embeds and messages, losing noth
   for (let i = 0; i < 60; i++) assert.ok(text.includes(`**Item ${i}**`), `item ${i} kept`);
   assert.equal(buildMessages(log, '1.0.0'), null);
 });
+
+test('updateCheckVersion: reads the version from a Chrome or Edge update check', async () => {
+  const { updateCheckVersion } = await lib();
+  const xml =
+    '<?xml version="1.0" encoding="UTF-8"?><gupdate xmlns="http://www.google.com/update2/response" protocol="2.0"><app appid="x" status="ok"><updatecheck codebase="https://x/y.crx" fp="1.ab" hash_sha256="cd" status="ok" version="0.2.7"/></app></gupdate>';
+  assert.equal(updateCheckVersion(xml), '0.2.7');
+  assert.equal(updateCheckVersion('<updatecheck status="noupdate"/>'), null);
+  assert.equal(updateCheckVersion(null), null);
+});
+
+test('versionNewer compares numerically', async () => {
+  const { versionNewer } = await lib();
+  assert.equal(versionNewer('0.2.10', '0.2.9'), true);
+  assert.equal(versionNewer('0.2.9', '0.2.10'), false);
+  assert.equal(versionNewer('0.3.0', '0.3.0'), false);
+  assert.equal(versionNewer('0.3', '0.2.99'), true);
+  assert.equal(versionNewer('0.2.8', null), true);
+  assert.equal(versionNewer(null, '0.2.8'), false);
+});
+
+test('submittedVersions: only real uploads count', async () => {
+  const { submittedVersions } = await lib();
+  const ok = (name) => ({ name, conclusion: 'success', notes: [] });
+  const runs = [
+    {
+      title: 'Publish v0.2.8 to all',
+      jobs: [ok('build'), ok('firefox'), ok('edge'), ok('chrome')],
+    },
+    {
+      title: 'Publish v0.2.9 to all',
+      jobs: [
+        ok('firefox'),
+        { name: 'edge', conclusion: 'failure', notes: [] },
+        {
+          name: 'chrome',
+          conclusion: 'success',
+          notes: [
+            "Chrome is still reviewing the previous version, so it won't take a new one yet.",
+          ],
+        },
+      ],
+    },
+    { title: 'Publish v0.3.0 to all (dry run)', jobs: [ok('firefox'), ok('edge'), ok('chrome')] },
+    { title: 'Publish v0.2.9 to discord', jobs: [ok('discord')] },
+  ];
+  assert.deepEqual(submittedVersions(runs), { firefox: '0.2.9', edge: '0.2.8', chrome: '0.2.8' });
+  assert.deepEqual(submittedVersions([]), {});
+});
+
+test('storeLine and stampStoreVersions fill the install buttons', async () => {
+  const { storeLine, stampStoreVersions } = await lib();
+  assert.deepEqual(storeLine('0.2.7', '0.2.8'), { live: '0.2.7', pending: '0.2.8' });
+  assert.deepEqual(storeLine('0.2.8', '0.2.8'), { live: '0.2.8', pending: null });
+  assert.deepEqual(storeLine(null, '0.2.8'), { live: null, pending: null });
+  const page = fs.readFileSync(path.join(__dirname, '..', 'site', 'index.html'), 'utf8');
+  for (const s of ['chrome', 'edge', 'firefox']) {
+    assert.match(page, new RegExp(`<span class="b-ver" data-ver="${s}"></span\\s*>`), s);
+    assert.match(page, new RegExp(`<span class="b-pend" data-pend="${s}"></span\\s*>`), s);
+  }
+  const out = stampStoreVersions(page, {
+    chrome: { live: '0.2.7', pending: '0.2.8' },
+    edge: { live: '0.2.8', pending: null },
+    firefox: { live: null, pending: null },
+  });
+  assert.ok(out.includes('<span class="b-ver" data-ver="chrome">v0.2.7</span'));
+  assert.ok(out.includes('<span class="b-pend" data-pend="chrome">v0.2.8 in review</span'));
+  assert.ok(out.includes('<span class="b-ver" data-ver="edge">v0.2.8</span'));
+  assert.ok(out.includes('<span class="b-pend" data-pend="edge"></span'));
+  assert.ok(out.includes('<span class="b-ver" data-ver="firefox"></span'));
+  // Stamping twice (a daily redeploy) gives the same page.
+  assert.equal(stampStoreVersions(out, { chrome: { live: '0.2.7', pending: '0.2.8' } }), out);
+});

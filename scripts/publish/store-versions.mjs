@@ -1,0 +1,86 @@
+// Stamps each store's live version, and a newer one waiting in review, onto the
+// install buttons of openhangar.space/extension (rules in lib.mjs). Run at deploy
+// and daily by .github/workflows/pages.yml:
+//   GH_TOKEN=… GITHUB_REPOSITORY=Draco-Foundry/open-hangar node scripts/publish/store-versions.mjs site/index.html
+// Live versions come from the stores' public update checks (what browsers ask)
+// and the Firefox add-ons API: one request each, one at a time, with an honest
+// User-Agent. "In review" = the newest version our Publish runs actually sent
+// to that store, when it's newer than the live one. Anything that can't be read
+// is left blank, never guessed; the page then just shows the buttons.
+import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { stampStoreVersions, storeLine, submittedVersions, updateCheckVersion } from './lib.mjs';
+
+const file = process.argv[2] || 'site/index.html';
+const repo = process.env.GITHUB_REPOSITORY || 'Draco-Foundry/open-hangar';
+const UA = 'OpenHangarSite/1.0 (+https://openhangar.space; version check once a day)';
+const CHROME_ID = 'aeabioadfphghjennmdbnpelojlhndjl';
+const EDGE_ID = 'fmcnemfepnifokjelgjacgdhoodaiicl';
+const AMO_SLUG = 'open-hangar';
+const updateCheck = (base, id) =>
+  `${base}?response=updatecheck&acceptformat=crx3&prodversion=140.0&x=${encodeURIComponent(`id=${id}&uc`)}`;
+
+async function get(url) {
+  try {
+    const r = await fetch(url, {
+      headers: { 'user-agent': UA },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!r.ok) {
+      console.log(`::notice::${new URL(url).host} answered ${r.status}`);
+      return null;
+    }
+    return await r.text();
+  } catch (e) {
+    console.log(`::notice::${new URL(url).host}: ${e.message}`);
+    return null;
+  }
+}
+
+const live = {
+  chrome: updateCheckVersion(
+    await get(updateCheck('https://clients2.google.com/service/update2/crx', CHROME_ID)),
+  ),
+  edge: updateCheckVersion(
+    await get(updateCheck('https://edge.microsoft.com/extensionwebstorebase/v1/crx', EDGE_ID)),
+  ),
+  firefox: null,
+};
+try {
+  const amo = await get(`https://addons.mozilla.org/api/v5/addons/addon/${AMO_SLUG}/`);
+  live.firefox = amo ? JSON.parse(amo).current_version?.version || null : null;
+} catch {
+  live.firefox = null;
+}
+
+// What our own Publish runs sent each store (needs GH_TOKEN with actions: read).
+let submitted = {};
+try {
+  const api = (route) =>
+    JSON.parse(execFileSync('gh', ['api', '-X', 'GET', route], { encoding: 'utf8' }));
+  const { workflow_runs: found = [] } = api(
+    `repos/${repo}/actions/workflows/publish.yml/runs?event=workflow_dispatch&status=completed&per_page=30`,
+  );
+  const runs = found
+    .filter((r) => /^Publish v[\d.]+ to (all|chrome|edge|firefox)$/.test(r.display_title))
+    .map((r) => ({
+      title: r.display_title,
+      jobs: (api(`repos/${repo}/actions/runs/${r.id}/jobs?filter=latest`).jobs || []).map((j) => ({
+        name: j.name,
+        conclusion: j.conclusion,
+        notes: ['chrome', 'edge', 'firefox'].includes(j.name)
+          ? api(`repos/${repo}/check-runs/${j.id}/annotations`).map((a) => a.message || '')
+          : [],
+      })),
+    }));
+  submitted = submittedVersions(runs);
+} catch (e) {
+  console.log(`::notice::Publish runs not read, so no "in review" lines: ${e.message}`);
+}
+
+const lines = Object.fromEntries(
+  ['chrome', 'edge', 'firefox'].map((s) => [s, storeLine(live[s], submitted[s])]),
+);
+fs.writeFileSync(file, stampStoreVersions(fs.readFileSync(file, 'utf8'), lines));
+for (const [s, l] of Object.entries(lines))
+  console.log(`${s}: live ${l.live || '?'}${l.pending ? `, ${l.pending} in review` : ''}`);
