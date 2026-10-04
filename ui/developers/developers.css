@@ -1,0 +1,30 @@
+/* Developers in Hangar Cobalt (styling pass, 2026-10-04). Every page bundle loads on
+   the one dashboard page, so these rules sit on top of dashboard.html's classic ones. */
+.profile-row {
+  border-radius: var(--r-sm);
+}
+.dev-linkbox {
+  border-radius: var(--r-md);
+}
+/* Small all-caps labels (Thanks, Links), Clean Pro style. */
+.sup-title,
+.dev-linkbox .dlb-title {
+  font: 700 11px var(--font-head);
+  letter-spacing: 0.08em;
+}
+a.sup-chip:hover {
+  border-color: var(--accent-line);
+}
+/* The error report preview reads like a log. */
+.report-preview pre {
+  font: 500 12px/1.5 var(--font-data);
+  border-radius: var(--r-sm);
+}
+/* Code and data shapes in the data font. */
+#view-developers code,
+#view-developers pre {
+  font-family: var(--font-data);
+}
+#view-developers pre {
+  border-radius: var(--r-md);
+}

@@ -1,3 +1,4 @@
+import './developers.css';
 import { mount } from 'svelte';
 import Developers from './Developers.svelte';
 
