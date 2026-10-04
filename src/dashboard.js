@@ -355,9 +355,6 @@ const state = {
   bbPicked: new Set(), // Buy-Backs Market: picked buy-back ids (for totals + exports)
   marketGiftableOnly: false, // Market view: show only sellable (giftable) items
   referral: null, // { code, url, current, legacy, prospects, recruitsList, prospectsList }
-  refTab: 'recruits', // referral list tab: 'recruits' | 'prospects'
-  refQuery: '', // referral list search
-  refSort: 'newest', // referral list sort: newest | oldest | name
 };
 
 // All dynamic markup goes through setHTML() instead of innerHTML. It's an
@@ -3187,6 +3184,8 @@ $('#view-store')?.addEventListener('click', (e) => {
 // --- Org fleet ------------------------------------------------------------
 // Members' ship lists (from HTF exports or backups) combined into one fleet.
 // Stored under `orgFleet` in this browser only: { members: [{ name, importedAt, ships }] }.
+// The page itself is Svelte (ui/org); this keeps the stored list and the actions it
+// calls through window.OHApp.org.
 let orgMembers = null;
 async function loadOrg() {
   if (!orgMembers) {
@@ -3222,290 +3221,18 @@ function syncMyOrgFleet() {
   return true;
 }
 
-const orgMsg = (t) => {
-  const el = $('#org-msg');
-  if (el) el.textContent = t;
-};
-
-function orgBarsHtml(map) {
-  const rows = Object.entries(map).sort((a, b) => b[1] - a[1]);
-  const max = Math.max(1, ...rows.map((r) => r[1]));
-  return rows
-    .map(
-      ([k, n]) => `<div class="bar-row">
-        <div class="bar-label">${OH.escapeHtml(titleCase(k))}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((n / max) * 100)}%"></div></div>
-        <div class="bar-val">${n}</div>
-      </div>`,
-    )
-    .join('');
-}
-
-// Org Fleet is click-to-explore: a role chip opens what fills it (or, for a
-// missing role, ships that would); a member opens their fleet next to the rest
-// of the org; two members can be compared side by side.
-const orgUi = { role: null, member: null, a: null, b: null };
-
-function orgRolesHtml(f) {
-  const missing = f.roles.filter((r) => !r.count);
-  // Covered, but only by ships that aren't flyable yet (in concept / production).
-  const concept = f.roles.filter((r) => r.count && !r.ready);
-  const names = (list) => list.map((r) => OH.escapeHtml(r.label)).join(', ');
-  const chips = f.roles
-    .map((r) => {
-      const cls = !r.count ? 'missing' : r.ready ? 'have' : 'concept';
-      const tip = cls === 'concept' ? ' title="Covered by ships that are still in concept"' : '';
-      return `<button type="button" class="role-chip ${cls}${
-        orgUi.role === r.key ? ' open' : ''
-      }" data-role="${r.key}" aria-expanded="${orgUi.role === r.key}"${tip}>${OH.escapeHtml(r.label)}${
-        r.count ? ` <b>${r.count}</b>` : ''
-      }</button>`;
-    })
-    .join('');
-  const notes = [
-    missing.length ? `No ships for: <strong>${names(missing)}</strong>.` : '',
-    concept.length ? `Only in-concept ships for: <strong>${names(concept)}</strong>.` : '',
-  ].filter(Boolean);
-  return `<h3 class="section-title" style="margin-top:22px">Roles</h3>
-    <p class="muted org-intro">${notes.join(' ') || 'Every role is covered.'} Click a role to see what fills it.</p>
-    <div class="role-chips">${chips}</div>${orgRolePanelHtml(f)}`;
-}
-
-function orgRolePanelHtml(f) {
-  const r = f.roles.find((x) => x.key === orgUi.role);
-  if (!r) return '';
-  const def = OH.ORG_ROLES.find((x) => x.key === r.key);
-  if (r.count) {
-    const rows = f.ships
-      .filter((sh) => sh.role && def.re.test(sh.role))
-      .map(
-        (sh) =>
-          `<tr><td>${OH.escapeHtml(sh.name)}</td><td class="muted">${OH.escapeHtml(titleCase(sh.role))}</td><td>${
-            sh.status === 'flight-ready'
-              ? '<span class="badge good">Flight Ready</span>'
-              : '<span class="badge warn">In Concept</span>'
-          }</td><td class="num">${sh.count}</td><td class="org-owners">${sh.owners
-            .map((o) => OH.escapeHtml(o.n > 1 ? `${o.name} ×${o.n}` : o.name))
-            .join(', ')}</td></tr>`,
-      )
-      .join('');
-    return `<div class="org-panel"><div class="org-panel-head"><strong>${OH.escapeHtml(r.label)}</strong> · ${
-      r.count
-    } ship${r.count === 1 ? '' : 's'}<button type="button" class="org-close" data-close="role" aria-label="Close">×</button></div>
-      <table class="org-table"><thead><tr><th>Ship</th><th>Role</th><th>Status</th><th class="num">Count</th><th>Owners</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-  }
-  const options = (state.catalog || [])
-    // Every ship that fills the role (big ones like the Orion used to fall off
-    // a top-10 list), cheapest first; unpriced concepts last.
-    .filter((v) => v.role && def.re.test(v.role))
-    .sort((x, y) => (x.msrp || Infinity) - (y.msrp || Infinity))
-    .map(
-      (v) =>
-        `<tr><td>${OH.escapeHtml(v.name || v.lname)}</td><td class="muted">${OH.escapeHtml(titleCase(v.role))}</td><td class="muted">${OH.escapeHtml(
-          v.status === 'flight-ready' ? 'Flight Ready' : 'In Concept',
-        )}</td><td class="num">${v.msrp ? dollars(v.msrp) : '—'}</td></tr>`,
-    )
-    .join('');
-  return `<div class="org-panel"><div class="org-panel-head"><strong>${OH.escapeHtml(r.label)}</strong> · nobody has one yet<button type="button" class="org-close" data-close="role" aria-label="Close">×</button></div>
-    ${
-      options
-        ? `<p class="muted org-intro">Every ship that fills this role, cheapest first:</p><div class="org-scroll"><table class="org-table"><thead><tr><th>Ship</th><th>Role</th><th>Status</th><th class="num">Store Price</th></tr></thead><tbody>${options}</tbody></table></div>`
-        : '<p class="muted">No ships in the ship list fill this role.</p>'
-    }</div>`;
-}
-
-// Member table: click a name to open their fleet vs the rest of the org.
-function orgMembersHtml(f, members) {
-  const rows = f.byMember
-    .map(
-      (m) =>
-        `<tr class="org-mrow${orgUi.member === m.name ? ' open' : ''}" data-member="${OH.escapeHtml(m.name)}"><td><button type="button" class="bb-open">${OH.escapeHtml(
-          m.name,
-        )}</button></td><td class="num">${m.ships}</td><td class="num">${m.lti}</td><td class="num">${
-          m.priced ? dollars(m.store) : '—'
-        }</td><td class="num">${f.store ? Math.round((m.store / f.store) * 100) + '%' : '—'}</td></tr>`,
-    )
-    .join('');
-  const opts = (sel) =>
-    members
-      .map(
-        (m) =>
-          `<option value="${OH.escapeHtml(m.name)}"${m.name === sel ? ' selected' : ''}>${OH.escapeHtml(m.name)}</option>`,
-      )
-      .join('');
-  const compare =
-    members.length >= 2
-      ? `<div class="org-compare-bar">Compare <select class="org-cmp" data-side="a" aria-label="First Member to Compare"><option value="">pick a member</option>${opts(
-          orgUi.a,
-        )}</select> with <select class="org-cmp" data-side="b" aria-label="Second Member to Compare"><option value="">pick a member</option>${opts(orgUi.b)}</select></div>`
-      : '';
-  return `<h3 class="section-title" style="margin-top:22px">Members</h3>
-    <p class="muted org-intro">Click a member to see their fleet next to the rest of the org.</p>
-    <table class="org-table"><thead><tr><th>Member</th><th class="num">Ships</th><th class="num">LTI</th><th class="num">Fleet Value</th><th class="num">Share</th></tr></thead><tbody>${rows}</tbody></table>
-    ${orgMemberPanelHtml(f, members)}${compare}${orgComparePanelHtml(members)}`;
-}
-
-// Two-series bars: one row per key, `a` and `b` side by side.
-function pairBarsHtml(mapA, mapB, labelA, labelB) {
-  const keys = [...new Set([...Object.keys(mapA), ...Object.keys(mapB)])].sort(
-    (x, y) => (mapB[y] || 0) + (mapA[y] || 0) - ((mapB[x] || 0) + (mapA[x] || 0)),
-  );
-  const max = Math.max(1, ...keys.map((k) => Math.max(mapA[k] || 0, mapB[k] || 0)));
-  return `<div class="pair-legend"><span class="sw a"></span>${OH.escapeHtml(labelA)} <span class="sw b"></span>${OH.escapeHtml(
-    labelB,
-  )}</div>${keys
-    .map(
-      (
-        k,
-      ) => `<div class="pair-row"><div class="bar-label">${OH.escapeHtml(titleCase(k))}</div><div class="pair-bars">
-        <div class="pair-bar a" style="width:${Math.round(((mapA[k] || 0) / max) * 100)}%"><span>${mapA[k] || 0}</span></div>
-        <div class="pair-bar b" style="width:${Math.round(((mapB[k] || 0) / max) * 100)}%"><span>${mapB[k] || 0}</span></div>
-      </div></div>`,
-    )
-    .join('')}`;
-}
-
-function orgMemberPanelHtml(f, members) {
-  const m = members.find((x) => x.name === orgUi.member);
-  if (!m) return '';
-  const me = OH.orgFleet([m], state.shipOf, state.priceOf);
-  const rest = OH.orgFleet(
-    members.filter((x) => x !== m),
-    state.shipOf,
-    state.priceOf,
-  );
-  const onlyMe = me.roles.filter((r) => r.count && !rest.roles.find((x) => x.key === r.key).count);
-  const box = (big, lbl) =>
-    `<div class="stat-box"><div class="big">${big}</div><div class="lbl">${lbl}</div></div>`;
-  return `<div class="org-panel"><div class="org-panel-head"><strong>${OH.escapeHtml(m.name)}</strong> vs the rest of the org<button type="button" class="org-close" data-close="member" aria-label="Close">×</button></div>
-    <div class="stat-grid">${
-      box(me.shipCount, 'ships') +
-      box(dollars(me.store), 'fleet value') +
-      box(f.store ? Math.round((me.store / f.store) * 100) + '%' : '—', 'of org value') +
-      box(me.roles.filter((r) => r.count).length, 'roles covered')
-    }</div>
-    ${
-      onlyMe.length
-        ? `<p class="org-intro">Only ${OH.escapeHtml(m.name)} covers: <strong>${onlyMe.map((r) => OH.escapeHtml(r.label)).join(', ')}</strong></p>`
-        : ''
-    }
-    <div class="fleet-cols"><div><h4 class="modal-h">By Role</h4>${pairBarsHtml(me.byCareer, rest.byCareer, m.name, 'Rest of org')}</div>
-    <div><h4 class="modal-h">By Size</h4>${pairBarsHtml(me.bySize, rest.bySize, m.name, 'Rest of org')}</div></div>
-    <h4 class="modal-h">Ships</h4><p class="org-owners">${me.ships
-      .map((sh) => OH.escapeHtml(sh.count > 1 ? `${sh.name} ×${sh.count}` : sh.name))
-      .join(', ')}</p></div>`;
-}
-
-function orgComparePanelHtml(members) {
-  const A = members.find((x) => x.name === orgUi.a);
-  const B = members.find((x) => x.name === orgUi.b);
-  if (!A || !B || A === B) return '';
-  const fa = OH.orgFleet([A], state.shipOf, state.priceOf);
-  const fb = OH.orgFleet([B], state.shipOf, state.priceOf);
-  const namesA = new Set(fa.ships.map((x) => x.name));
-  const namesB = new Set(fb.ships.map((x) => x.name));
-  const both = [...namesA].filter((n) => namesB.has(n));
-  const onlyA = [...namesA].filter((n) => !namesB.has(n));
-  const onlyB = [...namesB].filter((n) => !namesA.has(n));
-  const col = (f, name) =>
-    `<div class="cmp-col"><h4 class="modal-h">${OH.escapeHtml(name)}</h4>
-      <div class="cmp-kv"><span>Ships</span><b>${f.shipCount}</b></div>
-      <div class="cmp-kv"><span>Fleet value</span><b>${dollars(f.store)}</b></div>
-      <div class="cmp-kv"><span>LTI</span><b>${f.byMember[0] ? f.byMember[0].lti : 0}</b></div>
-      <div class="cmp-kv"><span>Cargo</span><b>${Math.round(f.cargo).toLocaleString('en-US')} SCU</b></div>
-      <div class="cmp-kv"><span>Crew seats</span><b>${f.crew}</b></div>
-      <div class="cmp-kv"><span>Roles covered</span><b>${f.roles.filter((r) => r.count).length}</b></div></div>`;
-  const list = (arr) =>
-    arr.length ? arr.map((n) => OH.escapeHtml(n)).join(', ') : '<span class="muted">none</span>';
-  return `<div class="org-panel"><div class="org-panel-head"><strong>${OH.escapeHtml(A.name)}</strong> vs <strong>${OH.escapeHtml(
-    B.name,
-  )}</strong><button type="button" class="org-close" data-close="compare" aria-label="Close">×</button></div>
-    <div class="cmp-cols">${col(fa, A.name)}${col(fb, B.name)}</div>
-    <div class="fleet-cols"><div><h4 class="modal-h">By Role</h4>${pairBarsHtml(fa.byCareer, fb.byCareer, A.name, B.name)}</div>
-    <div><h4 class="modal-h">By Size</h4>${pairBarsHtml(fa.bySize, fb.bySize, A.name, B.name)}</div></div>
-    <h4 class="modal-h">Both Own</h4><p class="org-owners">${list(both)}</p>
-    <h4 class="modal-h">Only ${OH.escapeHtml(A.name)}</h4><p class="org-owners">${list(onlyA)}</p>
-    <h4 class="modal-h">Only ${OH.escapeHtml(B.name)}</h4><p class="org-owners">${list(onlyB)}</p></div>`;
-}
-
-function orgBiggestHtml(f) {
-  if (!f.biggest.length) return '';
-  const rows = f.biggest
-    .map(
-      (r) =>
-        `<tr><td>${OH.escapeHtml(r.name)}</td><td>${OH.escapeHtml(titleCase(r.size))}</td><td class="num">${
-          r.count
-        }</td><td class="num">${r.msrp ? dollars(r.msrp) : '—'}</td><td class="org-owners">${r.owners
-          .map((o) => OH.escapeHtml(o.n > 1 ? `${o.name} ×${o.n}` : o.name))
-          .join(', ')}</td></tr>`,
-    )
-    .join('');
-  return `<h3 class="section-title" style="margin-top:22px">Biggest Ships</h3>
-    <table class="org-table"><thead><tr><th>Ship</th><th>Size</th><th class="num">Count</th><th class="num">Store Price</th><th>Owners</th></tr></thead><tbody>${rows}</tbody></table>`;
-}
-
+// Org Fleet is the Svelte page in ui/org (mounted into #oh-org); this loads the
+// members (keeping your own entry in step with your scan) and tells it to redraw.
 async function renderOrg() {
   ensurePrices();
-  const body = $('#org-body');
-  const members = await loadOrg();
+  await loadOrg();
   if (syncMyOrgFleet()) await saveOrg();
-  if (!members.length) {
-    setHTML(
-      body,
-      '<div class="empty">No org fleet assembled yet. Import member files, or start with <strong>Add My Fleet</strong>.</div>',
-    );
-    return;
-  }
-  const chips = members
-    .map(
-      (m) =>
-        `<span class="org-member">${OH.escapeHtml(m.name)} · ${m.ships.length} ships<button type="button" class="org-remove" data-name="${OH.escapeHtml(m.name)}" title="Remove" aria-label="Remove ${OH.escapeHtml(m.name)}">×</button></span>`,
-    )
-    .join('');
-  if (!state.shipOf) {
-    setHTML(body, `<div class="org-members">${chips}</div><p class="muted">Loading ship data…</p>`);
-    return;
-  }
-  const f = OH.orgFleet(members, state.shipOf, state.priceOf);
-  const box = (big, lbl) =>
-    `<div class="stat-box"><div class="big">${big}</div><div class="lbl">${lbl}</div></div>`;
-  const rows = f.ships
-    .map(
-      (r) => `<tr>
-        <td>${OH.escapeHtml(r.name)}</td>
-        <td class="num">${r.count}</td>
-        <td class="num">${r.lti}</td>
-        <td class="num">${r.msrp ? dollars(r.msrp) : '—'}</td>
-        <td class="org-owners">${r.owners
-          .map((o) => OH.escapeHtml(o.n > 1 ? `${o.name} ×${o.n}` : o.name))
-          .join(', ')}</td>
-      </tr>`,
-    )
-    .join('');
-  setHTML(
-    body,
-    `<div class="org-members">${chips}</div>` +
-      `<div class="stat-grid">${
-        box(f.members, 'members') +
-        box(f.shipCount, 'ships') +
-        box(dollars(f.store), `at store price (${f.priced} priced)`) +
-        box(Math.round(f.cargo).toLocaleString('en-US'), 'cargo (SCU)') +
-        box(f.crew.toLocaleString('en-US'), 'crew seats')
-      }</div>` +
-      orgRolesHtml(f) +
-      orgBiggestHtml(f) +
-      orgMembersHtml(f, members) +
-      `<div class="fleet-cols"><div><h4 class="modal-h">By Role</h4>${orgBarsHtml(f.byCareer)}</div>` +
-      `<div><h4 class="modal-h">By Size</h4>${orgBarsHtml(f.bySize)}</div></div>` +
-      `<h3 class="section-title" style="margin-top:22px">Ships</h3>` +
-      `<table class="org-table"><thead><tr><th>Ship</th><th class="num">Count</th><th class="num">LTI</th><th class="num">Store Price</th><th>Owners</th></tr></thead><tbody>${rows}</tbody></table>`,
-  );
+  homeUpdated();
 }
 
-$('#org-import')?.addEventListener('click', () => $('#org-file').click());
-$('#org-file')?.addEventListener('change', async (e) => {
-  const files = [...(e.target.files || [])];
-  e.target.value = '';
+// The page's buttons (ui/org calls them through OHApp.org). Each resolves to the
+// line shown next to the buttons.
+async function importOrgFiles(files) {
   await loadOrg();
   let added = 0;
   const problems = [];
@@ -3532,27 +3259,26 @@ $('#org-file')?.addEventListener('change', async (e) => {
     added++;
   }
   await saveOrg();
-  orgMsg(
-    `Added ${added} fleet${added === 1 ? '' : 's'}.` +
-      (problems.length ? ` Skipped: ${problems.join('; ')}` : ''),
-  );
   renderOrg();
-});
-$('#org-mine')?.addEventListener('click', async () => {
-  if (!state.items.length)
-    return orgMsg('Scan your hangar first, then bring your ships to the party.');
+  return (
+    `Added ${added} fleet${added === 1 ? '' : 's'}.` +
+    (problems.length ? ` Skipped: ${problems.join('; ')}` : '')
+  );
+}
+async function addMyOrgFleet() {
+  if (!state.items.length) return 'Scan your hangar first, then bring your ships to the party.';
   await loadOrg();
   const who = (state.owner && (state.owner.displayname || state.owner.nickname)) || 'Me';
   const r = OH.shipsFromFile({ sources: { hangar: { items: state.items } } });
-  if (r.error) return orgMsg(r.error);
+  if (r.error) return r.error;
   upsertMember(who, r.ships, { mine: true });
   await saveOrg();
-  orgMsg(`Added your fleet (${r.ships.length} ships).`);
   renderOrg();
-});
-$('#org-csv')?.addEventListener('click', async () => {
+  return `Added your fleet (${r.ships.length} ships).`;
+}
+async function exportOrgCsv() {
   const members = await loadOrg();
-  if (!members.length || !state.shipOf) return orgMsg('Nothing to export yet. Empty hangar bay.');
+  if (!members.length || !state.shipOf) return 'Nothing to export yet. Empty hangar bay.';
   const f = OH.orgFleet(members, state.shipOf, state.priceOf);
   const lines = [['Ship', 'Count', 'LTI', 'Store price (USD)', 'Owners']].concat(
     f.ships.map((r) => [
@@ -3567,36 +3293,14 @@ $('#org-csv')?.addEventListener('click', async () => {
     new Blob([lines.map((l) => l.map(csvCell).join(',')).join('\n')], { type: 'text/csv' }),
     `open-hangar-org-fleet-${new Date().toISOString().slice(0, 10)}.csv`,
   );
-  orgMsg('CSV saved. Time for the org meeting.');
-});
-$('#org-body')?.addEventListener('click', (e) => {
-  const role = e.target.closest('[data-role]');
-  const row = e.target.closest('.org-mrow');
-  const close = e.target.closest('.org-close');
-  if (role) orgUi.role = orgUi.role === role.dataset.role ? null : role.dataset.role;
-  else if (row) orgUi.member = orgUi.member === row.dataset.member ? null : row.dataset.member;
-  else if (close) {
-    const k = close.dataset.close;
-    if (k === 'role') orgUi.role = null;
-    if (k === 'member') orgUi.member = null;
-    if (k === 'compare') orgUi.a = orgUi.b = null;
-  } else return;
-  renderOrg();
-});
-$('#org-body')?.addEventListener('change', (e) => {
-  const sel = e.target.closest('.org-cmp');
-  if (!sel) return;
-  orgUi[sel.dataset.side] = sel.value || null;
-  renderOrg();
-});
-document.addEventListener('click', async (e) => {
-  const b = e.target.closest('.org-remove');
-  if (!b) return;
+  return 'CSV saved. Time for the org meeting.';
+}
+async function removeOrgMember(name) {
   await loadOrg();
-  orgMembers = orgMembers.filter((m) => m.name !== b.dataset.name);
+  orgMembers = orgMembers.filter((m) => m.name !== name);
   await saveOrg();
   renderOrg();
-});
+}
 
 // --- Stats ----------------------------------------------------------------
 
@@ -3711,324 +3415,6 @@ function eventForDate(d) {
   return null;
 }
 
-// Build a cumulative-over-time area+line chart + a per-month bar chart, as one SVG.
-function recruitsOverTimeSvg(rows) {
-  const dated = rows
-    .map(recruitDate)
-    .filter(Boolean)
-    .sort((a, b) => a - b);
-  if (dated.length < 2)
-    return '<p class="muted">Not enough dated recruits to chart yet. Recruit a few more and this lights up.</p>';
-  // Bucket by month.
-  const counts = new Map();
-  for (const d of dated) counts.set(monthKey(d), (counts.get(monthKey(d)) || 0) + 1);
-  // Fill gaps between first and last month so the x-axis is continuous.
-  const months = [];
-  const start = new Date(dated[0].getFullYear(), dated[0].getMonth(), 1);
-  const end = new Date(
-    dated[dated.length - 1].getFullYear(),
-    dated[dated.length - 1].getMonth(),
-    1,
-  );
-  for (let d = new Date(start); d <= end; d.setMonth(d.getMonth() + 1)) {
-    months.push({ key: monthKey(d), n: counts.get(monthKey(d)) || 0 });
-  }
-  let cum = 0;
-  const series = months.map((m) => ({ ...m, cum: (cum += m.n) }));
-  const W = 560,
-    H = 180,
-    padL = 34,
-    padR = 8,
-    padB = 22,
-    padT = 8;
-  const iw = W - padL - padR,
-    ih = H - padT - padB;
-  const maxCum = series[series.length - 1].cum || 1;
-  const maxBar = Math.max(1, ...series.map((s) => s.n));
-  const x = (i) => padL + (series.length === 1 ? iw / 2 : (i / (series.length - 1)) * iw);
-  const yCum = (v) => padT + ih - (v / maxCum) * ih;
-  const linePts = series.map((s, i) => `${x(i).toFixed(1)},${yCum(s.cum).toFixed(1)}`).join(' ');
-  const areaPts = `${padL},${padT + ih} ${linePts} ${(padL + iw).toFixed(1)},${(padT + ih).toFixed(1)}`;
-  const barW = Math.max(2, (iw / series.length) * 0.5);
-  const bars = series
-    .map((s, i) => {
-      const h = (s.n / maxBar) * ih;
-      return `<rect class="bar" x="${(x(i) - barW / 2).toFixed(1)}" y="${(padT + ih - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" opacity="0.35"></rect>`;
-    })
-    .join('');
-  // X labels: first, middle, last month.
-  const lblIdx = [...new Set([0, Math.floor(series.length / 2), series.length - 1])];
-  const labels = lblIdx
-    .map(
-      (i) =>
-        `<text class="tick" x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle">${series[i].key}</text>`,
-    )
-    .join('');
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Recruits over time">
-    <line class="axis" x1="${padL}" y1="${padT + ih}" x2="${padL + iw}" y2="${padT + ih}"></line>
-    ${bars}
-    <polygon class="area" points="${areaPts}"></polygon>
-    <polyline class="line" points="${linePts}"></polyline>
-    <text class="tick" x="${padL - 6}" y="${yCum(maxCum) + 3}" text-anchor="end">${maxCum}</text>
-    <text class="tick" x="${padL - 6}" y="${padT + ih}" text-anchor="end">0</text>
-    ${labels}
-  </svg>`;
-}
-
-function conversionHtml(ref) {
-  const prospects = ref.prospects ?? 0;
-  const recruits = ref.legacy?.recruits ?? 0;
-  const pct = prospects > 0 ? (recruits / prospects) * 100 : 0;
-  const restPct = Math.max(0, 100 - pct);
-  return `<div class="ref-conv-rate" style="font-size:26px;font-weight:700;margin-bottom:8px">${pct.toFixed(1)}%</div>
-    <div class="ref-conv-bar">
-      <div class="seg-conv" style="width:${pct.toFixed(2)}%"></div>
-      <div class="seg-rest" style="width:${restPct.toFixed(2)}%"></div>
-    </div>
-    <div class="ref-conv-legend">
-      <span><span class="dot" style="background:var(--good)"></span>${recruits.toLocaleString('en-US')} recruits</span>
-      <span><span class="dot" style="background:rgba(255,255,255,0.1)"></span>${(prospects - recruits).toLocaleString('en-US')} prospects</span>
-    </div>`;
-}
-
-// New recruits per calendar year (by conversion date), as a small bar chart.
-function recruitsByYearHtml(rows) {
-  const byYear = new Map();
-  for (const r of rows) {
-    const d = recruitDate(r);
-    if (d) byYear.set(d.getFullYear(), (byYear.get(d.getFullYear()) || 0) + 1);
-  }
-  if (!byYear.size) return '<p class="muted">No dated recruits yet.</p>';
-  const years = [...byYear.keys()].sort((a, b) => a - b);
-  const max = Math.max(...byYear.values());
-  return years
-    .map((y) => {
-      const n = byYear.get(y);
-      const pct = Math.round((n / max) * 100);
-      return `<div class="bar-row">
-        <div class="bar-label">${y}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
-        <div class="bar-val">${n}</div>
-      </div>`;
-    })
-    .join('');
-}
-
-// Render one reward item as a link. Ships link to the RSI ship-matrix and carry a
-// data-resolve so the shared hover-preview lazily fetches their art (reusing
-// OH.getShipImage / #item-preview). Non-ship items link to a starcitizen.tools
-// search. `img` overrides the ship name used for art lookup when it differs.
-function rewardItemHtml(item) {
-  const label = OH.escapeHtml(item.n);
-  if (item.ship) {
-    const shipName = item.img || item.n.replace(/\s*\(LTI\)/i, '').trim();
-    const href = `https://robertsspaceindustries.com/ship-matrix/search?q=${encodeURIComponent(shipName)}`;
-    return `<a class="reward-item ship" href="${href}" target="_blank" rel="noopener" data-resolve="${OH.escapeHtml(shipName)}">${label}</a>`;
-  }
-  const href = `https://starcitizen.tools/index.php?search=${encodeURIComponent(item.n)}`;
-  return `<a class="reward-item" href="${href}" target="_blank" rel="noopener">${label}</a>`;
-}
-
-// All items of a tier, joined — each independently linked/hoverable.
-function rewardItemsHtml(items) {
-  return (items || []).map(rewardItemHtml).join('<span class="reward-sep"> · </span>');
-}
-
-// Render one reward ladder (standard | legacy) as rows, marking each tier unlocked
-// (recruits ≥ tier) or locked, and highlighting the NEXT tier with the gap to go.
-// `recruits` is the user's all-time recruit total (legacy total = same number).
-function rewardLadderHtml(ladder, recruits, title, note) {
-  const next = ladder.find((t) => recruits < t.at) || null;
-  const unlocked = ladder.filter((t) => recruits >= t.at).length;
-  const rows = ladder
-    .map((t) => {
-      const isUnlocked = recruits >= t.at;
-      const isNext = next && t.at === next.at;
-      const cls = isUnlocked ? 'reward-unlocked' : isNext ? 'reward-next' : 'reward-locked';
-      const mark = isUnlocked ? '✓' : isNext ? '◷' : '○';
-      const need = isNext
-        ? ` <span class="reward-togo">${(t.at - recruits).toLocaleString('en-US')} to go</span>`
-        : '';
-      const rank = t.rank ? `<span class="reward-rank">${OH.escapeHtml(t.rank)}</span> ` : '';
-      return `<tr class="${cls}">
-        <td class="reward-mark">${mark}</td>
-        <td class="reward-at">${t.at.toLocaleString('en-US')}</td>
-        <td class="reward-name">${rank}${rewardItemsHtml(t.items)}${need}</td>
-      </tr>`;
-    })
-    .join('');
-  const nextItems = next ? rewardItemsHtml(next.items) : '';
-  const nextLine = next
-    ? `Next: ${nextItems} at ${next.at.toLocaleString('en-US')} (${(next.at - recruits).toLocaleString('en-US')} more)`
-    : 'All tiers unlocked';
-  return `<div class="reward-ladder">
-    <h4>${OH.escapeHtml(title)} <span class="reward-progress">${unlocked}/${ladder.length} unlocked</span></h4>
-    ${note ? `<p class="muted reward-note">${note}</p>` : ''}
-    <p class="muted reward-next-line">${nextLine}</p>
-    <table class="reward-table"><tbody>${rows}</tbody></table>
-  </div>`;
-}
-
-// Both ladders side by side. Legacy is only shown if the user has legacy access —
-// which we infer from the data: a legacy recruit count means they qualified
-// (referred ≥1 package buyer before the 2025-07-02 cutoff).
-function rewardsHtml(ref) {
-  const recruits = ref.legacy?.recruits ?? 0;
-  const hasLegacy = (ref.legacy?.recruits ?? 0) > 0;
-  const standard = rewardLadderHtml(
-    REFERRAL_LADDER_STANDARD,
-    recruits,
-    'Standard ladder',
-    'Always-on rewards; tiers by total recruits.',
-  );
-  if (!hasLegacy) return `<div class="reward-ladders">${standard}</div>`;
-  const legacy = rewardLadderHtml(
-    REFERRAL_LADDER_LEGACY,
-    recruits,
-    'Legacy ladder',
-    'Pre-July 2025 ladder — you keep access, and new recruits still count toward it.',
-  );
-  return `<div class="reward-ladders two">${standard}${legacy}</div>`;
-}
-
-// Event bonuses you earned. The reward is granted ONCE per event (not per recruit).
-// "Date received" = the earliest recruit conversion that fell in the event window
-// (i.e. when you first qualified). Best-effort — the event list is hand-maintained
-// and may lag CIG's, and per-day nuances within an event aren't modelled.
-function eventRewardsHtml(recruitsRows) {
-  const hits = new Map(); // event name -> { ev, firstDate }
-  for (const r of recruitsRows) {
-    const d = recruitDate(r);
-    const ev = eventForDate(d);
-    if (!ev) continue;
-    const cur = hits.get(ev.name);
-    if (!cur) hits.set(ev.name, { ev, firstDate: d });
-    else if (d < cur.firstDate) cur.firstDate = d;
-  }
-  const earned = [...hits.values()].sort((a, b) => parseTs(b.ev.start) - parseTs(a.ev.start));
-  const intro = `<p class="muted" style="font-size:12px;margin:0 0 12px">
-    A recruit who <strong>converted</strong> during a special-incentive event earns you that
-    event's bonus reward, once per event. The event list refreshes weekly from the Star Citizen wiki.</p>`;
-  if (!earned.length) {
-    return (
-      intro +
-      '<p class="muted">No recruits converted during a tracked bonus event. Next IAE, maybe.</p>'
-    );
-  }
-  const items = earned
-    .map(
-      ({ ev, firstDate }) => `<li class="event-item">
-        <span class="event-check">✓</span>
-        <span class="event-text">${OH.escapeHtml(ev.name)} — ${OH.escapeHtml(ev.reward)}</span>
-        <span class="event-date">${firstDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
-      </li>`,
-    )
-    .join('');
-  return (
-    intro +
-    `<p class="reward-next-line" style="margin-bottom:10px"><strong>${earned.length}</strong> event bonus reward(s) earned.</p>
-    <ul class="event-list">${items}</ul>`
-  );
-}
-
-// The active referral list (recruits | prospects), with search + sort applied.
-function refFilteredList() {
-  const ref = state.referral;
-  let list = (state.refTab === 'prospects' ? ref.prospectsList : ref.recruitsList) || [];
-  const q = state.refQuery.trim().toLowerCase();
-  if (q) {
-    list = list.filter((r) => `${r.handle || ''} ${r.moniker || ''}`.toLowerCase().includes(q));
-  }
-  // Sort by the date shown in this tab: recruits by conversion, prospects by enlist.
-  const ts = (r) => {
-    const d = state.refTab === 'recruits' ? recruitDate(r) : parseTs(r.enlistedOn);
-    return d ? d.getTime() : 0;
-  };
-  const byName = (a, b) => (a.handle || a.moniker || '').localeCompare(b.handle || b.moniker || '');
-  list = list.slice().sort((a, b) => {
-    switch (state.refSort) {
-      case 'oldest':
-        return ts(a) - ts(b);
-      case 'name':
-        return byName(a, b);
-      case 'newest':
-      default:
-        return ts(b) - ts(a);
-    }
-  });
-  return list;
-}
-
-function refListRows() {
-  const full =
-    (state.refTab === 'prospects' ? state.referral.prospectsList : state.referral.recruitsList) ||
-    [];
-  const list = refFilteredList();
-  if (!list.length) {
-    const msg = full.length ? `No ${state.refTab} match your search.` : `No ${state.refTab} found.`;
-    return `<tr><td colspan="3" class="muted">${msg}</td></tr>`;
-  }
-  return list
-    .map((r) => {
-      const handle = r.handle || r.moniker || '—';
-      // Link the handle to the citizen's RSI dossier, but styled as plain text
-      // (not a blue hyperlink) — see .ref-citizen-link.
-      const citizenUrl = r.handle
-        ? `https://robertsspaceindustries.com/en/citizens/${encodeURIComponent(r.handle)}`
-        : null;
-      const link = citizenUrl
-        ? `<a class="ref-citizen-link" href="${citizenUrl}" target="_blank" rel="noopener">${OH.escapeHtml(handle)}</a>`
-        : OH.escapeHtml(handle);
-      // Only flag legacy-ladder recruits; "current" is the default, so no badge.
-      const badge =
-        state.refTab === 'recruits' && r.campaign === 'legacy'
-          ? ` <span class="ref-badge legacy">legacy</span>`
-          : '';
-      // Recruits show their CONVERSION date (when they counted); prospects show
-      // when they enlisted (they haven't converted). Flag recruits who converted
-      // during a bonus event with a small ★.
-      let when = '—';
-      let eventTag = '';
-      if (state.refTab === 'recruits') {
-        const d = recruitDate(r);
-        when = d ? d.toLocaleDateString() : '—';
-        const ev = d ? eventForDate(d) : null;
-        if (ev)
-          eventTag = ` <span class="ref-event" title="${OH.escapeHtml(ev.name)}: ${OH.escapeHtml(ev.reward)}">★</span>`;
-      } else {
-        const d = parseTs(r.enlistedOn);
-        when = d ? d.toLocaleDateString() : '—';
-      }
-      return `<tr>
-      <td class="r-handle">${link}${badge}</td>
-      <td>${OH.escapeHtml(r.moniker || '')}</td>
-      <td>${OH.escapeHtml(when)}${eventTag}</td>
-    </tr>`;
-    })
-    .join('');
-}
-
-// Re-render only the list table + result count (used by search/sort/tab events so
-// we don't rebuild the whole page and lose input focus / chart state).
-function renderRefList() {
-  const tbody = $('#ref-tbody');
-  const count = $('#ref-count');
-  if (tbody) setHTML(tbody, refListRows());
-  if (count) {
-    const shown = refFilteredList().length;
-    const total =
-      (state.refTab === 'prospects' ? state.referral.prospectsList : state.referral.recruitsList) ||
-      [];
-    count.textContent = `Showing ${shown.toLocaleString('en-US')} of ${total.length.toLocaleString('en-US')}`;
-  }
-  // The date column means different things per tab (see refListRows).
-  const dateCol = $('#ref-date-col');
-  if (dateCol) dateCol.textContent = state.refTab === 'recruits' ? 'Converted' : 'Enlisted';
-  document.querySelectorAll('#referrals-body .ref-tab').forEach((b) => {
-    b.classList.toggle('active', b.dataset.reftab === state.refTab);
-  });
-}
-
 // --- Referrals: progress, gallery, milestones, insights, share card ---------
 // The bonus-event list starts as the built-in REFERRAL_EVENTS and is refreshed
 // from the wiki (OH.getReferralEvents, cached a week) the first time the page
@@ -4061,63 +3447,10 @@ function tierProgress(ladder, recruits) {
   return { next, prev, from, pct, done: done.length };
 }
 
-// A row of dots, one per tier: lit when earned, ringed for the next one.
-function ladderTrackHtml(ladder, recruits, label) {
-  const { next } = tierProgress(ladder, recruits);
-  const dots = ladder
-    .map((t) => {
-      const cls = recruits >= t.at ? 'on' : next && t.at === next.at ? 'next' : '';
-      const tip = `${t.at.toLocaleString('en-US')} recruit${t.at === 1 ? '' : 's'}${t.rank ? ` · ${t.rank}` : ''}: ${rewardNames(t.items)}`;
-      return `<div class="rt-step ${cls}" data-tip="${OH.escapeHtml(tip)}" aria-label="${OH.escapeHtml(tip)}"${
-        t.file ? ` data-file="${OH.escapeHtml(t.file)}"` : ''
-      }><span class="rt-dot"></span><span class="rt-at">${t.at.toLocaleString('en-US')}</span></div>`;
-    })
-    .join('');
-  return `<div class="rt"><div class="rt-label">${OH.escapeHtml(label)}</div><div class="rt-track">${dots}</div></div>`;
-}
-
 // The legacy rank you hold (e.g. "Sergeant"), or ''.
 function legacyRank(recruits) {
   const done = REFERRAL_LADDER_LEGACY.filter((t) => recruits >= t.at);
   return done.length ? done[done.length - 1].rank : '';
-}
-
-// Top of the page: recruits, rank, the bar to the next reward, both tracks.
-function refHeroHtml(ref, recruits, projection, hasLegacy) {
-  const p = tierProgress(REFERRAL_LADDER_STANDARD, recruits);
-  const rank = hasLegacy ? legacyRank(recruits) : '';
-  const nextLine = p.next
-    ? `<strong>${(p.next.at - recruits).toLocaleString('en-US')} more</strong> to ${OH.escapeHtml(rewardNames(p.next.items))}${
-        projection && projection !== '—'
-          ? ` <span class="muted">· at your pace ${OH.escapeHtml(projection)}</span>`
-          : ''
-      }`
-    : 'Every standard reward unlocked';
-  const running = runningEvent();
-  const eventPill = running
-    ? `<div class="ref-hero-event">Bonus event on now: <strong>${OH.escapeHtml(running.name)}</strong>, until ${OH.escapeHtml(
-        fmtDate(parseTs(running.end + ' 00:00:00')),
-      )}</div>`
-    : '';
-  return `<div class="ref-hero">
-    <div class="ref-hero-top">
-      <div>
-        <div class="ref-hero-n">${recruits.toLocaleString('en-US')}<span> recruit${recruits === 1 ? '' : 's'}</span></div>
-        ${rank ? `<div class="ref-hero-rank">${OH.escapeHtml(rank)}</div>` : ''}
-      </div>
-      <div class="ref-share">
-        <label class="mk-toggle" title="Adds your referral code and a QR code people can scan"><input type="checkbox" id="ref-share-code"> Include My Code</label>
-        <button type="button" class="mk-btn" id="ref-share">Download Image</button>
-        <span class="mk-export-status" id="ref-share-status" aria-live="polite"></span>
-      </div>
-    </div>
-    <div class="ref-hero-next">${nextLine}</div>
-    <div class="ref-hero-bar"><div style="width:${(p.pct * 100).toFixed(1)}%"></div></div>
-    <div class="ref-hero-bar-ends"><span>${p.from.toLocaleString('en-US')}</span><span>${p.next ? p.next.at.toLocaleString('en-US') : ''}</span></div>
-    ${eventPill}
-    ${ladderTrackHtml(REFERRAL_LADDER_STANDARD, recruits, 'Standard ladder')}
-    ${hasLegacy ? ladderTrackHtml(REFERRAL_LADDER_LEGACY, recruits, 'Legacy ladder') : ''}
-  </div>`;
 }
 
 // Bonus events you earned: once per event, dated by the first recruit who
@@ -4174,160 +3507,11 @@ function shortReward(text) {
       .trim() || text
   );
 }
-function rewardsGalleryHtml(list) {
-  if (!list.length)
-    return '<p class="muted">No rewards yet. Your first recruit unlocks the GCD-Army armor. Go recruit a wingman.</p>';
-  const attr = (k, v) => (v ? ` data-${k}="${OH.escapeHtml(v)}"` : '');
-  return `<div class="ref-gallery">${list
-    .map(
-      (r) => `<div class="ref-gcard"${attr('file', r.file)}${attr('resolve', r.resolve)}>
-        <div class="ref-gimg"></div>
-        <div class="ref-gname" title="${OH.escapeHtml(r.name)}">${OH.escapeHtml(r.name)}</div>
-        <div class="ref-gsub">${OH.escapeHtml(r.sub)}</div>
-      </div>`,
-    )
-    .join('')}</div>`;
-}
-// Fill each card's picture: the wiki's picture for that tier/event (one batched
-// lookup), else the ship's art for ship rewards.
-async function enhanceGalleryImages(container) {
-  const cards = [...container.querySelectorAll('.ref-gcard')];
-  const put = (card, url) => {
-    const slot = card.querySelector('.ref-gimg');
-    if (!url || !slot || !slot.isConnected) return;
-    const im = document.createElement('img');
-    im.alt = '';
-    im.loading = 'lazy';
-    im.src = url;
-    im.addEventListener('error', () => im.remove());
-    slot.replaceChildren(im);
-    card.dataset.image = url;
-  };
-  const files = await OH.wikiImageUrls(cards.map((c) => c.dataset.file).filter(Boolean));
-  const rest = [];
-  for (const card of cards) {
-    const url = card.dataset.file && files[card.dataset.file];
-    if (url) put(card, url);
-    else if (card.dataset.resolve) rest.push(card);
-  }
-  let i = 0;
-  const worker = async () => {
-    while (i < rest.length) {
-      const card = rest[i++];
-      put(card, await OH.getShipImage(card.dataset.resolve));
-    }
-  };
-  for (let w = 0; w < 3; w++) worker();
-}
-
-// When each tier was reached: the Nth recruit's conversion date. If RSI's list
-// is shorter than the total (very old recruits), early tiers have no date.
-function milestonesHtml(recruits, recruitsRows, hasLegacy) {
-  const dates = recruitsRows
-    .map(recruitDate)
-    .filter(Boolean)
-    .sort((a, b) => a - b);
-  const offset = recruits - dates.length; // recruits we have no date for
-  const byAt = new Map();
-  const tiers = [...REFERRAL_LADDER_STANDARD, ...(hasLegacy ? REFERRAL_LADDER_LEGACY : [])].filter(
-    (t) => recruits >= t.at,
-  );
-  for (const t of tiers) {
-    const cur = byAt.get(t.at) || { at: t.at, items: [], rank: '' };
-    cur.items.push(...t.items);
-    if (t.rank) cur.rank = t.rank;
-    byAt.set(t.at, cur);
-  }
-  const rows = [...byAt.values()].sort((a, b) => b.at - a.at);
-  if (!rows.length)
-    return '<p class="muted">Your first milestone is 1 recruit. Every fleet starts with a wingman.</p>';
-  return `<ol class="ref-timeline">${rows
-    .map((m) => {
-      const d = dates[m.at - 1 - offset];
-      return `<li><span class="rtl-dot"></span>
-        <div class="rtl-head"><strong>${m.at.toLocaleString('en-US')} recruit${m.at === 1 ? '' : 's'}</strong>${
-          m.rank ? ` <span class="reward-rank">${OH.escapeHtml(m.rank)}</span>` : ''
-        }<span class="rtl-date">${d ? OH.escapeHtml(fmtDate(d)) : 'before your recruit list starts'}</span></div>
-        <div class="rtl-items muted">${OH.escapeHtml(rewardNames(m.items))}</div></li>`;
-    })
-    .join('')}</ol>`;
-}
-
-// How long prospects have been waiting, and how fast recruits converted.
-function prospectInsightsHtml(ref) {
-  const DAY = 86400000;
-  const now = Date.now();
-  const buckets = [
-    ['Under 30 days', 30],
-    ['1 to 3 months', 91],
-    ['3 to 12 months', 365],
-    ['1 to 2 years', 730],
-    ['Over 2 years', Infinity],
-  ].map(([label, max]) => ({ label, max, n: 0 }));
-  for (const p of ref.prospectsList || []) {
-    const d = parseTs(p.enlistedOn);
-    if (!d) continue;
-    const age = (now - d) / DAY;
-    buckets.find((b) => age < b.max).n++;
-  }
-  const maxN = Math.max(1, ...buckets.map((b) => b.n));
-  const bars = buckets
-    .map(
-      (b) => `<div class="bar-row">
-        <div class="bar-label">${b.label}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((b.n / maxN) * 100)}%"></div></div>
-        <div class="bar-val">${b.n.toLocaleString('en-US')}</div>
-      </div>`,
-    )
-    .join('');
-  const waits = (ref.recruitsList || [])
-    .map((r) => {
-      const a = parseTs(r.enlistedOn);
-      const b = parseTs(r.convertedOn);
-      return a && b && b >= a ? (b - a) / DAY : null;
-    })
-    .filter((x) => x != null)
-    .sort((a, b) => a - b);
-  let speed = '<p class="muted">No recruits with both dates yet. Still waiting on comms.</p>';
-  if (waits.length) {
-    const median = waits[Math.floor(waits.length / 2)];
-    const within = (days) =>
-      Math.round((waits.filter((w) => w <= days).length / waits.length) * 100);
-    const days = (n) =>
-      n < 1 ? 'same day' : `${Math.round(n)} day${Math.round(n) === 1 ? '' : 's'}`;
-    speed = `<div class="stat-grid">
-      <div class="stat-box"><div class="big">${days(median)}</div><div class="lbl">typical time to convert</div></div>
-      <div class="stat-box"><div class="big">${within(1)}%</div><div class="lbl">bought the same day</div></div>
-      <div class="stat-box"><div class="big">${within(30)}%</div><div class="lbl">within 30 days</div></div>
-      <div class="stat-box"><div class="big">${100 - within(365)}%</div><div class="lbl">took over a year</div></div>
-    </div>`;
-  }
-  return `<div class="ref-charts">
-    <div class="ref-chart"><h4>Waiting Prospects by Age</h4>${bars}
-      <p class="muted ref-small">People who signed up with your code but haven't bought a game package yet. Still in the lobby. RSI doesn't share a way to contact them.</p></div>
-    <div class="ref-chart"><h4>How Fast Recruits Bought</h4>${speed}</div>
-  </div>`;
-}
 
 // The event running today, or null.
 function runningEvent() {
   const today = new Date();
   return eventForDate(today);
-}
-function eventBannerHtml() {
-  const running = runningEvent();
-  if (running) {
-    return `<div class="ref-event-banner live"><strong>${OH.escapeHtml(running.name)}</strong> is on until ${OH.escapeHtml(
-      fmtDate(parseTs(running.end + ' 00:00:00')),
-    )}. Anyone who enlists with your code and buys a game package gets you: <strong>${OH.escapeHtml(running.reward)}</strong>.</div>`;
-  }
-  const past = referralEvents.filter((e) => parseTs(e.end + ' 23:59:59') < new Date());
-  const last = past[past.length - 1];
-  return last
-    ? `<div class="ref-event-banner">No bonus event right now. The last one was <strong>${OH.escapeHtml(last.name)}</strong> (${OH.escapeHtml(
-        fmtDate(parseTs(last.start + ' 00:00:00')),
-      )}, ${OH.escapeHtml(last.reward)}). CIG runs one every few months.</div>`
-    : '';
 }
 
 // --- Share card -----------------------------------------------------------
@@ -4545,203 +3729,11 @@ async function shareReferralImage() {
   downloadImage(canvas, marketFilename('png').replace('sale-sheet', 'referrals'), status);
 }
 
+// The Referrals page is Svelte (ui/referrals): tell it to redraw, and fetch newer
+// bonus events from the wiki the first time it opens.
 function renderReferrals() {
-  const body = $('#referrals-body');
-  if (!body) return;
-  const ref = state.referral;
-
-  // Not signed in / never scanned → a friendly prompt instead of a blank page.
-  if (!ref) {
-    setHTML(
-      body,
-      `<div class="placeholder-view">
-      <p class="muted">No recruits on the roster yet. Your wingmen are out there somewhere. Hit
-        <strong>Scan</strong> at the top to pull your recruits and prospects from your
-        <a href="https://robertsspaceindustries.com/en/referral" target="_blank" rel="noopener">RSI Referral Rewards</a> page.</p>
-    </div>`,
-    );
-    return;
-  }
-
-  const box = (big, lbl, cls = '') =>
-    `<div class="stat-box ${cls}"><div class="big">${big}</div><div class="lbl">${lbl}</div></div>`;
-  const recruitsRows = ref.recruitsList || [];
-  const recruits = ref.legacy?.recruits ?? 0; // all-time recruit total
-  const prospects = ref.prospects ?? 0;
-  const total = prospects + recruits; // everyone who used your code (signed up or converted)
-  const hasLegacy = recruits > 0; // a legacy recruit count means legacy ladder access (see rewardsHtml)
-
-  // Date-derived stats from recruit CONVERSION dates (when they actually counted).
-  const dates = recruitsRows.map(recruitDate).filter(Boolean);
-  const best = bestMonth(dates);
-  const convRate = prospects > 0 ? `${((recruits / prospects) * 100).toFixed(1)}%` : '—';
-
-  // --- Richer, referral-specific stats ------------------------------------
-  const DAY = 86400000;
-  const now = new Date();
-  const prospectsList = ref.prospectsList || [];
-
-  // Momentum: conversions in the last 30 / 90 days, and trend vs the prior 30.
-  const convInWindow = (fromDaysAgo, toDaysAgo = 0) =>
-    dates.filter((d) => {
-      const age = (now - d) / DAY;
-      return age >= toDaysAgo && age < fromDaysAgo;
-    }).length;
-  const last30 = convInWindow(30);
-  const prev30 = convInWindow(60, 30);
-  const last90 = convInWindow(90);
-  let trend = '';
-  if (prev30 > 0) {
-    const pct = Math.round(((last30 - prev30) / prev30) * 100);
-    trend = pct === 0 ? '→ flat' : pct > 0 ? `↑ ${pct}%` : `↓ ${Math.abs(pct)}%`;
-  } else if (last30 > 0) {
-    trend = '↑ new';
-  }
-
-  // Recent pace (recruits/month over the last 90 days) → projection to next tier.
-  const pace90 = last90 / 3; // per month
-  const nextTier = REFERRAL_LADDER_STANDARD.find((t) => recruits < t.at) || null;
-  let projection = '—';
-  if (nextTier) {
-    const toGo = nextTier.at - recruits;
-    if (pace90 > 0) {
-      const months = toGo / pace90;
-      projection =
-        months < 1
-          ? '< 1 mo'
-          : months < 18
-            ? `${Math.round(months)} mo`
-            : `${(months / 12).toFixed(1)} yr`;
-    }
-  }
-
-  // Prospect funnel: pending = prospects who haven't converted.
-  const pending = prospectsList.length;
-
-  const fmtDay = (ms) =>
-    new Date(ms).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-  const latest = dates.length ? fmtDay(Math.max(...dates)) : '—';
-  const first = dates.length ? fmtDay(Math.min(...dates)) : '—';
-
-  // Three labelled clusters that read top→bottom as a story:
-  //   Overview (what you have) → Recent activity (how you're trending) →
-  //   Pipeline & progress (what's coming).
-  const overview =
-    box(total.toLocaleString('en-US'), 'total (prospects + recruits)', 'span2') +
-    box(recruits.toLocaleString('en-US'), 'recruits') +
-    box(prospects.toLocaleString('en-US'), 'prospects') +
-    box(convRate, 'conversion');
-
-  const activity =
-    box(last30.toLocaleString('en-US'), 'recruits · last 30d') +
-    box(trend || '—', 'vs prior 30d') +
-    box(last90.toLocaleString('en-US'), 'recruits · last 90d') +
-    box(latest, 'latest conversion');
-
-  const pipeline =
-    box(pending.toLocaleString('en-US'), 'pending prospects') +
-    box(best ? `${best.n}` : '—', best ? `best month (${best.label})` : 'best month') +
-    box(first, 'first conversion') +
-    box(
-      nextTier ? projection : '—',
-      nextTier ? `est. to ${nextTier.at.toLocaleString('en-US')} tier` : 'all tiers done',
-    );
-
-  const tab = (key, label, n) =>
-    `<button class="ref-tab ${state.refTab === key ? 'active' : ''}" data-reftab="${key}">${label} <b>${n.toLocaleString('en-US')}</b></button>`;
-
-  const code = ref.code
-    ? `<div class="ref-code-banner">Your referral code:
-        <span class="ref-code">${OH.escapeHtml(ref.code)}</span>
-        <button class="ref-copy" data-copy="${OH.escapeHtml(ref.url || ref.code)}" title="Copy referral link">Copy Link</button>
-      </div>`
-    : '';
-
-  setHTML(
-    body,
-    `
-    ${code}
-    ${refHeroHtml(ref, recruits, nextTier ? projection : '', hasLegacy)}
-
-    <h3 class="section-title" style="margin-top:26px">Rewards Earned</h3>
-    ${rewardsGalleryHtml(earnedRewards(recruits, recruitsRows, hasLegacy))}
-
-    <div class="stat-group-label" style="margin-top:22px">Overview</div>
-    <div class="stat-grid ref-totals">${overview}</div>
-
-    <div class="stat-group-label">Recent activity</div>
-    <div class="stat-grid">${activity}</div>
-
-    <div class="stat-group-label">Pipeline &amp; progress</div>
-    <div class="stat-grid">${pipeline}</div>
-
-    <h3 class="section-title" style="margin-top:26px">Trends</h3>
-    <div class="ref-charts">
-      <div class="ref-chart"><h4>Recruits Over Time (Cumulative · Monthly)</h4>${recruitsOverTimeSvg(recruitsRows)}</div>
-      <div class="ref-chart"><h4>Prospect → Recruit Conversion</h4>${conversionHtml(ref)}</div>
-    </div>
-    <div class="stat-group-label">Recruits by year</div>
-    ${recruitsByYearHtml(recruitsRows)}
-
-    <h3 class="section-title" style="margin-top:26px">Prospects</h3>
-    ${prospectInsightsHtml(ref)}
-
-    <h3 class="section-title" style="margin-top:26px">Milestones</h3>
-    ${milestonesHtml(recruits, recruitsRows, hasLegacy)}
-
-    <h3 class="section-title" style="margin-top:26px">Tier Rewards</h3>
-    ${rewardsHtml(ref)}
-
-    <h3 class="section-title" style="margin-top:26px">Event Bonuses</h3>
-    ${eventBannerHtml()}
-    ${eventRewardsHtml(recruitsRows)}
-
-    <h3 class="section-title" style="margin-top:26px">People</h3>
-    <div class="ref-list-controls">
-      <div class="ref-tabs">
-        ${tab('recruits', 'Recruits', recruits)}
-        ${tab('prospects', 'Prospects', prospects)}
-      </div>
-      <input id="ref-search" class="ref-search" type="search" placeholder="Search handle / moniker…" aria-label="Search Referrals" value="${OH.escapeHtml(state.refQuery)}" />
-      <select id="ref-sort" class="ref-sort" aria-label="Sort Referrals">
-        <option value="newest"${state.refSort === 'newest' ? ' selected' : ''}>Newest first</option>
-        <option value="oldest"${state.refSort === 'oldest' ? ' selected' : ''}>Oldest first</option>
-        <option value="name"${state.refSort === 'name' ? ' selected' : ''}>Name (A–Z)</option>
-      </select>
-    </div>
-    <div id="ref-count" class="result-count"></div>
-    <div class="ref-table-scroll">
-      <table class="ref-table">
-        <thead><tr><th>Handle</th><th>Moniker</th><th id="ref-date-col">Converted</th></tr></thead>
-        <tbody id="ref-tbody">${refListRows()}</tbody>
-      </table>
-    </div>`,
-  );
-
-  renderRefList(); // fills #ref-count
-  enhanceRewardImages(body); // lazily resolve ship art for reward-item hovers
-  enhanceGalleryImages(body);
-  enhanceLadderDots(body);
-  refreshReferralEvents(); // once: newer bonus events from the wiki
-}
-
-// Resolve ship art for reward items (links with data-resolve) so the shared hover
-// preview has an image to show. Lazy + concurrency-capped, mirroring
-// enhanceCardImages; sets data-image on each resolved item.
-function enhanceRewardImages(container) {
-  const items = [...container.querySelectorAll('.reward-item.ship[data-resolve]')].filter(
-    (el) => !el.dataset.image,
-  );
-  let i = 0;
-  const CONCURRENCY = 3;
-  const worker = async () => {
-    while (i < items.length) {
-      const el = items[i++];
-      const url = await OH.getShipImage(el.dataset.resolve);
-      if (url) el.dataset.image = url;
-    }
-  };
-  for (let w = 0; w < CONCURRENCY; w++) worker();
+  refreshReferralEvents();
+  homeUpdated();
 }
 
 // --- Buy-Backs ------------------------------------------------------------
@@ -5508,13 +4500,6 @@ function onRewardHover(e) {
   }
   positionPreview(e.clientX, e.clientY);
 }
-// The ladder dots' pictures: each tier's wiki image, looked up in one batch.
-async function enhanceLadderDots(container) {
-  const dots = [...container.querySelectorAll('.rt-step[data-file]')];
-  if (!dots.length) return;
-  const urls = await OH.wikiImageUrls(dots.map((d) => d.dataset.file));
-  for (const d of dots) if (urls[d.dataset.file]) d.dataset.image = urls[d.dataset.file];
-}
 
 function fmtScan() {
   return state.scannedAt ? new Date(state.scannedAt).toLocaleString() : '—';
@@ -5922,33 +4907,10 @@ document.addEventListener('keyup', (e) => {
 
 // Referral list tab switching (Recruits / Prospects) + reward-item hover preview.
 const referralsBodyEl = $('#referrals-body');
+// The Referrals page itself is Svelte (ui/referrals); the reward hover preview stays here.
 if (referralsBodyEl) {
   referralsBodyEl.addEventListener('mousemove', onRewardHover);
   referralsBodyEl.addEventListener('mouseleave', hidePreview);
-  // Tab switch (Recruits / Prospects): reset the search, re-render the list only.
-  referralsBodyEl.addEventListener('click', (e) => {
-    if (e.target.closest('#ref-share')) return void shareReferralImage();
-    const btn = e.target.closest('[data-reftab]');
-    if (!btn) return;
-    if (state.refTab === btn.dataset.reftab) return;
-    state.refTab = btn.dataset.reftab;
-    state.refQuery = '';
-    const search = $('#ref-search');
-    if (search) search.value = '';
-    renderRefList();
-  });
-  // Search box: filter the list live (lightweight re-render keeps focus).
-  referralsBodyEl.addEventListener('input', (e) => {
-    if (e.target.id !== 'ref-search') return;
-    state.refQuery = e.target.value;
-    renderRefList();
-  });
-  // Sort dropdown.
-  referralsBodyEl.addEventListener('change', (e) => {
-    if (e.target.id !== 'ref-sort') return;
-    state.refSort = e.target.value;
-    renderRefList();
-  });
 }
 
 // Inventory / Buy-Backs pass: switches, Clear filters, Below store price, saved
@@ -6012,25 +4974,6 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('[data-bb-all]')) return;
   state.bbOnly = null;
   renderBuybacks();
-});
-
-// Copy referral link/code button (Referrals page). Uses the clipboard API with
-// a brief "Copied" confirmation; falls back silently if clipboard is unavailable.
-document.addEventListener('click', async (e) => {
-  const btn = e.target.closest('.ref-copy');
-  if (!btn) return;
-  try {
-    await navigator.clipboard.writeText(btn.dataset.copy || '');
-    const prev = btn.textContent;
-    btn.textContent = 'Copied';
-    btn.classList.add('copied');
-    setTimeout(() => {
-      btn.textContent = prev;
-      btn.classList.remove('copied');
-    }, 1500);
-  } catch {
-    /* clipboard blocked — no-op */
-  }
 });
 
 // Scan a chosen set of sources. Each is independent and persisted on its own, so
@@ -6634,98 +5577,45 @@ async function loadChangelog() {
   return changelog;
 }
 
-// "2026-09-28" → "Sep 28, 2026"; anything else (e.g. "June 2026") as written.
-const releaseDate = (d) =>
-  /^\d{4}-\d{2}-\d{2}$/.test(d)
-    ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        timeZone: 'UTC',
-      })
-    : d;
-
-// Split a release's bullets into New / Improved / Fixed by their CHANGELOG
-// prefix ("New:", "Improved:", "Changed:", "Fixed:"). Untagged bullets count
-// as Improved.
-const RELEASE_TAG = /^(\*\*)?(new|improved|changed|fix(?:ed)?)\b\s*:?\s*/i;
-const releaseKind = (t) => {
-  const tag = (t.match(RELEASE_TAG)?.[2] || '').toLowerCase();
-  return tag === 'new' ? 'new' : tag.startsWith('fix') ? 'fixed' : 'improved';
-};
-function releaseGroupsHtml(items) {
-  const groups = [
-    ['new', 'New'],
-    ['improved', 'Improved'],
-    ['fixed', 'Fixed'],
-  ];
-  return groups
-    .map(([k, label]) => [k, label, items.filter((t) => releaseKind(t) === k)])
-    .filter(([, , list]) => list.length)
-    .map(
-      ([k, label, list]) =>
-        `<span class="release-group g-${k}">${label}</span><ul>${list
-          .map((t) => `<li>${OH.inlineMarkdown(capFirst(t.replace(RELEASE_TAG, '$1')))}</li>`)
-          .join('')}</ul>`,
-    )
-    .join('');
-}
-
-// Updates page: "Check for updates". Chrome and Edge can ask their store right
-// now (a found update downloads, then the Reload bar appears); Firefox can't,
-// so it asks the public AMO API (CORS-open, no permission needed) for the
-// latest published version and compares.
+// Updates page: "Check for Updates" (ui/updates/Updates.svelte shows the result).
+// Chrome and Edge can ask their store right now (a found update downloads, then
+// the Reload bar appears); Firefox can't, so it asks the public AMO API (CORS-open,
+// no permission needed) for the latest published version and compares. Resolves
+// to the line to show under the button.
 const AMO_ADDON_API = 'https://addons.mozilla.org/api/v5/addons/addon/open-hangar/';
-{
-  const btn = $('#update-check-btn');
-  const out = $('#update-check-status');
-  const curEl = $('#update-cur');
+async function checkForUpdates() {
   const cur = chrome.runtime.getManifest().version;
-  if (curEl) curEl.textContent = cur;
-  btn?.addEventListener('click', async () => {
-    // Looked up by name so Firefox's linter doesn't flag it (see initUpdates).
-    const check = chrome.runtime[['request', 'Update', 'Check'].join('')];
-    if (typeof check !== 'function') {
-      btn.disabled = true;
-      out.textContent = 'Checking…';
-      try {
-        const res = await fetch(AMO_ADDON_API, {
-          credentials: 'omit',
-          cache: 'no-store',
-          signal: AbortSignal.timeout(8000),
-        });
-        const latest = res.ok ? (await res.json())?.current_version?.version : null;
-        if (!latest) throw new Error('no version');
-        chrome.storage.local.set({ lastUpdateCheck: Date.now() });
-        out.textContent =
-          OH.compareVersions(latest, cur) > 0
-            ? `Open Hangar ${latest} is out. Firefox installs it on its own within a day, or get it now: about:addons, gear icon, Check for Updates.`
-            : 'You’re on the latest version. Fly safe.';
-      } catch {
-        out.textContent =
-          'Couldn’t reach Firefox Add-ons. Probably a 30k on their end, try again in a bit.';
-      }
-      btn.disabled = false;
-      return;
-    }
-    btn.disabled = true;
-    out.textContent = 'Checking…';
+  // Looked up by name so Firefox's linter doesn't flag it (see initUpdates).
+  const check = chrome.runtime[['request', 'Update', 'Check'].join('')];
+  if (typeof check !== 'function') {
     try {
-      const r = await check.call(chrome.runtime);
-      const status = (r && r.status) || r;
+      const res = await fetch(AMO_ADDON_API, {
+        credentials: 'omit',
+        cache: 'no-store',
+        signal: AbortSignal.timeout(8000),
+      });
+      const latest = res.ok ? (await res.json())?.current_version?.version : null;
+      if (!latest) throw new Error('no version');
       chrome.storage.local.set({ lastUpdateCheck: Date.now() });
-      out.textContent =
-        status === 'update_available'
-          ? `Open Hangar ${(r && r.version) || ''} is downloading. A Reload bar appears at the top when it's ready.`
-          : status === 'throttled'
-            ? 'Checked a moment ago. Try again in a few minutes.'
-            : 'You’re on the latest version. Fly safe.';
+      return OH.compareVersions(latest, cur) > 0
+        ? `Open Hangar ${latest} is out. Firefox installs it on its own within a day, or get it now: about:addons, gear icon, Check for Updates.`
+        : 'You’re on the latest version. Fly safe.';
     } catch {
-      out.textContent =
-        "Couldn't check. Developer builds (loaded unpacked) don't update from the store.";
+      return 'Couldn’t reach Firefox Add-ons. Probably a 30k on their end, try again in a bit.';
     }
-    btn.disabled = false;
-  });
+  }
+  try {
+    const r = await check.call(chrome.runtime);
+    const status = (r && r.status) || r;
+    chrome.storage.local.set({ lastUpdateCheck: Date.now() });
+    return status === 'update_available'
+      ? `Open Hangar ${(r && r.version) || ''} is downloading. A Reload bar appears at the top when it's ready.`
+      : status === 'throttled'
+        ? 'Checked a moment ago. Try again in a few minutes.'
+        : 'You’re on the latest version. Fly safe.';
+  } catch {
+    return "Couldn't check. Developer builds (loaded unpacked) don't update from the store.";
+  }
 }
 
 // Known Issues (#175): open bugs from the public GitHub tracker, fetched only when
@@ -6747,80 +5637,30 @@ async function loadKnownIssues() {
   return list;
 }
 
+// What the Svelte Updates and Known Issues pages (ui/updates) draw. These two
+// load it each time the page opens and fire 'oh:home' so the pages redraw.
+const updatesPage = { from: null, releases: null };
+const issuesPage = { status: 'loading', quip: '', list: [] };
+
 async function renderKnownIssues() {
-  const body = $('#issues-body');
-  if (!body) return;
-  setHTML(body, `<p class="muted">${OH.quip('loading')}</p>`);
-  let list;
+  issuesPage.status = 'loading';
+  issuesPage.quip = OH.quip('loading');
+  homeUpdated();
   try {
-    list = await loadKnownIssues();
+    issuesPage.list = await loadKnownIssues();
+    issuesPage.status = 'ok';
   } catch {
-    setHTML(
-      body,
-      `<p class="muted">Couldn't reach GitHub's comm relay. See the list <a href="${REPO_URL}/issues?q=is%3Aopen+label%3Abug" target="_blank" rel="noopener">on GitHub</a>.</p>`,
-    );
-    return;
+    issuesPage.status = 'error';
   }
-  if (!list.length) {
-    setHTML(body, '<p class="muted">No known bugs right now. Clear skies, Citizen.</p>');
-    return;
-  }
-  const days = (t) => {
-    const d = Math.floor((Date.now() - Date.parse(t)) / 86400000);
-    return d < 1 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`;
-  };
-  setHTML(
-    body,
-    `<ul class="known-issues">${list
-      .map(
-        (i) => `<li>
-          <a href="${OH.escapeHtml(i.url)}" target="_blank" rel="noopener">${OH.escapeHtml(i.title)}</a>
-          <span class="muted">#${i.number} · opened ${days(i.createdAt)}${
-            i.labels.includes('scan-broken') ? ' · <span class="ki-scan">Scan broken</span>' : ''
-          }</span>
-        </li>`,
-      )
-      .join('')}</ul>`,
-  );
+  homeUpdated();
 }
 
 async function renderUpdates() {
-  const body = $('#updates-body');
   const cur = chrome.runtime.getManifest().version;
   const { justUpdated } = await chrome.storage.local.get('justUpdated');
-  const from = justUpdated && justUpdated.to === cur ? justUpdated.from : null;
-  const list = await loadChangelog();
-  if (!list.length) {
-    setHTML(
-      body,
-      `<p class="muted">Release notes aren't bundled in this build. See them <a href="${REPO_URL}/blob/main/CHANGELOG.md" target="_blank" rel="noopener">on GitHub</a>.</p>`,
-    );
-    return;
-  }
-  setHTML(
-    body,
-    list
-      .map((r) => {
-        const isCur = OH.compareVersions(r.version, cur) === 0;
-        const isNew =
-          from &&
-          OH.compareVersions(r.version, from) > 0 &&
-          OH.compareVersions(r.version, cur) <= 0;
-        const tag = isCur
-          ? `<span class="release-tag${isNew ? ' new' : ''}">${isNew ? 'New · ' : ''}Your version</span>`
-          : isNew
-            ? '<span class="release-tag new">New</span>'
-            : '';
-        return `<section class="release">
-          <div class="release-head"><h3>${OH.escapeHtml(r.title)}</h3>${
-            r.date ? `<span class="release-date">${OH.escapeHtml(releaseDate(r.date))}</span>` : ''
-          }${tag}</div>
-          ${r.intro.map((t) => `<p>${OH.inlineMarkdown(t)}</p>`).join('')}
-          ${releaseGroupsHtml(r.items)}
-        </section>`;
-      })
-      .join(''),
-  );
+  updatesPage.from = justUpdated && justUpdated.to === cur ? justUpdated.from : null;
+  updatesPage.releases = await loadChangelog();
+  homeUpdated();
 }
 
 function showUpdateBanner(version) {
@@ -7811,6 +6651,19 @@ window.OHApp = {
   wishlistStock,
   tierProgress: (recruits) => tierProgress(REFERRAL_LADDER_STANDARD, recruits),
   rewardNames,
+  // Referrals page (ui/referrals).
+  referralLadders: { standard: REFERRAL_LADDER_STANDARD, legacy: REFERRAL_LADDER_LEGACY },
+  get referralEvents() {
+    return referralEvents;
+  },
+  eventForDate,
+  recruitDate,
+  bestMonth,
+  monthKey,
+  fmtDate,
+  legacyRank,
+  earnedRewards,
+  shareReferralImage,
   // Inventory (ui/inventory): what the page around the list shows, and the actions
   // its controls call. Each action updates state and redraws through renderInventory().
   inv: {
@@ -8012,6 +6865,26 @@ window.OHApp = {
     renderInventory();
   },
   shipOf: (name) => (state.shipOf ? state.shipOf(name) : null),
+  // Updates and Known Issues pages (ui/updates).
+  repoUrl: REPO_URL,
+  updates: {
+    get current() {
+      return chrome.runtime.getManifest().version;
+    },
+    // Releases from the bundled CHANGELOG.md (null until loaded, [] if missing).
+    get releases() {
+      return updatesPage.releases;
+    },
+    // The version you updated from, when this install is fresh from an update.
+    get from() {
+      return updatesPage.from;
+    },
+    check: checkForUpdates,
+  },
+  // { status: 'loading' | 'ok' | 'error', quip, list }
+  get knownIssues() {
+    return issuesPage;
+  },
   priceOf: (name) => (state.priceOf ? state.priceOf(name) : null),
   // For Stats (ui/stats): which page is showing, what's still loading, and the
   // helpers its tabs share with the classic pages.
@@ -8036,4 +6909,20 @@ window.OHApp = {
   ownedShips,
   loanersOf,
   includedOf,
+  // For Org Fleet (ui/org): whether it's showing, the stored members (null until it
+  // first shows), the fleet math, and its buttons (each resolves to a message).
+  org: {
+    get active() {
+      return currentView() === 'org';
+    },
+    get members() {
+      return orgMembers;
+    },
+    fleet: (members) => OH.orgFleet(members, state.shipOf, state.priceOf),
+    titleCase,
+    importFiles: importOrgFiles,
+    addMine: addMyOrgFleet,
+    exportCsv: exportOrgCsv,
+    remove: removeOrgMember,
+  },
 };
