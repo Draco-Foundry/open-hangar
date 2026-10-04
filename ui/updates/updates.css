@@ -1,0 +1,36 @@
+/* Updates and Known Issues in Hangar Cobalt (styling pass, 2026-10-04). Every page
+   bundle loads on the one dashboard page, so these rules sit on top of
+   dashboard.html's classic ones. */
+.release {
+  border-radius: var(--r-lg);
+}
+.release-head h3 {
+  font-family: var(--font-head);
+  font-weight: 600;
+  color: var(--head);
+  text-wrap: balance;
+}
+.release-date {
+  font-variant-numeric: tabular-nums;
+}
+.release-group {
+  border-radius: var(--r-sm);
+}
+/* The newest release wears the beacon: worth a look. */
+.release-tag.new {
+  border-color: currentColor;
+  background: var(--beacon-soft);
+  color: var(--beacon);
+}
+.release p,
+.release li {
+  text-wrap: pretty;
+}
+.known-issues li {
+  border-radius: var(--r-md);
+}
+/* Small buttons (Check for Updates here, and on Developers) at button weight. */
+.mk-btn {
+  border-radius: var(--r-sm);
+  font-weight: 500;
+}
