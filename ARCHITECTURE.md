@@ -169,7 +169,11 @@ is moving pages to Svelte one at a time; today that's the Home page cards.
   (or `npm run dev:ui` to watch).
 - **Loading.** `src/dashboard.html` links `ui/home.css` and loads `ui/home.js` as a
   module. `ui/home/main.js` mounts `Home` into `#oh-home`, `ForYou` into `#oh-foryou`
-  and `StatusCard` into `#oh-status`, but only when `window.OHApp` exists.
+  and `StatusCard` into `#oh-status`, plus the Citizen Card: `CitizenCard` before the
+  card's `#status` line (still classic: `setStatus()` writes it), `SignedOut` (the Log
+  In wall) after it, and `Welcome` above the Home search. Only when `window.OHApp`
+  exists. `renderAccount()` still reads the account and keeps the parts outside the
+  card (gear-menu portrait, Log Out, the signed-out banner) up to date.
 - **Classic to Svelte.** `src/dashboard.js` owns scanning, storage and state. At the
   end of the file it publishes `window.OHApp`: a getter for `state` plus read-only
   helpers (`hangarValue`, `accountValue`, `bigMoney`, `priceOf`, …) and a few actions
