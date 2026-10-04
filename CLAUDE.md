@@ -23,8 +23,10 @@ the 0.3.0 plan in [docs/REDESIGN-0.3.md](docs/REDESIGN-0.3.md), the voice in
 - Each page lives in `ui/<page>/` with a `main.js` entry, added to `input` in
   `vite.config.mjs` (`home` shows the pattern). Shared code goes in `ui/lib/`.
 - Build pages from the signed-off specs in `docs/REDESIGN-0.3.md`. A page with no
-  signed-off spec is ported **as it looks today**: no new design without the owner's
-  OK (mockups get signed off first).
+  signed-off spec is ported with **the same content and behavior** it has today: no
+  new design without the owner's OK (mockups get signed off first). The look doesn't
+  have to match pixel for pixel; every page gets a styling pass once all of them are
+  on Svelte (owner, 2026-10-04). Copy and style fixes the rules below call for are fine.
 - The extension must keep working at every step: a half-moved page stays on the
   classic code until its Svelte version is complete.
 - Before opening a PR: `npm test`, `npm run test:ui` (needs Chrome; say so in the PR
