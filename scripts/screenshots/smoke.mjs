@@ -109,7 +109,10 @@ try {
       .find((a) => /LTI/.test(a.textContent))
       .click();
     await new Promise((r) => setTimeout(r, 200));
-    const lti = location.hash === '#inventory' && state.traits.get('lti') === 'yes';
+    const lti =
+      location.hash === '#inventory' &&
+      state.traits.get('ins')?.has('LTI') &&
+      computeShown().every((p) => p.insurance === 'LTI');
     state.traits = new Map();
     location.hash = '#home';
     await new Promise((r) => setTimeout(r, 300));
@@ -750,22 +753,34 @@ try {
   await go('#inventory');
   const inv = await page.evaluate(async () => {
     const r = {};
+    // The page around the list is Svelte (ui/inventory): it redraws a moment later.
+    const tick = () => new Promise((res) => setTimeout(res, 60));
     r.sum = /Pledges\s*\d+/i.test(document.querySelector('#inv-sum').textContent);
     const all = computeShown().length;
     document.querySelector('[data-switch="inv-hide"]').click();
     r.hid = computeShown().length < all;
     document.querySelector('[data-switch="inv-hide"]').click();
-    // Saved view (no prompt in the test: push one directly, then apply it).
-    state.savedViews.push({
-      name: 'Ships',
-      f: { shown: ['ship'], traits: [], query: '', hideSmall: false },
-    });
+    // Saved views (no prompt in the test: push them directly, then apply). The old
+    // format ([trait, 'yes']) reads as the matching sidebar option.
+    state.savedViews.push(
+      { name: 'Ships', f: { shown: ['ship'], traits: [], query: '', hideSmall: false } },
+      { name: 'LTI', f: { shown: [], traits: [['lti', 'yes']], query: '', hideSmall: false } },
+    );
     renderInventory();
+    await tick();
     document.querySelector('[data-view-apply="0"]').click();
-    r.view = computeShown().every((p) => p.kind === 'ship') && state.shown.has('ship');
+    await tick();
+    r.view =
+      computeShown().every((p) => p.kind === 'ship') &&
+      state.shown.has('ship') &&
+      !!document.querySelector('.view-chip.on [data-view-apply="0"]');
+    document.querySelector('[data-view-apply="1"]').click();
+    await tick();
+    r.oldView = computeShown().length > 0 && computeShown().every((p) => p.insurance === 'LTI');
     state.savedViews = [];
-    state.shown = new Set();
+    resetInvFilters();
     renderInventory();
+    await tick();
     // Melt planner: pick two meltable pledges with a wishlist ship.
     const keepWish = state.wishlist;
     state.wishlist = ['Cutlass Black'];
@@ -775,6 +790,7 @@ try {
       .slice(0, 2)
       .forEach((p) => state.selected.add(p.id));
     renderInventory();
+    await tick();
     r.planner = document.querySelector('#sb-melt').textContent;
     state.selected.clear();
     setSelecting(false);
@@ -791,12 +807,97 @@ try {
     document.querySelector('#gsearch-top-results').hidden = true;
     return r;
   });
-  inv.sum && inv.hid && inv.view && /from your wishlist|wishlist/.test(inv.planner)
+  inv.sum && inv.hid && inv.view && inv.oldView && /from your wishlist|wishlist/.test(inv.planner)
     ? ok('inventory: summary strip, Hide small stuff, saved views, melt planner')
     : fail(`inventory pass: ${JSON.stringify(inv)}`);
   inv.counts && inv.bell && inv.search
     ? ok('top bar: counts, alerts bell, search on every page')
     : fail(`top bar: ${JSON.stringify(inv)}`);
+
+  // Filters Pass (B2): the sidebar's groups, the pills above the list, folding away.
+  const side = await page.evaluate(async () => {
+    const tick = () => new Promise((res) => setTimeout(res, 60));
+    const r = {};
+    const all = state.items.length;
+    const q = (sel) => document.querySelector(sel);
+    const opt = (g, k) => q(`.oh-fg[data-group="${g}"] [data-option="${k}"]`);
+    r.groups = [...document.querySelectorAll('.oh-fg summary')].map((x) => x.textContent);
+    // Within a group: either option. Across groups: both.
+    opt('status', 'meltable').click();
+    await tick();
+    const melt = computeShown().length;
+    opt('status', 'notMeltable').click();
+    await tick();
+    r.or = computeShown().length === all;
+    opt('status', 'notMeltable').click();
+    opt('ins', 'LTI').click();
+    await tick();
+    r.and = computeShown().every((p) => p.meltable === true && p.insurance === 'LTI');
+    r.count = q('.oh-fg[data-group="status"] .oh-sn')?.textContent === '1';
+    r.pills = [...document.querySelectorAll('.oh-af')].map((x) => x.textContent);
+    // × on a pill removes just that filter.
+    q('.oh-af button').click();
+    await tick();
+    r.removed = computeShown().length === melt;
+    // Melt Value: everything shown is at or under the cap.
+    const range = q('.oh-range input');
+    range.value = 100;
+    range.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((res) => setTimeout(res, 300));
+    r.meltCap =
+      computeShown().every((p) => p.value <= 100) && /Up to/.test(q('.oh-active').textContent);
+    // Manufacturer search narrows its options.
+    const find = q('.oh-fg[data-group="mfr"] .oh-fsearch');
+    const before = document.querySelectorAll('.oh-fg[data-group="mfr"] .oh-opt').length;
+    find.value = 'drake';
+    find.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    const after = [...document.querySelectorAll('.oh-fg[data-group="mfr"] .oh-opt')];
+    r.mfrSearch = after.length < before && after.every((b) => /drake/i.test(b.textContent));
+    // Clear All, then fold the sidebar away: Filters (n) brings it back.
+    q('.oh-clearall').click();
+    await tick();
+    r.cleared = computeShown().length === all && !q('.oh-active');
+    opt('deals', 'below').click();
+    q('.oh-fbar .oh-link').click();
+    await tick();
+    const fbtn = q('.oh-fbtn');
+    r.folded =
+      q('.oh-side').classList.contains('folded') && !!fbtn && /Filters\s*1/.test(fbtn.textContent);
+    r.pillsWhileFolded = !!q('.oh-af');
+    fbtn.click();
+    await tick();
+    r.back = !q('.oh-side').classList.contains('folded') && state.invFolded === false;
+    // A folded-shut group is remembered.
+    const det = q('.oh-fg[data-group="deals"]');
+    det.open = false;
+    await tick();
+    r.closed = state.invClosed.has('deals');
+    det.open = true;
+    await tick();
+    resetInvFilters();
+    renderInventory();
+    await tick();
+    return r;
+  });
+  side.groups.join('|').startsWith('Insurance|Status|Deals|Came From') &&
+  side.or &&
+  side.and &&
+  side.count &&
+  side.pills.length === 2 &&
+  side.removed &&
+  side.meltCap &&
+  side.mfrSearch &&
+  side.cleared
+    ? ok(
+        'filter sidebar: groups (any in a group, all across), counts, pills with ×, Melt Value, Manufacturer search, Clear All',
+      )
+    : fail(`filter sidebar: ${JSON.stringify(side)}`);
+  side.folded && side.pillsWhileFolded && side.back && side.closed
+    ? ok(
+        'filter sidebar folds away (Filters (n) brings it back, pills stay), group folds remembered',
+      )
+    : fail(`filter sidebar fold: ${JSON.stringify(side)}`);
 
   console.log('Buy-Backs');
   await go('#buybacks');
@@ -899,43 +1000,83 @@ try {
   await checkListAlignment('Buy-Backs', '#buybacks-body');
 
   console.log('Stats');
+  // Stats is the Svelte page in ui/stats, mounted into #stats-body.
   await go('#stats');
-  for (const tab of ['overview', 'value', 'fleet', 'history']) {
-    // the tab row re-renders on every click, so click via the DOM
+  const tabs = await page.$$eval('#stats-body [data-stats-tab]', (b) =>
+    b.map((x) => x.dataset.statsTab),
+  );
+  tabs.length === 8 ? ok('stats: 8 tabs') : fail(`stats tabs: ${tabs.join(',')}`);
+  for (const tab of tabs) {
     await page.$eval(`[data-stats-tab="${tab}"]`, (b) => b.click());
     await new Promise((r) => setTimeout(r, 200));
-    const text = await page.$eval('#stats-body', (e) => e.textContent.trim().length);
-    text > 40 ? ok(`${tab} tab renders`) : fail(`${tab} tab is empty`);
+    const t = await page.$eval('#stats-body', (e) => ({
+      text: e.textContent.trim().length,
+      picked: e.querySelector('[aria-selected="true"]')?.dataset.statsTab,
+    }));
+    t.text > 40 && t.picked === tab
+      ? ok(`${tab} tab renders`)
+      : fail(`${tab} tab: ${JSON.stringify(t)}`);
   }
+  await page.$eval('[data-stats-tab="history"]', (b) => b.click());
+  await new Promise((r) => setTimeout(r, 200));
   const acct = await page.evaluate(() => {
     const last = state.history[state.history.length - 1];
     return {
       title: [...document.querySelectorAll('#stats-body h3')].map((h) => h.textContent).join('|'),
       store: snapshotStore(last),
       now: accountValue().total,
+      dots: document.querySelectorAll('.hist-chart circle').length,
+      steps: document.querySelectorAll('#stats-body .hist-step').length,
       tip: document.querySelector('.hist-chart circle:last-of-type title')?.textContent || '',
     };
   });
   /Account Value Over Time/.test(acct.title) &&
   acct.store > 0 &&
-  Math.abs(acct.store - acct.now) < 1
+  Math.abs(acct.store - acct.now) < 1 &&
+  acct.dots >= 2 &&
+  acct.steps >= 1
     ? ok(`history charts account value (latest ${acct.tip})`)
     : fail(`account value: ${JSON.stringify(acct)}`);
+  // Download Backup (the classic [data-backup] handler) updates the line beside it.
+  const backup = await page.evaluate(async () => {
+    const before = document.querySelector('#stats-body .backup-row').textContent;
+    document.querySelector('#stats-body [data-backup]').click();
+    await new Promise((r) => setTimeout(r, 400));
+    return { before, after: document.querySelector('#stats-body .backup-row').textContent };
+  });
+  /never backed up/.test(backup.before) && /last backup/.test(backup.after)
+    ? ok('download backup updates the last backup line')
+    : fail(`backup row: ${JSON.stringify(backup)}`);
 
   for (const [tab, sel] of [
+    ['fleet', '#stats-body .fleet-cols .bar-row'],
     ['collection', '#stats-body .bar-row'],
-    ['buybacks', '#stats-body .stat-box'],
-    ['top', '#stats-body .row.clickable'],
+    ['buybacks', '#stats-body .row.clickable[data-open-bb]'],
+    ['top', '#stats-body .row.clickable[data-open-item]'],
   ]) {
     await page.evaluate((t) => document.querySelector(`[data-stats-tab="${t}"]`).click(), tab);
     await page.waitForSelector(sel, { timeout: 8000 }).catch(() => {});
-    (await page.$(sel)) ? ok(`${tab} tab renders`) : fail(`${tab} tab empty`);
+    (await page.$(sel)) ? ok(`${tab} tab has its rows`) : fail(`${tab} tab empty`);
   }
   await page.click('#stats-body .row.clickable');
   (await page.$eval('#item-modal', (m) => !m.hidden))
     ? ok('top list row opens the pledge')
     : fail('top list row did not open');
   await page.keyboard.press('Escape');
+  // Streamer Mode hides every amount on the page.
+  const masked = await page.evaluate(async () => {
+    streamer.on = true;
+    route();
+    await new Promise((r) => setTimeout(r, 200));
+    const text = document.querySelector('#stats-body').textContent;
+    streamer.on = false;
+    route();
+    await new Promise((r) => setTimeout(r, 200));
+    return { dots: /••••/.test(text), money: /\$\d/.test(text) };
+  });
+  masked.dots && !masked.money
+    ? ok('streamer mode hides stats amounts')
+    : fail(`stats streamer mode: ${JSON.stringify(masked)}`);
 
   console.log('Org Fleet');
   await go('#org');
@@ -1457,7 +1598,7 @@ try {
       return {
         id: a.id,
         card: a.classList.contains('card') ? a.dataset.id : null,
-        chip: a.dataset.key || null,
+        chip: a.dataset.type || null,
         inModal: !!a.closest('#item-modal'),
         inMenu: !!a.closest('#settings-menu'),
         ring: getComputedStyle(a).outlineStyle,
@@ -1512,18 +1653,17 @@ try {
     ? ok('picture opens full size, Escape closes just the viewer and returns to the picture')
     : fail(`full-size viewer: ${JSON.stringify({ lbOpen, lbTrapped, lbBack })}`);
   await page.keyboard.press('Escape');
-  await page.focus('#chips .chip[data-key]');
+  await page.focus('.oh-fbar .oh-tp[data-type]');
   const chip = await active();
-  // Picking one kind dims the others, so count the kinds still pressed.
   const pressed = () =>
-    page.$$eval('#chips .chip[data-key][aria-pressed="true"]', (cs) => cs.length);
+    page.$$eval('.oh-fbar .oh-tp[data-type][aria-pressed="true"]', (cs) => cs.length);
   const p0 = await pressed();
   await page.keyboard.press('Enter');
   const p1 = await pressed();
   const chipAfter = await active();
   await page.keyboard.press('Enter');
   p0 !== p1 && chipAfter.chip === chip.chip && (await pressed()) === p0
-    ? ok('filter chip toggles with Enter and keeps focus after redrawing')
+    ? ok('filter type pill toggles with Enter and keeps focus after redrawing')
     : fail(`chip keyboard: ${JSON.stringify({ p0, p1, chip, chipAfter })}`);
   await page.focus('#settings-btn');
   await page.keyboard.press('Enter');
