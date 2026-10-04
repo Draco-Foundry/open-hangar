@@ -1,5 +1,9 @@
 {
   "_help": "Kill switch for the extension. How to use it: docs/RSI-CHANGES.md, step 0.",
   "sources": {},
-  "banner": null
+  "banner": {
+    "message": "Welcome to Open Hangar, Citizen! This is an open beta and still a work in progress, with the full release set for November 10. Questions, ideas or a bug to report? Come find us on Discord: discord.gg/FF8Wm5HdnV o7",
+    "level": "info",
+    "until": "2026-11-11"
+  }
 }
