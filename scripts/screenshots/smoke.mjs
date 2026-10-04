@@ -1269,11 +1269,15 @@ try {
   const prices = await page.$$eval('#price-table tbody tr', (r) => r.length);
   prices > 50 ? ok(`price list: ${prices} ships`) : fail(`price list only ${prices} rows`);
   const st = await page.evaluate(async () => {
+    // The Store is Svelte (ui/store): it redraws a tick after a change.
+    const tick = (ms = 50) => new Promise((r) => setTimeout(r, ms));
     const rows = () => document.querySelectorAll('#price-table tbody tr').length;
     const flying = rows(); // default tab: Flight Ready
     document.querySelector('[data-price-tab="all"]').click();
+    await tick();
     const all = rows();
     document.querySelector('[data-price-tab="in-concept"]').click();
+    await tick();
     const concept = rows();
     const ccus = document.querySelectorAll('#ccu-owned tbody tr').length;
     // "In store now" comes from each ship's own store page (stubbed here):
@@ -1293,6 +1297,7 @@ try {
     });
     state.bbDetails['999001'] = { ships: [{ name: 'Carrack' }], also: [] };
     renderStore();
+    await tick();
     const packRow = [...document.querySelectorAll('#wishlist tbody tr')].find((r) =>
       /^Carrack/.test(r.textContent.trim()),
     );
@@ -1302,7 +1307,8 @@ try {
     renderStore();
     await new Promise((r) => setTimeout(r, 300));
     const stock = [...document.querySelectorAll('#wishlist .sale')].map((e) => e.textContent);
-    document.querySelector('[data-wish-bbs]')?.click();
+    document.querySelector('#wishlist .wish-open')?.click();
+    await tick();
     const sub = document.querySelector('.wish-bbs');
     const res = {
       flying,
@@ -1321,6 +1327,7 @@ try {
     };
     state.wishlist = [];
     state.priceTab = 'flight-ready';
+    renderStore();
     return res;
   });
   st.panels === 3 &&
@@ -1359,7 +1366,7 @@ try {
     const pick = async (v) => {
       const sel = document.querySelector('#wish-sort');
       sel.value = v;
-      sel.dispatchEvent(new Event('change'));
+      sel.dispatchEvent(new Event('change', { bubbles: true })); // as a real pick does
       await new Promise((r) => setTimeout(r, 300));
       return order().join(',');
     };
@@ -1371,7 +1378,8 @@ try {
       mineBefore: await pick('mine'),
       grips: document.querySelectorAll('#wishlist .wish-grip').length,
     };
-    moveWishlist('Carrack', 'Pioneer');
+    OHApp.store.setWishOrder(['Carrack', 'Pioneer', 'Cutlass Black']);
+    await new Promise((r) => setTimeout(r, 50));
     res.mineAfter = order().join(',');
     state.wishlist = [];
     state.wishSort = 'name';
@@ -1428,13 +1436,17 @@ try {
   // Panel searches: counts in the placeholder, "N of M" while typing, no CCU
   // search for a handful of CCUs.
   const sm = await page.evaluate(async () => {
+    const tick = () => new Promise((r) => setTimeout(r, 50));
+    await tick();
     const box = document.querySelector('#price-search');
     const placeholder = box.placeholder;
     box.value = 'cutlass';
     box.dispatchEvent(new Event('input'));
+    await tick();
     const count = document.querySelector('#price-search-count').textContent;
     box.value = '';
     box.dispatchEvent(new Event('input'));
+    await tick();
     return {
       placeholder,
       count,
@@ -1630,12 +1642,90 @@ try {
     ? ok('card pictures: two sizes in both RSI URL shapes, others untouched')
     : fail(`card picture sizes: ${JSON.stringify(sizes)}`);
 
-  console.log('Saved accounts');
+  console.log('Developers');
+  // Developers is the Svelte page in ui/developers; its data tools call
+  // window.OHApp.dev. Svelte redraws a microtask later, so wait a tick after actions.
   await go('#developers');
   const prof = await page.$$eval('#profiles .profile-row', (r) => r.map((e) => e.textContent));
   prof.length && /signed in/.test(prof[0])
     ? ok(`${prof.length} saved account(s) listed`)
     : fail('saved accounts list empty');
+  const devUi = await page.evaluate(async () => {
+    const tick = () => new Promise((r) => setTimeout(r, 150));
+    const q = (s) => document.querySelector(s);
+    const files = [];
+    window.downloadBlob = (blob, name) => files.push([blob.type, name]);
+    const out = {
+      links: document.querySelectorAll('#dev-links a').length,
+      restoreHidden: q('#restore-db').hidden,
+      supporters: q('#sup-contributors').textContent.trim(),
+      boosters: q('#sup-boosters a')?.textContent,
+    };
+    q('#export-db').click();
+    await tick();
+    out.json = q('#data-msg').textContent;
+    q('#export-htf').click();
+    await tick();
+    out.htf = q('#data-msg').textContent;
+    // The import picker opens from Import JSON and from the damaged-database notice.
+    const input = q('#import-file');
+    let opened = 0;
+    input.click = () => opened++;
+    q('#import-db').click();
+    q('#db-restore').click();
+    out.opened = opened;
+    delete input.click;
+    // A file that isn't JSON: an error note, nothing replaced.
+    const realConfirm = window.confirm;
+    window.confirm = () => true; // "Importing replaces your current data. Continue?"
+    const dt = new DataTransfer();
+    dt.items.add(new File(['not json'], 'x.json', { type: 'application/json' }));
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    window.confirm = realConfirm;
+    out.bad = q('#data-msg').textContent;
+    out.badRed = q('#data-msg').classList.contains('error');
+    out.items = state.items.length;
+    q('#report-preview').open = true;
+    await tick();
+    await tick();
+    out.report = q('#report-text').textContent.length;
+    q('#clear-log').click();
+    await tick();
+    out.cleared = q('#report-msg').textContent;
+    out.files = files.map((f) => f[1]);
+    return out;
+  });
+  devUi.links === 5 && devUi.restoreHidden && /Be the first/.test(devUi.supporters)
+    ? ok('quick links, supporters placeholder; Restore Previous Hangar hidden with no snapshot')
+    : fail(`developers page: ${JSON.stringify(devUi)}`);
+  /^Exported \d+ item\(s\) and \d+ history snapshot/.test(devUi.json) &&
+  /Hangar Transfer Format/.test(devUi.htf) &&
+  devUi.files.length === 2 &&
+  /^open-hangar-.*\.json$/.test(devUi.files[0]) &&
+  /^open-hangar-htf-/.test(devUi.files[1])
+    ? ok(`Export JSON and Export HTF download and say so ("${devUi.json}")`)
+    : fail(`developers exports: ${JSON.stringify(devUi)}`);
+  devUi.opened === 2 && /valid JSON/.test(devUi.bad) && devUi.badRed && devUi.items > 0
+    ? ok('Import JSON and the damaged-data notice open the picker; a bad file shows an error')
+    : fail(`developers import: ${JSON.stringify(devUi)}`);
+  devUi.report > 50 && devUi.cleared === 'Log cleared.'
+    ? ok('error report preview fills when opened; Clear Log says so')
+    : fail(`developers error report: ${JSON.stringify(devUi)}`);
+  // The card menus' Backup item clicks #export-db, so it must work while Developers
+  // is hidden (here from Inventory).
+  await go('#inventory');
+  const menuBackup = await page.evaluate(async () => {
+    const files = [];
+    window.downloadBlob = (blob, name) => files.push(name);
+    document.querySelector('#export-db').click();
+    await new Promise((r) => setTimeout(r, 300));
+    return { files, msg: document.querySelector('#data-msg').textContent };
+  });
+  menuBackup.files.length === 1 && /^Exported/.test(menuBackup.msg)
+    ? ok('#export-db downloads the backup from another page (the card menus use it)')
+    : fail(`backup from another page: ${JSON.stringify(menuBackup)}`);
 
   console.log('Referrals');
   await go('#referrals');
@@ -1767,12 +1857,19 @@ try {
     location.hash = '#store';
     await new Promise((r) => setTimeout(r, 400));
     const wish = document.querySelector('#wishlist').textContent;
+    const tick = () => new Promise((r) => setTimeout(r, 50));
     document.querySelector('[data-wish-remove]')?.click();
+    await tick();
     const undoBar = document.querySelector('#wish-undo');
     const undoShown = !undoBar.hidden && /Removed Carrack/.test(undoBar.textContent);
     undoBar.querySelector('[data-wish-undo]').click();
-    const restored = state.wishlist.length === 1 && undoBar.hidden;
+    await tick();
+    const restored =
+      state.wishlist.length === 1 &&
+      undoBar.hidden &&
+      /Carrack/.test(document.querySelector('#wishlist').textContent);
     document.querySelector('[data-wish-remove]')?.click();
+    await tick();
     const cleared = !state.wishlist.length && undoShown && restored;
     setStatsTab('spending');
     location.hash = '#stats';
