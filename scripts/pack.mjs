@@ -21,7 +21,7 @@ const RUNTIME = ['_locales', 'icons', 'src'];
 // a "@sync-start" marker through "@sync-end" are cut. OH_SYNC=1 keeps them, for
 // developers testing sync locally (with the `siteUrl` storage key).
 const KEEP_SYNC = process.env.OH_SYNC === '1';
-const SYNC_FILES = ['src/lib.js', 'src/dashboard.js', 'src/dashboard.html'];
+const SYNC_FILES = ['src/lib.js', 'src/dashboard.js', 'src/dashboard.html', 'src/background.js'];
 function stripSync(file) {
   const out = [];
   let inside = false;
@@ -85,6 +85,12 @@ for (const [name, transform] of Object.entries(targets)) {
   // Sync's sign-in window (identity.launchWebAuthFlow) needs "identity": only builds
   // that carry sync ask for it, so store builds' permissions don't change before launch.
   if (KEEP_SYNC) manifest.permissions = [...manifest.permissions, 'identity'];
+  // Connect from the website (src/background.js): only our own site may talk to the
+  // extension. Chrome and Edge only; Firefox doesn't let web pages reach extensions.
+  if (KEEP_SYNC && name !== 'firefox')
+    manifest.externally_connectable = {
+      matches: ['https://app.openhangar.space/*', 'https://staging.openhangar.space/*'],
+    };
   writeFileSync(`${out}/manifest.json`, JSON.stringify(manifest, null, 2) + '\n');
   if (!KEEP_SYNC) {
     for (const f of SYNC_FILES) stripSync(`${out}/${f}`);
