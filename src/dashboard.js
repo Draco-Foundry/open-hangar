@@ -6867,9 +6867,11 @@ for (const [btn, menu] of cardMenus) {
   });
   // Clicks inside the menu (checkboxes, the currency picker) shouldn't close it.
   menu.addEventListener('click', (e) => {
-    e.stopPropagation();
     // A link or action in the menu (Updates, Log Out of RSI…) closes it.
     if (e.target.closest('a, .menu-item')) closeCardMenus();
+    // Export ▾ items are handled by the document's [data-export] click handler, so
+    // those clicks go on to it; everything else stays inside the menu.
+    if (!e.target.closest('[data-export]')) e.stopPropagation();
   });
 }
 if (cardMenus.length) {
