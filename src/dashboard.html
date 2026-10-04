@@ -3518,70 +3518,19 @@
         <div id="updated-note" class="updated-note" hidden></div>
         <div class="home-hero">
           <div class="citizen-card">
-            <!-- Pilot ID card (owner, 2026-09-30): portrait down the left; name, org,
-                 UEE line, badges and wallet to its right; the org logo as a faint
-                 watermark. Scan and the gear menu live in the top bar. -->
-            <div class="cc-account" id="cc-account">
-              <a
-                class="cc-photo"
-                id="cc-photo"
-                target="_blank"
-                rel="noopener"
-                aria-label="Open Your RSI Citizen Page"
-                ><span class="cc-avatar" id="cc-avatar"></span
-              ></a>
-              <img class="cc-water" id="cc-water" alt="" hidden />
-              <div class="cc-info">
-                <div class="cc-name" id="cc-name">Open Hangar</div>
-                <div class="cc-org" id="cc-org" hidden></div>
-                <div class="cc-meta" id="cc-meta"></div>
-                <div class="home-flair" id="home-flair"></div>
-                <div class="home-balances" id="home-balances"></div>
-              </div>
-            </div>
+            <!-- Pilot ID card (owner, 2026-09-30): ui/home/CitizenCard.svelte mounts here,
+                 before the status line; ui/home/SignedOut.svelte (the Log In wall) after it. -->
             <!-- Scan progress and messages (kept outside cc-account so they show signed out too). -->
             <div class="cc-status">
               <div id="status"></div>
-            </div>
-            <!-- Shown instead of the card content when signed out of RSI -->
-            <div class="cc-loggedout" id="cc-loggedout" hidden>
-              <div class="cc-lo-inner">
-                <div class="cc-lo-title">Open Hangar</div>
-                <p class="cc-lo-sub">
-                  Log in to RSI to scan your hangar. Your ships are waiting on the pad.
-                </p>
-                <a
-                  class="btn-login cc-lo-btn"
-                  href="https://robertsspaceindustries.com/connect"
-                  target="_blank"
-                  rel="noopener"
-                  >Log In to RSI ↗</a
-                >
-              </div>
             </div>
           </div>
           <aside id="oh-status" aria-label="Game Status"></aside>
           <div id="oh-foryou" hidden></div>
         </div>
-        <!-- First run (nothing scanned yet): a big welcome with Scan All Now; the
-             search and the Home cards show once there's something to show. -->
-        <section class="oh-welcome" id="oh-welcome" hidden>
-          <h2>Welcome to Open Hangar, Citizen</h2>
-          <p>
-            Your whole Star Citizen hangar in one place: what it's worth, your buy-backs, your
-            referrals and more. Everything stays on this computer, locked in your own hangar.
-          </p>
-          <button type="button" class="welcome-scan" id="welcome-scan">Scan My Hangar</button>
-          <!-- The first scan's progress, in place of the button (#170). -->
-          <div class="welcome-progress" id="welcome-progress" role="status" hidden>
-            <div class="wp-bar"><span class="wp-fill" id="wp-fill"></span></div>
-            <div class="wp-text" id="wp-text"></div>
-          </div>
-          <p class="welcome-note" id="welcome-note">
-            A big hangar takes about a minute, still faster than a Lorville elevator. To scan just
-            part of it, use the ▾ next to Scan.
-          </p>
-        </section>
+        <!-- First run (nothing scanned yet): ui/home/Welcome.svelte mounts here, a big
+             welcome with Scan My Hangar; the search and the Home cards show once there's
+             something to show. -->
         <!-- Global Hangar Search: its own line under the card (owner, 2026-09-30); the
              right quarter is kept for the website Connect button at launch. -->
         <div class="home-search">
