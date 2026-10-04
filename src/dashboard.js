@@ -30,10 +30,6 @@ const scanSelectedBtn = $('#scan-selected');
 const logoutBtn = $('#logout-home');
 const clearBtn = $('#clear-home');
 const buybacksBodyEl = $('#buybacks-body');
-const bbSearchEl = $('#bb-search');
-const bbSortEl = $('#bb-sort');
-const bbChipsEl = $('#bb-chips');
-const bbLayoutEl = $('#bb-layout');
 
 // Buy-back kind labels (buy-backs classify into a slightly different set than
 // the hangar — notably 'paint'). Order = display order.
@@ -317,7 +313,9 @@ const state = {
   buybacks: [], // buy-back pledges (separate source)
   buybacksScannedAt: null,
   bbQuery: '',
-  bbUnder: false, // Buy-Backs: only ones below today's store price
+  bbPriceMax: null, // Buy-Backs filter: price cap in dollars (null = no cap)
+  bbFolded: false, // Buy-Backs: filter sidebar folded away
+  bbClosed: new Set(['from', 'size']), // Buy-Backs: filter groups folded shut
   bbStack: false, // Buy-Backs: stack identical ones (off: each buy-back is its own)
   bbHideSmall: true, // Buy-Backs: paints, add-ons, coupons tucked away
   hideSmall: false, // Inventory: same
@@ -329,7 +327,7 @@ const state = {
   groupByType: true, // Inventory: one section per type
   bbDetails: {}, // pledge id → details read from the buy-back's own RSI page
   bbShown: new Set(), // buy-back kind filter
-  bbTraits: new Map(), // buy-back trait filter (AND): key → 'yes' | 'no'
+  bbTraits: new Map(), // buy-back filter picks: group key → Set of option keys (BB_GROUPS)
   bbLayout: 'gallery', // gallery | compact | list | market (independent of inventory)
   owner: null, // { nickname, displayname } the stored data was scanned from
   storeCredit: null, // dollars, from the RSI account (counts in Account Value)
@@ -388,20 +386,6 @@ const SAFE_ATTRS = new Set(
   ).split(' '),
 );
 const SAFE_URL = /^(https?:|mailto:|#|\/|\.|[^:]*$)/i;
-// Re-rendering a row of chips or toggles swaps out its buttons. If one of them had
-// keyboard focus, put focus back on the same control (or the row's first button when
-// it's gone, like Clear) so filtering by keyboard doesn't drop you at the page top.
-const FOCUS_KEYS = ['key', 'trait', 'clear', 'switch', 'bbUnder'];
-function setHTMLKeepFocus(el, html) {
-  const had = document.activeElement;
-  const inside = !!(el && had && had !== el && el.contains(had));
-  const k = inside ? FOCUS_KEYS.find((a) => a in had.dataset) : null;
-  const val = k ? had.dataset[k] : null;
-  setHTML(el, html);
-  if (!inside) return;
-  const same = k && [...el.querySelectorAll('button')].find((b) => b.dataset[k] === val);
-  (same || el.querySelector('button'))?.focus({ preventScroll: true });
-}
 function setHTML(el, html) {
   if (!el) return;
   if (html == null || html === '') {
@@ -1423,29 +1407,6 @@ const TRAITS = [
   },
 ];
 
-// A trait chip cycles off → include → exclude → off. Exclude means "known not
-// to have it": unknown values (older scans, buy-backs) match neither.
-const traitNeg = (t) => t.neg || ((f) => !t.test(f));
-function traitMatch(t, mode, f) {
-  return mode === 'no' ? traitNeg(t)(f) : t.test(f);
-}
-function cycleTrait(selected, key) {
-  const mode = selected.get(key);
-  if (!mode) selected.set(key, 'yes');
-  else if (mode === 'yes') selected.set(key, 'no');
-  else selected.delete(key);
-}
-
-// Keep only items matching every selected trait (in its include/exclude mode).
-function applyTraits(list, selected, facets) {
-  if (!selected.size) return list;
-  const picked = TRAITS.filter((t) => selected.has(t.key));
-  return list.filter((x) => {
-    const f = facets(x);
-    return picked.every((t) => traitMatch(t, selected.get(t.key), f));
-  });
-}
-
 // --- Inventory filters (Filters Pass, B2) -------------------------------------
 // The sidebar's groups (ui/inventory). Inside a group any picked option matches;
 // across groups every group with picks must match, so "MISC + Meltable" is a
@@ -1521,77 +1482,209 @@ const INV_GROUPS = [
     order: (a, b) => SIZE_ORDER.indexOf(a.toLowerCase()) - SIZE_ORDER.indexOf(b.toLowerCase()),
   },
 ];
-function invOptionTest(g, key) {
+// Shared by Inventory and Buy-Backs (ui/lib/FilterSidebar.svelte): `groups` is a
+// page's group list, `picks` its Map of group key → Set of picked option keys.
+function groupOptionTest(g, key) {
   if (g.fixed) return (g.fixed.find(([k]) => k === key) || [])[2] || (() => false);
-  return (p) => g.of(p).includes(key);
+  return (x) => g.of(x).includes(key);
 }
-function applyInvFilters(list) {
-  for (const g of INV_GROUPS) {
-    const sel = state.traits.get(g.key);
+function applyGroups(list, groups, picks) {
+  for (const g of groups) {
+    const sel = picks.get(g.key);
     if (!(sel instanceof Set) || !sel.size) continue;
-    const tests = [...sel].map((k) => invOptionTest(g, k));
-    list = list.filter((p) => tests.some((t) => t(p)));
+    const tests = [...sel].map((k) => groupOptionTest(g, k));
+    list = list.filter((x) => tests.some((t) => t(x)));
   }
-  if (state.meltMax != null)
-    list = list.filter((p) => Number.isFinite(p.value) && p.value <= state.meltMax);
   return list;
 }
-// Everything the sidebar draws: type pills, each group's options with how many
-// pledges have them (an option nobody has is left out unless it's picked), the
-// Melt Value range, and the active filters as pills.
-function invFilters() {
-  const items = state.items;
-  const types = presentKinds().map((k) => ({
+// Everything a sidebar draws: type pills, each group's options with how many items
+// have them (an option nobody has is left out unless it's picked), the range at the
+// bottom (`cap`: { title, value, of(item) → number }), and the active filters as
+// pills (the range's pill is group 'cap').
+function filterView({ items, kinds, shown, groups, picks, cap }) {
+  const types = kinds.map((k) => ({
     key: k.key,
     label: k.label,
-    n: items.filter((p) => p.kind === k.key).length,
-    on: state.shown.has(k.key),
+    n: items.filter((x) => x.kind === k.key).length,
+    on: shown.has(k.key),
   }));
-  const groups = INV_GROUPS.map((g) => {
-    const sel = state.traits.get(g.key);
-    const picked = sel instanceof Set ? sel : new Set();
-    let opts;
-    if (g.fixed)
-      opts = g.fixed.map(([k, label, test]) => ({ key: k, label, n: items.filter(test).length }));
-    else {
-      const counts = new Map();
-      for (const p of items)
-        for (const k of new Set(g.of(p).filter(Boolean))) counts.set(k, (counts.get(k) || 0) + 1);
-      for (const k of picked) if (!counts.has(k)) counts.set(k, 0);
-      opts = [...counts.keys()].sort(g.order).map((k) => ({ key: k, label: k, n: counts.get(k) }));
-    }
-    const options = opts
-      .filter((o) => o.n || picked.has(o.key))
-      .map((o) => ({ ...o, on: picked.has(o.key) }));
-    return { key: g.key, title: g.title, search: !!g.search, picked: picked.size, options };
-  }).filter((g) => g.options.length);
-  const values = items.map((p) => p.value).filter(Number.isFinite);
+  const view = groups
+    .map((g) => {
+      const sel = picks.get(g.key);
+      const picked = sel instanceof Set ? sel : new Set();
+      let opts;
+      if (g.fixed)
+        opts = g.fixed.map(([k, label, test]) => ({ key: k, label, n: items.filter(test).length }));
+      else {
+        const counts = new Map();
+        for (const x of items)
+          for (const k of new Set(g.of(x).filter(Boolean))) counts.set(k, (counts.get(k) || 0) + 1);
+        for (const k of picked) if (!counts.has(k)) counts.set(k, 0);
+        opts = [...counts.keys()]
+          .sort(g.order)
+          .map((k) => ({ key: k, label: k, n: counts.get(k) }));
+      }
+      const options = opts
+        .filter((o) => o.n || picked.has(o.key))
+        .map((o) => ({ ...o, on: picked.has(o.key) }));
+      return { key: g.key, title: g.title, search: !!g.search, picked: picked.size, options };
+    })
+    .filter((g) => g.options.length);
+  const values = items.map(cap.of).filter(Number.isFinite);
   const top = values.length ? Math.max(5, Math.ceil(Math.max(...values) / 5) * 5) : 0;
   const active = [
     ...types
       .filter((t) => t.on)
       .map((t) => ({ group: 'type', key: t.key, label: t.label, title: 'Type' })),
-    ...groups.flatMap((g) =>
+    ...view.flatMap((g) =>
       g.options
         .filter((o) => o.on)
         .map((o) => ({ group: g.key, key: o.key, label: o.label, title: g.title })),
     ),
   ];
-  if (state.meltMax != null)
+  if (cap.value != null)
     active.push({
-      group: 'melt',
+      group: 'cap',
       key: '',
-      label: `Up to ${dollars(state.meltMax)}`,
-      title: 'Melt',
+      label: `Up to ${dollars(cap.value)}`,
+      title: cap.pill,
     });
+  return { types, groups: view, range: { title: cap.title, top, value: cap.value }, active };
+}
+function applyInvFilters(list) {
+  list = applyGroups(list, INV_GROUPS, state.traits);
+  if (state.meltMax != null)
+    list = list.filter((p) => Number.isFinite(p.value) && p.value <= state.meltMax);
+  return list;
+}
+// Inventory's sidebar.
+function invFilters() {
   return {
-    types,
-    hideSmall: state.hideSmall,
-    groups,
-    melt: { top, value: state.meltMax },
-    active,
+    ...filterView({
+      items: state.items,
+      kinds: presentKinds(),
+      shown: state.shown,
+      groups: INV_GROUPS,
+      picks: state.traits,
+      cap: {
+        title: 'Melt Value',
+        pill: 'Melt',
+        value: state.meltMax,
+        of: (p) => p.value,
+      },
+    }),
+    switches: [
+      {
+        key: 'inv-hide',
+        label: 'Hide Small Stuff',
+        on: state.hideSmall,
+        title: 'Paints, add-ons and coupons',
+      },
+    ],
     closed: [...state.invClosed],
     folded: state.invFolded,
+  };
+}
+// Buy-Backs' sidebar. Like Inventory's, minus what RSI doesn't say about a
+// buy-back (giftable, meltable); its range caps the buy-back price.
+// Ships a buy-back gives back: a CCU's target, a pack's ships once Load Details has
+// read its page, else the ship its name points at.
+function buybackShips(b) {
+  if (!state.shipOf) return [];
+  const d = bbDetail(b);
+  const names = b.ccu
+    ? [b.ccu.to]
+    : d && Array.isArray(d.ships) && d.ships.length
+      ? d.ships.map((x) => x.name)
+      : [resolveImageName(b)];
+  return names.map((n) => n && state.shipOf(n)).filter(Boolean);
+}
+// The insurance RSI's buy-back list spells out in a buy-back's contents line
+// ("Cutter · Lifetime Insurance", "120 Month Insurance"), in the short form
+// insLabel() reads ("LTI", "120M"), or ''.
+function insuranceFromContains(text) {
+  const t = String(text || '');
+  if (/lifetime insurance|\bLTI\b/i.test(t)) return 'LTI';
+  const m = t.match(/(\d+)[\s-]*(month|year)s?\s+insurance/i);
+  return m ? `${m[1]}${/^y/i.test(m[2]) ? 'Y' : 'M'}` : '';
+}
+const BB_GROUPS = [
+  {
+    key: 'ins',
+    title: 'Insurance',
+    of: (b) => {
+      const d = bbDetail(b);
+      const t =
+        (d && d.insurance) ||
+        b.insurance ||
+        window.OpenHangar.insuranceFromName(b.name) ||
+        insuranceFromContains(b.contains);
+      return t ? [insLabel(t)] : [];
+    },
+    order: (a, b) => insMonths(b) - insMonths(a),
+  },
+  {
+    key: 'deals',
+    title: 'Deals',
+    fixed: [['below', 'Below Store Price', (b) => bbUnderStore(b)]],
+  },
+  {
+    key: 'from',
+    title: 'Came From',
+    fixed: [
+      ['standalone', 'Standalone'],
+      ['pack', 'Pack'],
+      ['package', 'Package'],
+    ].map(([k, l]) => [
+      k,
+      l,
+      (b) => {
+        const f = buybackFacets(b);
+        const from = TRAITS[0].test(f) ? 'package' : TRAITS[1].test(f) ? 'pack' : 'standalone';
+        return from === k;
+      },
+    ]),
+  },
+  {
+    key: 'mfr',
+    title: 'Manufacturer',
+    search: true,
+    of: (b) => buybackShips(b).map((v) => v.mfr),
+    order: (a, b) => a.localeCompare(b),
+  },
+  {
+    key: 'size',
+    title: 'Size',
+    of: (b) => buybackShips(b).map((v) => v.size && titleCase(v.size)),
+    order: (a, b) => SIZE_ORDER.indexOf(a.toLowerCase()) - SIZE_ORDER.indexOf(b.toLowerCase()),
+  },
+];
+function bbFilters() {
+  return {
+    ...filterView({
+      items: state.buybacks,
+      kinds: presentBbKinds(),
+      shown: state.bbShown,
+      groups: BB_GROUPS,
+      picks: state.bbTraits,
+      cap: { title: 'Price', pill: 'Price', value: state.bbPriceMax, of: (b) => bbPrice(b) },
+    }),
+    switches: [
+      {
+        key: 'bb-hide',
+        label: 'Hide Small Stuff',
+        on: state.bbHideSmall,
+        title: 'Paints, add-ons and coupons',
+      },
+      {
+        key: 'bb-stack',
+        label: 'Stack Identical',
+        on: state.bbStack,
+        title: 'Show identical buy-backs as one row with a count',
+      },
+    ],
+    closed: [...state.bbClosed],
+    folded: state.bbFolded,
   };
 }
 function resetInvFilters() {
@@ -1627,33 +1720,6 @@ function invTraitsFrom(entries) {
     }
   }
   return map;
-}
-
-// Second chip row: traits present in `list`, plus Clear when anything is picked.
-// `skip`: trait keys that make no sense on this page.
-function traitRowHtml(list, selected, facets, anyFilter, skip = []) {
-  const all = list.map(facets);
-  const chips = TRAITS.filter((t) => !skip.includes(t.key))
-    .map((t) => {
-      const mode = selected.get(t.key);
-      const yes = all.filter(t.test).length;
-      const no = all.filter(traitNeg(t)).length;
-      // Offer a trait only when it splits the list (some have it, some are known
-      // not to) — or when it's already picked, so it can still be cleared.
-      if (!mode && (!yes || yes === all.length)) return '';
-      const label = mode === 'no' ? t.notLabel || `Not ${t.label}` : t.label;
-      const n = mode === 'no' ? no : yes;
-      const hint =
-        mode === 'yes' ? 'Click again to exclude' : mode === 'no' ? 'Click to clear' : '';
-      const title = hint ? `${t.title} · ${hint}` : t.title;
-      const k = t.key === 'pack' || t.key === 'package' ? ` k-${t.key}` : '';
-      return `<button class="chip trait${k}" data-trait="${t.key}" data-mode="${mode || ''}" aria-pressed="${!!mode}" title="${OH.escapeHtml(title)}">${OH.escapeHtml(
-        label,
-      )}<span class="n">${n}</span></button>`;
-    })
-    .join('');
-  const clear = anyFilter ? '<button class="chip chip-clear" data-clear="1">Clear</button>' : '';
-  return chips || clear ? `<div class="chip-row chip-row-traits">${chips}${clear}</div>` : '';
 }
 
 // M / G tags on a card: green = RSI says yes, red = no, grey = unknown (scans
@@ -2252,33 +2318,6 @@ function copyMarketImage(statusEl) {
 // --- Inventory / Buy-Backs pass (0.3.0) ------------------------------------------
 // Paints, add-ons and coupons: what "Hide small stuff" tucks away.
 const SMALL_KINDS = new Set(['paint', 'addon', 'coupon']);
-function switchHtml(key, label, on, title) {
-  return `<button type="button" class="oh-sw${on ? ' on' : ''}" data-switch="${key}" aria-pressed="${on}" title="${OH.escapeHtml(title)}"><span class="sw-t"></span>${OH.escapeHtml(label)}</button>`;
-}
-// Summary strip on top of Buy-Backs.
-function renderBbSummary() {
-  const el = $('#bb-sum');
-  if (!el) return;
-  const under = state.buybacks.filter(bbUnderStore).length;
-  const next = nextTokenDate();
-  const nextShort = next ? next.replace(/^\w+, /, '').replace(/, \d{4}$/, '') : '';
-  const stat = (l, v, t) =>
-    `<div class="ps-st"${t ? ` title="${OH.escapeHtml(t)}"` : ''}><div class="ps-l">${l}</div><div class="ps-v">${v}</div></div>`;
-  setHTML(
-    el,
-    `<div><h2>Buy-Backs</h2></div><div class="ps-stats">` +
-      stat('Buy-Backs', compactNum(state.buybacks.length)) +
-      stat(
-        'Tokens',
-        `${state.bbTokens != null ? state.bbTokens : '—'}${nextShort ? `<small>next ${OH.escapeHtml(nextShort)}</small>` : ''}`,
-        tokenTitle(),
-      ) +
-      (under
-        ? stat('Below Store Price', `<span class="ps-good">${compactNum(under)}</span>`)
-        : '') +
-      '</div>',
-  );
-}
 // "$20 under store" in green when today's store price is above what the pledge holds.
 function underStoreHtml(p) {
   const si = storeInfo(p);
@@ -3473,14 +3512,6 @@ function presentBbKinds() {
   return BB_KINDS.filter((k) => state.buybacks.some((b) => b.kind === k.key));
 }
 
-function bbChipHtml(kind) {
-  const n = state.buybacks.filter((b) => b.kind === kind.key).length;
-  const active = state.bbShown.size === 0 || state.bbShown.has(kind.key);
-  return `<button class="chip k-${kind.key}" data-key="${kind.key}" aria-pressed="${active}">${OH.escapeHtml(
-    kind.label,
-  )}<span class="n">${n}</span></button>`;
-}
-
 // --- Buy-back tokens + prices ---------------------------------------------
 // RSI adds one buy-back token per quarter (they don't roll over). Dates from
 // RSI's "2026 Buy Back Token Schedule" Spectrum post; add next year's when
@@ -3604,8 +3635,12 @@ function computeBuybacks() {
   if (state.bbOnly) list = list.filter((b) => state.bbOnly.ids.has(String(b.id)));
   if (state.bbHideSmall && !state.bbOnly)
     list = list.filter((b) => !SMALL_KINDS.has(b.kind) || state.bbShown.has(b.kind));
-  if (state.bbUnder) list = list.filter(bbUnderStore);
-  list = applyTraits(list, state.bbTraits, buybackFacets);
+  list = applyGroups(list, BB_GROUPS, state.bbTraits);
+  if (state.bbPriceMax != null)
+    list = list.filter((b) => {
+      const v = bbPrice(b);
+      return v != null && v <= state.bbPriceMax;
+    });
   if (q) list = list.filter((b) => `${b.name || ''} ${b.contains || ''}`.toLowerCase().includes(q));
   if (state.bbSort !== 'default') {
     const byName = (a, b) => (a.name || '').localeCompare(b.name || '');
@@ -3640,10 +3675,10 @@ function computeBuybacks() {
 
 function renderBuybacks() {
   const body = $('#buybacks-body');
-  const controls = $('#bb-controls');
   if (!body) return;
+  // The page around the list is Svelte (ui/buybacks); tell it to redraw.
+  homeUpdated();
   if (!state.buybacks.length) {
-    if (controls) controls.hidden = true;
     setHTML(
       body,
       `<div class="placeholder-view">
@@ -3657,34 +3692,8 @@ function renderBuybacks() {
     );
     return;
   }
-  if (controls) controls.hidden = false;
-  if (bbLayoutEl) {
-    bbLayoutEl
-      .querySelectorAll('button')
-      .forEach((b) => b.classList.toggle('active', b.dataset.layout === state.bbLayout));
-  }
-  if (bbChipsEl) {
-    const under = state.buybacks.filter(bbUnderStore).length;
-    const underChip =
-      under || state.bbUnder
-        ? `<button type="button" class="chip trait" data-bb-under aria-pressed="${state.bbUnder}" title="Buy-backs that cost less than the ship in today's store (load details for exact prices)">Below Store Price<span class="n">${under}</span></button>`
-        : '';
-    setHTMLKeepFocus(
-      bbChipsEl,
-      `<div class="chip-row">${presentBbKinds().map(bbChipHtml).join('')}${underChip}<span class="sw-group">${switchHtml('bb-hide', 'Hide Small Stuff', state.bbHideSmall, 'Paints, add-ons and coupons')}${switchHtml('bb-stack', 'Stack Identical', state.bbStack, 'Show identical buy-backs as one row with a count')}</span></div>` +
-        traitRowHtml(
-          state.buybacks,
-          state.bbTraits,
-          buybackFacets,
-          state.bbShown.size || state.bbTraits.size || state.bbUnder,
-          // Warbond only mattered for the price paid; reclaiming costs the same (#176).
-          ['warbond'],
-        ),
-    );
-  }
   if (!state.priceOf) ensurePrices();
   let list = computeBuybacks();
-  renderBbSummary();
   if (state.bbStack) list = stackBuybacks(list);
   const when = state.buybacksScannedAt ? new Date(state.buybacksScannedAt).toLocaleString() : '';
   if (!list.length) {
@@ -4000,47 +4009,7 @@ const debounce = (fn, ms = 150) => {
   };
 };
 const renderInventorySoon = debounce(() => renderInventory());
-if (bbSearchEl) {
-  const renderBuybacksSoon = debounce(() => renderBuybacks());
-  bbSearchEl.addEventListener('input', () => {
-    state.bbQuery = bbSearchEl.value;
-    renderBuybacksSoon();
-  });
-}
-if (bbSortEl) {
-  bbSortEl.addEventListener('change', () => {
-    state.bbSort = bbSortEl.value;
-    renderBuybacks();
-  });
-}
-if (bbChipsEl) {
-  bbChipsEl.addEventListener('click', (e) => {
-    const btn = e.target.closest('.chip');
-    if (!btn || 'bbUnder' in btn.dataset) return; // Below store price: handled below
-    if (btn.dataset.clear) {
-      state.bbShown.clear();
-      state.bbTraits.clear();
-      state.bbUnder = false;
-    } else if (btn.dataset.trait) {
-      cycleTrait(state.bbTraits, btn.dataset.trait);
-    } else {
-      const key = btn.dataset.key;
-      if (state.bbShown.has(key)) state.bbShown.delete(key);
-      else state.bbShown.add(key);
-    }
-    renderBuybacks();
-  });
-}
-if (bbLayoutEl) {
-  bbLayoutEl.addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-layout]');
-    if (!b) return;
-    state.bbLayout = b.dataset.layout;
-    chrome.storage.local.set({ bbLayout: state.bbLayout });
-    renderBuybacks();
-  });
-}
-
+const renderBuybacksSoon = debounce(() => renderBuybacks());
 // Broken thumbnails → placeholder (error events don't bubble; capture phase).
 // A thumbnail failed to load (RSI sometimes serves broken image links): show
 // the placeholder, then try the ship-art lookup once by the card's ship name.
@@ -4699,10 +4668,6 @@ document.addEventListener('click', (e) => {
     }
     return renderBuybacks();
   }
-  if (t.closest('[data-bb-under]')) {
-    state.bbUnder = !state.bbUnder;
-    return renderBuybacks();
-  }
   const apply = t.closest('[data-view-apply]');
   if (apply) {
     const v = state.savedViews[+apply.dataset.viewApply];
@@ -4822,6 +4787,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
       state.buybacksScannedAt = b.scannedAt;
       state.bbShown = new Set(); // default: no filter selected = show all
       state.bbTraits = new Map();
+      state.bbPriceMax = null;
       parts.push(`${b.items.length} buy-backs${b.partial ? ` (partial: ${b.partial})` : ''}`);
       if (b.partial) anyErr = true;
     } else {
@@ -5038,6 +5004,7 @@ clearBtn.addEventListener('click', async () => {
   state.meltMax = null;
   state.bbShown = new Set();
   state.bbTraits = new Map();
+  state.bbPriceMax = null;
   state.referral = null;
   setStatus('Local data cleared. Clean hangar, fresh start.');
   renderAccount(); // clear the referral pill too
@@ -5207,6 +5174,7 @@ if (importBtn && importFile) {
     state.meltMax = null;
     state.bbShown = new Set(); // default: no filter selected = show all
     state.bbTraits = new Map();
+    state.bbPriceMax = null;
     renderAccount(); // reflect imported referral in the pill
     setDataMsg(
       `Imported ${sourceItemCount(res.db.sources)} item(s) — open Inventory / Buy-Backs / Stats to view.`,
@@ -5242,6 +5210,7 @@ function loadStateFromDB(db) {
   state.meltMax = null;
   state.bbShown = new Set();
   state.bbTraits = new Map();
+  state.bbPriceMax = null;
 }
 
 // Multi-account: force a fresh read of the signed-in RSI account (the cache could
@@ -6228,6 +6197,8 @@ if (gsearch && gsearchOut) {
     invFiltersFolded,
     invClosedGroups,
     hideSmallBb,
+    bbFiltersFolded,
+    bbClosedGroups,
     bbStack,
     savedViews,
     currency,
@@ -6245,6 +6216,8 @@ if (gsearch && gsearchOut) {
     'invFiltersFolded',
     'invClosedGroups',
     'hideSmallBb',
+    'bbFiltersFolded',
+    'bbClosedGroups',
     'bbStack',
     'savedViews',
     'lastBackupAt',
@@ -6264,6 +6237,8 @@ if (gsearch && gsearchOut) {
   state.invFolded = invFiltersFolded === true;
   if (Array.isArray(invClosedGroups)) state.invClosed = new Set(invClosedGroups);
   state.bbHideSmall = hideSmallBb !== false; // on unless turned off
+  state.bbFolded = bbFiltersFolded === true;
+  if (Array.isArray(bbClosedGroups)) state.bbClosed = new Set(bbClosedGroups);
   state.bbStack = bbStack === true;
   if (Array.isArray(savedViews)) state.savedViews = savedViews.filter((v) => v && v.name && v.f);
   document.documentElement.classList.toggle('streamer', streamer.on);
@@ -6299,6 +6274,7 @@ if (gsearch && gsearchOut) {
   state.meltMax = null;
   state.bbShown = new Set(); // default: no filter selected = show all
   state.bbTraits = new Map();
+  state.bbPriceMax = null;
   route();
   if (notice) setStatus(notice);
   await refreshRecoveryUI();
@@ -6485,7 +6461,7 @@ window.OHApp = {
     },
     remove: (g, k) => {
       if (g === 'type') state.shown.delete(k);
-      else if (g === 'melt') state.meltMax = null;
+      else if (g === 'cap') state.meltMax = null;
       else state.traits.get(g)?.delete(k);
       renderInventory();
     },
@@ -6510,6 +6486,91 @@ window.OHApp = {
       if (open) state.invClosed.delete(g);
       else state.invClosed.add(g);
       chrome.storage.local.set({ invClosedGroups: [...state.invClosed] });
+    },
+  },
+  // Buy-Backs (ui/buybacks): like `inv`, for the page around the buy-back list.
+  bb: {
+    get empty() {
+      return !state.buybacks.length;
+    },
+    get query() {
+      return state.bbQuery;
+    },
+    get sort() {
+      return state.bbSort;
+    },
+    get layout() {
+      return state.bbLayout;
+    },
+    filters: bbFilters,
+    // Summary strip: count, tokens with the next date, and how many cost less than
+    // the same ship in today's store.
+    summary: () => {
+      const next = nextTokenDate();
+      return {
+        n: compactNum(state.buybacks.length),
+        tokens: state.bbTokens != null ? state.bbTokens : '—',
+        next: next ? next.replace(/^\w+, /, '').replace(/, \d{4}$/, '') : '',
+        tokenTitle: tokenTitle(),
+        under: state.buybacks.filter(bbUnderStore).length,
+        underText: compactNum(state.buybacks.filter(bbUnderStore).length),
+      };
+    },
+    setQuery: (q) => {
+      state.bbQuery = q;
+      renderBuybacksSoon();
+    },
+    setSort: (v) => {
+      state.bbSort = v;
+      renderBuybacks();
+    },
+    setLayout: (v) => {
+      if (!LAYOUTS.includes(v)) return;
+      state.bbLayout = v;
+      chrome.storage.local.set({ bbLayout: state.bbLayout });
+      renderBuybacks();
+    },
+    toggleType: (k) => {
+      if (state.bbShown.has(k)) state.bbShown.delete(k);
+      else state.bbShown.add(k);
+      renderBuybacks();
+    },
+    toggleOption: (g, k) => {
+      if (!(state.bbTraits.get(g) instanceof Set)) state.bbTraits.set(g, new Set());
+      const sel = state.bbTraits.get(g);
+      if (sel.has(k)) sel.delete(k);
+      else sel.add(k);
+      renderBuybacks();
+    },
+    remove: (g, k) => {
+      if (g === 'type') state.bbShown.delete(k);
+      else if (g === 'cap') state.bbPriceMax = null;
+      else state.bbTraits.get(g)?.delete(k);
+      renderBuybacks();
+    },
+    clearGroup: (g) => {
+      state.bbTraits.delete(g);
+      renderBuybacks();
+    },
+    clearAll: () => {
+      state.bbShown = new Set();
+      state.bbTraits = new Map();
+      state.bbPriceMax = null;
+      renderBuybacks();
+    },
+    setPriceMax: (v) => {
+      state.bbPriceMax = v == null ? null : Number(v);
+      renderBuybacksSoon();
+    },
+    setFolded: (on) => {
+      state.bbFolded = !!on;
+      chrome.storage.local.set({ bbFiltersFolded: state.bbFolded });
+      homeUpdated();
+    },
+    setGroupOpen: (g, open) => {
+      if (open) state.bbClosed.delete(g);
+      else state.bbClosed.add(g);
+      chrome.storage.local.set({ bbClosedGroups: [...state.bbClosed] });
     },
   },
   openItem: (id) => {
