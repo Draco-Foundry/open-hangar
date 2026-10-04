@@ -297,7 +297,13 @@ Now sends the first sync; without the window, a device code approved on `/link`)
 Now, Open, Disconnect (asked on the card) and Sync
 After Every Scan (`siteAutoSync`, off by default). Its state and actions are `site`
 in `src/dashboard.js`, behind `window.OHApp.site`. The `identity` permission is added by
-`scripts/pack.mjs` only to builds that keep sync (`OH_SYNC=1`).
+`scripts/pack.mjs` only to builds that keep sync (`OH_SYNC=1`). Connect from the
+website (Chrome and Edge): the website's `/link` page asks the extension through
+`externally_connectable` (also only in sync builds, our two site origins) for a PKCE
+challenge, gets a one-time code from `/api/link/approve`, and hands it back;
+`src/background.js` (its sync block) trades it for the token, saves `siteLink` and
+`siteUrl`, and opens the dashboard, which runs "Sync My Hangar Now"
+(`siteSyncRequested`).
 
 ## The Kill Switch
 

@@ -85,3 +85,67 @@ chrome.action.onClicked.addListener(() => {
   chrome.tabs.create({ url: chrome.runtime.getURL('src/dashboard.html') });
   updateReminder();
 });
+
+// @sync-start: cut from store builds until sync launches (scripts/pack.mjs, #187)
+// Connect from the website (Chrome and Edge, owner 2026-10-04). The website's Connect
+// page (openhangar.space's /link) asks whether Open Hangar is installed here; only
+// our own site can talk to the extension (externally_connectable, added by
+// scripts/pack.mjs to builds with sync). Connect This Browser there:
+//   oh-connect-begin  → a PKCE pair; the challenge and this extension's redirect
+//                       address go to the page, the verifier stays here
+//   oh-connect-finish → the page's one-time code, traded for the sync token with the
+//                       verifier; then the dashboard opens on Home (and syncs, if
+//                       Sync My Hangar Now was ticked)
+const SITE_ORIGINS = ['https://app.openhangar.space', 'https://staging.openhangar.space'];
+const b64url = (bytes) =>
+  btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+async function siteMessage(msg, origin) {
+  if (msg?.type === 'oh-hello') return { ok: true };
+  if (msg?.type === 'oh-connect-begin') {
+    const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+    const redirect = `https://${chrome.runtime.id}.chromiumapp.org/`;
+    await chrome.storage.session.set({
+      siteConnect: { verifier, origin, redirect, at: Date.now() },
+    });
+    return { ok: true, challenge: b64url(new Uint8Array(digest)), redirect_uri: redirect };
+  }
+  if (msg?.type === 'oh-connect-finish') {
+    const { siteConnect: p } = await chrome.storage.session.get('siteConnect');
+    await chrome.storage.session.remove('siteConnect');
+    if (!p || p.origin !== origin || Date.now() - p.at > 5 * 60e3)
+      return { ok: false, error: 'That connect attempt drifted past its window. Try again.' };
+    const res = await fetch(`${origin}/api/link/token`, {
+      method: 'POST',
+      credentials: 'omit',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        code: String(msg.code || ''),
+        code_verifier: p.verifier,
+        redirect_uri: p.redirect,
+      }),
+    }).catch(() => null);
+    if (!res || !res.ok) return { ok: false, error: "That didn't dock. Try again." };
+    const j = await res.json();
+    await chrome.storage.local.set({
+      siteLink: { token: j.token, name: j.name || '', connectedAt: Date.now(), lastSync: null },
+      siteUrl: origin, // sync goes to the site you connected on
+      ...(msg.sync ? { siteSyncRequested: Date.now() } : {}),
+    });
+    chrome.tabs.create({ url: chrome.runtime.getURL('src/dashboard.html#home') });
+    return { ok: true, name: j.name || '' };
+  }
+  return { ok: false, error: 'unknown request' };
+}
+chrome.runtime.onMessageExternal?.addListener((msg, sender, reply) => {
+  if (!SITE_ORIGINS.includes(sender.origin)) return false;
+  siteMessage(msg, sender.origin).then(reply, (err) =>
+    reply({ ok: false, error: String(err?.message || err) }),
+  );
+  return true; // answers later
+});
+// @sync-end
