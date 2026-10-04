@@ -759,9 +759,11 @@ try {
     const tick = () => new Promise((res) => setTimeout(res, 60));
     const r = {};
     const all = state.items.length;
-    const q = (sel) => document.querySelector(sel);
+    // Buy-Backs has the same sidebar: look only inside Inventory.
+    const root = document.querySelector('#view-inventory');
+    const q = (sel) => root.querySelector(sel);
     const opt = (g, k) => q(`.oh-fg[data-group="${g}"] [data-option="${k}"]`);
-    r.groups = [...document.querySelectorAll('.oh-fg summary')].map((x) => x.textContent);
+    r.groups = [...root.querySelectorAll('.oh-fg summary')].map((x) => x.textContent);
     // Within a group: either option. Across groups: both.
     opt('status', 'meltable').click();
     await tick();
@@ -774,7 +776,7 @@ try {
     await tick();
     r.and = computeShown().every((p) => p.meltable === true && p.insurance === 'LTI');
     r.count = q('.oh-fg[data-group="status"] .oh-sn')?.textContent === '1';
-    r.pills = [...document.querySelectorAll('.oh-af')].map((x) => x.textContent);
+    r.pills = [...root.querySelectorAll('.oh-af')].map((x) => x.textContent);
     // × on a pill removes just that filter.
     q('.oh-af button').click();
     await tick();
@@ -788,11 +790,11 @@ try {
       computeShown().every((p) => p.value <= 100) && /Up to/.test(q('.oh-active').textContent);
     // Manufacturer search narrows its options.
     const find = q('.oh-fg[data-group="mfr"] .oh-fsearch');
-    const before = document.querySelectorAll('.oh-fg[data-group="mfr"] .oh-opt').length;
+    const before = root.querySelectorAll('.oh-fg[data-group="mfr"] .oh-opt').length;
     find.value = 'drake';
     find.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
-    const after = [...document.querySelectorAll('.oh-fg[data-group="mfr"] .oh-opt')];
+    const after = [...root.querySelectorAll('.oh-fg[data-group="mfr"] .oh-opt')];
     r.mfrSearch = after.length < before && after.every((b) => /drake/i.test(b.textContent));
     // Clear All, then fold the sidebar away: Filters (n) brings it back.
     q('.oh-clearall').click();
@@ -866,6 +868,42 @@ try {
   bbPass.hideOn && bbPass.stackOff && bbPass.stacked === bbPass.flat - 2 && bbPass.badges === 2
     ? ok('buy-backs: small stuff hidden by default; Stack identical is opt-in and stacks copies')
     : fail(`buy-backs pass: ${JSON.stringify(bbPass)}`);
+  // The same filter sidebar as Inventory (ui/buybacks): insurance read from the
+  // contents line, a price cap, the pills, and Clear All.
+  const bbSide = await page.evaluate(async () => {
+    const tick = () => new Promise((res) => setTimeout(res, 60));
+    const root = document.querySelector('#view-buybacks');
+    const q = (sel) => root.querySelector(sel);
+    const r = {};
+    r.groups = [...root.querySelectorAll('.oh-fg')].map((g) => g.dataset.group).join(',');
+    const all = computeBuybacks().length;
+    q('.oh-fg[data-group="ins"] [data-option="LTI"]').click();
+    await tick();
+    const lti = computeBuybacks();
+    r.lti =
+      lti.length > 0 &&
+      lti.length < all &&
+      lti.every((b) => /lifetime|lti/i.test(`${b.name} ${b.contains}`));
+    r.pill = /Insurance:\s*LTI/.test(q('.oh-active')?.textContent || '');
+    const range = q('.oh-range input');
+    range.value = 50;
+    range.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((res) => setTimeout(res, 300));
+    r.cap = computeBuybacks().every((b) => bbPrice(b) != null && bbPrice(b) <= 50);
+    q('.oh-clearall').click();
+    await tick();
+    r.cleared = computeBuybacks().length === all && !q('.oh-active');
+    r.switches = !!q('[data-switch="bb-hide"]') && !!q('[data-switch="bb-stack"]');
+    return r;
+  });
+  /ins/.test(bbSide.groups) &&
+  bbSide.lti &&
+  bbSide.pill &&
+  bbSide.cap &&
+  bbSide.cleared &&
+  bbSide.switches
+    ? ok('buy-backs filter sidebar: insurance from the contents line, price cap, pills, Clear All')
+    : fail(`buy-backs sidebar: ${JSON.stringify(bbSide)}`);
   await page.select('#bb-sort', 'price-desc');
   const bbPrices = await page.$$eval('#buybacks-body .card .val', (v) =>
     v.map((e) => Number(e.textContent.replace(/[$,]/g, ''))),

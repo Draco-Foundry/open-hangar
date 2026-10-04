@@ -25,11 +25,16 @@ export default defineConfig({
       input: {
         home: 'ui/home/main.js',
         inventory: 'ui/inventory/main.js',
+        buybacks: 'ui/buybacks/main.js',
       },
       output: {
         format: 'es',
         entryFileNames: '[name].js',
-        // Code two pages share (Svelte's runtime, ui/lib) goes in one shared file.
+        // Code pages share (Svelte's runtime, ui/lib) goes in one file with a fixed
+        // name, ui/shared.js and ui/shared.css, so dashboard.html's links don't
+        // change as pages start sharing components.
+        manualChunks: (id) =>
+          /[\\/]node_modules[\\/]svelte[\\/]|[\\/]ui[\\/]lib[\\/]/.test(id) ? 'shared' : undefined,
         chunkFileNames: '[name].js',
         assetFileNames: (a) =>
           (a.names || [a.name || '']).some((n) => /\.css$/.test(n))

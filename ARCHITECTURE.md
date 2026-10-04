@@ -181,15 +181,20 @@ is moving pages to Svelte one at a time; today that's the Home page cards.
   (wiki, RSI news, patch notes) once per page view through `window.OH`.
 - **Svelte to classic.** `ui/home/ForYou.svelte` sets `window.OHApp.alerts` to
   `{ list, ignore }`, which the bell in `src/dashboard.js` reads.
-- **Inventory.** `ui/inventory/main.js` (built to `src/ui/inventory.js` and
-  `inventory.css`) mounts the page around the list into `#oh-inventory`: summary
+- **Inventory.** `ui/inventory/main.js` (built to `src/ui/inventory.js`) mounts the page around the list into `#oh-inventory`: summary
   strip, toolbar, the filter sidebar (Filters Pass), active-filter pills and saved
   views, plus the melt planner in Select mode's bar. It moves `#results` into its
   list column; the cards and the Market sale sheet in it are still drawn by
   `renderInventory()`. The filters live in `src/dashboard.js` (`INV_GROUPS`,
   `computeShown()`), because the list, Select All and the exports read them too;
   the Svelte controls call `window.OHApp.inv`. The toolbar, sidebar, pills, summary
-  strip and Export menu are shared components in `ui/lib/` for Buy-Backs to reuse.
+  strip and Export menu are shared components in `ui/lib/`.
+- **Buy-Backs.** `ui/buybacks/main.js` does the same for Buy-Backs (`#oh-buybacks`,
+  moving `#buybacks-body`), with its own groups (`BB_GROUPS`, applied by
+  `computeBuybacks()`) and `window.OHApp.bb`.
+- **Shared chunk.** Code pages share (Svelte's runtime and `ui/lib/`) builds into
+  `src/ui/shared.js` and `shared.css` (`manualChunks` in `vite.config.mjs`), so
+  `dashboard.html` links one fixed stylesheet however many pages share it.
 
 ## Outbound Requests
 
