@@ -3,6 +3,7 @@
 // friends in src/dashboard.js), with the full-size picture viewer on top. What each
 // shows comes from window.OHApp.detail; the look is the classic modal's
 // (dashboard.html, ui/theme.css).
+import './details.css';
 import { mount } from 'svelte';
 import Details from './Details.svelte';
 
