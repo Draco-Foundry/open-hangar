@@ -161,7 +161,7 @@ the community Hangar Transfer Format (one entry per ship).
 ## The Svelte and Classic Bridge
 
 The dashboard is mostly classic JavaScript. The 0.3.0 redesign (docs/REDESIGN-0.3.md)
-is moving pages to Svelte one at a time; every page is on it now (the popup isn't built yet).
+moved every page to Svelte, one at a time.
 
 - **Build.** `vite.config.mjs` builds each page's `ui/<page>/main.js` into
   `src/ui/<page>.js` (Home also gets `src/ui/home.css`), code the pages share into

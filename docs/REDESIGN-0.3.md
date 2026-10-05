@@ -67,7 +67,7 @@ Empty blocks disappear; the grid never leaves a card alone in a row.
 
 1. **Design** (mockups only, nothing built until the owner says so): style guide and
    building blocks, then every page: Home (done), Inventory, Buy-Backs, Stats, Store, Org
-   Fleet, Referrals, Updates, Developers, popup.
+   Fleet, Referrals, Updates, Developers. (No toolbar popup: the icon opens Home; #281 closed.)
 2. **Set up Svelte + Vite** on the branch; the extension must behave exactly as today.
    Firefox's store needs the source for built code (the repo is public).
 3. **Rebuild page by page** from the signed-off mockups; rewrite the UI smoke tests
