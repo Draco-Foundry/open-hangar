@@ -23,7 +23,7 @@
       ref: ref
         ? { name: ref.name, reward: a.shortReward(ref.reward), full: ref.reward, end: a.parseTs(ref.end + ' 00:00:00') }
         : null,
-      token: lib.nextBuybackToken(now),
+      token: lib.soonBuybackToken(now), // only in the last 30 days
     };
   });
 
