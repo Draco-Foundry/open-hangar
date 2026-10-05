@@ -4275,13 +4275,8 @@ async function logOut() {
 }
 
 // Your menu → Clear Data.
+// Asked first in your menu (YouMenu.svelte), so no browser confirm box here.
 async function clearData() {
-  if (
-    !confirm(
-      "Clear this account's scanned data from this browser? Other saved accounts are kept. You can re-scan at any time.",
-    )
-  )
-    return;
   await OH.clearData();
   state.items = [];
   state.scannedAt = null;

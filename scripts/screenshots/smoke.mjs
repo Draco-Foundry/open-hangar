@@ -2525,6 +2525,31 @@ try {
     ? ok('scan report: one row per source with the failed one marked, and its buttons')
     : fail(`partial scan report: ${JSON.stringify(rep)}`);
 
+  // Your menu: Clear Data (red) asks once in place; Keep Data backs out with nothing
+  // cleared and the menu still open.
+  const ask = await page.evaluate(async () => {
+    const tick = () => new Promise((r) => setTimeout(r, 60));
+    const items = state.items.length;
+    document.querySelector('#settings-btn').click();
+    await tick();
+    document.querySelector('#clear-home').click();
+    await tick();
+    const box = document.querySelector('#settings-menu .you-confirm.danger');
+    const r = {
+      asked: /Clear This Account's Data\?/.test(box?.textContent || ''),
+      open: !document.querySelector('#settings-menu').hidden,
+    };
+    [...box.querySelectorAll('button')].find((b) => /Keep Data/.test(b.textContent)).click();
+    await tick();
+    r.back = !!document.querySelector('#clear-home') && !document.querySelector('.you-confirm');
+    r.kept = state.items.length === items && items > 0;
+    document.dispatchEvent(new CustomEvent('oh:close-menus'));
+    return r;
+  });
+  ask.asked && ask.open && ask.back && ask.kept
+    ? ok('your menu: Clear Data asks first, Keep Data clears nothing')
+    : fail(`clear data confirm: ${JSON.stringify(ask)}`);
+
   console.log('Keyboard');
   await go('#inventory');
   await page.click('#layout [data-layout="gallery"]');

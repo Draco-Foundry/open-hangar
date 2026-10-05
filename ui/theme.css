@@ -461,6 +461,14 @@ body:not(:has(#view-home.active)) .wrap > header {
 .settings-menu .menu-danger {
   color: #f85149;
 }
+/* Account actions with weight (Disconnect, Log Out of RSI): amber; Clear Data: red.
+   Each asks once in place (.you-confirm). */
+.settings-menu .menu-warn {
+  color: var(--warn);
+}
+.settings-menu .menu-warn:hover {
+  color: #f2bb5e;
+}
 .settings-menu .menu-danger:hover {
   color: #ff7b72;
 }
@@ -2189,6 +2197,28 @@ body:not(:has(#view-home.active)) .market-title {
 }
 .you-confirm {
   margin: 6px 0;
+}
+.you-confirm.warn {
+  border-color: rgba(232, 163, 60, 0.6);
+}
+.you-confirm.danger {
+  border-color: rgba(248, 81, 73, 0.6);
+}
+.sc-btn.warn {
+  background: #9a6212;
+  border-color: #9a6212;
+  color: #fff;
+}
+.sc-btn.danger {
+  background: #c93c37;
+  border-color: #c93c37;
+  color: #fff;
+}
+.sc-btn.warn:hover {
+  background: #8f5a10;
+}
+.sc-btn.danger:hover {
+  background: #b5332e;
 }
 .sm-confirm b {
   color: var(--head);
