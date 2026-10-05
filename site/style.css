@@ -96,6 +96,18 @@ h1 {
   cursor: default;
   opacity: 0.7;
 }
+/* The browser's own logo, so people spot theirs without reading (the official
+   logos, used as each browser maker allows for "get it for this browser" links;
+   files from the browser-logos project). */
+.b-logo {
+  align-self: center;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 6px;
+}
+.install.soon .b-logo {
+  filter: grayscale(1);
+}
 .b-name {
   font-weight: 600;
   font-size: 1.05rem;
@@ -120,6 +132,41 @@ h1 {
 }
 .install.live .b-note::before {
   background: #3fb950;
+}
+/* Each store's live version, and a newer one waiting in its review queue. */
+.b-vers {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.b-vers:has(.b-ver:empty):has(.b-pend:empty) {
+  display: none;
+}
+.b-ver {
+  color: #8b949e;
+}
+
+.b-pend {
+  margin-top: 2px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(227, 179, 65, 0.12);
+  color: #e3b341;
+}
+.install.mine .b-ver {
+  color: #fff;
+}
+.install.mine .b-pend {
+  background: rgba(0, 0, 0, 0.28);
+  color: #ffe7a3;
+}
+.b-ver:empty,
+.b-pend:empty {
+  display: none;
 }
 .also a {
   color: var(--link);
@@ -287,10 +334,31 @@ footer {
 .maker:hover strong {
   color: var(--link);
 }
-footer nav {
+/* Footer links in two quiet rows: help and community, then legal and contact.
+   Underlined only on hover, so the rows read as a menu, not a wall of links. */
+.foot-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 8px 22px;
+}
+.foot-links + .foot-links {
+  margin-top: 8px;
+}
+.foot-links a {
+  color: var(--text);
+  text-decoration: none;
+}
+.foot-links a:hover,
+.foot-links a:focus-visible {
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.foot-small {
+  font-size: 0.8125rem;
+}
+.foot-small a {
+  color: var(--muted);
 }
 .support-links {
   display: flex;
@@ -347,4 +415,71 @@ footer nav {
 }
 .doc .updated {
   color: var(--muted);
+}
+
+/* Open beta notice (index.html, until the November 10 release). */
+.beta-note {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 50;
+  width: min(340px, calc(100vw - 32px));
+  padding: 18px 20px;
+  border: 1px solid rgba(47, 129, 247, 0.55);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+  color: var(--text);
+}
+.beta-note[hidden] {
+  display: none;
+}
+.beta-note h2 {
+  margin: 2px 0 6px;
+  font-size: 18px;
+  font-weight: 600;
+  text-wrap: balance;
+}
+.beta-note p {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+.beta-note .beta-tag {
+  margin: 0;
+  color: var(--link);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.beta-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 4px 6px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.beta-close:hover,
+.beta-close:focus-visible {
+  color: var(--text);
+}
+.beta-link {
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.beta-link:hover {
+  background: var(--accent-hover);
 }

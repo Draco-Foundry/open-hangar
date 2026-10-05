@@ -750,11 +750,46 @@ try {
     ? ok('select mode picks items')
     : fail(`select mode: "${sel}", ${marked} marked`);
   await page.click('[data-sb="done"]');
+  // Export ▾ items run (the menu used to swallow their clicks): Share Image starts
+  // Select mode, and Buy-Backs' CSV item reaches its handler too.
+  await page.click('#inv-exp-btn');
+  await page.click('#inv-exp-menu [data-export="inv-image"]');
+  const exp = await page.evaluate(async () => {
+    const r = {
+      selecting: state.selecting,
+      menuClosed: document.querySelector('#inv-exp-menu').hidden,
+    };
+    setSelecting(false);
+    const real = exportBuybackCsv;
+    let called = false;
+    exportBuybackCsv = () => (called = true);
+    location.hash = '#buybacks';
+    await new Promise((res) => setTimeout(res, 300));
+    document.querySelector('#bb-exp-btn').click();
+    document.querySelector('#bb-exp-menu [data-export="bb-csv"]').click();
+    exportBuybackCsv = real;
+    r.bbCsv = called;
+    location.hash = '#inventory';
+    await new Promise((res) => setTimeout(res, 300));
+    return r;
+  });
+  exp.selecting && exp.menuClosed && exp.bbCsv
+    ? ok('Export menu items run (Share Image starts Select mode, Buy-Backs CSV)')
+    : fail(`export menu: ${JSON.stringify(exp)}`);
 
   console.log('Broken thumbnails');
   await go('#inventory');
   const thumb = await page.evaluate(async () => {
-    const img = document.querySelector('#results .card img.thumb');
+    let img = document.querySelector('#results .card img.thumb');
+    if (!img) {
+      // Offline (no RSI or wiki pictures), every card shows its placeholder: give
+      // the first one a picture the way the art lookup does, then break it.
+      const ph = document.querySelector('#results .card .thumb.placeholder');
+      img = document.createElement('img');
+      img.className = 'thumb';
+      img.alt = '';
+      ph.replaceWith(img);
+    }
     const card = img.closest('.card');
     const missing = `${location.origin}/missing-${Date.now()}`;
     // Both sizes break together, as they would for a dead RSI link.
@@ -2289,6 +2324,13 @@ try {
       };
     });
   const modalOpen = () => page.$eval('#item-modal', (m) => !m.hidden);
+  // The pop-up's picture comes from RSI or the wiki; offline neither answers, so
+  // give the first card's item a local picture to fall back on (a real RSI image).
+  await page.evaluate(() => {
+    const id = document.querySelector('.card[data-id]').dataset.id;
+    const item = state.items.find((x) => String(x.id) === id);
+    if (item && !item.image) item.image = `${location.origin}/icons/icon128.png`;
+  });
   await page.focus('.card[data-id]');
   const cardId = (await active()).card;
   await page.keyboard.press('Enter');
