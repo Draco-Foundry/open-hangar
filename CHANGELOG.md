@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.2.18 — 2026-10-04
+
 - Fixed: **Reclaim on an upgrade buy-back lands on the right pad.** It used to drop you on
   the front page of RSI's pledge store. Now it opens just that upgrade in your buy-back
   list on RSI, where its Buy Back button brings up the upgrade window for exactly that
