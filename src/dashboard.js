@@ -3447,7 +3447,11 @@ function reclaimOf(b) {
   // Retired ships (#306) can't be reclaimed: say so instead of a dead link.
   const retired = OH.retiredBuyback(b);
   if (retired) return { retired };
-  const direct = buybackUrl(b);
+  // A CCU's button on RSI has no page of its own: its href is just the pledge
+  // store, which opened the store's front page instead of this upgrade (owner,
+  // 2026-10-05). CCUs always use the one-item buy-back list, where RSI's own Buy
+  // Back button opens the upgrade pop-up for exactly this pledge.
+  const direct = b.ccu || b.isCCU ? '' : buybackUrl(b);
   const url = direct || buybackViewUrl(b);
   if (!url) return null;
   const tip = direct
