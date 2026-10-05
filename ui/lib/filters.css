@@ -235,6 +235,16 @@
   border-radius: var(--r-md);
 }
 
+/* Read out, not shown: "Removed filter: LTI" when Escape takes one off. */
+.oh-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* Active filters above the list. */
 .oh-active {
   display: flex;

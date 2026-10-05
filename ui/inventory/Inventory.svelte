@@ -11,6 +11,7 @@
   import FilterSidebar from '../lib/FilterSidebar.svelte';
   import ActivePills from '../lib/ActivePills.svelte';
   import ExportMenu from '../lib/ExportMenu.svelte';
+  import { escapeClearsFilters } from '../lib/esc-filters.js';
   import SavedViews from './SavedViews.svelte';
 
   const SORTS = [
@@ -64,6 +65,22 @@
       viewKey: i.viewKey(),
       dollars: a.dollars,
     };
+  });
+
+  // Escape takes off the newest filter (ui/lib/esc-filters.js); `live` reads it out.
+  let live;
+  let esc = null;
+  $effect(() => {
+    esc = escapeClearsFilters({
+      page: live,
+      active: () => (inv().empty ? [] : inv().filters().active),
+      remove: (g, k) => inv().remove(g, k),
+      live,
+    });
+    return () => esc.stop();
+  });
+  $effect(() => {
+    esc?.track(d.f ? d.f.active : []);
   });
 
   // Moves the list (#results) into the list column, once.
@@ -126,6 +143,7 @@
       />
       <SavedViews views={d.views} current={d.viewKey} />
     {/if}
+    <span class="oh-sr" aria-live="polite" bind:this={live}></span>
     <div class="oh-list" use:adopt></div>
   </div>
 </div>

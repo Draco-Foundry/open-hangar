@@ -13,6 +13,7 @@
   import FilterSidebar from '../lib/FilterSidebar.svelte';
   import ActivePills from '../lib/ActivePills.svelte';
   import ExportMenu from '../lib/ExportMenu.svelte';
+  import { escapeClearsFilters } from '../lib/esc-filters.js';
 
   const SORTS = [
     ['date-desc', 'Date: newest first'],
@@ -61,6 +62,22 @@
       layout: b.layout,
       dollars: a.dollars,
     };
+  });
+
+  // Escape takes off the newest filter (ui/lib/esc-filters.js); `live` reads it out.
+  let live;
+  let esc = null;
+  $effect(() => {
+    esc = escapeClearsFilters({
+      page: live,
+      active: () => (bb().empty ? [] : bb().filters().active),
+      remove: (g, k) => bb().remove(g, k),
+      live,
+    });
+    return () => esc.stop();
+  });
+  $effect(() => {
+    esc?.track(d.f ? d.f.active : []);
   });
 
   // Moves the list (#buybacks-body) into the list column, once.
@@ -115,6 +132,7 @@
         onClearAll={() => bb().clearAll()}
       />
     {/if}
+    <span class="oh-sr" aria-live="polite" bind:this={live}></span>
     <div class="oh-list" use:adopt></div>
   </div>
 </div>
