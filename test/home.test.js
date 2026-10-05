@@ -60,9 +60,14 @@ test('activeWikiEvent hides an event whose dates are over (stale wiki card)', ()
   assert.equal(OH.activeWikiEvent(null), null);
 });
 
-test('nextBuybackToken is the next scheduled date, or null past the list', () => {
+test('nextBuybackToken: the listed date, then the first Monday of the next quarter', () => {
   assert.equal(OH.nextBuybackToken(Date.UTC(2026, 8, 30)), Date.parse('2026-10-05T12:00:00Z'));
-  assert.equal(OH.nextBuybackToken(Date.UTC(2026, 11, 1)), null);
+  // Past the list: Mon Jan 4 2027, then Mon Apr 5, Mon Jul 5, Mon Oct 4.
+  assert.equal(OH.nextBuybackToken(Date.UTC(2026, 9, 5, 18)), Date.parse('2027-01-04T12:00:00Z'));
+  assert.equal(OH.nextBuybackToken(Date.UTC(2026, 11, 1)), Date.parse('2027-01-04T12:00:00Z'));
+  assert.equal(OH.nextBuybackToken(Date.UTC(2027, 0, 4, 13)), Date.parse('2027-04-05T12:00:00Z'));
+  assert.equal(OH.nextBuybackToken(Date.UTC(2027, 5, 1)), Date.parse('2027-07-05T12:00:00Z'));
+  assert.equal(OH.nextBuybackToken(Date.UTC(2027, 6, 6)), Date.parse('2027-10-04T12:00:00Z'));
 });
 
 // RSI Spectrum Patch Notes channel, first 8 threads as read on 2026-09-30.
@@ -83,4 +88,11 @@ test('patchWave finds the newest wave for a test version', () => {
   const n = OH.parsePatchNotes(PATCH);
   assert.equal(OH.patchWave(n, '4.10.2'), 'Wave 3');
   assert.equal(OH.patchWave(n, '9.9.9'), '');
+});
+
+test('soonBuybackToken: only in the last 30 days before a token', () => {
+  // 2027-01-04 is the next one after 2026-10-05.
+  assert.equal(OH.soonBuybackToken(Date.UTC(2026, 9, 6)), null); // ~90 days away
+  assert.equal(OH.soonBuybackToken(Date.UTC(2026, 11, 10)), Date.parse('2027-01-04T12:00:00Z'));
+  assert.equal(OH.soonBuybackToken(Date.UTC(2026, 8, 30)), Date.parse('2026-10-05T12:00:00Z'));
 });
