@@ -31,7 +31,8 @@ most users see it within a few hours.
   is out, so people on the fix keep scanning). `message` is optional (300 characters,
   plain text).
 - `banner`: a notice across the top of the dashboard. `level` is `warn` or `info`;
-  `until` (a date) hides it automatically after that day.
+  `until` (a date) hides it automatically after that day; `maxVersion` shows it only
+  on that version or older (versions before 0.3.0 ignore it and always show it).
 - When the fix is out everywhere, put the file back to
   `{ "sources": {}, "banner": null }`.
 

@@ -2725,6 +2725,79 @@
       .beta-link:hover {
         background: var(--accent-hover);
       }
+      .beta-note {
+        background:
+          linear-gradient(180deg, rgba(59, 106, 237, 0.12), transparent 60%), var(--panel);
+      }
+      .beta-note .beta-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--beacon);
+      }
+      .beta-tag i {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--beacon);
+        box-shadow: 0 0 0 4px var(--beacon-soft);
+      }
+      .beta-when {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 10px 12px;
+        margin: 0 0 14px;
+        border-radius: 10px;
+        background: var(--panel-2);
+      }
+      .beta-when b {
+        display: block;
+        color: var(--head);
+        font: 600 15px var(--font-head);
+      }
+      .beta-when small {
+        display: block;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .beta-cal {
+        flex: 0 0 40px;
+        padding-top: 4px;
+        height: 44px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--bg);
+        color: var(--head);
+        text-align: center;
+        font: 600 16px/1 var(--font-head);
+      }
+      .beta-cal span {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--beacon);
+        font-size: 9px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      .beta-acts {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .beta-later {
+        padding: 8px 12px;
+        border: 0;
+        border-radius: 9px;
+        background: none;
+        color: var(--muted);
+        font: 500 14px var(--font-body);
+        cursor: pointer;
+      }
+      .beta-later:hover,
+      .beta-later:focus-visible {
+        color: var(--text);
+      }
     </style>
     <link rel="stylesheet" href="ui/home.css" />
     <link rel="stylesheet" href="ui/shared.css" />
@@ -3209,15 +3282,25 @@
          by itself after release day. dashboard.js shows it. Remove after the release. -->
     <aside class="beta-note" id="beta-note" role="status" aria-labelledby="beta-note-title" hidden>
       <button type="button" class="beta-close" id="beta-close" aria-label="Close">✕</button>
-      <p class="beta-tag">Open Beta</p>
+      <p class="beta-tag"><i aria-hidden="true"></i>Open Beta</p>
       <h2 id="beta-note-title">Still Spooling Up</h2>
       <p>
-        Open Hangar is a work in progress, with the official release set for
-        <strong>November 10</strong>. Questions, ideas or a bug to report? Come find us on Discord.
+        Open Hangar is a work in progress. Questions, ideas or a bug to report? Come find us on
+        Discord.
       </p>
-      <a class="beta-link" href="https://discord.gg/FF8Wm5HdnV" target="_blank" rel="noopener"
-        >Join the Discord ↗</a
-      >
+      <div class="beta-when">
+        <div class="beta-cal" aria-hidden="true"><span>Nov</span>10</div>
+        <div>
+          <b>Official Release</b>
+          <small id="beta-days">November 10</small>
+        </div>
+      </div>
+      <div class="beta-acts">
+        <a class="beta-link" href="https://discord.gg/FF8Wm5HdnV" target="_blank" rel="noopener"
+          >Join the Discord ↗</a
+        >
+        <button type="button" class="beta-later" id="beta-later">Maybe Later</button>
+      </div>
     </aside>
 
     <script src="scraper/parser.js"></script>
