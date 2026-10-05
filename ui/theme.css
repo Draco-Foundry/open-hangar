@@ -2187,6 +2187,9 @@ body:not(:has(#view-home.active)) .market-title {
   color: var(--muted);
   text-wrap: pretty;
 }
+.you-confirm {
+  margin: 6px 0;
+}
 .sm-confirm b {
   color: var(--head);
   font: 600 14px var(--font-head);

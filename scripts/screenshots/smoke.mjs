@@ -583,11 +583,19 @@ try {
       $('#scan-report .sr-x')?.click();
       await wait();
       OH.siteSync = realSync;
+      // Disconnect isn't in the Scan menu; it's in your portrait's menu, asked once.
       await openMenu();
-      btnIn(menu(), 'Disconnect').click();
+      r.noScanDisconnect = !/Disconnect/.test(txt(menu()));
+      $('#scan-report .sr-x')?.click();
+      document.dispatchEvent(new CustomEvent('oh:close-menus'));
       await wait();
-      r.ask = txt(menu());
-      btnIn($('#scan-menu-sync .sm-confirm'), 'Disconnect').click();
+      $('#settings-btn').click();
+      await wait();
+      $('#you-disconnect').click();
+      await wait();
+      r.ask = txt($('#settings-menu .you-confirm'));
+      r.menuStays = !$('#settings-menu').hidden;
+      btnIn($('#settings-menu .you-confirm'), 'Disconnect').click();
       await wait(150);
       r.back = txt(card());
       r.statusGone = !$('#sync-status') && !menu();
@@ -632,7 +640,9 @@ try {
   sc.cardStillQuiet &&
   /^Not Synced/.test(sc.manual) &&
   /Scan your hangar first/.test(sc.manual) &&
-  /Disconnect From the Website\?/.test(sc.ask) &&
+  sc.noScanDisconnect &&
+  sc.menuStays &&
+  /Disconnect From openhangar\.space\?/.test(sc.ask) &&
   /Connect to openhangar\.space/.test(sc.back) &&
   sc.statusGone &&
   sc.hiddenAgain

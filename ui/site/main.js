@@ -9,6 +9,7 @@ import { mount } from 'svelte';
 import SiteConnect from './SiteConnect.svelte';
 import SyncStatus from './SyncStatus.svelte';
 import SyncMenu from './SyncMenu.svelte';
+import YouDisconnect from './YouDisconnect.svelte';
 
 if (window.OHApp && window.OHApp.site) {
   const at = (sel) => document.querySelector(sel);
@@ -16,4 +17,5 @@ if (window.OHApp && window.OHApp.site) {
   if (card) mount(SiteConnect, { target: card });
   if (at('#scan-sync-status')) mount(SyncStatus, { target: at('#scan-sync-status') });
   if (at('#scan-menu-site')) mount(SyncMenu, { target: at('#scan-menu-site') });
+  if (at('#you-menu-site')) mount(YouDisconnect, { target: at('#you-menu-site') });
 }
