@@ -22,6 +22,7 @@ on:
 
 permissions:
   contents: read
+  actions: read # store-versions.mjs reads Publish to stores runs
 
 concurrency:
   group: site
@@ -52,6 +53,13 @@ jobs:
             site/index.html
           grep -E 'data-version|data-updated' site/index.html
           echo "Stamped v${VERSION}, updated ${HUMAN}"
+      # Each install button's live store version, and a newer one in review. A store
+      # that can't be read is left blank; this step never stops the deploy.
+      - name: Stamp store versions
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/publish/store-versions.mjs site/index.html
       # The extension's exchange rates (#243): built here, never committed.
       - run: node scripts/update-rates.mjs site/rates.json
       # openhangar.space is served by Cloudflare (site-worker/, open-hangar#201;
