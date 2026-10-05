@@ -91,6 +91,71 @@ async function checkListAlignment(label, rootSel) {
   else ok(`${label}: ${bad.rows} List rows aligned`);
 }
 
+// Escape takes off the newest filter, one per press (ui/lib/esc-filters.js), but
+// not while typing in the page's search, and a detail window's Escape only closes
+// the window. Puts on Insurance: LTI, then a type pill (pill order puts types
+// first, so "newest" really is the order they went on).
+async function checkEscapeFilters(label, view, search, opener) {
+  const tick = () => new Promise((r) => setTimeout(r, 120));
+  const pills = () =>
+    page.$$eval(`#view-${view} .oh-af`, (a) =>
+      a.map((x) => x.textContent.replace(/✕/g, '').trim()),
+    );
+  const blur = () => page.evaluate(() => document.activeElement?.blur());
+  const put = (sel) => page.$eval(`#view-${view} ${sel}`, (b) => b.click());
+  const clear = () =>
+    page.evaluate((v) => document.querySelector(`#view-${v} .oh-clearall`)?.click(), view);
+  const r = {};
+  await clear();
+  await put('.oh-fg[data-group="ins"] [data-option="LTI"]');
+  await tick();
+  await put('.oh-tp[data-type]');
+  await tick();
+  r.on = await pills();
+  await blur();
+  await page.keyboard.press('Escape');
+  await tick();
+  r.first = await pills();
+  r.said = await page.$eval(`#view-${view} .oh-sr`, (e) => e.textContent);
+  await page.keyboard.press('Escape');
+  await tick();
+  r.second = await pills();
+  await page.keyboard.press('Escape'); // nothing left: does nothing
+  await tick();
+  r.third = await pills();
+  r.firstOk = r.on.length === 2 && r.first.length === 1 && /Insurance:\s*LTI/.test(r.first[0]);
+  r.saidOk = /^Removed filter: \S/.test(r.said);
+  r.emptyOk = r.second.length === 0 && r.third.length === 0;
+  // In the search box Escape stays the box's.
+  await put('.oh-fg[data-group="ins"] [data-option="LTI"]');
+  await tick();
+  await page.focus(search);
+  await page.keyboard.press('Escape');
+  await tick();
+  r.inSearch = (await pills()).length === 1;
+  // A detail window: Escape closes it and leaves the filter on.
+  await blur();
+  await opener();
+  await page
+    .waitForFunction(() => !document.getElementById('item-modal').hidden, {
+      timeout: 5000,
+    })
+    .catch(() => {});
+  r.opened = await page.$eval('#item-modal', (m) => !m.hidden);
+  await page.keyboard.press('Escape');
+  await tick();
+  r.closed = await page.$eval('#item-modal', (m) => m.hidden);
+  r.inModal = (await pills()).length === 1;
+  await clear();
+  await tick();
+  r.firstOk && r.saidOk && r.emptyOk
+    ? ok(`${label}: Escape takes off the newest filter, then the next, then nothing`)
+    : fail(`${label} Escape order: ${JSON.stringify(r)}`);
+  r.inSearch && r.opened && r.closed && r.inModal
+    ? ok(`${label}: Escape in the search box or a detail window removes no filter`)
+    : fail(`${label} Escape elsewhere: ${JSON.stringify(r)}`);
+}
+
 try {
   console.log('Home');
   await go('#home');
@@ -1361,6 +1426,9 @@ try {
         'filter sidebar folds away (Filters (n) brings it back, pills stay), group folds remembered',
       )
     : fail(`filter sidebar fold: ${JSON.stringify(side)}`);
+  await checkEscapeFilters('inventory', 'inventory', '#search', () =>
+    page.click('#results .card[data-id]'),
+  );
 
   console.log('Buy-Backs');
   await go('#buybacks');
@@ -1430,6 +1498,9 @@ try {
   bbSide.switches
     ? ok('buy-backs filter sidebar: insurance from the contents line, price cap, pills, Clear All')
     : fail(`buy-backs sidebar: ${JSON.stringify(bbSide)}`);
+  await checkEscapeFilters('buy-backs', 'buybacks', '#bb-search', () =>
+    page.click('#buybacks-body .card[data-id]'),
+  );
   await page.select('#bb-sort', 'price-desc');
   const bbPrices = await page.$$eval('#buybacks-body .card .val', (v) =>
     v.map((e) => Number(e.textContent.replace(/[$,]/g, ''))),
