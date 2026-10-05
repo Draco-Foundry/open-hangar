@@ -54,16 +54,21 @@
       const inside = home ? e.target.closest('.gsearch') : host.contains(e.target);
       if (!inside && (input.value || open)) close();
     };
-    // While results are open the wheel scrolls them, wherever the mouse is over the
-    // panel (gaps, titles, footer, edges), and never hands the scroll to the page
-    // (#168). Home's dims the page behind, so that doesn't scroll either.
+    // While results are open, the wheel over the panel (gaps, titles, footer, edges)
+    // scrolls the results list (#168). Only while the list can still move that way:
+    // at its end, or when it has no scroll of its own (Home's results sit in the
+    // page), the page scrolls as normal. Blocking it there froze Home's wheel
+    // entirely (owner, 2026-10-06).
     const onWheel = (e) => {
-      if (!open) return;
-      const inside = panel.contains(e.target);
-      if (!inside && !home) return;
-      e.preventDefault();
+      if (!open || !panel.contains(e.target)) return;
       const list = panel.querySelector('.gs-scroll');
-      if (list && inside) list.scrollTop += e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+      if (!list || list.scrollHeight <= list.clientHeight + 1) return;
+      const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+      const atTop = list.scrollTop <= 0;
+      const atEnd = list.scrollTop + list.clientHeight >= list.scrollHeight - 1;
+      if ((dy < 0 && atTop) || (dy > 0 && atEnd)) return;
+      e.preventDefault();
+      list.scrollTop += dy;
     };
     // On the box itself, not delegated: code that sets the value and fires a plain
     // (non-bubbling) input event gets results too, as with the classic box.

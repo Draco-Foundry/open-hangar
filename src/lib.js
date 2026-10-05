@@ -3198,11 +3198,35 @@
   };
 
   // Buy-back tokens: RSI hands out one per quarter on these dates (its published
-  // schedule). Add the next year's dates when RSI announces them.
+  // schedule). Add the next year's dates when RSI announces them. Past the list,
+  // the next one is the first Monday of the next quarter, RSI's pattern so far
+  // (every 2026 date was one): the line on Home no longer vanished after the last
+  // listed date (2026-10-05).
   OH.BUYBACK_TOKEN_DATES = ['2026-01-05', '2026-04-06', '2026-07-06', '2026-10-05'];
+  const firstMondayNoon = (y, m) => {
+    const d = new Date(Date.UTC(y, m, 1, 12));
+    d.setUTCDate(1 + ((8 - d.getUTCDay()) % 7));
+    return d.getTime();
+  };
+  // The next token, but only once it's 30 days away or less (owner, 2026-10-05):
+  // a three-month countdown is noise, and dates past the list are estimates.
+  OH.TOKEN_SOON_DAYS = 30;
+  OH.soonBuybackToken = function soonBuybackToken(now = Date.now()) {
+    const t = OH.nextBuybackToken(now);
+    return t != null && t - +now <= OH.TOKEN_SOON_DAYS * 864e5 ? t : null;
+  };
   OH.nextBuybackToken = function nextBuybackToken(now = Date.now()) {
-    const t = OH.BUYBACK_TOKEN_DATES.map((d) => Date.parse(d + 'T12:00:00Z')).find((x) => x > now);
-    return Number.isFinite(t) ? t : null;
+    const ms = +now; // a number or a Date
+    if (!Number.isFinite(ms)) return null;
+    const t = OH.BUYBACK_TOKEN_DATES.map((d) => Date.parse(d + 'T12:00:00Z')).find((x) => x > ms);
+    if (Number.isFinite(t)) return t;
+    const n = new Date(ms);
+    // At most a quarter or two ahead; bounded so a bad date can never loop.
+    for (let q = Math.floor(n.getUTCMonth() / 3), i = 0; i < 8; q++, i++) {
+      const at = firstMondayNoon(n.getUTCFullYear() + Math.floor(q / 4), (q % 4) * 3);
+      if (at > ms) return at;
+    }
+    return null;
   };
 
   // --- Referral bonus events (starcitizen.tools) ---------------------------------

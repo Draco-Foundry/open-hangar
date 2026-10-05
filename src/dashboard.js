@@ -3228,9 +3228,11 @@ function presentBbKinds() {
 // RSI adds one buy-back token per quarter (they don't roll over). Dates from
 // RSI's "2026 Buy Back Token Schedule" Spectrum post; add next year's when
 // it's announced.
-const BUYBACK_TOKEN_DATES = ['2026-01-05', '2026-04-06', '2026-07-06', '2026-10-05'];
-function nextTokenDate(now = Date.now()) {
-  const d = BUYBACK_TOKEN_DATES.map((x) => new Date(x + 'T12:00:00Z')).find((t) => t > now);
+// The dates and the rule past them live in lib.js (OH.nextBuybackToken). Shown
+// on the page only in the last 30 days (soon); the tooltip always names it.
+function nextTokenDate(now = Date.now(), { soon = true } = {}) {
+  const t = soon ? OH.soonBuybackToken(now) : OH.nextBuybackToken(now);
+  const d = t == null ? null : new Date(t);
   return d
     ? d.toLocaleDateString('en-US', {
         weekday: 'short',
@@ -3242,7 +3244,7 @@ function nextTokenDate(now = Date.now()) {
     : null;
 }
 function tokenTitle() {
-  const next = nextTokenDate();
+  const next = nextTokenDate(Date.now(), { soon: false });
   return `A token lets you buy back one melted pledge with store credit. RSI adds one each quarter${
     next ? ` (next: ${next})` : ''
   }; they don't roll over.`;
