@@ -3002,17 +3002,28 @@
     return null;
   };
   // Upload the same payload as the JSON backup. → { synced_at } or throws.
+  const SYNC_NO_SCAN = 'Scan your hangar first, then press Sync Now.';
+  const SYNC_OLDER_SCAN =
+    'The website already has a newer scan from another browser. Scan here, then press Sync Now.';
   OH.siteSync = async function siteSync() {
     const link = await OH.getSiteLink();
     if (!link) throw new Error('Not connected to openhangar.space.');
+    const db = await OH.exportDB();
+    // Nothing scanned in this browser yet: sending its empty hangar would replace
+    // the one already on the website (the server refuses it too).
+    if (!db?.sources?.hangar?.scannedAt) throw new Error(SYNC_NO_SCAN);
     const res = await siteFetch('/api/sync', {
       method: 'POST',
       headers: { authorization: `Bearer ${link.token}` },
-      body: JSON.stringify(await OH.exportDB()),
+      body: JSON.stringify(db),
     });
     if (res.status === 401) {
       await chrome.storage.local.remove('siteLink');
       throw new Error('This extension was disconnected on the website. Connect again.');
+    }
+    if (res.status === 409) {
+      const { reason } = await res.json().catch(() => ({}));
+      throw new Error(reason === 'older-scan' ? SYNC_OLDER_SCAN : SYNC_NO_SCAN);
     }
     if (!res.ok) throw new Error(`openhangar.space responded ${res.status}`);
     const j = await res.json();
