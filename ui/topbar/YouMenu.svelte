@@ -151,6 +151,8 @@
     <a class="menu-item menu-link" href="#updates" data-view="updates">Updates</a>
     <a class="menu-item menu-link" href="#issues" data-view="issues">Known Issues</a>
     <a class="menu-item menu-link" href="#developers" data-view="developers">Developers</a>
+    <!-- openhangar.space: Disconnect, once connected (ui/site/YouDisconnect.svelte). -->
+    <div id="you-menu-site" style="display: contents"></div>
     <button
       id="logout-home"
       class="menu-item"
