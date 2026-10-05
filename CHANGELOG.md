@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.2.19 — 2026-10-06
+
 - Fixed: **the next buy-back token is back on the radar.** Open Hangar only knew RSI's 2026
   token dates, so after October 5 the "Next Buy-Back Token" line went dark. It now works
   out the next ones from RSI's pattern (the first Monday of each quarter) until RSI posts
