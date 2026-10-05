@@ -219,7 +219,8 @@ try {
   const cards = await page.evaluate(() => {
     const txt = document.querySelector('#oh-status').textContent;
     return {
-      events: /Next Buy-Back Token/.test(txt),
+      // The next token shows only in its last 30 days, so expect it only then.
+      events: /Next Buy-Back Token/.test(txt) === (OH.soonBuybackToken() != null),
       stale: /Last event: Pirate Week/.test(txt) || !/Pirate Week/.test(txt),
       wave: /4\.10\.2[\s\S]{0,40}Wave 3/.test(txt) && /Released [A-Z][a-z]{2} \d+ · /.test(txt),
       news: document.querySelectorAll('#oh-home .nl').length,
@@ -1131,6 +1132,20 @@ try {
     box.value = 'Idris';
     box.dispatchEvent(new Event('input'));
     const notOwned = /Nothing in your hangar/.test(out.textContent);
+    // With results open, the wheel isn't swallowed: off the panel it's the page's,
+    // and on a list that can't scroll it goes to the page too (owner, 2026-10-06).
+    box.value = 'au';
+    box.dispatchEvent(new Event('input'));
+    const wheel = (el) => {
+      const ev = new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true });
+      el.dispatchEvent(ev);
+      return ev.defaultPrevented;
+    };
+    const list = out.querySelector('.gs-scroll');
+    const listScrolls = !!list && list.scrollHeight > list.clientHeight + 1;
+    const wheelFree =
+      !wheel(document.querySelector('#view-home .citizen-card') || document.body) &&
+      (listScrolls || !wheel(out.querySelector('.gs-title') || out));
     box.value = '';
     box.dispatchEvent(new Event('input'));
     const shipName = ownedShips().find((s) => /cutlass/i.test(s.label))?.label;
@@ -1142,6 +1157,7 @@ try {
       hangarRow,
       storeRow,
       notOwned,
+      wheelFree,
       shipName,
       closed: out.hidden,
       title: modal.querySelector('.modal-name')?.textContent,
@@ -1150,7 +1166,12 @@ try {
     };
   });
   await page.evaluate(() => document.querySelector('#modal-close').click());
-  !gs.groups.includes('Ships') && gs.hangarRow && !gs.storeRow && gs.notOwned && gs.closed
+  !gs.groups.includes('Ships') &&
+  gs.hangarRow &&
+  !gs.storeRow &&
+  gs.notOwned &&
+  gs.wheelFree &&
+  gs.closed
     ? ok(`hangar search "cutlass": ${gs.groups.join(', ')}; "Idris" (not owned) finds nothing`)
     : fail(`global search: ${JSON.stringify(gs)}`);
   // A result opens its pledge, and both searches start empty again (#178).
@@ -1433,7 +1454,8 @@ try {
   console.log('Buy-Backs');
   await go('#buybacks');
   const tok = await page.$eval('#bb-sum', (e) => e.textContent).catch(() => '');
-  /Tokens\s*2\s*next/i.test(tok)
+  const tokSoon = await page.evaluate(() => OH.soonBuybackToken() != null);
+  /Tokens\s*2/i.test(tok) && /Tokens\s*2\s*next/i.test(tok) === tokSoon
     ? ok('buy-back tokens in the summary strip')
     : fail(`tokens: "${tok}"`);
   // Buy-Backs pass: Hide small stuff on by default; Stack identical off by default
