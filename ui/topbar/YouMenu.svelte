@@ -52,6 +52,24 @@
   let btn = $state();
   let menu = $state();
   $effect(() => register('you', btn, menu));
+
+  // Log Out of RSI and Clear Data ask once, right here (owner, 2026-10-05): the menu
+  // stays open for the question, and opening it again starts fresh.
+  let asking = $state(''); // '' | 'logout' | 'clear'
+  let keepBtn = $state();
+  $effect(() => {
+    if (menus.open !== 'you') asking = '';
+  });
+  async function ask(e, what) {
+    e.stopPropagation(); // a question, not an action: keep the menu open
+    asking = what;
+    await Promise.resolve();
+    keepBtn?.focus({ preventScroll: true });
+  }
+  function keep(e) {
+    e.stopPropagation();
+    asking = '';
+  }
 </script>
 
 <div class="cc-settings">
@@ -153,24 +171,61 @@
     <a class="menu-item menu-link" href="#developers" data-view="developers">Developers</a>
     <!-- openhangar.space: Disconnect, once connected (ui/site/YouDisconnect.svelte). -->
     <div id="you-menu-site" style="display: contents"></div>
-    <button
-      id="logout-home"
-      class="menu-item"
-      type="button"
-      hidden={!d.loggedIn}
-      disabled={d.loggingOut}
-      onclick={() => app().top.logOut()}
-    >
-      Log Out of RSI<small>For switching accounts. Your saved data stays.</small>
-    </button>
-    <button
-      id="clear-home"
-      class="menu-item menu-danger"
-      type="button"
-      hidden={!d.hasData}
-      onclick={() => app().top.clearData()}
-    >
-      Clear Data
-    </button>
+    {#if asking === 'logout'}
+      <div class="sm-confirm you-confirm warn" role="group" aria-label="Log Out of RSI">
+        <b>Log Out of RSI?</b>
+        <span>Signs you out of robertsspaceindustries.com in this browser. Your saved data stays.</span>
+        <div class="sm-confirm-row">
+          <button bind:this={keepBtn} type="button" class="sc-btn" onclick={keep}
+            >Stay Signed In</button
+          >
+          <button
+            type="button"
+            class="sc-btn warn menu-item"
+            id="logout-confirm"
+            onclick={() => ((asking = ''), app().top.logOut())}>Log Out</button
+          >
+        </div>
+      </div>
+    {:else}
+      <button
+        id="logout-home"
+        class="menu-item menu-warn"
+        type="button"
+        hidden={!d.loggedIn}
+        disabled={d.loggingOut}
+        onclick={(e) => ask(e, 'logout')}
+      >
+        Log Out of RSI<small>For switching accounts. Your saved data stays.</small>
+      </button>
+    {/if}
+    {#if asking === 'clear'}
+      <div class="sm-confirm you-confirm danger" role="group" aria-label="Clear Data">
+        <b>Clear This Account's Data?</b>
+        <span
+          >Removes this account's scans from this browser. Other saved accounts are kept, and you
+          can scan again any time.</span
+        >
+        <div class="sm-confirm-row">
+          <button bind:this={keepBtn} type="button" class="sc-btn" onclick={keep}>Keep Data</button>
+          <button
+            type="button"
+            class="sc-btn danger menu-item"
+            id="clear-confirm"
+            onclick={() => ((asking = ''), app().top.clearData())}>Clear Data</button
+          >
+        </div>
+      </div>
+    {:else}
+      <button
+        id="clear-home"
+        class="menu-item menu-danger"
+        type="button"
+        hidden={!d.hasData}
+        onclick={(e) => ask(e, 'clear')}
+      >
+        Clear Data<small>Removes this account's scans from this browser.</small>
+      </button>
+    {/if}
   </div>
 </div>

@@ -36,7 +36,7 @@
 
 {#if d.shown}
   {#if asking}
-    <div class="sm-confirm you-confirm" role="group" aria-label="Disconnect">
+    <div class="sm-confirm you-confirm warn" role="group" aria-label="Disconnect">
       <b>Disconnect From openhangar.space?</b>
       <span
         >Your synced copy stays on openhangar.space until you delete it there. This extension
@@ -46,13 +46,13 @@
         <button bind:this={stay} type="button" class="sc-btn" onclick={keep}>Stay Connected</button>
         <button
           type="button"
-          class="sc-btn primary menu-item"
+          class="sc-btn warn menu-item"
           onclick={() => ((asking = false), site().disconnect())}>Disconnect</button
         >
       </div>
     </div>
   {:else}
-    <button type="button" class="menu-item" id="you-disconnect" onclick={ask}>
+    <button type="button" class="menu-item menu-warn" id="you-disconnect" onclick={ask}>
       Disconnect From openhangar.space<small>Stops syncing. Your synced copy stays online.</small>
     </button>
   {/if}
