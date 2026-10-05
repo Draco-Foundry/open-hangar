@@ -447,8 +447,8 @@ try {
 
   // The Connect card (owner sign-off, 2026-10-04), switched on with siteUrl and the
   // website stubbed. Without the sign-in window (no identity permission), the code
-  // fallback: Connect → the code to approve → Connected as → Sync Now → Sync After
-  // Every Scan → Disconnect (asked on the card) → Connect again.
+  // fallback: Connect → the code to approve → Connected as → Sync Now → every scan
+  // syncs by itself → Disconnect (asked on the card) → Connect again.
   const sc = await page.evaluate(async () => {
     const wait = (ms = 80) => new Promise((r) => setTimeout(r, ms));
     const card = () => document.querySelector('#view-home .citizen-card #site-connect');
@@ -508,9 +508,15 @@ try {
       btn('Sync Now').click();
       await wait(150);
       r.synced = text();
-      card().querySelector('#site-auto-sync').click();
-      await wait();
-      r.auto = (await chrome.storage.local.get('siteAutoSync')).siteAutoSync;
+      // Connected, a finished scan syncs by itself (no switch for it).
+      let synced = 0;
+      const realSync = OH.siteSync;
+      OH.siteSync = async () => (synced++, realSync());
+      await runScan({ hangar: false, buybacks: false, referrals: false });
+      await wait(150);
+      OH.siteSync = realSync;
+      r.auto = synced === 1 && !card().querySelector('input[type=checkbox]');
+      r.autoHint = text();
       btn('Disconnect').click();
       await wait();
       r.ask = text();
@@ -527,7 +533,7 @@ try {
       });
       if (keep.tabs) chrome.tabs.create = keep.tabs;
       chrome.identity = keep.identity;
-      await chrome.storage.local.remove(['siteUrl', 'siteAutoSync']);
+      await chrome.storage.local.remove('siteUrl');
       await refreshSite();
       await wait();
     }
@@ -535,17 +541,18 @@ try {
     return r;
   });
   /Connect to openhangar\.space/.test(sc.off) &&
-  /Nothing is sent until you press Sync/.test(sc.off) &&
+  /Nothing is sent until you connect/.test(sc.off) &&
   /K7Q-4PX/.test(sc.wait) &&
   /\/link\?code=K7Q-4PX$/.test(sc.opened || '') &&
   /Connected as ExamplePilot/.test(sc.on) &&
   /Not synced yet/.test(sc.on) &&
   /Last synced today/.test(sc.synced) &&
   sc.auto === true &&
+  /Every scan syncs by itself/.test(sc.autoHint) &&
   /Disconnect From the Website\?/.test(sc.ask) &&
   /Connect to openhangar\.space/.test(sc.back) &&
   sc.hiddenAgain
-    ? ok('connect card: connect, approve the code, sync, sync after scans, disconnect')
+    ? ok('connect card: connect, approve the code, sync, a scan syncs by itself, disconnect')
     : fail(`connect card: ${JSON.stringify(sc)}`);
 
   // The usual way (owner, 2026-10-04): the browser's sign-in window opens the website's
