@@ -1,8 +1,7 @@
 <script>
   // The website's section in the Scan ▾ menu once connected (owner sign-off,
-  // 2026-10-05): Connected as <your RSI handle>, when it last synced, then Sync Now,
-  // Open My Hangar ↗ and Disconnect (asked once, right here in the menu).
-  import { tick } from 'svelte';
+  // 2026-10-05): Connected as <your RSI handle>, when it last synced, then Sync Now
+  // and Open My Hangar ↗. Disconnect is in your portrait's menu (YouDisconnect.svelte).
   import { app, version } from '../lib/app.svelte.js';
   import { synced } from './when.js';
 
@@ -24,26 +23,7 @@
     };
   });
 
-  let asking = $state(false); // Disconnect's "are you sure"
-  let stay = $state();
   const site = () => app().site;
-
-  // Opening the menu again starts fresh.
-  $effect(() => {
-    const caret = document.getElementById('scan-menu-btn');
-    const reset = () => (asking = false);
-    caret?.addEventListener('click', reset);
-    return () => caret?.removeEventListener('click', reset);
-  });
-  async function ask() {
-    asking = true;
-    await tick();
-    stay?.focus({ preventScroll: true });
-  }
-  async function disconnect() {
-    asking = false;
-    await site().disconnect();
-  }
 </script>
 
 {#if d.shown}
@@ -54,23 +34,6 @@
         >Connected{#if d.handle}{' '}as <b>{d.handle}</b>{/if}<small>{d.when}</small></span
       >
     </p>
-    {#if asking}
-      <div class="sm-confirm" role="group" aria-label="Disconnect">
-        <b>Disconnect From the Website?</b>
-        <span
-          >Your synced copy stays on openhangar.space until you delete it there. This extension
-          just stops syncing.</span
-        >
-        <div class="sm-confirm-row">
-          <button bind:this={stay} type="button" class="sc-btn" onclick={() => (asking = false)}
-            >Stay Connected</button
-          >
-          <button type="button" class="sc-btn primary menu-item" onclick={disconnect}
-            >Disconnect</button
-          >
-        </div>
-      </div>
-    {:else}
       <button
         type="button"
         class="sm-act menu-item"
@@ -81,8 +44,6 @@
       <button type="button" class="sm-act menu-item" onclick={() => site().open()}
         >Open My Hangar ↗</button
       >
-      <button type="button" class="sm-act dim" onclick={ask}>Disconnect</button>
-    {/if}
     {#if d.msg}<p class="sm-msg" role="status">{d.msg}</p>{/if}
   </div>
 {/if}
