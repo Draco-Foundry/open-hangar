@@ -288,14 +288,18 @@ timeout, and a site that timed out or answered 429/5xx is skipped for 10 minutes
 Code for the optional sync to app.openhangar.space sits between `@sync-start` and
 `@sync-end` markers in `src/lib.js`, `src/dashboard.js` and `src/dashboard.html`. It is
 off unless a developer sets the `siteUrl` key, and `scripts/pack.mjs` cuts it out of
-store builds (see [Build and Packaging](#build-and-packaging)). Its screen is the
-Connect card in the Citizen Card's corner (`ui/site`, built into `src/ui/site.js`,
-whose script tag is itself inside a sync block): Connect (the browser's sign-in window,
-`identity.launchWebAuthFlow`, opens the website's `/connect`; Approve hands back a
-one-time code traded for the token with PKCE at `/api/link/token`, and Sync My Hangar
-Now sends the first sync; without the window, a device code approved on `/link`), Sync
-Now, Open, Disconnect (asked on the card) and Sync
-After Every Scan (`siteAutoSync`, off by default). Its state and actions are `site`
+store builds (see [Build and Packaging](#build-and-packaging)). Its screens are in
+`ui/site` (built into `src/ui/site.js`, whose script tag is itself inside a sync block).
+Before you connect, the Connect card in the Citizen Card's corner: Connect (the
+browser's sign-in window, `identity.launchWebAuthFlow`, opens the website's `/connect`;
+Approve hands back a one-time code traded for the token with PKCE at
+`/api/link/token`, and Sync My Hangar Now sends the first sync; without the window, a
+device code approved on `/link`). On Firefox it first explains what Firefox's
+data-sharing prompt is about (`FirefoxExplain.svelte`). Once connected, sync lives in
+the top bar's Scan button, mounted into spots `ui/topbar` leaves empty: a status beside
+it, an openhangar.space section in its ▾ menu (Sync Now, Open My Hangar, Disconnect),
+"Syncing to Website…" as every scan's last step, and a refused sync in the scan
+report. Its state and actions are `site`
 in `src/dashboard.js`, behind `window.OHApp.site`. The `identity` permission is added by
 `scripts/pack.mjs` only to builds that keep sync (`OH_SYNC=1`). Connect from the
 website (Chrome and Edge): the website's `/link` page asks the extension through

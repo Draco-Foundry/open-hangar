@@ -5,7 +5,8 @@
   // what it's on in its hover text and at the top of the menu (#170). A scan that
   // ends with a problem leaves "Rough Landing" and its report (ScanReport.svelte)
   // until the next scan. The scan itself, and the progress, live in dashboard.js
-  // (window.OHApp.top).
+  // (window.OHApp.top). Sync builds put the website's section in the menu
+  // (#scan-menu-site, filled by ui/site).
   import { app, version } from '../lib/app.svelte.js';
   import {
     menus,
@@ -44,7 +45,13 @@
       fill: bar.scanning ? bar.fill : 0,
       report,
       rough: !!report,
-      label: bar.scanning ? bar.label : report ? 'Rough Landing' : all ? 'Scan All' : 'Scan Custom',
+      label: bar.scanning
+        ? bar.label
+        : report
+          ? report.label || 'Rough Landing'
+          : all
+            ? 'Scan All'
+            : 'Scan Custom',
       // The progress owns the hover text while it shows.
       title: bar.scanning
         ? bar.title
@@ -173,6 +180,8 @@
     <button id="scan-selected" class="scan-go" disabled={d.busy} onclick={() => app().top.scan()}
       >Scan Now</button
     >
+    <!-- openhangar.space: Connected as, Sync Now, Open My Hangar, Disconnect (ui/site). -->
+    <div id="scan-menu-site" style="display: contents"></div>
   </div>
   {#if d.report}
     <ScanReport r={d.report} bind:panel={reportPanel} onClose={closeReport} />

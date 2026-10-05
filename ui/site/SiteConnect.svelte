@@ -1,9 +1,12 @@
 <script>
   // Connect (the browser's sign-in window: Approve there and it closes by itself; or,
-  // as a fallback, the code shown big to match the website tab), then
-  // Connected as <name> with Sync Now, Open ↗ and Disconnect (asked once, right here);
-  // every scan syncs by itself. Hidden until the website is switched on (OH.siteEnabled).
+  // as a fallback, the code shown big to match the website tab). Once connected the
+  // corner goes quiet: sync lives in the top bar's Scan button (SyncStatus,
+  // SyncMenu; owner, 2026-10-05). On Firefox a line under Connect says what we share,
+  // and Learn More (or Connect, until Firefox has said yes) opens FirefoxExplain.
+  // Hidden until the website is switched on (OH.siteEnabled).
   import { app, version } from '../lib/app.svelte.js';
+  import FirefoxExplain from './FirefoxExplain.svelte';
 
   const d = $derived.by(() => {
     version.n;
@@ -14,40 +17,25 @@
       waiting: s.waiting ? s.waiting.code || '' : '',
       // The browser's sign-in window is open (the usual way to connect).
       inWindow: !!(s.waiting && s.waiting.window),
-      syncing: s.syncing,
+      firefox: s.firefox,
+      dataOk: s.dataOk,
       msg: s.msg,
     };
   });
-  let asking = $state(false); // Disconnect's "are you sure"
+  // While the Firefox card is up: the button that opened it (focus goes back there).
+  let explain = $state(null);
 
   const site = () => app().site;
-  function when(t) {
-    if (!t) return 'Not synced yet';
-    const at = new Date(t);
-    const today = at.toDateString() === new Date().toDateString();
-    const time = at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-    return `Last synced ${today ? 'today' : at.toLocaleDateString(undefined, { dateStyle: 'medium' })}, ${time}`;
+  function explainFrom(e) {
+    explain = e.currentTarget;
   }
-  async function disconnect() {
-    asking = false;
-    await site().disconnect();
+  function connect(e) {
+    if (d.firefox && !d.dataOk) explainFrom(e);
+    else site().connect();
   }
 </script>
 
-{#snippet check()}
-  <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
-    <path
-      d="M3 8.5l3 3 7-7"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="1.9"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    />
-  </svg>
-{/snippet}
-
-{#if d.enabled}
+{#if d.enabled && !d.link}
   <div class="site-connect" id="site-connect" aria-live="polite">
     {#if d.inWindow}
       <span class="sc-chip wait"><span class="sc-spin" aria-hidden="true"></span>Docking…</span>
@@ -64,41 +52,8 @@
         <button type="button" class="sc-btn" onclick={() => site().cancel()}>Cancel</button>
       </div>
       <p class="sc-hint">Spooling the quantum drive… this card updates by itself.</p>
-    {:else if d.link && asking}
-      <div class="sc-confirm" role="group" aria-label="Disconnect">
-        <b>Disconnect From the Website?</b>
-        <span class="sc-hint"
-          >Your synced copy stays on openhangar.space until you delete it there. This extension
-          just stops syncing.</span
-        >
-        <div class="sc-row">
-          <button type="button" class="sc-btn" onclick={() => (asking = false)}
-            >Stay Connected</button
-          >
-          <button type="button" class="sc-btn primary" onclick={disconnect}>Disconnect</button>
-        </div>
-      </div>
-    {:else if d.link}
-      <span class="sc-chip">{@render check()}Connected as {d.link.name || 'you'}</span>
-      <span class="sc-hint">{d.syncing ? 'Beaming your hangar up…' : when(d.link.lastSync)}</span>
-      <div class="sc-row">
-        <button
-          type="button"
-          class="sc-btn primary"
-          disabled={d.syncing}
-          onclick={() => site().sync()}
-          >{#if d.syncing}<span class="sc-spin" aria-hidden="true"></span>Syncing{:else}Sync Now{/if}</button
-        >
-        <button type="button" class="sc-btn" onclick={() => site().open()}>Open ↗</button>
-        {#if !d.syncing}
-          <button type="button" class="sc-btn quiet" onclick={() => (asking = true)}
-            >Disconnect</button
-          >
-        {/if}
-      </div>
-      <p class="sc-hint">Every scan syncs by itself.</p>
     {:else}
-      <button type="button" class="sc-btn primary" onclick={() => site().connect()}
+      <button type="button" class="sc-btn primary" onclick={connect}
         ><svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"
           ><circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.4" /><path
             d="M1.8 8h12.4M8 1.7c2 2.2 2 10.4 0 12.6M8 1.7c-2 2.2-2 10.4 0 12.6"
@@ -111,7 +66,31 @@
       <p class="sc-hint">
         Optional. See your hangar on any device. Nothing is sent until you connect.
       </p>
+      {#if d.firefox}
+        <p class="sc-ff">
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"
+            ><path
+              d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linejoin="round"
+            /></svg
+          ><span
+            >We'll share your <b>pledge prices and store credit</b> with openhangar.space, so
+            Firefox asks you first.
+            <button
+              type="button"
+              class="sc-learn"
+              onclick={explainFrom}>Learn More</button
+            ></span
+          >
+        </p>
+      {/if}
     {/if}
     {#if d.msg}<p class="sc-msg" role="status">{d.msg}</p>{/if}
   </div>
+  {#if explain}
+    <FirefoxExplain opener={explain} onClose={() => (explain = null)} />
+  {/if}
 {/if}

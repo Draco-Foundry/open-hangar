@@ -4,7 +4,8 @@
   // its own note with Log In; otherwise one row per source, what came home or what
   // went wrong, and Scan Again, Copy Error Report and Report a Scan Problem. It
   // closes like the other menus (✕, Escape, a click elsewhere); the button says
-  // Rough Landing until the next scan and opens it again.
+  // Rough Landing until the next scan and opens it again. A report can bring its own
+  // title and line (the website sync's "Scan Done, Not Synced"): just Scan Again.
   import { app } from '../lib/app.svelte.js';
   import { menus, menuClick, closeMenus } from './menus.svelte.js';
 
@@ -21,9 +22,9 @@
       sub: "Nothing made it home this time. Here's what happened.",
     },
   };
-  const head = $derived(HEAD[r.kind] || HEAD.part);
+  const head = $derived(r.title ? { title: r.title, sub: r.sub } : HEAD[r.kind] || HEAD.part);
   const sub = $derived(
-    r.kind === 'part'
+    r.kind === 'part' && !r.title
       ? r.bad > 1
         ? 'Most of it made it home. A few parts need another try.'
         : 'Most of it made it home. One part needs another try.'
@@ -125,6 +126,8 @@
         rel="noopener">Log In to RSI ↗</a
       >
       <button type="button" class="sr-btn" onclick={scanAgain}>Scan Again</button>
+    {:else if r.title}
+      <button type="button" class="sr-btn primary" onclick={scanAgain}>Scan Again</button>
     {:else}
       <button type="button" class="sr-btn primary" onclick={scanAgain}>Scan Again</button>
       <button type="button" class="sr-btn" onclick={copy}>Copy Error Report</button>
@@ -135,13 +138,13 @@
   </div>
   {#if copied}
     <p class="sr-hint" role="status">{copied}</p>
-  {:else if r.kind !== 'out'}
+  {:else if r.kind !== 'out' && !r.title}
     <p class="sr-hint">
       Report a Scan Problem opens a GitHub issue with the report filled in. Nothing is sent until
       you submit it.
     </p>
   {/if}
-  {#if r.kind !== 'part' && r.last}
+  {#if r.kind !== 'part' && !r.title && r.last}
     <p class="sr-kept">Your last scan ({r.last}) is still here, safe and sound.</p>
   {/if}
 </div>

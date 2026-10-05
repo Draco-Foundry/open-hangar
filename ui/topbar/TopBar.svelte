@@ -98,6 +98,8 @@
   <!-- Hangar Alerts from any page. -->
   <Bell />
   <ScanSplit />
+  <!-- "Synced 5:54 PM" once connected to openhangar.space (ui/site, sync builds). -->
+  <span id="scan-sync-status" style="display: contents"></span>
   <YouMenu />
 </div>
 
