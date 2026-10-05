@@ -143,7 +143,10 @@
   // no connection = scan as normal.
   //   { "sources": { "hangar": { "enabled": false, "message": "…" },
   //                  "buybacks": { "minVersion": "0.2.13" } },
-  //     "banner": { "message": "…", "level": "warn", "until": "2026-10-08" } }
+  //     "banner": { "message": "…", "level": "warn", "until": "2026-10-08",
+  //                 "maxVersion": "0.2.99" } }
+  // A banner with maxVersion only shows on that version or older (e.g. the 0.2.x open
+  // beta banner, which 0.3.0 replaces with its own card).
   // Source ids: hangar, buybacks, referrals.
   const STATUS_URL = 'https://openhangar.space/status.json';
   const STATUS_KEY = 'remoteStatus';
@@ -175,7 +178,12 @@
     }
     const b = data.banner;
     const until = b && typeof b.until === 'string' ? Date.parse(b.until) : NaN;
-    if (b && statusText(b.message) && !(until <= now)) {
+    const newer =
+      b &&
+      typeof b.maxVersion === 'string' &&
+      version &&
+      OH.compareVersions(version, b.maxVersion) > 0;
+    if (b && statusText(b.message) && !(until <= now) && !newer) {
       out.banner = { message: statusText(b.message), level: b.level === 'info' ? 'info' : 'warn' };
     }
     return out;

@@ -80,6 +80,13 @@ test('evalStatus: banner shows until its end date, warn unless info', () => {
   assert.equal(b({ message: '   ' }), null);
 });
 
+test('evalStatus: a banner with maxVersion skips newer versions', () => {
+  const banner = { message: 'Open beta', maxVersion: '0.2.99' };
+  assert.ok(OH.evalStatus({ banner }, '0.2.17').banner);
+  assert.ok(OH.evalStatus({ banner }, '0.2.99').banner);
+  assert.equal(OH.evalStatus({ banner }, '0.3.0').banner, null);
+});
+
 test('getRemoteStatus: caches the file between calls', async () => {
   reset();
   site = json({ sources: { hangar: { enabled: false } } });
