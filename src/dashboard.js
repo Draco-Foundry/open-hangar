@@ -4206,8 +4206,9 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   topBar.busy = false;
   homeUpdated(); // the welcome card and the top bar follow topBar.busy
   // @sync-start
-  // Sync After Every Scan (off unless you turned it on): what was just saved.
-  if (site.autoSync && site.link && !signedOut) siteSyncNow();
+  // Connected: every finished scan syncs by itself (owner, 2026-10-04; Connect is
+  // the opt-in). The server refuses an empty or older hangar, so this can't wipe one.
+  if (site.link && !signedOut) siteSyncNow();
   // @sync-end
 }
 
@@ -4690,21 +4691,19 @@ async function initUpdates() {
 // The Connect card in the Citizen Card's corner is Svelte (ui/site, owner sign-off
 // 2026-10-04); this holds its state and does what it asks. Hidden for everyone until
 // the website launches: developers switch it on with the `siteUrl` storage key (e.g.
-// https://staging.openhangar.space). Nothing is sent until you press Sync Now, or
-// turn on Sync After Every Scan.
+// https://staging.openhangar.space). Nothing is sent until you Connect; after that,
+// every scan syncs by itself, and Sync Now sends right away.
 const site = {
   enabled: false,
   link: null, // { name, connectedAt, lastSync } once connected (the token stays in lib.js)
   waiting: null, // { code, url, stop } while the website hasn't approved the code yet
   syncing: false,
-  autoSync: false, // Sync After Every Scan (siteAutoSync), off until you turn it on
   msg: '', // the last thing that went wrong, or ''
 };
 async function refreshSite() {
   site.enabled = await OH.siteEnabled();
   const link = site.enabled ? await OH.getSiteLink() : null;
   site.link = link && { name: link.name, connectedAt: link.connectedAt, lastSync: link.lastSync };
-  site.autoSync = !!(await chrome.storage.local.get('siteAutoSync')).siteAutoSync;
   homeUpdated();
 }
 function siteProblem(err) {
@@ -4774,7 +4773,7 @@ async function siteConnectWindow() {
 // manifest lists what sync sends as optional data collection (scripts/pack.mjs,
 // SYNC_DATA), so the first Connect or Sync Now shows Firefox's own prompt. Called
 // first thing in a click, before any await, so Firefox can show it. Other browsers:
-// always yes. Outside a click (Sync After Every Scan) it only checks.
+// always yes. Outside a click (the sync after a scan) it only checks.
 const SITE_DATA = {
   data_collection: ['personallyIdentifyingInfo', 'financialAndPaymentInfo', 'websiteContent'],
 };
@@ -5912,11 +5911,6 @@ window.OHApp = {
     sync: siteSyncNow,
     open: async () => chrome.tabs.create({ url: `${await OH.siteUrl()}/hangar` }),
     disconnect: siteDisconnect,
-    setAutoSync: async (on) => {
-      site.autoSync = !!on;
-      homeUpdated();
-      await chrome.storage.local.set({ siteAutoSync: site.autoSync });
-    },
   },
   // @sync-end
   // Global Hangar Search (ui/search): what matches (see searchResults), and its

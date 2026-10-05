@@ -1,8 +1,8 @@
 <script>
   // Connect (the browser's sign-in window: Approve there and it closes by itself; or,
   // as a fallback, the code shown big to match the website tab), then
-  // Connected as <name> with Sync Now, Open ↗, Disconnect (asked once, right here) and
-  // Sync After Every Scan. Hidden until the website is switched on (OH.siteEnabled).
+  // Connected as <name> with Sync Now, Open ↗ and Disconnect (asked once, right here);
+  // every scan syncs by itself. Hidden until the website is switched on (OH.siteEnabled).
   import { app, version } from '../lib/app.svelte.js';
 
   const d = $derived.by(() => {
@@ -15,7 +15,6 @@
       // The browser's sign-in window is open (the usual way to connect).
       inWindow: !!(s.waiting && s.waiting.window),
       syncing: s.syncing,
-      autoSync: s.autoSync,
       msg: s.msg,
     };
   });
@@ -97,14 +96,7 @@
           >
         {/if}
       </div>
-      <label class="sc-toggle">
-        <input
-          type="checkbox"
-          id="site-auto-sync"
-          checked={d.autoSync}
-          onchange={(e) => site().setAutoSync(e.currentTarget.checked)}
-        /><span class="sc-switch" aria-hidden="true"></span>Sync After Every Scan
-      </label>
+      <p class="sc-hint">Every scan syncs by itself.</p>
     {:else}
       <button type="button" class="sc-btn primary" onclick={() => site().connect()}
         ><svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"
@@ -117,7 +109,7 @@
         >Connect to openhangar.space</button
       >
       <p class="sc-hint">
-        Optional. See your hangar on any device. Nothing is sent until you press Sync.
+        Optional. See your hangar on any device. Nothing is sent until you connect.
       </p>
     {/if}
     {#if d.msg}<p class="sc-msg" role="status">{d.msg}</p>{/if}
