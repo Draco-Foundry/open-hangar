@@ -5364,12 +5364,17 @@ function homeUpdated() {
   });
 }
 // Soft launch notice until the November 10 release (owner, 2026-10-04): the card
-// in dashboard.html, shown until it's closed (remembered here) and never after
-// release day. Remove with the card after the release.
+// in dashboard.html with a countdown, shown until it's closed (✕ or Maybe Later,
+// remembered here) and never after release day. In 0.3.0 it replaces the status
+// file's green banner (that one has maxVersion 0.2.99). Remove after the release.
 (function () {
   const note = document.getElementById('beta-note');
   const close = document.getElementById('beta-close');
   if (!note || !close) return;
+  const days = Math.ceil((Date.parse('2026-11-10T00:00:00') - Date.now()) / 86400e3);
+  const left = document.getElementById('beta-days');
+  if (left)
+    left.textContent = days > 1 ? `${days} days to go` : days === 1 ? 'Tomorrow' : 'Release day';
   const KEY = 'ohBetaNoteClosed';
   let closed = false;
   try {
@@ -5379,6 +5384,8 @@ function homeUpdated() {
   }
   if (closed || Date.now() > Date.parse('2026-11-11')) return;
   note.hidden = false;
+  const later = document.getElementById('beta-later');
+  later?.addEventListener('click', () => close.click());
   close.addEventListener('click', () => {
     note.hidden = true;
     try {
