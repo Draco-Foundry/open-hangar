@@ -32,11 +32,13 @@ space left of the ship). Rebuild with `python docs/brand/draco-foundry/banner.py
 The logo badge (`logo-512.png`, round crop) beside the wordmark in Manrope 700, with
 a Hangar Cobalt rule (#3b6aed). No CIG ship art, so they suit any business mail.
 
-| File                            | Use                                                 |
-| ------------------------------- | --------------------------------------------------- |
-| `envelope-743x150.png`          | Envelope logo above the return address (no tagline) |
-| `envelope-743x150.jpg`          | Same, for upload forms that want JPG                |
-| `letterhead-light-2972x600.png` | Printed letterhead, top of the page about 6.5" wide |
-| `letterhead-light-743x150.png`  | Same at screen size                                 |
-| `letterhead-dark-2972x600.png`  | Email signatures, digital PDFs                      |
-| `letterhead-dark-743x150.png`   | Same at screen size                                 |
+| File                            | Use                                                      |
+| ------------------------------- | -------------------------------------------------------- |
+| `envelope-743x150.png`          | Envelope logo above the return address (no tagline)      |
+| `envelope-743x150.jpg`          | Same, for upload forms that want JPG                     |
+| `letterhead-light-2972x600.png` | Printed letterhead, top of the page about 6.5" wide      |
+| `letterhead-light-743x150.png`  | Same at screen size                                      |
+| `letterhead-dark-2972x600.png`  | Email signatures, digital PDFs                           |
+| `letterhead-dark-743x150.png`   | Same at screen size                                      |
+| `logo-transparent-1024.png`     | The gear logo cut out, no black square (any background)  |
+| `logo-transparent-256.png`      | Same, smaller (site footers use a 64px copy in site/img) |
