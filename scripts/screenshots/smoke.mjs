@@ -1525,6 +1525,18 @@ try {
   bbm.rows === bbTotal && bbm.reclaim && bbm.ins
     ? ok(`buy-back market: ${bbm.rows} rows, one each, Reclaim + Insurance`)
     : fail(`buy-back market: ${JSON.stringify(bbm)} vs ${bbTotal}`);
+  // A CCU's Reclaim opens its one-item buy-back list entry, never the pledge store
+  // its RSI button points at (owner, 2026-10-05).
+  const ccuLink = await page.evaluate(() => {
+    // A CCU that isn't retired (a retired one shows "Retired", no link).
+    const c = state.buybacks.find((b) => b.ccu && !OH.retiredBuyback(b));
+    if (!c) return { none: true };
+    const r = reclaimOf({ ...c, href: 'https://robertsspaceindustries.com/pledge' });
+    return { href: r?.url || '' };
+  });
+  ccuLink.none || /buy-back-pledges\?pagesize=1&page=\d+$/.test(ccuLink.href)
+    ? ok('CCU buy-back: Reclaim opens its own buy-back entry, not the pledge store')
+    : fail(`CCU buy-back link: ${JSON.stringify(ccuLink)}`);
   // Market tools: pricing a row ticks it; picked rows are totalled.
   const bbTools = await page.evaluate(async () => {
     const row = document.querySelector('#buybacks-body .market-table tbody tr');
