@@ -59,3 +59,28 @@
   // Drop the "submitted / in review" line once nothing is pending.
   if (allLive) document.getElementById('status-line').remove();
 })();
+
+// Open beta notice until the November 10 release: a small card in the corner, shown
+// until it's closed (remembered in this browser). Remove after the release.
+(function () {
+  var note = document.getElementById('beta-note');
+  var close = document.getElementById('beta-close');
+  if (!note || !close) return;
+  var KEY = 'ohBetaNoteClosed';
+  var closed = false;
+  try {
+    closed = localStorage.getItem(KEY) === '1';
+  } catch (e) {
+    /* storage blocked: show it */
+  }
+  if (closed || Date.now() > Date.parse('2026-11-11')) return;
+  note.hidden = false;
+  close.addEventListener('click', function () {
+    note.hidden = true;
+    try {
+      localStorage.setItem(KEY, '1');
+    } catch (e) {
+      /* fine: it just shows again next visit */
+    }
+  });
+})();

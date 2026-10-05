@@ -15,7 +15,15 @@
     "directory": "../site",
     "binding": "ASSETS",
     "html_handling": "none", // keep /privacy.html as it is (store listings link it)
-    "run_worker_first": ["/", "/store", "/api/store/*", "/_astro/*", "/fonts/*", "/favicon.svg"],
+    "run_worker_first": [
+      "/",
+      "/extension",
+      "/store",
+      "/api/store/*",
+      "/_astro/*",
+      "/fonts/*",
+      "/favicon.svg",
+    ],
   },
   "services": [{ "binding": "APP", "service": "open-hangar-server" }],
   // openhangar.space itself (switched from GitHub Pages, docs/SITE-CLOUDFLARE.md).
