@@ -465,16 +465,25 @@ try {
     ? ok('website sync hidden until the site is live (no teaser, no connect button)')
     : fail('site connect card shows without siteUrl');
 
-  // The Connect card (owner sign-off, 2026-10-04), switched on with siteUrl and the
+  // The website (owner sign-off, 2026-10-04 and -05), switched on with siteUrl and the
   // website stubbed. Without the sign-in window (no identity permission), the code
-  // fallback: Connect → the code to approve → Connected as → Sync Now → every scan
-  // syncs by itself → Disconnect (asked on the card) → Connect again.
+  // fallback: Connect on the Citizen Card → the code to approve → the card goes quiet
+  // and sync lives in the top bar: "Synced …" beside Scan, the ▾ menu's
+  // openhangar.space section (Connected as your RSI handle, Sync Now, Disconnect asked
+  // once), a scan syncs once as its last step ("Syncing to Website…"), and a refused
+  // sync shows in the scan report.
   const sc = await page.evaluate(async () => {
     const wait = (ms = 80) => new Promise((r) => setTimeout(r, ms));
-    const card = () => document.querySelector('#view-home .citizen-card #site-connect');
-    const text = () => card()?.textContent.replace(/\s+/g, ' ').trim() || '';
-    const btn = (label) =>
-      [...card().querySelectorAll('button')].find((b) => b.textContent.includes(label));
+    const $ = (sel) => document.querySelector(sel);
+    const txt = (el) => el?.textContent.replace(/\s+/g, ' ').trim() || '';
+    const card = () => $('#view-home .citizen-card #site-connect');
+    const btnIn = (root, label) =>
+      root && [...root.querySelectorAll('button')].find((b) => b.textContent.includes(label));
+    const menu = () => $('#scan-menu-sync');
+    const openMenu = async () => {
+      if ($('#scan-menu').hidden) $('#scan-menu-btn').click();
+      await wait();
+    };
     const keep = {
       start: OH.siteLinkStart,
       wait: OH.siteLinkWait,
@@ -504,7 +513,8 @@ try {
       OH.siteLinkWait = () =>
         new Promise((res) => {
           approve = () => {
-            link = { token: 't', name: 'ExamplePilot', connectedAt: Date.now(), lastSync: null };
+            // The website login's name, not the RSI handle the menu shows.
+            link = { token: 't', name: 'pilot.mail', connectedAt: Date.now(), lastSync: null };
             res(link);
           };
         });
@@ -517,32 +527,70 @@ try {
       };
       await refreshSite();
       await wait();
-      r.off = text();
-      btn('Connect').click();
+      r.off = txt(card());
+      r.noStatusYet = !$('#sync-status');
+      btnIn(card(), 'Connect').click();
       await wait();
-      r.wait = text();
+      r.wait = txt(card());
       r.opened = opened[0];
       approve();
       await wait(150);
-      r.on = text();
-      btn('Sync Now').click();
+      r.quiet = !card();
+      r.status = txt($('#sync-status'));
+      await openMenu();
+      r.menu = txt(menu());
+      btnIn(menu(), 'Sync Now').click();
       await wait(150);
-      r.synced = text();
-      // Connected, a finished scan syncs by itself (no switch for it).
+      r.menuClosed = $('#scan-menu').hidden;
+      r.synced = txt($('#sync-status'));
+      r.syncedTitle = $('#sync-status')?.title || '';
+      // Connected, a finished scan syncs once, as the Scan button's last step.
       let synced = 0;
       const realSync = OH.siteSync;
-      OH.siteSync = async () => (synced++, realSync());
+      OH.siteSync = async () => {
+        synced++;
+        await wait(0);
+        r.label = topBar.label;
+        r.button = txt($('#scan-home'));
+        return realSync();
+      };
       await runScan({ hangar: false, buybacks: false, referrals: false });
       await wait(150);
-      OH.siteSync = realSync;
-      r.auto = synced === 1 && !card().querySelector('input[type=checkbox]');
-      r.autoHint = text();
-      btn('Disconnect').click();
+      r.auto = synced;
+      // A refused sync after a scan: the scan report says so, not the Citizen Card.
+      OH.siteSync = async () => {
+        throw new Error(
+          'The website already has a newer scan from another browser. Scan here, then sync.',
+        );
+      };
+      await runScan({ hangar: false, buybacks: false, referrals: false });
+      await wait(250);
+      r.report = $('#scan-report') && !$('#scan-report').hidden ? txt($('#scan-report')) : '';
+      setScanning(''); // past the end-of-scan flash
       await wait();
-      r.ask = text();
-      btn('Disconnect').click();
+      r.rough = txt($('#scan-home'));
+      r.cardStillQuiet = !card();
+      $('#scan-report .sr-x')?.click();
+      await wait();
+      // Sync Now refused: "Not Synced".
+      OH.siteSync = async () => {
+        throw new Error('Scan your hangar first, then press Sync Now.');
+      };
+      await openMenu();
+      btnIn(menu(), 'Sync Now').click();
+      await wait(250);
+      r.manual = $('#scan-report') && !$('#scan-report').hidden ? txt($('#scan-report')) : '';
+      $('#scan-report .sr-x')?.click();
+      await wait();
+      OH.siteSync = realSync;
+      await openMenu();
+      btnIn(menu(), 'Disconnect').click();
+      await wait();
+      r.ask = txt(menu());
+      btnIn($('#scan-menu-sync .sm-confirm'), 'Disconnect').click();
       await wait(150);
-      r.back = text();
+      r.back = txt(card());
+      r.statusGone = !$('#sync-status') && !menu();
     } finally {
       Object.assign(OH, {
         siteLinkStart: keep.start,
@@ -553,6 +601,7 @@ try {
       });
       if (keep.tabs) chrome.tabs.create = keep.tabs;
       chrome.identity = keep.identity;
+      topBar.report = null;
       await chrome.storage.local.remove('siteUrl');
       await refreshSite();
       await wait();
@@ -562,18 +611,35 @@ try {
   });
   /Connect to openhangar\.space/.test(sc.off) &&
   /Nothing is sent until you connect/.test(sc.off) &&
+  sc.noStatusYet &&
   /K7Q-4PX/.test(sc.wait) &&
   /\/link\?code=K7Q-4PX$/.test(sc.opened || '') &&
-  /Connected as ExamplePilot/.test(sc.on) &&
-  /Not synced yet/.test(sc.on) &&
-  /Last synced today/.test(sc.synced) &&
-  sc.auto === true &&
-  /Every scan syncs by itself/.test(sc.autoHint) &&
+  sc.quiet &&
+  sc.status === 'Connected' &&
+  /Connected as Demo_Citizen/.test(sc.menu) &&
+  !/pilot\.mail/.test(sc.menu) &&
+  /Every scan syncs/.test(sc.menu) &&
+  /Open My Hangar/.test(sc.menu) &&
+  sc.menuClosed &&
+  /^Synced \d/.test(sc.synced) &&
+  /^Synced to openhangar\.space today, /.test(sc.syncedTitle) &&
+  sc.auto === 1 &&
+  sc.label === 'Syncing to Website…' &&
+  /Syncing to Website…/.test(sc.button) &&
+  /Scan Done, Not Synced/.test(sc.report) &&
+  /newer scan from another browser/.test(sc.report) &&
+  /Not Synced/.test(sc.rough) &&
+  sc.cardStillQuiet &&
+  /^Not Synced/.test(sc.manual) &&
+  /Scan your hangar first/.test(sc.manual) &&
   /Disconnect From the Website\?/.test(sc.ask) &&
   /Connect to openhangar\.space/.test(sc.back) &&
+  sc.statusGone &&
   sc.hiddenAgain
-    ? ok('connect card: connect, approve the code, sync, a scan syncs by itself, disconnect')
-    : fail(`connect card: ${JSON.stringify(sc)}`);
+    ? ok(
+        'website sync: connect on the card, then Synced beside Scan, the ▾ menu, a scan syncs as its last step, problems in the scan report, disconnect',
+      )
+    : fail(`website sync: ${JSON.stringify(sc)}`);
 
   // The usual way (owner, 2026-10-04): the browser's sign-in window opens the website's
   // /connect page; Approve hands back a one-time code, traded for the token with the
@@ -625,7 +691,8 @@ try {
       r.waiting = text();
       finish();
       await wait(250);
-      r.on = text();
+      r.quiet = !card();
+      r.status = document.querySelector('#sync-status')?.textContent.trim() || '';
       r.page = new URL(r.url).pathname;
     } finally {
       chrome.identity = keep.identity;
@@ -642,10 +709,123 @@ try {
   win.pkce &&
   win.traded &&
   win.synced &&
-  /Connected as ExamplePilot/.test(win.on) &&
-  /Last synced today/.test(win.on)
-    ? ok('connect card: the sign-in window, PKCE, and the first sync right after Approve')
+  win.quiet &&
+  /^Synced \d/.test(win.status)
+    ? ok('website sync: the sign-in window, PKCE, and the first sync right after Approve')
     : fail(`connect window: ${JSON.stringify(win)}`);
+
+  // Firefox (gecko manifest emulated): a line under Connect says what we share; Learn
+  // More, and Connect until Firefox has said yes, open What We Share, and Why Firefox
+  // Asks. Escape and Not Now close it (focus back on the button); Continue asks Firefox
+  // inside its own click, and a no shows the usual message. Once allowed, Connect goes
+  // straight on.
+  const ff = await page.evaluate(async () => {
+    const wait = (ms = 80) => new Promise((r) => setTimeout(r, ms));
+    const $ = (sel) => document.querySelector(sel);
+    const txt = (el) => el?.textContent.replace(/\s+/g, ' ').trim() || '';
+    const card = () => $('#view-home .citizen-card #site-connect');
+    const btnIn = (root, label) =>
+      root && [...root.querySelectorAll('button')].find((b) => b.textContent.includes(label));
+    const keep = {
+      manifest: chrome.runtime.getManifest,
+      permissions: chrome.permissions,
+      identity: chrome.identity,
+    };
+    const r = { asked: 0, inClick: [] };
+    let granted = false;
+    let answer = false;
+    let inClick = false;
+    try {
+      const m = keep.manifest();
+      chrome.runtime.getManifest = () => ({
+        ...m,
+        browser_specific_settings: { gecko: { id: 'open-hangar@draco-foundry' } },
+      });
+      chrome.permissions = {
+        contains: async () => granted,
+        request: (p) => {
+          r.asked++;
+          r.inClick.push(inClick);
+          r.what = p.data_collection;
+          granted = answer;
+          return Promise.resolve(answer);
+        },
+      };
+      chrome.identity = {
+        getRedirectURL: () => 'https://x.example/',
+        launchWebAuthFlow: async () => {
+          r.window = true;
+          throw new Error('The user cancelled');
+        },
+      };
+      await chrome.storage.local.set({ siteUrl: 'https://staging.example.test' });
+      await refreshSite();
+      await wait();
+      r.line = txt(card()?.querySelector('.sc-ff'));
+      const learn = card().querySelector('.sc-learn');
+      learn.click();
+      await wait();
+      r.card = txt($('#fx-explain'));
+      r.focusIn = $('#fx-explain').contains(document.activeElement);
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await wait();
+      r.escClosed = !$('#fx-explain');
+      r.focusBack = document.activeElement === learn;
+      btnIn(card(), 'Connect').click();
+      await wait();
+      r.connectOpens = !!$('#fx-explain') && r.asked === 0;
+      btnIn($('#fx-explain'), 'Not Now').click();
+      await wait();
+      r.notNow = !$('#fx-explain') && r.asked === 0;
+      btnIn(card(), 'Connect').click();
+      await wait();
+      inClick = true;
+      btnIn($('#fx-explain'), 'Continue').click();
+      inClick = false;
+      await wait(150);
+      r.refused = !$('#fx-explain') && txt(card());
+      answer = true;
+      btnIn(card(), 'Connect').click();
+      await wait();
+      inClick = true;
+      btnIn($('#fx-explain'), 'Continue').click();
+      inClick = false;
+      await wait(150);
+      r.yesConnects = r.window === true;
+      r.window = false;
+      await refreshSite();
+      await wait();
+      btnIn(card(), 'Connect').click();
+      await wait(150);
+      r.straightOn = !$('#fx-explain') && r.window === true;
+    } finally {
+      chrome.runtime.getManifest = keep.manifest;
+      chrome.permissions = keep.permissions;
+      chrome.identity = keep.identity;
+      await chrome.storage.local.remove('siteUrl');
+      await refreshSite();
+      await wait();
+    }
+    return r;
+  });
+  /pledge prices and store credit/.test(ff.line) &&
+  /Learn More/.test(ff.line) &&
+  /What We Share, and Why Firefox Asks/.test(ff.card) &&
+  ['What we send', 'What we never send', 'Why Firefox asks', 'If you say no', 'Change your mind']
+    .map((h) => ff.card.includes(h))
+    .every(Boolean) &&
+  ff.focusIn &&
+  ff.escClosed &&
+  ff.focusBack &&
+  ff.connectOpens &&
+  ff.notNow &&
+  /Sync stays off until you let Firefox share/.test(ff.refused || '') &&
+  // Continue's clicks asked inside the click; once allowed, Connect only checks.
+  ff.inClick.join() === 'true,true,false' &&
+  ff.yesConnects &&
+  ff.straightOn
+    ? ok('Firefox: what we share under Connect, the explainer, and Continue asks inside its click')
+    : fail(`Firefox explainer: ${JSON.stringify(ff)}`);
 
   // Currency: EUR converts the melt box (rates come from the demo's fixed file).
   const rates = await page.evaluate(async () => {

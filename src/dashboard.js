@@ -505,6 +505,8 @@ const topBar = {
   // The last scan's report when it ended with a problem (ui/topbar/ScanReport.svelte):
   // { kind: 'out' | 'part' | 'none', rows: [{ name, ok, text }], summary, last, n }.
   // Cleared when the next scan starts; the button says Rough Landing till then.
+  // A report of its own may bring its own title, sub and button label (the website
+  // sync's "Not Synced").
   report: null,
   fill: 0,
   title: '',
@@ -533,7 +535,9 @@ function scanDetail(text) {
   homeCard.scan = { text, pct: Math.max(4, Math.min(100, ((i + 0.5) / n) * 100)) };
   homeUpdated();
 }
-function setScanning(text, done = false) {
+// `label` replaces "Scanning… 2/4" for a step of its own (the website sync, the
+// scan's last step when connected).
+function setScanning(text, done = false, label = '') {
   clearTimeout(scanDoneTimer);
   homeUpdated();
   if (!text) {
@@ -552,8 +556,8 @@ function setScanning(text, done = false) {
   }
   const { i, n } = scanProgress;
   topBar.fill = Math.max(6, (i / n) * 100);
-  topBar.label = n > 1 ? `Scanning… ${Math.min(i + 1, n)}/${n}` : 'Scanning…';
-  topBar.title = `Scanning ${clean}`;
+  topBar.label = label || (n > 1 ? `Scanning… ${Math.min(i + 1, n)}/${n}` : 'Scanning…');
+  topBar.title = label ? clean : `Scanning ${clean}`;
 }
 
 // Amounts are USD; `fx` converts them to the display currency (Home → Currency).
@@ -4197,6 +4201,16 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
     };
     OH.log('error', 'status', summary);
   }
+  // @sync-start
+  // Connected: every finished scan syncs by itself, as the Scan button's last step
+  // ("Syncing to Website…"; owner, 2026-10-05). The server refuses an empty or older
+  // hangar, so this can't wipe one; a refusal shows in the scan report.
+  if (site.link && !signedOut) {
+    scanProgress.i = scanProgress.n;
+    setScanning('Sending this scan to openhangar.space', false, 'Syncing to Website…');
+    await siteSyncNow({ scan: true });
+  }
+  // @sync-end
   setScanning(`${anyErr ? '⚠ ' : '✓ '}${summary}`, true);
   route();
   renderAccount(); // refresh the Citizen Card pill with the new referral counts
@@ -4205,11 +4219,6 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   if (buybacks) warmPictures(computeBuybacks(), state.bbLayout);
   topBar.busy = false;
   homeUpdated(); // the welcome card and the top bar follow topBar.busy
-  // @sync-start
-  // Connected: every finished scan syncs by itself (owner, 2026-10-04; Connect is
-  // the opt-in). The server refuses an empty or older hangar, so this can't wipe one.
-  if (site.link && !signedOut) siteSyncNow();
-  // @sync-end
 }
 
 // The top bar's Scan runs what's ticked in its ▾ menu: "Scan All" by default,
@@ -4688,9 +4697,11 @@ async function initUpdates() {
 
 // @sync-start: cut from store builds until sync launches (scripts/pack.mjs, #187)
 // --- openhangar.space: connect + sync (optional) -----------------------------
-// The Connect card in the Citizen Card's corner is Svelte (ui/site, owner sign-off
-// 2026-10-04); this holds its state and does what it asks. Hidden for everyone until
-// the website launches: developers switch it on with the `siteUrl` storage key (e.g.
+// It's Svelte (ui/site, owner sign-off 2026-10-04 and -05): the Connect card in the
+// Citizen Card's corner until you connect, then the top bar's Scan button (a status
+// beside it, a section in its ▾ menu, problems in its scan report). This holds the
+// state and does what they ask. Hidden for everyone until the website launches:
+// developers switch it on with the `siteUrl` storage key (e.g.
 // https://staging.openhangar.space). Nothing is sent until you Connect; after that,
 // every scan syncs by itself, and Sync Now sends right away.
 const site = {
@@ -4699,11 +4710,16 @@ const site = {
   waiting: null, // { code, url, stop } while the website hasn't approved the code yet
   syncing: false,
   msg: '', // the last thing that went wrong, or ''
+  // Firefox, and whether it already lets us share (else Connect explains first).
+  firefox: false,
+  dataOk: true,
 };
 async function refreshSite() {
   site.enabled = await OH.siteEnabled();
   const link = site.enabled ? await OH.getSiteLink() : null;
   site.link = link && { name: link.name, connectedAt: link.connectedAt, lastSync: link.lastSync };
+  site.firefox = !!chrome.runtime.getManifest().browser_specific_settings?.gecko;
+  site.dataOk = !site.firefox || (await chrome.permissions.contains(SITE_DATA).catch(() => false));
   homeUpdated();
 }
 function siteProblem(err) {
@@ -4777,15 +4793,19 @@ async function siteConnectWindow() {
 const SITE_DATA = {
   data_collection: ['personallyIdentifyingInfo', 'financialAndPaymentInfo', 'websiteContent'],
 };
+// On Firefox, Connect explains first (ui/site/FirefoxExplain.svelte) until it's allowed;
+// that card's Continue is the click that asks.
 function siteDataOk() {
   if (!chrome.runtime.getManifest().browser_specific_settings?.gecko) return Promise.resolve(true);
   return chrome.permissions
     .request(SITE_DATA)
-    .catch(() => chrome.permissions.contains(SITE_DATA).catch(() => false));
+    .catch(() => chrome.permissions.contains(SITE_DATA).catch(() => false))
+    .then((ok) => (site.dataOk = !!ok));
 }
+const SITE_DATA_NO =
+  'No problem. Sync stays off until you let Firefox share your hangar with openhangar.space.';
 function siteDataNo() {
-  site.msg =
-    'No problem. Sync stays off until you let Firefox share your hangar with openhangar.space.';
+  site.msg = SITE_DATA_NO;
   homeUpdated();
 }
 
@@ -4845,22 +4865,52 @@ function siteCancel() {
   site.waiting = null;
   homeUpdated();
 }
-async function siteSyncNow() {
+// A sync that didn't go through shows in the scan report under the Scan button:
+// "Scan Done, Not Synced" after a scan (a row of its own if the scan had problems
+// too), "Not Synced" for Sync Now.
+async function siteSyncNow({ scan = false } = {}) {
   if (site.syncing || !site.link) return;
-  if (!(await siteDataOk())) return void siteDataNo();
-  site.syncing = true;
-  site.msg = '';
-  homeUpdated();
-  try {
-    await OH.siteSync();
-  } catch (err) {
-    siteProblem(err);
+  let problem = '';
+  if (!(await siteDataOk())) problem = SITE_DATA_NO;
+  else {
+    site.syncing = true;
+    site.msg = '';
+    homeUpdated();
+    try {
+      await OH.siteSync();
+    } catch (err) {
+      problem = String(err?.message || err);
+      OH.log('warn', 'site', problem);
+    }
+    site.syncing = false;
   }
-  site.syncing = false;
+  if (problem) siteSyncReport(problem, scan);
+  else if (topBar.report?.kind === 'sync') topBar.report = null; // went through this time
   await refreshSite();
+}
+function siteSyncReport(text, scan) {
+  const n = Date.now(); // a new report, so the top bar opens it
+  if (scan && topBar.report) {
+    topBar.report.rows.push({ name: 'Website', ok: false, text });
+    topBar.report.bad++;
+    topBar.report.n = n;
+    return;
+  }
+  topBar.report = {
+    kind: 'sync',
+    title: scan ? 'Scan Done, Not Synced' : 'Not Synced',
+    sub: text,
+    label: 'Not Synced',
+    rows: [],
+    bad: 1,
+    summary: text,
+    last: '',
+    n,
+  };
 }
 async function siteDisconnect() {
   site.msg = '';
+  if (topBar.report?.kind === 'sync') topBar.report = null;
   try {
     await OH.siteDisconnect();
   } catch (err) {
@@ -5907,7 +5957,8 @@ window.OHApp = {
     loadImage,
   },
   // @sync-start
-  // The Connect card (ui/site): its state and actions. Cut from store builds.
+  // The website (ui/site): the Connect card's and the Scan button's state and
+  // actions. Cut from store builds.
   site: {
     get state() {
       return site;
