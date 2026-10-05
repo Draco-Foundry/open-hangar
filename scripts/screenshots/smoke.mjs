@@ -131,7 +131,8 @@ try {
   const cards = await page.evaluate(() => {
     const txt = document.querySelector('#oh-status').textContent;
     return {
-      events: /Next Buy-Back Token/.test(txt),
+      // The next token shows only in its last 30 days, so expect it only then.
+      events: /Next Buy-Back Token/.test(txt) === (OH.soonBuybackToken() != null),
       stale: /Last event: Pirate Week/.test(txt) || !/Pirate Week/.test(txt),
       wave: /4\.10\.2[\s\S]{0,40}Wave 3/.test(txt) && /Released [A-Z][a-z]{2} \d+ · /.test(txt),
       news: document.querySelectorAll('#oh-home .nl').length,
@@ -776,7 +777,8 @@ try {
   console.log('Buy-Backs');
   await go('#buybacks');
   const tok = await page.$eval('#bb-sum', (e) => e.textContent).catch(() => '');
-  /Tokens\s*2\s*next/i.test(tok)
+  const tokSoon = await page.evaluate(() => OH.soonBuybackToken() != null);
+  /Tokens\s*2/i.test(tok) && /Tokens\s*2\s*next/i.test(tok) === tokSoon
     ? ok('buy-back tokens in the summary strip')
     : fail(`tokens: "${tok}"`);
   // Buy-Backs pass: Hide small stuff on by default; Stack identical off by default
