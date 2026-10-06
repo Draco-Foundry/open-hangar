@@ -2496,6 +2496,59 @@ try {
     out.addsAfterRefusal = calls.filter((c) => c[0] === 'add').length;
     document.querySelector('#modal-close').click();
 
+    // Any Ship: a From ship you don't own, found by name, priced on pick, added.
+    const fleet = Array.from({ length: 34 }, (_, i) => ({
+      id: 500 + i,
+      name: `Test Hull ${String(i + 1).padStart(2, '0')}`,
+      image: null,
+      msrp: 100 + i,
+      price: null,
+    }));
+    optionsAnswer = {
+      ok: true,
+      options: [{ id: 103, name: 'Cutlass Black', image: null, eligible: false, price: null }],
+      others: [{ id: 777, name: 'Gladius', image: null, msrp: 90, price: null }, ...fleet],
+    };
+    addAnswer = { ok: true };
+    openShipModal('Carrack');
+    await wait(() => q('[data-cart="upgrade"]'));
+    q('[data-cart="upgrade"] .cbtn').click();
+    await wait(() => q('[data-cart] [data-any] .opt'));
+    out.anyHeading = text('[data-any] .any-h');
+    out.anyNone = text('[data-cart] .cart-intro');
+    out.anyRows = document.querySelectorAll('#item-modal [data-any] .opt').length;
+    out.anyCount = text('[data-any] .any-count');
+    out.anyAddBefore = !q('[data-cart] .sum');
+    const search = q('[data-any] .any-q');
+    search.value = 'glad';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await wait(() => document.querySelectorAll('#item-modal [data-any] .opt').length === 1);
+    out.anySearched = [...document.querySelectorAll('#item-modal [data-any] .opt')].map((o) =>
+      o.textContent.replace(/\s+/g, ' ').trim(),
+    );
+    q('[data-any] .opt').click();
+    await wait(() => /\$15/.test(text('[data-cart] .sum')));
+    out.anySum = text('[data-cart] .sum');
+    out.anyPriceCall = calls.filter((c) => c[0] === 'price').pop();
+    [...document.querySelectorAll('#item-modal [data-cart] button.cbtn')].pop().click();
+    await wait(() => q('[data-cart] .note.good'));
+    out.anyAdded = text('[data-cart] .note.good');
+    out.anyAddCall = calls.filter((c) => c[0] === 'add').pop();
+    document.querySelector('#modal-close').click();
+
+    // RSI's cart already holds a buy-back (or this is one and the cart isn't empty).
+    optionsAnswer = { ok: true, options: [{ id: 101, name: 'Pulse', eligible: true, price: 100 }] };
+    addAnswer = { ok: false, error: 'cart-conflict' };
+    openShipModal('Carrack');
+    await wait(() => q('[data-cart="upgrade"]'));
+    q('[data-cart="upgrade"] .cbtn').click();
+    await wait(() => q('[data-cart] .opt'));
+    [...document.querySelectorAll('#item-modal [data-cart] button.cbtn')].pop().click();
+    await wait(() => q('[data-cart] .note.bad'));
+    out.busy = text('[data-cart] .note.bad');
+    out.busyLink = q('[data-cart] a.cbtn')?.textContent.trim() || '';
+    document.querySelector('#modal-close').click();
+
     // A buy-back upgrade: its ids from the buy-back button, RSI's price, one click.
     addAnswer = { ok: true };
     const b = {
@@ -2514,14 +2567,26 @@ try {
       kind: 'ccu',
       image: null,
     };
+    const tokensWas = state.bbTokens;
+    state.bbTokens = 0;
     openBuybackModal(b);
     await wait(() => /\$15/.test(text('[data-cart="buyback"]')));
     out.bbRows = text('[data-cart="buyback"]');
+    state.bbTokens = tokensWas;
     q('[data-cart="buyback"] button.cbtn').click();
     await wait(() => q('[data-cart="buyback"] .note.good'));
     out.bbAdded = text('[data-cart="buyback"] .note.good');
     out.bbCall = calls.filter((c) => c[0] === 'add').pop();
     out.bbId = b.id;
+    document.querySelector('#modal-close').click();
+    // A buy-back upgrade RSI won't sell any more (ship values changed).
+    addAnswer = { ok: false, error: 'refused', reason: 'invalid' };
+    openBuybackModal(b);
+    await wait(() => /\$15/.test(text('[data-cart="buyback"]')));
+    q('[data-cart="buyback"] button.cbtn').click();
+    await wait(() => q('[data-cart="buyback"] .note.bad'));
+    out.bbInvalid = text('[data-cart="buyback"] .note.bad');
+    addAnswer = { ok: true };
     document.querySelector('#modal-close').click();
     // Without the ids (older scans), or a retired ship RSI won't sell back: no button.
     openBuybackModal({ ...b, toSkuId: '' });
@@ -2542,13 +2607,15 @@ try {
     : fail(`cart heading: ${JSON.stringify(cart)}`);
   cart.rows.length === 3 &&
   /Avenger Titan\s*\$140/.test(cart.rows[0]) &&
-  /Cutlass Black.*RSI doesn't offer this one/.test(cart.rows[2]) &&
+  /Cutlass Black.*RSI isn't selling this upgrade right now/.test(cart.rows[2]) &&
   /Avenger Titan to Carrack\s*\$140/.test(cart.sum) &&
   /Pulse to Carrack\s*\$15/.test(cart.sumAfterPick)
     ? ok('cart picker: your ships with RSI prices, greyed one, price on pick')
     : fail(`cart picker: ${JSON.stringify(cart)}`);
   cart.addLabel === 'Add to RSI Cart' &&
-  /In Your RSI Cart\s*Pulse to Carrack, \$15\./.test(cart.added) &&
+  /In Your RSI Cart\s*Pulse to Carrack, \$15\..*A buy-back can't share this cart/.test(
+    cart.added,
+  ) &&
   cart.cartLink === 'https://robertsspaceindustries.com/en/store/pledge/cart' &&
   JSON.stringify(cart.addCall) === JSON.stringify(['add', 101, 900, 9001, {}])
     ? ok('Add to RSI Cart: one call with the right ships, In Your RSI Cart, Open RSI Cart')
@@ -2559,11 +2626,36 @@ try {
   /RSI Didn't Add It.*Nothing was added/.test(cart.refused) && cart.addsAfterRefusal === 2
     ? ok("cart refused: RSI Didn't Add It, and no second try by itself")
     : fail(`cart refused: ${JSON.stringify(cart)}`);
+  cart.anyHeading === 'Any Ship' &&
+  /Any ship below works too/.test(cart.anyNone) &&
+  cart.anyRows === 30 &&
+  /Showing 30 of 35 ships/.test(cart.anyCount) &&
+  cart.anyAddBefore &&
+  cart.anySearched.length === 1 &&
+  /Gladius/.test(cart.anySearched[0]) &&
+  /Gladius to Carrack\s*\$15/.test(cart.anySum) &&
+  JSON.stringify(cart.anyPriceCall) ===
+    JSON.stringify(['price', 777, 9001, { toShipId: 900, setContext: true }]) &&
+  /Gladius to Carrack, \$15/.test(cart.anyAdded) &&
+  JSON.stringify(cart.anyAddCall) === JSON.stringify(['add', 777, 900, 9001, {}])
+    ? ok('Any Ship: 30 of 35 shown, search finds one, priced on pick, added from a ship not owned')
+    : fail(`any ship: ${JSON.stringify(cart)}`);
+  /Cart Already Busy.*buy-back on its own/.test(cart.busy) && cart.busyLink === 'Open RSI Cart ↗'
+    ? ok('cart busy: Cart Already Busy with Open RSI Cart')
+    : fail(`cart busy: ${JSON.stringify(cart)}`);
   /Buy-Back Price\s*\$15 from RSI just now/.test(cart.bbRows) &&
-  /Not needed for upgrades/.test(cart.bbRows) &&
-  /Buy-back: Pulse to Carrack, \$15\./.test(cart.bbAdded) &&
+  /No Buy-Back Token right now: pay with cash, or wait for the next one \(\w{3} \d+\)\./.test(
+    cart.bbRows,
+  ) &&
+  /Buy-backs check out alone: one per cart, nothing else in it\./.test(cart.bbRows) &&
+  /Buy-back: Pulse to Carrack, \$15\. Check it out before you add anything else\./.test(
+    cart.bbAdded,
+  ) &&
   JSON.stringify(cart.bbCall) ===
     JSON.stringify(['add', 101, 900, 9001, { pledgeId: Number(cart.bbId) }]) &&
+  /RSI Didn't Add It\s*RSI won't sell this buy-back upgrade any more \(ship values changed\)\./.test(
+    cart.bbInvalid,
+  ) &&
   cart.bbNoIds &&
   cart.bbRetired
     ? ok(

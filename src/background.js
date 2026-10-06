@@ -102,9 +102,10 @@ siteHandlers['oh-hello'] = () => ({ ok: true, cart: true, connect: false });
 
 // Add to RSI Cart from the website's store (#288), in every build: no account
 // needed. The upgrade goes into the RSI cart in this browser's own RSI session
-// (src/rsi-cart.js); the page gets back your ships that can upgrade, RSI's prices
-// and whether it worked. Nothing is bought, and an add is never retried.
-//   oh-upgrade-options { toShipId, toSkuId }            → { ok, options }
+// (src/rsi-cart.js); the page gets back your ships that can upgrade, RSI's prices,
+// the other ships RSI takes for it (Any Ship) and whether it worked. Nothing is
+// bought, and an add is never retried.
+//   oh-upgrade-options { toShipId, toSkuId }            → { ok, options, others }
 //   oh-upgrade-price   { fromShipId, toSkuId }          → { ok, price }
 //   oh-add-upgrade     { fromShipId, toShipId, toSkuId } → { ok } | { ok: false, error }
 if (typeof importScripts === 'function' && !self.OHCart) importScripts('rsi-cart.js');

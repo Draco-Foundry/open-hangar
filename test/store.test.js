@@ -149,6 +149,7 @@ test('upgradeSku: the SKU an Add to RSI Cart goes to (cheapest edition on offer)
   assert.deepEqual(OH.upgradeSku(ships[0]), {
     toShipId: 900,
     toSkuId: 9002,
+    skus: [9002, 9001],
     price: 180,
     title: 'Warbond Edition',
   });

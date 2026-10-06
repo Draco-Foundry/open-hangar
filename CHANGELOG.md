@@ -9,6 +9,12 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   costs. Pick one and it lands in your RSI cart at the upgrade price. Buy-back upgrades
   get the same button in their window, at RSI's buy-back price. You check out on RSI as
   usual; nothing is bought here. On Chrome and Edge the website's store can use it too.
+- New: **upgrade from Any Ship.** RSI sells a CCU between any two ships it offers the
+  upgrade for, so you don't need to own the From ship. Under Your Ships, the Any Ship list
+  shows every other ship RSI takes, with a search box; pick one for RSI's price and add it
+  like your own. Buy-backs say they check out alone (one per cart, nothing else with
+  them), whether store credit needs a Buy-Back Token, and why RSI refused if your cart is
+  already busy or a buy-back upgrade isn't sold any more.
 
 ## 0.2.17 — 2026-10-04
 

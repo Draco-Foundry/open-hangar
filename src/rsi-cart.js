@@ -6,8 +6,9 @@
  *
  *   1. POST /api/ship-upgrades/setContextToken  { fromShipId, toShipId, toSkuId }
  *      (+ pledgeId for a buy-back upgrade: the session switches to buy-back mode)
- *   2. filterShips(fromId, toId = target SKU)  → from.ships = ships that can
- *      upgrade to it; we keep the ones you own (initShipUpgrade's `owned`)
+ *   2. filterShips(toId = target SKU)  → from.ships = ships that can
+ *      upgrade to it: the ones you own (initShipUpgrade's `owned`) come first,
+ *      the rest are `others` (a CCU doesn't need you to own the From ship)
  *   3. getPrice(from = ship id, to = SKU id)   → price { amount } in cents
  *   4. mutation addToCart(from, to)            → { jwt }: that alone puts the
  *      upgrade in the RSI cart at the difference price. Nothing is bought here.
@@ -25,6 +26,7 @@
   const RSI = 'https://robertsspaceindustries.com';
   const AUTH_URL = `${RSI}/api/account/v2/setAuthToken`;
   const CONTEXT_URL = `${RSI}/api/ship-upgrades/setContextToken`;
+  const CART_TOKEN_URL = `${RSI}/api/store/v2/cart/token`;
   const UPGRADE_URL = `${RSI}/pledge-store/api/upgrade/graphql`;
   const CART_URL = `${RSI}/en/store/pledge/cart`;
   const SIGN_IN_URL = `${RSI}/connect`;
@@ -34,8 +36,10 @@
   const SHIPS_QUERY =
     'query initShipUpgrade { ships { id name owned msrp medias { productThumbMediumAndSmall } } app { mode isAnonymous } }';
   const APP_QUERY = 'query initShipUpgrade { app { mode isAnonymous } }';
+  // Only RSI's "from" half: which of your ships can upgrade to the target SKU. Its
+  // "to" half, asked with no From ship, makes RSI answer "Ship not found".
   const FILTER_QUERY =
-    'query filterShips($fromId: Int, $toId: Int, $fromFilters: [FilterConstraintValues], $toFilters: [FilterConstraintValues]) {\n  from(to: $toId, filters: $fromFilters) {\n    ships {\n      id\n    }\n  }\n  to(from: $fromId, filters: $toFilters) {\n    ships {\n      id\n      skus {\n        id\n        price\n        upgradePrice\n        available\n      }\n    }\n  }\n}\n';
+    'query filterShips($toId: Int, $fromFilters: [FilterConstraintValues]) {\n  from(to: $toId, filters: $fromFilters) {\n    ships {\n      id\n    }\n  }\n}\n';
   const PRICE_QUERY =
     'query getPrice($from: Int!, $to: Int!) {\n  price(from: $from, to: $to) {\n    amount\n    nativeAmount\n  }\n}\n';
   const ADD_QUERY =
@@ -74,13 +78,8 @@
   const gql = (operationName, query, variables = {}) => ({ operationName, variables, query });
   const shipsBody = () => gql('initShipUpgrade', SHIPS_QUERY);
   const appBody = () => gql('initShipUpgrade', APP_QUERY);
-  const filterBody = (toSkuId, fromShipId = null) =>
-    gql('filterShips', FILTER_QUERY, {
-      fromId: toInt(fromShipId),
-      toId: toInt(toSkuId),
-      fromFilters: [],
-      toFilters: [],
-    });
+  const filterBody = (toSkuId) =>
+    gql('filterShips', FILTER_QUERY, { toId: toInt(toSkuId), fromFilters: [] });
   const priceBody = (fromShipId, toSkuId) =>
     gql('getPrice', PRICE_QUERY, { from: toInt(fromShipId), to: toInt(toSkuId) });
   const addBody = (fromShipId, toSkuId) =>
@@ -96,6 +95,28 @@
       ? 'signed-out'
       : 'refused';
   }
+  // What a refusal from the add (addToCart or the cart step) says, if we know it:
+  //   'invalid'       a buy-back upgrade RSI won't sell any more (ship values changed;
+  //                   only for a buy-back: its message talks about invalid / upgrade)
+  //   'cart-conflict' RSI's cart takes a buy-back on its own, one per cart, nothing
+  //                   else with it (the message talks about the cart or a buy-back)
+  // Anything else → null (a plain refusal).
+  function cartRefusal(json, buyback = false) {
+    const j = unwrap(json);
+    const bits = [j.msg, j.message, j.code, j.data && j.data.message];
+    if (Array.isArray(j.errors)) for (const e of j.errors) bits.push(e && e.message);
+    const text = bits.filter((b) => typeof b === 'string').join(' ');
+    if (buyback && /invalid/i.test(text)) return 'invalid';
+    if (/buy[\s-]?backs?|cart/i.test(text)) return 'cart-conflict';
+    if (buyback && /upgrade/i.test(text)) return 'invalid';
+    return null;
+  }
+  // → the add's answer for a refusal: cart-conflict, a refusal with a reason, or plain.
+  const refusedBy = (json, buyback) => {
+    const why = cartRefusal(json, buyback);
+    if (why === 'cart-conflict') return { ok: false, error: 'cart-conflict' };
+    return why ? { ok: false, error: 'refused', reason: why } : { ok: false, error: 'refused' };
+  };
   function parseApp(json) {
     const app = unwrap(json).data && unwrap(json).data.app;
     if (!app) return null;
@@ -132,9 +153,10 @@
       native: Number.isFinite(Number(p.nativeAmount)) ? Number(p.nativeAmount) / 100 : null,
     };
   }
+  // addToCart only hands back a ticket (jwt); the cart takes it at CART_TOKEN_URL.
   const parseAdded = (json) => {
     const r = (unwrap(json).data || {}).addToCart;
-    return !!(r && r.jwt);
+    return r && typeof r.jwt === 'string' && r.jwt ? r.jwt : null;
   };
 
   // Your ships that RSI lets you upgrade from, best first (the dearest ship you own
@@ -157,6 +179,18 @@
       price: null,
     });
     return [...ok.map((s) => row(s, true)), ...no.map((s) => row(s, false))];
+  }
+
+  // Any Ship: every other ship RSI offers this upgrade from, owned or not (you can
+  // buy a CCU between any two ships RSI sells it for). Sorted by name, no prices yet:
+  // RSI prices one when it's picked.
+  function buildOthers(ships, fromIds, toShipId, options) {
+    const allowed = new Set(fromIds || []);
+    const taken = new Set((options || []).map((o) => o.id));
+    return ships
+      .filter((s) => allowed.has(s.id) && !taken.has(s.id) && s.id !== toInt(toShipId))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((s) => ({ id: s.id, name: s.name, image: s.image, msrp: s.msrp, price: null }));
   }
 
   // --- The requests ------------------------------------------------------------------
@@ -259,9 +293,18 @@
       if (r.error) return r;
       const res = r.res;
       if (res.status === 401) return { error: 'signed-out' };
+      if (url === CART_TOKEN_URL && !res.ok) {
+        let body = null;
+        try {
+          body = await res.json();
+        } catch {
+          body = null;
+        }
+        if (body && cartRefusal(body, true)) return { error: 'refused', json: body };
+      }
       if (res.status === 403) return { error: 'refused' };
       if (!res.ok) return { error: 'network' };
-      if (url !== UPGRADE_URL) return { json: null }; // only their cookies matter
+      if (url !== UPGRADE_URL && url !== CART_TOKEN_URL) return { json: null }; // only their cookies matter
       try {
         return { json: await res.json() };
       } catch {
@@ -281,7 +324,7 @@
       const r = await post(UPGRADE_URL, body);
       if (r.error) return r;
       const e = gqlError(r.json);
-      return e ? { error: e } : r;
+      return e ? { error: e, json: r.json } : r;
     };
     const fail = (r) => ({
       ok: false,
@@ -297,7 +340,8 @@
       return p ? { ok: true, ...p } : { ok: false, error: 'refused' };
     }
 
-    // Your ships that can upgrade to toShipId / toSkuId, the first few priced by RSI.
+    // Your ships that can upgrade to toShipId / toSkuId, the first few priced by RSI,
+    // and `others`: every other ship RSI takes for this upgrade (unpriced).
     // opts.pledgeId: a buy-back upgrade (prices are its buy-back prices).
     async function upgradeOptions(toShipId, toSkuId, opts = {}) {
       if (!toInt(toShipId) || !toInt(toSkuId)) return { ok: false, error: 'refused' };
@@ -313,11 +357,29 @@
         csrf = null; // read a fresh token next time
         return { ok: false, error: 'signed-out' };
       }
-      const f = await ask(filterBody(toSkuId, pledge ? opts.fromShipId : null));
-      if (f.error) return fail(f);
-      const fromIds = parseFrom(f.json);
-      if (!fromIds) return { ok: false, error: 'refused' };
-      const options = buildOptions(parseShips(s.json), fromIds, toShipId);
+      // RSI doesn't sell an upgrade to every edition (the C8X's BIS Warbond answers
+      // "Ship not found"), so try the other editions in turn (opts.skus).
+      const skus = [toInt(toSkuId), ...(opts.skus || []).map(toInt)].filter(
+        (v, i, a) => v && a.indexOf(v) === i,
+      );
+      let fromIds = null;
+      let lastErr = null;
+      for (const sku of skus) {
+        const f = await ask(filterBody(sku));
+        if (f.error && f.error !== 'refused') return fail(f);
+        const ids = f.error ? null : parseFrom(f.json);
+        if (ids && ids.length) {
+          fromIds = ids;
+          toSkuId = sku;
+          break;
+        }
+        lastErr = f;
+      }
+      if (!fromIds)
+        return lastErr && lastErr.error ? fail(lastErr) : { ok: false, error: 'refused' };
+      const ships = parseShips(s.json);
+      const options = buildOptions(ships, fromIds, toShipId);
+      const others = buildOthers(ships, fromIds, toShipId, options);
       const limit = Number.isInteger(opts.priceLimit) ? opts.priceLimit : PRICE_LIMIT;
       for (const o of options.filter((x) => x.eligible).slice(0, limit)) {
         const p = await price(o.id, toSkuId);
@@ -327,7 +389,7 @@
         }
         o.price = p.price;
       }
-      return { ok: true, mode: app ? app.mode : null, options };
+      return { ok: true, mode: app ? app.mode : null, options, others, toSkuId };
     }
 
     // The price of one upgrade, in the right mode (a buy-back sends its pledge id;
@@ -350,6 +412,7 @@
 
     // Puts one upgrade in the RSI cart. → { ok: true } | { ok: false, error }.
     // Asked once: never retried, whatever happens (a retry could add it twice).
+    // fromShipId can be any ship RSI offers the upgrade from, owned or not.
     async function addUpgradeToCart(fromShipId, toShipId, toSkuId, opts = {}) {
       if (!toInt(fromShipId) || !toInt(toShipId) || !toInt(toSkuId))
         return { ok: false, error: 'refused' };
@@ -368,8 +431,17 @@
       if (pledge && (!app || app.mode !== 'buyback')) return { ok: false, error: 'refused' };
       if (!pledge && app && app.mode === 'buyback') return { ok: false, error: 'refused' };
       const r = await ask(addBody(fromShipId, toSkuId));
+      if (r.error === 'refused' && r.json) return refusedBy(r.json, !!pledge);
       if (r.error) return fail(r);
-      return parseAdded(r.json) ? { ok: true } : { ok: false, error: 'refused' };
+      const jwt = parseAdded(r.json);
+      if (!jwt) return { ok: false, error: 'refused' };
+      // Then the cart takes the ticket, as RSI's window does (also never retried).
+      const c = await post(CART_TOKEN_URL, { jwt });
+      if (c.error === 'refused' && c.json) return refusedBy(c.json, !!pledge);
+      if (c.error) return fail(c);
+      if (c.json && (c.json.success === 0 || c.json.success === false))
+        return refusedBy(c.json, !!pledge);
+      return { ok: true };
     }
 
     return { upgradeOptions, upgradePrice, addUpgradeToCart };
@@ -384,6 +456,7 @@
     PLEDGE_STORE_URL,
     AUTH_URL,
     CONTEXT_URL,
+    CART_TOKEN_URL,
     UPGRADE_URL,
     // Pure pieces, for tests.
     contextBody,
@@ -399,6 +472,8 @@
     parseFrom,
     parsePrice,
     parseAdded,
+    cartRefusal,
     buildOptions,
+    buildOthers,
   };
 })(typeof self !== 'undefined' ? self : globalThis);
