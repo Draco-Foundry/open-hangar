@@ -29,6 +29,24 @@ test('ciPassed: no run, a red run or a run still going blocks it', async () => {
   assert.equal(ciPassed([{ status: 'in_progress', conclusion: '' }]), false);
 });
 
+test('ciState: publish waits while CI is coming or running, stops on a finished red run', async () => {
+  const { ciState } = await lib();
+  assert.equal(ciState([{ status: 'completed', conclusion: 'success' }]), 'passed');
+  assert.equal(ciState([]), 'pending'); // CI on the release commit hasn't started yet
+  assert.equal(ciState(null), 'pending');
+  assert.equal(ciState([{ status: 'queued', conclusion: '' }]), 'pending');
+  assert.equal(ciState([{ status: 'in_progress', conclusion: '' }]), 'pending');
+  assert.equal(
+    ciState([
+      { status: 'completed', conclusion: 'failure' },
+      { status: 'in_progress', conclusion: '' }, // a rerun
+    ]),
+    'pending',
+  );
+  assert.equal(ciState([{ status: 'completed', conclusion: 'failure' }]), 'failed');
+  assert.equal(ciState([{ status: 'completed', conclusion: 'cancelled' }]), 'failed');
+});
+
 test('tagMatches: v-prefixed or bare tag against manifest.json', async () => {
   const { tagMatches } = await lib();
   assert.equal(tagMatches('v0.2.13', '0.2.13'), true);

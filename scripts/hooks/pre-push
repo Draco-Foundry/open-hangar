@@ -1,0 +1,13 @@
+#!/bin/sh
+# Fast checks before every push: formatting and the unit tests (not the UI test,
+# CI runs that). Installed by `npm install` (package.json "prepare" sets
+# core.hooksPath to scripts/hooks). In an emergency: git push --no-verify
+set -e
+echo "pre-push: npm run format:check"
+npm run --silent format:check
+echo "pre-push: npm test"
+npm test --silent >/dev/null 2>&1 || {
+  echo "pre-push: unit tests failed. Run npm test to see why (or git push --no-verify in an emergency)."
+  exit 1
+}
+echo "pre-push: all good"

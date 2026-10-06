@@ -35,8 +35,12 @@ const fail = (msg) => {
 };
 const ok = (msg) => console.log(`  ✔ ${msg}`);
 
+// The demo server, always on the fixed demo clock (an OH_DEMO_NOW from the shell
+// is for npm run demo, not the test).
+const { OH_DEMO_NOW: _skip, ...serverEnv } = process.env;
 const server = spawn(process.execPath, [path.join(HERE, 'run.mjs'), '--serve'], {
   stdio: ['ignore', 'pipe', 'inherit'],
+  env: serverEnv,
 });
 await new Promise((resolve, reject) => {
   server.stdout.on('data', (d) => String(d).includes('serving only') && resolve());
@@ -50,6 +54,14 @@ const browser = await puppeteer.launch({
   defaultViewport: { width: 1280, height: 900 },
 });
 const page = await browser.newPage();
+// A fixed clock (2026-10-01 15:00 UTC, moving forward in real time) before any page
+// script runs, so date-dependent fixtures (buy-back token dates, events, patch-note
+// ages, "today") give the same result every day. run.mjs loads the same file first
+// in <head>; whichever runs first installs it.
+const CLOCK = fs.readFileSync(path.join(HERE, 'demo-clock.js'), 'utf8');
+await page.evaluateOnNewDocument(CLOCK);
+// And one time zone, so "today" is the same calendar day on every machine.
+await page.emulateTimezone('UTC');
 page.on('pageerror', (e) => fail(`page error: ${e.message}`));
 page.on('console', (m) => {
   // Network hiccups to public APIs aren't our bugs; script errors are.
@@ -131,14 +143,19 @@ try {
   const cards = await page.evaluate(() => {
     const txt = document.querySelector('#oh-status').textContent;
     return {
-      // The next token shows only in its last 30 days, so expect it only then.
-      events: /Next Buy-Back Token/.test(txt) === (OH.soonBuybackToken() != null),
-      stale: /Last event: Pirate Week/.test(txt) || !/Pirate Week/.test(txt),
-      wave: /4\.10\.2[\s\S]{0,40}Wave 3/.test(txt) && /Released [A-Z][a-z]{2} \d+ · /.test(txt),
+      // The demo clock is Oct 1 2026, 15:00 UTC, so every date here is exact:
+      // the Oct 5 token is in its last 30 days, Pirate Week has ended.
+      clock: new Date().toISOString().slice(0, 13) === '2026-10-01T15',
+      events: /Next Buy-Back Token\s*Oct 5 · in 4 days/.test(txt),
+      stale: /Last event: Pirate Week\s*ended Sep 16/.test(txt),
+      wave:
+        /4\.10\.2[\s\S]{0,40}Wave 3 · notes 2 days ago/.test(txt) &&
+        /Released Sep 16 · 15 days ago/.test(txt),
       news: document.querySelectorAll('#oh-home .nl').length,
       lead: document.querySelector('#oh-home .lead .p')?.textContent || '',
     };
   });
+  cards.clock &&
   cards.events &&
   cards.stale &&
   cards.wave &&
@@ -777,8 +794,8 @@ try {
   console.log('Buy-Backs');
   await go('#buybacks');
   const tok = await page.$eval('#bb-sum', (e) => e.textContent).catch(() => '');
-  const tokSoon = await page.evaluate(() => OH.soonBuybackToken() != null);
-  /Tokens\s*2/i.test(tok) && /Tokens\s*2\s*next/i.test(tok) === tokSoon
+  // Demo clock: Oct 1, so the Oct 5 token is "next".
+  /Tokens\s*2\s*next/i.test(tok)
     ? ok('buy-back tokens in the summary strip')
     : fail(`tokens: "${tok}"`);
   // Buy-Backs pass: Hide small stuff on by default; Stack identical off by default
@@ -1402,9 +1419,8 @@ try {
     const spend = document.querySelector('#stats-body').textContent;
     const bars = document.querySelectorAll('#stats-body .bar-row').length;
     // A bonus event running today shows the Home banner.
-    // Local date, like the page uses (toISOString is UTC: wrong in the evening).
-    const now = new Date();
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    // The demo clock's day (2026-10-01, UTC).
+    const today = '2026-10-01';
     referralEvents = [
       ...referralEvents,
       { start: today, end: today, name: 'Test Expo', reward: 'Drake Dragonfly with LTI' },
