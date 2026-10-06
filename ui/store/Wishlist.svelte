@@ -170,7 +170,10 @@
 
 <div class="store-panel">
   <div class="sp-head">
-    <h3>Wishlist <span class="market-n" id="wish-n">{d && d.count ? d.count : ''}</span></h3>
+    <h3>
+      Wishlist{#if d && d.count}
+        <span class="market-n" id="wish-n">{d.count}</span>{/if}
+    </h3>
     <label class="wish-sort-label"
       >Sort
       <select

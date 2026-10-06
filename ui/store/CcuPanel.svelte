@@ -57,7 +57,8 @@
 <div class="store-panel">
   <div class="sp-head">
     <h3>
-      Your CCUs <span class="market-n" id="ccu-n">{d && d.count ? d.count : ''}</span>
+      Your CCUs{#if d && d.count}
+        <span class="market-n" id="ccu-n">{d.count}</span>{/if}
     </h3>
     <span class="sp-count" id="ccu-search-count" aria-live="polite" hidden={few}
       >{meta ? meta.count : ''}</span
