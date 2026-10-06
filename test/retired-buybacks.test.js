@@ -51,3 +51,9 @@ test('paints and Mk II ships keep their buy-back link', () => {
   assert.equal(retired({ kind: 'ship', name: 'Aurora Mk II' }), false);
   assert.equal(retired({ kind: 'ship', name: 'Cutlass Black' }), false);
 });
+
+test('retired is only a label: the note says RSI still sells the buy-back back', () => {
+  const note = OH.retiredBuyback({ kind: 'ship', name: 'Standalone Ship - Aurora Mk I MR' });
+  assert.match(note, /buy-back is still open on RSI/);
+  assert.doesNotMatch(note, /can no longer be bought back/);
+});

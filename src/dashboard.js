@@ -3446,22 +3446,22 @@ function buybackViewUrl(b) {
 // One "Reclaim" link for every buy-back: RSI's reclaim page, or for CCUs (which
 // have no page of their own; RSI reclaims them in a pop-up) the one-item
 // buy-back list entry where that button is.
-// Where a buy-back's Reclaim link goes: { retired } | { url, tip } | null.
+// Where a buy-back's Reclaim link goes: { url, tip, retired? } | { retired } | null.
 function reclaimOf(b) {
-  // Retired ships (#306) can't be reclaimed: say so instead of a dead link.
+  // Retired ships (#306): RSI still sells their buy-backs back, so they keep the link
+  // and get a "Retired, Buy-Back Still Open" label (`retired` is its note).
   const retired = OH.retiredBuyback(b);
-  if (retired) return { retired };
   // A CCU's button on RSI has no page of its own: its href is just the pledge
   // store, which opened the store's front page instead of this upgrade (owner,
   // 2026-10-05). CCUs always use the one-item buy-back list, where RSI's own Buy
   // Back button opens the upgrade pop-up for exactly this pledge.
   const direct = b.ccu || b.isCCU ? '' : buybackUrl(b);
   const url = direct || buybackViewUrl(b);
-  if (!url) return null;
+  if (!url) return retired ? { retired } : null;
   const tip = direct
     ? 'Open the buy-back page on RSI'
     : "Opens just this CCU in RSI's buy-back list, where its reclaim button is";
-  return { url, tip };
+  return retired ? { url, tip, retired } : { url, tip };
 }
 function bbDetail(b) {
   return state.bbDetails[b.id] || null;
@@ -3984,9 +3984,10 @@ function bbView(b) {
 }
 // A buy-back upgrade RSI can put back in the cart: its pledge id and the from/to
 // ship and SKU ids from its buy-back button (parser.js). null for anything else,
-// and for a retired ship RSI no longer sells back (#306).
+// A retired ship (#306) keeps the button: RSI still sells its buy-backs back, and
+// `retired` words a refusal if RSI has closed it since.
 function bbCartOf(b) {
-  if (!b || !b.isCCU || !b.ccu || OH.retiredBuyback(b)) return null;
+  if (!b || !b.isCCU || !b.ccu) return null;
   const n = (v) => (/^\d+$/.test(String(v || '')) ? Number(v) : null);
   const [pledgeId, fromShipId, toShipId, toSkuId] = [b.id, b.fromShipId, b.toShipId, b.toSkuId].map(
     n,
@@ -3994,6 +3995,7 @@ function bbCartOf(b) {
   if (!pledgeId || !fromShipId || !toShipId || !toSkuId) return null;
   return {
     pledgeId,
+    retired: !!OH.retiredBuyback(b),
     from: { id: fromShipId, name: b.ccu.from },
     target: { toShipId, toSkuId, name: b.ccu.to },
   };

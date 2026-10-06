@@ -15,6 +15,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   like your own. Buy-backs say they check out alone (one per cart, nothing else with
   them), whether store credit needs a Buy-Back Token, and why RSI refused if your cart is
   already busy or a buy-back upgrade isn't sold any more.
+- Changed: **retired ships can still be bought back.** RSI still sells back buy-backs of
+  the Aurora Mk I and Hornet Mk I, so they now say Retired, Buy-Back Still Open, keep
+  their Reclaim link, and buy-back upgrades keep Add to RSI Cart. If RSI ever refuses
+  one, the window says RSI closed its buy-back.
 
 ## 0.2.17 — 2026-10-04
 
