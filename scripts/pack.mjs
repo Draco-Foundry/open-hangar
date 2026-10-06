@@ -161,12 +161,13 @@ for (const [name, transform] of Object.entries(builds)) {
   if (name !== 'firefox')
     manifest.externally_connectable = {
       // The store is at openhangar.space/store and app.openhangar.space/store.
-      // The beta leaves staging out: it talks to production only.
+      // Staging only in developer builds with sync (OH_SYNC=1, npm run build:staging):
+      // never in a store build, the beta included (scripts/check-store-build.mjs).
       matches: [
         'https://openhangar.space/*',
         'https://app.openhangar.space/*',
-        'https://staging.openhangar.space/*',
-      ].filter((m) => !(BETA && m.includes('staging'))),
+        ...(KEEP_SYNC && !BETA ? ['https://staging.openhangar.space/*'] : []),
+      ],
     };
   if (beta) {
     // Its own store item: a name, icons and version line of its own, so testers can
