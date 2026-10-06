@@ -44,7 +44,7 @@ as normal". Paused scans never touch RSI and never change saved data.
 Usual signs:
 
 - A red **RSI canary** post in #ops. Every day `.github/workflows/canary.yml` runs
-  the real parsers on RSI's public pages (store, ship matrix, Comm-Links, patch notes,
+  the real parsers on RSI's public pages (store, ship matrix, patch notes,
   loaner help articles) and says which one broke, or that RSI couldn't be reached.
   Run it yourself any time: `npm run canary`. It can't see logged-in pages (hangar,
   buy-backs, referrals).

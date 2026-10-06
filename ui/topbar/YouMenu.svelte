@@ -2,10 +2,13 @@
   // Your menu: your RSI portrait (a gear until we know who you are) opens it. Name and
   // org at the top, "Update ready: Reload" when a new version is waiting (a dot on the
   // portrait too), then Currency, Streamer Mode (a badge on the portrait while it's
-  // on, #174), Rescan Reminder, the pages that left the nav, Log Out of RSI and Clear
-  // Data. What each one does stays in dashboard.js (window.OHApp.top).
+  // on, #174), Rescan Reminder, RSI Quick Links (#374, folds open), the pages that
+  // left the nav, Log Out of RSI and Clear Data. What each one does stays in dashboard.js (window.OHApp.top).
   import { app, version } from '../lib/app.svelte.js';
   import { menus, register, toggleMenu, menuClick } from './menus.svelte.js';
+  import { quickLinks, QL_ICONS } from '../lib/quick-links.js';
+  import { qlPref, setQuickLinksHidden } from '../lib/quick-links-pref.svelte.js';
+  import QuickLinkRow from '../lib/QuickLinkRow.svelte';
 
   const CURRENCIES = [
     ['USD', 'USD $'],
@@ -46,6 +49,7 @@
       remind: bar.remind,
       loggingOut: bar.loggingOut,
       hasData: !!(s.items.length || s.scannedAt),
+      quick: quickLinks(acc?.nickname, { menu: true }),
     };
   });
 
@@ -66,6 +70,12 @@
     await Promise.resolve();
     keepBtn?.focus({ preventScroll: true });
   }
+  // Quick Links fold open and shut; shut each time the menu opens, so it stays short.
+  let qlOpen = $state(false);
+  $effect(() => {
+    if (menus.open !== 'you') qlOpen = false;
+  });
+
   function keep(e) {
     e.stopPropagation();
     asking = '';
@@ -165,6 +175,36 @@
         onchange={(e) => app().top.setRemind(e.currentTarget.checked)}
       /></label
     >
+    <button
+      type="button"
+      class="ql-toggle"
+      id="ql-toggle"
+      class:open={qlOpen}
+      aria-expanded={qlOpen}
+      aria-controls="ql-menu"
+      onclick={() => (qlOpen = !qlOpen)}
+      ><svg
+        class="ql-grid-ic"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true">{@html QL_ICONS.grid}</svg
+      >Quick Links<span class="ql-tag">RSI</span><span class="ql-chev" aria-hidden="true">›</span></button
+    >
+    <div class="ql-in" id="ql-menu" hidden={!qlOpen}>
+      {#if qlPref.hidden}
+        <button type="button" class="ql-show" id="ql-show" onclick={() => setQuickLinksHidden(false)}
+          >Show on Home</button
+        >
+      {/if}
+      {#each d.quick as g (g.name)}
+        <p class="ql-grp">{g.name}</p>
+        {#each g.links as l (l.t)}<QuickLinkRow link={l} />{/each}
+      {/each}
+    </div>
     <a class="menu-item menu-link" href="#guide" data-view="guide">How to Use</a>
     <a class="menu-item menu-link" href="#updates" data-view="updates">Updates</a>
     <a class="menu-item menu-link" href="#issues" data-view="issues">Known Issues</a>
@@ -229,3 +269,4 @@
     {/if}
   </div>
 </div>
+

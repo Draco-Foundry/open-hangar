@@ -1,6 +1,8 @@
 <script>
-  // Hangar Spotlight: one ship from your own fleet per visit, with its art and key
-  // numbers; "Another ship" flips to the next.
+  // Hangar Spotlight: a clean picture of one ship from your own fleet, a new one each
+  // visit. No heading, buttons or stats (owner, 2026-10-05): the ship's name is the
+  // picture's alt text and a small caption on hover or focus. It fills the spare
+  // height of its column on Home, so the columns finish together.
   import { app, OH, version } from '../lib/app.svelte.js';
 
   const a = app();
@@ -13,28 +15,18 @@
       const v = name && a.shipOf(name);
       if (!v || seen.has(v.name)) continue;
       seen.set(v.name, {
-        key: v.name,
         name: [v.mfr && !v.name.startsWith(v.mfr.split(' ')[0]) ? v.mfr.split(' ')[0] : '', v.name]
           .filter(Boolean)
           .join(' '),
         lookup: name,
-        role: v.role || v.career || '',
-        size: v.size || '',
-        crew: v.crew,
-        cargo: v.cargo,
-        store: v.msrp || null,
-        status: v.status,
-        pledged: Date.parse(p.date),
-        paid: Number.isFinite(p.value) ? p.value : null,
-        ins: p.insurance && p.insurance !== 'Unknown' ? p.insurance : '',
         img: a.realImage(p.image),
       });
     }
     return [...seen.values()];
   });
-  // Start somewhere different each visit.
-  let i = $state(Math.floor(Math.random() * 1000));
-  const ship = $derived(ships.length ? ships[i % ships.length] : null);
+  // Somewhere different each visit.
+  const pick = Math.floor(Math.random() * 1000);
+  const ship = $derived(ships.length ? ships[pick % ships.length] : null);
   let art = $state('');
   $effect(() => {
     const s = ship;
@@ -46,142 +38,55 @@
         if (url && ship === s) art = url;
       });
   });
-  const month = (t) =>
-    Number.isFinite(t) ? new Date(t).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) : '';
-  // "Light Fighter · Small · Flight Ready · Pledged Dec 2021 for $90" (no price for
-  // free rewards).
-  const metaLine = (s) =>
-    [
-      cap(s.role),
-      cap(s.size),
-      s.status === 'flight-ready' ? 'Flight Ready' : 'In Concept',
-      Number.isFinite(s.pledged)
-        ? `Pledged ${month(s.pledged)}${s.paid ? ` for ${a.dollars(s.paid)}` : ''}`
-        : '',
-    ]
-      .filter(Boolean)
-      .join(' · ');
-  const cap = (s) => String(s || '').replace(/(^|[\s-])(\p{Ll})/gu, (_, p, c) => p + c.toUpperCase());
 </script>
 
 {#if ship}
-  <section class="oh-p spot">
-    <div class="oh-ph">
-      <h3>Hangar Spotlight</h3>
-      {#if ships.length > 1}<button type="button" class="next" onclick={() => i++}>Another Ship ↻</button>{/if}
-    </div>
-    <div class="art">
-      {#if art}<img src={art} alt="" />{/if}
-      <div class="cap"><b>{ship.name}</b>{#if ship.ins}<span>{ship.ins}</span>{/if}</div>
-    </div>
-    <div class="meta">{metaLine(ship)}</div>
-    <div class="specs">
-      <div><b>{ship.crew ?? '—'}</b>crew</div>
-      <div><b>{ship.cargo ?? '—'}</b>SCU</div>
-      <div><b>{cap(ship.size) || '—'}</b>size</div>
-      <div><b>{ship.store ? a.dollars(ship.store) : '—'}</b>store today</div>
-    </div>
-  </section>
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+  <figure class="spot" id="oh-spotlight" tabindex="0" aria-label={ship.name}>
+    {#if art}<img src={art} alt={ship.name} />{/if}
+    <figcaption>{ship.name}</figcaption>
+  </figure>
 {/if}
 
 <style>
-  .next {
-    border: 1px solid var(--line-2);
-    background: none;
-    border-radius: 999px;
-    padding: 4px 12px;
-    font-size: 13px;
-    color: var(--muted);
-    cursor: pointer;
-  }
-  .next:hover {
-    color: var(--head);
-  }
-  /* The card stretches to its row (beside Latest Acquisitions); the picture takes
-     the spare height so there's no empty band at the bottom. */
   .spot {
-    display: flex;
-    flex-direction: column;
-  }
-  .art {
     position: relative;
     flex: 1 1 auto;
-    min-height: 180px;
-    border-radius: var(--r-md);
+    min-height: 220px;
+    margin: 0;
+    border-radius: var(--radius-lg);
     overflow: hidden;
     background: linear-gradient(135deg, var(--panel-2), var(--bg));
+    outline: none;
   }
-  .art img {
+  .spot:focus-visible {
+    box-shadow: 0 0 0 2px var(--accent-line);
+  }
+  .spot img {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
   }
-  .art::after {
-    content: '';
+  figcaption {
     position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, transparent 45%, rgba(0, 0, 0, 0.6));
-  }
-  .cap {
-    position: absolute;
-    left: 14px;
-    right: 14px;
+    left: 12px;
     bottom: 12px;
-    z-index: 1;
-    display: flex;
-    justify-content: space-between;
-    align-items: end;
-    gap: 10px;
-  }
-  .cap b {
-    font: 600 22px var(--font-head);
-    color: #fff;
-    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .cap span {
-    flex: none;
-    font-size: 12px;
-    color: #e6ecf2;
-    background: rgba(0, 0, 0, 0.5);
+    max-width: calc(100% - 24px);
+    padding: 3px 9px;
     border-radius: var(--r-sm);
-    padding: 2px 8px;
-  }
-  .meta {
-    font-size: 14px;
-    color: var(--muted);
-    margin-top: 12px;
-  }
-  .specs {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
-    margin-top: 12px;
-  }
-  .specs div {
-    background: var(--panel-2);
-    border-radius: var(--r-md);
-    padding: 8px 10px;
-    font-size: 12px;
-    color: var(--muted);
-    min-width: 0;
-  }
-  .specs b {
-    display: block;
-    font: 600 17px var(--font-head);
-    color: var(--head);
+    background: rgba(0, 0, 0, 0.6);
+    color: #e6ecf2;
+    font: 500 12px var(--font-body);
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.15s;
   }
-  @media (max-width: 420px) {
-    .specs {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
+  .spot:hover figcaption,
+  .spot:focus-visible figcaption {
+    opacity: 1;
   }
 </style>
