@@ -190,9 +190,9 @@ To add a data source, see [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Privacy
 
 No credentials, only the session you already have. Your data stays in your browser
-unless you connect openhangar.space. Then Sync Now (or Sync After Every Scan, if you
-turn it on) sends the same data as the JSON export to your account there; Disconnect
-stops it and the website lets you download or delete everything. Details:
+unless you connect openhangar.space. Once connected, every scan sends the same data as
+the JSON export to your account there (Sync Now sends it right away); Disconnect stops
+it and the website lets you download or delete everything. Details:
 [PRIVACY.md](docs/PRIVACY.md). Every other outbound request carries no personal data:
 thumbnails and the banner from RSI's media servers, the current game version from the
 public star-citizen.wiki API, and (for items RSI ships without art) ship images looked up
