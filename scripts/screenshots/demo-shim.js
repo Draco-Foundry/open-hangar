@@ -309,7 +309,8 @@
       rec: { value: 12400, symbol: '¤', label: 'REC', currency: 'REC' },
     },
     subscriber: { type: 'Centurion', frequency: 'monthly' },
-    concierge: null,
+    // Invented Chairman's Club standing (RSI's own percentage), for the Home popup.
+    concierge: { level: 'Space Marshal', next: 'Wing Commander', percent: 42 },
     citizenRecord: 'n/a',
     org: {
       name: 'Demo Fleet Collective',
@@ -437,6 +438,27 @@
           { headers: { 'content-type': 'application/json' } },
         ),
       );
+    // The top bar's Game Status pill: an invented feed in the v1 shape
+    // (openhangar.space/api/game-status), dated around now.
+    if (url === 'https://openhangar.space/api/game-status') {
+      const at = (d) => new Date(Date.now() + d * 864e5).toISOString();
+      return Promise.resolve(
+        Response.json({
+          v: 1,
+          updatedAt: at(0),
+          status: { level: 'ok', label: 'All Systems Go', url: 'https://openhangar.space/' },
+          live: { version: '4.10.1', released: at(-20) },
+          ptu: { version: '4.10.2', wave: 'Wave 2', notesAt: at(-1) },
+          patchNotes: {
+            title: 'Alpha 4.10.2 PTU Patch Notes',
+            url: 'https://robertsspaceindustries.com/spectrum/community/SC/forum/190048',
+            at: at(-1),
+          },
+          event: { name: 'Demo Fleet Week', start: at(-3), end: at(4), url: null },
+          nextEvent: { name: 'Demo Ship Showdown', start: at(12), end: at(19), url: null },
+        }),
+      );
+    }
     // Your Subscriber Store (#418): an invented listing for the demo subscriber.
     if (/\/graphql$/.test(url) && /GetBrowseSkusByFilter/.test(String(init.body || '')))
       return Promise.resolve(Response.json(window.DEMO_SUB_STORE));

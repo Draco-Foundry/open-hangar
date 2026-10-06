@@ -984,10 +984,67 @@ async function wishlistStock({ force = false } = {}) {
     const s = storeOf(name);
     const st = s && s.link ? await OH.getShipStock(s.link, fetch, { force }) : null;
     if (st && st.state) stockMem.set(s.link, st.state);
-    out.push({ name: (shipEntry(name) || {}).name || name, st });
+    out.push({ name: (shipEntry(name) || {}).name || name, key: name, st });
   }
   return out;
 }
+// Wishlist Watch on Home: the last wishlist check, kept until the next one (the
+// store-page answers themselves are cached only 6 hours), so Home can say "Checked
+// 2 days ago". Only Check Now and Scan → Store check; nothing runs by itself.
+// Saved as { at, items: { name: { status, price, warbond, url } } }.
+let wishWatch = null;
+let wishChecking = false;
+function saveWishWatch(list) {
+  const items = {};
+  for (const { name, st, key } of list) {
+    const s = storeOf(key || name);
+    const v = shipEntry(key || name);
+    const eds = (s && s.editions) || [];
+    const min = (xs) => (xs.length ? Math.min(...xs) : null);
+    const std = min(eds.filter((e) => !e.warbond && e.price > 0).map((e) => e.price));
+    const wb = min(eds.filter((e) => e.warbond && e.price > 0).map((e) => e.price));
+    const status = st && st.state ? st.state : 'unknown';
+    const price = (status === 'in' && (std || (st && st.price))) || (v && v.msrp) || std || null;
+    items[key || name] = {
+      status,
+      price: Number.isFinite(price) ? price : null,
+      warbond: status === 'in' && wb && price && wb < price ? wb : null,
+      url: (s && s.link) || null,
+    };
+  }
+  wishWatch = { at: Date.now(), items };
+  chrome.storage.local.set({ wishWatch });
+}
+async function checkWishlist() {
+  if (wishChecking || !state.wishlist.length) return;
+  wishChecking = true;
+  homeUpdated();
+  try {
+    saveWishWatch(await wishlistStock({ force: true }));
+  } finally {
+    wishChecking = false;
+    homeUpdated();
+  }
+}
+// The card's rows, in your wishlist order (generic items: ui/lib/wish-watch.js).
+function wishWatchRows() {
+  const saved = (wishWatch && wishWatch.items) || {};
+  return wishlistOrder().map((name) => {
+    const v = shipEntry(name);
+    const got = saved[name] || null;
+    return {
+      kind: 'ship',
+      name: (v && v.name) || name,
+      lookup: name,
+      price: got ? got.price : (v && v.msrp) || null,
+      warbond: got ? got.warbond : null,
+      status: got ? got.status : 'unknown',
+      url: got ? got.url : null,
+      img: '',
+    };
+  });
+}
+
 function renderHome() {
   ensurePrices();
   renderEventBanner();
@@ -2450,11 +2507,10 @@ if (selectBar) {
 const titleCase = (t) =>
   String(t || '').replace(/(^|[\s/(-])(\p{Ll})/gu, (_, p, c) => p + c.toUpperCase());
 
-// Production state labels. "In production" reads as "In concept": to a player
-// both mean "can't fly it yet", and the difference was hard to tell apart.
+// Production state labels, as RSI words them.
 const SHIP_STATES = [
   ['flight-ready', 'Flight Ready'],
-  ['in-production', 'In Concept'],
+  ['in-production', 'In Production'],
   ['in-concept', 'In Concept'],
 ];
 // --- Store page -------------------------------------------------------------
@@ -4323,6 +4379,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
     setScanning('store');
     scanDetail('Store · checking your wishlist');
     const list = await wishlistStock({ force: true });
+    saveWishWatch(list); // Home's Wishlist Watch shows this check
     const n = list.filter((x) => x.st && x.st.state === 'in').length;
     const text = `${n} wishlist ship${n === 1 ? '' : 's'} on sale`;
     parts.push(text);
@@ -5500,8 +5557,10 @@ function searchResults(q) {
     uiGroupByType,
     wishlist,
     uiWishSort,
+    wishWatch: savedWishWatch,
   } = await chrome.storage.local.get([
     'wishlist',
+    'wishWatch',
     'uiWishSort',
     'currency',
     'uiGroupByType',
@@ -5524,6 +5583,8 @@ function searchResults(q) {
   if (LAYOUTS.includes(uiLayout)) state.layout = uiLayout;
   if (uiGroupByType === false) state.groupByType = false;
   if (Array.isArray(wishlist)) state.wishlist = wishlist.filter((n) => typeof n === 'string');
+  if (savedWishWatch && Number.isFinite(savedWishWatch.at) && savedWishWatch.items)
+    wishWatch = savedWishWatch;
   if (WISH_SORTS.some(([k]) => k === uiWishSort)) state.wishSort = uiWishSort;
   if (STATS_TABS.some(([k]) => k === uiStatsTab)) state.statsTab = uiStatsTab;
   if (Number.isFinite(lastBackupAt)) state.lastBackupAt = lastBackupAt;
@@ -6060,6 +6121,14 @@ window.OHApp = {
     // A store page's answer as the "In Store Now" cell shows it, or null (not yet).
     stock: (url) => (stockInfo.has(url) ? stockLabel(stockInfo.get(url)) : null),
     checkStock,
+    // Home's Wishlist Watch: the last check (null if never), its rows, Check Now.
+    get wishWatch() {
+      return wishWatch
+        ? { at: wishWatch.at, checking: wishChecking }
+        : { at: null, checking: wishChecking };
+    },
+    wishWatchRows,
+    checkWishlist,
     buybackHasShip,
     buybackName,
     bbFullName,

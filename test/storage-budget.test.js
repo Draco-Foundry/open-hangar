@@ -95,7 +95,10 @@ const BUDGET = {
   uiWishSort: small(),
   uiStatsTab: small(),
   uiLayout: small(),
-  uiQuickLinksHidden: small(),
+  uiQuickLinksHidden: small('old Quick Links switch, moved into uiHomeLayout'),
+  uiHomeLayout: small('show/hide per card and MAX_SAVED 10 named layouts (24 characters)'),
+  wishWatch: small('the last wishlist check, replaced whole'),
+  gameStatus: small('one openhangar.space game-status feed, replaced whole (10 minutes)'),
   uiGroupByType: small(),
   hideSmallInv: small(),
   hideSmallBb: small(),
@@ -248,6 +251,69 @@ async function fillWorstCase() {
       ]),
     ),
     bbHistoryRejects: timed(500, () => ({ from: 'archive' })),
+    // Customize Home at its cap: ten saved layouts with the longest names.
+    uiHomeLayout: {
+      v: 1,
+      cards: { citizen: true, value: true, acquisitions: true, wishlist: true, quicklinks: true },
+      saved: Array.from({ length: 10 }, (_, i) => ({
+        name: `Layout ${i}`.padEnd(24, 'x'),
+        v: 1,
+        cards: {
+          citizen: true,
+          value: true,
+          acquisitions: true,
+          wishlist: true,
+          quicklinks: true,
+          spotlight: true,
+          referrals: true,
+        },
+      })),
+    },
+    // A last wishlist check of 200 ships.
+    wishWatch: {
+      at: 1,
+      items: Object.fromEntries(
+        Array.from({ length: 200 }, (_, i) => [
+          `Anvil Carrack Expedition Edition ${i}`,
+          {
+            status: 'in',
+            price: 600,
+            warbond: 550,
+            url: `https://robertsspaceindustries.com/pledge/ships/anvil-carrack/Carrack-Expedition-${i}`,
+          },
+        ]),
+      ),
+    },
+    gameStatus: {
+      at: 1,
+      data: {
+        updatedAt: 1,
+        status: {
+          level: 'degraded',
+          label: 'PU Disrupted, Platform Disrupted',
+          url: 'https://openhangar.space/',
+        },
+        live: { version: '4.10.1', released: 1 },
+        ptu: { version: '4.10.2', wave: 'Wave 3', notesAt: 1 },
+        patchNotes: {
+          title: 'x'.repeat(160),
+          url: 'https://robertsspaceindustries.com/' + 'x'.repeat(400),
+          at: 1,
+        },
+        event: {
+          name: 'x'.repeat(120),
+          start: 1,
+          end: 2,
+          url: 'https://robertsspaceindustries.com/' + 'x'.repeat(400),
+        },
+        nextEvent: {
+          name: 'x'.repeat(120),
+          start: 1,
+          end: 2,
+          url: 'https://robertsspaceindustries.com/' + 'x'.repeat(400),
+        },
+      },
+    },
     // Every cache seeded over its cap; one real call below trims it.
     shipImages: timed(2600, (i) => ({ url: img(i, 3) })),
     wikiFiles: timed(1400, (i) => ({

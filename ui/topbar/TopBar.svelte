@@ -2,9 +2,11 @@
   // The top bar on every page (Top Bar and Top Menu Pass in docs/REDESIGN-0.3.md):
   // the logo, the page links (names only, no counts: owner, #260; a row you swipe
   // on a phone), then the search box, the alerts bell, Scan ▾ and your menu.
+  // Game Status sits before the bell as a pill (openhangar.space's feed).
   // Pinned while scrolling everywhere but Home; it slims down while you scroll down.
   import { app, version } from '../lib/app.svelte.js';
   import Bell from './Bell.svelte';
+  import GameStatus from './GameStatus.svelte';
   import ScanSplit from './ScanSplit.svelte';
   import YouMenu from './YouMenu.svelte';
 
@@ -88,6 +90,8 @@
   <!-- Language flags go here once the dashboard is translated (TODO.md). -->
   <!-- Search your hangar from any page (/ focuses it). -->
   <div class="top-search-slot" style="display: contents" use:adopt></div>
+  <!-- LIVE / PTU, patch notes and events (ui/lib/game-status.js). -->
+  <GameStatus />
   <!-- Hangar Alerts from any page. -->
   <Bell />
   <ScanSplit />

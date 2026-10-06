@@ -1,68 +1,36 @@
 /* Shared Home building blocks (Clean Pro). Component-specific styles live in each
    .svelte file. */
-.oh-rows {
+/* Home's 12-column grid (Home.svelte, ui/lib/home-layout.js): each card spans its
+   columns (--sw on wide windows, --sm from about 1100px down, the whole row on a
+   phone); the last card in a row already carries the spare columns, so rows end
+   level. Cards stretch to the tallest in their row. */
+.oh-grid {
   display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 16px;
+  align-items: stretch;
   margin-bottom: 16px;
 }
-.oh-row3 {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
-}
-.oh-row2 {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
-}
-.oh-row21 {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-  gap: 16px;
-}
-/* Home's two columns (Home.svelte): equal gaps, and the last card in each column
-   takes the spare height so both columns finish together. One column when only
-   one has anything in it, or when narrow. */
-.oh-cols {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
-}
-.oh-col {
+.oh-cell {
+  grid-column: span var(--sw, 12);
   display: flex;
   flex-direction: column;
-  gap: 16px;
   min-width: 0;
 }
-.oh-col > :last-child {
+.oh-cell > * {
   flex: 1 1 auto;
 }
-.oh-col:empty {
+.oh-cell:empty {
   display: none;
 }
-.oh-cols:has(> :only-child),
-.oh-cols:has(> .oh-col:empty) {
-  grid-template-columns: minmax(0, 1fr);
-}
-/* A row with one visible card spans the full width (never a card alone beside a gap). */
-.oh-row2:has(> :only-child),
-.oh-row21:has(> :only-child) {
-  grid-template-columns: minmax(0, 1fr);
-}
-@media (max-width: 980px) {
-  .oh-row3 {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  }
-  .oh-row3 > .oh-wide {
-    grid-column: 1 / -1;
+@media (max-width: 1199px) {
+  .oh-cell {
+    grid-column: span var(--sm, 12);
   }
 }
 @media (max-width: 680px) {
-  .oh-cols,
-  .oh-row3,
-  .oh-row2,
-  .oh-row21 {
-    grid-template-columns: minmax(0, 1fr);
+  .oh-cell {
+    grid-column: 1 / -1;
   }
 }
 .oh-p {
@@ -132,9 +100,4 @@
 }
 .oh-p a {
   color: var(--link);
-}
-/* With the ship picture above it, Quick Links keeps its own height and the picture
-   takes the spare. */
-#oh-spotlight + #oh-quicklinks {
-  flex: 0 0 auto;
 }

@@ -4,6 +4,25 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- New: **Home, the final layout.** Your Citizen Card now spans the whole width. Under it
+  sit Account Value, Latest Acquisitions and the new Wishlist Watch side by side, then
+  Quick Links. Account Value keeps the big number, the vs-melt badge, what it's made of
+  and your counts; the trend chart lives on Stats.
+- New: **Game Status in the top bar.** A pill shows the LIVE build with a status dot.
+  Click it for LIVE and PTU, the latest patch notes and the event on now (plus the next
+  one). It comes from openhangar.space at most every 10 minutes, so Home no longer asks
+  starcitizen.tools or star-citizen.wiki for events and versions.
+- New: **Subscriber and Chairman's Club popups.** Click either line on the Citizen Card:
+  your tier and perks with Manage, or your Concierge level, RSI's progress to the next one,
+  the six-level ladder and the rewards for your level and the next.
+- New: **Wishlist Watch.** Your wishlist on Home with In Store Now or Not on Sale, prices,
+  Warbond savings in green and Buy at RSI when it's on sale. It shows your last check
+  ("Checked 2 days ago") and only asks RSI's store when you press Check Now. Wishlist
+  alerts in the bell follow that same check.
+- New: **Customize Home.** Show or hide each card, add Hangar Spotlight or Referrals, and
+  save up to ten named layouts to switch between. Reset to Default brings back the
+  standard Home. Layouts stay in this browser.
+- Fixed: ships in production now read In Production, not In Concept.
 - New: **Your Subscriber Store.** Subscribers see the items RSI offers their account on
   the Store page, with pictures, prices, a search box, type chips and Buy at RSI. It reads
   RSI at most once a day (on the Store page or after a scan, never inside the scan), and
@@ -16,7 +35,7 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   buy-backs, billing, subscriptions, handle and profile, login and security, the launcher,
   PTU copy, Spectrum and your Citizen Dossier. They sit in a card on Home and fold open
   under Quick Links in your portrait menu. Hide Card puts the Home card away, and Show on
-  Home in the menu brings it back. Each link opens RSI in a new tab; nothing is sent.
+  Home in the menu (or Customize Home) brings it back. Each link opens RSI in a new tab; nothing is sent.
 - Changed: **a calmer Home.** The RSI news card is gone (news lives on openhangar.space),
   so Open Hangar no longer downloads RSI's Comm-Links or This Week in Star Citizen. Hangar
   Spotlight is now just a picture of one of your ships, a new one each visit, with its name
