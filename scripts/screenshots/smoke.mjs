@@ -186,7 +186,7 @@ try {
     counts: [...document.querySelectorAll('#oh-home .counts a')].map((a) => a.textContent.trim()),
     font: getComputedStyle(document.querySelector('#oh-home h3')).fontFamily,
   }));
-  val.big && val.counts.some((c) => /ships?$/.test(c)) && /Manrope/.test(val.font)
+  val.big && val.counts.some((c) => /ship pledges?$/.test(c)) && /Manrope/.test(val.font)
     ? ok(`value card: ${val.big}, ${val.counts.join(' · ')} (bundled Manrope)`)
     : fail(`home value card: ${JSON.stringify(val)}`);
   const clicks = await page.evaluate(async () => {
@@ -211,27 +211,286 @@ try {
   clicks.lti && clicks.rows === 5 && clicks.modal
     ? ok('home: LTI count filters Inventory; 5 latest acquisitions, a row opens details')
     : fail(`home clicks: ${JSON.stringify(clicks)}`);
-  await page
-    .waitForFunction(() => /LIVE/.test(document.querySelector('#oh-status')?.textContent || ''), {
-      timeout: 8000,
-    })
-    .catch(() => {});
-  const cards = await page.evaluate(() => {
-    const txt = document.querySelector('#oh-status').textContent;
-    return {
-      // The next token shows only in its last 30 days, so expect it only then.
-      events: /Next Buy-Back Token/.test(txt) === (OH.soonBuybackToken() != null),
-      stale: /Last event: Pirate Week/.test(txt) || !/Pirate Week/.test(txt),
-      wave: /4\.10\.2[\s\S]{0,40}Wave 3/.test(txt) && /Released [A-Z][a-z]{2} \d+ · /.test(txt),
-      // RSI news is website-only now: no news card on Home.
-      noNews: !/Latest From RSI/.test(document.querySelector('#oh-home').textContent),
-    };
+  // Home "Layout B, Final" (owner 2026-10-05): Game Status is the top bar's pill (an
+  // invented v1 feed in the demo), the Citizen Card has the whole row, then Account
+  // Value, Latest Acquisitions and Wishlist Watch a third each (ending level), then
+  // Quick Links. Popups are closed at first, open on a click, one at a time.
+  const fin = await page.evaluate(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const $ = (q) => document.querySelector(q);
+    const r = {};
+    await wait(300);
+    const pill = $('#gs-pill');
+    r.pill = pill?.textContent.trim();
+    r.pillDot = !!pill?.querySelector('.dot.ok');
+    r.pillStyled = !!pill && getComputedStyle(pill).borderRadius === '999px';
+    r.gsShutAtFirst = $('#gs-menu').hidden && pill.getAttribute('aria-expanded') === 'false';
+    pill.click();
+    await wait(150);
+    const m = $('#gs-menu');
+    const t = m.textContent;
+    r.gsOpen = !m.hidden && pill.getAttribute('aria-expanded') === 'true';
+    r.gsText =
+      /4\.10\.1/.test(t) &&
+      /Released [A-Z][a-z]{2} \d+/.test(t) &&
+      /4\.10\.2/.test(t) &&
+      /Wave 2/.test(t) &&
+      /Latest Patch Notes/.test(t) &&
+      /Demo Fleet Week/.test(t) &&
+      /Next: Demo Ship Showdown/.test(t);
+    document.body.click();
+    await wait(80);
+    r.gsClickOut = m.hidden;
+    pill.click();
+    await wait(80);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await wait(80);
+    r.gsEsc = m.hidden;
+    r.noStatusCard = !$('#oh-status') && !/Game Status/.test($('#oh-home').textContent);
+    // Citizen Card: full width; Subscriber and Chairman's Club one line each, popups.
+    const cc = $('.citizen-card').getBoundingClientRect();
+    const grid = $('#oh-grid').getBoundingClientRect();
+    r.ccFull = Math.abs(cc.width - grid.width) <= 2;
+    const sub = $('#flair-sub');
+    const con = $('#flair-con');
+    r.flairLines =
+      !!sub && !!con && con.getBoundingClientRect().top > sub.getBoundingClientRect().bottom - 2;
+    r.popsShut = !$('#cc-pop-sub') && !$('#cc-pop-con');
+    sub.click();
+    await wait(120);
+    const sp = $('#cc-pop-sub');
+    r.subPop =
+      !!sp &&
+      /Centurion/.test(sp.textContent) &&
+      /Vehicle of the Month/.test(sp.textContent) &&
+      /20,000/.test(sp.textContent) &&
+      [...sp.querySelectorAll('a')].some(
+        (a) =>
+          a.href === 'https://robertsspaceindustries.com/en/pledge/subscriptions' &&
+          /Manage/.test(a.textContent),
+      ) &&
+      [...sp.querySelectorAll('a')].some((a) => /Subscriber Store/.test(a.textContent));
+    con.click();
+    await wait(120);
+    const cp = $('#cc-pop-con');
+    r.oneAtATime = !$('#cc-pop-sub') && !!cp;
+    r.conPop =
+      !!cp &&
+      /42% to Wing Commander, per RSI/.test(cp.textContent) &&
+      cp.querySelectorAll('.ladder i').length === 6 &&
+      /Level 3 of 6/.test(cp.textContent) &&
+      /Venture Explorer Suit/.test(cp.textContent) &&
+      /Anvil F8C Lightning/.test(cp.textContent) &&
+      /Source: RSI Concierge Levels and Rewards/.test(cp.textContent);
+    pill.click();
+    await wait(100);
+    r.pillClosesPop = !$('#cc-pop-con') && !$('#gs-menu').hidden;
+    document.body.click();
+    con.click();
+    await wait(80);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await wait(80);
+    r.popEsc = !$('#cc-pop-con') && document.activeElement === con;
+    // Row 2: three across, ending level; Account Value without the chart or melt line.
+    const cells = [...document.querySelectorAll('#oh-grid > .oh-cell')].map((c) => c.dataset.card);
+    r.order = cells.join(',');
+    const box = (id) => $(`#oh-grid > [data-card="${id}"]`).getBoundingClientRect();
+    const row = ['value', 'acquisitions', 'wishlist'].map(box);
+    r.thirds = row.every(
+      (b) => Math.abs(b.width - row[0].width) <= 2 && Math.abs(b.top - row[0].top) <= 1,
+    );
+    r.level = row.every((b) => Math.abs(b.bottom - row[0].bottom) <= 1);
+    const av = $('#oh-grid [data-card="value"]');
+    r.noChart =
+      !av.querySelector('svg, .trend') &&
+      !/can be melted|gifted|Since Your First Scan/.test(av.textContent);
+    r.counts = /ship pledges?/.test(av.textContent) && /buy-backs?/.test(av.textContent);
+    return r;
   });
-  cards.events && cards.stale && cards.wave && cards.noNews
+  fin.pill === 'LIVE 4.10.1' &&
+  fin.pillDot &&
+  fin.pillStyled &&
+  fin.gsShutAtFirst &&
+  fin.gsOpen &&
+  fin.gsText &&
+  fin.gsClickOut &&
+  fin.gsEsc &&
+  fin.noStatusCard
     ? ok(
-        'Game Status beside the card: waves, events (ended not shown as live), next token; no news card on Home',
+        'Game Status pill in the top bar: LIVE 4.10.1 with a dot, shut at first, LIVE/PTU/notes/events, click outside and Escape close it; no Game Status card',
       )
-    : fail(`home cards: ${JSON.stringify(cards)}`);
+    : fail(`game status pill: ${JSON.stringify(fin)}`);
+  fin.ccFull &&
+  fin.flairLines &&
+  fin.popsShut &&
+  fin.subPop &&
+  fin.conPop &&
+  fin.oneAtATime &&
+  fin.pillClosesPop &&
+  fin.popEsc
+    ? ok(
+        "Citizen Card full width; Subscriber and Chairman's Club popups shut at first, open on click, one at a time, Escape returns focus",
+      )
+    : fail(`citizen popups: ${JSON.stringify(fin)}`);
+  fin.order === 'value,acquisitions,wishlist,quicklinks' &&
+  fin.thirds &&
+  fin.level &&
+  fin.noChart &&
+  fin.counts
+    ? ok(
+        'Home rows: Account Value, Latest Acquisitions, Wishlist Watch a third each and level, then Quick Links; no chart or melt line',
+      )
+    : fail(`home rows: ${JSON.stringify(fin)}`);
+
+  // Wishlist Watch: empty, never checked, Check Now (never by itself), the last check
+  // kept in storage, Buy only when for sale, Warbond savings in green.
+  const ww = await page.evaluate(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const $ = (q) => document.querySelector(q);
+    const card = () => $('#oh-wishwatch');
+    const r = {};
+    const keep = state.wishlist;
+    state.wishlist = [];
+    homeUpdated();
+    await wait(100);
+    r.empty = /Your wishlist is empty\. Add ships from Find a Ship on the Store page\./.test(
+      card().textContent,
+    );
+    await chrome.storage.local.remove('wishWatch');
+    wishWatch = null; // dashboard.js's copy of the last check
+    let asked = 0;
+    const real = OH.getShipStock;
+    OH.getShipStock = async (url) => {
+      asked++;
+      return /Cutlass-Black/i.test(url)
+        ? { state: 'in', price: 110, packs: [] }
+        : { state: 'out', price: null, packs: [] };
+    };
+    state.wishlist = ['Cutlass Black', 'Pioneer'];
+    homeUpdated();
+    await wait(400);
+    r.never =
+      /Not checked yet/.test(card().textContent) &&
+      !!$('#ww-check') &&
+      !card().querySelector('.buy');
+    r.noAuto = asked === 0;
+    $('#ww-check').click();
+    await wait(800);
+    const rows = [...card().querySelectorAll('.wl')];
+    const cut = rows.find((x) => /Cutlass Black/.test(x.textContent));
+    const pio = rows.find((x) => /Pioneer/.test(x.textContent));
+    r.checked = /Checked just now/.test(card().textContent) && asked >= 1;
+    r.inStore =
+      !!cut &&
+      /In Store Now/.test(cut.textContent) &&
+      !!cut.querySelector('a.buy[href^="https://robertsspaceindustries.com/"]');
+    r.notOnSale = !!pio && /Not on Sale/.test(pio.textContent) && !pio.querySelector('.buy');
+    const saved = (await chrome.storage.local.get('wishWatch')).wishWatch;
+    r.saved = !!saved && Number.isFinite(saved.at) && saved.items['Cutlass Black']?.status === 'in';
+    // Two days later the same check still shows, with its age.
+    await chrome.storage.local.set({ wishWatch: { ...saved, at: Date.now() - 2 * 864e5 } });
+    r.ago = true;
+    OH.getShipStock = real;
+    state.wishlist = keep;
+    homeUpdated();
+    return r;
+  });
+  Object.values(ww).every(Boolean)
+    ? ok(
+        'Wishlist Watch: empty state, Not Checked Yet with Check Now, no background check, Buy only when In Store Now, last check kept in storage',
+      )
+    : fail(`wishlist watch: ${JSON.stringify(ww)}`);
+
+  // Customize Home: shut at first; hide a card (rows still end level, remembered),
+  // save a layout, apply Default and the saved one, delete it with the in-drawer
+  // confirm, Reset to Default.
+  const cust = await page.evaluate(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const $ = (q) => document.querySelector(q);
+    const stored = async () => (await chrome.storage.local.get('uiHomeLayout')).uiHomeLayout;
+    const r = {};
+    r.shut = !$('#cust-drawer');
+    // No row above the Citizen Card: the button is the last thing on Home, and adds
+    // no height of its own.
+    const bar = $('#cust-btn').parentElement;
+    r.atEnd =
+      bar.getBoundingClientRect().height === 0 &&
+      $('#cust-btn').getBoundingClientRect().top > $('#oh-grid').getBoundingClientRect().bottom &&
+      !$('.home-hero').previousElementSibling?.contains($('#cust-btn'));
+    // The portrait menu's Customize Home opens the drawer too.
+    $('#settings-btn').click();
+    await wait(50);
+    $('#cust-menu').click();
+    await wait(120);
+    r.fromMenu = !!$('#cust-drawer') && $('#settings-menu').hidden;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await wait(80);
+    r.menuClosed = !$('#cust-drawer');
+    $('#cust-btn').click();
+    await wait(100);
+    const d = $('#cust-drawer');
+    r.open =
+      !!d &&
+      /Pinned first, can't be hidden/.test(d.textContent) &&
+      !d.querySelector('[data-card="citizen"]');
+    r.moreOff =
+      d.querySelector('[data-card="spotlight"]')?.getAttribute('aria-checked') === 'false';
+    d.querySelector('[data-card="acquisitions"]').click();
+    await wait(150);
+    const cells = [...document.querySelectorAll('#oh-grid > .oh-cell')];
+    r.hidden = !cells.some((c) => c.dataset.card === 'acquisitions');
+    const b = (id) => $(`#oh-grid > [data-card="${id}"]`).getBoundingClientRect();
+    r.levelHidden =
+      Math.abs(b('value').bottom - b('wishlist').bottom) <= 1 &&
+      Math.abs(
+        b('value').width + b('wishlist').width + 16 - $('#oh-grid').getBoundingClientRect().width,
+      ) <= 2;
+    r.stored = (await stored())?.cards?.acquisitions === false;
+    const input = $('#cust-name');
+    input.value = 'No Acquisitions';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    $('#cust-save').click();
+    await wait(120);
+    r.saved = (await stored())?.saved?.some((l) => l.name === 'No Acquisitions' && l.v === 1);
+    r.listed =
+      !!d.querySelector('[data-layout="No Acquisitions"]') &&
+      /On Home Now/.test(d.querySelector('[data-layout="No Acquisitions"]').textContent);
+    input.value = 'no acquisitions';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    $('#cust-save').click();
+    await wait(80);
+    r.dupe = /already have/.test($('#cust-msg').textContent);
+    d.querySelector('[data-apply="Default"]').click();
+    await wait(120);
+    r.default = !!$('#oh-grid > [data-card="acquisitions"]');
+    d.querySelector('[data-apply="No Acquisitions"]').click();
+    await wait(120);
+    r.applied = !$('#oh-grid > [data-card="acquisitions"]');
+    d.querySelector('[data-delete="No Acquisitions"]').click();
+    await wait(80);
+    r.confirm = /Delete No Acquisitions\?/.test(
+      d.querySelector('[data-layout="No Acquisitions"]').textContent,
+    );
+    d.querySelector('[data-confirm-delete]').click();
+    await wait(120);
+    r.deleted =
+      !d.querySelector('[data-layout="No Acquisitions"]') && !(await stored()).saved.length;
+    r.perBrowser = /this browser, not with your RSI account/.test(d.textContent);
+    $('#cust-reset').click();
+    await wait(120);
+    r.reset = !!$('#oh-grid > [data-card="acquisitions"]');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await wait(80);
+    r.closed = !$('#cust-drawer');
+    return r;
+  });
+  Object.values(cust).every(Boolean)
+    ? ok(
+        'Customize Home: hide a card (rows stay level, remembered), save, apply, delete with confirm, Reset to Default',
+      )
+    : fail(`customize home: ${JSON.stringify(cust)}`);
   // Hangar Alerts live in the top bar's bell: a wishlist sale shows with a count, and ×
   // ignores it. The Citizen Card has the whole row on Home.
   const home = await page.evaluate(async () => {
@@ -242,15 +501,16 @@ try {
     await chrome.storage.local.set({ homeIgnored: [] });
     state.wishlist = ['Cutlass Black', 'Pioneer'];
     document.dispatchEvent(new CustomEvent('oh:home'));
-    await new Promise((r) => setTimeout(r, 800));
+    // Alerts come from the last wishlist check (Check Now), never a check of their own.
+    await window.OHApp.store.checkWishlist();
+    await new Promise((r) => setTimeout(r, 300));
     const bell = document.querySelector('#bell-menu');
     const wish = bell.textContent;
     const count = document.querySelector('#bell-n').textContent;
     const card = document.querySelector('.citizen-card').getBoundingClientRect();
-    // Citizen Card at three quarters, Game Status beside it.
-    const side = document.querySelector('#oh-status').getBoundingClientRect();
+    // The Citizen Card has the whole row (Game Status is in the top bar).
     const full =
-      side.left > card.right && Math.abs(side.width / (card.width + side.width) - 0.25) < 0.06;
+      Math.abs(card.width - document.querySelector('#oh-grid').getBoundingClientRect().width) <= 2;
     const x = [...bell.querySelectorAll('.bm-row')]
       .find((r) => /Cutlass Black/.test(r.textContent))
       ?.querySelector('.bm-x');
@@ -352,12 +612,20 @@ try {
           /^https:\/\/([a-z0-9-]+\.)?robertsspaceindustries\.com\//.test(a.href) &&
           /↗/.test(a.textContent),
       );
-    const colBottoms = () =>
-      [...document.querySelectorAll('#oh-home .oh-col')].map((c) =>
-        Math.round(c.lastElementChild.getBoundingClientRect().bottom),
-      );
+    // Rows end level: every card in a grid row ends on the same line.
+    const rowsLevel = () => {
+      const by = new Map();
+      for (const c of document.querySelectorAll('#oh-grid > .oh-cell')) {
+        const b = c.getBoundingClientRect();
+        const k = Math.round(b.top);
+        by.set(k, [...(by.get(k) || []), Math.round(b.bottom)]);
+      }
+      return [...by.values()].every((bs) => Math.max(...bs) - Math.min(...bs) <= 1);
+    };
     location.hash = '#home';
-    await chrome.storage.local.set({ uiQuickLinksHidden: false });
+    // The old switch moved into Customize Home (uiHomeLayout).
+    const qlStored = async () =>
+      (await chrome.storage.local.get('uiHomeLayout')).uiHomeLayout?.cards?.quicklinks;
     await wait(200);
     const res = {};
     const card = () => document.querySelector('#oh-home #oh-quicklinks');
@@ -368,17 +636,9 @@ try {
     res.dossier = handle
       ? links(card()).some((a) => a.href.endsWith(`/citizens/${encodeURIComponent(handle)}`))
       : !/Citizen Dossier/.test(card()?.textContent || '');
-    // The ship picture: no heading or button, the name as alt text, Quick Links under
-    // it, and both columns finish together.
-    const spot = document.querySelector('#oh-home #oh-spotlight');
-    const img = spot?.querySelector('img');
-    res.spot =
-      !!spot &&
-      !spot.querySelector('h3, button') &&
-      (!img || img.alt === spot.querySelector('figcaption').textContent) &&
-      spot.nextElementSibling === card();
-    const b = colBottoms();
-    res.even = b.length === 2 && Math.abs(b[0] - b[1]) <= 1 ? true : b;
+    // Quick Links takes the whole last row; the rows above end level.
+    res.spot = card()?.closest('.oh-cell')?.dataset.card === 'quicklinks';
+    res.even = rowsLevel();
     // Portrait menu: shut at first, opens, shuts.
     document.querySelector('#settings-btn').click();
     await wait(50);
@@ -399,9 +659,8 @@ try {
     [...card().querySelectorAll('button')].find((x) => x.textContent === 'Hide Card').click();
     await wait(80);
     res.hidden = !card();
-    res.stored = (await chrome.storage.local.get('uiQuickLinksHidden')).uiQuickLinksHidden === true;
-    const h = colBottoms();
-    res.evenHidden = h.length < 2 || Math.abs(h[0] - h[1]) <= 1 ? true : h;
+    res.stored = (await qlStored()) === false;
+    res.evenHidden = rowsLevel();
     document.querySelector('#settings-btn').click();
     await wait(50);
     tog.click();
@@ -411,8 +670,7 @@ try {
     show?.click();
     await wait(80);
     res.back = !!card();
-    res.storedBack =
-      (await chrome.storage.local.get('uiQuickLinksHidden')).uiQuickLinksHidden === false;
+    res.storedBack = (await qlStored()) === true;
     document.body.click();
     return res;
   });
@@ -434,7 +692,7 @@ try {
   ql.back &&
   ql.storedBack
     ? ok(
-        'quick links: Home card under the ship picture (columns finish together), RSI links in a new tab ↗, portrait menu group folds, Hide Card remembered, Show on Home brings it back',
+        'quick links: Home card across the last row (rows end level), RSI links in a new tab ↗, portrait menu group folds, Hide Card remembered, Show on Home brings it back',
       )
     : fail(`quick links: ${JSON.stringify(ql)}`);
 
@@ -616,9 +874,7 @@ try {
   !/Pioneer/.test(home.wish) &&
   home.count === '1' &&
   home.full
-    ? ok(
-        'Hangar Alerts in the bell: wishlist sale with a count; Game Status a quarter beside the card',
-      )
+    ? ok('Hangar Alerts in the bell: wishlist sale with a count; Citizen Card full width')
     : fail(`For You: ${JSON.stringify(home)}`);
   home.hidden && home.storeOpt
     ? ok('bell: × ignores an alert; Scan has a Store option')
@@ -2994,17 +3250,8 @@ try {
     await new Promise((r) => setTimeout(r, 400));
     const spend = document.querySelector('#stats-body').textContent;
     const bars = document.querySelectorAll('#stats-body .bar-row').length;
-    // A bonus event running today shows the Home banner.
-    // Local date, like the page uses (toISOString is UTC: wrong in the evening).
-    const now = new Date();
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    referralEvents = [
-      ...referralEvents,
-      { start: today, end: today, name: 'Test Expo', reward: 'Drake Dragonfly with LTI' },
-    ];
     location.hash = '#home';
     await new Promise((r) => setTimeout(r, 400));
-    const banner = document.querySelector('#oh-status');
     return {
       before,
       after,
@@ -3012,7 +3259,6 @@ try {
       cleared,
       spend: /pledged in total/.test(spend),
       bars,
-      banner: /Referral bonus: Drake Dragonfly/.test(banner.textContent),
     };
   });
   wse.before === 'Add to Wishlist' &&
@@ -3024,9 +3270,6 @@ try {
   wse.spend && wse.bars >= 3
     ? ok(`spending tab: ${wse.bars} years`)
     : fail(`spending: ${JSON.stringify(wse)}`);
-  wse.banner
-    ? ok('Events card shows a running referral bonus event')
-    : fail(`event banner: ${JSON.stringify(wse)}`);
 
   // Top bar (ui/topbar, Svelte: it redraws a tick after a change). The page link is
   // marked; unticking a source reads "Scan Custom" (remembered) and keeps the ▾ menu

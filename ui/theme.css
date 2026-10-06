@@ -125,25 +125,14 @@ body:not(:has(#view-home.active)) .wrap > header {
   max-width: 100%;
 }
 
-/* Home: the Citizen Card (3/4) with Game Status beside it (1/4); stacked on narrow
-   windows. Hangar Alerts live in the top bar's bell. */
+/* Home: the Citizen Card across the whole width (Game Status is the top bar's pill).
+   Hangar Alerts live in the top bar's bell. */
 .home-hero {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   margin-bottom: 16px;
   align-items: stretch;
-}
-.home-hero:has(#cc-loggedout:not([hidden])) {
-  grid-template-columns: minmax(0, 1fr);
-}
-.home-hero:has(#cc-loggedout:not([hidden])) > #oh-status {
-  display: none;
-}
-@media (max-width: 1100px) {
-  .home-hero {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 /* Citizen Card: the "Pilot ID" design (owner, 2026-09-30). The portrait runs down
    the whole left side (RSI's 1024px original); name, org, the UEE line, badges and
@@ -155,7 +144,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   background: var(--panel);
   overflow: hidden;
 }
-/* The card can be stretched taller by Game Status beside it: the portrait follows. */
+/* The portrait runs the card's full height. */
 .home-hero .citizen-card {
   display: flex;
   flex-direction: column;

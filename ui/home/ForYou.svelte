@@ -15,7 +15,6 @@
 
   let ignored = $state(new Set());
   let ready = $state({}); // ship name → when we first saw it flight ready
-  let onSale = $state([]); // [{ name, price }]
   let enlisted = $state(null);
   store.get(['homeIgnored', 'homeReady']).then((r) => {
     ignored = new Set(r.homeIgnored || []);
@@ -60,16 +59,15 @@
     });
   });
 
-  // Wishlist ships in the store right now (reuses the Store page's cached check).
-  $effect(() => {
+  // Wishlist ships on sale at the last wishlist check (Check Now on Home's Wishlist
+  // Watch, or Scan → Store). Nothing asks RSI's store by itself.
+  const onSale = $derived.by(() => {
     version.n;
-    if (!a.state.wishlist.length) {
-      onSale = [];
-      return;
-    }
-    a.wishlistStock().then((list) => {
-      onSale = list.filter((x) => x.st && x.st.state === 'in').map((x) => ({ name: x.name, price: x.st.price }));
-    });
+    if (!a.state.wishlist.length) return [];
+    return a.store
+      .wishWatchRows()
+      .filter((x) => x.status === 'in')
+      .map((x) => ({ name: x.name, price: x.price }));
   });
 
   const alerts = $derived.by(() => {

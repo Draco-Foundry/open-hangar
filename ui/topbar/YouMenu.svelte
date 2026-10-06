@@ -3,12 +3,13 @@
   // org at the top, "Update ready: Reload" when a new version is waiting (a dot on the
   // portrait too), then Currency, Streamer Mode (a badge on the portrait while it's
   // on, #174), Rescan Reminder, RSI Quick Links (#374, folds open), the pages that
-  // left the nav, Log Out of RSI and Clear Data. What each one does stays in dashboard.js (window.OHApp.top).
+  // left the nav (and Customize Home), Log Out of RSI and Clear Data. What each one does stays in dashboard.js (window.OHApp.top).
   import { app, version } from '../lib/app.svelte.js';
   import { menus, register, toggleMenu, menuClick } from './menus.svelte.js';
   import { quickLinks, QL_ICONS } from '../lib/quick-links.js';
   import { qlPref, setQuickLinksHidden } from '../lib/quick-links-pref.svelte.js';
   import QuickLinkRow from '../lib/QuickLinkRow.svelte';
+  import { openCustomize } from '../lib/customize.svelte.js';
 
   const CURRENCIES = [
     ['USD', 'USD $'],
@@ -205,6 +206,15 @@
         {#each g.links as l (l.t)}<QuickLinkRow link={l} />{/each}
       {/each}
     </div>
+    <a
+      class="menu-item menu-link"
+      href="#home"
+      id="cust-menu"
+      onclick={(e) => {
+        e.preventDefault();
+        openCustomize();
+      }}>Customize Home</a
+    >
     <a class="menu-item menu-link" href="#guide" data-view="guide">How to Use</a>
     <a class="menu-item menu-link" href="#updates" data-view="updates">Updates</a>
     <a class="menu-item menu-link" href="#issues" data-view="issues">Known Issues</a>
