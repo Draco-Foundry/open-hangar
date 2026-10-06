@@ -9,11 +9,15 @@
 // "In review" = the newest version our Publish runs actually sent to that
 // store, when it's newer than the live one. Anything that can't be read
 // is left blank, never guessed; the page then just shows the buttons.
+// "Arriving" = a store we hold back on purpose, from site/store-plan.json beside
+// the page (docs/STORE.md "Holding a Store Back"): shown until that store has the
+// version, it goes to review, or the planned UTC day is over.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import {
   edgeDetailsVersion,
+  readStorePlan,
   stampStoreVersions,
   storeLine,
   submittedVersions,
@@ -95,8 +99,18 @@ try {
   console.log(`::notice::Publish runs not read, so no "in review" lines: ${e.message}`);
 }
 
+// Stores held back on purpose (hand-edited; missing or broken = no plan).
+let plan = {};
+try {
+  const planFile = path.join(path.dirname(file), 'store-plan.json');
+  if (fs.existsSync(planFile)) plan = readStorePlan(JSON.parse(fs.readFileSync(planFile, 'utf8')));
+} catch (e) {
+  console.log(`::warning::site/store-plan.json not read, so no "arriving" lines: ${e.message}`);
+}
+
+const today = new Date().toISOString().slice(0, 10); // UTC day
 const lines = Object.fromEntries(
-  ['chrome', 'edge', 'firefox'].map((s) => [s, storeLine(live[s], submitted[s])]),
+  ['chrome', 'edge', 'firefox'].map((s) => [s, storeLine(live[s], submitted[s], plan[s], today)]),
 );
 fs.writeFileSync(file, stampStoreVersions(fs.readFileSync(file, 'utf8'), lines));
 // The same, plus the latest version and its date, as versions.json next to the page.
@@ -119,4 +133,8 @@ fs.writeFileSync(
   ) + '\n',
 );
 for (const [s, l] of Object.entries(lines))
-  console.log(`${s}: live ${l.live || '?'}${l.pending ? `, ${l.pending} in review` : ''}`);
+  console.log(
+    `${s}: live ${l.live || '?'}${l.pending ? `, ${l.pending} in review` : ''}${
+      l.arriving ? `, ${l.arriving.version} arriving ${l.arriving.on}` : ''
+    }`,
+  );

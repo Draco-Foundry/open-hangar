@@ -233,9 +233,13 @@ test('submittedVersions: only real uploads count', async () => {
 
 test('storeLine and stampStoreVersions fill the install buttons', async () => {
   const { storeLine, stampStoreVersions } = await lib();
-  assert.deepEqual(storeLine('0.2.7', '0.2.8'), { live: '0.2.7', pending: '0.2.8' });
-  assert.deepEqual(storeLine('0.2.8', '0.2.8'), { live: '0.2.8', pending: null });
-  assert.deepEqual(storeLine(null, '0.2.8'), { live: null, pending: null });
+  assert.deepEqual(storeLine('0.2.7', '0.2.8'), {
+    live: '0.2.7',
+    pending: '0.2.8',
+    arriving: null,
+  });
+  assert.deepEqual(storeLine('0.2.8', '0.2.8'), { live: '0.2.8', pending: null, arriving: null });
+  assert.deepEqual(storeLine(null, '0.2.8'), { live: null, pending: null, arriving: null });
   const page = fs.readFileSync(path.join(__dirname, '..', 'site', 'index.html'), 'utf8');
   for (const s of ['chrome', 'edge', 'firefox']) {
     assert.match(page, new RegExp(`<span class="b-ver" data-ver="${s}"></span\\s*>`), s);
@@ -253,6 +257,54 @@ test('storeLine and stampStoreVersions fill the install buttons', async () => {
   assert.ok(out.includes('<span class="b-ver" data-ver="firefox"></span'));
   // Stamping twice (a daily redeploy) gives the same page.
   assert.equal(stampStoreVersions(out, { chrome: { live: '0.2.7', pending: '0.2.8' } }), out);
+  // A store held back on purpose: the same pill, saying when.
+  const held = stampStoreVersions(out, {
+    firefox: { live: '0.2.19', pending: null, arriving: { version: '0.2.20', on: '2026-10-07' } },
+  });
+  assert.ok(held.includes('<span class="b-pend" data-pend="firefox">v0.2.20 arriving Oct 7</span'));
+  assert.ok(
+    stampStoreVersions(held, {
+      firefox: { live: '0.2.20', pending: null, arriving: null },
+    }).includes('<span class="b-pend" data-pend="firefox"></span'),
+  );
+});
+
+test('store plan: "arriving" until live, in review, or the UTC day is over', async () => {
+  const { readStorePlan, storeLine } = await lib();
+  const plan = readStorePlan({
+    firefox: { version: '0.2.20', on: '2026-10-07' },
+    edge: { version: 'v0.2.20', on: '2026-10-07' }, // not a plain version
+    chrome: { version: '0.2.20', on: 'Oct 7' }, // not an ISO day
+    safari: { version: '0.2.20', on: '2026-10-07' }, // not a store we stamp
+  });
+  assert.deepEqual(plan, { firefox: { version: '0.2.20', on: '2026-10-07' } });
+  assert.deepEqual(readStorePlan(null), {});
+  assert.deepEqual(readStorePlan([]), {});
+  const p = plan.firefox;
+  const arriving = { version: '0.2.20', on: '2026-10-07' };
+  // Before and on the day: shown.
+  assert.deepEqual(storeLine('0.2.19', '0.2.19', p, '2026-10-06').arriving, arriving);
+  assert.deepEqual(storeLine('0.2.19', null, p, '2026-10-07').arriving, arriving);
+  // The day is over: gone, even if it never shipped.
+  assert.equal(storeLine('0.2.19', null, p, '2026-10-08').arriving, null);
+  // The store has it (or something newer): gone.
+  assert.equal(storeLine('0.2.20', null, p, '2026-10-07').arriving, null);
+  assert.equal(storeLine('0.2.21', null, p, '2026-10-07').arriving, null);
+  // Sent to review: "in review" wins.
+  assert.deepEqual(storeLine('0.2.19', '0.2.20', p, '2026-10-07'), {
+    live: '0.2.19',
+    pending: '0.2.20',
+    arriving: null,
+  });
+  // Live version unknown: nothing is guessed.
+  assert.equal(storeLine(null, null, p, '2026-10-07').arriving, null);
+  // No plan: nothing.
+  assert.equal(storeLine('0.2.19', null, undefined, '2026-10-07').arriving, null);
+  // The shipped file is valid JSON and reads cleanly.
+  const shipped = JSON.parse(
+    fs.readFileSync(path.join(__dirname, '..', 'site', 'store-plan.json'), 'utf8'),
+  );
+  assert.equal(typeof readStorePlan(shipped), 'object');
 });
 
 test('versionsJson: one shape, blanks as null', async () => {
@@ -264,6 +316,7 @@ test('versionsJson: one shape, blanks as null', async () => {
       lines: {
         chrome: { live: '0.3.0', pending: null },
         firefox: { live: '0.2.16', pending: '0.3.0' },
+        edge: { live: '0.2.16', pending: null, arriving: { version: '0.3.0', on: '2026-11-11' } },
       },
       checkedAt: 'T',
     }),
@@ -271,9 +324,13 @@ test('versionsJson: one shape, blanks as null', async () => {
       version: '0.3.0',
       updated: '2026-11-10',
       stores: {
-        chrome: { live: '0.3.0', pending: null },
-        edge: { live: null, pending: null },
-        firefox: { live: '0.2.16', pending: '0.3.0' },
+        chrome: { live: '0.3.0', pending: null, arriving: null },
+        edge: {
+          live: '0.2.16',
+          pending: null,
+          arriving: { version: '0.3.0', on: '2026-11-11' },
+        },
+        firefox: { live: '0.2.16', pending: '0.3.0', arriving: null },
       },
       checkedAt: 'T',
     },
