@@ -53,6 +53,8 @@ test('parseSubStore: names, dollars, pictures, stock, chips (invented fixture)',
     warbond: false,
     pack: false,
     available: true,
+    type: 'skus',
+    label: '',
     kind: 'Paints',
     tiers: ['Imperator'], // from its own tag
     tags: ['Paints', 'Imperator'],
@@ -252,4 +254,29 @@ test('getSubStore: refused or busy → stops, keeps the last good list', async (
   assert.equal(store.subStore.items.length, 150);
   // A 429 also marks RSI down for a while (OH.guarded): the next try waits.
   assert.ok(store.netDown && store.netDown['robertsspaceindustries.com']);
+});
+
+test('a saved list is sorted with the current rules when loaded', async () => {
+  const saved = {
+    at: Date.now(),
+    nickname: 'Pilot',
+    items: [
+      {
+        id: '1',
+        name: 'Example Star Kit',
+        tags: [],
+        type: 'skus',
+        label: '',
+        sub: '',
+        kind: 'Other',
+      },
+    ],
+  };
+  globalThis.chrome.storage.local.get = async () => ({ subStore: saved });
+  const c = await OH.getSubStoreCached({ nickname: 'Pilot' });
+  assert.equal(
+    c.items[0].kind,
+    OH.subStoreKind({ tags: [], type: 'skus', name: 'Example Star Kit', label: '', sub: '' }),
+  );
+  assert.equal(saved.items[0].kind, 'Other', 'the stored copy is left alone');
 });
