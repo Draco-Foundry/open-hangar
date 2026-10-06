@@ -13,6 +13,9 @@
 >
 > This table is the single source of truth for store status. Other docs link here
 > instead of repeating it.
+>
+> The unlisted **Open Hangar Beta** items (0.3.0 beta, separate from these listings):
+> [BETA.md](BETA.md).
 
 Everything needed to submit **Open Hangar** to the Chrome Web Store, Edge Add-ons and
 Firefox Add-ons. Work top to bottom. Items marked ✅ are ready in the repo; ⬜ need you to do them.
