@@ -1,98 +1,91 @@
-# Roadmap — toward an all-in-one RSI hangar extractor
+# Roadmap
 
-**Vision:** a source-available, local-first browser extension that scrapes _all_ of a
-user's own RSI / Star Citizen account data, organizes it into one clean, portable
-database, and (eventually) lets the user share that database with other tools/sites.
+Where Open Hangar is headed. Dates are UTC. For what already shipped, see
+[CHANGELOG.md](CHANGELOG.md); for open work, see the
+[issues](https://github.com/Draco-Foundry/open-hangar/issues) and their milestones.
 
-## Two scraping pipelines
+_Last updated: 2026-10-06_
 
-RSI runs two frontends, so the extension needs two strategies behind one interface:
+## Where We Are
 
-1. **HTML pipeline** — legacy server-rendered pages. `fetch(url, {credentials})` →
-   parse the HTML (this is what `parser.js` does for the hangar). Simple, robust.
-2. **GraphQL pipeline** — newer `rsi-heap` React/Apollo pages. Data comes from
-   `POST https://robertsspaceindustries.com/graphql`. Requires capturing the
-   operation (query + variables) once, then replaying it from the extension with
-   the session cookie (and possibly a CSRF token header). RSI is migrating pages
-   to this frontend over time, so this pipeline is strategically important.
+**0.2.19 is live** on Chrome, Edge and Firefox. It reads your own RSI account in your
+browser and turns it into something you can use:
 
-## Source registry (the enabling refactor) — ✅ DONE
+- Your hangar: ships, CCUs, add-ons, coupons, values, melt value and LTI
+- Buy-backs, with Reclaim links that land on the right item on RSI
+- Stats, store prices and what your CCUs are worth
+- Referrals and recruits
+- Org Fleet from imported member lists
+- Fleet pictures you can share
+- JSON and CSV export, and JSON import
 
-Scanning is generalized: every data source is an entry in `OH.SOURCES` (lib.js),
-and the database holds them all under one versioned key:
+Everything stays in your browser. Nothing is sent anywhere unless you choose to.
 
-```js
-OH.SOURCES = [
-  { id: 'hangar', label: 'Hangar', type: 'html', url: '…/account/pledges', parse: parsePledges },
-  // { id: 'buybacks', type: 'graphql', … }   ← add an entry + a parser
-];
-// OH.scanSource(id) / OH.scanAll() persist to:
-// storage.db = { schemaVersion, sources: { hangar: {items, scannedAt}, … } }
-// OH.loadDB() / OH.loadSource(id) read it (migrates the legacy {hangar} shape).
-```
+## 0.3.0: Launch, November 10, 2026
 
-Adding a source = one registry entry + a parser. `scanHtmlSource` handles the
-paginated-HTML pipeline today; a `graphql`/`api` pipeline gets added the same way.
-A full-DB **JSON export/import** that emits the whole `sources` object is done
-(`OH.exportDB`/`OH.importDB`); still TODO on top of this: a dashboard **source switcher**.
+A full rebuild with one clean look, plus the website at
+[app.openhangar.space](https://app.openhangar.space).
 
-## Data surface
+**What's in it**
 
-| Source                                                     | Page / endpoint                        | Served as    | Status         | Notes                                                                                    |
-| ---------------------------------------------------------- | -------------------------------------- | ------------ | -------------- | ---------------------------------------------------------------------------------------- |
-| **Hangar / pledges**                                       | `/account/pledges`                     | HTML         | ✅ Done        | ships, CCUs, add-ons, coupons; thumbnails                                                |
-| **Buy-backs**                                              | `/account/buy-back-pledges`            | HTML         | ✅ Done        | server-rendered `<article>` cards — same HTML pipeline as the hangar (no GraphQL needed) |
-| **Referrals**                                              | `/graphql` (`GetReferralRecruitsList`) | GraphQL      | ✅ Done        | code + recruits/prospects (current & legacy); Citizen Card pill + Stats charts           |
-| **Store credit / funds**                                   | account header / GraphQL               | TBD          | 🔜             | small but useful (spendable balance)                                                     |
-| **Org membership**                                         | `/account/organization` (or community) | TBD          | ❓             | optional                                                                                 |
-| **Profile** (handle, moniker, citizen record, enlist date) | profile page                           | HTML/GraphQL | ❓             | low-sensitivity public-ish data                                                          |
-| **Wallet / transactions / billing**                        | `/account/...`                         | TBD          | ⚠️ Opt-in only | **PII / financial** — see privacy note                                                   |
+- **A rebuilt app.** Every page redone for speed and a cleaner layout, with search across
+  your whole hangar.
+- **Optional sync.** Connect a free account and your hangar shows up on the website, on
+  any device. It stays optional: without it, nothing leaves your browser.
+- **Buy-back and melt help.** What you'd lose before you melt something, the ones RSI
+  never sells back, and what a buy-back really costs.
+- **Your data, safer.** The pledge archive keeps pledges that left your hangar, backups
+  carry it, and a storage check catches anything growing out of control.
+- **Clearer problem reports**, and a friendly message when you scan while signed out of
+  RSI.
+- **RSI Quick Links:** one place to jump to your hangar, settings, game packages and
+  more on RSI.
 
-## Privacy & scope (important for a shareable tool)
+**Timeline**
 
-Because the end goal is feeding this data to _other sites_, be deliberate about
-what's collected:
+| Date (UTC)   | Milestone                                          |
+| ------------ | -------------------------------------------------- |
+| Oct 16       | Feature complete: fixes and polish only after this |
+| Oct 20 to 27 | Beta with testers from our Discord                 |
+| Oct 27       | Code freeze and go/no-go                           |
+| Oct 28       | Submitted to the Chrome, Edge and Firefox stores   |
+| Nov 10       | Launch                                             |
 
-- **Default scope = fleet data** (ships, CCUs, add-ons, buybacks, store credit).
-- **Financial/PII data** (transaction history, billing, email) stays **opt-in and
-  off by default**, and ideally is excluded from anything shared externally.
-- Keep everything local-first and auditable; no silent collection.
+Want to help test? Join the [Draco Foundry Discord](https://discord.gg/FF8Wm5HdnV) and
+ask for the Beta Tester role.
 
-## Suggested order
+## After Launch
 
-1. ~~**Source-registry refactor**~~ — ✅ done (`OH.SOURCES` + versioned DB in lib.js).
-2. **Store Data** — RSI store catalog & prices (likely a cached `api`-type source).
-   Includes a **current warbonds** view broken into Standalone / Package / CCU.
-   - ~~**Hangar value**~~ — ✅ done. `OH.getPriceIndex()` prices ships from the
-     cached star-citizen.wiki vehicle list (`msrp`; the RSI ship-matrix has no
-     prices), `OH.hangarValue()` totals them; surfaced in Stats, the item modal,
-     Home, a Store-price sort and the "Below store price" filter.
-   - ~~**Price list**~~ — ✅ done (Store page). CCU chain planning is out of
-     scope on purpose: ccugame.app does it (and its own extension reads the
-     hangar). We only show what owned CCUs are worth.
-   - **Item-type enrichment:** classify add-ons precisely (paint vs decoration vs
-     armor vs gear, etc.) by matching item names against star-citizen.wiki /
-     starcitizen.tools, cached locally. Today's classifier can't tell a reward
-     _paint_ (e.g. "Luminalia 2953 Day 7") from a generic add-on because RSI
-     doesn't tag it — only an external reference can. Refs:
-     starcitizen.tools/Luminalia, starcitizen.tools/Freelancer_series/Paints.
-3. ~~**Buy-backs**~~ — ✅ done. Turned out to be **server-rendered HTML** (`<article>`
-   cards at `/account/buy-back-pledges?page=N&pagesize=100`), not the GraphQL frontend
-   earlier notes assumed — so it reuses the existing HTML pipeline (`parseBuybacks`).
-4. **Consumption layer** — JSON export/import is ✅ done (`OH.exportDB`/`OH.importDB`,
-   Developers page). Still to decide: how an approved site reads the DB directly
-   (an opt-in, domain-whitelisted `externally_connectable` messaging API). Note
-   this API isn't supported the same way across browsers — factor it into the
-   browser-support work below.
-5. **Browser support** — Chrome/Edge/Brave and **Firefox** builds are ✅ done
-   (`npm run pack`; see `docs/STORE.md`). Store listings pending review.
-   - ~~**Firefox:** MV3 event-page manifest variant~~ — generated by
-     `scripts/pack.mjs`; `web-ext lint` passes with 0 errors.
-   - **Safari:** repackage as a Safari Web Extension via Xcode
-     (`safari-web-extension-converter`). This is a port, not a drop-in load, and
-     Safari doesn't support `externally_connectable` — so the consumption layer
-     above needs a Safari-friendly path (or export/import only on Safari).
-6. **Dashboard source switcher** + full-DB export.
-7. Optional sources (org, profile) and opt-in PII sources as needed.
+Ideas we plan to pick up after 0.3.0, roughly in this order. None of these have dates
+yet.
 
-The first logo and the public website (`site/`, on Cloudflare) are done; store-listing screenshots + promo tile come with the store submission.
+- **Melt and buy-back advisor:** what's worth melting, what's cheap to get back
+- **Ship Sheet:** a shareable fleet card for Discord
+- **Paint and collectible tracker**
+- **Hangar journal:** your fleet's story over time
+- **More account data:** upgrade history, credit log, badges
+- **A stable ship catalog:** one record per vehicle, with names RSI uses and art
+- **German translation**, then more languages
+- **Safari** (Mac first)
+
+Website ideas (store tools, alerts, org features) are tracked separately.
+
+## Not Planned
+
+- **CCU chain planning.** [CCU Game](https://ccugame.app) does this well and has a great
+  community. Open Hangar shows what your CCUs are worth and leaves the planning to them.
+- **Rankings of pilots or orgs.** Stats stay anonymous and hangars stay private.
+- **Anything that reads another player's account.** Open Hangar only ever reads your own.
+
+## How It Works (for contributors)
+
+Open Hangar reads RSI two ways: server-rendered pages (hangar, buy-backs), parsed in the
+browser, and RSI's own GraphQL endpoints (referrals, store data). Every data source is
+an entry in `OH.SOURCES` in `src/lib.js`, saved under one versioned key. Adding a
+source means one registry entry plus a parser. See [ARCHITECTURE.md](ARCHITECTURE.md)
+for the full picture, and [docs/PRIVACY.md](docs/PRIVACY.md) for what is and isn't
+read.
+
+**Privacy rules for new sources:** fleet data by default. Anything financial or personal
+(billing, transactions, addresses) stays out, or opt-in and off by default, and is never
+part of anything shared.
