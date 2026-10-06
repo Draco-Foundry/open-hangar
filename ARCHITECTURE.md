@@ -128,7 +128,7 @@ browser's default quota). The main keys:
 | `lastBackupAt`            | When you last downloaded a backup file                                                           | `downloadBackup()` in `src/dashboard.js`  |
 
 Other keys are caches of public data (for example `shipMatrix`, `shipCatalog`,
-`shipImages`, `scVersion`, `rsiNews`, `patchNotes`, `storeShips`, `fxRates`) and UI
+`shipImages`, `scVersion`, `patchNotes`, `storeShips`, `fxRates`) and UI
 preferences read at start-up in `src/dashboard.js` (for example `uiLayout`, `currency`,
 `wishlist`, `streamerMode`).
 
@@ -287,7 +287,7 @@ In short:
 
 - **robertsspaceindustries.com**: your own account pages, with your session
   (`fetchPage()`, `OH.getAccount()`, `OH.getReferral()`), plus public pages such as
-  the ship matrix, Comm-Links and patch notes.
+  the ship matrix and patch notes.
 - **Public read-only data**: `api.star-citizen.wiki`, `starcitizen.tools` and
   `support.robertsspaceindustries.com`.
 - **openhangar.space**: `status.json` (the kill switch) and `rates.json` (exchange

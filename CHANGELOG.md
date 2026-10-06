@@ -4,6 +4,16 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- New: **RSI Quick Links.** One jump to the RSI pages pilots hunt for: your hangar,
+  buy-backs, billing, subscriptions, handle and profile, login and security, the launcher,
+  PTU copy, Spectrum and your Citizen Dossier. They sit in a card on Home and fold open
+  under Quick Links in your portrait menu. Hide Card puts the Home card away, and Show on
+  Home in the menu brings it back. Each link opens RSI in a new tab; nothing is sent.
+- Changed: **a calmer Home.** The RSI news card is gone (news lives on openhangar.space),
+  so Open Hangar no longer downloads RSI's Comm-Links or This Week in Star Citizen. Hangar
+  Spotlight is now just a picture of one of your ships, a new one each visit, with its name
+  on hover.
+
 - Changed: **the error report is now your Flight Log.** When a scan hits trouble, the
   problem card has Send Flight Log: it copies the log and opens #bug-reports on Discord,
   where you paste it. Report on GitHub opens an issue with the log filled in, and nothing
