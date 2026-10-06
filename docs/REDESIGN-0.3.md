@@ -10,6 +10,10 @@ small fixes; beta-tested before the stores.
   as-is. Only the screens are rebuilt.
 - The extension stays a scraper and viewer ("about me, from my RSI session, now"); see
   the website plan (private repo Draco-Foundry/open-hangar-server, docs/WEBSITE-PLAN.md) for what belongs on the website.
+- **Store page is a hangar companion (owner, 2026-10-05).** It keeps Your Wishlist (with
+  its on-sale check), Your CCUs and a small Find a Ship that opens a ship's window. The
+  full price list, store-wide sales and Compare live on the website's store; a line and
+  an Open the Full Store button at the top link there.
 - Colour meanings (Color Key): green good news, amber worth a look, red a problem, blue
   clickable, one colour per item type. Headings in Title Case.
 

@@ -274,9 +274,11 @@ moved every page to Svelte, one at a time.
   `src/ui/shared.js` and `shared.css` (`manualChunks` in `vite.config.mjs`), so
   `dashboard.html` links one fixed stylesheet however many pages share it.
 - **Store.** `ui/store/main.js` (built into `src/ui/store.js`) mounts the Store page
-  into `#oh-store`. `renderStore()` only loads ship prices and RSI's store feed and
-  calls `homeUpdated()`. The page reads and acts through `window.OHApp.store`
-  (wishlist order, store-page stock checks, sort, tab and drag order); removing a
+  into `#oh-store`: your side of the store (Wishlist, Your CCUs, Find a Ship) under a
+  link to the website's full store, which is where browsing every ship lives.
+  `renderStore()` only loads ship prices and RSI's store feed and calls
+  `homeUpdated()`. The page reads and acts through `window.OHApp.store`
+  (wishlist order, store-page stock checks, sort and drag order); removing a
   ship and its Undo bar still go through the classic `[data-wish-remove]` and
   `[data-wish-undo]` click handlers.
 
