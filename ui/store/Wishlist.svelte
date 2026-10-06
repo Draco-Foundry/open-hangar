@@ -1,10 +1,10 @@
 <script>
-  // Wishlist: one row per ship; its buy-backs (standalone copies, and CCUs that
+  // Wishlist: one row per ship or store item (packs, paints, gear, add-ons, CCUs
+  // from Find in Store). A ship's buy-backs (standalone copies, and CCUs that
   // upgrade to it) open underneath with dates, pledge IDs and Reclaim links.
-  // "In Store Now" asks each ship's own store page (through the classic
-  // checkStock(), which fires 'oh:home' as answers come in). Removing a ship and
-  // its Undo bar go through the classic [data-wish-remove] / [data-wish-undo]
-  // handlers.
+  // "In Store Now" is what openhangar.space's store catalog says (one download,
+  // matched here). Removing a row and its Undo bar go through the classic
+  // [data-wish-remove] / [data-wish-undo] handlers.
   import { tick } from 'svelte';
   import { flip } from 'svelte/animate';
   import { app, version } from '../lib/app.svelte.js';
@@ -24,9 +24,30 @@
     const st = a.state;
     const owned = new Map(s.ownedShips().map((x) => [s.shipKey(x.label), x.pledges.length]));
     const keys = new Set();
-    const rows = s.wishlistOrder().map((name) => {
-      const v = s.shipEntry(name);
-      const title = (v && v.name) || name;
+    const KIND = { pack: 'Pack', paint: 'Paint', gear: 'Gear', addon: 'Add-On', ccu: 'CCU' };
+    const rows = s.wishlistOrder().map((entry) => {
+      const ship = typeof entry === 'string';
+      const name = s.wishKey(entry);
+      const v = ship ? s.shipEntry(entry) : null;
+      const title = s.wishTitle(entry);
+      const stock = s.stock(entry);
+      if (!ship) {
+        const sale = stock ? s.wishStatus(entry) : null;
+        return {
+          key: name,
+          name,
+          title,
+          ship: false,
+          kind: KIND[entry.kind] || '',
+          kindCls: entry.kind,
+          price: sale && sale.price ? a.dollars(sale.price) : entry.price ? a.dollars(entry.price) : null,
+          stock,
+          status: '',
+          summary: '',
+          have: 0,
+          bbs: [],
+        };
+      }
       const bbs = st.buybacks
         .filter((b) => s.buybackHasShip(b, title))
         .sort(
@@ -36,8 +57,6 @@
       const ships = bbs.filter((b) => !b.ccu && b.kind === 'ship').length;
       const packs = bbs.filter((b) => !b.ccu && b.kind !== 'ship').length;
       const ccus = bbs.filter((b) => b.ccu).length;
-      const store = s.storeOf(title);
-      const link = (store && store.link) || null;
       // A name twice in the list (never by hand) still gets its own row.
       let key = name;
       while (keys.has(key)) key += '+';
@@ -46,9 +65,10 @@
         key,
         name,
         title,
+        ship: true,
+        kind: '',
         price: v && v.msrp ? a.dollars(v.msrp) : null,
-        link,
-        stock: link ? s.stock(link) : null,
+        stock,
         status: (v && (s.shipStates.find(([k]) => k === v.status) || [])[1]) || '',
         summary: [plural(ships, 'ship'), plural(packs, 'pack'), plural(ccus, 'CCU')]
           .filter(Boolean)
@@ -74,11 +94,6 @@
       feedLoaded: s.feedLoaded,
       undo: s.undo,
     };
-  });
-
-  // Ask the store pages of the ships on show (each once per renderStore()).
-  $effect(() => {
-    if (d) s.checkStock(d.rows.map((r) => r.link).filter(Boolean));
   });
 
   // Which rows have their buy-backs open (by row key).
@@ -161,8 +176,8 @@
     const keys = order;
     order = null;
     if (!moved || !d) return;
-    const nameOf = new Map(d.rows.map((r) => [r.key, r.name]));
-    s.setWishOrder(keys.map((k) => nameOf.get(k)));
+    const keyOf = new Map(d.rows.map((r) => [r.key, r.name]));
+    s.setWishOrder(keys.map((k) => keyOf.get(k)));
   }
 </script>
 
@@ -199,8 +214,8 @@
       <!-- Nothing to work out while another page is showing. -->
     {:else if !d.rows.length}
       <p class="muted sp-empty">
-        Your wishlist is emptier than a Hull C on launch day. Open any ship (Find a Ship below,
-        or the search at the top) and press <strong>Add to Wishlist</strong>.
+        Your wishlist is emptier than a Hull C on launch day. Find anything in Find in Store
+        below (or open a ship from the search at the top) and press <strong>Add to Wishlist</strong>.
       </p>
     {:else}
       {#if d.unchecked}
@@ -214,7 +229,7 @@
       <table class="org-table wishlist">
         <thead>
           <tr>
-            <th>Ship</th>
+            <th>Item</th>
             <th class="num">Store Price</th>
             <th>In Store Now</th>
             <th>Status</th>
@@ -233,26 +248,28 @@
               <td>
                 {#if d.mine}
                   <span class="wish-grip" title="Drag to reorder" aria-hidden="true">⠿</span>
-                {/if}<ShipLink name={r.title} />
+                {/if}{#if r.ship}<ShipLink name={r.title} />{:else}<span class="badge {r.kindCls}"
+                    >{r.kind}</span
+                  >
+                  {r.title}{/if}
               </td>
               <td class="num">{#if r.price}{r.price}{:else}<span class="muted">—</span>{/if}</td>
               <td>
-                {#if r.link}
-                  <a
-                    class="sale {r.stock ? r.stock.cls : ''}"
-                    href={r.link}
-                    target="_blank"
-                    rel="noopener"
-                    title={r.stock ? r.stock.title : undefined}
-                    >{r.stock ? r.stock.text : 'Checking…'}</a
+                {#if !r.stock}
+                  <span class="muted">Checking…</span>
+                {:else if r.stock.url}
+                  <a class="sale {r.stock.cls}" href={r.stock.url} target="_blank" rel="noopener" title={r.stock.title}
+                    >{r.stock.text}</a
                   >
-                {:else if d.feedLoaded}
-                  <span class="muted">—</span>
+                {:else}
+                  <span class="sale {r.stock.cls}" title={r.stock.title}>{r.stock.text}</span>
                 {/if}
               </td>
               <td>{r.status}</td>
               <td>
-                {#if r.bbs.length}
+                {#if !r.ship}
+                  <span class="muted">—</span>
+                {:else if r.bbs.length}
                   <button
                     type="button"
                     class="ship-link wish-open"

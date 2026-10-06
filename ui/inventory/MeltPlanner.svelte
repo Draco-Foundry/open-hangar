@@ -12,7 +12,7 @@
     const picked = a.inv.picked();
     const total = picked.reduce((acc, p) => acc + (a.inv.isMeltable(p) ? p.value : 0), 0);
     if (!picked.length || !total) return null;
-    const wish = s.wishlist || [];
+    const wish = a.store.wishShips(); // ships only (names); store items aren't melted into
     const priced = wish
       .map((name) => ({ name, price: (a.priceOf(name) || {}).msrp }))
       .filter((x) => x.price);

@@ -51,11 +51,9 @@ try {
   }
   if (alerts) {
     await page.evaluate(async () => {
-      OH.getShipStock = async (url) =>
-        /Cutlass-Black/i.test(url)
-          ? { state: 'in', price: 110, packs: [] }
-          : { state: 'out', price: null, packs: [] };
+      // The demo store catalog (demo-shim.js) has the Cutlass Black on sale.
       OHApp.state.wishlist = ['Cutlass Black'];
+      await OHApp.store.checkWishlist();
       document.dispatchEvent(new CustomEvent('oh:home'));
       await new Promise((r) => setTimeout(r, 1500));
     });

@@ -55,9 +55,16 @@ const BUDGET = {
     cap: 'CACHE_MAX.shipImages 2,000 newest; 90 days (1 day for misses)',
     max: 400 * KB,
   },
-  wikiFiles: { cap: 'CACHE_MAX.wikiFiles 1,000 newest; 30 days (1 day for misses)', max: 200 * KB },
-  shipStock2: { cap: 'CACHE_MAX.shipStock2 1,000 newest; 6 hours', max: 400 * KB },
-  shipCatalog: { cap: 'one wiki vehicle list, replaced whole (30 days)', max: 1 * MB },
+  // openhangar.space's feeds (OH.siteFeed): each one copy, replaced whole.
+  feedShips: { cap: 'one ships feed (~330 ships), replaced whole (a day)', max: 300 * KB },
+  feedCatalog: {
+    cap: 'one store catalog (RSI store size, ~700 items), replaced whole (30 minutes)',
+    max: 2 * MB,
+  },
+  feedReferral: small('one referral-events feed (events + picture links)'),
+  feedIssues: small('one known-issues feed, 100 issues at most'),
+  feedGameStatus: small('one game-status feed (10 minutes)'),
+  feedVersions: small('one versions.json'),
   shipMatrix: { cap: 'one RSI ship-matrix list, replaced whole', max: 300 * KB },
   storeShips: { cap: 'one store list, replaced whole (6 hours)', max: 1 * MB },
   subStore: {
@@ -67,14 +74,10 @@ const BUDGET = {
   netDown: small('hosts down in the last 10 minutes'),
   remoteStatus: small('one status.json, replaced whole'),
   account: small('the signed-in account, replaced whole'),
-  scVersion: small(),
-  wikiMainpage: small(),
   patchNotes: small('newest 15 threads'),
-  referralEvents: small(),
   fxRates: small(),
   loanerMatrix: { cap: 'one help-center table, replaced whole', max: 100 * KB },
   includedVessels: { cap: 'one help-center table, replaced whole', max: 100 * KB },
-  knownIssues: small('GitHub open issues, 100 at most'),
   siteLink: small(),
   siteUrl: small(),
   siteSyncRequested: small(),
@@ -98,7 +101,6 @@ const BUDGET = {
   uiQuickLinksHidden: small('old Quick Links switch, moved into uiHomeLayout'),
   uiHomeLayout: small('show/hide per card and MAX_SAVED 10 named layouts (24 characters)'),
   wishWatch: small('the last wishlist check, replaced whole'),
-  gameStatus: small('one openhangar.space game-status feed, replaced whole (10 minutes)'),
   uiGroupByType: small(),
   hideSmallInv: small(),
   hideSmallBb: small(),
@@ -117,6 +119,14 @@ const BUDGET = {
 const DYNAMIC = {
   '[profileKey()]': ['profile:*'],
   '[key]': ['profile:*', 'loanerMatrix', 'includedVessels'], // migrateRecovery, getHelpTable
+  '[feedKey]': [
+    'feedShips',
+    'feedCatalog',
+    'feedReferral',
+    'feedIssues',
+    'feedGameStatus',
+    'feedVersions',
+  ], // OH.siteFeed
 };
 const budgetOf = (key) => BUDGET[/^profile:/.test(key) ? 'profile:*' : key];
 
@@ -284,10 +294,12 @@ async function fillWorstCase() {
         ]),
       ),
     },
-    gameStatus: {
+    feedGameStatus: {
       at: 1,
+      etag: 'W/"' + 'f'.repeat(32) + '"',
       data: {
-        updatedAt: 1,
+        v: 1,
+        updatedAt: '2026-10-06T11:05:54.330Z',
         status: {
           level: 'degraded',
           label: 'PU Disrupted, Platform Disrupted',
@@ -316,12 +328,6 @@ async function fillWorstCase() {
     },
     // Every cache seeded over its cap; one real call below trims it.
     shipImages: timed(2600, (i) => ({ url: img(i, 3) })),
-    wikiFiles: timed(1400, (i) => ({
-      url: `https://media.starcitizen.tools/thumb/${i}/400px-File.jpg`,
-    })),
-    shipStock2: timed(1400, () => ({
-      s: { state: 'pack', price: null, packs: [{ name: 'Some Starter Pack Name', price: 6000 }] },
-    })),
     shipMatrix: {
       v: 2,
       at: Date.now(),
@@ -331,21 +337,6 @@ async function fillWorstCase() {
         img: img(i, 4),
         mfr: 'DRAK',
         mfrName: 'Drake Interplanetary',
-      })),
-    },
-    shipCatalog: {
-      v: 8,
-      at: Date.now(),
-      list: Array.from({ length: 1200 }, (_, i) => ({
-        lname: `ship ${i}`,
-        slug: `Ship_${i}`,
-        cls: 'Medium Freight',
-        msrp: 110,
-        name: `Ship ${i}`,
-        mfr: 'Drake Interplanetary',
-        size: 'Small',
-        status: 'flight-ready',
-        foci: ['Freight', 'Combat'],
       })),
     },
     storeShips: {
@@ -363,19 +354,95 @@ async function fillWorstCase() {
   };
   // The capped caches, each through one real write.
   await OH.getShipImage('Brand New Ship');
-  await OH.wikiImageUrls(['Brand New.jpg'], async () =>
-    Response.json({
-      query: {
-        pages: {
-          1: { title: 'File:Brand New.jpg', imageinfo: [{ thumburl: 'https://x.test/a.jpg' }] },
+  // The feeds through real reads, each far bigger than today's.
+  const etag = { headers: { etag: 'W/"' + 'e'.repeat(32) + '"' } };
+  await OH.getShipsFeed({
+    fetchFn: async () =>
+      Response.json(
+        {
+          v: 1,
+          updatedAt: '2026-09-30T00:00:00.000Z',
+          credit: 'x'.repeat(200),
+          ships: Array.from({ length: 1000 }, (_, i) => ({
+            name: `Drake Some Long Ship Name ${i}`,
+            cls: `drak_some_long_ship_name_${i}`,
+            msrp: 110,
+            img: `https://media.openhangar.space/${'a'.repeat(32)}${i}.jpg`,
+          })),
         },
-      },
-    }),
-  );
-  await OH.getShipStock(
-    'https://robertsspaceindustries.com/pledge/ships/new',
-    async () => new Response('', { status: 404 }),
-  );
+        etag,
+      ),
+  });
+  await OH.getStoreCatalog({
+    fetchFn: async () =>
+      Response.json(
+        {
+          v: 1,
+          updatedAt: '2026-10-06T11:03:32.858Z',
+          items: Array.from({ length: 2500 }, (_, i) => ({
+            id: `sku-${100000 + i}`,
+            kind: 'paint',
+            name: `Some Fairly Long Ship Name - Nebula Drift Paint ${i}`,
+            img: `https://media.openhangar.space/${'b'.repeat(32)}.jpg`,
+            url: `https://robertsspaceindustries.com/pledge/Paints/Some-Fairly-Long-Ship-Name-Nebula-Drift-Paint-${i}`,
+            price: 15,
+            wasPrice: 20,
+            warbond: false,
+            standardPrice: null,
+            savings: null,
+            inStore: true,
+            insurance: '24 Mo',
+            upgrade: null,
+          })),
+          ships: Array.from({ length: 300 }, (_, i) => ({
+            id: i,
+            name: `Ship ${i}`,
+            msrp: 110,
+            editions: [
+              { sku: 10000 + i, price: 110, warbond: false },
+              { sku: 20000 + i, price: 100, warbond: true },
+            ],
+          })),
+        },
+        etag,
+      ),
+  });
+  await OH.getReferralFeed({
+    fetchFn: async () =>
+      Response.json({
+        v: 1,
+        updatedAt: '2026-10-06T08:22:37.010Z',
+        credit: 'x'.repeat(100),
+        events: Array.from({ length: 40 }, (_, i) => ({
+          start: '2026-07-29',
+          end: '2026-08-12',
+          name: `Foundation Festival ${i}`,
+          reward: 'x'.repeat(200),
+          image: `Event picture ${i}.jpg`,
+          img: `https://media.openhangar.space/${'c'.repeat(32)}.jpg`,
+        })),
+        images: Object.fromEntries(
+          Array.from({ length: 80 }, (_, i) => [
+            `Referral reward picture ${i}.jpg`,
+            `https://media.openhangar.space/${'d'.repeat(32)}.jpg`,
+          ]),
+        ),
+      }),
+  });
+  await OH.getKnownIssues({
+    fetchFn: async () =>
+      Response.json({
+        v: 1,
+        updatedAt: '2026-10-06T08:22:37.010Z',
+        issues: Array.from({ length: 100 }, (_, i) => ({
+          number: 1000 + i,
+          title: 'x'.repeat(200),
+          url: `https://github.com/Draco-Foundry/open-hangar/issues/${1000 + i}`,
+          labels: ['bug', 'scan-broken'],
+          createdAt: '2026-10-06T08:22:37.010Z',
+        })),
+      }),
+  });
   // Your Subscriber Store through one real read: far more items than it keeps.
   await OH.getSubStore({
     account: { loggedIn: true, nickname: 'Main', subscriber: { type: 'Imperator' } },
@@ -410,8 +477,6 @@ async function fillWorstCase() {
 test('worst case: every key within its budget, the total under the warning line', async (t) => {
   await fillWorstCase();
   assert.ok(Object.keys(mem.shipImages).length <= OH.CACHE_MAX.shipImages);
-  assert.ok(Object.keys(mem.wikiFiles).length <= OH.CACHE_MAX.wikiFiles);
-  assert.ok(Object.keys(mem.shipStock2).length <= OH.CACHE_MAX.shipStock2);
   assert.ok(Object.keys(mem.pledgeArchive).length <= OH.ARCHIVE_MAX);
   assert.equal(mem.errorLog.length, 100);
   assert.equal(mem.subStore.items.length, OH.SUB_STORE_MAX);
