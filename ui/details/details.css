@@ -29,3 +29,55 @@
   font: 700 11px var(--font-head);
   letter-spacing: 0.08em;
 }
+/* Melt on RSI (#403): a link-styled button that opens an in-window confirm. The
+   red one is for pledges RSI never sells back. */
+button.melt-open {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+.melt-confirm {
+  margin: 8px 0 4px;
+}
+.melt-confirm.danger {
+  border: 2px solid var(--bad);
+  background: var(--bad-soft);
+  padding: 14px 16px;
+}
+.melt-confirm.danger .melt-title {
+  color: var(--bad);
+  font-size: 17px;
+}
+.melt-never {
+  color: var(--head);
+  font-weight: 600;
+}
+.melt-facts {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  color: var(--text, var(--muted));
+}
+.melt-where {
+  font-size: 12px;
+}
+.melt-confirm a.sc-btn {
+  text-decoration: none;
+}
+/* Can't Be Bought Back (#403): the tag reads like Retired; the window adds why. */
+.bb-blocked {
+  white-space: nowrap;
+}
+.bb-block-note {
+  margin: 4px 0 8px;
+  font-size: 13px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.bb-price-note {
+  margin: 2px 0 8px;
+  text-wrap: pretty;
+}

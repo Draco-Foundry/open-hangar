@@ -19,6 +19,15 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   the Aurora Mk I and Hornet Mk I, so they now say Retired, Buy-Back Still Open, keep
   their Reclaim link, and buy-back upgrades keep Add to RSI Cart. If RSI ever refuses
   one, the window says RSI closed its buy-back.
+- New: **Melt on RSI, with the facts first.** Every Inventory pledge window has a Melt on
+  RSI link to its page in your RSI hangar. Before it opens you see what melting means:
+  an upgraded pledge comes back as the original pack, the insurance it carries, gifting,
+  and that buy-backs cost full price (sales and subscriber coupons don't carry over).
+  Pledges RSI never sells back get a big red warning first. Melting still happens on
+  RSI; Open Hangar never melts anything.
+- New: **Can't Be Bought Back.** Buy-backs RSI never sells back (Squadron 42, physical
+  items, add-ons, the AMD package, community giveaways) say so with the reason instead of
+  a Reclaim link, and buy-back windows note that buy-backs cost full price.
 
 ## 0.2.17 — 2026-10-04
 
