@@ -212,7 +212,7 @@ try {
     ? ok('home: LTI count filters Inventory; 5 latest acquisitions, a row opens details')
     : fail(`home clicks: ${JSON.stringify(clicks)}`);
   await page
-    .waitForFunction(() => /LIVE/.test(document.querySelector('#oh-home')?.textContent || ''), {
+    .waitForFunction(() => /LIVE/.test(document.querySelector('#oh-status')?.textContent || ''), {
       timeout: 8000,
     })
     .catch(() => {});
@@ -223,17 +223,13 @@ try {
       events: /Next Buy-Back Token/.test(txt) === (OH.soonBuybackToken() != null),
       stale: /Last event: Pirate Week/.test(txt) || !/Pirate Week/.test(txt),
       wave: /4\.10\.2[\s\S]{0,40}Wave 3/.test(txt) && /Released [A-Z][a-z]{2} \d+ · /.test(txt),
-      news: document.querySelectorAll('#oh-home .nl').length,
-      lead: document.querySelector('#oh-home .lead .p')?.textContent || '',
+      // RSI news is website-only now: no news card on Home.
+      noNews: !/Latest From RSI/.test(document.querySelector('#oh-home').textContent),
     };
   });
-  cards.events &&
-  cards.stale &&
-  cards.wave &&
-  cards.news >= 1 &&
-  /^Last week was a busy one/.test(cards.lead)
+  cards.events && cards.stale && cards.wave && cards.noNews
     ? ok(
-        `Game Status beside the card: waves, events (ended not shown as live), next token; news lead + ${cards.news} items`,
+        'Game Status beside the card: waves, events (ended not shown as live), next token; no news card on Home',
       )
     : fail(`home cards: ${JSON.stringify(cards)}`);
   // Hangar Alerts live in the top bar's bell: a wishlist sale shows with a count, and ×
@@ -341,6 +337,106 @@ try {
         'citizen card: ¤ 1.2M / ¤ 90K, wallet four across (two by two when narrow), Scan in the top bar, gear menu (currency, Streamer Mode, Log Out of RSI), search on Home',
       )
     : fail(`citizen card: ${JSON.stringify(card)}`);
+
+  // RSI Quick Links (#374): a Home card under the ship picture, and a fold-open group
+  // in your portrait menu. Hide Card is remembered; Show on Home brings it back.
+  const ql = await page.evaluate(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const links = (el) => [...el.querySelectorAll('a.ql-ln')];
+    const rsiOnly = (as) =>
+      as.length > 0 &&
+      as.every(
+        (a) =>
+          a.target === '_blank' &&
+          /noopener/.test(a.rel) &&
+          /^https:\/\/([a-z0-9-]+\.)?robertsspaceindustries\.com\//.test(a.href) &&
+          /↗/.test(a.textContent),
+      );
+    const colBottoms = () =>
+      [...document.querySelectorAll('#oh-home .oh-col')].map((c) =>
+        Math.round(c.lastElementChild.getBoundingClientRect().bottom),
+      );
+    location.hash = '#home';
+    await chrome.storage.local.set({ uiQuickLinksHidden: false });
+    await wait(200);
+    const res = {};
+    const card = () => document.querySelector('#oh-home #oh-quicklinks');
+    res.card = !!card() && rsiOnly(links(card()));
+    res.cardGroups = card() ? card().querySelectorAll('.ql-grp').length : 0;
+    res.cardDesc = /First change free/.test(card()?.textContent || '');
+    const handle = (await OH.getAccount())?.nickname;
+    res.dossier = handle
+      ? links(card()).some((a) => a.href.endsWith(`/citizens/${encodeURIComponent(handle)}`))
+      : !/Citizen Dossier/.test(card()?.textContent || '');
+    // The ship picture: no heading or button, the name as alt text, Quick Links under
+    // it, and both columns finish together.
+    const spot = document.querySelector('#oh-home #oh-spotlight');
+    const img = spot?.querySelector('img');
+    res.spot =
+      !!spot &&
+      !spot.querySelector('h3, button') &&
+      (!img || img.alt === spot.querySelector('figcaption').textContent) &&
+      spot.nextElementSibling === card();
+    const b = colBottoms();
+    res.even = b.length === 2 && Math.abs(b[0] - b[1]) <= 1 ? true : b;
+    // Portrait menu: shut at first, opens, shuts.
+    document.querySelector('#settings-btn').click();
+    await wait(50);
+    const menu = document.querySelector('#settings-menu');
+    const tog = menu.querySelector('#ql-toggle');
+    const box = menu.querySelector('#ql-menu');
+    res.menuShut = !!tog && box.hidden && tog.getAttribute('aria-expanded') === 'false';
+    tog.click();
+    await wait(50);
+    res.menuOpen = !menu.hidden && !box.hidden && tog.getAttribute('aria-expanded') === 'true';
+    res.menuLinks = rsiOnly(links(box)) && !/Handle Change Pass/.test(box.textContent);
+    res.noShowYet = !box.querySelector('#ql-show');
+    tog.click();
+    await wait(50);
+    res.menuFolds = box.hidden && !menu.hidden;
+    document.body.click();
+    // Hide Card, then Show on Home brings it back.
+    [...card().querySelectorAll('button')].find((x) => x.textContent === 'Hide Card').click();
+    await wait(80);
+    res.hidden = !card();
+    res.stored = (await chrome.storage.local.get('uiQuickLinksHidden')).uiQuickLinksHidden === true;
+    const h = colBottoms();
+    res.evenHidden = h.length < 2 || Math.abs(h[0] - h[1]) <= 1 ? true : h;
+    document.querySelector('#settings-btn').click();
+    await wait(50);
+    tog.click();
+    await wait(50);
+    const show = box.querySelector('#ql-show');
+    res.showLabel = show?.textContent.trim();
+    show?.click();
+    await wait(80);
+    res.back = !!card();
+    res.storedBack =
+      (await chrome.storage.local.get('uiQuickLinksHidden')).uiQuickLinksHidden === false;
+    document.body.click();
+    return res;
+  });
+  ql.card &&
+  ql.cardGroups === 4 &&
+  ql.cardDesc &&
+  ql.dossier &&
+  ql.spot &&
+  ql.even === true &&
+  ql.menuShut &&
+  ql.menuOpen &&
+  ql.menuLinks &&
+  ql.noShowYet &&
+  ql.menuFolds &&
+  ql.hidden &&
+  ql.stored &&
+  ql.evenHidden === true &&
+  ql.showLabel === 'Show on Home' &&
+  ql.back &&
+  ql.storedBack
+    ? ok(
+        'quick links: Home card under the ship picture (columns finish together), RSI links in a new tab ↗, portrait menu group folds, Hide Card remembered, Show on Home brings it back',
+      )
+    : fail(`quick links: ${JSON.stringify(ql)}`);
 
   const colors = await page.evaluate(() => {
     const cs = getComputedStyle(document.documentElement);

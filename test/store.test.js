@@ -87,47 +87,6 @@ test('getShipStock: a missing page means not in the store; cached', async () => 
   assert.equal(await OH.getShipStock('https://evil.example/x', gone), null);
 });
 
-test('parseCommLinks reads RSI Comm-Link cards (real list)', () => {
-  const items = OH.parseCommLinks(
-    fs.readFileSync(path.join(__dirname, 'fixtures', 'commlinks.html'), 'utf8'),
-  );
-  assert.equal(items.length, 10);
-  assert.equal(items[0].title, 'This Week in Star Citizen - September 28, 2026');
-  assert.match(items[0].url, /^https:\/\/robertsspaceindustries\.com\/comm-link\//);
-  assert.equal(items[0].when, '1 day ago');
-  assert.ok(items[0].excerpt.includes('\u2018verse')); // &#8216; decoded
-  for (const it of items) assert.doesNotMatch(it.title, /&#?\w+;|</);
-});
-
-test('getRsiNews caches an hour and keeps the last list when RSI is down', async () => {
-  const html = fs.readFileSync(path.join(__dirname, 'fixtures', 'commlinks.html'), 'utf8');
-  let calls = 0;
-  const ok = async () => {
-    calls++;
-    return { ok: true, json: async () => ({ success: 1, data: html }) };
-  };
-  assert.equal((await OH.getRsiNews(ok)).length, 10);
-  assert.equal((await OH.getRsiNews(ok)).length, 10);
-  assert.equal(calls, 1);
-});
-
-test('This Week in Star Citizen: short summary from the real post', () => {
-  const read = (n) => fs.readFileSync(path.join(__dirname, 'fixtures', n), 'utf8');
-  assert.match(
-    OH.twiscBodyUrl(read('twisc-page.html')),
-    /^https:\/\/robertsspaceindustries\.com\/alexandria\/html\//,
-  );
-  assert.equal(OH.twiscBodyUrl("<script>const s3Url = 'https://evil.example/x';</script>"), null);
-  const sum = OH.parseTwisc(read('twisc-body.html'));
-  assert.ok(sum.points.length >= 4 && sum.points.length <= 6);
-  assert.match(sum.points[0], /^Last week was a busy one on the testing front/);
-  assert.ok(sum.points.every((p) => !/\s[.,!?]/.test(p) && !/see you soon/i.test(p)));
-  assert.deepEqual(sum.schedule, [
-    { day: 'Thursday, October 1', items: ['New Game Library System'] },
-    { day: 'Friday, October 2', items: ['RSI Weekly Newsletter'] },
-  ]);
-});
-
 test('upgradeSku: the SKU an Add to RSI Cart goes to (cheapest edition on offer)', () => {
   const ships = OH.parseStoreShips({
     data: {

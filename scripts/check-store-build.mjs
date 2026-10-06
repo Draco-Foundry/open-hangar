@@ -7,9 +7,10 @@
 // stores get).
 //
 // Public build: no sync code (app.openhangar.space), no built-in sync site and no
-// staging site in the code, and the public name and version, never the beta's. The
-// manifest's externally_connectable is left out of the host checks: it lists our own
-// site on purpose, for Add to RSI Cart from the website's store (#288).
+// staging site anywhere (the manifest included), and the public name and version,
+// never the beta's. The manifest's externally_connectable is left out of the sync
+// check: it lists our own site on purpose, for Add to RSI Cart from the website's
+// store (#288).
 //
 // Beta build (docs/BETA.md): sync code kept and built in to production
 // (app.openhangar.space) and nothing else; the staging site nowhere, manifest
@@ -29,7 +30,15 @@ const TEXT = /\.(js|mjs|html|json|css)$/;
 const STAGING = /staging\.openhangar\.space/;
 const BUILT_IN = /SITE_BUILT_IN\s*=\s*(['"`])((?:(?!\1).)*)\1/g;
 
+// A store manifest never mentions staging at all, under any name.
+function noStagingManifest(name, text) {
+  if (name.endsWith('manifest.json') && /staging/i.test(text))
+    problems.push(`${name}: mentions staging (store manifests never do)`);
+}
+
 function checkPublic(name, text) {
+  if (STAGING.test(text)) problems.push(`${name}: the staging site`);
+  noStagingManifest(name, text);
   let hosts = text;
   if (name.endsWith('manifest.json')) {
     const m = JSON.parse(text);
@@ -40,7 +49,6 @@ function checkPublic(name, text) {
     delete m.externally_connectable;
     hosts = JSON.stringify(m);
   }
-  if (STAGING.test(hosts)) problems.push(`${name}: the staging site`);
   if (/app\.openhangar\.space/.test(hosts))
     problems.push(`${name}: sync code (an OH_SYNC=1 build)`);
   for (const [, , site] of text.matchAll(BUILT_IN))
@@ -50,6 +58,7 @@ function checkPublic(name, text) {
 const seen = { builtIn: 0, sync: false, manifests: 0 };
 function checkBeta(name, text) {
   if (STAGING.test(text)) problems.push(`${name}: the staging site`);
+  noStagingManifest(name, text);
   if (/https?:\/\/(localhost|127\.0\.0\.1)/.test(text) && /SITE_BUILT_IN/.test(text))
     problems.push(`${name}: a local dev site`);
   for (const [, , site] of text.matchAll(BUILT_IN)) {

@@ -42,6 +42,8 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   updateReminder();
   if (details.reason !== 'update') return;
   const to = chrome.runtime.getManifest().version;
+  // Caches of RSI news, which Home no longer shows (0.3.0): drop them.
+  await chrome.storage.local.remove(['rsiNews', 'twisc2']);
   await chrome.storage.local.remove('updateReady');
   if (details.previousVersion && details.previousVersion !== to) {
     await chrome.storage.local.set({ justUpdated: { from: details.previousVersion, to } });

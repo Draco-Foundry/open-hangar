@@ -20,6 +20,30 @@
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: 16px;
 }
+/* Home's two columns (Home.svelte): equal gaps, and the last card in each column
+   takes the spare height so both columns finish together. One column when only
+   one has anything in it, or when narrow. */
+.oh-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+.oh-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.oh-col > :last-child {
+  flex: 1 1 auto;
+}
+.oh-col:empty {
+  display: none;
+}
+.oh-cols:has(> :only-child),
+.oh-cols:has(> .oh-col:empty) {
+  grid-template-columns: minmax(0, 1fr);
+}
 /* A row with one visible card spans the full width (never a card alone beside a gap). */
 .oh-row2:has(> :only-child),
 .oh-row21:has(> :only-child) {
@@ -34,6 +58,7 @@
   }
 }
 @media (max-width: 680px) {
+  .oh-cols,
   .oh-row3,
   .oh-row2,
   .oh-row21 {
@@ -107,4 +132,9 @@
 }
 .oh-p a {
   color: var(--link);
+}
+/* With the ship picture above it, Quick Links keeps its own height and the picture
+   takes the spare. */
+#oh-spotlight + #oh-quicklinks {
+  flex: 0 0 auto;
 }

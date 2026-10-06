@@ -473,6 +473,80 @@ body:not(:has(#view-home.active)) .wrap > header {
   color: #ff7b72;
 }
 
+/* RSI Quick Links in your menu (#374, YouMenu.svelte): a fold-open group. */
+.settings-menu .ql-toggle {
+  filter: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 4px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  font: 600 14px var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.settings-menu .ql-toggle:hover {
+  filter: none;
+  color: var(--head);
+}
+.settings-menu .ql-grid-ic {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--link);
+}
+.settings-menu .ql-tag {
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--link);
+  font: 600 11px var(--font-head);
+}
+.settings-menu .ql-chev {
+  margin-left: auto;
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+.settings-menu .ql-toggle.open .ql-chev {
+  transform: rotate(90deg);
+}
+/* Scrolls inside, so the open group never pushes the menu off screen. */
+.settings-menu .ql-in {
+  max-height: max(160px, calc(100vh - 600px));
+  overflow-y: auto;
+  margin-top: -4px;
+  padding: 0 0 4px;
+}
+.settings-menu .ql-in[hidden] {
+  display: none;
+}
+.settings-menu .ql-grp {
+  margin: 10px 6px 4px;
+  font: 600 11px var(--font-head);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.settings-menu .ql-show {
+  filter: none;
+  display: block;
+  margin: 6px 6px 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: 500 13px var(--font-head);
+  cursor: pointer;
+}
+.settings-menu .ql-show:hover {
+  filter: none;
+  text-decoration: underline;
+}
+
 /* Global Hangar Search on its own line under the Citizen Card. */
 .home-search {
   margin: 0 0 16px;

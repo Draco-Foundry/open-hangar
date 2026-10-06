@@ -92,17 +92,7 @@ const checks = [
       return null;
     },
   },
-  {
-    name: 'Comm-Links (Latest From RSI)',
-    host: 'robertsspaceindustries.com',
-    async run() {
-      const items = await OH.getRsiNews(fetchLogged);
-      if (items.length < 5) return `${items.length} posts (expected 5+)`;
-      if (share(items, (i) => i.title && i.url && i.when) < 0.9)
-        return 'posts missing title/link/date';
-      return null;
-    },
-  },
+
   {
     name: 'Patch notes (Spectrum)',
     host: 'robertsspaceindustries.com',
@@ -173,11 +163,7 @@ const savedPages = [
     live: async () => OH.parseStoreShips(await liveJson(/upgrade\/graphql/)),
     saved: () => OH.parseStoreShips(JSON.parse(fixture('store-ships.json'))),
   },
-  {
-    file: 'commlinks.html',
-    live: async () => OH.parseCommLinks((await liveJson(/getCommlinkItems/))?.data),
-    saved: () => OH.parseCommLinks(fixture('commlinks.html')),
-  },
+
   {
     file: 'patch-notes.json',
     live: async () => OH.parsePatchNotes(await liveJson(/forum\/channel\/threads/)),
