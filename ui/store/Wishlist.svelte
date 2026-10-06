@@ -196,8 +196,8 @@
       <!-- Nothing to work out while another page is showing. -->
     {:else if !d.rows.length}
       <p class="muted sp-empty">
-        Your wishlist is emptier than a Hull C on launch day. Open any ship (search at the top,
-        or a name in Ship Prices) and press <strong>Add to Wishlist</strong>.
+        Your wishlist is emptier than a Hull C on launch day. Open any ship (Find a Ship below,
+        or the search at the top) and press <strong>Add to Wishlist</strong>.
       </p>
     {:else}
       {#if d.unchecked}

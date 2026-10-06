@@ -342,7 +342,6 @@ const state = {
   // wipes your prices. Purely local — never exported or sent.
   market: {},
   wishlist: [], // ship names (Store → Wishlist)
-  priceTab: 'flight-ready', // Store → Ship Prices tab
   wishSort: 'name', // Store → Wishlist order: name | price-desc | price-asc | stock | mine
   bbPicked: new Set(), // Buy-Backs Market: picked buy-back ids (for totals + exports)
   marketGiftableOnly: false, // Market view: show only sellable (giftable) items
@@ -2445,9 +2444,8 @@ if (selectBar) {
   });
 }
 
-// --- Store: your CCUs + price list -----------------------------------------
+// --- Store: your wishlist and CCUs -------------------------------------------
 
-const capFirst = (t) => String(t || '').replace(/^\w/, (c) => c.toUpperCase());
 // Labels (roles, sizes, chart rows): every word capitalized, "light fighter" → "Light Fighter".
 const titleCase = (t) =>
   String(t || '').replace(/(^|[\s/(-])(\p{Ll})/gu, (_, p, c) => p + c.toUpperCase());
@@ -2460,7 +2458,8 @@ const SHIP_STATES = [
   ['in-concept', 'In Concept'],
 ];
 // --- Store page -------------------------------------------------------------
-// Three panels: Wishlist, Your CCUs and Ship Prices. Long lists scroll inside
+// Your side of the store: Wishlist, Your CCUs and Find a Ship, under a link to the
+// website's full store (every ship, sales, Compare). Long lists scroll inside
 // their panel. RSI's upgrade-tool feed (OH.getStoreShips) is used only to find
 // each ship's store page; whether a ship is in the store comes from that page
 // (OH.getShipStock), checked just for the wishlist and the ship window.
@@ -2573,13 +2572,6 @@ function wishlistOrder() {
     }[state.wishSort] || byName;
   return list.sort(cmp);
 }
-// Ship Prices: tabs (Flight Ready, In Concept incl. in production, All).
-const PRICE_TABS = [
-  ['flight-ready', 'Flight Ready'],
-  ['in-concept', 'In Concept'],
-  ['all', 'All'],
-];
-
 // The Store page is Svelte (ui/store, mounted into #oh-store); this loads what it
 // needs (ship prices, RSI's store feed) and tells it to redraw. Each call also
 // lets the wishlist ask its ships' store pages again (lib.js caches them).
@@ -6016,7 +6008,6 @@ window.OHApp = {
       return { name: (v && v.name) || wishUndo.name };
     },
     wishSorts: WISH_SORTS,
-    priceTabs: PRICE_TABS,
     shipStates: SHIP_STATES,
     wishlistOrder,
     shipEntry,
@@ -6032,16 +6023,8 @@ window.OHApp = {
     bbPriceText,
     reclaimOf,
     uncheckedPacks,
-    currencyNote,
-    titleCase,
-    capFirst,
     setWishSort,
     setWishOrder,
-    setPriceTab: (key) => {
-      if (!PRICE_TABS.some(([k]) => k === key)) return;
-      state.priceTab = key;
-      renderStore();
-    },
   },
   // For Developers (ui/developers): its links, supporters, the data tools' state
   // (note under the buttons, restore button, saved accounts) and their actions.
