@@ -91,6 +91,9 @@
       header {
         display: flex;
         align-items: center;
+        /* When the bar wraps (a narrow window), the search / Scan / portrait row
+           stays on the right instead of dropping to the left. */
+        justify-content: flex-end;
         gap: 12px;
         margin-bottom: 20px;
         padding-bottom: 14px;
