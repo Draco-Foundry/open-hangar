@@ -131,7 +131,11 @@ ordered _who → what they own_ so it drops straight into a backend table:
   sources: { hangar: {…}, buybacks: {…},
     referral: { items: { current, legacy, prospects,
                          recruitsList, prospectsList } } },  // referral code/url never exported
-  history: [ { at, items: [[id, name, value]] } ] }        // scan snapshots; merged on import
+  history: [ { at, items: [[id, name, value]] } ],        // scan snapshots; merged on import
+  pledgeArchive: { [pledgeId]: { id, name, value, currency, insurance, ccu,
+                   kind, date, contents: [{ kind, label }], goneAt } } }
+                   // pledges gone from the hangar (newest 2,000), for buy-back
+                   // details; merged on import (newest goneAt wins)
 ```
 
 ## How it works
