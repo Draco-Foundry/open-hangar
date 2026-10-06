@@ -25,7 +25,7 @@ export const QUICK_LINKS = [
         i: 'sub',
         u: `${RSI}/en/store/pledge/browse/extras/subscribers-store`,
       },
-      { t: 'Referral Program', i: 'referral', u: `${RSI}/en/account/referral-program` },
+      { t: 'Referral Program', i: 'referral', u: `${RSI}/en/referral` },
     ],
   },
   {
