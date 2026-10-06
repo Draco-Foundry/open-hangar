@@ -2399,6 +2399,174 @@ try {
     ? ok(`share image ${share.w}×${share.h}, QR scans to the referral link, "${share.status}"`)
     : fail(`share image: ${JSON.stringify(share)}`);
 
+  console.log('Add to RSI Cart');
+  // RSI's upgrade calls are stubbed (no real RSI): the ship window's picker, the
+  // add, the error notes, and the buy-back window's one button (#288).
+  const cart = await page.evaluate(async () => {
+    const wait = async (test, ms = 2000) => {
+      for (let t = 0; t < ms; t += 25) {
+        if (test()) return true;
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      return false;
+    };
+    const calls = [];
+    const real = {
+      upgradeOptions: OH.upgradeOptions,
+      upgradePrice: OH.upgradePrice,
+      addUpgradeToCart: OH.addUpgradeToCart,
+    };
+    let optionsAnswer = {
+      ok: true,
+      options: [
+        { id: 102, name: 'Avenger Titan', image: null, eligible: true, price: 140 },
+        { id: 101, name: 'Pulse', image: null, eligible: true, price: null },
+        { id: 103, name: 'Cutlass Black', image: null, eligible: false, price: null },
+      ],
+    };
+    let addAnswer = { ok: true };
+    OH.upgradeOptions = async (...a) => (calls.push(['options', ...a]), optionsAnswer);
+    OH.upgradePrice = async (...a) => (calls.push(['price', ...a]), { ok: true, price: 15 });
+    OH.addUpgradeToCart = async (...a) => (calls.push(['add', ...a]), addAnswer);
+    // RSI's store feed says an upgrade to the Carrack is on sale (SKU 9001).
+    const carrack = {
+      id: 900,
+      name: 'Carrack',
+      lname: 'carrack',
+      link: null,
+      forSale: true,
+      editions: [{ id: 9001, title: 'Standard Edition', price: 600, warbond: false }],
+    };
+    const was = { storeRequested, storeData, storeByKey };
+    storeRequested = Promise.resolve();
+    storeData = { at: Date.now(), ships: [carrack] };
+    storeByKey = new Map([
+      [shipKey('Carrack'), carrack],
+      ['carrack', carrack],
+    ]);
+    const q = (sel) => document.querySelector(`#item-modal ${sel}`);
+    const text = (sel) => (q(sel) ? q(sel).textContent.replace(/\s+/g, ' ').trim() : '');
+    const out = {};
+    openShipModal('Carrack');
+    await wait(() => q('[data-cart="upgrade"]'));
+    out.heading = text('[data-cart="upgrade"] .modal-h');
+    out.quietUntilClick = calls.length === 0;
+    q('[data-cart="upgrade"] .cbtn').click();
+    await wait(() => q('[data-cart] .opt'));
+    out.rows = [...document.querySelectorAll('#item-modal [data-cart] .opt')].map((o) =>
+      o.textContent.replace(/\s+/g, ' ').trim(),
+    );
+    out.sum = text('[data-cart] .sum');
+    q('[data-cart] .opt:nth-child(2)').click();
+    await wait(() => /\$15/.test(text('[data-cart] .sum')));
+    out.sumAfterPick = text('[data-cart] .sum');
+    const addBtn = [...document.querySelectorAll('#item-modal [data-cart] button.cbtn')].pop();
+    out.addLabel = addBtn.textContent.trim();
+    addBtn.click();
+    await wait(() => q('[data-cart] .note.good'));
+    out.added = text('[data-cart] .note.good');
+    out.cartLink = q('[data-cart] a.cbtn')?.getAttribute('href') || '';
+    out.addCall = calls.find((c) => c[0] === 'add');
+    document.querySelector('#modal-close').click();
+
+    // Signed out of RSI: the note and the way to log in.
+    optionsAnswer = { ok: false, error: 'signed-out' };
+    openShipModal('Carrack');
+    await wait(() => q('[data-cart="upgrade"]'));
+    q('[data-cart="upgrade"] .cbtn').click();
+    await wait(() => q('[data-cart] .note.bad'));
+    out.signedOut = text('[data-cart] .note.bad');
+    out.logIn = q('[data-cart] a.cbtn')?.textContent.trim() || '';
+    document.querySelector('#modal-close').click();
+
+    // RSI says no to the add.
+    optionsAnswer = { ok: true, options: [{ id: 101, name: 'Pulse', eligible: true, price: 100 }] };
+    addAnswer = { ok: false, error: 'refused' };
+    openShipModal('Carrack');
+    await wait(() => q('[data-cart="upgrade"]'));
+    q('[data-cart="upgrade"] .cbtn').click();
+    await wait(() => q('[data-cart] .opt'));
+    [...document.querySelectorAll('#item-modal [data-cart] button.cbtn')].pop().click();
+    await wait(() => q('[data-cart] .note.bad'));
+    out.refused = text('[data-cart] .note.bad');
+    out.addsAfterRefusal = calls.filter((c) => c[0] === 'add').length;
+    document.querySelector('#modal-close').click();
+
+    // A buy-back upgrade: its ids from the buy-back button, RSI's price, one click.
+    addAnswer = { ok: true };
+    const b = {
+      id: '8899',
+      name: 'Upgrade - Pulse to Carrack',
+      date: '2026-08-26',
+      contains: '',
+      href: '',
+      price: '',
+      isCCU: true,
+      ccu: { from: 'Pulse', to: 'Carrack' },
+      wasUpgraded: false,
+      fromShipId: '101',
+      toShipId: '900',
+      toSkuId: '9001',
+      kind: 'ccu',
+      image: null,
+    };
+    openBuybackModal(b);
+    await wait(() => /\$15/.test(text('[data-cart="buyback"]')));
+    out.bbRows = text('[data-cart="buyback"]');
+    q('[data-cart="buyback"] button.cbtn').click();
+    await wait(() => q('[data-cart="buyback"] .note.good'));
+    out.bbAdded = text('[data-cart="buyback"] .note.good');
+    out.bbCall = calls.filter((c) => c[0] === 'add').pop();
+    out.bbId = b.id;
+    document.querySelector('#modal-close').click();
+    // Without the ids (older scans), or a retired ship RSI won't sell back: no button.
+    openBuybackModal({ ...b, toSkuId: '' });
+    await new Promise((r) => setTimeout(r, 100));
+    out.bbNoIds = !q('[data-cart]');
+    document.querySelector('#modal-close').click();
+    const old = state.buybacks.find((x) => x.isCCU && x.ccu && OH.retiredBuyback(x));
+    openBuybackModal({ ...old, fromShipId: '101', toShipId: '900', toSkuId: '9001' });
+    await new Promise((r) => setTimeout(r, 100));
+    out.bbRetired = !!old && !q('[data-cart]');
+    document.querySelector('#modal-close').click();
+    Object.assign(OH, real);
+    ({ storeRequested, storeData, storeByKey } = was);
+    return out;
+  });
+  cart.heading === 'Upgrade From Your Ships' && cart.quietUntilClick
+    ? ok('ship window: Upgrade From Your Ships, nothing asked of RSI until the click')
+    : fail(`cart heading: ${JSON.stringify(cart)}`);
+  cart.rows.length === 3 &&
+  /Avenger Titan\s*\$140/.test(cart.rows[0]) &&
+  /Cutlass Black.*RSI doesn't offer this one/.test(cart.rows[2]) &&
+  /Avenger Titan to Carrack\s*\$140/.test(cart.sum) &&
+  /Pulse to Carrack\s*\$15/.test(cart.sumAfterPick)
+    ? ok('cart picker: your ships with RSI prices, greyed one, price on pick')
+    : fail(`cart picker: ${JSON.stringify(cart)}`);
+  cart.addLabel === 'Add to RSI Cart' &&
+  /In Your RSI Cart\s*Pulse to Carrack, \$15\./.test(cart.added) &&
+  cart.cartLink === 'https://robertsspaceindustries.com/en/store/pledge/cart' &&
+  JSON.stringify(cart.addCall) === JSON.stringify(['add', 101, 900, 9001, {}])
+    ? ok('Add to RSI Cart: one call with the right ships, In Your RSI Cart, Open RSI Cart')
+    : fail(`cart add: ${JSON.stringify(cart)}`);
+  /Sign In to RSI First/.test(cart.signedOut) && cart.logIn === 'Log In to RSI ↗'
+    ? ok('cart signed out: Sign In to RSI First with Log In to RSI')
+    : fail(`cart signed out: ${JSON.stringify(cart)}`);
+  /RSI Didn't Add It.*Nothing was added/.test(cart.refused) && cart.addsAfterRefusal === 2
+    ? ok("cart refused: RSI Didn't Add It, and no second try by itself")
+    : fail(`cart refused: ${JSON.stringify(cart)}`);
+  /Buy-Back Price\s*\$15 from RSI just now/.test(cart.bbRows) &&
+  /Not needed for upgrades/.test(cart.bbRows) &&
+  /Buy-back: Pulse to Carrack, \$15\./.test(cart.bbAdded) &&
+  JSON.stringify(cart.bbCall) ===
+    JSON.stringify(['add', 101, 900, 9001, { pledgeId: Number(cart.bbId) }]) &&
+  cart.bbNoIds &&
+  cart.bbRetired
+    ? ok(
+        'buy-back upgrade: RSI price, Add to RSI Cart with its pledge; none without ids or retired',
+      )
+    : fail(`buy-back cart: ${JSON.stringify(cart)}`);
+
   console.log('Wishlist, spending, events');
   const wse = await page.evaluate(async () => {
     openShipModal('Carrack');

@@ -86,6 +86,36 @@ chrome.action.onClicked.addListener(() => {
   updateReminder();
 });
 
+// --- Messages from our website -------------------------------------------------------
+// Which pages may talk to the extension is set in one place, the manifest's
+// externally_connectable (added by scripts/pack.mjs for Chrome and Edge; Firefox
+// doesn't let web pages reach extensions). Each message type has a handler here.
+const siteHandlers = {};
+function siteOrigins() {
+  const m = chrome.runtime.getManifest().externally_connectable;
+  // "https://host/*" → "https://host"
+  return ((m && m.matches) || [])
+    .map((p) => (/^(https:\/\/[^/*]+)\//.exec(p) || [])[1])
+    .filter(Boolean);
+}
+siteHandlers['oh-hello'] = () => ({ ok: true, cart: true, connect: false });
+
+// Add to RSI Cart from the website's store (#288), in every build: no account
+// needed. The upgrade goes into the RSI cart in this browser's own RSI session
+// (src/rsi-cart.js); the page gets back your ships that can upgrade, RSI's prices
+// and whether it worked. Nothing is bought, and an add is never retried.
+//   oh-upgrade-options { toShipId, toSkuId }            → { ok, options }
+//   oh-upgrade-price   { fromShipId, toSkuId }          → { ok, price }
+//   oh-add-upgrade     { fromShipId, toShipId, toSkuId } → { ok } | { ok: false, error }
+if (typeof importScripts === 'function' && !self.OHCart) importScripts('rsi-cart.js');
+const cartLane = () => self.OHCart;
+siteHandlers['oh-upgrade-options'] = (m) =>
+  cartLane().upgradeOptions(m.toShipId, m.toSkuId, { priceLimit: 4 });
+siteHandlers['oh-upgrade-price'] = (m) =>
+  cartLane().upgradePrice(m.fromShipId, m.toSkuId, { toShipId: m.toShipId, setContext: true });
+siteHandlers['oh-add-upgrade'] = (m) =>
+  cartLane().addUpgradeToCart(m.fromShipId, m.toShipId, m.toSkuId);
+
 // @sync-start: cut from store builds until sync launches (scripts/pack.mjs, #187)
 // Connect from the website (Chrome and Edge, owner 2026-10-04). The website's Connect
 // page (openhangar.space's /link) asks whether Open Hangar is installed here; only
@@ -103,49 +133,61 @@ const b64url = (bytes) =>
     .replace(/\//g, '_')
     .replace(/=+$/, '');
 
-async function siteMessage(msg, origin) {
-  if (msg?.type === 'oh-hello') return { ok: true };
-  if (msg?.type === 'oh-connect-begin') {
-    const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
-    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
-    const redirect = `https://${chrome.runtime.id}.chromiumapp.org/`;
-    await chrome.storage.session.set({
-      siteConnect: { verifier, origin, redirect, at: Date.now() },
-    });
-    return { ok: true, challenge: b64url(new Uint8Array(digest)), redirect_uri: redirect };
-  }
-  if (msg?.type === 'oh-connect-finish') {
-    const { siteConnect: p } = await chrome.storage.session.get('siteConnect');
-    await chrome.storage.session.remove('siteConnect');
-    if (!p || p.origin !== origin || Date.now() - p.at > 5 * 60e3)
-      return { ok: false, error: 'That connect attempt drifted past its window. Try again.' };
-    const res = await fetch(`${origin}/api/link/token`, {
-      method: 'POST',
-      credentials: 'omit',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        code: String(msg.code || ''),
-        code_verifier: p.verifier,
-        redirect_uri: p.redirect,
-      }),
-    }).catch(() => null);
-    if (!res || !res.ok) return { ok: false, error: "That didn't dock. Try again." };
-    const j = await res.json();
-    await chrome.storage.local.set({
-      siteLink: { token: j.token, name: j.name || '', connectedAt: Date.now(), lastSync: null },
-      siteUrl: origin, // sync goes to the site you connected on
-      ...(msg.sync ? { siteSyncRequested: Date.now() } : {}),
-    });
-    chrome.tabs.create({ url: chrome.runtime.getURL('src/dashboard.html#home') });
-    return { ok: true, name: j.name || '' };
-  }
-  return { ok: false, error: 'unknown request' };
+siteHandlers['oh-connect-begin'] = async (msg, origin) => {
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  const redirect = `https://${chrome.runtime.id}.chromiumapp.org/`;
+  await chrome.storage.session.set({
+    siteConnect: { verifier, origin, redirect, at: Date.now() },
+  });
+  return { ok: true, challenge: b64url(new Uint8Array(digest)), redirect_uri: redirect };
+};
+siteHandlers['oh-connect-finish'] = async (msg, origin) => {
+  const { siteConnect: p } = await chrome.storage.session.get('siteConnect');
+  await chrome.storage.session.remove('siteConnect');
+  if (!p || p.origin !== origin || Date.now() - p.at > 5 * 60e3)
+    return { ok: false, error: 'That connect attempt drifted past its window. Try again.' };
+  const res = await fetch(`${origin}/api/link/token`, {
+    method: 'POST',
+    credentials: 'omit',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      code: String(msg.code || ''),
+      code_verifier: p.verifier,
+      redirect_uri: p.redirect,
+    }),
+  }).catch(() => null);
+  if (!res || !res.ok) return { ok: false, error: "That didn't dock. Try again." };
+  const j = await res.json();
+  await chrome.storage.local.set({
+    siteLink: { token: j.token, name: j.name || '', connectedAt: Date.now(), lastSync: null },
+    siteUrl: origin, // sync goes to the site you connected on
+    ...(msg.sync ? { siteSyncRequested: Date.now() } : {}),
+  });
+  chrome.tabs.create({ url: chrome.runtime.getURL('src/dashboard.html#home') });
+  return { ok: true, name: j.name || '' };
+};
+// Connecting needs the sync site itself, not just any page the manifest lets in;
+// the website's Connect page asks `connect` before it offers the button.
+siteHandlers['oh-hello'] = (msg, origin) => ({
+  ok: true,
+  cart: true,
+  connect: SITE_ORIGINS.includes(origin),
+});
+for (const t of ['oh-connect-begin', 'oh-connect-finish']) {
+  const run = siteHandlers[t];
+  siteHandlers[t] = (msg, origin) =>
+    SITE_ORIGINS.includes(origin) ? run(msg, origin) : { ok: false, error: 'unknown request' };
 }
+// @sync-end
+
+// The website's messages, all of them: only from the pages the manifest's
+// externally_connectable lets in (our own site, Chrome and Edge; scripts/pack.mjs).
 chrome.runtime.onMessageExternal?.addListener((msg, sender, reply) => {
-  if (!SITE_ORIGINS.includes(sender.origin)) return false;
-  siteMessage(msg, sender.origin).then(reply, (err) =>
-    reply({ ok: false, error: String(err?.message || err) }),
-  );
+  if (!siteOrigins().includes(sender.origin)) return false;
+  const handler = siteHandlers[msg?.type];
+  Promise.resolve(
+    handler ? handler(msg, sender.origin) : { ok: false, error: 'unknown request' },
+  ).then(reply, (err) => reply({ ok: false, error: String(err?.message || err) }));
   return true; // answers later
 });
-// @sync-end
