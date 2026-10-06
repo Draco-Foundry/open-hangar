@@ -95,7 +95,12 @@ test('request bodies match RSI upgrade window (ids as numbers, buy-back adds ple
   assert.deepEqual(C.contextBody({ toShipId: 'x' }), {});
   const f = C.filterBody(9001);
   assert.equal(f.operationName, 'filterShips');
-  assert.deepEqual(f.variables, { fromId: null, toId: 9001, fromFilters: [], toFilters: [] });
+  assert.deepEqual(f.variables, { toId: 9001, fromFilters: [] });
+  assert.doesNotMatch(
+    f.query,
+    /to\(from:/,
+    'no "to" half: RSI says Ship not found without a From ship',
+  );
   assert.match(f.query, /from\(to: \$toId, filters: \$fromFilters\)/);
   assert.deepEqual(C.priceBody(101, 9001).variables, { from: 101, to: 9001 });
   assert.match(C.priceBody(1, 2).query, /^query getPrice\(\$from: Int!, \$to: Int!\)/);
