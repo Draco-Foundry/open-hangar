@@ -25,6 +25,7 @@
   const RSI = 'https://robertsspaceindustries.com';
   const AUTH_URL = `${RSI}/api/account/v2/setAuthToken`;
   const CONTEXT_URL = `${RSI}/api/ship-upgrades/setContextToken`;
+  const CART_TOKEN_URL = `${RSI}/api/store/v2/cart/token`;
   const UPGRADE_URL = `${RSI}/pledge-store/api/upgrade/graphql`;
   const CART_URL = `${RSI}/en/store/pledge/cart`;
   const SIGN_IN_URL = `${RSI}/connect`;
@@ -129,9 +130,10 @@
       native: Number.isFinite(Number(p.nativeAmount)) ? Number(p.nativeAmount) / 100 : null,
     };
   }
+  // addToCart only hands back a ticket (jwt); the cart takes it at CART_TOKEN_URL.
   const parseAdded = (json) => {
     const r = (unwrap(json).data || {}).addToCart;
-    return !!(r && r.jwt);
+    return r && typeof r.jwt === 'string' && r.jwt ? r.jwt : null;
   };
 
   // Your ships that RSI lets you upgrade from, best first (the dearest ship you own
@@ -258,7 +260,7 @@
       if (res.status === 401) return { error: 'signed-out' };
       if (res.status === 403) return { error: 'refused' };
       if (!res.ok) return { error: 'network' };
-      if (url !== UPGRADE_URL) return { json: null }; // only their cookies matter
+      if (url !== UPGRADE_URL && url !== CART_TOKEN_URL) return { json: null }; // only their cookies matter
       try {
         return { json: await res.json() };
       } catch {
@@ -382,7 +384,12 @@
       if (!pledge && app && app.mode === 'buyback') return { ok: false, error: 'refused' };
       const r = await ask(addBody(fromShipId, toSkuId));
       if (r.error) return fail(r);
-      return parseAdded(r.json) ? { ok: true } : { ok: false, error: 'refused' };
+      const jwt = parseAdded(r.json);
+      if (!jwt) return { ok: false, error: 'refused' };
+      // Then the cart takes the ticket, as RSI's window does (also never retried).
+      const c = await post(CART_TOKEN_URL, { jwt });
+      if (c.error) return fail(c);
+      return c.json && c.json.success === 0 ? { ok: false, error: 'refused' } : { ok: true };
     }
 
     return { upgradeOptions, upgradePrice, addUpgradeToCart };
@@ -397,6 +404,7 @@
     PLEDGE_STORE_URL,
     AUTH_URL,
     CONTEXT_URL,
+    CART_TOKEN_URL,
     UPGRADE_URL,
     // Pure pieces, for tests.
     contextBody,
