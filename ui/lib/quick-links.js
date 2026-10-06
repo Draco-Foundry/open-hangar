@@ -18,8 +18,13 @@ export const QUICK_LINKS = [
     links: [
       { t: 'My Hangar', i: 'hangar', u: `${RSI}/en/account/pledges` },
       { t: 'Buy-Back Pledges', i: 'buyback', u: `${RSI}/en/account/buy-back-pledges` },
-      { t: 'Billing and Orders', i: 'receipt', u: `${RSI}/en/account/billing` },
-      { t: 'Manage Subscriptions', i: 'sub', u: `${RSI}/en/pledge/subscriptions` },
+      {
+        t: 'Billing and Orders',
+        d: 'Orders, and manage your subscription',
+        i: 'receipt',
+        u: `${RSI}/en/account/billing`,
+      },
+      { t: 'Subscription Plans', i: 'sub', u: `${RSI}/en/pledge/subscriptions` },
       {
         t: 'Subscriber Store',
         i: 'sub',
