@@ -4498,7 +4498,8 @@ async function importBackup(file) {
     refSrc && refSrc.items && !Array.isArray(refSrc.items)
       ? OH.normalizeReferral(refSrc.items)
       : null;
-  state.owner = null; // imports aren't attributed to an account (see importDB)
+  // A backup isn't attributed to an account; the website's file is (see importDB).
+  state.owner = res.db.owner || null;
   await OH.dismissDamaged(); // restored from a backup: the damage notice has done its job
   renderDbNotice();
   state.shown = new Set(); // default: no filter selected = show all
@@ -4508,9 +4509,22 @@ async function importBackup(file) {
   state.bbTraits = new Map();
   state.bbPriceMax = null;
   renderAccount(); // reflect imported referral in the pill
-  setDataMsg(
-    `Imported ${sourceItemCount(res.db.sources)} item(s). Open Inventory, Buy-Backs or Stats to view.`,
-  );
+  const count = sourceItemCount(res.db.sources);
+  if (res.site) {
+    renderProfiles(); // parked accounts show under Saved Accounts
+    const others = res.site.parked;
+    setDataMsg(
+      others.length
+        ? `Imported ${others.length + 1} RSI accounts from your website data. ${res.site.live} is loaded (${count} item(s)). ${listNames(others)} ${others.length > 1 ? 'are' : 'is'} under Saved Accounts and load when you sign in as them.`
+        : `Imported ${count} item(s) for ${res.site.live} from your website data. Open Inventory, Buy-Backs or Stats to view.`,
+    );
+    return;
+  }
+  setDataMsg(`Imported ${count} item(s). Open Inventory, Buy-Backs or Stats to view.`);
+}
+// ["A", "B", "C"] → "A, B and C".
+function listNames(names) {
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0] || '';
 }
 
 // Fill `state` from a stored DB (init, account switches, restores).
