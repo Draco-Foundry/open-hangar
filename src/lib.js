@@ -2946,16 +2946,20 @@
   // Nothing leaves the browser unless the user connects AND presses Sync now.
   // Connecting uses a device code: the site confirms it while signed in, then
   // hands this extension a sync token (stored in `siteLink`).
-  const SITE_DEFAULT = 'https://app.openhangar.space';
+  // A dev build's built-in site: `npm run build:staging` writes the staging URL
+  // here (scripts/pack.mjs), so it syncs without a `siteUrl` override. Always empty
+  // in the repo; a store build can never carry it (scripts/check-store-build.mjs).
+  const SITE_BUILT_IN = '';
+  const SITE_DEFAULT = SITE_BUILT_IN || 'https://app.openhangar.space';
   OH.siteUrl = async function siteUrl() {
     const { siteUrl } = await chrome.storage.local.get('siteUrl'); // dev override
     return (siteUrl || SITE_DEFAULT).replace(/\/+$/, '');
   };
   // Off for everyone until app.openhangar.space launches; on only when a
-  // developer sets `siteUrl` (local testing).
+  // developer sets `siteUrl` (local testing) or built with build:staging.
   OH.siteEnabled = async function siteEnabled() {
     const { siteUrl } = await chrome.storage.local.get('siteUrl');
-    return Boolean(siteUrl);
+    return Boolean(siteUrl || SITE_BUILT_IN);
   };
   OH.getSiteLink = async function getSiteLink() {
     return (await chrome.storage.local.get('siteLink')).siteLink || null;

@@ -125,7 +125,10 @@ saving it as a fixture is the fastest feedback loop.
 (everything between `@sync-start` and `@sync-end` markers) out of store builds, and
 fails if `app.openhangar.space` is left anywhere in them. To test sync locally, build
 with `OH_SYNC=1 npm run build` and set the `siteUrl` storage key to your local site.
-Mark any new sync code the same way.
+`npm run build:staging` builds with sync on and already pointed at
+staging.openhangar.space, no storage key needed. That build is for your browser only:
+release, publish and CI fail if a store build carries it
+(`scripts/check-store-build.mjs`). Mark any new sync code the same way.
 
 ## Firefox Notes
 
@@ -150,16 +153,25 @@ host permissions behave differently than on Chrome. See ROADMAP.md.
 
 Everything automated lives in `.github/workflows/`:
 
-- **CI** (`ci.yml`): on every push and PR, runs the unit tests, the Prettier check, the
-  dashboard UI test, builds the store zips through Firefox's store linter, and checks the
-  workflow files themselves. Tells #ops on Discord when `main` goes red.
+- **CI** (`ci.yml`): once per change (pushes to `main`, and every PR whatever its
+  base), runs the unit tests, the Prettier check, the dashboard UI test, builds the
+  store zips through Firefox's store linter, and checks the workflow files themselves.
+  A new commit on a PR cancels its older run. A PR that only touches Markdown, `docs/`,
+  `site/` or issue templates skips the UI test and the zips (the `test` check still
+  reports). Tells #ops on Discord when `main` goes red.
+- **Pre-push hook** (`scripts/hooks/pre-push`): `npm install` points git at
+  `scripts/hooks`, so every `git push` first runs `npm run format:check` and
+  `npm test` (a few seconds; the UI test stays in CI). In an emergency,
+  `git push --no-verify` skips it.
 - **Pages** (`pages.yml`): deploys the website in `site/` to Cloudflare when it changes
   on `main`, and once a day to refresh the exchange rates.
-- **Release** (`release.yml`): a pushed `v*` tag builds the Chrome and Firefox zips and
-  publishes a GitHub Release with that version's CHANGELOG notes.
-- **Publish to stores** (`publish.yml`): run by hand after a release to upload a tag to
-  Chrome, Edge and Firefox, then announce it on Discord. Never runs on its own; a dry run
-  checks it on PRs that touch publishing. See [docs/STORE.md](docs/STORE.md).
+- **Release** (`release.yml`): a pushed `v*` tag builds the Chrome and Firefox zips,
+  publishes a GitHub Release with that version's CHANGELOG notes, and starts Publish to
+  stores for it.
+- **Publish to stores** (`publish.yml`): uploads a tag to Chrome, Edge and Firefox, then
+  announces it on Discord. Started by Release (or by hand); it waits for CI on the
+  tag's commit, and nothing uploads until the owner approves the `stores` environment.
+  A dry run checks it on PRs that touch publishing. See [docs/STORE.md](docs/STORE.md).
 - **Ship catalog** (`ship-catalog.yml`): weekly refresh of `src/data/ship-catalog.json`,
   committed to `main` only when it changed.
 - **RSI canary** (`canary.yml`): once a day, runs the real parsers on RSI's public pages

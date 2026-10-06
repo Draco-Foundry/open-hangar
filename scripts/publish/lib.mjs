@@ -10,6 +10,16 @@ export function ciPassed(runs) {
   );
 }
 
+// Where CI stands on the commit, for the publish job's wait (ci-gate.mjs):
+//   passed   a run finished green
+//   pending  no run yet, or one is queued / running: keep waiting
+//   failed   every run finished and none of them green: stop waiting
+export function ciState(runs) {
+  if (ciPassed(runs)) return 'passed';
+  if (!Array.isArray(runs) || !runs.length) return 'pending';
+  return runs.some((r) => r.status !== 'completed') ? 'pending' : 'failed';
+}
+
 // "v0.2.13" or "0.2.13" against manifest.json's version.
 export function tagMatches(tag, version) {
   return typeof tag === 'string' && tag.replace(/^v/, '') === version;

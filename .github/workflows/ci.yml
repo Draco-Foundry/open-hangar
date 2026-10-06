@@ -1,17 +1,51 @@
 name: CI
 
+# One run per change: a push to main runs on push, everything else runs as a pull
+# request (any base, so PRs into redesign/0.3-svelte too). Release tags need no
+# run of their own: the tag's commit is main's, and publish.yml waits for CI on it.
 on:
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
+
+# A newer commit on a PR cancels the PR's older run. Runs on main never cancel or
+# queue behind each other (each gets its own group): publish.yml waits for CI on
+# the release commit, so that run must always finish.
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || format('{0}-{1}', github.ref, github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
+  pull-requests: read # to list a PR's changed files (docs-only check)
 
 jobs:
+  # Branch protection requires this job by name ("test"): keep the name, and keep
+  # it reporting success on docs-only PRs (the slow steps skip, the job still runs).
   test:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Docs-only PRs (Markdown, docs/, the landing page in site/, issue templates)
+      # skip the slow UI test and the store packaging; the fast checks still run.
+      # When in doubt (not a PR, or the file list can't be read) everything runs.
+      - name: What changed
+        id: changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          docs_only=false
+          if [ -n "$PR" ] && files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename'); then
+            echo "$files"
+            code=$(echo "$files" | grep -vE '\.md$|^docs/|^site/|^\.github/ISSUE_TEMPLATE/' || true)
+            if [ -n "$files" ] && [ -z "$code" ]; then docs_only=true; fi
+          fi
+          echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
+          if [ "$docs_only" = true ]; then
+            echo "::notice::Docs-only change: the UI test and store packaging are skipped"
+          fi
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
@@ -20,11 +54,17 @@ jobs:
       - run: npm run format:check
       # Click through the real dashboard with the demo account (Chrome is
       # preinstalled on GitHub's Ubuntu runners).
-      - run: npm run test:ui
+      - if: steps.changes.outputs.docs_only != 'true'
+        run: npm run test:ui
       # The exact store zips, through Firefox's store linter, so a dependency bump
       # that breaks packaging fails here and not on release day.
-      - run: npm run pack
-      - run: npx web-ext lint --source-dir dist/firefox
+      - if: steps.changes.outputs.docs_only != 'true'
+        run: npm run pack
+      - if: steps.changes.outputs.docs_only != 'true'
+        run: npx web-ext lint --source-dir dist/firefox
+      # No store build may point at staging (that's npm run build:staging, dev only).
+      - if: steps.changes.outputs.docs_only != 'true'
+        run: node scripts/check-store-build.mjs
 
   # Every workflow file checked, so a typo fails the PR instead of a release (#235).
   workflows:

@@ -18,9 +18,31 @@ const RUNTIME = ['_locales', 'icons', 'src'];
 
 // Sync to app.openhangar.space isn't launched, and the privacy policy says nothing
 // leaves your device, so store builds don't carry its code at all (#187). Lines from
-// a "@sync-start" marker through "@sync-end" are cut. OH_SYNC=1 keeps them, for
-// developers testing sync locally (with the `siteUrl` storage key).
-const KEEP_SYNC = process.env.OH_SYNC === '1';
+// a "@sync-start" marker through "@sync-end" are cut. OH_SYNC=1 (or --sync) keeps
+// them, for developers testing sync locally (with the `siteUrl` storage key, or
+// pre-pointed at staging by `npm run build:staging`).
+const args = process.argv.slice(2);
+const KEEP_SYNC = process.env.OH_SYNC === '1' || args.includes('--sync');
+
+// `npm run build:staging` (--site=<url> or OH_SITE=<url>): a dev build with sync
+// on and pointed at that site, written into lib.js's SITE_BUILT_IN, so nobody has to
+// set the `siteUrl` storage key by hand. Dev builds only: it needs sync kept, and
+// scripts/check-store-build.mjs fails any release or publish whose build carries it.
+const SITE =
+  (args.find((a) => a.startsWith('--site=')) || '').slice('--site='.length) ||
+  process.env.OH_SITE ||
+  '';
+if (SITE) {
+  if (!KEEP_SYNC) throw new Error('--site / OH_SITE needs sync kept (--sync or OH_SYNC=1)');
+  if (!/^(https:\/\/[a-z0-9.-]+|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?)$/i.test(SITE))
+    throw new Error(`--site / OH_SITE must be an https:// origin (or http://localhost): ${SITE}`);
+}
+const SITE_LINE = "const SITE_BUILT_IN = '';";
+function presetSite(file) {
+  const src = readFileSync(file, 'utf8');
+  if (src.split(SITE_LINE).length !== 2) throw new Error(`${file}: expected one "${SITE_LINE}"`);
+  writeFileSync(file, src.replace(SITE_LINE, `const SITE_BUILT_IN = ${JSON.stringify(SITE)};`));
+}
 const SYNC_FILES = ['src/lib.js', 'src/dashboard.js', 'src/dashboard.html'];
 function stripSync(file) {
   const out = [];
@@ -86,5 +108,8 @@ for (const [name, transform] of Object.entries(targets)) {
     for (const f of SYNC_FILES) stripSync(`${out}/${f}`);
     assertNoSyncHost(`${out}/src`);
   }
-  console.log(`built ${out}${KEEP_SYNC ? ' (with sync, OH_SYNC=1)' : ''}`);
+  if (SITE) presetSite(`${out}/src/lib.js`);
+  console.log(
+    `built ${out}${KEEP_SYNC ? ' (with sync)' : ''}${SITE ? `, syncing to ${SITE} (dev build, never for a store)` : ''}`,
+  );
 }

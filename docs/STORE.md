@@ -194,13 +194,15 @@ CONTRIBUTING "Safari Notes". The other three stores are live, so this is the one
 
 ## 12. Publishing Updates From GitHub
 
-1. Bump `manifest.json` / `package.json`, move the CHANGELOG's Unreleased notes under
-   the new version, merge, then push a tag (`git tag v0.2.9 && git push origin v0.2.9`).
-   The **Release** workflow builds the zips and the GitHub Release.
-2. **Actions → Publish to stores → Run workflow**, enter the tag, pick a store (or all).
-   It uploads and submits for review; each store still reviews before it goes live.
-   Each upload job waits for you to **Approve** the `stores` environment in the run
-   (Review deployments).
+1. `npm run release <x.y.z>` on a clean `main` (or bump `manifest.json` /
+   `package.json`, move the CHANGELOG's Unreleased notes under the new version, merge,
+   and push a tag). The **Release** workflow builds the zips and the GitHub Release,
+   then starts **Publish to stores** for the tag with `store: all`.
+2. That run checks everything, waits for CI on the release commit to pass, then each
+   upload job waits for you to **Approve** the `stores` environment in the run
+   (Review deployments). It uploads and submits for review; each store still reviews
+   before it goes live. To publish one store or retry, run **Actions → Publish to
+   stores → Run workflow** by hand with the tag and a store.
 
 Picking a single store whose secrets aren't set skips it; picking **all** fails
 instead, so Discord never announces a store that got nothing. See Store Keys below for
