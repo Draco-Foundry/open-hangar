@@ -444,7 +444,7 @@ test('polite: one request at a time with a pause, and nothing during a Retry-Aft
 });
 
 // The background worker as a store build ships it (scripts/pack.mjs cuts @sync blocks).
-function loadBackground({ sync }) {
+function loadBackground({ sync, rsiOpts }) {
   let src = fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'), 'utf8');
   if (!sync) {
     const out = [];
@@ -458,7 +458,7 @@ function loadBackground({ sync }) {
   }
   const listen = () => ({ addListener() {} });
   let external;
-  const rsi = fakeRsi();
+  const rsi = fakeRsi(rsiOpts);
   const area = { get: async () => ({}), set: async () => {}, remove: async () => {} };
   const chrome = {
     storage: { local: area, session: area, onChanged: listen() },
@@ -558,6 +558,33 @@ test('website bridge in a sync build answers both the cart and Connect', async (
     'https://staging.openhangar.space',
   );
   assert.equal(o.ok, true);
+});
+
+test('website bridge passes skus on and returns the edition that worked (#329)', async () => {
+  const SITE = 'https://app.openhangar.space';
+  const x = loadBackground({ sync: false, rsiOpts: { noUpgradeTo: [9002] } });
+  const o = await x.send(
+    { type: 'oh-upgrade-options', toShipId: 900, toSkuId: 9002, skus: [9002, 9001] },
+    SITE,
+  );
+  assert.equal(o.ok, true);
+  assert.equal(o.toSkuId, 9001);
+  // A page without skus (older website): only its one edition, as before.
+  const old = await x.send({ type: 'oh-upgrade-options', toShipId: 900, toSkuId: 9002 }, SITE);
+  assert.deepEqual(old, { ok: false, error: 'refused' });
+  // Junk and long lists from a page are cleaned and capped.
+  const y = loadBackground({ sync: false, rsiOpts: { noUpgradeTo: [9002, 2, 3, 4, 5, 6] } });
+  const many = [9002, 'x', -1, 1.5, 2, 3, 4, 5, 6, 9001];
+  const r = await y.send(
+    { type: 'oh-upgrade-options', toShipId: 900, toSkuId: 9002, skus: many },
+    SITE,
+  );
+  assert.deepEqual(r, { ok: false, error: 'refused' }, '9001 is past the cap of 6');
+  const tried = y.rsi.calls.filter((c) => c.body.operationName === 'filterShips');
+  assert.deepEqual(
+    tried.map((c) => c.body.variables.toId),
+    [9002, 2, 3, 4, 5, 6],
+  );
 });
 
 test("signs in the way RSI's own window does: x-rsi-token on setup, X-CSRF-TOKEN on GraphQL", async () => {
