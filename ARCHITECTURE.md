@@ -152,10 +152,14 @@ the new account's parked DB (if any) comes back (`OH.switchProfile()`). Clear Da
 cache and log, but keeps UI preferences.
 
 **Backups and export.** `OH.exportDB()` writes one JSON file:
-`{ app, appVersion, exportedAt, schemaVersion, account, sources, history }`, with the
-referral code and URL stripped (`sanitizeSourcesForExport()`). `OH.importDB()` refuses
-files newer than it understands, merges history instead of replacing it
-(`OH.mergeHistory()`), and never restores the `account` block. `OH.exportHTF()` writes
+`{ app, appVersion, exportedAt, schemaVersion, account, sources, history, pledgeArchive }`,
+with the referral code and URL stripped (`sanitizeSourcesForExport()`) and the pledge
+archive trimmed to what buy-back details read (`OH.leanArchive()`). `OH.importDB()`
+refuses files newer than it understands, merges history instead of replacing it
+(`OH.mergeHistory()`), merges the pledge archive (`OH.mergeArchive()`, newest `goneAt`
+wins, 2,000 kept), and never restores the `account` block. Sync sends the same payload,
+kept under 4 MB by `OH.syncBody()` (oldest archive entries, then oldest history
+snapshots, left out of that request). `OH.exportHTF()` writes
 the community Hangar Transfer Format (one entry per ship).
 
 ## The Svelte and Classic Bridge
