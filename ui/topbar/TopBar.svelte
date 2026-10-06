@@ -1,7 +1,7 @@
 <script>
   // The top bar on every page (Top Bar and Top Menu Pass in docs/REDESIGN-0.3.md):
-  // the logo, the page links with counts beside Inventory and Buy-Backs (a row you
-  // swipe on a phone), then the search box, the alerts bell, Scan ▾ and your menu.
+  // the logo, the page links (names only, no counts: owner, #260; a row you swipe
+  // on a phone), then the search box, the alerts bell, Scan ▾ and your menu.
   // Pinned while scrolling everywhere but Home; it slims down while you scroll down.
   import { app, version } from '../lib/app.svelte.js';
   import Bell from './Bell.svelte';
@@ -22,12 +22,7 @@
 
   const d = $derived.by(() => {
     version.n;
-    const a = app();
-    const n = (count) => (count ? a.compactNum(count) : '');
-    return {
-      view: a.top.view,
-      counts: { inventory: n(a.state.items.length), buybacks: n(a.state.buybacks.length) },
-    };
+    return { view: app().top.view };
   });
 
   // The search box (ui/search) mounts into #top-search in the page's <header>; this
@@ -85,9 +80,7 @@
 <nav id="nav">
   {#each PAGES as [view, label] (view)}
     <a href="#{view}" data-view={view} class:active={d.view === view}
-      >{label}{#if view in d.counts}{' '}<span class="nav-n" id="nav-n-{view}"
-            >{d.counts[view]}</span
-          >{/if}</a
+      >{label}</a
     >
   {/each}
 </nav>

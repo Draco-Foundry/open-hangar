@@ -419,7 +419,7 @@
     );
   }
 
-  // A copy-paste report for bug posts: version, browser, data counts, cache
+  // The Flight Log (#315), a copy-paste report for bug posts: version, browser, data counts, cache
   // state and the recent log. Wrapped in a code block so Discord/GitHub keep
   // the columns. Contains counts and dates only — no handle, codes or names.
   OH.errorReport = async function errorReport({ maxLines = 40 } = {}) {
@@ -442,7 +442,7 @@
     const usage = await OH.storageUsage().catch(() => null);
     const lines = [
       '```',
-      'Open Hangar error report',
+      'Open Hangar flight log',
       `Version:   ${manifest.version || '?'} (${manifest.browser_specific_settings ? 'Firefox' : 'Chrome'} build)`,
       `Browser:   ${browserLabel((globalThis.navigator && globalThis.navigator.userAgent) || '')}`,
       `Hangar:    ${count(src('hangar'))} items, scanned ${ago(src('hangar').scannedAt)}`,
@@ -1539,14 +1539,14 @@
         // the parser couldn't read them → RSI likely changed their markup.
         if (src.marker && src.marker.test(html)) {
           return {
-            error: `Signed in, but couldn't read any ${src.label.toLowerCase()}. RSI may have changed their site. Copy the error report and drop it in #bug-reports, we'll patch it.`,
+            error: `Signed in, but couldn't read any ${src.label.toLowerCase()}. RSI may have changed their site. Send your flight log to #bug-reports and we'll patch it.`,
           };
         }
         // Sources that need server-rendered HTML but got none (e.g. a client-side
         // SPA shell) say so, rather than silently reporting "empty".
         if (src.requiresRender) {
           return {
-            error: `Couldn't read ${src.label.toLowerCase()}: RSI sent back an empty page. Copy the error report and drop it in #bug-reports, we'll patch it.`,
+            error: `Couldn't read ${src.label.toLowerCase()}: RSI sent back an empty page. Send your flight log to #bug-reports and we'll patch it.`,
           };
         }
         break; // logged in, source is genuinely empty
@@ -3254,6 +3254,15 @@
       .replace(/\s{2,}/g, ' ')
       .trim();
     return short || full;
+  };
+  // A buy-back's title, the one helper for every list, window and export (#273).
+  // Short (the default): no type label or Warbond / Standard Edition, "—" when it
+  // has no name. Full: RSI's name as is, for the details window and the exports.
+  // A CCU reads "from → to" either way.
+  OH.buybackTitle = function buybackTitle(b, { short = true } = {}) {
+    const s = short ? OH.shortBuybackName : (n) => n;
+    if (b.ccu) return `${s(b.ccu.from)} → ${s(b.ccu.to)}`;
+    return short ? s(b.name) || '—' : b.name || '';
   };
   OH.pruneBuybackDetails = async function pruneBuybackDetails(ids) {
     const keep = new Set(ids.map(String));

@@ -105,7 +105,7 @@ drop-down (every page); Scan is its own progress bar ("Scanning… 4/12", "✓ D
 "Last scan…" on hover; a search box on every page that expands (or /); your RSI
 portrait replaces the gear and opens the menu (name + org at the top, then Currency,
 Streamer Mode, Rescan Reminder, How to Use, Updates, Developers, Log Out of RSI, Clear
-Data); a Streamer pill while it's on; counts beside Inventory and Buy-Backs; an update
+Data); a Streamer pill while it's on; page names without counts (#260, 2026-10-05); an update
 dot on the portrait with "Update ready: Reload" in the menu; a slim bar while
 scrolling down; a real logo mark; phone tabs you swipe.
 

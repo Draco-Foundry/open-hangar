@@ -44,7 +44,7 @@ test('log keeps the newest entries and the report includes them', async () => {
   assert.equal(log.length, 100);
   assert.equal(log.at(-1).msg, 'Not signed in to RSI');
   const report = await OH.errorReport();
-  assert.match(report, /^```\nOpen Hangar error report/);
+  assert.match(report, /^```\nOpen Hangar flight log/);
   assert.match(report, /Version: +9\.9\.9/);
   assert.match(report, /ERROR +status +Not signed in to RSI/);
   await OH.clearLog();
