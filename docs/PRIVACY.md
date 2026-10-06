@@ -17,7 +17,7 @@ When you click Scan, the extension reads your own RSI account by making requests
 
 - Your hangar (pledges: ships, CCUs, add-ons, coupons).
 - A short history of past hangar scans (pledge id, name and value per scan), so the extension can show what changed between scans.
-- An archive of pledges that have left your hangar (melted, gifted or upgraded away): pledge id, name, value and dates, for up to the newest 2,000. It is used to fill in buy-back details.
+- An archive of pledges that have left your hangar (melted, gifted or upgraded away): pledge id, name, value, insurance, contents and dates, for up to the newest 2,000. It is used to fill in buy-back details.
 - Your buy-back pledges. After a good buy-back scan, the extension also opens up to 30 buy-back packs it hasn't read yet, to see what is inside each one. This means more requests to RSI than one page per scan. It is still read-only, and only ever your own account.
 - Account identity and balances (handle, display name, UEE Citizen Record number, org, rank, Store Credit, UEC, REC). The Citizen Record number is the public number on your RSI profile. It never changes.
 - Your referral code and your recruits/prospects (handles, monikers, dates).
