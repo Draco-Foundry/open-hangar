@@ -28,3 +28,10 @@ a.sup-chip:hover {
 #view-developers pre {
   border-radius: var(--r-md);
 }
+/* Storage Used line under the data tools; amber once it's bigger than expected. */
+.storage-use {
+  margin-top: 8px;
+}
+.storage-use.warn {
+  color: var(--warn);
+}
