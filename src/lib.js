@@ -273,6 +273,99 @@
   };
   OH.clearLog = () => chrome.storage.local.remove(LOG_KEY);
 
+  // --- Storage size guard -------------------------------------------------------
+  // The extension keeps `unlimitedStorage` (without it a big hangar would hit the
+  // browser's 10 MB limit and writes would fail quietly), so nothing outside stops
+  // a bug from growing storage forever. Every growing key has its own cap (see
+  // test/storage-budget.test.js); this measures what's really there after each
+  // scan. Past STORAGE_WARN_BYTES it logs a warning and the Developers page says
+  // so. It never deletes or blocks anything.
+  OH.STORAGE_WARN_BYTES = 50e6;
+  // Saved accounts are stored under `profile:<handle>`: the handle stays out of
+  // the log and the report.
+  const storageKeyLabel = (k) => (/^profile:/.test(k) ? 'profile:(saved account)' : k);
+  // → { total, keys: [{ key, bytes }] biggest first, over }. Uses the browser's own
+  // count where it has one (Chrome), else the JSON size (Firefox has no
+  // getBytesInUse on every version). No network, nothing written.
+  OH.storageUsage = async function storageUsage() {
+    const area = chrome.storage.local;
+    const enc = new TextEncoder();
+    let keys = null;
+    let all = null;
+    const perKey = typeof area.getBytesInUse === 'function';
+    if (perKey && typeof area.getKeys === 'function') {
+      try {
+        keys = await area.getKeys();
+      } catch {
+        keys = null;
+      }
+    }
+    if (!Array.isArray(keys)) {
+      all = (await area.get(null)) || {};
+      keys = Object.keys(all);
+    }
+    const sizes = new Map();
+    for (const key of keys) {
+      let bytes = null;
+      if (perKey) {
+        try {
+          bytes = await area.getBytesInUse(key);
+        } catch {
+          bytes = null;
+        }
+      }
+      if (!Number.isFinite(bytes)) {
+        if (!all) all = (await area.get(null)) || {};
+        try {
+          bytes = enc.encode(key + JSON.stringify(all[key] ?? null)).length;
+        } catch {
+          bytes = 0;
+        }
+      }
+      const label = storageKeyLabel(key);
+      sizes.set(label, (sizes.get(label) || 0) + bytes);
+    }
+    const list = [...sizes].map(([key, bytes]) => ({ key, bytes }));
+    list.sort((a, b) => b.bytes - a.bytes || (a.key < b.key ? -1 : 1));
+    const total = list.reduce((s, x) => s + x.bytes, 0);
+    return { total, keys: list, over: total > OH.STORAGE_WARN_BYTES };
+  };
+  // "4.2 MB" / "820 KB". Pure.
+  OH.formatBytes = function formatBytes(n) {
+    const b = Number(n) || 0;
+    if (b >= 1e6) return `${(b / 1e6).toFixed(1)} MB`;
+    if (b >= 1e3) return `${Math.round(b / 1e3)} KB`;
+    return `${b} B`;
+  };
+  // After a scan: measure, and log a warning when it's bigger than expected.
+  // Never throws.
+  OH.checkStorage = async function checkStorage() {
+    try {
+      const u = await OH.storageUsage();
+      if (u.over) {
+        const top = u.keys
+          .slice(0, 3)
+          .map((x) => `${x.key} ${OH.formatBytes(x.bytes)}`)
+          .join(', ');
+        await OH.log(
+          'warn',
+          'storage',
+          `storage is ${OH.formatBytes(u.total)}, larger than expected. Biggest: ${top}`,
+        );
+      }
+      return u;
+    } catch {
+      return null;
+    }
+  };
+  // Debounced, so Scan All (three sources) measures once.
+  let storageCheckTimer = null;
+  function queueStorageCheck() {
+    clearTimeout(storageCheckTimer);
+    storageCheckTimer = setTimeout(() => OH.checkStorage(), 2000);
+    storageCheckTimer?.unref?.(); // Node (tests): don't hold the process open
+  }
+
   const stamp = (t) => {
     const d = new Date(t);
     const p = (n) => String(n).padStart(2, '0');
@@ -346,6 +439,7 @@
     const log = await OH.getLog();
     const damaged = await OH.getDamaged();
     const bbd = await OH.buybackDetailStats();
+    const usage = await OH.storageUsage().catch(() => null);
     const lines = [
       '```',
       'Open Hangar error report',
@@ -357,6 +451,7 @@
       `History:   ${Array.isArray(db.history) ? db.history.length : 0} snapshots`,
       `Bb detail: ${bbd.history} from hangar history · ${bbd.scan} value only from scan history · ${bbd.rsi} read from RSI · ${bbd.rejected} names didn't agree`,
       `Set aside: ${damaged.length ? damaged.map((d) => `${d.what} (${d.problems.slice(0, 3).join('; ')})`).join(', ') : 'nothing'}`,
+      `Storage:   ${usage ? OH.formatBytes(usage.total) + (usage.over ? ', larger than expected' : '') : 'unknown'}`,
       `Catalog:   ${Array.isArray(cat.list) ? cat.list.length : 0} ships (v${cat.v || '?'}, ${ago(cat.at)}) · ship matrix ${Array.isArray(mat.list) ? mat.list.length : 0}`,
       `Log:       ${log.length ? `last ${Math.min(maxLines, log.length)} of ${log.length}` : 'empty'}`,
       ...log.slice(-maxLines).map(OH.formatLogLine),
@@ -1555,6 +1650,7 @@
       OH.log('info', src.id, `scan ok, ${result.items.length} items`);
       // A complete buy-back list: drop cached details for ones since reclaimed.
       if (src.id === 'buybacks') await OH.pruneBuybackDetails(result.items.map((b) => b.id));
+      queueStorageCheck();
       return { ok: true, items: result.items, scannedAt };
     } catch (err) {
       OH.log('error', src.id, `scan crashed: ${err?.stack || err?.message || err}`);
@@ -2117,6 +2213,17 @@
     }
     return out;
   }
+  // The newest `max` cache entries ({ at, … }) of `obj`. A time limit alone
+  // doesn't bound a cache, so each one keyed by name or address also has a count.
+  function capNewest(obj, max) {
+    const ids = Object.keys(obj || {});
+    if (ids.length <= max) return obj;
+    ids.sort((a, b) => (obj[b].at || 0) - (obj[a].at || 0));
+    return Object.fromEntries(ids.slice(0, max).map((k) => [k, obj[k]]));
+  }
+  OH.capNewest = capNewest;
+  // Entry caps for the caches above and below (test/storage-budget.test.js).
+  OH.CACHE_MAX = { shipImages: 2000, wikiFiles: 1000, shipStock2: 1000 };
   let catalogMem = null; // [{ lname, slug, cls, msrp }]  (wiki)
   const CATALOG_CACHE_V = 8; // v2: class + msrp, all pages · v3: fleet fields · v4: display name · v5: + ship matrix (concept ships) · v6: manufacturer · v7: every role (foci) · v8: sizes filled (ground vehicles, special editions)
   let catalogInflight = null;
@@ -2528,7 +2635,7 @@
         await mutateStored('shipImages', (cur = {}) => {
           const out = pruneTimed(cur, (e) => (e.url ? SHIP_IMG_TTL : 24 * 3600e3));
           out[key] = { url, at: Date.now() };
-          return out;
+          return capNewest(out, OH.CACHE_MAX.shipImages);
         }).catch(() => {
           /* storage full / unavailable — memory cache still applies */
         });
@@ -3692,10 +3799,9 @@
       }
     }
     if (Object.keys(fresh).length) {
-      await mutateStored(WIKI_FILES_KEY, (cur = {}) => ({
-        ...pruneTimed(cur, ttl),
-        ...fresh,
-      })).catch(() => {
+      await mutateStored(WIKI_FILES_KEY, (cur = {}) =>
+        capNewest({ ...pruneTimed(cur, ttl), ...fresh }, OH.CACHE_MAX.wikiFiles),
+      ).catch(() => {
         /* storage full: this session still has the URLs */
       });
     }
@@ -3856,10 +3962,12 @@
       OH.log('warn', 'store', `stock check failed: ${e?.message || e}`);
     }
     if (s) {
-      await mutateStored(STOCK_KEY, (cur = {}) => ({
-        ...pruneTimed(cur, () => STOCK_TTL),
-        [url]: { s, at: Date.now() },
-      })).catch(() => {});
+      await mutateStored(STOCK_KEY, (cur = {}) =>
+        capNewest(
+          { ...pruneTimed(cur, () => STOCK_TTL), [url]: { s, at: Date.now() } },
+          OH.CACHE_MAX.shipStock2,
+        ),
+      ).catch(() => {});
     }
     return s;
   };

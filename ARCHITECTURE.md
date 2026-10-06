@@ -132,6 +132,14 @@ Other keys are caches of public data (for example `shipMatrix`, `shipCatalog`,
 preferences read at start-up in `src/dashboard.js` (for example `uiLayout`, `currency`,
 `wishlist`, `streamerMode`).
 
+**Every key that grows has a cap.** Because `unlimitedStorage` removes the browser's
+limit, each growing key keeps its own: a count, a size or an expiry (history 3 MB,
+pledge archive 2,000, error log 100, `shipImages` 2,000, `wikiFiles` 1,000,
+`shipStock2` 1,000, …). `test/storage-budget.test.js` lists every key with its cap and
+fails when the code writes a key that isn't listed. After each scan
+`OH.checkStorage()` measures the total; past `OH.STORAGE_WARN_BYTES` (50 MB) it logs a
+warning and the Developers page names the biggest keys. It never deletes anything.
+
 **Two version numbers.** `DB_VERSION` (3) is how the database is stored in this
 browser; `EXPORT_VERSION` (2) is the backup file format. Both are defined at the top of
 `src/lib.js`, with their history in the comment above them.
