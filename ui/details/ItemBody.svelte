@@ -1,6 +1,7 @@
 <script>
   // A pledge's window: its facts, store price, where it is on RSI, what's inside.
   import Row from './Row.svelte';
+  import MeltOnRsi from './MeltOnRsi.svelte';
 
   let { v } = $props();
 </script>
@@ -29,6 +30,9 @@
         >View ↗</a
       >
     </Row>
+  {/if}
+  {#if v.melt}
+    {#key v.id}<MeltOnRsi m={v.melt} />{/key}
   {/if}
   <Row k="Scanned">{v.scanned}</Row>
   <h4 class="modal-h">Contents ({v.contents.length})</h4>

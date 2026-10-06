@@ -3446,11 +3446,14 @@ function buybackViewUrl(b) {
 // One "Reclaim" link for every buy-back: RSI's reclaim page, or for CCUs (which
 // have no page of their own; RSI reclaims them in a pop-up) the one-item
 // buy-back list entry where that button is.
-// Where a buy-back's Reclaim link goes: { url, tip, retired? } | { retired } | null.
+// Where a buy-back's Reclaim link goes: { blocked } | { url, tip, retired? } | { retired } | null.
 function reclaimOf(b) {
   // Retired ships (#306): RSI still sells their buy-backs back, so they keep the link
   // and get a "Retired, Buy-Back Still Open" label (`retired` is its note).
   const retired = OH.retiredBuyback(b);
+  // Pledges RSI never sells back (#403): say why instead of a link.
+  const block = OH.buybackBlock(b, bbDetail(b));
+  if (block) return { blocked: OH.BUYBACK_BLOCK_REASONS[block] };
   // A CCU's button on RSI has no page of its own: its href is just the pledge
   // store, which opened the store's front page instead of this upgrade (owner,
   // 2026-10-05). CCUs always use the one-item buy-back list, where RSI's own Buy
@@ -3926,6 +3929,22 @@ function itemView(p) {
       url: spot.url,
       title: `Opens page ${spot.page} of your RSI hangar; it's number ${spot.pos} on that page (as of your last scan)`,
     },
+    // Melt on RSI (#403): the same hangar page, behind an in-window confirm with
+    // what melting means. We never melt anything; RSI's own button does. Left out
+    // when RSI showed no melt button for it.
+    melt:
+      spot && p.meltable !== false
+        ? (() => {
+            const f = OH.meltFacts(p);
+            return {
+              url: spot.url,
+              page: spot.page,
+              pos: spot.pos,
+              reason: f.block ? OH.BUYBACK_BLOCK_REASONS[f.block] : '',
+              lines: f.lines,
+            };
+          })()
+        : null,
     scanned: fmtScan(),
     contents: (p.contents || []).map((c) => ({
       kind: contentKind(c),
@@ -3959,6 +3978,15 @@ function bbView(b) {
     date: b.date || '',
     id: b.id ? String(b.id) : '',
     reclaim: reclaimOf(b),
+    // Can't Be Bought Back (#403): the reason, shown under the Reclaim row.
+    block: (() => {
+      const k = OH.buybackBlock(b, d);
+      return k ? OH.BUYBACK_BLOCK_REASONS[k] : '';
+    })(),
+    // Next to the price: a buy-back never keeps a sale price or a coupon (#403).
+    priceNote: b.isCCU
+      ? "A buy-back upgrade costs today's upgrade price, not what you paid."
+      : "Buy-backs cost full price: sale prices and subscriber coupons don't carry over.",
     contents:
       d && !d.partial
         ? {
@@ -3987,7 +4015,7 @@ function bbView(b) {
 // A retired ship (#306) keeps the button: RSI still sells its buy-backs back, and
 // `retired` words a refusal if RSI has closed it since.
 function bbCartOf(b) {
-  if (!b || !b.isCCU || !b.ccu) return null;
+  if (!b || !b.isCCU || !b.ccu || OH.buybackBlock(b)) return null;
   const n = (v) => (/^\d+$/.test(String(v || '')) ? Number(v) : null);
   const [pledgeId, fromShipId, toShipId, toSkuId] = [b.id, b.fromShipId, b.toShipId, b.toSkuId].map(
     n,

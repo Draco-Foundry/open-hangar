@@ -1605,7 +1605,72 @@ try {
   /Also Contains/.test(bbModal) && /Lifetime Insurance/.test(bbModal) && /LTI/.test(bbModal)
     ? ok('buy-back details: ships, insurance, also contains')
     : fail(`buy-back details: "${bbModal.slice(0, 160)}"`);
+  /full price|today's upgrade price/.test(bbModal)
+    ? ok('buy-back window: the full price note sits by the price (#403)')
+    : fail(`buy-back price note: "${bbModal.slice(0, 200)}"`);
   await page.keyboard.press('Escape');
+  // Can't Be Bought Back (#403): a tag with the reason and no Reclaim link; and the
+  // Melt on RSI confirm in a pledge window, red for a pledge RSI never sells back.
+  const melt = await page.evaluate(async () => {
+    const pause = () => new Promise((r) => setTimeout(r, 120));
+    const q = (sel) => document.querySelector(`#item-modal ${sel}`);
+    const text = (sel) => (q(sel) ? q(sel).textContent.replace(/\s+/g, ' ').trim() : '');
+    const out = {};
+    const b = state.buybacks.find((x) => !x.isCCU && /^\d+$/.test(String(x.id)));
+    openBuybackModal({ ...b, name: 'Add-On - Name Reservation', kind: 'addon' });
+    await pause();
+    out.bbTag = text('.bb-blocked');
+    out.bbReason = text('#bb-block-note');
+    out.bbNoReclaim = !q('a.bb-reclaim');
+    document.querySelector('#modal-close').click();
+    const p = state.items.find((x) => x.meltable !== false && !x.isCCU) || state.items[0];
+    openItemModal({
+      ...p,
+      meltable: true,
+      contents: [...(p.contents || []), { kind: '', label: 'Squadron 42 Digital Download' }],
+    });
+    await pause();
+    out.closedFirst = !q('#melt-confirm');
+    q('#melt-open')?.click();
+    await pause();
+    out.red = !!q('#melt-confirm.danger');
+    out.title = text('#melt-never');
+    out.never = text('.melt-never');
+    out.go = text('#melt-go');
+    out.goHref = q('#melt-go')?.getAttribute('href') || '';
+    out.keepFocused = document.activeElement?.textContent === 'Keep It';
+    document.activeElement?.click();
+    await pause();
+    out.kept = !q('#melt-confirm');
+    document.querySelector('#modal-close').click();
+    openItemModal({ ...p, meltable: true, name: 'Standalone Ships - Arrow', contents: [] });
+    await pause();
+    q('#melt-open')?.click();
+    await pause();
+    out.plain = !!q('#melt-confirm') && !q('#melt-confirm.danger');
+    out.plainGo = text('#melt-go');
+    out.plainText = text('#melt-confirm');
+    document.querySelector('#modal-close').click();
+    return out;
+  });
+  melt.bbTag === "Can't Be Bought Back" && /Add-on pledges/.test(melt.bbReason) && melt.bbNoReclaim
+    ? ok("buy-back window: Can't Be Bought Back with the reason, no Reclaim link")
+    : fail(`can't be bought back: ${JSON.stringify(melt)}`);
+  melt.closedFirst &&
+  melt.red &&
+  melt.title === 'Gone for Good if You Melt It' &&
+  /RSI never sells this one back\. Pledges with Squadron 42/.test(melt.never) &&
+  melt.go === 'I Understand, Open on RSI ↗' &&
+  /^https:\/\/robertsspaceindustries\.com\/account\/pledges\?page=\d+$/.test(melt.goHref) &&
+  melt.keepFocused &&
+  melt.kept
+    ? ok('pledge window: Melt on RSI asks first; red Gone for Good warning for never-sold-back')
+    : fail(`melt warning: ${JSON.stringify(melt)}`);
+  melt.plain &&
+  melt.plainGo === 'Open on RSI ↗' &&
+  /full price.*Buy-Back Token/.test(melt.plainText)
+    ? ok('pledge window: a plain melt confirm says what melting costs')
+    : fail(`melt confirm: ${JSON.stringify(melt)}`);
   await page.click('#bb-layout [data-layout="gallery"]');
   await page.click('#bb-layout [data-layout="list"]');
   await checkListAlignment('Buy-Backs', '#buybacks-body');
