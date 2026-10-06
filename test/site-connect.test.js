@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-function load() {
+function load(matches = ['https://app.openhangar.space/*', 'https://staging.openhangar.space/*']) {
   const stores = { local: {}, session: {} };
   const area = (name) => ({
     get: async (k) => {
@@ -34,9 +34,7 @@ function load() {
       onMessageExternal: { addListener: (f) => (external = f) },
       getManifest: () => ({
         version: '0.0.0',
-        externally_connectable: {
-          matches: ['https://app.openhangar.space/*', 'https://staging.openhangar.space/*'],
-        },
+        externally_connectable: { matches },
       }),
       getURL: (p) => `chrome-extension://id/${p}`,
     },
@@ -110,4 +108,15 @@ test('other websites get no answer; finishing needs a begin from the same site',
   assert.equal(cross.ok, false);
   assert.equal(x.fetched.length, 0);
   assert.equal(x.stores.local.siteLink, undefined);
+});
+
+// The beta build (npm run build:beta) leaves staging out of the manifest, so the
+// extension won't connect there either: production only.
+test('a build without staging in the manifest connects to production only', async () => {
+  const x = load(['https://openhangar.space/*', 'https://app.openhangar.space/*']);
+  const prod = await x.send({ type: 'oh-hello' }, 'https://app.openhangar.space');
+  assert.equal(prod.connect, true);
+  assert.equal(await x.send({ type: 'oh-hello' }, SITE), undefined, 'staging gets no answer');
+  const front = await x.send({ type: 'oh-hello' }, 'https://openhangar.space');
+  assert.equal(front.connect, false, 'Connect stays on the app');
 });
