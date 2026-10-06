@@ -212,6 +212,28 @@ One store update a day: a real run fails if another one sent something to the st
 in the last 24 hours, unless it finishes the same tag one store at a time or the
 **Hotfix** box is ticked ([ROLLBACK.md](ROLLBACK.md)).
 
+### Holding a Store Back
+
+When a version goes to some stores but one waits a day on purpose, the extension page
+can say so with the same yellow pill as "in review", e.g. Firefox `v0.2.19` and
+`v0.2.20 arriving Oct 7`:
+
+1. Edit `site/store-plan.json` on `main` (chrome, edge or firefox; the date is the UTC
+   day you plan to publish):
+
+   ```json
+   { "firefox": { "version": "0.2.20", "on": "2026-10-07" } }
+   ```
+
+2. Merge it. That deploys the site (owner OK needed), and the hourly site runs keep it
+   up to date.
+3. Nothing to undo: the pill goes by itself once that store goes to review ("in
+   review" replaces it), has the version live, or the UTC day is over. Set the file
+   back to `{}` when convenient.
+
+A typo (bad version or date, unknown store) just shows no pill. The pill only appears
+while the store's live version can be read and is older.
+
 ## 13. Store Keys
 
 The upload keys are secrets in the `stores` environment (repo Settings → Environments →
