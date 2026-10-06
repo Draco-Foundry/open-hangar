@@ -8,7 +8,7 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
   Content-Security-Policy: default-src 'self'; img-src 'self' data:; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; connect-src 'self' https://cloudflareinsights.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
 
-# The extension reads these two from its own pages (no host permission for this
+# The extension reads these from its own pages (no host permission for this
 # site), so they need CORS, as GitHub Pages always sent. Short cache: the kill
 # switch must reach everyone within minutes.
 /status.json
@@ -17,3 +17,7 @@
 /rates.json
   Access-Control-Allow-Origin: *
   Cache-Control: public, max-age=3600
+# Store versions: Firefox's "Check for Updates" reads it instead of addons.mozilla.org.
+/versions.json
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=600

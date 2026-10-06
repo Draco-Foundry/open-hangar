@@ -1,8 +1,9 @@
 // openhangar.space: the static site in ../site, except the home page, which the
 // website Worker (open-hangar-server, app.openhangar.space) renders with live
 // Star Citizen data, the extension page (/extension), the Store (/store and the
-// data it loads, /api/store/*) and the public game status feed the extension's
-// Game Status pill reads (/api/game-status).
+// data it loads, /api/store/*) and the public feeds the extension reads
+// (/api/game-status, /api/ships, /api/catalog, /api/referral-events,
+// /api/known-issues): the extension only talks to RSI and this site.
 // Only the paths below reach this script (run_worker_first in
 // wrangler.jsonc); everything else, including the extension's status.json kill
 // switch and rates.json, is served straight from the static files as before.
@@ -11,7 +12,16 @@
 // instead, so openhangar.space never goes blank.
 
 const HOME_TTL_S = 60; // the home and extension pages are cached at the edge for a minute
-const FEED = '/api/game-status'; // public JSON, same for everyone; the website sets its 10 min cache
+// The extension's feeds. The website answers them itself (its own cache, ETag,
+// Origin check and rate limit), so they pass straight through, never cached here:
+// the answer depends on the caller's Origin.
+const FEEDS = new Set([
+  '/api/game-status',
+  '/api/ships',
+  '/api/catalog',
+  '/api/referral-events',
+  '/api/known-issues',
+]);
 
 export default {
   async fetch(request, env, ctx) {
@@ -22,11 +32,11 @@ export default {
     // Extension" links come here. The static site/index.html is its fallback.
     const extension = url.pathname === '/extension';
     const page = home || extension;
-    const feed = url.pathname === FEED;
+    const feed = FEEDS.has(url.pathname);
 
     // These pages are the same for every visitor (always signed out here), so
     // one copy a minute serves everyone. Only a plain GET is cached.
-    const cacheable = (page || feed) && request.method === 'GET' && !url.search;
+    const cacheable = page && request.method === 'GET' && !url.search;
     const cache = caches.default;
     if (cacheable) {
       const hit = await cache.match(request);
@@ -43,15 +53,19 @@ export default {
     if (page && (!res || res.status >= 500 || (extension && res.status === 404))) {
       return staticHome(request, env);
     }
-    // The feed answers in JSON even when the website can't, so the pill just waits.
+    // A feed answers in JSON even when the website can't, so the extension keeps
+    // its saved copy and tries again later. The caller's Origin is echoed so the
+    // extension can read the 503 (our feeds never answer other sites anyway).
     if (feed && (!res || res.status >= 500)) {
-      return new Response(JSON.stringify({ error: 'game status unavailable' }), {
+      const origin = request.headers.get('origin');
+      return new Response(JSON.stringify({ error: 'feed unavailable' }), {
         status: 503,
         headers: {
           'content-type': 'application/json; charset=utf-8',
           'cache-control': 'no-store',
-          'access-control-allow-origin': '*',
           'retry-after': '600',
+          vary: 'Origin',
+          ...(origin ? { 'access-control-allow-origin': origin } : {}),
         },
       });
     }
@@ -59,8 +73,7 @@ export default {
 
     if (cacheable && res.ok && !res.headers.has('set-cookie')) {
       const copy = new Response(res.body, res);
-      // The feed keeps the website's own cache time (public, 10 min).
-      if (page) copy.headers.set('cache-control', `public, max-age=0, s-maxage=${HOME_TTL_S}`);
+      copy.headers.set('cache-control', `public, max-age=0, s-maxage=${HOME_TTL_S}`);
       ctx.waitUntil(cache.put(request, copy.clone()));
       return copy;
     }

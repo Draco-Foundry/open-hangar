@@ -20,7 +20,12 @@
       "/extension",
       "/store",
       "/api/store/*",
-      "/api/game-status", // the extension's Game Status pill (public JSON)
+      // The extension's public feeds (the website answers them, Origin-checked).
+      "/api/game-status",
+      "/api/ships",
+      "/api/catalog",
+      "/api/referral-events",
+      "/api/known-issues",
       "/_astro/*",
       "/fonts/*",
       "/favicon.svg",
