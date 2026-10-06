@@ -3150,6 +3150,99 @@
     return null;
   };
 
+  // Can't Be Bought Back (#403, RSI's "Pledge Buy Back Tool" article): pledges RSI
+  // never sells back once melted. Only what the scanned data proves: the game
+  // Squadron 42 in it, a physical item in it, RSI's own "Add-On" store label, the
+  // AMD package by name, a community giveaway by name. Discounted combos, one per
+  // account limits and CCUs whose ships moved in value can't be told from the scan,
+  // so they get no label. Works on a hangar pledge (`contents`) and a buy-back
+  // (`contains`, plus its loaded page's `also` list in `detail`). → key or null. Pure.
+  const SQ42_GAME_RE =
+    /\bsquadron\s*42\b[^,;|]*?\b(digital|download|game|package)\b|(\+|&)\s*squadron\s*42\b|\bsquadron\s*42\s*(\+|&)/i;
+  // Squadron 42 extras that aren't the game (a soundtrack, a poster, …).
+  const SQ42_EXTRA_RE =
+    /\b(soundtrack|ost|posters?|art\s*book|artbook|wallpapers?|novel|book|models?|coins?|patch|shirt|jacket|hat|mug|paints?|skins?|livery)\b/i;
+  const BB_ADDON_RE = /^\s*add[\s-]?ons?\s*[-–]\s/i;
+  OH.BUYBACK_BLOCK_REASONS = {
+    sq42: 'Pledges with Squadron 42 in them are never sold back.',
+    physical: 'Pledges with a physical item in them are never sold back.',
+    addon: 'Add-on pledges are never sold back.',
+    amd: 'The AMD package is never sold back.',
+    giveaway: 'Community giveaway pledges are never sold back.',
+  };
+  OH.buybackBlock = function buybackBlock(p, detail) {
+    if (!p) return null;
+    const name = String(p.name || '');
+    // An upgrade is its own thing: none of the rules below are about CCUs.
+    if (p.isCCU || p.ccu) return null;
+    const labels = [
+      name,
+      ...(Array.isArray(p.contents) ? p.contents.map((c) => (c && c.label) || '') : []),
+      String(p.contains || ''),
+      ...((detail && Array.isArray(detail.also) && detail.also) || []),
+    ].filter(Boolean);
+    const sq42 = (l) =>
+      String(l)
+        .split(/[,;|]/)
+        .some((part) => SQ42_GAME_RE.test(part) && !SQ42_EXTRA_RE.test(part));
+    if (labels.some(sq42)) return 'sq42';
+    if (labels.some((l) => /\bphysical\b/i.test(l))) return 'physical';
+    if (BB_ADDON_RE.test(name)) return 'addon';
+    if (/\bAMD\b/.test(name)) return 'amd';
+    if (/\bgiveaways?\b/i.test(name)) return 'giveaway';
+    return null;
+  };
+
+  // What melting a hangar pledge means (#403), from what the scan shows. Never melts
+  // anything: the window only links to the pledge on RSI. → { block, lines }, where
+  // `block` is a buybackBlock key (or null) and `lines` are short sentences, the
+  // important one first. Some early pledges come back differently; none is claimed.
+  OH.meltFacts = function meltFacts(p) {
+    const lines = [];
+    if (!p) return { block: null, lines };
+    const block = OH.buybackBlock(p);
+    const name = String(p.name || '');
+    // An upgraded pledge: RSI adds "- upgraded" to its name. The buy-back is the
+    // pledge as first bought, so the upgrades on it are gone.
+    if (/\s[-–]\s*upgraded\s*$/i.test(name)) {
+      const before = name.replace(/\s[-–]\s*upgraded\s*$/i, '').trim();
+      const cat = String(before.match(/^\s*(.+?)\s+[-–]\s/)?.[1] || '').toLowerCase();
+      const short = OH.shortBuybackName(before);
+      const noun = /\bpack(age)?s?$/i.test(short)
+        ? ''
+        : /^(packs?|packages?|game\s+packages?)$/.test(cat)
+          ? ' pack'
+          : ' pledge';
+      const ships = (p.contents || []).filter(
+        (c) => c && /^ship$/i.test(c.kind || '') && !c.guessed && c.label,
+      );
+      // The ship it holds now, named only when it's clearly not the original one.
+      const now =
+        ships.length === 1 && !before.toLowerCase().includes(ships[0].label.toLowerCase())
+          ? `the ${ships[0].label}`
+          : 'the upgraded ship';
+      lines.push(
+        `The buy-back is your original ${short}${noun}, not ${now}. The upgrades on it are lost.`,
+      );
+    }
+    if (p.insurance) {
+      const ins =
+        p.insurance === 'LTI'
+          ? 'LTI'
+          : /^\d+M$/.test(p.insurance)
+            ? `${p.insurance.slice(0, -1)} months of insurance`
+            : `${p.insurance}`;
+      lines.push(`It carries ${ins}. Melting it gives that up until you buy it back.`);
+    }
+    if (p.giftable) {
+      lines.push("It's giftable now. Bought back with store credit, it can't be gifted.");
+    }
+    lines.push(
+      "Buying it back costs full price: sale prices and subscriber coupons don't carry over. Store credit also needs a Buy-Back Token, and it's one buy-back per cart.",
+    );
+    return { block, lines };
+  };
+
   OH.shortBuybackName = function shortBuybackName(name) {
     const full = String(name || '').trim();
     const short = full

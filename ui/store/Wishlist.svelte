@@ -296,7 +296,11 @@
                             {#if b.price}{b.price}{:else}<span class="muted">—</span>{/if}
                           </td>
                           <td class="num">
-                            {#if b.reclaim && b.reclaim.retired && b.reclaim.url}
+                            {#if b.reclaim && b.reclaim.blocked}
+                              <span class="bb-retired bb-blocked" title={b.reclaim.blocked}
+                                >Can't Be Bought Back</span
+                              >
+                            {:else if b.reclaim && b.reclaim.retired && b.reclaim.url}
                               <a
                                 class="bb-retired"
                                 href={b.reclaim.url}
