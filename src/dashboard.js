@@ -317,7 +317,7 @@ const state = {
   savedViews: [], // Inventory saved views: { name, shown, traits, query, sort }
   bbSort: 'date-desc', // default to newest buy-backs first
   groupByType: true, // Inventory: one section per type
-  bbDetails: {}, // pledge id → details read from the buy-back's own RSI page
+  bbDetails: {}, // pledge id → details from the buy-back's own RSI page or your hangar history
   bbShown: new Set(), // buy-back kind filter
   bbTraits: new Map(), // buy-back filter picks: group key → Set of option keys (BB_GROUPS)
   bbLayout: 'gallery', // gallery | compact | list | market (independent of inventory)
@@ -3295,12 +3295,12 @@ let bbLoading = null; // { stop: bool, done, total }
 // takes; null when there's nothing left to read.
 function bbDetailsInfo(list) {
   if (bbLoading) return { loading: true, done: bbLoading.done, total: bbLoading.total };
-  const need = list.filter((b) => !b.isCCU && /^\d+$/.test(String(b.id)) && !state.bbDetails[b.id]);
+  const need = list.filter((b) => !b.isCCU && /^\d+$/.test(String(b.id)) && bbNeedsRead(b));
   if (!need.length) return null;
   return {
     loading: false,
     need: need.length,
-    have: list.filter((b) => state.bbDetails[b.id]).length,
+    have: list.filter((b) => !bbNeedsRead(b)).length,
     of: list.length,
     mins: Math.max(1, Math.round((need.length * 1.6) / 60)),
     // Big lists get a heads-up: hundreds of pages in a row is what makes RSI throttle.
@@ -3308,13 +3308,15 @@ function bbDetailsInfo(list) {
   };
 }
 // packsOnly: just the packs whose contents are unread (search's "Get Details").
-async function loadBuybackDetails({ packsOnly = false } = {}) {
-  const list = (packsOnly ? state.buybacks : computeBuybacks()).filter(
-    (b) =>
-      !b.isCCU &&
-      !state.bbDetails[b.id] &&
-      (!packsOnly || b.kind === 'pack' || b.kind === 'package'),
-  );
+// max: read at most this many (the automatic read after a scan); the rest wait.
+// Anything already filled from your own hangar history is never read again.
+async function loadBuybackDetails({ packsOnly = false, max = Infinity } = {}) {
+  const list = (packsOnly ? state.buybacks : computeBuybacks())
+    .filter(
+      (b) =>
+        !b.isCCU && bbNeedsRead(b) && (!packsOnly || b.kind === 'pack' || b.kind === 'package'),
+    )
+    .slice(0, max);
   bbLoading = { stop: false, done: 0, total: 0 };
   renderBuybacks();
   const res = await OH.fetchBuybackDetails(
@@ -3464,11 +3466,17 @@ function reclaimOf(b) {
 function bbDetail(b) {
   return state.bbDetails[b.id] || null;
 }
+// Still worth reading its RSI page: nothing known yet, or only its value (from the
+// scan history; its contents are still unknown).
+function bbNeedsRead(b) {
+  const d = state.bbDetails[b.id];
+  return !d || !!d.partial;
+}
 function bbInsurance(b) {
   const d = bbDetail(b);
   return (
     insLabel((d && d.insurance) || b.insurance || window.OpenHangar.insuranceFromName(b.name)) ||
-    (d ? 'None' : '—')
+    (d && !d.partial ? 'None' : '—')
   );
 }
 
@@ -3479,11 +3487,25 @@ function bbPrice(b) {
   if (d && d.price != null) return d.price;
   return buybackStorePrice(b);
 }
+// Where a known price came from, when it wasn't RSI's buy-back page.
+const BB_PRICE_TITLE = {
+  history: 'What it was worth in your hangar before it was melted',
+  'scan-history': 'What it was worth in your hangar before it was melted (from your scan history)',
+};
+// The small print in a buy-back's window when its details came from this browser.
+const BB_SOURCE_NOTE = {
+  history: 'From your hangar history',
+  'scan-history': 'Price from your hangar history',
+};
 // The price a buy-back card or row shows: { text, title, est } or null.
 function bbPriceData(b) {
   const d = bbDetail(b);
   if (d && d.price != null)
-    return { text: money(d.price), title: 'Buy-back price on RSI', est: false };
+    return {
+      text: money(d.price),
+      title: BB_PRICE_TITLE[d.src] || 'Buy-back price on RSI',
+      est: false,
+    };
   if (b.price) return { text: String(b.price), title: '', est: false };
   const sp = buybackStorePrice(b);
   return sp
@@ -3937,16 +3959,19 @@ function bbView(b) {
     date: b.date || '',
     id: b.id ? String(b.id) : '',
     reclaim: reclaimOf(b),
-    contents: d
-      ? {
-          ships: d.ships.map((x) => ({
-            name: x.name,
-            sub: [x.manufacturer, x.focus].filter(Boolean).join(' · '),
-          })),
-          also: d.also,
-        }
-      : null,
-    canLoad: !d && !b.isCCU && /^\d+$/.test(String(b.id)),
+    contents:
+      d && !d.partial
+        ? {
+            ships: d.ships.map((x) => ({
+              name: x.name,
+              sub: [x.manufacturer, x.focus].filter(Boolean).join(' · '),
+            })),
+            also: d.also,
+          }
+        : null,
+    canLoad: bbNeedsRead(b) && !b.isCCU && /^\d+$/.test(String(b.id)),
+    // Filled from this browser instead of RSI's page: the small print says so.
+    source: (d && BB_SOURCE_NOTE[d.src]) || '',
     art: {
       real: realImage(b.image),
       resolve: b.ccu && b.ccu.to ? b.ccu.to : shipish ? b.name : '',
@@ -3954,6 +3979,17 @@ function bbView(b) {
       placeholder: 'Buy-Back',
     },
   };
+}
+// Fills buy-back details from your own hangar history (OH.fillBuybackDetailsFromHistory:
+// the pledge archive, then the scan history; no RSI requests), so RSI's pages are
+// only read for what's left. Never stops a scan or the page from loading.
+async function fillBbFromHistory() {
+  try {
+    await OH.fillBuybackDetailsFromHistory(state.buybacks, { history: state.history });
+    state.bbDetails = { ...(await OH.getBuybackDetails()) };
+  } catch (e) {
+    OH.log('warn', 'buybacks', `details from history failed: ${e?.message || e}`);
+  }
 }
 // Reads a buy-back's page for its window: null when done, else what went wrong.
 async function loadBbContents(b) {
@@ -4053,6 +4089,9 @@ document.addEventListener('click', (e) => {
   renderBuybacks();
 });
 
+// The automatic buy-back pack read after a scan reads at most this many pages.
+const BB_AUTO_MAX = 30;
+
 // Scan a chosen set of sources. Each is independent and persisted on its own, so
 // a partial scan (e.g. just referrals) refreshes only those and leaves the rest
 // of your data untouched; a failure in one still keeps the others' results.
@@ -4140,6 +4179,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
     if (b.ok) {
       state.buybacks = b.items;
       state.buybacksScannedAt = b.scannedAt;
+      await fillBbFromHistory();
       state.bbShown = new Set(); // default: no filter selected = show all
       state.bbTraits = new Map();
       state.bbPriceMax = null;
@@ -4229,11 +4269,13 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   // and paced like Get Details (owner, 2026-10-06: fully automatic). Only the
   // never-read ones, so after the first time it's usually none, and only after a
   // buy-back scan that worked. The scan itself is already done: it stays as fast.
+  // Packs filled from your own hangar history (at the buy-back scan above) are
+  // skipped, and at most BB_AUTO_MAX are read per scan: the rest wait for the next.
   const unreadPack = (b) =>
-    !b.isCCU && !state.bbDetails[b.id] && (b.kind === 'pack' || b.kind === 'package');
+    !b.isCCU && bbNeedsRead(b) && (b.kind === 'pack' || b.kind === 'package');
   const bbRead = rows.some((x) => x.name === 'Buy-Backs' && x.ok);
   if (bbRead && !bbLoading && state.buybacks.some(unreadPack))
-    loadBuybackDetails({ packsOnly: true });
+    loadBuybackDetails({ packsOnly: true, max: BB_AUTO_MAX });
 }
 
 // The top bar's Scan runs what's ticked in its ▾ menu: "Scan All" by default,
@@ -5382,6 +5424,7 @@ function searchResults(q) {
   loadStateFromDB(await OH.loadDB());
 
   const notice = await reconcileAccount();
+  await fillBbFromHistory(); // no requests: buy-backs your hangar history already knows
   state.shown = new Set(); // default: no filter selected = show all
   state.traits = new Map();
   state.meltMax = null;

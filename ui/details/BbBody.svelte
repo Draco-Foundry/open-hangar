@@ -1,6 +1,7 @@
 <script>
-  // A buy-back's window. What's inside comes from its own RSI page, read when the
-  // window opens (Details.svelte asks) and kept.
+  // A buy-back's window. What's inside comes from your own hangar history when this
+  // browser saw the pledge before it was melted (the small print says so), else from
+  // its own RSI page, read when the window opens (Details.svelte asks) and kept.
   import Row from './Row.svelte';
   import Reclaim from './Reclaim.svelte';
 
@@ -48,4 +49,5 @@
       {error ? `Couldn't load the contents: ${error}` : 'Loading what’s in it from RSI…'}
     </p>
   {/if}
+  {#if v.source}<p class="muted bbd-source" id="bbd-source"><small>{v.source}</small></p>{/if}
 </div>
