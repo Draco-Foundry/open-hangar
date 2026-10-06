@@ -9,7 +9,16 @@
 
   const PLANS = 'https://robertsspaceindustries.com/en/pledge/subscriptions';
   const STEP = 60; // cards drawn at a time
-  const KINDS = ['Paints', 'Armor', 'Weapons', 'Clothing', 'Decorations', 'Ships', 'Other'];
+  const KINDS = [
+    'Paints',
+    'Armor',
+    'Weapons',
+    'Clothing',
+    'Flair',
+    'Kits and Bundles',
+    'Ships',
+    'Other',
+  ];
 
   let q = $state('');
   let kind = $state('All');
@@ -241,11 +250,23 @@
     gap: 6px;
     padding: 8px 10px 10px;
   }
+  /* Every card in a row lines up: one chip line, a two-line slot for the name,
+     price and Buy pinned to the bottom. */
   .sub-chips {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 4px;
     min-height: 18px;
+    overflow: hidden;
+  }
+  .sub-chip {
+    flex: none;
+  }
+  .sub-kind {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .sub-kind,
   .sub-chip {
@@ -254,7 +275,7 @@
     border-radius: 999px;
     color: var(--muted);
     font-size: 10px;
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: 0.05em;
     text-transform: uppercase;
   }
@@ -268,7 +289,8 @@
   }
   .sub-name {
     display: -webkit-box;
-    flex: 1;
+    flex: none;
+    min-height: calc(2em * 1.3);
     margin: 0;
     overflow: hidden;
     color: var(--text);
@@ -282,6 +304,8 @@
   }
   .sub-foot {
     display: flex;
+    min-height: 26px; /* a Buy button's height, so Sold Out sits on the same line */
+    margin-top: auto;
     align-items: center;
     justify-content: space-between;
     gap: 8px;

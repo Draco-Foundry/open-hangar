@@ -2082,6 +2082,22 @@ try {
         c.firstChild.textContent.trim(),
       ),
     };
+    // Every card in a row lines up: name and price/Buy row at the same height,
+    // whether the name takes one line or two.
+    const rows = new Map();
+    for (const c of cards()) {
+      const top = Math.round(c.getBoundingClientRect().top);
+      const y = (sel) => Math.round(c.querySelector(sel).getBoundingClientRect().top);
+      if (!rows.has(top)) rows.set(top, []);
+      rows.get(top).push([y('.sub-name'), y('.sub-foot')]);
+    }
+    res.aligned =
+      [...rows.values()].some((r) => r.length > 1) &&
+      [...rows.values()].every((r) => r.every(([n, f]) => n === r[0][0] && f === r[0][1]));
+    const long = card("Kastak Arms Inquisitor 'Star Kitten' Armor Set");
+    res.longTitle = long?.querySelector('.sub-name').title;
+    res.longKind = long?.querySelector('.sub-kind').textContent;
+    res.kitKind = card('Star Kitten Kit')?.querySelector('.sub-kind').textContent;
     const box = root.querySelector('#sub-search');
     box.value = 'helmet';
     box.dispatchEvent(new Event('input'));
@@ -2112,9 +2128,13 @@ try {
     await tick();
     return res;
   });
-  sub.head === 'Your Subscriber Store 4' &&
-  sub.meta === '4 items, refreshed today' &&
-  sub.n === 4 &&
+  sub.head === 'Your Subscriber Store 6' &&
+  sub.meta === '6 items, refreshed today' &&
+  sub.n === 6 &&
+  sub.aligned &&
+  sub.longTitle === "Kastak Arms Inquisitor 'Star Kitten' Armor Set" &&
+  sub.longKind === 'Armor' &&
+  sub.kitKind === 'Kits and Bundles' &&
   /^https:\/\/robertsspaceindustries\.com\/en\/pledge\/Subscribers-Store\/Demo-2$/.test(sub.buy) &&
   sub.buyLabel === 'Buy at RSI ↗' &&
   /^\$9\.00 \$12\.00$/.test(sub.price) &&
@@ -2125,14 +2145,14 @@ try {
   !sub.plushBuy &&
   sub.lazy &&
   sub.note &&
-  sub.chips.join() === 'All,Paints,Armor,Clothing,Decorations' &&
+  sub.chips.join() === 'All,Paints,Armor,Clothing,Flair,Kits and Bundles' &&
   sub.search === 1 &&
   sub.paints.join() === 'Nebula Drift Paint' &&
   sub.plans === 'https://robertsspaceindustries.com/en/pledge/subscriptions' &&
   sub.plansText === 'Subscribers get their own store each month. See Plans ↗' &&
   sub.plansCards === 0
     ? ok(
-        'subscriber store: 4 cards, Warbond and tier chips, Sold Out, search, type chips, See Plans',
+        'subscriber store: 6 cards lined up, Warbond and tier chips, Sold Out, search, type chips, See Plans',
       )
     : fail(`subscriber store: ${JSON.stringify(sub)}`);
   const st = await page.evaluate(async () => {

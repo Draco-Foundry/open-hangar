@@ -21,6 +21,7 @@ When you click Scan, the extension reads your own RSI account by making requests
 - Your buy-back pledges
 - Account identity and balances (handle, display name, org, rank, Store Credit, UEC, REC)
 - Your referral code and your recruits/prospects (handles, monikers, dates)
+- If you're a subscriber: the subscriber-only items RSI offers your account (names, pictures, prices and availability), at most once a day, to show them on the Store page. Nothing about them is sent to us unless you sync
 
 All of this is stored only in your browser's local extension storage (chrome.storage.local). It is never transmitted to the developer or any third party. You can remove it at any time with Clear Data in the settings menu (click your portrait), or by uninstalling the extension (which deletes all stored data).
 
