@@ -976,18 +976,6 @@ body:not(:has(#view-home.active)) .wrap > header {
   font: 600 19px var(--font-head);
   white-space: nowrap;
 }
-/* Counts beside Inventory and Buy-Backs. */
-nav .nav-n {
-  margin-left: 4px;
-  font: 600 11px var(--font-head);
-  color: var(--faint);
-}
-nav a.active .nav-n {
-  color: var(--muted);
-}
-nav .nav-n:empty {
-  display: none;
-}
 /* Streamer Mode on: a purple badge on the portrait's bottom-left (the update dot
    has the top-right), so the top bar never needs room for it (#174). */
 .stream-dot {
@@ -1377,6 +1365,10 @@ nav .nav-n:empty {
 .sr-btn.primary:hover {
   background: var(--accent-hover);
 }
+.sr-btn .sr-btn-hint {
+  font-weight: 400;
+  opacity: 0.8;
+}
 .sr-btn.link {
   padding: 8px 4px;
   border: 0;
@@ -1527,11 +1519,6 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
   nav#nav a.active {
     background: var(--accent);
     color: #fff;
-  }
-}
-@media (max-width: 1180px) {
-  nav .nav-n {
-    display: none;
   }
 }
 

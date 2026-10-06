@@ -1,6 +1,6 @@
 <script>
   // Developers: how Open Hangar reads RSI, the data model and export file, and the
-  // data tools (export / import, saved accounts, error report). Ported from the 0.2.x
+  // data tools (export / import, saved accounts, flight log). Ported from the 0.2.x
   // page as it looked (no signed-off redesign yet), reusing the dashboard's classes.
   // Always drawn, even while another page shows: other pages use its buttons.
   import { app } from '../lib/app.svelte.js';
@@ -8,7 +8,7 @@
   import DataTools from './DataTools.svelte';
   import StorageUse from './StorageUse.svelte';
   import SavedAccounts from './SavedAccounts.svelte';
-  import ErrorReport from './ErrorReport.svelte';
+  import FlightLog from './FlightLog.svelte';
   import Supporters from './Supporters.svelte';
 
   const links = app().dev.links;
@@ -116,13 +116,13 @@
   </p>
   <SavedAccounts />
 
-  <h3>Error Report</h3>
+  <h3>Flight Log</h3>
   <p>
-    Something not working? Copy this report and paste it in #bug-reports on Discord or in a GitHub
-    issue. It has your Open Hangar version, browser, item counts and the recent errors. It doesn't
-    include your handle, referral code or any item names.
+    Something not working? Copy your flight log and paste it in #bug-reports on Discord or in a
+    GitHub issue. It has your Open Hangar version, browser, item counts and the recent errors. It
+    doesn't include your handle, referral code or any item names.
   </p>
-  <ErrorReport />
+  <FlightLog />
 
   <h3>Terms &amp; Fair Use</h3>
   <ul>

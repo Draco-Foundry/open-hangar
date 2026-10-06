@@ -1,8 +1,9 @@
 <script>
   // The scan report: when a scan ends with a problem it drops from the Scan button,
   // on whatever page you're on (owner sign-off, 2026-10-04). Signed out of RSI gets
-  // its own note with Log In; otherwise one row per source, what came home or what
-  // went wrong, and Scan Again, Copy Error Report and Report a Scan Problem. It
+  // its own note with Log In and no Flight Log (#314); otherwise one row per source,
+  // what came home or what went wrong, then Send Flight Log (copies the log and opens
+  // #bug-reports on Discord), Scan Again and Report on GitHub (#315). It
   // closes like the other menus (✕, Escape, a click elsewhere); the button says
   // Rough Landing until the next scan and opens it again. A report can bring its own
   // title and line (the website sync's "Scan Done, Not Synced"): just Scan Again.
@@ -14,7 +15,7 @@
   const HEAD = {
     out: {
       title: 'Hangar Doors Are Locked',
-      sub: "You're not signed in to RSI, so there was nothing to scan. Log in, then scan again.",
+      sub: "You're not logged in to RSI, so we can't see inside your hangar. Log in, come back and hit Scan All. Mind the elevators.",
     },
     part: { title: 'Rough Landing' },
     none: {
@@ -33,13 +34,15 @@
 
   let copied = $state('');
   let copyTimer;
-  async function copy() {
-    const ok = await app().top.copyReport(null);
+  // Send Flight Log: copy it, open #bug-reports on Discord in a new tab. Pasting
+  // stays with you (browsers don't allow auto-paste).
+  async function send() {
+    const ok = await app().top.sendFlightLog();
     copied = ok
-      ? 'Copied! Beam it to #bug-reports on Discord or a GitHub issue.'
-      : 'Copy failed. See Developers → Error report.';
+      ? 'Flight log copied. Paste it in #bug-reports.'
+      : 'Copy failed. Grab it from Developers → Flight Log.';
     clearTimeout(copyTimer);
-    copyTimer = setTimeout(() => (copied = ''), 4000);
+    copyTimer = setTimeout(() => (copied = ''), 6000);
   }
   function scanAgain() {
     closeMenus();
@@ -129,10 +132,12 @@
     {:else if r.title}
       <button type="button" class="sr-btn primary" onclick={scanAgain}>Scan Again</button>
     {:else}
-      <button type="button" class="sr-btn primary" onclick={scanAgain}>Scan Again</button>
-      <button type="button" class="sr-btn" onclick={copy}>Copy Error Report</button>
+      <button type="button" id="sr-send" class="sr-btn primary" onclick={send}
+        >Send Flight Log <span class="sr-btn-hint">(opens Discord)</span></button
+      >
+      <button type="button" class="sr-btn" onclick={scanAgain}>Scan Again</button>
       <button type="button" class="sr-btn link" onclick={() => app().top.reportProblem()}
-        >Report a Scan Problem</button
+        >Report on GitHub ↗</button
       >
     {/if}
   </div>
@@ -140,8 +145,8 @@
     <p class="sr-hint" role="status">{copied}</p>
   {:else if r.kind !== 'out' && !r.title}
     <p class="sr-hint">
-      Report a Scan Problem opens a GitHub issue with the report filled in. Nothing is sent until
-      you submit it.
+      Report on GitHub opens an issue with your flight log filled in. Nothing is sent until you
+      submit it.
     </p>
   {/if}
   {#if r.kind !== 'part' && !r.title && r.last}

@@ -1343,9 +1343,12 @@ try {
     state.selected.clear();
     setSelecting(false);
     state.wishlist = keepWish;
-    // Top bar: counts, bell, search.
+    // Top bar: page names only, no counts (#260), bell, search.
+    const navText = [...document.querySelectorAll('#nav a')].map((a) => a.textContent.trim());
     r.counts =
-      document.querySelector('#nav-n-inventory').textContent === String(state.items.length);
+      !document.querySelector('#nav .nav-n') &&
+      navText.includes('Inventory') &&
+      navText.includes('Buy-Backs');
     r.bell = !!document.querySelector('#bell-btn') && !!document.querySelector('#bell-menu');
     const top = document.querySelector('#gsearch-top');
     top.value = 'cutlass';
@@ -1358,7 +1361,7 @@ try {
     ? ok('inventory: summary strip, Hide small stuff, saved views, melt planner')
     : fail(`inventory pass: ${JSON.stringify(inv)}`);
   inv.counts && inv.bell && inv.search
-    ? ok('top bar: counts, alerts bell, search on every page')
+    ? ok('top bar: page names without counts, alerts bell, search on every page')
     : fail(`top bar: ${JSON.stringify(inv)}`);
 
   // Filters Pass (B2): the sidebar's groups, the pills above the list, folding away.
@@ -2905,6 +2908,8 @@ try {
         kept: state.items.length === r.before.items && state.buybacks.length === r.before.bbs,
         open: !!panel() && !panel().hidden,
         title: panel()?.querySelector('h3')?.textContent,
+        sub: panel()?.querySelector('.sr-titles p')?.textContent,
+        noLog: !panel()?.querySelector('#sr-send'),
         login: !!panel()?.querySelector('a[href*="robertsspaceindustries.com/connect"]'),
         label: btn.textContent.trim(),
         homeLine: document.querySelector('#status').textContent,
@@ -3050,7 +3055,33 @@ try {
         rows: [...panel().querySelectorAll('.sr-rows li')].map(
           (li) => `${li.querySelector('.sr-src').textContent}:${li.classList.contains('bad')}`,
         ),
-        actions: [...panel().querySelectorAll('.sr-btn')].map((b) => b.textContent.trim()),
+        actions: [...panel().querySelectorAll('.sr-btn')].map((b) =>
+          b.textContent.replace(/\s+/g, ' ').trim(),
+        ),
+        hint: panel().querySelector('.sr-hint')?.textContent.replace(/\s+/g, ' ').trim(),
+      };
+      // The problem card's Send Flight Log (#315): copies the log, then opens
+      // #bug-reports on Discord in a new tab, and says to paste it there.
+      const keepOpen = window.open;
+      const keepWrite = navigator.clipboard.writeText;
+      let copiedText = '';
+      const opened = [];
+      window.open = (...args) => (opened.push(args), null);
+      navigator.clipboard.writeText = async (t) => {
+        copiedText = t;
+      };
+      try {
+        panel().querySelector('#sr-send').click();
+        await wait();
+      } finally {
+        window.open = keepOpen;
+        navigator.clipboard.writeText = keepWrite;
+      }
+      r.send = {
+        log: /^```\nOpen Hangar flight log/.test(copiedText),
+        opened: opened.map((o) => o[0]),
+        said: panel().querySelector('.sr-hint')?.textContent.trim(),
+        open: !panel().hidden,
       };
     } finally {
       Object.assign(OH, { getAccount: keep.acct, scanSource: keep.scan, getReferral: keep.ref });
@@ -3071,6 +3102,8 @@ try {
   rep.out.kept &&
   rep.out.open &&
   rep.out.title === 'Hangar Doors Are Locked' &&
+  /Log in, come back and hit Scan All\. Mind the elevators\.$/.test(rep.out.sub) &&
+  rep.out.noLog &&
   rep.out.login &&
   /Rough Landing/.test(rep.out.label) &&
   !rep.out.homeLine
@@ -3096,10 +3129,18 @@ try {
   rep.part.open &&
   rep.part.title === 'Rough Landing' &&
   rep.part.rows.join() === 'Hangar:false,Buy-Backs:true,Referrals:false' &&
-  rep.part.actions.join() === 'Scan Again,Copy Error Report,Report a Scan Problem' &&
+  rep.part.actions.join() === 'Send Flight Log (opens Discord),Scan Again,Report on GitHub ↗' &&
+  /Nothing is sent until you submit it/.test(rep.part.hint) &&
   rep.cleared
     ? ok('scan report: one row per source with the failed one marked, and its buttons')
     : fail(`partial scan report: ${JSON.stringify(rep)}`);
+  rep.send &&
+  rep.send.log &&
+  rep.send.opened.join() === 'https://discord.gg/pxJ6PzQe7z' &&
+  rep.send.said === 'Flight log copied. Paste it in #bug-reports.' &&
+  rep.send.open
+    ? ok('problem card: Send Flight Log copies the log and opens #bug-reports on Discord')
+    : fail(`send flight log: ${JSON.stringify(rep.send)}`);
 
   // Your menu: Clear Data (red) asks once in place; Keep Data backs out with nothing
   // cleared and the menu still open.

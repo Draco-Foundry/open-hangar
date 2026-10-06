@@ -30,8 +30,8 @@ body:
   - type: textarea
     id: report
     attributes:
-      label: Error report
-      description: In Open Hangar, go to Developers → Copy error report and paste it here. It has no personal info.
+      label: Flight Log
+      description: In Open Hangar, go to Developers, click Copy Flight Log and paste it here. It has no personal info.
       render: text
   - type: textarea
     id: extra
