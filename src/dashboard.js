@@ -5173,7 +5173,9 @@ function shipView(name) {
     // Add to RSI Cart (#288): RSI's upgrade tool sells an upgrade to it.
     upgrade: (() => {
       const u = st && st.forSale ? OH.upgradeSku(st) : null;
-      return u ? { toShipId: u.toShipId, toSkuId: u.toSkuId, name: st.name || title } : null;
+      return u
+        ? { toShipId: u.toShipId, toSkuId: u.toSkuId, skus: u.skus, name: st.name || title }
+        : null;
     })(),
     comesWith: inc
       ? inc.map((t) => ({ name: t.replace(/\s*\(.*\)\s*$/, '').trim(), text: t }))

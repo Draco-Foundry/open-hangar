@@ -14,7 +14,13 @@ const C = globalThis.OHCart;
 
 // A pretend RSI upgrade tool. Ships: 101 and 102 can upgrade to the target (SKU 9001
 // of ship 900), 103 is owned but RSI won't take it, 104 isn't owned.
-function fakeRsi({ anonymous = false, mode = 'browse', add = 'ok', status = {} } = {}) {
+function fakeRsi({
+  anonymous = false,
+  mode = 'browse',
+  add = 'ok',
+  status = {},
+  noUpgradeTo = [],
+} = {}) {
   const calls = []; // the upgrade tool's calls (context + GraphQL)
   const all = []; // every request, the RSI page and setAuthToken too
   const res = (body, code = 200, headers = {}) => ({
@@ -55,6 +61,8 @@ function fakeRsi({ anonymous = false, mode = 'browse', add = 'ok', status = {} }
         ];
       return res({ data });
     }
+    if (op === 'filterShips' && noUpgradeTo.includes(body.variables.toId))
+      return res({ errors: [{ message: 'Ship not found ' }], data: null });
     if (op === 'filterShips')
       return res({
         data: { from: { ships: [{ id: 101 }, { id: 102 }, { id: 104 }] }, to: { ships: [] } },
@@ -489,4 +497,17 @@ test("signs in the way RSI's own window does: x-rsi-token on setup, X-CSRF-TOKEN
     1,
     'the page is read once and its token reused',
   );
+});
+
+test('an edition RSI sells no upgrade to (Ship not found): the next edition is tried', async () => {
+  const rsi = fakeRsi({ noUpgradeTo: [9002] });
+  const r = await fast(rsi).upgradeOptions(900, 9002, { skus: [9002, 9001] });
+  assert.equal(r.ok, true);
+  assert.equal(r.toSkuId, 9001, 'the edition that worked comes back');
+  const prices = rsi.calls.filter((c) => c.body.operationName === 'getPrice');
+  assert.ok(prices.length && prices.every((c) => c.body.variables.to === 9001));
+  const none = await fast(fakeRsi({ noUpgradeTo: [9001, 9002] })).upgradeOptions(900, 9002, {
+    skus: [9001],
+  });
+  assert.deepEqual(none, { ok: false, error: 'refused' });
 });
