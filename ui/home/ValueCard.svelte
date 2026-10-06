@@ -5,8 +5,13 @@
   // for gifted or grey-market pledges), and clickable counts that open Inventory
   // filtered. The value trend lives on Stats → History (owner: no chart on Home).
   import { app, OH, version } from '../lib/app.svelte.js';
+  import { SvelteMap } from 'svelte/reactivity';
   import { exactCount, plural, shortCount } from '../lib/format.js';
+  import { insChip, mostValuable } from '../lib/most-valuable.js';
 
+  // Rows in the Most Valuable list: enough that the card ends level with Latest
+  // Acquisitions (five rows) at 1440 and 1100 wide.
+  const TOP_N = 3;
   const d = $derived.by(() => {
     version.n;
     const a = app();
@@ -28,6 +33,16 @@
           ].filter(([, n]) => n >= 0.5)
         : [],
       melt,
+      // Most Valuable: the top ship pledges at today's store price (the numbers
+      // behind "Ships $X"; owner picked this to fill the card, 2026-10-06).
+      top: mostValuable(items, v, TOP_N).map((r) => ({
+        ...r,
+        name: a.cardName(r.p),
+        full: a.plainName(r.p),
+        ins: insChip(r.p.insurance),
+        img: a.realImage(r.p.image),
+        resolve: a.resolveImageName(r.p),
+      })),
       vsPaid: v && v.paidPriced ? v.storePriced - v.paidPriced : null,
       counts: [
         { key: 'ship', n: items.filter((p) => p.containsShip).length, one: 'ship pledge', many: 'ship pledges' },
@@ -66,6 +81,18 @@
     document.getElementById('scan-home')?.click();
   };
 
+  // Pledges without an RSI picture get the ship's wiki art (like Latest Acquisitions).
+  const art = new SvelteMap();
+  $effect(() => {
+    for (const r of d.top) {
+      if (r.img || !r.resolve || art.has(r.resolve)) continue;
+      art.set(r.resolve, '');
+      OH()
+        .getShipImage(r.resolve)
+        .then((url) => url && art.set(r.resolve, url));
+    }
+  });
+
   function open(c, e) {
     e.preventDefault();
     if (c.key === 'buybacks') location.hash = '#buybacks';
@@ -102,6 +129,32 @@
   {#if d.store != null && d.parts.length > 1}
     <div class="parts" title="Ships at today's store price, CCUs at standard price, everything else at melt value, plus Store Credit. Buy-backs, UEC and REC aren't counted.">
       {#each d.parts as [label, n], i (label)}{#if i}<span class="sep">·</span>{/if}<span>{label} <b>{a.bigMoney(n)}</b></span>{/each}
+    </div>
+  {/if}
+  {#if d.top.length}
+    <div class="mv" aria-label="Most Valuable">
+      <div class="mv-h">Most Valuable</div>
+      {#each d.top as r (r.id)}
+        <button type="button" class="mv-row" onclick={() => a.openItem(r.id)} title={r.full}>
+          {#if r.img || art.get(r.resolve)}
+            <img class="th" src={r.img || art.get(r.resolve)} alt="" loading="lazy" />
+          {:else}
+            <span class="th"></span>
+          {/if}
+          <span class="nm">
+            <span class="n">{r.name}</span>
+            {#if r.ins}<span class="ins" title="Insurance">{r.ins}</span>{/if}
+          </span>
+          <span class="meta">
+            <b title={"Today's store price: " + a.dollars(r.store)}>{a.bigMoney(r.store)}</b>
+            {#if r.gain != null && Math.abs(r.gain) >= 1}
+              <span class="gain" class:down={r.gain < 0} title="Melt value: {a.dollars(r.paid)}"
+                >{#if r.gain >= 0}{signed(r.gain)} over what you paid{:else}{signed(r.gain)}{/if}</span
+              >
+            {/if}
+          </span>
+        </button>
+      {/each}
     </div>
   {/if}
   <div class="counts">
@@ -190,7 +243,99 @@
     background: var(--bad-soft);
     color: var(--bad);
   }
-  /* Pinned to the bottom, so the card's footer lines up with its row. */
+  /* Most Valuable: rows shaped like Latest Acquisitions' so the two cards match. */
+  .mv {
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+  }
+  .mv-h {
+    font: 700 12px var(--font-head);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 2px;
+  }
+  .mv-row {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: center;
+    width: calc(100% + 16px);
+    margin-inline: -8px;
+    padding: 9px 8px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: none;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .mv-row:hover {
+    background: var(--panel-2);
+  }
+  .mv-row + .mv-row {
+    box-shadow: 0 -1px 0 var(--line);
+  }
+  .th {
+    width: 64px;
+    height: 40px;
+    border-radius: var(--r-sm);
+    object-fit: cover;
+    background: var(--panel-2);
+  }
+  .nm {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+    justify-items: start;
+  }
+  .n {
+    max-width: 100%;
+    font-weight: 600;
+    color: var(--head);
+    font-size: 15px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ins {
+    font: 600 11px var(--font-head);
+    color: var(--muted);
+    border: 1px solid var(--line-2);
+    border-radius: 999px;
+    padding: 1px 7px;
+    white-space: nowrap;
+  }
+  .meta {
+    text-align: right;
+    font-size: 13px;
+    color: var(--muted);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .meta b {
+    display: block;
+    color: var(--text);
+    font-weight: 600;
+  }
+  .gain {
+    color: var(--good);
+  }
+  .gain.down {
+    color: var(--muted);
+  }
+  @media (max-width: 480px) {
+    .mv-row {
+      grid-template-columns: 52px minmax(0, 1fr) auto;
+      gap: 10px;
+    }
+    .th {
+      width: 52px;
+      height: 34px;
+    }
+  }
   /* The counts are the card's footer: pinned to the bottom so they line up with the
      other cards' footers in the row. */
   .counts {

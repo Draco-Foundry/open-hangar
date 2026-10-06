@@ -238,3 +238,46 @@ test('loadGameStatus: at most every 10 minutes, the last copy when the site is q
   });
   assert.equal(empty, null);
 });
+
+// --- Account Value: Most Valuable ----------------------------------------------
+
+const mvLib = () => import('../ui/lib/most-valuable.js');
+
+test('Most Valuable: fully priced ship pledges by store price, gain only when melt is known', async () => {
+  const { mostValuable } = await mvLib();
+  const items = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }, { id: 6 }, { id: 7 }];
+  const hv = {
+    pledges: {
+      1: { store: 600, paid: 600, unpriced: 0 },
+      2: { store: 275, paid: 225, unpriced: 0 },
+      3: { store: 900, paid: null, unpriced: 1 }, // a ship without a price: left out
+      4: { ccu: true, store: 800, paid: 50, unpriced: 0 }, // CCUs aren't ships
+      5: { store: 90, paid: 0, unpriced: 0 }, // $0 reward: nothing to compare with
+      6: { store: 260, paid: 300, unpriced: 0 },
+      // 7: not a ship pledge at all
+    },
+  };
+  const top = mostValuable(items, hv, 4);
+  assert.deepEqual(
+    top.map((r) => [r.id, r.store, r.gain]),
+    [
+      ['1', 600, 0],
+      ['2', 275, 50],
+      ['6', 260, -40],
+      ['5', 90, null],
+    ],
+  );
+  assert.equal(mostValuable(items, hv).length, 3);
+  assert.deepEqual(mostValuable(items, null), []);
+  assert.deepEqual(mostValuable([{ id: 7 }], hv), []);
+});
+
+test('Most Valuable: short insurance chip', async () => {
+  const { insChip } = await mvLib();
+  assert.equal(insChip('LTI'), 'LTI');
+  assert.equal(insChip('120M'), '120 Mo');
+  assert.equal(insChip('10Y'), '120 Mo');
+  assert.equal(insChip('6M'), '6 Mo');
+  assert.equal(insChip('Unknown'), '');
+  assert.equal(insChip(''), '');
+});
