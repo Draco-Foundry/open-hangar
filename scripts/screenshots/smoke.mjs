@@ -266,8 +266,13 @@ try {
       /20,000/.test(sp.textContent) &&
       [...sp.querySelectorAll('a')].some(
         (a) =>
-          a.href === 'https://robertsspaceindustries.com/en/pledge/subscriptions' &&
+          a.href === 'https://robertsspaceindustries.com/en/account/billing' &&
           /Manage/.test(a.textContent),
+      ) &&
+      [...sp.querySelectorAll('a')].some(
+        (a) =>
+          a.href === 'https://robertsspaceindustries.com/en/pledge/subscriptions' &&
+          /See Plans/.test(a.textContent),
       ) &&
       [...sp.querySelectorAll('a')].some((a) => /Subscriber Store/.test(a.textContent));
     con.click();
