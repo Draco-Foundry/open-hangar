@@ -1978,24 +1978,80 @@ try {
 
   console.log('Store');
   await go('#store');
+  // The extension's Store is your side of it (0.3.0): Wishlist, Your CCUs and Find
+  // a Ship, under a link to the website's full store. No store-wide browsing.
   await page
-    .waitForFunction(() => document.querySelectorAll('#price-table tbody tr').length > 50, {
-      timeout: 20000,
-    })
+    .waitForFunction(
+      () => /^Search \d+ ships…$/.test(document.querySelector('#find-ship')?.placeholder || ''),
+      {
+        timeout: 20000,
+      },
+    )
     .catch(() => {});
-  const prices = await page.$$eval('#price-table tbody tr', (r) => r.length);
-  prices > 50 ? ok(`price list: ${prices} ships`) : fail(`price list only ${prices} rows`);
+  const fs1 = await page.evaluate(async () => {
+    const tick = (ms = 50) => new Promise((r) => setTimeout(r, ms));
+    const box = document.querySelector('#find-ship');
+    const placeholder = box.placeholder;
+    box.value = 'c';
+    box.dispatchEvent(new Event('input'));
+    await tick();
+    const oneLetter = document.querySelectorAll('.find-hits li').length;
+    box.value = 'cutlass';
+    box.dispatchEvent(new Event('input'));
+    await tick();
+    const hits = [...document.querySelectorAll('.find-hits .ship-link')].map((b) => b.textContent);
+    box.value = 'zzzz';
+    box.dispatchEvent(new Event('input'));
+    await tick();
+    const none = /No ship by that name/.test(document.querySelector('.find-ship').textContent);
+    box.value = 'carrack';
+    box.dispatchEvent(new Event('input'));
+    await tick();
+    // Bubbling, as a real key press does (Svelte listens at the root).
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await tick(300);
+    const modal = document.querySelector('#item-modal');
+    const opened =
+      !modal.hidden && /Carrack/.test(modal.querySelector('.modal-name')?.textContent || '');
+    document.querySelector('#modal-close').click();
+    box.value = '';
+    box.dispatchEvent(new Event('input'));
+    await tick();
+    const link = document.querySelector('#full-store a');
+    return {
+      placeholder,
+      oneLetter,
+      hits,
+      none,
+      opened,
+      href: link && link.href,
+      target: link && link.target,
+      label: link && link.textContent,
+      line: /The full store lives on openhangar\.space/.test(
+        document.querySelector('#full-store')?.textContent || '',
+      ),
+      gone: !document.querySelector('#price-table, [data-price-tab], #price-search'),
+    };
+  });
+  /^Search \d+ ships…$/.test(fs1.placeholder) &&
+  fs1.oneLetter === 0 &&
+  fs1.hits.length > 0 &&
+  fs1.hits.length <= 8 &&
+  fs1.hits.every((h) => /cutlass/i.test(h)) &&
+  fs1.none &&
+  fs1.opened &&
+  fs1.href === 'https://openhangar.space/store' &&
+  fs1.target === '_blank' &&
+  fs1.label === 'Open the Full Store ↗' &&
+  fs1.line &&
+  fs1.gone
+    ? ok(
+        `store: full store link, Find a Ship (${fs1.hits.length} for "cutlass", Enter opens it), no price list`,
+      )
+    : fail(`store slim page: ${JSON.stringify(fs1)}`);
   const st = await page.evaluate(async () => {
     // The Store is Svelte (ui/store): it redraws a tick after a change.
     const tick = (ms = 50) => new Promise((r) => setTimeout(r, ms));
-    const rows = () => document.querySelectorAll('#price-table tbody tr').length;
-    const flying = rows(); // default tab: Flight Ready
-    document.querySelector('[data-price-tab="all"]').click();
-    await tick();
-    const all = rows();
-    document.querySelector('[data-price-tab="in-concept"]').click();
-    await tick();
-    const concept = rows();
     const ccus = document.querySelectorAll('#ccu-owned tbody tr').length;
     // "In store now" comes from each ship's own store page (stubbed here):
     // Cutlass Black sold on its own, Carrack only in a pack.
@@ -2028,13 +2084,8 @@ try {
     await tick();
     const sub = document.querySelector('.wish-bbs');
     const res = {
-      flying,
-      all,
-      concept,
       ccus,
       stock,
-      priceStock: document.querySelectorAll('#price-table .sale').length,
-      tabs: [...document.querySelectorAll('[data-price-tab]')].map((b) => b.textContent),
       bbRows: sub && !sub.hidden ? sub.querySelectorAll('table.inner > tbody > tr').length : 0,
       bbTypes: sub ? [...sub.querySelectorAll('tbody .badge')].map((b) => b.textContent) : [],
       pack: /1 pack/.test(packSummary) && !/buy-back|to it/.test(packSummary),
@@ -2043,18 +2094,11 @@ try {
       ccugame: /ccugame/i.test(document.querySelector('#view-store').textContent),
     };
     state.wishlist = [];
-    state.priceTab = 'flight-ready';
     renderStore();
     return res;
   });
-  st.panels === 3 &&
-  st.all > st.flying &&
-  st.concept > 0 &&
-  !st.ccugame &&
-  !st.tabs.includes('For Sale Now') &&
-  st.tabs.join('|') === 'Flight Ready|In Concept|All' &&
-  st.priceStock === 0
-    ? ok(`store panels: ${st.flying} flight ready, ${st.all} in all, ${st.concept} in concept`)
+  st.panels === 3 && !st.ccugame
+    ? ok('store panels: Wishlist, Your CCUs, Find a Ship')
     : fail(`store page: ${JSON.stringify(st)}`);
   st.stock.join('|') === 'Only in a pack|In stock ($110)' &&
   st.ccus > 0 &&
@@ -2150,33 +2194,9 @@ try {
     ? ok('mouse drag lifts the row and reorders the wishlist')
     : fail(`live drag: lifted=${lifted} order=${dragged}`);
 
-  // Panel searches: counts in the placeholder, "N of M" while typing, no CCU
-  // search for a handful of CCUs.
-  const sm = await page.evaluate(async () => {
-    const tick = () => new Promise((r) => setTimeout(r, 50));
-    await tick();
-    const box = document.querySelector('#price-search');
-    const placeholder = box.placeholder;
-    box.value = 'cutlass';
-    box.dispatchEvent(new Event('input'));
-    await tick();
-    const count = document.querySelector('#price-search-count').textContent;
-    box.value = '';
-    box.dispatchEvent(new Event('input'));
-    await tick();
-    return {
-      placeholder,
-      count,
-      cleared: document.querySelector('#price-search-count').textContent,
-      ccuHidden: document.querySelector('#ccu-search').hidden,
-    };
-  });
-  /^Search \d+ ships…$/.test(sm.placeholder) &&
-  /^\d+ of \d+$/.test(sm.count) &&
-  !sm.cleared &&
-  sm.ccuHidden
-    ? ok(`panel search: "${sm.placeholder}", "${sm.count}", CCU search hidden for a few CCUs`)
-    : fail(`panel search: ${JSON.stringify(sm)}`);
+  // No CCU search for a handful of CCUs.
+  const ccuHidden = await page.evaluate(() => document.querySelector('#ccu-search').hidden);
+  ccuHidden ? ok('CCU search hidden for a few CCUs') : fail('CCU search shown for a few CCUs');
 
   console.log('Updates');
   await go('#updates');

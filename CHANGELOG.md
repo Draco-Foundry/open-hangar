@@ -13,6 +13,11 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   so Open Hangar no longer downloads RSI's Comm-Links or This Week in Star Citizen. Hangar
   Spotlight is now just a picture of one of your ships, a new one each visit, with its name
   on hover.
+- Changed: **the Store page is about your hangar now.** It keeps your Wishlist with its
+  on-sale check and what your CCUs are worth. Find a Ship opens any ship's window, so you
+  can still wishlist it or put an upgrade to it in your RSI cart. The full price list moved
+  to the website's store at openhangar.space, with every ship, sale history, Compare and
+  prices in your currency. Open the Full Store at the top of the page takes you there.
 
 - Changed: **the error report is now your Flight Log.** When a scan hits trouble, the
   problem card has Send Flight Log: it copies the log and opens #bug-reports on Discord,
