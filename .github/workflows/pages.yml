@@ -14,10 +14,17 @@ on:
         '.github/workflows/pages.yml',
         'scripts/update-rates.mjs',
       ]
-  # Daily, after the ECB publishes (about 16:00 CET on working days), so
-  # rates.json stays fresh even when nothing else on the site changes.
+  # Hourly (owner, 2026-10-06): the extension page's store versions keep up. Every
+  # 3 hours always, and every hour while a store has a version in review, so
+  # "approved and live" shows soon after a store finishes (the gate step below).
+  # 15:30 UTC is one of the 3-hour runs: after the ECB publishes (about 16:00 CET
+  # on working days), so rates.json stays fresh too.
   schedule:
-    - cron: '30 15 * * *'
+    - cron: '30 * * * *'
+  # Right after a store publish, so "in review" appears within minutes.
+  workflow_run:
+    workflows: ['Publish to stores']
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -29,7 +36,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Hourly runs only go ahead every 3 hours, or when a store has a version in review
+  # (read from the live versions.json). Pushes, publishes and manual runs always go.
+  gate:
+    runs-on: ubuntu-24.04
+    outputs:
+      go: ${{ steps.gate.outputs.go }}
+    steps:
+      - name: Is this hour worth a run?
+        id: gate
+        run: |
+          go=yes
+          if [ "${{ github.event_name }}" = "schedule" ] && [ $(( $(date -u +%-H) % 3 )) -ne 0 ]; then
+            pending=$(curl -fsS --max-time 15 https://openhangar.space/versions.json \
+              | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const v=JSON.parse(s);console.log(Object.values(v.stores||{}).some(x=>x&&x.pending)?'yes':'no')}catch{console.log('yes')}})" \
+              || echo yes)
+            [ "$pending" = "yes" ] || go=no
+          fi
+          echo "go=$go" >> "$GITHUB_OUTPUT"
+          echo "Run this hour: $go"
   deploy:
+    needs: gate
+    if: needs.gate.outputs.go == 'yes'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
