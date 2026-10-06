@@ -1,7 +1,8 @@
 <script>
   // The sync line at the top of your portrait's menu once connected (Top Bar Option
   // A, owner 2026-10-06): a dot, "Synced 5:54 PM" (the whole time on hover) and Sync
-  // Now. The Scan ▾ menu keeps its openhangar.space section (SyncMenu.svelte).
+  // Now. The only Sync Now; the Scan ▾ menu keeps Connected as and Open My Hangar
+  // (SyncMenu.svelte).
   import { app, version } from '../lib/app.svelte.js';
   import { synced } from './when.js';
 

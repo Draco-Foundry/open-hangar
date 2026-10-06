@@ -1,6 +1,6 @@
 Privacy Policy — Open Hangar
 
-(Last updated: 2026-09-30 · Also at https://openhangar.space/privacy.html)
+(Last updated: 2026-11-10 · Also at https://openhangar.space/privacy.html)
 
 Open Hangar is a source-available browser extension that reads your own Star Citizen / Roberts Space Industries (RSI) account data and stores it locally in your browser. This policy explains exactly what it does and does not do with data.
 
@@ -27,15 +27,23 @@ All of this is stored only in your browser's local extension storage (chrome.sto
 
 OUTBOUND NETWORK REQUESTS
 
-The extension makes a small number of outbound requests, none of which carry your personal data:
+Besides reading your own RSI account and Add to RSI Cart (both above), Open Hangar only ever talks to two places: RSI and our own site, openhangar.space. None of these requests carry your personal data.
 
-- robertsspaceindustries.com — to read your own account (above), to load hangar thumbnails, to show RSI's newest patch notes on the Home page (the same public pages for everyone), to look up ship art for items RSI ships without images from RSI's public ship-matrix index, and, only when you choose to scan the Store, to check whether the ships on your wishlist are on sale. No credentials are sent for the ship-matrix lookup.
-- openhangar.space (our own site, public, read-only): a small status file (the same for everyone), at most every few hours, so we can pause a scan that RSI's site changes have broken and show a short notice until a fix is out; and, only if you pick a currency other than USD, today's exchange rates (the European Central Bank's, the same file for everyone), at most once a day. Nothing is sent. The site is hosted on Cloudflare, which, like any website host, sees the request's IP address; we receive nothing.
-- api.star-citizen.wiki (public, read-only) — the current game version and when it was released, a fallback for ship art when the ship-matrix has no image, and the source of ship store prices for Hangar value. Prices come from downloading the whole public vehicle list (the same list for everyone), so they reveal nothing about your hangar. Ship-art lookups, done by ship name, are cached locally and are the only outbound signal that weakly relates to what you are viewing; no credentials or personal data are sent.
-- support.robertsspaceindustries.com (public, read-only) — RSI's Loaner Ship Matrix and Included Vessels help articles (the same pages for everyone), at most once a week, to show which loaners your ships give you. No credentials or personal data are sent.
-- starcitizen.tools (public, read-only) — the current game event and test-server versions on the Home page, and on the Referrals page the list of referral bonus events and the pictures of referral rewards (the same for everyone), cached for hours to a month. No credentials or personal data are sent.
-- api.github.com (public, read-only): only when you open the Known Issues page, the list of open bug reports for Open Hangar (the same list for everyone), cached for an hour. No credentials or personal data are sent.
-- addons.mozilla.org (Firefox only, public, read-only) — when you press "Check for updates", the latest published version number of Open Hangar. No credentials or personal data are sent.
+- robertsspaceindustries.com (including support.robertsspaceindustries.com): to load hangar thumbnails; to look up ship art for items RSI ships without images, from RSI's public ship-matrix index; and RSI's Loaner Ship Matrix and Included Vessels help articles (the same pages for everyone), at most once a week, to show which loaners your ships give you. No credentials are sent for these public pages.
+- openhangar.space (our own site, public, read-only). Every file below is the same for everyone and is cached on your device:
+  - a small status file, at most every few hours, so we can pause a scan that RSI's site changes have broken and show a short notice until a fix is out;
+  - today's exchange rates (the European Central Bank's), only if you pick a currency other than USD, at most once a day;
+  - the game status for the Game Status button: the live and test builds, the newest patch notes and the current and next game event, at most every 10 minutes;
+  - the public ship list (names, store prices and pictures) for Hangar value and ship art;
+  - the public store catalog (what's on sale now, with prices), when you press Check Now or scan the Store. Open Hangar downloads the whole catalog and checks your wishlist on your own device, so your wishlist is never sent anywhere;
+  - the list of referral bonus events and reward pictures, for the Referrals page;
+  - the list of open bug reports for Open Hangar, when you open the Known Issues page;
+  - on Firefox, when you press "Check for Updates", the latest published version number.
+  Nothing is sent to us by these requests. The site is hosted on Cloudflare, which, like any website host, sees the request's IP address; we keep nothing from it except a short-lived count per address to stop abuse.
+
+The site gathers some of this public information from community sources, such as the Star Citizen Wiki and starcitizen.tools, and credits them where it shows it. Open Hangar itself doesn't contact them.
+
+The footer also links to Ko-fi and Patreon, where you can choose to support the project, and some pages link to community sites such as the Star Citizen Wiki. They are plain links: nothing is loaded from those sites, and nothing is sent unless you click one and use that site yourself.
 
 PERMISSIONS AND WHY THEY ARE USED
 

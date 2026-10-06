@@ -202,7 +202,7 @@
     <button id="scan-selected" class="scan-go" disabled={d.busy} onclick={() => app().top.scan()}
       >Scan Now</button
     >
-    <!-- openhangar.space: Connected as, Sync Now, Open My Hangar, Disconnect (ui/site). -->
+    <!-- openhangar.space: Connected as and Open My Hangar (ui/site). -->
     <div id="scan-menu-site" style="display: contents"></div>
   </div>
   {#if d.report}

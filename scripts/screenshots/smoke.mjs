@@ -957,8 +957,8 @@ try {
   // website stubbed. Without the sign-in window (no identity permission), the code
   // fallback: Connect on the Citizen Card → the code to approve → the card goes quiet
   // and sync lives in the top bar: "Synced …" beside Scan, the ▾ menu's
-  // openhangar.space section (Connected as your RSI handle, Sync Now, Disconnect asked
-  // once), a scan syncs once as its last step ("Syncing to Website…"), and a refused
+  // openhangar.space section (Connected as your RSI handle, Open My Hangar; Sync Now
+  // and Disconnect, asked once, are in your portrait's menu), a scan syncs once as its last step ("Syncing to Website…"), and a refused
   // sync shows in the scan report.
   const sc = await page.evaluate(async () => {
     const wait = (ms = 80) => new Promise((r) => setTimeout(r, ms));
@@ -968,6 +968,14 @@ try {
     const btnIn = (root, label) =>
       root && [...root.querySelectorAll('button')].find((b) => b.textContent.includes(label));
     const menu = () => $('#scan-menu-sync');
+    // Sync Now is only in your portrait's menu (owner, 2026-10-07).
+    const syncNow = async () => {
+      document.dispatchEvent(new CustomEvent('oh:close-menus'));
+      await wait();
+      $('#settings-btn').click();
+      await wait();
+      $('#settings-menu #menu-sync-now').click();
+    };
     const openMenu = async () => {
       if ($('#scan-menu').hidden) $('#scan-menu-btn').click();
       await wait();
@@ -1027,9 +1035,10 @@ try {
       r.status = txt($('#sync-status'));
       await openMenu();
       r.menu = txt(menu());
-      btnIn(menu(), 'Sync Now').click();
+      r.noScanSyncNow = !btnIn(menu(), 'Sync Now');
+      await syncNow();
       await wait(150);
-      r.menuClosed = $('#scan-menu').hidden;
+      r.menuClosed = $('#settings-menu').hidden;
       r.synced = txt($('#sync-status'));
       r.syncedTitle = $('#sync-status')?.title || '';
       // Top Bar Option A (2026-10-06): the Synced dot sits on the portrait, its hover
@@ -1076,8 +1085,7 @@ try {
       OH.siteSync = async () => {
         throw new Error('Scan your hangar first, then press Sync Now.');
       };
-      await openMenu();
-      btnIn(menu(), 'Sync Now').click();
+      await syncNow();
       await wait(250);
       r.manual = $('#scan-report') && !$('#scan-report').hidden ? txt($('#scan-report')) : '';
       $('#scan-report .sr-x')?.click();
@@ -1128,6 +1136,7 @@ try {
   !/pilot\.mail/.test(sc.menu) &&
   /Every scan syncs/.test(sc.menu) &&
   /Open My Hangar/.test(sc.menu) &&
+  sc.noScanSyncNow &&
   sc.menuClosed &&
   /^Synced \d/.test(sc.synced) &&
   /^Synced to openhangar\.space today, /.test(sc.syncedTitle) &&
