@@ -26,7 +26,9 @@ const OH = globalThis.OH;
 // Each test simulates its own outages: forget the last test's 'site is down'.
 test.beforeEach(() => delete store.netDown);
 
-test('fetchShipCatalog throws when any page fails (so nothing half-empty is cached)', async () => {
+test('the ship-list script: fetchShipCatalog throws when any page fails (nothing half-empty written)', async () => {
+  const { fetchShipCatalog } = await import('../scripts/update-ship-catalog.mjs');
+  const pause = async () => {};
   const page = (data, last) => ({
     ok: true,
     json: async () => ({ data, meta: { last_page: last } }),
@@ -35,41 +37,38 @@ test('fetchShipCatalog throws when any page fails (so nothing half-empty is cach
   // Game-file list OK, ship matrix down.
   const matrixDown = async (url) =>
     /shipmatrix/.test(url) ? { ok: false, status: 503 } : page([ship], 1);
-  await assert.rejects(OH.fetchShipCatalog(matrixDown), /HTTP 503/);
-  delete store.netDown; // a new outage below, not the one above
+  await assert.rejects(fetchShipCatalog(matrixDown, pause), /HTTP 503/);
   // Second page of the game-file list fails.
   const midWalk = async (url) =>
     /number%5D=2/.test(url) && !/shipmatrix/.test(url)
       ? { ok: false, status: 429 }
       : page([ship], 2);
-  await assert.rejects(OH.fetchShipCatalog(midWalk), /HTTP 429/);
+  await assert.rejects(fetchShipCatalog(midWalk, pause), /HTTP 429/);
 });
 
-test('wikiImageUrls caches nothing when the request fails', async () => {
-  delete store.wikiFiles;
-  const down = async () => ({ ok: false, status: 503 });
+test('a feed that fails caches nothing new and keeps no stale "missing" answer', async () => {
+  delete store.feedReferral;
+  const down = async () => new Response('', { status: 503 });
   assert.deepEqual(await OH.wikiImageUrls(['Referral Pulse.jpg'], down), {});
-  assert.equal(store.wikiFiles, undefined);
+  assert.equal(store.feedReferral.data, undefined);
+  assert.ok(store.feedReferral.retryAt > Date.now()); // waits before asking again
   let calls = 0;
   const up = async () => {
     calls++;
-    return {
-      ok: true,
-      json: async () => ({
-        query: {
-          pages: { 1: { title: 'File:Referral Pulse.jpg', imageinfo: [{ thumburl: 'u' }] } },
-        },
-      }),
-    };
+    return Response.json({
+      v: 1,
+      events: [],
+      images: { 'Referral Pulse.jpg': 'https://media.openhangar.space/pulse.jpg' },
+    });
   };
   // Right after an outage the site is left alone for a while: no request at all.
   assert.deepEqual(await OH.wikiImageUrls(['Referral Pulse.jpg'], up), {});
   assert.equal(calls, 0);
-  delete store.netDown; // ten minutes later
+  store.feedReferral.retryAt = Date.now() - 1; // ten minutes later
   assert.deepEqual(await OH.wikiImageUrls(['Referral Pulse.jpg'], up), {
-    'Referral Pulse.jpg': 'u',
+    'Referral Pulse.jpg': 'https://media.openhangar.space/pulse.jpg',
   });
-  assert.equal(calls, 1); // retried after the failure, not stuck on a cached miss
+  assert.equal(calls, 1); // retried after the failure
 });
 
 test('mutateStored queues concurrent writes so none are lost', async () => {

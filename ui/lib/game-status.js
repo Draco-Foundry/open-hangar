@@ -9,8 +9,6 @@
 //     nextEvent: { … } | null }
 // Dates are ISO strings; they're turned into ms here. A part we can't read is null.
 export const GAME_STATUS_URL = 'https://openhangar.space/api/game-status';
-const GS_KEY = 'gameStatus';
-export const GAME_STATUS_TTL = 10 * 60 * 1000;
 
 const str = (v, max = 200) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
 const ms = (v) => {
@@ -71,41 +69,18 @@ export function pillOf(gs) {
 }
 
 // → the shaped feed (fresh, or the last saved copy), or null when it never loaded.
-// `fetchFn`, `store` and `guarded` let tests swap the network and storage.
+// The request, its 10-minute cache, ETag and back-off live in lib.js
+// (OH.getGameStatus), shared with the footer's game version. `feed` lets tests
+// swap it.
 export async function loadGameStatus({
-  fetchFn = typeof fetch === 'function' ? fetch : null,
-  store = typeof chrome !== 'undefined' ? chrome.storage.local : null,
-  guarded = typeof window !== 'undefined' && window.OH && window.OH.guarded,
-  now = Date.now(),
+  feed = typeof window !== 'undefined' && window.OH && window.OH.getGameStatus,
   force = false,
 } = {}) {
-  let saved = null;
+  if (!feed) return null;
   try {
-    saved = store ? (await store.get(GS_KEY))[GS_KEY] || null : null;
+    const got = await feed({ force });
+    return got ? shapeGameStatus(got.data) : null;
   } catch {
-    saved = null;
+    return null;
   }
-  const last = saved && saved.data ? saved.data : null;
-  // Asked within the last 10 minutes (answered or not): no new request.
-  if (!force && saved && now - (saved.at || 0) < GAME_STATUS_TTL) return last;
-  if (!fetchFn) return last;
-  let data = null;
-  try {
-    const get = guarded ? guarded(fetchFn) : fetchFn;
-    const res = await get(GAME_STATUS_URL, {
-      credentials: 'omit',
-      headers: { Accept: 'application/json' },
-    });
-    data = res.ok ? shapeGameStatus(await res.json()) : null;
-  } catch {
-    data = null;
-  }
-  try {
-    // A failed ask still counts toward the 10 minutes, so a down site isn't hammered;
-    // the last good copy stays.
-    if (store) await store.set({ [GS_KEY]: { at: now, data: data || last } });
-  } catch {
-    // Not saved: asked again next time.
-  }
-  return data || last;
 }

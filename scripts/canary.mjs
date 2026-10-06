@@ -65,18 +65,6 @@ const checks = [
     },
   },
   {
-    name: 'Ship store page (in stock / out / packs)',
-    host: 'robertsspaceindustries.com',
-    async run() {
-      const ship = (checks[0].ships || []).find((s) => s.forSale && s.link);
-      if (!ship) return 'skipped: no for-sale ship from the store feed';
-      const res = await fetchLogged(ship.link, { credentials: 'omit' });
-      if (!res.ok) return `${ship.name} page answered HTTP ${res.status}`;
-      const st = OH.parseShipStock(await res.text());
-      return st ? null : `couldn't read the offers on ${ship.name}'s page`;
-    },
-  },
-  {
     name: 'Ship matrix (pictures, manufacturers)',
     host: 'robertsspaceindustries.com',
     async run() {

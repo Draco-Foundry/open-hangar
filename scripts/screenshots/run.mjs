@@ -4,8 +4,8 @@
  * Serves the REAL dashboard from src/ on localhost, with two extra scripts
  * injected into dashboard.html:
  *   demo-shim.js       stubs chrome.* (in-memory storage seeded with a
- *                      fictional demo account) and routes public RSI /
- *                      star-citizen.wiki lookups through the local proxy
+ *                      fictional demo account) and routes public RSI
+ *                      ship-matrix lookups through the local proxy
  *   demo-after-lib.js  swaps the live account/referral calls for demo data
  * Then drives your installed Chrome (puppeteer-core, no browser download) at
  * exactly 1280x800 and saves one JPEG per view into docs/store-assets/.
@@ -28,7 +28,8 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '../..');
 const SRC = path.join(ROOT, 'src');
 const OUT = path.join(ROOT, 'docs', 'store-assets');
-const PORT = 8323;
+// DEMO_PORT lets two checkouts run the demo or the UI test at once.
+const PORT = Number(process.env.DEMO_PORT) || 8323;
 
 // Order = store listing order (first is the hero shot).
 const VIEWS = ['inventory', 'home', 'referrals', 'buybacks', 'stats'];
@@ -41,8 +42,7 @@ const TYPES = {
   '.png': 'image/png',
   '.json': 'application/json',
 };
-const PROXY_ALLOW =
-  /^https:\/\/(robertsspaceindustries\.com\/ship-matrix\/|api\.star-citizen\.wiki\/)/;
+const PROXY_ALLOW = /^https:\/\/robertsspaceindustries\.com\/ship-matrix\//;
 const proxyCache = new Map();
 
 function findChrome() {

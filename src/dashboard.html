@@ -578,23 +578,7 @@
       .full-store-btn:hover {
         filter: brightness(0.88);
       }
-      /* Find a Ship: matching names as a short list of links. */
-      .find-hits {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-        gap: 6px 16px;
-        margin: 0;
-        padding: 0;
-        list-style: none;
-      }
-      .find-hits li {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 8px;
-        padding: 4px 0;
-        border-bottom: 1px solid var(--line);
-      }
+      /* Find in Store: prices next to the matching names. */
       .find-price {
         color: var(--muted);
         font-size: 12px;
@@ -2323,7 +2307,7 @@
       .org-owners {
         color: var(--muted);
       }
-      /* Store: your CCUs and Find a Ship */
+      /* Store: your CCUs and Find in Store */
       .store-intro a {
         color: var(--link);
         font-weight: 600;
@@ -3023,7 +3007,7 @@
 
       <section class="view" id="view-store">
         <h2 class="section-title">Store</h2>
-        <!-- Wishlist, Your CCUs and Find a Ship are the Svelte Store (ui/store). -->
+        <!-- Wishlist, Your CCUs and Find in Store are the Svelte Store (ui/store). -->
         <div id="oh-store"></div>
       </section>
 
@@ -3291,7 +3275,8 @@
               <li>No password, no account, and no server. Nothing you scan leaves your browser.</li>
               <li>
                 The only other requests are public ones with nothing personal in them: ship pictures
-                from RSI, and ship prices and the game version from star-citizen.wiki.
+                and pages from RSI, and public lists (ship prices, the game version, the store
+                catalog) from our own site, openhangar.space.
               </li>
               <li>
                 Ship data comes from the

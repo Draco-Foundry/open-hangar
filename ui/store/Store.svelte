@@ -1,13 +1,13 @@
 <script>
   // The Store page: your side of the store. Your Wishlist, Your Subscriber Store
-  // (subscribers only), what your CCUs are worth, and Find a Ship to open any
-  // ship's window. Browsing every ship, sales,
+  // (subscribers only), what your CCUs are worth, and Find in Store to search the
+  // store and add anything to your wishlist. Browsing every ship, sales,
   // Compare and prices in your currency live on the website's full store. Long
   // lists scroll inside their panel.
   import Wishlist from './Wishlist.svelte';
   import SubStore from './SubStore.svelte';
   import CcuPanel from './CcuPanel.svelte';
-  import FindShip from './FindShip.svelte';
+  import FindInStore from './FindInStore.svelte';
 
   const FULL_STORE = 'https://openhangar.space/store';
 </script>
@@ -22,4 +22,4 @@
 <Wishlist />
 <SubStore />
 <CcuPanel />
-<FindShip />
+<FindInStore />

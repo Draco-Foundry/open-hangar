@@ -87,7 +87,7 @@
       if (at > cutoff)
         out.push({ key: `ready:${name}`, kind: 'good', title: `${name} is flight ready`, sub: 'A ship you own', href: '#inventory' });
     // Buy-backs of ships on your wishlist.
-    const wish = new Set((s.wishlist || []).map((w) => String(w).toLowerCase()));
+    const wish = new Set(a.store.wishShips().map((w) => String(w).toLowerCase()));
     const bb = (s.buybacks || []).filter((b) => {
       const v = a.shipOf(a.resolveImageName(b));
       return v && wish.has(String(v.name).toLowerCase());

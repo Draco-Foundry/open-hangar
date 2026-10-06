@@ -624,7 +624,7 @@ const shortMoney = (n, full) => {
 };
 
 // --- Hangar value (ship store prices) ---------------------------------------
-// Prices come from the cached star-citizen.wiki catalog (OH.getPriceIndex).
+// Prices come from the ship list (bundled + openhangar.space's ships feed, OH.getPriceIndex).
 // Loaded lazily the first time a view needs them; views re-render once ready.
 let pricesLoading = null;
 let valueCache = { items: null, priceOf: null, value: null };
@@ -974,53 +974,97 @@ function renderVersions() {
   });
 }
 
-// --- Home: quick-info panels -------------------------------------------------
-// "Wishlist: On Sale Now" (wishlist ships in RSI's store right now, from each
-// ship's store page) and "At a Glance" (tokens, next referral reward, loaners).
-async function wishlistStock({ force = false } = {}) {
-  await ensureStore();
-  const out = [];
-  for (const name of state.wishlist) {
-    const s = storeOf(name);
-    const st = s && s.link ? await OH.getShipStock(s.link, fetch, { force }) : null;
-    if (st && st.state) stockMem.set(s.link, st.state);
-    out.push({ name: (shipEntry(name) || {}).name || name, key: name, st });
-  }
-  return out;
+// --- Wishlist entries and the store catalog -----------------------------------
+// The wishlist (`state.wishlist`, kept in this browser) holds ships by name, as it
+// always has, and anything else from the store catalog as an object:
+//   { id: 'sku-123' | 'upgrade-7', kind: 'pack'|'paint'|'gear'|'addon'|'ccu', name,
+//     from?, to?, fromMsrp?, price?, img? }   (a CCU starts from `from`)
+// Whether each is in the store comes from openhangar.space's catalog feed
+// (OH.getStoreCatalog: one download for the whole store), matched here on your
+// machine. Nothing about the wishlist is ever sent anywhere.
+const WISH_ITEM_KINDS = ['pack', 'paint', 'gear', 'addon', 'ccu'];
+const isWishItem = (e) =>
+  !!e &&
+  typeof e === 'object' &&
+  typeof e.id === 'string' &&
+  /^(sku|upgrade)-\d+$/.test(e.id) &&
+  typeof e.name === 'string' &&
+  !!e.name.trim() &&
+  WISH_ITEM_KINDS.includes(e.kind) &&
+  (e.kind !== 'ccu' || (typeof e.from === 'string' && !!e.from.trim()));
+// One key per entry: the ship's name, the item's id (a CCU's with where it starts).
+const wishKey = (e) => (typeof e === 'string' ? e : e.kind === 'ccu' ? `${e.id}|${e.from}` : e.id);
+const wishTitle = (e) => (typeof e === 'string' ? (shipEntry(e) || {}).name || e : e.name);
+const wishShips = () => state.wishlist.filter((e) => typeof e === 'string');
+
+// The catalog, kept in memory once read: { at, items, ships, byId, readAt }.
+let catalog = null;
+let catalogAsked = 0;
+let catalogLoading = null;
+const CATALOG_RECHECK_MS = 30 * 60e3;
+function ensureCatalog({ force = false } = {}) {
+  if (catalogLoading) return catalogLoading;
+  if (!force && catalogAsked && Date.now() - catalogAsked < CATALOG_RECHECK_MS)
+    return Promise.resolve(catalog);
+  catalogAsked = Date.now();
+  catalogLoading = OH.getStoreCatalog({ force })
+    .then((feed) => {
+      if (feed && feed.data) catalog = { ...OH.shapeCatalog(feed.data), readAt: feed.at };
+      return catalog;
+    })
+    .catch(() => catalog)
+    .finally(() => {
+      catalogLoading = null;
+      homeUpdated();
+    });
+  return catalogLoading;
 }
-// Wishlist Watch on Home: the last wishlist check, kept until the next one (the
-// store-page answers themselves are cached only 6 hours), so Home can say "Checked
-// 2 days ago". Only Check Now and Scan → Store check; nothing runs by itself.
-// Saved as { at, items: { name: { status, price, warbond, url } } }.
+// A special edition ("600i 2951 BIS") is a different store item from the plain ship.
+const sameStoreShip = (a, b) => sameShip(a, b) && specialEdition(a) === specialEdition(b);
+// One entry against the catalog: { status, price, warbond, url, img } (lib.js).
+function wishStatus(e) {
+  return OH.catalogWishStatus(catalog, e, {
+    sameShip: sameStoreShip,
+    msrpOf: (name) => (shipEntry(name) || {}).msrp || null,
+  });
+}
+
+// --- Home: Wishlist Watch --------------------------------------------------------
+// The last wishlist check, kept until the next one, so Home can say "Checked 2 days
+// ago". Only Check Now and Scan → Store check (one catalog request); nothing runs by
+// itself. Saved as { at, items: { [wishKey]: { status, price, warbond, url, img } } }.
 let wishWatch = null;
 let wishChecking = false;
-function saveWishWatch(list) {
+function saveWishWatch() {
+  if (!catalog) return; // never read: keep the last check
   const items = {};
-  for (const { name, st, key } of list) {
-    const s = storeOf(key || name);
-    const v = shipEntry(key || name);
-    const eds = (s && s.editions) || [];
-    const min = (xs) => (xs.length ? Math.min(...xs) : null);
-    const std = min(eds.filter((e) => !e.warbond && e.price > 0).map((e) => e.price));
-    const wb = min(eds.filter((e) => e.warbond && e.price > 0).map((e) => e.price));
-    const status = st && st.state ? st.state : 'unknown';
-    const price = (status === 'in' && (std || (st && st.price))) || (v && v.msrp) || std || null;
-    items[key || name] = {
-      status,
-      price: Number.isFinite(price) ? price : null,
-      warbond: status === 'in' && wb && price && wb < price ? wb : null,
-      url: (s && s.link) || null,
+  for (const e of state.wishlist) {
+    const st = wishStatus(e);
+    items[wishKey(e)] = {
+      status: st.status,
+      price: Number.isFinite(st.price) ? st.price : null,
+      warbond: Number.isFinite(st.warbond) ? st.warbond : null,
+      url: st.url || null,
+      img: st.img || null,
     };
   }
-  wishWatch = { at: Date.now(), items };
+  wishWatch = { at: catalog.readAt || Date.now(), items };
   chrome.storage.local.set({ wishWatch });
+}
+// Ask the catalog again (with its ETag) and save what it says about the wishlist.
+// → how many are in the store, or null when the catalog has never loaded.
+async function checkWishlistNow() {
+  await ensureCatalog({ force: true });
+  if (!catalog) return null;
+  saveWishWatch();
+  return wishWatchRows().filter((r) => r.status === 'in').length;
 }
 async function checkWishlist() {
   if (wishChecking || !state.wishlist.length) return;
   wishChecking = true;
   homeUpdated();
   try {
-    saveWishWatch(await wishlistStock({ force: true }));
+    await checkWishlistNow();
   } finally {
     wishChecking = false;
     homeUpdated();
@@ -1029,22 +1073,25 @@ async function checkWishlist() {
 // The card's rows, in your wishlist order (generic items: ui/lib/wish-watch.js).
 function wishWatchRows() {
   const saved = (wishWatch && wishWatch.items) || {};
-  return wishlistOrder().map((name) => {
-    const v = shipEntry(name);
-    const got = saved[name] || null;
+  return wishlistOrder().map((e) => {
+    const got = saved[wishKey(e)] || null;
+    const ship = typeof e === 'string';
+    const v = ship ? shipEntry(e) : null;
     return {
-      kind: 'ship',
-      name: (v && v.name) || name,
-      lookup: name,
-      price: got ? got.price : (v && v.msrp) || null,
+      kind: ship ? 'ship' : e.kind,
+      name: wishTitle(e),
+      from: ship ? '' : e.from || '',
+      to: ship ? '' : e.to || '',
+      lookup: ship ? e : e.kind === 'ccu' ? e.to : e.name,
+      key: wishKey(e),
+      price: got ? got.price : ship ? (v && v.msrp) || null : e.price || null,
       warbond: got ? got.warbond : null,
       status: got ? got.status : 'unknown',
       url: got ? got.url : null,
-      img: '',
+      img: (got && got.img) || (!ship && e.img) || '',
     };
   });
 }
-
 function renderHome() {
   ensurePrices();
   renderEventBanner();
@@ -1233,7 +1280,7 @@ const TRAITS = [
     key: 'below',
     label: 'Below Store Price',
     title:
-      "Paid less than today's store price (star-citizen.wiki): warbonds, sales, older cheaper pricing. Ship pledges and CCUs.",
+      "Paid less than today's store price: warbonds, sales, older cheaper pricing. Ship pledges and CCUs.",
     notLabel: 'At / Above Store Price',
     test: (f) => f.below === true,
     neg: (f) => f.below === false,
@@ -2514,11 +2561,11 @@ const SHIP_STATES = [
   ['in-concept', 'In Concept'],
 ];
 // --- Store page -------------------------------------------------------------
-// Your side of the store: Wishlist, Your CCUs and Find a Ship, under a link to the
-// website's full store (every ship, sales, Compare). Long lists scroll inside
-// their panel. RSI's upgrade-tool feed (OH.getStoreShips) is used only to find
-// each ship's store page; whether a ship is in the store comes from that page
-// (OH.getShipStock), checked just for the wishlist and the ship window.
+// Your side of the store: Wishlist, Your CCUs and Find in Store, under a link to
+// the website's full store (every ship, sales, Compare). Long lists scroll inside
+// their panel. Whether something is in the store comes from openhangar.space's
+// catalog feed (ensureCatalog); RSI's upgrade-tool feed (OH.getStoreShips) is
+// still read for Add to RSI Cart (the upgrade SKUs).
 let storeData = null; // { at, ships }
 let storeByKey = null; // shipKey(name) → store entry
 let storeRequested = null; // the pending/finished load (a promise)
@@ -2574,30 +2621,35 @@ function storeOf(name) {
     null;
   return hit && specialEdition(hit.name) === specialEdition(name) ? hit : null;
 }
-const stockMem = new Map(); // store page URL → 'in' | 'pack' | 'out' (this session)
-// What a ship's store page said, as the "In Store Now" cell shows it.
-function stockLabel(st) {
-  const state = st && st.state;
-  const cls = state === 'in' ? 'on' : state === 'pack' ? 'wb' : 'off';
-  const packList = st && st.packs && st.packs.length ? st.packs.map((p) => p.name).join(', ') : '';
-  if (state === 'in') {
+// What the catalog says about a wishlist entry or ship, as the "In Store Now" cell
+// shows it: { cls, text, title, url }, or null before the catalog has loaded.
+function stockLabel(e) {
+  if (!catalog) return null;
+  const st = wishStatus(e);
+  if (st.status === 'in') {
+    // The cheapest way to buy it now; a Warbond's usual price in the tooltip.
+    const now = st.warbond || st.price;
+    const wb = st.warbond ? `: Warbond ${dollars(st.warbond)}, usually ${dollars(st.price)}` : '';
     return {
-      cls,
-      text: st.price ? `In stock (${dollars(st.price)})` : 'In stock',
-      title: `Sold on its own in RSI's store right now${packList ? `. Also in: ${packList}` : ''}`,
+      cls: 'on',
+      text: now ? `In stock (${dollars(now)})` : 'In stock',
+      title: `In RSI's store right now${wb}`,
+      url: st.url,
     };
   }
-  if (state === 'pack') {
+  if (st.status === 'soldout')
     return {
-      cls,
-      text: 'Only in a pack',
-      title: `Not sold on its own right now; comes in: ${packList}`,
+      cls: 'wb',
+      text: 'Sold out',
+      title: 'Listed in the store, sold out for now',
+      url: st.url,
     };
-  }
-  if (state === 'out') {
-    return { cls, text: 'Not in store', title: "Not for sale on RSI's store right now" };
-  }
-  return { cls, text: 'Unknown', title: "Couldn't read RSI's store page" };
+  return {
+    cls: 'off',
+    text: 'Not in store',
+    title: "Not for sale in RSI's store right now",
+    url: null,
+  };
 }
 
 // Wishlist order: the saved order ("My order", drag to change) or a sort.
@@ -2611,12 +2663,13 @@ const WISH_SORTS = [
 function wishlistOrder() {
   const list = state.wishlist.slice();
   if (state.wishSort === 'mine') return list;
-  const price = (n) => (shipEntry(n) || {}).msrp || 0;
-  const label = (n) => ((shipEntry(n) || {}).name || n).toLowerCase();
-  const stockRank = (n) => {
-    const st = storeOf(n);
-    const s = st && (stockPending ? stockRankSnap : stockMem).get(st.link);
-    return s === 'in' ? 0 : s === 'pack' ? 1 : s === 'out' ? 2 : 3;
+  const price = (e) =>
+    (typeof e === 'string' ? (shipEntry(e) || {}).msrp : wishStatus(e).price) || 0;
+  const label = (e) => wishTitle(e).toLowerCase();
+  const stockRank = (e) => {
+    if (!catalog) return 3;
+    const s = wishStatus(e).status;
+    return s === 'in' ? 0 : s === 'soldout' ? 1 : 2;
   };
   const byName = (a, b) => label(a).localeCompare(label(b));
   const cmp =
@@ -2629,12 +2682,11 @@ function wishlistOrder() {
   return list.sort(cmp);
 }
 // The Store page is Svelte (ui/store, mounted into #oh-store); this loads what it
-// needs (ship prices, RSI's store feed) and tells it to redraw. Each call also
-// lets the wishlist ask its ships' store pages again (lib.js caches them).
+// needs (ship prices, the store catalog, RSI's upgrade feed) and tells it to redraw.
 function renderStore() {
   ensurePrices();
   ensureStore();
-  stockAsked.clear();
+  ensureCatalog();
   loadSubStore();
   homeUpdated();
 }
@@ -2678,41 +2730,19 @@ async function loadSubStore({ force = false, auto = true } = {}) {
   homeUpdated();
 }
 
-// "In Store Now" for the Svelte wishlist: each ship's store page, asked once per
-// renderStore(). While answers are still coming in, "In stock first" keeps the
-// order it had, then sorts once they're all in (no rows hopping about).
-const stockInfo = new Map(); // store page URL → OH.getShipStock answer (or null)
-const stockAsked = new Set();
-const stockAsking = new Set(); // still waiting: never asked twice at once
-let stockPending = 0;
-let stockRankSnap = new Map();
-function checkStock(links) {
-  for (const url of links) {
-    if (!url || stockAsked.has(url) || stockAsking.has(url)) continue;
-    stockAsked.add(url);
-    stockAsking.add(url);
-    if (!stockPending++) stockRankSnap = new Map(stockMem);
-    OH.getShipStock(url)
-      .catch(() => null)
-      .then((st) => {
-        stockInfo.set(url, st || null);
-        if (st && st.state) stockMem.set(url, st.state);
-        stockAsking.delete(url);
-        stockPending--;
-        homeUpdated();
-      });
-  }
-}
 function setWishSort(key) {
   if (!WISH_SORTS.some(([k]) => k === key)) return;
   state.wishSort = key;
   chrome.storage.local.set({ uiWishSort: key });
   renderStore();
 }
-// "My order" after a drag: the wishlist's names in their new order.
-function setWishOrder(order) {
-  if (JSON.stringify(order) === JSON.stringify(state.wishlist)) return;
-  state.wishlist = order.slice();
+// "My order" after a drag: the wishlist's entry keys in their new order.
+function setWishOrder(keys) {
+  const byKey = new Map(state.wishlist.map((e) => [wishKey(e), e]));
+  const next = keys.map((k) => byKey.get(k)).filter(Boolean);
+  for (const e of state.wishlist) if (!next.includes(e)) next.push(e);
+  if (next.every((e, i) => e === state.wishlist[i])) return;
+  state.wishlist = next;
   chrome.storage.local.set({ wishlist: state.wishlist });
   renderStore();
 }
@@ -2953,8 +2983,9 @@ function eventForDate(d) {
 
 // --- Referrals: progress, gallery, milestones, insights, share card ---------
 // The bonus-event list starts as the built-in REFERRAL_EVENTS and is refreshed
-// from the wiki (OH.getReferralEvents, cached a week) the first time the page
-// opens; wiki rows replace built-in ones with the same start date.
+// from openhangar.space's referral-events feed (OH.getReferralEvents, asked at
+// most once a day) the first time the page opens; its rows replace built-in ones
+// with the same start date.
 let refEventsRequested = false;
 function refreshReferralEvents() {
   if (refEventsRequested) return;
@@ -4373,15 +4404,17 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
     }
   }
 
-  // Store: re-check RSI's store for your wishlist ships (skips the 6-hour cache).
+  // Store: read the store catalog again (one request) and check your wishlist
+  // against it; Home's Wishlist Watch shows this check.
   if (store && state.wishlist.length) {
     if (referrals) scanProgress.i++;
     setScanning('store');
     scanDetail('Store · checking your wishlist');
-    const list = await wishlistStock({ force: true });
-    saveWishWatch(list); // Home's Wishlist Watch shows this check
-    const n = list.filter((x) => x.st && x.st.state === 'in').length;
-    const text = `${n} wishlist ship${n === 1 ? '' : 's'} on sale`;
+    const n = await checkWishlistNow();
+    const text =
+      n == null
+        ? 'store list still on its way, checked next time'
+        : `${n} wishlist item${n === 1 ? '' : 's'} on sale`;
     parts.push(text);
     rows.push({ name: 'Store', ok: true, text });
   }
@@ -4778,29 +4811,25 @@ async function loadChangelog() {
 
 // Updates page: "Check for Updates" (ui/updates/Updates.svelte shows the result).
 // Chrome and Edge can ask their store right now (a found update downloads, then
-// the Reload bar appears); Firefox can't, so it asks the public AMO API (CORS-open,
-// no permission needed) for the latest published version and compares. Resolves
-// to the line to show under the button.
-const AMO_ADDON_API = 'https://addons.mozilla.org/api/v5/addons/addon/open-hangar/';
+// the Reload bar appears); Firefox can't, so it reads the version Firefox Add-ons
+// has live from our own site's openhangar.space/versions.json (stores.firefox.live,
+// OH.getStoreVersions) and compares. Resolves to the line to show under the button.
 async function checkForUpdates() {
   const cur = chrome.runtime.getManifest().version;
   // Looked up by name so Firefox's linter doesn't flag it (see initUpdates).
   const check = chrome.runtime[['request', 'Update', 'Check'].join('')];
   if (typeof check !== 'function') {
     try {
-      const res = await fetch(AMO_ADDON_API, {
-        credentials: 'omit',
-        cache: 'no-store',
-        signal: AbortSignal.timeout(8000),
-      });
-      const latest = res.ok ? (await res.json())?.current_version?.version : null;
-      if (!latest) throw new Error('no version');
+      const feed = await OH.getStoreVersions({ force: true });
+      const live = feed && feed.data.stores && feed.data.stores.firefox;
+      const latest = live && typeof live.live === 'string' ? live.live : null;
+      if (!latest || !/^\d+(\.\d+)*$/.test(latest)) throw new Error('no version');
       chrome.storage.local.set({ lastUpdateCheck: Date.now() });
       return OH.compareVersions(latest, cur) > 0
         ? `Open Hangar ${latest} is out. Firefox installs it on its own within a day, or get it now: about:addons, gear icon, Check for Updates.`
         : 'You’re on the latest version. Fly safe.';
     } catch {
-      return 'Couldn’t reach Firefox Add-ons. Probably a 30k on their end, try again in a bit.';
+      return 'The version check is still in the comm queue. Try again in a bit.';
     }
   }
   try {
@@ -4817,23 +4846,14 @@ async function checkForUpdates() {
   }
 }
 
-// Known Issues (#175): open bugs from the public GitHub tracker, fetched only when
-// this page opens and cached for an hour. No sign-in, nothing about the user sent.
-const ISSUES_API =
-  'https://api.github.com/repos/Draco-Foundry/open-hangar/issues?state=open&per_page=100';
-const ISSUES_TTL = 60 * 60 * 1000;
-
+// Known Issues (#175): open bugs from the public GitHub tracker, through our own
+// site's feed (OH.getKnownIssues), asked only when this page opens and cached for
+// an hour. Nothing about the user sent. Never loaded yet (site busy or offline):
+// the page links to the list on GitHub instead.
 async function loadKnownIssues() {
-  const { knownIssues } = await chrome.storage.local.get('knownIssues');
-  if (knownIssues && Date.now() - knownIssues.at < ISSUES_TTL) return knownIssues.list;
-  const res = await fetch(ISSUES_API, {
-    credentials: 'omit',
-    headers: { Accept: 'application/vnd.github+json' },
-  });
-  if (!res.ok) throw new Error(`GitHub said ${res.status}`);
-  const list = OH.parseKnownIssues(await res.json());
-  await chrome.storage.local.set({ knownIssues: { at: Date.now(), list } });
-  return list;
+  const feed = await OH.getKnownIssues();
+  if (!feed) throw new Error('known issues not loaded yet');
+  return OH.shapeKnownIssues(feed.data.issues);
 }
 
 // What the Svelte Updates and Known Issues pages (ui/updates) draw. These two
@@ -5285,6 +5305,7 @@ function openShipModal(name) {
   openDetail({ kind: 'ship', name });
   if (!loanerMatrix) ensureLoaners();
   ensureStore();
+  ensureCatalog();
 }
 // A ship's window: its specs, the store, what it comes with, loaners, links, and
 // your copies of it (pledges and buy-backs).
@@ -5310,8 +5331,6 @@ function shipView(name) {
     size: v && v.size ? titleCase(v.size) : '',
     crew: v && v.crew ? String(v.crew) : '',
     cargo: v && v.cargo ? `${v.cargo} SCU` : '',
-    // In Store Now: the ship's own store page (asked once it shows), "—" with none.
-    store: !st ? null : st.link ? { link: st.link } : storeData ? { none: true } : null,
     // Add to RSI Cart (#288): RSI's upgrade tool sells an upgrade to it.
     upgrade: (() => {
       const u = st && st.forSale ? OH.upgradeSku(st) : null;
@@ -5353,33 +5372,53 @@ document.addEventListener('click', (e) => {
 });
 
 // --- Wishlist ---------------------------------------------------------------
-// Ships you want (by name), kept in this browser (`wishlist`). Toggled from the
-// ship window; listed on the Store page with price, and any buy-back copies
-// you could reclaim instead of buying new.
+// What you want, kept in this browser (`wishlist`): ships by name (toggled from the
+// ship window or Find in Store) and other store items (Find in Store, see
+// isWishItem). Listed on the Store page with price, and for ships any buy-back
+// copies you could reclaim instead of buying new.
 function onWishlist(name) {
-  return state.wishlist.some((n) => sameShip(n, name));
+  return state.wishlist.some((n) => typeof n === 'string' && sameShip(n, name));
 }
 function toggleWishlist(name) {
   state.wishlist = onWishlist(name)
-    ? state.wishlist.filter((n) => !sameShip(n, name))
+    ? state.wishlist.filter((n) => typeof n !== 'string' || !sameShip(n, name))
     : [...state.wishlist, name];
   chrome.storage.local.set({ wishlist: state.wishlist });
+}
+// A store item from Find in Store: ships go in by name; the rest as an entry.
+const onWishlistItem = (entry) =>
+  typeof entry === 'string'
+    ? onWishlist(entry)
+    : state.wishlist.some((e) => typeof e !== 'string' && wishKey(e) === wishKey(entry));
+function toggleWishItem(entry) {
+  if (typeof entry === 'string') toggleWishlist(entry);
+  else if (isWishItem(entry)) {
+    state.wishlist = onWishlistItem(entry)
+      ? state.wishlist.filter((e) => typeof e === 'string' || wishKey(e) !== wishKey(entry))
+      : [...state.wishlist, entry];
+    chrome.storage.local.set({ wishlist: state.wishlist });
+  }
+  if (currentView() === 'store') renderStore();
+  homeUpdated();
 }
 document.addEventListener('click', (e) => {
   const r = e.target.closest('[data-wish-remove]');
   if (r) {
     // One click removes; an Undo bar brings it back (same spot) for 8 seconds.
-    const name = r.dataset.wishRemove;
-    const at = state.wishlist.indexOf(name);
-    toggleWishlist(name);
+    const key = r.dataset.wishRemove;
+    const at = state.wishlist.findIndex((x) => wishKey(x) === key);
+    if (at < 0) return;
+    const entry = state.wishlist[at];
+    state.wishlist = state.wishlist.filter((_, i) => i !== at);
+    chrome.storage.local.set({ wishlist: state.wishlist });
     renderStore();
-    showWishUndo(name, at);
+    showWishUndo(entry, at);
     return;
   }
   if (e.target.closest('[data-wish-undo]') && wishUndo) {
-    const { name, at } = wishUndo;
-    if (!onWishlist(name)) {
-      state.wishlist.splice(Math.max(0, at), 0, name);
+    const { entry, at } = wishUndo;
+    if (!state.wishlist.some((x) => wishKey(x) === wishKey(entry))) {
+      state.wishlist.splice(Math.max(0, at), 0, entry);
       chrome.storage.local.set({ wishlist: state.wishlist });
     }
     hideWishUndo();
@@ -5387,10 +5426,10 @@ document.addEventListener('click', (e) => {
   }
 });
 // The Undo bar on the Store page (ui/store) shows while this is set.
-let wishUndo = null; // { name, at, timer }
-function showWishUndo(name, at) {
+let wishUndo = null; // { entry, at, timer }
+function showWishUndo(entry, at) {
   clearTimeout(wishUndo && wishUndo.timer);
-  wishUndo = { name, at, timer: setTimeout(hideWishUndo, 8000) };
+  wishUndo = { entry, at, timer: setTimeout(hideWishUndo, 8000) };
   homeUpdated();
 }
 function hideWishUndo() {
@@ -5582,7 +5621,9 @@ function searchResults(q) {
   ]);
   if (LAYOUTS.includes(uiLayout)) state.layout = uiLayout;
   if (uiGroupByType === false) state.groupByType = false;
-  if (Array.isArray(wishlist)) state.wishlist = wishlist.filter((n) => typeof n === 'string');
+  // Ships by name, and store items (isWishItem); anything else is dropped.
+  if (Array.isArray(wishlist))
+    state.wishlist = wishlist.filter((n) => (typeof n === 'string' && n) || isWishItem(n));
   if (savedWishWatch && Number.isFinite(savedWishWatch.at) && savedWishWatch.items)
     wishWatch = savedWishWatch;
   if (WISH_SORTS.some(([k]) => k === uiWishSort)) state.wishSort = uiWishSort;
@@ -5604,6 +5645,7 @@ function searchResults(q) {
   if (LAYOUTS.includes(bbLayout)) state.bbLayout = bbLayout;
   if (marketAnnotations && typeof marketAnnotations === 'object') state.market = marketAnnotations;
 
+  OH.dropRetiredCaches(); // the old wiki, GitHub and store-page caches (now feeds)
   state.bbDetails = { ...(await OH.getBuybackDetails()) };
   await OH.migrateRecovery(); // old "Restore previous hangar" snapshot → saved account
   loadStateFromDB(await OH.loadDB());
@@ -5753,7 +5795,6 @@ window.OHApp = {
   runningEvent,
   shortReward,
   parseTs,
-  wishlistStock,
   tierProgress: (recruits) => tierProgress(REFERRAL_LADDER_STANDARD, recruits),
   rewardNames,
   // Referrals page (ui/referrals).
@@ -6102,25 +6143,37 @@ window.OHApp = {
     get active() {
       return currentView() === 'store';
     },
-    // RSI's store feed has loaded (so a ship without a store page shows "—").
+    // The store catalog has loaded (In Store Now can be answered).
     get feedLoaded() {
-      return !!storeData;
+      return !!catalog;
     },
     get undo() {
-      if (!wishUndo) return null;
-      const v = shipEntry(wishUndo.name);
-      return { name: (v && v.name) || wishUndo.name };
+      return wishUndo ? { name: wishTitle(wishUndo.entry) } : null;
     },
     wishSorts: WISH_SORTS,
     shipStates: SHIP_STATES,
     wishlistOrder,
+    wishKey,
+    wishTitle,
+    wishShips,
     shipEntry,
     shipKey,
     ownedShips,
     storeOf,
-    // A store page's answer as the "In Store Now" cell shows it, or null (not yet).
-    stock: (url) => (stockInfo.has(url) ? stockLabel(stockInfo.get(url)) : null),
-    checkStock,
+    // A wishlist entry (or ship name) as the "In Store Now" cell shows it: { cls,
+    // text, title, url }, or null until the catalog has loaded.
+    stock: stockLabel,
+    wishStatus: (e) => (catalog ? wishStatus(e) : null),
+    upgradeCost: (cat, item, fromMsrp) => OH.upgradeCost(cat, item, fromMsrp),
+    // Find in Store: the catalog (null until loaded), and adding or removing one
+    // of its items (a ship by name, anything else as an entry) on the wishlist.
+    get catalog() {
+      return catalog;
+    },
+    loadCatalog: () => ensureCatalog(),
+    onWishlist: onWishlistItem,
+    toggleWish: toggleWishItem,
+    sameShip,
     // Home's Wishlist Watch: the last check (null if never), its rows, Check Now.
     get wishWatch() {
       return wishWatch

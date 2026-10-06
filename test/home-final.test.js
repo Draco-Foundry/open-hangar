@@ -200,43 +200,27 @@ test('shapeGameStatus reads v1, drops what it cannot trust', async () => {
   assert.deepEqual(pillOf(null), { text: 'Game Status', dot: 'none' });
 });
 
-test('loadGameStatus: at most every 10 minutes, the last copy when the site is quiet', async () => {
+test('loadGameStatus: shapes the shared feed (lib.js OH.getGameStatus), null when never loaded', async () => {
   const { loadGameStatus, GAME_STATUS_URL } = await gsLib();
   assert.equal(GAME_STATUS_URL, 'https://openhangar.space/api/game-status');
-  const mem = {};
-  const store = {
-    get: async (k) => (k in mem ? { [k]: structuredClone(mem[k]) } : {}),
-    set: async (o) => Object.assign(mem, structuredClone(o)),
+  let asked = null;
+  const feed = async (o) => {
+    asked = o;
+    return { data: FEED, at: 1, etag: null };
   };
-  let calls = 0;
-  let answer = () => Response.json(FEED);
-  const fetchFn = async (url, init) => {
-    calls++;
-    assert.equal(init.credentials, 'omit');
-    return answer();
-  };
-  const t0 = Date.UTC(2026, 9, 6, 12);
-  const a = await loadGameStatus({ fetchFn, store, guarded: null, now: t0 });
+  const a = await loadGameStatus({ feed, force: true });
   assert.equal(a.live.version, '4.10.1');
-  assert.equal(calls, 1);
-  await loadGameStatus({ fetchFn, store, guarded: null, now: t0 + 9 * 60e3 });
-  assert.equal(calls, 1, 'cached for 10 minutes');
-  answer = () => new Response('', { status: 503 });
-  const b = await loadGameStatus({ fetchFn, store, guarded: null, now: t0 + 11 * 60e3 });
-  assert.equal(calls, 2);
-  assert.equal(b.live.version, '4.10.1', 'the last good copy');
-  await loadGameStatus({ fetchFn, store, guarded: null, now: t0 + 12 * 60e3 });
-  assert.equal(calls, 2, 'a failed ask counts too: no hammering');
-  answer = () => {
-    throw new Error('offline');
-  };
-  const empty = await loadGameStatus({
-    fetchFn,
-    store: { get: async () => ({}), set: async () => {} },
-    guarded: null,
-    now: t0,
-  });
-  assert.equal(empty, null);
+  assert.deepEqual(asked, { force: true });
+  assert.equal(await loadGameStatus({ feed: async () => null }), null);
+  assert.equal(
+    await loadGameStatus({
+      feed: async () => {
+        throw new Error('offline');
+      },
+    }),
+    null,
+  );
+  assert.equal(await loadGameStatus({ feed: null }), null);
 });
 
 // --- Account Value: Most Valuable ----------------------------------------------
