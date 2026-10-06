@@ -56,7 +56,8 @@ function checkBeta(name, text) {
     if (site !== PRODUCTION_SITE) problems.push(`${name}: built in to "${site}", not production`);
     else seen.builtIn++;
   }
-  if (name.endsWith('lib.js') && text.includes(PRODUCTION_SITE)) seen.sync = true;
+  // The sync code itself (lib.js's @sync block), not just an address.
+  if (name.endsWith('lib.js') && /OH\.siteLinkStart\s*=/.test(text)) seen.sync = true;
   if (name.endsWith('manifest.json')) {
     seen.manifests++;
     const m = JSON.parse(text);
