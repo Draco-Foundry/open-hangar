@@ -2594,7 +2594,12 @@ try {
         await wait(150);
         OH.fetchBuybackDetails = keepFetch;
         const want = state.buybacks
-          .filter((b) => !b.isCCU && !state.bbDetails[b.id] && /^pack(age)?$/.test(b.kind))
+          .filter(
+            (b) =>
+              !b.isCCU &&
+              (!state.bbDetails[b.id] || state.bbDetails[b.id].partial) &&
+              /^pack(age)?$/.test(b.kind),
+          )
           .map((b) => String(b.id));
         r.packs = {
           asked: asked && asked.length,
@@ -2602,6 +2607,89 @@ try {
           same: !!asked && asked.every((id) => want.includes(id)),
         };
         topBar.report = null;
+      }
+
+      // A pack melted since the last hangar scan is filled from your hangar history:
+      // no RSI request, "From your hangar history" in its window, and the automatic
+      // read skips it. That read takes 30 packs per scan at most.
+      {
+        const keepFetch = OH.fetchBuybackDetails;
+        const keepWinFetch = window.fetch;
+        const keepBbs = state.buybacks;
+        const P = '990000001';
+        let asked = null;
+        const rsi = [];
+        try {
+          OH.fetchBuybackDetails = async (ids) => ((asked = ids), { done: ids.length });
+          window.fetch = (u, init) => {
+            if (/\/pledge\/buyback\//.test(String(u))) rsi.push(String(u));
+            return keepWinFetch(u, init);
+          };
+          await chrome.storage.local.set({
+            pledgeArchive: {
+              [P]: {
+                id: P,
+                name: 'Package - Smoke Starter Pack',
+                value: 45,
+                currency: 'USD',
+                contents: [
+                  { kind: 'Ship', label: 'Aurora MR', image: null },
+                  { kind: 'Ship', label: 'Mustang Alpha', image: null },
+                  { kind: 'Insurance', label: '6 Month Insurance', image: null },
+                ],
+                insurance: '6M',
+                kind: 'ship',
+                goneAt: Date.now(),
+              },
+            },
+          });
+          const pack = (id, name) => ({
+            id,
+            name,
+            kind: 'package',
+            date: '',
+            contains: '',
+            href: '',
+            isCCU: false,
+            ccu: null,
+          });
+          const list = [
+            ...keepBbs,
+            pack(P, 'Package - Smoke Starter Pack'),
+            ...Array.from({ length: 35 }, (_, i) =>
+              pack(String(990000100 + i), `Package - Smoke Pack ${i}`),
+            ),
+          ];
+          OH.scanSource = async (id) =>
+            id === 'buybacks'
+              ? { ok: true, items: list, scannedAt: Date.now() }
+              : { ok: true, items: state.items, scannedAt: Date.now(), unchanged: true };
+          await runScan({ store: false });
+          await wait(150);
+          const d = state.bbDetails[P];
+          openDetail({ kind: 'bb', item: state.buybacks.find((b) => String(b.id) === P) });
+          await wait(150);
+          r.hist = {
+            src: d && d.src,
+            ships: d && d.ships.length,
+            price: d && d.price,
+            note: document.querySelector('#bbd-source')?.textContent.trim(),
+            loading: !!document.querySelector('#bbd-modal-loading'),
+            asked: asked && asked.length,
+            skipped: !!asked && !asked.includes(P),
+          };
+          document.querySelector('#modal-close')?.click();
+          await wait(60);
+          r.hist.rsi = rsi.length;
+        } finally {
+          OH.fetchBuybackDetails = keepFetch;
+          window.fetch = keepWinFetch;
+          state.buybacks = keepBbs;
+          await OH.pruneBuybackDetails(keepBbs.map((b) => String(b.id)));
+          state.bbDetails = { ...(await OH.getBuybackDetails()) };
+          await chrome.storage.local.remove('pledgeArchive');
+          topBar.report = null;
+        }
       }
 
       // Part of it failed: one row per source, the failed one marked.
@@ -2637,7 +2725,7 @@ try {
   rep.packs &&
   (rep.packs.want === 0
     ? rep.packs.asked === null || rep.packs.asked === 0
-    : rep.packs.asked === rep.packs.want && rep.packs.same) &&
+    : rep.packs.asked === Math.min(rep.packs.want, 30) && rep.packs.same) &&
   rep.out &&
   rep.out.asked === 0 &&
   rep.out.kept &&
@@ -2648,6 +2736,19 @@ try {
   !rep.out.homeLine
     ? ok('signed out: the scan reads nothing, keeps your hangar, and the report says to log in')
     : fail(`signed-out scan report: ${JSON.stringify(rep)}`);
+  rep.hist &&
+  rep.hist.src === 'history' &&
+  rep.hist.ships === 2 &&
+  rep.hist.price === 45 &&
+  rep.hist.note === 'From your hangar history' &&
+  !rep.hist.loading &&
+  rep.hist.rsi === 0 &&
+  rep.hist.skipped &&
+  rep.hist.asked === 30
+    ? ok(
+        'buy-backs: a melted pack shows its contents from your hangar history, no RSI read; 30 packs per scan',
+      )
+    : fail(`buy-backs from hangar history: ${JSON.stringify(rep.hist)}`);
   rep.closed && rep.reopened
     ? ok('scan report: ✕ closes it, Rough Landing opens it again')
     : fail(`scan report close/reopen: ${JSON.stringify(rep)}`);
