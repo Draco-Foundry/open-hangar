@@ -2579,6 +2579,46 @@ function renderStore() {
   ensurePrices();
   ensureStore();
   stockAsked.clear();
+  loadSubStore();
+  homeUpdated();
+}
+
+// Your Subscriber Store (#418): the subscriber-only items RSI offers this account.
+// The cached list shows at once; a fresh read runs at most once a day by itself
+// (here on the Store page, or after a scan) and on the section's Refresh button.
+// Signed out or not a subscriber: no request at all.
+const subStore = { list: null, loading: false, error: null, done: 0, total: null, account: null };
+async function loadSubStore({ force = false, auto = true } = {}) {
+  if (subStore.loading) return;
+  const account = await OH.getAccount().catch(() => null);
+  subStore.account = account;
+  if (!OH.isSubscriber(account)) {
+    subStore.list = null;
+    homeUpdated();
+    return;
+  }
+  if (!subStore.list) subStore.list = await OH.getSubStoreCached(account);
+  homeUpdated();
+  if (!force && !(auto && (await OH.subStoreDue()))) return;
+  subStore.loading = true;
+  subStore.error = null;
+  subStore.done = 0;
+  homeUpdated();
+  const r = await OH.getSubStore({
+    force,
+    account,
+    onProgress: (done, total) => {
+      subStore.done = done;
+      subStore.total = total;
+      homeUpdated();
+    },
+  });
+  subStore.loading = false;
+  if (r.ok) subStore.list = r.list;
+  else {
+    subStore.error = r.error;
+    if (r.list) subStore.list = r.list;
+  }
   homeUpdated();
 }
 
@@ -4336,6 +4376,8 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   const bbRead = rows.some((x) => x.name === 'Buy-Backs' && x.ok);
   if (bbRead && !bbLoading && state.buybacks.some(unreadPack))
     loadBuybackDetails({ packsOnly: true, max: BB_AUTO_MAX });
+  // Your Subscriber Store's once-a-day read, after the scan (never part of it).
+  if (!signedOut) loadSubStore();
 }
 
 // The top bar's Scan runs what's ticked in its ▾ menu: "Scan All" by default,
@@ -4409,6 +4451,7 @@ async function clearData() {
   state.bbTraits = new Map();
   state.bbPriceMax = null;
   state.referral = null;
+  subStore.list = null;
   setStatus('Local data cleared. Clean hangar, fresh start.');
   renderAccount(); // clear the referral pill too
   refreshRecoveryUI(); // a full manual wipe also drops any recovery snapshot
@@ -6025,6 +6068,11 @@ window.OHApp = {
     uncheckedPacks,
     setWishSort,
     setWishOrder,
+    // Your Subscriber Store: { list, loading, error, done, total, account } and Refresh.
+    get sub() {
+      return subStore;
+    },
+    refreshSub: () => loadSubStore({ force: true }),
   },
   // For Developers (ui/developers): its links, supporters, the data tools' state
   // (note under the buttons, restore button, saved accounts) and their actions.
