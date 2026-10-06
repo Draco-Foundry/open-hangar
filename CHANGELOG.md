@@ -8,6 +8,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   sit Account Value, Latest Acquisitions and the new Wishlist Watch side by side, then
   Quick Links. Account Value keeps the big number, the vs-melt badge, what it's made of
   and your counts; the trend chart lives on Stats.
+- New: **Most Valuable on Account Value.** Your top three ships at today's store price,
+  with insurance and, when the melt value is known, how much they've gained. Click one
+  to open its details.
 - New: **Game Status in the top bar.** A pill shows the LIVE build with a status dot.
   Click it for LIVE and PTU, the latest patch notes and the event on now (plus the next
   one). It comes from openhangar.space at most every 10 minutes, so Home no longer asks

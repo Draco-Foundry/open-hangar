@@ -211,6 +211,79 @@ try {
   clicks.lti && clicks.rows === 5 && clicks.modal
     ? ok('home: LTI count filters Inventory; 5 latest acquisitions, a row opens details')
     : fail(`home clicks: ${JSON.stringify(clicks)}`);
+  // Account Value's Most Valuable list (owner 2026-10-06): the top 3 ship pledges by
+  // today's store price, insurance chip, "+$N over what you paid" only when the melt
+  // value differs, a row opens details; no priced ships hides the list.
+  const mv = await page.evaluate(async () => {
+    const tick = () => new Promise((r) => setTimeout(r, 250));
+    const $v = () => document.querySelector('#oh-grid [data-card="value"]');
+    const rows = () => [...$v().querySelectorAll('.mv-row')];
+    const hv = window.OHApp.hangarValue();
+    const want = state.items
+      .map((p) => [String(p.id), hv.pledges[p.id]])
+      .filter(([, s]) => s && !s.ccu && !s.unpriced && s.store > 0)
+      .sort((x, y) => y[1].store - x[1].store)
+      .slice(0, 3)
+      .map(([id]) => state.items.find((p) => String(p.id) === id));
+    const r = {
+      heading: /Most Valuable/.test($v().querySelector('.mv')?.textContent || ''),
+      n: rows().length,
+      names: rows().map((b) => b.title),
+      order:
+        rows()
+          .map((b) => b.title)
+          .join('|') === want.map((p) => window.OHApp.plainName(p)).join('|'),
+      chip: rows().some((b) => /^(LTI|\d+ Mo)$/.test(b.querySelector('.ins')?.textContent || '')),
+      // The demo's top ships melt at their store price: no gain line to show.
+      noFakeGain: rows().every((b) => !b.querySelector('.gain')),
+      beforeCounts: $v().querySelector('.mv')?.nextElementSibling?.classList.contains('counts'),
+    };
+    // A ship melting below its store price shows the green gain.
+    const top = want[0];
+    const saved = top.value;
+    top.value = saved - 100;
+    state.items = [...state.items];
+    document.dispatchEvent(new CustomEvent('oh:home'));
+    await tick();
+    const g = rows()[0]?.querySelector('.gain');
+    r.gain =
+      !!g &&
+      /^\+.*100 over what you paid$/.test(g.textContent.trim()) &&
+      !g.classList.contains('down');
+    top.value = saved;
+    state.items = [...state.items];
+    document.dispatchEvent(new CustomEvent('oh:home'));
+    await tick();
+    rows()[0]?.click();
+    await tick();
+    r.opens = !document.querySelector('#item-modal').hidden;
+    document.querySelector('#item-modal').hidden = true;
+    // No priced ships: the list goes, the counts stay.
+    const all = state.items;
+    state.items = all.filter((p) => !(p.contents || []).some((c) => /^ship$/i.test(c.kind || '')));
+    document.dispatchEvent(new CustomEvent('oh:home'));
+    await tick();
+    r.emptyHidden = !$v().querySelector('.mv') && !!$v().querySelector('.counts');
+    state.items = all;
+    document.dispatchEvent(new CustomEvent('oh:home'));
+    await tick();
+    r.back = rows().length === r.n;
+    return r;
+  });
+  mv.heading &&
+  mv.n === 3 &&
+  mv.order &&
+  mv.chip &&
+  mv.noFakeGain &&
+  mv.beforeCounts &&
+  mv.gain &&
+  mv.opens &&
+  mv.emptyHidden &&
+  mv.back
+    ? ok(
+        `Most Valuable: ${mv.names.join(', ')}; gain only when known, a row opens details, hidden with no priced ships`,
+      )
+    : fail(`most valuable: ${JSON.stringify(mv)}`);
   // Home "Layout B, Final" (owner 2026-10-05): Game Status is the top bar's pill (an
   // invented v1 feed in the demo), the Citizen Card has the whole row, then Account
   // Value, Latest Acquisitions and Wishlist Watch a third each (ending level), then
