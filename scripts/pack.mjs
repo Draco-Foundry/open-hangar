@@ -100,7 +100,12 @@ for (const [name, transform] of Object.entries(targets)) {
   // back as the only origins it answers.
   if (name !== 'firefox')
     manifest.externally_connectable = {
-      matches: ['https://app.openhangar.space/*', 'https://staging.openhangar.space/*'],
+      // The store is at openhangar.space/store and app.openhangar.space/store.
+      matches: [
+        'https://openhangar.space/*',
+        'https://app.openhangar.space/*',
+        'https://staging.openhangar.space/*',
+      ],
     };
   writeFileSync(`${out}/manifest.json`, JSON.stringify(manifest, null, 2) + '\n');
   if (!KEEP_SYNC) {

@@ -367,7 +367,11 @@ function loadBackground({ sync }) {
       getManifest: () => ({
         version: '0.0.0',
         externally_connectable: {
-          matches: ['https://app.openhangar.space/*', 'https://staging.openhangar.space/*'],
+          matches: [
+            'https://openhangar.space/*',
+            'https://app.openhangar.space/*',
+            'https://staging.openhangar.space/*',
+          ],
         },
       }),
       getURL: (p) => p,
@@ -424,6 +428,8 @@ test('website bridge works in a store build: options, price, add; only from our 
   assert.deepEqual(a, { ok: true });
   const c = await x.send({ type: 'oh-connect-begin' }, SITE);
   assert.equal(c.ok, false, 'no connect in a store build');
+  const main = await x.send({ type: 'oh-hello' }, 'https://openhangar.space');
+  assert.equal(main.cart, true, 'the store on openhangar.space too');
   const before = x.rsi.calls.length;
   assert.equal(
     await x.send(
@@ -439,6 +445,10 @@ test('website bridge in a sync build answers both the cart and Connect', async (
   const x = loadBackground({ sync: true });
   const hello = await x.send({ type: 'oh-hello' }, 'https://staging.openhangar.space');
   assert.deepEqual(hello, { ok: true, cart: true, connect: true });
+  const main = await x.send({ type: 'oh-hello' }, 'https://openhangar.space');
+  assert.deepEqual(main, { ok: true, cart: true, connect: false }, 'Connect stays on the app');
+  const c = await x.send({ type: 'oh-connect-begin' }, 'https://openhangar.space');
+  assert.equal(c.ok, false);
   const o = await x.send(
     { type: 'oh-upgrade-options', toShipId: 900, toSkuId: 9001 },
     'https://staging.openhangar.space',

@@ -332,6 +332,7 @@
     color: var(--muted);
     font-weight: 400;
     font-size: 13px;
+    text-wrap: balance;
   }
   .opt .p {
     color: var(--beacon);
@@ -352,6 +353,8 @@
   .opt.no .p {
     color: var(--muted);
     font: 500 12px var(--font-body);
+    text-align: right;
+    text-wrap: balance;
   }
   .more {
     justify-self: start;
