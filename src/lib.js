@@ -21,7 +21,8 @@
  *     account: { handle, displayName, …, organization:{name,sid,rank,logo},
  *                balances:{storeCredit,uec,rec} },
  *     sources: { hangar, buybacks },
- *     history: [ { at, items: [[id, name, value]] } ] }   // scan snapshots
+ *     history: [ { at, items: [[id, name, value]] } ],   // scan snapshots
+ *     pledgeArchive: { [pledgeId]: { id, name, value, …, goneAt } } }  // OH.leanArchive
  * See OH.exportDB. Schema v2 added the `account` block (v1 had sources only).
  */
 
@@ -997,6 +998,9 @@
       sources: sanitizeSourcesForExport(db.sources),
       // Scan history rides along so a backup file is a complete restore point.
       history: Array.isArray(db.history) ? db.history : [],
+      // So does the pledge archive (#388), trimmed to what buy-back details read
+      // (OH.leanArchive). Added within format v2: older versions ignore it.
+      pledgeArchive: OH.leanArchive(await readArchive()),
     };
   };
 
@@ -1179,6 +1183,11 @@
       }
     }
     await writeDB(db);
+    // The pledge archive is merged too (#388): per pledge the newest goneAt wins.
+    // A file without one (older backups) leaves this browser's archive as it is.
+    if (isObj(obj.pledgeArchive)) {
+      await writeArchive(OH.mergeArchive(await readArchive(), OH.leanArchive(obj.pledgeArchive)));
+    }
     await chrome.storage.local.remove(['hangar', 'scannedAt']); // drop legacy keys
     return { ok: true, db };
   }
@@ -3031,12 +3040,64 @@
       const { raw, ...keep } = p; // the raw RSI strings aren't needed again
       out[String(p.id)] = { ...keep, goneAt: at };
     }
+    return capArchive(out);
+  };
+  // The newest ARCHIVE_MAX entries of an archive (by goneAt). Pure.
+  function capArchive(out) {
     const ids = Object.keys(out);
     if (ids.length <= ARCHIVE_MAX) return out;
     ids.sort((a, b) => (out[b].goneAt || 0) - (out[a].goneAt || 0));
     return Object.fromEntries(ids.slice(0, ARCHIVE_MAX).map((id) => [id, out[id]]));
-  };
+  }
   OH.getPledgeArchive = readArchive;
+
+  // The archive as the backup file (and so sync) carries it (#388): only what
+  // buy-back details read (name, value, currency, insurance, ccu, contents' kind
+  // and label) plus the date, kind and goneAt. Left out: the flags (isCCU,
+  // isAddOn, giftable…, worked out again from the kind and name) and every image
+  // URL (the details window never shows them; the buy-back card has its own
+  // picture). The images were about 40% of a big archive. Also cleans a
+  // hand-edited file's entries on import. Pure.
+  OH.leanArchive = function leanArchive(archive) {
+    const out = {};
+    if (!isObj(archive)) return out;
+    for (const [key, p] of Object.entries(archive)) {
+      if (!isObj(p) || !key) continue;
+      const e = { id: key, name: String(p.name || '') };
+      if (Number.isFinite(p.value)) e.value = p.value;
+      if (p.currency) e.currency = String(p.currency);
+      if (p.insurance) e.insurance = String(p.insurance);
+      if (isObj(p.ccu)) e.ccu = { from: String(p.ccu.from || ''), to: String(p.ccu.to || '') };
+      if (p.kind) e.kind = String(p.kind);
+      if (p.date) e.date = String(p.date);
+      const contents = (Array.isArray(p.contents) ? p.contents : []).filter(isObj).map((c) => {
+        const x = {};
+        if (c.kind) x.kind = String(c.kind);
+        if (c.label) x.label = String(c.label);
+        return x;
+      });
+      if (contents.length) e.contents = contents;
+      if (Number.isFinite(p.goneAt)) e.goneAt = p.goneAt;
+      out[key] = e;
+    }
+    return out;
+  };
+
+  // Two archives as one (a restored backup and this browser's): per pledge id the
+  // entry with the newest goneAt (a tie keeps `a`'s, this browser's fuller copy),
+  // newest ARCHIVE_MAX kept. Pure.
+  OH.mergeArchive = function mergeArchive(a, b) {
+    const out = {};
+    for (const src of [a, b]) {
+      if (!isObj(src)) continue;
+      for (const [id, p] of Object.entries(src)) {
+        if (!isObj(p) || !id) continue;
+        const cur = out[id];
+        if (!cur || (p.goneAt || 0) > (cur.goneAt || 0)) out[id] = p;
+      }
+    }
+    return capArchive(out);
+  };
 
   // A name as compared between a buy-back and a pledge: no case, curly quotes made
   // straight, one space, and without what OH.shortBuybackName drops (the store
@@ -3283,6 +3344,42 @@
     }
     return null;
   };
+  // The sync request's JSON text: the backup file's payload, kept within
+  // SYNC_BUDGET_BYTES (#388). The website takes up to 5 MB per sync
+  // (MAX_SYNC_BYTES), so the budget keeps a megabyte spare. When a payload is
+  // bigger, the oldest entries go first: pledge archive entries, then (only if
+  // that wasn't enough) scan history snapshots, the newest one always kept. The
+  // website only reads the history on an account's first sync, and a smaller one
+  // beats a sync it refuses. The hangar and buy-backs always go whole. Pure.
+  const SYNC_BUDGET_BYTES = 4e6;
+  OH.SYNC_BUDGET_BYTES = SYNC_BUDGET_BYTES;
+  OH.syncBody = function syncBody(payload, budget = SYNC_BUDGET_BYTES) {
+    const enc = new TextEncoder();
+    const bytes = (v) => enc.encode(JSON.stringify(v)).length;
+    const text = JSON.stringify(payload);
+    let over = enc.encode(text).length - budget;
+    if (over <= 0 || !isObj(payload)) return text;
+    const out = { ...payload };
+    if (isObj(payload.pledgeArchive)) {
+      const keep = { ...payload.pledgeArchive };
+      const oldestFirst = Object.keys(keep).sort(
+        (a, b) => ((keep[a] && keep[a].goneAt) || 0) - ((keep[b] && keep[b].goneAt) || 0),
+      );
+      for (const id of oldestFirst) {
+        if (over <= 0) break;
+        over -= bytes(id) + bytes(keep[id]) + 2; // the `:` and `,` around it
+        delete keep[id];
+      }
+      out.pledgeArchive = keep;
+    }
+    if (over > 0 && Array.isArray(payload.history)) {
+      const hist = payload.history.slice(); // oldest first, as stored
+      while (over > 0 && hist.length > 1) over -= bytes(hist.shift()) + 1;
+      out.history = hist;
+    }
+    return JSON.stringify(out);
+  };
+
   // Upload the same payload as the JSON backup. → { synced_at } or throws.
   const SYNC_NO_SCAN = 'Scan your hangar first, then press Sync Now.';
   const SYNC_OLDER_SCAN =
@@ -3297,7 +3394,7 @@
     const res = await siteFetch('/api/sync', {
       method: 'POST',
       headers: { authorization: `Bearer ${link.token}` },
-      body: JSON.stringify(db),
+      body: OH.syncBody(db),
     });
     if (res.status === 401) {
       await chrome.storage.local.remove('siteLink');
