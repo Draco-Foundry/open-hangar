@@ -422,21 +422,22 @@ function setStatus(text, isError = false, { scan = false } = {}) {
   statusEl.classList.toggle('error', isError);
   if (isError) {
     OH.log('error', 'status', text);
-    // One click to a paste-ready report for #bug-reports / GitHub.
+    // One click to the Flight Log in #bug-reports on Discord (#315).
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'link-btn';
-    btn.textContent = 'Copy Error Report';
-    btn.addEventListener('click', () => copyErrorReport(btn));
+    btn.textContent = 'Send Flight Log';
+    btn.title = 'Copies your flight log and opens #bug-reports on Discord.';
+    btn.addEventListener('click', () => sendFlightLog(btn));
     statusEl.append(' ', btn);
     if (scan) {
       // A failed or partial scan: open a prefilled Scan Broken issue (#250).
       const rep = document.createElement('button');
       rep.type = 'button';
       rep.className = 'link-btn';
-      rep.textContent = 'Report a Scan Problem';
+      rep.textContent = 'Report on GitHub ↗';
       rep.title =
-        'Opens a GitHub issue with the error report filled in. Nothing is sent until you submit it.';
+        'Opens a GitHub issue with your flight log filled in. Nothing is sent until you submit it.';
       rep.addEventListener('click', () => openScanReport(text));
       statusEl.append(' · ', rep);
     }
@@ -444,7 +445,7 @@ function setStatus(text, isError = false, { scan = false } = {}) {
 }
 
 // Open the prefilled Scan Broken issue in a new tab (#250). Counts and the
-// error report only; the person reviews it on GitHub before anything is sent.
+// flight log only; the person reviews it on GitHub before anything is sent.
 async function openScanReport(summary) {
   let version = '';
   try {
@@ -460,8 +461,9 @@ async function openScanReport(summary) {
   window.open(url, '_blank', 'noopener');
 }
 
-// Copy OH.errorReport() to the clipboard; `el` shows the outcome briefly.
-async function copyErrorReport(el) {
+// The Flight Log (#315): OH.errorReport() to the clipboard; `el` shows the outcome
+// briefly.
+async function copyFlightLog(el) {
   const text = await OH.errorReport();
   let ok = false;
   try {
@@ -473,11 +475,30 @@ async function copyErrorReport(el) {
   if (el) {
     const was = el.textContent;
     el.textContent = ok
-      ? 'Copied! Beam it to #bug-reports on Discord or a GitHub issue'
-      : 'Copy failed. See Developers → Error report';
+      ? 'Flight log copied. Drop it in #bug-reports and the engineers will suit up.'
+      : 'Copy failed. Grab it from Developers → Flight Log.';
     setTimeout(() => {
       el.textContent = was;
-    }, 3000);
+    }, 4000);
+  }
+  return ok;
+}
+
+// Send Flight Log (#315): copy it, then open #bug-reports on Discord in a new tab
+// (an invite made from that channel; members land in the server). Pasting stays
+// manual: browsers don't allow auto-paste. Copy first, while this page has focus.
+const BUG_REPORTS_INVITE = 'https://discord.gg/pxJ6PzQe7z';
+async function sendFlightLog(el) {
+  const ok = await copyFlightLog(null);
+  if (ok) window.open(BUG_REPORTS_INVITE, '_blank', 'noopener');
+  if (el) {
+    const was = el.textContent;
+    el.textContent = ok
+      ? 'Flight log copied. Paste it in #bug-reports.'
+      : 'Copy failed. Grab it from Developers → Flight Log.';
+    setTimeout(() => {
+      el.textContent = was;
+    }, 4000);
   }
   return ok;
 }
@@ -3424,11 +3445,13 @@ function bbList() {
 // A buy-back's title as shown in lists: without the type label and Warbond /
 // Standard Edition (OH.shortBuybackName, #176). The details window's title and
 // exports keep RSI's full name; the card's tooltip shows it too.
+// Both are OH.buybackTitle (#273): short for lists, full for windows and exports.
 function buybackName(b) {
-  const s = OH.shortBuybackName;
-  return b.ccu ? `${s(b.ccu.from)} → ${s(b.ccu.to)}` : s(b.name) || '—';
+  return OH.buybackTitle(b);
 }
-const bbFullName = (b) => (b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '');
+function bbFullName(b) {
+  return OH.buybackTitle(b, { short: false });
+}
 
 // The buy-back list DOES honour pagesize=1 (unlike the hangar), so page N is
 // exactly the Nth buy-back in scan order. Right until your buy-backs change.
@@ -3621,9 +3644,6 @@ function bbMine(b) {
   const saved = state.market[bbKey(b)];
   return saved && saved.price != null ? saved.price : '';
 }
-function bbName(b) {
-  return b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '';
-}
 function bbFilename(ext) {
   return marketFilename(ext).replace('sale-sheet', 'buy-backs');
 }
@@ -3647,7 +3667,7 @@ function exportBuybackCsv(statusEl) {
       const price = bbPrice(b);
       lines.push([
         section.label,
-        bbName(b),
+        bbFullName(b),
         bbInsurance(b),
         bbPriceText(b),
         bbStoreText(b),
@@ -3671,7 +3691,7 @@ const BB_IMG_COLS = [
 function bbImageCells(b) {
   const mine = bbMine(b);
   return {
-    name: bbName(b),
+    name: bbFullName(b),
     ins: bbInsurance(b),
     melt: bbPriceText(b) || '—',
     store: bbStoreText(b) || '—',
@@ -4164,7 +4184,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   const signedOut = account?.loggedIn === false && (hangar || buybacks || referrals);
   if (signedOut) {
     hangar = buybacks = referrals = false;
-    parts.push("You're not signed in to RSI, so there was nothing to scan");
+    parts.push("You're not logged in to RSI, so we can't see inside your hangar");
     anyErr = true;
   }
   // One row per source for the scan report: what came home, or what went wrong.
@@ -6058,9 +6078,9 @@ window.OHApp = {
     clearData,
     reload: () => $('#update-reload')?.click(),
     closeMenus: closeCardMenus,
-    // The scan report's buttons: the error report to the clipboard (`el` shows how
-    // it went), and a prefilled Scan Broken issue (#250).
-    copyReport: (el) => copyErrorReport(el),
+    // The scan report's buttons: Send Flight Log (copy, then #bug-reports on
+    // Discord, #315), and a prefilled Scan Broken issue (#250).
+    sendFlightLog: () => sendFlightLog(null),
     reportProblem: () => topBar.report && openScanReport(topBar.report.summary),
   },
   // The detail windows (ui/details): what each shows, and what they do.
@@ -6131,6 +6151,6 @@ window.OHApp = {
     importBackup,
     restoreBackup,
     removeProfile,
-    copyErrorReport: () => copyErrorReport(null),
+    copyFlightLog: () => copyFlightLog(null),
   },
 };

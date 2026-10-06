@@ -4,6 +4,13 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Changed: **the error report is now your Flight Log.** When a scan hits trouble, the
+  problem card has Send Flight Log: it copies the log and opens #bug-reports on Discord,
+  where you paste it. Report on GitHub opens an issue with the log filled in, and nothing
+  is sent until you submit it. Developers has Copy Flight Log too.
+- Changed: **signed out of RSI?** The scan card says the hangar doors are locked: log in,
+  come back and hit Scan All. No flight log needed for that one.
+- Changed: **a cleaner top bar.** The page links show just their names, no item counts.
 - New: **Add to RSI Cart for ship upgrades.** Open a ship's window, tap See Upgrade
   Prices, and Open Hangar asks RSI which of your ships can upgrade to it and what each
   costs. Pick one and it lands in your RSI cart at the upgrade price. Buy-back upgrades

@@ -15,7 +15,7 @@
 a.sup-chip:hover {
   border-color: var(--accent-line);
 }
-/* The error report preview reads like a log. */
+/* The flight log preview reads like a log. */
 .report-preview pre {
   font: 500 12px/1.5 var(--font-data);
   border-radius: var(--r-sm);
