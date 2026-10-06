@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const URL0 = 'http://localhost:8323/';
+const URL0 = `http://localhost:${Number(process.env.DEMO_PORT) || 8323}/`;
 
 function findChrome() {
   return [
@@ -428,18 +428,17 @@ try {
     state.wishlist = [];
     homeUpdated();
     await wait(100);
-    r.empty = /Your wishlist is empty\. Add ships from Find a Ship on the Store page\./.test(
+    r.empty = /Your wishlist is empty\. Add anything from Find in Store on the Store page\./.test(
       card().textContent,
     );
     await chrome.storage.local.remove('wishWatch');
     wishWatch = null; // dashboard.js's copy of the last check
+    // The store catalog (demo-shim.js): Cutlass Black on sale, Pioneer not.
     let asked = 0;
-    const real = OH.getShipStock;
-    OH.getShipStock = async (url) => {
+    const real = OH.getStoreCatalog;
+    OH.getStoreCatalog = (o) => {
       asked++;
-      return /Cutlass-Black/i.test(url)
-        ? { state: 'in', price: 110, packs: [] }
-        : { state: 'out', price: null, packs: [] };
+      return real(o);
     };
     state.wishlist = ['Cutlass Black', 'Pioneer'];
     homeUpdated();
@@ -465,7 +464,7 @@ try {
     // Two days later the same check still shows, with its age.
     await chrome.storage.local.set({ wishWatch: { ...saved, at: Date.now() - 2 * 864e5 } });
     r.ago = true;
-    OH.getShipStock = real;
+    OH.getStoreCatalog = real;
     state.wishlist = keep;
     homeUpdated();
     return r;
@@ -569,10 +568,6 @@ try {
   // Hangar Alerts live in the top bar's bell: a wishlist sale shows with a count, and ×
   // ignores it. The Citizen Card has the whole row on Home.
   const home = await page.evaluate(async () => {
-    OH.getShipStock = async (url) =>
-      /Cutlass-Black/i.test(url)
-        ? { state: 'in', price: 110, packs: [] }
-        : { state: 'out', price: null, packs: [] };
     await chrome.storage.local.set({ homeIgnored: [] });
     state.wishlist = ['Cutlass Black', 'Pioneer'];
     document.dispatchEvent(new CustomEvent('oh:home'));
@@ -2328,10 +2323,10 @@ try {
   console.log('Store');
   await go('#store');
   // The extension's Store is your side of it (0.3.0): Wishlist, Your CCUs and Find
-  // a Ship, under a link to the website's full store. No store-wide browsing.
+  // in Store, under a link to the website's full store. No store-wide browsing.
   await page
     .waitForFunction(
-      () => /^Search \d+ ships…$/.test(document.querySelector('#find-ship')?.placeholder || ''),
+      () => /^Search \d+ items…$/.test(document.querySelector('#find-ship')?.placeholder || ''),
       {
         timeout: 20000,
       },
@@ -2344,15 +2339,49 @@ try {
     box.value = 'c';
     box.dispatchEvent(new Event('input'));
     await tick();
-    const oneLetter = document.querySelectorAll('.find-hits li').length;
+    const oneLetter = document.querySelectorAll('.fis-hits li').length;
     box.value = 'cutlass';
     box.dispatchEvent(new Event('input'));
     await tick();
-    const hits = [...document.querySelectorAll('.find-hits .ship-link')].map((b) => b.textContent);
+    const rows = [...document.querySelectorAll('.fis-hits li')];
+    const hits = rows.map((li) => li.querySelector('.fis-name').textContent.trim());
+    const kinds = rows.map((li) => li.querySelector('.badge').textContent);
+    // Add a store item (a paint) to the wishlist from the results, then take it off.
+    const paint = rows.find((li) => /Ghoulish Green/.test(li.textContent));
+    paint?.querySelector('.fis-wish').click();
+    await tick();
+    const added = state.wishlist.some((e) => e && e.id === 'sku-501' && e.kind === 'paint');
+    const pressed = paint?.querySelector('.fis-wish').textContent;
+    paint?.querySelector('.fis-wish').click();
+    await tick();
+    const removed = !state.wishlist.some((e) => e && e.id === 'sku-501');
+    // An upgrade: From → To, priced from the ship you pick.
+    box.value = 'freelancer';
+    box.dispatchEvent(new Event('input'));
+    await tick();
+    const up = [...document.querySelectorAll('.fis-hits li')].find((li) =>
+      li.querySelector('.fis-from'),
+    );
+    const upOff = up ? up.querySelector('.fis-wish').disabled : null;
+    const sel = up && up.querySelector('.fis-from');
+    if (sel) {
+      sel.value =
+        [...sel.options].find((o) => /^Aurora M/.test(o.value))?.value || sel.options[1].value;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    await tick();
+    const up2 = [...document.querySelectorAll('.fis-hits li')].find((li) =>
+      li.querySelector('.fis-from'),
+    );
+    const upgrade = {
+      off: upOff,
+      on: up2 ? !up2.querySelector('.fis-wish').disabled : false,
+      price: up2 ? /\$\d+/.test(up2.querySelector('.find-price').textContent) : false,
+    };
     box.value = 'zzzz';
     box.dispatchEvent(new Event('input'));
     await tick();
-    const none = /No ship by that name/.test(document.querySelector('.find-ship').textContent);
+    const none = /Nothing by that name/.test(document.querySelector('.find-ship').textContent);
     box.value = 'carrack';
     box.dispatchEvent(new Event('input'));
     await tick();
@@ -2371,6 +2400,11 @@ try {
       placeholder,
       oneLetter,
       hits,
+      kinds,
+      added,
+      pressed,
+      removed,
+      upgrade,
       none,
       opened,
       href: link && link.href,
@@ -2382,11 +2416,18 @@ try {
       gone: !document.querySelector('#price-table, [data-price-tab], #price-search'),
     };
   });
-  /^Search \d+ ships…$/.test(fs1.placeholder) &&
+  /^Search \d+ items…$/.test(fs1.placeholder) &&
   fs1.oneLetter === 0 &&
   fs1.hits.length > 0 &&
   fs1.hits.length <= 8 &&
   fs1.hits.every((h) => /cutlass/i.test(h)) &&
+  ['Ship', 'Paint', 'Gear'].every((k) => fs1.kinds.includes(k)) &&
+  fs1.added &&
+  fs1.pressed === 'On Your Wishlist' &&
+  fs1.removed &&
+  fs1.upgrade.off === true &&
+  fs1.upgrade.on &&
+  fs1.upgrade.price &&
   fs1.none &&
   fs1.opened &&
   fs1.href === 'https://openhangar.space/store' &&
@@ -2395,7 +2436,7 @@ try {
   fs1.line &&
   fs1.gone
     ? ok(
-        `store: full store link, Find a Ship (${fs1.hits.length} for "cutlass", Enter opens it), no price list`,
+        `store: full store link, Find in Store (${fs1.hits.length} for "cutlass", ships and store items, Add to Wishlist, an upgrade From → To, Enter opens a ship), no price list`,
       )
     : fail(`store slim page: ${JSON.stringify(fs1)}`);
   // Your Subscriber Store (#418): the demo account is a subscriber; its listing is
@@ -2508,12 +2549,8 @@ try {
     // The Store is Svelte (ui/store): it redraws a tick after a change.
     const tick = (ms = 50) => new Promise((r) => setTimeout(r, ms));
     const ccus = document.querySelectorAll('#ccu-owned tbody tr').length;
-    // "In store now" comes from each ship's own store page (stubbed here):
-    // Cutlass Black sold on its own, Carrack only in a pack.
-    OH.getShipStock = async (url) =>
-      /Cutlass-Black/i.test(url)
-        ? { state: 'in', price: 110, packs: [] }
-        : { state: 'pack', price: null, packs: [{ name: 'Ultimate Explorer Pack', price: 1150 }] };
+    // "In store now" comes from the store catalog (demo-shim.js): Cutlass Black
+    // sold on its own, the Carrack not for sale.
     // Wishlist a ship with buy-backs; its row opens the list of them.
     state.wishlist = ['Cutlass Black', 'Carrack'];
     // A pack buy-back whose loaded details include the Carrack counts for it.
@@ -2553,9 +2590,9 @@ try {
     return res;
   });
   st.panels === 4 && !st.ccugame
-    ? ok('store panels: Wishlist, Your Subscriber Store, Your CCUs, Find a Ship')
+    ? ok('store panels: Wishlist, Your Subscriber Store, Your CCUs, Find in Store')
     : fail(`store page: ${JSON.stringify(st)}`);
-  st.stock.join('|') === 'Only in a pack|In stock ($110)' &&
+  st.stock.join('|') === 'Not in store|In stock ($110)' &&
   st.ccus > 0 &&
   st.bbRows > 0 &&
   st.reclaim &&
@@ -2563,17 +2600,11 @@ try {
   st.pack &&
   st.bbTypes.join() === [...st.bbTypes].sort((a, b) => (a === 'CCU') - (b === 'CCU')).join()
     ? ok(
-        `wishlist stock from ship pages (${st.stock.join(', ')}), buy-backs (${st.bbTypes.join(', ')})`,
+        `wishlist stock from the store catalog (${st.stock.join(', ')}), buy-backs (${st.bbTypes.join(', ')})`,
       )
     : fail(`store details: ${JSON.stringify(st)}`);
 
   const ws = await page.evaluate(async () => {
-    OH.getShipStock = async (url) =>
-      /Cutlass-Black/i.test(url)
-        ? { state: 'in', price: 110, packs: [] }
-        : /Carrack/i.test(url)
-          ? { state: 'pack', price: null, packs: [{ name: 'Some Pack' }] }
-          : { state: 'out', price: null, packs: [] };
     state.wishlist = ['Pioneer', 'Cutlass Black', 'Carrack'];
     const order = () =>
       [...document.querySelectorAll('#wishlist .wishlist > tbody > tr:not(.wish-bbs)')].map(
@@ -2675,10 +2706,12 @@ try {
     const btn = document.querySelector('#update-check-btn');
     const out = () => document.querySelector('#update-check-status').textContent;
     const wait = () => new Promise((r) => setTimeout(r, 200));
-    // No update API in the demo = Firefox, which asks AMO for the latest version.
+    // No update API in the demo = Firefox, which reads openhangar.space/versions.json.
     const realFetch = window.fetch;
-    const amo = (v) => async () =>
-      new Response(JSON.stringify({ current_version: { version: v } }));
+    const amo = (v) => async (u) => {
+      if (u !== 'https://openhangar.space/versions.json') throw new Error(`asked ${u}`);
+      return Response.json({ stores: { firefox: { live: v } } });
+    };
     window.fetch = amo('9.9.9');
     btn.click();
     await wait();
@@ -2702,7 +2735,7 @@ try {
   chk.cur &&
   /9\.9\.9 is out.*\| You['’]re on the latest version/.test(chk.firefox) &&
   /9\.9\.9 is downloading/.test(chk.chrome1)
-    ? ok('Check for updates: store check (Chrome) and AMO version check (Firefox)')
+    ? ok('Check for updates: store check (Chrome) and versions.json check (Firefox)')
     : fail(`check for updates: ${JSON.stringify(chk)}`);
   const md = await page.evaluate(() => ({
     // Release notes are Svelte nodes, never markup strings: no stray ** or `.
@@ -2725,26 +2758,29 @@ try {
       location.hash = '#issues';
       await wait();
     };
-    // From the hour-long cache: no request to GitHub.
+    // From the hour-long cache of openhangar.space's feed: no request.
     await chrome.storage.local.set({
-      knownIssues: {
+      feedIssues: {
         at: Date.now(),
-        list: [
-          {
-            number: 7,
-            title: 'Test bug <b>not bold</b>',
-            url: 'https://github.com/Draco-Foundry/open-hangar/issues/7',
-            createdAt: new Date().toISOString(),
-            labels: ['bug', 'scan-broken'],
-          },
-          {
-            number: 8,
-            title: 'Older bug',
-            url: 'https://github.com/Draco-Foundry/open-hangar/issues/8',
-            createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
-            labels: ['bug'],
-          },
-        ],
+        data: {
+          v: 1,
+          issues: [
+            {
+              number: 7,
+              title: 'Test bug <b>not bold</b>',
+              url: 'https://github.com/Draco-Foundry/open-hangar/issues/7',
+              createdAt: new Date().toISOString(),
+              labels: ['bug', 'scan-broken'],
+            },
+            {
+              number: 8,
+              title: 'Older bug',
+              url: 'https://github.com/Draco-Foundry/open-hangar/issues/8',
+              createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+              labels: ['bug'],
+            },
+          ],
+        },
       },
     });
     await open();
@@ -2752,27 +2788,26 @@ try {
       li.textContent.replace(/\s+/g, ' ').trim(),
     );
     const bold = !!body().querySelector('.known-issues b');
-    // Cache gone and GitHub unreachable: the fallback link.
+    // Never loaded and the site busy (503): the fallback link, no error.
     const realFetch = window.fetch;
-    window.fetch = async () => {
-      throw new Error('offline');
-    };
-    await chrome.storage.local.set({ knownIssues: { at: 0, list: [] } });
+    window.fetch = async () => new Response('', { status: 503, headers: { 'retry-after': '300' } });
+    await chrome.storage.local.remove('feedIssues');
     await open();
     const err = body().textContent.replace(/\s+/g, ' ').trim();
-    // An empty list (fresh from GitHub).
-    window.fetch = async () => new Response('[]');
+    // An empty list (fresh from the feed).
+    window.fetch = async () => Response.json({ v: 1, issues: [] });
+    await chrome.storage.local.remove('feedIssues');
     await open();
     const empty = body().textContent.trim();
     window.fetch = realFetch;
-    await chrome.storage.local.remove('knownIssues');
+    await chrome.storage.local.remove('feedIssues');
     return { rows, bold, err, empty };
   });
   ki.rows.length === 2 &&
   /^Test bug <b>not bold<\/b> #7 · opened today · Scan broken$/.test(ki.rows[0]) &&
   /^Older bug #8 · opened 3 days ago$/.test(ki.rows[1]) &&
   !ki.bold &&
-  /^Couldn't reach GitHub's comm relay\. See the list on GitHub\.$/.test(ki.err) &&
+  /^The bug list is still in transit\. See it on GitHub for now\.$/.test(ki.err) &&
   /^No known bugs right now/.test(ki.empty)
     ? ok('Known Issues: cached list, Scan broken tag, offline fallback, empty list')
     : fail(`known issues: ${JSON.stringify(ki)}`);

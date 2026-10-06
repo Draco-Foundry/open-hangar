@@ -1,5 +1,6 @@
 <script>
-  // Known Issues ("Bugs on the Radar"): open bugs from GitHub's public tracker.
+  // Known Issues ("Bugs on the Radar"): open bugs from GitHub's public tracker,
+  // through openhangar.space's known-issues feed.
   // Ported from renderKnownIssues() as it looked in 0.2.x (no signed-off redesign
   // yet), so it reuses the dashboard's classes. renderKnownIssues() in
   // src/dashboard.js loads the list (cached an hour) each time the page opens.
@@ -30,11 +31,11 @@
   <p class="muted">{d.quip}</p>
 {:else if d.status === 'error'}
   <p class="muted">
-    Couldn't reach GitHub's comm relay. See the list <a
+    The bug list is still in transit. See it <a
       href="{d.repo}/issues?q=is%3Aopen+label%3Abug"
       target="_blank"
       rel="noopener">on GitHub</a
-    >.
+    > for now.
   </p>
 {:else if !d.list.length}
   <p class="muted">No known bugs right now. Clear skies, Citizen.</p>

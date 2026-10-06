@@ -54,7 +54,7 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // --- Outbound requests: a time limit and "that site is down" memory ----------
-  // Requests to other sites (wiki, exchange rates, RSI's public feeds) go through
+  // Requests to RSI's public pages and our own site's files go through
   // OH.guarded(fetchFn): it gives up after 8 seconds, and once a site times out,
   // can't be reached or answers 429/5xx, further calls to it fail at once for 10
   // minutes (remembered across page loads) instead of each waiting on it again.
@@ -98,6 +98,106 @@
         throw e;
       }
     };
+  };
+
+  // --- openhangar.space public feeds ------------------------------------------
+  // Owner rule: the extension talks only to RSI and openhangar.space. Everything
+  // else it shows (ship prices and art, the game version, referral events, the
+  // store catalog, known issues, the latest Firefox version) comes from our own
+  // site's public feeds: the same JSON for everyone, read-only, no cookies and
+  // nothing about you sent. Polite: one request per feed at a time, at most once
+  // per `ttl`, If-None-Match with the stored ETag (304 keeps the cached copy), and
+  // on 429/5xx, a timeout or no network the cached copy stays and the feed waits
+  // for Retry-After (else 10 minutes, doubling up to 6 hours) before asking again.
+  // Never throws: → { data, at, etag } (the last good copy) or null (never loaded).
+  OH.SITE_FEEDS = 'https://openhangar.space/';
+  const FEED_RETRY_MS = 10 * 60e3;
+  const FEED_RETRY_MAX = 6 * 3600e3;
+  const feedInflight = new Map();
+  // Retry-After (seconds or an HTTP date) → ms to wait, kept between 1 minute and a day.
+  OH.retryAfterMs = function retryAfterMs(value, now = Date.now()) {
+    const v = String(value || '').trim();
+    if (!v) return 0;
+    const ms = /^\d+$/.test(v) ? Number(v) * 1000 : Date.parse(v) - now;
+    return Number.isFinite(ms) && ms > 0 ? Math.min(Math.max(ms, 60e3), 24 * 3600e3) : 0;
+  };
+  const isV1 = (j) => !!j && typeof j === 'object' && j.v === 1;
+  const header = (res, name) => (res.headers && res.headers.get && res.headers.get(name)) || null;
+  OH.siteFeed = function siteFeed(path, opts) {
+    const id = opts.key;
+    if (feedInflight.has(id)) return feedInflight.get(id);
+    const p = readFeed(path, opts).finally(() => feedInflight.delete(id));
+    feedInflight.set(id, p);
+    return p;
+  };
+  async function readFeed(
+    path,
+    { key: feedKey, ttl, fetchFn = fetch, force = false, valid = isV1 },
+  ) {
+    let saved = null;
+    try {
+      saved = (await chrome.storage.local.get(feedKey))[feedKey] || null;
+    } catch {
+      saved = null;
+    }
+    const now = Date.now();
+    const last = saved && saved.data != null ? saved : null;
+    const answer = (s) => (s ? { data: s.data, at: s.at, etag: s.etag || null } : null);
+    // Told to wait (Retry-After, or backing off after a failure): even Check Now waits.
+    if (saved && saved.retryAt && now < saved.retryAt) return answer(last);
+    if (!force && last && now - (last.at || 0) < ttl) return answer(last);
+    let next;
+    try {
+      const headers = { Accept: 'application/json' };
+      if (last && last.etag) headers['If-None-Match'] = last.etag;
+      const res = await fetchFn(OH.SITE_FEEDS + path, {
+        credentials: 'omit',
+        headers,
+        signal: AbortSignal.timeout(NET_TIMEOUT_MS),
+      });
+      if (res.status === 304 && last) {
+        next = { data: last.data, etag: last.etag, at: now };
+      } else if (res.ok) {
+        const json = await res.json();
+        if (!valid(json)) throw new Error('not a feed this version reads');
+        next = { data: json, etag: header(res, 'etag'), at: now };
+      } else {
+        const err = new Error('HTTP ' + res.status);
+        err.wait = OH.retryAfterMs(header(res, 'retry-after'));
+        throw err;
+      }
+    } catch (e) {
+      const fails = ((saved && saved.fails) || 0) + 1;
+      const wait = e.wait || Math.min(FEED_RETRY_MS * 2 ** (fails - 1), FEED_RETRY_MAX);
+      next = { ...(last || {}), retryAt: now + wait, fails };
+      OH.log('warn', 'feed', `${path}: ${e?.message || e}; keeping the last copy`);
+    }
+    try {
+      await chrome.storage.local.set({ [feedKey]: next });
+    } catch {
+      // Not saved: asked again next time.
+    }
+    return answer(next.data != null ? next : null);
+  }
+
+  // Caches of the third-party sources the feeds above replaced: dropped once, so
+  // they don't sit in storage forever. Never throws.
+  OH.RETIRED_CACHES = [
+    'shipCatalog',
+    'scVersion',
+    'wikiMainpage',
+    'wikiFiles',
+    'referralEvents',
+    'knownIssues',
+    'shipStock2',
+    'gameStatus',
+  ];
+  OH.dropRetiredCaches = async function dropRetiredCaches() {
+    try {
+      await chrome.storage.local.remove(OH.RETIRED_CACHES);
+    } catch {
+      // Next time.
+    }
   };
 
   // --- Source registry ------------------------------------------------------
@@ -460,24 +560,35 @@
     return lines.join('\n');
   };
 
-  // Known Issues page (#175): GitHub's open-issues list → the bugs worth showing.
-  // The issues API also returns pull requests (they carry `pull_request`); only
-  // issues labelled bug or scan-broken are kept, scan-broken first, then newest.
-  // Pure, so it's tested directly.
+  // Known Issues page (#175): Open Hangar's open bug reports, from
+  // openhangar.space/api/known-issues (v1: { issues: [{ number, title, url, labels,
+  // createdAt }] }), which the site reads from the public GitHub tracker: issues
+  // labelled bug or scan-broken, scan-broken first, then newest. Asked at most once
+  // an hour, only when the page opens.
   OH.KNOWN_ISSUE_LABELS = ['scan-broken', 'bug'];
-  OH.parseKnownIssues = function parseKnownIssues(list) {
+  OH.getKnownIssues = ({ force = false, fetchFn } = {}) =>
+    OH.siteFeed('api/known-issues', {
+      key: 'feedIssues',
+      ttl: 60 * 60e3,
+      force,
+      fetchFn,
+      valid: (j) => isV1(j) && Array.isArray(j.issues),
+    });
+  // The feed's issues, checked (links only to the repo's own issues) and in the
+  // page's order. Pure, so it's tested directly.
+  OH.shapeKnownIssues = function shapeKnownIssues(list) {
     if (!Array.isArray(list)) return [];
     return list
-      .filter((i) => i && !i.pull_request && Number.isInteger(i.number))
+      .filter((i) => i && Number.isInteger(i.number) && typeof i.title === 'string')
       .map((i) => ({
         number: i.number,
-        title: String(i.title || ''),
-        url: String(i.html_url || ''),
-        createdAt: String(i.created_at || ''),
-        labels: (i.labels || []).map((l) => (typeof l === 'string' ? l : l && l.name)),
+        title: i.title.trim().slice(0, 300),
+        url: String(i.url || ''),
+        createdAt: String(i.createdAt || ''),
+        labels: (Array.isArray(i.labels) ? i.labels : []).filter((l) => typeof l === 'string'),
       }))
       .filter((i) => i.labels.some((l) => OH.KNOWN_ISSUE_LABELS.includes(l)))
-      .filter((i) => /^https:\/\/github\.com\//.test(i.url))
+      .filter((i) => /^https:\/\/github\.com\/Draco-Foundry\/open-hangar\/issues\/\d+$/.test(i.url))
       .sort(
         (a, b) =>
           b.labels.includes('scan-broken') - a.labels.includes('scan-broken') ||
@@ -2251,45 +2362,25 @@
     return items.reduce((sum, p) => sum + (Number.isFinite(p.value) ? p.value : 0), 0);
   };
 
-  // --- Star Citizen game version (public star-citizen.wiki API) -------------
-  // Public, read-only endpoint; we send NO credentials and no personal data.
-  const SC_VERSIONS_URL = 'https://api.star-citizen.wiki/api/v2/game-versions';
-  const SC_TTL_MS = 12 * 60 * 60 * 1000; // refresh at most twice a day
+  // --- Star Citizen game version (openhangar.space's game-status feed) -----------
+  // The top bar's Game Status pill (ui/lib/game-status.js) and the footer read the
+  // same feed and the same cached copy (OH.getGameStatus), asked at most every 10
+  // minutes. Feed contract v1: { v: 1, live: { version, released }, ptu, … }.
+  OH.getGameStatus = ({ force = false, fetchFn } = {}) =>
+    OH.siteFeed('api/game-status', { key: 'feedGameStatus', ttl: 10 * 60e3, force, fetchFn });
 
   // "4.8.0-LIVE.11875683" → "4.8.0-LIVE" (drop the trailing build number).
   OH.formatScVersion = (code) => (code ? code.replace(/\.\d+$/, '') : '');
 
-  // Current default (LIVE) game version as { code, fetchedAt }. Cached in storage;
-  // returns the cached value (or { code: null }) on any failure. Never throws.
-  OH.getScVersion = async function getScVersion({ force = false } = {}) {
-    const { scVersion } = await chrome.storage.local.get('scVersion');
-    // Entries saved before release dates were kept ('released' missing) refresh once.
-    if (
-      !force &&
-      scVersion?.code &&
-      'released' in scVersion &&
-      Date.now() - scVersion.fetchedAt < SC_TTL_MS
-    )
-      return scVersion;
-    try {
-      const res = await OH.guarded()(SC_VERSIONS_URL, {
-        credentials: 'omit',
-        headers: { Accept: 'application/json' },
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const json = await res.json();
-      const list = Array.isArray(json.data) ? json.data : [];
-      const current = list.find((v) => v.is_default) || list[0];
-      const code = current?.code || null;
-      if (!code) throw new Error('no version in response');
-      // released_at: when this build went LIVE (Home's Game Status shows it).
-      const released = Date.parse(current.released_at || '') || null;
-      const v = { code, released, fetchedAt: Date.now() };
-      await chrome.storage.local.set({ scVersion: v });
-      return v;
-    } catch (e) {
-      return scVersion || { code: null, fetchedAt: 0, error: String(e?.message || e) };
-    }
+  // Current LIVE game version as { code: "4.10.1-LIVE", released (ms) | null }, from
+  // the game-status feed (cached), or { code: null } before it ever loaded. Never throws.
+  OH.getScVersion = async function getScVersion({ force = false, fetchFn } = {}) {
+    const feed = await OH.getGameStatus({ force, fetchFn });
+    const live = feed && feed.data && feed.data.live;
+    const version = live && typeof live.version === 'string' ? live.version.trim() : '';
+    if (!/^\d+\.\d+(\.\d+)*$/.test(version)) return { code: null, released: null };
+    const released = Date.parse(live.released || '') || null;
+    return { code: `${version}-LIVE`, released };
   };
 
   // --- Ship images ----------------------------------------------------------
@@ -2300,15 +2391,14 @@
   //   1. RSI ship-matrix (PRIMARY) — robertsspaceindustries.com/ship-matrix/index.
   //      One fetch returns ALL ships *with* images, including in-concept ships the
   //      wiki lacks (e.g. Vulcan, Genesis, Odin). We cache a slim {name → image}.
-  //   2. star-citizen.wiki (FALLBACK) — for anything the ship-matrix misses; needs
-  //      a catalog fetch + a per-slug image fetch.
+  //   2. openhangar.space's ships feed (FALLBACK) — for anything the ship-matrix
+  //      misses: the picture it carries for the ship (OH.getShipsFeed, one request).
   //
   // Images don't change → hard-cached in storage; negatives cached too. Callers
   // MUST resolve lazily (only for shown cards) — see enhanceCardImages.
-  const SC_API = 'https://api.star-citizen.wiki/api/v2';
   const SHIP_MATRIX_URL = 'https://robertsspaceindustries.com/ship-matrix/index';
   const SHIP_IMG_TTL = 90 * 24 * 60 * 60 * 1000; // 90 days (images don't change)
-  const CATALOG_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
+  const CATALOG_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days (the RSI ship-matrix copy)
   const shipImgMem = new Map(); // normName -> url|null (per session)
   const shipImgInflight = new Map(); // normName -> Promise (dedupe concurrent)
 
@@ -2345,9 +2435,8 @@
   }
   OH.capNewest = capNewest;
   // Entry caps for the caches above and below (test/storage-budget.test.js).
-  OH.CACHE_MAX = { shipImages: 2000, wikiFiles: 1000, shipStock2: 1000 };
-  let catalogMem = null; // [{ lname, slug, cls, msrp }]  (wiki)
-  const CATALOG_CACHE_V = 8; // v2: class + msrp, all pages · v3: fleet fields · v4: display name · v5: + ship matrix (concept ships) · v6: manufacturer · v7: every role (foci) · v8: sizes filled (ground vehicles, special editions)
+  OH.CACHE_MAX = { shipImages: 2000 };
+  let catalogMem = null; // [{ name, lname, slug, cls, msrp, img, … }] (bundled + ships feed)
   let catalogInflight = null;
   let matrixMem = null; // [{ lname, name, img, mfr, mfrName }]  (RSI ship-matrix)
   const MATRIX_CACHE_V = 2; // v2: + display name + manufacturer (for HTF ship codes)
@@ -2466,47 +2555,6 @@
     };
   };
 
-  // Walk one paged wiki endpoint and return every record's slim entry. The
-  // API serves 50 per page whatever we ask for, so walk until last_page.
-  async function fetchAllPages(path, fetchFn) {
-    const list = [];
-    for (let page = 1; page <= 12; page++) {
-      const res = await OH.guarded(fetchFn)(
-        `${SC_API}/${path}?page%5Bsize%5D=200&page%5Bnumber%5D=${page}`,
-        {
-          credentials: 'omit',
-          headers: { Accept: 'application/json' },
-        },
-      );
-      // A failed page means an incomplete list: throw, so nobody caches it
-      // (getCatalog keeps the previous or bundled list instead).
-      if (!res.ok) throw new Error(`${path} page ${page}: HTTP ${res.status}`);
-      const json = await res.json();
-      const data = Array.isArray(json.data) ? json.data : [];
-      for (const v of data) {
-        const slim = OH.slimVehicle(v);
-        if (slim) list.push(slim);
-      }
-      const last =
-        (json.meta && json.meta.last_page) || (json.links && json.links.next ? page + 1 : page);
-      if (!data.length || page >= last) break;
-    }
-    return list;
-  }
-
-  // The whole ship list, slimmed. `vehicles` is what's in the game files
-  // (flight-ready ships, ground vehicles); `shipmatrix` is RSI's ship matrix,
-  // which adds concept ships (Pioneer, Odyssey, …) and fills prices/status the
-  // first list lacks. Merged by slug, then name; the game-file entry wins,
-  // and only not-yet-flyable ships are added from the matrix.
-  OH.fetchShipCatalog = async function fetchShipCatalog(fetchFn = fetch) {
-    // Both halves or nothing: without the matrix, concept ships and many prices
-    // would be missing from a list that's then cached for 30 days.
-    const list = await fetchAllPages('vehicles', fetchFn);
-    const matrix = await fetchAllPages('shipmatrix/vehicles', fetchFn);
-    return OH.mergeCatalogs(list, matrix);
-  };
-
   // Fill missing sizes in place: a leftover "undefined" becomes null, and a special
   // edition ("F8C Lightning Wikelo War Special", "Corsair PYAM Exec") takes the size
   // of its base ship (the longest other name it starts with). Pure, returns list.
@@ -2554,6 +2602,73 @@
     return OH.fillCatalogSizes(out);
   };
 
+  // Pictures we show from a feed: RSI's own or our copies on openhangar.space only.
+  OH.feedImage = (url) =>
+    typeof url === 'string' &&
+    /^https:\/\/((media\.)?robertsspaceindustries\.com|([a-z0-9-]+\.)*openhangar\.space)\//i.test(
+      url,
+    )
+      ? url
+      : null;
+
+  // openhangar.space/api/ships (v1): { ships: [{ name, cls, msrp, img }] }, the same
+  // weekly ship list as the bundled one, cut to what prices and ship art need. Asked
+  // at most once a day.
+  const SHIPS_FEED_TTL = 24 * 3600e3;
+  OH.getShipsFeed = ({ force = false, fetchFn } = {}) =>
+    OH.siteFeed('api/ships', {
+      key: 'feedShips',
+      ttl: SHIPS_FEED_TTL,
+      force,
+      fetchFn,
+      valid: (j) => isV1(j) && Array.isArray(j.ships),
+    });
+
+  // The bundled list (fleet stats: career, role, size, crew, cargo, status, maker)
+  // with the ships feed on top: its store price, class name and picture, matched by
+  // class name, then name. A ship only the feed knows is added without stats. Pure.
+  OH.mergeShipsFeed = function mergeShipsFeed(bundled, ships) {
+    const out = (bundled || []).map((v) => ({ ...v }));
+    if (!Array.isArray(ships)) return out;
+    const byCls = new Map(out.filter((v) => v.cls).map((v) => [v.cls, v]));
+    const byName = new Map(out.map((v) => [v.lname, v]));
+    for (const s of ships) {
+      const name = s && typeof s.name === 'string' ? s.name.trim() : '';
+      if (!name) continue;
+      const lname = name.toLowerCase();
+      const cls = typeof s.cls === 'string' && s.cls.trim() ? s.cls.trim().toLowerCase() : null;
+      const msrp =
+        typeof s.msrp === 'number' && Number.isFinite(s.msrp) && s.msrp > 0 ? s.msrp : null;
+      const img = OH.feedImage(s.img);
+      const hit = (cls && byCls.get(cls)) || byName.get(lname);
+      if (hit) {
+        if (msrp) hit.msrp = msrp;
+        if (cls && !hit.cls) hit.cls = cls;
+        if (img) hit.img = img;
+        continue;
+      }
+      const v = {
+        name,
+        lname,
+        slug: cls || lname.replace(/[^a-z0-9]+/g, '-'),
+        cls,
+        msrp,
+        img,
+        career: null,
+        role: null,
+        size: null,
+        status: null,
+        crew: null,
+        cargo: 0,
+        mfr: null,
+      };
+      out.push(v);
+      byName.set(lname, v);
+      if (cls) byCls.set(cls, v);
+    }
+    return OH.fillCatalogSizes(out);
+  };
+
   // The ship list that ships inside the extension (src/data/ship-catalog.json,
   // refreshed weekly by a GitHub Action), or null.
   async function bundledCatalog() {
@@ -2568,50 +2683,32 @@
     }
   }
 
-  // The full wiki vehicle catalog, cached slim for CATALOG_TTL. On a cold cache
-  // the bundled snapshot answers straight away (prices show instantly, and
-  // offline) while the live list downloads in the background for next time.
+  // The ship list: bundled snapshot + the ships feed (OH.mergeShipsFeed). The
+  // bundled list answers at once (prices show instantly, and offline) when the feed
+  // is slow; the merged list replaces it as soon as the feed lands.
   async function getCatalog() {
     if (catalogMem) return catalogMem;
-    const cached = (await chrome.storage.local.get('shipCatalog')).shipCatalog;
-    if (
-      cached &&
-      cached.v === CATALOG_CACHE_V &&
-      cached.at &&
-      Date.now() - cached.at < CATALOG_TTL &&
-      Array.isArray(cached.list)
-    ) {
-      catalogMem = cached.list;
-      return catalogMem;
-    }
     if (catalogInflight) return catalogInflight;
-    const refresh = (async () => {
-      let list = [];
-      try {
-        list = await OH.fetchShipCatalog();
-      } catch (e) {
-        /* offline: fall back to the bundled snapshot (below) */
-        OH.log('warn', 'catalog', `ship catalog download failed: ${e?.message || e}`);
+    catalogInflight = (async () => {
+      const bundled = (await bundledCatalog()) || [];
+      const feedP = OH.getShipsFeed().catch(() => null);
+      const merge = (feed) => OH.mergeShipsFeed(bundled, feed && feed.data && feed.data.ships);
+      const quick = await Promise.race([
+        feedP,
+        new Promise((r) => setTimeout(() => r(false), 1500)),
+      ]);
+      if (quick === false) {
+        feedP.then((feed) => {
+          if (feed) catalogMem = merge(feed);
+        });
+        catalogMem = bundled.length ? bundled : null;
+        return bundled;
       }
-      if (list.length) {
-        catalogMem = list;
-        try {
-          await chrome.storage.local.set({
-            shipCatalog: { v: CATALOG_CACHE_V, at: Date.now(), list },
-          });
-        } catch {}
-      }
-      catalogInflight = null;
-      return list.length ? list : catalogMem || [];
-    })();
-    catalogInflight = refresh;
-    const bundled = await bundledCatalog();
-    if (catalogMem) return catalogMem; // the live list already landed
-    if (bundled) {
-      catalogMem = bundled; // answer now; `refresh` replaces it when it lands
-      return bundled;
-    }
-    return refresh;
+      const list = merge(quick);
+      if (list.length) catalogMem = list;
+      return list;
+    })().finally(() => (catalogInflight = null));
+    return catalogInflight;
   }
 
   // Score how well a catalog entry's (lowercased) name matches the query. 0 = no
@@ -2652,25 +2749,21 @@
     return best;
   }
 
-  // Rank wiki catalog entries against a raw RSI name; return up to 3 slugs.
-  function matchSlugs(catalog, rawName) {
+  // Best picture from the ship list (the ships feed's art) for a raw RSI name, or null.
+  function matchCatalogImage(catalog, rawName) {
     const q = OH.normShipName(rawName).toLowerCase();
-    if (!q || !catalog.length) return [];
-    const scored = [];
+    if (!q || !catalog || !catalog.length) return null;
+    let best = null;
+    let bestScore = 0;
     for (const v of catalog) {
-      const s = nameScore(v.lname, q);
-      if (s) scored.push({ slug: v.slug, score: s });
+      if (!v.img) continue;
+      const sc = nameScore(v.lname, q);
+      if (sc > bestScore) {
+        bestScore = sc;
+        best = v.img;
+      }
     }
-    scored.sort((a, b) => b.score - a.score);
-    const out = [];
-    const seen = new Set();
-    for (const s of scored) {
-      if (seen.has(s.slug)) continue;
-      seen.add(s.slug);
-      out.push(s.slug);
-      if (out.length >= 3) break;
-    }
-    return out;
+    return best;
   }
 
   // The original, full-size copy of a picture we show as a thumbnail (#299), or null
@@ -2703,28 +2796,6 @@
     return null;
   };
 
-  // Fetch a single vehicle's store image by slug (exact, reliable). ~600px webp.
-  async function fetchVehicleImage(slug) {
-    try {
-      const res = await OH.guarded()(
-        `${SC_API}/vehicles/${encodeURIComponent(slug)}?include=images`,
-        {
-          credentials: 'omit',
-          headers: { Accept: 'application/json' },
-        },
-      );
-      if (!res.ok) return null;
-      const json = await res.json();
-      const v = Array.isArray(json.data) ? json.data[0] : json.data;
-      const imgs = v && v.images;
-      if (Array.isArray(imgs) && imgs.length)
-        return imgs[0].thumbnail_url || imgs[0].original_url || null;
-    } catch {
-      /* ignore — caller caches a negative */
-    }
-    return null;
-  }
-
   // Resolve a ship store-image URL by (raw) name. Returns a URL or null; never throws.
   OH.getShipImage = async function getShipImage(rawName) {
     const key = OH.normShipName(rawName).toLowerCase();
@@ -2745,14 +2816,8 @@
         let url = null;
         // 1) RSI ship-matrix (one cached fetch, covers concept ships).
         url = matchMatrixImage(await getShipMatrix(), rawName);
-        // 2) Fallback: star-citizen.wiki (catalog match → per-slug image fetch).
-        if (!url) {
-          const catalog = await getCatalog();
-          for (const slug of matchSlugs(catalog, rawName)) {
-            url = await fetchVehicleImage(slug);
-            if (url) break; // first candidate with art wins
-          }
-        }
+        // 2) Fallback: the picture openhangar.space's ships feed has for it.
+        if (!url) url = matchCatalogImage(await getCatalog(), rawName);
         shipImgMem.set(key, url);
         await mutateStored('shipImages', (cur = {}) => {
           const out = pruneTimed(cur, (e) => (e.url ? SHIP_IMG_TTL : 24 * 3600e3));
@@ -2774,10 +2839,10 @@
   };
 
   // --- Ship prices + hangar value ------------------------------------------
-  // The star-citizen.wiki vehicle list carries each ship's `msrp` (current USD
-  // store price), so pricing a whole hangar costs the same ~6 cached catalog
-  // requests as the image lookup — nothing per ship. Concept ships the wiki has
-  // no price for stay unpriced (the UI says how many).
+  // The ship list (bundled, with openhangar.space's ships feed on top) carries each
+  // ship's `msrp` (current USD store price), so pricing a whole hangar costs one
+  // cached feed request, nothing per ship. Concept ships with no price stay
+  // unpriced (the UI says how many).
 
   // Word-set match for names RSI and the wiki order differently: "Hercules
   // Starlifter C2" ↔ "C2 Hercules Starlifter", "Aurora MR" ↔ "Aurora Mk I MR".
@@ -2858,7 +2923,7 @@
     return OH.makeShipIndex(catalog, codes).priceOf;
   };
 
-  // Live resolvers backed by the cached wiki catalog. Offline, they just return
+  // Live resolvers backed by the ship list. Offline, they just return
   // null, so callers never need to special-case it.
   OH.getShipIndex = async function getShipIndex() {
     const [catalog, codes] = await Promise.all([getCatalog(), loadShipCodes()]);
@@ -3784,70 +3849,6 @@
   ];
   OH.ZERO_DECIMAL = ['JPY', 'KRW']; // shown without cents
 
-  // --- Game status + events (starcitizen.tools main page settings) -------------
-  // The wiki's main page reads everything it shows from one JSON page: the
-  // current event ({ name, page, text, starts, ends }) and the patches on each
-  // channel ([{ channel: 'LIVE' | 'PTU' | 'EPTU' …, name: '4.10.2', page }]).
-  // Editors update it by hand and an event card can stay up after it ends, so
-  // callers must check the dates (OH.activeWikiEvent), never just show it.
-  const WIKI_MAIN_KEY = 'wikiMainpage';
-  const WIKI_MAIN_TTL = 6 * 60 * 60 * 1000;
-  // "2026-09-9 16:00" (wiki style, UTC, unpadded day) → ms, or NaN.
-  OH.parseWikiTime = function parseWikiTime(s) {
-    const m = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/.exec(String(s || '').trim());
-    return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0)) : NaN;
-  };
-  // Keep only what Home shows, from the settings JSON. Pure.
-  OH.shapeWikiMainpage = function shapeWikiMainpage(json) {
-    const e = json && typeof json.event === 'object' ? json.event : null;
-    const patches = Array.isArray(json && json.patches) ? json.patches : [];
-    return {
-      event:
-        e && e.name
-          ? {
-              name: String(e.name),
-              page: e.page ? String(e.page) : '',
-              text: e.text ? String(e.text) : '',
-              starts: OH.parseWikiTime(e.starts),
-              ends: OH.parseWikiTime(e.ends),
-            }
-          : null,
-      patches: patches
-        .filter((p) => p && p.channel && p.name)
-        .map((p) => ({
-          channel: String(p.channel).toUpperCase(),
-          name: String(p.name),
-          page: p.page ? String(p.page) : '',
-        })),
-    };
-  };
-  // The event only while it's actually on: started (or no start given) and not
-  // yet ended. An event with no end date is never shown (can't tell it's over).
-  OH.activeWikiEvent = function activeWikiEvent(main, now = Date.now()) {
-    const e = main && main.event;
-    if (!e || !Number.isFinite(e.ends) || now >= e.ends) return null;
-    if (Number.isFinite(e.starts) && now < e.starts) return null;
-    return e;
-  };
-  OH.getWikiMainpage = async function getWikiMainpage(fetchFn = fetch) {
-    const { [WIKI_MAIN_KEY]: cached } = await chrome.storage.local.get(WIKI_MAIN_KEY);
-    if (cached && Date.now() - cached.at < WIKI_MAIN_TTL) return cached.data;
-    try {
-      const res = await OH.guarded(fetchFn)(
-        'https://starcitizen.tools/api.php?action=query&titles=Module:Mainpage/settings.json&prop=revisions&rvprop=content&rvslots=main&format=json&origin=*',
-        { credentials: 'omit' },
-      );
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const page = Object.values((await res.json())?.query?.pages || {})[0];
-      const text = page?.revisions?.[0]?.slots?.main?.['*'];
-      const data = OH.shapeWikiMainpage(JSON.parse(text));
-      await chrome.storage.local.set({ [WIKI_MAIN_KEY]: { at: Date.now(), data } });
-      return data;
-    } catch {
-      return cached ? cached.data : null; // stale beats nothing; null when never fetched
-    }
-  };
-
   // --- Patch notes (RSI Spectrum, Patch Notes channel) --------------------------
   // Newest threads in RSI's Patch Notes forum: PTU waves, LIVE release notes,
   // hotfix threads. Same site as the hangar, so no new permission; no cookies sent.
@@ -3937,107 +3938,59 @@
     return null;
   };
 
-  // --- Referral bonus events (starcitizen.tools) ---------------------------------
-  // The wiki's "Special Incentive Events" table: one row per event with start,
-  // end, name and the rewards. Returns [{ start, end, name, reward }] where
-  // `reward` is what the referrer ("You") gets, as plain text.
-  function wikiPlain(s) {
-    const text = String(s || '')
-      .replace(/<ref[^>]*\/>/gi, '')
-      .replace(/<ref[\s\S]*?<\/ref\s*>/gi, '')
-      .replace(/\[\[(?:File|Image):[^\]]*\]\]/gi, '')
-      .replace(/\[\[[^\]|]*\|([^\]]*)\]\]/g, '$1')
-      .replace(/\[\[([^\]]*)\]\]/g, '$1')
-      .replace(/\{\{[\s\S]*?\}\}/g, '')
-      .replace(/'{2,}/g, '');
-    return stripTags(text, '')
-      .replace(/�/g, '"')
-      .replace(/[ \t]+/g, ' ')
-      .trim();
-  }
-  OH.parseReferralEvents = function parseReferralEvents(wikitext) {
-    const out = [];
-    for (const row of String(wikitext || '').split(/\n\|-[^\n]*\n/)) {
-      const cells = ('\n' + row)
-        .split(/\n\|(?![-}+])/)
-        .slice(1)
-        .map((c) => c.replace(/\n\|\}[\s\S]*$/, ''));
-      if (cells.length < 6) continue;
-      const [start, end, name] = cells.map((c) => wikiPlain(c));
-      const file = (cells[4].match(/\[\[(?:File|Image):([^|\]]+)/i) || [])[1];
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) continue;
-      let reward = wikiPlain(cells.slice(5).join('\n'));
-      // Newer rows list "You:" and "Referral:" rewards; keep what the referrer gets.
-      const you = reward.match(/You:?\s*([\s\S]*?)(?:\n\s*Referral\b|$)/i);
-      if (you) reward = you[1];
-      reward = reward
-        .split('\n')
-        .map((l) => l.replace(/^\s*\*\s*/, '').trim())
-        .filter(Boolean)
-        .join(', ')
-        .replace(/^(The|A|An)\s+/i, '')
-        .replace(/\.$/, '');
-      if (name && reward) out.push({ start, end, name, reward, image: file ? file.trim() : '' });
-    }
-    return out;
+  // --- Referral bonus events (openhangar.space/api/referral-events) -------------------
+  // v1: { events: [{ start, end, name, reward, image, img }], images: { "<wiki
+  // file name>": picture URL } }. The site reads the community wiki's "Special
+  // Incentive Events" table and copies the reward pictures (the referral tiers' and
+  // the events'); the extension only reads this feed, at most once a day. A picture
+  // the site hasn't copied yet is missing: no picture, never fetched elsewhere.
+  const REF_FEED_TTL = 24 * 3600e3;
+  const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+  OH.getReferralFeed = ({ force = false, fetchFn } = {}) =>
+    OH.siteFeed('api/referral-events', {
+      key: 'feedReferral',
+      ttl: REF_FEED_TTL,
+      force,
+      fetchFn,
+      valid: (j) => isV1(j) && Array.isArray(j.events),
+    });
+  // The feed's events, checked: [{ start, end, name, reward, image, img }]. Pure.
+  OH.shapeReferralEvents = function shapeReferralEvents(list) {
+    const text = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+    return (Array.isArray(list) ? list : [])
+      .filter((e) => e && DAY_RE.test(e.start) && DAY_RE.test(e.end) && text(e.name, 200))
+      .map((e) => ({
+        start: e.start,
+        end: e.end,
+        name: text(e.name, 200),
+        reward: text(e.reward, 500),
+        image: text(e.image, 200),
+        img: OH.feedImage(e.img),
+      }))
+      .filter((e) => e.reward);
   };
-  // Wiki file names ("Referral Pulse.jpg") → 400px image URLs on
-  // media.starcitizen.tools, 50 per request, cached a month. → { file: url }.
-  const WIKI_FILES_KEY = 'wikiFiles';
-  const WIKI_FILES_TTL = 30 * 24 * 3600e3;
+  // → the event list, or null when the feed never loaded (callers keep their list).
+  OH.getReferralEvents = async function getReferralEvents(fetchFn) {
+    const feed = await OH.getReferralFeed({ fetchFn });
+    const events = OH.shapeReferralEvents(feed && feed.data.events);
+    return events.length ? events : null;
+  };
+  // Wiki file names ("Referral Pulse.jpg", or "Referral_Pulse.jpg") → our copies of
+  // the pictures, from the same feed. → { file: url } for the ones it has.
   const wikiTitle = (f) => {
     const t = String(f).replace(/_/g, ' ').trim();
     return t.charAt(0).toUpperCase() + t.slice(1);
   };
-  OH.wikiImageUrls = async function wikiImageUrls(files, fetchFn = fetch) {
-    const want = [...new Set(files.filter(Boolean))];
-    const { [WIKI_FILES_KEY]: cache = {} } = await chrome.storage.local.get(WIKI_FILES_KEY);
-    // Found pictures keep a month; "no such file" answers only a day.
-    const ttl = (e) => (e.url ? WIKI_FILES_TTL : 24 * 3600e3);
+  OH.wikiImageUrls = async function wikiImageUrls(files, fetchFn) {
+    const feed = await OH.getReferralFeed({ fetchFn });
+    const images = (feed && feed.data.images) || {};
     const out = {};
-    const missing = [];
-    for (const f of want) {
-      const hit = cache[f];
-      if (hit && Date.now() - hit.at < ttl(hit)) {
-        if (hit.url) out[f] = hit.url;
-      } else missing.push(f);
-    }
-    const fresh = {};
-    for (let i = 0; i < missing.length; i += 50) {
-      const batch = missing.slice(i, i + 50);
-      try {
-        const titles = batch.map((f) => 'File:' + wikiTitle(f)).join('|');
-        const res = await OH.guarded(fetchFn)(
-          `https://starcitizen.tools/api.php?action=query&prop=imageinfo&iiprop=url&iiurlwidth=400&format=json&origin=*&titles=${encodeURIComponent(titles)}`,
-          { credentials: 'omit', headers: { Accept: 'application/json' } },
-        );
-        const json = res.ok ? await res.json() : null;
-        const pages = json && json.query && json.query.pages;
-        if (!pages) continue; // a failed request caches nothing; retried next time
-        const byTitle = {};
-        for (const pg of Object.values(pages)) {
-          const info = pg.imageinfo && pg.imageinfo[0];
-          if (info) byTitle[pg.title] = info.thumburl || info.url;
-        }
-        for (const f of batch) {
-          const url = byTitle['File:' + wikiTitle(f)] || null;
-          fresh[f] = { url, at: Date.now() };
-          if (url) out[f] = url;
-        }
-      } catch (e) {
-        OH.log('warn', 'referral', `wiki images failed: ${e?.message || e}`);
-      }
-    }
-    if (Object.keys(fresh).length) {
-      await mutateStored(WIKI_FILES_KEY, (cur = {}) =>
-        capNewest({ ...pruneTimed(cur, ttl), ...fresh }, OH.CACHE_MAX.wikiFiles),
-      ).catch(() => {
-        /* storage full: this session still has the URLs */
-      });
+    for (const f of new Set((files || []).filter(Boolean))) {
+      const url = OH.feedImage(images[f]) || OH.feedImage(images[wikiTitle(f)]);
+      if (url) out[f] = url;
     }
     return out;
   };
-
   // --- Live store status (RSI's upgrade tool data) ----------------------------------
   // The public data behind RSI's CCU upgrade tool lists every ship with the
   // editions on sale right now ("skus": Standard, Warbond, …, each available or
@@ -4472,80 +4425,195 @@
     return { ok: true, list };
   }
 
-  // --- Is a ship in the store right now? -------------------------------------------
-  // The upgrade-tool feed above only lists CCU targets, so it can't answer this.
-  // Each ship's own store page does: its schema.org data lists every offer for
-  // the ship with a link that says what it is, /Standalone-Ships/…, /Upgrades/…
-  // (a CCU to it) or /Packages/… (a pack that includes it), and the store's
-  // stock for each. A missing page means it's not in the store at all.
-  // One page per ship, so this is only asked for ships someone is looking at.
-  // Page HTML → { state: 'in' | 'pack' | 'out', price, packs: [{ name, price }] }
-  // or null (couldn't tell). 'in' = a standalone offer in stock. Pure.
-  OH.parseShipStock = function parseShipStock(html) {
-    let seen = false;
-    const standalone = [];
-    const packs = [];
-    const inStock = (o) =>
-      /InStock|LimitedAvailability|PreOrder/i.test(String(o.availability || ''));
-    for (const m of String(html || '').matchAll(
-      /<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi,
-    )) {
-      let j;
-      try {
-        j = JSON.parse(m[1]);
-      } catch {
-        continue;
-      }
-      for (const node of Array.isArray(j) ? j : [j]) {
-        if (!node || node['@type'] !== 'Product' || !node.offers) continue;
-        seen = true;
-        const top = node.offers;
-        const list = Array.isArray(top.offers) ? top.offers : Array.isArray(top) ? top : [top];
-        for (const o of list) {
-          if (!o || !inStock(o)) continue;
-          const url = String(o.url || '');
-          const price = Number(o.price) || null;
-          if (/\/Standalone-Ships\//i.test(url)) standalone.push(price);
-          else if (/\/Packages\//i.test(url))
-            packs.push({ name: String(o.name || 'a pack'), price });
-        }
-      }
-    }
-    if (!seen) return null;
-    if (standalone.length) {
-      const prices = standalone.filter(Boolean);
-      return { state: 'in', price: prices.length ? Math.min(...prices) : null, packs };
-    }
-    return { state: packs.length ? 'pack' : 'out', price: null, packs };
+  // --- The store catalog (openhangar.space/api/catalog) ------------------------------
+  // Everything in RSI's pledge store right now, as the website's store watcher last
+  // read it: one download (ETag'd, so usually a tiny "nothing new") instead of a
+  // request per ship. The wishlist is matched against it here, on your machine:
+  // nothing about it is ever sent. v1:
+  //   { items: [{ id: "sku-<RSI SKU>" | "upgrade-<to ship id>", kind, name, img, url,
+  //       price, wasPrice, warbond, standardPrice, savings, inStore, insurance,
+  //       upgrade: { toShipId, to, skus } | null }],
+  //     ships: [{ id, name, msrp, editions: [{ sku, price, warbond }] }] }
+  // In `items` with inStore = on sale now; inStore false = listed but sold out; not
+  // in `items` = not for sale. Asked at most every 30 minutes (Check Now and Scan →
+  // Store ask again, still with the ETag).
+  const CATALOG_FEED_TTL = 30 * 60e3;
+  OH.getStoreCatalog = ({ force = false, fetchFn } = {}) =>
+    OH.siteFeed('api/catalog', {
+      key: 'feedCatalog',
+      ttl: CATALOG_FEED_TTL,
+      force,
+      fetchFn,
+      valid: (j) => isV1(j) && Array.isArray(j.items),
+    });
+  const CATALOG_KINDS = [
+    'ship',
+    'vehicle',
+    'pack',
+    'starter',
+    'paint',
+    'gear',
+    'addon',
+    'subscriber',
+    'upgrade',
+    'other',
+  ];
+  // Catalog kind → the Wishlist Watch kind (ui/lib/wish-watch.js).
+  OH.CATALOG_WISH_KIND = {
+    ship: 'ship',
+    vehicle: 'ship',
+    pack: 'pack',
+    starter: 'pack',
+    paint: 'paint',
+    gear: 'gear',
+    addon: 'addon',
+    subscriber: 'addon',
+    other: 'addon',
+    upgrade: 'ccu',
   };
-  const STOCK_KEY = 'shipStock2'; // v2: standalone vs pack-only
-  const STOCK_TTL = 6 * 3600e3;
-  // Store page URL → result of parseShipStock (a 404 is 'out'), cached 6 hours.
-  // `force` skips the cache (Scan → Store).
-  OH.getShipStock = async function getShipStock(url, fetchFn = fetch, { force = false } = {}) {
-    if (!/^https:\/\/robertsspaceindustries\.com\/pledge\//.test(url || '')) return null;
-    const { [STOCK_KEY]: cache = {} } = await chrome.storage.local.get(STOCK_KEY);
-    const hit = cache[url];
-    if (!force && hit && Date.now() - hit.at < STOCK_TTL) return hit.s;
-    let s = null;
-    try {
-      const res = await OH.guarded(fetchFn)(url, { credentials: 'omit' });
-      if (res.status === 404) s = { state: 'out', price: null, packs: [] };
-      else if (res.ok) s = OH.parseShipStock(await res.text());
-    } catch (e) {
-      OH.log('warn', 'store', `stock check failed: ${e?.message || e}`);
+  const money = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
+  const rsiLink = (v) =>
+    typeof v === 'string' && /^https:\/\/robertsspaceindustries\.com\//.test(v) ? v : null;
+  // The feed's JSON → { at, items, ships, byId }, every field checked. Pure.
+  OH.shapeCatalog = function shapeCatalog(json) {
+    const items = [];
+    const seen = new Set();
+    for (const i of json && Array.isArray(json.items) ? json.items : []) {
+      if (!i || typeof i.id !== 'string' || !/^(sku|upgrade)-\d+$/.test(i.id)) continue;
+      const name = typeof i.name === 'string' ? i.name.trim().slice(0, 200) : '';
+      const price = money(i.price);
+      if (!name || price == null || seen.has(i.id)) continue;
+      const kind = CATALOG_KINDS.includes(i.kind) ? i.kind : 'other';
+      const u = i.upgrade;
+      const upgrade =
+        u && Number.isInteger(u.toShipId)
+          ? {
+              toShipId: u.toShipId,
+              to:
+                (typeof u.to === 'string' && u.to.trim().slice(0, 200)) ||
+                name.replace(/^Upgrade to\s+/i, ''),
+              skus: (Array.isArray(u.skus) ? u.skus : []).filter(Number.isInteger),
+            }
+          : null;
+      if (kind === 'upgrade' && !upgrade) continue;
+      seen.add(i.id);
+      items.push({
+        id: i.id,
+        kind,
+        wishKind: OH.CATALOG_WISH_KIND[kind],
+        name,
+        img: OH.feedImage(i.img),
+        url: rsiLink(i.url),
+        price,
+        wasPrice: money(i.wasPrice),
+        warbond: !!i.warbond,
+        standardPrice: money(i.standardPrice),
+        savings: money(i.savings),
+        inStore: i.inStore !== false,
+        insurance: typeof i.insurance === 'string' ? i.insurance.trim().slice(0, 20) : null,
+        upgrade: kind === 'upgrade' ? upgrade : null,
+      });
     }
-    if (s) {
-      await mutateStored(STOCK_KEY, (cur = {}) =>
-        capNewest(
-          { ...pruneTimed(cur, () => STOCK_TTL), [url]: { s, at: Date.now() } },
-          OH.CACHE_MAX.shipStock2,
-        ),
-      ).catch(() => {});
-    }
-    return s;
+    const ships = (json && Array.isArray(json.ships) ? json.ships : [])
+      .filter((s) => s && Number.isInteger(s.id) && typeof s.name === 'string' && s.name.trim())
+      .map((s) => ({
+        id: s.id,
+        name: s.name.trim().slice(0, 200),
+        msrp: money(s.msrp) || null,
+        editions: (Array.isArray(s.editions) ? s.editions : [])
+          .filter((e) => e && money(e.price))
+          .map((e) => ({
+            sku: Number.isInteger(e.sku) ? e.sku : null,
+            price: e.price,
+            warbond: !!e.warbond,
+          }))
+          .sort((a, b) => a.price - b.price),
+      }));
+    return {
+      at: Date.parse((json && json.updatedAt) || '') || null,
+      items,
+      ships,
+      byId: new Map(items.map((i) => [i.id, i])),
+    };
   };
 
+  const cheapest = (xs) => (xs.length ? Math.min(...xs) : null);
+  const cents = (n) => Math.round(n * 100) / 100;
+  // What upgrading from a ship worth `fromMsrp` (USD) costs with catalog upgrade
+  // `item`: each edition's price minus fromMsrp (editions from `ships`, else the
+  // item's own price). → { price, warbond } (warbond only when cheaper) or null when
+  // no edition costs more than the ship you start from. Pure.
+  OH.upgradeCost = function upgradeCost(cat, item, fromMsrp) {
+    if (!item || !item.upgrade || !(fromMsrp > 0)) return null;
+    const ship = ((cat && cat.ships) || []).find((s) => s.id === item.upgrade.toShipId);
+    const eds =
+      ship && ship.editions.length ? ship.editions : [{ price: item.price, warbond: item.warbond }];
+    const up = eds.filter((e) => e.price > fromMsrp);
+    const std = cheapest(up.filter((e) => !e.warbond).map((e) => cents(e.price - fromMsrp)));
+    const wb = cheapest(up.filter((e) => e.warbond).map((e) => cents(e.price - fromMsrp)));
+    if (std == null && wb == null) return null;
+    return {
+      price: std != null ? std : wb,
+      warbond: std != null && wb != null && wb < std ? wb : null,
+    };
+  };
+
+  // One wishlist entry against the catalog → { status, price, warbond, url, img }
+  // for its Wishlist Watch row (status: 'in' | 'soldout' | 'out', or 'unknown' with
+  // no catalog). An entry is a ship's name (a string), or a catalog item
+  // { id, kind, name, from?, fromMsrp? } (a CCU starts from `from`).
+  // `sameShip(a, b)` matches ship names; `msrpOf(name)` is a ship's standard price
+  // (USD) or null. Runs locally; pure.
+  OH.catalogWishStatus = function catalogWishStatus(cat, entry, { sameShip, msrpOf } = {}) {
+    const same = sameShip || ((a, b) => String(a).toLowerCase() === String(b).toLowerCase());
+    const msrp = (n) => (msrpOf && n ? msrpOf(n) : null) || null;
+    if (typeof entry === 'string') {
+      const usual = msrp(entry);
+      if (!cat) return { status: 'unknown', price: usual, warbond: null, url: null, img: null };
+      const hits = cat.items.filter(
+        (i) => (i.kind === 'ship' || i.kind === 'vehicle') && same(i.name, entry),
+      );
+      const on = hits.filter((i) => i.inStore);
+      if (!on.length) {
+        const any = hits[0] || null;
+        return {
+          status: any ? 'soldout' : 'out',
+          price: usual,
+          warbond: null,
+          url: any ? any.url : null,
+          img: any ? any.img : null,
+        };
+      }
+      const std = on.filter((i) => !i.warbond).sort((a, b) => a.price - b.price)[0] || null;
+      const wb = on.filter((i) => i.warbond).sort((a, b) => a.price - b.price)[0] || null;
+      const price = std ? std.price : (wb && wb.standardPrice) || usual || wb.price;
+      const pick = std || wb;
+      return {
+        status: 'in',
+        price,
+        warbond: wb && wb.price < price ? wb.price : null,
+        url: pick.url,
+        img: pick.img,
+      };
+    }
+    const e = entry || {};
+    const last = money(e.price);
+    if (!cat) return { status: 'unknown', price: last, warbond: null, url: null, img: null };
+    const item = cat.byId.get(e.id) || null;
+    if (!item) return { status: 'out', price: last, warbond: null, url: null, img: null };
+    const base = { url: item.url, img: item.img };
+    if (!item.inStore)
+      return { status: 'soldout', price: last || item.price, warbond: null, ...base };
+    if (item.upgrade) {
+      const cost = OH.upgradeCost(cat, item, money(e.fromMsrp) || msrp(e.from));
+      return cost
+        ? { status: 'in', price: cost.price, warbond: cost.warbond, ...base }
+        : { status: 'out', price: null, warbond: null, ...base };
+    }
+    if (item.warbond && item.standardPrice && item.standardPrice > item.price)
+      return { status: 'in', price: item.standardPrice, warbond: item.price, ...base };
+    return { status: 'in', price: item.price, warbond: null, ...base };
+  };
   // --- Loaner ships (RSI support: "Loaner Ship Matrix") --------------------------
   // A public help-center article with one table row per not-yet-flyable ship:
   // "YOUR SHIP" → "OUR LOANER(S)". Row names use shorthand ("Hull D, E",
@@ -4682,28 +4750,17 @@
   OH.getIncludedVessels = (fetchFn = fetch) =>
     getHelpTable('4408770370455', 'includedVessels', 5, fetchFn);
 
-  const REF_EVENTS_KEY = 'referralEvents';
-  const REF_EVENTS_TTL = 7 * 24 * 3600e3;
-  // Cached for a week; null when it can't be fetched (callers keep their list).
-  OH.getReferralEvents = async function getReferralEvents(fetchFn = fetch) {
-    const { [REF_EVENTS_KEY]: cached } = await chrome.storage.local.get(REF_EVENTS_KEY);
-    if (cached && Date.now() - cached.at < REF_EVENTS_TTL) return cached.events;
-    try {
-      const res = await OH.guarded(fetchFn)(
-        'https://starcitizen.tools/api.php?action=parse&page=Referral_program&prop=wikitext&section=5&format=json&origin=*',
-        { credentials: 'omit', headers: { Accept: 'application/json' } },
-      );
-      const json = res.ok ? await res.json() : null;
-      const events = OH.parseReferralEvents(json?.parse?.wikitext?.['*']);
-      if (events.length) {
-        await chrome.storage.local.set({ [REF_EVENTS_KEY]: { at: Date.now(), events } });
-        return events;
-      }
-    } catch (e) {
-      OH.log('warn', 'referral', `event list download failed: ${e?.message || e}`);
-    }
-    return cached ? cached.events : null;
-  };
+  // openhangar.space/versions.json: the version each store has live ({ stores:
+  // { chrome, edge, firefox: { live, … } } }). Firefox's Check for Updates reads it;
+  // asked only when that button is pressed.
+  OH.getStoreVersions = ({ force = false, fetchFn } = {}) =>
+    OH.siteFeed('versions.json', {
+      key: 'feedVersions',
+      ttl: 10 * 60e3,
+      force,
+      fetchFn,
+      valid: (j) => !!j && typeof j === 'object' && !!j.stores && typeof j.stores === 'object',
+    });
 
   const FX_KEY = 'fxRates';
   const FX_TTL = 24 * 3600e3;

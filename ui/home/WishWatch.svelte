@@ -1,10 +1,10 @@
 <script>
-  // Wishlist Watch: your wishlist with what RSI's store said at the last check:
-  // In Store Now (price, Warbond savings in green, Buy at RSI), Only in a Pack, Not
-  // on Sale or Sold Out. Shows the LAST check ("Checked 2 days ago") until the next
-  // one; only Check Now (or Scan → Store) asks the store, never anything by itself.
-  // Rows are generic items (ui/lib/wish-watch.js) so any store item fits: ships
-  // today, packs, paints, gear, add-ons and CCUs once the catalog feed lands.
+  // Wishlist Watch: your wishlist with what RSI's store had at the last check
+  // (openhangar.space's store catalog, matched on your machine): In Store Now
+  // (price, Warbond savings in green, Buy at RSI), Not on Sale or Sold Out. Shows
+  // the LAST check ("Checked 2 days ago") until the next one; only Check Now (or
+  // Scan → Store) asks, never anything by itself. Rows are generic items
+  // (ui/lib/wish-watch.js): ships, packs, paints, gear, add-ons and CCUs.
   import { SvelteMap } from 'svelte/reactivity';
   import { app, OH, version } from '../lib/app.svelte.js';
   import { checkedAgo, wishRow, wishSummary } from '../lib/wish-watch.js';
@@ -50,8 +50,8 @@
   <div class="oh-ph"><h3>Wishlist Watch</h3><a class="act" href="#store">Wishlist →</a></div>
   {#if !d.total}
     <div class="ww-empty">
-      <p>Your wishlist is empty. Add ships from Find a Ship on the Store page.</p>
-      <a class="oh-more" href="#store">Find a Ship →</a>
+      <p>Your wishlist is empty. Add anything from Find in Store on the Store page.</p>
+      <a class="oh-more" href="#store">Find in Store →</a>
     </div>
   {:else}
     <div class="ww-sum">
@@ -63,7 +63,7 @@
       {/if}
     </div>
     {#if !d.at}
-      <p class="ww-hint">Press Check Now to ask RSI's store which ones are on sale. Nothing is checked in the background.</p>
+      <p class="ww-hint">Press Check Now to see which ones are in RSI's store. Nothing is checked in the background.</p>
     {/if}
     <div class="ww-list">
       {#each d.rows as r, i (r.lookup + i)}
@@ -101,7 +101,7 @@
       <button type="button" class="btn sm" id="ww-check" disabled={d.checking} onclick={() => a.store.checkWishlist()}
         >{d.checking ? 'Checking…' : 'Check Now'}</button
       >
-      <span class="ww-note">Asks RSI's store only when you press it, one page per ship.</span>
+      <span class="ww-note">Reads the store list only when you press it, one request for everything.</span>
     </div>
   {/if}
 </section>

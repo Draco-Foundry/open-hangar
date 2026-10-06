@@ -8,14 +8,10 @@
 
   let { v, onChange } = $props();
 
-  const link = $derived(v.store && v.store.link);
-  // In Store Now: the ship's own store page, asked once it shows ("Checking…" till then).
-  $effect(() => {
-    if (link) app().store.checkStock([link]);
-  });
+  // In Store Now: what openhangar.space's store catalog says ("Checking…" till it loads).
   const stock = $derived.by(() => {
     version.n;
-    return link ? app().store.stock(link) : null;
+    return app().store.stock(v.title);
   });
 
   function toggleWish() {
@@ -39,19 +35,17 @@
   {#if v.size}<Row k="Size">{v.size}</Row>{/if}
   {#if v.crew}<Row k="Crew">{v.crew}</Row>{/if}
   {#if v.cargo}<Row k="Cargo">{v.cargo}</Row>{/if}
-  {#if v.store}
-    <Row k="In store now">
-      {#if link}
-        <a
-          class="sale {stock ? stock.cls : ''}"
-          href={link}
-          target="_blank"
-          rel="noopener"
-          title={stock ? stock.title : undefined}>{stock ? stock.text : 'Checking…'}</a
-        >
-      {:else}<span class="muted">—</span>{/if}
-    </Row>
-  {/if}
+  <Row k="In store now">
+    {#if !stock}
+      <span class="muted">Checking…</span>
+    {:else if stock.url}
+      <a class="sale {stock.cls}" href={stock.url} target="_blank" rel="noopener" title={stock.title}
+        >{stock.text}</a
+      >
+    {:else}
+      <span class="sale {stock.cls}" title={stock.title}>{stock.text}</span>
+    {/if}
+  </Row>
   {#if v.upgrade}
     {#key v.upgrade.toSkuId}<RsiCart kind="upgrade" target={v.upgrade} />{/key}
   {/if}
