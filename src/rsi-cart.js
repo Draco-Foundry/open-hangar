@@ -6,7 +6,7 @@
  *
  *   1. POST /api/ship-upgrades/setContextToken  { fromShipId, toShipId, toSkuId }
  *      (+ pledgeId for a buy-back upgrade: the session switches to buy-back mode)
- *   2. filterShips(fromId, toId = target SKU)  → from.ships = ships that can
+ *   2. filterShips(toId = target SKU)  → from.ships = ships that can
  *      upgrade to it; we keep the ones you own (initShipUpgrade's `owned`)
  *   3. getPrice(from = ship id, to = SKU id)   → price { amount } in cents
  *   4. mutation addToCart(from, to)            → { jwt }: that alone puts the
@@ -34,8 +34,10 @@
   const SHIPS_QUERY =
     'query initShipUpgrade { ships { id name owned msrp medias { productThumbMediumAndSmall } } app { mode isAnonymous } }';
   const APP_QUERY = 'query initShipUpgrade { app { mode isAnonymous } }';
+  // Only RSI's "from" half: which of your ships can upgrade to the target SKU. Its
+  // "to" half, asked with no From ship, makes RSI answer "Ship not found".
   const FILTER_QUERY =
-    'query filterShips($fromId: Int, $toId: Int, $fromFilters: [FilterConstraintValues], $toFilters: [FilterConstraintValues]) {\n  from(to: $toId, filters: $fromFilters) {\n    ships {\n      id\n    }\n  }\n  to(from: $fromId, filters: $toFilters) {\n    ships {\n      id\n      skus {\n        id\n        price\n        upgradePrice\n        available\n      }\n    }\n  }\n}\n';
+    'query filterShips($toId: Int, $fromFilters: [FilterConstraintValues]) {\n  from(to: $toId, filters: $fromFilters) {\n    ships {\n      id\n    }\n  }\n}\n';
   const PRICE_QUERY =
     'query getPrice($from: Int!, $to: Int!) {\n  price(from: $from, to: $to) {\n    amount\n    nativeAmount\n  }\n}\n';
   const ADD_QUERY =
@@ -74,13 +76,8 @@
   const gql = (operationName, query, variables = {}) => ({ operationName, variables, query });
   const shipsBody = () => gql('initShipUpgrade', SHIPS_QUERY);
   const appBody = () => gql('initShipUpgrade', APP_QUERY);
-  const filterBody = (toSkuId, fromShipId = null) =>
-    gql('filterShips', FILTER_QUERY, {
-      fromId: toInt(fromShipId),
-      toId: toInt(toSkuId),
-      fromFilters: [],
-      toFilters: [],
-    });
+  const filterBody = (toSkuId) =>
+    gql('filterShips', FILTER_QUERY, { toId: toInt(toSkuId), fromFilters: [] });
   const priceBody = (fromShipId, toSkuId) =>
     gql('getPrice', PRICE_QUERY, { from: toInt(fromShipId), to: toInt(toSkuId) });
   const addBody = (fromShipId, toSkuId) =>
@@ -313,7 +310,7 @@
         csrf = null; // read a fresh token next time
         return { ok: false, error: 'signed-out' };
       }
-      const f = await ask(filterBody(toSkuId, pledge ? opts.fromShipId : null));
+      const f = await ask(filterBody(toSkuId));
       if (f.error) return fail(f);
       const fromIds = parseFrom(f.json);
       if (!fromIds) return { ok: false, error: 'refused' };
