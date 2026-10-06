@@ -1,7 +1,8 @@
 <script>
   // The website's section in the Scan ▾ menu once connected (owner sign-off,
-  // 2026-10-05): Connected as <your RSI handle>, when it last synced, then Sync Now
-  // and Open My Hangar ↗. Disconnect is in your portrait's menu (YouDisconnect.svelte).
+  // 2026-10-05): Connected as <your RSI handle>, when it last synced, then Open My
+  // Hangar ↗. Sync Now (owner, 2026-10-07) and Disconnect (YouDisconnect.svelte)
+  // are in your portrait's menu.
   import { app, version } from '../lib/app.svelte.js';
   import { synced } from './when.js';
 
@@ -18,7 +19,6 @@
         ? 'Beaming your hangar up…'
         : `${at ? `Synced ${at.long}` : 'Not synced yet'}. Every scan syncs.`,
       syncing: s.syncing,
-      busy: a.top.bar.busy,
       msg: s.msg,
     };
   });
@@ -34,13 +34,6 @@
         >Connected{#if d.handle}{' '}as <b>{d.handle}</b>{/if}<small>{d.when}</small></span
       >
     </p>
-      <button
-        type="button"
-        class="sm-act menu-item"
-        id="site-sync-now"
-        disabled={d.syncing || d.busy}
-        onclick={() => site().sync()}>Sync Now</button
-      >
       <button type="button" class="sm-act menu-item" onclick={() => site().open()}
         >Open My Hangar ↗</button
       >
