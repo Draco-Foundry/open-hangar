@@ -15,8 +15,10 @@ on:
         'scripts/update-rates.mjs',
       ]
   # Hourly (owner, 2026-10-06): the extension page's store versions keep up. Every
-  # 3 hours always, and every hour while a store has a version in review, so
-  # "approved and live" shows soon after a store finishes (the gate step below).
+  # 3 hours always, and every hour while a store has a version in review or one
+  # held back on purpose ("arriving", site/store-plan.json), so "approved and
+  # live" shows soon after a store finishes and a passed plan date clears within
+  # the hour (the gate step below).
   # 15:30 UTC is one of the 3-hour runs: after the ECB publishes (about 16:00 CET
   # on working days), so rates.json stays fresh too.
   schedule:
@@ -37,7 +39,8 @@ concurrency:
 
 jobs:
   # Hourly runs only go ahead every 3 hours, or when a store has a version in review
-  # (read from the live versions.json). Pushes, publishes and manual runs always go.
+  # or arriving (read from the live versions.json). Pushes, publishes and manual runs
+  # always go.
   gate:
     runs-on: ubuntu-24.04
     outputs:
@@ -49,7 +52,7 @@ jobs:
           go=yes
           if [ "${{ github.event_name }}" = "schedule" ] && [ $(( $(date -u +%-H) % 3 )) -ne 0 ]; then
             pending=$(curl -fsS --max-time 15 https://openhangar.space/versions.json \
-              | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const v=JSON.parse(s);console.log(Object.values(v.stores||{}).some(x=>x&&x.pending)?'yes':'no')}catch{console.log('yes')}})" \
+              | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const v=JSON.parse(s);console.log(Object.values(v.stores||{}).some(x=>x&&(x.pending||x.arriving))?'yes':'no')}catch{console.log('yes')}})" \
               || echo yes)
             [ "$pending" = "yes" ] || go=no
           fi
@@ -81,8 +84,9 @@ jobs:
             site/index.html
           grep -E 'data-version|data-updated' site/index.html
           echo "Stamped v${VERSION}, updated ${HUMAN}"
-      # Each install button's live store version, and a newer one in review. A store
-      # that can't be read is left blank; this step never stops the deploy.
+      # Each install button's live store version, and a newer one in review (or one
+      # held back on purpose, from site/store-plan.json). A store that can't be read
+      # is left blank; this step never stops the deploy.
       - name: Stamp store versions
         continue-on-error: true
         env:
