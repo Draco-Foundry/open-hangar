@@ -15,14 +15,20 @@ const C = globalThis.OHCart;
 // A pretend RSI upgrade tool. Ships: 101 and 102 can upgrade to the target (SKU 9001
 // of ship 900), 103 is owned but RSI won't take it, 104 isn't owned.
 function fakeRsi({ anonymous = false, mode = 'browse', add = 'ok', status = {} } = {}) {
-  const calls = [];
+  const calls = []; // the upgrade tool's calls (context + GraphQL)
+  const all = []; // every request, the RSI page and setAuthToken too
   const res = (body, code = 200, headers = {}) => ({
     ok: code >= 200 && code < 300,
     status: code,
     headers: { get: (k) => headers[k.toLowerCase()] ?? null },
     json: async () => body,
+    text: async () => body,
   });
   const fetch = async (url, init) => {
+    all.push({ url, init });
+    if (url === C.PLEDGE_STORE_URL)
+      return res('<html><head><meta name="csrf-token" content="csrf-from-page"></head></html>');
+    if (url === C.AUTH_URL) return res({ success: 1 });
     const body = JSON.parse(init.body);
     calls.push({ url, body, init });
     const op = url.endsWith('setContextToken') ? 'context' : body.operationName;
@@ -67,6 +73,7 @@ function fakeRsi({ anonymous = false, mode = 'browse', add = 'ok', status = {} }
   return {
     fetch,
     calls,
+    all,
     ops: () =>
       calls.map((c) => (c.url.endsWith('setContextToken') ? 'context' : c.body.operationName)),
   };
@@ -321,7 +328,7 @@ test('polite: one request at a time with a pause, and nothing during a Retry-Aft
   });
   await Promise.all([api.upgradeOptions(900, 9001), api.upgradePrice(101, 9001)]);
   assert.equal(most, 1, 'never two at once');
-  assert.equal(waits.length, ok.calls.length - 1, 'a pause before every request but the first');
+  assert.equal(waits.length, ok.all.length - 1, 'a pause before every request but the first');
   assert.ok(waits.every((w) => w >= 300));
 
   const rsi = fakeRsi({ status: { getPrice: 429 } });
@@ -454,4 +461,27 @@ test('website bridge in a sync build answers both the cart and Connect', async (
     'https://staging.openhangar.space',
   );
   assert.equal(o.ok, true);
+});
+
+test("signs in the way RSI's own window does: x-rsi-token on setup, X-CSRF-TOKEN on GraphQL", async () => {
+  assert.equal(C.parseCsrf('<meta name="csrf-token" content="t0k">'), 't0k');
+  assert.equal(C.parseCsrf('<meta content="t0k" name="csrf-token" />'), 't0k');
+  assert.equal(C.parseCsrf('<html></html>'), null);
+  const rsi = fakeRsi();
+  const cart = fast(rsi, { rsiToken: async () => 'cookie-token' });
+  const r = await cart.upgradeOptions(900, 9001);
+  assert.equal(r.ok, true);
+  const urls = rsi.all.map((c) => c.url);
+  assert.equal(urls[0], C.AUTH_URL, 'setAuthToken first');
+  assert.equal(urls[1], C.CONTEXT_URL, 'then setContextToken');
+  for (const c of rsi.all.filter((x) => x.url === C.AUTH_URL || x.url === C.CONTEXT_URL))
+    assert.equal(c.init.headers['x-rsi-token'], 'cookie-token');
+  const gql = rsi.all.filter((x) => x.url === C.UPGRADE_URL);
+  assert.ok(gql.length >= 2);
+  for (const c of gql) assert.equal(c.init.headers['X-CSRF-TOKEN'], 'csrf-from-page');
+  assert.equal(
+    rsi.all.filter((x) => x.url === C.PLEDGE_STORE_URL).length,
+    1,
+    'the page is read once and its token reused',
+  );
 });
