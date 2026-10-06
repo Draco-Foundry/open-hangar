@@ -1,8 +1,9 @@
 name: Publish to stores
 
-# Uploads a released version to the extension stores. Run it by hand
-# (Actions → Publish to stores → Run workflow) after the Release workflow has
-# built that tag. Nothing here uploads on its own: publishing is always a choice.
+# Uploads a released version to the extension stores. The Release workflow starts
+# it (store: all) once it has built a new tag; it can also be run by hand (Actions →
+# Publish to stores → Run workflow). Nothing reaches a store without the owner:
+# every upload job waits for an Approve click on the 'stores' environment.
 #
 # A single store is skipped (not failed) until its secrets exist; a full release
 # (store: all) fails instead, so Discord never announces a store that got nothing:
@@ -16,8 +17,9 @@ name: Publish to stores
 # version while the last one is in review: that's a warning, rerun with store: chrome.
 # store: discord only posts the announcement (e.g. after fixing a failed run).
 #
-# Before anything is uploaded, the build job checks the tag's commit passed CI on
-# GitHub and runs the unit tests, the dashboard UI test and Firefox's store linter.
+# Before anything is uploaded, the build job runs the unit tests, the dashboard UI
+# test and Firefox's store linter, then waits (up to 20 minutes) for CI on the tag's
+# commit to pass on GitHub: a release starts this while that CI is still running.
 # One store update a day: a real run fails if another real run sent something to the
 # stores in the last 24 hours. Finishing the same tag with one store (store: chrome
 # after Chrome's "still in review") is fine; anything else needs the Hotfix box.
@@ -62,6 +64,7 @@ on:
       - scripts/discord-post.mjs
       - scripts/notify.mjs
       - scripts/pack.mjs
+      - scripts/check-store-build.mjs
 
 permissions:
   contents: read
@@ -98,10 +101,6 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - name: Only publish a commit that passed CI
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node .tools/scripts/publish/ci-gate.mjs
       # The owner's rule: at most one store update a day (#183). Dry runs and PRs skip it.
       - name: One store update a day
         if: env.DRY != 'true'
@@ -127,6 +126,15 @@ jobs:
           fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
       - run: npm run pack
+      # A store package never carries a dev build's staging site or the sync code.
+      - run: node .tools/scripts/check-store-build.mjs
+      # Last before the uploads, so CI on the release commit runs alongside the
+      # checks above instead of before them. Polls until it passes (or fails).
+      - name: Wait for CI on this commit to pass
+        timeout-minutes: 25
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .tools/scripts/publish/ci-gate.mjs --wait=20
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: packages

@@ -259,15 +259,18 @@ When RSI changes a page, every installed copy breaks until a fix clears store re
    clean `main`: it checks the version goes up and that every Unreleased CHANGELOG
    bullet starts with New:, Improved:, Changed: or Fixed:, runs the tests, dates the
    CHANGELOG section, bumps `manifest.json` and `package.json`, commits, tags
-   `v<x.y.z>` and pushes.
+   `v<x.y.z>` and pushes. `--hotfix` marks the tag as a second store update today.
 2. **GitHub Release.** `.github/workflows/release.yml` runs on the `v*` tag: tests,
    checks the tag matches `manifest.json`, runs `npm run pack`, and publishes a GitHub
-   Release with both zips and that version's CHANGELOG section as the notes.
-3. **Store upload.** `.github/workflows/publish.yml` only runs by hand (Actions,
-   Publish to stores) with a tag and a store (`all`, `firefox`, `edge`, `chrome` or
-   `discord`). The build job checks the tag's commit passed CI
-   (`scripts/publish/ci-gate.mjs`), runs the unit tests, the UI test and the Firefox
-   linter, then packs. Each upload job (Firefox, Edge, Chrome) uses the `stores`
+   Release with both zips and that version's CHANGELOG section as the notes, then
+   starts Publish to stores for the tag (`store: all`, the Hotfix box ticked for a
+   `--hotfix` tag). Running it by hand only rebuilds the GitHub Release.
+3. **Store upload.** `.github/workflows/publish.yml` runs when the Release workflow
+   starts it, or by hand (Actions, Publish to stores) with a tag and a store (`all`,
+   `firefox`, `edge`, `chrome` or `discord`). The build job runs the unit tests, the
+   UI test and the Firefox linter, packs, checks the zips are clean store builds
+   (`scripts/check-store-build.mjs`), then waits up to 20 minutes for CI on the tag's
+   commit to pass (`scripts/publish/ci-gate.mjs`). Each upload job (Firefox, Edge, Chrome) uses the `stores`
    environment, so it waits for the owner to approve it before it can read the store
    keys. Firefox uploads also attach the source code (docs/AMO-SOURCE.md). After a full
    release a job posts to Discord #updates; a failure posts to #ops. PRs that touch
