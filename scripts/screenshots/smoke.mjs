@@ -295,6 +295,7 @@ try {
     await wait(300);
     const pill = $('#gs-pill');
     r.pill = pill?.textContent.trim();
+    r.pillTip = pill?.title || '';
     r.pillDot = !!pill?.querySelector('.dot.ok');
     r.pillStyled = !!pill && getComputedStyle(pill).borderRadius === '999px';
     r.gsShutAtFirst = $('#gs-menu').hidden && pill.getAttribute('aria-expanded') === 'false';
@@ -380,7 +381,8 @@ try {
     r.counts = /ship pledges?/.test(av.textContent) && /buy-backs?/.test(av.textContent);
     return r;
   });
-  fin.pill === 'LIVE 4.10.1' &&
+  fin.pill === '4.10.1' &&
+  /LIVE 4\.10\.1/.test(fin.pillTip) &&
   fin.pillDot &&
   fin.pillStyled &&
   fin.gsShutAtFirst &&
@@ -390,7 +392,7 @@ try {
   fin.gsEsc &&
   fin.noStatusCard
     ? ok(
-        'Game Status pill in the top bar: LIVE 4.10.1 with a dot, shut at first, LIVE/PTU/notes/events, click outside and Escape close it; no Game Status card',
+        'Game Status pill in the top bar: 4.10.1 with a dot (LIVE 4.10.1 on hover), shut at first, LIVE/PTU/notes/events, click outside and Escape close it; no Game Status card',
       )
     : fail(`game status pill: ${JSON.stringify(fin)}`);
   fin.ccFull &&
@@ -1035,6 +1037,18 @@ try {
       r.menuClosed = $('#scan-menu').hidden;
       r.synced = txt($('#sync-status'));
       r.syncedTitle = $('#sync-status')?.title || '';
+      // Top Bar Option A (2026-10-06): the Synced dot sits on the portrait, its hover
+      // text says Synced, and the portrait's menu has the line with Sync Now.
+      r.dotOnPortrait = !!$('#settings-btn #sync-status.sync-dot.on');
+      r.portraitTip = $('#settings-btn').title;
+      r.noBarText = !$('.hdr-prefs > #sync-status, .hdr-prefs .sync-status');
+      document.dispatchEvent(new CustomEvent('oh:close-menus'));
+      $('#settings-btn').click();
+      await wait();
+      r.youLine = txt($('#settings-menu #menu-sync'));
+      r.youSyncNow = !!$('#settings-menu #menu-sync-now');
+      document.dispatchEvent(new CustomEvent('oh:close-menus'));
+      await wait();
       // Connected, a finished scan syncs once, as the Scan button's last step.
       let synced = 0;
       const realSync = OH.siteSync;
@@ -1042,7 +1056,7 @@ try {
         synced++;
         await wait(0);
         r.label = topBar.label;
-        r.button = txt($('#scan-home'));
+        r.button = $('#scan-home').getAttribute('aria-label') || '';
         return realSync();
       };
       await runScan({ hangar: false, buybacks: false, referrals: false });
@@ -1122,6 +1136,11 @@ try {
   sc.menuClosed &&
   /^Synced \d/.test(sc.synced) &&
   /^Synced to openhangar\.space today, /.test(sc.syncedTitle) &&
+  sc.dotOnPortrait &&
+  /^Synced \d/.test(sc.portraitTip) &&
+  sc.noBarText &&
+  /^Synced \d.*Sync Now$/.test(sc.youLine) &&
+  sc.youSyncNow &&
   sc.auto === 1 &&
   sc.label === 'Syncing to Website…' &&
   /Syncing to Website…/.test(sc.button) &&
@@ -1138,7 +1157,7 @@ try {
   sc.statusGone &&
   sc.hiddenAgain
     ? ok(
-        'website sync: connect on the card, then Synced beside Scan, the ▾ menu, a scan syncs as its last step, problems in the scan report, disconnect',
+        'website sync: connect on the card, then the Synced dot on the portrait (Synced line and Sync Now in its menu), the ▾ menu, a scan syncs as its last step, problems in the scan report, disconnect',
       )
     : fail(`website sync: ${JSON.stringify(sc)}`);
 
@@ -1537,7 +1556,8 @@ try {
       b.value = '';
       b.blur();
     });
-    await page.click(sel);
+    // The top bar's box opens from its search icon (Top Bar Option A).
+    await page.click(sel === '#gsearch-top' ? '#top-search-btn' : sel);
     await page.keyboard.type('cutlass', { delay: 15 });
     const typed = await page.$eval(sel, (b) => b.value);
     typed === 'cutlass'
@@ -3409,7 +3429,7 @@ try {
   bar.closed
     ? ok('top bar: page marked; Scan Custom once a source is unticked (remembered), Select All')
     : fail(`top bar scan menu: ${JSON.stringify(bar)}`);
-  bar.progress.label === 'Scanning… 2/4' &&
+  bar.progress.label === 'Scanning 2/4' &&
   bar.progress.fill === '25%' &&
   bar.progress.title === 'Buy-backs · page 2 · 200 items' &&
   bar.progress.line === 'Scanning: Buy-backs · page 2 · 200 items' &&
@@ -3420,6 +3440,134 @@ try {
   bar.badge && bar.badgeOff && bar.update
     ? ok('top bar: Streamer Mode badge on the portrait; update dot and "Update ready" line')
     : fail(`top bar portrait: ${JSON.stringify(bar)}`);
+
+  // Top Bar Option A, More Menu (owner, 2026-10-06; #260): Home, Inventory, Buy-Backs
+  // and Store in the bar, Stats, Org Fleet and Referrals under More ▾ (shut on load;
+  // More lights up and marks the page when you're on one; Escape and a click away
+  // close it, focus back on More). Search is an icon that opens the field over the
+  // page links on a click or /. The Game Status pill is the dot and the version. One
+  // row at 1440, 1100 and 800, nothing scrolling sideways; under 900px the logo drops
+  // its word and Scan All its words.
+  const more = await page.evaluate(async () => {
+    const tick = (ms = 60) => new Promise((r) => setTimeout(r, ms));
+    const $ = (sel) => document.querySelector(sel);
+    const btn = $('#more-btn');
+    const r = {
+      links: [...document.querySelectorAll('#nav > a')].map((a) => a.textContent.trim()),
+      shut: $('#more-menu').hidden && btn.getAttribute('aria-expanded') === 'false',
+      notActive: !btn.classList.contains('active'),
+      pill: $('#gs-pill .gs-txt').textContent.trim(),
+      pillTip: $('#gs-pill').title,
+    };
+    btn.click();
+    await tick();
+    r.items = [...$('#more-menu').querySelectorAll('a')].map((a) => a.textContent.trim());
+    r.open = !$('#more-menu').hidden && btn.getAttribute('aria-expanded') === 'true';
+    r.focusIn = $('#more-menu').contains(document.activeElement);
+    document.activeElement.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }),
+    );
+    r.arrow = document.activeElement.textContent.trim();
+    document.activeElement.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
+    await tick();
+    r.escShut = $('#more-menu').hidden && document.activeElement === btn;
+    btn.click();
+    await tick();
+    document.body.click();
+    await tick();
+    r.outsideShut = $('#more-menu').hidden;
+    btn.click();
+    await tick();
+    [...$('#more-menu').querySelectorAll('a')].find((a) => a.dataset.view === 'referrals').click();
+    await tick(400);
+    r.onReferrals = location.hash === '#referrals' && $('#more-menu').hidden;
+    r.moreActive = btn.classList.contains('active') && /Referrals/.test(btn.title);
+    r.noBarActive = !document.querySelector('#nav > a.active');
+    btn.click();
+    await tick();
+    r.marked = [...$('#more-menu').querySelectorAll('a[aria-current="page"]')].map((a) =>
+      a.textContent.trim(),
+    );
+    document.body.click();
+    await tick();
+    // Search: shut, the field is out of sight; / opens it with focus in the box.
+    const wrap = $('.tb-search');
+    r.searchShut = !wrap.classList.contains('open') && $('#gsearch-top').tabIndex === -1;
+    document.body.focus();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true }));
+    await tick();
+    r.slashOpens =
+      wrap.classList.contains('open') &&
+      document.activeElement === $('#gsearch-top') &&
+      $('#gsearch-top').getBoundingClientRect().width > 200;
+    $('#gsearch-top').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await tick();
+    r.escCloses = !wrap.classList.contains('open') && document.activeElement === $('#top-search-btn');
+    $('#top-search-btn').click();
+    await tick();
+    r.iconOpens = wrap.classList.contains('open') && document.activeElement === $('#gsearch-top');
+    document.body.click();
+    $('#gsearch-top').blur();
+    await tick();
+    r.clickAwayCloses = !wrap.classList.contains('open');
+    location.hash = '#inventory';
+    await tick(300);
+    return r;
+  });
+  more.links.join(',') === 'Home,Inventory,Buy-Backs,Store' &&
+  more.shut &&
+  more.notActive &&
+  more.items.join(',') === 'Stats,Org Fleet,Referrals' &&
+  more.open &&
+  more.focusIn &&
+  more.arrow === 'Org Fleet' &&
+  more.escShut &&
+  more.outsideShut &&
+  more.onReferrals &&
+  more.moreActive &&
+  more.noBarActive &&
+  more.marked.join(',') === 'Referrals'
+    ? ok('top bar: four pages in the bar, More ▾ for Stats, Org Fleet and Referrals, marks the page you are on')
+    : fail(`top bar More menu: ${JSON.stringify(more)}`);
+  more.searchShut && more.slashOpens && more.escCloses && more.iconOpens && more.clickAwayCloses
+    ? ok('top bar: search icon opens the field over the links (click or /), Escape and a click away close it')
+    : fail(`top bar search: ${JSON.stringify(more)}`);
+  /^\d+\.\d+/.test(more.pill) && /LIVE \d/.test(more.pillTip)
+    ? ok(`top bar: Game Status pill is compact ("${more.pill}", LIVE on hover)`)
+    : fail(`top bar pill: ${JSON.stringify(more)}`);
+  const rows = {};
+  for (const w of [1440, 1100, 800]) {
+    await page.setViewport({ width: w, height: 900 });
+    await new Promise((r) => setTimeout(r, 250));
+    rows[w] = await page.evaluate(() => {
+      const h = document.querySelector('.wrap > header');
+      const tops = [...h.querySelectorAll('.brand, #nav > a, #more-btn, .hdr-prefs > *')]
+        .filter((el) => el.getClientRects().length)
+        .map((el) => {
+          const r = el.getBoundingClientRect();
+          return Math.round(r.top + r.height / 2);
+        });
+      const scan = document.querySelector('#scan-home');
+      return {
+        oneRow: Math.max(...tops) - Math.min(...tops) <= 4,
+        over: document.documentElement.scrollWidth - innerWidth,
+        word: getComputedStyle(h.querySelector('.brand h1')).display !== 'none',
+        scanWords: getComputedStyle(scan.querySelector('.sl-word')).display !== 'none',
+        scanName: scan.getAttribute('aria-label'),
+      };
+    });
+  }
+  await page.setViewport({ width: 1280, height: 900 });
+  [1440, 1100, 800].every((w) => rows[w].oneRow && rows[w].over <= 0) &&
+  rows[1440].word &&
+  rows[1100].scanWords &&
+  !rows[800].word &&
+  !rows[800].scanWords &&
+  rows[800].scanName === 'Scan All'
+    ? ok('top bar: one row at 1440, 1100 and 800; under 900px the logo and Scan All fold to icons')
+    : fail(`top bar rows: ${JSON.stringify(rows)}`);
 
   // Keyboard (#200): cards open with Enter and Space, the pop-up keeps and returns
   // focus, chips keep focus when they redraw, menus close on Escape.

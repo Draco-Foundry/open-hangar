@@ -4,6 +4,12 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Changed: **A cleaner top bar.** Home, Inventory, Buy-Backs and Store sit in the bar,
+  and Stats, Org Fleet and Referrals live under More (it lights up when you're on one).
+  Search is an icon that opens the field over the links (or press /), Game Status shows
+  just the dot and the version, and Scan keeps one steady width while it counts
+  "Scanning 2/4". Once you sync with openhangar.space, a green dot on your portrait says
+  so, with the time and Sync Now in your menu. The bar fits one row from 800px up.
 - New: **Home, the final layout.** Your Citizen Card now spans the whole width. Under it
   sit Account Value, Latest Acquisitions and the new Wishlist Watch side by side, then
   Quick Links. Account Value keeps the big number, the vs-melt badge, what it's made of
