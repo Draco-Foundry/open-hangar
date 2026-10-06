@@ -1,38 +1,34 @@
 <script>
-  // The top bar on every page (Top Bar and Top Menu Pass in docs/REDESIGN-0.3.md):
-  // the logo, the page links (names only, no counts: owner, #260; a row you swipe
-  // on a phone), then the search box, the alerts bell, Scan ▾ and your menu.
-  // Game Status sits before the bell as a pill (openhangar.space's feed).
-  // Pinned while scrolling everywhere but Home; it slims down while you scroll down.
+  // The top bar on every page (Top Bar and Top Menu Pass in docs/REDESIGN-0.3.md),
+  // Option A, More Menu (owner pick, 2026-10-06; #260): the logo, Home, Inventory,
+  // Buy-Backs and Store, then More ▾ for Stats, Org Fleet and Referrals (More lights up
+  // when you are on one of them). On the right, small controls only: the search icon
+  // (opens the field over the page links, or press /), the Game Status pill (dot and
+  // version), the alerts bell, Scan ▾ and your portrait (a green dot once synced, sync
+  // builds). One row at every width from 800px up: under 900px the logo drops its
+  // word and Scan All drops to its icon. Pinned while scrolling everywhere but Home;
+  // it slims down while you scroll down.
   import { app, version } from '../lib/app.svelte.js';
   import Bell from './Bell.svelte';
   import GameStatus from './GameStatus.svelte';
+  import MoreMenu from './MoreMenu.svelte';
   import ScanSplit from './ScanSplit.svelte';
+  import TopSearch from './TopSearch.svelte';
   import YouMenu from './YouMenu.svelte';
 
   let { header } = $props();
 
-  const PAGES = [
+  const MAIN = [
     ['home', 'Home'],
     ['inventory', 'Inventory'],
     ['buybacks', 'Buy-Backs'],
-    ['stats', 'Stats'],
     ['store', 'Store'],
-    ['org', 'Org Fleet'],
-    ['referrals', 'Referrals'],
   ];
 
   const d = $derived.by(() => {
     version.n;
     return { view: app().top.view };
   });
-
-  // The search box (ui/search) mounts into #top-search in the page's <header>; this
-  // moves it into its place in the bar, once.
-  function adopt(node) {
-    const box = document.getElementById('top-search');
-    if (box) node.appendChild(box);
-  }
 
   // The bar slims down while you scroll down a long page, and comes back on the way up.
   $effect(() => {
@@ -75,28 +71,30 @@
   });
 </script>
 
-<a class="brand" href="#home" data-view="home"
+<a class="brand" href="#home" data-view="home" aria-label="Open Hangar, Home"
   ><img class="brand-mark" src="../icons/icon128.png" alt="" />
   <h1>Open Hangar</h1></a
 >
-<nav id="nav">
-  {#each PAGES as [view, label] (view)}
-    <a href="#{view}" data-view={view} class:active={d.view === view}
-      >{label}</a
+<nav id="nav" aria-label="Pages">
+  {#each MAIN as [view, label] (view)}
+    <a
+      href="#{view}"
+      data-view={view}
+      class:active={d.view === view}
+      aria-current={d.view === view ? 'page' : undefined}>{label}</a
     >
   {/each}
+  <MoreMenu view={d.view} />
 </nav>
 <div class="hdr-prefs">
   <!-- Language flags go here once the dashboard is translated (TODO.md). -->
-  <!-- Search your hangar from any page (/ focuses it). -->
-  <div class="top-search-slot" style="display: contents" use:adopt></div>
+  <!-- Search your hangar from any page: an icon that opens the field (/ too). -->
+  <TopSearch />
   <!-- LIVE / PTU, patch notes and events (ui/lib/game-status.js). -->
   <GameStatus />
   <!-- Hangar Alerts from any page. -->
   <Bell />
   <ScanSplit />
-  <!-- "Synced 5:54 PM" once connected to openhangar.space (ui/site, sync builds). -->
-  <span id="scan-sync-status" style="display: contents"></span>
+  <!-- Your menu; sync builds put the Synced dot on the portrait (ui/site). -->
   <YouMenu />
 </div>
-

@@ -1564,24 +1564,243 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
     width 0.2s,
     height 0.2s;
 }
-/* Phones: the page links become pill tabs you swipe, with a fade at the edge. */
+/* ---- Top Bar Option A, More Menu (owner, 2026-10-06; #260) ------------------- */
+/* One row at every width from 800px up: the logo, Home, Inventory, Buy-Backs, Store
+   and More ▾ on the left; search, Game Status, the bell, Scan ▾ and your portrait on
+   the right. Under 900px the logo drops its word and Scan All its words. Phones put
+   the page links on a second row you swipe. */
+.wrap > header {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  gap: 22px;
+}
+.wrap > header .brand {
+  flex: none;
+}
+.wrap > header #nav {
+  order: 0;
+  flex: 0 1 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  margin-left: 0;
+  overflow: visible;
+}
+.wrap > header #nav a,
+.wrap > header .more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 11px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  font: 500 14.5px var(--font-head);
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+}
+.wrap > header #nav a:hover,
+.wrap > header .more-btn:hover {
+  background: none;
+  color: var(--head);
+}
+.wrap > header #nav a.active,
+.wrap > header .more-btn.active,
+.wrap > header .more-btn.open {
+  background: var(--panel-2);
+  color: var(--head);
+}
+.wrap > header #nav a:focus-visible,
+.wrap > header .more-btn:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 1px;
+}
+.more-wrap {
+  display: inline-flex;
+}
+.scan-menu.more-menu {
+  width: 210px;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: #232933;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+.more-menu .more-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--text);
+  font: 500 14px var(--font-head);
+  text-decoration: none;
+}
+.more-menu .more-item svg {
+  flex: none;
+  color: var(--muted);
+}
+.more-menu .more-item:hover,
+.more-menu .more-item:focus-visible {
+  outline: none;
+  background: var(--panel-2);
+  color: var(--head);
+}
+.more-menu .more-item.active {
+  background: var(--accent-soft);
+  color: var(--head);
+}
+.more-menu .more-item.active svg {
+  color: var(--link);
+}
+.wrap > header .hdr-prefs {
+  order: 0;
+  flex: none;
+  gap: 10px;
+  margin-left: auto;
+}
+/* Search: an icon; the field opens over the page links (click or /). Shut, the field
+   is still there for / to focus, just not seen. */
+.tb-search {
+  position: relative;
+  display: flex;
+}
+.hdr-prefs .tb-search:not(.open) .top-search {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  opacity: 0;
+  pointer-events: none;
+}
+.hdr-prefs .tb-search.open .top-search {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  z-index: 6;
+  width: 340px;
+  height: 40px;
+  transform: translateY(-50%);
+  border-color: var(--accent-line);
+  background: var(--panel-2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  transition: none;
+}
+.hdr-prefs .tb-search.open .tb-search-btn {
+  visibility: hidden;
+}
+/* Scan ▾: one steady width whatever it says ("Scan All", "Scanning 2/4", "Landed"). */
+.hdr-prefs .scan-split {
+  display: inline-flex;
+  flex: none;
+}
+.hdr-prefs .scan-split #scan-home {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 140px;
+  min-width: 0;
+  height: 36px;
+  padding: 0 12px;
+  font-variant-numeric: tabular-nums;
+}
+.hdr-prefs .scan-split .scan-caret {
+  display: grid;
+  place-items: center;
+  height: 36px;
+  padding: 0 9px;
+}
+#scan-home .scan-ic {
+  flex: none;
+}
+#scan-home.rough .scan-ic {
+  color: #f2c14e;
+}
+/* Narrow bars (under 900px): the logo without its word, Scan as its icon (the count
+   while a scan runs), tighter gaps. */
+@media (max-width: 1180px) {
+  .wrap > header {
+    gap: 18px;
+  }
+}
 @media (max-width: 900px) {
-  .hdr-prefs .top-search {
+  .wrap > header {
+    gap: 12px;
+  }
+  .wrap > header .brand h1 {
     display: none;
   }
-  nav#nav {
-    gap: 6px;
-    -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent);
-    mask-image: linear-gradient(90deg, #000 85%, transparent);
+  .wrap > header #nav a,
+  .wrap > header .more-btn {
+    padding: 7px 9px;
+    font-size: 14px;
   }
-  nav#nav a {
+  .wrap > header .hdr-prefs {
+    gap: 8px;
+  }
+  .hdr-prefs .tb-search.open .top-search {
+    width: 300px;
+  }
+  .hdr-prefs .scan-split #scan-home {
+    width: 46px;
+    padding: 0;
+  }
+  #scan-home .sl-word {
+    display: none;
+  }
+  #scan-home.counting .scan-ic {
+    display: none;
+  }
+  #scan-home .sl-count {
+    font: 500 12.5px var(--font-data);
+  }
+}
+/* Phones: the page links move to a second row of pill tabs you swipe (no fade mask:
+   it would hide the More menu, which opens from inside the row); the search field
+   opens across the top. */
+@media (max-width: 640px) {
+  .wrap > header {
+    flex-wrap: wrap;
+    gap: 10px 12px;
+  }
+  .wrap > header .hdr-prefs {
+    order: 1;
+  }
+  .wrap > header #nav {
+    order: 2;
+    flex: 1 0 100%;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .wrap > header #nav a,
+  .wrap > header .more-btn {
     flex: none;
     border-radius: 999px;
     background: var(--panel);
   }
-  nav#nav a.active {
+  .wrap > header #nav a.active,
+  .wrap > header .more-btn.active {
     background: var(--accent);
     color: #fff;
+  }
+  .hdr-prefs .gs-pill .gs-txt {
+    display: none;
+  }
+  .hdr-prefs .tb-search.open .top-search {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    transform: none;
   }
 }
 
@@ -2145,20 +2364,32 @@ body:not(:has(#view-home.active)) .market-title {
   gap: 8px;
 }
 
-/* Beside Scan once connected (ui/site/SyncStatus.svelte): a dot and "Synced" over
-   "5:54 PM", small enough to fit the bar (the Scan button gives up a little of its
-   steady width for it). */
-.sync-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 11.5px;
-  line-height: 1.2;
-  white-space: nowrap;
+/* Sync builds, once connected (ui/site): the Synced dot on your portrait's bottom
+   right (the update dot has the top right, Streamer Mode the bottom left), and the
+   "Synced 5:54 PM" line with Sync Now at the top of its menu. */
+.sync-dot {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  background: var(--faint);
 }
-.ss-text {
-  display: grid;
+.sync-dot.on {
+  background: var(--good);
+}
+.sync-dot.busy {
+  background: var(--accent);
+}
+.sync-dot .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 .ss-dot {
   flex: none;
@@ -2175,13 +2406,35 @@ body:not(:has(#view-home.active)) .market-title {
   background: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
-.hdr-prefs:has(.sync-status) .scan-split #scan-home {
-  min-width: 112px;
+.menu-sync {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 8px 7px 10px;
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13.5px;
 }
-@media (max-width: 1180px) {
-  .sync-status .ss-text {
-    display: none;
-  }
+.menu-sync.on {
+  background: var(--good-soft);
+}
+.menu-sync > span {
+  flex: 1;
+  min-width: 0;
+}
+.settings-menu .menu-sync .menu-item {
+  display: inline;
+  width: auto;
+  padding: 2px 4px;
+  border: 0;
+  color: var(--link);
+  font: 500 13px var(--font-head);
+  white-space: nowrap;
+}
+.settings-menu .menu-sync .menu-item:disabled {
+  color: var(--muted);
+  cursor: progress;
 }
 
 /* The website's section in the Scan ▾ menu (ui/site/SyncMenu.svelte). */

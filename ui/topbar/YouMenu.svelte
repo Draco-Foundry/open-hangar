@@ -1,6 +1,7 @@
 <script>
   // Your menu: your RSI portrait (a gear until we know who you are) opens it. Name and
   // org at the top, "Update ready: Reload" when a new version is waiting (a dot on the
+  // portrait too), "Synced 5:54 PM" with Sync Now (sync builds; a green dot on the
   // portrait too), then Currency, Streamer Mode (a badge on the portrait while it's
   // on, #174), Rescan Reminder, RSI Quick Links (#374, folds open), the pages that
   // left the nav (and Customize Home), Log Out of RSI and Clear Data. What each one does stays in dashboard.js (window.OHApp.top).
@@ -10,6 +11,7 @@
   import { qlPref, setQuickLinksHidden } from '../lib/quick-links-pref.svelte.js';
   import QuickLinkRow from '../lib/QuickLinkRow.svelte';
   import { openCustomize } from '../lib/customize.svelte.js';
+  import { syncNote } from '../lib/sync-note.svelte.js';
 
   const CURRENCIES = [
     ['USD', 'USD $'],
@@ -36,7 +38,13 @@
     const loggedIn = !!acc && acc.loggedIn === true;
     const org = acc?.org?.name ? `${acc.org.name}${acc.org.rank ? ` · ${acc.org.rank}` : ''}` : '';
     const s = a.state;
-    const tip = a.streamer ? 'Your menu · Streamer Mode is on: money is hidden' : 'Your menu';
+    // Sync builds: "Synced 5:54 PM" leads the hover text (the green dot's meaning).
+    const tip = [
+      syncNote.text || 'Your menu',
+      a.streamer ? 'Streamer Mode is on: money is hidden' : '',
+    ]
+      .filter(Boolean)
+      .join(' · ');
     return {
       tip,
       streamer: a.streamer,
@@ -115,7 +123,11 @@
     ><span class="upd-dot" id="upd-dot" hidden={!d.update}></span
     ><!-- Streamer Mode on: a badge on the portrait, not a pill in the bar, so the bar
          keeps one row (#174). -->
-    <span class="stream-dot" id="stream-dot" hidden={!d.streamer}></span>
+    <span class="stream-dot" id="stream-dot" hidden={!d.streamer}></span
+    ><!-- Sync builds: the Synced dot, bottom right (ui/site/SyncStatus.svelte). --><span
+      id="you-sync-dot"
+      style="display: contents"
+    ></span>
   </button>
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -140,6 +152,8 @@
         onclick={() => app().top.reload()}>Reload</button
       >
     </div>
+    <!-- Sync builds: "Synced 5:54 PM" and Sync Now (ui/site/SyncLine.svelte). -->
+    <div id="you-menu-sync" style="display: contents"></div>
     <!-- Language picker goes here once the dashboard is translated (TODO.md). -->
     <label class="scan-opt menu-currency"
       ><span>Currency</span>
