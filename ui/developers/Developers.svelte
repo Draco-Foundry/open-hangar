@@ -6,6 +6,7 @@
   import { app } from '../lib/app.svelte.js';
   import ExtLink from './ExtLink.svelte';
   import DataTools from './DataTools.svelte';
+  import StorageUse from './StorageUse.svelte';
   import SavedAccounts from './SavedAccounts.svelte';
   import ErrorReport from './ErrorReport.svelte';
   import Supporters from './Supporters.svelte';
@@ -106,6 +107,7 @@
     across Chrome, Firefox, and Safari).
   </p>
   <DataTools />
+  <StorageUse />
 
   <h3>Saved Accounts</h3>
   <p>

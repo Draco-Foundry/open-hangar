@@ -2213,6 +2213,7 @@ try {
       restoreHidden: q('#restore-db').hidden,
       supporters: q('#sup-contributors').textContent.trim(),
       boosters: q('#sup-boosters a')?.textContent,
+      storage: q('#storage-use')?.textContent.trim(),
     };
     q('#export-db').click();
     await tick();
@@ -2263,6 +2264,9 @@ try {
   devUi.opened === 2 && /valid JSON/.test(devUi.bad) && devUi.badRed && devUi.items > 0
     ? ok('Import JSON and the damaged-data notice open the picker; a bad file shows an error')
     : fail(`developers import: ${JSON.stringify(devUi)}`);
+  /^Storage Used: [\d.]+ (MB|KB|B)$/.test(devUi.storage)
+    ? ok(`storage total under the data tools ("${devUi.storage}")`)
+    : fail(`developers storage line: ${JSON.stringify(devUi.storage)}`);
   devUi.report > 50 && devUi.cleared === 'Log cleared.'
     ? ok('error report preview fills when opened; Clear Log says so')
     : fail(`developers error report: ${JSON.stringify(devUi)}`);
