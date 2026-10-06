@@ -2,13 +2,15 @@
   // Add to RSI Cart (#288): puts a ship upgrade into your RSI cart, in your own RSI
   // session (OH.upgradeOptions / upgradePrice / addUpgradeToCart, src/rsi-cart.js).
   // You check out on RSI; nothing is bought here. Two forms:
-  //   upgrade: a ship's window. Ask RSI which of your ships can upgrade to it, pick
+  //   upgrade: a ship's window. Ask RSI which ships can upgrade to it (yours first,
+  //            then Any Ship: a CCU doesn't need you to own the From ship), pick
   //            one, see RSI's price, add it.
   //   buyback: a buy-back upgrade's window. Both ships are known: RSI's buy-back
   //            price (asked when the window opens) and one button.
   // Every request is a click (opening the buy-back window counts), and an add is
-  // never repeated by itself.
-  import { OH } from '../lib/app.svelte.js';
+  // never repeated by itself. RSI's cart takes a buy-back on its own (one per cart,
+  // nothing else in it), so both forms say so.
+  import { OH, app, version } from '../lib/app.svelte.js';
 
   let { kind = 'upgrade', target, from = null, pledgeId = null } = $props();
   // target: { toShipId, toSkuId, skus?, name }; from: { id, name } for a buy-back.
@@ -30,12 +32,22 @@
   let pricing = $state(false);
   let price = $state(null); // the buy-back's price
   let showAllNo = $state(false);
+  let others = $state([]); // Any Ship: RSI's other From ships, unpriced until picked
+  let query = $state('');
+  const ANY_CAP = 30;
 
   const ok = $derived(options.filter((o) => o.eligible));
   const no = $derived(options.filter((o) => !o.eligible));
   const noShown = $derived(showAllNo ? no : no.slice(0, 3));
+  const anyMatches = $derived.by(() => {
+    const q = query.trim().toLowerCase();
+    return q ? others.filter((o) => o.name.toLowerCase().includes(q)) : others;
+  });
+  const anyShown = $derived(anyMatches.slice(0, ANY_CAP));
   const choice = $derived(
-    kind === 'buyback' ? from && { ...from, price } : ok.find((o) => o.id === picked) || null,
+    kind === 'buyback'
+      ? from && { ...from, price }
+      : ok.find((o) => o.id === picked) || others.find((o) => o.id === picked) || null,
   );
   // The edition the upgrade goes to (may move off the cheapest one, see load()).
   let skuId = $state(target.toSkuId);
@@ -51,6 +63,7 @@
       return;
     }
     options = r.options;
+    others = r.others || [];
     if (r.toSkuId) skuId = r.toSkuId; // the edition RSI sells an upgrade to
     const first = r.options.find((o) => o.eligible);
     picked = first ? first.id : null;
@@ -58,7 +71,7 @@
   }
 
   async function pick(o) {
-    if (!o.eligible || phase === 'adding') return;
+    if (o.eligible === false || phase === 'adding') return;
     picked = o.id;
     if (o.price != null) return;
     pricing = true;
@@ -103,8 +116,24 @@
       return;
     }
     phase = 'error';
-    error = { kind: (r && r.error) || 'network', when: 'add' };
+    error = { kind: (r && r.error) || 'network', when: 'add', reason: (r && r.reason) || null };
   }
+
+  // Paying for a buy-back with store credit takes a Buy-Back Token (cash doesn't).
+  // Your token count comes from the last scan (Home shows it too); RSI adds one a
+  // quarter and they don't stack.
+  const tokenLine = $derived.by(() => {
+    version.n;
+    const n = app() && app().state ? app().state.bbTokens : null;
+    if (n == null || !Number.isFinite(Number(n)))
+      return "Store credit needs a Buy-Back Token. Cash doesn't.";
+    if (Number(n) > 0) return 'You have a Buy-Back Token, so store credit works here.';
+    const t = OH().nextBuybackToken && OH().nextBuybackToken();
+    const when = t
+      ? new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+      : null;
+    return `No Buy-Back Token right now: pay with cash, or wait for the next one${when ? ` (${when})` : ''}.`;
+  });
 
   // A buy-back's price comes with the window.
   $effect(() => {
@@ -115,6 +144,10 @@
     'signed-out': {
       title: 'Sign In to RSI First',
       text: "The upgrade goes into your RSI cart, so RSI needs to know it's you.",
+    },
+    'cart-conflict': {
+      title: 'Cart Already Busy',
+      text: 'RSI takes a buy-back on its own. Check out or empty your RSI cart, then try again.',
     },
     refused: {
       add: {
@@ -140,10 +173,34 @@
   };
   const note = $derived.by(() => {
     if (!error) return null;
+    if (error.kind === 'refused' && error.reason === 'invalid')
+      return {
+        title: "RSI Didn't Add It",
+        text: "RSI won't sell this buy-back upgrade any more (ship values changed).",
+      };
     const n = NOTES[error.kind] || NOTES.network;
     return n.title ? n : n[error.when === 'add' ? 'add' : 'load'];
   });
 </script>
+
+{#snippet row(o)}
+  <button
+    type="button"
+    class="opt"
+    class:on={o.id === picked}
+    role="radio"
+    aria-checked={o.id === picked}
+    onclick={() => pick(o)}
+  >
+    {#if o.image}<img src={o.image} alt="" loading="lazy" />{:else}<span class="img"></span>{/if}
+    <span class="n">{o.name}</span>
+    <span class="p"
+      >{#if o.price != null}{usd(o.price)}{:else if o.id === picked && pricing}<span
+          class="spin dark"
+        ></span>{:else}<span class="muted">Pick for Price</span>{/if}</span
+    >
+  </button>
+{/snippet}
 
 <div class="cart" class:bb={kind === 'buyback'} data-cart={kind}>
   {#if kind === 'upgrade'}
@@ -169,7 +226,9 @@
         <span
           >{kind === 'buyback' ? `Buy-back: ${pair}` : pair}{choice.price != null
             ? `, ${usd(choice.price)}`
-            : ''}.{kind === 'upgrade' ? ' Your insurance and items stay with the ship.' : ''}</span
+            : ''}.{kind === 'upgrade'
+            ? " Your insurance and items stay with the ship. A buy-back can't share this cart."
+            : ' Check it out before you add anything else.'}</span
         >
       </div>
     </div>
@@ -183,7 +242,7 @@
       </div>
       {#if error.kind === 'signed-out'}
         <a class="cbtn ghost" href={RSI_SIGN_IN} target="_blank" rel="noopener">Log In to RSI ↗</a>
-      {:else if error.kind === 'network' && error.when === 'add'}
+      {:else if error.kind === 'cart-conflict' || (error.kind === 'network' && error.when === 'add')}
         <a class="cbtn ghost" href={OH().RSI_CART_URL} target="_blank" rel="noopener"
           >Open RSI Cart ↗</a
         >
@@ -193,7 +252,7 @@
     {#if kind === 'upgrade'}
       {#if phase === 'idle' || (phase === 'error' && error.when === 'load')}
         <p class="muted cart-intro">
-          Pick one of your ships, see RSI's price, and put the upgrade in your RSI cart.
+          Pick a ship to upgrade from, see RSI's price, and put the upgrade in your RSI cart.
         </p>
         <button type="button" class="cbtn ghost" onclick={load}
           >{phase === 'error' ? 'Try Again' : 'See Upgrade Prices'}</button
@@ -203,37 +262,19 @@
       {:else}
         {#if !ok.length}
           <p class="muted cart-intro">
-            None of your ships can upgrade to {target.name} on RSI right now.
+            None of your ships can upgrade to {target.name} on RSI right now.{others.length
+              ? ' Any ship below works too.'
+              : ''}
           </p>
         {/if}
         <div class="pick" role="radiogroup" aria-label="Upgrade From">
-          {#each ok as o (o.id)}
-            <button
-              type="button"
-              class="opt"
-              class:on={o.id === picked}
-              role="radio"
-              aria-checked={o.id === picked}
-              onclick={() => pick(o)}
-            >
-              {#if o.image}<img src={o.image} alt="" loading="lazy" />{:else}<span class="img"
-                ></span>{/if}
-              <span class="n">{o.name}</span>
-              <span class="p"
-                >{#if o.price != null}{usd(o.price)}{:else if o.id === picked && pricing}<span
-                    class="spin dark"
-                  ></span>{:else}<span class="muted">Pick for Price</span>{/if}</span
-              >
-            </button>
-          {/each}
+          {#each ok as o (o.id)}{@render row(o)}{/each}
           {#each noShown as o (o.id)}
             <div class="opt no">
               {#if o.image}<img src={o.image} alt="" loading="lazy" />{:else}<span class="img"
                 ></span>{/if}
-              <span class="n"
-                >{o.name}<small>RSI lists no upgrade from it to {target.name}</small></span
-              >
-              <span class="p">RSI doesn't offer this one</span>
+              <span class="n">{o.name}<small>RSI isn't selling this upgrade right now</small></span>
+              <span class="p">Not on Offer</span>
             </div>
           {/each}
           {#if no.length > noShown.length}
@@ -242,6 +283,30 @@
             >
           {/if}
         </div>
+        {#if others.length}
+          <div class="any" data-any>
+            <h5 class="any-h">Any Ship</h5>
+            <p class="muted any-intro">
+              RSI sells this upgrade from these ships too. You don't need to own one.
+            </p>
+            <input
+              class="any-q"
+              type="search"
+              placeholder="Search ships"
+              aria-label="Search Any Ship"
+              autocomplete="off"
+              bind:value={query}
+            />
+            <div class="pick" role="radiogroup" aria-label="Upgrade From Any Ship">
+              {#each anyShown as o (o.id)}{@render row(o)}{/each}
+            </div>
+            <p class="muted any-count">
+              {#if !anyMatches.length}No ship matches that name.{:else if anyMatches.length > anyShown.length}Showing
+                {anyShown.length} of {anyMatches.length} ships. Search to narrow it down.{:else}{anyMatches.length}
+                {anyMatches.length === 1 ? 'ship' : 'ships'}{/if}
+            </p>
+          </div>
+        {/if}
       {/if}
     {:else}
       <div class="mr">
@@ -253,9 +318,7 @@
             >{/if}</span
         >
       </div>
-      <div class="mr">
-        <span class="mr-k">Buy-Back Tokens</span><span class="mr-v">Not needed for upgrades</span>
-      </div>
+      <p class="fine tok" data-token>{tokenLine}</p>
     {/if}
 
     {#if choice && (kind === 'buyback' || phase === 'ready' || phase === 'adding' || (phase === 'error' && error.when === 'add'))}
@@ -266,6 +329,9 @@
         </div>
       {/if}
       {#if !(phase === 'error' && error.kind === 'signed-out')}
+        {#if kind === 'buyback'}
+          <p class="fine alone">Buy-backs check out alone: one per cart, nothing else in it.</p>
+        {/if}
         <button
           type="button"
           class="cbtn"
@@ -358,6 +424,51 @@
     font: 500 12px var(--font-body);
     text-align: right;
     text-wrap: balance;
+  }
+  .any {
+    margin: 4px 0 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+  }
+  .any-h {
+    margin: 0 0 2px;
+    color: var(--head);
+    font: 600 14px var(--font-body);
+  }
+  .any-intro {
+    margin: 0 0 8px;
+    font-size: 13px;
+    text-wrap: pretty;
+  }
+  .any-q {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 10px;
+    margin-bottom: 8px;
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-sm);
+    background: var(--panel-2);
+    color: var(--text);
+    font: 400 14px var(--font-body);
+  }
+  .any-q:focus {
+    outline: none;
+    border-color: var(--accent-line);
+  }
+  .any .pick {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 6px;
+  }
+  .any-count {
+    margin: 0;
+    font-size: 13px;
+  }
+  .fine.tok {
+    margin: 10px 0 0;
+  }
+  .fine.alone {
+    margin: 4px 0 0;
   }
   .more {
     justify-self: start;

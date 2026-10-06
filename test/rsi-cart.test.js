@@ -20,6 +20,7 @@ function fakeRsi({
   add = 'ok',
   status = {},
   noUpgradeTo = [],
+  cartAnswer = null, // { body, code }: how the cart takes the ticket
 } = {}) {
   const calls = []; // the upgrade tool's calls (context + GraphQL)
   const all = []; // every request, the RSI page and setAuthToken too
@@ -38,6 +39,7 @@ function fakeRsi({
     if (url === C.AUTH_URL) return res({ success: 1 });
     if (url === C.CART_TOKEN_URL) {
       tickets.push({ body: JSON.parse(init.body), init });
+      if (cartAnswer) return res(cartAnswer.body, cartAnswer.code || 200);
       return res({ success: 1, code: 'OK' });
     }
     const body = JSON.parse(init.body);
@@ -73,12 +75,14 @@ function fakeRsi({
         data: { from: { ships: [{ id: 101 }, { id: 102 }, { id: 104 }] }, to: { ships: [] } },
       });
     if (op === 'getPrice') {
-      const amount = { 101: 17000, 102: 14500 }[body.variables.from];
+      const amount = { 101: 17000, 102: 14500, 104: 12500 }[body.variables.from];
       return res({ data: { price: { amount, nativeAmount: amount } } });
     }
     if (op === 'addToCart') {
       if (add === 'ok') return res({ data: { addToCart: { jwt: 'header.payload.sig' } } });
       if (add === 'auth') return res({ errors: [{ message: 'User is not authenticated' }] });
+      if (add === 'busy-cart')
+        return res({ errors: [{ message: 'Pretend: a buyback must be alone in the cart' }] });
       return res({ errors: [{ message: 'Upgrade not available' }], data: { addToCart: null } });
     }
     throw new Error(`unexpected ${op}`);
@@ -183,6 +187,8 @@ test('upgradeOptions: context, ship list, filterShips, then RSI prices one at a 
       [103, 'Cutlass Black', false, null],
     ],
   );
+  // Any Ship: RSI's other From ships, unowned ones too, unpriced until picked.
+  assert.deepEqual(r.others, [{ id: 104, name: 'Arrow', image: null, msrp: 7500, price: null }]);
   assert.deepEqual(rsi.ops(), [
     'context',
     'initShipUpgrade',
@@ -196,6 +202,38 @@ test('upgradeOptions: context, ship list, filterShips, then RSI prices one at a 
     assert.equal(c.init.credentials, 'include', 'runs in your own RSI session');
   }
   assert.equal(rsi.calls[2].url, C.UPGRADE_URL);
+});
+
+test('Any Ship: every From ship RSI lists that is not already yours, by name', () => {
+  const ships = [
+    { id: 1, name: 'Mine', owned: true, msrp: 50, image: null },
+    { id: 2, name: 'Zeta', owned: false, msrp: 90, image: '/z.jpg' },
+    { id: 3, name: 'Alpha', owned: false, msrp: 20, image: null },
+    { id: 4, name: 'Not Offered', owned: false, msrp: 30, image: null },
+    { id: 9, name: 'Target', owned: false, msrp: 200, image: null },
+  ];
+  const options = C.buildOptions(ships, [1, 2, 3, 9], 9);
+  const others = C.buildOthers(ships, [1, 2, 3, 9], 9, options);
+  assert.deepEqual(
+    others.map((o) => [o.id, o.name, o.msrp, o.price]),
+    [
+      [3, 'Alpha', 20, null],
+      [2, 'Zeta', 90, null],
+    ],
+  );
+  assert.deepEqual(C.buildOthers(ships, [], 9, options), []);
+  assert.deepEqual(C.buildOthers(ships, null, 9, []), []);
+});
+
+test('Any Ship: price and add an upgrade from a ship you do not own', async () => {
+  const rsi = fakeRsi();
+  const api = fast(rsi);
+  const p = await api.upgradePrice(104, 9001, { toShipId: 900, setContext: true });
+  assert.equal(p.ok, true);
+  assert.equal(p.price, 125);
+  assert.deepEqual(await api.addUpgradeToCart(104, 900, 9001), { ok: true });
+  const add = rsi.calls.find((c) => c.body.operationName === 'addToCart');
+  assert.deepEqual(add.body.variables, { from: 104, to: 9001 });
 });
 
 test('upgradeOptions: signed out of RSI says so and asks nothing more', async () => {
@@ -293,6 +331,46 @@ test('errors map to signed-out / refused / busy / network', async () => {
   });
   assert.deepEqual(await down.addUpgradeToCart(101, 900, 9001), { ok: false, error: 'network' });
   assert.deepEqual(await fast(fakeRsi()).addUpgradeToCart(0, 900, 9001), {
+    ok: false,
+    error: 'refused',
+  });
+});
+
+test('cart already busy: a refusal about the cart or a buy-back is cart-conflict', async () => {
+  // Invented refusal messages; RSI takes a buy-back alone in the cart.
+  assert.equal(
+    C.cartRefusal({ success: 0, msg: 'Pretend: Buy-back items must be alone' }),
+    'cart-conflict',
+  );
+  assert.equal(C.cartRefusal({ errors: [{ message: 'pretend cart is locked' }] }), 'cart-conflict');
+  assert.equal(C.cartRefusal({ success: 0, msg: 'Pretend: something else' }), null);
+  assert.equal(C.cartRefusal(null), null);
+  const conflict = { ok: false, error: 'cart-conflict' };
+  // The cart step answers success 0 with a message about the cart.
+  let rsi = fakeRsi({ cartAnswer: { body: { success: 0, msg: 'Pretend: cart holds a buyback' } } });
+  assert.deepEqual(await fast(rsi).addUpgradeToCart(101, 900, 9001), conflict);
+  assert.equal(rsi.ops().filter((o) => o === 'addToCart').length, 1, 'never retried');
+  // The cart step answers an error status with a message about a buy-back.
+  rsi = fakeRsi({
+    cartAnswer: { body: { message: 'Pretend: one buy-back per order' }, code: 422 },
+  });
+  assert.deepEqual(await fast(rsi).addUpgradeToCart(101, 900, 9001), conflict);
+  // addToCart itself refuses with a buy-back message.
+  rsi = fakeRsi({ add: 'busy-cart' });
+  assert.deepEqual(await fast(rsi).addUpgradeToCart(101, 900, 9001), conflict);
+  assert.equal(rsi.ops().filter((o) => o === 'addToCart').length, 1, 'never retried');
+  // A buy-back upgrade RSI won't sell any more (ship values changed): refused, why known.
+  rsi = fakeRsi({ cartAnswer: { body: { success: 0, msg: 'Pretend: invalid upgrade' } } });
+  assert.deepEqual(await fast(rsi).addUpgradeToCart(101, 900, 9001, { pledgeId: 5550001 }), {
+    ok: false,
+    error: 'refused',
+    reason: 'invalid',
+  });
+  assert.equal(C.cartRefusal({ msg: 'Pretend: upgrade unavailable' }, true), 'invalid');
+  assert.equal(C.cartRefusal({ msg: 'Pretend: upgrade unavailable' }), null);
+  // Unknown refusals stay plain refusals.
+  rsi = fakeRsi({ cartAnswer: { body: { success: 0, msg: 'Pretend: nope' } } });
+  assert.deepEqual(await fast(rsi).addUpgradeToCart(101, 900, 9001), {
     ok: false,
     error: 'refused',
   });

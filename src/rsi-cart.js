@@ -7,7 +7,8 @@
  *   1. POST /api/ship-upgrades/setContextToken  { fromShipId, toShipId, toSkuId }
  *      (+ pledgeId for a buy-back upgrade: the session switches to buy-back mode)
  *   2. filterShips(toId = target SKU)  → from.ships = ships that can
- *      upgrade to it; we keep the ones you own (initShipUpgrade's `owned`)
+ *      upgrade to it: the ones you own (initShipUpgrade's `owned`) come first,
+ *      the rest are `others` (a CCU doesn't need you to own the From ship)
  *   3. getPrice(from = ship id, to = SKU id)   → price { amount } in cents
  *   4. mutation addToCart(from, to)            → { jwt }: that alone puts the
  *      upgrade in the RSI cart at the difference price. Nothing is bought here.
@@ -94,6 +95,28 @@
       ? 'signed-out'
       : 'refused';
   }
+  // What a refusal from the add (addToCart or the cart step) says, if we know it:
+  //   'invalid'       a buy-back upgrade RSI won't sell any more (ship values changed;
+  //                   only for a buy-back: its message talks about invalid / upgrade)
+  //   'cart-conflict' RSI's cart takes a buy-back on its own, one per cart, nothing
+  //                   else with it (the message talks about the cart or a buy-back)
+  // Anything else → null (a plain refusal).
+  function cartRefusal(json, buyback = false) {
+    const j = unwrap(json);
+    const bits = [j.msg, j.message, j.code, j.data && j.data.message];
+    if (Array.isArray(j.errors)) for (const e of j.errors) bits.push(e && e.message);
+    const text = bits.filter((b) => typeof b === 'string').join(' ');
+    if (buyback && /invalid/i.test(text)) return 'invalid';
+    if (/buy[\s-]?backs?|cart/i.test(text)) return 'cart-conflict';
+    if (buyback && /upgrade/i.test(text)) return 'invalid';
+    return null;
+  }
+  // → the add's answer for a refusal: cart-conflict, a refusal with a reason, or plain.
+  const refusedBy = (json, buyback) => {
+    const why = cartRefusal(json, buyback);
+    if (why === 'cart-conflict') return { ok: false, error: 'cart-conflict' };
+    return why ? { ok: false, error: 'refused', reason: why } : { ok: false, error: 'refused' };
+  };
   function parseApp(json) {
     const app = unwrap(json).data && unwrap(json).data.app;
     if (!app) return null;
@@ -156,6 +179,18 @@
       price: null,
     });
     return [...ok.map((s) => row(s, true)), ...no.map((s) => row(s, false))];
+  }
+
+  // Any Ship: every other ship RSI offers this upgrade from, owned or not (you can
+  // buy a CCU between any two ships RSI sells it for). Sorted by name, no prices yet:
+  // RSI prices one when it's picked.
+  function buildOthers(ships, fromIds, toShipId, options) {
+    const allowed = new Set(fromIds || []);
+    const taken = new Set((options || []).map((o) => o.id));
+    return ships
+      .filter((s) => allowed.has(s.id) && !taken.has(s.id) && s.id !== toInt(toShipId))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((s) => ({ id: s.id, name: s.name, image: s.image, msrp: s.msrp, price: null }));
   }
 
   // --- The requests ------------------------------------------------------------------
@@ -258,6 +293,15 @@
       if (r.error) return r;
       const res = r.res;
       if (res.status === 401) return { error: 'signed-out' };
+      if (url === CART_TOKEN_URL && !res.ok) {
+        let body = null;
+        try {
+          body = await res.json();
+        } catch {
+          body = null;
+        }
+        if (body && cartRefusal(body, true)) return { error: 'refused', json: body };
+      }
       if (res.status === 403) return { error: 'refused' };
       if (!res.ok) return { error: 'network' };
       if (url !== UPGRADE_URL && url !== CART_TOKEN_URL) return { json: null }; // only their cookies matter
@@ -280,7 +324,7 @@
       const r = await post(UPGRADE_URL, body);
       if (r.error) return r;
       const e = gqlError(r.json);
-      return e ? { error: e } : r;
+      return e ? { error: e, json: r.json } : r;
     };
     const fail = (r) => ({
       ok: false,
@@ -296,7 +340,8 @@
       return p ? { ok: true, ...p } : { ok: false, error: 'refused' };
     }
 
-    // Your ships that can upgrade to toShipId / toSkuId, the first few priced by RSI.
+    // Your ships that can upgrade to toShipId / toSkuId, the first few priced by RSI,
+    // and `others`: every other ship RSI takes for this upgrade (unpriced).
     // opts.pledgeId: a buy-back upgrade (prices are its buy-back prices).
     async function upgradeOptions(toShipId, toSkuId, opts = {}) {
       if (!toInt(toShipId) || !toInt(toSkuId)) return { ok: false, error: 'refused' };
@@ -332,7 +377,9 @@
       }
       if (!fromIds)
         return lastErr && lastErr.error ? fail(lastErr) : { ok: false, error: 'refused' };
-      const options = buildOptions(parseShips(s.json), fromIds, toShipId);
+      const ships = parseShips(s.json);
+      const options = buildOptions(ships, fromIds, toShipId);
+      const others = buildOthers(ships, fromIds, toShipId, options);
       const limit = Number.isInteger(opts.priceLimit) ? opts.priceLimit : PRICE_LIMIT;
       for (const o of options.filter((x) => x.eligible).slice(0, limit)) {
         const p = await price(o.id, toSkuId);
@@ -342,7 +389,7 @@
         }
         o.price = p.price;
       }
-      return { ok: true, mode: app ? app.mode : null, options, toSkuId };
+      return { ok: true, mode: app ? app.mode : null, options, others, toSkuId };
     }
 
     // The price of one upgrade, in the right mode (a buy-back sends its pledge id;
@@ -365,6 +412,7 @@
 
     // Puts one upgrade in the RSI cart. → { ok: true } | { ok: false, error }.
     // Asked once: never retried, whatever happens (a retry could add it twice).
+    // fromShipId can be any ship RSI offers the upgrade from, owned or not.
     async function addUpgradeToCart(fromShipId, toShipId, toSkuId, opts = {}) {
       if (!toInt(fromShipId) || !toInt(toShipId) || !toInt(toSkuId))
         return { ok: false, error: 'refused' };
@@ -383,13 +431,17 @@
       if (pledge && (!app || app.mode !== 'buyback')) return { ok: false, error: 'refused' };
       if (!pledge && app && app.mode === 'buyback') return { ok: false, error: 'refused' };
       const r = await ask(addBody(fromShipId, toSkuId));
+      if (r.error === 'refused' && r.json) return refusedBy(r.json, !!pledge);
       if (r.error) return fail(r);
       const jwt = parseAdded(r.json);
       if (!jwt) return { ok: false, error: 'refused' };
       // Then the cart takes the ticket, as RSI's window does (also never retried).
       const c = await post(CART_TOKEN_URL, { jwt });
+      if (c.error === 'refused' && c.json) return refusedBy(c.json, !!pledge);
       if (c.error) return fail(c);
-      return c.json && c.json.success === 0 ? { ok: false, error: 'refused' } : { ok: true };
+      if (c.json && (c.json.success === 0 || c.json.success === false))
+        return refusedBy(c.json, !!pledge);
+      return { ok: true };
     }
 
     return { upgradeOptions, upgradePrice, addUpgradeToCart };
@@ -420,6 +472,8 @@
     parseFrom,
     parsePrice,
     parseAdded,
+    cartRefusal,
     buildOptions,
+    buildOthers,
   };
 })(typeof self !== 'undefined' ? self : globalThis);
