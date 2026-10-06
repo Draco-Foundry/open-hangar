@@ -4292,6 +4292,8 @@
         warbond: r.isWarbond === true,
         pack: r.isPackage === true,
         available: st.available === true || st.unlimited === true,
+        type: String(r.type || ''),
+        label,
         kind: OH.subStoreKind({ tags, type: r.type || '', name, label, sub: r.subtitle || '' }),
         tiers: subTiers([tags.join(' '), label].join(' ')),
         tags,
@@ -4311,7 +4313,18 @@
     const { [SUB_STORE_KEY]: c } = await chrome.storage.local.get(SUB_STORE_KEY);
     if (!c || !Array.isArray(c.items)) return null;
     if (acct && acct.nickname && c.nickname && c.nickname !== acct.nickname) return null;
-    return c;
+    // Sort with today's rules, so a saved list follows an update without a refresh.
+    const items = c.items.map((it) => ({
+      ...it,
+      kind: OH.subStoreKind({
+        tags: it.tags || [],
+        type: it.type || '',
+        name: it.name || '',
+        label: it.label || '',
+        sub: it.sub || '',
+      }),
+    }));
+    return { ...c, items };
   };
   // Due for its once-a-day read? (never tried, or the last try a day ago)
   OH.subStoreDue = async function subStoreDue() {
