@@ -1239,44 +1239,65 @@
   // snapshot for external consumers; it is deliberately NOT restored here, because
   // the in-tool Citizen Card always reflects the *live* signed-in RSI session
   // (see the multi-account safety notes), never an imported identity.
-  // Returns { ok, db?, error? }.
+  // The website's "Download Your Data" file is recognised too (importSiteNow):
+  // there every hangar names its account, so each goes to that account's slot.
+  // Returns { ok, db?, error?, site? }.
   OH.importDB = async function importDB(obj) {
     if (!obj || typeof obj !== 'object') return { ok: false, error: 'Not a JSON object.' };
+    const site = obj.sources ? null : OH.siteExportAccounts(obj);
+    if (site) {
+      if (!site.length) {
+        return {
+          ok: false,
+          error:
+            'This website file has no synced hangar in it yet. Sync from the extension first, or import a backup file.',
+        };
+      }
+      for (const a of site) {
+        const bad = versionError(a.data);
+        if (bad) return { ok: false, error: bad };
+      }
+      return exclusive(() => importSiteNow(site));
+    }
     if (!obj.sources || typeof obj.sources !== 'object') {
       return { ok: false, error: 'Missing "sources" — this is not an Open Hangar export.' };
     }
-    // A backup file says app: 'open-hangar' and carries the export version; a bare
-    // stored DB carries the storage version.
-    const newest = obj.app === 'open-hangar' ? EXPORT_VERSION : DB_VERSION;
-    if (obj.schemaVersion && obj.schemaVersion > newest) {
-      return {
-        ok: false,
-        error: `This file is format v${obj.schemaVersion}; this version of Open Hangar reads up to v${newest}. Update the extension first.`,
-      };
-    }
+    const bad = versionError(obj);
+    if (bad) return { ok: false, error: bad };
     return exclusive(() => importNow(obj));
   };
+  // A backup file says app: 'open-hangar' and carries the export version; a bare
+  // stored DB carries the storage version. → an error message, or null.
+  function versionError(obj) {
+    const newest = obj.app === 'open-hangar' ? EXPORT_VERSION : DB_VERSION;
+    if (obj.schemaVersion && obj.schemaVersion > newest) {
+      return `This file is format v${obj.schemaVersion}; this version of Open Hangar reads up to v${newest}. Update the extension first.`;
+    }
+    return null;
+  }
+  // A file's sources as stored. Most sources store an array of items (hangar,
+  // buybacks); the referral source stores a single object. Accept either so a full
+  // restore round-trips. Rows must be objects (a hand-edited or damaged file could
+  // hold nulls). Extras saved with a scan (e.g. buy-back tokens) survive too.
+  function importSources(sources) {
+    const out = {};
+    for (const [id, src] of Object.entries(isObj(sources) ? sources : {})) {
+      if (!src || !src.items || typeof src.items !== 'object') continue;
+      let items;
+      if (id === 'referral') items = OH.normalizeReferral(src.items);
+      else if (Array.isArray(src.items)) items = src.items.filter(isObj);
+      else continue;
+      out[id] = { items, scannedAt: src.scannedAt || null };
+      if (isObj(src.meta)) out[id].meta = src.meta;
+    }
+    return out;
+  }
   async function importNow(obj) {
-    const db = { schemaVersion: DB_VERSION, sources: {} };
+    const db = { schemaVersion: DB_VERSION, sources: importSources(obj.sources) };
     // History is merged, never replaced: restoring an old backup must not throw
     // away snapshots taken since, and vice versa.
     const { db: current } = await readDB();
     db.history = OH.mergeHistory(current.history, obj.history);
-    for (const [id, src] of Object.entries(obj.sources)) {
-      // Most sources store an array of items (hangar, buybacks); the referral
-      // source stores a single object. Accept either so a full restore round-trips.
-      if (src && (Array.isArray(src.items) || (src.items && typeof src.items === 'object'))) {
-        // Rows must be objects (a hand-edited or damaged file could hold nulls).
-        const items =
-          id === 'referral'
-            ? OH.normalizeReferral(src.items)
-            : src.items.filter((x) => x && typeof x === 'object');
-        db.sources[id] = { items, scannedAt: src.scannedAt || null };
-        // Extras saved with a scan (e.g. buy-back tokens) survive the round trip.
-        if (src.meta && typeof src.meta === 'object' && !Array.isArray(src.meta))
-          db.sources[id].meta = src.meta;
-      }
-    }
     await writeDB(db);
     // The pledge archive is merged too (#388): per pledge the newest goneAt wins.
     // A file without one (older backups) leaves this browser's archive as it is.
@@ -1285,6 +1306,105 @@
     }
     await chrome.storage.local.remove(['hangar', 'scannedAt']); // drop legacy keys
     return { ok: true, db };
+  }
+
+  // The website's "Download Your Data" file (the website app, Account → Your
+  // Data): { export: { format, … }, account, …, rsi_accounts: [{ account: { handle,
+  // … }, latest_sync: { synced_at, format_version, data } | null, … }] }. Each
+  // `data` is this extension's backup file as it was last synced, without its
+  // history. → [{ handle, displayName, syncedAt, data }] for the RSI accounts with a
+  // synced hangar, or null when `obj` isn't that file. Pure.
+  OH.siteExportAccounts = function siteExportAccounts(obj) {
+    if (!isObj(obj) || !Array.isArray(obj.rsi_accounts)) return null;
+    const out = [];
+    for (const r of obj.rsi_accounts) {
+      const sync = isObj(r) && isObj(r.latest_sync) ? r.latest_sync : null;
+      const data = sync && isObj(sync.data) && isObj(sync.data.sources) ? sync.data : null;
+      if (!data) continue;
+      const who = isObj(data.account) ? data.account : {};
+      const handle = String(who.handle || (isObj(r.account) && r.account.handle) || '').trim();
+      if (!handle) continue; // the website keeps every hangar under a handle
+      const syncedAt = Number(sync.synced_at);
+      out.push({
+        handle,
+        displayName: who.displayName ? String(who.displayName) : null,
+        syncedAt: Number.isFinite(syncedAt) ? syncedAt : 0,
+        data,
+      });
+    }
+    return out;
+  };
+
+  // Import the website's file. Unlike a backup file, every hangar in it says whose
+  // it is, so each goes to that account's own place, the way saved accounts work
+  // (OH.switchProfile): one becomes the live DB, owned by its handle; the others are
+  // parked under `profile:<handle>`. The live one is the account this browser's
+  // data already belongs to, else the signed-in one (cached, no request), else the
+  // most recently synced. Data here for an account the file doesn't have is parked
+  // first, never overwritten. The file has no history: each account keeps its own
+  // here. Archives merge as in importNow. → { ok, db, site: { live, parked } }.
+  async function importSiteNow(accounts) {
+    const lc = (s) => String(s || '').toLowerCase();
+    const find = (nick) => (nick ? accounts.find((a) => lc(a.handle) === lc(nick)) : null);
+    const { db: cur } = await readDB();
+    const { account: cached } = await chrome.storage.local.get('account');
+    const curOwner = cur.owner && cur.owner.nickname;
+    const live =
+      find(curOwner) ||
+      find(cached && cached.loggedIn && cached.nickname) ||
+      accounts.slice().sort((a, b) => b.syncedAt - a.syncedAt)[0];
+    const owner = (a) => ({ nickname: a.handle, displayname: a.displayName });
+    const fileArchive = (a) => OH.leanArchive(a.data.pledgeArchive);
+
+    // The live account: its history and archive are the live ones when this data is
+    // already its own (or nobody's), else its parked ones (that copy goes live).
+    let history = [];
+    let archive = {};
+    if (!curOwner || lc(curOwner) === lc(live.handle)) {
+      history = cur.history;
+      archive = await readArchive();
+    } else if (dbHasData(cur)) {
+      const here = await readArchive();
+      const park = Object.keys(here).length ? { ...cur, pledgeArchive: here } : cur;
+      await chrome.storage.local.set({ [profileKey(curOwner)]: park });
+    }
+    // A parked copy of the live account joins it (one place per account).
+    const key = profileKey(live.handle);
+    const saved = (await chrome.storage.local.get(key))[key];
+    if (isObj(saved) && saved.schemaVersion) {
+      history = OH.mergeHistory(history, fromStored(saved).history);
+      archive = OH.mergeArchive(archive, saved.pledgeArchive);
+    }
+    await chrome.storage.local.remove(key);
+    const db = {
+      schemaVersion: DB_VERSION,
+      sources: importSources(live.data.sources),
+      owner: owner(live),
+      history,
+    };
+    await writeDB(db);
+    await writeArchive(OH.mergeArchive(archive, fileArchive(live)));
+
+    // Every other account: parked, merged into what's parked for it already.
+    const parked = [];
+    for (const a of accounts) {
+      if (a === live || lc(a.handle) === lc(live.handle)) continue;
+      const key = profileKey(a.handle);
+      const saved = (await chrome.storage.local.get(key))[key];
+      const had = isObj(saved) && saved.schemaVersion ? saved : null;
+      const park = {
+        schemaVersion: DB_VERSION,
+        sources: importSources(a.data.sources),
+        owner: owner(a),
+        history: had ? fromStored(had).history : [],
+      };
+      const arch = OH.mergeArchive(had && had.pledgeArchive, fileArchive(a));
+      if (Object.keys(arch).length) park.pledgeArchive = arch;
+      await chrome.storage.local.set({ [key]: park });
+      parked.push(a.displayName || a.handle);
+    }
+    await chrome.storage.local.remove(['hangar', 'scannedAt']); // drop legacy keys
+    return { ok: true, db, site: { live: live.displayName || live.handle, parked } };
   }
 
   // --- Scanning -------------------------------------------------------------
