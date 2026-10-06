@@ -133,7 +133,10 @@ siteHandlers['oh-add-upgrade'] = (m) =>
 //   oh-connect-finish → the page's one-time code, traded for the sync token with the
 //                       verifier; then the dashboard opens on Home (and syncs, if
 //                       Sync My Hangar Now was ticked)
-const SITE_ORIGINS = ['https://app.openhangar.space', 'https://staging.openhangar.space'];
+// The sync sites: the manifest's origins except the public front page, so a build
+// that leaves staging out of externally_connectable (npm run build:beta) can't
+// connect there either.
+const SITE_ORIGINS = siteOrigins().filter((o) => o !== 'https://openhangar.space');
 const b64url = (bytes) =>
   btoa(String.fromCharCode(...bytes))
     .replace(/\+/g, '-')

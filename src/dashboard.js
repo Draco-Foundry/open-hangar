@@ -4815,8 +4815,8 @@ async function initUpdates() {
 // Citizen Card's corner until you connect, then the top bar's Scan button (a status
 // beside it, a section in its ▾ menu, problems in its scan report). This holds the
 // state and does what they ask. Hidden for everyone until the website launches:
-// developers switch it on with the `siteUrl` storage key (e.g.
-// https://staging.openhangar.space). Nothing is sent until you Connect; after that,
+// developers switch it on with the `siteUrl` storage key (the staging site, say), and
+// the beta build has it on (npm run build:beta). Nothing is sent until you Connect; after that,
 // every scan syncs by itself, and Sync Now sends right away.
 const site = {
   enabled: false,
