@@ -93,9 +93,12 @@ for (const [name, transform] of Object.entries(targets)) {
   // Sync's sign-in window (identity.launchWebAuthFlow) needs "identity": only builds
   // that carry sync ask for it, so store builds' permissions don't change before launch.
   if (KEEP_SYNC) manifest.permissions = [...manifest.permissions, 'identity'];
-  // Connect from the website (src/background.js): only our own site may talk to the
-  // extension. Chrome and Edge only; Firefox doesn't let web pages reach extensions.
-  if (KEEP_SYNC && name !== 'firefox')
+  // Our own site may talk to the extension (src/background.js): Add to RSI Cart from
+  // the website's store in every build (#288; no account, nothing sent anywhere but
+  // RSI), and Connect This Browser in builds with sync. Chrome and Edge only; Firefox
+  // doesn't let web pages reach extensions. The background worker reads this list
+  // back as the only origins it answers.
+  if (name !== 'firefox')
     manifest.externally_connectable = {
       matches: ['https://app.openhangar.space/*', 'https://staging.openhangar.space/*'],
     };
