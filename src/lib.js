@@ -3125,18 +3125,19 @@
   // buy-back cost the same to reclaim). For CCUs, run it on each ship name. The full
   // RSI name stays in tooltips, the details window and exports. Pure.
   // Retired ships (#306): RSI retired the Aurora Mk I (Sep 30, 2026) and the Hornet
-  // Mk I (2024). Buy-backs of the ships themselves, packs holding them and upgrades
-  // to or from them can't be reclaimed any more; their paints still can. Old pledges
+  // Mk I (2024). RSI still sells their buy-backs back for now (owner put an Aurora
+  // Mk I buy-back in the cart, 2026-10-05), so this only labels them: buy-backs of
+  // the ships, packs holding them and upgrades to or from them; paints aren't marked. Old pledges
   // use the old names ("Aurora MR", "F7C Hornet"), so any Aurora that isn't a Mk II
   // and any Hornet that isn't a Mk II counts. Returns a short note, or null. Pure.
   const RETIRED_SHIPS = [
     {
       re: /\baurora\b(?!\s*mk\s*ii\b)/i,
-      note: 'RSI retired the Aurora Mk I on Sep 30, 2026, so it can no longer be bought back.',
+      note: 'RSI retired the Aurora Mk I on Sep 30, 2026. Its buy-back is still open on RSI.',
     },
     {
       re: /\b(f7c[a-z-]*|hornet)\b(?![^,;|]*\bmk\s*ii\b)/i,
-      note: 'RSI retired the Hornet Mk I, so it can no longer be bought back.',
+      note: 'RSI retired the Hornet Mk I. Its buy-back is still open on RSI.',
     },
   ];
   OH.retiredBuyback = function retiredBuyback(b) {

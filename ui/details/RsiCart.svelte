@@ -12,7 +12,9 @@
   // nothing else in it), so both forms say so.
   import { OH, app, version } from '../lib/app.svelte.js';
 
-  let { kind = 'upgrade', target, from = null, pledgeId = null } = $props();
+  let { kind = 'upgrade', target, from = null, pledgeId = null, retired = false } = $props();
+  // retired: a retired ship's buy-back (#306). RSI still sells those back, so the
+  // button stays; only a real refusal from RSI says it closed.
   // target: { toShipId, toSkuId, skus?, name }; from: { id, name } for a buy-back.
 
   const RSI_SIGN_IN = 'https://robertsspaceindustries.com/connect';
@@ -173,6 +175,11 @@
   };
   const note = $derived.by(() => {
     if (!error) return null;
+    if (kind === 'buyback' && retired && error.kind === 'refused')
+      return {
+        title: 'RSI No Longer Sells This One Back',
+        text: "It's retired and RSI closed its buy-back.",
+      };
     if (error.kind === 'refused' && error.reason === 'invalid')
       return {
         title: "RSI Didn't Add It",

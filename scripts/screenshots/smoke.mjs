@@ -1536,8 +1536,8 @@ try {
     rows: document.querySelectorAll('#buybacks-body .market-table tbody tr').length,
     cards: window.state ? null : null,
     reclaim: [...document.querySelectorAll('#buybacks-body .market-table tbody tr')].every((r) =>
-      // Retired ships (#306) show a Retired label instead of the link.
-      /Reclaim|Retired/.test(r.textContent),
+      // Retired ships (#306): a "Retired, Buy-Back Still Open" label, still a link.
+      /Reclaim|Retired, Buy-Back Still Open/.test(r.textContent),
     ),
     ins: !!document.querySelector('#buybacks-body .market-table .mk-ins'),
   }));
@@ -1550,7 +1550,7 @@ try {
   // A CCU's Reclaim opens its one-item buy-back list entry, never the pledge store
   // its RSI button points at (owner, 2026-10-05).
   const ccuLink = await page.evaluate(() => {
-    // A CCU that isn't retired (a retired one shows "Retired", no link).
+    // A CCU that isn't retired (a retired one is labelled as such).
     const c = state.buybacks.find((b) => b.ccu && !OH.retiredBuyback(b));
     if (!c) return { none: true };
     const r = reclaimOf({ ...c, href: 'https://robertsspaceindustries.com/pledge' });
@@ -2588,15 +2588,22 @@ try {
     out.bbInvalid = text('[data-cart="buyback"] .note.bad');
     addAnswer = { ok: true };
     document.querySelector('#modal-close').click();
-    // Without the ids (older scans), or a retired ship RSI won't sell back: no button.
+    // Without the ids (older scans): no button.
     openBuybackModal({ ...b, toSkuId: '' });
     await new Promise((r) => setTimeout(r, 100));
     out.bbNoIds = !q('[data-cart]');
     document.querySelector('#modal-close').click();
     const old = state.buybacks.find((x) => x.isCCU && x.ccu && OH.retiredBuyback(x));
+    // A retired ship's buy-back: RSI still sells it back, so the button stays; only
+    // RSI's refusal says it closed (#306).
+    addAnswer = { ok: false, error: 'refused' };
     openBuybackModal({ ...old, fromShipId: '101', toShipId: '900', toSkuId: '9001' });
-    await new Promise((r) => setTimeout(r, 100));
-    out.bbRetired = !!old && !q('[data-cart]');
+    await wait(() => /\$15/.test(text('[data-cart="buyback"]')));
+    out.bbRetiredBefore = text('[data-cart="buyback"]');
+    q('[data-cart="buyback"] button.cbtn').click();
+    await wait(() => q('[data-cart="buyback"] .note.bad'));
+    out.bbRetired = !!old && text('[data-cart="buyback"] .note.bad');
+    addAnswer = { ok: true };
     document.querySelector('#modal-close').click();
     Object.assign(OH, real);
     ({ storeRequested, storeData, storeByKey } = was);
@@ -2657,9 +2664,13 @@ try {
     cart.bbInvalid,
   ) &&
   cart.bbNoIds &&
-  cart.bbRetired
+  /RSI No Longer Sells This One Back\s*It's retired and RSI closed its buy-back\./.test(
+    cart.bbRetired,
+  ) &&
+  /Add to RSI Cart/.test(cart.bbRetiredBefore) &&
+  !/No Longer Sells/.test(cart.bbRetiredBefore)
     ? ok(
-        'buy-back upgrade: RSI price, Add to RSI Cart with its pledge; none without ids or retired',
+        'buy-back upgrade: RSI price, Add to RSI Cart with its pledge; none without ids; retired keeps it',
       )
     : fail(`buy-back cart: ${JSON.stringify(cart)}`);
 

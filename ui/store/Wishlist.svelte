@@ -296,8 +296,16 @@
                             {#if b.price}{b.price}{:else}<span class="muted">—</span>{/if}
                           </td>
                           <td class="num">
-                            {#if b.reclaim && b.reclaim.retired}
-                              <span class="bb-retired" title={b.reclaim.retired}>Retired</span>
+                            {#if b.reclaim && b.reclaim.retired && b.reclaim.url}
+                              <a
+                                class="bb-retired"
+                                href={b.reclaim.url}
+                                target="_blank"
+                                rel="noopener"
+                                title={b.reclaim.retired}>Retired, Buy-Back Still Open ↗</a
+                              >
+                            {:else if b.reclaim && b.reclaim.retired}
+                              <span class="bb-retired" title={b.reclaim.retired}>Retired, Buy-Back Still Open</span>
                             {:else if b.reclaim}
                               <a
                                 class="bb-reclaim"
