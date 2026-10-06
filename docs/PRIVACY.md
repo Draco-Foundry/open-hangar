@@ -37,6 +37,8 @@ When you click Add to RSI Cart on a ship upgrade (CCU), the extension uses RSI's
 - This is the only thing the extension does on RSI that isn't read-only.
 - Nothing about it is sent to us.
 
+On the Open Hangar store at openhangar.space, the extension can show you these upgrade prices and add upgrades for you. The page then sees which of your ships can be upgraded and RSI's prices, inside your browser only. Nothing reaches our server.
+
 ## Outbound network requests
 
 Besides reading your own RSI account and Add to RSI Cart (both above), the extension makes a small number of outbound requests. None of them carry your personal data:
