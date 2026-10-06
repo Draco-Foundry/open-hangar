@@ -37,6 +37,7 @@
   const PROBE_MIN_PAGES = 3;
   const DB_KEY = 'db';
   const HISTORY_KEY = 'dbHistory';
+  const ARCHIVE_KEY = 'pledgeArchive'; // pledges gone from the hangar (see archiveGone)
   const CORRUPT_KEY = 'dbCorrupt';
   // Two version numbers (they were one, 2, until storage v3):
   //   DB_VERSION is how the database is stored in this browser. Changing that
@@ -343,6 +344,7 @@
     const mat = store.shipMatrix || {};
     const log = await OH.getLog();
     const damaged = await OH.getDamaged();
+    const bbd = await OH.buybackDetailStats();
     const lines = [
       '```',
       'Open Hangar error report',
@@ -352,6 +354,7 @@
       `Buy-backs: ${count(src('buybacks'))} items, scanned ${ago(src('buybacks').scannedAt)}`,
       `Read:      ${shapeLine(src('hangar').meta?.shape)}`,
       `History:   ${Array.isArray(db.history) ? db.history.length : 0} snapshots`,
+      `Bb detail: ${bbd.history} from hangar history · ${bbd.scan} value only from scan history · ${bbd.rsi} read from RSI · ${bbd.rejected} names didn't agree`,
       `Set aside: ${damaged.length ? damaged.map((d) => `${d.what} (${d.problems.slice(0, 3).join('; ')})`).join(', ') : 'nothing'}`,
       `Catalog:   ${Array.isArray(cat.list) ? cat.list.length : 0} ships (v${cat.v || '?'}, ${ago(cat.at)}) · ship matrix ${Array.isArray(mat.list) ? mat.list.length : 0}`,
       `Log:       ${log.length ? `last ${Math.min(maxLines, log.length)} of ${log.length}` : 'empty'}`,
@@ -404,11 +407,13 @@
         version: version ? `v${version}` : '',
       })}`;
     const lines = String(report).split('\n');
-    // Keep the header (first 10 lines: fence, title, counts, "Log:"), the newest
-    // log lines and the closing fence; trim the oldest log lines first.
-    const head = lines.slice(0, 10);
+    // Keep the header (fence, title, counts, up to "Log:"), the newest log lines
+    // and the closing fence; trim the oldest log lines first.
+    const logAt = lines.findIndex((l) => /^Log:/.test(l));
+    const n = logAt >= 0 ? logAt + 1 : 10;
+    const head = lines.slice(0, n);
     const tail = lines.slice(-1);
-    let log = lines.slice(10, -1);
+    let log = lines.slice(n, -1);
     let url = build(lines.join('\n'));
     while (url.length > OH.SCAN_REPORT_MAX_URL && log.length) {
       log = log.slice(Math.ceil(log.length / 4) || 1);
@@ -681,6 +686,17 @@
       const cents = acct && acct.loggedIn ? acct.credits?.store?.value : null;
       const credit = Number.isFinite(cents) ? cents / 100 : undefined;
       if (record) recordHistory(db, db.sources[id], items, scannedAt, credit);
+      // Pledges the last complete scan of this same account had and this one
+      // doesn't go to the pledge archive (see archiveGone).
+      const prev = db.sources[id];
+      const sameOwner =
+        !db.owner ||
+        !(acct && acct.loggedIn && acct.nickname) ||
+        db.owner.nickname.toLowerCase() === String(acct.nickname).toLowerCase();
+      const before =
+        record && id === 'hangar' && sameOwner && prev && Array.isArray(prev.items)
+          ? prev.items
+          : null;
       db.sources[id] = meta ? { items, scannedAt, meta } : { items, scannedAt };
       if (acct && acct.loggedIn && acct.nickname) {
         db.owner = { nickname: acct.nickname, displayname: acct.displayname || null };
@@ -688,6 +704,14 @@
       // History is only rewritten when it changed: a new snapshot, or it was just
       // moved out of the DB (needsWrite) and must not be lost with it.
       await writeDB(db, { history: record || needsWrite });
+      if (before) {
+        const now = new Set(items.map((p) => String(p && p.id)));
+        const gone = before.filter((p) => isObj(p) && p.id != null && !now.has(String(p.id)));
+        if (gone.length) {
+          const cur = (await chrome.storage.local.get(ARCHIVE_KEY))[ARCHIVE_KEY];
+          await chrome.storage.local.set({ [ARCHIVE_KEY]: OH.archiveGone(cur, gone, scannedAt) });
+        }
+      }
       await chrome.storage.local.remove(['hangar', 'scannedAt']); // drop legacy keys
       return scannedAt;
     });
@@ -716,13 +740,28 @@
           Object.values(db.sources || {}).some(
             (s) => s && Array.isArray(s.items) && s.items.length,
           ));
-      if (hasData) await chrome.storage.local.set({ [RECOVERY_KEY]: { at: Date.now(), db } });
-      await chrome.storage.local.remove([DB_KEY, HISTORY_KEY, 'hangar', 'scannedAt', 'account']);
+      if (hasData) {
+        // The pledge archive rides along too, like the history.
+        const archive = await readArchive();
+        const rec = { at: Date.now(), db };
+        if (Object.keys(archive).length) rec.archive = archive;
+        await chrome.storage.local.set({ [RECOVERY_KEY]: rec });
+      }
+      await chrome.storage.local.remove([
+        DB_KEY,
+        HISTORY_KEY,
+        ARCHIVE_KEY,
+        'hangar',
+        'scannedAt',
+        'account',
+      ]);
       return;
     }
     await chrome.storage.local.remove([
       DB_KEY,
       HISTORY_KEY,
+      ARCHIVE_KEY,
+      BB_REJECTS_KEY,
       CORRUPT_KEY,
       'hangar',
       'scannedAt',
@@ -749,6 +788,7 @@
       if (!rec) return null;
       const db = fromStored(rec.db);
       await writeDB(db);
+      await writeArchive(rec.archive);
       await chrome.storage.local.remove(RECOVERY_KEY);
       return db;
     });
@@ -765,9 +805,21 @@
       (s) => s && s.items && (Array.isArray(s.items) ? s.items.length : true),
     );
 
+  // The live account's pledge archive ({} when none), and writing one back (an
+  // empty or missing one removes the key).
+  async function readArchive() {
+    const a = (await chrome.storage.local.get(ARCHIVE_KEY))[ARCHIVE_KEY];
+    return isObj(a) ? a : {};
+  }
+  async function writeArchive(a) {
+    if (isObj(a) && Object.keys(a).length) await chrome.storage.local.set({ [ARCHIVE_KEY]: a });
+    else await chrome.storage.local.remove(ARCHIVE_KEY);
+  }
+
   // Make `nickname` the live account: park the current DB under its owner, then
   // load the new account's parked DB (if any). A parked DB keeps its scan history
-  // inside it, so each account's history travels with it. Returns { restored, parked }.
+  // and pledge archive (`pledgeArchive`) inside it, so both travel with their
+  // account. Returns { restored, parked }.
   OH.switchProfile = (nickname, displayname = null) =>
     exclusive(() => switchProfileNow(nickname, displayname));
   async function switchProfileNow(nickname, displayname) {
@@ -777,7 +829,9 @@
       if (cur.owner.nickname.toLowerCase() === String(nickname).toLowerCase()) {
         return { restored: false, parked: null }; // already live
       }
-      await chrome.storage.local.set({ [profileKey(cur.owner.nickname)]: cur });
+      const archive = await readArchive();
+      const park = Object.keys(archive).length ? { ...cur, pledgeArchive: archive } : cur;
+      await chrome.storage.local.set({ [profileKey(cur.owner.nickname)]: park });
       parked = cur.owner.displayname || cur.owner.nickname;
     }
     const key = profileKey(nickname);
@@ -787,6 +841,7 @@
       ? fromStored(saved)
       : { ...emptyDB(), owner: { nickname, displayname: displayname || null }, history: [] };
     await writeDB(next);
+    await writeArchive(restored ? saved.pledgeArchive : null);
     await chrome.storage.local.remove([key, 'account']); // live now; account cache is stale
     return { restored, parked };
   }
@@ -828,7 +883,10 @@
       live.owner && live.owner.nickname && live.owner.nickname.toLowerCase() === nick.toLowerCase();
     const key = profileKey(nick);
     const existing = (await chrome.storage.local.get(key))[key];
-    if (!isLive && !existing) await chrome.storage.local.set({ [key]: rec.db });
+    if (!isLive && !existing) {
+      const park = isObj(rec.archive) ? { ...rec.db, pledgeArchive: rec.archive } : rec.db;
+      await chrome.storage.local.set({ [key]: park });
+    }
     await chrome.storage.local.remove(RECOVERY_KEY);
     return !isLive && !existing;
   };
@@ -2877,7 +2935,7 @@
   // Read one buy-back page (cached). → detail | { error }.
   OH.fetchBuybackDetail = async function fetchBuybackDetail(id) {
     const all = await OH.getBuybackDetails();
-    if (all[id]) return all[id];
+    if (all[id] && !all[id].partial) return all[id];
     if (!/^\d+$/.test(String(id))) return { error: 'No RSI page for this buy-back.' };
     const got = await fetchPage(`https://robertsspaceindustries.com/pledge/buyback/${id}`, null, {
       retryRateLimit: false,
@@ -2918,7 +2976,7 @@
     shouldGo = () => true,
   ) {
     const all = await OH.getBuybackDetails();
-    const todo = ids.filter((id) => !all[id] && /^\d+$/.test(String(id)));
+    const todo = ids.filter((id) => (!all[id] || all[id].partial) && /^\d+$/.test(String(id)));
     const { [BBD_SLOW_KEY]: until = 0 } = await chrome.storage.local.get(BBD_SLOW_KEY);
     if (until > Date.now()) {
       return { done: 0, errors: 0, total: todo.length, rateLimited: true, retryAt: until };
@@ -2947,6 +3005,222 @@
       await sleep(DELAY_MS + Math.random() * DELAY_MS * 1.5); // 0.4 to 1 s, not a fixed beat
     }
     return { done, errors, total: todo.length };
+  };
+
+  // --- Buy-back details from your own history ------------------------------------
+  // Most buy-backs were pledges in this hangar once, and keep their pledge id when
+  // melted. So before reading any RSI page, details come from what this browser
+  // already has: the pledge archive (everything the hangar showed: contents,
+  // insurance, value), then the scan history (the value only). The ids are the
+  // same kind of number, but that a buy-back keeps its exact id isn't proven by a
+  // real melt yet, so the names must agree too; a disagreement is counted
+  // (`bbHistoryRejects`, ids only) and the buy-back falls through to RSI.
+  //
+  // Pledge archive (storage key `pledgeArchive`): { [pledge id]: { ...pledge,
+  // goneAt } } for pledges a complete hangar scan no longer has (melted, gifted,
+  // applied as an upgrade), newest ARCHIVE_MAX kept. It belongs to the live
+  // account like the scan history (parked with it, in the recovery copy, gone
+  // with Clear Data).
+  const ARCHIVE_MAX = 2000;
+  OH.ARCHIVE_MAX = ARCHIVE_MAX;
+  // `archive` plus the pledges in `gone`, stamped goneAt = at, newest kept. Pure.
+  OH.archiveGone = function archiveGone(archive, gone, at) {
+    const out = isObj(archive) ? { ...archive } : {};
+    for (const p of gone || []) {
+      if (!isObj(p) || p.id == null || p.id === '') continue;
+      const { raw, ...keep } = p; // the raw RSI strings aren't needed again
+      out[String(p.id)] = { ...keep, goneAt: at };
+    }
+    const ids = Object.keys(out);
+    if (ids.length <= ARCHIVE_MAX) return out;
+    ids.sort((a, b) => (out[b].goneAt || 0) - (out[a].goneAt || 0));
+    return Object.fromEntries(ids.slice(0, ARCHIVE_MAX).map((id) => [id, out[id]]));
+  };
+  OH.getPledgeArchive = readArchive;
+
+  // A name as compared between a buy-back and a pledge: no case, curly quotes made
+  // straight, one space, and without what OH.shortBuybackName drops (the store
+  // label in front, Warbond, Standard Edition). Pure.
+  OH.historyName = function historyName(name) {
+    const plain = String(name || '')
+      .replace(/[‘’‚‛′´`]/g, "'")
+      .replace(/[“”„‟″]/g, '"')
+      .replace(/[–—]/g, '-')
+      .replace(/\s+/g, ' ');
+    return OH.shortBuybackName(plain)
+      .toLowerCase()
+      .replace(/\s*-\s*/g, ' - ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+  const CCU_NAME_RE = /^\s*upgrade\s*-\s*(.+?)\s+to\s+(.+?)\s*$/i; // as parser.js
+  const ccuOf = (name) => {
+    const m = CCU_NAME_RE.exec(String(name || ''));
+    return m ? { from: m[1].trim(), to: m[2].trim() } : null;
+  };
+  // Do a buy-back and a pledge name (and the pledge's { from, to } when known) name
+  // the same thing? CCUs compare from and to. Pure.
+  OH.historyNamesAgree = function historyNamesAgree(b, name, pledgeCcu) {
+    const n = OH.historyName;
+    const bc = (b && b.ccu) || (b && b.isCCU ? ccuOf(b.name) : null);
+    const pc = pledgeCcu || ccuOf(name);
+    if (bc || pc) {
+      return !!(bc && pc && n(bc.from) && n(bc.from) === n(pc.from) && n(bc.to) === n(pc.to));
+    }
+    const a = n(b && b.name);
+    return !!a && a === n(name);
+  };
+
+  // What one buy-back's details can be filled with from this browser's history:
+  //   { detail }    from the archive (src 'history': contents, insurance, value)
+  //                 or the scan history (src 'scan-history', partial: value only)
+  //   { rejected }  an entry with its id exists but the names didn't agree
+  //   null          nothing known
+  // The value is what it was worth in the hangar (melt value). A Warbond's buy-back
+  // costs the standard price, so for those it's kept as `melt` but not used as the
+  // price. A pledge whose value changed while in the hangar had an upgrade
+  // applied, and a melted upgraded pledge comes back as the original ship (RSI's
+  // "- upgraded" buy-backs), so neither is filled from history. Pure.
+  OH.buybackFromHistory = function buybackFromHistory(b, archive, history, now = Date.now()) {
+    if (!b || b.id == null || b.id === '' || b.wasUpgraded) return null;
+    const id = String(b.id);
+    let last = null;
+    const values = new Set();
+    for (const snap of Array.isArray(history) ? history : []) {
+      for (const row of (snap && snap.items) || []) {
+        if (Array.isArray(row) && String(row[0]) === id) {
+          last = row;
+          values.add(Math.round(Number(row[2]) * 100));
+        }
+      }
+    }
+    if (values.size > 1) return null;
+    const warbond = (name) => /\bwarbond\b/i.test(String(name || ''));
+    let rejected = null;
+    const a = isObj(archive) ? archive[id] : null;
+    if (isObj(a)) {
+      if (OH.historyNamesAgree(b, a.name, a.ccu)) {
+        const contents = (Array.isArray(a.contents) ? a.contents : []).filter(isObj);
+        const isShip = (c) => /^ship$/i.test(String(c.kind || '').trim());
+        const melt = Number.isFinite(a.value) ? a.value : null;
+        const ins =
+          a.insurance ||
+          (window.OpenHangar && window.OpenHangar.insuranceTerm
+            ? window.OpenHangar.insuranceTerm(contents)
+            : null);
+        return {
+          detail: {
+            title: String(a.name || ''),
+            price: warbond(a.name) || warbond(b.name) ? null : melt,
+            melt,
+            currency: a.currency || 'USD',
+            ships: contents
+              .filter((c) => isShip(c) && c.label)
+              .map((c) => ({ name: c.label, manufacturer: '', focus: '', image: c.image || null })),
+            also: contents
+              .filter((c) => !isShip(c))
+              .map((c) => c.label || c.kind || '')
+              .filter(Boolean),
+            insurance: ins || null,
+            at: now,
+            src: 'history',
+          },
+        };
+      }
+      rejected = 'archive';
+    }
+    if (last) {
+      if (OH.historyNamesAgree(b, last[1])) {
+        const melt = Number(last[2]);
+        // 0 is also what a snapshot holds when RSI showed no value: say nothing.
+        if (!(melt > 0) || warbond(last[1]) || warbond(b.name))
+          return rejected ? { rejected } : null;
+        return {
+          detail: {
+            title: String(last[1] || ''),
+            price: melt,
+            melt,
+            currency: 'USD',
+            ships: [],
+            also: [],
+            insurance: null,
+            at: now,
+            src: 'scan-history',
+            partial: true, // contents still unknown: RSI's page can still be read
+          },
+        };
+      }
+      rejected = rejected || 'history';
+    }
+    return rejected ? { rejected } : null;
+  };
+
+  // Fill the details of these buy-backs from history where it can (above); RSI's
+  // pages are then only read for the rest. No requests. → { history, scan,
+  // rejected } counts for this run.
+  const BB_REJECTS_KEY = 'bbHistoryRejects';
+  const BB_REJECTS_MAX = 500;
+  // `history`: the scan history when the caller already has it (saves a read).
+  OH.fillBuybackDetailsFromHistory = async function fillBuybackDetailsFromHistory(
+    buybacks,
+    { history } = {},
+  ) {
+    const out = { history: 0, scan: 0, rejected: 0 };
+    const all = await OH.getBuybackDetails();
+    const todo = (buybacks || []).filter(
+      (b) => b && b.id != null && (!all[String(b.id)] || all[String(b.id)].partial),
+    );
+    if (!todo.length) return out;
+    const archive = await readArchive();
+    const hist = Array.isArray(history) ? history : (await OH.loadDB()).history;
+    const now = Date.now();
+    const rejects = {};
+    for (const b of todo) {
+      const id = String(b.id);
+      const r = OH.buybackFromHistory(b, archive, hist, now);
+      if (!r) continue;
+      if (r.rejected) {
+        rejects[id] = { at: now, from: r.rejected };
+        out.rejected++;
+      } else if (r.detail.partial) {
+        if (all[id]) continue; // already has its value
+        all[id] = r.detail;
+        out.scan++;
+      } else {
+        all[id] = r.detail;
+        out.history++;
+      }
+    }
+    if (out.history || out.scan) await flushBuybackDetails();
+    if (out.rejected) {
+      await mutateStored(BB_REJECTS_KEY, (cur = {}) => {
+        const next = { ...(isObj(cur) ? cur : {}), ...rejects };
+        const ids = Object.keys(next).sort((x, y) => (next[y].at || 0) - (next[x].at || 0));
+        return Object.fromEntries(ids.slice(0, BB_REJECTS_MAX).map((k) => [k, next[k]]));
+      }).catch(() => {});
+    }
+    if (out.history || out.scan || out.rejected)
+      OH.log(
+        'info',
+        'buybacks',
+        `details from history: ${out.history} from the pledge archive, ${out.scan} values from scan history, ${out.rejected} names didn't agree`,
+      );
+    return out;
+  };
+
+  // Where the saved buy-back details came from, for the error report: counts only.
+  OH.buybackDetailStats = async function buybackDetailStats() {
+    const all = await OH.getBuybackDetails();
+    const out = { history: 0, scan: 0, rsi: 0, rejected: 0 };
+    for (const d of Object.values(all)) {
+      if (!isObj(d)) continue;
+      if (d.src === 'history') out.history++;
+      else if (d.src === 'scan-history') out.scan++;
+      else out.rsi++;
+    }
+    const rej = (await chrome.storage.local.get(BB_REJECTS_KEY))[BB_REJECTS_KEY];
+    out.rejected = isObj(rej) ? Object.keys(rej).length : 0;
+    return out;
   };
 
   // @sync-start: cut from store builds until sync launches (scripts/pack.mjs, #187)
