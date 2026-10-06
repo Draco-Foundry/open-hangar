@@ -1905,7 +1905,8 @@
       .bb-reclaim:hover {
         text-decoration: underline;
       }
-      /* Retired ships (#306): can't be reclaimed, so a quiet label, not a link. */
+      /* Retired ships (#306): RSI still sells their buy-backs back (owner, 2026-10-05),
+         so a quiet label that links to the reclaim page when there is one. */
       .bb-retired {
         font-size: 11px;
         font-weight: 600;
@@ -1916,6 +1917,14 @@
         border-radius: 999px;
         padding: 1px 8px;
         cursor: help;
+      }
+      a.bb-retired {
+        cursor: pointer;
+        text-decoration: none;
+      }
+      a.bb-retired:hover {
+        color: var(--link);
+        border-color: currentColor;
       }
       .bb-end {
         display: inline-flex;

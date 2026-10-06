@@ -26,7 +26,13 @@
   {#if v.reclaim}<Row k="Reclaim"><Reclaim r={v.reclaim} /></Row>{/if}
   {#if v.cart}
     {#key v.cart.pledgeId}
-      <RsiCart kind="buyback" target={v.cart.target} from={v.cart.from} pledgeId={v.cart.pledgeId} />
+      <RsiCart
+        kind="buyback"
+        target={v.cart.target}
+        from={v.cart.from}
+        pledgeId={v.cart.pledgeId}
+        retired={v.cart.retired}
+      />
     {/key}
   {/if}
   {#if v.contents}
