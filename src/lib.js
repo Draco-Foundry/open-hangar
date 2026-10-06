@@ -850,6 +850,7 @@
         'hangar',
         'scannedAt',
         'account',
+        'subStore',
       ]);
       return;
     }
@@ -862,6 +863,7 @@
       'hangar',
       'scannedAt',
       'account',
+      'subStore',
       RECOVERY_KEY,
       LOG_KEY,
     ]);
@@ -4136,6 +4138,293 @@
     }
     return cached || null;
   };
+
+  // --- Your Subscriber Store (#418) ---------------------------------------------
+  // The subscriber-only items RSI offers the signed-in account: the same /graphql
+  // the referrals use, operation GetBrowseSkusByFilter with the store's
+  // "extras-subscribers-store" facet, in your own RSI session (an anonymous
+  // request gets 0 items). The list is exactly what RSI returns for the session,
+  // so tier differences (Centurion, Imperator) take care of themselves: we never
+  // guess which tier an item is for, only repeat what its tags or label say.
+  // Only for a signed-in subscriber, at most once a day by itself (Store page or
+  // after a scan, never inside the scan) plus the Refresh button. Pages one at a
+  // time with a pause; a 429/403/5xx stops the read and keeps the last list.
+  const SUB_STORE_KEY = 'subStore';
+  const SUB_STORE_TTL = 24 * 3600e3;
+  const SUB_STORE_PAGE = 100; // asked first; RSI's own page uses 20 (the fallback)
+  const SUB_STORE_PAGE_MIN = 20;
+  const SUB_STORE_MAX_PAGES = 20;
+  OH.SUB_STORE_MAX = 2000; // items kept (storage budget)
+  const SUB_STORE_QUERY = `query GetBrowseSkusByFilter($query: SearchQuery, $storeFront: String = "pledge") {
+  store(browse: true, name: $storeFront) {
+    listing: search(query: $query) {
+      resources {
+        id name title subtitle url type
+        media { thumbnail { storeSmall slideshow } }
+        nativePrice { amount discounted }
+        price { amount discounted }
+        stock { available unlimited show level }
+        tags { name }
+        ... on TySku { label isWarbond isPackage }
+      }
+      count
+      totalCount
+    }
+  }
+}`;
+  const subStoreBody = (page, limit) =>
+    JSON.stringify([
+      {
+        operationName: 'GetBrowseSkusByFilter',
+        query: SUB_STORE_QUERY,
+        variables: {
+          storeFront: 'pledge',
+          query: {
+            page,
+            limit,
+            skus: {
+              filtersFromTags: {
+                tagIdentifiers: [],
+                facetIdentifiers: ['extras-subscribers-store'],
+              },
+              products: [65],
+            },
+            sort: { field: 'weight', direction: 'desc' },
+          },
+        },
+      },
+    ]);
+  const rsiAbs = (u) => {
+    const s = String(u || '').trim();
+    if (!s) return null;
+    if (/^https:\/\//i.test(s)) return s;
+    if (s.startsWith('//')) return 'https:' + s;
+    if (s.startsWith('/')) return 'https://robertsspaceindustries.com' + s;
+    return null; // anything else (http:, javascript:) isn't kept
+  };
+  // A price block ({ amount, discounted } in cents) → dollars, the sale price when
+  // there is one (RSI's own rule: discounted counts when set and != amount).
+  const subPrice = (p) => {
+    if (!p || typeof p.amount !== 'number') return null;
+    const sale = typeof p.discounted === 'number' && p.discounted !== p.amount;
+    return {
+      price: (sale ? p.discounted : p.amount) / 100,
+      was: sale ? p.amount / 100 : null,
+    };
+  };
+  // Shelf names for the filter chips, from the item's tags, type and name.
+  const SUB_KINDS = [
+    ['Paints', /\b(paint|livery|liveries|skin)s?\b/i],
+    ['Armor', /\b(armou?r|helmet|undersuit|backpack)s?\b/i],
+    ['Weapons', /\b(weapon|rifle|pistol|smg|shotgun|sniper|knife|launcher)s?\b/i],
+    ['Clothing', /\b(clothing|jacket|shirt|hat|pants|boots|outfit|apparel|hoodie|coat)s?\b/i],
+    [
+      'Decorations',
+      /\b(decorations?|hangar|plush|plushie|trophy|model|poster|flair|statue|figurine)s?\b/i,
+    ],
+    ['Ships', /\b(ships?|vehicles?|standalone)\b/i],
+  ];
+  const subKind = (text) => (SUB_KINDS.find(([, re]) => re.test(text)) || ['Other'])[0];
+  // What RSI's tags or label say about the tier, as written; never inferred.
+  const subTiers = (text) =>
+    ['Imperator', 'Centurion'].filter((t) => new RegExp(`\\b${t}\\b`, 'i').test(text));
+  // GraphQL answer → { items, count, totalCount } or null (not a listing). Pure.
+  // items: [{ id, name, url, img, price, was, warbond, pack, available, kind, tiers, tags }]
+  OH.parseSubStore = function parseSubStore(json) {
+    const data = Array.isArray(json) ? json[0] : json;
+    const listing = data && data.data && data.data.store && data.data.store.listing;
+    if (!listing || !Array.isArray(listing.resources)) return null;
+    const items = [];
+    for (const r of listing.resources) {
+      if (!r || r.id == null) continue;
+      const name = String(r.title || r.name || '').trim();
+      if (!name) continue;
+      const tags = (Array.isArray(r.tags) ? r.tags : [])
+        .map((t) => String((t && t.name) || '').trim())
+        .filter(Boolean)
+        .slice(0, 12);
+      const label = String(r.label || '').trim();
+      const p = subPrice(r.nativePrice) || subPrice(r.price);
+      const st = r.stock || {};
+      const img = r.media && r.media.thumbnail;
+      const kindText = [tags.join(' '), r.type || '', label, name, r.subtitle || ''].join(' ');
+      items.push({
+        id: String(r.id),
+        name,
+        sub: String(r.subtitle || '').trim() || null,
+        url: rsiAbs(r.url),
+        img: rsiAbs(img && (img.storeSmall || img.slideshow)),
+        price: p ? p.price : null,
+        was: p ? p.was : null,
+        warbond: r.isWarbond === true,
+        pack: r.isPackage === true,
+        available: st.available === true || st.unlimited === true,
+        kind: subKind(kindText),
+        tiers: subTiers([tags.join(' '), label].join(' ')),
+        tags,
+      });
+    }
+    return {
+      items,
+      count: Number.isFinite(listing.count) ? listing.count : items.length,
+      totalCount: Number.isFinite(listing.totalCount) ? listing.totalCount : null,
+    };
+  };
+  // Does this account get a Subscriber Store? (signed in and a subscriber)
+  OH.isSubscriber = (acct) =>
+    !!(acct && acct.loggedIn === true && acct.subscriber && acct.subscriber.type);
+  // The cached list for this account ({ at, nickname, total, items, partial }) or null.
+  OH.getSubStoreCached = async function getSubStoreCached(acct) {
+    const { [SUB_STORE_KEY]: c } = await chrome.storage.local.get(SUB_STORE_KEY);
+    if (!c || !Array.isArray(c.items)) return null;
+    if (acct && acct.nickname && c.nickname && c.nickname !== acct.nickname) return null;
+    return c;
+  };
+  // Due for its once-a-day read? (never tried, or the last try a day ago)
+  OH.subStoreDue = async function subStoreDue() {
+    const { [SUB_STORE_KEY]: c } = await chrome.storage.local.get(SUB_STORE_KEY);
+    const last = c ? Math.max(c.at || 0, c.triedAt || 0) : 0;
+    return Date.now() - last >= SUB_STORE_TTL;
+  };
+  let subStoreInflight = null;
+  // Read the whole list (or answer from the day's cache unless `force`).
+  // → { ok: true, list } | { ok: false, error, list? (the last good one) }.
+  // error: 'signed-out' | 'not-subscriber' | 'busy' | 'refused' | 'network'. Never throws.
+  // `pause` is the wait between pages (tests skip it).
+  OH.getSubStore = function getSubStore({
+    force = false,
+    account,
+    fetchFn = fetch,
+    onProgress,
+    pause = () => sleep(DELAY_MS + Math.random() * 400),
+  } = {}) {
+    if (subStoreInflight) return subStoreInflight;
+    subStoreInflight = readSubStore({ force, account, fetchFn, onProgress, pause }).finally(() => {
+      subStoreInflight = null;
+    });
+    return subStoreInflight;
+  };
+  async function readSubStore({ force, account, fetchFn, onProgress, pause }) {
+    const acct = account === undefined ? await OH.getAccount().catch(() => null) : account;
+    if (!acct || acct.loggedIn !== true) return { ok: false, error: 'signed-out' };
+    if (!OH.isSubscriber(acct)) return { ok: false, error: 'not-subscriber' };
+    const cached = await OH.getSubStoreCached(acct);
+    if (!force && cached && Date.now() - (cached.at || 0) < SUB_STORE_TTL)
+      return { ok: true, list: cached };
+    const markTried = () =>
+      chrome.storage.local
+        .set({
+          [SUB_STORE_KEY]: {
+            ...(cached || { items: [] }),
+            nickname: acct.nickname || null,
+            triedAt: Date.now(),
+          },
+        })
+        .catch(() => {});
+    const get = OH.guarded(fetchFn, { timeout: 20000 });
+    const ask = async (page, limit) => {
+      let res;
+      try {
+        res = await get(GRAPHQL_URL, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'content-type': 'application/json', Accept: 'application/json' },
+          body: subStoreBody(page, limit),
+        });
+      } catch (e) {
+        return { error: 'network', msg: e?.message || String(e) };
+      }
+      if (res.status === 401 || res.status === 403) return { error: 'refused', status: res.status };
+      if (res.status === 429 || res.status >= 500) return { error: 'busy', status: res.status };
+      if (!res.ok) return { error: 'bad', status: res.status };
+      let json;
+      try {
+        json = await res.json();
+      } catch {
+        return { error: 'bad' };
+      }
+      const d = Array.isArray(json) ? json[0] : json;
+      if (d && Array.isArray(d.errors) && d.errors.length)
+        return { error: 'bad', msg: d.errors.map((e) => e && e.message).join('; ') };
+      const parsed = OH.parseSubStore(json);
+      return parsed || { error: 'bad', msg: 'no listing in the answer' };
+    };
+    const fail = async (r) => {
+      await markTried();
+      OH.log(
+        'warn',
+        'subStore',
+        `subscriber store read stopped: ${r.error} ${r.status || ''} ${r.msg || ''}`.trim(),
+      );
+      return { ok: false, error: r.error === 'bad' ? 'network' : r.error, list: cached || null };
+    };
+    // Page 1 at 100; if RSI refuses that size, again at its own 20.
+    let limit = SUB_STORE_PAGE;
+    let first = await ask(1, limit);
+    if (first.error === 'bad') {
+      await pause();
+      limit = SUB_STORE_PAGE_MIN;
+      first = await ask(1, limit);
+    }
+    if (first.error) return fail(first);
+    const total = first.totalCount;
+    // RSI may hand back fewer than asked: page on at the size it actually uses.
+    if (
+      first.items.length &&
+      first.items.length < limit &&
+      total != null &&
+      first.items.length < total
+    )
+      limit = first.items.length;
+    const seen = new Set();
+    const items = [];
+    const add = (list) => {
+      let n = 0;
+      for (const it of list) {
+        if (seen.has(it.id) || items.length >= OH.SUB_STORE_MAX) continue;
+        seen.add(it.id);
+        items.push(it);
+        n++;
+      }
+      return n;
+    };
+    add(first.items);
+    onProgress?.(items.length, total);
+    let partial = false;
+    for (let page = 2; page <= SUB_STORE_MAX_PAGES; page++) {
+      if (total != null && items.length >= total) break;
+      if (items.length >= OH.SUB_STORE_MAX) break;
+      await pause();
+      const r = await ask(page, limit);
+      if (r.error) {
+        partial = true; // keep what came in, say it's short
+        OH.log(
+          'warn',
+          'subStore',
+          `subscriber store page ${page}: ${r.error} ${r.status || ''}`.trim(),
+        );
+        break;
+      }
+      if (!r.items.length || add(r.items) === 0) break;
+      onProgress?.(items.length, total);
+    }
+    // A short read never replaces a fuller list from earlier.
+    if (partial && cached && cached.items.length > items.length) return fail({ error: 'busy' });
+    const list = {
+      at: Date.now(),
+      nickname: acct.nickname || null,
+      total: total ?? items.length,
+      pageSize: limit,
+      partial,
+      items,
+    };
+    try {
+      await chrome.storage.local.set({ [SUB_STORE_KEY]: list });
+    } catch {
+      /* storage full: this page view still has the list */
+    }
+    return { ok: true, list };
+  }
 
   // --- Is a ship in the store right now? -------------------------------------------
   // The upgrade-tool feed above only lists CCU targets, so it can't answer this.

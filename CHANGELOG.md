@@ -4,6 +4,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- New: **Your Subscriber Store.** Subscribers see the items RSI offers their account on
+  the Store page, with pictures, prices, a search box, type chips and Buy at RSI. It reads
+  RSI at most once a day (on the Store page or after a scan, never inside the scan), and
+  Refresh reads it again. Not a subscriber? Nothing is asked of RSI.
 - New: **RSI Quick Links.** One jump to the RSI pages pilots hunt for: your hangar,
   buy-backs, billing, subscriptions, handle and profile, login and security, the launcher,
   PTU copy, Spectrum and your Citizen Dossier. They sit in a card on Home and fold open
