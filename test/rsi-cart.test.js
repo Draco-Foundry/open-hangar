@@ -23,6 +23,7 @@ function fakeRsi({
 } = {}) {
   const calls = []; // the upgrade tool's calls (context + GraphQL)
   const all = []; // every request, the RSI page and setAuthToken too
+  const tickets = []; // addToCart's ticket handed to the cart
   const res = (body, code = 200, headers = {}) => ({
     ok: code >= 200 && code < 300,
     status: code,
@@ -35,6 +36,10 @@ function fakeRsi({
     if (url === C.PLEDGE_STORE_URL)
       return res('<html><head><meta name="csrf-token" content="csrf-from-page"></head></html>');
     if (url === C.AUTH_URL) return res({ success: 1 });
+    if (url === C.CART_TOKEN_URL) {
+      tickets.push({ body: JSON.parse(init.body), init });
+      return res({ success: 1, code: 'OK' });
+    }
     const body = JSON.parse(init.body);
     calls.push({ url, body, init });
     const op = url.endsWith('setContextToken') ? 'context' : body.operationName;
@@ -82,6 +87,7 @@ function fakeRsi({
     fetch,
     calls,
     all,
+    tickets,
     ops: () =>
       calls.map((c) => (c.url.endsWith('setContextToken') ? 'context' : c.body.operationName)),
   };
@@ -129,8 +135,8 @@ test('parsing: prices in dollars, the from list, errors, owned ships first and b
   assert.equal(C.gqlError({ errors: [{ message: 'Not logged in' }] }), 'signed-out');
   assert.equal(C.gqlError({ errors: [{ message: 'Sku is not available' }] }), 'refused');
   assert.equal(C.gqlError({ data: {} }), null);
-  assert.equal(C.parseAdded({ data: { addToCart: { jwt: 'x' } } }), true);
-  assert.equal(C.parseAdded({ data: { addToCart: null } }), false);
+  assert.equal(C.parseAdded({ data: { addToCart: { jwt: 'x' } } }), 'x');
+  assert.equal(C.parseAdded({ data: { addToCart: null } }), null);
   const ships = C.parseShips({
     data: {
       ships: [
@@ -510,4 +516,17 @@ test('an edition RSI sells no upgrade to (Ship not found): the next edition is t
     skus: [9001],
   });
   assert.deepEqual(none, { ok: false, error: 'refused' });
+});
+
+test("addToCart's ticket goes to the cart (RSI's second step), with x-rsi-token", async () => {
+  const rsi = fakeRsi();
+  const r = await fast(rsi, { rsiToken: async () => 'cookie-token' }).addUpgradeToCart(
+    101,
+    900,
+    9001,
+  );
+  assert.deepEqual(r, { ok: true });
+  assert.equal(rsi.tickets.length, 1);
+  assert.deepEqual(rsi.tickets[0].body, { jwt: 'header.payload.sig' });
+  assert.equal(rsi.tickets[0].init.headers['x-rsi-token'], 'cookie-token');
 });
