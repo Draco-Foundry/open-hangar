@@ -23,6 +23,7 @@
  */
 (function (root) {
   const RSI = 'https://robertsspaceindustries.com';
+  const AUTH_URL = `${RSI}/api/account/v2/setAuthToken`;
   const CONTEXT_URL = `${RSI}/api/ship-upgrades/setContextToken`;
   const UPGRADE_URL = `${RSI}/pledge-store/api/upgrade/graphql`;
   const CART_URL = `${RSI}/en/store/pledge/cart`;
@@ -50,6 +51,15 @@
   };
   const absUrl = (u) => (typeof u === 'string' && u.startsWith('/') ? RSI + u : u || null);
   const unwrap = (json) => (Array.isArray(json) ? json[0] : json) || {};
+
+  // The security token every RSI page carries (<meta name="csrf-token">). RSI's
+  // upgrade window sends it as X-CSRF-TOKEN on each GraphQL call; without it RSI
+  // answers as if nobody were signed in.
+  function parseCsrf(html) {
+    const tag = String(html || '').match(/<meta[^>]+name=["']csrf-token["'][^>]*>/i);
+    const m = tag && tag[0].match(/content=["']([^"']+)["']/i);
+    return m ? m[1] : null;
+  }
 
   // --- Request bodies (pure) ------------------------------------------------------
   // setContextToken: only the ids we know. A buy-back adds its pledge id.
@@ -159,38 +169,41 @@
     let last = 0;
     let holdUntil = 0; // RSI said slow down: nothing before this
 
-    // RSI's pages send their session token back as a header; we do the same when the
-    // browser lets us read it (the "cookies" permission), harmless otherwise.
-    async function rsiToken() {
-      try {
-        const c = root.chrome && root.chrome.cookies;
-        if (!c || !c.get) return null;
-        const got = await c.get({ url: RSI, name: 'Rsi-Token' });
-        return (got && got.value) || null;
-      } catch {
-        return null;
-      }
-    }
+    // How RSI's own upgrade window signs in (its rsi-store-common code):
+    // setAuthToken and setContextToken carry the Rsi-Token cookie as x-rsi-token,
+    // and every GraphQL call carries the page's csrf-token as X-CSRF-TOKEN.
+    const cookieToken =
+      deps.rsiToken ||
+      (async () => {
+        try {
+          const c = root.chrome && root.chrome.cookies;
+          if (!c || !c.get) return null;
+          const got = await c.get({ url: RSI, name: 'Rsi-Token' });
+          if (!got || !got.value) return null;
+          try {
+            return decodeURIComponent(got.value);
+          } catch {
+            return got.value;
+          }
+        } catch {
+          return null;
+        }
+      });
+    let csrf = null; // { value, at }: read from an RSI page, kept 10 minutes
+    const CSRF_TTL = 10 * 60e3;
 
-    // One POST. → { json } or { error, retryAt? }. Never retried here.
-    function post(url, body) {
+    // One request in the lane: paced, held after a 429. → { res } or { error, retryAt? }.
+    function send(url, init) {
       const run = async () => {
         if (now() < holdUntil) return { error: 'busy', retryAt: holdUntil };
         const wait = last + GAP_MS + rand() * GAP_MS * 1.5 - now();
         if (last && wait > 0) await sleep(wait);
         last = now();
-        const token = await rsiToken();
         let res;
         try {
           res = await fetchFn(url, {
-            method: 'POST',
             credentials: 'include',
-            headers: {
-              'content-type': 'application/json',
-              accept: 'application/json',
-              ...(token ? { 'x-rsi-token': token } : {}),
-            },
-            body: JSON.stringify(body),
+            ...init,
             signal:
               root.AbortSignal && AbortSignal.timeout ? AbortSignal.timeout(20000) : undefined,
           });
@@ -202,21 +215,64 @@
           holdUntil = now() + (after > 0 ? Math.min(after * 1000, 15 * 60e3) : SLOW_DOWN_MS);
           return { error: 'busy', retryAt: holdUntil };
         }
-        if (res.status === 401) return { error: 'signed-out' };
-        if (res.status === 403) return { error: 'refused' };
-        if (!res.ok) return { error: 'network' };
-        if (url === CONTEXT_URL) return { json: null }; // only its cookie matters
-        try {
-          return { json: await res.json() };
-        } catch {
-          return { error: 'network' };
-        }
+        return { res };
       };
       const p = lane.then(run, run);
       lane = p.catch(() => {});
       return p;
     }
+
+    async function csrfToken() {
+      if (csrf && now() - csrf.at < CSRF_TTL) return csrf.value;
+      const r = await send(PLEDGE_STORE_URL, { method: 'GET', headers: { accept: 'text/html' } });
+      if (r.error || !r.res.ok) return null;
+      let value = null;
+      try {
+        value = parseCsrf(await r.res.text());
+      } catch {
+        value = null;
+      }
+      csrf = value ? { value, at: now() } : null;
+      return value;
+    }
+
+    // One POST. → { json } or { error, retryAt? }. Never retried here.
+    async function post(url, body) {
+      const token = url === UPGRADE_URL ? await csrfToken() : await cookieToken();
+      const tokenHeader =
+        url === UPGRADE_URL
+          ? token
+            ? { 'X-CSRF-TOKEN': token }
+            : {}
+          : token
+            ? { 'x-rsi-token': token }
+            : {};
+      const r = await send(url, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json;charset=UTF-8',
+          accept: 'application/json',
+          ...tokenHeader,
+        },
+        body: JSON.stringify(body),
+      });
+      if (r.error) return r;
+      const res = r.res;
+      if (res.status === 401) return { error: 'signed-out' };
+      if (res.status === 403) return { error: 'refused' };
+      if (!res.ok) return { error: 'network' };
+      if (url !== UPGRADE_URL) return { json: null }; // only their cookies matter
+      try {
+        return { json: await res.json() };
+      } catch {
+        return { error: 'network' };
+      }
+    }
+    // Opens RSI's upgrade window: sign the tool in, then set what's being upgraded
+    // (RSI's own window does both, every time it opens).
     const setContext = async (ids) => {
+      const a = await post(AUTH_URL, {});
+      if (a.error) return a;
       const r = await post(CONTEXT_URL, contextBody(ids));
       return r.error ? r : { ok: true };
     };
@@ -253,7 +309,10 @@
       const s = await ask(shipsBody());
       if (s.error) return fail(s);
       const app = parseApp(s.json);
-      if (app && app.anonymous) return { ok: false, error: 'signed-out' };
+      if (app && app.anonymous) {
+        csrf = null; // read a fresh token next time
+        return { ok: false, error: 'signed-out' };
+      }
       const f = await ask(filterBody(toSkuId, pledge ? opts.fromShipId : null));
       if (f.error) return fail(f);
       const fromIds = parseFrom(f.json);
@@ -302,7 +361,10 @@
       const a = await ask(appBody());
       if (a.error) return fail(a);
       const app = parseApp(a.json);
-      if (app && app.anonymous) return { ok: false, error: 'signed-out' };
+      if (app && app.anonymous) {
+        csrf = null; // read a fresh token next time
+        return { ok: false, error: 'signed-out' };
+      }
       if (pledge && (!app || app.mode !== 'buyback')) return { ok: false, error: 'refused' };
       if (!pledge && app && app.mode === 'buyback') return { ok: false, error: 'refused' };
       const r = await ask(addBody(fromShipId, toSkuId));
@@ -320,10 +382,12 @@
     CART_URL,
     SIGN_IN_URL,
     PLEDGE_STORE_URL,
+    AUTH_URL,
     CONTEXT_URL,
     UPGRADE_URL,
     // Pure pieces, for tests.
     contextBody,
+    parseCsrf,
     filterBody,
     priceBody,
     addBody,
