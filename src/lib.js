@@ -3719,6 +3719,7 @@
         const editions = (s.skus || [])
           .filter((k) => k && k.available)
           .map((k) => ({
+            id: Number.isInteger(k.id) ? k.id : null, // the SKU, for Add to RSI Cart
             title: String(k.title || '').trim(),
             price: Number(k.price) / 100,
             warbond: /warbond/i.test(k.title || ''),
@@ -3737,6 +3738,33 @@
         };
       });
   };
+  // --- Add to RSI Cart (#288) ----------------------------------------------------
+  // Ship upgrades into the RSI cart, in your own RSI session, only on a click. The
+  // requests live in src/rsi-cart.js (loaded before this file) so the background
+  // worker can answer the website's store with the same code.
+  //   OH.upgradeOptions(toShipId, toSkuId, { pledgeId? })
+  //     → { ok, options: [{ id, name, image, eligible, price }] } | { ok: false, error }
+  //   OH.upgradePrice(fromShipId, toSkuId, { pledgeId?, toShipId? }) → { ok, price } | …
+  //   OH.addUpgradeToCart(fromShipId, toShipId, toSkuId, { pledgeId? }) → { ok } | …
+  // error: 'signed-out' | 'refused' | 'busy' | 'network'. Never retried.
+  const cart = () => window.OHCart;
+  OH.upgradeOptions = (toShipId, toSkuId, opts) =>
+    cart() ? cart().upgradeOptions(toShipId, toSkuId, opts) : { ok: false, error: 'network' };
+  OH.upgradePrice = (fromShipId, toSkuId, opts) =>
+    cart() ? cart().upgradePrice(fromShipId, toSkuId, opts) : { ok: false, error: 'network' };
+  OH.addUpgradeToCart = (fromShipId, toShipId, toSkuId, opts) =>
+    cart()
+      ? cart().addUpgradeToCart(fromShipId, toShipId, toSkuId, opts)
+      : { ok: false, error: 'network' };
+  OH.RSI_CART_URL = 'https://robertsspaceindustries.com/en/store/pledge/cart';
+  // The SKU an upgrade to this store ship goes to: its cheapest edition on offer.
+  OH.upgradeSku = function upgradeSku(storeShip) {
+    const eds = ((storeShip && storeShip.editions) || []).filter((e) => e && e.id);
+    if (!storeShip || !storeShip.id || !eds.length) return null;
+    const best = eds.reduce((a, b) => (b.price < a.price ? b : a));
+    return { toShipId: storeShip.id, toSkuId: best.id, price: best.price, title: best.title };
+  };
+
   const STORE_KEY = 'storeShips';
   const STORE_TTL = 6 * 3600e3;
   // → { at, ships } (cached 6 hours), or the cached copy / null when RSI doesn't answer.

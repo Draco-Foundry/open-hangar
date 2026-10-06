@@ -4,6 +4,7 @@
   // its own RSI page, read when the window opens (Details.svelte asks) and kept.
   import Row from './Row.svelte';
   import Reclaim from './Reclaim.svelte';
+  import RsiCart from './RsiCart.svelte';
 
   let { v, error = '' } = $props();
 </script>
@@ -23,6 +24,11 @@
   {#if v.date}<Row k="Melted">{v.date}</Row>{/if}
   {#if v.id}<Row k="Pledge ID">{v.id}</Row>{/if}
   {#if v.reclaim}<Row k="Reclaim"><Reclaim r={v.reclaim} /></Row>{/if}
+  {#if v.cart}
+    {#key v.cart.pledgeId}
+      <RsiCart kind="buyback" target={v.cart.target} from={v.cart.from} pledgeId={v.cart.pledgeId} />
+    {/key}
+  {/if}
   {#if v.contents}
     {#if v.contents.ships.length}
       <h4 class="modal-h">Ships ({v.contents.ships.length})</h4>

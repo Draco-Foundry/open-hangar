@@ -4,6 +4,7 @@
   import { app, version } from '../lib/app.svelte.js';
   import Row from './Row.svelte';
   import Reclaim from './Reclaim.svelte';
+  import RsiCart from './RsiCart.svelte';
 
   let { v, onChange } = $props();
 
@@ -50,6 +51,9 @@
         >
       {:else}<span class="muted">—</span>{/if}
     </Row>
+  {/if}
+  {#if v.upgrade}
+    {#key v.upgrade.toSkuId}<RsiCart kind="upgrade" target={v.upgrade} />{/key}
   {/if}
   {#if v.comesWith}
     <Row k="Comes with">

@@ -4,6 +4,12 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- New: **Add to RSI Cart for ship upgrades.** Open a ship's window, tap See Upgrade
+  Prices, and Open Hangar asks RSI which of your ships can upgrade to it and what each
+  costs. Pick one and it lands in your RSI cart at the upgrade price. Buy-back upgrades
+  get the same button in their window, at RSI's buy-back price. You check out on RSI as
+  usual; nothing is bought here. On Chrome and Edge the website's store can use it too.
+
 ## 0.2.17 — 2026-10-04
 
 - New: **an Open Beta note.** Open Hangar is still spooling up for its official release

@@ -127,3 +127,31 @@ test('This Week in Star Citizen: short summary from the real post', () => {
     { day: 'Friday, October 2', items: ['RSI Weekly Newsletter'] },
   ]);
 });
+
+test('upgradeSku: the SKU an Add to RSI Cart goes to (cheapest edition on offer)', () => {
+  const ships = OH.parseStoreShips({
+    data: {
+      ships: [
+        {
+          id: 900,
+          name: 'Example Hauler',
+          skus: [
+            { id: 9001, title: 'Standard Edition', available: true, price: 20000 },
+            { id: 9002, title: 'Warbond Edition', available: true, price: 18000 },
+            { id: 9003, title: 'Old Edition', available: false, price: 10000 },
+          ],
+        },
+        { id: 901, name: 'Example Concept', skus: [] },
+      ],
+    },
+  });
+  assert.equal(ships[0].editions[0].id, 9001);
+  assert.deepEqual(OH.upgradeSku(ships[0]), {
+    toShipId: 900,
+    toSkuId: 9002,
+    price: 180,
+    title: 'Warbond Edition',
+  });
+  assert.equal(OH.upgradeSku(ships[1]), null);
+  assert.equal(OH.upgradeSku({ id: 5, editions: [{ title: 'Old cache', price: 1 }] }), null);
+});

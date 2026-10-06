@@ -32,7 +32,12 @@ function load() {
       onStartup: listen(),
       onUpdateAvailable: listen(),
       onMessageExternal: { addListener: (f) => (external = f) },
-      getManifest: () => ({ version: '0.0.0' }),
+      getManifest: () => ({
+        version: '0.0.0',
+        externally_connectable: {
+          matches: ['https://app.openhangar.space/*', 'https://staging.openhangar.space/*'],
+        },
+      }),
       getURL: (p) => `chrome-extension://id/${p}`,
     },
     action: { onClicked: listen(), setBadgeText() {}, setTitle() {}, setBadgeBackgroundColor() {} },
@@ -58,7 +63,11 @@ const b64 = (buf) => Buffer.from(buf).toString('base64url');
 
 test('our site: hello, begin with a PKCE challenge, finish with the code', async () => {
   const x = load();
-  assert.deepEqual(await x.send({ type: 'oh-hello' }, SITE), { ok: true });
+  assert.deepEqual(await x.send({ type: 'oh-hello' }, SITE), {
+    ok: true,
+    cart: true,
+    connect: true,
+  });
   const begin = await x.send({ type: 'oh-connect-begin' }, SITE);
   assert.ok(begin.ok);
   assert.equal(begin.redirect_uri, 'https://aeabioadfphghjennmdbnpelojlhndjl.chromiumapp.org/');

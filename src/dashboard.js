@@ -3970,6 +3970,8 @@ function bbView(b) {
           }
         : null,
     canLoad: bbNeedsRead(b) && !b.isCCU && /^\d+$/.test(String(b.id)),
+    // Add to RSI Cart (#288): a buy-back upgrade whose button carried both ships.
+    cart: bbCartOf(b),
     // Filled from this browser instead of RSI's page: the small print says so.
     source: (d && BB_SOURCE_NOTE[d.src]) || '',
     art: {
@@ -3978,6 +3980,22 @@ function bbView(b) {
       preferShip: !!b.ccu && !b.shipArt,
       placeholder: 'Buy-Back',
     },
+  };
+}
+// A buy-back upgrade RSI can put back in the cart: its pledge id and the from/to
+// ship and SKU ids from its buy-back button (parser.js). null for anything else,
+// and for a retired ship RSI no longer sells back (#306).
+function bbCartOf(b) {
+  if (!b || !b.isCCU || !b.ccu || OH.retiredBuyback(b)) return null;
+  const n = (v) => (/^\d+$/.test(String(v || '')) ? Number(v) : null);
+  const [pledgeId, fromShipId, toShipId, toSkuId] = [b.id, b.fromShipId, b.toShipId, b.toSkuId].map(
+    n,
+  );
+  if (!pledgeId || !fromShipId || !toShipId || !toSkuId) return null;
+  return {
+    pledgeId,
+    from: { id: fromShipId, name: b.ccu.from },
+    target: { toShipId, toSkuId, name: b.ccu.to },
   };
 }
 // Fills buy-back details from your own hangar history (OH.fillBuybackDetailsFromHistory:
@@ -5138,6 +5156,11 @@ function shipView(name) {
     cargo: v && v.cargo ? `${v.cargo} SCU` : '',
     // In Store Now: the ship's own store page (asked once it shows), "—" with none.
     store: !st ? null : st.link ? { link: st.link } : storeData ? { none: true } : null,
+    // Add to RSI Cart (#288): RSI's upgrade tool sells an upgrade to it.
+    upgrade: (() => {
+      const u = st && st.forSale ? OH.upgradeSku(st) : null;
+      return u ? { toShipId: u.toShipId, toSkuId: u.toSkuId, name: st.name || title } : null;
+    })(),
     comesWith: inc
       ? inc.map((t) => ({ name: t.replace(/\s*\(.*\)\s*$/, '').trim(), text: t }))
       : null,
