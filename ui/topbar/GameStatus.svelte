@@ -1,7 +1,8 @@
 <script>
   // Game Status in the top bar (owner, Home Layout B Final): a pill like the
-  // website header's, "LIVE 4.10.1" with a dot in the services' colour (green all
-  // systems go, amber disrupted, red down). Click for LIVE and PTU, the newest patch
+  // website header's, compact since Top Bar Option A: "4.10.1" with a dot in the
+  // services' colour (green all systems go, amber disrupted, red down), "LIVE 4.10.1"
+  // on hover. Click for LIVE and PTU, the newest patch
   // notes and the event on now (and the next one). From openhangar.space's public
   // feed (ui/lib/game-status.js): asked at most every 10 minutes, the last copy
   // kept; until it has ever loaded the pill just says "Game Status".
@@ -21,6 +22,14 @@
   refresh();
 
   const pill = $derived(pillOf(gs));
+  // Compact in the bar (Top Bar Option A, 2026-10-06): the dot and "4.10.1"; the full
+  // "LIVE 4.10.1" (and how the services are doing) is the hover text and the label.
+  const short = $derived(gs?.live ? gs.live.version : pill.text);
+  const full = $derived(
+    [`Game Status: ${pill.text === 'Game Status' ? 'not loaded yet' : pill.text}`, gs?.status?.label]
+      .filter(Boolean)
+      .join('. '),
+  );
   const DOT_TITLE = { ok: 'All systems go', degraded: 'Some services disrupted', down: 'Services down' };
 
   let btn = $state();
@@ -46,10 +55,11 @@
     aria-haspopup="dialog"
     aria-expanded={menus.open === 'gs'}
     aria-controls="gs-menu"
-    title={gs?.status ? gs.status.label : 'Game Status'}
+    title={full}
+    aria-label={full}
     onclick={open}
   >
-    <i class="dot {pill.dot}" aria-hidden="true"></i><span class="gs-txt">{pill.text}</span><svg
+    <i class="dot {pill.dot}" aria-hidden="true"></i><span class="gs-txt">{short}</span><svg
       viewBox="0 0 24 24"
       width="13"
       height="13"
@@ -137,14 +147,14 @@
   .gs-pill {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    height: 34px;
-    padding: 0 12px;
+    gap: 7px;
+    height: 36px;
+    padding: 0 10px 0 12px;
     border-radius: 999px;
     border: 1px solid var(--line);
     background: var(--panel);
     color: var(--text);
-    font: 500 13px var(--font-head);
+    font: 500 13px var(--font-data);
     white-space: nowrap;
     cursor: pointer;
   }

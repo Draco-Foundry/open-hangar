@@ -65,6 +65,30 @@
     };
   });
 
+  // How the button draws its label (Top Bar Option A, 2026-10-06): an icon and the
+  // words, at one steady width so nothing beside it moves. "Scanning 2/4" while a scan
+  // runs (narrow bars keep just "2/4"), a tick and "Landed", the warning sign and
+  // "Rough Landing". Under 900px only the icon (or the count) shows; the words stay
+  // in the hover text and the label.
+  const ICONS = {
+    scan: '<path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/>',
+    done: '<path d="m5 12 5 5 9-10"/>',
+    warn: '<path d="M12 3 22 20H2L12 3Z"/><path d="M12 10v4.5M12 17.2v.3"/>',
+  };
+  const look = $derived.by(() => {
+    const label = d.label;
+    const m = /^Scanning…\s*(\d+)\/(\d+)$/.exec(label);
+    if (m) return { icon: 'scan', word: 'Scanning', count: `${m[1]}/${m[2]}`, aria: `Scanning ${m[1]} of ${m[2]}` };
+    if (/^✓\s*/.test(label)) {
+      const word = label.replace(/^✓\s*/, '');
+      return { icon: 'done', word, aria: `Scan ${word}` };
+    }
+    if (d.rough || label === 'Rough Landing') return { icon: 'warn', word: label, aria: label };
+    // The website sync step: shorter in the bar, the whole line in the hover text.
+    if (label === 'Syncing to Website…') return { icon: 'scan', word: 'Syncing…', aria: label };
+    return { icon: 'scan', word: label, aria: label };
+  });
+
   let btn = $state();
   let menu = $state();
   let scanBtn = $state();
@@ -104,32 +128,29 @@
     id="scan-home"
     class:scanning={d.scanning}
     class:rough={d.rough || d.label === 'Rough Landing'}
+    class:counting={!!look.count}
     disabled={d.busy}
     title={d.title}
+    aria-label={look.aria}
     aria-haspopup={d.report ? 'dialog' : undefined}
     aria-expanded={d.report ? menus.open === 'report' : undefined}
     onclick={onScan}
   >
     <span class="scan-fill" style:width="{d.fill}%"></span><span class="scan-label"
-      >{#if d.rough || d.label === 'Rough Landing'}<svg
-          class="scan-warn"
-          width="14"
-          height="14"
-          viewBox="0 0 16 16"
-          aria-hidden="true"
-          ><path
-            d="M8 1.5 15 14H1L8 1.5Z"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.6"
-            stroke-linejoin="round"
-          /><path
-            d="M8 6v3.6M8 11.6v.2"
-            stroke="currentColor"
-            stroke-width="1.6"
-            stroke-linecap="round"
-          /></svg
-        >{/if}{d.label}</span
+      ><svg
+        class="scan-ic {look.icon}"
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.9"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true">{@html ICONS[look.icon]}</svg
+      >{#if look.count}<span class="sl-word">{look.word}</span>
+        <span class="sl-count">{look.count}</span>{:else}<span class="sl-word">{look.word}</span
+        >{/if}</span
     >
   </button>
   <button
@@ -141,9 +162,10 @@
     aria-label="Scan options"
     title="Choose what to scan"
     onclick={(e) => toggleMenu('scan', e)}
+    ><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"
+      ><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" /></svg
+    ></button
   >
-    ▾
-  </button>
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
