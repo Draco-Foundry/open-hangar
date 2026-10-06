@@ -31,6 +31,28 @@ no alternate looks; light mode stays the one scheduled option. Reference mockup:
 - Big numbers shorten past a threshold (counts from 1,000: "1.2K"; money from $100,000:
   "$1.24M"), exact value on hover, so huge hangars never break a layout.
 
+## Home: Layout B, Final (owner, 2026-10-05; supersedes v5 below)
+
+Mockup: "Layout B, Final" with Game Status in the top bar (ohs-mockups, home-layout-v2).
+
+- **Top bar:** a Game Status pill ("LIVE 4.10.1", dot = RSI services) opening LIVE, PTU
+  with wave, Latest Patch Notes, the event on now and the next one. Game info only (no
+  buy-back tokens). Source: openhangar.space/api/game-status (v1), at most every 10
+  minutes, last copy kept; "Game Status" until it has ever loaded.
+- **Citizen Card** across the whole width. Subscriber and Chairman's Club one line each,
+  each opening a popup (perks and Manage; Concierge level, RSI's progress, the six-level
+  ladder, rewards for this level and the next).
+- **Row 2:** Account Value (no chart, no melt/gift line), Latest Acquisitions, Wishlist
+  Watch, a third each (halves at about 1100px, Wishlist Watch then full width).
+- **Row 3:** Quick Links, full width.
+- **Wishlist Watch:** the last check with its age; Check Now only (never in the
+  background). Rows are generic store items (kind, name or From → To, price, Warbond,
+  status, url, picture) so the website catalog feed can drive it later.
+- **Customize Home** (0.3.0: show/hide only): Citizen Card pinned; Hangar Spotlight and
+  Referrals off by default; up to ten saved layouts per browser (with a version field
+  for order and sizes later); Reset to Default. 12-column grid: the last card in a row
+  stretches, so rows end level.
+
 ## Home (v5, signed off 2026-09-30)
 
 Ordered by what a viewer needs first:
