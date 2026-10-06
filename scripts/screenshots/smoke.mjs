@@ -2578,6 +2578,32 @@ try {
       document.body.click();
       await wait(60);
 
+      // A good buy-back scan reads the never-read packs by itself afterwards (owner,
+      // 2026-10-06), and only those.
+      {
+        const keepFetch = OH.fetchBuybackDetails;
+        let asked = null;
+        OH.fetchBuybackDetails = async (ids) => ((asked = ids), { done: ids.length });
+        OH.scanSource = async (id) =>
+          id === 'buybacks'
+            ? { ok: true, items: state.buybacks, scannedAt: Date.now() }
+            : { ok: true, items: state.items, scannedAt: Date.now(), unchanged: true };
+        OH.getReferral = async () => ({ ok: true, referral: state.referral });
+        OH.getAccount = keep.acct;
+        await runScan({ store: false });
+        await wait(150);
+        OH.fetchBuybackDetails = keepFetch;
+        const want = state.buybacks
+          .filter((b) => !b.isCCU && !state.bbDetails[b.id] && /^pack(age)?$/.test(b.kind))
+          .map((b) => String(b.id));
+        r.packs = {
+          asked: asked && asked.length,
+          want: want.length,
+          same: !!asked && asked.every((id) => want.includes(id)),
+        };
+        topBar.report = null;
+      }
+
       // Part of it failed: one row per source, the failed one marked.
       OH.getAccount = keep.acct;
       OH.scanSource = async (id) =>
@@ -2608,6 +2634,10 @@ try {
     r.cleared = !document.querySelector('#scan-report') && !/Rough/.test(btn.textContent);
     return r;
   });
+  rep.packs &&
+  (rep.packs.want === 0
+    ? rep.packs.asked === null || rep.packs.asked === 0
+    : rep.packs.asked === rep.packs.want && rep.packs.same) &&
   rep.out &&
   rep.out.asked === 0 &&
   rep.out.kept &&
