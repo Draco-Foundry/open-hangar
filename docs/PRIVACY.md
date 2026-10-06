@@ -21,6 +21,7 @@ When you click Scan, the extension reads your own RSI account by making requests
 - Your buy-back pledges. After a good buy-back scan, the extension also opens up to 30 buy-back packs it hasn't read yet, to see what is inside each one. This means more requests to RSI than one page per scan. It is still read-only, and only ever your own account.
 - Account identity and balances (handle, display name, UEE Citizen Record number, org, rank, Store Credit, UEC, REC). The Citizen Record number is the public number on your RSI profile. It never changes.
 - Your referral code and your recruits/prospects (handles, monikers, dates).
+- If you're a subscriber: the subscriber-only items RSI offers your account (names, pictures, prices and availability), at most once a day, to show them on the Store page. Nothing about them is sent to us unless you sync.
 - Any org members' ship lists you choose to import on the Org Fleet page (ship names and LTI only).
 
 If you use more than one RSI account in this browser, each account's data is kept separately so they don't overwrite each other (see [Multiple accounts](#multiple-accounts)).
