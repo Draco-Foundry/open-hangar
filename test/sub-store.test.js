@@ -69,7 +69,7 @@ test('parseSubStore: names, dollars, pictures, stock, chips (invented fixture)',
   assert.equal(plush.img, null);
   assert.equal(plush.price, 0);
   assert.equal(plush.available, true); // unlimited stock
-  assert.equal(plush.kind, 'Decorations');
+  assert.equal(plush.kind, 'Flair'); // Decorations merged into Flair
   assert.deepEqual(plush.tiers, []); // nothing said: no tier guessed
 });
 
@@ -77,6 +77,57 @@ test('parseSubStore: not a listing → null', () => {
   assert.equal(OH.parseSubStore(null), null);
   assert.equal(OH.parseSubStore({ data: { store: null } }), null);
   assert.equal(OH.parseSubStore([{ errors: [{ message: 'x' }] }]), null);
+});
+
+// Shelf sorting (#418): ~30 invented names in the shapes RSI uses, no tags, so
+// only the name decides. Other must stay small.
+test('subStoreKind: invented names land on the right shelf, Other stays small', () => {
+  const cases = [
+    ["Kastak Arms Inquisitor 'Star Kitten' Armor Set", 'Armor'],
+    ['Star Kitten Kit', 'Kits and Bundles'],
+    ['Banu Ochelo Set', 'Kits and Bundles'],
+    ['Coin and Weapon Display Set', 'Flair'],
+    ['Nebula Drift Paint', 'Paints'],
+    ['Aurora Frostbite Livery', 'Paints'],
+    ['Quasar Explorer Helmet', 'Armor'],
+    ['Pembroke Undersuit Midnight', 'Armor'],
+    ['Corbel Helmet and Armor Set', 'Armor'],
+    ['Venture Backpack Sandstorm', 'Armor'],
+    ['Gemini S71 Rifle Ember', 'Weapons'],
+    ['Arclight Pistol Gold Edition', 'Weapons'],
+    ['Devastator Shotgun Bloodline', 'Weapons'],
+    ['Frontier Jacket Ochre', 'Clothing'],
+    ['Stoneface Balaclava', 'Clothing'],
+    ['Hangar Crew Cap', 'Clothing'],
+    ['Deckhand Boots Charcoal', 'Clothing'],
+    ['Lunar Gala Gown', 'Clothing'],
+    ['Racer Flight Suit Crimson', 'Clothing'],
+    ['Pilot Goggles Amber', 'Clothing'],
+    ['Station Mug Blue', 'Flair'],
+    ['Origin 890 Jump Model', 'Flair'],
+    ['Tiny Hangar Plushie', 'Flair'],
+    ['Racing Trophy 2955', 'Flair'],
+    ['Weapon Rack Gunmetal', 'Flair'],
+    ['Pico Penguin Dashbot', 'Flair'],
+    ['Vanduul Skull Display Case', 'Flair'],
+    ['Explorer Starter Pack', 'Kits and Bundles'],
+    ['Frontier Fashion Collection', 'Kits and Bundles'],
+    ['Standalone Ship Example Hauler', 'Ships'],
+    ['Mystery Item 42', 'Other'],
+  ];
+  for (const [name, want] of cases) assert.equal(OH.subStoreKind({ name }), want, name);
+  const other = cases.filter(([name]) => OH.subStoreKind({ name }) === 'Other').length;
+  assert.ok(other <= 1, `Other has ${other}`);
+  // Specific RSI tags win; a vague or mixed tag set falls back to the name.
+  assert.equal(OH.subStoreKind({ tags: ['Paints', 'Imperator'], name: 'Mystery' }), 'Paints');
+  assert.equal(OH.subStoreKind({ tags: ['Imperator'], name: 'Frontier Jacket' }), 'Clothing');
+  assert.equal(
+    OH.subStoreKind({ tags: ['Armor', 'Weapons'], name: 'Combat Ready Bundle' }),
+    'Kits and Bundles',
+  );
+  // Word boundaries: "Kitten" is not a kit, "Arms" (a maker) is not armor.
+  assert.equal(OH.subStoreKind({ name: 'Kitten Ears' }), 'Other');
+  assert.equal(OH.subStoreKind({ name: 'Kastak Arms Coda' }), 'Other');
 });
 
 // A fake RSI: `total` items, honoring the asked limit up to `cap`.

@@ -4212,19 +4212,53 @@
       was: sale ? p.amount / 100 : null,
     };
   };
-  // Shelf names for the filter chips, from the item's tags, type and name.
-  const SUB_KINDS = [
-    ['Paints', /\b(paint|livery|liveries|skin)s?\b/i],
-    ['Armor', /\b(armou?r|helmet|undersuit|backpack)s?\b/i],
-    ['Weapons', /\b(weapon|rifle|pistol|smg|shotgun|sniper|knife|launcher)s?\b/i],
-    ['Clothing', /\b(clothing|jacket|shirt|hat|pants|boots|outfit|apparel|hoodie|coat)s?\b/i],
+  // Shelf names for the filter chips. RSI's own tags/type first when they name
+  // exactly one shelf; otherwise the item's name (plus label and subtitle), checked
+  // in a fixed order so the more telling word wins: a paint is a paint, a display
+  // or mug is Flair even when it says "Weapon" or "Set", armor stays Armor even as
+  // an "Armor Set", and Kit/Set/Pack/Bundle/Collection wins over the loose words
+  // after it. Other only when nothing matches. Pure.
+  const SUB_TAG_KINDS = [
+    ['Paints', /\b(paints?|liver(y|ies)|skins?)\b/i],
+    ['Armor', /\b(armou?rs?|helmets?|undersuits?)\b/i],
+    ['Weapons', /\b(weapons?|fps weapons?)\b/i],
+    ['Clothing', /\b(clothing|clothes|apparel)\b/i],
+    ['Flair', /\b(flair|decorations?|collectibles?|hangar decor)\b/i],
+    ['Kits and Bundles', /\b(kits?|bundles?|packs?|packages?|collections?)\b/i],
+    ['Ships', /\b(ships?|vehicles?|standalone ships?)\b/i],
+  ];
+  const SUB_NAME_KINDS = [
+    ['Paints', /\b(paints?|liver(y|ies)|skins?)\b/i],
     [
-      'Decorations',
-      /\b(decorations?|hangar|plush|plushie|trophy|model|poster|flair|statue|figurine)s?\b/i,
+      'Flair',
+      /\b(mugs?|cups?|displays?|cases?|racks?|plush(ie)?s?|posters?|models?|trophy|trophies|statues?|figures?|figurines?|paintings?|flags?|banners?|dashbots?|bobbleheads?|coins?|decorations?|flair)\b/i,
+    ],
+    ['Armor', /\b(armou?rs?|helmets?|undersuits?|backpacks?)\b/i],
+    ['Kits and Bundles', /\b(kits?|sets?|packs?|bundles?|collections?)\b/i],
+    [
+      'Weapons',
+      /\b(weapons?|rifles?|pistols?|smgs?|shotguns?|snipers?|knife|knives|launchers?|lmgs?|railguns?)\b/i,
+    ],
+    [
+      'Clothing',
+      /\b(clothing|apparel|outfits?|balaclavas?|hats?|caps?|beanies?|jackets?|coats?|shirts?|t-shirts?|hoodies?|sweaters?|pants|trousers|shorts|boots|shoes|gloves|gowns?|suits?|uniforms?|glasses|sunglasses|goggles|masks?|bandanas?|scarf|scarves|vests?|ponchos?|robes?|dress(es)?)\b/i,
     ],
     ['Ships', /\b(ships?|vehicles?|standalone)\b/i],
   ];
-  const subKind = (text) => (SUB_KINDS.find(([, re]) => re.test(text)) || ['Other'])[0];
+  OH.subStoreKind = function subStoreKind({
+    tags = [],
+    type = '',
+    name = '',
+    label = '',
+    sub = '',
+  } = {}) {
+    const tagText = [...tags, type].join(' ');
+    const fromTags = SUB_TAG_KINDS.filter(([, re]) => re.test(tagText));
+    if (fromTags.length === 1) return fromTags[0][0];
+    const text = [name, label, sub].join(' ');
+    const hit = SUB_NAME_KINDS.find(([, re]) => re.test(text));
+    return hit ? hit[0] : 'Other';
+  };
   // What RSI's tags or label say about the tier, as written; never inferred.
   const subTiers = (text) =>
     ['Imperator', 'Centurion'].filter((t) => new RegExp(`\\b${t}\\b`, 'i').test(text));
@@ -4247,7 +4281,6 @@
       const p = subPrice(r.nativePrice) || subPrice(r.price);
       const st = r.stock || {};
       const img = r.media && r.media.thumbnail;
-      const kindText = [tags.join(' '), r.type || '', label, name, r.subtitle || ''].join(' ');
       items.push({
         id: String(r.id),
         name,
@@ -4259,7 +4292,7 @@
         warbond: r.isWarbond === true,
         pack: r.isPackage === true,
         available: st.available === true || st.unlimited === true,
-        kind: subKind(kindText),
+        kind: OH.subStoreKind({ tags, type: r.type || '', name, label, sub: r.subtitle || '' }),
         tiers: subTiers([tags.join(' '), label].join(' ')),
         tags,
       });
