@@ -321,6 +321,47 @@
     fetchedAt: now,
   };
   window.DEMO_REFERRAL = referral;
+  // Invented subscriber items (names, prices and stock are made up).
+  const subItem = (id, name, cents, extra = {}) => ({
+    id,
+    name,
+    title: name,
+    url: `/en/pledge/Subscribers-Store/Demo-${id}`,
+    media: null,
+    nativePrice: { amount: cents, discounted: null },
+    stock: { available: true },
+    tags: [],
+    isWarbond: false,
+    ...extra,
+  });
+  window.DEMO_SUB_STORE = [
+    {
+      data: {
+        store: {
+          listing: {
+            resources: [
+              subItem(1, 'Nebula Drift Paint', 500, { tags: [{ name: 'Paints' }] }),
+              subItem(2, 'Quasar Explorer Helmet', 1200, {
+                nativePrice: { amount: 1200, discounted: 900 },
+                isWarbond: true,
+                tags: [{ name: 'Armor' }],
+              }),
+              subItem(3, 'Tiny Hangar Plushie', 300, {
+                stock: { available: false },
+                tags: [{ name: 'Decorations' }],
+              }),
+              subItem(4, 'Starlight Flight Jacket', 800, {
+                label: 'Centurion',
+                tags: [{ name: 'Clothing' }],
+              }),
+            ],
+            count: 4,
+            totalCount: 4,
+          },
+        },
+      },
+    },
+  ];
 
   const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
   const keysOf = (k) =>
@@ -393,6 +434,9 @@
           { headers: { 'content-type': 'application/json' } },
         ),
       );
+    // Your Subscriber Store (#418): an invented listing for the demo subscriber.
+    if (/\/graphql$/.test(url) && /GetBrowseSkusByFilter/.test(String(init.body || '')))
+      return Promise.resolve(Response.json(window.DEMO_SUB_STORE));
     if (/^https:\/\/(robertsspaceindustries\.com|api\.star-citizen\.wiki)\//.test(url)) {
       if (/\/account\/|\/graphql|\/citizens\//.test(url) && !/\/pledge\/buyback\//.test(url))
         return Promise.resolve(new Response('', { status: 404 }));

@@ -60,6 +60,10 @@ const BUDGET = {
   shipCatalog: { cap: 'one wiki vehicle list, replaced whole (30 days)', max: 1 * MB },
   shipMatrix: { cap: 'one RSI ship-matrix list, replaced whole', max: 300 * KB },
   storeShips: { cap: 'one store list, replaced whole (6 hours)', max: 1 * MB },
+  subStore: {
+    cap: 'SUB_STORE_MAX 2,000 items (20 pages), replaced whole once a day',
+    max: 1.5 * MB,
+  },
   netDown: small('hosts down in the last 10 minutes'),
   remoteStatus: small('one status.json, replaced whole'),
   account: small('the signed-in account, replaced whole'),
@@ -306,6 +310,32 @@ async function fillWorstCase() {
     'https://robertsspaceindustries.com/pledge/ships/new',
     async () => new Response('', { status: 404 }),
   );
+  // Your Subscriber Store through one real read: far more items than it keeps.
+  await OH.getSubStore({
+    account: { loggedIn: true, nickname: 'Main', subscriber: { type: 'Imperator' } },
+    pause: async () => {},
+    fetchFn: async (url, init) => {
+      const { page, limit } = JSON.parse(init.body)[0].variables.query;
+      const resources = Array.from({ length: limit }, (_, i) => {
+        const n = (page - 1) * limit + i;
+        return {
+          id: 9000000 + n,
+          name: `Subscriber Exclusive Nebula Drift Paint For The Example Hauler ${n}`,
+          subtitle: 'Example Hauler Series And Variants',
+          url: `/en/pledge/Subscribers-Store/Subscriber-Exclusive-Nebula-Drift-Paint-${n}`,
+          media: { thumbnail: { storeSmall: img(n, 5) } },
+          nativePrice: { amount: 1500, discounted: 1200 },
+          stock: { available: true },
+          tags: Array.from({ length: 12 }, (_, j) => ({ name: `Some Store Tag ${j}` })),
+          label: 'Imperator',
+          isWarbond: true,
+        };
+      });
+      return Response.json([
+        { data: { store: { listing: { resources, count: limit, totalCount: 5000 } } } },
+      ]);
+    },
+  });
   // The log, well past its cap, with the longest messages it keeps.
   for (let i = 0; i < 150; i++) OH.log('warn', 'hangar', `retry ${i} `.padEnd(700, 'x'));
   await OH.log('info', 'hangar', 'done');
@@ -318,6 +348,7 @@ test('worst case: every key within its budget, the total under the warning line'
   assert.ok(Object.keys(mem.shipStock2).length <= OH.CACHE_MAX.shipStock2);
   assert.ok(Object.keys(mem.pledgeArchive).length <= OH.ARCHIVE_MAX);
   assert.equal(mem.errorLog.length, 100);
+  assert.equal(mem.subStore.items.length, OH.SUB_STORE_MAX);
 
   const u = await OH.storageUsage();
   const over = [];
