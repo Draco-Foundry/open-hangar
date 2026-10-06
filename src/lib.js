@@ -3988,7 +3988,18 @@
     const eds = ((storeShip && storeShip.editions) || []).filter((e) => e && e.id);
     if (!storeShip || !storeShip.id || !eds.length) return null;
     const best = eds.reduce((a, b) => (b.price < a.price ? b : a));
-    return { toShipId: storeShip.id, toSkuId: best.id, price: best.price, title: best.title };
+    // Every edition, cheapest first: RSI may not sell an upgrade to the cheapest one.
+    const skus = eds
+      .slice()
+      .sort((a, b) => a.price - b.price)
+      .map((e) => e.id);
+    return {
+      toShipId: storeShip.id,
+      toSkuId: best.id,
+      skus,
+      price: best.price,
+      title: best.title,
+    };
   };
 
   const STORE_KEY = 'storeShips';

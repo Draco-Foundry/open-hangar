@@ -310,10 +310,26 @@
         csrf = null; // read a fresh token next time
         return { ok: false, error: 'signed-out' };
       }
-      const f = await ask(filterBody(toSkuId));
-      if (f.error) return fail(f);
-      const fromIds = parseFrom(f.json);
-      if (!fromIds) return { ok: false, error: 'refused' };
+      // RSI doesn't sell an upgrade to every edition (the C8X's BIS Warbond answers
+      // "Ship not found"), so try the other editions in turn (opts.skus).
+      const skus = [toInt(toSkuId), ...(opts.skus || []).map(toInt)].filter(
+        (v, i, a) => v && a.indexOf(v) === i,
+      );
+      let fromIds = null;
+      let lastErr = null;
+      for (const sku of skus) {
+        const f = await ask(filterBody(sku));
+        if (f.error && f.error !== 'refused') return fail(f);
+        const ids = f.error ? null : parseFrom(f.json);
+        if (ids && ids.length) {
+          fromIds = ids;
+          toSkuId = sku;
+          break;
+        }
+        lastErr = f;
+      }
+      if (!fromIds)
+        return lastErr && lastErr.error ? fail(lastErr) : { ok: false, error: 'refused' };
       const options = buildOptions(parseShips(s.json), fromIds, toShipId);
       const limit = Number.isInteger(opts.priceLimit) ? opts.priceLimit : PRICE_LIMIT;
       for (const o of options.filter((x) => x.eligible).slice(0, limit)) {
@@ -324,7 +340,7 @@
         }
         o.price = p.price;
       }
-      return { ok: true, mode: app ? app.mode : null, options };
+      return { ok: true, mode: app ? app.mode : null, options, toSkuId };
     }
 
     // The price of one upgrade, in the right mode (a buy-back sends its pledge id;

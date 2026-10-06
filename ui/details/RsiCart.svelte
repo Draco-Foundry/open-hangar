@@ -11,7 +11,7 @@
   import { OH } from '../lib/app.svelte.js';
 
   let { kind = 'upgrade', target, from = null, pledgeId = null } = $props();
-  // target: { toShipId, toSkuId, name }; from: { id, name } for a buy-back.
+  // target: { toShipId, toSkuId, skus?, name }; from: { id, name } for a buy-back.
 
   const RSI_SIGN_IN = 'https://robertsspaceindustries.com/connect';
   const usd = (n) =>
@@ -37,18 +37,21 @@
   const choice = $derived(
     kind === 'buyback' ? from && { ...from, price } : ok.find((o) => o.id === picked) || null,
   );
+  // The edition the upgrade goes to (may move off the cheapest one, see load()).
+  let skuId = $state(target.toSkuId);
   const pair = $derived(choice ? `${choice.name} to ${target.name}` : '');
 
   async function load() {
     phase = 'loading';
     error = null;
-    const r = await OH().upgradeOptions(target.toShipId, target.toSkuId);
+    const r = await OH().upgradeOptions(target.toShipId, skuId, { skus: target.skus });
     if (!r || !r.ok) {
       phase = 'error';
       error = { kind: (r && r.error) || 'network', when: 'load' };
       return;
     }
     options = r.options;
+    if (r.toSkuId) skuId = r.toSkuId; // the edition RSI sells an upgrade to
     const first = r.options.find((o) => o.eligible);
     picked = first ? first.id : null;
     phase = 'ready';
@@ -59,7 +62,7 @@
     picked = o.id;
     if (o.price != null) return;
     pricing = true;
-    const r = await OH().upgradePrice(o.id, target.toSkuId, {
+    const r = await OH().upgradePrice(o.id, skuId, {
       toShipId: target.toShipId,
       setContext: true,
     });
@@ -92,7 +95,7 @@
     const r = await OH().addUpgradeToCart(
       choice.id,
       target.toShipId,
-      target.toSkuId,
+      skuId,
       kind === 'buyback' ? { pledgeId } : {},
     );
     if (r && r.ok) {
