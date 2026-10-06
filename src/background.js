@@ -105,13 +105,19 @@ siteHandlers['oh-hello'] = () => ({ ok: true, cart: true, connect: false });
 // (src/rsi-cart.js); the page gets back your ships that can upgrade, RSI's prices,
 // the other ships RSI takes for it (Any Ship) and whether it worked. Nothing is
 // bought, and an add is never retried.
-//   oh-upgrade-options { toShipId, toSkuId }            → { ok, options, others }
+//   oh-upgrade-options { toShipId, toSkuId, skus? }     → { ok, options, others, toSkuId }
 //   oh-upgrade-price   { fromShipId, toSkuId }          → { ok, price }
+// skus: every edition on offer, cheapest first. RSI sells no upgrade to some
+// editions (the C8X's BIS Warbond), so the others are tried in turn and the one
+// that worked comes back as toSkuId, for the price and the add (website #329).
 //   oh-add-upgrade     { fromShipId, toShipId, toSkuId } → { ok } | { ok: false, error }
 if (typeof importScripts === 'function' && !self.OHCart) importScripts('rsi-cart.js');
 const cartLane = () => self.OHCart;
+const SITE_SKUS = 6; // editions tried at most: a few asks to RSI, never a burst
+const siteSkus = (v) =>
+  Array.isArray(v) ? v.filter((x) => Number.isInteger(x) && x > 0).slice(0, SITE_SKUS) : [];
 siteHandlers['oh-upgrade-options'] = (m) =>
-  cartLane().upgradeOptions(m.toShipId, m.toSkuId, { priceLimit: 4 });
+  cartLane().upgradeOptions(m.toShipId, m.toSkuId, { priceLimit: 4, skus: siteSkus(m.skus) });
 siteHandlers['oh-upgrade-price'] = (m) =>
   cartLane().upgradePrice(m.fromShipId, m.toSkuId, { toShipId: m.toShipId, setContext: true });
 siteHandlers['oh-add-upgrade'] = (m) =>
