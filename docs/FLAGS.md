@@ -60,7 +60,9 @@ what sync sends as optional data collection, asked on the first Connect.
 
 It stays opt-in: nothing personal goes to openhangar.space until you Connect. Before
 that, the extension only reads the public feeds (game status, ships, catalog, rates and
-the like), which carry nothing about you. Until launch day the website answers a sync
+the like), which carry nothing about you. `npm run test:privacy` (in CI) holds the built
+Chrome store extension to that: never connected, it scans and opens every page, and any
+request to the sync site fails the check. Until launch day the website answers a sync
 from an account without beta access with "Sync opens November 10" (reason `not-open`,
 a switch on the website's side): the extension shows that as a calm note in the scan
 report ("Not Synced Yet"), not a problem, and stays connected. The note uses the

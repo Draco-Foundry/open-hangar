@@ -23,6 +23,7 @@
     "lint:firefox-beta": "npm run build:beta && web-ext lint --self-hosted --source-dir dist/beta-firefox",
     "build:staging": "npm run build:ui && node scripts/pack.mjs --sync --site=https://staging.openhangar.space",
     "check:store": "node scripts/check-store-build.mjs",
+    "test:privacy": "node scripts/privacy-check.mjs",
     "screenshots": "npm run build:ui && node scripts/screenshots/run.mjs",
     "demo": "npm run build:ui && node scripts/screenshots/run.mjs --serve",
     "test:ui": "npm run build:ui && node scripts/screenshots/smoke.mjs",

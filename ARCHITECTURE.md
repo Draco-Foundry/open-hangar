@@ -380,9 +380,16 @@ When RSI changes a page, every installed copy breaks until a fix clears store re
   account (`scripts/screenshots/run.mjs --serve` on port 8323; `demo-shim.js` stubs
   `chrome.*`), drives your installed Chrome with `puppeteer-core`, and fails on page
   errors, empty views and misaligned List-view rows.
+- **Privacy check:** `npm run test:privacy` (after `npm run pack`) loads the built
+  Chrome store extension in Chrome as someone who never connected, presses Scan and
+  opens every page, with every request answered locally. It fails on any request to the
+  sync site (app.openhangar.space), anything but a plain GET of openhangar.space's
+  public feeds, or a host other than RSI and openhangar.space
+  (`scripts/privacy-check.mjs`).
 - **CI** (`.github/workflows/ci.yml`), on every push and PR: `npm ci`, `npm test`,
   `npm run format:check`, `npm run test:ui`, `npm run pack`, `web-ext lint` on the
-  Firefox build, and `scripts/actionlint.sh` on the workflow files.
+  Firefox build, the store check and the privacy check, and `scripts/actionlint.sh` on
+  the workflow files.
 - **RSI canary** (`.github/workflows/canary.yml`): once a day, `scripts/canary.mjs`
   runs the real parsers on RSI's public pages and tells #ops if one broke. It can't
   see signed-in pages.
