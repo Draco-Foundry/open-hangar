@@ -4,7 +4,7 @@
     "description": "Extension name (a brand; keep as is)."
   },
   "extDescription": {
-    "message": "Your Star Citizen hangar, made useful: ship values, melt candidates, CCU savings, fleet stats and buy-backs. Private and local.",
+    "message": "The free Star Citizen fleet manager. Your hangar, buy-backs, values and stats in one place. Private, with optional sync.",
     "description": "Store summary and manifest description, 132 characters max."
   }
 }

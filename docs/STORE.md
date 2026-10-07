@@ -82,7 +82,6 @@ Firefox Add-ons. Work top to bottom. Items marked ✅ are ready in the repo; ⬜
   - ☑ "I do not sell or transfer user data to third parties."
   - ☑ "I do not use/transfer data for purposes unrelated to the item's core function."
   - ☑ "I do not use/transfer data to determine creditworthiness / for lending."
-  - Local-only with no server is a strong position — state it plainly.
 
 ## 5. Permission Justifications (Paste Into the Dashboard)
 
@@ -124,17 +123,21 @@ install prompt only names robertsspaceindustries.com.)_
 
 **Summary (≤132 chars, also the manifest `description`):**
 
-> Your Star Citizen hangar, made useful: ship values, melt candidates, CCU savings, fleet stats and buy-backs. Private and local.
+> The free Star Citizen fleet manager. Your hangar, buy-backs, values and stats in one place. Private, with optional sync.
 
 **Detailed description:**
 
-> Open Hangar is a free companion for your Star Citizen account. It reads what RSI
-> already shows you (your hangar, buy-backs, balances, org and referrals) and turns it
-> into something you can actually use.
+The store fields are plain text: paste it without the `>` quote marks and the `**` bold
+markers, with each paragraph and each • bullet on one line.
+
+> **The free Star Citizen fleet manager.**
+>
+> Open Hangar reads what RSI already shows you (your hangar, buy-backs, balances, org
+> and referrals) and puts it all in one place you can actually use. No more clicking
+> through page after page of pledges.
 >
 > What you get:
-> • A clean home page: your account value and how it's changed over time, game
-> status and events, your newest pledges, and the latest from RSI
+> • A clean home page: your account value, game status and events, your newest pledges
 > • Hangar value: what your ships sell for at today's store prices, next to their
 > melt value
 > • Hangar alerts: a wishlist ship on sale, a ship you own turning flight ready, and more
@@ -146,15 +149,25 @@ install prompt only names robertsspaceindustries.com.)_
 > • Buy-backs with direct reclaim links, and a full referrals dashboard
 > • Streamer Mode hides your money amounts for streams and screenshots
 > • History: see what changed since your last scan, and back it all up to a file
-> • Export to CSV, JSON, or other fleet tools (Hangar Transfer Format)
+> • Export to CSV or JSON
 >
-> Private by design: it runs entirely in your browser, using the RSI session you're
-> already signed in with. No password, no account, no server. Nothing leaves your
-> device.
+> **Your fleet on any device (optional):** connect a free account at openhangar.space
+> and your hangar syncs after each scan, so you can check it from your phone.
+> Disconnect any time.
 >
-> Source available on GitHub. Ideas and bug reports are always welcome.
+> **Private by design:** Open Hangar runs in your browser, using the RSI session you're
+> already signed in with. It never asks for your password. Nothing about you is sent
+> to us unless you connect.
 >
-> Unofficial and fan-made. Not affiliated with Cloud Imperium Games or RSI.
+> The extension is source available on GitHub. Ideas and bug reports are always welcome.
+>
+> Unofficial and fan-made. Not affiliated with Cloud Imperium Games or RSI. Fly safe, o7.
+
+**Hold 0.3.0 until the store build has sync.** The sync parts (the "Your fleet on any
+device" paragraph, and "with optional sync" in the summary, which is also the manifest
+description in `_locales/en/messages.json`) are only true of a store build with sync in it.
+Today the store build has no sync: the `sync` flag is off for it and no sync site is built in
+([FLAGS.md](FLAGS.md)). Don't cut 0.3.0 for the stores or paste this copy until it does.
 
 ## 7. Submit & Review
 
@@ -185,17 +198,12 @@ install prompt only names robertsspaceindustries.com.)_
   Entertainment_.
 - ✅ Automated validation is instant; human review can follow after listing.
 
-## 10. Safari (Deferred)
-
-Needs a Mac with Xcode and the **$99/yr** Apple Developer Program. See
-CONTRIBUTING "Safari Notes". The other three stores are live, so this is the one left.
-
-## 11. Post-Launch
+## 10. Post-Launch
 
 - ✅ Add the store links to the README. ⬜ Org profile.
 - ⬜ Watch the dashboard for policy notices; respond promptly to any review query.
 
-## 12. Publishing Updates From GitHub
+## 11. Publishing Updates From GitHub
 
 1. Bump `manifest.json` / `package.json`, move the CHANGELOG's Unreleased notes under
    the new version, merge, then push a tag (`git tag v0.2.9 && git push origin v0.2.9`).
@@ -213,7 +221,7 @@ One store update a day: a real run fails if another one sent something to the st
 in the last 24 hours, unless it finishes the same tag one store at a time or the
 **Hotfix** box is ticked ([ROLLBACK.md](ROLLBACK.md)).
 
-## 13. Store Keys
+## 12. Store Keys
 
 The upload keys are secrets in the `stores` environment (repo Settings → Environments →
 stores), which needs your approval before any job can read them (#192). Keys not moved
