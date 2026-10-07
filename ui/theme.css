@@ -2202,6 +2202,19 @@ body:not(:has(#view-home.active)) .market-title {
   font: 600 20px var(--font-head);
   letter-spacing: 0.12em;
 }
+.sc-copy {
+  padding: 6px 11px;
+  font-size: 13px;
+}
+.sc-copy.done {
+  border-color: var(--good-line);
+  color: var(--good);
+}
+.sc-left {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 .sc-confirm {
   display: grid;
   gap: 8px;
@@ -2418,6 +2431,43 @@ body:not(:has(#view-home.active)) .market-title {
 }
 .menu-sync.on {
   background: var(--good-soft);
+}
+/* Not connected yet: Connect sits at the top of the menu (#434). */
+.settings-menu .menu-connect {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 9px;
+  align-items: start;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--accent-line);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.settings-menu .menu-connect:hover {
+  border-color: var(--accent);
+}
+.settings-menu .menu-connect:disabled {
+  cursor: progress;
+}
+.menu-connect svg {
+  margin-top: 2px;
+  color: var(--link);
+}
+.menu-connect b {
+  display: block;
+  color: var(--head);
+  font: 600 13.5px var(--font-head);
+}
+.menu-connect small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
 }
 .menu-sync > span {
   flex: 1;
