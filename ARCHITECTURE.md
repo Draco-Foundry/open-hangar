@@ -351,6 +351,15 @@ When RSI changes a page, every installed copy breaks until a fix clears store re
     Firefox 140, and `data_collection_permissions: none`).
 - Unless `OH_SYNC=1`, it removes `@sync-start` to `@sync-end` blocks and fails the
   build if `app.openhangar.space` is still mentioned anywhere in `dist/*/src`.
+- **Build flags** ([docs/FLAGS.md](docs/FLAGS.md)): `src/flags.js` is the one registry
+  of flags, each with a one-line description and its default. `scripts/pack.mjs`
+  writes each build's values into its copy of `src/flags.js` (store builds: the
+  defaults; `--beta`: the beta set; `--sync` / `OH_SYNC=1`: `sync` on; developers:
+  `--flag name=on`) and cuts `@flag-start name` to `@flag-end name` blocks of every
+  flag that's off (`@sync-start` / `@sync-end` are the `sync` flag's). Pages, the
+  background worker and the Svelte pages read `OH.flags`. Flags are build-time only:
+  no remote config, ever (store policy). Website features are switched by the
+  website's own flags, which answer with data, never code.
 - `npm run pack` zips both with `web-ext` into
   `dist/open-hangar-chrome-<version>.zip` and `dist/open-hangar-firefox-<version>.zip`.
   `npm run lint:firefox` runs Mozilla's linter on `dist/firefox`.

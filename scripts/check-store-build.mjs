@@ -17,14 +17,23 @@
 // (app.openhangar.space) and nothing else; the staging site nowhere, manifest
 // included; the Open Hangar Beta name, amber icons, a four-number version and a
 // "0.3.0 Beta 1" style version_name; the identity permission for Connect.
+//
+// Both: every build carries src/flags.js with exactly its set of build flags (the
+// registry's defaults, or its beta set), and no flag the registry marks dev-only
+// is on (docs/FLAGS.md).
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { buildValues, loadFlags, readRegistry } from './build-flags.mjs';
 
 const args = process.argv.slice(2);
 const BETA = args.includes('--beta');
 const root = args.find((a) => !a.startsWith('--')) || 'dist';
 const PRODUCTION_SITE = 'https://app.openhangar.space';
 const BETA_NAME = 'Open Hangar Beta';
+// The repo's registry, wherever this is run from.
+const REGISTRY = readRegistry(fileURLToPath(new URL('../src/flags.js', import.meta.url)));
+const WANT_FLAGS = buildValues(REGISTRY, { beta: BETA });
 
 const problems = [];
 const TEXT = /\.(js|mjs|html|json|css)$/;
@@ -91,7 +100,37 @@ function checkBeta(name, text) {
       problems.push(`${name}: a Firefox manifest (beta is Chrome and Edge)`);
   }
 }
-const check = BETA ? checkBeta : checkPublic;
+// The built flags.js: this build's set, nothing dev-only, nothing unknown.
+const flagged = { files: 0, manifests: 0 };
+function checkFlags(name, text) {
+  if (name.endsWith('manifest.json')) flagged.manifests++;
+  if (!/(^|[/:])src\/flags\.js$/.test(name)) return;
+  flagged.files++;
+  let values;
+  try {
+    ({ values } = loadFlags(text, name));
+  } catch (e) {
+    problems.push(`${name}: unreadable build flags (${e.message})`);
+    return;
+  }
+  for (const [flag, on] of Object.entries(values)) {
+    if (!(flag in REGISTRY))
+      problems.push(`${name}: flag "${flag}" isn't in src/flags.js (stale?)`);
+    else if (on && REGISTRY[flag].devOnly)
+      problems.push(`${name}: flag "${flag}" is on, and it's dev-only (src/flags.js)`);
+    else if (on !== WANT_FLAGS[flag])
+      problems.push(
+        `${name}: flag "${flag}" is ${on ? 'on' : 'off'}, ${BETA ? 'the beta set' : 'the store default'} is ${WANT_FLAGS[flag] ? 'on' : 'off'}`,
+      );
+  }
+  for (const flag of Object.keys(REGISTRY))
+    if (!(flag in values)) problems.push(`${name}: flag "${flag}" is missing (stale build?)`);
+}
+const checkBuild = BETA ? checkBeta : checkPublic;
+const check = (name, text) => {
+  checkBuild(name, text);
+  checkFlags(name, text);
+};
 
 // Beta: only its own folder and zip. Public: everything in dist.
 const wanted = (rel) =>
@@ -128,6 +167,10 @@ if (!existsSync(root)) {
   process.exit(1);
 }
 walk(root);
+if (flagged.files < flagged.manifests)
+  problems.push(
+    `${root}: a build without src/flags.js (${flagged.files} for ${flagged.manifests} builds)`,
+  );
 if (BETA) {
   if (!existsSync(`${root}/beta/manifest.json`)) problems.push(`${root}/beta: no beta build`);
   if (!zips) problems.push(`${root}: no open-hangar-beta-<version>.zip`);
@@ -146,5 +189,5 @@ if (problems.length) {
 console.log(
   BETA
     ? `✔ ${root} has a clean Open Hangar Beta build (synced to production, no staging)`
-    : `✔ ${root} is a clean store build (no staging site, no sync code)`,
+    : `✔ ${root} is a clean store build (no staging site, no sync code, store flags)`,
 );
