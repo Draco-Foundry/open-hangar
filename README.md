@@ -1,5 +1,7 @@
 # Open Hangar
 
+_The free Star Citizen fleet manager._
+
 [![Website](https://img.shields.io/badge/Website-openhangar.space-2f81f7?style=for-the-badge)](https://openhangar.space/)
 [![Version](https://img.shields.io/badge/version-0.2.8-blue?style=for-the-badge)](manifest.json)
 [![License](https://img.shields.io/badge/License-PolyForm%20Strict-blue?style=for-the-badge)](LICENSE)
@@ -48,8 +50,8 @@ viewer, or export everything as one JSON file and build on it.
 | **Referrals** | Your recruits and prospects (current and legacy programs), reward tiers, event bonuses and charts                                            |
 
 All of it is stored locally in one versioned database, and can be exported as a
-single JSON file — or as a **Hangar Transfer Format** (HTF) file that FleetYards and
-other community tools can import.
+single JSON file, or as a **Hangar Transfer Format** (HTF) file that other community
+fleet tools can import.
 
 ## Install
 
@@ -78,8 +80,6 @@ npm run build
 
 (Chromium browsers can also load the repo root directly — `npm run build` is only
 required for Firefox.)
-
-**Safari** is on the roadmap. It needs an Xcode port, not a drop-in load.
 
 ## Using it
 
@@ -163,13 +163,10 @@ holdings; the `account` block is a read-only snapshot.)
 
 **Export HTF** writes the community
 [Hangar Transfer Format](https://docs.starcitizen.fans/hangar-transfer-format.yaml):
-one entry per ship with `ship_code`, manufacturer, `pledge_*`, `lti` and `warbond` —
-import it at FleetYards (Hangar → Import). Ship codes come from a bundled snapshot of
-[HangarXPLOR](https://github.com/dolkensp/HangarXPLOR)'s MIT-licensed table
-(`src/data/`); CCUs, paints and add-ons have no HTF equivalent and are skipped.
-
-Planned: an opt-in way for sites you approve to request your data directly, limited
-to domains you trust (via `externally_connectable`). See [ROADMAP.md](ROADMAP.md).
+one entry per ship with `ship_code`, manufacturer, `pledge_*`, `lti` and `warbond`.
+Import it into any fleet tool that reads HTF. Ship codes come from a bundled table in
+`src/data/` (its license is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)); CCUs,
+paints and add-ons have no HTF equivalent and are skipped.
 
 Useful commands:
 
@@ -187,10 +184,11 @@ To add a data source, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Privacy
 
-No credentials — only the session you already have. No server; your data never
-leaves your browser. The only outbound requests carry no personal data: thumbnails
+No credentials, only the session you already have. Today's release (0.2.x) has no
+sync, so your data never leaves your browser; optional sync to a free openhangar.space
+account comes with 0.3.0. The only outbound requests carry no personal data: thumbnails
 and the banner from RSI's media servers, the current game version from the public
-star-citizen.wiki API, and — for items RSI ships without art — ship images looked up
+star-citizen.wiki API, and (for items RSI ships without art) ship images looked up
 by **name** from RSI's public ship-matrix (with star-citizen.wiki as a fallback).
 Those lookups are cached and weakly reveal which ships you're viewing.
 
@@ -205,9 +203,9 @@ Full policy: [openhangar.space/privacy.html](https://openhangar.space/privacy.ht
 Done: ~~hangar~~ · ~~buy-backs~~ · ~~account + balances~~ · ~~org + rank~~ ·
 ~~referrals~~ · ~~JSON export/import~~ · ~~Chrome/Edge/Firefox builds~~ · ~~website~~
 
-Next: store listings live → store catalog & prices (incl. warbonds) → finer
-item-type classification → Hangar Transfer Format export → Safari → an opt-in API
-for approved sites.
+Next: 0.3.0 and the website launch together on November 10, 2026. From 0.3.0 on, the
+extension gets reading improvements and fixes, and new features land on the website.
+The player roadmap moves to **openhangar.space/whats-next** at launch.
 
 Full detail in [ROADMAP.md](ROADMAP.md); parked ideas in [TODO.md](TODO.md); release
 notes in [CHANGELOG.md](CHANGELOG.md).

@@ -1,4 +1,4 @@
-name: ✨ Feature request
+name: Feature Request
 description: A specific, ready-to-build improvement. (Loose ideas → Discussions → Ideas.)
 labels: [enhancement]
 body:
@@ -6,6 +6,8 @@ body:
     attributes:
       value: |
         Got a rough idea you'd like others to weigh in on? Post it in [Discussions → Ideas](https://github.com/Draco-Foundry/open-hangar/discussions/categories/ideas) instead, where people can upvote it.
+
+        New features land on [openhangar.space](https://openhangar.space); from 0.3.0 the extension gets reading improvements and fixes.
   - type: textarea
     id: problem
     attributes:
@@ -23,4 +25,4 @@ body:
     attributes:
       label: Fits the project
       options:
-        - label: It only needs data from my own RSI account (Open Hangar never reads other people's accounts or sends data to a server).
+        - label: It uses my own RSI account or public Star Citizen data (Open Hangar never reads other people's accounts).

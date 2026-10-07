@@ -1,4 +1,4 @@
-name: 🛰️ Scan Broken (RSI changed something)
+name: Scan Broken (RSI Changed Something)
 description: A scan that used to work now fails or comes back empty for everyone, not just you.
 title: 'Scan broken: '
 labels: [scan-broken]

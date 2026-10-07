@@ -1,7 +1,9 @@
 # Working on Open Hangar
 
 Rules for anyone (people or AI sessions) changing this public repo: the browser
-extension and the openhangar.space landing site. They come from the owner's decisions
+extension (the scraper that reads the player's RSI account) and the static files and
+front Worker behind openhangar.space (`site/`, `site-worker/`: help, privacy,
+status.json and the fallback home page). They come from the owner's decisions
 and aren't visible in the code. Big picture: [ARCHITECTURE.md](ARCHITECTURE.md), the
 0.3.0 plan [docs/REDESIGN-0.3.md](docs/REDESIGN-0.3.md). Detail lives in the topic files
 below; each rule is written in one place only.

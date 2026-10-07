@@ -1,4 +1,4 @@
-name: 📌 Outage Notice (maintainers)
+name: Outage Notice (Maintainers)
 description: A pinned notice while a scan is broken for everyone. Maintainers only; please use Scan Broken instead.
 title: 'Known issue: '
 labels: [scan-broken]

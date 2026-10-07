@@ -4,7 +4,7 @@ Where Open Hangar is headed. Dates are UTC. For what already shipped, see
 [CHANGELOG.md](CHANGELOG.md); for open work, see the
 [issues](https://github.com/Draco-Foundry/open-hangar/issues) and their milestones.
 
-_Last updated: 2026-10-06_
+_Last updated: 2026-10-08_
 
 ## Where We Are
 
@@ -56,24 +56,14 @@ ask for the Beta Tester role.
 
 ## After Launch
 
-Ideas we plan to pick up after 0.3.0, roughly in this order. None of these have dates
-yet.
-
-- **Melt and buy-back advisor:** what's worth melting, what's cheap to get back
-- **Ship Sheet:** a shareable fleet card for Discord
-- **Paint and collectible tracker**
-- **Hangar journal:** your fleet's story over time
-- **More account data:** upgrade history, credit log, badges
-- **A stable ship catalog:** one record per vehicle, with names RSI uses and art
-- **German translation**, then more languages
-- **Safari** (Mac first)
-
-Website ideas (store tools, alerts, org features) are tracked separately.
+From 0.3.0 on, the extension gets reading improvements and fixes, and new features land
+on the website. Store listing languages come back one at a time after launch. The player
+roadmap moves to **openhangar.space/whats-next** at launch.
 
 ## Not Planned
 
-- **CCU chain planning.** [CCU Game](https://ccugame.app) does this well and has a great
-  community. Open Hangar shows what your CCUs are worth and leaves the planning to them.
+- **CCU chain planning.** Other community tools do this well. Open Hangar shows what your
+  CCUs are worth and leaves the planning to them.
 - **Rankings of pilots or orgs.** Stats stay anonymous and hangars stay private.
 - **Anything that reads another player's account.** Open Hangar only ever reads your own.
 

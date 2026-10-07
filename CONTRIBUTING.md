@@ -140,15 +140,6 @@ Firefox-only keys added (`background.scripts`, the gecko add-on id, and
 calls work via Firefox's compatibility shim; if you hit an API difference, that's the
 first place to look.
 
-## Safari Notes
-
-A Safari build is on the roadmap and is a **port, not a drop-in load**. Safari Web
-Extensions are packaged inside a macOS/iOS app via Xcode — start from Apple's
-`safari-web-extension-converter` against this folder. Two things to watch: Safari
-doesn't support `externally_connectable` (so the planned approved-sites API needs a
-Safari-specific path, or export/import only there), and the `cookies` permission and
-host permissions behave differently than on Chrome. See ROADMAP.md.
-
 ## GitHub Workflows
 
 Everything automated lives in `.github/workflows/`:
