@@ -30,6 +30,7 @@
   let now = $state(Date.now());
   $effect(() => {
     if (!d.until) return;
+    now = Date.now();
     const t = setInterval(() => (now = Date.now()), 1000);
     return () => clearInterval(t);
   });

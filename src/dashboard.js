@@ -4969,7 +4969,7 @@ async function refreshSite() {
   site.link = link && { name: link.name, connectedAt: link.connectedAt, lastSync: link.lastSync };
   site.firefox = !!chrome.runtime.getManifest().browser_specific_settings?.gecko;
   site.dataOk = !site.firefox || (await chrome.permissions.contains(SITE_DATA).catch(() => false));
-  if (site.firefox && !site.dataOk && !site.link) {
+  if (site.firefox && !site.dataOk && !site.link && chrome.storage.session) {
     const { siteAskFirefox: at } = await chrome.storage.session.get('siteAskFirefox');
     if (at) {
       await chrome.storage.session.remove('siteAskFirefox');
