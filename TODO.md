@@ -1,8 +1,9 @@
 # TODO / Later
 
-From 0.3.0 the extension gets reading improvements and fixes only. New features land on
-the website (openhangar.space), so a feature idea below is a website idea now; reading
-improvements and fixes still land here.
+0.3.0 finishes the signed-off specs in `docs/REDESIGN-0.3.md`; beyond those, the
+extension gets reading improvements and fixes only. New features land on the website
+(openhangar.space), so a feature idea below is a website idea now; reading improvements
+and fixes still land here.
 
 ## Ideas parked for a decision (not yet committed to a direction)
 
@@ -234,8 +235,9 @@ Rescue", "600i Explorer" → "600i"):
   ALL ~250 ships _with_ images, including in-concept ships the wiki lacks (Vulcan,
   Genesis, Odin). We cache a slim {name → image} (~25KB) for 30 days.
 - **Fallback: openhangar.space's ships feed** (`api/ships`): the picture it carries
-  for anything the ship-matrix misses (`OH.getShipsFeed`, one request). The extension
-  talks only to RSI and openhangar.space.
+  for anything the ship-matrix misses (`OH.getShipsFeed`, one request). From 0.3.0
+  (#428) the extension talks only to RSI and openhangar.space; 0.2.x still falls back
+  to the wiki directly.
 
 `hiRes()` upgrades ship-matrix `store_small.jpg` → `source.jpg` on hover/modal.
 Resolver stays lazy, concurrency-capped, hard-cached (negatives too).
@@ -278,8 +280,8 @@ Two layers of fix:
 2. **External reference for untagged items.** Some reward items have no `.kind` at
    all; only their _name_ identifies them, so knowing a bare "Luminalia …" name is a
    paint needs a reference outside RSI. If it's built, it lives on the website and
-   reaches the extension through an openhangar.space feed (the extension talks only
-   to RSI and openhangar.space).
+   reaches the extension through an openhangar.space feed (from 0.3.0 the extension
+   talks only to RSI and openhangar.space).
 
 Keep `kind` backward-compatible (ship / ccu / addon / coupon / other) and extend
 with the finer types; update the inventory filter chips + Stats accordingly.
@@ -295,13 +297,14 @@ permission. The importer we checked matches on `name`. `pledge_date` now comes f
 the hangar card's `.date-col` (parser `date`, ISO). Still open: refreshing the bundled
 table periodically, and a real import test in another fleet tool. Original plan below.
 
-> Scope note: trading-oriented hangar enrichment (per-item melt value, base-item
-> surfacing, LTI/Warbond/Gift status filters) was **considered and deliberately
-> dropped**: that's CCU and trading territory, not Open Hangar's. Live-markup
-> inspection (June 2026) also showed none are simple field reads: melt value isn't in
-> the hangar DOM (would be a derived calc), and Warbond/Gift flags weren't present on
-> inspected cards. Not pursuing. HTF export below is kept because it lets players take
-> their hangar to other fleet tools.
+> Scope note (June 2026, superseded): per-item melt value, base-item surfacing and
+> LTI/Warbond/Gift status filters were set aside at the time as CCU and trading
+> territory. 0.3.0 has since added a Melt Planner and LTI, Giftable and Warbond
+> filters. The June 2026 live-markup inspection still stands: melt value isn't in the
+> hangar DOM (would be a derived calc), and the inspected cards had no Warbond or Gift
+> flag fields (the Giftable filter reads RSI's Gift action, the Warbond filter the
+> pledge name). HTF export below is kept because it lets players take their hangar to
+> other fleet tools.
 
 A public community **interchange format** that other fleet tools import, so players
 can take their hangar with them. Spec:
@@ -392,35 +395,39 @@ anything that shows them.
 rankings). Display defaults to ALL_TIME; the API's `display` enum (other
 ranges) and `sortBy` aren't surfaced in the UI yet.
 
-### Referral rewards data — verify & complete (planned)
+### Referral Rewards Data: Verified and Kept Fresh
 
 The reward ladders (`REFERRAL_LADDER_STANDARD` / `_LEGACY`) and event windows
-(`REFERRAL_EVENTS`) in `dashboard.js` are **hardcoded best-effort** from
+(`REFERRAL_EVENTS`) in `dashboard.js` started as **hardcoded best-effort** from
 [starcitizen.tools/Referral_program](https://starcitizen.tools/Referral_program)
-(captured May 2026). Two gaps to close:
+(captured May 2026). Both gaps below are closed; re-verifying the ladders stays
+ongoing.
 
 1. **Completeness/accuracy audit.** ✅ Done June 2026 — standard + legacy ladders
    verified item-by-item against the wiki (accurate), and the event list completed to
    the full 23 events back to 2019 (`REFERRAL_EVENTS`). Ongoing: re-verify the ladders
    as the wiki updates; new events arrive through the feed (2 below).
-2. **Keep it fresh without manual edits.** Done: events and reward pictures come from
-   openhangar.space's public referral feed (`OH.getReferralFeed`,
+2. **Keep it fresh without manual edits.** Done: from 0.3.0 (#428), events and reward
+   pictures come from openhangar.space's public referral feed (`OH.getReferralFeed`,
    `api/referral-events`), at most once a day, on top of the built-in
-   `REFERRAL_EVENTS`. The website keeps them current and credits its source.
+   `REFERRAL_EVENTS`. The website keeps them current and credits its source. 0.2.x
+   still reads the wiki directly.
 
-### Referral reward item links + hover art — make them correct (planned)
+### Referral Reward Item Links and Hover Art: Make Them Correct (Planned)
 
-The per-item links/hover on the Referrals page (`rewardItemHtml` in `dashboard.js`)
-are **placeholder-quality** and need finishing:
+The per-item links/hover on the Referrals page (`shipHref` / `wikiHref` in
+`ui/referrals/Referrals.svelte`) are **placeholder-quality** and need finishing:
 
 - **Links are searches, not destinations.** Ship items point at the RSI ship-matrix
   _search_ (`/ship-matrix/search?q=…`) and non-ship items at a starcitizen.tools
-  _search_ — not the actual reward/item page. Replace with canonical deep links
-  (curated per item, or resolved from the wiki/ship-matrix once and cached).
+  _search_, not the actual reward or item page. Replace with canonical deep links
+  (curated per item, or carried in openhangar.space's referral feed).
 - **Hover art is ship-only.** Only `ship: true` items resolve an image (via
   `OH.getShipImage`); armor/statues/paints/figurines/decorations show no preview.
-  Add image resolution for non-ship reward items (wiki image lookup, lazy + cached
-  - CSP-safe, same pattern as ship art) so every item can hover-preview.
+  Pictures for non-ship reward items would come through openhangar.space's referral
+  feed (it already carries the tier and event pictures), lazy and cached like ship
+  art, so every item can hover-preview. From 0.3.0 the extension doesn't look
+  pictures up on the wiki itself.
 - **Verify ship-name overrides.** Some items use an `img:`/name override (e.g.
   "Esperia Blade" → `Blade`); confirm each resolves to the right art, especially
   replicas/variants vs. the flyable ship.

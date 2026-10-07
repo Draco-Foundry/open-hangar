@@ -157,8 +157,8 @@ for (const t of REFERRAL_LADDER_LEGACY) t.file = REFERRAL_TIER_FILES.legacy[t.at
 // package, spending the threshold) inside one of these windows earns a bonus reward.
 // `reward` is what the REFERRER ("You") earns. STATIC reference data, complete list
 // from starcitizen.tools/Referral_program (verified June 2026). Dates inclusive
-// [start, end]. Will go stale as CIG adds ~monthly events — see TODO for the planned
-// auto-refresh; until then, append new events here.
+// [start, end]. The built-in starting point: CIG adds events about monthly, and new ones
+// arrive through openhangar.space's referral feed (refreshReferralEvents below).
 const REFERRAL_EVENTS = [
   {
     start: '2019-10-28',

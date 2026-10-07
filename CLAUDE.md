@@ -16,8 +16,9 @@ the 0.3.0 plan in [docs/REDESIGN-0.3.md](docs/REDESIGN-0.3.md), the voice in
 
 ## The 0.3.0 Svelte Rebuild
 
-- **The extension is the scraper.** From 0.3.0 it gets reading improvements and fixes
-  only; new features land on the website (openhangar.space).
+- **The extension is the scraper.** 0.3.0 finishes the signed-off specs in
+  `docs/REDESIGN-0.3.md`; beyond those, the extension gets reading improvements and
+  fixes only, and new features land on the website (openhangar.space).
 - Rebuild work goes in PRs into **`redesign/0.3-svelte`**, never `main`. One page per PR.
 - `src/lib.js` (reading RSI, parsing, storage, value math) and its tests stay as they
   are. Only the screens move to Svelte. If a page needs data `lib.js` doesn't expose,
@@ -55,7 +56,8 @@ the 0.3.0 plan in [docs/REDESIGN-0.3.md](docs/REDESIGN-0.3.md), the voice in
 ## What Not to Build
 
 - No rankings, leaderboards or gear scores: never compare totals, values or counts
-  between players or orgs. Org Fleet shows ships only, never values.
+  between players or orgs. Org Fleet must show ships only, never values (the 0.3.0
+  page still shows them: #466).
 - No LTI counts or LTI emphasis in summaries, no CCU-chain features, no "best use of
   your buy-back token" advice, no duplicates card, no insight cards (pages go straight
   to their search bar).
