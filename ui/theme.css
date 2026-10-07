@@ -1332,6 +1332,10 @@ body:not(:has(#view-home.active)) .wrap > header {
   background: var(--warn-soft);
   color: #f2c14e;
 }
+.sr-icon.calm {
+  background: var(--accent-soft);
+  color: var(--link);
+}
 .sr-titles {
   min-width: 0;
 }
@@ -1381,7 +1385,8 @@ body:not(:has(#view-home.active)) .wrap > header {
   background: var(--warn-soft);
 }
 .sr-ok,
-.sr-warn {
+.sr-warn,
+.sr-note {
   display: flex;
   padding-top: 2px;
 }
@@ -1390,6 +1395,10 @@ body:not(:has(#view-home.active)) .wrap > header {
 }
 .sr-warn {
   color: #f2c14e;
+}
+/* A calm note (the website's sync isn't open yet): blue, not a problem. */
+.sr-note {
+  color: var(--link);
 }
 .sr-src {
   font-weight: 600;
