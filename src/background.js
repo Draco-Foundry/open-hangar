@@ -19,6 +19,10 @@
  * (`reopenAfterUpdate`, checked each time the worker starts).
  */
 
+// Build flags (src/flags.js) as self.OH.flags. Firefox's event page loads the file
+// itself, listed first in its manifest (scripts/pack.mjs).
+if (typeof importScripts === 'function' && !self.OH?.flags) importScripts('flags.js');
+
 const STALE_DAYS = 7;
 
 async function updateReminder() {

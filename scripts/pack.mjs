@@ -17,9 +17,22 @@
  * (app.openhangar.space). Never the staging site. The public listing never gets it:
  * different name, version scheme and store item. scripts/check-store-build.mjs --beta
  * checks it.
+ *
+ * Build flags (src/flags.js, docs/FLAGS.md): each build's values go into its copy of
+ * src/flags.js, and the code of every flag that's off is cut. Store builds get the
+ * registry's defaults, --beta the beta set, --sync / OH_SYNC=1 turn `sync` on, and
+ * --flag name=on (or =off, repeatable) is for developers' own builds.
  */
 
 import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  FLAGS_FILE,
+  buildValues,
+  parseFlagArgs,
+  readRegistry,
+  stripFlagsInDir,
+  writeFlags,
+} from './build-flags.mjs';
 
 const RUNTIME = ['_locales', 'icons', 'src'];
 
@@ -28,12 +41,24 @@ const BETA = args.includes('--beta');
 // The beta's one site. Staging is never built in to anything a store gets.
 const PRODUCTION_SITE = 'https://app.openhangar.space';
 
+// This build's flags (src/flags.js): the store defaults or the beta set, then the
+// developer's own. A beta is always exactly the beta set.
+const REGISTRY = readRegistry(FLAGS_FILE);
+const OVERRIDES = parseFlagArgs(args, REGISTRY);
+if (BETA && Object.keys(OVERRIDES).length)
+  throw new Error('--beta always builds the beta set of flags; drop --flag');
+if (!BETA && (process.env.OH_SYNC === '1' || args.includes('--sync'))) OVERRIDES.sync ??= true;
+const FLAGS = buildValues(REGISTRY, { beta: BETA, overrides: OVERRIDES });
+const FLAGS_ON = Object.keys(FLAGS).filter((f) => FLAGS[f]);
+const DEV_ONLY_ON = FLAGS_ON.filter((f) => REGISTRY[f].devOnly);
+
 // Sync to app.openhangar.space isn't launched, and the privacy policy says nothing
 // leaves your device, so store builds don't carry its code at all (#187). Lines from
-// a "@sync-start" marker through "@sync-end" are cut. OH_SYNC=1 (or --sync) keeps
-// them, for developers testing sync locally (with the `siteUrl` storage key, or
-// pre-pointed at staging by `npm run build:staging`). The beta always keeps them.
-const KEEP_SYNC = BETA || process.env.OH_SYNC === '1' || args.includes('--sync');
+// a "@sync-start" marker through "@sync-end" are cut. The `sync` flag keeps them:
+// OH_SYNC=1 (or --sync, or --flag sync=on), for developers testing sync locally
+// (with the `siteUrl` storage key, or pre-pointed at staging by
+// `npm run build:staging`). The beta always keeps them.
+const KEEP_SYNC = FLAGS.sync;
 
 // A built-in sync site, written into lib.js's SITE_BUILT_IN so nobody has to set the
 // `siteUrl` storage key by hand: production for --beta, or --site=<url> / OH_SITE=<url>
@@ -77,22 +102,6 @@ const BETA_NAME = 'Open Hangar Beta';
 // ≤132 characters (Chrome's limit); the store's short description comes from it.
 const BETA_DESCRIPTION =
   'Beta build of Open Hangar for invited testers: your Star Citizen hangar, made useful, with opt-in sync to openhangar.space.';
-const SYNC_FILES = ['src/lib.js', 'src/dashboard.js', 'src/dashboard.html', 'src/background.js'];
-function stripSync(file) {
-  const out = [];
-  let inside = false;
-  for (const line of readFileSync(file, 'utf8').split('\n')) {
-    if (line.includes('@sync-start')) {
-      if (inside) throw new Error(`${file}: @sync-start inside another sync block`);
-      inside = true;
-    } else if (line.includes('@sync-end')) {
-      if (!inside) throw new Error(`${file}: @sync-end without @sync-start`);
-      inside = false;
-    } else if (!inside) out.push(line);
-  }
-  if (inside) throw new Error(`${file}: @sync-start never closed`);
-  writeFileSync(file, out.join('\n'));
-}
 // Belt and braces: no store build may still talk to the sync site.
 function assertNoSyncHost(dir) {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -118,7 +127,8 @@ const targets = {
   chrome: (m) => m,
   firefox: (m) => ({
     ...m,
-    background: { scripts: [m.background.service_worker] },
+    // flags.js first: Firefox's event page has no importScripts (src/background.js).
+    background: { scripts: [FLAGS_FILE, m.background.service_worker] },
     browser_specific_settings: {
       gecko: {
         id: 'open-hangar@draco-foundry',
@@ -187,14 +197,14 @@ for (const [name, transform] of Object.entries(builds)) {
       cpSync(`beta/icons/${f}`, `${out}/icons/${f}`);
   }
   writeFileSync(`${out}/manifest.json`, JSON.stringify(manifest, null, 2) + '\n');
-  if (!KEEP_SYNC) {
-    for (const f of SYNC_FILES) stripSync(`${out}/${f}`);
-    assertNoSyncHost(`${out}/src`);
-  }
+  writeFlags(`${out}/${FLAGS_FILE}`, FLAGS);
+  stripFlagsInDir(`${out}/src`, FLAGS);
+  if (!KEEP_SYNC) assertNoSyncHost(`${out}/src`);
   if (SITE) presetSite(`${out}/src/lib.js`);
   console.log(
     `built ${out}${KEEP_SYNC ? ' (with sync)' : ''}${SITE ? `, syncing to ${SITE}` : ''}` +
       (beta ? ` as ${BETA_NAME} ${beta.version} (${beta.version_name})` : '') +
-      (SITE && !beta ? ' (dev build, never for a store)' : ''),
+      (FLAGS_ON.length ? `; flags on: ${FLAGS_ON.join(', ')}` : '') +
+      ((SITE && !beta) || DEV_ONLY_ON.length ? ' (dev build, never for a store)' : ''),
   );
 }
