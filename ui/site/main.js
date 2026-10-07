@@ -4,8 +4,8 @@
 // lives in the top bar: a section in the Scan ▾ menu (2026-10-05), and the Synced dot
 // on your portrait with "Synced …" and Sync Now in its menu (Top Bar Option A,
 // 2026-10-06), mounted into the spots ui/topbar leaves for them. Its state and
-// actions are in src/dashboard.js (window.OHApp.site). Store builds don't load this
-// file until sync launches (the script tag sits in a @sync block, scripts/pack.mjs).
+// actions are in src/dashboard.js (window.OHApp.site). Its script tag sits in a @sync
+// block: every store build loads it, and only a build with the `sync` flag off doesn't.
 import { mount } from 'svelte';
 import SiteConnect from './SiteConnect.svelte';
 import SyncStatus from './SyncStatus.svelte';

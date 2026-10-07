@@ -4941,15 +4941,15 @@ async function initUpdates() {
   }
 }
 
-// @sync-start: cut from store builds until sync launches (scripts/pack.mjs, #187)
+// @sync-start: the `sync` build flag's code, in every store build (src/flags.js, #187)
 // --- openhangar.space: connect + sync (optional) -----------------------------
 // It's Svelte (ui/site, owner sign-off 2026-10-04 and -05): the Connect card in the
 // Citizen Card's corner until you connect, then the top bar's Scan button (a status
 // beside it, a section in its ▾ menu, problems in its scan report). This holds the
-// state and does what they ask. Hidden for everyone until the website launches:
-// developers switch it on with the `siteUrl` storage key (the staging site, say), and
-// the beta build has it on (npm run build:beta). Nothing is sent until you Connect; after that,
-// every scan syncs by itself, and Sync Now sends right away.
+// state and does what they ask. On in every build with a built-in site (the store
+// builds and the beta sync to production, scripts/pack.mjs); developers point it
+// elsewhere with the `siteUrl` storage key (the staging site, say). Nothing is sent
+// until you Connect; after that, every scan syncs by itself, and Sync Now sends right away.
 const site = {
   enabled: false,
   link: null, // { name, connectedAt, lastSync } once connected (the token stays in lib.js)
@@ -6270,7 +6270,7 @@ window.OHApp = {
   },
   // @sync-start
   // The website (ui/site): the Connect card's and the Scan button's state and
-  // actions. Cut from store builds.
+  // actions. Cut only from a build with the `sync` flag off.
   site: {
     get state() {
       return site;

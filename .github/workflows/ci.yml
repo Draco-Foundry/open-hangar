@@ -25,8 +25,11 @@ jobs:
       # that breaks packaging fails here and not on release day.
       - run: npm run pack
       - run: npx web-ext lint --source-dir dist/firefox
-      # No staging site, built-in sync site or beta name in the public zips.
+      # The public zips: sync built in to production only, no staging site, no beta name.
       - run: npm run check:store
+      # The Chrome store build in Chrome, never connected: nothing to the sync site and
+      # only plain reads of the public feeds (scripts/privacy-check.mjs).
+      - run: npm run test:privacy
       # The unlisted Open Hangar Beta (docs/BETA.md): synced to production, never
       # staging. build:beta checks its own zips (check-store-build.mjs --beta).
       - run: npm run build:beta
