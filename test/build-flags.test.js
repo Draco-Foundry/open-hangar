@@ -196,8 +196,8 @@ test('pack: writes each build its values and cuts the code of flags that are off
     }
     assert.deepEqual(
       JSON.parse(fs.readFileSync(path.join(dir, 'dist/firefox/manifest.json'))).background,
-      { scripts: ['src/flags.js', 'src/background.js'] },
-      "Firefox's event page loads the flags first",
+      { scripts: ['src/flags.js', 'src/rsi-cart.js', 'src/background.js'] },
+      "Firefox's event page loads what background.js imports on Chrome, first",
     );
     assert.match(check(dir), /clean store build/);
     // The source copy keeps its defaults.
