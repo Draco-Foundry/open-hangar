@@ -1,5 +1,7 @@
 # Open Hangar
 
+_The free Star Citizen fleet manager._
+
 [![Website](https://img.shields.io/badge/Website-openhangar.space-2f81f7?style=for-the-badge)](https://openhangar.space/)
 [![Version](https://img.shields.io/badge/version-0.2.8-blue?style=for-the-badge)](manifest.json)
 [![License](https://img.shields.io/badge/License-PolyForm%20Strict-blue?style=for-the-badge)](LICENSE)
@@ -80,8 +82,6 @@ npm run build
 
 (Chromium browsers can also load the repo root directly — `npm run build` is only
 required for Firefox.)
-
-**Safari** is on the roadmap. It needs an Xcode port, not a drop-in load.
 
 ## Using it
 
@@ -174,9 +174,6 @@ Import it into any fleet tool that reads HTF. Ship codes come from a bundled tab
 `src/data/` (its license is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)); CCUs,
 paints and add-ons have no HTF equivalent and are skipped.
 
-Planned: an opt-in way for sites you approve to request your data directly, limited
-to domains you trust (via `externally_connectable`). See [ROADMAP.md](ROADMAP.md).
-
 Useful commands:
 
 | Command                | Does                                                              |
@@ -211,15 +208,9 @@ Full policy: [openhangar.space/privacy.html](https://openhangar.space/privacy.ht
 
 ## Roadmap
 
-Done: ~~hangar~~ · ~~buy-backs~~ · ~~account + balances~~ · ~~org + rank~~ ·
-~~referrals~~ · ~~JSON export/import~~ · ~~Chrome/Edge/Firefox builds~~ · ~~website~~
-
-Next: store listings live → store catalog & prices (incl. warbonds) → finer
-item-type classification → Hangar Transfer Format export → Safari → an opt-in API
-for approved sites.
-
-Full detail in [ROADMAP.md](ROADMAP.md); parked ideas in [TODO.md](TODO.md); release
-notes in [CHANGELOG.md](CHANGELOG.md).
+Open Hangar's roadmap lives on the website: **openhangar.space/whats-next**. The
+extension's job is reading your RSI account; new features land on the website, where
+they work on any device.
 
 ## Ideas & feedback
 

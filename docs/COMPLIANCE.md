@@ -20,8 +20,9 @@ buy-backs, balances, organization, and referral standing — and view or export 
 
 - **collects no credentials** — it uses only the RSI session the user is already
   signed into; the user never enters a password into the extension;
-- **operates entirely on the user's device** — no external server receives the
-  user's data; there is no backend to receive it;
+- **keeps the user's data on their device by default**: nothing is sent anywhere
+  unless the user opts in to sync by connecting their own openhangar.space account;
+  once connected, it syncs to that account after each scan;
 - **is read-only and rate-limited** — it reads pages the user can already see, with
   a politeness delay, and does not perform bulk or automated account actions;
 - **accesses only the signed-in user's own account** — never third parties.
@@ -47,7 +48,7 @@ purpose (§3).
 
 | Permission                         | Why it is needed                                                                                                                                                                                                                                                    | Scope limit                                                                            |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `storage`                          | Persist the user's own scanned data + UI preferences locally (`chrome.storage.local`).                                                                                                                                                                              | Local only; never transmitted.                                                         |
+| `storage`                          | Persist the user's own scanned data + UI preferences locally (`chrome.storage.local`).                                                                                                                                                                              | Local; sent only to the user's own openhangar.space account, if they connect sync.     |
 | `cookies`                          | Implements "Log out of RSI" — clears `robertsspaceindustries.com` cookies (incl. the HttpOnly session cookie page scripts can't remove) so the user can end their RSI session from the extension.                                                                   | Cookie **values are never read or transmitted**; only removed on explicit user action. |
 | host: `robertsspaceindustries.com` | Read the signed-in user's own account pages — hangar, buy-backs, balances, and the referrals GraphQL endpoint (a read-only `POST` query) — via same-session `fetch`, parsed locally; also RSI's public ship-matrix index for art on items RSI ships without images. | Read-only, rate-limited, user's own account only.                                      |
 
@@ -55,14 +56,18 @@ purpose (§3).
 
 - **Data collected:** only the signed-in user's own RSI account data. (The referral
   section of that account lists the user's own recruits/prospects — other citizens'
-  public handles, monikers, and dates — which are likewise stored locally only and
-  never transmitted.)
-- **Where it goes:** stored locally on the user's device. **No server. No
-  transmission to the developer or any third party. No sale or sharing of data.**
+  public handles, monikers, and dates — which are likewise stored locally, and sent
+  only to the user's own openhangar.space account if they connect sync.)
+- **Where it goes:** stored locally on the user's device. **Nothing is sent unless
+  the user opts in to sync** by connecting their own openhangar.space account; once
+  connected, the extension syncs after each scan, sending the same data as the JSON
+  export to that account only. Disconnect stops it. **No transmission to any third
+  party. No sale or sharing of data.**
 - **Credentials:** none requested, entered, or stored. The extension relies on the
   user's pre-existing browser session.
 - **Removal:** "Clear Data" wipes stored data on demand; uninstalling removes
-  everything.
+  everything in the browser. A synced copy can be downloaded or deleted from the
+  user's Account page on the website.
 
 A full user-facing privacy policy is published in `docs/PRIVACY.md`.
 
@@ -74,7 +79,8 @@ Open Hangar's **source code is public** (PolyForm Strict), so every claim in thi
 document is independently verifiable by reading the source. There is no obfuscated,
 minified, or remotely-hosted code; the extension ships no remote `<script>` and
 loads no remote executable code (consistent with Manifest V3 and store policy). A
-reviewer can confirm the "local-only, no credentials, read-only" claims directly.
+reviewer can confirm the "local unless the user connects sync, no credentials,
+read-only" claims directly.
 
 ---
 
@@ -126,11 +132,12 @@ total, confirming this is a high-traffic, well-trodden category._
    service** — hangar.link, Citizens' Hub, hubcitizen.com, OrgCommand, scbridge.app,
    versesync.com, FleetBooks, and others.
 
-Open Hangar belongs to the **first, more conservative pattern** — and is stricter
-still: it has no companion web app and no backend, so the user's data is **never
-transmitted anywhere** (§1, §3). The many approved "sync" peers that _do_ send
-hangar data to a remote server demonstrate that even the more data-exposing pattern
-is accepted; Open Hangar deliberately stays on the local-only side of that line.
+Open Hangar works like the **first, more conservative pattern** by default: unless the
+user connects sync, their data is **never transmitted anywhere** (§1, §3). The second
+pattern is **opt-in only**: a user who connects their own openhangar.space account
+syncs a copy there after each scan. The many approved "sync" peers that _do_ send
+hangar data to a remote server demonstrate that this pattern is accepted; Open Hangar
+only enters it when the user chooses to.
 
 **Credential handling — Open Hangar is on the strict end.** Almost every peer is
 credential-free (it relies on the existing RSI session), and several explicitly
@@ -146,31 +153,35 @@ Chrome's data-disclosure form requires each developer to declare the categories 
 user data the extension handles. The declarations below are taken **verbatim from
 the listed peers' own Chrome Web Store data disclosures** — they are not our
 characterization. They show that the category, as currently approved, accommodates
-data handling far broader than anything Open Hangar does:
+data handling as broad as Open Hangar's opt-in sync, and broader:
 
-| Extension                 | Self-declared data handling (per its own CWS disclosure)                                                         |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| FleetBooks RSI Sync       | Personally identifiable information; **Financial and payment information**; Website content                      |
-| VerseSync RSI Pledge Sync | Personally identifiable information; **Authentication information**; User activity                               |
-| SC Bridge Sync            | Personally identifiable information; **Authentication information**; Website content                             |
-| VerseLink RSI Hangar Sync | **Authentication information**; Website content                                                                  |
-| starplace.net             | **Web history**; Website content                                                                                 |
-| Star Citizen CCU Game     | Personally identifiable information; Website content                                                             |
-| Star Citizen — LinkBox    | Personally identifiable information; Website content                                                             |
-| Citizens' Hub             | Website content                                                                                                  |
-| **Open Hangar**           | **None transmitted** — local-only; no PII, authentication, financial, or web-history data ever leaves the device |
+| Extension                 | Self-declared data handling (per its own CWS disclosure)                                     |
+| ------------------------- | -------------------------------------------------------------------------------------------- |
+| FleetBooks RSI Sync       | Personally identifiable information; **Financial and payment information**; Website content  |
+| VerseSync RSI Pledge Sync | Personally identifiable information; **Authentication information**; User activity           |
+| SC Bridge Sync            | Personally identifiable information; **Authentication information**; Website content         |
+| VerseLink RSI Hangar Sync | **Authentication information**; Website content                                              |
+| starplace.net             | **Web history**; Website content                                                             |
+| Star Citizen CCU Game     | Personally identifiable information; Website content                                         |
+| Star Citizen — LinkBox    | Personally identifiable information; Website content                                         |
+| Citizens' Hub             | Website content                                                                              |
+| **Open Hangar**           | **None transmitted** until the user opts in to sync; then PII, financial and website content |
 
 Several of these — **SC Bridge Sync** and **VerseLink** declare handling
 **Authentication information**; **FleetBooks** declares handling **Financial and
 payment information** — are nonetheless **listed and in good standing**. Open Hangar
-declares none of these categories because it transmits nothing. (For balance, a
-number of peers — the HangarXPLOR family, StarCitizen Hangar helper, SCTool Ship
-Exporter, SC Labs Importer, Guardians Hub Sync, ATLAS — instead declare _"will not
-collect or use your data,"_ the same posture Open Hangar takes.)
+transmits nothing until the user connects sync. For the opt-in sync it declares
+Personally identifiable information (RSI handle and org), Financial and payment
+information (store credit balances and pledge prices) and Website content (hangar
+and buy-back contents), sent only to the user's own openhangar.space account. (For
+balance, a number of peers — the HangarXPLOR family, StarCitizen Hangar helper,
+SCTool Ship Exporter, SC Labs Importer, Guardians Hub Sync, ATLAS — instead declare
+_"will not collect or use your data,"_ the same posture Open Hangar takes until the
+user connects sync.)
 
-Open Hangar's local-only claim is not merely a declaration: with no web platform and
-no backend (§3, §4), there is nowhere for data to be sent, and a reviewer can confirm
-this directly in the public source.
+Open Hangar's local-by-default claim is not merely a declaration: the only place it
+can send account data is the user's own openhangar.space account, and only after the
+user connects it (§3, §4). A reviewer can confirm this directly in the public source.
 
 **Representative flagship precedents** (the highest-install, most directly
 comparable peers):
@@ -180,8 +191,8 @@ comparable peers):
   buy-backs to plan upgrade chains. Its own listing states it _"only runs in your
   browser and doesn't send any data to another server. You need to be logged in on
   robertsspaceindustries.com, you don't need to login in the extension itself, so
-  your credentials stay secure."_ This is the same architecture Open Hangar uses,
-  described in the same terms.
+  your credentials stay secure."_ This is the same architecture Open Hangar uses
+  until the user connects sync, described in the same terms.
 
 - **Star Citizen Hangar XPLORer** (`hmiiohicemghafoicmmlfklnngmcinnm`, plus the
   Dwayde's-mod and Community-Edition forks) — 20,000 users, 4.7★ (128 ratings) on
@@ -199,9 +210,9 @@ comparable peers):
 **Why this matters for Open Hangar specifically:** the category is established,
 populated, and currently listed; its tools span from local-only readers, to
 server-syncing uploaders, to a password-prompting bulk-action tool — and all are
-accepted. Open Hangar is read-only, credential-free, and local-only, with no backend
-and no account actions. It therefore sits on the **most conservative end** of an
-already-permitted category, not at its edge.
+accepted. Open Hangar is read-only, credential-free, and local unless the user
+connects sync, with no account actions. It therefore sits on the **most conservative
+end** of an already-permitted category, not at its edge.
 
 ---
 
@@ -237,8 +248,9 @@ stance on fan activity:
 
 - Remain read-only, rate-limited, and credential-free (keep the politeness delay in
   `lib.js`; no bulk or automated account actions).
-- Keep the extension local-only with no data transmission; keep the privacy policy
-  accurate to behavior.
+- Keep the extension local by default: nothing is transmitted unless the user
+  connects sync, and sync sends only to the user's own openhangar.space account; keep
+  the privacy policy accurate to behavior.
 - Keep the code public (source available) and free of remote code execution.
 - Maintain the unaffiliated disclaimer and brand guardrails in §6.
 - Respond promptly to any platform or rights-holder inquiry.
@@ -247,8 +259,9 @@ stance on fan activity:
 
 ## 8. Conclusion
 
-Open Hangar is a transparent, local-only, credential-free, source-available tool that
-reads only the user's own account data and sends it nowhere. It fits squarely within
+Open Hangar is a transparent, local-by-default, credential-free, source-available tool
+that reads only the user's own account data and sends it nowhere unless the user opts
+in to sync it to their own openhangar.space account. It fits squarely within
 an established and currently-listed Chrome Web Store category, while operating more
 conservatively than several approved peers. We are confident it meets store policy
 and respects the rights holder's published fan-use guidance, and we welcome reviewer
