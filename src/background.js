@@ -135,11 +135,11 @@ siteHandlers['oh-upgrade-price'] = (m) =>
 siteHandlers['oh-add-upgrade'] = (m) =>
   cartLane().addUpgradeToCart(m.fromShipId, m.toShipId, m.toSkuId);
 
-// @sync-start: cut from store builds until sync launches (scripts/pack.mjs, #187)
+// @sync-start: the `sync` build flag's code, in every store build (src/flags.js, #187)
 // Connect from the website (Chrome and Edge, owner 2026-10-04). The website's Connect
 // page (openhangar.space's /link) asks whether Open Hangar is installed here; only
 // our own site can talk to the extension (externally_connectable, added by
-// scripts/pack.mjs to builds with sync). Connect This Browser there:
+// scripts/pack.mjs; Firefox's site-bridge.js). Connect This Browser there:
 //   oh-connect-begin  → a PKCE pair; the challenge and this extension's redirect
 //                       address go to the page, the verifier stays here
 //   oh-connect-finish → the page's one-time code, traded for the sync token with the

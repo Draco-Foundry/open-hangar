@@ -7,7 +7,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 let mem = {};
-let sent = []; // bodies POSTed to /api/sync
+let sent = []; // bodies POSTed to /api/v1/sync
+let calls = []; // every request: "METHOD url"
 let answer = () => new Response(JSON.stringify({ ok: true, synced_at: 123 }), { status: 200 });
 global.window = globalThis;
 global.chrome = {
@@ -26,7 +27,8 @@ global.chrome = {
   runtime: { getManifest: () => ({ version: '0.0.0' }) },
 };
 global.fetch = async (url, init) => {
-  if (String(url).endsWith('/api/sync') && init?.method === 'POST') {
+  calls.push(`${init?.method || 'GET'} ${url}`);
+  if (String(url).endsWith('/api/v1/sync') && init?.method === 'POST') {
     sent.push(JSON.parse(init.body));
     return answer();
   }
@@ -146,4 +148,17 @@ test('disconnected on the website: forgets the link', async () => {
   const err = await refusedWith(401, { error: 'not connected' });
   assert.match(err.message, /disconnected on the website/);
   assert.equal(mem.siteLink, undefined);
+});
+
+test('sync and disconnect use the versioned /api/v1/sync', async () => {
+  linked(scanned(Date.now() - 60_000));
+  answer = () => new Response(JSON.stringify({ ok: true, synced_at: 456 }), { status: 200 });
+  calls = [];
+  await OH.siteSync();
+  await OH.siteDisconnect();
+  assert.deepEqual(calls, [
+    'POST https://staging.example/api/v1/sync',
+    'DELETE https://staging.example/api/v1/sync',
+  ]);
+  assert.equal(mem.siteLink, undefined, 'forgotten after disconnect');
 });

@@ -443,7 +443,8 @@ test('polite: one request at a time with a pause, and nothing during a Retry-Aft
   assert.equal((await slow.addUpgradeToCart(101, 900, 9001)).ok, true);
 });
 
-// The background worker as a store build ships it (scripts/pack.mjs cuts @sync blocks).
+// The background worker as scripts/pack.mjs builds it: with sync (every store build), or
+// with its @sync blocks cut (a developer's --flag sync=off build).
 function loadBackground({ sync, rsiOpts }) {
   let src = fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'), 'utf8');
   if (!sync) {
@@ -509,7 +510,7 @@ function loadBackground({ sync, rsiOpts }) {
   return { send, rsi };
 }
 
-test('website bridge works in a store build: options, price, add; only from our site', async () => {
+test('website bridge works with sync off: options, price, add; only from our site', async () => {
   const x = loadBackground({ sync: false });
   const SITE = 'https://app.openhangar.space';
   assert.deepEqual(await x.send({ type: 'oh-hello' }, SITE), {
@@ -531,7 +532,7 @@ test('website bridge works in a store build: options, price, add; only from our 
   );
   assert.deepEqual(a, { ok: true });
   const c = await x.send({ type: 'oh-connect-begin' }, SITE);
-  assert.equal(c.ok, false, 'no connect in a store build');
+  assert.equal(c.ok, false, 'no connect with sync off');
   const main = await x.send({ type: 'oh-hello' }, 'https://openhangar.space');
   assert.equal(main.cart, true, 'the store on openhangar.space too');
   const before = x.rsi.calls.length;
@@ -549,6 +550,13 @@ test('website bridge in a sync build answers both the cart and Connect', async (
   const x = loadBackground({ sync: true });
   const hello = await x.send({ type: 'oh-hello' }, 'https://staging.openhangar.space');
   assert.deepEqual(hello, { ok: true, cart: true, connect: true });
+  // Every store build: Connect from the app. Beginning sends nothing anywhere.
+  const app = await x.send({ type: 'oh-hello' }, 'https://app.openhangar.space');
+  assert.deepEqual(app, { ok: true, cart: true, connect: true });
+  const begin = await x.send({ type: 'oh-connect-begin' }, 'https://app.openhangar.space');
+  assert.equal(begin.ok, true);
+  assert.match(begin.challenge, /^[\w-]{43}$/);
+  assert.equal(x.rsi.all.length, 0, 'no request made');
   const main = await x.send({ type: 'oh-hello' }, 'https://openhangar.space');
   assert.deepEqual(main, { ok: true, cart: true, connect: false }, 'Connect stays on the app');
   const c = await x.send({ type: 'oh-connect-begin' }, 'https://openhangar.space');

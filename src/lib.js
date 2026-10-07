@@ -3681,23 +3681,27 @@
     return out;
   };
 
-  // @sync-start: cut from store builds until sync launches (scripts/pack.mjs, #187)
+  // @sync-start: the `sync` build flag's code, in every store build (src/flags.js, #187)
   // --- openhangar.space (optional sync) -------------------------------------------
-  // Nothing leaves the browser unless the user connects AND presses Sync now.
+  // Nothing leaves the browser unless the user connects. Once connected, every scan
+  // syncs, and Sync Now sends right away.
   // Connecting uses a device code: the site confirms it while signed in, then
   // hands this extension a sync token (stored in `siteLink`).
-  // A built-in site: `npm run build:beta` writes the production site here and
+  // A built-in site: every build with sync gets the production site here, and
   // `npm run build:staging` the staging one (scripts/pack.mjs), so sync is on without a
-  // `siteUrl` override. Always empty in the repo; a store build can never carry it
-  // (scripts/check-store-build.mjs).
+  // `siteUrl` override. Always empty in the repo; a store build only ever carries
+  // production (scripts/check-store-build.mjs).
   const SITE_BUILT_IN = '';
   const SITE_DEFAULT = SITE_BUILT_IN || 'https://app.openhangar.space';
+  // The versioned sync address: a later change to what sync sends gets /api/v2/sync on
+  // the website, and this version keeps working here.
+  const SYNC_PATH = '/api/v1/sync';
   OH.siteUrl = async function siteUrl() {
     const { siteUrl } = await chrome.storage.local.get('siteUrl'); // dev override
     return (siteUrl || SITE_DEFAULT).replace(/\/+$/, '');
   };
-  // Off for everyone until app.openhangar.space launches; on only when a
-  // developer sets `siteUrl` (local testing) or built with build:beta / build:staging.
+  // On in every build with a built-in site (the store builds, the beta, staging), or
+  // when a developer sets `siteUrl` (local testing).
   OH.siteEnabled = async function siteEnabled() {
     const { siteUrl } = await chrome.storage.local.get('siteUrl');
     return Boolean(siteUrl || SITE_BUILT_IN);
@@ -3814,7 +3818,7 @@
     // Nothing scanned in this browser yet: sending its empty hangar would replace
     // the one already on the website (the server refuses it too).
     if (!db?.sources?.hangar?.scannedAt) throw new Error(SYNC_NO_SCAN);
-    const res = await siteFetch('/api/sync', {
+    const res = await siteFetch(SYNC_PATH, {
       method: 'POST',
       headers: { authorization: `Bearer ${link.token}` },
       body: OH.syncBody(db),
@@ -3835,7 +3839,7 @@
   OH.siteDisconnect = async function siteDisconnect() {
     const link = await OH.getSiteLink();
     if (link) {
-      await siteFetch('/api/sync', {
+      await siteFetch(SYNC_PATH, {
         method: 'DELETE',
         headers: { authorization: `Bearer ${link.token}` },
       }).catch(() => null);
