@@ -165,19 +165,28 @@ const SITE_DATA = {
 const firefoxNeedsOk = async () =>
   !!chrome.runtime.getManifest().browser_specific_settings?.gecko &&
   !(await chrome.permissions.contains(SITE_DATA).catch(() => false));
+// This extension's sign-in address: chromiumapp.org on Chrome and Edge,
+// extensions.allizom.org on Firefox (the website checks it, lib/connect.ts). Firefox
+// for Android has no identity API, so there it's worked out the way desktop Firefox
+// does it (the SHA-1 of the add-on id, in hex). Nothing ever opens it here: the code
+// comes back in oh-connect-finish. '' when there's none (then no Connect from the site).
+async function connectRedirect() {
+  if (chrome.identity?.getRedirectURL) return chrome.identity.getRedirectURL();
+  if (!chrome.runtime.getManifest().browser_specific_settings?.gecko) return '';
+  const d = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(chrome.runtime.id));
+  const hex = [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, '0')).join('');
+  return `https://${hex}.extensions.allizom.org/`;
+}
 siteHandlers['oh-connect-begin'] = async (msg, origin) => {
   if (await firefoxNeedsOk()) {
     await chrome.storage.session.set({ siteAskFirefox: Date.now() });
     chrome.tabs.create({ url: chrome.runtime.getURL('src/dashboard.html#home') });
     return { ok: false, firefoxAsk: true };
   }
+  const redirect = await connectRedirect();
+  if (!redirect) return { ok: false, error: 'Connect from Open Hangar itself here.' };
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
-  // The sign-in window's own address: chromiumapp.org on Chrome and Edge,
-  // extensions.allizom.org on Firefox (the website checks it, lib/connect.ts).
-  const redirect =
-    (chrome.identity && chrome.identity.getRedirectURL && chrome.identity.getRedirectURL()) ||
-    `https://${chrome.runtime.id}.chromiumapp.org/`;
   await chrome.storage.session.set({
     siteConnect: { verifier, origin, redirect, at: Date.now() },
   });

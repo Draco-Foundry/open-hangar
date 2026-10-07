@@ -444,8 +444,10 @@ test('polite: one request at a time with a pause, and nothing during a Retry-Aft
 });
 
 // The background worker as scripts/pack.mjs builds it: with sync (every store build), or
-// with its @sync blocks cut (a developer's --flag sync=off build).
-function loadBackground({ sync, rsiOpts }) {
+// with its @sync blocks cut (a developer's --flag sync=off build). `browser`: 'chrome'
+// (Chrome and Edge, with the identity API), 'firefox-android' (Firefox's manifest, no
+// identity API) or 'bare' (neither).
+function loadBackground({ sync, rsiOpts, browser = 'chrome' }) {
   let src = fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'), 'utf8');
   if (!sync) {
     const out = [];
@@ -461,16 +463,29 @@ function loadBackground({ sync, rsiOpts }) {
   let external;
   const rsi = fakeRsi(rsiOpts);
   const area = { get: async () => ({}), set: async () => {}, remove: async () => {} };
+  const firefox = browser === 'firefox-android';
   const chrome = {
     storage: { local: area, session: area, onChanged: listen() },
+    ...(browser === 'chrome'
+      ? {
+          identity: {
+            getRedirectURL: () => 'https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/',
+          },
+        }
+      : {}),
+    // Firefox already said yes to sharing (else Connect opens Home first).
+    ...(firefox ? { permissions: { contains: async () => true } } : {}),
     runtime: {
-      id: 'x',
+      id: firefox ? 'open-hangar@draco-foundry' : 'abcdefghijklmnopabcdefghijklmnop',
       onInstalled: listen(),
       onStartup: listen(),
       onUpdateAvailable: listen(),
       onMessageExternal: { addListener: (f) => (external = f) },
       getManifest: () => ({
         version: '0.0.0',
+        ...(firefox
+          ? { browser_specific_settings: { gecko: { id: 'open-hangar@draco-foundry' } } }
+          : {}),
         externally_connectable: {
           matches: [
             'https://openhangar.space/*',
@@ -566,6 +581,33 @@ test('website bridge in a sync build answers both the cart and Connect', async (
     'https://staging.openhangar.space',
   );
   assert.equal(o.ok, true);
+});
+
+test("Connect from the website hands over this browser's own sign-in address", async () => {
+  const SITE = 'https://app.openhangar.space';
+  // Chrome and Edge: the identity API's chromiumapp.org address.
+  const chromeBegin = await loadBackground({ sync: true }).send({ type: 'oh-connect-begin' }, SITE);
+  assert.equal(
+    chromeBegin.redirect_uri,
+    'https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/',
+  );
+  // Firefox for Android has no identity API: the address desktop Firefox gives, the
+  // SHA-1 of the add-on id (the one the website allows), never a chromiumapp.org one.
+  const android = loadBackground({ sync: true, browser: 'firefox-android' });
+  const begin = await android.send({ type: 'oh-connect-begin' }, SITE);
+  assert.equal(begin.ok, true);
+  assert.equal(
+    begin.redirect_uri,
+    'https://7d8638397fe44e0a2ae860c993d0de41d38c35eb.extensions.allizom.org/',
+  );
+  assert.equal(android.rsi.all.length, 0, 'no request made');
+  // Neither: no address to give, so no Connect from the website (the code still works).
+  const bare = await loadBackground({ sync: true, browser: 'bare' }).send(
+    { type: 'oh-connect-begin' },
+    SITE,
+  );
+  assert.equal(bare.ok, false);
+  assert.equal(bare.redirect_uri, undefined);
 });
 
 test('website bridge passes skus on and returns the edition that worked (#329)', async () => {
