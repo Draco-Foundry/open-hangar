@@ -16,9 +16,16 @@ players are welcome.
 
 Locales: zh_CN (简体中文), fr, ko, es, pt_BR, de, uk, it, cs, ru.
 
+**Retired for 0.3.0.** Every description below was written for 0.2.x and says there's
+no server, which stops being true once sync ships. Don't paste them for 0.3.0. They stay
+here as a starting point for translating the new English listing (docs/STORE.md,
+section 6).
+
 ---
 
 ## 简体中文 (zh_CN)
+
+_Retired for 0.3.0: written for 0.2.x, it says there is no server._
 
 Open Hangar 是一款免费的星际公民账户助手。它读取 RSI 已经展示给你的内容（机库、回购、余额、军团和推荐奖励），把它们整理成真正好用的样子。
 
@@ -42,6 +49,8 @@ Open Hangar 是一款免费的星际公民账户助手。它读取 RSI 已经展
 
 ## Français (fr)
 
+_Retired for 0.3.0: written for 0.2.x, it says there is no server._
+
 Open Hangar est un compagnon gratuit pour votre compte Star Citizen. Il lit ce que RSI vous montre déjà (votre hangar, vos rachats, vos soldes, votre organisation et vos parrainages) et en fait quelque chose de vraiment utile.
 
 Ce que vous obtenez :
@@ -63,6 +72,8 @@ Non officiel, fait par un fan. Sans lien avec Cloud Imperium Games ou RSI.
 ---
 
 ## 한국어 (ko)
+
+_Retired for 0.3.0: written for 0.2.x, it says there is no server._
 
 Open Hangar는 스타 시티즌 계정을 위한 무료 도우미입니다. RSI가 이미 보여 주는 정보(격납고, 바이백, 잔액, 조직, 추천)를 읽어서 실제로 쓸모 있게 정리해 줍니다.
 
@@ -86,6 +97,8 @@ Open Hangar는 스타 시티즌 계정을 위한 무료 도우미입니다. RSI�
 
 ## Español (es)
 
+_Retired for 0.3.0: written for 0.2.x, it says there is no server._
+
 Open Hangar es un compañero gratuito para tu cuenta de Star Citizen. Lee lo que RSI ya te muestra (tu hangar, buy-backs, saldos, organización y referidos) y lo convierte en algo que de verdad puedes usar.
 
 Lo que obtienes:
@@ -107,6 +120,8 @@ No oficial, hecho por fans. Sin relación con Cloud Imperium Games ni RSI.
 ---
 
 ## Português Brasileiro (pt_BR)
+
+_Retired for 0.3.0: written for 0.2.x, it says there is no server._
 
 O Open Hangar é um companheiro gratuito para a sua conta do Star Citizen. Ele lê o que a RSI já mostra para você (seu hangar, buy-backs, saldos, organização e indicações) e transforma tudo em algo que você realmente consegue usar.
 
@@ -130,6 +145,8 @@ Não oficial, feito por fãs. Sem vínculo com a Cloud Imperium Games ou a RSI.
 
 ## Deutsch (de)
 
+_Retired for 0.3.0: written for 0.2.x, it says there is no server._
+
 Open Hangar ist ein kostenloser Begleiter für deinen Star Citizen Account. Er liest, was RSI dir sowieso schon zeigt (deinen Hangar, Buy-Backs, Guthaben, Org und Empfehlungen), und macht daraus etwas, das du wirklich nutzen kannst.
 
 Was du bekommst:
@@ -151,6 +168,8 @@ Inoffiziell und von Fans gemacht. Nicht verbunden mit Cloud Imperium Games oder 
 ---
 
 ## Українська (uk)
+
+_Retired for 0.3.0: written for 0.2.x, it says there is no server._
 
 Open Hangar це безкоштовний помічник для твого акаунта Star Citizen. Він читає те, що RSI вже показує тобі (ангар, buy-back, баланси, організацію й реферали), і перетворює це на щось справді корисне.
 
@@ -174,6 +193,8 @@ Open Hangar це безкоштовний помічник для твого а�
 
 ## Italiano (it)
 
+_Retired for 0.3.0: written for 0.2.x, it says there is no server._
+
 Open Hangar è un compagno gratuito per il tuo account di Star Citizen. Legge quello che RSI ti mostra già (il tuo hangar, i buy-back, i saldi, la tua org e i referral) e lo trasforma in qualcosa di davvero utile.
 
 Cosa ottieni:
@@ -196,6 +217,8 @@ Non ufficiale, fatto da fan. Non affiliato a Cloud Imperium Games o RSI.
 
 ## Čeština (cs)
 
+_Retired for 0.3.0: written for 0.2.x, it says there is no server._
+
 Open Hangar je bezplatný pomocník pro tvůj účet ve Star Citizen. Čte to, co ti RSI už ukazuje (hangár, buy-backy, zůstatky, organizaci a doporučení), a dělá z toho něco, co opravdu využiješ.
 
 Co dostaneš:
@@ -217,6 +240,8 @@ Neoficiální fanouškovský projekt. Není spojen s Cloud Imperium Games ani RS
 ---
 
 ## Русский (ru)
+
+_Retired for 0.3.0: written for 0.2.x, it says there is no server._
 
 Open Hangar это бесплатный помощник для твоего аккаунта Star Citizen. Он читает то, что RSI и так тебе показывает (ангар, бай-бэки, балансы, организацию и рефералы), и превращает это во что-то действительно полезное.
 
