@@ -1,5 +1,10 @@
 # TODO / Later
 
+0.3.0 finishes the signed-off specs in `docs/REDESIGN-0.3.md`; beyond those, the
+extension gets reading improvements and fixes only. New features land on the website
+(openhangar.space), so a feature idea below is a website idea now; reading improvements
+and fixes still land here.
+
 ## Ideas parked for a decision (not yet committed to a direction)
 
 - **Wishlist insurance wants (owner, 2026-09-30).** Let a wishlist entry say what
@@ -10,14 +15,10 @@
   lives (the ship window's wishlist button, the Store page's wishlist list) and how
   the alert reads ("Cutlass Black with LTI is in your buy-backs").
 
-- **Translate the dashboard (planned).** Same 11 languages as the store listings
-  (English, 简体中文, Français, 한국어, Español, Português Brasileiro, Deutsch,
-  Українська, Italiano, Čeština, Русский; ccugame.app offers these). Store summaries
-  (`_locales/`) and full listings (`docs/STORE-LISTINGS.md`) are done. Plan: a `t()`
-  helper + per-language string files, a language picker next to Currency, start
-  with nav, Home, Inventory, Buy-Backs and Market, then the rest; a "help translate"
-  link so native speakers can fix wording. Decide after seeing whether non-English
-  installs show up in the store dashboards.
+- **Translations (later).** The 0.3.0 store listing is English only; languages come
+  back later, one at a time. The 0.2.x translations in `docs/STORE-LISTINGS.md` stay
+  as a starting point, and the translated summaries in `_locales/` need a redo from the
+  new English summary. Translating the dashboard itself waits for the owner's call.
 
 - ~~**Detect warbonds (and other discounts) by price, not name.**~~ ✅ Done: the
   **Below store price** filter compares a ship pledge's paid value to its ships'
@@ -224,7 +225,7 @@ research before touching it:
 - Decide only after confirming offscreen-document support + limits across Chrome
   and Firefox.
 
-## Ship-image coverage — ✅ ship-matrix primary + wiki fallback
+## Ship-Image Coverage: Done (RSI Ship Matrix, openhangar.space Fallback)
 
 Resolved. Two sources now, matched locally (`nameScore`) so RSI shorthands work
 ("Genesis" → "Genesis Starliner", "PTV Buggy" → "PTV", "C8R Pisces" → "C8R Pisces
@@ -233,9 +234,10 @@ Rescue", "600i Explorer" → "600i"):
 - **Primary: RSI ship-matrix** (`/ship-matrix/index`) — one cached fetch returns
   ALL ~250 ships _with_ images, including in-concept ships the wiki lacks (Vulcan,
   Genesis, Odin). We cache a slim {name → image} (~25KB) for 30 days.
-- **Fallback: star-citizen.wiki** — for anything the ship-matrix misses (catalog
-  match → per-slug image fetch). Also fixed its catalog pagination bug (`limit=600`
-  was silently capped at 200, dropping ~88 vehicles).
+- **Fallback: openhangar.space's ships feed** (`api/ships`): the picture it carries
+  for anything the ship-matrix misses (`OH.getShipsFeed`, one request). From 0.3.0
+  (#428) the extension talks only to RSI and openhangar.space; 0.2.x still falls back
+  to the wiki directly.
 
 `hiRes()` upgrades ship-matrix `store_small.jpg` → `source.jpg` on hover/modal.
 Resolver stays lazy, concurrency-capped, hard-cached (negatives too).
@@ -276,10 +278,10 @@ Two layers of fix:
    `skin`, not generic `addon`. This alone fixes most reward paints/skins. Then add
    the new kinds to `OH.KINDS` (+ chip colours) and the stats breakdown.
 2. **External reference for untagged items.** Some reward items have no `.kind` at
-   all — only their _name_ identifies them. Match the name against
-   star-citizen.wiki / starcitizen.tools (cached) to assign a type. See ROADMAP
-   "item-type enrichment". This is the only way to know a bare "Luminalia …" name
-   is a paint when RSI tags nothing.
+   all; only their _name_ identifies them, so knowing a bare "Luminalia …" name is a
+   paint needs a reference outside RSI. If it's built, it lives on the website and
+   reaches the extension through an openhangar.space feed (from 0.3.0 the extension
+   talks only to RSI and openhangar.space).
 
 Keep `kind` backward-compatible (ship / ccu / addon / coupon / other) and extend
 with the finer types; update the inventory filter chips + Stats accordingly.
@@ -291,21 +293,21 @@ tests in `test/htf.test.js`. Findings that changed the plan below: HTF is a **ba
 array, one entry per ship** (no wrapper/version); nearly every field is optional;
 the docs' `ship-codes.json` is stale (2022) and GPL-3.0, so we bundle HangarXPLOR's
 MIT-licensed, maintained table instead (`src/data/`, 305 ships) — no new host
-permission. FleetYards' importer matches on `name`. `pledge_date` now comes from
+permission. The importer we checked matches on `name`. `pledge_date` now comes from
 the hangar card's `.date-col` (parser `date`, ISO). Still open: refreshing the bundled
-table periodically, and a real FleetYards import test. Original plan below.
+table periodically, and a real import test in another fleet tool. Original plan below.
 
-> Scope note: trading-oriented hangar enrichment (per-item melt value, base-item
-> surfacing, LTI/Warbond/Gift status filters) was **considered and deliberately
-> dropped** — that's CCU/trade-optimizer territory (HangarXPLOR et al.), not Open
-> Hangar's "clean reusable data layer" goal. Live-markup inspection (June 2026) also
-> showed none are simple field reads: melt value isn't in the hangar DOM (would be a
-> derived calc), and Warbond/Gift flags weren't present on inspected cards. Not
-> pursuing. HTF export below is kept because it directly serves the data-layer goal.
+> Scope note (June 2026, superseded): per-item melt value, base-item surfacing and
+> LTI/Warbond/Gift status filters were set aside at the time as CCU and trading
+> territory. 0.3.0 has since added a Melt Planner and LTI, Giftable and Warbond
+> filters. The June 2026 live-markup inspection still stands: melt value isn't in the
+> hangar DOM (would be a derived calc), and the inspected cards had no Warbond or Gift
+> flag fields (the Giftable filter reads RSI's Gift action, the Warbond filter the
+> pledge name). HTF export below is kept because it lets players take their hangar to
+> other fleet tools.
 
-A public community **interchange format** consumed by other SC tools (Erkul DPS
-calc, FleetYards, Starship42 3D viewer, HangarXPLOR) — exporting it directly serves
-the "be the data layer other tools build on" mission. Spec:
+A public community **interchange format** that other fleet tools import, so players
+can take their hangar with them. Spec:
 `https://docs.starcitizen.fans` (`hangar-transfer-format.yaml`, OAS3, v0.0.1 draft).
 
 - Core schemas:
@@ -384,53 +386,48 @@ handle, moniker, avatar, enlistedOn, convertedOn, campaign}], prospectsList:[…
   load/clear/import/reconcile all updated to carry `state.referral`.
 
 **Privacy:** recruit/prospect rows are _other people's_ handles + enlist dates tied
-to your account — treated like the rest of the scraped DB (local only, in export,
-never auto-shared). Keep the "don't redistribute other people's data" line in mind
-for any future sharing/API.
+to your account. They're treated like the rest of the scraped DB: kept in this
+browser and in the export, and sent only to your own openhangar.space account if you
+connect sync. Keep the "don't redistribute other people's data" line in mind for
+anything that shows them.
 
-**Not done / later:** the public Weekly/Monthly/All-time leaderboard on the page
-(out of scope for v1). Display defaults to ALL_TIME; the API's `display` enum (other
+**Not shown, on purpose:** the page's public Weekly/Monthly/All-time leaderboard (no
+rankings). Display defaults to ALL_TIME; the API's `display` enum (other
 ranges) and `sortBy` aren't surfaced in the UI yet.
 
-### Referral rewards data — verify & complete (planned)
+### Referral Rewards Data: Verified and Kept Fresh
 
 The reward ladders (`REFERRAL_LADDER_STANDARD` / `_LEGACY`) and event windows
-(`REFERRAL_EVENTS`) in `dashboard.js` are **hardcoded best-effort** from
+(`REFERRAL_EVENTS`) in `dashboard.js` started as **hardcoded best-effort** from
 [starcitizen.tools/Referral_program](https://starcitizen.tools/Referral_program)
-(captured May 2026). Two gaps to close:
+(captured May 2026). Both gaps below are closed; re-verifying the ladders stays
+ongoing.
 
 1. **Completeness/accuracy audit.** ✅ Done June 2026 — standard + legacy ladders
    verified item-by-item against the wiki (accurate), and the event list completed to
-   the full 23 events back to 2019 (`REFERRAL_EVENTS`). Ongoing: re-verify as the wiki
-   updates, and append each new CIG event until the auto-refresh below lands.
-2. **Keep it fresh without manual edits.** CIG adds a new incentive event roughly
-   monthly. Decide a low-maintenance refresh path that works under extension CSP on
-   **Chrome + Firefox + Safari** (no remote `<script>`; `fetch` to an allowed host is
-   fine). Options, lightest → heaviest:
-   - **Ship a versioned JSON** (`referral-rewards.json`) bundled in the extension;
-     update it on release. Zero runtime network, but stale between releases.
-   - **Fetch a community-maintained JSON** (e.g. a file in this GitHub repo / Pages)
-     at runtime, cached locally with a TTL like the ship-matrix cache; fall back to
-     the bundled copy offline. Needs the host in `host_permissions` + each store's
-     review, but auto-updates without a release. **Likely the right balance.**
-   - **Parse the wiki live** — fragile (wiki markup changes, 403s to non-browsers as
-     we hit) and heavier; avoid unless the JSON approaches fail.
-     Whatever the source, keep the parser/shape in ONE place and treat reward art the
-     way ship images already work (lazy, cached, CSP-safe).
+   the full 23 events back to 2019 (`REFERRAL_EVENTS`). Ongoing: re-verify the ladders
+   as the wiki updates; new events arrive through the feed (2 below).
+2. **Keep it fresh without manual edits.** Done: from 0.3.0 (#428), events and reward
+   pictures come from openhangar.space's public referral feed (`OH.getReferralFeed`,
+   `api/referral-events`), at most once a day, on top of the built-in
+   `REFERRAL_EVENTS`. The website keeps them current and credits its source. 0.2.x
+   still reads the wiki directly.
 
-### Referral reward item links + hover art — make them correct (planned)
+### Referral Reward Item Links and Hover Art: Make Them Correct (Planned)
 
-The per-item links/hover on the Referrals page (`rewardItemHtml` in `dashboard.js`)
-are **placeholder-quality** and need finishing:
+The per-item links/hover on the Referrals page (`shipHref` / `wikiHref` in
+`ui/referrals/Referrals.svelte`) are **placeholder-quality** and need finishing:
 
 - **Links are searches, not destinations.** Ship items point at the RSI ship-matrix
   _search_ (`/ship-matrix/search?q=…`) and non-ship items at a starcitizen.tools
-  _search_ — not the actual reward/item page. Replace with canonical deep links
-  (curated per item, or resolved from the wiki/ship-matrix once and cached).
+  _search_, not the actual reward or item page. Replace with canonical deep links
+  (curated per item, or carried in openhangar.space's referral feed).
 - **Hover art is ship-only.** Only `ship: true` items resolve an image (via
   `OH.getShipImage`); armor/statues/paints/figurines/decorations show no preview.
-  Add image resolution for non-ship reward items (wiki image lookup, lazy + cached
-  - CSP-safe, same pattern as ship art) so every item can hover-preview.
+  Pictures for non-ship reward items would come through openhangar.space's referral
+  feed (it already carries the tier and event pictures), lazy and cached like ship
+  art, so every item can hover-preview. From 0.3.0 the extension doesn't look
+  pictures up on the wiki itself.
 - **Verify ship-name overrides.** Some items use an `img:`/name override (e.g.
   "Esperia Blade" → `Blade`); confirm each resolves to the right art, especially
   replicas/variants vs. the flyable ship.
@@ -484,8 +481,8 @@ value:
 5. **Standardize a spacing scale** (`--sp-2:8px; --sp-3:12px; --sp-4:16px`) for card
    padding + cluster bottom-margins, which currently drift (18/22/26px).
 
-## Consumption layer (deferred — parked by design)
+## Consumption Layer (Dropped, 2026-10-08)
 
-How external sites read the database (whitelisted `externally_connectable` API,
-JSON export/import, etc.) — to be decided once the database (hangar + buybacks) is
-complete. Keep it local-first/auditable to fit open-source + store distribution.
+No API for other sites. Players reach their data on other devices through opt-in sync
+to their own openhangar.space account (from 0.3.0), or take it with them as a JSON or
+HTF export.
