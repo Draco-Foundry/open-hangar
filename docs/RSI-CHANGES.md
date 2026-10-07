@@ -52,10 +52,11 @@ Usual signs:
   has pledge markers but the parser found nothing: markup changed).
 - A scan that finishes but with missing fields (no dates, no values, every item
   "unknown") or far fewer items than before.
-- Several bug reports in the same day, often with a pasted **error report**
-  (Developers → Copy error report).
+- Several bug reports in the same day (in #bug-reports on Discord or on GitHub),
+  often with a pasted **Flight Log** (Send Flight Log on the problem card, or
+  Developers → Copy Flight Log).
 
-Check the error reports first: they show the version, browser, item counts and the
+Check the flight logs first: they show the version, browser, item counts and the
 exact errors, which usually tells you which source broke.
 
 ## 2. Find what broke
