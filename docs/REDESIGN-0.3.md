@@ -20,7 +20,8 @@ small fixes; beta-tested before the stores.
 ## Style: Clean Pro (the Only Look)
 
 The owner's call (2026-09-30): **one theme, simple and easy to read**. No theme picker,
-no alternate looks; light mode stays the one scheduled option. Reference mockup: the
+no alternate looks; light mode is the only other look under consideration (owner to
+confirm). Reference mockup: the
 "Open Hangar Home Styles" artifact (Clean Pro tab).
 
 - Graphite surfaces, no glow, no decoration. Colour only where it means something (the
@@ -118,8 +119,9 @@ Empty blocks disappear; the grid never leaves a card alone in a row.
 - Right side: **Scan All ▾** (reads "Scan Custom" when a source is unticked; the choice is
   remembered in `scanSources`), then the **gear menu**: currency, Streamer Mode, Rescan
   Reminder, Updates, Developers, **Log Out of RSI** ("For switching accounts. Your saved
-  data stays."; it only clears RSI's cookies), Clear Data in red. The language picker
-  goes in the gear menu when translations land. Updates and Developers left the nav.
+  data stays."; it only clears RSI's cookies), Clear Data in red. If translations come
+  to the extension (owner to confirm), the language picker goes in the gear menu.
+  Updates and Developers left the nav.
 - **Streamer Mode** (global, `streamerMode`): every money amount (fmtCurrency,
   shortMoney, bigMoney, formatValue) shows as dots, hover text included; UEC/REC on the
   card too. Its scope may grow beyond money.
@@ -234,7 +236,12 @@ Tracked as GitHub issues from 2026-09-30 on; the issue is the source of truth.
 
 ## Scheduled Alongside
 
-- Light mode (Dark default / Light / Auto) after the redesign's pages exist.
-- RSI server status on Game Status (needs a CORS-safe route, e.g. via app.openhangar.space).
+0.3.0 finishes the signed-off specs above; beyond those, the extension gets reading
+improvements and fixes only, and new features land on the website.
+
+- Light mode (Dark default / Light / Auto) after the redesign's pages exist (owner to
+  confirm).
+- ~~RSI server status on Game Status~~ Done: the Game Status pill's dot and status line
+  come from openhangar.space's game-status feed (#424).
 - The parked draft PR #155 (first Home build) is reference only; its data functions
   (wiki events/patches, buy-back dates, stale-event guard, tests) get reused.
