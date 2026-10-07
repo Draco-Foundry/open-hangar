@@ -112,11 +112,19 @@ h1 {
   font-weight: 600;
   font-size: 1.05rem;
 }
+/* For screen readers only: the button's full name. */
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
 .b-note {
   font-size: 0.85rem;
   color: #c9d1d9;
 }
-/* Status dot before the note: amber = in review, grey = planned, green = live. */
+/* Status dot before the note (stores not live yet): amber = in review, grey = planned. */
 .b-note::before {
   content: '';
   display: inline-block;
@@ -129,9 +137,6 @@ h1 {
 }
 .install.status-review .b-note::before {
   background: #d29922;
-}
-.install.live .b-note::before {
-  background: #3fb950;
 }
 /* Each store's live version, and a newer one waiting in its review queue. */
 .b-vers {
