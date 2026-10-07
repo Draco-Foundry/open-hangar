@@ -10,7 +10,8 @@
 // staging site anywhere (the manifest included), and the public name and version,
 // never the beta's. The manifest's externally_connectable is left out of the sync
 // check: it lists our own site on purpose, for Add to RSI Cart from the website's
-// store (#288).
+// store (#288). So does the Firefox build's site-bridge content script, its way to
+// the same pages (#434).
 //
 // Beta build (docs/BETA.md): sync code kept and built in to production
 // (app.openhangar.space) and nothing else; the staging site nowhere, manifest
@@ -47,6 +48,11 @@ function checkPublic(name, text) {
     if (m.version_name)
       problems.push(`${name}: has a version_name (${m.version_name}): a beta build?`);
     delete m.externally_connectable;
+    // Firefox's way to the same pages (src/site-bridge.js, #434).
+    if (m.content_scripts)
+      m.content_scripts = m.content_scripts.filter(
+        (c) => !(c.js || []).every((f) => f.endsWith('site-bridge.js')),
+      );
     hosts = JSON.stringify(m);
   }
   if (/app\.openhangar\.space/.test(hosts))

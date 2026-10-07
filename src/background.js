@@ -89,16 +89,22 @@ chrome.action.onClicked.addListener(() => {
 });
 
 // --- Messages from our website -------------------------------------------------------
-// Which pages may talk to the extension is set in one place, the manifest's
-// externally_connectable (added by scripts/pack.mjs for Chrome and Edge; Firefox
-// doesn't let web pages reach extensions). Each message type has a handler here.
+// Which pages may talk to the extension is set in one place by scripts/pack.mjs: the
+// manifest's externally_connectable on Chrome and Edge, and on Firefox (which doesn't
+// let web pages reach extensions) the matches of src/site-bridge.js, a content script
+// that passes our own site's messages here (#434). Each message type has a handler.
 const siteHandlers = {};
 function siteOrigins() {
-  const m = chrome.runtime.getManifest().externally_connectable;
+  const m = chrome.runtime.getManifest();
+  const bridge = (m.content_scripts || []).find((c) =>
+    (c.js || []).some((f) => f.endsWith('site-bridge.js')),
+  );
+  const matches =
+    (m.externally_connectable && m.externally_connectable.matches) ||
+    (bridge && bridge.matches) ||
+    [];
   // "https://host/*" → "https://host"
-  return ((m && m.matches) || [])
-    .map((p) => (/^(https:\/\/[^/*]+)\//.exec(p) || [])[1])
-    .filter(Boolean);
+  return matches.map((p) => (/^(https:\/\/[^/*]+)\//.exec(p) || [])[1]).filter(Boolean);
 }
 siteHandlers['oh-hello'] = () => ({ ok: true, cart: true, connect: false });
 
@@ -145,10 +151,29 @@ const b64url = (bytes) =>
     .replace(/\//g, '_')
     .replace(/=+$/, '');
 
+// Firefox asks before an extension sends anything off the device (the Firefox
+// manifest's optional data collection, scripts/pack.mjs), and only from a click in
+// the extension. So the first Connect from the website opens Home with Firefox's
+// card already up (src/dashboard.js siteAskFirefox): its Continue is that click.
+const SITE_DATA = {
+  data_collection: ['personallyIdentifyingInfo', 'financialAndPaymentInfo', 'websiteContent'],
+};
+const firefoxNeedsOk = async () =>
+  !!chrome.runtime.getManifest().browser_specific_settings?.gecko &&
+  !(await chrome.permissions.contains(SITE_DATA).catch(() => false));
 siteHandlers['oh-connect-begin'] = async (msg, origin) => {
+  if (await firefoxNeedsOk()) {
+    await chrome.storage.session.set({ siteAskFirefox: Date.now() });
+    chrome.tabs.create({ url: chrome.runtime.getURL('src/dashboard.html#home') });
+    return { ok: false, firefoxAsk: true };
+  }
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
-  const redirect = `https://${chrome.runtime.id}.chromiumapp.org/`;
+  // The sign-in window's own address: chromiumapp.org on Chrome and Edge,
+  // extensions.allizom.org on Firefox (the website checks it, lib/connect.ts).
+  const redirect =
+    (chrome.identity && chrome.identity.getRedirectURL && chrome.identity.getRedirectURL()) ||
+    `https://${chrome.runtime.id}.chromiumapp.org/`;
   await chrome.storage.session.set({
     siteConnect: { verifier, origin, redirect, at: Date.now() },
   });
@@ -193,13 +218,32 @@ for (const t of ['oh-connect-begin', 'oh-connect-finish']) {
 }
 // @sync-end
 
-// The website's messages, all of them: only from the pages the manifest's
-// externally_connectable lets in (our own site, Chrome and Edge; scripts/pack.mjs).
+// The website's messages, all of them: only from the pages the manifest lets in
+// (our own site; scripts/pack.mjs).
+function answerSite(msg, origin, reply) {
+  const handler = siteHandlers[msg?.type];
+  Promise.resolve(handler ? handler(msg, origin) : { ok: false, error: 'unknown request' }).then(
+    reply,
+    (err) => reply({ ok: false, error: String(err?.message || err) }),
+  );
+  return true; // answers later
+}
+// Chrome and Edge: straight from the page.
 chrome.runtime.onMessageExternal?.addListener((msg, sender, reply) => {
   if (!siteOrigins().includes(sender.origin)) return false;
-  const handler = siteHandlers[msg?.type];
-  Promise.resolve(
-    handler ? handler(msg, sender.origin) : { ok: false, error: 'unknown request' },
-  ).then(reply, (err) => reply({ ok: false, error: String(err?.message || err) }));
-  return true; // answers later
+  return answerSite(msg, sender.origin, reply);
+});
+// Firefox: through src/site-bridge.js, our own content script in a tab of our site.
+// The browser says which page it runs in (sender.url), never the page itself.
+chrome.runtime.onMessage?.addListener((msg, sender, reply) => {
+  if (!msg || typeof msg !== 'object' || !('ohSite' in msg)) return false;
+  if (sender.id !== chrome.runtime.id || !sender.tab || !sender.url) return false;
+  let origin = '';
+  try {
+    origin = new URL(sender.url).origin;
+  } catch {
+    return false;
+  }
+  if (!siteOrigins().includes(origin)) return false;
+  return answerSite(msg.ohSite, origin, reply);
 });

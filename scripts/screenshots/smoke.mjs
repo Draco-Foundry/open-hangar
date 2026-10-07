@@ -1030,9 +1030,16 @@ try {
       await wait();
       r.off = txt(card());
       r.noStatusYet = !$('#sync-status');
+      // Not connected: the portrait's menu offers Connect at the top (#434).
+      $('#settings-btn').click();
+      await wait();
+      r.youOffer = txt($('#settings-menu #menu-connect'));
+      document.dispatchEvent(new CustomEvent('oh:close-menus'));
+      await wait();
       btnIn(card(), 'Connect').click();
       await wait();
       r.wait = txt(card());
+      r.copy = !!btnIn(card(), 'Copy');
       r.opened = opened[0];
       approve();
       await wait(150);
@@ -1133,7 +1140,10 @@ try {
   /Connect to openhangar\.space/.test(sc.off) &&
   /Nothing is sent until you connect/.test(sc.off) &&
   sc.noStatusYet &&
+  /^Connect to openhangar\.space\s*Optional/.test(sc.youOffer || '') &&
   /K7Q-4PX/.test(sc.wait) &&
+  /Good for (10:00|9:5\d)/.test(sc.wait) &&
+  sc.copy &&
   /\/link\?code=K7Q-4PX$/.test(sc.opened || '') &&
   sc.quiet &&
   sc.status === 'Connected' &&
@@ -1166,7 +1176,7 @@ try {
   sc.statusGone &&
   sc.hiddenAgain
     ? ok(
-        'website sync: connect on the card, then the Synced dot on the portrait (Synced line and Sync Now in its menu), the ▾ menu, a scan syncs as its last step, problems in the scan report, disconnect',
+        'website sync: connect on the card or the portrait menu (the code with Copy and its time left), then the Synced dot on the portrait (Synced line and Sync Now in its menu), the ▾ menu, a scan syncs as its last step, problems in the scan report, disconnect',
       )
     : fail(`website sync: ${JSON.stringify(sc)}`);
 
@@ -3553,7 +3563,8 @@ try {
       $('#gsearch-top').getBoundingClientRect().width > 200;
     $('#gsearch-top').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await tick();
-    r.escCloses = !wrap.classList.contains('open') && document.activeElement === $('#top-search-btn');
+    r.escCloses =
+      !wrap.classList.contains('open') && document.activeElement === $('#top-search-btn');
     $('#top-search-btn').click();
     await tick();
     r.iconOpens = wrap.classList.contains('open') && document.activeElement === $('#gsearch-top');
@@ -3578,10 +3589,14 @@ try {
   more.moreActive &&
   more.noBarActive &&
   more.marked.join(',') === 'Referrals'
-    ? ok('top bar: four pages in the bar, More ▾ for Stats, Org Fleet and Referrals, marks the page you are on')
+    ? ok(
+        'top bar: four pages in the bar, More ▾ for Stats, Org Fleet and Referrals, marks the page you are on',
+      )
     : fail(`top bar More menu: ${JSON.stringify(more)}`);
   more.searchShut && more.slashOpens && more.escCloses && more.iconOpens && more.clickAwayCloses
-    ? ok('top bar: search icon opens the field over the links (click or /), Escape and a click away close it')
+    ? ok(
+        'top bar: search icon opens the field over the links (click or /), Escape and a click away close it',
+      )
     : fail(`top bar search: ${JSON.stringify(more)}`);
   /^\d+\.\d+/.test(more.pill) && /LIVE \d/.test(more.pillTip)
     ? ok(`top bar: Game Status pill is compact ("${more.pill}", LIVE on hover)`)
