@@ -127,8 +127,10 @@ const targets = {
   chrome: (m) => m,
   firefox: (m) => ({
     ...m,
-    // flags.js first: Firefox's event page has no importScripts (src/background.js).
-    background: { scripts: [FLAGS_FILE, m.background.service_worker] },
+    // Firefox's event page has no importScripts, so what background.js imports on
+    // Chrome is listed here, before it: flags.js, and rsi-cart.js for Add to RSI Cart
+    // from the website (through site-bridge.js, #434).
+    background: { scripts: [FLAGS_FILE, 'src/rsi-cart.js', m.background.service_worker] },
     browser_specific_settings: {
       gecko: {
         id: 'open-hangar@draco-foundry',
