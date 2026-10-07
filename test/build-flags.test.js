@@ -219,6 +219,7 @@ test('pack: writes each build its values and cuts the code of flags that are off
     // The beta: exactly the beta set, no overrides.
     pack(dir, ['--beta']);
     assert.deepEqual(built('beta').flags, { sync: true, orgFleet: false });
+    assert.deepEqual(built('beta-firefox').flags, { sync: true, orgFleet: false });
     assert.throws(() => pack(dir, ['--beta', '--flag', 'orgFleet=on']), /beta set/);
     assert.throws(() => pack(dir, ['--flag', 'warpDrive=on']), /no such flag/);
   } finally {
