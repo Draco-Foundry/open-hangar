@@ -100,6 +100,25 @@ test('sync not open yet: a calm note with the date, and the link stays', async (
   assert.equal(mem.siteLink.lastSync, undefined);
 });
 
+test("sync not open yet: the website's own words win, so a new date needs no store update", async () => {
+  const moved = await refusedWith(403, {
+    error: 'Sync opens November 17. Your hangar stays safe in your browser until then.',
+    reason: 'not-open',
+  });
+  assert.equal(
+    moved.message,
+    'Sync opens November 17. Your hangar stays safe in your browser until then.',
+  );
+  assert.equal(moved.calm, true);
+  // No words, markup or a wall of text: the built-in sentence instead.
+  const fallback = 'Sync opens November 10. Your hangar stays safe in your browser until then.';
+  for (const error of [undefined, '', '  ', '<b>closed</b>', 'x'.repeat(201), 42]) {
+    const err = await refusedWith(403, { error, reason: 'not-open' });
+    assert.equal(err.message, fallback);
+    assert.equal(err.calm, true);
+  }
+});
+
 test('an extension too old to sync is told to update', async () => {
   const err = await refusedWith(426, { error: 'too old', reason: 'old-format' });
   assert.equal(

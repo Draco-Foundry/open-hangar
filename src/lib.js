@@ -3800,11 +3800,16 @@
     "openhangar.space hasn't caught up with this version yet. Try again soon.";
   const SYNC_TOO_BIG =
     "That's more cargo than openhangar.space can hold. Your hangar stays safe in your browser.";
-  // A refusal's status and reason → the Error to throw. Sync not open yet isn't
-  // something you did, so it's marked `calm`: the scan report shows it as a note,
-  // not a problem (src/dashboard.js siteSyncReport).
-  function syncRefusal(status, reason) {
-    if (reason === 'not-open') return Object.assign(new Error(SYNC_NOT_OPEN), { calm: true });
+  // A refusal's status, reason and the website's own words → the Error to throw. Sync
+  // not open yet isn't something you did, so it's marked `calm`: the scan report shows
+  // it as a note, not a problem (src/dashboard.js siteSyncReport). Its words are the
+  // website's when it sends a short plain sentence: a store update takes days, so a new
+  // opening date only has to change there.
+  function syncRefusal(status, reason, said = '') {
+    if (reason === 'not-open') {
+      const own = said.length <= 200 && !/[<>]/.test(said) ? said : '';
+      return Object.assign(new Error(own || SYNC_NOT_OPEN), { calm: true });
+    }
     if (status === 409) return new Error(reason === 'older-scan' ? SYNC_OLDER_SCAN : SYNC_NO_SCAN);
     if (status === 426 || reason === 'old-format') return new Error(SYNC_OLD_FORMAT);
     if (reason === 'newer-format') return new Error(SYNC_NEWER_FORMAT);
@@ -3830,7 +3835,8 @@
     if (!res.ok) {
       // Not always JSON (a proxy's error page, say): then there's no reason.
       const body = await res.json().catch(() => null);
-      throw syncRefusal(res.status, typeof body?.reason === 'string' ? body.reason : '');
+      const text = (v) => (typeof v === 'string' ? v.trim() : '');
+      throw syncRefusal(res.status, text(body?.reason), text(body?.error));
     }
     const j = await res.json();
     await chrome.storage.local.set({ siteLink: { ...link, lastSync: j.synced_at } });

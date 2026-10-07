@@ -63,7 +63,9 @@ that, the extension only reads the public feeds (game status, ships, catalog, ra
 the like), which carry nothing about you. Until launch day the website answers a sync
 from an account without beta access with "Sync opens November 10" (reason `not-open`,
 a switch on the website's side): the extension shows that as a calm note in the scan
-report ("Not Synced Yet"), not a problem, and stays connected.
+report ("Not Synced Yet"), not a problem, and stays connected. The note uses the
+website's own sentence (its built-in copy only when there's none), so a new date only
+changes on the website.
 
 `--flag sync=off` still builds a copy without it, for a developer; the store check
 refuses that build.
