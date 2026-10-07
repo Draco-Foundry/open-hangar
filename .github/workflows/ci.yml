@@ -27,6 +27,24 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # PR rules (docs/dev/git.md): the title is a conventional commit (the squash
+      # commit takes it), and no branch plan in docs/plans/ is left behind.
+      - name: PR rules
+        if: github.event_name == 'pull_request'
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          ok=true
+          if ! printf '%s' "$TITLE" | grep -Eq '^(feat|fix|perf|refactor|docs|test|build|ci|chore|style|revert)(\([a-z0-9._/-]+\))?!?: .+'; then
+            echo "::error::PR title must be a conventional commit, like 'fix(store): …' (docs/dev/git.md)"
+            ok=false
+          fi
+          plans=$(git ls-tree -r --name-only HEAD docs/plans | grep -v '^docs/plans/README.md$' || true)
+          if [ -n "$plans" ]; then
+            echo "::error::Delete the branch plan before merging: $plans"
+            ok=false
+          fi
+          $ok
       # Docs-only PRs (Markdown, docs/, the landing page in site/, issue templates)
       # skip the slow UI test and the store packaging; the fast checks still run.
       # When in doubt (not a PR, or the file list can't be read) everything runs.
