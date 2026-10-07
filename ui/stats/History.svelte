@@ -1,8 +1,12 @@
 <script>
   // Stats → History: account value over time (one point per scan, on the same rules
   // as Home's Account Value), a log of what changed per scan, and a backup button
-  // (scans and history live only in this browser).
+  // (scans and history live in this browser, plus the website's copy once synced).
   import { app, OH, version } from '../lib/app.svelte.js';
+  import { flag } from '../lib/flags.js';
+
+  // Builds with website sync mention the synced copy (docs/FLAGS.md).
+  const sync = flag('sync');
 
   const W = 560,
     H = 150,
@@ -119,9 +123,10 @@
 <div class="backup-row">
   <button class="mk-btn" type="button" data-backup>Download Backup</button>
   <span class="muted"
-    ><span class={d.backup.stale ? 'stale' : undefined}>{d.backup.text}</span> · Your scans and
-    this history live only in this browser. Uninstalling the extension or moving to another browser loses
-    them. Keep the file somewhere safe (a Drive or OneDrive folder works) and restore it with
+    ><span class={d.backup.stale ? 'stale' : undefined}>{d.backup.text}</span> · {sync
+      ? "Your scans and this history live in this browser, plus a synced copy on openhangar.space once you connect. Uninstalling the extension or moving to another browser loses this browser's copy."
+      : 'Your scans and this history live only in this browser. Uninstalling the extension or moving to another browser loses them.'}
+    Keep the file somewhere safe (a Drive or OneDrive folder works) and restore it with
     Developers → Import JSON.</span
   >
 </div>
