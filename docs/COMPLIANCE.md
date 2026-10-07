@@ -20,11 +20,13 @@ buy-backs, balances, organization, and referral standing — and view or export 
 
 - **collects no credentials** — it uses only the RSI session the user is already
   signed into; the user never enters a password into the extension;
-- **keeps the user's data on their device by default**: nothing is sent anywhere
+- **keeps the user's data on their device by default**: nothing is sent to any server
   unless the user opts in to sync by connecting their own openhangar.space account;
   once connected, it syncs to that account after each scan;
 - **is read-only and rate-limited** — it reads pages the user can already see, with
-  a politeness delay, and does not perform bulk or automated account actions;
+  a politeness delay, and does not perform bulk or automated account actions. The one
+  exception to read-only is Add to RSI Cart, which puts one upgrade in the user's RSI
+  cart when they click it and never checks out;
 - **accesses only the signed-in user's own account** — never third parties.
 
 This places Open Hangar within a **well-established, currently-listed category** of
@@ -50,7 +52,7 @@ purpose (§3).
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `storage`                          | Persist the user's own scanned data + UI preferences locally (`chrome.storage.local`).                                                                                                                                                                              | Local; sent only to the user's own openhangar.space account, if they connect sync.     |
 | `cookies`                          | Implements "Log out of RSI" — clears `robertsspaceindustries.com` cookies (incl. the HttpOnly session cookie page scripts can't remove) so the user can end their RSI session from the extension.                                                                   | Cookie **values are never read or transmitted**; only removed on explicit user action. |
-| host: `robertsspaceindustries.com` | Read the signed-in user's own account pages — hangar, buy-backs, balances, and the referrals GraphQL endpoint (a read-only `POST` query) — via same-session `fetch`, parsed locally; also RSI's public ship-matrix index for art on items RSI ships without images. | Read-only, rate-limited, user's own account only.                                      |
+| host: `robertsspaceindustries.com` | Read the signed-in user's own account pages — hangar, buy-backs, balances, and the referrals GraphQL endpoint (a read-only `POST` query) — via same-session `fetch`, parsed locally; also RSI's public ship-matrix index for art on items RSI ships without images. | Read-only apart from Add to RSI Cart; rate-limited; user's own account only.           |
 
 **Data handling summary (for data-disclosure forms):**
 
@@ -58,8 +60,8 @@ purpose (§3).
   section of that account lists the user's own recruits/prospects — other citizens'
   public handles, monikers, and dates — which are likewise stored locally, and sent
   only to the user's own openhangar.space account if they connect sync.)
-- **Where it goes:** stored locally on the user's device. **Nothing is sent unless
-  the user opts in to sync** by connecting their own openhangar.space account; once
+- **Where it goes:** stored locally on the user's device. **Nothing is sent to any
+  server unless the user opts in to sync** by connecting their own openhangar.space account; once
   connected, the extension syncs after each scan, sending the same data as the JSON
   export to that account only. Disconnect stops it. **No transmission to any third
   party. No sale or sharing of data.**
@@ -80,7 +82,7 @@ document is independently verifiable by reading the source. There is no obfuscat
 minified, or remotely-hosted code; the extension ships no remote `<script>` and
 loads no remote executable code (consistent with Manifest V3 and store policy). A
 reviewer can confirm the "local unless the user connects sync, no credentials,
-read-only" claims directly.
+read-only apart from Add to RSI Cart" claims directly.
 
 ---
 
@@ -133,7 +135,7 @@ total, confirming this is a high-traffic, well-trodden category._
    versesync.com, FleetBooks, and others.
 
 Open Hangar works like the **first, more conservative pattern** by default: unless the
-user connects sync, their data is **never transmitted anywhere** (§1, §3). The second
+user connects sync, their data is **never sent to any server** (§1, §3). The second
 pattern is **opt-in only**: a user who connects their own openhangar.space account
 syncs a copy there after each scan. The many approved "sync" peers that _do_ send
 hangar data to a remote server demonstrate that this pattern is accepted; Open Hangar
@@ -145,8 +147,9 @@ advertise that they "never require your RSI password." The one notable exception
 **Star Citizen Bulk XPLORer** (`bdccgdpiiagbadkjmnflkpkeogpmnpkm`), an approved,
 listed tool that performs bulk melt/gift and, per its own listing, **"WILL ask for
 your password … but at no stage is this password ever stored, or sent to any non-RSI
-websites."** Open Hangar performs **no account actions and requests no password at
-all** — it is strictly read-only and credential-free.
+websites."** Open Hangar performs **no bulk or automated account actions and requests
+no password at all**: it is credential-free and read-only, apart from Add to RSI Cart,
+which puts one upgrade in the user's RSI cart when they click it and never checks out.
 
 **The category's accepted data-handling envelope (per peers' own disclosures).**
 Chrome's data-disclosure form requires each developer to declare the categories of
@@ -170,7 +173,7 @@ data handling as broad as Open Hangar's opt-in sync, and broader:
 Several of these — **SC Bridge Sync** and **VerseLink** declare handling
 **Authentication information**; **FleetBooks** declares handling **Financial and
 payment information** — are nonetheless **listed and in good standing**. Open Hangar
-transmits nothing until the user connects sync. For the opt-in sync it declares
+sends nothing to any server until the user connects sync. For the opt-in sync it declares
 Personally identifiable information (RSI handle and org), Financial and payment
 information (store credit balances and pledge prices) and Website content (hangar
 and buy-back contents), sent only to the user's own openhangar.space account. (For
@@ -179,9 +182,12 @@ SCTool Ship Exporter, SC Labs Importer, Guardians Hub Sync, ATLAS — instead de
 _"will not collect or use your data,"_ the same posture Open Hangar takes until the
 user connects sync.)
 
-Open Hangar's local-by-default claim is not merely a declaration: the only place it
-can send account data is the user's own openhangar.space account, and only after the
-user connects it (§3, §4). A reviewer can confirm this directly in the public source.
+Open Hangar's local-by-default claim is not merely a declaration: account data
+reaches a server only through sync, which the user must connect, and only their own
+openhangar.space account (§3, §4). The one other hand-off is Add to RSI Cart on the
+openhangar.space store: the page sees which of the user's ships can upgrade and RSI's
+prices, inside the browser only (`siteHandlers` in `src/background.js`). A reviewer
+can confirm both directly in the public source.
 
 **Representative flagship precedents** (the highest-install, most directly
 comparable peers):
@@ -210,9 +216,11 @@ comparable peers):
 **Why this matters for Open Hangar specifically:** the category is established,
 populated, and currently listed; its tools span from local-only readers, to
 server-syncing uploaders, to a password-prompting bulk-action tool — and all are
-accepted. Open Hangar is read-only, credential-free, and local unless the user
-connects sync, with no account actions. It therefore sits on the **most conservative
-end** of an already-permitted category, not at its edge.
+accepted. Open Hangar is credential-free, local unless the user connects sync, and
+read-only apart from Add to RSI Cart (one upgrade into the user's RSI cart when they
+click it, never a checkout), with no bulk or automated account actions. It therefore
+sits on the **most conservative end** of an already-permitted category, not at its
+edge.
 
 ---
 
@@ -246,9 +254,10 @@ stance on fan activity:
 
 ## 7. Ongoing compliance commitments
 
-- Remain read-only, rate-limited, and credential-free (keep the politeness delay in
-  `lib.js`; no bulk or automated account actions).
-- Keep the extension local by default: nothing is transmitted unless the user
+- Remain rate-limited and credential-free, and read-only apart from Add to RSI Cart
+  when the user clicks it (keep the politeness delay in `lib.js`; no bulk or automated
+  account actions; never check out).
+- Keep the extension local by default: nothing is sent to any server unless the user
   connects sync, and sync sends only to the user's own openhangar.space account; keep
   the privacy policy accurate to behavior.
 - Keep the code public (source available) and free of remote code execution.
@@ -260,8 +269,8 @@ stance on fan activity:
 ## 8. Conclusion
 
 Open Hangar is a transparent, local-by-default, credential-free, source-available tool
-that reads only the user's own account data and sends it nowhere unless the user opts
-in to sync it to their own openhangar.space account. It fits squarely within
+that reads only the user's own account data and sends it to no server unless the user
+opts in to sync it to their own openhangar.space account. It fits squarely within
 an established and currently-listed Chrome Web Store category, while operating more
 conservatively than several approved peers. We are confident it meets store policy
 and respects the rights holder's published fan-use guidance, and we welcome reviewer
