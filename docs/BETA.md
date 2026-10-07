@@ -11,18 +11,18 @@ Timeline: submit **Oct 13**, wave 1 tests **Oct 20 to 27**, go/no-go Oct 27, lau
 
 ## How the Beta Build Differs
 
-| Item            | Public Open Hangar (`npm run pack`)        | Open Hangar Beta (`npm run build:beta`)                       |
-| --------------- | ------------------------------------------ | ------------------------------------------------------------- |
-| Name            | Open Hangar (from `_locales`)              | Open Hangar Beta                                              |
-| Icon            | blue (`icons/`)                            | amber, with a BETA tag at 48 and 128 px (`beta/icons/`)       |
-| Version         | `manifest.json`, e.g. 0.2.17               | `beta/beta.json`: `0.3.0.1`, shown as "0.3.0 Beta 1"          |
-| Sync            | code cut out (`@sync` blocks)              | on, built in to production `app.openhangar.space`             |
-| Staging site    | in the manifest's website list             | nowhere: the build check fails if it shows up                 |
-| Permissions     | storage, unlimitedStorage, cookies         | the same plus `identity` (Connect's sign-in window)           |
-| Browsers        | Chrome, Edge, Firefox                      | Chrome and Edge (one zip), Firefox (its own zip)              |
-| Firefox add-on  | `open-hangar@draco-foundry`, listed on AMO | `open-hangar-beta@draco-foundry`, unlisted (self-distributed) |
-| Firefox data    | none collected                             | optional: what sync sends, asked on the first Connect         |
-| Firefox updates | from AMO                                   | from `app.openhangar.space/beta/firefox-updates.json`         |
+| Item            | Public Open Hangar (`npm run pack`)                                       | Open Hangar Beta (`npm run build:beta`)                       |
+| --------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Name            | Open Hangar (from `_locales`)                                             | Open Hangar Beta                                              |
+| Icon            | blue (`icons/`)                                                           | amber, with a BETA tag at 48 and 128 px (`beta/icons/`)       |
+| Version         | `manifest.json`, e.g. 0.2.17                                              | `beta/beta.json`: `0.3.0.1`, shown as "0.3.0 Beta 1"          |
+| Sync            | on, built in to production `app.openhangar.space`                         | the same                                                      |
+| Staging site    | nowhere: the build check fails if it shows up                             | the same                                                      |
+| Permissions     | storage, unlimitedStorage, cookies, `identity` (Connect's sign-in window) | the same                                                      |
+| Browsers        | Chrome, Edge, Firefox                                                     | Chrome and Edge (one zip), Firefox (its own zip)              |
+| Firefox add-on  | `open-hangar@draco-foundry`, listed on AMO                                | `open-hangar-beta@draco-foundry`, unlisted (self-distributed) |
+| Firefox data    | optional: what sync sends, asked on the first Connect                     | the same                                                      |
+| Firefox updates | from AMO                                                                  | from `app.openhangar.space/beta/firefox-updates.json`         |
 
 Chrome and Edge only take dotted numbers as a version, so the beta counts `0.3.0.1`,
 `0.3.0.2`, ... and `version_name` carries the readable "0.3.0 Beta N". Firefox takes the
@@ -48,7 +48,8 @@ dist/beta-firefox` (or `npm run lint:firefox-beta`) runs Firefox's store linter:
 errors. `--self-hosted` because a listed add-on may not have an `update_url`; without it
 the linter reports that as an error. Its warnings are the same `innerHTML` ones as the
 public build's, from the Svelte runtime (`docs/AMO-SOURCE.md`). CI runs both on every PR.
-The public check is `npm run check:store`.
+The public check is `npm run check:store`; it holds the public build to the same sync rules
+(docs/FLAGS.md).
 
 Build it from `redesign/0.3-svelte` (later `main`). Never upload this zip to the public
 items, and never run the **Publish to stores** workflow for it: that workflow only knows
