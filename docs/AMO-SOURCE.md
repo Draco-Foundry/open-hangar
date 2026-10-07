@@ -25,6 +25,10 @@ What `npm run build` does:
    `icons/`, `src/`, `CHANGELOG.md`, `LICENSE`, `THIRD_PARTY_NOTICES.md`) into
    `dist/firefox/` and adds the Firefox manifest keys.
 
+**Open Hangar Beta** (the unlisted beta add-on, `open-hangar-beta@draco-foundry`) is
+built from the same source with `npm run build:beta` instead; its Firefox package is
+then in `dist/beta-firefox/` (docs/BETA.md lists how it differs).
+
 Everything else in `src/` (`dashboard.js`, `lib.js`, `background.js`, `scraper/`) is
 hand-written and shipped as-is, not compiled.
 
