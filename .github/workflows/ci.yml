@@ -28,8 +28,10 @@ jobs:
       # No staging site, built-in sync site or beta name in the public zips.
       - run: npm run check:store
       # The unlisted Open Hangar Beta (docs/BETA.md): synced to production, never
-      # staging. build:beta checks its own zip (check-store-build.mjs --beta).
+      # staging. build:beta checks its own zips (check-store-build.mjs --beta).
       - run: npm run build:beta
+      # Its Firefox build is self-distributed, so its update_url is allowed.
+      - run: npx web-ext lint --self-hosted --source-dir dist/beta-firefox
 
   # Every workflow file checked, so a typo fails the PR instead of a release (#235).
   workflows:

@@ -1,26 +1,32 @@
 # Open Hangar Beta
 
-The 0.3.0 beta ships as its own **unlisted** store item, **Open Hangar Beta**, on Chrome
-and Edge. It is a separate listing from the public Open Hangar, so it never updates the
-public item and testers can tell the two apart. Firefox isn't part of this beta.
+The 0.3.0 beta ships as its own **unlisted** item, **Open Hangar Beta**: a store item on
+Chrome and Edge, and on Firefox a signed add-on that the website hands out
+(self-distributed from addons.mozilla.org, "On your own"). It is separate from the public
+Open Hangar everywhere, so it never updates the public item and testers can tell the two
+apart.
 
 Timeline: submit **Oct 13**, wave 1 tests **Oct 20 to 27**, go/no-go Oct 27, launch
 **Nov 10** (launch checklist: issue #344).
 
 ## How the Beta Build Differs
 
-| Item         | Public Open Hangar (`npm run pack`) | Open Hangar Beta (`npm run build:beta`)                 |
-| ------------ | ----------------------------------- | ------------------------------------------------------- |
-| Name         | Open Hangar (from `_locales`)       | Open Hangar Beta                                        |
-| Icon         | blue (`icons/`)                     | amber, with a BETA tag at 48 and 128 px (`beta/icons/`) |
-| Version      | `manifest.json`, e.g. 0.2.17        | `beta/beta.json`: `0.3.0.1`, shown as "0.3.0 Beta 1"    |
-| Sync         | code cut out (`@sync` blocks)       | on, built in to production `app.openhangar.space`       |
-| Staging site | in the manifest's website list      | nowhere: the build check fails if it shows up           |
-| Permissions  | storage, unlimitedStorage, cookies  | the same plus `identity` (Connect's sign-in window)     |
-| Browsers     | Chrome, Edge, Firefox               | Chrome and Edge (one zip)                               |
+| Item            | Public Open Hangar (`npm run pack`)        | Open Hangar Beta (`npm run build:beta`)                       |
+| --------------- | ------------------------------------------ | ------------------------------------------------------------- |
+| Name            | Open Hangar (from `_locales`)              | Open Hangar Beta                                              |
+| Icon            | blue (`icons/`)                            | amber, with a BETA tag at 48 and 128 px (`beta/icons/`)       |
+| Version         | `manifest.json`, e.g. 0.2.17               | `beta/beta.json`: `0.3.0.1`, shown as "0.3.0 Beta 1"          |
+| Sync            | code cut out (`@sync` blocks)              | on, built in to production `app.openhangar.space`             |
+| Staging site    | in the manifest's website list             | nowhere: the build check fails if it shows up                 |
+| Permissions     | storage, unlimitedStorage, cookies         | the same plus `identity` (Connect's sign-in window)           |
+| Browsers        | Chrome, Edge, Firefox                      | Chrome and Edge (one zip), Firefox (its own zip)              |
+| Firefox add-on  | `open-hangar@draco-foundry`, listed on AMO | `open-hangar-beta@draco-foundry`, unlisted (self-distributed) |
+| Firefox data    | none collected                             | optional: what sync sends, asked on the first Connect         |
+| Firefox updates | from AMO                                   | from `app.openhangar.space/beta/firefox-updates.json`         |
 
 Chrome and Edge only take dotted numbers as a version, so the beta counts `0.3.0.1`,
-`0.3.0.2`, ... and `version_name` carries the readable "0.3.0 Beta N".
+`0.3.0.2`, ... and `version_name` carries the readable "0.3.0 Beta N". Firefox takes the
+same four numbers and shows `0.3.0.1` itself.
 
 ## Build It
 
@@ -28,11 +34,21 @@ Chrome and Edge only take dotted numbers as a version, so the beta counts `0.3.0
 npm run build:beta
 ```
 
-Builds `dist/beta/` and **`dist/open-hangar-beta-<version>.zip`** (today
-`dist/open-hangar-beta-0.3.0.1.zip`): the same zip goes to Chrome and Edge. It then runs
-`node scripts/check-store-build.mjs --beta`, which fails unless the zip has the beta
-name, icons and version, sync built in to production only, and no staging site anywhere.
-CI runs it on every PR. The public check is `npm run check:store`.
+Builds two packages (today's version in the names):
+
+- `dist/beta/` and **`dist/open-hangar-beta-0.3.0.1.zip`**: the same zip goes to Chrome
+  and Edge.
+- `dist/beta-firefox/` and **`dist/open-hangar-beta-firefox-0.3.0.1.zip`**: for AMO.
+
+It then runs `node scripts/check-store-build.mjs --beta`, which fails unless both have the
+beta name, icons and version, sync built in to production only, and no staging site
+anywhere; the Firefox one also needs the beta's add-on id, its `update_url` and the
+optional data collection sync asks for. Then `npx web-ext lint --self-hosted --source-dir
+dist/beta-firefox` (or `npm run lint:firefox-beta`) runs Firefox's store linter: 0
+errors. `--self-hosted` because a listed add-on may not have an `update_url`; without it
+the linter reports that as an error. Its warnings are the same `innerHTML` ones as the
+public build's, from the Svelte runtime (`docs/AMO-SOURCE.md`). CI runs both on every PR.
+The public check is `npm run check:store`.
 
 Build it from `redesign/0.3-svelte` (later `main`). Never upload this zip to the public
 items, and never run the **Publish to stores** workflow for it: that workflow only knows
@@ -43,7 +59,7 @@ Icons: edit `beta/icons/icon.svg`, then `node scripts/beta-icons.mjs` redraws th
 
 ## Oct 13: Submit (Owner)
 
-Claude builds the zip and gives you its path. The text to paste is under Listing Text
+Claude builds the zips and gives you their paths. The text to paste is under Listing Text
 below.
 
 ### Chrome Web Store
@@ -69,18 +85,60 @@ below.
    screenshots.
 5. **Notes for Certification:** the reviewer notes below. Then **Publish**.
 
+### Firefox (addons.mozilla.org)
+
+1. [Developer Hub](https://addons.mozilla.org/developers/) (Draco Foundry account) →
+   **Submit a New Add-on** → **On your own** (self-distribution, unlisted).
+2. Upload `open-hangar-beta-firefox-0.3.0.1.zip`. Source code only if AMO asks for it
+   (the UI is built with Vite, so it may): Claude makes the source zip with
+   `git archive --format=zip -o open-hangar-beta-source-0.3.0.1.zip HEAD` from the commit
+   the zip was built from; it carries `docs/AMO-SOURCE.md`, the rebuild steps for
+   reviewers.
+3. Wait for signing (usually minutes), then download the signed `.xpi`.
+4. Give the `.xpi` to Claude, who hosts it with `firefox-updates.json` on the website
+   and sets the /beta button.
+
 ### Paste Back to Claude
 
 1. The Chrome item ID (32 letters, on the item's page in the dashboard right after the
    upload).
 2. The Edge CRX ID (Partner Center → the item → Extension Overview; it may only show
    after you press Publish).
+3. The signed Firefox `.xpi` (the file itself).
 
 Claude then makes one website PR: `BETA_CHROME_URL` and `BETA_EDGE_URL` in
-`app/wrangler.jsonc` (the /beta page shows the buttons as soon as they're set), and both
-IDs on the website's extension allowlist (`app/src/lib/cors.ts`). Without the allowlist
-the beta can scan but can't Connect or sync. It needs a **production deploy before
-Oct 20**, in your next batch.
+`app/wrangler.jsonc` (the /beta page shows the buttons as soon as they're set), both
+IDs on the website's extension allowlist (`app/src/lib/cors.ts`), the Firefox beta's
+add-on id `open-hangar-beta@draco-foundry` next to the public one on the Connect list,
+and the signed `.xpi` with its `firefox-updates.json` (below) and the Firefox button.
+Without the allowlists the beta can scan but can't Connect or sync. It needs a
+**production deploy before Oct 20**, in your next batch.
+
+### Firefox Updates File
+
+Self-distributed copies check the manifest's `update_url`,
+`https://app.openhangar.space/beta/firefox-updates.json`, for new versions. The website
+serves it (as `application/json`, over https) next to the signed `.xpi`, in Firefox's
+updates.json format:
+
+```json
+{
+  "addons": {
+    "open-hangar-beta@draco-foundry": {
+      "updates": [
+        {
+          "version": "0.3.0.1",
+          "update_link": "https://app.openhangar.space/beta/open-hangar-beta-firefox-0.3.0.1.xpi"
+        }
+      ]
+    }
+  }
+}
+```
+
+Each new beta adds an entry (the newest version wins); `update_link` must point at the
+AMO-signed `.xpi` of that version, over https (the path above is only an example).
+Firefox checks about once a day.
 
 ## Listing Text
 
@@ -164,10 +222,12 @@ buttons; these steps belong in the pinned #beta post:
      enter the code, confirm your email, then open `app.openhangar.space/beta`. An account
      made with a code has beta access for good; a later Discord sign-in never takes it away.
 2. /beta says "Welcome to the Beta, Pilot" once your key checks out.
-3. **Turn off the public Open Hangar first** (`chrome://extensions` or
-   `edge://extensions`, switch it off). Both would scan RSI and both answer the website,
-   so testing with both on muddies every report.
-4. Press **Get It for Chrome** (or Edge) and add Open Hangar Beta, the amber icon.
+3. **Turn off the public Open Hangar first** (`chrome://extensions`,
+   `edge://extensions` or Firefox's `about:addons`, switch it off). Both would scan RSI
+   and both answer the website, so testing with both on muddies every report.
+4. Press **Get It for Chrome** (or Edge) and add Open Hangar Beta, the amber icon. On
+   Firefox, press **Get It for Firefox**: it installs the signed `.xpi` straight from
+   /beta (Firefox asks once to allow the install), and it updates itself from then on.
 5. Scan once (the beta has its own local data), then Connect on the Citizen Card to try
    sync.
 6. Report in #beta-reports.
@@ -187,9 +247,14 @@ unpacked-only build). Ask Claude when it comes to that.
 2. `npm run build:beta`, then upload `dist/open-hangar-beta-0.3.0.2.zip`: Chrome →
    the item → **Package → Upload New Package → Submit for Review**; Edge → the item →
    **Packages → Replace → Publish**.
-3. Reviews: Chrome updates usually take hours to a few days and only one version can be
+3. Firefox: upload `dist/open-hangar-beta-firefox-0.3.0.2.zip` as a new version on AMO
+   (Developer Hub → Open Hangar Beta → **Upload New Version** → **On your own**), wait
+   for signing, and give Claude the signed `.xpi`. Claude adds it to
+   `firefox-updates.json` and points the /beta button at it.
+4. Reviews: Chrome updates usually take hours to a few days and only one version can be
    in review at a time; Edge takes up to 7 business days. Installed copies update by
-   themselves within a few hours of approval.
+   themselves within a few hours of approval. Firefox signs in minutes, and installed
+   copies pick it up at their next daily update check.
 
 Same rule as the public listing: at most one upload a day, and only when you say so.
 Batch the daily fixes into one upload rather than chasing each.
@@ -199,6 +264,8 @@ Batch the daily fixes into one upload rather than chasing each.
 1. Post in #beta: switch the public Open Hangar back on (it's 0.3.0 now), Connect it
    once, then remove Open Hangar Beta.
 2. Chrome: the item → **Distribution → Unpublish**. Edge: the item → **Unpublish**.
-   Don't delete them: the same items can carry the next beta.
-3. Website: clear `BETA_CHROME_URL` and `BETA_EDGE_URL`, and around Dec 1 take the beta
-   IDs off the allowlist so leftover beta copies stop syncing.
+   Don't delete them: the same items can carry the next beta. Firefox: nothing on AMO
+   (an unlisted add-on isn't shown anywhere); the website takes the `.xpi` down.
+3. Website: clear `BETA_CHROME_URL` and `BETA_EDGE_URL` and the Firefox button, and
+   around Dec 1 take the beta IDs (the Firefox one too) off the allowlists so leftover
+   beta copies stop syncing.

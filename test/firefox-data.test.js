@@ -33,6 +33,11 @@ test('sync declares and requests the same Firefox data categories', () => {
   const pack = list(read('scripts/pack.mjs'), /const SYNC_DATA = \[([^\]]+)\]/);
   const dash = list(read('src/dashboard.js'), /data_collection: \[([^\]]+)\]/);
   assert.deepEqual(dash, pack);
+  // The beta's store check holds the Firefox beta to the same list.
+  assert.deepEqual(
+    list(read('scripts/check-store-build.mjs'), /const SYNC_DATA = \[([^\]]+)\]/),
+    pack,
+  );
   for (const c of pack) assert.ok(KNOWN.includes(c), `${c} is a Firefox category`);
 });
 

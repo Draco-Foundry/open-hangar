@@ -11,12 +11,13 @@
  *
  * Kept out of manifest.json itself so Chrome doesn't warn about unknown keys.
  *
- * --beta (npm run build:beta): the separate, unlisted "Open Hangar Beta" item instead
- * (docs/BETA.md). Chrome target only, into dist/beta/: its own name, amber icons
- * (beta/icons/), the version from beta/beta.json, and sync on, built in to production
+ * --beta (npm run build:beta): the separate, unlisted "Open Hangar Beta" instead
+ * (docs/BETA.md), into dist/beta/ (Chrome and Edge) and dist/beta-firefox/ (a
+ * self-distributed Firefox add-on): its own name, amber icons (beta/icons/), the
+ * version from beta/beta.json, and sync on, built in to production
  * (app.openhangar.space). Never the staging site. The public listing never gets it:
- * different name, version scheme and store item. scripts/check-store-build.mjs --beta
- * checks it.
+ * different name, version scheme, store item and Firefox add-on id.
+ * scripts/check-store-build.mjs --beta checks both.
  *
  * Build flags (src/flags.js, docs/FLAGS.md): each build's values go into its copy of
  * src/flags.js, and the code of every flag that's off is cut. Store builds get the
@@ -123,9 +124,16 @@ const base = JSON.parse(readFileSync('manifest.json', 'utf8'));
 // (src/dashboard.js, siteDataOk). Keep the two lists the same (test/firefox-data.test.js).
 const SYNC_DATA = ['personallyIdentifyingInfo', 'financialAndPaymentInfo', 'websiteContent'];
 
+// The Firefox beta: an unlisted add-on of its own, so it never replaces the public
+// one, signed on AMO and handed out by the website. A self-distributed add-on only
+// updates from its update_url: the website hosts that file (Firefox's updates.json
+// format, docs/BETA.md) next to the signed .xpi.
+const BETA_FIREFOX_ID = 'open-hangar-beta@draco-foundry';
+const BETA_FIREFOX_UPDATES = `${PRODUCTION_SITE}/beta/firefox-updates.json`;
+
 const targets = {
   chrome: (m) => m,
-  firefox: (m) => ({
+  firefox: (m, gecko = { id: 'open-hangar@draco-foundry' }) => ({
     ...m,
     // Firefox's event page has no importScripts, so what background.js imports on
     // Chrome is listed here, before it: flags.js, and rsi-cart.js for Add to RSI Cart
@@ -133,7 +141,7 @@ const targets = {
     background: { scripts: [FLAGS_FILE, 'src/rsi-cart.js', m.background.service_worker] },
     browser_specific_settings: {
       gecko: {
-        id: 'open-hangar@draco-foundry',
+        ...gecko,
         // data_collection_permissions landed in Firefox 140 (Android 142).
         strict_min_version: '140.0',
         data_collection_permissions: KEEP_SYNC
@@ -145,8 +153,15 @@ const targets = {
   }),
 };
 
-// The beta is one Chrome-and-Edge zip; the public build is both browsers.
-const builds = BETA ? { beta: targets.chrome } : targets;
+// Both browsers either way: the beta as one Chrome-and-Edge zip plus a Firefox one.
+const builds = BETA
+  ? {
+      beta: targets.chrome,
+      'beta-firefox': (m) =>
+        targets.firefox(m, { id: BETA_FIREFOX_ID, update_url: BETA_FIREFOX_UPDATES }),
+    }
+  : targets;
+const FIREFOX = new Set(['firefox', 'beta-firefox']);
 const beta = BETA ? betaVersion() : null;
 
 rmSync('dist', { recursive: true, force: true });
@@ -181,12 +196,12 @@ for (const [name, transform] of Object.entries(builds)) {
   // that, so there src/site-bridge.js runs on just those pages and passes the
   // messages on (#434, owner 2026-10-07: one-click Connect in every browser). Only
   // the Firefox build carries it.
-  if (name === 'firefox')
+  if (FIREFOX.has(name))
     manifest.content_scripts = [
       { matches: SITE_PAGES, js: ['src/site-bridge.js'], run_at: 'document_start' },
     ];
   else manifest.externally_connectable = { matches: SITE_PAGES };
-  if (name !== 'firefox') rmSync(`${out}/src/site-bridge.js`, { force: true });
+  if (!FIREFOX.has(name)) rmSync(`${out}/src/site-bridge.js`, { force: true });
   if (beta) {
     // Its own store item: a name, icons and version line of its own, so testers can
     // tell it apart and it never stands in for the public Open Hangar.
