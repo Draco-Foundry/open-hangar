@@ -61,7 +61,7 @@ The site gathers some of this public information from community sources, such as
 
 The footer also links to Ko-fi and Patreon, where you can choose to support the project, and some pages link to community sites such as the Star Citizen Wiki. They are plain links: nothing is loaded from those sites, and nothing is sent unless you click one and use that site yourself.
 
-When a scan fails, Report a Scan Problem opens a new GitHub issue in your browser with the scan summary (counts only) and the error report filled in: version, browser, item counts and the recent log, with no handle, Citizen Record number, referral code or item names. Nothing is sent by the extension. You read it on GitHub and decide whether to submit it.
+When a scan fails, the problem card offers two ways to tell us. **Send Flight Log** copies your flight log (version, browser, item counts and the recent log, with no handle, Citizen Record number, referral code or item names) and opens our #bug-reports channel on Discord, where you paste it yourself. **Report on GitHub** opens a new GitHub issue in your browser with the same flight log filled in. Nothing is sent by the extension either way: you read it and decide whether to post it.
 
 ## Optional Sync to openhangar.space
 
