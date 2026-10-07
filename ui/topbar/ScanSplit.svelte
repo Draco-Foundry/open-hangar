@@ -38,16 +38,19 @@
         : 'Nothing ticked: pick what to scan with ▾';
     const at = a.state.scannedAt;
     // After a scan with a problem the button says Rough Landing and opens the report.
+    // A calm note (the website's sync isn't open yet) drops down once and leaves the
+    // button as it was.
     const report = bar.busy ? null : bar.report;
+    const rough = !!report && !report.calm;
     return {
       busy: bar.busy,
       scanning: bar.scanning,
       fill: bar.scanning ? bar.fill : 0,
       report,
-      rough: !!report,
+      rough,
       label: bar.scanning
         ? bar.label
-        : report
+        : rough
           ? report.label || 'Rough Landing'
           : all
             ? 'Scan All'
@@ -55,7 +58,7 @@
       // The progress owns the hover text while it shows.
       title: bar.scanning
         ? bar.title
-        : report
+        : rough
           ? 'See how the last scan went'
           : at
             ? `${what}\nLast scan: ${new Date(at).toLocaleString()}`
@@ -108,7 +111,7 @@
   });
 
   function onScan(e) {
-    if (d.report) toggleMenu('report', e);
+    if (d.rough) toggleMenu('report', e);
     else app().top.scan();
   }
   function closeReport() {
@@ -132,8 +135,8 @@
     disabled={d.busy}
     title={d.title}
     aria-label={look.aria}
-    aria-haspopup={d.report ? 'dialog' : undefined}
-    aria-expanded={d.report ? menus.open === 'report' : undefined}
+    aria-haspopup={d.rough ? 'dialog' : undefined}
+    aria-expanded={d.rough ? menus.open === 'report' : undefined}
     onclick={onScan}
   >
     <span class="scan-fill" style:width="{d.fill}%"></span><span class="scan-label"

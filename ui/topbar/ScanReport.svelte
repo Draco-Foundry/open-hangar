@@ -7,6 +7,8 @@
   // closes like the other menus (✕, Escape, a click elsewhere); the button says
   // Rough Landing until the next scan and opens it again. A report can bring its own
   // title and line (the website sync's "Scan Done, Not Synced"): just Scan Again.
+  // A calm one (`r.calm`, or a row's `calm`: the website's sync isn't open yet) is a
+  // note, not a problem: an info sign in blue and Roger That to close it.
   import { app } from '../lib/app.svelte.js';
   import { menus, menuClick, closeMenus } from './menus.svelte.js';
 
@@ -62,6 +64,12 @@
     <path d="M8 6v3.6M8 11.6v.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
   </svg>
 {/snippet}
+{#snippet info(size)}
+  <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden="true">
+    <circle cx="8" cy="8" r="6.4" fill="none" stroke="currentColor" stroke-width="1.6" />
+    <path d="M8 7.2v4M8 4.6v.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+  </svg>
+{/snippet}
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
 <div
@@ -74,7 +82,7 @@
   onclick={menuClick}
 >
   <div class="sr-head">
-    <span class="sr-icon">
+    <span class="sr-icon" class:calm={r.calm}>
       {#if r.kind === 'out'}
         <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true">
           <circle cx="7" cy="10" r="3.6" fill="none" stroke="currentColor" stroke-width="1.7" />
@@ -86,7 +94,7 @@
             stroke-linecap="round"
           />
         </svg>
-      {:else}{@render warn(18)}{/if}
+      {:else if r.calm}{@render info(18)}{:else}{@render warn(18)}{/if}
     </span>
     <div class="sr-titles">
       <h3 id="sr-title">{head.title}</h3>
@@ -98,8 +106,8 @@
   {#if r.rows.length}
     <ul class="sr-rows">
       {#each r.rows as row (row.name)}
-        <li class:bad={!row.ok}>
-          <span class={row.ok ? 'sr-ok' : 'sr-warn'}>
+        <li class:bad={!row.ok && !row.calm}>
+          <span class={row.ok ? 'sr-ok' : row.calm ? 'sr-note' : 'sr-warn'}>
             {#if row.ok}
               <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
                 <path
@@ -111,7 +119,7 @@
                   stroke-linejoin="round"
                 />
               </svg>
-            {:else}{@render warn(16)}{/if}
+            {:else if row.calm}{@render info(16)}{:else}{@render warn(16)}{/if}
           </span>
           <span class="sr-src">{row.name}</span>
           <span class="sr-what">{row.text}</span>
@@ -129,6 +137,8 @@
         rel="noopener">Log In to RSI ↗</a
       >
       <button type="button" class="sr-btn" onclick={scanAgain}>Scan Again</button>
+    {:else if r.calm}
+      <button type="button" class="sr-btn primary" onclick={onClose}>Roger That</button>
     {:else if r.title}
       <button type="button" class="sr-btn primary" onclick={scanAgain}>Scan Again</button>
     {:else}

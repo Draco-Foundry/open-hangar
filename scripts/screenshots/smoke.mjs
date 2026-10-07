@@ -1102,6 +1102,30 @@ try {
       r.manual = $('#scan-report') && !$('#scan-report').hidden ? txt($('#scan-report')) : '';
       $('#scan-report .sr-x')?.click();
       await wait();
+      // Sync not open yet: a calm note (an info sign, Roger That, no Flight Log), and
+      // the Scan button stays as it was, after Sync Now and after a scan.
+      OH.siteSync = async () => {
+        throw Object.assign(
+          new Error('Sync opens November 10. Your hangar stays safe in your browser until then.'),
+          { calm: true },
+        );
+      };
+      await syncNow();
+      await wait(250);
+      r.calm = $('#scan-report') && !$('#scan-report').hidden ? txt($('#scan-report')) : '';
+      r.calmLook = !!$('#scan-report .sr-icon.calm') && !$('#scan-report #sr-send');
+      r.calmButton = txt($('#scan-home'));
+      btnIn($('#scan-report'), 'Roger That')?.click();
+      await wait();
+      r.calmClosed = $('#scan-report').hidden;
+      await runScan({ hangar: false, buybacks: false, referrals: false });
+      await wait(250);
+      r.calmScan = $('#scan-report') && !$('#scan-report').hidden ? txt($('#scan-report')) : '';
+      setScanning(''); // past the end-of-scan flash
+      await wait();
+      r.calmScanButton = txt($('#scan-home'));
+      $('#scan-report .sr-x')?.click();
+      await wait();
       OH.siteSync = realSync;
       // Disconnect isn't in the Scan menu; it's in your portrait's menu, asked once.
       await openMenu();
@@ -1169,6 +1193,12 @@ try {
   sc.cardStillQuiet &&
   /^Not Synced/.test(sc.manual) &&
   /Scan your hangar first/.test(sc.manual) &&
+  /^Not Synced Yet\s*Sync opens November 10\..*Roger That$/.test(sc.calm) &&
+  sc.calmLook &&
+  /^Scan (All|Custom)$/.test(sc.calmButton) &&
+  sc.calmClosed &&
+  /^Scan Done, Not Synced Yet/.test(sc.calmScan) &&
+  /^Scan (All|Custom)$/.test(sc.calmScanButton) &&
   sc.noScanDisconnect &&
   sc.menuStays &&
   /Disconnect From openhangar\.space\?/.test(sc.ask) &&
@@ -1176,7 +1206,7 @@ try {
   sc.statusGone &&
   sc.hiddenAgain
     ? ok(
-        'website sync: connect on the card or the portrait menu (the code with Copy and its time left), then the Synced dot on the portrait (Synced line and Sync Now in its menu), the ▾ menu, a scan syncs as its last step, problems in the scan report, disconnect',
+        'website sync: connect on the card or the portrait menu (the code with Copy and its time left), then the Synced dot on the portrait (Synced line and Sync Now in its menu), the ▾ menu, a scan syncs as its last step, problems in the scan report (sync not open yet as a calm note), disconnect',
       )
     : fail(`website sync: ${JSON.stringify(sc)}`);
 

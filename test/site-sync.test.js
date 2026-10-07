@@ -70,3 +70,80 @@ test("the server's refusals read as advice, not a status code", async () => {
   answer = () => new Response(JSON.stringify({ reason: 'no-scan' }), { status: 409 });
   await assert.rejects(OH.siteSync(), /Scan your hangar first/);
 });
+
+// The website's other refusals (JSON { error, reason }): each reads as short advice,
+// and only "sync isn't open yet" is calm (a note in the scan report, not a problem).
+const refusedWith = async (status, body) => {
+  linked(scanned(Date.now() - 60_000));
+  answer = () => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status });
+  try {
+    await OH.siteSync();
+  } catch (err) {
+    return err;
+  }
+  assert.fail('the sync went through');
+};
+
+test('sync not open yet: a calm note with the date, and the link stays', async () => {
+  const err = await refusedWith(403, {
+    error: 'Sync opens November 10. Your hangar stays safe in your browser until then.',
+    reason: 'not-open',
+  });
+  assert.equal(
+    err.message,
+    'Sync opens November 10. Your hangar stays safe in your browser until then.',
+  );
+  assert.equal(err.calm, true);
+  assert.ok(mem.siteLink, 'still connected');
+  assert.equal(mem.siteLink.lastSync, undefined);
+});
+
+test('an extension too old to sync is told to update', async () => {
+  const err = await refusedWith(426, { error: 'too old', reason: 'old-format' });
+  assert.equal(
+    err.message,
+    'This version of Open Hangar is too old to sync. Update it, then sync again.',
+  );
+  assert.ok(!err.calm);
+  // 426 means the same even without a reason.
+  assert.match((await refusedWith(426, '')).message, /too old to sync/);
+});
+
+test('a format newer than the website knows: try again soon', async () => {
+  const err = await refusedWith(400, { error: 'newer', reason: 'newer-format' });
+  assert.equal(
+    err.message,
+    "openhangar.space hasn't caught up with this version yet. Try again soon.",
+  );
+  assert.ok(!err.calm);
+});
+
+test('no format version, or any other refusal, keeps the status', async () => {
+  const noFormat = await refusedWith(400, { error: 'no format', reason: 'no-format' });
+  assert.equal(noFormat.message, 'openhangar.space responded 400');
+  assert.ok(!noFormat.calm);
+  const accounts = await refusedWith(403, { error: 'too many RSI accounts on this login' });
+  assert.equal(accounts.message, 'openhangar.space responded 403');
+  assert.ok(!accounts.calm);
+});
+
+test("a body that isn't JSON still gives a message", async () => {
+  const err = await refusedWith(502, '<html>Bad gateway</html>');
+  assert.equal(err.message, 'openhangar.space responded 502');
+  assert.match((await refusedWith(409, 'nope')).message, /Scan your hangar first/);
+});
+
+test('too big to sync: says so, and that the hangar is safe', async () => {
+  for (const error of ['too large', 'storage limit reached for this login']) {
+    const err = await refusedWith(413, { error });
+    assert.match(err.message, /more cargo than openhangar\.space can hold/);
+    assert.match(err.message, /stays safe in your browser/);
+    assert.ok(!err.calm);
+  }
+});
+
+test('disconnected on the website: forgets the link', async () => {
+  const err = await refusedWith(401, { error: 'not connected' });
+  assert.match(err.message, /disconnected on the website/);
+  assert.equal(mem.siteLink, undefined);
+});

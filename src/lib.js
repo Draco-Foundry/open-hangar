@@ -3783,9 +3783,30 @@
   };
 
   // Upload the same payload as the JSON backup. → { synced_at } or throws.
+  // The website says why it refused a sync as JSON { error, reason }; each reason
+  // reads as plain advice here.
   const SYNC_NO_SCAN = 'Scan your hangar first, then press Sync Now.';
   const SYNC_OLDER_SCAN =
     'The website already has a newer scan from another browser. Scan here, then press Sync Now.';
+  const SYNC_NOT_OPEN =
+    'Sync opens November 10. Your hangar stays safe in your browser until then.';
+  const SYNC_OLD_FORMAT =
+    'This version of Open Hangar is too old to sync. Update it, then sync again.';
+  const SYNC_NEWER_FORMAT =
+    "openhangar.space hasn't caught up with this version yet. Try again soon.";
+  const SYNC_TOO_BIG =
+    "That's more cargo than openhangar.space can hold. Your hangar stays safe in your browser.";
+  // A refusal's status and reason → the Error to throw. Sync not open yet isn't
+  // something you did, so it's marked `calm`: the scan report shows it as a note,
+  // not a problem (src/dashboard.js siteSyncReport).
+  function syncRefusal(status, reason) {
+    if (reason === 'not-open') return Object.assign(new Error(SYNC_NOT_OPEN), { calm: true });
+    if (status === 409) return new Error(reason === 'older-scan' ? SYNC_OLDER_SCAN : SYNC_NO_SCAN);
+    if (status === 426 || reason === 'old-format') return new Error(SYNC_OLD_FORMAT);
+    if (reason === 'newer-format') return new Error(SYNC_NEWER_FORMAT);
+    if (status === 413) return new Error(SYNC_TOO_BIG); // one sync, or the login's storage
+    return new Error(`openhangar.space responded ${status}`);
+  }
   OH.siteSync = async function siteSync() {
     const link = await OH.getSiteLink();
     if (!link) throw new Error('Not connected to openhangar.space.');
@@ -3802,11 +3823,11 @@
       await chrome.storage.local.remove('siteLink');
       throw new Error('This extension was disconnected on the website. Connect again.');
     }
-    if (res.status === 409) {
-      const { reason } = await res.json().catch(() => ({}));
-      throw new Error(reason === 'older-scan' ? SYNC_OLDER_SCAN : SYNC_NO_SCAN);
+    if (!res.ok) {
+      // Not always JSON (a proxy's error page, say): then there's no reason.
+      const body = await res.json().catch(() => null);
+      throw syncRefusal(res.status, typeof body?.reason === 'string' ? body.reason : '');
     }
-    if (!res.ok) throw new Error(`openhangar.space responded ${res.status}`);
     const j = await res.json();
     await chrome.storage.local.set({ siteLink: { ...link, lastSync: j.synced_at } });
     return j;

@@ -5125,10 +5125,13 @@ function siteCancel() {
 }
 // A sync that didn't go through shows in the scan report under the Scan button:
 // "Scan Done, Not Synced" after a scan (a row of its own if the scan had problems
-// too), "Not Synced" for Sync Now.
+// too), "Not Synced" for Sync Now. A calm refusal (sync isn't open yet, OH.siteSync)
+// is a note instead: "Not Synced Yet" with an info sign, no problem counted, and the
+// Scan button stays as it was.
 async function siteSyncNow({ scan = false } = {}) {
   if (site.syncing || !site.link) return;
   let problem = '';
+  let calm = false;
   if (!(await siteDataOk())) problem = SITE_DATA_NO;
   else {
     site.syncing = true;
@@ -5138,29 +5141,31 @@ async function siteSyncNow({ scan = false } = {}) {
       await OH.siteSync();
     } catch (err) {
       problem = String(err?.message || err);
-      OH.log('warn', 'site', problem);
+      calm = !!err?.calm;
+      OH.log(calm ? 'info' : 'warn', 'site', problem);
     }
     site.syncing = false;
   }
-  if (problem) siteSyncReport(problem, scan);
+  if (problem) siteSyncReport(problem, scan, calm);
   else if (topBar.report?.kind === 'sync') topBar.report = null; // went through this time
   await refreshSite();
 }
-function siteSyncReport(text, scan) {
+function siteSyncReport(text, scan, calm = false) {
   const n = Date.now(); // a new report, so the top bar opens it
   if (scan && topBar.report) {
-    topBar.report.rows.push({ name: 'Website', ok: false, text });
-    topBar.report.bad++;
+    topBar.report.rows.push({ name: 'Website', ok: false, calm, text });
+    if (!calm) topBar.report.bad++;
     topBar.report.n = n;
     return;
   }
   topBar.report = {
     kind: 'sync',
-    title: scan ? 'Scan Done, Not Synced' : 'Not Synced',
+    calm,
+    title: `${scan ? 'Scan Done, ' : ''}Not Synced${calm ? ' Yet' : ''}`,
     sub: text,
     label: 'Not Synced',
     rows: [],
-    bad: 1,
+    bad: calm ? 0 : 1,
     summary: text,
     last: '',
     n,
