@@ -81,13 +81,6 @@
       rel="noopener"
       class="bb-reclaim">Wiki ↗</a
     >
-    ·
-    <a
-      href="https://www.erkul.games/live/calculator"
-      target="_blank"
-      rel="noopener"
-      class="bb-reclaim">Erkul ↗</a
-    >
   </Row>
   <h4 class="modal-h">In Your Hangar ({v.pledges.length})</h4>
   {#if v.pledges.length}

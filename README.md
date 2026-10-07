@@ -50,8 +50,8 @@ viewer, or export everything as one JSON file and build on it.
 | **Referrals** | Your recruits and prospects (current and legacy programs), reward tiers, event bonuses and charts                                            |
 
 All of it is stored locally in one versioned database, and can be exported as a
-single JSON file — or as a **Hangar Transfer Format** (HTF) file that FleetYards and
-other community tools can import.
+single JSON file, or as a **Hangar Transfer Format** (HTF) file that other community
+fleet tools can import.
 
 ## Install
 
@@ -169,10 +169,10 @@ holdings; the `account` block is a read-only snapshot.)
 
 **Export HTF** writes the community
 [Hangar Transfer Format](https://docs.starcitizen.fans/hangar-transfer-format.yaml):
-one entry per ship with `ship_code`, manufacturer, `pledge_*`, `lti` and `warbond` —
-import it at FleetYards (Hangar → Import). Ship codes come from a bundled snapshot of
-[HangarXPLOR](https://github.com/dolkensp/HangarXPLOR)'s MIT-licensed table
-(`src/data/`); CCUs, paints and add-ons have no HTF equivalent and are skipped.
+one entry per ship with `ship_code`, manufacturer, `pledge_*`, `lti` and `warbond`.
+Import it into any fleet tool that reads HTF. Ship codes come from a bundled table in
+`src/data/` (its license is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)); CCUs,
+paints and add-ons have no HTF equivalent and are skipped.
 
 Planned: an opt-in way for sites you approve to request your data directly, limited
 to domains you trust (via `externally_connectable`). See [ROADMAP.md](ROADMAP.md).
