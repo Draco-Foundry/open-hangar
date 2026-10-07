@@ -26,6 +26,8 @@ function load(matches = ['https://app.openhangar.space/*', 'https://staging.open
   const fetched = [];
   const chrome = {
     storage: { local: area('local'), session: area('session'), onChanged: listen() },
+    // Chrome and Edge: identity is in every build's manifest.
+    identity: { getRedirectURL: () => 'https://aeabioadfphghjennmdbnpelojlhndjl.chromiumapp.org/' },
     runtime: {
       id: 'aeabioadfphghjennmdbnpelojlhndjl',
       onInstalled: listen(),

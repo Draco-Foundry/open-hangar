@@ -1,7 +1,7 @@
 # Build Flags
 
-Some features ship in some builds and not others: sync is in the beta and in developer
-builds, not yet in the public store build. Build flags say which, in one place.
+Some features ship in some builds and not others: Org Fleet sharing only in a
+developer's own build, for one. Build flags say which, in one place.
 
 ## Build-Time Only
 
@@ -36,7 +36,7 @@ Today's flags:
 
 | Flag       | What it turns on                                   | Store | Beta | Dev-only |
 | ---------- | -------------------------------------------------- | ----- | ---- | -------- |
-| `sync`     | Website sync (Connect This Browser, Sync Now, ...) | off   | on   | no       |
+| `sync`     | Website sync (Connect This Browser, Sync Now, ...) | on    | on   | no       |
 | `orgFleet` | Org Fleet sharing (nothing behind it yet)          | off   | off  | yes      |
 
 ## Adding or Retiring a Flag
@@ -50,25 +50,54 @@ Today's flags:
 To retire a flag, remove its entry. The build then fails on any marker still naming
 it, so the code it guarded has to be kept (markers removed) or deleted on purpose.
 
+## Sync in the Store Build
+
+`sync` is on in every store build from 0.3.0: its code stays (the `@sync` blocks), it's
+built in to production (`app.openhangar.space`), and every build asks for `identity`
+(Connect's sign-in window; it's in `manifest.json`). On Firefox the site bridge
+(`src/site-bridge.js`) lets the website's Connect This Browser in, and the manifest lists
+what sync sends as optional data collection, asked on the first Connect.
+
+It stays opt-in: nothing personal goes to openhangar.space until you Connect. Before
+that, the extension only reads the public feeds (game status, ships, catalog, rates and
+the like), which carry nothing about you. `npm run test:privacy` (in CI) holds the built
+Chrome store extension to that: never connected, it scans and opens every page, and any
+request to the sync site fails the check. Until launch day the website answers a sync
+from an account without beta access with "Sync opens November 10" (reason `not-open`,
+a switch on the website's side): the extension shows that as a calm note in the scan
+report ("Not Synced Yet"), not a problem, and stays connected. The note uses the
+website's own sentence (its built-in copy only when there's none), so a new date only
+changes on the website.
+
+`--flag sync=off` still builds a copy without it, for a developer; the store check
+refuses that build.
+
 ## How Builds Set Them
 
 `scripts/pack.mjs` picks each build's values and writes them into that build's copy,
 `dist/<target>/src/flags.js` (`BUILD_VALUES`). The file in the repo always holds the
 defaults.
 
-| Build                                                 | Flags                                  |
-| ----------------------------------------------------- | -------------------------------------- |
-| `npm run build`, `npm run pack` (public store)        | every flag at its `default`            |
-| `npm run build:beta`                                  | the beta set, exactly (no `--flag`)    |
-| `OH_SYNC=1` or `--sync` (`npm run build:staging` too) | the defaults with `sync` on            |
-| `--flag name=on` / `--flag name=off`, repeatable      | a developer's own build, on top of any |
+| Build                                                        | Flags                                       |
+| ------------------------------------------------------------ | ------------------------------------------- |
+| `npm run build`, `npm run pack` (public store)               | every flag at its `default`                 |
+| `npm run build:beta`                                         | the beta set, exactly (no `--flag`)         |
+| `npm run build:staging` (or `--site=<url>`, `OH_SITE=<url>`) | the defaults, built in to that site instead |
+| `--flag name=on` / `--flag name=off`, repeatable             | a developer's own build, on top of any      |
 
-For example `npm run build -- --flag orgFleet=on`. The build log lists the flags that
-are on, and calls the build "dev build, never for a store" when a dev-only flag is.
+For example `npm run build -- --flag orgFleet=on`. `OH_SYNC=1` and `--sync` are the
+older spelling of `--flag sync=on`, which is the store build now. A build with a site of
+its own lets the staging site talk to it too. The build log lists the flags that are on,
+and calls the build "dev build, never for a store" when a dev-only flag is on, a flag is
+off its default, or the built-in site isn't production.
 
 `scripts/check-store-build.mjs` (`npm run check:store`, and `--beta` for the beta)
 fails unless every build in `dist/` carries `src/flags.js` with exactly its set: the
-defaults for the public build, the beta set for the beta, and no dev-only flag on.
+defaults for the public build, the beta set for the beta, and no dev-only flag on. With
+`sync` on, each build (every folder and every zip) also needs the sync code, built in to
+production only, the `identity` permission and the website's way in (Chrome and Edge:
+`externally_connectable`; Firefox: the site bridge and sync's optional data collection),
+and no staging site anywhere.
 
 ## Reading a Flag
 

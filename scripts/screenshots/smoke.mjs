@@ -955,7 +955,7 @@ try {
     ? ok('bell: × ignores an alert; Scan has a Store option')
     : fail(`For You ignore: ${JSON.stringify(home)}`);
   !(await page.$('#site-connect'))
-    ? ok('website sync hidden until the site is live (no teaser, no connect button)')
+    ? ok('website sync hidden without a sync site (the demo has none; store builds do)')
     : fail('site connect card shows without siteUrl');
 
   // The website (owner sign-off, 2026-10-04 and -05), switched on with siteUrl and the

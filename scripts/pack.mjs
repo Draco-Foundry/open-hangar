@@ -7,9 +7,13 @@
  *   chrome   — manifest.json as-is. Same zip goes to Chrome Web Store + Edge.
  *   firefox  — adds background.scripts (Firefox MV3 runs an event page, not a
  *              service worker) and browser_specific_settings.gecko (add-on id +
- *              the "no data collected" declaration AMO requires).
+ *              the data collection declaration AMO requires: none required, what
+ *              sync sends optional).
  *
  * Kept out of manifest.json itself so Chrome doesn't warn about unknown keys.
+ *
+ * Both carry sync (the `sync` flag is on by default), built in to production
+ * (app.openhangar.space). Sync is opt-in: nothing is sent until you Connect.
  *
  * --beta (npm run build:beta): the separate, unlisted "Open Hangar Beta" instead
  * (docs/BETA.md), into dist/beta/ (Chrome and Edge) and dist/beta-firefox/ (a
@@ -21,8 +25,8 @@
  *
  * Build flags (src/flags.js, docs/FLAGS.md): each build's values go into its copy of
  * src/flags.js, and the code of every flag that's off is cut. Store builds get the
- * registry's defaults, --beta the beta set, --sync / OH_SYNC=1 turn `sync` on, and
- * --flag name=on (or =off, repeatable) is for developers' own builds.
+ * registry's defaults, --beta the beta set, and --flag name=on (or =off, repeatable)
+ * is for developers' own builds (--sync / OH_SYNC=1 are the older --flag sync=on).
  */
 
 import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -39,7 +43,8 @@ const RUNTIME = ['_locales', 'icons', 'src'];
 
 const args = process.argv.slice(2);
 const BETA = args.includes('--beta');
-// The beta's one site. Staging is never built in to anything a store gets.
+// The sync site of every store build, the beta's included. Staging is never built in
+// to anything a store gets.
 const PRODUCTION_SITE = 'https://app.openhangar.space';
 
 // This build's flags (src/flags.js): the store defaults or the beta set, then the
@@ -52,30 +57,34 @@ if (!BETA && (process.env.OH_SYNC === '1' || args.includes('--sync'))) OVERRIDES
 const FLAGS = buildValues(REGISTRY, { beta: BETA, overrides: OVERRIDES });
 const FLAGS_ON = Object.keys(FLAGS).filter((f) => FLAGS[f]);
 const DEV_ONLY_ON = FLAGS_ON.filter((f) => REGISTRY[f].devOnly);
+// Flags set away from the store defaults (--flag): a developer's build.
+const OFF_DEFAULT = !BETA && Object.keys(FLAGS).some((f) => FLAGS[f] !== REGISTRY[f].default);
 
-// Sync to app.openhangar.space isn't launched, and the privacy policy says nothing
-// leaves your device, so store builds don't carry its code at all (#187). Lines from
-// a "@sync-start" marker through "@sync-end" are cut. The `sync` flag keeps them:
-// OH_SYNC=1 (or --sync, or --flag sync=on), for developers testing sync locally
-// (with the `siteUrl` storage key, or pre-pointed at staging by
-// `npm run build:staging`). The beta always keeps them.
+// Sync to app.openhangar.space (#187): the code between a "@sync-start" marker and
+// "@sync-end" is the `sync` flag's, on by default, so every store build keeps it (the
+// beta too). Sync stays opt-in: nothing is sent until you Connect. A developer's
+// `--flag sync=off` build cuts it, and fails if app.openhangar.space is left anywhere.
 const KEEP_SYNC = FLAGS.sync;
 
-// A built-in sync site, written into lib.js's SITE_BUILT_IN so nobody has to set the
-// `siteUrl` storage key by hand: production for --beta, or --site=<url> / OH_SITE=<url>
-// for a dev build (`npm run build:staging`). The public store build never has one
-// (scripts/check-store-build.mjs).
+// The sync site, written into lib.js's SITE_BUILT_IN so nobody has to set the
+// `siteUrl` storage key by hand: production in every build with sync, or
+// --site=<url> / OH_SITE=<url> for a developer's build (`npm run build:staging`), which
+// is never for a store (scripts/check-store-build.mjs).
 const SITE_ARG =
   (args.find((a) => a.startsWith('--site=')) || '').slice('--site='.length) ||
   process.env.OH_SITE ||
   '';
 if (BETA && SITE_ARG) throw new Error('--beta always syncs to production; drop --site / OH_SITE');
-const SITE = BETA ? PRODUCTION_SITE : SITE_ARG;
-if (SITE) {
-  if (!KEEP_SYNC) throw new Error('--site / OH_SITE needs sync kept (--sync or OH_SYNC=1)');
-  if (!/^(https:\/\/[a-z0-9.-]+|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?)$/i.test(SITE))
-    throw new Error(`--site / OH_SITE must be an https:// origin (or http://localhost): ${SITE}`);
+if (SITE_ARG) {
+  if (!KEEP_SYNC) throw new Error('--site / OH_SITE needs sync on (drop --flag sync=off)');
+  if (!/^(https:\/\/[a-z0-9.-]+|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?)$/i.test(SITE_ARG))
+    throw new Error(
+      `--site / OH_SITE must be an https:// origin (or http://localhost): ${SITE_ARG}`,
+    );
 }
+const SITE = KEEP_SYNC ? SITE_ARG || PRODUCTION_SITE : '';
+// Built in to a site other than production: a developer's build.
+const DEV_SITE = Boolean(SITE) && SITE !== PRODUCTION_SITE;
 const SITE_LINE = "const SITE_BUILT_IN = '';";
 function presetSite(file) {
   const src = readFileSync(file, 'utf8');
@@ -103,7 +112,7 @@ const BETA_NAME = 'Open Hangar Beta';
 // ≤132 characters (Chrome's limit); the store's short description comes from it.
 const BETA_DESCRIPTION =
   'Beta build of Open Hangar for invited testers: your Star Citizen hangar, made useful, with opt-in sync to openhangar.space.';
-// Belt and braces: no store build may still talk to the sync site.
+// Belt and braces: a build without sync may not still talk to the sync site.
 function assertNoSyncHost(dir) {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const p = `${dir}/${e.name}`;
@@ -177,20 +186,20 @@ for (const [name, transform] of Object.entries(builds)) {
   cpSync('LICENSE', `${out}/LICENSE`);
   cpSync('THIRD_PARTY_NOTICES.md', `${out}/THIRD_PARTY_NOTICES.md`);
   const manifest = { ...transform(base) }; // a copy: chrome returns `base` itself
-  // Sync's sign-in window (identity.launchWebAuthFlow) needs "identity": only builds
-  // that carry sync ask for it, so store builds' permissions don't change before launch.
-  if (KEEP_SYNC) manifest.permissions = [...manifest.permissions, 'identity'];
+  // Sync's sign-in window (identity.launchWebAuthFlow) needs "identity": it's in
+  // manifest.json, so every build asks for it.
   // Our own site may talk to the extension (src/background.js): Add to RSI Cart from
   // the website's store in every build (#288; no account, nothing sent anywhere but
   // RSI), and Connect This Browser in builds with sync. The background worker reads
   // this list back as the only origins it answers.
   // The store is at openhangar.space/store and app.openhangar.space/store.
-  // Staging only in developer builds with sync (OH_SYNC=1, npm run build:staging):
-  // never in a store build, the beta included (scripts/check-store-build.mjs).
+  // Staging only in a developer's build pointed at another site (npm run
+  // build:staging): never in a store build, the beta included
+  // (scripts/check-store-build.mjs).
   const SITE_PAGES = [
     'https://openhangar.space/*',
     'https://app.openhangar.space/*',
-    ...(KEEP_SYNC && !BETA ? ['https://staging.openhangar.space/*'] : []),
+    ...(DEV_SITE ? ['https://staging.openhangar.space/*'] : []),
   ];
   // Chrome and Edge: the pages message the extension directly. Firefox doesn't allow
   // that, so there src/site-bridge.js runs on just those pages and passes the
@@ -222,6 +231,6 @@ for (const [name, transform] of Object.entries(builds)) {
     `built ${out}${KEEP_SYNC ? ' (with sync)' : ''}${SITE ? `, syncing to ${SITE}` : ''}` +
       (beta ? ` as ${BETA_NAME} ${beta.version} (${beta.version_name})` : '') +
       (FLAGS_ON.length ? `; flags on: ${FLAGS_ON.join(', ')}` : '') +
-      ((SITE && !beta) || DEV_ONLY_ON.length ? ' (dev build, never for a store)' : ''),
+      (DEV_SITE || DEV_ONLY_ON.length || OFF_DEFAULT ? ' (dev build, never for a store)' : ''),
   );
 }

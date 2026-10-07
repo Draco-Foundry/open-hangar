@@ -49,8 +49,9 @@ Firefox Add-ons. Work top to bottom. Items marked ✅ are ready in the repo; ⬜
   - `open-hangar-chrome-<version>.zip`: Chrome Web Store **and** Edge Add-ons.
   - `open-hangar-firefox-<version>.zip`: Firefox AMO. `scripts/pack.mjs` adds the
     Firefox-only manifest keys (event-page `background.scripts`, gecko add-on id,
-    `data_collection_permissions: none`, and `gecko_android` for Firefox for Android
-    142+). Validate with `npm run lint:firefox`.
+    `data_collection_permissions` (none required; what sync sends optional, asked on
+    the first Connect), and `gecko_android` for Firefox for Android 142+). Validate
+    with `npm run lint:firefox`.
 - ✅ Icons: 128px declared (required). 16/32/48 also added to the manifest.
 
 ## 3. Store Listing Assets

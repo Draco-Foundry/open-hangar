@@ -1,6 +1,7 @@
 # 0001: Local-First, No Server for Scan Data
 
-- **Date:** 2026-06-01 (initial commit); sync rules added 2026-09-28 and 2026-09-30
+- **Date:** 2026-06-01 (initial commit); sync rules added 2026-09-28 and 2026-09-30;
+  sync in the store build 2026-10-08
 - **Sources:** initial `README.md` (commit d0f197b), ROADMAP.md "Privacy & scope",
   CONTRIBUTING.md "Principles", commits fcc3603 and fc48dbf (#187), docs/PRIVACY.md
 
@@ -30,3 +31,7 @@ launched and the privacy policy says nothing leaves the device, its code is mark
   download a backup (`lastBackupAt`).
 - `scripts/pack.mjs` strips sync code unless `OH_SYNC=1`, and fails if
   `app.openhangar.space` survives in a store build. New sync code must use the markers.
+- From 0.3.0 (sync launches November 10, 2026; launch checklist #344) the store build
+  keeps the sync code, built in to app.openhangar.space. It stays opt-in: nothing is
+  sent until you connect. The markers are the `sync` build flag's (docs/FLAGS.md), and
+  a `--flag sync=off` build still cuts them.

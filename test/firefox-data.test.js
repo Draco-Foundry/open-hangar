@@ -33,7 +33,7 @@ test('sync declares and requests the same Firefox data categories', () => {
   const pack = list(read('scripts/pack.mjs'), /const SYNC_DATA = \[([^\]]+)\]/);
   const dash = list(read('src/dashboard.js'), /data_collection: \[([^\]]+)\]/);
   assert.deepEqual(dash, pack);
-  // The beta's store check holds the Firefox beta to the same list.
+  // The store check holds every Firefox build with sync to the same list.
   assert.deepEqual(
     list(read('scripts/check-store-build.mjs'), /const SYNC_DATA = \[([^\]]+)\]/),
     pack,
@@ -41,6 +41,8 @@ test('sync declares and requests the same Firefox data categories', () => {
   for (const c of pack) assert.ok(KNOWN.includes(c), `${c} is a Firefox category`);
 });
 
-test('store builds still declare that nothing is collected', () => {
-  assert.match(read('scripts/pack.mjs'), /: \{ required: \['none'\] \}/);
+test('nothing is required: what sync sends is optional, and a build without sync asks none', () => {
+  const pack = read('scripts/pack.mjs');
+  assert.match(pack, /KEEP_SYNC\s*\? \{ required: \['none'\], optional: SYNC_DATA \}/);
+  assert.match(pack, /: \{ required: \['none'\] \}/);
 });

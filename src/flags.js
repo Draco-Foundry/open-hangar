@@ -22,7 +22,7 @@
   const REGISTRY = {
     sync: {
       about: 'Website sync: Connect This Browser, Sync Now and your hangar on the website.',
-      default: false,
+      default: true,
       beta: true,
     },
     orgFleet: {

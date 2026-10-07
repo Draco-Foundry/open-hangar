@@ -19,8 +19,8 @@ Reason not recorded. The commit says what moved, not why.
 
 ## Consequences
 
-- The extension's sync code stays here, marked with `@sync-start` / `@sync-end` and cut
-  from store builds (see [0001](0001-local-first.md)).
+- The extension's sync code stays here, marked with `@sync-start` / `@sync-end` (the
+  `sync` build flag, in store builds from 0.3.0; see [0001](0001-local-first.md)).
 - Some files point at the private repo: docs/REDESIGN-0.3.md (the website plan),
   `scripts/site-stars.mjs` and `src/quips.js` (copies kept in step with the website),
   and `scripts/release.mjs` (the "private website plan").

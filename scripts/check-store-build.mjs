@@ -4,24 +4,27 @@
 //   node scripts/check-store-build.mjs --beta [dir]   Open Hangar Beta (npm run build:beta)
 //
 // dir defaults to dist. Every text file is read, inside the zips too (they're what the
-// stores get).
+// stores get). Each folder and each zip is checked as a build of its own.
 //
-// Public build: no sync code (app.openhangar.space), no built-in sync site and no
-// staging site anywhere (the manifest included), and the public name and version,
-// never the beta's. The manifest's externally_connectable is left out of the sync
-// check: it lists our own site on purpose, for Add to RSI Cart from the website's
-// store (#288). So does the Firefox build's site-bridge content script, its way to
-// the same pages (#434).
+// Public build: the public name and version, never the beta's.
 //
 // Beta build (docs/BETA.md), both of them (dist/beta for Chrome and Edge,
-// dist/beta-firefox for Firefox): sync code kept and built in to production
-// (app.openhangar.space) and nothing else; the staging site nowhere, manifest
-// included; the Open Hangar Beta name, amber icons, a four-number version and a
-// "0.3.0 Beta 1" style version_name; the identity permission for Connect. Firefox's
-// also has the beta's own add-on id (never the public one), the update_url its
-// self-distributed copies update from, and the optional data collection sync asks for.
+// dist/beta-firefox for Firefox): the Open Hangar Beta name, amber icons, a four-number
+// version and a "0.3.0 Beta 1" style version_name. Firefox's also has the beta's own
+// add-on id (never the public one) and the update_url its self-distributed copies
+// update from.
 //
-// Both: every build carries src/flags.js with exactly its set of build flags (the
+// Both: no staging site anywhere (the manifest included). Sync, while the `sync` flag
+// is on for the build (src/flags.js; on by default, so in the public build too): the
+// sync code, built in to production (app.openhangar.space) and nothing else, the
+// identity permission for Connect, and the website's way in to the extension:
+// externally_connectable on Chrome and Edge, the site-bridge content script on Firefox
+// (#434), with the optional data collection sync asks for. With sync off: no sync code
+// (app.openhangar.space) and no built-in sync site; the manifest's
+// externally_connectable and Firefox's site bridge still list our own site on purpose,
+// for Add to RSI Cart from the website's store (#288).
+//
+// And every build carries src/flags.js with exactly its set of build flags (the
 // registry's defaults, or its beta set), and no flag the registry marks dev-only
 // is on (docs/FLAGS.md).
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -41,11 +44,17 @@ const SYNC_DATA = ['personallyIdentifyingInfo', 'financialAndPaymentInfo', 'webs
 // The repo's registry, wherever this is run from.
 const REGISTRY = readRegistry(fileURLToPath(new URL('../src/flags.js', import.meta.url)));
 const WANT_FLAGS = buildValues(REGISTRY, { beta: BETA });
+const SYNC = WANT_FLAGS.sync;
 
 const problems = [];
 const TEXT = /\.(js|mjs|html|json|css)$/;
 const STAGING = /staging\.openhangar\.space/;
 const BUILT_IN = /SITE_BUILT_IN\s*=\s*(['"`])((?:(?!\1).)*)\1/g;
+
+// What each build (a folder in dir, or a zip) turned out to carry.
+const builds = {};
+const buildOf = (unit) =>
+  (builds[unit] ??= { firefox: /firefox/.test(unit), manifests: 0, builtIn: 0, sync: false });
 
 // A store manifest never mentions staging at all, under any name.
 function noStagingManifest(name, text) {
@@ -54,76 +63,56 @@ function noStagingManifest(name, text) {
 }
 
 function checkPublic(name, text) {
-  if (STAGING.test(text)) problems.push(`${name}: the staging site`);
-  noStagingManifest(name, text);
-  let hosts = text;
-  if (name.endsWith('manifest.json')) {
-    const m = JSON.parse(text);
-    if (m.name !== '__MSG_extName__')
-      problems.push(`${name}: name is "${m.name}", not the public one`);
-    if (m.version_name)
-      problems.push(`${name}: has a version_name (${m.version_name}): a beta build?`);
-    delete m.externally_connectable;
-    // Firefox's way to the same pages (src/site-bridge.js, #434).
-    if (m.content_scripts)
-      m.content_scripts = m.content_scripts.filter(
-        (c) => !(c.js || []).every((f) => f.endsWith('site-bridge.js')),
-      );
-    hosts = JSON.stringify(m);
-  }
-  if (/app\.openhangar\.space/.test(hosts))
-    problems.push(`${name}: sync code (an OH_SYNC=1 build)`);
-  for (const [, , site] of text.matchAll(BUILT_IN))
-    if (site) problems.push(`${name}: a built-in sync site (${site})`);
+  if (!name.endsWith('manifest.json')) return;
+  const m = JSON.parse(text);
+  if (m.name !== '__MSG_extName__')
+    problems.push(`${name}: name is "${m.name}", not the public one`);
+  if (m.version_name)
+    problems.push(`${name}: has a version_name (${m.version_name}): a beta build?`);
 }
 
-// Which beta a file is from: the Firefox folder or zip, or Chrome and Edge's.
-const betaOf = (name) =>
-  /(^|\/)(beta-firefox\/|open-hangar-beta-firefox-)/.test(name) ? 'firefox' : 'chrome';
-const seen = {
-  chrome: { builtIn: 0, sync: false, manifests: 0 },
-  firefox: { builtIn: 0, sync: false, manifests: 0 },
-};
-function checkBeta(name, text) {
-  const firefox = betaOf(name) === 'firefox';
-  const saw = seen[firefox ? 'firefox' : 'chrome'];
-  if (STAGING.test(text)) problems.push(`${name}: the staging site`);
-  noStagingManifest(name, text);
-  if (/https?:\/\/(localhost|127\.0\.0\.1)/.test(text) && /SITE_BUILT_IN/.test(text))
-    problems.push(`${name}: a local dev site`);
-  for (const [, , site] of text.matchAll(BUILT_IN)) {
-    if (site !== PRODUCTION_SITE) problems.push(`${name}: built in to "${site}", not production`);
-    else saw.builtIn++;
-  }
-  // The sync code itself (lib.js's @sync block), not just an address.
-  if (name.endsWith('lib.js') && /OH\.siteLinkStart\s*=/.test(text)) saw.sync = true;
-  if (name.endsWith('manifest.json')) {
-    saw.manifests++;
-    const m = JSON.parse(text);
-    if (m.name !== BETA_NAME) problems.push(`${name}: name is "${m.name}", not "${BETA_NAME}"`);
-    const v = String(m.version || '').split('.');
-    if (v.length !== 4 || !v.every((p) => /^\d+$/.test(p) && +p <= 65535))
-      problems.push(`${name}: version "${m.version}" isn't four dotted numbers`);
-    if (!/^\d+\.\d+\.\d+ Beta \d+$/.test(m.version_name || ''))
-      problems.push(`${name}: version_name "${m.version_name}" isn't like "0.3.0 Beta 1"`);
-    if (!(m.permissions || []).includes('identity'))
-      problems.push(`${name}: no identity permission (Connect's sign-in window needs it)`);
-    if (firefox) checkBetaFirefox(name, m);
-    else {
-      const ec = (m.externally_connectable && m.externally_connectable.matches) || [];
-      if (!ec.includes(`${PRODUCTION_SITE}/*`))
-        problems.push(`${name}: externally_connectable doesn't let in ${PRODUCTION_SITE}`);
-      if (m.browser_specific_settings)
-        problems.push(`${name}: a Firefox manifest in the Chrome and Edge beta`);
-    }
-  }
-}
-function checkBetaFirefox(name, m) {
+function checkBeta(name, text, build) {
+  if (!name.endsWith('manifest.json')) return;
+  const m = JSON.parse(text);
+  if (m.name !== BETA_NAME) problems.push(`${name}: name is "${m.name}", not "${BETA_NAME}"`);
+  const v = String(m.version || '').split('.');
+  if (v.length !== 4 || !v.every((p) => /^\d+$/.test(p) && +p <= 65535))
+    problems.push(`${name}: version "${m.version}" isn't four dotted numbers`);
+  if (!/^\d+\.\d+\.\d+ Beta \d+$/.test(m.version_name || ''))
+    problems.push(`${name}: version_name "${m.version_name}" isn't like "0.3.0 Beta 1"`);
+  if (!build.firefox) return;
   const gecko = (m.browser_specific_settings && m.browser_specific_settings.gecko) || {};
   if (gecko.id !== BETA_FIREFOX_ID)
     problems.push(`${name}: add-on id "${gecko.id}", not the beta's "${BETA_FIREFOX_ID}"`);
   if (gecko.update_url !== BETA_FIREFOX_UPDATES)
     problems.push(`${name}: update_url "${gecko.update_url}", not ${BETA_FIREFOX_UPDATES}`);
+}
+
+// A build with sync: the code, production built in, and Connect's way in.
+function checkSync(name, text, build) {
+  if (/https?:\/\/(localhost|127\.0\.0\.1)/.test(text) && /SITE_BUILT_IN/.test(text))
+    problems.push(`${name}: a local dev site`);
+  for (const [, , site] of text.matchAll(BUILT_IN)) {
+    if (site !== PRODUCTION_SITE) problems.push(`${name}: built in to "${site}", not production`);
+    else build.builtIn++;
+  }
+  // The sync code itself (lib.js's @sync block), not just an address.
+  if (name.endsWith('lib.js') && /OH\.siteLinkStart\s*=/.test(text)) build.sync = true;
+  if (!name.endsWith('manifest.json')) return;
+  const m = JSON.parse(text);
+  if (!(m.permissions || []).includes('identity'))
+    problems.push(`${name}: no identity permission (Connect's sign-in window needs it)`);
+  if (build.firefox) checkSyncFirefox(name, m);
+  else {
+    const ec = (m.externally_connectable && m.externally_connectable.matches) || [];
+    if (!ec.includes(`${PRODUCTION_SITE}/*`))
+      problems.push(`${name}: externally_connectable doesn't let in ${PRODUCTION_SITE}`);
+    if (m.browser_specific_settings)
+      problems.push(`${name}: a Firefox manifest in the Chrome and Edge build`);
+  }
+}
+function checkSyncFirefox(name, m) {
+  const gecko = (m.browser_specific_settings && m.browser_specific_settings.gecko) || {};
   const dc = gecko.data_collection_permissions;
   if (!dc) problems.push(`${name}: no data_collection_permissions (AMO requires them)`);
   else {
@@ -143,6 +132,27 @@ function checkBetaFirefox(name, m) {
   if (!bridge || !bridge.matches.includes(`${PRODUCTION_SITE}/*`))
     problems.push(`${name}: no site-bridge content script for ${PRODUCTION_SITE}`);
 }
+
+// A build without sync: no sync code and no built-in site. The manifest's
+// externally_connectable and Firefox's site bridge (#434) list our own site for Add to
+// RSI Cart (#288), so they're left out of the address check.
+function checkNoSync(name, text) {
+  let hosts = text;
+  if (name.endsWith('manifest.json')) {
+    const m = JSON.parse(text);
+    delete m.externally_connectable;
+    if (m.content_scripts)
+      m.content_scripts = m.content_scripts.filter(
+        (c) => !(c.js || []).every((f) => f.endsWith('site-bridge.js')),
+      );
+    hosts = JSON.stringify(m);
+  }
+  if (/app\.openhangar\.space/.test(hosts))
+    problems.push(`${name}: sync code, in a build with sync off`);
+  for (const [, , site] of text.matchAll(BUILT_IN))
+    if (site) problems.push(`${name}: a built-in sync site (${site})`);
+}
+
 // The built flags.js: this build's set, nothing dev-only, nothing unknown.
 const flagged = { files: 0, manifests: 0 };
 function checkFlags(name, text) {
@@ -169,9 +179,15 @@ function checkFlags(name, text) {
   for (const flag of Object.keys(REGISTRY))
     if (!(flag in values)) problems.push(`${name}: flag "${flag}" is missing (stale build?)`);
 }
-const checkBuild = BETA ? checkBeta : checkPublic;
-const check = (name, text) => {
-  checkBuild(name, text);
+const check = (name, text, unit) => {
+  const build = buildOf(unit);
+  if (name.endsWith('manifest.json')) build.manifests++;
+  if (STAGING.test(text)) problems.push(`${name}: the staging site`);
+  noStagingManifest(name, text);
+  if (BETA) checkBeta(name, text, build);
+  else checkPublic(name, text);
+  if (SYNC) checkSync(name, text, build);
+  else checkNoSync(name, text);
   checkFlags(name, text);
 };
 
@@ -186,10 +202,12 @@ function walk(dir, rel = '') {
     const p = `${dir}/${e.name}`;
     const r = rel ? `${rel}/${e.name}` : e.name;
     if (!wanted(r)) continue;
+    // The build a file belongs to: its top folder in dir, or its zip.
+    const unit = r.split('/')[0];
     if (e.isDirectory()) walk(p, r);
-    else if (TEXT.test(e.name)) check(p, readFileSync(p, 'utf8'));
+    else if (TEXT.test(e.name)) check(p, readFileSync(p, 'utf8'), unit);
     else if (e.name.endsWith('.zip')) {
-      zips[BETA ? betaOf(r) : 'chrome']++;
+      zips[/firefox/.test(r) ? 'firefox' : 'chrome']++;
       let list;
       try {
         list = execFileSync('unzip', ['-Z1', p], { encoding: 'utf8' }).split('\n');
@@ -198,7 +216,7 @@ function walk(dir, rel = '') {
         continue;
       }
       for (const f of list.filter((f) => TEXT.test(f)))
-        check(`${p}:${f}`, execFileSync('unzip', ['-p', p, f], { encoding: 'utf8' }));
+        check(`${p}:${f}`, execFileSync('unzip', ['-p', p, f], { encoding: 'utf8' }), r);
       if (BETA)
         for (const f of list.filter((f) => /^icons\/icon\d+\.png$/.test(f)))
           if (!execFileSync('unzip', ['-p', p, f]).equals(readFileSync(`beta/${f}`)))
@@ -223,11 +241,14 @@ if (BETA) {
   ]) {
     if (!existsSync(`${root}/${dir}/manifest.json`)) problems.push(`${root}/${dir}: no beta build`);
     if (!zips[browser]) problems.push(`${root}: no ${zip}`);
-    const saw = seen[browser];
-    if (saw.manifests && !saw.builtIn) problems.push(`${dir}: sync is not built in to production`);
-    if (saw.manifests && !saw.sync) problems.push(`${dir}: the sync code is missing`);
   }
 }
+if (SYNC)
+  for (const [unit, build] of Object.entries(builds)) {
+    if (!build.manifests) continue;
+    if (!build.builtIn) problems.push(`${unit}: sync is not built in to production`);
+    if (!build.sync) problems.push(`${unit}: the sync code is missing`);
+  }
 if (problems.length) {
   console.error(`✖ Not a ${BETA ? 'beta' : 'public store'} build:\n  ${problems.join('\n  ')}`);
   console.error(
@@ -237,8 +258,9 @@ if (problems.length) {
   );
   process.exit(1);
 }
+const what = SYNC ? 'sync built in to production, no staging' : 'no staging site, no sync code';
 console.log(
   BETA
-    ? `✔ ${root} has clean Open Hangar Beta builds for Chrome, Edge and Firefox (synced to production, no staging)`
-    : `✔ ${root} is a clean store build (no staging site, no sync code, store flags)`,
+    ? `✔ ${root} has clean Open Hangar Beta builds for Chrome, Edge and Firefox (${what})`
+    : `✔ ${root} is a clean store build (${what}, store flags)`,
 );
