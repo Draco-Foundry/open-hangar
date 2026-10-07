@@ -3,6 +3,10 @@
   // first scan the button becomes a progress bar with the step under it (#170).
   // Signed out, the card above has the Log In button, so the note points there.
   import { app, version } from '../lib/app.svelte.js';
+  import { flag } from '../lib/flags.js';
+
+  // Builds with website sync mention it; the rest stay local-only (docs/FLAGS.md).
+  const sync = flag('sync');
 
   const d = $derived.by(() => {
     version.n;
@@ -23,7 +27,9 @@
     <h2>Welcome to Open Hangar, Citizen</h2>
     <p>
       Your whole Star Citizen hangar in one place: what it's worth, your buy-backs, your referrals
-      and more. Everything stays on this computer, locked in your own hangar.
+      and more. {sync
+        ? 'It stays in this browser, locked in your own hangar, unless you connect openhangar.space to see it on any device.'
+        : 'Everything stays on this computer, locked in your own hangar.'}
     </p>
     <button
       type="button"

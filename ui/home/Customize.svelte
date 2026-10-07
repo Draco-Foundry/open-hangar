@@ -209,7 +209,6 @@
     </div>
     <div class="dfoot">
       <button type="button" class="btn sm" id="cust-reset" onclick={resetLayout}>Reset to Default</button>
-      <span class="hint">Reorder and card sizes are coming later.</span>
     </div>
   </div>
 {/if}
@@ -441,9 +440,5 @@
     gap: 10px;
     padding: 14px 22px;
     border-top: 1px solid var(--line);
-  }
-  .dfoot .hint {
-    margin: 0;
-    text-align: right;
   }
 </style>
