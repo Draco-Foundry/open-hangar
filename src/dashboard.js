@@ -4953,12 +4953,15 @@ async function initUpdates() {
 const site = {
   enabled: false,
   link: null, // { name, connectedAt, lastSync } once connected (the token stays in lib.js)
-  waiting: null, // { code, url, stop } while the website hasn't approved the code yet
+  waiting: null, // { code, url, until, stop } while the website hasn't approved the code yet
   syncing: false,
   msg: '', // the last thing that went wrong, or ''
   // Firefox, and whether it already lets us share (else Connect explains first).
   firefox: false,
   dataOk: true,
+  // Connect was pressed on the website before Firefox said yes: Home opens with
+  // Firefox's card up (background.js oh-connect-begin; ui/site/SiteConnect.svelte).
+  askFirefox: false,
 };
 async function refreshSite() {
   site.enabled = await OH.siteEnabled();
@@ -4966,6 +4969,13 @@ async function refreshSite() {
   site.link = link && { name: link.name, connectedAt: link.connectedAt, lastSync: link.lastSync };
   site.firefox = !!chrome.runtime.getManifest().browser_specific_settings?.gecko;
   site.dataOk = !site.firefox || (await chrome.permissions.contains(SITE_DATA).catch(() => false));
+  if (site.firefox && !site.dataOk && !site.link) {
+    const { siteAskFirefox: at } = await chrome.storage.session.get('siteAskFirefox');
+    if (at) {
+      await chrome.storage.session.remove('siteAskFirefox');
+      if (Date.now() - at < 5 * 60e3) site.askFirefox = true;
+    }
+  }
   homeUpdated();
 }
 function siteProblem(err) {
@@ -5081,6 +5091,8 @@ async function siteConnect() {
     const w = {
       code: start.user_code,
       url: `${start.verification_uri}?code=${encodeURIComponent(start.user_code)}`,
+      // When the code runs out: the card counts down to it.
+      until: Date.now() + (start.expires_in || 600) * 1000,
       stop: false,
     };
     site.waiting = w;

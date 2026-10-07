@@ -15,15 +15,47 @@
       enabled: s.enabled,
       link: s.link,
       waiting: s.waiting ? s.waiting.code || '' : '',
+      until: s.waiting ? s.waiting.until || 0 : 0,
       // The browser's sign-in window is open (the usual way to connect).
       inWindow: !!(s.waiting && s.waiting.window),
       firefox: s.firefox,
       dataOk: s.dataOk,
+      askFirefox: s.askFirefox,
       msg: s.msg,
     };
   });
   // While the Firefox card is up: the button that opened it (focus goes back there).
   let explain = $state(null);
+  // The code's countdown ("Good for 9:41") and Copy, while a code is up (#434).
+  let now = $state(Date.now());
+  $effect(() => {
+    if (!d.until) return;
+    const t = setInterval(() => (now = Date.now()), 1000);
+    return () => clearInterval(t);
+  });
+  const left = $derived.by(() => {
+    const s = Math.max(0, Math.round((d.until - now) / 1000));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  });
+  // Sent here from the website's Connect This Browser (Firefox, first time): the
+  // card opens by itself, so its Continue is the one click Firefox needs.
+  let connectBtn = $state(null);
+  $effect(() => {
+    if (d.askFirefox && connectBtn && !explain) {
+      app().site.state.askFirefox = false;
+      explain = connectBtn;
+    }
+  });
+  let copied = $state(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(d.waiting);
+      copied = true;
+      setTimeout(() => (copied = false), 1600);
+    } catch {
+      /* no clipboard: the code is right there to type */
+    }
+  }
 
   const site = () => app().site;
   function explainFrom(e) {
@@ -44,7 +76,15 @@
       </p>
     {:else if d.waiting}
       <span class="sc-hint">Approve this code on openhangar.space</span>
-      <span class="sc-code">{d.waiting}</span>
+      <span class="sc-row"
+        ><span class="sc-code">{d.waiting}</span><button
+          type="button"
+          class="sc-btn sc-copy"
+          class:done={copied}
+          onclick={copy}>{copied ? 'Copied' : 'Copy'}</button
+        ></span
+      >
+      {#if d.until}<span class="sc-hint">Good for <b class="sc-left">{left}</b></span>{/if}
       <div class="sc-row">
         <button type="button" class="sc-btn quiet" onclick={() => site().reopen()}
           >Open the Page Again ↗</button
@@ -53,7 +93,7 @@
       </div>
       <p class="sc-hint">Spooling the quantum drive… this card updates by itself.</p>
     {:else}
-      <button type="button" class="sc-btn primary" onclick={connect}
+      <button type="button" class="sc-btn primary" bind:this={connectBtn} onclick={connect}
         ><svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"
           ><circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.4" /><path
             d="M1.8 8h12.4M8 1.7c2 2.2 2 10.4 0 12.6M8 1.7c-2 2.2-2 10.4 0 12.6"

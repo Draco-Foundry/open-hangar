@@ -155,20 +155,26 @@ for (const [name, transform] of Object.entries(builds)) {
   if (KEEP_SYNC) manifest.permissions = [...manifest.permissions, 'identity'];
   // Our own site may talk to the extension (src/background.js): Add to RSI Cart from
   // the website's store in every build (#288; no account, nothing sent anywhere but
-  // RSI), and Connect This Browser in builds with sync. Chrome and Edge only; Firefox
-  // doesn't let web pages reach extensions. The background worker reads this list
-  // back as the only origins it answers.
-  if (name !== 'firefox')
-    manifest.externally_connectable = {
-      // The store is at openhangar.space/store and app.openhangar.space/store.
-      // Staging only in developer builds with sync (OH_SYNC=1, npm run build:staging):
-      // never in a store build, the beta included (scripts/check-store-build.mjs).
-      matches: [
-        'https://openhangar.space/*',
-        'https://app.openhangar.space/*',
-        ...(KEEP_SYNC && !BETA ? ['https://staging.openhangar.space/*'] : []),
-      ],
-    };
+  // RSI), and Connect This Browser in builds with sync. The background worker reads
+  // this list back as the only origins it answers.
+  // The store is at openhangar.space/store and app.openhangar.space/store.
+  // Staging only in developer builds with sync (OH_SYNC=1, npm run build:staging):
+  // never in a store build, the beta included (scripts/check-store-build.mjs).
+  const SITE_PAGES = [
+    'https://openhangar.space/*',
+    'https://app.openhangar.space/*',
+    ...(KEEP_SYNC && !BETA ? ['https://staging.openhangar.space/*'] : []),
+  ];
+  // Chrome and Edge: the pages message the extension directly. Firefox doesn't allow
+  // that, so there src/site-bridge.js runs on just those pages and passes the
+  // messages on (#434, owner 2026-10-07: one-click Connect in every browser). Only
+  // the Firefox build carries it.
+  if (name === 'firefox')
+    manifest.content_scripts = [
+      { matches: SITE_PAGES, js: ['src/site-bridge.js'], run_at: 'document_start' },
+    ];
+  else manifest.externally_connectable = { matches: SITE_PAGES };
+  if (name !== 'firefox') rmSync(`${out}/src/site-bridge.js`, { force: true });
   if (beta) {
     // Its own store item: a name, icons and version line of its own, so testers can
     // tell it apart and it never stands in for the public Open Hangar.
