@@ -168,8 +168,8 @@
     <li>
       <strong>Game version &amp; ship data</strong>: openhangar.space's public feeds, the same for
       everyone&nbsp;· ship pictures from RSI's
-      <a href="{RSI}/ship-matrix" target="_blank" rel="noopener">Ship Matrix</a>&nbsp;· ship stats
-      from the
+      <a href="{RSI}/ship-matrix" target="_blank" rel="noopener">Ship Matrix</a> first&nbsp;· the
+      ship list, stats, standalone store prices and some ship pictures from the
       <a href="https://api.star-citizen.wiki" target="_blank" rel="noopener">Star Citizen Wiki</a>
       community, with thanks
     </li>
