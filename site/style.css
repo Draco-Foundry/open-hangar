@@ -62,16 +62,21 @@ h1 {
   color: #c9d1d9;
 }
 
+/* Three cards side by side, or one per row on phones: never one left alone. */
 .installs {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 170px));
   justify-content: center;
   gap: 12px;
+}
+@media (max-width: 560px) {
+  .installs {
+    grid-template-columns: minmax(0, 170px);
+  }
 }
 .install {
   display: flex;
   flex-direction: column;
-  min-width: 170px;
   padding: 12px 20px;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -119,6 +124,7 @@ h1 {
   height: 1px;
   overflow: hidden;
   clip-path: inset(50%);
+  white-space: nowrap;
 }
 .b-note {
   font-size: 0.85rem;
