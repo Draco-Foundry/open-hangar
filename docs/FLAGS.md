@@ -61,9 +61,9 @@ what sync sends as optional data collection, asked on the first Connect.
 It stays opt-in: nothing personal goes to openhangar.space until you Connect. Before
 that, the extension only reads the public feeds (game status, ships, catalog, rates and
 the like), which carry nothing about you. Until launch day the website answers a sync
-from an account without beta access with "Sync opens November 10" (its `sync_open`
-flag): the extension shows that as a calm note in the scan report ("Not Synced Yet"),
-not a problem, and stays connected.
+from an account without beta access with "Sync opens November 10" (reason `not-open`,
+a switch on the website's side): the extension shows that as a calm note in the scan
+report ("Not Synced Yet"), not a problem, and stays connected.
 
 `--flag sync=off` still builds a copy without it, for a developer; the store check
 refuses that build.
