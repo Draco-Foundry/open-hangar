@@ -14,7 +14,7 @@ body:
   - type: dropdown
     id: part
     attributes:
-      label: Which scan?
+      label: Which Scan?
       options:
         [Hangar (pledges), Buy-backs, Referrals, Account and balances, Store prices, Not sure]
     validations:
@@ -22,7 +22,7 @@ body:
   - type: textarea
     id: what
     attributes:
-      label: What happens?
+      label: What Happens?
       description: An error, an empty list, wrong numbers? When did it start?
     validations:
       required: true
@@ -37,7 +37,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Open Hangar version
+      label: Open Hangar Version
       description: Shown at the bottom of the dashboard (e.g. v0.2.14).
     validations:
       required: true

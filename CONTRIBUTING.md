@@ -95,7 +95,7 @@ file format has its own number, `EXPORT_VERSION`; only bump it when the file its
 changes, since older versions refuse newer files. Today `OH.SOURCES` holds two `html`
 sources, the hangar and buy-backs (RSI renders buy-backs as the same server-side HTML as
 pledges). Referrals come from RSI's GraphQL API through their own fetch in `lib.js`,
-outside `OH.SOURCES`. Store data (API) is the next pipeline; see ROADMAP.md.
+outside `OH.SOURCES`.
 
 ## Versioning
 
@@ -111,8 +111,8 @@ features and **patch** (`0.2.7`…) for fixes; `1.0.0` is reserved for the first
   Everything downstream should depend on the normalized model, not raw RSI data.
 - **Be a good citizen.** Keep the throttle (`DELAY_MS`) in `lib.js`. Don't add
   parallel page fetching. This is for personal use, not bulk scraping.
-- **No silent data exfiltration, ever.** Any sync feature must be opt-in,
-  documented, and ideally self-hostable. Keep it out of the core scraper.
+- **No silent data exfiltration, ever.** Sync stays opt-in and documented: no player
+  data is sent until the player connects their own openhangar.space account.
 - **No credential handling.** We rely on the existing session cookie only.
 
 ## Local Testing Without RSI

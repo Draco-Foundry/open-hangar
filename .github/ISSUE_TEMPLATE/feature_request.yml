@@ -11,18 +11,18 @@ body:
   - type: textarea
     id: problem
     attributes:
-      label: What would you like to do?
+      label: What Would You Like to Do?
       description: The thing you're trying to do, and why it matters to you.
     validations:
       required: true
   - type: textarea
     id: idea
     attributes:
-      label: How could Open Hangar help?
+      label: How Could Open Hangar Help?
       description: Your idea for how it should work. Sketches or examples from other tools are welcome.
   - type: checkboxes
     id: scope
     attributes:
-      label: Fits the project
+      label: Fits the Project
       options:
         - label: It uses my own RSI account or public Star Citizen data (Open Hangar never reads other people's accounts).

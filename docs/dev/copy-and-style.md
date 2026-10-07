@@ -18,10 +18,9 @@
 - **No emojis** anywhere in the UI. A simple drawn (SVG) icon when one is truly needed;
   the ✕ close button is fine.
 - **No em dashes (—)** in user-facing text. Use periods, commas or parentheses.
-- **Voice:** short and professional, with light Star Citizen flavour (docs/VOICE.md),
-  always positive, never implying something was broken. The action must stay obvious;
-  add a small muted hint after a joke label when needed. Legal and privacy text stays
-  plain.
+- **Voice:** fun, short Star Citizen player flavour (docs/VOICE.md), always positive,
+  never implying something was broken. The action must stay obvious; add a small muted
+  hint after a joke label when needed. Legal and privacy text stays plain.
 - **Don't name other community tools or sites** in public text, except required data
   and license credits (#448).
 

@@ -15,7 +15,7 @@ It reads your own RSI account using the session you're already signed in with, a
 saves it on your machine as tidy, structured data. Browse your fleet in the built-in
 viewer, or export everything as one JSON file and build on it.
 
-- **No password, no account, no server.** Nothing leaves your browser.
+- **No password, no account needed.** Today's extension keeps everything in your browser.
 - **For players:** hangar value at today's store prices, melt candidates, fleet
   stats, history between scans, buy-backs, referrals, and fleet images to share.
 - **For developers:** the data layer RSI doesn't offer. There's no public API, so
@@ -186,11 +186,14 @@ To add a data source, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 No credentials, only the session you already have. Today's release (0.2.x) has no
 sync, so your data never leaves your browser; optional sync to a free openhangar.space
-account comes with 0.3.0. The only outbound requests carry no personal data: thumbnails
-and the banner from RSI's media servers, the current game version from the public
-star-citizen.wiki API, and (for items RSI ships without art) ship images looked up
-by **name** from RSI's public ship-matrix (with star-citizen.wiki as a fallback).
-Those lookups are cached and weakly reveal which ships you're viewing.
+account comes with 0.3.0. Apart from reading your own account on RSI, every request is
+public, read-only and carries no personal data: thumbnails and public pages from RSI,
+game data from the public star-citizen.wiki API, and two small files from
+openhangar.space (a status notice, and exchange rates if you pick a currency other than
+USD). The full list is in [docs/PRIVACY.md](docs/PRIVACY.md). Ship art for items RSI
+ships without images is looked up by **name** from RSI's public ship-matrix (with
+star-citizen.wiki as a fallback). Those lookups are cached and weakly reveal which ships
+you're viewing.
 
 The `cookies` permission is used only by **Log out**, which clears RSI's cookies so
 you can fully end your session. Signing in with a different RSI account clears the
@@ -203,9 +206,9 @@ Full policy: [openhangar.space/privacy.html](https://openhangar.space/privacy.ht
 Done: ~~hangar~~ · ~~buy-backs~~ · ~~account + balances~~ · ~~org + rank~~ ·
 ~~referrals~~ · ~~JSON export/import~~ · ~~Chrome/Edge/Firefox builds~~ · ~~website~~
 
-Next: 0.3.0 and the website launch together on November 10, 2026. From 0.3.0 on, the
-extension gets reading improvements and fixes, and new features land on the website.
-The player roadmap moves to **openhangar.space/whats-next** at launch.
+Next: 0.3.0 and the openhangar.space fleet manager launch together on November 10, 2026.
+From 0.3.0 on, the extension gets reading improvements and fixes, and new features land
+on the website. The player roadmap moves to **openhangar.space/whats-next** at launch.
 
 Full detail in [ROADMAP.md](ROADMAP.md); parked ideas in [TODO.md](TODO.md); release
 notes in [CHANGELOG.md](CHANGELOG.md).

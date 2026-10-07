@@ -11,7 +11,7 @@ body:
   - type: textarea
     id: notice
     attributes:
-      label: What's broken
+      label: What's Broken
       description: Plain words, for players. What stopped working, and since when.
       value: |
         RSI changed their ___ page, so the ___ scan isn't working right now. Your saved data is safe: a failed scan never overwrites a good one.

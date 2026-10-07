@@ -57,8 +57,9 @@ ask for the Beta Tester role.
 ## After Launch
 
 From 0.3.0 on, the extension gets reading improvements and fixes, and new features land
-on the website. Store listing languages come back one at a time after launch. The player
-roadmap moves to **openhangar.space/whats-next** at launch.
+on the website. The 0.3.0 store listing is English only; other languages come back one at
+a time after launch. The player roadmap moves to **openhangar.space/whats-next** at
+launch.
 
 ## Not Planned
 
