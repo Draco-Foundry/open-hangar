@@ -91,7 +91,7 @@ Oct 20**, in your next batch.
 
 **Description:**
 
-> Open Hangar Beta is the test flight of Open Hangar 0.3.0, for pilots in our Discord
+> Open Hangar Beta is the test flight of Open Hangar 0.3.0, for invited pilots in our
 > beta program. If you weren't invited, grab the public Open Hangar instead.
 >
 > What's new in 0.3.0:
@@ -157,8 +157,13 @@ Oct 20**, in your next batch.
 The /beta page (`app.openhangar.space/beta`, link shared in #beta only) has the install
 buttons; these steps belong in the pinned #beta post:
 
-1. Get the Beta Tester role in our Discord.
-2. Open `app.openhangar.space/beta` and Sign In with Discord.
+1. Get your key, either one works:
+   - **The Beta Tester role** in our Discord: open `app.openhangar.space/beta` and Sign In
+     with Discord.
+   - **An invite code** (wave invites): Create Account at `app.openhangar.space/sign-up`,
+     enter the code, confirm your email, then open `app.openhangar.space/beta`. An account
+     made with a code has beta access for good; a later Discord sign-in never takes it away.
+2. /beta says "Welcome to the Beta, Pilot" once your key checks out.
 3. **Turn off the public Open Hangar first** (`chrome://extensions` or
    `edge://extensions`, switch it off). Both would scan RSI and both answer the website,
    so testing with both on muddies every report.
