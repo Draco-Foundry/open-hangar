@@ -127,6 +127,9 @@ install prompt only names robertsspaceindustries.com.)_
 
 **Detailed description:**
 
+The store fields are plain text: paste it without the `>` quote marks and the `**` bold
+markers, with each paragraph and each • bullet on one line.
+
 > **The free Star Citizen fleet manager.**
 >
 > Open Hangar reads what RSI already shows you (your hangar, buy-backs, balances, org
@@ -160,9 +163,11 @@ install prompt only names robertsspaceindustries.com.)_
 >
 > Unofficial and fan-made. Not affiliated with Cloud Imperium Games or RSI. Fly safe, o7.
 
-The sync parts (the "Your fleet on any device" paragraph and "with optional sync" in the
-summary) are only true of a store build with sync in it. The `sync` flag is off in the
-store build today ([FLAGS.md](FLAGS.md)), so it has to be on before this copy goes out.
+**Hold 0.3.0 until the store build has sync.** The sync parts (the "Your fleet on any
+device" paragraph, and "with optional sync" in the summary, which is also the manifest
+description in `_locales/en/messages.json`) are only true of a store build with sync in it.
+Today the store build has no sync: the `sync` flag is off for it and no sync site is built in
+([FLAGS.md](FLAGS.md)). Don't cut 0.3.0 for the stores or paste this copy until it does.
 
 ## 7. Submit & Review
 
