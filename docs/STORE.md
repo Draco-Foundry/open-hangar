@@ -146,7 +146,7 @@ install prompt only names robertsspaceindustries.com.)_
 > • Buy-backs with direct reclaim links, and a full referrals dashboard
 > • Streamer Mode hides your money amounts for streams and screenshots
 > • History: see what changed since your last scan, and back it all up to a file
-> • Export to CSV, JSON, or FleetYards and other tools (Hangar Transfer Format)
+> • Export to CSV, JSON, or other fleet tools (Hangar Transfer Format)
 >
 > Private by design: it runs entirely in your browser, using the RSI session you're
 > already signed in with. No password, no account, no server. Nothing leaves your
