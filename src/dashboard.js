@@ -4614,8 +4614,8 @@ document.addEventListener('click', async (e) => {
   if (currentView() === 'stats') renderStats();
 });
 
-// Hangar Transfer Format: ships only, one entry per ship — the file FleetYards
-// (Hangar → Import) and other community tools read.
+// Hangar Transfer Format: ships only, one entry per ship, the file community
+// fleet tools read. No tool is named (owner, 2026-10-07).
 async function exportHtf() {
   const { ships, unmatched } = await OH.exportHTF();
   if (!ships.length) {
@@ -4633,7 +4633,7 @@ async function exportHtf() {
   setDataMsg(
     `Exported ${ships.length} ship(s) in Hangar Transfer Format` +
       (unmatched ? ` · ${unmatched} without a ship code (kept by name)` : '') +
-      '. Import it at FleetYards → Hangar → Import.',
+      '. Import it into any fleet tool that reads HTF.',
   );
 }
 

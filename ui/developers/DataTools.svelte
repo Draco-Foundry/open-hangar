@@ -23,7 +23,7 @@
   <button
     id="export-htf"
     class="btn-secondary"
-    title="Hangar Transfer Format: one entry per ship, for FleetYards and other SC tools"
+    title="Hangar Transfer Format: one entry per ship, for other Star Citizen fleet tools"
     onclick={() => app().dev.exportHtf()}
   >
     Export HTF
