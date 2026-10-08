@@ -3786,7 +3786,98 @@
     return JSON.stringify(out);
   };
 
-  // Upload the same payload as the JSON backup. → { synced_at } or throws.
+  // What sync sends: the backup file's payload without the referral prospects list.
+  // Prospects are other players (handles, monikers, enlist dates) who used your code but
+  // aren't recruits yet, so they stay in this browser; the backup file keeps them, and
+  // the prospects count still goes. Returns a copy, never changes `payload`. Pure.
+  OH.syncPayload = function syncPayload(payload) {
+    const ref = payload?.sources?.referral;
+    if (!isObj(ref) || !isObj(ref.items) || !('prospectsList' in ref.items)) return payload;
+    const { prospectsList, ...items } = ref.items;
+    return { ...payload, sources: { ...payload.sources, referral: { ...ref, items } } };
+  };
+
+  // Whose hangar a sync sends. The link is one per browser, but a browser can keep
+  // more than one RSI account (OH.switchProfile parks the others), so the link
+  // remembers the accounts it has synced (`accounts`: handle and Citizen Record) and
+  // the ones you said no to (`declined`). A scan of any other account asks first
+  // ("Sync <handle> to your openhangar.space account?" in the scan report), and the
+  // answer is kept per handle. A link's first sync isn't asked when this browser keeps
+  // only that one account: that's whoever connected.
+  const SITE_PILOTS_MAX = 20;
+  const lcHandle = (s) => String(s || '').toLowerCase();
+  // The export's account (the website files a hangar under its handle) → { handle,
+  // record } or null when there's no handle (nothing to tell apart, so it goes as before).
+  function pilotOf(payload) {
+    const a = isObj(payload?.account) ? payload.account : null;
+    const handle = typeof a?.handle === 'string' ? a.handle.trim() : '';
+    if (!handle) return null;
+    const record = a.ueeRecord == null ? '' : String(a.ueeRecord).trim();
+    return { handle, record: record || null };
+  }
+  const samePilot = (a, b) =>
+    lcHandle(a.handle) === lcHandle(b.handle) || (!!a.record && a.record === b.record);
+  const pilotList = (list) => (Array.isArray(list) ? list.filter(isObj) : []);
+  const withPilot = (list, who) =>
+    [
+      ...pilotList(list).filter((p) => !samePilot(p, who)),
+      { handle: who.handle, record: who.record || null },
+    ].slice(-SITE_PILOTS_MAX);
+  const withoutPilot = (list, who) => pilotList(list).filter((p) => !samePilot(p, who));
+  // → 'yes' (synced through this link before), 'no' (you said no), 'new' (another
+  // account than the ones it synced) or 'first' (it hasn't synced one yet). Pure.
+  OH.sitePilotAnswer = function sitePilotAnswer(link, who) {
+    if (!who) return 'yes';
+    if (pilotList(link?.accounts).some((p) => samePilot(p, who))) return 'yes';
+    if (pilotList(link?.declined).some((p) => samePilot(p, who))) return 'no';
+    return pilotList(link?.accounts).length ? 'new' : 'first';
+  };
+  // Does this browser keep a hangar for another RSI account than `who`?
+  async function otherPilotsHere(who) {
+    const rows = await OH.listProfiles().catch(() => []);
+    return rows.some((r) => r.nickname && lcHandle(r.nickname) !== lcHandle(who.handle));
+  }
+  // Change the stored link, unless it was disconnected or replaced meanwhile (a sync
+  // that ends after Disconnect mustn't bring the link back).
+  async function updateLink(token, change) {
+    const now = await OH.getSiteLink();
+    if (!now || now.token !== token) return;
+    await chrome.storage.local.set({ siteLink: change(now) });
+  }
+  // Your answer to "Sync <handle> to your openhangar.space account?": yes syncs that
+  // account through this link from now on; no keeps it out of the sync after a scan
+  // (Sync Now asks again).
+  OH.siteSyncAnswer = async function siteSyncAnswer(who, yes) {
+    const link = await OH.getSiteLink();
+    if (!link || !who || typeof who.handle !== 'string' || !who.handle) return;
+    const pilot = { handle: who.handle, record: who.record || null };
+    await updateLink(link.token, (l) => ({
+      ...l,
+      accounts: yes ? withPilot(l.accounts, pilot) : withoutPilot(l.accounts, pilot),
+      declined: yes ? withoutPilot(l.declined, pilot) : withPilot(l.declined, pilot),
+    }));
+  };
+
+  // Holding off (owner, 2026-10-08). Until launch day the website refuses most accounts
+  // (`not-open`), and it takes one sync per account every few minutes (429,
+  // `too-soon`). Uploading the whole hangar after every scan only to hear that again
+  // helps nobody, so the link keeps `wait: { reason, until, said }`: after `not-open`
+  // the sync after a scan holds off for SYNC_NOT_OPEN_WAIT_MS (Sync Now still tries),
+  // and a 429's Retry-After holds every sync, Sync Now too.
+  const SYNC_NOT_OPEN_WAIT_MS = 6 * 3600e3;
+  const SYNC_TOO_SOON_WAIT_MS = 5 * 60e3; // a 429 without Retry-After
+  // → the wait that holds this sync ({ reason, until, said }) or null. One that runs
+  // past a day (a clock set back) is ignored. Pure.
+  OH.siteSyncWait = function siteSyncWait(link, { auto = false, now = Date.now() } = {}) {
+    const w = isObj(link?.wait) ? link.wait : null;
+    if (!w || !Number.isFinite(w.until) || now >= w.until || w.until - now > 24 * 3600e3)
+      return null;
+    if (w.reason === 'too-soon' || (w.reason === 'not-open' && auto)) return w;
+    return null;
+  };
+
+  // Upload the same payload as the JSON backup (OH.syncPayload). → { synced_at } or
+  // throws. `auto` is the sync after a scan; `onSend` runs just before the upload.
   // The website says why it refused a sync as JSON { error, reason }; each reason
   // reads as plain advice here.
   const SYNC_NO_SCAN = 'Scan your hangar first, then press Sync Now.';
@@ -3794,6 +3885,8 @@
     'The website already has a newer scan from another browser. Scan here, then press Sync Now.';
   const SYNC_NOT_OPEN =
     'Sync opens November 10. Your hangar stays safe in your browser until then.';
+  const SYNC_TOO_SOON =
+    'openhangar.space just took a sync for this account. The next one can launch in a few minutes.';
   const SYNC_OLD_FORMAT =
     'This version of Open Hangar is too old to sync. Update it, then sync again.';
   const SYNC_NEWER_FORMAT =
@@ -3801,14 +3894,15 @@
   const SYNC_TOO_BIG =
     "That's more cargo than openhangar.space can hold. Your hangar stays safe in your browser.";
   // A refusal's status, reason and the website's own words → the Error to throw. Sync
-  // not open yet isn't something you did, so it's marked `calm`: the scan report shows
-  // it as a note, not a problem (src/dashboard.js siteSyncReport). Its words are the
-  // website's when it sends a short plain sentence: a store update takes days, so a new
-  // opening date only has to change there.
+  // not open yet, or another sync too soon, isn't something you did, so it's marked
+  // `calm`: the scan report shows it as a note, not a problem (src/dashboard.js
+  // siteSyncReport). Its words are the website's when it sends a short plain sentence:
+  // a store update takes days, so a new opening date only has to change there.
   function syncRefusal(status, reason, said = '') {
-    if (reason === 'not-open') {
+    if (reason === 'not-open' || reason === 'too-soon' || status === 429) {
       const own = said.length <= 200 && !/[<>]/.test(said) ? said : '';
-      return Object.assign(new Error(own || SYNC_NOT_OPEN), { calm: true });
+      const fallback = reason === 'not-open' ? SYNC_NOT_OPEN : SYNC_TOO_SOON;
+      return Object.assign(new Error(own || fallback), { calm: true });
     }
     if (status === 409) return new Error(reason === 'older-scan' ? SYNC_OLDER_SCAN : SYNC_NO_SCAN);
     if (status === 426 || reason === 'old-format') return new Error(SYNC_OLD_FORMAT);
@@ -3816,17 +3910,38 @@
     if (status === 413) return new Error(SYNC_TOO_BIG); // one sync, or the login's storage
     return new Error(`openhangar.space responded ${status}`);
   }
-  OH.siteSync = async function siteSync() {
+  // Thrown instead of sending: `held` (a wait above; calm, the website's last words),
+  // `ask` (an account this link hasn't synced: { handle, record }, calm) and `quiet`
+  // (an account you said no to, after a scan: nothing to show). Their messages may
+  // name the handle, so they're for the screen, never the log.
+  OH.siteSync = async function siteSync({ auto = false, onSend } = {}) {
     const link = await OH.getSiteLink();
     if (!link) throw new Error('Not connected to openhangar.space.');
+    const wait = OH.siteSyncWait(link, { auto });
+    if (wait) {
+      const said = typeof wait.said === 'string' ? wait.said : '';
+      throw Object.assign(syncRefusal(0, wait.reason, said), { held: wait.reason });
+    }
     const db = await OH.exportDB();
     // Nothing scanned in this browser yet: sending its empty hangar would replace
     // the one already on the website (the server refuses it too).
     if (!db?.sources?.hangar?.scannedAt) throw new Error(SYNC_NO_SCAN);
+    const who = pilotOf(db);
+    const answer = OH.sitePilotAnswer(link, who);
+    if (answer === 'no' && auto)
+      throw Object.assign(new Error('Not synced: you chose to keep this account here.'), {
+        quiet: true,
+      });
+    if (answer === 'no' || answer === 'new' || (answer === 'first' && (await otherPilotsHere(who))))
+      throw Object.assign(new Error(`Sync ${who.handle} to your openhangar.space account?`), {
+        calm: true,
+        ask: who,
+      });
+    onSend?.();
     const res = await siteFetch(SYNC_PATH, {
       method: 'POST',
       headers: { authorization: `Bearer ${link.token}` },
-      body: OH.syncBody(db),
+      body: OH.syncBody(OH.syncPayload(db)),
     });
     if (res.status === 401) {
       await chrome.storage.local.remove('siteLink');
@@ -3836,10 +3951,34 @@
       // Not always JSON (a proxy's error page, say): then there's no reason.
       const body = await res.json().catch(() => null);
       const text = (v) => (typeof v === 'string' ? v.trim() : '');
-      throw syncRefusal(res.status, text(body?.reason), text(body?.error));
+      const reason = text(body?.reason);
+      const err = syncRefusal(res.status, reason, text(body?.error));
+      const at = Date.now();
+      const hold =
+        reason === 'not-open'
+          ? { reason, until: at + SYNC_NOT_OPEN_WAIT_MS }
+          : res.status === 429 || reason === 'too-soon'
+            ? {
+                reason: 'too-soon',
+                until:
+                  at + (OH.retryAfterMs(header(res, 'retry-after'), at) || SYNC_TOO_SOON_WAIT_MS),
+              }
+            : null;
+      if (hold)
+        await updateLink(link.token, (l) => ({ ...l, wait: { ...hold, said: err.message } }));
+      throw err;
     }
     const j = await res.json();
-    await chrome.storage.local.set({ siteLink: { ...link, lastSync: j.synced_at } });
+    await updateLink(link.token, (l) => {
+      const { wait, ...rest } = l;
+      return {
+        ...rest,
+        lastSync: j.synced_at,
+        ...(who
+          ? { accounts: withPilot(l.accounts, who), declined: withoutPilot(l.declined, who) }
+          : {}),
+      };
+    });
     return j;
   };
   OH.siteDisconnect = async function siteDisconnect() {

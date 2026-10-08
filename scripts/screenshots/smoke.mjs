@@ -989,6 +989,7 @@ try {
       start: OH.siteLinkStart,
       wait: OH.siteLinkWait,
       sync: OH.siteSync,
+      answer: OH.siteSyncAnswer,
       get: OH.getSiteLink,
       off: OH.siteDisconnect,
       tabs: chrome.tabs?.create,
@@ -1068,8 +1069,9 @@ try {
       // Connected, a finished scan syncs once, as the Scan button's last step.
       let synced = 0;
       const realSync = OH.siteSync;
-      OH.siteSync = async () => {
+      OH.siteSync = async (opts) => {
         synced++;
+        opts?.onSend?.(); // the real one calls it just before the upload
         await wait(0);
         r.label = topBar.label;
         r.button = $('#scan-home').getAttribute('aria-label') || '';
@@ -1126,6 +1128,37 @@ try {
       r.calmScanButton = txt($('#scan-home'));
       $('#scan-report .sr-x')?.click();
       await wait();
+      // An RSI account this link hasn't synced: the scan report asks (a calm note with
+      // Sync It and Don't Sync), the answer goes to OH.siteSyncAnswer, and Sync It
+      // then syncs.
+      const answers = [];
+      let tries = 0;
+      OH.siteSyncAnswer = async (who, yes) => answers.push(`${who.handle}:${yes}`);
+      OH.siteSync = async () => {
+        tries++;
+        if (answers.at(-1) === 'Pilot_B:true') return realSync();
+        throw Object.assign(new Error('Sync Pilot_B to your openhangar.space account?'), {
+          calm: true,
+          ask: { handle: 'Pilot_B', record: null },
+        });
+      };
+      await runScan({ hangar: false, buybacks: false, referrals: false });
+      await wait(250);
+      r.askReport = $('#scan-report') && !$('#scan-report').hidden ? txt($('#scan-report')) : '';
+      r.askLook = !!$('#scan-report .sr-icon.calm') && !$('#scan-report #sr-send');
+      setScanning(''); // past the end-of-scan flash
+      await wait();
+      r.askScanButton = txt($('#scan-home'));
+      btnIn($('#scan-report'), "Don't Sync")?.click();
+      await wait(150);
+      r.askClosed = !$('#scan-report')?.checkVisibility() && !topBar.report;
+      await runScan({ hangar: false, buybacks: false, referrals: false });
+      await wait(250);
+      btnIn($('#scan-report'), 'Sync It')?.click();
+      await wait(250);
+      r.answers = answers.join(' ');
+      r.askTries = tries;
+      r.askSynced = !topBar.report;
       OH.siteSync = realSync;
       // Disconnect isn't in the Scan menu; it's in your portrait's menu, asked once.
       await openMenu();
@@ -1148,6 +1181,7 @@ try {
         siteLinkStart: keep.start,
         siteLinkWait: keep.wait,
         siteSync: keep.sync,
+        siteSyncAnswer: keep.answer,
         getSiteLink: keep.get,
         siteDisconnect: keep.off,
       });
@@ -1199,6 +1233,15 @@ try {
   sc.calmClosed &&
   /^Scan Done, Not Synced Yet/.test(sc.calmScan) &&
   /^Scan (All|Custom)$/.test(sc.calmScanButton) &&
+  /^New Pilot Aboard\s*Sync Pilot_B to your openhangar\.space account\?/.test(sc.askReport) &&
+  /Sync It Don't Sync/.test(sc.askReport) &&
+  /We'll remember your answer for Pilot_B\.$/.test(sc.askReport) &&
+  sc.askLook &&
+  /^Scan (All|Custom)$/.test(sc.askScanButton) &&
+  sc.askClosed &&
+  sc.answers === 'Pilot_B:false Pilot_B:true' &&
+  sc.askTries === 3 &&
+  sc.askSynced &&
   sc.noScanDisconnect &&
   sc.menuStays &&
   /Disconnect From openhangar\.space\?/.test(sc.ask) &&
@@ -1206,7 +1249,7 @@ try {
   sc.statusGone &&
   sc.hiddenAgain
     ? ok(
-        'website sync: connect on the card or the portrait menu (the code with Copy and its time left), then the Synced dot on the portrait (Synced line and Sync Now in its menu), the ▾ menu, a scan syncs as its last step, problems in the scan report (sync not open yet as a calm note), disconnect',
+        "website sync: connect on the card or the portrait menu (the code with Copy and its time left), then the Synced dot on the portrait (Synced line and Sync Now in its menu), the ▾ menu, a scan syncs as its last step, problems in the scan report (sync not open yet as a calm note), a new RSI account asks first (Sync It / Don't Sync), disconnect",
       )
     : fail(`website sync: ${JSON.stringify(sc)}`);
 
