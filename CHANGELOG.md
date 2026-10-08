@@ -12,7 +12,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   in and approve, and your hangar docks on your own openhangar.space account, there on
   any device. After that every scan syncs by itself, and Sync Now sits in your portrait
   menu. Nothing is sent until you connect, and Disconnect stops it. On Firefox, Firefox
-  asks you once before anything is shared.
+  asks you once before anything is shared. Share a browser with another pilot? A hangar
+  from an RSI account it hasn't synced waits until you say Sync It, and the people who
+  used your referral code but aren't recruits yet stay in your browser.
 - Changed: **A cleaner top bar.** Home, Inventory, Buy-Backs and Store sit in the bar,
   and Stats, Org Fleet and Referrals live under More (it lights up when you're on one).
   Search is an icon that opens the field over the links (or press /), Game Status shows
