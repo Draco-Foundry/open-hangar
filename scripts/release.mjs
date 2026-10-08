@@ -2,18 +2,23 @@
 //
 //   npm run release 0.2.12            cut the release and push it
 //   npm run release 0.2.12 --dry-run  show what would happen, change nothing
+//   npm run release 0.2.12 --hotfix   a second store update within 24 hours
 //
 // On main, with a clean tree: checks the version is newer and every Unreleased bullet
 // starts with New:, Improved:, Changed: or Fixed:; runs the tests; moves "## Unreleased"
 // in CHANGELOG.md under "## <version> — <today>"; bumps manifest.json and package.json;
-// commits, tags v<version> and pushes. The tag builds the GitHub Release; then run
-// Actions → Publish to stores (store: all), which also posts to Discord #updates.
+// commits, tags v<version> and pushes. The tag builds the GitHub Release, which then
+// starts Actions → Publish to stores (store: all) by itself: that waits for CI on the
+// release commit, then for your Approve on the 'stores' environment, uploads, and
+// posts to Discord #updates. --hotfix marks the tag so that run may be the second
+// store update today (the Hotfix box).
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 
 const args = process.argv.slice(2);
 const version = args.find((a) => !a.startsWith('--'));
 const dry = args.includes('--dry-run');
+const hotfix = args.includes('--hotfix');
 // With stdio: 'inherit' execSync returns null (the output went to the terminal).
 const run = (cmd, opts = {}) =>
   (execSync(cmd, { encoding: 'utf8', stdio: 'pipe', ...opts }) ?? '').trim();
@@ -23,7 +28,7 @@ const fail = (msg) => {
 };
 
 if (!version || !/^\d+\.\d+\.\d+$/.test(version))
-  fail('usage: npm run release <x.y.z> [--dry-run]');
+  fail('usage: npm run release <x.y.z> [--dry-run] [--hotfix]');
 
 // Where we are.
 const branch = run('git branch --show-current');
@@ -72,6 +77,10 @@ if (dry) {
   console.log('\nDry run: nothing changed. Without --dry-run this would:');
   console.log('  run the tests, update CHANGELOG.md / manifest.json / package.json,');
   console.log(`  commit "release: ${version}", tag v${version} and push both.`);
+  console.log('  Then GitHub builds the release and starts publishing to every store');
+  console.log(
+    `  (${hotfix ? 'as a hotfix: a second update today is allowed' : 'one store update a day'}).`,
+  );
   process.exit(0);
 }
 
@@ -90,7 +99,9 @@ for (const f of ['manifest.json', 'package.json']) {
 run('npx prettier --write CHANGELOG.md manifest.json package.json');
 run('git add CHANGELOG.md manifest.json package.json');
 run(`git commit -m "release: ${version}"`);
-run(`git tag -a v${version} -m "Open Hangar ${version}"`);
+// "[hotfix]" in the tag's message ticks the Hotfix box on the publish run that
+// release.yml starts (a second store update within 24 hours).
+run(`git tag -a v${version} -m "Open Hangar ${version}${hotfix ? ' [hotfix]' : ''}"`);
 // Pushes retry: a push can hit a one-off network hiccup (seen with 0.2.12).
 const push = (ref) => {
   for (let i = 1; ; i++) {
@@ -106,7 +117,9 @@ push('main');
 push(`v${version}`);
 console.log(`\n✔ Released v${version}. The GitHub Release is building now.`);
 console.log(`
-  Next, publish it to the stores:
+  Publishing to the stores starts by itself once the release is built
+  (store: all${hotfix ? ', hotfix' : ''}). It waits for CI on the release commit, then for you:
     1. Open https://github.com/Draco-Foundry/open-hangar/actions/workflows/publish.yml
-    2. Run workflow → Tag to publish: v${version} → Which store: all → Run workflow
-    (Leaving the tag empty does nothing: the form just closes.)`);
+    2. Open the run "Publish v${version} to all"
+    3. Review deployments → stores → Approve and deploy
+  Nothing started after ~5 minutes? Run that workflow by hand: tag v${version}, store: all.`);

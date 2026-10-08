@@ -86,10 +86,13 @@ request and markup in DevTools.
 
 1. Patch version bump in `manifest.json` and `package.json` (e.g. 0.2.8 → 0.2.9),
    and a CHANGELOG entry ("Fixed: scans after RSI's … change").
-2. Merge, then tag: `git tag v0.2.9 && git push origin v0.2.9`. The Release
-   workflow builds the zips and publishes the GitHub Release.
-3. Run **Actions → Publish to stores** with that tag and `store: all`, then
-   Approve the `stores` environment when the run asks. It uploads to Firefox, Edge
+2. Merge, then tag: `git tag v0.2.9 && git push origin v0.2.9` (or `npm run release`).
+   The Release workflow builds the zips, publishes the GitHub Release and starts
+   **Publish to stores** for the tag (`store: all`). If the stores already got an
+   update today, tag it as a hotfix instead:
+   `git tag -a v0.2.9 -m "Open Hangar 0.2.9 [hotfix]"` (or `npm run release 0.2.9 --hotfix`).
+3. Approve the `stores` environment when the Publish run asks (it first waits for
+   CI on the commit). It uploads to Firefox, Edge
    and Chrome and posts to Discord #updates. If Chrome is still reviewing the last
    version, rerun later with `store: chrome`. Small fixes for a change on RSI's side
    usually clear review quickly.

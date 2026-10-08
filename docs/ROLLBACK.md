@@ -31,7 +31,8 @@ Chrome and Edge only install a version **higher** than the one users have, so
    `manifest.json` and `package.json`, and add a CHANGELOG entry
    ("Fixed: undid 0.2.13's … while we fix it").
 3. Merge it to `main` through a PR (Publish only takes a commit that passed CI), tag
-   it and let the Release workflow build it, then run **Publish to stores**.
+   it and let the Release workflow build it: it starts **Publish to stores** for the
+   tag by itself. Approve the `stores` environment when the run asks.
 
 Per store:
 
@@ -48,8 +49,10 @@ Per store:
 
 Normally the stores get at most one update a day, and Publish to stores enforces it: a
 real run fails if another one sent something to the stores in the last 24 hours. If
-the rollback is worth a second update that day, tick **Hotfix: allow a second store
-update within 24h** when you run it. Finishing the same tag one store at a time (say
+the rollback is worth a second update that day, tag it as a hotfix
+(`git tag -a v0.2.14 -m "Open Hangar 0.2.14 [hotfix]"`, or `npm run release 0.2.14 --hotfix`):
+the run Release starts then has **Hotfix: allow a second store update within 24h**
+ticked. Running Publish by hand, tick the box yourself. Finishing the same tag one store at a time (say
 store: chrome after Chrome was still reviewing the last version) doesn't need the box.
 
 ## Staged Rollout (Chrome, Later)

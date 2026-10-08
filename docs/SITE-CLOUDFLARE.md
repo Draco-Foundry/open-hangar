@@ -54,10 +54,17 @@ back the A and AAAA records, and turn Pages back on.
 ## 4. Home Page From the Website (2026-10-02)
 
 openhangar.space's home page now comes from the website Worker (open-hangar-server), so it shows live
-store, patch and status data. `site-worker/src/index.js` hands only `/`, `/_astro/*`, `/fonts/*` and
-`/favicon.svg` to it through a service binding; every other path (`status.json`, `rates.json`, help,
-privacy) is still a plain file and never runs the script. The home page is cached at the edge for a
-minute. If the website Worker fails, the old `site/index.html` is served instead.
+store, patch and status data. `site-worker/src/index.js` hands it, through a service binding, `/`
+and the files it loads (`/_astro/*`, `/fonts/*`, `/favicon.svg`), `/extension`, the Store (`/store`,
+`/api/store/*`), the Ship Explorer (`/ships`, `/ships/*`), What's Next (`/whats-next`), Help
+(`/help`) and the extension's feeds (`run_worker_first` in `site-worker/wrangler.jsonc`). A path with
+no file in `site/` reaches the script too and is handed on the same way. Every file in `site/`
+(`status.json`, `rates.json`, `help.html`, `privacy.html`) is still a plain file and never runs the
+script. The home and extension pages are cached at the edge for a minute.
+
+If the website Worker fails: `/` and `/extension` get the old `site/index.html`, `/help` gets
+`site/help.html`, the Ship Explorer and What's Next answer a 503 with Retry-After, and the feeds a
+JSON 503.
 
 Staging copy, wired to staging.openhangar.space, on workers.dev only:
 `npx wrangler deploy --config site-worker/wrangler.jsonc --env staging`.
