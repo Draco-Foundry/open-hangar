@@ -33,7 +33,8 @@ Jump to: [The Plan](#the-plan-at-a-glance) · [What Launches](#what-launches-on-
   ([Release Notes](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.2.19))
 - **[openhangar.space](https://openhangar.space/)** is live with a Star Citizen news front
   page, the [Open Hangar Store](https://openhangar.space/store) and accounts. Sign-ups are
-  invite-only until launch, and sync is open to beta testers.
+  invite-only until launch, and sync is open to beta testers. Several Wave 1 features are
+  already built and stay switched off until launch.
 - **0.3.0** is built and in testing: the rebuilt extension with optional sync. It launches on
   Nov 10.
 
@@ -60,7 +61,7 @@ fills as its tasks are done:
 - [ ] **Oct 16, 2026:** [Wave 1: Core Hangar Manager](https://github.com/Draco-Foundry/open-hangar/milestone/6)
       built.
 - [ ] **Oct 16 to 19, 2026:** bug-fix days, with no new features. [#507](https://github.com/Draco-Foundry/open-hangar/issues/507)
-- [ ] **Oct 20 to 27, 2026:** a small beta with 5 to 10 testers from our Discord.
+- [ ] **Oct 20 to 27, 2026:** an invite-only beta with 5 to 10 testers, invites on our Discord.
       [#508](https://github.com/Draco-Foundry/open-hangar/issues/508)
 - [ ] **Oct 25, 2026:** [Wave 2: Your Hangar Meets the Store](https://github.com/Draco-Foundry/open-hangar/milestone/7)
       built and in testing.
@@ -79,9 +80,8 @@ fills as its tasks are done:
 - [ ] **[Early 2027](https://github.com/Draco-Foundry/open-hangar/milestone/11) and [Later in 2027](https://github.com/Draco-Foundry/open-hangar/milestone/12):**
       planned, not promised.
 
-A small beta runs Oct 20 to 27 with testers from the
-[Draco Foundry Discord](https://discord.gg/FF8Wm5HdnV), and spots are limited.
-[Beta Details](https://openhangar.space/beta)
+An invite-only beta runs Oct 20 to 27, with invites on the
+[Draco Foundry Discord](https://discord.gg/FF8Wm5HdnV). Spots are limited.
 
 ## What Launches on November 10
 
@@ -97,9 +97,10 @@ The heart of the website fleet manager.
 
 - **My Hangar: Tabs and Account Switcher:** the frame My Hangar lives in, with a tab for each
   part of your hangar, helpful pages when a tab is empty, and a switcher for your RSI
-  accounts. [#469](https://github.com/Draco-Foundry/open-hangar/issues/469)
-- **Site Navigation:** one clear menu across openhangar.space, on phone and desktop.
-  [#470](https://github.com/Draco-Foundry/open-hangar/issues/470)
+  accounts. Built, switched off until launch.
+  [#469](https://github.com/Draco-Foundry/open-hangar/issues/469)
+- **Site Navigation:** one clear menu across openhangar.space, on phone and desktop. Built,
+  switched off until launch. [#470](https://github.com/Draco-Foundry/open-hangar/issues/470)
 - **Ship Explorer:** a page for every ship, with its specs, store prices and news. Built,
   switched off until launch. [#471](https://github.com/Draco-Foundry/open-hangar/issues/471)
   Reading the specs straight from RSI is next. [#460](https://github.com/Draco-Foundry/open-hangar/issues/460)
@@ -116,15 +117,16 @@ The heart of the website fleet manager.
 - **What Is Open Hangar:** a short page on what Open Hangar is and how the extension and the
   website fit together. [#479](https://github.com/Draco-Foundry/open-hangar/issues/479)
 - **Help and FAQ:** answers to common questions, and help when a scan or sync goes wrong.
-  [#480](https://github.com/Draco-Foundry/open-hangar/issues/480)
-- **Settings and Badges:** your website settings and your badges in one place.
-  [#481](https://github.com/Draco-Foundry/open-hangar/issues/481)
+  Built, switched off until launch. [#480](https://github.com/Draco-Foundry/open-hangar/issues/480)
+- **Settings and Badges:** your website settings and your badges in one place. Built,
+  switched off until launch. [#481](https://github.com/Draco-Foundry/open-hangar/issues/481)
 - **Status Page:** whether the website, sync and store data are working right now.
   [#482](https://github.com/Draco-Foundry/open-hangar/issues/482)
 - **Store Freshness:** the store shows when its prices and listings were last checked. Built,
   switched off until launch. [#483](https://github.com/Draco-Foundry/open-hangar/issues/483)
 - **Store Highlights for Your Ships:** the store's What's New view highlights the new items
-  that match your hangar. [#484](https://github.com/Draco-Foundry/open-hangar/issues/484)
+  that match your hangar. Built, switched off until launch.
+  [#484](https://github.com/Draco-Foundry/open-hangar/issues/484)
 - **Open on Website Buttons:** buttons in the extension that open the same page on
   openhangar.space. [#485](https://github.com/Draco-Foundry/open-hangar/issues/485)
 - **Front Page Polish:** a cleaner top of the front page [#458](https://github.com/Draco-Foundry/open-hangar/issues/458),
@@ -175,8 +177,8 @@ Your own hangar, tied into the store and the news.
   leads with the newest story [#467](https://github.com/Draco-Foundry/open-hangar/issues/467).
 - **Org Fleet, Ships Only:** taking member values and comparisons out of the extension's Org
   Fleet page. [#466](https://github.com/Draco-Foundry/open-hangar/issues/466)
-- **Beta (Oct 20 to 27):** 5 to 10 Discord testers try 0.3.0 and the website together, sync
-  included. [#508](https://github.com/Draco-Foundry/open-hangar/issues/508)
+- **Beta (Oct 20 to 27):** 5 to 10 invited Discord testers try 0.3.0 and the website
+  together, sync included. [#508](https://github.com/Draco-Foundry/open-hangar/issues/508)
 - **One Sync Format for Both:** the extension and the website share one description of what
   a sync contains, if it's ready by Oct 27. [#441](https://github.com/Draco-Foundry/open-hangar/issues/441)
 - **Code Freeze and Final Check (Oct 27):** last extension changes in, then a go or no-go call
@@ -356,8 +358,8 @@ Newest first. Dates are UTC. Full notes for every version are on the
 
 ### October 2026
 
-- [x] **Oct 6 to 7 · Website:** the [Open Hangar Beta](https://openhangar.space/beta) page for
-      Discord testers, with what to test and how to install the test build.
+- [x] **Oct 6 to 7 · Website:** a sign-in page for beta pilots, ready for the invite-only beta.
+      Invites are on our [Discord](https://discord.gg/FF8Wm5HdnV).
 - [x] **Oct 6 to 7 · Website:** a fresh front page with today's top stories, Ships in the
       News, a Patch, Roadmap and Issues card, and each subscriber tier's Vehicle of the Month.
       ([Visit openhangar.space](https://openhangar.space/))

@@ -10,8 +10,8 @@
 
 Open Hangar comes in two parts that work together:
 
-- **The Extension** for Chrome, Edge and Firefox reads your own RSI account right in your
-  browser: every pledge, buy-back, balance and referral, made useful.
+- **The Extension** for Chrome, Edge and Firefox reads your own Star Citizen account on RSI's
+  website, right in your browser: every pledge, buy-back, balance and referral, made useful.
 - **The Website**, [openhangar.space](https://openhangar.space/), has Star Citizen news and
   store tools today. At the **November 10, 2026** launch it also becomes your fleet manager:
   My Hangar on any device, a store that knows what you own, and a page for every ship.
@@ -51,9 +51,8 @@ ends your RSI session.
 The website works in any browser, phone included, and from the Nov 10 launch that's where
 My Hangar lives.
 
-A small beta for 0.3.0 runs Oct 20 to 27 with testers from our
-[Discord](https://discord.gg/FF8Wm5HdnV), and spots are limited.
-[Beta Details](https://openhangar.space/beta)
+An invite-only beta for 0.3.0 runs Oct 20 to 27, with invites on our
+[Discord](https://discord.gg/FF8Wm5HdnV). Spots are limited.
 
 ## Where We're Headed
 
@@ -92,7 +91,7 @@ are 2026, in UTC. Each bar fills as its tasks are done:
       built. My Hangar on the website, a page for every ship, and store badges for what you
       own.
 - [ ] **Oct 16 to 19:** bug-fix days, with no new features.
-- [ ] **Oct 20 to 27:** a small beta with 5 to 10 testers from our Discord.
+- [ ] **Oct 20 to 27:** an invite-only beta with 5 to 10 testers, invites on our Discord.
 - [ ] **Oct 25:** [Wave 2: Your Hangar Meets the Store](https://github.com/Draco-Foundry/open-hangar/milestone/7)
       built and in testing.
 - [ ] **Oct 27:** last extension changes in, then a final check before the stores.
@@ -134,10 +133,10 @@ Anything after launch is a plan, not a promise. The details are in the
 - [x] **Oct 6 to 7, 2026 · Website:** a fresh front page with today's top stories, Ships in
       the News, a Patch, Roadmap and Issues card, and each subscriber tier's Vehicle of the
       Month.
-- [x] **Oct 6 to 7, 2026 · Website:** the [Open Hangar Beta](https://openhangar.space/beta)
-      page for Discord testers, with what to test and how to install the test build.
 - [x] **Oct 5, 2026 · 0.2.18 and 0.2.19:** Reclaim on an upgrade buy-back opens the right
       item, and the next buy-back token date keeps working past RSI's posted 2026 dates.
+- [x] **Oct 4, 2026 · Website:** one page to get Open Hangar, showing each store's current
+      version. ([Get the Extension](https://openhangar.space/extension))
 - [x] **Oct 4, 2026 · 0.2.17:** much faster rescans when nothing has changed, and full-size
       pictures.
 - [x] **Oct 3, 2026 · Website:** the [Open Hangar Store](https://openhangar.space/store) lists
@@ -195,8 +194,8 @@ Anything after launch is a plan, not a promise. The details are in the
 
 ## For Developers
 
-Open Hangar is also the data layer RSI doesn't offer. There's no public API, so Open Hangar
-handles the session and the page parsing and hands you clean records.
+RSI has no public API for your hangar, so the extension handles the session and the page
+parsing in your browser and turns your account into clean records you can browse and export.
 
 <details>
 <summary><strong>Build From Source</strong></summary>
