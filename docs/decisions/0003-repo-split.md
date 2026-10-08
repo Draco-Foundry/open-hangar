@@ -21,7 +21,7 @@ Reason not recorded. The commit says what moved, not why.
 
 - The extension's sync code stays here, marked with `@sync-start` / `@sync-end` (the
   `sync` build flag, in store builds from 0.3.0; see [0001](0001-local-first.md)).
-- Some files point at the private repo: docs/REDESIGN-0.3.md (the website plan),
-  `scripts/site-stars.mjs` and `src/quips.js` (copies kept in step with the website),
-  and `scripts/release.mjs` (the "private website plan").
+- Some files point at the private repo: `scripts/site-stars.mjs` and `src/quips.js`
+  (copies kept in step with the website), and `scripts/release.mjs` (the "private
+  website plan").
 - CI here no longer builds or deploys the website backend.

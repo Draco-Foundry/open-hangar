@@ -7,6 +7,8 @@
  *                      fictional demo account) and routes public RSI
  *                      ship-matrix lookups through the local proxy
  *   demo-after-lib.js  swaps the live account/referral calls for demo data
+ *   demo-clock.js      runs the page at a fixed date (2026-10-01 15:00 UTC), so
+ *                      date-dependent demo data never drifts (OH_DEMO_NOW)
  * Then drives your installed Chrome (puppeteer-core, no browser download) at
  * exactly 1280x800 and saves one JPEG per view into docs/store-assets/.
  *
@@ -62,10 +64,20 @@ function findChrome() {
   return hit;
 }
 
-// dashboard.html with the demo scripts injected around parser.js / lib.js.
+// The demo runs at a fixed moment (demo-clock.js) so its dates read the same every
+// day. OH_DEMO_NOW=2026-12-24T12:00:00Z picks another moment; OH_DEMO_NOW=real
+// uses the real clock.
+const DEMO_NOW = process.env.OH_DEMO_NOW || '';
+
+// dashboard.html with the demo scripts injected: the clock first in <head>, before
+// any page script, then the shims around parser.js / lib.js.
 function demoDashboard() {
+  const clock =
+    (DEMO_NOW ? `<script>window.__OH_DEMO_NOW = ${JSON.stringify(DEMO_NOW)};</script>\n    ` : '') +
+    '<script src="/__demo/demo-clock.js"></script>';
   return fs
     .readFileSync(path.join(SRC, 'dashboard.html'), 'utf8')
+    .replace('<head>', `<head>\n    ${clock}`)
     .replace(
       '<script src="scraper/parser.js"></script>',
       '<script src="/__demo/demo-shim.js"></script>\n    <script src="scraper/parser.js"></script>',

@@ -35,8 +35,12 @@ const fail = (msg) => {
 };
 const ok = (msg) => console.log(`  ✔ ${msg}`);
 
+// The demo server, always on the fixed demo clock (an OH_DEMO_NOW from the shell
+// is for npm run demo, not the test).
+const { OH_DEMO_NOW: _skip, ...serverEnv } = process.env;
 const server = spawn(process.execPath, [path.join(HERE, 'run.mjs'), '--serve'], {
   stdio: ['ignore', 'pipe', 'inherit'],
+  env: serverEnv,
 });
 await new Promise((resolve, reject) => {
   server.stdout.on('data', (d) => String(d).includes('serving only') && resolve());
@@ -50,6 +54,14 @@ const browser = await puppeteer.launch({
   defaultViewport: { width: 1280, height: 900 },
 });
 const page = await browser.newPage();
+// A fixed clock (2026-10-01 15:00 UTC, moving forward in real time) before any page
+// script runs, so date-dependent fixtures (buy-back token dates, events, patch-note
+// ages, "today") give the same result every day. run.mjs loads the same file first
+// in <head>; whichever runs first installs it.
+const CLOCK = fs.readFileSync(path.join(HERE, 'demo-clock.js'), 'utf8');
+await page.evaluateOnNewDocument(CLOCK);
+// And one time zone, so "today" is the same calendar day on every machine.
+await page.emulateTimezone('UTC');
 page.on('pageerror', (e) => fail(`page error: ${e.message}`));
 page.on('console', (m) => {
   // Network hiccups to public APIs aren't our bugs; script errors are.
