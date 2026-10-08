@@ -284,9 +284,11 @@ Each store still reviews every upload before it goes live.
 
 [openhangar.space](https://openhangar.space/) is the static site in `site/` (landing
 page, troubleshooting page `help.html`, privacy policy, `status.json`). It's served by Cloudflare as Workers static
-assets with no script: `site-worker/wrangler.jsonc` (worker `openhangar-site`, custom
+assets: `site-worker/wrangler.jsonc` (worker `openhangar-site`, custom
 domain `openhangar.space`). It moved off GitHub Pages on 2026-10-01
-(docs/SITE-CLOUDFLARE.md).
+(docs/SITE-CLOUDFLARE.md). A small script, `site-worker/src/index.js`, hands the home
+page and the website's public pages to the website Worker, with a fallback for each
+when it fails (docs/SITE-CLOUDFLARE.md section 4).
 
 `.github/workflows/pages.yml` deploys it with `wrangler` when `site/` (or a few shared
 files) change on `main`, and daily to refresh exchange rates. Before deploying it
