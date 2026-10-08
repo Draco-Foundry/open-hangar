@@ -3,6 +3,10 @@
   // total. Uses each pledge's melt value, the store credit you'd get back, so gifts
   // and rewards count as $0 and upgrades count what they added.
   import { app, version } from '../lib/app.svelte.js';
+  import { flag } from '../lib/flags.js';
+
+  // Builds with website sync say the pledges go once you connect (docs/FLAGS.md).
+  const sync = flag('sync');
 
   const d = $derived.by(() => {
     version.n;
@@ -75,6 +79,9 @@
     By pledge date, using each pledge's melt value (the store credit it would return), so gifts and
     rewards count as $0 and upgrades count only what they added.{d.undated
       ? ` ${d.undated} of pledges have no date.`
-      : ''} Stays on your PC like everything else.
+      : ''}
+    {sync
+      ? 'Stays in this browser unless you connect openhangar.space.'
+      : 'Stays on your PC like everything else.'}
   </p>
 {/if}
