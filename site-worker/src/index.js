@@ -10,8 +10,10 @@
 // extension's status.json kill switch, rates.json and the Troubleshooting page
 // (/help.html), is served straight from the static files as before.
 //
-// If the website Worker is down or errors, the old static home page is served
-// instead, so openhangar.space never goes blank.
+// If the website Worker is down or errors, openhangar.space never goes blank:
+// the home page and /extension get the old static home page (site/index.html),
+// /help the Troubleshooting page (site/help.html), the Ship Explorer and What's
+// Next a 503 that says try again, and the feeds a JSON 503.
 
 const HOME_TTL_S = 60; // the home and extension pages are cached at the edge for a minute
 // The extension's feeds. The website answers them itself (its own cache, ETag,
@@ -38,13 +40,12 @@ export default {
     // The website's newer pages (owner, 2026-10-08): the Ship Explorer, each
     // ship's page, What's Next and Help. Each is dark behind its own flag there,
     // and its 404 passes straight through until the owner switches it on. Never
-    // cached here: the website sets their cache headers itself.
-    const help = url.pathname === '/help';
+    // cached here: the website sets their cache headers itself. The website
+    // answers /help/ like /help, so a trailing slash gets the same fallback.
+    const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, '') : url.pathname;
+    const help = path === '/help';
     const newPage =
-      help ||
-      url.pathname === '/whats-next' ||
-      url.pathname === '/ships' ||
-      url.pathname.startsWith('/ships/');
+      help || path === '/whats-next' || path === '/ships' || path.startsWith('/ships/');
 
     // These pages are the same for every visitor (always signed out here), so
     // one copy a minute serves everyone. Only a plain GET is cached.
