@@ -26,7 +26,8 @@ name: Publish to stores
 # Chrome goes to 100% once approved: staged rollout needs 10,000+ users (ROLLBACK.md).
 # Dry run (the checkbox, and on every PR that touches publishing): everything but
 # the uploads and posts. A PR's dry run publishes the latest released tag with the
-# PR's tooling, exactly like a real run after the PR merges.
+# PR's tooling, exactly like a real run after the PR merges. The store-build check is
+# the exception: it's the tag's own, so CI's check:store is what tests a PR's copy.
 #
 # The tag's code is what gets built; the scripts that publish it (scripts/publish,
 # discord-post, notify) always come from this workflow's own commit, in .tools/,
@@ -64,7 +65,6 @@ on:
       - scripts/discord-post.mjs
       - scripts/notify.mjs
       - scripts/pack.mjs
-      - scripts/check-store-build.mjs
 
 permissions:
   contents: read
@@ -128,16 +128,19 @@ jobs:
       - run: npm run pack
       # A store package never carries a dev build's staging site, and its sync and build
       # flags are what the store gets. The tag's own check (as release.yml runs it): it
-      # reads the tag's src/flags.js, which .tools doesn't have. A tag from before the
-      # check (0.2.19 and older) has none, so there it's skipped.
+      # reads the tag's src/flags.js, which .tools doesn't have. Only a tag from before
+      # the check (0.2.19 and older) may lack it; any newer tag without it fails.
       - name: Check the zips are a store build
         env:
           REF: ${{ steps.ref.outputs.ref }}
+          V: ${{ steps.v.outputs.version }}
         run: |
           if [ -f scripts/check-store-build.mjs ]; then
             node scripts/check-store-build.mjs
-          else
+          elif [ -n "$V" ] && node -e "import('./.tools/scripts/publish/lib.mjs').then(m => process.exit(m.versionNewer(process.argv[1], '0.2.19') ? 1 : 0))" "$V"; then
             echo "::notice::$REF has no scripts/check-store-build.mjs (older than the check): skipped"
+          else
+            echo "::error::$REF has no scripts/check-store-build.mjs, so its zips can't be checked"; exit 1
           fi
       # Last before the uploads, so CI on the release commit runs alongside the
       # checks above instead of before them. Polls until it passes (or fails).
