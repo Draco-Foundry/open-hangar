@@ -6,14 +6,19 @@
 // 2026-10-06), mounted into the spots ui/topbar leaves for them. Its state and
 // actions are in src/dashboard.js (window.OHApp.site). Its script tag sits in a @sync
 // block: every store build loads it, and only a build with the `sync` flag off doesn't.
+// Inventory, Buy-Backs and Stats draw Open On Website under their titles once it's
+// handed to them here (ui/lib/site-ui.svelte.js); Home's is in the Citizen Card.
 import { mount } from 'svelte';
+import { siteUi } from '../lib/site-ui.svelte.js';
 import SiteConnect from './SiteConnect.svelte';
 import SyncStatus from './SyncStatus.svelte';
 import SyncMenu from './SyncMenu.svelte';
 import SyncLine from './SyncLine.svelte';
 import YouDisconnect from './YouDisconnect.svelte';
+import OpenOnWebsite from './OpenOnWebsite.svelte';
 
 if (window.OHApp && window.OHApp.site) {
+  siteUi.Open = OpenOnWebsite;
   const at = (sel) => document.querySelector(sel);
   const card = at('#view-home .citizen-card');
   if (card) mount(SiteConnect, { target: card });

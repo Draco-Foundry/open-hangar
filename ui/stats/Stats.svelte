@@ -4,6 +4,7 @@
   // Tab clicks go through the classic [data-stats-tab] handler (setStatsTab), which
   // remembers the tab and fires 'oh:home'.
   import { app, OH, version } from '../lib/app.svelte.js';
+  import { siteUi } from '../lib/site-ui.svelte.js';
   import Overview from './Overview.svelte';
   import Value from './Value.svelte';
   import Fleet from './Fleet.svelte';
@@ -44,6 +45,8 @@
   {#if d.empty}
     <div class="empty">{d.quip} Hit Scan at the top to fill it.</div>
   {:else}
+    <!-- Under the page's title, as on Inventory and Buy-Backs. -->
+    {#if siteUi.Open}<div class="stats-site"><siteUi.Open /></div>{/if}
     <div class="layout-toggle stats-tabs" role="tablist">
       {#each d.tabs as [key, label] (key)}
         <button

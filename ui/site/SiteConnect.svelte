@@ -2,11 +2,14 @@
   // Connect (the browser's sign-in window: Approve there and it closes by itself; or,
   // as a fallback, the code shown big to match the website tab). Once connected the
   // corner goes quiet: sync lives in the top bar's Scan button (SyncStatus,
-  // SyncMenu; owner, 2026-10-05). On Firefox a line under Connect says what we share,
-  // and Learn More (or Connect, until Firefox has said yes) opens FirefoxExplain.
-  // Hidden until the website is switched on (OH.siteEnabled).
+  // SyncMenu; owner, 2026-10-05), and the corner keeps only Open On Website, the same
+  // button as under the other pages' titles (OpenOnWebsite.svelte). On Firefox a line
+  // under Connect says what we share, and Learn More (or Connect, until Firefox has
+  // said yes) opens FirefoxExplain. Hidden until the website is switched on
+  // (OH.siteEnabled).
   import { app, version } from '../lib/app.svelte.js';
   import FirefoxExplain from './FirefoxExplain.svelte';
+  import OpenOnWebsite from './OpenOnWebsite.svelte';
 
   const d = $derived.by(() => {
     version.n;
@@ -134,4 +137,8 @@
   {#if explain}
     <FirefoxExplain opener={explain} onClose={() => (explain = null)} />
   {/if}
+{:else if d.enabled}
+  <div class="site-connect site-open-home" id="site-open-home">
+    <OpenOnWebsite offer={false} />
+  </div>
 {/if}

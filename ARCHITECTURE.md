@@ -315,7 +315,11 @@ data-sharing prompt is about (`FirefoxExplain.svelte`). Once connected, sync liv
 the top bar's Scan button, mounted into spots `ui/topbar` leaves empty: a status beside
 it, an openhangar.space section in its ▾ menu (Sync Now, Open My Hangar, Disconnect),
 "Syncing to Website…" as every scan's last step, and a refused sync in the scan
-report. Its state and actions are `site`
+report. The pages with a website twin link there (`OpenOnWebsite.svelte`): Open On
+Website (the website's My Hangar) under the title of Inventory, Buy-Backs and Stats and
+in the Citizen Card's corner once connected, See It on Any Device (Connect) before that.
+`ui/site/main.js` hands the component to the pages through `ui/lib/site-ui.svelte.js`,
+so a build without sync shows none. Its state and actions are `site`
 in `src/dashboard.js`, behind `window.OHApp.site`. The `identity` permission is in
 `manifest.json`, so every build has it. Syncs go to `/api/v1/sync`. Connect from the
 website: the website's `/link` page asks the extension through
