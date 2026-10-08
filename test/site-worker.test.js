@@ -166,3 +166,25 @@ test('run_worker_first names the new pages and never shadows a static file', () 
     }
   }
 });
+
+// The website's pages this Worker hands it that are open to everyone. The Ship
+// Explorer, What's Next and Help are in run_worker_first too but still answer 404
+// while their flags are off; each joins this list, and the sitemap, once it's on.
+const LIVE_WEBSITE_PAGES = ['/', '/extension', '/store'];
+
+test('the sitemap lists only pages openhangar.space serves, the Store among them', () => {
+  const xml = fs.readFileSync(path.join(SITE_DIR, 'sitemap.xml'), 'utf8');
+  const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  for (const page of LIVE_WEBSITE_PAGES) {
+    assert.ok(locs.includes(`https://openhangar.space${page}`), `${page} is in the sitemap`);
+  }
+  // Each one is a file in site/ or a live page this Worker hands to the website.
+  const patterns = runWorkerFirst();
+  for (const loc of locs) {
+    const url = new URL(loc);
+    assert.equal(url.origin, 'https://openhangar.space', loc);
+    const file = fs.statSync(path.join(SITE_DIR, url.pathname), { throwIfNoEntry: false });
+    const live = LIVE_WEBSITE_PAGES.includes(url.pathname) && patterns.includes(url.pathname);
+    assert.ok(live || Boolean(file?.isFile()), `${loc} is served here`);
+  }
+});
