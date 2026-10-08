@@ -7,7 +7,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 let mem = {};
-let sent = []; // bodies POSTed to /api/sync
+let sent = []; // bodies POSTed to /api/v1/sync
+let calls = []; // every request: "METHOD url"
 let answer = () => new Response(JSON.stringify({ ok: true, synced_at: 123 }), { status: 200 });
 global.window = globalThis;
 global.chrome = {
@@ -26,7 +27,8 @@ global.chrome = {
   runtime: { getManifest: () => ({ version: '0.0.0' }) },
 };
 global.fetch = async (url, init) => {
-  if (String(url).endsWith('/api/sync') && init?.method === 'POST') {
+  calls.push(`${init?.method || 'GET'} ${url}`);
+  if (String(url).endsWith('/api/v1/sync') && init?.method === 'POST') {
     sent.push(JSON.parse(init.body));
     return answer();
   }
@@ -98,6 +100,25 @@ test('sync not open yet: a calm note with the date, and the link stays', async (
   assert.equal(mem.siteLink.lastSync, undefined);
 });
 
+test("sync not open yet: the website's own words win, so a new date needs no store update", async () => {
+  const moved = await refusedWith(403, {
+    error: 'Sync opens November 17. Your hangar stays safe in your browser until then.',
+    reason: 'not-open',
+  });
+  assert.equal(
+    moved.message,
+    'Sync opens November 17. Your hangar stays safe in your browser until then.',
+  );
+  assert.equal(moved.calm, true);
+  // No words, markup or a wall of text: the built-in sentence instead.
+  const fallback = 'Sync opens November 10. Your hangar stays safe in your browser until then.';
+  for (const error of [undefined, '', '  ', '<b>closed</b>', 'x'.repeat(201), 42]) {
+    const err = await refusedWith(403, { error, reason: 'not-open' });
+    assert.equal(err.message, fallback);
+    assert.equal(err.calm, true);
+  }
+});
+
 test('an extension too old to sync is told to update', async () => {
   const err = await refusedWith(426, { error: 'too old', reason: 'old-format' });
   assert.equal(
@@ -146,4 +167,17 @@ test('disconnected on the website: forgets the link', async () => {
   const err = await refusedWith(401, { error: 'not connected' });
   assert.match(err.message, /disconnected on the website/);
   assert.equal(mem.siteLink, undefined);
+});
+
+test('sync and disconnect use the versioned /api/v1/sync', async () => {
+  linked(scanned(Date.now() - 60_000));
+  answer = () => new Response(JSON.stringify({ ok: true, synced_at: 456 }), { status: 200 });
+  calls = [];
+  await OH.siteSync();
+  await OH.siteDisconnect();
+  assert.deepEqual(calls, [
+    'POST https://staging.example/api/v1/sync',
+    'DELETE https://staging.example/api/v1/sync',
+  ]);
+  assert.equal(mem.siteLink, undefined, 'forgotten after disconnect');
 });

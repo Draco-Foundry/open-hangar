@@ -4,6 +4,7 @@
   // page as it looked (no signed-off redesign yet), reusing the dashboard's classes.
   // Always drawn, even while another page shows: other pages use its buttons.
   import { app } from '../lib/app.svelte.js';
+  import { flag } from '../lib/flags.js';
   import ExtLink from './ExtLink.svelte';
   import DataTools from './DataTools.svelte';
   import StorageUse from './StorageUse.svelte';
@@ -12,6 +13,8 @@
   import Supporters from './Supporters.svelte';
 
   const links = app().dev.links;
+  // Builds with website sync say what it sends; the rest stay local-only (docs/FLAGS.md).
+  const sync = flag('sync');
 
   // Kept as strings: Svelte would read the braces in the markup as expressions.
   const MODEL = `{ id, name, value, currency,
@@ -55,23 +58,24 @@
     <span id="dev-links"
       >{#each links as [url, label] (label)}<ExtLink {url} {label} />{/each}</span
     >
-    <a href="https://api.star-citizen.wiki" target="_blank" rel="noopener">star-citizen.wiki API</a>
-    <a href="https://docs.star-citizen.wiki" target="_blank" rel="noopener">API Docs</a>
+    <a href="https://openhangar.space" target="_blank" rel="noopener">openhangar.space</a>
     <a href="{RSI}/tos" target="_blank" rel="noopener">RSI Terms of Service</a>
   </aside>
   <p>
     Open Hangar is built as a <strong>data tool</strong>: it reads a user's own Star Citizen
-    account and organizes it into a clean, structured, local database that other tools and sites
-    can build on. Source available and auditable.
+    account and organizes it into clean, structured data, kept in this browser{sync
+      ? ' and, once connected, synced to their account on openhangar.space, the free Star Citizen fleet manager'
+      : ''}. Source available and auditable.
   </p>
 
   <h3>How It Pulls Data</h3>
   <p>
     RSI uses cookie-based session auth. The extension holds host permission for
     <code>robertsspaceindustries.com</code>, so its own <code>fetch</code> requests carry the
-    user's existing session cookie (no password, no RSI tab, no server). Server-rendered pages
-    (the hangar) are fetched and parsed locally; nothing is sent anywhere. The fragile bit (RSI's
-    markup) is isolated in <code>parser.js</code>.
+    user's existing session cookie (no password, no RSI tab). Server-rendered pages (the hangar)
+    are fetched and parsed locally; nothing is sent anywhere{sync
+      ? ' unless the user connects sync to openhangar.space'
+      : ''}. The fragile bit (RSI's markup) is isolated in <code>parser.js</code>.
   </p>
 
   <h3>The Data Model</h3>
@@ -81,8 +85,8 @@
     The <strong>hangar</strong>, <strong>buy-backs</strong>,
     <strong>account identity + balances</strong> (handle, org, rank, Store Credit, UEC, REC, read
     from the dashboard's embedded JSON and the public citizen dossier), and
-    <strong>referrals</strong> (code + recruits/prospects via RSI's GraphQL API) are live; the
-    <strong>store catalog</strong> is planned.
+    <strong>referrals</strong> (code + recruits/prospects via RSI's GraphQL API) are read live
+    from RSI; the <strong>store catalog</strong> comes from openhangar.space's public feed.
   </p>
 
   <h3>The Export File</h3>
@@ -99,12 +103,7 @@
     back it up or feed it into your own project; import restores a previous export. Import
     restores the <code>sources</code> (holdings) and merges the scan
     <code>history</code> with what's already here; the <code>account</code> block is a read-only
-    snapshot for consumers (the Citizen Card always reflects the live RSI session). Still on the
-    roadmap: an opt-in way for sites you approve to ask the extension for your data directly,
-    instead of exporting a file by hand. It would be limited to a short list of domains you trust,
-    using the browser's
-    <code>externally_connectable</code> messaging channel (note this isn't supported identically
-    across Chrome, Firefox, and Safari).
+    snapshot for consumers (the Citizen Card always reflects the live RSI session).
   </p>
   <DataTools />
   <StorageUse />
@@ -162,17 +161,17 @@
       JSON
     </li>
     <li>
-      <strong>Store catalog &amp; prices</strong> (planned):
+      <strong>Store catalog &amp; prices</strong> (live): openhangar.space's public feed, the
+      website's read of the
       <a href="{RSI}/pledge" target="_blank" rel="noopener">RSI Pledge Store</a>
-      ·
-      <a href="{RSI}/ship-matrix" target="_blank" rel="noopener">Ship Matrix</a>
     </li>
     <li>
-      <strong>Game version &amp; ship data</strong>:
-      <a href="https://api.star-citizen.wiki" target="_blank" rel="noopener"
-        >star-citizen.wiki API</a
-      >
-      · <a href="https://docs.star-citizen.wiki" target="_blank" rel="noopener">API Docs</a>
+      <strong>Game version &amp; ship data</strong>: openhangar.space's public feeds, the same for
+      everyone&nbsp;· ship pictures from RSI's
+      <a href="{RSI}/ship-matrix" target="_blank" rel="noopener">Ship Matrix</a> first&nbsp;· the
+      ship list, stats, standalone store prices and some ship pictures from the
+      <a href="https://api.star-citizen.wiki" target="_blank" rel="noopener">Star Citizen Wiki</a>
+      community, with thanks
     </li>
     <li>
       <strong>RSI Terms of Service</strong>:

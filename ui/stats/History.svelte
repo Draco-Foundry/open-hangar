@@ -1,8 +1,13 @@
 <script>
   // Stats → History: account value over time (one point per scan, on the same rules
   // as Home's Account Value), a log of what changed per scan, and a backup button
-  // (scans and history live only in this browser).
+  // (scans and history live in this browser; the website keeps the latest synced
+  // hangar, but its file has no history, so this backup is the way to restore it).
   import { app, OH, version } from '../lib/app.svelte.js';
+  import { flag } from '../lib/flags.js';
+
+  // Builds with website sync mention what the website keeps (docs/FLAGS.md).
+  const sync = flag('sync');
 
   const W = 560,
     H = 150,
@@ -119,9 +124,10 @@
 <div class="backup-row">
   <button class="mk-btn" type="button" data-backup>Download Backup</button>
   <span class="muted"
-    ><span class={d.backup.stale ? 'stale' : undefined}>{d.backup.text}</span> · Your scans and
-    this history live only in this browser. Uninstalling the extension or moving to another browser loses
-    them. Keep the file somewhere safe (a Drive or OneDrive folder works) and restore it with
+    ><span class={d.backup.stale ? 'stale' : undefined}>{d.backup.text}</span> · {sync
+      ? 'Your scans and this history live in this browser. Once you connect, openhangar.space keeps your latest hangar too, but uninstalling the extension or moving to another browser loses the history here.'
+      : 'Your scans and this history live only in this browser. Uninstalling the extension or moving to another browser loses them.'}
+    Keep the file somewhere safe (a Drive or OneDrive folder works) and restore it with
     Developers → Import JSON.</span
   >
 </div>

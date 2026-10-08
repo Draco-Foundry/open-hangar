@@ -300,9 +300,11 @@ timeout, and a site that timed out or answered 429/5xx is skipped for 10 minutes
 (`netDown`). Callers fall back to their cached copy.
 
 Code for the optional sync to app.openhangar.space sits between `@sync-start` and
-`@sync-end` markers in `src/lib.js`, `src/dashboard.js` and `src/dashboard.html`. It is
-off unless a developer sets the `siteUrl` key, and `scripts/pack.mjs` cuts it out of
-store builds (see [Build and Packaging](#build-and-packaging)). Its screens are in
+`@sync-end` markers in `src/lib.js`, `src/dashboard.js`, `src/background.js` and
+`src/dashboard.html`: the `sync` build flag's, on in every store build from 0.3.0
+(see [Build and Packaging](#build-and-packaging)). `scripts/pack.mjs` writes production
+into `SITE_BUILT_IN`; a developer's `siteUrl` key points a copy elsewhere. Nothing is
+sent until you connect. Its screens are in
 `ui/site` (built into `src/ui/site.js`, whose script tag is itself inside a sync block).
 Before you connect, the Connect card in the Citizen Card's corner: Connect (the
 browser's sign-in window, `identity.launchWebAuthFlow`, opens the website's `/connect`;
@@ -314,11 +316,12 @@ the top bar's Scan button, mounted into spots `ui/topbar` leaves empty: a status
 it, an openhangar.space section in its ▾ menu (Sync Now, Open My Hangar, Disconnect),
 "Syncing to Website…" as every scan's last step, and a refused sync in the scan
 report. Its state and actions are `site`
-in `src/dashboard.js`, behind `window.OHApp.site`. The `identity` permission is added by
-`scripts/pack.mjs` only to builds that keep sync (`OH_SYNC=1`). Connect from the
-website (Chrome and Edge): the website's `/link` page asks the extension through
-`externally_connectable` (also only in sync builds, our two site origins) for a PKCE
-challenge, gets a one-time code from `/api/link/approve`, and hands it back;
+in `src/dashboard.js`, behind `window.OHApp.site`. The `identity` permission is in
+`manifest.json`, so every build has it. Syncs go to `/api/v1/sync`. Connect from the
+website: the website's `/link` page asks the extension through
+`externally_connectable` (Chrome and Edge; our two site origins) or Firefox's
+`src/site-bridge.js` for a PKCE challenge, gets a one-time code from
+`/api/link/approve`, and hands it back;
 `src/background.js` (its sync block) trades it for the token, saves `siteLink` and
 `siteUrl`, and opens the dashboard, which runs "Sync My Hangar Now"
 (`siteSyncRequested`).
@@ -348,14 +351,17 @@ When RSI changes a page, every installed copy breaks until a fix clears store re
   - `dist/chrome`: `manifest.json` as is. The same zip goes to Chrome and Edge.
   - `dist/firefox`: adds `background.scripts` (Firefox MV3 runs an event page) and
     `browser_specific_settings.gecko` (add-on id `open-hangar@draco-foundry`, minimum
-    Firefox 140, and `data_collection_permissions: none`).
-- Unless `OH_SYNC=1`, it removes `@sync-start` to `@sync-end` blocks and fails the
-  build if `app.openhangar.space` is still mentioned anywhere in `dist/*/src`.
+    Firefox 140, and `data_collection_permissions`: none required, what sync sends
+    optional).
+- With the `sync` flag on (every store build) it keeps the `@sync-start` to
+  `@sync-end` blocks and writes production into `SITE_BUILT_IN`. A developer's
+  `--flag sync=off` build cuts them and fails if `app.openhangar.space` is still
+  mentioned anywhere in `dist/*/src`.
 - **Build flags** ([docs/FLAGS.md](docs/FLAGS.md)): `src/flags.js` is the one registry
   of flags, each with a one-line description and its default. `scripts/pack.mjs`
   writes each build's values into its copy of `src/flags.js` (store builds: the
-  defaults; `--beta`: the beta set; `--sync` / `OH_SYNC=1`: `sync` on; developers:
-  `--flag name=on`) and cuts `@flag-start name` to `@flag-end name` blocks of every
+  defaults; `--beta`: the beta set; developers: `--flag name=on` or `=off`) and cuts
+  `@flag-start name` to `@flag-end name` blocks of every
   flag that's off (`@sync-start` / `@sync-end` are the `sync` flag's). Pages, the
   background worker and the Svelte pages read `OH.flags`. Flags are build-time only:
   no remote config, ever (store policy). Website features are switched by the
@@ -374,9 +380,16 @@ When RSI changes a page, every installed copy breaks until a fix clears store re
   account (`scripts/screenshots/run.mjs --serve` on port 8323; `demo-shim.js` stubs
   `chrome.*`), drives your installed Chrome with `puppeteer-core`, and fails on page
   errors, empty views and misaligned List-view rows.
+- **Privacy check:** `npm run test:privacy` (after `npm run pack`) loads the built
+  Chrome store extension in Chrome as someone who never connected, presses Scan and
+  opens every page, with every request answered locally. It fails on any request to the
+  sync site (app.openhangar.space), anything but a plain GET of openhangar.space's
+  public feeds, or a host other than RSI and openhangar.space
+  (`scripts/privacy-check.mjs`).
 - **CI** (`.github/workflows/ci.yml`), on every push and PR: `npm ci`, `npm test`,
   `npm run format:check`, `npm run test:ui`, `npm run pack`, `web-ext lint` on the
-  Firefox build, and `scripts/actionlint.sh` on the workflow files.
+  Firefox build, the store check and the privacy check, and `scripts/actionlint.sh` on
+  the workflow files.
 - **RSI canary** (`.github/workflows/canary.yml`): once a day, `scripts/canary.mjs`
   runs the real parsers on RSI's public pages and tells #ops if one broke. It can't
   see signed-in pages.

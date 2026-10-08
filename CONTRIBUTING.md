@@ -121,11 +121,12 @@ You can unit-test `parser.js` in isolation by feeding it saved sample payloads
 (scrub anything personal first). Capturing a real response from DevTools and
 saving it as a fixture is the fastest feedback loop.
 
-**Sync to app.openhangar.space** isn't launched, so `npm run build` cuts its code
-(everything between `@sync-start` and `@sync-end` markers) out of store builds, and
-fails if `app.openhangar.space` is left anywhere in them. To test sync locally, build
-with `OH_SYNC=1 npm run build` and set the `siteUrl` storage key to your local site.
-Mark any new sync code the same way.
+**Sync to app.openhangar.space** is in every store build from 0.3.0, built in to
+production, and opt-in: nothing is sent until you connect. Its code sits between
+`@sync-start` and `@sync-end` markers (the `sync` build flag, docs/FLAGS.md); mark any
+new sync code the same way. To test sync locally, set the `siteUrl` storage key to your
+local site, or build one pointed at it with `npm run build -- --site=<url>`
+(`npm run build:staging` for the staging site).
 
 ## Firefox Notes
 
