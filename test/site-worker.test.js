@@ -166,3 +166,20 @@ test('run_worker_first names the new pages and never shadows a static file', () 
     }
   }
 });
+
+test('the sitemap lists only pages openhangar.space serves, the Store among them', () => {
+  const xml = fs.readFileSync(path.join(SITE_DIR, 'sitemap.xml'), 'utf8');
+  const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  for (const page of ['/', '/extension', '/store']) {
+    assert.ok(locs.includes(`https://openhangar.space${page}`), `${page} is in the sitemap`);
+  }
+  // Each one is a file in site/ or a page this Worker hands to the website.
+  const patterns = runWorkerFirst();
+  for (const loc of locs) {
+    const url = new URL(loc);
+    assert.equal(url.origin, 'https://openhangar.space', loc);
+    const file = fs.statSync(path.join(SITE_DIR, url.pathname), { throwIfNoEntry: false });
+    const served = patterns.includes(url.pathname) || Boolean(file?.isFile());
+    assert.ok(served, `${loc} is served here`);
+  }
+});
