@@ -19,7 +19,7 @@ The static Troubleshooting page at `/help.html` keeps working exactly as it is.
      `/help.html`), the most useful thing to show someone looking for help.
    - The Ship Explorer and What's Next get a short "try again" 503 with Retry-After,
      so a passing outage never looks like a missing page.
-   No edge caching for these pages here; the website sets its own cache headers.
+     No edge caching for these pages here; the website sets its own cache headers.
 3. Check locally with `wrangler dev` (no website bound, so every forward fails):
    `/help.html` is still the static file, `/help` falls back to Troubleshooting,
    `/ships`, `/ships/<name>` and `/whats-next` answer 503, `/` still falls back home.

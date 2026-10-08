@@ -1,12 +1,14 @@
 // openhangar.space: the static site in ../site, except the home page, which the
 // website Worker (open-hangar-server, app.openhangar.space) renders with live
 // Star Citizen data, the extension page (/extension), the Store (/store and the
-// data it loads, /api/store/*) and the public feeds the extension reads
+// data it loads, /api/store/*), the Ship Explorer (/ships, /ships/<ship>), What's
+// Next (/whats-next), Help (/help) and the public feeds the extension reads
 // (/api/game-status, /api/ships, /api/catalog, /api/referral-events,
 // /api/known-issues): the extension only talks to RSI and this site.
-// Only the paths below reach this script (run_worker_first in
-// wrangler.jsonc); everything else, including the extension's status.json kill
-// switch and rates.json, is served straight from the static files as before.
+// The paths below reach this script first (run_worker_first in wrangler.jsonc),
+// and so does any path with no file in ../site. Every file there, including the
+// extension's status.json kill switch, rates.json and the Troubleshooting page
+// (/help.html), is served straight from the static files as before.
 //
 // If the website Worker is down or errors, the old static home page is served
 // instead, so openhangar.space never goes blank.
@@ -33,6 +35,16 @@ export default {
     const extension = url.pathname === '/extension';
     const page = home || extension;
     const feed = FEEDS.has(url.pathname);
+    // The website's newer pages (owner, 2026-10-08): the Ship Explorer, each
+    // ship's page, What's Next and Help. Each is dark behind its own flag there,
+    // and its 404 passes straight through until the owner switches it on. Never
+    // cached here: the website sets their cache headers itself.
+    const help = url.pathname === '/help';
+    const newPage =
+      help ||
+      url.pathname === '/whats-next' ||
+      url.pathname === '/ships' ||
+      url.pathname.startsWith('/ships/');
 
     // These pages are the same for every visitor (always signed out here), so
     // one copy a minute serves everyone. Only a plain GET is cached.
@@ -51,7 +63,22 @@ export default {
     }
     // Also the static page if the website doesn't have /extension (yet).
     if (page && (!res || res.status >= 500 || (extension && res.status === 404))) {
-      return staticHome(request, env);
+      return staticPage('/index.html', request, env);
+    }
+    // If the website can't answer, never the old home page at these addresses.
+    // Help still helps: the static Troubleshooting page (its canonical stays
+    // /help.html). The others say try again, as a 503 so a passing outage never
+    // reads as a missing page.
+    if (newPage && (!res || res.status >= 500)) {
+      if (help) return staticPage('/help.html', request, env);
+      return new Response('Lost the signal. Try again in a moment.', {
+        status: 503,
+        headers: {
+          'content-type': 'text/plain; charset=utf-8',
+          'cache-control': 'no-store',
+          'retry-after': '60',
+        },
+      });
     }
     // A feed answers in JSON even when the website can't, so the extension keeps
     // its saved copy and tries again later. The caller's Origin is echoed so the
@@ -81,7 +108,8 @@ export default {
   },
 };
 
-// The old static landing page (site/index.html), as a fallback.
-function staticHome(request, env) {
-  return env.ASSETS.fetch(new Request(new URL('/index.html', request.url), request));
+// A page from the static site, as a fallback: the old landing page
+// (site/index.html) or the Troubleshooting page (site/help.html).
+function staticPage(path, request, env) {
+  return env.ASSETS.fetch(new Request(new URL(path, request.url), request));
 }
