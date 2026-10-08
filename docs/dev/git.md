@@ -30,5 +30,5 @@ release checks those prefixes.
 ## Releases
 
 Owner only, one store update a day at most. `npm run release <version>` moves
-Unreleased under the version, bumps it, tags it; the owner then runs Publish to stores.
-Nothing automated ever publishes.
+Unreleased under the version, bumps it, tags it; the tag starts Publish to stores, which
+uploads nothing until the owner approves it (the `stores` environment).
