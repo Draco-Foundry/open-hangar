@@ -25,6 +25,12 @@ body {
     sans-serif;
   background: transparent;
   color: var(--text);
+  /* No word left alone on a line: pretty body text, balanced headings. */
+  text-wrap: pretty;
+}
+h1,
+h2 {
+  text-wrap: balance;
 }
 a {
   color: var(--link);
@@ -60,6 +66,15 @@ h1 {
   margin: 12px auto 32px;
   font-size: 1.125rem;
   color: #c9d1d9;
+}
+/* The one-line pitch, on its own line above the rest. */
+.tagline .lead {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text);
+  font-size: 1.25rem;
+  font-weight: 600;
+  text-wrap: balance;
 }
 
 /* Three cards side by side, or one per row on phones: never one left alone. */
@@ -434,7 +449,7 @@ footer {
   right: 20px;
   bottom: 20px;
   z-index: 50;
-  width: min(340px, calc(100vw - 32px));
+  width: 340px;
   padding: 18px 20px;
   border: 1px solid rgba(47, 129, 247, 0.55);
   border-radius: 14px;
@@ -493,4 +508,18 @@ footer {
 }
 .beta-link:hover {
   background: var(--accent-hover);
+}
+/* Phones, and short landscape screens: in the page flow under the hero instead of
+   floating over it, so it never covers the install buttons or the tour. */
+@media (max-width: 640px), (max-height: 500px) {
+  .beta-note {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    z-index: auto;
+    width: min(560px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 16px 18px;
+    box-shadow: none;
+  }
 }
