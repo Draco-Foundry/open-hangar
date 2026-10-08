@@ -1583,6 +1583,12 @@
       }
       if (res.status >= 500) {
         const msg = `RSI responded ${res.status}`;
+        // Buy-back details: a 5xx that comes with a Retry-After (seconds or a date)
+        // ends the page at once, for the batch to hold off until then rather than
+        // retry sooner (OH.fetchBuybackDetails). Scans keep their capped retries.
+        if (!retryRateLimit && OH.retryAfterMs(retryAfter)) {
+          return { error: msg, transient: true, retryAfter };
+        }
         if (++errors > RETRIES) return { error: msg, transient: true, retryAfter };
         retry = {
           msg,
@@ -3382,20 +3388,22 @@
   // row (OH.bbdCooldown: 15 minutes, 30, an hour… up to 6 hours; a batch that reads
   // a page and ends without one starts it over). A page that fails for a passing
   // reason (5xx or no network, after fetchPage's own retries) doubles the next pause;
-  // three in a row stop the batch, and one RSI answers with a Retry-After holds
-  // batches off until then. What was read is kept. onProgress(done, total); stop by
-  // returning false from shouldGo(). → { done, errors, total, rateLimited?, retryAt? }.
+  // three in a row stop the batch. A 5xx with a Retry-After stops it at once and holds
+  // batches off until then (`busy`). What was read is kept. onProgress(done, total);
+  // stop by returning false from shouldGo().
+  // → { done, errors, total, rateLimited?, retryAt?, held?, busy? } (held: still held
+  // off from an earlier batch, so RSI wasn't asked at all).
   const BBD_PAUSE_MS = 1000;
-  const BBD_MAX_PAUSE_MS = 30e3;
   const BBD_MAX_FAILS = 3;
   const BBD_COOLDOWN_MS = 15 * 60e3;
   const BBD_MAX_COOLDOWN_MS = 6 * 3600e3;
   const BBD_SLOW_KEY = 'bbdSlowDownUntil';
   const BBD_STRIKES_KEY = 'bbdSlowDowns'; // slow-downs in a row
   // The pause after a page: 1 to 2 s at random (never a fixed beat), doubled for
-  // each failed page in a row, 30 s at most. Pure (`rand` for tests).
+  // each failed page in a row (2 to 4 s after one, 4 to 8 s after two; a third stops
+  // the batch). Pure (`rand` for tests).
   OH.bbdPause = function bbdPause(fails = 0, rand = Math.random) {
-    return Math.min(BBD_PAUSE_MS * (1 + rand()) * 2 ** fails, BBD_MAX_PAUSE_MS);
+    return BBD_PAUSE_MS * (1 + rand()) * 2 ** fails;
   };
   // How long batches are held off after the `strikes`-th slow-down in a row: the
   // longer of the cooldown (15 minutes, doubling, 6 hours at most) and RSI's
@@ -3414,13 +3422,14 @@
     const { [BBD_SLOW_KEY]: until = 0, [BBD_STRIKES_KEY]: before = 0 } =
       await chrome.storage.local.get([BBD_SLOW_KEY, BBD_STRIKES_KEY]);
     if (until > Date.now()) {
-      return { done: 0, errors: 0, total: todo.length, rateLimited: true, retryAt: until };
+      const held = { rateLimited: true, retryAt: until, held: true };
+      return { done: 0, errors: 0, total: todo.length, ...held };
     }
     let done = 0;
     let errors = 0;
     let read = 0; // pages read fine
     let fails = 0; // pages in a row that failed for a passing reason
-    for (const id of todo) {
+    for (const [i, id] of todo.entries()) {
       if (!shouldGo()) break;
       const r = await OH.fetchBuybackDetail(id);
       const after = r.transient ? OH.retryAfterMs(r.retryAfter) : 0;
@@ -3432,7 +3441,8 @@
         await chrome.storage.local.set({ [BBD_SLOW_KEY]: retryAt, [BBD_STRIKES_KEY]: strikes });
         const why = r.rateLimited ? 'RSI asked us to slow down' : `${r.error}, with a Retry-After`;
         OH.log('warn', 'buybacks', `details stopped after ${done} pages: ${why}`);
-        return { done, errors, total: todo.length, rateLimited: true, retryAt };
+        const busy = r.rateLimited ? {} : { busy: true }; // RSI failing, not a slow-down
+        return { done, errors, total: todo.length, rateLimited: true, retryAt, ...busy };
       }
       if (r.error) {
         errors++;
@@ -3445,7 +3455,8 @@
         OH.log('warn', 'buybacks', `details stopped after ${done} pages: RSI kept failing`);
         break;
       }
-      await sleep(OH.bbdPause(fails));
+      // No pause after the last page, or once Stop is pressed.
+      if (i < todo.length - 1 && shouldGo()) await sleep(OH.bbdPause(fails));
     }
     if (before && read) await chrome.storage.local.remove(BBD_STRIKES_KEY);
     return { done, errors, total: todo.length };

@@ -124,7 +124,7 @@ browser's default quota). The main keys:
 | `account`                 | Cached RSI identity and balances (10 minutes)                                                    | `OH.getAccount()`                         |
 | `errorLog`                | The rolling error log                                                                            | `OH.log()`                                |
 | `remoteStatus`, `netDown` | Cached kill switch file; sites that recently timed out                                           | `loadStatus()`, `OH.guarded()`            |
-| `bbDetails`               | Buy-back details, fetched only when you ask                                                      | `OH.fetchBuybackDetails()`                |
+| `bbDetails`               | Buy-back details: packs read after a buy-back scan, the rest with Load Details (paced)           | `OH.fetchBuybackDetails()`                |
 | `lastBackupAt`            | When you last downloaded a backup file                                                           | `downloadBackup()` in `src/dashboard.js`  |
 
 Other keys are caches of public data (for example `shipMatrix`, `shipCatalog`,

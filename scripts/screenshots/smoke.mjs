@@ -3980,6 +3980,72 @@ try {
     ? ok('problem card: Send Flight Log copies the log and opens #bug-reports on Discord')
     : fail(`send flight log: ${JSON.stringify(rep.send)}`);
 
+  // Buy-back details: one batch at a time, quiet after a scan while an earlier hold is
+  // on, and the status says why and how long (hours for a long hold).
+  const bbd = await page.evaluate(async () => {
+    const keepFetch = OH.fetchBuybackDetails;
+    const keepBbs = state.buybacks;
+    const r = {};
+    try {
+      state.buybacks = [
+        {
+          id: '990000201',
+          name: 'Package - Smoke Pack',
+          kind: 'package',
+          date: '',
+          contains: '',
+          href: '',
+          isCCU: false,
+          ccu: null,
+        },
+      ];
+      let calls = 0;
+      let release;
+      OH.fetchBuybackDetails = () => (calls++, new Promise((res) => (release = res)));
+      const first = loadBuybackDetails({ packsOnly: true });
+      await loadBuybackDetails({ packsOnly: true }); // a second while the first reads
+      r.oneLane = calls === 1;
+      release({ done: 1, errors: 0, total: 1 });
+      await first;
+      const say = async (res, opts) => {
+        setStatus('');
+        OH.fetchBuybackDetails = async () => res;
+        await loadBuybackDetails({ packsOnly: true, ...opts });
+        return { text: statusEl.textContent, error: statusEl.classList.contains('error') };
+      };
+      const hold = { errors: 0, total: 5, rateLimited: true };
+      const soon = Date.now() + 10 * 60e3 - 5e3;
+      const late = Date.now() + 6 * 3600e3 - 5e3;
+      const held = { ...hold, done: 0, held: true };
+      r.autoHeld = await say({ ...held, retryAt: soon }, { max: 30, auto: true });
+      r.held = await say({ ...held, retryAt: late });
+      r.busy = await say({ ...hold, done: 2, retryAt: soon, busy: true });
+      r.slow = await say({ ...hold, done: 1, retryAt: late });
+    } finally {
+      OH.fetchBuybackDetails = keepFetch;
+      state.buybacks = keepBbs;
+      state.bbDetails = { ...(await OH.getBuybackDetails()) };
+      setStatus('');
+    }
+    return r;
+  });
+  const single = 'Opening a single buy-back still works.';
+  bbd.oneLane &&
+  bbd.autoHeld.text === '' &&
+  bbd.held.text === `Buy-back details are on an R&R stop for about 6 hours more. ${single}` &&
+  !bbd.held.error &&
+  bbd.busy.text ===
+    `RSI is busy right now, so we stopped after 2 pages (kept). Try again in about 10 min. ${single}` &&
+  !bbd.busy.error &&
+  bbd.slow.text.startsWith(
+    `RSI asked us to slow down, so we stopped after 1 page (kept). Give it about 6 hours to cool off. ${single}`,
+  ) &&
+  bbd.slow.error
+    ? ok(
+        'buy-back details: one batch at a time, quiet after a scan while held, says why and how long',
+      )
+    : fail(`buy-back details status: ${JSON.stringify(bbd)}`);
+
   // Your menu: Clear Data (red) asks once in place; Keep Data backs out with nothing
   // cleared and the menu still open.
   const ask = await page.evaluate(async () => {

@@ -33,11 +33,13 @@ global.setTimeout = (fn, ms) => {
 let answer; // id → status
 let body = () => '<html>buy-back</html>'; // id → page HTML
 let retryAfter = () => null; // id → Retry-After header, or null for none
+let offline = () => false; // id → true when RSI can't be reached at all
 let hits;
 global.fetch = async (url) => {
   const m = String(url).match(/\/pledge\/buyback\/(\d+)/);
   if (!m) return new Response('', { status: 404 });
   hits.push(m[1]);
+  if (offline(m[1])) throw new TypeError('Failed to fetch');
   const after = retryAfter(m[1]);
   return new Response(body(m[1]), {
     status: answer(m[1]),
@@ -56,6 +58,7 @@ async function reset() {
   waits = [];
   body = () => '<html>buy-back</html>';
   retryAfter = () => null;
+  offline = () => false;
   OpenHangar.parseBuybackDetail = parseOk;
 }
 // `ms` within a few seconds of `want` (the test's own clock moves too).
@@ -153,7 +156,7 @@ test('signed out of RSI mid-batch: stop, and save nothing for that page (#199)',
 
 // --- Pacing (OH-021): gentle between pages, slower after failures ---------------
 
-test('the pause: 1 to 2 s at random, doubled for each failed page in a row, 30 s at most', () => {
+test('the pause: 1 to 2 s at random, doubled for each failed page in a row', () => {
   assert.equal(
     OH.bbdPause(0, () => 0),
     1000,
@@ -171,17 +174,14 @@ test('the pause: 1 to 2 s at random, doubled for each failed page in a row, 30 s
     OH.bbdPause(2, () => 0.5),
     6000,
   );
-  assert.equal(
-    OH.bbdPause(9, () => 0.5),
-    30000,
-  );
+  assert.ok(OH.bbdPause(2, () => 0.9999) < 8000); // the longest: a third failure stops
 });
 
-test('a batch pauses 1 to 2 s after every page, never on a fixed beat', async () => {
+test('a batch pauses 1 to 2 s between pages, never on a fixed beat', async () => {
   await reset();
   answer = () => 200;
   await OH.fetchBuybackDetails(ids);
-  assert.equal(waits.length, ids.length);
+  assert.equal(waits.length, ids.length - 1); // none after the last page
   for (const ms of waits) assert.ok(ms >= 1000 && ms < 2000, `paused ${ms} ms`);
   assert.ok(new Set(waits).size > 1, 'the pauses vary');
 });
@@ -204,8 +204,44 @@ test('a page read fine brings the pause back to 1 to 2 s', async () => {
   assert.deepEqual(r, { done: 3, errors: 2, total: 3 });
   assert.deepEqual(
     waits.filter((ms) => ![800, 1600, 3200].includes(ms)),
-    [3000, 1500, 3000],
+    [3000, 1500], // and none after page 3, the last
   );
+});
+
+test('Stop: no pause after the page it lands on', async () => {
+  await reset();
+  answer = () => 200;
+  let stop = false;
+  const r = await OH.fetchBuybackDetails(
+    ids,
+    () => (stop = true),
+    () => !stop,
+  );
+  assert.deepEqual(r, { done: 1, errors: 0, total: 5 });
+  assert.deepEqual(waits, []);
+  assert.deepEqual(hits, ['1']);
+});
+
+test('no network three pages in a row stops the batch, with no hold', async () => {
+  await reset();
+  offline = () => true;
+  const r = await withRandom(0.5, () => OH.fetchBuybackDetails(ids));
+  assert.deepEqual(r, { done: 3, errors: 3, total: 5 });
+  assert.equal(hits.length, 12); // three pages, each tried 4 times
+  assert.deepEqual(
+    waits.filter((ms) => ![800, 1600, 3200].includes(ms)),
+    [3000, 6000],
+  );
+  assert.equal(store.bbdSlowDownUntil, undefined);
+});
+
+test('a batch that reads nothing keeps the slow-down count', async () => {
+  await reset();
+  store.bbdSlowDowns = 2;
+  answer = () => 503;
+  const r = await OH.fetchBuybackDetails(ids);
+  assert.equal(r.done, 3);
+  assert.equal(store.bbdSlowDowns, 2); // the next slow-down still holds 1 hour
 });
 
 for (const status of [429, 403]) {
@@ -253,15 +289,37 @@ test('slow-downs in a row double the hold (up to 6 h); a batch that reads fine s
   near((await OH.fetchBuybackDetails(ids)).retryAt - t, 15 * MIN);
 });
 
-test('a 5xx that still carries a Retry-After stops the batch until then', async () => {
+test('a 5xx with a Retry-After stops the batch at once, until then', async () => {
   await reset();
   answer = (id) => (id === '2' ? 503 : 200);
   retryAfter = (id) => (id === '2' ? '600' : null); // ten minutes
-  const t = Date.now();
+  let t = Date.now();
   const r = await OH.fetchBuybackDetails(ids);
   assert.equal(r.rateLimited, true);
+  assert.equal(r.busy, true); // RSI failing, not asking us to slow down
   assert.equal(r.done, 1);
   near(r.retryAt - t, 10 * MIN);
-  assert.deepEqual(hits, ['1', '2', '2', '2', '2']); // its retries, then 3 to 5 never asked
+  assert.deepEqual(hits, ['1', '2']); // no retry sooner than asked, and 3 to 5 never asked
   assert.ok(!store.bbdSlowDowns); // not a slow-down: the next one still waits 15 min
+
+  // Held off: the next batch asks RSI nothing and says so.
+  hits = [];
+  const held = await OH.fetchBuybackDetails(ids);
+  assert.equal(held.held, true);
+  assert.deepEqual(hits, []);
+
+  await reset();
+  answer = (id) => (id === '2' ? 503 : 200);
+  retryAfter = (id) => (id === '2' ? new Date(Date.now() + 30 * MIN).toUTCString() : null);
+  t = Date.now();
+  near((await OH.fetchBuybackDetails(ids)).retryAt - t, 30 * MIN); // as a date
+  assert.deepEqual(hits, ['1', '2']);
+});
+
+test('a slow-down is neither busy nor held', async () => {
+  await reset();
+  answer = (id) => (id === '1' ? 429 : 200);
+  const r = await OH.fetchBuybackDetails(ids);
+  assert.equal(r.busy, undefined);
+  assert.equal(r.held, undefined);
 });
