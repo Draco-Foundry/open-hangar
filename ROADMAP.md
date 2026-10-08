@@ -100,8 +100,9 @@ The heart of the website fleet manager.
   accounts. [#469](https://github.com/Draco-Foundry/open-hangar/issues/469)
 - **Site Navigation:** one clear menu across openhangar.space, on phone and desktop.
   [#470](https://github.com/Draco-Foundry/open-hangar/issues/470)
-- **Ship Explorer:** a page for every ship, with specs straight from RSI. Built, switched off
-  until launch. [#471](https://github.com/Draco-Foundry/open-hangar/issues/471) [#460](https://github.com/Draco-Foundry/open-hangar/issues/460)
+- **Ship Explorer:** a page for every ship, with its specs, store prices and news. Built,
+  switched off until launch. [#471](https://github.com/Draco-Foundry/open-hangar/issues/471)
+  Reading the specs straight from RSI is next. [#460](https://github.com/Draco-Foundry/open-hangar/issues/460)
 - **Hangar Overview:** your whole hangar at a glance, the first tab of My Hangar.
   [#472](https://github.com/Draco-Foundry/open-hangar/issues/472)
 - **Fleet Tab:** your ships as a fleet, and which roles it covers. [#473](https://github.com/Draco-Foundry/open-hangar/issues/473)
@@ -169,8 +170,9 @@ Your own hangar, tied into the store and the news.
 - **Bug-Fix Days (Oct 16 to 19):** fixes and polish only, so the beta starts on solid ground.
   [#507](https://github.com/Draco-Foundry/open-hangar/issues/507)
 - **Front Page Fixes:** canceled events keep their strike-through on hover
-  [#457](https://github.com/Draco-Foundry/open-hangar/issues/457), and the top stories pause when you hover
-  [#459](https://github.com/Draco-Foundry/open-hangar/issues/459).
+  [#457](https://github.com/Draco-Foundry/open-hangar/issues/457), the top stories pause when you hover
+  [#459](https://github.com/Draco-Foundry/open-hangar/issues/459), and on phones Ships in the News
+  leads with the newest story [#467](https://github.com/Draco-Foundry/open-hangar/issues/467).
 - **Org Fleet, Ships Only:** taking member values and comparisons out of the extension's Org
   Fleet page. [#466](https://github.com/Draco-Foundry/open-hangar/issues/466)
 - **Beta (Oct 20 to 27):** 5 to 10 Discord testers try 0.3.0 and the website together, sync
