@@ -165,9 +165,10 @@ with the referral code and URL stripped (`sanitizeSourcesForExport()`) and the p
 archive trimmed to what buy-back details read (`OH.leanArchive()`). `OH.importDB()`
 refuses files newer than it understands, merges history instead of replacing it
 (`OH.mergeHistory()`), merges the pledge archive (`OH.mergeArchive()`, newest `goneAt`
-wins, 2,000 kept), and never restores the `account` block. Sync sends the same payload,
-kept under 4 MB by `OH.syncBody()` (oldest archive entries, then oldest history
-snapshots, left out of that request). `OH.exportHTF()` writes
+wins, 2,000 kept), and never restores the `account` block. Sync sends the same payload
+without the referral prospects list (`OH.syncPayload()`: other players who aren't
+recruits yet stay in the browser), kept under 4 MB by `OH.syncBody()` (oldest archive
+entries, then oldest history snapshots, left out of that request). `OH.exportHTF()` writes
 the community Hangar Transfer Format (one entry per ship).
 
 ## The Svelte and Classic Bridge
@@ -315,9 +316,16 @@ data-sharing prompt is about (`FirefoxExplain.svelte`). Once connected, sync liv
 the top bar's Scan button, mounted into spots `ui/topbar` leaves empty: a status beside
 it, an openhangar.space section in its ▾ menu (Sync Now, Open My Hangar, Disconnect),
 "Syncing to Website…" as every scan's last step, and a refused sync in the scan
-report. The pages with a website twin link there (`OpenOnWebsite.svelte`): Open on
-Website (the website's My Hangar) under the title of Inventory, Buy-Backs and Stats and
-in the Citizen Card's corner once connected, See It on Any Device (Connect) before that.
+report. The link (`siteLink`) is one per browser, so it remembers the RSI accounts it
+has synced and the ones you said no to; any other account's hangar waits for the scan
+report's "Sync <handle> to your openhangar.space account?" (Sync It, Don't Sync). A
+pilot is the same by handle or by Citizen Record number (digits only), and a hangar
+whose account isn't the cached RSI login never goes (reload switches hangars). It
+also keeps the website's last "wait" (`OH.siteSyncWait()`): after `not-open` the sync
+after a scan sends nothing for 6 hours, and a 429's `Retry-After` holds Sync Now too.
+The pages with a website twin link there (`OpenOnWebsite.svelte`): Open on Website
+(the website's My Hangar) under the title of Inventory, Buy-Backs and Stats and in the
+Citizen Card's corner once connected, See It on Any Device (Connect) before that.
 `ui/site/main.js` hands the component to the pages through `ui/lib/site-ui.svelte.js`,
 so a build without sync shows none. Its state and actions are `site`
 in `src/dashboard.js`, behind `window.OHApp.site`. The `identity` permission is in
