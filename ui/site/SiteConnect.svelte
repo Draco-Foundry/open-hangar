@@ -105,8 +105,8 @@
         >Connect to openhangar.space</button
       >
       <p class="sc-hint">
-        Optional. See your hangar on any device. Nothing is sent until you connect. Open Hangar
-        will sync after every scan. Disconnect any time.
+        Optional. See your hangar on any device. Nothing is sent until you connect.
+        Open&nbsp;Hangar will sync after every scan. Disconnect any time.
       </p>
       {#if d.firefox}
         <p class="sc-ff">
