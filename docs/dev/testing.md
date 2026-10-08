@@ -13,4 +13,4 @@
   never connected, sends nothing to the sync site (scripts/privacy-check.mjs).
 
 CI runs the tests, the UI test, the Firefox linter, the store build and privacy checks
-and the beta build on every PR.
+and the beta build on every PR; a docs-only PR runs just the tests and the format check.
