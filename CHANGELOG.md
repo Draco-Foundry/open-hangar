@@ -98,6 +98,23 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   items, add-ons, the AMD package, community giveaways) say so with the reason instead of
   a Reclaim link, and buy-back windows note that buy-backs cost full price.
 
+## 0.2.19 — 2026-10-06
+
+- Fixed: **the next buy-back token is back on the radar.** Open Hangar only knew RSI's 2026
+  token dates, so after October 5 the "Next Buy-Back Token" line went dark. It now works
+  out the next ones from RSI's pattern (the first Monday of each quarter) until RSI posts
+  next year's schedule.
+- Changed: **the next token shows up in its last 30 days.** A three-month countdown was
+  just noise, so the date now appears on Home and Buy-Backs once a token is a month or
+  less away. Your token count is always there, and hovering it names the next date.
+
+## 0.2.18 — 2026-10-04
+
+- Fixed: **Reclaim on an upgrade buy-back lands on the right pad.** It used to drop you on
+  the front page of RSI's pledge store. Now it opens just that upgrade in your buy-back
+  list on RSI, where its Buy Back button brings up the upgrade window for exactly that
+  pledge.
+
 ## 0.2.17 — 2026-10-04
 
 - New: **an Open Beta note.** Open Hangar is still spooling up for its official release

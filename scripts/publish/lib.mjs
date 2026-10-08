@@ -10,6 +10,16 @@ export function ciPassed(runs) {
   );
 }
 
+// Where CI stands on the commit, for the publish job's wait (ci-gate.mjs):
+//   passed   a run finished green
+//   pending  no run yet, or one is queued / running: keep waiting
+//   failed   every run finished and none of them green: stop waiting
+export function ciState(runs) {
+  if (ciPassed(runs)) return 'passed';
+  if (!Array.isArray(runs) || !runs.length) return 'pending';
+  return runs.some((r) => r.status !== 'completed') ? 'pending' : 'failed';
+}
+
 // "v0.2.13" or "0.2.13" against manifest.json's version.
 export function tagMatches(tag, version) {
   return typeof tag === 'string' && tag.replace(/^v/, '') === version;
@@ -117,21 +127,59 @@ export function submittedVersions(runs) {
   return out;
 }
 
-// One store's line: the live version, and a newer submitted one as pending.
-export function storeLine(live, submitted) {
-  return {
-    live: live || null,
-    pending: live && versionNewer(submitted, live) ? submitted : null,
-  };
+// site/store-plan.json (hand-edited, docs/STORE.md "Holding a Store Back"): a
+// store we hold back on purpose, with the version and the UTC date it's due,
+//   { "firefox": { "version": "0.2.20", "on": "2026-10-07" } }
+// Returns only the well-formed entries for the three stores; anything else is
+// dropped, never shown.
+export function readStorePlan(raw) {
+  const r = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const out = {};
+  for (const s of ['chrome', 'edge', 'firefox']) {
+    const e = r[s];
+    if (!e || typeof e !== 'object') continue;
+    const version = typeof e.version === 'string' ? e.version.trim() : '';
+    const on = typeof e.on === 'string' ? e.on.trim() : '';
+    if (!/^\d+(?:\.\d+){0,3}$/.test(version)) continue;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(on) || Number.isNaN(Date.parse(`${on}T00:00:00Z`))) continue;
+    out[s] = { version, on };
+  }
+  return out;
+}
+
+// "2026-10-07" -> "Oct 7" (the plan's dates are UTC days).
+export function shortDay(iso) {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+// One store's line: the live version, a newer submitted one as pending, and a
+// planned one (from the store plan) as arriving. "Arriving" shows only while the
+// store's live version is known and older, nothing is in review (in review wins),
+// and the plan's UTC day hasn't passed (`today` is "YYYY-MM-DD" in UTC); so it
+// clears itself once the store has it, it goes to review, or the day is over.
+export function storeLine(live, submitted, planned = null, today = null) {
+  const pending = live && versionNewer(submitted, live) ? submitted : null;
+  const day = today || new Date().toISOString().slice(0, 10);
+  const arriving =
+    live && !pending && planned && versionNewer(planned.version, live) && planned.on >= day
+      ? { version: planned.version, on: planned.on }
+      : null;
+  return { live: live || null, pending, arriving };
 }
 
 // Fills each install button's version spans in the landing page:
 //   <span class="b-ver" data-ver="chrome"></span>
 //   <span class="b-pend" data-pend="chrome"></span>
-// Empty spans stay empty (and hidden), so a store we couldn't read shows nothing.
+// The second one says "v0.2.8 in review", or "v0.2.8 arriving Oct 7" for a store
+// held back on purpose (store plan). Empty spans stay empty (and hidden), so a
+// store we couldn't read shows nothing.
 export function stampStoreVersions(html, lines) {
   let out = String(html);
-  for (const [store, { live, pending }] of Object.entries(lines || {})) {
+  for (const [store, { live, pending, arriving }] of Object.entries(lines || {})) {
     out = out
       .replace(
         new RegExp(`(<span class="b-ver" data-ver="${store}">)[^<]*(</span\\s*>)`),
@@ -139,7 +187,13 @@ export function stampStoreVersions(html, lines) {
       )
       .replace(
         new RegExp(`(<span class="b-pend" data-pend="${store}">)[^<]*(</span\\s*>)`),
-        `$1${pending ? `v${pending} in review` : ''}$2`,
+        `$1${
+          pending
+            ? `v${pending} in review`
+            : arriving
+              ? `v${arriving.version} arriving ${shortDay(arriving.on)}`
+              : ''
+        }$2`,
       );
   }
   return out;
@@ -154,7 +208,11 @@ export function versionsJson({ version, updated, lines, checkedAt }) {
     stores: Object.fromEntries(
       ['chrome', 'edge', 'firefox'].map((s) => [
         s,
-        { live: lines?.[s]?.live ?? null, pending: lines?.[s]?.pending ?? null },
+        {
+          live: lines?.[s]?.live ?? null,
+          pending: lines?.[s]?.pending ?? null,
+          arriving: lines?.[s]?.arriving ?? null,
+        },
       ]),
     ),
     checkedAt,

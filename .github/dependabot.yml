@@ -3,13 +3,17 @@
 # arrive automatically: a new major version is upgraded on purpose and tested end to
 # end, because PR CI doesn't run the publish, release and deploy workflows
 # (Draco-Foundry/open-hangar#218). Security updates for npm packages come from
-# Dependabot alerts, separately.
+# Dependabot alerts, separately. Titles start "chore(deps):" so they pass CI's
+# conventional-title check (docs/dev/git.md).
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
     ignore:
       - dependency-name: '*'
         update-types: ['version-update:semver-major']
@@ -21,6 +25,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
     open-pull-requests-limit: 3
     ignore:
       - dependency-name: '*'
