@@ -1,7 +1,8 @@
 <script>
   // Roles: one chip per job the fleet can do (green: flyable today, amber: only
   // in-concept ships, dashed: nobody has one). A chip opens what fills it, or for a
-  // missing role every ship in the ship list that would, cheapest first.
+  // missing role every ship in the ship list that would, cheapest first (ships only: the
+  // prices just set the order and aren't shown).
   import { app, OH } from '../lib/app.svelte.js';
   import { ui } from './ui.svelte.js';
   import { owners } from './text.js';
@@ -45,7 +46,6 @@
           name: v.name || v.lname,
           role: tc(v.role),
           status: v.status === 'flight-ready' ? 'Flight Ready' : 'In Concept',
-          price: v.msrp ? a.dollars(v.msrp) : '—',
         })),
     };
   });
@@ -120,7 +120,7 @@
       <div class="org-scroll">
         <table class="org-table">
           <thead>
-            <tr><th>Ship</th><th>Role</th><th>Status</th><th class="num">Store Price</th></tr>
+            <tr><th>Ship</th><th>Role</th><th>Status</th></tr>
           </thead>
           <tbody>
             {#each panel.options as v}
@@ -128,7 +128,6 @@
                 <td>{v.name}</td>
                 <td class="muted">{v.role}</td>
                 <td class="muted">{v.status}</td>
-                <td class="num">{v.price}</td>
               </tr>
             {/each}
           </tbody>

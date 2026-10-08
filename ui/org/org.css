@@ -14,13 +14,31 @@
 .role-chip.open {
   outline-color: var(--accent-line);
 }
-.org-compare-bar select {
-  border-radius: var(--r-sm);
+/* Member chips: the name opens their ships (× still removes them). */
+.org-member .org-mname {
+  padding: 0;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
 }
-.pair-bar {
-  border-radius: 999px;
+.org-member .org-mname:hover {
+  color: var(--accent);
 }
-.pair-bar span,
-.cmp-kv b {
-  font-family: var(--font-data);
+.org-member.open {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.org-hint {
+  align-self: center;
+  font-size: 12px;
+}
+/* The four fleet boxes (members, ships, cargo, crew seats) finish together: one row of
+   four, or two by two when narrow, never three and a lone one. */
+#oh-org .stat-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 720px) {
+  #oh-org .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

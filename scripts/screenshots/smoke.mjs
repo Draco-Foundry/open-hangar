@@ -2295,11 +2295,31 @@ try {
     ? ok(`org fleet: ${org.members} members, ${org.rows} ship types`)
     : fail(`org fleet: ${JSON.stringify(org)}`);
   const roleChips = await page.$$eval('.role-chip', (c) => c.length);
-  const memberRows = await page.$$eval('.org-table', (t) => t.length);
+  const orgTables = await page.$$eval('.org-table', (t) => t.length);
   const roleCount = await page.evaluate(() => OH.ORG_ROLES.length);
-  roleChips === roleCount && memberRows >= 3
-    ? ok(`org roles (${roleChips}) + biggest ships + members`)
-    : fail(`org extras: ${roleChips} role chips, ${memberRows} tables`);
+  roleChips === roleCount && orgTables === 2
+    ? ok(`org roles (${roleChips}) + biggest ships + ships`)
+    : fail(`org extras: ${roleChips} role chips, ${orgTables} tables`);
+  // Ships only (CLAUDE.md, What Not to Build): no prices or fleet values, no ship
+  // counts on the member chips, nothing that compares members. Checked again below
+  // with a missing role's suggestions and a member's panel open.
+  const orgValues = () =>
+    page.evaluate(() => {
+      const el = document.querySelector('#oh-org');
+      const text = el.textContent;
+      return {
+        money: /[$€£¥]\s?\d|\bUSD\b|Store Price|Fleet Value|of org value|\bShare\b/i.test(text),
+        chipCounts: [...el.querySelectorAll('.org-member')].some((c) =>
+          /\d+\s*ships?\b/i.test(c.textContent),
+        ),
+        compare: !!el.querySelector('select, .org-compare-bar, .cmp-cols, .pair-row'),
+      };
+    });
+  const noValues = (v) => !v.money && !v.chipCounts && !v.compare;
+  const shipsOnly = await orgValues();
+  noValues(shipsOnly)
+    ? ok('org shows ships only: no values, chip counts or member compare')
+    : fail(`org values: ${JSON.stringify(shipsOnly)}`);
   await page.click('.role-chip.missing');
   await orgTick();
   const rolePanel = await page.evaluate(() => ({
@@ -2309,12 +2329,38 @@ try {
   rolePanel.panel && rolePanel.open === 'true'
     ? ok('missing role opens suggestions')
     : fail(`role click: ${JSON.stringify(rolePanel)}`);
+  const roleValues = await orgValues();
+  noValues(roleValues)
+    ? ok('missing role suggestions show no prices')
+    : fail(`role suggestions values: ${JSON.stringify(roleValues)}`);
   await page.click('.org-close[data-close="role"]');
   await orgTick();
   (await page.$('.org-panel')) ? fail('role panel did not close') : ok('role panel closes');
-  await page.click('.org-mrow');
+  await page.click('.org-mname[data-member="Buddy"]');
   await orgTick();
-  (await page.$('.pair-row')) ? ok('member opens vs-org charts') : fail('member panel missing');
+  const memberPanel = await page.evaluate(() => {
+    const p = document.querySelector('.org-member-panel');
+    return {
+      panel: !!p,
+      ships: p ? p.querySelector('.org-owners').textContent : '',
+      open: document
+        .querySelector('.org-mname[data-member="Buddy"]')
+        ?.getAttribute('aria-expanded'),
+    };
+  });
+  const memberValues = await orgValues();
+  memberPanel.panel &&
+  memberPanel.open === 'true' &&
+  /Carrack/.test(memberPanel.ships) &&
+  /Cutlass Black/.test(memberPanel.ships) &&
+  noValues(memberValues)
+    ? ok("a member's name opens their ships, with no values")
+    : fail(`member panel: ${JSON.stringify({ memberPanel, memberValues })}`);
+  await page.click('.org-close[data-close="member"]');
+  await orgTick();
+  (await page.$('.org-member-panel'))
+    ? fail('member panel did not close')
+    : ok('member panel closes');
   // Your entry follows your latest scan, and a concept-only role is amber, not missing.
   const live = await page.evaluate(async () => {
     const tick = () => new Promise((r) => setTimeout(r, 50));
@@ -2349,13 +2395,24 @@ try {
   live.grew && /\bconcept\b/.test(live.chip || '') && live.intro
     ? ok('org: your fleet follows your scan; Pioneer-only Construction shows as in concept')
     : fail(`org live/concept: ${JSON.stringify(live)}`);
-  const names = await page.$$eval('.org-cmp[data-side="a"] option', (o) =>
-    o.map((x) => x.value).filter(Boolean),
-  );
-  await page.select('.org-cmp[data-side="a"]', names[0]);
-  await page.select('.org-cmp[data-side="b"]', names[1]);
-  await orgTick();
-  (await page.$('.cmp-cols')) ? ok('compare two members') : fail('compare panel missing');
+  // Export CSV: ships, counts, LTI and owners, no store price column.
+  const orgCsv = await page.evaluate(async () => {
+    let got = null;
+    const real = window.downloadBlob;
+    window.downloadBlob = (blob, name) => (got = { blob, name });
+    document.querySelector('#org-csv').click();
+    for (let t = 0; !got && t < 50; t++) await new Promise((r) => setTimeout(r, 100));
+    window.downloadBlob = real;
+    if (!got) return null;
+    const text = await got.blob.text();
+    return { name: got.name, head: text.split('\n')[0], rows: text.split('\n').length - 1 };
+  });
+  orgCsv &&
+  orgCsv.head === 'Ship,Count,LTI,Owners' &&
+  orgCsv.rows > 0 &&
+  /^open-hangar-org-fleet-.*\.csv$/.test(orgCsv.name)
+    ? ok(`org CSV: ships only (${orgCsv.rows} rows)`)
+    : fail(`org CSV: ${JSON.stringify(orgCsv)}`);
   // Remove a member: its chip goes, the rest stays (and so does what's saved).
   await page.click('.org-remove[data-name="Buddy"]');
   await page
@@ -2368,9 +2425,8 @@ try {
     saved: ((await chrome.storage.local.get('orgFleet')).orgFleet?.members || []).map(
       (m) => m.name,
     ),
-    compare: !!document.querySelector('.org-compare-bar'),
   }));
-  removed.chips === 1 && !removed.saved.includes('Buddy') && !removed.compare
+  removed.chips === 1 && !removed.saved.includes('Buddy')
     ? ok('remove a member')
     : fail(`remove member: ${JSON.stringify(removed)}`);
 

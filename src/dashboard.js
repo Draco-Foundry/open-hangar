@@ -2842,16 +2842,16 @@ async function addMyOrgFleet() {
   renderOrg();
   return `Added your fleet (${r.ships.length} ships).`;
 }
+// Ships only, like the page: no store prices or fleet values.
 async function exportOrgCsv() {
   const members = await loadOrg();
   if (!members.length || !state.shipOf) return 'Nothing to export yet. Empty hangar bay.';
   const f = OH.orgFleet(members, state.shipOf, state.priceOf);
-  const lines = [['Ship', 'Count', 'LTI', 'Store price (USD)', 'Owners']].concat(
+  const lines = [['Ship', 'Count', 'LTI', 'Owners']].concat(
     f.ships.map((r) => [
       r.name,
       r.count,
       r.lti,
-      r.msrp ?? '',
       r.owners.map((o) => `${o.name} x${o.n}`).join('; '),
     ]),
   );

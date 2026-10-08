@@ -56,8 +56,8 @@ the 0.3.0 plan in [docs/REDESIGN-0.3.md](docs/REDESIGN-0.3.md), the voice in
 ## What Not to Build
 
 - No rankings, leaderboards or gear scores: never compare totals, values or counts
-  between players or orgs. Org Fleet must show ships only, never values (the 0.3.0
-  page still shows them: #466).
+  between players or orgs. Org Fleet shows ships only, never values: no store prices,
+  no fleet value, and no member's totals next to another's.
 - No LTI counts or LTI emphasis in summaries, no CCU-chain features, no "best use of
   your buy-back token" advice, no duplicates card, no insight cards (pages go straight
   to their search bar).
