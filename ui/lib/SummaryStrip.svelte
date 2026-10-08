@@ -1,6 +1,6 @@
 <script>
   // The summary strip on top of Inventory and Buy-Backs: the page title, a note
-  // (e.g. "Totals follow your filters"), anything the page adds under them (Open On
+  // (e.g. "Totals follow your filters"), anything the page adds under them (Open on
   // Website), then a few big numbers. Each stat is { label, value, title?, small?,
   // good? }.
   let { title, note = '', stats = [], children } = $props();

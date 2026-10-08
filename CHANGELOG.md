@@ -9,9 +9,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   any device. After that every scan syncs by itself, and Sync Now sits in your portrait
   menu. Nothing is sent until you connect, and Disconnect stops it. On Firefox, Firefox
   asks you once before anything is shared.
-- New: **Open On Website.** Once you've connected, Home, Inventory, Buy-Backs and Stats
-  each have an Open On Website button that opens your hangar on openhangar.space. Before
-  that, a small See It on Any Device link starts Connect.
+- New: **Open on Website.** Once you've connected, Home, Inventory, Buy-Backs and Stats
+  each have an Open on Website button that opens your hangar on openhangar.space. Before
+  that, Inventory, Buy-Backs and Stats show a small See It on Any Device link that starts
+  Connect.
 - Changed: **A cleaner top bar.** Home, Inventory, Buy-Backs and Store sit in the bar,
   and Stats, Org Fleet and Referrals live under More (it lights up when you're on one).
   Search is an icon that opens the field over the links (or press /), Game Status shows

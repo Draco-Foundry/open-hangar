@@ -1,6 +1,6 @@
 <script>
   // The website from the pages that have a twin there (Home, Inventory, Buy-Backs,
-  // Stats). Connected: Open On Website ↗, your hangar on openhangar.space (its My
+  // Stats). Connected: Open on Website ↗, your hangar on openhangar.space (its My
   // Hangar page for now; the pages per tab aren't open on the website yet). Not
   // connected: See It on Any Device, which starts Connect like the portrait menu's
   // (SyncLine.svelte), the Firefox card first until Firefox has said yes. Home passes
@@ -35,7 +35,7 @@
       type="button"
       class="site-open-btn"
       title="Your hangar on openhangar.space"
-      onclick={() => app().site.open()}>Open On Website ↗</button
+      onclick={() => app().site.open()}>Open on Website ↗</button
     >
   </p>
 {:else if d.offer}

@@ -1495,15 +1495,63 @@ try {
   oow.homeCard &&
   oow.ffCard &&
   oow.ffClosed &&
-  each(oow.on, 'Open On Website ↗', 'Open On Website ↗') &&
+  each(oow.on, 'Open on Website ↗', 'Open on Website ↗') &&
   oow.homeCorner &&
   oow.homeQuiet &&
   oow.opened === 'https://staging.example.test/hangar' &&
   oow.goneAgain
     ? ok(
-        'website twin: Open On Website on Home, Inventory, Buy-Backs and Stats once connected (opens My Hangar), See It on Any Device before (starts Connect, Firefox card first), none without a sync site',
+        'website twin: Open on Website on Home, Inventory, Buy-Backs and Stats once connected (opens My Hangar), See It on Any Device before (starts Connect, Firefox card first), none without a sync site',
       )
-    : fail(`Open On Website: ${JSON.stringify(oow)}`);
+    : fail(`Open on Website: ${JSON.stringify(oow)}`);
+
+  // Home, connected, at widths where Open on Website sits in the Citizen Card's corner
+  // (761px up): a long name stops short of it instead of running underneath.
+  const keepLink = await page.evaluate(async () => {
+    window.__keepSiteLink = OH.getSiteLink;
+    OH.getSiteLink = async () => ({ token: 't', name: 'p', connectedAt: 1, lastSync: 1 });
+    await chrome.storage.local.set({ siteUrl: 'https://staging.example.test' });
+    await refreshSite();
+    location.hash = '#home';
+    await new Promise((r) => setTimeout(r, 200));
+    // The name's own text node, so the card keeps updating it afterwards.
+    const n = document.querySelector('#cc-name');
+    const t = [...(n.querySelector('a') || n).childNodes].find((c) => c.nodeType === 3);
+    const old = t.data;
+    t.data = 'Commander Longname of the Very Long Fleet';
+    window.__keepName = () => (t.data = old);
+    return true;
+  });
+  const clash = {};
+  try {
+    for (const w of [1280, 900, 800, 761]) {
+      await page.setViewport({ width: w, height: 900 });
+      await new Promise((r) => setTimeout(r, 200));
+      const c = await page.evaluate(() => {
+        const n = document.querySelector('#cc-name');
+        const b = document.querySelector('#site-open-home .site-open-btn');
+        if (!b) return 'no link';
+        const nr = n.getBoundingClientRect();
+        const br = b.getBoundingClientRect();
+        const end = nr.right - parseFloat(getComputedStyle(n).paddingRight);
+        const under = nr.top < br.bottom && br.top < nr.bottom && br.left < end;
+        return under ? `name ends at ${Math.round(end)}, link starts at ${Math.round(br.left)}` : '';
+      });
+      if (c) clash[w] = c;
+    }
+  } finally {
+    await page.setViewport({ width: 1280, height: 900 });
+    await page.evaluate(async () => {
+      window.__keepName?.();
+      if (window.__keepSiteLink) OH.getSiteLink = window.__keepSiteLink;
+      await chrome.storage.local.remove('siteUrl');
+      await refreshSite();
+      await new Promise((r) => setTimeout(r, 200));
+    });
+  }
+  keepLink && Object.keys(clash).length === 0
+    ? ok("Home's Open on Website corner leaves room for a long name (761px to 1280px)")
+    : fail(`Open on Website over the name: ${JSON.stringify(clash)}`);
 
   // Currency: EUR converts the melt box (rates come from the demo's fixed file).
   const rates = await page.evaluate(async () => {

@@ -2268,7 +2268,7 @@ body:not(:has(#view-home.active)) .market-title {
   }
 }
 
-/* Open On Website, or See It on Any Device before you connect
+/* Open on Website, or See It on Any Device before you connect
    (ui/site/OpenOnWebsite.svelte): a quiet link under the page title on Inventory,
    Buy-Backs and Stats, and in the Citizen Card's corner on Home once connected. */
 .site-open {
@@ -2289,9 +2289,22 @@ body:not(:has(#view-home.active)) .market-title {
   color: var(--muted);
   cursor: progress;
 }
+/* Touch screens (Firefox for Android): a taller tap area, nothing around it moves. */
+@media (pointer: coarse) {
+  .site-open-btn {
+    padding-block: 7px;
+    margin-block: -7px;
+  }
+}
 /* Stats: right under its title, the tabs below. */
 .stats-site .site-open {
   margin: -10px 0 12px;
+}
+/* Home: while the link sits in the card's corner, a long name stops short of it. */
+@media (min-width: 761px) {
+  .home-hero .citizen-card:has(#site-open-home) .cc-name {
+    padding-right: 130px;
+  }
 }
 
 /* Firefox only: what we share, under Connect (opens the explainer below). */
