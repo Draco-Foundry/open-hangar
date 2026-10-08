@@ -1,15 +1,17 @@
 name: CI
 
 # One run per change: a push to main runs on push, everything else runs as a pull
-# request (any base, so PRs into redesign/0.3-svelte too). Release tags need no
-# run of their own: the tag's commit is main's, and publish.yml waits for CI on it.
+# request (any base, so PRs into redesign/0.3-svelte too). Pushes to
+# redesign/0.3-svelte run as well, so the tip its parallel PRs land on is tested
+# (drop it once 0.3 is on main). Release tags need no run of their own: the tag's
+# commit is main's, and publish.yml waits for CI on it.
 on:
   push:
-    branches: [main]
+    branches: [main, redesign/0.3-svelte]
   pull_request:
   workflow_dispatch:
 
-# A newer commit on a PR cancels the PR's older run. Runs on main never cancel or
+# A newer commit on a PR cancels the PR's older run. Push runs never cancel or
 # queue behind each other (each gets its own group): publish.yml waits for CI on
 # the release commit, so that run must always finish.
 concurrency:
