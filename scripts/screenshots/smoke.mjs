@@ -2359,6 +2359,36 @@ try {
   roleChips === roleCount && orgTables === 2
     ? ok(`org roles (${roleChips}) + biggest ships + ships`)
     : fail(`org extras: ${roleChips} role chips, ${orgTables} tables`);
+  // Nothing is picked or ordered by price: Ships go most first, then A to Z; Biggest
+  // Ships by size class, then most, then A to Z.
+  const orgOrder = await page.evaluate(() => {
+    const [big, all] = [...document.querySelectorAll('#oh-org .org-table')].map((t) =>
+      [...t.querySelectorAll('tbody tr')].map((tr) => [...tr.cells].map((c) => c.textContent)),
+    );
+    const most = (a, b) => b.n - a.n || a.name.localeCompare(b.name);
+    const sorted = (rows, cmp) => rows.every((r, i) => !i || cmp(rows[i - 1], r) <= 0);
+    const size = ['Medium', 'Large', 'Capital'];
+    const bigRows = big.map(([name, sz, n]) => ({ name, rank: size.indexOf(sz), n: +n }));
+    const allRows = all.map(([name, n]) => ({ name, n: +n }));
+    return {
+      big: sorted(bigRows, (a, b) => b.rank - a.rank || most(a, b)),
+      all: sorted(allRows, most),
+      rows: [bigRows.length, allRows.length],
+    };
+  });
+  orgOrder.big && orgOrder.all && orgOrder.rows.every((n) => n > 1)
+    ? ok('org lists go by size and count, then A to Z, never by price')
+    : fail(`org order: ${JSON.stringify(orgOrder)}`);
+  // Each member chip button is at least 24px to tap.
+  const orgTaps = await page.evaluate(() =>
+    ['.org-mname[data-member="Buddy"]', '.org-remove[data-name="Buddy"]'].map((s) => {
+      const r = document.querySelector(s).getBoundingClientRect();
+      return [Math.round(r.width), Math.round(r.height)];
+    }),
+  );
+  orgTaps.every(([w, h]) => w >= 24 && h >= 24)
+    ? ok('member chip buttons are 24px or more to tap')
+    : fail(`member chip tap sizes: ${JSON.stringify(orgTaps)}`);
   // Ships only (CLAUDE.md, What Not to Build): no prices or fleet values, no ship
   // counts on the member chips, nothing that compares members. Checked again below
   // with a missing role's suggestions and a member's panel open.
@@ -2478,13 +2508,20 @@ try {
   /^open-hangar-org-fleet-.*\.csv$/.test(orgCsv.name)
     ? ok(`org CSV: ships only (${orgCsv.rows} rows)`)
     : fail(`org CSV: ${JSON.stringify(orgCsv)}`);
-  // Remove a member: its chip goes, the rest stays (and so does what's saved).
-  await page.click('.org-remove[data-name="Buddy"]');
-  await page
-    .waitForFunction(() => document.querySelectorAll('.org-member').length === 1, {
-      timeout: 5000,
-    })
-    .catch(() => {});
+  // Remove a member (with their panel open): its chip goes, the rest stays (and so does
+  // what's saved).
+  const removeBuddy = () =>
+    page
+      .click('.org-remove[data-name="Buddy"]')
+      .then(() =>
+        page.waitForFunction(() => document.querySelectorAll('.org-member').length === 1, {
+          timeout: 5000,
+        }),
+      )
+      .catch(() => {});
+  await page.click('.org-mname[data-member="Buddy"]');
+  await orgTick();
+  await removeBuddy();
   const removed = await page.evaluate(async () => ({
     chips: document.querySelectorAll('.org-member').length,
     saved: ((await chrome.storage.local.get('orgFleet')).orgFleet?.members || []).map(
@@ -2494,6 +2531,23 @@ try {
   removed.chips === 1 && !removed.saved.includes('Buddy')
     ? ok('remove a member')
     : fail(`remove member: ${JSON.stringify(removed)}`);
+  // Their panel went with them: imported again, it doesn't pop back open.
+  await input.uploadFile(buddy);
+  await page
+    .waitForFunction(() => document.querySelectorAll('.org-member').length === 2, {
+      timeout: 15000,
+    })
+    .catch(() => {});
+  await orgTick();
+  const buddyBack = await page.evaluate(() => ({
+    chips: document.querySelectorAll('.org-member').length,
+    panel: !!document.querySelector('.org-member-panel'),
+    open: !!document.querySelector('.org-member.open'),
+  }));
+  buddyBack.chips === 2 && !buddyBack.panel && !buddyBack.open
+    ? ok("a removed member's panel stays shut when they're imported again")
+    : fail(`member back: ${JSON.stringify(buddyBack)}`);
+  await removeBuddy();
   // With one member left there's nobody to set them apart from: no "Only ... covers".
   await page.click('.org-mname');
   await orgTick();

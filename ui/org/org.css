@@ -18,12 +18,26 @@
 .role-chip.open {
   outline-color: var(--accent-line);
 }
-/* Member chips: the name opens their ships (× still removes them). */
+/* Member chips: the name opens their ships (× still removes them). The two buttons
+   carry the chip's padding, so each is at least 24px to tap (phones included), with a
+   gap between them. */
+#oh-org .org-member {
+  gap: 4px;
+  padding: 0 2px 0 6px;
+}
+.org-member .org-mname,
+.org-member .org-remove {
+  min-height: 26px;
+}
 .org-member .org-mname {
-  padding: 0;
+  padding: 0 6px;
   color: var(--text);
   font-size: 12px;
   font-weight: 500;
+}
+.org-member .org-remove {
+  min-width: 26px;
+  padding: 0 6px;
 }
 .org-member .org-mname:hover {
   color: var(--accent);

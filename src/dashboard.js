@@ -2787,6 +2787,21 @@ function syncMyOrgFleet() {
   return true;
 }
 
+// The fleet math for the page and its CSV, ships only: no prices go in, so nothing is
+// picked or ordered by them. Ships: most first, then A to Z. Biggest Ships: medium and
+// up, largest size class first, then most, then A to Z, eight at most.
+function shipsOnlyFleet(members) {
+  const f = OH.orgFleet(members, state.shipOf, () => null);
+  const most = (a, b) => b.count - a.count || a.name.localeCompare(b.name);
+  const rank = (sh) => SIZE_ORDER.indexOf(String(sh.size || '').toLowerCase());
+  f.ships.sort(most);
+  f.biggest = f.ships
+    .filter((sh) => rank(sh) >= SIZE_ORDER.indexOf('medium'))
+    .sort((a, b) => rank(b) - rank(a) || most(a, b))
+    .slice(0, 8);
+  return f;
+}
+
 // Org Fleet is the Svelte page in ui/org (mounted into #oh-org); this loads the
 // members (keeping your own entry in step with your scan) and tells it to redraw.
 async function renderOrg() {
@@ -2846,7 +2861,7 @@ async function addMyOrgFleet() {
 async function exportOrgCsv() {
   const members = await loadOrg();
   if (!members.length || !state.shipOf) return 'Nothing to export yet. Empty hangar bay.';
-  const f = OH.orgFleet(members, state.shipOf, state.priceOf);
+  const f = shipsOnlyFleet(members);
   const lines = [['Ship', 'Count', 'LTI', 'Owners']].concat(
     f.ships.map((r) => [
       r.name,
@@ -6196,7 +6211,7 @@ window.OHApp = {
     get members() {
       return orgMembers;
     },
-    fleet: (members) => OH.orgFleet(members, state.shipOf, state.priceOf),
+    fleet: shipsOnlyFleet,
     titleCase,
     importFiles: importOrgFiles,
     addMine: addMyOrgFleet,

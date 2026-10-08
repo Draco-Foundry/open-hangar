@@ -33,6 +33,11 @@
   });
 
   const open = (name) => (ui.member = ui.member === name ? null : name);
+  // Their panel goes with them, so it doesn't pop open again if they're imported back.
+  const remove = (name) => {
+    if (ui.member === name) ui.member = null;
+    app().org.remove(name);
+  };
 </script>
 
 <div class="org-members">
@@ -50,7 +55,7 @@
         data-name={m.name}
         title="Remove"
         aria-label="Remove {m.name}"
-        onclick={() => app().org.remove(m.name)}>×</button
+        onclick={() => remove(m.name)}>×</button
       ></span
     >
   {/each}
