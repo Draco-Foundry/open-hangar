@@ -81,6 +81,8 @@ Sync lets you see your hangar on any device. It is off until you connect, and th
 - **unlimitedStorage:** big hangars and buy-back lists, plus scan history and the pledge archive, can outgrow the browser's default 10 MB limit; this lifts the limit. Everything still stays on your device.
 - **cookies:** used solely for "Log Out of RSI", which clears robertsspaceindustries.com cookies so you can fully end your RSI session from the extension. Cookie values are never read or transmitted.
 - **Host access to robertsspaceindustries.com:** to make the read-only requests described above, and to add an upgrade to your RSI cart when you click Add to RSI Cart.
+- **identity:** for Connect's sign-in window, where you sign in to app.openhangar.space and approve the connection (see [Optional Sync](#optional-sync-to-openhangarspace)). The window only hands the extension a one-time code to finish connecting, never your password. Nothing else uses this permission.
+- **Messages from openhangar.space:** pages on openhangar.space and app.openhangar.space, and no other site, can check that Open Hangar is installed and ask it for two things: Add to RSI Cart on the website's store (see [Add to RSI Cart](#add-to-rsi-cart)) and, on app.openhangar.space, Connect This Browser, which connects sync from the website. Chrome and Edge let these pages message the extension directly. Firefox doesn't, so on Firefox the extension runs a small bridge script on these pages that only passes their messages to the extension and its answers back. It reads nothing else on the page and sends nothing anywhere else.
 
 ## Data export
 

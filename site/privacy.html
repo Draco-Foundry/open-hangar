@@ -259,6 +259,23 @@
           <strong>Host access to robertsspaceindustries.com:</strong> to make the read-only requests
           described above, and to add an upgrade to your RSI cart when you click Add to RSI Cart.
         </li>
+        <li>
+          <strong>identity:</strong> for Connect's sign-in window, where you sign in to
+          app.openhangar.space and approve the connection (see
+          <a href="#optional-sync">Optional Sync</a>). The window only hands the extension a
+          one-time code to finish connecting, never your password. Nothing else uses this
+          permission.
+        </li>
+        <li>
+          <strong>Messages from openhangar.space:</strong> pages on openhangar.space and
+          app.openhangar.space, and no other site, can check that Open Hangar is installed and ask
+          it for two things: Add to RSI Cart on the website's store (see
+          <a href="#add-to-rsi-cart">Add to RSI Cart</a>) and, on app.openhangar.space, Connect This
+          Browser, which connects sync from the website. Chrome and Edge let these pages message the
+          extension directly. Firefox doesn't, so on Firefox the extension runs a small bridge
+          script on these pages that only passes their messages to the extension and its answers
+          back. It reads nothing else on the page and sends nothing anywhere else.
+        </li>
       </ul>
       <h2>Data Export</h2>
       <p>
