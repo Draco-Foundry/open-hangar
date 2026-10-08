@@ -30,25 +30,25 @@
       ? 'firefox'
       : /Chrome\//.test(ua)
         ? 'chrome'
-        : /Safari\//.test(ua)
-          ? 'safari'
-          : null;
+        : null;
   var LABELS = { review: 'In Review', planned: 'Soon™' };
   var box = document.getElementById('installs');
   var allLive = true;
   box.querySelectorAll('.install').forEach(function (a) {
     var url = a.getAttribute('data-url');
     var status = a.getAttribute('data-status') || 'planned';
-    var note = a.querySelector('.b-note');
     // Only real store links (https) become hrefs (CodeQL #285).
     if (status === 'live' && url && /^https:\/\//.test(url)) {
       a.href = url;
       a.classList.add('live');
-      note.textContent = 'Add to ' + a.querySelector('.b-name').textContent;
     } else {
+      // A store that isn't live yet says so under its name.
       a.classList.add('soon', 'status-' + status);
       a.setAttribute('aria-disabled', 'true');
+      var note = document.createElement('span');
+      note.className = 'b-note';
       note.textContent = LABELS[status] || 'Coming Soon';
+      a.querySelector('.b-name').after(note);
       if (status === 'review') allLive = false;
     }
     if (a.getAttribute('data-browser') === mine) {
@@ -60,8 +60,9 @@
   if (allLive) document.getElementById('status-line').remove();
 })();
 
-// Open beta notice until the November 10 release: a small card in the corner, shown
-// until it's closed (remembered in this browser). Remove after the release.
+// Open beta notice until the November 10 release: a small card in the corner (under the
+// hero on phones), shown until it's closed (remembered in this browser). Remove after
+// the release.
 (function () {
   var note = document.getElementById('beta-note');
   var close = document.getElementById('beta-close');

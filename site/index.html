@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Open Hangar: your Star Citizen hangar, in a clean local database</title>
+    <title>Open Hangar: The Free Star Citizen Fleet Manager</title>
     <meta
       name="description"
-      content="Open Hangar is a free, source-available browser extension that reads your own Star Citizen / RSI hangar, buy-backs, balances and referrals into a clean, local, exportable database. No password, no server."
+      content="The free Star Citizen fleet manager. A browser extension that reads your own RSI account right in your browser: hangar, buy-backs, balances and referrals in one clean view, with optional sync to openhangar.space."
     />
     <link rel="canonical" href="https://openhangar.space/extension" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
@@ -14,7 +14,7 @@
     <meta property="og:title" content="Open Hangar" />
     <meta
       property="og:description"
-      content="Read your own Star Citizen / RSI hangar into a clean, local, exportable database. Free, with public source code."
+      content="The free Star Citizen fleet manager. A browser extension that reads your own RSI account right in your browser: hangar, buy-backs, balances and referrals in one clean view, with optional sync to openhangar.space."
     />
     <meta property="og:url" content="https://openhangar.space/extension" />
     <meta property="og:site_name" content="Open Hangar" />
@@ -54,8 +54,9 @@
         <img class="logo" src="icon.svg" alt="" width="72" height="72" />
         <h1>Open Hangar</h1>
         <p class="tagline">
-          Your whole Star Citizen hangar, buy-backs, balances and referrals in one clean, local
-          database. Browse it, flex it, export it. No 30k required.
+          <span class="lead">The free Star Citizen fleet manager.</span>
+          It reads your own RSI account right in your browser: hangar, buy-backs, balances and
+          referrals in one clean view. Sync with openhangar.space is&nbsp;optional.
         </p>
 
         <div class="installs" id="installs">
@@ -70,7 +71,7 @@
             data-url="https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl"
           >
             <img class="b-logo" src="img/browsers/chrome.svg" alt="" width="36" height="36" />
-            <span class="b-name">Chrome</span><span class="b-note">Add to Chrome</span>
+            <span class="b-name"><span class="sr">Get Open Hangar for </span>Chrome</span>
             <span class="b-vers"
               ><span class="b-ver" data-ver="chrome"></span
               ><span class="b-pend" data-pend="chrome"></span
@@ -83,7 +84,7 @@
             data-url="https://microsoftedge.microsoft.com/addons/detail/fmcnemfepnifokjelgjacgdhoodaiicl"
           >
             <img class="b-logo" src="img/browsers/edge.svg" alt="" width="36" height="36" />
-            <span class="b-name">Edge</span><span class="b-note">Add to Edge</span>
+            <span class="b-name"><span class="sr">Get Open Hangar for </span>Edge</span>
             <span class="b-vers"
               ><span class="b-ver" data-ver="edge"></span
               ><span class="b-pend" data-pend="edge"></span
@@ -96,15 +97,11 @@
             data-url="https://addons.mozilla.org/en-US/firefox/addon/open-hangar/"
           >
             <img class="b-logo" src="img/browsers/firefox.svg" alt="" width="36" height="36" />
-            <span class="b-name">Firefox</span><span class="b-note">Add to Firefox</span>
+            <span class="b-name"><span class="sr">Get Open Hangar for </span>Firefox</span>
             <span class="b-vers"
               ><span class="b-ver" data-ver="firefox"></span
               ><span class="b-pend" data-pend="firefox"></span
             ></span>
-          </a>
-          <a class="install" data-browser="safari" data-status="planned" data-url="">
-            <img class="b-logo" src="img/browsers/safari.svg" alt="" width="36" height="36" />
-            <span class="b-name">Safari</span><span class="b-note">Soon™</span>
           </a>
         </div>
         <p class="also" id="status-line">
@@ -117,11 +114,26 @@
           Latest version <strong data-version>0.2.7</strong> · updated
           <time data-updated datetime="2026-09-25">Sep 25, 2026</time> ·
           <a href="https://github.com/Draco-Foundry/open-hangar/blob/main/CHANGELOG.md"
-            >What's New</a
+            >What's&nbsp;New</a
           >
         </p>
       </div>
     </header>
+
+    <!-- Open beta notice until the November 10 release (owner, 2026-10-04). Shown by
+         main.js unless closed before; remove after the release. A card in the corner on
+         wide screens; on phones it sits here, under the hero, so it covers nothing. -->
+    <aside class="beta-note" id="beta-note" role="status" aria-labelledby="beta-note-title" hidden>
+      <button type="button" class="beta-close" id="beta-close" aria-label="Close">✕</button>
+      <p class="beta-tag">Open Beta</p>
+      <h2 id="beta-note-title">Still Spooling Up</h2>
+      <p>
+        Open Hangar is a work in progress, with the official release set for
+        <strong>November&nbsp;10</strong>. Questions, ideas or a bug to report? Come find us
+        on&nbsp;Discord.
+      </p>
+      <a class="beta-link" href="https://discord.gg/FF8Wm5HdnV">Join the Discord ↗</a>
+    </aside>
 
     <main class="wrap">
       <!-- Real UI with a fictional demo account (npm run screenshots); the images
@@ -138,7 +150,7 @@
           />
           <figcaption id="tour-caption">
             <strong>Home:</strong> your Citizen Card with balances, what your account is worth and
-            how it has changed, game status, and one search box for everything you own.
+            how it has changed, game status, and one search box for everything you&nbsp;own.
           </figcaption>
         </figure>
         <div class="tour-thumbs" role="tablist" aria-label="Screenshots">
@@ -147,7 +159,7 @@
             aria-selected="true"
             data-src="img/screens/screenshot-2-home.jpg"
             data-title="Home"
-            data-text="your Citizen Card with balances, what your account is worth and how it has changed, game status, and one search box for everything you own."
+            data-text="your Citizen Card with balances, what your account is worth and how it has changed, game status, and one search box for everything you&nbsp;own."
           >
             <img src="img/screens/screenshot-2-home.jpg" alt="" loading="lazy" />
             <span>Home</span>
@@ -157,7 +169,7 @@
             aria-selected="false"
             data-src="img/screens/screenshot-1-inventory.jpg"
             data-title="Inventory"
-            data-text="your whole fleet as a searchable, filterable gallery, with insurance, value and pledge dates."
+            data-text="your whole fleet as a searchable, filterable gallery, with insurance, value and pledge&nbsp;dates."
           >
             <img src="img/screens/screenshot-1-inventory.jpg" alt="" loading="lazy" />
             <span>Inventory</span>
@@ -167,7 +179,7 @@
             aria-selected="false"
             data-src="img/screens/screenshot-3-referrals.jpg"
             data-title="Referrals"
-            data-text="recruits, prospects, conversion stats, reward tiers and event bonuses."
+            data-text="recruits, prospects, conversion stats, reward tiers and event&nbsp;bonuses."
           >
             <img src="img/screens/screenshot-3-referrals.jpg" alt="" loading="lazy" />
             <span>Referrals</span>
@@ -177,7 +189,7 @@
             aria-selected="false"
             data-src="img/screens/screenshot-4-buybacks.jpg"
             data-title="Buy-Backs"
-            data-text="every melted pledge you can re-acquire, with a direct link to reclaim it on RSI."
+            data-text="every melted pledge you can re-acquire, with a direct link to reclaim it on&nbsp;RSI."
           >
             <img src="img/screens/screenshot-4-buybacks.jpg" alt="" loading="lazy" />
             <span>Buy-Backs</span>
@@ -187,57 +199,59 @@
             aria-selected="false"
             data-src="img/screens/screenshot-5-stats.jpg"
             data-title="Stats"
-            data-text="your hangar at today's store prices, your best deals, what you've spent over time and more."
+            data-text="your hangar at today's store prices, your best deals, what you've spent over time and&nbsp;more."
           >
             <img src="img/screens/screenshot-5-stats.jpg" alt="" loading="lazy" />
             <span>Stats</span>
           </button>
         </div>
-        <p class="tour-note">Screens show a fictional demo account. No real whales were harmed.</p>
+        <p class="tour-note">
+          Screens show a fictional demo account. No real whales were&nbsp;harmed.
+        </p>
       </section>
 
       <section class="features">
         <div class="feature">
           <h2>Private by Design</h2>
           <p>
-            Runs entirely in your browser using the RSI session you're already signed in with. No
-            password, no account, no server. Nothing leaves your device. What happens in your hangar
-            stays in your hangar.
+            It runs in your browser with the RSI session you already have. It never asks for your
+            password, and nothing about you is sent to us unless you connect openhangar.space. What
+            happens in your hangar stays in your&nbsp;hangar.
           </p>
         </div>
         <div class="feature">
           <h2>Your Whole Fleet</h2>
           <p>
             What your ships are worth today, what your CCUs saved you, your loaners, plus fleet
-            stats and filters for everything. Search it all from one box, JPEGs included.
+            stats and filters for everything. Search it all from one box, JPEGs&nbsp;included.
           </p>
         </div>
         <div class="feature">
           <h2>Wishlist and Store</h2>
           <p>
             Every ship's store price in your currency. Keep a wishlist and see what's on sale now,
-            or find it in your buy-backs. Your wallet has been warned.
+            or find it in your buy-backs. Your wallet has been&nbsp;warned.
           </p>
         </div>
         <div class="feature">
           <h2>Org Muster <span class="hint">(org fleet)</span></h2>
           <p>
             Combine your org's ship lists into one fleet and see which roles you've got covered and
-            which ones you're missing. Finally settle who's bringing the Hull C.
+            which ones you're missing. Finally settle who's bringing the Hull&nbsp;C.
           </p>
         </div>
         <div class="feature">
           <h2>Wingman Tracker <span class="hint">(referrals)</span></h2>
           <p>
             Recruits, prospects, conversion stats, reward tiers and event bonuses on one page. See
-            who's still waiting in the lobby.
+            who's still waiting in the&nbsp;lobby.
           </p>
         </div>
         <div class="feature">
           <h2>Built to Build On</h2>
           <p>
             Export everything as one JSON file to back it up or feed your own tools. The code is
-            public and fully auditable. Your data, persisted like PES, minus the wipes.
+            public and fully auditable. Your data, persisted like PES, minus the&nbsp;wipes.
           </p>
         </div>
       </section>
@@ -245,10 +259,10 @@
       <section class="how">
         <h2>Pre-Flight Checklist <span class="hint">(how it works)</span></h2>
         <ol>
-          <li>Install the extension for your browser.</li>
-          <li>Sign in to robertsspaceindustries.com as you normally would.</li>
+          <li>Install the extension for your&nbsp;browser.</li>
+          <li>Sign in to robertsspaceindustries.com as you normally&nbsp;would.</li>
           <li>
-            Click the Open Hangar icon and hit <strong>Scan</strong>. Big fleet? Grab a coffee.
+            Click the Open Hangar icon and hit <strong>Scan</strong>. Big fleet? Grab a&nbsp;coffee.
           </li>
         </ol>
       </section>
@@ -298,19 +312,6 @@
         </div>
       </div>
     </footer>
-
-    <!-- Open beta notice until the November 10 release (owner, 2026-10-04). Shown by
-         main.js unless closed before; remove after the release. -->
-    <aside class="beta-note" id="beta-note" role="status" aria-labelledby="beta-note-title" hidden>
-      <button type="button" class="beta-close" id="beta-close" aria-label="Close">✕</button>
-      <p class="beta-tag">Open Beta</p>
-      <h2 id="beta-note-title">Still Spooling Up</h2>
-      <p>
-        Open Hangar is a work in progress, with the official release set for
-        <strong>November 10</strong>. Questions, ideas or a bug to report? Come find us on Discord.
-      </p>
-      <a class="beta-link" href="https://discord.gg/FF8Wm5HdnV">Join the Discord ↗</a>
-    </aside>
 
     <script src="main.js"></script>
   </body>

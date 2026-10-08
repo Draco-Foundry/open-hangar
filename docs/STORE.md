@@ -206,13 +206,15 @@ Today the store build has no sync: the `sync` flag is off for it and no sync sit
 
 ## 11. Publishing Updates From GitHub
 
-1. Bump `manifest.json` / `package.json`, move the CHANGELOG's Unreleased notes under
-   the new version, merge, then push a tag (`git tag v0.2.9 && git push origin v0.2.9`).
-   The **Release** workflow builds the zips and the GitHub Release.
-2. **Actions → Publish to stores → Run workflow**, enter the tag, pick a store (or all).
-   It uploads and submits for review; each store still reviews before it goes live.
-   Each upload job waits for you to **Approve** the `stores` environment in the run
-   (Review deployments).
+1. `npm run release <x.y.z>` on a clean `main` (or bump `manifest.json` /
+   `package.json`, move the CHANGELOG's Unreleased notes under the new version, merge,
+   and push a tag). The **Release** workflow builds the zips and the GitHub Release,
+   then starts **Publish to stores** for the tag with `store: all`.
+2. That run checks everything, waits for CI on the release commit to pass, then each
+   upload job waits for you to **Approve** the `stores` environment in the run
+   (Review deployments). It uploads and submits for review; each store still reviews
+   before it goes live. To publish one store or retry, run **Actions → Publish to
+   stores → Run workflow** by hand with the tag and a store.
 
 Picking a single store whose secrets aren't set skips it; picking **all** fails
 instead, so Discord never announces a store that got nothing. See Store Keys below for
@@ -221,6 +223,28 @@ the secrets.
 One store update a day: a real run fails if another one sent something to the stores
 in the last 24 hours, unless it finishes the same tag one store at a time or the
 **Hotfix** box is ticked ([ROLLBACK.md](ROLLBACK.md)).
+
+### Holding a Store Back
+
+When a version goes to some stores but one waits a day on purpose, the extension page
+can say so with the same yellow pill as "in review", e.g. Firefox `v0.2.19` and
+`v0.2.20 arriving Oct 7`:
+
+1. Edit `site/store-plan.json` on `main` (chrome, edge or firefox; the date is the UTC
+   day you plan to publish):
+
+   ```json
+   { "firefox": { "version": "0.2.20", "on": "2026-10-07" } }
+   ```
+
+2. Merge it. That deploys the site (owner OK needed), and the hourly site runs keep it
+   up to date.
+3. Nothing to undo: the pill goes by itself once that store goes to review ("in
+   review" replaces it), has the version live, or the UTC day is over. Set the file
+   back to `{}` when convenient.
+
+A typo (bad version or date, unknown store) just shows no pill. The pill only appears
+while the store's live version can be read and is older.
 
 ## 12. Store Keys
 

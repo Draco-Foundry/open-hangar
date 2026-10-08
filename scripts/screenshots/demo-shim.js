@@ -386,7 +386,13 @@
               .map((x) => [x, clone(store[x])]),
           ),
         set: async (o) => {
-          Object.assign(store, clone(o));
+          // The demo's "RSI" is mostly local fixtures; only a few public lookups
+          // go through the proxy to the real internet. A slow or failed one would
+          // mark robertsspaceindustries.com as down (lib.js netDown) and the local
+          // store fixture would then be refused for 10 minutes: the UI test's old
+          // "store details / wishlist" flake. The demo never records that.
+          const { netDown: _skip, ...rest } = o || {};
+          Object.assign(store, clone(rest));
         },
         remove: async (k) => {
           for (const x of keysOf(k)) delete store[x];
