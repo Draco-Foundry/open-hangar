@@ -5,8 +5,11 @@
   // SyncMenu; owner, 2026-10-05). On Firefox a line under Connect says what we share,
   // and Learn More (or Connect, until Firefox has said yes) opens FirefoxExplain.
   // Hidden until the website is switched on (OH.siteEnabled).
+  // Connected, the corner shows just Open on Website (OpenOnWebsite.svelte), the
+  // quiet link the other pages with a website twin have under their titles.
   import { app, version } from '../lib/app.svelte.js';
   import FirefoxExplain from './FirefoxExplain.svelte';
+  import OpenOnWebsite from './OpenOnWebsite.svelte';
 
   const d = $derived.by(() => {
     version.n;
@@ -135,4 +138,8 @@
   {#if explain}
     <FirefoxExplain opener={explain} onClose={() => (explain = null)} />
   {/if}
+{:else if d.enabled}
+  <div class="site-connect site-open-home" id="site-open-home">
+    <OpenOnWebsite offer={false} />
+  </div>
 {/if}

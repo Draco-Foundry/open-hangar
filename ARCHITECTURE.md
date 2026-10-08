@@ -323,7 +323,11 @@ pilot is the same by handle or by Citizen Record number (digits only), and a han
 whose account isn't the cached RSI login never goes (reload switches hangars). It
 also keeps the website's last "wait" (`OH.siteSyncWait()`): after `not-open` the sync
 after a scan sends nothing for 6 hours, and a 429's `Retry-After` holds Sync Now too.
-Its state and actions are `site`
+The pages with a website twin link there (`OpenOnWebsite.svelte`): Open on Website
+(the website's My Hangar) under the title of Inventory, Buy-Backs and Stats and in the
+Citizen Card's corner once connected, See It on Any Device (Connect) before that.
+`ui/site/main.js` hands the component to the pages through `ui/lib/site-ui.svelte.js`,
+so a build without sync shows none. Its state and actions are `site`
 in `src/dashboard.js`, behind `window.OHApp.site`. The `identity` permission is in
 `manifest.json`, so every build has it. Syncs go to `/api/v1/sync`. Connect from the
 website: the website's `/link` page asks the extension through

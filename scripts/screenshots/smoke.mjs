@@ -1454,6 +1454,163 @@ try {
     ? ok('Firefox: what we share under Connect, the explainer, and Continue asks inside its click')
     : fail(`Firefox explainer: ${JSON.stringify(ff)}`);
 
+  // The pages with a website twin (Home, Inventory, Buy-Backs, Stats). Connected: Open
+  // On Website ↗ under each title (Home: the Citizen Card's corner), opening your
+  // hangar there. Before that: See It on Any Device, which starts Connect (Firefox's
+  // card first until Firefox says yes); Home has its Connect card instead. Nothing
+  // at all without a sync site.
+  const oow = await page.evaluate(async () => {
+    const wait = (ms = 80) => new Promise((r) => setTimeout(r, ms));
+    const $ = (sel) => document.querySelector(sel);
+    const PAGES = ['home', 'inventory', 'buybacks', 'stats'];
+    // Each page's button label ('' when there's none).
+    const labels = async () => {
+      const out = {};
+      for (const v of PAGES) {
+        location.hash = '#' + v;
+        await wait(200);
+        out[v] = [...document.querySelectorAll(`#view-${v} .site-open-btn`)]
+          .map((b) => b.textContent.trim())
+          .join('|');
+      }
+      return out;
+    };
+    const btn = async (v) => {
+      location.hash = '#' + v;
+      await wait(200);
+      return $(`#view-${v} .site-open-btn`);
+    };
+    const site = OHApp.site;
+    const keep = {
+      get: OH.getSiteLink,
+      connect: site.connect,
+      tabs: chrome.tabs?.create,
+      manifest: chrome.runtime.getManifest,
+      permissions: chrome.permissions,
+    };
+    const r = { connects: 0 };
+    const opened = [];
+    let link = null;
+    try {
+      r.none = await labels();
+      chrome.tabs = chrome.tabs || {};
+      chrome.tabs.create = (o) => opened.push(o.url);
+      OH.getSiteLink = async () => link;
+      site.connect = () => r.connects++;
+      await chrome.storage.local.set({ siteUrl: 'https://staging.example.test' });
+      await refreshSite();
+      await wait();
+      r.offer = await labels();
+      r.homeCard = !!$('#view-home .citizen-card #site-connect');
+      (await btn('stats')).click();
+      await wait();
+      // Firefox, not allowed yet: the card first, Connect only from its Continue.
+      const m = keep.manifest();
+      chrome.runtime.getManifest = () => ({
+        ...m,
+        browser_specific_settings: { gecko: { id: 'open-hangar@draco-foundry' } },
+      });
+      chrome.permissions = { contains: async () => false, request: async () => false };
+      await refreshSite();
+      await wait();
+      (await btn('inventory')).click();
+      await wait();
+      r.ffCard = !!$('#fx-explain') && r.connects === 1;
+      [...$('#fx-explain').querySelectorAll('button')]
+        .find((b) => b.textContent.includes('Not Now'))
+        .click();
+      await wait();
+      r.ffClosed = !$('#fx-explain') && r.connects === 1;
+      chrome.runtime.getManifest = keep.manifest;
+      chrome.permissions = keep.permissions;
+      link = { token: 't', name: 'pilot.mail', connectedAt: Date.now(), lastSync: Date.now() };
+      await refreshSite();
+      await wait();
+      r.on = await labels();
+      r.homeCorner = !!$('#view-home .citizen-card #site-open-home .site-open-btn');
+      r.homeQuiet = !$('#view-home .citizen-card #site-connect');
+      (await btn('buybacks')).click();
+      await wait();
+      r.opened = opened.join('|');
+    } finally {
+      OH.getSiteLink = keep.get;
+      site.connect = keep.connect;
+      if (keep.tabs) chrome.tabs.create = keep.tabs;
+      chrome.runtime.getManifest = keep.manifest;
+      chrome.permissions = keep.permissions;
+      await chrome.storage.local.remove('siteUrl');
+      await refreshSite();
+      location.hash = '#home';
+      await wait(200);
+    }
+    r.goneAgain = !document.querySelector('.site-open-btn');
+    return r;
+  });
+  const each = (o, home, rest) =>
+    o && o.home === home && ['inventory', 'buybacks', 'stats'].every((v) => o[v] === rest);
+  each(oow.none, '', '') &&
+  each(oow.offer, '', 'See It on Any Device') &&
+  oow.homeCard &&
+  oow.ffCard &&
+  oow.ffClosed &&
+  each(oow.on, 'Open on Website ↗', 'Open on Website ↗') &&
+  oow.homeCorner &&
+  oow.homeQuiet &&
+  oow.opened === 'https://staging.example.test/hangar' &&
+  oow.goneAgain
+    ? ok(
+        'website twin: Open on Website on Home, Inventory, Buy-Backs and Stats once connected (opens My Hangar), See It on Any Device before (starts Connect, Firefox card first), none without a sync site',
+      )
+    : fail(`Open on Website: ${JSON.stringify(oow)}`);
+
+  // Home, connected, at widths where Open on Website sits in the Citizen Card's corner
+  // (761px up): a long name stops short of it instead of running underneath.
+  const keepLink = await page.evaluate(async () => {
+    window.__keepSiteLink = OH.getSiteLink;
+    OH.getSiteLink = async () => ({ token: 't', name: 'p', connectedAt: 1, lastSync: 1 });
+    await chrome.storage.local.set({ siteUrl: 'https://staging.example.test' });
+    await refreshSite();
+    location.hash = '#home';
+    await new Promise((r) => setTimeout(r, 200));
+    // The name's own text node, so the card keeps updating it afterwards.
+    const n = document.querySelector('#cc-name');
+    const t = [...(n.querySelector('a') || n).childNodes].find((c) => c.nodeType === 3);
+    const old = t.data;
+    t.data = 'Commander Longname of the Very Long Fleet';
+    window.__keepName = () => (t.data = old);
+    return true;
+  });
+  const clash = {};
+  try {
+    for (const w of [1280, 900, 800, 761]) {
+      await page.setViewport({ width: w, height: 900 });
+      await new Promise((r) => setTimeout(r, 200));
+      const c = await page.evaluate(() => {
+        const n = document.querySelector('#cc-name');
+        const b = document.querySelector('#site-open-home .site-open-btn');
+        if (!b) return 'no link';
+        const nr = n.getBoundingClientRect();
+        const br = b.getBoundingClientRect();
+        const end = nr.right - parseFloat(getComputedStyle(n).paddingRight);
+        const under = nr.top < br.bottom && br.top < nr.bottom && br.left < end;
+        return under ? `name ends at ${Math.round(end)}, link starts at ${Math.round(br.left)}` : '';
+      });
+      if (c) clash[w] = c;
+    }
+  } finally {
+    await page.setViewport({ width: 1280, height: 900 });
+    await page.evaluate(async () => {
+      window.__keepName?.();
+      if (window.__keepSiteLink) OH.getSiteLink = window.__keepSiteLink;
+      await chrome.storage.local.remove('siteUrl');
+      await refreshSite();
+      await new Promise((r) => setTimeout(r, 200));
+    });
+  }
+  keepLink && Object.keys(clash).length === 0
+    ? ok("Home's Open on Website corner leaves room for a long name (761px to 1280px)")
+    : fail(`Open on Website over the name: ${JSON.stringify(clash)}`);
+
   // Currency: EUR converts the melt box (rates come from the demo's fixed file).
   const rates = await page.evaluate(async () => {
     try {
