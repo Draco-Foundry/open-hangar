@@ -318,7 +318,9 @@ it, an openhangar.space section in its ▾ menu (Sync Now, Open My Hangar, Disco
 "Syncing to Website…" as every scan's last step, and a refused sync in the scan
 report. The link (`siteLink`) is one per browser, so it remembers the RSI accounts it
 has synced and the ones you said no to; any other account's hangar waits for the scan
-report's "Sync <handle> to your openhangar.space account?" (Sync It, Don't Sync). It
+report's "Sync <handle> to your openhangar.space account?" (Sync It, Don't Sync). A
+pilot is the same by handle or by Citizen Record number (digits only), and a hangar
+whose account isn't the cached RSI login never goes (reload switches hangars). It
 also keeps the website's last "wait" (`OH.siteSyncWait()`): after `not-open` the sync
 after a scan sends nothing for 6 hours, and a 429's `Retry-After` holds Sync Now too.
 Its state and actions are `site`

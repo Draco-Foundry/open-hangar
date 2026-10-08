@@ -5135,14 +5135,14 @@ function siteCancel() {
 // took one moments ago; OH.siteSync) is a note instead: "Not Synced Yet" with an info
 // sign, no problem counted, and the Scan button stays as it was. An RSI account this
 // link hasn't synced asks first (siteSyncAsk). `scan` is the sync after a scan;
-// `onSend` runs when it really sends.
-async function siteSyncNow({ scan = false, onSend } = {}) {
+// `onSend` runs when it really sends; `dataOk` is a siteDataOk() the click already asked.
+async function siteSyncNow({ scan = false, onSend, dataOk } = {}) {
   if (site.syncing || !site.link) return;
   let problem = '';
   let calm = false;
   let ask = null;
   let quiet = false;
-  if (!(await siteDataOk())) problem = SITE_DATA_NO;
+  if (!(await (dataOk || siteDataOk()))) problem = SITE_DATA_NO;
   else {
     site.syncing = true;
     site.msg = '';
@@ -5191,10 +5191,12 @@ function siteSyncAsk(ask, question, scan) {
 async function siteSyncAnswer(yes) {
   const r = topBar.report;
   if (!r?.ask) return;
+  // Sync It is the click Firefox's prompt needs, so it's asked before any await.
+  const dataOk = yes ? siteDataOk() : null;
   topBar.report = r.before || null;
   homeUpdated();
   await OH.siteSyncAnswer(r.ask, yes);
-  if (yes) await siteSyncNow();
+  if (yes) await siteSyncNow({ dataOk });
 }
 function siteSyncReport(text, scan, calm = false) {
   const n = Date.now(); // a new report, so the top bar opens it

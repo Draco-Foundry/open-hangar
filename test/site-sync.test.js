@@ -169,6 +169,16 @@ test('disconnected on the website: forgets the link', async () => {
   assert.equal(mem.siteLink, undefined);
 });
 
+test('an old link refused after connecting again leaves the new link alone', async () => {
+  linked(scanned(Date.now() - 60_000));
+  answer = () => {
+    mem.siteLink = { token: 'new', name: 'pilot' }; // Disconnect, then Connect, meanwhile
+    return new Response(JSON.stringify({ error: 'not connected' }), { status: 401 });
+  };
+  await assert.rejects(OH.siteSync(), /disconnected on the website/);
+  assert.deepEqual(mem.siteLink, { token: 'new', name: 'pilot' });
+});
+
 test('sync and disconnect use the versioned /api/v1/sync', async () => {
   linked(scanned(Date.now() - 60_000));
   answer = () => new Response(JSON.stringify({ ok: true, synced_at: 456 }), { status: 200 });
@@ -329,6 +339,72 @@ test('the same Citizen Record under a new handle is the same pilot', async () =>
   assert.deepEqual(mem.siteLink.accounts, [{ handle: 'New_Handle', record: '3003' }]);
 });
 
+test('only a real Citizen Record number makes two handles one pilot', async () => {
+  linked(scanned(Date.now() - 60_000));
+  signedInAs('Pilot_A', 'n/a'); // a placeholder, not a record
+  answer = ok;
+  await OH.siteSync({ auto: true });
+  assert.deepEqual(mem.siteLink.accounts, [{ handle: 'Pilot_A', record: null }]);
+  signedInAs('Pilot_B', 'n/a');
+  const err = await tryAuto();
+  assert.equal(err?.ask?.handle, 'Pilot_B', 'asks: the same placeholder is no match');
+  assert.equal(sent.length, 1);
+  assert.deepEqual(
+    mem.siteLink.accounts.map((a) => a.handle),
+    ['Pilot_A'],
+  );
+  // "#123" on the dossier and "123" are the same number.
+  linked(scanned(Date.now() - 60_000));
+  signedInAs('Old_Handle', '#123');
+  await OH.siteSync({ auto: true });
+  assert.deepEqual(mem.siteLink.accounts, [{ handle: 'Old_Handle', record: '123' }]);
+  signedInAs('New_Handle', '123');
+  await OH.siteSync({ auto: true });
+  assert.equal(sent.length, 2);
+});
+
+test("the hangar's own account counts, not just the cached RSI login", async () => {
+  linked(scanned(Date.now() - 60_000));
+  signedInAs('Pilot_A', '1001');
+  answer = ok;
+  await OH.siteSync({ auto: true });
+  assert.equal(sent.length, 1);
+  // Pilot_B's hangar is the live one, but the RSI login cached is still Pilot_A's
+  // (signed in again elsewhere before this page switched hangars).
+  mem.db = { ...mem.db, owner: { nickname: 'Pilot_B', displayname: 'Pilot_B' } };
+  let sends = 0;
+  for (const opts of [{ auto: true }, {}]) {
+    await assert.rejects(OH.siteSync({ ...opts, onSend: () => sends++ }), (e) => {
+      assert.match(e.message, /belongs to another pilot than the one signed in to RSI/);
+      assert.equal(e.calm, true);
+      assert.ok(!e.ask && !/Pilot_/.test(e.message), 'no handle, so it can be logged');
+      return true;
+    });
+  }
+  assert.equal(sends, 0);
+  assert.equal(sent.length, 1, "Pilot_B's hangar never went as Pilot_A's");
+  // Signed out of RSI (no login cached): the hangar's own account is the one asked about.
+  delete mem.account;
+  const err = await tryAuto();
+  assert.equal(err?.ask?.handle, 'Pilot_B');
+  assert.equal(sent.length, 1);
+});
+
+test('a sync without a Citizen Record keeps the one already known', async () => {
+  linked(scanned(Date.now() - 60_000));
+  signedInAs('Pilot_A', '1001');
+  answer = ok;
+  await OH.siteSync({ auto: true });
+  delete mem.account; // signed out of RSI: the export has no record
+  await OH.siteSync({ auto: true });
+  assert.equal(sent.length, 2);
+  assert.deepEqual(mem.siteLink.accounts, [{ handle: 'Pilot_A', record: '1001' }]);
+  // So a new handle with that record is still the same pilot.
+  signedInAs('Pilot_A2', '1001');
+  await OH.siteSync({ auto: true });
+  assert.equal(sent.length, 3);
+});
+
 test("a link's first sync asks when this browser keeps another account too", async () => {
   linked(scanned(Date.now() - 60_000));
   signedInAs('Pilot_B', '2002');
@@ -447,6 +523,15 @@ test('a 429 without a reason or Retry-After waits 5 minutes, with built-in words
   );
   const left = mem.siteLink.wait.until - Date.now();
   assert.ok(left > 4.9 * 60e3 && left <= 5 * 60e3);
+});
+
+// An extension page only sees the Retry-After header when the website exposes it (CORS);
+// the test's fetch has no CORS, so the JSON's `retry_after` is checked on its own here.
+test('a 429 with retry_after in its JSON waits that long', async () => {
+  const err = await refusedWith(429, { error: 'Too soon.', reason: 'too-soon', retry_after: 600 });
+  assert.equal(err.calm, true);
+  const left = mem.siteLink.wait.until - Date.now();
+  assert.ok(left > 9.9 * 60e3 && left <= 10 * 60e3);
 });
 
 test('OH.siteSyncWait: which wait holds which sync', () => {

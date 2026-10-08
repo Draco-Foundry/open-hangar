@@ -1187,9 +1187,9 @@
   // a consumer gets everything in one file. Reads the account from cache only (no
   // network), so export is deterministic and works offline. ALWAYS emits the
   // current schemaVersion (the format it actually wrote), regardless of the stored
-  // DB's version.
-  OH.exportDB = async function exportDB() {
-    const db = await OH.loadDB();
+  // DB's version. `live`: a DB already loaded (OH.siteSync checks whose it is first).
+  OH.exportDB = async function exportDB(live = null) {
+    const db = live || (await OH.loadDB());
     const { account } = await chrome.storage.local.get('account');
     let appVersion = null;
     try {
@@ -3806,23 +3806,35 @@
   // only that one account: that's whoever connected.
   const SITE_PILOTS_MAX = 20;
   const lcHandle = (s) => String(s || '').toLowerCase();
+  // A Citizen Record the way the website reads it: its digits ("#123456" → "123456"),
+  // else null. A placeholder ("n/a") or nothing is no record, so two accounts never
+  // count as one pilot by it.
+  const cleanRecord = (v) => String(v ?? '').match(/(\d{1,12})/)?.[1] || null;
   // The export's account (the website files a hangar under its handle) → { handle,
   // record } or null when there's no handle (nothing to tell apart, so it goes as before).
   function pilotOf(payload) {
     const a = isObj(payload?.account) ? payload.account : null;
     const handle = typeof a?.handle === 'string' ? a.handle.trim() : '';
     if (!handle) return null;
-    const record = a.ueeRecord == null ? '' : String(a.ueeRecord).trim();
-    return { handle, record: record || null };
+    return { handle, record: cleanRecord(a.ueeRecord) };
   }
-  const samePilot = (a, b) =>
-    lcHandle(a.handle) === lcHandle(b.handle) || (!!a.record && a.record === b.record);
+  const samePilot = (a, b) => {
+    const record = cleanRecord(a.record);
+    return (
+      lcHandle(a.handle) === lcHandle(b.handle) || (!!record && record === cleanRecord(b.record))
+    );
+  };
   const pilotList = (list) => (Array.isArray(list) ? list.filter(isObj) : []);
-  const withPilot = (list, who) =>
-    [
-      ...pilotList(list).filter((p) => !samePilot(p, who)),
-      { handle: who.handle, record: who.record || null },
-    ].slice(-SITE_PILOTS_MAX);
+  // A sync that couldn't read the Citizen Record (signed out of RSI, say) keeps the one
+  // already known for that handle.
+  const withPilot = (list, who) => {
+    const had = pilotList(list);
+    const record =
+      cleanRecord(who.record) || cleanRecord(had.find((p) => samePilot(p, who))?.record);
+    return [...had.filter((p) => !samePilot(p, who)), { handle: who.handle, record }].slice(
+      -SITE_PILOTS_MAX,
+    );
+  };
   const withoutPilot = (list, who) => pilotList(list).filter((p) => !samePilot(p, who));
   // → 'yes' (synced through this link before), 'no' (you said no), 'new' (another
   // account than the ones it synced) or 'first' (it hasn't synced one yet). Pure.
@@ -3850,7 +3862,7 @@
   OH.siteSyncAnswer = async function siteSyncAnswer(who, yes) {
     const link = await OH.getSiteLink();
     if (!link || !who || typeof who.handle !== 'string' || !who.handle) return;
-    const pilot = { handle: who.handle, record: who.record || null };
+    const pilot = { handle: who.handle, record: cleanRecord(who.record) };
     await updateLink(link.token, (l) => ({
       ...l,
       accounts: yes ? withPilot(l.accounts, pilot) : withoutPilot(l.accounts, pilot),
@@ -3893,6 +3905,8 @@
     "openhangar.space hasn't caught up with this version yet. Try again soon.";
   const SYNC_TOO_BIG =
     "That's more cargo than openhangar.space can hold. Your hangar stays safe in your browser.";
+  const SYNC_OTHER_LOGIN =
+    'This hangar belongs to another pilot than the one signed in to RSI. Reload Open Hangar to switch hangars, then sync.';
   // A refusal's status, reason and the website's own words → the Error to throw. Sync
   // not open yet, or another sync too soon, isn't something you did, so it's marked
   // `calm`: the scan report shows it as a note, not a problem (src/dashboard.js
@@ -3922,11 +3936,19 @@
       const said = typeof wait.said === 'string' ? wait.said : '';
       throw Object.assign(syncRefusal(0, wait.reason, said), { held: wait.reason });
     }
-    const db = await OH.exportDB();
+    const live = await OH.loadDB();
+    const db = await OH.exportDB(live);
     // Nothing scanned in this browser yet: sending its empty hangar would replace
     // the one already on the website (the server refuses it too).
     if (!db?.sources?.hangar?.scannedAt) throw new Error(SYNC_NO_SCAN);
     const who = pilotOf(db);
+    // The export names the cached RSI login, but the hangar is the live account's
+    // (`owner`). They differ when someone else signed in to RSI before this page
+    // switched hangars (reconcileAccount): one pilot's hangar under the other's handle
+    // never goes. Calm, and without a handle, so it can be logged.
+    const owner = String(live?.owner?.nickname || '').trim();
+    if (who && owner && lcHandle(owner) !== lcHandle(who.handle))
+      throw Object.assign(new Error(SYNC_OTHER_LOGIN), { calm: true });
     const answer = OH.sitePilotAnswer(link, who);
     if (answer === 'no' && auto)
       throw Object.assign(new Error('Not synced: you chose to keep this account here.'), {
@@ -3944,7 +3966,9 @@
       body: OH.syncBody(OH.syncPayload(db)),
     });
     if (res.status === 401) {
-      await chrome.storage.local.remove('siteLink');
+      // Forget this link only: one connected again meanwhile stays.
+      if ((await OH.getSiteLink())?.token === link.token)
+        await chrome.storage.local.remove('siteLink');
       throw new Error('This extension was disconnected on the website. Connect again.');
     }
     if (!res.ok) {
@@ -3954,14 +3978,16 @@
       const reason = text(body?.reason);
       const err = syncRefusal(res.status, reason, text(body?.error));
       const at = Date.now();
+      // An extension page only sees Retry-After when the website exposes it (CORS), so
+      // `retry_after` (seconds) in the JSON counts too.
+      const retryAfter = header(res, 'retry-after') || body?.retry_after;
       const hold =
         reason === 'not-open'
           ? { reason, until: at + SYNC_NOT_OPEN_WAIT_MS }
           : res.status === 429 || reason === 'too-soon'
             ? {
                 reason: 'too-soon',
-                until:
-                  at + (OH.retryAfterMs(header(res, 'retry-after'), at) || SYNC_TOO_SOON_WAIT_MS),
+                until: at + (OH.retryAfterMs(retryAfter, at) || SYNC_TOO_SOON_WAIT_MS),
               }
             : null;
       if (hold)

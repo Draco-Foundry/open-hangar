@@ -71,7 +71,9 @@ changes on the website. After that answer the sync after a scan holds off for 6 
 (Sync Now still asks), so a connected extension doesn't upload its whole hangar after
 every scan just to hear it again. The website's limit of one sync per account every few
 minutes (429, reason `too-soon`) is a calm note too, and its `Retry-After` holds every
-sync, Sync Now included.
+sync, Sync Now included. An extension page only sees that header when the website
+exposes it (`access-control-expose-headers`), so `retry_after` (seconds) in the JSON
+counts too; with neither, it waits 5 minutes.
 
 `--flag sync=off` still builds a copy without it, for a developer; the store check
 refuses that build.

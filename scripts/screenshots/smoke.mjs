@@ -1129,14 +1129,20 @@ try {
       $('#scan-report .sr-x')?.click();
       await wait();
       // An RSI account this link hasn't synced: the scan report asks (a calm note with
-      // Sync It and Don't Sync), the answer goes to OH.siteSyncAnswer, and Sync It
-      // then syncs.
+      // Sync It and Don't Sync) and the answer goes to OH.siteSyncAnswer. After Don't
+      // Sync, the sync after a scan stays quiet (no report); Sync Now asks again, and
+      // Sync It then syncs. The stub follows OH.siteSync's rules.
       const answers = [];
       let tries = 0;
       OH.siteSyncAnswer = async (who, yes) => answers.push(`${who.handle}:${yes}`);
-      OH.siteSync = async () => {
+      OH.siteSync = async (opts) => {
         tries++;
-        if (answers.at(-1) === 'Pilot_B:true') return realSync();
+        const last = answers.at(-1);
+        if (last === 'Pilot_B:true') return realSync();
+        if (last === 'Pilot_B:false' && opts?.auto)
+          throw Object.assign(new Error('Not synced: you chose to keep this account here.'), {
+            quiet: true,
+          });
         throw Object.assign(new Error('Sync Pilot_B to your openhangar.space account?'), {
           calm: true,
           ask: { handle: 'Pilot_B', record: null },
@@ -1154,6 +1160,12 @@ try {
       r.askClosed = !$('#scan-report')?.checkVisibility() && !topBar.report;
       await runScan({ hangar: false, buybacks: false, referrals: false });
       await wait(250);
+      r.quietAfterNo = !topBar.report && !$('#scan-report')?.checkVisibility();
+      setScanning(''); // past the end-of-scan flash
+      await wait();
+      await syncNow();
+      await wait(250);
+      r.askAgain = $('#scan-report') && !$('#scan-report').hidden ? txt($('#scan-report')) : '';
       btnIn($('#scan-report'), 'Sync It')?.click();
       await wait(250);
       r.answers = answers.join(' ');
@@ -1239,8 +1251,10 @@ try {
   sc.askLook &&
   /^Scan (All|Custom)$/.test(sc.askScanButton) &&
   sc.askClosed &&
+  sc.quietAfterNo &&
+  /Sync Pilot_B to your openhangar\.space account\?/.test(sc.askAgain) &&
   sc.answers === 'Pilot_B:false Pilot_B:true' &&
-  sc.askTries === 3 &&
+  sc.askTries === 4 &&
   sc.askSynced &&
   sc.noScanDisconnect &&
   sc.menuStays &&
@@ -1249,7 +1263,7 @@ try {
   sc.statusGone &&
   sc.hiddenAgain
     ? ok(
-        "website sync: connect on the card or the portrait menu (the code with Copy and its time left), then the Synced dot on the portrait (Synced line and Sync Now in its menu), the ▾ menu, a scan syncs as its last step, problems in the scan report (sync not open yet as a calm note), a new RSI account asks first (Sync It / Don't Sync), disconnect",
+        "website sync: connect on the card or the portrait menu (the code with Copy and its time left), then the Synced dot on the portrait (Synced line and Sync Now in its menu), the ▾ menu, a scan syncs as its last step, problems in the scan report (sync not open yet as a calm note), a new RSI account asks first (Sync It / Don't Sync; after Don't Sync a scan stays quiet and Sync Now asks again), disconnect",
       )
     : fail(`website sync: ${JSON.stringify(sc)}`);
 
