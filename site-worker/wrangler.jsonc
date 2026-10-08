@@ -3,11 +3,12 @@
   // served as Workers static assets, so it gets Cloudflare's proxy, WAF, caching
   // and analytics like app.openhangar.space. Deployed by .github/workflows/pages.yml.
   //
-  // The home page and the files it loads come from the website Worker
-  // (open-hangar-server, which also serves app.openhangar.space) through the
-  // small script in src/index.js. Every other path never runs the script: the
-  // extension's status.json and rates.json, help and privacy are plain files as
-  // before. If the website Worker fails, the old static home page is served.
+  // The home page, the files it loads and the paths below come from the website
+  // Worker (open-hangar-server, which also serves app.openhangar.space) through
+  // the small script in src/index.js. Every file in ../site never runs the
+  // script: the extension's status.json and rates.json, help.html and privacy.html
+  // are plain files as before. If the website Worker fails, src/index.js gives
+  // each path its fallback (the old static home page for / and /extension).
   "name": "openhangar-site",
   "main": "src/index.js",
   "compatibility_date": "2026-09-26",
@@ -20,6 +21,12 @@
       "/extension",
       "/store",
       "/api/store/*",
+      // The website's newer pages, each a 404 there until its flag is on. Exact
+      // paths: "/help" never matches the static Troubleshooting page, /help.html.
+      "/ships",
+      "/ships/*",
+      "/whats-next",
+      "/help",
       // The extension's public feeds (the website answers them, Origin-checked).
       "/api/game-status",
       "/api/ships",
