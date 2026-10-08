@@ -28,8 +28,9 @@ function htmlBullets() {
   const html = read('site/privacy.html');
   const sec = /<h2>Permissions and Why They Are Used<\/h2>\s*<ul>([\s\S]*?)<\/ul>/i.exec(html);
   assert.ok(sec, 'site/privacy.html has a permissions section');
+  // The text between the tags (our own page, read here, never shown anywhere).
   return [...sec[1].matchAll(/<li>([\s\S]*?)<\/li>/g)].map((m) =>
-    plain(m[1].replace(/<[^>]+>/g, '')),
+    plain(m[1].split(/<[^>]*>/).join('')),
   );
 }
 const named = (bullets, label) => bullets.some((b) => b.startsWith(`${label}:`));
