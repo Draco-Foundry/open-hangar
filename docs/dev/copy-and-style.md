@@ -21,10 +21,18 @@
 - **Voice:** fun, short Star Citizen player flavour (docs/VOICE.md), always positive,
   never implying something was broken. The action must stay obvious; add a small muted
   hint after a joke label when needed. Legal and privacy text stays plain.
+- **Don't name other community tools or sites** in public text, except required data
+  and license credits (#448).
 
 ## What Not to Build
 
+- From 0.3.0 the extension gets reading improvements and fixes only; new features go on
+  the website.
 - No rankings or leaderboards of pilots or orgs.
+- No gear score: never compare totals, values or counts between players. Org Fleet
+  shows ships, never values.
+- No paid tiers: no subscriptions, premium tier or paid features.
+- No Safari build, and no API for other sites to read the extension's data.
 - No LTI counts or LTI emphasis in summaries, no CCU-chain features, no "best use of
   your buy-back token" advice, no duplicates card, no insight cards (pages go straight
   to their search bar).

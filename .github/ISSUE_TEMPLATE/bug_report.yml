@@ -1,25 +1,32 @@
-name: 🐞 Bug report
+name: Bug Report
 description: Something in Open Hangar isn't working right.
 labels: [bug]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting! Please **don't paste personal data** (referral codes, emails, order numbers) — screenshots are fine if you crop them.
+        Thanks for reporting! Please **don't paste personal data** (referral codes, emails, order numbers). Screenshots are fine if you crop them.
   - type: textarea
     id: what
     attributes:
-      label: What happened?
+      label: What Happened?
       description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where Did It Happen?
+      options: [The extension, The website (openhangar.space), Both]
     validations:
       required: true
   - type: input
     id: version
     attributes:
-      label: Open Hangar version
-      description: Shown at the bottom of the dashboard (e.g. v0.2.7).
+      label: Open Hangar Version
+      description: 'Extension only: shown at the bottom of the dashboard (e.g. v0.2.7).'
     validations:
-      required: true
+      required: false
   - type: dropdown
     id: browser
     attributes:
@@ -36,5 +43,5 @@ body:
   - type: textarea
     id: extra
     attributes:
-      label: Anything else?
+      label: Anything Else?
       description: Screenshots, which page (Inventory, Buy-Backs, Stats…), roughly how many pledges you have.

@@ -182,17 +182,12 @@ install prompt only names robertsspaceindustries.com.)_
   Entertainment_.
 - ✅ Automated validation is instant; human review can follow after listing.
 
-## 10. Safari (Deferred)
-
-Needs a Mac with Xcode and the **$99/yr** Apple Developer Program. See
-CONTRIBUTING "Safari Notes". The other three stores are live, so this is the one left.
-
-## 11. Post-Launch
+## 10. Post-Launch
 
 - ✅ Add the store links to the README. ⬜ Org profile.
 - ⬜ Watch the dashboard for policy notices; respond promptly to any review query.
 
-## 12. Publishing Updates From GitHub
+## 11. Publishing Updates From GitHub
 
 1. `npm run release <x.y.z>` on a clean `main` (or bump `manifest.json` /
    `package.json`, move the CHANGELOG's Unreleased notes under the new version, merge,
@@ -234,7 +229,7 @@ can say so with the same yellow pill as "in review", e.g. Firefox `v0.2.19` and
 A typo (bad version or date, unknown store) just shows no pill. The pill only appears
 while the store's live version can be read and is older.
 
-## 13. Store Keys
+## 12. Store Keys
 
 The upload keys are secrets in the `stores` environment (repo Settings → Environments →
 stores), which needs your approval before any job can read them (#192). Keys not moved
