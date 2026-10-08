@@ -2,7 +2,7 @@
   "name": "open-hangar",
   "version": "0.2.19",
   "private": true,
-  "description": "Browser extension that reads your own Star Citizen / RSI account data into a clean, reusable local database you can build on.",
+  "description": "Browser extension for Open Hangar, the free Star Citizen fleet manager: reads your own RSI account (hangar, buy-backs, balances, referrals) in your browser.",
   "license": "PolyForm-Strict-1.0.0",
   "homepage": "https://github.com/Draco-Foundry/open-hangar#readme",
   "repository": {
