@@ -6,6 +6,8 @@ action stays clear though: what happened, what to do next, and any warning must
 be obvious at a glance. Legal and privacy pages stay plain. No em dashes; Title
 Case headings. (#256)
 
+Flavor, not overload: the look stays professional; the words carry the 'verse.
+
 ## Phrasebook
 
 ### People and Greetings
