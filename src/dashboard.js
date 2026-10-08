@@ -3442,7 +3442,8 @@ function bbDetailsInfo(list) {
     need: need.length,
     have: list.filter((b) => !bbNeedsRead(b)).length,
     of: list.length,
-    mins: Math.max(1, Math.round((need.length * 1.6) / 60)),
+    // About 2.4 s a page: the page itself and the 1 to 2 s pause after it (OH.bbdPause).
+    mins: Math.max(1, Math.round((need.length * 2.4) / 60)),
     // Big lists get a heads-up: hundreds of pages in a row is what makes RSI throttle.
     big: need.length > 100,
   };
