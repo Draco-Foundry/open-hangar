@@ -209,12 +209,12 @@
         <li>
           <strong>What is sent, and when:</strong> once connected, the extension syncs automatically
           after every successful scan. There is nothing to press and no setting to turn on. Each
-          sync sends the same data as its JSON backup file: your hangar, buy-backs (including what
-          is inside each pack), scan history, pledge archive, account identity and balances (handle,
-          display name, UEE Citizen Record number, org, rank, Store Credit, UEC, REC) and your
-          referral recruits list. The Citizen Record number lets the website keep the same account
-          and history if you change your RSI handle. Your referral code is never sent, and neither
-          is your RSI password or any RSI cookie.
+          sync sends the same data as its JSON backup file, except your referral prospects list:
+          your hangar, buy-backs (including what is inside each pack), scan history, pledge archive,
+          account identity and balances (handle, display name, UEE Citizen Record number, org, rank,
+          Store Credit, UEC, REC) and your referral recruits list. The Citizen Record number lets
+          the website keep the same account and history if you change your RSI handle. Your referral
+          code is never sent, and neither is your RSI password or any RSI cookie.
         </li>
         <li>
           <strong>No extra RSI requests:</strong> sync sends what the extension already has. It
@@ -260,21 +260,22 @@
           described above, and to add an upgrade to your RSI cart when you click Add to RSI Cart.
         </li>
         <li>
-          <strong>identity:</strong> for Connect's sign-in window, where you sign in to
-          app.openhangar.space and approve the connection (see
-          <a href="#optional-sync">Optional Sync</a>). The window only hands the extension a
-          one-time code to finish connecting, never your password. Nothing else uses this
-          permission.
+          <strong>identity:</strong> for connecting sync. Connect opens a sign-in window, where you
+          sign in to app.openhangar.space and approve the connection (see
+          <a href="#optional-sync">Optional Sync</a>). The window hands the extension a one-time
+          code to finish connecting, never your password. Connect This Browser on the website uses
+          this permission only to look up the extension's sign-in address. Nothing else uses it.
         </li>
         <li>
           <strong>Messages from openhangar.space:</strong> pages on openhangar.space and
           app.openhangar.space, and no other site, can check that Open Hangar is installed and ask
-          it for two things: Add to RSI Cart on the website's store (see
-          <a href="#add-to-rsi-cart">Add to RSI Cart</a>) and, on app.openhangar.space, Connect This
-          Browser, which connects sync from the website. Chrome and Edge let these pages message the
-          extension directly. Firefox doesn't, so on Firefox the extension runs a small bridge
-          script on these pages that only passes their messages to the extension and its answers
-          back. It reads nothing else on the page and sends nothing anywhere else.
+          it for two things. The first is Add to RSI Cart on the website's store: the page sees
+          which of your ships can be upgraded and RSI's prices, inside your browser only (see
+          <a href="#add-to-rsi-cart">Add to RSI Cart</a>). The second, on app.openhangar.space only,
+          is Connect This Browser, which connects sync from the website. Chrome and Edge let these
+          pages message the extension directly. Firefox doesn't, so on Firefox the extension runs a
+          small bridge script on these pages that only passes their messages to the extension and
+          its answers back. It reads nothing else on the page and sends nothing anywhere else.
         </li>
       </ul>
       <h2>Data Export</h2>
@@ -282,8 +283,8 @@
         Open Hangar lets you export your database as a JSON file (or a CSV of what a page shows)
         that you choose to save. The JSON file includes your scan history and pledge archive. That
         file is created locally and handled entirely by you; the extension does not upload it
-        anywhere. (Only sync sends the same data, and only if you connected it.) Your referral code
-        is deliberately left out of exports.
+        anywhere. (Only sync sends this data, minus the referral prospects list, and only if you
+        connected it.) Your referral code is deliberately left out of exports.
       </p>
       <h2 id="multiple-accounts">Multiple Accounts</h2>
       <p>
