@@ -4441,11 +4441,17 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   // @sync-start
   // Connected: every finished scan syncs by itself, as the Scan button's last step
   // ("Syncing to Website…"; owner, 2026-10-05). The server refuses an empty or older
-  // hangar, so this can't wipe one; a refusal shows in the scan report.
+  // hangar, so this can't wipe one; a refusal shows in the scan report. It sends
+  // nothing while the website asked to wait, or for an account this link hasn't
+  // synced before you say yes (OH.siteSync).
   if (site.link && !signedOut) {
-    scanProgress.i = scanProgress.n;
-    setScanning('Sending this scan to openhangar.space', false, 'Syncing to Website…');
-    await siteSyncNow({ scan: true });
+    await siteSyncNow({
+      scan: true,
+      onSend: () => {
+        scanProgress.i = scanProgress.n;
+        setScanning('Sending this scan to openhangar.space', false, 'Syncing to Website…');
+      },
+    });
   }
   // @sync-end
   setScanning(`${anyErr ? '⚠ ' : '✓ '}${summary}`, true);
@@ -5126,30 +5132,72 @@ function siteCancel() {
 }
 // A sync that didn't go through shows in the scan report under the Scan button:
 // "Scan Done, Not Synced" after a scan (a row of its own if the scan had problems
-// too), "Not Synced" for Sync Now. A calm refusal (sync isn't open yet, OH.siteSync)
-// is a note instead: "Not Synced Yet" with an info sign, no problem counted, and the
-// Scan button stays as it was.
-async function siteSyncNow({ scan = false } = {}) {
+// too), "Not Synced" for Sync Now. A calm refusal (sync isn't open yet, or the website
+// took one moments ago; OH.siteSync) is a note instead: "Not Synced Yet" with an info
+// sign, no problem counted, and the Scan button stays as it was. An RSI account this
+// link hasn't synced asks first (siteSyncAsk). `scan` is the sync after a scan;
+// `onSend` runs when it really sends; `dataOk` is a siteDataOk() the click already asked.
+async function siteSyncNow({ scan = false, onSend, dataOk } = {}) {
   if (site.syncing || !site.link) return;
   let problem = '';
   let calm = false;
-  if (!(await siteDataOk())) problem = SITE_DATA_NO;
+  let ask = null;
+  let quiet = false;
+  if (!(await (dataOk || siteDataOk()))) problem = SITE_DATA_NO;
   else {
     site.syncing = true;
     site.msg = '';
     homeUpdated();
     try {
-      await OH.siteSync();
+      await OH.siteSync({ auto: scan, onSend });
     } catch (err) {
       problem = String(err?.message || err);
       calm = !!err?.calm;
-      OH.log(calm ? 'info' : 'warn', 'site', problem);
+      ask = err?.ask || null;
+      quiet = !!err?.quiet;
+      // These two name the RSI account, and the flight log never does.
+      if (ask) OH.log('info', 'site', 'asked before syncing an RSI account new to this link');
+      else if (quiet) OH.log('info', 'site', 'not synced: you chose to keep this account here');
+      else OH.log(calm ? 'info' : 'warn', 'site', problem);
     }
     site.syncing = false;
   }
-  if (problem) siteSyncReport(problem, scan, calm);
+  if (ask) siteSyncAsk(ask, problem, scan);
+  else if (quiet) {
+    // Your answer for this account stands: nothing to show.
+  } else if (problem) siteSyncReport(problem, scan, calm);
   else if (topBar.report?.kind === 'sync') topBar.report = null; // went through this time
   await refreshSite();
+}
+// "Sync <handle> to your openhangar.space account?" in the scan report, with Sync It
+// and Don't Sync (siteSyncAnswer). After a scan with problems their rows stay under
+// it, and they come back as the report once you answer.
+function siteSyncAsk(ask, question, scan) {
+  const before = scan && topBar.report ? topBar.report : null;
+  topBar.report = {
+    kind: 'sync',
+    calm: !before?.bad,
+    ask,
+    title: 'New Pilot Aboard',
+    sub: question,
+    hint: `Open Hangar checks before beaming up a hangar from another RSI account. We'll remember your answer for ${ask.handle}.`,
+    rows: before ? before.rows : [],
+    bad: before ? before.bad : 0,
+    summary: before ? before.summary : 'Not synced yet: asked about a new RSI account', // no handle
+    last: '',
+    before,
+    n: Date.now(), // a new report, so the top bar opens it
+  };
+}
+async function siteSyncAnswer(yes) {
+  const r = topBar.report;
+  if (!r?.ask) return;
+  // Sync It is the click Firefox's prompt needs, so it's asked before any await.
+  const dataOk = yes ? siteDataOk() : null;
+  topBar.report = r.before || null;
+  homeUpdated();
+  await OH.siteSyncAnswer(r.ask, yes);
+  if (yes) await siteSyncNow({ dataOk });
 }
 function siteSyncReport(text, scan, calm = false) {
   const n = Date.now(); // a new report, so the top bar opens it
@@ -6280,6 +6328,8 @@ window.OHApp = {
     cancel: siteCancel,
     reopen: () => site.waiting && chrome.tabs.create({ url: site.waiting.url }),
     sync: siteSyncNow,
+    // The scan report's Sync It (true) and Don't Sync (false) for a new RSI account.
+    answer: siteSyncAnswer,
     open: async () => chrome.tabs.create({ url: `${await OH.siteUrl()}/hangar` }),
     disconnect: siteDisconnect,
   },
