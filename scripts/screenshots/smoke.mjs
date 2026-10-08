@@ -171,8 +171,9 @@ async function checkEscapeFilters(label, view, search, opener) {
 try {
   console.log('Home');
   await go('#home');
-  // The Open Beta card (until the November 10 release): a countdown, and Maybe Later
-  // closes it for good. Closed here, so it doesn't cover buttons later checks click.
+  // The Open Beta card (until the November 10 release, so always on the demo clock): a
+  // countdown, and Maybe Later closes it for good. Closed here, so it doesn't cover
+  // buttons later checks click.
   const beta = await page.evaluate(() => {
     const note = document.getElementById('beta-note');
     const r = {
@@ -184,11 +185,7 @@ try {
     r.remembered = localStorage.getItem('ohBetaNoteClosed') === '1';
     return r;
   });
-  Date.now() > Date.parse('2026-11-11') ||
-  (beta.shown &&
-    /days to go|Tomorrow|Release day/.test(beta.days) &&
-    beta.closed &&
-    beta.remembered)
+  beta.shown && /days to go|Tomorrow|Release day/.test(beta.days) && beta.closed && beta.remembered
     ? ok('Open Beta card: countdown, Maybe Later closes it and remembers')
     : fail(`beta card: ${JSON.stringify(beta)}`);
   // The Svelte Home (ui/home) mounts under the Citizen Card.
