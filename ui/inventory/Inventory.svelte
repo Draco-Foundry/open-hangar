@@ -12,6 +12,7 @@
   import ActivePills from '../lib/ActivePills.svelte';
   import ExportMenu from '../lib/ExportMenu.svelte';
   import { escapeClearsFilters } from '../lib/esc-filters.js';
+  import { siteUi } from '../lib/site-ui.svelte.js';
   import SavedViews from './SavedViews.svelte';
 
   const SORTS = [
@@ -92,7 +93,9 @@
 
 {#if !d.empty}
   <div id="inv-sum">
-    <SummaryStrip title="Inventory" note={d.note} stats={d.stats} />
+    <SummaryStrip title="Inventory" note={d.note} stats={d.stats}>
+      {#if siteUi.Open}<siteUi.Open />{/if}
+    </SummaryStrip>
   </div>
 {/if}
 <div class="oh-side" class:folded={d.empty || d.f.folded}>
