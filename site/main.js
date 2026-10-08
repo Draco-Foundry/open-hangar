@@ -60,8 +60,9 @@
   if (allLive) document.getElementById('status-line').remove();
 })();
 
-// Open beta notice until the November 10 release: a small card in the corner, shown
-// until it's closed (remembered in this browser). Remove after the release.
+// Open beta notice until the November 10 release: a small card in the corner (under the
+// hero on phones), shown until it's closed (remembered in this browser). Remove after
+// the release.
 (function () {
   var note = document.getElementById('beta-note');
   var close = document.getElementById('beta-close');
