@@ -3,6 +3,10 @@
 .org-panel {
   border-radius: var(--r-md);
 }
+/* Names and role lists in the intros and panels: 600 at most, never the browser's 700. */
+#oh-org strong {
+  font-weight: 600;
+}
 /* Role chips are buttons: weight 500, counts in the data font. */
 .role-chip {
   font-weight: 500;
@@ -14,13 +18,45 @@
 .role-chip.open {
   outline-color: var(--accent-line);
 }
-.org-compare-bar select {
-  border-radius: var(--r-sm);
+/* Member chips: the name opens their ships (× still removes them). The two buttons
+   carry the chip's padding, so each is at least 24px to tap (phones included), with a
+   gap between them. */
+#oh-org .org-member {
+  gap: 4px;
+  padding: 0 2px 0 6px;
 }
-.pair-bar {
-  border-radius: 999px;
+.org-member .org-mname,
+.org-member .org-remove {
+  min-height: 26px;
 }
-.pair-bar span,
-.cmp-kv b {
-  font-family: var(--font-data);
+.org-member .org-mname {
+  padding: 0 6px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+}
+.org-member .org-remove {
+  min-width: 26px;
+  padding: 0 6px;
+}
+.org-member .org-mname:hover {
+  color: var(--accent);
+}
+.org-member.open {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.org-hint {
+  align-self: center;
+  font-size: 12px;
+}
+/* The four fleet boxes (members, ships, cargo, crew seats) finish together: one row of
+   four, or two by two when narrow, never three and a lone one. */
+#oh-org .stat-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 720px) {
+  #oh-org .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

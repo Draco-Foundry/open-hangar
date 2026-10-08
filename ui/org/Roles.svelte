@@ -1,7 +1,8 @@
 <script>
   // Roles: one chip per job the fleet can do (green: flyable today, amber: only
   // in-concept ships, dashed: nobody has one). A chip opens what fills it, or for a
-  // missing role every ship in the ship list that would, cheapest first.
+  // missing role every ship in the ship list that would, flyable ones first, then by
+  // name (ships only: no prices, and nothing ordered by them).
   import { app, OH } from '../lib/app.svelte.js';
   import { ui } from './ui.svelte.js';
   import { owners } from './text.js';
@@ -37,16 +38,16 @@
     return {
       r,
       // Every ship that fills the role (big ones like the Orion used to fall off a
-      // top-10 list), cheapest first; unpriced concepts last.
+      // top-10 list): flight ready first, then A to Z.
       options: catalog
         .filter((v) => v.role && def.re.test(v.role))
-        .sort((x, y) => (x.msrp || Infinity) - (y.msrp || Infinity))
         .map((v) => ({
-          name: v.name || v.lname,
+          name: v.name || v.lname || '',
           role: tc(v.role),
-          status: v.status === 'flight-ready' ? 'Flight Ready' : 'In Concept',
-          price: v.msrp ? a.dollars(v.msrp) : '—',
-        })),
+          ready: v.status === 'flight-ready',
+        }))
+        .sort((x, y) => y.ready - x.ready || x.name.localeCompare(y.name))
+        .map(({ ready, ...v }) => ({ ...v, status: ready ? 'Flight Ready' : 'In Concept' })),
     };
   });
 
@@ -116,11 +117,11 @@
         </tbody>
       </table>
     {:else if panel.options.length}
-      <p class="muted org-intro">Every ship that fills this role, cheapest first:</p>
+      <p class="muted org-intro">Every ship that fills this role, flight ready first:</p>
       <div class="org-scroll">
         <table class="org-table">
           <thead>
-            <tr><th>Ship</th><th>Role</th><th>Status</th><th class="num">Store Price</th></tr>
+            <tr><th>Ship</th><th>Role</th><th>Status</th></tr>
           </thead>
           <tbody>
             {#each panel.options as v}
@@ -128,7 +129,6 @@
                 <td>{v.name}</td>
                 <td class="muted">{v.role}</td>
                 <td class="muted">{v.status}</td>
-                <td class="num">{v.price}</td>
               </tr>
             {/each}
           </tbody>
