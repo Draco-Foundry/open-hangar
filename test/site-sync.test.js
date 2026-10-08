@@ -169,6 +169,16 @@ test('disconnected on the website: forgets the link', async () => {
   assert.equal(mem.siteLink, undefined);
 });
 
+test('an old link refused after connecting again leaves the new link alone', async () => {
+  linked(scanned(Date.now() - 60_000));
+  answer = () => {
+    mem.siteLink = { token: 'new', name: 'pilot' }; // Disconnect, then Connect, meanwhile
+    return new Response(JSON.stringify({ error: 'not connected' }), { status: 401 });
+  };
+  await assert.rejects(OH.siteSync(), /disconnected on the website/);
+  assert.deepEqual(mem.siteLink, { token: 'new', name: 'pilot' });
+});
+
 test('sync and disconnect use the versioned /api/v1/sync', async () => {
   linked(scanned(Date.now() - 60_000));
   answer = () => new Response(JSON.stringify({ ok: true, synced_at: 456 }), { status: 200 });
@@ -180,4 +190,359 @@ test('sync and disconnect use the versioned /api/v1/sync', async () => {
     'DELETE https://staging.example/api/v1/sync',
   ]);
   assert.equal(mem.siteLink, undefined, 'forgotten after disconnect');
+});
+
+// --- What sync leaves out ------------------------------------------------------------
+// The referral prospects list is other players (handles, monikers, enlist dates) who
+// aren't recruits yet: the backup file keeps it, sync never sends it.
+
+const withReferral = () => {
+  const db = scanned(Date.now() - 60_000);
+  db.sources.referral = {
+    scannedAt: Date.now() - 60_000,
+    items: {
+      current: { recruits: 1 },
+      legacy: { recruits: 1 },
+      prospects: 2,
+      recruitsList: [{ id: 'r1', handle: 'Recruit_One', campaign: 'current' }],
+      prospectsList: [
+        { id: 'x1', handle: 'Someone_Else', moniker: 'Someone', date: '2026-09-01' },
+        { id: 'x2', handle: 'Another_Pilot', moniker: 'Another', date: '2026-09-02' },
+      ],
+    },
+  };
+  return db;
+};
+
+test('sync leaves the prospects list out; the backup file keeps it', async () => {
+  linked(withReferral());
+  answer = () => new Response(JSON.stringify({ ok: true, synced_at: 1 }), { status: 200 });
+  await OH.siteSync();
+  const ref = sent[0].sources.referral.items;
+  assert.equal('prospectsList' in ref, false, 'no prospects list in the sync');
+  assert.equal(ref.prospects, 2, 'the count still goes');
+  assert.equal(ref.recruitsList.length, 1, 'the recruits list still goes');
+  assert.ok(!JSON.stringify(sent[0]).includes('Someone_Else'));
+  // The backup file (OH.exportDB) and the stored data are untouched.
+  const backup = await OH.exportDB();
+  assert.equal(backup.sources.referral.items.prospectsList.length, 2);
+  assert.equal(mem.db.sources.referral.items.prospectsList.length, 2);
+});
+
+test('OH.syncPayload is pure and passes payloads without prospects through', () => {
+  const payload = { sources: { referral: { items: { prospects: 1, prospectsList: [{}] } } } };
+  const out = OH.syncPayload(payload);
+  assert.deepEqual(out.sources.referral.items, { prospects: 1 });
+  assert.equal(payload.sources.referral.items.prospectsList.length, 1, 'not changed');
+  const plain = { sources: { hangar: {} } };
+  assert.equal(OH.syncPayload(plain), plain);
+  assert.equal(OH.syncPayload(null), null);
+});
+
+// --- A browser shared by more than one RSI account ------------------------------------
+// The link is one per browser, so it remembers which RSI accounts it has synced, and
+// any other account asks first ("Sync <handle> to your openhangar.space account?").
+
+const signedInAs = (handle, record) => {
+  mem.account = { loggedIn: true, nickname: handle, displayname: handle, citizenRecord: record };
+  mem.db = { ...mem.db, owner: { nickname: handle, displayname: handle } };
+};
+const ok = () => new Response(JSON.stringify({ ok: true, synced_at: 7 }), { status: 200 });
+const tryAuto = async () => {
+  try {
+    await OH.siteSync({ auto: true });
+    return null;
+  } catch (err) {
+    return err;
+  }
+};
+
+test("a link's first sync goes without asking and remembers the account", async () => {
+  linked(scanned(Date.now() - 60_000));
+  signedInAs('Pilot_A', '1001');
+  answer = ok;
+  await OH.siteSync({ auto: true });
+  assert.equal(sent.length, 1);
+  assert.deepEqual(mem.siteLink.accounts, [{ handle: 'Pilot_A', record: '1001' }]);
+  // And again, without asking.
+  await OH.siteSync({ auto: true });
+  assert.equal(sent.length, 2);
+});
+
+test('another RSI account in the same browser asks first and sends nothing', async () => {
+  linked(scanned(Date.now() - 60_000));
+  signedInAs('Pilot_A', '1001');
+  answer = ok;
+  await OH.siteSync({ auto: true });
+  signedInAs('Pilot_B', '2002'); // reconcileAccount switched the hangar
+  let sends = 0;
+  const err = await tryAuto();
+  assert.equal(err.message, 'Sync Pilot_B to your openhangar.space account?');
+  assert.equal(err.calm, true);
+  assert.deepEqual(err.ask, { handle: 'Pilot_B', record: '2002' });
+  assert.equal(sent.length, 1, 'only the first account was sent');
+  // Sync Now asks too.
+  await assert.rejects(OH.siteSync({ onSend: () => sends++ }), (e) => e.ask?.handle === 'Pilot_B');
+  assert.equal(sends, 0);
+  assert.equal(sent.length, 1);
+});
+
+test('yes syncs that account from now on; the answer is kept per handle', async () => {
+  linked(scanned(Date.now() - 60_000));
+  signedInAs('Pilot_A', '1001');
+  answer = ok;
+  await OH.siteSync({ auto: true });
+  signedInAs('Pilot_B', '2002');
+  await OH.siteSyncAnswer({ handle: 'Pilot_B', record: '2002' }, true);
+  await OH.siteSync({ auto: true });
+  assert.equal(sent.length, 2);
+  assert.equal(sent[1].account.handle, 'Pilot_B');
+  assert.deepEqual(
+    mem.siteLink.accounts.map((a) => a.handle),
+    ['Pilot_A', 'Pilot_B'],
+  );
+  // Back to the first one: still no question.
+  signedInAs('Pilot_A', '1001');
+  await OH.siteSync({ auto: true });
+  assert.equal(sent.length, 3);
+});
+
+test('no keeps the sync after a scan quiet; Sync Now asks again', async () => {
+  linked(scanned(Date.now() - 60_000));
+  signedInAs('Pilot_A', '1001');
+  answer = ok;
+  await OH.siteSync({ auto: true });
+  signedInAs('pilot_b', '2002');
+  await OH.siteSyncAnswer({ handle: 'pilot_b', record: '2002' }, false);
+  assert.deepEqual(mem.siteLink.declined, [{ handle: 'pilot_b', record: '2002' }]);
+  const err = await tryAuto();
+  assert.equal(err.quiet, true);
+  assert.ok(!err.calm && !err.ask);
+  assert.ok(!/pilot_b/i.test(err.message), 'nothing to show, and no handle to log');
+  await assert.rejects(OH.siteSync(), (e) => e.ask?.handle === 'pilot_b');
+  assert.equal(sent.length, 1);
+  // Changing your mind later: yes moves it over.
+  await OH.siteSyncAnswer({ handle: 'Pilot_B', record: '2002' }, true);
+  assert.deepEqual(mem.siteLink.declined, []);
+  await OH.siteSync({ auto: true });
+  assert.equal(sent.length, 2);
+});
+
+test('the same Citizen Record under a new handle is the same pilot', async () => {
+  linked(scanned(Date.now() - 60_000));
+  signedInAs('Old_Handle', '3003');
+  answer = ok;
+  await OH.siteSync({ auto: true });
+  signedInAs('New_Handle', '3003');
+  await OH.siteSync({ auto: true });
+  assert.equal(sent.length, 2);
+  assert.deepEqual(mem.siteLink.accounts, [{ handle: 'New_Handle', record: '3003' }]);
+});
+
+test('only a real Citizen Record number makes two handles one pilot', async () => {
+  linked(scanned(Date.now() - 60_000));
+  signedInAs('Pilot_A', 'n/a'); // a placeholder, not a record
+  answer = ok;
+  await OH.siteSync({ auto: true });
+  assert.deepEqual(mem.siteLink.accounts, [{ handle: 'Pilot_A', record: null }]);
+  signedInAs('Pilot_B', 'n/a');
+  const err = await tryAuto();
+  assert.equal(err?.ask?.handle, 'Pilot_B', 'asks: the same placeholder is no match');
+  assert.equal(sent.length, 1);
+  assert.deepEqual(
+    mem.siteLink.accounts.map((a) => a.handle),
+    ['Pilot_A'],
+  );
+  // "#123" on the dossier and "123" are the same number.
+  linked(scanned(Date.now() - 60_000));
+  signedInAs('Old_Handle', '#123');
+  await OH.siteSync({ auto: true });
+  assert.deepEqual(mem.siteLink.accounts, [{ handle: 'Old_Handle', record: '123' }]);
+  signedInAs('New_Handle', '123');
+  await OH.siteSync({ auto: true });
+  assert.equal(sent.length, 2);
+});
+
+test("the hangar's own account counts, not just the cached RSI login", async () => {
+  linked(scanned(Date.now() - 60_000));
+  signedInAs('Pilot_A', '1001');
+  answer = ok;
+  await OH.siteSync({ auto: true });
+  assert.equal(sent.length, 1);
+  // Pilot_B's hangar is the live one, but the RSI login cached is still Pilot_A's
+  // (signed in again elsewhere before this page switched hangars).
+  mem.db = { ...mem.db, owner: { nickname: 'Pilot_B', displayname: 'Pilot_B' } };
+  let sends = 0;
+  for (const opts of [{ auto: true }, {}]) {
+    await assert.rejects(OH.siteSync({ ...opts, onSend: () => sends++ }), (e) => {
+      assert.match(e.message, /belongs to another pilot than the one signed in to RSI/);
+      assert.equal(e.calm, true);
+      assert.ok(!e.ask && !/Pilot_/.test(e.message), 'no handle, so it can be logged');
+      return true;
+    });
+  }
+  assert.equal(sends, 0);
+  assert.equal(sent.length, 1, "Pilot_B's hangar never went as Pilot_A's");
+  // Signed out of RSI (no login cached): the hangar's own account is the one asked about.
+  delete mem.account;
+  const err = await tryAuto();
+  assert.equal(err?.ask?.handle, 'Pilot_B');
+  assert.equal(sent.length, 1);
+});
+
+test('a sync without a Citizen Record keeps the one already known', async () => {
+  linked(scanned(Date.now() - 60_000));
+  signedInAs('Pilot_A', '1001');
+  answer = ok;
+  await OH.siteSync({ auto: true });
+  delete mem.account; // signed out of RSI: the export has no record
+  await OH.siteSync({ auto: true });
+  assert.equal(sent.length, 2);
+  assert.deepEqual(mem.siteLink.accounts, [{ handle: 'Pilot_A', record: '1001' }]);
+  // So a new handle with that record is still the same pilot.
+  signedInAs('Pilot_A2', '1001');
+  await OH.siteSync({ auto: true });
+  assert.equal(sent.length, 3);
+});
+
+test("a link's first sync asks when this browser keeps another account too", async () => {
+  linked(scanned(Date.now() - 60_000));
+  signedInAs('Pilot_B', '2002');
+  mem['profile:pilot_a'] = {
+    schemaVersion: 3,
+    sources: { hangar: { scannedAt: 1, items: [] } },
+    owner: { nickname: 'Pilot_A', displayname: 'Pilot_A' },
+  };
+  answer = ok;
+  const err = await tryAuto();
+  assert.equal(err?.ask?.handle, 'Pilot_B');
+  assert.equal(sent.length, 0);
+  await OH.siteSyncAnswer(err.ask, true);
+  await OH.siteSync({ auto: true });
+  assert.equal(sent.length, 1);
+});
+
+test('a sync that ends after Disconnect does not bring the link back', async () => {
+  linked(scanned(Date.now() - 60_000));
+  signedInAs('Pilot_A', '1001');
+  answer = () => {
+    delete mem.siteLink; // Disconnect pressed while the sync was in flight
+    return ok();
+  };
+  await OH.siteSync();
+  assert.equal(mem.siteLink, undefined);
+});
+
+// --- Holding off while the website says wait ------------------------------------------
+// After "not open yet" the sync after a scan waits 6 hours (Sync Now still tries); a
+// 429's Retry-After holds every sync. Nothing is uploaded while it holds.
+
+const notOpen = () =>
+  new Response(
+    JSON.stringify({
+      error: 'Sync opens November 10. Your hangar stays safe in your browser until then.',
+      reason: 'not-open',
+    }),
+    { status: 403 },
+  );
+
+test('not open yet: the sync after a scan holds off for 6 hours, Sync Now still tries', async () => {
+  linked(scanned(Date.now() - 60_000));
+  answer = notOpen;
+  const before = Date.now();
+  await assert.rejects(OH.siteSync({ auto: true }), (e) => e.calm === true);
+  assert.equal(sent.length, 1);
+  const wait = mem.siteLink.wait;
+  assert.equal(wait.reason, 'not-open');
+  assert.ok(wait.until >= before + 6 * 3600e3 && wait.until <= Date.now() + 6 * 3600e3);
+  // The next scan: the same calm note, nothing uploaded, nothing sent before it.
+  let sends = 0;
+  await assert.rejects(OH.siteSync({ auto: true, onSend: () => sends++ }), (e) => {
+    assert.equal(
+      e.message,
+      'Sync opens November 10. Your hangar stays safe in your browser until then.',
+    );
+    assert.equal(e.calm, true);
+    assert.equal(e.held, 'not-open');
+    return true;
+  });
+  assert.equal(sends, 0);
+  assert.equal(sent.length, 1);
+  // Sync Now asks the website again.
+  await assert.rejects(OH.siteSync(), (e) => e.calm === true && !e.held);
+  assert.equal(sent.length, 2);
+  // Six hours on, the sync after a scan tries again; a sync that goes clears the wait.
+  mem.siteLink.wait.until = Date.now() - 1;
+  answer = ok;
+  await OH.siteSync({ auto: true });
+  assert.equal(sent.length, 3);
+  assert.equal(mem.siteLink.wait, undefined);
+  assert.equal(mem.siteLink.lastSync, 7);
+});
+
+test('too soon (429): a calm note, and Retry-After holds every sync', async () => {
+  linked(scanned(Date.now() - 60_000));
+  answer = () =>
+    new Response(
+      JSON.stringify({ error: 'One sync every 5 minutes. Try again soon.', reason: 'too-soon' }),
+      { status: 429, headers: { 'retry-after': '120' } },
+    );
+  const before = Date.now();
+  await assert.rejects(OH.siteSync(), (e) => {
+    assert.equal(e.message, 'One sync every 5 minutes. Try again soon.');
+    assert.equal(e.calm, true);
+    return true;
+  });
+  assert.equal(sent.length, 1);
+  const wait = mem.siteLink.wait;
+  assert.equal(wait.reason, 'too-soon');
+  assert.ok(wait.until >= before + 120e3 && wait.until <= Date.now() + 120e3);
+  // Both the sync after a scan and Sync Now wait, with the website's words.
+  for (const opts of [{ auto: true }, {}]) {
+    await assert.rejects(OH.siteSync(opts), (e) => {
+      assert.equal(e.held, 'too-soon');
+      assert.equal(e.calm, true);
+      assert.equal(e.message, 'One sync every 5 minutes. Try again soon.');
+      return true;
+    });
+  }
+  assert.equal(sent.length, 1);
+  // Once it's passed, Sync Now goes.
+  mem.siteLink.wait.until = Date.now() - 1;
+  answer = ok;
+  await OH.siteSync();
+  assert.equal(sent.length, 2);
+});
+
+test('a 429 without a reason or Retry-After waits 5 minutes, with built-in words', async () => {
+  const err = await refusedWith(429, '<html>Too many</html>');
+  assert.equal(err.calm, true);
+  assert.equal(
+    err.message,
+    'openhangar.space just took a sync for this account. The next one can launch in a few minutes.',
+  );
+  const left = mem.siteLink.wait.until - Date.now();
+  assert.ok(left > 4.9 * 60e3 && left <= 5 * 60e3);
+});
+
+// An extension page only sees the Retry-After header when the website exposes it (CORS);
+// the test's fetch has no CORS, so the JSON's `retry_after` is checked on its own here.
+test('a 429 with retry_after in its JSON waits that long', async () => {
+  const err = await refusedWith(429, { error: 'Too soon.', reason: 'too-soon', retry_after: 600 });
+  assert.equal(err.calm, true);
+  const left = mem.siteLink.wait.until - Date.now();
+  assert.ok(left > 9.9 * 60e3 && left <= 10 * 60e3);
+});
+
+test('OH.siteSyncWait: which wait holds which sync', () => {
+  const now = 1_000_000;
+  const link = (reason, until) => ({ token: 't', wait: { reason, until, said: '' } });
+  assert.equal(OH.siteSyncWait(null, { now }), null);
+  assert.equal(OH.siteSyncWait({ token: 't' }, { now }), null);
+  assert.ok(OH.siteSyncWait(link('not-open', now + 1), { auto: true, now }));
+  assert.equal(OH.siteSyncWait(link('not-open', now + 1), { auto: false, now }), null);
+  assert.ok(OH.siteSyncWait(link('too-soon', now + 1), { auto: false, now }));
+  assert.equal(OH.siteSyncWait(link('too-soon', now), { now }), null, 'over');
+  // A clock set back can't hold sync for days.
+  assert.equal(OH.siteSyncWait(link('too-soon', now + 2 * 24 * 3600e3), { now }), null);
 });
