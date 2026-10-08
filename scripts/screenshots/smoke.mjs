@@ -807,7 +807,7 @@ try {
       pal: palette().good === cs.getPropertyValue('--good').trim(),
     };
   });
-  colors.key === 13 && colors.tokens && colors.whiteBal && colors.pal
+  colors.key === 12 && colors.tokens && colors.whiteBal && colors.pal
     ? ok('colors: tokens, Color Key (12), white balances, exports share the palette')
     : fail(`colors: ${JSON.stringify(colors)}`);
 
@@ -1221,6 +1221,7 @@ try {
   });
   /Connect to openhangar\.space/.test(sc.off) &&
   /Nothing is sent until you connect/.test(sc.off) &&
+  /Open Hangar will sync after every scan\. Disconnect any time\./.test(sc.off) &&
   sc.noStatusYet &&
   /^Connect to openhangar\.space\s*Optional/.test(sc.youOffer || '') &&
   /K7Q-4PX/.test(sc.wait) &&
@@ -2502,6 +2503,8 @@ try {
     JSON.stringify([
       { name: 'Carrack', entity_type: 'ship', lti: true },
       { name: 'Cutlass Black', entity_type: 'ship', lti: false },
+      // Salvage: a role the demo fleet doesn't cover, so only Buddy fills it.
+      { name: 'Vulture', entity_type: 'ship', lti: false },
     ]),
   );
   const input = await page.$('#org-file');
@@ -2521,11 +2524,61 @@ try {
     ? ok(`org fleet: ${org.members} members, ${org.rows} ship types`)
     : fail(`org fleet: ${JSON.stringify(org)}`);
   const roleChips = await page.$$eval('.role-chip', (c) => c.length);
-  const memberRows = await page.$$eval('.org-table', (t) => t.length);
+  const orgTables = await page.$$eval('.org-table', (t) => t.length);
   const roleCount = await page.evaluate(() => OH.ORG_ROLES.length);
-  roleChips === roleCount && memberRows >= 3
-    ? ok(`org roles (${roleChips}) + biggest ships + members`)
-    : fail(`org extras: ${roleChips} role chips, ${memberRows} tables`);
+  roleChips === roleCount && orgTables === 2
+    ? ok(`org roles (${roleChips}) + biggest ships + ships`)
+    : fail(`org extras: ${roleChips} role chips, ${orgTables} tables`);
+  // Nothing is picked or ordered by price: Ships go most first, then A to Z; Biggest
+  // Ships by size class, then most, then A to Z.
+  const orgOrder = await page.evaluate(() => {
+    const [big, all] = [...document.querySelectorAll('#oh-org .org-table')].map((t) =>
+      [...t.querySelectorAll('tbody tr')].map((tr) => [...tr.cells].map((c) => c.textContent)),
+    );
+    const most = (a, b) => b.n - a.n || a.name.localeCompare(b.name);
+    const sorted = (rows, cmp) => rows.every((r, i) => !i || cmp(rows[i - 1], r) <= 0);
+    const size = ['Medium', 'Large', 'Capital'];
+    const bigRows = big.map(([name, sz, n]) => ({ name, rank: size.indexOf(sz), n: +n }));
+    const allRows = all.map(([name, n]) => ({ name, n: +n }));
+    return {
+      big: sorted(bigRows, (a, b) => b.rank - a.rank || most(a, b)),
+      all: sorted(allRows, most),
+      rows: [bigRows.length, allRows.length],
+    };
+  });
+  orgOrder.big && orgOrder.all && orgOrder.rows.every((n) => n > 1)
+    ? ok('org lists go by size and count, then A to Z, never by price')
+    : fail(`org order: ${JSON.stringify(orgOrder)}`);
+  // Each member chip button is at least 24px to tap.
+  const orgTaps = await page.evaluate(() =>
+    ['.org-mname[data-member="Buddy"]', '.org-remove[data-name="Buddy"]'].map((s) => {
+      const r = document.querySelector(s).getBoundingClientRect();
+      return [Math.round(r.width), Math.round(r.height)];
+    }),
+  );
+  orgTaps.every(([w, h]) => w >= 24 && h >= 24)
+    ? ok('member chip buttons are 24px or more to tap')
+    : fail(`member chip tap sizes: ${JSON.stringify(orgTaps)}`);
+  // Ships only (CLAUDE.md, What Not to Build): no prices or fleet values, no ship
+  // counts on the member chips, nothing that compares members. Checked again below
+  // with a missing role's suggestions and a member's panel open.
+  const orgValues = () =>
+    page.evaluate(() => {
+      const el = document.querySelector('#oh-org');
+      const text = el.textContent;
+      return {
+        money: /[$€£¥]\s?\d|\bUSD\b|Store Price|Fleet Value|of org value|\bShare\b/i.test(text),
+        chipCounts: [...el.querySelectorAll('.org-member')].some((c) =>
+          /\d+\s*ships?\b/i.test(c.textContent),
+        ),
+        compare: !!el.querySelector('select, .org-compare-bar, .cmp-cols, .pair-row'),
+      };
+    });
+  const noValues = (v) => !v.money && !v.chipCounts && !v.compare;
+  const shipsOnly = await orgValues();
+  noValues(shipsOnly)
+    ? ok('org shows ships only: no values, chip counts or member compare')
+    : fail(`org values: ${JSON.stringify(shipsOnly)}`);
   await page.click('.role-chip.missing');
   await orgTick();
   const rolePanel = await page.evaluate(() => ({
@@ -2535,12 +2588,44 @@ try {
   rolePanel.panel && rolePanel.open === 'true'
     ? ok('missing role opens suggestions')
     : fail(`role click: ${JSON.stringify(rolePanel)}`);
+  const roleValues = await orgValues();
+  noValues(roleValues)
+    ? ok('missing role suggestions show no prices')
+    : fail(`role suggestions values: ${JSON.stringify(roleValues)}`);
   await page.click('.org-close[data-close="role"]');
   await orgTick();
   (await page.$('.org-panel')) ? fail('role panel did not close') : ok('role panel closes');
-  await page.click('.org-mrow');
+  await page.click('.org-mname[data-member="Buddy"]');
   await orgTick();
-  (await page.$('.pair-row')) ? ok('member opens vs-org charts') : fail('member panel missing');
+  const memberPanel = await page.evaluate(() => {
+    const p = document.querySelector('.org-member-panel');
+    return {
+      panel: !!p,
+      ships: p ? p.querySelector('.org-owners').textContent : '',
+      intro: p ? [...p.querySelectorAll('.org-intro')].map((x) => x.textContent) : [],
+      open: document
+        .querySelector('.org-mname[data-member="Buddy"]')
+        ?.getAttribute('aria-expanded'),
+    };
+  });
+  const memberValues = await orgValues();
+  memberPanel.panel &&
+  memberPanel.open === 'true' &&
+  /Carrack/.test(memberPanel.ships) &&
+  /Cutlass Black/.test(memberPanel.ships) &&
+  /Vulture/.test(memberPanel.ships) &&
+  noValues(memberValues)
+    ? ok("a member's name opens their ships, with no values")
+    : fail(`member panel: ${JSON.stringify({ memberPanel, memberValues })}`);
+  memberPanel.intro.some((t) => /^Roles: .*\bSalvage\b/.test(t)) &&
+  memberPanel.intro.some((t) => /^Only Buddy covers: .*\bSalvage\b/.test(t))
+    ? ok("a member's panel lists their roles and the ones only they cover")
+    : fail(`member roles: ${JSON.stringify(memberPanel.intro)}`);
+  await page.click('.org-close[data-close="member"]');
+  await orgTick();
+  (await page.$('.org-member-panel'))
+    ? fail('member panel did not close')
+    : ok('member panel closes');
   // Your entry follows your latest scan, and a concept-only role is amber, not missing.
   const live = await page.evaluate(async () => {
     const tick = () => new Promise((r) => setTimeout(r, 50));
@@ -2575,30 +2660,81 @@ try {
   live.grew && /\bconcept\b/.test(live.chip || '') && live.intro
     ? ok('org: your fleet follows your scan; Pioneer-only Construction shows as in concept')
     : fail(`org live/concept: ${JSON.stringify(live)}`);
-  const names = await page.$$eval('.org-cmp[data-side="a"] option', (o) =>
-    o.map((x) => x.value).filter(Boolean),
-  );
-  await page.select('.org-cmp[data-side="a"]', names[0]);
-  await page.select('.org-cmp[data-side="b"]', names[1]);
+  // Export CSV: ships, counts, LTI and owners, no store price column.
+  const orgCsv = await page.evaluate(async () => {
+    let got = null;
+    const real = window.downloadBlob;
+    window.downloadBlob = (blob, name) => (got = { blob, name });
+    document.querySelector('#org-csv').click();
+    for (let t = 0; !got && t < 50; t++) await new Promise((r) => setTimeout(r, 100));
+    window.downloadBlob = real;
+    if (!got) return null;
+    const text = await got.blob.text();
+    return { name: got.name, head: text.split('\n')[0], rows: text.split('\n').length - 1 };
+  });
+  orgCsv &&
+  orgCsv.head === 'Ship,Count,LTI,Owners' &&
+  orgCsv.rows > 0 &&
+  /^open-hangar-org-fleet-.*\.csv$/.test(orgCsv.name)
+    ? ok(`org CSV: ships only (${orgCsv.rows} rows)`)
+    : fail(`org CSV: ${JSON.stringify(orgCsv)}`);
+  // Remove a member (with their panel open): its chip goes, the rest stays (and so does
+  // what's saved).
+  const removeBuddy = () =>
+    page
+      .click('.org-remove[data-name="Buddy"]')
+      .then(() =>
+        page.waitForFunction(() => document.querySelectorAll('.org-member').length === 1, {
+          timeout: 5000,
+        }),
+      )
+      .catch(() => {});
+  await page.click('.org-mname[data-member="Buddy"]');
   await orgTick();
-  (await page.$('.cmp-cols')) ? ok('compare two members') : fail('compare panel missing');
-  // Remove a member: its chip goes, the rest stays (and so does what's saved).
-  await page.click('.org-remove[data-name="Buddy"]');
-  await page
-    .waitForFunction(() => document.querySelectorAll('.org-member').length === 1, {
-      timeout: 5000,
-    })
-    .catch(() => {});
+  await removeBuddy();
   const removed = await page.evaluate(async () => ({
     chips: document.querySelectorAll('.org-member').length,
     saved: ((await chrome.storage.local.get('orgFleet')).orgFleet?.members || []).map(
       (m) => m.name,
     ),
-    compare: !!document.querySelector('.org-compare-bar'),
   }));
-  removed.chips === 1 && !removed.saved.includes('Buddy') && !removed.compare
+  removed.chips === 1 && !removed.saved.includes('Buddy')
     ? ok('remove a member')
     : fail(`remove member: ${JSON.stringify(removed)}`);
+  // Their panel went with them: imported again, it doesn't pop back open.
+  await input.uploadFile(buddy);
+  await page
+    .waitForFunction(() => document.querySelectorAll('.org-member').length === 2, {
+      timeout: 15000,
+    })
+    .catch(() => {});
+  await orgTick();
+  const buddyBack = await page.evaluate(() => ({
+    chips: document.querySelectorAll('.org-member').length,
+    panel: !!document.querySelector('.org-member-panel'),
+    open: !!document.querySelector('.org-member.open'),
+  }));
+  buddyBack.chips === 2 && !buddyBack.panel && !buddyBack.open
+    ? ok("a removed member's panel stays shut when they're imported again")
+    : fail(`member back: ${JSON.stringify(buddyBack)}`);
+  await removeBuddy();
+  // With one member left there's nobody to set them apart from: no "Only ... covers".
+  await page.click('.org-mname');
+  await orgTick();
+  const lone = await page.evaluate(() => {
+    const p = document.querySelector('.org-member-panel');
+    return {
+      panel: !!p,
+      only: p
+        ? [...p.querySelectorAll('.org-intro')].some((x) => /^Only /.test(x.textContent))
+        : null,
+    };
+  });
+  lone.panel && lone.only === false
+    ? ok('a lone member gets no "Only ... covers" line')
+    : fail(`lone member panel: ${JSON.stringify(lone)}`);
+  await page.click('.org-close[data-close="member"]');
+  await orgTick();
 
   console.log('Store');
   await go('#store');
@@ -4147,6 +4283,72 @@ try {
   rep.send.open
     ? ok('problem card: Send Flight Log copies the log and opens #bug-reports on Discord')
     : fail(`send flight log: ${JSON.stringify(rep.send)}`);
+
+  // Buy-back details: one batch at a time, quiet after a scan while an earlier hold is
+  // on, and the status says why and how long (hours for a long hold).
+  const bbd = await page.evaluate(async () => {
+    const keepFetch = OH.fetchBuybackDetails;
+    const keepBbs = state.buybacks;
+    const r = {};
+    try {
+      state.buybacks = [
+        {
+          id: '990000201',
+          name: 'Package - Smoke Pack',
+          kind: 'package',
+          date: '',
+          contains: '',
+          href: '',
+          isCCU: false,
+          ccu: null,
+        },
+      ];
+      let calls = 0;
+      let release;
+      OH.fetchBuybackDetails = () => (calls++, new Promise((res) => (release = res)));
+      const first = loadBuybackDetails({ packsOnly: true });
+      await loadBuybackDetails({ packsOnly: true }); // a second while the first reads
+      r.oneLane = calls === 1;
+      release({ done: 1, errors: 0, total: 1 });
+      await first;
+      const say = async (res, opts) => {
+        setStatus('');
+        OH.fetchBuybackDetails = async () => res;
+        await loadBuybackDetails({ packsOnly: true, ...opts });
+        return { text: statusEl.textContent, error: statusEl.classList.contains('error') };
+      };
+      const hold = { errors: 0, total: 5, rateLimited: true };
+      const soon = Date.now() + 10 * 60e3 - 5e3;
+      const late = Date.now() + 6 * 3600e3 - 5e3;
+      const held = { ...hold, done: 0, held: true };
+      r.autoHeld = await say({ ...held, retryAt: soon }, { max: 30, auto: true });
+      r.held = await say({ ...held, retryAt: late });
+      r.busy = await say({ ...hold, done: 2, retryAt: soon, busy: true });
+      r.slow = await say({ ...hold, done: 1, retryAt: late });
+    } finally {
+      OH.fetchBuybackDetails = keepFetch;
+      state.buybacks = keepBbs;
+      state.bbDetails = { ...(await OH.getBuybackDetails()) };
+      setStatus('');
+    }
+    return r;
+  });
+  const single = 'Opening a single buy-back still works.';
+  bbd.oneLane &&
+  bbd.autoHeld.text === '' &&
+  bbd.held.text === `Buy-back details are on an R&R stop for about 6 hours more. ${single}` &&
+  !bbd.held.error &&
+  bbd.busy.text ===
+    `RSI is busy right now, so we stopped after 2 pages (kept). Try again in about 10 min. ${single}` &&
+  !bbd.busy.error &&
+  bbd.slow.text.startsWith(
+    `RSI asked us to slow down, so we stopped after 1 page (kept). Give it about 6 hours to cool off. ${single}`,
+  ) &&
+  bbd.slow.error
+    ? ok(
+        'buy-back details: one batch at a time, quiet after a scan while held, says why and how long',
+      )
+    : fail(`buy-back details status: ${JSON.stringify(bbd)}`);
 
   // Your menu: Clear Data (red) asks once in place; Keep Data backs out with nothing
   // cleared and the menu still open.

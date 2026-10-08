@@ -1,8 +1,10 @@
 <script>
   // Org Fleet: members' ship lists (HTF exports or backups) combined into one fleet.
   // Ported from renderOrg() as it looked in 0.2.x (no signed-off redesign yet), so it
-  // reuses the dashboard's classes. The stored list and the buttons' work stay in
-  // src/dashboard.js (OHApp.org); renderOrg() there fires 'oh:home' when it changes.
+  // reuses the dashboard's classes. Ships only: no store prices or fleet values, and no
+  // member's totals next to another's (CLAUDE.md, What Not to Build). The stored list
+  // and the buttons' work stay in src/dashboard.js (OHApp.org); renderOrg() there fires
+  // 'oh:home' when it changes.
   import { app, version } from '../lib/app.svelte.js';
   import { owners } from './text.js';
   import Bars from './Bars.svelte';
@@ -22,7 +24,6 @@
     const s = a.state;
     if (!members.length || !s.shipOf) return { members, f: null };
     const f = o.fleet(members);
-    const money = (n) => (n ? a.dollars(n) : '—');
     return {
       members,
       f,
@@ -30,17 +31,15 @@
       boxes: [
         [f.members, 'members'],
         [f.shipCount, 'ships'],
-        [a.dollars(f.store), `at store price (${f.priced} priced)`],
         [Math.round(f.cargo).toLocaleString('en-US'), 'cargo (SCU)'],
         [f.crew.toLocaleString('en-US'), 'crew seats'],
       ],
       biggest: f.biggest.map((r) => ({
         ...r,
         size: o.titleCase(r.size),
-        price: money(r.msrp),
         owners: owners(r.owners),
       })),
-      ships: f.ships.map((r) => ({ ...r, price: money(r.msrp), owners: owners(r.owners) })),
+      ships: f.ships.map((r) => ({ ...r, owners: owners(r.owners) })),
     };
   });
 
@@ -88,20 +87,7 @@
       No org fleet assembled yet. Import member files, or start with <strong>Add My Fleet</strong>.
     </div>
   {:else if d}
-    <div class="org-members">
-      {#each d.members as m}
-        <span class="org-member"
-          >{m.name} · {m.ships.length} ships<button
-            type="button"
-            class="org-remove"
-            data-name={m.name}
-            title="Remove"
-            aria-label="Remove {m.name}"
-            onclick={() => app().org.remove(m.name)}>×</button
-          ></span
-        >
-      {/each}
-    </div>
+    <Members members={d.members} ready={!!d.f} />
     {#if !d.f}
       <p class="muted">Loading ship data…</p>
     {:else}
@@ -116,8 +102,7 @@
         <table class="org-table">
           <thead>
             <tr>
-              <th>Ship</th><th>Size</th><th class="num">Count</th>
-              <th class="num">Store Price</th><th>Owners</th>
+              <th>Ship</th><th>Size</th><th class="num">Count</th><th>Owners</th>
             </tr>
           </thead>
           <tbody>
@@ -126,14 +111,12 @@
                 <td>{r.name}</td>
                 <td>{r.size}</td>
                 <td class="num">{r.count}</td>
-                <td class="num">{r.price}</td>
                 <td class="org-owners">{r.owners}</td>
               </tr>
             {/each}
           </tbody>
         </table>
       {/if}
-      <Members f={d.f} members={d.members} />
       <div class="fleet-cols">
         <div><h4 class="modal-h">By Role</h4><Bars map={d.f.byCareer} /></div>
         <div><h4 class="modal-h">By Size</h4><Bars map={d.f.bySize} /></div>
@@ -142,8 +125,7 @@
       <table class="org-table">
         <thead>
           <tr>
-            <th>Ship</th><th class="num">Count</th><th class="num">LTI</th>
-            <th class="num">Store Price</th><th>Owners</th>
+            <th>Ship</th><th class="num">Count</th><th class="num">LTI</th><th>Owners</th>
           </tr>
         </thead>
         <tbody>
@@ -152,7 +134,6 @@
               <td>{r.name}</td>
               <td class="num">{r.count}</td>
               <td class="num">{r.lti}</td>
-              <td class="num">{r.price}</td>
               <td class="org-owners">{r.owners}</td>
             </tr>
           {/each}

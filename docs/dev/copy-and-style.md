@@ -34,7 +34,8 @@
   only, and new features go on the website (openhangar.space).
 - No rankings or leaderboards of pilots or orgs.
 - No gear score: never compare totals, values or counts between players. Org Fleet
-  shows ships, never values.
+  shows ships only, never values: no store prices, no fleet value, and no member's
+  totals next to another's.
 - No paid tiers: no subscriptions, premium tier or paid features.
 - No Safari build, and no API for other sites to read the extension's data.
 - No LTI counts or LTI emphasis in summaries, no CCU-chain features, no "best use of

@@ -4,6 +4,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Changed: **Org Fleet shows ships, not price tags.** No store prices, fleet value or
+  shares, and no comparing one member's fleet with another's. Click a member's name to
+  see the ships they fly and the roles they cover. The CSV export drops its price column
+  too.
 - New: **Optional sync to openhangar.space.** Press Connect on your Citizen Card, sign
   in and approve, and your hangar docks on your own openhangar.space account, there on
   any device. After that every scan syncs by itself, and Sync Now sits in your portrait

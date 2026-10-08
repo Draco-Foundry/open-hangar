@@ -51,6 +51,7 @@ const BUDGET = {
   bbDetails: { cap: 'pruned to the current buy-back list after each buy-back scan', max: 1 * MB },
   bbHistoryRejects: { cap: 'BB_REJECTS_MAX 500 newest', max: 50 * KB },
   bbdSlowDownUntil: small('one timestamp'),
+  bbdSlowDowns: small('one count'),
   shipImages: {
     cap: 'CACHE_MAX.shipImages 2,000 newest; 90 days (1 day for misses)',
     max: 400 * KB,
