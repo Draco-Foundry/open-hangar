@@ -8,7 +8,9 @@
   // Rough Landing until the next scan and opens it again. A report can bring its own
   // title and line (the website sync's "Scan Done, Not Synced"): just Scan Again.
   // A calm one (`r.calm`, or a row's `calm`: the website's sync isn't open yet) is a
-  // note, not a problem: an info sign in blue and Roger That to close it.
+  // note, not a problem: an info sign in blue and Roger That to close it. One that asks
+  // (`r.ask`: sync an RSI account new to this browser's link?) has Sync It and Don't
+  // Sync instead, and its own hint (`r.hint`).
   import { app } from '../lib/app.svelte.js';
   import { menus, menuClick, closeMenus } from './menus.svelte.js';
 
@@ -49,6 +51,11 @@
   function scanAgain() {
     closeMenus();
     app().top.scan();
+  }
+  // Sync It / Don't Sync: the website's code (app().site) is only in builds with sync.
+  function answer(yes) {
+    closeMenus();
+    app().site?.answer(yes);
   }
 </script>
 
@@ -137,6 +144,9 @@
         rel="noopener">Log In to RSI ↗</a
       >
       <button type="button" class="sr-btn" onclick={scanAgain}>Scan Again</button>
+    {:else if r.ask}
+      <button type="button" class="sr-btn primary" onclick={() => answer(true)}>Sync It</button>
+      <button type="button" class="sr-btn" onclick={() => answer(false)}>Don't Sync</button>
     {:else if r.calm}
       <button type="button" class="sr-btn primary" onclick={onClose}>Roger That</button>
     {:else if r.title}
@@ -153,6 +163,8 @@
   </div>
   {#if copied}
     <p class="sr-hint" role="status">{copied}</p>
+  {:else if r.hint}
+    <p class="sr-hint">{r.hint}</p>
   {:else if r.kind !== 'out' && !r.title}
     <p class="sr-hint">
       Report on GitHub opens an issue with your flight log filled in. Nothing is sent until you
