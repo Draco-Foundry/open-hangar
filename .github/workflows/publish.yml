@@ -126,8 +126,19 @@ jobs:
           fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
       - run: npm run pack
-      # A store package never carries a dev build's staging site or the sync code.
-      - run: node .tools/scripts/check-store-build.mjs
+      # A store package never carries a dev build's staging site, and its sync and build
+      # flags are what the store gets. The tag's own check (as release.yml runs it): it
+      # reads the tag's src/flags.js, which .tools doesn't have. A tag from before the
+      # check (0.2.19 and older) has none, so there it's skipped.
+      - name: Check the zips are a store build
+        env:
+          REF: ${{ steps.ref.outputs.ref }}
+        run: |
+          if [ -f scripts/check-store-build.mjs ]; then
+            node scripts/check-store-build.mjs
+          else
+            echo "::notice::$REF has no scripts/check-store-build.mjs (older than the check): skipped"
+          fi
       # Last before the uploads, so CI on the release commit runs alongside the
       # checks above instead of before them. Polls until it passes (or fails).
       - name: Wait for CI on this commit to pass
