@@ -3457,15 +3457,19 @@ function bbDetailsInfo(list) {
     need: need.length,
     have: list.filter((b) => !bbNeedsRead(b)).length,
     of: list.length,
-    mins: Math.max(1, Math.round((need.length * 1.6) / 60)),
+    // About 2.4 s a page: the page itself and the 1 to 2 s pause after it (OH.bbdPause).
+    mins: Math.max(1, Math.round((need.length * 2.4) / 60)),
     // Big lists get a heads-up: hundreds of pages in a row is what makes RSI throttle.
     big: need.length > 100,
   };
 }
 // packsOnly: just the packs whose contents are unread (search's "Get Details").
 // max: read at most this many (the automatic read after a scan); the rest wait.
+// auto: the automatic read after a scan, quiet while an earlier hold is still on.
 // Anything already filled from your own hangar history is never read again.
-async function loadBuybackDetails({ packsOnly = false, max = Infinity } = {}) {
+async function loadBuybackDetails({ packsOnly = false, max = Infinity, auto = false } = {}) {
+  // One batch at a time: two at once would double the pace RSI sees (OH.bbdPause).
+  if (bbLoading) return;
   const list = (packsOnly ? state.buybacks : computeBuybacks())
     .filter(
       (b) =>
@@ -3490,10 +3494,21 @@ async function loadBuybackDetails({ packsOnly = false, max = Infinity } = {}) {
   state.bbDetails = { ...(await OH.getBuybackDetails()) };
   if (res.rateLimited) {
     const mins = Math.max(1, Math.ceil((res.retryAt - Date.now()) / 60e3));
-    setStatus(
-      `RSI asked us to slow down, so we stopped${res.done ? ` after ${res.done} pages (kept)` : ''}. Give it about ${mins} min to cool off. Opening a single buy-back still works.`,
-      true,
-    );
+    const hours = Math.round(mins / 60);
+    const wait = mins < 60 ? `about ${mins} min` : `about ${hours} hour${hours === 1 ? '' : 's'}`;
+    const kept = res.done ? ` after ${res.done} page${res.done === 1 ? '' : 's'} (kept)` : '';
+    const single = 'Opening a single buy-back still works.';
+    // held: still waiting from an earlier batch, so RSI wasn't asked this time.
+    if (res.held) {
+      if (!auto) setStatus(`Buy-back details are on an R&R stop for ${wait} more. ${single}`);
+    } else if (res.busy) {
+      setStatus(`RSI is busy right now, so we stopped${kept}. Try again in ${wait}. ${single}`);
+    } else {
+      setStatus(
+        `RSI asked us to slow down, so we stopped${kept}. Give it ${wait} to cool off. ${single}`,
+        true,
+      );
+    }
   } else if (res.errors)
     setStatus(`Read ${res.done - res.errors} buy-back pages; ${res.errors} couldn't be read.`);
   if (currentView() === 'buybacks') renderBuybacks();
@@ -4486,7 +4501,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
     !b.isCCU && bbNeedsRead(b) && (b.kind === 'pack' || b.kind === 'package');
   const bbRead = rows.some((x) => x.name === 'Buy-Backs' && x.ok);
   if (bbRead && !bbLoading && state.buybacks.some(unreadPack))
-    loadBuybackDetails({ packsOnly: true, max: BB_AUTO_MAX });
+    loadBuybackDetails({ packsOnly: true, max: BB_AUTO_MAX, auto: true });
   // Your Subscriber Store's once-a-day read, after the scan (never part of it).
   if (!signedOut) loadSubStore();
 }
