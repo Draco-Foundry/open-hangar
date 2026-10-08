@@ -2,8 +2,9 @@
   // Org Fleet: members' ship lists (HTF exports or backups) combined into one fleet.
   // Ported from renderOrg() as it looked in 0.2.x (no signed-off redesign yet), so it
   // reuses the dashboard's classes. Ships only: no store prices or fleet values, and no
-  // member's totals next to another's (CLAUDE.md, What Not to Build). The stored list and the buttons' work stay in
-  // src/dashboard.js (OHApp.org); renderOrg() there fires 'oh:home' when it changes.
+  // member's totals next to another's (CLAUDE.md, What Not to Build). The stored list
+  // and the buttons' work stay in src/dashboard.js (OHApp.org); renderOrg() there fires
+  // 'oh:home' when it changes.
   import { app, version } from '../lib/app.svelte.js';
   import { owners } from './text.js';
   import Bars from './Bars.svelte';

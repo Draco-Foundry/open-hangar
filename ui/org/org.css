@@ -3,6 +3,10 @@
 .org-panel {
   border-radius: var(--r-md);
 }
+/* Names and role lists in the intros and panels: 600 at most, never the browser's 700. */
+#oh-org strong {
+  font-weight: 600;
+}
 /* Role chips are buttons: weight 500, counts in the data font. */
 .role-chip {
   font-weight: 500;

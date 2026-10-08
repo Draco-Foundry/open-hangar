@@ -795,7 +795,7 @@ try {
       pal: palette().good === cs.getPropertyValue('--good').trim(),
     };
   });
-  colors.key === 13 && colors.tokens && colors.whiteBal && colors.pal
+  colors.key === 12 && colors.tokens && colors.whiteBal && colors.pal
     ? ok('colors: tokens, Color Key (12), white balances, exports share the palette')
     : fail(`colors: ${JSON.stringify(colors)}`);
 
@@ -2276,6 +2276,8 @@ try {
     JSON.stringify([
       { name: 'Carrack', entity_type: 'ship', lti: true },
       { name: 'Cutlass Black', entity_type: 'ship', lti: false },
+      // Salvage: a role the demo fleet doesn't cover, so only Buddy fills it.
+      { name: 'Vulture', entity_type: 'ship', lti: false },
     ]),
   );
   const input = await page.$('#org-file');
@@ -2343,6 +2345,7 @@ try {
     return {
       panel: !!p,
       ships: p ? p.querySelector('.org-owners').textContent : '',
+      intro: p ? [...p.querySelectorAll('.org-intro')].map((x) => x.textContent) : [],
       open: document
         .querySelector('.org-mname[data-member="Buddy"]')
         ?.getAttribute('aria-expanded'),
@@ -2353,9 +2356,14 @@ try {
   memberPanel.open === 'true' &&
   /Carrack/.test(memberPanel.ships) &&
   /Cutlass Black/.test(memberPanel.ships) &&
+  /Vulture/.test(memberPanel.ships) &&
   noValues(memberValues)
     ? ok("a member's name opens their ships, with no values")
     : fail(`member panel: ${JSON.stringify({ memberPanel, memberValues })}`);
+  memberPanel.intro.some((t) => /^Roles: .*\bSalvage\b/.test(t)) &&
+  memberPanel.intro.some((t) => /^Only Buddy covers: .*\bSalvage\b/.test(t))
+    ? ok("a member's panel lists their roles and the ones only they cover")
+    : fail(`member roles: ${JSON.stringify(memberPanel.intro)}`);
   await page.click('.org-close[data-close="member"]');
   await orgTick();
   (await page.$('.org-member-panel'))
@@ -2429,6 +2437,23 @@ try {
   removed.chips === 1 && !removed.saved.includes('Buddy')
     ? ok('remove a member')
     : fail(`remove member: ${JSON.stringify(removed)}`);
+  // With one member left there's nobody to set them apart from: no "Only ... covers".
+  await page.click('.org-mname');
+  await orgTick();
+  const lone = await page.evaluate(() => {
+    const p = document.querySelector('.org-member-panel');
+    return {
+      panel: !!p,
+      only: p
+        ? [...p.querySelectorAll('.org-intro')].some((x) => /^Only /.test(x.textContent))
+        : null,
+    };
+  });
+  lone.panel && lone.only === false
+    ? ok('a lone member gets no "Only ... covers" line')
+    : fail(`lone member panel: ${JSON.stringify(lone)}`);
+  await page.click('.org-close[data-close="member"]');
+  await orgTick();
 
   console.log('Store');
   await go('#store');
