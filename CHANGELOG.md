@@ -15,6 +15,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   asks you once before anything is shared. Share a browser with another pilot? A hangar
   from an RSI account it hasn't synced waits until you say Sync It, and the people who
   used your referral code but aren't recruits yet stay in your browser.
+- New: **Open on Website.** Once you've connected, Home, Inventory, Buy-Backs and Stats
+  each have an Open on Website button that opens your hangar on openhangar.space. Before
+  that, Inventory, Buy-Backs and Stats show a small See It on Any Device link that starts
+  Connect.
 - Changed: **A cleaner top bar.** Home, Inventory, Buy-Backs and Store sit in the bar,
   and Stats, Org Fleet and Referrals live under More (it lights up when you're on one).
   Search is an icon that opens the field over the links (or press /), Game Status shows
