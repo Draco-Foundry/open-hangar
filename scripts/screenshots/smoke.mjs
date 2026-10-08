@@ -1163,6 +1163,7 @@ try {
   });
   /Connect to openhangar\.space/.test(sc.off) &&
   /Nothing is sent until you connect/.test(sc.off) &&
+  /Open Hangar will sync after every scan\. Disconnect any time\./.test(sc.off) &&
   sc.noStatusYet &&
   /^Connect to openhangar\.space\s*Optional/.test(sc.youOffer || '') &&
   /K7Q-4PX/.test(sc.wait) &&
