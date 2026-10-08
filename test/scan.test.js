@@ -181,6 +181,16 @@ test('429: a longer Retry-After from RSI is honoured, up to 30 s (#298)', async 
   assert.ok(waits.includes(20000));
 });
 
+test('a 5xx with a Retry-After is still retried in a scan (only buy-back details stop)', async () => {
+  await reset();
+  script = (page, n) =>
+    page === 1 && n === 1 ? { status: 503, headers: { 'retry-after': '10' } } : healthy(page);
+  const r = await OH.scanSource('hangar');
+  assert.equal(r.ok, true);
+  assert.equal(calls[1], 2);
+  assert.ok(waits.includes(10000));
+});
+
 test('429: after 5 tries the scan gives up instead of pushing on (#298)', async () => {
   await reset();
   script = (page) => (page === 1 ? { status: 429 } : healthy(page));

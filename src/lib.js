@@ -1531,7 +1531,8 @@
 
   // Fetch one page, retrying only *transient* failures (network error, 5xx, 429)
   // with a polite backoff. Auth failures and other 4xx return at once.
-  // Returns { res } or { error, transient }.
+  // Returns { res } or { error, transient }. Giving up on a 429 or a 5xx, it also
+  // hands back RSI's Retry-After header as sent (`retryAfter`, null without one).
   // Network errors and 5xx: up to 3 retries, quick exponential backoff.
   // RSI's "slow down" (429, #298): up to 5 retries, waiting 5 s, 10 s, 15 s, 20 s,
   // 25 s (or longer when RSI's Retry-After asks, up to 30 s), so a busy RSI gets
@@ -1562,9 +1563,11 @@
         retry = { msg, wait: DELAY_MS * 2 ** errors, attempt: errors, of: RETRIES };
         continue;
       }
-      const after = Number(res.headers.get('retry-after')) * 1000;
+      const retryAfter = res.headers.get('retry-after');
+      const after = Number(retryAfter) * 1000;
       if (res.status === 429) {
-        if (!retryRateLimit) return { error: 'RSI asked us to slow down', rateLimited: true };
+        if (!retryRateLimit)
+          return { error: 'RSI asked us to slow down', rateLimited: true, retryAfter };
         const msg = 'RSI asked us to slow down';
         if (++slowDowns > RATE_LIMIT_RETRIES) return { error: msg, transient: true };
         retry = {
@@ -1580,7 +1583,13 @@
       }
       if (res.status >= 500) {
         const msg = `RSI responded ${res.status}`;
-        if (++errors > RETRIES) return { error: msg, transient: true };
+        // Buy-back details: a 5xx that comes with a Retry-After (seconds or a date)
+        // ends the page at once, for the batch to hold off until then rather than
+        // retry sooner (OH.fetchBuybackDetails). Scans keep their capped retries.
+        if (!retryRateLimit && OH.retryAfterMs(retryAfter)) {
+          return { error: msg, transient: true, retryAfter };
+        }
+        if (++errors > RETRIES) return { error: msg, transient: true, retryAfter };
         retry = {
           msg,
           wait: Math.min(after > 0 ? after : DELAY_MS * 2 ** errors, MAX_RETRY_WAIT_MS),
@@ -3338,7 +3347,8 @@
     ).catch(() => null);
     if (next) bbdMem = next;
   };
-  // Read one buy-back page (cached). → detail | { error }.
+  // Read one buy-back page (cached). → detail | { error, rateLimited?, transient?,
+  // retryAfter? } (transient: RSI failed or couldn't be reached, after retries).
   OH.fetchBuybackDetail = async function fetchBuybackDetail(id) {
     const all = await OH.getBuybackDetails();
     if (all[id] && !all[id].partial) return all[id];
@@ -3347,9 +3357,10 @@
       retryRateLimit: false,
     });
     if (got.rateLimited || got.res?.status === 403) {
-      return { error: 'RSI asked us to slow down.', rateLimited: true };
+      const retryAfter = got.rateLimited ? got.retryAfter : header(got.res, 'retry-after');
+      return { error: 'RSI asked us to slow down.', rateLimited: true, retryAfter };
     }
-    if (got.error) return { error: got.error };
+    if (got.error) return { error: got.error, transient: true, retryAfter: got.retryAfter };
     if (!got.res.ok) return { error: `RSI responded ${got.res.status}.` };
     const html = await got.res.text();
     // A page the parser chokes on is skipped like an unreadable one, so one odd
@@ -3369,13 +3380,38 @@
     saveBuybackDetails();
     return all[id];
   };
-  // Read many, politely: one at a time with a random pause between pages, and at
-  // RSI's first "slow down" (429, or a 403 block) the whole batch stops and batches
-  // are held off for BBD_COOLDOWN_MS, rather than pushing on page by page. What was
-  // read is kept. onProgress(done, total); stop by returning false from shouldGo().
-  // → { done, errors, total, rateLimited?, retryAt? }.
+  // Read many, politely (the automatic pack read after a scan, Load Details and Get
+  // Details): one page at a time, with a random 1 to 2 s pause between pages
+  // (OH.bbdPause). At RSI's first "slow down" (429, or a 403 block) the whole batch
+  // stops, rather than pushing on page by page, and batches are held off for the
+  // longer of RSI's Retry-After and a cooldown that doubles with each slow-down in a
+  // row (OH.bbdCooldown: 15 minutes, 30, an hour… up to 6 hours; a batch that reads
+  // a page and ends without one starts it over). A page that fails for a passing
+  // reason (5xx or no network, after fetchPage's own retries) doubles the next pause;
+  // three in a row stop the batch. A 5xx with a Retry-After stops it at once and holds
+  // batches off until then (`busy`). What was read is kept. onProgress(done, total);
+  // stop by returning false from shouldGo().
+  // → { done, errors, total, rateLimited?, retryAt?, held?, busy? } (held: still held
+  // off from an earlier batch, so RSI wasn't asked at all).
+  const BBD_PAUSE_MS = 1000;
+  const BBD_MAX_FAILS = 3;
   const BBD_COOLDOWN_MS = 15 * 60e3;
+  const BBD_MAX_COOLDOWN_MS = 6 * 3600e3;
   const BBD_SLOW_KEY = 'bbdSlowDownUntil';
+  const BBD_STRIKES_KEY = 'bbdSlowDowns'; // slow-downs in a row
+  // The pause after a page: 1 to 2 s at random (never a fixed beat), doubled for
+  // each failed page in a row (2 to 4 s after one, 4 to 8 s after two; a third stops
+  // the batch). Pure (`rand` for tests).
+  OH.bbdPause = function bbdPause(fails = 0, rand = Math.random) {
+    return BBD_PAUSE_MS * (1 + rand()) * 2 ** fails;
+  };
+  // How long batches are held off after the `strikes`-th slow-down in a row: the
+  // longer of the cooldown (15 minutes, doubling, 6 hours at most) and RSI's
+  // Retry-After (seconds or a date, OH.retryAfterMs). Pure.
+  OH.bbdCooldown = function bbdCooldown(strikes, retryAfter, now = Date.now()) {
+    const ours = BBD_COOLDOWN_MS * 2 ** Math.max(0, strikes - 1);
+    return Math.max(Math.min(ours, BBD_MAX_COOLDOWN_MS), OH.retryAfterMs(retryAfter, now));
+  };
   OH.fetchBuybackDetails = async function fetchBuybackDetails(
     ids,
     onProgress,
@@ -3383,33 +3419,46 @@
   ) {
     const all = await OH.getBuybackDetails();
     const todo = ids.filter((id) => (!all[id] || all[id].partial) && /^\d+$/.test(String(id)));
-    const { [BBD_SLOW_KEY]: until = 0 } = await chrome.storage.local.get(BBD_SLOW_KEY);
+    const { [BBD_SLOW_KEY]: until = 0, [BBD_STRIKES_KEY]: before = 0 } =
+      await chrome.storage.local.get([BBD_SLOW_KEY, BBD_STRIKES_KEY]);
     if (until > Date.now()) {
-      return { done: 0, errors: 0, total: todo.length, rateLimited: true, retryAt: until };
+      const held = { rateLimited: true, retryAt: until, held: true };
+      return { done: 0, errors: 0, total: todo.length, ...held };
     }
     let done = 0;
     let errors = 0;
-    for (const id of todo) {
+    let read = 0; // pages read fine
+    let fails = 0; // pages in a row that failed for a passing reason
+    for (const [i, id] of todo.entries()) {
       if (!shouldGo()) break;
       const r = await OH.fetchBuybackDetail(id);
-      if (r.rateLimited) {
-        const retryAt = Date.now() + BBD_COOLDOWN_MS;
-        await chrome.storage.local.set({ [BBD_SLOW_KEY]: retryAt });
-        OH.log(
-          'warn',
-          'buybacks',
-          `details stopped after ${done} pages: RSI asked us to slow down`,
-        );
-        return { done, errors, total: todo.length, rateLimited: true, retryAt };
+      const after = r.transient ? OH.retryAfterMs(r.retryAfter) : 0;
+      if (r.rateLimited || after) {
+        // Slow-downs count toward the cooldown; a failure with a Retry-After waits it out.
+        const strikes = r.rateLimited ? before + 1 : before;
+        const retryAt =
+          Date.now() + (r.rateLimited ? OH.bbdCooldown(strikes, r.retryAfter) : after);
+        await chrome.storage.local.set({ [BBD_SLOW_KEY]: retryAt, [BBD_STRIKES_KEY]: strikes });
+        const why = r.rateLimited ? 'RSI asked us to slow down' : `${r.error}, with a Retry-After`;
+        OH.log('warn', 'buybacks', `details stopped after ${done} pages: ${why}`);
+        const busy = r.rateLimited ? {} : { busy: true }; // RSI failing, not a slow-down
+        return { done, errors, total: todo.length, rateLimited: true, retryAt, ...busy };
       }
       if (r.error) {
         errors++;
         if (/signed in/i.test(r.error)) break;
-      }
+      } else read++;
+      fails = r.transient ? fails + 1 : 0;
       done++;
       onProgress?.(done, todo.length);
-      await sleep(DELAY_MS + Math.random() * DELAY_MS * 1.5); // 0.4 to 1 s, not a fixed beat
+      if (fails >= BBD_MAX_FAILS) {
+        OH.log('warn', 'buybacks', `details stopped after ${done} pages: RSI kept failing`);
+        break;
+      }
+      // No pause after the last page, or once Stop is pressed.
+      if (i < todo.length - 1 && shouldGo()) await sleep(OH.bbdPause(fails));
     }
+    if (before && read) await chrome.storage.local.remove(BBD_STRIKES_KEY);
     return { done, errors, total: todo.length };
   };
 
