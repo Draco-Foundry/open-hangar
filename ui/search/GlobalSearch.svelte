@@ -175,17 +175,7 @@
             {/each}
           </div>
         {/if}
-        {#if r.buybacks.length}
-          <div class="gs-group">
-            <div class="gs-title">
-              <span>In Your Buy-Backs</span><span>{count(r.buybacks, r.bbCount)}</span>
-            </div>
-            {#each r.buybacks as row (row.key)}
-              {@render rich(row, { 'data-open-bb': row.bb })}
-            {/each}
-          </div>
-        {/if}
-        {@render note()}
+        <!-- Earned rewards are yours, so they come before buy-backs (owner, 2026-10-09). -->
         {#if r.rewards.length}
           <div class="gs-group">
             <div class="gs-title">
@@ -203,6 +193,17 @@
             {/each}
           </div>
         {/if}
+        {#if r.buybacks.length}
+          <div class="gs-group">
+            <div class="gs-title">
+              <span>In Your Buy-Backs</span><span>{count(r.buybacks, r.bbCount)}</span>
+            </div>
+            {#each r.buybacks as row (row.key)}
+              {@render rich(row, { 'data-open-bb': row.bb })}
+            {/each}
+          </div>
+        {/if}
+        {@render note()}
       </div>
       <div class="gs-foot">
         <span>{shown} result{shown === 1 ? '' : 's'} · Enter opens the first</span>
