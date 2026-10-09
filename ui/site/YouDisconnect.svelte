@@ -46,7 +46,7 @@
         <button bind:this={stay} type="button" class="sc-btn" onclick={keep}>Stay Connected</button>
         <button
           type="button"
-          class="sc-btn warn menu-item"
+          class="sc-btn warn"
           onclick={() => ((asking = false), site().disconnect())}>Disconnect</button
         >
       </div>
@@ -57,3 +57,17 @@
     </button>
   {/if}
 {/if}
+
+<style>
+  /* Two equal buttons side by side, each on one line, centred (owner, 2026-10-09). */
+  .you-confirm .sm-confirm-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .you-confirm .sm-confirm-row .sc-btn {
+    justify-content: center;
+    text-align: center;
+    white-space: nowrap;
+  }
+</style>
