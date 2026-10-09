@@ -195,19 +195,23 @@ try {
     counts: [...document.querySelectorAll('#oh-home .counts a')].map((a) => a.textContent.trim()),
     font: getComputedStyle(document.querySelector('#oh-home h3')).fontFamily,
   }));
-  val.big && val.counts.some((c) => /ship pledges?$/.test(c)) && /Manrope/.test(val.font)
+  // Ships · CCUs · Paints · Other (owner, 2026-10-09): no pledge, LTI or buy-back counts.
+  val.big &&
+  /ships?$/.test(val.counts[0] || '') &&
+  !val.counts.some((c) => /pledge|LTI|buy-back/.test(c)) &&
+  /Manrope/.test(val.font)
     ? ok(`value card: ${val.big}, ${val.counts.join(' · ')} (bundled Manrope)`)
     : fail(`home value card: ${JSON.stringify(val)}`);
   const clicks = await page.evaluate(async () => {
     [...document.querySelectorAll('#oh-home .counts a')]
-      .find((a) => /LTI/.test(a.textContent))
+      .find((a) => /ships?$/.test(a.textContent.trim()))
       .click();
     await new Promise((r) => setTimeout(r, 200));
-    const lti =
+    const ships =
       location.hash === '#inventory' &&
-      state.traits.get('ins')?.has('LTI') &&
-      computeShown().every((p) => p.insurance === 'LTI');
-    state.traits = new Map();
+      state.shown.has('ship') &&
+      computeShown().every((p) => p.kind === 'ship');
+    state.shown = new Set();
     location.hash = '#home';
     await new Promise((r) => setTimeout(r, 300));
     const rows = document.querySelectorAll('#oh-home .li').length;
@@ -215,10 +219,10 @@ try {
     await new Promise((r) => setTimeout(r, 200));
     const modal = !document.querySelector('#item-modal').hidden;
     document.querySelector('#item-modal').hidden = true;
-    return { lti, rows, modal };
+    return { ships, rows, modal };
   });
-  clicks.lti && clicks.rows === 5 && clicks.modal
-    ? ok('home: LTI count filters Inventory; 5 latest acquisitions, a row opens details')
+  clicks.ships && clicks.rows === 5 && clicks.modal
+    ? ok('home: Ships count filters Inventory; 5 latest acquisitions, a row opens details')
     : fail(`home clicks: ${JSON.stringify(clicks)}`);
   // Account Value's Most Valuable list (owner 2026-10-06): the top 3 ship pledges by
   // today's store price, insurance chip, "+$N over what you paid" only when the melt
@@ -392,7 +396,9 @@ try {
     r.noChart =
       !av.querySelector('svg, .trend') &&
       !/can be melted|gifted|Since Your First Scan/.test(av.textContent);
-    r.counts = /ship pledges?/.test(av.textContent) && /buy-backs?/.test(av.textContent);
+    // Ships · CCUs · Paints · Other (owner, 2026-10-09), no pledge or buy-back counts.
+    const countText = [...av.querySelectorAll('.counts a')].map((a) => a.textContent).join(' ');
+    r.counts = /\bships?\b/.test(countText) && !/pledge|buy-back|LTI/.test(countText);
     return r;
   });
   fin.pill === '4.10.1' &&
@@ -1602,7 +1608,9 @@ try {
         const br = b.getBoundingClientRect();
         const end = nr.right - parseFloat(getComputedStyle(n).paddingRight);
         const under = nr.top < br.bottom && br.top < nr.bottom && br.left < end;
-        return under ? `name ends at ${Math.round(end)}, link starts at ${Math.round(br.left)}` : '';
+        return under
+          ? `name ends at ${Math.round(end)}, link starts at ${Math.round(br.left)}`
+          : '';
       });
       if (c) clash[w] = c;
     }

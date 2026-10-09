@@ -44,15 +44,50 @@
         resolve: a.resolveImageName(r.p),
       })),
       vsPaid: v && v.paidPriced ? v.storePriced - v.paidPriced : null,
-      counts: [
-        { key: 'ship', n: items.filter((p) => p.containsShip).length, one: 'ship pledge', many: 'ship pledges' },
-        { key: 'all', n: items.length, one: 'pledge', many: 'pledges' },
-        { key: 'ccu', n: items.filter((p) => p.kind === 'ccu').length, one: 'CCU', many: 'CCUs' },
-        { key: 'lti', n: items.filter((p) => p.insurance === 'LTI').length, one: 'LTI', many: 'LTI' },
-        { key: 'buybacks', n: s.buybacks.length, one: 'buy-back', many: 'buy-backs' },
-      ].filter((c) => c.n > 0),
+      // Ships · CCUs · Paints · Other, in the usual category order (owner, 2026-10-09):
+      // Ships counts every ship (a pack with two counts two), not pledges; Other's
+      // hover names what it holds. No LTI, pledge or buy-back counts here.
+      counts: countsOf(items),
     };
   });
+  function countsOf(items) {
+    const of = (k) => items.filter((p) => p.kind === k).length;
+    // Every ship in every pledge, as Stats counts them (OH.fleetStats), without
+    // looking each one up: the count is all this card needs.
+    const ships = items.reduce(
+      (n, p) => n + (p.contents || []).filter((c) => /^ship$/i.test(c.kind || '')).length,
+      0,
+    );
+    const shipPledges = items.filter((p) => p.containsShip).length;
+    const others = [
+      ['addon', 'add-on', 'add-ons'],
+      ['coupon', 'coupon', 'coupons'],
+      ['other', 'other', 'other'],
+    ].map(([k, one, many]) => [of(k), one, many]);
+    const otherN = others.reduce((n, [c]) => n + c, 0);
+    return [
+      {
+        key: 'ship',
+        n: ships,
+        one: 'ship',
+        many: 'ships',
+        hint: `${ships} ${ships === 1 ? 'ship' : 'ships'} in ${shipPledges} ${shipPledges === 1 ? 'pledge' : 'pledges'}`,
+      },
+      { key: 'ccu', n: of('ccu'), one: 'CCU', many: 'CCUs' },
+      { key: 'paint', n: of('paint'), one: 'paint', many: 'paints' },
+      {
+        // Opens the whole Inventory: Other spans three kinds there.
+        key: 'other-all',
+        n: otherN,
+        one: 'other',
+        many: 'other',
+        hint: others
+          .filter(([c]) => c > 0)
+          .map(([c, one, many]) => `${c} ${c === 1 ? one : many}`)
+          .join(', '),
+      },
+    ].filter((c) => c.n > 0);
+  }
   const a = app();
   const signed = (n) => (n >= 0 ? '+' : '−') + a.bigMoney(Math.abs(n));
   const exact = (n) => (n < 0 ? '−' : '') + a.dollars(Math.abs(n));
@@ -159,7 +194,7 @@
   {/if}
   <div class="counts">
     {#each d.counts as c (c.key)}
-      <a href={c.key === 'buybacks' ? '#buybacks' : '#inventory'} title="{exactCount(c.n)} {plural(c.n, c.one, c.many)}" onclick={(e) => open(c, e)}
+      <a href={c.key === 'buybacks' ? '#buybacks' : '#inventory'} title={c.hint || `${exactCount(c.n)} ${plural(c.n, c.one, c.many)}`} onclick={(e) => open(c, e)}
         ><b>{shortCount(c.n)}</b> {plural(c.n, c.one, c.many)}</a
       >
     {/each}
