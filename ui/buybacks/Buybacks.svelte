@@ -54,7 +54,19 @@
           small: sum.next ? `next ${sum.next}` : '',
           title: sum.tokenTitle,
         },
-        ...(sum.under ? [{ label: 'Below Store Price', value: sum.underText, good: true }] : []),
+        // Its number turns Deals > Below Store Price on, and off again (owner, 2026-10-09).
+        ...(sum.under
+          ? [
+              {
+                label: 'Below Store Price',
+                value: sum.underText,
+                good: true,
+                on: f.active.some((x) => x.group === 'deals' && x.key === 'below'),
+                go: () => b.toggleOption('deals', 'below'),
+                title: 'Show only the buy-backs below store price (click again to show all)',
+              },
+            ]
+          : []),
       ],
       f,
       on: f ? f.active.length : 0,
