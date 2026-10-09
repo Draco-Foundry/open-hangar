@@ -38,7 +38,12 @@
       "/favicon.svg",
     ],
   },
-  "services": [{ "binding": "APP", "service": "open-hangar-server" }],
+  // EDGE: the website's edge gateway (open-hangar-edge), for its pages; APP: the
+  // website itself, for its feeds and files and when the gateway can't answer.
+  "services": [
+    { "binding": "APP", "service": "open-hangar-server" },
+    { "binding": "EDGE", "service": "open-hangar-edge" },
+  ],
   // openhangar.space itself (switched from GitHub Pages, docs/SITE-CLOUDFLARE.md).
   // www is a proxied record plus a "www to root" redirect rule in the dashboard.
   "routes": [{ "pattern": "openhangar.space", "custom_domain": true }],
@@ -50,7 +55,10 @@
       "name": "openhangar-site-staging",
       "routes": [],
       "workers_dev": true,
-      "services": [{ "binding": "APP", "service": "open-hangar-server-staging" }],
+      "services": [
+        { "binding": "APP", "service": "open-hangar-server-staging" },
+        { "binding": "EDGE", "service": "open-hangar-edge-staging" },
+      ],
     },
   },
 }

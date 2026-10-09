@@ -60,7 +60,9 @@ and the files it loads (`/_astro/*`, `/fonts/*`, `/favicon.svg`), `/extension`, 
 (`/help`) and the extension's feeds (`run_worker_first` in `site-worker/wrangler.jsonc`). A path with
 no file in `site/` reaches the script too and is handed on the same way. Every file in `site/`
 (`status.json`, `rates.json`, `help.html`, `privacy.html`) is still a plain file and never runs the
-script. The home and extension pages are cached at the edge for a minute.
+script. The website's pages go through its edge gateway (the `EDGE` binding, the
+`open-hangar-edge` Worker), which keeps signed-out pages near each visitor per host and Day or
+Night look; this Worker keeps no copy of its own.
 
 If the website Worker fails: `/` and `/extension` get the old `site/index.html`, `/help` gets
 `site/help.html`, the Ship Explorer and What's Next answer a 503 with Retry-After, and the feeds a

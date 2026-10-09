@@ -22,10 +22,11 @@ const load = import('data:text/javascript;base64,' + Buffer.from(source).toStrin
 );
 
 // One request through the worker. `app` is what the website Worker does: a
-// status code it answers with, or 'down' when the call itself fails.
-async function visit(pathname, app) {
+// status code it answers with, or 'down' when the call itself fails. With `edge`,
+// the website's edge gateway (EDGE) is bound and answers the same way.
+async function visit(pathname, app, { edge = false } = {}) {
   const worker = await load;
-  const calls = { app: [], assets: [], cache: [] };
+  const calls = { app: [], edge: [], assets: [], cache: [] };
   globalThis.caches = {
     default: {
       match: async (req) => {
@@ -55,6 +56,14 @@ async function visit(pathname, app) {
       },
     },
   };
+  if (edge)
+    env.EDGE = {
+      fetch: async (req) => {
+        calls.edge.push(req);
+        if (app === 'down') throw new Error('gateway unreachable');
+        return new Response(`edge ${app}`, { status: app });
+      },
+    };
   const ctx = { waitUntil: () => {} };
   const res = await worker.fetch(new Request(`https://openhangar.space${pathname}`), env, ctx);
   return { res, body: await res.text(), calls };
@@ -119,9 +128,53 @@ test('the home page and /extension keep the old static home page as their fallba
     assert.equal(res.status, 200, `${page} ${app}`);
     assert.equal(body, 'static /index.html', `${page} ${app}`);
   }
+  // Never kept here: a copy keyed on the address alone would hand one visitor's
+  // Day or Night look to the next (the website's edge gateway keeps them per look).
   const { body, calls } = await visit('/', 200);
   assert.equal(body, 'website 200');
-  assert.deepEqual(calls.cache, ['match /', 'put /']);
+  assert.deepEqual(calls.cache, []);
+});
+
+test("with the edge gateway bound, the website's pages go through it as they came", async () => {
+  const pages = [
+    '/',
+    '/extension',
+    '/store',
+    '/store/',
+    '/ships',
+    '/ships/aurora-mk-ii',
+    '/whats-next',
+    '/help',
+    '/updates',
+    '/about',
+  ];
+  for (const page of pages) {
+    const { res, body, calls } = await visit(`${page}?view=list`, 200, { edge: true });
+    assert.equal(res.status, 200, page);
+    assert.equal(body, 'edge 200', page);
+    assert.deepEqual(calls.app, [], page);
+    assert.equal(calls.edge.length, 1, page);
+    // The visitor's own request, untouched: the gateway decides from it.
+    assert.equal(calls.edge[0].url, `https://openhangar.space${page}?view=list`);
+    assert.deepEqual(calls.cache, [], page);
+  }
+  // Feeds and files go straight to the website.
+  for (const p of ['/api/catalog', '/api/store/catalog', '/_astro/app.js', '/fonts/x.woff2']) {
+    const { calls } = await visit(p, 200, { edge: true });
+    assert.deepEqual(calls.edge, [], p);
+    assert.equal(calls.app.length, 1, p);
+  }
+  // The fallbacks still stand when the gateway can't answer.
+  for (const [page, app, want] of [
+    ['/', 'down', 'static /index.html'],
+    ['/', 500, 'static /index.html'],
+    ['/help', 503, 'static /help.html'],
+  ]) {
+    const { body } = await visit(page, app, { edge: true });
+    assert.equal(body, want, `${page} ${app}`);
+  }
+  const { res } = await visit('/ships', 'down', { edge: true });
+  assert.equal(res.status, 503);
 });
 
 test('look-alike paths get no new-page fallback', async () => {
