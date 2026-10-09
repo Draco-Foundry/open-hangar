@@ -14,8 +14,23 @@
 // the home page and /extension get the old static home page (site/index.html),
 // /help the Troubleshooting page (site/help.html), the Ship Explorer and What's
 // Next a 503 that says try again, and the feeds a JSON 503.
+//
+// The website's pages go through its edge gateway (EDGE, the open-hangar-edge
+// Worker): a signed-out page comes from Cloudflare's edge near the visitor, kept
+// per host and per Day or Night look, and anything it doesn't keep goes on to
+// the website as before. Without the EDGE binding, straight to the website.
 
-const HOME_TTL_S = 60; // the home and extension pages are cached at the edge for a minute
+// The website's pages (not its feeds or files) that may come through the gateway.
+const PAGES = new Set([
+  '/',
+  '/extension',
+  '/store',
+  '/ships',
+  '/whats-next',
+  '/help',
+  '/updates',
+  '/about',
+]);
 // The extension's feeds. The website answers them itself (its own cache, ETag,
 // Origin check and rate limit), so they pass straight through, never cached here:
 // the answer depends on the caller's Origin.
@@ -28,7 +43,7 @@ const FEEDS = new Set([
 ]);
 
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request, env) {
     const url = new URL(request.url);
     const home = url.pathname === '/';
     // The extension's own page (owner, 2026-10-04), rendered by the website
@@ -40,25 +55,20 @@ export default {
     // The website's newer pages (owner, 2026-10-08): the Ship Explorer, each
     // ship's page, What's Next and Help. Each is dark behind its own flag there,
     // and its 404 passes straight through until the owner switches it on. Never
-    // cached here: the website sets their cache headers itself. The website
+    // cached here (the website's edge gateway keeps signed-out pages). The website
     // answers /help/ like /help, so a trailing slash gets the same fallback.
     const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, '') : url.pathname;
     const help = path === '/help';
     const newPage =
       help || path === '/whats-next' || path === '/ships' || path.startsWith('/ships/');
 
-    // These pages are the same for every visitor (always signed out here), so
-    // one copy a minute serves everyone. Only a plain GET is cached.
-    const cacheable = page && request.method === 'GET' && !url.search;
-    const cache = caches.default;
-    if (cacheable) {
-      const hit = await cache.match(request);
-      if (hit) return hit;
-    }
+    // Pages through the gateway, the request as it came: the gateway decides from it
+    // whether a kept page may answer.
+    const viaEdge = env.EDGE && (PAGES.has(path) || path.startsWith('/ships/'));
 
     let res;
     try {
-      res = await env.APP.fetch(request);
+      res = await (viaEdge ? env.EDGE : env.APP).fetch(request);
     } catch {
       res = null;
     }
@@ -98,13 +108,6 @@ export default {
       });
     }
     if (!res) return new Response('Lost the signal. Try again in a moment.', { status: 502 });
-
-    if (cacheable && res.ok && !res.headers.has('set-cookie')) {
-      const copy = new Response(res.body, res);
-      copy.headers.set('cache-control', `public, max-age=0, s-maxage=${HOME_TTL_S}`);
-      ctx.waitUntil(cache.put(request, copy.clone()));
-      return copy;
-    }
     return res;
   },
 };
