@@ -2276,6 +2276,24 @@ try {
   bbm.rows === bbTotal && bbm.reclaim && bbm.ins
     ? ok(`buy-back market: ${bbm.rows} rows, one each, Buy Back + Insurance`)
     : fail(`buy-back market: ${JSON.stringify(bbm)} vs ${bbTotal}`);
+  // The header's Below Store Price number turns Deals > Below Store Price on, and off
+  // again (owner, 2026-10-09).
+  const below = await page.evaluate(async () => {
+    const go = () => document.querySelector('.page-sum .ps-go');
+    if (!go()) return { none: true };
+    go().click();
+    await new Promise((r) => setTimeout(r, 250));
+    const on =
+      !!state.bbTraits.get('deals')?.has('below') && go()?.getAttribute('aria-pressed') === 'true';
+    go().click();
+    await new Promise((r) => setTimeout(r, 250));
+    return { on, off: !state.bbTraits.get('deals')?.has('below') };
+  });
+  below.none
+    ? ok('buy-backs header: nothing below store price in this hangar, so no button')
+    : below.on && below.off
+      ? ok('buy-backs header: Below Store Price turns its filter on, and off again')
+      : fail(`buy-backs header Below Store Price: ${JSON.stringify(below)}`);
   // A CCU's Reclaim opens its one-item buy-back list entry, never the pledge store
   // its RSI button points at (owner, 2026-10-05).
   const ccuLink = await page.evaluate(() => {
