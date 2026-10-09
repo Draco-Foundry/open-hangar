@@ -9,6 +9,7 @@
   import Thumb from './Thumb.svelte';
   import BbPrice from './BbPrice.svelte';
   import Reclaim from './Reclaim.svelte';
+  import { RETIRED_TIP } from './retired-tip.js';
   import ItemName from './ItemName.svelte';
 
   let { item, list, layout } = $props();
@@ -83,12 +84,17 @@
       </div>
       <div class="card-contents">{c.contents}</div>
       <div class="card-foot">
-        <span class="foot-left"><span class="badge {c.badge}">{c.type}</span></span>
+        <span class="foot-left"
+          ><span class="badge {c.badge}">{c.type}</span>{#if c.reclaim?.retired}<span
+              class="badge retired"
+              title={RETIRED_TIP}>Retired*</span
+            >{/if}</span
+        >
         <span class="bb-date">{c.date}</span>
         <span class="bb-end"
           >{#if c.price}<BbPrice p={c.price} />{/if}{#if c.under}<small class="under"
               >{c.under} under store</small
-            >{/if}{#if c.reclaim}<Reclaim r={c.reclaim} />{/if}</span
+            >{/if}{#if c.reclaim}<Reclaim r={c.reclaim} mark={false} />{/if}</span
         >
       </div>
     </div>

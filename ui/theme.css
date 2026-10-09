@@ -2655,6 +2655,21 @@ body:not(:has(#view-home.active)) .market-title {
 .badge.paint {
   background: var(--t-paint-soft);
 }
+/* A retired ship's buy-back: RSI still sells it back for now (owner, 2026-10-09). */
+.badge.retired {
+  margin-left: 6px;
+  color: var(--warn);
+  cursor: help;
+}
+.bb-retired-mark {
+  margin-right: 8px;
+  color: var(--warn);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: help;
+}
 .badge.addon {
   background: var(--t-addon-soft);
 }
