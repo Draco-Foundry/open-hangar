@@ -91,7 +91,13 @@
     {#if gs}
       {#if gs.live}
         <div class="gs-row">
-          <div class="gs-top"><span><i class="ch live"></i>LIVE</span><b>{gs.live.version}</b></div>
+          <div class="gs-top">
+            <!-- LIVE is the PU: its mark shows the services' state, the pill's dot (owner, 2026-10-09). -->
+            <span
+              >{#if gs.status}<i class="dot {gs.status.level} live-dot" title={DOT_TITLE[gs.status.level]}
+                ></i>{:else}<i class="ch live"></i>{/if}LIVE</span
+            ><b>{gs.live.version}</b>
+          </div>
           {#if gs.live.released}<div class="gs-sub">Released {shortDay(gs.live.released)}, {ago(gs.live.released)}</div>{/if}
         </div>
       {/if}
@@ -240,6 +246,9 @@
     margin-right: 9px;
     border-radius: 50%;
     background: var(--good);
+  }
+  .live-dot {
+    margin-right: 9px;
   }
   .ch.test {
     background: none;
