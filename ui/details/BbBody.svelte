@@ -26,7 +26,7 @@
   {#if v.insurance}<Row k="Insurance">{v.insurance}</Row>{/if}
   {#if v.date}<Row k="Melted">{v.date}</Row>{/if}
   {#if v.id}<Row k="Pledge ID">{v.id}</Row>{/if}
-  {#if v.reclaim}<Row k="Reclaim"><Reclaim r={v.reclaim} /></Row>{/if}
+  {#if v.reclaim}<Row k="Buy Back"><Reclaim r={v.reclaim} /></Row>{/if}
   {#if v.block}<p class="bb-block-note" id="bb-block-note">{v.block}</p>{/if}
   {#if v.cart}
     {#key v.cart.pledgeId}

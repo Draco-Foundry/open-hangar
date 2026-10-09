@@ -2265,8 +2265,8 @@ try {
     rows: document.querySelectorAll('#buybacks-body .market-table tbody tr').length,
     cards: window.state ? null : null,
     reclaim: [...document.querySelectorAll('#buybacks-body .market-table tbody tr')].every((r) =>
-      // Retired ships (#306): a "Retired, Buy-Back Still Open" label, still a link.
-      /Reclaim|Retired, Buy-Back Still Open/.test(r.textContent),
+      // Every row: Buy Back (owner, 2026-10-09); a retired ship adds a Retired* mark.
+      /Buy Back/.test(r.textContent),
     ),
     ins: !!document.querySelector('#buybacks-body .market-table .mk-ins'),
   }));
@@ -2274,7 +2274,7 @@ try {
     Number((e.textContent.match(/of (\d+)/) || [])[1]),
   );
   bbm.rows === bbTotal && bbm.reclaim && bbm.ins
-    ? ok(`buy-back market: ${bbm.rows} rows, one each, Reclaim + Insurance`)
+    ? ok(`buy-back market: ${bbm.rows} rows, one each, Buy Back + Insurance`)
     : fail(`buy-back market: ${JSON.stringify(bbm)} vs ${bbTotal}`);
   // A CCU's Reclaim opens its one-item buy-back list entry, never the pledge store
   // its RSI button points at (owner, 2026-10-05).
@@ -3002,7 +3002,7 @@ try {
       bbRows: sub && !sub.hidden ? sub.querySelectorAll('table.inner > tbody > tr').length : 0,
       bbTypes: sub ? [...sub.querySelectorAll('tbody .badge')].map((b) => b.textContent) : [],
       pack: /1 pack/.test(packSummary) && !/buy-back|to it/.test(packSummary),
-      reclaim: sub ? /Reclaim/.test(sub.textContent) : false,
+      reclaim: sub ? /Buy Back|Reclaim/.test(sub.textContent) : false,
       panels: document.querySelectorAll('#view-store .store-panel').length,
       ccugame: /ccugame/i.test(document.querySelector('#view-store').textContent),
     };

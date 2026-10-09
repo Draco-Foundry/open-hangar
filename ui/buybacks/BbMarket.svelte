@@ -62,7 +62,7 @@
             <th title="Store price minus the buy-back price (needs Load details)">vs Store</th>
             <th title="Your price as a percent of the buy-back price">% of Price</th>
             <th>My Price</th>
-            <th>Reclaim</th>
+            <th>Buy Back</th>
           </tr>
         </thead>
         <tbody>
