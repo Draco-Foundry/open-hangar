@@ -30,11 +30,13 @@
       default: false,
       devOnly: true,
     },
-    // Off in the beta too until the privacy policy names our hangar page and what it
-    // may read (test/privacy-permissions.test.js): then `beta: true`, with the policy.
+    // On in the beta since the privacy policy names our hangar page and what it may
+    // read (test/privacy-permissions.test.js, owner-approved words 2026-10-10). Off in
+    // the public store builds until the owner turns it on.
     localMode: {
       about: 'Our hangar page reads the hangar this browser scanned (Local Mode).',
       default: false,
+      beta: true,
     },
     // The website is the full app and the extension its connector (owner, 2026-10-10):
     // the toolbar opens a popup, and one basic page stays. Needs localMode.

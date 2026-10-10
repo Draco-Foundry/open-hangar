@@ -46,12 +46,12 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     localMode: false,
     connector: false,
   });
-  // Local Mode stays off in the beta until the privacy policy names our hangar page
-  // (test/privacy-permissions.test.js).
+  // Local Mode is on in the beta now that the privacy policy names our hangar page
+  // (test/privacy-permissions.test.js); the public store builds keep it off.
   assert.deepEqual(buildValues(registry, { beta: true }), {
     sync: true,
     orgFleet: false,
-    localMode: false,
+    localMode: true,
     connector: false,
   });
   assert.deepEqual(buildValues(registry, { overrides: { sync: false } }), {
@@ -418,21 +418,22 @@ test('pack: writes each build its values and cuts the code of flags that are off
       assert.ok(!/ohPopup/.test(read(t, 'src/background.js')), `${t}: the popup's Scan cut`);
     }
 
-    // The beta: exactly the beta set, no overrides.
+    // The beta: exactly the beta set, no overrides. Local Mode is on there (the
+    // policy names our hangar page), so the production hangar page is let in.
     pack(dir, ['--beta']);
     assert.deepEqual(built('beta').flags, {
       sync: true,
       orgFleet: false,
-      localMode: false,
+      localMode: true,
       connector: false,
     });
     assert.deepEqual(built('beta-firefox').flags, {
       sync: true,
       orgFleet: false,
-      localMode: false,
+      localMode: true,
       connector: false,
     });
-    assert.deepEqual(built('beta').pages.hangar, []);
+    assert.deepEqual(built('beta').pages.hangar, ['https://hangar.openhangar.space']);
     assert.throws(() => pack(dir, ['--beta', '--flag', 'orgFleet=on']), /beta set/);
     assert.throws(() => pack(dir, ['--flag', 'warpDrive=on']), /no such flag/);
   } finally {
