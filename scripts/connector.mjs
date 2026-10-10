@@ -100,9 +100,11 @@ export function trimToConnector(out) {
 
 // A build that doesn't agree with its connector flag → its problems ([] when fine).
 // `files`: every path in it (relative to its root); `read(f)`: a text file's contents;
-// `manifest`: the built one; `site`: the sync site built in (for connect-src). Works
-// the same on a dist/ folder and on a zip.
-export function connectorProblems(unit, { files, read, manifest, connector, site }) {
+// `manifest`: the built one; `site`: the sync site built in (for connect-src);
+// `refs: false` skips checking the pages' scripts are there (a build made before the
+// Svelte pages were, as npm test does; the store check always checks). Works the same
+// on a dist/ folder and on a zip.
+export function connectorProblems(unit, { files, read, manifest, connector, site, refs = true }) {
   const problems = [];
   const has = (f) => files.has(f);
   const csp = manifest.content_security_policy?.extension_pages || '';
@@ -122,7 +124,7 @@ export function connectorProblems(unit, { files, read, manifest, connector, site
     if (!csp.includes(connectSrc(site)))
       problems.push(`${unit}: its pages may send requests beyond ${connectSrc(site)}`);
     // Every script and stylesheet the connector's pages name is in the build.
-    for (const page of CONNECTOR_PAGES.filter(has))
+    for (const page of refs ? CONNECTOR_PAGES.filter(has) : [])
       for (const m of read(page).matchAll(/\b(?:src|href)="([^"]+)"/g))
         if (!/^[a-z]+:/.test(m[1]) && !has(path.posix.join(path.posix.dirname(page), m[1])))
           problems.push(`${unit}: ${page} loads ${m[1]}, which isn't in the build`);

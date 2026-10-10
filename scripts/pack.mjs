@@ -33,7 +33,15 @@
  * built src/site-bridge.js; each build is checked to agree before it's done.
  */
 
-import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import {
   FLAGS_FILE,
   buildValues,
@@ -316,6 +324,8 @@ for (const [name, transform] of Object.entries(builds)) {
       manifest,
       connector: FLAGS.connector,
       site: SITE,
+      // npm test packs before the Svelte pages are built; the store check always looks.
+      refs: existsSync(`${out}/src/ui`),
     }),
   );
   if (problems.length) throw new Error(problems.join('\n'));
