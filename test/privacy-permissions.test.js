@@ -81,7 +81,9 @@ test('every page a store or beta build lets in is named in both copies of the po
     for (const origin of [...pages.hangar, ...pages.site]) {
       const host = new URL(origin).hostname;
       // The host itself, not just the end of a longer one (app.openhangar.space).
-      const own = new RegExp(`(^|[^\\w.-])${host.replace(/\./g, '\\.')}(?![\\w-]|\\.\\w)`);
+      const own = new RegExp(
+        `(^|[^\\w.-])${host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-]|\\.\\w)`,
+      );
       for (const [file, text] of copies)
         assert.ok(own.test(text || ''), `${file} names ${host} (the ${build} build lets it in)`);
     }
