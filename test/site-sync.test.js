@@ -561,7 +561,10 @@ test('a body that fails the sync schema is not sent: reason schema, and where', 
   );
   assert.equal(err.reason, 'schema');
   assert.equal(err.path, '/sources/hangar/items/0/value');
-  assert.equal(err.message, '[copy: sync.schema-refused]');
+  assert.equal(
+    err.message,
+    "Held at the hangar doors: this version packs your hangar in a shape our site won't accept. Our bug, not yours. Nothing was sent and your hangar is safe here. Update Open Hangar, or report it if it keeps happening.",
+  );
   assert.ok(!err.calm, 'a problem, not a note');
   assert.equal(sent.length, 0);
   assert.ok(!calls.some((c) => c.startsWith('POST')), 'no request at all');

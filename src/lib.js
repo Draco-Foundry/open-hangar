@@ -3795,8 +3795,10 @@
     "That's more cargo than openhangar.space can hold. Your hangar stays safe in your browser.";
   const SYNC_OTHER_LOGIN =
     'This hangar belongs to another pilot than the one signed in to RSI. Reload Open Hangar to switch hangars, then sync.';
-  // What this version would send doesn't fit the sync format (#441), so nothing went.
-  const SYNC_SCHEMA = '[copy: sync.schema-refused]';
+  // What this version would send doesn't fit the sync format (#441), so nothing went
+  // (owner-approved words, 2026-10-10).
+  const SYNC_SCHEMA =
+    "Held at the hangar doors: this version packs your hangar in a shape our site won't accept. Our bug, not yours. Nothing was sent and your hangar is safe here. Update Open Hangar, or report it if it keeps happening.";
   // A refusal's status, reason and the website's own words → the Error to throw. Sync
   // not open yet, or another sync too soon, isn't something you did, so it's marked
   // `calm`: the scan report shows it as a note, not a problem (src/dashboard.js
