@@ -4431,6 +4431,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
     if (b.ok) {
       state.buybacks = b.items;
       state.buybacksScannedAt = b.scannedAt;
+      state.bbTokens = bbTokensOf(await OH.loadSource('buybacks')); // saved with the scan (#587)
       await fillBbFromHistory();
       state.bbShown = new Set(); // default: no filter selected = show all
       state.bbTraits = new Map();
@@ -4623,6 +4624,7 @@ async function clearData() {
   state.selected.clear();
   state.buybacks = [];
   state.buybacksScannedAt = null;
+  state.bbTokens = null;
   state.owner = null;
   state.shown = new Set();
   state.traits = new Map();
@@ -4758,6 +4760,7 @@ async function importBackup(file) {
   const bb = res.db.sources.buybacks || { items: [], scannedAt: null };
   state.buybacks = bb.items || [];
   state.buybacksScannedAt = bb.scannedAt || null;
+  state.bbTokens = bbTokensOf(bb);
   const refSrc = res.db.sources.referral;
   state.referral =
     refSrc && refSrc.items && !Array.isArray(refSrc.items)
@@ -4792,6 +4795,12 @@ function listNames(names) {
   return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0] || '';
 }
 
+// Buy-back tokens from a stored buy-back source: read once from page 1 at each scan
+// (db.sources.buybacks.meta), null when the page didn't say.
+function bbTokensOf(src) {
+  return src?.meta && Number.isFinite(src.meta.tokens) ? src.meta.tokens : null;
+}
+
 // Fill `state` from a stored DB (init, account switches, restores).
 function loadStateFromDB(db) {
   const hangar = db.sources.hangar || { items: [], scannedAt: null };
@@ -4806,8 +4815,7 @@ function loadStateFromDB(db) {
     kind: window.OpenHangar.classifyBuyback(b.name, b.contains),
   }));
   state.buybacksScannedAt = buybacks.scannedAt || null;
-  state.bbTokens =
-    buybacks.meta && Number.isFinite(buybacks.meta.tokens) ? buybacks.meta.tokens : null;
+  state.bbTokens = bbTokensOf(buybacks);
   const referral = db.sources.referral;
   state.referral =
     referral && referral.items && !Array.isArray(referral.items)

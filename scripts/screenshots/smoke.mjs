@@ -4141,6 +4141,42 @@ try {
         topBar.report = null;
       }
 
+      // A buy-back scan that saves a new token count shows it on Home's wallet and the
+      // Buy-Backs header straight away, no reload (#587).
+      {
+        const keepFetch = OH.fetchBuybackDetails;
+        const keepLoad = OH.loadSource;
+        const keepTokens = state.bbTokens;
+        const shown = () =>
+          [...document.querySelectorAll('#cc-account .bal-lbl')].find(
+            (x) => x.textContent === 'Buy-Back Tokens',
+          )?.nextElementSibling?.textContent;
+        try {
+          state.bbTokens = null;
+          homeUpdated();
+          await wait();
+          OH.fetchBuybackDetails = async (ids) => ({ done: ids.length });
+          OH.scanSource = async (id) =>
+            id === 'buybacks'
+              ? { ok: true, items: state.buybacks, scannedAt: Date.now() }
+              : { ok: true, items: state.items, scannedAt: Date.now(), unchanged: true };
+          OH.loadSource = async (id) =>
+            id === 'buybacks'
+              ? { items: state.buybacks, scannedAt: Date.now(), meta: { tokens: 7 } }
+              : keepLoad(id);
+          const before = shown();
+          await runScan({ hangar: false, referrals: false, store: false });
+          await wait(150);
+          r.tokens = { before, home: shown(), header: OHApp.bb.summary().tokens };
+        } finally {
+          OH.fetchBuybackDetails = keepFetch;
+          OH.loadSource = keepLoad;
+          state.bbTokens = keepTokens;
+          topBar.report = null;
+          homeUpdated();
+        }
+      }
+
       // A pack melted since the last hangar scan is filled from your hangar history:
       // no RSI request, "From your hangar history" in its window, and the automatic
       // read skips it. That read takes 30 packs per scan at most.
@@ -4296,6 +4332,9 @@ try {
   !rep.out.homeLine
     ? ok('signed out: the scan reads nothing, keeps your hangar, and the report says to log in')
     : fail(`signed-out scan report: ${JSON.stringify(rep)}`);
+  rep.tokens && rep.tokens.before === '—' && rep.tokens.home === '7' && rep.tokens.header === 7
+    ? ok('buy-back tokens: a scan that saves a new count shows it without a reload')
+    : fail(`buy-back tokens after a scan: ${JSON.stringify(rep.tokens)}`);
   rep.hist &&
   rep.hist.src === 'history' &&
   rep.hist.ships === 2 &&
