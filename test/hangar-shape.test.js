@@ -362,7 +362,7 @@ test('the shared scripts load in a worker: no window, document, chrome or requir
 
 test('the shared scripts load on the dashboard before lib.js', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'dashboard.html'), 'utf8');
-  const order = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map((m) => m[1]);
+  const order = [...html.matchAll(/\bsrc="([^"]+\.js)"/g)].map((m) => m[1]);
   const at = (f) => order.indexOf(f);
   for (const f of ['schema-check.js', 'sync-schema.js', 'hangar-shape.js'])
     assert.ok(at(f) >= 0 && at(f) < at('lib.js'), `${f} before lib.js`);
