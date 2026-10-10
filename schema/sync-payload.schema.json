@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://openhangar.space/schema/sync-payload/2",
   "title": "Open Hangar sync payload, format 2",
-  "description": "What the extension sends to openhangar.space when it syncs (#441): its backup file (format 2, schemaVersion) without the referral prospects list. `history` is optional: the hangar the website keeps, and the hangar view the extension hands our own hangar page, are this same shape without it. Containers whose keys the extension builds itself are strict; pledge and buy-back rows type the keys the extension and the website read and allow new ones. A value RSI reports that the extension passes on as it is (balances, country, recruits, referral counts) takes any simple value ($defs/scalar), so a type change on RSI's side can't stop sync. src/schema-check.js reads it and supports only the keywords used here.",
+  "description": "What the extension sends to openhangar.space when it syncs (#441): its backup file (format 2, schemaVersion) without the referral prospects list. `history` is optional: the hangar the website keeps, and the hangar view the extension hands our own hangar page, are this same shape without it. Containers whose keys the extension builds itself are strict; pledge and buy-back rows type the keys the extension and the website read and allow new ones. A value RSI reports that the extension passes on as it is (display name, balances, country, recruits, referral counts) takes any simple value ($defs/scalar), so a type change on RSI's side can't stop sync. src/schema-check.js reads it and supports only the keywords used here.",
   "type": "object",
   "required": ["app", "appVersion", "exportedAt", "schemaVersion", "account", "sources"],
   "additionalProperties": false,
@@ -52,7 +52,7 @@
       "additionalProperties": false,
       "properties": {
         "handle": { "type": ["string", "null"] },
-        "displayName": { "type": ["string", "null"] },
+        "displayName": { "$ref": "#/$defs/scalar" },
         "avatar": { "type": ["string", "null"] },
         "ueeRecord": { "type": ["string", "null"] },
         "enlistedSince": { "$ref": "#/$defs/scalar" },
