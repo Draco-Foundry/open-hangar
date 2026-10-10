@@ -637,6 +637,26 @@ test("firefox: only our content script, in a tab's top frame, on one of our page
   assert.deepEqual(await x.fromPage({ type: 'oh-get-hangar', x: 1 }, `${FRONT}/`), UNKNOWN);
 });
 
+test("firefox: other add-ons' messages get no answer, even from a script on our page", async () => {
+  // Firefox has no externally_connectable, so any add-on may message this one; Firefox
+  // fills in the page's origin when another add-on's content script on our page sends.
+  // None of it is a page's own message, so the Firefox build doesn't listen.
+  const x = load({ browser: 'firefox', local: full() });
+  const other = { id: 'some-other-addon@example', frameId: 2, tab: { id: 1 } };
+  for (const msg of Object.values(VALID))
+    for (const [origin, sender] of [
+      [HANGAR, other],
+      [APP, { ...other, frameId: 0 }],
+      [FRONT, { id: 'some-other-addon@example' }],
+    ])
+      assert.equal(await x.send(msg, origin, sender), undefined, `${origin} ${msg.type}`);
+  assert.deepEqual(x.opened, []);
+  assert.deepEqual(x.cart, []);
+  assert.deepEqual(x.stores.session, {});
+  // Chrome and Edge: the pages' own messages still come straight in.
+  assert.equal((await load().send({ type: 'oh-hello' }, HANGAR)).ok, true);
+});
+
 // --- Firefox: the bridge on the page -------------------------------------------------
 // src/site-bridge.js as a build writes it, on a page at `origin`, with a stand-in
 // window and runtime.

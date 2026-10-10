@@ -349,11 +349,15 @@ function answerSite(msg, origin, reply) {
   ).then(reply, (err) => reply({ ok: false, error: String(err?.message || err) }));
   return true; // answers later
 }
-// Chrome and Edge: straight from the page; the browser says which page it is.
-chrome.runtime.onMessageExternal?.addListener((msg, sender, reply) => {
-  if (!self.OHPages.known(sender.origin)) return false;
-  return answerSite(msg, sender.origin, reply);
-});
+// Chrome and Edge: straight from the page; the browser says which page it is (our
+// externally_connectable names no other extension, so none can call). Firefox has no
+// externally_connectable: there this event carries other add-ons' messages, never a
+// page's, so the Firefox build doesn't listen to it at all.
+if (!chrome.runtime.getManifest().browser_specific_settings?.gecko)
+  chrome.runtime.onMessageExternal?.addListener((msg, sender, reply) => {
+    if (!self.OHPages.known(sender.origin)) return false;
+    return answerSite(msg, sender.origin, reply);
+  });
 // Firefox: through src/site-bridge.js, our own content script, in the top frame of a
 // tab on one of our pages. The browser says which page it ran in (sender.url), never
 // the page itself.

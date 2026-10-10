@@ -455,7 +455,7 @@ function loadBackground({ sync, rsiOpts, browser = 'chrome' }) {
     fetch: rsi.fetch,
     globals: { Math, JSON, Promise },
   });
-  return { send: x.send, rsi };
+  return { send: x.send, fromPage: x.fromPage, rsi };
 }
 // The site's hello (bridge v2; cart and connect for older pages).
 const hello = (caps) => ({
@@ -531,8 +531,9 @@ test("Connect from the website hands over this browser's own sign-in address", a
   );
   // Firefox for Android has no identity API: the address desktop Firefox gives, the
   // SHA-1 of the add-on id (the one the website allows), never a chromiumapp.org one.
+  // (Firefox's pages reach the extension through the site bridge.)
   const android = loadBackground({ sync: true, browser: 'firefox-android' });
-  const begin = await android.send({ type: 'oh-connect-begin' }, SITE);
+  const begin = await android.fromPage({ type: 'oh-connect-begin' }, `${SITE}/link`);
   assert.equal(begin.ok, true);
   assert.equal(
     begin.redirect_uri,

@@ -88,9 +88,10 @@ the top frame of just our pages, passes `{ oh: 'ask', id, msg }` window messages
 posts `{ oh: 'answer', id, answer }` back to the page's own origin. It acts only on its
 own copy of the page list, from the page's own window at exactly its origin, with an id
 of at most 64 characters and a known type; the background then checks it's our content
-script in a tab's top frame and takes the origin from `sender.url`. A window message can
-be read by any script on that page, so the hangar page's strict script policy is what
-keeps its hangar to itself.
+script in a tab's top frame and takes the origin from `sender.url`. On Firefox any
+add-on may message another one (`onMessageExternal`), so the Firefox build doesn't
+listen to that at all. A window message can be read by any script on that page, so the
+hangar page's strict script policy is what keeps its hangar to itself.
 
 `scripts/pack.mjs` decides each build's lists once (`scripts/site-pages.mjs`) and writes
 them into the manifest, the built `src/site-pages.js` and the built bridge; the build
