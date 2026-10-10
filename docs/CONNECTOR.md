@@ -66,19 +66,26 @@ step 3 above).
 
 **Stays**
 
-| Request                                                                    | Why                                                                       |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| robertsspaceindustries.com `/account/pledges`, `/account/buy-back-pledges` | Scan: hangar and buy-backs                                                |
-| robertsspaceindustries.com `/pledge/buyback/<id>`                          | Scan: up to 30 unread packs                                               |
-| robertsspaceindustries.com `/en/account/dashboard`                         | Identity and balances: Scan, and opening the basic page (kept 10 minutes) |
-| robertsspaceindustries.com `/en/citizens/<handle>` (no cookies)            | Citizen Record and org, with the one above                                |
-| robertsspaceindustries.com `POST /graphql` (referral recruits)             | Scan: referrals                                                           |
-| robertsspaceindustries.com `/pledge-store/api/upgrade/graphql`, the cart   | Add to RSI Cart from our pages                                            |
-| openhangar.space `status.json`                                             | The kill switch                                                           |
-| openhangar.space `api/ships` (once a day)                                  | The popup's Account Value                                                 |
-| app.openhangar.space `/connect`, `/api/link/token`, `/link`                | Connect                                                                   |
-| app.openhangar.space `POST` and `DELETE /api/v1/sync`                      | Sync, Disconnect                                                          |
-| github.com new issue (only when you press Report a Scan Problem)           | Report a Scan Problem                                                     |
+| Request                                                                            | Why                                                                       |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| robertsspaceindustries.com `/account/pledges`, `/account/buy-back-pledges`         | Scan: hangar and buy-backs                                                |
+| robertsspaceindustries.com `/pledge/buyback/<id>`                                  | Scan: up to 30 unread packs                                               |
+| robertsspaceindustries.com `/en/account/dashboard`                                 | Identity and balances: Scan, and opening the basic page (kept 10 minutes) |
+| robertsspaceindustries.com `/en/citizens/<handle>` (no cookies)                    | Citizen Record and org, with the one above                                |
+| robertsspaceindustries.com `POST /graphql` (referral recruits)                     | Scan: referrals                                                           |
+| robertsspaceindustries.com `/pledge-store/api/upgrade/graphql`, the cart           | Add to RSI Cart from our pages                                            |
+| openhangar.space `status.json`                                                     | The kill switch                                                           |
+| openhangar.space `api/ships` (once a day)                                          | The popup's Account Value                                                 |
+| app.openhangar.space `/connect`, `/api/link/token`, `/link`                        | Connect                                                                   |
+| app.openhangar.space `POST` and `DELETE /api/v1/sync`                              | Sync, Disconnect                                                          |
+| github.com new issue (only when you press Report a Scan Problem)                   | Report a Scan Problem                                                     |
+| app.openhangar.space `POST /api/v1/wishlist/import` (once per connection, **new**) | The 0.3.x wishlist into your account                                      |
+
+The wishlist import is new: until now the wishlist never left the browser. It sends the
+ships and store items on this browser's wishlist (names and store ids), once per
+connection, and only once you've connected; the website adds them to your account's
+wishlist and removes nothing. The privacy policy needs words for it before the
+connector is on in a store build.
 
 **Goes**
 
