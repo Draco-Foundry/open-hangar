@@ -5,9 +5,7 @@
 // No real RSI anywhere: every id and name below is invented. Run: `npm test`.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
+const { loadBackground: loadBuiltBackground } = require('./bridge-env.js');
 
 require('../src/rsi-cart.js');
 const C = globalThis.OHCart;
@@ -443,96 +441,36 @@ test('polite: one request at a time with a pause, and nothing during a Retry-Aft
   assert.equal((await slow.addUpgradeToCart(101, 900, 9001)).ok, true);
 });
 
-// The background worker as scripts/pack.mjs builds it: with sync (every store build), or
-// with its @sync blocks cut (a developer's --flag sync=off build). `browser`: 'chrome'
-// (Chrome and Edge, with the identity API), 'firefox-android' (Firefox's manifest, no
-// identity API) or 'bare' (neither).
+// The background worker as scripts/pack.mjs builds it (test/bridge-env.js): with sync
+// (every store build), or with its @sync blocks cut (a developer's --flag sync=off
+// build); staging's pages let in, as a staging build does. `browser`: 'chrome' (Chrome
+// and Edge, with the identity API), 'firefox-android' (Firefox's manifest, no identity
+// API) or 'bare' (neither).
 function loadBackground({ sync, rsiOpts, browser = 'chrome' }) {
-  let src = fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'), 'utf8');
-  if (!sync) {
-    const out = [];
-    let inside = false;
-    for (const line of src.split('\n')) {
-      if (line.includes('@sync-start')) inside = true;
-      else if (line.includes('@sync-end')) inside = false;
-      else if (!inside) out.push(line);
-    }
-    src = out.join('\n');
-  }
-  const listen = () => ({ addListener() {} });
-  let external;
   const rsi = fakeRsi(rsiOpts);
-  const area = { get: async () => ({}), set: async () => {}, remove: async () => {} };
-  const firefox = browser === 'firefox-android';
-  const chrome = {
-    storage: { local: area, session: area, onChanged: listen() },
-    ...(browser === 'chrome'
-      ? {
-          identity: {
-            getRedirectURL: () => 'https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/',
-          },
-        }
-      : {}),
-    // Firefox already said yes to sharing (else Connect opens Home first).
-    ...(firefox ? { permissions: { contains: async () => true } } : {}),
-    runtime: {
-      id: firefox ? 'open-hangar@draco-foundry' : 'abcdefghijklmnopabcdefghijklmnop',
-      onInstalled: listen(),
-      onStartup: listen(),
-      onUpdateAvailable: listen(),
-      onMessageExternal: { addListener: (f) => (external = f) },
-      getManifest: () => ({
-        version: '0.0.0',
-        ...(firefox
-          ? { browser_specific_settings: { gecko: { id: 'open-hangar@draco-foundry' } } }
-          : {}),
-        externally_connectable: {
-          matches: [
-            'https://openhangar.space/*',
-            'https://app.openhangar.space/*',
-            'https://staging.openhangar.space/*',
-          ],
-        },
-      }),
-      getURL: (p) => p,
-    },
-    action: { onClicked: listen(), setBadgeText() {}, setTitle() {}, setBadgeBackgroundColor() {} },
-    tabs: { create() {} },
-  };
-  const ctx = {
-    chrome,
-    console,
-    crypto,
-    TextEncoder,
-    btoa,
-    Date,
-    Math,
-    JSON,
-    Promise,
-    setTimeout,
+  const x = loadBuiltBackground({
+    browser,
+    staging: true,
+    flags: { sync, orgFleet: false, localMode: false },
     fetch: rsi.fetch,
-  };
-  ctx.self = ctx;
-  ctx.importScripts = (f) =>
-    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', f), 'utf8'), ctx);
-  vm.createContext(ctx);
-  vm.runInContext(src, ctx);
-  const send = (msg, origin) =>
-    new Promise((res) => {
-      const later = external(msg, { origin }, (r) => res(r && JSON.parse(JSON.stringify(r))));
-      if (!later) res(undefined);
-    });
-  return { send, rsi };
+    globals: { Math, JSON, Promise },
+  });
+  return { send: x.send, fromPage: x.fromPage, rsi };
 }
+// The site's hello (bridge v2; cart and connect for older pages).
+const hello = (caps) => ({
+  ok: true,
+  v: 2,
+  version: '0.3.0',
+  caps,
+  cart: true,
+  connect: caps.includes('connect'),
+});
 
 test('website bridge works with sync off: options, price, add; only from our site', async () => {
   const x = loadBackground({ sync: false });
   const SITE = 'https://app.openhangar.space';
-  assert.deepEqual(await x.send({ type: 'oh-hello' }, SITE), {
-    ok: true,
-    cart: true,
-    connect: false,
-  });
+  assert.deepEqual(await x.send({ type: 'oh-hello' }, SITE), hello(['hello', 'addToCart']));
   const o = await x.send({ type: 'oh-upgrade-options', toShipId: 900, toSkuId: 9001 }, SITE);
   assert.equal(o.ok, true);
   assert.deepEqual(
@@ -563,17 +501,17 @@ test('website bridge works with sync off: options, price, add; only from our sit
 
 test('website bridge in a sync build answers both the cart and Connect', async () => {
   const x = loadBackground({ sync: true });
-  const hello = await x.send({ type: 'oh-hello' }, 'https://staging.openhangar.space');
-  assert.deepEqual(hello, { ok: true, cart: true, connect: true });
+  const staging = await x.send({ type: 'oh-hello' }, 'https://staging.openhangar.space');
+  assert.deepEqual(staging, hello(['hello', 'addToCart', 'connect']));
   // Every store build: Connect from the app. Beginning sends nothing anywhere.
   const app = await x.send({ type: 'oh-hello' }, 'https://app.openhangar.space');
-  assert.deepEqual(app, { ok: true, cart: true, connect: true });
+  assert.deepEqual(app, hello(['hello', 'addToCart', 'connect']));
   const begin = await x.send({ type: 'oh-connect-begin' }, 'https://app.openhangar.space');
   assert.equal(begin.ok, true);
   assert.match(begin.challenge, /^[\w-]{43}$/);
   assert.equal(x.rsi.all.length, 0, 'no request made');
   const main = await x.send({ type: 'oh-hello' }, 'https://openhangar.space');
-  assert.deepEqual(main, { ok: true, cart: true, connect: false }, 'Connect stays on the app');
+  assert.deepEqual(main, hello(['hello', 'addToCart']), 'Connect stays on the app');
   const c = await x.send({ type: 'oh-connect-begin' }, 'https://openhangar.space');
   assert.equal(c.ok, false);
   const o = await x.send(
@@ -593,8 +531,9 @@ test("Connect from the website hands over this browser's own sign-in address", a
   );
   // Firefox for Android has no identity API: the address desktop Firefox gives, the
   // SHA-1 of the add-on id (the one the website allows), never a chromiumapp.org one.
+  // (Firefox's pages reach the extension through the site bridge.)
   const android = loadBackground({ sync: true, browser: 'firefox-android' });
-  const begin = await android.send({ type: 'oh-connect-begin' }, SITE);
+  const begin = await android.fromPage({ type: 'oh-connect-begin' }, `${SITE}/link`);
   assert.equal(begin.ok, true);
   assert.equal(
     begin.redirect_uri,

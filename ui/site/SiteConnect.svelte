@@ -7,6 +7,7 @@
   // Hidden until the website is switched on (OH.siteEnabled).
   // Connected, the corner shows just Open on Website (OpenOnWebsite.svelte), the
   // quiet link the other pages with a website twin have under their titles.
+  import { untrack } from 'svelte';
   import { app, version } from '../lib/app.svelte.js';
   import FirefoxExplain from './FirefoxExplain.svelte';
   import OpenOnWebsite from './OpenOnWebsite.svelte';
@@ -42,10 +43,14 @@
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   });
   // Sent here from the website's Connect This Browser (Firefox, first time): the
-  // card opens by itself, so its Continue is the one click Firefox needs.
+  // card opens by itself, so its Continue is the one click Firefox needs. From our
+  // hangar page (askFirefox 'local', Local Mode) its Continue only asks Firefox. Once
+  // per ask: closing the card doesn't open it again from the same ask.
   let connectBtn = $state(null);
+  let explainLocal = $state(false);
   $effect(() => {
-    if (d.askFirefox && connectBtn && !explain) {
+    if (d.askFirefox && connectBtn && !untrack(() => explain)) {
+      explainLocal = d.askFirefox === 'local';
       app().site.state.askFirefox = false;
       explain = connectBtn;
     }
@@ -63,6 +68,7 @@
 
   const site = () => app().site;
   function explainFrom(e) {
+    explainLocal = false;
     explain = e.currentTarget;
   }
   function connect(e) {
@@ -136,7 +142,7 @@
     {#if d.msg}<p class="sc-msg" role="status">{d.msg}</p>{/if}
   </div>
   {#if explain}
-    <FirefoxExplain opener={explain} onClose={() => (explain = null)} />
+    <FirefoxExplain opener={explain} local={explainLocal} onClose={() => (explain = null)} />
   {/if}
 {:else if d.enabled}
   <div class="site-connect site-open-home" id="site-open-home">

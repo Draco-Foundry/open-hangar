@@ -1440,6 +1440,23 @@ try {
       btnIn(card(), 'Connect').click();
       await wait(150);
       r.straightOn = !$('#fx-explain') && r.window === true;
+      // Our hangar page asked for the hangar (Local Mode): the same card opens by
+      // itself, and its Continue asks Firefox inside the click and never connects.
+      granted = false;
+      r.window = false;
+      await refreshSite();
+      await wait();
+      site.askFirefox = 'local';
+      homeUpdated();
+      await wait();
+      r.localCard = !!$('#fx-explain');
+      const asked = r.asked;
+      inClick = true;
+      btnIn($('#fx-explain'), 'Continue').click();
+      inClick = false;
+      await wait(150);
+      r.localAsks = r.asked === asked + 1 && r.inClick.at(-1) === true;
+      r.localNoConnect = !$('#fx-explain') && r.window === false;
     } finally {
       chrome.runtime.getManifest = keep.manifest;
       chrome.permissions = keep.permissions;
@@ -1463,10 +1480,15 @@ try {
   ff.notNow &&
   /Sync stays off until you let Firefox share/.test(ff.refused || '') &&
   // Continue's clicks asked inside the click; once allowed, Connect only checks.
-  ff.inClick.join() === 'true,true,false' &&
+  ff.inClick.slice(0, 3).join() === 'true,true,false' &&
   ff.yesConnects &&
-  ff.straightOn
-    ? ok('Firefox: what we share under Connect, the explainer, and Continue asks inside its click')
+  ff.straightOn &&
+  ff.localCard &&
+  ff.localAsks &&
+  ff.localNoConnect
+    ? ok(
+        'Firefox: what we share under Connect, the explainer, and Continue asks inside its click (for our hangar page: asks only)',
+      )
     : fail(`Firefox explainer: ${JSON.stringify(ff)}`);
 
   // The pages with a website twin (Home, Inventory, Buy-Backs, Stats). Connected: Open

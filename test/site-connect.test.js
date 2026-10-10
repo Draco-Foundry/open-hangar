@@ -4,73 +4,44 @@
 // the verifier it kept, saves the link and opens the dashboard. Run: `npm test`.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
+const { loadBackground, CHROME_ID } = require('./bridge-env.js');
 
-function load(matches = ['https://app.openhangar.space/*', 'https://staging.openhangar.space/*']) {
-  const stores = { local: {}, session: {} };
-  const area = (name) => ({
-    get: async (k) => {
-      const keys = [].concat(k);
-      return Object.fromEntries(
-        keys.filter((x) => x in stores[name]).map((x) => [x, stores[name][x]]),
-      );
-    },
-    set: async (o) => Object.assign(stores[name], o),
-    remove: async (k) => [].concat(k).forEach((x) => delete stores[name][x]),
-  });
-  const listen = () => ({ addListener() {} });
-  let external;
-  const opened = [];
+// The background worker as a sync build makes it (test/bridge-env.js), its token
+// exchange answered here. staging: a developer's build pointed at staging (npm run
+// build:staging), which lets staging's pages in; the store builds don't.
+function load({ staging = true, browser = 'chrome', granted = true } = {}) {
   const fetched = [];
-  const chrome = {
-    storage: { local: area('local'), session: area('session'), onChanged: listen() },
-    // Chrome and Edge: identity is in every build's manifest.
-    identity: { getRedirectURL: () => 'https://aeabioadfphghjennmdbnpelojlhndjl.chromiumapp.org/' },
-    runtime: {
-      id: 'aeabioadfphghjennmdbnpelojlhndjl',
-      onInstalled: listen(),
-      onStartup: listen(),
-      onUpdateAvailable: listen(),
-      onMessageExternal: { addListener: (f) => (external = f) },
-      getManifest: () => ({
-        version: '0.0.0',
-        externally_connectable: { matches },
-      }),
-      getURL: (p) => `chrome-extension://id/${p}`,
+  const x = loadBackground({
+    browser,
+    staging,
+    granted,
+    flags: { sync: true, orgFleet: false, localMode: false },
+    fetch: async (url, init) => {
+      fetched.push({ url, body: JSON.parse(init.body) });
+      return { ok: true, json: async () => ({ token: 'oht_x', name: 'ExamplePilot' }) };
     },
-    action: { onClicked: listen(), setBadgeText() {}, setTitle() {}, setBadgeBackgroundColor() {} },
-    tabs: { create: (o) => opened.push(o.url) },
-  };
-  const fetch = async (url, init) => {
-    fetched.push({ url, body: JSON.parse(init.body) });
-    return { ok: true, json: async () => ({ token: 'oht_x', name: 'ExamplePilot' }) };
-  };
-  const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'), 'utf8');
-  vm.runInNewContext(src, { chrome, fetch, console, crypto, TextEncoder, btoa, Date, setTimeout });
-  const send = (msg, origin) =>
-    new Promise((res) => {
-      // Copied out of the sandbox, so deepEqual compares plain values.
-      const async = external(msg, { origin }, (r) => res(r && JSON.parse(JSON.stringify(r))));
-      if (!async) res(undefined);
-    });
-  return { send, stores, opened, fetched };
+  });
+  return { ...x, fetched };
 }
+// The site's hello in a sync build (bridge v2; cart and connect for older pages).
+const HELLO_APP = {
+  ok: true,
+  v: 2,
+  version: '0.3.0',
+  caps: ['hello', 'addToCart', 'connect'],
+  cart: true,
+  connect: true,
+};
 
 const SITE = 'https://staging.openhangar.space';
 const b64 = (buf) => Buffer.from(buf).toString('base64url');
 
 test('our site: hello, begin with a PKCE challenge, finish with the code', async () => {
   const x = load();
-  assert.deepEqual(await x.send({ type: 'oh-hello' }, SITE), {
-    ok: true,
-    cart: true,
-    connect: true,
-  });
+  assert.deepEqual(await x.send({ type: 'oh-hello' }, SITE), HELLO_APP);
   const begin = await x.send({ type: 'oh-connect-begin' }, SITE);
   assert.ok(begin.ok);
-  assert.equal(begin.redirect_uri, 'https://aeabioadfphghjennmdbnpelojlhndjl.chromiumapp.org/');
+  assert.equal(begin.redirect_uri, `https://${CHROME_ID}.chromiumapp.org/`);
   const verifier = x.stores.session.siteConnect.verifier;
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
   assert.equal(begin.challenge, b64(digest));
@@ -115,7 +86,7 @@ test('other websites get no answer; finishing needs a begin from the same site',
 // The beta build (npm run build:beta) leaves staging out of the manifest, so the
 // extension won't connect there either: production only.
 test('a build without staging in the manifest connects to production only', async () => {
-  const x = load(['https://openhangar.space/*', 'https://app.openhangar.space/*']);
+  const x = load({ staging: false });
   const prod = await x.send({ type: 'oh-hello' }, 'https://app.openhangar.space');
   assert.equal(prod.connect, true);
   assert.equal(await x.send({ type: 'oh-hello' }, SITE), undefined, 'staging gets no answer');
@@ -126,80 +97,11 @@ test('a build without staging in the manifest connects to production only', asyn
 // Firefox (#434): no externally_connectable; src/site-bridge.js, a content script on
 // our own site only, passes the page's messages on, and the browser says which page
 // it ran in. The first Connect waits for Firefox's own yes, asked from Home.
-function loadFirefox({ granted = true } = {}) {
-  const stores = { local: {}, session: {} };
-  const area = (name) => ({
-    get: async (k) =>
-      Object.fromEntries(
-        []
-          .concat(k)
-          .filter((x) => x in stores[name])
-          .map((x) => [x, stores[name][x]]),
-      ),
-    set: async (o) => Object.assign(stores[name], o),
-    remove: async (k) => [].concat(k).forEach((x) => delete stores[name][x]),
-  });
-  const listen = () => ({ addListener() {} });
-  let internal;
-  const opened = [];
-  const ID = 'open-hangar@draco-foundry';
-  const chrome = {
-    storage: { local: area('local'), session: area('session'), onChanged: listen() },
-    runtime: {
-      id: ID,
-      onInstalled: listen(),
-      onStartup: listen(),
-      onUpdateAvailable: listen(),
-      onMessage: { addListener: (f) => (internal = f) },
-      getManifest: () => ({
-        version: '0.0.0',
-        browser_specific_settings: { gecko: { id: ID } },
-        content_scripts: [
-          {
-            matches: ['https://app.openhangar.space/*', 'https://staging.openhangar.space/*'],
-            js: ['src/site-bridge.js'],
-          },
-        ],
-      }),
-      getURL: (p) => `moz-extension://uuid/${p}`,
-    },
-    identity: { getRedirectURL: () => 'https://abc123.extensions.allizom.org/' },
-    permissions: { contains: async () => granted },
-    action: { onClicked: listen(), setBadgeText() {}, setTitle() {}, setBadgeBackgroundColor() {} },
-    tabs: { create: (o) => opened.push(o.url) },
-  };
-  const fetch = async () => ({
-    ok: true,
-    json: async () => ({ token: 'oht_x', name: 'ExamplePilot' }),
-  });
-  const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'), 'utf8');
-  vm.runInNewContext(src, {
-    chrome,
-    fetch,
-    console,
-    crypto,
-    TextEncoder,
-    btoa,
-    Date,
-    setTimeout,
-    URL,
-  });
-  const send = (msg, sender) =>
-    new Promise((res) => {
-      const async = internal(msg, sender, (r) => res(r && JSON.parse(JSON.stringify(r))));
-      if (!async) res(undefined);
-    });
-  const fromPage = (msg, url) => send({ ohSite: msg }, { id: ID, tab: { id: 1 }, url });
-  return { send, fromPage, stores, opened, ID };
-}
+const loadFirefox = ({ granted = true } = {}) => load({ browser: 'firefox', granted });
 
 test('firefox: our site connects through the bridge, with Firefox’s own redirect', async () => {
   const x = loadFirefox();
-  assert.deepEqual(await x.fromPage({ type: 'oh-hello' }, `${SITE}/link`), {
-    ok: true,
-    cart: true,
-    connect: true,
-  });
+  assert.deepEqual(await x.fromPage({ type: 'oh-hello' }, `${SITE}/link`), HELLO_APP);
   const begin = await x.fromPage({ type: 'oh-connect-begin' }, `${SITE}/link`);
   assert.ok(begin.ok);
   assert.equal(begin.redirect_uri, 'https://abc123.extensions.allizom.org/');
@@ -214,18 +116,21 @@ test('firefox: only our own content script on our own site gets an answer', asyn
   const x = loadFirefox();
   // Another site (the bridge never runs there, but if it did): no answer.
   assert.equal(await x.fromPage({ type: 'oh-hello' }, 'https://evil.example/link'), undefined);
-  // Not from a tab, or not our extension: no answer.
+  // Not from a tab, not our extension, or not the top frame: no answer.
+  const id = x.chrome.runtime.id;
+  const hello = { ohSite: { type: 'oh-hello' } };
+  assert.equal(await x.sendInternal(hello, { id, frameId: 0, url: `${SITE}/` }), undefined);
   assert.equal(
-    await x.send({ ohSite: { type: 'oh-hello' } }, { id: x.ID, url: `${SITE}/` }),
+    await x.sendInternal(hello, { id: 'other', tab: {}, frameId: 0, url: `${SITE}/` }),
     undefined,
   );
   assert.equal(
-    await x.send({ ohSite: { type: 'oh-hello' } }, { id: 'other', tab: {}, url: `${SITE}/` }),
+    await x.sendInternal(hello, { id, tab: {}, frameId: 2, url: `${SITE}/` }),
     undefined,
   );
   // The dashboard's own messages aren't the website's.
   assert.equal(
-    await x.send({ type: 'oh-hello' }, { id: x.ID, tab: {}, url: `${SITE}/` }),
+    await x.sendInternal({ type: 'oh-hello' }, { id, tab: {}, frameId: 0, url: `${SITE}/` }),
     undefined,
   );
 });
