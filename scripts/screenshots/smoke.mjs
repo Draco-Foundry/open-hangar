@@ -1450,6 +1450,7 @@ try {
       homeUpdated();
       await wait();
       r.localCard = !!$('#fx-explain');
+      r.localText = txt($('#fx-explain'));
       const asked = r.asked;
       inClick = true;
       btnIn($('#fx-explain'), 'Continue').click();
@@ -1484,6 +1485,31 @@ try {
   ff.yesConnects &&
   ff.straightOn &&
   ff.localCard &&
+  // Local Mode's own words, never the Connect card's.
+  /Local Mode/.test(ff.localText || '') &&
+  /What Our Hangar Page Reads, and Why Firefox Asks/.test(ff.localText || '') &&
+  [
+    'What it reads',
+    'Where it goes',
+    'No account',
+    'Why Firefox asks',
+    'If you say no',
+    'Change your mind',
+  ]
+    .map((h) => (ff.localText || '').includes(h))
+    .every(Boolean) &&
+  // Every approved sentence, word for word (owner, 2026-10-10).
+  [
+    "The hangar this browser scanned: your pledges, buy-backs, Store Credit and RSI handle. It's your backup file without the scan history, referral code or referral prospects.",
+    "Nowhere. The page shows it right here in this browser and doesn't save it. Nothing goes to our servers.",
+    "None needed. Saying yes doesn't sign you up or turn on sync.",
+    'The page is a website, so we ask Firefox before handing it your hangar. Firefox names what\'s shared from a short fixed list, so pledge prices and Store Credit show up as "financial and payment information".',
+    "Nothing changes in Open Hangar. The hangar page can't show your hangar until you say yes, and its Try Again button asks again.",
+    'Turn it off any time on Open Hangar\'s "Permissions and data" tab in Firefox\'s add-ons page.',
+  ]
+    .map((line) => (ff.localText || '').includes(line))
+    .every(Boolean) &&
+  !/Before You Connect|What we send/.test(ff.localText || '') &&
   ff.localAsks &&
   ff.localNoConnect
     ? ok(

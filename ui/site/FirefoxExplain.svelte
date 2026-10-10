@@ -6,7 +6,9 @@
   // any wait, as Firefox needs), then Connect carries on; Not Now, ✕ and Escape close
   // it. Focus moves into the card and back to the button that opened it.
   // `local`: opened for our hangar page (Local Mode), which has no account: Continue
-  // only asks Firefox, and Connect doesn't start.
+  // only asks Firefox, and Connect doesn't start. Its words say what that page reads
+  // and that nothing goes to our servers (owner-approved word for word, 2026-10-10);
+  // the layout and buttons are the Connect card's.
   import { app } from '../lib/app.svelte.js';
 
   let { opener = null, local = false, onClose } = $props();
@@ -78,27 +80,64 @@
     onkeydown={onKey}
   >
     <button type="button" class="fx-x" aria-label="Close" onclick={close}>✕</button>
-    <span class="fx-kick">{@render shield(14)}Before You Connect</span>
-    <h2 id="fx-title">What We Share, and Why Firefox Asks</h2>
-    <dl>
-      <dt>What we send</dt>
-      <dd>
-        Your pledges (name, date, price, insurance), buy-backs, store credit and your RSI handle.
-        The same as your backup file.
-      </dd>
-      <dt>What we never send</dt>
-      <dd>Passwords, card numbers, bank details or how you pay. Open Hangar never sees any of that.</dd>
-      <dt>Why Firefox asks</dt>
-      <dd>
-        Firefox makes every extension name what it shares, using a short fixed list. Pledge prices
-        and store credit fall under <b>"financial and payment information"</b>, so that's what its
-        prompt will say.
-      </dd>
-      <dt>If you say no</dt>
-      <dd>Nothing changes. Open Hangar stays private and local, and you can connect later.</dd>
-      <dt>Change your mind</dt>
-      <dd>Disconnect any time, and delete what was synced from your Account page.</dd>
-    </dl>
+    {#if local}
+      <span class="fx-kick">{@render shield(14)}Local Mode</span>
+      <h2 id="fx-title">What Our Hangar Page Reads, and Why Firefox Asks</h2>
+      <dl>
+        <dt>What it reads</dt>
+        <dd>
+          The hangar this browser scanned: your pledges, buy-backs, Store Credit and RSI handle.
+          It's your backup file without the scan history, referral code or referral prospects.
+        </dd>
+        <dt>Where it goes</dt>
+        <dd>
+          Nowhere. The page shows it right here in this browser and doesn't save it. Nothing goes to
+          our servers.
+        </dd>
+        <dt>No account</dt>
+        <dd>None needed. Saying yes doesn't sign you up or turn on sync.</dd>
+        <dt>Why Firefox asks</dt>
+        <dd>
+          The page is a website, so we ask Firefox before handing it your hangar. Firefox names what's
+          shared from a short fixed list, so pledge prices and Store Credit show up as <b
+            >"financial and payment information"</b
+          >.
+        </dd>
+        <dt>If you say no</dt>
+        <dd>
+          Nothing changes in Open Hangar. The hangar page can't show your hangar until you say yes,
+          and its Try Again button asks again.
+        </dd>
+        <dt>Change your mind</dt>
+        <dd>
+          Turn it off any time on Open Hangar's "Permissions and data" tab in Firefox's add-ons page.
+        </dd>
+      </dl>
+    {:else}
+      <span class="fx-kick">{@render shield(14)}Before You Connect</span>
+      <h2 id="fx-title">What We Share, and Why Firefox Asks</h2>
+      <dl>
+        <dt>What we send</dt>
+        <dd>
+          Your pledges (name, date, price, insurance), buy-backs, store credit and your RSI handle.
+          The same as your backup file.
+        </dd>
+        <dt>What we never send</dt>
+        <dd>
+          Passwords, card numbers, bank details or how you pay. Open Hangar never sees any of that.
+        </dd>
+        <dt>Why Firefox asks</dt>
+        <dd>
+          Firefox makes every extension name what it shares, using a short fixed list. Pledge prices
+          and store credit fall under <b>"financial and payment information"</b>, so that's what its
+          prompt will say.
+        </dd>
+        <dt>If you say no</dt>
+        <dd>Nothing changes. Open Hangar stays private and local, and you can connect later.</dd>
+        <dt>Change your mind</dt>
+        <dd>Disconnect any time, and delete what was synced from your Account page.</dd>
+      </dl>
+    {/if}
     <div class="fx-acts">
       <button type="button" class="sc-btn primary" id="fx-continue" onclick={proceed}
         >Continue</button
