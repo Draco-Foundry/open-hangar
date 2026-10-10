@@ -58,10 +58,13 @@ export function readBridgePages(text, file = 'src/site-bridge.js') {
   if (!m) throw new Error(`${file}: no "const PAGES = [...];" line`);
   return JSON.parse(m[1]);
 }
-// The page lists' own lines, left out where a build without sync is checked for the
-// sync site's address (they list our own pages for Add to RSI Cart, as the manifest does).
+// The two built page-list lines (writePages, writeBridgePages), left out where a build
+// without sync is checked for the sync site's address: they list our own pages for Add
+// to RSI Cart, as the manifest does.
 export const withoutPageLists = (text) =>
-  text.replace(/^\s*const (BUILD_PAGES|PAGES) = .*;$/gm, '');
+  text
+    .replace(/^\s*const BUILD_PAGES = \{"hangar":\[[^\n]*\};$/gm, '')
+    .replace(/^\s*const PAGES = \["https:\/\/[^\n]*\];$/gm, '');
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const EXACT = /^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)+\/\*$/;

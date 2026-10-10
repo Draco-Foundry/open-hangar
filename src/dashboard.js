@@ -5048,7 +5048,7 @@ async function refreshSite() {
   // Our hangar page asked for the hangar before Firefox said yes (Local Mode,
   // background.js oh-get-hangar): Home, with the same card up, whose Continue then
   // only asks Firefox and never starts Connect ('local').
-  if (OH.flags.localMode && site.firefox && !site.dataOk && chrome.storage.session) {
+  if (OH.flags.localMode && site.firefox && !site.dataOk && !site.link && chrome.storage.session) {
     const { localAskFirefox: at } = await chrome.storage.session.get('localAskFirefox');
     if (at) {
       await chrome.storage.session.remove('localAskFirefox');
