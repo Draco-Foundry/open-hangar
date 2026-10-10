@@ -21,3 +21,14 @@ sending, and the website checks the same format on its side with a pinned copy o
 schema and the vectors in `test/fixtures/sync-schema/`. A change to the format needs the
 schema changed (then `npm run schema`), the vectors and sync tests updated here, the
 privacy policy checked, and the website told before it ships.
+
+## Our Pages Asking the Extension
+
+Our own web pages reach the extension through bridge v2 (`src/site-pages.js`,
+ARCHITECTURE.md "Messages From Our Pages"). A new request needs its capability and type
+in `src/site-pages.js`, its exact keys there, its handler in `src/background.js` (behind
+its flag's markers), the type in the Firefox bridge's list, tests in
+`test/bridge-v2.test.js`, and the website told. A request from a page that may not ask
+it answers `unknown request`, the same as one that doesn't exist. Anything handed to a
+page is checked before it goes, and handing a page something new means checking the
+privacy policy first.

@@ -34,10 +34,11 @@ orgFleet: {
 
 Today's flags:
 
-| Flag       | What it turns on                                   | Store | Beta | Dev-only |
-| ---------- | -------------------------------------------------- | ----- | ---- | -------- |
-| `sync`     | Website sync (Connect This Browser, Sync Now, ...) | on    | on   | no       |
-| `orgFleet` | Org Fleet sharing (nothing behind it yet)          | off   | off  | yes      |
+| Flag        | What it turns on                                   | Store | Beta | Dev-only |
+| ----------- | -------------------------------------------------- | ----- | ---- | -------- |
+| `sync`      | Website sync (Connect This Browser, Sync Now, ...) | on    | on   | no       |
+| `orgFleet`  | Org Fleet sharing (nothing behind it yet)          | off   | off  | yes      |
+| `localMode` | Our hangar page reads this browser's hangar        | off   | on   | no       |
 
 ## Adding or Retiring a Flag
 
@@ -78,6 +79,16 @@ counts too; with neither, it waits 5 minutes.
 `--flag sync=off` still builds a copy without it, for a developer; the store check
 refuses that build.
 
+## Local Mode in the Beta
+
+`localMode` lets our hangar page, hangar.openhangar.space, read the hangar this browser
+scanned, with no account (ARCHITECTURE.md, "Messages From Our Pages"). With it on, the
+build lets that page in (the manifest's lists and the built page lists) and keeps the
+`@flag-start localMode` blocks: its requests in `src/background.js` and the dashboard's
+side of a scan it asks for. Off (the public store build), the page isn't let in and its
+handlers are cut. It needs `sync` (Firefox's consent card for sharing is sync's), so
+`--flag sync=off --flag localMode=on` doesn't build.
+
 ## How Builds Set Them
 
 `scripts/pack.mjs` picks each build's values and writes them into that build's copy,
@@ -103,7 +114,9 @@ defaults for the public build, the beta set for the beta, and no dev-only flag o
 `sync` on, each build (every folder and every zip) also needs the sync code, built in to
 production only, the `identity` permission and the website's way in (Chrome and Edge:
 `externally_connectable`; Firefox: the site bridge and sync's optional data collection),
-and no staging site anywhere.
+and no staging site anywhere. Every build also has its pages' way in agree with itself
+(the manifest's list, the built `src/site-pages.js` and the Firefox bridge's copy), with
+exactly the store's pages for its flags: the hangar page only with `localMode` on.
 
 ## Reading a Flag
 

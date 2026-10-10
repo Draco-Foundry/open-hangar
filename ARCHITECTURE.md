@@ -12,7 +12,7 @@ backend: everything it reads is kept in `chrome.storage.local` in your browser.
 
 | Piece               | Files                                                    | Job                                                                |
 | ------------------- | -------------------------------------------------------- | ------------------------------------------------------------------ |
-| Service worker      | `src/background.js`                                      | Opens the dashboard, rescan reminder badge, update handling        |
+| Service worker      | `src/background.js`                                      | Opens the dashboard, rescan badge, updates, our pages' messages    |
 | Dashboard (classic) | `src/dashboard.html`, `src/dashboard.js`                 | The whole app: views, scanning, state, most pages                  |
 | Shared library      | `src/lib.js` (exposed as `window.OH`)                    | Source registry, scan loop, storage, export/import, outside data   |
 | Parser              | `src/scraper/parser.js` (exposed as `window.OpenHangar`) | RSI HTML to normalized items; the only place that knows RSI markup |
@@ -35,10 +35,67 @@ extension's own scripts (`script-src 'self'`).
   7 days old or more (`updateReminder()`, turned off with the `remindRescan` key);
 - holds back a browser update while a dashboard tab is open (`updateReady`), records
   `justUpdated` after an update, and reopens the Updates page after a reload
-  (`reopenAfterUpdate`).
+  (`reopenAfterUpdate`);
+- answers our own web pages ([Messages From Our Pages](#messages-from-our-pages)).
 
 Scanning can't run here: MV3 service workers have no `DOMParser`, which the parser
 needs (see the header of `src/lib.js` and CONTRIBUTING.md, "How Auth Works").
+
+## Messages From Our Pages
+
+Our own web pages may ask the extension a few things (bridge v2). Which pages, and what
+each may ask, is `src/site-pages.js` (`self.OHPages`), loaded by the background worker:
+
+| Pages                                      | May ask                                                       |
+| ------------------------------------------ | ------------------------------------------------------------- |
+| hangar.openhangar.space (`localMode` flag) | hello, getHangar, getScanStatus, requestScan, addToCart       |
+| openhangar.space, app.openhangar.space     | hello, addToCart, and connect on the app (builds with `sync`) |
+
+Each capability has its message types (`oh-hello`; `oh-get-hangar`; `oh-scan-status`;
+`oh-request-scan`; `oh-upgrade-options`, `oh-upgrade-price` and `oh-add-upgrade` for Add
+to RSI Cart; `oh-connect-begin` and `oh-connect-finish` for Connect). Every message is
+checked before its handler runs (`OHPages.vet`): a plain object of at most 16 KB with a
+string `type` (else `bad request`), a type this page may ask in this build (else
+`unknown request`, the same answer as a type that doesn't exist, so a page can't probe
+another page's list), and only that type's keys with the right kinds of values (else
+`bad request`). A page that isn't one of ours gets no answer at all.
+
+`oh-hello` is the version handshake: `{ ok, v: 2, version, caps, cart, connect }`, where
+`caps` is what this page may ask in this build (a capability whose handlers a build's
+flags cut is never offered) and `cart` and `connect` stay for the website's pages from
+before v2. The website treats an answer without `v` as a v1 extension.
+
+Our hangar page (Local Mode, behind the `localMode` flag, which needs `sync`):
+
+- `oh-get-hangar`: the stored shape, the hangar as the website keeps a synced one, from
+  `OHShape.readHangarView()` (the same shaping as the backup file and sync; never the
+  sync token, the site address, settings, cookies, the referral code or prospects), and
+  only after it passes the sync schema and the never-sent key walk. Errors: `no-scan`,
+  `needs-upgrade`, `schema` (with `path`) and, on Firefox before it allows sharing,
+  `firefox-ask`: Home opens with Firefox's card up (`localAskFirefox` in session
+  storage), whose Continue only asks Firefox.
+- `oh-scan-status`: when the hangar and buy-backs were scanned, `stale` (the badge's 7
+  days) and `running`, a `scanRunning` time in session storage that the dashboard renews
+  every minute while a scan runs (counted for 10 minutes at most).
+- `oh-request-scan`: opens or focuses a dashboard tab and leaves a `scanRequest` naming
+  it; that tab runs the Scan button's own scan. Busy while a scan runs and for 60 seconds
+  after a request. The worker never scans or asks RSI anything for it.
+
+Chrome and Edge: the pages message the extension directly
+(`externally_connectable`, exact `https://host/*` patterns) and the browser gives
+`sender.origin`. Firefox doesn't allow that, so `src/site-bridge.js`, a content script in
+the top frame of just our pages, passes `{ oh: 'ask', id, msg }` window messages on and
+posts `{ oh: 'answer', id, answer }` back to the page's own origin. It acts only on its
+own copy of the page list, from the page's own window at exactly its origin, with an id
+of at most 64 characters and a known type; the background then checks it's our content
+script in a tab's top frame and takes the origin from `sender.url`. A window message can
+be read by any script on that page, so the hangar page's strict script policy is what
+keeps its hangar to itself.
+
+`scripts/pack.mjs` decides each build's lists once (`scripts/site-pages.mjs`) and writes
+them into the manifest, the built `src/site-pages.js` and the built bridge; the build
+and `scripts/check-store-build.mjs` check all three agree. The repo's copy of
+`src/site-pages.js` is empty, so an unbuilt copy answers no page.
 
 ## The Scan Pipeline
 
@@ -335,8 +392,8 @@ so a build without sync shows none. Its state and actions are `site`
 in `src/dashboard.js`, behind `window.OHApp.site`. The `identity` permission is in
 `manifest.json`, so every build has it. Syncs go to `/api/v1/sync`. Connect from the
 website: the website's `/link` page asks the extension through
-`externally_connectable` (Chrome and Edge; our two site origins) or Firefox's
-`src/site-bridge.js` for a PKCE challenge, gets a one-time code from
+`externally_connectable` (Chrome and Edge) or Firefox's `src/site-bridge.js`
+([Messages From Our Pages](#messages-from-our-pages)) for a PKCE challenge, gets a one-time code from
 `/api/link/approve`, and hands it back;
 `src/background.js` (its sync block) trades it for the token, saves `siteLink` and
 `siteUrl`, and opens the dashboard, which runs "Sync My Hangar Now"
@@ -369,6 +426,11 @@ When RSI changes a page, every installed copy breaks until a fix clears store re
     `browser_specific_settings.gecko` (add-on id `open-hangar@draco-foundry`, minimum
     Firefox 140, and `data_collection_permissions`: none required, what sync sends
     optional).
+- It writes the pages that may message the extension
+  ([Messages From Our Pages](#messages-from-our-pages)) into each manifest
+  (`externally_connectable` on Chrome and Edge, the site bridge on Firefox), the built
+  `src/site-pages.js` and the Firefox bridge, from one list: staging's pages only in a
+  developer's build pointed at another site, our hangar page only with `localMode` on.
 - With the `sync` flag on (every store build) it keeps the `@sync-start` to
   `@sync-end` blocks and writes production into `SITE_BUILT_IN`. A developer's
   `--flag sync=off` build cuts them and fails if `app.openhangar.space` is still
