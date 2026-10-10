@@ -104,6 +104,13 @@ const DEV_SITE = Boolean(SITE) && SITE !== PRODUCTION_SITE;
 // sync's Firefox check (src/background.js).
 if (FLAGS.localMode && !KEEP_SYNC)
   throw new Error('--flag localMode=on needs sync on (drop --flag sync=off)');
+// The connector (src/flags.js) hands the hangar to our hangar page and the website:
+// its popup's Open My Hangar and its scans for that page are Local Mode's.
+if (FLAGS.connector && !FLAGS.localMode)
+  throw new Error('--flag connector=on needs localMode on (add --flag localMode=on)');
+// The connector's own pages. Without the flag they're left out of the build: nothing
+// opens them there.
+const CONNECTOR_FILES = ['src/popup.html', 'src/ui/popup.js', 'src/ui/popup.css'];
 const SITE_LINE = "const SITE_BUILT_IN = '';";
 function presetSite(file) {
   const src = readFileSync(file, 'utf8');
@@ -246,6 +253,9 @@ for (const [name, transform] of Object.entries(builds)) {
     ];
   else manifest.externally_connectable = { matches: SITE_MATCHES };
   if (!FIREFOX.has(name)) rmSync(`${out}/src/site-bridge.js`, { force: true });
+  // The connector: the toolbar icon opens the popup (src/background.js answers its Scan).
+  if (FLAGS.connector) manifest.action = { ...manifest.action, default_popup: 'src/popup.html' };
+  else for (const f of CONNECTOR_FILES) rmSync(`${out}/${f}`, { force: true });
   // The same lists, for the background worker and the bridge.
   const pagesFile = `${out}/src/site-pages.js`;
   writeFileSync(pagesFile, writePages(readFileSync(pagesFile, 'utf8'), PAGES, pagesFile));

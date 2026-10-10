@@ -350,8 +350,9 @@ siteHandlers['oh-scan-status'] = async () => {
 
 // The dashboard runs the scan, the same one its Scan button runs, in its own tab: this
 // worker never scans and never asks RSI anything for it. The request names the tab
-// (src/dashboard.js scanIfAsked), so only that one scans.
-siteHandlers['oh-request-scan'] = async () => {
+// (src/dashboard.js scanIfAsked), so only that one scans. Our hangar page asks for it,
+// and the toolbar popup in the connector build (below).
+async function requestScan() {
   const now = Date.now();
   // Checked and set before any wait, so two requests at once can't both pass; kept in
   // session storage too, for a worker that stopped and started again in between.
@@ -367,8 +368,31 @@ siteHandlers['oh-request-scan'] = async () => {
   const tabId = await dashboardTab();
   await chrome.storage.session.set({ scanRequest: { at: Date.now(), tabId } });
   return { ok: true, opened: true };
-};
+}
+siteHandlers['oh-request-scan'] = () => requestScan();
 // @flag-end localMode
+
+// @flag-start connector: the toolbar popup (needs localMode, scripts/pack.mjs)
+// In the connector build the toolbar icon opens src/popup.html. Its Scan asks here,
+// and gets the same scan our hangar page asks for (requestScan): the dashboard tab
+// comes to the front and runs it. While a scan runs, or a minute after one was asked
+// for, the tab still comes to the front, so the popup's Scan is never a dead click.
+//   { ohPopup: 'scan' } → { ok, opened: true } | { ok: false, error: 'busy' }
+const POPUP = 'src/popup.html';
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if (!msg || typeof msg !== 'object' || msg.ohPopup !== 'scan') return false;
+  // Only our own popup: an extension page, not a tab, at exactly its address.
+  if (sender.id !== chrome.runtime.id || sender.tab) return false;
+  if (String(sender.url || '').split(/[?#]/)[0] !== chrome.runtime.getURL(POPUP)) return false;
+  requestScan()
+    .then(async (r) => {
+      if (!r.ok) await dashboardTab();
+      return r;
+    })
+    .then(reply, (err) => reply({ ok: false, error: String(err?.message || err) }));
+  return true; // answers later
+});
+// @flag-end connector
 
 // The website's messages, all of them: only from our own pages (src/site-pages.js),
 // each checked before its handler runs.

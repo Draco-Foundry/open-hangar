@@ -71,16 +71,32 @@ const DEMO_NOW = process.env.OH_DEMO_NOW || '';
 
 // dashboard.html with the demo scripts injected: the clock first in <head>, before
 // any page script, then the shims around parser.js / lib.js.
+const demoClock = () =>
+  (DEMO_NOW ? `<script>window.__OH_DEMO_NOW = ${JSON.stringify(DEMO_NOW)};</script>\n    ` : '') +
+  '<script src="/__demo/demo-clock.js"></script>';
 function demoDashboard() {
-  const clock =
-    (DEMO_NOW ? `<script>window.__OH_DEMO_NOW = ${JSON.stringify(DEMO_NOW)};</script>\n    ` : '') +
-    '<script src="/__demo/demo-clock.js"></script>';
   return fs
     .readFileSync(path.join(SRC, 'dashboard.html'), 'utf8')
-    .replace('<head>', `<head>\n    ${clock}`)
+    .replace('<head>', `<head>\n    ${demoClock()}`)
     .replace(
       '<script src="scraper/parser.js"></script>',
       '<script src="/__demo/demo-shim.js"></script>\n    <script src="scraper/parser.js"></script>',
+    )
+    .replace(
+      '<script src="lib.js"></script>',
+      '<script src="lib.js"></script>\n    <script src="/__demo/demo-after-lib.js"></script>',
+    );
+}
+// The connector's own pages (src/popup.html): the same shims, before flags.js, plus
+// what only those pages use (demo-connector.js: session storage, change events, the
+// popup's message to the background).
+function demoConnectorPage(file) {
+  return fs
+    .readFileSync(path.join(SRC, file), 'utf8')
+    .replace('<head>', `<head>\n    ${demoClock()}`)
+    .replace(
+      '<script src="flags.js"></script>',
+      '<script src="/__demo/demo-shim.js"></script>\n    <script src="/__demo/demo-connector.js"></script>\n    <script src="flags.js"></script>',
     )
     .replace(
       '<script src="lib.js"></script>',
@@ -116,6 +132,11 @@ async function handle(req, res) {
     }
   }
 
+  if (u.pathname === '/popup.html') {
+    return res
+      .writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' })
+      .end(demoConnectorPage(u.pathname.slice(1)));
+  }
   if (u.pathname === '/' || u.pathname === '/dashboard.html') {
     return res
       .writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' })
