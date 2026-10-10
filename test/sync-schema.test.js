@@ -14,6 +14,8 @@ const JSON_SCHEMA = JSON.parse(
 );
 const { validate, prepare, pointer } = require('../src/schema-check.js');
 const SCHEMA = require('../src/sync-schema.js');
+const SHAPE = require('../src/hangar-shape.js');
+const { states } = require('./stored-data.js');
 
 const VECTOR_DIR = path.join(ROOT, 'test', 'fixtures', 'sync-schema');
 const vectors = fs
@@ -36,7 +38,7 @@ test('the scripts carry the schema file as it is, frozen', async () => {
 test('the schema: format 2, only keywords the checker knows, strict where the extension builds', () => {
   assert.equal(SCHEMA.$schema, 'https://json-schema.org/draft/2020-12/schema');
   assert.match(SCHEMA.$id, /\/2$/, 'its $id ends in the format version');
-  assert.equal(SCHEMA.properties.schemaVersion.const, 2);
+  assert.equal(SCHEMA.properties.schemaVersion.const, SHAPE.EXPORT_VERSION);
   assert.doesNotThrow(() => prepare(SCHEMA));
   const strict = (s) => s.additionalProperties === false;
   assert.ok(strict(SCHEMA), 'top level');
@@ -85,6 +87,25 @@ test('vectors hold invented data only: no real players, no real referral codes',
       assert.match(handle[1], /^(TestPilot|Recruit\d+)$/, v.file);
     for (const code of text.matchAll(/STAR-[A-Z0-9]{4}-[A-Z0-9]{4}/g))
       assert.equal(code[0], 'STAR-TEST-0000', v.file);
+  }
+});
+
+test('what the extension really sends fits: every stored state, synced and as a hangar view', () => {
+  for (const { name, mem } of states()) {
+    const db = SHAPE.checkDB(mem.db ?? { schemaVersion: 3, sources: {} }).db;
+    const backup = SHAPE.exportPayload({
+      db,
+      account: mem.account,
+      archive: mem.pledgeArchive,
+      appVersion: '0.3.0',
+    });
+    const sync = JSON.parse(JSON.stringify(SHAPE.withoutProspects(backup)));
+    assert.equal(validate(SCHEMA, sync), null, `${name}: sync`);
+    assert.equal(SHAPE.checkPayload(sync), null, `${name}: sync`);
+    assert.equal(SHAPE.checkHangarView(SHAPE.hangarView(sync)), null, `${name}: view`);
+    // The backup file keeps the prospects, so it isn't a sync payload.
+    if (backup.sources.referral?.items?.prospectsList)
+      assert.equal(validate(SCHEMA, backup).path, '/sources/referral/items/prospectsList');
   }
 });
 
@@ -205,4 +226,26 @@ test('checker: a keyword it does not know is refused, wherever it sits', () => {
   walk(JSON_SCHEMA);
   const { KEYWORDS } = require('../src/schema-check.js');
   for (const k of used) assert.ok(KEYWORDS.includes(k), k);
+});
+
+test('checker: a payload as big as sync allows is checked in good time', () => {
+  const { pledge, snapshot } = require('./stored-data.js');
+  const sync = JSON.parse(
+    JSON.stringify(
+      SHAPE.withoutProspects(
+        SHAPE.exportPayload({
+          db: {
+            schemaVersion: 3,
+            sources: {
+              hangar: { items: Array.from({ length: 1500 }, (_, i) => pledge(i)), scannedAt: 1 },
+            },
+            history: Array.from({ length: 30 }, (_, i) => snapshot(1e12 + i, 1500)),
+          },
+        }),
+      ),
+    ),
+  );
+  const t = Date.now();
+  assert.equal(SHAPE.checkPayload(sync), null);
+  assert.ok(Date.now() - t < 2000, `${Date.now() - t} ms`);
 });

@@ -28,6 +28,11 @@
 
 (function () {
   const OH = (window.OH = window.OH || {});
+  // The backup file, the sync payload and the stored DB check are shaped in
+  // src/hangar-shape.js, which the background worker loads too. The dashboard loads
+  // it before this file; node tests load this file on its own.
+  if (!window.OHShape && typeof require === 'function') require('./hangar-shape.js');
+  const SHAPE = window.OHShape;
 
   const PAGE_SIZE = 10;
   const DELAY_MS = 400; // politeness throttle between pages
@@ -40,16 +45,12 @@
   const HISTORY_KEY = 'dbHistory';
   const ARCHIVE_KEY = 'pledgeArchive'; // pledges gone from the hangar (see archiveGone)
   const CORRUPT_KEY = 'dbCorrupt';
-  // Two version numbers (they were one, 2, until storage v3):
+  // Two version numbers, set in src/hangar-shape.js (which says what each changed):
   //   DB_VERSION is how the database is stored in this browser. Changing that
   //   shape needs a MIGRATIONS step (see the Storage section).
-  //     v1 → v2: unchanged (only the export gained `account`)
-  //     v2 → v3: scan history moved out of `db` into its own key
   //   EXPORT_VERSION is the backup-file format (OH.exportDB / OH.importDB).
-  //     v2 added the `account` block (identity, org/rank, balances); v1 had
-  //     sources only. Keeping it at 2 lets older versions import new backups.
-  const DB_VERSION = 3;
-  const EXPORT_VERSION = 2;
+  const DB_VERSION = SHAPE.DB_VERSION;
+  const EXPORT_VERSION = SHAPE.EXPORT_VERSION;
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -645,62 +646,9 @@
 
   // Raw stored DB → { db, problems }. `db` always has the shape the rest of the
   // extension relies on; `problems` says what had to be dropped (empty = it was
-  // fine). History embedded in the DB (before v3, or written by an older version
-  // after a rollback) comes back as db.history. Pure.
-  OH.checkDB = function checkDB(raw) {
-    const problems = [];
-    if (!isObj(raw)) return { db: emptyDB(), problems: ['not an object'] };
-    let version = raw.schemaVersion;
-    if (!Number.isInteger(version) || version < 1) {
-      problems.push('no schema version');
-      version = DB_VERSION;
-    } else if (version > DB_VERSION) {
-      problems.push(`made by a newer version of Open Hangar (v${version})`);
-      version = DB_VERSION;
-    }
-    const db = { schemaVersion: version, sources: {} };
-    if (!isObj(raw.sources)) problems.push('no sources');
-    else {
-      for (const [id, src] of Object.entries(raw.sources)) {
-        if (!isObj(src)) {
-          problems.push(`${id}: unreadable`);
-          continue;
-        }
-        let items;
-        if (Array.isArray(src.items)) {
-          items = src.items.filter(isObj);
-          const bad = src.items.length - items.length;
-          if (bad) problems.push(`${id}: ${bad} unreadable row${bad === 1 ? '' : 's'}`);
-        } else if (isObj(src.items)) {
-          items = src.items; // the referral source is one object
-        } else {
-          problems.push(`${id}: no items`);
-          continue;
-        }
-        const out = { items, scannedAt: okTime(src.scannedAt) ? src.scannedAt : null };
-        if (src.scannedAt != null && out.scannedAt == null) problems.push(`${id}: bad scan time`);
-        if (isObj(src.meta)) out.meta = src.meta;
-        else if (src.meta !== undefined) problems.push(`${id}: bad meta`);
-        db.sources[id] = out;
-      }
-    }
-    if (raw.owner != null) {
-      if (isObj(raw.owner) && typeof raw.owner.nickname === 'string' && raw.owner.nickname) {
-        db.owner = {
-          nickname: raw.owner.nickname,
-          displayname: typeof raw.owner.displayname === 'string' ? raw.owner.displayname : null,
-        };
-      } else problems.push('unreadable owner');
-    }
-    if (raw.history !== undefined) {
-      if (Array.isArray(raw.history)) {
-        db.history = raw.history.map(cleanSnapshot).filter(Boolean);
-        const bad = raw.history.length - db.history.length;
-        if (bad) problems.push(`history: ${bad} unreadable snapshot${bad === 1 ? '' : 's'}`);
-      } else problems.push('unreadable history');
-    }
-    return { db, problems };
-  };
+  // fine). History embedded in the DB comes back as db.history. Pure, and shared
+  // with the background worker (src/hangar-shape.js).
+  OH.checkDB = SHAPE.checkDB;
 
   // Storage migrations: MIGRATIONS[n] turns a v(n) DB into v(n+1). Add one with
   // every DB_VERSION bump, and a test (test/db.test.js). Scan history is never
@@ -1127,67 +1075,15 @@
 
   // --- Export / import (the developer consumption contract) ----------------
 
-  // Flatten the internal cached `account` (getAccount's shape) into a clean,
-  // stable identity block for export — renamed/reordered so a backend reading the
-  // file sees WHO the data belongs to before WHAT they own. `owner` (set on scan)
-  // is the fallback for handle/displayName when the live account isn't cached or
-  // the user is signed out. Returns null only when we know nothing about the user.
-  // NOTE: balances.storeCredit.value is in CENTS (e.g. 1234 = $12.34); uec/rec are
-  // whole-number game currencies. Values pass through exactly as RSI reports them.
-  function shapeAccountForExport(account, owner) {
-    const a = account && account.loggedIn ? account : null;
-    const handle = a?.nickname || owner?.nickname || null;
-    if (!a && !handle) return null; // nothing known about the user
-    const credit = (c) =>
-      c
-        ? {
-            value: c.value ?? null,
-            currency: c.currency || null,
-            symbol: c.symbol || null,
-            label: c.label || null,
-          }
-        : null;
-    const org = a?.org;
-    return {
-      handle,
-      displayName: a?.displayname || owner?.displayname || null,
-      avatar: a?.avatar || null,
-      ueeRecord: a?.citizenRecord || null, // UEE Citizen Record number
-      enlistedSince: a?.enlistedSince || null,
-      country: a?.countryName || null,
-      organization: org
-        ? {
-            name: org.name || null,
-            sid: org.sid || null,
-            rank: org.rank || null,
-            logo: org.logo || null,
-          }
-        : null, // null = no main org, or the affiliation is private/redacted
-      subscriber: a?.subscriber || null, // { type, frequency } | null
-      concierge: a?.concierge || null, // { level, next, percent } | null
-      balances: a
-        ? {
-            storeCredit: credit(a.credits?.store),
-            uec: credit(a.credits?.uec),
-            rec: credit(a.credits?.rec),
-          }
-        : null,
-      // NOTE: the referral CODE/URL are deliberately NOT exported. They live in the
-      // in-tool runtime (account cache + the referral source) but are stripped from
-      // the export file — the code is a personal, shareable credential the user
-      // chose to keep out of exports. Referral COUNTS and recruit/prospect lists
-      // still export; only code/url are stripped (see exportDB).
-      capturedAt: a?.fetchedAt || null, // when this identity snapshot was read
-    };
-  }
-
   // Export the whole database as a self-describing JSON object, ordered the way a
   // backend reads it: provenance → who (identity, org, rank, balances) → what they
   // own (sources). The identity block is flattened from the cached RSI account so
-  // a consumer gets everything in one file. Reads the account from cache only (no
-  // network), so export is deterministic and works offline. ALWAYS emits the
-  // current schemaVersion (the format it actually wrote), regardless of the stored
-  // DB's version. `live`: a DB already loaded (OH.siteSync checks whose it is first).
+  // a consumer gets everything in one file; the referral code and its link are left
+  // out. Reads the account from cache only (no network), so export is deterministic
+  // and works offline. ALWAYS emits the current schemaVersion (the format it actually
+  // wrote), regardless of the stored DB's version. `live`: a DB already loaded
+  // (OH.siteSync checks whose it is first). The shaping itself is
+  // src/hangar-shape.js (exportPayload), shared with the background worker.
   OH.exportDB = async function exportDB(live = null) {
     const db = live || (await OH.loadDB());
     const { account } = await chrome.storage.local.get('account');
@@ -1197,33 +1093,8 @@
     } catch {
       /* non-extension context */
     }
-    return {
-      app: 'open-hangar',
-      appVersion,
-      exportedAt: new Date().toISOString(),
-      schemaVersion: EXPORT_VERSION,
-      account: shapeAccountForExport(account, db.owner),
-      sources: sanitizeSourcesForExport(db.sources),
-      // Scan history rides along so a backup file is a complete restore point.
-      history: Array.isArray(db.history) ? db.history : [],
-      // So does the pledge archive (#388), trimmed to what buy-back details read
-      // (OH.leanArchive). Added within format v2: older versions ignore it.
-      pledgeArchive: OH.leanArchive(await readArchive()),
-    };
+    return SHAPE.exportPayload({ db, account, archive: await readArchive(), appVersion });
   };
-
-  // Strip the referral CODE/URL from the exported referral source — the user's
-  // personal referral credential is kept out of export files (counts + recruit/
-  // prospect lists still export). Returns a shallow copy; never mutates the stored
-  // DB. Other sources pass through untouched.
-  function sanitizeSourcesForExport(sources) {
-    if (!sources || typeof sources !== 'object') return sources;
-    const ref = sources.referral;
-    if (!ref || !ref.items || typeof ref.items !== 'object' || Array.isArray(ref.items))
-      return sources;
-    const { code, url, ...rest } = ref.items; // drop code + url (url embeds the code)
-    return { ...sources, referral: { ...ref, items: rest } };
-  }
 
   // --- Hangar Transfer Format (HTF) export ---------------------------------
   // The community interchange format read by FleetYards, HangarXPLOR & co.
@@ -3476,7 +3347,7 @@
   // applied as an upgrade), newest ARCHIVE_MAX kept. It belongs to the live
   // account like the scan history (parked with it, in the recovery copy, gone
   // with Clear Data).
-  const ARCHIVE_MAX = 2000;
+  const ARCHIVE_MAX = SHAPE.ARCHIVE_MAX; // 2000 (src/hangar-shape.js)
   OH.ARCHIVE_MAX = ARCHIVE_MAX;
   // `archive` plus the pledges in `gone`, stamped goneAt = at, newest kept. Pure.
   OH.archiveGone = function archiveGone(archive, gone, at) {
@@ -3498,36 +3369,9 @@
   OH.getPledgeArchive = readArchive;
 
   // The archive as the backup file (and so sync) carries it (#388): only what
-  // buy-back details read (name, value, currency, insurance, ccu, contents' kind
-  // and label) plus the date, kind and goneAt. Left out: the flags (isCCU,
-  // isAddOn, giftable…, worked out again from the kind and name) and every image
-  // URL (the details window never shows them; the buy-back card has its own
-  // picture). The images were about 40% of a big archive. Also cleans a
-  // hand-edited file's entries on import. Pure.
-  OH.leanArchive = function leanArchive(archive) {
-    const out = {};
-    if (!isObj(archive)) return out;
-    for (const [key, p] of Object.entries(archive)) {
-      if (!isObj(p) || !key) continue;
-      const e = { id: key, name: String(p.name || '') };
-      if (Number.isFinite(p.value)) e.value = p.value;
-      if (p.currency) e.currency = String(p.currency);
-      if (p.insurance) e.insurance = String(p.insurance);
-      if (isObj(p.ccu)) e.ccu = { from: String(p.ccu.from || ''), to: String(p.ccu.to || '') };
-      if (p.kind) e.kind = String(p.kind);
-      if (p.date) e.date = String(p.date);
-      const contents = (Array.isArray(p.contents) ? p.contents : []).filter(isObj).map((c) => {
-        const x = {};
-        if (c.kind) x.kind = String(c.kind);
-        if (c.label) x.label = String(c.label);
-        return x;
-      });
-      if (contents.length) e.contents = contents;
-      if (Number.isFinite(p.goneAt)) e.goneAt = p.goneAt;
-      out[key] = e;
-    }
-    return out;
-  };
+  // buy-back details read, no flags or images. Also cleans a hand-edited file's
+  // entries on import. Pure (src/hangar-shape.js).
+  OH.leanArchive = SHAPE.leanArchive;
 
   // Two archives as one (a restored backup and this browser's): per pledge id the
   // entry with the newest goneAt (a tie keeps `a`'s, this browser's fuller copy),
@@ -3835,16 +3679,11 @@
     return JSON.stringify(out);
   };
 
-  // What sync sends: the backup file's payload without the referral prospects list.
-  // Prospects are other players (handles, monikers, enlist dates) who used your code but
-  // aren't recruits yet, so they stay in this browser; the backup file keeps them, and
-  // the prospects count still goes. Returns a copy, never changes `payload`. Pure.
-  OH.syncPayload = function syncPayload(payload) {
-    const ref = payload?.sources?.referral;
-    if (!isObj(ref) || !isObj(ref.items) || !('prospectsList' in ref.items)) return payload;
-    const { prospectsList, ...items } = ref.items;
-    return { ...payload, sources: { ...payload.sources, referral: { ...ref, items } } };
-  };
+  // What sync sends: the backup file's payload without the referral prospects list
+  // (other players who used your code but aren't recruits yet stay in this browser;
+  // their count still goes). Returns a copy, never changes `payload`. Pure
+  // (src/hangar-shape.js withoutProspects).
+  OH.syncPayload = SHAPE.withoutProspects;
 
   // Whose hangar a sync sends. The link is one per browser, but a browser can keep
   // more than one RSI account (OH.switchProfile parks the others), so the link
@@ -5343,17 +5182,9 @@
     db.history = OH.trimHistory(hist);
   }
 
-  // Keep only well-formed snapshots ({ at, items: [[id, name, value]] }).
-  function cleanSnapshot(x) {
-    if (!x || !Number.isFinite(x.at) || !Array.isArray(x.items)) return null;
-    const items = x.items
-      .filter((r) => Array.isArray(r) && r.length >= 3)
-      .map((r) => [String(r[0]), String(r[1]), Number(r[2]) || 0]);
-    const out = { at: x.at, items };
-    if (Number.isFinite(x.credit)) out.credit = x.credit;
-    if (Number.isFinite(x.checkedAt)) out.checkedAt = x.checkedAt;
-    return out;
-  }
+  // Keep only well-formed snapshots ({ at, items: [[id, name, value]] }), as
+  // OH.checkDB does (src/hangar-shape.js).
+  const cleanSnapshot = SHAPE.cleanSnapshot;
 
   // Union of two histories (e.g. this browser's + a backup file's): by time,
   // one snapshot per timestamp, consecutive identical snapshots collapsed,

@@ -140,14 +140,24 @@ const SYNC_DATA = ['personallyIdentifyingInfo', 'financialAndPaymentInfo', 'webs
 const BETA_FIREFOX_ID = 'open-hangar-beta@draco-foundry';
 const BETA_FIREFOX_UPDATES = `${PRODUCTION_SITE}/beta/firefox-updates.json`;
 
+// What src/background.js loads with importScripts on Chrome besides flags.js
+// (test/build-flags.test.js checks the two lists agree).
+const WORKER_SCRIPTS = [
+  'src/rsi-cart.js',
+  'src/schema-check.js',
+  'src/sync-schema.js',
+  'src/hangar-shape.js',
+];
+
 const targets = {
   chrome: (m) => m,
   firefox: (m, gecko = { id: 'open-hangar@draco-foundry' }) => ({
     ...m,
     // Firefox's event page has no importScripts, so what background.js imports on
-    // Chrome is listed here, before it: flags.js, and rsi-cart.js for Add to RSI Cart
-    // from the website (through site-bridge.js, #434).
-    background: { scripts: [FLAGS_FILE, 'src/rsi-cart.js', m.background.service_worker] },
+    // Chrome is listed here, before it: flags.js, rsi-cart.js for Add to RSI Cart
+    // from the website (through site-bridge.js, #434), and the sync schema with the
+    // shared hangar shaping (#441).
+    background: { scripts: [FLAGS_FILE, ...WORKER_SCRIPTS, m.background.service_worker] },
     browser_specific_settings: {
       gecko: {
         ...gecko,
