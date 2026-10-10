@@ -3795,8 +3795,9 @@
     "That's more cargo than openhangar.space can hold. Your hangar stays safe in your browser.";
   const SYNC_OTHER_LOGIN =
     'This hangar belongs to another pilot than the one signed in to RSI. Reload Open Hangar to switch hangars, then sync.';
-  // What this version would send doesn't fit the sync format (#441), so nothing went
-  // (owner-approved words, 2026-10-10).
+  // What this version would send doesn't fit the sync format (#441), so nothing went;
+  // or the website's own check of it said so (400, reason `schema`, #584).
+  // Owner-approved words (2026-10-10).
   const SYNC_SCHEMA =
     "Held at the hangar doors: this version packs your hangar in a shape our site won't accept. Our bug, not yours. Nothing was sent and your hangar is safe here. Update Open Hangar, or report it if it keeps happening.";
   // A refusal's status, reason and the website's own words → the Error to throw. Sync
@@ -3810,6 +3811,7 @@
       const fallback = reason === 'not-open' ? SYNC_NOT_OPEN : SYNC_TOO_SOON;
       return Object.assign(new Error(own || fallback), { calm: true });
     }
+    if (reason === 'schema') return Object.assign(new Error(SYNC_SCHEMA), { reason });
     if (status === 409) return new Error(reason === 'older-scan' ? SYNC_OLDER_SCAN : SYNC_NO_SCAN);
     if (status === 426 || reason === 'old-format') return new Error(SYNC_OLD_FORMAT);
     if (reason === 'newer-format') return new Error(SYNC_NEWER_FORMAT);
@@ -3885,6 +3887,18 @@
       const text = (v) => (typeof v === 'string' ? v.trim() : '');
       const reason = text(body?.reason);
       const err = syncRefusal(res.status, reason, text(body?.error));
+      // The website's format check refused it: where it didn't fit goes in the flight
+      // log, for a scan problem report. A JSON Pointer of keys and row numbers only,
+      // never a value; anything else is left out.
+      if (reason === 'schema') {
+        const path = text(body?.path);
+        if (/^(\/[\w.~-]*){1,32}$/.test(path) && path.length <= 200) err.path = path;
+        OH.log(
+          'error',
+          'site',
+          `sync refused: the website's format check failed at ${err.path || '?'}`,
+        );
+      }
       const at = Date.now();
       // An extension page only sees Retry-After when the website exposes it (CORS), so
       // `retry_after` (seconds) in the JSON counts too.
