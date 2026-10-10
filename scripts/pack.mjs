@@ -27,6 +27,10 @@
  * src/flags.js, and the code of every flag that's off is cut. Store builds get the
  * registry's defaults, --beta the beta set, and --flag name=on (or =off, repeatable)
  * is for developers' own builds (--sync / OH_SYNC=1 are the older --flag sync=on).
+ *
+ * Our pages that may talk to the extension (bridge v2, scripts/site-pages.mjs): decided
+ * once per build and written into the manifest, the built src/site-pages.js and the
+ * built src/site-bridge.js; each build is checked to agree before it's done.
  */
 
 import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -38,6 +42,16 @@ import {
   stripFlagsInDir,
   writeFlags,
 } from './build-flags.mjs';
+import {
+  pagesFor,
+  pagesProblems,
+  patternsOf,
+  readBridgePages,
+  readPages,
+  withoutPageLists,
+  writeBridgePages,
+  writePages,
+} from './site-pages.mjs';
 
 const RUNTIME = ['_locales', 'icons', 'src'];
 
@@ -85,6 +99,11 @@ if (SITE_ARG) {
 const SITE = KEEP_SYNC ? SITE_ARG || PRODUCTION_SITE : '';
 // Built in to a site other than production: a developer's build.
 const DEV_SITE = Boolean(SITE) && SITE !== PRODUCTION_SITE;
+// Local Mode (our hangar page reading this browser's hangar) asks Firefox's data
+// permission through sync's consent card (src/dashboard.js), and its handlers use
+// sync's Firefox check (src/background.js).
+if (FLAGS.localMode && !KEEP_SYNC)
+  throw new Error('--flag localMode=on needs sync on (drop --flag sync=off)');
 const SITE_LINE = "const SITE_BUILT_IN = '';";
 function presetSite(file) {
   const src = readFileSync(file, 'utf8');
@@ -112,14 +131,15 @@ const BETA_NAME = 'Open Hangar Beta';
 // ≤132 characters (Chrome's limit); the store's short description comes from it.
 const BETA_DESCRIPTION =
   'Beta build of Open Hangar for invited testers: your Star Citizen hangar, made useful, with opt-in sync to openhangar.space.';
-// Belt and braces: a build without sync may not still talk to the sync site.
+// Belt and braces: a build without sync may not still talk to the sync site. The page
+// lists name it for Add to RSI Cart, the same as the manifest.
 function assertNoSyncHost(dir) {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const p = `${dir}/${e.name}`;
     if (e.isDirectory()) assertNoSyncHost(p);
     else if (
       /\.(js|html|json)$/.test(e.name) &&
-      readFileSync(p, 'utf8').includes('app.openhangar.space')
+      withoutPageLists(readFileSync(p, 'utf8')).includes('app.openhangar.space')
     ) {
       throw new Error(`${p} still mentions app.openhangar.space; wrap it in @sync-start/@sync-end`);
     }
@@ -143,6 +163,7 @@ const BETA_FIREFOX_UPDATES = `${PRODUCTION_SITE}/beta/firefox-updates.json`;
 // What src/background.js loads with importScripts on Chrome besides flags.js
 // (test/build-flags.test.js checks the two lists agree).
 const WORKER_SCRIPTS = [
+  'src/site-pages.js',
   'src/rsi-cart.js',
   'src/schema-check.js',
   'src/sync-schema.js',
@@ -154,9 +175,9 @@ const targets = {
   firefox: (m, gecko = { id: 'open-hangar@draco-foundry' }) => ({
     ...m,
     // Firefox's event page has no importScripts, so what background.js imports on
-    // Chrome is listed here, before it: flags.js, rsi-cart.js for Add to RSI Cart
-    // from the website (through site-bridge.js, #434), and the sync schema with the
-    // shared hangar shaping (#441).
+    // Chrome is listed here, before it: flags.js, site-pages.js (which of our pages
+    // may ask what), rsi-cart.js for Add to RSI Cart from the website (through
+    // site-bridge.js, #434), and the sync schema with the shared hangar shaping (#441).
     background: { scripts: [FLAGS_FILE, ...WORKER_SCRIPTS, m.background.service_worker] },
     browser_specific_settings: {
       gecko: {
@@ -183,6 +204,17 @@ const builds = BETA
 const FIREFOX = new Set(['firefox', 'beta-firefox']);
 const beta = BETA ? betaVersion() : null;
 
+// Our pages that may talk to the extension, and what each may ask (src/site-pages.js):
+//   hangar   our hangar page (Local Mode): its hangar, scan status and a scan, and
+//            Add to RSI Cart; only with the `localMode` flag on
+//   site     openhangar.space and app.openhangar.space: Add to RSI Cart in every build
+//            (#288; no account, nothing sent anywhere but RSI)
+//   connect  the pages Connect This Browser answers: the app, in builds with sync
+// Staging's pages only in a developer's build pointed at another site (npm run
+// build:staging): never in a store build, the beta included
+// (scripts/check-store-build.mjs).
+const PAGES = pagesFor({ localMode: FLAGS.localMode, sync: KEEP_SYNC, devSite: DEV_SITE });
+
 rmSync('dist', { recursive: true, force: true });
 for (const [name, transform] of Object.entries(builds)) {
   const out = `dist/${name}`;
@@ -198,29 +230,31 @@ for (const [name, transform] of Object.entries(builds)) {
   const manifest = { ...transform(base) }; // a copy: chrome returns `base` itself
   // Sync's sign-in window (identity.launchWebAuthFlow) needs "identity": it's in
   // manifest.json, so every build asks for it.
-  // Our own site may talk to the extension (src/background.js): Add to RSI Cart from
-  // the website's store in every build (#288; no account, nothing sent anywhere but
-  // RSI), and Connect This Browser in builds with sync. The background worker reads
-  // this list back as the only origins it answers.
-  // The store is at openhangar.space/store and app.openhangar.space/store.
-  // Staging only in a developer's build pointed at another site (npm run
-  // build:staging): never in a store build, the beta included
-  // (scripts/check-store-build.mjs).
-  const SITE_PAGES = [
-    'https://openhangar.space/*',
-    'https://app.openhangar.space/*',
-    ...(DEV_SITE ? ['https://staging.openhangar.space/*'] : []),
-  ];
-  // Chrome and Edge: the pages message the extension directly. Firefox doesn't allow
-  // that, so there src/site-bridge.js runs on just those pages and passes the
-  // messages on (#434, owner 2026-10-07: one-click Connect in every browser). Only
-  // the Firefox build carries it.
+  // Our pages (PAGES) may talk to the extension (src/background.js). Chrome and Edge:
+  // they message it directly. Firefox doesn't allow that, so there src/site-bridge.js
+  // runs in the top frame of just those pages and passes the messages on (#434, owner
+  // 2026-10-07: one-click Connect in every browser). Only the Firefox build carries it.
+  const SITE_MATCHES = patternsOf(PAGES);
   if (FIREFOX.has(name))
     manifest.content_scripts = [
-      { matches: SITE_PAGES, js: ['src/site-bridge.js'], run_at: 'document_start' },
+      {
+        matches: SITE_MATCHES,
+        js: ['src/site-bridge.js'],
+        run_at: 'document_start',
+        all_frames: false,
+      },
     ];
-  else manifest.externally_connectable = { matches: SITE_PAGES };
+  else manifest.externally_connectable = { matches: SITE_MATCHES };
   if (!FIREFOX.has(name)) rmSync(`${out}/src/site-bridge.js`, { force: true });
+  // The same lists, for the background worker and the bridge.
+  const pagesFile = `${out}/src/site-pages.js`;
+  writeFileSync(pagesFile, writePages(readFileSync(pagesFile, 'utf8'), PAGES, pagesFile));
+  const bridgeFile = `${out}/src/site-bridge.js`;
+  if (FIREFOX.has(name))
+    writeFileSync(
+      bridgeFile,
+      writeBridgePages(readFileSync(bridgeFile, 'utf8'), PAGES, bridgeFile),
+    );
   if (beta) {
     // Its own store item: a name, icons and version line of its own, so testers can
     // tell it apart and it never stands in for the public Open Hangar.
@@ -237,6 +271,17 @@ for (const [name, transform] of Object.entries(builds)) {
   stripFlagsInDir(`${out}/src`, FLAGS);
   if (!KEEP_SYNC) assertNoSyncHost(`${out}/src`);
   if (SITE) presetSite(`${out}/src/lib.js`);
+  // What was built agrees with itself: the manifest's lists and the two copies.
+  const problems = pagesProblems(out, {
+    manifest,
+    pages: readPages(readFileSync(pagesFile, 'utf8'), pagesFile),
+    bridge: FIREFOX.has(name)
+      ? readBridgePages(readFileSync(bridgeFile, 'utf8'), bridgeFile)
+      : null,
+    firefox: FIREFOX.has(name),
+    flags: FLAGS,
+  });
+  if (problems.length) throw new Error(problems.join('\n'));
   console.log(
     `built ${out}${KEEP_SYNC ? ' (with sync)' : ''}${SITE ? `, syncing to ${SITE}` : ''}` +
       (beta ? ` as ${BETA_NAME} ${beta.version} (${beta.version_name})` : '') +

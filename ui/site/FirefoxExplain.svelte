@@ -5,9 +5,11 @@
   // Continue is the click that asks Firefox (siteConnect asks first thing, before
   // any wait, as Firefox needs), then Connect carries on; Not Now, ✕ and Escape close
   // it. Focus moves into the card and back to the button that opened it.
+  // `local`: opened for our hangar page (Local Mode), which has no account: Continue
+  // only asks Firefox, and Connect doesn't start.
   import { app } from '../lib/app.svelte.js';
 
-  let { opener = null, onClose } = $props();
+  let { opener = null, local = false, onClose } = $props();
   let card = $state();
 
   // Drawn on the page itself, so the Citizen Card's clipping can't cut it.
@@ -25,7 +27,9 @@
   function proceed() {
     const back = opener;
     onClose();
-    app().site.connect(); // asks Firefox right away, inside this click
+    // Both ask Firefox right away, inside this click.
+    if (local) app().site.allowData();
+    else app().site.connect();
     if (back?.isConnected) back.focus({ preventScroll: true });
   }
   function onEscape(e) {

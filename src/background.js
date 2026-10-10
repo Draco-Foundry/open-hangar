@@ -98,24 +98,31 @@ chrome.action.onClicked.addListener(() => {
 });
 
 // --- Messages from our website -------------------------------------------------------
-// Which pages may talk to the extension is set in one place by scripts/pack.mjs: the
-// manifest's externally_connectable on Chrome and Edge, and on Firefox (which doesn't
-// let web pages reach extensions) the matches of src/site-bridge.js, a content script
-// that passes our own site's messages here (#434). Each message type has a handler.
+// Bridge v2. Which of our pages may talk to the extension, and what each may ask, is
+// src/site-pages.js (self.OHPages): its lists are written per build by
+// scripts/pack.mjs from the same values as the manifest's, externally_connectable on
+// Chrome and Edge, and on Firefox (which doesn't let web pages reach extensions) the
+// matches of src/site-bridge.js, a content script that passes our own pages' messages
+// here (#434). Every message is checked there before its handler runs, and a request
+// a page may not ask gets the same answer as one that doesn't exist.
+if (typeof importScripts === 'function' && !self.OHPages) importScripts('site-pages.js');
 const siteHandlers = {};
-function siteOrigins() {
-  const m = chrome.runtime.getManifest();
-  const bridge = (m.content_scripts || []).find((c) =>
-    (c.js || []).some((f) => f.endsWith('site-bridge.js')),
-  );
-  const matches =
-    (m.externally_connectable && m.externally_connectable.matches) ||
-    (bridge && bridge.matches) ||
-    [];
-  // "https://host/*" → "https://host"
-  return matches.map((p) => (/^(https:\/\/[^/*]+)\//.exec(p) || [])[1]).filter(Boolean);
-}
-siteHandlers['oh-hello'] = () => ({ ok: true, cart: true, connect: false });
+const handles = (type) => Object.hasOwn(siteHandlers, type);
+
+// Hello, the version handshake: what this page may ask in this build (a build's flags
+// cut handlers, and what's cut is never offered). cart and connect stay for the
+// website's pages from before v2, which read an answer without `v` as v1.
+siteHandlers['oh-hello'] = (msg, origin) => {
+  const caps = self.OHPages.capsFor(origin, handles);
+  return {
+    ok: true,
+    v: 2,
+    version: chrome.runtime.getManifest().version,
+    caps,
+    cart: caps.includes('addToCart'),
+    connect: caps.includes('connect'),
+  };
+};
 
 // Add to RSI Cart from the website's store (#288), in every build: no account
 // needed. The upgrade goes into the RSI cart in this browser's own RSI session
@@ -143,17 +150,15 @@ siteHandlers['oh-add-upgrade'] = (m) =>
 // @sync-start: the `sync` build flag's code, in every store build (src/flags.js, #187)
 // Connect from the website (Chrome and Edge, owner 2026-10-04). The website's Connect
 // page (openhangar.space's /link) asks whether Open Hangar is installed here; only
-// our own site can talk to the extension (externally_connectable, added by
-// scripts/pack.mjs; Firefox's site-bridge.js). Connect This Browser there:
+// our own site can talk to the extension. Connect This Browser there:
 //   oh-connect-begin  → a PKCE pair; the challenge and this extension's redirect
 //                       address go to the page, the verifier stays here
 //   oh-connect-finish → the page's one-time code, traded for the sync token with the
 //                       verifier; then the dashboard opens on Home (and syncs, if
 //                       Sync My Hangar Now was ticked)
-// The sync sites: the manifest's origins except the public front page, so a build
-// that leaves staging out of externally_connectable (npm run build:beta) can't
+// Only the pages in src/site-pages.js's `connect` list may ask (the app, never the
+// public front page), so a build that leaves staging out (npm run build:beta) can't
 // connect there either.
-const SITE_ORIGINS = siteOrigins().filter((o) => o !== 'https://openhangar.space');
 const b64url = (bytes) =>
   btoa(String.fromCharCode(...bytes))
     .replace(/\+/g, '-')
@@ -222,46 +227,146 @@ siteHandlers['oh-connect-finish'] = async (msg, origin) => {
   chrome.tabs.create({ url: chrome.runtime.getURL('src/dashboard.html#home') });
   return { ok: true, name: j.name || '' };
 };
-// Connecting needs the sync site itself, not just any page the manifest lets in;
-// the website's Connect page asks `connect` before it offers the button.
-siteHandlers['oh-hello'] = (msg, origin) => ({
-  ok: true,
-  cart: true,
-  connect: SITE_ORIGINS.includes(origin),
-});
-for (const t of ['oh-connect-begin', 'oh-connect-finish']) {
-  const run = siteHandlers[t];
-  siteHandlers[t] = (msg, origin) =>
-    SITE_ORIGINS.includes(origin) ? run(msg, origin) : { ok: false, error: 'unknown request' };
-}
 // @sync-end
 
-// The website's messages, all of them: only from the pages the manifest lets in
-// (our own site; scripts/pack.mjs).
+// @flag-start localMode: our own hangar page (Local Mode; needs sync, scripts/pack.mjs)
+// hangar.openhangar.space shows the hangar this browser scanned, with no account.
+// Only the hangar pages may ask these (src/site-pages.js):
+//   oh-get-hangar   → { ok, hangar } | { ok: false, error: 'no-scan' | 'needs-upgrade'
+//                     | 'schema' (+ path) | 'firefox-ask' }
+//   oh-scan-status  → { ok, scannedAt: { hangar, buybacks }, running, stale }
+//   oh-request-scan → { ok, opened: true } | { ok: false, error: 'busy' }
+// The hangar is the stored shape, what the website keeps for a synced hangar, built by
+// the backup file's and sync's own shaping (src/hangar-shape.js readHangarView): never
+// the sync token, the site address, cookies, settings, the referral code or the
+// prospects list. It's checked against the sync schema and the never-sent keys before
+// it goes, and one that fails is never handed out. On Firefox the answer reaches the
+// page through the window (src/site-bridge.js), where any script on that page could
+// read it: the hangar page's strict script policy (no script but its own) is what
+// keeps it there.
+const DASHBOARD = 'src/dashboard.html';
+// A scan-running marker older than this is a page that went away mid-scan
+// (src/dashboard.js scanMark refreshes it every minute while a scan runs).
+const SCAN_RUN_MAX = 10 * 60e3;
+// One scan request a minute at most, and none while a scan runs.
+const SCAN_ASK_GAP = 60e3;
+let scanAskedAt = 0;
+
+// The dashboard tab to use: an open one, brought to the front, or a new one (with
+// `hash`). → its tab id, or null.
+async function dashboardTab(hash = '') {
+  const url = chrome.runtime.getURL(DASHBOARD);
+  try {
+    const tabs = chrome.runtime.getContexts
+      ? await chrome.runtime.getContexts({ contextTypes: ['TAB'] })
+      : [];
+    const open = tabs.find((c) => c.tabId >= 0 && String(c.documentUrl || '').startsWith(url));
+    if (open) {
+      await chrome.tabs.update(open.tabId, { active: true });
+      if (chrome.windows?.update)
+        await chrome.windows.update(open.windowId, { focused: true }).catch(() => {});
+      return open.tabId;
+    }
+  } catch {
+    /* can't tell what's open: a new tab */
+  }
+  const tab = await chrome.tabs.create({ url: url + hash });
+  return tab?.id ?? null;
+}
+
+// A scan running in a dashboard right now (src/dashboard.js scanMark).
+async function scanRunning() {
+  const { scanRunning: at } = await chrome.storage.session.get('scanRunning');
+  return Number.isFinite(at) && Date.now() - at < SCAN_RUN_MAX;
+}
+
+siteHandlers['oh-get-hangar'] = async () => {
+  // Handing the hangar to a web page shares it, so Firefox asks first: the same yes
+  // Connect needs. Until then Home opens with Firefox's card up (src/dashboard.js
+  // refreshSite, localAskFirefox), at most once a minute so a page asking again
+  // doesn't stack tabs.
+  if (await firefoxNeedsOk()) {
+    const { localAskedAt: at } = await chrome.storage.session.get('localAskedAt');
+    if (!(Number.isFinite(at) && Date.now() - at < 60e3)) {
+      const now = Date.now();
+      await chrome.storage.session.set({ localAskedAt: now, localAskFirefox: now });
+      await dashboardTab('#home');
+    }
+    return { ok: false, error: 'firefox-ask' };
+  }
+  const r = await self.OHShape.readHangarView((keys) => chrome.storage.local.get(keys), {
+    appVersion: chrome.runtime.getManifest().version,
+  });
+  if (r.ok) return { ok: true, hangar: r.hangar };
+  return r.path ? { ok: false, error: r.error, path: r.path } : { ok: false, error: r.error };
+};
+
+siteHandlers['oh-scan-status'] = async () => {
+  const { db } = await chrome.storage.local.get('db');
+  const at = (id) => {
+    const t = db?.sources?.[id]?.scannedAt;
+    const ms = typeof t === 'number' ? t : typeof t === 'string' ? Date.parse(t) : NaN;
+    return Number.isFinite(ms) ? ms : null;
+  };
+  const hangar = at('hangar');
+  return {
+    ok: true,
+    scannedAt: { hangar, buybacks: at('buybacks') },
+    running: await scanRunning(),
+    // The toolbar badge's rule (updateReminder).
+    stale: hangar != null && Date.now() - hangar >= STALE_DAYS * 86400000,
+  };
+};
+
+// The dashboard runs the scan, the same one its Scan button runs, in its own tab: this
+// worker never scans and never asks RSI anything for it. The request names the tab
+// (src/dashboard.js scanIfAsked), so only that one scans.
+siteHandlers['oh-request-scan'] = async () => {
+  const now = Date.now();
+  // Checked and set before any wait, so two requests at once can't both pass; kept in
+  // session storage too, for a worker that stopped and started again in between.
+  if (now - scanAskedAt < SCAN_ASK_GAP) return { ok: false, error: 'busy' };
+  const held = scanAskedAt;
+  scanAskedAt = now;
+  const { scanAskedAt: before } = await chrome.storage.session.get('scanAskedAt');
+  if ((Number.isFinite(before) && now - before < SCAN_ASK_GAP) || (await scanRunning())) {
+    scanAskedAt = held; // refused, so it doesn't count as a request
+    return { ok: false, error: 'busy' };
+  }
+  await chrome.storage.session.set({ scanAskedAt: now });
+  const tabId = await dashboardTab();
+  await chrome.storage.session.set({ scanRequest: { at: Date.now(), tabId } });
+  return { ok: true, opened: true };
+};
+// @flag-end localMode
+
+// The website's messages, all of them: only from our own pages (src/site-pages.js),
+// each checked before its handler runs.
 function answerSite(msg, origin, reply) {
-  const handler = siteHandlers[msg?.type];
-  Promise.resolve(handler ? handler(msg, origin) : { ok: false, error: 'unknown request' }).then(
-    reply,
-    (err) => reply({ ok: false, error: String(err?.message || err) }),
-  );
+  const v = self.OHPages.vet(msg, origin, handles);
+  new Promise((done) =>
+    done(v.type ? siteHandlers[v.type](msg, origin) : { ok: false, error: v.error }),
+  ).then(reply, (err) => reply({ ok: false, error: String(err?.message || err) }));
   return true; // answers later
 }
-// Chrome and Edge: straight from the page.
+// Chrome and Edge: straight from the page; the browser says which page it is.
 chrome.runtime.onMessageExternal?.addListener((msg, sender, reply) => {
-  if (!siteOrigins().includes(sender.origin)) return false;
+  if (!self.OHPages.known(sender.origin)) return false;
   return answerSite(msg, sender.origin, reply);
 });
-// Firefox: through src/site-bridge.js, our own content script in a tab of our site.
-// The browser says which page it runs in (sender.url), never the page itself.
+// Firefox: through src/site-bridge.js, our own content script, in the top frame of a
+// tab on one of our pages. The browser says which page it ran in (sender.url), never
+// the page itself.
 chrome.runtime.onMessage?.addListener((msg, sender, reply) => {
   if (!msg || typeof msg !== 'object' || !('ohSite' in msg)) return false;
-  if (sender.id !== chrome.runtime.id || !sender.tab || !sender.url) return false;
+  if (sender.id !== chrome.runtime.id || !sender.tab || sender.frameId !== 0 || !sender.url)
+    return false;
   let origin = '';
   try {
     origin = new URL(sender.url).origin;
   } catch {
     return false;
   }
-  if (!siteOrigins().includes(origin)) return false;
+  if (!self.OHPages.known(origin)) return false;
   return answerSite(msg.ohSite, origin, reply);
 });

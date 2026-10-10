@@ -79,6 +79,7 @@ test('Firefox beta: its own add-on id, update_url, the beta version and sync dat
     assert.deepEqual(ff.background, {
       scripts: [
         'src/flags.js',
+        'src/site-pages.js',
         'src/rsi-cart.js',
         'src/schema-check.js',
         'src/sync-schema.js',
@@ -87,10 +88,18 @@ test('Firefox beta: its own add-on id, update_url, the beta version and sync dat
       ],
     });
     assert.ok(fs.existsSync(path.join(dir, 'dist/beta-firefox/src/site-bridge.js')));
+    // Local Mode is on in the beta: our hangar page is let in too, production only.
+    const PAGES = [
+      'https://hangar.openhangar.space/*',
+      'https://openhangar.space/*',
+      'https://app.openhangar.space/*',
+    ];
+    assert.deepEqual(ff.content_scripts[0].matches, PAGES);
     // The Chrome and Edge beta next to it stays as it was.
     const chrome = manifestOf(dir, 'beta');
     assert.equal(chrome.browser_specific_settings, undefined);
     assert.equal(chrome.version, b.version);
+    assert.deepEqual(chrome.externally_connectable, { matches: PAGES });
     // Both pass the store check, apart from the zips only npm run build:beta makes.
     assert.deepEqual(
       storeCheck(dir)

@@ -30,6 +30,11 @@
       default: false,
       devOnly: true,
     },
+    localMode: {
+      about: 'Our hangar page reads the hangar this browser scanned (Local Mode).',
+      default: false,
+      beta: true,
+    },
   };
 
   // Set per build by scripts/pack.mjs. Keep it empty here.
