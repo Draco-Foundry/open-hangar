@@ -27,10 +27,25 @@
 // And every build carries src/flags.js with exactly its set of build flags (the
 // registry's defaults, or its beta set), and no flag the registry marks dev-only
 // is on (docs/FLAGS.md).
+//
+// Our pages' way in (bridge v2, scripts/site-pages.mjs): the manifest's list
+// (externally_connectable on Chrome and Edge with exact https://host/* patterns and
+// nothing else, no `ids`; on Firefox the one site bridge, top frame only), the built
+// src/site-pages.js and the Firefox bridge's own copy all agree, and they're exactly the
+// store's pages for the build's flags: openhangar.space and app.openhangar.space,
+// Connect on the app with sync on, and hangar.openhangar.space only with localMode on.
+// This holds with localMode on (the beta) and off (the public build).
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { buildValues, loadFlags, readRegistry } from './build-flags.mjs';
+import {
+  pagesFor,
+  pagesProblems,
+  readBridgePages,
+  readPages,
+  withoutPageLists,
+} from './site-pages.mjs';
 
 const args = process.argv.slice(2);
 const BETA = args.includes('--beta');
@@ -54,7 +69,17 @@ const BUILT_IN = /SITE_BUILT_IN\s*=\s*(['"`])((?:(?!\1).)*)\1/g;
 // What each build (a folder in dir, or a zip) turned out to carry.
 const builds = {};
 const buildOf = (unit) =>
-  (builds[unit] ??= { firefox: /firefox/.test(unit), manifests: 0, builtIn: 0, sync: false });
+  (builds[unit] ??= {
+    firefox: /firefox/.test(unit),
+    manifests: 0,
+    builtIn: 0,
+    sync: false,
+    // What its way in was built with (scripts/site-pages.mjs).
+    manifest: null,
+    pages: null,
+    bridge: null,
+    flags: null,
+  });
 
 // A store manifest never mentions staging at all, under any name.
 function noStagingManifest(name, text) {
@@ -137,7 +162,7 @@ function checkSyncFirefox(name, m) {
 // externally_connectable and Firefox's site bridge (#434) list our own site for Add to
 // RSI Cart (#288), so they're left out of the address check.
 function checkNoSync(name, text) {
-  let hosts = text;
+  let hosts = withoutPageLists(text);
   if (name.endsWith('manifest.json')) {
     const m = JSON.parse(text);
     delete m.externally_connectable;
@@ -155,7 +180,7 @@ function checkNoSync(name, text) {
 
 // The built flags.js: this build's set, nothing dev-only, nothing unknown.
 const flagged = { files: 0, manifests: 0 };
-function checkFlags(name, text) {
+function checkFlags(name, text, build) {
   if (name.endsWith('manifest.json')) flagged.manifests++;
   if (!/(^|[/:])src\/flags\.js$/.test(name)) return;
   flagged.files++;
@@ -166,6 +191,7 @@ function checkFlags(name, text) {
     problems.push(`${name}: unreadable build flags (${e.message})`);
     return;
   }
+  build.flags = values;
   for (const [flag, on] of Object.entries(values)) {
     if (!(flag in REGISTRY))
       problems.push(`${name}: flag "${flag}" isn't in src/flags.js (stale?)`);
@@ -179,6 +205,28 @@ function checkFlags(name, text) {
   for (const flag of Object.keys(REGISTRY))
     if (!(flag in values)) problems.push(`${name}: flag "${flag}" is missing (stale build?)`);
 }
+// The way in's three copies, collected per build and checked once all are read.
+function collectPages(name, text, build) {
+  try {
+    if (name.endsWith('manifest.json')) build.manifest = JSON.parse(text);
+    else if (/(^|[/:])src\/site-pages\.js$/.test(name)) build.pages = readPages(text, name);
+    else if (/(^|[/:])src\/site-bridge\.js$/.test(name)) build.bridge = readBridgePages(text, name);
+  } catch (e) {
+    problems.push(`${name}: unreadable (${e.message})`);
+  }
+}
+function checkPages(unit, build) {
+  if (!build.pages) return void problems.push(`${unit}: no src/site-pages.js`);
+  if (!build.flags) return; // reported with the flags
+  if (build.firefox && !build.bridge) return void problems.push(`${unit}: no src/site-bridge.js`);
+  problems.push(...pagesProblems(unit, build));
+  const want = pagesFor({ localMode: build.flags.localMode, sync: build.flags.sync });
+  if (JSON.stringify(build.pages) !== JSON.stringify(want))
+    problems.push(
+      `${unit}: its pages ${JSON.stringify(build.pages)} aren't the store's for its flags (${JSON.stringify(want)})`,
+    );
+}
+
 const check = (name, text, unit) => {
   const build = buildOf(unit);
   if (name.endsWith('manifest.json')) build.manifests++;
@@ -188,7 +236,8 @@ const check = (name, text, unit) => {
   else checkPublic(name, text);
   if (SYNC) checkSync(name, text, build);
   else checkNoSync(name, text);
-  checkFlags(name, text);
+  checkFlags(name, text, build);
+  collectPages(name, text, build);
 };
 
 // Beta: only its own folders and zips. Public: everything in dist.
@@ -249,6 +298,7 @@ if (SYNC)
     if (!build.builtIn) problems.push(`${unit}: sync is not built in to production`);
     if (!build.sync) problems.push(`${unit}: the sync code is missing`);
   }
+for (const [unit, build] of Object.entries(builds)) if (build.manifest) checkPages(unit, build);
 if (problems.length) {
   console.error(`✖ Not a ${BETA ? 'beta' : 'public store'} build:\n  ${problems.join('\n  ')}`);
   console.error(
