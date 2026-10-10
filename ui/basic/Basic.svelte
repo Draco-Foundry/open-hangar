@@ -17,6 +17,7 @@
   } from './hub.svelte.js';
   import List from './List.svelte';
   import Settings from './Settings.svelte';
+  import FirefoxCard from './FirefoxCard.svelte';
 
   const TABS = ['pledges', 'buybacks', 'settings'];
   const fromHash = () => {
@@ -96,26 +97,11 @@
   {/if}
 
   {#if hub.site.askFirefox}
-    <div class="bp-note" id="bp-firefox" role="dialog" aria-labelledby="bp-firefox-h">
-      <b id="bp-firefox-h"
-        >{hub.site.askFirefox === 'local'
-          ? t('basic.firefox-local-title')
-          : t('basic.firefox-connect-title')}</b
-      >
-      <p>
-        {hub.site.askFirefox === 'local'
-          ? t('basic.firefox-local-body')
-          : t('basic.firefox-connect-body')}
-      </p>
-      <div class="bp-row">
-        <button type="button" class="bp-btn primary" onclick={firefoxContinue}
-          >{t('basic.firefox-continue')}</button
-        >
-        <button type="button" class="bp-btn" onclick={() => (hub.site.askFirefox = null)}
-          >{t('basic.not-now')}</button
-        >
-      </div>
-    </div>
+    <FirefoxCard
+      local={hub.site.askFirefox === 'local'}
+      onContinue={firefoxContinue}
+      onClose={() => (hub.site.askFirefox = null)}
+    />
   {/if}
   {#if hub.site.pilot}
     <div class="bp-note" id="bp-pilot" role="dialog" aria-labelledby="bp-pilot-h">
