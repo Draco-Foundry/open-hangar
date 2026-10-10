@@ -103,10 +103,17 @@ on, so the staging hangar page (hangar-staging.openhangar.space) can talk to tha
 website is the full app, and the extension scans RSI, hands the hangar to our pages and
 keeps one basic page that works on its own. With it on, the toolbar icon opens a popup
 (`src/popup.html`, `ui/popup/`: Account Value, the last scan, Scan, Open My Hangar and
-where sync stands) instead of a tab. The popup's Scan asks the background
-(`{ ohPopup: 'scan' }`, the `@flag-start connector` block in `src/background.js`), which
-brings the extension's page to the front to run the scan our hangar page asks for. Off,
-the popup isn't in the build and that handler is cut. It needs `localMode` (Open My
+where sync stands) instead of a tab, and the extension's one page is the basic page
+(`src/basic.html`, `ui/basic/`): Pledges and Buy-Backs with search, totals and CSV,
+Export JSON, Report a Scan Problem and the settings (openhangar.space, Clear Data, Saved
+Accounts, Log Out of RSI). It is text only and reads only what's stored, so it works
+with no network and without openhangar.space; its scan is the dashboard's Scan All
+without the store check. Everything the background opened as the dashboard (a scan our
+hangar page or the popup asks for, Connect from the website, Firefox's asks, the reload
+after an update) opens the basic page instead (`hubUrl()` in `src/background.js`). The
+popup's Scan asks the background (`{ ohPopup: 'scan' }`, the `@flag-start connector`
+block), which brings the basic page to the front to run the scan our hangar page asks
+for. Off, the popup and the basic page aren't in the build and that handler is cut. It needs `localMode` (Open My
 Hangar goes to our hangar page until you connect), so `--flag connector=on` alone
 doesn't build. It's off in every store build until the basic page and the website's
 pages are ready.

@@ -4620,6 +4620,131 @@ try {
     ? ok("connected: who and when, and Open My Hangar goes to the website's My Hangar")
     : fail(`popup connected: ${JSON.stringify({ linked, went })}`);
   await page.setViewport({ width: 1280, height: 900 });
+
+  // The basic page (the connector build, src/basic.html): the lists with search and
+  // totals, the CSV and backup files, Clear Data, a scan, Report a Scan Problem, all
+  // with every request off this computer refused (it must work with no network).
+  console.log('Basic Page');
+  const outside = [];
+  await page.setRequestInterception(true);
+  const offline = (req) => {
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)[:/]/.test(req.url()) || req.url().startsWith('data:'))
+      return req.continue();
+    outside.push(req.url());
+    req.abort('internetdisconnected');
+  };
+  page.on('request', offline);
+  await page.goto(URL0 + 'basic.html', { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#bp-pledges tbody tr');
+  const bp = await page.evaluate(async () => {
+    const db = await OH.loadDB();
+    const q = (s) => document.querySelector(s);
+    return {
+      rows: document.querySelectorAll('#bp-pledges tbody tr').length,
+      items: db.sources.hangar.items.length,
+      totals: q('.bp-totals').textContent,
+      tab: q('.bp-tabs [aria-current="page"]').getAttribute('href'),
+    };
+  });
+  bp.rows === Math.min(bp.items, 300) && /basic\.pledge-totals \d+ \$/.test(bp.totals)
+    ? ok(`Pledges: ${bp.rows} rows and their totals, offline`)
+    : fail(`basic page pledges: ${JSON.stringify(bp)}`);
+  const firstName = await page.$eval('#bp-pledges tbody td.name', (e) =>
+    e.firstChild.textContent.trim(),
+  );
+  await page.type('.bp-search', firstName);
+  await new Promise((r) => setTimeout(r, 200));
+  const found = await page.$$eval('#bp-pledges tbody tr', (r) => r.length);
+  await page.click('#bp-pledges .bp-bar .bp-btn');
+  const csv = await page.evaluate(async () => {
+    const b = __demo.saved.at(-1);
+    return b ? await b.text() : '';
+  });
+  const csvRows = csv.trim().split('\r\n');
+  found >= 1 &&
+  found < bp.rows &&
+  csvRows[0].startsWith('id,name,type,value') &&
+  csvRows.length === found + 1
+    ? ok(`search finds ${found} row(s); Export CSV saves just those`)
+    : fail(`basic search/CSV: ${JSON.stringify({ found, csvRows: csvRows.length })}`);
+  await page.click('.bp-tabs a[href="#buybacks"]');
+  await page.waitForSelector('#bp-buybacks');
+  const bbRows = await page.$$eval('#bp-buybacks tbody tr', (r) => r.length);
+  bbRows > 0 ? ok(`Buy-Backs: ${bbRows} rows`) : fail('basic page: no buy-back rows');
+  await page.click('.bp-tabs a[href="#settings"]');
+  await page.waitForSelector('#bp-export-json');
+  await page.click('#bp-export-json');
+  const bpBackup = await page.evaluate(async () => {
+    const text = await __demo.saved.at(-1).text();
+    const j = JSON.parse(text);
+    return {
+      app: j.app,
+      pledges: j.sources?.hangar?.items?.length,
+      code: text.includes(window.DEMO_REFERRAL.code),
+      hash: location.hash,
+    };
+  });
+  bpBackup.pledges === bp.items && !bpBackup.code && bpBackup.hash === '#settings'
+    ? ok('Export JSON: the whole hangar, no referral code')
+    : fail(`basic backup: ${JSON.stringify(bpBackup)}`);
+  await page.click('#bp-clear');
+  const asked = await page.$('#bp-clear-yes');
+  await page.click('#bp-clear-yes');
+  await page.waitForFunction(
+    () => !document.querySelector('.bp-tabs small')?.textContent.match(/[1-9]/),
+  );
+  const cleared = await page.evaluate(
+    async () => (await OH.loadDB()).sources.hangar?.items?.length || 0,
+  );
+  asked && cleared === 0
+    ? ok('Clear Data asks first, then clears')
+    : fail(`basic Clear Data: ${JSON.stringify({ asked: !!asked, cleared })}`);
+  // A scan (RSI stood in for): saved, reported, then one that fails offers Report a
+  // Scan Problem, which opens a prefilled GitHub issue.
+  const bpScan = await page.evaluate(async () => {
+    const item = (i) => ({
+      id: String(500 + i),
+      name: `Demo Pledge ${i}`,
+      value: 10 + i,
+      kind: 'ship',
+      contents: [],
+    });
+    OH.scanSource = async (id) => {
+      const items = id === 'hangar' ? [item(1), item(2)] : [];
+      await OH.storageSettled();
+      return { ok: true, items, scannedAt: Date.now() };
+    };
+    OH.getReferral = async () => ({ ok: true });
+    document.getElementById('bp-scan').click();
+    await new Promise((r) => setTimeout(r, 600));
+    const done = document.getElementById('bp-done')?.textContent || '';
+    OH.scanSource = async () => ({ ok: false, error: 'RSI changed something' });
+    document.getElementById('bp-scan').click();
+    await new Promise((r) => setTimeout(r, 600));
+    const rep = document.getElementById('bp-report')?.textContent || '';
+    document.getElementById('bp-report-btn')?.click();
+    await new Promise((r) => setTimeout(r, 300));
+    return { done, rep, opened: __demo.opened.at(-1) || '' };
+  });
+  /basic\.scan-done/.test(bpScan.done) &&
+  /RSI changed something/.test(bpScan.rep) &&
+  bpScan.opened.startsWith('https://github.com/Draco-Foundry/open-hangar/issues/new?')
+    ? ok('Scan reports what came home; a failed one offers Report a Scan Problem')
+    : fail(`basic scan: ${JSON.stringify(bpScan)}`);
+  const outsideNow = outside.filter((u) => !/^https:\/\/openhangar\.space\/status\.json/.test(u));
+  outsideNow.length === 0
+    ? ok(`no request off this computer but the kill switch file (${outside.length} refused)`)
+    : fail(`basic page asked the network: ${outsideNow.join(', ')}`);
+  // A phone-width window: no sideways scroll for the page (the table scrolls in its box).
+  await page.setViewport({ width: 375, height: 800 });
+  await page.goto(URL0 + 'basic.html#pledges', { waitUntil: 'networkidle0' });
+  const narrow = await page.evaluate(() => document.documentElement.scrollWidth);
+  narrow <= 375
+    ? ok('375 px wide: no sideways scroll')
+    : fail(`basic page is ${narrow} px wide at 375`);
+  page.off('request', offline);
+  await page.setRequestInterception(false);
+  await page.setViewport({ width: 1280, height: 900 });
 } finally {
   await browser.close();
   server.kill();
