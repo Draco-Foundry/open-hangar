@@ -36,6 +36,8 @@ export default defineConfig({
         search: 'ui/search/main.js',
         details: 'ui/details/main.js',
         site: 'ui/site/main.js',
+        // The connector's own pages (src/flags.js `connector`).
+        popup: 'ui/popup/main.js',
       },
       output: {
         format: 'es',

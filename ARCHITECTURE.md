@@ -29,7 +29,9 @@ extension's own scripts (`script-src 'self'`).
 ## The Service Worker
 
 `src/background.js` is deliberately thin. The toolbar button has no popup:
-`chrome.action.onClicked` opens `src/dashboard.html` in a tab. It also:
+`chrome.action.onClicked` opens `src/dashboard.html` in a tab (in a build with the
+`connector` flag it opens `src/popup.html` instead, whose Scan asks the background for
+the same scan our hangar page asks for; docs/FLAGS.md). It also:
 
 - shows an amber `!` badge when the last hangar scan (`db.sources.hangar.scannedAt`) is
   7 days old or more (`updateReminder()`, turned off with the `remindRescan` key);

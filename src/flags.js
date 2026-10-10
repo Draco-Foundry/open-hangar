@@ -36,6 +36,12 @@
       about: 'Our hangar page reads the hangar this browser scanned (Local Mode).',
       default: false,
     },
+    // The website is the full app and the extension its connector (owner, 2026-10-10):
+    // the toolbar opens a popup, and one basic page stays. Needs localMode.
+    connector: {
+      about: 'The connector: a toolbar popup and one basic page instead of the dashboard.',
+      default: false,
+    },
   };
 
   // Set per build by scripts/pack.mjs. Keep it empty here.

@@ -1,0 +1,136 @@
+/* The toolbar popup: one narrow column on the Clean Pro tokens (ui/tokens.css). */
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+body {
+  width: 320px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.pp {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+.pp-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-head);
+  color: var(--head);
+}
+.pp-top b {
+  font-weight: 600;
+}
+.pp-who {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 50%;
+}
+.pp-value {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+}
+.pp-lbl {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pp-big {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 28px;
+  color: var(--head);
+  font-variant-numeric: tabular-nums;
+}
+.pp-alerts {
+  margin-top: 4px;
+  color: var(--beacon);
+}
+.pp-scan,
+.pp-note {
+  margin: 0;
+  color: var(--muted);
+}
+.pp-scan.warn {
+  color: var(--warn);
+}
+.pp-acts {
+  display: flex;
+  gap: 8px;
+}
+.pp-btn {
+  flex: 1;
+  font: inherit;
+  font-weight: 500;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--head);
+  cursor: pointer;
+}
+.pp-btn:hover {
+  border-color: var(--accent-line);
+}
+.pp-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.pp-btn.primary:hover {
+  background: var(--accent-hover);
+}
+.pp-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.pp-site {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.pp-site small {
+  display: block;
+  color: var(--muted);
+}
+.pp-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+.pp-dot.on {
+  background: var(--good);
+}
+.pp-link {
+  display: block;
+  font: inherit;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  cursor: pointer;
+  text-align: left;
+}
+.pp-link:hover {
+  text-decoration: underline;
+}
+.pp-btn:focus-visible,
+.pp-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
