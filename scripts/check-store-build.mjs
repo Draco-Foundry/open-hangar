@@ -39,6 +39,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { buildValues, loadFlags, readRegistry } from './build-flags.mjs';
+import { connectorProblems } from './connector.mjs';
 import {
   pagesFor,
   pagesProblems,
@@ -79,6 +80,10 @@ const buildOf = (unit) =>
     pages: null,
     bridge: null,
     flags: null,
+    // Every path in it, how to read one, and its built-in sync site (the connector).
+    files: new Set(),
+    read: null,
+    site: '',
   });
 
 // A store manifest never mentions staging at all, under any name.
@@ -238,6 +243,7 @@ const check = (name, text, unit) => {
   else checkNoSync(name, text);
   checkFlags(name, text, build);
   collectPages(name, text, build);
+  for (const [, , site] of text.matchAll(BUILT_IN)) if (site) build.site = site;
 };
 
 // Beta: only its own folders and zips. Public: everything in dist.
@@ -253,8 +259,17 @@ function walk(dir, rel = '') {
     if (!wanted(r)) continue;
     // The build a file belongs to: its top folder in dir, or its zip.
     const unit = r.split('/')[0];
-    if (e.isDirectory()) walk(p, r);
-    else if (TEXT.test(e.name)) check(p, readFileSync(p, 'utf8'), unit);
+    if (e.isDirectory()) {
+      walk(p, r);
+      continue;
+    }
+    if (r !== unit) {
+      // A file in a build folder: its path in the build, for the connector check.
+      const build = buildOf(unit);
+      build.files.add(r.slice(unit.length + 1));
+      build.read ??= (f) => readFileSync(`${root}/${unit}/${f}`, 'utf8');
+    }
+    if (TEXT.test(e.name)) check(p, readFileSync(p, 'utf8'), unit);
     else if (e.name.endsWith('.zip')) {
       zips[/firefox/.test(r) ? 'firefox' : 'chrome']++;
       let list;
@@ -266,6 +281,9 @@ function walk(dir, rel = '') {
       }
       for (const f of list.filter((f) => TEXT.test(f)))
         check(`${p}:${f}`, execFileSync('unzip', ['-p', p, f], { encoding: 'utf8' }), r);
+      const build = buildOf(r);
+      for (const f of list.filter((f) => f && !f.endsWith('/'))) build.files.add(f);
+      build.read = (f) => execFileSync('unzip', ['-p', p, f], { encoding: 'utf8' });
       if (BETA)
         for (const f of list.filter((f) => /^icons\/icon\d+\.png$/.test(f)))
           if (!execFileSync('unzip', ['-p', p, f]).equals(readFileSync(`beta/${f}`)))
@@ -299,6 +317,11 @@ if (SYNC)
     if (!build.sync) problems.push(`${unit}: the sync code is missing`);
   }
 for (const [unit, build] of Object.entries(builds)) if (build.manifest) checkPages(unit, build);
+// The connector (scripts/connector.mjs): its popup, basic page and request limit when its
+// flag is on, and none of them when it's off.
+for (const [unit, build] of Object.entries(builds))
+  if (build.manifest && build.flags && build.read)
+    problems.push(...connectorProblems(unit, { ...build, connector: !!build.flags.connector }));
 if (problems.length) {
   console.error(`✖ Not a ${BETA ? 'beta' : 'public store'} build:\n  ${problems.join('\n  ')}`);
   console.error(

@@ -33,7 +33,15 @@
  * built src/site-bridge.js; each build is checked to agree before it's done.
  */
 
-import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import {
   FLAGS_FILE,
   buildValues,
@@ -42,6 +50,13 @@ import {
   stripFlagsInDir,
   writeFlags,
 } from './build-flags.mjs';
+import {
+  CONNECTOR_PAGES,
+  connectSrc,
+  connectorProblems,
+  folderBuild,
+  trimToConnector,
+} from './connector.mjs';
 import {
   pagesFor,
   pagesProblems,
@@ -108,16 +123,11 @@ if (FLAGS.localMode && !KEEP_SYNC)
 // its popup's Open My Hangar and its scans for that page are Local Mode's.
 if (FLAGS.connector && !FLAGS.localMode)
   throw new Error('--flag connector=on needs localMode on (add --flag localMode=on)');
-// The connector's own pages. Without the flag they're left out of the build: nothing
-// opens them there.
+// The connector's own pages (scripts/connector.mjs). Without the flag they're left out
+// of the build: nothing opens them there.
 const CONNECTOR_FILES = [
-  'src/popup.html',
-  'src/ui/popup.js',
-  'src/ui/popup.css',
-  'src/basic.html',
-  'src/ui/basic.js',
-  'src/ui/basic.css',
-  'src/ui/tokens.css',
+  ...CONNECTOR_PAGES,
+  ...['popup.js', 'popup.css', 'basic.js', 'basic.css', 'tokens.css'].map((f) => `src/ui/${f}`),
 ];
 const SITE_LINE = "const SITE_BUILT_IN = '';";
 function presetSite(file) {
@@ -261,9 +271,18 @@ for (const [name, transform] of Object.entries(builds)) {
     ];
   else manifest.externally_connectable = { matches: SITE_MATCHES };
   if (!FIREFOX.has(name)) rmSync(`${out}/src/site-bridge.js`, { force: true });
-  // The connector: the toolbar icon opens the popup (src/background.js answers its Scan).
-  if (FLAGS.connector) manifest.action = { ...manifest.action, default_popup: 'src/popup.html' };
-  else for (const f of CONNECTOR_FILES) rmSync(`${out}/${f}`, { force: true });
+  // The connector: the toolbar icon opens the popup (src/background.js answers its Scan),
+  // the dashboard and its pages stay out, and the pages may only send requests to RSI,
+  // openhangar.space and the sync site (scripts/connector.mjs).
+  if (FLAGS.connector) {
+    manifest.action = { ...manifest.action, default_popup: 'src/popup.html' };
+    const csp = manifest.content_security_policy;
+    manifest.content_security_policy = {
+      ...csp,
+      extension_pages: `${csp.extension_pages}; ${connectSrc(SITE)}`,
+    };
+    trimToConnector(out);
+  } else for (const f of CONNECTOR_FILES) rmSync(`${out}/${f}`, { force: true });
   // The same lists, for the background worker and the bridge.
   const pagesFile = `${out}/src/site-pages.js`;
   writeFileSync(pagesFile, writePages(readFileSync(pagesFile, 'utf8'), PAGES, pagesFile));
@@ -299,6 +318,16 @@ for (const [name, transform] of Object.entries(builds)) {
     firefox: FIREFOX.has(name),
     flags: FLAGS,
   });
+  problems.push(
+    ...connectorProblems(out, {
+      ...folderBuild(out),
+      manifest,
+      connector: FLAGS.connector,
+      site: SITE,
+      // npm test packs before the Svelte pages are built; the store check always looks.
+      refs: existsSync(`${out}/src/ui`),
+    }),
+  );
   if (problems.length) throw new Error(problems.join('\n'));
   console.log(
     `built ${out}${KEEP_SYNC ? ' (with sync)' : ''}${SITE ? `, syncing to ${SITE}` : ''}` +

@@ -113,7 +113,11 @@ hangar page or the popup asks for, Connect from the website, Firefox's asks, the
 after an update) opens the basic page instead (`hubUrl()` in `src/background.js`). The
 popup's Scan asks the background (`{ ohPopup: 'scan' }`, the `@flag-start connector`
 block), which brings the basic page to the front to run the scan our hangar page asks
-for. Off, the popup and the basic page aren't in the build and that handler is cut. It needs `localMode` (Open My
+for. Off, the popup and the basic page aren't in the build and that handler is cut.
+With it on, the dashboard and its pages are left out of the build, and the pages may
+only send requests to RSI, openhangar.space and the sync site (`connect-src`);
+`scripts/check-store-build.mjs` checks both ways. What it keeps, the plan for removing
+the dashboard and the outbound requests that go: [CONNECTOR.md](CONNECTOR.md). It needs `localMode` (Open My
 Hangar goes to our hangar page until you connect), so `--flag connector=on` alone
 doesn't build. It's off in every store build until the basic page and the website's
 pages are ready.
