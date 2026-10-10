@@ -3795,6 +3795,8 @@
     "That's more cargo than openhangar.space can hold. Your hangar stays safe in your browser.";
   const SYNC_OTHER_LOGIN =
     'This hangar belongs to another pilot than the one signed in to RSI. Reload Open Hangar to switch hangars, then sync.';
+  // What this version would send doesn't fit the sync format (#441), so nothing went.
+  const SYNC_SCHEMA = '[copy: sync.schema-refused]';
   // A refusal's status, reason and the website's own words → the Error to throw. Sync
   // not open yet, or another sync too soon, isn't something you did, so it's marked
   // `calm`: the scan report shows it as a note, not a problem (src/dashboard.js
@@ -3815,7 +3817,8 @@
   // Thrown instead of sending: `held` (a wait above; calm, the website's last words),
   // `ask` (an account this link hasn't synced: { handle, record }, calm) and `quiet`
   // (an account you said no to, after a scan: nothing to show). Their messages may
-  // name the handle, so they're for the screen, never the log.
+  // name the handle, so they're for the screen, never the log. A body that fails the
+  // sync schema isn't sent either: `reason: 'schema'` and `path` (a JSON Pointer).
   OH.siteSync = async function siteSync({ auto = false, onSend } = {}) {
     const link = await OH.getSiteLink();
     if (!link) throw new Error('Not connected to openhangar.space.');
@@ -3847,11 +3850,26 @@
         calm: true,
         ask: who,
       });
+    // The body is checked against the sync payload's schema (#441) as it will go,
+    // parsed back from its own text: one that fails is never sent. The flight log
+    // gets where (a path of keys and row numbers, never a value), the screen the
+    // plain words.
+    const body = OH.syncBody(OH.syncPayload(db));
+    const bad = SHAPE.checkPayload(JSON.parse(body));
+    if (bad) {
+      const at = bad.path || '/';
+      OH.log(
+        'error',
+        'site',
+        `sync not sent: the payload fails its schema at ${at} (${bad.reason})`,
+      );
+      throw Object.assign(new Error(SYNC_SCHEMA), { reason: 'schema', path: bad.path });
+    }
     onSend?.();
     const res = await siteFetch(SYNC_PATH, {
       method: 'POST',
       headers: { authorization: `Bearer ${link.token}` },
-      body: OH.syncBody(OH.syncPayload(db)),
+      body,
     });
     if (res.status === 401) {
       // Forget this link only: one connected again meanwhile stays.
