@@ -373,13 +373,26 @@
   }
 
   // --- The hangar view, read from storage ----------------------------------------
+  // Is the cached RSI login (`account`, getAccount's shape) another pilot than the
+  // one the stored hangar belongs to (`owner`)? Someone signed in to RSI as another
+  // account and no extension page has switched hangars yet (src/dashboard.js
+  // reconcileAccount). The same rule as lib.js siteSync, which never sends one
+  // pilot's hangar under the other's handle: handles compared trimmed, in any case.
+  function otherLogin(account, owner) {
+    const lc = (s) => (typeof s === 'string' ? s.trim().toLowerCase() : '');
+    const login = isObj(account) && account.loggedIn ? lc(account.nickname) : '';
+    const own = lc(owner?.nickname);
+    return !!login && !!own && login !== own;
+  }
+
   // For the background worker, which can't load lib.js: `get` is
   // chrome.storage.local.get (or a stand-in), `appVersion` the manifest's version.
   // → { ok: true, hangar } or { ok: false, error } where error is
   //   'no-scan'        nothing scanned in this browser yet
   //   'needs-upgrade'  storage isn't in this version's shape yet (older, damaged or
-  //                    from before the versioned database); opening an extension
-  //                    page fixes it (lib.js loadDB)
+  //                    from before the versioned database), or the RSI login is
+  //                    another pilot than the hangar's (otherLogin); opening an
+  //                    extension page fixes both (lib.js loadDB, reconcileAccount)
   //   'schema'         the view fails its checks (+ path); nothing is handed out
   // Reads only the database, the cached account and the pledge archive.
   async function readHangarView(get, { appVersion = null, now } = {}) {
@@ -389,6 +402,7 @@
     const { db, problems } = checkDB(raw[DB_KEY]);
     if (problems.length || db.schemaVersion < DB_VERSION)
       return { ok: false, error: 'needs-upgrade' };
+    if (otherLogin(raw.account, db.owner)) return { ok: false, error: 'needs-upgrade' };
     if (!db.sources.hangar?.scannedAt) return { ok: false, error: 'no-scan' };
     const hangar = hangarView(
       exportPayload({

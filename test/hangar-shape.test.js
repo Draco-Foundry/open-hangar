@@ -187,6 +187,57 @@ test('reading the view: nothing scanned, older storage, damage', async () => {
   assert.equal((await viewOf()).ok, true);
 });
 
+test('a hangar never goes under another RSI login: the same rule as sync', async () => {
+  // [the RSI login, the stored hangar's owner, refused]. Signed in to RSI as Wingmate
+  // while TestPilot's hangar is still the live one (no extension page has switched
+  // hangars yet): TestPilot's pledges never go under Wingmate's handle, record and
+  // balances. Sync refuses exactly the same states.
+  const cases = [
+    ['Wingmate', 'TestPilot', true],
+    [' testpilot ', 'TestPilot', false], // the same pilot, written another way
+    [null, 'TestPilot', false], // signed out: the account block is the owner's
+    ['Wingmate', null, false], // no owner known: nothing to mix up
+  ];
+  for (const [login, owner, refused] of cases) {
+    const state = () => {
+      const m = full();
+      delete m.siteUrl; // sync stops before any request
+      m.account = login
+        ? { ...account(login), citizenRecord: '#999' }
+        : { loggedIn: false, fetchedAt: 1 };
+      if (owner) m.db.owner = { nickname: owner, displayname: null };
+      else delete m.db.owner;
+      return m;
+    };
+    const name = `${login} on ${owner}'s hangar`;
+    mem = state();
+    const read = await viewOf();
+    if (refused) assert.deepEqual(read, { ok: false, error: 'needs-upgrade' }, name);
+    else assert.equal(read.ok, true, name);
+    mem = state();
+    const sync = await OH.siteSync().then(
+      () => null,
+      (e) => e,
+    );
+    await OH.storageSettled();
+    assert.equal(/another pilot than the one signed in/.test(sync?.message), refused, name);
+  }
+  // An extension page switches hangars (reconcileAccount → OH.switchProfile): then the
+  // view is Wingmate's own parked hangar.
+  mem = full();
+  mem.account = account('Wingmate');
+  await OH.switchProfile('Wingmate', 'Wingmate Prime');
+  await OH.storageSettled();
+  mem.account = account('Wingmate');
+  const { ok, hangar } = await viewOf();
+  assert.equal(ok, true);
+  assert.equal(hangar.account.handle, 'Wingmate');
+  assert.deepEqual(
+    hangar.sources.hangar.items.map((p) => p.id),
+    ['40000009'],
+  );
+});
+
 test('reading the view touches only the database, the account and the archive', async () => {
   mem = full();
   reads = [];
