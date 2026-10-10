@@ -139,6 +139,33 @@ test('a format newer than the website knows: try again soon', async () => {
   assert.ok(!err.calm);
 });
 
+test("the website's format check refused it: its own words, and where in the flight log (#584)", async () => {
+  const err = await refusedWith(400, {
+    error: 'schema',
+    reason: 'schema',
+    path: '/sources/hangar/items/3/value',
+  });
+  assert.equal(
+    err.message,
+    "Held at the hangar doors: this version packs your hangar in a shape our site won't accept. Our bug, not yours. Nothing was sent and your hangar is safe here. Update Open Hangar, or report it if it keeps happening.",
+  );
+  assert.equal(err.reason, 'schema');
+  assert.equal(err.path, '/sources/hangar/items/3/value');
+  assert.ok(!err.calm, 'a problem, not a note');
+  await OH.storageSettled();
+  assert.match(
+    (await OH.getLog()).at(-1).msg,
+    /format check failed at \/sources\/hangar\/items\/3\/value$/,
+  );
+  // A path that isn't a plain pointer (a value smuggled in, markup) never reaches the log.
+  for (const path of ['/a b', '<b>x</b>', 'sources/hangar', 42, '/x'.repeat(40)]) {
+    const bad = await refusedWith(400, { reason: 'schema', path });
+    assert.equal(bad.path, undefined, String(path));
+    await OH.storageSettled();
+    assert.match((await OH.getLog()).at(-1).msg, /failed at \?$/);
+  }
+});
+
 test('no format version, or any other refusal, keeps the status', async () => {
   const noFormat = await refusedWith(400, { error: 'no format', reason: 'no-format' });
   assert.equal(noFormat.message, 'openhangar.space responded 400');
