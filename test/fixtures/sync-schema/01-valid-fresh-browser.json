@@ -1,0 +1,14 @@
+{
+  "name": "A browser that has scanned nothing yet: no account, no sources",
+  "valid": true,
+  "payload": {
+    "app": "open-hangar",
+    "appVersion": "0.3.0",
+    "exportedAt": "2026-10-10T12:00:00.000Z",
+    "schemaVersion": 2,
+    "account": null,
+    "sources": {},
+    "history": [],
+    "pledgeArchive": {}
+  }
+}

@@ -22,6 +22,11 @@
 // Build flags (src/flags.js) as self.OH.flags. Firefox's event page loads the file
 // itself, listed first in its manifest (scripts/pack.mjs).
 if (typeof importScripts === 'function' && !self.OH?.flags) importScripts('flags.js');
+// The sync payload's schema and the shared shaping of the stored hangar (#441,
+// src/hangar-shape.js: self.OHShape), the same code the dashboard's backup and sync
+// use. Firefox's event page lists them in its manifest too.
+if (typeof importScripts === 'function' && !self.OHShape)
+  importScripts('schema-check.js', 'sync-schema.js', 'hangar-shape.js');
 
 const STALE_DAYS = 7;
 

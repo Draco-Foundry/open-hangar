@@ -161,15 +161,19 @@ cache and log, but keeps UI preferences.
 
 **Backups and export.** `OH.exportDB()` writes one JSON file:
 `{ app, appVersion, exportedAt, schemaVersion, account, sources, history, pledgeArchive }`,
-with the referral code and URL stripped (`sanitizeSourcesForExport()`) and the pledge
-archive trimmed to what buy-back details read (`OH.leanArchive()`). `OH.importDB()`
+with the referral code and URL stripped and the pledge archive trimmed to what buy-back
+details read (`OH.leanArchive()`). The shaping lives in `src/hangar-shape.js`, which the
+background worker loads too: the same code builds the hangar view, the hangar as the
+website keeps it after a sync (no history, no referral code or prospects, 2,000 archived
+pledges at most), read straight from storage (`OHShape.readHangarView()`). `OH.importDB()`
 refuses files newer than it understands, merges history instead of replacing it
 (`OH.mergeHistory()`), merges the pledge archive (`OH.mergeArchive()`, newest `goneAt`
 wins, 2,000 kept), and never restores the `account` block. Sync sends the same payload
 without the referral prospects list (`OH.syncPayload()`: other players who aren't
 recruits yet stay in the browser), kept under 4 MB by `OH.syncBody()` (oldest archive
-entries, then oldest history snapshots, left out of that request). `OH.exportHTF()` writes
-the community Hangar Transfer Format (one entry per ship).
+entries, then oldest history snapshots, left out of that request), and never sent unless
+it fits `schema/sync-payload.schema.json` (#441, checked by `src/schema-check.js`).
+`OH.exportHTF()` writes the community Hangar Transfer Format (one entry per ship).
 
 ## The Svelte and Classic Bridge
 

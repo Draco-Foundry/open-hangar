@@ -15,6 +15,9 @@ loads remote code: what a build can do is fixed when it's built (build-time flag
 
 ## Sync
 
-What a sync sends is the backup format (`OH.exportDB`, `schemaVersion`). The website
-checks the same format on its side; a change to it needs the sync tests updated here,
-the privacy policy checked, and the website told before it ships.
+What a sync sends is the backup format (`OH.exportDB`, `schemaVersion`), written down as
+`schema/sync-payload.schema.json` (#441). The extension checks every sync against it before
+sending, and the website checks the same format on its side with a pinned copy of the
+schema and the vectors in `test/fixtures/sync-schema/`. A change to the format needs the
+schema changed (then `npm run schema`), the vectors and sync tests updated here, the
+privacy policy checked, and the website told before it ships.

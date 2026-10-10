@@ -77,7 +77,14 @@ test('Firefox beta: its own add-on id, update_url, the beta version and sync dat
     });
     assert.ok(ff.permissions.includes('identity'), 'Connect');
     assert.deepEqual(ff.background, {
-      scripts: ['src/flags.js', 'src/rsi-cart.js', 'src/background.js'],
+      scripts: [
+        'src/flags.js',
+        'src/rsi-cart.js',
+        'src/schema-check.js',
+        'src/sync-schema.js',
+        'src/hangar-shape.js',
+        'src/background.js',
+      ],
     });
     assert.ok(fs.existsSync(path.join(dir, 'dist/beta-firefox/src/site-bridge.js')));
     // The Chrome and Edge beta next to it stays as it was.

@@ -210,9 +210,25 @@ test('pack: writes each build its values and cuts the code of flags that are off
     const ff = built('firefox').manifest;
     assert.deepEqual(
       ff.background,
-      { scripts: ['src/flags.js', 'src/rsi-cart.js', 'src/background.js'] },
+      {
+        scripts: [
+          'src/flags.js',
+          'src/rsi-cart.js',
+          'src/schema-check.js',
+          'src/sync-schema.js',
+          'src/hangar-shape.js',
+          'src/background.js',
+        ],
+      },
       "Firefox's event page loads what background.js imports on Chrome, first",
     );
+    // Every script background.js imports on Chrome is on that list.
+    const bg = fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8');
+    const imported = [...bg.matchAll(/importScripts\(([^)]*)\)/g)].flatMap((m) =>
+      [...m[1].matchAll(/'([^']+)'/g)].map((x) => `src/${x[1]}`),
+    );
+    assert.ok(imported.length >= 5, imported.join(', '));
+    for (const f of imported) assert.ok(ff.background.scripts.includes(f), `${f} on Firefox`);
     assert.deepEqual(
       ff.content_scripts.map((c) => [c.js, c.matches]),
       [[['src/site-bridge.js'], ['https://openhangar.space/*', 'https://app.openhangar.space/*']]],
