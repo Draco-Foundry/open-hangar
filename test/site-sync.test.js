@@ -546,3 +546,34 @@ test('OH.siteSyncWait: which wait holds which sync', () => {
   // A clock set back can't hold sync for days.
   assert.equal(OH.siteSyncWait(link('too-soon', now + 2 * 24 * 3600e3), { now }), null);
 });
+
+// The sync payload's schema (#441, src/hangar-shape.js checkPayload): a body that
+// doesn't fit it never leaves, and the sync error says why and where.
+test('a body that fails the sync schema is not sent: reason schema, and where', async () => {
+  answer = () => new Response(JSON.stringify({ ok: true, synced_at: 123 }), { status: 200 });
+  linked(scanned(Date.now() - 60_000));
+  mem.db.sources.hangar.items[0].value = '90'; // text where a number goes
+  calls = [];
+  let sending = false;
+  const err = await OH.siteSync({ onSend: () => (sending = true) }).then(
+    () => assert.fail('it was sent'),
+    (e) => e,
+  );
+  assert.equal(err.reason, 'schema');
+  assert.equal(err.path, '/sources/hangar/items/0/value');
+  assert.equal(err.message, '[copy: sync.schema-refused]');
+  assert.ok(!err.calm, 'a problem, not a note');
+  assert.equal(sent.length, 0);
+  assert.ok(!calls.some((c) => c.startsWith('POST')), 'no request at all');
+  assert.equal(sending, false, "onSend doesn't run");
+  assert.equal(mem.siteLink.lastSync, undefined);
+  await OH.storageSettled();
+  const log = (await OH.getLog()).at(-1);
+  assert.equal(log.where, 'site');
+  assert.match(log.msg, /schema at \/sources\/hangar\/items\/0\/value \(expected number or null\)/);
+  assert.doesNotMatch(log.msg, /90/, 'never the value itself');
+  // The same hangar with a number there goes.
+  mem.db.sources.hangar.items[0].value = 90;
+  await OH.siteSync();
+  assert.equal(sent.length, 1);
+});
