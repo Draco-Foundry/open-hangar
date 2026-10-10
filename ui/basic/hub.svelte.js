@@ -10,6 +10,7 @@
 // sync when connected. Scan depth is the same; the wishlist and Subscriber Store reads
 // went to the website.
 import { t } from './copy.js';
+import { importWishlist } from './wishlist-import.js';
 
 const OH = globalThis.OH;
 const SITE_DATA = {
@@ -332,6 +333,7 @@ export async function connect({ asked } = {}) {
   });
   await refreshSite();
   if (answer.get('sync') === '1') await syncNow();
+  await wishlistToAccount();
 }
 
 // Sync Now, and the sync after a scan (auto). A calm refusal (sync not open yet, or
@@ -359,6 +361,7 @@ export async function syncNow({ auto = false, asked } = {}) {
   }
   s.syncing = false;
   await refreshSite();
+  await wishlistToAccount();
 }
 export async function pilotAnswer(yes) {
   const who = hub.site.pilot;
@@ -381,6 +384,28 @@ async function syncIfAsked() {
   if (!at) return;
   await chrome.storage.local.remove('siteSyncRequested');
   if (Date.now() - at < 10 * 60e3) await syncNow({ auto: true });
+}
+
+// The 0.3.x wishlist into the account, once per connection (ui/basic/wishlist-import.js).
+// Only once Firefox lets this extension share (the same yes sync needs), and never in a
+// loop: a website that doesn't take it yet is asked again hours later.
+let wishImporting = false;
+async function wishlistToAccount() {
+  if (wishImporting || !hub.site.link || !hub.site.dataOk) return;
+  wishImporting = true;
+  try {
+    const r = await importWishlist({
+      store: chrome.storage.local,
+      fetchFn: fetch,
+      siteUrl: await OH.siteUrl(),
+      appVersion: chrome.runtime.getManifest().version,
+    });
+    if (r === 'later') OH.log('info', 'site', 'wishlist not taken by the website yet; later');
+  } catch (e) {
+    OH.log('warn', 'site', `wishlist import: ${e?.message || e}`);
+  } finally {
+    wishImporting = false;
+  }
 }
 
 // --- Settings ---------------------------------------------------------------------
@@ -446,12 +471,13 @@ export async function start() {
     .catch(() => {});
   chrome.storage.onChanged.addListener((c, area) => {
     if (area === 'local' && c.updateReady) hub.update = c.updateReady.newValue || null;
-    if (area === 'local' && c.siteLink) refreshSite();
+    if (area === 'local' && c.siteLink) refreshSite().then(wishlistToAccount);
     if (area === 'local' && c.siteSyncRequested?.newValue) syncIfAsked();
     if (area === 'local' && c.db && !hub.scan.busy) loadDB();
     if (area === 'session' && c.scanRequest?.newValue) scanIfAsked();
     if (area === 'session' && (c.siteAskFirefox || c.localAskFirefox)) refreshSite();
   });
   await syncIfAsked();
+  await wishlistToAccount();
   await scanIfAsked();
 }

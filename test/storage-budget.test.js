@@ -57,6 +57,8 @@ const BUDGET = {
     max: 400 * KB,
   },
   // openhangar.space's feeds (OH.siteFeed): each one copy, replaced whole.
+  // The connector's one-time wishlist import (ui/basic/wishlist-import.js).
+  wishImport: small('one record for the current connection'),
   feedShips: { cap: 'one ships feed (~330 ships), replaced whole (a day)', max: 300 * KB },
   feedCatalog: {
     cap: 'one store catalog (RSI store size, ~700 items), replaced whole (30 minutes)',
