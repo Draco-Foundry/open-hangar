@@ -1,7 +1,6 @@
 {
-  "name": "A balance value as text",
-  "valid": false,
-  "path": "/account/balances/storeCredit/value",
+  "name": "RSI changed the type of values the extension passes on as they are: still a sync",
+  "valid": true,
   "payload": {
     "app": "open-hangar",
     "appVersion": "0.3.0",
@@ -13,7 +12,7 @@
       "avatar": "https://robertsspaceindustries.com/media/testavatar/heap_infobox/avatar.png",
       "ueeRecord": "#1234567",
       "enlistedSince": "Nov 28, 2016",
-      "country": "Testland",
+      "country": 44,
       "organization": {
         "name": "Test Org",
         "sid": "TESTORG",
@@ -39,7 +38,7 @@
         "uec": {
           "value": 5000,
           "currency": "UEC",
-          "symbol": "UEC",
+          "symbol": null,
           "label": "UEC"
         },
         "rec": {
@@ -155,19 +154,19 @@
       "referral": {
         "items": {
           "current": {
-            "recruits": 1
+            "recruits": "1"
           },
           "legacy": {
             "recruits": 2
           },
-          "prospects": 1,
+          "prospects": "1",
           "recruitsList": [
             {
-              "id": "901",
+              "id": 901,
               "handle": "Recruit1",
               "moniker": "Recruit 1",
               "avatar": null,
-              "enlistedOn": "2025-02-03",
+              "enlistedOn": 1738540800000,
               "convertedOn": "2025-03-04",
               "campaign": "current"
             },
@@ -175,7 +174,7 @@
               "id": "902",
               "handle": "Recruit2",
               "moniker": "Recruit 2",
-              "avatar": null,
+              "avatar": false,
               "enlistedOn": "2025-02-03",
               "convertedOn": "2025-03-04",
               "campaign": "legacy"
