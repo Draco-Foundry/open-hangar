@@ -10,9 +10,9 @@ const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
 const read = (page) => fs.readFileSync(path.join(ROOT, 'src', page), 'utf8');
-// Pages with an HTML file of their own (the connector's popup); the rest are mounted
+// Pages with an HTML file of their own (the connector's popup and basic page); the rest are mounted
 // into dashboard.html.
-const OWN_PAGE = { popup: 'popup.html' };
+const OWN_PAGE = { popup: 'popup.html', basic: 'basic.html' };
 const config = fs.readFileSync(path.join(ROOT, 'vite.config.mjs'), 'utf8');
 
 test('every page entry that imports CSS has its stylesheet linked in its page', () => {
@@ -26,5 +26,14 @@ test('every page entry that imports CSS has its stylesheet linked in its page', 
       read(page).includes(`<link rel="stylesheet" href="ui/${name}.css" />`),
       `${file} imports CSS, so ${page} needs <link rel="stylesheet" href="ui/${name}.css" />`,
     );
+  }
+});
+
+test("the connector's pages link the Clean Pro look (ui/tokens.css) before their own", () => {
+  assert.match(config, /tokens: 'ui\/tokens\.css'/, 'built on its own');
+  for (const [name, page] of Object.entries(OWN_PAGE)) {
+    const html = read(page);
+    const at = html.indexOf('<link rel="stylesheet" href="ui/tokens.css" />');
+    assert.ok(at >= 0 && at < html.indexOf(`href="ui/${name}.css"`), page);
   }
 });

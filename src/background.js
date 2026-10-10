@@ -30,6 +30,16 @@ if (typeof importScripts === 'function' && !self.OHShape)
 
 const STALE_DAYS = 7;
 
+// The extension's own page: the dashboard, or in the connector build (src/flags.js
+// `connector`) the basic page, src/basic.html. `dash` is the dashboard's view to open
+// (#home, #updates); the basic page has its settings for what #home is opened for
+// (Connect, Firefox's ask) and its lists for the rest.
+const HUB_PAGE = self.OH.flags.connector ? 'src/basic.html' : 'src/dashboard.html';
+const hubUrl = (dash = '') =>
+  chrome.runtime.getURL(
+    HUB_PAGE + (self.OH.flags.connector ? (dash === '#home' ? '#settings' : '') : dash),
+  );
+
 async function updateReminder() {
   const { db, remindRescan } = await chrome.storage.local.get(['db', 'remindRescan']);
   const at = db && db.sources && db.sources.hangar && db.sources.hangar.scannedAt;
@@ -64,7 +74,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 chrome.storage.local.get('reopenAfterUpdate').then(({ reopenAfterUpdate }) => {
   if (!reopenAfterUpdate) return;
   chrome.storage.local.remove(['reopenAfterUpdate', 'updateReady']);
-  chrome.tabs.create({ url: chrome.runtime.getURL('src/dashboard.html#updates') });
+  chrome.tabs.create({ url: hubUrl('#updates') });
 });
 
 // Is a dashboard (or any extension tab) open right now?
@@ -93,7 +103,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 // Clicking the toolbar icon opens the hub home page in a tab.
 chrome.action.onClicked.addListener(() => {
-  chrome.tabs.create({ url: chrome.runtime.getURL('src/dashboard.html') });
+  chrome.tabs.create({ url: hubUrl() });
   updateReminder();
 });
 
@@ -190,7 +200,7 @@ async function connectRedirect() {
 siteHandlers['oh-connect-begin'] = async (msg, origin) => {
   if (await firefoxNeedsOk()) {
     await chrome.storage.session.set({ siteAskFirefox: Date.now() });
-    chrome.tabs.create({ url: chrome.runtime.getURL('src/dashboard.html#home') });
+    chrome.tabs.create({ url: hubUrl('#home') });
     return { ok: false, firefoxAsk: true };
   }
   const redirect = await connectRedirect();
@@ -224,7 +234,7 @@ siteHandlers['oh-connect-finish'] = async (msg, origin) => {
     siteUrl: origin, // sync goes to the site you connected on
     ...(msg.sync ? { siteSyncRequested: Date.now() } : {}),
   });
-  chrome.tabs.create({ url: chrome.runtime.getURL('src/dashboard.html#home') });
+  chrome.tabs.create({ url: hubUrl('#home') });
   return { ok: true, name: j.name || '' };
 };
 // @sync-end
@@ -244,7 +254,6 @@ siteHandlers['oh-connect-finish'] = async (msg, origin) => {
 // page through the window (src/site-bridge.js), where any script on that page could
 // read it: the hangar page's strict script policy (no script but its own) is what
 // keeps it there.
-const DASHBOARD = 'src/dashboard.html';
 // A scan-running marker older than this is a page that went away mid-scan
 // (src/dashboard.js scanMark refreshes it every minute while a scan runs).
 const SCAN_RUN_MAX = 10 * 60e3;
@@ -258,7 +267,7 @@ let firefoxAskedAt = 0;
 // The open dashboard tabs ({ tabId, windowId }), or null when this browser can't tell.
 async function dashboardTabs() {
   if (!chrome.runtime.getContexts) return null;
-  const url = chrome.runtime.getURL(DASHBOARD);
+  const url = chrome.runtime.getURL(HUB_PAGE);
   try {
     const tabs = await chrome.runtime.getContexts({ contextTypes: ['TAB'] });
     return tabs.filter((c) => c.tabId >= 0 && String(c.documentUrl || '').startsWith(url));
@@ -281,7 +290,7 @@ async function dashboardTab(hash = '') {
       /* it closed just now: a new tab */
     }
   }
-  const tab = await chrome.tabs.create({ url: chrome.runtime.getURL(DASHBOARD) + hash });
+  const tab = await chrome.tabs.create({ url: hubUrl(hash) });
   return tab?.id ?? null;
 }
 

@@ -110,7 +110,15 @@ if (FLAGS.connector && !FLAGS.localMode)
   throw new Error('--flag connector=on needs localMode on (add --flag localMode=on)');
 // The connector's own pages. Without the flag they're left out of the build: nothing
 // opens them there.
-const CONNECTOR_FILES = ['src/popup.html', 'src/ui/popup.js', 'src/ui/popup.css'];
+const CONNECTOR_FILES = [
+  'src/popup.html',
+  'src/ui/popup.js',
+  'src/ui/popup.css',
+  'src/basic.html',
+  'src/ui/basic.js',
+  'src/ui/basic.css',
+  'src/ui/tokens.css',
+];
 const SITE_LINE = "const SITE_BUILT_IN = '';";
 function presetSite(file) {
   const src = readFileSync(file, 'utf8');

@@ -406,13 +406,15 @@ test('pack: writes each build its values and cuts the code of flags that are off
     pack(dir, ['--flag', 'localMode=on', '--flag', 'connector=on']);
     for (const t of ['chrome', 'firefox']) {
       assert.equal(built(t).manifest.action.default_popup, 'src/popup.html', t);
-      assert.ok(fs.existsSync(path.join(dir, 'dist', t, 'src', 'popup.html')), t);
+      for (const f of ['popup.html', 'basic.html'])
+        assert.ok(fs.existsSync(path.join(dir, 'dist', t, 'src', f)), `${t}: ${f}`);
       assert.match(read(t, 'src/background.js'), /ohPopup/, `${t}: the popup's Scan`);
     }
     pack(dir);
     for (const t of ['chrome', 'firefox']) {
       assert.equal(built(t).manifest.action.default_popup, undefined, t);
-      assert.ok(!fs.existsSync(path.join(dir, 'dist', t, 'src', 'popup.html')), t);
+      for (const f of ['popup.html', 'basic.html'])
+        assert.ok(!fs.existsSync(path.join(dir, 'dist', t, 'src', f)), `${t}: no ${f}`);
       assert.ok(!/ohPopup/.test(read(t, 'src/background.js')), `${t}: the popup's Scan cut`);
     }
 

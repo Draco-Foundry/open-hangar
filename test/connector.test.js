@@ -8,22 +8,22 @@ const { HANGAR, CHROME_ID, loadBackground } = require('./bridge-env.js');
 
 const CONNECTOR = { sync: true, orgFleet: false, localMode: true, connector: true };
 const POPUP = `chrome-extension://${CHROME_ID}/src/popup.html`;
-const DASHBOARD = `chrome-extension://${CHROME_ID}/src/dashboard.html`;
+const BASIC = `chrome-extension://${CHROME_ID}/src/basic.html`;
 const fromPopup = (x, msg = { ohPopup: 'scan' }, sender = {}) =>
   x.sendInternal(msg, { id: CHROME_ID, url: POPUP, ...sender });
 const data = () => import('../ui/popup/data.js');
 
 // --- The popup's Scan ------------------------------------------------------------------
-test("popup Scan: the hangar page's scan, in the extension's page", async () => {
+test("popup Scan: the hangar page's scan, in the basic page", async () => {
   const x = loadBackground({ flags: CONNECTOR });
   assert.deepEqual(await fromPopup(x), { ok: true, opened: true });
-  assert.deepEqual(x.opened, [DASHBOARD]);
+  assert.deepEqual(x.opened, [BASIC]);
   assert.equal(x.stores.session.scanRequest.tabId, 100, 'the request names the tab it opened');
   // Asked again within the minute: busy, and the page still comes to the front.
   const open = loadBackground({
     flags: CONNECTOR,
     session: { scanAskedAt: Date.now() - 5000 },
-    contexts: [{ contextType: 'TAB', tabId: 7, windowId: 3, documentUrl: DASHBOARD }],
+    contexts: [{ contextType: 'TAB', tabId: 7, windowId: 3, documentUrl: `${BASIC}#settings` }],
   });
   assert.deepEqual(await fromPopup(open), { ok: false, error: 'busy' });
   assert.deepEqual(open.opened, []);
@@ -38,10 +38,7 @@ test('popup Scan: only our own popup is heard', async () => {
   // another of our pages: no answer.
   assert.equal(await fromPopup(x, undefined, { tab: { id: 1 } }), undefined);
   assert.equal(await fromPopup(x, undefined, { id: 'someone-else' }), undefined);
-  assert.equal(
-    await fromPopup(x, undefined, { url: `chrome-extension://${CHROME_ID}/src/dashboard.html` }),
-    undefined,
-  );
+  assert.equal(await fromPopup(x, undefined, { url: BASIC }), undefined);
   assert.equal(await fromPopup(x, { ohPopup: 'melt' }), undefined);
   assert.deepEqual(x.opened, []);
   // Its address with a hash is still the popup.
@@ -62,6 +59,34 @@ test("connector build: the bridge's Firefox messages still get through", async (
   const r = await x.fromPage({ type: 'oh-hello' }, `${HANGAR}/`);
   assert.equal(r.ok, true);
   assert.ok(r.caps.includes('requestScan'));
+});
+
+test('connector build: every page the background opens is the basic page', async () => {
+  // Our hangar page's scan, Firefox's ask for it (Home → the settings) and an open
+  // dashboard that isn't the basic page doesn't count.
+  const x = loadBackground({
+    flags: CONNECTOR,
+    contexts: [
+      {
+        contextType: 'TAB',
+        tabId: 4,
+        windowId: 1,
+        documentUrl: `chrome-extension://${CHROME_ID}/src/dashboard.html`,
+      },
+    ],
+  });
+  assert.deepEqual(await x.send({ type: 'oh-request-scan' }, HANGAR), { ok: true, opened: true });
+  assert.deepEqual(x.opened, [BASIC]);
+  const ff = loadBackground({ browser: 'firefox', flags: CONNECTOR, granted: false, contexts: [] });
+  assert.deepEqual(await ff.fromPage({ type: 'oh-get-hangar' }, `${HANGAR}/`), {
+    ok: false,
+    error: 'firefox-ask',
+  });
+  assert.deepEqual(ff.opened, ['moz-extension://uuid/src/basic.html#settings']);
+  // Without the connector: the dashboard, as before.
+  const dash = loadBackground({ flags: { ...CONNECTOR, connector: false } });
+  await dash.send({ type: 'oh-request-scan' }, HANGAR);
+  assert.deepEqual(dash.opened, [`chrome-extension://${CHROME_ID}/src/dashboard.html`]);
 });
 
 // --- What the popup shows ----------------------------------------------------------------
