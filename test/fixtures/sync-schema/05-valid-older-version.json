@@ -1,0 +1,171 @@
+{
+  "name": "An older version: no pledge archive, a date string scan time, fewer pledge fields",
+  "valid": true,
+  "payload": {
+    "app": "open-hangar",
+    "appVersion": "0.2.12",
+    "exportedAt": "2026-10-10T12:00:00.000Z",
+    "schemaVersion": 2,
+    "account": {
+      "handle": "TestPilot",
+      "displayName": "TestPilot Prime",
+      "avatar": "https://robertsspaceindustries.com/media/testavatar/heap_infobox/avatar.png",
+      "ueeRecord": "#1234567",
+      "enlistedSince": "Nov 28, 2016",
+      "country": "Testland",
+      "organization": {
+        "name": "Test Org",
+        "sid": "TESTORG",
+        "rank": "Member",
+        "logo": "https://robertsspaceindustries.com/media/testorg/heap_thumb/logo.png"
+      },
+      "subscriber": {
+        "type": "Centurion",
+        "frequency": "monthly"
+      },
+      "concierge": {
+        "level": "High Admiral",
+        "next": "Grand Admiral",
+        "percent": 40
+      },
+      "balances": {
+        "storeCredit": {
+          "value": 123456,
+          "currency": "USD",
+          "symbol": "$",
+          "label": "Store Credits"
+        },
+        "uec": {
+          "value": 5000,
+          "currency": "UEC",
+          "symbol": "UEC",
+          "label": "UEC"
+        },
+        "rec": {
+          "value": 0,
+          "currency": "REC",
+          "symbol": "REC",
+          "label": "REC"
+        }
+      },
+      "capturedAt": 1790856001000
+    },
+    "sources": {
+      "hangar": {
+        "items": [
+          {
+            "id": "40000001",
+            "name": "Package - Test Cutlass Black 1",
+            "value": null,
+            "currency": "USD",
+            "contents": [
+              {
+                "kind": "Ship",
+                "label": "Test Item 1",
+                "image": "https://media.robertsspaceindustries.com/test00000031/store_small.jpg"
+              },
+              {
+                "kind": "Insurance",
+                "label": "Lifetime Insurance",
+                "image": null
+              },
+              {
+                "kind": "Hangar decoration",
+                "label": "Test Poster",
+                "image": "https://media.robertsspaceindustries.com/test00000033/store_small.jpg",
+                "guessed": true
+              }
+            ],
+            "image": "https://media.robertsspaceindustries.com/test00000031/store_small.jpg",
+            "containsShip": true,
+            "isCCU": false,
+            "ccu": null,
+            "isAddOn": false,
+            "isCoupon": false,
+            "isPaint": false,
+            "kind": "ship",
+            "raw": {
+              "rawValue": "$111.00 USD"
+            }
+          },
+          {
+            "id": "40000002",
+            "name": "Upgrade - Test Arrow to Test Hornet 2",
+            "value": 15,
+            "currency": "USD",
+            "contents": [],
+            "image": null,
+            "containsShip": false,
+            "isCCU": true,
+            "ccu": {
+              "from": "Test Arrow",
+              "to": "Test Hornet 2"
+            },
+            "isAddOn": false,
+            "isCoupon": false,
+            "isPaint": false,
+            "kind": "ccu",
+            "raw": {
+              "rawValue": "$15.00 USD"
+            }
+          }
+        ],
+        "scannedAt": "2026-09-01T10:00:00.000Z",
+        "meta": {
+          "probe": {
+            "at": 1790856000000,
+            "n": 2,
+            "v": "0.3.0"
+          }
+        }
+      },
+      "buybacks": {
+        "items": [
+          {
+            "id": "70000001",
+            "name": "Test Mustang 1",
+            "image": "https://media.robertsspaceindustries.com/test00015531/store_small.jpg",
+            "date": "",
+            "contains": "Test Mustang and 2 items",
+            "href": "/pledge/buyback/70000001",
+            "price": "",
+            "isCCU": false,
+            "ccu": null,
+            "wasUpgraded": true,
+            "fromShipId": "",
+            "toShipId": "",
+            "toSkuId": "",
+            "kind": "ship"
+          }
+        ],
+        "scannedAt": 1790856000010,
+        "meta": {
+          "tokens": 2
+        }
+      },
+      "referral": {
+        "items": {
+          "current": {
+            "recruits": 1
+          },
+          "legacy": {
+            "recruits": 2
+          },
+          "prospects": 1,
+          "recruitsList": []
+        },
+        "scannedAt": 1790856000020
+      }
+    },
+    "history": [
+      {
+        "at": 1790856000000,
+        "items": [
+          ["40000000", "Test Ship 0", 110],
+          ["40000001", "Test Ship 1", 111]
+        ],
+        "credit": 1234.56
+      }
+    ]
+  }
+}
