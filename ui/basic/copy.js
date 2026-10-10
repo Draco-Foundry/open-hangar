@@ -68,16 +68,7 @@ const COPY = {
   'basic.logout-about': '[copy: basic.logout-about]', // ends the RSI session; data stays
   'basic.logged-out': '[copy: basic.logged-out]',
   'basic.logout-failed': '[copy: basic.logout-failed]',
-  // --- Firefox's data ask ---
-  // Connect pressed on the website before Firefox allowed sharing.
-  'basic.firefox-connect-title': '[copy: basic.firefox-connect-title]',
-  'basic.firefox-connect-body': '[copy: basic.firefox-connect-body]',
-  // Our hangar page asked for the hangar (Local Mode): no account, nothing to our
-  // servers; why Firefox still asks (the step-1 report's firefox-consent.local-mode).
-  'basic.firefox-local-title': '[copy: basic.firefox-local-title]',
-  'basic.firefox-local-body': '[copy: basic.firefox-local-body]',
-  'basic.firefox-continue': '[copy: basic.firefox-continue]',
-  'basic.not-now': '[copy: basic.not-now]',
+  // --- Firefox's data ask (its card's words: ui/basic/FirefoxCard.svelte) ---
   'basic.firefox-no': '[copy: basic.firefox-no]', // Firefox said no: sync stays off
   // --- A new RSI account on a connected browser ---
   'basic.pilot-title': '[copy: basic.pilot-title {handle}]',

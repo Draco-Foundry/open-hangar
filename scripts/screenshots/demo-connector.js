@@ -42,4 +42,15 @@
   chrome.tabs.getCurrent = async () => ({ id: 42 });
   chrome.permissions = { contains: async () => true, request: async () => true };
   chrome.runtime.reload = () => void (demo.reloaded = true);
+  // Firefox before it lets the extension share, with our hangar page's ask waiting for
+  // this tab (src/background.js oh-get-hangar): set by the UI test.
+  if (window.__demoFirefoxLocal) {
+    const manifest = chrome.runtime.getManifest;
+    chrome.runtime.getManifest = () => ({
+      ...manifest(),
+      browser_specific_settings: { gecko: { id: 'open-hangar@draco-foundry' } },
+    });
+    chrome.permissions.contains = async () => false;
+    session.localAskFirefox = { at: Date.now(), tabId: 42 };
+  }
 })();

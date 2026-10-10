@@ -4742,6 +4742,28 @@ try {
   narrow <= 375
     ? ok('375 px wide: no sideways scroll')
     : fail(`basic page is ${narrow} px wide at 375`);
+  // Firefox, our hangar page asking before Firefox said yes: the Local Mode card, every
+  // approved line word for word (owner, 2026-10-10), never the Connect card's words.
+  await page.setViewport({ width: 1280, height: 900 });
+  const fxHook = await page.evaluateOnNewDocument(() => (window.__demoFirefoxLocal = true));
+  await page.goto(URL0 + 'basic.html', { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#bp-firefox');
+  const fx = await page.$eval('#bp-firefox', (e) => e.textContent.replace(/\s+/g, ' '));
+  await page.removeScriptToEvaluateOnNewDocument(fxHook.identifier);
+  const fxLines = [
+    'Local Mode',
+    'What Our Hangar Page Reads, and Why Firefox Asks',
+    "The hangar this browser scanned: your pledges, buy-backs, Store Credit and RSI handle. It's your backup file without the scan history, referral code or referral prospects.",
+    "Nowhere. The page shows it right here in this browser and doesn't save it. Nothing goes to our servers.",
+    "None needed. Saying yes doesn't sign you up or turn on sync.",
+    'The page is a website, so we ask Firefox before handing it your hangar. Firefox names what\'s shared from a short fixed list, so pledge prices and Store Credit show up as "financial and payment information".',
+    "Nothing changes in Open Hangar. The hangar page can't show your hangar until you say yes, and its Try Again button asks again.",
+    'Turn it off any time on Open Hangar\'s "Permissions and data" tab in Firefox\'s add-ons page.',
+  ];
+  const fxMissing = fxLines.filter((l) => !fx.includes(l));
+  !fxMissing.length && !/Before You Connect|What we send/.test(fx)
+    ? ok("Firefox: our hangar page's ask shows the Local Mode card, word for word")
+    : fail(`basic Firefox card: missing ${JSON.stringify(fxMissing)}`);
   page.off('request', offline);
   await page.setRequestInterception(false);
   await page.setViewport({ width: 1280, height: 900 });

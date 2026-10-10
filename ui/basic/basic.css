@@ -290,3 +290,27 @@ body {
     min-width: 160px;
   }
 }
+
+/* Firefox's card: what's shared and why, before Firefox asks. */
+.bp-fx h2 {
+  font-size: 17px;
+}
+.bp-kick {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.bp-fx dl {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+.bp-fx dt {
+  color: var(--head);
+  font-weight: 600;
+  margin-top: 6px;
+}
+.bp-fx dd {
+  margin: 0;
+}
