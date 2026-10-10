@@ -129,7 +129,7 @@
             properties: {
               items: { type: 'array', items: { $ref: '#/$defs/pledge' } },
               scannedAt: { $ref: '#/$defs/scanTime' },
-              meta: { type: 'object' },
+              meta: { $ref: '#/$defs/hangarMeta' },
             },
           },
           buybacks: {
@@ -139,7 +139,7 @@
             properties: {
               items: { type: 'array', items: { $ref: '#/$defs/buyback' } },
               scannedAt: { $ref: '#/$defs/scanTime' },
-              meta: { type: 'object' },
+              meta: { $ref: '#/$defs/buybackMeta' },
             },
           },
           referral: {
@@ -149,10 +149,52 @@
             properties: {
               items: { $ref: '#/$defs/referral' },
               scannedAt: { $ref: '#/$defs/scanTime' },
-              meta: { type: 'object' },
+              meta: {
+                description: 'Nothing is kept next to a referral scan.',
+                type: 'object',
+                additionalProperties: false,
+              },
             },
           },
         },
+      },
+      hangarMeta: {
+        description:
+          "What a complete hangar scan keeps next to its pledges: how completely it read RSI's page (shape), and what the next scan checks to skip an unchanged hangar (probe).",
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          shape: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              n: { type: 'number' },
+              date: { type: 'number' },
+              value: { type: 'number' },
+              contents: { type: 'number' },
+              image: { type: 'number' },
+              tiles: { type: 'number' },
+              untyped: { type: 'number' },
+              guessed: { type: 'number' },
+            },
+          },
+          probe: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              at: { type: 'number' },
+              n: { type: 'number' },
+              v: { type: ['string', 'null'] },
+            },
+          },
+        },
+      },
+      buybackMeta: {
+        description:
+          "What a buy-back scan keeps next to its list: the buy-back tokens RSI's page shows, or null when it didn't say.",
+        type: 'object',
+        additionalProperties: false,
+        properties: { tokens: { type: ['number', 'null'] } },
       },
       ccu: {
         description: "An upgrade's From and To ships.",

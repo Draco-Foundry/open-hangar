@@ -291,13 +291,53 @@ test('forbidden keys are refused wherever they sit, rows RSI fills included', ()
     view((v) => (v.sources.buybacks.meta.siteUrl = 'x')).path,
     '/sources/buybacks/meta/siteUrl',
   );
-  // Where the schema is strict it answers first, with the same path.
+  // What this browser keeps for itself: the wishlist, the buy-back details cache,
+  // settings, cookies, other accounts parked here.
+  for (const [change, at] of [
+    [
+      (v) => (v.sources.referral.items.recruitsList[0].wishlist = {}),
+      'referral/items/recruitsList/0/wishlist',
+    ],
+    [(v) => (v.sources.buybacks.items[1].bbDetails = {}), 'buybacks/items/1/bbDetails'],
+    [
+      (v) => (v.sources.hangar.items[0].raw['profile:wingmate'] = {}),
+      'hangar/items/0/raw/profile:wingmate',
+    ],
+    [
+      (v) => (v.sources.hangar.items[0].contents[1].cookies = 'x'),
+      'hangar/items/0/contents/1/cookies',
+    ],
+    [(v) => (v.sources.referral.items.current.settings = {}), 'referral/items/current/settings'],
+  ])
+    assert.deepEqual(view(change), { path: `/sources/${at}`, reason: 'never sent' }, at);
+  // Where the schema is strict it answers first, with the same path: the account
+  // block, and what a scan keeps next to its rows.
   assert.equal(view((v) => (v.account.referral = { code: 'x' })).path, '/account/referral');
+  assert.deepEqual(
+    view((v) => (v.sources.hangar.meta.wishlist = { 123: {} })),
+    { path: '/sources/hangar/meta/wishlist', reason: 'not allowed here' },
+  );
+  assert.equal(
+    view((v) => (v.sources.hangar.meta.shape.bbDetails = {})).path,
+    '/sources/hangar/meta/shape/bbDetails',
+  );
   // An ordinary pledge key named like a setting elsewhere is fine.
   assert.equal(
     view((v) => (v.sources.hangar.items[0].url = 'https://robertsspaceindustries.com/x')),
     null,
   );
+});
+
+test('what a scan keeps next to its rows, as the extension writes it, fits', () => {
+  const db = SHAPE.checkDB(full().db).db;
+  db.sources.hangar.meta = {
+    shape: OH.scanShape(db.sources.hangar.items), // every key a scan's read-out has
+    probe: { at: NOW, n: db.sources.hangar.items.length, v: null },
+  };
+  db.sources.buybacks.meta = { tokens: null }; // RSI's page didn't say
+  const sync = SHAPE.withoutProspects(SHAPE.exportPayload({ db, appVersion: '0.3.0', now: NOW }));
+  assert.equal(SHAPE.checkPayload(JSON.parse(JSON.stringify(sync))), null);
+  assert.equal(SHAPE.checkHangarView(SHAPE.hangarView(sync)), null);
 });
 
 test('the shared scripts load in a worker: no window, document, chrome or require', async () => {

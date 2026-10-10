@@ -267,14 +267,25 @@
     'referrerReferralCode',
   ];
   // Never anywhere in what leaves the extension: the sync link and its token, the
-  // sync site's address, Connect's state, the prospects list and the referral code.
+  // sync site's address, Connect's state, the prospects list, the referral code, and
+  // what this browser keeps next to the hangar for itself: the wishlist and its
+  // alerts, the buy-back details cache, settings, cookies and the other accounts
+  // parked here (stored as profile:<handle>, PROFILE_PREFIX).
   const NEVER = new Set([
     'siteLink',
     'siteUrl',
     'siteConnect',
     'prospectsList',
     ...REFERRAL_ITEM_KEYS.slice(2),
+    'wishlist',
+    'wishWatch',
+    'bbDetails',
+    'settings',
+    'cookies',
+    'cookie',
+    'profiles',
   ]);
+  const PROFILE_PREFIX = 'profile:';
 
   const omit = (o, keys) =>
     Object.fromEntries(Object.entries(o).filter(([k]) => !keys.includes(k)));
@@ -326,8 +337,9 @@
   }
 
   // A key that must not be there, anywhere in `value` → { path, reason }, else null.
-  // The schema already refuses unknown keys where the extension builds the object;
-  // this walk also covers the rows RSI's pages fill (pledges, buy-backs, recruits).
+  // The schema already refuses unknown keys where the extension builds the object
+  // (the account block, the sources, what a scan keeps with them); this walk also
+  // covers the rows RSI's pages fill (pledges, buy-backs, recruits).
   function forbiddenKey(value) {
     const path = [];
     const at = (k) => schema().pointer([...path, k]);
@@ -344,6 +356,7 @@
         for (const k of Object.keys(v)) {
           if (
             NEVER.has(k) ||
+            k.startsWith(PROFILE_PREFIX) ||
             (here === 'sources/referral/items' && REFERRAL_ITEM_KEYS.includes(k)) ||
             (here === 'account' && REFERRAL_ACCOUNT_KEYS.includes(k))
           )

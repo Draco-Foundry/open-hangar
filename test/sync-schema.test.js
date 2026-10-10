@@ -46,6 +46,12 @@ test('the schema: format 2, only keywords the checker knows, strict where the ex
   assert.ok(strict(SCHEMA.$defs.account.properties.balances), 'account.balances');
   assert.ok(strict(SCHEMA.$defs.sources), 'sources');
   assert.ok(strict(SCHEMA.$defs.referral), 'the referral block');
+  // What a scan keeps next to its rows, all the way down.
+  const meta = (id) => SCHEMA.$defs.sources.properties[id].properties.meta;
+  assert.ok(strict(SCHEMA.$defs.hangarMeta) && meta('hangar').$ref === '#/$defs/hangarMeta');
+  for (const k of ['shape', 'probe']) assert.ok(strict(SCHEMA.$defs.hangarMeta.properties[k]), k);
+  assert.ok(strict(SCHEMA.$defs.buybackMeta) && meta('buybacks').$ref === '#/$defs/buybackMeta');
+  assert.ok(strict(meta('referral')), 'referral meta');
   for (const id of ['pledge', 'buyback', 'content', 'recruit'])
     assert.ok(!strict(SCHEMA.$defs[id]), `${id} rows may gain keys`);
   // No address of the sync site: a build without sync carries the schema too.
