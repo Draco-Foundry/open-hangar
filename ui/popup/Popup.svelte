@@ -126,7 +126,7 @@
             type="button"
             class="pp-link"
             id="pp-connect"
-            onclick={() => openHub('#home')}>Connect to openhangar.space</button
+            onclick={() => openHub('#settings')}>Connect to openhangar.space</button
           ></span
         >
       {/if}

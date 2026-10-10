@@ -36,8 +36,11 @@ export default defineConfig({
         search: 'ui/search/main.js',
         details: 'ui/details/main.js',
         site: 'ui/site/main.js',
-        // The connector's own pages (src/flags.js `connector`).
+        // The connector's own pages (src/flags.js `connector`), and the Clean Pro look
+        // they link by itself (ui/tokens.css → src/ui/tokens.css).
+        tokens: 'ui/tokens.css',
         popup: 'ui/popup/main.js',
+        basic: 'ui/basic/main.js',
       },
       output: {
         format: 'es',

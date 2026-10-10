@@ -1,4 +1,5 @@
-// Loaded after demo-shim.js on the connector's own pages (src/popup.html): what only
+// Loaded after demo-shim.js on the connector's own pages (src/popup.html,
+// src/basic.html): what only
 // they use. Session storage, storage change events, the popup's message to the
 // background, and new tabs, recorded on window.__demo for the UI test.
 (function () {
@@ -33,4 +34,12 @@
   };
   chrome.tabs.create = (o) => void demo.opened.push(o.url);
   window.close = () => void (demo.closed = true);
+  // Files the page saves (CSV, the backup) and pages it opens (Report a Scan Problem).
+  demo.saved = [];
+  const blobUrl = URL.createObjectURL.bind(URL);
+  URL.createObjectURL = (b) => (demo.saved.push(b), blobUrl(b));
+  window.open = (url) => void demo.opened.push(url);
+  chrome.tabs.getCurrent = async () => ({ id: 42 });
+  chrome.permissions = { contains: async () => true, request: async () => true };
+  chrome.runtime.reload = () => void (demo.reloaded = true);
 })();

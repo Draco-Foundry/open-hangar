@@ -87,7 +87,7 @@ function demoDashboard() {
       '<script src="lib.js"></script>\n    <script src="/__demo/demo-after-lib.js"></script>',
     );
 }
-// The connector's own pages (src/popup.html): the same shims, before flags.js, plus
+// The connector's own pages (src/popup.html, src/basic.html): the same shims, before flags.js, plus
 // what only those pages use (demo-connector.js: session storage, change events, the
 // popup's message to the background).
 function demoConnectorPage(file) {
@@ -132,7 +132,7 @@ async function handle(req, res) {
     }
   }
 
-  if (u.pathname === '/popup.html') {
+  if (u.pathname === '/popup.html' || u.pathname === '/basic.html') {
     return res
       .writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' })
       .end(demoConnectorPage(u.pathname.slice(1)));

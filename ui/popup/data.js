@@ -5,8 +5,8 @@
 // list from openhangar.space, read at most once a day and bundled-only offline) and the
 // last RSI account read (the `account` key) for Store Credit.
 
-// The extension's own page, where scans run and Connect lives.
-export const HUB_PAGE = 'src/dashboard.html';
+// The extension's own page in the connector build, where scans run and Connect lives.
+export const HUB_PAGE = 'src/basic.html';
 
 // The toolbar badge's rule (src/background.js updateReminder).
 export const STALE_DAYS = 7;

@@ -10,17 +10,18 @@ function) it comes from, so you can check it. The big "why" decisions live in
 Open Hangar is a Manifest V3 browser extension (Chrome, Edge, Firefox). It has no
 backend: everything it reads is kept in `chrome.storage.local` in your browser.
 
-| Piece               | Files                                                    | Job                                                                |
-| ------------------- | -------------------------------------------------------- | ------------------------------------------------------------------ |
-| Service worker      | `src/background.js`                                      | Opens the dashboard, rescan badge, updates, our pages' messages    |
-| Dashboard (classic) | `src/dashboard.html`, `src/dashboard.js`                 | The whole app: views, scanning, state, most pages                  |
-| Shared library      | `src/lib.js` (exposed as `window.OH`)                    | Source registry, scan loop, storage, export/import, outside data   |
-| Parser              | `src/scraper/parser.js` (exposed as `window.OpenHangar`) | RSI HTML to normalized items; the only place that knows RSI markup |
-| Svelte pages        | `ui/` (built into `src/ui/`)                             | The new Home page cards (0.3.0 redesign, in progress)              |
-| Bundled data        | `src/data/ship-catalog.json`, `src/data/ship-codes.json` | Ship list and prices; ship codes for the HTF export                |
-| Packaging           | `scripts/pack.mjs`                                       | Per-browser builds in `dist/chrome` and `dist/firefox`             |
-| Website             | `site/`, `site-worker/wrangler.jsonc`                    | openhangar.space, including the `status.json` kill switch          |
-| Workflows           | `.github/workflows/`                                     | CI, release, store publishing, site deploy, canary                 |
+| Piece               | Files                                                       | Job                                                                |
+| ------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------ |
+| Service worker      | `src/background.js`                                         | Opens the dashboard, rescan badge, updates, our pages' messages    |
+| Dashboard (classic) | `src/dashboard.html`, `src/dashboard.js`                    | The whole app: views, scanning, state, most pages                  |
+| Shared library      | `src/lib.js` (exposed as `window.OH`)                       | Source registry, scan loop, storage, export/import, outside data   |
+| Parser              | `src/scraper/parser.js` (exposed as `window.OpenHangar`)    | RSI HTML to normalized items; the only place that knows RSI markup |
+| Svelte pages        | `ui/` (built into `src/ui/`)                                | The new Home page cards (0.3.0 redesign, in progress)              |
+| Connector pages     | `src/popup.html`, `src/basic.html` (`ui/popup`, `ui/basic`) | The `connector` build's popup and basic page (docs/FLAGS.md)       |
+| Bundled data        | `src/data/ship-catalog.json`, `src/data/ship-codes.json`    | Ship list and prices; ship codes for the HTF export                |
+| Packaging           | `scripts/pack.mjs`                                          | Per-browser builds in `dist/chrome` and `dist/firefox`             |
+| Website             | `site/`, `site-worker/wrangler.jsonc`                       | openhangar.space, including the `status.json` kill switch          |
+| Workflows           | `.github/workflows/`                                        | CI, release, store publishing, site deploy, canary                 |
 
 `manifest.json` asks for `storage`, `unlimitedStorage` and `cookies`, plus host access
 to `https://robertsspaceindustries.com/*`. The content security policy only allows the
