@@ -7,11 +7,14 @@ list of requests, every message is checked before anything runs, the hello says 
 this build answers for that page, and the Firefox bridge does nothing anywhere but our
 own pages. Our own hangar page (hangar.openhangar.space, Local Mode) can read the
 hangar this browser scanned, see how fresh it is and ask for a scan, behind a new
-`localMode` build flag (off in the store build, on in the beta).
+`localMode` build flag (off in the store build and the beta until the privacy policy
+names the hangar page; on in the staging developer build).
 
 ## Steps
 
-1. `localMode` in `src/flags.js` (default off, beta on, not dev-only).
+1. `localMode` in `src/flags.js` (default off, beta off until the privacy policy names
+   the hangar page, not dev-only; a test fails while a store or beta build lets in a
+   page the policy doesn't name). `npm run build:staging` turns it on.
 2. `src/site-pages.js`: the page lists (hangar pages, site pages, the pages that may
    Connect), written per build by `scripts/pack.mjs` into the built copy; the
    capabilities and their message types; which page may ask what; and the inbound

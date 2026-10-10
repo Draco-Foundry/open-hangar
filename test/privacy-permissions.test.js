@@ -1,8 +1,9 @@
 'use strict';
 // The privacy policy explains every permission the extension asks for, in the same
 // words in docs/PRIVACY.md and the site's copy (site/privacy.html). A permission added
-// to manifest.json, or a new way for our website to reach the extension
-// (scripts/pack.mjs), fails here until the policy says why. Run: `npm test`.
+// to manifest.json, a new way for our website to reach the extension
+// (scripts/pack.mjs), or a page of ours a store or beta build newly lets in
+// (scripts/site-pages.mjs), fails here until the policy says why. Run: `npm test`.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -57,6 +58,34 @@ test("the website's way in has a note while the build adds one", (t) => {
     return t.skip('scripts/pack.mjs gives openhangar.space no way in');
   assert.ok(named(mdBullets(), 'Messages from openhangar.space'), 'docs/PRIVACY.md');
   assert.ok(named(htmlBullets(), 'Messages from openhangar.space'), 'site/privacy.html');
+});
+
+// The pages a store or beta build lets talk to the extension (scripts/site-pages.mjs,
+// for that build's flags) are each named in that note, so a flag that lets a new page
+// in (our hangar page, with localMode) fails here until the policy says so.
+test('every page a store or beta build lets in is named in both copies of the policy', async () => {
+  const { buildValues, readRegistry } = await import('../scripts/build-flags.mjs');
+  const { pagesFor } = await import('../scripts/site-pages.mjs');
+  const registry = readRegistry(path.join(ROOT, 'src', 'flags.js'));
+  const note = (bullets) => bullets.find((b) => b.startsWith('Messages from openhangar.space:'));
+  const copies = [
+    ['docs/PRIVACY.md', note(mdBullets())],
+    ['site/privacy.html', note(htmlBullets())],
+  ];
+  for (const [build, beta] of [
+    ['store', false],
+    ['beta', true],
+  ]) {
+    const flags = buildValues(registry, { beta });
+    const pages = pagesFor({ localMode: flags.localMode, sync: flags.sync });
+    for (const origin of [...pages.hangar, ...pages.site]) {
+      const host = new URL(origin).hostname;
+      // The host itself, not just the end of a longer one (app.openhangar.space).
+      const own = new RegExp(`(^|[^\\w.-])${host.replace(/\./g, '\\.')}(?![\\w-]|\\.\\w)`);
+      for (const [file, text] of copies)
+        assert.ok(own.test(text || ''), `${file} names ${host} (the ${build} build lets it in)`);
+    }
+  }
 });
 
 test('both copies of the policy explain permissions in the same words', () => {

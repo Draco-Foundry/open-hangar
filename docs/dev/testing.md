@@ -9,7 +9,9 @@
 - `npm run build`: the Chrome and Firefox builds in `dist/`. Then
   `node scripts/check-store-build.mjs` checks a store build carries nothing it mustn't
   (its pages' way in included: the manifest and the built page lists agree).
-- `npm run build:beta` / `npm run build:staging`: the beta and staging builds.
+- `npm run build:beta` / `npm run build:staging`: the beta and staging builds. The
+  staging build has `localMode` on, so the staging hangar page can talk to it
+  (docs/FLAGS.md, "Local Mode").
 - `npm run lint:firefox`: Mozilla's linter on the Firefox build.
 - `npm run test:privacy` (after `npm run pack`): the Chrome store build in Chrome,
   never connected, sends nothing to the sync site (scripts/privacy-check.mjs).

@@ -88,12 +88,9 @@ test('Firefox beta: its own add-on id, update_url, the beta version and sync dat
       ],
     });
     assert.ok(fs.existsSync(path.join(dir, 'dist/beta-firefox/src/site-bridge.js')));
-    // Local Mode is on in the beta: our hangar page is let in too, production only.
-    const PAGES = [
-      'https://hangar.openhangar.space/*',
-      'https://openhangar.space/*',
-      'https://app.openhangar.space/*',
-    ];
+    // Our own site's pages, production only. Not our hangar page: Local Mode stays off
+    // in the beta until the privacy policy names it (src/flags.js).
+    const PAGES = ['https://openhangar.space/*', 'https://app.openhangar.space/*'];
     assert.deepEqual(ff.content_scripts[0].matches, PAGES);
     // The Chrome and Edge beta next to it stays as it was.
     const chrome = manifestOf(dir, 'beta');

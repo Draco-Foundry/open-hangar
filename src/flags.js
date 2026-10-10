@@ -30,10 +30,11 @@
       default: false,
       devOnly: true,
     },
+    // Off in the beta too until the privacy policy names our hangar page and what it
+    // may read (test/privacy-permissions.test.js): then `beta: true`, with the policy.
     localMode: {
       about: 'Our hangar page reads the hangar this browser scanned (Local Mode).',
       default: false,
-      beta: true,
     },
   };
 

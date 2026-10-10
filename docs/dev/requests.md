@@ -31,4 +31,6 @@ its flag's markers), the type in the Firefox bridge's list, tests in
 `test/bridge-v2.test.js`, and the website told. A request from a page that may not ask
 it answers `unknown request`, the same as one that doesn't exist. Anything handed to a
 page is checked before it goes, and handing a page something new means checking the
-privacy policy first.
+privacy policy first. A new page needs the policy to name it before a store or beta
+build may let it in (`test/privacy-permissions.test.js` fails until it does), and the
+policy's words are the owner's to approve.

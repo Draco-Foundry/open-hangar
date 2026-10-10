@@ -38,7 +38,7 @@ Today's flags:
 | ----------- | -------------------------------------------------- | ----- | ---- | -------- |
 | `sync`      | Website sync (Connect This Browser, Sync Now, ...) | on    | on   | no       |
 | `orgFleet`  | Org Fleet sharing (nothing behind it yet)          | off   | off  | yes      |
-| `localMode` | Our hangar page reads this browser's hangar        | off   | on   | no       |
+| `localMode` | Our hangar page reads this browser's hangar        | off   | off  | no       |
 
 ## Adding or Retiring a Flag
 
@@ -79,15 +79,22 @@ counts too; with neither, it waits 5 minutes.
 `--flag sync=off` still builds a copy without it, for a developer; the store check
 refuses that build.
 
-## Local Mode in the Beta
+## Local Mode
 
 `localMode` lets our hangar page, hangar.openhangar.space, read the hangar this browser
 scanned, with no account (ARCHITECTURE.md, "Messages From Our Pages"). With it on, the
 build lets that page in (the manifest's lists and the built page lists) and keeps the
 `@flag-start localMode` blocks: its requests in `src/background.js` and the dashboard's
-side of a scan it asks for. Off (the public store build), the page isn't let in and its
-handlers are cut. It needs `sync` (Firefox's consent card for sharing is sync's), so
+side of a scan it asks for. Off, the page isn't let in and its handlers are cut. It
+needs `sync` (Firefox's consent card for sharing is sync's), so
 `--flag sync=off --flag localMode=on` doesn't build.
+
+It's off in the store build and the beta until the privacy policy (docs/PRIVACY.md and
+site/privacy.html) names our hangar page and what it may read: a store or beta build
+that lets in a page the policy doesn't name fails `npm test`
+(test/privacy-permissions.test.js). Turning it on for the beta is `beta: true` in
+`src/flags.js`, in the same change as the policy's words. `npm run build:staging` has it
+on, so the staging hangar page (hangar-staging.openhangar.space) can talk to that build.
 
 ## How Builds Set Them
 
@@ -95,18 +102,20 @@ handlers are cut. It needs `sync` (Firefox's consent card for sharing is sync's)
 `dist/<target>/src/flags.js` (`BUILD_VALUES`). The file in the repo always holds the
 defaults.
 
-| Build                                                        | Flags                                       |
-| ------------------------------------------------------------ | ------------------------------------------- |
-| `npm run build`, `npm run pack` (public store)               | every flag at its `default`                 |
-| `npm run build:beta`                                         | the beta set, exactly (no `--flag`)         |
-| `npm run build:staging` (or `--site=<url>`, `OH_SITE=<url>`) | the defaults, built in to that site instead |
-| `--flag name=on` / `--flag name=off`, repeatable             | a developer's own build, on top of any      |
+| Build                                            | Flags                                                      |
+| ------------------------------------------------ | ---------------------------------------------------------- |
+| `npm run build`, `npm run pack` (public store)   | every flag at its `default`                                |
+| `npm run build:beta`                             | the beta set, exactly (no `--flag`)                        |
+| `npm run build:staging`                          | the defaults and `localMode`, built in to the staging site |
+| `--site=<url>`, `OH_SITE=<url>`                  | the defaults, built in to that site instead                |
+| `--flag name=on` / `--flag name=off`, repeatable | a developer's own build, on top of any                     |
 
 For example `npm run build -- --flag orgFleet=on`. `OH_SYNC=1` and `--sync` are the
 older spelling of `--flag sync=on`, which is the store build now. A build with a site of
-its own lets the staging site talk to it too. The build log lists the flags that are on,
-and calls the build "dev build, never for a store" when a dev-only flag is on, a flag is
-off its default, or the built-in site isn't production.
+its own lets the staging site talk to it too (and with `localMode` on, the staging
+hangar page). The build log lists the flags that are on, and calls the build "dev build,
+never for a store" when a dev-only flag is on, a flag is off its default, or the
+built-in site isn't production.
 
 `scripts/check-store-build.mjs` (`npm run check:store`, and `--beta` for the beta)
 fails unless every build in `dist/` carries `src/flags.js` with exactly its set: the

@@ -21,7 +21,7 @@
     "pack": "npm run build && web-ext build --source-dir dist/chrome --artifacts-dir dist --filename open-hangar-chrome-{version}.zip --overwrite-dest && web-ext build --source-dir dist/firefox --artifacts-dir dist --filename open-hangar-firefox-{version}.zip --overwrite-dest",
     "build:beta": "npm run build:ui && node scripts/pack.mjs --beta && web-ext build --source-dir dist/beta --artifacts-dir dist --filename open-hangar-beta-{version}.zip --overwrite-dest && web-ext build --source-dir dist/beta-firefox --artifacts-dir dist --filename open-hangar-beta-firefox-{version}.zip --overwrite-dest && node scripts/check-store-build.mjs --beta",
     "lint:firefox-beta": "npm run build:beta && web-ext lint --self-hosted --source-dir dist/beta-firefox",
-    "build:staging": "npm run build:ui && node scripts/pack.mjs --sync --site=https://staging.openhangar.space",
+    "build:staging": "npm run build:ui && node scripts/pack.mjs --sync --site=https://staging.openhangar.space --flag localMode=on",
     "check:store": "node scripts/check-store-build.mjs",
     "test:privacy": "node scripts/privacy-check.mjs",
     "screenshots": "npm run build:ui && node scripts/screenshots/run.mjs",

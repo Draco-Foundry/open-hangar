@@ -41,10 +41,12 @@ test('public store builds get the defaults; the beta its set; sync is on in both
   const { loadFlags, buildValues } = await lib();
   const { registry } = loadFlags(FLAGS_SRC);
   assert.deepEqual(buildValues(registry), { sync: true, orgFleet: false, localMode: false });
+  // Local Mode stays off in the beta until the privacy policy names our hangar page
+  // (test/privacy-permissions.test.js).
   assert.deepEqual(buildValues(registry, { beta: true }), {
     sync: true,
     orgFleet: false,
-    localMode: true,
+    localMode: false,
   });
   assert.deepEqual(buildValues(registry, { overrides: { sync: false } }), {
     sync: false,
@@ -52,7 +54,7 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     localMode: false,
   });
   assert.equal(registry.orgFleet.devOnly, true, 'orgFleet stays out of every store build');
-  assert.ok(!registry.localMode.devOnly, 'Local Mode may ship: in the beta first');
+  assert.ok(!registry.localMode.devOnly, 'Local Mode may ship once the policy says so');
   assert.throws(() => buildValues(registry, { overrides: { nope: true } }), /no such flag/);
 });
 
@@ -339,7 +341,13 @@ test('pack: writes each build its values and cuts the code of flags that are off
       ),
     );
     assert.throws(() => check(dir), /the staging site/);
-    // With Local Mode too: staging's hangar page, still never for a store.
+    // With Local Mode too, as npm run build:staging builds it: staging's hangar page,
+    // still never for a store.
+    const scripts = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'))).scripts;
+    assert.match(
+      scripts['build:staging'],
+      /pack\.mjs --sync --site=https:\/\/staging\.openhangar\.space --flag localMode=on$/,
+    );
     pack(dir, ['--site=https://staging.openhangar.space', '--flag', 'localMode=on']);
     assert.deepEqual(built('firefox').pages.hangar, [
       'https://hangar.openhangar.space',
@@ -369,9 +377,13 @@ test('pack: writes each build its values and cuts the code of flags that are off
 
     // The beta: exactly the beta set, no overrides.
     pack(dir, ['--beta']);
-    assert.deepEqual(built('beta').flags, { sync: true, orgFleet: false, localMode: true });
-    assert.deepEqual(built('beta-firefox').flags, { sync: true, orgFleet: false, localMode: true });
-    assert.deepEqual(built('beta').pages.hangar, ['https://hangar.openhangar.space']);
+    assert.deepEqual(built('beta').flags, { sync: true, orgFleet: false, localMode: false });
+    assert.deepEqual(built('beta-firefox').flags, {
+      sync: true,
+      orgFleet: false,
+      localMode: false,
+    });
+    assert.deepEqual(built('beta').pages.hangar, []);
     assert.throws(() => pack(dir, ['--beta', '--flag', 'orgFleet=on']), /beta set/);
     assert.throws(() => pack(dir, ['--flag', 'warpDrive=on']), /no such flag/);
   } finally {
