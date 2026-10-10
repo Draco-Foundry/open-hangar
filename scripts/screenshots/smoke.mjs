@@ -4519,6 +4519,68 @@ try {
     const len = await page.$eval(`#view-${view}`, (e) => e.textContent.trim().length);
     len > 100 ? ok('renders') : fail(`${view} view looks empty`);
   }
+
+  // The toolbar popup (the connector build, src/popup.html): the demo hangar's value,
+  // the last scan, Scan asking the background, Connect, then the connected state.
+  console.log('Popup');
+  await page.setViewport({ width: 320, height: 600 });
+  await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => /\$\d/.test(document.getElementById('pp-value')?.textContent));
+  const pop = await page.evaluate(() => ({
+    value: document.getElementById('pp-value').textContent,
+    label: document.querySelector('.pp-lbl').textContent,
+    last: document.getElementById('pp-last').textContent.trim(),
+    who: document.querySelector('.pp-who')?.textContent || '',
+    hangar: !!document.getElementById('pp-hangar'),
+    connect: !!document.getElementById('pp-connect'),
+    wide: document.documentElement.scrollWidth > 320,
+  }));
+  pop.label === 'Account Value' &&
+  /\[copy: popup\.last-scan /.test(pop.last) &&
+  pop.who &&
+  !pop.wide
+    ? ok(`shows ${pop.value} for ${pop.who}, the last scan, no sideways scroll`)
+    : fail(`popup: ${JSON.stringify(pop)}`);
+  // Not connected and no hangar page in an unbuilt copy: Connect, no Open My Hangar.
+  pop.connect && !pop.hangar
+    ? ok('not connected: Connect, and no Open My Hangar without a hangar page')
+    : fail(`popup site: ${JSON.stringify(pop)}`);
+  await page.click('#pp-scan');
+  const scanned = await page.evaluate(() => ({ sent: __demo.sent, closed: !!__demo.closed }));
+  scanned.sent.length === 1 && scanned.sent[0].ohPopup === 'scan' && scanned.closed
+    ? ok('Scan asks the background and closes')
+    : fail(`popup Scan: ${JSON.stringify(scanned)}`);
+  // Busy: the popup stays open and says so.
+  await page.evaluate(() => {
+    __demo.answer = { ok: false, error: 'busy' };
+    __demo.closed = false;
+  });
+  await page.click('#pp-scan');
+  const busy = await page.evaluate(() => ({
+    note: document.querySelector('.pp-note[role="status"]')?.textContent || '',
+    closed: __demo.closed,
+  }));
+  /\[copy: popup\.scan-busy\]/.test(busy.note) && !busy.closed
+    ? ok('Scan while one runs: stays open and says so')
+    : fail(`popup busy: ${JSON.stringify(busy)}`);
+  await page.evaluate(async () => {
+    const siteLink = { token: 't', name: 'demo@pilot', connectedAt: 1, lastSync: Date.now() };
+    await chrome.storage.local.set({ siteLink, siteUrl: 'https://app.openhangar.space' });
+    for (const f of __demo.listeners) f({ siteLink: { newValue: siteLink } }, 'local');
+  });
+  await page.waitForSelector('#pp-hangar');
+  const linked = await page.evaluate(() => ({
+    site: document.getElementById('pp-site').textContent,
+    connect: !!document.getElementById('pp-connect'),
+  }));
+  await page.click('#pp-hangar');
+  const went = await page.evaluate(() => __demo.opened.at(-1));
+  /popup\.connected demo@pilot/.test(linked.site) &&
+  !linked.connect &&
+  went === 'https://app.openhangar.space/hangar'
+    ? ok("connected: who and when, and Open My Hangar goes to the website's My Hangar")
+    : fail(`popup connected: ${JSON.stringify({ linked, went })}`);
+  await page.setViewport({ width: 1280, height: 900 });
 } finally {
   await browser.close();
   server.kill();

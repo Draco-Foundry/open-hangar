@@ -39,6 +39,7 @@ Today's flags:
 | `sync`      | Website sync (Connect This Browser, Sync Now, ...) | on    | on   | no       |
 | `orgFleet`  | Org Fleet sharing (nothing behind it yet)          | off   | off  | yes      |
 | `localMode` | Our hangar page reads this browser's hangar        | off   | off  | no       |
+| `connector` | A toolbar popup and one basic page (the connector) | off   | off  | no       |
 
 ## Adding or Retiring a Flag
 
@@ -95,6 +96,20 @@ that lets in a page the policy doesn't name fails `npm test`
 (test/privacy-permissions.test.js). Turning it on for the beta is `beta: true` in
 `src/flags.js`, in the same change as the policy's words. `npm run build:staging` has it
 on, so the staging hangar page (hangar-staging.openhangar.space) can talk to that build.
+
+## The Connector
+
+`connector` is the extension as the website's connector (owner, 2026-10-10): the
+website is the full app, and the extension scans RSI, hands the hangar to our pages and
+keeps one basic page that works on its own. With it on, the toolbar icon opens a popup
+(`src/popup.html`, `ui/popup/`: Account Value, the last scan, Scan, Open My Hangar and
+where sync stands) instead of a tab. The popup's Scan asks the background
+(`{ ohPopup: 'scan' }`, the `@flag-start connector` block in `src/background.js`), which
+brings the extension's page to the front to run the scan our hangar page asks for. Off,
+the popup isn't in the build and that handler is cut. It needs `localMode` (Open My
+Hangar goes to our hangar page until you connect), so `--flag connector=on` alone
+doesn't build. It's off in every store build until the basic page and the website's
+pages are ready.
 
 ## How Builds Set Them
 

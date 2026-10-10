@@ -113,7 +113,8 @@ function loadBackground({
   const firefox = browser === 'firefox' || browser === 'firefox-android';
   const listen = () => ({ addListener() {} });
   let external = null;
-  let internal = null;
+  // Every onMessage listener, in order (the connector build adds the popup's).
+  const internal = [];
   const opened = [];
   const focused = [];
   let nextTab = 100;
@@ -137,7 +138,7 @@ function loadBackground({
       onUpdateAvailable: listen(),
       // Chrome and Firefox both have both; Firefox's pages never reach the first.
       onMessageExternal: { addListener: (f) => (external = f) },
-      onMessage: { addListener: (f) => (internal = f) },
+      onMessage: { addListener: (f) => void internal.push(f) },
       getManifest: () => ({
         version: '0.3.0',
         ...(firefox
@@ -186,14 +187,17 @@ function loadBackground({
   vm.runInContext(cutFlags(read('background.js'), flags), ctx, { filename: 'src/background.js' });
 
   // Answers come back copied out of the sandbox, so deepEqual compares plain values;
-  // undefined = no answer at all (the listener let the message go).
-  const answer = (listener, msg, sender) =>
+  // undefined = no answer at all (every listener let the message go). Like the
+  // browser, each listener sees the message until one says it answers later.
+  const answer = (listeners, msg, sender) =>
     new Promise((res) => {
-      if (!listener) return res(undefined);
-      const later = listener(msg, sender, (r) =>
-        res(r === undefined ? r : JSON.parse(JSON.stringify(r))),
-      );
-      if (!later) res(undefined);
+      for (const listener of [].concat(listeners || [])) {
+        const later = listener(msg, sender, (r) =>
+          res(r === undefined ? r : JSON.parse(JSON.stringify(r))),
+        );
+        if (later) return;
+      }
+      res(undefined);
     });
   // Chrome and Edge: a page's message, with the origin the browser gives.
   const send = (msg, origin, sender = {}) => answer(external, msg, { origin, ...sender });
