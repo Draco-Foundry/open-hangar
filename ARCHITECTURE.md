@@ -72,11 +72,13 @@ Our hangar page (Local Mode, behind the `localMode` flag, which needs `sync`):
   sync token, the site address, settings, cookies, the referral code or prospects), and
   only after it passes the sync schema and the never-sent key walk. Errors: `no-scan`,
   `needs-upgrade`, `schema` (with `path`) and, on Firefox before it allows sharing,
-  `firefox-ask`: Home opens with Firefox's card up (`localAskFirefox` in session
-  storage), whose Continue only asks Firefox.
+  `firefox-ask`: Home opens with Firefox's card up, in the dashboard tab that
+  `localAskFirefox` in session storage names (at most once a minute), and its Continue
+  only asks Firefox.
 - `oh-scan-status`: when the hangar and buy-backs were scanned, `stale` (the badge's 7
-  days) and `running`, a `scanRunning` time in session storage that the dashboard renews
-  every minute while a scan runs (counted for 10 minutes at most).
+  days) and `running`: a `scanRunning` mark in session storage (the scanning tab and a
+  time the dashboard renews every minute, counted while that tab is open and for 10
+  minutes at most), or a `scanRequest` from the last minute that its tab hasn't started.
 - `oh-request-scan`: opens or focuses a dashboard tab and leaves a `scanRequest` naming
   it; that tab runs the Scan button's own scan. Busy while a scan runs and for 60 seconds
   after a request. The worker never scans or asks RSI anything for it.

@@ -555,21 +555,40 @@ function scanDetail(text) {
   homeCard.scan = { text, pct: Math.max(4, Math.min(100, ((i + 0.5) / n) * 100)) };
   homeUpdated();
 }
+// This page's tab id (null outside a tab), asked once: what our hangar page's requests
+// to a dashboard name (background.js, Local Mode).
+let thisTab = null;
+const thisTabId = () =>
+  (thisTab ??= chrome.tabs?.getCurrent
+    ? chrome.tabs.getCurrent().then(
+        (t) => t?.id ?? null,
+        () => null,
+      )
+    : Promise.resolve(null));
 // A scan running in this page, for our hangar page's scan status (Local Mode,
-// background.js oh-scan-status): a time in session storage, renewed at most once a
-// minute while the scan goes on and cleared when it ends. The background counts one
-// older than 10 minutes as a page that closed mid-scan.
+// background.js oh-scan-status): this tab and a time in session storage, renewed at
+// most once a minute while the scan goes on, and cleared when it ends or the page
+// goes away. The background counts one whose tab has closed, or older than 10
+// minutes, as no scan. Written in order (scanMarkWrite), so an end never lands
+// before its start.
 let scanMarkAt = 0;
+let scanMarkWrite = Promise.resolve();
 function scanMark(on) {
   if (!OH.flags.localMode || !chrome.storage.session) return;
   const now = Date.now();
   if (on && now - scanMarkAt < 60e3) return;
   scanMarkAt = on ? now : 0;
-  (on
-    ? chrome.storage.session.set({ scanRunning: now })
-    : chrome.storage.session.remove('scanRunning')
-  ).catch(() => {});
+  scanMarkWrite = scanMarkWrite
+    .then(async () =>
+      on
+        ? chrome.storage.session.set({ scanRunning: { at: now, tabId: await thisTabId() } })
+        : chrome.storage.session.remove('scanRunning'),
+    )
+    .catch(() => {});
 }
+window.addEventListener('pagehide', () => {
+  if (scanMarkAt) chrome.storage.session?.remove('scanRunning').catch(() => {});
+});
 // `label` replaces "Scanning… 2/4" for a step of its own (the website sync, the
 // scan's last step when connected).
 function setScanning(text, done = false, label = '') {
@@ -4546,15 +4565,19 @@ function scanChosen() {
 // @flag-start localMode: Scan from our own hangar page (Local Mode)
 // hangar.openhangar.space asks for a scan (background.js oh-request-scan): the
 // background brings a dashboard tab to the front (or opens one) and leaves a request
-// naming it, and that tab runs the Scan button's own scan, once.
+// naming it, and that tab runs the Scan button's own scan, once. The request goes
+// once the scan has marked itself running (scanMark), so the background counts it as
+// running all along; one this tab drops (too old, a scan already on, nothing ticked)
+// just goes.
 async function scanIfAsked() {
   if (!chrome.storage.session) return;
   const { scanRequest: r } = await chrome.storage.session.get('scanRequest');
   if (!r) return;
-  const tab = await chrome.tabs.getCurrent().catch(() => null);
-  if (!tab || r.tabId !== tab.id) return;
-  await chrome.storage.session.remove('scanRequest');
+  const tab = await thisTabId();
+  if (tab == null || r.tabId !== tab) return;
   if (Date.now() - r.at < 60e3 && !topBar.busy) scanChosen();
+  await scanMarkWrite;
+  await chrome.storage.session.remove('scanRequest');
 }
 // @flag-end localMode
 chrome.storage.local.get('scanSources').then(({ scanSources }) => {
@@ -5047,12 +5070,13 @@ async function refreshSite() {
   }
   // Our hangar page asked for the hangar before Firefox said yes (Local Mode,
   // background.js oh-get-hangar): Home, with the same card up, whose Continue then
-  // only asks Firefox and never starts Connect ('local').
+  // only asks Firefox and never starts Connect ('local'). Only in the tab the ask
+  // names, the one the background brought to the front; other dashboards leave it.
   if (OH.flags.localMode && site.firefox && !site.dataOk && !site.link && chrome.storage.session) {
-    const { localAskFirefox: at } = await chrome.storage.session.get('localAskFirefox');
-    if (at) {
+    const { localAskFirefox: ask } = await chrome.storage.session.get('localAskFirefox');
+    if (ask && (ask.tabId == null || ask.tabId === (await thisTabId()))) {
       await chrome.storage.session.remove('localAskFirefox');
-      if (Date.now() - at < 5 * 60e3) {
+      if (Date.now() - ask.at < 5 * 60e3) {
         site.askFirefox = 'local';
         if (currentView() !== 'home') location.hash = '#home';
       }

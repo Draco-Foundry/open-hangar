@@ -462,7 +462,10 @@ test('getHangar on Firefox: Firefox says yes first, then the hangar comes throug
     error: 'firefox-ask',
   });
   assert.deepEqual(ask.opened, ['moz-extension://uuid/src/dashboard.html#home']);
-  assert.ok(ask.stores.session.localAskFirefox, "Home opens with Firefox's card up");
+  // Home opens with Firefox's card up, in the tab it opened and no other dashboard.
+  const card = ask.stores.session.localAskFirefox;
+  assert.equal(card.tabId, 100, 'names the tab it opened');
+  assert.ok(Date.now() - card.at < 5000);
   assert.equal(ask.stores.session.siteAskFirefox, undefined, "it isn't Connect's card");
   // Asked again (the page reloaded): the same answer, no second tab.
   assert.deepEqual(await ask.fromPage({ type: 'oh-get-hangar' }, url), {
@@ -498,6 +501,35 @@ test('getHangar on Firefox: Firefox says yes first, then the hangar comes throug
     { tab: 7, active: true },
     { window: 3, focused: true },
   ]);
+  assert.equal(open.stores.session.localAskFirefox.tabId, 7, 'the card is for that tab');
+});
+
+test("getHangar on Firefox: two asks at once open one tab, and a restarted worker doesn't stack one", async () => {
+  const url = `${HANGAR}/`;
+  const ASK = { ok: false, error: 'firefox-ask' };
+  // Two hangar pages loading together (a restored session): one Home tab.
+  const both = load({ browser: 'firefox', local: full(), granted: false });
+  assert.deepEqual(
+    await Promise.all([
+      both.fromPage({ type: 'oh-get-hangar' }, url),
+      both.fromPage({ type: 'oh-get-hangar' }, url),
+    ]),
+    [ASK, ASK],
+  );
+  assert.equal(both.opened.length, 1);
+  // A worker that stopped and started again still knows the last ask; once it's a
+  // minute old, the next ask brings Home up again.
+  const restarted = load({
+    browser: 'firefox',
+    local: full(),
+    granted: false,
+    session: { localAskedAt: Date.now() - 30e3 },
+  });
+  assert.deepEqual(await restarted.fromPage({ type: 'oh-get-hangar' }, url), ASK);
+  assert.deepEqual(restarted.opened, []);
+  restarted.stores.session.localAskedAt = Date.now() - 61e3;
+  assert.deepEqual(await restarted.fromPage({ type: 'oh-get-hangar' }, url), ASK);
+  assert.equal(restarted.opened.length, 1);
 });
 
 // --- getScanStatus -------------------------------------------------------------------
@@ -512,7 +544,7 @@ test('getScanStatus: when each source was scanned, whether a scan runs, and stal
   const fresh = full();
   fresh.db.sources.hangar.scannedAt = Date.now() - 6 * 86400000;
   fresh.db.sources.buybacks.scannedAt = new Date(AT).toISOString(); // older copies kept text
-  const y = load({ local: fresh, session: { scanRunning: Date.now() - 1000 } });
+  const y = load({ local: fresh, session: { scanRunning: { at: Date.now() - 1000, tabId: 9 } } });
   const s = await y.send({ type: 'oh-scan-status' }, HANGAR);
   assert.equal(s.stale, false);
   assert.equal(s.running, true);
@@ -521,7 +553,10 @@ test('getScanStatus: when each source was scanned, whether a scan runs, and stal
   old.db.sources.hangar.scannedAt = Date.now() - 7 * 86400000 - 1;
   assert.equal((await load({ local: old }).send({ type: 'oh-scan-status' }, HANGAR)).stale, true);
   // A marker left by a page that closed mid-scan runs out after 10 minutes.
-  const stuck = load({ local: full(), session: { scanRunning: Date.now() - 10 * 60e3 - 1 } });
+  const stuck = load({
+    local: full(),
+    session: { scanRunning: { at: Date.now() - 10 * 60e3 - 1, tabId: 9 } },
+  });
   assert.equal((await stuck.send({ type: 'oh-scan-status' }, HANGAR)).running, false);
   // Nothing scanned yet.
   assert.deepEqual(await load().send({ type: 'oh-scan-status' }, HANGAR), {
@@ -536,6 +571,43 @@ test('getScanStatus: when each source was scanned, whether a scan runs, and stal
     hangar: null,
     buybacks: null,
   });
+});
+
+test('getScanStatus: a mark whose tab has closed is no scan; a request not started yet is one', async () => {
+  const tab = (tabId, url = `${DASHBOARD}#home`) => ({
+    contextType: 'TAB',
+    tabId,
+    windowId: 1,
+    documentUrl: url,
+  });
+  const status = async (session, contexts = null) => {
+    const x = load({ local: full(), session, contexts });
+    const s = await x.send({ type: 'oh-scan-status' }, HANGAR);
+    // Asking for the status never asks for a scan or opens anything.
+    assert.deepEqual(x.opened, []);
+    assert.deepEqual(x.focused, []);
+    return s.running;
+  };
+  const mark = { scanRunning: { at: Date.now() - 9 * 60e3, tabId: 9 } };
+  // The scanning tab is still open: running.
+  assert.equal(await status(mark, [tab(4), tab(9)]), true);
+  // It was closed mid-scan (or reloaded into something else): not running, well
+  // before the 10 minutes run out, so the hangar page can ask for a scan again.
+  assert.equal(await status(mark, [tab(4)]), false);
+  assert.equal(await status(mark, [tab(9, 'chrome-extension://other/x.html')]), false);
+  assert.equal(await status(mark, []), false);
+  // A browser that can't list its tabs: the mark's time alone.
+  assert.equal(await status(mark, null), true);
+  // A request the dashboard hasn't started yet (it's still loading): running, for a
+  // minute at most; one it dropped is gone, and one left over runs out.
+  const asked = (ago) => ({ scanRequest: { at: Date.now() - ago, tabId: 100 } });
+  assert.equal(await status(asked(1000), []), true);
+  assert.equal(await status(asked(61e3), []), false);
+  assert.equal(await status({}, [tab(100)]), false);
+  // Right after the request, before the tab has loaded.
+  const x = load({ local: full(), contexts: [] });
+  assert.deepEqual(await x.send({ type: 'oh-request-scan' }, HANGAR), { ok: true, opened: true });
+  assert.equal((await x.send({ type: 'oh-scan-status' }, HANGAR)).running, true);
 });
 
 // --- requestScan ---------------------------------------------------------------------
@@ -556,7 +628,7 @@ test('requestScan: opens the dashboard with a request naming its tab, then busy 
 });
 
 test('requestScan: busy while a scan runs, after a restart, and for two at once', async () => {
-  const running = load({ session: { scanRunning: Date.now() - 5000 } });
+  const running = load({ session: { scanRunning: { at: Date.now() - 5000, tabId: 9 } } });
   assert.deepEqual(await running.send({ type: 'oh-request-scan' }, HANGAR), {
     ok: false,
     error: 'busy',
@@ -569,6 +641,16 @@ test('requestScan: busy while a scan runs, after a restart, and for two at once'
     ok: true,
     opened: true,
   });
+  // Its tab was closed mid-scan, so the mark it left behind doesn't hold a request up.
+  const closed = load({
+    session: { scanRunning: { at: Date.now() - 5 * 60e3, tabId: 9 } },
+    contexts: [],
+  });
+  assert.deepEqual(await closed.send({ type: 'oh-request-scan' }, HANGAR), {
+    ok: true,
+    opened: true,
+  });
+  assert.equal(closed.opened.length, 1);
   // A worker that stopped and started again still knows the last request.
   const restarted = load({ session: { scanAskedAt: Date.now() - 30e3 } });
   assert.deepEqual(await restarted.send({ type: 'oh-request-scan' }, HANGAR), {

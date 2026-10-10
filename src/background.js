@@ -251,46 +251,76 @@ const SCAN_RUN_MAX = 10 * 60e3;
 // One scan request a minute at most, and none while a scan runs.
 const SCAN_ASK_GAP = 60e3;
 let scanAskedAt = 0;
+// One Firefox ask for the hangar page a minute at most.
+const FIREFOX_ASK_GAP = 60e3;
+let firefoxAskedAt = 0;
+
+// The open dashboard tabs ({ tabId, windowId }), or null when this browser can't tell.
+async function dashboardTabs() {
+  if (!chrome.runtime.getContexts) return null;
+  const url = chrome.runtime.getURL(DASHBOARD);
+  try {
+    const tabs = await chrome.runtime.getContexts({ contextTypes: ['TAB'] });
+    return tabs.filter((c) => c.tabId >= 0 && String(c.documentUrl || '').startsWith(url));
+  } catch {
+    return null;
+  }
+}
 
 // The dashboard tab to use: an open one, brought to the front, or a new one (with
 // `hash`). → its tab id, or null.
 async function dashboardTab(hash = '') {
-  const url = chrome.runtime.getURL(DASHBOARD);
-  try {
-    const tabs = chrome.runtime.getContexts
-      ? await chrome.runtime.getContexts({ contextTypes: ['TAB'] })
-      : [];
-    const open = tabs.find((c) => c.tabId >= 0 && String(c.documentUrl || '').startsWith(url));
-    if (open) {
+  const open = (await dashboardTabs())?.[0];
+  if (open) {
+    try {
       await chrome.tabs.update(open.tabId, { active: true });
       if (chrome.windows?.update)
         await chrome.windows.update(open.windowId, { focused: true }).catch(() => {});
       return open.tabId;
+    } catch {
+      /* it closed just now: a new tab */
     }
-  } catch {
-    /* can't tell what's open: a new tab */
   }
-  const tab = await chrome.tabs.create({ url: url + hash });
+  const tab = await chrome.tabs.create({ url: chrome.runtime.getURL(DASHBOARD) + hash });
   return tab?.id ?? null;
 }
 
-// A scan running in a dashboard right now (src/dashboard.js scanMark).
+// A scan running in a dashboard right now (src/dashboard.js scanMark), or one asked
+// for in the last minute that its tab hasn't started yet (scanIfAsked takes the
+// request once the scan has begun, or drops it). A mark counts only while its tab is
+// still open, as far as this browser can tell, and for 10 minutes at most.
 async function scanRunning() {
-  const { scanRunning: at } = await chrome.storage.session.get('scanRunning');
-  return Number.isFinite(at) && Date.now() - at < SCAN_RUN_MAX;
+  const { scanRunning: mark, scanRequest: asked } = await chrome.storage.session.get([
+    'scanRunning',
+    'scanRequest',
+  ]);
+  const now = Date.now();
+  if (Number.isFinite(asked?.at) && now - asked.at < SCAN_ASK_GAP) return true;
+  if (!(Number.isFinite(mark?.at) && now - mark.at < SCAN_RUN_MAX)) return false;
+  const tabs = await dashboardTabs();
+  return !tabs || !Number.isInteger(mark.tabId) || tabs.some((c) => c.tabId === mark.tabId);
 }
 
 siteHandlers['oh-get-hangar'] = async () => {
   // Handing the hangar to a web page shares it, so Firefox asks first: the same yes
-  // Connect needs. Until then Home opens with Firefox's card up (src/dashboard.js
-  // refreshSite, localAskFirefox), at most once a minute so a page asking again
-  // doesn't stack tabs.
+  // Connect needs. Until then Home opens with Firefox's card up, in the tab the ask
+  // names (localAskFirefox, src/dashboard.js refreshSite). At most once a minute, so a
+  // page asking again doesn't stack tabs: checked and set before any other wait, so
+  // two asks at once can't both pass, and kept in session storage too, for a worker
+  // that stopped and started again in between.
   if (await firefoxNeedsOk()) {
-    const { localAskedAt: at } = await chrome.storage.session.get('localAskedAt');
-    if (!(Number.isFinite(at) && Date.now() - at < 60e3)) {
-      const now = Date.now();
-      await chrome.storage.session.set({ localAskedAt: now, localAskFirefox: now });
-      await dashboardTab('#home');
+    const now = Date.now();
+    if (now - firefoxAskedAt >= FIREFOX_ASK_GAP) {
+      const held = firefoxAskedAt;
+      firefoxAskedAt = now;
+      const { localAskedAt: before } = await chrome.storage.session.get('localAskedAt');
+      if (Number.isFinite(before) && now - before < FIREFOX_ASK_GAP) {
+        firefoxAskedAt = held; // not asked now, so it doesn't count
+      } else {
+        await chrome.storage.session.set({ localAskedAt: now });
+        const tabId = await dashboardTab('#home');
+        await chrome.storage.session.set({ localAskFirefox: { at: now, tabId } });
+      }
     }
     return { ok: false, error: 'firefox-ask' };
   }
