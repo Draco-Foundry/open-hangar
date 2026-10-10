@@ -267,15 +267,24 @@
           this permission only to look up the extension's sign-in address. Nothing else uses it.
         </li>
         <li>
-          <strong>Messages from openhangar.space:</strong> pages on openhangar.space and
-          app.openhangar.space, and no other site, can check that Open Hangar is installed and ask
-          it for two things. The first is Add to RSI Cart on the website's store: the page sees
-          which of your ships can be upgraded and RSI's prices, inside your browser only (see
+          <strong>Messages from openhangar.space:</strong> pages on openhangar.space,
+          app.openhangar.space and hangar.openhangar.space, and no other site, can check that Open
+          Hangar is installed. Pages on openhangar.space and app.openhangar.space can ask it for two
+          things. The first is Add to RSI Cart on the website's store: the page sees which of your
+          ships can be upgraded and RSI's prices, inside your browser only (see
           <a href="#add-to-rsi-cart">Add to RSI Cart</a>). The second, on app.openhangar.space only,
-          is Connect This Browser, which connects sync from the website. Chrome and Edge let these
-          pages message the extension directly. Firefox doesn't, so on Firefox the extension runs a
-          small bridge script on these pages that only passes their messages to the extension and
-          its answers back. It reads nothing else on the page and sends nothing anywhere else.
+          is Connect This Browser, which connects sync from the website. hangar.openhangar.space is
+          our hangar page, which shows your hangar without an account. It can ask for four things:
+          your hangar as this browser scanned it, when it was last scanned, a new scan, and Add to
+          RSI Cart. Your hangar here means your backup file without the scan history, your referral
+          code and your referral prospects list. It never includes your sync token, the site
+          address, your settings or your wishlist. The page shows it inside your browser only and
+          keeps no copy after you close it. Your hangar never reaches our server. On Firefox, the
+          page can read your hangar only after you say yes to Firefox's data prompt. Chrome and Edge
+          let these pages message the extension directly. Firefox doesn't, so on Firefox the
+          extension runs a small bridge script on these pages that only passes their messages to the
+          extension and its answers back. It reads nothing else on the page and sends nothing
+          anywhere else.
         </li>
       </ul>
       <h2>Data Export</h2>
