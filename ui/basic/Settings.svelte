@@ -1,7 +1,10 @@
 <script>
-  // The basic page's settings: openhangar.space (Connect, Sync Now, Disconnect), your
-  // data (Export JSON, Clear Data), Saved Accounts and Log Out of RSI.
+  // The basic page's settings: openhangar.space (Connect, Sync Now, Disconnect), the
+  // store alerts' switch (the `alerts` build flag, ./AlertsCard.svelte), your data
+  // (Export JSON, Clear Data), Saved Accounts and Log Out of RSI.
   import { t } from './copy.js';
+  import { flag } from '../lib/flags.js';
+  import AlertsCard from './AlertsCard.svelte';
   import {
     clearData,
     connect,
@@ -74,6 +77,8 @@
         </p>{/if}
     </div>
   {/if}
+
+  {#if flag('alerts')}<AlertsCard />{/if}
 
   <div class="bp-card" id="bp-data">
     <h3>{t('basic.your-data')}</h3>

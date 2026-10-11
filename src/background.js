@@ -47,7 +47,7 @@ async function updateReminder() {
   const alert = AL.badgeFor(got[AL.ON_KEY], got[AL.STATE_KEY]);
   if (alert) {
     await chrome.action.setBadgeText({ text: alert.text });
-    await chrome.action.setBadgeBackgroundColor({ color: '#1f6feb' });
+    await chrome.action.setBadgeBackgroundColor({ color: '#3b6aed' });
     await chrome.action.setTitle({ title: alert.title });
     return;
   }

@@ -12,11 +12,13 @@ build for now.
 
 ## What a Connector Build Has
 
-- **The toolbar popup** (`src/popup.html`, `ui/popup/`): Account Value, a place for the
-  alert count, the last scan, Scan, Open My Hangar, where sync stands.
+- **The toolbar popup** (`src/popup.html`, `ui/popup/`): Account Value, the last scan,
+  Scan, Open My Hangar, the store alerts with why (with the `alerts` flag,
+  `ui/popup/Alerts.svelte`: opening the popup marks them seen), where sync stands.
 - **The basic page** (`src/basic.html`, `ui/basic/`): Pledges and Buy-Backs with search,
   totals and CSV, Export JSON, Report a Scan Problem, and the settings (openhangar.space,
-  Clear Data, Saved Accounts, Log Out of RSI). Text only; it works with no network.
+  the store alerts' switch with the `alerts` flag, Clear Data, Saved Accounts, Log Out of
+  RSI). Text only; it works with no network.
 - **The background worker** as today: our pages' messages (bridge v2), the rescan badge,
   updates.
 - **The scan**, at the same depth: account and balances, the hangar (with the pledge
