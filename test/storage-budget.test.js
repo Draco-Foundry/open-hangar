@@ -117,6 +117,17 @@ const BUDGET = {
   currency: small(),
   streamerMode: small(),
   remindRescan: small(),
+  // Extension Alerts (src/alerts.js, the `alerts` build flag).
+  alertsOn: small('the switch'),
+  alerts: {
+    cap: 'MATCH_MAX 200 matches; PAIRS_MAX 2,000 newest pairs in each of known, seen, gone',
+    max: 400 * KB,
+  },
+  alertsFeed: {
+    cap: 'one sale feed (FEED_ITEMS_MAX 2,000 items, FEED_SHIPS_MAX 1,000 ships), replaced whole',
+    max: 2.5 * MB,
+  },
+  alertsWish: small('the account Wishlist keys, 300 at most, replaced whole'),
 };
 // Keys built at run time, as the source writes them (test/storage-keys.js).
 const DYNAMIC = {
@@ -296,6 +307,65 @@ async function fillWorstCase() {
           },
         ]),
       ),
+    },
+    // Extension Alerts at their caps.
+    alertsFeed: (() => {
+      const AL = require('../src/alerts.js');
+      const slug = (i) => `anvil-carrack-expedition-best-in-show-edition-${i}`;
+      const data = AL.readFeed({
+        v: 1,
+        updatedAt: '2026-10-11T11:55:00.000Z',
+        ships: Array.from({ length: AL.FEED_SHIPS_MAX }, (_, i) => ({
+          slug: slug(i),
+          name: `Anvil Carrack Expedition Best In Show Edition ${i}`,
+          keys: Array.from(
+            { length: AL.KEYS_PER_SHIP_MAX },
+            (_, k) => `${k} anvil carrack expedition ${i}`,
+          ),
+        })),
+        items: Array.from({ length: AL.FEED_ITEMS_MAX }, (_, i) => ({
+          id: `sku-${100000 + i}`,
+          kind: 'paint',
+          name: `Carrack - Best In Show Edition ${i} Paint`.padEnd(120, 'x'),
+          price: 12.5,
+          sale: ['warbond', 'discount', 'limited', 'listed', 'back'],
+          endsOn: '2026-10-15',
+          ships: Array.from({ length: 4 }, (_, k) => slug(i + k)),
+        })),
+      });
+      return { data, etag: 'W/"' + 'f'.repeat(32) + '"', at: 1, fails: 0 };
+    })(),
+    alerts: (() => {
+      const pairs = (tag) =>
+        Object.fromEntries(
+          Array.from({ length: 2000 }, (_, i) => [`sku-${100000 + i}|${tag}`, 1e12 + i]),
+        );
+      return {
+        v: 1,
+        checkedAt: 1,
+        items: Array.from({ length: 200 }, (_, i) => ({
+          id: `sku-${100000 + i}`,
+          name: `Carrack - Best In Show Edition ${i} Paint`.padEnd(120, 'x'),
+          kind: 'paint',
+          price: 12.5,
+          sale: ['warbond', 'discount', 'limited', 'listed', 'back'],
+          endsOn: '2026-10-15',
+          why: ['wishlist', 'buyback', 'paint', 'warbond', 'limited'].map((why) => ({
+            why,
+            ships: ['Anvil Carrack Expedition Best In Show Edition'],
+          })),
+        })),
+        known: pairs('paint'),
+        seen: pairs('paint'),
+        gone: pairs('warbond'),
+      };
+    })(),
+    alertsWish: {
+      keys: Array.from({ length: 300 }, (_, i) => `ship:anvil-carrack-expedition-${i}`),
+      at: 1,
+      connectedAt: 1,
+      retryAt: 2,
+      fails: 0,
     },
     feedGameStatus: {
       at: 1,

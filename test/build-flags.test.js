@@ -17,7 +17,13 @@ test('registry parses: every flag has a name, a one-line about and a default', a
   const { loadFlags, validateRegistry } = await lib();
   const { registry, values } = loadFlags(FLAGS_SRC);
   validateRegistry(registry);
-  assert.deepEqual(Object.keys(registry).sort(), ['connector', 'localMode', 'orgFleet', 'sync']);
+  assert.deepEqual(Object.keys(registry).sort(), [
+    'alerts',
+    'connector',
+    'localMode',
+    'orgFleet',
+    'sync',
+  ]);
   for (const [name, f] of Object.entries(registry)) {
     assert.ok(f.about.length < 100, `${name}: keep about to one short line`);
     assert.ok(!/\u2014/.test(f.about), `${name}: no em dashes`);
@@ -45,6 +51,7 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     orgFleet: false,
     localMode: false,
     connector: false,
+    alerts: false,
   });
   // Local Mode is on in the beta now that the privacy policy names our hangar page
   // (test/privacy-permissions.test.js); the public store builds keep it off.
@@ -53,12 +60,14 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     orgFleet: false,
     localMode: true,
     connector: false,
+    alerts: false,
   });
   assert.deepEqual(buildValues(registry, { overrides: { sync: false } }), {
     sync: false,
     orgFleet: false,
     localMode: false,
     connector: false,
+    alerts: false,
   });
   assert.equal(registry.orgFleet.devOnly, true, 'orgFleet stays out of every store build');
   assert.ok(!registry.localMode.devOnly, 'Local Mode may ship once the policy says so');
@@ -83,9 +92,21 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'oh-flags-'));
   const file = path.join(dir, 'flags.js');
   fs.writeFileSync(file, FLAGS_SRC);
-  writeFlags(file, { sync: false, orgFleet: true, localMode: true, connector: false });
+  writeFlags(file, {
+    sync: false,
+    orgFleet: true,
+    localMode: true,
+    connector: false,
+    alerts: false,
+  });
   const { values } = loadFlags(fs.readFileSync(file, 'utf8'));
-  assert.deepEqual(values, { sync: false, orgFleet: true, localMode: true, connector: false });
+  assert.deepEqual(values, {
+    sync: false,
+    orgFleet: true,
+    localMode: true,
+    connector: false,
+    alerts: false,
+  });
   assert.throws(() => writeFlags(file, {}), /expected one/, 'only ever written once');
   fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -226,7 +247,7 @@ test('pack: writes each build its values and cuts the code of flags that are off
       const b = built(t);
       assert.deepEqual(
         b.flags,
-        { sync: true, orgFleet: false, localMode: false, connector: false },
+        { sync: true, orgFleet: false, localMode: false, connector: false, alerts: false },
         t,
       );
       assert.equal(b.probe, 'keep();\n', `${t}: orgFleet code cut`);
@@ -268,8 +289,9 @@ test('pack: writes each build its values and cuts the code of flags that are off
       },
       "Firefox's event page loads what background.js imports on Chrome, first",
     );
-    // Every script background.js imports on Chrome is on that list.
-    const bg = fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8');
+    // Every script the built background.js imports on Chrome is on that list (a flag
+    // that's off takes its imports with it: Extension Alerts' src/alerts.js).
+    const bg = read('chrome', 'src/background.js');
     const imported = [...bg.matchAll(/importScripts\(([^)]*)\)/g)].flatMap((m) =>
       [...m[1].matchAll(/'([^']+)'/g)].map((x) => `src/${x[1]}`),
     );
@@ -308,6 +330,7 @@ test('pack: writes each build its values and cuts the code of flags that are off
       orgFleet: true,
       localMode: false,
       connector: false,
+      alerts: false,
     });
     assert.match(built('chrome').probe, /orgFleetOnly\(\);/);
     assert.throws(() => check(dir), /flag "orgFleet" is on, and it's dev-only/);
@@ -320,6 +343,7 @@ test('pack: writes each build its values and cuts the code of flags that are off
         orgFleet: false,
         localMode: false,
         connector: false,
+        alerts: false,
       });
       assert.match(built('chrome').lib, /OH\.siteLinkStart\s*=/, 'sync code kept');
       assert.match(check(dir), /clean store build/);
@@ -332,7 +356,7 @@ test('pack: writes each build its values and cuts the code of flags that are off
       const b = built(t);
       assert.deepEqual(
         b.flags,
-        { sync: false, orgFleet: false, localMode: false, connector: false },
+        { sync: false, orgFleet: false, localMode: false, connector: false, alerts: false },
         t,
       );
       assert.ok(!/OH\.siteLinkStart\s*=/.test(b.lib), `${t}: sync code cut`);
@@ -428,12 +452,14 @@ test('pack: writes each build its values and cuts the code of flags that are off
       orgFleet: false,
       localMode: true,
       connector: false,
+      alerts: false,
     });
     assert.deepEqual(built('beta-firefox').flags, {
       sync: true,
       orgFleet: false,
       localMode: true,
       connector: false,
+      alerts: false,
     });
     assert.deepEqual(built('beta').pages.hangar, ['https://hangar.openhangar.space']);
     assert.throws(() => pack(dir, ['--beta', '--flag', 'orgFleet=on']), /beta set/);

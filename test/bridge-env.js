@@ -68,8 +68,17 @@ const builtBridge = (pages) =>
     `const PAGES = ${JSON.stringify([...pages.hangar, ...pages.site])};`,
   );
 
-// chrome.storage's areas: copies in and out, as the real one.
-function area(data) {
+// chrome.storage's areas: copies in and out, as the real one. `changed` (optional): the
+// onChanged listeners to tell, as the browser does after a write.
+function area(data, changed = null, name = 'local') {
+  const tell = (before) => {
+    if (!changed) return;
+    const c = {};
+    for (const k of new Set([...Object.keys(before), ...Object.keys(data)]))
+      if (JSON.stringify(before[k]) !== JSON.stringify(data[k]))
+        c[k] = { oldValue: before[k], newValue: structuredClone(data[k]) };
+    if (Object.keys(c).length) for (const f of changed) f(c, name);
+  };
   const pick = (k) =>
     k == null
       ? Object.keys(data)
@@ -85,8 +94,16 @@ function area(data) {
           .filter((x) => x in data)
           .map((x) => [x, structuredClone(data[x])]),
       ),
-    set: async (o) => void Object.assign(data, structuredClone(o)),
-    remove: async (k) => void [].concat(k).forEach((x) => delete data[x]),
+    set: async (o) => {
+      const before = structuredClone(data);
+      Object.assign(data, structuredClone(o));
+      tell(before);
+    },
+    remove: async (k) => {
+      const before = structuredClone(data);
+      [].concat(k).forEach((x) => delete data[x]);
+      tell(before);
+    },
   };
 }
 
@@ -96,6 +113,9 @@ function area(data) {
 // flags, with staging's for staging: true). local and session: what storage holds.
 // granted: Firefox's data permission. contexts: runtime.getContexts' answer (null:
 // a browser without it). fetch: the network (RSI's stand-in for Add to RSI Cart).
+// Extension Alerts: notify (true: Notifications allowed, so chrome.notifications is
+// there), and changes (true: storage writes tell the onChanged listeners, as the browser
+// does). The fake alarms and notifications are in the answer.
 function loadBackground({
   browser = 'chrome',
   flags = { sync: true, orgFleet: false, localMode: true },
@@ -108,6 +128,8 @@ function loadBackground({
   fetch = async () => {
     throw new Error('no network here');
   },
+  notify = false,
+  changes = false,
   globals = {},
 } = {}) {
   const firefox = browser === 'firefox' || browser === 'firefox-android';
@@ -118,8 +140,32 @@ function loadBackground({
   const opened = [];
   const focused = [];
   let nextTab = 100;
+  const changed = [];
+  const alarms = new Map();
+  const onAlarm = [];
+  const notes = [];
+  const onNoteClick = [];
   const chrome = {
-    storage: { local: area(local), session: area(session), onChanged: listen() },
+    storage: {
+      local: area(local, changes ? changed : null, 'local'),
+      session: area(session, changes ? changed : null, 'session'),
+      onChanged: { addListener: (f) => void changed.push(f) },
+    },
+    alarms: {
+      create: async (name, o) => void alarms.set(name, { name, ...o }),
+      get: async (name) => (alarms.has(name) ? structuredClone(alarms.get(name)) : undefined),
+      clear: async (name) => alarms.delete(name),
+      onAlarm: { addListener: (f) => void onAlarm.push(f) },
+    },
+    ...(notify
+      ? {
+          notifications: {
+            create: async (id, o) => void notes.push({ id, ...o }),
+            clear: async () => true,
+            onClicked: { addListener: (f) => void onNoteClick.push(f) },
+          },
+        }
+      : {}),
     ...(browser === 'chrome' || browser === 'firefox'
       ? {
           identity: {
@@ -130,7 +176,14 @@ function loadBackground({
           },
         }
       : {}),
-    permissions: { contains: async () => granted },
+    // Firefox's data permission (granted), or Notifications (notify).
+    permissions: {
+      contains: async (q) =>
+        q && Array.isArray(q.permissions) && q.permissions.includes('notifications')
+          ? notify
+          : granted,
+      onAdded: listen(),
+    },
     runtime: {
       id: firefox ? FIREFOX_ID : CHROME_ID,
       onInstalled: listen(),
@@ -177,7 +230,18 @@ function loadBackground({
     'flags.js': () => builtFlags(flags),
     'site-pages.js': () => builtPages(pages),
   };
-  const ctx = { chrome, console, crypto, TextEncoder, btoa, URL, setTimeout, fetch, ...globals };
+  const ctx = {
+    chrome,
+    console,
+    crypto,
+    TextEncoder,
+    btoa,
+    URL,
+    setTimeout,
+    AbortSignal,
+    fetch,
+    ...globals,
+  };
   ctx.self = ctx;
   vm.createContext(ctx);
   ctx.importScripts = (...names) => {
@@ -210,6 +274,9 @@ function loadBackground({
       { ohSite: msg },
       { id: chrome.runtime.id, tab: { id: 1 }, frameId: 0, url, ...sender },
     );
+  // An alarm going off, and a notification clicked (Extension Alerts).
+  const fireAlarm = (name) => Promise.all(onAlarm.map((f) => f({ name })));
+  const clickNote = (id) => Promise.all(onNoteClick.map((f) => f(id)));
   return {
     send,
     sendInternal,
@@ -217,6 +284,10 @@ function loadBackground({
     stores: { local, session },
     opened,
     focused,
+    alarms,
+    notes,
+    fireAlarm,
+    clickNote,
     ctx,
     chrome,
   };

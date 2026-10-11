@@ -44,6 +44,14 @@
       about: 'The connector: a toolbar popup and one basic page instead of the dashboard.',
       default: false,
     },
+    // Store alerts matched on the device (connector plan 0.4, src/alerts.js). Off in the
+    // store and the beta until the privacy policy and the store forms name the sale
+    // feed, the Wishlist read and the alarms and notifications permissions
+    // (test/privacy-permissions.test.js). Needs connector.
+    alerts: {
+      about: "Store alerts: a badge and notifications for what's on sale for you, matched here.",
+      default: false,
+    },
   };
 
   // Set per build by scripts/pack.mjs. Keep it empty here.

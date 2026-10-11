@@ -93,3 +93,36 @@ test('every page a store or beta build lets in is named in both copies of the po
 test('both copies of the policy explain permissions in the same words', () => {
   assert.deepEqual(htmlBullets(), mdBullets());
 });
+
+// Extension Alerts (scripts/alerts.mjs): a store or beta build with the `alerts` flag on
+// asks for `alarms` and an optional `notifications`, downloads the public sale feed and,
+// while connected, reads the account's Wishlist keys. Each fails here until both copies
+// of the policy say so (owner-approved words, word for word).
+test('a store or beta build with alerts on: the policy explains its permissions and requests', async () => {
+  const { buildValues, readRegistry } = await import('../scripts/build-flags.mjs');
+  const { alertsPermissions } = await import('../scripts/alerts.mjs');
+  const registry = readRegistry(path.join(ROOT, 'src', 'flags.js'));
+  const copies = [
+    ['docs/PRIVACY.md', read('docs/PRIVACY.md'), mdBullets()],
+    ['site/privacy.html', read('site/privacy.html'), htmlBullets()],
+  ];
+  // What a build with the flag adds, checked here so a change to scripts/alerts.mjs
+  // can't quietly skip the policy.
+  assert.deepEqual(alertsPermissions({ alerts: true }), {
+    permissions: ['alarms'],
+    optional: ['notifications'],
+  });
+  for (const [build, beta] of [
+    ['store', false],
+    ['beta', true],
+  ]) {
+    const add = alertsPermissions(buildValues(registry, { beta }));
+    if (!add) continue;
+    for (const [file, text, bullets] of copies) {
+      for (const p of [...add.permissions, ...add.optional])
+        assert.ok(named(bullets, p), `${file} explains "${p}" (the ${build} build has alerts)`);
+      for (const req of ['/api/store/on-sale', '/api/v1/wishlist'])
+        assert.ok(text.includes(req), `${file} names ${req} (the ${build} build has alerts)`);
+    }
+  }
+});

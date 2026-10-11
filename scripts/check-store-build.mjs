@@ -26,7 +26,8 @@
 //
 // And every build carries src/flags.js with exactly its set of build flags (the
 // registry's defaults, or its beta set), and no flag the registry marks dev-only
-// is on (docs/FLAGS.md).
+// is on (docs/FLAGS.md). Extension Alerts' file and permissions are there only with
+// its flag on (scripts/alerts.mjs), Notifications only ever optional.
 //
 // Our pages' way in (bridge v2, scripts/site-pages.mjs): the manifest's list
 // (externally_connectable on Chrome and Edge with exact https://host/* patterns and
@@ -38,6 +39,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { alertsProblems } from './alerts.mjs';
 import { buildValues, loadFlags, readRegistry } from './build-flags.mjs';
 import { connectorProblems } from './connector.mjs';
 import {
@@ -322,6 +324,11 @@ for (const [unit, build] of Object.entries(builds)) if (build.manifest) checkPag
 for (const [unit, build] of Object.entries(builds))
   if (build.manifest && build.flags && build.read)
     problems.push(...connectorProblems(unit, { ...build, connector: !!build.flags.connector }));
+// Extension Alerts (scripts/alerts.mjs): src/alerts.js and its permissions (notifications
+// only ever optional) when the flag is on, none of them when it's off.
+for (const [unit, build] of Object.entries(builds))
+  if (build.manifest && build.flags)
+    problems.push(...alertsProblems(unit, { ...build, alerts: !!build.flags.alerts }));
 if (problems.length) {
   console.error(`✖ Not a ${BETA ? 'beta' : 'public store'} build:\n  ${problems.join('\n  ')}`);
   console.error(
