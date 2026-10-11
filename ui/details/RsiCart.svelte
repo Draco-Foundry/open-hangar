@@ -118,7 +118,13 @@
       return;
     }
     phase = 'error';
-    error = { kind: (r && r.error) || 'network', when: 'add', reason: (r && r.reason) || null };
+    error = {
+      kind: (r && r.error) || 'network',
+      when: 'add',
+      reason: (r && r.reason) || null,
+      // RSI's own short message when it turned the add down (src/rsi-cart.js rsiSays).
+      rsiSays: (r && typeof r.rsiSays === 'string' && r.rsiSays.trim()) || null,
+    };
   }
 
   // Paying for a buy-back with store credit takes a Buy-Back Token (cash doesn't).
@@ -142,19 +148,22 @@
     if (kind === 'buyback' && phase === 'idle') loadBuybackPrice();
   });
 
+  // [copy: …] marks words still to be written: each says what they must say.
+  const RSI_SAYS_LEAD =
+    "[copy: a few words before RSI's own message in quotes, saying these are RSI's words and nothing was added]";
   const NOTES = {
     'signed-out': {
-      title: 'Sign In to RSI First',
-      text: "The upgrade goes into your RSI cart, so RSI needs to know it's you.",
+      title: '[copy: title: signed out of RSI, sign in there and then try again]',
+      text: '[copy: one line: the upgrade goes into your own RSI cart, so sign in to RSI in this browser first; nothing was added]',
     },
     'cart-conflict': {
       title: 'Cart Already Busy',
-      text: 'RSI takes a buy-back on its own. Check out or empty your RSI cart, then try again.',
+      text: '[copy: one line: RSI says your cart holds a buy-back, which goes in a cart alone; check out or empty your RSI cart, then try again; must not suggest this upgrade spent one]',
     },
     refused: {
       add: {
         title: "RSI Didn't Add It",
-        text: "That upgrade isn't on offer from this ship right now. Nothing was added.",
+        text: '[copy: one line: RSI turned the upgrade down without saying why and nothing was added; no guess at a reason]',
       },
       load: {
         title: 'No Upgrade on Offer',
@@ -186,7 +195,17 @@
         text: "RSI won't sell this buy-back upgrade any more (ship values changed).",
       };
     const n = NOTES[error.kind] || NOTES.network;
-    return n.title ? n : n[error.when === 'add' ? 'add' : 'load'];
+    const base = n.title ? n : n[error.when === 'add' ? 'add' : 'load'];
+    // RSI said why: its words, quoted, so nothing here guesses.
+    if (error.rsiSays && (error.kind === 'refused' || error.kind === 'cart-conflict'))
+      return { title: base.title, text: `${RSI_SAYS_LEAD} “${error.rsiSays}”` };
+    // A buy-back clash on a buy-back's own add: it goes into the cart alone.
+    if (error.kind === 'cart-conflict' && kind === 'buyback')
+      return {
+        title: base.title,
+        text: '[copy: one line: a buy-back goes into the RSI cart alone, so empty or check out your RSI cart first, then try again]',
+      };
+    return base;
   });
 </script>
 
