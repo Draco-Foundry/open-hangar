@@ -111,8 +111,8 @@ on, so the staging hangar page (hangar-staging.openhangar.space) can talk to tha
 `connector` is the extension as the website's connector (owner, 2026-10-10): the
 website is the full app, and the extension scans RSI, hands the hangar to our pages and
 keeps one basic page that works on its own. With it on, the toolbar icon opens a popup
-(`src/popup.html`, `ui/popup/`: Account Value, the last scan, Scan, Open My Hangar and
-where sync stands) instead of a tab, and the extension's one page is the basic page
+(`src/popup.html`, `ui/popup/`: Account Value, the last scan, Scan, Open My Hangar,
+the store alerts with the `alerts` flag, and where sync stands) instead of a tab, and the extension's one page is the basic page
 (`src/basic.html`, `ui/basic/`): Pledges and Buy-Backs with search, totals and CSV,
 Export JSON, Report a Scan Problem and the settings (openhangar.space, Clear Data, Saved
 Accounts, Log Out of RSI). It is text only and reads only what's stored, so it works
@@ -143,8 +143,12 @@ everyone) and, while this browser is connected, the account's Wishlist keys
 hangar and buy-backs this browser scanned. Each match says why: on your Wishlist, a ship
 in your buy-backs is in the store again, a paint for a ship you own just arrived, a ship
 you own is sold as a warbond, or is on a limited-time sale. The badge counts the items
-you haven't seen (the popup lists them); a new one gets a notification. It's off until
-the pilot turns it on in the basic page's settings, and asks nothing before that.
+you haven't seen (the popup lists them, `ui/popup/Alerts.svelte`, and opening it marks
+them seen); a new one gets a notification. It's off until the pilot turns it on in the
+basic page's settings (`ui/basic/AlertsCard.svelte`), and asks nothing before that:
+Turn On asks for Notifications first (a no leaves the badge and the list), Turn Off
+stops the checks and gives Notifications back. The popup never asks for a permission
+(it closes when the browser asks).
 
 The build adds the `alarms` permission (no install warning) and `notifications` as an
 optional permission, asked only when the pilot turns alerts on, never a required one

@@ -89,14 +89,16 @@ function demoDashboard() {
 }
 // The connector's own pages (src/popup.html, src/basic.html): the same shims, before flags.js, plus
 // what only those pages use (demo-connector.js: session storage, change events, the
-// popup's message to the background).
+// popup's message to the background). Their flags are a connector build's, Extension
+// Alerts on (connectorFlags), as `--flag localMode=on --flag connector=on --flag
+// alerts=on` builds them.
 function demoConnectorPage(file) {
   return fs
     .readFileSync(path.join(SRC, file), 'utf8')
     .replace('<head>', `<head>\n    ${demoClock()}`)
     .replace(
       '<script src="flags.js"></script>',
-      '<script src="/__demo/demo-shim.js"></script>\n    <script src="/__demo/demo-connector.js"></script>\n    <script src="flags.js"></script>',
+      '<script src="/__demo/demo-shim.js"></script>\n    <script src="/__demo/demo-connector.js"></script>\n    <script src="/__connector-flags.js"></script>',
     )
     .replace(
       '<script src="lib.js"></script>',
@@ -104,8 +106,23 @@ function demoConnectorPage(file) {
     );
 }
 
+// src/flags.js as a connector build with Extension Alerts writes it (scripts/pack.mjs).
+const connectorFlags = () =>
+  fs
+    .readFileSync(path.join(SRC, 'flags.js'), 'utf8')
+    .replace(
+      'const BUILD_VALUES = {};',
+      'const BUILD_VALUES = {"sync":true,"orgFleet":false,"localMode":true,"connector":true,"alerts":true};',
+    );
+
 async function handle(req, res) {
   const u = new URL(req.url, 'http://localhost');
+
+  if (u.pathname === '/__connector-flags.js') {
+    return res
+      .writeHead(200, { 'content-type': 'text/javascript', 'cache-control': 'no-store' })
+      .end(connectorFlags());
+  }
 
   if (u.pathname === '/proxy') {
     const target = u.searchParams.get('u') || '';

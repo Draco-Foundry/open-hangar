@@ -1,21 +1,21 @@
 <script>
   // The toolbar popup (the connector build, src/flags.js `connector`): Account Value,
-  // the alert count's place (alerts come later), the last scan, Scan, Open My Hangar,
-  // and where sync stands. It shows what's stored here and never asks RSI anything
+  // the last scan, Scan, Open My Hangar, the store alerts (the `alerts` flag,
+  // ./Alerts.svelte) and where sync stands. It shows what's stored here and never asks RSI anything
   // (ui/popup/data.js). Scan asks the background, which brings the
   // extension's page to the front to run it (src/background.js requestScan).
   import { onMount } from 'svelte';
   import { t } from './copy.js';
   import { HUB_PAGE, popupView, scanBusy, storeCredit } from './data.js';
   import { synced } from '../site/when.js';
+  import { flag } from '../lib/flags.js';
+  import Alerts from './Alerts.svelte';
 
   const OH = globalThis.OH;
   let v = $state(null);
   let value = $state(null); // { total } once ship prices are in
   let busy = $state(false);
   let note = $state('');
-  // Alert count: null until alerts move here (a later step), so nothing shows.
-  const alerts = null;
 
   const money = (n) =>
     n == null
@@ -86,7 +86,6 @@
     <section class="pp-value" aria-live="polite">
       <div class="pp-lbl">{value ? 'Account Value' : t('popup.melt-label')}</div>
       <div class="pp-big" id="pp-value">{money(value ? value.total : v.melt)}</div>
-      {#if alerts != null}<div class="pp-alerts">{t('popup.alerts', { n: alerts })}</div>{/if}
     </section>
 
     <p class="pp-scan" class:warn={v.staleDays != null} id="pp-last">
@@ -108,6 +107,8 @@
       {/if}
     </div>
     {#if note}<p class="pp-note" role="status">{note}</p>{/if}
+
+    {#if flag('alerts')}<Alerts {openHub} />{/if}
 
     <section class="pp-site" id="pp-site">
       {#if v.connected}

@@ -41,6 +41,24 @@
   window.open = (url) => void demo.opened.push(url);
   chrome.tabs.getCurrent = async () => ({ id: 42 });
   chrome.permissions = { contains: async () => true, request: async () => true };
+  // Extension Alerts' permission asks and gives back, recorded (Notifications); set
+  // __demoNotify = false for a browser that said no. __demoAlerts: storage to start with.
+  demo.asked = [];
+  demo.removed = [];
+  const notifyOk = () => window.__demoNotify !== false;
+  chrome.permissions.contains = async (q) =>
+    q?.permissions?.includes('notifications') ? notifyOk() && !demo.gaveBack : true;
+  chrome.permissions.request = async (q) => {
+    demo.asked.push(...(q?.permissions || []));
+    demo.gaveBack = false;
+    return q?.permissions?.includes('notifications') ? notifyOk() : true;
+  };
+  chrome.permissions.remove = async (q) => {
+    demo.removed.push(...(q?.permissions || []));
+    demo.gaveBack = true;
+    return true;
+  };
+  if (window.__demoAlerts) chrome.storage.local.set(window.__demoAlerts);
   chrome.runtime.reload = () => void (demo.reloaded = true);
   // Firefox before it lets the extension share, with our hangar page's ask waiting for
   // this tab (src/background.js oh-get-hangar): set by the UI test.
