@@ -199,6 +199,25 @@ body {
   align-items: center;
   gap: 8px;
 }
+/* Disconnect's question: two equal buttons side by side, each on one line, centered
+   (owner, 2026-10-09). */
+.bp-confirm {
+  display: grid;
+  gap: 8px;
+  max-width: 420px;
+}
+.bp-confirm p {
+  margin: 0;
+}
+.bp-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.bp-pair .bp-btn {
+  text-align: center;
+  white-space: nowrap;
+}
 .bp-msg {
   color: var(--warn);
 }
