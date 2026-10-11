@@ -1,15 +1,9 @@
 {
   "format": 1,
   "revision": "2026-10-11",
-  "paging": {
-    "page": "page",
-    "size": "pagesize"
-  },
+  "paging": { "page": "page", "size": "pagesize" },
   "signedOut": {
-    "redirect": {
-      "source": "account\\/(connect|sign-?in)|\\/connect\\b",
-      "flags": "i"
-    },
+    "redirect": { "source": "account\\/(connect|sign-?in)|\\/connect\\b", "flags": "i" },
     "page": {
       "source": "name=[\"']password[\"']|id=[\"']?password|account\\/connect",
       "flags": "i"
@@ -18,10 +12,7 @@
   "hangar": {
     "path": "/account/pledges",
     "pageSize": 10,
-    "marker": {
-      "source": "js-pledge-id",
-      "flags": ""
-    },
+    "marker": { "source": "js-pledge-id", "flags": "" },
     "id": ".js-pledge-id",
     "card": ".row",
     "cardHas": ".js-pledge-name",
@@ -42,28 +33,14 @@
   "buybacks": {
     "path": "/account/buy-back-pledges",
     "pageSize": 100,
-    "empty": {
-      "source": "no pledges available",
-      "flags": "i"
-    },
+    "empty": { "source": "no pledges available", "flags": "i" },
     "card": "article",
     "name": "h1",
     "cells": "dd",
     "cellLayouts": [
-      {
-        "min": 4,
-        "date": 0,
-        "contains": 2
-      },
-      {
-        "min": 2,
-        "date": 0,
-        "contains": 1
-      },
-      {
-        "min": 1,
-        "date": 0
-      }
+      { "min": 4, "date": 0, "contains": 2 },
+      { "min": 2, "date": 0, "contains": 1 },
+      { "min": 1, "date": 0 }
     ],
     "button": ".holosmallbtn, a[href*='reclaim'], a[href*='buy-back']",
     "ids": {
@@ -72,25 +49,16 @@
       "toShip": "data-toshipid",
       "toSku": "data-toskuid"
     },
-    "hrefId": {
-      "source": "(?<id>\\d+)",
-      "flags": ""
-    },
+    "hrefId": { "source": "(?<id>\\d+)", "flags": "" },
     "image": "img",
     "background": "[style*=\"background\"]",
     "price": ".price, [class*=\"price\"], [class*=\"cost\"]",
-    "upgraded": {
-      "source": "\\s-\\s*upgraded\\s*$",
-      "flags": "i"
-    },
+    "upgraded": { "source": "\\s-\\s*upgraded\\s*$", "flags": "i" },
     "tokens": {
       "source": "you have (?<n>\\d+|no) opportunit(?:y|ies) to buy back",
       "flags": "i"
     },
-    "noTokens": {
-      "source": "^no$",
-      "flags": "i"
-    }
+    "noTokens": { "source": "^no$", "flags": "i" }
   },
   "buybackDetail": {
     "path": "/pledge/buyback/",
@@ -100,10 +68,7 @@
     "title": ".content-block4 h1, #store-wrapper h1",
     "ships": ".package-listing.ship li",
     "info": ".info",
-    "infoLine": {
-      "source": "^(?<label>[^:]+):\\s*(?<value>.*)$",
-      "flags": ""
-    },
+    "infoLine": { "source": "^(?<label>[^:]+):\\s*(?<value>.*)$", "flags": "" },
     "fields": {
       "name": ["ship", "vehicle"],
       "manufacturer": ["manufacturer"],
@@ -113,62 +78,26 @@
     "also": ".package-listing.item li"
   },
   "names": {
-    "ccu": {
-      "source": "^\\s*upgrade\\s*-\\s*(?<from>.+?)\\s+to\\s+(?<to>.+?)\\s*$",
-      "flags": "i"
-    },
-    "addon": {
-      "source": "^\\s*add[\\s-]*on\\s*-",
-      "flags": "i"
-    },
-    "coupon": {
-      "source": "\\bcoupon\\b",
-      "flags": "i"
-    },
+    "ccu": { "source": "^\\s*upgrade\\s*-\\s*(?<from>.+?)\\s+to\\s+(?<to>.+?)\\s*$", "flags": "i" },
+    "addon": { "source": "^\\s*add[\\s-]*on\\s*-", "flags": "i" },
+    "coupon": { "source": "\\bcoupon\\b", "flags": "i" },
     "gameAccess": {
       "source": "\\b(star citizen|squadron 42)\\b.*\\b(digital|download|game|package)\\b",
       "flags": "i"
     },
-    "paint": {
-      "source": "\\b(paint|skin|livery|liveries|camo)\\b",
-      "flags": "i"
-    },
-    "pack": {
-      "source": "\\bpacks?\\b",
-      "flags": "i"
-    },
-    "category": {
-      "source": "^\\s*(?<prefix>.+?)\\s+[-–]\\s",
-      "flags": ""
-    }
+    "paint": { "source": "\\b(paint|skin|livery|liveries|camo)\\b", "flags": "i" },
+    "pack": { "source": "\\bpacks?\\b", "flags": "i" },
+    "category": { "source": "^\\s*(?<prefix>.+?)\\s+[-–]\\s", "flags": "" }
   },
   "categories": {
-    "package": {
-      "source": "^(packages?|game\\s+packages?)$",
-      "flags": "i"
-    },
+    "package": { "source": "^(packages?|game\\s+packages?)$", "flags": "i" },
     "kinds": [
+      { "pattern": { "source": "^(paints?|skins?|liver(y|ies))$", "flags": "i" }, "kind": "paint" },
       {
-        "pattern": {
-          "source": "^(paints?|skins?|liver(y|ies))$",
-          "flags": "i"
-        },
-        "kind": "paint"
-      },
-      {
-        "pattern": {
-          "source": "^(gear|armou?r|weapons?|components?|fps)$",
-          "flags": "i"
-        },
+        "pattern": { "source": "^(gear|armou?r|weapons?|components?|fps)$", "flags": "i" },
         "kind": "addon"
       },
-      {
-        "pattern": {
-          "source": "^subscribers?\\s+(store|vault)$",
-          "flags": "i"
-        },
-        "kind": "other"
-      },
+      { "pattern": { "source": "^subscribers?\\s+(store|vault)$", "flags": "i" }, "kind": "other" },
       {
         "pattern": {
           "source": "^(add[-\\s]?ons?|decorations?|posters?|flair|model\\s+ships?)$",
@@ -176,72 +105,30 @@
         },
         "kind": "addon"
       },
-      {
-        "pattern": {
-          "source": "^(packs?|combos?|bundles?)$",
-          "flags": "i"
-        },
-        "kind": "pack"
-      }
+      { "pattern": { "source": "^(packs?|combos?|bundles?)$", "flags": "i" }, "kind": "pack" }
     ],
-    "ship": {
-      "source": "^(standalone\\s+ships?|ships?|warbonds?)$",
-      "flags": "i"
-    }
+    "ship": { "source": "^(standalone\\s+ships?|ships?|warbonds?)$", "flags": "i" }
   },
   "kinds": {
-    "ship": {
-      "source": "^ship$",
-      "flags": "i"
-    },
-    "insurance": {
-      "source": "insurance",
-      "flags": "i"
-    },
-    "insuranceName": {
-      "source": "\\binsurance\\b",
-      "flags": "i"
-    }
+    "ship": { "source": "^ship$", "flags": "i" },
+    "insurance": { "source": "insurance", "flags": "i" },
+    "insuranceName": { "source": "\\binsurance\\b", "flags": "i" }
   },
   "insurance": {
     "fromName": {
-      "lti": {
-        "source": "\\blti\\b|lifetime",
-        "flags": "i"
-      },
-      "years": {
-        "source": "\\b(?<n>\\d+)\\s*[- ]?\\s*years?\\b",
-        "flags": "i"
-      },
-      "months": {
-        "source": "\\b(?<n>\\d+)\\s*[- ]?\\s*months?\\b",
-        "flags": "i"
-      }
+      "lti": { "source": "\\blti\\b|lifetime", "flags": "i" },
+      "years": { "source": "\\b(?<n>\\d+)\\s*[- ]?\\s*years?\\b", "flags": "i" },
+      "months": { "source": "\\b(?<n>\\d+)\\s*[- ]?\\s*months?\\b", "flags": "i" }
     },
     "fromItem": {
-      "lti": {
-        "source": "life\\s*-?\\s*time|lifetime|\\blti\\b",
-        "flags": "i"
-      },
-      "months": {
-        "source": "(?<n>\\d+)\\s*month",
-        "flags": "i"
-      },
-      "years": {
-        "source": "(?<n>\\d+)\\s*year",
-        "flags": "i"
-      }
+      "lti": { "source": "life\\s*-?\\s*time|lifetime|\\blti\\b", "flags": "i" },
+      "months": { "source": "(?<n>\\d+)\\s*month", "flags": "i" },
+      "years": { "source": "(?<n>\\d+)\\s*year", "flags": "i" }
     }
   },
   "dates": {
-    "label": {
-      "source": "^\\s*created\\s*:?\\s*",
-      "flags": "i"
-    },
-    "iso": {
-      "source": "^(?<year>\\d{4})-(?<month>\\d{2})-(?<day>\\d{2})",
-      "flags": ""
-    },
+    "label": { "source": "^\\s*created\\s*:?\\s*", "flags": "i" },
+    "iso": { "source": "^(?<year>\\d{4})-(?<month>\\d{2})-(?<day>\\d{2})", "flags": "" },
     "named": {
       "source": "^(?<month>[A-Za-z]{3})[a-z]*\\.?\\s+(?<day>\\d{1,2}),?\\s+(?<year>\\d{4})\\b",
       "flags": ""
@@ -267,10 +154,7 @@
       "label": "label",
       "currency": "currency"
     },
-    "subscriber": {
-      "type": "type",
-      "frequency": "frequency"
-    },
+    "subscriber": { "type": "type", "frequency": "frequency" },
     "concierge": {
       "level": "conciergeCurrentLevel",
       "next": "conciergeNextLevel",
@@ -291,38 +175,20 @@
     "entry": ".entry",
     "label": ".label",
     "value": ".value",
-    "sid": {
-      "source": "sid",
-      "flags": "i"
-    },
-    "rank": {
-      "source": "rank",
-      "flags": "i"
-    },
+    "sid": { "source": "sid", "flags": "i" },
+    "rank": { "source": "rank", "flags": "i" },
     "name": "a.value",
-    "redacted": {
-      "source": "^redacted$",
-      "flags": "i"
-    },
+    "redacted": { "source": "^redacted$", "flags": "i" },
     "orgLink": "a[href*=\"/orgs/\"]",
-    "orgSid": {
-      "source": "\\/orgs\\/(?<sid>[^/?#]+)",
-      "flags": ""
-    },
+    "orgSid": { "source": "\\/orgs\\/(?<sid>[^/?#]+)", "flags": "" },
     "logo": ".thumb img"
   },
   "referrals": {
     "path": "/graphql",
     "operation": "GetReferralRecruitsList",
     "query": "query GetReferralRecruitsList($campaignId: ID!, $converted: Boolean!, $display: ReferralRecruitsListDisplay, $limit: Int!, $page: Int!, $sortBy: ReferralRecruitsListSortBy) {\n  referralRecruitsList(query: {campaignId: $campaignId, converted: $converted, display: $display, limit: $limit, page: $page, sortBy: $sortBy}) {\n    recruitsCount\n    prospectsCount\n    data { id displayName nickname avatar enlistedOn convertedOn }\n  }\n}",
-    "variables": {
-      "display": "ALL_TIME",
-      "sortBy": "NEWEST"
-    },
-    "campaigns": {
-      "current": "2",
-      "legacy": "1"
-    },
+    "variables": { "display": "ALL_TIME", "sortBy": "NEWEST" },
+    "campaigns": { "current": "2", "legacy": "1" },
     "pageSize": 50
   },
   "subStore": {
@@ -339,10 +205,7 @@
           },
           "products": [65]
         },
-        "sort": {
-          "field": "weight",
-          "direction": "desc"
-        }
+        "sort": { "field": "weight", "direction": "desc" }
       }
     },
     "pageSize": 100,
@@ -355,7 +218,5 @@
       "query": "query initShipUpgrade { ships { id name flyableStatus msrp link skus { id title available price } } }"
     }
   },
-  "cart": {
-    "path": "/en/store/pledge/cart"
-  }
+  "cart": { "path": "/en/store/pledge/cart" }
 }
