@@ -95,11 +95,37 @@
       ? 'signed-out'
       : 'refused';
   }
+  // RSI's own words in a refusal (its msg / message / errors), for the website to show
+  // as they are: tags and spacing tidied, anything that looks like account data (an
+  // email address, a long number such as an order or pledge id) taken out, at most
+  // RSI_SAYS_MAX characters. → the text, or null when RSI said nothing readable.
+  const RSI_SAYS_MAX = 200;
+  function rsiSays(json) {
+    const j = unwrap(json);
+    const bits = [j.msg, j.message, j.data && j.data.message];
+    if (Array.isArray(j.errors)) for (const e of j.errors) bits.push(e && e.message);
+    const seen = new Set();
+    const text = bits
+      .filter((b) => typeof b === 'string')
+      .map((b) =>
+        b
+          .replace(/<[^>]*>/g, ' ')
+          .replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, ' ')
+          .replace(/#?\d{5,}/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim(),
+      )
+      .filter((b) => b && !seen.has(b) && seen.add(b))
+      .join(' ');
+    if (!/[a-z]/i.test(text)) return null;
+    return text.length > RSI_SAYS_MAX ? `${text.slice(0, RSI_SAYS_MAX - 1).trimEnd()}…` : text;
+  }
   // What a refusal from the add (addToCart or the cart step) says, if we know it:
   //   'invalid'       a buy-back upgrade RSI won't sell any more (ship values changed;
   //                   only for a buy-back: its message talks about invalid / upgrade)
   //   'cart-conflict' RSI's cart takes a buy-back on its own, one per cart, nothing
-  //                   else with it (the message talks about the cart or a buy-back)
+  //                   else with it: only when RSI's message names a buy-back (a message
+  //                   that just mentions the cart is a plain refusal)
   // Anything else → null (a plain refusal).
   function cartRefusal(json, buyback = false) {
     const j = unwrap(json);
@@ -107,15 +133,22 @@
     if (Array.isArray(j.errors)) for (const e of j.errors) bits.push(e && e.message);
     const text = bits.filter((b) => typeof b === 'string').join(' ');
     if (buyback && /invalid/i.test(text)) return 'invalid';
-    if (/buy[\s-]?backs?|cart/i.test(text)) return 'cart-conflict';
+    if (/buy[\s-]?backs?/i.test(text)) return 'cart-conflict';
     if (buyback && /upgrade/i.test(text)) return 'invalid';
     return null;
   }
-  // → the add's answer for a refusal: cart-conflict, a refusal with a reason, or plain.
+  // → the add's answer for a refusal: cart-conflict, a refusal with a reason, or plain,
+  // each with RSI's own words (rsiSays) when it gave any.
   const refusedBy = (json, buyback) => {
     const why = cartRefusal(json, buyback);
-    if (why === 'cart-conflict') return { ok: false, error: 'cart-conflict' };
-    return why ? { ok: false, error: 'refused', reason: why } : { ok: false, error: 'refused' };
+    const says = rsiSays(json);
+    const out =
+      why === 'cart-conflict'
+        ? { ok: false, error: 'cart-conflict' }
+        : why
+          ? { ok: false, error: 'refused', reason: why }
+          : { ok: false, error: 'refused' };
+    return says ? { ...out, rsiSays: says } : out;
   };
   function parseApp(json) {
     const app = unwrap(json).data && unwrap(json).data.app;
@@ -206,14 +239,17 @@
     // How RSI's own upgrade window signs in (its rsi-store-common code):
     // setAuthToken and setContextToken carry the Rsi-Token cookie as x-rsi-token,
     // and every GraphQL call carries the page's csrf-token as X-CSRF-TOKEN.
-    const cookieToken =
-      deps.rsiToken ||
+    // The Rsi-Token cookie RSI keeps for your session. → its value, '' when the
+    // browser says there is none (signed out of RSI), null when it can't tell (no
+    // cookies API here, or it failed).
+    const rsiCookie =
+      deps.rsiCookie ||
       (async () => {
         try {
           const c = root.chrome && root.chrome.cookies;
           if (!c || !c.get) return null;
           const got = await c.get({ url: RSI, name: 'Rsi-Token' });
-          if (!got || !got.value) return null;
+          if (!got || !got.value) return '';
           try {
             return decodeURIComponent(got.value);
           } catch {
@@ -223,6 +259,11 @@
           return null;
         }
       });
+    const cookieToken = deps.rsiToken || (async () => (await rsiCookie()) || null);
+    // Signed out for sure: the browser holds no RSI session at all. Checked before
+    // anything is asked of RSI; a session RSI no longer takes shows in its own answer
+    // (isAnonymous) further on.
+    const signedOut = async () => (await rsiCookie()) === '';
     let csrf = null; // { value, at }: read from an RSI page, kept 10 minutes
     const CSRF_TTL = 10 * 60e3;
 
@@ -300,7 +341,9 @@
         } catch {
           body = null;
         }
-        if (body && cartRefusal(body, true)) return { error: 'refused', json: body };
+        // RSI explained itself (a 4xx with a message): its words go back to the page.
+        if (body && res.status < 500 && (cartRefusal(body, true) || rsiSays(body)))
+          return { error: 'refused', json: body };
       }
       if (res.status === 403) return { error: 'refused' };
       if (!res.ok) return { error: 'network' };
@@ -345,6 +388,7 @@
     // opts.pledgeId: a buy-back upgrade (prices are its buy-back prices).
     async function upgradeOptions(toShipId, toSkuId, opts = {}) {
       if (!toInt(toShipId) || !toInt(toSkuId)) return { ok: false, error: 'refused' };
+      if (await signedOut()) return { ok: false, error: 'signed-out' };
       const pledge = toInt(opts.pledgeId);
       const ctx = await setContext(
         pledge ? { fromShipId: opts.fromShipId, toShipId, toSkuId, pledgeId: pledge } : {},
@@ -397,6 +441,7 @@
     // when you pick a From ship).
     async function upgradePrice(fromShipId, toSkuId, opts = {}) {
       if (!toInt(fromShipId) || !toInt(toSkuId)) return { ok: false, error: 'refused' };
+      if (await signedOut()) return { ok: false, error: 'signed-out' };
       const pledge = toInt(opts.pledgeId);
       if (pledge || opts.setContext) {
         const ctx = await setContext({
@@ -410,12 +455,14 @@
       return price(fromShipId, toSkuId);
     }
 
-    // Puts one upgrade in the RSI cart. → { ok: true } | { ok: false, error }.
+    // Puts one upgrade in the RSI cart. → { ok: true } | { ok: false, error, reason?,
+    // rsiSays? } (rsiSays: RSI's own words when it refused and said why).
     // Asked once: never retried, whatever happens (a retry could add it twice).
     // fromShipId can be any ship RSI offers the upgrade from, owned or not.
     async function addUpgradeToCart(fromShipId, toShipId, toSkuId, opts = {}) {
       if (!toInt(fromShipId) || !toInt(toShipId) || !toInt(toSkuId))
         return { ok: false, error: 'refused' };
+      if (await signedOut()) return { ok: false, error: 'signed-out' };
       const pledge = toInt(opts.pledgeId);
       const ctx = await setContext({ fromShipId, toShipId, toSkuId, pledgeId: pledge });
       if (ctx.error) return fail(ctx);
@@ -473,6 +520,7 @@
     parsePrice,
     parseAdded,
     cartRefusal,
+    rsiSays,
     buildOptions,
     buildOthers,
   };

@@ -145,6 +145,10 @@ siteHandlers['oh-hello'] = (msg, origin) => {
 // editions (the C8X's BIS Warbond), so the others are tried in turn and the one
 // that worked comes back as toSkuId, for the price and the add (website #329).
 //   oh-add-upgrade     { fromShipId, toShipId, toSkuId } → { ok } | { ok: false, error }
+// A refused add can carry rsiSays: RSI's own short message, trimmed and with anything
+// that looks like account data taken out, for the page to show as RSI's words. error
+// is 'cart-conflict' only when that message names a buy-back, and 'signed-out' comes
+// back before anything is asked of RSI when this browser holds no RSI session.
 if (typeof importScripts === 'function' && !self.OHCart) importScripts('rsi-cart.js');
 const cartLane = () => self.OHCart;
 const SITE_SKUS = 6; // editions tried at most: a few asks to RSI, never a burst
