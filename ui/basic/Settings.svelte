@@ -3,6 +3,7 @@
   // store alerts' switch (the `alerts` build flag, ./AlertsCard.svelte), your data
   // (Export JSON, Clear Data), Saved Accounts and Log Out of RSI.
   import { t } from './copy.js';
+  import { tick } from 'svelte';
   import { flag } from '../lib/flags.js';
   import AlertsCard from './AlertsCard.svelte';
   import {
@@ -19,6 +20,8 @@
   import { exportName } from './rows.js';
 
   let confirmClear = $state(false);
+  let confirmDisconnect = $state(false);
+  let stay = $state(); // Stay Connected, focused when the question opens
   let removing = $state(''); // the saved account asked about, before it goes
   let dataNote = $state('');
   const when = (at) =>
@@ -32,6 +35,15 @@
     );
     await chrome.storage.local.set({ lastBackupAt: Date.now() });
     dataNote = t('basic.json-saved');
+  }
+  async function askDisconnect() {
+    confirmDisconnect = true;
+    await tick();
+    stay?.focus();
+  }
+  async function leave() {
+    confirmDisconnect = false;
+    await disconnect();
   }
   async function clear() {
     confirmClear = false;
@@ -56,14 +68,37 @@
                 : t('basic.not-synced')}</small
           >
         </p>
-        <div class="bp-row">
-          <button type="button" class="bp-btn" onclick={() => syncNow()} disabled={hub.site.syncing}
-            >Sync Now</button
-          >
-          <button type="button" class="bp-btn" id="bp-disconnect" onclick={disconnect}
-            >Disconnect</button
-          >
-        </div>
+        {#if confirmDisconnect}
+          <!-- The dashboard's question, word for word (ui/site/YouDisconnect.svelte). -->
+          <div class="bp-confirm" id="bp-disconnect-ask" role="group" aria-label="Disconnect">
+            <b>Disconnect From openhangar.space?</b>
+            <p>
+              Your synced copy stays on openhangar.space until you delete it there. This extension
+              just stops syncing.
+            </p>
+            <div class="bp-pair">
+              <button
+                bind:this={stay}
+                type="button"
+                class="bp-btn"
+                id="bp-stay"
+                onclick={() => (confirmDisconnect = false)}>Stay Connected</button
+              >
+              <button type="button" class="bp-btn danger" id="bp-disconnect-yes" onclick={leave}
+                >Disconnect</button
+              >
+            </div>
+          </div>
+        {:else}
+          <div class="bp-row">
+            <button type="button" class="bp-btn" onclick={() => syncNow()} disabled={hub.site.syncing}
+              >Sync Now</button
+            >
+            <button type="button" class="bp-btn" id="bp-disconnect" onclick={askDisconnect}
+              >Disconnect</button
+            >
+          </div>
+        {/if}
       {:else}
         <p>{t('basic.connect-about')}</p>
         <div class="bp-row">
