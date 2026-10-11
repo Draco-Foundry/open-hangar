@@ -969,6 +969,34 @@ try {
   home.hidden && home.storeOpt
     ? ok('bell: × ignores an alert; Scan has a Store option')
     : fail(`For You ignore: ${JSON.stringify(home)}`);
+  // The caught-up line holds still while the menu is open (a scan fires 'oh:alerts'
+  // every page, #586) and is picked again on the next open.
+  const caught = await page.evaluate(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const line = () => document.querySelector('#bell-menu .bm-none')?.textContent.trim();
+    const btn = document.querySelector('#bell-btn');
+    const opens = [];
+    let steady = true;
+    for (let i = 0; i < 3; i++) {
+      btn.click();
+      await wait(50);
+      const first = line();
+      for (let j = 0; j < 4; j++) {
+        // A new list each time, as ui/home/ForYou.svelte publishes it.
+        window.OHApp.alerts = { ...window.OHApp.alerts, list: [] };
+        document.dispatchEvent(new CustomEvent('oh:alerts'));
+        await wait(30);
+        if (line() !== first) steady = false;
+      }
+      opens.push(first);
+      btn.click();
+      await wait(50);
+    }
+    return { opens, steady, closed: document.querySelector('#bell-menu').hidden };
+  });
+  caught.opens.every(Boolean) && caught.steady && new Set(caught.opens).size > 1 && caught.closed
+    ? ok('bell: the caught-up line holds through alerts refreshes, and changes between opens')
+    : fail(`bell caught-up line: ${JSON.stringify(caught)}`);
   !(await page.$('#site-connect'))
     ? ok('website sync hidden without a sync site (the demo has none; store builds do)')
     : fail('site connect card shows without siteUrl');
