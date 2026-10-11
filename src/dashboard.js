@@ -5200,6 +5200,10 @@ async function siteConnect() {
   }
   // Fallback: a code, the website's link page in a new tab (code filled in, one
   // Approve click), then wait here until it's approved, expires or you cancel.
+  // The page fills the code in only when this extension says it's the one it's
+  // waiting for (background.js oh-link-check), so it's kept in session storage
+  // (siteLinkPending: the code, the site's origin, when it runs out) until then.
+  let pending = null;
   try {
     const start = await OH.siteLinkStart();
     const w = {
@@ -5209,6 +5213,9 @@ async function siteConnect() {
       until: Date.now() + (start.expires_in || 600) * 1000,
       stop: false,
     };
+    // Best effort: without it the page just leaves the code for the pilot to type.
+    pending = { code: w.code, origin: new URL(w.url).origin, until: w.until };
+    await chrome.storage.session?.set({ siteLinkPending: pending }).catch(() => {});
     site.waiting = w;
     homeUpdated();
     chrome.tabs.create({ url: w.url });
@@ -5218,6 +5225,15 @@ async function siteConnect() {
   } catch (err) {
     site.waiting = null;
     siteProblem(err);
+  } finally {
+    // Done with it (approved, expired, cancelled or failed), unless a newer one took over.
+    if (pending && chrome.storage.session) {
+      const { siteLinkPending: now } = await chrome.storage.session
+        .get('siteLinkPending')
+        .catch(() => ({}));
+      if (now && now.code === pending.code)
+        await chrome.storage.session.remove('siteLinkPending').catch(() => {});
+    }
   }
   await refreshSite();
 }

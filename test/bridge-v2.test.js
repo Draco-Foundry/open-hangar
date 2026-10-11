@@ -63,6 +63,7 @@ const VALID = {
   'oh-add-upgrade': { type: 'oh-add-upgrade', fromShipId: 101, toShipId: 900, toSkuId: 9001 },
   'oh-connect-begin': { type: 'oh-connect-begin' },
   'oh-connect-finish': { type: 'oh-connect-finish', code: 'one-time-code', sync: true },
+  'oh-link-check': { type: 'oh-link-check', code: 'K7Q-4PX' },
 };
 
 test('the capability lists: two per-origin lists, each type named once', () => {
@@ -76,7 +77,7 @@ test('the capability lists: two per-origin lists, each type named once', () => {
     getScanStatus: ['oh-scan-status'],
     requestScan: ['oh-request-scan'],
     addToCart: ['oh-upgrade-options', 'oh-upgrade-price', 'oh-add-upgrade'],
-    connect: ['oh-connect-begin', 'oh-connect-finish'],
+    connect: ['oh-connect-begin', 'oh-connect-finish', 'oh-link-check'],
   });
   assert.deepEqual(Object.keys(VALID).sort(), [...PAGES.TYPES].sort());
   // The Firefox bridge's own list of types is the same.

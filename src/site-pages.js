@@ -7,7 +7,8 @@
  *           build flag): hello, the hangar this browser scanned (getHangar), how fresh
  *           it is (getScanStatus), a scan (requestScan) and Add to RSI Cart (addToCart)
  *   site    the website, openhangar.space and its app: hello, Add to RSI Cart, and
- *           Connect This Browser (connect) on the pages in `connect` (the app, in
+ *           Connect (connect: Connect This Browser, and whether a code is the one
+ *           this extension is waiting for) on the pages in `connect` (the app, in
  *           builds with sync)
  * A request from the other list's pages gets the same answer as one that doesn't
  * exist, so a page can't find out what the others may ask.
@@ -33,7 +34,7 @@
     getScanStatus: ['oh-scan-status'],
     requestScan: ['oh-request-scan'],
     addToCart: ['oh-upgrade-options', 'oh-upgrade-price', 'oh-add-upgrade'],
-    connect: ['oh-connect-begin', 'oh-connect-finish'],
+    connect: ['oh-connect-begin', 'oh-connect-finish', 'oh-link-check'],
   };
   const LISTS = {
     hangar: ['hello', 'getHangar', 'getScanStatus', 'requestScan', 'addToCart'],
@@ -45,10 +46,12 @@
   // pages send exactly these. skus (every edition on offer) is cleaned and capped by
   // its handler, as before; v (the bridge version the page speaks) is allowed and not
   // read. pledgeId: a buy-back upgrade's pledge (price and add in RSI's buy-back mode).
+  // A link code: the short code Connect's code page shows (K7Q-4PX).
   const MAX_BYTES = 16 * 1024;
   const posInt = (v) => Number.isInteger(v) && v > 0;
   const code = (v) => typeof v === 'string' && v.length > 0 && v.length <= 512;
   const bool = (v) => typeof v === 'boolean';
+  const linkCode = (v) => typeof v === 'string' && v.length > 0 && v.length <= 16;
   const ID = [posInt, true];
   const SHAPES = {
     'oh-hello': { v: [posInt, false] },
@@ -65,6 +68,7 @@
     'oh-add-upgrade': { fromShipId: ID, toShipId: ID, toSkuId: ID, pledgeId: [posInt, false] },
     'oh-connect-begin': {},
     'oh-connect-finish': { code: [code, true], sync: [bool, false] },
+    'oh-link-check': { code: [linkCode, true] },
   };
 
   const pages = Object.freeze({

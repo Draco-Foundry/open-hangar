@@ -1085,8 +1085,12 @@ try {
       r.wait = txt(card());
       r.copy = !!btnIn(card(), 'Copy');
       r.opened = opened[0];
+      // Kept for the code page's check (background.js oh-link-check) while it waits.
+      r.pending = (await chrome.storage.session.get('siteLinkPending')).siteLinkPending || null;
+      r.pendingFresh = !!r.pending && r.pending.until > Date.now();
       approve();
       await wait(150);
+      r.pendingGone = !(await chrome.storage.session.get('siteLinkPending')).siteLinkPending;
       r.quiet = !card();
       r.status = txt($('#sync-status'));
       await openMenu();
@@ -1259,6 +1263,10 @@ try {
   /Good for (10:00|9:5\d)/.test(sc.wait) &&
   sc.copy &&
   /\/link\?code=K7Q-4PX$/.test(sc.opened || '') &&
+  sc.pending?.code === 'K7Q-4PX' &&
+  sc.pending?.origin === 'https://staging.example.test' &&
+  sc.pendingFresh &&
+  sc.pendingGone &&
   sc.quiet &&
   sc.status === 'Connected' &&
   /Connected as Demo_Citizen/.test(sc.menu) &&
