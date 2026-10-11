@@ -15,6 +15,10 @@ const COPY = {
   'basic.scan': '[copy: basic.scan]', // the Scan button
   'basic.scanning': '[copy: basic.scanning]', // the button while a scan runs
   'basic.scan-start': '[copy: basic.scan-start]', // first progress line, before RSI answers
+  // Access to robertsspaceindustries.com is off (Firefox's add-ons page, say): the short
+  // reason above the "Allow Access to RSI" button. Scan reads your hangar there, and
+  // only there; one click lets it, then the scan runs.
+  'basic.rsi-access-why': '[copy: basic.rsi-access-why]',
   // Progress: part is Hangar or Buy-Backs; page and count so far.
   'basic.progress': '[copy: basic.progress {part} {page} {count}]',
   'basic.progress-retry': '[copy: basic.progress-retry {part} {page} {n}/{of}]', // RSI hiccup

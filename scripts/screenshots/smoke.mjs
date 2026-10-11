@@ -4846,6 +4846,58 @@ try {
   !fxMissing.length && !/Before You Connect|What we send/.test(fx)
     ? ok("Firefox: our hangar page's ask shows the Local Mode card, word for word")
     : fail(`basic Firefox card: missing ${JSON.stringify(fxMissing)}`);
+  // Access to RSI turned off (Firefox's add-ons page): the card with its reason and
+  // Allow Access to RSI instead of a scan that can only fail, a scan asked for from the
+  // popup waits for it, and one click asks the browser and scans (owner, 2026-10-09).
+  const rsiCheck = async (mode) => {
+    const hook = await page.evaluateOnNewDocument((m) => (window.__demoNoRsi = m), mode);
+    await page.goto(URL0 + 'basic.html', { waitUntil: 'networkidle0' });
+    await page.removeScriptToEvaluateOnNewDocument(hook.identifier);
+    await page.waitForSelector('#bp-rsi-access');
+    return page.evaluate(async () => {
+      let scans = 0;
+      OH.scanSource = async (id) => {
+        scans++;
+        return { ok: true, items: [], scannedAt: Date.now() };
+      };
+      OH.getReferral = async () => ({ ok: true });
+      const card = document.getElementById('bp-rsi-access').textContent.replace(/\s+/g, ' ');
+      // The popup's Scan (src/background.js requestScan) while access is off.
+      const scanRequest = { at: Date.now(), tabId: 42 };
+      await chrome.storage.session.set({ scanRequest });
+      for (const f of __demo.listeners) f({ scanRequest: { newValue: scanRequest } }, 'session');
+      await new Promise((r) => setTimeout(r, 300));
+      const held = { scans, report: !!document.querySelector('#bp-report, #bp-done') };
+      document.getElementById('bp-rsi-allow').click();
+      await new Promise((r) => setTimeout(r, 600));
+      return {
+        card,
+        held,
+        asked: __demo.asked.filter((o) => o === 'https://robertsspaceindustries.com/*').length,
+        scans,
+        cardAfter: !!document.getElementById('bp-rsi-access'),
+        done: !!document.getElementById('bp-done'),
+        failed: !!document.getElementById('bp-report'),
+      };
+    });
+  };
+  const rsiYes = await rsiCheck(true);
+  rsiYes.card.includes('[copy: basic.rsi-access-why]') &&
+  rsiYes.card.includes('Allow Access to RSI') &&
+  rsiYes.held.scans === 0 &&
+  !rsiYes.held.report &&
+  rsiYes.asked === 1 &&
+  rsiYes.scans > 0 &&
+  !rsiYes.cardAfter &&
+  rsiYes.done
+    ? ok(
+        'RSI access off: the reason and Allow Access to RSI, no failed scan; one click allows and scans',
+      )
+    : fail(`basic RSI access: ${JSON.stringify(rsiYes)}`);
+  const rsiNo = await rsiCheck('deny');
+  rsiNo.asked === 1 && rsiNo.scans === 0 && rsiNo.cardAfter && !rsiNo.failed && !rsiNo.done
+    ? ok('RSI access refused: the card stays, still no scan and no failure')
+    : fail(`basic RSI access refused: ${JSON.stringify(rsiNo)}`);
   // A too-soon sync (429) on the basic page, offline: the time Sync Now works again,
   // and Sync Now meanwhile asks nothing and shows the website's calm words.
   await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });

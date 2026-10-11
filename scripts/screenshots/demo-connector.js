@@ -46,10 +46,19 @@
   demo.asked = [];
   demo.removed = [];
   const notifyOk = () => window.__demoNotify !== false;
+  // Access to RSI turned off (Firefox's add-ons page): set __demoNoRsi; 'deny' says no
+  // to the ask too.
+  demo.rsiOff = !!window.__demoNoRsi;
+  const rsi = (q) => q?.origins?.includes('https://robertsspaceindustries.com/*');
   chrome.permissions.contains = async (q) =>
-    q?.permissions?.includes('notifications') ? notifyOk() && !demo.gaveBack : true;
+    rsi(q)
+      ? !demo.rsiOff
+      : q?.permissions?.includes('notifications')
+        ? notifyOk() && !demo.gaveBack
+        : true;
   chrome.permissions.request = async (q) => {
-    demo.asked.push(...(q?.permissions || []));
+    demo.asked.push(...(q?.permissions || []), ...(q?.origins || []));
+    if (rsi(q)) return !(demo.rsiOff = window.__demoNoRsi === 'deny');
     demo.gaveBack = false;
     return q?.permissions?.includes('notifications') ? notifyOk() : true;
   };
@@ -68,7 +77,7 @@
       ...manifest(),
       browser_specific_settings: { gecko: { id: 'open-hangar@draco-foundry' } },
     });
-    chrome.permissions.contains = async () => false;
+    chrome.permissions.contains = async (q) => (rsi(q) ? !demo.rsiOff : false);
     session.localAskFirefox = { at: Date.now(), tabId: 42 };
   }
 })();

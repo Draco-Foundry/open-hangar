@@ -16,6 +16,10 @@ const OH = globalThis.OH;
 const SITE_DATA = {
   data_collection: ['personallyIdentifyingInfo', 'financialAndPaymentInfo', 'websiteContent'],
 };
+// The scan reads robertsspaceindustries.com. Firefox lets you turn that access off on
+// the add-ons page (and Chrome or Edge can hold it back): then a scan only fails, so it
+// asks first (rsiAllow).
+const RSI_HOST = { origins: ['https://robertsspaceindustries.com/*'] };
 const BB_AUTO_MAX = 30; // src/dashboard.js: never-read packs read after a scan
 const firefox = () => !!chrome.runtime.getManifest().browser_specific_settings?.gecko;
 
@@ -28,6 +32,9 @@ export const hub = $state({
   owner: null,
   bbDetails: {},
   account: null,
+  // Access to robertsspaceindustries.com: off means the Allow Access to RSI card instead
+  // of a scan (rsiAllow).
+  rsiOk: true,
   // The scan: busy, what it's on, and the last report ({ rows, signedOut, problem }).
   scan: { busy: false, detail: '', report: null },
   // openhangar.space: link { name, connectedAt, lastSync } (never the token), Firefox's
@@ -114,8 +121,35 @@ const progress = (part) => (page, count, retry) => {
     : t('basic.progress', { part, page, count });
 };
 
+// → whether this extension may read robertsspaceindustries.com. A browser that can't
+// say counts as yes (the scan then says what went wrong).
+async function rsiAccess() {
+  if (!chrome.permissions?.contains) return true;
+  return (hub.rsiOk = await chrome.permissions.contains(RSI_HOST).catch(() => true));
+}
+// Allow Access to RSI: the click the browser's ask needs, so it's asked before any
+// await; yes runs the scan right away (the one that was waiting, or the one pressed).
+export function rsiAllow() {
+  const asked = chrome.permissions.request(RSI_HOST).catch(() => false);
+  return asked.then(async (yes) => {
+    hub.rsiOk = !!yes || (await rsiAccess());
+    if (!hub.rsiOk) return;
+    await scan();
+  });
+}
+// The Scan button: with RSI access off, the click goes to the browser's ask instead.
+export function scanClick() {
+  if (!hub.rsiOk) return rsiAllow();
+  return scan();
+}
+
 export async function scan() {
   if (hub.scan.busy) return;
+  // No access to RSI: no scan that can only fail. The card asks instead.
+  if (!(await rsiAccess())) {
+    OH.log('info', 'status', 'scan held: no access to robertsspaceindustries.com');
+    return;
+  }
   hub.scan = { busy: true, detail: t('basic.scan-start'), report: null };
   hub.note = '';
   scanMark(true);
@@ -470,7 +504,10 @@ export async function start() {
   const switched = await reconcile(acct);
   if (switched) hub.note = switched;
   hub.ready = true;
-  await Promise.all([refreshProfiles(), refreshSite()]);
+  await Promise.all([refreshProfiles(), refreshSite(), rsiAccess()]);
+  // Turned on or off on the browser's add-ons page while this page is open.
+  chrome.permissions?.onAdded?.addListener(() => rsiAccess());
+  chrome.permissions?.onRemoved?.addListener(() => rsiAccess());
   const { updateReady } = await chrome.storage.local.get('updateReady');
   hub.update = updateReady || null;
   OH.getRemoteStatus()
