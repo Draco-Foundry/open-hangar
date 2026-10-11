@@ -15,7 +15,8 @@ backend: everything it reads is kept in `chrome.storage.local` in your browser.
 | Service worker      | `src/background.js`                                         | Opens the dashboard, rescan badge, updates, our pages' messages    |
 | Dashboard (classic) | `src/dashboard.html`, `src/dashboard.js`                    | The whole app: views, scanning, state, most pages                  |
 | Shared library      | `src/lib.js` (exposed as `window.OH`)                       | Source registry, scan loop, storage, export/import, outside data   |
-| Parser              | `src/scraper/parser.js` (exposed as `window.OpenHangar`)    | RSI HTML to normalized items; the only place that knows RSI markup |
+| Parser              | `src/scraper/parser.js` (exposed as `window.OpenHangar`)    | RSI HTML to normalized items, reading where to look from the rules |
+| Parser rules        | `src/data/parser-rules.json`, `src/parser-rules.js`         | Where things are on RSI's pages, as data (`window.OHRules`)        |
 | Svelte pages        | `ui/` (built into `src/ui/`)                                | The new Home page cards (0.3.0 redesign, in progress)              |
 | Connector pages     | `src/popup.html`, `src/basic.html` (`ui/popup`, `ui/basic`) | The `connector` build's popup and basic page (docs/CONNECTOR.md)   |
 | Bundled data        | `src/data/ship-catalog.json`, `src/data/ship-codes.json`    | Ship list and prices; ship codes for the HTF export                |
@@ -171,8 +172,34 @@ The source registry in `src/lib.js`. Each entry describes one paginated RSI page
 | `requiresRender`  | Buy-backs only: an empty page is an error, not "no buy-backs"                  |
 | `meta(html)`      | Buy-backs only: reads buy-back tokens from page 1 into `sources.buybacks.meta` |
 
+The paths, page sizes, paging names and both markers come from the parser rules (below).
 `OH.scanAll()` scans every registered source in order. To add a source, see
 CONTRIBUTING.md, "Adding a Data Source".
+
+## Parser Rules
+
+Where things are on RSI's pages is data, not code: `src/data/parser-rules.json`,
+described by `schema/parser-rules.schema.json`. It holds the account lists' paths and
+paging, the signs of RSI's sign-in page, the hangar's and buy-backs' selectors and cell
+positions, the buy-back page's, the name patterns that sort pledges and buy-backs
+(upgrades, add-ons, coupons, game access, paints, store categories), insurance terms,
+dates and the buy-back token sentence. The parsing stays in `src/scraper/parser.js` and
+`src/lib.js`, which read it as `RULES.<path>`; when RSI moves something, the fix is in
+the rules (docs/RSI-CHANGES.md).
+
+- `npm run rules` writes its copy as a script, `src/parser-rules-data.js` (with the
+  schema), which the pages load the way they load `src/sync-schema.js`.
+- `src/parser-rules.js` loads it: checks it against its schema with
+  `src/schema-check.js`, compiles each pattern (`{ source, flags }`) once with
+  `new RegExp`, freezes everything and exposes `self.OHRules`. A file that doesn't fit
+  throws before anything reads it. The pages load both before `scraper/parser.js` and
+  `lib.js`.
+- Data only: strings, numbers, lists and objects with fixed keys. Patterns never take
+  `g` or `y`; where the code reads part of a match, the pattern names it
+  (`(?<from>…)`). Addresses are paths: the host stays in the code.
+- `test/parser-rules.test.js` checks every rule is read by the code, the code reads only
+  rules that exist, and the moved code holds no pattern or selector of its own.
+- It ships in the extension and is never fetched (docs/FLAGS.md).
 
 ## Storage
 

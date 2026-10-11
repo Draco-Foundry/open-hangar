@@ -33,8 +33,13 @@
   // it before this file; node tests load this file on its own.
   if (!window.OHShape && typeof require === 'function') require('./hangar-shape.js');
   const SHAPE = window.OHShape;
+  // Where things are on RSI's pages (addresses, paging, selectors, patterns): the
+  // parser rules (src/data/parser-rules.json), loaded by src/parser-rules.js before
+  // this file; node tests load them here. The host stays in the code: rules hold paths.
+  if (!window.OHRules && typeof require === 'function') require('./parser-rules.js');
+  const RULES = window.OHRules;
+  const RSI_ORIGIN = 'https://robertsspaceindustries.com';
 
-  const PAGE_SIZE = 10;
   const DELAY_MS = 400; // politeness throttle between pages
   const MAX_PAGES = 1000; // safety cap: 10,000 pledges at RSI's 10 per page
   // Skipping an unchanged hangar (#294): only within a day of the last full scan,
@@ -209,11 +214,11 @@
       id: 'hangar',
       label: 'Hangar',
       type: 'html',
-      url: 'https://robertsspaceindustries.com/account/pledges',
-      pageSize: PAGE_SIZE,
+      url: RSI_ORIGIN + RULES.hangar.path,
+      pageSize: RULES.hangar.pageSize,
       // If this marker is present in a signed-in page but parsing yields nothing,
       // RSI changed their markup (vs. a genuinely empty hangar). See scanHtmlSource.
-      marker: /js-pledge-id/,
+      marker: RULES.hangar.marker,
       // Rescans first check whether anything changed (#294). See unchangedSince.
       probe: true,
       parse: (html) => window.OpenHangar.parsePledges(html),
@@ -222,12 +227,12 @@
       id: 'buybacks',
       label: 'Buy-Backs',
       type: 'html',
-      url: 'https://robertsspaceindustries.com/account/buy-back-pledges',
-      pageSize: 100,
+      url: RSI_ORIGIN + RULES.buybacks.path,
+      pageSize: RULES.buybacks.pageSize,
       // Buy-backs render the SAME server-side HTML as pledges (a list of <article>
       // cards) — not the GraphQL frontend earlier notes feared. Selector mapping
       // derived from the MIT-licensed SC-Open/hangarlink-hangarexport extension.
-      emptyMarker: /no pledges available/i, // RSI's "you have no buy-backs" message
+      emptyMarker: RULES.buybacks.empty, // RSI's "you have no buy-backs" message
       requiresRender: true, // if RSI ever serves a JS-only shell, report it (don't silently say "empty")
       parse: (html) => window.OpenHangar.parseBuybacks(html),
       // Read once from page 1 and kept next to the items (db.sources.buybacks.meta).
@@ -1396,8 +1401,8 @@
   // A logged-out fetch lands on a sign-in page (redirect to /connect, or HTML
   // with a password field) — distinguish that from a genuinely empty source.
   function looksLoggedOut(res, html) {
-    if (res.redirected && /account\/(connect|sign-?in)|\/connect\b/i.test(res.url)) return true;
-    return /name=["']password["']|id=["']?password|account\/connect/i.test(html);
+    if (res.redirected && RULES.signedOut.redirect.test(res.url)) return true;
+    return RULES.signedOut.page.test(html);
   }
 
   // Fetch one page, retrying only *transient* failures (network error, 5xx, 429)
@@ -1473,6 +1478,10 @@
     }
   }
 
+  // One page of a paginated source: ?page=N&pagesize=… (the names: RULES.paging).
+  const pageUrl = (src, page, size) =>
+    `${src.url}?${RULES.paging.page}=${page}&${RULES.paging.size}=${size}`;
+
   // Paginated HTML source: fetch ?page=N&pagesize=…, parse, dedupe by id, stop
   // when a page yields no NEW ids (RSI clamps out-of-range pages to the last).
   // onProgress(page, count, retry?) — retry = { attempt, of } while retrying.
@@ -1484,15 +1493,14 @@
   async function scanHtmlSource(src, onProgress, prev) {
     const seen = new Set();
     const all = [];
-    const size = src.pageSize || PAGE_SIZE;
+    const size = src.pageSize;
     let meta;
     let lastPage = 0;
     let lastAdded = 0;
     let aligned = true;
 
     for (let page = 1; page <= MAX_PAGES; page++) {
-      const url = `${src.url}?page=${page}&pagesize=${size}`;
-      const got = await fetchPage(url, (attempt, of, reason) => {
+      const got = await fetchPage(pageUrl(src, page, size), (attempt, of, reason) => {
         OH.log('warn', src.id, `page ${page}: ${reason}, retry ${attempt}/${of}`);
         onProgress?.(page, all.length, { attempt, of });
       });
@@ -1610,7 +1618,7 @@
       if (!same(first, saved.slice(0, size))) return false;
       const read = async (page) => {
         await sleep(DELAY_MS);
-        const got = await fetchPage(`${src.url}?page=${page}&pagesize=${size}`);
+        const got = await fetchPage(pageUrl(src, page, size));
         if (got.error || !got.res.ok) return null;
         return fillIds(src, src.parse(await got.res.text()), page);
       };
@@ -3224,7 +3232,7 @@
     const all = await OH.getBuybackDetails();
     if (all[id] && !all[id].partial) return all[id];
     if (!/^\d+$/.test(String(id))) return { error: 'No RSI page for this buy-back.' };
-    const got = await fetchPage(`https://robertsspaceindustries.com/pledge/buyback/${id}`, null, {
+    const got = await fetchPage(RSI_ORIGIN + RULES.buybackDetail.path + id, null, {
       retryRateLimit: false,
     });
     if (got.rateLimited || got.res?.status === 403) {

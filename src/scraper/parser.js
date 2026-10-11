@@ -15,46 +15,33 @@
  * authoritative pledge-category field in the markup, so we derive classification
  * from the name (CCU / add-on) plus the contained `.kind` set (containsShip).
  *
- * Loaded via <script> in dashboard.html BEFORE lib.js, so its helpers hang off
- * globalThis.OpenHangar and lib.js can parse fetched HTML.
+ * Where each of these is (selectors, cell positions, name patterns) lives in the
+ * parser rules, src/data/parser-rules.json (read through src/parser-rules.js as
+ * RULES); this file is how they're read. When RSI moves something, fix the rules.
+ *
+ * Loaded via <script> in dashboard.html BEFORE lib.js (and after parser-rules.js),
+ * so its helpers hang off globalThis.OpenHangar and lib.js can parse fetched HTML.
  */
 
 (function () {
   const ns = (globalThis.OpenHangar = globalThis.OpenHangar || {});
+  if (!globalThis.OHRules && typeof require === 'function') require('../parser-rules.js');
+  const RULES = globalThis.OHRules;
 
   // --- Classification -------------------------------------------------------
-
-  // CCU (Cross-Chassis Upgrade) names look like "Upgrade - <from> to <to>".
-  // We gate on the "Upgrade -" prefix AND the " to " join so a stray
-  // "Upgrade -" without a target can't false-positive. Captures from/to so the
-  // CCU can be classified and displayed (the "from → to" chain).
-  //
-  // NOTE: the previous scaffold used /^\s*upgrade\s*-.*-/i (two dashes). RSI's
-  // real names carry a single dash ("Upgrade - Pulse to C8R Pisces ..."), so the
-  // two-dash form would NOT have matched them. This pattern matches all 87 CCUs;
-  // confirm the count with the verification snippet if you change it.
-  const CCU_RE = /^\s*upgrade\s*-\s*(.+?)\s+to\s+(.+?)\s*$/i;
-
-  // Standalone add-ons (paints, posters, name reservations, decorations, …) are
-  // prefixed "Add-On - " when sold on their own.
-  const ADDON_NAME_RE = /^\s*add[\s-]*on\s*-/i;
-
-  // Store/discount coupons (e.g. "6 Months Imperator Reward - 20% Coupon: SR…").
-  // They carry no contents and no value — neither ship nor add-on.
-  const COUPON_NAME_RE = /\bcoupon\b/i;
-
-  // Game access ("Star Citizen Digital Download", "Squadron 42 Digital Game", …):
-  // anything carrying it is a package, not a pack (owner, 2026-10-01). Same test as
-  // the dashboard's Game Packages chip (GAME_ITEM_RE).
-  const GAME_ACCESS_RE = /\b(star citizen|squadron 42)\b.*\b(digital|download|game|package)\b/i;
-
-  // Paints / skins / liveries — a common reward & buy-back type RSI doesn't tag.
-  const PAINT_NAME_RE = /\b(paint|skin|livery|liveries|camo)\b/i;
+  // The name patterns are RULES.names: an upgrade ("Upgrade - <from> to <to>", gated
+  // on the "Upgrade -" prefix AND the " to " join so a stray "Upgrade -" without a
+  // target can't false-positive), a standalone add-on ("Add-On - …"), a store coupon
+  // (no contents, no value: neither ship nor add-on), game access ("Star Citizen
+  // Digital Download", "Squadron 42 Digital Game", …: anything carrying it is a
+  // package, not a pack, owner 2026-10-01; the same test as the dashboard's Game
+  // Packages chip, GAME_ITEM_RE) and paints / skins / liveries (a common reward and
+  // buy-back type RSI doesn't tag).
 
   ns.detectCCU = function detectCCU(name) {
-    const m = CCU_RE.exec(name || '');
+    const m = RULES.names.ccu.exec(name || '');
     if (!m) return null;
-    return { from: m[1].trim(), to: m[2].trim() };
+    return { from: m.groups.from.trim(), to: m.groups.to.trim() };
   };
 
   // RSI prefixes most pledge names with their store category — "Standalone Ships
@@ -63,8 +50,8 @@
   // none. The dash must have spaces around it: "Add-Ons - X" is category
   // "Add-Ons", not "Add".
   ns.buybackCategoryPrefix = function buybackCategoryPrefix(name) {
-    const m = String(name || '').match(/^\s*(.+?)\s+[-–]\s/);
-    return m ? m[1].trim() : '';
+    const m = String(name || '').match(RULES.names.category);
+    return m ? m.groups.prefix.trim() : '';
   };
 
   // Classify a buy-back from its name + the free-text "contains" string (buy-back
@@ -76,29 +63,24 @@
   ns.classifyBuyback = function classifyBuyback(name, contains) {
     const hay = `${name || ''} ${contains || ''}`;
     if (ns.detectCCU(name)) return 'ccu';
-    if (COUPON_NAME_RE.test(hay)) return 'coupon';
+    if (RULES.names.coupon.test(hay)) return 'coupon';
 
     const prefix = ns.buybackCategoryPrefix(name);
-    if (/^(packages?|game\s+packages?)$/i.test(prefix)) return 'package';
+    if (RULES.categories.package.test(prefix)) return 'package';
     // Owner: a package is anything with game access (Star Citizen or Squadron 42),
     // whatever it's called ("Mustang Alpha Starter Pack" + "Star Citizen Digital
     // Download" in its items line).
-    if (GAME_ACCESS_RE.test(hay)) return 'package';
+    if (RULES.names.gameAccess.test(hay)) return 'package';
     // Owner's rule: "Pack" in the name makes it a pack, whatever the label in front
     // says ("Standalone Ships - Nine Tails Shogun Pack", "Paints - Wolf - 8 Paint
     // Pack", "… Paint Pack - Referral Reward"). Game packages ("Package - … Starter
     // Pack") stay packages, just above.
-    if (/\bpacks?\b/i.test(name || '')) return 'pack';
-    if (/^(paints?|skins?|liver(y|ies))$/i.test(prefix)) return 'paint';
-    if (/^(gear|armou?r|weapons?|components?|fps)$/i.test(prefix)) return 'addon';
-    if (/^subscribers?\s+(store|vault)$/i.test(prefix)) return 'other';
-    if (/^(add[-\s]?ons?|decorations?|posters?|flair|model\s+ships?)$/i.test(prefix))
-      return 'addon';
-    if (/^(packs?|combos?|bundles?)$/i.test(prefix)) return 'pack';
-    if (/^(standalone\s+ships?|ships?|warbonds?)$/i.test(prefix)) return 'ship';
+    if (RULES.names.pack.test(name || '')) return 'pack';
+    for (const row of RULES.categories.kinds) if (row.pattern.test(prefix)) return row.kind;
+    if (RULES.categories.ship.test(prefix)) return 'ship';
 
-    if (PAINT_NAME_RE.test(hay)) return 'paint';
-    if (ADDON_NAME_RE.test(name)) return 'addon';
+    if (RULES.names.paint.test(hay)) return 'paint';
+    if (RULES.names.addon.test(name)) return 'addon';
     return 'ship';
   };
 
@@ -111,25 +93,25 @@
   // since RSI's buy-back list doesn't list contents. null when there's no hint.
   ns.insuranceFromName = function insuranceFromName(name) {
     const n = String(name || '');
-    if (/\blti\b|lifetime/i.test(n)) return 'LTI';
-    const yr = n.match(/\b(\d+)\s*[- ]?\s*years?\b/i);
-    if (yr) return `${Number(yr[1]) * 12}M`;
-    const mo = n.match(/\b(\d+)\s*[- ]?\s*months?\b/i);
-    if (mo) return `${mo[1]}M`;
+    if (RULES.insurance.fromName.lti.test(n)) return 'LTI';
+    const yr = n.match(RULES.insurance.fromName.years);
+    if (yr) return `${Number(yr.groups.n) * 12}M`;
+    const mo = n.match(RULES.insurance.fromName.months);
+    if (mo) return `${mo.groups.n}M`;
     return null;
   };
 
   ns.insuranceTerm = function insuranceTerm(contents) {
-    const ins = (contents || []).find((c) => /insurance/i.test(c.kind || ''));
+    const ins = (contents || []).find((c) => RULES.kinds.insurance.test(c.kind || ''));
     if (!ins) return null;
     const label = ins.label || '';
-    if (/life\s*-?\s*time|lifetime|\blti\b/i.test(label)) return 'LTI';
-    const mo = label.match(/(\d+)\s*month/i);
-    if (mo) return `${mo[1]}M`;
+    if (RULES.insurance.fromItem.lti.test(label)) return 'LTI';
+    const mo = label.match(RULES.insurance.fromItem.months);
+    if (mo) return `${mo.groups.n}M`;
     // Years in months, the same as insuranceFromName ("10 Year" → "120M"), so
     // one term never shows up two ways in filters and stats.
-    const yr = label.match(/(\d+)\s*year/i);
-    if (yr) return `${Number(yr[1]) * 12}M`;
+    const yr = label.match(RULES.insurance.fromItem.years);
+    if (yr) return `${Number(yr.groups.n) * 12}M`;
     return label || null; // unrecognized phrasing — surface RSI's text verbatim
   };
 
@@ -137,15 +119,14 @@
   // 6). When it's missing, read it from the item's own name where that's safe:
   // insurance and paints say so, and the ship in a "Standalone Ships - …" pledge
   // is the item the pledge is named after. Anything else stays untyped ('').
-  const SHIP_STORE_RE = /^(standalone\s+ships?|ships?|warbonds?)$/i;
   ns.inferKind = function inferKind(label, pledgeName) {
     const l = String(label || '').trim();
     if (!l) return '';
-    if (/\binsurance\b/i.test(l)) return 'Insurance';
-    if (PAINT_NAME_RE.test(l)) return 'Paint';
+    if (RULES.kinds.insuranceName.test(l)) return 'Insurance';
+    if (RULES.names.paint.test(l)) return 'Paint';
     const n = String(pledgeName || '');
     if (
-      SHIP_STORE_RE.test(ns.buybackCategoryPrefix(n)) &&
+      RULES.categories.ship.test(ns.buybackCategoryPrefix(n)) &&
       n.toLowerCase().includes(l.toLowerCase())
     )
       return 'Ship';
@@ -161,26 +142,28 @@
       const kind = ns.inferKind(c.label, name);
       return kind ? { ...c, kind, guessed: true } : c;
     });
-    const containsShip = contents.some((c) => (c.kind || '').trim().toLowerCase() === 'ship');
+    const containsShip = contents.some((c) => RULES.kinds.ship.test((c.kind || '').trim()));
 
     const ccu = ns.detectCCU(name);
     const isCCU = ccu != null;
     // A coupon is a non-upgrade, non-ship reward whose name says so.
-    const isCoupon = !isCCU && !containsShip && COUPON_NAME_RE.test(name);
+    const isCoupon = !isCCU && !containsShip && RULES.names.coupon.test(name);
     // An add-on is anything that isn't an upgrade/coupon and carries no ship:
     // either explicitly name-prefixed, or a card whose only contents are
     // non-ship items (a standalone paint, skin, decoration, etc.).
     const isAddOn =
-      !isCCU && !isCoupon && (ADDON_NAME_RE.test(name) || (!containsShip && contents.length > 0));
+      !isCCU &&
+      !isCoupon &&
+      (RULES.names.addon.test(name) || (!containsShip && contents.length > 0));
 
     // Paint/skin/livery — a finer add-on type. Detect from the name OR from a
     // contained item's kind (RSI tags some as kind "Paint"/"Skin"). Best-effort;
     // untagged reward paints still need the external reference (ROADMAP).
     const contentIsPaint = contents.some((c) =>
-      PAINT_NAME_RE.test(`${c.kind || ''} ${c.label || ''}`),
+      RULES.names.paint.test(`${c.kind || ''} ${c.label || ''}`),
     );
     const isPaint =
-      !isCCU && !containsShip && !isCoupon && (PAINT_NAME_RE.test(name) || contentIsPaint);
+      !isCCU && !containsShip && !isCoupon && (RULES.names.paint.test(name) || contentIsPaint);
 
     // Backward-compatible display category (the dashboard renders `kind`). Derived,
     // best-effort — the structured fields above are the source of truth.
@@ -221,52 +204,37 @@
   // RSI prints dates as "December 08, 2016" / "Dec 8, 2016" (sometimes behind a
   // "Created:" label). Return ISO 'YYYY-MM-DD' — built by hand, not via Date, so
   // the user's timezone can't shift the day — or null if it doesn't parse.
-  const MONTHS = [
-    'jan',
-    'feb',
-    'mar',
-    'apr',
-    'may',
-    'jun',
-    'jul',
-    'aug',
-    'sep',
-    'oct',
-    'nov',
-    'dec',
-  ];
   ns.parseRsiDate = function parseRsiDate(text) {
     const s = String(text || '')
-      .replace(/^\s*created\s*:?\s*/i, '')
+      .replace(RULES.dates.label, '')
       .trim();
-    let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); // already ISO
-    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-    m = s.match(/^([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})\b/);
+    let m = s.match(RULES.dates.iso); // already ISO
+    if (m) return `${m.groups.year}-${m.groups.month}-${m.groups.day}`;
+    m = s.match(RULES.dates.named);
     if (!m) return null;
-    const month = MONTHS.indexOf(m[1].toLowerCase()) + 1;
-    const day = Number(m[2]);
+    const month = RULES.dates.months.indexOf(m.groups.month.toLowerCase()) + 1;
+    const day = Number(m.groups.day);
     if (!month || day < 1 || day > 31) return null;
-    return `${m[3]}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return `${m.groups.year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   };
 
   // --- DOM extraction -------------------------------------------------------
 
   // Resolve a pledge card from one of its hidden inputs. Climb to the NEAREST
-  // ancestor that both carries the `.row` class AND contains a `.js-pledge-name`,
-  // so the full card (inputs + .kind list) is guaranteed in scope and we never
-  // grab a parent `.row` that wraps several cards. Falls back progressively.
+  // ancestor that both is a card AND contains a name input, so the full card
+  // (inputs + .kind list) is guaranteed in scope and we never grab a parent `.row`
+  // that wraps several cards. Falls back progressively.
   function resolveCard(anchor) {
     for (let el = anchor; el && el.nodeType === 1; el = el.parentElement) {
-      if (el.classList && el.classList.contains('row') && el.querySelector('.js-pledge-name')) {
+      if (el.matches(RULES.hangar.card) && el.querySelector(RULES.hangar.cardHas)) {
         return el;
       }
     }
-    return (
-      (anchor.closest && anchor.closest('.row')) ||
-      (anchor.closest && anchor.closest('.item')) ||
-      anchor.parentElement ||
-      anchor
-    );
+    for (const fallback of RULES.hangar.cardFallbacks) {
+      const el = anchor.closest && anchor.closest(fallback);
+      if (el) return el;
+    }
+    return anchor.parentElement || anchor;
   }
 
   // Build the contents array from the card's contained-item tiles (`.item`).
@@ -291,16 +259,16 @@
     const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
     const contents = [];
 
-    for (const tile of card.querySelectorAll('.item')) {
-      const kind = clean(tile.querySelector('.kind')?.textContent);
-      const label = clean(tile.querySelector('.title, .name, .item-name')?.textContent);
+    for (const tile of card.querySelectorAll(RULES.hangar.item)) {
+      const kind = clean(tile.querySelector(RULES.hangar.itemKind)?.textContent);
+      const label = clean(tile.querySelector(RULES.hangar.itemName)?.textContent);
       if (!kind && !label) continue; // structural noise, not a real item tile
-      contents.push({ kind, label, image: bgUrl(tile.querySelector('.image')) });
+      contents.push({ kind, label, image: bgUrl(tile.querySelector(RULES.hangar.itemImage)) });
     }
     if (contents.length) return contents;
 
     // Fallback for layouts that expose `.kind` without an `.item` wrapper.
-    return Array.from(card.querySelectorAll('.kind')).map((k) => ({
+    return Array.from(card.querySelectorAll(RULES.hangar.kindFallback)).map((k) => ({
       kind: clean(k.textContent),
       label: '',
       image: null,
@@ -310,11 +278,11 @@
   // The card's hero thumbnail: prefer the contained Ship's art, then any item
   // with art, then any image on the card. CCUs/coupons often have none.
   function pickImage(card, contents) {
-    const ship = contents.find((c) => /^ship$/i.test(c.kind) && c.image);
+    const ship = contents.find((c) => RULES.kinds.ship.test(c.kind) && c.image);
     return (
       ship?.image ||
       contents.find((c) => c.image)?.image ||
-      bgUrl(card.querySelector('.image')) ||
+      bgUrl(card.querySelector(RULES.hangar.image)) ||
       null
     );
   }
@@ -324,19 +292,19 @@
     const seen = new Set();
     const pledges = [];
 
-    for (const idInput of root.querySelectorAll('.js-pledge-id')) {
+    for (const idInput of root.querySelectorAll(RULES.hangar.id)) {
       const card = resolveCard(idInput);
       if (seen.has(card)) continue; // guard against shared-ancestor double counts
       seen.add(card);
 
-      const val = (cls) => card.querySelector('.' + cls)?.value?.trim() ?? null;
-      const name = val('js-pledge-name') || '';
-      const rawValue = val('js-pledge-value'); // "$35.00 USD"
+      const val = (selector) => card.querySelector(selector)?.value?.trim() ?? null;
+      const name = val(RULES.hangar.name) || '';
+      const rawValue = val(RULES.hangar.value); // "$35.00 USD"
       const numeric = rawValue ? Number(rawValue.replace(/[^0-9.]/g, '')) : null;
       // RSI stuffs junk into js-pledge-currency for $0 reward items (e.g.
       // "TyCustomer_ledger_-en"); keep only a real ISO-4217 code, else derive it
       // from the value string ("$35.00 USD" → USD), else null.
-      const rawCurrency = val('js-pledge-currency');
+      const rawCurrency = val(RULES.hangar.currency);
       let currency = /^[A-Z]{3}$/.test(rawCurrency || '') ? rawCurrency : null;
       if (!currency) {
         const m = (rawValue || '').match(/\b([A-Z]{3})\b/);
@@ -348,18 +316,18 @@
       // button rather than re-deriving the rules (store-credit purchases, gear,
       // CCUs, …) — RSI already computed it. `.js-gift` lives inside this card's
       // `.row`, so scope the query to the card to avoid neighbour bleed.
-      const giftable = !!card.querySelector('.js-gift');
+      const giftable = !!card.querySelector(RULES.hangar.gift);
       // Meltable: RSI renders an "Exchange" action (`a.js-reclaim`) on pledges you
       // can melt for store credit — same approach as giftability, same scoping.
-      const meltable = !!card.querySelector('.js-reclaim');
+      const meltable = !!card.querySelector(RULES.hangar.melt);
       // Pledge date: the card's first `.date-col` (the selector HangarXPLOR has
       // relied on for years), e.g. "Created: December 08, 2016".
-      const dateEl = card.querySelector('.date-col');
+      const dateEl = card.querySelector(RULES.hangar.date);
       const date = dateEl ? ns.parseRsiDate(dateEl.textContent.replace(/\s+/g, ' ')) : null;
 
       pledges.push(
         ns.normalizePledge({
-          id: val('js-pledge-id'),
+          id: val(RULES.hangar.id),
           name,
           value: Number.isFinite(numeric) ? numeric : null,
           currency,
@@ -391,10 +359,10 @@
   // --- Buy-backs ------------------------------------------------------------
   // The buy-back page (/account/buy-back-pledges) is the SAME server-rendered
   // HTML style as the hangar — a list of <article> cards — NOT the GraphQL
-  // frontend earlier notes assumed. Per card:
+  // frontend earlier notes assumed. Per card (RULES.buybacks):
   //   • name        → <h1>
   //   • date/items  → the card's <dd> cells: 4 cells → [0]=date, [2]=items;
-  //                   2 cells → [0]=date, [1]=items
+  //                   2 cells → [0]=date, [1]=items (cellLayouts)
   //   • id + reclaim link + ship ids → the `.holosmallbtn` element's
   //                   data-pledgeid / data-fromshipid / data-toshipid /
   //                   data-toskuid attributes and its href
@@ -408,39 +376,32 @@
   ns.parseBuybacksFromDOM = function parseBuybacksFromDOM(root = document) {
     const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
     const out = [];
-    for (const node of root.querySelectorAll('article')) {
-      const name = clean(node.querySelector('h1')?.textContent);
+    for (const node of root.querySelectorAll(RULES.buybacks.card)) {
+      const name = clean(node.querySelector(RULES.buybacks.name)?.textContent);
       if (!name) continue; // every real buy-back card has a name
 
-      const dds = node.querySelectorAll('dd');
-      let date = '',
-        contains = '';
-      if (dds.length >= 4) {
-        date = clean(dds[0].textContent);
-        contains = clean(dds[2].textContent);
-      } else if (dds.length >= 2) {
-        date = clean(dds[0].textContent);
-        contains = clean(dds[1].textContent);
-      } else if (dds.length === 1) {
-        date = clean(dds[0].textContent);
-      }
+      const dds = node.querySelectorAll(RULES.buybacks.cells);
+      const layout = RULES.buybacks.cellLayouts.find((l) => dds.length >= l.min);
+      const date = layout ? clean(dds[layout.date]?.textContent) : '';
+      const contains =
+        layout && layout.contains != null ? clean(dds[layout.contains]?.textContent) : '';
 
       // The reclaim button carries the ids and the buy-back href.
-      const btn = node.querySelector(".holosmallbtn, a[href*='reclaim'], a[href*='buy-back']");
+      const btn = node.querySelector(RULES.buybacks.button);
       const href = btn?.getAttribute('href') || '';
       // getAttribute is case-insensitive for HTML, so lowercase names match data-pledgeId etc.
-      let id = btn?.getAttribute('data-pledgeid') || '';
-      const fromShipId = btn?.getAttribute('data-fromshipid') || '';
-      const toShipId = btn?.getAttribute('data-toshipid') || '';
-      const toSkuId = btn?.getAttribute('data-toskuid') || '';
+      let id = btn?.getAttribute(RULES.buybacks.ids.pledge) || '';
+      const fromShipId = btn?.getAttribute(RULES.buybacks.ids.fromShip) || '';
+      const toShipId = btn?.getAttribute(RULES.buybacks.ids.toShip) || '';
+      const toSkuId = btn?.getAttribute(RULES.buybacks.ids.toSku) || '';
       if (!id) {
-        const m = href.match(/(\d+)/); // fall back to an id embedded in the reclaim URL
-        id = m ? m[1] : null; // no button: the scanner gives it a per-page id (never merged)
+        const m = href.match(RULES.buybacks.hrefId); // fall back to an id embedded in the reclaim URL
+        id = m ? m.groups.id : null; // no button: the scanner gives it a per-page id (never merged)
       }
 
-      const img = node.querySelector('img');
+      const img = node.querySelector(RULES.buybacks.image);
       let image =
-        img?.getAttribute('src') || bgUrl(node.querySelector('[style*="background"]')) || null;
+        img?.getAttribute('src') || bgUrl(node.querySelector(RULES.buybacks.background)) || null;
       // RSI sometimes returns a RELATIVE image path (e.g. "/media/…"); in the
       // extension page context that resolves to chrome-extension://… and 404s.
       // Absolutize any root-relative URL to the RSI host so the <img> loads.
@@ -451,19 +412,18 @@
       // Best-effort buy-back price (store-credit cost). RSI's exact markup here is
       // unconfirmed, so we read a price-labelled element if one exists; otherwise
       // leave it blank. Refine the selector once a real capture is available.
-      const price =
-        clean(node.querySelector('.price, [class*="price"], [class*="cost"]')?.textContent) || '';
+      const price = clean(node.querySelector(RULES.buybacks.price)?.textContent) || '';
 
       // Melted-CCU quirk: when an upgraded ship is melted, RSI reverts it to the
       // ORIGINAL ship but tags the name "<ship> - upgraded" and leaves a STALE
       // "Contained" cell naming the former CCU target (e.g. "Tiburon and 2 items")
       // — which you do NOT get back. So for "- upgraded" buybacks, drop the suffix
       // and discard the misleading contains string; the original ship is the truth.
-      const wasUpgraded = /\s-\s*upgraded\s*$/i.test(name);
+      const wasUpgraded = RULES.buybacks.upgraded.test(name);
       let displayName = name;
       let displayContains = contains;
       if (wasUpgraded) {
-        displayName = name.replace(/\s-\s*upgraded\s*$/i, '').trim();
+        displayName = name.replace(RULES.buybacks.upgraded, '').trim();
         displayContains = ''; // stale CCU-target data — not what's actually returned
       }
 
@@ -499,9 +459,9 @@
     const text = String(html || '')
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ');
-    const m = text.match(/you have (\d+|no) opportunit(?:y|ies) to buy back/i);
+    const m = text.match(RULES.buybacks.tokens);
     if (!m) return null;
-    return /^no$/i.test(m[1]) ? 0 : Number(m[1]);
+    return RULES.buybacks.noTokens.test(m.groups.n) ? 0 : Number(m.groups.n);
   };
 
   // One buy-back's own page (/pledge/buyback/<pledge id>): what the list page
@@ -514,36 +474,41 @@
       String(t || '')
         .replace(/\s+/g, ' ')
         .trim();
-    const priceEl = doc.querySelector('.final-price[data-value]');
-    const title = clean(doc.querySelector('.content-block4 h1, #store-wrapper h1')?.textContent);
+    const priceEl = doc.querySelector(RULES.buybackDetail.price);
+    const title = clean(doc.querySelector(RULES.buybackDetail.title)?.textContent);
     if (!priceEl && !title) return null;
-    const ships = [...doc.querySelectorAll('.package-listing.ship li')].map((li) => {
+    const ships = [...doc.querySelectorAll(RULES.buybackDetail.ships)].map((li) => {
       const info = {};
-      for (const d of li.querySelectorAll('.info')) {
-        const m = clean(d.textContent).match(/^([^:]+):\s*(.*)$/);
-        if (m) info[m[1].toLowerCase()] = m[2];
+      for (const d of li.querySelectorAll(RULES.buybackDetail.info)) {
+        const m = clean(d.textContent).match(RULES.buybackDetail.infoLine);
+        if (m) info[m.groups.label.toLowerCase()] = m.groups.value;
       }
-      let image = li.querySelector('img')?.getAttribute('src') || null;
+      // A field is the first of its labels the ship has.
+      const field = (labels) => labels.map((l) => info[l]).find(Boolean) || '';
+      let image = li.querySelector(RULES.buybackDetail.image)?.getAttribute('src') || null;
       if (image && image.startsWith('/')) image = 'https://robertsspaceindustries.com' + image;
       return {
-        name: info.ship || info.vehicle || '',
-        manufacturer: info.manufacturer || '',
-        focus: info.focus || '',
+        name: field(RULES.buybackDetail.fields.name),
+        manufacturer: field(RULES.buybackDetail.fields.manufacturer),
+        focus: field(RULES.buybackDetail.fields.focus),
         image,
       };
     });
-    const also = [...doc.querySelectorAll('.package-listing.item li')].map((li) =>
+    const also = [...doc.querySelectorAll(RULES.buybackDetail.also)].map((li) =>
       clean(li.textContent),
     );
-    const cents = priceEl ? Number(priceEl.getAttribute('data-value')) : NaN;
+    const cents = priceEl ? Number(priceEl.getAttribute(RULES.buybackDetail.cents)) : NaN;
     return {
       title,
       price: Number.isFinite(cents) ? cents / 100 : null,
-      currency: priceEl?.getAttribute('data-currency') || 'USD',
+      currency: priceEl?.getAttribute(RULES.buybackDetail.currency) || 'USD',
       ships: ships.filter((x) => x.name),
       also,
       insurance: ns.insuranceTerm(
-        also.map((label) => ({ kind: /insurance/i.test(label) ? 'Insurance' : '', label })),
+        also.map((label) => ({
+          kind: RULES.kinds.insurance.test(label) ? 'Insurance' : '',
+          label,
+        })),
       ),
     };
   };
