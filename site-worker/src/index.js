@@ -15,10 +15,12 @@
 // /help the Troubleshooting page (site/help.html), the Ship Explorer and What's
 // Next a 503 that says try again, and the feeds a JSON 503.
 //
-// The website's pages go through its edge gateway (EDGE, the open-hangar-edge
-// Worker): a signed-out page comes from Cloudflare's edge near the visitor, kept
-// per host and per Day or Night look, and anything it doesn't keep goes on to
-// the website as before. Without the EDGE binding, straight to the website.
+// The website's pages and feeds go through its edge gateway (EDGE, the
+// open-hangar-edge Worker): a signed-out page comes from Cloudflare's edge near the
+// visitor, kept per host and per Day or Night look, and a feed the same way, the
+// gateway checking the caller's Origin and rate there; anything it doesn't keep
+// goes on to the website as before. Without the EDGE binding, straight to the
+// website.
 
 // The website's pages (not its feeds or files) that may come through the gateway.
 const PAGES = new Set([
@@ -31,15 +33,17 @@ const PAGES = new Set([
   '/updates',
   '/about',
 ]);
-// The extension's feeds. The website answers them itself (its own cache, ETag,
-// Origin check and rate limit), so they pass straight through, never cached here:
-// the answer depends on the caller's Origin.
+// The extension's feeds, and its alerts' sale feed (under /api/store/*). The
+// website's gateway answers them (its edge copy, ETag, Origin check and rate
+// limit), so they pass straight through, never cached here: the answer depends on
+// the caller's Origin.
 const FEEDS = new Set([
   '/api/game-status',
   '/api/ships',
   '/api/catalog',
   '/api/referral-events',
   '/api/known-issues',
+  '/api/store/on-sale',
 ]);
 
 export default {
@@ -62,9 +66,9 @@ export default {
     const newPage =
       help || path === '/whats-next' || path === '/ships' || path.startsWith('/ships/');
 
-    // Pages through the gateway, the request as it came: the gateway decides from it
-    // whether a kept page may answer.
-    const viaEdge = env.EDGE && (PAGES.has(path) || path.startsWith('/ships/'));
+    // Pages and feeds through the gateway, the request as it came: the gateway
+    // decides from it whether a kept copy may answer.
+    const viaEdge = env.EDGE && (PAGES.has(path) || path.startsWith('/ships/') || feed);
 
     let res;
     try {

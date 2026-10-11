@@ -158,8 +158,8 @@ test("with the edge gateway bound, the website's pages go through it as they cam
     assert.equal(calls.edge[0].url, `https://openhangar.space${page}?view=list`);
     assert.deepEqual(calls.cache, [], page);
   }
-  // Feeds and files go straight to the website.
-  for (const p of ['/api/catalog', '/api/store/catalog', '/_astro/app.js', '/fonts/x.woff2']) {
+  // The Store's own data and files go straight to the website.
+  for (const p of ['/api/store/catalog', '/api/store/item', '/_astro/app.js', '/fonts/x.woff2']) {
     const { calls } = await visit(p, 200, { edge: true });
     assert.deepEqual(calls.edge, [], p);
     assert.equal(calls.app.length, 1, p);
@@ -175,6 +175,44 @@ test("with the edge gateway bound, the website's pages go through it as they cam
   }
   const { res } = await visit('/ships', 'down', { edge: true });
   assert.equal(res.status, 503);
+});
+
+const FEEDS = [
+  '/api/game-status',
+  '/api/ships',
+  '/api/catalog',
+  '/api/referral-events',
+  '/api/known-issues',
+  '/api/store/on-sale',
+];
+
+test("with the edge gateway bound, the extension's feeds go through it as they came", async () => {
+  for (const feed of FEEDS) {
+    const { res, body, calls } = await visit(feed, 200, { edge: true });
+    assert.equal(res.status, 200, feed);
+    assert.equal(body, 'edge 200', feed);
+    assert.deepEqual(calls.app, [], feed);
+    assert.equal(calls.edge.length, 1, feed);
+    assert.equal(calls.edge[0].url, `https://openhangar.space${feed}`);
+    assert.deepEqual(calls.cache, [], feed);
+  }
+  // Without the binding, straight to the website as before.
+  const { body, calls } = await visit('/api/catalog', 200);
+  assert.equal(body, 'website 200');
+  assert.deepEqual(calls.app, ['/api/catalog']);
+});
+
+test("a feed the gateway or website can't answer is a JSON 503 the extension waits out", async () => {
+  for (const edge of [true, false]) {
+    for (const app of ['down', 500, 503]) {
+      const { res, body } = await visit('/api/store/on-sale', app, { edge });
+      assert.equal(res.status, 503, `${edge} ${app}`);
+      assert.equal(res.headers.get('content-type'), 'application/json; charset=utf-8');
+      assert.equal(res.headers.get('retry-after'), '600');
+      assert.equal(res.headers.get('cache-control'), 'no-store');
+      assert.deepEqual(JSON.parse(body), { error: 'feed unavailable' });
+    }
+  }
 });
 
 test('look-alike paths get no new-page fallback', async () => {
