@@ -216,7 +216,56 @@
     "storeList": {
       "operation": "initShipUpgrade",
       "query": "query initShipUpgrade { ships { id name flyableStatus msrp link skus { id title available price } } }"
-    }
+    },
+    "ships": {
+      "operation": "initShipUpgrade",
+      "query": "query initShipUpgrade { ships { id name owned msrp medias { productThumbMediumAndSmall } } app { mode isAnonymous } }"
+    },
+    "app": {
+      "operation": "initShipUpgrade",
+      "query": "query initShipUpgrade { app { mode isAnonymous } }"
+    },
+    "filter": {
+      "operation": "filterShips",
+      "query": "query filterShips($toId: Int, $fromFilters: [FilterConstraintValues]) {\n  from(to: $toId, filters: $fromFilters) {\n    ships {\n      id\n    }\n  }\n}\n",
+      "variables": { "fromFilters": [] }
+    },
+    "price": {
+      "operation": "getPrice",
+      "query": "query getPrice($from: Int!, $to: Int!) {\n  price(from: $from, to: $to) {\n    amount\n    nativeAmount\n  }\n}\n"
+    },
+    "add": {
+      "operation": "addToCart",
+      "query": "mutation addToCart($from: Int!, $to: Int!) {\n  addToCart(from: $from, to: $to) {\n    jwt\n  }\n}\n"
+    },
+    "signedOut": {
+      "source": "auth|log(ged)? ?in|sign(ed)? ?in|anonymous|unauthori[sz]ed|session",
+      "flags": "i"
+    },
+    "buybackMode": "buyback"
   },
-  "cart": { "path": "/en/store/pledge/cart" }
+  "cart": {
+    "path": "/en/store/pledge/cart",
+    "signInPath": "/connect",
+    "storePath": "/en/pledge",
+    "authPath": "/api/account/v2/setAuthToken",
+    "contextPath": "/api/ship-upgrades/setContextToken",
+    "ticketPath": "/api/store/v2/cart/token",
+    "cookie": "Rsi-Token",
+    "tokenHeader": "x-rsi-token",
+    "csrfHeader": "X-CSRF-TOKEN",
+    "csrfTag": { "source": "<meta[^>]+name=[\"']csrf-token[\"'][^>]*>", "flags": "i" },
+    "csrfValue": { "source": "content=[\"'](?<value>[^\"']+)[\"']", "flags": "i" },
+    "context": {
+      "fromShip": "fromShipId",
+      "toShip": "toShipId",
+      "toSku": "toSkuId",
+      "pledge": "pledgeId"
+    },
+    "refusal": {
+      "invalid": { "source": "invalid", "flags": "i" },
+      "buyback": { "source": "buy[\\s-]?backs?", "flags": "i" },
+      "upgrade": { "source": "upgrade", "flags": "i" }
+    }
+  }
 }

@@ -184,9 +184,10 @@ paging, the signs of RSI's sign-in page, the hangar's and buy-backs' selectors a
 positions, the buy-back page's, the name patterns that sort pledges and buy-backs
 (upgrades, add-ons, coupons, game access, paints, store categories), insurance terms,
 dates, the buy-back token sentence, the account's JSON keys, the dossier's selectors,
-and the GraphQL requests (referrals, the Subscriber Store, the store list) with the
-cart's address. The parsing stays in `src/scraper/parser.js` and
-`src/lib.js`, which read it as `RULES.<path>`; when RSI moves something, the fix is in
+the GraphQL requests (referrals, the Subscriber Store, the store list) and Add to RSI
+Cart's requests (addresses, GraphQL documents, the token's cookie and headers, RSI's
+refusal words). The parsing stays in `src/scraper/parser.js`, `src/lib.js` and
+`src/rsi-cart.js`, which read it as `RULES.<path>`; when RSI moves something, the fix is in
 the rules (docs/RSI-CHANGES.md).
 
 - `npm run rules` writes its copy as a script, `src/parser-rules-data.js` (with the
@@ -194,8 +195,9 @@ the rules (docs/RSI-CHANGES.md).
 - `src/parser-rules.js` loads it: checks it against its schema with
   `src/schema-check.js`, compiles each pattern (`{ source, flags }`) once with
   `new RegExp`, freezes everything and exposes `self.OHRules`. A file that doesn't fit
-  throws before anything reads it. The pages load both before `scraper/parser.js` and
-  `lib.js`.
+  throws before anything reads it. The pages load both before `scraper/parser.js`,
+  `rsi-cart.js` and `lib.js`; the background worker imports them before `rsi-cart.js`
+  (Firefox's event page lists them in its manifest, `scripts/pack.mjs`).
 - Data only: strings, numbers, lists and objects with fixed keys. Patterns never take
   `g` or `y`; where the code reads part of a match, the pattern names it
   (`(?<from>…)`). Addresses are paths: the host stays in the code.
