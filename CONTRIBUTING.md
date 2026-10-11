@@ -111,7 +111,7 @@ features and **patch** (`0.2.7`…) for fixes; `1.0.0` is reserved for the first
 ## Principles
 
 - **Keep RSI's field names, selectors and patterns in the parser rules**
-  (`src/data/parser-rules.json`, read by `parser.js`). Everything downstream should
+  (`src/data/parser-rules.json`, read by `parser.js` and `lib.js`). Everything downstream should
   depend on the normalized model, not raw RSI data.
 - **Be a good citizen.** Keep the throttle (`DELAY_MS`) in `lib.js`. Don't add
   parallel page fetching. This is for personal use, not bulk scraping.
