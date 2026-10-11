@@ -3674,7 +3674,7 @@ try {
 
     // RSI says no to the add.
     optionsAnswer = { ok: true, options: [{ id: 101, name: 'Pulse', eligible: true, price: 100 }] };
-    addAnswer = { ok: false, error: 'refused' };
+    addAnswer = { ok: false, error: 'refused', rsiSays: 'Pretend: this item is unavailable' };
     openShipModal('Carrack');
     await wait(() => q('[data-cart="upgrade"]'));
     q('[data-cart="upgrade"] .cbtn').click();
@@ -3816,11 +3816,12 @@ try {
   JSON.stringify(cart.addCall) === JSON.stringify(['add', 101, 900, 9001, {}])
     ? ok('Add to RSI Cart: one call with the right ships, In Your RSI Cart, Open RSI Cart')
     : fail(`cart add: ${JSON.stringify(cart)}`);
-  /Sign In to RSI First/.test(cart.signedOut) && cart.logIn === 'Log In to RSI ↗'
-    ? ok('cart signed out: Sign In to RSI First with Log In to RSI')
+  /signed out of RSI/.test(cart.signedOut) && cart.logIn === 'Log In to RSI ↗'
+    ? ok('cart signed out: the signed-out note with Log In to RSI')
     : fail(`cart signed out: ${JSON.stringify(cart)}`);
-  /RSI Didn't Add It.*Nothing was added/.test(cart.refused) && cart.addsAfterRefusal === 2
-    ? ok("cart refused: RSI Didn't Add It, and no second try by itself")
+  /RSI Didn't Add It.*“Pretend: this item is unavailable”/.test(cart.refused) &&
+  cart.addsAfterRefusal === 2
+    ? ok("cart refused: RSI Didn't Add It with RSI's own words, and no second try by itself")
     : fail(`cart refused: ${JSON.stringify(cart)}`);
   cart.anyHeading === 'Any Ship' &&
   /Any ship below works too/.test(cart.anyNone) &&
@@ -3836,7 +3837,7 @@ try {
   JSON.stringify(cart.anyAddCall) === JSON.stringify(['add', 777, 900, 9001, {}])
     ? ok('Any Ship: 30 of 35 shown, search finds one, priced on pick, added from a ship not owned')
     : fail(`any ship: ${JSON.stringify(cart)}`);
-  /Cart Already Busy.*buy-back on its own/.test(cart.busy) && cart.busyLink === 'Open RSI Cart ↗'
+  /Cart Already Busy.*holds a buy-back/.test(cart.busy) && cart.busyLink === 'Open RSI Cart ↗'
     ? ok('cart busy: Cart Already Busy with Open RSI Cart')
     : fail(`cart busy: ${JSON.stringify(cart)}`);
   /Buy-Back Price\s*\$15 from RSI just now/.test(cart.bbRows) &&
