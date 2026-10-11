@@ -75,6 +75,28 @@ const COPY = {
   'basic.pilot-body': '[copy: basic.pilot-body]',
   'basic.pilot-yes': '[copy: basic.pilot-yes]',
   'basic.pilot-no': '[copy: basic.pilot-no]',
+  // --- Store alerts (the `alerts` flag, ./AlertsCard.svelte) ---
+  'basic.alerts-title': '[copy: basic.alerts-title]', // the card's heading (Title Case)
+  // What alerts do: a badge and notifications when something in RSI's store is for
+  // you (Wishlist, buy-backs, paints, warbonds, limited sales), matched in this browser
+  // from one public file, nothing about you sent; a check at most every 30 minutes.
+  'basic.alerts-about': '[copy: basic.alerts-about]',
+  // The switch, off: turn alerts on (the browser then asks about notifications).
+  'basic.alerts-turn-on': '[copy: basic.alerts-turn-on]',
+  'basic.alerts-turn-off': '[copy: basic.alerts-turn-off]', // the switch, on
+  // On: how many items are alerts right now, and when the store was last checked.
+  'basic.alerts-on-line': '[copy: basic.alerts-on-line {n}]',
+  'basic.alerts-checked': '[copy: basic.alerts-checked {when}]',
+  // Notifications allowed, or not (then the badge and the popup's list only).
+  'basic.alerts-notify-on': '[copy: basic.alerts-notify-on]',
+  'basic.alerts-notify-off': '[copy: basic.alerts-notify-off]',
+  'basic.alerts-allow': '[copy: basic.alerts-allow]', // ask for Notifications again (button)
+  // Connected: the account's Wishlist counts too (read, never written or sent back).
+  'basic.alerts-wishlist-on': '[copy: basic.alerts-wishlist-on]',
+  // Not connected: only the hangar's rules; Connect adds the Wishlist.
+  'basic.alerts-wishlist-connect': '[copy: basic.alerts-wishlist-connect]',
+  // The last check didn't reach openhangar.space: it tries again later, calm.
+  'basic.alerts-trouble': '[copy: basic.alerts-trouble]',
   // --- Updates ---
   'basic.update-ready': '[copy: basic.update-ready {version}]',
   'basic.update-reload': '[copy: basic.update-reload]',

@@ -18,8 +18,20 @@ const COPY = {
   'popup.scan': '[copy: popup.scan]',
   // Scan pressed while one is already running or was just asked for.
   'popup.scan-busy': '[copy: popup.scan-busy]',
-  // The alert count (alerts come in a later step), e.g. "3 alerts".
+  // --- Store alerts (the `alerts` flag, ./Alerts.svelte) ---
+  // The list's heading: how many items in RSI's store are alerts for you, e.g. "3 Alerts".
   'popup.alerts': '[copy: popup.alerts {n}]',
+  // Alerts on, nothing for you in the store right now.
+  'popup.alerts-none': '[copy: popup.alerts-none]',
+  // Read by screen readers before an alert you hadn't seen yet (shown with a dot).
+  'popup.alerts-unseen': '[copy: popup.alerts-unseen]',
+  // Alerts on, not connected: only the hangar's rules run; connecting adds your
+  // account's Wishlist (read on this device, never sent back).
+  'popup.alerts-connect': '[copy: popup.alerts-connect]',
+  // Alerts off: what they'd do in one line (matched here, nothing about you sent).
+  'popup.alerts-off': '[copy: popup.alerts-off]',
+  // The link to the settings switch that turns them on (Title Case).
+  'popup.alerts-turn-on': '[copy: popup.alerts-turn-on]',
   // Connected to openhangar.space: as whom, and when it last synced.
   'popup.connected': '[copy: popup.connected {name}]',
   'popup.synced': '[copy: popup.synced {when}]',

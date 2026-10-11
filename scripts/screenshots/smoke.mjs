@@ -4822,6 +4822,139 @@ try {
   page.off('request', offline);
   await page.setRequestInterception(false);
   await page.setViewport({ width: 1280, height: 900 });
+
+  // Extension Alerts (the `alerts` flag; the connector pages are served as a build with
+  // it on): the popup's list (off: the way to the switch; on: the matches, the unseen
+  // marked, opening it marks them seen, a row opens our Store), and the basic page's
+  // switch (on asks for Notifications first, off gives them back).
+  console.log('Store Alerts');
+  await page.setViewport({ width: 320, height: 600 });
+  await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#pp-alerts-on');
+  const alOff = await page.$eval('#pp-alerts', (e) => e.textContent.replace(/\s+/g, ' '));
+  await page.click('#pp-alerts-on');
+  const alOffGo = await page.evaluate(() => ({ url: __demo.opened.at(-1), closed: __demo.closed }));
+  /\[copy: popup\.alerts-off\]/.test(alOff) &&
+  /\[copy: popup\.alerts-turn-on\]/.test(alOff) &&
+  /basic\.html#settings$/.test(alOffGo.url) &&
+  alOffGo.closed
+    ? ok('popup, alerts off: one line and the way to the settings switch')
+    : fail(`popup alerts off: ${JSON.stringify({ alOff, alOffGo })}`);
+  const why = (w, ships = []) => ({ why: w, ships });
+  const alState = {
+    alertsOn: true,
+    alerts: {
+      v: 1,
+      checkedAt: Date.now() - 60e3,
+      items: [
+        {
+          id: 'sku-19623',
+          name: 'Sabre Raven EX',
+          kind: 'ship',
+          price: 185,
+          sale: ['limited'],
+          endsOn: '2026-10-15',
+          why: [why('buyback', ['Sabre Raven EX'])],
+        },
+        {
+          id: 'sku-19699',
+          name: 'Constellation Mk IV - Nightbreak Paint',
+          kind: 'paint',
+          price: 11,
+          sale: ['listed'],
+          endsOn: null,
+          why: [why('paint', ['Constellation Andromeda'])],
+        },
+      ],
+      known: { 'sku-19623|buyback': 1, 'sku-19699|paint': 2 },
+      seen: { 'sku-19699|paint': 3 },
+      gone: {},
+    },
+  };
+  const alHook = await page.evaluateOnNewDocument((st) => (window.__demoAlerts = st), alState);
+  await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
+  await page.waitForSelector('.pp-alist li');
+  const alOn = await page.evaluate(() => ({
+    head: document.getElementById('pp-alerts-h').textContent.trim(),
+    rows: [...document.querySelectorAll('.pp-alist li')].map((li) => ({
+      fresh: li.classList.contains('fresh'),
+      text: li.textContent.replace(/\s+/g, ' ').trim(),
+    })),
+    connect: /\[copy: popup\.alerts-connect\]/.test(
+      document.getElementById('pp-alerts').textContent,
+    ),
+    sent: __demo.sent.map((m) => m.ohPopup),
+    wide: document.documentElement.scrollWidth > 320,
+  }));
+  alOn.head === '[copy: popup.alerts 2]' &&
+  alOn.rows.length === 2 &&
+  alOn.rows[0].fresh &&
+  !alOn.rows[1].fresh &&
+  alOn.rows[0].text.includes('[copy: popup.alerts-unseen]') &&
+  alOn.rows[0].text.includes('[copy: alerts.why.buyback Sabre Raven EX]') &&
+  alOn.rows[0].text.includes('[copy: alerts.ends Oct 15]') &&
+  alOn.rows[1].text.includes('[copy: alerts.why.paint Constellation Andromeda]') &&
+  alOn.connect &&
+  alOn.sent.includes('alerts-seen') &&
+  !alOn.wide
+    ? ok(
+        'popup, alerts on: the matches with why, the unseen one marked, all marked seen, no sideways scroll',
+      )
+    : fail(`popup alerts on: ${JSON.stringify(alOn)}`);
+  await page.click('.pp-alist li .pp-arow');
+  const alRow = await page.evaluate(() => __demo.opened.at(-1));
+  alRow === 'https://openhangar.space/store#item=19623'
+    ? ok('an alert opens that item on our Store')
+    : fail(`alert row went to ${alRow}`);
+  await page.removeScriptToEvaluateOnNewDocument(alHook.identifier);
+  await page.setViewport({ width: 1280, height: 900 });
+  // The basic page's switch.
+  await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#bp-alerts-on');
+  await page.click('#bp-alerts-on');
+  await page.waitForSelector('#bp-alerts-off');
+  const alSwitch = await page.evaluate(async () => ({
+    asked: __demo.asked,
+    on: (await chrome.storage.local.get('alertsOn')).alertsOn,
+    card: document.getElementById('bp-alerts').textContent.replace(/\s+/g, ' '),
+  }));
+  await page.click('#bp-alerts-off');
+  await page.waitForSelector('#bp-alerts-on');
+  const alSwitchOff = await page.evaluate(async () => ({
+    removed: __demo.removed,
+    on: (await chrome.storage.local.get('alertsOn')).alertsOn,
+  }));
+  alSwitch.asked.join() === 'notifications' &&
+  alSwitch.on === true &&
+  /\[copy: basic\.alerts-notify-on\]/.test(alSwitch.card) &&
+  /\[copy: basic\.alerts-wishlist-connect\]/.test(alSwitch.card) &&
+  alSwitchOff.removed.join() === 'notifications' &&
+  alSwitchOff.on === false
+    ? ok(
+        'settings: Turn On asks for Notifications and switches alerts on; Turn Off gives them back',
+      )
+    : fail(`alerts switch: ${JSON.stringify({ alSwitch, alSwitchOff })}`);
+  // A no from the browser: alerts still on (the badge and the list), and a way to ask again.
+  const noHook = await page.evaluateOnNewDocument(() => (window.__demoNotify = false));
+  // A new document (the same address with a hash would only scroll).
+  await page.goto('about:blank');
+  await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#bp-alerts-on');
+  await page.click('#bp-alerts-on');
+  await page.waitForSelector('#bp-alerts-allow');
+  const alNo = await page.$eval('#bp-alerts', (e) => e.textContent.replace(/\s+/g, ' '));
+  await page.removeScriptToEvaluateOnNewDocument(noHook.identifier);
+  /\[copy: basic\.alerts-notify-off\]/.test(alNo) && /\[copy: basic\.alerts-allow\]/.test(alNo)
+    ? ok('Notifications said no: alerts on, the badge only, and Allow to ask again')
+    : fail(`alerts without notifications: ${alNo}`);
+  await page.setViewport({ width: 375, height: 800 });
+  await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#bp-alerts');
+  const alNarrow = await page.evaluate(() => document.documentElement.scrollWidth);
+  alNarrow <= 375
+    ? ok('settings with the alerts card at 375 px: no sideways scroll')
+    : fail(`settings ${alNarrow} px wide at 375`);
+  await page.setViewport({ width: 1280, height: 900 });
 } finally {
   await browser.close();
   server.kill();
