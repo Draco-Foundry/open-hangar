@@ -44,7 +44,7 @@
   // What each message may carry besides its type: [check, needed]. The website's own
   // pages send exactly these. skus (every edition on offer) is cleaned and capped by
   // its handler, as before; v (the bridge version the page speaks) is allowed and not
-  // read.
+  // read. pledgeId: a buy-back upgrade's pledge (price and add in RSI's buy-back mode).
   const MAX_BYTES = 16 * 1024;
   const posInt = (v) => Number.isInteger(v) && v > 0;
   const code = (v) => typeof v === 'string' && v.length > 0 && v.length <= 512;
@@ -56,8 +56,13 @@
     'oh-scan-status': {},
     'oh-request-scan': {},
     'oh-upgrade-options': { toShipId: ID, toSkuId: ID, skus: [Array.isArray, false] },
-    'oh-upgrade-price': { fromShipId: ID, toSkuId: ID, toShipId: [posInt, false] },
-    'oh-add-upgrade': { fromShipId: ID, toShipId: ID, toSkuId: ID },
+    'oh-upgrade-price': {
+      fromShipId: ID,
+      toSkuId: ID,
+      toShipId: [posInt, false],
+      pledgeId: [posInt, false],
+    },
+    'oh-add-upgrade': { fromShipId: ID, toShipId: ID, toSkuId: ID, pledgeId: [posInt, false] },
     'oh-connect-begin': {},
     'oh-connect-finish': { code: [code, true], sync: [bool, false] },
   };
