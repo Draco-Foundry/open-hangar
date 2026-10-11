@@ -36,12 +36,14 @@ const OH = globalThis.OH;
 const READERS = ['src/scraper/parser.js', 'src/lib.js'];
 
 // A rule is a leaf: a pattern ({ source, flags }), a string, a number or a list (read
-// whole: a table, a list of selectors or labels).
+// whole: a table, a list of selectors or labels), or a GraphQL request's fixed
+// `variables` (sent whole).
 const isPattern = (v) =>
   !!v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).join() === 'source,flags';
-const isLeaf = (v) => isPattern(v) || Array.isArray(v) || typeof v !== 'object';
+const isLeaf = (v, key) =>
+  isPattern(v) || Array.isArray(v) || typeof v !== 'object' || key === 'variables';
 function leaves(v, at = [], out = []) {
-  if (isLeaf(v)) out.push({ path: at.join('.'), value: v });
+  if (isLeaf(v, at[at.length - 1])) out.push({ path: at.join('.'), value: v });
   else for (const [k, x] of Object.entries(v)) leaves(x, [...at, k], out);
   return out;
 }
@@ -189,6 +191,7 @@ test('the parts of a match the code reads are named groups in its pattern', () =
     'insurance.fromItem.months': ['n'],
     'dates.iso': ['year', 'month', 'day'],
     'dates.named': ['year', 'month', 'day'],
+    'dossier.orgSid': ['sid'],
   };
   const groupsOf = (re) =>
     Object.keys(new RegExp(`(?:${re.source})|`, re.flags).exec('').groups || {});
@@ -199,6 +202,15 @@ test('the parts of a match the code reads are named groups in its pattern', () =
     .filter((l) => groupsOf(at(RULES, l.path)).length)
     .map((l) => l.path);
   assert.deepEqual(named.sort(), Object.keys(GROUPS).sort());
+});
+
+test('each GraphQL document defines the operation its request names', () => {
+  const requests = byDef('operation');
+  assert.ok(requests.length >= 3, `${requests.length} requests`);
+  for (const { path: p, value: op } of requests) {
+    const doc = at(RULES_JSON, p.replace(/operation$/, 'query'));
+    assert.match(doc, new RegExp(`^\\s*(query|mutation)\\s+${op}\\b`), p);
+  }
 });
 
 test('every selector parses, and cell layouts read cells the card has', () => {
@@ -224,7 +236,7 @@ test('every rule is read by the code, and the code reads only rules that exist',
       let node = RULES_JSON;
       let p = [];
       for (const s of segs) {
-        if (isLeaf(node)) break; // a method or property of the rule itself (.test, .find…)
+        if (isLeaf(node, p[p.length - 1])) break; // the rule's own method or part (.test…)
         assert.ok(
           Object.prototype.hasOwnProperty.call(node, s),
           `${f} reads RULES.${[...p, s].join('.')}, which isn't a rule`,
@@ -232,7 +244,10 @@ test('every rule is read by the code, and the code reads only rules that exist',
         node = node[s];
         p.push(s);
       }
-      assert.ok(isLeaf(node), `${f} reads RULES.${p.join('.')} whole: read its rules one by one`);
+      assert.ok(
+        isLeaf(node, p[p.length - 1]),
+        `${f} reads RULES.${p.join('.')} whole: read its rules one by one`,
+      );
       used.add(p.join('.'));
     }
     // The rules are only reached through RULES.
@@ -286,11 +301,28 @@ test('the moved code keeps no pattern or selector of its own', () => {
     for (const { path: p, value } of byDef('path'))
       assert.ok(!literals.some((s) => s.includes(value)), `${f} spells out ${p}: ${value}`);
   }
-  // parser.js reads every selector and attribute from the rules (lib.js's account and
-  // dossier readers still hold theirs).
-  const literals = [...parser.matchAll(/(['"`])((?:\\.|(?!\1)[^\\\n])*)\1/g)].map((m) => m[2]);
-  for (const { path: p, value } of [...byDef('selector'), ...byDef('attribute')])
-    assert.ok(!literals.includes(value), `parser.js spells out ${p}: ${value}`);
+  // Both read every selector, attribute and RSI JSON key from the rules, and never
+  // hand a selector of their own to the DOM.
+  for (const f of READERS) {
+    const text = code(f);
+    const literals = [...text.matchAll(/(['"`])((?:\\.|(?!\1)[^\\\n])*)\1/g)].map((m) => m[2]);
+    for (const { path: p, value } of [...byDef('selector'), ...byDef('attribute')])
+      assert.ok(!literals.includes(value), `${f} spells out ${p}: ${value}`);
+    for (const m of text.matchAll(/\.(querySelector|querySelectorAll|closest|matches)\(\s*(\S)/g))
+      assert.ok(!/['"`]/.test(m[2]), `${f}: ${m[1]}() with a selector of its own`);
+    for (const { path: p, value } of byDef('operation'))
+      assert.ok(!literals.includes(value), `${f} spells out ${p}: ${value}`);
+  }
+  // lib.js reads the account's JSON (OH.getAccount, up to the referrals) by the rules'
+  // keys, never obj.<key> of its own.
+  const lib = code('src/lib.js');
+  const account = lib.slice(
+    lib.indexOf('function extractAccount'),
+    lib.indexOf('async function fetchReferralPage'),
+  );
+  assert.ok(account.length > 2000, 'found OH.getAccount');
+  for (const { path: p, value } of byDef('jsonKey').filter((l) => /^account\./.test(l.path)))
+    assert.doesNotMatch(account, new RegExp(`\\b(obj|sub|con|c)\\.${value}\\b`), p);
 });
 
 test('the rules load in a worker too: no window, document, chrome or require', () => {

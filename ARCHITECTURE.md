@@ -183,7 +183,9 @@ described by `schema/parser-rules.schema.json`. It holds the account lists' path
 paging, the signs of RSI's sign-in page, the hangar's and buy-backs' selectors and cell
 positions, the buy-back page's, the name patterns that sort pledges and buy-backs
 (upgrades, add-ons, coupons, game access, paints, store categories), insurance terms,
-dates and the buy-back token sentence. The parsing stays in `src/scraper/parser.js` and
+dates, the buy-back token sentence, the account's JSON keys, the dossier's selectors,
+and the GraphQL requests (referrals, the Subscriber Store, the store list) with the
+cart's address. The parsing stays in `src/scraper/parser.js` and
 `src/lib.js`, which read it as `RULES.<path>`; when RSI moves something, the fix is in
 the rules (docs/RSI-CHANGES.md).
 
@@ -197,6 +199,10 @@ the rules (docs/RSI-CHANGES.md).
 - Data only: strings, numbers, lists and objects with fixed keys. Patterns never take
   `g` or `y`; where the code reads part of a match, the pattern names it
   (`(?<from>…)`). Addresses are paths: the host stays in the code.
+- A GraphQL request is its operation, its document and the variables that never
+  change; the code adds the rest (page, size, campaign). The code reads the answer by
+  the field names the document asks for, so a field RSI renames is aliased in the
+  document (`oldName: newName`) and the answer keeps its shape.
 - `test/parser-rules.test.js` checks every rule is read by the code, the code reads only
   rules that exist, and the moved code holds no pattern or selector of its own.
 - It ships in the extension and is never fetched (docs/FLAGS.md).
