@@ -4,6 +4,7 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Fixed: [copy: Add to RSI Cart no longer says your cart is busy with a buy-back when RSI turned the upgrade down for another reason; it shows what RSI said instead.]
 - Changed: **Org Fleet shows ships, not price tags.** No store prices, fleet value or
   shares, and no comparing one member's fleet with another's. Click a member's name to
   see the ships they fly and the roles they cover. The CSV export drops its price column
