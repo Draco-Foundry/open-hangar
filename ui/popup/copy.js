@@ -36,6 +36,10 @@ const COPY = {
   'popup.connected': '[copy: popup.connected {name}]',
   'popup.synced': '[copy: popup.synced {when}]',
   'popup.not-synced': '[copy: popup.not-synced]',
+  // The website took a sync for this account moments ago (too soon): calm, never an
+  // error code; the next one can go at {time} ("6:02 PM"). The owner's words start
+  // "try again at ..." (#570).
+  'popup.sync-wait': '[copy: popup.sync-wait {time}]',
   // Not connected: the hangar stays in this browser; Connect is optional.
   'popup.not-connected': '[copy: popup.not-connected]',
   // Signed out of RSI: Scan needs you logged in on robertsspaceindustries.com.
