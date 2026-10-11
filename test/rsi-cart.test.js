@@ -312,6 +312,7 @@ test('errors map to signed-out / refused / busy / network', async () => {
   assert.deepEqual(await fast(fakeRsi({ add: 'no' })).addUpgradeToCart(101, 900, 9001), {
     ok: false,
     error: 'refused',
+    rsiSays: 'Upgrade not available',
   });
   assert.deepEqual(
     await fast(fakeRsi({ status: { context: 401 } })).addUpgradeToCart(101, 900, 9001),
@@ -334,28 +335,37 @@ test('errors map to signed-out / refused / busy / network', async () => {
   });
 });
 
-test('cart already busy: a refusal about the cart or a buy-back is cart-conflict', async () => {
+test('cart already busy: only a refusal that names a buy-back is cart-conflict', async () => {
   // Invented refusal messages; RSI takes a buy-back alone in the cart.
   assert.equal(
     C.cartRefusal({ success: 0, msg: 'Pretend: Buy-back items must be alone' }),
     'cart-conflict',
   );
-  assert.equal(C.cartRefusal({ errors: [{ message: 'pretend cart is locked' }] }), 'cart-conflict');
+  // Mentioning the cart isn't enough: that was the "$5 upgrade, Cart Already Busy" mix-up.
+  assert.equal(C.cartRefusal({ errors: [{ message: 'pretend cart is locked' }] }), null);
+  assert.equal(C.cartRefusal({ msg: 'Pretend: could not add to cart' }), null);
   assert.equal(C.cartRefusal({ success: 0, msg: 'Pretend: something else' }), null);
   assert.equal(C.cartRefusal(null), null);
-  const conflict = { ok: false, error: 'cart-conflict' };
-  // The cart step answers success 0 with a message about the cart.
+  // The cart step answers success 0 with a message about a buy-back.
   let rsi = fakeRsi({ cartAnswer: { body: { success: 0, msg: 'Pretend: cart holds a buyback' } } });
-  assert.deepEqual(await fast(rsi).addUpgradeToCart(101, 900, 9001), conflict);
+  assert.deepEqual(await fast(rsi).addUpgradeToCart(101, 900, 9001), {
+    ok: false,
+    error: 'cart-conflict',
+    rsiSays: 'Pretend: cart holds a buyback',
+  });
   assert.equal(rsi.ops().filter((o) => o === 'addToCart').length, 1, 'never retried');
   // The cart step answers an error status with a message about a buy-back.
   rsi = fakeRsi({
     cartAnswer: { body: { message: 'Pretend: one buy-back per order' }, code: 422 },
   });
-  assert.deepEqual(await fast(rsi).addUpgradeToCart(101, 900, 9001), conflict);
+  assert.deepEqual(await fast(rsi).addUpgradeToCart(101, 900, 9001), {
+    ok: false,
+    error: 'cart-conflict',
+    rsiSays: 'Pretend: one buy-back per order',
+  });
   // addToCart itself refuses with a buy-back message.
   rsi = fakeRsi({ add: 'busy-cart' });
-  assert.deepEqual(await fast(rsi).addUpgradeToCart(101, 900, 9001), conflict);
+  assert.equal((await fast(rsi).addUpgradeToCart(101, 900, 9001)).error, 'cart-conflict');
   assert.equal(rsi.ops().filter((o) => o === 'addToCart').length, 1, 'never retried');
   // A buy-back upgrade RSI won't sell any more (ship values changed): refused, why known.
   rsi = fakeRsi({ cartAnswer: { body: { success: 0, msg: 'Pretend: invalid upgrade' } } });
@@ -363,15 +373,81 @@ test('cart already busy: a refusal about the cart or a buy-back is cart-conflict
     ok: false,
     error: 'refused',
     reason: 'invalid',
+    rsiSays: 'Pretend: invalid upgrade',
   });
   assert.equal(C.cartRefusal({ msg: 'Pretend: upgrade unavailable' }, true), 'invalid');
   assert.equal(C.cartRefusal({ msg: 'Pretend: upgrade unavailable' }), null);
-  // Unknown refusals stay plain refusals.
-  rsi = fakeRsi({ cartAnswer: { body: { success: 0, msg: 'Pretend: nope' } } });
+});
+
+test("a plain refusal carries RSI's own words, never a guess", async () => {
+  // A new upgrade whose cart step says something about the cart, not a buy-back.
+  let rsi = fakeRsi({
+    cartAnswer: { body: { success: 0, msg: 'Pretend: this item could not be added to your cart' } },
+  });
+  assert.deepEqual(await fast(rsi).addUpgradeToCart(101, 900, 9001), {
+    ok: false,
+    error: 'refused',
+    rsiSays: 'Pretend: this item could not be added to your cart',
+  });
+  // An error status with a message: RSI's words, not "network".
+  rsi = fakeRsi({ cartAnswer: { body: { message: 'Pretend: limit reached' }, code: 422 } });
+  assert.deepEqual(await fast(rsi).addUpgradeToCart(101, 900, 9001), {
+    ok: false,
+    error: 'refused',
+    rsiSays: 'Pretend: limit reached',
+  });
+  // A server error stays a network error, whatever its body says.
+  rsi = fakeRsi({ cartAnswer: { body: { message: 'Pretend: oops' }, code: 500 } });
+  assert.deepEqual(await fast(rsi).addUpgradeToCart(101, 900, 9001), {
+    ok: false,
+    error: 'network',
+  });
+  // Nothing readable: a plain refusal, no rsiSays.
+  rsi = fakeRsi({ cartAnswer: { body: { success: 0, code: 'ERR' } } });
   assert.deepEqual(await fast(rsi).addUpgradeToCart(101, 900, 9001), {
     ok: false,
     error: 'refused',
   });
+});
+
+test('rsiSays: trimmed, tags out, no account data, capped', () => {
+  assert.equal(C.rsiSays({ msg: '  Pretend:   <b>not</b>\n sold  ' }), 'Pretend: not sold');
+  assert.equal(
+    C.rsiSays({ msg: 'Pretend: pilot@example.com can not add order #12345678 now' }),
+    'Pretend: can not add order now',
+  );
+  // The same words twice (msg and errors) are said once.
+  assert.equal(
+    C.rsiSays({ msg: 'Pretend: no', errors: [{ message: 'Pretend: no' }, { message: 'Again' }] }),
+    'Pretend: no Again',
+  );
+  assert.equal(C.rsiSays({ code: 'ERR_CART' }), null, 'a bare code is not words');
+  assert.equal(C.rsiSays({ msg: '1234567' }), null);
+  assert.equal(C.rsiSays(null), null);
+  const long = C.rsiSays({ msg: 'Pretend '.repeat(60) });
+  assert.ok(long.length <= 200 && long.endsWith('…'));
+});
+
+test('signed out of RSI: no session cookie means nothing is asked of RSI', async () => {
+  const noCookie = { rsiCookie: async () => '' };
+  for (const ask of [
+    (api) => api.addUpgradeToCart(101, 900, 9001),
+    (api) => api.upgradeOptions(900, 9001),
+    (api) => api.upgradePrice(101, 9001, { toShipId: 900, setContext: true }),
+  ]) {
+    const rsi = fakeRsi();
+    assert.deepEqual(await ask(fast(rsi, noCookie)), { ok: false, error: 'signed-out' });
+    assert.equal(rsi.all.length, 0, 'not one request to RSI');
+  }
+  // The browser can't tell (no cookies API): ask RSI, which says who you are.
+  const rsi = fakeRsi();
+  const r = await fast(rsi, { rsiCookie: async () => null }).addUpgradeToCart(101, 900, 9001);
+  assert.deepEqual(r, { ok: true });
+  // A cookie RSI no longer takes: its own answer says signed out, nothing added.
+  const stale = fakeRsi({ anonymous: true });
+  const s = await fast(stale, { rsiCookie: async () => 'old' }).addUpgradeToCart(101, 900, 9001);
+  assert.deepEqual(s, { ok: false, error: 'signed-out' });
+  assert.ok(!stale.ops().includes('addToCart'));
 });
 
 test('addToCart is never retried, even when RSI fails or asks to slow down', async () => {
