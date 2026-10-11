@@ -2021,7 +2021,8 @@ body:not(:has(#view-home.active)) .market-title {
 }
 
 /* The website Connect card (ui/site/SiteConnect.svelte): top right of the Citizen Card,
-   over the org watermark; under the card's text on narrow screens. */
+   over the org watermark; under the card's text up to 1000px wide, where beside it the
+   name and org lines would run under it or wrap a word alone (#542). */
 .home-hero .citizen-card .site-connect {
   position: absolute;
   top: 18px;
@@ -2032,6 +2033,12 @@ body:not(:has(#view-home.active)) .market-title {
   gap: 6px;
   max-width: 300px;
   text-align: right;
+}
+/* While Connect is in the corner, the name and org lines stop short of it (its 300px,
+   its 18px from the edge and a 16px gap, less the card's own 24px padding): a long
+   name ends in "…" and a long org name wraps, never under the card. */
+.home-hero .citizen-card:has(#site-connect) :is(.cc-name, .cc-org) {
+  margin-right: 310px;
 }
 .sc-btn {
   display: inline-flex;
@@ -2152,7 +2159,10 @@ body:not(:has(#view-home.active)) .market-title {
     }
   }
 }
-@media (max-width: 760px) {
+@media (max-width: 1000px) {
+  .home-hero .citizen-card:has(#site-connect) :is(.cc-name, .cc-org) {
+    margin-right: 0;
+  }
   .home-hero .citizen-card .site-connect {
     position: static;
     justify-items: start;
