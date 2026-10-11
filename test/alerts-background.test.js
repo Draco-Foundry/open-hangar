@@ -225,6 +225,29 @@ test('turned off while a check waits on the network: nothing of it comes back', 
   }
 });
 
+test('turned off and on again while a check waits: the new check keeps its matches and alarm', async () => {
+  const held = [];
+  const x = loadBackground({
+    flags: ALERTS,
+    notify: true,
+    changes: true,
+    local: { db: structuredClone(DB) },
+    fetch: async () => {
+      if (!held.length) await new Promise((r) => held.push(r));
+      return json(FEED);
+    },
+  });
+  await x.chrome.storage.local.set({ alertsOn: true });
+  await until(() => held.length === 1);
+  await x.chrome.storage.local.set({ alertsOn: false });
+  await x.chrome.storage.local.set({ alertsOn: true });
+  held[0]();
+  await until(() => x.alarms.has('oh-alerts') && x.stores.local.alerts);
+  await new Promise((r) => setTimeout(r, 30));
+  assert.ok(x.alarms.has('oh-alerts'), 'the next check is set');
+  assert.equal(x.stores.local.alerts.items.length, 2);
+});
+
 test('the worker starting with alerts on and no alarm: one, 30 minutes after the last check', async () => {
   const last = Date.now() - 5 * 60e3;
   const x = worker({

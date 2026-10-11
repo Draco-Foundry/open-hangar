@@ -514,10 +514,13 @@ chrome.storage.onChanged.addListener((c, area) => {
     if (c[AL.ON_KEY].newValue === true) alertsCheck();
     else {
       // Off: no more checks, and the matches and the Wishlist keys go; again once a
-      // check that was already running settles, in case it wrote them back.
-      const off = () => {
+      // check that was already running settles, in case it wrote them back (unless
+      // alerts are on again by then).
+      const off = async () => {
+        if ((await chrome.storage.local.get(AL.ON_KEY))[AL.ON_KEY] === true) return;
         chrome.alarms.clear(AL.ALARM);
-        return chrome.storage.local.remove(AL.OFF_KEYS).then(updateReminder);
+        await chrome.storage.local.remove(AL.OFF_KEYS);
+        return updateReminder();
       };
       off();
       if (alertsRun) alertsRun.finally(off);
