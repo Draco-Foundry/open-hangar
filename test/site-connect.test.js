@@ -144,3 +144,60 @@ test('firefox: before Firefox says yes, Connect opens Home with its card up', as
   assert.ok(x.stores.session.siteAskFirefox);
   assert.equal(x.stores.session.siteConnect, undefined);
 });
+
+// Connect with a code (src/dashboard.js siteConnect, when the sign-in window can't
+// open): the dashboard keeps the code it's waiting for in session storage, and the
+// website's code page fills a code in only when this says it's that one.
+const PENDING = (o = {}) => ({
+  siteLinkPending: { code: 'K7Q-4PX', origin: SITE, until: Date.now() + 600e3, ...o },
+});
+const check = (x, code, from = SITE) => x.send({ type: 'oh-link-check', code }, from);
+
+test('the code check: yes only for the code this extension is waiting for', async () => {
+  const x = load();
+  assert.deepEqual(await check(x, 'K7Q-4PX'), { ok: true, mine: false }, 'nothing waiting');
+  Object.assign(x.stores.session, PENDING());
+  assert.deepEqual(await check(x, 'K7Q-4PX'), { ok: true, mine: true });
+  assert.deepEqual(await check(x, ' k7q4px '), { ok: true, mine: true }, 'as people type it');
+  for (const other of ['K7Q-4PY', 'K7Q', 'K7Q-4PXX', '-', '???'])
+    assert.deepEqual(await check(x, other), { ok: true, mine: false }, other);
+  // Only from the site it asked for that code, and not once it has run out.
+  assert.deepEqual(await check(x, 'K7Q-4PX', 'https://app.openhangar.space'), {
+    ok: true,
+    mine: false,
+  });
+  Object.assign(x.stores.session, PENDING({ until: Date.now() - 1 }));
+  assert.deepEqual(await check(x, 'K7Q-4PX'), { ok: true, mine: false }, 'run out');
+  Object.assign(x.stores.session, PENDING({ code: '' }));
+  assert.deepEqual(await check(x, ''), { ok: false, error: 'bad request' });
+  assert.deepEqual(await check(x, '-'), { ok: true, mine: false }, 'an empty code never matches');
+  // Nothing asked of the website, nothing changed here.
+  assert.equal(x.fetched.length, 0);
+  assert.equal(x.opened.length, 0);
+});
+
+test('the code check: only on the pages that may Connect, and only a short code', async () => {
+  const x = load({ staging: false });
+  Object.assign(x.stores.session, PENDING({ origin: 'https://app.openhangar.space' }));
+  const app = 'https://app.openhangar.space';
+  assert.deepEqual(await check(x, 'K7Q-4PX', app), { ok: true, mine: true });
+  const UNKNOWN = { ok: false, error: 'unknown request' };
+  assert.deepEqual(await check(x, 'K7Q-4PX', 'https://openhangar.space'), UNKNOWN);
+  assert.equal(await check(x, 'K7Q-4PX', 'https://evil.example'), undefined);
+  const BAD = { ok: false, error: 'bad request' };
+  for (const code of [undefined, 1234567, 'K'.repeat(17), ['K7Q-4PX']])
+    assert.deepEqual(await x.send({ type: 'oh-link-check', code }, app), BAD, String(code));
+  assert.deepEqual(
+    await x.send({ type: 'oh-link-check', code: 'K7Q-4PX', more: 1 }, app),
+    BAD,
+    'nothing else rides along',
+  );
+});
+
+test('firefox: the code page checks its code through the bridge', async () => {
+  const x = loadFirefox();
+  Object.assign(x.stores.session, PENDING());
+  const ask = (code) => x.fromPage({ type: 'oh-link-check', code }, `${SITE}/link?code=${code}`);
+  assert.deepEqual(await ask('K7Q-4PX'), { ok: true, mine: true });
+  assert.deepEqual(await ask('ABC-DEF'), { ok: true, mine: false });
+});
