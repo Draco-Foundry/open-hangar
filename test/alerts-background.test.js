@@ -194,6 +194,98 @@ test('turned off: no alarm, the matches and the Wishlist keys gone', async () =>
   assert.ok('alertsFeed' in x.stores.local, 'the public feed stays (nothing of the pilot in it)');
 });
 
+// A worker whose network holds the request `hold(url)` picks until let go (`release`).
+function holding(hold, { local = {}, answer } = {}) {
+  const asked = [];
+  const held = [];
+  const x = loadBackground({
+    flags: ALERTS,
+    notify: true,
+    changes: true,
+    local: { db: structuredClone(DB), ...local },
+    fetch: async (url) => {
+      asked.push(url);
+      const wish = url.endsWith('/api/v1/wishlist');
+      if (hold(url) && !held.length) await new Promise((r) => held.push(r));
+      if (answer) return answer(url);
+      return json(wish ? { v: 1, keys: ['ship:cutlass-black', 'sku:42'] } : FEED);
+    },
+  });
+  return { x, asked, held, release: () => held.forEach((r) => r()) };
+}
+const settle = () => new Promise((r) => setTimeout(r, 30));
+const LINK = { siteLink: { token: 'oht_test', connectedAt: 1 } };
+
+test('turned off while a check waits on the network: nothing of it comes back', async () => {
+  for (const which of ['feed', 'wishlist']) {
+    const h = holding((url) => url.endsWith('/api/v1/wishlist') === (which === 'wishlist'), {
+      local: LINK,
+    });
+    await h.x.chrome.storage.local.set({ alertsOn: true });
+    await until(() => h.held.length === 1);
+    const before = h.asked.length;
+    await h.x.chrome.storage.local.set({ alertsOn: false });
+    h.release();
+    await settle();
+    const local = h.x.stores.local;
+    assert.ok(!('alerts' in local), `${which}: no matches kept`);
+    assert.ok(!('alertsWish' in local), `${which}: no Wishlist keys kept`);
+    assert.ok(!h.x.alarms.has('oh-alerts'), `${which}: no next check`);
+    assert.equal(h.x.notes.length, 0, `${which}: no notification`);
+    assert.equal(h.asked.length, before, `${which}: nothing more asked after Off`);
+    assert.ok('alertsFeed' in local, `${which}: the public feed's record stays`);
+  }
+});
+
+test("turned off mid-check: the feed's backoff is kept, so turning on again asks nothing", async () => {
+  const h = holding(() => true, {
+    answer: () => new Response(null, { status: 429, headers: { 'retry-after': '7200' } }),
+  });
+  await h.x.chrome.storage.local.set({ alertsOn: true });
+  await until(() => h.held.length === 1);
+  await h.x.chrome.storage.local.set({ alertsOn: false });
+  h.release();
+  await settle();
+  assert.ok(h.x.stores.local.alertsFeed?.retryAt > Date.now(), 'the 429 is remembered');
+  await h.x.chrome.storage.local.set({ alertsOn: true });
+  await settle();
+  assert.equal(h.asked.length, 1, 'nothing asked again before Retry-After');
+});
+
+test('turned off just as a check saves: cleaned up again once it settles', async () => {
+  const x = worker({ answers: [json(FEED)] });
+  // Off lands right after the check has kept its matches, past its last look at the
+  // switch: the check goes on to set its next alarm, and the clean-up runs again.
+  const set = x.chrome.storage.local.set;
+  let flipped = false;
+  x.chrome.storage.local.set = async (o) => {
+    await set(o);
+    if (!flipped && o && 'alerts' in o && 'alertsFeed' in o) {
+      flipped = true;
+      await set({ alertsOn: false });
+    }
+  };
+  await x.chrome.storage.local.set({ alertsOn: true });
+  await until(() => flipped);
+  await settle();
+  assert.ok(!('alerts' in x.stores.local), 'no matches kept');
+  assert.ok(!x.alarms.has('oh-alerts'), 'no next check');
+  assert.equal(x.notes.length, 0, 'no notification');
+});
+
+test('turned off and on again while a check waits: the late clean-up leaves the new state', async () => {
+  const h = holding(() => true);
+  await h.x.chrome.storage.local.set({ alertsOn: true });
+  await until(() => h.held.length === 1);
+  await h.x.chrome.storage.local.set({ alertsOn: false });
+  // On again, its change not heard yet (the browser tells listeners later).
+  h.x.stores.local.alertsOn = true;
+  h.release();
+  await settle();
+  assert.ok(h.x.alarms.has('oh-alerts'), 'the next check is set');
+  assert.equal(h.x.stores.local.alerts?.items.length, 2);
+});
+
 test('the worker starting with alerts on and no alarm: one, 30 minutes after the last check', async () => {
   const last = Date.now() - 5 * 60e3;
   const x = worker({

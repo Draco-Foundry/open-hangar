@@ -590,11 +590,14 @@
         ? s[WISH_KEY]
         : null;
     const save = {};
+    // Alerts turned off while this check waits on the network: the switch has dropped
+    // the matches and the Wishlist keys already, so nothing more is asked or kept.
+    const stillOn = async () => (await env.get([ON_KEY]))[ON_KEY] === true;
     if (network) {
       feedRec = await freshFeed(env, feeds, feedRec, now);
       save[FEED_KEY] = feedRec;
       // Firefox asks before anything goes off the device: the sync token is sync's yes.
-      if (link && (await env.mayShare())) {
+      if (link && (await stillOn()) && (await env.mayShare())) {
         wishRec = await freshWish(env, site, link, wishRec, now);
         save[WISH_KEY] = wishRec;
       }
@@ -611,10 +614,15 @@
       state = { ...r.state, checkedAt: network ? now : Number.isFinite(was) ? was : null };
       save[STATE_KEY] = state;
     }
+    if (!(await stillOn())) {
+      // The public feed's record stays (its ETag and backoff, nothing of the pilot's).
+      if (save[FEED_KEY]) await env.set({ [FEED_KEY]: save[FEED_KEY] });
+      return { ran: false, why: 'off' };
+    }
     if (Object.keys(save).length) await env.set(save);
     // Not connected (or another connection now): no Wishlist kept for a link that isn't.
     if (!link || !wishRec) await env.remove(WISH_KEY);
-    if (fresh.length) await env.notify(notesFor(fresh));
+    if (fresh.length && (await stillOn())) await env.notify(notesFor(fresh));
     await env.badge();
     if (network) await env.schedule(nextAt(now, env.rand(), feedRec && feedRec.retryAt));
     return { ran: true, matches: state ? state.items.length : null, fresh: fresh.length };
