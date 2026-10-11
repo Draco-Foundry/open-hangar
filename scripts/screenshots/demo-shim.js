@@ -368,6 +368,7 @@
   ];
 
   const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
+  const sessionStore = {};
   const keysOf = (k) =>
     k == null
       ? Object.keys(store)
@@ -396,6 +397,19 @@
         },
         remove: async (k) => {
           for (const x of keysOf(k)) delete store[x];
+        },
+      },
+      // Session storage (what the dashboard keeps only while the browser runs).
+      session: {
+        get: async (k) =>
+          Object.fromEntries(
+            keysOf(k)
+              .filter((x) => x in sessionStore)
+              .map((x) => [x, clone(sessionStore[x])]),
+          ),
+        set: async (o) => void Object.assign(sessionStore, clone(o)),
+        remove: async (k) => {
+          for (const x of keysOf(k)) delete sessionStore[x];
         },
       },
     },

@@ -265,6 +265,27 @@ siteHandlers['oh-connect-finish'] = async (msg, origin) => {
   chrome.tabs.create({ url: hubUrl('#home') });
   return { ok: true, name: j.name || '' };
 };
+// Connect with a code (src/dashboard.js siteConnect, when the sign-in window can't
+// open): the dashboard opens the website's code page with its code in the address, and
+// keeps that code here while it waits (siteLinkPending, session storage). The page
+// fills a code in only when it's this one:
+//   oh-link-check { code } → { ok: true, mine }: true only for the code this extension
+//   is waiting for, from the site it asked, before it runs out. The code never leaves.
+const linkCode = (s) =>
+  String(s || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+siteHandlers['oh-link-check'] = async (msg, origin) => {
+  const { siteLinkPending: p } = await chrome.storage.session.get('siteLinkPending');
+  const mine =
+    !!p &&
+    p.origin === origin &&
+    Number.isFinite(p.until) &&
+    Date.now() < p.until &&
+    linkCode(p.code).length > 0 &&
+    linkCode(p.code) === linkCode(msg.code);
+  return { ok: true, mine };
+};
 // @sync-end
 
 // @flag-start localMode: our own hangar page (Local Mode; needs sync, scripts/pack.mjs)

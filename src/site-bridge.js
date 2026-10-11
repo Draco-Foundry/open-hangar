@@ -28,6 +28,7 @@
     'oh-add-upgrade',
     'oh-connect-begin',
     'oh-connect-finish',
+    'oh-link-check',
   ];
   const origin = location.origin;
   if (!PAGES.includes(origin)) return;

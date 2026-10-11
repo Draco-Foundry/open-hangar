@@ -65,12 +65,16 @@ each may ask, is `src/site-pages.js` (`self.OHPages`), loaded by the background 
 
 Each capability has its message types (`oh-hello`; `oh-get-hangar`; `oh-scan-status`;
 `oh-request-scan`; `oh-upgrade-options`, `oh-upgrade-price` and `oh-add-upgrade` for Add
-to RSI Cart; `oh-connect-begin` and `oh-connect-finish` for Connect). Every message is
-checked before its handler runs (`OHPages.vet`): a plain object of at most 16 KB with a
-string `type` (else `bad request`), a type this page may ask in this build (else
-`unknown request`, the same answer as a type that doesn't exist, so a page can't probe
-another page's list), and only that type's keys with the right kinds of values (else
-`bad request`). A page that isn't one of ours gets no answer at all.
+to RSI Cart; `oh-connect-begin`, `oh-connect-finish` and `oh-link-check` for Connect).
+`oh-link-check { code }` answers `{ ok: true, mine }`: whether a code on the website's
+code page is the one the dashboard is waiting for (it keeps it in session storage while
+it waits), so the page fills a code in only then; the code itself never leaves.
+
+Every message is checked before its handler runs (`OHPages.vet`): a plain object of at
+most 16 KB with a string `type` (else `bad request`), a type this page may ask in this
+build (else `unknown request`, the same answer as a type that doesn't exist, so a page
+can't probe another page's list), and only that type's keys with the right kinds of
+values (else `bad request`). A page that isn't one of ours gets no answer at all.
 
 `oh-hello` is the version handshake: `{ ok, v: 2, version, caps, cart, buyback, connect }`,
 where `caps` is what this page may ask in this build (a capability whose handlers a
