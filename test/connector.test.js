@@ -135,8 +135,40 @@ test('popup view: who, signed out, and where Open My Hangar goes', async () => {
     { db, link: { name: 'pilot@site', lastSync: NOW - 60e3, token: 'secret' }, siteUrl: app },
     { now: NOW },
   );
-  assert.deepEqual(v.connected, { name: 'pilot@site', lastSync: NOW - 60e3 });
+  assert.deepEqual(v.connected, { name: 'pilot@site', lastSync: NOW - 60e3, waitUntil: null });
   assert.ok(!JSON.stringify(v).includes('secret'), 'the sync token never reaches the popup view');
+});
+
+test('popup view: a too-soon sync waits until its time, nothing else does', async () => {
+  const { popupView } = await data();
+  // OH.siteSyncWait's rule, as the popup calls it (Sync Now, so not-open never holds).
+  const syncWait = (link, { now }) =>
+    link.wait && link.wait.reason === 'too-soon' && link.wait.until > now ? link.wait : null;
+  const view = (wait) =>
+    popupView(
+      { db: hangar([], NOW), link: { name: 'p', lastSync: NOW - 60e3, wait } },
+      {
+        now: NOW,
+        syncWait,
+      },
+    ).connected.waitUntil;
+  assert.equal(view({ reason: 'too-soon', until: NOW + 4 * 60e3 }), NOW + 4 * 60e3);
+  assert.equal(view({ reason: 'too-soon', until: NOW - 1 }), null, 'over');
+  assert.equal(view({ reason: 'not-open', until: NOW + 60e3 }), null);
+  assert.equal(view(undefined), null);
+});
+
+test('when.at: a time ahead reads as the time today, the date and time after', async () => {
+  const { at } = await import('../ui/site/when.js');
+  const soon = new Date();
+  soon.setHours(18, 2, 0, 0);
+  assert.equal(
+    at(soon.getTime()),
+    soon.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
+  );
+  const later = new Date(soon.getTime() + 2 * DAY);
+  assert.match(at(later.getTime()), /, /);
+  assert.equal(at(null), '');
 });
 
 test('popup view: a scan running, Store Credit', async () => {
