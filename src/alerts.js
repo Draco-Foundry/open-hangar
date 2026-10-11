@@ -614,11 +614,15 @@
       state = { ...r.state, checkedAt: network ? now : Number.isFinite(was) ? was : null };
       save[STATE_KEY] = state;
     }
-    if (!(await stillOn())) return { ran: false, why: 'off' };
+    if (!(await stillOn())) {
+      // The public feed's record stays (its ETag and backoff, nothing of the pilot's).
+      if (save[FEED_KEY]) await env.set({ [FEED_KEY]: save[FEED_KEY] });
+      return { ran: false, why: 'off' };
+    }
     if (Object.keys(save).length) await env.set(save);
     // Not connected (or another connection now): no Wishlist kept for a link that isn't.
     if (!link || !wishRec) await env.remove(WISH_KEY);
-    if (fresh.length) await env.notify(notesFor(fresh));
+    if (fresh.length && (await stillOn())) await env.notify(notesFor(fresh));
     await env.badge();
     if (network) await env.schedule(nextAt(now, env.rand(), feedRec && feedRec.retryAt));
     return { ran: true, matches: state ? state.items.length : null, fresh: fresh.length };
