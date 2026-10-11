@@ -14,7 +14,7 @@
       $id: 'https://openhangar.space/schema/parser-rules/1',
       title: 'Open Hangar parser rules, format 1',
       description:
-        "Where the extension finds things on RSI's pages (src/data/parser-rules.json): addresses and paging, selectors and cell positions, name patterns, JSON keys. The parsing itself stays in code (src/scraper/parser.js, src/lib.js); a change on RSI's side is fixed here. Data only: strings, numbers, arrays and objects with fixed keys. A pattern is { source, flags }, compiled with new RegExp when the file loads (src/parser-rules.js); where the code reads a part of a match, the pattern names it with a named group, (?<name>…), so a reordered page only needs a new pattern. Addresses are paths on RSI's site: the host stays in the code. Bundled in the extension, never fetched (docs/FLAGS.md). src/schema-check.js reads this schema and supports only the keywords used here.",
+        "Where the extension finds things on RSI's pages (src/data/parser-rules.json): addresses and paging, selectors and cell positions, name patterns, JSON keys, GraphQL documents. The parsing itself stays in code (src/scraper/parser.js, src/lib.js); a change on RSI's side is fixed here. Data only: strings, numbers, arrays and objects with fixed keys. A pattern is { source, flags }, compiled with new RegExp when the file loads (src/parser-rules.js); where the code reads a part of a match, the pattern names it with a named group, (?<name>…), so a reordered page only needs a new pattern. Addresses are paths on RSI's site: the host stays in the code. Bundled in the extension, never fetched (docs/FLAGS.md). src/schema-check.js reads this schema and supports only the keywords used here. A GraphQL request is its operation, its document and the variables that never change (the code adds the rest: page, size and the like); the code reads the answer by the field names the document asks for, so when RSI renames a field, alias it in the document (`oldName: newName`) and the answer keeps its shape.",
       type: 'object',
       required: [
         'format',
@@ -29,6 +29,12 @@
         'kinds',
         'insurance',
         'dates',
+        'account',
+        'dossier',
+        'referrals',
+        'subStore',
+        'upgrade',
+        'cart',
       ],
       additionalProperties: false,
       properties: {
@@ -392,6 +398,255 @@
             },
           },
         },
+        account: {
+          description:
+            'The account dashboard. Its HTML carries the signed-in account as escaped JSON: the object around the first `keys.nickname`, and a separate referral object around `referral.code`.',
+          type: 'object',
+          required: ['path', 'keys', 'credit', 'subscriber', 'concierge', 'referral'],
+          additionalProperties: false,
+          properties: {
+            path: { $ref: '#/$defs/path' },
+            keys: {
+              description:
+                "The account object's keys: credits a list, subscriber and concierge objects.",
+              type: 'object',
+              required: [
+                'nickname',
+                'displayname',
+                'avatar',
+                'enlistedSince',
+                'countryName',
+                'credits',
+                'subscriber',
+                'concierge',
+              ],
+              additionalProperties: false,
+              properties: {
+                nickname: { $ref: '#/$defs/jsonKey' },
+                displayname: { $ref: '#/$defs/jsonKey' },
+                avatar: { $ref: '#/$defs/jsonKey' },
+                enlistedSince: { $ref: '#/$defs/jsonKey' },
+                countryName: { $ref: '#/$defs/jsonKey' },
+                credits: { $ref: '#/$defs/jsonKey' },
+                subscriber: { $ref: '#/$defs/jsonKey' },
+                concierge: { $ref: '#/$defs/jsonKey' },
+              },
+            },
+            credit: {
+              description: "A credit's keys (store credit's value is in cents).",
+              type: 'object',
+              required: ['variant', 'value', 'symbol', 'label', 'currency'],
+              additionalProperties: false,
+              properties: {
+                variant: { $ref: '#/$defs/jsonKey' },
+                value: { $ref: '#/$defs/jsonKey' },
+                symbol: { $ref: '#/$defs/jsonKey' },
+                label: { $ref: '#/$defs/jsonKey' },
+                currency: { $ref: '#/$defs/jsonKey' },
+              },
+            },
+            subscriber: {
+              description: "The subscriber object's keys.",
+              type: 'object',
+              required: ['type', 'frequency'],
+              additionalProperties: false,
+              properties: {
+                type: { $ref: '#/$defs/jsonKey' },
+                frequency: { $ref: '#/$defs/jsonKey' },
+              },
+            },
+            concierge: {
+              description: "The concierge object's keys.",
+              type: 'object',
+              required: ['level', 'next', 'percent'],
+              additionalProperties: false,
+              properties: {
+                level: { $ref: '#/$defs/jsonKey' },
+                next: { $ref: '#/$defs/jsonKey' },
+                percent: { $ref: '#/$defs/jsonKey' },
+              },
+            },
+            referral: {
+              description:
+                "The referral object's keys: the enlist link is the first of `url` it has.",
+              type: 'object',
+              required: ['code', 'url', 'referrerCode'],
+              additionalProperties: false,
+              properties: {
+                code: { $ref: '#/$defs/jsonKey' },
+                url: {
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: 5,
+                  items: { $ref: '#/$defs/jsonKey' },
+                },
+                referrerCode: { $ref: '#/$defs/jsonKey' },
+              },
+            },
+          },
+        },
+        dossier: {
+          description:
+            'The public citizen dossier: the Citizen Record and the main organization (label and value entries; a hidden one is skipped).',
+          type: 'object',
+          required: [
+            'path',
+            'record',
+            'org',
+            'hidden',
+            'info',
+            'entry',
+            'label',
+            'value',
+            'sid',
+            'rank',
+            'name',
+            'redacted',
+            'orgLink',
+            'orgSid',
+            'logo',
+          ],
+          additionalProperties: false,
+          properties: {
+            path: { description: "The page's path, before the handle.", $ref: '#/$defs/path' },
+            record: { description: 'The Citizen Record number.', $ref: '#/$defs/selector' },
+            org: { description: 'The main organization block.', $ref: '#/$defs/selector' },
+            hidden: {
+              description: 'The block when the membership is hidden.',
+              $ref: '#/$defs/selector',
+            },
+            info: { description: 'Its details.', $ref: '#/$defs/selector' },
+            entry: {
+              description: 'One entry: a label and a value, or a value alone (the name).',
+              $ref: '#/$defs/selector',
+            },
+            label: { $ref: '#/$defs/selector' },
+            value: { $ref: '#/$defs/selector' },
+            sid: {
+              description: 'The label of the SID entry (lowercase).',
+              $ref: '#/$defs/pattern',
+            },
+            rank: {
+              description: 'The label of the rank entry (lowercase).',
+              $ref: '#/$defs/pattern',
+            },
+            name: { description: 'The name, when no entry gave it.', $ref: '#/$defs/selector' },
+            redacted: { description: 'A name RSI hides.', $ref: '#/$defs/pattern' },
+            orgLink: { description: 'The link to the organization.', $ref: '#/$defs/selector' },
+            orgSid: {
+              description: 'The SID in that link, when no entry gave it (group `sid`).',
+              $ref: '#/$defs/pattern',
+            },
+            logo: { description: "The organization's logo.", $ref: '#/$defs/selector' },
+          },
+        },
+        referrals: {
+          description:
+            'Recruits and prospects, by campaign, a page at a time. The code adds campaignId, converted, limit (pageSize) and page.',
+          type: 'object',
+          required: ['path', 'operation', 'query', 'variables', 'campaigns', 'pageSize'],
+          additionalProperties: false,
+          properties: {
+            path: { $ref: '#/$defs/path' },
+            operation: { $ref: '#/$defs/operation' },
+            query: { $ref: '#/$defs/document' },
+            variables: {
+              type: 'object',
+              required: ['display', 'sortBy'],
+              additionalProperties: false,
+              properties: {
+                display: { $ref: '#/$defs/enumValue' },
+                sortBy: { $ref: '#/$defs/enumValue' },
+              },
+            },
+            campaigns: {
+              description: 'The current program and the legacy one (before the cutoff).',
+              type: 'object',
+              required: ['current', 'legacy'],
+              additionalProperties: false,
+              properties: { current: { $ref: '#/$defs/id' }, legacy: { $ref: '#/$defs/id' } },
+            },
+            pageSize: { $ref: '#/$defs/pageSize' },
+          },
+        },
+        subStore: {
+          description:
+            "The Subscriber Store's items for the signed-in account. The code adds the page and its size to variables.query (pageSize first; pageSizeMin when RSI refuses that).",
+          type: 'object',
+          required: ['path', 'operation', 'query', 'variables', 'pageSize', 'pageSizeMin'],
+          additionalProperties: false,
+          properties: {
+            path: { $ref: '#/$defs/path' },
+            operation: { $ref: '#/$defs/operation' },
+            query: { $ref: '#/$defs/document' },
+            variables: {
+              type: 'object',
+              required: ['storeFront', 'query'],
+              additionalProperties: false,
+              properties: {
+                storeFront: { type: 'string', pattern: '^[a-z][a-z0-9-]*$' },
+                query: {
+                  type: 'object',
+                  required: ['skus', 'sort'],
+                  additionalProperties: false,
+                  properties: {
+                    skus: {
+                      type: 'object',
+                      required: ['filtersFromTags', 'products'],
+                      additionalProperties: false,
+                      properties: {
+                        filtersFromTags: {
+                          type: 'object',
+                          required: ['tagIdentifiers', 'facetIdentifiers'],
+                          additionalProperties: false,
+                          properties: {
+                            tagIdentifiers: { $ref: '#/$defs/identifiers' },
+                            facetIdentifiers: { $ref: '#/$defs/identifiers' },
+                          },
+                        },
+                        products: {
+                          type: 'array',
+                          maxItems: 20,
+                          items: { type: 'integer', minimum: 0 },
+                        },
+                      },
+                    },
+                    sort: {
+                      type: 'object',
+                      required: ['field', 'direction'],
+                      additionalProperties: false,
+                      properties: {
+                        field: { type: 'string', pattern: '^[A-Za-z_]+$' },
+                        direction: { enum: ['asc', 'desc'] },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            pageSize: { $ref: '#/$defs/pageSize' },
+            pageSizeMin: { $ref: '#/$defs/pageSize' },
+          },
+        },
+        upgrade: {
+          description: "RSI's upgrade tool: the store list (every ship and the editions on sale).",
+          type: 'object',
+          required: ['path', 'storeList'],
+          additionalProperties: false,
+          properties: { path: { $ref: '#/$defs/path' }, storeList: { $ref: '#/$defs/request' } },
+        },
+        cart: {
+          description: "RSI's cart.",
+          type: 'object',
+          required: ['path'],
+          additionalProperties: false,
+          properties: {
+            path: {
+              description: 'The cart page, opened for you after an add.',
+              $ref: '#/$defs/path',
+            },
+          },
+        },
       },
       $defs: {
         pattern: {
@@ -444,6 +699,41 @@
             years: { $ref: '#/$defs/pattern' },
             months: { $ref: '#/$defs/pattern' },
           },
+        },
+        jsonKey: {
+          description: "A key in RSI's JSON.",
+          type: 'string',
+          pattern: '^[A-Za-z_$][A-Za-z0-9_$]*$',
+          maxLength: 100,
+        },
+        operation: {
+          description: "A GraphQL operation's name: the one the document defines.",
+          type: 'string',
+          pattern: '^[A-Za-z_][A-Za-z0-9_]*$',
+          maxLength: 100,
+        },
+        document: {
+          description: 'A GraphQL document.',
+          type: 'string',
+          minLength: 1,
+          maxLength: 4000,
+        },
+        request: {
+          description: 'A GraphQL request without variables.',
+          type: 'object',
+          required: ['operation', 'query'],
+          additionalProperties: false,
+          properties: {
+            operation: { $ref: '#/$defs/operation' },
+            query: { $ref: '#/$defs/document' },
+          },
+        },
+        enumValue: { type: 'string', pattern: '^[A-Z][A-Z0-9_]*$' },
+        id: { type: 'string', pattern: '^[0-9]+$' },
+        identifiers: {
+          type: 'array',
+          maxItems: 20,
+          items: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]*$' },
         },
       },
     },
@@ -587,6 +877,93 @@
           'dec',
         ],
       },
+      account: {
+        path: '/en/account/dashboard',
+        keys: {
+          nickname: 'nickname',
+          displayname: 'displayname',
+          avatar: 'avatar',
+          enlistedSince: 'enlistedSince',
+          countryName: 'countryName',
+          credits: 'creditsData',
+          subscriber: 'subscriberData',
+          concierge: 'conciergeData',
+        },
+        credit: {
+          variant: 'variant',
+          value: 'value',
+          symbol: 'symbol',
+          label: 'label',
+          currency: 'currency',
+        },
+        subscriber: { type: 'type', frequency: 'frequency' },
+        concierge: {
+          level: 'conciergeCurrentLevel',
+          next: 'conciergeNextLevel',
+          percent: 'conciergeNextLevelPercentage',
+        },
+        referral: {
+          code: 'referralCode',
+          url: ['referralUrlCopy', 'referralUrl'],
+          referrerCode: 'referrerReferralCode',
+        },
+      },
+      dossier: {
+        path: '/en/citizens/',
+        record: '.citizen-record .value',
+        org: '.main-org',
+        hidden: '.visibility-R',
+        info: '.info',
+        entry: '.entry',
+        label: '.label',
+        value: '.value',
+        sid: { source: 'sid', flags: 'i' },
+        rank: { source: 'rank', flags: 'i' },
+        name: 'a.value',
+        redacted: { source: '^redacted$', flags: 'i' },
+        orgLink: 'a[href*="/orgs/"]',
+        orgSid: { source: '\\/orgs\\/(?<sid>[^/?#]+)', flags: '' },
+        logo: '.thumb img',
+      },
+      referrals: {
+        path: '/graphql',
+        operation: 'GetReferralRecruitsList',
+        query:
+          'query GetReferralRecruitsList($campaignId: ID!, $converted: Boolean!, $display: ReferralRecruitsListDisplay, $limit: Int!, $page: Int!, $sortBy: ReferralRecruitsListSortBy) {\n  referralRecruitsList(query: {campaignId: $campaignId, converted: $converted, display: $display, limit: $limit, page: $page, sortBy: $sortBy}) {\n    recruitsCount\n    prospectsCount\n    data { id displayName nickname avatar enlistedOn convertedOn }\n  }\n}',
+        variables: { display: 'ALL_TIME', sortBy: 'NEWEST' },
+        campaigns: { current: '2', legacy: '1' },
+        pageSize: 50,
+      },
+      subStore: {
+        path: '/graphql',
+        operation: 'GetBrowseSkusByFilter',
+        query:
+          'query GetBrowseSkusByFilter($query: SearchQuery, $storeFront: String = "pledge") {\n  store(browse: true, name: $storeFront) {\n    listing: search(query: $query) {\n      resources {\n        id name title subtitle url type\n        media { thumbnail { storeSmall slideshow } }\n        nativePrice { amount discounted }\n        price { amount discounted }\n        stock { available unlimited show level }\n        tags { name }\n        ... on TySku { label isWarbond isPackage }\n      }\n      count\n      totalCount\n    }\n  }\n}',
+        variables: {
+          storeFront: 'pledge',
+          query: {
+            skus: {
+              filtersFromTags: {
+                tagIdentifiers: [],
+                facetIdentifiers: ['extras-subscribers-store'],
+              },
+              products: [65],
+            },
+            sort: { field: 'weight', direction: 'desc' },
+          },
+        },
+        pageSize: 100,
+        pageSizeMin: 20,
+      },
+      upgrade: {
+        path: '/pledge-store/api/upgrade/graphql',
+        storeList: {
+          operation: 'initShipUpgrade',
+          query:
+            'query initShipUpgrade { ships { id name flyableStatus msrp link skus { id title available price } } }',
+        },
+      },
+      cart: { path: '/en/store/pledge/cart' },
     },
   });
   root.OHParserRulesData = data;

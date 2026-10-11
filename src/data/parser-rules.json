@@ -134,5 +134,89 @@
       "flags": ""
     },
     "months": ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
-  }
+  },
+  "account": {
+    "path": "/en/account/dashboard",
+    "keys": {
+      "nickname": "nickname",
+      "displayname": "displayname",
+      "avatar": "avatar",
+      "enlistedSince": "enlistedSince",
+      "countryName": "countryName",
+      "credits": "creditsData",
+      "subscriber": "subscriberData",
+      "concierge": "conciergeData"
+    },
+    "credit": {
+      "variant": "variant",
+      "value": "value",
+      "symbol": "symbol",
+      "label": "label",
+      "currency": "currency"
+    },
+    "subscriber": { "type": "type", "frequency": "frequency" },
+    "concierge": {
+      "level": "conciergeCurrentLevel",
+      "next": "conciergeNextLevel",
+      "percent": "conciergeNextLevelPercentage"
+    },
+    "referral": {
+      "code": "referralCode",
+      "url": ["referralUrlCopy", "referralUrl"],
+      "referrerCode": "referrerReferralCode"
+    }
+  },
+  "dossier": {
+    "path": "/en/citizens/",
+    "record": ".citizen-record .value",
+    "org": ".main-org",
+    "hidden": ".visibility-R",
+    "info": ".info",
+    "entry": ".entry",
+    "label": ".label",
+    "value": ".value",
+    "sid": { "source": "sid", "flags": "i" },
+    "rank": { "source": "rank", "flags": "i" },
+    "name": "a.value",
+    "redacted": { "source": "^redacted$", "flags": "i" },
+    "orgLink": "a[href*=\"/orgs/\"]",
+    "orgSid": { "source": "\\/orgs\\/(?<sid>[^/?#]+)", "flags": "" },
+    "logo": ".thumb img"
+  },
+  "referrals": {
+    "path": "/graphql",
+    "operation": "GetReferralRecruitsList",
+    "query": "query GetReferralRecruitsList($campaignId: ID!, $converted: Boolean!, $display: ReferralRecruitsListDisplay, $limit: Int!, $page: Int!, $sortBy: ReferralRecruitsListSortBy) {\n  referralRecruitsList(query: {campaignId: $campaignId, converted: $converted, display: $display, limit: $limit, page: $page, sortBy: $sortBy}) {\n    recruitsCount\n    prospectsCount\n    data { id displayName nickname avatar enlistedOn convertedOn }\n  }\n}",
+    "variables": { "display": "ALL_TIME", "sortBy": "NEWEST" },
+    "campaigns": { "current": "2", "legacy": "1" },
+    "pageSize": 50
+  },
+  "subStore": {
+    "path": "/graphql",
+    "operation": "GetBrowseSkusByFilter",
+    "query": "query GetBrowseSkusByFilter($query: SearchQuery, $storeFront: String = \"pledge\") {\n  store(browse: true, name: $storeFront) {\n    listing: search(query: $query) {\n      resources {\n        id name title subtitle url type\n        media { thumbnail { storeSmall slideshow } }\n        nativePrice { amount discounted }\n        price { amount discounted }\n        stock { available unlimited show level }\n        tags { name }\n        ... on TySku { label isWarbond isPackage }\n      }\n      count\n      totalCount\n    }\n  }\n}",
+    "variables": {
+      "storeFront": "pledge",
+      "query": {
+        "skus": {
+          "filtersFromTags": {
+            "tagIdentifiers": [],
+            "facetIdentifiers": ["extras-subscribers-store"]
+          },
+          "products": [65]
+        },
+        "sort": { "field": "weight", "direction": "desc" }
+      }
+    },
+    "pageSize": 100,
+    "pageSizeMin": 20
+  },
+  "upgrade": {
+    "path": "/pledge-store/api/upgrade/graphql",
+    "storeList": {
+      "operation": "initShipUpgrade",
+      "query": "query initShipUpgrade { ships { id name flyableStatus msrp link skus { id title available price } } }"
+    }
+  },
+  "cart": { "path": "/en/store/pledge/cart" }
 }

@@ -1795,7 +1795,8 @@
   // --- RSI account: identity + balances ------------------------------------
   // The server-rendered dashboard embeds an HTML-escaped JSON object with the
   // signed-in user's nickname, displayname, and creditsData — no GraphQL needed.
-  const ACCOUNT_URL = 'https://robertsspaceindustries.com/en/account/dashboard';
+  // Its address and keys: RULES.account.
+  const ACCOUNT_URL = RSI_ORIGIN + RULES.account.path;
   const ACCOUNT_TTL_MS = 10 * 60 * 1000;
   const ACCOUNT_CACHE_V = 6; // bump when the cached account shape changes (v6: + referral)
 
@@ -1847,7 +1848,18 @@
 
   function extractAccount(html) {
     const un = unescapeEntities(html);
-    return extractObjectAround(un, un.indexOf('"nickname"'));
+    return extractObjectAround(un, un.indexOf(JSON.stringify(RULES.account.keys.nickname)));
+  }
+
+  // Where `"<key>":` first appears in JSON text (spaces allowed before the colon), or -1.
+  function keyIndex(text, key) {
+    const quoted = JSON.stringify(key);
+    for (let i = text.indexOf(quoted); i >= 0; i = text.indexOf(quoted, i + 1)) {
+      let j = i + quoted.length;
+      while (j < text.length && /\s/.test(text[j])) j++;
+      if (text[j] === ':') return i;
+    }
+    return -1;
   }
 
   // The dashboard HTML embeds a SEPARATE referral blob (not inside the nickname
@@ -1856,33 +1868,34 @@
   // Returns { code, url, referrerCode } or null when absent (e.g. signed out).
   function extractReferral(html) {
     const un = unescapeEntities(html);
-    const m = /"referralCode"\s*:/.exec(un);
-    const obj = m ? extractObjectAround(un, m.index) : null;
-    if (!obj || !obj.referralCode) return null;
+    const at = keyIndex(un, RULES.account.referral.code);
+    const obj = at >= 0 ? extractObjectAround(un, at) : null;
+    if (!obj || !obj[RULES.account.referral.code]) return null;
     return {
-      code: obj.referralCode,
-      url: obj.referralUrlCopy || obj.referralUrl || null,
-      referrerCode: obj.referrerReferralCode || null,
+      code: obj[RULES.account.referral.code],
+      url: RULES.account.referral.url.map((k) => obj[k]).find(Boolean) || null,
+      referrerCode: obj[RULES.account.referral.referrerCode] || null,
     };
   }
 
   // → { loggedIn: true|false|null, nickname, displayname, credits } where credits
   // is keyed by variant: { store|uec|rec: { value, symbol, currency, label } }.
   // NOTE: store credit `value` is in CENTS. Cached; null loggedIn = couldn't tell.
-  // Parse the member's MAIN organization from the citizen dossier DOM. The block
-  // is `.main-org` with a logo (`.thumb img`) and `.info .entry` rows of
-  // label/value pairs (Organization, Spectrum Identification (SID), Organization
-  // rank). Returns { name, sid, rank, logo } or null when the member has no main
-  // org or it's set to private (RSI redacts the values, marking the block
-  // `visibility-R`). Verified against a live dossier (May 2026).
+  // Parse the member's MAIN organization from the citizen dossier DOM (where each
+  // part is: RULES.dossier). The block is `.main-org` with a logo (`.thumb img`)
+  // and `.info .entry` rows of label/value pairs (Organization, Spectrum
+  // Identification (SID), Organization rank). Returns { name, sid, rank, logo } or
+  // null when the member has no main org or it's set to private (RSI redacts the
+  // values, marking the block `visibility-R`). Verified against a live dossier
+  // (May 2026).
   function parseMainOrg(doc) {
-    const block = doc.querySelector('.main-org');
+    const block = doc.querySelector(RULES.dossier.org);
     if (!block) return null;
     // Private/hidden affiliation: RSI flags the block visibility-R and blanks the
     // values. Skip rather than show "REDACTED".
-    if (block.classList.contains('visibility-R')) return null;
+    if (block.matches(RULES.dossier.hidden)) return null;
     const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
-    const info = block.querySelector('.info');
+    const info = block.querySelector(RULES.dossier.info);
     if (!info) return null;
     // Within .main-org .info, entries are <p class="entry">. The ORG NAME entry
     // has NO label (it's an <a class="value">…</a>); SID and rank entries pair a
@@ -1891,26 +1904,26 @@
     let name = '',
       sid = null,
       rank = null;
-    for (const entry of info.querySelectorAll('.entry')) {
-      const label = clean(entry.querySelector('.label')?.textContent).toLowerCase();
-      const value = clean(entry.querySelector('.value')?.textContent);
+    for (const entry of info.querySelectorAll(RULES.dossier.entry)) {
+      const label = clean(entry.querySelector(RULES.dossier.label)?.textContent).toLowerCase();
+      const value = clean(entry.querySelector(RULES.dossier.value)?.textContent);
       if (!value) continue;
       if (!label) {
         if (!name) name = value;
       } // labelless ⇒ org name
-      else if (label.includes('sid'))
+      else if (RULES.dossier.sid.test(label))
         sid = value; // "Spectrum Identification (SID)"
-      else if (label.includes('rank')) rank = value; // "Organization rank"
+      else if (RULES.dossier.rank.test(label)) rank = value; // "Organization rank"
     }
-    if (!name) name = clean(info.querySelector('a.value')?.textContent); // fallback
-    if (!name || /^redacted$/i.test(name)) return null; // no org, or private
+    if (!name) name = clean(info.querySelector(RULES.dossier.name)?.textContent); // fallback
+    if (!name || RULES.dossier.redacted.test(name)) return null; // no org, or private
     // SID also lives in the org link href (/orgs/SID) — derive if not labelled.
     if (!sid) {
-      const href = info.querySelector('a[href*="/orgs/"]')?.getAttribute('href') || '';
-      const m = href.match(/\/orgs\/([^/?#]+)/);
-      if (m) sid = m[1];
+      const href = info.querySelector(RULES.dossier.orgLink)?.getAttribute('href') || '';
+      const m = href.match(RULES.dossier.orgSid);
+      if (m) sid = m.groups.sid;
     }
-    let logo = block.querySelector('.thumb img')?.getAttribute('src') || null;
+    let logo = block.querySelector(RULES.dossier.logo)?.getAttribute('src') || null;
     if (logo && !logo.startsWith('http')) logo = 'https://robertsspaceindustries.com' + logo;
     return { name, sid, rank, logo };
   }
@@ -1944,37 +1957,44 @@
         };
       }
       const credits = {};
-      for (const c of obj.creditsData || []) {
-        credits[c.variant] = {
-          value: c.value,
-          symbol: c.symbol,
-          label: c.label,
-          currency: c.currency,
+      for (const c of obj[RULES.account.keys.credits] || []) {
+        credits[c[RULES.account.credit.variant]] = {
+          value: c[RULES.account.credit.value],
+          symbol: c[RULES.account.credit.symbol],
+          label: c[RULES.account.credit.label],
+          currency: c[RULES.account.credit.currency],
         };
       }
-      const sub = obj.subscriberData;
-      const con = obj.conciergeData;
-      const avatar = obj.avatar
-        ? obj.avatar.startsWith('http')
-          ? obj.avatar
-          : 'https://robertsspaceindustries.com' + obj.avatar
+      const sub = obj[RULES.account.keys.subscriber];
+      const con = obj[RULES.account.keys.concierge];
+      const pic = obj[RULES.account.keys.avatar];
+      const avatar = pic
+        ? pic.startsWith('http')
+          ? pic
+          : 'https://robertsspaceindustries.com' + pic
         : null;
       const out = {
         v: ACCOUNT_CACHE_V,
         loggedIn: true,
-        nickname: obj.nickname || null,
-        displayname: obj.displayname || null,
+        nickname: obj[RULES.account.keys.nickname] || null,
+        displayname: obj[RULES.account.keys.displayname] || null,
         avatar,
-        enlistedSince: obj.enlistedSince || null,
-        countryName: obj.countryName || null,
+        enlistedSince: obj[RULES.account.keys.enlistedSince] || null,
+        countryName: obj[RULES.account.keys.countryName] || null,
         credits,
-        subscriber: sub && sub.type ? { type: sub.type, frequency: sub.frequency || null } : null,
-        concierge:
-          con && con.conciergeCurrentLevel
+        subscriber:
+          sub && sub[RULES.account.subscriber.type]
             ? {
-                level: con.conciergeCurrentLevel,
-                next: con.conciergeNextLevel || null,
-                percent: con.conciergeNextLevelPercentage ?? null,
+                type: sub[RULES.account.subscriber.type],
+                frequency: sub[RULES.account.subscriber.frequency] || null,
+              }
+            : null,
+        concierge:
+          con && con[RULES.account.concierge.level]
+            ? {
+                level: con[RULES.account.concierge.level],
+                next: con[RULES.account.concierge.next] || null,
+                percent: con[RULES.account.concierge.percent] ?? null,
               }
             : null,
         citizenRecord: null,
@@ -1986,13 +2006,13 @@
       if (out.nickname) {
         try {
           const cres = await fetch(
-            `https://robertsspaceindustries.com/en/citizens/${encodeURIComponent(out.nickname)}`,
+            RSI_ORIGIN + RULES.dossier.path + encodeURIComponent(out.nickname),
             { credentials: 'omit', signal: AbortSignal.timeout(20000) },
           );
           if (cres.ok) {
             const cdoc = new DOMParser().parseFromString(await cres.text(), 'text/html');
             out.citizenRecord =
-              cdoc.querySelector('.citizen-record .value')?.textContent?.trim() || null;
+              cdoc.querySelector(RULES.dossier.record)?.textContent?.trim() || null;
             out.org = parseMainOrg(cdoc);
           }
         } catch (e) {
@@ -2017,38 +2037,29 @@
   // counts differ (legacy = all-time total, current = post-cutoff conversions).
   // Each row: { id, displayName, nickname, avatar, enlistedOn, convertedOn }.
   // `converted:true` filters to recruits; `false` returns the full prospect list.
-  const GRAPHQL_URL = 'https://robertsspaceindustries.com/graphql';
-  const REFERRAL_CAMPAIGNS = { current: '2', legacy: '1' };
-  const REFERRAL_PAGE_SIZE = 50; // API accepts this; pages don't overlap (verified)
+  // The request (address, operation, document, the variables that never change,
+  // the campaigns and page size): RULES.referrals.
   const REFERRAL_MAX_PAGES = 200; // safety cap (10k rows)
-  const REFERRAL_QUERY = `query GetReferralRecruitsList($campaignId: ID!, $converted: Boolean!, $display: ReferralRecruitsListDisplay, $limit: Int!, $page: Int!, $sortBy: ReferralRecruitsListSortBy) {
-  referralRecruitsList(query: {campaignId: $campaignId, converted: $converted, display: $display, limit: $limit, page: $page, sortBy: $sortBy}) {
-    recruitsCount
-    prospectsCount
-    data { id displayName nickname avatar enlistedOn convertedOn }
-  }
-}`;
 
   // One page of the recruits/prospects list for a campaign. Returns
   // { recruitsCount, prospectsCount, data: [...] } or { error }.
   async function fetchReferralPage(campaignId, converted, page) {
     let res;
     try {
-      res = await fetch(GRAPHQL_URL, {
+      res = await fetch(RSI_ORIGIN + RULES.referrals.path, {
         method: 'POST',
         signal: AbortSignal.timeout(20000),
         credentials: 'include',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          operationName: 'GetReferralRecruitsList',
-          query: REFERRAL_QUERY,
+          operationName: RULES.referrals.operation,
+          query: RULES.referrals.query,
           variables: {
+            ...RULES.referrals.variables,
             campaignId,
             converted,
-            display: 'ALL_TIME',
-            limit: REFERRAL_PAGE_SIZE,
+            limit: RULES.referrals.pageSize,
             page,
-            sortBy: 'NEWEST',
           },
         }),
       });
@@ -2105,7 +2116,7 @@
         added++;
       }
       onProgress?.(items.length, count);
-      if (added === 0 || res.data.length < REFERRAL_PAGE_SIZE) break;
+      if (added === 0 || res.data.length < RULES.referrals.pageSize) break;
       await sleep(DELAY_MS);
     }
     return { count, items };
@@ -2132,19 +2143,23 @@
       // Recruits: legacy is the all-time superset, current is the post-cutoff subset.
       // Pull both and tag each row; prospects are shared, so fetch once (current).
       onProgress?.('recruits (legacy)', 0, null);
-      const legacyRecruits = await fetchReferralList(REFERRAL_CAMPAIGNS.legacy, true, (n, t) =>
-        onProgress?.('recruits (legacy)', n, t),
+      const legacyRecruits = await fetchReferralList(
+        RULES.referrals.campaigns.legacy,
+        true,
+        (n, t) => onProgress?.('recruits (legacy)', n, t),
       );
       if (legacyRecruits.error && !legacyRecruits.items?.length)
         return { ok: false, error: legacyRecruits.error };
 
       onProgress?.('recruits (current)', 0, null);
-      const currentRecruits = await fetchReferralList(REFERRAL_CAMPAIGNS.current, true, (n, t) =>
-        onProgress?.('recruits (current)', n, t),
+      const currentRecruits = await fetchReferralList(
+        RULES.referrals.campaigns.current,
+        true,
+        (n, t) => onProgress?.('recruits (current)', n, t),
       );
 
       onProgress?.('prospects', 0, null);
-      const prospects = await fetchReferralList(REFERRAL_CAMPAIGNS.current, false, (n, t) =>
+      const prospects = await fetchReferralList(RULES.referrals.campaigns.current, false, (n, t) =>
         onProgress?.('prospects', n, t),
       );
 
@@ -4121,9 +4136,8 @@
   // The public data behind RSI's CCU upgrade tool lists every ship with the
   // editions on sale right now ("skus": Standard, Warbond, …, each available or
   // not). No skus = not for sale. Prices come in cents.
-  const STORE_URL = 'https://robertsspaceindustries.com/pledge-store/api/upgrade/graphql';
-  const STORE_QUERY =
-    'query initShipUpgrade { ships { id name flyableStatus msrp link skus { id title available price } } }';
+  // Its address and query: RULES.upgrade (path, storeList).
+  const STORE_URL = RSI_ORIGIN + RULES.upgrade.path;
   // Raw response → [{ id, name, lname, link, concept, editions: [{ title, price, warbond }], forSale, warbond, price }]. Pure.
   OH.parseStoreShips = function parseStoreShips(json) {
     const data = Array.isArray(json) ? json[0] : json;
@@ -4171,7 +4185,7 @@
     cart()
       ? cart().addUpgradeToCart(fromShipId, toShipId, toSkuId, opts)
       : { ok: false, error: 'network' };
-  OH.RSI_CART_URL = 'https://robertsspaceindustries.com/en/store/pledge/cart';
+  OH.RSI_CART_URL = RSI_ORIGIN + RULES.cart.path;
   // The SKU an upgrade to this store ship goes to: its cheapest edition on offer.
   OH.upgradeSku = function upgradeSku(storeShip) {
     const eds = ((storeShip && storeShip.editions) || []).filter((e) => e && e.id);
@@ -4203,7 +4217,11 @@
         credentials: 'omit',
         headers: { 'content-type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify([
-          { operationName: 'initShipUpgrade', variables: {}, query: STORE_QUERY },
+          {
+            operationName: RULES.upgrade.storeList.operation,
+            variables: {},
+            query: RULES.upgrade.storeList.query,
+          },
         ]),
       });
       const ships = res.ok ? OH.parseStoreShips(await res.json()) : [];
@@ -4230,46 +4248,18 @@
   // time with a pause; a 429/403/5xx stops the read and keeps the last list.
   const SUB_STORE_KEY = 'subStore';
   const SUB_STORE_TTL = 24 * 3600e3;
-  const SUB_STORE_PAGE = 100; // asked first; RSI's own page uses 20 (the fallback)
-  const SUB_STORE_PAGE_MIN = 20;
+  // The request (address, operation, document, its fixed variables, and the page
+  // size asked first, then RSI's own 20 as the fallback): RULES.subStore.
   const SUB_STORE_MAX_PAGES = 20;
   OH.SUB_STORE_MAX = 2000; // items kept (storage budget)
-  const SUB_STORE_QUERY = `query GetBrowseSkusByFilter($query: SearchQuery, $storeFront: String = "pledge") {
-  store(browse: true, name: $storeFront) {
-    listing: search(query: $query) {
-      resources {
-        id name title subtitle url type
-        media { thumbnail { storeSmall slideshow } }
-        nativePrice { amount discounted }
-        price { amount discounted }
-        stock { available unlimited show level }
-        tags { name }
-        ... on TySku { label isWarbond isPackage }
-      }
-      count
-      totalCount
-    }
-  }
-}`;
   const subStoreBody = (page, limit) =>
     JSON.stringify([
       {
-        operationName: 'GetBrowseSkusByFilter',
-        query: SUB_STORE_QUERY,
+        operationName: RULES.subStore.operation,
+        query: RULES.subStore.query,
         variables: {
-          storeFront: 'pledge',
-          query: {
-            page,
-            limit,
-            skus: {
-              filtersFromTags: {
-                tagIdentifiers: [],
-                facetIdentifiers: ['extras-subscribers-store'],
-              },
-              products: [65],
-            },
-            sort: { field: 'weight', direction: 'desc' },
-          },
+          ...RULES.subStore.variables,
+          query: { page, limit, ...RULES.subStore.variables.query },
         },
       },
     ]);
@@ -4450,7 +4440,7 @@
     const ask = async (page, limit) => {
       let res;
       try {
-        res = await get(GRAPHQL_URL, {
+        res = await get(RSI_ORIGIN + RULES.subStore.path, {
           method: 'POST',
           credentials: 'include',
           headers: { 'content-type': 'application/json', Accept: 'application/json' },
@@ -4484,11 +4474,11 @@
       return { ok: false, error: r.error === 'bad' ? 'network' : r.error, list: cached || null };
     };
     // Page 1 at 100; if RSI refuses that size, again at its own 20.
-    let limit = SUB_STORE_PAGE;
+    let limit = RULES.subStore.pageSize;
     let first = await ask(1, limit);
     if (first.error === 'bad') {
       await pause();
-      limit = SUB_STORE_PAGE_MIN;
+      limit = RULES.subStore.pageSizeMin;
       first = await ask(1, limit);
     }
     if (first.error) return fail(first);
