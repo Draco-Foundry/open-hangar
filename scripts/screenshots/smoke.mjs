@@ -4682,6 +4682,25 @@ try {
   went === 'https://app.openhangar.space/hangar'
     ? ok("connected: who and when, and Open My Hangar goes to the website's My Hangar")
     : fail(`popup connected: ${JSON.stringify({ linked, went })}`);
+  // The website took a sync moments ago (429, too soon): the calm line with the time
+  // the next one can go (owner, 2026-10-09), never an error code.
+  const popWait = await page.evaluate(async () => {
+    const until = Date.now() + 4 * 60e3;
+    const { siteLink: l } = await chrome.storage.local.get('siteLink');
+    const siteLink = { ...l, wait: { reason: 'too-soon', until, said: 'x' } };
+    await chrome.storage.local.set({ siteLink });
+    for (const f of __demo.listeners) f({ siteLink: { newValue: siteLink } }, 'local');
+    await new Promise((r) => setTimeout(r, 300));
+    const time = new Date(until).toLocaleTimeString(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    return { site: document.getElementById('pp-site').textContent, time };
+  });
+  popWait.site.includes(`[copy: popup.sync-wait ${popWait.time}]`) &&
+  !/429|responded/.test(popWait.site)
+    ? ok(`a too-soon sync: the calm line and the time (${popWait.time}), no error code`)
+    : fail(`popup sync wait: ${JSON.stringify(popWait)}`);
   await page.setViewport({ width: 1280, height: 900 });
 
   // The basic page (the connector build, src/basic.html): the lists with search and
@@ -4879,8 +4898,115 @@ try {
   rsiNo.asked === 1 && rsiNo.scans === 0 && rsiNo.cardAfter && !rsiNo.failed && !rsiNo.done
     ? ok('RSI access refused: the card stays, still no scan and no failure')
     : fail(`basic RSI access refused: ${JSON.stringify(rsiNo)}`);
+  // A too-soon sync (429) on the basic page, offline: the time Sync Now works again,
+  // and Sync Now meanwhile asks nothing and shows the website's calm words.
+  await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
+  const askedBefore = outside.length;
+  const bpWait = await page.evaluate(async () => {
+    const until = Date.now() + 4 * 60e3;
+    const said = 'openhangar.space just took a sync for this account.';
+    const siteLink = {
+      token: 't',
+      name: 'demo@pilot',
+      connectedAt: 1,
+      lastSync: Date.now() - 60e3,
+      wait: { reason: 'too-soon', until, said },
+    };
+    const wishImport = { link: 1, done: 1, sent: 0 }; // no wishlist import asked
+    await chrome.storage.local.set({
+      siteLink,
+      wishImport,
+      siteUrl: 'https://app.openhangar.space',
+    });
+    for (const f of __demo.listeners) f({ siteLink: { newValue: siteLink } }, 'local');
+    await new Promise((r) => setTimeout(r, 300));
+    [...document.querySelectorAll('#bp-site .bp-btn')]
+      .find((b) => b.textContent === 'Sync Now')
+      .click();
+    await new Promise((r) => setTimeout(r, 300));
+    const time = new Date(until).toLocaleTimeString(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    return {
+      card: document.getElementById('bp-site').textContent.replace(/\s+/g, ' '),
+      calm: !!document.querySelector('#bp-site .bp-msg.calm'),
+      said,
+      time,
+    };
+  });
+  const askedNow = outside.slice(askedBefore).filter((u) => !/status\.json/.test(u));
+  bpWait.card.includes(`[copy: basic.sync-wait ${bpWait.time}]`) &&
+  bpWait.card.includes(bpWait.said) &&
+  bpWait.calm &&
+  !askedNow.length &&
+  !/429|responded/.test(bpWait.card)
+    ? ok(`a too-soon sync: the time (${bpWait.time}) and the website's calm words, no error code`)
+    : fail(`basic sync wait: ${JSON.stringify({ bpWait, askedNow })}`);
   page.off('request', offline);
   await page.setRequestInterception(false);
+  // Connected: Disconnect asks first, two equal buttons side by side, one line each
+  // (owner, 2026-10-09); Stay Connected keeps the link, Disconnect drops it. At phone
+  // width, the narrowest the question gets. Nothing is sent: the website's half is
+  // stood in for.
+  await page.setViewport({ width: 375, height: 800 });
+  await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
+  await page.evaluate(async () => {
+    OH.siteDisconnect = async () => {
+      __demo.disconnected = true;
+      await chrome.storage.local.remove('siteLink');
+      for (const f of __demo.listeners) f({ siteLink: { newValue: undefined } }, 'local');
+    };
+    const siteLink = { token: 't', name: 'demo@pilot', connectedAt: 1, lastSync: Date.now() };
+    // The wishlist already went for this connection: no import asked of the website.
+    const wishImport = { link: 1, done: 1, sent: 0 };
+    await chrome.storage.local.set({
+      siteLink,
+      wishImport,
+      siteUrl: 'https://app.openhangar.space',
+    });
+    for (const f of __demo.listeners) f({ siteLink: { newValue: siteLink } }, 'local');
+  });
+  await page.waitForSelector('#bp-disconnect');
+  await page.click('#bp-disconnect');
+  await page.waitForSelector('#bp-disconnect-ask');
+  const dc = await page.evaluate(() => {
+    const box = (id) => document.getElementById(id).getBoundingClientRect();
+    const line = (id) => parseFloat(getComputedStyle(document.getElementById(id)).lineHeight);
+    const stay = box('bp-stay');
+    const go = box('bp-disconnect-yes');
+    return {
+      text: document.getElementById('bp-disconnect-ask').textContent.replace(/\s+/g, ' '),
+      sameRow: Math.abs(stay.top - go.top) < 1,
+      equal: Math.abs(stay.width - go.width) < 1,
+      oneLine: stay.height < 2 * line('bp-stay') && go.height < 2 * line('bp-disconnect-yes'),
+      focused: document.activeElement?.id === 'bp-stay',
+      wide: document.documentElement.scrollWidth > 375,
+    };
+  });
+  await page.click('#bp-stay');
+  const stayed = await page.evaluate(
+    () => !!document.getElementById('bp-disconnect') && !__demo.disconnected,
+  );
+  await page.click('#bp-disconnect');
+  await page.waitForSelector('#bp-disconnect-yes');
+  await page.click('#bp-disconnect-yes');
+  await page.waitForSelector('#bp-connect');
+  const dropped = await page.evaluate(
+    async () => __demo.disconnected && !(await chrome.storage.local.get('siteLink')).siteLink,
+  );
+  dc.text.includes('Disconnect From openhangar.space?') &&
+  dc.sameRow &&
+  dc.equal &&
+  dc.oneLine &&
+  dc.focused &&
+  !dc.wide &&
+  stayed &&
+  dropped
+    ? ok(
+        'Disconnect asks first: two equal buttons side by side, one line each; Stay Connected keeps it',
+      )
+    : fail(`basic Disconnect: ${JSON.stringify({ dc, stayed, dropped })}`);
   await page.setViewport({ width: 1280, height: 900 });
 
   // Extension Alerts (the `alerts` flag; the connector pages are served as a build with

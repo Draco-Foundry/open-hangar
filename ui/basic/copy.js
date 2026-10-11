@@ -55,6 +55,10 @@ const COPY = {
   'basic.connected': '[copy: basic.connected {name}]',
   'basic.synced': '[copy: basic.synced {when}]',
   'basic.not-synced': '[copy: basic.not-synced]',
+  // The website took a sync for this account moments ago (too soon): calm, never an
+  // error code; Sync Now works again at {time} ("6:02 PM"). The owner's words start
+  // "try again at ..." (#570). The website's own sentence shows under it.
+  'basic.sync-wait': '[copy: basic.sync-wait {time}]',
   'basic.syncing': '[copy: basic.syncing]',
   'basic.connect-failed': '[copy: basic.connect-failed]', // the token trade failed: try again
   'basic.your-data': '[copy: basic.your-data]', // heading

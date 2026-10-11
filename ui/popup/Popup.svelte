@@ -7,7 +7,7 @@
   import { onMount } from 'svelte';
   import { t } from './copy.js';
   import { HUB_PAGE, popupView, scanBusy, storeCredit } from './data.js';
-  import { synced } from '../site/when.js';
+  import { at, synced } from '../site/when.js';
   import { flag } from '../lib/flags.js';
   import Alerts from './Alerts.svelte';
 
@@ -36,7 +36,7 @@
     const hangarPage = globalThis.OHPages?.pages?.hangar?.[0] || '';
     v = popupView(
       { db, account, link, siteUrl, hangarPage },
-      { totalValue: (items) => OH.totalValue(items) },
+      { totalValue: (items) => OH.totalValue(items), syncWait: OH.siteSyncWait },
     );
     const s = chrome.storage.session
       ? await chrome.storage.session.get(['scanRunning', 'scanRequest'])
@@ -115,9 +115,11 @@
         <i class="pp-dot on" aria-hidden="true"></i>
         <span
           >{t('popup.connected', { name: v.connected.name })}<small
-            >{v.connected.lastSync
-              ? t('popup.synced', { when: when(v.connected.lastSync) })
-              : t('popup.not-synced')}</small
+            >{v.connected.waitUntil
+              ? t('popup.sync-wait', { time: at(v.connected.waitUntil) })
+              : v.connected.lastSync
+                ? t('popup.synced', { when: when(v.connected.lastSync) })
+                : t('popup.not-synced')}</small
           ></span
         >
       {:else}

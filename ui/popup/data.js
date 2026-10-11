@@ -42,10 +42,12 @@ export function storeCredit(account) {
   return Number.isFinite(c) ? c / 100 : null;
 }
 
-// → { scannedAt, staleDays, items, melt, handle, signedOut, connected, myHangar }
+// → { scannedAt, staleDays, items, melt, handle, signedOut, connected, myHangar }.
+// `syncWait` is OH.siteSyncWait: the website took a sync for this account moments ago
+// (429, too soon), so the next one waits until connected.waitUntil.
 export function popupView(
   { db, account, link, siteUrl, hangarPage },
-  { now = Date.now(), totalValue } = {},
+  { now = Date.now(), totalValue, syncWait } = {},
 ) {
   const items = Array.isArray(db?.sources?.hangar?.items) ? db.sources.hangar.items : [];
   const scannedAt = time(db?.sources?.hangar?.scannedAt);
@@ -62,7 +64,13 @@ export function popupView(
       '',
     // Only a confirmed sign-out: an account read that failed (null) says nothing.
     signedOut: account?.loggedIn === false,
-    connected: link ? { name: link.name || '', lastSync: time(link.lastSync) } : null,
+    connected: link
+      ? {
+          name: link.name || '',
+          lastSync: time(link.lastSync),
+          waitUntil: (syncWait && syncWait(link, { now })?.until) || null,
+        }
+      : null,
     myHangar: myHangarUrl({ link, siteUrl, hangarPage }),
   };
 }

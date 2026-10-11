@@ -261,15 +261,22 @@ async function scanIfAsked() {
 }
 
 // --- openhangar.space ----------------------------------------------------------------
+let waitTimer = null;
 export async function refreshSite() {
   const s = hub.site;
   s.enabled = await OH.siteEnabled();
   const link = s.enabled ? await OH.getSiteLink() : null;
+  // A too-soon sync holds every sync until `waitUntil` (OH.siteSyncWait); the line
+  // that says so goes when the wait is over.
+  const until = (link && OH.siteSyncWait(link)?.until) || null;
   s.link = link && {
     name: link.name || '',
     connectedAt: link.connectedAt,
     lastSync: link.lastSync,
+    waitUntil: until,
   };
+  clearTimeout(waitTimer);
+  if (until) waitTimer = setTimeout(refreshSite, Math.max(0, until - Date.now()) + 500);
   s.dataOk = !firefox() || (await chrome.permissions.contains(SITE_DATA).catch(() => false));
   if (!firefox() || s.dataOk || !chrome.storage.session) return;
   // Connect was pressed on the website, or our hangar page asked for the hangar,
