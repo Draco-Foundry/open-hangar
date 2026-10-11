@@ -34,7 +34,8 @@ SOFTWARE.
 
 ## hangarlink-hangarexport
 
-The hangar page selector map in `src/scraper/parser.js` was derived from
+The hangar page selector map in the parser rules (`src/data/parser-rules.json`, read by
+`src/scraper/parser.js`) was derived from
 [SC-Open/hangarlink-hangarexport](https://github.com/SC-Open/hangarlink-hangarexport).
 
 ```

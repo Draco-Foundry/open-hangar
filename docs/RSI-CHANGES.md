@@ -68,6 +68,8 @@ exact errors, which usually tells you which source broke.
 | Account   | account dashboard's embedded JSON + public citizen dossier | `OH.getAccount()` in `src/lib.js`            |
 | Referrals | `POST /graphql` (`GetReferralRecruitsList` …)              | `OH.getReferral()` in `src/lib.js`           |
 
+Where each of them looks (addresses, selectors, cell positions, name patterns) is in
+the parser rules, `src/data/parser-rules.json`; the functions above are how it's read.
 Then follow **CONTRIBUTING.md → "Rediscovering the data source"** to see the new
 request and markup in DevTools.
 
@@ -78,7 +80,10 @@ request and markup in DevTools.
    anything personal. Keep the structure, change the text.
 3. Replace or add a fixture in `test/fixtures/` (e.g. `pledges.sample.html`).
 4. Run `npm test`: the parser tests should fail the same way users see.
-5. Update the selectors/parsing, and add an assertion for whatever broke.
+5. Fix the rules in `src/data/parser-rules.json` (a new key also goes in
+   `schema/parser-rules.schema.json`), run `npm run rules`, and add an assertion for
+   whatever broke. Change the parsing code only when how a page is read changed, not
+   just where.
 6. `npm test`, `npm run test:ui`, then try a real scan with the unpacked build
    (`npm run build`, load `dist/chrome`).
 

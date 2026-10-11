@@ -287,7 +287,8 @@ no RSI tab needed. Pages are fetched and parsed in your browser (referrals come 
 GraphQL API). Scans are read-only and rate-limited.
 
 RSI updates its site from time to time. All HTML parsing is isolated in
-`src/scraper/parser.js`, so when the markup changes there's one place to fix.
+`src/scraper/parser.js`, and where it looks (selectors, patterns) is one data file,
+`src/data/parser-rules.json`, so when the markup changes there's one place to fix.
 
 ```
 manifest.json           permissions + config (Chrome-shaped; see scripts/pack.mjs)
@@ -295,6 +296,7 @@ src/
   background.js         opens the hub when the toolbar icon is clicked
   lib.js                source registry, scan loop, storage, export/import
   scraper/parser.js     RSI HTML -> normalized model   (the layer to maintain)
+  data/parser-rules.json  where things are on RSI's pages (the parser rules)
   dashboard.html / .js  the viewer
 ui/                     Svelte pages, built with Vite
 scripts/pack.mjs        builds per-browser bundles into dist/
