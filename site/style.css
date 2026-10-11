@@ -132,15 +132,6 @@ h1 {
   font-weight: 600;
   font-size: 1.05rem;
 }
-/* For screen readers only: the button's full name. */
-.sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
 .b-note {
   font-size: 0.85rem;
   color: #c9d1d9;
