@@ -14,6 +14,14 @@ Features on the website (openhangar.space) are switched on the website's side, b
 own flags. When the extension asks the website something, the answer is data (a list,
 a status, "not available"), never code.
 
+The parser rules are bundled data, not remote config. Where the extension finds things
+on RSI's pages (addresses, selectors, name patterns) is one data file,
+`src/data/parser-rules.json` (ARCHITECTURE.md, "Parser Rules"), so a change on RSI's
+side is fixed in data, not code. It ships inside the extension and is never fetched:
+changing it is a new build, like a flag. A signed copy from our site is planned for after
+launch (ed25519, able only to narrow the bundled rules, never an address or a host); it
+needs the owner's decision and this page changed first.
+
 ## The Registry
 
 [`src/flags.js`](../src/flags.js) lists every flag:
