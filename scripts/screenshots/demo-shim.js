@@ -372,6 +372,12 @@
     if (/\/api\/hub\/getCommlinkItems/.test(url)) return realFetch('/__commlinks.json');
     if (/\/api\/spectrum\/forum\/channel\/threads/.test(url))
       return realFetch('/__patchnotes.json');
+    // Home's Game Status: the wiki main page settings (event, test channels) and the
+    // LIVE version list, saved, so the card reads the same on the demo clock every day.
+    if (/^https:\/\/starcitizen\.tools\/api\.php\?.*Module:Mainpage\/settings\.json/.test(url))
+      return realFetch('/__wiki-mainpage.json');
+    if (/^https:\/\/api\.star-citizen\.wiki\/api\/v2\/game-versions/.test(url))
+      return realFetch('/__game-versions.json');
     // Fixed exchange rates, so the demo and the UI test never wait on the live file.
     if (url === 'https://openhangar.space/rates.json')
       return Promise.resolve(
