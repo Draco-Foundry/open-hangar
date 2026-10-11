@@ -1,0 +1,40 @@
+name: Last updated
+
+# The README's and roadmap's "Last Updated" badge: the time of the latest push to main or
+# redesign/0.3-svelte, in UTC (Zulu). This writes it as a shields.io endpoint file to the
+# `badges` branch (one commit, replaced each time), so main itself never gets a bot commit.
+# The badge reads
+# https://raw.githubusercontent.com/Draco-Foundry/open-hangar/badges/last-updated.json
+
+on:
+  push:
+    branches: [main, redesign/0.3-svelte]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Two pushes close together: the later one waits and writes last.
+concurrency:
+  group: last-updated
+  cancel-in-progress: false
+
+jobs:
+  stamp:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Write the time to the badges branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          stamp=$(date -u +'%Y-%m-%d %H:%MZ')
+          mkdir badges && cd badges
+          git init -q
+          printf '{"schemaVersion":1,"label":"Last Updated","message":"%s","color":"blue"}\n' "$stamp" > last-updated.json
+          git add last-updated.json
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -qm "Last updated $stamp"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" HEAD:refs/heads/badges
+          echo "Last updated $stamp"
