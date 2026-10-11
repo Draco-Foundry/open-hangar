@@ -121,7 +121,8 @@ const handles = (type) => Object.hasOwn(siteHandlers, type);
 
 // Hello, the version handshake: what this page may ask in this build (a build's flags
 // cut handlers, and what's cut is never offered). cart and connect stay for the
-// website's pages from before v2, which read an answer without `v` as v1.
+// website's pages from before v2, which read an answer without `v` as v1. buyback:
+// Add to RSI Cart takes a buy-back upgrade too (pledgeId on its price and add).
 siteHandlers['oh-hello'] = (msg, origin) => {
   const caps = self.OHPages.capsFor(origin, handles);
   return {
@@ -130,6 +131,7 @@ siteHandlers['oh-hello'] = (msg, origin) => {
     version: chrome.runtime.getManifest().version,
     caps,
     cart: caps.includes('addToCart'),
+    buyback: caps.includes('addToCart'),
     connect: caps.includes('connect'),
   };
 };
@@ -145,6 +147,8 @@ siteHandlers['oh-hello'] = (msg, origin) => {
 // editions (the C8X's BIS Warbond), so the others are tried in turn and the one
 // that worked comes back as toSkuId, for the price and the add (website #329).
 //   oh-add-upgrade     { fromShipId, toShipId, toSkuId } → { ok } | { ok: false, error }
+// pledgeId (optional, price and add): a buy-back upgrade, priced and added in RSI's
+// buy-back mode for that pledge; RSI's cart takes it alone. Without it, a new upgrade.
 // A refused add can carry rsiSays: RSI's own short message, trimmed and with anything
 // that looks like account data taken out, for the page to show as RSI's words. error
 // is 'cart-conflict' only when that message names a buy-back, and 'signed-out' comes
@@ -156,10 +160,15 @@ const siteSkus = (v) =>
   Array.isArray(v) ? v.filter((x) => Number.isInteger(x) && x > 0).slice(0, SITE_SKUS) : [];
 siteHandlers['oh-upgrade-options'] = (m) =>
   cartLane().upgradeOptions(m.toShipId, m.toSkuId, { priceLimit: 4, skus: siteSkus(m.skus) });
+const pledgeOf = (m) => (m.pledgeId ? { pledgeId: m.pledgeId } : {});
 siteHandlers['oh-upgrade-price'] = (m) =>
-  cartLane().upgradePrice(m.fromShipId, m.toSkuId, { toShipId: m.toShipId, setContext: true });
+  cartLane().upgradePrice(m.fromShipId, m.toSkuId, {
+    toShipId: m.toShipId,
+    setContext: true,
+    ...pledgeOf(m),
+  });
 siteHandlers['oh-add-upgrade'] = (m) =>
-  cartLane().addUpgradeToCart(m.fromShipId, m.toShipId, m.toSkuId);
+  cartLane().addUpgradeToCart(m.fromShipId, m.toShipId, m.toSkuId, pledgeOf(m));
 
 // @sync-start: the `sync` build flag's code, in every store build (src/flags.js, #187)
 // Connect from the website (Chrome and Edge, owner 2026-10-04). The website's Connect

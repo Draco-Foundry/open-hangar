@@ -540,6 +540,7 @@ const hello = (caps) => ({
   version: '0.3.0',
   caps,
   cart: true,
+  buyback: true,
   connect: caps.includes('connect'),
 });
 
@@ -699,4 +700,17 @@ test("addToCart's ticket goes to the cart (RSI's second step), with x-rsi-token"
   assert.equal(rsi.tickets.length, 1);
   assert.deepEqual(rsi.tickets[0].body, { jwt: 'header.payload.sig' });
   assert.equal(rsi.tickets[0].init.headers['x-rsi-token'], 'cookie-token');
+});
+
+test('website bridge: a buy-back upgrade is priced and added in buy-back mode', async () => {
+  const x = loadBackground({ sync: false });
+  const SITE = 'https://app.openhangar.space';
+  const ids = { fromShipId: 101, toShipId: 900, toSkuId: 9001, pledgeId: 5550001 };
+  const p = await x.send({ type: 'oh-upgrade-price', ...ids }, SITE);
+  assert.equal(p.price, 170);
+  assert.deepEqual(await x.send({ type: 'oh-add-upgrade', ...ids }, SITE), { ok: true });
+  const contexts = x.rsi.calls.filter((c) => c.url.endsWith('setContextToken'));
+  assert.ok(contexts.length >= 2);
+  for (const c of contexts) assert.equal(c.body.pledgeId, 5550001, 'every context is buy-back');
+  assert.equal(x.rsi.ops().filter((o) => o === 'addToCart').length, 1);
 });
