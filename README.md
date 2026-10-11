@@ -2,12 +2,9 @@
 
 **The free Star Citizen fleet manager.**
 
-[![Latest Release](https://img.shields.io/github/v/release/Draco-Foundry/open-hangar?label=Release&style=flat)](https://github.com/Draco-Foundry/open-hangar/releases/latest)
-[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/aeabioadfphghjennmdbnpelojlhndjl?label=Chrome&style=flat)](https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl)
-[![Firefox Add-ons](https://img.shields.io/amo/v/open-hangar?label=Firefox&style=flat)](https://addons.mozilla.org/en-US/firefox/addon/open-hangar/)
-[![Microsoft Edge Add-ons](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fopenhangar.space%2Fversions.json&query=%24.stores.edge.live&prefix=v&label=Edge&style=flat)](https://microsoftedge.microsoft.com/addons/detail/fmcnemfepnifokjelgjacgdhoodaiicl)
-[![License](https://img.shields.io/badge/License-PolyForm%20Strict-blue?style=flat)](LICENSE)
-[![Last Updated](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FDraco-Foundry%2Fopen-hangar%2Fbadges%2Flast-updated.json&style=flat)](https://github.com/Draco-Foundry/open-hangar/commits/main)
+[![Version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fopenhangar.space%2Fversions.json&query=%24.version&prefix=v&label=Version&color=3b6aed&style=flat)](https://github.com/Draco-Foundry/open-hangar/releases/latest)
+[![Updated](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FDraco-Foundry%2Fopen-hangar%2Fbadges%2Flast-updated.json&label=Updated&color=3b6aed&style=flat)](https://github.com/Draco-Foundry/open-hangar/commits/main)
+[![License](https://img.shields.io/badge/License-PolyForm%20Strict-3b6aed?style=flat)](LICENSE)
 
 Open Hangar comes in two parts that work together:
 
