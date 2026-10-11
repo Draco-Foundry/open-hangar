@@ -15,7 +15,8 @@
  *
  * Loaded by the dashboard (before lib.js, which exposes it as OH.upgradeOptions,
  * OH.upgradePrice and OH.addUpgradeToCart) and by the background worker, which
- * answers the website's store panel (src/background.js).
+ * answers the website's store panel (src/background.js), both after the parser rules
+ * (src/parser-rules.js), which hold each request's path and document.
  *
  * Polite: only ever on a click, one request at a time with a short random pause
  * between them, and after RSI's "slow down" (429) nothing more until its
@@ -23,27 +24,19 @@
  * could put the upgrade in the cart twice.
  */
 (function (root) {
+  // Where each request goes and what it asks (paths, GraphQL operations and
+  // documents, the token's cookie and headers, RSI's refusal words): the parser rules
+  // (src/parser-rules.js, loaded first; node tests load them here). The host stays here.
+  if (!root.OHRules && typeof require === 'function') require('./parser-rules.js');
+  const RULES = root.OHRules;
   const RSI = 'https://robertsspaceindustries.com';
-  const AUTH_URL = `${RSI}/api/account/v2/setAuthToken`;
-  const CONTEXT_URL = `${RSI}/api/ship-upgrades/setContextToken`;
-  const CART_TOKEN_URL = `${RSI}/api/store/v2/cart/token`;
-  const UPGRADE_URL = `${RSI}/pledge-store/api/upgrade/graphql`;
-  const CART_URL = `${RSI}/en/store/pledge/cart`;
-  const SIGN_IN_URL = `${RSI}/connect`;
-  const PLEDGE_STORE_URL = `${RSI}/en/pledge`;
-
-  // RSI's own queries (initShipUpgrade trimmed to what we use, like lib.js does).
-  const SHIPS_QUERY =
-    'query initShipUpgrade { ships { id name owned msrp medias { productThumbMediumAndSmall } } app { mode isAnonymous } }';
-  const APP_QUERY = 'query initShipUpgrade { app { mode isAnonymous } }';
-  // Only RSI's "from" half: which of your ships can upgrade to the target SKU. Its
-  // "to" half, asked with no From ship, makes RSI answer "Ship not found".
-  const FILTER_QUERY =
-    'query filterShips($toId: Int, $fromFilters: [FilterConstraintValues]) {\n  from(to: $toId, filters: $fromFilters) {\n    ships {\n      id\n    }\n  }\n}\n';
-  const PRICE_QUERY =
-    'query getPrice($from: Int!, $to: Int!) {\n  price(from: $from, to: $to) {\n    amount\n    nativeAmount\n  }\n}\n';
-  const ADD_QUERY =
-    'mutation addToCart($from: Int!, $to: Int!) {\n  addToCart(from: $from, to: $to) {\n    jwt\n  }\n}\n';
+  const AUTH_URL = RSI + RULES.cart.authPath;
+  const CONTEXT_URL = RSI + RULES.cart.contextPath;
+  const CART_TOKEN_URL = RSI + RULES.cart.ticketPath;
+  const UPGRADE_URL = RSI + RULES.upgrade.path;
+  const CART_URL = RSI + RULES.cart.path;
+  const SIGN_IN_URL = RSI + RULES.cart.signInPath;
+  const PLEDGE_STORE_URL = RSI + RULES.cart.storePath;
 
   const GAP_MS = 300; // pause between two requests: 300 to 750 ms, never a fixed beat
   const SLOW_DOWN_MS = 60e3; // after a 429 without Retry-After
@@ -60,30 +53,42 @@
   // upgrade window sends it as X-CSRF-TOKEN on each GraphQL call; without it RSI
   // answers as if nobody were signed in.
   function parseCsrf(html) {
-    const tag = String(html || '').match(/<meta[^>]+name=["']csrf-token["'][^>]*>/i);
-    const m = tag && tag[0].match(/content=["']([^"']+)["']/i);
-    return m ? m[1] : null;
+    const tag = String(html || '').match(RULES.cart.csrfTag);
+    const m = tag && tag[0].match(RULES.cart.csrfValue);
+    return m ? m.groups.value : null;
   }
 
   // --- Request bodies (pure) ------------------------------------------------------
   // setContextToken: only the ids we know. A buy-back adds its pledge id.
   function contextBody({ fromShipId, toShipId, toSkuId, pledgeId } = {}) {
     const out = {};
-    if (toInt(fromShipId)) out.fromShipId = toInt(fromShipId);
-    if (toInt(toShipId)) out.toShipId = toInt(toShipId);
-    if (toInt(toSkuId)) out.toSkuId = toInt(toSkuId);
-    if (toInt(pledgeId)) out.pledgeId = toInt(pledgeId);
+    if (toInt(fromShipId)) out[RULES.cart.context.fromShip] = toInt(fromShipId);
+    if (toInt(toShipId)) out[RULES.cart.context.toShip] = toInt(toShipId);
+    if (toInt(toSkuId)) out[RULES.cart.context.toSku] = toInt(toSkuId);
+    if (toInt(pledgeId)) out[RULES.cart.context.pledge] = toInt(pledgeId);
     return out;
   }
   const gql = (operationName, query, variables = {}) => ({ operationName, variables, query });
-  const shipsBody = () => gql('initShipUpgrade', SHIPS_QUERY);
-  const appBody = () => gql('initShipUpgrade', APP_QUERY);
+  // RSI's own queries (initShipUpgrade trimmed to what we use, like lib.js does).
+  const shipsBody = () => gql(RULES.upgrade.ships.operation, RULES.upgrade.ships.query);
+  const appBody = () => gql(RULES.upgrade.app.operation, RULES.upgrade.app.query);
+  // Only RSI's "from" half: which of your ships can upgrade to the target SKU. Its
+  // "to" half, asked with no From ship, makes RSI answer "Ship not found".
   const filterBody = (toSkuId) =>
-    gql('filterShips', FILTER_QUERY, { toId: toInt(toSkuId), fromFilters: [] });
+    gql(RULES.upgrade.filter.operation, RULES.upgrade.filter.query, {
+      toId: toInt(toSkuId),
+      ...RULES.upgrade.filter.variables,
+    });
   const priceBody = (fromShipId, toSkuId) =>
-    gql('getPrice', PRICE_QUERY, { from: toInt(fromShipId), to: toInt(toSkuId) });
+    gql(RULES.upgrade.price.operation, RULES.upgrade.price.query, {
+      from: toInt(fromShipId),
+      to: toInt(toSkuId),
+    });
   const addBody = (fromShipId, toSkuId) =>
-    gql('addToCart', ADD_QUERY, { from: toInt(fromShipId), to: toInt(toSkuId) });
+    gql(RULES.upgrade.add.operation, RULES.upgrade.add.query, {
+      from: toInt(fromShipId),
+      to: toInt(toSkuId),
+    });
 
   // --- Response parsing (pure) ----------------------------------------------------
   // GraphQL errors → our error kinds. Anything about who you are = signed out.
@@ -91,9 +96,7 @@
     const errs = unwrap(json).errors;
     if (!Array.isArray(errs) || !errs.length) return null;
     const text = errs.map((e) => (e && e.message) || '').join(' ');
-    return /auth|log(ged)? ?in|sign(ed)? ?in|anonymous|unauthori[sz]ed|session/i.test(text)
-      ? 'signed-out'
-      : 'refused';
+    return RULES.upgrade.signedOut.test(text) ? 'signed-out' : 'refused';
   }
   // RSI's own words in a refusal (its msg / message / errors), for the website to show
   // as they are: tags and spacing tidied, anything that looks like account data (an
@@ -132,9 +135,9 @@
     const bits = [j.msg, j.message, j.code, j.data && j.data.message];
     if (Array.isArray(j.errors)) for (const e of j.errors) bits.push(e && e.message);
     const text = bits.filter((b) => typeof b === 'string').join(' ');
-    if (buyback && /invalid/i.test(text)) return 'invalid';
-    if (/buy[\s-]?backs?/i.test(text)) return 'cart-conflict';
-    if (buyback && /upgrade/i.test(text)) return 'invalid';
+    if (buyback && RULES.cart.refusal.invalid.test(text)) return 'invalid';
+    if (RULES.cart.refusal.buyback.test(text)) return 'cart-conflict';
+    if (buyback && RULES.cart.refusal.upgrade.test(text)) return 'invalid';
     return null;
   }
   // → the add's answer for a refusal: cart-conflict, a refusal with a reason, or plain,
@@ -248,7 +251,7 @@
         try {
           const c = root.chrome && root.chrome.cookies;
           if (!c || !c.get) return null;
-          const got = await c.get({ url: RSI, name: 'Rsi-Token' });
+          const got = await c.get({ url: RSI, name: RULES.cart.cookie });
           if (!got || !got.value) return '';
           try {
             return decodeURIComponent(got.value);
@@ -317,10 +320,10 @@
       const tokenHeader =
         url === UPGRADE_URL
           ? token
-            ? { 'X-CSRF-TOKEN': token }
+            ? { [RULES.cart.csrfHeader]: token }
             : {}
           : token
-            ? { 'x-rsi-token': token }
+            ? { [RULES.cart.tokenHeader]: token }
             : {};
       const r = await send(url, {
         method: 'POST',
@@ -475,8 +478,10 @@
         csrf = null; // read a fresh token next time
         return { ok: false, error: 'signed-out' };
       }
-      if (pledge && (!app || app.mode !== 'buyback')) return { ok: false, error: 'refused' };
-      if (!pledge && app && app.mode === 'buyback') return { ok: false, error: 'refused' };
+      if (pledge && (!app || app.mode !== RULES.upgrade.buybackMode))
+        return { ok: false, error: 'refused' };
+      if (!pledge && app && app.mode === RULES.upgrade.buybackMode)
+        return { ok: false, error: 'refused' };
       const r = await ask(addBody(fromShipId, toSkuId));
       if (r.error === 'refused' && r.json) return refusedBy(r.json, !!pledge);
       if (r.error) return fail(r);

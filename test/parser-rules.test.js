@@ -2,7 +2,7 @@
 // The parser rules (connector step 4): where things are on RSI's pages, as data.
 // src/data/parser-rules.json and its schema, their copy for the extension's scripts
 // (src/parser-rules-data.js), the loader (src/parser-rules.js), and the code that
-// reads them (src/scraper/parser.js, src/lib.js): every rule is read, nothing is read
+// reads them (src/scraper/parser.js, src/lib.js, src/rsi-cart.js): every rule is read, nothing is read
 // that isn't a rule, and the moved code keeps no pattern or selector of its own.
 // Run: `npm test` (`npm run rules` after changing either JSON file).
 const test = require('node:test');
@@ -33,7 +33,7 @@ const P = globalThis.OpenHangar;
 const OH = globalThis.OH;
 
 // The files that read the rules, as RULES.<path>.
-const READERS = ['src/scraper/parser.js', 'src/lib.js'];
+const READERS = ['src/scraper/parser.js', 'src/lib.js', 'src/rsi-cart.js'];
 
 // A rule is a leaf: a pattern ({ source, flags }), a string, a number or a list (read
 // whole: a table, a list of selectors or labels), or a GraphQL request's fixed
@@ -192,6 +192,7 @@ test('the parts of a match the code reads are named groups in its pattern', () =
     'dates.iso': ['year', 'month', 'day'],
     'dates.named': ['year', 'month', 'day'],
     'dossier.orgSid': ['sid'],
+    'cart.csrfValue': ['value'],
   };
   const groupsOf = (re) =>
     Object.keys(new RegExp(`(?:${re.source})|`, re.flags).exec('').groups || {});
@@ -301,8 +302,8 @@ test('the moved code keeps no pattern or selector of its own', () => {
     for (const { path: p, value } of byDef('path'))
       assert.ok(!literals.some((s) => s.includes(value)), `${f} spells out ${p}: ${value}`);
   }
-  // Both read every selector, attribute and RSI JSON key from the rules, and never
-  // hand a selector of their own to the DOM.
+  // They read every selector, attribute, operation, header and cookie name from the
+  // rules, and never hand a selector of their own to the DOM.
   for (const f of READERS) {
     const text = code(f);
     const literals = [...text.matchAll(/(['"`])((?:\\.|(?!\1)[^\\\n])*)\1/g)].map((m) => m[2]);
@@ -310,7 +311,7 @@ test('the moved code keeps no pattern or selector of its own', () => {
       assert.ok(!literals.includes(value), `${f} spells out ${p}: ${value}`);
     for (const m of text.matchAll(/\.(querySelector|querySelectorAll|closest|matches)\(\s*(\S)/g))
       assert.ok(!/['"`]/.test(m[2]), `${f}: ${m[1]}() with a selector of its own`);
-    for (const { path: p, value } of byDef('operation'))
+    for (const { path: p, value } of [...byDef('operation'), ...byDef('headerName')])
       assert.ok(!literals.includes(value), `${f} spells out ${p}: ${value}`);
   }
   // lib.js reads the account's JSON (OH.getAccount, up to the referrals) by the rules'
@@ -323,6 +324,10 @@ test('the moved code keeps no pattern or selector of its own', () => {
   assert.ok(account.length > 2000, 'found OH.getAccount');
   for (const { path: p, value } of byDef('jsonKey').filter((l) => /^account\./.test(l.path)))
     assert.doesNotMatch(account, new RegExp(`\\b(obj|sub|con|c)\\.${value}\\b`), p);
+  // rsi-cart.js sends the context body with the rules' keys, never its own.
+  const cart = code('src/rsi-cart.js');
+  for (const { path: p, value } of byDef('jsonKey').filter((l) => /^cart\./.test(l.path)))
+    assert.doesNotMatch(cart, new RegExp(`\\.${value}\\s*=|['"\`]${value}['"\`]`), p);
 });
 
 test('the rules load in a worker too: no window, document, chrome or require', () => {

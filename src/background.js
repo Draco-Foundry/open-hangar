@@ -153,6 +153,10 @@ siteHandlers['oh-hello'] = (msg, origin) => {
 // that looks like account data taken out, for the page to show as RSI's words. error
 // is 'cart-conflict' only when that message names a buy-back, and 'signed-out' comes
 // back before anything is asked of RSI when this browser holds no RSI session.
+// Where its requests go and what they ask: the parser rules (src/parser-rules.js, which
+// needs schema-check.js from above), loaded first. Firefox lists them in its manifest.
+if (typeof importScripts === 'function' && !self.OHRules)
+  importScripts('parser-rules-data.js', 'parser-rules.js');
 if (typeof importScripts === 'function' && !self.OHCart) importScripts('rsi-cart.js');
 const cartLane = () => self.OHCart;
 const SITE_SKUS = 6; // editions tried at most: a few asks to RSI, never a burst
