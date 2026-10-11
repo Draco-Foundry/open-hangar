@@ -7,6 +7,7 @@
 [![Firefox Add-ons](https://img.shields.io/amo/v/open-hangar?label=Firefox&style=flat)](https://addons.mozilla.org/en-US/firefox/addon/open-hangar/)
 [![Microsoft Edge Add-ons](https://img.shields.io/badge/Edge-Add--ons-0078D7?style=flat)](https://microsoftedge.microsoft.com/addons/detail/fmcnemfepnifokjelgjacgdhoodaiicl)
 [![License](https://img.shields.io/badge/License-PolyForm%20Strict-blue?style=flat)](LICENSE)
+[![Last Updated](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FDraco-Foundry%2Fopen-hangar%2Fbadges%2Flast-updated.json&style=flat)](https://github.com/Draco-Foundry/open-hangar/commits/main)
 
 Open Hangar comes in two parts that work together:
 
