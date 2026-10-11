@@ -268,8 +268,7 @@ siteHandlers['oh-connect-finish'] = async (msg, origin) => {
 // Connect with a code (src/dashboard.js siteConnect, when the sign-in window can't
 // open): the dashboard opens the website's code page with its code in the address, and
 // keeps that code here while it waits (siteLinkPending, session storage). The page
-// fills a code in only when it's this one, so a code page opened from anywhere else
-// never has one ready to approve:
+// fills a code in only when it's this one:
 //   oh-link-check { code } → { ok: true, mine }: true only for the code this extension
 //   is waiting for, from the site it asked, before it runs out. The code never leaves.
 const linkCode = (s) =>
