@@ -12,7 +12,8 @@
     pilotAnswer,
     reloadForUpdate,
     reportProblem,
-    scan,
+    rsiAllow,
+    scanClick,
     start,
   } from './hub.svelte.js';
   import List from './List.svelte';
@@ -53,7 +54,7 @@
       type="button"
       class="bp-btn primary bp-scan"
       id="bp-scan"
-      onclick={scan}
+      onclick={scanClick}
       disabled={hub.scan.busy || !hub.ready}
       >{hub.scan.busy ? t('basic.scanning') : t('basic.scan')}</button
     >
@@ -72,6 +73,15 @@
     </div>
   {/if}
   {#if hub.note}<div class="bp-note" role="status">{hub.note}</div>{/if}
+
+  {#if hub.ready && !hub.rsiOk}
+    <div class="bp-note warn" id="bp-rsi-access" role="alert">
+      <p>{t('basic.rsi-access-why')}</p>
+      <button type="button" class="bp-btn primary" id="bp-rsi-allow" onclick={() => rsiAllow()}
+        >Allow Access to RSI</button
+      >
+    </div>
+  {/if}
 
   {#if report && (report.bad || report.signedOut)}
     <div class="bp-note warn" id="bp-report" role="alert">
