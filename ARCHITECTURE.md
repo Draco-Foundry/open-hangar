@@ -63,9 +63,11 @@ string `type` (else `bad request`), a type this page may ask in this build (else
 another page's list), and only that type's keys with the right kinds of values (else
 `bad request`). A page that isn't one of ours gets no answer at all.
 
-`oh-hello` is the version handshake: `{ ok, v: 2, version, caps, cart, connect }`, where
-`caps` is what this page may ask in this build (a capability whose handlers a build's
-flags cut is never offered) and `cart` and `connect` stay for the website's pages from
+`oh-hello` is the version handshake: `{ ok, v: 2, version, caps, cart, buyback, connect }`,
+where `caps` is what this page may ask in this build (a capability whose handlers a
+build's flags cut is never offered), `buyback` says Add to RSI Cart also takes a buy-back
+upgrade (an optional `pledgeId` on `oh-upgrade-price` and `oh-add-upgrade`, priced and
+added in RSI's buy-back mode), and `cart` and `connect` stay for the website's pages from
 before v2. The website treats an answer without `v` as a v1 extension.
 
 Our hangar page (Local Mode, behind the `localMode` flag, which needs `sync`):

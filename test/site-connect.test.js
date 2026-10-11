@@ -30,6 +30,7 @@ const HELLO_APP = {
   version: '0.3.0',
   caps: ['hello', 'addToCart', 'connect'],
   cart: true,
+  buyback: true,
   connect: true,
 };
 

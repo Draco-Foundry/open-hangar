@@ -203,6 +203,7 @@ test('hello v2: the version, and what this page may ask in this build', async ()
     version: '0.3.0',
     caps,
     cart: caps.includes('addToCart'),
+    buyback: caps.includes('addToCart'),
     connect: caps.includes('connect'),
   });
   assert.deepEqual(await x.send({ type: 'oh-hello' }, HANGAR), v2(HANGAR_CAPS));
@@ -828,4 +829,28 @@ test("bridge: answers go to this page's origin only, never '*'; a dead extension
   ]);
   const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'site-bridge.js'), 'utf8');
   assert.doesNotMatch(src, /postMessage\([^)]*'\*'/);
+});
+
+// --- Buy-back upgrades -------------------------------------------------------------
+test('a buy-back upgrade: pledgeId reaches the price and the add, and only as a number', async () => {
+  const x = load();
+  const price = { ...VALID['oh-upgrade-price'], pledgeId: 5550001 };
+  const add = { ...VALID['oh-add-upgrade'], pledgeId: 5550001 };
+  assert.deepEqual(await x.send(price, APP), { ok: true, price: 170 });
+  assert.deepEqual(await x.send(add, APP), { ok: true });
+  // The lane's calls come from the worker's own realm: compared as plain data.
+  const calls = () => JSON.parse(JSON.stringify(x.cart));
+  assert.deepEqual(calls(), [
+    ['price', 101, 9001, { toShipId: 900, setContext: true, pledgeId: 5550001 }],
+    ['add', 101, 900, 9001, { pledgeId: 5550001 }],
+  ]);
+  // Without it: a new upgrade, as before.
+  await x.send(VALID['oh-add-upgrade'], APP);
+  assert.deepEqual(calls()[2], ['add', 101, 900, 9001, {}]);
+  // Anything but a positive whole number is a bad request, and nothing runs.
+  for (const pledgeId of ['5550001', 0, -1, 1.5, null])
+    assert.deepEqual(await x.send({ ...add, pledgeId }, APP), BAD, String(pledgeId));
+  assert.equal(x.cart.length, 3);
+  // Options take no pledge.
+  assert.deepEqual(await x.send({ ...VALID['oh-upgrade-options'], pledgeId: 5550001 }, APP), BAD);
 });
