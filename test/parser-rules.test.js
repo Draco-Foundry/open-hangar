@@ -163,6 +163,7 @@ test('loading refuses a file that does not fit, whole', () => {
   refused((r) => (r.names.coupon.flags = 'y'), /\/names\/coupon\/flags/);
   refused((r) => (r.hangar.path = 'https://example.com/account/pledges'), /\/hangar\/path/);
   refused((r) => (r.hangar.path = '//example.com/x'), /\/hangar\/path/);
+  refused((r) => (r.hangar.path = '/account//pledges'), /\/hangar\/path/);
   refused((r) => (r.hangar.pageSize = '10'), /\/hangar\/pageSize/);
   refused((r) => (r.categories.kinds[0].kind = 'starship'), /\/categories\/kinds\/0\/kind/);
   refused((r) => (r.buybacks.cellLayouts[0].min = 0), /\/buybacks\/cellLayouts\/0\/min/);

@@ -405,7 +405,7 @@
     "path": {
       "description": "A path on RSI's site, never a host.",
       "type": "string",
-      "pattern": "^/(?:[A-Za-z0-9._~-]+/?)*$",
+      "pattern": "^/(?:[A-Za-z0-9._~-]+/)*[A-Za-z0-9._~-]*$",
       "maxLength": 200
     },
     "param": {
