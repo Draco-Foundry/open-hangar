@@ -629,21 +629,139 @@
           },
         },
         upgrade: {
-          description: "RSI's upgrade tool: the store list (every ship and the editions on sale).",
+          description:
+            "RSI's upgrade tool: the store list (every ship and the editions on sale), and Add to RSI Cart (src/rsi-cart.js): your ships and the mode (ships, app), which ships can upgrade to a SKU (filter), the price (price) and the add itself (add), each asked with the csrf token.",
           type: 'object',
-          required: ['path', 'storeList'],
+          required: [
+            'path',
+            'storeList',
+            'ships',
+            'app',
+            'filter',
+            'price',
+            'add',
+            'signedOut',
+            'buybackMode',
+          ],
           additionalProperties: false,
-          properties: { path: { $ref: '#/$defs/path' }, storeList: { $ref: '#/$defs/request' } },
+          properties: {
+            path: { $ref: '#/$defs/path' },
+            storeList: { $ref: '#/$defs/request' },
+            ships: {
+              description: 'Every ship, which you own, and the mode.',
+              $ref: '#/$defs/request',
+            },
+            app: {
+              description: 'The mode alone: new upgrade or buy-back, signed in or not.',
+              $ref: '#/$defs/request',
+            },
+            filter: {
+              description: 'The ships that can upgrade to a SKU. The code adds toId.',
+              type: 'object',
+              required: ['operation', 'query', 'variables'],
+              additionalProperties: false,
+              properties: {
+                operation: { $ref: '#/$defs/operation' },
+                query: { $ref: '#/$defs/document' },
+                variables: {
+                  type: 'object',
+                  required: ['fromFilters'],
+                  additionalProperties: false,
+                  properties: { fromFilters: { type: 'array', maxItems: 0 } },
+                },
+              },
+            },
+            price: {
+              description: "An upgrade's price. The code adds from and to.",
+              $ref: '#/$defs/request',
+            },
+            add: {
+              description:
+                'The add: it hands back a ticket for the cart. The code adds from and to.',
+              $ref: '#/$defs/request',
+            },
+            signedOut: {
+              description:
+                "A GraphQL error that means you're not signed in (anything else is a refusal).",
+              $ref: '#/$defs/pattern',
+            },
+            buybackMode: {
+              description: "The app's mode while upgrading a buy-back.",
+              type: 'string',
+              pattern: '^[a-z][a-z0-9_-]*$',
+            },
+          },
         },
         cart: {
-          description: "RSI's cart.",
+          description:
+            "RSI's cart, and what Add to RSI Cart (src/rsi-cart.js) needs around the upgrade tool: signing the tool in (authPath) and setting what's upgraded (contextPath), both with the session cookie as tokenHeader; the csrf token from a store page (storePath) for every GraphQL call (csrfHeader); and the cart taking the add's ticket (ticketPath).",
           type: 'object',
-          required: ['path'],
+          required: [
+            'path',
+            'signInPath',
+            'storePath',
+            'authPath',
+            'contextPath',
+            'ticketPath',
+            'cookie',
+            'tokenHeader',
+            'csrfHeader',
+            'csrfTag',
+            'csrfValue',
+            'context',
+            'refusal',
+          ],
           additionalProperties: false,
           properties: {
             path: {
               description: 'The cart page, opened for you after an add.',
               $ref: '#/$defs/path',
+            },
+            signInPath: { description: "RSI's sign-in page.", $ref: '#/$defs/path' },
+            storePath: {
+              description: 'A store page, read for its csrf token.',
+              $ref: '#/$defs/path',
+            },
+            authPath: { $ref: '#/$defs/path' },
+            contextPath: { $ref: '#/$defs/path' },
+            ticketPath: { $ref: '#/$defs/path' },
+            cookie: {
+              description: 'The session cookie sent as tokenHeader.',
+              $ref: '#/$defs/headerName',
+            },
+            tokenHeader: { $ref: '#/$defs/headerName' },
+            csrfHeader: { $ref: '#/$defs/headerName' },
+            csrfTag: {
+              description: "The csrf token's meta tag in the store page.",
+              $ref: '#/$defs/pattern',
+            },
+            csrfValue: {
+              description: 'Its value in that tag (group `value`).',
+              $ref: '#/$defs/pattern',
+            },
+            context: {
+              description: "The context body's keys (pledge: a buy-back upgrade).",
+              type: 'object',
+              required: ['fromShip', 'toShip', 'toSku', 'pledge'],
+              additionalProperties: false,
+              properties: {
+                fromShip: { $ref: '#/$defs/jsonKey' },
+                toShip: { $ref: '#/$defs/jsonKey' },
+                toSku: { $ref: '#/$defs/jsonKey' },
+                pledge: { $ref: '#/$defs/jsonKey' },
+              },
+            },
+            refusal: {
+              description:
+                "What a refused add says: a buy-back upgrade RSI won't sell any more (invalid, or upgrade, for a buy-back), or a cart that takes a buy-back alone (buyback).",
+              type: 'object',
+              required: ['invalid', 'buyback', 'upgrade'],
+              additionalProperties: false,
+              properties: {
+                invalid: { $ref: '#/$defs/pattern' },
+                buyback: { $ref: '#/$defs/pattern' },
+                upgrade: { $ref: '#/$defs/pattern' },
+              },
             },
           },
         },
@@ -734,6 +852,11 @@
           type: 'array',
           maxItems: 20,
           items: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]*$' },
+        },
+        headerName: {
+          description: 'An HTTP header or cookie name.',
+          type: 'string',
+          pattern: '^[A-Za-z][A-Za-z0-9-]*$',
         },
       },
     },
@@ -962,8 +1085,61 @@
           query:
             'query initShipUpgrade { ships { id name flyableStatus msrp link skus { id title available price } } }',
         },
+        ships: {
+          operation: 'initShipUpgrade',
+          query:
+            'query initShipUpgrade { ships { id name owned msrp medias { productThumbMediumAndSmall } } app { mode isAnonymous } }',
+        },
+        app: {
+          operation: 'initShipUpgrade',
+          query: 'query initShipUpgrade { app { mode isAnonymous } }',
+        },
+        filter: {
+          operation: 'filterShips',
+          query:
+            'query filterShips($toId: Int, $fromFilters: [FilterConstraintValues]) {\n  from(to: $toId, filters: $fromFilters) {\n    ships {\n      id\n    }\n  }\n}\n',
+          variables: { fromFilters: [] },
+        },
+        price: {
+          operation: 'getPrice',
+          query:
+            'query getPrice($from: Int!, $to: Int!) {\n  price(from: $from, to: $to) {\n    amount\n    nativeAmount\n  }\n}\n',
+        },
+        add: {
+          operation: 'addToCart',
+          query:
+            'mutation addToCart($from: Int!, $to: Int!) {\n  addToCart(from: $from, to: $to) {\n    jwt\n  }\n}\n',
+        },
+        signedOut: {
+          source: 'auth|log(ged)? ?in|sign(ed)? ?in|anonymous|unauthori[sz]ed|session',
+          flags: 'i',
+        },
+        buybackMode: 'buyback',
       },
-      cart: { path: '/en/store/pledge/cart' },
+      cart: {
+        path: '/en/store/pledge/cart',
+        signInPath: '/connect',
+        storePath: '/en/pledge',
+        authPath: '/api/account/v2/setAuthToken',
+        contextPath: '/api/ship-upgrades/setContextToken',
+        ticketPath: '/api/store/v2/cart/token',
+        cookie: 'Rsi-Token',
+        tokenHeader: 'x-rsi-token',
+        csrfHeader: 'X-CSRF-TOKEN',
+        csrfTag: { source: '<meta[^>]+name=["\']csrf-token["\'][^>]*>', flags: 'i' },
+        csrfValue: { source: 'content=["\'](?<value>[^"\']+)["\']', flags: 'i' },
+        context: {
+          fromShip: 'fromShipId',
+          toShip: 'toShipId',
+          toSku: 'toSkuId',
+          pledge: 'pledgeId',
+        },
+        refusal: {
+          invalid: { source: 'invalid', flags: 'i' },
+          buyback: { source: 'buy[\\s-]?backs?', flags: 'i' },
+          upgrade: { source: 'upgrade', flags: 'i' },
+        },
+      },
     },
   });
   root.OHParserRulesData = data;

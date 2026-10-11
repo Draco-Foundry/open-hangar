@@ -80,8 +80,10 @@ test('Firefox beta: its own add-on id, update_url, the beta version and sync dat
       scripts: [
         'src/flags.js',
         'src/site-pages.js',
-        'src/rsi-cart.js',
         'src/schema-check.js',
+        'src/parser-rules-data.js',
+        'src/parser-rules.js',
+        'src/rsi-cart.js',
         'src/sync-schema.js',
         'src/hangar-shape.js',
         'src/background.js',

@@ -189,8 +189,10 @@ const BETA_FIREFOX_UPDATES = `${PRODUCTION_SITE}/beta/firefox-updates.json`;
 // (test/build-flags.test.js checks the two lists agree).
 const WORKER_SCRIPTS = [
   'src/site-pages.js',
-  'src/rsi-cart.js',
   'src/schema-check.js',
+  'src/parser-rules-data.js',
+  'src/parser-rules.js',
+  'src/rsi-cart.js',
   'src/sync-schema.js',
   'src/hangar-shape.js',
 ];
@@ -201,8 +203,9 @@ const targets = {
     ...m,
     // Firefox's event page has no importScripts, so what background.js imports on
     // Chrome is listed here, before it: flags.js, site-pages.js (which of our pages
-    // may ask what), rsi-cart.js for Add to RSI Cart from the website (through
-    // site-bridge.js, #434), and the sync schema with the shared hangar shaping (#441).
+    // may ask what), the schema checker and the parser rules, rsi-cart.js for Add to
+    // RSI Cart from the website (through site-bridge.js, #434; it reads the rules), and
+    // the sync schema with the shared hangar shaping (#441).
     background: { scripts: [FLAGS_FILE, ...WORKER_SCRIPTS, m.background.service_worker] },
     browser_specific_settings: {
       gecko: {
