@@ -13,6 +13,18 @@ loads remote code: what a build can do is fixed when it's built (build-time flag
 - **Be polite:** an honest User-Agent, one request at a time with pauses, no bursts,
   honor `Retry-After`, back off on 403/429/5xx and stop on a denial, cache where you can.
 
+## Extension Alerts
+
+The `alerts` flag's checks (src/alerts.js) ask openhangar.space for two things, no more
+than once every 30 minutes (an alarm, 30 to 35 minutes apart): the public sale feed
+(`/api/store/on-sale`, with its ETag, nothing about the pilot in the request) and, only
+while connected, the account's Wishlist keys (`/api/v1/wishlist`, the sync token, read
+only). Retry-After is honored, a failure doubles the wait up to 6 hours, a copy younger
+than 10 minutes is used as it is, and nothing is asked before the pilot turns alerts on.
+Everything is matched on the device; nothing goes back. A change to either feed's shape
+is a new `v` on the website, and the name fold (`nameKey`) must stay the website's
+`saleKey`: both repos test the same strings.
+
 ## Sync
 
 What a sync sends is the backup format (`OH.exportDB`, `schemaVersion`), written down as

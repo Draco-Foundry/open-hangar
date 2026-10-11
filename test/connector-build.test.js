@@ -28,7 +28,7 @@ const UI_STUBS = {
   'fonts/m.woff2': 'font',
 };
 
-function scratch({ connectorDefault = false } = {}) {
+function scratch({ connectorDefault = false, alertsDefault = false } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'oh-connector-'));
   for (const f of ['manifest.json', 'CHANGELOG.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md'])
     fs.copyFileSync(path.join(ROOT, f), path.join(dir, f));
@@ -48,6 +48,12 @@ function scratch({ connectorDefault = false } = {}) {
       .readFileSync(f, 'utf8')
       .replace(/(localMode: \{[^}]*?default: )false/, '$1true')
       .replace(/(connector: \{[^}]*?default: )false/, '$1true');
+    fs.writeFileSync(f, text);
+  }
+  if (alertsDefault) {
+    // The day Extension Alerts ship too (they need the connector).
+    const f = path.join(dir, 'src', 'flags.js');
+    const text = fs.readFileSync(f, 'utf8').replace(/(alerts: \{[^}]*?default: )false/, '$1true');
     fs.writeFileSync(f, text);
   }
   return dir;
@@ -196,4 +202,103 @@ test('the connector keeps only what its pages import', async () => {
     'tokens.css',
     'when.js',
   ]);
+});
+
+// --- Extension Alerts (scripts/alerts.mjs) ----------------------------------------------
+
+const manifestOf = (dir, t) =>
+  JSON.parse(fs.readFileSync(path.join(dir, 'dist', t, 'manifest.json'), 'utf8'));
+const writeManifest = (dir, t, m) =>
+  fs.writeFileSync(path.join(dir, 'dist', t, 'manifest.json'), JSON.stringify(m));
+
+test('alerts build: src/alerts.js, alarms, notifications only optional, production built in', () => {
+  const dir = scratch({ connectorDefault: true, alertsDefault: true });
+  try {
+    run(dir, 'pack.mjs');
+    for (const t of ['chrome', 'firefox']) {
+      const m = manifestOf(dir, t);
+      assert.deepEqual(m.permissions, [
+        'storage',
+        'unlimitedStorage',
+        'cookies',
+        'identity',
+        'alarms',
+      ]);
+      assert.deepEqual(m.optional_permissions, ['notifications']);
+      const alerts = fs.readFileSync(path.join(dir, 'dist', t, 'src', 'alerts.js'), 'utf8');
+      assert.match(alerts, /const SITE_BUILT_IN = "https:\/\/app\.openhangar\.space";/);
+      const bg = fs.readFileSync(path.join(dir, 'dist', t, 'src', 'background.js'), 'utf8');
+      assert.match(bg, /importScripts\('alerts\.js'\)/);
+    }
+    assert.ok(manifestOf(dir, 'firefox').background.scripts.includes('src/alerts.js'));
+    assert.match(run(dir, 'check-store-build.mjs'), /clean store build/);
+    // Tampered: notifications required, alarms gone, Firefox not loading the file.
+    const m = manifestOf(dir, 'chrome');
+    m.permissions = ['storage', 'unlimitedStorage', 'cookies', 'identity', 'notifications'];
+    writeManifest(dir, 'chrome', m);
+    const ff = manifestOf(dir, 'firefox');
+    ff.background.scripts = ff.background.scripts.filter((f) => f !== 'src/alerts.js');
+    writeManifest(dir, 'firefox', ff);
+    assert.deepEqual(problems(dir).sort(), [
+      "chrome: no alarms permission (the alerts' checks)",
+      "chrome: notifications is required (it's asked for, optional)",
+      "firefox: Firefox's event page doesn't load src/alerts.js",
+    ]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('no alerts: no src/alerts.js, no alarms, no notifications', () => {
+  const dir = scratch({ connectorDefault: true });
+  try {
+    run(dir, 'pack.mjs');
+    for (const t of ['chrome', 'firefox']) {
+      assert.ok(!fs.existsSync(path.join(dir, 'dist', t, 'src', 'alerts.js')), t);
+      assert.equal(manifestOf(dir, t).optional_permissions, undefined, t);
+      const bg = fs.readFileSync(path.join(dir, 'dist', t, 'src', 'background.js'), 'utf8');
+      assert.ok(!/OHAlerts|chrome\.alarms/.test(bg), `${t}: the alerts' code cut`);
+    }
+    assert.ok(!manifestOf(dir, 'firefox').background.scripts.includes('src/alerts.js'));
+    const m = manifestOf(dir, 'chrome');
+    m.permissions.push('alarms');
+    m.optional_permissions = ['notifications'];
+    writeManifest(dir, 'chrome', m);
+    fs.copyFileSync(
+      path.join(ROOT, 'src', 'alerts.js'),
+      path.join(dir, 'dist', 'firefox', 'src', 'alerts.js'),
+    );
+    assert.deepEqual(problems(dir).sort(), [
+      'chrome: the alarms permission without alerts',
+      'chrome: the notifications permission without alerts',
+      // The repo's copy, with no site built in.
+      'dist/firefox/src/alerts.js: built in to "", not production',
+      'firefox: src/alerts.js without alerts',
+    ]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('alerts need the connector', () => {
+  const dir = scratch();
+  try {
+    assert.throws(
+      () => run(dir, 'pack.mjs', ['--flag', 'alerts=on']),
+      /alerts=on needs the connector/,
+    );
+    assert.match(
+      run(dir, 'pack.mjs', [
+        '--flag',
+        'localMode=on',
+        '--flag',
+        'connector=on',
+        '--flag',
+        'alerts=on',
+      ]),
+      /flags on: sync, localMode, connector, alerts \(dev build, never for a store\)/,
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

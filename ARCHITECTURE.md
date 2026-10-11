@@ -40,7 +40,15 @@ the same scan our hangar page asks for; docs/FLAGS.md). It also:
 - holds back a browser update while a dashboard tab is open (`updateReady`), records
   `justUpdated` after an update, and reopens the Updates page after a reload
   (`reopenAfterUpdate`);
-- answers our own web pages ([Messages From Our Pages](#messages-from-our-pages)).
+- answers our own web pages ([Messages From Our Pages](#messages-from-our-pages));
+- in a build with the `alerts` flag (docs/FLAGS.md, "Alerts"), runs the store alerts
+  (`src/alerts.js`, `self.OHAlerts`) once the pilot turns them on (`alertsOn`): a check
+  on an alarm at most every 30 minutes (30 to 35 apart) downloads the public sale feed
+  and, while connected, the account's Wishlist keys, and matches them here against the
+  stored scan. Unseen matches take the badge in place of the `!`; a new one gets a
+  notification while that optional permission is granted; a click opens the item on our
+  Store; the popup's `{ ohPopup: 'alerts-seen' }` marks them seen. A new scan matches
+  again from what's saved, asking nothing.
 
 Scanning can't run here: MV3 service workers have no `DOMParser`, which the parser
 needs (see the header of `src/lib.js` and CONTRIBUTING.md, "How Auth Works").
@@ -214,18 +222,20 @@ the rules (docs/RSI-CHANGES.md).
 Everything lives in `chrome.storage.local` (the `unlimitedStorage` permission lifts the
 browser's default quota). The main keys:
 
-| Key                       | What it holds                                                                                    | Code                                      |
-| ------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------- |
-| `db`                      | `{ schemaVersion, sources: { hangar, buybacks, referral: { items, scannedAt, meta? } }, owner }` | `readDB()`, `writeDB()`, `OH.loadDB()`    |
-| `dbHistory`               | Scan history: `[{ at, items: [[id, name, value]], credit?, checkedAt? }]`                        | `recordHistory()`, `OH.trimHistory()`     |
-| `dbCorrupt`               | Up to 3 damaged originals that failed the check, kept until Clear Data                           | `setAside()`, `OH.getDamaged()`           |
-| `dbRecovery`              | `{ at, db }`: the previous account's data, saved before an automatic clear                       | `clearDataNow()`, `OH.recoverData()`      |
-| `profile:<nickname>`      | Another RSI account's whole DB (history inside), parked while a different account is signed in   | `OH.switchProfile()`, `OH.listProfiles()` |
-| `account`                 | Cached RSI identity and balances (10 minutes)                                                    | `OH.getAccount()`                         |
-| `errorLog`                | The rolling error log                                                                            | `OH.log()`                                |
-| `remoteStatus`, `netDown` | Cached kill switch file; sites that recently timed out                                           | `loadStatus()`, `OH.guarded()`            |
-| `bbDetails`               | Buy-back details: packs read after a buy-back scan, the rest with Load Details (paced)           | `OH.fetchBuybackDetails()`                |
-| `lastBackupAt`            | When you last downloaded a backup file                                                           | `downloadBackup()` in `src/dashboard.js`  |
+| Key                        | What it holds                                                                                    | Code                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------- |
+| `db`                       | `{ schemaVersion, sources: { hangar, buybacks, referral: { items, scannedAt, meta? } }, owner }` | `readDB()`, `writeDB()`, `OH.loadDB()`    |
+| `dbHistory`                | Scan history: `[{ at, items: [[id, name, value]], credit?, checkedAt? }]`                        | `recordHistory()`, `OH.trimHistory()`     |
+| `dbCorrupt`                | Up to 3 damaged originals that failed the check, kept until Clear Data                           | `setAside()`, `OH.getDamaged()`           |
+| `dbRecovery`               | `{ at, db }`: the previous account's data, saved before an automatic clear                       | `clearDataNow()`, `OH.recoverData()`      |
+| `profile:<nickname>`       | Another RSI account's whole DB (history inside), parked while a different account is signed in   | `OH.switchProfile()`, `OH.listProfiles()` |
+| `account`                  | Cached RSI identity and balances (10 minutes)                                                    | `OH.getAccount()`                         |
+| `errorLog`                 | The rolling error log                                                                            | `OH.log()`                                |
+| `remoteStatus`, `netDown`  | Cached kill switch file; sites that recently timed out                                           | `loadStatus()`, `OH.guarded()`            |
+| `bbDetails`                | Buy-back details: packs read after a buy-back scan, the rest with Load Details (paced)           | `OH.fetchBuybackDetails()`                |
+| `lastBackupAt`             | When you last downloaded a backup file                                                           | `downloadBackup()` in `src/dashboard.js`  |
+| `alertsOn`, `alerts`       | Extension Alerts: the switch; the matches and which you've seen (`alerts` flag)                  | `OHAlerts.check()`, `src/background.js`   |
+| `alertsFeed`, `alertsWish` | The last sale feed (ETag, when to ask again); the account's Wishlist keys for this connection    | `OHAlerts.check()`                        |
 
 Other keys are caches of public data (for example `shipMatrix`, `shipCatalog`,
 `shipImages`, `scVersion`, `patchNotes`, `storeShips`, `fxRates`) and UI
@@ -455,6 +465,8 @@ When RSI changes a page, every installed copy breaks until a fix clears store re
   version. A source is paused by `"enabled": false`, or by `"minVersion"` when the
   running version is older. Source ids: `hangar`, `buybacks`, `referrals`.
 - It fails open: no file, a bad file or no connection means scan as normal.
+- `"alerts": { "enabled": false }` pauses Extension Alerts' checks (`src/alerts.js`,
+  from the copy the extension's pages cached; the background never fetches the file).
 - `OH.scanSource()` and `OH.getReferral()` check it before scanning;
   `renderSiteNotice()` in `src/dashboard.js` shows the banner.
 

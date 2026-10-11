@@ -28,7 +28,8 @@ build for now.
 their imports). `scripts/check-store-build.mjs` refuses a connector build with any of
 them, and a build without the connector that has the popup or the basic page.
 
-**Permissions** stay as they are: `storage`, `unlimitedStorage` (big hangars, history
+**Permissions** stay as they are (Extension Alerts, the `alerts` flag, add `alarms` and an
+optional `notifications`, docs/FLAGS.md "Alerts"): `storage`, `unlimitedStorage` (big hangars, history
 and the archive), `cookies` (Log Out of RSI), `identity` (Connect's sign-in window), and
 host access to robertsspaceindustries.com only. The **hosts** the pages may reach shrink:
 a connector build's content security policy adds
@@ -66,20 +67,27 @@ step 3 above).
 
 **Stays**
 
-| Request                                                                            | Why                                                                       |
-| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| robertsspaceindustries.com `/account/pledges`, `/account/buy-back-pledges`         | Scan: hangar and buy-backs                                                |
-| robertsspaceindustries.com `/pledge/buyback/<id>`                                  | Scan: up to 30 unread packs                                               |
-| robertsspaceindustries.com `/en/account/dashboard`                                 | Identity and balances: Scan, and opening the basic page (kept 10 minutes) |
-| robertsspaceindustries.com `/en/citizens/<handle>` (no cookies)                    | Citizen Record and org, with the one above                                |
-| robertsspaceindustries.com `POST /graphql` (referral recruits)                     | Scan: referrals                                                           |
-| robertsspaceindustries.com `/pledge-store/api/upgrade/graphql`, the cart           | Add to RSI Cart from our pages                                            |
-| openhangar.space `status.json`                                                     | The kill switch                                                           |
-| openhangar.space `api/ships` (once a day)                                          | The popup's Account Value                                                 |
-| app.openhangar.space `/connect`, `/api/link/token`, `/link`                        | Connect                                                                   |
-| app.openhangar.space `POST` and `DELETE /api/v1/sync`                              | Sync, Disconnect                                                          |
-| github.com new issue (only when you press Report a Scan Problem)                   | Report a Scan Problem                                                     |
-| app.openhangar.space `POST /api/v1/wishlist/import` (once per connection, **new**) | The 0.3.x wishlist into your account                                      |
+| Request                                                                             | Why                                                                       |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| robertsspaceindustries.com `/account/pledges`, `/account/buy-back-pledges`          | Scan: hangar and buy-backs                                                |
+| robertsspaceindustries.com `/pledge/buyback/<id>`                                   | Scan: up to 30 unread packs                                               |
+| robertsspaceindustries.com `/en/account/dashboard`                                  | Identity and balances: Scan, and opening the basic page (kept 10 minutes) |
+| robertsspaceindustries.com `/en/citizens/<handle>` (no cookies)                     | Citizen Record and org, with the one above                                |
+| robertsspaceindustries.com `POST /graphql` (referral recruits)                      | Scan: referrals                                                           |
+| robertsspaceindustries.com `/pledge-store/api/upgrade/graphql`, the cart            | Add to RSI Cart from our pages                                            |
+| openhangar.space `status.json`                                                      | The kill switch                                                           |
+| openhangar.space `api/ships` (once a day)                                           | The popup's Account Value                                                 |
+| app.openhangar.space `/connect`, `/api/link/token`, `/link`                         | Connect                                                                   |
+| app.openhangar.space `POST` and `DELETE /api/v1/sync`                               | Sync, Disconnect                                                          |
+| github.com new issue (only when you press Report a Scan Problem)                    | Report a Scan Problem                                                     |
+| app.openhangar.space `POST /api/v1/wishlist/import` (once per connection, **new**)  | The 0.3.x wishlist into your account                                      |
+| openhangar.space `api/store/on-sale` (alerts on, every 30 minutes at most, **new**) | Extension Alerts: the public sale feed, matched on the device             |
+| app.openhangar.space `GET /api/v1/wishlist` (alerts on and connected, **new**)      | Extension Alerts: your account's Wishlist keys, read only                 |
+
+Extension Alerts' two requests are new too: the sale feed is the same public file for
+everyone; the Wishlist read brings your account's Wishlist keys to this browser, and
+what they match stays here. The privacy policy and the store forms need words for both
+and for the two permissions before `alerts` is on in a store or beta build.
 
 The wishlist import is new: until now the wishlist never left the browser. It sends the
 ships and store items on this browser's wishlist (names and store ids), once per

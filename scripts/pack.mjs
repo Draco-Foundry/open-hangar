@@ -50,6 +50,7 @@ import {
   stripFlagsInDir,
   writeFlags,
 } from './build-flags.mjs';
+import { ALERTS_FILES, alertsProblems, withAlerts } from './alerts.mjs';
 import {
   CONNECTOR_PAGES,
   connectSrc,
@@ -123,6 +124,9 @@ if (FLAGS.localMode && !KEEP_SYNC)
 // its popup's Open My Hangar and its scans for that page are Local Mode's.
 if (FLAGS.connector && !FLAGS.localMode)
   throw new Error('--flag connector=on needs localMode on (add --flag localMode=on)');
+// Extension Alerts (scripts/alerts.mjs) show in the connector's popup.
+if (FLAGS.alerts && !FLAGS.connector)
+  throw new Error('--flag alerts=on needs the connector on (add --flag connector=on)');
 // The connector's own pages (scripts/connector.mjs). Without the flag they're left out
 // of the build: nothing opens them there.
 const CONNECTOR_FILES = [
@@ -195,6 +199,8 @@ const WORKER_SCRIPTS = [
   'src/rsi-cart.js',
   'src/sync-schema.js',
   'src/hangar-shape.js',
+  // Extension Alerts (scripts/alerts.mjs), only in a build with them.
+  ...(FLAGS.alerts ? ALERTS_FILES : []),
 ];
 
 const targets = {
@@ -255,7 +261,10 @@ for (const [name, transform] of Object.entries(builds)) {
   // License terms and third-party notices travel with every copy.
   cpSync('LICENSE', `${out}/LICENSE`);
   cpSync('THIRD_PARTY_NOTICES.md', `${out}/THIRD_PARTY_NOTICES.md`);
-  const manifest = { ...transform(base) }; // a copy: chrome returns `base` itself
+  // A copy (chrome returns `base` itself), with the alerts' permissions in a build with
+  // them (scripts/alerts.mjs).
+  const manifest = withAlerts({ ...transform(base) }, FLAGS);
+  if (!FLAGS.alerts) for (const f of ALERTS_FILES) rmSync(`${out}/${f}`, { force: true });
   // Sync's sign-in window (identity.launchWebAuthFlow) needs "identity": it's in
   // manifest.json, so every build asks for it.
   // Our pages (PAGES) may talk to the extension (src/background.js). Chrome and Edge:
@@ -311,6 +320,7 @@ for (const [name, transform] of Object.entries(builds)) {
   stripFlagsInDir(`${out}/src`, FLAGS);
   if (!KEEP_SYNC) assertNoSyncHost(`${out}/src`);
   if (SITE) presetSite(`${out}/src/lib.js`);
+  if (SITE && FLAGS.alerts) for (const f of ALERTS_FILES) presetSite(`${out}/${f}`);
   // What was built agrees with itself: the manifest's lists and the two copies.
   const problems = pagesProblems(out, {
     manifest,
@@ -329,6 +339,12 @@ for (const [name, transform] of Object.entries(builds)) {
       site: SITE,
       // npm test packs before the Svelte pages are built; the store check always looks.
       refs: existsSync(`${out}/src/ui`),
+    }),
+    ...alertsProblems(out, {
+      ...folderBuild(out),
+      manifest,
+      alerts: FLAGS.alerts,
+      firefox: FIREFOX.has(name),
     }),
   );
   if (problems.length) throw new Error(problems.join('\n'));
