@@ -1,0 +1,14 @@
+{
+  "data": [
+    {
+      "code": "4.10.1-LIVE.12660092",
+      "released_at": "2026-09-16T00:00:00+00:00",
+      "is_default": true
+    },
+    {
+      "code": "4.10.0-LIVE.12519617",
+      "released_at": "2026-08-26T00:00:00+00:00",
+      "is_default": false
+    }
+  ]
+}
