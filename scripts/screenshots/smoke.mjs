@@ -4893,6 +4893,68 @@ try {
     : fail(`basic sync wait: ${JSON.stringify({ bpWait, askedNow })}`);
   page.off('request', offline);
   await page.setRequestInterception(false);
+  // Connected: Disconnect asks first, two equal buttons side by side, one line each
+  // (owner, 2026-10-09); Stay Connected keeps the link, Disconnect drops it. At phone
+  // width, the narrowest the question gets. Nothing is sent: the website's half is
+  // stood in for.
+  await page.setViewport({ width: 375, height: 800 });
+  await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
+  await page.evaluate(async () => {
+    OH.siteDisconnect = async () => {
+      __demo.disconnected = true;
+      await chrome.storage.local.remove('siteLink');
+      for (const f of __demo.listeners) f({ siteLink: { newValue: undefined } }, 'local');
+    };
+    const siteLink = { token: 't', name: 'demo@pilot', connectedAt: 1, lastSync: Date.now() };
+    // The wishlist already went for this connection: no import asked of the website.
+    const wishImport = { link: 1, done: 1, sent: 0 };
+    await chrome.storage.local.set({
+      siteLink,
+      wishImport,
+      siteUrl: 'https://app.openhangar.space',
+    });
+    for (const f of __demo.listeners) f({ siteLink: { newValue: siteLink } }, 'local');
+  });
+  await page.waitForSelector('#bp-disconnect');
+  await page.click('#bp-disconnect');
+  await page.waitForSelector('#bp-disconnect-ask');
+  const dc = await page.evaluate(() => {
+    const box = (id) => document.getElementById(id).getBoundingClientRect();
+    const line = (id) => parseFloat(getComputedStyle(document.getElementById(id)).lineHeight);
+    const stay = box('bp-stay');
+    const go = box('bp-disconnect-yes');
+    return {
+      text: document.getElementById('bp-disconnect-ask').textContent.replace(/\s+/g, ' '),
+      sameRow: Math.abs(stay.top - go.top) < 1,
+      equal: Math.abs(stay.width - go.width) < 1,
+      oneLine: stay.height < 2 * line('bp-stay') && go.height < 2 * line('bp-disconnect-yes'),
+      focused: document.activeElement?.id === 'bp-stay',
+      wide: document.documentElement.scrollWidth > 375,
+    };
+  });
+  await page.click('#bp-stay');
+  const stayed = await page.evaluate(
+    () => !!document.getElementById('bp-disconnect') && !__demo.disconnected,
+  );
+  await page.click('#bp-disconnect');
+  await page.waitForSelector('#bp-disconnect-yes');
+  await page.click('#bp-disconnect-yes');
+  await page.waitForSelector('#bp-connect');
+  const dropped = await page.evaluate(
+    async () => __demo.disconnected && !(await chrome.storage.local.get('siteLink')).siteLink,
+  );
+  dc.text.includes('Disconnect From openhangar.space?') &&
+  dc.sameRow &&
+  dc.equal &&
+  dc.oneLine &&
+  dc.focused &&
+  !dc.wide &&
+  stayed &&
+  dropped
+    ? ok(
+        'Disconnect asks first: two equal buttons side by side, one line each; Stay Connected keeps it',
+      )
+    : fail(`basic Disconnect: ${JSON.stringify({ dc, stayed, dropped })}`);
   await page.setViewport({ width: 1280, height: 900 });
 
   // Extension Alerts (the `alerts` flag; the connector pages are served as a build with
