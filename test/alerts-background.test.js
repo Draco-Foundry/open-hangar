@@ -194,6 +194,37 @@ test('turned off: no alarm, the matches and the Wishlist keys gone', async () =>
   assert.ok('alertsFeed' in x.stores.local, 'the public feed stays (nothing of the pilot in it)');
 });
 
+test('turned off while a check waits on the network: nothing of it comes back', async () => {
+  for (const hold of ['feed', 'wishlist']) {
+    const asked = [];
+    const held = [];
+    const x = loadBackground({
+      flags: ALERTS,
+      notify: true,
+      changes: true,
+      local: { db: structuredClone(DB), siteLink: { token: 'oht_test', connectedAt: 1 } },
+      fetch: async (url) => {
+        asked.push(url);
+        const wish = url.endsWith('/api/v1/wishlist');
+        if (wish === (hold === 'wishlist')) await new Promise((r) => held.push(r));
+        return json(wish ? { v: 1, keys: ['ship:cutlass-black', 'sku:42'] } : FEED);
+      },
+    });
+    await x.chrome.storage.local.set({ alertsOn: true });
+    await until(() => held.length === 1);
+    const before = asked.length;
+    await x.chrome.storage.local.set({ alertsOn: false });
+    await until(() => !x.alarms.has('oh-alerts'));
+    held[0]();
+    await new Promise((r) => setTimeout(r, 30));
+    assert.ok(!('alerts' in x.stores.local), `${hold}: no matches kept`);
+    assert.ok(!('alertsWish' in x.stores.local), `${hold}: no Wishlist keys kept`);
+    assert.ok(!x.alarms.has('oh-alerts'), `${hold}: no next check`);
+    assert.equal(x.notes.length, 0, `${hold}: no notification`);
+    assert.equal(asked.length, before, `${hold}: nothing more asked after Off`);
+  }
+});
+
 test('the worker starting with alerts on and no alarm: one, 30 minutes after the last check', async () => {
   const last = Date.now() - 5 * 60e3;
   const x = worker({
