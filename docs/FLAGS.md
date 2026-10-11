@@ -42,12 +42,13 @@ orgFleet: {
 
 Today's flags:
 
-| Flag        | What it turns on                                   | Store | Beta | Dev-only |
-| ----------- | -------------------------------------------------- | ----- | ---- | -------- |
-| `sync`      | Website sync (Connect This Browser, Sync Now, ...) | on    | on   | no       |
-| `orgFleet`  | Org Fleet sharing (nothing behind it yet)          | off   | off  | yes      |
-| `localMode` | Our hangar page reads this browser's hangar        | off   | off  | no       |
-| `connector` | A toolbar popup and one basic page (the connector) | off   | off  | no       |
+| Flag        | What it turns on                                     | Store | Beta | Dev-only |
+| ----------- | ---------------------------------------------------- | ----- | ---- | -------- |
+| `sync`      | Website sync (Connect This Browser, Sync Now, ...)   | on    | on   | no       |
+| `orgFleet`  | Org Fleet sharing (nothing behind it yet)            | off   | off  | yes      |
+| `localMode` | Our hangar page reads this browser's hangar          | off   | off  | no       |
+| `connector` | A toolbar popup and one basic page (the connector)   | off   | off  | no       |
+| `alerts`    | Store alerts matched on the device (needs connector) | off   | off  | no       |
 
 ## Adding or Retiring a Flag
 
@@ -129,6 +130,31 @@ the dashboard and the outbound requests that go: [CONNECTOR.md](CONNECTOR.md). I
 Hangar goes to our hangar page until you connect), so `--flag connector=on` alone
 doesn't build. It's off in every store build until the basic page and the website's
 pages are ready.
+
+## Alerts
+
+`alerts` is Extension Alerts (connector plan 0.4): a toolbar badge and notifications for
+what a pilot cares about in RSI's store, matched on the device so nobody learns their
+wishlist or hangar, us included. With it on, the background worker loads `src/alerts.js`
+(Firefox's event page lists it) and checks at most every 30 minutes on an alarm: it
+downloads openhangar.space's public sale feed (`/api/store/on-sale`, the same file for
+everyone) and, while this browser is connected, the account's Wishlist keys
+(`/api/v1/wishlist` with the sync token; read only), and matches them here against the
+hangar and buy-backs this browser scanned. Each match says why: on your Wishlist, a ship
+in your buy-backs is in the store again, a paint for a ship you own just arrived, a ship
+you own is sold as a warbond, or is on a limited-time sale. The badge counts the items
+you haven't seen (the popup lists them); a new one gets a notification. It's off until
+the pilot turns it on in the basic page's settings, and asks nothing before that.
+
+The build adds the `alarms` permission (no install warning) and `notifications` as an
+optional permission, asked only when the pilot turns alerts on, never a required one
+(`scripts/alerts.mjs`; `scripts/check-store-build.mjs` checks both ways). It needs
+`connector` (the popup shows the alerts), so `--flag alerts=on` alone doesn't build. Off
+in the store and the beta until the privacy policy (docs/PRIVACY.md and
+site/privacy.html) and the store forms name the sale feed, the Wishlist read and the two
+permissions: a store or beta build with it on fails `npm test` until the policy does
+(test/privacy-permissions.test.js). The kill switch (site/status.json) pauses the checks
+with `"alerts": { "enabled": false }`.
 
 ## How Builds Set Them
 

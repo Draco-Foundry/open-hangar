@@ -41,6 +41,17 @@ const hubUrl = (dash = '') =>
   );
 
 async function updateReminder() {
+  // @flag-start alerts: store alerts waiting take the badge (src/alerts.js)
+  const AL = self.OHAlerts;
+  const got = await chrome.storage.local.get([AL.ON_KEY, AL.STATE_KEY]);
+  const alert = AL.badgeFor(got[AL.ON_KEY], got[AL.STATE_KEY]);
+  if (alert) {
+    await chrome.action.setBadgeText({ text: alert.text });
+    await chrome.action.setBadgeBackgroundColor({ color: '#1f6feb' });
+    await chrome.action.setTitle({ title: alert.title });
+    return;
+  }
+  // @flag-end alerts
   const { db, remindRescan } = await chrome.storage.local.get(['db', 'remindRescan']);
   const at = db && db.sources && db.sources.hangar && db.sources.hangar.scannedAt;
   const days = at ? (Date.now() - at) / 86400000 : null;
@@ -419,6 +430,151 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   return true; // answers later
 });
 // @flag-end connector
+
+// @flag-start alerts: Extension Alerts (needs connector, scripts/pack.mjs)
+// Store alerts (src/alerts.js, self.OHAlerts), off until the pilot turns them on in the
+// basic page's settings (`alertsOn`). A check runs on an alarm (the `alarms`
+// permission, no install warning) at most every 30 minutes: it downloads the public
+// sale feed and, while this browser is connected, the account's Wishlist keys, and
+// matches them here against this browser's scan, which never leaves it. Unseen matches
+// take the toolbar badge (updateReminder); a new one gets a notification while
+// Notifications are allowed (an optional permission the settings switch asks for).
+//   { ohPopup: 'alerts-seen' } → { ok }: the popup is open, every match is seen
+if (typeof importScripts === 'function' && !self.OHAlerts) importScripts('alerts.js');
+const NOTIFY = { permissions: ['notifications'] };
+const notifyOk = async () =>
+  !!chrome.notifications && (await chrome.permissions.contains(NOTIFY).catch(() => false));
+const alertsEnv = {
+  get: (k) => chrome.storage.local.get(k),
+  set: (o) => chrome.storage.local.set(o),
+  remove: (k) => chrome.storage.local.remove(k),
+  fetch: (url, init) => fetch(url, init),
+  now: () => Date.now(),
+  rand: () => Math.random(),
+  // Firefox's data yes (sync's) before the sync token goes to the website.
+  mayShare: async () => !(await firefoxNeedsOk()),
+  badge: () => updateReminder(),
+  schedule: (when) => chrome.alarms.create(self.OHAlerts.ALARM, { when }),
+  notify: async (notes) => {
+    if (!(await notifyOk())) return;
+    for (const n of notes)
+      await chrome.notifications
+        .create(n.id, {
+          type: 'basic',
+          iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+          title: n.title,
+          message: n.message,
+        })
+        .catch(() => {});
+  },
+};
+// One check at a time. Asked again while one runs (a scan saved, say): once it's done,
+// one more from what's saved (asking nothing), or with the network if that's what was
+// asked.
+let alertsRun = null;
+let alertsAgain = null;
+function alertsCheck(o = {}) {
+  if (alertsRun) {
+    alertsAgain = { network: !!(alertsAgain?.network || o.network !== false) };
+    return alertsRun;
+  }
+  alertsRun = self.OHAlerts.check(alertsEnv, o)
+    .catch((e) => console.warn('[OpenHangar] alerts:', e?.message || e))
+    .finally(() => {
+      alertsRun = null;
+      const next = alertsAgain;
+      alertsAgain = null;
+      if (next) alertsCheck(next);
+    });
+  return alertsRun;
+}
+// The worker started (the browser opened, an update, a wake-up): alerts on but no
+// check scheduled (a browser restart can drop alarms), so one is, 30 to 35 minutes
+// after the last, or a minute or two from now when that's past. Alerts off: none.
+async function alertsWake() {
+  const AL = self.OHAlerts;
+  const got = await chrome.storage.local.get([AL.ON_KEY, AL.STATE_KEY]);
+  if (got[AL.ON_KEY] !== true) return chrome.alarms.clear(AL.ALARM);
+  if (await chrome.alarms.get(AL.ALARM)) return;
+  const now = Date.now();
+  const last = got[AL.STATE_KEY]?.checkedAt;
+  const soon = now + 60e3 + Math.floor(Math.random() * 60e3);
+  await chrome.alarms.create(AL.ALARM, {
+    when: Number.isFinite(last) ? Math.max(soon, AL.nextAt(last, Math.random())) : soon,
+  });
+}
+alertsWake();
+chrome.alarms.onAlarm.addListener((a) => {
+  if (a.name === self.OHAlerts.ALARM) alertsCheck();
+});
+chrome.storage.onChanged.addListener((c, area) => {
+  if (area !== 'local') return;
+  const AL = self.OHAlerts;
+  if (c[AL.ON_KEY]) {
+    if (c[AL.ON_KEY].newValue === true) alertsCheck();
+    else {
+      // Off: no more checks, and the matches and the Wishlist keys go.
+      chrome.alarms.clear(AL.ALARM);
+      chrome.storage.local.remove(AL.OFF_KEYS).then(updateReminder);
+    }
+    return;
+  }
+  // A new scan or another connection: matched again from what's saved; connecting
+  // reads the Wishlist now. A sync after a scan (lastSync) changes nothing here.
+  const was = c.siteLink?.oldValue;
+  const now = c.siteLink?.newValue;
+  const relinked =
+    !!c.siteLink && (was?.token !== now?.token || was?.connectedAt !== now?.connectedAt);
+  if (c.db || relinked) alertsCheck({ network: relinked && !!now?.token });
+});
+// A notification clicked: our Store's page for that item (the one for "more" opens the
+// Store), and that item counts as seen.
+async function alertClicked(id) {
+  const AL = self.OHAlerts;
+  if (!String(id).startsWith(`${AL.ALARM}:`)) return;
+  chrome.notifications.clear(id).catch(() => {});
+  const got = await chrome.storage.local.get([AL.STATE_KEY, 'siteUrl']);
+  const { feeds } = AL.sitesOf(got.siteUrl);
+  const itemId = id.slice(AL.ALARM.length + 1);
+  const m = got[AL.STATE_KEY]?.items?.find((x) => x.id === itemId);
+  await chrome.tabs.create({ url: m ? AL.itemUrl(feeds, m) : `${feeds}/store` });
+  if (m) {
+    await chrome.storage.local.set({
+      [AL.STATE_KEY]: AL.markSeen(got[AL.STATE_KEY], Date.now(), itemId),
+    });
+    await updateReminder();
+  }
+}
+// chrome.notifications only exists once its optional permission is granted, so its
+// listener goes on then too (once).
+let clicksHeard = false;
+function hearClicks() {
+  if (clicksHeard || !chrome.notifications?.onClicked) return;
+  clicksHeard = true;
+  chrome.notifications.onClicked.addListener(alertClicked);
+}
+hearClicks();
+chrome.permissions?.onAdded?.addListener(hearClicks);
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if (!msg || typeof msg !== 'object' || msg.ohPopup !== 'alerts-seen') return false;
+  if (sender.id !== chrome.runtime.id || sender.tab) return false;
+  if (String(sender.url || '').split(/[?#]/)[0] !== chrome.runtime.getURL(POPUP)) return false;
+  const AL = self.OHAlerts;
+  chrome.storage.local
+    .get(AL.STATE_KEY)
+    .then((got) =>
+      got[AL.STATE_KEY]
+        ? chrome.storage.local.set({ [AL.STATE_KEY]: AL.markSeen(got[AL.STATE_KEY], Date.now()) })
+        : null,
+    )
+    .then(updateReminder)
+    .then(
+      () => reply({ ok: true }),
+      (err) => reply({ ok: false, error: String(err?.message || err) }),
+    );
+  return true; // answers later
+});
+// @flag-end alerts
 
 // The website's messages, all of them: only from our own pages (src/site-pages.js),
 // each checked before its handler runs.
