@@ -4842,7 +4842,13 @@ try {
       for (const f of __demo.listeners) f({ siteLink: { newValue: undefined } }, 'local');
     };
     const siteLink = { token: 't', name: 'demo@pilot', connectedAt: 1, lastSync: Date.now() };
-    await chrome.storage.local.set({ siteLink, siteUrl: 'https://app.openhangar.space' });
+    // The wishlist already went for this connection: no import asked of the website.
+    const wishImport = { link: 1, done: 1, sent: 0 };
+    await chrome.storage.local.set({
+      siteLink,
+      wishImport,
+      siteUrl: 'https://app.openhangar.space',
+    });
     for (const f of __demo.listeners) f({ siteLink: { newValue: siteLink } }, 'local');
   });
   await page.waitForSelector('#bp-disconnect');
