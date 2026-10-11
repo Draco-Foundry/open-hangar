@@ -19,10 +19,9 @@
     n;
     return app().alerts?.list || [];
   });
-  const quip = $derived.by(() => {
-    list;
-    return window.OH.quip('caughtUp');
-  });
+  // Once per open: a scan refreshes the list every page, and a new line each time
+  // would flicker (#586).
+  const quip = $derived(menus.open === 'bell' ? window.OH.quip('caughtUp') : '');
 
   let btn = $state();
   let menu = $state();
