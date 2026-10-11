@@ -4873,7 +4873,7 @@ try {
       return {
         card,
         held,
-        asked: __demo.asked.filter((o) => o.includes('robertsspaceindustries.com')).length,
+        asked: __demo.asked.filter((o) => o === 'https://robertsspaceindustries.com/*').length,
         scans,
         cardAfter: !!document.getElementById('bp-rsi-access'),
         done: !!document.getElementById('bp-done'),

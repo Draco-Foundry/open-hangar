@@ -49,7 +49,7 @@
   // Access to RSI turned off (Firefox's add-ons page): set __demoNoRsi; 'deny' says no
   // to the ask too.
   demo.rsiOff = !!window.__demoNoRsi;
-  const rsi = (q) => q?.origins?.some((o) => o.includes('robertsspaceindustries.com'));
+  const rsi = (q) => q?.origins?.includes('https://robertsspaceindustries.com/*');
   chrome.permissions.contains = async (q) =>
     rsi(q)
       ? !demo.rsiOff
