@@ -4682,6 +4682,25 @@ try {
   went === 'https://app.openhangar.space/hangar'
     ? ok("connected: who and when, and Open My Hangar goes to the website's My Hangar")
     : fail(`popup connected: ${JSON.stringify({ linked, went })}`);
+  // The website took a sync moments ago (429, too soon): the calm line with the time
+  // the next one can go (owner, 2026-10-09), never an error code.
+  const popWait = await page.evaluate(async () => {
+    const until = Date.now() + 4 * 60e3;
+    const { siteLink: l } = await chrome.storage.local.get('siteLink');
+    const siteLink = { ...l, wait: { reason: 'too-soon', until, said: 'x' } };
+    await chrome.storage.local.set({ siteLink });
+    for (const f of __demo.listeners) f({ siteLink: { newValue: siteLink } }, 'local');
+    await new Promise((r) => setTimeout(r, 300));
+    const time = new Date(until).toLocaleTimeString(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    return { site: document.getElementById('pp-site').textContent, time };
+  });
+  popWait.site.includes(`[copy: popup.sync-wait ${popWait.time}]`) &&
+  !/429|responded/.test(popWait.site)
+    ? ok(`a too-soon sync: the calm line and the time (${popWait.time}), no error code`)
+    : fail(`popup sync wait: ${JSON.stringify(popWait)}`);
   await page.setViewport({ width: 1280, height: 900 });
 
   // The basic page (the connector build, src/basic.html): the lists with search and
@@ -4827,6 +4846,51 @@ try {
   !fxMissing.length && !/Before You Connect|What we send/.test(fx)
     ? ok("Firefox: our hangar page's ask shows the Local Mode card, word for word")
     : fail(`basic Firefox card: missing ${JSON.stringify(fxMissing)}`);
+  // A too-soon sync (429) on the basic page, offline: the time Sync Now works again,
+  // and Sync Now meanwhile asks nothing and shows the website's calm words.
+  await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
+  const askedBefore = outside.length;
+  const bpWait = await page.evaluate(async () => {
+    const until = Date.now() + 4 * 60e3;
+    const said = 'openhangar.space just took a sync for this account.';
+    const siteLink = {
+      token: 't',
+      name: 'demo@pilot',
+      connectedAt: 1,
+      lastSync: Date.now() - 60e3,
+      wait: { reason: 'too-soon', until, said },
+    };
+    const wishImport = { link: 1, done: 1, sent: 0 }; // no wishlist import asked
+    await chrome.storage.local.set({
+      siteLink,
+      wishImport,
+      siteUrl: 'https://app.openhangar.space',
+    });
+    for (const f of __demo.listeners) f({ siteLink: { newValue: siteLink } }, 'local');
+    await new Promise((r) => setTimeout(r, 300));
+    [...document.querySelectorAll('#bp-site .bp-btn')]
+      .find((b) => b.textContent === 'Sync Now')
+      .click();
+    await new Promise((r) => setTimeout(r, 300));
+    const time = new Date(until).toLocaleTimeString(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    return {
+      card: document.getElementById('bp-site').textContent.replace(/\s+/g, ' '),
+      calm: !!document.querySelector('#bp-site .bp-msg.calm'),
+      said,
+      time,
+    };
+  });
+  const askedNow = outside.slice(askedBefore).filter((u) => !/status\.json/.test(u));
+  bpWait.card.includes(`[copy: basic.sync-wait ${bpWait.time}]`) &&
+  bpWait.card.includes(bpWait.said) &&
+  bpWait.calm &&
+  !askedNow.length &&
+  !/429|responded/.test(bpWait.card)
+    ? ok(`a too-soon sync: the time (${bpWait.time}) and the website's calm words, no error code`)
+    : fail(`basic sync wait: ${JSON.stringify({ bpWait, askedNow })}`);
   page.off('request', offline);
   await page.setRequestInterception(false);
   // Connected: Disconnect asks first, two equal buttons side by side, one line each

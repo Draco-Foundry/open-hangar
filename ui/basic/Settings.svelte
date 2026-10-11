@@ -5,6 +5,7 @@
   import { t } from './copy.js';
   import { tick } from 'svelte';
   import { flag } from '../lib/flags.js';
+  import { at } from '../site/when.js';
   import AlertsCard from './AlertsCard.svelte';
   import {
     clearData,
@@ -63,9 +64,11 @@
           <small
             >{hub.site.syncing
               ? t('basic.syncing')
-              : hub.site.link.lastSync
-                ? t('basic.synced', { when: when(hub.site.link.lastSync) })
-                : t('basic.not-synced')}</small
+              : hub.site.link.waitUntil
+                ? t('basic.sync-wait', { time: at(hub.site.link.waitUntil) })
+                : hub.site.link.lastSync
+                  ? t('basic.synced', { when: when(hub.site.link.lastSync) })
+                  : t('basic.not-synced')}</small
           >
         </p>
         {#if confirmDisconnect}
