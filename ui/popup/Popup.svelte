@@ -86,6 +86,9 @@
     <section class="pp-value" aria-live="polite">
       <div class="pp-lbl">{value ? 'Account Value' : t('popup.melt-label')}</div>
       <div class="pp-big" id="pp-value">{money(value ? value.total : v.melt)}</div>
+      {#if (value ? value.unpriced : v.unpriced) > 0}
+        <div class="pp-unpriced">{t('popup.unpriced', { n: value ? value.unpriced : v.unpriced })}</div>
+      {/if}
     </section>
 
     <p class="pp-scan" class:warn={v.staleDays != null} id="pp-last">

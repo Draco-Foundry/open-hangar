@@ -114,6 +114,18 @@ test('popup view: a fresh browser, a scan, a stale one', async () => {
   assert.equal(old.staleDays, 8);
 });
 
+test('popup view: pledges with no melt value are counted, not added', async () => {
+  const { popupView } = await data();
+  const total = (items) => items.reduce((s, p) => s + (Number.isFinite(p.value) ? p.value : 0), 0);
+  const v = popupView(
+    { db: hangar([{ value: 45 }, { value: null }, {}, { value: 0 }], NOW) },
+    { now: NOW, totalValue: total },
+  );
+  assert.equal(v.melt, 45);
+  assert.equal(v.unpriced, 2); // a real $0 is a price
+  assert.equal(popupView({ db: { sources: {} } }, { now: NOW }).unpriced, 0);
+});
+
 test('popup view: who, signed out, and where Open My Hangar goes', async () => {
   const { popupView, myHangarUrl } = await data();
   const db = { ...hangar([], NOW), owner: { nickname: 'TestPilot' } };

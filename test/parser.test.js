@@ -361,3 +361,24 @@ test('Component, FPS Equipment, Paint and Hangar decoration keep RSI’s own kin
   );
   for (const p of kinds) for (const c of p.contents) assert.equal(c.guessed, undefined);
 });
+
+test('a value with no digits is no price (null), never $0; $0.00 is a real $0', () => {
+  const card = (id, value) => `<div class="row">
+    <input class="js-pledge-id" value="${id}" />
+    <input class="js-pledge-name" value="Add-On - Thing ${id}" />
+    <input class="js-pledge-value" value="${value}" />
+    <div class="item"><span class="kind">Poster</span><span class="title">Thing</span></div>
+  </div>`;
+  const got = OpenHangar.parsePledges(
+    `<div>${card('1', 'USD')}${card('2', '')}${card('3', '$0.00 USD')}${card('4', '$12.50 USD')}</div>`,
+  );
+  assert.deepEqual(
+    got.map((p) => [p.id, p.value]),
+    [
+      ['1', null],
+      ['2', null],
+      ['3', 0],
+      ['4', 12.5],
+    ],
+  );
+});

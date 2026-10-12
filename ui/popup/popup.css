@@ -53,6 +53,12 @@ body {
   color: var(--head);
   font-variant-numeric: tabular-nums;
 }
+/* How many pledges have no price, so the total leaves them out. */
+.pp-unpriced {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
 .pp-al {
   display: grid;
   gap: 6px;

@@ -61,7 +61,7 @@
   </div>
   <p class="bp-totals" aria-live="polite">
     {#if kind === 'pledges'}
-      {t('basic.pledge-totals', { n: sum.count, value: money(sum.value) })}
+      {t('basic.pledge-totals', { n: sum.count, value: money(sum.value), priced: sum.priced })}
     {:else}
       {t('basic.buyback-totals', { n: sum.count, value: money(sum.value), priced: sum.priced })}
     {/if}
