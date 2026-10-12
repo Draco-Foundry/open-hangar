@@ -85,6 +85,11 @@ export function totals(rows, key = 'value') {
   return { count: rows.length, value: Math.round(value * 100) / 100, priced };
 }
 
+// The pledges list's total line, in the owner's words (2026-10-12): how many shown,
+// their melt total (`money` formats it), and how many had a melt value.
+export const pledgeTotalsLine = ({ count, value, priced }, money) =>
+  `${count.toLocaleString('en-US')} ${count === 1 ? 'pledge' : 'pledges'}, ${money(value)} melt (${priced.toLocaleString('en-US')} with melt listed)`;
+
 // One CSV cell (RFC 4180). A cell a spreadsheet would run as a formula (=, +, -, @,
 // a tab or a carriage return first) gets a ' in front, so a pledge name can't.
 export function csvCell(v) {

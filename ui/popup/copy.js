@@ -6,9 +6,6 @@
 const COPY = {
   // The value's label before ship prices load: the pledges' melt total for now.
   'popup.melt-label': '[copy: popup.melt-label]',
-  // Under the value, when some pledges have no price (no store price and no melt
-  // value): they're not in the total. {n} is how many, 1 or more.
-  'popup.unpriced': '[copy: popup.unpriced {n}]',
   // Under the value: no scan yet in this browser; points at the Scan button.
   'popup.no-scan': '[copy: popup.no-scan]',
   // When the hangar was last scanned, e.g. "today, 5:54 PM".

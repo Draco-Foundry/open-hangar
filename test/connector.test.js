@@ -194,6 +194,13 @@ test('popup view: a scan running, Store Credit', async () => {
   assert.equal(storeCredit({}), null);
 });
 
+test("popup: the line for pledges with no price, in the owner's words (2026-10-12)", async () => {
+  const { unpricedLine } = await data();
+  assert.equal(unpricedLine(1), 'Not counted: 1 pledge with no price.');
+  assert.equal(unpricedLine(3), 'Not counted: 3 pledges with no price.');
+  assert.equal(unpricedLine(1200), 'Not counted: 1,200 pledges with no price.');
+});
+
 test('popup copy: every word is a placeholder or the words the extension already uses', async () => {
   const { t } = await import('../ui/popup/copy.js');
   assert.match(t('popup.scan'), /^\[copy: popup\.scan\]$/);

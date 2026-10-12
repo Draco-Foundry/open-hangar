@@ -72,8 +72,8 @@ test('basic page copy: placeholders, filled in', async () => {
   const { t, KEYS } = await import('../ui/basic/copy.js');
   assert.equal(t('basic.scan'), '[copy: basic.scan]');
   assert.equal(
-    t('basic.pledge-totals', { n: 2, value: '$5.00', priced: 1 }),
-    '[copy: basic.pledge-totals 2 $5.00 1]',
+    t('basic.buyback-totals', { n: 2, value: '$5.00', priced: 1 }),
+    '[copy: basic.buyback-totals 2 $5.00 1]',
   );
   assert.throws(() => t('basic.nope'), /no "basic.nope"/);
   for (const k of KEYS) assert.match(t(k), new RegExp(`^\\[copy: ${k.replace('.', '\\.')}`), k);
@@ -175,4 +175,21 @@ test('wishlist import: nothing to send, not connected, no network', async () => 
   assert.equal(await importWishlist({ store: offline, fetchFn, siteUrl: SITE }), 'later');
   assert.equal(offline.data.wishImport.status, 0);
   assert.ok(!JSON.stringify(offline.data.wishImport).includes('tok'), 'no token kept beside it');
+});
+
+test("the pledges total line, in the owner's words (2026-10-12)", async () => {
+  const { pledgeTotalsLine } = await import('../ui/basic/rows.js');
+  const money = (n) => `$${n.toFixed(2)}`;
+  assert.equal(
+    pledgeTotalsLine({ count: 12, value: 345.5, priced: 11 }, money),
+    '12 pledges, $345.50 melt (11 with melt listed)',
+  );
+  assert.equal(
+    pledgeTotalsLine({ count: 1, value: 45, priced: 1 }, money),
+    '1 pledge, $45.00 melt (1 with melt listed)',
+  );
+  assert.equal(
+    pledgeTotalsLine({ count: 1200, value: 0, priced: 0 }, money),
+    '1,200 pledges, $0.00 melt (0 with melt listed)',
+  );
 });

@@ -45,6 +45,11 @@ export function storeCredit(account) {
 // → { scannedAt, staleDays, items, melt, unpriced, handle, signedOut, connected, myHangar }.
 // `syncWait` is OH.siteSyncWait: the website took a sync for this account moments ago
 // (429, too soon), so the next one waits until connected.waitUntil.
+// Under the value when some pledges have no price (no store price and no melt
+// value): the owner's words (2026-10-12), singular for one.
+export const unpricedLine = (n) =>
+  `Not counted: ${n.toLocaleString('en-US')} ${n === 1 ? 'pledge' : 'pledges'} with no price.`;
+
 export function popupView(
   { db, account, link, siteUrl, hangarPage },
   { now = Date.now(), totalValue, syncWait } = {},

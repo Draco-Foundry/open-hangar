@@ -4728,7 +4728,8 @@ try {
       tab: q('.bp-tabs [aria-current="page"]').getAttribute('href'),
     };
   });
-  bp.rows === Math.min(bp.items, 300) && /basic\.pledge-totals \d+ \$/.test(bp.totals)
+  bp.rows === Math.min(bp.items, 300) &&
+  /^[\d,]+ pledges?, \$[\d,.]+ melt \([\d,]+ with melt listed\)/.test(bp.totals)
     ? ok(`Pledges: ${bp.rows} rows and their totals, offline`)
     : fail(`basic page pledges: ${JSON.stringify(bp)}`);
   const firstName = await page.$eval('#bp-pledges tbody td.name', (e) =>
