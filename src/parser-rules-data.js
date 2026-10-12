@@ -710,6 +710,7 @@
             'csrfValue',
             'context',
             'refusal',
+            'addMany',
           ],
           additionalProperties: false,
           properties: {
@@ -761,6 +762,19 @@
                 invalid: { $ref: '#/$defs/pattern' },
                 buyback: { $ref: '#/$defs/pattern' },
                 upgrade: { $ref: '#/$defs/pattern' },
+              },
+            },
+            addMany: {
+              description:
+                "Store items into the cart, a list in one request (the Haul): RSI's own add, sent as full text to path with the store page's csrf token. The code adds the items ({ qty, skuId }) and storeFront.",
+              type: 'object',
+              required: ['path', 'operation', 'query', 'storeFront'],
+              additionalProperties: false,
+              properties: {
+                path: { $ref: '#/$defs/path' },
+                operation: { $ref: '#/$defs/operation' },
+                query: { $ref: '#/$defs/document' },
+                storeFront: { type: 'string', pattern: '^[a-z]+$', maxLength: 40 },
               },
             },
           },
@@ -1138,6 +1152,13 @@
           invalid: { source: 'invalid', flags: 'i' },
           buyback: { source: 'buy[\\s-]?backs?', flags: 'i' },
           upgrade: { source: 'upgrade', flags: 'i' },
+        },
+        addMany: {
+          path: '/graphql',
+          operation: 'AddCartMultiItemMutation',
+          query:
+            'mutation AddCartMultiItemMutation($query: [CartAddInput!], $storeFront: String = "pledge") {\n  store(name: $storeFront) {\n    cart {\n      mutations {\n        addMany(query: $query) {\n          count\n          resources {\n            id\n            title\n          }\n        }\n      }\n    }\n  }\n}\n',
+          storeFront: 'pledge',
         },
       },
     },

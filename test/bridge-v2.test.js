@@ -35,6 +35,10 @@ const fakeCart = () => {
     upgradeOptions: async (...a) => (calls.push(['options', ...a]), { ok: true, options: [] }),
     upgradePrice: async (...a) => (calls.push(['price', ...a]), { ok: true, price: 170 }),
     addUpgradeToCart: async (...a) => (calls.push(['add', ...a]), { ok: true }),
+    addItemsToCart: async (...a) => (
+      calls.push(['items', ...a]),
+      { ok: true, count: 3, added: [19001, 19002] }
+    ),
   };
   return { lane, calls };
 };
@@ -61,6 +65,13 @@ const VALID = {
   'oh-upgrade-options': { type: 'oh-upgrade-options', toShipId: 900, toSkuId: 9001, skus: [9001] },
   'oh-upgrade-price': { type: 'oh-upgrade-price', fromShipId: 101, toShipId: 900, toSkuId: 9001 },
   'oh-add-upgrade': { type: 'oh-add-upgrade', fromShipId: 101, toShipId: 900, toSkuId: 9001 },
+  'oh-add-items': {
+    type: 'oh-add-items',
+    items: [
+      { skuId: 19001, qty: 1 },
+      { skuId: 19002, qty: 2 },
+    ],
+  },
   'oh-connect-begin': { type: 'oh-connect-begin' },
   'oh-connect-finish': { type: 'oh-connect-finish', code: 'one-time-code', sync: true },
   'oh-link-check': { type: 'oh-link-check', code: 'K7Q-4PX' },
@@ -69,7 +80,7 @@ const VALID = {
 test('the capability lists: two per-origin lists, each type named once', () => {
   assert.deepEqual(PAGES.LISTS, {
     hangar: HANGAR_CAPS,
-    site: ['hello', 'addToCart', 'connect'],
+    site: ['hello', 'addToCart', 'addItems', 'connect'],
   });
   assert.deepEqual(PAGES.CAPS, {
     hello: ['oh-hello'],
@@ -77,6 +88,7 @@ test('the capability lists: two per-origin lists, each type named once', () => {
     getScanStatus: ['oh-scan-status'],
     requestScan: ['oh-request-scan'],
     addToCart: ['oh-upgrade-options', 'oh-upgrade-price', 'oh-add-upgrade'],
+    addItems: ['oh-add-items'],
     connect: ['oh-connect-begin', 'oh-connect-finish', 'oh-link-check'],
   });
   assert.deepEqual(Object.keys(VALID).sort(), [...PAGES.TYPES].sort());
@@ -109,8 +121,8 @@ const ALLOWED = {
     'oh-request-scan',
     ...PAGES.CAPS.addToCart,
   ],
-  app: ['oh-hello', ...PAGES.CAPS.addToCart, ...PAGES.CAPS.connect],
-  front: ['oh-hello', ...PAGES.CAPS.addToCart],
+  app: ['oh-hello', ...PAGES.CAPS.addToCart, ...PAGES.CAPS.addItems, ...PAGES.CAPS.connect],
+  front: ['oh-hello', ...PAGES.CAPS.addToCart, ...PAGES.CAPS.addItems],
 };
 const ORIGINS = [
   ['hangar', HANGAR, ALLOWED.hangar, false],
@@ -208,8 +220,14 @@ test('hello v2: the version, and what this page may ask in this build', async ()
     connect: caps.includes('connect'),
   });
   assert.deepEqual(await x.send({ type: 'oh-hello' }, HANGAR), v2(HANGAR_CAPS));
-  assert.deepEqual(await x.send({ type: 'oh-hello' }, APP), v2(['hello', 'addToCart', 'connect']));
-  assert.deepEqual(await x.send({ type: 'oh-hello' }, FRONT), v2(['hello', 'addToCart']));
+  assert.deepEqual(
+    await x.send({ type: 'oh-hello' }, APP),
+    v2(['hello', 'addToCart', 'addItems', 'connect']),
+  );
+  assert.deepEqual(
+    await x.send({ type: 'oh-hello' }, FRONT),
+    v2(['hello', 'addToCart', 'addItems']),
+  );
   // A page may say which version it speaks; it's allowed and changes nothing.
   assert.deepEqual(await x.send({ type: 'oh-hello', v: 2 }, HANGAR), v2(HANGAR_CAPS));
   assert.deepEqual(await x.send({ type: 'oh-hello', v: '2' }, HANGAR), BAD);
@@ -221,7 +239,10 @@ test('hello v2: the version, and what this page may ask in this build', async ()
 
   // A build without sync (a developer's): no Connect anywhere, and it says so.
   const nosync = load({ flags: { sync: false, orgFleet: false, localMode: false } });
-  assert.deepEqual(await nosync.send({ type: 'oh-hello' }, APP), v2(['hello', 'addToCart']));
+  assert.deepEqual(
+    await nosync.send({ type: 'oh-hello' }, APP),
+    v2(['hello', 'addToCart', 'addItems']),
+  );
   assert.deepEqual(await nosync.send(VALID['oh-connect-begin'], APP), UNKNOWN);
   // A build without Local Mode: the site's pages can't ask for the hangar either.
   const pub = load({ flags: { sync: true, orgFleet: false, localMode: false } });
@@ -255,6 +276,20 @@ test('malformed messages are refused before any handler runs', async () => {
     { type: 'oh-upgrade-price', fromShipId: 101, toSkuId: 9001, toShipId: '900' },
     { type: 'oh-add-upgrade', fromShipId: 101, toShipId: 900 },
     { type: 'oh-add-upgrade', fromShipId: 101, toShipId: 900, toSkuId: 9001, qty: 2 },
+    { type: 'oh-add-items' },
+    { type: 'oh-add-items', items: [] },
+    { type: 'oh-add-items', items: { skuId: 19001, qty: 1 } },
+    { type: 'oh-add-items', items: [[19001, 1]] },
+    { type: 'oh-add-items', items: [{ skuId: '19001', qty: 1 }] },
+    { type: 'oh-add-items', items: [{ skuId: 19001, qty: 0 }] },
+    { type: 'oh-add-items', items: [{ skuId: 19001, qty: 11 }] },
+    { type: 'oh-add-items', items: [{ skuId: 19001, qty: 1.5 }] },
+    { type: 'oh-add-items', items: [{ skuId: 19001 }] },
+    { type: 'oh-add-items', items: [{ skuId: 19001, qty: 1, price: 5 }] },
+    {
+      type: 'oh-add-items',
+      items: Array.from({ length: 21 }, (_, i) => ({ skuId: 19001 + i, qty: 1 })),
+    },
     { type: 'oh-connect-begin', redirect: 'https://evil.example/' },
     { type: 'oh-connect-finish' },
     { type: 'oh-connect-finish', code: '' },
@@ -696,6 +731,7 @@ test("firefox: only our content script, in a tab's top frame, on one of our page
   assert.deepEqual((await x.fromPage(hello, `${APP}/link?x=1`)).caps, [
     'hello',
     'addToCart',
+    'addItems',
     'connect',
   ]);
   const no = [
@@ -830,6 +866,25 @@ test("bridge: answers go to this page's origin only, never '*'; a dead extension
   ]);
   const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'site-bridge.js'), 'utf8');
   assert.doesNotMatch(src, /postMessage\([^)]*'\*'/);
+});
+
+// --- The Haul: store items into the RSI cart ----------------------------------------
+test("the Haul's items reach the cart lane as sent, and only from the website", async () => {
+  const x = load();
+  const calls = () => JSON.parse(JSON.stringify(x.cart));
+  assert.deepEqual(await x.send(VALID['oh-add-items'], FRONT), {
+    ok: true,
+    count: 3,
+    added: [19001, 19002],
+  });
+  assert.deepEqual(calls(), [['items', VALID['oh-add-items'].items]]);
+  // Twenty different items is the most one send takes.
+  const twenty = Array.from({ length: 20 }, (_, i) => ({ skuId: 19001 + i, qty: 1 }));
+  assert.equal((await x.send({ type: 'oh-add-items', items: twenty }, APP)).ok, true);
+  // The hangar page has no Store: it can't ask, and gets the same answer as a type
+  // that doesn't exist.
+  assert.deepEqual(await x.send(VALID['oh-add-items'], HANGAR), UNKNOWN);
+  assert.equal(x.cart.length, 2);
 });
 
 // --- Buy-back upgrades -------------------------------------------------------------

@@ -77,6 +77,7 @@ step 3 above).
 | robertsspaceindustries.com `/en/citizens/<handle>` (no cookies)                     | Citizen Record and org, with the one above                                |
 | robertsspaceindustries.com `POST /graphql` (referral recruits)                      | Scan: referrals                                                           |
 | robertsspaceindustries.com `/pledge-store/api/upgrade/graphql`, the cart            | Add to RSI Cart from our pages                                            |
+| robertsspaceindustries.com `POST /graphql` (`AddCartMultiItemMutation`)             | The Store's Haul: store items into the RSI cart, on a click               |
 | openhangar.space `status.json`                                                      | The kill switch                                                           |
 | openhangar.space `api/ships` (once a day)                                           | The popup's Account Value                                                 |
 | app.openhangar.space `/connect`, `/api/link/token`, `/link`                         | Connect                                                                   |
