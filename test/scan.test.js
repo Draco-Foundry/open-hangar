@@ -217,6 +217,31 @@ test('scanShape: how completely a scan read the page, and untyped items (#295, #
   });
 });
 
+test('an Upgrade item or one with no kind is counted, never a reason to call a scan short', () => {
+  const s = OH.scanShape([
+    {
+      date: '2024-03-03',
+      value: 35,
+      image: 'x',
+      contents: [{ kind: 'Upgrade', label: 'Pulse to C8R Pisces' }],
+    },
+    {
+      date: '2024-03-03',
+      value: 90,
+      image: 'x',
+      contents: [
+        { kind: 'Ship' },
+        { kind: '', label: 'Star Citizen Digital Download' },
+        { kind: '' },
+      ],
+    },
+  ]);
+  assert.equal(s.contents, 1);
+  assert.equal(s.tiles, 4);
+  assert.equal(s.untyped, 2); // the two with no kind; Upgrade is a kind
+  assert.deepEqual(OH.shapeDrops({ ...s, untyped: 0 }, s), []);
+});
+
 test('shapeDrops: flags a field that went from most pledges to none (#295)', () => {
   const prev = { n: 40, date: 0.98, value: 1, contents: 0.9, image: 0.95 };
   assert.deepEqual(OH.shapeDrops(prev, { ...prev, date: 0 }), [
