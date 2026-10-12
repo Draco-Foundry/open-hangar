@@ -6,7 +6,7 @@
   // extension's page to the front to run it (src/background.js requestScan).
   import { onMount } from 'svelte';
   import { t } from './copy.js';
-  import { HUB_PAGE, popupView, scanBusy, storeCredit } from './data.js';
+  import { HUB_PAGE, popupView, scanBusy, storeCredit, unpricedLine } from './data.js';
   import { at, synced } from '../site/when.js';
   import { flag } from '../lib/flags.js';
   import Alerts from './Alerts.svelte';
@@ -87,7 +87,7 @@
       <div class="pp-lbl">{value ? 'Account Value' : t('popup.melt-label')}</div>
       <div class="pp-big" id="pp-value">{money(value ? value.total : v.melt)}</div>
       {#if (value ? value.unpriced : v.unpriced) > 0}
-        <div class="pp-unpriced">{t('popup.unpriced', { n: value ? value.unpriced : v.unpriced })}</div>
+        <div class="pp-unpriced">{unpricedLine(value ? value.unpriced : v.unpriced)}</div>
       {/if}
     </section>
 
