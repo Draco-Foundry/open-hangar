@@ -42,7 +42,7 @@ export function storeCredit(account) {
   return Number.isFinite(c) ? c / 100 : null;
 }
 
-// → { scannedAt, staleDays, items, melt, handle, signedOut, connected, myHangar }.
+// → { scannedAt, staleDays, items, melt, unpriced, handle, signedOut, connected, myHangar }.
 // `syncWait` is OH.siteSyncWait: the website took a sync for this account moments ago
 // (429, too soon), so the next one waits until connected.waitUntil.
 export function popupView(
@@ -57,6 +57,8 @@ export function popupView(
     staleDays: days != null && days >= STALE_DAYS ? days : null,
     items,
     melt: totalValue ? totalValue(items) : null,
+    // Pledges with no melt value: left out of `melt`, and said so under it.
+    unpriced: items.filter((p) => !Number.isFinite(p?.value)).length,
     handle:
       (account?.loggedIn && (account.displayname || account.nickname)) ||
       db?.owner?.displayname ||

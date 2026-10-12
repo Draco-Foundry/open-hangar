@@ -300,7 +300,11 @@
       const val = (selector) => card.querySelector(selector)?.value?.trim() ?? null;
       const name = val(RULES.hangar.name) || '';
       const rawValue = val(RULES.hangar.value); // "$35.00 USD"
-      const numeric = rawValue ? Number(rawValue.replace(/[^0-9.]/g, '')) : null;
+      // A value with no digits in it means RSI showed none: no price (null), never
+      // $0, so totals can say what they leave out. "$0.00 USD" is a real $0.
+      const digits = rawValue ? rawValue.replace(/[^0-9.]/g, '') : '';
+      const hasDigit = [...digits].some((c) => c >= '0' && c <= '9');
+      const numeric = hasDigit && Number.isFinite(Number(digits)) ? Number(digits) : null;
       // RSI stuffs junk into js-pledge-currency for $0 reward items (e.g.
       // "TyCustomer_ledger_-en"); keep only a real ISO-4217 code, else derive it
       // from the value string ("$35.00 USD" → USD), else null.

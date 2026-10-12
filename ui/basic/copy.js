@@ -35,7 +35,9 @@ const COPY = {
   'basic.switched-new': '[copy: basic.switched-new {who}]',
   // --- Lists ---
   'basic.search': '[copy: basic.search]', // the search box's hint
-  'basic.pledge-totals': '[copy: basic.pledge-totals {n} {value}]', // shown pledges, melt total
+  // Shown pledges, their melt total, and how many of them had a melt value ({priced}),
+  // like the buy-backs' line.
+  'basic.pledge-totals': '[copy: basic.pledge-totals {n} {value} {priced}]',
   // Shown buy-backs, and the total of the ones whose price we've read.
   'basic.buyback-totals': '[copy: basic.buyback-totals {n} {value} {priced}]',
   'basic.scanned-at': '[copy: basic.scanned-at {when}]',
