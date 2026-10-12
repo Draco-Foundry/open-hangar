@@ -1,0 +1,89 @@
+<!doctype html>
+<!--
+  Made-up hangar pledge cards in RSI's /account/pledges markup, one for each kind of
+  contained item the parser meets: Ship, Vehicle, Insurance, Skin, Paint, Component,
+  FPS Equipment, Hangar decoration, Upgrade (a ship-to-ship upgrade item, which RSI
+  now tags with its own kind), and items listed under "Also Contains", which carry
+  no kind at all. No personal data. See CONTRIBUTING.md.
+-->
+<html>
+  <body>
+    <div class="account-pledges">
+      <!-- A package: ship, ground vehicle, insurance, paint, and an Also Contains list -->
+      <div class="row">
+        <input class="js-pledge-id" value="501" />
+        <input class="js-pledge-name" value="Package - Explorer Starter Pack" />
+        <input class="js-pledge-value" value="$90.00 USD" />
+        <input class="js-pledge-currency" value="USD" />
+        <div class="date-col">March 3, 2024</div>
+        <div class="item"><span class="kind">Ship</span><span class="title">Cutlass Black</span></div>
+        <div class="item"><span class="kind">Vehicle</span><span class="title">Ursa</span></div>
+        <div class="item"><span class="kind">Insurance</span><span class="title">120 Months Insurance</span></div>
+        <div class="item"><span class="kind">Skin</span><span class="title">Cutlass Black Ghoulish Green</span></div>
+        <div class="also-contains">
+          <h3>Also Contains</h3>
+          <div class="item"><span class="title">Star Citizen Digital Download</span></div>
+          <div class="item"><span class="title">Squadron 42 Digital Download</span></div>
+          <div class="item"><span class="title">Digital Star Map</span></div>
+        </div>
+      </div>
+
+      <!-- A ship upgrade: its contained item now says Upgrade -->
+      <div class="row">
+        <input class="js-pledge-id" value="502" />
+        <input class="js-pledge-name" value="Upgrade - Pulse to C8R Pisces Standard Edition" />
+        <input class="js-pledge-value" value="$35.00 USD" />
+        <input class="js-pledge-currency" value="USD" />
+        <div class="item"><span class="kind">Upgrade</span><span class="title">Pulse to C8R Pisces</span></div>
+      </div>
+
+      <!-- A ship with an upgrade applied: the new ship and the applied Upgrade item -->
+      <div class="row">
+        <input class="js-pledge-id" value="503" />
+        <input class="js-pledge-name" value="Standalone Ship - Avenger Titan - upgraded" />
+        <input class="js-pledge-value" value="$70.00 USD" />
+        <input class="js-pledge-currency" value="USD" />
+        <div class="item"><span class="kind">Ship</span><span class="title">Cutlass Black</span></div>
+        <div class="item"><span class="kind">Upgrade</span><span class="title">Avenger Titan to Cutlass Black</span></div>
+        <div class="item"><span class="kind">Insurance</span><span class="title">Lifetime Insurance</span></div>
+      </div>
+
+      <!-- A paint on its own -->
+      <div class="row">
+        <input class="js-pledge-id" value="504" />
+        <input class="js-pledge-name" value="Paints - Constellation Mk IV Emerald Paint" />
+        <input class="js-pledge-value" value="$15.00 USD" />
+        <input class="js-pledge-currency" value="USD" />
+        <div class="item"><span class="kind">Paint</span><span class="title">Constellation Mk IV Emerald Paint</span></div>
+      </div>
+
+      <!-- A ship component -->
+      <div class="row">
+        <input class="js-pledge-id" value="505" />
+        <input class="js-pledge-name" value="Add-On - Size 2 Quantum Drive" />
+        <input class="js-pledge-value" value="$10.00 USD" />
+        <input class="js-pledge-currency" value="USD" />
+        <div class="item"><span class="kind">Component</span><span class="title">Size 2 Quantum Drive</span></div>
+      </div>
+
+      <!-- FPS gear -->
+      <div class="row">
+        <input class="js-pledge-id" value="506" />
+        <input class="js-pledge-name" value="Gear - Venture Explorer Armor Set" />
+        <input class="js-pledge-value" value="$20.00 USD" />
+        <input class="js-pledge-currency" value="USD" />
+        <div class="item"><span class="kind">FPS Equipment</span><span class="title">Venture Explorer Helmet</span></div>
+        <div class="item"><span class="kind">FPS Equipment</span><span class="title">Venture Explorer Core</span></div>
+      </div>
+
+      <!-- A hangar decoration, a reward with no value -->
+      <div class="row">
+        <input class="js-pledge-id" value="507" />
+        <input class="js-pledge-name" value="Hangar Decoration - Mug" />
+        <input class="js-pledge-value" value="$0.00 USD" />
+        <input class="js-pledge-currency" value="USD" />
+        <div class="item"><span class="kind">Hangar decoration</span><span class="title">Mug</span></div>
+      </div>
+    </div>
+  </body>
+</html>
