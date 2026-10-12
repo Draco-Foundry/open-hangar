@@ -72,8 +72,8 @@ test('basic page copy: placeholders, filled in', async () => {
   const { t, KEYS } = await import('../ui/basic/copy.js');
   assert.equal(t('basic.scan'), '[copy: basic.scan]');
   assert.equal(
-    t('basic.pledge-totals', { n: 2, value: '$5.00' }),
-    '[copy: basic.pledge-totals 2 $5.00]',
+    t('basic.pledge-totals', { n: 2, value: '$5.00', priced: 1 }),
+    '[copy: basic.pledge-totals 2 $5.00 1]',
   );
   assert.throws(() => t('basic.nope'), /no "basic.nope"/);
   for (const k of KEYS) assert.match(t(k), new RegExp(`^\\[copy: ${k.replace('.', '\\.')}`), k);

@@ -2930,10 +2930,12 @@
   // history snapshot can be valued with exactly the same numbers.
   OH.accountValue = function accountValue(items, priceOf, credit, hv) {
     const v = hv || OH.hangarValue(items, priceOf);
-    const out = { ships: 0, ccus: 0, other: 0, credit: 0, total: 0, byId: {} };
+    const out = { ships: 0, ccus: 0, other: 0, credit: 0, total: 0, byId: {}, unpriced: 0 };
     for (const p of items || []) {
       const si = v.pledges[p.id];
       const melt = Number.isFinite(p.value) ? p.value : 0;
+      // No store price and no melt value: it adds nothing, and `unpriced` says so.
+      if (!Number.isFinite(p.value) && !(si && si.store != null)) out.unpriced++;
       let amt;
       let bucket;
       if (si && si.ccu) {
