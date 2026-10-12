@@ -277,3 +277,87 @@ test('a type RSI did give is never overwritten, and gear bundles stay add-ons (#
   assert.equal(gear.containsShip, false);
   assert.equal(gear.kind, 'addon');
 });
+
+// Every kind of contained item the parser meets, including two RSI changed: a
+// ship-to-ship upgrade item now says "Upgrade", and items under "Also Contains"
+// carry no kind at all. Neither may drop an item, mark a pledge unknown, or change
+// what the pledge is.
+const kinds = OpenHangar.parsePledges(
+  fs.readFileSync(path.join(__dirname, 'fixtures', 'pledge-item-kinds.html'), 'utf8'),
+);
+const kindsById = (id) => kinds.find((p) => p.id === id);
+
+test('every item kind is read, and every pledge keeps its type', () => {
+  assert.equal(kinds.length, 7);
+  assert.deepEqual(
+    kinds.map((p) => [p.id, p.kind]),
+    [
+      ['501', 'ship'],
+      ['502', 'ccu'],
+      ['503', 'ship'],
+      ['504', 'paint'],
+      ['505', 'addon'],
+      ['506', 'addon'],
+      ['507', 'addon'],
+    ],
+  );
+  for (const p of kinds) assert.ok(p.contents.length > 0, `${p.id} lost its items`);
+});
+
+test('an Upgrade item never makes a ship, and a ship upgrade is still read from its name', () => {
+  const ccu = kindsById('502');
+  assert.deepEqual(
+    ccu.contents.map((c) => [c.kind, c.label]),
+    [['Upgrade', 'Pulse to C8R Pisces']],
+  );
+  assert.equal(ccu.isCCU, true);
+  assert.deepEqual(ccu.ccu, { from: 'Pulse', to: 'C8R Pisces Standard Edition' });
+  assert.equal(ccu.containsShip, false);
+  // An applied upgrade alongside the new ship: still one ship, insured as before.
+  const applied = kindsById('503');
+  assert.deepEqual(
+    applied.contents.map((c) => c.kind),
+    ['Ship', 'Upgrade', 'Insurance'],
+  );
+  assert.equal(applied.containsShip, true);
+  assert.equal(applied.insurance, 'LTI');
+});
+
+test('items under Also Contains are kept, untyped, and the package stays whole', () => {
+  const pack = kindsById('501');
+  assert.deepEqual(
+    pack.contents.map((c) => [c.kind, c.label]),
+    [
+      ['Ship', 'Cutlass Black'],
+      ['Vehicle', 'Ursa'],
+      ['Insurance', '120 Months Insurance'],
+      ['Skin', 'Cutlass Black Ghoulish Green'],
+      ['', 'Star Citizen Digital Download'],
+      ['', 'Squadron 42 Digital Download'],
+      ['', 'Digital Star Map'],
+    ],
+  );
+  assert.equal(pack.insurance, '120M');
+  assert.equal(pack.value, 90);
+});
+
+test('Component, FPS Equipment, Paint and Hangar decoration keep RSI’s own kind', () => {
+  assert.deepEqual(
+    kindsById('504').contents.map((c) => c.kind),
+    ['Paint'],
+  );
+  assert.equal(kindsById('504').isPaint, true);
+  assert.deepEqual(
+    kindsById('505').contents.map((c) => c.kind),
+    ['Component'],
+  );
+  assert.deepEqual(
+    kindsById('506').contents.map((c) => c.kind),
+    ['FPS Equipment', 'FPS Equipment'],
+  );
+  assert.deepEqual(
+    kindsById('507').contents.map((c) => c.kind),
+    ['Hangar decoration'],
+  );
+  for (const p of kinds) for (const c of p.contents) assert.equal(c.guessed, undefined);
+});
