@@ -83,6 +83,33 @@ test("basic page copy: the owner's words (2026-10-13), filled in", async () => {
   for (const k of KEYS) assert.doesNotMatch(t(k), /\[copy:/, k);
 });
 
+test("basic page copy: the scan's report rows and the signed-out box (2026-10-13)", async () => {
+  const { t } = await import('../ui/basic/copy.js');
+  // "Scan complete: ... · referrals read", and "Referrals: read" in the problem box.
+  assert.equal(t('basic.row-referrals'), 'referrals read');
+  assert.equal(t('basic.row-referrals-box'), 'read');
+  // Signed out: a title, and the line under it.
+  assert.equal(t('basic.signed-out'), "You're Signed Out of RSI");
+  assert.equal(
+    t('basic.signed-out-line'),
+    'Nothing was scanned, and your saved hangar is safe. Log in on RSI, then scan again.',
+  );
+  const fs = require('node:fs');
+  const page = fs.readFileSync(`${__dirname}/../ui/basic/Basic.svelte`, 'utf8');
+  assert.match(
+    page,
+    /\{r\.name\}: \{r\.box \?\? r\.text\}/,
+    "the problem box shows a row's own words",
+  );
+  assert.match(page, /t\('basic\.signed-out-line'\)/, 'the line under the signed-out title');
+  const hub = fs.readFileSync(`${__dirname}/../ui/basic/hub.svelte.js`, 'utf8');
+  assert.match(
+    hub,
+    /box: t\('basic\.row-referrals-box'\)/,
+    'the referrals row carries its box words',
+  );
+});
+
 test('basic page copy: one pledge, one buy-back', async () => {
   const { t, KEYS } = await import('../ui/basic/copy.js');
   assert.equal(t('basic.row-pledges', { n: 1 }), '1 pledge');
@@ -96,6 +123,8 @@ test('basic page copy: one pledge, one buy-back', async () => {
     t('basic.buyback-totals', { n: 1, value: '$5.00', priced: 1 }),
     '1 buy-back, $5.00 (1 with a price listed)',
   );
+  assert.equal(t('basic.csv-saved', { n: 1 }), 'Saved 1 row to a CSV file.');
+  assert.equal(t('basic.csv-saved', { n: 7 }), 'Saved 7 rows to a CSV file.');
   // A key with no singular words keeps its own for 1.
   assert.equal(t('basic.show-all', { n: 1 }), 'Show All 1');
   // Every singular sits beside its key and fills the same parts.

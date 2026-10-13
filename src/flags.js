@@ -30,27 +30,36 @@
       default: false,
       devOnly: true,
     },
-    // On in the beta since the privacy policy names our hangar page and what it may
-    // read (test/privacy-permissions.test.js, owner-approved words 2026-10-10). Off in
-    // the public store builds until the owner turns it on.
+    // On since the privacy policy names our hangar page and what it may read
+    // (test/privacy-permissions.test.js, owner-approved words 2026-10-10); in the store
+    // builds from 0.3.0 (owner, 2026-10-13: the extension ships as the connector).
     localMode: {
       about: 'Our hangar page reads the hangar this browser scanned (Local Mode).',
-      default: false,
-      beta: true,
+      default: true,
     },
     // The website is the full app and the extension its connector (owner, 2026-10-10):
-    // the toolbar opens a popup, and one basic page stays. Needs localMode.
+    // the toolbar opens a popup, and one basic page stays. Needs localMode. In every
+    // build from 0.3.0 (owner, 2026-10-13).
     connector: {
       about: 'The connector: a toolbar popup and one basic page instead of the dashboard.',
-      default: false,
+      default: true,
     },
-    // Store alerts matched on the device (connector plan 0.4, src/alerts.js). Off in the
-    // store and the beta until the privacy policy and the store forms name the sale
-    // feed, the Wishlist read and the alarms and notifications permissions
-    // (test/privacy-permissions.test.js). Needs connector.
+    // The basic page sends the wishlist this browser kept to the openhangar.space account,
+    // once per connection (ui/basic/wishlist-import.js). On in every build from 0.3.0:
+    // the privacy policy names it ("Your old wishlist, once", owner-approved words
+    // 2026-10-13; test/privacy-permissions.test.js). It runs in the connector's basic page.
+    wishlistImport: {
+      about: "This browser's wishlist goes to your openhangar.space account, once per connection.",
+      default: true,
+    },
+    // Store alerts matched on the device (connector plan 0.4, src/alerts.js). On in every
+    // build from 0.3.0: the privacy policy names the sale feed, the Wishlist read and the
+    // alarms and notifications permissions (owner-approved words 2026-10-13;
+    // test/privacy-permissions.test.js). Off for each pilot until they turn it on. Needs
+    // connector.
     alerts: {
       about: "Store alerts: a badge and notifications for what's on sale for you, matched here.",
-      default: false,
+      default: true,
     },
   };
 

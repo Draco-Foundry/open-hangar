@@ -14,7 +14,9 @@
   (docs/FLAGS.md, "Local Mode").
 - `npm run lint:firefox`: Mozilla's linter on the Firefox build.
 - `npm run test:privacy` (after `npm run pack`): the Chrome store build in Chrome,
-  never connected, sends nothing to the sync site (scripts/privacy-check.mjs).
+  never connected, sends nothing to the sync site (scripts/privacy-check.mjs). It scans
+  from the basic page and opens its views and the popup (the dashboard's pages in a
+  build without the connector).
 
 CI runs the tests, the UI test, the Firefox linter, the store build and privacy checks
 and the beta build on every PR; a docs-only PR runs just the tests and the format check.

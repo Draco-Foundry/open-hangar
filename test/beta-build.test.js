@@ -11,6 +11,7 @@ const { execFileSync } = require('node:child_process');
 
 const ROOT = path.join(__dirname, '..');
 const read = (f) => fs.readFileSync(path.join(ROOT, f));
+const { stubUi } = require('./ui-stubs.js');
 
 test('beta version: four numbers for the stores, "0.3.0 Beta N" for people', () => {
   const b = JSON.parse(read('beta/beta.json'));
@@ -38,6 +39,8 @@ function betaBuild() {
     fs.copyFileSync(path.join(ROOT, f), path.join(dir, f));
   for (const d of ['_locales', 'icons', 'src', 'beta'])
     fs.cpSync(path.join(ROOT, d), path.join(dir, d), { recursive: true });
+  // The connector's pages load the built Svelte pages (test/ui-stubs.js).
+  stubUi(dir);
   execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'pack.mjs'), '--beta'], {
     cwd: dir,
     env: { ...process.env, OH_SYNC: '', OH_SITE: '' },
@@ -76,6 +79,9 @@ test('Firefox beta: its own add-on id, update_url, the beta version and sync dat
       optional: ['personallyIdentifyingInfo', 'financialAndPaymentInfo', 'websiteContent'],
     });
     assert.ok(ff.permissions.includes('identity'), 'Connect');
+    // Store alerts are on in the beta too: alarms, and Notifications only when asked.
+    assert.ok(ff.permissions.includes('alarms'), 'store alerts');
+    assert.deepEqual(ff.optional_permissions, ['notifications']);
     assert.deepEqual(ff.background, {
       scripts: [
         'src/flags.js',
@@ -86,12 +92,13 @@ test('Firefox beta: its own add-on id, update_url, the beta version and sync dat
         'src/rsi-cart.js',
         'src/sync-schema.js',
         'src/hangar-shape.js',
+        'src/alerts.js',
         'src/background.js',
       ],
     });
     assert.ok(fs.existsSync(path.join(dir, 'dist/beta-firefox/src/site-bridge.js')));
     // Our own site's pages, production only, and our hangar page: Local Mode is on in
-    // the beta since the privacy policy names it (src/flags.js).
+    // every store build since the privacy policy names it (src/flags.js).
     const PAGES = [
       'https://hangar.openhangar.space/*',
       'https://openhangar.space/*',
@@ -103,6 +110,20 @@ test('Firefox beta: its own add-on id, update_url, the beta version and sync dat
     assert.equal(chrome.browser_specific_settings, undefined);
     assert.equal(chrome.version, b.version);
     assert.deepEqual(chrome.externally_connectable, { matches: PAGES });
+    // Both are the connector, like the public build: the toolbar opens the popup, and
+    // the dashboard is left out.
+    for (const [t, m] of [
+      ['beta', chrome],
+      ['beta-firefox', ff],
+    ]) {
+      assert.equal(m.action.default_popup, 'src/popup.html', t);
+      assert.equal(m.action.default_title, 'Open Hangar Beta', t);
+      assert.ok(fs.existsSync(path.join(dir, 'dist', t, 'src/basic.html')), `${t}: basic page`);
+      assert.ok(
+        !fs.existsSync(path.join(dir, 'dist', t, 'src/dashboard.html')),
+        `${t}: no dashboard`,
+      );
+    }
     // Both pass the store check, apart from the zips only npm run build:beta makes.
     assert.deepEqual(
       storeCheck(dir)

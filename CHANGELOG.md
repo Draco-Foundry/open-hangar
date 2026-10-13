@@ -4,104 +4,17 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
-- Fixed: [copy: Add to RSI Cart no longer says your cart is busy with a buy-back when RSI turned the upgrade down for another reason; it shows what RSI said instead.]
-- Changed: **Org Fleet shows ships, not price tags.** No store prices, fleet value or
-  shares, and no comparing one member's fleet with another's. Click a member's name to
-  see the ships they fly and the roles they cover. The CSV export drops its price column
-  too.
-- New: **Optional sync to openhangar.space.** Press Connect on your Citizen Card, sign
-  in and approve, and your hangar docks on your own openhangar.space account, there on
-  any device. After that every scan syncs by itself, and Sync Now sits in your portrait
-  menu. Nothing is sent until you connect, and Disconnect stops it. On Firefox, Firefox
-  asks you once before anything is shared. Share a browser with another pilot? A hangar
-  from an RSI account it hasn't synced waits until you say Sync It, and the people who
-  used your referral code but aren't recruits yet stay in your browser.
-- New: **Open on Website.** Once you've connected, Home, Inventory, Buy-Backs and Stats
-  each have an Open on Website button that opens your hangar on openhangar.space. Before
-  that, Inventory, Buy-Backs and Stats show a small See It on Any Device link that starts
-  Connect.
-- Changed: **A cleaner top bar.** Home, Inventory, Buy-Backs and Store sit in the bar,
-  and Stats, Org Fleet and Referrals live under More (it lights up when you're on one).
-  Search is an icon that opens the field over the links (or press /), Game Status shows
-  just the dot and the version, and Scan keeps one steady width while it counts
-  "Scanning 2/4". Once you sync with openhangar.space, a green dot on your portrait says
-  so, with the time and Sync Now in your menu. The bar fits one row from 800px up.
-- New: **Home, the final layout.** Your Citizen Card now spans the whole width. Under it
-  sit Account Value, Latest Acquisitions and the new Wishlist Watch side by side, then
-  Quick Links. Account Value keeps the big number, the vs-melt badge, what it's made of
-  and your counts; the trend chart lives on Stats.
-- New: **Most Valuable on Account Value.** Your top three ships at today's store price,
-  with insurance and, when the melt value is known, how much they've gained. Click one
-  to open its details.
-- New: **Game Status in the top bar.** A pill shows the LIVE build with a status dot.
-  Click it for LIVE and PTU, the latest patch notes and the event on now (plus the next
-  one). It comes from openhangar.space at most every 10 minutes, so Home no longer asks
-  starcitizen.tools or star-citizen.wiki for events and versions.
-- New: **Subscriber and Chairman's Club popups.** Click either line on the Citizen Card:
-  your tier and perks with Manage, or your Concierge level, RSI's progress to the next one,
-  the six-level ladder and the rewards for your level and the next.
-- New: **Wishlist Watch.** Your wishlist on Home with In Store Now or Not on Sale, prices,
-  Warbond savings in green and Buy at RSI when it's on sale. It shows your last check
-  ("Checked 2 days ago") and only asks RSI's store when you press Check Now. Wishlist
-  alerts in the bell follow that same check.
-- New: **Customize Home.** Show or hide each card, add Hangar Spotlight or Referrals, and
-  save up to ten named layouts to switch between. Reset to Default brings back the
-  standard Home. Layouts stay in this browser.
-- Fixed: ships in production now read In Production, not In Concept.
-- New: **Your Subscriber Store.** Subscribers see the items RSI offers their account on
-  the Store page, with pictures, prices, a search box, type chips and Buy at RSI. It reads
-  RSI at most once a day (on the Store page or after a scan, never inside the scan), and
-  Refresh reads it again. Not a subscriber? Nothing is asked of RSI.
-- Changed: **Subscriber Store shelves sort better.** New Kits and Bundles and Flair chips
-  (Flair takes in the old Decorations, plus mugs, displays, models and dashbots), and more
-  clothing words, so far fewer items end up in Other. Cards in a row now line up: a long
-  name takes two lines at most and the price and Buy at RSI stay at the bottom.
-- New: **RSI Quick Links.** One jump to the RSI pages pilots hunt for: your hangar,
-  buy-backs, billing, subscriptions, handle and profile, login and security, the launcher,
-  PTU copy, Spectrum and your Citizen Dossier. They sit in a card on Home and fold open
-  under Quick Links in your portrait menu. Hide Card puts the Home card away, and Show on
-  Home in the menu (or Customize Home) brings it back. Each link opens RSI in a new tab; nothing is sent.
-- Changed: **a calmer Home.** The RSI news card is gone (news lives on openhangar.space),
-  so Open Hangar no longer downloads RSI's Comm-Links or This Week in Star Citizen. Hangar
-  Spotlight is now just a picture of one of your ships, a new one each visit, with its name
-  on hover.
-- Changed: **the Store page is about your hangar now.** It keeps your Wishlist with its
-  on-sale check and what your CCUs are worth. Find a Ship opens any ship's window, so you
-  can still wishlist it or put an upgrade to it in your RSI cart. The full price list moved
-  to the website's store at openhangar.space, with every ship, sale history, Compare and
-  prices in your currency. Open the Full Store at the top of the page takes you there.
-
-- Changed: **the error report is now your Flight Log.** When a scan hits trouble, the
-  problem card has Send Flight Log: it copies the log and opens #bug-reports on Discord,
-  where you paste it. Report on GitHub opens an issue with the log filled in, and nothing
-  is sent until you submit it. Developers has Copy Flight Log too.
-- Changed: **signed out of RSI?** The scan card says the hangar doors are locked: log in,
-  come back and hit Scan All. No flight log needed for that one.
-- Changed: **a cleaner top bar.** The page links show just their names, no item counts.
-- New: **Add to RSI Cart for ship upgrades.** Open a ship's window, tap See Upgrade
-  Prices, and Open Hangar asks RSI which of your ships can upgrade to it and what each
-  costs. Pick one and it lands in your RSI cart at the upgrade price. Buy-back upgrades
-  get the same button in their window, at RSI's buy-back price. You check out on RSI as
-  usual; nothing is bought here. On Chrome and Edge the website's store can use it too.
-- New: **upgrade from Any Ship.** RSI sells a CCU between any two ships it offers the
-  upgrade for, so you don't need to own the From ship. Under Your Ships, the Any Ship list
-  shows every other ship RSI takes, with a search box; pick one for RSI's price and add it
-  like your own. Buy-backs say they check out alone (one per cart, nothing else with
-  them), whether store credit needs a Buy-Back Token, and why RSI refused if your cart is
-  already busy or a buy-back upgrade isn't sold any more.
-- Changed: **retired ships can still be bought back.** RSI still sells back buy-backs of
-  the Aurora Mk I and Hornet Mk I, so they now say Retired, Buy-Back Still Open, keep
-  their Reclaim link, and buy-back upgrades keep Add to RSI Cart. If RSI ever refuses
-  one, the window says RSI closed its buy-back.
-- New: **Melt on RSI, with the facts first.** Every Inventory pledge window has a Melt on
-  RSI link to its page in your RSI hangar. Before it opens you see what melting means:
-  an upgraded pledge comes back as the original pack, the insurance it carries, gifting,
-  and that buy-backs cost full price (sales and subscriber coupons don't carry over).
-  Pledges RSI never sells back get a big red warning first. Melting still happens on
-  RSI; Open Hangar never melts anything.
-- New: **Can't Be Bought Back.** Buy-backs RSI never sells back (Squadron 42, physical
-  items, add-ons, the AMD package, community giveaways) say so with the reason instead of
-  a Reclaim link, and buy-back windows note that buy-backs cost full price.
+- Changed: **The extension is now a lighter connector, and your full hangar opens on
+  openhangar.space.** The toolbar button opens a popup with your Account Value, your
+  last scan, Scan and store alerts. One extension page stays, with your pledges and
+  buy-backs (search, totals and CSV), your backup and your settings. The dashboard's
+  other pages are gone from the extension: press Open My Hangar to see your whole hangar
+  at hangar.openhangar.space, with no account. Your scans still stay in this browser.
+- Changed: **Open beta until launch day, November 10.** Everything in this update is
+  yours now. Syncing your hangar to openhangar.space opens to everyone on November 10.
+  Until then it's for beta testers.
+- Fixed: Add to RSI Cart no longer blames a buy-back in your cart when RSI turned the
+  upgrade down for another reason. It shows RSI's own message instead.
 
 ## 0.2.19 — 2026-10-06
 

@@ -56,12 +56,14 @@ Firefox Add-ons. Work top to bottom. Items marked ✅ are ready in the repo; ⬜
 
 ## 3. Store Listing Assets
 
-- ✅ **Screenshots** (1–5 required), **1280×800** or 640×400 PNG/JPG: `docs/store-assets/screenshot-1…5-*.jpg`. Regenerate with `npm run screenshots` (real UI, fictional demo account):
-  1. Inventory (fleet gallery)
-  2. Home
-  3. Referrals page (stats + charts)
-  4. Buy-backs
-  5. Stats
+- ✅ **Screenshots** (1–5 required), **1280×800** or 640×400 PNG/JPG, from 0.3.0 the
+  connector's (real UI, fictional demo account; PNG copies beside them for Edge):
+  1. The toolbar popup: `docs/store-assets/screenshot-connector-1-popup.jpg`
+  2. The Open Hangar page (Pledges): `docs/store-assets/screenshot-connector-2-basic.jpg`
+
+  The older `screenshot-1…5-*` files (`npm run screenshots`) show the dashboard, which
+  the 0.3.0 extension doesn't have: don't upload them for 0.3.0.
+
 - ✅ **Small promo tile**: **440×280** PNG (required) — `docs/store-assets/promo-small-440x280.png`. Can be the logo on a dark
   background. (`icons/icon.svg` + the banner in `src/assets/` are starting points.)
 - ✅ (Optional) Marquee promo: 1400×560 — `docs/store-assets/promo-marquee-1400x560.png`.
@@ -116,6 +118,14 @@ _(Since 0.2.8 there is no `api.star-citizen.wiki` host permission: that public A
 sends `Access-Control-Allow-Origin: *` and we fetch it without credentials, so the
 install prompt only names robertsspaceindustries.com.)_
 
+**`alarms`** (added in 0.3.0)
+
+> Used only for store alerts, which the user turns on in the extension's settings (they're off by default). The alarm wakes the extension for a check at most every 30 minutes: it downloads one public sale file from openhangar.space (the same file for everyone, with nothing about the user in the request) and matches it on the device. Turning alerts off clears the alarm.
+
+**`notifications`** (optional, added in 0.3.0)
+
+> Optional. Requested only when the user turns store alerts on, and the user can decline: the toolbar badge and the popup's list still work without it. Used only to show a notification when an item in RSI's store newly matches the user's hangar, buy-backs or wishlist, at most three per check. Matching happens on the device, and nothing is sent. Turning alerts off removes the permission.
+
 ## 6. Listing Copy (Ready to Paste)
 
 **Single purpose:**
@@ -125,51 +135,40 @@ install prompt only names robertsspaceindustries.com.)_
 
 **Summary (≤132 chars, also the manifest `description`):**
 
-> The free Star Citizen fleet manager. Your hangar, buy-backs, values and stats in one place. Private, with optional sync.
+> Scan your Star Citizen hangar in one click, see it all on openhangar.space and get store alerts. Private, with no account needed.
+
+The other languages' `_locales/*/messages.json` have no description of their own for
+0.3.0, so every language shows this English line until new translations are approved.
 
 **Detailed description:**
 
 The store fields are plain text: paste it without the `>` quote marks and the `**` bold
 markers, with each paragraph and each • bullet on one line.
 
-> **The free Star Citizen fleet manager.**
+> **Your Star Citizen hangar, one click away.**
 >
-> Open Hangar reads what RSI already shows you (your hangar, buy-backs, balances, org
-> and referrals) and puts it all in one place you can actually use. No more clicking
-> through page after page of pledges.
+> Open Hangar reads what RSI already shows you (your pledges, buy-backs, balances and referrals) and shows it all on our hangar page, where you can actually use it. No account needed, and no more clicking through page after page of pledges.
 >
 > What you get:
-> • A clean home page: your account value, game status and events, your newest pledges
-> • Hangar value: what your ships sell for at today's store prices, next to their
-> melt value
-> • Hangar alerts: a wishlist ship on sale, a ship you own turning flight ready, and more
-> • Search your whole hangar, buy-backs and rewards from any page
-> • Melt planner: pick pledges and see what their melt value buys from your wishlist
-> • Filters for everything, plus saved views: LTI, giftable, meltable, packs, below
-> store price and more
-> • Fleet stats: cargo, crew seats, roles, and how much of your fleet is flight ready
-> • Buy-backs with direct reclaim links, and a full referrals dashboard
-> • Streamer Mode hides your money amounts for streams and screenshots
-> • History: see what changed since your last scan, and back it all up to a file
-> • Export to CSV or JSON
+> • Scan: one click reads your hangar and buy-backs from RSI, with the session you're already signed in with
+> • The toolbar popup: your Account Value, your last scan and your store alerts at a glance
+> • Your full hangar at hangar.openhangar.space: pledges, buy-backs, fleet stats, values, referrals and more, read from this browser, with no account
+> • Store alerts (optional): a badge and a notification when a ship in your buy-backs is back in the store, or a ship you own gets a new paint, a warbond edition or a limited-time sale. Matched on your device
+> • Add to RSI Cart and Send to RSI Cart: put the upgrades and store items you pick in your RSI cart in one click. You always check out on RSI yourself
+> • The Open Hangar page: your pledges and buy-backs with search, totals and CSV, a JSON backup, and your settings
 >
-> **Your fleet on any device (optional):** connect a free account at openhangar.space
-> and your hangar syncs after each scan, so you can check it from your phone.
-> Disconnect any time.
+> **Open beta:** this is Open Hangar 0.3, and it's all yours now. Syncing your hangar to openhangar.space opens to everyone at our official launch on November 10.
 >
-> **Private by design:** Open Hangar runs in your browser, using the RSI session you're
-> already signed in with. It never asks for your password. Nothing about you is sent
-> to us unless you connect.
+> **Private by design:** Open Hangar runs in your browser, using the RSI session you're already signed in with. It never asks for your password. Your hangar stays on your device, and nothing about you is sent to us unless you connect.
 >
 > The extension is source available on GitHub. Ideas and bug reports are always welcome.
 >
 > Unofficial and fan-made. Not affiliated with Cloud Imperium Games or RSI. Fly safe, o7.
 
-**Hold 0.3.0 until the store build has sync.** The sync parts (the "Your fleet on any
-device" paragraph, and "with optional sync" in the summary, which is also the manifest
-description in `_locales/en/messages.json`) are only true of a store build with sync in it.
-Today the store build has no sync: the `sync` flag is off for it and no sync site is built in
-([FLAGS.md](FLAGS.md)). Don't cut 0.3.0 for the stores or paste this copy until it does.
+**If Send to RSI Cart isn't open to everyone on openhangar.space's store when the listing
+goes up,** use this cart bullet instead, and switch to the one above once it is:
+
+> • Add to RSI Cart: put a ship upgrade (CCU) in your RSI cart in one click. You always check out on RSI yourself
 
 ## 7. Submit & Review
 

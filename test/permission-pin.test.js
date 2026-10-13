@@ -18,8 +18,10 @@ const ROOT = path.join(__dirname, '..');
 // docs/PRIVACY.md and site/privacy.html, owner-approved words): add the policy's
 // note, then the entry here, never the other way round.
 const ALLOWED = {
-  permissions: ['storage', 'unlimitedStorage', 'cookies', 'identity'],
-  optional_permissions: [],
+  // alarms and the optional notifications: store alerts (the policy's "alarms" and
+  // "notifications", owner-approved 2026-10-13).
+  permissions: ['storage', 'unlimitedStorage', 'cookies', 'identity', 'alarms'],
+  optional_permissions: ['notifications'],
   host_permissions: ['https://robertsspaceindustries.com/*'],
   optional_host_permissions: [],
   // Our own pages only ("Messages from openhangar.space"): externally_connectable on
@@ -100,7 +102,7 @@ test('the pin itself catches each kind of addition', () => {
   };
   assert.deepEqual(pinProblems('x', base), []);
   assert.equal(pinProblems('x', { ...base, permissions: ['storage', 'tabs'] }).length, 1);
-  assert.equal(pinProblems('x', { ...base, optional_permissions: ['notifications'] }).length, 1);
+  assert.equal(pinProblems('x', { ...base, optional_permissions: ['downloads'] }).length, 1);
   assert.equal(pinProblems('x', { ...base, host_permissions: ['<all_urls>'] }).length, 1);
   assert.equal(pinProblems('x', { ...base, optional_host_permissions: ['https://*/*'] }).length, 1);
   assert.equal(

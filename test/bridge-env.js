@@ -11,6 +11,21 @@ const vm = require('node:vm');
 const SRC = path.join(__dirname, '..', 'src');
 const read = (f) => fs.readFileSync(path.join(SRC, f), 'utf8');
 
+// The flag registry (src/flags.js). STORE_FLAGS: every store build's set, its defaults
+// (the connector with Local Mode and sync since 0.3.0).
+const REGISTRY = (() => {
+  const root = {};
+  vm.runInNewContext(read('flags.js'), { self: root });
+  return root.OH.flagRegistry;
+})();
+const STORE_FLAGS = Object.freeze(
+  Object.fromEntries(Object.entries(REGISTRY).map(([k, f]) => [k, f.default === true])),
+);
+// A build's whole set, as scripts/pack.mjs writes it: a flag a test leaves out is off,
+// in flags.js and in the code cut alike.
+const wholeFlags = (flags) =>
+  Object.fromEntries(Object.keys(REGISTRY).map((k) => [k, flags[k] === true]));
+
 const FRONT = 'https://openhangar.space';
 const APP = 'https://app.openhangar.space';
 const HANGAR = 'https://hangar.openhangar.space';
@@ -109,8 +124,9 @@ function area(data, changed = null, name = 'local') {
 
 // browser: 'chrome' (Chrome and Edge, with the identity API), 'firefox' (desktop),
 // 'firefox-android' (Firefox's manifest, no identity API) or 'bare' (neither).
-// flags: the build's flags; pages: its page lists (default: the store's for those
-// flags, with staging's for staging: true). local and session: what storage holds.
+// flags: the build's flags (default: the store build's, STORE_FLAGS; one left out is
+// off); pages: its page lists (default: the store's for those flags, with staging's for
+// staging: true). local and session: what storage holds.
 // granted: Firefox's data permission. contexts: runtime.getContexts' answer (null:
 // a browser without it). fetch: the network (RSI's stand-in for Add to RSI Cart).
 // Extension Alerts: notify (true: Notifications allowed, so chrome.notifications is
@@ -118,9 +134,9 @@ function area(data, changed = null, name = 'local') {
 // does). The fake alarms and notifications are in the answer.
 function loadBackground({
   browser = 'chrome',
-  flags = { sync: true, orgFleet: false, localMode: true },
+  flags: given = STORE_FLAGS,
   staging = false,
-  pages = pagesFor({ ...flags, staging }),
+  pages = pagesFor({ ...given, staging }),
   local = {},
   session = {},
   granted = true,
@@ -132,6 +148,7 @@ function loadBackground({
   changes = false,
   globals = {},
 } = {}) {
+  const flags = wholeFlags(given);
   const firefox = browser === 'firefox' || browser === 'firefox-android';
   const listen = () => ({ addListener() {} });
   let external = null;
@@ -301,6 +318,7 @@ module.exports = {
   HANGAR_STAGING,
   CHROME_ID,
   FIREFOX_ID,
+  STORE_FLAGS,
   pagesFor,
   cutFlags,
   builtPages,
