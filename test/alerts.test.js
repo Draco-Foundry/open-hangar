@@ -381,23 +381,23 @@ test('notifications: one each, three at most, then one for the rest', () => {
   assert.deepEqual(AL.notesFor([byId(ms, 'sku-11')])[0], {
     id: 'oh-alerts:sku-11',
     title: 'Freelancer MAX',
-    message: '[copy: alerts.why.warbond MISC Freelancer MAX]',
+    message: 'Warbond edition in the store: MISC Freelancer MAX (new money only)',
   });
   const four = AL.notesFor(ms);
   assert.equal(four.length, 3);
   assert.equal(four[2].id, 'oh-alerts:more');
-  assert.equal(four[2].title, '[copy: alerts.notify-more-title 2]');
+  assert.equal(four[2].title, 'More alerts: 2');
   const ends = AL.lines(byId(ms, 'sku-19700'));
-  assert.deepEqual(ends, [
-    '[copy: alerts.why.buyback Sabre Raven EX]',
-    '[copy: alerts.ends Oct 15]',
-  ]);
+  assert.deepEqual(ends, ['In your buy-backs, now in the store: Sabre Raven EX', 'Ends Oct 15']);
 });
 
 test('the badge: unseen items while alerts are on, else the rescan reminder', () => {
   const ms = AL.matchAll(AL.readFeed(FEED), DB, null);
   const { state } = AL.nextState(null, ms, NOW);
-  assert.deepEqual(AL.badgeFor(true, state), { text: '4', title: '[copy: alerts.badge-title 4]' });
+  assert.deepEqual(AL.badgeFor(true, state), {
+    text: '4',
+    title: 'Open Hangar alerts: 4. Click to see them.',
+  });
   assert.equal(AL.badgeFor(false, state), null);
   assert.equal(AL.badgeFor(undefined, state), null);
   assert.equal(AL.badgeFor(true, AL.markSeen(state, NOW)), null);
@@ -641,6 +641,7 @@ test('the kill switch pauses the checks: nothing asked', async () => {
   assert.equal(x.out.at.length, 1);
 });
 
-test('every word alerts show is a placeholder until it is approved', () => {
-  for (const [k, v] of Object.entries(AL.COPY)) assert.match(v, /^\[copy: /, k);
+test("every word alerts show is the owner's (2026-10-13), no placeholder left", () => {
+  for (const [k, v] of Object.entries(AL.COPY)) assert.doesNotMatch(v, /\[copy:/, k);
+  assert.equal(AL.COPY['alerts.why.wishlist'], 'On your Wishlist');
 });

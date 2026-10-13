@@ -148,22 +148,26 @@
     if (kind === 'buyback' && phase === 'idle') loadBuybackPrice();
   });
 
-  // [copy: …] marks words still to be written: each says what they must say.
-  const RSI_SAYS_LEAD =
-    "[copy: a few words before RSI's own message in quotes, saying these are RSI's words and nothing was added]";
+  // Owner-approved words (2026-10-13), word for word.
+  // Before RSI's own message in quotes: these are RSI's words, and nothing was added.
+  const RSI_SAYS_LEAD = 'Nothing was added. RSI says:';
   const NOTES = {
+    // Signed out of RSI: the upgrade goes into the pilot's own RSI cart.
     'signed-out': {
-      title: '[copy: title: signed out of RSI, sign in there and then try again]',
-      text: '[copy: one line: the upgrade goes into your own RSI cart, so sign in to RSI in this browser first; nothing was added]',
+      title: 'Log In to RSI First',
+      text: 'The upgrade goes into your own RSI cart, so log in to RSI in this browser first. Nothing was added.',
     },
+    // RSI says the cart holds a buy-back, which goes in a cart alone. Never suggests
+    // this upgrade spent one.
     'cart-conflict': {
       title: 'Cart Already Busy',
-      text: '[copy: one line: RSI says your cart holds a buy-back, which goes in a cart alone; check out or empty your RSI cart, then try again; must not suggest this upgrade spent one]',
+      text: 'Your RSI cart holds a buy-back, and RSI keeps a buy-back in a cart on its own. Check out or empty your RSI cart, then try again.',
     },
     refused: {
+      // RSI turned the upgrade down without saying why: no guess at a reason.
       add: {
         title: "RSI Didn't Add It",
-        text: '[copy: one line: RSI turned the upgrade down without saying why and nothing was added; no guess at a reason]',
+        text: 'RSI turned it down without saying why. Nothing was added.',
       },
       load: {
         title: 'No Upgrade on Offer',
@@ -203,7 +207,7 @@
     if (error.kind === 'cart-conflict' && kind === 'buyback')
       return {
         title: base.title,
-        text: '[copy: one line: a buy-back goes into the RSI cart alone, so empty or check out your RSI cart first, then try again]',
+        text: 'A buy-back goes into your RSI cart on its own. Empty or check out your RSI cart first, then try again.',
       };
     return base;
   });
