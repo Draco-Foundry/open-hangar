@@ -6,10 +6,11 @@
  *   hangar  our own hangar page, hangar.openhangar.space (Local Mode, the `localMode`
  *           build flag): hello, the hangar this browser scanned (getHangar), how fresh
  *           it is (getScanStatus), a scan (requestScan) and Add to RSI Cart (addToCart)
- *   site    the website, openhangar.space and its app: hello, Add to RSI Cart, and
- *           Connect (connect: Connect This Browser, and whether a code is the one
- *           this extension is waiting for) on the pages in `connect` (the app, in
- *           builds with sync)
+ *   site    the website, openhangar.space and its app: hello, Add to RSI Cart, the
+ *           Store's Haul sending its items to the RSI cart (addItems), and Connect
+ *           (connect: Connect This Browser, and whether a code is the one this
+ *           extension is waiting for) on the pages in `connect` (the app, in builds
+ *           with sync)
  * A request from the other list's pages gets the same answer as one that doesn't
  * exist, so a page can't find out what the others may ask.
  *
@@ -34,11 +35,12 @@
     getScanStatus: ['oh-scan-status'],
     requestScan: ['oh-request-scan'],
     addToCart: ['oh-upgrade-options', 'oh-upgrade-price', 'oh-add-upgrade'],
+    addItems: ['oh-add-items'],
     connect: ['oh-connect-begin', 'oh-connect-finish', 'oh-link-check'],
   };
   const LISTS = {
     hangar: ['hello', 'getHangar', 'getScanStatus', 'requestScan', 'addToCart'],
-    site: ['hello', 'addToCart', 'connect'],
+    site: ['hello', 'addToCart', 'addItems', 'connect'],
   };
   const TYPES = Object.values(CAPS).flat();
 
@@ -47,11 +49,22 @@
   // its handler, as before; v (the bridge version the page speaks) is allowed and not
   // read. pledgeId: a buy-back upgrade's pledge (price and add in RSI's buy-back mode).
   // A link code: the short code Connect's code page shows (K7Q-4PX).
+  // items: the Haul's list, 1 to ITEMS_MAX plain { skuId, qty } (whole numbers, qty at
+  // most QTY_MAX), nothing else in them; the cart lane checks them again (src/rsi-cart.js).
   const MAX_BYTES = 16 * 1024;
+  const ITEMS_MAX = 20;
+  const QTY_MAX = 10;
   const posInt = (v) => Number.isInteger(v) && v > 0;
   const code = (v) => typeof v === 'string' && v.length > 0 && v.length <= 512;
   const bool = (v) => typeof v === 'boolean';
   const linkCode = (v) => typeof v === 'string' && v.length > 0 && v.length <= 16;
+  const item = (v) =>
+    isPlain(v) &&
+    Object.keys(v).length === 2 &&
+    posInt(v.skuId) &&
+    posInt(v.qty) &&
+    v.qty <= QTY_MAX;
+  const items = (v) => Array.isArray(v) && v.length > 0 && v.length <= ITEMS_MAX && v.every(item);
   const ID = [posInt, true];
   const SHAPES = {
     'oh-hello': { v: [posInt, false] },
@@ -66,6 +79,7 @@
       pledgeId: [posInt, false],
     },
     'oh-add-upgrade': { fromShipId: ID, toShipId: ID, toSkuId: ID, pledgeId: [posInt, false] },
+    'oh-add-items': { items: [items, true] },
     'oh-connect-begin': {},
     'oh-connect-finish': { code: [code, true], sync: [bool, false] },
     'oh-link-check': { code: [linkCode, true] },

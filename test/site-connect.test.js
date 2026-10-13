@@ -28,7 +28,7 @@ const HELLO_APP = {
   ok: true,
   v: 2,
   version: '0.3.0',
-  caps: ['hello', 'addToCart', 'connect'],
+  caps: ['hello', 'addToCart', 'addItems', 'connect'],
   cart: true,
   buyback: true,
   connect: true,

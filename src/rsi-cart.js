@@ -13,6 +13,10 @@
  *   4. mutation addToCart(from, to)            → { jwt }: that alone puts the
  *      upgrade in the RSI cart at the difference price. Nothing is bought here.
  *
+ * And store items (paints, ships, packs, gear) for the website's Haul (#635): a list
+ * of { skuId, qty } in one request, RSI's own AddCartMultiItemMutation on /graphql
+ * with the store page's csrf token, as RSI's store does when you press Add to Cart.
+ *
  * Loaded by the dashboard (before lib.js, which exposes it as OH.upgradeOptions,
  * OH.upgradePrice and OH.addUpgradeToCart) and by the background worker, which
  * answers the website's store panel (src/background.js), both after the parser rules
@@ -20,8 +24,8 @@
  *
  * Polite: only ever on a click, one request at a time with a short random pause
  * between them, and after RSI's "slow down" (429) nothing more until its
- * Retry-After has passed. addToCart is NEVER retried automatically: a retry
- * could put the upgrade in the cart twice.
+ * Retry-After has passed. addToCart and the item add are NEVER retried
+ * automatically: a retry could put them in the cart twice.
  */
 (function (root) {
   // Where each request goes and what it asks (paths, GraphQL operations and
@@ -37,10 +41,16 @@
   const CART_URL = RSI + RULES.cart.path;
   const SIGN_IN_URL = RSI + RULES.cart.signInPath;
   const PLEDGE_STORE_URL = RSI + RULES.cart.storePath;
+  const ITEMS_URL = RSI + RULES.cart.addMany.path;
 
   const GAP_MS = 300; // pause between two requests: 300 to 750 ms, never a fixed beat
   const SLOW_DOWN_MS = 60e3; // after a 429 without Retry-After
   const PRICE_LIMIT = 4; // options come with RSI's price for this many ships at most
+  // The Haul's send: at most this many different items, to start (owner, 2026-10-12),
+  // raised once RSI's own cart limits are known. Of one item at most QTY_MAX: RSI's
+  // per-order limit (its maxQty, 5 for a paint) is lower, and the page keeps to it.
+  const ITEMS_MAX = 20;
+  const QTY_MAX = 10;
 
   const toInt = (v) => {
     const n = Number(v);
@@ -89,6 +99,28 @@
       from: toInt(fromShipId),
       to: toInt(toSkuId),
     });
+  // The Haul's items → [{ skuId, qty }], or null when the list isn't one we send:
+  // 1 to ITEMS_MAX different SKUs, 1 to QTY_MAX of each, no SKU twice.
+  function cleanItems(items) {
+    if (!Array.isArray(items) || !items.length || items.length > ITEMS_MAX) return null;
+    const seen = new Set();
+    const out = [];
+    for (const it of items) {
+      const skuId = toInt(it && it.skuId);
+      const qty = toInt(it && it.qty);
+      if (!skuId || !qty || qty > QTY_MAX || seen.has(skuId)) return null;
+      seen.add(skuId);
+      out.push({ skuId, qty });
+    }
+    return out;
+  }
+  // As RSI's store sends it: a batch of one, the SKU as a string.
+  const addManyBody = (items) => [
+    gql(RULES.cart.addMany.operation, RULES.cart.addMany.query, {
+      storeFront: RULES.cart.addMany.storeFront,
+      query: items.map((i) => ({ qty: i.qty, skuId: String(i.skuId) })),
+    }),
+  ];
 
   // --- Response parsing (pure) ----------------------------------------------------
   // GraphQL errors → our error kinds. Anything about who you are = signed out.
@@ -194,6 +226,17 @@
     const r = (unwrap(json).data || {}).addToCart;
     return r && typeof r.jwt === 'string' && r.jwt ? r.jwt : null;
   };
+  // The item add's answer → { count, added } (RSI's count as it sent it, and the SKU
+  // ids it says it added), or null when there's no answer to read.
+  function parseAddMany(json) {
+    const store = (unwrap(json).data || {}).store;
+    const m = store && store.cart && store.cart.mutations && store.cart.mutations.addMany;
+    if (!m || typeof m !== 'object') return null;
+    const added = Array.isArray(m.resources)
+      ? m.resources.map((x) => toInt(x && x.id)).filter(Boolean)
+      : [];
+    return { count: Number.isInteger(m.count) ? m.count : null, added };
+  }
 
   // Your ships that RSI lets you upgrade from, best first (the dearest ship you own
   // makes the cheapest upgrade), then the ones you own that it doesn't allow.
@@ -315,16 +358,18 @@
     }
 
     // One POST. → { json } or { error, retryAt? }. Never retried here.
+    // The GraphQL calls (the upgrade tool's and the item add) carry the store page's
+    // csrf token; the upgrade tool's other calls carry the session cookie's value.
     async function post(url, body) {
-      const token = url === UPGRADE_URL ? await csrfToken() : await cookieToken();
-      const tokenHeader =
-        url === UPGRADE_URL
-          ? token
-            ? { [RULES.cart.csrfHeader]: token }
-            : {}
-          : token
-            ? { [RULES.cart.tokenHeader]: token }
-            : {};
+      const gqlCall = url === UPGRADE_URL || url === ITEMS_URL;
+      const token = gqlCall ? await csrfToken() : await cookieToken();
+      const tokenHeader = gqlCall
+        ? token
+          ? { [RULES.cart.csrfHeader]: token }
+          : {}
+        : token
+          ? { [RULES.cart.tokenHeader]: token }
+          : {};
       const r = await send(url, {
         method: 'POST',
         headers: {
@@ -337,7 +382,7 @@
       if (r.error) return r;
       const res = r.res;
       if (res.status === 401) return { error: 'signed-out' };
-      if (url === CART_TOKEN_URL && !res.ok) {
+      if ((url === CART_TOKEN_URL || url === ITEMS_URL) && !res.ok) {
         let body = null;
         try {
           body = await res.json();
@@ -345,12 +390,13 @@
           body = null;
         }
         // RSI explained itself (a 4xx with a message): its words go back to the page.
-        if (body && res.status < 500 && (cartRefusal(body, true) || rsiSays(body)))
+        const buyback = url === CART_TOKEN_URL;
+        if (body && res.status < 500 && (cartRefusal(body, buyback) || rsiSays(body)))
           return { error: 'refused', json: body };
       }
       if (res.status === 403) return { error: 'refused' };
       if (!res.ok) return { error: 'network' };
-      if (url !== UPGRADE_URL && url !== CART_TOKEN_URL) return { json: null }; // only their cookies matter
+      if (!gqlCall && url !== CART_TOKEN_URL) return { json: null }; // only their cookies matter
       try {
         return { json: await res.json() };
       } catch {
@@ -496,7 +542,33 @@
       return { ok: true };
     }
 
-    return { upgradeOptions, upgradePrice, addUpgradeToCart };
+    // Puts the Haul's store items in the RSI cart, all in one request.
+    // items: [{ skuId, qty }], 1 to ITEMS_MAX different SKUs, 1 to QTY_MAX of each.
+    // → { ok: true, count, added, rsiSays? } | { ok: false, error, reason?, rsiSays? }
+    // count: RSI's count as it sent it; added: the SKU ids RSI says it added (the page
+    // compares them with what it sent, and rsiSays carries RSI's words for any it
+    // turned down). Asked once: never retried, whatever happens (a retry could add twice).
+    async function addItemsToCart(items) {
+      const list = cleanItems(items);
+      if (!list) return { ok: false, error: 'refused' };
+      if (await signedOut()) return { ok: false, error: 'signed-out' };
+      const r = await post(ITEMS_URL, addManyBody(list));
+      if (r.error === 'refused' && r.json) return refusedBy(r.json, false);
+      if (r.error) return fail(r);
+      const got = parseAddMany(r.json);
+      const e = gqlError(r.json);
+      if (got) {
+        const says = e ? rsiSays(r.json) : null;
+        return says ? { ok: true, ...got, rsiSays: says } : { ok: true, ...got };
+      }
+      if (e === 'signed-out') {
+        csrf = null; // read a fresh token next time
+        return { ok: false, error: 'signed-out' };
+      }
+      return e ? refusedBy(r.json, false) : { ok: false, error: 'refused' };
+    }
+
+    return { upgradeOptions, upgradePrice, addUpgradeToCart, addItemsToCart };
   }
 
   const api = make();
@@ -510,8 +582,14 @@
     CONTEXT_URL,
     CART_TOKEN_URL,
     UPGRADE_URL,
+    ITEMS_URL,
+    ITEMS_MAX,
+    QTY_MAX,
     // Pure pieces, for tests.
     contextBody,
+    cleanItems,
+    addManyBody,
+    parseAddMany,
     parseCsrf,
     filterBody,
     priceBody,

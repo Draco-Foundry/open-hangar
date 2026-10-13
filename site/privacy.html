@@ -46,7 +46,8 @@
         </li>
         <li>
           Open Hangar only reads your RSI account, with one exception: when you click Add to RSI
-          Cart, it puts that upgrade in your RSI cart. It never checks out or pays.
+          Cart or Send to RSI Cart, it puts what you picked in your RSI cart. It never checks out or
+          pays.
         </li>
         <li>
           We do not sell or share your personal data. Without sync we collect nothing; with sync we
@@ -105,23 +106,23 @@
       <h2 id="add-to-rsi-cart">Add to RSI Cart</h2>
       <p>
         When you click Add to RSI Cart on a ship upgrade (CCU), the extension uses RSI's own upgrade
-        store, with your existing RSI session, to put that upgrade in your RSI cart.
+        store, with your existing RSI session, to put that upgrade in your RSI cart. It sends RSI
+        only the ship and upgrade ids, plus the buy-back pledge id when the upgrade is a buy-back.
       </p>
-      <ul>
-        <li>
-          It sends RSI only the ship and upgrade ids, plus the buy-back pledge id when the upgrade
-          is a buy-back.
-        </li>
-        <li>It never checks out or pays. You finish the purchase on RSI yourself.</li>
-        <li>It only happens when you click the button.</li>
-        <li>This is the only thing the extension does on RSI that isn't read-only.</li>
-        <li>Nothing about it is sent to us.</li>
-      </ul>
       <p>
-        On the Open Hangar store at openhangar.space, the extension can show you these upgrade
-        prices and add upgrades for you. The page then sees which of your ships can be upgraded and
-        RSI's prices, inside your browser only. Nothing reaches our server.
+        When you click Send to RSI Cart on the store at openhangar.space, the extension puts the
+        items in your Haul (paints, ships, packs or gear) in your RSI cart in one request, with your
+        existing RSI session. It sends RSI only each item's store id and how many you picked. The
+        page then sees which items RSI added, and RSI's own message for any it turned down, inside
+        your browser only.
       </p>
+      <p>For both:</p>
+      <ul>
+        <li>They never check out or pay. You finish the purchase on RSI yourself.</li>
+        <li>They only happen when you click the button.</li>
+        <li>They are the only things the extension does on RSI that aren't read-only.</li>
+        <li>Nothing about them is sent to us.</li>
+      </ul>
       <h2>Outbound Network Requests</h2>
       <p>
         Besides reading your own RSI account and Add to RSI Cart (both above), Open Hangar only ever
@@ -257,7 +258,8 @@
         </li>
         <li>
           <strong>Host access to robertsspaceindustries.com:</strong> to make the read-only requests
-          described above, and to add an upgrade to your RSI cart when you click Add to RSI Cart.
+          described above, and to put an upgrade or the items you picked in your RSI cart when you
+          click Add to RSI Cart or Send to RSI Cart.
         </li>
         <li>
           <strong>identity:</strong> for connecting sync. Connect opens a sign-in window, where you
@@ -269,22 +271,24 @@
         <li>
           <strong>Messages from openhangar.space:</strong> pages on openhangar.space,
           app.openhangar.space and hangar.openhangar.space, and no other site, can check that Open
-          Hangar is installed. Pages on openhangar.space and app.openhangar.space can ask it for two
-          things. The first is Add to RSI Cart on the website's store: the page sees which of your
-          ships can be upgraded and RSI's prices, inside your browser only (see
-          <a href="#add-to-rsi-cart">Add to RSI Cart</a>). The second, on app.openhangar.space only,
-          is Connect This Browser, which connects sync from the website. hangar.openhangar.space is
-          our hangar page, which shows your hangar without an account. It can ask for four things:
-          your hangar as this browser scanned it, when it was last scanned, a new scan, and Add to
-          RSI Cart. Your hangar here means your backup file without the scan history, your referral
-          code and your referral prospects list. It never includes your sync token, the site
-          address, your settings or your wishlist. The page shows it inside your browser only and
-          keeps no copy after you close it. Your hangar never reaches our server. On Firefox, the
-          page can read your hangar only after you say yes to Firefox's data prompt. Chrome and Edge
-          let these pages message the extension directly. Firefox doesn't, so on Firefox the
-          extension runs a small bridge script on these pages that only passes their messages to the
-          extension and its answers back. It reads nothing else on the page and sends nothing
-          anywhere else.
+          Hangar is installed. Pages on openhangar.space and app.openhangar.space can ask it for
+          three things. The first is Add to RSI Cart on the website's store: the page sees which of
+          your ships can be upgraded and RSI's prices, inside your browser only (see
+          <a href="#add-to-rsi-cart">Add to RSI Cart</a>). The second is Send to RSI Cart on the
+          website's store: the page sends the items in your Haul and sees which ones RSI added,
+          inside your browser only (see <a href="#add-to-rsi-cart">Add to RSI Cart</a>). The third,
+          on app.openhangar.space only, is Connect This Browser, which connects sync from the
+          website. hangar.openhangar.space is our hangar page, which shows your hangar without an
+          account. It can ask for four things: your hangar as this browser scanned it, when it was
+          last scanned, a new scan, and Add to RSI Cart. Your hangar here means your backup file
+          without the scan history, your referral code and your referral prospects list. It never
+          includes your sync token, the site address, your settings or your wishlist. The page shows
+          it inside your browser only and keeps no copy after you close it. Your hangar never
+          reaches our server. On Firefox, the page can read your hangar only after you say yes to
+          Firefox's data prompt. Chrome and Edge let these pages message the extension directly.
+          Firefox doesn't, so on Firefox the extension runs a small bridge script on these pages
+          that only passes their messages to the extension and its answers back. It reads nothing
+          else on the page and sends nothing anywhere else.
         </li>
       </ul>
       <h2>Data Export</h2>

@@ -686,7 +686,8 @@
         "csrfTag",
         "csrfValue",
         "context",
-        "refusal"
+        "refusal",
+        "addMany"
       ],
       "additionalProperties": false,
       "properties": {
@@ -737,6 +738,18 @@
             "invalid": { "$ref": "#/$defs/pattern" },
             "buyback": { "$ref": "#/$defs/pattern" },
             "upgrade": { "$ref": "#/$defs/pattern" }
+          }
+        },
+        "addMany": {
+          "description": "Store items into the cart, a list in one request (the Haul): RSI's own add, sent as full text to path with the store page's csrf token. The code adds the items ({ qty, skuId }) and storeFront.",
+          "type": "object",
+          "required": ["path", "operation", "query", "storeFront"],
+          "additionalProperties": false,
+          "properties": {
+            "path": { "$ref": "#/$defs/path" },
+            "operation": { "$ref": "#/$defs/operation" },
+            "query": { "$ref": "#/$defs/document" },
+            "storeFront": { "type": "string", "pattern": "^[a-z]+$", "maxLength": 40 }
           }
         }
       }

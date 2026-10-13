@@ -26,6 +26,7 @@
     'oh-upgrade-options',
     'oh-upgrade-price',
     'oh-add-upgrade',
+    'oh-add-items',
     'oh-connect-begin',
     'oh-connect-finish',
     'oh-link-check',

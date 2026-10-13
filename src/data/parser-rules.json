@@ -266,6 +266,12 @@
       "invalid": { "source": "invalid", "flags": "i" },
       "buyback": { "source": "buy[\\s-]?backs?", "flags": "i" },
       "upgrade": { "source": "upgrade", "flags": "i" }
+    },
+    "addMany": {
+      "path": "/graphql",
+      "operation": "AddCartMultiItemMutation",
+      "query": "mutation AddCartMultiItemMutation($query: [CartAddInput!], $storeFront: String = \"pledge\") {\n  store(name: $storeFront) {\n    cart {\n      mutations {\n        addMany(query: $query) {\n          count\n          resources {\n            id\n            title\n          }\n        }\n      }\n    }\n  }\n}\n",
+      "storeFront": "pledge"
     }
   }
 }
