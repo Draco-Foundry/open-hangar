@@ -45,9 +45,9 @@
     "jsdom": "^24.1.0",
     "jsqr": "^1.4.0",
     "prettier": "^3.9.9",
-    "puppeteer-core": "^25.12.0",
-    "svelte": "5.57.1",
-    "vite": "8.3.1",
+    "puppeteer-core": "^25.13.0",
+    "svelte": "5.57.2",
+    "vite": "8.3.4",
     "web-ext": "^10.7.0"
   },
   "overrides": {
