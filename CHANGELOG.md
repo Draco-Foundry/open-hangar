@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.3.0 — 2026-10-13
+
 - Changed: **The extension is now a lighter connector, and your full hangar opens on
   openhangar.space.** The toolbar button opens a popup with your Account Value, your
   last scan, Scan and store alerts. One extension page stays, with your pledges and
