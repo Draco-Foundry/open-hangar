@@ -13,3 +13,5 @@ test/fixtures/ship-page-in.html
 test/fixtures/ship-page-out.html
 test/fixtures/ship-page-pack.html
 src/ui
+# Local Claude files and agent worktrees (whole copies of the repo), never committed
+.claude
