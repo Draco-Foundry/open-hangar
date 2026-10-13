@@ -5,7 +5,7 @@
   "default_locale": "en",
   "version": "0.2.19",
   "author": "Draco Foundry",
-  "homepage_url": "https://github.com/Draco-Foundry/open-hangar",
+  "homepage_url": "https://openhangar.space",
   "permissions": ["storage", "unlimitedStorage", "cookies", "identity"],
   "host_permissions": ["https://robertsspaceindustries.com/*"],
   "content_security_policy": {
