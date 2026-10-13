@@ -1,45 +1,8 @@
 /*
- * Clean Pro, the 0.3.0 look (docs/REDESIGN-0.3.md): graphite surfaces, colour only
- * where it means something, heavy clear numbers. Loaded after dashboard.html's own
- * styles, so these token values win everywhere; pages move to Svelte one by one.
- * Fonts are bundled (no requests to Google).
+ * The dashboard's Clean Pro styles. The look itself (fonts, colours, radii) is
+ * ui/tokens.css, which the connector's own pages (ui/popup, ui/basic) load alone.
  */
-@import '@fontsource/manrope/latin-600.css';
-@import '@fontsource/manrope/latin-700.css';
-@import '@fontsource/manrope/latin-800.css';
-@import '@fontsource/source-sans-3/latin-400.css';
-@import '@fontsource/source-sans-3/latin-600.css';
-
-:root {
-  --bg: #0e1013;
-  --panel: #16191e;
-  --panel-2: #1d2127;
-  --line: #23272e;
-  --line-2: #30353d;
-  --text: #dfe3e8;
-  --head: #ffffff;
-  --muted: #8b939e;
-  --faint: #808994; /* 4.5:1 on panels (WCAG AA) */
-  --accent: #2372e0; /* white button text reads at 4.6:1 */
-  --accent-hover: #1b5fc2; /* darker on hover keeps white text readable (#200) */
-  --accent-soft: rgba(47, 129, 247, 0.14);
-  --link: #6cb4ff;
-  --good-soft: rgba(63, 185, 80, 0.13);
-  --warn-soft: rgba(210, 153, 34, 0.14);
-  --bad-soft: rgba(248, 81, 73, 0.13);
-  --font-head: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-body: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --radius-lg: 14px;
-}
-body {
-  font-family: var(--font-body);
-}
-h1,
-h2,
-h3,
-h4 {
-  font-family: var(--font-head);
-}
+@import './tokens.css';
 
 /* Top bar: pinned while scrolling on every page except Home (owner, 2026-09-30), so
    the page links stay one click away on long pages. */
@@ -59,25 +22,14 @@ body:not(:has(#view-home.active)) .wrap > header {
   max-width: 100%;
 }
 
-/* Home: the Citizen Card (3/4) with Game Status beside it (1/4); stacked on narrow
-   windows. Hangar Alerts live in the top bar's bell. */
+/* Home: the Citizen Card across the whole width (Game Status is the top bar's pill).
+   Hangar Alerts live in the top bar's bell. */
 .home-hero {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   margin-bottom: 16px;
   align-items: stretch;
-}
-.home-hero:has(#cc-loggedout:not([hidden])) {
-  grid-template-columns: minmax(0, 1fr);
-}
-.home-hero:has(#cc-loggedout:not([hidden])) > #oh-status {
-  display: none;
-}
-@media (max-width: 1100px) {
-  .home-hero {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 /* Citizen Card: the "Pilot ID" design (owner, 2026-09-30). The portrait runs down
    the whole left side (RSI's 1024px original); name, org, the UEE line, badges and
@@ -89,7 +41,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   background: var(--panel);
   overflow: hidden;
 }
-/* The card can be stretched taller by Game Status beside it: the portrait follows. */
+/* The portrait runs the card's full height. */
 .home-hero .citizen-card {
   display: flex;
   flex-direction: column;
@@ -116,9 +68,9 @@ body:not(:has(#view-home.active)) .wrap > header {
   inset: 0;
   display: grid;
   place-items: center;
-  background: #1b1f25 center 25% / cover no-repeat;
-  font: 800 44px var(--font-head);
-  color: #cfd8e3;
+  background: var(--panel-2) center 25% / cover no-repeat;
+  font: 600 44px var(--font-head);
+  color: var(--text);
   transition: filter 0.15s;
 }
 .home-hero a.cc-photo[href]:hover .cc-avatar {
@@ -146,7 +98,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   padding: 22px 24px;
 }
 .home-hero .cc-name {
-  font: 800 30px/1.1 var(--font-head);
+  font: 600 30px/1.1 var(--font-head);
   color: var(--head);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -194,7 +146,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  font: 700 16px/1.25 var(--font-head);
+  font: 600 16px/1.25 var(--font-head);
   color: var(--head);
   overflow-wrap: anywhere;
 }
@@ -281,7 +233,8 @@ body:not(:has(#view-home.active)) .wrap > header {
   color: var(--muted);
 }
 .home-hero .home-balances .bal b {
-  font: 800 22px var(--font-head);
+  font: 500 22px var(--font-data);
+  letter-spacing: -0.01em;
   color: var(--head);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -339,7 +292,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   background: var(--accent);
   border: 1px solid var(--accent);
   color: #fff;
-  font: 700 13px var(--font-head);
+  font: 500 13px var(--font-head);
   cursor: pointer;
 }
 .hdr-prefs .scan-split #scan-home {
@@ -394,8 +347,90 @@ body:not(:has(#view-home.active)) .wrap > header {
 .settings-menu .menu-danger {
   color: #f85149;
 }
+/* Account actions with weight (Disconnect, Log Out of RSI): amber; Clear Data: red.
+   Each asks once in place (.you-confirm). */
+.settings-menu .menu-warn {
+  color: var(--warn);
+}
+.settings-menu .menu-warn:hover {
+  color: #f2bb5e;
+}
 .settings-menu .menu-danger:hover {
   color: #ff7b72;
+}
+
+/* RSI Quick Links in your menu (#374, YouMenu.svelte): a fold-open group. */
+.settings-menu .ql-toggle {
+  filter: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 4px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  font: 600 14px var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.settings-menu .ql-toggle:hover {
+  filter: none;
+  color: var(--head);
+}
+.settings-menu .ql-grid-ic {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--link);
+}
+.settings-menu .ql-tag {
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--link);
+  font: 600 11px var(--font-head);
+}
+.settings-menu .ql-chev {
+  margin-left: auto;
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+.settings-menu .ql-toggle.open .ql-chev {
+  transform: rotate(90deg);
+}
+/* Scrolls inside, so the open group never pushes the menu off screen. */
+.settings-menu .ql-in {
+  max-height: max(160px, calc(100vh - 600px));
+  overflow-y: auto;
+  margin-top: -4px;
+  padding: 0 0 4px;
+}
+.settings-menu .ql-in[hidden] {
+  display: none;
+}
+.settings-menu .ql-grp {
+  margin: 10px 6px 4px;
+  font: 600 11px var(--font-head);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.settings-menu .ql-show {
+  filter: none;
+  display: block;
+  margin: 6px 6px 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: 500 13px var(--font-head);
+  cursor: pointer;
+}
+.settings-menu .ql-show:hover {
+  filter: none;
+  text-decoration: underline;
 }
 
 /* Global Hangar Search on its own line under the Citizen Card. */
@@ -440,7 +475,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   max-height: none;
   overflow: hidden;
   padding: 0;
-  border: 1px solid rgba(47, 129, 247, 0.55);
+  border: 1px solid rgba(77, 124, 255, 0.55);
   border-radius: 14px;
   background: #232933;
   box-shadow:
@@ -522,7 +557,7 @@ body:not(:has(#view-home.active)) .wrap > header {
 }
 .gs-img span {
   padding: 0 8px;
-  font: 700 11px var(--font-head);
+  font: 600 11px var(--font-head);
   color: var(--faint);
   text-align: center;
 }
@@ -532,7 +567,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   min-width: 0;
 }
 .home-search .gs-row .gs-name {
-  font: 800 17px var(--font-head);
+  font: 600 17px var(--font-head);
   color: var(--head);
   white-space: nowrap;
   overflow: hidden;
@@ -558,7 +593,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   border: 1px solid var(--line-2);
   border-radius: 6px;
   background: none;
-  font: 700 11px var(--font-head);
+  font: 600 11px var(--font-head);
   letter-spacing: 0.04em;
   color: var(--muted);
 }
@@ -574,7 +609,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   white-space: nowrap;
 }
 .gs-side b {
-  font: 800 16px var(--font-head);
+  font: 600 16px var(--font-head);
   color: var(--head);
 }
 .gs-side small {
@@ -582,7 +617,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   color: var(--muted);
 }
 .gs-open {
-  font: 700 13px var(--font-head);
+  font: 600 13px var(--font-head);
   color: var(--link);
 }
 .gs-foot {
@@ -621,7 +656,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   flex-wrap: wrap;
   margin: 0 0 12px;
   padding: 10px 14px;
-  border: 1px solid rgba(47, 129, 247, 0.45);
+  border: 1px solid rgba(77, 124, 255, 0.45);
   border-radius: 10px;
   background: var(--accent-soft);
   color: var(--head);
@@ -669,7 +704,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   border: 0;
   background: none;
   color: var(--link);
-  font: 700 12px var(--font-head);
+  font: 500 12px var(--font-head);
   letter-spacing: 0;
   text-transform: none;
   cursor: pointer;
@@ -699,7 +734,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   min-width: 0;
 }
 .sm-txt b {
-  font: 700 14px var(--font-head);
+  font: 600 14px var(--font-head);
   color: var(--head);
 }
 .sm-txt small {
@@ -713,7 +748,7 @@ body:not(:has(#view-home.active)) .wrap > header {
   border-radius: 8px;
   background: var(--accent);
   color: #fff;
-  font: 700 14px var(--font-head);
+  font: 500 14px var(--font-head);
   cursor: pointer;
 }
 .scan-menu.sm-rich .scan-go:hover {
@@ -728,10 +763,10 @@ body:not(:has(#view-home.active)) .wrap > header {
   gap: 14px;
   margin: 0 0 16px;
   padding: 56px 24px;
-  border: 1px solid rgba(47, 129, 247, 0.35);
+  border: 1px solid rgba(77, 124, 255, 0.35);
   border-radius: var(--radius-lg);
   background:
-    radial-gradient(60% 120% at 50% 0%, rgba(47, 129, 247, 0.18), transparent 70%), var(--panel);
+    radial-gradient(60% 120% at 50% 0%, rgba(77, 124, 255, 0.16), transparent 70%), var(--panel);
   text-align: center;
 }
 .oh-welcome[hidden] {
@@ -739,8 +774,9 @@ body:not(:has(#view-home.active)) .wrap > header {
 }
 .oh-welcome h2 {
   margin: 0;
-  font: 800 32px var(--font-head);
+  font: 600 32px var(--font-head);
   color: var(--head);
+  text-wrap: balance;
 }
 .oh-welcome p {
   max-width: 56ch;
@@ -752,13 +788,13 @@ body:not(:has(#view-home.active)) .wrap > header {
   margin-top: 8px;
   padding: 16px 40px;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--accent);
   color: #fff;
-  font: 800 20px var(--font-head);
+  font: 500 20px var(--font-head);
   text-decoration: none;
   cursor: pointer;
-  box-shadow: 0 10px 30px rgba(47, 129, 247, 0.35);
+  box-shadow: 0 10px 30px rgba(77, 124, 255, 0.3);
 }
 .oh-welcome .welcome-scan:hover {
   background: var(--accent-hover);
@@ -855,7 +891,7 @@ body:not(:has(#view-home.active)) .wrap > header {
 }
 .grid.list .val,
 #buybacks-body .grid.list .bb-end .val {
-  font: 800 19px var(--font-head);
+  font: 500 18px var(--font-data);
   color: var(--head);
 }
 #buybacks-body .grid.list .bb-end {
@@ -897,20 +933,8 @@ body:not(:has(#view-home.active)) .wrap > header {
   border-radius: 8px;
 }
 .wrap > header .brand h1 {
-  font: 800 19px var(--font-head);
+  font: 600 19px var(--font-head);
   white-space: nowrap;
-}
-/* Counts beside Inventory and Buy-Backs. */
-nav .nav-n {
-  margin-left: 4px;
-  font: 700 11px var(--font-head);
-  color: var(--faint);
-}
-nav a.active .nav-n {
-  color: var(--muted);
-}
-nav .nav-n:empty {
-  display: none;
 }
 /* Streamer Mode on: a purple badge on the portrait's bottom-left (the update dot
    has the top-right), so the top bar never needs room for it (#174). */
@@ -974,7 +998,7 @@ nav .nav-n:empty {
   max-height: none;
   padding: 0;
   overflow: hidden;
-  border: 1px solid rgba(47, 129, 247, 0.55);
+  border: 1px solid rgba(77, 124, 255, 0.55);
   border-radius: 14px;
   background: #232933;
   box-shadow:
@@ -1005,7 +1029,7 @@ nav .nav-n:empty {
   height: 68px;
 }
 .hdr-prefs .top-results .gs-name {
-  font: 800 16px var(--font-head);
+  font: 600 16px var(--font-head);
   color: var(--head);
   white-space: nowrap;
   overflow: hidden;
@@ -1053,7 +1077,7 @@ nav .nav-n:empty {
   border-radius: 9px;
   background: #da3633;
   color: #fff;
-  font: 800 11px/18px var(--font-head);
+  font: 600 11px/18px var(--font-head);
   text-align: center;
 }
 .badge-n[hidden] {
@@ -1082,7 +1106,7 @@ nav .nav-n:empty {
   border: 0;
   background: none;
   color: var(--link);
-  font: 700 12px var(--font-head);
+  font: 500 12px var(--font-head);
   letter-spacing: 0;
   text-transform: none;
   cursor: pointer;
@@ -1109,7 +1133,7 @@ nav .nav-n:empty {
   text-decoration: none;
 }
 .bm-row b {
-  font: 700 14px var(--font-head);
+  font: 600 14px var(--font-head);
   color: var(--head);
 }
 .bm-row a:hover b {
@@ -1163,6 +1187,181 @@ nav .nav-n:empty {
 #scan-home.scanning:disabled {
   opacity: 1;
   cursor: progress;
+}
+/* After a scan with a problem: Rough Landing, with a drawn warning sign. */
+#scan-home .scan-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+#scan-home .scan-warn {
+  color: #f2c14e;
+  flex: none;
+}
+
+/* The scan report (ui/topbar/ScanReport.svelte), dropped from the Scan button: same
+   panel as Home's search results (lighter, a blue edge). */
+.scan-menu.scan-report {
+  width: min(420px, calc(100vw - 32px));
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid rgba(77, 124, 255, 0.55);
+  border-radius: 14px;
+  background: #232933;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  color: var(--text);
+  font: 15px/1.45 var(--font-body);
+  text-align: left;
+  white-space: normal;
+}
+.sr-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.sr-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--warn-soft);
+  color: #f2c14e;
+}
+.sr-icon.calm {
+  background: var(--accent-soft);
+  color: var(--link);
+}
+.sr-titles {
+  min-width: 0;
+}
+.sr-titles h3 {
+  margin: 0;
+  font: 600 17px var(--font-head);
+  color: var(--head);
+  text-wrap: balance;
+}
+.sr-titles p {
+  margin: 2px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.sr-x {
+  margin-left: auto;
+  padding: 2px 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.sr-x:hover {
+  color: var(--head);
+}
+.sr-rows {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sr-rows li {
+  display: grid;
+  grid-template-columns: 18px 84px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  font-size: 14px;
+}
+.sr-rows li.bad {
+  background: var(--warn-soft);
+}
+.sr-ok,
+.sr-warn,
+.sr-note {
+  display: flex;
+  padding-top: 2px;
+}
+.sr-ok {
+  color: #3fb950;
+}
+.sr-warn {
+  color: #f2c14e;
+}
+/* A calm note (the website's sync isn't open yet): blue, not a problem. */
+.sr-note {
+  color: var(--link);
+}
+.sr-src {
+  font-weight: 600;
+  color: var(--head);
+}
+.sr-what {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+  font-variant-numeric: tabular-nums;
+}
+.sr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.sr-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  background: var(--panel-2);
+  color: var(--head);
+  font: 500 14px var(--font-body);
+  text-decoration: none;
+  cursor: pointer;
+}
+.sr-btn:hover {
+  border-color: var(--faint);
+}
+.sr-btn.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+.sr-btn.primary:hover {
+  background: var(--accent-hover);
+}
+.sr-btn .sr-btn-hint {
+  font-weight: 400;
+  opacity: 0.8;
+}
+.sr-btn.link {
+  padding: 8px 4px;
+  border: 0;
+  background: none;
+  color: var(--link);
+}
+.sr-hint,
+.sr-kept {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.sr-kept {
+  padding-top: 10px;
+  border-top: 1px solid var(--line-2);
+}
+@media (max-width: 560px) {
+  .sr-rows li {
+    grid-template-columns: 18px minmax(0, 1fr);
+  }
+  .sr-what {
+    grid-column: 2;
+  }
 }
 /* Your RSI portrait opens the menu (a gear until we know who you are). */
 .avatar-btn {
@@ -1221,7 +1420,7 @@ nav .nav-n:empty {
 }
 .menu-who b {
   display: block;
-  font: 800 15px var(--font-head);
+  font: 600 15px var(--font-head);
   color: var(--head);
 }
 .menu-who small {
@@ -1245,7 +1444,7 @@ nav .nav-n:empty {
   border-radius: 7px;
   background: var(--accent);
   color: #fff;
-  font: 700 12px var(--font-head);
+  font: 500 12px var(--font-head);
   cursor: pointer;
 }
 /* The old full-width update banner stays hidden: the menu carries it now. */
@@ -1271,29 +1470,243 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
     width 0.2s,
     height 0.2s;
 }
-/* Phones: the page links become pill tabs you swipe, with a fade at the edge. */
+/* ---- Top Bar Option A, More Menu (owner, 2026-10-06; #260) ------------------- */
+/* One row at every width from 800px up: the logo, Home, Inventory, Buy-Backs, Store
+   and More ▾ on the left; search, Game Status, the bell, Scan ▾ and your portrait on
+   the right. Under 900px the logo drops its word and Scan All its words. Phones put
+   the page links on a second row you swipe. */
+.wrap > header {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  gap: 22px;
+}
+.wrap > header .brand {
+  flex: none;
+}
+.wrap > header #nav {
+  order: 0;
+  flex: 0 1 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  margin-left: 0;
+  overflow: visible;
+}
+.wrap > header #nav a,
+.wrap > header .more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 11px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  font: 500 14.5px var(--font-head);
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+}
+.wrap > header #nav a:hover,
+.wrap > header .more-btn:hover {
+  background: none;
+  color: var(--head);
+}
+.wrap > header #nav a.active,
+.wrap > header .more-btn.active,
+.wrap > header .more-btn.open {
+  background: var(--panel-2);
+  color: var(--head);
+}
+.wrap > header #nav a:focus-visible,
+.wrap > header .more-btn:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 1px;
+}
+.more-wrap {
+  display: inline-flex;
+}
+.scan-menu.more-menu {
+  width: 210px;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: #232933;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+.more-menu .more-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--text);
+  font: 500 14px var(--font-head);
+  text-decoration: none;
+}
+.more-menu .more-item svg {
+  flex: none;
+  color: var(--muted);
+}
+.more-menu .more-item:hover,
+.more-menu .more-item:focus-visible {
+  outline: none;
+  background: var(--panel-2);
+  color: var(--head);
+}
+.more-menu .more-item.active {
+  background: var(--accent-soft);
+  color: var(--head);
+}
+.more-menu .more-item.active svg {
+  color: var(--link);
+}
+.wrap > header .hdr-prefs {
+  order: 0;
+  flex: none;
+  gap: 10px;
+  margin-left: auto;
+}
+/* Search: an icon; the field opens over the page links (click or /). Shut, the field
+   is still there for / to focus, just not seen. */
+.tb-search {
+  position: relative;
+  display: flex;
+}
+.hdr-prefs .tb-search:not(.open) .top-search {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  opacity: 0;
+  pointer-events: none;
+}
+.hdr-prefs .tb-search.open .top-search {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  z-index: 6;
+  width: 340px;
+  height: 40px;
+  transform: translateY(-50%);
+  border-color: var(--accent-line);
+  background: var(--panel-2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  transition: none;
+}
+.hdr-prefs .tb-search.open .tb-search-btn {
+  visibility: hidden;
+}
+/* Scan ▾: one steady width whatever it says ("Scan All", "Scanning 2/4", "Landed"). */
+.hdr-prefs .scan-split {
+  display: inline-flex;
+  flex: none;
+}
+.hdr-prefs .scan-split #scan-home {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 140px;
+  min-width: 0;
+  height: 36px;
+  padding: 0 12px;
+  font-variant-numeric: tabular-nums;
+}
+.hdr-prefs .scan-split .scan-caret {
+  display: grid;
+  place-items: center;
+  height: 36px;
+  padding: 0 9px;
+}
+#scan-home .scan-ic {
+  flex: none;
+}
+#scan-home.rough .scan-ic {
+  color: #f2c14e;
+}
+/* Narrow bars (under 900px): the logo without its word, Scan as its icon (the count
+   while a scan runs), tighter gaps. */
+@media (max-width: 1180px) {
+  .wrap > header {
+    gap: 18px;
+  }
+}
 @media (max-width: 900px) {
-  .hdr-prefs .top-search {
+  .wrap > header {
+    gap: 12px;
+  }
+  .wrap > header .brand h1 {
     display: none;
   }
-  nav#nav {
-    gap: 6px;
-    -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent);
-    mask-image: linear-gradient(90deg, #000 85%, transparent);
+  .wrap > header #nav a,
+  .wrap > header .more-btn {
+    padding: 7px 9px;
+    font-size: 14px;
   }
-  nav#nav a {
+  .wrap > header .hdr-prefs {
+    gap: 8px;
+  }
+  .hdr-prefs .tb-search.open .top-search {
+    width: 300px;
+  }
+  .hdr-prefs .scan-split #scan-home {
+    width: 46px;
+    padding: 0;
+  }
+  #scan-home .sl-word {
+    display: none;
+  }
+  #scan-home.counting .scan-ic {
+    display: none;
+  }
+  #scan-home .sl-count {
+    font: 500 12.5px var(--font-data);
+  }
+}
+/* Phones: the page links move to a second row of pill tabs you swipe (no fade mask:
+   it would hide the More menu, which opens from inside the row); the search field
+   opens across the top. */
+@media (max-width: 640px) {
+  .wrap > header {
+    flex-wrap: wrap;
+    gap: 10px 12px;
+  }
+  .wrap > header .hdr-prefs {
+    order: 1;
+  }
+  .wrap > header #nav {
+    order: 2;
+    flex: 1 0 100%;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .wrap > header #nav a,
+  .wrap > header .more-btn {
     flex: none;
     border-radius: 999px;
     background: var(--panel);
   }
-  nav#nav a.active {
+  .wrap > header #nav a.active,
+  .wrap > header .more-btn.active {
     background: var(--accent);
     color: #fff;
   }
-}
-@media (max-width: 1180px) {
-  nav .nav-n {
+  .hdr-prefs .gs-pill .gs-txt {
     display: none;
+  }
+  .hdr-prefs .tb-search.open .top-search {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    transform: none;
   }
 }
 
@@ -1315,7 +1728,7 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
 }
 .page-sum h2 {
   margin: 0;
-  font: 800 26px var(--font-head);
+  font: 600 26px var(--font-head);
   color: var(--head);
 }
 .ps-note {
@@ -1342,7 +1755,8 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
   color: var(--muted);
 }
 .ps-v {
-  font: 800 22px var(--font-head);
+  font: 500 22px var(--font-data);
+  letter-spacing: -0.01em;
   color: var(--head);
   font-variant-numeric: tabular-nums;
 }
@@ -1431,7 +1845,7 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
   border: 0;
   background: none;
   color: var(--text);
-  font: 700 13px var(--font-head);
+  font: 600 13px var(--font-head);
   cursor: pointer;
 }
 .chip-row .oh-sw + .oh-sw {
@@ -1482,7 +1896,7 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
   display: inline-flex;
   align-items: center;
   border: 1px dashed var(--line-2);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
 }
 .view-chip.on {
   border-style: solid;
@@ -1496,7 +1910,7 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
   border: 0;
   background: none;
   color: var(--text);
-  font: 700 12px var(--font-head);
+  font: 600 12px var(--font-head);
   cursor: pointer;
 }
 .view-chip .view-x {
@@ -1516,7 +1930,7 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
 .val .under,
 .bb-end .under {
   display: block;
-  font: 800 11px var(--font-head);
+  font: 600 11px var(--font-head);
   color: var(--good);
   white-space: nowrap;
 }
@@ -1528,10 +1942,10 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
   display: inline-block;
   margin-left: 6px;
   padding: 1px 7px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   background: var(--panel-2);
   color: var(--link);
-  font: 800 12px var(--font-head);
+  font: 500 12px var(--font-data);
   vertical-align: 2px;
 }
 /* Melt planner line in Select mode's bar. */
@@ -1549,7 +1963,7 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
 }
 .sb-melt .sb-total {
   margin-right: 6px;
-  font: 800 22px var(--font-head);
+  font: 500 22px var(--font-data);
   vertical-align: -2px;
 }
 .sb-warn {
@@ -1564,7 +1978,7 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
   width: auto;
   height: 20px;
   padding: 0 7px;
-  font: 700 11px var(--font-head);
+  font: 600 11px var(--font-head);
 }
 .grid.list .flag .fl-s {
   display: none;
@@ -1604,4 +2018,684 @@ body.bar-slim:not(:has(#view-home.active)) .wrap > header .brand h1 {
 body:not(:has(#view-home.active)) .market-title {
   top: calc(var(--hdr-h, 0px) - 12px);
   padding-top: 20px;
+}
+
+/* The website Connect card (ui/site/SiteConnect.svelte): top right of the Citizen Card,
+   over the org watermark; under the card's text up to 1000px wide, where beside it the
+   name and org lines would run under it or wrap a word alone (#542). */
+.home-hero .citizen-card .site-connect {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 2;
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  max-width: 300px;
+  text-align: right;
+}
+/* While Connect is in the corner, the name and org lines stop short of it (its 300px,
+   its 18px from the edge and a 16px gap, less the card's own 24px padding): a long
+   name ends in "…" and a long org name wraps, never under the card. */
+.home-hero .citizen-card:has(#site-connect) :is(.cc-name, .cc-org) {
+  margin-right: 310px;
+}
+.sc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  background: var(--panel-2);
+  color: var(--head);
+  font: 500 14px var(--font-body);
+  cursor: pointer;
+}
+.sc-btn:hover {
+  border-color: var(--faint);
+}
+.sc-btn.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+.sc-btn.primary:hover {
+  background: var(--accent-hover);
+}
+.sc-btn.quiet {
+  padding-inline: 4px;
+  border-color: transparent;
+  background: none;
+  color: var(--link);
+}
+.sc-btn:disabled {
+  cursor: progress;
+  opacity: 0.85;
+}
+.sc-hint,
+.sc-msg {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.sc-msg {
+  color: #f2c14e;
+}
+.sc-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+}
+.sc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--good-soft);
+  color: var(--head);
+  font-size: 14px;
+}
+.sc-chip svg {
+  color: #3fb950;
+}
+.sc-chip.wait {
+  background: var(--accent-soft);
+}
+.sc-code {
+  padding: 6px 12px;
+  border: 1px dashed rgba(77, 124, 255, 0.55);
+  border-radius: 10px;
+  background: #232933;
+  color: var(--head);
+  font: 600 20px var(--font-head);
+  letter-spacing: 0.12em;
+}
+.sc-copy {
+  padding: 6px 11px;
+  font-size: 13px;
+}
+.sc-copy.done {
+  border-color: var(--good-line);
+  color: var(--good);
+}
+.sc-left {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.sc-confirm {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(77, 124, 255, 0.55);
+  border-radius: 12px;
+  background: #232933;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+  text-align: left;
+}
+.sc-confirm b {
+  color: var(--head);
+  font: 600 15px var(--font-head);
+}
+.sc-spin {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sc-spin {
+    animation: sc-spin 0.8s linear infinite;
+  }
+  @keyframes sc-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+}
+@media (max-width: 1000px) {
+  .home-hero .citizen-card:has(#site-connect) :is(.cc-name, .cc-org) {
+    margin-right: 0;
+  }
+  .home-hero .citizen-card .site-connect {
+    position: static;
+    justify-items: start;
+    max-width: none;
+    padding: 0 22px 20px;
+    text-align: left;
+  }
+  .site-connect .sc-row {
+    justify-content: flex-start;
+  }
+}
+
+/* Open on Website, or See It on Any Device before you connect
+   (ui/site/OpenOnWebsite.svelte): a quiet link under the page title on Inventory,
+   Buy-Backs and Stats, and in the Citizen Card's corner on Home once connected. */
+.site-open {
+  margin: 3px 0 0;
+}
+.site-open-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: 500 13px var(--font-body);
+  cursor: pointer;
+}
+.site-open-btn:hover:not(:disabled) {
+  text-decoration: underline;
+}
+.site-open-btn:disabled {
+  color: var(--muted);
+  cursor: progress;
+}
+/* Touch screens (Firefox for Android): a taller tap area, nothing around it moves. */
+@media (pointer: coarse) {
+  .site-open-btn {
+    padding-block: 7px;
+    margin-block: -7px;
+  }
+}
+/* Stats: right under its title, the tabs below. */
+.stats-site .site-open {
+  margin: -10px 0 12px;
+}
+/* Home: while the link sits in the card's corner, a long name stops short of it. */
+@media (min-width: 761px) {
+  .home-hero .citizen-card:has(#site-open-home) .cc-name {
+    padding-right: 130px;
+  }
+}
+
+/* Firefox only: what we share, under Connect (opens the explainer below). */
+.sc-ff {
+  display: flex;
+  gap: 10px;
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(245, 181, 68, 0.4);
+  border-radius: 10px;
+  background: var(--beacon-soft);
+  color: var(--text);
+  font-size: 13.5px;
+  text-align: left;
+  text-wrap: pretty;
+}
+.sc-ff svg {
+  flex: 0 0 18px;
+  margin-top: 2px;
+  color: var(--beacon);
+}
+.sc-ff b {
+  color: var(--head);
+  font-weight: 600;
+}
+.sc-learn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sc-learn:hover {
+  text-decoration: underline;
+}
+
+/* The Firefox explainer (ui/site/FirefoxExplain.svelte): a card over the page. */
+.fx-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(5, 7, 10, 0.6);
+}
+.fx-card {
+  position: relative;
+  width: min(480px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 20px 22px;
+  border: 1px solid rgba(77, 124, 255, 0.5);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(59, 106, 237, 0.12), transparent 50%), var(--panel);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+  color: var(--text);
+  text-align: left;
+}
+.fx-card:focus {
+  outline: none;
+}
+.fx-x {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  padding: 2px 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.fx-x:hover {
+  color: var(--head);
+}
+.fx-kick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--beacon);
+  font: 700 11px var(--font-head);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.fx-card h2 {
+  margin: 6px 0 12px;
+  padding-right: 20px;
+  color: var(--head);
+  font: 600 19px var(--font-head);
+  text-wrap: balance;
+}
+.fx-card dl {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 16px;
+}
+.fx-card dt {
+  margin-top: 8px;
+  color: var(--head);
+  font-size: 14px;
+  font-weight: 600;
+}
+.fx-card dd {
+  margin: 0;
+  font-size: 14px;
+  text-wrap: pretty;
+}
+.fx-card dd b {
+  color: var(--head);
+  font-weight: 600;
+}
+.fx-acts {
+  display: flex;
+  gap: 8px;
+}
+
+/* Sync builds, once connected (ui/site): the Synced dot on your portrait's bottom
+   right (the update dot has the top right, Streamer Mode the bottom left), and the
+   "Synced 5:54 PM" line with Sync Now at the top of its menu. */
+.sync-dot {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  background: var(--faint);
+}
+.sync-dot.on {
+  background: var(--good);
+}
+.sync-dot.busy {
+  background: var(--accent);
+}
+.sync-dot .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.ss-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+.ss-dot.on {
+  background: var(--good);
+  box-shadow: 0 0 0 3px rgba(63, 185, 122, 0.2);
+}
+.ss-dot.busy {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.menu-sync {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 8px 7px 10px;
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13.5px;
+}
+.menu-sync.on {
+  background: var(--good-soft);
+}
+/* Not connected yet: Connect sits at the top of the menu (#434). */
+.settings-menu .menu-connect {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 9px;
+  align-items: start;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--accent-line);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.settings-menu .menu-connect:hover {
+  border-color: var(--accent);
+}
+.settings-menu .menu-connect:disabled {
+  cursor: progress;
+}
+.menu-connect svg {
+  margin-top: 2px;
+  color: var(--link);
+}
+.menu-connect b {
+  display: block;
+  color: var(--head);
+  font: 600 13.5px var(--font-head);
+}
+.menu-connect small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.menu-sync > span {
+  flex: 1;
+  min-width: 0;
+}
+.settings-menu .menu-sync .menu-item {
+  display: inline;
+  width: auto;
+  padding: 2px 4px;
+  border: 0;
+  color: var(--link);
+  font: 500 13px var(--font-head);
+  white-space: nowrap;
+}
+.settings-menu .menu-sync .menu-item:disabled {
+  color: var(--muted);
+  cursor: progress;
+}
+
+/* The website's section in the Scan ▾ menu (ui/site/SyncMenu.svelte). */
+.sm-site {
+  display: grid;
+  gap: 2px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-2);
+}
+.sm-stat {
+  display: flex;
+  gap: 9px;
+  margin: 0 0 4px;
+  padding: 2px 8px 4px;
+  font-size: 14px;
+  color: var(--text);
+}
+.sm-stat .ss-dot {
+  margin-top: 6px;
+}
+.sm-stat b {
+  color: var(--head);
+  font-weight: 600;
+}
+.sm-stat small {
+  display: block;
+  font-size: 12.5px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.sm-act {
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font: 500 14px var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.sm-act:hover:not(:disabled) {
+  background: #2c333e;
+  color: var(--head);
+}
+.sm-act:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+.sm-act.dim {
+  color: var(--muted);
+}
+.sm-confirm {
+  display: grid;
+  gap: 8px;
+  margin: 2px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(77, 124, 255, 0.55);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.you-confirm {
+  margin: 6px 0;
+}
+.you-confirm.warn {
+  border-color: rgba(232, 163, 60, 0.6);
+}
+.you-confirm.danger {
+  border-color: rgba(248, 81, 73, 0.6);
+}
+.sc-btn.warn {
+  background: #9a6212;
+  border-color: #9a6212;
+  color: #fff;
+}
+.sc-btn.danger {
+  background: #c93c37;
+  border-color: #c93c37;
+  color: #fff;
+}
+.sc-btn.warn:hover {
+  background: #8f5a10;
+}
+.sc-btn.danger:hover {
+  background: #b5332e;
+}
+.sm-confirm b {
+  color: var(--head);
+  font: 600 14px var(--font-head);
+}
+.sm-confirm-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.sm-msg {
+  margin: 4px 8px 2px;
+  font-size: 13px;
+  color: #f2c14e;
+  text-wrap: pretty;
+}
+
+/* Type tags: tiny all-caps pills in the item's type colour on a soft wash of it. */
+.badge {
+  padding: 2px 8px;
+  border-color: currentColor;
+  font-family: var(--font-head);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1.4;
+}
+.badge.ship {
+  background: var(--t-ship-soft);
+}
+.badge.ccu {
+  background: var(--t-ccu-soft);
+}
+.badge.paint {
+  background: var(--t-paint-soft);
+}
+/* A retired ship's buy-back: RSI still sells it back for now (owner, 2026-10-09). */
+.badge.retired {
+  margin-left: 6px;
+  color: var(--warn);
+  cursor: help;
+}
+.bb-retired-mark {
+  margin-right: 8px;
+  color: var(--warn);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: help;
+}
+.badge.addon {
+  background: var(--t-addon-soft);
+}
+.badge.coupon {
+  background: var(--t-coupon-soft);
+}
+.badge.pack {
+  background: var(--t-pack-soft);
+}
+.badge.package {
+  background: var(--t-package-soft);
+}
+.badge.good {
+  background: var(--good-soft);
+}
+.badge.warn {
+  background: var(--warn-soft);
+}
+
+/* Buttons: weight 500 (CLAUDE.md) and the rounded corner. Classed buttons (tabs,
+   chips, pills) keep their own shapes. */
+button,
+.btn {
+  border-radius: var(--r-sm);
+  font-weight: 500;
+}
+
+/* ---- Inventory and Buy-Backs in Hangar Cobalt (styling pass, 2026-10-04) ------ */
+/* Cards: rounded, and on hover they lift and light their edge in cobalt. */
+.card {
+  border-radius: var(--r-md);
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease,
+    transform 0.12s ease;
+}
+.card:hover {
+  border-color: var(--accent-line);
+  box-shadow:
+    0 0 0 1px var(--accent-line),
+    0 10px 24px rgba(0, 0, 0, 0.35);
+}
+/* Prices read like instrument readouts. */
+.val {
+  font-family: var(--font-data);
+  font-weight: 500;
+  color: var(--head);
+  letter-spacing: -0.01em;
+}
+.market-table th {
+  font-weight: 600;
+}
+.market-table th:first-child {
+  border-top-left-radius: var(--r-sm);
+}
+.market-table th:last-child {
+  border-top-right-radius: var(--r-sm);
+}
+
+/* ---- Stats in Hangar Cobalt (styling pass, 2026-10-04) ------------------------- */
+.section-title {
+  font-family: var(--font-head);
+  font-weight: 600;
+  color: var(--head);
+  text-wrap: balance;
+}
+.stat-box {
+  border-radius: var(--r-md);
+}
+/* Big numbers and bar values read like instrument readouts. */
+.stat-box .big {
+  font: 500 26px var(--font-data);
+  letter-spacing: -0.02em;
+  color: var(--head);
+}
+.stat-box.good .big {
+  color: var(--good);
+}
+.bar-val,
+.top-list .row .vl {
+  font-family: var(--font-data);
+  letter-spacing: -0.01em;
+}
+.bar-track {
+  height: 14px;
+  border-radius: 999px;
+}
+.bar-fill {
+  border-radius: 999px;
+}
+.top-list {
+  border-radius: var(--r-md);
+}
+/* Tabs and view switches are buttons: weight 500. */
+.layout-toggle {
+  border-radius: var(--r-sm);
+}
+.layout-toggle button {
+  font-weight: 500;
+}
+
+/* ---- Store in Hangar Cobalt (styling pass, 2026-10-04) ------------------------- */
+.store-panel {
+  border-radius: var(--r-lg);
+}
+.sp-head h3 {
+  font-family: var(--font-head);
+  font-weight: 600;
+  color: var(--head);
+}
+.sp-scroll {
+  border-radius: var(--r-sm);
+}
+/* Prices and counts in tables (Store, Org Fleet) read like instrument readouts. */
+.org-table td.num {
+  font-family: var(--font-data);
+  letter-spacing: -0.01em;
+}
+/* Warbond deals glow in the beacon colour: worth a look. */
+.sale.wb {
+  color: var(--beacon);
 }

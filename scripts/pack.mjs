@@ -7,66 +7,168 @@
  *   chrome   — manifest.json as-is. Same zip goes to Chrome Web Store + Edge.
  *   firefox  — adds background.scripts (Firefox MV3 runs an event page, not a
  *              service worker) and browser_specific_settings.gecko (add-on id +
- *              the "no data collected" declaration AMO requires).
+ *              the data collection declaration AMO requires: none required, what
+ *              sync sends optional).
  *
  * Kept out of manifest.json itself so Chrome doesn't warn about unknown keys.
+ *
+ * Both carry sync (the `sync` flag is on by default), built in to production
+ * (app.openhangar.space). Sync is opt-in: nothing is sent until you Connect.
+ *
+ * --beta (npm run build:beta): the separate, unlisted "Open Hangar Beta" instead
+ * (docs/BETA.md), into dist/beta/ (Chrome and Edge) and dist/beta-firefox/ (a
+ * self-distributed Firefox add-on): its own name, amber icons (beta/icons/), the
+ * version from beta/beta.json, and sync on, built in to production
+ * (app.openhangar.space). Never the staging site. The public listing never gets it:
+ * different name, version scheme, store item and Firefox add-on id.
+ * scripts/check-store-build.mjs --beta checks both.
+ *
+ * Build flags (src/flags.js, docs/FLAGS.md): each build's values go into its copy of
+ * src/flags.js, and the code of every flag that's off is cut. Store builds get the
+ * registry's defaults, --beta the beta set, and --flag name=on (or =off, repeatable)
+ * is for developers' own builds (--sync / OH_SYNC=1 are the older --flag sync=on).
+ *
+ * Our pages that may talk to the extension (bridge v2, scripts/site-pages.mjs): decided
+ * once per build and written into the manifest, the built src/site-pages.js and the
+ * built src/site-bridge.js; each build is checked to agree before it's done.
  */
 
-import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import {
+  FLAGS_FILE,
+  buildValues,
+  parseFlagArgs,
+  readRegistry,
+  stripFlagsInDir,
+  writeFlags,
+} from './build-flags.mjs';
+import { ALERTS_FILES, alertsProblems, withAlerts } from './alerts.mjs';
+import {
+  CONNECTOR_PAGES,
+  connectSrc,
+  connectorProblems,
+  folderBuild,
+  trimToConnector,
+} from './connector.mjs';
+import {
+  pagesFor,
+  pagesProblems,
+  patternsOf,
+  readBridgePages,
+  readPages,
+  withoutPageLists,
+  writeBridgePages,
+  writePages,
+} from './site-pages.mjs';
 
 const RUNTIME = ['_locales', 'icons', 'src'];
 
-// Sync to app.openhangar.space isn't launched, and the privacy policy says nothing
-// leaves your device, so store builds don't carry its code at all (#187). Lines from
-// a "@sync-start" marker through "@sync-end" are cut. OH_SYNC=1 (or --sync) keeps
-// them, for developers testing sync locally (with the `siteUrl` storage key, or
-// pre-pointed at staging by `npm run build:staging`).
 const args = process.argv.slice(2);
-const KEEP_SYNC = process.env.OH_SYNC === '1' || args.includes('--sync');
+const BETA = args.includes('--beta');
+// The sync site of every store build, the beta's included. Staging is never built in
+// to anything a store gets.
+const PRODUCTION_SITE = 'https://app.openhangar.space';
 
-// `npm run build:staging` (--site=<url> or OH_SITE=<url>): a dev build with sync
-// on and pointed at that site, written into lib.js's SITE_BUILT_IN, so nobody has to
-// set the `siteUrl` storage key by hand. Dev builds only: it needs sync kept, and
-// scripts/check-store-build.mjs fails any release or publish whose build carries it.
-const SITE =
+// This build's flags (src/flags.js): the store defaults or the beta set, then the
+// developer's own. A beta is always exactly the beta set.
+const REGISTRY = readRegistry(FLAGS_FILE);
+const OVERRIDES = parseFlagArgs(args, REGISTRY);
+if (BETA && Object.keys(OVERRIDES).length)
+  throw new Error('--beta always builds the beta set of flags; drop --flag');
+if (!BETA && (process.env.OH_SYNC === '1' || args.includes('--sync'))) OVERRIDES.sync ??= true;
+const FLAGS = buildValues(REGISTRY, { beta: BETA, overrides: OVERRIDES });
+const FLAGS_ON = Object.keys(FLAGS).filter((f) => FLAGS[f]);
+const DEV_ONLY_ON = FLAGS_ON.filter((f) => REGISTRY[f].devOnly);
+// Flags set away from the store defaults (--flag): a developer's build.
+const OFF_DEFAULT = !BETA && Object.keys(FLAGS).some((f) => FLAGS[f] !== REGISTRY[f].default);
+
+// Sync to app.openhangar.space (#187): the code between a "@sync-start" marker and
+// "@sync-end" is the `sync` flag's, on by default, so every store build keeps it (the
+// beta too). Sync stays opt-in: nothing is sent until you Connect. A developer's
+// `--flag sync=off` build cuts it, and fails if app.openhangar.space is left anywhere.
+const KEEP_SYNC = FLAGS.sync;
+
+// The sync site, written into lib.js's SITE_BUILT_IN so nobody has to set the
+// `siteUrl` storage key by hand: production in every build with sync, or
+// --site=<url> / OH_SITE=<url> for a developer's build (`npm run build:staging`), which
+// is never for a store (scripts/check-store-build.mjs).
+const SITE_ARG =
   (args.find((a) => a.startsWith('--site=')) || '').slice('--site='.length) ||
   process.env.OH_SITE ||
   '';
-if (SITE) {
-  if (!KEEP_SYNC) throw new Error('--site / OH_SITE needs sync kept (--sync or OH_SYNC=1)');
-  if (!/^(https:\/\/[a-z0-9.-]+|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?)$/i.test(SITE))
-    throw new Error(`--site / OH_SITE must be an https:// origin (or http://localhost): ${SITE}`);
+if (BETA && SITE_ARG) throw new Error('--beta always syncs to production; drop --site / OH_SITE');
+if (SITE_ARG) {
+  if (!KEEP_SYNC) throw new Error('--site / OH_SITE needs sync on (drop --flag sync=off)');
+  if (!/^(https:\/\/[a-z0-9.-]+|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?)$/i.test(SITE_ARG))
+    throw new Error(
+      `--site / OH_SITE must be an https:// origin (or http://localhost): ${SITE_ARG}`,
+    );
 }
+const SITE = KEEP_SYNC ? SITE_ARG || PRODUCTION_SITE : '';
+// Built in to a site other than production: a developer's build.
+const DEV_SITE = Boolean(SITE) && SITE !== PRODUCTION_SITE;
+// Local Mode (our hangar page reading this browser's hangar) asks Firefox's data
+// permission through sync's consent card (src/dashboard.js), and its handlers use
+// sync's Firefox check (src/background.js).
+if (FLAGS.localMode && !KEEP_SYNC)
+  throw new Error('--flag localMode=on needs sync on (drop --flag sync=off)');
+// The connector (src/flags.js) hands the hangar to our hangar page and the website:
+// its popup's Open My Hangar and its scans for that page are Local Mode's.
+if (FLAGS.connector && !FLAGS.localMode)
+  throw new Error('--flag connector=on needs localMode on (add --flag localMode=on)');
+// Extension Alerts (scripts/alerts.mjs) show in the connector's popup.
+if (FLAGS.alerts && !FLAGS.connector)
+  throw new Error('--flag alerts=on needs the connector on (add --flag connector=on)');
+// The connector's own pages (scripts/connector.mjs). Without the flag they're left out
+// of the build: nothing opens them there.
+const CONNECTOR_FILES = [
+  ...CONNECTOR_PAGES,
+  ...['popup.js', 'popup.css', 'basic.js', 'basic.css', 'tokens.css'].map((f) => `src/ui/${f}`),
+];
 const SITE_LINE = "const SITE_BUILT_IN = '';";
 function presetSite(file) {
   const src = readFileSync(file, 'utf8');
   if (src.split(SITE_LINE).length !== 2) throw new Error(`${file}: expected one "${SITE_LINE}"`);
   writeFileSync(file, src.replace(SITE_LINE, `const SITE_BUILT_IN = ${JSON.stringify(SITE)};`));
 }
-const SYNC_FILES = ['src/lib.js', 'src/dashboard.js', 'src/dashboard.html'];
-function stripSync(file) {
-  const out = [];
-  let inside = false;
-  for (const line of readFileSync(file, 'utf8').split('\n')) {
-    if (line.includes('@sync-start')) {
-      if (inside) throw new Error(`${file}: @sync-start inside another sync block`);
-      inside = true;
-    } else if (line.includes('@sync-end')) {
-      if (!inside) throw new Error(`${file}: @sync-end without @sync-start`);
-      inside = false;
-    } else if (!inside) out.push(line);
-  }
-  if (inside) throw new Error(`${file}: @sync-start never closed`);
-  writeFileSync(file, out.join('\n'));
+
+// The beta's version (beta/beta.json). Chrome and Edge only take one to four dotted
+// numbers (each 0 to 65535) as `version`, so the beta counts 0.3.0.1, 0.3.0.2, ... and
+// `version_name` ("0.3.0 Beta 1") is what people see.
+function betaVersion() {
+  const b = JSON.parse(readFileSync('beta/beta.json', 'utf8'));
+  const parts = String(b.version || '').split('.');
+  if (parts.length !== 4 || !parts.every((p) => /^(0|[1-9]\d{0,4})$/.test(p) && +p <= 65535))
+    throw new Error(
+      `beta/beta.json: version must be four dotted numbers, e.g. 0.3.0.1 (got "${b.version}")`,
+    );
+  if (!/^\d+\.\d+\.\d+ Beta \d+$/.test(b.version_name || ''))
+    throw new Error(
+      `beta/beta.json: version_name must read like "0.3.0 Beta 1" (got "${b.version_name}")`,
+    );
+  return b;
 }
-// Belt and braces: no store build may still talk to the sync site.
+const BETA_NAME = 'Open Hangar Beta';
+// ≤132 characters (Chrome's limit); the store's short description comes from it.
+const BETA_DESCRIPTION =
+  'Beta build of Open Hangar for invited testers: your Star Citizen hangar, made useful, with opt-in sync to openhangar.space.';
+// Belt and braces: a build without sync may not still talk to the sync site. The page
+// lists name it for Add to RSI Cart, the same as the manifest.
 function assertNoSyncHost(dir) {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const p = `${dir}/${e.name}`;
     if (e.isDirectory()) assertNoSyncHost(p);
     else if (
       /\.(js|html|json)$/.test(e.name) &&
-      readFileSync(p, 'utf8').includes('app.openhangar.space')
+      withoutPageLists(readFileSync(p, 'utf8')).includes('app.openhangar.space')
     ) {
       throw new Error(`${p} still mentions app.openhangar.space; wrap it in @sync-start/@sync-end`);
     }
@@ -74,25 +176,81 @@ function assertNoSyncHost(dir) {
 }
 const base = JSON.parse(readFileSync('manifest.json', 'utf8'));
 
+// What sync sends (the same payload as the JSON backup: RSI handle and org, balances
+// and pledge prices, hangar and buy-back contents), in Firefox's data-collection
+// categories. Optional, because sync is opt-in: Firefox asks on the first Connect
+// (src/dashboard.js, siteDataOk). Keep the two lists the same (test/firefox-data.test.js).
+const SYNC_DATA = ['personallyIdentifyingInfo', 'financialAndPaymentInfo', 'websiteContent'];
+
+// The Firefox beta: an unlisted add-on of its own, so it never replaces the public
+// one, signed on AMO and handed out by the website. A self-distributed add-on only
+// updates from its update_url: the website hosts that file (Firefox's updates.json
+// format, docs/BETA.md) next to the signed .xpi.
+const BETA_FIREFOX_ID = 'open-hangar-beta@draco-foundry';
+const BETA_FIREFOX_UPDATES = `${PRODUCTION_SITE}/beta/firefox-updates.json`;
+
+// What src/background.js loads with importScripts on Chrome besides flags.js
+// (test/build-flags.test.js checks the two lists agree).
+const WORKER_SCRIPTS = [
+  'src/site-pages.js',
+  'src/schema-check.js',
+  'src/parser-rules-data.js',
+  'src/parser-rules.js',
+  'src/rsi-cart.js',
+  'src/sync-schema.js',
+  'src/hangar-shape.js',
+  // Extension Alerts (scripts/alerts.mjs), only in a build with them.
+  ...(FLAGS.alerts ? ALERTS_FILES : []),
+];
+
 const targets = {
   chrome: (m) => m,
-  firefox: (m) => ({
+  firefox: (m, gecko = { id: 'open-hangar@draco-foundry' }) => ({
     ...m,
-    background: { scripts: [m.background.service_worker] },
+    // Firefox's event page has no importScripts, so what background.js imports on
+    // Chrome is listed here, before it: flags.js, site-pages.js (which of our pages
+    // may ask what), the schema checker and the parser rules, rsi-cart.js for Add to
+    // RSI Cart from the website (through site-bridge.js, #434; it reads the rules), and
+    // the sync schema with the shared hangar shaping (#441).
+    background: { scripts: [FLAGS_FILE, ...WORKER_SCRIPTS, m.background.service_worker] },
     browser_specific_settings: {
       gecko: {
-        id: 'open-hangar@draco-foundry',
+        ...gecko,
         // data_collection_permissions landed in Firefox 140 (Android 142).
         strict_min_version: '140.0',
-        data_collection_permissions: { required: ['none'] },
+        data_collection_permissions: KEEP_SYNC
+          ? { required: ['none'], optional: SYNC_DATA }
+          : { required: ['none'] },
       },
       gecko_android: { strict_min_version: '142.0' },
     },
   }),
 };
 
+// Both browsers either way: the beta as one Chrome-and-Edge zip plus a Firefox one.
+const builds = BETA
+  ? {
+      beta: targets.chrome,
+      'beta-firefox': (m) =>
+        targets.firefox(m, { id: BETA_FIREFOX_ID, update_url: BETA_FIREFOX_UPDATES }),
+    }
+  : targets;
+const FIREFOX = new Set(['firefox', 'beta-firefox']);
+const beta = BETA ? betaVersion() : null;
+
+// Our pages that may talk to the extension, and what each may ask (src/site-pages.js):
+//   hangar   our hangar page (Local Mode): its hangar, scan status and a scan, and
+//            Add to RSI Cart; only with the `localMode` flag on
+//   site     openhangar.space and app.openhangar.space: Add to RSI Cart in every build
+//            (#288; no account, nothing sent anywhere but RSI)
+//   connect  the pages Connect This Browser answers: the app, in builds with sync
+// Staging's pages only in a developer's build pointed at another site (npm run
+// build:staging): never in a store build, the beta included
+// (scripts/check-store-build.mjs).
+const PAGES = pagesFor({ localMode: FLAGS.localMode, sync: KEEP_SYNC, devSite: DEV_SITE });
+
 rmSync('dist', { recursive: true, force: true });
-for (const [name, transform] of Object.entries(targets)) {
+for (const [name, transform] of Object.entries(builds)) {
   const out = `dist/${name}`;
   mkdirSync(out, { recursive: true });
   for (const dir of RUNTIME) cpSync(dir, `${out}/${dir}`, { recursive: true });
@@ -103,13 +261,97 @@ for (const [name, transform] of Object.entries(targets)) {
   // License terms and third-party notices travel with every copy.
   cpSync('LICENSE', `${out}/LICENSE`);
   cpSync('THIRD_PARTY_NOTICES.md', `${out}/THIRD_PARTY_NOTICES.md`);
-  writeFileSync(`${out}/manifest.json`, JSON.stringify(transform(base), null, 2) + '\n');
-  if (!KEEP_SYNC) {
-    for (const f of SYNC_FILES) stripSync(`${out}/${f}`);
-    assertNoSyncHost(`${out}/src`);
+  // A copy (chrome returns `base` itself), with the alerts' permissions in a build with
+  // them (scripts/alerts.mjs).
+  const manifest = withAlerts({ ...transform(base) }, FLAGS);
+  if (!FLAGS.alerts) for (const f of ALERTS_FILES) rmSync(`${out}/${f}`, { force: true });
+  // Sync's sign-in window (identity.launchWebAuthFlow) needs "identity": it's in
+  // manifest.json, so every build asks for it.
+  // Our pages (PAGES) may talk to the extension (src/background.js). Chrome and Edge:
+  // they message it directly. Firefox doesn't allow that, so there src/site-bridge.js
+  // runs in the top frame of just those pages and passes the messages on (#434, owner
+  // 2026-10-07: one-click Connect in every browser). Only the Firefox build carries it.
+  const SITE_MATCHES = patternsOf(PAGES);
+  if (FIREFOX.has(name))
+    manifest.content_scripts = [
+      {
+        matches: SITE_MATCHES,
+        js: ['src/site-bridge.js'],
+        run_at: 'document_start',
+        all_frames: false,
+      },
+    ];
+  else manifest.externally_connectable = { matches: SITE_MATCHES };
+  if (!FIREFOX.has(name)) rmSync(`${out}/src/site-bridge.js`, { force: true });
+  // The connector: the toolbar icon opens the popup (src/background.js answers its Scan),
+  // the dashboard and its pages stay out, and the pages may only send requests to RSI,
+  // openhangar.space and the sync site (scripts/connector.mjs).
+  if (FLAGS.connector) {
+    manifest.action = { ...manifest.action, default_popup: 'src/popup.html' };
+    const csp = manifest.content_security_policy;
+    manifest.content_security_policy = {
+      ...csp,
+      extension_pages: `${csp.extension_pages}; ${connectSrc(SITE)}`,
+    };
+    trimToConnector(out);
+  } else for (const f of CONNECTOR_FILES) rmSync(`${out}/${f}`, { force: true });
+  // The same lists, for the background worker and the bridge.
+  const pagesFile = `${out}/src/site-pages.js`;
+  writeFileSync(pagesFile, writePages(readFileSync(pagesFile, 'utf8'), PAGES, pagesFile));
+  const bridgeFile = `${out}/src/site-bridge.js`;
+  if (FIREFOX.has(name))
+    writeFileSync(
+      bridgeFile,
+      writeBridgePages(readFileSync(bridgeFile, 'utf8'), PAGES, bridgeFile),
+    );
+  if (beta) {
+    // Its own store item: a name, icons and version line of its own, so testers can
+    // tell it apart and it never stands in for the public Open Hangar.
+    manifest.name = BETA_NAME;
+    manifest.description = BETA_DESCRIPTION;
+    manifest.version = beta.version;
+    manifest.version_name = beta.version_name;
+    manifest.action = { ...manifest.action, default_title: BETA_NAME };
+    for (const f of readdirSync('beta/icons').filter((f) => f.endsWith('.png')))
+      cpSync(`beta/icons/${f}`, `${out}/icons/${f}`);
   }
+  writeFileSync(`${out}/manifest.json`, JSON.stringify(manifest, null, 2) + '\n');
+  writeFlags(`${out}/${FLAGS_FILE}`, FLAGS);
+  stripFlagsInDir(`${out}/src`, FLAGS);
+  if (!KEEP_SYNC) assertNoSyncHost(`${out}/src`);
   if (SITE) presetSite(`${out}/src/lib.js`);
+  if (SITE && FLAGS.alerts) for (const f of ALERTS_FILES) presetSite(`${out}/${f}`);
+  // What was built agrees with itself: the manifest's lists and the two copies.
+  const problems = pagesProblems(out, {
+    manifest,
+    pages: readPages(readFileSync(pagesFile, 'utf8'), pagesFile),
+    bridge: FIREFOX.has(name)
+      ? readBridgePages(readFileSync(bridgeFile, 'utf8'), bridgeFile)
+      : null,
+    firefox: FIREFOX.has(name),
+    flags: FLAGS,
+  });
+  problems.push(
+    ...connectorProblems(out, {
+      ...folderBuild(out),
+      manifest,
+      connector: FLAGS.connector,
+      site: SITE,
+      // npm test packs before the Svelte pages are built; the store check always looks.
+      refs: existsSync(`${out}/src/ui`),
+    }),
+    ...alertsProblems(out, {
+      ...folderBuild(out),
+      manifest,
+      alerts: FLAGS.alerts,
+      firefox: FIREFOX.has(name),
+    }),
+  );
+  if (problems.length) throw new Error(problems.join('\n'));
   console.log(
-    `built ${out}${KEEP_SYNC ? ' (with sync)' : ''}${SITE ? `, syncing to ${SITE} (dev build, never for a store)` : ''}`,
+    `built ${out}${KEEP_SYNC ? ' (with sync)' : ''}${SITE ? `, syncing to ${SITE}` : ''}` +
+      (beta ? ` as ${BETA_NAME} ${beta.version} (${beta.version_name})` : '') +
+      (FLAGS_ON.length ? `; flags on: ${FLAGS_ON.join(', ')}` : '') +
+      (DEV_SITE || DEV_ONLY_ON.length || OFF_DEFAULT ? ' (dev build, never for a store)' : ''),
   );
 }

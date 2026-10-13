@@ -1,7 +1,7 @@
 // Screenshot harness: runs the real dashboard with a fictional demo account.
 // - chrome.* is stubbed with in-memory storage seeded from DEMO_DB.
-// - RSI / star-citizen.wiki PUBLIC lookups (ship-matrix, wiki) go through the
-//   local proxy (no cookies ever sent); account/graphql calls never happen
+// - RSI PUBLIC lookups (ship-matrix) go through the local proxy; openhangar.space's
+//   feeds are answered here with invented data (no cookies ever sent); account/graphql calls never happen
 //   because getAccount/getReferral are stubbed after lib.js loads.
 (function () {
   const now = Date.now();
@@ -309,7 +309,8 @@
       rec: { value: 12400, symbol: '¤', label: 'REC', currency: 'REC' },
     },
     subscriber: { type: 'Centurion', frequency: 'monthly' },
-    concierge: null,
+    // Invented Chairman's Club standing (RSI's own percentage), for the Home popup.
+    concierge: { level: 'Space Marshal', next: 'Wing Commander', percent: 42 },
     citizenRecord: 'n/a',
     org: {
       name: 'Demo Fleet Collective',
@@ -321,8 +322,53 @@
     fetchedAt: now,
   };
   window.DEMO_REFERRAL = referral;
+  // Invented subscriber items (names, prices and stock are made up).
+  const subItem = (id, name, cents, extra = {}) => ({
+    id,
+    name,
+    title: name,
+    url: `/en/pledge/Subscribers-Store/Demo-${id}`,
+    media: null,
+    nativePrice: { amount: cents, discounted: null },
+    stock: { available: true },
+    tags: [],
+    isWarbond: false,
+    ...extra,
+  });
+  window.DEMO_SUB_STORE = [
+    {
+      data: {
+        store: {
+          listing: {
+            resources: [
+              subItem(1, 'Nebula Drift Paint', 500, { tags: [{ name: 'Paints' }] }),
+              subItem(2, 'Quasar Explorer Helmet', 1200, {
+                nativePrice: { amount: 1200, discounted: 900 },
+                isWarbond: true,
+                tags: [{ name: 'Armor' }],
+              }),
+              subItem(3, 'Tiny Hangar Plushie', 300, {
+                stock: { available: false },
+                tags: [{ name: 'Decorations' }],
+              }),
+              subItem(4, 'Starlight Flight Jacket', 800, {
+                label: 'Centurion',
+                tags: [{ name: 'Clothing' }],
+              }),
+              // A long name that wraps, and a kit: cards in a row still line up.
+              subItem(5, "Kastak Arms Inquisitor 'Star Kitten' Armor Set", 2500),
+              subItem(6, 'Star Kitten Kit', 1500),
+            ],
+            count: 6,
+            totalCount: 6,
+          },
+        },
+      },
+    },
+  ];
 
   const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
+  const sessionStore = {};
   const keysOf = (k) =>
     k == null
       ? Object.keys(store)
@@ -353,6 +399,19 @@
           for (const x of keysOf(k)) delete store[x];
         },
       },
+      // Session storage (what the dashboard keeps only while the browser runs).
+      session: {
+        get: async (k) =>
+          Object.fromEntries(
+            keysOf(k)
+              .filter((x) => x in sessionStore)
+              .map((x) => [x, clone(sessionStore[x])]),
+          ),
+        set: async (o) => void Object.assign(sessionStore, clone(o)),
+        remove: async (k) => {
+          for (const x of keysOf(k)) delete sessionStore[x];
+        },
+      },
     },
     runtime: {
       getManifest: () => ({ version: '0.2.7', name: 'Open Hangar' }),
@@ -365,11 +424,63 @@
     action: { setBadgeText() {}, onClicked: { addListener() {} } },
   };
 
+  // The store catalog (openhangar.space/api/catalog, v1), invented: Cutlass Black on
+  // sale on its own, Hull A sold out, the Carrack and Pioneer not for sale, and a
+  // pack, a paint, gear and an upgrade to the Freelancer.
+  const item = (id, kind, name, price, extra = {}) => ({
+    id,
+    kind,
+    name,
+    img: null,
+    url: `https://robertsspaceindustries.com/pledge/Demo/${name.replace(/\W+/g, '-')}`,
+    price,
+    wasPrice: null,
+    warbond: false,
+    standardPrice: null,
+    savings: null,
+    inStore: true,
+    insurance: null,
+    upgrade: null,
+    ...extra,
+  });
+  window.DEMO_CATALOG = {
+    v: 1,
+    updatedAt: new Date(now - 3600e3).toISOString(),
+    items: [
+      item('sku-89', 'ship', 'Cutlass Black', 110, {
+        url: 'https://robertsspaceindustries.com/pledge/Standalone-Ships/Cutlass-Black',
+        insurance: '6 Mo',
+      }),
+      item('sku-92', 'ship', 'Hull A', 100, { inStore: false }),
+      item('sku-19453', 'pack', 'ATLS Duo Pack', 75, {
+        warbond: true,
+        standardPrice: 90,
+        savings: 15,
+      }),
+      item('sku-501', 'paint', 'Cutlass - Ghoulish Green Paint', 10),
+      item('sku-502', 'gear', 'Cutlass Pilot Armor Set', 20),
+      item('upgrade-16', 'upgrade', 'Upgrade to Freelancer', 110, {
+        url: 'https://robertsspaceindustries.com/en/pledge',
+        upgrade: { toShipId: 16, to: 'Freelancer', skus: [13002] },
+      }),
+    ],
+    ships: [
+      {
+        id: 16,
+        name: 'Freelancer',
+        msrp: 110,
+        editions: [
+          { sku: 13002, price: 110, warbond: false },
+          { sku: 13003, price: 100, warbond: true },
+        ],
+      },
+    ],
+  };
+
   const realFetch = window.fetch.bind(window);
   window.fetch = (input, init = {}) => {
     const url = typeof input === 'string' ? input : input.url;
     if (/\/pledge-store\/api\/upgrade\/graphql/.test(url)) return realFetch('/__store-ships.json');
-    if (/\/api\/hub\/getCommlinkItems/.test(url)) return realFetch('/__commlinks.json');
     if (/\/api\/spectrum\/forum\/channel\/threads/.test(url))
       return realFetch('/__patchnotes.json');
     // Home's Game Status: the wiki main page settings (event, test channels) and the
@@ -406,11 +517,61 @@
           { headers: { 'content-type': 'application/json' } },
         ),
       );
-    if (/robertsspaceindustries\.com\/comm-link\/transmission\//.test(url))
-      return realFetch('/__twisc-page.html');
-    if (/robertsspaceindustries\.com\/alexandria\/html\//.test(url))
-      return realFetch('/__twisc-body.html');
-    if (/^https:\/\/(robertsspaceindustries\.com|api\.star-citizen\.wiki)\//.test(url)) {
+    // The top bar's Game Status pill: an invented feed in the v1 shape
+    // (openhangar.space/api/game-status), dated around now.
+    if (url === 'https://openhangar.space/api/game-status') {
+      const at = (d) => new Date(Date.now() + d * 864e5).toISOString();
+      return Promise.resolve(
+        Response.json({
+          v: 1,
+          updatedAt: at(0),
+          status: { level: 'ok', label: 'All Systems Go', url: 'https://openhangar.space/' },
+          live: { version: '4.10.1', released: at(-20) },
+          ptu: { version: '4.10.2', wave: 'Wave 2', notesAt: at(-1) },
+          patchNotes: {
+            title: 'Alpha 4.10.2 PTU Patch Notes',
+            url: 'https://robertsspaceindustries.com/spectrum/community/SC/forum/190048',
+            at: at(-1),
+          },
+          event: { name: 'Demo Fleet Week', start: at(-3), end: at(4), url: null },
+          nextEvent: { name: 'Demo Ship Showdown', start: at(12), end: at(19), url: null },
+        }),
+      );
+    }
+    // openhangar.space's other public feeds (the extension talks only to RSI and
+    // openhangar.space): invented, so the demo and the UI test never go online.
+    if (url === 'https://openhangar.space/api/catalog')
+      return Promise.resolve(
+        Response.json(window.DEMO_CATALOG, { headers: { etag: 'W/"demo-catalog"' } }),
+      );
+    if (url === 'https://openhangar.space/api/ships')
+      return Promise.resolve(Response.json({ v: 1, updatedAt: null, credit: 'demo', ships: [] }));
+    // Referral events: none beyond the built-in list; every tier's reward picture is
+    // a ship picture on RSI's media host (open to canvases, for the share card).
+    if (url === 'https://openhangar.space/api/referral-events') {
+      const pic = 'https://media.robertsspaceindustries.com/dogyaf0p2eup4/store_small.jpg';
+      // REFERRAL_TIER_FILES: dashboard.js's tier pictures, by ladder and tier.
+      const files = Object.values(REFERRAL_TIER_FILES).flatMap((l) => Object.values(l));
+      return Promise.resolve(
+        Response.json({
+          v: 1,
+          updatedAt: null,
+          credit: 'demo',
+          events: [],
+          images: Object.fromEntries(files.map((f) => [f, pic])),
+        }),
+      );
+    }
+    if (url === 'https://openhangar.space/api/known-issues')
+      return Promise.resolve(Response.json({ v: 1, updatedAt: null, issues: [] }));
+    if (url === 'https://openhangar.space/versions.json')
+      return Promise.resolve(
+        Response.json({ version: '0.2.19', stores: { firefox: { live: '0.2.19' } } }),
+      );
+    // Your Subscriber Store (#418): an invented listing for the demo subscriber.
+    if (/\/graphql$/.test(url) && /GetBrowseSkusByFilter/.test(String(init.body || '')))
+      return Promise.resolve(Response.json(window.DEMO_SUB_STORE));
+    if (/^https:\/\/robertsspaceindustries\.com\//.test(url)) {
       if (/\/account\/|\/graphql|\/citizens\//.test(url) && !/\/pledge\/buyback\//.test(url))
         return Promise.resolve(new Response('', { status: 404 }));
       return realFetch('/proxy?u=' + encodeURIComponent(url), { method: 'GET' });

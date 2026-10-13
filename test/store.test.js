@@ -58,72 +58,31 @@ test('getStoreShips caches for 6 hours and keeps the last copy when RSI is down'
   assert.equal(again.ships.length, 242); // cached copy
 });
 
-test('parseShipStock: standalone vs only-in-a-pack vs not in store (real RSI pages)', () => {
-  const page = (n) =>
-    fs.readFileSync(path.join(__dirname, 'fixtures', `ship-page-${n}.html`), 'utf8');
-  const cutlass = OH.parseShipStock(page('in')); // standalone offer in stock
-  assert.equal(cutlass.state, 'in');
-  assert.equal(cutlass.price, 110);
-  const carrack = OH.parseShipStock(page('pack')); // only offer: Ultimate Explorer Pack
-  assert.equal(carrack.state, 'pack');
-  assert.deepEqual(
-    carrack.packs.map((p) => p.name),
-    ['Ultimate Explorer Pack'],
-  );
-  assert.equal(OH.parseShipStock(page('out')).state, 'out'); // E1 Spirit
-  assert.equal(OH.parseShipStock('<html>no data</html>'), null);
-});
-
-test('getShipStock: a missing page means not in the store; cached', async () => {
-  let calls = 0;
-  const gone = async () => {
-    calls++;
-    return { ok: false, status: 404 };
-  };
-  const url = 'https://robertsspaceindustries.com/pledge/ships/merchantman/Merchantman';
-  assert.equal((await OH.getShipStock(url, gone)).state, 'out');
-  assert.equal((await OH.getShipStock(url, gone)).state, 'out');
-  assert.equal(calls, 1);
-  assert.equal(await OH.getShipStock('https://evil.example/x', gone), null);
-});
-
-test('parseCommLinks reads RSI Comm-Link cards (real list)', () => {
-  const items = OH.parseCommLinks(
-    fs.readFileSync(path.join(__dirname, 'fixtures', 'commlinks.html'), 'utf8'),
-  );
-  assert.equal(items.length, 10);
-  assert.equal(items[0].title, 'This Week in Star Citizen - September 28, 2026');
-  assert.match(items[0].url, /^https:\/\/robertsspaceindustries\.com\/comm-link\//);
-  assert.equal(items[0].when, '1 day ago');
-  assert.ok(items[0].excerpt.includes('\u2018verse')); // &#8216; decoded
-  for (const it of items) assert.doesNotMatch(it.title, /&#?\w+;|</);
-});
-
-test('getRsiNews caches an hour and keeps the last list when RSI is down', async () => {
-  const html = fs.readFileSync(path.join(__dirname, 'fixtures', 'commlinks.html'), 'utf8');
-  let calls = 0;
-  const ok = async () => {
-    calls++;
-    return { ok: true, json: async () => ({ success: 1, data: html }) };
-  };
-  assert.equal((await OH.getRsiNews(ok)).length, 10);
-  assert.equal((await OH.getRsiNews(ok)).length, 10);
-  assert.equal(calls, 1);
-});
-
-test('This Week in Star Citizen: short summary from the real post', () => {
-  const read = (n) => fs.readFileSync(path.join(__dirname, 'fixtures', n), 'utf8');
-  assert.match(
-    OH.twiscBodyUrl(read('twisc-page.html')),
-    /^https:\/\/robertsspaceindustries\.com\/alexandria\/html\//,
-  );
-  assert.equal(OH.twiscBodyUrl("<script>const s3Url = 'https://evil.example/x';</script>"), null);
-  const sum = OH.parseTwisc(read('twisc-body.html'));
-  assert.ok(sum.points.length >= 4 && sum.points.length <= 6);
-  assert.match(sum.points[0], /^Last week was a busy one on the testing front/);
-  assert.ok(sum.points.every((p) => !/\s[.,!?]/.test(p) && !/see you soon/i.test(p)));
-  assert.deepEqual(sum.schedule, [
-    { day: 'Thursday, October 1', items: ['New Game Library System'] },
-    { day: 'Friday, October 2', items: ['RSI Weekly Newsletter'] },
-  ]);
+test('upgradeSku: the SKU an Add to RSI Cart goes to (cheapest edition on offer)', () => {
+  const ships = OH.parseStoreShips({
+    data: {
+      ships: [
+        {
+          id: 900,
+          name: 'Example Hauler',
+          skus: [
+            { id: 9001, title: 'Standard Edition', available: true, price: 20000 },
+            { id: 9002, title: 'Warbond Edition', available: true, price: 18000 },
+            { id: 9003, title: 'Old Edition', available: false, price: 10000 },
+          ],
+        },
+        { id: 901, name: 'Example Concept', skus: [] },
+      ],
+    },
+  });
+  assert.equal(ships[0].editions[0].id, 9001);
+  assert.deepEqual(OH.upgradeSku(ships[0]), {
+    toShipId: 900,
+    toSkuId: 9002,
+    skus: [9002, 9001],
+    price: 180,
+    title: 'Warbond Edition',
+  });
+  assert.equal(OH.upgradeSku(ships[1]), null);
+  assert.equal(OH.upgradeSku({ id: 5, editions: [{ title: 'Old cache', price: 1 }] }), null);
 });

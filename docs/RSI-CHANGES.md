@@ -31,7 +31,8 @@ most users see it within a few hours.
   is out, so people on the fix keep scanning). `message` is optional (300 characters,
   plain text).
 - `banner`: a notice across the top of the dashboard. `level` is `warn` or `info`;
-  `until` (a date) hides it automatically after that day.
+  `until` (a date) hides it automatically after that day; `maxVersion` shows it only
+  on that version or older (versions before 0.3.0 ignore it and always show it).
 - When the fix is out everywhere, put the file back to
   `{ "sources": {}, "banner": null }`.
 
@@ -43,7 +44,7 @@ as normal". Paused scans never touch RSI and never change saved data.
 Usual signs:
 
 - A red **RSI canary** post in #ops. Every day `.github/workflows/canary.yml` runs
-  the real parsers on RSI's public pages (store, ship matrix, Comm-Links, patch notes,
+  the real parsers on RSI's public pages (store, ship matrix, patch notes,
   loaner help articles) and says which one broke, or that RSI couldn't be reached.
   Run it yourself any time: `npm run canary`. It can't see logged-in pages (hangar,
   buy-backs, referrals).
@@ -51,10 +52,11 @@ Usual signs:
   has pledge markers but the parser found nothing: markup changed).
 - A scan that finishes but with missing fields (no dates, no values, every item
   "unknown") or far fewer items than before.
-- Several bug reports in the same day, often with a pasted **error report**
-  (Developers → Copy error report).
+- Several bug reports in the same day (in #bug-reports on Discord or on GitHub),
+  often with a pasted **Flight Log** (Send Flight Log on the problem card, or
+  Developers → Copy Flight Log).
 
-Check the error reports first: they show the version, browser, item counts and the
+Check the flight logs first: they show the version, browser, item counts and the
 exact errors, which usually tells you which source broke.
 
 ## 2. Find what broke
@@ -66,6 +68,8 @@ exact errors, which usually tells you which source broke.
 | Account   | account dashboard's embedded JSON + public citizen dossier | `OH.getAccount()` in `src/lib.js`            |
 | Referrals | `POST /graphql` (`GetReferralRecruitsList` …)              | `OH.getReferral()` in `src/lib.js`           |
 
+Where each of them looks (addresses, selectors, cell positions, name patterns) is in
+the parser rules, `src/data/parser-rules.json`; the functions above are how it's read.
 Then follow **CONTRIBUTING.md → "Rediscovering the data source"** to see the new
 request and markup in DevTools.
 
@@ -76,7 +80,10 @@ request and markup in DevTools.
    anything personal. Keep the structure, change the text.
 3. Replace or add a fixture in `test/fixtures/` (e.g. `pledges.sample.html`).
 4. Run `npm test`: the parser tests should fail the same way users see.
-5. Update the selectors/parsing, and add an assertion for whatever broke.
+5. Fix the rules in `src/data/parser-rules.json` (a new key also goes in
+   `schema/parser-rules.schema.json`), run `npm run rules`, and add an assertion for
+   whatever broke. Change the parsing code only when how a page is read changed, not
+   just where.
 6. `npm test`, `npm run test:ui`, then try a real scan with the unpacked build
    (`npm run build`, load `dist/chrome`).
 

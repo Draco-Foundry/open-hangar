@@ -46,17 +46,20 @@ Here's how to find the new shape:
 4. For the request that returns your pledges, note:
    - **URL** and **method** — today it's a `GET` to
      `https://robertsspaceindustries.com/account/pledges?page=N&pagesize=10`,
-     returning server-rendered HTML. The `hangar` entry in `OH.SOURCES` (`lib.js`)
-     holds this (`url`, and `pageSize` from `PAGE_SIZE`); update it if the URL shape or
-     method changes (e.g. if RSI moves to a JSON/POST endpoint).
+     returning server-rendered HTML. The parser rules (`src/data/parser-rules.json`)
+     hold this (`hangar.path`, `hangar.pageSize`, the `paging` names), read by the
+     `hangar` entry in `OH.SOURCES` (`lib.js`); update the rules if the URL shape
+     changes, and the code if the method does (e.g. if RSI moves to a JSON/POST
+     endpoint).
    - **Response** — currently an HTML page. Each pledge is a `.row` card holding
      hidden inputs (`.js-pledge-id`, `.js-pledge-name`, `.js-pledge-value`,
      `.js-pledge-currency`) plus zero or more `.kind` tiles describing contained
-     items. If the selectors or card container change, fix `resolveCard()` and
-     `readContents()` in `src/scraper/parser.js`.
+     items. If the selectors or card container change, fix the `hangar` selectors in
+     the parser rules (`resolveCard()` and `readContents()` in
+     `src/scraper/parser.js` read them).
    - **Classification** — `normalizePledge()` derives `isCCU` / `isAddOn` /
      `containsShip` from the name and `.kind` set. If RSI changes naming
-     conventions, update the `CCU_RE` / `ADDON_NAME_RE` patterns there.
+     conventions, update the `names` patterns in the parser rules.
    - **Token (only if you add write actions)** — the read-only scan needs no
      anti-forgery token, so none is read. (An earlier `getCsrfToken()` helper was
      removed to keep the audit story unambiguously read-only.) A future melt/buyback
@@ -107,8 +110,9 @@ features and **patch** (`0.2.7`…) for fixes; `1.0.0` is reserved for the first
 
 ## Principles
 
-- **Keep `parser.js` the only place that knows RSI's field names / selectors.**
-  Everything downstream should depend on the normalized model, not raw RSI data.
+- **Keep RSI's field names, selectors and patterns in the parser rules**
+  (`src/data/parser-rules.json`, read by `parser.js`, `lib.js` and `rsi-cart.js`). Everything downstream should
+  depend on the normalized model, not raw RSI data.
 - **Be a good citizen.** Keep the throttle (`DELAY_MS`) in `lib.js`. Don't add
   parallel page fetching. This is for personal use, not bulk scraping.
 - **No silent data exfiltration, ever.** Sync stays opt-in and documented: no player
@@ -121,14 +125,12 @@ You can unit-test `parser.js` in isolation by feeding it saved sample payloads
 (scrub anything personal first). Capturing a real response from DevTools and
 saving it as a fixture is the fastest feedback loop.
 
-**Sync to app.openhangar.space** isn't launched, so `npm run build` cuts its code
-(everything between `@sync-start` and `@sync-end` markers) out of store builds, and
-fails if `app.openhangar.space` is left anywhere in them. To test sync locally, build
-with `OH_SYNC=1 npm run build` and set the `siteUrl` storage key to your local site.
-`npm run build:staging` builds with sync on and already pointed at
-staging.openhangar.space, no storage key needed. That build is for your browser only:
-release, publish and CI fail if a store build carries it
-(`scripts/check-store-build.mjs`). Mark any new sync code the same way.
+**Sync to app.openhangar.space** is in every store build from 0.3.0, built in to
+production, and opt-in: nothing is sent until you connect. Its code sits between
+`@sync-start` and `@sync-end` markers (the `sync` build flag, docs/FLAGS.md); mark any
+new sync code the same way. To test sync locally, set the `siteUrl` storage key to your
+local site, or build one pointed at it with `npm run build -- --site=<url>`
+(`npm run build:staging` for the staging site).
 
 ## Firefox Notes
 

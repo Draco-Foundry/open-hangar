@@ -10,7 +10,7 @@ body:
         check the [open scan-broken issues](https://github.com/Draco-Foundry/open-hangar/issues?q=is%3Aopen+label%3Ascan-broken):
         if it's already there, a 👍 on it helps more than a new issue.
 
-        Please **don't paste personal data** (referral codes, emails, order numbers). The error report is safe: it has none.
+        Please **don't paste personal data** (referral codes, emails, order numbers). Your flight log is safe: it has none.
   - type: dropdown
     id: part
     attributes:
@@ -29,8 +29,8 @@ body:
   - type: textarea
     id: report
     attributes:
-      label: Error report
-      description: In Open Hangar, click Copy Error Report next to the error (also on the Developers page) and paste it here.
+      label: Flight Log
+      description: In Open Hangar, Report on GitHub fills this in for you. Or go to Developers, click Copy Flight Log and paste it here.
       render: text
     validations:
       required: true

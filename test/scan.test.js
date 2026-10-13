@@ -181,6 +181,16 @@ test('429: a longer Retry-After from RSI is honoured, up to 30 s (#298)', async 
   assert.ok(waits.includes(20000));
 });
 
+test('a 5xx with a Retry-After is still retried in a scan (only buy-back details stop)', async () => {
+  await reset();
+  script = (page, n) =>
+    page === 1 && n === 1 ? { status: 503, headers: { 'retry-after': '10' } } : healthy(page);
+  const r = await OH.scanSource('hangar');
+  assert.equal(r.ok, true);
+  assert.equal(calls[1], 2);
+  assert.ok(waits.includes(10000));
+});
+
 test('429: after 5 tries the scan gives up instead of pushing on (#298)', async () => {
   await reset();
   script = (page) => (page === 1 ? { status: 429 } : healthy(page));
@@ -205,6 +215,31 @@ test('scanShape: how completely a scan read the page, and untyped items (#295, #
     untyped: 2,
     guessed: 1,
   });
+});
+
+test('an Upgrade item or one with no kind is counted, never a reason to call a scan short', () => {
+  const s = OH.scanShape([
+    {
+      date: '2024-03-03',
+      value: 35,
+      image: 'x',
+      contents: [{ kind: 'Upgrade', label: 'Pulse to C8R Pisces' }],
+    },
+    {
+      date: '2024-03-03',
+      value: 90,
+      image: 'x',
+      contents: [
+        { kind: 'Ship' },
+        { kind: '', label: 'Star Citizen Digital Download' },
+        { kind: '' },
+      ],
+    },
+  ]);
+  assert.equal(s.contents, 1);
+  assert.equal(s.tiles, 4);
+  assert.equal(s.untyped, 2); // the two with no kind; Upgrade is a kind
+  assert.deepEqual(OH.shapeDrops({ ...s, untyped: 0 }, s), []);
 });
 
 test('shapeDrops: flags a field that went from most pledges to none (#295)', () => {

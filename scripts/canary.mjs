@@ -65,18 +65,6 @@ const checks = [
     },
   },
   {
-    name: 'Ship store page (in stock / out / packs)',
-    host: 'robertsspaceindustries.com',
-    async run() {
-      const ship = (checks[0].ships || []).find((s) => s.forSale && s.link);
-      if (!ship) return 'skipped: no for-sale ship from the store feed';
-      const res = await fetchLogged(ship.link, { credentials: 'omit' });
-      if (!res.ok) return `${ship.name} page answered HTTP ${res.status}`;
-      const st = OH.parseShipStock(await res.text());
-      return st ? null : `couldn't read the offers on ${ship.name}'s page`;
-    },
-  },
-  {
     name: 'Ship matrix (pictures, manufacturers)',
     host: 'robertsspaceindustries.com',
     async run() {
@@ -92,17 +80,7 @@ const checks = [
       return null;
     },
   },
-  {
-    name: 'Comm-Links (Latest From RSI)',
-    host: 'robertsspaceindustries.com',
-    async run() {
-      const items = await OH.getRsiNews(fetchLogged);
-      if (items.length < 5) return `${items.length} posts (expected 5+)`;
-      if (share(items, (i) => i.title && i.url && i.when) < 0.9)
-        return 'posts missing title/link/date';
-      return null;
-    },
-  },
+
   {
     name: 'Patch notes (Spectrum)',
     host: 'robertsspaceindustries.com',
@@ -173,11 +151,7 @@ const savedPages = [
     live: async () => OH.parseStoreShips(await liveJson(/upgrade\/graphql/)),
     saved: () => OH.parseStoreShips(JSON.parse(fixture('store-ships.json'))),
   },
-  {
-    file: 'commlinks.html',
-    live: async () => OH.parseCommLinks((await liveJson(/getCommlinkItems/))?.data),
-    saved: () => OH.parseCommLinks(fixture('commlinks.html')),
-  },
+
   {
     file: 'patch-notes.json',
     live: async () => OH.parsePatchNotes(await liveJson(/forum\/channel\/threads/)),

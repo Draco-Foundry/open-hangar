@@ -297,6 +297,23 @@ test('accountValue counts ships, CCUs, other pledges at melt and Store Credit', 
   assert.equal(v.byId.c, 12);
 });
 
+test('accountValue counts the pledges with no price at all, and adds nothing for them', () => {
+  const items = [
+    {
+      id: 'a',
+      name: 'Standalone Ship - Carrack',
+      value: null, // no melt, but a store price: priced
+      contents: [{ kind: 'Ship', label: 'Carrack' }],
+    },
+    { id: 'b', name: 'Paint - Some Livery', value: null, contents: [] }, // nothing: unpriced
+    { id: 'c', name: 'Coupon - Gift', value: 0, contents: [] }, // a real $0
+  ];
+  const v = OH.accountValue(items, priceOf, 0);
+  assert.equal(v.unpriced, 1);
+  assert.equal(v.other, 0);
+  assert.equal(OH.accountValue([], priceOf, 0).unpriced, 0);
+});
+
 test('the latest snapshot of the same hangar values exactly like today', () => {
   const items = [
     {

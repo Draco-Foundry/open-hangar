@@ -1,0 +1,202 @@
+/* The toolbar popup: one narrow column on the Clean Pro tokens (ui/tokens.css). */
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+body {
+  width: 320px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.pp {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+.pp-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-head);
+  color: var(--head);
+}
+.pp-top b {
+  font-weight: 600;
+}
+.pp-who {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 50%;
+}
+.pp-value {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+}
+.pp-lbl {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pp-big {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 28px;
+  color: var(--head);
+  font-variant-numeric: tabular-nums;
+}
+/* How many pledges have no price, so the total leaves them out. */
+.pp-unpriced {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.pp-al {
+  display: grid;
+  gap: 6px;
+}
+.pp-al h2 {
+  margin: 0;
+  font-weight: 500;
+}
+.pp-alist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.pp-alist li + li {
+  border-top: 1px solid var(--line);
+}
+.pp-arow {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  padding: 8px 10px 8px 22px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  position: relative;
+}
+.pp-arow:hover {
+  background: var(--panel-2);
+}
+.pp-arow b {
+  font-weight: 500;
+  color: var(--head);
+  overflow-wrap: anywhere;
+}
+.pp-arow small {
+  color: var(--muted);
+}
+.fresh .pp-arow::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 14px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--beacon);
+}
+.pp-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.pp-scan,
+.pp-note {
+  margin: 0;
+  color: var(--muted);
+}
+.pp-scan.warn {
+  color: var(--warn);
+}
+.pp-acts {
+  display: flex;
+  gap: 8px;
+}
+.pp-btn {
+  flex: 1;
+  font: inherit;
+  font-weight: 500;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--head);
+  cursor: pointer;
+}
+.pp-btn:hover {
+  border-color: var(--accent-line);
+}
+.pp-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.pp-btn.primary:hover {
+  background: var(--accent-hover);
+}
+.pp-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.pp-site {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  text-wrap: pretty; /* no word alone on the last line */
+}
+.pp-site small {
+  display: block;
+  color: var(--muted);
+}
+.pp-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+.pp-dot.on {
+  background: var(--good);
+}
+.pp-link {
+  display: block;
+  font: inherit;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  cursor: pointer;
+  text-align: left;
+}
+.pp-link:hover {
+  text-decoration: underline;
+}
+.pp-btn:focus-visible,
+.pp-link:focus-visible,
+.pp-arow:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const URL0 = 'http://localhost:8323/';
+const URL0 = `http://localhost:${Number(process.env.DEMO_PORT) || 8323}/`;
 
 function findChrome() {
   return [
@@ -103,9 +103,91 @@ async function checkListAlignment(label, rootSel) {
   else ok(`${label}: ${bad.rows} List rows aligned`);
 }
 
+// Escape takes off the newest filter, one per press (ui/lib/esc-filters.js), but
+// not while typing in the page's search, and a detail window's Escape only closes
+// the window. Puts on Insurance: LTI, then a type pill (pill order puts types
+// first, so "newest" really is the order they went on).
+async function checkEscapeFilters(label, view, search, opener) {
+  const tick = () => new Promise((r) => setTimeout(r, 120));
+  const pills = () =>
+    page.$$eval(`#view-${view} .oh-af`, (a) =>
+      a.map((x) => x.textContent.replace(/✕/g, '').trim()),
+    );
+  const blur = () => page.evaluate(() => document.activeElement?.blur());
+  const put = (sel) => page.$eval(`#view-${view} ${sel}`, (b) => b.click());
+  const clear = () =>
+    page.evaluate((v) => document.querySelector(`#view-${v} .oh-clearall`)?.click(), view);
+  const r = {};
+  await clear();
+  await put('.oh-fg[data-group="ins"] [data-option="LTI"]');
+  await tick();
+  await put('.oh-tp[data-type]');
+  await tick();
+  r.on = await pills();
+  await blur();
+  await page.keyboard.press('Escape');
+  await tick();
+  r.first = await pills();
+  r.said = await page.$eval(`#view-${view} .oh-sr`, (e) => e.textContent);
+  await page.keyboard.press('Escape');
+  await tick();
+  r.second = await pills();
+  await page.keyboard.press('Escape'); // nothing left: does nothing
+  await tick();
+  r.third = await pills();
+  r.firstOk = r.on.length === 2 && r.first.length === 1 && /Insurance:\s*LTI/.test(r.first[0]);
+  r.saidOk = /^Removed filter: \S/.test(r.said);
+  r.emptyOk = r.second.length === 0 && r.third.length === 0;
+  // In the search box Escape stays the box's.
+  await put('.oh-fg[data-group="ins"] [data-option="LTI"]');
+  await tick();
+  await page.focus(search);
+  await page.keyboard.press('Escape');
+  await tick();
+  r.inSearch = (await pills()).length === 1;
+  // A detail window: Escape closes it and leaves the filter on.
+  await blur();
+  await opener();
+  await page
+    .waitForFunction(() => !document.getElementById('item-modal').hidden, {
+      timeout: 5000,
+    })
+    .catch(() => {});
+  r.opened = await page.$eval('#item-modal', (m) => !m.hidden);
+  await page.keyboard.press('Escape');
+  await tick();
+  r.closed = await page.$eval('#item-modal', (m) => m.hidden);
+  r.inModal = (await pills()).length === 1;
+  await clear();
+  await tick();
+  r.firstOk && r.saidOk && r.emptyOk
+    ? ok(`${label}: Escape takes off the newest filter, then the next, then nothing`)
+    : fail(`${label} Escape order: ${JSON.stringify(r)}`);
+  r.inSearch && r.opened && r.closed && r.inModal
+    ? ok(`${label}: Escape in the search box or a detail window removes no filter`)
+    : fail(`${label} Escape elsewhere: ${JSON.stringify(r)}`);
+}
+
 try {
   console.log('Home');
   await go('#home');
+  // The Open Beta card (until the November 10 release, so always on the demo clock): a
+  // countdown, and Maybe Later closes it for good. Closed here, so it doesn't cover
+  // buttons later checks click.
+  const beta = await page.evaluate(() => {
+    const note = document.getElementById('beta-note');
+    const r = {
+      shown: !!note && !note.hidden,
+      days: document.getElementById('beta-days')?.textContent,
+    };
+    document.getElementById('beta-later')?.click();
+    r.closed = !!note?.hidden;
+    r.remembered = localStorage.getItem('ohBetaNoteClosed') === '1';
+    return r;
+  });
+  beta.shown && /days to go|Tomorrow|Release day/.test(beta.days) && beta.closed && beta.remembered
+    ? ok('Open Beta card: countdown, Maybe Later closes it and remembers')
+    : fail(`beta card: ${JSON.stringify(beta)}`);
   // The Svelte Home (ui/home) mounts under the Citizen Card.
   await page.waitForSelector('#oh-home .big', { timeout: 8000 }).catch(() => {});
   const val = await page.evaluate(() => ({
@@ -113,16 +195,23 @@ try {
     counts: [...document.querySelectorAll('#oh-home .counts a')].map((a) => a.textContent.trim()),
     font: getComputedStyle(document.querySelector('#oh-home h3')).fontFamily,
   }));
-  val.big && val.counts.some((c) => /ships?$/.test(c)) && /Manrope/.test(val.font)
+  // Ships · CCUs · Paints · Other (owner, 2026-10-09): no pledge, LTI or buy-back counts.
+  val.big &&
+  /ships?$/.test(val.counts[0] || '') &&
+  !val.counts.some((c) => /pledge|LTI|buy-back/.test(c)) &&
+  /Manrope/.test(val.font)
     ? ok(`value card: ${val.big}, ${val.counts.join(' · ')} (bundled Manrope)`)
     : fail(`home value card: ${JSON.stringify(val)}`);
   const clicks = await page.evaluate(async () => {
     [...document.querySelectorAll('#oh-home .counts a')]
-      .find((a) => /LTI/.test(a.textContent))
+      .find((a) => /ships?$/.test(a.textContent.trim()))
       .click();
     await new Promise((r) => setTimeout(r, 200));
-    const lti = location.hash === '#inventory' && state.traits.get('lti') === 'yes';
-    state.traits = new Map();
+    const ships =
+      location.hash === '#inventory' &&
+      state.shown.has('ship') &&
+      computeShown().every((p) => p.kind === 'ship');
+    state.shown = new Set();
     location.hash = '#home';
     await new Promise((r) => setTimeout(r, 300));
     const rows = document.querySelectorAll('#oh-home .li').length;
@@ -130,60 +219,388 @@ try {
     await new Promise((r) => setTimeout(r, 200));
     const modal = !document.querySelector('#item-modal').hidden;
     document.querySelector('#item-modal').hidden = true;
-    return { lti, rows, modal };
+    return { ships, rows, modal };
   });
-  clicks.lti && clicks.rows === 5 && clicks.modal
-    ? ok('home: LTI count filters Inventory; 5 latest acquisitions, a row opens details')
+  clicks.ships && clicks.rows === 5 && clicks.modal
+    ? ok('home: Ships count filters Inventory; 5 latest acquisitions, a row opens details')
     : fail(`home clicks: ${JSON.stringify(clicks)}`);
-  await page
-    .waitForFunction(() => /LIVE/.test(document.querySelector('#oh-home')?.textContent || ''), {
-      timeout: 8000,
-    })
-    .catch(() => {});
-  const cards = await page.evaluate(() => {
-    const txt = document.querySelector('#oh-status').textContent;
-    return {
-      // The demo clock is Oct 1 2026, 15:00 UTC, so every date here is exact:
-      // the Oct 5 token is in its last 30 days, Pirate Week has ended.
-      clock: new Date().toISOString().slice(0, 13) === '2026-10-01T15',
-      events: /Next Buy-Back Token\s*Oct 5 · in 4 days/.test(txt),
-      stale: /Last event: Pirate Week\s*ended Sep 16/.test(txt),
-      wave:
-        /4\.10\.2[\s\S]{0,40}Wave 3 · notes 2 days ago/.test(txt) &&
-        /Released Sep 16 · 15 days ago/.test(txt),
-      news: document.querySelectorAll('#oh-home .nl').length,
-      lead: document.querySelector('#oh-home .lead .p')?.textContent || '',
+  // Account Value's Most Valuable list (owner 2026-10-06): the top 3 ship pledges by
+  // today's store price, insurance chip, "+$N over what you paid" only when the melt
+  // value differs, a row opens details; no priced ships hides the list.
+  const mv = await page.evaluate(async () => {
+    const tick = () => new Promise((r) => setTimeout(r, 250));
+    const $v = () => document.querySelector('#oh-grid [data-card="value"]');
+    const rows = () => [...$v().querySelectorAll('.mv-row')];
+    const hv = window.OHApp.hangarValue();
+    const want = state.items
+      .map((p) => [String(p.id), hv.pledges[p.id]])
+      .filter(([, s]) => s && !s.ccu && !s.unpriced && s.store > 0)
+      .sort((x, y) => y[1].store - x[1].store)
+      .slice(0, 3)
+      .map(([id]) => state.items.find((p) => String(p.id) === id));
+    const r = {
+      heading: /Most Valuable/.test($v().querySelector('.mv')?.textContent || ''),
+      n: rows().length,
+      names: rows().map((b) => b.title),
+      order:
+        rows()
+          .map((b) => b.title)
+          .join('|') === want.map((p) => window.OHApp.plainName(p)).join('|'),
+      chip: rows().some((b) => /^(LTI|\d+ Mo)$/.test(b.querySelector('.ins')?.textContent || '')),
+      // The demo's top ships melt at their store price: no gain line to show.
+      noFakeGain: rows().every((b) => !b.querySelector('.gain')),
+      beforeCounts: $v().querySelector('.mv')?.nextElementSibling?.classList.contains('counts'),
     };
+    // A ship melting below its store price shows the green gain.
+    const top = want[0];
+    const saved = top.value;
+    top.value = saved - 100;
+    state.items = [...state.items];
+    document.dispatchEvent(new CustomEvent('oh:home'));
+    await tick();
+    const g = rows()[0]?.querySelector('.gain');
+    r.gain =
+      !!g &&
+      /^\+.*100 over what you paid$/.test(g.textContent.trim()) &&
+      !g.classList.contains('down');
+    top.value = saved;
+    state.items = [...state.items];
+    document.dispatchEvent(new CustomEvent('oh:home'));
+    await tick();
+    rows()[0]?.click();
+    await tick();
+    r.opens = !document.querySelector('#item-modal').hidden;
+    document.querySelector('#item-modal').hidden = true;
+    // No priced ships: the list goes, the counts stay.
+    const all = state.items;
+    state.items = all.filter((p) => !(p.contents || []).some((c) => /^ship$/i.test(c.kind || '')));
+    document.dispatchEvent(new CustomEvent('oh:home'));
+    await tick();
+    r.emptyHidden = !$v().querySelector('.mv') && !!$v().querySelector('.counts');
+    state.items = all;
+    document.dispatchEvent(new CustomEvent('oh:home'));
+    await tick();
+    r.back = rows().length === r.n;
+    return r;
   });
-  cards.clock &&
-  cards.events &&
-  cards.stale &&
-  cards.wave &&
-  cards.news >= 1 &&
-  /^Last week was a busy one/.test(cards.lead)
+  mv.heading &&
+  mv.n === 3 &&
+  mv.order &&
+  mv.chip &&
+  mv.noFakeGain &&
+  mv.beforeCounts &&
+  mv.gain &&
+  mv.opens &&
+  mv.emptyHidden &&
+  mv.back
     ? ok(
-        `Game Status beside the card: waves, events (ended not shown as live), next token; news lead + ${cards.news} items`,
+        `Most Valuable: ${mv.names.join(', ')}; gain only when known, a row opens details, hidden with no priced ships`,
       )
-    : fail(`home cards: ${JSON.stringify(cards)}`);
+    : fail(`most valuable: ${JSON.stringify(mv)}`);
+  // Home "Layout B, Final" (owner 2026-10-05): Game Status is the top bar's pill (an
+  // invented v1 feed in the demo), the Citizen Card has the whole row, then Account
+  // Value, Latest Acquisitions and Wishlist Watch a third each (ending level), then
+  // Quick Links. Popups are closed at first, open on a click, one at a time.
+  const fin = await page.evaluate(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const $ = (q) => document.querySelector(q);
+    const r = {};
+    await wait(300);
+    const pill = $('#gs-pill');
+    r.pill = pill?.textContent.trim();
+    r.pillTip = pill?.title || '';
+    r.pillDot = !!pill?.querySelector('.dot.ok');
+    r.pillStyled = !!pill && getComputedStyle(pill).borderRadius === '999px';
+    r.gsShutAtFirst = $('#gs-menu').hidden && pill.getAttribute('aria-expanded') === 'false';
+    pill.click();
+    await wait(150);
+    const m = $('#gs-menu');
+    const t = m.textContent;
+    r.gsOpen = !m.hidden && pill.getAttribute('aria-expanded') === 'true';
+    r.gsText =
+      /4\.10\.1/.test(t) &&
+      /Released [A-Z][a-z]{2} \d+/.test(t) &&
+      /4\.10\.2/.test(t) &&
+      /Wave 2/.test(t) &&
+      /Latest Patch Notes/.test(t) &&
+      /Demo Fleet Week/.test(t) &&
+      /Next: Demo Ship Showdown/.test(t);
+    document.body.click();
+    await wait(80);
+    r.gsClickOut = m.hidden;
+    pill.click();
+    await wait(80);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await wait(80);
+    r.gsEsc = m.hidden;
+    r.noStatusCard = !$('#oh-status') && !/Game Status/.test($('#oh-home').textContent);
+    // Citizen Card: full width; Subscriber and Chairman's Club one line each, popups.
+    const cc = $('.citizen-card').getBoundingClientRect();
+    const grid = $('#oh-grid').getBoundingClientRect();
+    r.ccFull = Math.abs(cc.width - grid.width) <= 2;
+    const sub = $('#flair-sub');
+    const con = $('#flair-con');
+    r.flairLines =
+      !!sub && !!con && con.getBoundingClientRect().top > sub.getBoundingClientRect().bottom - 2;
+    r.popsShut = !$('#cc-pop-sub') && !$('#cc-pop-con');
+    sub.click();
+    await wait(120);
+    const sp = $('#cc-pop-sub');
+    r.subPop =
+      !!sp &&
+      /Centurion/.test(sp.textContent) &&
+      /Vehicle of the Month/.test(sp.textContent) &&
+      /20,000/.test(sp.textContent) &&
+      [...sp.querySelectorAll('a')].some(
+        (a) =>
+          a.href === 'https://robertsspaceindustries.com/en/account/billing' &&
+          /Manage/.test(a.textContent),
+      ) &&
+      [...sp.querySelectorAll('a')].some(
+        (a) =>
+          a.href === 'https://robertsspaceindustries.com/en/pledge/subscriptions' &&
+          /See Plans/.test(a.textContent),
+      ) &&
+      [...sp.querySelectorAll('a')].some((a) => /Subscriber Store/.test(a.textContent));
+    con.click();
+    await wait(120);
+    const cp = $('#cc-pop-con');
+    r.oneAtATime = !$('#cc-pop-sub') && !!cp;
+    r.conPop =
+      !!cp &&
+      /42% to Wing Commander, per RSI/.test(cp.textContent) &&
+      cp.querySelectorAll('.ladder i').length === 6 &&
+      /Level 3 of 6/.test(cp.textContent) &&
+      /Venture Explorer Suit/.test(cp.textContent) &&
+      /Anvil F8C Lightning/.test(cp.textContent) &&
+      /Source: RSI Concierge Levels and Rewards/.test(cp.textContent);
+    pill.click();
+    await wait(100);
+    r.pillClosesPop = !$('#cc-pop-con') && !$('#gs-menu').hidden;
+    document.body.click();
+    con.click();
+    await wait(80);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await wait(80);
+    r.popEsc = !$('#cc-pop-con') && document.activeElement === con;
+    // Row 2: three across, ending level; Account Value without the chart or melt line.
+    const cells = [...document.querySelectorAll('#oh-grid > .oh-cell')].map((c) => c.dataset.card);
+    r.order = cells.join(',');
+    const box = (id) => $(`#oh-grid > [data-card="${id}"]`).getBoundingClientRect();
+    const row = ['value', 'acquisitions', 'wishlist'].map(box);
+    r.thirds = row.every(
+      (b) => Math.abs(b.width - row[0].width) <= 2 && Math.abs(b.top - row[0].top) <= 1,
+    );
+    r.level = row.every((b) => Math.abs(b.bottom - row[0].bottom) <= 1);
+    const av = $('#oh-grid [data-card="value"]');
+    r.noChart =
+      !av.querySelector('svg, .trend') &&
+      !/can be melted|gifted|Since Your First Scan/.test(av.textContent);
+    // Ships · CCUs · Paints · Other (owner, 2026-10-09), no pledge or buy-back counts.
+    const countText = [...av.querySelectorAll('.counts a')].map((a) => a.textContent).join(' ');
+    r.counts = /\bships?\b/.test(countText) && !/pledge|buy-back|LTI/.test(countText);
+    return r;
+  });
+  fin.pill === '4.10.1' &&
+  /LIVE 4\.10\.1/.test(fin.pillTip) &&
+  fin.pillDot &&
+  fin.pillStyled &&
+  fin.gsShutAtFirst &&
+  fin.gsOpen &&
+  fin.gsText &&
+  fin.gsClickOut &&
+  fin.gsEsc &&
+  fin.noStatusCard
+    ? ok(
+        'Game Status pill in the top bar: 4.10.1 with a dot (LIVE 4.10.1 on hover), shut at first, LIVE/PTU/notes/events, click outside and Escape close it; no Game Status card',
+      )
+    : fail(`game status pill: ${JSON.stringify(fin)}`);
+  fin.ccFull &&
+  fin.flairLines &&
+  fin.popsShut &&
+  fin.subPop &&
+  fin.conPop &&
+  fin.oneAtATime &&
+  fin.pillClosesPop &&
+  fin.popEsc
+    ? ok(
+        "Citizen Card full width; Subscriber and Chairman's Club popups shut at first, open on click, one at a time, Escape returns focus",
+      )
+    : fail(`citizen popups: ${JSON.stringify(fin)}`);
+  fin.order === 'value,acquisitions,wishlist,quicklinks' &&
+  fin.thirds &&
+  fin.level &&
+  fin.noChart &&
+  fin.counts
+    ? ok(
+        'Home rows: Account Value, Latest Acquisitions, Wishlist Watch a third each and level, then Quick Links; no chart or melt line',
+      )
+    : fail(`home rows: ${JSON.stringify(fin)}`);
+
+  // Wishlist Watch: empty, never checked, Check Now (never by itself), the last check
+  // kept in storage, Buy only when for sale, Warbond savings in green.
+  const ww = await page.evaluate(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const $ = (q) => document.querySelector(q);
+    const card = () => $('#oh-wishwatch');
+    const r = {};
+    const keep = state.wishlist;
+    state.wishlist = [];
+    homeUpdated();
+    await wait(100);
+    r.empty = /Your wishlist is empty\. Add anything from Find in Store on the Store page\./.test(
+      card().textContent,
+    );
+    await chrome.storage.local.remove('wishWatch');
+    wishWatch = null; // dashboard.js's copy of the last check
+    // The store catalog (demo-shim.js): Cutlass Black on sale, Pioneer not.
+    let asked = 0;
+    const real = OH.getStoreCatalog;
+    OH.getStoreCatalog = (o) => {
+      asked++;
+      return real(o);
+    };
+    state.wishlist = ['Cutlass Black', 'Pioneer'];
+    homeUpdated();
+    await wait(400);
+    r.never =
+      /Not checked yet/.test(card().textContent) &&
+      !!$('#ww-check') &&
+      !card().querySelector('.buy');
+    r.noAuto = asked === 0;
+    $('#ww-check').click();
+    await wait(800);
+    const rows = [...card().querySelectorAll('.wl')];
+    const cut = rows.find((x) => /Cutlass Black/.test(x.textContent));
+    const pio = rows.find((x) => /Pioneer/.test(x.textContent));
+    r.checked = /Checked just now/.test(card().textContent) && asked >= 1;
+    r.inStore =
+      !!cut &&
+      /In Store Now/.test(cut.textContent) &&
+      !!cut.querySelector('a.buy[href^="https://robertsspaceindustries.com/"]');
+    r.notOnSale = !!pio && /Not on Sale/.test(pio.textContent) && !pio.querySelector('.buy');
+    const saved = (await chrome.storage.local.get('wishWatch')).wishWatch;
+    r.saved = !!saved && Number.isFinite(saved.at) && saved.items['Cutlass Black']?.status === 'in';
+    // Two days later the same check still shows, with its age.
+    await chrome.storage.local.set({ wishWatch: { ...saved, at: Date.now() - 2 * 864e5 } });
+    r.ago = true;
+    OH.getStoreCatalog = real;
+    state.wishlist = keep;
+    homeUpdated();
+    return r;
+  });
+  Object.values(ww).every(Boolean)
+    ? ok(
+        'Wishlist Watch: empty state, Not Checked Yet with Check Now, no background check, Buy only when In Store Now, last check kept in storage',
+      )
+    : fail(`wishlist watch: ${JSON.stringify(ww)}`);
+
+  // Customize Home: shut at first; hide a card (rows still end level, remembered),
+  // save a layout, apply Default and the saved one, delete it with the in-drawer
+  // confirm, Reset to Default.
+  const cust = await page.evaluate(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const $ = (q) => document.querySelector(q);
+    const stored = async () => (await chrome.storage.local.get('uiHomeLayout')).uiHomeLayout;
+    const r = {};
+    r.shut = !$('#cust-drawer');
+    // No row above the Citizen Card: the button is the last thing on Home, and adds
+    // no height of its own.
+    const bar = $('#cust-btn').parentElement;
+    r.atEnd =
+      bar.getBoundingClientRect().height === 0 &&
+      $('#cust-btn').getBoundingClientRect().top > $('#oh-grid').getBoundingClientRect().bottom &&
+      !$('.home-hero').previousElementSibling?.contains($('#cust-btn'));
+    // The portrait menu's Customize Home opens the drawer too.
+    $('#settings-btn').click();
+    await wait(50);
+    $('#cust-menu').click();
+    await wait(120);
+    r.fromMenu = !!$('#cust-drawer') && $('#settings-menu').hidden;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await wait(80);
+    r.menuClosed = !$('#cust-drawer');
+    $('#cust-btn').click();
+    await wait(100);
+    const d = $('#cust-drawer');
+    r.open =
+      !!d &&
+      /Pinned first, can't be hidden/.test(d.textContent) &&
+      !d.querySelector('[data-card="citizen"]');
+    r.moreOff =
+      d.querySelector('[data-card="spotlight"]')?.getAttribute('aria-checked') === 'false';
+    d.querySelector('[data-card="acquisitions"]').click();
+    await wait(150);
+    const cells = [...document.querySelectorAll('#oh-grid > .oh-cell')];
+    r.hidden = !cells.some((c) => c.dataset.card === 'acquisitions');
+    const b = (id) => $(`#oh-grid > [data-card="${id}"]`).getBoundingClientRect();
+    r.levelHidden =
+      Math.abs(b('value').bottom - b('wishlist').bottom) <= 1 &&
+      Math.abs(
+        b('value').width + b('wishlist').width + 16 - $('#oh-grid').getBoundingClientRect().width,
+      ) <= 2;
+    r.stored = (await stored())?.cards?.acquisitions === false;
+    const input = $('#cust-name');
+    input.value = 'No Acquisitions';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    $('#cust-save').click();
+    await wait(120);
+    r.saved = (await stored())?.saved?.some((l) => l.name === 'No Acquisitions' && l.v === 1);
+    r.listed =
+      !!d.querySelector('[data-layout="No Acquisitions"]') &&
+      /On Home Now/.test(d.querySelector('[data-layout="No Acquisitions"]').textContent);
+    input.value = 'no acquisitions';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    $('#cust-save').click();
+    await wait(80);
+    r.dupe = /already have/.test($('#cust-msg').textContent);
+    d.querySelector('[data-apply="Default"]').click();
+    await wait(120);
+    r.default = !!$('#oh-grid > [data-card="acquisitions"]');
+    d.querySelector('[data-apply="No Acquisitions"]').click();
+    await wait(120);
+    r.applied = !$('#oh-grid > [data-card="acquisitions"]');
+    d.querySelector('[data-delete="No Acquisitions"]').click();
+    await wait(80);
+    r.confirm = /Delete No Acquisitions\?/.test(
+      d.querySelector('[data-layout="No Acquisitions"]').textContent,
+    );
+    d.querySelector('[data-confirm-delete]').click();
+    await wait(120);
+    r.deleted =
+      !d.querySelector('[data-layout="No Acquisitions"]') && !(await stored()).saved.length;
+    r.perBrowser = /this browser, not with your RSI account/.test(d.textContent);
+    $('#cust-reset').click();
+    await wait(120);
+    r.reset = !!$('#oh-grid > [data-card="acquisitions"]');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await wait(80);
+    r.closed = !$('#cust-drawer');
+    return r;
+  });
+  Object.values(cust).every(Boolean)
+    ? ok(
+        'Customize Home: hide a card (rows stay level, remembered), save, apply, delete with confirm, Reset to Default',
+      )
+    : fail(`customize home: ${JSON.stringify(cust)}`);
   // Hangar Alerts live in the top bar's bell: a wishlist sale shows with a count, and ×
   // ignores it. The Citizen Card has the whole row on Home.
   const home = await page.evaluate(async () => {
-    OH.getShipStock = async (url) =>
-      /Cutlass-Black/i.test(url)
-        ? { state: 'in', price: 110, packs: [] }
-        : { state: 'out', price: null, packs: [] };
     await chrome.storage.local.set({ homeIgnored: [] });
     state.wishlist = ['Cutlass Black', 'Pioneer'];
     document.dispatchEvent(new CustomEvent('oh:home'));
-    await new Promise((r) => setTimeout(r, 800));
+    // Alerts come from the last wishlist check (Check Now), never a check of their own.
+    await window.OHApp.store.checkWishlist();
+    await new Promise((r) => setTimeout(r, 300));
     const bell = document.querySelector('#bell-menu');
     const wish = bell.textContent;
     const count = document.querySelector('#bell-n').textContent;
     const card = document.querySelector('.citizen-card').getBoundingClientRect();
-    // Citizen Card at three quarters, Game Status beside it.
-    const side = document.querySelector('#oh-status').getBoundingClientRect();
+    // The Citizen Card has the whole row (Game Status is in the top bar).
     const full =
-      side.left > card.right && Math.abs(side.width / (card.width + side.width) - 0.25) < 0.06;
+      Math.abs(card.width - document.querySelector('#oh-grid').getBoundingClientRect().width) <= 2;
     const x = [...bell.querySelectorAll('.bm-row')]
       .find((r) => /Cutlass Black/.test(r.textContent))
       ?.querySelector('.bm-x');
@@ -271,9 +688,115 @@ try {
       )
     : fail(`citizen card: ${JSON.stringify(card)}`);
 
+  // RSI Quick Links (#374): a Home card under the ship picture, and a fold-open group
+  // in your portrait menu. Hide Card is remembered; Show on Home brings it back.
+  const ql = await page.evaluate(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const links = (el) => [...el.querySelectorAll('a.ql-ln')];
+    const rsiOnly = (as) =>
+      as.length > 0 &&
+      as.every(
+        (a) =>
+          a.target === '_blank' &&
+          /noopener/.test(a.rel) &&
+          /^https:\/\/([a-z0-9-]+\.)?robertsspaceindustries\.com\//.test(a.href) &&
+          /↗/.test(a.textContent),
+      );
+    // Rows end level: every card in a grid row ends on the same line.
+    const rowsLevel = () => {
+      const by = new Map();
+      for (const c of document.querySelectorAll('#oh-grid > .oh-cell')) {
+        const b = c.getBoundingClientRect();
+        const k = Math.round(b.top);
+        by.set(k, [...(by.get(k) || []), Math.round(b.bottom)]);
+      }
+      return [...by.values()].every((bs) => Math.max(...bs) - Math.min(...bs) <= 1);
+    };
+    location.hash = '#home';
+    // The old switch moved into Customize Home (uiHomeLayout).
+    const qlStored = async () =>
+      (await chrome.storage.local.get('uiHomeLayout')).uiHomeLayout?.cards?.quicklinks;
+    await wait(200);
+    const res = {};
+    const card = () => document.querySelector('#oh-home #oh-quicklinks');
+    res.card = !!card() && rsiOnly(links(card()));
+    res.cardGroups = card() ? card().querySelectorAll('.ql-grp').length : 0;
+    res.cardDesc = /First change free/.test(card()?.textContent || '');
+    const handle = (await OH.getAccount())?.nickname;
+    res.dossier = handle
+      ? links(card()).some((a) => a.href.endsWith(`/citizens/${encodeURIComponent(handle)}`))
+      : !/Citizen Dossier/.test(card()?.textContent || '');
+    // Quick Links takes the whole last row; the rows above end level.
+    res.spot = card()?.closest('.oh-cell')?.dataset.card === 'quicklinks';
+    res.even = rowsLevel();
+    // Portrait menu: shut at first, opens, shuts.
+    document.querySelector('#settings-btn').click();
+    await wait(50);
+    const menu = document.querySelector('#settings-menu');
+    const tog = menu.querySelector('#ql-toggle');
+    const box = menu.querySelector('#ql-menu');
+    res.menuShut = !!tog && box.hidden && tog.getAttribute('aria-expanded') === 'false';
+    tog.click();
+    await wait(50);
+    res.menuOpen = !menu.hidden && !box.hidden && tog.getAttribute('aria-expanded') === 'true';
+    res.menuLinks = rsiOnly(links(box)) && !/Handle Change Pass/.test(box.textContent);
+    res.noShowYet = !box.querySelector('#ql-show');
+    tog.click();
+    await wait(50);
+    res.menuFolds = box.hidden && !menu.hidden;
+    document.body.click();
+    // Hide Card, then Show on Home brings it back.
+    [...card().querySelectorAll('button')].find((x) => x.textContent === 'Hide Card').click();
+    await wait(80);
+    res.hidden = !card();
+    res.stored = (await qlStored()) === false;
+    res.evenHidden = rowsLevel();
+    document.querySelector('#settings-btn').click();
+    await wait(50);
+    tog.click();
+    await wait(50);
+    const show = box.querySelector('#ql-show');
+    res.showLabel = show?.textContent.trim();
+    show?.click();
+    await wait(80);
+    res.back = !!card();
+    res.storedBack = (await qlStored()) === true;
+    document.body.click();
+    return res;
+  });
+  ql.card &&
+  ql.cardGroups === 4 &&
+  ql.cardDesc &&
+  ql.dossier &&
+  ql.spot &&
+  ql.even === true &&
+  ql.menuShut &&
+  ql.menuOpen &&
+  ql.menuLinks &&
+  ql.noShowYet &&
+  ql.menuFolds &&
+  ql.hidden &&
+  ql.stored &&
+  ql.evenHidden === true &&
+  ql.showLabel === 'Show on Home' &&
+  ql.back &&
+  ql.storedBack
+    ? ok(
+        'quick links: Home card across the last row (rows end level), RSI links in a new tab ↗, portrait menu group folds, Hide Card remembered, Show on Home brings it back',
+      )
+    : fail(`quick links: ${JSON.stringify(ql)}`);
+
   const colors = await page.evaluate(() => {
     const cs = getComputedStyle(document.documentElement);
     const bal = document.querySelector('#home-balances .bal.uec b');
+    const headWhite = () => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--head)';
+      document.body.append(probe);
+      const c = getComputedStyle(probe).color;
+      probe.remove();
+      return c;
+    };
     return {
       key: document.querySelectorAll('.color-key li').length,
       tokens: ['--good', '--warn', '--bad', '--t-ship', '--t-pack', '--t-ccu'].every((n) =>
@@ -283,13 +806,11 @@ try {
       // numbers), never a meaning colour.
       whiteBal:
         bal &&
-        [getComputedStyle(document.body).color, 'rgb(255, 255, 255)'].includes(
-          getComputedStyle(bal).color,
-        ),
+        [getComputedStyle(document.body).color, headWhite()].includes(getComputedStyle(bal).color),
       pal: palette().good === cs.getPropertyValue('--good').trim(),
     };
   });
-  colors.key === 13 && colors.tokens && colors.whiteBal && colors.pal
+  colors.key === 12 && colors.tokens && colors.whiteBal && colors.pal
     ? ok('colors: tokens, Color Key (12), white balances, exports share the palette')
     : fail(`colors: ${JSON.stringify(colors)}`);
 
@@ -342,6 +863,66 @@ try {
       )
     : fail(`card tweaks: ${JSON.stringify(tweaks)}`);
 
+  // The card is Svelte (ui/home/CitizenCard.svelte, SignedOut.svelte, Welcome.svelte).
+  // Signed out: the Log In wall replaces the card, after the status line.
+  const wall = await page.evaluate(async () => {
+    const a = await OH.getAccount();
+    const real = OH.getAccount;
+    OH.getAccount = async () => ({ ...a, loggedIn: false });
+    renderAccount();
+    await new Promise((r) => setTimeout(r, 200));
+    const lo = document.querySelector('#cc-loggedout');
+    const res = {
+      wall: !lo.hidden && lo.getBoundingClientRect().height > 0,
+      cardHidden: document.querySelector('#cc-account').hidden,
+      afterStatus: !!document.querySelector('.cc-status ~ #cc-loggedout'),
+      login: /Log In to RSI/.test(lo.textContent),
+    };
+    OH.getAccount = real;
+    renderAccount();
+    await new Promise((r) => setTimeout(r, 200));
+    res.back = !document.querySelector('#cc-account').hidden && lo.hidden;
+    return res;
+  });
+  Object.values(wall).every(Boolean)
+    ? ok('signed out: the Log In wall replaces the card, and the card comes back')
+    : fail(`signed-out wall: ${JSON.stringify(wall)}`);
+  // First run (nothing scanned): the welcome card, its button, then the first
+  // scan's progress in place of the button.
+  const welcome = await page.evaluate(async () => {
+    const keep = { items: state.items, buybacks: state.buybacks };
+    state.items = [];
+    state.buybacks = [];
+    homeUpdated();
+    await new Promise((r) => setTimeout(r, 100));
+    const el = () => document.querySelector('#oh-welcome');
+    const shown = !!el() && !document.querySelector('#welcome-scan').hidden;
+    scanProgress.i = 1;
+    scanProgress.n = 4;
+    scanDetail('Buy-backs · page 2 · 200 items');
+    await new Promise((r) => setTimeout(r, 100));
+    const prog = document.querySelector('#welcome-progress');
+    const progress = {
+      shown: !prog.hidden,
+      button: document.querySelector('#welcome-scan').hidden,
+      text: document.querySelector('#wp-text').textContent,
+      width: document.querySelector('#wp-fill').style.width,
+    };
+    scanDetail('');
+    Object.assign(state, keep);
+    homeUpdated();
+    await new Promise((r) => setTimeout(r, 100));
+    return { shown, progress, gone: !el() };
+  });
+  welcome.shown &&
+  welcome.progress.shown &&
+  welcome.progress.button &&
+  /page 2/.test(welcome.progress.text) &&
+  welcome.progress.width === '37.5%' &&
+  welcome.gone
+    ? ok('welcome card: Scan My Hangar, then the first scan as a progress bar; gone with data')
+    : fail(`welcome card: ${JSON.stringify(welcome)}`);
+
   // Phone width: nothing scrolls sideways.
   await page.setViewport({ width: 390, height: 844 });
   await new Promise((r) => setTimeout(r, 200));
@@ -383,17 +964,753 @@ try {
   !/Pioneer/.test(home.wish) &&
   home.count === '1' &&
   home.full
-    ? ok(
-        'Hangar Alerts in the bell: wishlist sale with a count; Game Status a quarter beside the card',
-      )
+    ? ok('Hangar Alerts in the bell: wishlist sale with a count; Citizen Card full width')
     : fail(`For You: ${JSON.stringify(home)}`);
   home.hidden && home.storeOpt
     ? ok('bell: × ignores an alert; Scan has a Store option')
     : fail(`For You ignore: ${JSON.stringify(home)}`);
-  const site = await page.$eval('#site-link', (e) => e.textContent).catch(() => '');
-  !site.trim() && !(await page.$('#site-link button'))
-    ? ok('website sync hidden until the site is live (no teaser, no connect button)')
-    : fail(`site link: "${site}"`);
+  // The caught-up line holds still while the menu is open (a scan fires 'oh:alerts'
+  // every page, #586) and is picked again on the next open.
+  const caught = await page.evaluate(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const line = () => document.querySelector('#bell-menu .bm-none')?.textContent.trim();
+    const btn = document.querySelector('#bell-btn');
+    const opens = [];
+    let steady = true;
+    for (let i = 0; i < 3; i++) {
+      btn.click();
+      await wait(50);
+      const first = line();
+      for (let j = 0; j < 4; j++) {
+        // A new list each time, as ui/home/ForYou.svelte publishes it.
+        window.OHApp.alerts = { ...window.OHApp.alerts, list: [] };
+        document.dispatchEvent(new CustomEvent('oh:alerts'));
+        await wait(30);
+        if (line() !== first) steady = false;
+      }
+      opens.push(first);
+      btn.click();
+      await wait(50);
+    }
+    return { opens, steady, closed: document.querySelector('#bell-menu').hidden };
+  });
+  caught.opens.every(Boolean) && caught.steady && new Set(caught.opens).size > 1 && caught.closed
+    ? ok('bell: the caught-up line holds through alerts refreshes, and changes between opens')
+    : fail(`bell caught-up line: ${JSON.stringify(caught)}`);
+  !(await page.$('#site-connect'))
+    ? ok('website sync hidden without a sync site (the demo has none; store builds do)')
+    : fail('site connect card shows without siteUrl');
+
+  // The website (owner sign-off, 2026-10-04 and -05), switched on with siteUrl and the
+  // website stubbed. Without the sign-in window (no identity permission), the code
+  // fallback: Connect on the Citizen Card → the code to approve → the card goes quiet
+  // and sync lives in the top bar: "Synced …" beside Scan, the ▾ menu's
+  // openhangar.space section (Connected as your RSI handle, Open My Hangar; Sync Now
+  // and Disconnect, asked once, are in your portrait's menu), a scan syncs once as its last step ("Syncing to Website…"), and a refused
+  // sync shows in the scan report.
+  const sc = await page.evaluate(async () => {
+    const wait = (ms = 80) => new Promise((r) => setTimeout(r, ms));
+    const $ = (sel) => document.querySelector(sel);
+    const txt = (el) => el?.textContent.replace(/\s+/g, ' ').trim() || '';
+    const card = () => $('#view-home .citizen-card #site-connect');
+    const btnIn = (root, label) =>
+      root && [...root.querySelectorAll('button')].find((b) => b.textContent.includes(label));
+    const menu = () => $('#scan-menu-sync');
+    // Sync Now is only in your portrait's menu (owner, 2026-10-07).
+    const syncNow = async () => {
+      document.dispatchEvent(new CustomEvent('oh:close-menus'));
+      await wait();
+      $('#settings-btn').click();
+      await wait();
+      $('#settings-menu #menu-sync-now').click();
+    };
+    const openMenu = async () => {
+      if ($('#scan-menu').hidden) $('#scan-menu-btn').click();
+      await wait();
+    };
+    const keep = {
+      start: OH.siteLinkStart,
+      wait: OH.siteLinkWait,
+      sync: OH.siteSync,
+      answer: OH.siteSyncAnswer,
+      get: OH.getSiteLink,
+      off: OH.siteDisconnect,
+      tabs: chrome.tabs?.create,
+      identity: chrome.identity,
+    };
+    const r = {};
+    let link = null;
+    let approve;
+    const opened = [];
+    try {
+      chrome.identity = undefined;
+      await chrome.storage.local.set({ siteUrl: 'https://staging.example.test' });
+      chrome.tabs = chrome.tabs || {};
+      chrome.tabs.create = (o) => opened.push(o.url);
+      OH.getSiteLink = async () => link;
+      OH.siteLinkStart = async () => ({
+        device_code: 'd',
+        user_code: 'K7Q-4PX',
+        verification_uri: 'https://staging.example.test/link',
+        expires_in: 600,
+        interval: 1,
+      });
+      OH.siteLinkWait = () =>
+        new Promise((res) => {
+          approve = () => {
+            // The website login's name, not the RSI handle the menu shows.
+            link = { token: 't', name: 'pilot.mail', connectedAt: Date.now(), lastSync: null };
+            res(link);
+          };
+        });
+      OH.siteSync = async () => {
+        link = { ...link, lastSync: Date.now() };
+        return { synced_at: link.lastSync };
+      };
+      OH.siteDisconnect = async () => {
+        link = null;
+      };
+      await refreshSite();
+      await wait();
+      r.off = txt(card());
+      r.noStatusYet = !$('#sync-status');
+      // Not connected: the portrait's menu offers Connect at the top (#434).
+      $('#settings-btn').click();
+      await wait();
+      r.youOffer = txt($('#settings-menu #menu-connect'));
+      document.dispatchEvent(new CustomEvent('oh:close-menus'));
+      await wait();
+      btnIn(card(), 'Connect').click();
+      await wait();
+      r.wait = txt(card());
+      r.copy = !!btnIn(card(), 'Copy');
+      r.opened = opened[0];
+      // Kept for the code page's check (background.js oh-link-check) while it waits.
+      r.pending = (await chrome.storage.session.get('siteLinkPending')).siteLinkPending || null;
+      r.pendingFresh = !!r.pending && r.pending.until > Date.now();
+      approve();
+      await wait(150);
+      r.pendingGone = !(await chrome.storage.session.get('siteLinkPending')).siteLinkPending;
+      r.quiet = !card();
+      r.status = txt($('#sync-status'));
+      await openMenu();
+      r.menu = txt(menu());
+      r.noScanSyncNow = !btnIn(menu(), 'Sync Now');
+      await syncNow();
+      await wait(150);
+      r.menuClosed = $('#settings-menu').hidden;
+      r.synced = txt($('#sync-status'));
+      r.syncedTitle = $('#sync-status')?.title || '';
+      // Top Bar Option A (2026-10-06): the Synced dot sits on the portrait, its hover
+      // text says Synced, and the portrait's menu has the line with Sync Now.
+      r.dotOnPortrait = !!$('#settings-btn #sync-status.sync-dot.on');
+      r.portraitTip = $('#settings-btn').title;
+      r.noBarText = !$('.hdr-prefs > #sync-status, .hdr-prefs .sync-status');
+      document.dispatchEvent(new CustomEvent('oh:close-menus'));
+      $('#settings-btn').click();
+      await wait();
+      r.youLine = txt($('#settings-menu #menu-sync'));
+      r.youSyncNow = !!$('#settings-menu #menu-sync-now');
+      document.dispatchEvent(new CustomEvent('oh:close-menus'));
+      await wait();
+      // Connected, a finished scan syncs once, as the Scan button's last step.
+      let synced = 0;
+      const realSync = OH.siteSync;
+      OH.siteSync = async (opts) => {
+        synced++;
+        opts?.onSend?.(); // the real one calls it just before the upload
+        await wait(0);
+        r.label = topBar.label;
+        r.button = $('#scan-home').getAttribute('aria-label') || '';
+        return realSync();
+      };
+      await runScan({ hangar: false, buybacks: false, referrals: false });
+      await wait(150);
+      r.auto = synced;
+      // A refused sync after a scan: the scan report says so, not the Citizen Card.
+      OH.siteSync = async () => {
+        throw new Error(
+          'The website already has a newer scan from another browser. Scan here, then sync.',
+        );
+      };
+      await runScan({ hangar: false, buybacks: false, referrals: false });
+      await wait(250);
+      r.report = $('#scan-report') && !$('#scan-report').hidden ? txt($('#scan-report')) : '';
+      setScanning(''); // past the end-of-scan flash
+      await wait();
+      r.rough = txt($('#scan-home'));
+      r.cardStillQuiet = !card();
+      $('#scan-report .sr-x')?.click();
+      await wait();
+      // Sync Now refused: "Not Synced".
+      OH.siteSync = async () => {
+        throw new Error('Scan your hangar first, then press Sync Now.');
+      };
+      await syncNow();
+      await wait(250);
+      r.manual = $('#scan-report') && !$('#scan-report').hidden ? txt($('#scan-report')) : '';
+      $('#scan-report .sr-x')?.click();
+      await wait();
+      // Sync not open yet: a calm note (an info sign, Roger That, no Flight Log), and
+      // the Scan button stays as it was, after Sync Now and after a scan.
+      OH.siteSync = async () => {
+        throw Object.assign(
+          new Error('Sync opens November 10. Your hangar stays safe in your browser until then.'),
+          { calm: true },
+        );
+      };
+      await syncNow();
+      await wait(250);
+      r.calm = $('#scan-report') && !$('#scan-report').hidden ? txt($('#scan-report')) : '';
+      r.calmLook = !!$('#scan-report .sr-icon.calm') && !$('#scan-report #sr-send');
+      r.calmButton = txt($('#scan-home'));
+      btnIn($('#scan-report'), 'Roger That')?.click();
+      await wait();
+      r.calmClosed = $('#scan-report').hidden;
+      await runScan({ hangar: false, buybacks: false, referrals: false });
+      await wait(250);
+      r.calmScan = $('#scan-report') && !$('#scan-report').hidden ? txt($('#scan-report')) : '';
+      setScanning(''); // past the end-of-scan flash
+      await wait();
+      r.calmScanButton = txt($('#scan-home'));
+      $('#scan-report .sr-x')?.click();
+      await wait();
+      // An RSI account this link hasn't synced: the scan report asks (a calm note with
+      // Sync It and Don't Sync) and the answer goes to OH.siteSyncAnswer. After Don't
+      // Sync, the sync after a scan stays quiet (no report); Sync Now asks again, and
+      // Sync It then syncs. The stub follows OH.siteSync's rules.
+      const answers = [];
+      let tries = 0;
+      OH.siteSyncAnswer = async (who, yes) => answers.push(`${who.handle}:${yes}`);
+      OH.siteSync = async (opts) => {
+        tries++;
+        const last = answers.at(-1);
+        if (last === 'Pilot_B:true') return realSync();
+        if (last === 'Pilot_B:false' && opts?.auto)
+          throw Object.assign(new Error('Not synced: you chose to keep this account here.'), {
+            quiet: true,
+          });
+        throw Object.assign(new Error('Sync Pilot_B to your openhangar.space account?'), {
+          calm: true,
+          ask: { handle: 'Pilot_B', record: null },
+        });
+      };
+      await runScan({ hangar: false, buybacks: false, referrals: false });
+      await wait(250);
+      r.askReport = $('#scan-report') && !$('#scan-report').hidden ? txt($('#scan-report')) : '';
+      r.askLook = !!$('#scan-report .sr-icon.calm') && !$('#scan-report #sr-send');
+      setScanning(''); // past the end-of-scan flash
+      await wait();
+      r.askScanButton = txt($('#scan-home'));
+      btnIn($('#scan-report'), "Don't Sync")?.click();
+      await wait(150);
+      r.askClosed = !$('#scan-report')?.checkVisibility() && !topBar.report;
+      await runScan({ hangar: false, buybacks: false, referrals: false });
+      await wait(250);
+      r.quietAfterNo = !topBar.report && !$('#scan-report')?.checkVisibility();
+      setScanning(''); // past the end-of-scan flash
+      await wait();
+      await syncNow();
+      await wait(250);
+      r.askAgain = $('#scan-report') && !$('#scan-report').hidden ? txt($('#scan-report')) : '';
+      btnIn($('#scan-report'), 'Sync It')?.click();
+      await wait(250);
+      r.answers = answers.join(' ');
+      r.askTries = tries;
+      r.askSynced = !topBar.report;
+      OH.siteSync = realSync;
+      // Disconnect isn't in the Scan menu; it's in your portrait's menu, asked once.
+      await openMenu();
+      r.noScanDisconnect = !/Disconnect/.test(txt(menu()));
+      $('#scan-report .sr-x')?.click();
+      document.dispatchEvent(new CustomEvent('oh:close-menus'));
+      await wait();
+      $('#settings-btn').click();
+      await wait();
+      $('#you-disconnect').click();
+      await wait();
+      r.ask = txt($('#settings-menu .you-confirm'));
+      r.menuStays = !$('#settings-menu').hidden;
+      btnIn($('#settings-menu .you-confirm'), 'Disconnect').click();
+      await wait(150);
+      r.back = txt(card());
+      r.statusGone = !$('#sync-status') && !menu();
+    } finally {
+      Object.assign(OH, {
+        siteLinkStart: keep.start,
+        siteLinkWait: keep.wait,
+        siteSync: keep.sync,
+        siteSyncAnswer: keep.answer,
+        getSiteLink: keep.get,
+        siteDisconnect: keep.off,
+      });
+      if (keep.tabs) chrome.tabs.create = keep.tabs;
+      chrome.identity = keep.identity;
+      topBar.report = null;
+      await chrome.storage.local.remove('siteUrl');
+      await refreshSite();
+      await wait();
+    }
+    r.hiddenAgain = !card();
+    return r;
+  });
+  /Connect to openhangar\.space/.test(sc.off) &&
+  /Nothing is sent until you connect/.test(sc.off) &&
+  /Open Hangar will sync after every scan\. Disconnect any time\./.test(sc.off) &&
+  sc.noStatusYet &&
+  /^Connect to openhangar\.space\s*Optional/.test(sc.youOffer || '') &&
+  /K7Q-4PX/.test(sc.wait) &&
+  /Good for (10:00|9:5\d)/.test(sc.wait) &&
+  sc.copy &&
+  /\/link\?code=K7Q-4PX$/.test(sc.opened || '') &&
+  sc.pending?.code === 'K7Q-4PX' &&
+  sc.pending?.origin === 'https://staging.example.test' &&
+  sc.pendingFresh &&
+  sc.pendingGone &&
+  sc.quiet &&
+  sc.status === 'Connected' &&
+  /Connected as Demo_Citizen/.test(sc.menu) &&
+  !/pilot\.mail/.test(sc.menu) &&
+  /Every scan syncs/.test(sc.menu) &&
+  /Open My Hangar/.test(sc.menu) &&
+  sc.noScanSyncNow &&
+  sc.menuClosed &&
+  /^Synced \d/.test(sc.synced) &&
+  /^Synced to openhangar\.space today, /.test(sc.syncedTitle) &&
+  sc.dotOnPortrait &&
+  /^Synced \d/.test(sc.portraitTip) &&
+  sc.noBarText &&
+  /^Synced \d.*Sync Now$/.test(sc.youLine) &&
+  sc.youSyncNow &&
+  sc.auto === 1 &&
+  sc.label === 'Syncing to Website…' &&
+  /Syncing to Website…/.test(sc.button) &&
+  /Scan Done, Not Synced/.test(sc.report) &&
+  /newer scan from another browser/.test(sc.report) &&
+  /Not Synced/.test(sc.rough) &&
+  sc.cardStillQuiet &&
+  /^Not Synced/.test(sc.manual) &&
+  /Scan your hangar first/.test(sc.manual) &&
+  /^Not Synced Yet\s*Sync opens November 10\..*Roger That$/.test(sc.calm) &&
+  sc.calmLook &&
+  /^Scan (All|Custom)$/.test(sc.calmButton) &&
+  sc.calmClosed &&
+  /^Scan Done, Not Synced Yet/.test(sc.calmScan) &&
+  /^Scan (All|Custom)$/.test(sc.calmScanButton) &&
+  /^New Pilot Aboard\s*Sync Pilot_B to your openhangar\.space account\?/.test(sc.askReport) &&
+  /Sync It Don't Sync/.test(sc.askReport) &&
+  /We'll remember your answer for Pilot_B\.$/.test(sc.askReport) &&
+  sc.askLook &&
+  /^Scan (All|Custom)$/.test(sc.askScanButton) &&
+  sc.askClosed &&
+  sc.quietAfterNo &&
+  /Sync Pilot_B to your openhangar\.space account\?/.test(sc.askAgain) &&
+  sc.answers === 'Pilot_B:false Pilot_B:true' &&
+  sc.askTries === 4 &&
+  sc.askSynced &&
+  sc.noScanDisconnect &&
+  sc.menuStays &&
+  /Disconnect From openhangar\.space\?/.test(sc.ask) &&
+  /Connect to openhangar\.space/.test(sc.back) &&
+  sc.statusGone &&
+  sc.hiddenAgain
+    ? ok(
+        "website sync: connect on the card or the portrait menu (the code with Copy and its time left), then the Synced dot on the portrait (Synced line and Sync Now in its menu), the ▾ menu, a scan syncs as its last step, problems in the scan report (sync not open yet as a calm note), a new RSI account asks first (Sync It / Don't Sync; after Don't Sync a scan stays quiet and Sync Now asks again), disconnect",
+      )
+    : fail(`website sync: ${JSON.stringify(sc)}`);
+
+  // The usual way (owner, 2026-10-04): the browser's sign-in window opens the website's
+  // /connect page; Approve hands back a one-time code, traded for the token with the
+  // PKCE verifier, and "Sync My Hangar Now" sends the first sync right away.
+  const win = await page.evaluate(async () => {
+    const wait = (ms = 80) => new Promise((r) => setTimeout(r, ms));
+    const card = () => document.querySelector('#view-home .citizen-card #site-connect');
+    const text = () => card()?.textContent.replace(/\s+/g, ' ').trim() || '';
+    const keep = { identity: chrome.identity, fetch: window.fetch, sync: OH.siteSync };
+    const REDIRECT = 'https://aeabioadfphghjennmdbnpelojlhndjl.chromiumapp.org/';
+    const r = {};
+    let finish;
+    try {
+      await chrome.storage.local.set({ siteUrl: 'https://staging.example.test' });
+      chrome.identity = {
+        getRedirectURL: () => REDIRECT,
+        launchWebAuthFlow: ({ url }) =>
+          new Promise((res) => {
+            r.url = url;
+            const q = new URL(url).searchParams;
+            finish = () => res(`${REDIRECT}?state=${q.get('state')}&code=one-time&sync=1`);
+          }),
+      };
+      window.fetch = async (u, init) => {
+        if (!String(u).endsWith('/api/link/token')) return keep.fetch(u, init);
+        const body = JSON.parse(init.body);
+        const d = await crypto.subtle.digest(
+          'SHA-256',
+          new TextEncoder().encode(body.code_verifier),
+        );
+        const challenge = btoa(String.fromCharCode(...new Uint8Array(d)))
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
+        r.pkce = challenge === new URL(r.url).searchParams.get('code_challenge');
+        r.traded = body.code === 'one-time' && body.redirect_uri === REDIRECT;
+        return new Response(JSON.stringify({ token: 'oht_x', name: 'ExamplePilot' }));
+      };
+      OH.siteSync = async () => {
+        r.synced = true;
+        const { siteLink } = await chrome.storage.local.get('siteLink');
+        await chrome.storage.local.set({ siteLink: { ...siteLink, lastSync: Date.now() } });
+        return { synced_at: Date.now() };
+      };
+      await refreshSite();
+      await wait();
+      [...card().querySelectorAll('button')].find((b) => /Connect/.test(b.textContent)).click();
+      await wait();
+      r.waiting = text();
+      finish();
+      await wait(250);
+      r.quiet = !card();
+      r.status = document.querySelector('#sync-status')?.textContent.trim() || '';
+      r.page = new URL(r.url).pathname;
+    } finally {
+      chrome.identity = keep.identity;
+      window.fetch = keep.fetch;
+      OH.siteSync = keep.sync;
+      await chrome.storage.local.remove(['siteUrl', 'siteLink']);
+      await refreshSite();
+      await wait();
+    }
+    return r;
+  });
+  win.page === '/connect' &&
+  /Finish connecting in the window that opened/.test(win.waiting) &&
+  win.pkce &&
+  win.traded &&
+  win.synced &&
+  win.quiet &&
+  /^Synced \d/.test(win.status)
+    ? ok('website sync: the sign-in window, PKCE, and the first sync right after Approve')
+    : fail(`connect window: ${JSON.stringify(win)}`);
+
+  // Firefox (gecko manifest emulated): a line under Connect says what we share; Learn
+  // More, and Connect until Firefox has said yes, open What We Share, and Why Firefox
+  // Asks. Escape and Not Now close it (focus back on the button); Continue asks Firefox
+  // inside its own click, and a no shows the usual message. Once allowed, Connect goes
+  // straight on.
+  const ff = await page.evaluate(async () => {
+    const wait = (ms = 80) => new Promise((r) => setTimeout(r, ms));
+    const $ = (sel) => document.querySelector(sel);
+    const txt = (el) => el?.textContent.replace(/\s+/g, ' ').trim() || '';
+    const card = () => $('#view-home .citizen-card #site-connect');
+    const btnIn = (root, label) =>
+      root && [...root.querySelectorAll('button')].find((b) => b.textContent.includes(label));
+    const keep = {
+      manifest: chrome.runtime.getManifest,
+      permissions: chrome.permissions,
+      identity: chrome.identity,
+    };
+    const r = { asked: 0, inClick: [] };
+    let granted = false;
+    let answer = false;
+    let inClick = false;
+    try {
+      const m = keep.manifest();
+      chrome.runtime.getManifest = () => ({
+        ...m,
+        browser_specific_settings: { gecko: { id: 'open-hangar@draco-foundry' } },
+      });
+      chrome.permissions = {
+        contains: async () => granted,
+        request: (p) => {
+          r.asked++;
+          r.inClick.push(inClick);
+          r.what = p.data_collection;
+          granted = answer;
+          return Promise.resolve(answer);
+        },
+      };
+      chrome.identity = {
+        getRedirectURL: () => 'https://x.example/',
+        launchWebAuthFlow: async () => {
+          r.window = true;
+          throw new Error('The user cancelled');
+        },
+      };
+      await chrome.storage.local.set({ siteUrl: 'https://staging.example.test' });
+      await refreshSite();
+      await wait();
+      r.line = txt(card()?.querySelector('.sc-ff'));
+      const learn = card().querySelector('.sc-learn');
+      learn.click();
+      await wait();
+      r.card = txt($('#fx-explain'));
+      r.focusIn = $('#fx-explain').contains(document.activeElement);
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await wait();
+      r.escClosed = !$('#fx-explain');
+      r.focusBack = document.activeElement === learn;
+      btnIn(card(), 'Connect').click();
+      await wait();
+      r.connectOpens = !!$('#fx-explain') && r.asked === 0;
+      btnIn($('#fx-explain'), 'Not Now').click();
+      await wait();
+      r.notNow = !$('#fx-explain') && r.asked === 0;
+      btnIn(card(), 'Connect').click();
+      await wait();
+      inClick = true;
+      btnIn($('#fx-explain'), 'Continue').click();
+      inClick = false;
+      await wait(150);
+      r.refused = !$('#fx-explain') && txt(card());
+      answer = true;
+      btnIn(card(), 'Connect').click();
+      await wait();
+      inClick = true;
+      btnIn($('#fx-explain'), 'Continue').click();
+      inClick = false;
+      await wait(150);
+      r.yesConnects = r.window === true;
+      r.window = false;
+      await refreshSite();
+      await wait();
+      btnIn(card(), 'Connect').click();
+      await wait(150);
+      r.straightOn = !$('#fx-explain') && r.window === true;
+      // Our hangar page asked for the hangar (Local Mode): the same card opens by
+      // itself, and its Continue asks Firefox inside the click and never connects.
+      granted = false;
+      r.window = false;
+      await refreshSite();
+      await wait();
+      site.askFirefox = 'local';
+      homeUpdated();
+      await wait();
+      r.localCard = !!$('#fx-explain');
+      r.localText = txt($('#fx-explain'));
+      const asked = r.asked;
+      inClick = true;
+      btnIn($('#fx-explain'), 'Continue').click();
+      inClick = false;
+      await wait(150);
+      r.localAsks = r.asked === asked + 1 && r.inClick.at(-1) === true;
+      r.localNoConnect = !$('#fx-explain') && r.window === false;
+    } finally {
+      chrome.runtime.getManifest = keep.manifest;
+      chrome.permissions = keep.permissions;
+      chrome.identity = keep.identity;
+      await chrome.storage.local.remove('siteUrl');
+      await refreshSite();
+      await wait();
+    }
+    return r;
+  });
+  /pledge prices and store credit/.test(ff.line) &&
+  /Learn More/.test(ff.line) &&
+  /What We Share, and Why Firefox Asks/.test(ff.card) &&
+  ['What we send', 'What we never send', 'Why Firefox asks', 'If you say no', 'Change your mind']
+    .map((h) => ff.card.includes(h))
+    .every(Boolean) &&
+  ff.focusIn &&
+  ff.escClosed &&
+  ff.focusBack &&
+  ff.connectOpens &&
+  ff.notNow &&
+  /Sync stays off until you let Firefox share/.test(ff.refused || '') &&
+  // Continue's clicks asked inside the click; once allowed, Connect only checks.
+  ff.inClick.slice(0, 3).join() === 'true,true,false' &&
+  ff.yesConnects &&
+  ff.straightOn &&
+  ff.localCard &&
+  // Local Mode's own words, never the Connect card's.
+  /Local Mode/.test(ff.localText || '') &&
+  /What Our Hangar Page Reads, and Why Firefox Asks/.test(ff.localText || '') &&
+  [
+    'What it reads',
+    'Where it goes',
+    'No account',
+    'Why Firefox asks',
+    'If you say no',
+    'Change your mind',
+  ]
+    .map((h) => (ff.localText || '').includes(h))
+    .every(Boolean) &&
+  // Every approved sentence, word for word (owner, 2026-10-10).
+  [
+    "The hangar this browser scanned: your pledges, buy-backs, Store Credit and RSI handle. It's your backup file without the scan history, referral code or referral prospects.",
+    "Nowhere. The page shows it right here in this browser and doesn't save it. Nothing goes to our servers.",
+    "None needed. Saying yes doesn't sign you up or turn on sync.",
+    'The page is a website, so we ask Firefox before handing it your hangar. Firefox names what\'s shared from a short fixed list, so pledge prices and Store Credit show up as "financial and payment information".',
+    "Nothing changes in Open Hangar. The hangar page can't show your hangar until you say yes, and its Try Again button asks again.",
+    'Turn it off any time on Open Hangar\'s "Permissions and data" tab in Firefox\'s add-ons page.',
+  ]
+    .map((line) => (ff.localText || '').includes(line))
+    .every(Boolean) &&
+  !/Before You Connect|What we send/.test(ff.localText || '') &&
+  ff.localAsks &&
+  ff.localNoConnect
+    ? ok(
+        'Firefox: what we share under Connect, the explainer, and Continue asks inside its click (for our hangar page: asks only)',
+      )
+    : fail(`Firefox explainer: ${JSON.stringify(ff)}`);
+
+  // The pages with a website twin (Home, Inventory, Buy-Backs, Stats). Connected: Open
+  // On Website ↗ under each title (Home: the Citizen Card's corner), opening your
+  // hangar there. Before that: See It on Any Device, which starts Connect (Firefox's
+  // card first until Firefox says yes); Home has its Connect card instead. Nothing
+  // at all without a sync site.
+  const oow = await page.evaluate(async () => {
+    const wait = (ms = 80) => new Promise((r) => setTimeout(r, ms));
+    const $ = (sel) => document.querySelector(sel);
+    const PAGES = ['home', 'inventory', 'buybacks', 'stats'];
+    // Each page's button label ('' when there's none).
+    const labels = async () => {
+      const out = {};
+      for (const v of PAGES) {
+        location.hash = '#' + v;
+        await wait(200);
+        out[v] = [...document.querySelectorAll(`#view-${v} .site-open-btn`)]
+          .map((b) => b.textContent.trim())
+          .join('|');
+      }
+      return out;
+    };
+    const btn = async (v) => {
+      location.hash = '#' + v;
+      await wait(200);
+      return $(`#view-${v} .site-open-btn`);
+    };
+    const site = OHApp.site;
+    const keep = {
+      get: OH.getSiteLink,
+      connect: site.connect,
+      tabs: chrome.tabs?.create,
+      manifest: chrome.runtime.getManifest,
+      permissions: chrome.permissions,
+    };
+    const r = { connects: 0 };
+    const opened = [];
+    let link = null;
+    try {
+      r.none = await labels();
+      chrome.tabs = chrome.tabs || {};
+      chrome.tabs.create = (o) => opened.push(o.url);
+      OH.getSiteLink = async () => link;
+      site.connect = () => r.connects++;
+      await chrome.storage.local.set({ siteUrl: 'https://staging.example.test' });
+      await refreshSite();
+      await wait();
+      r.offer = await labels();
+      r.homeCard = !!$('#view-home .citizen-card #site-connect');
+      (await btn('stats')).click();
+      await wait();
+      // Firefox, not allowed yet: the card first, Connect only from its Continue.
+      const m = keep.manifest();
+      chrome.runtime.getManifest = () => ({
+        ...m,
+        browser_specific_settings: { gecko: { id: 'open-hangar@draco-foundry' } },
+      });
+      chrome.permissions = { contains: async () => false, request: async () => false };
+      await refreshSite();
+      await wait();
+      (await btn('inventory')).click();
+      await wait();
+      r.ffCard = !!$('#fx-explain') && r.connects === 1;
+      [...$('#fx-explain').querySelectorAll('button')]
+        .find((b) => b.textContent.includes('Not Now'))
+        .click();
+      await wait();
+      r.ffClosed = !$('#fx-explain') && r.connects === 1;
+      chrome.runtime.getManifest = keep.manifest;
+      chrome.permissions = keep.permissions;
+      link = { token: 't', name: 'pilot.mail', connectedAt: Date.now(), lastSync: Date.now() };
+      await refreshSite();
+      await wait();
+      r.on = await labels();
+      r.homeCorner = !!$('#view-home .citizen-card #site-open-home .site-open-btn');
+      r.homeQuiet = !$('#view-home .citizen-card #site-connect');
+      (await btn('buybacks')).click();
+      await wait();
+      r.opened = opened.join('|');
+    } finally {
+      OH.getSiteLink = keep.get;
+      site.connect = keep.connect;
+      if (keep.tabs) chrome.tabs.create = keep.tabs;
+      chrome.runtime.getManifest = keep.manifest;
+      chrome.permissions = keep.permissions;
+      await chrome.storage.local.remove('siteUrl');
+      await refreshSite();
+      location.hash = '#home';
+      await wait(200);
+    }
+    r.goneAgain = !document.querySelector('.site-open-btn');
+    return r;
+  });
+  const each = (o, home, rest) =>
+    o && o.home === home && ['inventory', 'buybacks', 'stats'].every((v) => o[v] === rest);
+  each(oow.none, '', '') &&
+  each(oow.offer, '', 'See It on Any Device') &&
+  oow.homeCard &&
+  oow.ffCard &&
+  oow.ffClosed &&
+  each(oow.on, 'Open on Website ↗', 'Open on Website ↗') &&
+  oow.homeCorner &&
+  oow.homeQuiet &&
+  oow.opened === 'https://staging.example.test/hangar' &&
+  oow.goneAgain
+    ? ok(
+        'website twin: Open on Website on Home, Inventory, Buy-Backs and Stats once connected (opens My Hangar), See It on Any Device before (starts Connect, Firefox card first), none without a sync site',
+      )
+    : fail(`Open on Website: ${JSON.stringify(oow)}`);
+
+  // Home, connected, at widths where Open on Website sits in the Citizen Card's corner
+  // (761px up): a long name stops short of it instead of running underneath.
+  const keepLink = await page.evaluate(async () => {
+    window.__keepSiteLink = OH.getSiteLink;
+    OH.getSiteLink = async () => ({ token: 't', name: 'p', connectedAt: 1, lastSync: 1 });
+    await chrome.storage.local.set({ siteUrl: 'https://staging.example.test' });
+    await refreshSite();
+    location.hash = '#home';
+    await new Promise((r) => setTimeout(r, 200));
+    // The name's own text node, so the card keeps updating it afterwards.
+    const n = document.querySelector('#cc-name');
+    const t = [...(n.querySelector('a') || n).childNodes].find((c) => c.nodeType === 3);
+    const old = t.data;
+    t.data = 'Commander Longname of the Very Long Fleet';
+    window.__keepName = () => (t.data = old);
+    return true;
+  });
+  const clash = {};
+  try {
+    for (const w of [1280, 900, 800, 761]) {
+      await page.setViewport({ width: w, height: 900 });
+      await new Promise((r) => setTimeout(r, 200));
+      const c = await page.evaluate(() => {
+        const n = document.querySelector('#cc-name');
+        const b = document.querySelector('#site-open-home .site-open-btn');
+        if (!b) return 'no link';
+        const nr = n.getBoundingClientRect();
+        const br = b.getBoundingClientRect();
+        const end = nr.right - parseFloat(getComputedStyle(n).paddingRight);
+        const under = nr.top < br.bottom && br.top < nr.bottom && br.left < end;
+        return under
+          ? `name ends at ${Math.round(end)}, link starts at ${Math.round(br.left)}`
+          : '';
+      });
+      if (c) clash[w] = c;
+    }
+  } finally {
+    await page.setViewport({ width: 1280, height: 900 });
+    await page.evaluate(async () => {
+      window.__keepName?.();
+      if (window.__keepSiteLink) OH.getSiteLink = window.__keepSiteLink;
+      await chrome.storage.local.remove('siteUrl');
+      await refreshSite();
+      await new Promise((r) => setTimeout(r, 200));
+    });
+  }
+  keepLink && Object.keys(clash).length === 0
+    ? ok("Home's Open on Website corner leaves room for a long name (761px to 1280px)")
+    : fail(`Open on Website over the name: ${JSON.stringify(clash)}`);
 
   // Currency: EUR converts the melt box (rates come from the demo's fixed file).
   const rates = await page.evaluate(async () => {
@@ -460,14 +1777,19 @@ try {
   await checkListAlignment('Inventory', '#results');
   await page.click('#layout [data-layout="market"]');
   (await page.$('.market-table')) ? ok('Market view renders') : fail('Market view empty');
-  // Tick a row without Select mode; % and price stay linked.
+  // Tick a row without Select mode; % and price stay linked. The list is Svelte
+  // (ui/inventory): it redraws a moment after each change.
   await page.click('.market-table .mk-pick');
-  const mk = await page.evaluate(() => {
+  const mk = await page.evaluate(async () => {
     const row = document.querySelector('.market-table .mk-row');
     const pct = row.querySelector('.mk-pct-in');
+    pct.focus();
     pct.value = '50';
     pct.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 60));
     return {
+      // Typing keeps the field (and its focus): the row isn't redrawn under the cursor.
+      kept: document.activeElement === pct && pct.isConnected && pct.value === '50',
       count: document.querySelector('.mk-selcount').textContent,
       bar: !document.querySelector('#select-bar').hidden,
       price: Number(row.querySelector('.mk-price').value),
@@ -477,6 +1799,7 @@ try {
   /1 picked/.test(mk.count) && mk.bar
     ? ok('market rows tick without Select mode')
     : fail(`market tick: ${JSON.stringify(mk)}`);
+  mk.kept ? ok('typing a % keeps focus in the field') : fail(`market focus: ${JSON.stringify(mk)}`);
   Math.abs(mk.price - mk.melt / 2) < 0.01
     ? ok(`50% of melt → $${mk.price}`)
     : fail(`% of melt: ${JSON.stringify(mk)}`);
@@ -488,16 +1811,19 @@ try {
   });
   await page.click('.market-table .mk-pick');
   // Typing a % ticks the row on its own.
-  const autoTick = await page.evaluate(() => {
+  const autoTick = await page.evaluate(async () => {
+    const tick = () => new Promise((r) => setTimeout(r, 60));
     const row = document.querySelectorAll('.market-table .mk-row')[1];
     const pct = row.querySelector('.mk-pct-in');
     pct.value = '60';
     pct.dispatchEvent(new Event('input', { bubbles: true }));
-    const ticked = row.querySelector('.mk-pick').checked;
+    await tick();
+    const ticked = row.querySelector('.mk-pick').checked && row.classList.contains('picked');
     const store = row.querySelector('.mk-store').textContent.trim();
     pct.value = '';
     pct.dispatchEvent(new Event('input', { bubbles: true }));
     row.querySelector('.mk-pick').click();
+    await tick();
     return { ticked, store };
   });
   autoTick.ticked ? ok('typing a % ticks the row') : fail('typing a % did not tick the row');
@@ -509,8 +1835,12 @@ try {
   const [c1, c2] = await page.$$('#results .card');
   await c1.click();
   await c2.click();
+  await new Promise((r) => setTimeout(r, 60));
   const sel = await page.$eval('#sb-count', (e) => e.textContent);
-  /2 selected/.test(sel) ? ok('select mode picks items') : fail(`select mode: "${sel}"`);
+  const marked = await page.$$eval('#results .card.selected', (e) => e.length);
+  /2 selected/.test(sel) && marked === 2
+    ? ok('select mode picks items')
+    : fail(`select mode: "${sel}", ${marked} marked`);
   await page.click('[data-sb="done"]');
   // Export ▾ items run (the menu used to swallow their clicks): Share Image starts
   // Select mode, and Buy-Backs' CSV item reaches its handler too.
@@ -591,7 +1921,8 @@ try {
       b.value = '';
       b.blur();
     });
-    await page.click(sel);
+    // The top bar's box opens from its search icon (Top Bar Option A).
+    await page.click(sel === '#gsearch-top' ? '#top-search-btn' : sel);
     await page.keyboard.type('cutlass', { delay: 15 });
     const typed = await page.$eval(sel, (b) => b.value);
     typed === 'cutlass'
@@ -611,6 +1942,20 @@ try {
     box.value = 'Idris';
     box.dispatchEvent(new Event('input'));
     const notOwned = /Nothing in your hangar/.test(out.textContent);
+    // With results open, the wheel isn't swallowed: off the panel it's the page's,
+    // and on a list that can't scroll it goes to the page too (owner, 2026-10-06).
+    box.value = 'au';
+    box.dispatchEvent(new Event('input'));
+    const wheel = (el) => {
+      const ev = new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true });
+      el.dispatchEvent(ev);
+      return ev.defaultPrevented;
+    };
+    const list = out.querySelector('.gs-scroll');
+    const listScrolls = !!list && list.scrollHeight > list.clientHeight + 1;
+    const wheelFree =
+      !wheel(document.querySelector('#view-home .citizen-card') || document.body) &&
+      (listScrolls || !wheel(out.querySelector('.gs-title') || out));
     box.value = '';
     box.dispatchEvent(new Event('input'));
     const shipName = ownedShips().find((s) => /cutlass/i.test(s.label))?.label;
@@ -622,6 +1967,7 @@ try {
       hangarRow,
       storeRow,
       notOwned,
+      wheelFree,
       shipName,
       closed: out.hidden,
       title: modal.querySelector('.modal-name')?.textContent,
@@ -630,9 +1976,31 @@ try {
     };
   });
   await page.evaluate(() => document.querySelector('#modal-close').click());
-  !gs.groups.includes('Ships') && gs.hangarRow && !gs.storeRow && gs.notOwned && gs.closed
+  !gs.groups.includes('Ships') &&
+  gs.hangarRow &&
+  !gs.storeRow &&
+  gs.notOwned &&
+  gs.wheelFree &&
+  gs.closed
     ? ok(`hangar search "cutlass": ${gs.groups.join(', ')}; "Idris" (not owned) finds nothing`)
     : fail(`global search: ${JSON.stringify(gs)}`);
+  // A result opens its pledge, and both searches start empty again (#178).
+  const pick = await page.evaluate(async () => {
+    const box = document.querySelector('#gsearch-top');
+    box.value = 'cutlass';
+    box.dispatchEvent(new Event('input'));
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    await new Promise((r) => setTimeout(r, 300));
+    const res = {
+      modal: !document.querySelector('#item-modal').hidden,
+      cleared: box.value === '' && document.querySelector('#gsearch-top-results').hidden,
+    };
+    document.querySelector('#modal-close').click();
+    return res;
+  });
+  pick.modal && pick.cleared
+    ? ok('search: Enter opens the first result and the box starts empty again')
+    : fail(`search pick: ${JSON.stringify(pick)}`);
   gs.title && gs.inHangar && gs.links >= 3
     ? ok(`ship window for ${gs.title}: specs, pledges, links`)
     : fail(`ship window: ${JSON.stringify(gs)}`);
@@ -743,22 +2111,34 @@ try {
   await go('#inventory');
   const inv = await page.evaluate(async () => {
     const r = {};
+    // The page around the list is Svelte (ui/inventory): it redraws a moment later.
+    const tick = () => new Promise((res) => setTimeout(res, 60));
     r.sum = /Pledges\s*\d+/i.test(document.querySelector('#inv-sum').textContent);
     const all = computeShown().length;
     document.querySelector('[data-switch="inv-hide"]').click();
     r.hid = computeShown().length < all;
     document.querySelector('[data-switch="inv-hide"]').click();
-    // Saved view (no prompt in the test: push one directly, then apply it).
-    state.savedViews.push({
-      name: 'Ships',
-      f: { shown: ['ship'], traits: [], query: '', hideSmall: false },
-    });
+    // Saved views (no prompt in the test: push them directly, then apply). The old
+    // format ([trait, 'yes']) reads as the matching sidebar option.
+    state.savedViews.push(
+      { name: 'Ships', f: { shown: ['ship'], traits: [], query: '', hideSmall: false } },
+      { name: 'LTI', f: { shown: [], traits: [['lti', 'yes']], query: '', hideSmall: false } },
+    );
     renderInventory();
+    await tick();
     document.querySelector('[data-view-apply="0"]').click();
-    r.view = computeShown().every((p) => p.kind === 'ship') && state.shown.has('ship');
+    await tick();
+    r.view =
+      computeShown().every((p) => p.kind === 'ship') &&
+      state.shown.has('ship') &&
+      !!document.querySelector('.view-chip.on [data-view-apply="0"]');
+    document.querySelector('[data-view-apply="1"]').click();
+    await tick();
+    r.oldView = computeShown().length > 0 && computeShown().every((p) => p.insurance === 'LTI');
     state.savedViews = [];
-    state.shown = new Set();
+    resetInvFilters();
     renderInventory();
+    await tick();
     // Melt planner: pick two meltable pledges with a wishlist ship.
     const keepWish = state.wishlist;
     state.wishlist = ['Cutlass Black'];
@@ -768,57 +2148,194 @@ try {
       .slice(0, 2)
       .forEach((p) => state.selected.add(p.id));
     renderInventory();
+    await tick();
     r.planner = document.querySelector('#sb-melt').textContent;
     state.selected.clear();
     setSelecting(false);
     state.wishlist = keepWish;
-    // Top bar: counts, bell, search.
+    // Top bar: page names only, no counts (#260), bell, search.
+    const navText = [...document.querySelectorAll('#nav a')].map((a) => a.textContent.trim());
     r.counts =
-      document.querySelector('#nav-n-inventory').textContent === String(state.items.length);
+      !document.querySelector('#nav .nav-n') &&
+      navText.includes('Inventory') &&
+      navText.includes('Buy-Backs');
     r.bell = !!document.querySelector('#bell-btn') && !!document.querySelector('#bell-menu');
     const top = document.querySelector('#gsearch-top');
     top.value = 'cutlass';
     top.dispatchEvent(new Event('input'));
     r.search = !!document.querySelector('#gsearch-top-results .gs-row');
-    top.value = '';
-    document.querySelector('#gsearch-top-results').hidden = true;
+    top.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     return r;
   });
-  inv.sum && inv.hid && inv.view && /from your wishlist|wishlist/.test(inv.planner)
+  inv.sum && inv.hid && inv.view && inv.oldView && /from your wishlist|wishlist/.test(inv.planner)
     ? ok('inventory: summary strip, Hide small stuff, saved views, melt planner')
     : fail(`inventory pass: ${JSON.stringify(inv)}`);
   inv.counts && inv.bell && inv.search
-    ? ok('top bar: counts, alerts bell, search on every page')
+    ? ok('top bar: page names without counts, alerts bell, search on every page')
     : fail(`top bar: ${JSON.stringify(inv)}`);
+
+  // Filters Pass (B2): the sidebar's groups, the pills above the list, folding away.
+  const side = await page.evaluate(async () => {
+    const tick = () => new Promise((res) => setTimeout(res, 60));
+    const r = {};
+    const all = state.items.length;
+    // Buy-Backs has the same sidebar: look only inside Inventory.
+    const root = document.querySelector('#view-inventory');
+    const q = (sel) => root.querySelector(sel);
+    const opt = (g, k) => q(`.oh-fg[data-group="${g}"] [data-option="${k}"]`);
+    r.groups = [...root.querySelectorAll('.oh-fg summary')].map((x) => x.textContent);
+    // Within a group: either option. Across groups: both.
+    opt('status', 'meltable').click();
+    await tick();
+    const melt = computeShown().length;
+    opt('status', 'notMeltable').click();
+    await tick();
+    r.or = computeShown().length === all;
+    opt('status', 'notMeltable').click();
+    opt('ins', 'LTI').click();
+    await tick();
+    r.and = computeShown().every((p) => p.meltable === true && p.insurance === 'LTI');
+    r.count = q('.oh-fg[data-group="status"] .oh-sn')?.textContent === '1';
+    r.pills = [...root.querySelectorAll('.oh-af')].map((x) => x.textContent);
+    // × on a pill removes just that filter.
+    q('.oh-af button').click();
+    await tick();
+    r.removed = computeShown().length === melt;
+    // Melt Value: everything shown is at or under the cap.
+    const range = q('.oh-range input');
+    range.value = 100;
+    range.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((res) => setTimeout(res, 300));
+    r.meltCap =
+      computeShown().every((p) => p.value <= 100) && /Up to/.test(q('.oh-active').textContent);
+    // Manufacturer search narrows its options.
+    const find = q('.oh-fg[data-group="mfr"] .oh-fsearch');
+    const before = root.querySelectorAll('.oh-fg[data-group="mfr"] .oh-opt').length;
+    find.value = 'drake';
+    find.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    const after = [...root.querySelectorAll('.oh-fg[data-group="mfr"] .oh-opt')];
+    r.mfrSearch = after.length < before && after.every((b) => /drake/i.test(b.textContent));
+    // Clear All, then fold the sidebar away: Filters (n) brings it back.
+    q('.oh-clearall').click();
+    await tick();
+    r.cleared = computeShown().length === all && !q('.oh-active');
+    opt('deals', 'below').click();
+    q('.oh-fbar .oh-link').click();
+    await tick();
+    const fbtn = q('.oh-fbtn');
+    r.folded =
+      q('.oh-side').classList.contains('folded') && !!fbtn && /Filters\s*1/.test(fbtn.textContent);
+    r.pillsWhileFolded = !!q('.oh-af');
+    fbtn.click();
+    await tick();
+    r.back = !q('.oh-side').classList.contains('folded') && state.invFolded === false;
+    // A folded-shut group is remembered.
+    const det = q('.oh-fg[data-group="deals"]');
+    det.open = false;
+    await tick();
+    r.closed = state.invClosed.has('deals');
+    det.open = true;
+    await tick();
+    resetInvFilters();
+    renderInventory();
+    await tick();
+    return r;
+  });
+  side.groups.join('|').startsWith('Insurance|Status|Deals|Came From') &&
+  side.or &&
+  side.and &&
+  side.count &&
+  side.pills.length === 2 &&
+  side.removed &&
+  side.meltCap &&
+  side.mfrSearch &&
+  side.cleared
+    ? ok(
+        'filter sidebar: groups (any in a group, all across), counts, pills with ×, Melt Value, Manufacturer search, Clear All',
+      )
+    : fail(`filter sidebar: ${JSON.stringify(side)}`);
+  side.folded && side.pillsWhileFolded && side.back && side.closed
+    ? ok(
+        'filter sidebar folds away (Filters (n) brings it back, pills stay), group folds remembered',
+      )
+    : fail(`filter sidebar fold: ${JSON.stringify(side)}`);
+  await checkEscapeFilters('inventory', 'inventory', '#search', () =>
+    page.click('#results .card[data-id]'),
+  );
 
   console.log('Buy-Backs');
   await go('#buybacks');
   const tok = await page.$eval('#bb-sum', (e) => e.textContent).catch(() => '');
-  // Demo clock: Oct 1, so the Oct 5 token is "next".
-  /Tokens\s*2\s*next/i.test(tok)
+  const tokSoon = await page.evaluate(() => OH.soonBuybackToken() != null);
+  /Tokens\s*2/i.test(tok) && /Tokens\s*2\s*next/i.test(tok) === tokSoon
     ? ok('buy-back tokens in the summary strip')
     : fail(`tokens: "${tok}"`);
   // Buy-Backs pass: Hide small stuff on by default; Stack identical off by default
   // and stacks copies when on.
   const bbPass = await page.evaluate(async () => {
+    // The list is Svelte (ui/buybacks): it redraws a moment after each change.
+    const tick = () => new Promise((res) => setTimeout(res, 60));
     const rows = () => document.querySelectorAll('#buybacks-body .card').length;
     const hideOn = state.bbHideSmall;
     const stackOff = !state.bbStack;
     const saved = state.buybacks;
     state.buybacks = saved.concat(saved.slice(0, 2).map((x) => ({ ...x, id: x.id + '-copy' })));
     renderBuybacks();
+    await tick();
     const flat = rows();
     document.querySelector('[data-switch="bb-stack"]').click();
+    await tick();
     const stacked = rows();
     const badges = document.querySelectorAll('#buybacks-body .stack-n').length;
     document.querySelector('[data-switch="bb-stack"]').click();
     state.buybacks = saved;
     renderBuybacks();
+    await tick();
     return { hideOn, stackOff, flat, stacked, badges };
   });
   bbPass.hideOn && bbPass.stackOff && bbPass.stacked === bbPass.flat - 2 && bbPass.badges === 2
     ? ok('buy-backs: small stuff hidden by default; Stack identical is opt-in and stacks copies')
     : fail(`buy-backs pass: ${JSON.stringify(bbPass)}`);
+  // The same filter sidebar as Inventory (ui/buybacks): insurance read from the
+  // contents line, a price cap, the pills, and Clear All.
+  const bbSide = await page.evaluate(async () => {
+    const tick = () => new Promise((res) => setTimeout(res, 60));
+    const root = document.querySelector('#view-buybacks');
+    const q = (sel) => root.querySelector(sel);
+    const r = {};
+    r.groups = [...root.querySelectorAll('.oh-fg')].map((g) => g.dataset.group).join(',');
+    const all = computeBuybacks().length;
+    q('.oh-fg[data-group="ins"] [data-option="LTI"]').click();
+    await tick();
+    const lti = computeBuybacks();
+    r.lti =
+      lti.length > 0 &&
+      lti.length < all &&
+      lti.every((b) => /lifetime|lti/i.test(`${b.name} ${b.contains}`));
+    r.pill = /Insurance:\s*LTI/.test(q('.oh-active')?.textContent || '');
+    const range = q('.oh-range input');
+    range.value = 50;
+    range.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((res) => setTimeout(res, 300));
+    r.cap = computeBuybacks().every((b) => bbPrice(b) != null && bbPrice(b) <= 50);
+    q('.oh-clearall').click();
+    await tick();
+    r.cleared = computeBuybacks().length === all && !q('.oh-active');
+    r.switches = !!q('[data-switch="bb-hide"]') && !!q('[data-switch="bb-stack"]');
+    return r;
+  });
+  /ins/.test(bbSide.groups) &&
+  bbSide.lti &&
+  bbSide.pill &&
+  bbSide.cap &&
+  bbSide.cleared &&
+  bbSide.switches
+    ? ok('buy-backs filter sidebar: insurance from the contents line, price cap, pills, Clear All')
+    : fail(`buy-backs sidebar: ${JSON.stringify(bbSide)}`);
+  await checkEscapeFilters('buy-backs', 'buybacks', '#bb-search', () =>
+    page.click('#buybacks-body .card[data-id]'),
+  );
   await page.select('#bb-sort', 'price-desc');
   const bbPrices = await page.$$eval('#buybacks-body .card .val', (v) =>
     v.map((e) => Number(e.textContent.replace(/[$,]/g, ''))),
@@ -832,8 +2349,8 @@ try {
     rows: document.querySelectorAll('#buybacks-body .market-table tbody tr').length,
     cards: window.state ? null : null,
     reclaim: [...document.querySelectorAll('#buybacks-body .market-table tbody tr')].every((r) =>
-      // Retired ships (#306) show a Retired label instead of the link.
-      /Reclaim|Retired/.test(r.textContent),
+      // Every row: Buy Back (owner, 2026-10-09); a retired ship adds a Retired* mark.
+      /Buy Back/.test(r.textContent),
     ),
     ins: !!document.querySelector('#buybacks-body .market-table .mk-ins'),
   }));
@@ -841,26 +2358,45 @@ try {
     Number((e.textContent.match(/of (\d+)/) || [])[1]),
   );
   bbm.rows === bbTotal && bbm.reclaim && bbm.ins
-    ? ok(`buy-back market: ${bbm.rows} rows, one each, Reclaim + Insurance`)
+    ? ok(`buy-back market: ${bbm.rows} rows, one each, Buy Back + Insurance`)
     : fail(`buy-back market: ${JSON.stringify(bbm)} vs ${bbTotal}`);
+  // The header's Below Store Price number turns Deals > Below Store Price on, and off
+  // again (owner, 2026-10-09).
+  const below = await page.evaluate(async () => {
+    const go = () => document.querySelector('.page-sum .ps-go');
+    if (!go()) return { none: true };
+    go().click();
+    await new Promise((r) => setTimeout(r, 250));
+    const on =
+      !!state.bbTraits.get('deals')?.has('below') && go()?.getAttribute('aria-pressed') === 'true';
+    go().click();
+    await new Promise((r) => setTimeout(r, 250));
+    return { on, off: !state.bbTraits.get('deals')?.has('below') };
+  });
+  below.none
+    ? ok('buy-backs header: nothing below store price in this hangar, so no button')
+    : below.on && below.off
+      ? ok('buy-backs header: Below Store Price turns its filter on, and off again')
+      : fail(`buy-backs header Below Store Price: ${JSON.stringify(below)}`);
   // A CCU's Reclaim opens its one-item buy-back list entry, never the pledge store
   // its RSI button points at (owner, 2026-10-05).
   const ccuLink = await page.evaluate(() => {
-    // A CCU that isn't retired (a retired one shows "Retired", no link).
+    // A CCU that isn't retired (a retired one is labelled as such).
     const c = state.buybacks.find((b) => b.ccu && !OH.retiredBuyback(b));
     if (!c) return { none: true };
-    const html = buybackReclaimLink({ ...c, href: 'https://robertsspaceindustries.com/pledge' });
-    return { href: (html.match(/href="([^"]+)"/) || [])[1] || '', html: html.slice(0, 160) };
+    const r = reclaimOf({ ...c, href: 'https://robertsspaceindustries.com/pledge' });
+    return { href: r?.url || '' };
   });
-  ccuLink.none || /buy-back-pledges\?pagesize=1&page=\d+$/.test(ccuLink.href.replace(/&amp;/g, '&'))
+  ccuLink.none || /buy-back-pledges\?pagesize=1&page=\d+$/.test(ccuLink.href)
     ? ok('CCU buy-back: Reclaim opens its own buy-back entry, not the pledge store')
     : fail(`CCU buy-back link: ${JSON.stringify(ccuLink)}`);
   // Market tools: pricing a row ticks it; picked rows are totalled.
-  const bbTools = await page.evaluate(() => {
+  const bbTools = await page.evaluate(async () => {
     const row = document.querySelector('#buybacks-body .market-table tbody tr');
     const pct = row.querySelector('.mk-pct-in');
     pct.value = '50';
     pct.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 60));
     return {
       picked: row.querySelector('.mk-pick').checked,
       price: row.querySelector('.mk-price').value,
@@ -877,13 +2413,14 @@ try {
   bbTools.store
     ? ok(`buy-back market tools: pick, % → price, total ("${bbTools.sel.trim()}"), exports`)
     : fail(`buy-back market tools: ${JSON.stringify(bbTools)}`);
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     const box = document.querySelector('#buybacks-body .mk-pick');
     box.click(); // untick so later checks start clean
     const row = box.closest('tr');
     const price = row.querySelector('.mk-price');
     price.value = '';
     price.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 60));
   });
   // Click a name: the details window reads the buy-back's own page.
   await page.click('#buybacks-body .bb-open');
@@ -899,59 +2436,182 @@ try {
   /Also Contains/.test(bbModal) && /Lifetime Insurance/.test(bbModal) && /LTI/.test(bbModal)
     ? ok('buy-back details: ships, insurance, also contains')
     : fail(`buy-back details: "${bbModal.slice(0, 160)}"`);
+  /full price|today's upgrade price/.test(bbModal)
+    ? ok('buy-back window: the full price note sits by the price (#403)')
+    : fail(`buy-back price note: "${bbModal.slice(0, 200)}"`);
   await page.keyboard.press('Escape');
+  // Can't Be Bought Back (#403): a tag with the reason and no Reclaim link; and the
+  // Melt on RSI confirm in a pledge window, red for a pledge RSI never sells back.
+  const melt = await page.evaluate(async () => {
+    const pause = () => new Promise((r) => setTimeout(r, 120));
+    const q = (sel) => document.querySelector(`#item-modal ${sel}`);
+    const text = (sel) => (q(sel) ? q(sel).textContent.replace(/\s+/g, ' ').trim() : '');
+    const out = {};
+    const b = state.buybacks.find((x) => !x.isCCU && /^\d+$/.test(String(x.id)));
+    openBuybackModal({ ...b, name: 'Add-On - Name Reservation', kind: 'addon' });
+    await pause();
+    out.bbTag = text('.bb-blocked');
+    out.bbReason = text('#bb-block-note');
+    out.bbNoReclaim = !q('a.bb-reclaim');
+    document.querySelector('#modal-close').click();
+    const p = state.items.find((x) => x.meltable !== false && !x.isCCU) || state.items[0];
+    openItemModal({
+      ...p,
+      meltable: true,
+      contents: [...(p.contents || []), { kind: '', label: 'Squadron 42 Digital Download' }],
+    });
+    await pause();
+    out.closedFirst = !q('#melt-confirm');
+    q('#melt-open')?.click();
+    await pause();
+    out.red = !!q('#melt-confirm.danger');
+    out.title = text('#melt-never');
+    out.never = text('.melt-never');
+    out.go = text('#melt-go');
+    out.goHref = q('#melt-go')?.getAttribute('href') || '';
+    out.keepFocused = document.activeElement?.textContent === 'Keep It';
+    document.activeElement?.click();
+    await pause();
+    out.kept = !q('#melt-confirm');
+    document.querySelector('#modal-close').click();
+    openItemModal({ ...p, meltable: true, name: 'Standalone Ships - Arrow', contents: [] });
+    await pause();
+    q('#melt-open')?.click();
+    await pause();
+    out.plain = !!q('#melt-confirm') && !q('#melt-confirm.danger');
+    out.plainGo = text('#melt-go');
+    out.plainText = text('#melt-confirm');
+    document.querySelector('#modal-close').click();
+    return out;
+  });
+  melt.bbTag === "Can't Be Bought Back" && /Add-on pledges/.test(melt.bbReason) && melt.bbNoReclaim
+    ? ok("buy-back window: Can't Be Bought Back with the reason, no Reclaim link")
+    : fail(`can't be bought back: ${JSON.stringify(melt)}`);
+  melt.closedFirst &&
+  melt.red &&
+  melt.title === 'Gone for Good if You Melt It' &&
+  /RSI never sells this one back\. Pledges with Squadron 42/.test(melt.never) &&
+  melt.go === 'I Understand, Open on RSI ↗' &&
+  /^https:\/\/robertsspaceindustries\.com\/account\/pledges\?page=\d+$/.test(melt.goHref) &&
+  melt.keepFocused &&
+  melt.kept
+    ? ok('pledge window: Melt on RSI asks first; red Gone for Good warning for never-sold-back')
+    : fail(`melt warning: ${JSON.stringify(melt)}`);
+  melt.plain &&
+  melt.plainGo === 'Open on RSI ↗' &&
+  /full price.*Buy-Back Token/.test(melt.plainText)
+    ? ok('pledge window: a plain melt confirm says what melting costs')
+    : fail(`melt confirm: ${JSON.stringify(melt)}`);
   await page.click('#bb-layout [data-layout="gallery"]');
   await page.click('#bb-layout [data-layout="list"]');
   await checkListAlignment('Buy-Backs', '#buybacks-body');
 
   console.log('Stats');
+  // Stats is the Svelte page in ui/stats, mounted into #stats-body.
   await go('#stats');
-  for (const tab of ['overview', 'value', 'fleet', 'history']) {
-    // the tab row re-renders on every click, so click via the DOM
+  const tabs = await page.$$eval('#stats-body [data-stats-tab]', (b) =>
+    b.map((x) => x.dataset.statsTab),
+  );
+  tabs.length === 8 ? ok('stats: 8 tabs') : fail(`stats tabs: ${tabs.join(',')}`);
+  for (const tab of tabs) {
     await page.$eval(`[data-stats-tab="${tab}"]`, (b) => b.click());
     await new Promise((r) => setTimeout(r, 200));
-    const text = await page.$eval('#stats-body', (e) => e.textContent.trim().length);
-    text > 40 ? ok(`${tab} tab renders`) : fail(`${tab} tab is empty`);
+    const t = await page.$eval('#stats-body', (e) => ({
+      text: e.textContent.trim().length,
+      picked: e.querySelector('[aria-selected="true"]')?.dataset.statsTab,
+    }));
+    t.text > 40 && t.picked === tab
+      ? ok(`${tab} tab renders`)
+      : fail(`${tab} tab: ${JSON.stringify(t)}`);
   }
+  await page.$eval('[data-stats-tab="history"]', (b) => b.click());
+  await new Promise((r) => setTimeout(r, 200));
   const acct = await page.evaluate(() => {
     const last = state.history[state.history.length - 1];
     return {
       title: [...document.querySelectorAll('#stats-body h3')].map((h) => h.textContent).join('|'),
       store: snapshotStore(last),
       now: accountValue().total,
+      dots: document.querySelectorAll('.hist-chart circle').length,
+      steps: document.querySelectorAll('#stats-body .hist-step').length,
       tip: document.querySelector('.hist-chart circle:last-of-type title')?.textContent || '',
     };
   });
   /Account Value Over Time/.test(acct.title) &&
   acct.store > 0 &&
-  Math.abs(acct.store - acct.now) < 1
+  Math.abs(acct.store - acct.now) < 1 &&
+  acct.dots >= 2 &&
+  acct.steps >= 1
     ? ok(`history charts account value (latest ${acct.tip})`)
     : fail(`account value: ${JSON.stringify(acct)}`);
+  // Download Backup (the classic [data-backup] handler) updates the line beside it.
+  const backup = await page.evaluate(async () => {
+    const before = document.querySelector('#stats-body .backup-row').textContent;
+    document.querySelector('#stats-body [data-backup]').click();
+    await new Promise((r) => setTimeout(r, 400));
+    return { before, after: document.querySelector('#stats-body .backup-row').textContent };
+  });
+  /never backed up/.test(backup.before) && /last backup/.test(backup.after)
+    ? ok('download backup updates the last backup line')
+    : fail(`backup row: ${JSON.stringify(backup)}`);
 
   for (const [tab, sel] of [
+    ['fleet', '#stats-body .fleet-cols .bar-row'],
     ['collection', '#stats-body .bar-row'],
-    ['buybacks', '#stats-body .stat-box'],
-    ['top', '#stats-body .row.clickable'],
+    ['buybacks', '#stats-body .row.clickable[data-open-bb]'],
+    ['top', '#stats-body .row.clickable[data-open-item]'],
   ]) {
     await page.evaluate((t) => document.querySelector(`[data-stats-tab="${t}"]`).click(), tab);
     await page.waitForSelector(sel, { timeout: 8000 }).catch(() => {});
-    (await page.$(sel)) ? ok(`${tab} tab renders`) : fail(`${tab} tab empty`);
+    (await page.$(sel)) ? ok(`${tab} tab has its rows`) : fail(`${tab} tab empty`);
   }
   await page.click('#stats-body .row.clickable');
   (await page.$eval('#item-modal', (m) => !m.hidden))
     ? ok('top list row opens the pledge')
     : fail('top list row did not open');
   await page.keyboard.press('Escape');
+  // Streamer Mode hides every amount on the page.
+  const masked = await page.evaluate(async () => {
+    streamer.on = true;
+    route();
+    await new Promise((r) => setTimeout(r, 200));
+    const text = document.querySelector('#stats-body').textContent;
+    streamer.on = false;
+    route();
+    await new Promise((r) => setTimeout(r, 200));
+    return { dots: /••••/.test(text), money: /\$\d/.test(text) };
+  });
+  masked.dots && !masked.money
+    ? ok('streamer mode hides stats amounts')
+    : fail(`stats streamer mode: ${JSON.stringify(masked)}`);
 
   console.log('Org Fleet');
+  // The page is Svelte (ui/org); it redraws a microtask after each change.
+  const orgTick = () => new Promise((r) => setTimeout(r, 150));
   await go('#org');
+  (await page.$('#oh-org .org-actions #org-import'))
+    ? ok('org page mounts with its buttons')
+    : fail('org page did not mount');
   await page.click('#org-mine');
+  await page
+    .waitForFunction(
+      () => /Added your fleet/.test(document.querySelector('#org-msg').textContent),
+      {
+        timeout: 8000,
+      },
+    )
+    .catch(() => {});
+  (await page.$eval('#org-msg', (m) => /Added your fleet \(\d+ ships\)/.test(m.textContent)))
+    ? ok('Add My Fleet says what it added')
+    : fail(`Add My Fleet message: ${await page.$eval('#org-msg', (m) => m.textContent)}`);
   const buddy = path.join(os.tmpdir(), 'open-hangar-htf-Buddy-2026-01-01.json');
   fs.writeFileSync(
     buddy,
     JSON.stringify([
       { name: 'Carrack', entity_type: 'ship', lti: true },
       { name: 'Cutlass Black', entity_type: 'ship', lti: false },
+      // Salvage: a role the demo fleet doesn't cover, so only Buddy fills it.
+      { name: 'Vulture', entity_type: 'ship', lti: false },
     ]),
   );
   const input = await page.$('#org-file');
@@ -965,25 +2625,118 @@ try {
   const org = await page.evaluate(() => ({
     members: document.querySelectorAll('.org-member').length,
     rows: document.querySelectorAll('.org-table tbody tr').length,
+    msg: document.querySelector('#org-msg').textContent,
   }));
-  org.members === 2 && org.rows > 0
+  org.members === 2 && org.rows > 0 && /Added 1 fleet\./.test(org.msg)
     ? ok(`org fleet: ${org.members} members, ${org.rows} ship types`)
     : fail(`org fleet: ${JSON.stringify(org)}`);
   const roleChips = await page.$$eval('.role-chip', (c) => c.length);
-  const memberRows = await page.$$eval('.org-table', (t) => t.length);
+  const orgTables = await page.$$eval('.org-table', (t) => t.length);
   const roleCount = await page.evaluate(() => OH.ORG_ROLES.length);
-  roleChips === roleCount && memberRows >= 3
-    ? ok(`org roles (${roleChips}) + biggest ships + members`)
-    : fail(`org extras: ${roleChips} role chips, ${memberRows} tables`);
+  roleChips === roleCount && orgTables === 2
+    ? ok(`org roles (${roleChips}) + biggest ships + ships`)
+    : fail(`org extras: ${roleChips} role chips, ${orgTables} tables`);
+  // Nothing is picked or ordered by price: Ships go most first, then A to Z; Biggest
+  // Ships by size class, then most, then A to Z.
+  const orgOrder = await page.evaluate(() => {
+    const [big, all] = [...document.querySelectorAll('#oh-org .org-table')].map((t) =>
+      [...t.querySelectorAll('tbody tr')].map((tr) => [...tr.cells].map((c) => c.textContent)),
+    );
+    const most = (a, b) => b.n - a.n || a.name.localeCompare(b.name);
+    const sorted = (rows, cmp) => rows.every((r, i) => !i || cmp(rows[i - 1], r) <= 0);
+    const size = ['Medium', 'Large', 'Capital'];
+    const bigRows = big.map(([name, sz, n]) => ({ name, rank: size.indexOf(sz), n: +n }));
+    const allRows = all.map(([name, n]) => ({ name, n: +n }));
+    return {
+      big: sorted(bigRows, (a, b) => b.rank - a.rank || most(a, b)),
+      all: sorted(allRows, most),
+      rows: [bigRows.length, allRows.length],
+    };
+  });
+  orgOrder.big && orgOrder.all && orgOrder.rows.every((n) => n > 1)
+    ? ok('org lists go by size and count, then A to Z, never by price')
+    : fail(`org order: ${JSON.stringify(orgOrder)}`);
+  // Each member chip button is at least 24px to tap.
+  const orgTaps = await page.evaluate(() =>
+    ['.org-mname[data-member="Buddy"]', '.org-remove[data-name="Buddy"]'].map((s) => {
+      const r = document.querySelector(s).getBoundingClientRect();
+      return [Math.round(r.width), Math.round(r.height)];
+    }),
+  );
+  orgTaps.every(([w, h]) => w >= 24 && h >= 24)
+    ? ok('member chip buttons are 24px or more to tap')
+    : fail(`member chip tap sizes: ${JSON.stringify(orgTaps)}`);
+  // Ships only (CLAUDE.md, What Not to Build): no prices or fleet values, no ship
+  // counts on the member chips, nothing that compares members. Checked again below
+  // with a missing role's suggestions and a member's panel open.
+  const orgValues = () =>
+    page.evaluate(() => {
+      const el = document.querySelector('#oh-org');
+      const text = el.textContent;
+      return {
+        money: /[$€£¥]\s?\d|\bUSD\b|Store Price|Fleet Value|of org value|\bShare\b/i.test(text),
+        chipCounts: [...el.querySelectorAll('.org-member')].some((c) =>
+          /\d+\s*ships?\b/i.test(c.textContent),
+        ),
+        compare: !!el.querySelector('select, .org-compare-bar, .cmp-cols, .pair-row'),
+      };
+    });
+  const noValues = (v) => !v.money && !v.chipCounts && !v.compare;
+  const shipsOnly = await orgValues();
+  noValues(shipsOnly)
+    ? ok('org shows ships only: no values, chip counts or member compare')
+    : fail(`org values: ${JSON.stringify(shipsOnly)}`);
   await page.click('.role-chip.missing');
-  (await page.$('.org-panel'))
+  await orgTick();
+  const rolePanel = await page.evaluate(() => ({
+    panel: !!document.querySelector('.org-panel'),
+    open: document.querySelector('.role-chip.missing.open')?.getAttribute('aria-expanded'),
+  }));
+  rolePanel.panel && rolePanel.open === 'true'
     ? ok('missing role opens suggestions')
-    : fail('role click opened nothing');
-  await page.click('.org-mrow');
-  (await page.$('.pair-row')) ? ok('member opens vs-org charts') : fail('member panel missing');
+    : fail(`role click: ${JSON.stringify(rolePanel)}`);
+  const roleValues = await orgValues();
+  noValues(roleValues)
+    ? ok('missing role suggestions show no prices')
+    : fail(`role suggestions values: ${JSON.stringify(roleValues)}`);
+  await page.click('.org-close[data-close="role"]');
+  await orgTick();
+  (await page.$('.org-panel')) ? fail('role panel did not close') : ok('role panel closes');
+  await page.click('.org-mname[data-member="Buddy"]');
+  await orgTick();
+  const memberPanel = await page.evaluate(() => {
+    const p = document.querySelector('.org-member-panel');
+    return {
+      panel: !!p,
+      ships: p ? p.querySelector('.org-owners').textContent : '',
+      intro: p ? [...p.querySelectorAll('.org-intro')].map((x) => x.textContent) : [],
+      open: document
+        .querySelector('.org-mname[data-member="Buddy"]')
+        ?.getAttribute('aria-expanded'),
+    };
+  });
+  const memberValues = await orgValues();
+  memberPanel.panel &&
+  memberPanel.open === 'true' &&
+  /Carrack/.test(memberPanel.ships) &&
+  /Cutlass Black/.test(memberPanel.ships) &&
+  /Vulture/.test(memberPanel.ships) &&
+  noValues(memberValues)
+    ? ok("a member's name opens their ships, with no values")
+    : fail(`member panel: ${JSON.stringify({ memberPanel, memberValues })}`);
+  memberPanel.intro.some((t) => /^Roles: .*\bSalvage\b/.test(t)) &&
+  memberPanel.intro.some((t) => /^Only Buddy covers: .*\bSalvage\b/.test(t))
+    ? ok("a member's panel lists their roles and the ones only they cover")
+    : fail(`member roles: ${JSON.stringify(memberPanel.intro)}`);
+  await page.click('.org-close[data-close="member"]');
+  await orgTick();
+  (await page.$('.org-member-panel'))
+    ? fail('member panel did not close')
+    : ok('member panel closes');
   // Your entry follows your latest scan, and a concept-only role is amber, not missing.
   const live = await page.evaluate(async () => {
-    const mine = orgMembers.find((m) => m.mine);
+    const tick = () => new Promise((r) => setTimeout(r, 50));
+    const mine = OHApp.org.members.find((m) => m.mine);
     const before = mine.ships.length;
     state.items = [
       ...state.items,
@@ -997,6 +2750,7 @@ try {
       },
     ];
     await renderOrg();
+    await tick();
     const chip = document.querySelector('.role-chip[data-role="construction"]');
     const res = {
       grew: mine.ships.length === before + 1,
@@ -1007,41 +2761,319 @@ try {
     };
     state.items = state.items.filter((p) => p.id !== 'pio-1');
     await renderOrg();
+    await tick();
     return res;
   });
   live.grew && /\bconcept\b/.test(live.chip || '') && live.intro
     ? ok('org: your fleet follows your scan; Pioneer-only Construction shows as in concept')
     : fail(`org live/concept: ${JSON.stringify(live)}`);
-  const names = await page.$$eval('.org-cmp[data-side="a"] option', (o) =>
-    o.map((x) => x.value).filter(Boolean),
-  );
-  await page.select('.org-cmp[data-side="a"]', names[0]);
-  await page.select('.org-cmp[data-side="b"]', names[1]);
-  (await page.$('.cmp-cols')) ? ok('compare two members') : fail('compare panel missing');
+  // Export CSV: ships, counts, LTI and owners, no store price column.
+  const orgCsv = await page.evaluate(async () => {
+    let got = null;
+    const real = window.downloadBlob;
+    window.downloadBlob = (blob, name) => (got = { blob, name });
+    document.querySelector('#org-csv').click();
+    for (let t = 0; !got && t < 50; t++) await new Promise((r) => setTimeout(r, 100));
+    window.downloadBlob = real;
+    if (!got) return null;
+    const text = await got.blob.text();
+    return { name: got.name, head: text.split('\n')[0], rows: text.split('\n').length - 1 };
+  });
+  orgCsv &&
+  orgCsv.head === 'Ship,Count,LTI,Owners' &&
+  orgCsv.rows > 0 &&
+  /^open-hangar-org-fleet-.*\.csv$/.test(orgCsv.name)
+    ? ok(`org CSV: ships only (${orgCsv.rows} rows)`)
+    : fail(`org CSV: ${JSON.stringify(orgCsv)}`);
+  // Remove a member (with their panel open): its chip goes, the rest stays (and so does
+  // what's saved).
+  const removeBuddy = () =>
+    page
+      .click('.org-remove[data-name="Buddy"]')
+      .then(() =>
+        page.waitForFunction(() => document.querySelectorAll('.org-member').length === 1, {
+          timeout: 5000,
+        }),
+      )
+      .catch(() => {});
+  await page.click('.org-mname[data-member="Buddy"]');
+  await orgTick();
+  await removeBuddy();
+  const removed = await page.evaluate(async () => ({
+    chips: document.querySelectorAll('.org-member').length,
+    saved: ((await chrome.storage.local.get('orgFleet')).orgFleet?.members || []).map(
+      (m) => m.name,
+    ),
+  }));
+  removed.chips === 1 && !removed.saved.includes('Buddy')
+    ? ok('remove a member')
+    : fail(`remove member: ${JSON.stringify(removed)}`);
+  // Their panel went with them: imported again, it doesn't pop back open.
+  await input.uploadFile(buddy);
+  await page
+    .waitForFunction(() => document.querySelectorAll('.org-member').length === 2, {
+      timeout: 15000,
+    })
+    .catch(() => {});
+  await orgTick();
+  const buddyBack = await page.evaluate(() => ({
+    chips: document.querySelectorAll('.org-member').length,
+    panel: !!document.querySelector('.org-member-panel'),
+    open: !!document.querySelector('.org-member.open'),
+  }));
+  buddyBack.chips === 2 && !buddyBack.panel && !buddyBack.open
+    ? ok("a removed member's panel stays shut when they're imported again")
+    : fail(`member back: ${JSON.stringify(buddyBack)}`);
+  await removeBuddy();
+  // With one member left there's nobody to set them apart from: no "Only ... covers".
+  await page.click('.org-mname');
+  await orgTick();
+  const lone = await page.evaluate(() => {
+    const p = document.querySelector('.org-member-panel');
+    return {
+      panel: !!p,
+      only: p
+        ? [...p.querySelectorAll('.org-intro')].some((x) => /^Only /.test(x.textContent))
+        : null,
+    };
+  });
+  lone.panel && lone.only === false
+    ? ok('a lone member gets no "Only ... covers" line')
+    : fail(`lone member panel: ${JSON.stringify(lone)}`);
+  await page.click('.org-close[data-close="member"]');
+  await orgTick();
 
   console.log('Store');
   await go('#store');
+  // The extension's Store is your side of it (0.3.0): Wishlist, Your CCUs and Find
+  // in Store, under a link to the website's full store. No store-wide browsing.
   await page
-    .waitForFunction(() => document.querySelectorAll('#price-table tbody tr').length > 50, {
-      timeout: 20000,
+    .waitForFunction(
+      () => /^Search \d+ items…$/.test(document.querySelector('#find-ship')?.placeholder || ''),
+      {
+        timeout: 20000,
+      },
+    )
+    .catch(() => {});
+  const fs1 = await page.evaluate(async () => {
+    const tick = (ms = 50) => new Promise((r) => setTimeout(r, ms));
+    const box = document.querySelector('#find-ship');
+    const placeholder = box.placeholder;
+    box.value = 'c';
+    box.dispatchEvent(new Event('input'));
+    await tick();
+    const oneLetter = document.querySelectorAll('.fis-hits li').length;
+    box.value = 'cutlass';
+    box.dispatchEvent(new Event('input'));
+    await tick();
+    const rows = [...document.querySelectorAll('.fis-hits li')];
+    const hits = rows.map((li) => li.querySelector('.fis-name').textContent.trim());
+    const kinds = rows.map((li) => li.querySelector('.badge').textContent);
+    // Add a store item (a paint) to the wishlist from the results, then take it off.
+    const paint = rows.find((li) => /Ghoulish Green/.test(li.textContent));
+    paint?.querySelector('.fis-wish').click();
+    await tick();
+    const added = state.wishlist.some((e) => e && e.id === 'sku-501' && e.kind === 'paint');
+    const pressed = paint?.querySelector('.fis-wish').textContent;
+    paint?.querySelector('.fis-wish').click();
+    await tick();
+    const removed = !state.wishlist.some((e) => e && e.id === 'sku-501');
+    // An upgrade: From → To, priced from the ship you pick.
+    box.value = 'freelancer';
+    box.dispatchEvent(new Event('input'));
+    await tick();
+    const up = [...document.querySelectorAll('.fis-hits li')].find((li) =>
+      li.querySelector('.fis-from'),
+    );
+    const upOff = up ? up.querySelector('.fis-wish').disabled : null;
+    const sel = up && up.querySelector('.fis-from');
+    if (sel) {
+      sel.value =
+        [...sel.options].find((o) => /^Aurora M/.test(o.value))?.value || sel.options[1].value;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    await tick();
+    const up2 = [...document.querySelectorAll('.fis-hits li')].find((li) =>
+      li.querySelector('.fis-from'),
+    );
+    const upgrade = {
+      off: upOff,
+      on: up2 ? !up2.querySelector('.fis-wish').disabled : false,
+      price: up2 ? /\$\d+/.test(up2.querySelector('.find-price').textContent) : false,
+    };
+    box.value = 'zzzz';
+    box.dispatchEvent(new Event('input'));
+    await tick();
+    const none = /Nothing by that name/.test(document.querySelector('.find-ship').textContent);
+    box.value = 'carrack';
+    box.dispatchEvent(new Event('input'));
+    await tick();
+    // Bubbling, as a real key press does (Svelte listens at the root).
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await tick(300);
+    const modal = document.querySelector('#item-modal');
+    const opened =
+      !modal.hidden && /Carrack/.test(modal.querySelector('.modal-name')?.textContent || '');
+    document.querySelector('#modal-close').click();
+    box.value = '';
+    box.dispatchEvent(new Event('input'));
+    await tick();
+    const link = document.querySelector('#full-store a');
+    return {
+      placeholder,
+      oneLetter,
+      hits,
+      kinds,
+      added,
+      pressed,
+      removed,
+      upgrade,
+      none,
+      opened,
+      href: link && link.href,
+      target: link && link.target,
+      label: link && link.textContent,
+      line: /The full store lives on openhangar\.space/.test(
+        document.querySelector('#full-store')?.textContent || '',
+      ),
+      gone: !document.querySelector('#price-table, [data-price-tab], #price-search'),
+    };
+  });
+  /^Search \d+ items…$/.test(fs1.placeholder) &&
+  fs1.oneLetter === 0 &&
+  fs1.hits.length > 0 &&
+  fs1.hits.length <= 8 &&
+  fs1.hits.every((h) => /cutlass/i.test(h)) &&
+  ['Ship', 'Paint', 'Gear'].every((k) => fs1.kinds.includes(k)) &&
+  fs1.added &&
+  fs1.pressed === 'On Your Wishlist' &&
+  fs1.removed &&
+  fs1.upgrade.off === true &&
+  fs1.upgrade.on &&
+  fs1.upgrade.price &&
+  fs1.none &&
+  fs1.opened &&
+  fs1.href === 'https://openhangar.space/store' &&
+  fs1.target === '_blank' &&
+  fs1.label === 'Open the Full Store ↗' &&
+  fs1.line &&
+  fs1.gone
+    ? ok(
+        `store: full store link, Find in Store (${fs1.hits.length} for "cutlass", ships and store items, Add to Wishlist, an upgrade From → To, Enter opens a ship), no price list`,
+      )
+    : fail(`store slim page: ${JSON.stringify(fs1)}`);
+  // Your Subscriber Store (#418): the demo account is a subscriber; its listing is
+  // an invented one (demo-shim.js), read through the real OH.getSubStore.
+  await page
+    .waitForFunction(() => document.querySelectorAll('#sub-grid .sub-card').length > 0, {
+      timeout: 10000,
     })
     .catch(() => {});
-  const prices = await page.$$eval('#price-table tbody tr', (r) => r.length);
-  prices > 50 ? ok(`price list: ${prices} ships`) : fail(`price list only ${prices} rows`);
+  const sub = await page.evaluate(async () => {
+    const tick = (ms = 80) => new Promise((r) => setTimeout(r, ms));
+    const root = document.querySelector('#sub-store');
+    const cards = () => [...root.querySelectorAll('.sub-card')];
+    const card = (name) => cards().find((c) => c.querySelector('.sub-name').textContent === name);
+    const helmet = card('Quasar Explorer Helmet');
+    const plush = card('Tiny Hangar Plushie');
+    const jacket = card('Starlight Flight Jacket');
+    const res = {
+      head: root.querySelector('h3')?.textContent.replace(/\s+/g, ' ').trim(),
+      meta: root.querySelector('#sub-meta')?.textContent.replace(/\s+/g, ' ').trim(),
+      n: cards().length,
+      buy: helmet?.querySelector('.sub-buy')?.href,
+      buyLabel: helmet?.querySelector('.sub-buy')?.textContent,
+      price: helmet?.querySelector('.sub-price')?.textContent.replace(/\s+/g, ' ').trim(),
+      warbond: helmet?.querySelector('.sub-chip.wb')?.textContent,
+      tier: jacket?.querySelector('.sub-chip.tier')?.textContent,
+      noTier: !helmet?.querySelector('.sub-chip.tier'),
+      soldOut: plush?.querySelector('.sub-out')?.textContent,
+      plushBuy: !!plush?.querySelector('.sub-buy'),
+      lazy: [...root.querySelectorAll('img')].every((i) => i.loading === 'lazy'),
+      note: /What RSI shows your account today\./.test(root.textContent),
+      chips: [...root.querySelectorAll('.sub-kinds .chip')].map((c) =>
+        c.firstChild.textContent.trim(),
+      ),
+    };
+    // Every card in a row lines up: name and price/Buy row at the same height,
+    // whether the name takes one line or two.
+    const rows = new Map();
+    for (const c of cards()) {
+      const top = Math.round(c.getBoundingClientRect().top);
+      const y = (sel) => Math.round(c.querySelector(sel).getBoundingClientRect().top);
+      if (!rows.has(top)) rows.set(top, []);
+      rows.get(top).push([y('.sub-name'), y('.sub-foot')]);
+    }
+    res.aligned =
+      [...rows.values()].some((r) => r.length > 1) &&
+      [...rows.values()].every((r) => r.every(([n, f]) => n === r[0][0] && f === r[0][1]));
+    const long = card("Kastak Arms Inquisitor 'Star Kitten' Armor Set");
+    res.longTitle = long?.querySelector('.sub-name').title;
+    res.longKind = long?.querySelector('.sub-kind').textContent;
+    res.kitKind = card('Star Kitten Kit')?.querySelector('.sub-kind').textContent;
+    const box = root.querySelector('#sub-search');
+    box.value = 'helmet';
+    box.dispatchEvent(new Event('input'));
+    await tick();
+    res.search = cards().length;
+    box.value = '';
+    box.dispatchEvent(new Event('input'));
+    await tick();
+    [...root.querySelectorAll('.sub-kinds .chip')]
+      .find((c) => /^Paints/.test(c.textContent))
+      ?.click();
+    await tick();
+    res.paints = cards().map((c) => c.querySelector('.sub-name').textContent);
+    root.querySelector('.sub-kinds .chip').click(); // All
+    await tick();
+    // Not a subscriber: no list, a pointer to the plans.
+    const s = OHApp.store.sub;
+    const acct = s.account;
+    s.account = { ...acct, subscriber: null };
+    document.dispatchEvent(new Event('oh:home'));
+    await tick();
+    const plans = root.querySelector('.sub-plans a');
+    res.plans = plans && plans.href;
+    res.plansText = root.querySelector('.sub-plans')?.textContent.replace(/\s+/g, ' ').trim();
+    res.plansCards = cards().length;
+    s.account = acct;
+    document.dispatchEvent(new Event('oh:home'));
+    await tick();
+    return res;
+  });
+  sub.head === 'Your Subscriber Store 6' &&
+  sub.meta === '6 items, refreshed today' &&
+  sub.n === 6 &&
+  sub.aligned &&
+  sub.longTitle === "Kastak Arms Inquisitor 'Star Kitten' Armor Set" &&
+  sub.longKind === 'Armor' &&
+  sub.kitKind === 'Kits and Bundles' &&
+  /^https:\/\/robertsspaceindustries\.com\/en\/pledge\/Subscribers-Store\/Demo-2$/.test(sub.buy) &&
+  sub.buyLabel === 'Buy at RSI ↗' &&
+  /^\$9\.00 \$12\.00$/.test(sub.price) &&
+  sub.warbond === 'Warbond' &&
+  sub.tier === 'Centurion' &&
+  sub.noTier &&
+  sub.soldOut === 'Sold Out' &&
+  !sub.plushBuy &&
+  sub.lazy &&
+  sub.note &&
+  sub.chips.join() === 'All,Paints,Armor,Clothing,Flair,Kits and Bundles' &&
+  sub.search === 1 &&
+  sub.paints.join() === 'Nebula Drift Paint' &&
+  sub.plans === 'https://robertsspaceindustries.com/en/pledge/subscriptions' &&
+  sub.plansText === 'Subscribers get their own store each month. See Plans ↗' &&
+  sub.plansCards === 0
+    ? ok(
+        'subscriber store: 6 cards lined up, Warbond and tier chips, Sold Out, search, type chips, See Plans',
+      )
+    : fail(`subscriber store: ${JSON.stringify(sub)}`);
   const st = await page.evaluate(async () => {
-    const rows = () => document.querySelectorAll('#price-table tbody tr').length;
-    const flying = rows(); // default tab: Flight Ready
-    document.querySelector('[data-price-tab="all"]').click();
-    const all = rows();
-    document.querySelector('[data-price-tab="in-concept"]').click();
-    const concept = rows();
+    // The Store is Svelte (ui/store): it redraws a tick after a change.
+    const tick = (ms = 50) => new Promise((r) => setTimeout(r, ms));
     const ccus = document.querySelectorAll('#ccu-owned tbody tr').length;
-    // "In store now" comes from each ship's own store page (stubbed here):
-    // Cutlass Black sold on its own, Carrack only in a pack.
-    OH.getShipStock = async (url) =>
-      /Cutlass-Black/i.test(url)
-        ? { state: 'in', price: 110, packs: [] }
-        : { state: 'pack', price: null, packs: [{ name: 'Ultimate Explorer Pack', price: 1150 }] };
+    // "In store now" comes from the store catalog (demo-shim.js): Cutlass Black
+    // sold on its own, the Carrack not for sale.
     // Wishlist a ship with buy-backs; its row opens the list of them.
     state.wishlist = ['Cutlass Black', 'Carrack'];
     // A pack buy-back whose loaded details include the Carrack counts for it.
@@ -1053,6 +3085,7 @@ try {
     });
     state.bbDetails['999001'] = { ships: [{ name: 'Carrack' }], also: [] };
     renderStore();
+    await tick();
     const packRow = [...document.querySelectorAll('#wishlist tbody tr')].find((r) =>
       /^Carrack/.test(r.textContent.trim()),
     );
@@ -1062,37 +3095,27 @@ try {
     renderStore();
     await new Promise((r) => setTimeout(r, 300));
     const stock = [...document.querySelectorAll('#wishlist .sale')].map((e) => e.textContent);
-    document.querySelector('[data-wish-bbs]')?.click();
+    document.querySelector('#wishlist .wish-open')?.click();
+    await tick();
     const sub = document.querySelector('.wish-bbs');
     const res = {
-      flying,
-      all,
-      concept,
       ccus,
       stock,
-      priceStock: document.querySelectorAll('#price-table .sale').length,
-      tabs: [...document.querySelectorAll('[data-price-tab]')].map((b) => b.textContent),
       bbRows: sub && !sub.hidden ? sub.querySelectorAll('table.inner > tbody > tr').length : 0,
       bbTypes: sub ? [...sub.querySelectorAll('tbody .badge')].map((b) => b.textContent) : [],
       pack: /1 pack/.test(packSummary) && !/buy-back|to it/.test(packSummary),
-      reclaim: sub ? /Reclaim/.test(sub.textContent) : false,
+      reclaim: sub ? /Buy Back|Reclaim/.test(sub.textContent) : false,
       panels: document.querySelectorAll('#view-store .store-panel').length,
       ccugame: /ccugame/i.test(document.querySelector('#view-store').textContent),
     };
     state.wishlist = [];
-    state.priceTab = 'flight-ready';
+    renderStore();
     return res;
   });
-  st.panels === 3 &&
-  st.all > st.flying &&
-  st.concept > 0 &&
-  !st.ccugame &&
-  !st.tabs.includes('For Sale Now') &&
-  st.tabs.join('|') === 'Flight Ready|In Concept|All' &&
-  st.priceStock === 0
-    ? ok(`store panels: ${st.flying} flight ready, ${st.all} in all, ${st.concept} in concept`)
+  st.panels === 4 && !st.ccugame
+    ? ok('store panels: Wishlist, Your Subscriber Store, Your CCUs, Find in Store')
     : fail(`store page: ${JSON.stringify(st)}`);
-  st.stock.join('|') === 'Only in a pack|In stock ($110)' &&
+  st.stock.join('|') === 'Not in store|In stock ($110)' &&
   st.ccus > 0 &&
   st.bbRows > 0 &&
   st.reclaim &&
@@ -1100,17 +3123,11 @@ try {
   st.pack &&
   st.bbTypes.join() === [...st.bbTypes].sort((a, b) => (a === 'CCU') - (b === 'CCU')).join()
     ? ok(
-        `wishlist stock from ship pages (${st.stock.join(', ')}), buy-backs (${st.bbTypes.join(', ')})`,
+        `wishlist stock from the store catalog (${st.stock.join(', ')}), buy-backs (${st.bbTypes.join(', ')})`,
       )
     : fail(`store details: ${JSON.stringify(st)}`);
 
   const ws = await page.evaluate(async () => {
-    OH.getShipStock = async (url) =>
-      /Cutlass-Black/i.test(url)
-        ? { state: 'in', price: 110, packs: [] }
-        : /Carrack/i.test(url)
-          ? { state: 'pack', price: null, packs: [{ name: 'Some Pack' }] }
-          : { state: 'out', price: null, packs: [] };
     state.wishlist = ['Pioneer', 'Cutlass Black', 'Carrack'];
     const order = () =>
       [...document.querySelectorAll('#wishlist .wishlist > tbody > tr:not(.wish-bbs)')].map(
@@ -1119,7 +3136,7 @@ try {
     const pick = async (v) => {
       const sel = document.querySelector('#wish-sort');
       sel.value = v;
-      sel.dispatchEvent(new Event('change'));
+      sel.dispatchEvent(new Event('change', { bubbles: true })); // as a real pick does
       await new Promise((r) => setTimeout(r, 300));
       return order().join(',');
     };
@@ -1131,7 +3148,8 @@ try {
       mineBefore: await pick('mine'),
       grips: document.querySelectorAll('#wishlist .wish-grip').length,
     };
-    moveWishlist('Carrack', 'Pioneer');
+    OHApp.store.setWishOrder(['Carrack', 'Pioneer', 'Cutlass Black']);
+    await new Promise((r) => setTimeout(r, 50));
     res.mineAfter = order().join(',');
     state.wishlist = [];
     state.wishSort = 'name';
@@ -1185,29 +3203,9 @@ try {
     ? ok('mouse drag lifts the row and reorders the wishlist')
     : fail(`live drag: lifted=${lifted} order=${dragged}`);
 
-  // Panel searches: counts in the placeholder, "N of M" while typing, no CCU
-  // search for a handful of CCUs.
-  const sm = await page.evaluate(async () => {
-    const box = document.querySelector('#price-search');
-    const placeholder = box.placeholder;
-    box.value = 'cutlass';
-    box.dispatchEvent(new Event('input'));
-    const count = document.querySelector('#price-search-count').textContent;
-    box.value = '';
-    box.dispatchEvent(new Event('input'));
-    return {
-      placeholder,
-      count,
-      cleared: document.querySelector('#price-search-count').textContent,
-      ccuHidden: document.querySelector('#ccu-search').hidden,
-    };
-  });
-  /^Search \d+ ships…$/.test(sm.placeholder) &&
-  /^\d+ of \d+$/.test(sm.count) &&
-  !sm.cleared &&
-  sm.ccuHidden
-    ? ok(`panel search: "${sm.placeholder}", "${sm.count}", CCU search hidden for a few CCUs`)
-    : fail(`panel search: ${JSON.stringify(sm)}`);
+  // No CCU search for a handful of CCUs.
+  const ccuHidden = await page.evaluate(() => document.querySelector('#ccu-search').hidden);
+  ccuHidden ? ok('CCU search hidden for a few CCUs') : fail('CCU search shown for a few CCUs');
 
   console.log('Updates');
   await go('#updates');
@@ -1231,10 +3229,12 @@ try {
     const btn = document.querySelector('#update-check-btn');
     const out = () => document.querySelector('#update-check-status').textContent;
     const wait = () => new Promise((r) => setTimeout(r, 200));
-    // No update API in the demo = Firefox, which asks AMO for the latest version.
+    // No update API in the demo = Firefox, which reads openhangar.space/versions.json.
     const realFetch = window.fetch;
-    const amo = (v) => async () =>
-      new Response(JSON.stringify({ current_version: { version: v } }));
+    const amo = (v) => async (u) => {
+      if (u !== 'https://openhangar.space/versions.json') throw new Error(`asked ${u}`);
+      return Response.json({ stores: { firefox: { live: v } } });
+    };
     window.fetch = amo('9.9.9');
     btn.click();
     await wait();
@@ -1258,8 +3258,82 @@ try {
   chk.cur &&
   /9\.9\.9 is out.*\| You['’]re on the latest version/.test(chk.firefox) &&
   /9\.9\.9 is downloading/.test(chk.chrome1)
-    ? ok('Check for updates: store check (Chrome) and AMO version check (Firefox)')
+    ? ok('Check for updates: store check (Chrome) and versions.json check (Firefox)')
     : fail(`check for updates: ${JSON.stringify(chk)}`);
+  const md = await page.evaluate(() => ({
+    // Release notes are Svelte nodes, never markup strings: no stray ** or `.
+    raw: [...document.querySelectorAll('#updates-body li, #updates-body p')].filter((e) =>
+      /\*\*|`/.test(e.textContent),
+    ).length,
+    links: document.querySelectorAll('#updates-body .release a[target="_blank"]').length,
+  }));
+  !md.raw
+    ? ok(`release notes markdown drawn (${md.links} links)`)
+    : fail(`release notes markdown: ${JSON.stringify(md)}`);
+
+  console.log('Known Issues');
+  const ki = await page.evaluate(async () => {
+    const wait = (ms = 300) => new Promise((r) => setTimeout(r, ms));
+    const body = () => document.querySelector('#issues-body');
+    const open = async () => {
+      location.hash = '#home';
+      await wait(100);
+      location.hash = '#issues';
+      await wait();
+    };
+    // From the hour-long cache of openhangar.space's feed: no request.
+    await chrome.storage.local.set({
+      feedIssues: {
+        at: Date.now(),
+        data: {
+          v: 1,
+          issues: [
+            {
+              number: 7,
+              title: 'Test bug <b>not bold</b>',
+              url: 'https://github.com/Draco-Foundry/open-hangar/issues/7',
+              createdAt: new Date().toISOString(),
+              labels: ['bug', 'scan-broken'],
+            },
+            {
+              number: 8,
+              title: 'Older bug',
+              url: 'https://github.com/Draco-Foundry/open-hangar/issues/8',
+              createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+              labels: ['bug'],
+            },
+          ],
+        },
+      },
+    });
+    await open();
+    const rows = [...body().querySelectorAll('.known-issues li')].map((li) =>
+      li.textContent.replace(/\s+/g, ' ').trim(),
+    );
+    const bold = !!body().querySelector('.known-issues b');
+    // Never loaded and the site busy (503): the fallback link, no error.
+    const realFetch = window.fetch;
+    window.fetch = async () => new Response('', { status: 503, headers: { 'retry-after': '300' } });
+    await chrome.storage.local.remove('feedIssues');
+    await open();
+    const err = body().textContent.replace(/\s+/g, ' ').trim();
+    // An empty list (fresh from the feed).
+    window.fetch = async () => Response.json({ v: 1, issues: [] });
+    await chrome.storage.local.remove('feedIssues');
+    await open();
+    const empty = body().textContent.trim();
+    window.fetch = realFetch;
+    await chrome.storage.local.remove('feedIssues');
+    return { rows, bold, err, empty };
+  });
+  ki.rows.length === 2 &&
+  /^Test bug <b>not bold<\/b> #7 · opened today · Scan broken$/.test(ki.rows[0]) &&
+  /^Older bug #8 · opened 3 days ago$/.test(ki.rows[1]) &&
+  !ki.bold &&
+  /^The bug list is still in transit\. See it on GitHub for now\.$/.test(ki.err) &&
+  /^No known bugs right now/.test(ki.empty)
+    ? ok('Known Issues: cached list, Scan broken tag, offline fallback, empty list')
+    : fail(`known issues: ${JSON.stringify(ki)}`);
 
   // Kill switch notice: shown from the cached status file, as text (never HTML).
   const notice = await page.evaluate(async () => {
@@ -1289,14 +3363,23 @@ try {
 
   // Card pictures offer two sizes (store_small + slideshow) so the browser picks
   // one sharp image and never swaps (#179); markup survives the sanitizer.
-  const sizes = await page.evaluate(() => {
+  // The cards are Svelte (ui/lib/Thumb.svelte); Inventory is hidden here, so the
+  // lazy picture isn't fetched while we look.
+  const sizes = await page.evaluate(async () => {
     const url = 'https://media.robertsspaceindustries.com/abc123/store_small.jpg';
-    const box = document.createElement('div');
-    setHTML(box, `<img class="thumb" src="${url}"${thumbSizeAttrs(url, 'gallery')} alt="">`);
-    const im = box.querySelector('img');
+    const p = state.items.find((x) => !x.isCCU);
+    const keep = { image: p.image, layout: state.layout };
+    p.image = url;
+    state.layout = 'gallery';
+    renderInventory();
+    await new Promise((r) => setTimeout(r, 60));
+    const im = document.querySelector(`#results .card[data-id="${p.id}"] img.thumb`);
+    const got = { srcset: im?.getAttribute('srcset'), sizes: im?.getAttribute('sizes') };
+    p.image = keep.image;
+    state.layout = keep.layout;
+    renderInventory();
     return {
-      srcset: im.getAttribute('srcset'),
-      sizes: im.getAttribute('sizes'),
+      ...got,
       folder: srcsetFor('https://robertsspaceindustries.com/media/abc/store_small/a.jpg'),
       other: srcsetFor('https://robertsspaceindustries.com/media/abc/store_hub_small/a.jpg'),
     };
@@ -1309,12 +3392,94 @@ try {
     ? ok('card pictures: two sizes in both RSI URL shapes, others untouched')
     : fail(`card picture sizes: ${JSON.stringify(sizes)}`);
 
-  console.log('Saved accounts');
+  console.log('Developers');
+  // Developers is the Svelte page in ui/developers; its data tools call
+  // window.OHApp.dev. Svelte redraws a microtask later, so wait a tick after actions.
   await go('#developers');
   const prof = await page.$$eval('#profiles .profile-row', (r) => r.map((e) => e.textContent));
   prof.length && /signed in/.test(prof[0])
     ? ok(`${prof.length} saved account(s) listed`)
     : fail('saved accounts list empty');
+  const devUi = await page.evaluate(async () => {
+    const tick = () => new Promise((r) => setTimeout(r, 150));
+    const q = (s) => document.querySelector(s);
+    const files = [];
+    window.downloadBlob = (blob, name) => files.push([blob.type, name]);
+    const out = {
+      links: document.querySelectorAll('#dev-links a').length,
+      restoreHidden: q('#restore-db').hidden,
+      supporters: q('#sup-contributors').textContent.trim(),
+      boosters: q('#sup-boosters a')?.textContent,
+      storage: q('#storage-use')?.textContent.trim(),
+    };
+    q('#export-db').click();
+    await tick();
+    out.json = q('#data-msg').textContent;
+    q('#export-htf').click();
+    await tick();
+    out.htf = q('#data-msg').textContent;
+    // The import picker opens from Import JSON and from the damaged-database notice.
+    const input = q('#import-file');
+    let opened = 0;
+    input.click = () => opened++;
+    q('#import-db').click();
+    q('#db-restore').click();
+    out.opened = opened;
+    delete input.click;
+    // A file that isn't JSON: an error note, nothing replaced.
+    const realConfirm = window.confirm;
+    window.confirm = () => true; // "Importing replaces your current data. Continue?"
+    const dt = new DataTransfer();
+    dt.items.add(new File(['not json'], 'x.json', { type: 'application/json' }));
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    window.confirm = realConfirm;
+    out.bad = q('#data-msg').textContent;
+    out.badRed = q('#data-msg').classList.contains('error');
+    out.items = state.items.length;
+    q('#report-preview').open = true;
+    await tick();
+    await tick();
+    out.report = q('#report-text').textContent.length;
+    q('#clear-log').click();
+    await tick();
+    out.cleared = q('#report-msg').textContent;
+    out.files = files.map((f) => f[1]);
+    return out;
+  });
+  devUi.links === 5 && devUi.restoreHidden && /Be the first/.test(devUi.supporters)
+    ? ok('quick links, supporters placeholder; Restore Previous Hangar hidden with no snapshot')
+    : fail(`developers page: ${JSON.stringify(devUi)}`);
+  /^Exported \d+ item\(s\) and \d+ history snapshot/.test(devUi.json) &&
+  /Hangar Transfer Format/.test(devUi.htf) &&
+  devUi.files.length === 2 &&
+  /^open-hangar-.*\.json$/.test(devUi.files[0]) &&
+  /^open-hangar-htf-/.test(devUi.files[1])
+    ? ok(`Export JSON and Export HTF download and say so ("${devUi.json}")`)
+    : fail(`developers exports: ${JSON.stringify(devUi)}`);
+  devUi.opened === 2 && /valid JSON/.test(devUi.bad) && devUi.badRed && devUi.items > 0
+    ? ok('Import JSON and the damaged-data notice open the picker; a bad file shows an error')
+    : fail(`developers import: ${JSON.stringify(devUi)}`);
+  /^Storage Used: [\d.]+ (MB|KB|B)$/.test(devUi.storage)
+    ? ok(`storage total under the data tools ("${devUi.storage}")`)
+    : fail(`developers storage line: ${JSON.stringify(devUi.storage)}`);
+  devUi.report > 50 && devUi.cleared === 'Log cleared.'
+    ? ok('error report preview fills when opened; Clear Log says so')
+    : fail(`developers error report: ${JSON.stringify(devUi)}`);
+  // The card menus' Backup item clicks #export-db, so it must work while Developers
+  // is hidden (here from Inventory).
+  await go('#inventory');
+  const menuBackup = await page.evaluate(async () => {
+    const files = [];
+    window.downloadBlob = (blob, name) => files.push(name);
+    document.querySelector('#export-db').click();
+    await new Promise((r) => setTimeout(r, 300));
+    return { files, msg: document.querySelector('#data-msg').textContent };
+  });
+  menuBackup.files.length === 1 && /^Exported/.test(menuBackup.msg)
+    ? ok('#export-db downloads the backup from another page (the card menus use it)')
+    : fail(`backup from another page: ${JSON.stringify(menuBackup)}`);
 
   console.log('Referrals');
   await go('#referrals');
@@ -1365,6 +3530,46 @@ try {
         `gallery ${refUi.gallery} rewards, ${refUi.timeline} milestones, prospect ages, event banner`,
       )
     : fail(`referral sections: ${JSON.stringify(refUi)}`);
+  // People list (Svelte): tabs swap the list and clear the search, search filters
+  // live, sort reorders.
+  const people = await page.evaluate(async () => {
+    const wait = () => new Promise((r) => setTimeout(r, 50));
+    const rows = () => [...document.querySelectorAll('#ref-tbody tr')];
+    const count = () => document.querySelector('#ref-count').textContent;
+    const search = document.querySelector('#ref-search');
+    const out = { recruits: rows().length, count: count() };
+    const first = rows()[0]?.querySelector('td').textContent.trim() || '';
+    search.value = first;
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await wait();
+    out.searched = rows().length;
+    document.querySelector('[data-reftab="prospects"]').click();
+    await wait();
+    out.prospects = rows().length;
+    out.cleared = search.value === '';
+    out.dateCol = document.querySelector('#ref-date-col').textContent;
+    const sort = document.querySelector('#ref-sort');
+    sort.value = 'name';
+    sort.dispatchEvent(new Event('change', { bubbles: true }));
+    await wait();
+    const names = rows().map((r) => r.querySelector('td').textContent.trim());
+    out.sorted = names.every((n, i) => !i || names[i - 1].localeCompare(n) <= 0);
+    document.querySelector('[data-reftab="recruits"]').click();
+    sort.value = 'newest';
+    sort.dispatchEvent(new Event('change', { bubbles: true }));
+    await wait();
+    return out;
+  });
+  people.recruits > 1 &&
+  /^Showing \d+ of \d+$/.test(people.count) &&
+  people.searched >= 1 &&
+  people.searched < people.recruits &&
+  people.prospects > 0 &&
+  people.cleared &&
+  people.dateCol === 'Enlisted' &&
+  people.sorted
+    ? ok(`people list: tabs, search (${people.searched} of ${people.recruits}), sort by name`)
+    : fail(`people list: ${JSON.stringify(people)}`);
   // jsQR (dev-only) reads the QR back out of the finished image.
   await page.addScriptTag({ path: 'node_modules/jsqr/dist/jsQR.js' });
   const share = await page.evaluate(async () => {
@@ -1395,6 +3600,281 @@ try {
     ? ok(`share image ${share.w}×${share.h}, QR scans to the referral link, "${share.status}"`)
     : fail(`share image: ${JSON.stringify(share)}`);
 
+  console.log('Add to RSI Cart');
+  // RSI's upgrade calls are stubbed (no real RSI): the ship window's picker, the
+  // add, the error notes, and the buy-back window's one button (#288).
+  const cart = await page.evaluate(async () => {
+    const wait = async (test, ms = 2000) => {
+      for (let t = 0; t < ms; t += 25) {
+        if (test()) return true;
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      return false;
+    };
+    const calls = [];
+    const real = {
+      upgradeOptions: OH.upgradeOptions,
+      upgradePrice: OH.upgradePrice,
+      addUpgradeToCart: OH.addUpgradeToCart,
+    };
+    let optionsAnswer = {
+      ok: true,
+      options: [
+        { id: 102, name: 'Avenger Titan', image: null, eligible: true, price: 140 },
+        { id: 101, name: 'Pulse', image: null, eligible: true, price: null },
+        { id: 103, name: 'Cutlass Black', image: null, eligible: false, price: null },
+      ],
+    };
+    let addAnswer = { ok: true };
+    OH.upgradeOptions = async (...a) => (calls.push(['options', ...a]), optionsAnswer);
+    OH.upgradePrice = async (...a) => (calls.push(['price', ...a]), { ok: true, price: 15 });
+    OH.addUpgradeToCart = async (...a) => (calls.push(['add', ...a]), addAnswer);
+    // RSI's store feed says an upgrade to the Carrack is on sale (SKU 9001).
+    const carrack = {
+      id: 900,
+      name: 'Carrack',
+      lname: 'carrack',
+      link: null,
+      forSale: true,
+      editions: [{ id: 9001, title: 'Standard Edition', price: 600, warbond: false }],
+    };
+    const was = { storeRequested, storeData, storeByKey };
+    storeRequested = Promise.resolve();
+    storeData = { at: Date.now(), ships: [carrack] };
+    storeByKey = new Map([
+      [shipKey('Carrack'), carrack],
+      ['carrack', carrack],
+    ]);
+    const q = (sel) => document.querySelector(`#item-modal ${sel}`);
+    const text = (sel) => (q(sel) ? q(sel).textContent.replace(/\s+/g, ' ').trim() : '');
+    const out = {};
+    openShipModal('Carrack');
+    await wait(() => q('[data-cart="upgrade"]'));
+    out.heading = text('[data-cart="upgrade"] .modal-h');
+    out.quietUntilClick = calls.length === 0;
+    q('[data-cart="upgrade"] .cbtn').click();
+    await wait(() => q('[data-cart] .opt'));
+    out.rows = [...document.querySelectorAll('#item-modal [data-cart] .opt')].map((o) =>
+      o.textContent.replace(/\s+/g, ' ').trim(),
+    );
+    out.sum = text('[data-cart] .sum');
+    q('[data-cart] .opt:nth-child(2)').click();
+    await wait(() => /\$15/.test(text('[data-cart] .sum')));
+    out.sumAfterPick = text('[data-cart] .sum');
+    const addBtn = [...document.querySelectorAll('#item-modal [data-cart] button.cbtn')].pop();
+    out.addLabel = addBtn.textContent.trim();
+    addBtn.click();
+    await wait(() => q('[data-cart] .note.good'));
+    out.added = text('[data-cart] .note.good');
+    out.cartLink = q('[data-cart] a.cbtn')?.getAttribute('href') || '';
+    out.addCall = calls.find((c) => c[0] === 'add');
+    document.querySelector('#modal-close').click();
+
+    // Signed out of RSI: the note and the way to log in.
+    optionsAnswer = { ok: false, error: 'signed-out' };
+    openShipModal('Carrack');
+    await wait(() => q('[data-cart="upgrade"]'));
+    q('[data-cart="upgrade"] .cbtn').click();
+    await wait(() => q('[data-cart] .note.bad'));
+    out.signedOut = text('[data-cart] .note.bad');
+    out.logIn = q('[data-cart] a.cbtn')?.textContent.trim() || '';
+    document.querySelector('#modal-close').click();
+
+    // RSI says no to the add.
+    optionsAnswer = { ok: true, options: [{ id: 101, name: 'Pulse', eligible: true, price: 100 }] };
+    addAnswer = { ok: false, error: 'refused', rsiSays: 'Pretend: this item is unavailable' };
+    openShipModal('Carrack');
+    await wait(() => q('[data-cart="upgrade"]'));
+    q('[data-cart="upgrade"] .cbtn').click();
+    await wait(() => q('[data-cart] .opt'));
+    [...document.querySelectorAll('#item-modal [data-cart] button.cbtn')].pop().click();
+    await wait(() => q('[data-cart] .note.bad'));
+    out.refused = text('[data-cart] .note.bad');
+    out.addsAfterRefusal = calls.filter((c) => c[0] === 'add').length;
+    document.querySelector('#modal-close').click();
+
+    // Any Ship: a From ship you don't own, found by name, priced on pick, added.
+    const fleet = Array.from({ length: 34 }, (_, i) => ({
+      id: 500 + i,
+      name: `Test Hull ${String(i + 1).padStart(2, '0')}`,
+      image: null,
+      msrp: 100 + i,
+      price: null,
+    }));
+    optionsAnswer = {
+      ok: true,
+      options: [{ id: 103, name: 'Cutlass Black', image: null, eligible: false, price: null }],
+      others: [{ id: 777, name: 'Gladius', image: null, msrp: 90, price: null }, ...fleet],
+    };
+    addAnswer = { ok: true };
+    openShipModal('Carrack');
+    await wait(() => q('[data-cart="upgrade"]'));
+    q('[data-cart="upgrade"] .cbtn').click();
+    await wait(() => q('[data-cart] [data-any] .opt'));
+    out.anyHeading = text('[data-any] .any-h');
+    out.anyNone = text('[data-cart] .cart-intro');
+    out.anyRows = document.querySelectorAll('#item-modal [data-any] .opt').length;
+    out.anyCount = text('[data-any] .any-count');
+    out.anyAddBefore = !q('[data-cart] .sum');
+    const search = q('[data-any] .any-q');
+    search.value = 'glad';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await wait(() => document.querySelectorAll('#item-modal [data-any] .opt').length === 1);
+    out.anySearched = [...document.querySelectorAll('#item-modal [data-any] .opt')].map((o) =>
+      o.textContent.replace(/\s+/g, ' ').trim(),
+    );
+    q('[data-any] .opt').click();
+    await wait(() => /\$15/.test(text('[data-cart] .sum')));
+    out.anySum = text('[data-cart] .sum');
+    out.anyPriceCall = calls.filter((c) => c[0] === 'price').pop();
+    [...document.querySelectorAll('#item-modal [data-cart] button.cbtn')].pop().click();
+    await wait(() => q('[data-cart] .note.good'));
+    out.anyAdded = text('[data-cart] .note.good');
+    out.anyAddCall = calls.filter((c) => c[0] === 'add').pop();
+    document.querySelector('#modal-close').click();
+
+    // RSI's cart already holds a buy-back (or this is one and the cart isn't empty).
+    optionsAnswer = { ok: true, options: [{ id: 101, name: 'Pulse', eligible: true, price: 100 }] };
+    addAnswer = { ok: false, error: 'cart-conflict' };
+    openShipModal('Carrack');
+    await wait(() => q('[data-cart="upgrade"]'));
+    q('[data-cart="upgrade"] .cbtn').click();
+    await wait(() => q('[data-cart] .opt'));
+    [...document.querySelectorAll('#item-modal [data-cart] button.cbtn')].pop().click();
+    await wait(() => q('[data-cart] .note.bad'));
+    out.busy = text('[data-cart] .note.bad');
+    out.busyLink = q('[data-cart] a.cbtn')?.textContent.trim() || '';
+    document.querySelector('#modal-close').click();
+
+    // A buy-back upgrade: its ids from the buy-back button, RSI's price, one click.
+    addAnswer = { ok: true };
+    const b = {
+      id: '8899',
+      name: 'Upgrade - Pulse to Carrack',
+      date: '2026-08-26',
+      contains: '',
+      href: '',
+      price: '',
+      isCCU: true,
+      ccu: { from: 'Pulse', to: 'Carrack' },
+      wasUpgraded: false,
+      fromShipId: '101',
+      toShipId: '900',
+      toSkuId: '9001',
+      kind: 'ccu',
+      image: null,
+    };
+    const tokensWas = state.bbTokens;
+    state.bbTokens = 0;
+    openBuybackModal(b);
+    await wait(() => /\$15/.test(text('[data-cart="buyback"]')));
+    out.bbRows = text('[data-cart="buyback"]');
+    state.bbTokens = tokensWas;
+    q('[data-cart="buyback"] button.cbtn').click();
+    await wait(() => q('[data-cart="buyback"] .note.good'));
+    out.bbAdded = text('[data-cart="buyback"] .note.good');
+    out.bbCall = calls.filter((c) => c[0] === 'add').pop();
+    out.bbId = b.id;
+    document.querySelector('#modal-close').click();
+    // A buy-back upgrade RSI won't sell any more (ship values changed).
+    addAnswer = { ok: false, error: 'refused', reason: 'invalid' };
+    openBuybackModal(b);
+    await wait(() => /\$15/.test(text('[data-cart="buyback"]')));
+    q('[data-cart="buyback"] button.cbtn').click();
+    await wait(() => q('[data-cart="buyback"] .note.bad'));
+    out.bbInvalid = text('[data-cart="buyback"] .note.bad');
+    addAnswer = { ok: true };
+    document.querySelector('#modal-close').click();
+    // Without the ids (older scans): no button.
+    openBuybackModal({ ...b, toSkuId: '' });
+    await new Promise((r) => setTimeout(r, 100));
+    out.bbNoIds = !q('[data-cart]');
+    document.querySelector('#modal-close').click();
+    const old = state.buybacks.find((x) => x.isCCU && x.ccu && OH.retiredBuyback(x));
+    // A retired ship's buy-back: RSI still sells it back, so the button stays; only
+    // RSI's refusal says it closed (#306).
+    addAnswer = { ok: false, error: 'refused' };
+    openBuybackModal({ ...old, fromShipId: '101', toShipId: '900', toSkuId: '9001' });
+    await wait(() => /\$15/.test(text('[data-cart="buyback"]')));
+    out.bbRetiredBefore = text('[data-cart="buyback"]');
+    q('[data-cart="buyback"] button.cbtn').click();
+    await wait(() => q('[data-cart="buyback"] .note.bad'));
+    out.bbRetired = !!old && text('[data-cart="buyback"] .note.bad');
+    addAnswer = { ok: true };
+    document.querySelector('#modal-close').click();
+    Object.assign(OH, real);
+    ({ storeRequested, storeData, storeByKey } = was);
+    return out;
+  });
+  cart.heading === 'Upgrade From Your Ships' && cart.quietUntilClick
+    ? ok('ship window: Upgrade From Your Ships, nothing asked of RSI until the click')
+    : fail(`cart heading: ${JSON.stringify(cart)}`);
+  cart.rows.length === 3 &&
+  /Avenger Titan\s*\$140/.test(cart.rows[0]) &&
+  /Cutlass Black.*RSI isn't selling this upgrade right now/.test(cart.rows[2]) &&
+  /Avenger Titan to Carrack\s*\$140/.test(cart.sum) &&
+  /Pulse to Carrack\s*\$15/.test(cart.sumAfterPick)
+    ? ok('cart picker: your ships with RSI prices, greyed one, price on pick')
+    : fail(`cart picker: ${JSON.stringify(cart)}`);
+  cart.addLabel === 'Add to RSI Cart' &&
+  /In Your RSI Cart\s*Pulse to Carrack, \$15\..*A buy-back can't share this cart/.test(
+    cart.added,
+  ) &&
+  cart.cartLink === 'https://robertsspaceindustries.com/en/store/pledge/cart' &&
+  JSON.stringify(cart.addCall) === JSON.stringify(['add', 101, 900, 9001, {}])
+    ? ok('Add to RSI Cart: one call with the right ships, In Your RSI Cart, Open RSI Cart')
+    : fail(`cart add: ${JSON.stringify(cart)}`);
+  /Log In to RSI First.*log in to RSI in this browser first\. Nothing was added\./.test(
+    cart.signedOut,
+  ) && cart.logIn === 'Log In to RSI ↗'
+    ? ok('cart signed out: the signed-out note with Log In to RSI')
+    : fail(`cart signed out: ${JSON.stringify(cart)}`);
+  /RSI Didn't Add It.*Nothing was added\. RSI says: “Pretend: this item is unavailable”/.test(
+    cart.refused,
+  ) && cart.addsAfterRefusal === 2
+    ? ok("cart refused: RSI Didn't Add It with RSI's own words, and no second try by itself")
+    : fail(`cart refused: ${JSON.stringify(cart)}`);
+  cart.anyHeading === 'Any Ship' &&
+  /Any ship below works too/.test(cart.anyNone) &&
+  cart.anyRows === 30 &&
+  /Showing 30 of 35 ships/.test(cart.anyCount) &&
+  cart.anyAddBefore &&
+  cart.anySearched.length === 1 &&
+  /Gladius/.test(cart.anySearched[0]) &&
+  /Gladius to Carrack\s*\$15/.test(cart.anySum) &&
+  JSON.stringify(cart.anyPriceCall) ===
+    JSON.stringify(['price', 777, 9001, { toShipId: 900, setContext: true }]) &&
+  /Gladius to Carrack, \$15/.test(cart.anyAdded) &&
+  JSON.stringify(cart.anyAddCall) === JSON.stringify(['add', 777, 900, 9001, {}])
+    ? ok('Any Ship: 30 of 35 shown, search finds one, priced on pick, added from a ship not owned')
+    : fail(`any ship: ${JSON.stringify(cart)}`);
+  /Cart Already Busy.*holds a buy-back/.test(cart.busy) && cart.busyLink === 'Open RSI Cart ↗'
+    ? ok('cart busy: Cart Already Busy with Open RSI Cart')
+    : fail(`cart busy: ${JSON.stringify(cart)}`);
+  /Buy-Back Price\s*\$15 from RSI just now/.test(cart.bbRows) &&
+  /No Buy-Back Token right now: pay with cash, or wait for the next one \(\w{3} \d+\)\./.test(
+    cart.bbRows,
+  ) &&
+  /Buy-backs check out alone: one per cart, nothing else in it\./.test(cart.bbRows) &&
+  /Buy-back: Pulse to Carrack, \$15\. Check it out before you add anything else\./.test(
+    cart.bbAdded,
+  ) &&
+  JSON.stringify(cart.bbCall) ===
+    JSON.stringify(['add', 101, 900, 9001, { pledgeId: Number(cart.bbId) }]) &&
+  /RSI Didn't Add It\s*RSI won't sell this buy-back upgrade any more \(ship values changed\)\./.test(
+    cart.bbInvalid,
+  ) &&
+  cart.bbNoIds &&
+  /RSI No Longer Sells This One Back\s*It's retired and RSI closed its buy-back\./.test(
+    cart.bbRetired,
+  ) &&
+  /Add to RSI Cart/.test(cart.bbRetiredBefore) &&
+  !/No Longer Sells/.test(cart.bbRetiredBefore)
+    ? ok(
+        'buy-back upgrade: RSI price, Add to RSI Cart with its pledge; none without ids; retired keeps it',
+      )
+    : fail(`buy-back cart: ${JSON.stringify(cart)}`);
+
   console.log('Wishlist, spending, events');
   const wse = await page.evaluate(async () => {
     openShipModal('Carrack');
@@ -1406,28 +3886,27 @@ try {
     location.hash = '#store';
     await new Promise((r) => setTimeout(r, 400));
     const wish = document.querySelector('#wishlist').textContent;
+    const tick = () => new Promise((r) => setTimeout(r, 50));
     document.querySelector('[data-wish-remove]')?.click();
+    await tick();
     const undoBar = document.querySelector('#wish-undo');
     const undoShown = !undoBar.hidden && /Removed Carrack/.test(undoBar.textContent);
     undoBar.querySelector('[data-wish-undo]').click();
-    const restored = state.wishlist.length === 1 && undoBar.hidden;
+    await tick();
+    const restored =
+      state.wishlist.length === 1 &&
+      undoBar.hidden &&
+      /Carrack/.test(document.querySelector('#wishlist').textContent);
     document.querySelector('[data-wish-remove]')?.click();
+    await tick();
     const cleared = !state.wishlist.length && undoShown && restored;
     setStatsTab('spending');
     location.hash = '#stats';
     await new Promise((r) => setTimeout(r, 400));
     const spend = document.querySelector('#stats-body').textContent;
     const bars = document.querySelectorAll('#stats-body .bar-row').length;
-    // A bonus event running today shows the Home banner.
-    // The demo clock's day (2026-10-01, UTC).
-    const today = '2026-10-01';
-    referralEvents = [
-      ...referralEvents,
-      { start: today, end: today, name: 'Test Expo', reward: 'Drake Dragonfly with LTI' },
-    ];
     location.hash = '#home';
     await new Promise((r) => setTimeout(r, 400));
-    const banner = document.querySelector('#oh-status');
     return {
       before,
       after,
@@ -1435,7 +3914,6 @@ try {
       cleared,
       spend: /pledged in total/.test(spend),
       bars,
-      banner: /Referral bonus: Drake Dragonfly/.test(banner.textContent),
     };
   });
   wse.before === 'Add to Wishlist' &&
@@ -1447,40 +3925,605 @@ try {
   wse.spend && wse.bars >= 3
     ? ok(`spending tab: ${wse.bars} years`)
     : fail(`spending: ${JSON.stringify(wse)}`);
-  wse.banner
-    ? ok('Events card shows a running referral bonus event')
-    : fail(`event banner: ${JSON.stringify(wse)}`);
+
+  // Top bar (ui/topbar, Svelte: it redraws a tick after a change). The page link is
+  // marked; unticking a source reads "Scan Custom" (remembered) and keeps the ▾ menu
+  // open; the scan's progress shows on the button and in the menu; Streamer Mode puts
+  // a badge on the portrait; a waiting update puts a dot on it and a line in the menu.
+  console.log('Top bar');
+  await go('#inventory');
+  const bar = await page.evaluate(async () => {
+    const tick = () => new Promise((r) => setTimeout(r, 50));
+    const btn = document.querySelector('#scan-home');
+    const label = () => btn.querySelector('.scan-label').textContent;
+    const r = { active: document.querySelector('#nav a.active')?.dataset.view };
+    document.querySelector('#scan-menu-btn').click();
+    document.querySelector('.scan-src[value="store"]').click();
+    await tick();
+    r.stillOpen = !document.querySelector('#scan-menu').hidden;
+    r.custom = label();
+    r.saved = (await chrome.storage.local.get('scanSources')).scanSources.join(',');
+    document.querySelector('[data-scan-all]').click();
+    await tick();
+    r.all = label();
+    document.body.click();
+    r.closed = document.querySelector('#scan-menu').hidden;
+    scanProgress.i = 1;
+    scanProgress.n = 4;
+    setScanning('buy-backs… 200');
+    scanDetail('Buy-backs · page 2 · 200 items');
+    await tick();
+    r.progress = {
+      label: label(),
+      fill: btn.querySelector('.scan-fill').style.width,
+      title: btn.title,
+      line: document.querySelector('#scan-menu-progress').textContent,
+      bar: btn.classList.contains('scanning'),
+    };
+    scanDetail('');
+    setScanning('');
+    await tick();
+    r.idle = label() === 'Scan All' && !btn.classList.contains('scanning');
+    await OHApp.top.setStreamer(true);
+    await tick();
+    r.badge =
+      !document.querySelector('#stream-dot').hidden &&
+      /Streamer Mode is on/.test(document.querySelector('#settings-btn').title) &&
+      document.querySelector('#streamer-toggle').checked;
+    await OHApp.top.setStreamer(false);
+    await tick();
+    r.badgeOff = document.querySelector('#stream-dot').hidden;
+    showUpdateBanner('99.0.0');
+    await tick();
+    r.update =
+      !document.querySelector('#upd-dot').hidden &&
+      document.querySelector('#menu-upd-text').textContent === 'Update ready: 99.0.0';
+    topBar.update = null;
+    homeUpdated();
+    await tick();
+    return r;
+  });
+  bar.active === 'inventory' &&
+  bar.stillOpen &&
+  bar.custom === 'Scan Custom' &&
+  bar.saved === 'hangar,buybacks,referrals' &&
+  bar.all === 'Scan All' &&
+  bar.closed
+    ? ok('top bar: page marked; Scan Custom once a source is unticked (remembered), Select All')
+    : fail(`top bar scan menu: ${JSON.stringify(bar)}`);
+  bar.progress.label === 'Scanning 2/4' &&
+  bar.progress.fill === '25%' &&
+  bar.progress.title === 'Buy-backs · page 2 · 200 items' &&
+  bar.progress.line === 'Scanning: Buy-backs · page 2 · 200 items' &&
+  bar.progress.bar &&
+  bar.idle
+    ? ok('top bar: Scan fills with the progress, the ▾ menu says what it is on, then Scan All')
+    : fail(`top bar scan progress: ${JSON.stringify(bar)}`);
+  bar.badge && bar.badgeOff && bar.update
+    ? ok('top bar: Streamer Mode badge on the portrait; update dot and "Update ready" line')
+    : fail(`top bar portrait: ${JSON.stringify(bar)}`);
+
+  // Top Bar Option A, More Menu (owner, 2026-10-06; #260): Home, Inventory, Buy-Backs
+  // and Store in the bar, Stats, Org Fleet and Referrals under More ▾ (shut on load;
+  // More lights up and marks the page when you're on one; Escape and a click away
+  // close it, focus back on More). Search is an icon that opens the field over the
+  // page links on a click or /. The Game Status pill is the dot and the version. One
+  // row at 1440, 1100 and 800, nothing scrolling sideways; under 900px the logo drops
+  // its word and Scan All its words.
+  const more = await page.evaluate(async () => {
+    const tick = (ms = 60) => new Promise((r) => setTimeout(r, ms));
+    const $ = (sel) => document.querySelector(sel);
+    const btn = $('#more-btn');
+    const r = {
+      links: [...document.querySelectorAll('#nav > a')].map((a) => a.textContent.trim()),
+      shut: $('#more-menu').hidden && btn.getAttribute('aria-expanded') === 'false',
+      notActive: !btn.classList.contains('active'),
+      pill: $('#gs-pill .gs-txt').textContent.trim(),
+      pillTip: $('#gs-pill').title,
+    };
+    btn.click();
+    await tick();
+    r.items = [...$('#more-menu').querySelectorAll('a')].map((a) => a.textContent.trim());
+    r.open = !$('#more-menu').hidden && btn.getAttribute('aria-expanded') === 'true';
+    r.focusIn = $('#more-menu').contains(document.activeElement);
+    document.activeElement.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }),
+    );
+    r.arrow = document.activeElement.textContent.trim();
+    document.activeElement.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
+    await tick();
+    r.escShut = $('#more-menu').hidden && document.activeElement === btn;
+    btn.click();
+    await tick();
+    document.body.click();
+    await tick();
+    r.outsideShut = $('#more-menu').hidden;
+    btn.click();
+    await tick();
+    [...$('#more-menu').querySelectorAll('a')].find((a) => a.dataset.view === 'referrals').click();
+    await tick(400);
+    r.onReferrals = location.hash === '#referrals' && $('#more-menu').hidden;
+    r.moreActive = btn.classList.contains('active') && /Referrals/.test(btn.title);
+    r.noBarActive = !document.querySelector('#nav > a.active');
+    btn.click();
+    await tick();
+    r.marked = [...$('#more-menu').querySelectorAll('a[aria-current="page"]')].map((a) =>
+      a.textContent.trim(),
+    );
+    document.body.click();
+    await tick();
+    // Search: shut, the field is out of sight; / opens it with focus in the box.
+    const wrap = $('.tb-search');
+    r.searchShut = !wrap.classList.contains('open') && $('#gsearch-top').tabIndex === -1;
+    document.body.focus();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true }));
+    await tick();
+    r.slashOpens =
+      wrap.classList.contains('open') &&
+      document.activeElement === $('#gsearch-top') &&
+      $('#gsearch-top').getBoundingClientRect().width > 200;
+    $('#gsearch-top').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await tick();
+    r.escCloses =
+      !wrap.classList.contains('open') && document.activeElement === $('#top-search-btn');
+    $('#top-search-btn').click();
+    await tick();
+    r.iconOpens = wrap.classList.contains('open') && document.activeElement === $('#gsearch-top');
+    document.body.click();
+    $('#gsearch-top').blur();
+    await tick();
+    r.clickAwayCloses = !wrap.classList.contains('open');
+    location.hash = '#inventory';
+    await tick(300);
+    return r;
+  });
+  more.links.join(',') === 'Home,Inventory,Buy-Backs,Store' &&
+  more.shut &&
+  more.notActive &&
+  more.items.join(',') === 'Stats,Org Fleet,Referrals' &&
+  more.open &&
+  more.focusIn &&
+  more.arrow === 'Org Fleet' &&
+  more.escShut &&
+  more.outsideShut &&
+  more.onReferrals &&
+  more.moreActive &&
+  more.noBarActive &&
+  more.marked.join(',') === 'Referrals'
+    ? ok(
+        'top bar: four pages in the bar, More ▾ for Stats, Org Fleet and Referrals, marks the page you are on',
+      )
+    : fail(`top bar More menu: ${JSON.stringify(more)}`);
+  more.searchShut && more.slashOpens && more.escCloses && more.iconOpens && more.clickAwayCloses
+    ? ok(
+        'top bar: search icon opens the field over the links (click or /), Escape and a click away close it',
+      )
+    : fail(`top bar search: ${JSON.stringify(more)}`);
+  /^\d+\.\d+/.test(more.pill) && /LIVE \d/.test(more.pillTip)
+    ? ok(`top bar: Game Status pill is compact ("${more.pill}", LIVE on hover)`)
+    : fail(`top bar pill: ${JSON.stringify(more)}`);
+  const rows = {};
+  for (const w of [1440, 1100, 800]) {
+    await page.setViewport({ width: w, height: 900 });
+    await new Promise((r) => setTimeout(r, 250));
+    rows[w] = await page.evaluate(() => {
+      const h = document.querySelector('.wrap > header');
+      const tops = [...h.querySelectorAll('.brand, #nav > a, #more-btn, .hdr-prefs > *')]
+        .filter((el) => el.getClientRects().length)
+        .map((el) => {
+          const r = el.getBoundingClientRect();
+          return Math.round(r.top + r.height / 2);
+        });
+      const scan = document.querySelector('#scan-home');
+      return {
+        oneRow: Math.max(...tops) - Math.min(...tops) <= 4,
+        over: document.documentElement.scrollWidth - innerWidth,
+        word: getComputedStyle(h.querySelector('.brand h1')).display !== 'none',
+        scanWords: getComputedStyle(scan.querySelector('.sl-word')).display !== 'none',
+        scanName: scan.getAttribute('aria-label'),
+      };
+    });
+  }
+  await page.setViewport({ width: 1280, height: 900 });
+  [1440, 1100, 800].every((w) => rows[w].oneRow && rows[w].over <= 0) &&
+  rows[1440].word &&
+  rows[1100].scanWords &&
+  !rows[800].word &&
+  !rows[800].scanWords &&
+  rows[800].scanName === 'Scan All'
+    ? ok('top bar: one row at 1440, 1100 and 800; under 900px the logo and Scan All fold to icons')
+    : fail(`top bar rows: ${JSON.stringify(rows)}`);
 
   // Keyboard (#200): cards open with Enter and Space, the pop-up keeps and returns
   // focus, chips keep focus when they redraw, menus close on Escape.
-  console.log('Signed out');
-  // Signed out of RSI, a scan reads nothing and saves nothing: the hangar and
-  // buy-backs you had stay, and the status says to log in.
-  const out = await page.evaluate(async () => {
+  // Scan report (owner sign-off, 2026-10-04): a scan that ends with a problem opens a
+  // report under the Scan button on any page, and Home has no line of text for it.
+  // Signed out of RSI, the scan reads and saves nothing.
+  console.log('Scan report');
+  await go('#inventory');
+  const rep = await page.evaluate(async () => {
+    const wait = (ms = 120) => new Promise((r) => setTimeout(r, ms));
     const keep = { acct: OH.getAccount, scan: OH.scanSource, ref: OH.getReferral };
-    const before = { items: state.items.length, bbs: state.buybacks.length };
+    const panel = () => document.querySelector('#scan-report');
+    const btn = document.querySelector('#scan-home');
+    const r = { before: { items: state.items.length, bbs: state.buybacks.length } };
     let asked = 0;
-    OH.getAccount = async () => ({ loggedIn: false, fetchedAt: Date.now() });
-    OH.scanSource = async () => (asked++, { ok: true, items: [], scannedAt: Date.now() });
-    OH.getReferral = async () => (asked++, { ok: false, error: 'Not signed in to RSI.' });
     try {
+      OH.getAccount = async () => ({ loggedIn: false, fetchedAt: Date.now() });
+      OH.scanSource = async () => (asked++, { ok: true, items: [], scannedAt: Date.now() });
+      OH.getReferral = async () => (asked++, { ok: false, error: 'Not signed in to RSI.' });
       await runScan({ store: false });
+      await wait();
+      r.out = {
+        asked,
+        kept: state.items.length === r.before.items && state.buybacks.length === r.before.bbs,
+        open: !!panel() && !panel().hidden,
+        title: panel()?.querySelector('h3')?.textContent,
+        sub: panel()?.querySelector('.sr-titles p')?.textContent,
+        noLog: !panel()?.querySelector('#sr-send'),
+        login: !!panel()?.querySelector('a[href*="robertsspaceindustries.com/connect"]'),
+        label: btn.textContent.trim(),
+        homeLine: document.querySelector('#status').textContent,
+      };
+      panel().querySelector('.sr-x').click();
+      await wait(60);
+      r.closed = panel().hidden;
+      btn.click();
+      await wait(60);
+      r.reopened = !panel().hidden;
+      document.body.click();
+      await wait(60);
+
+      // A good buy-back scan reads the never-read packs by itself afterwards (owner,
+      // 2026-10-06), and only those.
+      {
+        const keepFetch = OH.fetchBuybackDetails;
+        let asked = null;
+        OH.fetchBuybackDetails = async (ids) => ((asked = ids), { done: ids.length });
+        OH.scanSource = async (id) =>
+          id === 'buybacks'
+            ? { ok: true, items: state.buybacks, scannedAt: Date.now() }
+            : { ok: true, items: state.items, scannedAt: Date.now(), unchanged: true };
+        OH.getReferral = async () => ({ ok: true, referral: state.referral });
+        OH.getAccount = keep.acct;
+        await runScan({ store: false });
+        await wait(150);
+        OH.fetchBuybackDetails = keepFetch;
+        const want = state.buybacks
+          .filter(
+            (b) =>
+              !b.isCCU &&
+              (!state.bbDetails[b.id] || state.bbDetails[b.id].partial) &&
+              /^pack(age)?$/.test(b.kind),
+          )
+          .map((b) => String(b.id));
+        r.packs = {
+          asked: asked && asked.length,
+          want: want.length,
+          same: !!asked && asked.every((id) => want.includes(id)),
+        };
+        topBar.report = null;
+      }
+
+      // A buy-back scan that saves a new token count shows it on Home's wallet and the
+      // Buy-Backs header straight away, no reload (#587).
+      {
+        const keepFetch = OH.fetchBuybackDetails;
+        const keepLoad = OH.loadSource;
+        const keepTokens = state.bbTokens;
+        const shown = () =>
+          [...document.querySelectorAll('#cc-account .bal-lbl')].find(
+            (x) => x.textContent === 'Buy-Back Tokens',
+          )?.nextElementSibling?.textContent;
+        try {
+          state.bbTokens = null;
+          homeUpdated();
+          await wait();
+          OH.fetchBuybackDetails = async (ids) => ({ done: ids.length });
+          OH.scanSource = async (id) =>
+            id === 'buybacks'
+              ? { ok: true, items: state.buybacks, scannedAt: Date.now() }
+              : { ok: true, items: state.items, scannedAt: Date.now(), unchanged: true };
+          OH.loadSource = async (id) =>
+            id === 'buybacks'
+              ? { items: state.buybacks, scannedAt: Date.now(), meta: { tokens: 7 } }
+              : keepLoad(id);
+          const before = shown();
+          await runScan({ hangar: false, referrals: false, store: false });
+          await wait(150);
+          r.tokens = { before, home: shown(), header: OHApp.bb.summary().tokens };
+        } finally {
+          OH.fetchBuybackDetails = keepFetch;
+          OH.loadSource = keepLoad;
+          state.bbTokens = keepTokens;
+          topBar.report = null;
+          homeUpdated();
+        }
+      }
+
+      // A pack melted since the last hangar scan is filled from your hangar history:
+      // no RSI request, "From your hangar history" in its window, and the automatic
+      // read skips it. That read takes 30 packs per scan at most.
+      {
+        const keepFetch = OH.fetchBuybackDetails;
+        const keepWinFetch = window.fetch;
+        const keepBbs = state.buybacks;
+        const P = '990000001';
+        let asked = null;
+        const rsi = [];
+        try {
+          OH.fetchBuybackDetails = async (ids) => ((asked = ids), { done: ids.length });
+          window.fetch = (u, init) => {
+            if (/\/pledge\/buyback\//.test(String(u))) rsi.push(String(u));
+            return keepWinFetch(u, init);
+          };
+          await chrome.storage.local.set({
+            pledgeArchive: {
+              [P]: {
+                id: P,
+                name: 'Package - Smoke Starter Pack',
+                value: 45,
+                currency: 'USD',
+                contents: [
+                  { kind: 'Ship', label: 'Aurora MR', image: null },
+                  { kind: 'Ship', label: 'Mustang Alpha', image: null },
+                  { kind: 'Insurance', label: '6 Month Insurance', image: null },
+                ],
+                insurance: '6M',
+                kind: 'ship',
+                goneAt: Date.now(),
+              },
+            },
+          });
+          const pack = (id, name) => ({
+            id,
+            name,
+            kind: 'package',
+            date: '',
+            contains: '',
+            href: '',
+            isCCU: false,
+            ccu: null,
+          });
+          const list = [
+            ...keepBbs,
+            pack(P, 'Package - Smoke Starter Pack'),
+            ...Array.from({ length: 35 }, (_, i) =>
+              pack(String(990000100 + i), `Package - Smoke Pack ${i}`),
+            ),
+          ];
+          OH.scanSource = async (id) =>
+            id === 'buybacks'
+              ? { ok: true, items: list, scannedAt: Date.now() }
+              : { ok: true, items: state.items, scannedAt: Date.now(), unchanged: true };
+          await runScan({ store: false });
+          await wait(150);
+          const d = state.bbDetails[P];
+          openDetail({ kind: 'bb', item: state.buybacks.find((b) => String(b.id) === P) });
+          await wait(150);
+          r.hist = {
+            src: d && d.src,
+            ships: d && d.ships.length,
+            price: d && d.price,
+            note: document.querySelector('#bbd-source')?.textContent.trim(),
+            loading: !!document.querySelector('#bbd-modal-loading'),
+            asked: asked && asked.length,
+            skipped: !!asked && !asked.includes(P),
+          };
+          document.querySelector('#modal-close')?.click();
+          await wait(60);
+          r.hist.rsi = rsi.length;
+        } finally {
+          OH.fetchBuybackDetails = keepFetch;
+          window.fetch = keepWinFetch;
+          state.buybacks = keepBbs;
+          await OH.pruneBuybackDetails(keepBbs.map((b) => String(b.id)));
+          state.bbDetails = { ...(await OH.getBuybackDetails()) };
+          await chrome.storage.local.remove('pledgeArchive');
+          topBar.report = null;
+        }
+      }
+
+      // Part of it failed: one row per source, the failed one marked.
+      OH.getAccount = keep.acct;
+      OH.scanSource = async (id) =>
+        id === 'hangar'
+          ? { ok: true, items: state.items, scannedAt: Date.now(), unchanged: true }
+          : {
+              ok: false,
+              error: 'RSI stopped responding at page 8, so we kept your previous scan.',
+            };
+      OH.getReferral = async () => ({ ok: true, referral: state.referral });
+      await runScan({ store: false });
+      await wait();
+      r.part = {
+        open: !panel().hidden,
+        title: panel().querySelector('h3').textContent,
+        rows: [...panel().querySelectorAll('.sr-rows li')].map(
+          (li) => `${li.querySelector('.sr-src').textContent}:${li.classList.contains('bad')}`,
+        ),
+        actions: [...panel().querySelectorAll('.sr-btn')].map((b) =>
+          b.textContent.replace(/\s+/g, ' ').trim(),
+        ),
+        hint: panel().querySelector('.sr-hint')?.textContent.replace(/\s+/g, ' ').trim(),
+      };
+      // The problem card's Send Flight Log (#315): copies the log, then opens
+      // #bug-reports on Discord in a new tab, and says to paste it there.
+      const keepOpen = window.open;
+      const keepWrite = navigator.clipboard.writeText;
+      let copiedText = '';
+      const opened = [];
+      window.open = (...args) => (opened.push(args), null);
+      navigator.clipboard.writeText = async (t) => {
+        copiedText = t;
+      };
+      try {
+        panel().querySelector('#sr-send').click();
+        await wait();
+      } finally {
+        window.open = keepOpen;
+        navigator.clipboard.writeText = keepWrite;
+      }
+      r.send = {
+        log: /^```\nOpen Hangar flight log/.test(copiedText),
+        opened: opened.map((o) => o[0]),
+        said: panel().querySelector('.sr-hint')?.textContent.trim(),
+        open: !panel().hidden,
+      };
     } finally {
       Object.assign(OH, { getAccount: keep.acct, scanSource: keep.scan, getReferral: keep.ref });
+      topBar.report = null;
+      setScanning(''); // the button's "done" moment, over now
+      document.body.click();
+      await wait();
     }
-    const status = document.querySelector('#status');
-    return {
-      asked,
-      kept: state.items.length === before.items && state.buybacks.length === before.bbs,
-      before,
-      said: /not signed in to RSI/.test(status.textContent),
-      noReport: !/Report a Scan Problem/.test(status.textContent),
-    };
+    r.cleared = !document.querySelector('#scan-report') && !/Rough/.test(btn.textContent);
+    return r;
   });
-  out.asked === 0 && out.kept && out.before.items > 0 && out.said && out.noReport
-    ? ok('signed out: the scan reads nothing, keeps your hangar and says to log in')
-    : fail(`signed-out scan: ${JSON.stringify(out)}`);
-  await page.evaluate(() => setStatus(''));
+  rep.packs &&
+  (rep.packs.want === 0
+    ? rep.packs.asked === null || rep.packs.asked === 0
+    : rep.packs.asked === Math.min(rep.packs.want, 30) && rep.packs.same) &&
+  rep.out &&
+  rep.out.asked === 0 &&
+  rep.out.kept &&
+  rep.out.open &&
+  rep.out.title === 'Hangar Doors Are Locked' &&
+  /Log in, come back and hit Scan All\. Mind the elevators\.$/.test(rep.out.sub) &&
+  rep.out.noLog &&
+  rep.out.login &&
+  /Rough Landing/.test(rep.out.label) &&
+  !rep.out.homeLine
+    ? ok('signed out: the scan reads nothing, keeps your hangar, and the report says to log in')
+    : fail(`signed-out scan report: ${JSON.stringify(rep)}`);
+  rep.tokens && rep.tokens.before === '—' && rep.tokens.home === '7' && rep.tokens.header === 7
+    ? ok('buy-back tokens: a scan that saves a new count shows it without a reload')
+    : fail(`buy-back tokens after a scan: ${JSON.stringify(rep.tokens)}`);
+  rep.hist &&
+  rep.hist.src === 'history' &&
+  rep.hist.ships === 2 &&
+  rep.hist.price === 45 &&
+  rep.hist.note === 'From your hangar history' &&
+  !rep.hist.loading &&
+  rep.hist.rsi === 0 &&
+  rep.hist.skipped &&
+  rep.hist.asked === 30
+    ? ok(
+        'buy-backs: a melted pack shows its contents from your hangar history, no RSI read; 30 packs per scan',
+      )
+    : fail(`buy-backs from hangar history: ${JSON.stringify(rep.hist)}`);
+  rep.closed && rep.reopened
+    ? ok('scan report: ✕ closes it, Rough Landing opens it again')
+    : fail(`scan report close/reopen: ${JSON.stringify(rep)}`);
+  rep.part &&
+  rep.part.open &&
+  rep.part.title === 'Rough Landing' &&
+  rep.part.rows.join() === 'Hangar:false,Buy-Backs:true,Referrals:false' &&
+  rep.part.actions.join() === 'Send Flight Log (opens Discord),Scan Again,Report on GitHub ↗' &&
+  /Nothing is sent until you submit it/.test(rep.part.hint) &&
+  rep.cleared
+    ? ok('scan report: one row per source with the failed one marked, and its buttons')
+    : fail(`partial scan report: ${JSON.stringify(rep)}`);
+  rep.send &&
+  rep.send.log &&
+  rep.send.opened.join() === 'https://discord.gg/pxJ6PzQe7z' &&
+  rep.send.said === 'Flight log copied. Paste it in #bug-reports.' &&
+  rep.send.open
+    ? ok('problem card: Send Flight Log copies the log and opens #bug-reports on Discord')
+    : fail(`send flight log: ${JSON.stringify(rep.send)}`);
+
+  // Buy-back details: one batch at a time, quiet after a scan while an earlier hold is
+  // on, and the status says why and how long (hours for a long hold).
+  const bbd = await page.evaluate(async () => {
+    const keepFetch = OH.fetchBuybackDetails;
+    const keepBbs = state.buybacks;
+    const r = {};
+    try {
+      state.buybacks = [
+        {
+          id: '990000201',
+          name: 'Package - Smoke Pack',
+          kind: 'package',
+          date: '',
+          contains: '',
+          href: '',
+          isCCU: false,
+          ccu: null,
+        },
+      ];
+      let calls = 0;
+      let release;
+      OH.fetchBuybackDetails = () => (calls++, new Promise((res) => (release = res)));
+      const first = loadBuybackDetails({ packsOnly: true });
+      await loadBuybackDetails({ packsOnly: true }); // a second while the first reads
+      r.oneLane = calls === 1;
+      release({ done: 1, errors: 0, total: 1 });
+      await first;
+      const say = async (res, opts) => {
+        setStatus('');
+        OH.fetchBuybackDetails = async () => res;
+        await loadBuybackDetails({ packsOnly: true, ...opts });
+        return { text: statusEl.textContent, error: statusEl.classList.contains('error') };
+      };
+      const hold = { errors: 0, total: 5, rateLimited: true };
+      const soon = Date.now() + 10 * 60e3 - 5e3;
+      const late = Date.now() + 6 * 3600e3 - 5e3;
+      const held = { ...hold, done: 0, held: true };
+      r.autoHeld = await say({ ...held, retryAt: soon }, { max: 30, auto: true });
+      r.held = await say({ ...held, retryAt: late });
+      r.busy = await say({ ...hold, done: 2, retryAt: soon, busy: true });
+      r.slow = await say({ ...hold, done: 1, retryAt: late });
+    } finally {
+      OH.fetchBuybackDetails = keepFetch;
+      state.buybacks = keepBbs;
+      state.bbDetails = { ...(await OH.getBuybackDetails()) };
+      setStatus('');
+    }
+    return r;
+  });
+  const single = 'Opening a single buy-back still works.';
+  bbd.oneLane &&
+  bbd.autoHeld.text === '' &&
+  bbd.held.text === `Buy-back details are on an R&R stop for about 6 hours more. ${single}` &&
+  !bbd.held.error &&
+  bbd.busy.text ===
+    `RSI is busy right now, so we stopped after 2 pages (kept). Try again in about 10 min. ${single}` &&
+  !bbd.busy.error &&
+  bbd.slow.text.startsWith(
+    `RSI asked us to slow down, so we stopped after 1 page (kept). Give it about 6 hours to cool off. ${single}`,
+  ) &&
+  bbd.slow.error
+    ? ok(
+        'buy-back details: one batch at a time, quiet after a scan while held, says why and how long',
+      )
+    : fail(`buy-back details status: ${JSON.stringify(bbd)}`);
+
+  // Your menu: Clear Data (red) asks once in place; Keep Data backs out with nothing
+  // cleared and the menu still open.
+  const ask = await page.evaluate(async () => {
+    const tick = () => new Promise((r) => setTimeout(r, 60));
+    const items = state.items.length;
+    document.querySelector('#settings-btn').click();
+    await tick();
+    document.querySelector('#clear-home').click();
+    await tick();
+    const box = document.querySelector('#settings-menu .you-confirm.danger');
+    const r = {
+      asked: /Clear This Account's Data\?/.test(box?.textContent || ''),
+      open: !document.querySelector('#settings-menu').hidden,
+    };
+    [...box.querySelectorAll('button')].find((b) => /Keep Data/.test(b.textContent)).click();
+    await tick();
+    r.back = !!document.querySelector('#clear-home') && !document.querySelector('.you-confirm');
+    r.kept = state.items.length === items && items > 0;
+    document.dispatchEvent(new CustomEvent('oh:close-menus'));
+    return r;
+  });
+  ask.asked && ask.open && ask.back && ask.kept
+    ? ok('your menu: Clear Data asks first, Keep Data clears nothing')
+    : fail(`clear data confirm: ${JSON.stringify(ask)}`);
 
   console.log('Keyboard');
   await go('#inventory');
@@ -1491,7 +4534,7 @@ try {
       return {
         id: a.id,
         card: a.classList.contains('card') ? a.dataset.id : null,
-        chip: a.dataset.key || null,
+        chip: a.dataset.type || null,
         inModal: !!a.closest('#item-modal'),
         inMenu: !!a.closest('#settings-menu'),
         ring: getComputedStyle(a).outlineStyle,
@@ -1553,18 +4596,17 @@ try {
     ? ok('picture opens full size, Escape closes just the viewer and returns to the picture')
     : fail(`full-size viewer: ${JSON.stringify({ lbOpen, lbTrapped, lbBack })}`);
   await page.keyboard.press('Escape');
-  await page.focus('#chips .chip[data-key]');
+  await page.focus('.oh-fbar .oh-tp[data-type]');
   const chip = await active();
-  // Picking one kind dims the others, so count the kinds still pressed.
   const pressed = () =>
-    page.$$eval('#chips .chip[data-key][aria-pressed="true"]', (cs) => cs.length);
+    page.$$eval('.oh-fbar .oh-tp[data-type][aria-pressed="true"]', (cs) => cs.length);
   const p0 = await pressed();
   await page.keyboard.press('Enter');
   const p1 = await pressed();
   const chipAfter = await active();
   await page.keyboard.press('Enter');
   p0 !== p1 && chipAfter.chip === chip.chip && (await pressed()) === p0
-    ? ok('filter chip toggles with Enter and keeps focus after redrawing')
+    ? ok('filter type pill toggles with Enter and keeps focus after redrawing')
     : fail(`chip keyboard: ${JSON.stringify({ p0, p1, chip, chipAfter })}`);
   await page.focus('#settings-btn');
   await page.keyboard.press('Enter');
@@ -1582,6 +4624,549 @@ try {
     const len = await page.$eval(`#view-${view}`, (e) => e.textContent.trim().length);
     len > 100 ? ok('renders') : fail(`${view} view looks empty`);
   }
+
+  // The toolbar popup (the connector build, src/popup.html): the demo hangar's value,
+  // the last scan, Scan asking the background, Connect, then the connected state.
+  console.log('Popup');
+  await page.setViewport({ width: 320, height: 600 });
+  await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => /\$\d/.test(document.getElementById('pp-value')?.textContent));
+  const pop = await page.evaluate(() => ({
+    value: document.getElementById('pp-value').textContent,
+    label: document.querySelector('.pp-lbl').textContent,
+    last: document.getElementById('pp-last').textContent.trim(),
+    who: document.querySelector('.pp-who')?.textContent || '',
+    hangar: !!document.getElementById('pp-hangar'),
+    connect: !!document.getElementById('pp-connect'),
+    wide: document.documentElement.scrollWidth > 320,
+  }));
+  pop.label === 'Account Value' && /^Scanned /.test(pop.last) && pop.who && !pop.wide
+    ? ok(`shows ${pop.value} for ${pop.who}, the last scan, no sideways scroll`)
+    : fail(`popup: ${JSON.stringify(pop)}`);
+  // Not connected and no hangar page in an unbuilt copy: Connect, no Open My Hangar.
+  pop.connect && !pop.hangar
+    ? ok('not connected: Connect, and no Open My Hangar without a hangar page')
+    : fail(`popup site: ${JSON.stringify(pop)}`);
+  await page.click('#pp-scan');
+  const scanned = await page.evaluate(() => ({ sent: __demo.sent, closed: !!__demo.closed }));
+  scanned.sent.length === 1 && scanned.sent[0].ohPopup === 'scan' && scanned.closed
+    ? ok('Scan asks the background and closes')
+    : fail(`popup Scan: ${JSON.stringify(scanned)}`);
+  // Busy: the popup stays open and says so.
+  await page.evaluate(() => {
+    __demo.answer = { ok: false, error: 'busy' };
+    __demo.closed = false;
+  });
+  await page.click('#pp-scan');
+  const busy = await page.evaluate(() => ({
+    note: document.querySelector('.pp-note[role="status"]')?.textContent || '',
+    closed: __demo.closed,
+  }));
+  busy.note.includes('A scan is already running.') && !busy.closed
+    ? ok('Scan while one runs: stays open and says so')
+    : fail(`popup busy: ${JSON.stringify(busy)}`);
+  await page.evaluate(async () => {
+    const siteLink = { token: 't', name: 'demo@pilot', connectedAt: 1, lastSync: Date.now() };
+    await chrome.storage.local.set({ siteLink, siteUrl: 'https://app.openhangar.space' });
+    for (const f of __demo.listeners) f({ siteLink: { newValue: siteLink } }, 'local');
+  });
+  await page.waitForSelector('#pp-hangar');
+  const linked = await page.evaluate(() => ({
+    site: document.getElementById('pp-site').textContent,
+    connect: !!document.getElementById('pp-connect'),
+  }));
+  await page.click('#pp-hangar');
+  const went = await page.evaluate(() => __demo.opened.at(-1));
+  /Connected as demo@pilot/.test(linked.site) &&
+  !linked.connect &&
+  went === 'https://app.openhangar.space/hangar'
+    ? ok("connected: who and when, and Open My Hangar goes to the website's My Hangar")
+    : fail(`popup connected: ${JSON.stringify({ linked, went })}`);
+  // The website took a sync moments ago (429, too soon): the calm line with the time
+  // the next one can go (owner, 2026-10-09), never an error code.
+  const popWait = await page.evaluate(async () => {
+    const until = Date.now() + 4 * 60e3;
+    const { siteLink: l } = await chrome.storage.local.get('siteLink');
+    const siteLink = { ...l, wait: { reason: 'too-soon', until, said: 'x' } };
+    await chrome.storage.local.set({ siteLink });
+    for (const f of __demo.listeners) f({ siteLink: { newValue: siteLink } }, 'local');
+    await new Promise((r) => setTimeout(r, 300));
+    const time = new Date(until).toLocaleTimeString(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    return { site: document.getElementById('pp-site').textContent, time };
+  });
+  popWait.site.includes(`Try again at ${popWait.time}. The last sync was moments ago.`) &&
+  !/429|responded/.test(popWait.site)
+    ? ok(`a too-soon sync: the calm line and the time (${popWait.time}), no error code`)
+    : fail(`popup sync wait: ${JSON.stringify(popWait)}`);
+  await page.setViewport({ width: 1280, height: 900 });
+
+  // The basic page (the connector build, src/basic.html): the lists with search and
+  // totals, the CSV and backup files, Clear Data, a scan, Report a Scan Problem, all
+  // with every request off this computer refused (it must work with no network).
+  console.log('Basic Page');
+  const outside = [];
+  await page.setRequestInterception(true);
+  const offline = (req) => {
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)[:/]/.test(req.url()) || req.url().startsWith('data:'))
+      return req.continue();
+    outside.push(req.url());
+    req.abort('internetdisconnected');
+  };
+  page.on('request', offline);
+  await page.goto(URL0 + 'basic.html', { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#bp-pledges tbody tr');
+  const bp = await page.evaluate(async () => {
+    const db = await OH.loadDB();
+    const q = (s) => document.querySelector(s);
+    return {
+      rows: document.querySelectorAll('#bp-pledges tbody tr').length,
+      items: db.sources.hangar.items.length,
+      totals: q('.bp-totals').textContent,
+      tab: q('.bp-tabs [aria-current="page"]').getAttribute('href'),
+    };
+  });
+  bp.rows === Math.min(bp.items, 300) &&
+  /^[\d,]+ pledges?, \$[\d,.]+ melt \([\d,]+ with melt listed\)/.test(bp.totals)
+    ? ok(`Pledges: ${bp.rows} rows and their totals, offline`)
+    : fail(`basic page pledges: ${JSON.stringify(bp)}`);
+  const firstName = await page.$eval('#bp-pledges tbody td.name', (e) =>
+    e.firstChild.textContent.trim(),
+  );
+  await page.type('.bp-search', firstName);
+  await new Promise((r) => setTimeout(r, 200));
+  const found = await page.$$eval('#bp-pledges tbody tr', (r) => r.length);
+  await page.click('#bp-pledges .bp-bar .bp-btn');
+  const csv = await page.evaluate(async () => {
+    const b = __demo.saved.at(-1);
+    return b ? await b.text() : '';
+  });
+  const csvRows = csv.trim().split('\r\n');
+  found >= 1 &&
+  found < bp.rows &&
+  csvRows[0].startsWith('id,name,type,value') &&
+  csvRows.length === found + 1
+    ? ok(`search finds ${found} row(s); Export CSV saves just those`)
+    : fail(`basic search/CSV: ${JSON.stringify({ found, csvRows: csvRows.length })}`);
+  await page.click('.bp-tabs a[href="#buybacks"]');
+  await page.waitForSelector('#bp-buybacks');
+  const bbRows = await page.$$eval('#bp-buybacks tbody tr', (r) => r.length);
+  bbRows > 0 ? ok(`Buy-Backs: ${bbRows} rows`) : fail('basic page: no buy-back rows');
+  await page.click('.bp-tabs a[href="#settings"]');
+  await page.waitForSelector('#bp-export-json');
+  await page.click('#bp-export-json');
+  const bpBackup = await page.evaluate(async () => {
+    const text = await __demo.saved.at(-1).text();
+    const j = JSON.parse(text);
+    return {
+      app: j.app,
+      pledges: j.sources?.hangar?.items?.length,
+      code: text.includes(window.DEMO_REFERRAL.code),
+      hash: location.hash,
+    };
+  });
+  bpBackup.pledges === bp.items && !bpBackup.code && bpBackup.hash === '#settings'
+    ? ok('Export JSON: the whole hangar, no referral code')
+    : fail(`basic backup: ${JSON.stringify(bpBackup)}`);
+  await page.click('#bp-clear');
+  const asked = await page.$('#bp-clear-yes');
+  await page.click('#bp-clear-yes');
+  await page.waitForFunction(
+    () => !document.querySelector('.bp-tabs small')?.textContent.match(/[1-9]/),
+  );
+  const cleared = await page.evaluate(
+    async () => (await OH.loadDB()).sources.hangar?.items?.length || 0,
+  );
+  asked && cleared === 0
+    ? ok('Clear Data asks first, then clears')
+    : fail(`basic Clear Data: ${JSON.stringify({ asked: !!asked, cleared })}`);
+  // A scan (RSI stood in for): saved, reported, then one that fails offers Report a
+  // Scan Problem, which opens a prefilled GitHub issue.
+  const bpScan = await page.evaluate(async () => {
+    const item = (i) => ({
+      id: String(500 + i),
+      name: `Demo Pledge ${i}`,
+      value: 10 + i,
+      kind: 'ship',
+      contents: [],
+    });
+    OH.scanSource = async (id) => {
+      const items = id === 'hangar' ? [item(1), item(2)] : [];
+      await OH.storageSettled();
+      return { ok: true, items, scannedAt: Date.now() };
+    };
+    OH.getReferral = async () => ({ ok: true });
+    document.getElementById('bp-scan').click();
+    await new Promise((r) => setTimeout(r, 600));
+    const done = document.getElementById('bp-done')?.textContent || '';
+    OH.scanSource = async () => ({ ok: false, error: 'RSI changed something' });
+    document.getElementById('bp-scan').click();
+    await new Promise((r) => setTimeout(r, 600));
+    const rep = document.getElementById('bp-report')?.textContent || '';
+    const rows = [...document.querySelectorAll('#bp-report li')].map((li) => li.textContent);
+    document.getElementById('bp-report-btn')?.click();
+    await new Promise((r) => setTimeout(r, 300));
+    const opened = __demo.opened.at(-1) || '';
+    // Signed out of RSI: the title, and the line under it; nothing to report.
+    const getAccount = OH.getAccount;
+    OH.getAccount = async () => ({ loggedIn: false });
+    document.getElementById('bp-scan').click();
+    await new Promise((r) => setTimeout(r, 600));
+    const out = {
+      title: document.querySelector('#bp-report b')?.textContent || '',
+      line: document.getElementById('bp-signed-out')?.textContent || '',
+      report: !!document.getElementById('bp-report-btn'),
+    };
+    OH.getAccount = getAccount;
+    return { done, rep, rows, opened, out };
+  });
+  /Scan complete:\s*2 pledges · 0 buy-backs · referrals read/.test(bpScan.done) &&
+  /RSI changed something/.test(bpScan.rep) &&
+  bpScan.rows.includes('Referrals: read') &&
+  bpScan.opened.startsWith('https://github.com/Draco-Foundry/open-hangar/issues/new?')
+    ? ok('Scan reports what came home; a failed one offers Report a Scan Problem')
+    : fail(`basic scan: ${JSON.stringify(bpScan)}`);
+  bpScan.out.title === "You're Signed Out of RSI" &&
+  bpScan.out.line ===
+    'Nothing was scanned, and your saved hangar is safe. Log in on RSI, then scan again.' &&
+  !bpScan.out.report
+    ? ok('signed out: the title and the line under it, no Report a Scan Problem')
+    : fail(`basic signed out: ${JSON.stringify(bpScan.out)}`);
+  const outsideNow = outside.filter((u) => !/^https:\/\/openhangar\.space\/status\.json/.test(u));
+  outsideNow.length === 0
+    ? ok(`no request off this computer but the kill switch file (${outside.length} refused)`)
+    : fail(`basic page asked the network: ${outsideNow.join(', ')}`);
+  // A phone-width window: no sideways scroll for the page (the table scrolls in its box).
+  await page.setViewport({ width: 375, height: 800 });
+  await page.goto(URL0 + 'basic.html#pledges', { waitUntil: 'networkidle0' });
+  const narrow = await page.evaluate(() => document.documentElement.scrollWidth);
+  narrow <= 375
+    ? ok('375 px wide: no sideways scroll')
+    : fail(`basic page is ${narrow} px wide at 375`);
+  // Firefox, our hangar page asking before Firefox said yes: the Local Mode card, every
+  // approved line word for word (owner, 2026-10-10), never the Connect card's words.
+  await page.setViewport({ width: 1280, height: 900 });
+  const fxHook = await page.evaluateOnNewDocument(() => (window.__demoFirefoxLocal = true));
+  await page.goto(URL0 + 'basic.html', { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#bp-firefox');
+  const fx = await page.$eval('#bp-firefox', (e) => e.textContent.replace(/\s+/g, ' '));
+  await page.removeScriptToEvaluateOnNewDocument(fxHook.identifier);
+  const fxLines = [
+    'Local Mode',
+    'What Our Hangar Page Reads, and Why Firefox Asks',
+    "The hangar this browser scanned: your pledges, buy-backs, Store Credit and RSI handle. It's your backup file without the scan history, referral code or referral prospects.",
+    "Nowhere. The page shows it right here in this browser and doesn't save it. Nothing goes to our servers.",
+    "None needed. Saying yes doesn't sign you up or turn on sync.",
+    'The page is a website, so we ask Firefox before handing it your hangar. Firefox names what\'s shared from a short fixed list, so pledge prices and Store Credit show up as "financial and payment information".',
+    "Nothing changes in Open Hangar. The hangar page can't show your hangar until you say yes, and its Try Again button asks again.",
+    'Turn it off any time on Open Hangar\'s "Permissions and data" tab in Firefox\'s add-ons page.',
+  ];
+  const fxMissing = fxLines.filter((l) => !fx.includes(l));
+  !fxMissing.length && !/Before You Connect|What we send/.test(fx)
+    ? ok("Firefox: our hangar page's ask shows the Local Mode card, word for word")
+    : fail(`basic Firefox card: missing ${JSON.stringify(fxMissing)}`);
+  // Access to RSI turned off (Firefox's add-ons page): the card with its reason and
+  // Allow Access to RSI instead of a scan that can only fail, a scan asked for from the
+  // popup waits for it, and one click asks the browser and scans (owner, 2026-10-09).
+  const rsiCheck = async (mode) => {
+    const hook = await page.evaluateOnNewDocument((m) => (window.__demoNoRsi = m), mode);
+    await page.goto(URL0 + 'basic.html', { waitUntil: 'networkidle0' });
+    await page.removeScriptToEvaluateOnNewDocument(hook.identifier);
+    await page.waitForSelector('#bp-rsi-access');
+    return page.evaluate(async () => {
+      let scans = 0;
+      OH.scanSource = async (id) => {
+        scans++;
+        return { ok: true, items: [], scannedAt: Date.now() };
+      };
+      OH.getReferral = async () => ({ ok: true });
+      const card = document.getElementById('bp-rsi-access').textContent.replace(/\s+/g, ' ');
+      // The popup's Scan (src/background.js requestScan) while access is off.
+      const scanRequest = { at: Date.now(), tabId: 42 };
+      await chrome.storage.session.set({ scanRequest });
+      for (const f of __demo.listeners) f({ scanRequest: { newValue: scanRequest } }, 'session');
+      await new Promise((r) => setTimeout(r, 300));
+      const held = { scans, report: !!document.querySelector('#bp-report, #bp-done') };
+      document.getElementById('bp-rsi-allow').click();
+      await new Promise((r) => setTimeout(r, 600));
+      return {
+        card,
+        held,
+        asked: __demo.asked.filter((o) => o === 'https://robertsspaceindustries.com/*').length,
+        scans,
+        cardAfter: !!document.getElementById('bp-rsi-access'),
+        done: !!document.getElementById('bp-done'),
+        failed: !!document.getElementById('bp-report'),
+      };
+    });
+  };
+  const rsiYes = await rsiCheck(true);
+  rsiYes.card.includes(
+    'Scan reads your hangar on robertsspaceindustries.com, and only there. Allow it once and the scan starts.',
+  ) &&
+  rsiYes.card.includes('Allow Access to RSI') &&
+  rsiYes.held.scans === 0 &&
+  !rsiYes.held.report &&
+  rsiYes.asked === 1 &&
+  rsiYes.scans > 0 &&
+  !rsiYes.cardAfter &&
+  rsiYes.done
+    ? ok(
+        'RSI access off: the reason and Allow Access to RSI, no failed scan; one click allows and scans',
+      )
+    : fail(`basic RSI access: ${JSON.stringify(rsiYes)}`);
+  const rsiNo = await rsiCheck('deny');
+  rsiNo.asked === 1 && rsiNo.scans === 0 && rsiNo.cardAfter && !rsiNo.failed && !rsiNo.done
+    ? ok('RSI access refused: the card stays, still no scan and no failure')
+    : fail(`basic RSI access refused: ${JSON.stringify(rsiNo)}`);
+  // A too-soon sync (429) on the basic page, offline: the time Sync Now works again,
+  // and Sync Now meanwhile asks nothing and shows the website's calm words.
+  await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
+  const askedBefore = outside.length;
+  const bpWait = await page.evaluate(async () => {
+    const until = Date.now() + 4 * 60e3;
+    const said = 'openhangar.space just took a sync for this account.';
+    const siteLink = {
+      token: 't',
+      name: 'demo@pilot',
+      connectedAt: 1,
+      lastSync: Date.now() - 60e3,
+      wait: { reason: 'too-soon', until, said },
+    };
+    const wishImport = { link: 1, done: 1, sent: 0 }; // no wishlist import asked
+    await chrome.storage.local.set({
+      siteLink,
+      wishImport,
+      siteUrl: 'https://app.openhangar.space',
+    });
+    for (const f of __demo.listeners) f({ siteLink: { newValue: siteLink } }, 'local');
+    await new Promise((r) => setTimeout(r, 300));
+    [...document.querySelectorAll('#bp-site .bp-btn')]
+      .find((b) => b.textContent === 'Sync Now')
+      .click();
+    await new Promise((r) => setTimeout(r, 300));
+    const time = new Date(until).toLocaleTimeString(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    return {
+      card: document.getElementById('bp-site').textContent.replace(/\s+/g, ' '),
+      calm: !!document.querySelector('#bp-site .bp-msg.calm'),
+      said,
+      time,
+    };
+  });
+  const askedNow = outside.slice(askedBefore).filter((u) => !/status\.json/.test(u));
+  bpWait.card.includes(`Try again at ${bpWait.time}. The last sync was moments ago.`) &&
+  bpWait.card.includes(bpWait.said) &&
+  bpWait.calm &&
+  !askedNow.length &&
+  !/429|responded/.test(bpWait.card)
+    ? ok(`a too-soon sync: the time (${bpWait.time}) and the website's calm words, no error code`)
+    : fail(`basic sync wait: ${JSON.stringify({ bpWait, askedNow })}`);
+  page.off('request', offline);
+  await page.setRequestInterception(false);
+  // Connected: Disconnect asks first, two equal buttons side by side, one line each
+  // (owner, 2026-10-09); Stay Connected keeps the link, Disconnect drops it. At phone
+  // width, the narrowest the question gets. Nothing is sent: the website's half is
+  // stood in for.
+  await page.setViewport({ width: 375, height: 800 });
+  await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
+  await page.evaluate(async () => {
+    OH.siteDisconnect = async () => {
+      __demo.disconnected = true;
+      await chrome.storage.local.remove('siteLink');
+      for (const f of __demo.listeners) f({ siteLink: { newValue: undefined } }, 'local');
+    };
+    const siteLink = { token: 't', name: 'demo@pilot', connectedAt: 1, lastSync: Date.now() };
+    // The wishlist already went for this connection: no import asked of the website.
+    const wishImport = { link: 1, done: 1, sent: 0 };
+    await chrome.storage.local.set({
+      siteLink,
+      wishImport,
+      siteUrl: 'https://app.openhangar.space',
+    });
+    for (const f of __demo.listeners) f({ siteLink: { newValue: siteLink } }, 'local');
+  });
+  await page.waitForSelector('#bp-disconnect');
+  await page.click('#bp-disconnect');
+  await page.waitForSelector('#bp-disconnect-ask');
+  const dc = await page.evaluate(() => {
+    const box = (id) => document.getElementById(id).getBoundingClientRect();
+    const line = (id) => parseFloat(getComputedStyle(document.getElementById(id)).lineHeight);
+    const stay = box('bp-stay');
+    const go = box('bp-disconnect-yes');
+    return {
+      text: document.getElementById('bp-disconnect-ask').textContent.replace(/\s+/g, ' '),
+      sameRow: Math.abs(stay.top - go.top) < 1,
+      equal: Math.abs(stay.width - go.width) < 1,
+      oneLine: stay.height < 2 * line('bp-stay') && go.height < 2 * line('bp-disconnect-yes'),
+      focused: document.activeElement?.id === 'bp-stay',
+      wide: document.documentElement.scrollWidth > 375,
+    };
+  });
+  await page.click('#bp-stay');
+  const stayed = await page.evaluate(
+    () => !!document.getElementById('bp-disconnect') && !__demo.disconnected,
+  );
+  await page.click('#bp-disconnect');
+  await page.waitForSelector('#bp-disconnect-yes');
+  await page.click('#bp-disconnect-yes');
+  await page.waitForSelector('#bp-connect');
+  const dropped = await page.evaluate(
+    async () => __demo.disconnected && !(await chrome.storage.local.get('siteLink')).siteLink,
+  );
+  dc.text.includes('Disconnect From openhangar.space?') &&
+  dc.sameRow &&
+  dc.equal &&
+  dc.oneLine &&
+  dc.focused &&
+  !dc.wide &&
+  stayed &&
+  dropped
+    ? ok(
+        'Disconnect asks first: two equal buttons side by side, one line each; Stay Connected keeps it',
+      )
+    : fail(`basic Disconnect: ${JSON.stringify({ dc, stayed, dropped })}`);
+  await page.setViewport({ width: 1280, height: 900 });
+
+  // Extension Alerts (the `alerts` flag; the connector pages are served as a build with
+  // it on): the popup's list (off: the way to the switch; on: the matches, the unseen
+  // marked, opening it marks them seen, a row opens our Store), and the basic page's
+  // switch (on asks for Notifications first, off gives them back).
+  console.log('Store Alerts');
+  await page.setViewport({ width: 320, height: 600 });
+  await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#pp-alerts-on');
+  const alOff = await page.$eval('#pp-alerts', (e) => e.textContent.replace(/\s+/g, ' '));
+  await page.click('#pp-alerts-on');
+  const alOffGo = await page.evaluate(() => ({ url: __demo.opened.at(-1), closed: __demo.closed }));
+  alOff.includes("Alerts tell you when something in RSI's store is for you.") &&
+  alOff.includes('Turn On Alerts') &&
+  /basic\.html#settings$/.test(alOffGo.url) &&
+  alOffGo.closed
+    ? ok('popup, alerts off: one line and the way to the settings switch')
+    : fail(`popup alerts off: ${JSON.stringify({ alOff, alOffGo })}`);
+  const why = (w, ships = []) => ({ why: w, ships });
+  const alState = {
+    alertsOn: true,
+    alerts: {
+      v: 1,
+      checkedAt: Date.now() - 60e3,
+      items: [
+        {
+          id: 'sku-19623',
+          name: 'Sabre Raven EX',
+          kind: 'ship',
+          price: 185,
+          sale: ['limited'],
+          endsOn: '2026-10-15',
+          why: [why('buyback', ['Sabre Raven EX'])],
+        },
+        {
+          id: 'sku-19699',
+          name: 'Constellation Mk IV - Nightbreak Paint',
+          kind: 'paint',
+          price: 11,
+          sale: ['listed'],
+          endsOn: null,
+          why: [why('paint', ['Constellation Andromeda'])],
+        },
+      ],
+      known: { 'sku-19623|buyback': 1, 'sku-19699|paint': 2 },
+      seen: { 'sku-19699|paint': 3 },
+      gone: {},
+    },
+  };
+  const alHook = await page.evaluateOnNewDocument((st) => (window.__demoAlerts = st), alState);
+  await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
+  await page.waitForSelector('.pp-alist li');
+  const alOn = await page.evaluate(() => ({
+    head: document.getElementById('pp-alerts-h').textContent.trim(),
+    rows: [...document.querySelectorAll('.pp-alist li')].map((li) => ({
+      fresh: li.classList.contains('fresh'),
+      text: li.textContent.replace(/\s+/g, ' ').trim(),
+    })),
+    connect: document
+      .getElementById('pp-alerts')
+      .textContent.includes('Connect to openhangar.space to add your Wishlist.'),
+    sent: __demo.sent.map((m) => m.ohPopup),
+    wide: document.documentElement.scrollWidth > 320,
+  }));
+  alOn.head === 'Alerts: 2' &&
+  alOn.rows.length === 2 &&
+  alOn.rows[0].fresh &&
+  !alOn.rows[1].fresh &&
+  alOn.rows[0].text.includes('Not seen yet:') &&
+  alOn.rows[0].text.includes('In your buy-backs, now in the store: Sabre Raven EX') &&
+  alOn.rows[0].text.includes('Ends Oct 15') &&
+  alOn.rows[1].text.includes(
+    'In the store in the last 7 days: paint for your Constellation Andromeda',
+  ) &&
+  alOn.connect &&
+  alOn.sent.includes('alerts-seen') &&
+  !alOn.wide
+    ? ok(
+        'popup, alerts on: the matches with why, the unseen one marked, all marked seen, no sideways scroll',
+      )
+    : fail(`popup alerts on: ${JSON.stringify(alOn)}`);
+  await page.click('.pp-alist li .pp-arow');
+  const alRow = await page.evaluate(() => __demo.opened.at(-1));
+  alRow === 'https://openhangar.space/store#item=19623'
+    ? ok('an alert opens that item on our Store')
+    : fail(`alert row went to ${alRow}`);
+  await page.removeScriptToEvaluateOnNewDocument(alHook.identifier);
+  await page.setViewport({ width: 1280, height: 900 });
+  // The basic page's switch.
+  await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#bp-alerts-on');
+  await page.click('#bp-alerts-on');
+  await page.waitForSelector('#bp-alerts-off');
+  const alSwitch = await page.evaluate(async () => ({
+    asked: __demo.asked,
+    on: (await chrome.storage.local.get('alertsOn')).alertsOn,
+    card: document.getElementById('bp-alerts').textContent.replace(/\s+/g, ' '),
+  }));
+  await page.click('#bp-alerts-off');
+  await page.waitForSelector('#bp-alerts-on');
+  const alSwitchOff = await page.evaluate(async () => ({
+    removed: __demo.removed,
+    on: (await chrome.storage.local.get('alertsOn')).alertsOn,
+  }));
+  alSwitch.asked.join() === 'notifications' &&
+  alSwitch.on === true &&
+  alSwitch.card.includes('Notifications are on.') &&
+  alSwitch.card.includes('Connect to openhangar.space to add your Wishlist.') &&
+  alSwitchOff.removed.join() === 'notifications' &&
+  alSwitchOff.on === false
+    ? ok(
+        'settings: Turn On asks for Notifications and switches alerts on; Turn Off gives them back',
+      )
+    : fail(`alerts switch: ${JSON.stringify({ alSwitch, alSwitchOff })}`);
+  // A no from the browser: alerts still on (the badge and the list), and a way to ask again.
+  const noHook = await page.evaluateOnNewDocument(() => (window.__demoNotify = false));
+  // A new document (the same address with a hash would only scroll).
+  await page.goto('about:blank');
+  await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#bp-alerts-on');
+  await page.click('#bp-alerts-on');
+  await page.waitForSelector('#bp-alerts-allow');
+  const alNo = await page.$eval('#bp-alerts', (e) => e.textContent.replace(/\s+/g, ' '));
+  await page.removeScriptToEvaluateOnNewDocument(noHook.identifier);
+  alNo.includes('Notifications are off, so alerts show on the badge and in the popup only.') &&
+  alNo.includes('Ask for Notifications Again')
+    ? ok('Notifications said no: alerts on, the badge only, and Allow to ask again')
+    : fail(`alerts without notifications: ${alNo}`);
+  await page.setViewport({ width: 375, height: 800 });
+  await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#bp-alerts');
+  const alNarrow = await page.evaluate(() => document.documentElement.scrollWidth);
+  alNarrow <= 375
+    ? ok('settings with the alerts card at 375 px: no sideways scroll')
+    : fail(`settings ${alNarrow} px wide at 375`);
+  await page.setViewport({ width: 1280, height: 900 });
 } finally {
   await browser.close();
   server.kill();

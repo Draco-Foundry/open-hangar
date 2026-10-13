@@ -4,8 +4,8 @@
  * Serves the REAL dashboard from src/ on localhost, with two extra scripts
  * injected into dashboard.html:
  *   demo-shim.js       stubs chrome.* (in-memory storage seeded with a
- *                      fictional demo account) and routes public RSI /
- *                      star-citizen.wiki lookups through the local proxy
+ *                      fictional demo account) and routes public RSI
+ *                      ship-matrix lookups through the local proxy
  *   demo-after-lib.js  swaps the live account/referral calls for demo data
  *   demo-clock.js      runs the page at a fixed date (2026-10-01 15:00 UTC), so
  *                      date-dependent demo data never drifts (OH_DEMO_NOW)
@@ -30,7 +30,8 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '../..');
 const SRC = path.join(ROOT, 'src');
 const OUT = path.join(ROOT, 'docs', 'store-assets');
-const PORT = 8323;
+// DEMO_PORT lets two checkouts run the demo or the UI test at once.
+const PORT = Number(process.env.DEMO_PORT) || 8323;
 
 // Order = store listing order (first is the hero shot).
 const VIEWS = ['inventory', 'home', 'referrals', 'buybacks', 'stats'];
@@ -43,8 +44,7 @@ const TYPES = {
   '.png': 'image/png',
   '.json': 'application/json',
 };
-const PROXY_ALLOW =
-  /^https:\/\/(robertsspaceindustries\.com\/ship-matrix\/|api\.star-citizen\.wiki\/)/;
+const PROXY_ALLOW = /^https:\/\/robertsspaceindustries\.com\/ship-matrix\//;
 const proxyCache = new Map();
 
 function findChrome() {
@@ -71,13 +71,13 @@ const DEMO_NOW = process.env.OH_DEMO_NOW || '';
 
 // dashboard.html with the demo scripts injected: the clock first in <head>, before
 // any page script, then the shims around parser.js / lib.js.
+const demoClock = () =>
+  (DEMO_NOW ? `<script>window.__OH_DEMO_NOW = ${JSON.stringify(DEMO_NOW)};</script>\n    ` : '') +
+  '<script src="/__demo/demo-clock.js"></script>';
 function demoDashboard() {
-  const clock =
-    (DEMO_NOW ? `<script>window.__OH_DEMO_NOW = ${JSON.stringify(DEMO_NOW)};</script>\n    ` : '') +
-    '<script src="/__demo/demo-clock.js"></script>';
   return fs
     .readFileSync(path.join(SRC, 'dashboard.html'), 'utf8')
-    .replace('<head>', `<head>\n    ${clock}`)
+    .replace('<head>', `<head>\n    ${demoClock()}`)
     .replace(
       '<script src="scraper/parser.js"></script>',
       '<script src="/__demo/demo-shim.js"></script>\n    <script src="scraper/parser.js"></script>',
@@ -87,9 +87,42 @@ function demoDashboard() {
       '<script src="lib.js"></script>\n    <script src="/__demo/demo-after-lib.js"></script>',
     );
 }
+// The connector's own pages (src/popup.html, src/basic.html): the same shims, before flags.js, plus
+// what only those pages use (demo-connector.js: session storage, change events, the
+// popup's message to the background). Their flags are a connector build's, Extension
+// Alerts on (connectorFlags), as `--flag localMode=on --flag connector=on --flag
+// alerts=on` builds them.
+function demoConnectorPage(file) {
+  return fs
+    .readFileSync(path.join(SRC, file), 'utf8')
+    .replace('<head>', `<head>\n    ${demoClock()}`)
+    .replace(
+      '<script src="flags.js"></script>',
+      '<script src="/__demo/demo-shim.js"></script>\n    <script src="/__demo/demo-connector.js"></script>\n    <script src="/__connector-flags.js"></script>',
+    )
+    .replace(
+      '<script src="lib.js"></script>',
+      '<script src="lib.js"></script>\n    <script src="/__demo/demo-after-lib.js"></script>',
+    );
+}
+
+// src/flags.js as a connector build with Extension Alerts writes it (scripts/pack.mjs).
+const connectorFlags = () =>
+  fs
+    .readFileSync(path.join(SRC, 'flags.js'), 'utf8')
+    .replace(
+      'const BUILD_VALUES = {};',
+      'const BUILD_VALUES = {"sync":true,"orgFleet":false,"localMode":true,"connector":true,"alerts":true};',
+    );
 
 async function handle(req, res) {
   const u = new URL(req.url, 'http://localhost');
+
+  if (u.pathname === '/__connector-flags.js') {
+    return res
+      .writeHead(200, { 'content-type': 'text/javascript', 'cache-control': 'no-store' })
+      .end(connectorFlags());
+  }
 
   if (u.pathname === '/proxy') {
     const target = u.searchParams.get('u') || '';
@@ -116,37 +149,23 @@ async function handle(req, res) {
     }
   }
 
+  if (u.pathname === '/popup.html' || u.pathname === '/basic.html') {
+    return res
+      .writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' })
+      .end(demoConnectorPage(u.pathname.slice(1)));
+  }
   if (u.pathname === '/' || u.pathname === '/dashboard.html') {
     return res
       .writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' })
       .end(demoDashboard());
   }
 
-  // This Week in Star Citizen: the saved post page and its body.
-  if (u.pathname === '/__twisc-page.html' || u.pathname === '/__twisc-body.html') {
-    const f = u.pathname === '/__twisc-page.html' ? 'twisc-page.html' : 'twisc-body.html';
-    return res
-      .writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-      .end(fs.readFileSync(path.join(SRC, '..', 'test', 'fixtures', f)));
-  }
-
-  // RSI's Comm-Link list (a POST too): the saved fixture.
   // RSI Spectrum Patch Notes (a POST too): the saved fixture.
   if (u.pathname === '/__patchnotes.json') {
     return res
       .writeHead(200, { 'content-type': 'application/json' })
       .end(fs.readFileSync(path.join(SRC, '..', 'test', 'fixtures', 'patch-notes.json')));
   }
-  if (u.pathname === '/__commlinks.json') {
-    const data = fs.readFileSync(
-      path.join(SRC, '..', 'test', 'fixtures', 'commlinks.html'),
-      'utf8',
-    );
-    return res
-      .writeHead(200, { 'content-type': 'application/json' })
-      .end(JSON.stringify({ success: 1, code: 'OK', data }));
-  }
-
   // RSI's store status (a POST the proxy can't forward): a saved snapshot.
   if (u.pathname === '/__store-ships.json') {
     return res

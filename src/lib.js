@@ -21,14 +21,25 @@
  *     account: { handle, displayName, …, organization:{name,sid,rank,logo},
  *                balances:{storeCredit,uec,rec} },
  *     sources: { hangar, buybacks },
- *     history: [ { at, items: [[id, name, value]] } ] }   // scan snapshots
+ *     history: [ { at, items: [[id, name, value]] } ],   // scan snapshots
+ *     pledgeArchive: { [pledgeId]: { id, name, value, …, goneAt } } }  // OH.leanArchive
  * See OH.exportDB. Schema v2 added the `account` block (v1 had sources only).
  */
 
 (function () {
   const OH = (window.OH = window.OH || {});
+  // The backup file, the sync payload and the stored DB check are shaped in
+  // src/hangar-shape.js, which the background worker loads too. The dashboard loads
+  // it before this file; node tests load this file on its own.
+  if (!window.OHShape && typeof require === 'function') require('./hangar-shape.js');
+  const SHAPE = window.OHShape;
+  // Where things are on RSI's pages (addresses, paging, selectors, patterns): the
+  // parser rules (src/data/parser-rules.json), loaded by src/parser-rules.js before
+  // this file; node tests load them here. The host stays in the code: rules hold paths.
+  if (!window.OHRules && typeof require === 'function') require('./parser-rules.js');
+  const RULES = window.OHRules;
+  const RSI_ORIGIN = 'https://robertsspaceindustries.com';
 
-  const PAGE_SIZE = 10;
   const DELAY_MS = 400; // politeness throttle between pages
   const MAX_PAGES = 1000; // safety cap: 10,000 pledges at RSI's 10 per page
   // Skipping an unchanged hangar (#294): only within a day of the last full scan,
@@ -37,22 +48,19 @@
   const PROBE_MIN_PAGES = 3;
   const DB_KEY = 'db';
   const HISTORY_KEY = 'dbHistory';
+  const ARCHIVE_KEY = 'pledgeArchive'; // pledges gone from the hangar (see archiveGone)
   const CORRUPT_KEY = 'dbCorrupt';
-  // Two version numbers (they were one, 2, until storage v3):
+  // Two version numbers, set in src/hangar-shape.js (which says what each changed):
   //   DB_VERSION is how the database is stored in this browser. Changing that
   //   shape needs a MIGRATIONS step (see the Storage section).
-  //     v1 → v2: unchanged (only the export gained `account`)
-  //     v2 → v3: scan history moved out of `db` into its own key
   //   EXPORT_VERSION is the backup-file format (OH.exportDB / OH.importDB).
-  //     v2 added the `account` block (identity, org/rank, balances); v1 had
-  //     sources only. Keeping it at 2 lets older versions import new backups.
-  const DB_VERSION = 3;
-  const EXPORT_VERSION = 2;
+  const DB_VERSION = SHAPE.DB_VERSION;
+  const EXPORT_VERSION = SHAPE.EXPORT_VERSION;
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // --- Outbound requests: a time limit and "that site is down" memory ----------
-  // Requests to other sites (wiki, exchange rates, RSI's public feeds) go through
+  // Requests to RSI's public pages and our own site's files go through
   // OH.guarded(fetchFn): it gives up after 8 seconds, and once a site times out,
   // can't be reached or answers 429/5xx, further calls to it fail at once for 10
   // minutes (remembered across page loads) instead of each waiting on it again.
@@ -98,6 +106,106 @@
     };
   };
 
+  // --- openhangar.space public feeds ------------------------------------------
+  // Owner rule: the extension talks only to RSI and openhangar.space. Everything
+  // else it shows (ship prices and art, the game version, referral events, the
+  // store catalog, known issues, the latest Firefox version) comes from our own
+  // site's public feeds: the same JSON for everyone, read-only, no cookies and
+  // nothing about you sent. Polite: one request per feed at a time, at most once
+  // per `ttl`, If-None-Match with the stored ETag (304 keeps the cached copy), and
+  // on 429/5xx, a timeout or no network the cached copy stays and the feed waits
+  // for Retry-After (else 10 minutes, doubling up to 6 hours) before asking again.
+  // Never throws: → { data, at, etag } (the last good copy) or null (never loaded).
+  OH.SITE_FEEDS = 'https://openhangar.space/';
+  const FEED_RETRY_MS = 10 * 60e3;
+  const FEED_RETRY_MAX = 6 * 3600e3;
+  const feedInflight = new Map();
+  // Retry-After (seconds or an HTTP date) → ms to wait, kept between 1 minute and a day.
+  OH.retryAfterMs = function retryAfterMs(value, now = Date.now()) {
+    const v = String(value || '').trim();
+    if (!v) return 0;
+    const ms = /^\d+$/.test(v) ? Number(v) * 1000 : Date.parse(v) - now;
+    return Number.isFinite(ms) && ms > 0 ? Math.min(Math.max(ms, 60e3), 24 * 3600e3) : 0;
+  };
+  const isV1 = (j) => !!j && typeof j === 'object' && j.v === 1;
+  const header = (res, name) => (res.headers && res.headers.get && res.headers.get(name)) || null;
+  OH.siteFeed = function siteFeed(path, opts) {
+    const id = opts.key;
+    if (feedInflight.has(id)) return feedInflight.get(id);
+    const p = readFeed(path, opts).finally(() => feedInflight.delete(id));
+    feedInflight.set(id, p);
+    return p;
+  };
+  async function readFeed(
+    path,
+    { key: feedKey, ttl, fetchFn = fetch, force = false, valid = isV1 },
+  ) {
+    let saved = null;
+    try {
+      saved = (await chrome.storage.local.get(feedKey))[feedKey] || null;
+    } catch {
+      saved = null;
+    }
+    const now = Date.now();
+    const last = saved && saved.data != null ? saved : null;
+    const answer = (s) => (s ? { data: s.data, at: s.at, etag: s.etag || null } : null);
+    // Told to wait (Retry-After, or backing off after a failure): even Check Now waits.
+    if (saved && saved.retryAt && now < saved.retryAt) return answer(last);
+    if (!force && last && now - (last.at || 0) < ttl) return answer(last);
+    let next;
+    try {
+      const headers = { Accept: 'application/json' };
+      if (last && last.etag) headers['If-None-Match'] = last.etag;
+      const res = await fetchFn(OH.SITE_FEEDS + path, {
+        credentials: 'omit',
+        headers,
+        signal: AbortSignal.timeout(NET_TIMEOUT_MS),
+      });
+      if (res.status === 304 && last) {
+        next = { data: last.data, etag: last.etag, at: now };
+      } else if (res.ok) {
+        const json = await res.json();
+        if (!valid(json)) throw new Error('not a feed this version reads');
+        next = { data: json, etag: header(res, 'etag'), at: now };
+      } else {
+        const err = new Error('HTTP ' + res.status);
+        err.wait = OH.retryAfterMs(header(res, 'retry-after'));
+        throw err;
+      }
+    } catch (e) {
+      const fails = ((saved && saved.fails) || 0) + 1;
+      const wait = e.wait || Math.min(FEED_RETRY_MS * 2 ** (fails - 1), FEED_RETRY_MAX);
+      next = { ...(last || {}), retryAt: now + wait, fails };
+      OH.log('warn', 'feed', `${path}: ${e?.message || e}; keeping the last copy`);
+    }
+    try {
+      await chrome.storage.local.set({ [feedKey]: next });
+    } catch {
+      // Not saved: asked again next time.
+    }
+    return answer(next.data != null ? next : null);
+  }
+
+  // Caches of the third-party sources the feeds above replaced: dropped once, so
+  // they don't sit in storage forever. Never throws.
+  OH.RETIRED_CACHES = [
+    'shipCatalog',
+    'scVersion',
+    'wikiMainpage',
+    'wikiFiles',
+    'referralEvents',
+    'knownIssues',
+    'shipStock2',
+    'gameStatus',
+  ];
+  OH.dropRetiredCaches = async function dropRetiredCaches() {
+    try {
+      await chrome.storage.local.remove(OH.RETIRED_CACHES);
+    } catch {
+      // Next time.
+    }
+  };
+
   // --- Source registry ------------------------------------------------------
   // type 'html'  → paginated server-rendered HTML, parsed by `parse(html)`.
   // (future) type 'graphql' → POST /graphql, parsed from JSON. See ROADMAP.md.
@@ -106,11 +214,11 @@
       id: 'hangar',
       label: 'Hangar',
       type: 'html',
-      url: 'https://robertsspaceindustries.com/account/pledges',
-      pageSize: PAGE_SIZE,
+      url: RSI_ORIGIN + RULES.hangar.path,
+      pageSize: RULES.hangar.pageSize,
       // If this marker is present in a signed-in page but parsing yields nothing,
       // RSI changed their markup (vs. a genuinely empty hangar). See scanHtmlSource.
-      marker: /js-pledge-id/,
+      marker: RULES.hangar.marker,
       // Rescans first check whether anything changed (#294). See unchangedSince.
       probe: true,
       parse: (html) => window.OpenHangar.parsePledges(html),
@@ -119,12 +227,12 @@
       id: 'buybacks',
       label: 'Buy-Backs',
       type: 'html',
-      url: 'https://robertsspaceindustries.com/account/buy-back-pledges',
-      pageSize: 100,
+      url: RSI_ORIGIN + RULES.buybacks.path,
+      pageSize: RULES.buybacks.pageSize,
       // Buy-backs render the SAME server-side HTML as pledges (a list of <article>
       // cards) — not the GraphQL frontend earlier notes feared. Selector mapping
       // derived from the MIT-licensed SC-Open/hangarlink-hangarexport extension.
-      emptyMarker: /no pledges available/i, // RSI's "you have no buy-backs" message
+      emptyMarker: RULES.buybacks.empty, // RSI's "you have no buy-backs" message
       requiresRender: true, // if RSI ever serves a JS-only shell, report it (don't silently say "empty")
       parse: (html) => window.OpenHangar.parseBuybacks(html),
       // Read once from page 1 and kept next to the items (db.sources.buybacks.meta).
@@ -143,7 +251,10 @@
   // no connection = scan as normal.
   //   { "sources": { "hangar": { "enabled": false, "message": "…" },
   //                  "buybacks": { "minVersion": "0.2.13" } },
-  //     "banner": { "message": "…", "level": "warn", "until": "2026-10-08" } }
+  //     "banner": { "message": "…", "level": "warn", "until": "2026-10-08",
+  //                 "maxVersion": "0.2.99" } }
+  // A banner with maxVersion only shows on that version or older (e.g. the 0.2.x open
+  // beta banner, which 0.3.0 replaces with its own card).
   // Source ids: hangar, buybacks, referrals.
   const STATUS_URL = 'https://openhangar.space/status.json';
   const STATUS_KEY = 'remoteStatus';
@@ -175,7 +286,12 @@
     }
     const b = data.banner;
     const until = b && typeof b.until === 'string' ? Date.parse(b.until) : NaN;
-    if (b && statusText(b.message) && !(until <= now)) {
+    const newer =
+      b &&
+      typeof b.maxVersion === 'string' &&
+      version &&
+      OH.compareVersions(version, b.maxVersion) > 0;
+    if (b && statusText(b.message) && !(until <= now) && !newer) {
       out.banner = { message: statusText(b.message), level: b.level === 'info' ? 'info' : 'warn' };
     }
     return out;
@@ -263,6 +379,99 @@
   };
   OH.clearLog = () => chrome.storage.local.remove(LOG_KEY);
 
+  // --- Storage size guard -------------------------------------------------------
+  // The extension keeps `unlimitedStorage` (without it a big hangar would hit the
+  // browser's 10 MB limit and writes would fail quietly), so nothing outside stops
+  // a bug from growing storage forever. Every growing key has its own cap (see
+  // test/storage-budget.test.js); this measures what's really there after each
+  // scan. Past STORAGE_WARN_BYTES it logs a warning and the Developers page says
+  // so. It never deletes or blocks anything.
+  OH.STORAGE_WARN_BYTES = 50e6;
+  // Saved accounts are stored under `profile:<handle>`: the handle stays out of
+  // the log and the report.
+  const storageKeyLabel = (k) => (/^profile:/.test(k) ? 'profile:(saved account)' : k);
+  // → { total, keys: [{ key, bytes }] biggest first, over }. Uses the browser's own
+  // count where it has one (Chrome), else the JSON size (Firefox has no
+  // getBytesInUse on every version). No network, nothing written.
+  OH.storageUsage = async function storageUsage() {
+    const area = chrome.storage.local;
+    const enc = new TextEncoder();
+    let keys = null;
+    let all = null;
+    const perKey = typeof area.getBytesInUse === 'function';
+    if (perKey && typeof area.getKeys === 'function') {
+      try {
+        keys = await area.getKeys();
+      } catch {
+        keys = null;
+      }
+    }
+    if (!Array.isArray(keys)) {
+      all = (await area.get(null)) || {};
+      keys = Object.keys(all);
+    }
+    const sizes = new Map();
+    for (const key of keys) {
+      let bytes = null;
+      if (perKey) {
+        try {
+          bytes = await area.getBytesInUse(key);
+        } catch {
+          bytes = null;
+        }
+      }
+      if (!Number.isFinite(bytes)) {
+        if (!all) all = (await area.get(null)) || {};
+        try {
+          bytes = enc.encode(key + JSON.stringify(all[key] ?? null)).length;
+        } catch {
+          bytes = 0;
+        }
+      }
+      const label = storageKeyLabel(key);
+      sizes.set(label, (sizes.get(label) || 0) + bytes);
+    }
+    const list = [...sizes].map(([key, bytes]) => ({ key, bytes }));
+    list.sort((a, b) => b.bytes - a.bytes || (a.key < b.key ? -1 : 1));
+    const total = list.reduce((s, x) => s + x.bytes, 0);
+    return { total, keys: list, over: total > OH.STORAGE_WARN_BYTES };
+  };
+  // "4.2 MB" / "820 KB". Pure.
+  OH.formatBytes = function formatBytes(n) {
+    const b = Number(n) || 0;
+    if (b >= 1e6) return `${(b / 1e6).toFixed(1)} MB`;
+    if (b >= 1e3) return `${Math.round(b / 1e3)} KB`;
+    return `${b} B`;
+  };
+  // After a scan: measure, and log a warning when it's bigger than expected.
+  // Never throws.
+  OH.checkStorage = async function checkStorage() {
+    try {
+      const u = await OH.storageUsage();
+      if (u.over) {
+        const top = u.keys
+          .slice(0, 3)
+          .map((x) => `${x.key} ${OH.formatBytes(x.bytes)}`)
+          .join(', ');
+        await OH.log(
+          'warn',
+          'storage',
+          `storage is ${OH.formatBytes(u.total)}, larger than expected. Biggest: ${top}`,
+        );
+      }
+      return u;
+    } catch {
+      return null;
+    }
+  };
+  // Debounced, so Scan All (three sources) measures once.
+  let storageCheckTimer = null;
+  function queueStorageCheck() {
+    clearTimeout(storageCheckTimer);
+    storageCheckTimer = setTimeout(() => OH.checkStorage(), 2000);
+    storageCheckTimer?.unref?.(); // Node (tests): don't hold the process open
+  }
+
   const stamp = (t) => {
     const d = new Date(t);
     const p = (n) => String(n).padStart(2, '0');
@@ -316,7 +525,7 @@
     );
   }
 
-  // A copy-paste report for bug posts: version, browser, data counts, cache
+  // The Flight Log (#315), a copy-paste report for bug posts: version, browser, data counts, cache
   // state and the recent log. Wrapped in a code block so Discord/GitHub keep
   // the columns. Contains counts and dates only — no handle, codes or names.
   OH.errorReport = async function errorReport({ maxLines = 40 } = {}) {
@@ -335,16 +544,20 @@
     const mat = store.shipMatrix || {};
     const log = await OH.getLog();
     const damaged = await OH.getDamaged();
+    const bbd = await OH.buybackDetailStats();
+    const usage = await OH.storageUsage().catch(() => null);
     const lines = [
       '```',
-      'Open Hangar error report',
+      'Open Hangar flight log',
       `Version:   ${manifest.version || '?'} (${manifest.browser_specific_settings ? 'Firefox' : 'Chrome'} build)`,
       `Browser:   ${browserLabel((globalThis.navigator && globalThis.navigator.userAgent) || '')}`,
       `Hangar:    ${count(src('hangar'))} items, scanned ${ago(src('hangar').scannedAt)}`,
       `Buy-backs: ${count(src('buybacks'))} items, scanned ${ago(src('buybacks').scannedAt)}`,
       `Read:      ${shapeLine(src('hangar').meta?.shape)}`,
       `History:   ${Array.isArray(db.history) ? db.history.length : 0} snapshots`,
+      `Bb detail: ${bbd.history} from hangar history · ${bbd.scan} value only from scan history · ${bbd.rsi} read from RSI · ${bbd.rejected} names didn't agree`,
       `Set aside: ${damaged.length ? damaged.map((d) => `${d.what} (${d.problems.slice(0, 3).join('; ')})`).join(', ') : 'nothing'}`,
+      `Storage:   ${usage ? OH.formatBytes(usage.total) + (usage.over ? ', larger than expected' : '') : 'unknown'}`,
       `Catalog:   ${Array.isArray(cat.list) ? cat.list.length : 0} ships (v${cat.v || '?'}, ${ago(cat.at)}) · ship matrix ${Array.isArray(mat.list) ? mat.list.length : 0}`,
       `Log:       ${log.length ? `last ${Math.min(maxLines, log.length)} of ${log.length}` : 'empty'}`,
       ...log.slice(-maxLines).map(OH.formatLogLine),
@@ -353,24 +566,35 @@
     return lines.join('\n');
   };
 
-  // Known Issues page (#175): GitHub's open-issues list → the bugs worth showing.
-  // The issues API also returns pull requests (they carry `pull_request`); only
-  // issues labelled bug or scan-broken are kept, scan-broken first, then newest.
-  // Pure, so it's tested directly.
+  // Known Issues page (#175): Open Hangar's open bug reports, from
+  // openhangar.space/api/known-issues (v1: { issues: [{ number, title, url, labels,
+  // createdAt }] }), which the site reads from the public GitHub tracker: issues
+  // labelled bug or scan-broken, scan-broken first, then newest. Asked at most once
+  // an hour, only when the page opens.
   OH.KNOWN_ISSUE_LABELS = ['scan-broken', 'bug'];
-  OH.parseKnownIssues = function parseKnownIssues(list) {
+  OH.getKnownIssues = ({ force = false, fetchFn } = {}) =>
+    OH.siteFeed('api/known-issues', {
+      key: 'feedIssues',
+      ttl: 60 * 60e3,
+      force,
+      fetchFn,
+      valid: (j) => isV1(j) && Array.isArray(j.issues),
+    });
+  // The feed's issues, checked (links only to the repo's own issues) and in the
+  // page's order. Pure, so it's tested directly.
+  OH.shapeKnownIssues = function shapeKnownIssues(list) {
     if (!Array.isArray(list)) return [];
     return list
-      .filter((i) => i && !i.pull_request && Number.isInteger(i.number))
+      .filter((i) => i && Number.isInteger(i.number) && typeof i.title === 'string')
       .map((i) => ({
         number: i.number,
-        title: String(i.title || ''),
-        url: String(i.html_url || ''),
-        createdAt: String(i.created_at || ''),
-        labels: (i.labels || []).map((l) => (typeof l === 'string' ? l : l && l.name)),
+        title: i.title.trim().slice(0, 300),
+        url: String(i.url || ''),
+        createdAt: String(i.createdAt || ''),
+        labels: (Array.isArray(i.labels) ? i.labels : []).filter((l) => typeof l === 'string'),
       }))
       .filter((i) => i.labels.some((l) => OH.KNOWN_ISSUE_LABELS.includes(l)))
-      .filter((i) => /^https:\/\/github\.com\//.test(i.url))
+      .filter((i) => /^https:\/\/github\.com\/Draco-Foundry\/open-hangar\/issues\/\d+$/.test(i.url))
       .sort(
         (a, b) =>
           b.labels.includes('scan-broken') - a.labels.includes('scan-broken') ||
@@ -396,11 +620,13 @@
         version: version ? `v${version}` : '',
       })}`;
     const lines = String(report).split('\n');
-    // Keep the header (first 10 lines: fence, title, counts, "Log:"), the newest
-    // log lines and the closing fence; trim the oldest log lines first.
-    const head = lines.slice(0, 10);
+    // Keep the header (fence, title, counts, up to "Log:"), the newest log lines
+    // and the closing fence; trim the oldest log lines first.
+    const logAt = lines.findIndex((l) => /^Log:/.test(l));
+    const n = logAt >= 0 ? logAt + 1 : 10;
+    const head = lines.slice(0, n);
     const tail = lines.slice(-1);
-    let log = lines.slice(10, -1);
+    let log = lines.slice(n, -1);
     let url = build(lines.join('\n'));
     while (url.length > OH.SCAN_REPORT_MAX_URL && log.length) {
       log = log.slice(Math.ceil(log.length / 4) || 1);
@@ -425,62 +651,9 @@
 
   // Raw stored DB → { db, problems }. `db` always has the shape the rest of the
   // extension relies on; `problems` says what had to be dropped (empty = it was
-  // fine). History embedded in the DB (before v3, or written by an older version
-  // after a rollback) comes back as db.history. Pure.
-  OH.checkDB = function checkDB(raw) {
-    const problems = [];
-    if (!isObj(raw)) return { db: emptyDB(), problems: ['not an object'] };
-    let version = raw.schemaVersion;
-    if (!Number.isInteger(version) || version < 1) {
-      problems.push('no schema version');
-      version = DB_VERSION;
-    } else if (version > DB_VERSION) {
-      problems.push(`made by a newer version of Open Hangar (v${version})`);
-      version = DB_VERSION;
-    }
-    const db = { schemaVersion: version, sources: {} };
-    if (!isObj(raw.sources)) problems.push('no sources');
-    else {
-      for (const [id, src] of Object.entries(raw.sources)) {
-        if (!isObj(src)) {
-          problems.push(`${id}: unreadable`);
-          continue;
-        }
-        let items;
-        if (Array.isArray(src.items)) {
-          items = src.items.filter(isObj);
-          const bad = src.items.length - items.length;
-          if (bad) problems.push(`${id}: ${bad} unreadable row${bad === 1 ? '' : 's'}`);
-        } else if (isObj(src.items)) {
-          items = src.items; // the referral source is one object
-        } else {
-          problems.push(`${id}: no items`);
-          continue;
-        }
-        const out = { items, scannedAt: okTime(src.scannedAt) ? src.scannedAt : null };
-        if (src.scannedAt != null && out.scannedAt == null) problems.push(`${id}: bad scan time`);
-        if (isObj(src.meta)) out.meta = src.meta;
-        else if (src.meta !== undefined) problems.push(`${id}: bad meta`);
-        db.sources[id] = out;
-      }
-    }
-    if (raw.owner != null) {
-      if (isObj(raw.owner) && typeof raw.owner.nickname === 'string' && raw.owner.nickname) {
-        db.owner = {
-          nickname: raw.owner.nickname,
-          displayname: typeof raw.owner.displayname === 'string' ? raw.owner.displayname : null,
-        };
-      } else problems.push('unreadable owner');
-    }
-    if (raw.history !== undefined) {
-      if (Array.isArray(raw.history)) {
-        db.history = raw.history.map(cleanSnapshot).filter(Boolean);
-        const bad = raw.history.length - db.history.length;
-        if (bad) problems.push(`history: ${bad} unreadable snapshot${bad === 1 ? '' : 's'}`);
-      } else problems.push('unreadable history');
-    }
-    return { db, problems };
-  };
+  // fine). History embedded in the DB comes back as db.history. Pure, and shared
+  // with the background worker (src/hangar-shape.js).
+  OH.checkDB = SHAPE.checkDB;
 
   // Storage migrations: MIGRATIONS[n] turns a v(n) DB into v(n+1). Add one with
   // every DB_VERSION bump, and a test (test/db.test.js). Scan history is never
@@ -673,6 +846,17 @@
       const cents = acct && acct.loggedIn ? acct.credits?.store?.value : null;
       const credit = Number.isFinite(cents) ? cents / 100 : undefined;
       if (record) recordHistory(db, db.sources[id], items, scannedAt, credit);
+      // Pledges the last complete scan of this same account had and this one
+      // doesn't go to the pledge archive (see archiveGone).
+      const prev = db.sources[id];
+      const sameOwner =
+        !db.owner ||
+        !(acct && acct.loggedIn && acct.nickname) ||
+        db.owner.nickname.toLowerCase() === String(acct.nickname).toLowerCase();
+      const before =
+        record && id === 'hangar' && sameOwner && prev && Array.isArray(prev.items)
+          ? prev.items
+          : null;
       db.sources[id] = meta ? { items, scannedAt, meta } : { items, scannedAt };
       if (acct && acct.loggedIn && acct.nickname) {
         db.owner = { nickname: acct.nickname, displayname: acct.displayname || null };
@@ -680,6 +864,14 @@
       // History is only rewritten when it changed: a new snapshot, or it was just
       // moved out of the DB (needsWrite) and must not be lost with it.
       await writeDB(db, { history: record || needsWrite });
+      if (before) {
+        const now = new Set(items.map((p) => String(p && p.id)));
+        const gone = before.filter((p) => isObj(p) && p.id != null && !now.has(String(p.id)));
+        if (gone.length) {
+          const cur = (await chrome.storage.local.get(ARCHIVE_KEY))[ARCHIVE_KEY];
+          await chrome.storage.local.set({ [ARCHIVE_KEY]: OH.archiveGone(cur, gone, scannedAt) });
+        }
+      }
       await chrome.storage.local.remove(['hangar', 'scannedAt']); // drop legacy keys
       return scannedAt;
     });
@@ -708,17 +900,34 @@
           Object.values(db.sources || {}).some(
             (s) => s && Array.isArray(s.items) && s.items.length,
           ));
-      if (hasData) await chrome.storage.local.set({ [RECOVERY_KEY]: { at: Date.now(), db } });
-      await chrome.storage.local.remove([DB_KEY, HISTORY_KEY, 'hangar', 'scannedAt', 'account']);
+      if (hasData) {
+        // The pledge archive rides along too, like the history.
+        const archive = await readArchive();
+        const rec = { at: Date.now(), db };
+        if (Object.keys(archive).length) rec.archive = archive;
+        await chrome.storage.local.set({ [RECOVERY_KEY]: rec });
+      }
+      await chrome.storage.local.remove([
+        DB_KEY,
+        HISTORY_KEY,
+        ARCHIVE_KEY,
+        'hangar',
+        'scannedAt',
+        'account',
+        'subStore',
+      ]);
       return;
     }
     await chrome.storage.local.remove([
       DB_KEY,
       HISTORY_KEY,
+      ARCHIVE_KEY,
+      BB_REJECTS_KEY,
       CORRUPT_KEY,
       'hangar',
       'scannedAt',
       'account',
+      'subStore',
       RECOVERY_KEY,
       LOG_KEY,
     ]);
@@ -741,6 +950,7 @@
       if (!rec) return null;
       const db = fromStored(rec.db);
       await writeDB(db);
+      await writeArchive(rec.archive);
       await chrome.storage.local.remove(RECOVERY_KEY);
       return db;
     });
@@ -757,9 +967,21 @@
       (s) => s && s.items && (Array.isArray(s.items) ? s.items.length : true),
     );
 
+  // The live account's pledge archive ({} when none), and writing one back (an
+  // empty or missing one removes the key).
+  async function readArchive() {
+    const a = (await chrome.storage.local.get(ARCHIVE_KEY))[ARCHIVE_KEY];
+    return isObj(a) ? a : {};
+  }
+  async function writeArchive(a) {
+    if (isObj(a) && Object.keys(a).length) await chrome.storage.local.set({ [ARCHIVE_KEY]: a });
+    else await chrome.storage.local.remove(ARCHIVE_KEY);
+  }
+
   // Make `nickname` the live account: park the current DB under its owner, then
   // load the new account's parked DB (if any). A parked DB keeps its scan history
-  // inside it, so each account's history travels with it. Returns { restored, parked }.
+  // and pledge archive (`pledgeArchive`) inside it, so both travel with their
+  // account. Returns { restored, parked }.
   OH.switchProfile = (nickname, displayname = null) =>
     exclusive(() => switchProfileNow(nickname, displayname));
   async function switchProfileNow(nickname, displayname) {
@@ -769,7 +991,9 @@
       if (cur.owner.nickname.toLowerCase() === String(nickname).toLowerCase()) {
         return { restored: false, parked: null }; // already live
       }
-      await chrome.storage.local.set({ [profileKey(cur.owner.nickname)]: cur });
+      const archive = await readArchive();
+      const park = Object.keys(archive).length ? { ...cur, pledgeArchive: archive } : cur;
+      await chrome.storage.local.set({ [profileKey(cur.owner.nickname)]: park });
       parked = cur.owner.displayname || cur.owner.nickname;
     }
     const key = profileKey(nickname);
@@ -779,6 +1003,7 @@
       ? fromStored(saved)
       : { ...emptyDB(), owner: { nickname, displayname: displayname || null }, history: [] };
     await writeDB(next);
+    await writeArchive(restored ? saved.pledgeArchive : null);
     await chrome.storage.local.remove([key, 'account']); // live now; account cache is stale
     return { restored, parked };
   }
@@ -820,7 +1045,10 @@
       live.owner && live.owner.nickname && live.owner.nickname.toLowerCase() === nick.toLowerCase();
     const key = profileKey(nick);
     const existing = (await chrome.storage.local.get(key))[key];
-    if (!isLive && !existing) await chrome.storage.local.set({ [key]: rec.db });
+    if (!isLive && !existing) {
+      const park = isObj(rec.archive) ? { ...rec.db, pledgeArchive: rec.archive } : rec.db;
+      await chrome.storage.local.set({ [key]: park });
+    }
     await chrome.storage.local.remove(RECOVERY_KEY);
     return !isLive && !existing;
   };
@@ -852,69 +1080,17 @@
 
   // --- Export / import (the developer consumption contract) ----------------
 
-  // Flatten the internal cached `account` (getAccount's shape) into a clean,
-  // stable identity block for export — renamed/reordered so a backend reading the
-  // file sees WHO the data belongs to before WHAT they own. `owner` (set on scan)
-  // is the fallback for handle/displayName when the live account isn't cached or
-  // the user is signed out. Returns null only when we know nothing about the user.
-  // NOTE: balances.storeCredit.value is in CENTS (e.g. 1234 = $12.34); uec/rec are
-  // whole-number game currencies. Values pass through exactly as RSI reports them.
-  function shapeAccountForExport(account, owner) {
-    const a = account && account.loggedIn ? account : null;
-    const handle = a?.nickname || owner?.nickname || null;
-    if (!a && !handle) return null; // nothing known about the user
-    const credit = (c) =>
-      c
-        ? {
-            value: c.value ?? null,
-            currency: c.currency || null,
-            symbol: c.symbol || null,
-            label: c.label || null,
-          }
-        : null;
-    const org = a?.org;
-    return {
-      handle,
-      displayName: a?.displayname || owner?.displayname || null,
-      avatar: a?.avatar || null,
-      ueeRecord: a?.citizenRecord || null, // UEE Citizen Record number
-      enlistedSince: a?.enlistedSince || null,
-      country: a?.countryName || null,
-      organization: org
-        ? {
-            name: org.name || null,
-            sid: org.sid || null,
-            rank: org.rank || null,
-            logo: org.logo || null,
-          }
-        : null, // null = no main org, or the affiliation is private/redacted
-      subscriber: a?.subscriber || null, // { type, frequency } | null
-      concierge: a?.concierge || null, // { level, next, percent } | null
-      balances: a
-        ? {
-            storeCredit: credit(a.credits?.store),
-            uec: credit(a.credits?.uec),
-            rec: credit(a.credits?.rec),
-          }
-        : null,
-      // NOTE: the referral CODE/URL are deliberately NOT exported. They live in the
-      // in-tool runtime (account cache + the referral source) but are stripped from
-      // the export file — the code is a personal, shareable credential the user
-      // chose to keep out of exports. Referral COUNTS and recruit/prospect lists
-      // still export; only code/url are stripped (see exportDB).
-      capturedAt: a?.fetchedAt || null, // when this identity snapshot was read
-    };
-  }
-
   // Export the whole database as a self-describing JSON object, ordered the way a
   // backend reads it: provenance → who (identity, org, rank, balances) → what they
   // own (sources). The identity block is flattened from the cached RSI account so
-  // a consumer gets everything in one file. Reads the account from cache only (no
-  // network), so export is deterministic and works offline. ALWAYS emits the
-  // current schemaVersion (the format it actually wrote), regardless of the stored
-  // DB's version.
-  OH.exportDB = async function exportDB() {
-    const db = await OH.loadDB();
+  // a consumer gets everything in one file; the referral code and its link are left
+  // out. Reads the account from cache only (no network), so export is deterministic
+  // and works offline. ALWAYS emits the current schemaVersion (the format it actually
+  // wrote), regardless of the stored DB's version. `live`: a DB already loaded
+  // (OH.siteSync checks whose it is first). The shaping itself is
+  // src/hangar-shape.js (exportPayload), shared with the background worker.
+  OH.exportDB = async function exportDB(live = null) {
+    const db = live || (await OH.loadDB());
     const { account } = await chrome.storage.local.get('account');
     let appVersion = null;
     try {
@@ -922,30 +1098,8 @@
     } catch {
       /* non-extension context */
     }
-    return {
-      app: 'open-hangar',
-      appVersion,
-      exportedAt: new Date().toISOString(),
-      schemaVersion: EXPORT_VERSION,
-      account: shapeAccountForExport(account, db.owner),
-      sources: sanitizeSourcesForExport(db.sources),
-      // Scan history rides along so a backup file is a complete restore point.
-      history: Array.isArray(db.history) ? db.history : [],
-    };
+    return SHAPE.exportPayload({ db, account, archive: await readArchive(), appVersion });
   };
-
-  // Strip the referral CODE/URL from the exported referral source — the user's
-  // personal referral credential is kept out of export files (counts + recruit/
-  // prospect lists still export). Returns a shallow copy; never mutates the stored
-  // DB. Other sources pass through untouched.
-  function sanitizeSourcesForExport(sources) {
-    if (!sources || typeof sources !== 'object') return sources;
-    const ref = sources.referral;
-    if (!ref || !ref.items || typeof ref.items !== 'object' || Array.isArray(ref.items))
-      return sources;
-    const { code, url, ...rest } = ref.items; // drop code + url (url embeds the code)
-    return { ...sources, referral: { ...ref, items: rest } };
-  }
 
   // --- Hangar Transfer Format (HTF) export ---------------------------------
   // The community interchange format read by FleetYards, HangarXPLOR & co.
@@ -1074,47 +1228,172 @@
   // snapshot for external consumers; it is deliberately NOT restored here, because
   // the in-tool Citizen Card always reflects the *live* signed-in RSI session
   // (see the multi-account safety notes), never an imported identity.
-  // Returns { ok, db?, error? }.
+  // The website's "Download Your Data" file is recognised too (importSiteNow):
+  // there every hangar names its account, so each goes to that account's slot.
+  // Returns { ok, db?, error?, site? }.
   OH.importDB = async function importDB(obj) {
     if (!obj || typeof obj !== 'object') return { ok: false, error: 'Not a JSON object.' };
+    const site = obj.sources ? null : OH.siteExportAccounts(obj);
+    if (site) {
+      if (!site.length) {
+        return {
+          ok: false,
+          error:
+            'This website file has no synced hangar in it yet. Sync from the extension first, or import a backup file.',
+        };
+      }
+      for (const a of site) {
+        const bad = versionError(a.data);
+        if (bad) return { ok: false, error: bad };
+      }
+      return exclusive(() => importSiteNow(site));
+    }
     if (!obj.sources || typeof obj.sources !== 'object') {
       return { ok: false, error: 'Missing "sources" — this is not an Open Hangar export.' };
     }
-    // A backup file says app: 'open-hangar' and carries the export version; a bare
-    // stored DB carries the storage version.
-    const newest = obj.app === 'open-hangar' ? EXPORT_VERSION : DB_VERSION;
-    if (obj.schemaVersion && obj.schemaVersion > newest) {
-      return {
-        ok: false,
-        error: `This file is format v${obj.schemaVersion}; this version of Open Hangar reads up to v${newest}. Update the extension first.`,
-      };
-    }
+    const bad = versionError(obj);
+    if (bad) return { ok: false, error: bad };
     return exclusive(() => importNow(obj));
   };
+  // A backup file says app: 'open-hangar' and carries the export version; a bare
+  // stored DB carries the storage version. → an error message, or null.
+  function versionError(obj) {
+    const newest = obj.app === 'open-hangar' ? EXPORT_VERSION : DB_VERSION;
+    if (obj.schemaVersion && obj.schemaVersion > newest) {
+      return `This file is format v${obj.schemaVersion}; this version of Open Hangar reads up to v${newest}. Update the extension first.`;
+    }
+    return null;
+  }
+  // A file's sources as stored. Most sources store an array of items (hangar,
+  // buybacks); the referral source stores a single object. Accept either so a full
+  // restore round-trips. Rows must be objects (a hand-edited or damaged file could
+  // hold nulls). Extras saved with a scan (e.g. buy-back tokens) survive too.
+  function importSources(sources) {
+    const out = {};
+    for (const [id, src] of Object.entries(isObj(sources) ? sources : {})) {
+      if (!src || !src.items || typeof src.items !== 'object') continue;
+      let items;
+      if (id === 'referral') items = OH.normalizeReferral(src.items);
+      else if (Array.isArray(src.items)) items = src.items.filter(isObj);
+      else continue;
+      out[id] = { items, scannedAt: src.scannedAt || null };
+      if (isObj(src.meta)) out[id].meta = src.meta;
+    }
+    return out;
+  }
   async function importNow(obj) {
-    const db = { schemaVersion: DB_VERSION, sources: {} };
+    const db = { schemaVersion: DB_VERSION, sources: importSources(obj.sources) };
     // History is merged, never replaced: restoring an old backup must not throw
     // away snapshots taken since, and vice versa.
     const { db: current } = await readDB();
     db.history = OH.mergeHistory(current.history, obj.history);
-    for (const [id, src] of Object.entries(obj.sources)) {
-      // Most sources store an array of items (hangar, buybacks); the referral
-      // source stores a single object. Accept either so a full restore round-trips.
-      if (src && (Array.isArray(src.items) || (src.items && typeof src.items === 'object'))) {
-        // Rows must be objects (a hand-edited or damaged file could hold nulls).
-        const items =
-          id === 'referral'
-            ? OH.normalizeReferral(src.items)
-            : src.items.filter((x) => x && typeof x === 'object');
-        db.sources[id] = { items, scannedAt: src.scannedAt || null };
-        // Extras saved with a scan (e.g. buy-back tokens) survive the round trip.
-        if (src.meta && typeof src.meta === 'object' && !Array.isArray(src.meta))
-          db.sources[id].meta = src.meta;
-      }
-    }
     await writeDB(db);
+    // The pledge archive is merged too (#388): per pledge the newest goneAt wins.
+    // A file without one (older backups) leaves this browser's archive as it is.
+    if (isObj(obj.pledgeArchive)) {
+      await writeArchive(OH.mergeArchive(await readArchive(), OH.leanArchive(obj.pledgeArchive)));
+    }
     await chrome.storage.local.remove(['hangar', 'scannedAt']); // drop legacy keys
     return { ok: true, db };
+  }
+
+  // The website's "Download Your Data" file (the website app, Account → Your
+  // Data): { export: { format, … }, account, …, rsi_accounts: [{ account: { handle,
+  // … }, latest_sync: { synced_at, format_version, data } | null, … }] }. Each
+  // `data` is this extension's backup file as it was last synced, without its
+  // history. → [{ handle, displayName, syncedAt, data }] for the RSI accounts with a
+  // synced hangar, or null when `obj` isn't that file. Pure.
+  OH.siteExportAccounts = function siteExportAccounts(obj) {
+    if (!isObj(obj) || !Array.isArray(obj.rsi_accounts)) return null;
+    const out = [];
+    for (const r of obj.rsi_accounts) {
+      const sync = isObj(r) && isObj(r.latest_sync) ? r.latest_sync : null;
+      const data = sync && isObj(sync.data) && isObj(sync.data.sources) ? sync.data : null;
+      if (!data) continue;
+      const who = isObj(data.account) ? data.account : {};
+      const handle = String(who.handle || (isObj(r.account) && r.account.handle) || '').trim();
+      if (!handle) continue; // the website keeps every hangar under a handle
+      const syncedAt = Number(sync.synced_at);
+      out.push({
+        handle,
+        displayName: who.displayName ? String(who.displayName) : null,
+        syncedAt: Number.isFinite(syncedAt) ? syncedAt : 0,
+        data,
+      });
+    }
+    return out;
+  };
+
+  // Import the website's file. Unlike a backup file, every hangar in it says whose
+  // it is, so each goes to that account's own place, the way saved accounts work
+  // (OH.switchProfile): one becomes the live DB, owned by its handle; the others are
+  // parked under `profile:<handle>`. The live one is the account this browser's
+  // data already belongs to, else the signed-in one (cached, no request), else the
+  // most recently synced. Data here for an account the file doesn't have is parked
+  // first, never overwritten. The file has no history: each account keeps its own
+  // here. Archives merge as in importNow. → { ok, db, site: { live, parked } }.
+  async function importSiteNow(accounts) {
+    const lc = (s) => String(s || '').toLowerCase();
+    const find = (nick) => (nick ? accounts.find((a) => lc(a.handle) === lc(nick)) : null);
+    const { db: cur } = await readDB();
+    const { account: cached } = await chrome.storage.local.get('account');
+    const curOwner = cur.owner && cur.owner.nickname;
+    const live =
+      find(curOwner) ||
+      find(cached && cached.loggedIn && cached.nickname) ||
+      accounts.slice().sort((a, b) => b.syncedAt - a.syncedAt)[0];
+    const owner = (a) => ({ nickname: a.handle, displayname: a.displayName });
+    const fileArchive = (a) => OH.leanArchive(a.data.pledgeArchive);
+
+    // The live account: its history and archive are the live ones when this data is
+    // already its own (or nobody's), else its parked ones (that copy goes live).
+    let history = [];
+    let archive = {};
+    if (!curOwner || lc(curOwner) === lc(live.handle)) {
+      history = cur.history;
+      archive = await readArchive();
+    } else if (dbHasData(cur)) {
+      const here = await readArchive();
+      const park = Object.keys(here).length ? { ...cur, pledgeArchive: here } : cur;
+      await chrome.storage.local.set({ [profileKey(curOwner)]: park });
+    }
+    // A parked copy of the live account joins it (one place per account).
+    const key = profileKey(live.handle);
+    const saved = (await chrome.storage.local.get(key))[key];
+    if (isObj(saved) && saved.schemaVersion) {
+      history = OH.mergeHistory(history, fromStored(saved).history);
+      archive = OH.mergeArchive(archive, saved.pledgeArchive);
+    }
+    await chrome.storage.local.remove(key);
+    const db = {
+      schemaVersion: DB_VERSION,
+      sources: importSources(live.data.sources),
+      owner: owner(live),
+      history,
+    };
+    await writeDB(db);
+    await writeArchive(OH.mergeArchive(archive, fileArchive(live)));
+
+    // Every other account: parked, merged into what's parked for it already.
+    const parked = [];
+    for (const a of accounts) {
+      if (a === live || lc(a.handle) === lc(live.handle)) continue;
+      const key = profileKey(a.handle);
+      const saved = (await chrome.storage.local.get(key))[key];
+      const had = isObj(saved) && saved.schemaVersion ? saved : null;
+      const park = {
+        schemaVersion: DB_VERSION,
+        sources: importSources(a.data.sources),
+        owner: owner(a),
+        history: had ? fromStored(had).history : [],
+      };
+      const arch = OH.mergeArchive(had && had.pledgeArchive, fileArchive(a));
+      if (Object.keys(arch).length) park.pledgeArchive = arch;
+      await chrome.storage.local.set({ [key]: park });
+      parked.push(a.displayName || a.handle);
+    }
+    await chrome.storage.local.remove(['hangar', 'scannedAt']); // drop legacy keys
+    return { ok: true, db, site: { live: live.displayName || live.handle, parked } };
   }
 
   // --- Scanning -------------------------------------------------------------
@@ -1122,13 +1401,14 @@
   // A logged-out fetch lands on a sign-in page (redirect to /connect, or HTML
   // with a password field) — distinguish that from a genuinely empty source.
   function looksLoggedOut(res, html) {
-    if (res.redirected && /account\/(connect|sign-?in)|\/connect\b/i.test(res.url)) return true;
-    return /name=["']password["']|id=["']?password|account\/connect/i.test(html);
+    if (res.redirected && RULES.signedOut.redirect.test(res.url)) return true;
+    return RULES.signedOut.page.test(html);
   }
 
   // Fetch one page, retrying only *transient* failures (network error, 5xx, 429)
   // with a polite backoff. Auth failures and other 4xx return at once.
-  // Returns { res } or { error, transient }.
+  // Returns { res } or { error, transient }. Giving up on a 429 or a 5xx, it also
+  // hands back RSI's Retry-After header as sent (`retryAfter`, null without one).
   // Network errors and 5xx: up to 3 retries, quick exponential backoff.
   // RSI's "slow down" (429, #298): up to 5 retries, waiting 5 s, 10 s, 15 s, 20 s,
   // 25 s (or longer when RSI's Retry-After asks, up to 30 s), so a busy RSI gets
@@ -1159,9 +1439,11 @@
         retry = { msg, wait: DELAY_MS * 2 ** errors, attempt: errors, of: RETRIES };
         continue;
       }
-      const after = Number(res.headers.get('retry-after')) * 1000;
+      const retryAfter = res.headers.get('retry-after');
+      const after = Number(retryAfter) * 1000;
       if (res.status === 429) {
-        if (!retryRateLimit) return { error: 'RSI asked us to slow down', rateLimited: true };
+        if (!retryRateLimit)
+          return { error: 'RSI asked us to slow down', rateLimited: true, retryAfter };
         const msg = 'RSI asked us to slow down';
         if (++slowDowns > RATE_LIMIT_RETRIES) return { error: msg, transient: true };
         retry = {
@@ -1177,7 +1459,13 @@
       }
       if (res.status >= 500) {
         const msg = `RSI responded ${res.status}`;
-        if (++errors > RETRIES) return { error: msg, transient: true };
+        // Buy-back details: a 5xx that comes with a Retry-After (seconds or a date)
+        // ends the page at once, for the batch to hold off until then rather than
+        // retry sooner (OH.fetchBuybackDetails). Scans keep their capped retries.
+        if (!retryRateLimit && OH.retryAfterMs(retryAfter)) {
+          return { error: msg, transient: true, retryAfter };
+        }
+        if (++errors > RETRIES) return { error: msg, transient: true, retryAfter };
         retry = {
           msg,
           wait: Math.min(after > 0 ? after : DELAY_MS * 2 ** errors, MAX_RETRY_WAIT_MS),
@@ -1190,6 +1478,10 @@
     }
   }
 
+  // One page of a paginated source: ?page=N&pagesize=… (the names: RULES.paging).
+  const pageUrl = (src, page, size) =>
+    `${src.url}?${RULES.paging.page}=${page}&${RULES.paging.size}=${size}`;
+
   // Paginated HTML source: fetch ?page=N&pagesize=…, parse, dedupe by id, stop
   // when a page yields no NEW ids (RSI clamps out-of-range pages to the last).
   // onProgress(page, count, retry?) — retry = { attempt, of } while retrying.
@@ -1201,15 +1493,14 @@
   async function scanHtmlSource(src, onProgress, prev) {
     const seen = new Set();
     const all = [];
-    const size = src.pageSize || PAGE_SIZE;
+    const size = src.pageSize;
     let meta;
     let lastPage = 0;
     let lastAdded = 0;
     let aligned = true;
 
     for (let page = 1; page <= MAX_PAGES; page++) {
-      const url = `${src.url}?page=${page}&pagesize=${size}`;
-      const got = await fetchPage(url, (attempt, of, reason) => {
+      const got = await fetchPage(pageUrl(src, page, size), (attempt, of, reason) => {
         OH.log('warn', src.id, `page ${page}: ${reason}, retry ${attempt}/${of}`);
         onProgress?.(page, all.length, { attempt, of });
       });
@@ -1249,14 +1540,14 @@
         // the parser couldn't read them → RSI likely changed their markup.
         if (src.marker && src.marker.test(html)) {
           return {
-            error: `Signed in, but couldn't read any ${src.label.toLowerCase()}. RSI may have changed their site. Copy the error report and drop it in #bug-reports, we'll patch it.`,
+            error: `Signed in, but couldn't read any ${src.label.toLowerCase()}. RSI may have changed their site. Send your flight log to #bug-reports and we'll patch it.`,
           };
         }
         // Sources that need server-rendered HTML but got none (e.g. a client-side
         // SPA shell) say so, rather than silently reporting "empty".
         if (src.requiresRender) {
           return {
-            error: `Couldn't read ${src.label.toLowerCase()}: RSI sent back an empty page. Copy the error report and drop it in #bug-reports, we'll patch it.`,
+            error: `Couldn't read ${src.label.toLowerCase()}: RSI sent back an empty page. Send your flight log to #bug-reports and we'll patch it.`,
           };
         }
         break; // logged in, source is genuinely empty
@@ -1327,7 +1618,7 @@
       if (!same(first, saved.slice(0, size))) return false;
       const read = async (page) => {
         await sleep(DELAY_MS);
-        const got = await fetchPage(`${src.url}?page=${page}&pagesize=${size}`);
+        const got = await fetchPage(pageUrl(src, page, size));
         if (got.error || !got.res.ok) return null;
         return fillIds(src, src.parse(await got.res.text()), page);
       };
@@ -1480,6 +1771,7 @@
       OH.log('info', src.id, `scan ok, ${result.items.length} items`);
       // A complete buy-back list: drop cached details for ones since reclaimed.
       if (src.id === 'buybacks') await OH.pruneBuybackDetails(result.items.map((b) => b.id));
+      queueStorageCheck();
       return { ok: true, items: result.items, scannedAt };
     } catch (err) {
       OH.log('error', src.id, `scan crashed: ${err?.stack || err?.message || err}`);
@@ -1503,7 +1795,8 @@
   // --- RSI account: identity + balances ------------------------------------
   // The server-rendered dashboard embeds an HTML-escaped JSON object with the
   // signed-in user's nickname, displayname, and creditsData — no GraphQL needed.
-  const ACCOUNT_URL = 'https://robertsspaceindustries.com/en/account/dashboard';
+  // Its address and keys: RULES.account.
+  const ACCOUNT_URL = RSI_ORIGIN + RULES.account.path;
   const ACCOUNT_TTL_MS = 10 * 60 * 1000;
   const ACCOUNT_CACHE_V = 6; // bump when the cached account shape changes (v6: + referral)
 
@@ -1555,7 +1848,18 @@
 
   function extractAccount(html) {
     const un = unescapeEntities(html);
-    return extractObjectAround(un, un.indexOf('"nickname"'));
+    return extractObjectAround(un, un.indexOf(JSON.stringify(RULES.account.keys.nickname)));
+  }
+
+  // Where `"<key>":` first appears in JSON text (spaces allowed before the colon), or -1.
+  function keyIndex(text, key) {
+    const quoted = JSON.stringify(key);
+    for (let i = text.indexOf(quoted); i >= 0; i = text.indexOf(quoted, i + 1)) {
+      let j = i + quoted.length;
+      while (j < text.length && /\s/.test(text[j])) j++;
+      if (text[j] === ':') return i;
+    }
+    return -1;
   }
 
   // The dashboard HTML embeds a SEPARATE referral blob (not inside the nickname
@@ -1564,33 +1868,34 @@
   // Returns { code, url, referrerCode } or null when absent (e.g. signed out).
   function extractReferral(html) {
     const un = unescapeEntities(html);
-    const m = /"referralCode"\s*:/.exec(un);
-    const obj = m ? extractObjectAround(un, m.index) : null;
-    if (!obj || !obj.referralCode) return null;
+    const at = keyIndex(un, RULES.account.referral.code);
+    const obj = at >= 0 ? extractObjectAround(un, at) : null;
+    if (!obj || !obj[RULES.account.referral.code]) return null;
     return {
-      code: obj.referralCode,
-      url: obj.referralUrlCopy || obj.referralUrl || null,
-      referrerCode: obj.referrerReferralCode || null,
+      code: obj[RULES.account.referral.code],
+      url: RULES.account.referral.url.map((k) => obj[k]).find(Boolean) || null,
+      referrerCode: obj[RULES.account.referral.referrerCode] || null,
     };
   }
 
   // → { loggedIn: true|false|null, nickname, displayname, credits } where credits
   // is keyed by variant: { store|uec|rec: { value, symbol, currency, label } }.
   // NOTE: store credit `value` is in CENTS. Cached; null loggedIn = couldn't tell.
-  // Parse the member's MAIN organization from the citizen dossier DOM. The block
-  // is `.main-org` with a logo (`.thumb img`) and `.info .entry` rows of
-  // label/value pairs (Organization, Spectrum Identification (SID), Organization
-  // rank). Returns { name, sid, rank, logo } or null when the member has no main
-  // org or it's set to private (RSI redacts the values, marking the block
-  // `visibility-R`). Verified against a live dossier (May 2026).
+  // Parse the member's MAIN organization from the citizen dossier DOM (where each
+  // part is: RULES.dossier). The block is `.main-org` with a logo (`.thumb img`)
+  // and `.info .entry` rows of label/value pairs (Organization, Spectrum
+  // Identification (SID), Organization rank). Returns { name, sid, rank, logo } or
+  // null when the member has no main org or it's set to private (RSI redacts the
+  // values, marking the block `visibility-R`). Verified against a live dossier
+  // (May 2026).
   function parseMainOrg(doc) {
-    const block = doc.querySelector('.main-org');
+    const block = doc.querySelector(RULES.dossier.org);
     if (!block) return null;
     // Private/hidden affiliation: RSI flags the block visibility-R and blanks the
     // values. Skip rather than show "REDACTED".
-    if (block.classList.contains('visibility-R')) return null;
+    if (block.matches(RULES.dossier.hidden)) return null;
     const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
-    const info = block.querySelector('.info');
+    const info = block.querySelector(RULES.dossier.info);
     if (!info) return null;
     // Within .main-org .info, entries are <p class="entry">. The ORG NAME entry
     // has NO label (it's an <a class="value">…</a>); SID and rank entries pair a
@@ -1599,26 +1904,26 @@
     let name = '',
       sid = null,
       rank = null;
-    for (const entry of info.querySelectorAll('.entry')) {
-      const label = clean(entry.querySelector('.label')?.textContent).toLowerCase();
-      const value = clean(entry.querySelector('.value')?.textContent);
+    for (const entry of info.querySelectorAll(RULES.dossier.entry)) {
+      const label = clean(entry.querySelector(RULES.dossier.label)?.textContent).toLowerCase();
+      const value = clean(entry.querySelector(RULES.dossier.value)?.textContent);
       if (!value) continue;
       if (!label) {
         if (!name) name = value;
       } // labelless ⇒ org name
-      else if (label.includes('sid'))
+      else if (RULES.dossier.sid.test(label))
         sid = value; // "Spectrum Identification (SID)"
-      else if (label.includes('rank')) rank = value; // "Organization rank"
+      else if (RULES.dossier.rank.test(label)) rank = value; // "Organization rank"
     }
-    if (!name) name = clean(info.querySelector('a.value')?.textContent); // fallback
-    if (!name || /^redacted$/i.test(name)) return null; // no org, or private
+    if (!name) name = clean(info.querySelector(RULES.dossier.name)?.textContent); // fallback
+    if (!name || RULES.dossier.redacted.test(name)) return null; // no org, or private
     // SID also lives in the org link href (/orgs/SID) — derive if not labelled.
     if (!sid) {
-      const href = info.querySelector('a[href*="/orgs/"]')?.getAttribute('href') || '';
-      const m = href.match(/\/orgs\/([^/?#]+)/);
-      if (m) sid = m[1];
+      const href = info.querySelector(RULES.dossier.orgLink)?.getAttribute('href') || '';
+      const m = href.match(RULES.dossier.orgSid);
+      if (m) sid = m.groups.sid;
     }
-    let logo = block.querySelector('.thumb img')?.getAttribute('src') || null;
+    let logo = block.querySelector(RULES.dossier.logo)?.getAttribute('src') || null;
     if (logo && !logo.startsWith('http')) logo = 'https://robertsspaceindustries.com' + logo;
     return { name, sid, rank, logo };
   }
@@ -1652,37 +1957,44 @@
         };
       }
       const credits = {};
-      for (const c of obj.creditsData || []) {
-        credits[c.variant] = {
-          value: c.value,
-          symbol: c.symbol,
-          label: c.label,
-          currency: c.currency,
+      for (const c of obj[RULES.account.keys.credits] || []) {
+        credits[c[RULES.account.credit.variant]] = {
+          value: c[RULES.account.credit.value],
+          symbol: c[RULES.account.credit.symbol],
+          label: c[RULES.account.credit.label],
+          currency: c[RULES.account.credit.currency],
         };
       }
-      const sub = obj.subscriberData;
-      const con = obj.conciergeData;
-      const avatar = obj.avatar
-        ? obj.avatar.startsWith('http')
-          ? obj.avatar
-          : 'https://robertsspaceindustries.com' + obj.avatar
+      const sub = obj[RULES.account.keys.subscriber];
+      const con = obj[RULES.account.keys.concierge];
+      const pic = obj[RULES.account.keys.avatar];
+      const avatar = pic
+        ? pic.startsWith('http')
+          ? pic
+          : 'https://robertsspaceindustries.com' + pic
         : null;
       const out = {
         v: ACCOUNT_CACHE_V,
         loggedIn: true,
-        nickname: obj.nickname || null,
-        displayname: obj.displayname || null,
+        nickname: obj[RULES.account.keys.nickname] || null,
+        displayname: obj[RULES.account.keys.displayname] || null,
         avatar,
-        enlistedSince: obj.enlistedSince || null,
-        countryName: obj.countryName || null,
+        enlistedSince: obj[RULES.account.keys.enlistedSince] || null,
+        countryName: obj[RULES.account.keys.countryName] || null,
         credits,
-        subscriber: sub && sub.type ? { type: sub.type, frequency: sub.frequency || null } : null,
-        concierge:
-          con && con.conciergeCurrentLevel
+        subscriber:
+          sub && sub[RULES.account.subscriber.type]
             ? {
-                level: con.conciergeCurrentLevel,
-                next: con.conciergeNextLevel || null,
-                percent: con.conciergeNextLevelPercentage ?? null,
+                type: sub[RULES.account.subscriber.type],
+                frequency: sub[RULES.account.subscriber.frequency] || null,
+              }
+            : null,
+        concierge:
+          con && con[RULES.account.concierge.level]
+            ? {
+                level: con[RULES.account.concierge.level],
+                next: con[RULES.account.concierge.next] || null,
+                percent: con[RULES.account.concierge.percent] ?? null,
               }
             : null,
         citizenRecord: null,
@@ -1694,13 +2006,13 @@
       if (out.nickname) {
         try {
           const cres = await fetch(
-            `https://robertsspaceindustries.com/en/citizens/${encodeURIComponent(out.nickname)}`,
+            RSI_ORIGIN + RULES.dossier.path + encodeURIComponent(out.nickname),
             { credentials: 'omit', signal: AbortSignal.timeout(20000) },
           );
           if (cres.ok) {
             const cdoc = new DOMParser().parseFromString(await cres.text(), 'text/html');
             out.citizenRecord =
-              cdoc.querySelector('.citizen-record .value')?.textContent?.trim() || null;
+              cdoc.querySelector(RULES.dossier.record)?.textContent?.trim() || null;
             out.org = parseMainOrg(cdoc);
           }
         } catch (e) {
@@ -1725,38 +2037,29 @@
   // counts differ (legacy = all-time total, current = post-cutoff conversions).
   // Each row: { id, displayName, nickname, avatar, enlistedOn, convertedOn }.
   // `converted:true` filters to recruits; `false` returns the full prospect list.
-  const GRAPHQL_URL = 'https://robertsspaceindustries.com/graphql';
-  const REFERRAL_CAMPAIGNS = { current: '2', legacy: '1' };
-  const REFERRAL_PAGE_SIZE = 50; // API accepts this; pages don't overlap (verified)
+  // The request (address, operation, document, the variables that never change,
+  // the campaigns and page size): RULES.referrals.
   const REFERRAL_MAX_PAGES = 200; // safety cap (10k rows)
-  const REFERRAL_QUERY = `query GetReferralRecruitsList($campaignId: ID!, $converted: Boolean!, $display: ReferralRecruitsListDisplay, $limit: Int!, $page: Int!, $sortBy: ReferralRecruitsListSortBy) {
-  referralRecruitsList(query: {campaignId: $campaignId, converted: $converted, display: $display, limit: $limit, page: $page, sortBy: $sortBy}) {
-    recruitsCount
-    prospectsCount
-    data { id displayName nickname avatar enlistedOn convertedOn }
-  }
-}`;
 
   // One page of the recruits/prospects list for a campaign. Returns
   // { recruitsCount, prospectsCount, data: [...] } or { error }.
   async function fetchReferralPage(campaignId, converted, page) {
     let res;
     try {
-      res = await fetch(GRAPHQL_URL, {
+      res = await fetch(RSI_ORIGIN + RULES.referrals.path, {
         method: 'POST',
         signal: AbortSignal.timeout(20000),
         credentials: 'include',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          operationName: 'GetReferralRecruitsList',
-          query: REFERRAL_QUERY,
+          operationName: RULES.referrals.operation,
+          query: RULES.referrals.query,
           variables: {
+            ...RULES.referrals.variables,
             campaignId,
             converted,
-            display: 'ALL_TIME',
-            limit: REFERRAL_PAGE_SIZE,
+            limit: RULES.referrals.pageSize,
             page,
-            sortBy: 'NEWEST',
           },
         }),
       });
@@ -1813,7 +2116,7 @@
         added++;
       }
       onProgress?.(items.length, count);
-      if (added === 0 || res.data.length < REFERRAL_PAGE_SIZE) break;
+      if (added === 0 || res.data.length < RULES.referrals.pageSize) break;
       await sleep(DELAY_MS);
     }
     return { count, items };
@@ -1840,19 +2143,23 @@
       // Recruits: legacy is the all-time superset, current is the post-cutoff subset.
       // Pull both and tag each row; prospects are shared, so fetch once (current).
       onProgress?.('recruits (legacy)', 0, null);
-      const legacyRecruits = await fetchReferralList(REFERRAL_CAMPAIGNS.legacy, true, (n, t) =>
-        onProgress?.('recruits (legacy)', n, t),
+      const legacyRecruits = await fetchReferralList(
+        RULES.referrals.campaigns.legacy,
+        true,
+        (n, t) => onProgress?.('recruits (legacy)', n, t),
       );
       if (legacyRecruits.error && !legacyRecruits.items?.length)
         return { ok: false, error: legacyRecruits.error };
 
       onProgress?.('recruits (current)', 0, null);
-      const currentRecruits = await fetchReferralList(REFERRAL_CAMPAIGNS.current, true, (n, t) =>
-        onProgress?.('recruits (current)', n, t),
+      const currentRecruits = await fetchReferralList(
+        RULES.referrals.campaigns.current,
+        true,
+        (n, t) => onProgress?.('recruits (current)', n, t),
       );
 
       onProgress?.('prospects', 0, null);
-      const prospects = await fetchReferralList(REFERRAL_CAMPAIGNS.current, false, (n, t) =>
+      const prospects = await fetchReferralList(RULES.referrals.campaigns.current, false, (n, t) =>
         onProgress?.('prospects', n, t),
       );
 
@@ -1958,45 +2265,25 @@
     return items.reduce((sum, p) => sum + (Number.isFinite(p.value) ? p.value : 0), 0);
   };
 
-  // --- Star Citizen game version (public star-citizen.wiki API) -------------
-  // Public, read-only endpoint; we send NO credentials and no personal data.
-  const SC_VERSIONS_URL = 'https://api.star-citizen.wiki/api/v2/game-versions';
-  const SC_TTL_MS = 12 * 60 * 60 * 1000; // refresh at most twice a day
+  // --- Star Citizen game version (openhangar.space's game-status feed) -----------
+  // The top bar's Game Status pill (ui/lib/game-status.js) and the footer read the
+  // same feed and the same cached copy (OH.getGameStatus), asked at most every 10
+  // minutes. Feed contract v1: { v: 1, live: { version, released }, ptu, … }.
+  OH.getGameStatus = ({ force = false, fetchFn } = {}) =>
+    OH.siteFeed('api/game-status', { key: 'feedGameStatus', ttl: 10 * 60e3, force, fetchFn });
 
   // "4.8.0-LIVE.11875683" → "4.8.0-LIVE" (drop the trailing build number).
   OH.formatScVersion = (code) => (code ? code.replace(/\.\d+$/, '') : '');
 
-  // Current default (LIVE) game version as { code, fetchedAt }. Cached in storage;
-  // returns the cached value (or { code: null }) on any failure. Never throws.
-  OH.getScVersion = async function getScVersion({ force = false } = {}) {
-    const { scVersion } = await chrome.storage.local.get('scVersion');
-    // Entries saved before release dates were kept ('released' missing) refresh once.
-    if (
-      !force &&
-      scVersion?.code &&
-      'released' in scVersion &&
-      Date.now() - scVersion.fetchedAt < SC_TTL_MS
-    )
-      return scVersion;
-    try {
-      const res = await OH.guarded()(SC_VERSIONS_URL, {
-        credentials: 'omit',
-        headers: { Accept: 'application/json' },
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const json = await res.json();
-      const list = Array.isArray(json.data) ? json.data : [];
-      const current = list.find((v) => v.is_default) || list[0];
-      const code = current?.code || null;
-      if (!code) throw new Error('no version in response');
-      // released_at: when this build went LIVE (Home's Game Status shows it).
-      const released = Date.parse(current.released_at || '') || null;
-      const v = { code, released, fetchedAt: Date.now() };
-      await chrome.storage.local.set({ scVersion: v });
-      return v;
-    } catch (e) {
-      return scVersion || { code: null, fetchedAt: 0, error: String(e?.message || e) };
-    }
+  // Current LIVE game version as { code: "4.10.1-LIVE", released (ms) | null }, from
+  // the game-status feed (cached), or { code: null } before it ever loaded. Never throws.
+  OH.getScVersion = async function getScVersion({ force = false, fetchFn } = {}) {
+    const feed = await OH.getGameStatus({ force, fetchFn });
+    const live = feed && feed.data && feed.data.live;
+    const version = live && typeof live.version === 'string' ? live.version.trim() : '';
+    if (!/^\d+\.\d+(\.\d+)*$/.test(version)) return { code: null, released: null };
+    const released = Date.parse(live.released || '') || null;
+    return { code: `${version}-LIVE`, released };
   };
 
   // --- Ship images ----------------------------------------------------------
@@ -2007,15 +2294,14 @@
   //   1. RSI ship-matrix (PRIMARY) — robertsspaceindustries.com/ship-matrix/index.
   //      One fetch returns ALL ships *with* images, including in-concept ships the
   //      wiki lacks (e.g. Vulcan, Genesis, Odin). We cache a slim {name → image}.
-  //   2. star-citizen.wiki (FALLBACK) — for anything the ship-matrix misses; needs
-  //      a catalog fetch + a per-slug image fetch.
+  //   2. openhangar.space's ships feed (FALLBACK) — for anything the ship-matrix
+  //      misses: the picture it carries for the ship (OH.getShipsFeed, one request).
   //
   // Images don't change → hard-cached in storage; negatives cached too. Callers
   // MUST resolve lazily (only for shown cards) — see enhanceCardImages.
-  const SC_API = 'https://api.star-citizen.wiki/api/v2';
   const SHIP_MATRIX_URL = 'https://robertsspaceindustries.com/ship-matrix/index';
   const SHIP_IMG_TTL = 90 * 24 * 60 * 60 * 1000; // 90 days (images don't change)
-  const CATALOG_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
+  const CATALOG_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days (the RSI ship-matrix copy)
   const shipImgMem = new Map(); // normName -> url|null (per session)
   const shipImgInflight = new Map(); // normName -> Promise (dedupe concurrent)
 
@@ -2042,8 +2328,18 @@
     }
     return out;
   }
-  let catalogMem = null; // [{ lname, slug, cls, msrp }]  (wiki)
-  const CATALOG_CACHE_V = 8; // v2: class + msrp, all pages · v3: fleet fields · v4: display name · v5: + ship matrix (concept ships) · v6: manufacturer · v7: every role (foci) · v8: sizes filled (ground vehicles, special editions)
+  // The newest `max` cache entries ({ at, … }) of `obj`. A time limit alone
+  // doesn't bound a cache, so each one keyed by name or address also has a count.
+  function capNewest(obj, max) {
+    const ids = Object.keys(obj || {});
+    if (ids.length <= max) return obj;
+    ids.sort((a, b) => (obj[b].at || 0) - (obj[a].at || 0));
+    return Object.fromEntries(ids.slice(0, max).map((k) => [k, obj[k]]));
+  }
+  OH.capNewest = capNewest;
+  // Entry caps for the caches above and below (test/storage-budget.test.js).
+  OH.CACHE_MAX = { shipImages: 2000 };
+  let catalogMem = null; // [{ name, lname, slug, cls, msrp, img, … }] (bundled + ships feed)
   let catalogInflight = null;
   let matrixMem = null; // [{ lname, name, img, mfr, mfrName }]  (RSI ship-matrix)
   const MATRIX_CACHE_V = 2; // v2: + display name + manufacturer (for HTF ship codes)
@@ -2162,47 +2458,6 @@
     };
   };
 
-  // Walk one paged wiki endpoint and return every record's slim entry. The
-  // API serves 50 per page whatever we ask for, so walk until last_page.
-  async function fetchAllPages(path, fetchFn) {
-    const list = [];
-    for (let page = 1; page <= 12; page++) {
-      const res = await OH.guarded(fetchFn)(
-        `${SC_API}/${path}?page%5Bsize%5D=200&page%5Bnumber%5D=${page}`,
-        {
-          credentials: 'omit',
-          headers: { Accept: 'application/json' },
-        },
-      );
-      // A failed page means an incomplete list: throw, so nobody caches it
-      // (getCatalog keeps the previous or bundled list instead).
-      if (!res.ok) throw new Error(`${path} page ${page}: HTTP ${res.status}`);
-      const json = await res.json();
-      const data = Array.isArray(json.data) ? json.data : [];
-      for (const v of data) {
-        const slim = OH.slimVehicle(v);
-        if (slim) list.push(slim);
-      }
-      const last =
-        (json.meta && json.meta.last_page) || (json.links && json.links.next ? page + 1 : page);
-      if (!data.length || page >= last) break;
-    }
-    return list;
-  }
-
-  // The whole ship list, slimmed. `vehicles` is what's in the game files
-  // (flight-ready ships, ground vehicles); `shipmatrix` is RSI's ship matrix,
-  // which adds concept ships (Pioneer, Odyssey, …) and fills prices/status the
-  // first list lacks. Merged by slug, then name; the game-file entry wins,
-  // and only not-yet-flyable ships are added from the matrix.
-  OH.fetchShipCatalog = async function fetchShipCatalog(fetchFn = fetch) {
-    // Both halves or nothing: without the matrix, concept ships and many prices
-    // would be missing from a list that's then cached for 30 days.
-    const list = await fetchAllPages('vehicles', fetchFn);
-    const matrix = await fetchAllPages('shipmatrix/vehicles', fetchFn);
-    return OH.mergeCatalogs(list, matrix);
-  };
-
   // Fill missing sizes in place: a leftover "undefined" becomes null, and a special
   // edition ("F8C Lightning Wikelo War Special", "Corsair PYAM Exec") takes the size
   // of its base ship (the longest other name it starts with). Pure, returns list.
@@ -2250,6 +2505,73 @@
     return OH.fillCatalogSizes(out);
   };
 
+  // Pictures we show from a feed: RSI's own or our copies on openhangar.space only.
+  OH.feedImage = (url) =>
+    typeof url === 'string' &&
+    /^https:\/\/((media\.)?robertsspaceindustries\.com|([a-z0-9-]+\.)*openhangar\.space)\//i.test(
+      url,
+    )
+      ? url
+      : null;
+
+  // openhangar.space/api/ships (v1): { ships: [{ name, cls, msrp, img }] }, the same
+  // weekly ship list as the bundled one, cut to what prices and ship art need. Asked
+  // at most once a day.
+  const SHIPS_FEED_TTL = 24 * 3600e3;
+  OH.getShipsFeed = ({ force = false, fetchFn } = {}) =>
+    OH.siteFeed('api/ships', {
+      key: 'feedShips',
+      ttl: SHIPS_FEED_TTL,
+      force,
+      fetchFn,
+      valid: (j) => isV1(j) && Array.isArray(j.ships),
+    });
+
+  // The bundled list (fleet stats: career, role, size, crew, cargo, status, maker)
+  // with the ships feed on top: its store price, class name and picture, matched by
+  // class name, then name. A ship only the feed knows is added without stats. Pure.
+  OH.mergeShipsFeed = function mergeShipsFeed(bundled, ships) {
+    const out = (bundled || []).map((v) => ({ ...v }));
+    if (!Array.isArray(ships)) return out;
+    const byCls = new Map(out.filter((v) => v.cls).map((v) => [v.cls, v]));
+    const byName = new Map(out.map((v) => [v.lname, v]));
+    for (const s of ships) {
+      const name = s && typeof s.name === 'string' ? s.name.trim() : '';
+      if (!name) continue;
+      const lname = name.toLowerCase();
+      const cls = typeof s.cls === 'string' && s.cls.trim() ? s.cls.trim().toLowerCase() : null;
+      const msrp =
+        typeof s.msrp === 'number' && Number.isFinite(s.msrp) && s.msrp > 0 ? s.msrp : null;
+      const img = OH.feedImage(s.img);
+      const hit = (cls && byCls.get(cls)) || byName.get(lname);
+      if (hit) {
+        if (msrp) hit.msrp = msrp;
+        if (cls && !hit.cls) hit.cls = cls;
+        if (img) hit.img = img;
+        continue;
+      }
+      const v = {
+        name,
+        lname,
+        slug: cls || lname.replace(/[^a-z0-9]+/g, '-'),
+        cls,
+        msrp,
+        img,
+        career: null,
+        role: null,
+        size: null,
+        status: null,
+        crew: null,
+        cargo: 0,
+        mfr: null,
+      };
+      out.push(v);
+      byName.set(lname, v);
+      if (cls) byCls.set(cls, v);
+    }
+    return OH.fillCatalogSizes(out);
+  };
+
   // The ship list that ships inside the extension (src/data/ship-catalog.json,
   // refreshed weekly by a GitHub Action), or null.
   async function bundledCatalog() {
@@ -2264,50 +2586,32 @@
     }
   }
 
-  // The full wiki vehicle catalog, cached slim for CATALOG_TTL. On a cold cache
-  // the bundled snapshot answers straight away (prices show instantly, and
-  // offline) while the live list downloads in the background for next time.
+  // The ship list: bundled snapshot + the ships feed (OH.mergeShipsFeed). The
+  // bundled list answers at once (prices show instantly, and offline) when the feed
+  // is slow; the merged list replaces it as soon as the feed lands.
   async function getCatalog() {
     if (catalogMem) return catalogMem;
-    const cached = (await chrome.storage.local.get('shipCatalog')).shipCatalog;
-    if (
-      cached &&
-      cached.v === CATALOG_CACHE_V &&
-      cached.at &&
-      Date.now() - cached.at < CATALOG_TTL &&
-      Array.isArray(cached.list)
-    ) {
-      catalogMem = cached.list;
-      return catalogMem;
-    }
     if (catalogInflight) return catalogInflight;
-    const refresh = (async () => {
-      let list = [];
-      try {
-        list = await OH.fetchShipCatalog();
-      } catch (e) {
-        /* offline: fall back to the bundled snapshot (below) */
-        OH.log('warn', 'catalog', `ship catalog download failed: ${e?.message || e}`);
+    catalogInflight = (async () => {
+      const bundled = (await bundledCatalog()) || [];
+      const feedP = OH.getShipsFeed().catch(() => null);
+      const merge = (feed) => OH.mergeShipsFeed(bundled, feed && feed.data && feed.data.ships);
+      const quick = await Promise.race([
+        feedP,
+        new Promise((r) => setTimeout(() => r(false), 1500)),
+      ]);
+      if (quick === false) {
+        feedP.then((feed) => {
+          if (feed) catalogMem = merge(feed);
+        });
+        catalogMem = bundled.length ? bundled : null;
+        return bundled;
       }
-      if (list.length) {
-        catalogMem = list;
-        try {
-          await chrome.storage.local.set({
-            shipCatalog: { v: CATALOG_CACHE_V, at: Date.now(), list },
-          });
-        } catch {}
-      }
-      catalogInflight = null;
-      return list.length ? list : catalogMem || [];
-    })();
-    catalogInflight = refresh;
-    const bundled = await bundledCatalog();
-    if (catalogMem) return catalogMem; // the live list already landed
-    if (bundled) {
-      catalogMem = bundled; // answer now; `refresh` replaces it when it lands
-      return bundled;
-    }
-    return refresh;
+      const list = merge(quick);
+      if (list.length) catalogMem = list;
+      return list;
+    })().finally(() => (catalogInflight = null));
+    return catalogInflight;
   }
 
   // Score how well a catalog entry's (lowercased) name matches the query. 0 = no
@@ -2348,25 +2652,21 @@
     return best;
   }
 
-  // Rank wiki catalog entries against a raw RSI name; return up to 3 slugs.
-  function matchSlugs(catalog, rawName) {
+  // Best picture from the ship list (the ships feed's art) for a raw RSI name, or null.
+  function matchCatalogImage(catalog, rawName) {
     const q = OH.normShipName(rawName).toLowerCase();
-    if (!q || !catalog.length) return [];
-    const scored = [];
+    if (!q || !catalog || !catalog.length) return null;
+    let best = null;
+    let bestScore = 0;
     for (const v of catalog) {
-      const s = nameScore(v.lname, q);
-      if (s) scored.push({ slug: v.slug, score: s });
+      if (!v.img) continue;
+      const sc = nameScore(v.lname, q);
+      if (sc > bestScore) {
+        bestScore = sc;
+        best = v.img;
+      }
     }
-    scored.sort((a, b) => b.score - a.score);
-    const out = [];
-    const seen = new Set();
-    for (const s of scored) {
-      if (seen.has(s.slug)) continue;
-      seen.add(s.slug);
-      out.push(s.slug);
-      if (out.length >= 3) break;
-    }
-    return out;
+    return best;
   }
 
   // The original, full-size copy of a picture we show as a thumbnail (#299), or null
@@ -2399,28 +2699,6 @@
     return null;
   };
 
-  // Fetch a single vehicle's store image by slug (exact, reliable). ~600px webp.
-  async function fetchVehicleImage(slug) {
-    try {
-      const res = await OH.guarded()(
-        `${SC_API}/vehicles/${encodeURIComponent(slug)}?include=images`,
-        {
-          credentials: 'omit',
-          headers: { Accept: 'application/json' },
-        },
-      );
-      if (!res.ok) return null;
-      const json = await res.json();
-      const v = Array.isArray(json.data) ? json.data[0] : json.data;
-      const imgs = v && v.images;
-      if (Array.isArray(imgs) && imgs.length)
-        return imgs[0].thumbnail_url || imgs[0].original_url || null;
-    } catch {
-      /* ignore — caller caches a negative */
-    }
-    return null;
-  }
-
   // Resolve a ship store-image URL by (raw) name. Returns a URL or null; never throws.
   OH.getShipImage = async function getShipImage(rawName) {
     const key = OH.normShipName(rawName).toLowerCase();
@@ -2441,19 +2719,13 @@
         let url = null;
         // 1) RSI ship-matrix (one cached fetch, covers concept ships).
         url = matchMatrixImage(await getShipMatrix(), rawName);
-        // 2) Fallback: star-citizen.wiki (catalog match → per-slug image fetch).
-        if (!url) {
-          const catalog = await getCatalog();
-          for (const slug of matchSlugs(catalog, rawName)) {
-            url = await fetchVehicleImage(slug);
-            if (url) break; // first candidate with art wins
-          }
-        }
+        // 2) Fallback: the picture openhangar.space's ships feed has for it.
+        if (!url) url = matchCatalogImage(await getCatalog(), rawName);
         shipImgMem.set(key, url);
         await mutateStored('shipImages', (cur = {}) => {
           const out = pruneTimed(cur, (e) => (e.url ? SHIP_IMG_TTL : 24 * 3600e3));
           out[key] = { url, at: Date.now() };
-          return out;
+          return capNewest(out, OH.CACHE_MAX.shipImages);
         }).catch(() => {
           /* storage full / unavailable — memory cache still applies */
         });
@@ -2470,10 +2742,10 @@
   };
 
   // --- Ship prices + hangar value ------------------------------------------
-  // The star-citizen.wiki vehicle list carries each ship's `msrp` (current USD
-  // store price), so pricing a whole hangar costs the same ~6 cached catalog
-  // requests as the image lookup — nothing per ship. Concept ships the wiki has
-  // no price for stay unpriced (the UI says how many).
+  // The ship list (bundled, with openhangar.space's ships feed on top) carries each
+  // ship's `msrp` (current USD store price), so pricing a whole hangar costs one
+  // cached feed request, nothing per ship. Concept ships with no price stay
+  // unpriced (the UI says how many).
 
   // Word-set match for names RSI and the wiki order differently: "Hercules
   // Starlifter C2" ↔ "C2 Hercules Starlifter", "Aurora MR" ↔ "Aurora Mk I MR".
@@ -2554,7 +2826,7 @@
     return OH.makeShipIndex(catalog, codes).priceOf;
   };
 
-  // Live resolvers backed by the cached wiki catalog. Offline, they just return
+  // Live resolvers backed by the ship list. Offline, they just return
   // null, so callers never need to special-case it.
   OH.getShipIndex = async function getShipIndex() {
     const [catalog, codes] = await Promise.all([getCatalog(), loadShipCodes()]);
@@ -2658,10 +2930,12 @@
   // history snapshot can be valued with exactly the same numbers.
   OH.accountValue = function accountValue(items, priceOf, credit, hv) {
     const v = hv || OH.hangarValue(items, priceOf);
-    const out = { ships: 0, ccus: 0, other: 0, credit: 0, total: 0, byId: {} };
+    const out = { ships: 0, ccus: 0, other: 0, credit: 0, total: 0, byId: {}, unpriced: 0 };
     for (const p of items || []) {
       const si = v.pledges[p.id];
       const melt = Number.isFinite(p.value) ? p.value : 0;
+      // No store price and no melt value: it adds nothing, and `unpriced` says so.
+      if (!Number.isFinite(p.value) && !(si && si.store != null)) out.unpriced++;
       let amt;
       let bucket;
       if (si && si.ccu) {
@@ -2823,18 +3097,19 @@
   // buy-back cost the same to reclaim). For CCUs, run it on each ship name. The full
   // RSI name stays in tooltips, the details window and exports. Pure.
   // Retired ships (#306): RSI retired the Aurora Mk I (Sep 30, 2026) and the Hornet
-  // Mk I (2024). Buy-backs of the ships themselves, packs holding them and upgrades
-  // to or from them can't be reclaimed any more; their paints still can. Old pledges
+  // Mk I (2024). RSI still sells their buy-backs back for now (owner put an Aurora
+  // Mk I buy-back in the cart, 2026-10-05), so this only labels them: buy-backs of
+  // the ships, packs holding them and upgrades to or from them; paints aren't marked. Old pledges
   // use the old names ("Aurora MR", "F7C Hornet"), so any Aurora that isn't a Mk II
   // and any Hornet that isn't a Mk II counts. Returns a short note, or null. Pure.
   const RETIRED_SHIPS = [
     {
       re: /\baurora\b(?!\s*mk\s*ii\b)/i,
-      note: 'RSI retired the Aurora Mk I on Sep 30, 2026, so it can no longer be bought back.',
+      note: 'RSI retired the Aurora Mk I on Sep 30, 2026. Its buy-back is still open on RSI.',
     },
     {
       re: /\b(f7c[a-z-]*|hornet)\b(?![^,;|]*\bmk\s*ii\b)/i,
-      note: 'RSI retired the Hornet Mk I, so it can no longer be bought back.',
+      note: 'RSI retired the Hornet Mk I. Its buy-back is still open on RSI.',
     },
   ];
   OH.retiredBuyback = function retiredBuyback(b) {
@@ -2845,6 +3120,99 @@
     if (/\b(paint|livery|skin)\b/i.test(String(b.name || '')) && !b.ccu) return null;
     for (const r of RETIRED_SHIPS) if (r.re.test(names)) return r.note;
     return null;
+  };
+
+  // Can't Be Bought Back (#403, RSI's "Pledge Buy Back Tool" article): pledges RSI
+  // never sells back once melted. Only what the scanned data proves: the game
+  // Squadron 42 in it, a physical item in it, RSI's own "Add-On" store label, the
+  // AMD package by name, a community giveaway by name. Discounted combos, one per
+  // account limits and CCUs whose ships moved in value can't be told from the scan,
+  // so they get no label. Works on a hangar pledge (`contents`) and a buy-back
+  // (`contains`, plus its loaded page's `also` list in `detail`). → key or null. Pure.
+  const SQ42_GAME_RE =
+    /\bsquadron\s*42\b[^,;|]*?\b(digital|download|game|package)\b|(\+|&)\s*squadron\s*42\b|\bsquadron\s*42\s*(\+|&)/i;
+  // Squadron 42 extras that aren't the game (a soundtrack, a poster, …).
+  const SQ42_EXTRA_RE =
+    /\b(soundtrack|ost|posters?|art\s*book|artbook|wallpapers?|novel|book|models?|coins?|patch|shirt|jacket|hat|mug|paints?|skins?|livery)\b/i;
+  const BB_ADDON_RE = /^\s*add[\s-]?ons?\s*[-–]\s/i;
+  OH.BUYBACK_BLOCK_REASONS = {
+    sq42: 'Pledges with Squadron 42 in them are never sold back.',
+    physical: 'Pledges with a physical item in them are never sold back.',
+    addon: 'Add-on pledges are never sold back.',
+    amd: 'The AMD package is never sold back.',
+    giveaway: 'Community giveaway pledges are never sold back.',
+  };
+  OH.buybackBlock = function buybackBlock(p, detail) {
+    if (!p) return null;
+    const name = String(p.name || '');
+    // An upgrade is its own thing: none of the rules below are about CCUs.
+    if (p.isCCU || p.ccu) return null;
+    const labels = [
+      name,
+      ...(Array.isArray(p.contents) ? p.contents.map((c) => (c && c.label) || '') : []),
+      String(p.contains || ''),
+      ...((detail && Array.isArray(detail.also) && detail.also) || []),
+    ].filter(Boolean);
+    const sq42 = (l) =>
+      String(l)
+        .split(/[,;|]/)
+        .some((part) => SQ42_GAME_RE.test(part) && !SQ42_EXTRA_RE.test(part));
+    if (labels.some(sq42)) return 'sq42';
+    if (labels.some((l) => /\bphysical\b/i.test(l))) return 'physical';
+    if (BB_ADDON_RE.test(name)) return 'addon';
+    if (/\bAMD\b/.test(name)) return 'amd';
+    if (/\bgiveaways?\b/i.test(name)) return 'giveaway';
+    return null;
+  };
+
+  // What melting a hangar pledge means (#403), from what the scan shows. Never melts
+  // anything: the window only links to the pledge on RSI. → { block, lines }, where
+  // `block` is a buybackBlock key (or null) and `lines` are short sentences, the
+  // important one first. Some early pledges come back differently; none is claimed.
+  OH.meltFacts = function meltFacts(p) {
+    const lines = [];
+    if (!p) return { block: null, lines };
+    const block = OH.buybackBlock(p);
+    const name = String(p.name || '');
+    // An upgraded pledge: RSI adds "- upgraded" to its name. The buy-back is the
+    // pledge as first bought, so the upgrades on it are gone.
+    if (/\s[-–]\s*upgraded\s*$/i.test(name)) {
+      const before = name.replace(/\s[-–]\s*upgraded\s*$/i, '').trim();
+      const cat = String(before.match(/^\s*(.+?)\s+[-–]\s/)?.[1] || '').toLowerCase();
+      const short = OH.shortBuybackName(before);
+      const noun = /\bpack(age)?s?$/i.test(short)
+        ? ''
+        : /^(packs?|packages?|game\s+packages?)$/.test(cat)
+          ? ' pack'
+          : ' pledge';
+      const ships = (p.contents || []).filter(
+        (c) => c && /^ship$/i.test(c.kind || '') && !c.guessed && c.label,
+      );
+      // The ship it holds now, named only when it's clearly not the original one.
+      const now =
+        ships.length === 1 && !before.toLowerCase().includes(ships[0].label.toLowerCase())
+          ? `the ${ships[0].label}`
+          : 'the upgraded ship';
+      lines.push(
+        `The buy-back is your original ${short}${noun}, not ${now}. The upgrades on it are lost.`,
+      );
+    }
+    if (p.insurance) {
+      const ins =
+        p.insurance === 'LTI'
+          ? 'LTI'
+          : /^\d+M$/.test(p.insurance)
+            ? `${p.insurance.slice(0, -1)} months of insurance`
+            : `${p.insurance}`;
+      lines.push(`It carries ${ins}. Melting it gives that up until you buy it back.`);
+    }
+    if (p.giftable) {
+      lines.push("It's giftable now. Bought back with store credit, it can't be gifted.");
+    }
+    lines.push(
+      "Buying it back costs full price: sale prices and subscriber coupons don't carry over. Store credit also needs a Buy-Back Token, and it's one buy-back per cart.",
+    );
+    return { block, lines };
   };
 
   OH.shortBuybackName = function shortBuybackName(name) {
@@ -2859,6 +3227,15 @@
       .trim();
     return short || full;
   };
+  // A buy-back's title, the one helper for every list, window and export (#273).
+  // Short (the default): no type label or Warbond / Standard Edition, "—" when it
+  // has no name. Full: RSI's name as is, for the details window and the exports.
+  // A CCU reads "from → to" either way.
+  OH.buybackTitle = function buybackTitle(b, { short = true } = {}) {
+    const s = short ? OH.shortBuybackName : (n) => n;
+    if (b.ccu) return `${s(b.ccu.from)} → ${s(b.ccu.to)}`;
+    return short ? s(b.name) || '—' : b.name || '';
+  };
   OH.pruneBuybackDetails = async function pruneBuybackDetails(ids) {
     const keep = new Set(ids.map(String));
     const next = await mutateStored(BBD_KEY, (cur = {}) =>
@@ -2866,18 +3243,20 @@
     ).catch(() => null);
     if (next) bbdMem = next;
   };
-  // Read one buy-back page (cached). → detail | { error }.
+  // Read one buy-back page (cached). → detail | { error, rateLimited?, transient?,
+  // retryAfter? } (transient: RSI failed or couldn't be reached, after retries).
   OH.fetchBuybackDetail = async function fetchBuybackDetail(id) {
     const all = await OH.getBuybackDetails();
-    if (all[id]) return all[id];
+    if (all[id] && !all[id].partial) return all[id];
     if (!/^\d+$/.test(String(id))) return { error: 'No RSI page for this buy-back.' };
-    const got = await fetchPage(`https://robertsspaceindustries.com/pledge/buyback/${id}`, null, {
+    const got = await fetchPage(RSI_ORIGIN + RULES.buybackDetail.path + id, null, {
       retryRateLimit: false,
     });
     if (got.rateLimited || got.res?.status === 403) {
-      return { error: 'RSI asked us to slow down.', rateLimited: true };
+      const retryAfter = got.rateLimited ? got.retryAfter : header(got.res, 'retry-after');
+      return { error: 'RSI asked us to slow down.', rateLimited: true, retryAfter };
     }
-    if (got.error) return { error: got.error };
+    if (got.error) return { error: got.error, transient: true, retryAfter: got.retryAfter };
     if (!got.res.ok) return { error: `RSI responded ${got.res.status}.` };
     const html = await got.res.text();
     // A page the parser chokes on is skipped like an unreadable one, so one odd
@@ -2897,66 +3276,350 @@
     saveBuybackDetails();
     return all[id];
   };
-  // Read many, politely: one at a time with a random pause between pages, and at
-  // RSI's first "slow down" (429, or a 403 block) the whole batch stops and batches
-  // are held off for BBD_COOLDOWN_MS, rather than pushing on page by page. What was
-  // read is kept. onProgress(done, total); stop by returning false from shouldGo().
-  // → { done, errors, total, rateLimited?, retryAt? }.
+  // Read many, politely (the automatic pack read after a scan, Load Details and Get
+  // Details): one page at a time, with a random 1 to 2 s pause between pages
+  // (OH.bbdPause). At RSI's first "slow down" (429, or a 403 block) the whole batch
+  // stops, rather than pushing on page by page, and batches are held off for the
+  // longer of RSI's Retry-After and a cooldown that doubles with each slow-down in a
+  // row (OH.bbdCooldown: 15 minutes, 30, an hour… up to 6 hours; a batch that reads
+  // a page and ends without one starts it over). A page that fails for a passing
+  // reason (5xx or no network, after fetchPage's own retries) doubles the next pause;
+  // three in a row stop the batch. A 5xx with a Retry-After stops it at once and holds
+  // batches off until then (`busy`). What was read is kept. onProgress(done, total);
+  // stop by returning false from shouldGo().
+  // → { done, errors, total, rateLimited?, retryAt?, held?, busy? } (held: still held
+  // off from an earlier batch, so RSI wasn't asked at all).
+  const BBD_PAUSE_MS = 1000;
+  const BBD_MAX_FAILS = 3;
   const BBD_COOLDOWN_MS = 15 * 60e3;
+  const BBD_MAX_COOLDOWN_MS = 6 * 3600e3;
   const BBD_SLOW_KEY = 'bbdSlowDownUntil';
+  const BBD_STRIKES_KEY = 'bbdSlowDowns'; // slow-downs in a row
+  // The pause after a page: 1 to 2 s at random (never a fixed beat), doubled for
+  // each failed page in a row (2 to 4 s after one, 4 to 8 s after two; a third stops
+  // the batch). Pure (`rand` for tests).
+  OH.bbdPause = function bbdPause(fails = 0, rand = Math.random) {
+    return BBD_PAUSE_MS * (1 + rand()) * 2 ** fails;
+  };
+  // How long batches are held off after the `strikes`-th slow-down in a row: the
+  // longer of the cooldown (15 minutes, doubling, 6 hours at most) and RSI's
+  // Retry-After (seconds or a date, OH.retryAfterMs). Pure.
+  OH.bbdCooldown = function bbdCooldown(strikes, retryAfter, now = Date.now()) {
+    const ours = BBD_COOLDOWN_MS * 2 ** Math.max(0, strikes - 1);
+    return Math.max(Math.min(ours, BBD_MAX_COOLDOWN_MS), OH.retryAfterMs(retryAfter, now));
+  };
   OH.fetchBuybackDetails = async function fetchBuybackDetails(
     ids,
     onProgress,
     shouldGo = () => true,
   ) {
     const all = await OH.getBuybackDetails();
-    const todo = ids.filter((id) => !all[id] && /^\d+$/.test(String(id)));
-    const { [BBD_SLOW_KEY]: until = 0 } = await chrome.storage.local.get(BBD_SLOW_KEY);
+    const todo = ids.filter((id) => (!all[id] || all[id].partial) && /^\d+$/.test(String(id)));
+    const { [BBD_SLOW_KEY]: until = 0, [BBD_STRIKES_KEY]: before = 0 } =
+      await chrome.storage.local.get([BBD_SLOW_KEY, BBD_STRIKES_KEY]);
     if (until > Date.now()) {
-      return { done: 0, errors: 0, total: todo.length, rateLimited: true, retryAt: until };
+      const held = { rateLimited: true, retryAt: until, held: true };
+      return { done: 0, errors: 0, total: todo.length, ...held };
     }
     let done = 0;
     let errors = 0;
-    for (const id of todo) {
+    let read = 0; // pages read fine
+    let fails = 0; // pages in a row that failed for a passing reason
+    for (const [i, id] of todo.entries()) {
       if (!shouldGo()) break;
       const r = await OH.fetchBuybackDetail(id);
-      if (r.rateLimited) {
-        const retryAt = Date.now() + BBD_COOLDOWN_MS;
-        await chrome.storage.local.set({ [BBD_SLOW_KEY]: retryAt });
-        OH.log(
-          'warn',
-          'buybacks',
-          `details stopped after ${done} pages: RSI asked us to slow down`,
-        );
-        return { done, errors, total: todo.length, rateLimited: true, retryAt };
+      const after = r.transient ? OH.retryAfterMs(r.retryAfter) : 0;
+      if (r.rateLimited || after) {
+        // Slow-downs count toward the cooldown; a failure with a Retry-After waits it out.
+        const strikes = r.rateLimited ? before + 1 : before;
+        const retryAt =
+          Date.now() + (r.rateLimited ? OH.bbdCooldown(strikes, r.retryAfter) : after);
+        await chrome.storage.local.set({ [BBD_SLOW_KEY]: retryAt, [BBD_STRIKES_KEY]: strikes });
+        const why = r.rateLimited ? 'RSI asked us to slow down' : `${r.error}, with a Retry-After`;
+        OH.log('warn', 'buybacks', `details stopped after ${done} pages: ${why}`);
+        const busy = r.rateLimited ? {} : { busy: true }; // RSI failing, not a slow-down
+        return { done, errors, total: todo.length, rateLimited: true, retryAt, ...busy };
       }
       if (r.error) {
         errors++;
         if (/signed in/i.test(r.error)) break;
-      }
+      } else read++;
+      fails = r.transient ? fails + 1 : 0;
       done++;
       onProgress?.(done, todo.length);
-      await sleep(DELAY_MS + Math.random() * DELAY_MS * 1.5); // 0.4 to 1 s, not a fixed beat
+      if (fails >= BBD_MAX_FAILS) {
+        OH.log('warn', 'buybacks', `details stopped after ${done} pages: RSI kept failing`);
+        break;
+      }
+      // No pause after the last page, or once Stop is pressed.
+      if (i < todo.length - 1 && shouldGo()) await sleep(OH.bbdPause(fails));
     }
+    if (before && read) await chrome.storage.local.remove(BBD_STRIKES_KEY);
     return { done, errors, total: todo.length };
   };
 
-  // @sync-start: cut from store builds until sync launches (scripts/pack.mjs, #187)
+  // --- Buy-back details from your own history ------------------------------------
+  // Most buy-backs were pledges in this hangar once, and keep their pledge id when
+  // melted. So before reading any RSI page, details come from what this browser
+  // already has: the pledge archive (everything the hangar showed: contents,
+  // insurance, value), then the scan history (the value only). The ids are the
+  // same kind of number, but that a buy-back keeps its exact id isn't proven by a
+  // real melt yet, so the names must agree too; a disagreement is counted
+  // (`bbHistoryRejects`, ids only) and the buy-back falls through to RSI.
+  //
+  // Pledge archive (storage key `pledgeArchive`): { [pledge id]: { ...pledge,
+  // goneAt } } for pledges a complete hangar scan no longer has (melted, gifted,
+  // applied as an upgrade), newest ARCHIVE_MAX kept. It belongs to the live
+  // account like the scan history (parked with it, in the recovery copy, gone
+  // with Clear Data).
+  const ARCHIVE_MAX = SHAPE.ARCHIVE_MAX; // 2000 (src/hangar-shape.js)
+  OH.ARCHIVE_MAX = ARCHIVE_MAX;
+  // `archive` plus the pledges in `gone`, stamped goneAt = at, newest kept. Pure.
+  OH.archiveGone = function archiveGone(archive, gone, at) {
+    const out = isObj(archive) ? { ...archive } : {};
+    for (const p of gone || []) {
+      if (!isObj(p) || p.id == null || p.id === '') continue;
+      const { raw, ...keep } = p; // the raw RSI strings aren't needed again
+      out[String(p.id)] = { ...keep, goneAt: at };
+    }
+    return capArchive(out);
+  };
+  // The newest ARCHIVE_MAX entries of an archive (by goneAt). Pure.
+  function capArchive(out) {
+    const ids = Object.keys(out);
+    if (ids.length <= ARCHIVE_MAX) return out;
+    ids.sort((a, b) => (out[b].goneAt || 0) - (out[a].goneAt || 0));
+    return Object.fromEntries(ids.slice(0, ARCHIVE_MAX).map((id) => [id, out[id]]));
+  }
+  OH.getPledgeArchive = readArchive;
+
+  // The archive as the backup file (and so sync) carries it (#388): only what
+  // buy-back details read, no flags or images. Also cleans a hand-edited file's
+  // entries on import. Pure (src/hangar-shape.js).
+  OH.leanArchive = SHAPE.leanArchive;
+
+  // Two archives as one (a restored backup and this browser's): per pledge id the
+  // entry with the newest goneAt (a tie keeps `a`'s, this browser's fuller copy),
+  // newest ARCHIVE_MAX kept. Pure.
+  OH.mergeArchive = function mergeArchive(a, b) {
+    const out = {};
+    for (const src of [a, b]) {
+      if (!isObj(src)) continue;
+      for (const [id, p] of Object.entries(src)) {
+        if (!isObj(p) || !id) continue;
+        const cur = out[id];
+        if (!cur || (p.goneAt || 0) > (cur.goneAt || 0)) out[id] = p;
+      }
+    }
+    return capArchive(out);
+  };
+
+  // A name as compared between a buy-back and a pledge: no case, curly quotes made
+  // straight, one space, and without what OH.shortBuybackName drops (the store
+  // label in front, Warbond, Standard Edition). Pure.
+  OH.historyName = function historyName(name) {
+    const plain = String(name || '')
+      .replace(/[‘’‚‛′´`]/g, "'")
+      .replace(/[“”„‟″]/g, '"')
+      .replace(/[–—]/g, '-')
+      .replace(/\s+/g, ' ');
+    return OH.shortBuybackName(plain)
+      .toLowerCase()
+      .replace(/\s*-\s*/g, ' - ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+  const CCU_NAME_RE = /^\s*upgrade\s*-\s*(.+?)\s+to\s+(.+?)\s*$/i; // as parser.js
+  const ccuOf = (name) => {
+    const m = CCU_NAME_RE.exec(String(name || ''));
+    return m ? { from: m[1].trim(), to: m[2].trim() } : null;
+  };
+  // Do a buy-back and a pledge name (and the pledge's { from, to } when known) name
+  // the same thing? CCUs compare from and to. Pure.
+  OH.historyNamesAgree = function historyNamesAgree(b, name, pledgeCcu) {
+    const n = OH.historyName;
+    const bc = (b && b.ccu) || (b && b.isCCU ? ccuOf(b.name) : null);
+    const pc = pledgeCcu || ccuOf(name);
+    if (bc || pc) {
+      return !!(bc && pc && n(bc.from) && n(bc.from) === n(pc.from) && n(bc.to) === n(pc.to));
+    }
+    const a = n(b && b.name);
+    return !!a && a === n(name);
+  };
+
+  // What one buy-back's details can be filled with from this browser's history:
+  //   { detail }    from the archive (src 'history': contents, insurance, value)
+  //                 or the scan history (src 'scan-history', partial: value only)
+  //   { rejected }  an entry with its id exists but the names didn't agree
+  //   null          nothing known
+  // The value is what it was worth in the hangar (melt value). A Warbond's buy-back
+  // costs the standard price, so for those it's kept as `melt` but not used as the
+  // price. A pledge whose value changed while in the hangar had an upgrade
+  // applied, and a melted upgraded pledge comes back as the original ship (RSI's
+  // "- upgraded" buy-backs), so neither is filled from history. Pure.
+  OH.buybackFromHistory = function buybackFromHistory(b, archive, history, now = Date.now()) {
+    if (!b || b.id == null || b.id === '' || b.wasUpgraded) return null;
+    const id = String(b.id);
+    let last = null;
+    const values = new Set();
+    for (const snap of Array.isArray(history) ? history : []) {
+      for (const row of (snap && snap.items) || []) {
+        if (Array.isArray(row) && String(row[0]) === id) {
+          last = row;
+          values.add(Math.round(Number(row[2]) * 100));
+        }
+      }
+    }
+    if (values.size > 1) return null;
+    const warbond = (name) => /\bwarbond\b/i.test(String(name || ''));
+    let rejected = null;
+    const a = isObj(archive) ? archive[id] : null;
+    if (isObj(a)) {
+      if (OH.historyNamesAgree(b, a.name, a.ccu)) {
+        const contents = (Array.isArray(a.contents) ? a.contents : []).filter(isObj);
+        const isShip = (c) => /^ship$/i.test(String(c.kind || '').trim());
+        const melt = Number.isFinite(a.value) ? a.value : null;
+        const ins =
+          a.insurance ||
+          (window.OpenHangar && window.OpenHangar.insuranceTerm
+            ? window.OpenHangar.insuranceTerm(contents)
+            : null);
+        return {
+          detail: {
+            title: String(a.name || ''),
+            price: warbond(a.name) || warbond(b.name) ? null : melt,
+            melt,
+            currency: a.currency || 'USD',
+            ships: contents
+              .filter((c) => isShip(c) && c.label)
+              .map((c) => ({ name: c.label, manufacturer: '', focus: '', image: c.image || null })),
+            also: contents
+              .filter((c) => !isShip(c))
+              .map((c) => c.label || c.kind || '')
+              .filter(Boolean),
+            insurance: ins || null,
+            at: now,
+            src: 'history',
+          },
+        };
+      }
+      rejected = 'archive';
+    }
+    if (last) {
+      if (OH.historyNamesAgree(b, last[1])) {
+        const melt = Number(last[2]);
+        // 0 is also what a snapshot holds when RSI showed no value: say nothing.
+        if (!(melt > 0) || warbond(last[1]) || warbond(b.name))
+          return rejected ? { rejected } : null;
+        return {
+          detail: {
+            title: String(last[1] || ''),
+            price: melt,
+            melt,
+            currency: 'USD',
+            ships: [],
+            also: [],
+            insurance: null,
+            at: now,
+            src: 'scan-history',
+            partial: true, // contents still unknown: RSI's page can still be read
+          },
+        };
+      }
+      rejected = rejected || 'history';
+    }
+    return rejected ? { rejected } : null;
+  };
+
+  // Fill the details of these buy-backs from history where it can (above); RSI's
+  // pages are then only read for the rest. No requests. → { history, scan,
+  // rejected } counts for this run.
+  const BB_REJECTS_KEY = 'bbHistoryRejects';
+  const BB_REJECTS_MAX = 500;
+  // `history`: the scan history when the caller already has it (saves a read).
+  OH.fillBuybackDetailsFromHistory = async function fillBuybackDetailsFromHistory(
+    buybacks,
+    { history } = {},
+  ) {
+    const out = { history: 0, scan: 0, rejected: 0 };
+    const all = await OH.getBuybackDetails();
+    const todo = (buybacks || []).filter(
+      (b) => b && b.id != null && (!all[String(b.id)] || all[String(b.id)].partial),
+    );
+    if (!todo.length) return out;
+    const archive = await readArchive();
+    const hist = Array.isArray(history) ? history : (await OH.loadDB()).history;
+    const now = Date.now();
+    const rejects = {};
+    for (const b of todo) {
+      const id = String(b.id);
+      const r = OH.buybackFromHistory(b, archive, hist, now);
+      if (!r) continue;
+      if (r.rejected) {
+        rejects[id] = { at: now, from: r.rejected };
+        out.rejected++;
+      } else if (r.detail.partial) {
+        if (all[id]) continue; // already has its value
+        all[id] = r.detail;
+        out.scan++;
+      } else {
+        all[id] = r.detail;
+        out.history++;
+      }
+    }
+    if (out.history || out.scan) await flushBuybackDetails();
+    if (out.rejected) {
+      await mutateStored(BB_REJECTS_KEY, (cur = {}) => {
+        const next = { ...(isObj(cur) ? cur : {}), ...rejects };
+        const ids = Object.keys(next).sort((x, y) => (next[y].at || 0) - (next[x].at || 0));
+        return Object.fromEntries(ids.slice(0, BB_REJECTS_MAX).map((k) => [k, next[k]]));
+      }).catch(() => {});
+    }
+    if (out.history || out.scan || out.rejected)
+      OH.log(
+        'info',
+        'buybacks',
+        `details from history: ${out.history} from the pledge archive, ${out.scan} values from scan history, ${out.rejected} names didn't agree`,
+      );
+    return out;
+  };
+
+  // Where the saved buy-back details came from, for the error report: counts only.
+  OH.buybackDetailStats = async function buybackDetailStats() {
+    const all = await OH.getBuybackDetails();
+    const out = { history: 0, scan: 0, rsi: 0, rejected: 0 };
+    for (const d of Object.values(all)) {
+      if (!isObj(d)) continue;
+      if (d.src === 'history') out.history++;
+      else if (d.src === 'scan-history') out.scan++;
+      else out.rsi++;
+    }
+    const rej = (await chrome.storage.local.get(BB_REJECTS_KEY))[BB_REJECTS_KEY];
+    out.rejected = isObj(rej) ? Object.keys(rej).length : 0;
+    return out;
+  };
+
+  // @sync-start: the `sync` build flag's code, in every store build (src/flags.js, #187)
   // --- openhangar.space (optional sync) -------------------------------------------
-  // Nothing leaves the browser unless the user connects AND presses Sync now.
+  // Nothing leaves the browser unless the user connects. Once connected, every scan
+  // syncs, and Sync Now sends right away.
   // Connecting uses a device code: the site confirms it while signed in, then
   // hands this extension a sync token (stored in `siteLink`).
-  // A dev build's built-in site: `npm run build:staging` writes the staging URL
-  // here (scripts/pack.mjs), so it syncs without a `siteUrl` override. Always empty
-  // in the repo; a store build can never carry it (scripts/check-store-build.mjs).
+  // A built-in site: every build with sync gets the production site here, and
+  // `npm run build:staging` the staging one (scripts/pack.mjs), so sync is on without a
+  // `siteUrl` override. Always empty in the repo; a store build only ever carries
+  // production (scripts/check-store-build.mjs).
   const SITE_BUILT_IN = '';
   const SITE_DEFAULT = SITE_BUILT_IN || 'https://app.openhangar.space';
+  // The versioned sync address: a later change to what sync sends gets /api/v2/sync on
+  // the website, and this version keeps working here.
+  const SYNC_PATH = '/api/v1/sync';
   OH.siteUrl = async function siteUrl() {
     const { siteUrl } = await chrome.storage.local.get('siteUrl'); // dev override
     return (siteUrl || SITE_DEFAULT).replace(/\/+$/, '');
   };
-  // Off for everyone until app.openhangar.space launches; on only when a
-  // developer sets `siteUrl` (local testing) or built with build:staging.
+  // On in every build with a built-in site (the store builds, the beta, staging), or
+  // when a developer sets `siteUrl` (local testing).
   OH.siteEnabled = async function siteEnabled() {
     const { siteUrl } = await chrome.storage.local.get('siteUrl');
     return Boolean(siteUrl || SITE_BUILT_IN);
@@ -3005,28 +3668,296 @@
     }
     return null;
   };
-  // Upload the same payload as the JSON backup. → { synced_at } or throws.
-  OH.siteSync = async function siteSync() {
+  // The sync request's JSON text: the backup file's payload, kept within
+  // SYNC_BUDGET_BYTES (#388). The website takes up to 5 MB per sync
+  // (MAX_SYNC_BYTES), so the budget keeps a megabyte spare. When a payload is
+  // bigger, the oldest entries go first: pledge archive entries, then (only if
+  // that wasn't enough) scan history snapshots, the newest one always kept. The
+  // website only reads the history on an account's first sync, and a smaller one
+  // beats a sync it refuses. The hangar and buy-backs always go whole. Pure.
+  const SYNC_BUDGET_BYTES = 4e6;
+  OH.SYNC_BUDGET_BYTES = SYNC_BUDGET_BYTES;
+  OH.syncBody = function syncBody(payload, budget = SYNC_BUDGET_BYTES) {
+    const enc = new TextEncoder();
+    const bytes = (v) => enc.encode(JSON.stringify(v)).length;
+    const text = JSON.stringify(payload);
+    let over = enc.encode(text).length - budget;
+    if (over <= 0 || !isObj(payload)) return text;
+    const out = { ...payload };
+    if (isObj(payload.pledgeArchive)) {
+      const keep = { ...payload.pledgeArchive };
+      const oldestFirst = Object.keys(keep).sort(
+        (a, b) => ((keep[a] && keep[a].goneAt) || 0) - ((keep[b] && keep[b].goneAt) || 0),
+      );
+      for (const id of oldestFirst) {
+        if (over <= 0) break;
+        over -= bytes(id) + bytes(keep[id]) + 2; // the `:` and `,` around it
+        delete keep[id];
+      }
+      out.pledgeArchive = keep;
+    }
+    if (over > 0 && Array.isArray(payload.history)) {
+      const hist = payload.history.slice(); // oldest first, as stored
+      while (over > 0 && hist.length > 1) over -= bytes(hist.shift()) + 1;
+      out.history = hist;
+    }
+    return JSON.stringify(out);
+  };
+
+  // What sync sends: the backup file's payload without the referral prospects list
+  // (other players who used your code but aren't recruits yet stay in this browser;
+  // their count still goes). Returns a copy, never changes `payload`. Pure
+  // (src/hangar-shape.js withoutProspects).
+  OH.syncPayload = SHAPE.withoutProspects;
+
+  // Whose hangar a sync sends. The link is one per browser, but a browser can keep
+  // more than one RSI account (OH.switchProfile parks the others), so the link
+  // remembers the accounts it has synced (`accounts`: handle and Citizen Record) and
+  // the ones you said no to (`declined`). A scan of any other account asks first
+  // ("Sync <handle> to your openhangar.space account?" in the scan report), and the
+  // answer is kept per handle. A link's first sync isn't asked when this browser keeps
+  // only that one account: that's whoever connected.
+  const SITE_PILOTS_MAX = 20;
+  const lcHandle = (s) => String(s || '').toLowerCase();
+  // A Citizen Record the way the website reads it: its digits ("#123456" → "123456"),
+  // else null. A placeholder ("n/a") or nothing is no record, so two accounts never
+  // count as one pilot by it.
+  const cleanRecord = (v) => String(v ?? '').match(/(\d{1,12})/)?.[1] || null;
+  // The export's account (the website files a hangar under its handle) → { handle,
+  // record } or null when there's no handle (nothing to tell apart, so it goes as before).
+  function pilotOf(payload) {
+    const a = isObj(payload?.account) ? payload.account : null;
+    const handle = typeof a?.handle === 'string' ? a.handle.trim() : '';
+    if (!handle) return null;
+    return { handle, record: cleanRecord(a.ueeRecord) };
+  }
+  const samePilot = (a, b) => {
+    const record = cleanRecord(a.record);
+    return (
+      lcHandle(a.handle) === lcHandle(b.handle) || (!!record && record === cleanRecord(b.record))
+    );
+  };
+  const pilotList = (list) => (Array.isArray(list) ? list.filter(isObj) : []);
+  // A sync that couldn't read the Citizen Record (signed out of RSI, say) keeps the one
+  // already known for that handle.
+  const withPilot = (list, who) => {
+    const had = pilotList(list);
+    const record =
+      cleanRecord(who.record) || cleanRecord(had.find((p) => samePilot(p, who))?.record);
+    return [...had.filter((p) => !samePilot(p, who)), { handle: who.handle, record }].slice(
+      -SITE_PILOTS_MAX,
+    );
+  };
+  const withoutPilot = (list, who) => pilotList(list).filter((p) => !samePilot(p, who));
+  // → 'yes' (synced through this link before), 'no' (you said no), 'new' (another
+  // account than the ones it synced) or 'first' (it hasn't synced one yet). Pure.
+  OH.sitePilotAnswer = function sitePilotAnswer(link, who) {
+    if (!who) return 'yes';
+    if (pilotList(link?.accounts).some((p) => samePilot(p, who))) return 'yes';
+    if (pilotList(link?.declined).some((p) => samePilot(p, who))) return 'no';
+    return pilotList(link?.accounts).length ? 'new' : 'first';
+  };
+  // Does this browser keep a hangar for another RSI account than `who`?
+  async function otherPilotsHere(who) {
+    const rows = await OH.listProfiles().catch(() => []);
+    return rows.some((r) => r.nickname && lcHandle(r.nickname) !== lcHandle(who.handle));
+  }
+  // Change the stored link, unless it was disconnected or replaced meanwhile (a sync
+  // that ends after Disconnect mustn't bring the link back).
+  async function updateLink(token, change) {
+    const now = await OH.getSiteLink();
+    if (!now || now.token !== token) return;
+    await chrome.storage.local.set({ siteLink: change(now) });
+  }
+  // Your answer to "Sync <handle> to your openhangar.space account?": yes syncs that
+  // account through this link from now on; no keeps it out of the sync after a scan
+  // (Sync Now asks again).
+  OH.siteSyncAnswer = async function siteSyncAnswer(who, yes) {
+    const link = await OH.getSiteLink();
+    if (!link || !who || typeof who.handle !== 'string' || !who.handle) return;
+    const pilot = { handle: who.handle, record: cleanRecord(who.record) };
+    await updateLink(link.token, (l) => ({
+      ...l,
+      accounts: yes ? withPilot(l.accounts, pilot) : withoutPilot(l.accounts, pilot),
+      declined: yes ? withoutPilot(l.declined, pilot) : withPilot(l.declined, pilot),
+    }));
+  };
+
+  // Holding off (owner, 2026-10-08). Until launch day the website refuses most accounts
+  // (`not-open`), and it takes one sync per account every few minutes (429,
+  // `too-soon`). Uploading the whole hangar after every scan only to hear that again
+  // helps nobody, so the link keeps `wait: { reason, until, said }`: after `not-open`
+  // the sync after a scan holds off for SYNC_NOT_OPEN_WAIT_MS (Sync Now still tries),
+  // and a 429's Retry-After holds every sync, Sync Now too.
+  const SYNC_NOT_OPEN_WAIT_MS = 6 * 3600e3;
+  const SYNC_TOO_SOON_WAIT_MS = 5 * 60e3; // a 429 without Retry-After
+  // → the wait that holds this sync ({ reason, until, said }) or null. One that runs
+  // past a day (a clock set back) is ignored. Pure.
+  OH.siteSyncWait = function siteSyncWait(link, { auto = false, now = Date.now() } = {}) {
+    const w = isObj(link?.wait) ? link.wait : null;
+    if (!w || !Number.isFinite(w.until) || now >= w.until || w.until - now > 24 * 3600e3)
+      return null;
+    if (w.reason === 'too-soon' || (w.reason === 'not-open' && auto)) return w;
+    return null;
+  };
+
+  // Upload the same payload as the JSON backup (OH.syncPayload). → { synced_at } or
+  // throws. `auto` is the sync after a scan; `onSend` runs just before the upload.
+  // The website says why it refused a sync as JSON { error, reason }; each reason
+  // reads as plain advice here.
+  const SYNC_NO_SCAN = 'Scan your hangar first, then press Sync Now.';
+  const SYNC_OLDER_SCAN =
+    'The website already has a newer scan from another browser. Scan here, then press Sync Now.';
+  const SYNC_NOT_OPEN =
+    'Sync opens November 10. Your hangar stays safe in your browser until then.';
+  const SYNC_TOO_SOON =
+    'openhangar.space just took a sync for this account. The next one can launch in a few minutes.';
+  const SYNC_OLD_FORMAT =
+    'This version of Open Hangar is too old to sync. Update it, then sync again.';
+  const SYNC_NEWER_FORMAT =
+    "openhangar.space hasn't caught up with this version yet. Try again soon.";
+  const SYNC_TOO_BIG =
+    "That's more cargo than openhangar.space can hold. Your hangar stays safe in your browser.";
+  const SYNC_OTHER_LOGIN =
+    'This hangar belongs to another pilot than the one signed in to RSI. Reload Open Hangar to switch hangars, then sync.';
+  // What this version would send doesn't fit the sync format (#441), so nothing went;
+  // or the website's own check of it said so (400, reason `schema`, #584).
+  // Owner-approved words (2026-10-10).
+  const SYNC_SCHEMA =
+    "Held at the hangar doors: this version packs your hangar in a shape our site won't accept. Our bug, not yours. Nothing was sent and your hangar is safe here. Update Open Hangar, or report it if it keeps happening.";
+  // A refusal's status, reason and the website's own words → the Error to throw. Sync
+  // not open yet, or another sync too soon, isn't something you did, so it's marked
+  // `calm`: the scan report shows it as a note, not a problem (src/dashboard.js
+  // siteSyncReport). Its words are the website's when it sends a short plain sentence:
+  // a store update takes days, so a new opening date only has to change there.
+  function syncRefusal(status, reason, said = '') {
+    if (reason === 'not-open' || reason === 'too-soon' || status === 429) {
+      const own = said.length <= 200 && !/[<>]/.test(said) ? said : '';
+      const fallback = reason === 'not-open' ? SYNC_NOT_OPEN : SYNC_TOO_SOON;
+      return Object.assign(new Error(own || fallback), { calm: true });
+    }
+    if (reason === 'schema') return Object.assign(new Error(SYNC_SCHEMA), { reason });
+    if (status === 409) return new Error(reason === 'older-scan' ? SYNC_OLDER_SCAN : SYNC_NO_SCAN);
+    if (status === 426 || reason === 'old-format') return new Error(SYNC_OLD_FORMAT);
+    if (reason === 'newer-format') return new Error(SYNC_NEWER_FORMAT);
+    if (status === 413) return new Error(SYNC_TOO_BIG); // one sync, or the login's storage
+    return new Error(`openhangar.space responded ${status}`);
+  }
+  // Thrown instead of sending: `held` (a wait above; calm, the website's last words),
+  // `ask` (an account this link hasn't synced: { handle, record }, calm) and `quiet`
+  // (an account you said no to, after a scan: nothing to show). Their messages may
+  // name the handle, so they're for the screen, never the log. A body that fails the
+  // sync schema isn't sent either: `reason: 'schema'` and `path` (a JSON Pointer).
+  OH.siteSync = async function siteSync({ auto = false, onSend } = {}) {
     const link = await OH.getSiteLink();
     if (!link) throw new Error('Not connected to openhangar.space.');
-    const res = await siteFetch('/api/sync', {
+    const wait = OH.siteSyncWait(link, { auto });
+    if (wait) {
+      const said = typeof wait.said === 'string' ? wait.said : '';
+      throw Object.assign(syncRefusal(0, wait.reason, said), { held: wait.reason });
+    }
+    const live = await OH.loadDB();
+    const db = await OH.exportDB(live);
+    // Nothing scanned in this browser yet: sending its empty hangar would replace
+    // the one already on the website (the server refuses it too).
+    if (!db?.sources?.hangar?.scannedAt) throw new Error(SYNC_NO_SCAN);
+    const who = pilotOf(db);
+    // The export names the cached RSI login, but the hangar is the live account's
+    // (`owner`). They differ when someone else signed in to RSI before this page
+    // switched hangars (reconcileAccount): one pilot's hangar under the other's handle
+    // never goes. Calm, and without a handle, so it can be logged.
+    const owner = String(live?.owner?.nickname || '').trim();
+    if (who && owner && lcHandle(owner) !== lcHandle(who.handle))
+      throw Object.assign(new Error(SYNC_OTHER_LOGIN), { calm: true });
+    const answer = OH.sitePilotAnswer(link, who);
+    if (answer === 'no' && auto)
+      throw Object.assign(new Error('Not synced: you chose to keep this account here.'), {
+        quiet: true,
+      });
+    if (answer === 'no' || answer === 'new' || (answer === 'first' && (await otherPilotsHere(who))))
+      throw Object.assign(new Error(`Sync ${who.handle} to your openhangar.space account?`), {
+        calm: true,
+        ask: who,
+      });
+    // The body is checked against the sync payload's schema (#441) as it will go,
+    // parsed back from its own text: one that fails is never sent. The flight log
+    // gets where (a path of keys and row numbers, never a value), the screen the
+    // plain words.
+    const body = OH.syncBody(OH.syncPayload(db));
+    const bad = SHAPE.checkPayload(JSON.parse(body));
+    if (bad) {
+      const at = bad.path || '/';
+      OH.log(
+        'error',
+        'site',
+        `sync not sent: the payload fails its schema at ${at} (${bad.reason})`,
+      );
+      throw Object.assign(new Error(SYNC_SCHEMA), { reason: 'schema', path: bad.path });
+    }
+    onSend?.();
+    const res = await siteFetch(SYNC_PATH, {
       method: 'POST',
       headers: { authorization: `Bearer ${link.token}` },
-      body: JSON.stringify(await OH.exportDB()),
+      body,
     });
     if (res.status === 401) {
-      await chrome.storage.local.remove('siteLink');
+      // Forget this link only: one connected again meanwhile stays.
+      if ((await OH.getSiteLink())?.token === link.token)
+        await chrome.storage.local.remove('siteLink');
       throw new Error('This extension was disconnected on the website. Connect again.');
     }
-    if (!res.ok) throw new Error(`openhangar.space responded ${res.status}`);
+    if (!res.ok) {
+      // Not always JSON (a proxy's error page, say): then there's no reason.
+      const body = await res.json().catch(() => null);
+      const text = (v) => (typeof v === 'string' ? v.trim() : '');
+      const reason = text(body?.reason);
+      const err = syncRefusal(res.status, reason, text(body?.error));
+      // The website's format check refused it: where it didn't fit goes in the flight
+      // log, for a scan problem report. A JSON Pointer of keys and row numbers only,
+      // never a value; anything else is left out.
+      if (reason === 'schema') {
+        const path = text(body?.path);
+        if (/^(\/[\w.~-]*){1,32}$/.test(path) && path.length <= 200) err.path = path;
+        OH.log(
+          'error',
+          'site',
+          `sync refused: the website's format check failed at ${err.path || '?'}`,
+        );
+      }
+      const at = Date.now();
+      // An extension page only sees Retry-After when the website exposes it (CORS), so
+      // `retry_after` (seconds) in the JSON counts too.
+      const retryAfter = header(res, 'retry-after') || body?.retry_after;
+      const hold =
+        reason === 'not-open'
+          ? { reason, until: at + SYNC_NOT_OPEN_WAIT_MS }
+          : res.status === 429 || reason === 'too-soon'
+            ? {
+                reason: 'too-soon',
+                until: at + (OH.retryAfterMs(retryAfter, at) || SYNC_TOO_SOON_WAIT_MS),
+              }
+            : null;
+      if (hold)
+        await updateLink(link.token, (l) => ({ ...l, wait: { ...hold, said: err.message } }));
+      throw err;
+    }
     const j = await res.json();
-    await chrome.storage.local.set({ siteLink: { ...link, lastSync: j.synced_at } });
+    await updateLink(link.token, (l) => {
+      const { wait, ...rest } = l;
+      return {
+        ...rest,
+        lastSync: j.synced_at,
+        ...(who
+          ? { accounts: withPilot(l.accounts, who), declined: withoutPilot(l.declined, who) }
+          : {}),
+      };
+    });
     return j;
   };
   OH.siteDisconnect = async function siteDisconnect() {
     const link = await OH.getSiteLink();
     if (link) {
-      await siteFetch('/api/sync', {
+      await siteFetch(SYNC_PATH, {
         method: 'DELETE',
         headers: { authorization: `Bearer ${link.token}` },
       }).catch(() => null);
@@ -3060,70 +3991,6 @@
     'KRW',
   ];
   OH.ZERO_DECIMAL = ['JPY', 'KRW']; // shown without cents
-
-  // --- Game status + events (starcitizen.tools main page settings) -------------
-  // The wiki's main page reads everything it shows from one JSON page: the
-  // current event ({ name, page, text, starts, ends }) and the patches on each
-  // channel ([{ channel: 'LIVE' | 'PTU' | 'EPTU' …, name: '4.10.2', page }]).
-  // Editors update it by hand and an event card can stay up after it ends, so
-  // callers must check the dates (OH.activeWikiEvent), never just show it.
-  const WIKI_MAIN_KEY = 'wikiMainpage';
-  const WIKI_MAIN_TTL = 6 * 60 * 60 * 1000;
-  // "2026-09-9 16:00" (wiki style, UTC, unpadded day) → ms, or NaN.
-  OH.parseWikiTime = function parseWikiTime(s) {
-    const m = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/.exec(String(s || '').trim());
-    return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0)) : NaN;
-  };
-  // Keep only what Home shows, from the settings JSON. Pure.
-  OH.shapeWikiMainpage = function shapeWikiMainpage(json) {
-    const e = json && typeof json.event === 'object' ? json.event : null;
-    const patches = Array.isArray(json && json.patches) ? json.patches : [];
-    return {
-      event:
-        e && e.name
-          ? {
-              name: String(e.name),
-              page: e.page ? String(e.page) : '',
-              text: e.text ? String(e.text) : '',
-              starts: OH.parseWikiTime(e.starts),
-              ends: OH.parseWikiTime(e.ends),
-            }
-          : null,
-      patches: patches
-        .filter((p) => p && p.channel && p.name)
-        .map((p) => ({
-          channel: String(p.channel).toUpperCase(),
-          name: String(p.name),
-          page: p.page ? String(p.page) : '',
-        })),
-    };
-  };
-  // The event only while it's actually on: started (or no start given) and not
-  // yet ended. An event with no end date is never shown (can't tell it's over).
-  OH.activeWikiEvent = function activeWikiEvent(main, now = Date.now()) {
-    const e = main && main.event;
-    if (!e || !Number.isFinite(e.ends) || now >= e.ends) return null;
-    if (Number.isFinite(e.starts) && now < e.starts) return null;
-    return e;
-  };
-  OH.getWikiMainpage = async function getWikiMainpage(fetchFn = fetch) {
-    const { [WIKI_MAIN_KEY]: cached } = await chrome.storage.local.get(WIKI_MAIN_KEY);
-    if (cached && Date.now() - cached.at < WIKI_MAIN_TTL) return cached.data;
-    try {
-      const res = await OH.guarded(fetchFn)(
-        'https://starcitizen.tools/api.php?action=query&titles=Module:Mainpage/settings.json&prop=revisions&rvprop=content&rvslots=main&format=json&origin=*',
-        { credentials: 'omit' },
-      );
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const page = Object.values((await res.json())?.query?.pages || {})[0];
-      const text = page?.revisions?.[0]?.slots?.main?.['*'];
-      const data = OH.shapeWikiMainpage(JSON.parse(text));
-      await chrome.storage.local.set({ [WIKI_MAIN_KEY]: { at: Date.now(), data } });
-      return data;
-    } catch {
-      return cached ? cached.data : null; // stale beats nothing; null when never fetched
-    }
-  };
 
   // --- Patch notes (RSI Spectrum, Patch Notes channel) --------------------------
   // Newest threads in RSI's Patch Notes forum: PTU waves, LIVE release notes,
@@ -3214,115 +4081,65 @@
     return null;
   };
 
-  // --- Referral bonus events (starcitizen.tools) ---------------------------------
-  // The wiki's "Special Incentive Events" table: one row per event with start,
-  // end, name and the rewards. Returns [{ start, end, name, reward }] where
-  // `reward` is what the referrer ("You") gets, as plain text.
-  function wikiPlain(s) {
-    const text = String(s || '')
-      .replace(/<ref[^>]*\/>/gi, '')
-      .replace(/<ref[\s\S]*?<\/ref\s*>/gi, '')
-      .replace(/\[\[(?:File|Image):[^\]]*\]\]/gi, '')
-      .replace(/\[\[[^\]|]*\|([^\]]*)\]\]/g, '$1')
-      .replace(/\[\[([^\]]*)\]\]/g, '$1')
-      .replace(/\{\{[\s\S]*?\}\}/g, '')
-      .replace(/'{2,}/g, '');
-    return stripTags(text, '')
-      .replace(/�/g, '"')
-      .replace(/[ \t]+/g, ' ')
-      .trim();
-  }
-  OH.parseReferralEvents = function parseReferralEvents(wikitext) {
-    const out = [];
-    for (const row of String(wikitext || '').split(/\n\|-[^\n]*\n/)) {
-      const cells = ('\n' + row)
-        .split(/\n\|(?![-}+])/)
-        .slice(1)
-        .map((c) => c.replace(/\n\|\}[\s\S]*$/, ''));
-      if (cells.length < 6) continue;
-      const [start, end, name] = cells.map((c) => wikiPlain(c));
-      const file = (cells[4].match(/\[\[(?:File|Image):([^|\]]+)/i) || [])[1];
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) continue;
-      let reward = wikiPlain(cells.slice(5).join('\n'));
-      // Newer rows list "You:" and "Referral:" rewards; keep what the referrer gets.
-      const you = reward.match(/You:?\s*([\s\S]*?)(?:\n\s*Referral\b|$)/i);
-      if (you) reward = you[1];
-      reward = reward
-        .split('\n')
-        .map((l) => l.replace(/^\s*\*\s*/, '').trim())
-        .filter(Boolean)
-        .join(', ')
-        .replace(/^(The|A|An)\s+/i, '')
-        .replace(/\.$/, '');
-      if (name && reward) out.push({ start, end, name, reward, image: file ? file.trim() : '' });
-    }
-    return out;
+  // --- Referral bonus events (openhangar.space/api/referral-events) -------------------
+  // v1: { events: [{ start, end, name, reward, image, img }], images: { "<wiki
+  // file name>": picture URL } }. The site reads the community wiki's "Special
+  // Incentive Events" table and copies the reward pictures (the referral tiers' and
+  // the events'); the extension only reads this feed, at most once a day. A picture
+  // the site hasn't copied yet is missing: no picture, never fetched elsewhere.
+  const REF_FEED_TTL = 24 * 3600e3;
+  const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+  OH.getReferralFeed = ({ force = false, fetchFn } = {}) =>
+    OH.siteFeed('api/referral-events', {
+      key: 'feedReferral',
+      ttl: REF_FEED_TTL,
+      force,
+      fetchFn,
+      valid: (j) => isV1(j) && Array.isArray(j.events),
+    });
+  // The feed's events, checked: [{ start, end, name, reward, image, img }]. Pure.
+  OH.shapeReferralEvents = function shapeReferralEvents(list) {
+    const text = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+    return (Array.isArray(list) ? list : [])
+      .filter((e) => e && DAY_RE.test(e.start) && DAY_RE.test(e.end) && text(e.name, 200))
+      .map((e) => ({
+        start: e.start,
+        end: e.end,
+        name: text(e.name, 200),
+        reward: text(e.reward, 500),
+        image: text(e.image, 200),
+        img: OH.feedImage(e.img),
+      }))
+      .filter((e) => e.reward);
   };
-  // Wiki file names ("Referral Pulse.jpg") → 400px image URLs on
-  // media.starcitizen.tools, 50 per request, cached a month. → { file: url }.
-  const WIKI_FILES_KEY = 'wikiFiles';
-  const WIKI_FILES_TTL = 30 * 24 * 3600e3;
+  // → the event list, or null when the feed never loaded (callers keep their list).
+  OH.getReferralEvents = async function getReferralEvents(fetchFn) {
+    const feed = await OH.getReferralFeed({ fetchFn });
+    const events = OH.shapeReferralEvents(feed && feed.data.events);
+    return events.length ? events : null;
+  };
+  // Wiki file names ("Referral Pulse.jpg", or "Referral_Pulse.jpg") → our copies of
+  // the pictures, from the same feed. → { file: url } for the ones it has.
   const wikiTitle = (f) => {
     const t = String(f).replace(/_/g, ' ').trim();
     return t.charAt(0).toUpperCase() + t.slice(1);
   };
-  OH.wikiImageUrls = async function wikiImageUrls(files, fetchFn = fetch) {
-    const want = [...new Set(files.filter(Boolean))];
-    const { [WIKI_FILES_KEY]: cache = {} } = await chrome.storage.local.get(WIKI_FILES_KEY);
-    // Found pictures keep a month; "no such file" answers only a day.
-    const ttl = (e) => (e.url ? WIKI_FILES_TTL : 24 * 3600e3);
+  OH.wikiImageUrls = async function wikiImageUrls(files, fetchFn) {
+    const feed = await OH.getReferralFeed({ fetchFn });
+    const images = (feed && feed.data.images) || {};
     const out = {};
-    const missing = [];
-    for (const f of want) {
-      const hit = cache[f];
-      if (hit && Date.now() - hit.at < ttl(hit)) {
-        if (hit.url) out[f] = hit.url;
-      } else missing.push(f);
-    }
-    const fresh = {};
-    for (let i = 0; i < missing.length; i += 50) {
-      const batch = missing.slice(i, i + 50);
-      try {
-        const titles = batch.map((f) => 'File:' + wikiTitle(f)).join('|');
-        const res = await OH.guarded(fetchFn)(
-          `https://starcitizen.tools/api.php?action=query&prop=imageinfo&iiprop=url&iiurlwidth=400&format=json&origin=*&titles=${encodeURIComponent(titles)}`,
-          { credentials: 'omit', headers: { Accept: 'application/json' } },
-        );
-        const json = res.ok ? await res.json() : null;
-        const pages = json && json.query && json.query.pages;
-        if (!pages) continue; // a failed request caches nothing; retried next time
-        const byTitle = {};
-        for (const pg of Object.values(pages)) {
-          const info = pg.imageinfo && pg.imageinfo[0];
-          if (info) byTitle[pg.title] = info.thumburl || info.url;
-        }
-        for (const f of batch) {
-          const url = byTitle['File:' + wikiTitle(f)] || null;
-          fresh[f] = { url, at: Date.now() };
-          if (url) out[f] = url;
-        }
-      } catch (e) {
-        OH.log('warn', 'referral', `wiki images failed: ${e?.message || e}`);
-      }
-    }
-    if (Object.keys(fresh).length) {
-      await mutateStored(WIKI_FILES_KEY, (cur = {}) => ({
-        ...pruneTimed(cur, ttl),
-        ...fresh,
-      })).catch(() => {
-        /* storage full: this session still has the URLs */
-      });
+    for (const f of new Set((files || []).filter(Boolean))) {
+      const url = OH.feedImage(images[f]) || OH.feedImage(images[wikiTitle(f)]);
+      if (url) out[f] = url;
     }
     return out;
   };
-
   // --- Live store status (RSI's upgrade tool data) ----------------------------------
   // The public data behind RSI's CCU upgrade tool lists every ship with the
   // editions on sale right now ("skus": Standard, Warbond, …, each available or
   // not). No skus = not for sale. Prices come in cents.
-  const STORE_URL = 'https://robertsspaceindustries.com/pledge-store/api/upgrade/graphql';
-  const STORE_QUERY =
-    'query initShipUpgrade { ships { id name flyableStatus msrp link skus { id title available price } } }';
+  // Its address and query: RULES.upgrade (path, storeList).
+  const STORE_URL = RSI_ORIGIN + RULES.upgrade.path;
   // Raw response → [{ id, name, lname, link, concept, editions: [{ title, price, warbond }], forSale, warbond, price }]. Pure.
   OH.parseStoreShips = function parseStoreShips(json) {
     const data = Array.isArray(json) ? json[0] : json;
@@ -3333,6 +4150,7 @@
         const editions = (s.skus || [])
           .filter((k) => k && k.available)
           .map((k) => ({
+            id: Number.isInteger(k.id) ? k.id : null, // the SKU, for Add to RSI Cart
             title: String(k.title || '').trim(),
             price: Number(k.price) / 100,
             warbond: /warbond/i.test(k.title || ''),
@@ -3351,6 +4169,44 @@
         };
       });
   };
+  // --- Add to RSI Cart (#288) ----------------------------------------------------
+  // Ship upgrades into the RSI cart, in your own RSI session, only on a click. The
+  // requests live in src/rsi-cart.js (loaded before this file) so the background
+  // worker can answer the website's store with the same code.
+  //   OH.upgradeOptions(toShipId, toSkuId, { pledgeId? })
+  //     → { ok, options: [{ id, name, image, eligible, price }] } | { ok: false, error }
+  //   OH.upgradePrice(fromShipId, toSkuId, { pledgeId?, toShipId? }) → { ok, price } | …
+  //   OH.addUpgradeToCart(fromShipId, toShipId, toSkuId, { pledgeId? }) → { ok } | …
+  // error: 'signed-out' | 'refused' | 'busy' | 'network'. Never retried.
+  const cart = () => window.OHCart;
+  OH.upgradeOptions = (toShipId, toSkuId, opts) =>
+    cart() ? cart().upgradeOptions(toShipId, toSkuId, opts) : { ok: false, error: 'network' };
+  OH.upgradePrice = (fromShipId, toSkuId, opts) =>
+    cart() ? cart().upgradePrice(fromShipId, toSkuId, opts) : { ok: false, error: 'network' };
+  OH.addUpgradeToCart = (fromShipId, toShipId, toSkuId, opts) =>
+    cart()
+      ? cart().addUpgradeToCart(fromShipId, toShipId, toSkuId, opts)
+      : { ok: false, error: 'network' };
+  OH.RSI_CART_URL = RSI_ORIGIN + RULES.cart.path;
+  // The SKU an upgrade to this store ship goes to: its cheapest edition on offer.
+  OH.upgradeSku = function upgradeSku(storeShip) {
+    const eds = ((storeShip && storeShip.editions) || []).filter((e) => e && e.id);
+    if (!storeShip || !storeShip.id || !eds.length) return null;
+    const best = eds.reduce((a, b) => (b.price < a.price ? b : a));
+    // Every edition, cheapest first: RSI may not sell an upgrade to the cheapest one.
+    const skus = eds
+      .slice()
+      .sort((a, b) => a.price - b.price)
+      .map((e) => e.id);
+    return {
+      toShipId: storeShip.id,
+      toSkuId: best.id,
+      skus,
+      price: best.price,
+      title: best.title,
+    };
+  };
+
   const STORE_KEY = 'storeShips';
   const STORE_TTL = 6 * 3600e3;
   // → { at, ships } (cached 6 hours), or the cached copy / null when RSI doesn't answer.
@@ -3363,7 +4219,11 @@
         credentials: 'omit',
         headers: { 'content-type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify([
-          { operationName: 'initShipUpgrade', variables: {}, query: STORE_QUERY },
+          {
+            operationName: RULES.upgrade.storeList.operation,
+            variables: {},
+            query: RULES.upgrade.storeList.query,
+          },
         ]),
       });
       const ships = res.ok ? OH.parseStoreShips(await res.json()) : [];
@@ -3378,236 +4238,500 @@
     return cached || null;
   };
 
-  // --- Is a ship in the store right now? -------------------------------------------
-  // The upgrade-tool feed above only lists CCU targets, so it can't answer this.
-  // Each ship's own store page does: its schema.org data lists every offer for
-  // the ship with a link that says what it is, /Standalone-Ships/…, /Upgrades/…
-  // (a CCU to it) or /Packages/… (a pack that includes it), and the store's
-  // stock for each. A missing page means it's not in the store at all.
-  // One page per ship, so this is only asked for ships someone is looking at.
-  // Page HTML → { state: 'in' | 'pack' | 'out', price, packs: [{ name, price }] }
-  // or null (couldn't tell). 'in' = a standalone offer in stock. Pure.
-  OH.parseShipStock = function parseShipStock(html) {
-    let seen = false;
-    const standalone = [];
-    const packs = [];
-    const inStock = (o) =>
-      /InStock|LimitedAvailability|PreOrder/i.test(String(o.availability || ''));
-    for (const m of String(html || '').matchAll(
-      /<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi,
-    )) {
-      let j;
-      try {
-        j = JSON.parse(m[1]);
-      } catch {
-        continue;
-      }
-      for (const node of Array.isArray(j) ? j : [j]) {
-        if (!node || node['@type'] !== 'Product' || !node.offers) continue;
-        seen = true;
-        const top = node.offers;
-        const list = Array.isArray(top.offers) ? top.offers : Array.isArray(top) ? top : [top];
-        for (const o of list) {
-          if (!o || !inStock(o)) continue;
-          const url = String(o.url || '');
-          const price = Number(o.price) || null;
-          if (/\/Standalone-Ships\//i.test(url)) standalone.push(price);
-          else if (/\/Packages\//i.test(url))
-            packs.push({ name: String(o.name || 'a pack'), price });
-        }
-      }
-    }
-    if (!seen) return null;
-    if (standalone.length) {
-      const prices = standalone.filter(Boolean);
-      return { state: 'in', price: prices.length ? Math.min(...prices) : null, packs };
-    }
-    return { state: packs.length ? 'pack' : 'out', price: null, packs };
+  // --- Your Subscriber Store (#418) ---------------------------------------------
+  // The subscriber-only items RSI offers the signed-in account: the same /graphql
+  // the referrals use, operation GetBrowseSkusByFilter with the store's
+  // "extras-subscribers-store" facet, in your own RSI session (an anonymous
+  // request gets 0 items). The list is exactly what RSI returns for the session,
+  // so tier differences (Centurion, Imperator) take care of themselves: we never
+  // guess which tier an item is for, only repeat what its tags or label say.
+  // Only for a signed-in subscriber, at most once a day by itself (Store page or
+  // after a scan, never inside the scan) plus the Refresh button. Pages one at a
+  // time with a pause; a 429/403/5xx stops the read and keeps the last list.
+  const SUB_STORE_KEY = 'subStore';
+  const SUB_STORE_TTL = 24 * 3600e3;
+  // The request (address, operation, document, its fixed variables, and the page
+  // size asked first, then RSI's own 20 as the fallback): RULES.subStore.
+  const SUB_STORE_MAX_PAGES = 20;
+  OH.SUB_STORE_MAX = 2000; // items kept (storage budget)
+  const subStoreBody = (page, limit) =>
+    JSON.stringify([
+      {
+        operationName: RULES.subStore.operation,
+        query: RULES.subStore.query,
+        variables: {
+          ...RULES.subStore.variables,
+          query: { page, limit, ...RULES.subStore.variables.query },
+        },
+      },
+    ]);
+  const rsiAbs = (u) => {
+    const s = String(u || '').trim();
+    if (!s) return null;
+    if (/^https:\/\//i.test(s)) return s;
+    if (s.startsWith('//')) return 'https:' + s;
+    if (s.startsWith('/')) return 'https://robertsspaceindustries.com' + s;
+    return null; // anything else (http:, javascript:) isn't kept
   };
-  const STOCK_KEY = 'shipStock2'; // v2: standalone vs pack-only
-  const STOCK_TTL = 6 * 3600e3;
-  // Store page URL → result of parseShipStock (a 404 is 'out'), cached 6 hours.
-  // `force` skips the cache (Scan → Store).
-  OH.getShipStock = async function getShipStock(url, fetchFn = fetch, { force = false } = {}) {
-    if (!/^https:\/\/robertsspaceindustries\.com\/pledge\//.test(url || '')) return null;
-    const { [STOCK_KEY]: cache = {} } = await chrome.storage.local.get(STOCK_KEY);
-    const hit = cache[url];
-    if (!force && hit && Date.now() - hit.at < STOCK_TTL) return hit.s;
-    let s = null;
-    try {
-      const res = await OH.guarded(fetchFn)(url, { credentials: 'omit' });
-      if (res.status === 404) s = { state: 'out', price: null, packs: [] };
-      else if (res.ok) s = OH.parseShipStock(await res.text());
-    } catch (e) {
-      OH.log('warn', 'store', `stock check failed: ${e?.message || e}`);
-    }
-    if (s) {
-      await mutateStored(STOCK_KEY, (cur = {}) => ({
-        ...pruneTimed(cur, () => STOCK_TTL),
-        [url]: { s, at: Date.now() },
-      })).catch(() => {});
-    }
-    return s;
+  // A price block ({ amount, discounted } in cents) → dollars, the sale price when
+  // there is one (RSI's own rule: discounted counts when set and != amount).
+  const subPrice = (p) => {
+    if (!p || typeof p.amount !== 'number') return null;
+    const sale = typeof p.discounted === 'number' && p.discounted !== p.amount;
+    return {
+      price: (sale ? p.discounted : p.amount) / 100,
+      was: sale ? p.amount / 100 : null,
+    };
   };
-
-  // --- Latest from RSI (Comm-Links) -------------------------------------------------
-  // RSI's own Comm-Link hub list (the "Latest" tab on robertsspaceindustries.com),
-  // newest first. The API returns ready-made HTML cards; this reads the fields.
-  // → [{ title, url, type, when, excerpt, image }]. Pure.
-  OH.parseCommLinks = function parseCommLinks(html) {
-    const text = (s) =>
-      decodeEntities(String(s || '').replace(/<[^>]+>/g, ' '))
-        .replace(/\s+/g, ' ')
-        .trim();
-    const out = [];
-    for (const m of String(html || '').matchAll(/<a class="content-block2[\s\S]*?<\/a>/g)) {
-      const b = m[0];
-      const href = (b.match(/href="([^"]+)"/) || [])[1];
-      const title = text((b.match(/<div class="title[^"]*">([\s\S]*?)<\/div>/) || [])[1]);
-      if (!href || !title) continue;
-      out.push({
-        title,
-        url: href.startsWith('http') ? href : `https://robertsspaceindustries.com${href}`,
-        type: text((b.match(/<div class="type[^"]*">[\s\S]*?<span>([\s\S]*?)<\/span>/) || [])[1]),
-        when: text((b.match(/<span class="value">([\s\S]*?)<\/span>/) || [])[1]),
-        excerpt: text((b.match(/<div class="body">([\s\S]*?)<\/div>/) || [])[1]),
-        image: (b.match(/url\('([^']+)'\)/) || [])[1] || null,
+  // Shelf names for the filter chips. RSI's own tags/type first when they name
+  // exactly one shelf; otherwise the item's name (plus label and subtitle), checked
+  // in a fixed order so the more telling word wins: a paint is a paint, a display
+  // or mug is Flair even when it says "Weapon" or "Set", armor stays Armor even as
+  // an "Armor Set", and Kit/Set/Pack/Bundle/Collection wins over the loose words
+  // after it. Other only when nothing matches. Pure.
+  const SUB_TAG_KINDS = [
+    ['Paints', /\b(paints?|liver(y|ies)|skins?)\b/i],
+    ['Armor', /\b(armou?rs?|helmets?|undersuits?)\b/i],
+    ['Weapons', /\b(weapons?|fps weapons?)\b/i],
+    ['Clothing', /\b(clothing|clothes|apparel)\b/i],
+    ['Flair', /\b(flair|decorations?|collectibles?|hangar decor)\b/i],
+    ['Kits and Bundles', /\b(kits?|bundles?|packs?|packages?|collections?)\b/i],
+    ['Ships', /\b(ships?|vehicles?|standalone ships?)\b/i],
+  ];
+  const SUB_NAME_KINDS = [
+    ['Paints', /\b(paints?|liver(y|ies)|skins?)\b/i],
+    [
+      'Flair',
+      /\b(mugs?|cups?|displays?|cases?|racks?|plush(ie)?s?|posters?|models?|trophy|trophies|statues?|figures?|figurines?|paintings?|flags?|banners?|dashbots?|bobbleheads?|coins?|decorations?|flair)\b/i,
+    ],
+    ['Armor', /\b(armou?rs?|helmets?|undersuits?|backpacks?)\b/i],
+    ['Kits and Bundles', /\b(kits?|sets?|packs?|bundles?|collections?)\b/i],
+    [
+      'Weapons',
+      /\b(weapons?|rifles?|pistols?|smgs?|shotguns?|snipers?|knife|knives|launchers?|lmgs?|railguns?)\b/i,
+    ],
+    [
+      'Clothing',
+      /\b(clothing|apparel|outfits?|balaclavas?|hats?|caps?|beanies?|jackets?|coats?|shirts?|t-shirts?|hoodies?|sweaters?|pants|trousers|shorts|boots|shoes|gloves|gowns?|suits?|uniforms?|glasses|sunglasses|goggles|masks?|bandanas?|scarf|scarves|vests?|ponchos?|robes?|dress(es)?)\b/i,
+    ],
+    ['Ships', /\b(ships?|vehicles?|standalone)\b/i],
+  ];
+  OH.subStoreKind = function subStoreKind({
+    tags = [],
+    type = '',
+    name = '',
+    label = '',
+    sub = '',
+  } = {}) {
+    const tagText = [...tags, type].join(' ');
+    const fromTags = SUB_TAG_KINDS.filter(([, re]) => re.test(tagText));
+    if (fromTags.length === 1) return fromTags[0][0];
+    const text = [name, label, sub].join(' ');
+    const hit = SUB_NAME_KINDS.find(([, re]) => re.test(text));
+    return hit ? hit[0] : 'Other';
+  };
+  // What RSI's tags or label say about the tier, as written; never inferred.
+  const subTiers = (text) =>
+    ['Imperator', 'Centurion'].filter((t) => new RegExp(`\\b${t}\\b`, 'i').test(text));
+  // GraphQL answer → { items, count, totalCount } or null (not a listing). Pure.
+  // items: [{ id, name, url, img, price, was, warbond, pack, available, kind, tiers, tags }]
+  OH.parseSubStore = function parseSubStore(json) {
+    const data = Array.isArray(json) ? json[0] : json;
+    const listing = data && data.data && data.data.store && data.data.store.listing;
+    if (!listing || !Array.isArray(listing.resources)) return null;
+    const items = [];
+    for (const r of listing.resources) {
+      if (!r || r.id == null) continue;
+      const name = String(r.title || r.name || '').trim();
+      if (!name) continue;
+      const tags = (Array.isArray(r.tags) ? r.tags : [])
+        .map((t) => String((t && t.name) || '').trim())
+        .filter(Boolean)
+        .slice(0, 12);
+      const label = String(r.label || '').trim();
+      const p = subPrice(r.nativePrice) || subPrice(r.price);
+      const st = r.stock || {};
+      const img = r.media && r.media.thumbnail;
+      items.push({
+        id: String(r.id),
+        name,
+        sub: String(r.subtitle || '').trim() || null,
+        url: rsiAbs(r.url),
+        img: rsiAbs(img && (img.storeSmall || img.slideshow)),
+        price: p ? p.price : null,
+        was: p ? p.was : null,
+        warbond: r.isWarbond === true,
+        pack: r.isPackage === true,
+        available: st.available === true || st.unlimited === true,
+        type: String(r.type || ''),
+        label,
+        kind: OH.subStoreKind({ tags, type: r.type || '', name, label, sub: r.subtitle || '' }),
+        tiers: subTiers([tags.join(' '), label].join(' ')),
+        tags,
       });
     }
-    return out;
-  };
-  const NEWS_KEY = 'rsiNews';
-  const NEWS_TTL = 3600e3;
-  // Newest Comm-Links (cached an hour); the cached copy or [] when RSI doesn't answer.
-  OH.getRsiNews = async function getRsiNews(fetchFn = fetch) {
-    const { [NEWS_KEY]: cached } = await chrome.storage.local.get(NEWS_KEY);
-    if (cached && Date.now() - cached.at < NEWS_TTL) return cached.items;
-    try {
-      const res = await OH.guarded(fetchFn)(
-        'https://robertsspaceindustries.com/api/hub/getCommlinkItems',
-        {
-          method: 'POST',
-          credentials: 'omit',
-          headers: { 'content-type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({
-            channel: '',
-            series: '',
-            type: '',
-            text: '',
-            sort: 'publish_new',
-            page: 1,
-          }),
-        },
-      );
-      const json = res.ok ? await res.json() : null;
-      const items = OH.parseCommLinks(json && json.data);
-      if (items.length) {
-        await chrome.storage.local.set({ [NEWS_KEY]: { at: Date.now(), items } });
-        return items;
-      }
-    } catch (e) {
-      OH.log('warn', 'news', `Comm-Link list download failed: ${e?.message || e}`);
-    }
-    return cached ? cached.items : [];
-  };
-
-  // --- This Week in Star Citizen: a short summary -------------------------------
-  // The weekly post has a fixed shape: a few paragraphs on last week, "Now let's
-  // see what's going on this week", then a day-by-day schedule (h4 day, list of
-  // items). The summary is the first sentence of each paragraph plus that
-  // schedule, read straight from the post (no AI, nothing sent anywhere).
-  // Post body HTML → { points: [..], schedule: [{ day, items: [..] }] }. Pure.
-  OH.parseTwisc = function parseTwisc(html) {
-    const clean = (s) =>
-      decodeEntities(stripTags(s))
-        .replace(/\s+/g, ' ')
-        .replace(/\s+([.,!?;:])/g, '$1')
-        .trim();
-    // Script and style tags are defused, not cut out: their "<" becomes text, so
-    // nothing below can ever read them as a tag (CodeQL #285 flags any regex
-    // that tries to cut blocks out). Only <p>, <h4> and <li> text is read later,
-    // and every bit of it is escaped again before it's shown.
-    const src = String(html || '').replace(/<(?=\/?(?:script|style)\b)/gi, '&lt;');
-    const cut = src.search(/<h[1-6][^>]*>[^<]*Weekly Community Content Schedule/i);
-    const intro = cut >= 0 ? src.slice(0, cut) : src;
-    const rest = cut >= 0 ? src.slice(cut) : '';
-    const firstSentence = (t) => {
-      const m = t.match(/^.*?[.!?](?=\s|$)/);
-      const s = (m ? m[0] : t).trim();
-      return s.length > 200 ? `${s.slice(0, 197).trimEnd()}…` : s;
+    return {
+      items,
+      count: Number.isFinite(listing.count) ? listing.count : items.length,
+      totalCount: Number.isFinite(listing.totalCount) ? listing.totalCount : null,
     };
-    const points = [];
-    let lead = ''; // the post's opening paragraph, as written (the Home starter text)
-    for (const m of intro.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)) {
-      const t = clean(m[1]);
-      // Skip the sign-off ("…, see you soon.") and anything too short to say much.
-      if (t.length < 40 || /see you (soon|next)/i.test(t)) continue;
-      if (!lead) lead = t.length > 420 ? `${t.slice(0, 417).trimEnd()}…` : t;
-      points.push(firstSentence(t));
-      if (points.length >= 6) break;
-    }
-    const schedule = [];
-    for (const m of rest.matchAll(/<h4[^>]*>([\s\S]*?)<\/h4>([\s\S]*?)(?=<h[1-6][^>]*>|$)/gi)) {
-      const day = clean(m[1]);
-      const items = [...m[2].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)]
-        .map((x) => clean(x[1]))
-        .filter(Boolean);
-      if (!/^(mon|tue|wed|thu|fri|sat|sun)/i.test(day) || !items.length) continue;
-      schedule.push({ day: day.replace(/\b\w+/g, (w) => w[0] + w.slice(1).toLowerCase()), items });
-    }
-    return { lead, points, schedule };
   };
-  // The post page loads its body from a separate file on RSI's site; its address
-  // sits in the page. Page HTML → body URL or null. Pure.
-  OH.twiscBodyUrl = function twiscBodyUrl(pageHtml) {
-    const m = String(pageHtml || '').match(
-      /s3Url\s*=\s*'(https:\/\/robertsspaceindustries\.com\/[^']+)'/,
-    );
-    return m ? m[1] : null;
+  // Does this account get a Subscriber Store? (signed in and a subscriber)
+  OH.isSubscriber = (acct) =>
+    !!(acct && acct.loggedIn === true && acct.subscriber && acct.subscriber.type);
+  // The cached list for this account ({ at, nickname, total, items, partial }) or null.
+  OH.getSubStoreCached = async function getSubStoreCached(acct) {
+    const { [SUB_STORE_KEY]: c } = await chrome.storage.local.get(SUB_STORE_KEY);
+    if (!c || !Array.isArray(c.items)) return null;
+    if (acct && acct.nickname && c.nickname && c.nickname !== acct.nickname) return null;
+    // Sort with today's rules, so a saved list follows an update without a refresh.
+    const items = c.items.map((it) => ({
+      ...it,
+      kind: OH.subStoreKind({
+        tags: it.tags || [],
+        type: it.type || '',
+        name: it.name || '',
+        label: it.label || '',
+        sub: it.sub || '',
+      }),
+    }));
+    return { ...c, items };
   };
-  const TWISC_KEY = 'twisc2'; // v2: + lead, image
-  // → { title, url, points, schedule } for the newest This Week in Star Citizen,
-  // cached until a newer one appears (checked with the hourly news list); null
-  // if it can't be read.
-  OH.getTwiscSummary = async function getTwiscSummary(fetchFn = fetch) {
-    const news = await OH.getRsiNews(fetchFn);
-    const post = news.find((n) => /this week in star citizen/i.test(n.title));
-    if (!post) return null;
-    const { [TWISC_KEY]: cached } = await chrome.storage.local.get(TWISC_KEY);
-    if (cached && cached.url === post.url && cached.lead) return cached;
+  // Due for its once-a-day read? (never tried, or the last try a day ago)
+  OH.subStoreDue = async function subStoreDue() {
+    const { [SUB_STORE_KEY]: c } = await chrome.storage.local.get(SUB_STORE_KEY);
+    const last = c ? Math.max(c.at || 0, c.triedAt || 0) : 0;
+    return Date.now() - last >= SUB_STORE_TTL;
+  };
+  let subStoreInflight = null;
+  // Read the whole list (or answer from the day's cache unless `force`).
+  // → { ok: true, list } | { ok: false, error, list? (the last good one) }.
+  // error: 'signed-out' | 'not-subscriber' | 'busy' | 'refused' | 'network'. Never throws.
+  // `pause` is the wait between pages (tests skip it).
+  OH.getSubStore = function getSubStore({
+    force = false,
+    account,
+    fetchFn = fetch,
+    onProgress,
+    pause = () => sleep(DELAY_MS + Math.random() * 400),
+  } = {}) {
+    if (subStoreInflight) return subStoreInflight;
+    subStoreInflight = readSubStore({ force, account, fetchFn, onProgress, pause }).finally(() => {
+      subStoreInflight = null;
+    });
+    return subStoreInflight;
+  };
+  async function readSubStore({ force, account, fetchFn, onProgress, pause }) {
+    const acct = account === undefined ? await OH.getAccount().catch(() => null) : account;
+    if (!acct || acct.loggedIn !== true) return { ok: false, error: 'signed-out' };
+    if (!OH.isSubscriber(acct)) return { ok: false, error: 'not-subscriber' };
+    const cached = await OH.getSubStoreCached(acct);
+    if (!force && cached && Date.now() - (cached.at || 0) < SUB_STORE_TTL)
+      return { ok: true, list: cached };
+    const markTried = () =>
+      chrome.storage.local
+        .set({
+          [SUB_STORE_KEY]: {
+            ...(cached || { items: [] }),
+            nickname: acct.nickname || null,
+            triedAt: Date.now(),
+          },
+        })
+        .catch(() => {});
+    const get = OH.guarded(fetchFn, { timeout: 20000 });
+    const ask = async (page, limit) => {
+      let res;
+      try {
+        res = await get(RSI_ORIGIN + RULES.subStore.path, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'content-type': 'application/json', Accept: 'application/json' },
+          body: subStoreBody(page, limit),
+        });
+      } catch (e) {
+        return { error: 'network', msg: e?.message || String(e) };
+      }
+      if (res.status === 401 || res.status === 403) return { error: 'refused', status: res.status };
+      if (res.status === 429 || res.status >= 500) return { error: 'busy', status: res.status };
+      if (!res.ok) return { error: 'bad', status: res.status };
+      let json;
+      try {
+        json = await res.json();
+      } catch {
+        return { error: 'bad' };
+      }
+      const d = Array.isArray(json) ? json[0] : json;
+      if (d && Array.isArray(d.errors) && d.errors.length)
+        return { error: 'bad', msg: d.errors.map((e) => e && e.message).join('; ') };
+      const parsed = OH.parseSubStore(json);
+      return parsed || { error: 'bad', msg: 'no listing in the answer' };
+    };
+    const fail = async (r) => {
+      await markTried();
+      OH.log(
+        'warn',
+        'subStore',
+        `subscriber store read stopped: ${r.error} ${r.status || ''} ${r.msg || ''}`.trim(),
+      );
+      return { ok: false, error: r.error === 'bad' ? 'network' : r.error, list: cached || null };
+    };
+    // Page 1 at 100; if RSI refuses that size, again at its own 20.
+    let limit = RULES.subStore.pageSize;
+    let first = await ask(1, limit);
+    if (first.error === 'bad') {
+      await pause();
+      limit = RULES.subStore.pageSizeMin;
+      first = await ask(1, limit);
+    }
+    if (first.error) return fail(first);
+    const total = first.totalCount;
+    // RSI may hand back fewer than asked: page on at the size it actually uses.
+    if (
+      first.items.length &&
+      first.items.length < limit &&
+      total != null &&
+      first.items.length < total
+    )
+      limit = first.items.length;
+    const seen = new Set();
+    const items = [];
+    const add = (list) => {
+      let n = 0;
+      for (const it of list) {
+        if (seen.has(it.id) || items.length >= OH.SUB_STORE_MAX) continue;
+        seen.add(it.id);
+        items.push(it);
+        n++;
+      }
+      return n;
+    };
+    add(first.items);
+    onProgress?.(items.length, total);
+    let partial = false;
+    for (let page = 2; page <= SUB_STORE_MAX_PAGES; page++) {
+      if (total != null && items.length >= total) break;
+      if (items.length >= OH.SUB_STORE_MAX) break;
+      await pause();
+      const r = await ask(page, limit);
+      if (r.error) {
+        partial = true; // keep what came in, say it's short
+        OH.log(
+          'warn',
+          'subStore',
+          `subscriber store page ${page}: ${r.error} ${r.status || ''}`.trim(),
+        );
+        break;
+      }
+      if (!r.items.length || add(r.items) === 0) break;
+      onProgress?.(items.length, total);
+    }
+    // A short read never replaces a fuller list from earlier.
+    if (partial && cached && cached.items.length > items.length) return fail({ error: 'busy' });
+    const list = {
+      at: Date.now(),
+      nickname: acct.nickname || null,
+      total: total ?? items.length,
+      pageSize: limit,
+      partial,
+      items,
+    };
     try {
-      const page = await OH.guarded(fetchFn)(post.url, { credentials: 'omit' });
-      const bodyUrl = page.ok ? OH.twiscBodyUrl(await page.text()) : null;
-      const body = bodyUrl ? await OH.guarded(fetchFn)(bodyUrl, { credentials: 'omit' }) : null;
-      if (body && body.ok) {
-        const sum = {
-          title: post.title,
-          url: post.url,
-          image: post.image,
-          when: post.when,
-          ...OH.parseTwisc(await body.text()),
-        };
-        if (sum.points.length || sum.schedule.length) {
-          await chrome.storage.local.set({ [TWISC_KEY]: sum });
-          return sum;
-        }
-      }
-    } catch (e) {
-      OH.log('warn', 'news', `This Week in Star Citizen summary failed: ${e?.message || e}`);
+      await chrome.storage.local.set({ [SUB_STORE_KEY]: list });
+    } catch {
+      /* storage full: this page view still has the list */
     }
-    return (
-      cached || {
-        title: post.title,
-        url: post.url,
-        image: post.image,
-        when: post.when,
-        lead: post.excerpt,
-        points: [],
-        schedule: [],
-      }
-    );
+    return { ok: true, list };
+  }
+
+  // --- The store catalog (openhangar.space/api/catalog) ------------------------------
+  // Everything in RSI's pledge store right now, as the website's store watcher last
+  // read it: one download (ETag'd, so usually a tiny "nothing new") instead of a
+  // request per ship. The wishlist is matched against it here, on your machine:
+  // nothing about it is ever sent. v1:
+  //   { items: [{ id: "sku-<RSI SKU>" | "upgrade-<to ship id>", kind, name, img, url,
+  //       price, wasPrice, warbond, standardPrice, savings, inStore, insurance,
+  //       upgrade: { toShipId, to, skus } | null }],
+  //     ships: [{ id, name, msrp, editions: [{ sku, price, warbond }] }] }
+  // In `items` with inStore = on sale now; inStore false = listed but sold out; not
+  // in `items` = not for sale. Asked at most every 30 minutes (Check Now and Scan →
+  // Store ask again, still with the ETag).
+  const CATALOG_FEED_TTL = 30 * 60e3;
+  OH.getStoreCatalog = ({ force = false, fetchFn } = {}) =>
+    OH.siteFeed('api/catalog', {
+      key: 'feedCatalog',
+      ttl: CATALOG_FEED_TTL,
+      force,
+      fetchFn,
+      valid: (j) => isV1(j) && Array.isArray(j.items),
+    });
+  const CATALOG_KINDS = [
+    'ship',
+    'vehicle',
+    'pack',
+    'starter',
+    'paint',
+    'gear',
+    'addon',
+    'subscriber',
+    'upgrade',
+    'other',
+  ];
+  // Catalog kind → the Wishlist Watch kind (ui/lib/wish-watch.js).
+  OH.CATALOG_WISH_KIND = {
+    ship: 'ship',
+    vehicle: 'ship',
+    pack: 'pack',
+    starter: 'pack',
+    paint: 'paint',
+    gear: 'gear',
+    addon: 'addon',
+    subscriber: 'addon',
+    other: 'addon',
+    upgrade: 'ccu',
+  };
+  const money = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
+  const rsiLink = (v) =>
+    typeof v === 'string' && /^https:\/\/robertsspaceindustries\.com\//.test(v) ? v : null;
+  // The feed's JSON → { at, items, ships, byId }, every field checked. Pure.
+  OH.shapeCatalog = function shapeCatalog(json) {
+    const items = [];
+    const seen = new Set();
+    for (const i of json && Array.isArray(json.items) ? json.items : []) {
+      if (!i || typeof i.id !== 'string' || !/^(sku|upgrade)-\d+$/.test(i.id)) continue;
+      const name = typeof i.name === 'string' ? i.name.trim().slice(0, 200) : '';
+      const price = money(i.price);
+      if (!name || price == null || seen.has(i.id)) continue;
+      const kind = CATALOG_KINDS.includes(i.kind) ? i.kind : 'other';
+      const u = i.upgrade;
+      const upgrade =
+        u && Number.isInteger(u.toShipId)
+          ? {
+              toShipId: u.toShipId,
+              to:
+                (typeof u.to === 'string' && u.to.trim().slice(0, 200)) ||
+                name.replace(/^Upgrade to\s+/i, ''),
+              skus: (Array.isArray(u.skus) ? u.skus : []).filter(Number.isInteger),
+            }
+          : null;
+      if (kind === 'upgrade' && !upgrade) continue;
+      seen.add(i.id);
+      items.push({
+        id: i.id,
+        kind,
+        wishKind: OH.CATALOG_WISH_KIND[kind],
+        name,
+        img: OH.feedImage(i.img),
+        url: rsiLink(i.url),
+        price,
+        wasPrice: money(i.wasPrice),
+        warbond: !!i.warbond,
+        standardPrice: money(i.standardPrice),
+        savings: money(i.savings),
+        inStore: i.inStore !== false,
+        insurance: typeof i.insurance === 'string' ? i.insurance.trim().slice(0, 20) : null,
+        upgrade: kind === 'upgrade' ? upgrade : null,
+      });
+    }
+    const ships = (json && Array.isArray(json.ships) ? json.ships : [])
+      .filter((s) => s && Number.isInteger(s.id) && typeof s.name === 'string' && s.name.trim())
+      .map((s) => ({
+        id: s.id,
+        name: s.name.trim().slice(0, 200),
+        msrp: money(s.msrp) || null,
+        editions: (Array.isArray(s.editions) ? s.editions : [])
+          .filter((e) => e && money(e.price))
+          .map((e) => ({
+            sku: Number.isInteger(e.sku) ? e.sku : null,
+            price: e.price,
+            warbond: !!e.warbond,
+          }))
+          .sort((a, b) => a.price - b.price),
+      }));
+    return {
+      at: Date.parse((json && json.updatedAt) || '') || null,
+      items,
+      ships,
+      byId: new Map(items.map((i) => [i.id, i])),
+    };
   };
 
+  const cheapest = (xs) => (xs.length ? Math.min(...xs) : null);
+  const cents = (n) => Math.round(n * 100) / 100;
+  // What upgrading from a ship worth `fromMsrp` (USD) costs with catalog upgrade
+  // `item`: each edition's price minus fromMsrp (editions from `ships`, else the
+  // item's own price). → { price, warbond } (warbond only when cheaper) or null when
+  // no edition costs more than the ship you start from. Pure.
+  OH.upgradeCost = function upgradeCost(cat, item, fromMsrp) {
+    if (!item || !item.upgrade || !(fromMsrp > 0)) return null;
+    const ship = ((cat && cat.ships) || []).find((s) => s.id === item.upgrade.toShipId);
+    const eds =
+      ship && ship.editions.length ? ship.editions : [{ price: item.price, warbond: item.warbond }];
+    const up = eds.filter((e) => e.price > fromMsrp);
+    const std = cheapest(up.filter((e) => !e.warbond).map((e) => cents(e.price - fromMsrp)));
+    const wb = cheapest(up.filter((e) => e.warbond).map((e) => cents(e.price - fromMsrp)));
+    if (std == null && wb == null) return null;
+    return {
+      price: std != null ? std : wb,
+      warbond: std != null && wb != null && wb < std ? wb : null,
+    };
+  };
+
+  // One wishlist entry against the catalog → { status, price, warbond, url, img }
+  // for its Wishlist Watch row (status: 'in' | 'soldout' | 'out', or 'unknown' with
+  // no catalog). An entry is a ship's name (a string), or a catalog item
+  // { id, kind, name, from?, fromMsrp? } (a CCU starts from `from`).
+  // `sameShip(a, b)` matches ship names; `msrpOf(name)` is a ship's standard price
+  // (USD) or null. Runs locally; pure.
+  OH.catalogWishStatus = function catalogWishStatus(cat, entry, { sameShip, msrpOf } = {}) {
+    const same = sameShip || ((a, b) => String(a).toLowerCase() === String(b).toLowerCase());
+    const msrp = (n) => (msrpOf && n ? msrpOf(n) : null) || null;
+    if (typeof entry === 'string') {
+      const usual = msrp(entry);
+      if (!cat) return { status: 'unknown', price: usual, warbond: null, url: null, img: null };
+      const hits = cat.items.filter(
+        (i) => (i.kind === 'ship' || i.kind === 'vehicle') && same(i.name, entry),
+      );
+      const on = hits.filter((i) => i.inStore);
+      if (!on.length) {
+        const any = hits[0] || null;
+        return {
+          status: any ? 'soldout' : 'out',
+          price: usual,
+          warbond: null,
+          url: any ? any.url : null,
+          img: any ? any.img : null,
+        };
+      }
+      const std = on.filter((i) => !i.warbond).sort((a, b) => a.price - b.price)[0] || null;
+      const wb = on.filter((i) => i.warbond).sort((a, b) => a.price - b.price)[0] || null;
+      const price = std ? std.price : (wb && wb.standardPrice) || usual || wb.price;
+      const pick = std || wb;
+      return {
+        status: 'in',
+        price,
+        warbond: wb && wb.price < price ? wb.price : null,
+        url: pick.url,
+        img: pick.img,
+      };
+    }
+    const e = entry || {};
+    const last = money(e.price);
+    if (!cat) return { status: 'unknown', price: last, warbond: null, url: null, img: null };
+    const item = cat.byId.get(e.id) || null;
+    if (!item) return { status: 'out', price: last, warbond: null, url: null, img: null };
+    const base = { url: item.url, img: item.img };
+    if (!item.inStore)
+      return { status: 'soldout', price: last || item.price, warbond: null, ...base };
+    if (item.upgrade) {
+      const cost = OH.upgradeCost(cat, item, money(e.fromMsrp) || msrp(e.from));
+      return cost
+        ? { status: 'in', price: cost.price, warbond: cost.warbond, ...base }
+        : { status: 'out', price: null, warbond: null, ...base };
+    }
+    if (item.warbond && item.standardPrice && item.standardPrice > item.price)
+      return { status: 'in', price: item.standardPrice, warbond: item.price, ...base };
+    return { status: 'in', price: item.price, warbond: null, ...base };
+  };
   // --- Loaner ships (RSI support: "Loaner Ship Matrix") --------------------------
   // A public help-center article with one table row per not-yet-flyable ship:
   // "YOUR SHIP" → "OUR LOANER(S)". Row names use shorthand ("Hull D, E",
@@ -3744,28 +4868,17 @@
   OH.getIncludedVessels = (fetchFn = fetch) =>
     getHelpTable('4408770370455', 'includedVessels', 5, fetchFn);
 
-  const REF_EVENTS_KEY = 'referralEvents';
-  const REF_EVENTS_TTL = 7 * 24 * 3600e3;
-  // Cached for a week; null when it can't be fetched (callers keep their list).
-  OH.getReferralEvents = async function getReferralEvents(fetchFn = fetch) {
-    const { [REF_EVENTS_KEY]: cached } = await chrome.storage.local.get(REF_EVENTS_KEY);
-    if (cached && Date.now() - cached.at < REF_EVENTS_TTL) return cached.events;
-    try {
-      const res = await OH.guarded(fetchFn)(
-        'https://starcitizen.tools/api.php?action=parse&page=Referral_program&prop=wikitext&section=5&format=json&origin=*',
-        { credentials: 'omit', headers: { Accept: 'application/json' } },
-      );
-      const json = res.ok ? await res.json() : null;
-      const events = OH.parseReferralEvents(json?.parse?.wikitext?.['*']);
-      if (events.length) {
-        await chrome.storage.local.set({ [REF_EVENTS_KEY]: { at: Date.now(), events } });
-        return events;
-      }
-    } catch (e) {
-      OH.log('warn', 'referral', `event list download failed: ${e?.message || e}`);
-    }
-    return cached ? cached.events : null;
-  };
+  // openhangar.space/versions.json: the version each store has live ({ stores:
+  // { chrome, edge, firefox: { live, … } } }). Firefox's Check for Updates reads it;
+  // asked only when that button is pressed.
+  OH.getStoreVersions = ({ force = false, fetchFn } = {}) =>
+    OH.siteFeed('versions.json', {
+      key: 'feedVersions',
+      ttl: 10 * 60e3,
+      force,
+      fetchFn,
+      valid: (j) => !!j && typeof j === 'object' && !!j.stores && typeof j.stores === 'object',
+    });
 
   const FX_KEY = 'fxRates';
   const FX_TTL = 24 * 3600e3;
@@ -4103,17 +5216,9 @@
     db.history = OH.trimHistory(hist);
   }
 
-  // Keep only well-formed snapshots ({ at, items: [[id, name, value]] }).
-  function cleanSnapshot(x) {
-    if (!x || !Number.isFinite(x.at) || !Array.isArray(x.items)) return null;
-    const items = x.items
-      .filter((r) => Array.isArray(r) && r.length >= 3)
-      .map((r) => [String(r[0]), String(r[1]), Number(r[2]) || 0]);
-    const out = { at: x.at, items };
-    if (Number.isFinite(x.credit)) out.credit = x.credit;
-    if (Number.isFinite(x.checkedAt)) out.checkedAt = x.checkedAt;
-    return out;
-  }
+  // Keep only well-formed snapshots ({ at, items: [[id, name, value]] }), as
+  // OH.checkDB does (src/hangar-shape.js).
+  const cleanSnapshot = SHAPE.cleanSnapshot;
 
   // Union of two histories (e.g. this browser's + a backup file's): by time,
   // one snapshot per timestamp, consecutive identical snapshots collapsed,

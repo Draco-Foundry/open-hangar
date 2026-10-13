@@ -1,15 +1,17 @@
 name: CI
 
 # One run per change: a push to main runs on push, everything else runs as a pull
-# request (any base, so PRs into redesign/0.3-svelte too). Release tags need no
-# run of their own: the tag's commit is main's, and publish.yml waits for CI on it.
+# request (any base, so PRs into redesign/0.3-svelte too). Pushes to
+# redesign/0.3-svelte run as well, so the tip its parallel PRs land on is tested
+# (drop it once 0.3 is on main). Release tags need no run of their own: the tag's
+# commit is main's, and publish.yml waits for CI on it.
 on:
   push:
-    branches: [main]
+    branches: [main, redesign/0.3-svelte]
   pull_request:
   workflow_dispatch:
 
-# A newer commit on a PR cancels the PR's older run. Runs on main never cancel or
+# A newer commit on a PR cancels the PR's older run. Push runs never cancel or
 # queue behind each other (each gets its own group): publish.yml waits for CI on
 # the release commit, so that run must always finish.
 concurrency:
@@ -80,9 +82,20 @@ jobs:
         run: npm run pack
       - if: steps.changes.outputs.docs_only != 'true'
         run: npx web-ext lint --source-dir dist/firefox
-      # No store build may point at staging (that's npm run build:staging, dev only).
+      # The public zips: sync built in to production only, no staging site, no beta name.
       - if: steps.changes.outputs.docs_only != 'true'
-        run: node scripts/check-store-build.mjs
+        run: npm run check:store
+      # The Chrome store build in Chrome, never connected: nothing to the sync site and
+      # only plain reads of the public feeds (scripts/privacy-check.mjs).
+      - if: steps.changes.outputs.docs_only != 'true'
+        run: npm run test:privacy
+      # The unlisted Open Hangar Beta (docs/BETA.md): synced to production, never
+      # staging. build:beta checks its own zips (check-store-build.mjs --beta).
+      - if: steps.changes.outputs.docs_only != 'true'
+        run: npm run build:beta
+      # Its Firefox build is self-distributed, so its update_url is allowed.
+      - if: steps.changes.outputs.docs_only != 'true'
+        run: npx web-ext lint --self-hosted --source-dir dist/beta-firefox
 
   # Every workflow file checked, so a typo fails the PR instead of a release (#235).
   workflows:

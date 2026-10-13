@@ -19,14 +19,41 @@ export default defineConfig({
     // Fonts ship as files next to the bundle, never inlined or fetched remotely.
     assetsInlineLimit: 0,
     modulePreload: false,
+    // One bundle per page (0.3.0 rebuild): ui/<page>/main.js → src/ui/<page>.js and
+    // <page>.css. Add a page here as it moves from dashboard.js to Svelte.
     rollupOptions: {
-      input: 'ui/home/main.js',
+      input: {
+        home: 'ui/home/main.js',
+        inventory: 'ui/inventory/main.js',
+        buybacks: 'ui/buybacks/main.js',
+        stats: 'ui/stats/main.js',
+        referrals: 'ui/referrals/main.js',
+        org: 'ui/org/main.js',
+        updates: 'ui/updates/main.js',
+        store: 'ui/store/main.js',
+        developers: 'ui/developers/main.js',
+        topbar: 'ui/topbar/main.js',
+        search: 'ui/search/main.js',
+        details: 'ui/details/main.js',
+        site: 'ui/site/main.js',
+        // The connector's own pages (src/flags.js `connector`), and the Clean Pro look
+        // they link by itself (ui/tokens.css → src/ui/tokens.css).
+        tokens: 'ui/tokens.css',
+        popup: 'ui/popup/main.js',
+        basic: 'ui/basic/main.js',
+      },
       output: {
         format: 'es',
-        entryFileNames: 'home.js',
+        entryFileNames: '[name].js',
+        // Code pages share (Svelte's runtime, ui/lib) goes in one file with a fixed
+        // name, ui/shared.js and ui/shared.css, so dashboard.html's links don't
+        // change as pages start sharing components.
+        manualChunks: (id) =>
+          /[\\/]node_modules[\\/]svelte[\\/]|[\\/]ui[\\/]lib[\\/]/.test(id) ? 'shared' : undefined,
+        chunkFileNames: '[name].js',
         assetFileNames: (a) =>
           (a.names || [a.name || '']).some((n) => /\.css$/.test(n))
-            ? 'home.css'
+            ? '[name][extname]'
             : 'fonts/[name][extname]',
       },
     },

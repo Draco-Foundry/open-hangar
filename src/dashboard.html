@@ -17,8 +17,6 @@
         --link: #58a6ff;
         --accent-soft: rgba(47, 129, 247, 0.14);
         --accent-line: rgba(47, 129, 247, 0.5);
-        /* Comparisons: the second side of "you (blue) vs them" charts */
-        --compare: #dfe6ee;
         --shadow: 0 1px 3px rgba(1, 4, 9, 0.5);
 
         /* One color, one meaning (see "Color Key" under How to Use on Home).
@@ -91,6 +89,9 @@
       header {
         display: flex;
         align-items: center;
+        /* When the bar wraps (a narrow window), the search / Scan / portrait row
+           stays on the right instead of dropping to the left. */
+        justify-content: flex-end;
         gap: 12px;
         margin-bottom: 20px;
         padding-bottom: 14px;
@@ -404,7 +405,7 @@
       }
       .cc-lo-title {
         font-size: 24px;
-        font-weight: 700;
+        font-weight: 600;
         color: #fff;
         letter-spacing: 0.2px;
         text-shadow: 0 1px 10px rgba(0, 0, 0, 0.5);
@@ -499,239 +500,6 @@
         font-size: 13px;
       }
 
-      .ref-code {
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        letter-spacing: 0.04em;
-      }
-      .ref-copy {
-        cursor: pointer;
-        background: transparent;
-        border: 1px solid var(--line);
-        color: var(--muted);
-        border-radius: 6px;
-        padding: 2px 8px;
-        font-size: 11px;
-      }
-      .ref-copy:hover {
-        color: #fff;
-        border-color: rgba(255, 255, 255, 0.4);
-      }
-      .ref-copy.copied {
-        color: var(--good);
-        border-color: var(--good);
-      }
-
-      /* Referrals view */
-      .ref-totals .stat-box.span2 {
-        grid-column: span 2;
-      }
-      .ref-totals .stat-box.span2 .big {
-        color: var(--good);
-      }
-      /* Referrals: progress hero */
-      .ref-hero {
-        margin: 14px 0 6px;
-        padding: 18px 20px;
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        background: linear-gradient(135deg, var(--panel), var(--panel-2));
-      }
-      .ref-hero-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 12px;
-        flex-wrap: wrap;
-      }
-      .ref-hero-n {
-        font-size: 40px;
-        font-weight: 800;
-        line-height: 1;
-      }
-      .ref-hero-n span {
-        font-size: 17px;
-        font-weight: 600;
-        color: var(--muted);
-      }
-      .ref-hero-rank {
-        margin-top: 6px;
-        color: var(--text);
-        font-weight: 700;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        font-size: 13px;
-      }
-      .ref-share {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        flex-wrap: wrap;
-      }
-      .ref-hero-next {
-        margin: 16px 0 8px;
-        font-size: 15px;
-      }
-      .ref-hero-bar {
-        height: 12px;
-        border-radius: 6px;
-        background: rgba(255, 255, 255, 0.08);
-        overflow: hidden;
-      }
-      .ref-hero-bar div {
-        height: 100%;
-        min-width: 12px;
-        border-radius: 6px;
-        background: linear-gradient(90deg, var(--good), var(--good));
-      }
-      .ref-hero-bar-ends {
-        display: flex;
-        justify-content: space-between;
-        font-size: 12px;
-        color: var(--muted);
-        margin-top: 4px;
-      }
-      .ref-hero-event {
-        margin-top: 12px;
-        font-size: 13px;
-      }
-      .rt {
-        margin-top: 14px;
-      }
-      .rt-label {
-        font-size: 12px;
-        color: var(--muted);
-        margin-bottom: 6px;
-      }
-      .rt-track {
-        display: flex;
-        position: relative;
-      }
-      .rt-track::before {
-        content: '';
-        position: absolute;
-        left: 0;
-        right: 0;
-        top: 6px;
-        height: 2px;
-        background: var(--line);
-      }
-      .rt-step {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        position: relative;
-        cursor: default;
-      }
-      .rt-dot {
-        width: 14px;
-        height: 14px;
-        border-radius: 50%;
-        background: var(--panel-2);
-        border: 2px solid var(--line);
-      }
-      .rt-step.on .rt-dot {
-        background: var(--good);
-        border-color: var(--good);
-      }
-      .rt-step.next .rt-dot {
-        border-color: var(--good);
-        box-shadow: 0 0 0 4px var(--good-soft);
-      }
-      .rt-at {
-        margin-top: 4px;
-        font-size: 10px;
-        color: var(--muted);
-      }
-      .rt-step.on .rt-at,
-      .rt-step.next .rt-at {
-        color: var(--text);
-      }
-      /* Referrals: rewards gallery */
-      .ref-gallery {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-        gap: 12px;
-      }
-      .ref-gcard {
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        background: var(--panel);
-        overflow: hidden;
-      }
-      .ref-gimg {
-        height: 86px;
-        background: linear-gradient(135deg, var(--panel-2), var(--panel));
-      }
-      .ref-gimg img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-      }
-      .ref-gname {
-        padding: 8px 10px 0;
-        font-size: 13px;
-        font-weight: 600;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .ref-gsub {
-        padding: 2px 10px 9px;
-        font-size: 11px;
-        color: var(--muted);
-      }
-      /* Referrals: milestone timeline */
-      .ref-timeline {
-        list-style: none;
-        margin: 0;
-        padding: 0 0 0 18px;
-        border-left: 2px solid var(--line);
-      }
-      .ref-timeline li {
-        position: relative;
-        padding: 0 0 14px 14px;
-      }
-      .rtl-dot {
-        position: absolute;
-        left: -26px;
-        top: 3px;
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background: var(--good);
-        border: 2px solid var(--bg);
-      }
-      .rtl-head {
-        display: flex;
-        align-items: baseline;
-        gap: 8px;
-        flex-wrap: wrap;
-      }
-      .rtl-date {
-        margin-left: auto;
-        font-size: 12px;
-        color: var(--muted);
-      }
-      .rtl-items {
-        font-size: 13px;
-        margin-top: 2px;
-      }
-      .ref-small {
-        font-size: 12px;
-        margin-top: 10px;
-      }
-      .ref-event-banner {
-        margin: 0 0 12px;
-        padding: 10px 14px;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        font-size: 13px;
-      }
-      .ref-event-banner.live {
-        border-color: var(--good-line);
-        background: var(--good-soft);
-      }
       .wish-btn {
         margin: 2px 0 10px;
       }
@@ -771,14 +539,48 @@
         overflow: auto;
         border-radius: 8px;
       }
-      .sp-scroll.tall {
-        max-height: 520px;
-      }
       .sp-scroll thead th {
         position: sticky;
         top: 0;
         z-index: 1;
         background: var(--panel-2);
+      }
+      /* The link to the website's full store, above the panels. */
+      .full-store {
+        display: flex;
+        align-items: center;
+        gap: 12px 16px;
+        flex-wrap: wrap;
+        margin: 0 0 18px;
+        padding: 12px 16px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--panel-2);
+      }
+      .full-store p {
+        flex: 1 1 320px;
+        margin: 0;
+        font-size: 14px;
+        text-wrap: pretty;
+      }
+      .full-store-btn {
+        display: inline-block;
+        padding: 7px 12px;
+        border-radius: 6px;
+        background: var(--accent);
+        color: #fff;
+        font-size: 13px;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .full-store-btn:hover {
+        filter: brightness(0.88);
+      }
+      /* Find in Store: prices next to the matching names. */
+      .find-price {
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
       }
       .sp-count {
         font-size: 12px;
@@ -859,7 +661,7 @@
       }
       .wish-undo-btn {
         margin-left: 6px;
-        font-weight: 700;
+        font-weight: 500;
         color: var(--link);
       }
       .wish-bbs > td {
@@ -880,343 +682,6 @@
         border-radius: 8px;
         font-size: 13px;
       }
-      .ref-code-banner {
-        display: flex;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-bottom: 16px;
-        padding: 10px 14px;
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        font-size: 14px;
-        color: var(--muted);
-      }
-      .ref-charts {
-        display: grid;
-        grid-template-columns: 2fr 1fr;
-        gap: 18px;
-        margin: 16px 0 22px;
-      }
-      @media (max-width: 760px) {
-        .ref-charts {
-          grid-template-columns: 1fr;
-        }
-      }
-      .ref-chart {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        padding: 14px 16px;
-      }
-      .ref-chart h4 {
-        margin: 0 0 10px;
-        font-size: 13px;
-        color: var(--muted);
-        font-weight: 600;
-      }
-      .ref-chart svg {
-        width: 100%;
-        height: auto;
-        display: block;
-        overflow: visible;
-      }
-      .ref-chart .axis {
-        stroke: var(--line);
-        stroke-width: 1;
-      }
-      .ref-chart .area {
-        fill: var(--good-soft);
-      }
-      .ref-chart .line {
-        fill: none;
-        stroke: var(--good);
-        stroke-width: 2;
-      }
-      .ref-chart .bar {
-        fill: var(--link);
-      }
-      .ref-chart .tick {
-        fill: var(--muted);
-        font-size: 9px;
-      }
-      .ref-conv-bar {
-        display: flex;
-        height: 26px;
-        border-radius: 6px;
-        overflow: hidden;
-        border: 1px solid var(--line);
-      }
-      .ref-conv-bar .seg-conv {
-        background: var(--good);
-      }
-      .ref-conv-bar .seg-rest {
-        background: rgba(255, 255, 255, 0.1);
-      }
-      .ref-conv-legend {
-        display: flex;
-        gap: 16px;
-        margin-top: 10px;
-        font-size: 12px;
-        color: var(--muted);
-      }
-      .ref-conv-legend .dot {
-        display: inline-block;
-        width: 9px;
-        height: 9px;
-        border-radius: 2px;
-        margin-right: 5px;
-        vertical-align: middle;
-      }
-      /* Referral list (recruits / prospects), reuses table-ish rows */
-      .ref-list-controls {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        align-items: center;
-        margin: 8px 0 12px;
-      }
-      .ref-tabs {
-        display: inline-flex;
-        gap: 6px;
-      }
-      .ref-search {
-        flex: 1;
-        min-width: 160px;
-        padding: 6px 10px;
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        color: var(--text);
-        font-size: 13px;
-      }
-      .ref-sort {
-        padding: 6px 10px;
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        color: var(--text);
-        font-size: 13px;
-      }
-      .ref-tab {
-        cursor: pointer;
-        background: transparent;
-        border: 1px solid var(--line);
-        color: var(--muted);
-        border-radius: 8px;
-        padding: 6px 12px;
-        font-size: 13px;
-      }
-      .ref-tab:hover {
-        color: var(--text);
-        border-color: var(--muted);
-      }
-      .ref-tab.active {
-        color: #fff;
-        border-color: var(--good);
-        background: var(--good-soft);
-      }
-      /* Cap the (potentially 1000s-long) list and scroll within it; the header
-         stays pinned so columns stay labelled while scrolling. */
-      .ref-table-scroll {
-        max-height: 460px;
-        overflow-y: auto;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-      }
-      .ref-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 13px;
-      }
-      .ref-table th {
-        position: sticky;
-        top: 0;
-        z-index: 1;
-        background: var(--panel-2);
-        text-align: left;
-        color: var(--muted);
-        font-weight: 600;
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.03em;
-        padding: 8px 10px;
-        border-bottom: 1px solid var(--line);
-      }
-      .ref-table td {
-        padding: 8px 10px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      }
-      .ref-table tr:hover td {
-        background: rgba(255, 255, 255, 0.03);
-      }
-      /* Handle links to the RSI dossier but reads as plain text — only a subtle
-         underline on hover hints it's clickable. */
-      .ref-citizen-link {
-        color: inherit;
-        text-decoration: none;
-        cursor: pointer;
-      }
-      .ref-citizen-link:hover {
-        text-decoration: underline;
-        text-decoration-color: var(--muted);
-      }
-      .ref-badge {
-        font-size: 10px;
-        text-transform: uppercase;
-        letter-spacing: 0.03em;
-        padding: 1px 6px;
-        border-radius: 4px;
-        border: 1px solid var(--line);
-        color: var(--muted);
-      }
-      .ref-badge.current {
-        color: var(--good);
-        border-color: var(--good-line);
-      }
-      .ref-badge.legacy {
-        color: var(--muted);
-        border-color: var(--line);
-      }
-
-      /* Referral reward ladders */
-      .reward-ladders {
-        display: grid;
-        gap: 18px;
-      }
-      .reward-ladders.two {
-        grid-template-columns: 1fr 1fr;
-      }
-      @media (max-width: 760px) {
-        .reward-ladders.two {
-          grid-template-columns: 1fr;
-        }
-      }
-      .reward-ladder {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        padding: 14px 16px;
-      }
-      .reward-ladder h4 {
-        margin: 0 0 4px;
-        font-size: 14px;
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 8px;
-      }
-      .reward-progress {
-        font-size: 11px;
-        font-weight: 600;
-        color: var(--good);
-      }
-      .reward-note {
-        font-size: 11px;
-        margin: 0 0 8px;
-      }
-      .reward-next-line {
-        font-size: 12px;
-        margin: 0 0 10px;
-        color: var(--text);
-      }
-      .reward-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 12px;
-      }
-      .reward-table td {
-        padding: 5px 6px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-        vertical-align: top;
-      }
-      .reward-mark {
-        width: 18px;
-        text-align: center;
-      }
-      .reward-at {
-        width: 44px;
-        text-align: right;
-        color: var(--muted);
-        font-variant-numeric: tabular-nums;
-      }
-      .reward-unlocked .reward-mark {
-        color: var(--good);
-      }
-      .reward-unlocked .reward-name {
-        color: var(--text);
-      }
-      .reward-next {
-        background: var(--accent-soft);
-      }
-      .reward-next .reward-mark {
-        color: var(--link);
-      }
-      .reward-next .reward-name {
-        color: #fff;
-        font-weight: 600;
-      }
-      .reward-locked {
-        opacity: 0.5;
-      }
-      .reward-togo {
-        font-size: 10px;
-        color: var(--link);
-        margin-left: 6px;
-        white-space: nowrap;
-      }
-      /* ★ marker on recruits who converted during a bonus event */
-      .ref-event {
-        color: var(--warn);
-        margin-left: 4px;
-      }
-      /* Individual reward items (each links out; ships also hover-preview art) */
-      .reward-item {
-        color: var(--link);
-        text-decoration: none;
-      }
-      .reward-item:hover {
-        text-decoration: underline;
-      }
-      .reward-item.ship {
-        color: var(--t-ship);
-      }
-      .reward-sep {
-        color: var(--muted);
-      }
-      .reward-rank {
-        color: var(--muted);
-        font-weight: 600;
-        margin-right: 4px;
-      }
-
-      /* Event bonuses — a simple one-line-per-item list. */
-      .event-list {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-      }
-      .event-item {
-        display: flex;
-        align-items: baseline;
-        gap: 8px;
-        padding: 5px 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        font-size: 13px;
-      }
-      .event-check {
-        color: var(--good);
-      }
-      .event-text {
-        flex: 1;
-      }
-      .event-date {
-        color: var(--muted);
-        font-size: 12px;
-        white-space: nowrap;
-      }
-
       /* Small label above a stat-tile cluster, so rows are scannable groups */
       .stat-group-label {
         font-size: 11px;
@@ -1305,7 +770,7 @@
       }
       .stat-box .big {
         font-size: 24px;
-        font-weight: 700;
+        font-weight: 600;
         font-variant-numeric: tabular-nums;
       }
       .stat-box .lbl {
@@ -1385,7 +850,7 @@
         background: var(--accent);
         color: #fff;
         font-size: 13px;
-        font-weight: 700;
+        font-weight: 600;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1526,34 +991,6 @@
         background: var(--panel-2);
         color: var(--text);
         font-size: 12px;
-      }
-      .site-link {
-        display: flex;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin: 14px 0 16px;
-        padding: 10px 14px;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        background: var(--panel);
-        font-size: 13px;
-      }
-
-      .site-link:empty {
-        display: none;
-      }
-      .site-link .ok {
-        color: var(--good);
-        font-weight: 600;
-      }
-      .site-link button {
-        padding: 4px 10px;
-        font-size: 12px;
-      }
-      .site-link code {
-        font-size: 13px;
-        letter-spacing: 2px;
       }
       .remind-toggle {
         display: flex;
@@ -1816,7 +1253,7 @@
       }
       .market-table th {
         text-align: left;
-        font-weight: 700;
+        font-weight: 600;
         color: var(--text);
         background: var(--panel-2);
         padding: 11px 14px;
@@ -2135,9 +1572,6 @@
         font-size: 13px;
         font-weight: 600;
         color: var(--text);
-      }
-      .rt-step[data-image] {
-        cursor: help;
       }
 
       /* Inventory item detail modal */
@@ -2503,7 +1937,8 @@
       .bb-reclaim:hover {
         text-decoration: underline;
       }
-      /* Retired ships (#306): can't be reclaimed, so a quiet label, not a link. */
+      /* Retired ships (#306): RSI still sells their buy-backs back (owner, 2026-10-05),
+         so a quiet label that links to the reclaim page when there is one. */
       .bb-retired {
         font-size: 11px;
         font-weight: 600;
@@ -2514,6 +1949,14 @@
         border-radius: 999px;
         padding: 1px 8px;
         cursor: help;
+      }
+      a.bb-retired {
+        cursor: pointer;
+        text-decoration: none;
+      }
+      a.bb-retired:hover {
+        color: var(--link);
+        border-color: currentColor;
       }
       .bb-end {
         display: inline-flex;
@@ -2773,87 +2216,11 @@
         background: none;
         color: var(--text);
       }
-      .org-mrow {
-        cursor: pointer;
-      }
-      .org-mrow.open td {
-        background: var(--accent-soft);
-      }
-      .org-compare-bar {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
-        margin: 14px 0 4px;
-        font-size: 13px;
-      }
-      .org-compare-bar select {
-        padding: 5px 8px;
-        border: 1px solid var(--line);
-        border-radius: 6px;
-        background: var(--panel-2);
-        color: var(--text);
-      }
-      .cmp-cols {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 18px;
-        margin-bottom: 8px;
-      }
-      .cmp-kv {
-        display: flex;
-        justify-content: space-between;
-        padding: 4px 0;
-        border-bottom: 1px solid var(--line);
-        font-size: 13px;
-      }
-      .pair-legend {
-        font-size: 12px;
-        color: var(--muted);
-        margin: 0 0 6px;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
       .sw {
         display: inline-block;
         width: 10px;
         height: 10px;
         border-radius: 2px;
-      }
-      .sw.a,
-      .pair-bar.a {
-        background: var(--accent);
-      }
-      .sw.b,
-      .pair-bar.b {
-        background: var(--compare);
-      }
-      .pair-row {
-        display: grid;
-        grid-template-columns: 110px 1fr;
-        gap: 8px;
-        align-items: center;
-        margin: 5px 0;
-        font-size: 12px;
-      }
-      .pair-bars {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-      }
-      .pair-bar {
-        height: 9px;
-        min-width: 2px;
-        border-radius: 3px;
-        position: relative;
-      }
-      .pair-bar span {
-        position: absolute;
-        left: calc(100% + 6px);
-        top: -3px;
-        font-size: 10px;
-        color: var(--muted);
       }
       .org-scroll {
         max-height: 320px;
@@ -2862,12 +2229,12 @@
       .org-owners {
         color: var(--muted);
       }
-      /* Store: your CCUs + price list */
+      /* Store: your CCUs and Find in Store */
       .store-intro a {
         color: var(--link);
         font-weight: 600;
       }
-      #price-search,
+      #find-ship,
       #ccu-search {
         width: 260px;
         padding: 8px 10px;
@@ -2880,9 +2247,6 @@
       .store-intro {
         max-width: 760px;
         font-size: 13px;
-      }
-      #price-table {
-        margin-top: 10px;
       }
 
       .link-btn {
@@ -3082,7 +2446,7 @@
         border: 1px solid var(--line);
         background: var(--panel-2);
         font-size: 12px;
-        font-weight: 700;
+        font-weight: 600;
       }
       /* Release groups follow the Color Key: green good news, blue extra info, red the problem fixed */
       .release-group.g-new {
@@ -3326,217 +2690,113 @@
       .beta-link:hover {
         background: var(--accent-hover);
       }
+      .beta-note {
+        background:
+          linear-gradient(180deg, rgba(59, 106, 237, 0.12), transparent 60%), var(--panel);
+      }
+      .beta-note .beta-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--beacon);
+      }
+      .beta-tag i {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--beacon);
+        box-shadow: 0 0 0 4px var(--beacon-soft);
+      }
+      .beta-when {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 10px 12px;
+        margin: 0 0 14px;
+        border-radius: 10px;
+        background: var(--panel-2);
+      }
+      .beta-when b {
+        display: block;
+        color: var(--head);
+        font: 600 15px var(--font-head);
+      }
+      .beta-when small {
+        display: block;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .beta-cal {
+        flex: 0 0 40px;
+        padding-top: 4px;
+        height: 44px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--bg);
+        color: var(--head);
+        text-align: center;
+        font: 600 16px/1 var(--font-head);
+      }
+      .beta-cal span {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--beacon);
+        font-size: 9px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      .beta-acts {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .beta-later {
+        padding: 8px 12px;
+        border: 0;
+        border-radius: 9px;
+        background: none;
+        color: var(--muted);
+        font: 500 14px var(--font-body);
+        cursor: pointer;
+      }
+      .beta-later:hover,
+      .beta-later:focus-visible {
+        color: var(--text);
+      }
     </style>
     <link rel="stylesheet" href="ui/home.css" />
+    <link rel="stylesheet" href="ui/shared.css" />
     <script type="module" src="ui/home.js"></script>
+    <script type="module" src="ui/inventory.js"></script>
+    <script type="module" src="ui/buybacks.js"></script>
+    <script type="module" src="ui/stats.js"></script>
+    <link rel="stylesheet" href="ui/referrals.css" />
+    <script type="module" src="ui/referrals.js"></script>
+    <link rel="stylesheet" href="ui/org.css" />
+    <script type="module" src="ui/org.js"></script>
+    <link rel="stylesheet" href="ui/updates.css" />
+    <script type="module" src="ui/updates.js"></script>
+    <link rel="stylesheet" href="ui/store.css" />
+    <script type="module" src="ui/store.js"></script>
+    <link rel="stylesheet" href="ui/developers.css" />
+    <script type="module" src="ui/developers.js"></script>
+    <!-- The top bar's own styles (the Game Status pill). -->
+    <link rel="stylesheet" href="ui/topbar.css" />
+    <script type="module" src="ui/topbar.js"></script>
+    <script type="module" src="ui/search.js"></script>
+    <link rel="stylesheet" href="ui/details.css" />
+    <script type="module" src="ui/details.js"></script>
+    <!-- @sync-start: the website Connect card (ui/site), the sync flag's (#187) -->
+    <script type="module" src="ui/site.js"></script>
+    <!-- @sync-end -->
   </head>
   <body>
     <div class="wrap">
       <header>
-        <a class="brand" href="#home" data-view="home"
-          ><img class="brand-mark" src="../icons/icon128.png" alt="" />
-          <h1>Open Hangar</h1></a
-        >
-        <nav id="nav">
-          <a href="#home" data-view="home">Home</a>
-          <a href="#inventory" data-view="inventory"
-            >Inventory <span class="nav-n" id="nav-n-inventory"></span
-          ></a>
-          <a href="#buybacks" data-view="buybacks"
-            >Buy-Backs <span class="nav-n" id="nav-n-buybacks"></span
-          ></a>
-          <a href="#stats" data-view="stats">Stats</a>
-          <a href="#store" data-view="store">Store</a>
-          <a href="#org" data-view="org">Org Fleet</a>
-          <a href="#referrals" data-view="referrals">Referrals</a>
-        </nav>
-        <div class="hdr-prefs">
-          <!-- Language flags go here once the dashboard is translated (TODO.md). -->
-          <!-- Scan ▾ (every page), then the gear menu: currency, Streamer Mode, rescan
-               reminder, Log Out of RSI, Clear Data, Updates, Developers (0.3.0). -->
-          <!-- Search your hangar from any page (/ focuses it). -->
-          <div class="gsearch top-search" id="top-search">
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-              <path
-                fill="currentColor"
-                d="M10 3a7 7 0 0 1 5.6 11.2l4.6 4.6-1.4 1.4-4.6-4.6A7 7 0 1 1 10 3Zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z"
-              />
-            </svg>
-            <input
-              id="gsearch-top"
-              type="search"
-              placeholder="Search"
-              autocomplete="off"
-              aria-label="Search your hangar, buy-backs and rewards"
-            />
-            <kbd class="gsearch-key">/</kbd>
-            <div id="gsearch-top-results" class="gsearch-results top-results" hidden></div>
-          </div>
-          <!-- Hangar Alerts from any page. -->
-          <div class="bell-wrap">
-            <button
-              id="bell-btn"
-              class="icon-btn"
-              type="button"
-              aria-haspopup="true"
-              aria-expanded="false"
-              aria-label="Hangar Alerts"
-              title="Hangar Alerts"
-            >
-              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                <path
-                  fill="currentColor"
-                  d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5.5-6.84V3.5a1.5 1.5 0 0 0-3 0v.66A7 7 0 0 0 5 11v5l-2 2v1h18v-1Z"
-                /></svg
-              ><span class="badge-n" id="bell-n" hidden></span>
-            </button>
-            <div id="bell-menu" class="scan-menu bell-menu" hidden></div>
-          </div>
-          <div class="scan-split">
-            <button id="scan-home">
-              <span class="scan-fill"></span><span class="scan-label">Scan All</span>
-            </button>
-            <button
-              id="scan-menu-btn"
-              class="scan-caret"
-              aria-haspopup="true"
-              aria-expanded="false"
-              aria-label="Scan options"
-              title="Choose what to scan"
-            >
-              ▾
-            </button>
-            <div id="scan-menu" class="scan-menu sm-rich" hidden>
-              <!-- While a scan runs: what it's on (#170). -->
-              <div class="sm-progress" id="scan-menu-progress" role="status" hidden></div>
-              <div class="sm-head">
-                <span>What to Scan</span
-                ><button type="button" class="sm-all" data-scan-all>Select All</button>
-              </div>
-              <label class="sm-opt"
-                ><input
-                  type="checkbox"
-                  class="scan-src"
-                  value="hangar"
-                  data-name="Inventory"
-                  checked
-                /><span class="sm-txt"
-                  ><b>Inventory</b><small>Your pledges, ships and upgrades</small></span
-                ></label
-              >
-              <label class="sm-opt"
-                ><input
-                  type="checkbox"
-                  class="scan-src"
-                  value="buybacks"
-                  data-name="Buy-Backs"
-                  checked
-                /><span class="sm-txt"
-                  ><b>Buy-Backs</b><small>Melted pledges you can get back</small></span
-                ></label
-              >
-              <label class="sm-opt"
-                ><input
-                  type="checkbox"
-                  class="scan-src"
-                  value="referrals"
-                  data-name="Referrals"
-                  checked
-                /><span class="sm-txt"
-                  ><b>Referrals</b><small>Recruits and the rewards you've earned</small></span
-                ></label
-              >
-              <label class="sm-opt"
-                ><input
-                  type="checkbox"
-                  class="scan-src"
-                  value="store"
-                  data-name="Store"
-                  checked
-                /><span class="sm-txt"
-                  ><b>Store</b><small>Is anything on your wishlist for sale?</small></span
-                ></label
-              >
-              <button id="scan-selected" class="scan-go">Scan Now</button>
-            </div>
-          </div>
-          <div class="cc-settings">
-            <button
-              id="settings-btn"
-              class="avatar-btn"
-              type="button"
-              aria-haspopup="true"
-              aria-expanded="false"
-              aria-label="Your menu"
-              title="Your menu"
-            >
-              <span class="avatar-img" id="menu-avatar"
-                ><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-                  <path
-                    fill="currentColor"
-                    d="M19.14 12.94a7.4 7.4 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7 7 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2.4h-3.8a.5.5 0 0 0-.49.42l-.36 2.54a7 7 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.88a.5.5 0 0 0 .12.64l2.03 1.58a7.4 7.4 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.39 1.05.7 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.8a.5.5 0 0 0 .49-.42l.36-2.54a7 7 0 0 0 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"
-                  /></svg></span
-              ><span class="upd-dot" id="upd-dot" hidden></span
-              ><!-- Streamer Mode on: a badge on the portrait, not a pill in the bar,
-                   so the bar keeps one row (#174). -->
-              <span class="stream-dot" id="stream-dot" hidden></span>
-            </button>
-            <div id="settings-menu" class="scan-menu settings-menu" hidden>
-              <div class="menu-who" id="menu-who" hidden></div>
-              <div class="menu-upd" id="menu-upd" hidden>
-                <span id="menu-upd-text"></span
-                ><button type="button" id="menu-upd-reload">Reload</button>
-              </div>
-              <!-- Language picker goes here once the dashboard is translated (TODO.md). -->
-              <label class="scan-opt menu-currency"
-                ><span>Currency</span>
-                <select
-                  id="currency-select"
-                  class="currency-select"
-                  aria-label="Currency"
-                  title="Show amounts in your currency (converted from USD)"
-                >
-                  <option value="USD">USD $</option>
-                  <option value="EUR">EUR €</option>
-                  <option value="GBP">GBP £</option>
-                  <option value="CAD">CAD $</option>
-                  <option value="AUD">AUD $</option>
-                  <option value="NZD">NZD $</option>
-                  <option value="CHF">CHF</option>
-                  <option value="SEK">SEK kr</option>
-                  <option value="PLN">PLN zł</option>
-                  <option value="CZK">CZK Kč</option>
-                  <option value="BRL">BRL R$</option>
-                  <option value="CNY">CNY ¥</option>
-                  <option value="JPY">JPY ¥</option>
-                  <option value="KRW">KRW ₩</option>
-                </select>
-              </label>
-              <label
-                class="scan-opt"
-                title="Hides money amounts across Open Hangar, for streams and screenshots"
-                ><span>Streamer Mode</span><input type="checkbox" id="streamer-toggle"
-              /></label>
-              <label
-                class="scan-opt"
-                title="Shows an amber ! on the toolbar icon when your last scan is a week old"
-                ><span>Rescan Reminder</span><input type="checkbox" id="remind-toggle" checked
-              /></label>
-              <a class="menu-item menu-link" href="#guide" data-view="guide">How to Use</a>
-              <a class="menu-item menu-link" href="#updates" data-view="updates">Updates</a>
-              <a class="menu-item menu-link" href="#issues" data-view="issues">Known Issues</a>
-              <a class="menu-item menu-link" href="#developers" data-view="developers"
-                >Developers</a
-              >
-              <button id="logout-home" class="menu-item" type="button" hidden>
-                Log Out of RSI<small>For switching accounts. Your saved data stays.</small>
-              </button>
-              <button id="clear-home" class="menu-item menu-danger" type="button" hidden>
-                Clear Data
-              </button>
-            </div>
-          </div>
-        </div>
+        <!-- The top bar is Svelte (ui/topbar): the logo, the page links, the alerts
+             bell, Scan ▾ and your menu. The search box (ui/search) mounts in here and
+             the bar moves it into its place. -->
+        <div class="gsearch top-search" id="top-search"></div>
       </header>
 
       <!-- Global "signed out, showing cached scan" banner. Shown on every view when
@@ -3583,158 +2843,38 @@
         <div id="updated-note" class="updated-note" hidden></div>
         <div class="home-hero">
           <div class="citizen-card">
-            <!-- Pilot ID card (owner, 2026-09-30): portrait down the left; name, org,
-                 UEE line, badges and wallet to its right; the org logo as a faint
-                 watermark. Scan and the gear menu live in the top bar. -->
-            <div class="cc-account" id="cc-account">
-              <a
-                class="cc-photo"
-                id="cc-photo"
-                target="_blank"
-                rel="noopener"
-                aria-label="Open Your RSI Citizen Page"
-                ><span class="cc-avatar" id="cc-avatar"></span
-              ></a>
-              <img class="cc-water" id="cc-water" alt="" hidden />
-              <div class="cc-info">
-                <div class="cc-name" id="cc-name">Open Hangar</div>
-                <div class="cc-org" id="cc-org" hidden></div>
-                <div class="cc-meta" id="cc-meta"></div>
-                <div class="home-flair" id="home-flair"></div>
-                <div class="home-balances" id="home-balances"></div>
-              </div>
-            </div>
+            <!-- Pilot ID card (owner, 2026-09-30): ui/home/CitizenCard.svelte mounts here,
+                 before the status line; ui/home/SignedOut.svelte (the Log In wall) after it. -->
             <!-- Scan progress and messages (kept outside cc-account so they show signed out too). -->
             <div class="cc-status">
               <div id="status"></div>
             </div>
-            <!-- Shown instead of the card content when signed out of RSI -->
-            <div class="cc-loggedout" id="cc-loggedout" hidden>
-              <div class="cc-lo-inner">
-                <div class="cc-lo-title">Open Hangar</div>
-                <p class="cc-lo-sub">
-                  Log in to RSI to scan your hangar. Your ships are waiting on the pad.
-                </p>
-                <a
-                  class="btn-login cc-lo-btn"
-                  href="https://robertsspaceindustries.com/connect"
-                  target="_blank"
-                  rel="noopener"
-                  >Log In to RSI ↗</a
-                >
-              </div>
-            </div>
           </div>
-          <aside id="oh-status" aria-label="Game Status"></aside>
           <div id="oh-foryou" hidden></div>
         </div>
-        <!-- First run (nothing scanned yet): a big welcome with Scan All Now; the
-             search and the Home cards show once there's something to show. -->
-        <section class="oh-welcome" id="oh-welcome" hidden>
-          <h2>Welcome to Open Hangar, Citizen</h2>
-          <p>
-            Your whole Star Citizen hangar in one place: what it's worth, your buy-backs, your
-            referrals and more. Everything stays on this computer, locked in your own hangar.
-          </p>
-          <button type="button" class="welcome-scan" id="welcome-scan">Scan My Hangar</button>
-          <!-- The first scan's progress, in place of the button (#170). -->
-          <div class="welcome-progress" id="welcome-progress" role="status" hidden>
-            <div class="wp-bar"><span class="wp-fill" id="wp-fill"></span></div>
-            <div class="wp-text" id="wp-text"></div>
-          </div>
-          <p class="welcome-note" id="welcome-note">
-            A big hangar takes about a minute, still faster than a Lorville elevator. To scan just
-            part of it, use the ▾ next to Scan.
-          </p>
-        </section>
+        <!-- First run (nothing scanned yet): ui/home/Welcome.svelte mounts here, a big
+             welcome with Scan My Hangar; the search and the Home cards show once there's
+             something to show. -->
         <!-- Global Hangar Search: its own line under the card (owner, 2026-09-30); the
              right quarter is kept for the website Connect button at launch. -->
         <div class="home-search">
-          <div class="gsearch gsearch-home">
-            <input
-              id="gsearch"
-              type="search"
-              placeholder="Global Hangar Search"
-              autocomplete="off"
-              aria-label="Search ships, hangar, buy-backs and rewards"
-            />
-            <kbd class="gsearch-key" title="Press / on any page to search">/</kbd>
-            <div id="gsearch-results" class="gsearch-results" hidden></div>
-          </div>
+          <!-- Svelte (ui/search): the box and its results. -->
+          <div class="gsearch gsearch-home"></div>
         </div>
         <!-- Everything under the card is the Svelte Home (ui/home, built into ui/). -->
         <div id="oh-home"></div>
-        <!-- @sync-start: cut from store builds until sync launches (#187) -->
-        <!-- openhangar.space connect/sync: always visible (even signed out of RSI). -->
-        <div class="site-link" id="site-link"></div>
-        <!-- @sync-end -->
       </section>
 
       <!-- INVENTORY -->
       <section class="view" id="view-inventory">
-        <div class="page-sum" id="inv-sum"></div>
-        <div class="controls">
-          <input
-            id="search"
-            type="search"
-            placeholder="Search by name…"
-            autocomplete="off"
-            aria-label="Search Inventory"
-          />
-          <select id="sort" aria-label="Sort Inventory">
-            <option value="default">Sort: Hangar order</option>
-            <option value="date-desc">Pledged: newest first</option>
-            <option value="date-asc">Pledged: oldest first</option>
-            <option value="value-desc">Value: high → low</option>
-            <option value="value-asc">Value: low → high</option>
-            <option value="store-desc">Store price: high → low</option>
-            <option value="name-asc">Name: A → Z</option>
-            <option value="name-desc">Name: Z → A</option>
-          </select>
-          <div class="layout-toggle" id="layout">
-            <button data-layout="gallery">Gallery</button>
-            <button data-layout="compact">Compact</button>
-            <button data-layout="list">List</button>
-            <button data-layout="market">Market</button>
-          </div>
-          <button
-            id="select-toggle"
-            class="mk-btn select-toggle"
-            type="button"
-            aria-pressed="false"
-            title="Pick items to make a fleet image (e.g. a sale post)"
-          >
-            Select
-          </button>
-          <div class="exp-wrap">
-            <button
-              id="inv-exp-btn"
-              class="mk-btn exp-btn"
-              type="button"
-              aria-haspopup="true"
-              aria-expanded="false"
-            >
-              Export ▾
-            </button>
-            <div id="inv-exp-menu" class="scan-menu exp-menu" hidden>
-              <button type="button" class="menu-item" data-export="inv-csv">
-                CSV of What's Showing<small>Just the rows your filters show</small>
-              </button>
-              <button type="button" class="menu-item" data-export="inv-image">
-                Share Image<small>Pick items, then Download Image</small>
-              </button>
-              <button type="button" class="menu-item" data-export="backup">
-                Everything (JSON)<small>Your full backup</small>
-              </button>
-            </div>
-          </div>
-        </div>
-        <div class="chips" id="chips"></div>
-        <div class="views" id="inv-views"></div>
+        <!-- ui/inventory (Svelte) mounts here: summary strip, toolbar, the filter sidebar,
+             active filters and saved views. It moves #results into its list column; the
+             list in it (the cards or the Market sale sheet) is Svelte too. -->
+        <div id="oh-inventory"></div>
         <div id="results"></div>
         <div class="select-bar" id="select-bar" hidden>
           <span class="sb-count" id="sb-count"></span>
-          <span class="sb-melt" id="sb-melt" hidden></span>
+          <!-- The melt planner (ui/inventory/MeltPlanner.svelte) mounts here. -->
           <button class="mk-btn" type="button" data-sb="all">Select All Shown</button>
           <button class="mk-btn" type="button" data-sb="none">Clear</button>
           <span class="sb-sep"></span>
@@ -3767,129 +2907,30 @@
       <!-- REFERRALS -->
       <section class="view" id="view-referrals">
         <h2 class="section-title">Referrals</h2>
+        <!-- The Svelte Referrals page (ui/referrals, built into ui/). -->
         <div id="referrals-body"></div>
       </section>
 
       <!-- BUY-BACKS -->
       <section class="view" id="view-buybacks">
-        <div class="page-sum" id="bb-sum"></div>
-        <div class="controls" id="bb-controls" hidden>
-          <input
-            id="bb-search"
-            type="search"
-            placeholder="Search buy-backs…"
-            autocomplete="off"
-            aria-label="Search Buy-Backs"
-          />
-          <select id="bb-sort" aria-label="Sort Buy-Backs">
-            <option value="date-desc">Date: newest first</option>
-            <option value="date-asc">Date: oldest first</option>
-            <option value="price-desc">Price: high to low</option>
-            <option value="price-asc">Price: low to high</option>
-            <option value="name-asc">Name: A → Z</option>
-            <option value="name-desc">Name: Z → A</option>
-            <option value="default">Scan order</option>
-          </select>
-          <div class="layout-toggle" id="bb-layout">
-            <button data-layout="gallery">Gallery</button>
-            <button data-layout="compact">Compact</button>
-            <button data-layout="list">List</button>
-            <button data-layout="market">Market</button>
-          </div>
-          <div class="exp-wrap">
-            <button
-              id="bb-exp-btn"
-              class="mk-btn exp-btn"
-              type="button"
-              aria-haspopup="true"
-              aria-expanded="false"
-            >
-              Export ▾
-            </button>
-            <div id="bb-exp-menu" class="scan-menu exp-menu" hidden>
-              <button type="button" class="menu-item" data-export="bb-csv">
-                CSV of What's Showing<small>Just the rows your filters show</small>
-              </button>
-              <button type="button" class="menu-item" data-export="backup">
-                Everything (JSON)<small>Your full backup</small>
-              </button>
-            </div>
-          </div>
-        </div>
-        <div class="chips" id="bb-chips"></div>
+        <!-- ui/buybacks (Svelte) mounts here: summary strip, toolbar, the filter sidebar
+             and active filters. It moves #buybacks-body into its list column; the list in
+             it (the cards or the Market reclaim sheet) is Svelte too. -->
+        <div id="oh-buybacks"></div>
         <div id="buybacks-body"></div>
       </section>
 
       <!-- STORE -->
       <!-- ORG FLEET -->
       <section class="view" id="view-org">
-        <h2 class="section-title">Org Fleet</h2>
-        <p class="muted org-intro">
-          Put your org's hangars together into one fleet. Each member opens Open Hangar, goes to
-          <strong>Developers → Export HTF</strong> (ships only, nothing personal) and sends you the
-          file. Import them here. Full backups work too, but only the ships are read. Everything
-          stays in this browser.
-        </p>
-        <div class="org-actions">
-          <button id="org-import" type="button">Import Member Files…</button>
-          <button id="org-mine" type="button" class="btn-secondary">Add My Fleet</button>
-          <button id="org-csv" type="button" class="btn-secondary">Export CSV</button>
-          <input id="org-file" type="file" accept="application/json,.json" multiple hidden />
-          <span id="org-msg" class="muted" aria-live="polite"></span>
-        </div>
-        <div id="org-body"></div>
+        <!-- Org Fleet is Svelte (ui/org, built into ui/); it mounts here. -->
+        <div id="oh-org"></div>
       </section>
 
       <section class="view" id="view-store">
         <h2 class="section-title">Store</h2>
-
-        <div class="store-panel">
-          <div class="sp-head">
-            <h3>Wishlist <span class="market-n" id="wish-n"></span></h3>
-            <label class="wish-sort-label"
-              >Sort
-              <select id="wish-sort" aria-label="Sort wishlist"></select
-            ></label>
-          </div>
-          <div class="wish-undo" id="wish-undo" role="status" hidden></div>
-          <div class="sp-scroll" id="wishlist"></div>
-        </div>
-
-        <div class="store-panel">
-          <div class="sp-head">
-            <h3>Your CCUs <span class="market-n" id="ccu-n"></span></h3>
-            <span class="sp-count" id="ccu-search-count" aria-live="polite"></span>
-            <input
-              id="ccu-search"
-              type="search"
-              placeholder="Search CCUs…"
-              autocomplete="off"
-              aria-label="Search Your CCUs"
-            />
-          </div>
-          <div class="sp-scroll" id="ccu-owned"></div>
-        </div>
-
-        <div class="store-panel">
-          <div class="sp-head">
-            <h3>Ship Prices</h3>
-            <div class="layout-toggle sp-tabs" id="price-tabs" role="tablist"></div>
-            <span class="sp-count" id="price-search-count" aria-live="polite"></span>
-            <input
-              id="price-search"
-              type="search"
-              placeholder="Search ships…"
-              autocomplete="off"
-              aria-label="Search Ship Prices"
-            />
-          </div>
-          <p class="currency-note muted store-intro" hidden></p>
-          <div class="sp-scroll tall" id="price-table"></div>
-          <p class="muted value-note">
-            Standard store prices (USD, before tax). To see if a ship is in RSI's store right now,
-            open it (or add it to your wishlist): that checks its RSI store page.
-          </p>
-        </div>
+        <!-- Wishlist, Your CCUs and Find in Store are the Svelte Store (ui/store). -->
+        <div id="oh-store"></div>
       </section>
 
       <!-- UPDATES -->
@@ -3899,11 +2940,7 @@
           Every Open Hangar release and what changed. Your browser installs new versions on its own;
           when one is ready you'll see a bar at the top with a Reload button.
         </p>
-        <div class="update-check">
-          <span>You're on <strong id="update-cur"></strong></span>
-          <button type="button" class="mk-btn" id="update-check-btn">Check for Updates</button>
-          <span class="muted" id="update-check-status" aria-live="polite"></span>
-        </div>
+        <!-- Check for Updates and the release notes: Svelte (ui/updates/Updates.svelte) -->
         <div id="updates-body"></div>
       </section>
 
@@ -3926,6 +2963,7 @@
             >Report a Bug</a
           >
         </p>
+        <!-- The list: Svelte (ui/updates/KnownIssues.svelte) -->
         <div id="issues-body"></div>
       </section>
 
@@ -4004,10 +3042,6 @@
                   ><span class="muted">a problem, or something you excluded</span>
                 </li>
                 <li>
-                  <span class="sw" style="background: var(--compare)"></span><b>White bars</b
-                  ><span class="muted">the other side when comparing (you are blue)</span>
-                </li>
-                <li>
                   <span class="sw" style="background: var(--accent)"></span><b>Blue</b
                   ><span class="muted">something you can click, or extra info</span>
                 </li>
@@ -4084,8 +3118,8 @@
               </li>
               <li>
                 Import their files on <a href="#org" data-view="org">Org Fleet</a>, add your own
-                with <strong>Add My Fleet</strong>, and see every ship, who owns it, and the totals.
-                Export it as a CSV for your org's spreadsheet.
+                with <strong>Add My Fleet</strong>, and see every ship, who flies it and which roles
+                you cover. Export it as a CSV for your org's spreadsheet.
               </li>
             </ul>
           </details>
@@ -4116,14 +3150,15 @@
             <summary>Ship Exploded? <span class="btn-hint">(something not working)</span></summary>
             <ul>
               <li>
-                Click <strong>Copy Error Report</strong> next to the error (it's also on the
-                <a href="#developers" data-view="developers">Developers</a> page).
+                Click <strong>Send Flight Log</strong> on the problem card. It copies your flight
+                log and opens #bug-reports on Discord. Copy Flight Log is also on the
+                <a href="#developers" data-view="developers">Developers</a> page.
               </li>
               <li>
                 Paste it in #bug-reports on
                 <a
                   class="ext-discord"
-                  href="https://discord.gg/FF8Wm5HdnV"
+                  href="https://discord.gg/pxJ6PzQe7z"
                   target="_blank"
                   rel="noopener"
                   >Discord</a
@@ -4155,10 +3190,17 @@
               using the RSI login you already have in this browser, and saves everything locally.
             </p>
             <ul>
-              <li>No password, no account, and no server. Nothing you scan leaves your browser.</li>
+              <!-- @flag-start sync: what optional sync sends; a build without sync drops it -->
               <li>
-                The only other requests are public ones with nothing personal in them: ship pictures
-                from RSI, and ship prices and the game version from star-citizen.wiki.
+                No password needed. Nothing you scan leaves your browser unless you connect a free
+                openhangar.space account; once connected, it syncs after every scan. Disconnect
+                any&nbsp;time.
+              </li>
+              <!-- @flag-end sync -->
+              <li>
+                Everything else it loads is public, with nothing personal in it: ship pictures and
+                pages from RSI, and public lists (ship prices, the game version, the store catalog)
+                from our own site,&nbsp;openhangar.space.
               </li>
               <li>
                 Ship data comes from the
@@ -4180,241 +3222,8 @@
         </div>
       </section>
 
-      <section class="view" id="view-developers">
-        <h2 class="section-title">For Developers</h2>
-        <div class="prose">
-          <aside class="dev-linkbox">
-            <div class="dlb-title">Quick links</div>
-            <span id="dev-links"></span>
-            <a href="https://api.star-citizen.wiki" target="_blank" rel="noopener"
-              >star-citizen.wiki API</a
-            >
-            <a href="https://docs.star-citizen.wiki" target="_blank" rel="noopener">API Docs</a>
-            <a href="https://robertsspaceindustries.com/tos" target="_blank" rel="noopener"
-              >RSI Terms of Service</a
-            >
-          </aside>
-          <p>
-            Open Hangar is built as a <strong>data tool</strong>: it reads a user's own Star Citizen
-            account and organizes it into a clean, structured, local database that other tools and
-            sites can build on. Source available and auditable.
-          </p>
-
-          <h3>How It Pulls Data</h3>
-          <p>
-            RSI uses cookie-based session auth. The extension holds host permission for
-            <code>robertsspaceindustries.com</code>, so its own <code>fetch</code> requests carry
-            the user's existing session cookie — no password, no RSI tab, no server. Server-rendered
-            pages (the hangar) are fetched and parsed locally; nothing is sent anywhere. The fragile
-            bit (RSI's markup) is isolated in <code>parser.js</code>.
-          </p>
-
-          <h3>The Data Model</h3>
-          <p>Every pledge is normalized to one object:</p>
-          <pre>
-{ id, name, value, currency,
-  contents: [{ kind, label, image }],
-  image, containsShip,
-  isCCU, ccu: { from, to },
-  isAddOn, isCoupon,
-  kind }   // ship | ccu | addon | coupon | other</pre>
-          <p>
-            The <strong>hangar</strong>, <strong>buy-backs</strong>,
-            <strong>account identity + balances</strong> (handle, org, rank, Store Credit, UEC, REC
-            — read from the dashboard's embedded JSON and the public citizen dossier), and
-            <strong>referrals</strong> (code + recruits/prospects via RSI's GraphQL API) are live;
-            the <strong>store catalog</strong> is planned.
-          </p>
-
-          <h3>The Export File</h3>
-          <p>
-            One self-describing JSON file, ordered <em>provenance → who → what they own</em> so it
-            maps straight onto a backend table. Schema <strong>v2</strong> added the
-            <code>account</code> block (org, rank, balances); v1 had <code>sources</code> only.
-          </p>
-          <pre>
-{
-  app, appVersion, exportedAt, schemaVersion,   // provenance
-  account: {                                    // who this is
-    handle, displayName, avatar,
-    ueeRecord, enlistedSince, country,
-    organization: { name, sid, rank, logo },    // null if none / private
-    subscriber, concierge,
-    balances: {                                 // storeCredit.value is in CENTS
-      storeCredit: { value, currency, symbol, label },
-      uec:         { value, currency, symbol, label },
-      rec:         { value, currency, symbol, label }
-    },
-    capturedAt
-  },
-  sources: {                                    // what they own
-    hangar:   { items: [ …pledges… ],  scannedAt },
-    buybacks: { items: [ …buy-backs… ], scannedAt },
-    referral: { items: {                        // object, not array (one summary)
-      current: { recruits }, legacy: { recruits }, prospects,
-      recruitsList: [ { handle, moniker, enlistedOn, convertedOn, campaign } ],
-      prospectsList: [ … ]
-    }, scannedAt }                              // NB: referral code/url are NOT exported
-  },
-  history: [ { at, items: [ [id, name, value] ] } ]  // scan snapshots (Stats → History)
-}</pre>
-
-          <h3>Using It in Your Project</h3>
-          <p>
-            <strong>JSON export/import is live</strong> — download the whole database (the shape
-            above) to back it up or feed it into your own project; import restores a previous
-            export. Import restores the <code>sources</code> (holdings) and merges the scan
-            <code>history</code> with what's already here; the <code>account</code> block is a
-            read-only snapshot for consumers — the Citizen Card always reflects the live RSI
-            session. Still on the roadmap: an opt-in way for sites you approve to ask the extension
-            for your data directly, instead of exporting a file by hand. It would be limited to a
-            short list of domains you trust, using the browser's
-            <code>externally_connectable</code> messaging channel (note this isn't supported
-            identically across Chrome, Firefox, and Safari).
-          </p>
-          <div class="data-actions">
-            <button id="export-db">Export JSON</button>
-            <button
-              id="export-htf"
-              class="btn-secondary"
-              title="Hangar Transfer Format — one entry per ship, for FleetYards and other SC tools"
-            >
-              Export HTF
-            </button>
-            <button id="import-db" class="btn-secondary">Import JSON…</button>
-            <button id="restore-db" class="btn-secondary" hidden>Restore Previous Hangar</button>
-            <input id="import-file" type="file" accept="application/json,.json" hidden />
-          </div>
-          <div id="data-msg" class="muted"></div>
-
-          <h3>Saved Accounts</h3>
-          <p>
-            Each RSI account you scan keeps its own data here. Sign in as another account and Open
-            Hangar sets the current one aside and loads that account's last scan instead.
-          </p>
-          <div id="profiles" class="profiles"></div>
-
-          <h3>Error Report</h3>
-          <p>
-            Something not working? Copy this report and paste it in #bug-reports on Discord or in a
-            GitHub issue. It has your Open Hangar version, browser, item counts and the recent
-            errors. It doesn't include your handle, referral code or any item names.
-          </p>
-          <div class="data-actions">
-            <button id="copy-report" type="button">Copy Error Report</button>
-            <button id="clear-log" type="button" class="btn-secondary">Clear Log</button>
-          </div>
-          <div id="report-msg" class="muted"></div>
-          <details id="report-preview" class="report-preview">
-            <summary>See Exactly What Gets Copied</summary>
-            <pre id="report-text"></pre>
-          </details>
-
-          <h3>Terms &amp; Fair Use</h3>
-          <ul>
-            <li>
-              Read-only, personal, and rate-limited — it reads only the signed-in user's own
-              account.
-            </li>
-            <li>Respect RSI's Terms of Service; don't redistribute other people's data.</li>
-            <li>
-              Source available: read and audit every line, and file issues and ideas on GitHub.
-            </li>
-          </ul>
-
-          <h3>Data Sources &amp; References</h3>
-          <p>
-            Where every piece of data comes from — handy for verifying the scrape or building your
-            own:
-          </p>
-          <ul>
-            <li>
-              <strong>Hangar</strong> (live) —
-              <a
-                href="https://robertsspaceindustries.com/account/pledges"
-                target="_blank"
-                rel="noopener"
-                >RSI › Account › Pledges</a
-              >
-              · server-rendered HTML, parsed by <code>parser.js</code>
-            </li>
-            <li>
-              <strong>Account identity + balances</strong> (live) —
-              <a
-                href="https://robertsspaceindustries.com/en/account/dashboard"
-                target="_blank"
-                rel="noopener"
-                >RSI › Account › Dashboard</a
-              >
-              · embedded JSON blob
-            </li>
-            <li>
-              <strong>Buy-Backs</strong> (live) —
-              <a
-                href="https://robertsspaceindustries.com/en/account/buy-back-pledges"
-                target="_blank"
-                rel="noopener"
-                >RSI › Account › Buy-Back Pledges</a
-              >
-              · server-rendered HTML, parsed by <code>parser.js</code>
-            </li>
-            <li>
-              <strong>Referrals</strong> (live) —
-              <a
-                href="https://robertsspaceindustries.com/en/referral"
-                target="_blank"
-                rel="noopener"
-                >RSI › Referral Rewards</a
-              >
-              · <code>POST /graphql</code> (<code>GetReferralRecruitsList</code>); code from the
-              dashboard JSON
-            </li>
-            <li>
-              <strong>Store catalog &amp; prices</strong> (planned) —
-              <a href="https://robertsspaceindustries.com/pledge" target="_blank" rel="noopener"
-                >RSI Pledge Store</a
-              >
-              ·
-              <a
-                href="https://robertsspaceindustries.com/ship-matrix"
-                target="_blank"
-                rel="noopener"
-                >Ship Matrix</a
-              >
-            </li>
-            <li>
-              <strong>Game version &amp; ship data</strong> —
-              <a href="https://api.star-citizen.wiki" target="_blank" rel="noopener"
-                >star-citizen.wiki API</a
-              >
-              · <a href="https://docs.star-citizen.wiki" target="_blank" rel="noopener">API Docs</a>
-            </li>
-            <li>
-              <strong>RSI Terms of Service</strong> —
-              <a href="https://robertsspaceindustries.com/tos" target="_blank" rel="noopener"
-                >robertsspaceindustries.com/tos</a
-              >
-            </li>
-          </ul>
-
-          <h3>Thanks &amp; Supporters</h3>
-          <p>
-            Open Hangar is community-built and community-kept. Huge thanks to everyone who
-            contributes code, reports parser breakages when RSI changes their site, or supports the
-            project on Discord.
-          </p>
-          <div class="supporters">
-            <div class="sup-group">
-              <div class="sup-title">GitHub contributors</div>
-              <div class="sup-list" id="sup-contributors"></div>
-            </div>
-            <div class="sup-group">
-              <div class="sup-title">Discord boosters</div>
-              <div class="sup-list" id="sup-boosters"></div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <!-- Developers is the Svelte page in ui/developers (built into ui/). -->
+      <section class="view" id="view-developers"></section>
 
       <footer class="site-footer" id="footer"></footer>
       <!-- Optional support (#240). Official Ko-fi / Patreon symbols, bundled locally. -->
@@ -4435,54 +3244,44 @@
       <div class="ip-cap" hidden></div>
     </div>
 
-    <!-- Inventory item detail modal -->
-    <div class="modal-overlay" id="item-modal" hidden>
-      <div class="modal-card" role="dialog" aria-modal="true" aria-label="Details">
-        <button class="modal-close" id="modal-close" aria-label="Close">&times;</button>
-        <div class="modal-body" id="modal-body"></div>
-      </div>
-    </div>
-
-    <!-- Full-size picture viewer (#299), opened from the detail modal's picture -->
-    <div
-      class="lightbox"
-      id="lightbox"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Full Size Picture"
-      hidden
-    >
-      <button class="lightbox-close" id="lightbox-close" type="button" aria-label="Close">
-        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
-          <path
-            d="M3 3l10 10M13 3L3 13"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-          />
-        </svg>
-      </button>
-      <img id="lightbox-img" alt="" />
-      <p class="lightbox-status" id="lightbox-status" role="status" hidden></p>
-    </div>
+    <!-- The detail window (pledge, buy-back, ship) and its full-size picture viewer
+         are Svelte (ui/details), mounted here. -->
+    <div id="oh-details"></div>
 
     <!-- Soft launch notice until the November 10 release (owner, 2026-10-04), the
          same card as openhangar.space: shown until closed (remembered), and gone
          by itself after release day. dashboard.js shows it. Remove after the release. -->
     <aside class="beta-note" id="beta-note" role="status" aria-labelledby="beta-note-title" hidden>
       <button type="button" class="beta-close" id="beta-close" aria-label="Close">✕</button>
-      <p class="beta-tag">Open Beta</p>
+      <p class="beta-tag"><i aria-hidden="true"></i>Open Beta</p>
       <h2 id="beta-note-title">Still Spooling Up</h2>
       <p>
-        Open Hangar is a work in progress, with the official release set for
-        <strong>November 10</strong>. Questions, ideas or a bug to report? Come find us on Discord.
+        Open Hangar is a work in progress. Questions, ideas or a bug to report? Come find us on
+        Discord.
       </p>
-      <a class="beta-link" href="https://discord.gg/FF8Wm5HdnV" target="_blank" rel="noopener"
-        >Join the Discord ↗</a
-      >
+      <div class="beta-when">
+        <div class="beta-cal" aria-hidden="true"><span>Nov</span>10</div>
+        <div>
+          <b>Official Release</b>
+          <small id="beta-days">November 10</small>
+        </div>
+      </div>
+      <div class="beta-acts">
+        <a class="beta-link" href="https://discord.gg/FF8Wm5HdnV" target="_blank" rel="noopener"
+          >Join the Discord ↗</a
+        >
+        <button type="button" class="beta-later" id="beta-later">Maybe Later</button>
+      </div>
     </aside>
 
+    <script src="flags.js"></script>
+    <script src="schema-check.js"></script>
+    <script src="parser-rules-data.js"></script>
+    <script src="parser-rules.js"></script>
     <script src="scraper/parser.js"></script>
+    <script src="rsi-cart.js"></script>
+    <script src="sync-schema.js"></script>
+    <script src="hangar-shape.js"></script>
     <script src="lib.js"></script>
     <script src="quips.js"></script>
     <script src="qr.js"></script>

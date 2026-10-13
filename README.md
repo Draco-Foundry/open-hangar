@@ -183,11 +183,17 @@ Anything after launch is a plan, not a promise. The details are in the
   rates. None of them carry your personal data, but ship-art lookups are made by ship name,
   so they weakly hint at which ships you're viewing. The `cookies` permission is used only by
   **Log Out of RSI**. Each RSI account's data is kept separately, so accounts never mix.
-- **From 0.3.0 (Launching Nov 10, 2026):** you can choose to sync with openhangar.space.
-  Nothing from your hangar is sent until you connect a free account, and you can disconnect
-  any time. With or without sync, the extension talks only to RSI and openhangar.space.
+- **From 0.3.0 (Launching Nov 10, 2026):** your data stays in your browser unless you
+  connect a free openhangar.space account. Once connected, every scan sends the same data as
+  the JSON export to your account there (Sync Now sends it right away). Disconnect stops it,
+  and the website lets you download or delete everything. With or without sync, the
+  extension talks only to RSI and openhangar.space. Apart from reading your own account and
+  syncing, those requests fetch public files that are the same for everyone.
+- **Add to RSI Cart (0.3.0)** is the one thing that isn't read-only: when you click it, one
+  upgrade goes into your RSI cart. It never checks out or pays.
 
 [Extension Privacy Policy](https://openhangar.space/privacy.html) ·
+[0.3.0 Privacy Policy](docs/PRIVACY.md) ·
 [Website Privacy Policy](https://openhangar.space/privacy)
 
 ## For Developers
@@ -261,7 +267,11 @@ what they own:
   sources: { hangar: {…}, buybacks: {…},
     referral: { items: { current, legacy, prospects,
                          recruitsList, prospectsList } } },  // referral code/url never exported
-  history: [ { at, items: [[id, name, value]] } ] }        // scan snapshots; merged on import
+  history: [ { at, items: [[id, name, value]] } ],        // scan snapshots; merged on import
+  pledgeArchive: { [pledgeId]: { id, name, value, currency, insurance, ccu,
+                   kind, date, contents: [{ kind, label }], goneAt } } }
+                   // pledges gone from the hangar (newest 2,000), for buy-back
+                   // details; merged on import (newest goneAt wins)
 ```
 
 </details>
@@ -275,7 +285,8 @@ no RSI tab needed. Pages are fetched and parsed in your browser (referrals come 
 GraphQL API). Scans are read-only and rate-limited.
 
 RSI updates its site from time to time. All HTML parsing is isolated in
-`src/scraper/parser.js`, so when the markup changes there's one place to fix.
+`src/scraper/parser.js`, and where it looks (selectors, patterns) is one data file,
+`src/data/parser-rules.json`, so when the markup changes there's one place to fix.
 
 ```
 manifest.json           permissions + config (Chrome-shaped; see scripts/pack.mjs)
@@ -283,6 +294,7 @@ src/
   background.js         opens the hub when the toolbar icon is clicked
   lib.js                source registry, scan loop, storage, export/import
   scraper/parser.js     RSI HTML -> normalized model   (the layer to maintain)
+  data/parser-rules.json  where things are on RSI's pages (the parser rules)
   dashboard.html / .js  the viewer
 ui/                     Svelte pages, built with Vite
 scripts/pack.mjs        builds per-browser bundles into dist/
