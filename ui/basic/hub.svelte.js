@@ -11,6 +11,7 @@
 // went to the website.
 import { t } from './copy.js';
 import { importWishlist } from './wishlist-import.js';
+import { flag } from '../lib/flags.js';
 
 const OH = globalThis.OH;
 const SITE_DATA = {
@@ -190,7 +191,12 @@ export async function scan() {
       if (r)
         rows.push(
           r.ok
-            ? { name: 'Referrals', ok: !r.partial, text: t('basic.row-referrals') }
+            ? {
+                name: 'Referrals',
+                ok: !r.partial,
+                text: t('basic.row-referrals'),
+                box: t('basic.row-referrals-box'),
+              }
             : { name: 'Referrals', ok: false, text: r.error },
         );
       await loadDB();
@@ -428,10 +434,12 @@ async function syncIfAsked() {
 }
 
 // The 0.3.x wishlist into the account, once per connection (ui/basic/wishlist-import.js).
-// Only once Firefox lets this extension share (the same yes sync needs), and never in a
+// Only in a build with the `wishlistImport` flag (off until the privacy policy names it),
+// only once Firefox lets this extension share (the same yes sync needs), and never in a
 // loop: a website that doesn't take it yet is asked again hours later.
 let wishImporting = false;
 async function wishlistToAccount() {
+  if (!flag('wishlistImport')) return;
   if (wishImporting || !hub.site.link || !hub.site.dataOk) return;
   wishImporting = true;
   try {

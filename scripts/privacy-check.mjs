@@ -4,11 +4,14 @@
 //   npm run pack && npm run test:privacy      (CI runs it on the store build)
 //   node scripts/privacy-check.mjs [dir]      dir defaults to dist/chrome
 //
-// It opens Home, presses Scan, visits every page, then calls Sync and Disconnect
-// directly. Nothing leaves the machine: the dashboard's requests are answered here
-// (openhangar.space's feeds get an empty answer, RSI is cut off), and the browser can
-// only go out through a local proxy that refuses everything. Every request from the
-// dashboard and the background worker is noted. It fails on:
+// It opens the extension's page, presses Scan, visits every view, then calls Sync and
+// Disconnect directly. The store build is the connector (docs/CONNECTOR.md): its basic
+// page (Scan, Pledges, Buy-Backs, Settings) and the toolbar popup. A build without the
+// connector: the dashboard's Home and every page. Nothing leaves the machine: the
+// page's requests are answered here (openhangar.space's feeds get an empty answer, RSI
+// is cut off), and the browser can only go out through a local proxy that refuses
+// everything. Every request from the page and the background worker is noted. It
+// fails on:
 // - any request to app.openhangar.space or another openhangar.space subdomain (the
 //   sync site), from anywhere in the browser (the proxy sees those too)
 // - a request to openhangar.space that isn't a plain GET with no body (the public feeds)
@@ -24,6 +27,7 @@ const dir = path.resolve(process.argv[2] || 'dist/chrome');
 const SYNC_SITE = 'app.openhangar.space';
 const FEEDS = 'openhangar.space';
 const RSI = /(^|\.)robertsspaceindustries\.com$/;
+// The dashboard's pages (a build without the connector).
 const PAGES = [
   'home',
   'inventory',
@@ -35,6 +39,9 @@ const PAGES = [
   'updates',
   'developers',
 ];
+// The connector's: the basic page's views, then the popup.
+const CONNECTOR_VIEWS = ['pledges', 'buybacks', 'settings'];
+const CONNECTOR = fs.existsSync(path.join(dir, 'src', 'basic.html'));
 
 function findChrome() {
   return [
@@ -66,7 +73,7 @@ if (!chromePath) {
   process.exit(1);
 }
 
-// The extension's requests (dashboard and background worker): { from, method, url, body }.
+// The extension's requests (its page and background worker): { from, method, url, body }.
 const seen = [];
 // Hosts the whole browser tried to reach through the proxy (Chrome's own traffic too).
 const outbound = [];
@@ -139,29 +146,50 @@ try {
   };
 
   console.log(`Privacy check: ${path.relative(process.cwd(), dir) || dir}`);
-  await page.goto(`${ORIGIN}/src/dashboard.html#home`);
+  const HUB = CONNECTOR ? `${ORIGIN}/src/basic.html` : `${ORIGIN}/src/dashboard.html`;
+  await page.goto(CONNECTOR ? `${HUB}#settings` : `${HUB}#home`);
   await settle();
 
-  // The build the store gets: sync on and built in to production, never connected.
-  const state = await page.evaluate(async () => ({
-    sync: !!(OH.flags && OH.flags.sync),
-    enabled: await OH.siteEnabled(),
-    url: await OH.siteUrl(),
-    link: await OH.getSiteLink(),
-    connect: !!(window.OHApp && window.OHApp.site),
-  }));
+  // The build the store gets: sync on and built in to production, never connected, with
+  // Connect on its page.
+  const state = await page.evaluate(
+    async (connector) => ({
+      sync: !!(OH.flags && OH.flags.sync),
+      enabled: await OH.siteEnabled(),
+      url: await OH.siteUrl(),
+      link: await OH.getSiteLink(),
+      connect: connector
+        ? !!document.querySelector('#bp-connect')
+        : !!(window.OHApp && window.OHApp.site),
+    }),
+    CONNECTOR,
+  );
   if (state.sync && state.enabled && state.url === `https://${SYNC_SITE}` && state.connect)
     ok('store build: sync on, built in to production, Connect there');
   else fail(`not the store build's sync: ${JSON.stringify(state)}`);
   if (state.link) fail('a fresh install has a sync link');
 
-  await page.evaluate(() => document.querySelector('#scan-home')?.click());
+  const views = CONNECTOR ? CONNECTOR_VIEWS : PAGES;
+  await page.evaluate(
+    (sel) => document.querySelector(sel)?.click(),
+    CONNECTOR ? '#bp-scan' : '#scan-home',
+  );
   await settle();
-  for (const p of PAGES) {
+  for (const p of views) {
     await page.evaluate((h) => (location.hash = h), `#${p}`);
     await settle(1500);
   }
-  ok(`Scan and ${PAGES.length} pages: ${seen.length} requests, every one answered here`);
+  if (CONNECTOR) {
+    // The toolbar popup, as a page (its Account Value reads the public ship list).
+    await page.goto(`${ORIGIN}/src/popup.html`);
+    await settle(1500);
+    await page.goto(`${HUB}#settings`);
+    await settle(1500);
+  }
+  ok(
+    `Scan and ${views.length} ${CONNECTOR ? 'views and the popup' : 'pages'}: ` +
+      `${seen.length} requests, every one answered here`,
+  );
 
   const before = seen.length;
   const direct = await page.evaluate(async () => {

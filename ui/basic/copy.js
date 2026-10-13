@@ -29,11 +29,16 @@ const COPY = {
   'basic.row-buybacks': '{n} buy-backs', // report row: buy-backs read
   'basic.row-buybacks.one': '{n} buy-back',
   'basic.row-referrals': 'referrals read', // report row: referrals read
+  // The same row in the problem box, which shows each row as "{name}: {text}":
+  // "Referrals: read".
+  'basic.row-referrals-box': 'read',
   'basic.scan-done': 'Scan complete:', // before the rows of a scan that went fine
   'basic.scan-problem': 'The Scan Ran Into Trouble', // title of a scan with a problem
-  // Signed out of RSI: nothing was scanned, your saved hangar is safe, log in on RSI.
-  'basic.signed-out':
-    "You're signed out of RSI. Nothing was scanned, and your saved hangar is safe. Log in on RSI, then scan again.",
+  // Signed out of RSI: the problem box's title, and the line under it (nothing was
+  // scanned, your saved hangar is safe, log in on RSI).
+  'basic.signed-out': "You're Signed Out of RSI",
+  'basic.signed-out-line':
+    'Nothing was scanned, and your saved hangar is safe. Log in on RSI, then scan again.',
   // A different RSI account is signed in: its hangar is loaded (back) or needs a scan.
   'basic.switched-back': "Signed in as {who} on RSI: that account's saved hangar is back.",
   'basic.switched-new': 'Signed in as {who} on RSI: that account has no scan here yet. Press Scan.',
@@ -48,6 +53,7 @@ const COPY = {
   'basic.no-match': 'Nothing matches "{q}".',
   'basic.show-all': 'Show All {n}', // button: draw every row
   'basic.csv-saved': 'Saved {n} rows to a CSV file.',
+  'basic.csv-saved.one': 'Saved {n} row to a CSV file.',
   'basic.col-name': 'Name',
   'basic.col-type': 'Type',
   'basic.col-value': 'Melt Value', // melt value

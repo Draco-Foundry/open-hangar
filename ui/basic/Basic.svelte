@@ -86,10 +86,12 @@
   {#if report && (report.bad || report.signedOut)}
     <div class="bp-note warn" id="bp-report" role="alert">
       <b>{report.signedOut ? t('basic.signed-out') : t('basic.scan-problem')}</b>
+      {#if report.signedOut}<p id="bp-signed-out">{t('basic.signed-out-line')}</p>{/if}
       {#if report.rows.length}
         <ul>
           {#each report.rows as r (r.name)}
-            <li class:bad={!r.ok}>{r.name}: {r.text}</li>
+            <!-- A row's own words for this box, where its name comes first. -->
+            <li class:bad={!r.ok}>{r.name}: {r.box ?? r.text}</li>
           {/each}
         </ul>
       {/if}

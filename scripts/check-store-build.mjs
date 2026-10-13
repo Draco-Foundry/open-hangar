@@ -34,8 +34,8 @@
 // nothing else, no `ids`; on Firefox the one site bridge, top frame only), the built
 // src/site-pages.js and the Firefox bridge's own copy all agree, and they're exactly the
 // store's pages for the build's flags: openhangar.space and app.openhangar.space,
-// Connect on the app with sync on, and hangar.openhangar.space only with localMode on.
-// This holds with localMode on (the beta) and off (the public build).
+// Connect on the app with sync on, and hangar.openhangar.space only with localMode on
+// (every store build and the beta from 0.3.0; a developer's build may turn it off).
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';

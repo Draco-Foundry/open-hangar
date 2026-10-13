@@ -1,21 +1,23 @@
 'use strict';
 // Connect from the website (src/background.js, sync builds only): our site may ask
 // for a PKCE challenge and hand back a one-time code; the extension trades it with
-// the verifier it kept, saves the link and opens the dashboard. Run: `npm test`.
+// the verifier it kept, saves the link and opens the basic page's settings (the
+// dashboard's Home in a developer's build without the connector). Run: `npm test`.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { loadBackground, CHROME_ID } = require('./bridge-env.js');
+const { loadBackground, CHROME_ID, STORE_FLAGS } = require('./bridge-env.js');
 
-// The background worker as a sync build makes it (test/bridge-env.js), its token
-// exchange answered here. staging: a developer's build pointed at staging (npm run
-// build:staging), which lets staging's pages in; the store builds don't.
-function load({ staging = true, browser = 'chrome', granted = true } = {}) {
+// The background worker as a store build makes it (test/bridge-env.js: sync, Local
+// Mode and the connector), its token exchange answered here. staging: a developer's
+// build pointed at staging (npm run build:staging), which lets staging's pages in; the
+// store builds don't. flags: a developer's build's own.
+function load({ staging = true, browser = 'chrome', granted = true, flags = STORE_FLAGS } = {}) {
   const fetched = [];
   const x = loadBackground({
     browser,
     staging,
     granted,
-    flags: { sync: true, orgFleet: false, localMode: false },
+    flags,
     fetch: async (url, init) => {
       fetched.push({ url, body: JSON.parse(init.body) });
       return { ok: true, json: async () => ({ token: 'oht_x', name: 'ExamplePilot' }) };
@@ -58,8 +60,14 @@ test('our site: hello, begin with a PKCE challenge, finish with the code', async
   assert.equal(x.stores.local.siteLink.token, 'oht_x');
   assert.equal(x.stores.local.siteUrl, SITE);
   assert.ok(x.stores.local.siteSyncRequested);
-  assert.match(x.opened[0], /dashboard\.html#home$/);
+  // The basic page opens on its settings, where it syncs (siteSyncRequested).
+  assert.deepEqual(x.opened, [`chrome-extension://${CHROME_ID}/src/basic.html#settings`]);
   assert.equal(x.stores.session.siteConnect, undefined, 'the verifier is used once');
+  // A developer's build without the connector: the dashboard's Home, as before.
+  const dash = load({ flags: { ...STORE_FLAGS, connector: false } });
+  await dash.send({ type: 'oh-connect-begin' }, SITE);
+  await dash.send({ type: 'oh-connect-finish', code: 'one-time', sync: true }, SITE);
+  assert.deepEqual(dash.opened, [`chrome-extension://${CHROME_ID}/src/dashboard.html#home`]);
 });
 
 test('no sync asked, no sync flagged', async () => {
@@ -97,7 +105,7 @@ test('a build without staging in the manifest connects to production only', asyn
 
 // Firefox (#434): no externally_connectable; src/site-bridge.js, a content script on
 // our own site only, passes the page's messages on, and the browser says which page
-// it ran in. The first Connect waits for Firefox's own yes, asked from Home.
+// it ran in. The first Connect waits for Firefox's own yes, asked from the basic page.
 const loadFirefox = ({ granted = true } = {}) => load({ browser: 'firefox', granted });
 
 test('firefox: our site connects through the bridge, with Firefox’s own redirect', async () => {
@@ -136,11 +144,12 @@ test('firefox: only our own content script on our own site gets an answer', asyn
   );
 });
 
-test('firefox: before Firefox says yes, Connect opens Home with its card up', async () => {
+test("firefox: before Firefox says yes, Connect opens the basic page's settings with its card up", async () => {
   const x = loadFirefox({ granted: false });
   const begin = await x.fromPage({ type: 'oh-connect-begin' }, `${SITE}/link`);
   assert.deepEqual(begin, { ok: false, firefoxAsk: true });
-  assert.deepEqual(x.opened, ['moz-extension://uuid/src/dashboard.html#home']);
+  // The basic page's Firefox card (ui/basic/FirefoxCard.svelte) shows on any of its tabs.
+  assert.deepEqual(x.opened, ['moz-extension://uuid/src/basic.html#settings']);
   assert.ok(x.stores.session.siteAskFirefox);
   assert.equal(x.stores.session.siteConnect, undefined);
 });

@@ -18,6 +18,7 @@ const {
   builtBridge,
   loadBackground,
   pagesFor,
+  STORE_FLAGS,
 } = require('./bridge-env.js');
 const { AT, states } = require('./stored-data.js');
 const PAGES = require('../src/site-pages.js');
@@ -25,7 +26,11 @@ const PAGES = require('../src/site-pages.js');
 const UNKNOWN = { ok: false, error: 'unknown request' };
 const BAD = { ok: false, error: 'bad request' };
 const HANGAR_CAPS = ['hello', 'getHangar', 'getScanStatus', 'requestScan', 'addToCart'];
+// The extension's one page in every store build (the connector, src/flags.js): the
+// basic page. A developer's build without the connector opens the dashboard instead.
+const BASIC = 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/src/basic.html';
 const DASHBOARD = 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/src/dashboard.html';
+const NO_CONNECTOR = { ...STORE_FLAGS, connector: false };
 const full = () => structuredClone(states()[1].mem);
 
 // Add to RSI Cart's lane, stood in for: these tests are about who may ask, not RSI.
@@ -111,7 +116,7 @@ test("the repo's copy lets no page in: only a build has pages", () => {
 });
 
 // --- Every message from every kind of page ------------------------------------------
-// What each kind of page may ask, in a build with sync and Local Mode (the beta), plus
+// What each kind of page may ask, in a build with sync and Local Mode (every store build), plus
 // staging's in a developer's staging build.
 const ALLOWED = {
   hangar: [
@@ -166,7 +171,7 @@ test('pages that are not ours (or not in this build) get no answer at all', asyn
   for (const origin of others)
     for (const msg of Object.values(VALID))
       assert.equal(await x.send(msg, origin), undefined, `${origin} ${msg.type}`);
-  // Without Local Mode (the public build) the hangar page isn't one of ours either.
+  // Without Local Mode (a developer's build) the hangar page isn't one of ours either.
   const pub = load({ flags: { sync: true, orgFleet: false, localMode: false } });
   for (const msg of Object.values(VALID))
     assert.equal(await pub.send(msg, HANGAR), undefined, msg.type);
@@ -498,8 +503,9 @@ test('getHangar on Firefox: Firefox says yes first, then the hangar comes throug
     ok: false,
     error: 'firefox-ask',
   });
-  assert.deepEqual(ask.opened, ['moz-extension://uuid/src/dashboard.html#home']);
-  // Home opens with Firefox's card up, in the tab it opened and no other dashboard.
+  assert.deepEqual(ask.opened, ['moz-extension://uuid/src/basic.html#settings']);
+  // The basic page's settings open with Firefox's card up, in the tab it opened and no
+  // other.
   const card = ask.stores.session.localAskFirefox;
   assert.equal(card.tabId, 100, 'names the tab it opened');
   assert.ok(Date.now() - card.at < 5000);
@@ -518,7 +524,7 @@ test('getHangar on Firefox: Firefox says yes first, then the hangar comes throug
   assert.equal(r.ok, true);
   assert.equal(r.hangar.account.handle, 'TestPilot');
   assert.deepEqual(yes.opened, []);
-  // An open dashboard is brought forward instead of a new tab.
+  // An open basic page is brought forward instead of a new tab.
   const open = load({
     browser: 'firefox',
     local: full(),
@@ -528,7 +534,7 @@ test('getHangar on Firefox: Firefox says yes first, then the hangar comes throug
         contextType: 'TAB',
         tabId: 7,
         windowId: 3,
-        documentUrl: 'moz-extension://uuid/src/dashboard.html#stats',
+        documentUrl: 'moz-extension://uuid/src/basic.html#buybacks',
       },
     ],
   });
@@ -539,12 +545,16 @@ test('getHangar on Firefox: Firefox says yes first, then the hangar comes throug
     { window: 3, focused: true },
   ]);
   assert.equal(open.stores.session.localAskFirefox.tabId, 7, 'the card is for that tab');
+  // A developer's build without the connector: the dashboard's Home, as before.
+  const dash = load({ browser: 'firefox', flags: NO_CONNECTOR, local: full(), granted: false });
+  await dash.fromPage({ type: 'oh-get-hangar' }, url);
+  assert.deepEqual(dash.opened, ['moz-extension://uuid/src/dashboard.html#home']);
 });
 
 test("getHangar on Firefox: two asks at once open one tab, and a restarted worker doesn't stack one", async () => {
   const url = `${HANGAR}/`;
   const ASK = { ok: false, error: 'firefox-ask' };
-  // Two hangar pages loading together (a restored session): one Home tab.
+  // Two hangar pages loading together (a restored session): one tab.
   const both = load({ browser: 'firefox', local: full(), granted: false });
   assert.deepEqual(
     await Promise.all([
@@ -555,7 +565,7 @@ test("getHangar on Firefox: two asks at once open one tab, and a restarted worke
   );
   assert.equal(both.opened.length, 1);
   // A worker that stopped and started again still knows the last ask; once it's a
-  // minute old, the next ask brings Home up again.
+  // minute old, the next ask brings the page up again.
   const restarted = load({
     browser: 'firefox',
     local: full(),
@@ -611,14 +621,14 @@ test('getScanStatus: when each source was scanned, whether a scan runs, and stal
 });
 
 test('getScanStatus: a mark whose tab has closed is no scan; a request not started yet is one', async () => {
-  const tab = (tabId, url = `${DASHBOARD}#home`) => ({
+  const tab = (tabId, url = `${BASIC}#settings`) => ({
     contextType: 'TAB',
     tabId,
     windowId: 1,
     documentUrl: url,
   });
-  const status = async (session, contexts = null) => {
-    const x = load({ local: full(), session, contexts });
+  const status = async (session, contexts = null, flags = STORE_FLAGS) => {
+    const x = load({ local: full(), session, contexts, flags });
     const s = await x.send({ type: 'oh-scan-status' }, HANGAR);
     // Asking for the status never asks for a scan or opens anything.
     assert.deepEqual(x.opened, []);
@@ -633,9 +643,14 @@ test('getScanStatus: a mark whose tab has closed is no scan; a request not start
   assert.equal(await status(mark, [tab(4)]), false);
   assert.equal(await status(mark, [tab(9, 'chrome-extension://other/x.html')]), false);
   assert.equal(await status(mark, []), false);
+  // Only the page that scans counts: the basic page in a store build, the dashboard in
+  // a developer's build without the connector.
+  assert.equal(await status(mark, [tab(9, `${DASHBOARD}#home`)]), false);
+  assert.equal(await status(mark, [tab(9, `${DASHBOARD}#home`)], NO_CONNECTOR), true);
+  assert.equal(await status(mark, [tab(9)], NO_CONNECTOR), false);
   // A browser that can't list its tabs: the mark's time alone.
   assert.equal(await status(mark, null), true);
-  // A request the dashboard hasn't started yet (it's still loading): running, for a
+  // A request the page hasn't started yet (it's still loading): running, for a
   // minute at most; one it dropped is gone, and one left over runs out.
   const asked = (ago) => ({ scanRequest: { at: Date.now() - ago, tabId: 100 } });
   assert.equal(await status(asked(1000), []), true);
@@ -648,10 +663,10 @@ test('getScanStatus: a mark whose tab has closed is no scan; a request not start
 });
 
 // --- requestScan ---------------------------------------------------------------------
-test('requestScan: opens the dashboard with a request naming its tab, then busy for 60 s', async () => {
+test('requestScan: opens the basic page with a request naming its tab, then busy for 60 s', async () => {
   const x = load();
   assert.deepEqual(await x.send({ type: 'oh-request-scan' }, HANGAR), { ok: true, opened: true });
-  assert.deepEqual(x.opened, [DASHBOARD]);
+  assert.deepEqual(x.opened, [BASIC]);
   const req = x.stores.session.scanRequest;
   assert.equal(req.tabId, 100, 'the tab it opened');
   assert.ok(Date.now() - req.at < 5000);
@@ -707,11 +722,11 @@ test('requestScan: busy while a scan runs, after a restart, and for two at once'
   assert.equal(both.opened.length, 1);
 });
 
-test('requestScan: an open dashboard is brought to the front and named in the request', async () => {
+test('requestScan: an open basic page is brought to the front and named in the request', async () => {
   const x = load({
     contexts: [
       { contextType: 'TAB', tabId: 4, windowId: 1, documentUrl: 'chrome-extension://other/x.html' },
-      { contextType: 'TAB', tabId: 9, windowId: 2, documentUrl: `${DASHBOARD}#buybacks` },
+      { contextType: 'TAB', tabId: 9, windowId: 2, documentUrl: `${BASIC}#buybacks` },
     ],
   });
   assert.deepEqual(await x.send({ type: 'oh-request-scan' }, HANGAR), { ok: true, opened: true });

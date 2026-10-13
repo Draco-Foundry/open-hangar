@@ -49,7 +49,8 @@
   const FEED_FRESH_MS = 10 * 60e3;
   // A match gone from the store this long is forgotten, so it can alert again later.
   const GONE_KEEP_MS = 24 * 3600e3;
-  // Notifications in one check; the rest get one notification together.
+  // Notifications of their own in one check; any more get one notification together
+  // (the privacy policy's Store Alerts: "up to three at a time, then one for the rest").
   const NOTIFY_MAX = 3;
 
   // ---- Sizes (test/storage-budget.test.js) ----
@@ -421,10 +422,10 @@
     if (m.endsOn) out.push(t('alerts.ends', { day: shortDay(m.endsOn) }));
     return out;
   }
-  // The notifications for the fresh matches: one each, NOTIFY_MAX at most, then one for
-  // the rest. → [{ id, title, message }].
+  // The notifications for the fresh matches: one each for the first NOTIFY_MAX, then one
+  // for the rest. → [{ id, title, message }].
   function notesFor(fresh) {
-    const one = fresh.slice(0, fresh.length > NOTIFY_MAX ? NOTIFY_MAX - 1 : NOTIFY_MAX);
+    const one = fresh.slice(0, NOTIFY_MAX);
     const out = one.map((m) => ({
       id: `${ALARM}:${m.id}`,
       title: m.name,
