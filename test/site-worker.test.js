@@ -22,10 +22,11 @@ const load = import('data:text/javascript;base64,' + Buffer.from(source).toStrin
 );
 
 // One request through the worker. `app` is what the website Worker does: a
-// status code it answers with, or 'down' when the call itself fails.
-async function visit(pathname, app) {
+// status code it answers with, or 'down' when the call itself fails. With `edge`,
+// the website's edge gateway (EDGE) is bound and answers the same way.
+async function visit(pathname, app, { edge = false } = {}) {
   const worker = await load;
-  const calls = { app: [], assets: [], cache: [] };
+  const calls = { app: [], edge: [], assets: [], cache: [] };
   globalThis.caches = {
     default: {
       match: async (req) => {
@@ -55,6 +56,14 @@ async function visit(pathname, app) {
       },
     },
   };
+  if (edge)
+    env.EDGE = {
+      fetch: async (req) => {
+        calls.edge.push(req);
+        if (app === 'down') throw new Error('gateway unreachable');
+        return new Response(`edge ${app}`, { status: app });
+      },
+    };
   const ctx = { waitUntil: () => {} };
   const res = await worker.fetch(new Request(`https://openhangar.space${pathname}`), env, ctx);
   return { res, body: await res.text(), calls };
@@ -119,9 +128,91 @@ test('the home page and /extension keep the old static home page as their fallba
     assert.equal(res.status, 200, `${page} ${app}`);
     assert.equal(body, 'static /index.html', `${page} ${app}`);
   }
+  // Never kept here: a copy keyed on the address alone would hand one visitor's
+  // Day or Night look to the next (the website's edge gateway keeps them per look).
   const { body, calls } = await visit('/', 200);
   assert.equal(body, 'website 200');
-  assert.deepEqual(calls.cache, ['match /', 'put /']);
+  assert.deepEqual(calls.cache, []);
+});
+
+test("with the edge gateway bound, the website's pages go through it as they came", async () => {
+  const pages = [
+    '/',
+    '/extension',
+    '/store',
+    '/store/',
+    '/ships',
+    '/ships/aurora-mk-ii',
+    '/whats-next',
+    '/help',
+    '/updates',
+    '/about',
+  ];
+  for (const page of pages) {
+    const { res, body, calls } = await visit(`${page}?view=list`, 200, { edge: true });
+    assert.equal(res.status, 200, page);
+    assert.equal(body, 'edge 200', page);
+    assert.deepEqual(calls.app, [], page);
+    assert.equal(calls.edge.length, 1, page);
+    // The visitor's own request, untouched: the gateway decides from it.
+    assert.equal(calls.edge[0].url, `https://openhangar.space${page}?view=list`);
+    assert.deepEqual(calls.cache, [], page);
+  }
+  // The Store's own data and files go straight to the website.
+  for (const p of ['/api/store/catalog', '/api/store/item', '/_astro/app.js', '/fonts/x.woff2']) {
+    const { calls } = await visit(p, 200, { edge: true });
+    assert.deepEqual(calls.edge, [], p);
+    assert.equal(calls.app.length, 1, p);
+  }
+  // The fallbacks still stand when the gateway can't answer.
+  for (const [page, app, want] of [
+    ['/', 'down', 'static /index.html'],
+    ['/', 500, 'static /index.html'],
+    ['/help', 503, 'static /help.html'],
+  ]) {
+    const { body } = await visit(page, app, { edge: true });
+    assert.equal(body, want, `${page} ${app}`);
+  }
+  const { res } = await visit('/ships', 'down', { edge: true });
+  assert.equal(res.status, 503);
+});
+
+const FEEDS = [
+  '/api/game-status',
+  '/api/ships',
+  '/api/catalog',
+  '/api/referral-events',
+  '/api/known-issues',
+  '/api/store/on-sale',
+];
+
+test("with the edge gateway bound, the extension's feeds go through it as they came", async () => {
+  for (const feed of FEEDS) {
+    const { res, body, calls } = await visit(feed, 200, { edge: true });
+    assert.equal(res.status, 200, feed);
+    assert.equal(body, 'edge 200', feed);
+    assert.deepEqual(calls.app, [], feed);
+    assert.equal(calls.edge.length, 1, feed);
+    assert.equal(calls.edge[0].url, `https://openhangar.space${feed}`);
+    assert.deepEqual(calls.cache, [], feed);
+  }
+  // Without the binding, straight to the website as before.
+  const { body, calls } = await visit('/api/catalog', 200);
+  assert.equal(body, 'website 200');
+  assert.deepEqual(calls.app, ['/api/catalog']);
+});
+
+test("a feed the gateway or website can't answer is a JSON 503 the extension waits out", async () => {
+  for (const edge of [true, false]) {
+    for (const app of ['down', 500, 503]) {
+      const { res, body } = await visit('/api/store/on-sale', app, { edge });
+      assert.equal(res.status, 503, `${edge} ${app}`);
+      assert.equal(res.headers.get('content-type'), 'application/json; charset=utf-8');
+      assert.equal(res.headers.get('retry-after'), '600');
+      assert.equal(res.headers.get('cache-control'), 'no-store');
+      assert.deepEqual(JSON.parse(body), { error: 'feed unavailable' });
+    }
+  }
 });
 
 test('look-alike paths get no new-page fallback', async () => {
@@ -164,5 +255,27 @@ test('run_worker_first names the new pages and never shadows a static file', () 
     for (const file of files) {
       assert.ok(!re.test(file), `${pattern} would send ${file} to the script`);
     }
+  }
+});
+
+// The website's pages this Worker hands it that are open to everyone. The Ship
+// Explorer, What's Next and Help are in run_worker_first too but still answer 404
+// while their flags are off; each joins this list, and the sitemap, once it's on.
+const LIVE_WEBSITE_PAGES = ['/', '/extension', '/store'];
+
+test('the sitemap lists only pages openhangar.space serves, the Store among them', () => {
+  const xml = fs.readFileSync(path.join(SITE_DIR, 'sitemap.xml'), 'utf8');
+  const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  for (const page of LIVE_WEBSITE_PAGES) {
+    assert.ok(locs.includes(`https://openhangar.space${page}`), `${page} is in the sitemap`);
+  }
+  // Each one is a file in site/ or a live page this Worker hands to the website.
+  const patterns = runWorkerFirst();
+  for (const loc of locs) {
+    const url = new URL(loc);
+    assert.equal(url.origin, 'https://openhangar.space', loc);
+    const file = fs.statSync(path.join(SITE_DIR, url.pathname), { throwIfNoEntry: false });
+    const live = LIVE_WEBSITE_PAGES.includes(url.pathname) && patterns.includes(url.pathname);
+    assert.ok(live || Boolean(file?.isFile()), `${loc} is served here`);
   }
 });
