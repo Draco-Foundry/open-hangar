@@ -124,4 +124,4 @@ page's store list; only the store list goes.
 
 Firefox asks before an extension sends anything off the device. The basic page shows the
 ask for Connect (from the website) and for our hangar page (Local Mode), each with its
-own words (`[copy: basic.firefox-*]`).
+own words (ui/basic/FirefoxCard.svelte).

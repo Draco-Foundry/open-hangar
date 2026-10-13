@@ -201,9 +201,16 @@ test("popup: the line for pledges with no price, in the owner's words (2026-10-1
   assert.equal(unpricedLine(1200), 'Not counted: 1,200 pledges with no price.');
 });
 
-test('popup copy: every word is a placeholder or the words the extension already uses', async () => {
+test("popup copy: the owner's words (2026-10-13), filled in", async () => {
   const { t } = await import('../ui/popup/copy.js');
-  assert.match(t('popup.scan'), /^\[copy: popup\.scan\]$/);
-  assert.equal(t('popup.last-scan', { when: 'today' }), '[copy: popup.last-scan today]');
+  assert.equal(t('popup.scan'), 'Scan');
+  assert.equal(t('popup.last-scan', { when: 'today' }), 'Scanned today');
+  assert.equal(t('popup.stale', { days: 9 }), 'Last scan 9 days ago. Time for a fresh one.');
+  assert.equal(
+    t('popup.sync-wait', { time: '6:02 PM' }),
+    'Try again at 6:02 PM. The last sync was moments ago.',
+  );
   assert.throws(() => t('popup.nope'), /no "popup.nope"/);
+  const src = require('node:fs').readFileSync(`${__dirname}/../ui/popup/copy.js`, 'utf8');
+  assert.doesNotMatch(src, /\[copy:/);
 });

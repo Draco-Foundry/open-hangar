@@ -71,32 +71,32 @@
   // in the repo.
   const SITE_BUILT_IN = '';
 
-  // Every word alerts show, in one place: placeholders until Claude chat writes them and
-  // the owner approves them (CLAUDE.md). The note beside each says what it must say.
-  // {name} parts are filled in by t(). The popup's own words are in ui/popup/copy.js.
+  // Every word alerts show, in one place: the owner's approved words (2026-10-13), word
+  // for word. The note beside each says what it's for. {name} parts are filled in by
+  // t(). The popup's own words are in ui/popup/copy.js.
   const COPY = {
     // The toolbar button's tooltip while alerts wait: how many, and that the popup
     // shows them.
-    'alerts.badge-title': '[copy: alerts.badge-title {n}]',
+    'alerts.badge-title': 'Open Hangar alerts: {n}. Click to see them.',
     // Why an item is an alert, one line each:
     // On the pilot's account Wishlist (only while this browser is connected).
-    'alerts.why.wishlist': '[copy: alerts.why.wishlist]',
+    'alerts.why.wishlist': 'On your Wishlist',
     // A ship in your buy-backs is sold in the store again. Mustn't promise RSI will
     // sell the buy-back back (its own rules apply: tokens, store credit).
-    'alerts.why.buyback': '[copy: alerts.why.buyback {ship}]',
+    'alerts.why.buyback': 'In your buy-backs, now in the store: {ship}',
     // A paint for a ship you own arrived in the store in the last week (our own
     // record of the store). Never "new", "first" or "never sold before".
-    'alerts.why.paint': '[copy: alerts.why.paint {ship}]',
+    'alerts.why.paint': 'In the store in the last 7 days: paint for your {ship}',
     // A ship you own is sold as a warbond edition now (new money only, cheaper).
-    'alerts.why.warbond': '[copy: alerts.why.warbond {ship}]',
+    'alerts.why.warbond': 'Warbond edition in the store: {ship} (new money only)',
     // A ship you own is on a limited-time sale now (the Store's Limited-Time Sales).
-    'alerts.why.limited': '[copy: alerts.why.limited {ship}]',
+    'alerts.why.limited': 'Limited-time sale: {ship}',
     // The sale's last day, only when RSI's own post gives it, e.g. "Oct 15".
-    'alerts.ends': '[copy: alerts.ends {day}]',
+    'alerts.ends': 'Ends {day}',
     // One notification for the rest when more than three arrive at once: how many
     // more, and that the toolbar button shows them all.
-    'alerts.notify-more-title': '[copy: alerts.notify-more-title {n}]',
-    'alerts.notify-more-body': '[copy: alerts.notify-more-body]',
+    'alerts.notify-more-title': 'More alerts: {n}',
+    'alerts.notify-more-body': 'Click the Open Hangar button in your toolbar to see them all.',
   };
   function t(key, vars = {}) {
     const s = COPY[key];
