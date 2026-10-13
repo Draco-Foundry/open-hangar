@@ -3824,10 +3824,14 @@ try {
   JSON.stringify(cart.addCall) === JSON.stringify(['add', 101, 900, 9001, {}])
     ? ok('Add to RSI Cart: one call with the right ships, In Your RSI Cart, Open RSI Cart')
     : fail(`cart add: ${JSON.stringify(cart)}`);
-  /signed out of RSI/.test(cart.signedOut) && cart.logIn === 'Log In to RSI ↗'
+  /Log In to RSI First.*log in to RSI in this browser first\. Nothing was added\./.test(
+    cart.signedOut,
+  ) && cart.logIn === 'Log In to RSI ↗'
     ? ok('cart signed out: the signed-out note with Log In to RSI')
     : fail(`cart signed out: ${JSON.stringify(cart)}`);
-  /RSI Didn't Add It.*“Pretend: this item is unavailable”/.test(cart.refused) &&
+  /RSI Didn't Add It.*Nothing was added\. RSI says: “Pretend: this item is unavailable”/.test(
+    cart.refused,
+  ) &&
   cart.addsAfterRefusal === 2
     ? ok("cart refused: RSI Didn't Add It with RSI's own words, and no second try by itself")
     : fail(`cart refused: ${JSON.stringify(cart)}`);
@@ -4638,7 +4642,7 @@ try {
     wide: document.documentElement.scrollWidth > 320,
   }));
   pop.label === 'Account Value' &&
-  /\[copy: popup\.last-scan /.test(pop.last) &&
+  /^Scanned /.test(pop.last) &&
   pop.who &&
   !pop.wide
     ? ok(`shows ${pop.value} for ${pop.who}, the last scan, no sideways scroll`)
@@ -4662,7 +4666,7 @@ try {
     note: document.querySelector('.pp-note[role="status"]')?.textContent || '',
     closed: __demo.closed,
   }));
-  /\[copy: popup\.scan-busy\]/.test(busy.note) && !busy.closed
+  busy.note.includes('A scan is already running.') && !busy.closed
     ? ok('Scan while one runs: stays open and says so')
     : fail(`popup busy: ${JSON.stringify(busy)}`);
   await page.evaluate(async () => {
@@ -4677,7 +4681,7 @@ try {
   }));
   await page.click('#pp-hangar');
   const went = await page.evaluate(() => __demo.opened.at(-1));
-  /popup\.connected demo@pilot/.test(linked.site) &&
+  /Connected as demo@pilot/.test(linked.site) &&
   !linked.connect &&
   went === 'https://app.openhangar.space/hangar'
     ? ok("connected: who and when, and Open My Hangar goes to the website's My Hangar")
@@ -4697,7 +4701,7 @@ try {
     });
     return { site: document.getElementById('pp-site').textContent, time };
   });
-  popWait.site.includes(`[copy: popup.sync-wait ${popWait.time}]`) &&
+  popWait.site.includes(`Try again at ${popWait.time}. The last sync was moments ago.`) &&
   !/429|responded/.test(popWait.site)
     ? ok(`a too-soon sync: the calm line and the time (${popWait.time}), no error code`)
     : fail(`popup sync wait: ${JSON.stringify(popWait)}`);
@@ -4809,7 +4813,7 @@ try {
     await new Promise((r) => setTimeout(r, 300));
     return { done, rep, opened: __demo.opened.at(-1) || '' };
   });
-  /basic\.scan-done/.test(bpScan.done) &&
+  /Scan complete:\s*2 pledges · 0 buy-backs · referrals read/.test(bpScan.done) &&
   /RSI changed something/.test(bpScan.rep) &&
   bpScan.opened.startsWith('https://github.com/Draco-Foundry/open-hangar/issues/new?')
     ? ok('Scan reports what came home; a failed one offers Report a Scan Problem')
@@ -4883,7 +4887,9 @@ try {
     });
   };
   const rsiYes = await rsiCheck(true);
-  rsiYes.card.includes('[copy: basic.rsi-access-why]') &&
+  rsiYes.card.includes(
+    'Scan reads your hangar on robertsspaceindustries.com, and only there. Allow it once and the scan starts.',
+  ) &&
   rsiYes.card.includes('Allow Access to RSI') &&
   rsiYes.held.scans === 0 &&
   !rsiYes.held.report &&
@@ -4937,7 +4943,7 @@ try {
     };
   });
   const askedNow = outside.slice(askedBefore).filter((u) => !/status\.json/.test(u));
-  bpWait.card.includes(`[copy: basic.sync-wait ${bpWait.time}]`) &&
+  bpWait.card.includes(`Try again at ${bpWait.time}. The last sync was moments ago.`) &&
   bpWait.card.includes(bpWait.said) &&
   bpWait.calm &&
   !askedNow.length &&
@@ -5021,8 +5027,8 @@ try {
   const alOff = await page.$eval('#pp-alerts', (e) => e.textContent.replace(/\s+/g, ' '));
   await page.click('#pp-alerts-on');
   const alOffGo = await page.evaluate(() => ({ url: __demo.opened.at(-1), closed: __demo.closed }));
-  /\[copy: popup\.alerts-off\]/.test(alOff) &&
-  /\[copy: popup\.alerts-turn-on\]/.test(alOff) &&
+  alOff.includes("Alerts tell you when something in RSI's store is for you.") &&
+  alOff.includes('Turn On Alerts') &&
   /basic\.html#settings$/.test(alOffGo.url) &&
   alOffGo.closed
     ? ok('popup, alerts off: one line and the way to the settings switch')
@@ -5067,20 +5073,22 @@ try {
       fresh: li.classList.contains('fresh'),
       text: li.textContent.replace(/\s+/g, ' ').trim(),
     })),
-    connect: /\[copy: popup\.alerts-connect\]/.test(
-      document.getElementById('pp-alerts').textContent,
-    ),
+    connect: document
+      .getElementById('pp-alerts')
+      .textContent.includes('Connect to openhangar.space to add your Wishlist.'),
     sent: __demo.sent.map((m) => m.ohPopup),
     wide: document.documentElement.scrollWidth > 320,
   }));
-  alOn.head === '[copy: popup.alerts 2]' &&
+  alOn.head === 'Alerts: 2' &&
   alOn.rows.length === 2 &&
   alOn.rows[0].fresh &&
   !alOn.rows[1].fresh &&
-  alOn.rows[0].text.includes('[copy: popup.alerts-unseen]') &&
-  alOn.rows[0].text.includes('[copy: alerts.why.buyback Sabre Raven EX]') &&
-  alOn.rows[0].text.includes('[copy: alerts.ends Oct 15]') &&
-  alOn.rows[1].text.includes('[copy: alerts.why.paint Constellation Andromeda]') &&
+  alOn.rows[0].text.includes('Not seen yet:') &&
+  alOn.rows[0].text.includes('In your buy-backs, now in the store: Sabre Raven EX') &&
+  alOn.rows[0].text.includes('Ends Oct 15') &&
+  alOn.rows[1].text.includes(
+    'In the store in the last 7 days: paint for your Constellation Andromeda',
+  ) &&
   alOn.connect &&
   alOn.sent.includes('alerts-seen') &&
   !alOn.wide
@@ -5113,8 +5121,8 @@ try {
   }));
   alSwitch.asked.join() === 'notifications' &&
   alSwitch.on === true &&
-  /\[copy: basic\.alerts-notify-on\]/.test(alSwitch.card) &&
-  /\[copy: basic\.alerts-wishlist-connect\]/.test(alSwitch.card) &&
+  alSwitch.card.includes('Notifications are on.') &&
+  alSwitch.card.includes('Connect to openhangar.space to add your Wishlist.') &&
   alSwitchOff.removed.join() === 'notifications' &&
   alSwitchOff.on === false
     ? ok(
@@ -5131,7 +5139,8 @@ try {
   await page.waitForSelector('#bp-alerts-allow');
   const alNo = await page.$eval('#bp-alerts', (e) => e.textContent.replace(/\s+/g, ' '));
   await page.removeScriptToEvaluateOnNewDocument(noHook.identifier);
-  /\[copy: basic\.alerts-notify-off\]/.test(alNo) && /\[copy: basic\.alerts-allow\]/.test(alNo)
+  alNo.includes('Notifications are off, so alerts show on the badge and in the popup only.') &&
+  alNo.includes('Ask for Notifications Again')
     ? ok('Notifications said no: alerts on, the badge only, and Allow to ask again')
     : fail(`alerts without notifications: ${alNo}`);
   await page.setViewport({ width: 375, height: 800 });

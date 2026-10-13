@@ -68,15 +68,43 @@ test('CSV: quoted where needed, no formulas, one row per shown item', async () =
   assert.equal(exportName('backup', '', 'json', at), 'open-hangar-backup-2026-10-11.json');
 });
 
-test('basic page copy: placeholders, filled in', async () => {
+test("basic page copy: the owner's words (2026-10-13), filled in", async () => {
   const { t, KEYS } = await import('../ui/basic/copy.js');
-  assert.equal(t('basic.scan'), '[copy: basic.scan]');
+  assert.equal(t('basic.scan'), 'Scan');
   assert.equal(
     t('basic.buyback-totals', { n: 2, value: '$5.00', priced: 1 }),
-    '[copy: basic.buyback-totals 2 $5.00 1]',
+    '2 buy-backs, $5.00 (1 with a price listed)',
+  );
+  assert.equal(
+    t('basic.switched-new', { who: 'Pilot_A' }),
+    'Signed in as Pilot_A on RSI: that account has no scan here yet. Press Scan.',
   );
   assert.throws(() => t('basic.nope'), /no "basic.nope"/);
-  for (const k of KEYS) assert.match(t(k), new RegExp(`^\\[copy: ${k.replace('.', '\\.')}`), k);
+  for (const k of KEYS) assert.doesNotMatch(t(k), /\[copy:/, k);
+});
+
+test('basic page copy: one pledge, one buy-back', async () => {
+  const { t, KEYS } = await import('../ui/basic/copy.js');
+  assert.equal(t('basic.row-pledges', { n: 1 }), '1 pledge');
+  assert.equal(t('basic.row-pledges', { n: 0 }), '0 pledges');
+  assert.equal(t('basic.row-pledges', { n: 12 }), '12 pledges');
+  assert.equal(t('basic.row-buybacks', { n: 1 }), '1 buy-back');
+  assert.equal(t('basic.row-buybacks', { n: 3 }), '3 buy-backs');
+  assert.equal(t('basic.account-line', { n: 1, when: 'today' }), '1 pledge, last scan today');
+  assert.equal(t('basic.account-line', { n: 40, when: 'today' }), '40 pledges, last scan today');
+  assert.equal(
+    t('basic.buyback-totals', { n: 1, value: '$5.00', priced: 1 }),
+    '1 buy-back, $5.00 (1 with a price listed)',
+  );
+  // A key with no singular words keeps its own for 1.
+  assert.equal(t('basic.show-all', { n: 1 }), 'Show All 1');
+  // Every singular sits beside its key and fills the same parts.
+  const parts = (s) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).join();
+  for (const k of KEYS.filter((k) => k.endsWith('.one'))) {
+    const base = k.slice(0, -'.one'.length);
+    assert.ok(KEYS.includes(base), k);
+    assert.equal(parts(t(k)), parts(t(base)), k);
+  }
 });
 
 // --- The wishlist into the account, once (ui/basic/wishlist-import.js) -------------------
