@@ -184,6 +184,12 @@ siteHandlers['oh-upgrade-price'] = (m) =>
   });
 siteHandlers['oh-add-upgrade'] = (m) =>
   cartLane().addUpgradeToCart(m.fromShipId, m.toShipId, m.toSkuId, pledgeOf(m));
+// The Store's Haul (#635): its store items into the RSI cart in one request, the same
+// lane, never retried. Nothing is bought.
+//   oh-add-items { items: [{ skuId, qty }] } → { ok, count, added, rsiSays? }
+//                                             | { ok: false, error, reason?, rsiSays? }
+// added: the SKU ids RSI says it added; the page compares them with what it sent.
+siteHandlers['oh-add-items'] = (m) => cartLane().addItemsToCart(m.items);
 
 // @sync-start: the `sync` build flag's code, in every store build (src/flags.js, #187)
 // Connect from the website (Chrome and Edge, owner 2026-10-04). The website's Connect

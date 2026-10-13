@@ -19,10 +19,12 @@ function fakeRsi({
   status = {},
   noUpgradeTo = [],
   cartAnswer = null, // { body, code }: how the cart takes the ticket
+  items = 'ok', // how RSI's store answers the item add (the Haul)
 } = {}) {
   const calls = []; // the upgrade tool's calls (context + GraphQL)
   const all = []; // every request, the RSI page and setAuthToken too
   const tickets = []; // addToCart's ticket handed to the cart
+  const adds = []; // the item adds (RSI's store /graphql)
   const res = (body, code = 200, headers = {}) => ({
     ok: code >= 200 && code < 300,
     status: code,
@@ -39,6 +41,39 @@ function fakeRsi({
       tickets.push({ body: JSON.parse(init.body), init });
       if (cartAnswer) return res(cartAnswer.body, cartAnswer.code || 200);
       return res({ success: 1, code: 'OK' });
+    }
+    if (url === C.ITEMS_URL) {
+      const body = JSON.parse(init.body);
+      adds.push({ body, init });
+      if (status.items) return res({}, status.items, { 'retry-after': '30' });
+      const query = body[0].variables.query;
+      const done = (list) => ({
+        store: {
+          cart: {
+            mutations: {
+              addMany: {
+                count: list.reduce((n, q) => n + q.qty, 0),
+                resources: list.map((q) => ({ id: q.skuId, title: 'Pretend Paint' })),
+              },
+            },
+          },
+        },
+      });
+      if (items === 'ok') return res([{ data: done(query) }]);
+      if (items === 'partial')
+        return res([
+          {
+            data: done(query.slice(0, 1)),
+            errors: [{ message: 'Pretend: maximum quantity reached for this item' }],
+          },
+        ]);
+      if (items === 'auth')
+        return res([{ errors: [{ message: 'User is not authenticated' }], data: null }]);
+      if (items === 'busy-cart')
+        return res([{ errors: [{ message: 'Pretend: a buyback must be alone in the cart' }] }]);
+      if (items === 'bad-request')
+        return res({ errors: [{ message: 'Pretend: that item is not for sale' }] }, 400);
+      return res([{ errors: [{ message: 'Pretend: that item is not for sale' }], data: null }]);
     }
     const body = JSON.parse(init.body);
     calls.push({ url, body, init });
@@ -90,6 +125,7 @@ function fakeRsi({
     calls,
     all,
     tickets,
+    adds,
     ops: () =>
       calls.map((c) => (c.url.endsWith('setContextToken') ? 'context' : c.body.operationName)),
   };
@@ -517,6 +553,140 @@ test('polite: one request at a time with a pause, and nothing during a Retry-Aft
   assert.equal((await slow.addUpgradeToCart(101, 900, 9001)).ok, true);
 });
 
+// --- The Haul: store items, a list in one request ----------------------------------
+const HAUL = [
+  { skuId: 19001, qty: 1 },
+  { skuId: 19002, qty: 3 },
+];
+
+test("the item add's body is RSI's own: a batch of one, SKUs as strings, full query text", () => {
+  const [b, ...rest] = C.addManyBody(HAUL);
+  assert.equal(rest.length, 0);
+  assert.equal(b.operationName, 'AddCartMultiItemMutation');
+  assert.deepEqual(b.variables, {
+    storeFront: 'pledge',
+    query: [
+      { qty: 1, skuId: '19001' },
+      { qty: 3, skuId: '19002' },
+    ],
+  });
+  assert.match(b.query, /^mutation AddCartMultiItemMutation\(\$query: \[CartAddInput!\]/);
+  assert.match(b.query, /addMany\(query: \$query\)[\s\S]*count[\s\S]*resources/);
+  assert.equal(C.ITEMS_URL, 'https://robertsspaceindustries.com/graphql');
+});
+
+test('the Haul list is cleaned: 1 to 20 different items, 1 to 10 of each, no repeats', () => {
+  assert.deepEqual(C.cleanItems([{ skuId: '19001', qty: '2' }]), [{ skuId: 19001, qty: 2 }]);
+  const twenty = Array.from({ length: C.ITEMS_MAX }, (_, i) => ({ skuId: 1 + i, qty: 1 }));
+  assert.equal(C.cleanItems(twenty).length, 20);
+  for (const bad of [
+    null,
+    [],
+    'x',
+    [...twenty, { skuId: 99, qty: 1 }],
+    [{ skuId: 19001, qty: 0 }],
+    [{ skuId: 19001, qty: C.QTY_MAX + 1 }],
+    [{ skuId: 0, qty: 1 }],
+    [{ skuId: 19001 }],
+    [
+      { skuId: 19001, qty: 1 },
+      { skuId: 19001, qty: 2 },
+    ],
+  ])
+    assert.equal(C.cleanItems(bad), null, JSON.stringify(bad));
+});
+
+test("parsing the item add: RSI's count and the SKUs it added", () => {
+  const ok = [
+    {
+      data: {
+        store: { cart: { mutations: { addMany: { count: 4, resources: [{ id: '19001' }] } } } },
+      },
+    },
+  ];
+  assert.deepEqual(C.parseAddMany(ok), { count: 4, added: [19001] });
+  assert.deepEqual(
+    C.parseAddMany({ data: { store: { cart: { mutations: { addMany: { count: 'x' } } } } } }),
+    { count: null, added: [] },
+  );
+  assert.equal(C.parseAddMany({ data: { store: null } }), null);
+  assert.equal(C.parseAddMany(null), null);
+});
+
+test('the Haul goes to RSI in one request, with the store page csrf token', async () => {
+  const rsi = fakeRsi();
+  const r = await fast(rsi).addItemsToCart(HAUL);
+  assert.deepEqual(r, { ok: true, count: 4, added: [19001, 19002] });
+  assert.equal(rsi.adds.length, 1, 'one request for the whole list');
+  const { init } = rsi.adds[0];
+  assert.equal(init.method, 'POST');
+  assert.equal(init.credentials, 'include');
+  assert.equal(init.headers['X-CSRF-TOKEN'], 'csrf-from-page');
+  assert.equal(init.headers['x-rsi-token'], undefined, 'the cookie value stays a cookie');
+  // Only the store page (for its token) and the add: nothing of the upgrade tool's.
+  assert.deepEqual(
+    rsi.all.map((c) => c.url),
+    [C.PLEDGE_STORE_URL, C.ITEMS_URL],
+  );
+});
+
+test("the Haul's answers: some turned down, signed out, refused, a buy-back in the cart", async () => {
+  const partial = await fast(fakeRsi({ items: 'partial' })).addItemsToCart(HAUL);
+  assert.deepEqual(partial, {
+    ok: true,
+    count: 1,
+    added: [19001],
+    rsiSays: 'Pretend: maximum quantity reached for this item',
+  });
+  assert.deepEqual(await fast(fakeRsi({ items: 'auth' })).addItemsToCart(HAUL), {
+    ok: false,
+    error: 'signed-out',
+  });
+  assert.deepEqual(await fast(fakeRsi({ items: 'refused' })).addItemsToCart(HAUL), {
+    ok: false,
+    error: 'refused',
+    rsiSays: 'Pretend: that item is not for sale',
+  });
+  assert.deepEqual(await fast(fakeRsi({ items: 'bad-request' })).addItemsToCart(HAUL), {
+    ok: false,
+    error: 'refused',
+    rsiSays: 'Pretend: that item is not for sale',
+  });
+  const busy = await fast(fakeRsi({ items: 'busy-cart' })).addItemsToCart(HAUL);
+  assert.equal(busy.error, 'cart-conflict');
+  // A list we don't send never reaches RSI.
+  const rsi = fakeRsi();
+  assert.deepEqual(await fast(rsi).addItemsToCart([{ skuId: 19001, qty: 99 }]), {
+    ok: false,
+    error: 'refused',
+  });
+  assert.equal(rsi.all.length, 0);
+  // Signed out for sure: nothing asked.
+  const out = fakeRsi();
+  assert.deepEqual(await fast(out, { rsiCookie: async () => '' }).addItemsToCart(HAUL), {
+    ok: false,
+    error: 'signed-out',
+  });
+  assert.equal(out.all.length, 0);
+});
+
+test('the item add is never retried, and waits out a Retry-After', async () => {
+  for (const code of [500, 502, 429]) {
+    const rsi = fakeRsi({ status: { items: code } });
+    const r = await fast(rsi).addItemsToCart(HAUL);
+    assert.equal(r.ok, false);
+    assert.equal(rsi.adds.length, 1, `status ${code}`);
+  }
+  let t = 1000;
+  const rsi = fakeRsi({ status: { items: 429 } });
+  const api = C.make({ fetch: rsi.fetch, sleep: async () => {}, now: () => t });
+  assert.equal((await api.addItemsToCart(HAUL)).error, 'busy');
+  const again = await api.addItemsToCart(HAUL);
+  assert.equal(again.error, 'busy');
+  assert.ok(again.retryAt > t);
+  assert.equal(rsi.adds.length, 1, 'held off: nothing sent');
+});
+
 // The background worker as scripts/pack.mjs builds it (test/bridge-env.js): with sync
 // (every store build), or with its @sync blocks cut (a developer's --flag sync=off
 // build); staging's pages let in, as a staging build does. `browser`: 'chrome' (Chrome
@@ -547,7 +717,10 @@ const hello = (caps) => ({
 test('website bridge works with sync off: options, price, add; only from our site', async () => {
   const x = loadBackground({ sync: false });
   const SITE = 'https://app.openhangar.space';
-  assert.deepEqual(await x.send({ type: 'oh-hello' }, SITE), hello(['hello', 'addToCart']));
+  assert.deepEqual(
+    await x.send({ type: 'oh-hello' }, SITE),
+    hello(['hello', 'addToCart', 'addItems']),
+  );
   const o = await x.send({ type: 'oh-upgrade-options', toShipId: 900, toSkuId: 9001 }, SITE);
   assert.equal(o.ok, true);
   assert.deepEqual(
@@ -579,16 +752,29 @@ test('website bridge works with sync off: options, price, add; only from our sit
 test('website bridge in a sync build answers both the cart and Connect', async () => {
   const x = loadBackground({ sync: true });
   const staging = await x.send({ type: 'oh-hello' }, 'https://staging.openhangar.space');
-  assert.deepEqual(staging, hello(['hello', 'addToCart', 'connect']));
+  assert.deepEqual(staging, hello(['hello', 'addToCart', 'addItems', 'connect']));
   // Every store build: Connect from the app. Beginning sends nothing anywhere.
   const app = await x.send({ type: 'oh-hello' }, 'https://app.openhangar.space');
-  assert.deepEqual(app, hello(['hello', 'addToCart', 'connect']));
+  assert.deepEqual(app, hello(['hello', 'addToCart', 'addItems', 'connect']));
   const begin = await x.send({ type: 'oh-connect-begin' }, 'https://app.openhangar.space');
   assert.equal(begin.ok, true);
   assert.match(begin.challenge, /^[\w-]{43}$/);
   assert.equal(x.rsi.all.length, 0, 'no request made');
   const main = await x.send({ type: 'oh-hello' }, 'https://openhangar.space');
-  assert.deepEqual(main, hello(['hello', 'addToCart']), 'Connect stays on the app');
+  assert.deepEqual(main, hello(['hello', 'addToCart', 'addItems']), 'Connect stays on the app');
+  // The Store's Haul on openhangar.space, through the built worker to (pretend) RSI.
+  const haul = await x.send(
+    {
+      type: 'oh-add-items',
+      items: [
+        { skuId: 19001, qty: 1 },
+        { skuId: 19002, qty: 2 },
+      ],
+    },
+    'https://openhangar.space',
+  );
+  assert.deepEqual(haul, { ok: true, count: 3, added: [19001, 19002] });
+  assert.equal(x.rsi.adds.length, 1);
   const c = await x.send({ type: 'oh-connect-begin' }, 'https://openhangar.space');
   assert.equal(c.ok, false);
   const o = await x.send(
