@@ -65,6 +65,7 @@ Firefox Add-ons. Work top to bottom. Items marked ✅ are ready in the repo; ⬜
 - ✅ **Small promo tile**: **440×280** PNG (required) — `docs/store-assets/promo-small-440x280.png`. Can be the logo on a dark
   background. (`icons/icon.svg` + the banner in `src/assets/` are starting points.)
 - ✅ (Optional) Marquee promo: 1400×560 — `docs/store-assets/promo-marquee-1400x560.png`.
+- ✅ **Privacy policy as plain text**: `docs/store-assets/privacy-plain.txt`, generated from `docs/PRIVACY.md` by `npm run privacy:plain` (`npm test` fails while they differ).
 - ✅ **Listing title**: `Open Hangar` (≤ 75 chars).
 - ✅ **Summary / short description** (≤ 132 chars) — see §6.
 - ✅ **Detailed description** — see §6.
