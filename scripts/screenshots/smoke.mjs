@@ -3831,8 +3831,7 @@ try {
     : fail(`cart signed out: ${JSON.stringify(cart)}`);
   /RSI Didn't Add It.*Nothing was added\. RSI says: “Pretend: this item is unavailable”/.test(
     cart.refused,
-  ) &&
-  cart.addsAfterRefusal === 2
+  ) && cart.addsAfterRefusal === 2
     ? ok("cart refused: RSI Didn't Add It with RSI's own words, and no second try by itself")
     : fail(`cart refused: ${JSON.stringify(cart)}`);
   cart.anyHeading === 'Any Ship' &&
@@ -4641,10 +4640,7 @@ try {
     connect: !!document.getElementById('pp-connect'),
     wide: document.documentElement.scrollWidth > 320,
   }));
-  pop.label === 'Account Value' &&
-  /^Scanned /.test(pop.last) &&
-  pop.who &&
-  !pop.wide
+  pop.label === 'Account Value' && /^Scanned /.test(pop.last) && pop.who && !pop.wide
     ? ok(`shows ${pop.value} for ${pop.who}, the last scan, no sideways scroll`)
     : fail(`popup: ${JSON.stringify(pop)}`);
   // Not connected and no hangar page in an unbuilt copy: Connect, no Open My Hangar.
@@ -4809,15 +4805,35 @@ try {
     document.getElementById('bp-scan').click();
     await new Promise((r) => setTimeout(r, 600));
     const rep = document.getElementById('bp-report')?.textContent || '';
+    const rows = [...document.querySelectorAll('#bp-report li')].map((li) => li.textContent);
     document.getElementById('bp-report-btn')?.click();
     await new Promise((r) => setTimeout(r, 300));
-    return { done, rep, opened: __demo.opened.at(-1) || '' };
+    const opened = __demo.opened.at(-1) || '';
+    // Signed out of RSI: the title, and the line under it; nothing to report.
+    const getAccount = OH.getAccount;
+    OH.getAccount = async () => ({ loggedIn: false });
+    document.getElementById('bp-scan').click();
+    await new Promise((r) => setTimeout(r, 600));
+    const out = {
+      title: document.querySelector('#bp-report b')?.textContent || '',
+      line: document.getElementById('bp-signed-out')?.textContent || '',
+      report: !!document.getElementById('bp-report-btn'),
+    };
+    OH.getAccount = getAccount;
+    return { done, rep, rows, opened, out };
   });
   /Scan complete:\s*2 pledges · 0 buy-backs · referrals read/.test(bpScan.done) &&
   /RSI changed something/.test(bpScan.rep) &&
+  bpScan.rows.includes('Referrals: read') &&
   bpScan.opened.startsWith('https://github.com/Draco-Foundry/open-hangar/issues/new?')
     ? ok('Scan reports what came home; a failed one offers Report a Scan Problem')
     : fail(`basic scan: ${JSON.stringify(bpScan)}`);
+  bpScan.out.title === "You're Signed Out of RSI" &&
+  bpScan.out.line ===
+    'Nothing was scanned, and your saved hangar is safe. Log in on RSI, then scan again.' &&
+  !bpScan.out.report
+    ? ok('signed out: the title and the line under it, no Report a Scan Problem')
+    : fail(`basic signed out: ${JSON.stringify(bpScan.out)}`);
   const outsideNow = outside.filter((u) => !/^https:\/\/openhangar\.space\/status\.json/.test(u));
   outsideNow.length === 0
     ? ok(`no request off this computer but the kill switch file (${outside.length} refused)`)

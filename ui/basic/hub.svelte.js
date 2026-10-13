@@ -191,7 +191,12 @@ export async function scan() {
       if (r)
         rows.push(
           r.ok
-            ? { name: 'Referrals', ok: !r.partial, text: t('basic.row-referrals') }
+            ? {
+                name: 'Referrals',
+                ok: !r.partial,
+                text: t('basic.row-referrals'),
+                box: t('basic.row-referrals-box'),
+              }
             : { name: 'Referrals', ok: false, text: r.error },
         );
       await loadDB();
