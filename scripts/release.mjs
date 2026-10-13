@@ -17,8 +17,12 @@ import fs from 'node:fs';
 
 const args = process.argv.slice(2);
 const version = args.find((a) => !a.startsWith('--'));
-const dry = args.includes('--dry-run');
-const hotfix = args.includes('--hotfix');
+// `npm run release 0.3.0 --dry-run` doesn't pass the flag on: npm keeps --dry-run and
+// --hotfix for itself and hands them over as npm_config_* instead (2026-10-13, a dry
+// run that cut a release locally). Either spelling works, with or without the --.
+const npmFlag = (name) => process.env[`npm_config_${name}`] === 'true';
+const dry = args.includes('--dry-run') || npmFlag('dry_run');
+const hotfix = args.includes('--hotfix') || npmFlag('hotfix');
 // With stdio: 'inherit' execSync returns null (the output went to the terminal).
 const run = (cmd, opts = {}) =>
   (execSync(cmd, { encoding: 'utf8', stdio: 'pipe', ...opts }) ?? '').trim();
