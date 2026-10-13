@@ -383,10 +383,15 @@ test('notifications: one each, three at most, then one for the rest', () => {
     title: 'Freelancer MAX',
     message: 'Warbond edition in the store: MISC Freelancer MAX (new money only)',
   });
+  // Three of their own, then one for the rest (the privacy policy's words).
   const four = AL.notesFor(ms);
-  assert.equal(four.length, 3);
-  assert.equal(four[2].id, 'oh-alerts:more');
-  assert.equal(four[2].title, 'More alerts: 2');
+  assert.equal(four.length, 4);
+  assert.deepEqual(
+    four.slice(0, 3).map((n) => n.id),
+    ms.slice(0, 3).map((m) => `oh-alerts:${m.id}`),
+  );
+  assert.equal(four[3].id, 'oh-alerts:more');
+  assert.equal(four[3].title, 'More alerts: 1');
   const ends = AL.lines(byId(ms, 'sku-19700'));
   assert.deepEqual(ends, ['In your buy-backs, now in the store: Sabre Raven EX', 'Ends Oct 15']);
 });
@@ -509,7 +514,8 @@ test('a check, not connected: the public feed only, with nothing of the pilot in
   assert.equal(init.credentials, 'omit');
   assert.deepEqual(init.headers, { Accept: 'application/json' });
   assert.ok(!('body' in init) && !init.method, 'a plain GET');
-  assert.equal(x.out.notes.length, 3);
+  // Four matches: three of their own, then one for the rest.
+  assert.equal(x.out.notes.length, 4);
   assert.equal(x.out.badges, 1);
   assert.deepEqual(x.out.at, [NOW + 30 * MIN + 150e3]);
   assert.equal(x.data.alertsFeed.etag, 'W/"a"');
