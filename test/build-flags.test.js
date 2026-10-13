@@ -10,6 +10,7 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
 const ROOT = path.join(__dirname, '..');
+const { stubUi } = require('./ui-stubs.js');
 const FLAGS_SRC = fs.readFileSync(path.join(ROOT, 'src', 'flags.js'), 'utf8');
 const lib = () => import('../scripts/build-flags.mjs');
 
@@ -23,6 +24,7 @@ test('registry parses: every flag has a name, a one-line about and a default', a
     'localMode',
     'orgFleet',
     'sync',
+    'wishlistImport',
   ]);
   for (const [name, f] of Object.entries(registry)) {
     assert.ok(f.about.length < 100, `${name}: keep about to one short line`);
@@ -46,31 +48,27 @@ test('registry: bad entries fail loudly', async () => {
 test('public store builds get the defaults; the beta its set; sync is on in both', async () => {
   const { loadFlags, buildValues } = await lib();
   const { registry } = loadFlags(FLAGS_SRC);
-  assert.deepEqual(buildValues(registry), {
-    sync: true,
-    orgFleet: false,
-    localMode: false,
-    connector: false,
-    alerts: false,
-  });
-  // Local Mode is on in the beta now that the privacy policy names our hangar page
-  // (test/privacy-permissions.test.js); the public store builds keep it off.
-  assert.deepEqual(buildValues(registry, { beta: true }), {
+  // From 0.3.0 every store build is the connector, with Local Mode (the privacy policy
+  // names our hangar page, test/privacy-permissions.test.js). The wishlist import and
+  // Extension Alerts wait for the policy's words.
+  const STORE = {
     sync: true,
     orgFleet: false,
     localMode: true,
-    connector: false,
+    connector: true,
+    wishlistImport: false,
     alerts: false,
-  });
+  };
+  assert.deepEqual(buildValues(registry), STORE);
+  // The beta is the same set: no flag has a beta value of its own today.
+  assert.deepEqual(buildValues(registry, { beta: true }), STORE);
   assert.deepEqual(buildValues(registry, { overrides: { sync: false } }), {
+    ...STORE,
     sync: false,
-    orgFleet: false,
-    localMode: false,
-    connector: false,
-    alerts: false,
   });
   assert.equal(registry.orgFleet.devOnly, true, 'orgFleet stays out of every store build');
-  assert.ok(!registry.localMode.devOnly, 'Local Mode may ship once the policy says so');
+  assert.ok(!registry.localMode.devOnly, 'Local Mode ships');
+  assert.ok(!registry.connector.devOnly, 'the connector ships');
   assert.throws(() => buildValues(registry, { overrides: { nope: true } }), /no such flag/);
 });
 
@@ -97,6 +95,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     orgFleet: true,
     localMode: true,
     connector: false,
+    wishlistImport: false,
     alerts: false,
   });
   const { values } = loadFlags(fs.readFileSync(file, 'utf8'));
@@ -105,6 +104,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     orgFleet: true,
     localMode: true,
     connector: false,
+    wishlistImport: false,
     alerts: false,
   });
   assert.throws(() => writeFlags(file, {}), /expected one/, 'only ever written once');
@@ -191,6 +191,8 @@ function scratchRepo() {
     fs.copyFileSync(path.join(ROOT, f), path.join(dir, f));
   for (const d of ['_locales', 'icons', 'src', 'beta'])
     fs.cpSync(path.join(ROOT, d), path.join(dir, d), { recursive: true });
+  // The connector's pages load the built Svelte pages (test/ui-stubs.js).
+  stubUi(dir);
   // A probe the build should cut unless orgFleet is on.
   fs.writeFileSync(
     path.join(dir, 'src', 'probe.js'),
@@ -240,16 +242,26 @@ test('pack: writes each build its values and cuts the code of flags that are off
       fs.readFileSync(path.join(dir, 'dist', target, 'src', 'site-pages.js'), 'utf8'),
     ),
   });
+  // Every store build's set (src/flags.js): the connector with Local Mode and sync.
+  const STORE = {
+    sync: true,
+    orgFleet: false,
+    localMode: true,
+    connector: true,
+    wishlistImport: false,
+    alerts: false,
+  };
+  const ALL_PAGES = [
+    'https://hangar.openhangar.space/*',
+    'https://openhangar.space/*',
+    'https://app.openhangar.space/*',
+  ];
   try {
-    // The public store build: every flag at its default (sync on), flagged code gone.
+    // The public store build: every flag at its default, flagged code gone.
     pack(dir);
     for (const t of ['chrome', 'firefox']) {
       const b = built(t);
-      assert.deepEqual(
-        b.flags,
-        { sync: true, orgFleet: false, localMode: false, connector: false, alerts: false },
-        t,
-      );
+      assert.deepEqual(b.flags, STORE, t);
       assert.equal(b.probe, 'keep();\n', `${t}: orgFleet code cut`);
       assert.match(b.lib, /OH\.siteLinkStart\s*=/, `${t}: sync code kept`);
       assert.match(
@@ -260,17 +272,28 @@ test('pack: writes each build its values and cuts the code of flags that are off
       assert.ok(b.manifest.permissions.includes('identity'), `${t}: identity for Connect`);
       assert.ok(!/staging/.test(JSON.stringify(b.manifest)), `${t}: no staging`);
     }
-    assert.deepEqual(built('chrome').manifest.externally_connectable, {
-      matches: ['https://openhangar.space/*', 'https://app.openhangar.space/*'],
-    });
-    // The background worker's lists: the same pages, Connect on the app, no hangar page
-    // without Local Mode.
+    assert.deepEqual(built('chrome').manifest.externally_connectable, { matches: ALL_PAGES });
+    // The background worker's lists: the same pages, Connect on the app, and our hangar
+    // page (Local Mode).
     assert.deepEqual(built('chrome').pages, {
-      hangar: [],
+      hangar: ['https://hangar.openhangar.space'],
       site: ['https://openhangar.space', 'https://app.openhangar.space'],
       connect: ['https://app.openhangar.space'],
     });
-    assert.ok(!/oh-get-hangar|scanRequest/.test(read('chrome', 'src/background.js')));
+    // Local Mode's requests and the popup's Scan are kept.
+    for (const t of ['chrome', 'firefox']) {
+      const bg = read(t, 'src/background.js');
+      for (const kept of [/oh-get-hangar/, /scanRequest/, /ohPopup/]) assert.match(bg, kept, t);
+    }
+    // The connector: the toolbar opens the popup, the basic page is the one page, and
+    // the dashboard is left out (scripts/connector.mjs).
+    for (const t of ['chrome', 'firefox']) {
+      assert.equal(built(t).manifest.action.default_popup, 'src/popup.html', t);
+      for (const f of ['src/popup.html', 'src/basic.html'])
+        assert.ok(fs.existsSync(path.join(dir, 'dist', t, f)), `${t}: ${f}`);
+      for (const f of ['src/dashboard.html', 'src/dashboard.js', 'CHANGELOG.md'])
+        assert.ok(!fs.existsSync(path.join(dir, 'dist', t, f)), `${t}: no ${f}`);
+    }
     const ff = built('firefox').manifest;
     assert.deepEqual(
       ff.background,
@@ -301,17 +324,17 @@ test('pack: writes each build its values and cuts the code of flags that are off
       ff.content_scripts,
       [
         {
-          matches: ['https://openhangar.space/*', 'https://app.openhangar.space/*'],
+          matches: ALL_PAGES,
           js: ['src/site-bridge.js'],
           run_at: 'document_start',
           all_frames: false,
         },
       ],
-      "Firefox's one-click Connect: the site bridge on our own site, top frame only",
+      "Firefox's one-click Connect and Local Mode: the site bridge on our own pages, top frame only",
     );
     assert.match(
       read('firefox', 'src/site-bridge.js'),
-      /const PAGES = \["https:\/\/openhangar\.space","https:\/\/app\.openhangar\.space"\];/,
+      /const PAGES = \["https:\/\/hangar\.openhangar\.space","https:\/\/openhangar\.space","https:\/\/app\.openhangar\.space"\];/,
       "the bridge's own copy of the list",
     );
     assert.ok(!fs.existsSync(path.join(dir, 'dist/chrome/src/site-bridge.js')));
@@ -325,40 +348,37 @@ test('pack: writes each build its values and cuts the code of flags that are off
 
     // A developer's build with a dev-only flag on: built, and the store check refuses it.
     assert.match(pack(dir, ['--flag', 'orgFleet=on']), /dev build, never for a store/);
-    assert.deepEqual(built('chrome').flags, {
-      sync: true,
-      orgFleet: true,
-      localMode: false,
-      connector: false,
-      alerts: false,
-    });
+    assert.deepEqual(built('chrome').flags, { ...STORE, orgFleet: true });
     assert.match(built('chrome').probe, /orgFleetOnly\(\);/);
     assert.throws(() => check(dir), /flag "orgFleet" is on, and it's dev-only/);
 
     // OH_SYNC=1, --sync and --flag sync=on are the store build now.
     for (const [args, env] of [[[], { OH_SYNC: '1' }], [['--sync']], [['--flag', 'sync=on']]]) {
       assert.doesNotMatch(pack(dir, args, env), /dev build/);
-      assert.deepEqual(built('chrome').flags, {
-        sync: true,
-        orgFleet: false,
-        localMode: false,
-        connector: false,
-        alerts: false,
-      });
+      assert.deepEqual(built('chrome').flags, STORE);
       assert.match(built('chrome').lib, /OH\.siteLinkStart\s*=/, 'sync code kept');
       assert.match(check(dir), /clean store build/);
     }
 
-    // --flag sync=off: a developer's build with the sync code cut, which the store
-    // check refuses. The identity permission stays (it's in manifest.json).
-    assert.match(pack(dir, ['--flag', 'sync=off']), /dev build, never for a store/);
+    // Local Mode asks Firefox through sync's consent card, and the connector's popup and
+    // scans are Local Mode's: on top of the store build, sync=off or localMode=off alone
+    // doesn't build.
+    assert.throws(() => pack(dir, ['--flag', 'sync=off']), /localMode=on needs sync on/);
+    assert.throws(() => pack(dir, ['--flag', 'localMode=off']), /connector=on needs localMode on/);
+    // The wishlist import runs in the basic page: not without the connector.
+    assert.throws(
+      () => pack(dir, ['--flag', 'connector=off', '--flag', 'wishlistImport=on']),
+      /wishlistImport=on needs the connector on/,
+    );
+
+    // Without sync (so without Local Mode and the connector): a developer's build with the
+    // sync code cut, which the store check refuses. The identity permission stays (it's
+    // in manifest.json).
+    const NO_SYNC = ['--flag', 'sync=off', '--flag', 'localMode=off', '--flag', 'connector=off'];
+    assert.match(pack(dir, NO_SYNC), /dev build, never for a store/);
     for (const t of ['chrome', 'firefox']) {
       const b = built(t);
-      assert.deepEqual(
-        b.flags,
-        { sync: false, orgFleet: false, localMode: false, connector: false, alerts: false },
-        t,
-      );
+      assert.deepEqual(b.flags, { ...STORE, sync: false, localMode: false, connector: false }, t);
       assert.ok(!/OH\.siteLinkStart\s*=/.test(b.lib), `${t}: sync code cut`);
       // Add to RSI Cart still lets our own site in; no page may Connect.
       assert.deepEqual(b.pages.connect, [], t);
@@ -373,16 +393,13 @@ test('pack: writes each build its values and cuts the code of flags that are off
     );
     assert.throws(() => check(dir), /flag "sync" is off, the store default is on/);
     assert.throws(
-      () => pack(dir, ['--flag', 'sync=off', '--site=https://staging.openhangar.space']),
+      () => pack(dir, [...NO_SYNC, '--site=https://staging.openhangar.space']),
       /needs sync on/,
     );
-    // Local Mode asks Firefox through sync's consent card: not without sync.
-    assert.throws(
-      () => pack(dir, ['--flag', 'sync=off', '--flag', 'localMode=on']),
-      /localMode=on needs sync on/,
-    );
 
-    // A developer's staging build: built in to staging, which lets staging in too.
+    // A developer's staging build: built in to staging, which lets staging's pages in
+    // too, its hangar page included, and lets the connector's pages ask it. Never for a
+    // store.
     const staging = pack(dir, ['--site=https://staging.openhangar.space']);
     assert.match(staging, /syncing to https:\/\/staging\.openhangar\.space.*dev build/);
     assert.match(built('chrome').lib, /SITE_BUILT_IN = "https:\/\/staging\.openhangar\.space"/);
@@ -391,9 +408,12 @@ test('pack: writes each build its values and cuts the code of flags that are off
         'https://staging.openhangar.space/*',
       ),
     );
+    assert.match(
+      built('chrome').manifest.content_security_policy.extension_pages,
+      /; connect-src 'self' https:\/\/robertsspaceindustries\.com https:\/\/openhangar\.space https:\/\/staging\.openhangar\.space$/,
+    );
     assert.throws(() => check(dir), /the staging site/);
-    // With Local Mode too, as npm run build:staging builds it: staging's hangar page,
-    // still never for a store.
+    // As npm run build:staging builds it (Local Mode named, though it's the default now).
     const scripts = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'))).scripts;
     assert.match(
       scripts['build:staging'],
@@ -406,62 +426,61 @@ test('pack: writes each build its values and cuts the code of flags that are off
     ]);
     assert.throws(() => check(dir), /hangar-staging\.openhangar\.space|the staging site/);
 
-    // A developer's Local Mode build: the hangar page in every list; the store check
-    // only minds the flag being off its store default, not the pages.
-    pack(dir, ['--flag', 'localMode=on']);
-    assert.deepEqual(built('chrome').manifest.externally_connectable.matches, [
-      'https://hangar.openhangar.space/*',
-      'https://openhangar.space/*',
-      'https://app.openhangar.space/*',
-    ]);
-    assert.deepEqual(built('firefox').manifest.content_scripts[0].matches, [
-      'https://hangar.openhangar.space/*',
-      'https://openhangar.space/*',
-      'https://app.openhangar.space/*',
-    ]);
-    assert.deepEqual(built('chrome').pages.hangar, ['https://hangar.openhangar.space']);
-    assert.match(read('chrome', 'src/background.js'), /oh-get-hangar/);
-    assert.deepEqual(problemsOf(dir), [
-      'dist/chrome/src/flags.js: flag "localMode" is on, the store default is off',
-      'dist/firefox/src/flags.js: flag "localMode" is on, the store default is off',
-    ]);
-
-    // The connector: the toolbar opens the popup, and its handler is kept. It needs
-    // Local Mode (its hangar page). Without the flag the popup isn't in the build.
-    assert.throws(() => pack(dir, ['--flag', 'connector=on']), /connector=on needs localMode on/);
-    pack(dir, ['--flag', 'localMode=on', '--flag', 'connector=on']);
+    // A developer's build without the connector (the dashboard, as every store build had
+    // before 0.3.0): no popup and no basic page, the popup's Scan cut, Local Mode kept.
+    // The store check refuses it for the flag alone.
+    assert.match(pack(dir, ['--flag', 'connector=off']), /dev build, never for a store/);
     for (const t of ['chrome', 'firefox']) {
-      assert.equal(built(t).manifest.action.default_popup, 'src/popup.html', t);
-      for (const f of ['popup.html', 'basic.html'])
-        assert.ok(fs.existsSync(path.join(dir, 'dist', t, 'src', f)), `${t}: ${f}`);
-      assert.match(read(t, 'src/background.js'), /ohPopup/, `${t}: the popup's Scan`);
-    }
-    pack(dir);
-    for (const t of ['chrome', 'firefox']) {
-      assert.equal(built(t).manifest.action.default_popup, undefined, t);
+      const m = built(t).manifest;
+      assert.equal(m.action.default_popup, undefined, t);
       for (const f of ['popup.html', 'basic.html'])
         assert.ok(!fs.existsSync(path.join(dir, 'dist', t, 'src', f)), `${t}: no ${f}`);
-      assert.ok(!/ohPopup/.test(read(t, 'src/background.js')), `${t}: the popup's Scan cut`);
+      assert.ok(fs.existsSync(path.join(dir, 'dist', t, 'src', 'dashboard.html')), t);
+      assert.doesNotMatch(m.content_security_policy.extension_pages, /connect-src/, t);
+      const bg = read(t, 'src/background.js');
+      assert.ok(!/ohPopup/.test(bg), `${t}: the popup's Scan cut`);
+      assert.match(bg, /oh-get-hangar/, `${t}: Local Mode kept`);
     }
+    assert.deepEqual(problemsOf(dir).sort(), [
+      'dist/chrome/src/flags.js: flag "connector" is off, the store default is on',
+      'dist/firefox/src/flags.js: flag "connector" is off, the store default is on',
+    ]);
 
-    // The beta: exactly the beta set, no overrides. Local Mode is on there (the
-    // policy names our hangar page), so the production hangar page is let in.
+    // Without Local Mode too: the hangar page in no list and its requests cut; the store
+    // check minds the flags, not the pages. One that lets the hangar page in anyway is
+    // refused for that as well.
+    pack(dir, ['--flag', 'connector=off', '--flag', 'localMode=off']);
+    const OUR_SITE = ['https://openhangar.space/*', 'https://app.openhangar.space/*'];
+    assert.deepEqual(built('chrome').manifest.externally_connectable.matches, OUR_SITE);
+    assert.deepEqual(built('firefox').manifest.content_scripts[0].matches, OUR_SITE);
+    assert.deepEqual(built('chrome').pages.hangar, []);
+    assert.ok(!/oh-get-hangar|scanRequest/.test(read('chrome', 'src/background.js')));
+    assert.deepEqual(problemsOf(dir).sort(), [
+      'dist/chrome/src/flags.js: flag "connector" is off, the store default is on',
+      'dist/chrome/src/flags.js: flag "localMode" is off, the store default is on',
+      'dist/firefox/src/flags.js: flag "connector" is off, the store default is on',
+      'dist/firefox/src/flags.js: flag "localMode" is off, the store default is on',
+    ]);
+    const pagesFile = path.join(dir, 'dist', 'chrome', 'src', 'site-pages.js');
+    fs.writeFileSync(
+      pagesFile,
+      fs
+        .readFileSync(pagesFile, 'utf8')
+        .replace('"hangar":[]', '"hangar":["https://hangar.openhangar.space"]'),
+    );
+    const m = built('chrome').manifest;
+    m.externally_connectable.matches.unshift('https://hangar.openhangar.space/*');
+    fs.writeFileSync(path.join(dir, 'dist', 'chrome', 'manifest.json'), JSON.stringify(m));
+    assert.ok(problemsOf(dir).includes('chrome: the hangar page with localMode off'));
+
+    // The beta: exactly the beta set, no overrides. It's the store's (the connector with
+    // Local Mode), so the production hangar page is let in and the toolbar opens the popup.
     pack(dir, ['--beta']);
-    assert.deepEqual(built('beta').flags, {
-      sync: true,
-      orgFleet: false,
-      localMode: true,
-      connector: false,
-      alerts: false,
-    });
-    assert.deepEqual(built('beta-firefox').flags, {
-      sync: true,
-      orgFleet: false,
-      localMode: true,
-      connector: false,
-      alerts: false,
-    });
+    assert.deepEqual(built('beta').flags, STORE);
+    assert.deepEqual(built('beta-firefox').flags, STORE);
     assert.deepEqual(built('beta').pages.hangar, ['https://hangar.openhangar.space']);
+    for (const t of ['beta', 'beta-firefox'])
+      assert.equal(built(t).manifest.action.default_popup, 'src/popup.html', t);
     assert.throws(() => pack(dir, ['--beta', '--flag', 'orgFleet=on']), /beta set/);
     assert.throws(() => pack(dir, ['--flag', 'warpDrive=on']), /no such flag/);
   } finally {
@@ -482,8 +501,10 @@ test('store check: the way in agrees with itself, or the build is refused', () =
     change(json);
     fs.writeFileSync(file(target, f), JSON.stringify(json));
   };
-  const hangarLists = (t) =>
-    t.replace('"hangar":[]', '"hangar":["https://hangar.openhangar.space"]');
+  // The store build has Local Mode (src/flags.js): our hangar page is in its lists.
+  // (The other way round, the hangar page in a build without it: the pack test.)
+  const noHangarLists = (t) =>
+    t.replace('"hangar":["https://hangar.openhangar.space"]', '"hangar":[]');
   const cases = [
     [
       'another site let in',
@@ -522,14 +543,17 @@ test('store check: the way in agrees with itself, or the build is refused', () =
       /^firefox: src\/site-bridge\.js's own list .* doesn't agree/,
     ],
     [
-      'the hangar page without Local Mode',
+      'no hangar page with Local Mode on',
       () => {
-        edit('chrome', 'src/site-pages.js', hangarLists);
+        edit('chrome', 'src/site-pages.js', noHangarLists);
         edit('chrome', 'manifest.json', (m) =>
-          m.externally_connectable.matches.unshift('https://hangar.openhangar.space/*'),
+          m.externally_connectable.matches.splice(
+            m.externally_connectable.matches.indexOf('https://hangar.openhangar.space/*'),
+            1,
+          ),
         );
       },
-      /^chrome: the hangar page with localMode off/,
+      /^chrome: no hangar page with localMode on/,
     ],
     [
       'Connect on the public front page',

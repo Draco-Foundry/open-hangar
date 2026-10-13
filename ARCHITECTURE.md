@@ -30,10 +30,11 @@ extension's own scripts (`script-src 'self'`).
 
 ## The Service Worker
 
-`src/background.js` is deliberately thin. The toolbar button has no popup:
-`chrome.action.onClicked` opens `src/dashboard.html` in a tab (in a build with the
-`connector` flag it opens `src/popup.html` instead, whose Scan asks the background for
-the same scan our hangar page asks for; docs/FLAGS.md). It also:
+`src/background.js` is deliberately thin. In every store build (the `connector` flag,
+docs/CONNECTOR.md) the toolbar button opens `src/popup.html`, whose Scan asks the
+background for the same scan our hangar page asks for, and the extension's one page is
+the basic page, `src/basic.html`. A developer's build without the connector has no
+popup: `chrome.action.onClicked` opens `src/dashboard.html` in a tab. It also:
 
 - shows an amber `!` badge when the last hangar scan (`db.sources.hangar.scannedAt`) is
   7 days old or more (`updateReminder()`, turned off with the `remindRescan` key);
@@ -95,15 +96,16 @@ Our hangar page (Local Mode, behind the `localMode` flag, which needs `sync`):
   sync token, the site address, settings, cookies, the referral code or prospects), and
   only after it passes the sync schema and the never-sent key walk. Errors: `no-scan`,
   `needs-upgrade`, `schema` (with `path`) and, on Firefox before it allows sharing,
-  `firefox-ask`: Home opens with Firefox's card up, in the dashboard tab that
-  `localAskFirefox` in session storage names (at most once a minute), and its Continue
-  only asks Firefox.
+  `firefox-ask`: the basic page (the dashboard's Home without the connector) opens with
+  Firefox's card up, in the tab that `localAskFirefox` in session storage names (at most
+  once a minute), and its Continue only asks Firefox.
 - `oh-scan-status`: when the hangar and buy-backs were scanned, `stale` (the badge's 7
   days) and `running`: a `scanRunning` mark in session storage (the scanning tab and a
   time the dashboard renews every minute, counted while that tab is open and for 10
   minutes at most), or a `scanRequest` from the last minute that its tab hasn't started.
-- `oh-request-scan`: opens or focuses a dashboard tab and leaves a `scanRequest` naming
-  it; that tab runs the Scan button's own scan. Busy while a scan runs and for 60 seconds
+- `oh-request-scan`: opens or focuses the extension's page (the basic page, or the
+  dashboard without the connector) and leaves a `scanRequest` naming it; that tab runs
+  its Scan button's own scan. Busy while a scan runs and for 60 seconds
   after a request. The worker never scans or asks RSI anything for it.
 
 Chrome and Edge: the pages message the extension directly

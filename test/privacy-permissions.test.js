@@ -126,3 +126,30 @@ test('a store or beta build with alerts on: the policy explains its permissions 
     }
   }
 });
+
+// The wishlist import (ui/basic/wishlist-import.js): a store or beta build with the
+// `wishlistImport` flag on sends the wishlist this browser kept to the openhangar.space
+// account, which the policy says never leaves the browser. It fails here until both
+// copies of the policy name it (owner-approved words, word for word), and the basic page
+// never sends it in a build without the flag.
+test('a store or beta build with the wishlist import on: the policy names it', async () => {
+  const { buildValues, readRegistry } = await import('../scripts/build-flags.mjs');
+  const { IMPORT_PATH } = await import('../ui/basic/wishlist-import.js');
+  const registry = readRegistry(path.join(ROOT, 'src', 'flags.js'));
+  for (const [build, beta] of [
+    ['store', false],
+    ['beta', true],
+  ]) {
+    if (!buildValues(registry, { beta }).wishlistImport) continue;
+    for (const file of ['docs/PRIVACY.md', 'site/privacy.html'])
+      assert.ok(
+        read(file).includes(IMPORT_PATH),
+        `${file} names ${IMPORT_PATH} (the ${build} build sends the wishlist)`,
+      );
+  }
+  // The basic page asks the flag before anything else.
+  const hub = read('ui/basic/hub.svelte.js');
+  const fn = /async function wishlistToAccount\(\) \{\n\s*(.*)\n/.exec(hub);
+  assert.ok(fn, 'ui/basic/hub.svelte.js has wishlistToAccount');
+  assert.equal(fn[1], "if (!flag('wishlistImport')) return;");
+});

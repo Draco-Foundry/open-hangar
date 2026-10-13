@@ -11,51 +11,29 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
 const ROOT = path.join(__dirname, '..');
-// Stand-ins for the built Svelte pages (src/ui is generated, and npm test runs before
-// the build in CI), shaped like Vite's output: entries importing a shared chunk.
-const UI_STUBS = {
-  'popup.js': 'import { a } from "./shared.js";\nimport { w } from "./when.js";\n',
-  'basic.js': 'import { a } from "./shared.js";\n',
-  'home.js': 'import { a } from "./shared.js";\nimport { w } from "./when.js";\n',
-  'store.js': 'import { a } from "./shared.js";\n',
-  'shared.js': "/** @import { X } from './types.js' */\nexport const a = 1;\n",
-  'when.js': 'export const w = 2;\n',
-  'popup.css': '.pp{}',
-  'basic.css': '.bp{}',
-  'tokens.css': '@font-face{src:url(./fonts/m.woff2)}',
-  'home.css': '@font-face{src:url(./fonts/m.woff2)}',
-  'store.css': '.s{}',
-  'fonts/m.woff2': 'font',
-};
+const { UI_STUBS, stubUi } = require('./ui-stubs.js');
 
-function scratch({ connectorDefault = false, alertsDefault = false } = {}) {
+// A scratch copy of the repo with the Svelte pages stood in for. Its flags are the
+// repo's (the connector and Local Mode on in every store build since 0.3.0), or with
+// `connector: false` a registry whose store build has no connector (Local Mode stays on,
+// as the beta had it before), or with `alerts: true` one where Extension Alerts ship too.
+function scratch({ connector = true, alerts = false } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'oh-connector-'));
   for (const f of ['manifest.json', 'CHANGELOG.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md'])
     fs.copyFileSync(path.join(ROOT, f), path.join(dir, f));
   // The scripts too: the store check reads the flag defaults beside itself.
   for (const d of ['_locales', 'icons', 'src', 'beta', 'scripts'])
     fs.cpSync(path.join(ROOT, d), path.join(dir, d), { recursive: true });
-  const ui = path.join(dir, 'src', 'ui');
-  fs.rmSync(ui, { recursive: true, force: true });
-  for (const [f, text] of Object.entries(UI_STUBS)) {
-    fs.mkdirSync(path.dirname(path.join(ui, f)), { recursive: true });
-    fs.writeFileSync(path.join(ui, f), text);
-  }
-  if (connectorDefault) {
-    // The day the connector ships: on in the store build, with Local Mode.
-    const f = path.join(dir, 'src', 'flags.js');
-    const text = fs
-      .readFileSync(f, 'utf8')
-      .replace(/(localMode: \{[^}]*?default: )false/, '$1true')
-      .replace(/(connector: \{[^}]*?default: )false/, '$1true');
-    fs.writeFileSync(f, text);
-  }
-  if (alertsDefault) {
-    // The day Extension Alerts ship too (they need the connector).
-    const f = path.join(dir, 'src', 'flags.js');
-    const text = fs.readFileSync(f, 'utf8').replace(/(alerts: \{[^}]*?default: )false/, '$1true');
-    fs.writeFileSync(f, text);
-  }
+  stubUi(dir);
+  const flagsFile = path.join(dir, 'src', 'flags.js');
+  const setDefault = (name, on) => {
+    const re = new RegExp(`(${name}: \\{[^}]*?default: )(true|false)`);
+    const text = fs.readFileSync(flagsFile, 'utf8');
+    assert.match(text, re, `src/flags.js has ${name}'s default`);
+    fs.writeFileSync(flagsFile, text.replace(re, `$1${on}`));
+  };
+  setDefault('connector', connector);
+  setDefault('alerts', alerts);
   return dir;
 }
 const run = (dir, script, args = []) =>
@@ -90,7 +68,7 @@ const filesOf = (dir) => {
 };
 
 test('connector build: the popup, the basic page and what they load, nothing else', () => {
-  const dir = scratch({ connectorDefault: true });
+  const dir = scratch();
   try {
     run(dir, 'pack.mjs');
     for (const t of ['chrome', 'firefox']) {
@@ -133,7 +111,7 @@ test('connector build: the popup, the basic page and what they load, nothing els
 });
 
 test('store check: a connector build that let the dashboard back in is refused', () => {
-  const dir = scratch({ connectorDefault: true });
+  const dir = scratch();
   try {
     run(dir, 'pack.mjs');
     const out = path.join(dir, 'dist', 'chrome');
@@ -161,7 +139,9 @@ test('store check: a connector build that let the dashboard back in is refused',
 });
 
 test('store check: no popup or basic page without the connector', () => {
-  const dir = scratch();
+  // A registry whose store build has no connector (every store build had none before
+  // 0.3.0): the dashboard, and the store check refuses the popup in it.
+  const dir = scratch({ connector: false });
   try {
     run(dir, 'pack.mjs');
     assert.deepEqual(problems(dir), []);
@@ -212,7 +192,7 @@ const writeManifest = (dir, t, m) =>
   fs.writeFileSync(path.join(dir, 'dist', t, 'manifest.json'), JSON.stringify(m));
 
 test('alerts build: src/alerts.js, alarms, notifications only optional, production built in', () => {
-  const dir = scratch({ connectorDefault: true, alertsDefault: true });
+  const dir = scratch({ alerts: true });
   try {
     run(dir, 'pack.mjs');
     for (const t of ['chrome', 'firefox']) {
@@ -250,7 +230,7 @@ test('alerts build: src/alerts.js, alarms, notifications only optional, producti
 });
 
 test('no alerts: no src/alerts.js, no alarms, no notifications', () => {
-  const dir = scratch({ connectorDefault: true });
+  const dir = scratch();
   try {
     run(dir, 'pack.mjs');
     for (const t of ['chrome', 'firefox']) {
@@ -284,18 +264,12 @@ test('alerts need the connector', () => {
   const dir = scratch();
   try {
     assert.throws(
-      () => run(dir, 'pack.mjs', ['--flag', 'alerts=on']),
+      () => run(dir, 'pack.mjs', ['--flag', 'connector=off', '--flag', 'alerts=on']),
       /alerts=on needs the connector/,
     );
+    // On top of the store build, which has the connector: a developer's build.
     assert.match(
-      run(dir, 'pack.mjs', [
-        '--flag',
-        'localMode=on',
-        '--flag',
-        'connector=on',
-        '--flag',
-        'alerts=on',
-      ]),
+      run(dir, 'pack.mjs', ['--flag', 'alerts=on']),
       /flags on: sync, localMode, connector, alerts \(dev build, never for a store\)/,
     );
   } finally {

@@ -7,8 +7,8 @@ cart, and keeps one basic page that works on its own: the privacy policy promise
 extension works without the website, and the stores turn down an extension that only
 opens a website.
 
-It's the `connector` build flag ([FLAGS.md](FLAGS.md#the-connector)), off in every store
-build for now.
+It's the `connector` build flag ([FLAGS.md](FLAGS.md#the-connector)), on in every store
+build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`.
 
 ## What a Connector Build Has
 
@@ -42,13 +42,13 @@ the sync site, so a request anywhere else fails in the browser itself.
 
 The pages the website now has leave in three steps. The code stays until the last one.
 
-1. **Gated (now).** The `connector` flag leaves them out of a connector build; every
-   store build still has them.
-2. **Switched on.** Once the website's versions and Local Mode work on staging and the
-   owner has checked them: `connector` and `localMode` on in the beta, then the store
-   (`src/flags.js`), in the same change as the privacy policy's new words (owner and
-   legal), the store listing and screenshots (the screenshots show the dashboard today),
-   and the copy for the popup and the basic page.
+1. **Gated.** The `connector` flag leaves them out of a connector build; every store
+   build still had them.
+2. **Switched on (now, 0.3.0).** `connector` and `localMode` on in the store and the beta
+   (`src/flags.js`, owner 2026-10-13). The store screenshots of the popup and the basic
+   page are `docs/store-assets/screenshot-connector-*` (the older ones show the
+   dashboard). Still waiting on the privacy policy's words for the wishlist import, which
+   stays off until then (the `wishlistImport` flag), and on the store listing's text.
 3. **Deleted.** After a release with the connector on: the dashboard and its pages go
    from the repo (`src/dashboard.*`, `ui/` except `ui/popup`, `ui/basic` and what they
    import, `src/quips.js`, `src/qr.js`, `src/assets/`), with their tests, the UI test's
@@ -83,7 +83,7 @@ step 3 above).
 | app.openhangar.space `/connect`, `/api/link/token`, `/link`                         | Connect                                                                   |
 | app.openhangar.space `POST` and `DELETE /api/v1/sync`                               | Sync, Disconnect                                                          |
 | github.com new issue (only when you press Report a Scan Problem)                    | Report a Scan Problem                                                     |
-| app.openhangar.space `POST /api/v1/wishlist/import` (once per connection, **new**)  | The 0.3.x wishlist into your account                                      |
+| app.openhangar.space `POST /api/v1/wishlist/import` (once per connection, **new**)  | The 0.3.x wishlist into your account (`wishlistImport` flag, off for now) |
 | openhangar.space `api/store/on-sale` (alerts on, every 30 minutes at most, **new**) | Extension Alerts: the public sale feed, matched on the device             |
 | app.openhangar.space `GET /api/v1/wishlist` (alerts on and connected, **new**)      | Extension Alerts: your account's Wishlist keys, read only                 |
 
@@ -95,8 +95,9 @@ and for the two permissions before `alerts` is on in a store or beta build.
 The wishlist import is new: until now the wishlist never left the browser. It sends the
 ships and store items on this browser's wishlist (names and store ids), once per
 connection, and only once you've connected; the website adds them to your account's
-wishlist and removes nothing. The privacy policy needs words for it before the
-connector is on in a store build.
+wishlist and removes nothing. The privacy policy needs words for it before it's on in a
+store build, so it has a flag of its own, `wishlistImport`, off until then
+([FLAGS.md](FLAGS.md#the-wishlist-import)).
 
 **Goes**
 

@@ -40,15 +40,16 @@ orgFleet: {
   beta gets `default`.
 - `devOnly` (optional): `true` keeps it out of every store build, the beta included.
 
-Today's flags:
+Today's flags (from 0.3.0 every store build is the connector, with Local Mode):
 
-| Flag        | What it turns on                                     | Store | Beta | Dev-only |
-| ----------- | ---------------------------------------------------- | ----- | ---- | -------- |
-| `sync`      | Website sync (Connect This Browser, Sync Now, ...)   | on    | on   | no       |
-| `orgFleet`  | Org Fleet sharing (nothing behind it yet)            | off   | off  | yes      |
-| `localMode` | Our hangar page reads this browser's hangar          | off   | off  | no       |
-| `connector` | A toolbar popup and one basic page (the connector)   | off   | off  | no       |
-| `alerts`    | Store alerts matched on the device (needs connector) | off   | off  | no       |
+| Flag             | What it turns on                                           | Store | Beta | Dev-only |
+| ---------------- | ---------------------------------------------------------- | ----- | ---- | -------- |
+| `sync`           | Website sync (Connect This Browser, Sync Now, ...)         | on    | on   | no       |
+| `orgFleet`       | Org Fleet sharing (nothing behind it yet)                  | off   | off  | yes      |
+| `localMode`      | Our hangar page reads this browser's hangar                | on    | on   | no       |
+| `connector`      | A toolbar popup and one basic page (the connector)         | on    | on   | no       |
+| `wishlistImport` | This browser's wishlist into the account (needs connector) | off   | off  | no       |
+| `alerts`         | Store alerts matched on the device (needs connector)       | off   | off  | no       |
 
 ## Adding or Retiring a Flag
 
@@ -99,12 +100,13 @@ side of a scan it asks for. Off, the page isn't let in and its handlers are cut.
 needs `sync` (Firefox's consent card for sharing is sync's), so
 `--flag sync=off --flag localMode=on` doesn't build.
 
-It's off in the store build and the beta until the privacy policy (docs/PRIVACY.md and
-site/privacy.html) names our hangar page and what it may read: a store or beta build
-that lets in a page the policy doesn't name fails `npm test`
-(test/privacy-permissions.test.js). Turning it on for the beta is `beta: true` in
-`src/flags.js`, in the same change as the policy's words. `npm run build:staging` has it
-on, so the staging hangar page (hangar-staging.openhangar.space) can talk to that build.
+It's on in every store build and the beta from 0.3.0 (owner, 2026-10-13): the privacy
+policy (docs/PRIVACY.md and site/privacy.html) names our hangar page and what it may
+read, and a store or beta build that lets in a page the policy doesn't name fails
+`npm test` (test/privacy-permissions.test.js). `npm run build:staging` has it on too, so
+the staging hangar page (hangar-staging.openhangar.space) can talk to that build.
+`--flag localMode=off` builds a developer's copy without it, which needs
+`--flag connector=off` as well.
 
 ## The Connector
 
@@ -128,8 +130,22 @@ only send requests to RSI, openhangar.space and the sync site (`connect-src`);
 `scripts/check-store-build.mjs` checks both ways. What it keeps, the plan for removing
 the dashboard and the outbound requests that go: [CONNECTOR.md](CONNECTOR.md). It needs `localMode` (Open My
 Hangar goes to our hangar page until you connect), so `--flag connector=on` alone
-doesn't build. It's off in every store build until the basic page and the website's
-pages are ready.
+doesn't build. It's on in every store build and the beta from 0.3.0 (owner, 2026-10-13:
+the extension ships as the connector). `--flag connector=off` still builds the
+dashboard, for a developer; the store check refuses that build.
+
+## The Wishlist Import
+
+`wishlistImport` lets the basic page send the wishlist this browser kept (the 0.3.x
+dashboard's Store page) to the openhangar.space account, once per connection
+(`ui/basic/wishlist-import.js`, `POST /api/v1/wishlist/import` with the sync token; the
+website adds it and removes nothing). Until now the wishlist never left the browser, and
+the privacy policy says so. So it's off in the store and the beta until the policy
+(docs/PRIVACY.md and site/privacy.html) names it: a store or beta build with it on fails
+`npm test` until both copies name `/api/v1/wishlist/import`
+(test/privacy-permissions.test.js). The wishlist stays in storage meanwhile, so turning
+it on later still brings it over. It runs in the basic page, so it needs `connector`
+(`--flag wishlistImport=on` alone with `--flag connector=off` doesn't build).
 
 ## Alerts
 
@@ -166,13 +182,13 @@ with `"alerts": { "enabled": false }`.
 `dist/<target>/src/flags.js` (`BUILD_VALUES`). The file in the repo always holds the
 defaults.
 
-| Build                                            | Flags                                                      |
-| ------------------------------------------------ | ---------------------------------------------------------- |
-| `npm run build`, `npm run pack` (public store)   | every flag at its `default`                                |
-| `npm run build:beta`                             | the beta set, exactly (no `--flag`)                        |
-| `npm run build:staging`                          | the defaults and `localMode`, built in to the staging site |
-| `--site=<url>`, `OH_SITE=<url>`                  | the defaults, built in to that site instead                |
-| `--flag name=on` / `--flag name=off`, repeatable | a developer's own build, on top of any                     |
+| Build                                            | Flags                                                                     |
+| ------------------------------------------------ | ------------------------------------------------------------------------- |
+| `npm run build`, `npm run pack` (public store)   | every flag at its `default`                                               |
+| `npm run build:beta`                             | the beta set, exactly (no `--flag`)                                       |
+| `npm run build:staging`                          | the defaults (Local Mode and the connector), built in to the staging site |
+| `--site=<url>`, `OH_SITE=<url>`                  | the defaults, built in to that site instead                               |
+| `--flag name=on` / `--flag name=off`, repeatable | a developer's own build, on top of any                                    |
 
 For example `npm run build -- --flag orgFleet=on`. `OH_SYNC=1` and `--sync` are the
 older spelling of `--flag sync=on`, which is the store build now. A build with a site of
