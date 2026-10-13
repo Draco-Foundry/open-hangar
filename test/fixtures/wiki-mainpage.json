@@ -1,0 +1,18 @@
+{
+  "query": {
+    "pages": {
+      "83108": {
+        "title": "Module:Mainpage/settings.json",
+        "revisions": [
+          {
+            "slots": {
+              "main": {
+                "*": "{\"event\":{\"name\":\"Pirate Week\",\"page\":\"Pirate Week\",\"text\":\"Loot, bounties and pirate trouble across the verse\",\"starts\":\"2026-09-9 16:00\",\"ends\":\"2026-09-16 20:00\"},\"patches\":[{\"channel\":\"LIVE\",\"name\":\"4.10.1\",\"page\":\"Update:Star Citizen Alpha 4.10.1\"},{\"channel\":\"PTU\",\"name\":\"4.10.2\",\"page\":\"Update:Star Citizen Alpha 4.10.2\"}]}"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
