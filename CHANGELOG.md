@@ -4,7 +4,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
-- Fixed: [copy: Add to RSI Cart no longer says your cart is busy with a buy-back when RSI turned the upgrade down for another reason; it shows what RSI said instead.]
+- Changed: **Open beta until launch day, November 10.** Everything in this update is yours now. Syncing your hangar to openhangar.space opens to everyone on November 10. Until then it's for beta testers.
+- Changed: [copy: connector release line]
+- Fixed: Add to RSI Cart no longer blames a buy-back in your cart when RSI turned the upgrade down for another reason. It shows RSI's own message instead.
 - Changed: **Org Fleet shows ships, not price tags.** No store prices, fleet value or
   shares, and no comparing one member's fleet with another's. Click a member's name to
   see the ships they fly and the roles they cover. The CSV export drops its price column
@@ -70,7 +72,6 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
   can still wishlist it or put an upgrade to it in your RSI cart. The full price list moved
   to the website's store at openhangar.space, with every ship, sale history, Compare and
   prices in your currency. Open the Full Store at the top of the page takes you there.
-
 - Changed: **the error report is now your Flight Log.** When a scan hits trouble, the
   problem card has Send Flight Log: it copies the log and opens #bug-reports on Discord,
   where you paste it. Report on GitHub opens an issue with the log filled in, and nothing
