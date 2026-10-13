@@ -1,5 +1,7 @@
 # Open Hangar Roadmap
 
+[![Updated](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FDraco-Foundry%2Fopen-hangar%2Fbadges%2Flast-updated.json&label=Updated&color=3b6aed&style=flat)](https://github.com/Draco-Foundry/open-hangar/commits/main)
+
 Our flight plan: where Open Hangar is going, the steps to get there, and everything shipped so
 far.
 

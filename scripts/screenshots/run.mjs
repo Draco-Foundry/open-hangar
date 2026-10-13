@@ -173,6 +173,16 @@ async function handle(req, res) {
       .end(fs.readFileSync(path.join(SRC, '..', 'test', 'fixtures', 'store-ships.json')));
   }
 
+  // Home's Game Status (the wikis' live pages change every patch): saved snapshots,
+  // dated for the demo clock. The wiki main page settings and the LIVE version list.
+  if (u.pathname === '/__wiki-mainpage.json' || u.pathname === '/__game-versions.json') {
+    const f =
+      u.pathname === '/__wiki-mainpage.json' ? 'wiki-mainpage.json' : 'wiki-game-versions.json';
+    return res
+      .writeHead(200, { 'content-type': 'application/json' })
+      .end(fs.readFileSync(path.join(SRC, '..', 'test', 'fixtures', f)));
+  }
+
   if (u.pathname === '/CHANGELOG.md') {
     return res
       .writeHead(200, {
