@@ -129,23 +129,38 @@ test('a store or beta build with alerts on: the policy explains its permissions 
 
 // The wishlist import (ui/basic/wishlist-import.js): a store or beta build with the
 // `wishlistImport` flag on sends the wishlist this browser kept to the openhangar.space
-// account, which the policy says never leaves the browser. It fails here until both
-// copies of the policy name it (owner-approved words, word for word), and the basic page
-// never sends it in a build without the flag.
+// account. It fails here until both copies of the policy explain it in Optional Sync
+// ("Your old wishlist, once", owner-approved words, word for word) and name it among the
+// requests while connected, and the basic page never sends it in a build without the flag.
 test('a store or beta build with the wishlist import on: the policy names it', async () => {
   const { buildValues, readRegistry } = await import('../scripts/build-flags.mjs');
-  const { IMPORT_PATH } = await import('../ui/basic/wishlist-import.js');
+  const { MAX_ITEMS } = await import('../ui/basic/wishlist-import.js');
   const registry = readRegistry(path.join(ROOT, 'src', 'flags.js'));
+  // The policy's text, as plain words (no Markdown marks, no tags).
+  const words = (f) =>
+    plain(
+      read(f)
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\*\*/g, '')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'),
+    );
   for (const [build, beta] of [
     ['store', false],
     ['beta', true],
   ]) {
     if (!buildValues(registry, { beta }).wishlistImport) continue;
-    for (const file of ['docs/PRIVACY.md', 'site/privacy.html'])
-      assert.ok(
-        read(file).includes(IMPORT_PATH),
-        `${file} names ${IMPORT_PATH} (the ${build} build sends the wishlist)`,
+    for (const file of ['docs/PRIVACY.md', 'site/privacy.html']) {
+      const text = words(file);
+      assert.match(
+        text,
+        new RegExp(`Your old wishlist, once: .*? up to ${MAX_ITEMS} items\\.`),
+        `${file} explains the wishlist import (the ${build} build sends the wishlist)`,
       );
+      assert.ok(
+        text.includes('to send your old wishlist once'),
+        `${file} names the wishlist import among the requests while connected`,
+      );
+    }
   }
   // The basic page asks the flag before anything else.
   const hub = read('ui/basic/hub.svelte.js');

@@ -40,16 +40,17 @@ orgFleet: {
   beta gets `default`.
 - `devOnly` (optional): `true` keeps it out of every store build, the beta included.
 
-Today's flags (from 0.3.0 every store build is the connector, with Local Mode):
+Today's flags (from 0.3.0 every store build is the connector, with Local Mode, the
+wishlist import and store alerts):
 
-| Flag             | What it turns on                                           | Store | Beta | Dev-only |
-| ---------------- | ---------------------------------------------------------- | ----- | ---- | -------- |
-| `sync`           | Website sync (Connect This Browser, Sync Now, ...)         | on    | on   | no       |
-| `orgFleet`       | Org Fleet sharing (nothing behind it yet)                  | off   | off  | yes      |
-| `localMode`      | Our hangar page reads this browser's hangar                | on    | on   | no       |
-| `connector`      | A toolbar popup and one basic page (the connector)         | on    | on   | no       |
-| `wishlistImport` | This browser's wishlist into the account (needs connector) | off   | off  | no       |
-| `alerts`         | Store alerts matched on the device (needs connector)       | off   | off  | no       |
+| Flag             | What it turns on                                          | Store | Beta | Dev-only |
+| ---------------- | --------------------------------------------------------- | ----- | ---- | -------- |
+| `sync`           | Website sync (Connect This Browser, Sync Now, ...)        | on    | on   | no       |
+| `orgFleet`       | Org Fleet sharing (nothing behind it yet)                 | off   | off  | yes      |
+| `localMode`      | Our hangar page reads this browser's hangar               | on    | on   | no       |
+| `connector`      | A toolbar popup and one basic page (the connector)        | on    | on   | no       |
+| `wishlistImport` | This browser's wishlist into the account (the basic page) | on    | on   | no       |
+| `alerts`         | Store alerts matched on the device (needs connector)      | on    | on   | no       |
 
 ## Adding or Retiring a Flag
 
@@ -139,13 +140,12 @@ dashboard, for a developer; the store check refuses that build.
 `wishlistImport` lets the basic page send the wishlist this browser kept (the 0.3.x
 dashboard's Store page) to the openhangar.space account, once per connection
 (`ui/basic/wishlist-import.js`, `POST /api/v1/wishlist/import` with the sync token; the
-website adds it and removes nothing). Until now the wishlist never left the browser, and
-the privacy policy says so. So it's off in the store and the beta until the policy
-(docs/PRIVACY.md and site/privacy.html) names it: a store or beta build with it on fails
-`npm test` until both copies name `/api/v1/wishlist/import`
-(test/privacy-permissions.test.js). The wishlist stays in storage meanwhile, so turning
-it on later still brings it over. It runs in the basic page, so it needs `connector`
-(`--flag wishlistImport=on` alone with `--flag connector=off` doesn't build).
+website adds it and removes nothing). Until 0.3.0 the wishlist never left the browser.
+It's on in every store build and the beta from 0.3.0: the privacy policy (docs/PRIVACY.md
+and site/privacy.html) explains it under Optional Sync ("Your old wishlist, once",
+owner-approved words 2026-10-13), and a store or beta build with it on fails `npm test`
+while either copy doesn't (test/privacy-permissions.test.js). It runs in the basic page,
+so a build without `connector` has nothing to run it.
 
 ## Alerts
 
@@ -169,12 +169,15 @@ stops the checks and gives Notifications back. The popup never asks for a permis
 The build adds the `alarms` permission (no install warning) and `notifications` as an
 optional permission, asked only when the pilot turns alerts on, never a required one
 (`scripts/alerts.mjs`; `scripts/check-store-build.mjs` checks both ways). It needs
-`connector` (the popup shows the alerts), so `--flag alerts=on` alone doesn't build. Off
-in the store and the beta until the privacy policy (docs/PRIVACY.md and
-site/privacy.html) and the store forms name the sale feed, the Wishlist read and the two
-permissions: a store or beta build with it on fails `npm test` until the policy does
-(test/privacy-permissions.test.js). The kill switch (site/status.json) pauses the checks
-with `"alerts": { "enabled": false }`.
+`connector` (the popup shows the alerts), so `--flag alerts=on` with `--flag
+connector=off` doesn't build. It's on in every store build and the beta from 0.3.0: the
+privacy policy (docs/PRIVACY.md and site/privacy.html) has a Store Alerts section and
+notes for the two permissions (owner-approved words 2026-10-13), and a store or beta
+build with it on fails `npm test` while the policy doesn't name the sale feed, the
+Wishlist read and both permissions (test/privacy-permissions.test.js). The store forms
+take the two permissions' reasons from docs/STORE.md. Each pilot still turns alerts on
+themselves. The kill switch (site/status.json) pauses the checks with
+`"alerts": { "enabled": false }`.
 
 ## How Builds Set Them
 

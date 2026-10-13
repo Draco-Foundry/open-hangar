@@ -127,9 +127,6 @@ if (FLAGS.connector && !FLAGS.localMode)
 // Extension Alerts (scripts/alerts.mjs) show in the connector's popup.
 if (FLAGS.alerts && !FLAGS.connector)
   throw new Error('--flag alerts=on needs the connector on (add --flag connector=on)');
-// The wishlist import runs in the connector's basic page.
-if (FLAGS.wishlistImport && !FLAGS.connector)
-  throw new Error('--flag wishlistImport=on needs the connector on (add --flag connector=on)');
 // The connector's own pages (scripts/connector.mjs). Without the flag they're left out
 // of the build: nothing opens them there.
 const CONNECTOR_FILES = [

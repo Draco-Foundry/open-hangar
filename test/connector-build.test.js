@@ -13,10 +13,11 @@ const { execFileSync } = require('node:child_process');
 const ROOT = path.join(__dirname, '..');
 const { UI_STUBS, stubUi } = require('./ui-stubs.js');
 
-// A scratch copy of the repo with the Svelte pages stood in for. Its flags are the
-// repo's (the connector and Local Mode on in every store build since 0.3.0), or with
-// `connector: false` a registry whose store build has no connector (Local Mode stays on,
-// as the beta had it before), or with `alerts: true` one where Extension Alerts ship too.
+// A scratch copy of the repo with the Svelte pages stood in for. Its registry's store
+// build has the connector with Local Mode (as every store build since 0.3.0) and the
+// wishlist import, and Extension Alerts only with `alerts: true` (the store builds have
+// them too). With `connector: false`, a registry whose store build has no connector and
+// no wishlist import (Local Mode stays on, as the beta had it before).
 function scratch({ connector = true, alerts = false } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'oh-connector-'));
   for (const f of ['manifest.json', 'CHANGELOG.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md'])
@@ -33,6 +34,7 @@ function scratch({ connector = true, alerts = false } = {}) {
     fs.writeFileSync(flagsFile, text.replace(re, `$1${on}`));
   };
   setDefault('connector', connector);
+  setDefault('wishlistImport', connector);
   setDefault('alerts', alerts);
   return dir;
 }
@@ -270,7 +272,7 @@ test('alerts need the connector', () => {
     // On top of the store build, which has the connector: a developer's build.
     assert.match(
       run(dir, 'pack.mjs', ['--flag', 'alerts=on']),
-      /flags on: sync, localMode, connector, alerts \(dev build, never for a store\)/,
+      /flags on: sync, localMode, connector, wishlistImport, alerts \(dev build, never for a store\)/,
     );
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

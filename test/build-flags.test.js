@@ -48,16 +48,15 @@ test('registry: bad entries fail loudly', async () => {
 test('public store builds get the defaults; the beta its set; sync is on in both', async () => {
   const { loadFlags, buildValues } = await lib();
   const { registry } = loadFlags(FLAGS_SRC);
-  // From 0.3.0 every store build is the connector, with Local Mode (the privacy policy
-  // names our hangar page, test/privacy-permissions.test.js). The wishlist import and
-  // Extension Alerts wait for the policy's words.
+  // From 0.3.0 every store build is the connector, with Local Mode, the wishlist import
+  // and Extension Alerts (the privacy policy names each, test/privacy-permissions.test.js).
   const STORE = {
     sync: true,
     orgFleet: false,
     localMode: true,
     connector: true,
-    wishlistImport: false,
-    alerts: false,
+    wishlistImport: true,
+    alerts: true,
   };
   assert.deepEqual(buildValues(registry), STORE);
   // The beta is the same set: no flag has a beta value of its own today.
@@ -69,6 +68,8 @@ test('public store builds get the defaults; the beta its set; sync is on in both
   assert.equal(registry.orgFleet.devOnly, true, 'orgFleet stays out of every store build');
   assert.ok(!registry.localMode.devOnly, 'Local Mode ships');
   assert.ok(!registry.connector.devOnly, 'the connector ships');
+  assert.ok(!registry.alerts.devOnly, 'store alerts ship');
+  assert.ok(!registry.wishlistImport.devOnly, 'the wishlist import ships');
   assert.throws(() => buildValues(registry, { overrides: { nope: true } }), /no such flag/);
 });
 
@@ -242,15 +243,25 @@ test('pack: writes each build its values and cuts the code of flags that are off
       fs.readFileSync(path.join(dir, 'dist', target, 'src', 'site-pages.js'), 'utf8'),
     ),
   });
-  // Every store build's set (src/flags.js): the connector with Local Mode and sync.
+  // Every store build's set (src/flags.js): the connector with Local Mode and sync, the
+  // wishlist import and Extension Alerts.
   const STORE = {
     sync: true,
     orgFleet: false,
     localMode: true,
     connector: true,
-    wishlistImport: false,
-    alerts: false,
+    wishlistImport: true,
+    alerts: true,
   };
+  // Without the connector, what needs it goes too.
+  const NO_CONNECTOR = [
+    '--flag',
+    'connector=off',
+    '--flag',
+    'alerts=off',
+    '--flag',
+    'wishlistImport=off',
+  ];
   const ALL_PAGES = [
     'https://hangar.openhangar.space/*',
     'https://openhangar.space/*',
@@ -307,11 +318,18 @@ test('pack: writes each build its values and cuts the code of flags that are off
           'src/rsi-cart.js',
           'src/sync-schema.js',
           'src/hangar-shape.js',
+          'src/alerts.js',
           'src/background.js',
         ],
       },
       "Firefox's event page loads what background.js imports on Chrome, first",
     );
+    // Store alerts: the alarms permission, and Notifications only when the pilot turns
+    // them on (scripts/alerts.mjs).
+    for (const t of ['chrome', 'firefox']) {
+      assert.ok(built(t).manifest.permissions.includes('alarms'), `${t}: alarms`);
+      assert.deepEqual(built(t).manifest.optional_permissions, ['notifications'], t);
+    }
     // Every script the built background.js imports on Chrome is on that list (a flag
     // that's off takes its imports with it: Extension Alerts' src/alerts.js).
     const bg = read('chrome', 'src/background.js');
@@ -365,20 +383,28 @@ test('pack: writes each build its values and cuts the code of flags that are off
     // doesn't build.
     assert.throws(() => pack(dir, ['--flag', 'sync=off']), /localMode=on needs sync on/);
     assert.throws(() => pack(dir, ['--flag', 'localMode=off']), /connector=on needs localMode on/);
-    // The wishlist import runs in the basic page: not without the connector.
-    assert.throws(
-      () => pack(dir, ['--flag', 'connector=off', '--flag', 'wishlistImport=on']),
-      /wishlistImport=on needs the connector on/,
-    );
+    // Store alerts show in the popup: not without the connector.
+    assert.throws(() => pack(dir, ['--flag', 'connector=off']), /alerts=on needs the connector/);
 
     // Without sync (so without Local Mode and the connector): a developer's build with the
     // sync code cut, which the store check refuses. The identity permission stays (it's
     // in manifest.json).
-    const NO_SYNC = ['--flag', 'sync=off', '--flag', 'localMode=off', '--flag', 'connector=off'];
+    const NO_SYNC = ['--flag', 'sync=off', '--flag', 'localMode=off', ...NO_CONNECTOR];
     assert.match(pack(dir, NO_SYNC), /dev build, never for a store/);
     for (const t of ['chrome', 'firefox']) {
       const b = built(t);
-      assert.deepEqual(b.flags, { ...STORE, sync: false, localMode: false, connector: false }, t);
+      assert.deepEqual(
+        b.flags,
+        {
+          ...STORE,
+          sync: false,
+          localMode: false,
+          connector: false,
+          wishlistImport: false,
+          alerts: false,
+        },
+        t,
+      );
       assert.ok(!/OH\.siteLinkStart\s*=/.test(b.lib), `${t}: sync code cut`);
       // Add to RSI Cart still lets our own site in; no page may Connect.
       assert.deepEqual(b.pages.connect, [], t);
@@ -429,7 +455,7 @@ test('pack: writes each build its values and cuts the code of flags that are off
     // A developer's build without the connector (the dashboard, as every store build had
     // before 0.3.0): no popup and no basic page, the popup's Scan cut, Local Mode kept.
     // The store check refuses it for the flag alone.
-    assert.match(pack(dir, ['--flag', 'connector=off']), /dev build, never for a store/);
+    assert.match(pack(dir, NO_CONNECTOR), /dev build, never for a store/);
     for (const t of ['chrome', 'firefox']) {
       const m = built(t).manifest;
       assert.equal(m.action.default_popup, undefined, t);
@@ -441,26 +467,28 @@ test('pack: writes each build its values and cuts the code of flags that are off
       assert.ok(!/ohPopup/.test(bg), `${t}: the popup's Scan cut`);
       assert.match(bg, /oh-get-hangar/, `${t}: Local Mode kept`);
     }
-    assert.deepEqual(problemsOf(dir).sort(), [
-      'dist/chrome/src/flags.js: flag "connector" is off, the store default is on',
-      'dist/firefox/src/flags.js: flag "connector" is off, the store default is on',
-    ]);
+    const offDefault = (flags) =>
+      ['chrome', 'firefox'].flatMap((t) =>
+        flags.map((f) => `dist/${t}/src/flags.js: flag "${f}" is off, the store default is on`),
+      );
+    assert.deepEqual(
+      problemsOf(dir).sort(),
+      offDefault(['alerts', 'connector', 'wishlistImport']).sort(),
+    );
 
     // Without Local Mode too: the hangar page in no list and its requests cut; the store
     // check minds the flags, not the pages. One that lets the hangar page in anyway is
     // refused for that as well.
-    pack(dir, ['--flag', 'connector=off', '--flag', 'localMode=off']);
+    pack(dir, [...NO_CONNECTOR, '--flag', 'localMode=off']);
     const OUR_SITE = ['https://openhangar.space/*', 'https://app.openhangar.space/*'];
     assert.deepEqual(built('chrome').manifest.externally_connectable.matches, OUR_SITE);
     assert.deepEqual(built('firefox').manifest.content_scripts[0].matches, OUR_SITE);
     assert.deepEqual(built('chrome').pages.hangar, []);
     assert.ok(!/oh-get-hangar|scanRequest/.test(read('chrome', 'src/background.js')));
-    assert.deepEqual(problemsOf(dir).sort(), [
-      'dist/chrome/src/flags.js: flag "connector" is off, the store default is on',
-      'dist/chrome/src/flags.js: flag "localMode" is off, the store default is on',
-      'dist/firefox/src/flags.js: flag "connector" is off, the store default is on',
-      'dist/firefox/src/flags.js: flag "localMode" is off, the store default is on',
-    ]);
+    assert.deepEqual(
+      problemsOf(dir).sort(),
+      offDefault(['alerts', 'connector', 'localMode', 'wishlistImport']).sort(),
+    );
     const pagesFile = path.join(dir, 'dist', 'chrome', 'src', 'site-pages.js');
     fs.writeFileSync(
       pagesFile,

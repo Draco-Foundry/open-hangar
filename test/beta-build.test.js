@@ -79,6 +79,9 @@ test('Firefox beta: its own add-on id, update_url, the beta version and sync dat
       optional: ['personallyIdentifyingInfo', 'financialAndPaymentInfo', 'websiteContent'],
     });
     assert.ok(ff.permissions.includes('identity'), 'Connect');
+    // Store alerts are on in the beta too: alarms, and Notifications only when asked.
+    assert.ok(ff.permissions.includes('alarms'), 'store alerts');
+    assert.deepEqual(ff.optional_permissions, ['notifications']);
     assert.deepEqual(ff.background, {
       scripts: [
         'src/flags.js',
@@ -89,6 +92,7 @@ test('Firefox beta: its own add-on id, update_url, the beta version and sync dat
         'src/rsi-cart.js',
         'src/sync-schema.js',
         'src/hangar-shape.js',
+        'src/alerts.js',
         'src/background.js',
       ],
     });

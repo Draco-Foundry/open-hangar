@@ -8,7 +8,8 @@ extension works without the website, and the stores turn down an extension that 
 opens a website.
 
 It's the `connector` build flag ([FLAGS.md](FLAGS.md#the-connector)), on in every store
-build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`.
+build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistImport` and
+`alerts`.
 
 ## What a Connector Build Has
 
@@ -47,8 +48,8 @@ The pages the website now has leave in three steps. The code stays until the las
 2. **Switched on (now, 0.3.0).** `connector` and `localMode` on in the store and the beta
    (`src/flags.js`, owner 2026-10-13). The store screenshots of the popup and the basic
    page are `docs/store-assets/screenshot-connector-*` (the older ones show the
-   dashboard). Still waiting on the privacy policy's words for the wishlist import, which
-   stays off until then (the `wishlistImport` flag), and on the store listing's text.
+   dashboard). The privacy policy and the store listing describe the connector
+   (owner-approved 2026-10-13), store alerts and the wishlist import included.
 3. **Deleted.** After a release with the connector on: the dashboard and its pages go
    from the repo (`src/dashboard.*`, `ui/` except `ui/popup`, `ui/basic` and what they
    import, `src/quips.js`, `src/qr.js`, `src/assets/`), with their tests, the UI test's
@@ -83,21 +84,21 @@ step 3 above).
 | app.openhangar.space `/connect`, `/api/link/token`, `/link`                         | Connect                                                                   |
 | app.openhangar.space `POST` and `DELETE /api/v1/sync`                               | Sync, Disconnect                                                          |
 | github.com new issue (only when you press Report a Scan Problem)                    | Report a Scan Problem                                                     |
-| app.openhangar.space `POST /api/v1/wishlist/import` (once per connection, **new**)  | The 0.3.x wishlist into your account (`wishlistImport` flag, off for now) |
+| app.openhangar.space `POST /api/v1/wishlist/import` (once per connection, **new**)  | The 0.3.x wishlist into your account (`wishlistImport` flag)              |
 | openhangar.space `api/store/on-sale` (alerts on, every 30 minutes at most, **new**) | Extension Alerts: the public sale feed, matched on the device             |
 | app.openhangar.space `GET /api/v1/wishlist` (alerts on and connected, **new**)      | Extension Alerts: your account's Wishlist keys, read only                 |
 
 Extension Alerts' two requests are new too: the sale feed is the same public file for
 everyone; the Wishlist read brings your account's Wishlist keys to this browser, and
-what they match stays here. The privacy policy and the store forms need words for both
-and for the two permissions before `alerts` is on in a store or beta build.
+what they match stays here. The privacy policy names both and the two permissions
+(owner-approved 2026-10-13), and docs/STORE.md has the permissions' reasons for the
+store forms.
 
 The wishlist import is new: until now the wishlist never left the browser. It sends the
 ships and store items on this browser's wishlist (names and store ids), once per
 connection, and only once you've connected; the website adds them to your account's
-wishlist and removes nothing. The privacy policy needs words for it before it's on in a
-store build, so it has a flag of its own, `wishlistImport`, off until then
-([FLAGS.md](FLAGS.md#the-wishlist-import)).
+wishlist and removes nothing. It has a flag of its own, `wishlistImport`
+([FLAGS.md](FLAGS.md#the-wishlist-import)), on since the privacy policy explains it.
 
 **Goes**
 
