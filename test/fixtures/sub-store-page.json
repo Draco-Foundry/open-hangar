@@ -1,0 +1,61 @@
+[
+  {
+    "data": {
+      "store": {
+        "listing": {
+          "resources": [
+            {
+              "id": 900001,
+              "slug": "nebula-drift-paint",
+              "name": "Nebula Drift Paint",
+              "title": "Nebula Drift Paint",
+              "subtitle": "Example Hauler",
+              "url": "/en/pledge/Subscribers-Store/Nebula-Drift-Paint",
+              "type": "skus",
+              "media": {
+                "thumbnail": {
+                  "storeSmall": "https://media.example-rsi.test/aaa/store_small/nebula.jpg",
+                  "slideshow": "https://media.example-rsi.test/aaa/slideshow/nebula.jpg"
+                }
+              },
+              "nativePrice": { "amount": 500, "discounted": null },
+              "price": { "amount": 600, "discounted": null },
+              "stock": { "available": true, "unlimited": false, "show": true, "level": "AVAILABLE" },
+              "tags": [{ "name": "Paints" }, { "name": "Imperator" }],
+              "label": "",
+              "isWarbond": false,
+              "isPackage": false
+            },
+            {
+              "id": 900002,
+              "name": "Quasar Explorer Helmet",
+              "title": "",
+              "subtitle": null,
+              "url": "https://robertsspaceindustries.com/en/pledge/Subscribers-Store/Quasar-Helmet",
+              "type": "skus",
+              "media": { "thumbnail": { "storeSmall": "/media/bbb/store_small/helmet.jpg" } },
+              "nativePrice": { "amount": 1200, "discounted": 900 },
+              "stock": { "available": false, "unlimited": false, "show": true, "level": "SOLD_OUT" },
+              "tags": [{ "name": "Armor" }],
+              "label": "Centurion Exclusive",
+              "isWarbond": true
+            },
+            {
+              "id": 900003,
+              "name": "Tiny Hangar Plushie",
+              "url": "javascript:alert(1)",
+              "media": null,
+              "price": { "amount": 0, "discounted": null },
+              "stock": { "unlimited": true },
+              "tags": null
+            },
+            { "id": 900004, "name": "", "title": "" },
+            null
+          ],
+          "count": 5,
+          "totalCount": 5
+        }
+      }
+    }
+  }
+]

@@ -1,126 +1,109 @@
-# Privacy Policy — Open Hangar
+# Privacy Policy: Open Hangar
 
-_Last updated: 2026-10-01_
+**Last updated: 2026-10-13**
 
-Open Hangar is a source-available browser extension that reads your own Star Citizen /
-Roberts Space Industries (RSI) account data and stores it **locally in your
-browser**. This policy explains exactly what it does and does not do with data.
+Open Hangar is a source-available browser extension that reads your own Star Citizen / Roberts Space Industries (RSI) account data and stores it locally in your browser. Open Hangar has a toolbar popup and one page of its own, the Open Hangar page, with your pledges, buy-backs and settings. Every other view of your hangar is on our website, openhangar.space. This policy explains exactly what it does and does not do with data.
 
 ## The short version
 
-- **No account, no password, no sign-up.** Open Hangar uses the RSI session you are
-  already signed in with in your browser.
-- **No server. Nothing is sent to us — we have no server to send it to.** Your
-  scraped data never leaves your device.
-- **We do not collect, sell, transfer, or share any personal data.**
+- No account, no password, no sign-up needed. Open Hangar uses the RSI session you are already signed in with in your browser. The extension and our hangar page, hangar.openhangar.space, work without an account.
+- Your data stays on your device unless you choose to sync. Syncing to our website, app.openhangar.space, is optional and off until you connect. Once you connect, the extension syncs after every successful scan. Until then nothing is sent to us.
+- Open Hangar only reads your RSI account, with one exception: when you click Add to RSI Cart or Send to RSI Cart, it puts what you picked in your RSI cart. It never checks out or pays.
+- Store alerts are optional and off until you turn them on. They download one public sale file, the same for everyone, and match it on your device (see [Store Alerts](#store-alerts)).
+- We do not sell or share your personal data. Without sync we collect nothing; with sync we keep only what you send (see [Optional Sync](#optional-sync-to-openhangarspace)).
 
 ## What data is accessed and where it is stored
 
-When you click **Scan**, the extension reads **your own** RSI account by making
-requests to robertsspaceindustries.com using your existing browser session, and
-parses the results locally. This may include:
+When you click Scan, in the toolbar popup or on the Open Hangar page, the extension reads your own RSI account by making requests to robertsspaceindustries.com using your existing browser session, and parses the results locally. This may include:
 
-- Your hangar (pledges: ships, CCUs, add-ons, coupons)
-- If you use more than one RSI account in this browser, each account's scans are kept
-  separately so they don't overwrite each other
-- Any org members' ship lists you choose to import on the Org Fleet page (ship names
-  and LTI only)
-- A short history of past hangar scans (pledge id, name and value per scan), so
-  the extension can show what changed between scans (kept only here, and included
-  in the JSON backup file you can download yourself)
-- Your buy-back pledges
-- Account identity and balances (handle, display name, org, rank, Store Credit,
-  UEC, REC)
-- Your referral code and your recruits/prospects (handles, monikers, dates)
+- Your hangar (pledges: ships, CCUs, add-ons, coupons).
+- A short history of past hangar scans (pledge id, name and value per scan), so the extension can show what changed between scans.
+- An archive of pledges that have left your hangar (melted, gifted or upgraded away): pledge id, name, value, insurance, contents and dates, for up to the newest 2,000. It is used to fill in buy-back details.
+- Your buy-back pledges. After a good buy-back scan, the extension also opens up to 30 buy-back packs it hasn't read yet, to see what is inside each one. This means more requests to RSI than one page per scan. It is still read-only, and only ever your own account.
+- Account identity and balances (handle, display name, UEE Citizen Record number, org, rank, Store Credit, UEC, REC). The Citizen Record number is the public number on your RSI profile. It never changes.
+- Your referral code and your recruits/prospects (handles, monikers, dates).
 
-All of this is stored **only** in your browser's local extension storage
-(`chrome.storage.local`). It is never transmitted to the developer or any third
-party. You can remove it at any time with **Clear Data** in the settings menu (click your portrait), or by
-uninstalling the extension (which deletes all stored data).
+If you use more than one RSI account in this browser, each account's data is kept separately so they don't overwrite each other (see [Multiple accounts](#multiple-accounts)).
+
+All of this is stored only in your browser's local extension storage (`chrome.storage.local`). It is only sent to us if you connect sync (below), and never to anyone else. You can remove it at any time with Clear Data on the Open Hangar page's Settings tab, or by uninstalling the extension (which deletes all stored data).
+
+The toolbar popup only shows what's already stored in this browser: your Account Value, your last scan, store alerts and whether sync is connected. It never asks RSI anything itself. Its Scan button opens the Open Hangar page, which runs the scan.
+
+## Add to RSI Cart
+
+When you click Add to RSI Cart on a ship upgrade (CCU), the extension uses RSI's own upgrade store, with your existing RSI session, to put that upgrade in your RSI cart. It sends RSI only the ship and upgrade ids, plus the buy-back pledge id when the upgrade is a buy-back.
+
+When you click Send to RSI Cart on the store at openhangar.space, the extension puts the items in your Haul (paints, ships, packs or gear) in your RSI cart in one request, with your existing RSI session. It sends RSI only each item's store id and how many you picked. The page then sees which items RSI added, and RSI's own message for any it turned down, inside your browser only.
+
+For both:
+
+- They never check out or pay. You finish the purchase on RSI yourself.
+- They only happen when you click the button.
+- They are the only things the extension does on RSI that aren't read-only.
+- Nothing about them is sent to us.
+
+## Store Alerts
+
+Store alerts tell you when something in RSI's store is for you. They're optional and off until you turn them on, on the Open Hangar page's Settings tab, and they're matched on your device.
+
+- **What a check downloads:** one public file from our site, openhangar.space/api/store/on-sale, that lists what's on sale in RSI's store now. It's the same file for everyone, and nothing about you is in the request. A check runs at most every 30 minutes, and less often when our site is busy or can't be reached.
+- **What it's matched against:** the hangar and buy-backs this browser scanned, on your device. For example, a ship in your buy-backs is in the store again, or a ship you own gets a new paint. Alerts never send them anywhere.
+- **Your Wishlist, while you're connected:** the extension also reads your account's Wishlist from app.openhangar.space/api/v1/wishlist, using its sync token. The Wishlist's items come to this browser, read only. Nothing is sent back, and what they match stays here.
+- **What you see:** a number on the toolbar button, the matches in the toolbar popup and, if you allow notifications, a notification for each new match (up to three at a time, then one for the rest). Clicking a match opens that item on openhangar.space.
+- **Turning them off:** on the same Settings tab. The checks stop, and the matches and Wishlist items saved for alerts are deleted from this browser.
 
 ## Outbound network requests
 
-The extension makes a small number of outbound requests, none of which carry your
-personal data:
+Besides reading your own RSI account, the cart buttons, store alerts (all above) and sync (below), Open Hangar only talks to our own public site, openhangar.space. None of these requests carry your personal data.
 
-- **robertsspaceindustries.com** — to read your own account (above), to load hangar
-  thumbnails, to show RSI's newest Comm-Links, This Week in Star Citizen and patch notes
-  on the Home page (the same public pages for everyone), to look up ship art for items
-  RSI ships without images from RSI's public ship-matrix index, and, only when you
-  choose to scan the Store, to check whether the ships on your wishlist are on sale.
-  No credentials are sent for the ship-matrix lookup.
+- openhangar.space (our own site, public, read-only). Every file below is the same for everyone and is cached on your device:
+  - a small status file, at most every few hours, so we can pause a scan that RSI's site changes have broken, or pause store alerts, and show a short notice until a fix is out;
+  - the public ship list (names, store prices and pictures), at most once a day, to value your ships.
 
-- **api.star-citizen.wiki** (public, read-only) — the current game version and when
-  it was released, a fallback for ship art when the ship-matrix has no image, and the source of ship
-  store prices for Hangar value. Prices come from downloading the whole public
-  vehicle list (the same list for everyone), so they reveal nothing about your
-  hangar. Ship-art lookups, done by ship name, are cached locally and are the only
-  outbound signal that weakly relates to what you are viewing; no credentials or
-  personal data are sent.
-- **support.robertsspaceindustries.com** (public, read-only) — RSI's Loaner Ship
-  Matrix and Included Vessels help articles (the same pages for everyone), at most once a week, to show
-  which loaners your ships give you. No credentials or personal data are sent.
-- **starcitizen.tools** (public, read-only) — the current game event and test-server
-  versions on the Home page, and on the Referrals page the list of referral bonus events
-  and the pictures of referral rewards (the same for everyone), cached for hours to a
-  month. No credentials or personal data are sent.
-- **openhangar.space** (our own site, public, read-only): a small status file (the same
-  for everyone), at most every few hours, so we can pause a scan that RSI's site changes
-  have broken and show a short notice until a fix is out; and, only if you pick a
-  currency other than USD, today's exchange rates (the European Central Bank's, the same
-  file for everyone), at most once a day. Nothing is sent. The site is
-  hosted on Cloudflare, which, like any website host, sees the request's IP address; we
-  receive nothing.
-- **api.github.com** (public, read-only): only when you open the Known Issues page, the
-  list of open bug reports for Open Hangar (the same list for everyone), cached for an
-  hour. No credentials or personal data are sent.
-- **addons.mozilla.org** (Firefox only, public, read-only) — when you press "Check for
-  updates", the latest published version number of Open Hangar. No credentials or
-  personal data are sent.
+  Nothing is sent to us by these requests. The site is hosted on Cloudflare, which, like any website host, sees the request's IP address; we keep nothing from it except a short-lived count per address to stop abuse.
 
-The footer also links to Ko-fi and Patreon, where you can choose to support the project.
-They are plain links: nothing is loaded from either site, and nothing is sent unless you
-click one and use that site yourself.
+The site gathers some of this public information from community sources, such as the Star Citizen Wiki and starcitizen.tools, and credits them where it shows it. Open Hangar itself doesn't contact them.
 
-When a scan fails, **Report a Scan Problem** opens a new GitHub issue in your browser with
-the scan summary (counts only) and the error report filled in: version, browser, item
-counts and the recent log, with no handle, referral code or item names. Nothing is sent by
-the extension. You read it on GitHub and decide whether to submit it.
+When a scan fails, **Report a Scan Problem** opens a new GitHub issue in your browser with which parts of the scan worked and your flight log filled in (version, browser, item counts and the recent log, with no handle, Citizen Record number, referral code or item names). Nothing is sent by the extension: you read it on GitHub and decide whether to post it.
+
+## Optional Sync to openhangar.space
+
+Sync lets you see your hangar on any device. It is off until you connect, and the extension works the same without it.
+
+- **Connecting:** press Connect to openhangar.space on the Open Hangar page's Settings tab, or Connect This Browser on app.openhangar.space. Sign in on app.openhangar.space and approve the connection. The extension then keeps a sync token in its local storage. Connecting sends nothing about your hangar.
+- **What is sent, and when:** once connected, the extension syncs automatically after every successful scan. There is nothing to press and no setting to turn on. Each sync sends the same data as its JSON backup file, except your referral prospects list: your hangar, buy-backs (including what is inside each pack), scan history, pledge archive, account identity and balances (handle, display name, UEE Citizen Record number, org, rank, Store Credit, UEC, REC) and your referral recruits list. The Citizen Record number lets the website keep the same account and history if you change your RSI handle. Your referral code is never sent, and neither is your RSI password or any RSI cookie.
+- **No extra RSI requests:** sync sends what the extension already has. It never reads anything more from RSI.
+- **Your old wishlist, once:** the wishlist now lives on the website. If this browser still has a wishlist from an earlier version of Open Hangar, the extension sends it to your account once each time you connect: what each item is (its name, kind and store id, and for an upgrade, the ships it goes from and to), up to 500 items. The website adds them to your account's Wishlist and removes nothing there. The copy in this browser stays as it is. Nothing is sent if it's empty.
+- **Requests while connected:** only to app.openhangar.space: to finish connecting, to sync, to disconnect, to send your old wishlist once (above) and, with store alerts on, to read your Wishlist (see [Store Alerts](#store-alerts)).
+- **Disconnecting:** Disconnect on the Open Hangar page's Settings tab stops syncing and cancels this extension's token. The copy already synced stays on the website until you delete it there; your Account page on the website can download or delete everything.
+- **Inactive accounts:** if a website account has no sign-in and no sync for 24 months, the website deletes it along with all its synced data. It emails you 6 months before, and again 30 days before. Signing in or syncing resets the clock. Data in the extension itself is not affected.
+- **What the website keeps and for how long:** see the website's own privacy policy, https://app.openhangar.space/privacy. The website is run by Draco Foundry, LLC and hosted on Cloudflare.
 
 ## Permissions and why they are used
 
-- **storage** — to save your scanned data and UI preferences locally.
-- **unlimitedStorage** — big hangars and buy-back lists, plus scan history, can outgrow
-  the browser's default 10 MB limit; this lifts the limit. Everything still stays on
-  your device.
-- **cookies** — used solely for "Log Out of RSI," which clears
-  robertsspaceindustries.com cookies so you can fully end your RSI session from the
-  extension. Cookie values are never read or transmitted.
-- **host access** to robertsspaceindustries.com, to make
-  the read-only requests described above.
+- **storage:** to save your scanned data and UI preferences locally.
+- **unlimitedStorage:** big hangars and buy-back lists, plus scan history and the pledge archive, can outgrow the browser's default 10 MB limit; this lifts the limit. Everything still stays on your device.
+- **cookies:** used solely for "Log Out of RSI", which clears robertsspaceindustries.com cookies so you can fully end your RSI session from the extension. Cookie values are never read or transmitted.
+- **Host access to robertsspaceindustries.com:** to make the read-only requests described above, and to put an upgrade or the items you picked in your RSI cart when you click Add to RSI Cart or Send to RSI Cart.
+- **identity:** for connecting sync. Connect opens a sign-in window, where you sign in to app.openhangar.space and approve the connection (see [Optional Sync](#optional-sync-to-openhangarspace)). The window hands the extension a one-time code to finish connecting, never your password. Connect This Browser on the website uses this permission only to look up the extension's sign-in address. Nothing else uses it.
+- **alarms:** for store alerts only. It wakes the extension for a check at most every 30 minutes while alerts are on (see [Store Alerts](#store-alerts)). Turning alerts off stops it. Nothing else uses it.
+- **notifications:** optional. The browser asks for it only when you turn store alerts on, and you can say no: the number on the toolbar button and the popup's list still work. With it, each new match gets a notification. Turning alerts off gives it back. Nothing else uses it.
+- **Messages from openhangar.space:** pages on openhangar.space, app.openhangar.space and hangar.openhangar.space, and no other site, can check that Open Hangar is installed. Pages on openhangar.space and app.openhangar.space can ask it for three things. The first is Add to RSI Cart on the website's store: the page sees which of your ships can be upgraded and RSI's prices, inside your browser only (see [Add to RSI Cart](#add-to-rsi-cart)). The second is Send to RSI Cart on the website's store: the page sends the items in your Haul and sees which ones RSI added, inside your browser only (see [Add to RSI Cart](#add-to-rsi-cart)). The third, on app.openhangar.space only, is Connect This Browser, which connects sync from the website. hangar.openhangar.space is our hangar page, which shows your hangar without an account. It can ask for four things: your hangar as this browser scanned it, when it was last scanned, a new scan, and Add to RSI Cart. Your hangar here means your backup file without the scan history, your referral code and your referral prospects list. It never includes your sync token, the site address, your settings or your wishlist. The page shows it inside your browser only and keeps no copy after you close it. Your hangar never reaches our server. On Firefox, the page can read your hangar only after you say yes to Firefox's data prompt. Chrome and Edge let these pages message the extension directly. Firefox doesn't, so on Firefox the extension runs a small bridge script on these pages that only passes their messages to the extension and its answers back. It reads nothing else on the page and sends nothing anywhere else.
 
 ## Data export
 
-Open Hangar lets you export your database as a JSON file (or a CSV of what a page shows) that you choose to save.
-That file is created locally and handled entirely by you; the extension does not
-upload it anywhere. (Your referral code is deliberately excluded from exports.)
+Open Hangar lets you export your database as a JSON file (or a CSV of your Pledges or Buy-Backs list) that you choose to save. The JSON file includes your scan history and pledge archive. That file is created locally and handled entirely by you; the extension does not upload it anywhere. (Only sync sends this data, minus the referral prospects list, and only if you connected it.) Your referral code is deliberately left out of exports.
 
 ## Multiple accounts
 
-Scanned data is tied to the RSI account it came from. Each account's data is kept
-separately in this browser: when you sign in to RSI with a different account, Open
-Hangar shows that account's last scan (or asks for a first scan), and the other
-account's data waits until you sign in as them again. Accounts never mix. You can see
-and remove saved accounts on the Developers page.
+Scanned data is tied to the RSI account it came from. Each account's data is kept separately in this browser: when you sign in to RSI with a different account, Open Hangar shows that account's last scan (or asks for a first scan), and the other account's data waits until you sign in as them again. Accounts never mix. You can see and remove saved accounts under Saved Accounts on the Open Hangar page's Settings tab.
 
 ## Changes to this policy
 
-Material changes will be noted in the project's repository and the "Last updated"
-date above.
+Material changes will be noted in the project's repository and the "Last updated" date above.
 
 ## Contact
 
-Email support@openhangar.space, or open an issue on GitHub:
-https://github.com/Draco-Foundry/open-hangar/issues
+Email [support@openhangar.space](mailto:support@openhangar.space), or open an issue on GitHub: https://github.com/Draco-Foundry/open-hangar/issues
 
-_Unofficial, fan-made, and not affiliated with Cloud Imperium Games or RSI._
+Unofficial, fan-made, and not affiliated with Cloud Imperium Games or RSI.

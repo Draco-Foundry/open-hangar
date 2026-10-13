@@ -4,7 +4,7 @@
     "description": "Extension name (a brand; keep as is)."
   },
   "extDescription": {
-    "message": "Your Star Citizen hangar, made useful: ship values, melt candidates, CCU savings, fleet stats and buy-backs. Private and local.",
+    "message": "Scan your Star Citizen hangar in one click, see it all on openhangar.space and get store alerts. Private, with no account needed.",
     "description": "Store summary and manifest description, 132 characters max."
   }
 }

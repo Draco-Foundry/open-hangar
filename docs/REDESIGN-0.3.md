@@ -11,13 +11,18 @@ small fixes; beta-tested before the stores.
 - The extension is the scraper: it reads your RSI account and keeps a basic local view.
   From 0.3.0 on it gets reading improvements and fixes only; new features land on the
   website (openhangar.space).
+- **Store page is a hangar companion (owner, 2026-10-05).** It keeps Your Wishlist (with
+  its on-sale check), Your CCUs and a small Find a Ship that opens a ship's window. The
+  full price list, store-wide sales and Compare live on the website's store; a line and
+  an Open the Full Store button at the top link there.
 - Colour meanings (Color Key): green good news, amber worth a look, red a problem, blue
   clickable, one colour per item type. Headings in Title Case.
 
 ## Style: Clean Pro (the Only Look)
 
 The owner's call (2026-09-30): **one theme, simple and easy to read**. No theme picker,
-no alternate looks; light mode stays the one scheduled option. Reference mockup: the
+no alternate looks; light mode is the only other look under consideration (owner to
+confirm). Reference mockup: the
 "Open Hangar Home Styles" artifact (Clean Pro tab).
 
 - Graphite surfaces, no glow, no decoration. Colour only where it means something (the
@@ -27,6 +32,28 @@ no alternate looks; light mode stays the one scheduled option. Reference mockup:
   quietly so they read as clickable.
 - Big numbers shorten past a threshold (counts from 1,000: "1.2K"; money from $100,000:
   "$1.24M"), exact value on hover, so huge hangars never break a layout.
+
+## Home: Layout B, Final (owner, 2026-10-05; supersedes v5 below)
+
+Mockup: "Layout B, Final" with Game Status in the top bar (ohs-mockups, home-layout-v2).
+
+- **Top bar:** a Game Status pill ("LIVE 4.10.1", dot = RSI services) opening LIVE, PTU
+  with wave, Latest Patch Notes, the event on now and the next one. Game info only (no
+  buy-back tokens). Source: openhangar.space/api/game-status (v1), at most every 10
+  minutes, last copy kept; "Game Status" until it has ever loaded.
+- **Citizen Card** across the whole width. Subscriber and Chairman's Club one line each,
+  each opening a popup (perks and Manage; Concierge level, RSI's progress, the six-level
+  ladder, rewards for this level and the next).
+- **Row 2:** Account Value (no chart, no melt/gift line), Latest Acquisitions, Wishlist
+  Watch, a third each (halves at about 1100px, Wishlist Watch then full width).
+- **Row 3:** Quick Links, full width.
+- **Wishlist Watch:** the last check with its age; Check Now only (never in the
+  background). Rows are generic store items (kind, name or From → To, price, Warbond,
+  status, url, picture) so the website catalog feed can drive it later.
+- **Customize Home** (0.3.0: show/hide only): Citizen Card pinned; Hangar Spotlight and
+  Referrals off by default; up to ten saved layouts per browser (with a version field
+  for order and sizes later); Reset to Default. 12-column grid: the last card in a row
+  stretches, so rows end level.
 
 ## Home (v5, signed off 2026-09-30)
 
@@ -68,7 +95,7 @@ Empty blocks disappear; the grid never leaves a card alone in a row.
 
 1. **Design** (mockups only, nothing built until the owner says so): style guide and
    building blocks, then every page: Home (done), Inventory, Buy-Backs, Stats, Store, Org
-   Fleet, Referrals, Updates, Developers, popup.
+   Fleet, Referrals, Updates, Developers. (No toolbar popup: the icon opens Home; #281 closed.)
 2. **Set up Svelte + Vite** on the branch; the extension must behave exactly as today.
    Firefox's store needs the source for built code (the repo is public).
 3. **Rebuild page by page** from the signed-off mockups; rewrite the UI smoke tests
@@ -93,8 +120,9 @@ Empty blocks disappear; the grid never leaves a card alone in a row.
 - Right side: **Scan All ▾** (reads "Scan Custom" when a source is unticked; the choice is
   remembered in `scanSources`), then the **gear menu**: currency, Streamer Mode, Rescan
   Reminder, Updates, Developers, **Log Out of RSI** ("For switching accounts. Your saved
-  data stays."; it only clears RSI's cookies), Clear Data in red. The language picker
-  goes in the gear menu when translations land. Updates and Developers left the nav.
+  data stays."; it only clears RSI's cookies), Clear Data in red. If translations come
+  to the extension (owner to confirm), the language picker goes in the gear menu.
+  Updates and Developers left the nav.
 - **Streamer Mode** (global, `streamerMode`): every money amount (fmtCurrency,
   shortMoney, bigMoney, formatValue) shows as dots, hover text included; UEC/REC on the
   card too. Its scope may grow beyond money.
@@ -106,7 +134,7 @@ drop-down (every page); Scan is its own progress bar ("Scanning… 4/12", "✓ D
 "Last scan…" on hover; a search box on every page that expands (or /); your RSI
 portrait replaces the gear and opens the menu (name + org at the top, then Currency,
 Streamer Mode, Rescan Reminder, How to Use, Updates, Developers, Log Out of RSI, Clear
-Data); a Streamer pill while it's on; counts beside Inventory and Buy-Backs; an update
+Data); a Streamer pill while it's on; page names without counts (#260, 2026-10-05); an update
 dot on the portrait with "Update ready: Reload" in the menu; a slim bar while
 scrolling down; a real logo mark; phone tabs you swipe.
 
@@ -209,7 +237,12 @@ Tracked as GitHub issues from 2026-09-30 on; the issue is the source of truth.
 
 ## Scheduled Alongside
 
-- Light mode (Dark default / Light / Auto) after the redesign's pages exist.
-- RSI server status on Game Status (needs a CORS-safe route, e.g. via app.openhangar.space).
+0.3.0 finishes the signed-off specs above; beyond those, the extension gets reading
+improvements and fixes only, and new features land on the website.
+
+- Light mode (Dark default / Light / Auto) after the redesign's pages exist (owner to
+  confirm).
+- ~~RSI server status on Game Status~~ Done: the Game Status pill's dot and status line
+  come from openhangar.space's game-status feed (#424).
 - The parked draft PR #155 (first Home build) is reference only; its data functions
   (wiki events/patches, buy-back dates, stale-event guard, tests) get reused.

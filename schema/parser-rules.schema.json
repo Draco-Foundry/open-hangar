@@ -1,0 +1,855 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openhangar.space/schema/parser-rules/1",
+  "title": "Open Hangar parser rules, format 1",
+  "description": "Where the extension finds things on RSI's pages (src/data/parser-rules.json): addresses and paging, selectors and cell positions, name patterns, JSON keys, GraphQL documents. The parsing itself stays in code (src/scraper/parser.js, src/lib.js); a change on RSI's side is fixed here. Data only: strings, numbers, arrays and objects with fixed keys. A pattern is { source, flags }, compiled with new RegExp when the file loads (src/parser-rules.js); where the code reads a part of a match, the pattern names it with a named group, (?<name>…), so a reordered page only needs a new pattern. Addresses are paths on RSI's site: the host stays in the code. Bundled in the extension, never fetched (docs/FLAGS.md). src/schema-check.js reads this schema and supports only the keywords used here. A GraphQL request is its operation, its document and the variables that never change (the code adds the rest: page, size and the like); the code reads the answer by the field names the document asks for, so when RSI renames a field, alias it in the document (`oldName: newName`) and the answer keeps its shape.",
+  "type": "object",
+  "required": [
+    "format",
+    "revision",
+    "paging",
+    "signedOut",
+    "hangar",
+    "buybacks",
+    "buybackDetail",
+    "names",
+    "categories",
+    "kinds",
+    "insurance",
+    "dates",
+    "account",
+    "dossier",
+    "referrals",
+    "subStore",
+    "upgrade",
+    "cart"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "description": "The rules format this code reads. Another format is refused whole.",
+      "const": 1
+    },
+    "revision": {
+      "description": "When the rules last changed (YYYY-MM-DD).",
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "paging": {
+      "description": "The query parameters of a paged account list: ?<page>=N&<size>=M.",
+      "type": "object",
+      "required": ["page", "size"],
+      "additionalProperties": false,
+      "properties": {
+        "page": { "$ref": "#/$defs/param" },
+        "size": { "$ref": "#/$defs/param" }
+      }
+    },
+    "signedOut": {
+      "description": "Signs that RSI answered with its sign-in page instead of the account page.",
+      "type": "object",
+      "required": ["redirect", "page"],
+      "additionalProperties": false,
+      "properties": {
+        "redirect": {
+          "description": "The address a redirected request landed on.",
+          "$ref": "#/$defs/pattern"
+        },
+        "page": { "description": "The page's HTML.", "$ref": "#/$defs/pattern" }
+      }
+    },
+    "hangar": {
+      "description": "The hangar list. Each pledge is a card (`card`, the nearest one around `id` that holds `cardHas`) with hidden inputs carrying its id, name, value and currency, and a tile per contained item. RSI leaves `itemKind` off many tiles.",
+      "type": "object",
+      "required": [
+        "path",
+        "pageSize",
+        "marker",
+        "id",
+        "card",
+        "cardHas",
+        "cardFallbacks",
+        "name",
+        "value",
+        "currency",
+        "item",
+        "itemKind",
+        "itemName",
+        "itemImage",
+        "kindFallback",
+        "image",
+        "gift",
+        "melt",
+        "date"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "pageSize": { "$ref": "#/$defs/pageSize" },
+        "marker": {
+          "description": "In a signed-in page that parsed to nothing, this means RSI changed the markup (not an empty hangar).",
+          "$ref": "#/$defs/pattern"
+        },
+        "id": { "description": "The pledge id input: one per card.", "$ref": "#/$defs/selector" },
+        "card": { "description": "A pledge card.", "$ref": "#/$defs/selector" },
+        "cardHas": {
+          "description": "What a card holds, so a wrapper around several cards isn't taken for one.",
+          "$ref": "#/$defs/selector"
+        },
+        "cardFallbacks": {
+          "description": "Tried in order (closest) when no card is found.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/selector" }
+        },
+        "name": { "description": "The name input.", "$ref": "#/$defs/selector" },
+        "value": { "description": "The value input (\"$35.00 USD\").", "$ref": "#/$defs/selector" },
+        "currency": { "description": "The currency input.", "$ref": "#/$defs/selector" },
+        "item": { "description": "A contained item's tile.", "$ref": "#/$defs/selector" },
+        "itemKind": {
+          "description": "A tile's kind (\"Ship\", \"Insurance\"…).",
+          "$ref": "#/$defs/selector"
+        },
+        "itemName": { "description": "A tile's name.", "$ref": "#/$defs/selector" },
+        "itemImage": {
+          "description": "A tile's picture (an inline background-image).",
+          "$ref": "#/$defs/selector"
+        },
+        "kindFallback": {
+          "description": "Kinds without tiles, read when a card has no tiles.",
+          "$ref": "#/$defs/selector"
+        },
+        "image": {
+          "description": "Any picture on the card, when no tile has one.",
+          "$ref": "#/$defs/selector"
+        },
+        "gift": {
+          "description": "The Gift action: the pledge can be gifted.",
+          "$ref": "#/$defs/selector"
+        },
+        "melt": {
+          "description": "The Exchange action: the pledge can be melted.",
+          "$ref": "#/$defs/selector"
+        },
+        "date": {
+          "description": "The pledge date (\"Created: December 08, 2016\").",
+          "$ref": "#/$defs/selector"
+        }
+      }
+    },
+    "buybacks": {
+      "description": "The buy-back list: a card per buy-back, its name, its date and contents in cells, and a button carrying its ids.",
+      "type": "object",
+      "required": [
+        "path",
+        "pageSize",
+        "empty",
+        "card",
+        "name",
+        "cells",
+        "cellLayouts",
+        "button",
+        "ids",
+        "hrefId",
+        "image",
+        "background",
+        "price",
+        "upgraded",
+        "tokens",
+        "noTokens"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "pageSize": { "$ref": "#/$defs/pageSize" },
+        "empty": {
+          "description": "RSI's sentence for an account with no buy-backs.",
+          "$ref": "#/$defs/pattern"
+        },
+        "card": { "description": "A buy-back card.", "$ref": "#/$defs/selector" },
+        "name": { "description": "Its name.", "$ref": "#/$defs/selector" },
+        "cells": { "description": "Its data cells.", "$ref": "#/$defs/selector" },
+        "cellLayouts": {
+          "description": "Which cell holds the date and which the contents, by how many cells a card has: the first layout whose `min` the card reaches.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "required": ["min", "date"],
+            "additionalProperties": false,
+            "properties": {
+              "min": { "type": "integer", "minimum": 1, "maximum": 20 },
+              "date": { "$ref": "#/$defs/cellIndex" },
+              "contains": { "$ref": "#/$defs/cellIndex" }
+            }
+          }
+        },
+        "button": {
+          "description": "The reclaim button with the ids and the buy-back's link.",
+          "$ref": "#/$defs/selector"
+        },
+        "ids": {
+          "description": "The button's attributes.",
+          "type": "object",
+          "required": ["pledge", "fromShip", "toShip", "toSku"],
+          "additionalProperties": false,
+          "properties": {
+            "pledge": { "$ref": "#/$defs/attribute" },
+            "fromShip": { "$ref": "#/$defs/attribute" },
+            "toShip": { "$ref": "#/$defs/attribute" },
+            "toSku": { "$ref": "#/$defs/attribute" }
+          }
+        },
+        "hrefId": {
+          "description": "The pledge id in the button's link, when the button has none (group `id`).",
+          "$ref": "#/$defs/pattern"
+        },
+        "image": { "description": "The card's picture.", "$ref": "#/$defs/selector" },
+        "background": {
+          "description": "Or an element with an inline background picture.",
+          "$ref": "#/$defs/selector"
+        },
+        "price": {
+          "description": "The buy-back price, best effort.",
+          "$ref": "#/$defs/selector"
+        },
+        "upgraded": {
+          "description": "The name's ending on a melted upgraded ship (its contents cell is stale).",
+          "$ref": "#/$defs/pattern"
+        },
+        "tokens": {
+          "description": "The sentence saying how many buy-back tokens the account has (group `n`: a number or `noTokens`).",
+          "$ref": "#/$defs/pattern"
+        },
+        "noTokens": { "description": "`n` meaning none.", "$ref": "#/$defs/pattern" }
+      }
+    },
+    "buybackDetail": {
+      "description": "One buy-back's own page: its price, title, ships and other items.",
+      "type": "object",
+      "required": [
+        "path",
+        "price",
+        "cents",
+        "currency",
+        "title",
+        "ships",
+        "info",
+        "infoLine",
+        "fields",
+        "image",
+        "also"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "The page's path, before the pledge id.",
+          "$ref": "#/$defs/path"
+        },
+        "price": { "description": "The price element.", "$ref": "#/$defs/selector" },
+        "cents": { "description": "Its price in cents.", "$ref": "#/$defs/attribute" },
+        "currency": { "description": "Its currency.", "$ref": "#/$defs/attribute" },
+        "title": { "description": "The title.", "$ref": "#/$defs/selector" },
+        "ships": { "description": "One per ship.", "$ref": "#/$defs/selector" },
+        "info": { "description": "A ship's \"Label: value\" lines.", "$ref": "#/$defs/selector" },
+        "infoLine": {
+          "description": "One line (groups `label` and `value`).",
+          "$ref": "#/$defs/pattern"
+        },
+        "fields": {
+          "description": "The labels (lowercase) each ship field is read from, first found wins.",
+          "type": "object",
+          "required": ["name", "manufacturer", "focus"],
+          "additionalProperties": false,
+          "properties": {
+            "name": { "$ref": "#/$defs/labels" },
+            "manufacturer": { "$ref": "#/$defs/labels" },
+            "focus": { "$ref": "#/$defs/labels" }
+          }
+        },
+        "image": { "description": "A ship's picture.", "$ref": "#/$defs/selector" },
+        "also": { "description": "One per other item.", "$ref": "#/$defs/selector" }
+      }
+    },
+    "names": {
+      "description": "What a pledge or buy-back name says.",
+      "type": "object",
+      "required": ["ccu", "addon", "coupon", "gameAccess", "paint", "pack", "category"],
+      "additionalProperties": false,
+      "properties": {
+        "ccu": {
+          "description": "An upgrade, \"Upgrade - <from> to <to>\" (groups `from` and `to`).",
+          "$ref": "#/$defs/pattern"
+        },
+        "addon": { "description": "A standalone add-on.", "$ref": "#/$defs/pattern" },
+        "coupon": { "description": "A store coupon.", "$ref": "#/$defs/pattern" },
+        "gameAccess": {
+          "description": "Game access: anything with it is a package (name and contents).",
+          "$ref": "#/$defs/pattern"
+        },
+        "paint": { "description": "A paint or skin.", "$ref": "#/$defs/pattern" },
+        "pack": {
+          "description": "A pack, whatever its category says (a buy-back's name).",
+          "$ref": "#/$defs/pattern"
+        },
+        "category": {
+          "description": "RSI's store category in front of a name, \"Standalone Ships - …\" (group `prefix`).",
+          "$ref": "#/$defs/pattern"
+        }
+      }
+    },
+    "categories": {
+      "description": "Store categories (names.category) and what they make a buy-back.",
+      "type": "object",
+      "required": ["package", "kinds", "ship"],
+      "additionalProperties": false,
+      "properties": {
+        "package": {
+          "description": "A game package, checked before game access and packs.",
+          "$ref": "#/$defs/pattern"
+        },
+        "kinds": {
+          "description": "Then these in order, after game access and packs.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 30,
+          "items": {
+            "type": "object",
+            "required": ["pattern", "kind"],
+            "additionalProperties": false,
+            "properties": {
+              "pattern": { "$ref": "#/$defs/pattern" },
+              "kind": { "enum": ["paint", "addon", "other", "pack", "package", "ship"] }
+            }
+          }
+        },
+        "ship": {
+          "description": "A ship category, last; also how an untyped item in it is known as its ship.",
+          "$ref": "#/$defs/pattern"
+        }
+      }
+    },
+    "kinds": {
+      "description": "What a contained item's kind or name says.",
+      "type": "object",
+      "required": ["ship", "insurance", "insuranceName"],
+      "additionalProperties": false,
+      "properties": {
+        "ship": { "description": "A kind meaning a ship.", "$ref": "#/$defs/pattern" },
+        "insurance": {
+          "description": "A kind (or a buy-back page's item) meaning insurance.",
+          "$ref": "#/$defs/pattern"
+        },
+        "insuranceName": {
+          "description": "An untyped item whose name says it's insurance.",
+          "$ref": "#/$defs/pattern"
+        }
+      }
+    },
+    "insurance": {
+      "description": "The insurance term (groups `n`).",
+      "type": "object",
+      "required": ["fromName", "fromItem"],
+      "additionalProperties": false,
+      "properties": {
+        "fromName": {
+          "description": "In a buy-back's name: lifetime, then years, then months.",
+          "$ref": "#/$defs/term"
+        },
+        "fromItem": {
+          "description": "In an insurance item's name: lifetime, then months, then years.",
+          "$ref": "#/$defs/term"
+        }
+      }
+    },
+    "dates": {
+      "description": "A pledge date (groups `year`, `month`, `day`).",
+      "type": "object",
+      "required": ["label", "iso", "named", "months"],
+      "additionalProperties": false,
+      "properties": {
+        "label": { "description": "A label in front of it.", "$ref": "#/$defs/pattern" },
+        "iso": { "description": "2016-12-08.", "$ref": "#/$defs/pattern" },
+        "named": {
+          "description": "December 08, 2016 (`month` is matched against `months`).",
+          "$ref": "#/$defs/pattern"
+        },
+        "months": {
+          "description": "Month names, lowercase, January first.",
+          "type": "array",
+          "minItems": 12,
+          "maxItems": 12,
+          "items": { "type": "string", "pattern": "^[a-z]+$" }
+        }
+      }
+    },
+    "account": {
+      "description": "The account dashboard. Its HTML carries the signed-in account as escaped JSON: the object around the first `keys.nickname`, and a separate referral object around `referral.code`.",
+      "type": "object",
+      "required": ["path", "keys", "credit", "subscriber", "concierge", "referral"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "keys": {
+          "description": "The account object's keys: credits a list, subscriber and concierge objects.",
+          "type": "object",
+          "required": [
+            "nickname",
+            "displayname",
+            "avatar",
+            "enlistedSince",
+            "countryName",
+            "credits",
+            "subscriber",
+            "concierge"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "nickname": { "$ref": "#/$defs/jsonKey" },
+            "displayname": { "$ref": "#/$defs/jsonKey" },
+            "avatar": { "$ref": "#/$defs/jsonKey" },
+            "enlistedSince": { "$ref": "#/$defs/jsonKey" },
+            "countryName": { "$ref": "#/$defs/jsonKey" },
+            "credits": { "$ref": "#/$defs/jsonKey" },
+            "subscriber": { "$ref": "#/$defs/jsonKey" },
+            "concierge": { "$ref": "#/$defs/jsonKey" }
+          }
+        },
+        "credit": {
+          "description": "A credit's keys (store credit's value is in cents).",
+          "type": "object",
+          "required": ["variant", "value", "symbol", "label", "currency"],
+          "additionalProperties": false,
+          "properties": {
+            "variant": { "$ref": "#/$defs/jsonKey" },
+            "value": { "$ref": "#/$defs/jsonKey" },
+            "symbol": { "$ref": "#/$defs/jsonKey" },
+            "label": { "$ref": "#/$defs/jsonKey" },
+            "currency": { "$ref": "#/$defs/jsonKey" }
+          }
+        },
+        "subscriber": {
+          "description": "The subscriber object's keys.",
+          "type": "object",
+          "required": ["type", "frequency"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "$ref": "#/$defs/jsonKey" },
+            "frequency": { "$ref": "#/$defs/jsonKey" }
+          }
+        },
+        "concierge": {
+          "description": "The concierge object's keys.",
+          "type": "object",
+          "required": ["level", "next", "percent"],
+          "additionalProperties": false,
+          "properties": {
+            "level": { "$ref": "#/$defs/jsonKey" },
+            "next": { "$ref": "#/$defs/jsonKey" },
+            "percent": { "$ref": "#/$defs/jsonKey" }
+          }
+        },
+        "referral": {
+          "description": "The referral object's keys: the enlist link is the first of `url` it has.",
+          "type": "object",
+          "required": ["code", "url", "referrerCode"],
+          "additionalProperties": false,
+          "properties": {
+            "code": { "$ref": "#/$defs/jsonKey" },
+            "url": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 5,
+              "items": { "$ref": "#/$defs/jsonKey" }
+            },
+            "referrerCode": { "$ref": "#/$defs/jsonKey" }
+          }
+        }
+      }
+    },
+    "dossier": {
+      "description": "The public citizen dossier: the Citizen Record and the main organization (label and value entries; a hidden one is skipped).",
+      "type": "object",
+      "required": [
+        "path",
+        "record",
+        "org",
+        "hidden",
+        "info",
+        "entry",
+        "label",
+        "value",
+        "sid",
+        "rank",
+        "name",
+        "redacted",
+        "orgLink",
+        "orgSid",
+        "logo"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "description": "The page's path, before the handle.", "$ref": "#/$defs/path" },
+        "record": { "description": "The Citizen Record number.", "$ref": "#/$defs/selector" },
+        "org": { "description": "The main organization block.", "$ref": "#/$defs/selector" },
+        "hidden": {
+          "description": "The block when the membership is hidden.",
+          "$ref": "#/$defs/selector"
+        },
+        "info": { "description": "Its details.", "$ref": "#/$defs/selector" },
+        "entry": {
+          "description": "One entry: a label and a value, or a value alone (the name).",
+          "$ref": "#/$defs/selector"
+        },
+        "label": { "$ref": "#/$defs/selector" },
+        "value": { "$ref": "#/$defs/selector" },
+        "sid": {
+          "description": "The label of the SID entry (lowercase).",
+          "$ref": "#/$defs/pattern"
+        },
+        "rank": {
+          "description": "The label of the rank entry (lowercase).",
+          "$ref": "#/$defs/pattern"
+        },
+        "name": { "description": "The name, when no entry gave it.", "$ref": "#/$defs/selector" },
+        "redacted": { "description": "A name RSI hides.", "$ref": "#/$defs/pattern" },
+        "orgLink": { "description": "The link to the organization.", "$ref": "#/$defs/selector" },
+        "orgSid": {
+          "description": "The SID in that link, when no entry gave it (group `sid`).",
+          "$ref": "#/$defs/pattern"
+        },
+        "logo": { "description": "The organization's logo.", "$ref": "#/$defs/selector" }
+      }
+    },
+    "referrals": {
+      "description": "Recruits and prospects, by campaign, a page at a time. The code adds campaignId, converted, limit (pageSize) and page.",
+      "type": "object",
+      "required": ["path", "operation", "query", "variables", "campaigns", "pageSize"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "operation": { "$ref": "#/$defs/operation" },
+        "query": { "$ref": "#/$defs/document" },
+        "variables": {
+          "type": "object",
+          "required": ["display", "sortBy"],
+          "additionalProperties": false,
+          "properties": {
+            "display": { "$ref": "#/$defs/enumValue" },
+            "sortBy": { "$ref": "#/$defs/enumValue" }
+          }
+        },
+        "campaigns": {
+          "description": "The current program and the legacy one (before the cutoff).",
+          "type": "object",
+          "required": ["current", "legacy"],
+          "additionalProperties": false,
+          "properties": { "current": { "$ref": "#/$defs/id" }, "legacy": { "$ref": "#/$defs/id" } }
+        },
+        "pageSize": { "$ref": "#/$defs/pageSize" }
+      }
+    },
+    "subStore": {
+      "description": "The Subscriber Store's items for the signed-in account. The code adds the page and its size to variables.query (pageSize first; pageSizeMin when RSI refuses that).",
+      "type": "object",
+      "required": ["path", "operation", "query", "variables", "pageSize", "pageSizeMin"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "operation": { "$ref": "#/$defs/operation" },
+        "query": { "$ref": "#/$defs/document" },
+        "variables": {
+          "type": "object",
+          "required": ["storeFront", "query"],
+          "additionalProperties": false,
+          "properties": {
+            "storeFront": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+            "query": {
+              "type": "object",
+              "required": ["skus", "sort"],
+              "additionalProperties": false,
+              "properties": {
+                "skus": {
+                  "type": "object",
+                  "required": ["filtersFromTags", "products"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "filtersFromTags": {
+                      "type": "object",
+                      "required": ["tagIdentifiers", "facetIdentifiers"],
+                      "additionalProperties": false,
+                      "properties": {
+                        "tagIdentifiers": { "$ref": "#/$defs/identifiers" },
+                        "facetIdentifiers": { "$ref": "#/$defs/identifiers" }
+                      }
+                    },
+                    "products": {
+                      "type": "array",
+                      "maxItems": 20,
+                      "items": { "type": "integer", "minimum": 0 }
+                    }
+                  }
+                },
+                "sort": {
+                  "type": "object",
+                  "required": ["field", "direction"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "field": { "type": "string", "pattern": "^[A-Za-z_]+$" },
+                    "direction": { "enum": ["asc", "desc"] }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "pageSize": { "$ref": "#/$defs/pageSize" },
+        "pageSizeMin": { "$ref": "#/$defs/pageSize" }
+      }
+    },
+    "upgrade": {
+      "description": "RSI's upgrade tool: the store list (every ship and the editions on sale), and Add to RSI Cart (src/rsi-cart.js): your ships and the mode (ships, app), which ships can upgrade to a SKU (filter), the price (price) and the add itself (add), each asked with the csrf token.",
+      "type": "object",
+      "required": [
+        "path",
+        "storeList",
+        "ships",
+        "app",
+        "filter",
+        "price",
+        "add",
+        "signedOut",
+        "buybackMode"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "storeList": { "$ref": "#/$defs/request" },
+        "ships": {
+          "description": "Every ship, which you own, and the mode.",
+          "$ref": "#/$defs/request"
+        },
+        "app": {
+          "description": "The mode alone: new upgrade or buy-back, signed in or not.",
+          "$ref": "#/$defs/request"
+        },
+        "filter": {
+          "description": "The ships that can upgrade to a SKU. The code adds toId.",
+          "type": "object",
+          "required": ["operation", "query", "variables"],
+          "additionalProperties": false,
+          "properties": {
+            "operation": { "$ref": "#/$defs/operation" },
+            "query": { "$ref": "#/$defs/document" },
+            "variables": {
+              "type": "object",
+              "required": ["fromFilters"],
+              "additionalProperties": false,
+              "properties": { "fromFilters": { "type": "array", "maxItems": 0 } }
+            }
+          }
+        },
+        "price": {
+          "description": "An upgrade's price. The code adds from and to.",
+          "$ref": "#/$defs/request"
+        },
+        "add": {
+          "description": "The add: it hands back a ticket for the cart. The code adds from and to.",
+          "$ref": "#/$defs/request"
+        },
+        "signedOut": {
+          "description": "A GraphQL error that means you're not signed in (anything else is a refusal).",
+          "$ref": "#/$defs/pattern"
+        },
+        "buybackMode": {
+          "description": "The app's mode while upgrading a buy-back.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]*$"
+        }
+      }
+    },
+    "cart": {
+      "description": "RSI's cart, and what Add to RSI Cart (src/rsi-cart.js) needs around the upgrade tool: signing the tool in (authPath) and setting what's upgraded (contextPath), both with the session cookie as tokenHeader; the csrf token from a store page (storePath) for every GraphQL call (csrfHeader); and the cart taking the add's ticket (ticketPath).",
+      "type": "object",
+      "required": [
+        "path",
+        "signInPath",
+        "storePath",
+        "authPath",
+        "contextPath",
+        "ticketPath",
+        "cookie",
+        "tokenHeader",
+        "csrfHeader",
+        "csrfTag",
+        "csrfValue",
+        "context",
+        "refusal",
+        "addMany"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "The cart page, opened for you after an add.",
+          "$ref": "#/$defs/path"
+        },
+        "signInPath": { "description": "RSI's sign-in page.", "$ref": "#/$defs/path" },
+        "storePath": {
+          "description": "A store page, read for its csrf token.",
+          "$ref": "#/$defs/path"
+        },
+        "authPath": { "$ref": "#/$defs/path" },
+        "contextPath": { "$ref": "#/$defs/path" },
+        "ticketPath": { "$ref": "#/$defs/path" },
+        "cookie": {
+          "description": "The session cookie sent as tokenHeader.",
+          "$ref": "#/$defs/headerName"
+        },
+        "tokenHeader": { "$ref": "#/$defs/headerName" },
+        "csrfHeader": { "$ref": "#/$defs/headerName" },
+        "csrfTag": {
+          "description": "The csrf token's meta tag in the store page.",
+          "$ref": "#/$defs/pattern"
+        },
+        "csrfValue": {
+          "description": "Its value in that tag (group `value`).",
+          "$ref": "#/$defs/pattern"
+        },
+        "context": {
+          "description": "The context body's keys (pledge: a buy-back upgrade).",
+          "type": "object",
+          "required": ["fromShip", "toShip", "toSku", "pledge"],
+          "additionalProperties": false,
+          "properties": {
+            "fromShip": { "$ref": "#/$defs/jsonKey" },
+            "toShip": { "$ref": "#/$defs/jsonKey" },
+            "toSku": { "$ref": "#/$defs/jsonKey" },
+            "pledge": { "$ref": "#/$defs/jsonKey" }
+          }
+        },
+        "refusal": {
+          "description": "What a refused add says: a buy-back upgrade RSI won't sell any more (invalid, or upgrade, for a buy-back), or a cart that takes a buy-back alone (buyback).",
+          "type": "object",
+          "required": ["invalid", "buyback", "upgrade"],
+          "additionalProperties": false,
+          "properties": {
+            "invalid": { "$ref": "#/$defs/pattern" },
+            "buyback": { "$ref": "#/$defs/pattern" },
+            "upgrade": { "$ref": "#/$defs/pattern" }
+          }
+        },
+        "addMany": {
+          "description": "Store items into the cart, a list in one request (the Haul): RSI's own add, sent as full text to path with the store page's csrf token. The code adds the items ({ qty, skuId }) and storeFront.",
+          "type": "object",
+          "required": ["path", "operation", "query", "storeFront"],
+          "additionalProperties": false,
+          "properties": {
+            "path": { "$ref": "#/$defs/path" },
+            "operation": { "$ref": "#/$defs/operation" },
+            "query": { "$ref": "#/$defs/document" },
+            "storeFront": { "type": "string", "pattern": "^[a-z]+$", "maxLength": 40 }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "pattern": {
+      "description": "A regular expression: its source and flags (i, m, s, u in that order; never g or y, which would make a test depend on the last one).",
+      "type": "object",
+      "required": ["source", "flags"],
+      "additionalProperties": false,
+      "properties": {
+        "source": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "flags": { "type": "string", "pattern": "^i?m?s?u?$" }
+      }
+    },
+    "selector": {
+      "description": "A CSS selector.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "attribute": {
+      "description": "An HTML attribute's name.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "path": {
+      "description": "A path on RSI's site, never a host.",
+      "type": "string",
+      "pattern": "^/(?:[A-Za-z0-9._~-]+/)*[A-Za-z0-9._~-]*$",
+      "maxLength": 200
+    },
+    "param": {
+      "description": "A query parameter's name.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "pageSize": {
+      "description": "Items asked for per page.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "cellIndex": { "type": "integer", "minimum": 0, "maximum": 20 },
+    "labels": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": { "type": "string", "pattern": "^[^A-Z]+$" }
+    },
+    "term": {
+      "type": "object",
+      "required": ["lti", "years", "months"],
+      "additionalProperties": false,
+      "properties": {
+        "lti": { "$ref": "#/$defs/pattern" },
+        "years": { "$ref": "#/$defs/pattern" },
+        "months": { "$ref": "#/$defs/pattern" }
+      }
+    },
+    "jsonKey": {
+      "description": "A key in RSI's JSON.",
+      "type": "string",
+      "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*$",
+      "maxLength": 100
+    },
+    "operation": {
+      "description": "A GraphQL operation's name: the one the document defines.",
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+      "maxLength": 100
+    },
+    "document": {
+      "description": "A GraphQL document.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000
+    },
+    "request": {
+      "description": "A GraphQL request without variables.",
+      "type": "object",
+      "required": ["operation", "query"],
+      "additionalProperties": false,
+      "properties": {
+        "operation": { "$ref": "#/$defs/operation" },
+        "query": { "$ref": "#/$defs/document" }
+      }
+    },
+    "enumValue": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+    "id": { "type": "string", "pattern": "^[0-9]+$" },
+    "identifiers": {
+      "type": "array",
+      "maxItems": 20,
+      "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }
+    },
+    "headerName": {
+      "description": "An HTTP header or cookie name.",
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9-]*$"
+    }
+  }
+}

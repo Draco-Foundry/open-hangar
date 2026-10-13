@@ -13,7 +13,7 @@ const OH = globalThis.OH;
 
 const header = [
   '```',
-  'Open Hangar error report',
+  'Open Hangar flight log',
   'Version:   0.2.15 (Chrome build)',
   'Browser:   Chrome 141 on Windows',
   'Hangar:    120 items, scanned 2 min ago',

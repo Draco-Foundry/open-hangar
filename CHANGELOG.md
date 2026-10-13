@@ -4,6 +4,18 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Changed: **The extension is now a lighter connector, and your full hangar opens on
+  openhangar.space.** The toolbar button opens a popup with your Account Value, your
+  last scan, Scan and store alerts. One extension page stays, with your pledges and
+  buy-backs (search, totals and CSV), your backup and your settings. The dashboard's
+  other pages are gone from the extension: press Open My Hangar to see your whole hangar
+  at hangar.openhangar.space, with no account. Your scans still stay in this browser.
+- Changed: **Open beta until launch day, November 10.** Everything in this update is
+  yours now. Syncing your hangar to openhangar.space opens to everyone on November 10.
+  Until then it's for beta testers.
+- Fixed: Add to RSI Cart no longer blames a buy-back in your cart when RSI turned the
+  upgrade down for another reason. It shows RSI's own message instead.
+
 ## 0.2.19 — 2026-10-06
 
 - Fixed: **the next buy-back token is back on the radar.** Open Hangar only knew RSI's 2026

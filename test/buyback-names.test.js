@@ -40,3 +40,30 @@ test('never returns an empty title for a non-empty name', () => {
   assert.equal(short('Package - '), 'Package -');
   assert.equal(short(null), '');
 });
+
+// OH.buybackTitle (#273) replaced three copies in dashboard.js: buybackName (short),
+// bbFullName and bbName (full, the same code twice). Same output as the old ones,
+// on invented names.
+const title = globalThis.OH.buybackTitle;
+const oldShort = (b) =>
+  b.ccu ? `${short(b.ccu.from)} → ${short(b.ccu.to)}` : short(b.name) || '—';
+const oldFull = (b) => (b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '');
+const invented = [
+  { name: 'Standalone Ship - Kestrel Vantage Warbond Edition' },
+  { name: 'Package - Nebula Drifter Starter Pack' },
+  { name: 'Halcyon Skiff (Standard Edition)' },
+  { name: 'Quillon Lantern Paint' },
+  { name: '' },
+  {},
+  {
+    name: 'Upgrade - Kestrel Vantage to Ostara Longhaul Warbond Edition',
+    ccu: { from: 'Kestrel Vantage', to: 'Ostara Longhaul Warbond Edition' },
+  },
+  { ccu: { from: 'Halcyon Skiff Standard Edition', to: 'Quillon Lantern' } },
+];
+for (const b of invented) {
+  test(`buybackTitle matches the old helpers: ${JSON.stringify(b)}`, () => {
+    assert.equal(title(b), oldShort(b));
+    assert.equal(title(b, { short: false }), oldFull(b));
+  });
+}

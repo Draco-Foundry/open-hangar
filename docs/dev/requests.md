@@ -13,8 +13,36 @@ loads remote code: what a build can do is fixed when it's built (build-time flag
 - **Be polite:** an honest User-Agent, one request at a time with pauses, no bursts,
   honor `Retry-After`, back off on 403/429/5xx and stop on a denial, cache where you can.
 
+## Extension Alerts
+
+The `alerts` flag's checks (src/alerts.js) ask openhangar.space for two things, no more
+than once every 30 minutes (an alarm, 30 to 35 minutes apart): the public sale feed
+(`/api/store/on-sale`, with its ETag, nothing about the pilot in the request) and, only
+while connected, the account's Wishlist keys (`/api/v1/wishlist`, the sync token, read
+only). Retry-After is honored, a failure doubles the wait up to 6 hours, a copy younger
+than 10 minutes is used as it is, and nothing is asked before the pilot turns alerts on.
+Everything is matched on the device; nothing goes back. A change to either feed's shape
+is a new `v` on the website, and the name fold (`nameKey`) must stay the website's
+`saleKey`: both repos test the same strings.
+
 ## Sync
 
-What a sync sends is the backup format (`OH.exportDB`, `schemaVersion`). The website
-checks the same format on its side; a change to it needs the sync tests updated here,
-the privacy policy checked, and the website told before it ships.
+What a sync sends is the backup format (`OH.exportDB`, `schemaVersion`), written down as
+`schema/sync-payload.schema.json` (#441). The extension checks every sync against it before
+sending, and the website checks the same format on its side with a pinned copy of the
+schema and the vectors in `test/fixtures/sync-schema/`. A change to the format needs the
+schema changed (then `npm run schema`), the vectors and sync tests updated here, the
+privacy policy checked, and the website told before it ships.
+
+## Our Pages Asking the Extension
+
+Our own web pages reach the extension through bridge v2 (`src/site-pages.js`,
+ARCHITECTURE.md "Messages From Our Pages"). A new request needs its capability and type
+in `src/site-pages.js`, its exact keys there, its handler in `src/background.js` (behind
+its flag's markers), the type in the Firefox bridge's list, tests in
+`test/bridge-v2.test.js`, and the website told. A request from a page that may not ask
+it answers `unknown request`, the same as one that doesn't exist. Anything handed to a
+page is checked before it goes, and handing a page something new means checking the
+privacy policy first. A new page needs the policy to name it before a store or beta
+build may let it in (`test/privacy-permissions.test.js` fails until it does), and the
+policy's words are the owner's to approve.
