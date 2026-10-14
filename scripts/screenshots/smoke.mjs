@@ -4646,17 +4646,30 @@ try {
     await page.waitForSelector(wait);
     await sleep(250);
   };
+  // A write from elsewhere (the background, a scan): set, or removed for no newValue. The
+  // demo storage tells the page's listeners itself, as the browser does.
   const told = (changes, area = 'local') =>
     page.evaluate(
       async (c, a) => {
-        const vals = Object.fromEntries(Object.entries(c).map(([k, v]) => [k, v.newValue]));
-        await chrome.storage[a].set(vals);
-        for (const f of __demo.listeners) f(c, a);
+        const gone = Object.keys(c).filter((k) => c[k].newValue === undefined);
+        const vals = Object.fromEntries(
+          Object.entries(c)
+            .filter(([k]) => !gone.includes(k))
+            .map(([k, v]) => [k, v.newValue]),
+        );
+        if (Object.keys(vals).length) await chrome.storage[a].set(vals);
+        if (gone.length) await chrome.storage[a].remove(gone);
         await new Promise((r) => setTimeout(r, 300));
       },
       changes,
       area,
     );
+  // The popup asks openhangar.space nothing itself (its Wishlist is the alerts' copy).
+  const ppAsked = [];
+  const ppAsk = (req) => {
+    if (/\/api\/v1\/wishlist/.test(req.url())) ppAsked.push(req.url());
+  };
+  page.on('request', ppAsk);
   const PNG =
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
   const demoAccount = {
@@ -4854,6 +4867,8 @@ try {
     panel: getComputedStyle(document.querySelector('.pp')).backgroundColor,
     text: getComputedStyle(document.body).color,
     kept: (await chrome.storage.local.get('popupPrefs')).popupPrefs?.look,
+    // The copy the next popup paints in before its settings load (no dark flash).
+    copy: localStorage.getItem('ohPopupLook'),
   }));
   await page.select('#pp-look', 'auto');
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
@@ -4870,6 +4885,7 @@ try {
   lit.panel === 'rgb(255, 255, 255)' &&
   lit.text === 'rgb(27, 34, 48)' &&
   lit.kept === 'light' &&
+  lit.copy === 'light' &&
   litAuto.panel === 'rgb(255, 255, 255)' &&
   litAuto.top === 'rgb(59, 106, 237)' &&
   litAuto.good === '#1f9d5c' &&
@@ -4894,8 +4910,8 @@ try {
     ? ok('connected: who and when; Disconnect asks first and Stay Connected keeps it')
     : fail(`popup connected: ${JSON.stringify({ linked, askFocus, stayed: ppStayed })}`);
   // The website took a sync moments ago (429, too soon): Settings has an amber dot and
-  // says when it can go (owner, 2026-10-09), never an error code; with a retry kept,
-  // the time it retries.
+  // says when it can go (owner, 2026-10-09), never an error code; a retry kept by the
+  // basic page changes nothing (only that page, open, retries).
   const ppUntil = (await pageNow()) + 4 * 60e3;
   const ppTime = await page.evaluate(
     (u) => new Date(u).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
@@ -4914,8 +4930,9 @@ try {
   popWait.card.includes(`Try again at ${ppTime}. The last sync was moments ago.`) &&
   !/429|responded/.test(popWait.card) &&
   popWait.dot &&
-  retry.includes(`Retrying at ${ppTime}`)
-    ? ok(`a sync that didn't go through: an amber dot, then "Retrying at ${ppTime}"`)
+  retry.includes(`Try again at ${ppTime}.`) &&
+  !/Retrying/.test(retry)
+    ? ok(`a sync that didn't go through: an amber dot and "Try again at ${ppTime}", no retry promised`)
     : fail(`popup sync wait: ${JSON.stringify({ popWait, retry, time: ppTime })}`);
   await page.click('#pp-tab-hangar');
   await page.waitForSelector('#pp-hangar');
@@ -5020,6 +5037,55 @@ try {
   busy.note === 'A scan is already running.' && !busy.closed
     ? ok('Scan while one runs: stays open and says so')
     : fail(`popup busy: ${JSON.stringify(busy)}`);
+  // A scan the runner held (another page was scanning: ms 0, no rows): never "Scanned in
+  // 1s"; it says a scan is running instead.
+  await popAt(signedIn, '#pp-scan');
+  await page.evaluate(() => (__demo.answers.scan = { ok: true }));
+  await page.click('#pp-scan');
+  await page.waitForSelector('.pp-bar');
+  const heldAt = await pageNow();
+  await told({
+    scanReport: {
+      newValue: {
+        v: 1,
+        run: 'r6',
+        by: 'offscreen',
+        reason: 'popup',
+        startedAt: heldAt,
+        at: heldAt + 1,
+        ms: 0,
+        held: 'busy',
+        signedOut: false,
+        switched: null,
+        rows: [],
+        bad: 0,
+        sync: null,
+      },
+    },
+  });
+  const heldBusy = await page.evaluate(() => ({
+    done: !!document.getElementById('pp-done'),
+    note: document.querySelector('#pp-panel-hangar .pp-note[role="status"]')?.textContent || '',
+    bar: !!document.querySelector('.pp-bar'),
+  }));
+  !heldBusy.done && heldBusy.note === 'A scan is already running.' && !heldBusy.bar
+    ? ok('a scan held because another page was scanning: no success line, says one is running')
+    : fail(`popup held busy: ${JSON.stringify(heldBusy)}`);
+  // Any other no from the background: it brought the Open Hangar page up, so the popup
+  // closes, as before (no bar left running).
+  await page.evaluate(() => {
+    __demo.answers.scan = { ok: false, error: 'no tab' };
+    __demo.closed = false;
+  });
+  await page.click('#pp-scan');
+  await sleep(150);
+  const refused = await page.evaluate(() => ({
+    closed: !!__demo.closed,
+    bar: !!document.querySelector('.pp-bar'),
+  }));
+  refused.closed && !refused.bar
+    ? ok('a scan the background refused: the popup closes, as before, no bar')
+    : fail(`popup refused: ${JSON.stringify(refused)}`);
   // A scan whose page went away (its mark left behind): Scan stopped, Scan Again.
   await popAt(
     {
@@ -5038,8 +5104,10 @@ try {
     ? ok('a scan that stopped: Scan stopped and Scan Again')
     : fail(`popup stopped: ${JSON.stringify(stopped)}`);
 
-  // Before the first scan: no tabs, one heading and Scan. Signed out with no RSI
-  // session: Log In to RSI, Scan greyed. After an update: the dot on the version, once.
+  // Before the first scan: no tabs, one heading and Scan. Signed out: Log In to RSI, a
+  // grey Scan still there to press (the popup reads no RSI cookie, so it can't tell when
+  // you've logged in again). No access to RSI: Allow Access to RSI, on the basic page.
+  // After an update: the dot on the version, once.
   await popAt({ __demoLocal: { db: null } }, '#pp-first');
   const ppFirst = await page.evaluate(() => ({
     text: document.getElementById('pp-first').textContent.trim(),
@@ -5053,18 +5121,36 @@ try {
   !ppFirst.bell
     ? ok('before the first scan: one heading and Scan, no tabs, "Not scanned"')
     : fail(`popup first run: ${JSON.stringify(ppFirst)}`);
-  await popAt({ __demoAccount: { loggedIn: false }, __demoRsiCookie: '' }, '#pp-login');
-  const ppOut = await page.evaluate(() => ({
-    login: document.getElementById('pp-login').textContent,
-    scanOff: document.getElementById('pp-scan').disabled,
-  }));
+  await popAt({ __demoAccount: { loggedIn: false } }, '#pp-login');
+  const ppOut = await page.evaluate(() => {
+    const scan = document.getElementById('pp-scan');
+    return {
+      login: document.getElementById('pp-login').textContent,
+      scanOn: !scan.disabled,
+      grey: scan.classList.contains('grey') && !scan.classList.contains('primary'),
+    };
+  });
   await page.click('#pp-login');
   const outGo = await page.evaluate(() => __demo.opened.at(-1));
   ppOut.login === 'Log In to RSI ↗' &&
-  ppOut.scanOff &&
+  ppOut.scanOn &&
+  ppOut.grey &&
   outGo === 'https://robertsspaceindustries.com/connect'
-    ? ok("signed out of RSI: Log In to RSI opens RSI's sign-in page, Scan greyed")
+    ? ok("signed out of RSI: Log In to RSI opens RSI's sign-in page, a grey Scan under it")
     : fail(`popup signed out: ${JSON.stringify({ out: ppOut, outGo })}`);
+  await popAt({ ...signedIn, __demoNoRsi: true }, '#pp-rsi-allow');
+  const noRsi = await page.evaluate(() => ({
+    scan: !!document.getElementById('pp-scan'),
+    label: document.getElementById('pp-rsi-allow').textContent,
+  }));
+  await page.click('#pp-rsi-allow');
+  const noRsiGo = await page.evaluate(() => ({ url: __demo.opened.at(-1), closed: __demo.closed }));
+  !noRsi.scan &&
+  noRsi.label === 'Allow Access to RSI' &&
+  /basic\.html$/.test(noRsiGo.url) &&
+  noRsiGo.closed
+    ? ok('no access to RSI: Allow Access to RSI instead of Scan, on the basic page')
+    : fail(`popup no RSI: ${JSON.stringify({ noRsi, noRsiGo })}`);
   await popAt(
     { ...signedIn, __demoLocal: { justUpdated: { from: '0.2.6', to: '0.2.7' } } },
     '#pp-ver',
@@ -5084,53 +5170,97 @@ try {
     ? ok("what's new after an update: the dot on the version tag, Got It hides it for good")
     : fail(`popup what's new: ${JSON.stringify({ news, newsGone })}`);
 
-  // The last scan ran into trouble: its rows and Report a Scan Problem on Hangar.
+  // The last scan ran into trouble: its rows (one not read, one read only in part) and
+  // Report a Scan Problem on Hangar, never a success line.
+  const badReport = {
+    v: 1,
+    run: 'r5',
+    by: 'offscreen',
+    reason: 'popup',
+    startedAt: T0 - 60e3,
+    at: T0 - 30e3,
+    ms: 30e3,
+    held: null,
+    signedOut: false,
+    switched: null,
+    rows: [
+      { id: 'hangar', ok: true, partial: 'stopped at page 3', n: 20, error: null },
+      { id: 'buybacks', ok: false, partial: null, n: null, error: 'RSI answered 500' },
+    ],
+    bad: 2,
+    sync: null,
+  };
+  await popAt({ ...signedIn, __demoLocal: { scanReport: badReport } }, '#pp-trouble');
+  // As drawn: each row on its own line.
+  const trouble = await page.$eval('#pp-trouble', (e) => e.innerText.replace(/\s+/g, ' ').trim());
+  const troubleDone = await page.evaluate(() => !!document.getElementById('pp-done'));
+  await page.click('#pp-report');
+  await sleep(300);
+  const reported = await page.evaluate(() => __demo.opened.at(-1) || '');
+  trouble ===
+    'The Scan Ran Into Trouble Hangar: 20 pledges Buy-Backs: RSI answered 500 Report a Scan Problem' &&
+  !troubleDone &&
+  /^https:\/\/github\.com\/Draco-Foundry\/open-hangar\/issues\/new\?/.test(reported) &&
+  reported.includes(
+    encodeURIComponent('Hangar: problem · Buy-Backs: problem').replace(/%20/g, '+'),
+  )
+    ? ok('a scan with trouble: the rows not read or read in part, and Report a Scan Problem')
+    : fail(`popup scan trouble: ${JSON.stringify({ trouble, troubleDone, reported })}`);
+
+  // The scan's sync asked first (an RSI account new to this connection): the question on
+  // Hangar; Not This One keeps it out, and the question goes.
   await popAt(
     {
       ...signedIn,
       __demoLocal: {
+        siteUrl: 'https://app.openhangar.space',
+        siteLink: {
+          token: 't',
+          name: 'demo@pilot',
+          connectedAt: 1,
+          lastSync: T0 - 3600e3,
+          accounts: [{ handle: 'Other_Pilot', record: null }],
+        },
         scanReport: {
-          v: 1,
-          run: 'r5',
-          by: 'offscreen',
-          reason: 'popup',
-          startedAt: T0 - 60e3,
-          at: T0 - 30e3,
-          ms: 30e3,
-          held: null,
-          signedOut: false,
-          switched: null,
-          rows: [
-            { id: 'hangar', ok: true, partial: null, n: 20, error: null },
-            { id: 'buybacks', ok: false, partial: null, n: null, error: 'RSI answered 500' },
-          ],
-          bad: true,
-          sync: null,
+          ...badReport,
+          run: 'r7',
+          ms: 20e3,
+          rows: [{ id: 'hangar', ok: true, partial: null, n: 20, error: null }],
+          bad: 0,
+          sync: { state: 'ask', msg: null, at: T0 - 20e3 },
         },
       },
     },
-    '#pp-trouble',
+    '#pp-pilot',
   );
-  const trouble = await page.$eval('#pp-trouble', (e) => e.textContent.replace(/\s+/g, ' ').trim());
-  await page.click('#pp-report');
+  const askPilot = await page.$eval('#pp-pilot', (e) => e.textContent.replace(/\s+/g, ' ').trim());
+  await page.click('#pp-pilot-no');
   await sleep(300);
-  const reported = await page.evaluate(() => __demo.opened.at(-1) || '');
-  trouble === 'The Scan Ran Into Trouble Buy-Backs: RSI answered 500 Report a Scan Problem' &&
-  /^https:\/\/github\.com\/Draco-Foundry\/open-hangar\/issues\/new\?/.test(reported) &&
-  reported.includes(encodeURIComponent('Hangar: ok · Buy-Backs: problem').replace(/%20/g, '+'))
-    ? ok('a scan with trouble: the row that failed, and Report a Scan Problem with the counts')
-    : fail(`popup scan trouble: ${JSON.stringify({ trouble, reported })}`);
+  const askedPilot = await page.evaluate(async () => ({
+    gone: !document.getElementById('pp-pilot'),
+    declined: (await chrome.storage.local.get('siteLink')).siteLink?.declined?.map(
+      (p) => p.handle,
+    ),
+  }));
+  askPilot.startsWith('Sync Demo_Citizen Too?') &&
+  askPilot.endsWith('Sync It Not This One') &&
+  askedPilot.gone &&
+  askedPilot.declined?.join() === 'Demo_Citizen'
+    ? ok("the scan's sync asked about a new RSI account: Sync It or Not This One on Hangar")
+    : fail(`popup pilot ask: ${JSON.stringify({ askPilot, askedPilot })}`);
 
-  // Connected, with the Wishlist the store alerts read: named rows, on sale or not, the
-  // count, and Full Wishlist to the website (nothing asked: the alerts' copy is fresh).
+  // Connected, alerts on, with the Wishlist the store alerts read: named rows, on sale or
+  // not, the count, and Full Wishlist to the website (the popup itself asks nothing).
   const ppSite = 'https://app.openhangar.space';
+  const ppWishLink = { token: 't', name: 'demo@pilot', connectedAt: 1, lastSync: T0 - 60e3 };
   await popAt(
     {
       ...signedIn,
       __demoLocal: {
         popupPrefs: { tab: 'wishlist' },
         siteUrl: ppSite,
-        siteLink: { token: 't', name: 'demo@pilot', connectedAt: 1, lastSync: T0 - 60e3 },
+        siteLink: ppWishLink,
+        alertsOn: true,
         alertsWish: {
           keys: ['ship:avenger-titan', 'ship:zeus-mk-ii-cl', 'sku:9'],
           at: T0 - 60e3,
@@ -5177,6 +5307,51 @@ try {
   wishFull === `${ppSite}/hangar/wishlist`
     ? ok('Wishlist, connected: named rows, on sale or not, read only, Full Wishlist ↗')
     : fail(`popup wishlist: ${JSON.stringify({ ppWish, wishFull })}`);
+  // No sale feed kept yet: the ship list names the ships (never an empty list over "And
+  // N more").
+  await popAt(
+    {
+      ...signedIn,
+      __demoLocal: {
+        popupPrefs: { tab: 'wishlist' },
+        siteUrl: ppSite,
+        siteLink: ppWishLink,
+        alertsOn: true,
+        alertsWish: {
+          keys: ['ship:avenger-titan', 'ship:zeus-mk-ii-cl'],
+          at: T0 - 60e3,
+          connectedAt: 1,
+        },
+      },
+    },
+    '#pp-wish-h',
+  );
+  await page.waitForSelector('.pp-wlist li');
+  const wishNoFeed = await page.evaluate(() => ({
+    head: document.getElementById('pp-wish-h').textContent,
+    rows: [...document.querySelectorAll('.pp-wlist li')].map((li) =>
+      li.textContent.replace(/\s+/g, ' ').trim(),
+    ),
+    more: !!document.querySelector('#pp-wish .pp-note'),
+  }));
+  wishNoFeed.head === 'Your Wishlist · 2' &&
+  wishNoFeed.rows.join(' | ') === 'Avenger Titan Not for Sale | Zeus Mk II CL Not for Sale' &&
+  !wishNoFeed.more
+    ? ok('Wishlist with no sale feed yet: named from the ship list')
+    : fail(`popup wishlist, no feed: ${JSON.stringify(wishNoFeed)}`);
+  // Store alerts off (the default): nothing is read (the privacy policy), the Wishlist
+  // lives on the website.
+  await popAt(
+    {
+      ...signedIn,
+      __demoLocal: { popupPrefs: { tab: 'wishlist' }, siteUrl: ppSite, siteLink: ppWishLink },
+    },
+    '#pp-wish-off',
+  );
+  const wishOff = await page.$eval('#pp-wish-off', (e) => e.textContent.replace(/\s+/g, ' ').trim());
+  wishOff === 'Your Wishlist Lives on openhangar.space Full Wishlist ↗' && !ppAsked.length
+    ? ok('Wishlist with store alerts off: nothing read, Full Wishlist ↗ to the website')
+    : fail(`popup wishlist, alerts off: ${JSON.stringify({ wishOff, ppAsked })}`);
 
   // Saved Accounts: another account's hangar can be removed (the privacy policy promises
   // it), after a question; Log Out of RSI; Clear Data asks first.
@@ -5222,17 +5397,21 @@ try {
     e.textContent.replace(/\s+/g, ' ').trim(),
   );
   await page.click('#pp-clear-yes');
-  await sleep(300);
+  // Nothing scanned is left: the popup's first view, which says so under Scan.
+  await page.waitForSelector('#pp-first', { timeout: 3000 }).catch(() => {});
+  await sleep(200);
   const ppCleared = await page.evaluate(async () => ({
-    note: document.querySelector('.pp-settings .pp-note[role="status"]')?.textContent,
+    note: document.querySelector('#pp-first .pp-note[role="status"]')?.textContent,
+    tabs: document.querySelectorAll('[role="tab"]').length,
     db: 'db' in (await chrome.storage.local.get('db')),
   }));
   loggedOut === 'Logged out of RSI.' &&
   clearAsk ===
     'Clear all saved data from this browser? Export a backup first if you might want it. Clear Data Keep It' &&
   ppCleared.note === 'Saved data cleared from this browser.' &&
+  !ppCleared.tabs &&
   !ppCleared.db
-    ? ok('Log Out of RSI, and Clear Data after its question')
+    ? ok('Log Out of RSI, and Clear Data after its question: back to the first view, said under Scan')
     : fail(`popup log out and clear: ${JSON.stringify({ loggedOut, clearAsk, ppCleared })}`);
 
   // 375 px wide: still no sideways scroll. A phone (Firefox for Android opens the popup as
@@ -5242,6 +5421,20 @@ try {
   const at375 = await page.evaluate(() => document.documentElement.scrollWidth);
   at375 <= 375 ? ok('375 px: no sideways scroll') : fail(`popup ${at375} px wide at 375`);
   const desktopUA = await browser.userAgent();
+  // A touch screen that isn't a phone (a Windows tablet, ChromeOS): still the toolbar
+  // popup's 360 px, never the phone layout.
+  await page.emulate({
+    viewport: { width: 800, height: 600, isMobile: false, hasTouch: true },
+    userAgent: desktopUA,
+  });
+  await popAt(signedIn, '#pp-value');
+  const touchDesk = await page.evaluate(() => ({
+    phone: document.documentElement.classList.contains('phone'),
+    width: Math.round(document.body.getBoundingClientRect().width),
+  }));
+  !touchDesk.phone && touchDesk.width === 360
+    ? ok('a touch screen on a desktop: the 360 px popup, not the phone layout')
+    : fail(`popup touch desktop: ${JSON.stringify(touchDesk)}`);
   await page.emulate({
     viewport: { width: 390, height: 844, isMobile: true, hasTouch: true },
     userAgent: 'Mozilla/5.0 (Android 14; Mobile; rv:142.0) Gecko/142.0 Firefox/142.0',
@@ -5251,6 +5444,7 @@ try {
     const tabs = document.querySelector('[role="tablist"]').getBoundingClientRect();
     const head = document.querySelector('.pp-hd').getBoundingClientRect();
     return {
+      phone: document.documentElement.classList.contains('phone'),
       width: Math.round(document.body.getBoundingClientRect().width),
       wide: document.documentElement.scrollWidth > 390,
       tabsLow: tabs.top > head.bottom + 300 && Math.round(tabs.bottom) >= innerHeight - 1,
@@ -5264,6 +5458,7 @@ try {
   });
   await page.setUserAgent(desktopUA);
   await page.setViewport({ width: 1280, height: 900, isMobile: false, hasTouch: false });
+  ppPhone.phone &&
   ppPhone.width === 390 &&
   !ppPhone.wide &&
   ppPhone.tabsLow &&
@@ -5273,6 +5468,10 @@ try {
     : fail(`popup phone: ${JSON.stringify(ppPhone)}`);
   await page.emulateMediaFeatures([]);
   await page.setViewport({ width: 1280, height: 900 });
+  page.off('request', ppAsk);
+  !ppAsked.length
+    ? ok('the popup never asked openhangar.space for the Wishlist itself')
+    : fail(`popup asked for the Wishlist: ${JSON.stringify(ppAsked)}`);
 
   // The basic page (the connector build, src/basic.html): the lists with search and
   // totals, the CSV and backup files, Clear Data, a scan, Report a Scan Problem, all

@@ -51,7 +51,7 @@ const COPY = {
   'popup.scan-again': 'Scan Again', // NEW: needs the owner's OK (after a scan stopped)
   // Before the first scan: no tabs, one heading and Scan.
   'popup.first': 'Your Hangar, in One Scan', // NEW: needs the owner's OK
-  // Signed out of RSI: the big button to RSI's sign-in page (Scan greys out under it).
+  // Signed out of RSI: the big button to RSI's sign-in page (a grey Scan under it).
   'popup.log-in': 'Log In to RSI ↗', // NEW: needs the owner's OK
   // The scan's steps, the basic page's names for its parts, word for word.
   'popup.step-hangar': 'Hangar',
@@ -62,6 +62,14 @@ const COPY = {
   'popup.scanned-in-m': 'Scanned in {m}m {s}s', // NEW: needs the owner's OK
   // A scan with a problem: the basic page's title (basic.scan-problem), word for word.
   'popup.scan-problem': 'The Scan Ran Into Trouble',
+  // A part read only in part, in the problem box ("Hangar: 42 pledges"): the basic
+  // page's row words (basic.row-pledges, basic.row-buybacks, basic.row-referrals-box),
+  // word for word.
+  'popup.row-pledges': '{n} pledges',
+  'popup.row-pledges.one': '{n} pledge',
+  'popup.row-buybacks': '{n} buy-backs',
+  'popup.row-buybacks.one': '{n} buy-back',
+  'popup.row-referrals': 'read',
   // A different RSI account signed in: the basic page's words, word for word.
   'popup.switched-back': "Signed in as {who} on RSI: that account's saved hangar is back.",
   'popup.switched-new': 'Signed in as {who} on RSI: that account has no scan here yet. Press Scan.',
@@ -89,7 +97,8 @@ const COPY = {
   'popup.wish-empty': 'Your Wishlist Is Empty', // NEW: needs the owner's OK
   'popup.wish-trouble': "Couldn't Reach openhangar.space", // NEW: needs the owner's OK
   'popup.wish-full': 'Full Wishlist ↗', // NEW: needs the owner's OK
-  // Not connected: the Wishlist lives on the website (the mockup's placeholder).
+  // Not connected, or store alerts off (the popup reads the Wishlist only through the
+  // alerts, as the privacy policy says): the Wishlist lives on the website.
   'popup.wish-connect': 'Your Wishlist Lives on openhangar.space', // NEW: needs the owner's OK
   // --- Settings tab ---
   // Connected to openhangar.space: as whom, and when it last synced.
@@ -102,7 +111,6 @@ const COPY = {
   // "try again at ..." (#570).
   'popup.sync-wait': 'Try again at {time}. The last sync was moments ago.',
   'popup.sync-trouble': "Last Sync Didn't Go Through", // NEW: needs the owner's OK
-  'popup.retrying': 'Retrying at {time}', // NEW: needs the owner's OK
   // Firefox said no to sharing: the basic page's words (basic.firefox-no), word for word.
   'popup.firefox-no': 'Firefox said no, so sync stays off.',
   // A new RSI account on a connected browser: the basic page's words, word for word.

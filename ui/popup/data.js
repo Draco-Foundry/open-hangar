@@ -187,6 +187,46 @@ export function took(ms) {
   const s = Math.max(1, Math.round(ms / 1000));
   return { m: Math.floor(s / 60), s: s % 60 };
 }
+// A report held before it read anything (`held`: 'busy' another page was scanning,
+// 'no-rsi' no access to RSI, 'paused' status.json paused every part) never counts as a
+// scan that went fine, and neither does one with a part not read or read only in part
+// (`partial`, counted in `bad`) or one signed out of RSI.
+const readAll = (r) => isObj(r) && !r.held && !r.bad && !r.signedOut;
+// "Scanned in 38s": how long a scan that read everything took, or null.
+export function reportDone(report) {
+  return readAll(report) ? took(report.ms) : null;
+}
+// A report older than a scan since (`scannedAt` newer) says nothing any more.
+const since = (report, scannedAt) =>
+  Number.isFinite(scannedAt) && Number.isFinite(report.at) && scannedAt > report.at + 60e3;
+// The rows of the last scan that went wrong (not read, or read only in part), unless a
+// scan since went fine. Held reports read nothing: none.
+export function reportTrouble(report, scannedAt) {
+  if (!isObj(report) || report.held || !report.bad || report.signedOut) return [];
+  if (since(report, scannedAt)) return [];
+  return (Array.isArray(report.rows) ? report.rows : []).filter(
+    (r) => isObj(r) && (!r.ok || !!r.partial),
+  );
+}
+// A scan status.json paused (every part): its message (the status file's words, the
+// ones the basic page shows), or ''.
+export function reportPaused(report, scannedAt) {
+  if (!isObj(report) || report.held !== 'paused' || since(report, scannedAt)) return '';
+  const row = (Array.isArray(report.rows) ? report.rows : []).find(
+    (r) => isObj(r) && typeof r.error === 'string' && r.error,
+  );
+  return row ? row.error : '';
+}
+// The sync after the scan asked first (state 'ask': an RSI account this link hasn't
+// synced). The report keeps no handle, so it's the account the scan read: → { handle,
+// record } for the question, or null.
+export function reportPilot(report, { account, db } = {}) {
+  const s = isObj(report) ? report.sync : null;
+  if (!isObj(s) || s.state !== 'ask') return null;
+  const live = account?.loggedIn ? account : null;
+  const handle = String((live && live.nickname) || db?.owner?.nickname || '').trim();
+  return handle ? { handle, record: (live && live.citizenRecord) || null } : null;
+}
 
 // --- Account Value since an earlier scan -----------------------------------------------
 // The change since the newest earlier scan that valued differently (`valueOf` is
@@ -231,15 +271,31 @@ export function openingTab(saved, newsUnseen) {
 }
 
 // --- The Wishlist tab ----------------------------------------------------------------------
+// The website's slug for a ship's name (its Ship Explorer's shipSlug), which its
+// Wishlist keys use: "Zeus Mk II CL" → "zeus-mk-ii-cl".
+export function shipSlug(name) {
+  return String(name || '')
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[‘’'"“”]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+
 // The account's Wishlist keys (the website's lib/wishlist.ts: ship:<slug>, sku:<n>,
 // ccu:<n>) as rows, named from the sale feed the alerts keep (alertsFeed: every ship's
-// name, and what's in the store with its price). → { rows: [{ key, name, onSale, price
-// }], unnamed }: a key the feed can't name is counted, never guessed.
-export function wishRows(keys, feed) {
+// name, and what's in the store with its price), then from `names` (slug → name, the
+// ship list: ./wishlist.js shipNames). → { rows: [{ key, name, onSale, price }],
+// unnamed }: a key nothing can name is counted, never guessed.
+export function wishRows(keys, feed, names = null) {
   const ships = new Map();
   const items = new Map();
   for (const s of Array.isArray(feed?.ships) ? feed.ships : [])
     if (isObj(s) && s.slug && s.name) ships.set(s.slug, s.name);
+  if (names instanceof Map)
+    for (const [slug, name] of names) if (name && !ships.has(slug)) ships.set(slug, name);
   for (const i of Array.isArray(feed?.items) ? feed.items : [])
     if (isObj(i) && i.id) items.set(i.id, i);
   const cheapest = (slug) => {
@@ -273,13 +329,15 @@ export function wishRows(keys, feed) {
 
 // --- openhangar.space in Settings ----------------------------------------------------------
 // A sync that didn't go through: the website's pace held it back (a too-soon wait, with
-// the time it tries again), or the last one failed (`failed`: the message the popup or
-// the last scan got). → { until, again, msg } or null.
-export function syncTrouble({ connected, again, failed }, now = Date.now()) {
+// the time the next one can go), or the last one failed (`failed`: the message the popup
+// or the last scan got). → { until, msg } or null. Nothing the popup starts tries again
+// by itself (only the open basic page does, ui/basic/hub.svelte.js retryIfDue), so it
+// never says it will.
+export function syncTrouble({ connected, failed }, now = Date.now()) {
   if (!connected) return null;
   if (Number.isFinite(connected.waitUntil) && connected.waitUntil > now)
-    return { until: connected.waitUntil, again: Number.isFinite(again?.at), msg: '' };
-  if (failed?.msg) return { until: null, again: false, msg: String(failed.msg) };
+    return { until: connected.waitUntil, msg: '' };
+  if (failed?.msg) return { until: null, msg: String(failed.msg) };
   return null;
 }
 // The last scan's sync, when it failed after the last sync that went through.

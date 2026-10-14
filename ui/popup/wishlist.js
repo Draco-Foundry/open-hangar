@@ -1,51 +1,44 @@
-// The Wishlist tab's list: the account's Wishlist keys, read with the sync token from
-// the website's Wishlist read (GET /api/v1/wishlist, src/alerts.js WISH_PATH), read only,
-// nothing sent back. Named from the sale feed the store alerts keep (wishRows in
-// ./data.js). Polite (docs/dev/requests.md): the keys the store alerts read in the last
-// half hour are used as they are, and the popup's own read is kept for ten minutes in
-// session storage, so opening the tab again asks nothing.
-const ALERTS_FRESH = 30 * 60e3;
-const OWN_FRESH = 10 * 60e3;
-const TIMEOUT = 10e3;
-const SITE_DATA = {
-  data_collection: ['personallyIdentifyingInfo', 'financialAndPaymentInfo', 'websiteContent'],
-};
+// The Wishlist tab's list: the account's Wishlist keys the store alerts read
+// (src/alerts.js freshWish, kept in `alertsWish`), read only. The popup asks the website
+// nothing itself: the privacy policy lets the extension read the Wishlist only while
+// store alerts are on, and the alerts' own check reads it then, politely (its backoff,
+// Retry-After, and what a 401 or 404 means). Named in ./data.js wishRows.
+import { shipSlug } from './data.js';
 
-// → { keys } or { error: true }; never throws.
-export async function readWishlist({ now = Date.now(), fetchFn = fetch } = {}) {
+// → { off: true } (alerts off, not connected, or a build without alerts), { pending:
+// true } (alerts on, not read yet for this connection), { failed: true } (the last read
+// didn't go through and nothing is kept), or { keys }. Never throws.
+export async function readWishlist() {
   const AL = globalThis.OHAlerts;
-  const OH = globalThis.OH;
-  if (!AL || !OH) return { error: true };
-  const got = await chrome.storage.local.get(['siteLink', AL.WISH_KEY]);
-  const link = got.siteLink;
-  if (!link?.token) return { error: true };
-  const kept = got[AL.WISH_KEY];
-  if (
-    kept?.connectedAt === link.connectedAt &&
-    Array.isArray(kept.keys) &&
-    Number.isFinite(kept.at) &&
-    now - kept.at < ALERTS_FRESH
-  )
-    return { keys: AL.readWish({ v: 1, keys: kept.keys }) || [] };
-  const session = chrome.storage.session;
-  const own = session ? (await session.get('popupWish')).popupWish : null;
-  if (own?.connectedAt === link.connectedAt && Number.isFinite(own.at) && now - own.at < OWN_FRESH)
-    return { keys: own.keys };
-  // Firefox's yes before the sync token goes to the website (sync's own).
-  const gecko = !!chrome.runtime.getManifest().browser_specific_settings?.gecko;
-  if (gecko && !(await chrome.permissions.contains(SITE_DATA).catch(() => false)))
-    return { error: true };
+  if (!AL) return { off: true };
   try {
-    const res = await fetchFn((await OH.siteUrl()) + AL.WISH_PATH, {
-      credentials: 'omit',
-      headers: { Accept: 'application/json', Authorization: `Bearer ${link.token}` },
-      signal: AbortSignal.timeout(TIMEOUT),
-    });
-    const keys = res.ok ? AL.readWish(await res.json().catch(() => null)) : null;
-    if (!keys) return { error: true };
-    await session?.set({ popupWish: { keys, at: now, connectedAt: link.connectedAt } });
-    return { keys };
+    const got = await chrome.storage.local.get(['siteLink', AL.ON_KEY, AL.WISH_KEY]);
+    const link = got.siteLink;
+    if (!link?.token || got[AL.ON_KEY] !== true) return { off: true };
+    const kept = got[AL.WISH_KEY];
+    if (!kept || kept.connectedAt !== link.connectedAt) return { pending: true };
+    if (!Array.isArray(kept.keys)) return { failed: true };
+    return { keys: AL.readWish({ v: 1, keys: kept.keys }) || [] };
   } catch {
-    return { error: true };
+    return { failed: true };
   }
+}
+
+// Ship names by the website's slug (ship:<slug>), from the ship list the extension
+// already keeps for prices (OH.getShipCatalog: bundled, plus the public list from
+// openhangar.space at most once a day). → Map, empty when there's none.
+export async function shipNames() {
+  const OH = globalThis.OH;
+  const names = new Map();
+  try {
+    const list = OH?.getShipCatalog ? await OH.getShipCatalog() : [];
+    for (const s of Array.isArray(list) ? list : []) {
+      if (!s || typeof s.name !== 'string' || !s.name) continue;
+      const slug = shipSlug(s.name);
+      if (slug && !names.has(slug)) names.set(slug, s.name);
+    }
+  } catch {
+    // No ship list: those keys stay counted, never guessed.
+  }
+  return names;
 }

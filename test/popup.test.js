@@ -108,6 +108,50 @@ test('scan report: shown once, and how long it took', async () => {
   assert.equal(took(undefined), null);
 });
 
+test('scan report: a held one, one read in part or signed out is never "Scanned in"', async () => {
+  const { reportDone, reportTrouble, reportPaused } = await data();
+  const base = { v: 1, run: 'r', at: NOW, ms: 38e3, held: null, signedOut: false, bad: 0 };
+  const ok = { id: 'hangar', ok: true, partial: null, n: 20, error: null };
+  assert.deepEqual(reportDone({ ...base, rows: [ok] }), { m: 0, s: 38 });
+  // The runner's held reports (ui/scan/runner.js): ms 0, no rows, nothing read.
+  for (const held of ['busy', 'no-rsi', 'paused']) {
+    const r = { ...base, ms: 0, rows: [], held };
+    assert.equal(reportDone(r), null, held);
+    assert.deepEqual(reportTrouble(r, null), [], `${held}: no trouble rows either`);
+  }
+  // Read only in part: a problem, with its count, never a success line.
+  const part = { ...ok, partial: 'stopped at page 3 (timeout); rescan to get the rest' };
+  const bb = { id: 'buybacks', ok: false, partial: null, n: null, error: 'RSI answered 500' };
+  const bad = { ...base, rows: [part, bb, { ...ok, id: 'referrals' }], bad: 2 };
+  assert.equal(reportDone(bad), null);
+  assert.deepEqual(reportTrouble(bad, NOW - HOUR), [part, bb]);
+  // A scan since went fine: the old trouble says nothing.
+  assert.deepEqual(reportTrouble(bad, NOW + 2 * MIN), []);
+  assert.equal(reportDone({ ...base, rows: [], signedOut: true }), null);
+  assert.deepEqual(reportTrouble({ ...bad, signedOut: true }, null), []);
+  // Paused by status.json: its own line, the status file's words.
+  const words = 'RSI changed their site, so this scan is paused while we patch it.';
+  const paused = { ...base, held: 'paused', rows: [{ ...bb, error: words }], bad: 1 };
+  assert.equal(reportPaused(paused, NOW - HOUR), words);
+  assert.equal(reportPaused(paused, NOW + 2 * MIN), '');
+  assert.equal(reportPaused(bad, null), '');
+  assert.equal(reportPaused(null, null), '');
+});
+
+test("scan report: the sync's question names the account the scan read", async () => {
+  const { reportPilot } = await data();
+  const ask = { v: 1, at: NOW, sync: { state: 'ask', msg: null, at: NOW } };
+  const account = { loggedIn: true, nickname: 'New_Pilot', citizenRecord: '123' };
+  assert.deepEqual(reportPilot(ask, { account }), { handle: 'New_Pilot', record: '123' });
+  assert.deepEqual(reportPilot(ask, { account: null, db: { owner: { nickname: 'Owner' } } }), {
+    handle: 'Owner',
+    record: null,
+  });
+  assert.equal(reportPilot({ ...ask, sync: { state: 'sent', at: NOW } }, { account }), null);
+  assert.equal(reportPilot({ ...ask, sync: null }, { account }), null);
+  assert.equal(reportPilot(ask, {}), null, 'no handle known');
+});
+
 test('Account Value since an earlier scan: the newest one that differs, never this one', async () => {
   const { valueSince } = await data();
   const snap = (at, v) => ({ at, items: [['1', 'x', v]] });
@@ -196,24 +240,97 @@ test('Wishlist rows: named from the sale feed, on sale with the cheapest price, 
   });
   assert.deepEqual(wishRows(['ship:avenger-titan'], null), { rows: [], unnamed: 1 });
   assert.deepEqual(wishRows(null, feed), { rows: [], unnamed: 0 });
+  // No sale feed (alerts on, the feed not read yet): the ship list names the ships.
+  const names = new Map([
+    ['avenger-titan', 'Avenger Titan'],
+    ['nope-not', 'Other'],
+  ]);
+  assert.deepEqual(wishRows(['ship:avenger-titan', 'ship:nope', 'sku:20'], null, names), {
+    rows: [{ key: 'ship:avenger-titan', name: 'Avenger Titan', onSale: false, price: null }],
+    unnamed: 2,
+  });
+  // The feed's own name wins.
+  assert.equal(
+    wishRows(['ship:avenger-titan'], feed, new Map([['avenger-titan', 'Old']])).rows[0].name,
+    'Avenger Titan',
+  );
 });
 
-test("Settings: a sync that didn't go through, and when it tries again", async () => {
+test("Wishlist keys by the website's ship slug", async () => {
+  const { shipSlug } = await data();
+  assert.equal(shipSlug('Zeus Mk II CL'), 'zeus-mk-ii-cl');
+  assert.equal(shipSlug('Avenger Titan'), 'avenger-titan');
+  assert.equal(shipSlug("Hull C: 'Le Café'"), 'hull-c-le-cafe');
+  assert.equal(shipSlug('  -- '), '');
+  assert.equal(shipSlug(null), '');
+});
+
+test('the Wishlist tab reads only the store alerts’ copy, and nothing with alerts off', async () => {
+  const { readWishlist } = await import('../ui/popup/wishlist.js');
+  const was = { chrome: globalThis.chrome, AL: globalThis.OHAlerts, fetch: globalThis.fetch };
+  let store = {};
+  const asked = [];
+  globalThis.fetch = async (url) => {
+    asked.push(String(url));
+    throw new Error('the popup asks the website nothing');
+  };
+  globalThis.chrome = {
+    storage: {
+      local: {
+        get: async (keys) =>
+          Object.fromEntries(keys.filter((k) => k in store).map((k) => [k, store[k]])),
+      },
+    },
+  };
+  globalThis.OHAlerts = {
+    ON_KEY: 'alertsOn',
+    WISH_KEY: 'alertsWish',
+    readWish: (j) => (Array.isArray(j?.keys) ? j.keys : null),
+  };
+  try {
+    const link = { token: 't', connectedAt: 5 };
+    const keys = ['ship:avenger-titan'];
+    // Alerts off (the default): nothing read, even with the alerts' copy left over.
+    store = { siteLink: link, alertsWish: { keys, connectedAt: 5, at: NOW } };
+    assert.deepEqual(await readWishlist(), { off: true });
+    store = { alertsOn: true, alertsWish: { keys, connectedAt: 5, at: NOW } };
+    assert.deepEqual(await readWishlist(), { off: true }, 'not connected');
+    // Alerts on: the copy for this connection, whatever its age.
+    store = { siteLink: link, alertsOn: true, alertsWish: { keys, connectedAt: 5, at: 0 } };
+    assert.deepEqual(await readWishlist(), { keys });
+    // Another connection's copy, or none yet: not read yet.
+    store = { siteLink: link, alertsOn: true, alertsWish: { keys, connectedAt: 4, at: NOW } };
+    assert.deepEqual(await readWishlist(), { pending: true });
+    store = { siteLink: link, alertsOn: true };
+    assert.deepEqual(await readWishlist(), { pending: true });
+    // The alerts' last read failed with nothing kept (a 401, a 404, a first failure).
+    store = {
+      siteLink: link,
+      alertsOn: true,
+      alertsWish: { keys: null, connectedAt: 5, at: null, retryAt: NOW + HOUR, fails: 1 },
+    };
+    assert.deepEqual(await readWishlist(), { failed: true });
+    assert.deepEqual(asked, []);
+  } finally {
+    globalThis.chrome = was.chrome;
+    globalThis.OHAlerts = was.AL;
+    globalThis.fetch = was.fetch;
+  }
+});
+
+test("Settings: a sync that didn't go through, never a retry promised", async () => {
   const { syncTrouble, reportSyncFailed } = await data();
   const connected = { name: 'p', lastSync: NOW - HOUR, waitUntil: NOW + 4 * MIN };
-  assert.deepEqual(syncTrouble({ connected, again: { at: NOW - MIN } }, NOW), {
-    until: NOW + 4 * MIN,
-    again: true,
-    msg: '',
-  });
-  assert.equal(syncTrouble({ connected, again: null }, NOW).again, false);
+  assert.deepEqual(syncTrouble({ connected }, NOW), { until: NOW + 4 * MIN, msg: '' });
   const ok = { ...connected, waitUntil: null };
   assert.equal(syncTrouble({ connected: ok }, NOW), null);
   assert.deepEqual(syncTrouble({ connected: ok, failed: { msg: 'responded 500' } }, NOW), {
     until: null,
-    again: false,
     msg: 'responded 500',
   });
+  // The popup's words for a wait say when it can go, never that it retries.
+  const { KEYS } = await import('../ui/popup/copy.js');
+  assert.ok(!KEYS.includes('popup.retrying'));
   assert.equal(syncTrouble({ connected: null, failed: { msg: 'x' } }, NOW), null);
   // The last scan's sync failed after the last one that went through, not before.
   const report = { sync: { state: 'error', msg: 'responded 500', at: NOW } };
@@ -297,8 +414,13 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
     'popup.account-remove-ask': 'basic.account-remove-ask',
     'popup.logged-out': 'basic.logged-out',
     'popup.logout-failed': 'basic.logout-failed',
+    'popup.row-referrals': 'basic.row-referrals-box',
   };
   for (const [mine, theirs] of Object.entries(SAME)) assert.equal(t(mine), basic.t(theirs), mine);
+  for (const n of [1, 42]) {
+    assert.equal(t('popup.row-pledges', { n }), basic.t('basic.row-pledges', { n }));
+    assert.equal(t('popup.row-buybacks', { n }), basic.t('basic.row-buybacks', { n }));
+  }
   assert.equal(
     t('popup.pilot-title', { handle: 'X' }),
     basic.t('basic.pilot-title', { handle: 'X' }),

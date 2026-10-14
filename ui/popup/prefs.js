@@ -37,7 +37,23 @@ export function savePref(change) {
 }
 
 // The Look on <html>: tokens.css swaps to its light set for "light", and for "auto"
-// when the browser is light.
+// when the browser is light. A copy stays in this page's localStorage (a per-browser
+// convenience), so the next popup paints in it before popupPrefs is read.
+const LOOK_COPY = 'ohPopupLook';
 export function applyLook(look) {
-  document.documentElement.dataset.look = LOOKS.includes(look) ? look : 'auto';
+  const l = LOOKS.includes(look) ? look : 'auto';
+  document.documentElement.dataset.look = l;
+  try {
+    localStorage.setItem(LOOK_COPY, l);
+  } catch {
+    // No localStorage (blocked): the stored setting still applies once it's read.
+  }
+}
+export function lastLook() {
+  try {
+    const l = localStorage.getItem(LOOK_COPY);
+    return LOOKS.includes(l) ? l : 'auto';
+  } catch {
+    return 'auto';
+  }
 }

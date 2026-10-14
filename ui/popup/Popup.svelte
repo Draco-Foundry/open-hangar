@@ -17,6 +17,7 @@
     popupView,
     portrait,
     progressFraction,
+    reportPilot,
     reportSyncFailed,
     syncTrouble,
     scanAge,
@@ -25,7 +26,7 @@
     valueSince,
   } from './data.js';
   import { applyLook, cleanPrefs, loadPrefs, savePref } from './prefs.js';
-  import { rsiCookie } from './actions.js';
+  import { pilotAnswer, rsiAccess } from './actions.js';
   import { flag } from '../lib/flags.js';
   import Alerts from './Alerts.svelte';
   import Hangar from './Hangar.svelte';
@@ -46,11 +47,12 @@
   let account = $state(null);
   let report = $state(null); // the last scan's report (local scanReport)
   let shown = $state(null); // the report shown once (Scanned in 38s)
-  let again = $state(null); // siteSyncAgain: a sync the website's pace held back
+  let link = $state(null); // the openhangar.space link, when sync is on
+  let pilotDone = $state(false); // the scan's sync question, answered here
   let justUpdated = $state(null);
   let prefs = $state(cleanPrefs());
   let session = $state({});
-  let rsi = $state(null); // the RSI session cookie: '' none, null can't tell
+  let rsiOff = $state(false); // no access to robertsspaceindustries.com
   let now = $state(Date.now());
   let asked = $state(0); // when this popup asked for a scan the background runs unseen
   let note = $state('');
@@ -78,16 +80,25 @@
   const frac = $derived(sc.progress ? Math.round(progressFraction(sc.progress) * 100) : null);
   const age = $derived(scanAge(v?.scannedAt, now));
   const news = $derived(ALERTS && alerts.on ? fleetNews(alerts.items, fresh) : []);
-  // Signed out of RSI: the last account read or scan said so, or the browser holds no
-  // RSI session at all. Scan greys out only for the last (it lights up once there's one).
-  const signedOut = $derived(
-    rsi === '' || !!v?.signedOut || (!!report?.signedOut && !newer(report)),
-  );
+  // Signed out of RSI: the last account read or scan said so (the popup reads no RSI
+  // cookie: the privacy policy says cookie values are never read).
+  const signedOut = $derived(!!v?.signedOut || (!!report?.signedOut && !newer(report)));
   const failing = $derived(
     failed || reportSyncFailed(report, v?.connected ? { lastSync: v.connected.lastSync } : null),
   );
   // A sync that didn't go through: the amber dot on Settings.
-  const trouble = $derived(syncTrouble({ connected: v?.connected, again, failed: failing }, now));
+  const trouble = $derived(syncTrouble({ connected: v?.connected, failed: failing }, now));
+  // The scan's sync asked first (an RSI account new to this connection): the question
+  // on Hangar, until it's answered here or anywhere else, or a sync since went through.
+  const pilot = $derived.by(() => {
+    if (pilotDone || !link || !v?.connected) return null;
+    const who = reportPilot(report, { account, db });
+    if (!who) return null;
+    const answer = OH.sitePilotAnswer ? OH.sitePilotAnswer(link, who) : 'new';
+    if (answer === 'yes' || answer === 'no') return null;
+    const last = v.connected.lastSync;
+    return Number.isFinite(last) && last >= report.sync.at ? null : who;
+  });
   const hasNews = $derived(justUpdated?.to === version && prefs.seenVersion !== version);
 
   // A report older than the last scan's own time is a stale one.
@@ -96,9 +107,9 @@
   }
 
   async function loadData() {
-    const [stored, got, link, siteUrl] = await Promise.all([
+    const [stored, got, siteLink, siteUrl] = await Promise.all([
       OH.loadDB(),
-      chrome.storage.local.get(['account', 'avatarImg', 'scanReport', 'justUpdated', 'siteSyncAgain']),
+      chrome.storage.local.get(['account', 'avatarImg', 'scanReport', 'justUpdated']),
       OH.siteEnabled().then((on) => (on ? OH.getSiteLink() : null)),
       OH.siteUrl(),
     ]);
@@ -106,9 +117,9 @@
     db = stored;
     account = got.account || null;
     justUpdated = got.justUpdated || null;
-    again = got.siteSyncAgain || null;
+    link = siteLink || null;
     v = popupView(
-      { db: stored, account: got.account, link, siteUrl, hangarPage },
+      { db: stored, account: got.account, link: siteLink, siteUrl, hangarPage },
       { totalValue: (items) => OH.totalValue(items), syncWait: OH.siteSyncWait },
     );
     avatar = portrait(got.avatarImg, v.nickname);
@@ -137,8 +148,21 @@
     const n = newReport(r, prefs.reportSeenAt);
     if (n) {
       shown = n;
+      pilotDone = false;
       prefs.reportSeenAt = n.at;
       savePref({ reportSeenAt: n.at });
+    }
+  }
+  // Sync It or Not This One, for the scan's question. Sync It syncs now (Settings shows
+  // how that went, as after Sync Now).
+  async function answerPilot(yes) {
+    const who = pilot;
+    pilotDone = true;
+    if (!who) return;
+    const r = await pilotAnswer(who, yes).catch((e) => ({ msg: String(e?.message || e) }));
+    if (r?.msg) {
+      note = r.msg;
+      failed = r.calm ? null : { msg: r.msg };
     }
   }
   async function loadAlerts() {
@@ -161,21 +185,20 @@
       if (fresh.size) chrome.runtime.sendMessage({ ohPopup: 'alerts-seen' }).catch(() => {});
     }
   }
-  const readRsi = async () => (rsi = await rsiCookie());
+  const readAccess = async () => (rsiOff = !(await rsiAccess()));
 
   onMount(() => {
     (async () => {
       prefs = await loadPrefs();
       applyLook(prefs.look);
-      await Promise.all([loadData(), loadSession(), loadAlerts(), readRsi()]);
+      await Promise.all([loadData(), loadSession(), loadAlerts(), readAccess()]);
       const unseenNews = news.filter((m) => fresh.has(m.id)).length;
       tab = v?.scannedAt == null ? 'hangar' : openingTab(prefs.tab, unseenNews);
       ready = true;
     })();
     const changed = (c, area) => {
       if (area === 'local') {
-        if (c.db || c.account || c.siteLink || c.siteUrl || c.avatarImg || c.siteSyncAgain)
-          loadData();
+        if (c.db || c.account || c.siteLink || c.siteUrl || c.avatarImg) loadData();
         else if (c.scanReport) setReport(c.scanReport.newValue || null);
         if (c.justUpdated) justUpdated = c.justUpdated.newValue || null;
         if (ALERTS && (c[AL.ON_KEY] || c[AL.STATE_KEY] || c.siteLink)) loadAlerts();
@@ -188,24 +211,28 @@
       }
     };
     chrome.storage.onChanged.addListener(changed);
-    const cookie = (info) => {
-      if (/robertsspaceindustries\.com$/.test(info?.cookie?.domain || '')) readRsi();
-    };
-    chrome.cookies?.onChanged?.addListener(cookie);
+    // Access to RSI given or taken back (the basic page's Allow Access to RSI, Firefox's
+    // add-ons page).
+    chrome.permissions?.onAdded?.addListener(readAccess);
+    chrome.permissions?.onRemoved?.addListener(readAccess);
     const clock = setInterval(() => (now = Date.now()), 15e3);
     return () => {
       chrome.storage.onChanged.removeListener(changed);
-      chrome.cookies?.onChanged?.removeListener(cookie);
+      chrome.permissions?.onAdded?.removeListener(readAccess);
+      chrome.permissions?.onRemoved?.removeListener(readAccess);
       clearInterval(clock);
     };
   });
 
   async function scan() {
     note = '';
-    if (rsi === '') return;
     const r = await chrome.runtime.sendMessage({ ohPopup: 'scan' }).catch(() => null);
-    if (r && !r.ok && r.error === 'busy') return void (note = t('popup.scan-busy'));
-    if (!r) return void window.close();
+    if (!r?.ok) {
+      if (r?.error === 'busy') return void (note = t('popup.scan-busy'));
+      // Any other no (or no answer): the background brought the Open Hangar page up
+      // instead (src/background.js), so the popup closes, as before.
+      return void window.close();
+    }
     const s = chrome.storage.session
       ? await chrome.storage.session.get(['scanProgress', 'scanRunning'])
       : {};
@@ -366,7 +393,7 @@
           {account}
           {sc}
           {signedOut}
-          rsiOut={rsi === ''}
+          {rsiOff}
           report={shown}
           lastReport={report}
           {note}
@@ -410,9 +437,11 @@
               {account}
               {sc}
               {signedOut}
-              rsiOut={rsi === ''}
+              {rsiOff}
               report={shown}
               lastReport={report}
+              {pilot}
+              onpilot={answerPilot}
               {note}
               {news}
               onscan={scan}
@@ -426,13 +455,13 @@
             <Settings
               {v}
               {busy}
-              {again}
               {failing}
               {prefs}
               lastReport={report}
               onlook={setLook}
               oncurrency={setCurrency}
               onfailed={(f) => (failed = f)}
+              onnote={(n) => (note = n)}
             />
           {/if}
         </div>

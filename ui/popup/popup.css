@@ -462,6 +462,13 @@ body {
   color: var(--muted);
   overflow-wrap: anywhere;
 }
+/* The sync's question (an RSI account new to the connection): a question, not trouble. */
+.pp-trouble.pp-pilot {
+  border-color: var(--accent-line);
+}
+.pp-pilot .pp-pair {
+  margin-top: 4px;
+}
 
 /* Fleet News. */
 .pp-news {
@@ -588,6 +595,11 @@ body {
 .pp-btn.big {
   height: 52px;
   font-size: 16px;
+}
+/* Scan under Log In to RSI: grey, and still there to press. */
+.pp-btn.grey {
+  background: transparent;
+  color: var(--muted);
 }
 .pp-btn:disabled {
   color: var(--faint);
@@ -858,80 +870,81 @@ body {
   outline-offset: 2px;
 }
 
-/* --- A phone: the whole screen, tabs at the bottom, bigger targets --- */
-@media (hover: none) and (pointer: coarse) {
-  body {
-    width: auto;
-  }
-  .pp {
-    min-height: 100vh;
-    border: 0;
-    border-top: 3px solid var(--accent);
-    border-radius: 0;
-  }
-  .pp-hd {
-    padding: 14px 18px 10px;
-  }
-  .pp-name {
-    font-size: 17px;
-  }
-  .pp-panel {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-  }
-  .pp-body {
-    padding: 6px 18px 14px;
-    gap: 14px;
-    flex: 1;
-  }
-  .pp-big {
-    font-size: 40px;
-  }
-  .pp-tabs {
-    order: 99;
-    position: sticky;
-    bottom: 0;
-    border-bottom: 0;
-    border-top: 1px solid var(--line);
-    background: var(--lift);
-    padding: 8px 0 18px;
-  }
-  .pp-tabs button {
-    flex-direction: column;
-    font-size: 12px;
-    border-bottom: 0;
-    min-height: 48px;
-    padding: 0;
-  }
-  .pp-tabs button[aria-selected='true'] {
-    color: var(--link);
-  }
-  .pp-ti {
-    display: block;
-  }
-  .pp-btn {
-    height: 52px;
-    font-size: 17px;
-    border-radius: 12px;
-  }
-  .pp-item,
-  .pp-r,
-  .pp-arow,
-  .pp-wlist li {
-    min-height: 48px;
-    box-sizing: border-box;
-  }
-  .pp-arow,
-  .pp-wlist li {
-    box-sizing: content-box;
-  }
-  .pp-btn2 {
-    height: 48px;
-  }
-  .pp-bell,
-  .pp-back {
-    width: 44px;
-    height: 44px;
-  }
+/* --- A phone: the whole screen, tabs at the bottom, bigger targets ---
+ * html.phone, set in ./main.js from the browser itself (Android: Firefox for Android
+ * opens the popup as a page), never from the pointer (a touch screen's toolbar popup
+ * still sizes itself to its content). */
+html.phone body {
+  width: auto;
+}
+.phone .pp {
+  min-height: 100vh;
+  border: 0;
+  border-top: 3px solid var(--accent);
+  border-radius: 0;
+}
+.phone .pp-hd {
+  padding: 14px 18px 10px;
+}
+.phone .pp-name {
+  font-size: 17px;
+}
+.phone .pp-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.phone .pp-body {
+  padding: 6px 18px 14px;
+  gap: 14px;
+  flex: 1;
+}
+.phone .pp-big {
+  font-size: 40px;
+}
+.phone .pp-tabs {
+  order: 99;
+  position: sticky;
+  bottom: 0;
+  border-bottom: 0;
+  border-top: 1px solid var(--line);
+  background: var(--lift);
+  padding: 8px 0 18px;
+}
+.phone .pp-tabs button {
+  flex-direction: column;
+  font-size: 12px;
+  border-bottom: 0;
+  min-height: 48px;
+  padding: 0;
+}
+.phone .pp-tabs button[aria-selected='true'] {
+  color: var(--link);
+}
+.phone .pp-ti {
+  display: block;
+}
+.phone .pp-btn {
+  height: 52px;
+  font-size: 17px;
+  border-radius: 12px;
+}
+.phone .pp-item,
+.phone .pp-r,
+.phone .pp-arow,
+.phone .pp-wlist li {
+  min-height: 48px;
+  box-sizing: border-box;
+}
+.phone .pp-arow,
+.phone .pp-wlist li {
+  box-sizing: content-box;
+}
+.phone .pp-btn2 {
+  height: 48px;
+}
+.phone .pp-bell,
+.phone .pp-back {
+  width: 44px;
+  height: 44px;
 }

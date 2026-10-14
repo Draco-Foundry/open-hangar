@@ -3,11 +3,21 @@
   // and the handle), Account Value and its change since an earlier scan, Store Credit,
   // buy-back tokens, Fleet News (what in the store is news for this hangar, from the
   // store alerts) and Scan. Before the first scan: one heading and Scan. Signed out of
-  // RSI: Log In to RSI, with Scan greyed until the browser holds an RSI session again.
-  // While a scan runs: its steps instead of Scan.
+  // RSI: Log In to RSI, with a grey Scan under it (the popup reads no RSI cookie, so it
+  // can't tell when you've logged in again: Scan stays there to press). No access to RSI
+  // (Firefox's add-ons page): Allow Access to RSI, on the basic page. While a scan runs:
+  // its steps instead of Scan. After one: how long it took, or what went wrong, and the
+  // question when its sync found an RSI account new to the connection.
   import { t } from './copy.js';
-  import { scanSteps, storeCredit, took, unpricedLine } from './data.js';
-  import { openTab, reportProblem, rsiSignIn } from './actions.js';
+  import {
+    reportDone,
+    reportPaused,
+    reportTrouble,
+    scanSteps,
+    storeCredit,
+    unpricedLine,
+  } from './data.js';
+  import { openHub, openTab, reportProblem, rsiSignIn } from './actions.js';
 
   let {
     v,
@@ -17,9 +27,11 @@
     account,
     sc,
     signedOut,
-    rsiOut,
+    rsiOff = false, // no access to robertsspaceindustries.com
     report, // the report shown once (Scanned in 38s)
     lastReport, // the last scan's report, for a problem
+    pilot = null, // the scan's sync asked: { handle } (ask), answered with onpilot(yes)
+    onpilot,
     note,
     news,
     first = false,
@@ -47,13 +59,22 @@
   const running = $derived(sc.phase === 'running');
   const steps = $derived(scanSteps(sc.progress?.part));
   const STEP = { hangar: 'popup.step-hangar', buybacks: 'popup.step-buybacks', referrals: 'popup.step-referrals' };
-  // A problem in the last scan, unless a scan since went fine.
-  const trouble = $derived(
-    lastReport?.bad && !lastReport.signedOut && !(v?.scannedAt > lastReport.at + 60e3)
-      ? (Array.isArray(lastReport.rows) ? lastReport.rows : []).filter((r) => !r?.ok)
-      : [],
-  );
-  const doneIn = $derived(report && !report.bad && !report.signedOut ? took(report.ms) : null);
+  // A problem in the last scan (a part not read, or read only in part), unless a scan
+  // since went fine.
+  const trouble = $derived(reportTrouble(lastReport, v?.scannedAt));
+  const ROW = { hangar: 'popup.row-pledges', buybacks: 'popup.row-buybacks' };
+  const rowText = (r) =>
+    !r.ok
+      ? r.error || ''
+      : r.id === 'referrals'
+        ? t('popup.row-referrals')
+        : ROW[r.id] && Number.isFinite(r.n)
+          ? t(ROW[r.id], { n: r.n })
+          : '';
+  // Only a scan that read everything says how long it took (never a held one).
+  const doneIn = $derived(reportDone(report));
+  const paused = $derived(reportPaused(lastReport, v?.scannedAt));
+  const noRsi = $derived(rsiOff || report?.held === 'no-rsi');
   const switched = $derived(report?.switched?.who ? report.switched : null);
   const sub = (m) => (AL ? AL.lines(m)[0] || '' : '');
 </script>
@@ -130,7 +151,7 @@
     {#if trouble.length}
       <div class="pp-trouble" id="pp-trouble" role="alert">
         <b>{t('popup.scan-problem')}</b>
-        {#each trouble as r (r.id)}<small>{t(STEP[r.id] || 'popup.step-hangar')}: {r.error || r.partial || ''}</small>{/each}
+        {#each trouble as r (r.id)}<small>{t(STEP[r.id] || 'popup.step-hangar')}: {rowText(r)}</small>{/each}
         <button type="button" class="pp-link" id="pp-report" onclick={() => reportProblem(lastReport)}
           >Report a Scan Problem</button
         >
@@ -140,6 +161,20 @@
       <p class="pp-note" role="status">
         {t(switched.restored ? 'popup.switched-back' : 'popup.switched-new', { who: switched.who })}
       </p>
+    {/if}
+    {#if pilot}
+      <div class="pp-trouble pp-pilot" id="pp-pilot" role="group" aria-labelledby="pp-pilot-h">
+        <b id="pp-pilot-h">{t('popup.pilot-title', { handle: pilot.handle })}</b>
+        <small>{t('popup.pilot-body')}</small>
+        <div class="pp-pair">
+          <button type="button" class="pp-btn2" id="pp-pilot-yes" onclick={() => onpilot(true)}
+            >{t('popup.pilot-yes')}</button
+          >
+          <button type="button" class="pp-btn2" id="pp-pilot-no" onclick={() => onpilot(false)}
+            >{t('popup.pilot-no')}</button
+          >
+        </div>
+      </div>
     {/if}
 
     {#if news.length}
@@ -191,13 +226,16 @@
         <p class="pp-note">{t('popup.scanning')}</p>
       {/if}
     </div>
+  {:else if noRsi}
+    <!-- The basic page's card asks the browser (its ask would close the popup). -->
+    <button type="button" class="pp-btn primary" id="pp-rsi-allow" onclick={() => openHub()}
+      >Allow Access to RSI</button
+    >
   {:else if signedOut}
     <button type="button" class="pp-btn primary big" id="pp-login" onclick={() => openTab(rsiSignIn())}
       >{t('popup.log-in')}</button
     >
-    <button type="button" class="pp-btn" id="pp-scan" disabled={rsiOut} onclick={onscan}
-      >{t('popup.scan')}</button
-    >
+    <button type="button" class="pp-btn grey" id="pp-scan" onclick={onscan}>{t('popup.scan')}</button>
   {:else}
     <button type="button" class="pp-btn primary" id="pp-scan" onclick={onscan}
       >{sc.phase === 'stopped' ? t('popup.scan-again') : t('popup.scan')}</button
@@ -210,5 +248,7 @@
         : t('popup.scanned-in-s', { s: doneIn.s })}
     </p>
   {/if}
-  {#if note}<p class="pp-note" role="status">{note}</p>{/if}
+  {#if paused && !running}<p class="pp-note" id="pp-paused" role="status">{paused}</p>{/if}
+  {#if note}<p class="pp-note" role="status">{note}</p>
+  {:else if report?.held === 'busy' && !running}<p class="pp-note" role="status">{t('popup.scan-busy')}</p>{/if}
 {/snippet}

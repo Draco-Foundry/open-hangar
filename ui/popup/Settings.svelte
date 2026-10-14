@@ -33,7 +33,7 @@
     syncNow,
   } from './actions.js';
 
-  let { v, busy, again, failing, prefs, lastReport, onlook, oncurrency, onfailed } = $props();
+  let { v, busy, failing, prefs, lastReport, onlook, oncurrency, onfailed, onnote } = $props();
   const OH = globalThis.OH;
   const AL = globalThis.OHAlerts;
   const ALERTS = flag('alerts') && !!AL;
@@ -55,7 +55,7 @@
   let shortcut = $state(null); // '' none set, null no shortcuts here
   let now = $state(Date.now());
 
-  const trouble = $derived(syncTrouble({ connected: v.connected, again, failed: failing }, now));
+  const trouble = $derived(syncTrouble({ connected: v.connected, failed: failing }, now));
   const ago = (ms) => {
     const a = scanAge(ms, now);
     return a.tone === 'never' ? '' : t(`popup.ago-${a.unit}`, { n: a.n });
@@ -140,9 +140,12 @@
     const r = await logOut();
     dataNote = r.ok ? t('popup.logged-out') : r.error || t('popup.logout-failed');
   }
+  // Clear Data: nothing scanned is left, so the popup goes back to its first view (no
+  // tabs), which says so under Scan.
   async function clear() {
     askClear = false;
     await clearData();
+    onnote?.(t('popup.cleared'));
     profiles = await listProfiles();
     dataNote = t('popup.cleared');
   }
@@ -172,13 +175,7 @@
         {#if trouble}
           <div class="pp-r pp-col" id="pp-sync-trouble">
             <b>{t('popup.sync-trouble')}</b>
-            <small
-              >{trouble.until
-                ? trouble.again
-                  ? t('popup.retrying', { time: at(trouble.until) })
-                  : t('popup.sync-wait', { time: at(trouble.until) })
-                : trouble.msg}</small
-            >
+            <small>{trouble.until ? t('popup.sync-wait', { time: at(trouble.until) }) : trouble.msg}</small>
           </div>
         {/if}
         {#if flag('autoScan')}
@@ -216,7 +213,8 @@
             <button type="button" class="pp-btn2 quiet" id="pp-disconnect" onclick={openAsk}>Disconnect</button>
           </div>
         {/if}
-        {#if msg}<p class="pp-r pp-msg" class:calm role="status">{msg}</p>{/if}
+        <!-- A failure already under Last Sync Didn't Go Through isn't said twice. -->
+        {#if msg && msg !== trouble?.msg}<p class="pp-r pp-msg" class:calm role="status">{msg}</p>{/if}
       {:else}
         <div class="pp-r pp-col">
           <b>openhangar.space</b>

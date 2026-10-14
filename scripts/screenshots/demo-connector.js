@@ -1,17 +1,16 @@
 // Loaded after demo-shim.js on the connector's own pages (src/popup.html,
 // src/basic.html): what only
 // they use. Session storage, storage change events, the popup's messages to the
-// background, new tabs, the browser's shortcuts and its RSI cookie, recorded on
-// window.__demo for the UI test. Set before a page loads (evaluateOnNewDocument):
-// __demoAccount (the `account` key), __demoAvatar (`avatarImg`), __demoLocal (any other
-// local keys), __demoSession (session keys), __demoRsiCookie ('' for none, a value, or
-// leave it out for a browser that can't tell), __demoShortcut ('' for none set).
+// background, new tabs and the browser's shortcuts, recorded on window.__demo for the
+// UI test. Set before a page loads (evaluateOnNewDocument): __demoAccount (the
+// `account` key), __demoAvatar (`avatarImg`), __demoLocal (any other local keys),
+// __demoSession (session keys), __demoShortcut ('' for none set).
 (function () {
   const demo = (window.__demo = { sent: [], opened: [], listeners: [] });
   const session = {};
-  const keysOf = (k) =>
+  const keysOf = (k, all) =>
     k == null
-      ? Object.keys(session)
+      ? Object.keys(all)
       : typeof k === 'string'
         ? [k]
         : Array.isArray(k)
@@ -20,17 +19,47 @@
   chrome.storage.session = {
     get: async (k) =>
       Object.fromEntries(
-        keysOf(k)
+        keysOf(k, session)
           .filter((x) => x in session)
           .map((x) => [x, session[x]]),
       ),
     set: async (o) => void Object.assign(session, o),
-    remove: async (k) => void keysOf(k).forEach((x) => delete session[x]),
+    remove: async (k) => void keysOf(k, session).forEach((x) => delete session[x]),
   };
   chrome.storage.onChanged = {
     addListener: (f) => demo.listeners.push(f),
     removeListener: (f) => (demo.listeners = demo.listeners.filter((x) => x !== f)),
   };
+  // As the browser does: every set and remove that changes something tells each
+  // listener, a moment after the write, with the keys' old and new values.
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const told = (area, c) => {
+    if (!Object.keys(c).length) return;
+    setTimeout(() => {
+      for (const f of [...demo.listeners]) f(c, area);
+    }, 0);
+  };
+  for (const area of ['local', 'session']) {
+    const s = chrome.storage[area];
+    const { get, set, remove } = s;
+    s.set = async (o) => {
+      const keys = Object.keys(o || {});
+      const before = await get(keys);
+      await set(o);
+      const after = await get(keys);
+      const c = {};
+      for (const k of keys)
+        if (!same(before[k], after[k])) c[k] = { oldValue: before[k], newValue: after[k] };
+      told(area, c);
+    };
+    s.remove = async (k) => {
+      const before = await get(k == null ? null : keysOf(k, {}));
+      await remove(k);
+      const c = {};
+      for (const x of Object.keys(before)) c[x] = { oldValue: before[x] };
+      told(area, c);
+    };
+  }
   // The background's answers to the popup (src/background.js): its Scan
   // (requestScan) and the alerts it saw. `demo.answers` by ohPopup, or `demo.answer`
   // for every one.
@@ -50,14 +79,6 @@
       },
     ],
   };
-  // RSI's session cookie (Rsi-Token), or none.
-  if ('__demoRsiCookie' in window) {
-    chrome.cookies.get = async ({ name }) =>
-      window.__demoRsiCookie && name === 'Rsi-Token'
-        ? { name, value: window.__demoRsiCookie, domain: '.robertsspaceindustries.com' }
-        : null;
-  }
-  chrome.cookies.onChanged = { addListener() {}, removeListener() {} };
   chrome.tabs.create = (o) => void demo.opened.push(o.url);
   window.close = () => void (demo.closed = true);
   // Files the page saves (CSV, the backup) and pages it opens (Report a Scan Problem).

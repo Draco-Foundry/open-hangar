@@ -20,20 +20,16 @@ export function openTab(url) {
 }
 export const openHub = (hash = '') => openTab(chrome.runtime.getURL(HUB_PAGE) + hash);
 
-// RSI's sign-in page, and whether the browser holds an RSI session at all: its
-// Rsi-Token cookie (src/rsi-cart.js reads it the same way). → '' when there's none
-// (signed out for sure), the value, or null when this browser can't tell. Read from
-// the browser, never asked of RSI.
+// RSI's sign-in page.
 export const rsiSignIn = () => RSI + (globalThis.OHRules?.cart?.signInPath || '/connect');
-export async function rsiCookie() {
-  try {
-    if (!chrome.cookies?.get) return null;
-    const name = globalThis.OHRules?.cart?.cookie || 'Rsi-Token';
-    const got = await chrome.cookies.get({ url: RSI, name });
-    return got?.value ? got.value : '';
-  } catch {
-    return null;
-  }
+// Access to robertsspaceindustries.com (Firefox lets a player turn it off on its add-ons
+// page): without it a scan can only be held, so the popup offers the basic page's Allow
+// Access to RSI card instead (the browser's ask would close the popup). → true when
+// this browser can't tell.
+const RSI_HOST = { origins: [`${RSI}/*`] };
+export async function rsiAccess() {
+  if (!chrome.permissions?.contains) return true;
+  return chrome.permissions.contains(RSI_HOST).catch(() => true);
 }
 
 // --- openhangar.space ------------------------------------------------------------------
@@ -55,17 +51,10 @@ export async function syncNow() {
       return { pilot: err.ask };
     }
     if (err?.quiet) return {};
+    // Held back by the website's pace: Settings says when the next one can go. The
+    // popup keeps no retry of its own (it closes; only the open basic page retries).
     const out = { msg: String(err?.message || err), calm: !!err?.calm };
     OH().log(out.calm ? 'info' : 'warn', 'site', out.msg);
-    // Held back by the website's pace: tried once more when the wait is over, as the
-    // basic page does (ui/basic/hub.svelte.js retryIfDue).
-    const wait = OH().siteSyncWait(
-      await OH()
-        .getSiteLink()
-        .catch(() => null),
-    );
-    if (wait?.reason === 'too-soon')
-      await chrome.storage.local.set({ siteSyncAgain: { at: Date.now(), auto: false } });
     return out;
   }
 }
@@ -131,8 +120,9 @@ const ROW_NAME = { hangar: 'Hangar', buybacks: 'Buy-Backs', referrals: 'Referral
 export async function reportProblem(report) {
   const rows = Array.isArray(report?.rows) ? report.rows : [];
   const summary =
-    rows.map((r) => `${ROW_NAME[r.id] || r.id}: ${r.ok ? 'ok' : 'problem'}`).join(' · ') ||
-    (report?.signedOut ? 'signed out of RSI' : 'no scan this session');
+    rows
+      .map((r) => `${ROW_NAME[r.id] || r.id}: ${r.ok && !r.partial ? 'ok' : 'problem'}`)
+      .join(' · ') || (report?.signedOut ? 'signed out of RSI' : 'no scan this session');
   openTab(
     OH().scanProblemUrl({
       summary,
