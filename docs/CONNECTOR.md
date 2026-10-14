@@ -23,7 +23,9 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
 - **The background worker** as today: our pages' messages (bridge v2), the rescan badge,
   updates.
 - **The scan**, at the same depth: account and balances, the hangar (with the pledge
-  archive and history), buy-backs and up to 30 unread packs, referrals.
+  archive and history), buy-backs and up to 30 unread packs, referrals. It's the scan
+  runner (`ui/scan/runner.js`), which the basic page runs in its tab; it stores its
+  progress (session `scanProgress`) and its last report (`scanReport`) for any page.
 
 `scripts/pack.mjs` leaves the dashboard out of it (`scripts/connector.mjs`):
 `src/dashboard.html`, `src/dashboard.js`, `src/quips.js`, `src/qr.js`, `src/assets/`,

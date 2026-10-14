@@ -83,6 +83,20 @@ test('reads every page when RSI is happy', async () => {
   assert.deepEqual(hits, ids);
 });
 
+test('flushBuybackDetails: every detail read is in storage once it answers', async () => {
+  await reset();
+  answer = () => 200;
+  await OH.fetchBuybackDetails(['1', '2']);
+  await OH.flushBuybackDetails(); // a scan's page closing next (ui/scan/runner.js)
+  assert.deepEqual(Object.keys(store.bbDetails || {}).sort(), ['1', '2']);
+  // Nothing waiting: nothing written again.
+  const before = JSON.stringify(store.bbDetails);
+  delete store.bbDetails;
+  await OH.flushBuybackDetails();
+  assert.equal(store.bbDetails, undefined, 'no save asked for, none made');
+  store.bbDetails = JSON.parse(before);
+});
+
 for (const status of [429, 403]) {
   test(`stops the whole batch at the first ${status}, without retrying it`, async () => {
     await reset();
