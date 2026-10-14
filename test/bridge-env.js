@@ -187,8 +187,14 @@ function loadBackground({
       session: area(session, changes ? changed : null, 'session'),
       onChanged: { addListener: (f) => void changed.push(f) },
     },
+    // An alarm keeps its time as the browser says it (scheduledTime) and as asked (when).
     alarms: {
-      create: async (name, o) => void alarms.set(name, { name, ...o }),
+      create: async (name, o) =>
+        void alarms.set(name, {
+          name,
+          scheduledTime: o.when ?? Date.now() + (o.delayInMinutes || 0) * 60e3,
+          ...o,
+        }),
       get: async (name) => (alarms.has(name) ? structuredClone(alarms.get(name)) : undefined),
       clear: async (name) => alarms.delete(name),
       onAlarm: { addListener: (f) => void onAlarm.push(f) },
@@ -375,8 +381,14 @@ function loadBackground({
       { ohSite: msg },
       { id: chrome.runtime.id, tab: { id: 1 }, frameId: 0, url, ...sender },
     );
-  // An alarm going off, and a notification clicked (Extension Alerts).
-  const fireAlarm = (name) => Promise.all(onAlarm.map((f) => f({ name })));
+  // An alarm going off (when it was due: `scheduledTime`, else the time it was set for),
+  // and a notification clicked (Extension Alerts). The browser forgets a one-off alarm
+  // as it goes off.
+  const fireAlarm = (name, { scheduledTime } = {}) => {
+    const due = scheduledTime ?? alarms.get(name)?.scheduledTime ?? Date.now();
+    alarms.delete(name);
+    return Promise.all(onAlarm.map((f) => f({ name, scheduledTime: due })));
+  };
   const clickNote = (id) => Promise.all(onNoteClick.map((f) => f(id)));
   // The browser has an update ready (runtime.onUpdateAvailable).
   const updateAvailable = (details) => Promise.all(onUpdate.map((f) => f(details)));
