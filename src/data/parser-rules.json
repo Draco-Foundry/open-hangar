@@ -162,8 +162,7 @@
     },
     "referral": {
       "code": "referralCode",
-      "url": ["referralUrlCopy", "referralUrl"],
-      "referrerCode": "referrerReferralCode"
+      "url": ["referralUrlCopy", "referralUrl"]
     }
   },
   "dossier": {
