@@ -87,6 +87,11 @@
   --t-coupon: #e8925a;
   --t-coupon-line: #8a5d42;
   --t-coupon-soft: rgba(232, 146, 90, 0.13);
+  /* The toolbar popup's lifted panel (owner, 2026-10-14, Edge B), what sits on it, and
+     its quieter text. */
+  --lift: #141922;
+  --lift-2: #1a2029;
+  --text-2: #c3cad5;
   --font-head: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-body: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-data: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
@@ -96,6 +101,72 @@
   --r-lg: 16px;
   --radius-lg: var(--r-lg);
   --pad: 12px;
+}
+/*
+ * Light, the same look with the colours swapped (owner, 2026-10-14): only on a page
+ * that asks for it with data-look on <html> (the toolbar popup's Look setting): "light",
+ * or "auto" to follow the browser. Cobalt stays; green and amber get darker so they keep
+ * their contrast on white. The two blocks are the same list.
+ */
+:root[data-look='light'] {
+  --bg: #e6eaf0;
+  --panel: #ffffff;
+  --panel-2: #f4f6f9;
+  --line: #dde2ea;
+  --line-2: #cfd6e0;
+  --text: #1b2230;
+  --head: #1b2230;
+  --muted: #5d6675;
+  --faint: #5d6675;
+  --text-2: #3d4757;
+  --lift: #ffffff;
+  --lift-2: #f4f6f9;
+  --accent-soft: rgba(59, 106, 237, 0.12);
+  --accent-line: rgba(59, 106, 237, 0.5);
+  --link: #2f5bd8;
+  --beacon: #b9771a;
+  --beacon-soft: rgba(185, 119, 26, 0.12);
+  --good: #1f9d5c;
+  --good-line: rgba(31, 157, 92, 0.4);
+  --good-soft: rgba(31, 157, 92, 0.08);
+  --warn: #9a6210;
+  --warn-line: rgba(185, 119, 26, 0.55);
+  --warn-soft: rgba(185, 119, 26, 0.1);
+  --bad: #c03a3a;
+  --bad-line: rgba(192, 58, 58, 0.5);
+  --bad-soft: rgba(192, 58, 58, 0.1);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: light) {
+  :root[data-look='auto'] {
+    --bg: #e6eaf0;
+    --panel: #ffffff;
+    --panel-2: #f4f6f9;
+    --line: #dde2ea;
+    --line-2: #cfd6e0;
+    --text: #1b2230;
+    --head: #1b2230;
+    --muted: #5d6675;
+    --faint: #5d6675;
+    --text-2: #3d4757;
+    --lift: #ffffff;
+    --lift-2: #f4f6f9;
+    --accent-soft: rgba(59, 106, 237, 0.12);
+    --accent-line: rgba(59, 106, 237, 0.5);
+    --link: #2f5bd8;
+    --beacon: #b9771a;
+    --beacon-soft: rgba(185, 119, 26, 0.12);
+    --good: #1f9d5c;
+    --good-line: rgba(31, 157, 92, 0.4);
+    --good-soft: rgba(31, 157, 92, 0.08);
+    --warn: #9a6210;
+    --warn-line: rgba(185, 119, 26, 0.55);
+    --warn-soft: rgba(185, 119, 26, 0.1);
+    --bad: #c03a3a;
+    --bad-line: rgba(192, 58, 58, 0.5);
+    --bad-soft: rgba(192, 58, 58, 0.1);
+    color-scheme: light;
+  }
 }
 body {
   font-family: var(--font-body);

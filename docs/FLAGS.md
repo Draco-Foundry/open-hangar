@@ -51,6 +51,7 @@ wishlist import and store alerts):
 | `connector`      | A toolbar popup and one basic page (the connector)        | on    | on   | no       |
 | `wishlistImport` | This browser's wishlist into the account (the basic page) | on    | on   | no       |
 | `alerts`         | Store alerts matched on the device (needs connector)      | on    | on   | no       |
+| `autoScan`       | Auto Scan Daily in the popup (nothing behind it yet)      | off   | off  | yes      |
 
 ## Adding or Retiring a Flag
 
@@ -114,9 +115,9 @@ the staging hangar page (hangar-staging.openhangar.space) can talk to that build
 `connector` is the extension as the website's connector (owner, 2026-10-10): the
 website is the full app, and the extension scans RSI, hands the hangar to our pages and
 keeps one basic page that works on its own. With it on, the toolbar icon opens a popup
-(`src/popup.html`, `ui/popup/`: Account Value, the last scan, Scan, Open My Hangar,
-the store alerts with the `alerts` flag, and where sync stands) instead of a tab. Its
-scans run in a hidden page, `src/scan.html` (`src/scan-host.js`, `ui/scan/main.js`): an
+(`src/popup.html`, `ui/popup/`: the Hangar, Wishlist and Settings tabs and the alerts
+bell with the `alerts` flag, [CONNECTOR.md](CONNECTOR.md)) instead of a tab. Its scans
+run in a hidden page, `src/scan.html` (`src/scan-host.js`, `ui/scan/main.js`): an
 offscreen document on Chrome and Edge (the `offscreen` permission), a hidden frame of
 the event page on Firefox (its pages' `frame-src 'self'`), so no tab opens
 (`scripts/scan-host.mjs` adds both per browser; the store check checks both ways). The
@@ -165,10 +166,10 @@ in your buy-backs is in the store again, a paint for a ship you own just arrived
 you own is sold as a warbond, or is on a limited-time sale. The badge counts the items
 you haven't seen (the popup lists them, `ui/popup/Alerts.svelte`, and opening it marks
 them seen); a new one gets a notification. It's off until the pilot turns it on in the
-popup's settings, and asks nothing before that:
-Turn On asks for Notifications first (a no leaves the badge and the list), Turn Off
-stops the checks and gives Notifications back. The popup never asks for a permission
-(it closes when the browser asks).
+popup's settings (Store Alerts), and asks nothing before that: the popup has its own
+Notifications switch, and turning alerts off stops the checks and gives Notifications
+back. The popup's switch asks as the click's very first step; if the popup closes for
+the browser's question, the browser keeps the answer.
 
 The build adds the `alarms` permission (no install warning) and `notifications` as an
 optional permission, asked only when the pilot turns alerts on, never a required one
@@ -182,6 +183,13 @@ Wishlist read and both permissions (test/privacy-permissions.test.js). The store
 take the two permissions' reasons from docs/STORE.md. Each pilot still turns alerts on
 themselves. The kill switch (site/status.json) pauses the checks with
 `"alerts": { "enabled": false }`.
+
+## Auto Scan
+
+`autoScan` is Auto Scan Daily from the 0.4.0 mockups: a scan once a day while connected.
+Nothing is behind it yet. With it on, the popup's Settings draws the row, switched off
+and greyed. It's dev-only until it's built: it needs the `alarms` permission outside the
+alerts build and the privacy policy's words first.
 
 ## How Builds Set Them
 
