@@ -449,7 +449,7 @@ async function fillWorstCase() {
         n: 1500,
         error: 'x'.repeat(600),
       })),
-      bad: 3,
+      bad: true,
       sync: { state: 'error', msg: 'x'.repeat(600), at: 3 },
     },
     avatarImg: {

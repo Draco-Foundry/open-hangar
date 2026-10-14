@@ -1035,8 +1035,14 @@
     return out;
   };
 
-  // Forget a parked account's saved data.
-  OH.deleteProfile = (nickname) => chrome.storage.local.remove(profileKey(nickname));
+  // Forget a parked account's saved data, and its portrait when the copy is theirs
+  // (avatarImg, ui/scan/runner.js).
+  OH.deleteProfile = async function deleteProfile(nickname) {
+    await chrome.storage.local.remove(profileKey(nickname));
+    const { avatarImg } = await chrome.storage.local.get('avatarImg');
+    if (avatarImg && profileKey(avatarImg.nickname) === profileKey(nickname))
+      await chrome.storage.local.remove('avatarImg');
+  };
 
   // One-time: turn an old "Restore previous hangar" snapshot (from before saved
   // accounts existed) into a parked account, unless that account is live.

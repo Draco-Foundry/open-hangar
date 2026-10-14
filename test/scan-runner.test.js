@@ -198,7 +198,7 @@ test('scan: the account, the hangar, buy-backs, referrals, saved, then the sync 
     { id: 'buybacks', ok: true, partial: null, n: 4, error: null },
     { id: 'referrals', ok: true, partial: null, n: null, error: null },
   ]);
-  assert.equal(report.bad, 0);
+  assert.equal(report.bad, false);
   assert.deepEqual(report.sync, { state: 'sent', msg: null, at: x.clock.t });
   // Stored as it is (local scanReport): first without the sync, then with it.
   const stored = sets(x.local, 'scanReport');
@@ -231,6 +231,40 @@ test('scan: its marks (run and by), renewed at most once a minute, gone at the e
   const y = await setup({ tabId: Promise.resolve(7), by: 'tab' });
   await y.runner.scan();
   assert.equal(sets(y.session, 'scanRunning')[0].tabId, 7);
+});
+
+test('marked: settles once the scan has its mark stored, or once it is held', async () => {
+  const x = await setup();
+  // A slow session: the mark lands well after the scan has started.
+  const set = x.session.set;
+  let land;
+  const slow = new Promise((r) => (land = r));
+  x.session.set = async (o) => {
+    if ('scanRunning' in o) await slow;
+    return set(o);
+  };
+  const running = x.runner.scan();
+  let settled = false;
+  x.runner.marked().then(() => (settled = true));
+  await sleep(10);
+  assert.equal(settled, false, 'not before the mark is stored');
+  land();
+  await x.runner.marked();
+  assert.equal(sets(x.session, 'scanRunning').length, 1);
+  await running;
+  // Held: settles once the held report is stored, with no mark.
+  const off = await setup({ rsi: false });
+  const held = off.runner.scan();
+  await off.runner.marked();
+  assert.equal(off.local.data.scanReport.held, 'no-rsi');
+  assert.equal(sets(off.session, 'scanRunning').length, 0);
+  await held;
+  const other = { at: 1_000_000 - 5000, tabId: 9, run: 'run-b', by: 'tab' };
+  const busy = await setup({ session: { scanRunning: other } });
+  const waiting = busy.runner.scan();
+  await busy.runner.marked();
+  assert.equal(busy.local.data.scanReport.held, 'busy');
+  assert.equal((await waiting).bad, false);
 });
 
 test('scan: progress stored about twice a second at most, the newest kept, gone at the end', async () => {
@@ -294,6 +328,23 @@ test('scan: progress stored about twice a second at most, the newest kept, gone 
   );
 });
 
+test('scan: its progress goes even when the page throws after the report', async () => {
+  const x = await setup({
+    env: {
+      hooks: {
+        scanned: () => {
+          throw new Error('the page broke');
+        },
+      },
+    },
+  });
+  await assert.rejects(x.runner.scan(), /the page broke/);
+  await sleep(10); // the queued removals
+  assert.equal(x.local.data.scanReport.held, null, 'the report was stored first');
+  assert.equal(x.session.data.scanProgress, undefined);
+  assert.equal(x.session.data.scanRunning, undefined);
+});
+
 test('scan: held while another run scans, never by its own run; held without RSI access', async () => {
   const other = { at: 1_000_000 - 5000, tabId: null, run: 'run-b', by: 'offscreen' };
   const x = await setup({ session: { scanRunning: other } });
@@ -351,7 +402,7 @@ test('scan: a part that fails or stops short is a problem, logged without names'
     },
     { id: 'buybacks', ok: false, partial: null, n: null, error: 'RSI changed something' },
   ]);
-  assert.equal(r.bad, 2);
+  assert.equal(r.bad, true);
   assert.ok(x.logs.includes('error status: Hangar: problem · Buy-Backs: problem · Referrals: ok'));
   assert.deepEqual(r.sync, { state: 'off', msg: null, at: x.clock.t }, 'not connected');
   assert.ok(
@@ -413,6 +464,38 @@ test('sync: one asked for during a scan is kept, then sent as a press at its end
   });
   assert.equal((await elsewhere.runner.sync({ auto: true })).state, 'kept');
   assert.ok(!elsewhere.calls.some((c) => c.startsWith('siteSync')));
+});
+
+test("sync: a press near the scan's end never stops the scan's own sync", async () => {
+  // The press is still keeping itself for the scan (a slow session) when the scan
+  // reaches its own sync.
+  let x;
+  let press;
+  x = await setup({
+    scanSource: async (id) => {
+      if (id === 'buybacks') press = x.runner.sync({ auto: false });
+      return { ok: true, items: [] };
+    },
+  });
+  const get = x.session.get;
+  let land;
+  const slow = new Promise((r) => (land = r));
+  let first = true;
+  x.session.get = async (k) => {
+    if (k === 'syncAfterScan' && first) {
+      first = false;
+      await slow;
+    }
+    return get(k);
+  };
+  const r = await x.runner.scan();
+  assert.equal(r.sync?.state, 'sent', "the scan's own sync went");
+  assert.deepEqual(
+    x.calls.filter((c) => c.startsWith('siteSync')),
+    ['siteSync auto'],
+  );
+  land();
+  assert.equal((await press).state, 'kept');
 });
 
 test("sync: Firefox's no, the website's answers, and the one try more after its pace", async () => {
@@ -540,7 +623,73 @@ test('the portrait: a small copy of the RSI picture, read again only when it cha
       throw new TypeError('Failed to fetch');
     },
   });
-  assert.equal((await down.runner.scan()).bad, 0, 'the scan goes on without it');
+  assert.equal((await down.runner.scan()).bad, false, 'the scan goes on without it');
+});
+
+test("the portrait: one that couldn't be copied isn't asked for again; another pilot's goes", async () => {
+  const { AVATAR_MAX } = await load();
+  let asked = 0;
+  const big = await setup({
+    fetchFn: async () => {
+      asked++;
+      return new Response(new Uint8Array(AVATAR_MAX), {
+        headers: { 'content-type': 'image/jpeg' },
+      });
+    },
+  });
+  await big.runner.scan();
+  await big.runner.scan();
+  assert.equal(asked, 1, 'once for that address');
+  assert.deepEqual(big.session.data.avatarMiss, {
+    nickname: 'Test_Pilot',
+    url: ACCOUNT.avatar,
+    at: 1_000_000,
+  });
+  // A new picture: asked for once more.
+  const next = 'https://robertsspaceindustries.com/media/def456/heap_infobox/avatar.jpg';
+  big.OH.getAccount = async () => ({ ...ACCOUNT, avatar: next });
+  await big.runner.scan();
+  await big.runner.scan();
+  assert.equal(asked, 2);
+  // Without session storage: remembered while the page is open.
+  let tries = 0;
+  const down = await setup({
+    session: null,
+    fetchFn: async () => {
+      tries++;
+      throw new TypeError('Failed to fetch');
+    },
+  });
+  await down.runner.scan();
+  await down.runner.scan();
+  assert.equal(tries, 1);
+  // Another pilot's copy goes when the one signed in has none to copy (RSI's default
+  // picture lives on another host), and when theirs can't be copied.
+  const other = {
+    nickname: 'Other_Pilot',
+    src: 'data:image/png;base64,AA==',
+    at: 1,
+    url: 'https://robertsspaceindustries.com/media/zzz/heap_infobox/a.png',
+  };
+  const plain = await setup({
+    account: {
+      ...ACCOUNT,
+      avatar: 'https://cdn.robertsspaceindustries.com/static/images/account/avatar_default_big.jpg',
+    },
+    local: { avatarImg: other },
+  });
+  await plain.runner.scan();
+  assert.equal(plain.local.data.avatarImg, undefined);
+  const failed = await setup({
+    local: { avatarImg: other },
+    fetchFn: async () => new Response('', { status: 404 }),
+  });
+  await failed.runner.scan();
+  assert.equal(failed.local.data.avatarImg, undefined);
+  // Signed out: nothing read, the copy kept.
+  const out = await setup({ account: { loggedIn: false }, local: { avatarImg: other } });
+  await out.runner.scan();
+  assert.deepEqual(out.local.data.avatarImg, other);
 });
 
 test('the wishlist import: only with its flag, connected and allowed to share', async () => {

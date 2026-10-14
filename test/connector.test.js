@@ -19,6 +19,14 @@ test("popup Scan: the hangar page's scan, in the basic page", async () => {
   assert.deepEqual(await fromPopup(x), { ok: true, opened: true });
   assert.deepEqual(x.opened, [BASIC]);
   assert.equal(x.stores.session.scanRequest.tabId, 100, 'the request names the tab it opened');
+  // And who asked, for the scan's report (ui/scan/runner.js scanReport.reason).
+  assert.equal(x.stores.session.scanRequest.reason, 'popup');
+  const site = loadBackground({ flags: CONNECTOR });
+  assert.deepEqual(await site.send({ type: 'oh-request-scan' }, HANGAR), {
+    ok: true,
+    opened: true,
+  });
+  assert.equal(site.stores.session.scanRequest.reason, 'site', 'our hangar page asked');
   // Asked again within the minute: busy, and the page still comes to the front.
   const open = loadBackground({
     flags: CONNECTOR,

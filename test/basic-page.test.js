@@ -125,7 +125,7 @@ const runnerReport = (rows, extra = {}) => ({
   signedOut: false,
   switched: null,
   rows,
-  bad: rows.filter((r) => !r.ok || r.partial).length,
+  bad: rows.some((r) => !r.ok || !!r.partial),
   sync: null,
   ...extra,
 });

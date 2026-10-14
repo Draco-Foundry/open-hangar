@@ -22,6 +22,9 @@
 //                        (src: a data URL; url: the RSI address it's a copy of, so it's
 //                        read again only when that changes). A page shows src, never an
 //                        RSI address: the popup never asks RSI anything.
+//   session avatarMiss   { nickname, url, at }: a portrait that couldn't be copied, not
+//                        asked for again until its address changes or the browser starts
+//                        again
 import { afterScan, retryDue, scanElsewhere, syncWhen } from './sync-timing.js';
 import { importWishlist } from './wishlist-import.js';
 
@@ -178,34 +181,51 @@ export function createRunner(env) {
   }
 
   // The portrait, copied while the scan is reading RSI anyway: a data URL of at most
-  // AVATAR_MAX characters, read again only when RSI's address for it changes. Anything
-  // else (another host, too big, not a picture, no network) keeps what's there.
+  // AVATAR_MAX characters, read again only when RSI's address for it changes. The copy
+  // is always the signed-in pilot's picture or nothing: when there's no new one (another
+  // host, too big, not a picture, no network), the one kept goes. One that couldn't be
+  // copied isn't asked for again in this browser session (session avatarMiss).
+  let missed = null; // avatarMiss, for a page without session storage
   async function keepPortrait(acct) {
     try {
       const url = typeof acct?.avatar === 'string' ? acct.avatar : '';
       const nickname = acct?.nickname;
-      if (!acct?.loggedIn || !nickname || !url.startsWith(AVATAR_ORIGIN)) return;
+      if (!acct?.loggedIn || !nickname) return;
       const { avatarImg: had } = await store.get('avatarImg');
       if (had?.src && had.url === url && had.nickname === nickname) return;
-      const res = await fetchFn(url, {
-        credentials: 'omit',
-        signal: globalThis.AbortSignal?.timeout?.(5000), // the scan waits for it
-      });
-      const type = String(res?.headers?.get?.('content-type') || '')
-        .split(';')[0]
-        .trim()
-        .toLowerCase();
-      const most = Math.floor(((AVATAR_MAX - `data:${type};base64,`.length) * 3) / 4);
-      if (!res?.ok || !AVATAR_TYPES.test(type) || Number(res.headers.get('content-length')) > most)
-        return void res?.body?.cancel?.().catch(() => {});
-      const bytes = new Uint8Array(await res.arrayBuffer());
-      if (!bytes.length || bytes.length > most) return;
-      const src = `data:${type};base64,${base64(bytes)}`;
-      if (src.length > AVATAR_MAX) return;
-      await store.set({ avatarImg: { nickname, src, at: now(), url } });
+      const src = url.startsWith(AVATAR_ORIGIN) ? await portraitOf(url, nickname) : null;
+      if (src) await store.set({ avatarImg: { nickname, src, at: now(), url } });
+      else if (had) await store.remove('avatarImg');
     } catch {
       /* the portrait is optional */
     }
+  }
+  // → the picture at `url` as a data URL, or null (that address missed before, or now).
+  async function portraitOf(url, nickname) {
+    const miss = session ? (await session.get('avatarMiss')).avatarMiss : missed;
+    if (miss?.url === url && miss.nickname === nickname) return null;
+    const src = await copyPortrait(url).catch(() => null);
+    if (src) return src;
+    missed = { nickname, url, at: now() };
+    await session?.set({ avatarMiss: missed });
+    return null;
+  }
+  async function copyPortrait(url) {
+    const res = await fetchFn(url, {
+      credentials: 'omit',
+      signal: globalThis.AbortSignal?.timeout?.(5000), // the scan waits for it
+    });
+    const type = String(res?.headers?.get?.('content-type') || '')
+      .split(';')[0]
+      .trim()
+      .toLowerCase();
+    const most = Math.floor(((AVATAR_MAX - `data:${type};base64,`.length) * 3) / 4);
+    if (!res?.ok || !AVATAR_TYPES.test(type) || Number(res.headers.get('content-length')) > most)
+      return void res?.body?.cancel?.().catch(() => {});
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (!bytes.length || bytes.length > most) return null;
+    const src = `data:${type};base64,${base64(bytes)}`;
+    return src.length > AVATAR_MAX ? null : src;
   }
 
   // --- Scan ---------------------------------------------------------------------------
@@ -221,13 +241,17 @@ export function createRunner(env) {
   // → the report (REPORT_V): { v, run, by, reason, startedAt, at, ms, held, signedOut,
   // switched, rows: [{ id, ok, partial, n, error }], bad, sync }, or null when this page
   // is scanning already. A row's ok: that part was read and saved (partial: why it's
-  // short); bad: the rows not ok or partial. held: 'busy' (another page is scanning),
-  // 'no-rsi' (no access to RSI: nothing read), 'paused' (status.json paused every
-  // part), else null. sync: the sync after it (see sync()), null when there was none.
+  // short); bad: true when a row isn't ok or is partial. held: 'busy' (another page is
+  // scanning), 'no-rsi' (no access to RSI: nothing read), 'paused' (status.json paused
+  // every part), else null. sync: the sync after it (see sync()), null when there was
+  // none.
   let starting = false;
+  let marked = Promise.resolve(); // marked(), below
   async function scan({ reason = 'page' } = {}) {
-    if (busy || starting) return null;
+    if (busy || starting) return null; // `marked` stays the running scan's
     starting = true;
+    let markedDone;
+    marked = new Promise((r) => (markedDone = r));
     const startedAt = now();
     const base = { v: REPORT_V, run: me.run, by: me.by, reason, startedAt };
     const held = async (why) => {
@@ -239,7 +263,7 @@ export function createRunner(env) {
         signedOut: false,
         switched: null,
         rows: [],
-        bad: 0,
+        bad: false,
         sync: null,
       };
       await writeReport(report);
@@ -256,10 +280,12 @@ export function createRunner(env) {
       busy = true;
     } finally {
       starting = false;
+      if (!busy) markedDone();
     }
     hooks.start?.();
     setProgress('start');
     mark(true);
+    writes.then(markedDone);
     const rows = [];
     const paused = new Set();
     let signedOut = false;
@@ -303,7 +329,7 @@ export function createRunner(env) {
         error: String(e?.message || e),
       });
     }
-    const bad = rows.filter((r) => !r.ok || r.partial).length;
+    const bad = rows.some((r) => !r.ok || !!r.partial);
     if (signedOut || bad)
       OH.log(
         'error',
@@ -327,20 +353,24 @@ export function createRunner(env) {
       sync: null,
     };
     await writeReport(report);
-    await hooks.scanned?.(report, { db });
-    // Connected: every finished scan syncs once, with the whole hangar, as the
-    // dashboard's does. A sync asked for while it ran (Connect, Sync Now, the website's
-    // Sync My Hangar Now) was kept for this one (#658). This scan's mark is gone first,
-    // so the sync doesn't wait on it.
-    await writes;
-    const isLinked = await linked();
-    const go = afterScan({ linked: isLinked, signedOut, kept: await takeKeptSync() });
-    if (go) {
-      setProgress('sync');
-      const s = await sync({ auto: go.auto, scanDone: true });
-      report.sync = s && { state: s.state, msg: s.msg, at: s.at };
-    } else if (!isLinked) report.sync = { state: 'off', msg: null, at: now() };
-    endProgress();
+    // Whatever the page or the sync does next, the progress goes at the end.
+    try {
+      await hooks.scanned?.(report, { db });
+      // Connected: every finished scan syncs once, with the whole hangar, as the
+      // dashboard's does. A sync asked for while it ran (Connect, Sync Now, the
+      // website's Sync My Hangar Now) was kept for this one (#658). This scan's mark is
+      // gone first, so the sync doesn't wait on it.
+      await writes;
+      const isLinked = await linked();
+      const go = afterScan({ linked: isLinked, signedOut, kept: await takeKeptSync() });
+      if (go) {
+        setProgress('sync');
+        const s = await sync({ auto: go.auto, scanDone: true });
+        report.sync = s && { state: s.state, msg: s.msg, at: s.at };
+      } else if (!isLinked) report.sync = { state: 'off', msg: null, at: now() };
+    } finally {
+      endProgress();
+    }
     if (report.sync) await writeReport(report);
     // Packs never read: their contents, paced, in the background (Scan stays fast).
     if (rows.some((r) => r.id === 'buybacks' && r.ok && !r.partial))
@@ -396,26 +426,28 @@ export function createRunner(env) {
   // (the website's pace or opening date held it: msg is the website's words), 'calm'
   // (a refusal that isn't a problem: msg), 'error' (msg), 'ask' (an RSI account this
   // link hasn't synced: the page asks), 'quiet' (an account you said no to).
+  // `syncing` only once it's being sent: a press that's only being kept never stops the
+  // scan's own sync at its end.
   let syncing = false;
   async function sync({ auto = false, scanDone = false, again = false, asked } = {}) {
     if (syncing) return null;
-    syncing = true;
+    if (!(await linked())) return null;
     let result;
+    if (!(await (asked || mayShare()))) result = { state: 'off', msg: null, at: now() };
+    else {
+      const when = syncWhen({ busyHere: busy, elsewhere: await otherScan(), scanDone });
+      if (when === 'after-scan') {
+        await keepSyncForScan(auto);
+        result = { state: 'kept', msg: null, at: now() };
+      }
+    }
+    if (result) {
+      await hooks.synced?.(result);
+      return result;
+    }
+    if (syncing) return null;
+    syncing = true;
     try {
-      if (!(await linked())) return null;
-      if (!(await (asked || mayShare()))) result = { state: 'off', msg: null, at: now() };
-      else {
-        const when = syncWhen({ busyHere: busy, elsewhere: await otherScan(), scanDone });
-        if (when === 'after-scan') {
-          await keepSyncForScan(auto);
-          result = { state: 'kept', msg: null, at: now() };
-        }
-      }
-      if (result) {
-        syncing = false;
-        await hooks.synced?.(result);
-        return result;
-      }
       await hooks.syncStart?.();
       try {
         await OH.siteSync({ auto });
@@ -507,9 +539,10 @@ export function createRunner(env) {
     wishlistToAccount,
     otherScan,
     reconcile,
-    // Every session write so far has landed (a page that hands a scan request back
-    // once the scan has marked itself).
-    written: () => writes,
+    // Settles once the last scan asked for has its scanRunning mark stored, or won't
+    // run (held, or this page scanning already): a page that hands a scan request back
+    // then, so there's never a moment with neither.
+    marked: () => marked,
     get busy() {
       return busy;
     },

@@ -180,7 +180,8 @@ export async function scan({ reason = 'page' } = {}) {
 }
 
 // Our hangar page or the popup asked for a scan (src/background.js requestScan): the
-// request names this tab. Taken once the scan has marked itself running.
+// request names this tab and who asked. Taken once the scan has its scanRunning mark
+// stored (or won't run), so the worker always sees one or the other.
 async function scanIfAsked() {
   if (!chrome.storage.session) return;
   const { scanRequest: r } = await chrome.storage.session.get('scanRequest');
@@ -188,10 +189,9 @@ async function scanIfAsked() {
   const tab = await thisTabId();
   if (tab == null || r.tabId !== tab) return;
   const go = Date.now() - r.at < 60e3 && !hub.scan.busy;
-  // The request doesn't say yet whether the popup or our hangar page asked.
   const reason = r.reason === 'site' ? 'site' : 'popup';
   const running = go ? scan({ reason }) : null;
-  await runner.written();
+  await runner.marked();
   await chrome.storage.session.remove('scanRequest');
   await running;
 }

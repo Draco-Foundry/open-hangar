@@ -4863,7 +4863,7 @@ try {
       ['buybacks', true, 0],
       ['referrals', true, null],
     ]) &&
-  runStore.report.bad === 0 &&
+  runStore.report.bad === false &&
   !JSON.stringify(runStore.report).includes('Demo Pledge') &&
   runStore.running?.by === 'tab' &&
   runStore.running.tabId === 42 &&
@@ -4871,7 +4871,7 @@ try {
   runStore.report.run === runStore.running.run &&
   ['start', 'account', 'hangar', 'buybacks'].every((p) => runStore.parts.includes(p)) &&
   !runStore.left.length &&
-  runStore.failed?.bad === 2 &&
+  runStore.failed?.bad === true &&
   runStore.failed.rows[0].error === 'RSI changed something' &&
   runStore.signedOut === true
     ? ok('the scan runner stores its marks while it runs and its report, ids only, for other pages')

@@ -105,9 +105,10 @@ Our hangar page (Local Mode, behind the `localMode` flag, which needs `sync`):
   time the dashboard renews every minute, counted while that tab is open and for 10
   minutes at most), or a `scanRequest` from the last minute that its tab hasn't started.
 - `oh-request-scan`: opens or focuses the extension's page (the basic page, or the
-  dashboard without the connector) and leaves a `scanRequest` naming it; that tab runs
-  its Scan button's own scan. Busy while a scan runs and for 60 seconds
-  after a request. The worker never scans or asks RSI anything for it.
+  dashboard without the connector) and leaves a `scanRequest` naming it and who asked
+  (`reason`: `'site'` here, `'popup'` for the toolbar popup); that tab runs its Scan
+  button's own scan. Busy while a scan runs and for 60 seconds after a request. The
+  worker never scans or asks RSI anything for it.
 
 Chrome and Edge: the pages message the extension directly
 (`externally_connectable`, exact `https://host/*` patterns) and the browser gives
