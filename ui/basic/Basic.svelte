@@ -55,11 +55,14 @@
       class="bp-btn primary bp-scan"
       id="bp-scan"
       onclick={scanClick}
-      disabled={hub.scan.busy || !hub.ready}
+      disabled={hub.scan.busy || hub.scanElsewhere || !hub.ready}
       >{hub.scan.busy ? t('basic.scanning') : t('basic.scan')}</button
     >
   </header>
-  {#if hub.scan.busy}<p class="bp-detail" role="status">{hub.scan.detail}</p>{/if}
+  {#if hub.scan.busy}<p class="bp-detail" role="status">{hub.scan.detail}</p>
+  {:else if hub.scanElsewhere}<p class="bp-detail" id="bp-scan-elsewhere" role="status">
+      {t('basic.scan-elsewhere')}
+    </p>{/if}
 
   {#if hub.update}
     <div class="bp-note" id="bp-update" role="status">

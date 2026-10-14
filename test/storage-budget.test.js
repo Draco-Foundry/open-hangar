@@ -84,6 +84,7 @@ const BUDGET = {
   siteLink: small(),
   siteUrl: small(),
   siteSyncRequested: small(),
+  siteSyncAgain: small('one { at, auto }: the sync to try once more'),
   justUpdated: small(),
   updateReady: small(),
   reopenAfterUpdate: small(),
