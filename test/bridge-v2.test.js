@@ -393,6 +393,9 @@ const FORBIDDEN = [
   'prospectsList',
   'referralCode',
   'referralUrl',
+  'referralUrlCopy',
+  'referrerCode',
+  'referrerReferralCode',
   'wishlist',
   'bbDetails',
   'settings',
@@ -431,7 +434,14 @@ test('getHangar: the stored shape, never the sync token, site address, settings 
   for (const k of FORBIDDEN) assert.ok(!keys.has(k), `no "${k}" anywhere`);
   assert.ok(![...keys].some((k) => k.startsWith('profile:')), 'no parked account');
   const text = JSON.stringify(r);
-  for (const s of ['test-sync-token', 'example.invalid', 'STAR-TEST-0000', 'Recruit3', 'Wingmate'])
+  for (const s of [
+    'test-sync-token',
+    'example.invalid',
+    'STAR-TEST-0000',
+    'STAR-RCRT-0001',
+    'Recruit3',
+    'Wingmate',
+  ])
     assert.ok(!text.includes(s), `"${s}" never handed out`);
   assert.equal('code' in r.hangar.sources.referral.items, false);
   assert.equal('url' in r.hangar.sources.referral.items, false);

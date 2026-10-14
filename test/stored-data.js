@@ -86,7 +86,9 @@ function referral() {
   };
 }
 
-// The cached RSI account (lib.js getAccount, cache v6), signed in.
+// The cached RSI account, signed in, as cache v6 (lib.js getAccount) kept it: with the
+// code of the player who recruited you (invented), which v7 no longer keeps and the
+// update clears (src/background.js). It never leaves the browser either way.
 function account(nickname = 'TestPilot') {
   return {
     v: 6,
@@ -110,7 +112,11 @@ function account(nickname = 'TestPilot') {
       rank: 'Member',
       logo: 'https://robertsspaceindustries.com/media/testorg/heap_thumb/logo.png',
     },
-    referral: { code: 'STAR-TEST-0000', url: 'https://example.invalid/r', referrerCode: null },
+    referral: {
+      code: 'STAR-TEST-0000',
+      url: 'https://example.invalid/r',
+      referrerCode: 'STAR-RCRT-0001',
+    },
     fetchedAt: AT + 1000,
   };
 }
