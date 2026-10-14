@@ -24,3 +24,6 @@ _dump/
 
 # built by Vite from ui/ (npm run build:ui)
 /src/ui/
+
+# Claude Code session files and its temporary worktrees (local only).
+.claude/
