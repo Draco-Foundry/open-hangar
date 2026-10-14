@@ -11,6 +11,7 @@
 // went to the website.
 import { t } from './copy.js';
 import { importWishlist } from './wishlist-import.js';
+import { afterScan, retryDue, scanElsewhere, syncWhen } from './sync-timing.js';
 import { flag } from '../lib/flags.js';
 
 const OH = globalThis.OH;
@@ -38,6 +39,8 @@ export const hub = $state({
   rsiOk: true,
   // The scan: busy, what it's on, and the last report ({ rows, signedOut, problem }).
   scan: { busy: false, detail: '', report: null },
+  // Another Open Hangar tab is scanning (its scanRunning mark): this one waits.
+  scanElsewhere: false,
   // openhangar.space: link { name, connectedAt, lastSync } (never the token), Firefox's
   // yes, and an ask waiting: 'connect' | 'local' (Firefox's card), pilot (a new RSI
   // account to sync or not: { handle, record }).
@@ -115,6 +118,16 @@ function scanMark(on) {
 addEventListener('pagehide', () => {
   if (markAt) chrome.storage.session?.remove('scanRunning').catch(() => {});
 });
+// Another Open Hangar tab scanning right now (its scanRunning mark): this tab's Scan
+// waits, and so does any sync (sync-timing.js).
+async function otherScan() {
+  if (hub.scan.busy || !chrome.storage.session) return false;
+  const { scanRunning } = await chrome.storage.session.get('scanRunning');
+  return scanElsewhere(scanRunning, await thisTabId());
+}
+async function noteOtherScan() {
+  hub.scanElsewhere = await otherScan().catch(() => false);
+}
 const progress = (part) => (page, count, retry) => {
   scanMark(true);
   hub.scan.detail = retry
@@ -146,6 +159,8 @@ export function scanClick() {
 
 export async function scan() {
   if (hub.scan.busy) return;
+  // Another Open Hangar tab is scanning: two at once would read RSI twice.
+  if (await otherScan()) return void (hub.scanElsewhere = true);
   // No access to RSI: no scan that can only fail. The card asks instead.
   if (!(await rsiAccess())) {
     OH.log('info', 'status', 'scan held: no access to robertsspaceindustries.com');
@@ -227,8 +242,14 @@ export async function scan() {
   scanMark(false);
   hub.bbDetails = { ...(await OH.getBuybackDetails()) };
   await refreshProfiles();
-  // Connected: every finished scan syncs, as the dashboard's does.
-  if (hub.site.link && !signedOut) await syncNow({ auto: true });
+  // Connected: every finished scan syncs once, with the whole hangar, as the
+  // dashboard's does. A sync asked for while it ran (Connect, Sync Now, the website's
+  // Sync My Hangar Now) was kept for this one (#658). This scan's mark is gone first,
+  // so the sync doesn't wait on it.
+  await markWrite;
+  if (!hub.site.link) await refreshSite();
+  const go = afterScan({ linked: !!hub.site.link, signedOut, kept: await takeKeptSync() });
+  if (go) await syncNow({ auto: go.auto, asked: Promise.resolve(hub.site.dataOk), scanDone: true });
   // Packs never read: their contents, paced, in the background (Scan stays fast).
   if (rows.some((r) => r.name === 'Buy-Backs' && r.ok)) readPacks();
 }
@@ -283,6 +304,7 @@ export async function refreshSite() {
   };
   clearTimeout(waitTimer);
   if (until) waitTimer = setTimeout(refreshSite, Math.max(0, until - Date.now()) + 500);
+  else if (link && !s.syncing) retryIfDue(link).catch(() => {});
   s.dataOk = !firefox() || (await chrome.permissions.contains(SITE_DATA).catch(() => false));
   if (!firefox() || s.dataOk || !chrome.storage.session) return;
   // Connect was pressed on the website, or our hangar page asked for the hangar,
@@ -386,16 +408,23 @@ export async function connect({ asked } = {}) {
 // Sync Now, and the sync after a scan (auto). A calm refusal (sync not open yet, or
 // one moments ago) is a note, not a problem; an RSI account this link hasn't synced
 // asks first (hub.site.pilot).
-export async function syncNow({ auto = false, asked } = {}) {
+// While a scan runs (here or in another Open Hangar tab) a sync is kept for the
+// scan's own sync at its end (syncAfterScan, session storage), so the website gets the
+// whole hangar, never half of one (#658). `scanDone`: that sync. `again`: the one try
+// more after the website's pace held a sync back (retryIfDue).
+export async function syncNow({ auto = false, asked, scanDone = false, again = false } = {}) {
   const s = hub.site;
   if (s.syncing || !s.link) return;
   if (!(await (asked || (auto ? Promise.resolve(s.dataOk) : dataOk()))))
     return void (s.msg = t('basic.firefox-no'));
+  const when = syncWhen({ busyHere: hub.scan.busy, elsewhere: await otherScan(), scanDone });
+  if (when === 'after-scan') return keepSyncForScan(auto);
   s.syncing = true;
   s.msg = '';
   s.calm = false;
   try {
     await OH.siteSync({ auto });
+    await chrome.storage.local.remove('siteSyncAgain');
   } catch (err) {
     if (err?.ask) {
       s.pilot = err.ask;
@@ -405,10 +434,45 @@ export async function syncNow({ auto = false, asked } = {}) {
       s.calm = !!err?.calm;
       OH.log(s.calm ? 'info' : 'warn', 'site', s.msg);
     }
+    // Held back by the website's pace ("synced moments ago"): tried once more when the
+    // wait is over, so the newest scan still reaches the website.
+    if (!again && !err?.ask && !err?.quiet) {
+      const wait = OH.siteSyncWait(await OH.getSiteLink().catch(() => null));
+      if (wait?.reason === 'too-soon')
+        await chrome.storage.local.set({ siteSyncAgain: { at: Date.now(), auto } });
+    }
   }
   s.syncing = false;
   await refreshSite();
   await wishlistToAccount();
+}
+// A sync asked for during a scan, for the scan's own sync (afterScan). One asked for
+// by a press (not `auto`) stays one, whatever is kept after it.
+async function keepSyncForScan(auto) {
+  if (!chrome.storage.session) return;
+  const { syncAfterScan: prev } = await chrome.storage.session.get('syncAfterScan');
+  await chrome.storage.session.set({
+    syncAfterScan: { at: Date.now(), auto: auto && prev?.auto !== false },
+  });
+  OH.log('info', 'site', 'sync kept until the scan running now is done');
+}
+async function takeKeptSync() {
+  if (!chrome.storage.session) return null;
+  const { syncAfterScan: kept } = await chrome.storage.session.get('syncAfterScan');
+  if (kept) await chrome.storage.session.remove('syncAfterScan');
+  return kept || null;
+}
+// The one try more for a sync the website's pace held back (siteSyncAgain), once no
+// wait holds it.
+async function retryIfDue(link) {
+  const { siteSyncAgain: again } = await chrome.storage.local.get('siteSyncAgain');
+  if (!retryDue(again, OH.siteSyncWait(link))) return;
+  await chrome.storage.local.remove('siteSyncAgain');
+  await syncNow({
+    auto: again.auto !== false,
+    asked: Promise.resolve(hub.site.dataOk),
+    again: true,
+  });
 }
 export async function pilotAnswer(yes) {
   const who = hub.site.pilot;
@@ -527,8 +591,10 @@ export async function start() {
     if (area === 'local' && c.siteSyncRequested?.newValue) syncIfAsked();
     if (area === 'local' && c.db && !hub.scan.busy) loadDB();
     if (area === 'session' && c.scanRequest?.newValue) scanIfAsked();
+    if (area === 'session' && c.scanRunning) noteOtherScan();
     if (area === 'session' && (c.siteAskFirefox || c.localAskFirefox)) refreshSite();
   });
+  await noteOtherScan();
   await syncIfAsked();
   await wishlistToAccount();
   await scanIfAsked();

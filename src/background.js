@@ -268,7 +268,9 @@ siteHandlers['oh-connect-finish'] = async (msg, origin) => {
     siteUrl: origin, // sync goes to the site you connected on
     ...(msg.sync ? { siteSyncRequested: Date.now() } : {}),
   });
-  chrome.tabs.create({ url: hubUrl('#home') });
+  // An Open Hangar tab already open comes to the front instead of a second one (#658):
+  // a scan running there keeps going, and the sync waits for it.
+  await dashboardTab('#home');
   return { ok: true, name: j.name || '' };
 };
 // Connect with a code (src/dashboard.js siteConnect, when the sign-in window can't
