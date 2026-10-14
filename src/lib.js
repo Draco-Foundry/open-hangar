@@ -2137,6 +2137,7 @@
       // (citizen profile) page — one fetch covers both.
       if (out.nickname) {
         try {
+          if (expect != null) await OH.autoPause(); // Auto Scan Daily's pace
           const cres = await fetch(
             RSI_ORIGIN + RULES.dossier.path + encodeURIComponent(out.nickname),
             { credentials: 'omit', signal: AbortSignal.timeout(20000) },

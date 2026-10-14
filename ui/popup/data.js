@@ -220,7 +220,10 @@ const AUTO_ASKS = ['bad', 'partway'];
 // 6:12 AM"). `locale`: the browser's, unless a test names one.
 export function autoWhen(at, now = Date.now(), locale) {
   const d = new Date(at);
-  const time = d.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
+  // A plain space before AM/PM (some browsers' formats put a narrow one there).
+  const time = d
+    .toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })
+    .replace(/\u202f/g, ' ');
   if (d.toDateString() === new Date(now).toDateString()) return t('popup.auto-today', { time });
   return `${d.toLocaleDateString(locale, { month: 'short', day: 'numeric' })}, ${time}`;
 }

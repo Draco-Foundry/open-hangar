@@ -37,7 +37,12 @@ const PLEDGES = /\/account\/pledges\?page=(\d+)/;
 let script; // (page, callNo) => { status, body } | 'network'
 let calls;
 let other = []; // every non-pledge request (account lookups etc.)
-global.fetch = async (url) => {
+// Other pages of RSI's, for a test that needs them: (url, init) → a Response, or
+// undefined for the usual answers.
+let extra = null;
+global.fetch = async (url, init) => {
+  const own = extra && (await extra(String(url), init));
+  if (own) return own;
   const m = String(url).match(PLEDGES);
   if (!m) {
     other.push(String(url));
@@ -63,6 +68,7 @@ async function reset(prevItems) {
   calls = {};
   other = [];
   waits = [];
+  extra = null;
   if (prevItems) {
     store.db = { schemaVersion: 2, sources: { hangar: { items: prevItems, scannedAt: 1 } } };
   }
@@ -390,4 +396,216 @@ test('a partial scan leaves nothing for the next one to skip on (#294)', async (
   const r = await OH.scanSource('hangar');
   assert.ok(r.partial);
   assert.equal(store.db.sources.hangar.meta?.probe, undefined);
+});
+
+// --- Auto Scan Daily's reads (#666) -------------------------------------------
+// Its quick check (OH.peekSource), who is signed in (OH.whoIsSignedIn), the account read
+// that names the handle it expects (OH.getAccount({ expect })), and a part read in auto
+// mode: never saved unless read whole, and only when the keep gate says yes.
+// Buy-back pages are served as { items, tokens } (their own stand-in parser).
+global.OpenHangar.parseBuybacks = (html) => JSON.parse(html || '{}').items || [];
+global.OpenHangar.parseBuybackTokens = (html) => JSON.parse(html || '{}').tokens ?? null;
+const BUYBACKS = /\/account\/buy-back-pledges\?page=(\d+)/;
+const DASHBOARD = /\/account\/dashboard$/;
+const dashboard = (nickname) =>
+  new Response(
+    `<div data-account="${JSON.stringify({ nickname, displayname: `${nickname} D` }).replace(/"/g, '&quot;')}"></div>`,
+  );
+const snapshot = () => JSON.parse(JSON.stringify(store));
+// A page that's RSI's sign-in form: no pledges on it.
+const signInPage = { body: '[]<input name="password">' };
+const withSignIn = async (fn) => {
+  global.OpenHangar.parsePledges = (html) => JSON.parse(String(html).split('<')[0] || '[]');
+  try {
+    await fn();
+  } finally {
+    global.OpenHangar.parsePledges = (html) => JSON.parse(html || '[]');
+  }
+};
+
+test('peekSource: one page, nothing written, the same as saved or not', async () => {
+  const list = pledges(25);
+  await scannedOnce(list);
+  const before = snapshot();
+  assert.deepEqual(await OH.peekSource('hangar'), { same: true });
+  assert.deepEqual(calls, { 1: 1 }, 'only the newest page');
+  assert.deepEqual(snapshot(), before, 'nothing saved, nothing written');
+  // Something new on top: different.
+  calls = {};
+  script = serve([{ id: 'new', name: 'Fresh' }, ...list]);
+  assert.deepEqual(await OH.peekSource('hangar'), { same: false });
+  assert.deepEqual(calls, { 1: 1 });
+  assert.deepEqual(snapshot(), before);
+  // Never scanned: different, without asking RSI.
+  await reset();
+  assert.deepEqual(await OH.peekSource('hangar'), { same: false });
+  assert.deepEqual(calls, {});
+  // Not a part it peeks at.
+  assert.ok((await OH.peekSource('referral')).error);
+});
+
+test('peekSource: a 429 comes back at once, with its Retry-After; a sign-in page is signed out', async () => {
+  await scannedOnce(pledges(25));
+  const date = 'Wed, 21 Oct 2026 07:28:00 GMT';
+  script = () => ({ status: 429, headers: { 'retry-after': date } });
+  const r = await OH.peekSource('hangar');
+  assert.equal(r.rsiDown, true);
+  assert.equal(r.retryAfter, date);
+  assert.equal(calls[1], 1, 'never retried');
+  await withSignIn(async () => {
+    script = () => signInPage;
+    assert.deepEqual(await OH.peekSource('hangar'), { signedOut: true });
+  });
+  script = () => ({ status: 403 });
+  assert.deepEqual(await OH.peekSource('hangar'), { signedOut: true });
+  script = () => ({ status: 404 });
+  assert.equal((await OH.peekSource('hangar')).rsiDown, false, 'an answer, not RSI down');
+});
+
+test('peekSource: buy-backs compare their token count too', async () => {
+  await reset();
+  const page = { items: [{ id: 'b1', name: 'Cutlass' }], tokens: 2 };
+  store.db = {
+    schemaVersion: 3, // as stored today (an older one is written back once)
+    sources: { buybacks: { items: page.items, scannedAt: 1, meta: { tokens: 2 } } },
+  };
+  // status.json as the pages cached it (its cache is the one thing a check may refresh).
+  store.remoteStatus = { at: Date.now(), data: null };
+  let body = page;
+  extra = (url) => (BUYBACKS.test(url) ? new Response(JSON.stringify(body)) : undefined);
+  const before = snapshot();
+  assert.deepEqual(await OH.peekSource('buybacks'), { same: true });
+  body = { ...page, tokens: 3 };
+  assert.deepEqual(await OH.peekSource('buybacks'), { same: false }, 'a token spent');
+  assert.deepEqual(snapshot(), before);
+});
+
+test('whoIsSignedIn: one request, nothing stored, never the cached account', async () => {
+  await reset();
+  store.account = { v: 7, loggedIn: true, nickname: 'Cached', fetchedAt: Date.now() };
+  const asked = [];
+  let answer = () => dashboard('Test_Pilot');
+  extra = async (url) => (asked.push(url), answer());
+  assert.deepEqual(await OH.whoIsSignedIn(), {
+    state: 'in',
+    nickname: 'Test_Pilot',
+    displayname: 'Test_Pilot D',
+  });
+  assert.equal(asked.length, 1);
+  assert.match(asked[0], DASHBOARD);
+  assert.equal(store.account.nickname, 'Cached', 'the cache untouched');
+  // A dashboard with no account on it: signed out.
+  answer = () => new Response('<html>Sign in</html>');
+  assert.deepEqual(await OH.whoIsSignedIn(), { state: 'out' });
+  // No answer: unknown, never the cache.
+  answer = () => {
+    throw new TypeError('Failed to fetch');
+  };
+  assert.equal((await OH.whoIsSignedIn()).state, 'unknown');
+  answer = () => new Response('', { status: 429, headers: { 'retry-after': '600' } });
+  asked.length = 0;
+  assert.deepEqual(await OH.whoIsSignedIn(), { state: 'unknown', retryAfter: '600' });
+  assert.equal(asked.length, 1, 'a 429 is never retried');
+  assert.equal(store.account.nickname, 'Cached');
+});
+
+test('getAccount({ expect }): another handle reads no dossier and caches nothing', async () => {
+  await reset();
+  store.account = { v: 7, loggedIn: true, nickname: 'Test_Pilot', fetchedAt: 1 };
+  const asked = [];
+  let who = 'Other_Pilot';
+  let down = false;
+  extra = async (url) => {
+    asked.push(url);
+    if (down) throw new TypeError('Failed to fetch');
+    return DASHBOARD.test(url) ? dashboard(who) : new Response('', { status: 404 });
+  };
+  const a = await OH.getAccount({ force: true, expect: 'test_pilot' });
+  assert.equal(a.other, true);
+  assert.equal(a.nickname, 'Other_Pilot');
+  assert.deepEqual(
+    asked.filter((u) => /\/citizens\//.test(u)),
+    [],
+    'no dossier',
+  );
+  assert.equal(store.account.fetchedAt, 1, 'the cache untouched');
+  // The handle it expects (any case): read and cached as before.
+  who = 'Test_Pilot';
+  const b = await OH.getAccount({ force: true, expect: ' TEST_PILOT ' });
+  assert.equal(b.other, undefined);
+  assert.equal(b.loggedIn, true);
+  assert.ok(store.account.fetchedAt > 1);
+  // No answer: couldn't tell, never the cached account.
+  down = true;
+  assert.deepEqual(await OH.getAccount({ force: true, expect: 'Test_Pilot' }), {
+    loggedIn: null,
+    fetchedAt: 0,
+  });
+  assert.equal(
+    (await OH.getAccount({ force: true })).nickname,
+    'Test_Pilot',
+    'without it, the cache',
+  );
+});
+
+test('scanSource in auto mode: a part cut short is never saved, however big', async () => {
+  await reset(pledges(5));
+  const before = snapshot();
+  script = (page) =>
+    page === 3 ? { status: 429, headers: { 'retry-after': '120' } } : healthy(page);
+  const r = await OH.scanSource('hangar', null, { auto: true });
+  assert.equal(r.ok, false);
+  assert.equal(r.unfinished, true);
+  assert.equal(r.rsiDown, true);
+  assert.equal(r.retryAfter, '120');
+  assert.equal(calls[3], 1, 'a 429 comes back at once');
+  assert.deepEqual(snapshot().db, before.db, 'the 20 it read are not kept over 5');
+  // A scan you pressed keeps going, as before.
+  const manual = await OH.scanSource('hangar');
+  assert.equal(manual.ok, true);
+});
+
+test('scanSource in auto mode: a sign-in page partway is unfinished, not the end of the list', async () => {
+  await reset(pledges(5));
+  await withSignIn(async () => {
+    script = (page) => (page === 2 ? signInPage : healthy(page));
+    const r = await OH.scanSource('hangar', null, { auto: true });
+    assert.equal(r.unfinished, true);
+    assert.match(r.error, /signed out/);
+    assert.equal(store.db.sources.hangar.items.length, 5);
+    // Pressed Scan: the shorter list, as before.
+    const manual = await OH.scanSource('hangar');
+    assert.equal(manual.ok, true);
+    assert.equal(store.db.sources.hangar.items.length, 10);
+  });
+});
+
+test('scanSource in auto mode: no change probe, and the keep gate decides', async () => {
+  const list = pledges(50);
+  await scannedOnce(list);
+  const at = store.db.sources.hangar.scannedAt;
+  // Auto never takes the #294 shortcut: every page is read.
+  const seen = [];
+  const r = await OH.scanSource('hangar', null, {
+    auto: true,
+    keep: async (got) => (seen.push(got.items.length), false),
+  });
+  assert.deepEqual(r, { ok: false, refused: true });
+  assert.deepEqual(seen, [50]);
+  assert.equal(calls[2], 1, 'no probe');
+  assert.equal(store.db.sources.hangar.scannedAt, at, 'refused: nothing saved');
+  // Yes: saved as Scan saves it.
+  script = serve([{ id: 'new', name: 'Fresh' }, ...list]);
+  const yes = await OH.scanSource('hangar', null, { auto: true, keep: async () => true });
+  assert.equal(yes.ok, true);
+  assert.equal(store.db.sources.hangar.items.length, 51);
+  assert.equal(yes.scannedAt, store.db.sources.hangar.scannedAt);
+});
+
+test("syncStamp: the three parts' scan times, one string", () => {
+  assert.equal(
+    OH.syncStamp({ sources: { hangar: { scannedAt: 5 }, referral: { scannedAt: 7 } } }),
+    '5||7',
+  );
+  assert.equal(OH.syncStamp(null), '||');
 });
