@@ -98,6 +98,10 @@ test('connector build: the popup, the basic page and what they load, nothing els
       assert.ok(src.length < 30, `${t}: a small build (${src.length} files)`);
       const m = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8'));
       assert.equal(m.action.default_popup, 'src/popup.html');
+      // Alt+Shift+H opens the popup in every browser (manifest.json commands).
+      assert.deepEqual(m.commands, {
+        _execute_action: { suggested_key: { default: 'Alt+Shift+H', mac: 'Alt+Shift+H' } },
+      });
       assert.match(
         m.content_security_policy.extension_pages,
         /; connect-src 'self' https:\/\/robertsspaceindustries\.com https:\/\/openhangar\.space https:\/\/app\.openhangar\.space$/,
@@ -127,10 +131,12 @@ test('store check: a connector build that let the dashboard back in is refused',
       / connect-src[^;]*$/,
       '',
     );
+    delete m.commands;
     fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify(m));
     fs.rmSync(path.join(dir, 'dist', 'firefox', 'src', 'ui', 'basic.js'));
     assert.deepEqual(problems(dir).sort(), [
       "chrome: its pages may send requests beyond connect-src 'self' https://robertsspaceindustries.com https://openhangar.space https://app.openhangar.space",
+      'chrome: no keyboard shortcut opens the popup (commands._execute_action)',
       'chrome: src/dashboard.html is in a connector build',
       "chrome: src/ui/home.js isn't the connector's",
       "firefox: src/basic.html loads ui/basic.js, which isn't in the build",
