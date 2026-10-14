@@ -147,10 +147,21 @@ test('retryAtOf: a Retry-After over a day holds, up to the 4-day cap', async () 
 test('lineOf: another account or a drop first, then partway, then whether anything changed', async () => {
   const { lineOf, LINES } = await auto();
   assert.equal(lineOf({ bad: true, partway: true, changed: true }), 'bad');
+  assert.equal(lineOf({ bad: true, out: true }), 'bad');
+  assert.equal(lineOf({ out: true, partway: true, changed: true }), 'out-partway');
   assert.equal(lineOf({ partway: true, changed: true }), 'partway');
   assert.equal(lineOf({ changed: true }), 'full');
   assert.equal(lineOf({}), 'quick', 'a full read that found nothing different: no changes');
-  assert.deepEqual(LINES, ['quick', 'full', 'signed-out', 'other', 'paused', 'bad', 'partway']);
+  assert.deepEqual(LINES, [
+    'quick',
+    'full',
+    'signed-out',
+    'other',
+    'paused',
+    'bad',
+    'out-partway',
+    'partway',
+  ]);
 });
 
 test('connectedPilot: synced through this link, or its first with no other account here', async () => {

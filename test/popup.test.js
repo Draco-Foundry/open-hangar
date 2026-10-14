@@ -115,6 +115,7 @@ test("Auto Scan Daily's line: each run's approved words, none while it's off", a
     other: ['Skipped today 6:12 AM: a different RSI account is signed in', false],
     paused: ['Skipped today 6:12 AM: scans are paused', false],
     bad: ["Last: today 6:12 AM, something looked wrong and wasn't saved. Scan to check.", true],
+    'out-partway': ['Last: today 6:12 AM, signed out of RSI partway. Scan to check.', true],
     partway: ['Last: today 6:12 AM, RSI stopped answering partway. Scan to check.', true],
   };
   for (const [line, [words, ask]] of Object.entries(rows))
@@ -133,6 +134,10 @@ test("Auto Scan Daily's ask: the Settings dot for a part not kept, until a scan 
   const rec = { v: 1, at: NOW - HOUR, ended: NOW - HOUR + MIN, line: 'partway' };
   assert.equal(autoAsk({ on: true, rec, scannedAt: NOW - DAY }), true);
   assert.equal(autoAsk({ on: true, rec: { ...rec, line: 'bad' }, scannedAt: NOW - DAY }), true);
+  assert.equal(
+    autoAsk({ on: true, rec: { ...rec, line: 'out-partway' }, scannedAt: NOW - DAY }),
+    true,
+  );
   assert.equal(autoAsk({ on: true, rec, scannedAt: NOW }), false, 'a scan saved since');
   assert.equal(autoAsk({ on: false, rec, scannedAt: NOW - DAY }), false, 'switched off');
   for (const line of ['quick', 'full', 'signed-out', 'other', 'paused', null])
@@ -568,6 +573,7 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
     'popup.auto-paused': 'Skipped {when}: scans are paused',
     'popup.auto-bad': "Last: {when}, something looked wrong and wasn't saved. Scan to check.",
     'popup.auto-stopped': 'Last: {when}, RSI stopped answering partway. Scan to check.',
+    'popup.auto-out-partway': 'Last: {when}, signed out of RSI partway. Scan to check.',
     // {when}'s form on the day it ran ("today 6:12 AM", the approved status lines').
     'popup.auto-today': 'today {time}',
   };

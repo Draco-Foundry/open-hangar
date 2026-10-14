@@ -407,12 +407,12 @@ test('buy-backs cut short after the hangar was kept: the hangar stays and syncs'
   assert.equal(site.length, 1, 'the hangar it kept is synced');
 });
 
-test('a sign-in page partway through the hangar: not saved', async () => {
+test('a sign-in page partway through the hangar: not saved, signed out partway', async () => {
   const { r, before } = await fullRun();
   rsi.fail = (kind) => (kind === 'hangar:2' ? new Response(`[]${SIGN_IN}`) : null);
   const rec = await r.autoScan();
   assert.deepEqual(mem.db.sources.hangar, before.db.sources.hangar);
-  assert.equal(rec.line, 'partway');
+  assert.equal(rec.line, 'out-partway', 'its own line: the pilot signed out, RSI did answer');
   assert.equal(stamps().hangar, undefined);
 });
 
@@ -670,11 +670,11 @@ test("a page it can't read, or a save that fails: partway, and the part is due",
   }
 });
 
-test('signed out by the end of a part: not kept, partway, and it backs off like any partway', async () => {
+test('signed out by the end of a part: not kept, signed out partway, and it backs off like any partway', async () => {
   const { r, before } = await fullRun();
   rsi.who = (n) => (n >= 3 ? null : 'Test_Pilot');
   const rec = await r.autoScan();
-  assert.equal(rec.line, 'partway');
+  assert.equal(rec.line, 'out-partway');
   assert.equal(rec.fails, 1);
   assert.equal(rec.retryAt, rec.ended + DAY, 'a day: about when the next run is due anyway');
   assert.deepEqual(mem.db.sources.hangar, before.db.sources.hangar);
