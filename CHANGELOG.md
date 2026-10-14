@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.4.0 — 2026-10-14
+
 - New: **A new toolbar popup.** Three tabs, Hangar, Wishlist and Settings, plus an alerts bell whose number matches the toolbar badge. The Hangar tab shows your RSI portrait and handle, Account Value and how it changed since an earlier scan, Store Credit, Buy-Back Tokens with the next refill, up to three Fleet News notes, and Scan.
 - New: **Scans run out of sight.** No more scan tab: the scan runs in a hidden page, and closing the popup doesn't stop it. If your browser closes mid-scan, the parts that finished are saved and the popup shows Scan stopped, even after a restart.
 - New: **Auto Scan Daily (optional).** While you're connected to openhangar.space, Open Hangar can check your hangar once a day. It looks at the newest pages first, runs a full scan only when something is new or once a week, saves part by part, and skips days when you're signed out or signed in to a different RSI account. Off until you turn it on.
