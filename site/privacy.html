@@ -361,13 +361,15 @@
           Everything still stays on your device.
         </li>
         <li>
-          <strong>cookies:</strong> for two things only. Log Out of RSI clears
-          robertsspaceindustries.com cookies so you can fully end your RSI session from the
-          extension. And to tell whether you're signed in to RSI, so the popup can show Log In to
-          RSI instead of Scan, the extension checks whether RSI's sign-in cookie is in this browser.
-          The browser hands over the cookie when asked, but the extension only looks at whether it's
-          there: it never uses its value, never saves it and never sends it anywhere. The check
-          doesn't contact RSI.
+          <strong>cookies:</strong> for three things, all on robertsspaceindustries.com. Log Out of
+          RSI clears RSI's cookies so you can fully end your RSI session from the extension. To tell
+          whether you're signed in to RSI, so the popup can show Log In to RSI instead of Scan and
+          Auto Scan Daily can skip a day when you're signed out, the extension checks whether RSI's
+          sign-in cookie is in this browser. The browser hands over the cookie when asked, but for
+          this check the extension only looks at whether it's there, and the check doesn't contact
+          RSI. And Add to RSI Cart works the way RSI's own upgrade window does: it reads RSI's
+          session token cookie and sends it back to robertsspaceindustries.com with the cart
+          request. The extension never saves a cookie's value and never sends one anywhere but RSI.
         </li>
         <li>
           <strong>Host access to robertsspaceindustries.com:</strong> to make the read-only requests
