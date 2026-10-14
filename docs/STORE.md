@@ -102,10 +102,7 @@ Firefox Add-ons. Work top to bottom. Items marked ✅ are ready in the repo; ⬜
 
 **`cookies`**
 
-> Used solely to implement "Log out of RSI": clears robertsspaceindustries.com
-> cookies (including the HttpOnly session cookie that page scripts can't remove) so
-> the user can fully end their RSI session from the extension. The extension never
-> reads cookie values or sends them anywhere.
+> Used for three things, all on robertsspaceindustries.com. First, "Log Out of RSI": clears RSI's cookies (including the HttpOnly session cookie that page scripts can't remove) so the user can fully end their RSI session from the extension. Second, telling whether the user is signed in to RSI: the extension checks only whether RSI's sign-in cookie exists, so the popup can show "Log In to RSI" and Auto Scan Daily can skip a signed-out day, without contacting RSI. Third, Add to RSI Cart: like RSI's own upgrade window, it reads RSI's session token cookie and sends it back to robertsspaceindustries.com with the cart request the user asked for. Cookie values are never stored and never sent anywhere except RSI.
 
 **`host_permissions` → `https://robertsspaceindustries.com/*`**
 
@@ -121,6 +118,10 @@ install prompt only names robertsspaceindustries.com.)_
 **`alarms`** (added in 0.3.0)
 
 > Used only for store alerts, which the user turns on in the extension's settings (they're off by default). The alarm wakes the extension for a check at most every 30 minutes: it downloads one public sale file from openhangar.space (the same file for everyone, with nothing about the user in the request) and matches it on the device. Turning alerts off clears the alarm.
+
+**`offscreen`** (added in 0.4.0; Chrome and Edge only)
+
+> Used only to run the hangar scan in a hidden page instead of opening a tab. The scan reads the signed-in user's own RSI pages and parses their HTML with DOMParser, which the extension's service worker doesn't have (reason: DOM_PARSER). The hidden page reads nothing beyond what the user's Scan already reads from robertsspaceindustries.com.
 
 **`notifications`** (optional, added in 0.3.0)
 

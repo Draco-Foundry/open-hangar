@@ -291,20 +291,11 @@ export function shipSlug(name) {
 // unnamed }: a key nothing can name is counted, never guessed.
 export function wishRows(keys, feed, names = null) {
   const ships = new Map();
-  const items = new Map();
   for (const s of Array.isArray(feed?.ships) ? feed.ships : [])
     if (isObj(s) && s.slug && s.name) ships.set(s.slug, s.name);
   if (names instanceof Map)
     for (const [slug, name] of names) if (name && !ships.has(slug)) ships.set(slug, name);
-  for (const i of Array.isArray(feed?.items) ? feed.items : [])
-    if (isObj(i) && i.id) items.set(i.id, i);
-  const cheapest = (slug) => {
-    let best = null;
-    for (const i of items.values())
-      if ((i.kind === 'ship' || i.kind === 'vehicle') && i.ships?.includes(slug))
-        if (!best || (i.price ?? Infinity) < (best.price ?? Infinity)) best = i;
-    return best;
-  };
+  const sale = saleIndex(feed);
   const rows = [];
   let unnamed = 0;
   for (const key of Array.isArray(keys) ? keys : []) {
@@ -315,16 +306,45 @@ export function wishRows(keys, feed, names = null) {
         unnamed++;
         continue;
       }
-      const sale = cheapest(id);
-      rows.push({ key, name, onSale: !!sale, price: sale?.price ?? null });
+      const on = sale(key);
+      rows.push({ key, name, onSale: !!on, price: on?.price ?? null });
       continue;
     }
-    const item = items.get(`${kind === 'ccu' ? 'upgrade' : 'sku'}-${id}`);
+    const item = sale(key);
     if ((kind === 'sku' || kind === 'ccu') && item)
       rows.push({ key, name: item.name, onSale: true, price: item.price ?? null });
     else unnamed++;
   }
   return { rows, unnamed };
+}
+
+// The sale feed's item for a Wishlist key (a ship: its cheapest edition in the store),
+// or null when the store doesn't sell it now.
+function saleIndex(feed) {
+  const items = new Map();
+  for (const i of Array.isArray(feed?.items) ? feed.items : [])
+    if (isObj(i) && i.id) items.set(i.id, i);
+  return (key) => {
+    const [kind, id] = String(key).split(':');
+    if (kind === 'sku' || kind === 'ccu')
+      return items.get(`${kind === 'ccu' ? 'upgrade' : 'sku'}-${id}`) || null;
+    if (kind !== 'ship') return null;
+    let best = null;
+    for (const i of items.values())
+      if ((i.kind === 'ship' || i.kind === 'vehicle') && i.ships?.includes(id))
+        if (!best || (i.price ?? Infinity) < (best.price ?? Infinity)) best = i;
+    return best;
+  };
+}
+// The Wishlist tab's sale line for an item the website named: → (key) → { onSale, price },
+// or null with no sale feed kept (alerts off): then nothing is said about sales.
+export function wishSale(feed) {
+  if (!isObj(feed) || !Array.isArray(feed.items)) return null;
+  const sale = saleIndex(feed);
+  return (key) => {
+    const on = sale(key);
+    return { onSale: !!on, price: on?.price ?? null };
+  };
 }
 
 // --- openhangar.space in Settings ----------------------------------------------------------

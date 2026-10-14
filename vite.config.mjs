@@ -41,6 +41,8 @@ export default defineConfig({
         tokens: 'ui/tokens.css',
         popup: 'ui/popup/main.js',
         basic: 'ui/basic/main.js',
+        // The hidden page the connector scans in (src/scan.html), never shown.
+        scan: 'ui/scan/main.js',
       },
       output: {
         format: 'es',

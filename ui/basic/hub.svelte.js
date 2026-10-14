@@ -1,17 +1,16 @@
-// The basic page's state and what it does (the connector build, src/basic.html). The
-// one extension page left when the website is the full app: it scans, keeps the
-// hangar, exports it and holds the settings. Everything goes through lib.js
-// (window.OH); nothing here reads RSI markup or the website's pages. It works with no
-// network: the lists, totals and exports read only what's stored.
+// The basic page's state and what it does (the connector build, src/basic.html). Since
+// 0.4.0 the popup holds the hangar and the settings and scans run in a hidden page
+// (src/scan-host.js), so this page is for what needs a page that stays open: the
+// browser's asks (RSI access, Firefox's yes to share), the new RSI account question,
+// Connect, and a scan that can't run hidden. Everything goes through lib.js
+// (window.OH); nothing here reads RSI markup or the website's pages.
 //
 // The scan itself, the pack reads and the sync after a scan are the scan runner's
 // (ui/scan/runner.js), which any page can run. This page runs it in its own tab
-// (`by: 'tab'`), draws what it says in this page's words (./report-lines.js) and keeps
-// what needs a click here: the browser's asks (RSI access, Firefox's yes to share),
-// the new RSI account question, Connect.
+// (`by: 'tab'`) and draws what it says in this page's words (./report-lines.js).
 import { t } from './copy.js';
 import { progressLine, reportLines, reportSummary } from './report-lines.js';
-import { buybacksOf, createRunner, newRun } from '../scan/runner.js';
+import { createRunner, newRun } from '../scan/runner.js';
 
 const OH = globalThis.OH;
 const SITE_DATA = {
@@ -25,12 +24,7 @@ const firefox = () => !!chrome.runtime.getManifest().browser_specific_settings?.
 
 export const hub = $state({
   ready: false,
-  items: [],
-  buybacks: [],
-  scannedAt: null,
-  bbScannedAt: null,
-  owner: null,
-  bbDetails: {},
+  owner: null, // whose hangar is stored (the handle beside the title)
   account: null,
   // Access to robertsspaceindustries.com: off means the Allow Access to RSI card instead
   // of a scan (rsiAllow).
@@ -52,31 +46,21 @@ export const hub = $state({
     askFirefox: null,
     pilot: null,
   },
-  profiles: [],
   update: null, // a newer version waiting for this tab to let it in
   banner: null, // the kill switch's banner (status.json), { message, level }
-  note: '', // the last thing a button did ("Exported …", "Cleared …")
+  note: '', // the last thing that happened (another RSI account signed in)
 });
 
 // --- Data -------------------------------------------------------------------------
-// The stored hangar into the page (`db`: one the scan just read, else read here).
+// Whose hangar is stored (`db`: one the scan just read, else read here).
 async function loadDB(db) {
   db = db || (await OH.loadDB());
-  hub.items = db.sources.hangar?.items || [];
-  hub.scannedAt = db.sources.hangar?.scannedAt || null;
-  hub.buybacks = buybacksOf(db);
-  hub.bbScannedAt = db.sources.buybacks?.scannedAt || null;
   hub.owner = db.owner || null;
-  hub.bbDetails = { ...(await OH.getBuybackDetails()) };
 }
 
 // The runner's account switch (OH.switchProfile) → this page's note.
 const switchedNote = (s) =>
   t(s.restored ? 'basic.switched-back' : 'basic.switched-new', { who: s.who });
-
-export async function refreshProfiles() {
-  hub.profiles = await OH.listProfiles().catch(() => []);
-}
 
 // --- Scan -------------------------------------------------------------------------
 let thisTab = null;
@@ -121,8 +105,6 @@ const runner = createRunner({
     async scanned(report, { db }) {
       hub.scan = { busy: false, detail: '', report: reportLines(report, t) };
       if (db) await loadDB(db);
-      else hub.bbDetails = { ...(await OH.getBuybackDetails()) };
-      await refreshProfiles();
       if (!hub.site.link) await refreshSite();
     },
     syncStart() {
@@ -143,9 +125,6 @@ const runner = createRunner({
       }
       s.syncing = false;
       await refreshSite();
-    },
-    async packs() {
-      hub.bbDetails = { ...(await OH.getBuybackDetails()) };
     },
   },
 });
@@ -179,13 +158,14 @@ export async function scan({ reason = 'page' } = {}) {
   if (report?.held === 'busy') hub.scanElsewhere = true;
 }
 
-// Our hangar page or the popup asked for a scan (src/background.js requestScan): the
-// request names this tab and who asked. Taken once the scan has its scanRunning mark
-// stored (or won't run), so the worker always sees one or the other.
+// Our hangar page or the popup asked for a scan that can't run hidden
+// (src/background.js requestScan): the request names this tab and who asked. Taken once
+// the scan has its scanRunning mark stored (or won't run), so the worker always sees
+// one or the other. A request for the hidden page (src/scan-host.js) names no tab.
 async function scanIfAsked() {
   if (!chrome.storage.session) return;
   const { scanRequest: r } = await chrome.storage.session.get('scanRequest');
-  if (!r) return;
+  if (!r || (r.by && r.by !== 'tab')) return;
   const tab = await thisTabId();
   if (tab == null || r.tabId !== tab) return;
   const go = Date.now() - r.at < 60e3 && !hub.scan.busy;
@@ -346,24 +326,6 @@ async function syncIfAsked() {
   if (Date.now() - at < 10 * 60e3) await syncNow({ auto: true });
 }
 
-// --- Settings ---------------------------------------------------------------------
-export async function clearData() {
-  await OH.clearData();
-  await loadDB();
-  await refreshProfiles();
-  hub.scan.report = null;
-  hub.note = t('basic.cleared');
-}
-export async function removeProfile(nickname) {
-  await OH.deleteProfile(nickname);
-  await refreshProfiles();
-}
-export async function logOut() {
-  const r = await OH.logout();
-  hub.note = r.ok ? t('basic.logged-out') : r.error || t('basic.logout-failed');
-  if (r.ok) hub.account = { loggedIn: false };
-}
-
 // Report a Scan Problem: a new GitHub issue from the Scan Broken template, with the
 // scan's counts and the flight log (no handle, no item names; OH.scanProblemUrl).
 // Nothing is sent: you read it on GitHub and submit it yourself.
@@ -374,11 +336,6 @@ export async function reportProblem() {
     version: chrome.runtime.getManifest().version,
   });
   window.open(url, '_blank', 'noopener');
-}
-
-// The backup file (OH.exportDB: the referral code and its link left out).
-export async function exportJson() {
-  return OH.exportDB();
 }
 
 // --- Updates ----------------------------------------------------------------------
@@ -400,7 +357,7 @@ export async function start() {
     hub.note = switchedNote(switched);
   }
   hub.ready = true;
-  await Promise.all([refreshProfiles(), refreshSite(), rsiAccess()]);
+  await Promise.all([refreshSite(), rsiAccess()]);
   // Turned on or off on the browser's add-ons page while this page is open.
   chrome.permissions?.onAdded?.addListener(() => rsiAccess());
   chrome.permissions?.onRemoved?.addListener(() => rsiAccess());

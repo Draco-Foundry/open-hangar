@@ -326,6 +326,7 @@ test('pack: writes each build its values and cuts the code of flags that are off
           'src/rsi-cart.js',
           'src/sync-schema.js',
           'src/hangar-shape.js',
+          'src/scan-host.js',
           'src/alerts.js',
           'src/background.js',
         ],
@@ -338,6 +339,15 @@ test('pack: writes each build its values and cuts the code of flags that are off
       assert.ok(built(t).manifest.permissions.includes('alarms'), `${t}: alarms`);
       assert.deepEqual(built(t).manifest.optional_permissions, ['notifications'], t);
     }
+    // The hidden scan page (scripts/scan-host.mjs): Chrome and Edge's offscreen document,
+    // Firefox's frame in its event page.
+    assert.ok(built('chrome').manifest.permissions.includes('offscreen'), 'chrome: offscreen');
+    assert.ok(!ff.permissions.includes('offscreen'), 'firefox: no offscreen');
+    assert.match(ff.content_security_policy.extension_pages, /frame-src 'self'/);
+    assert.match(
+      built('chrome').manifest.content_security_policy.extension_pages,
+      /frame-src 'none'/,
+    );
     // Every script the built background.js imports on Chrome is on that list (a flag
     // that's off takes its imports with it: Extension Alerts' src/alerts.js).
     const bg = read('chrome', 'src/background.js');

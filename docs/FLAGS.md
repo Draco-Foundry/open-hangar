@@ -116,17 +116,21 @@ the staging hangar page (hangar-staging.openhangar.space) can talk to that build
 website is the full app, and the extension scans RSI, hands the hangar to our pages and
 keeps one basic page that works on its own. With it on, the toolbar icon opens a popup
 (`src/popup.html`, `ui/popup/`: the Hangar, Wishlist and Settings tabs and the alerts
-bell with the `alerts` flag, [CONNECTOR.md](CONNECTOR.md)) instead of a tab, and the extension's one page is the basic page
-(`src/basic.html`, `ui/basic/`): Pledges and Buy-Backs with search, totals and CSV,
-Export JSON, Report a Scan Problem and the settings (openhangar.space, Clear Data, Saved
-Accounts, Log Out of RSI). It is text only and reads only what's stored, so it works
-with no network and without openhangar.space; its scan is the dashboard's Scan All
-without the store check. Everything the background opened as the dashboard (a scan our
-hangar page or the popup asks for, Connect from the website, Firefox's asks, the reload
-after an update) opens the basic page instead (`hubUrl()` in `src/background.js`). The
-popup's Scan asks the background (`{ ohPopup: 'scan' }`, the `@flag-start connector`
-block), which brings the basic page to the front to run the scan our hangar page asks
-for. Off, the popup and the basic page aren't in the build and that handler is cut.
+bell with the `alerts` flag, [CONNECTOR.md](CONNECTOR.md)) instead of a tab. Its scans
+run in a hidden page, `src/scan.html` (`src/scan-host.js`, `ui/scan/main.js`): an
+offscreen document on Chrome and Edge (the `offscreen` permission), a hidden frame of
+the event page on Firefox (its pages' `frame-src 'self'`), so no tab opens
+(`scripts/scan-host.mjs` adds both per browser; the store check checks both ways). The
+extension's one page left is the basic page (`src/basic.html`, `ui/basic/`), small since
+0.4.0: Firefox's asks, Allow Access to RSI, Connect (`#settings`) and a scan that can't
+run hidden, with its progress, report and Report a Scan Problem; no lists. Its scan is
+the dashboard's Scan All without the store check. Everything the background opened as
+the dashboard (a scan that can't run hidden, Connect from the website, Firefox's asks,
+the reload after an update) opens the basic page instead (`hubUrl()` in
+`src/background.js`). The popup's Scan asks the background (`{ ohPopup: 'scan' }`, the
+`@flag-start connector` block), the same scan our hangar page asks for. Off, the popup,
+the basic page and the hidden scan page aren't in the build, and those handlers are
+cut.
 With it on, the dashboard and its pages are left out of the build, and the pages may
 only send requests to RSI, openhangar.space and the sync site (`connect-src`);
 `scripts/check-store-build.mjs` checks both ways. What it keeps, the plan for removing
@@ -162,12 +166,10 @@ in your buy-backs is in the store again, a paint for a ship you own just arrived
 you own is sold as a warbond, or is on a limited-time sale. The badge counts the items
 you haven't seen (the popup lists them, `ui/popup/Alerts.svelte`, and opening it marks
 them seen); a new one gets a notification. It's off until the pilot turns it on in the
-basic page's settings (`ui/basic/AlertsCard.svelte`) or the popup's (Store Alerts), and
-asks nothing before that: the basic page's Turn On asks for Notifications first (a no
-leaves the badge and the list), the popup has its own Notifications switch, and turning
-alerts off stops the checks and gives Notifications back. The popup's switch asks as the
-click's very first step; if the popup closes for the browser's question, the browser
-keeps the answer.
+popup's settings (Store Alerts), and asks nothing before that: the popup has its own
+Notifications switch, and turning alerts off stops the checks and gives Notifications
+back. The popup's switch asks as the click's very first step; if the popup closes for
+the browser's question, the browser keeps the answer.
 
 The build adds the `alarms` permission (no install warning) and `notifications` as an
 optional permission, asked only when the pilot turns alerts on, never a required one

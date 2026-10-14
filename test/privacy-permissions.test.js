@@ -127,6 +127,40 @@ test('a store or beta build with alerts on: the policy explains its permissions 
   }
 });
 
+// The hidden scan page (scripts/scan-host.mjs): a store or beta build with the connector
+// asks for `offscreen` on Chrome and Edge, never on Firefox, and pack.mjs adds it per
+// browser, so manifest.json (the first test) never shows it. It fails here until both
+// copies of the policy explain it and say which browsers (owner-approved words
+// 2026-10-14, word for word).
+test('a store or beta build with the connector: the policy explains offscreen', async () => {
+  const { buildValues, readRegistry } = await import('../scripts/build-flags.mjs');
+  const { scanHostPermissions } = await import('../scripts/scan-host.mjs');
+  const registry = readRegistry(path.join(ROOT, 'src', 'flags.js'));
+  // What each browser's build adds, checked here so a change to scripts/scan-host.mjs
+  // can't quietly skip the policy.
+  assert.deepEqual(scanHostPermissions({ connector: true }), ['offscreen']);
+  assert.deepEqual(scanHostPermissions({ connector: true }, { firefox: true }), []);
+  assert.deepEqual(scanHostPermissions({ connector: false }), []);
+  // A permission only some browsers ask for names them before its colon.
+  const noted = (bullets, p) => bullets.some((b) => new RegExp(`^${p}( \\([^)]*\\))?:`).test(b));
+  const copies = [
+    ['docs/PRIVACY.md', mdBullets()],
+    ['site/privacy.html', htmlBullets()],
+  ];
+  for (const [build, beta] of [
+    ['store', false],
+    ['beta', true],
+  ])
+    for (const p of scanHostPermissions(buildValues(registry, { beta })))
+      for (const [file, bullets] of copies) {
+        assert.ok(noted(bullets, p), `${file} explains "${p}" (the ${build} build has it)`);
+        assert.ok(
+          bullets.some((b) => b.startsWith(`${p} (Chrome and Edge only):`)),
+          `${file} says only Chrome and Edge ask for "${p}"`,
+        );
+      }
+});
+
 // The wishlist import (ui/scan/wishlist-import.js): a store or beta build with the
 // `wishlistImport` flag on sends the wishlist this browser kept to the openhangar.space
 // account. It fails here until both copies of the policy explain it in Optional Sync

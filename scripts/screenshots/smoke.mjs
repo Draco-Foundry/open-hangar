@@ -4664,7 +4664,8 @@ try {
       changes,
       area,
     );
-  // The popup asks openhangar.space nothing itself (its Wishlist is the alerts' copy).
+  // The Wishlist's requests are the demo's to answer (demo-connector.js): none reaches the
+  // internet.
   const ppAsked = [];
   const ppAsk = (req) => {
     if (/\/api\/v1\/wishlist/.test(req.url())) ppAsked.push(req.url());
@@ -4720,7 +4721,7 @@ try {
   pop.handle === 'Demo_Citizen' &&
   pop.face === PNG &&
   /^Store Credit\s*\$42\.50$/.test(pop.credit.trim()) &&
-  /^Buy-Back Tokens\s*2\s*next \w+ \d+$/.test(pop.tokens.trim()) &&
+  /^Buy-Back Tokens\s*2\s*Next refill \w+ \d+$/.test(pop.tokens.trim()) &&
   /^[▲▼] \$[\d,]+ since \w+ \d+$/.test(pop.since) &&
   pop.tabs.join() === 'Hangar:true,Wishlist:false,Settings:false' &&
   pop.bell === 'Alerts' &&
@@ -4803,8 +4804,9 @@ try {
     'USD',
     'Shortcut',
     'Change ↗',
-    'Export JSON',
-    'Export CSV',
+    'JSON Backup',
+    'Pledges CSV',
+    'Buy-Backs CSV',
     'Saved Accounts',
     'Demo Citizen',
     'Signed In',
@@ -4828,15 +4830,66 @@ try {
   shortGo === 'chrome://extensions/shortcuts'
     ? ok("Change opens the browser's shortcuts page")
     : fail(`popup shortcut change: ${shortGo}`);
-  await page.click('#pp-export-csv');
+  await page.click('#pp-export-pledges');
+  await sleep(100);
+  await page.click('#pp-export-buybacks');
+  await sleep(100);
+  const bbNote = await page.$eval('.pp-settings .pp-note[role="status"]', (e) => e.textContent);
   await page.click('#pp-export-json');
-  const ppSaved = await page.evaluate(() => ({
+  await sleep(100);
+  const ppSaved = await page.evaluate(async () => ({
     types: __demo.saved.map((b) => b.type),
+    head: (await __demo.saved[1]?.text())?.split('\r\n')[0] || '',
+    rows: (await __demo.saved[1]?.text())?.trim().split('\r\n').length - 1,
+    buybacks: (await chrome.storage.local.get('db')).db?.sources?.buybacks?.items?.length,
     note: document.querySelector('.pp-settings .pp-note[role="status"]')?.textContent || '',
+    row: (() => {
+      const [a, b, c] = ['json', 'pledges', 'buybacks'].map((id) =>
+        document.getElementById(`pp-export-${id}`).getBoundingClientRect(),
+      );
+      return a.top === b.top && b.top === c.top;
+    })(),
   }));
-  ppSaved.types.join() === 'text/csv,application/json' && ppSaved.note === 'Backup saved.'
-    ? ok('Export CSV and Export JSON save their files')
-    : fail(`popup exports: ${JSON.stringify(ppSaved)}`);
+  ppSaved.types.join() === 'text/csv,text/csv,application/json' &&
+  ppSaved.head === 'id,name,type,date,contains,insurance,price' &&
+  ppSaved.rows === ppSaved.buybacks &&
+  bbNote === `Saved ${ppSaved.buybacks} rows to a CSV file.` &&
+  ppSaved.note === 'Backup saved.' &&
+  ppSaved.row
+    ? ok(
+        `JSON Backup, Pledges CSV and Buy-Backs CSV (${ppSaved.rows} buy-backs) save their files, one row`,
+      )
+    : fail(`popup exports: ${JSON.stringify({ ppSaved, bbNote })}`);
+  // Currency: USD until one is picked, and no exchange rates asked for USD; EUR picked asks for the day's rates once and shows the
+  // dollar figure on hover; back to USD asks nothing more.
+  const rated = () =>
+    page.evaluate(() => __demo.fetched.filter((u) => /\/rates\.json$/.test(u)).length);
+  const usdFirst = { picked: await page.$eval('#pp-currency', (s) => s.value), asked: await rated() };
+  await page.select('#pp-currency', 'EUR');
+  await sleep(300);
+  const ppEurAsked = await rated();
+  await page.click('#pp-tab-hangar');
+  await page.waitForFunction(() => /€/.test(document.getElementById('pp-value')?.textContent));
+  const ppEur = await page.evaluate(async () => ({
+    value: document.getElementById('pp-value').textContent,
+    title: document.getElementById('pp-value').title,
+    credit: document.querySelector('#pp-credit b')?.title || '',
+    kept: (await chrome.storage.local.get('popupPrefs')).popupPrefs?.currency,
+  }));
+  await page.click('#pp-tab-settings');
+  await page.waitForSelector('#pp-currency');
+  await page.select('#pp-currency', 'USD');
+  await sleep(300);
+  usdFirst.picked === 'USD' &&
+  usdFirst.asked === 0 &&
+  ppEurAsked === 1 &&
+  /€/.test(ppEur.value) &&
+  /^\$[\d,]+$/.test(ppEur.title) &&
+  ppEur.credit === '$42.50' &&
+  ppEur.kept === 'EUR' &&
+  (await rated()) === 1
+    ? ok(`Currency: USD asks no rates; EUR asks once, ${ppEur.value} with ${ppEur.title} on hover`)
+    : fail(`popup currency: ${JSON.stringify({ usdFirst, ppEurAsked, ppEur })}`);
   // Store Alerts on from the popup; Notifications off gives the permission back, and on
   // asks as the click's first step.
   await page.click('#pp-al-sw');
@@ -4941,6 +4994,22 @@ try {
   went === 'https://app.openhangar.space/hangar'
     ? ok("Open My Hangar goes to the website's My Hangar")
     : fail(`popup Open My Hangar: ${went}`);
+
+  // A German browser with no currency picked: still US dollars, and no rates asked (the
+  // policy: only if you pick a currency other than USD).
+  const ppDeHook = await page.evaluateOnNewDocument(() =>
+    Object.defineProperty(navigator, 'language', { get: () => 'de-DE' }),
+  );
+  await popAt(signedIn, '#pp-value');
+  await sleep(300);
+  const ppDe = await page.evaluate(() => ({
+    value: document.getElementById('pp-value').textContent,
+    asked: __demo.fetched.filter((u) => /\/rates\.json$/.test(u)).length,
+  }));
+  await page.removeScriptToEvaluateOnNewDocument(ppDeHook.identifier);
+  /^\$/.test(ppDe.value.trim()) && !/€/.test(ppDe.value) && ppDe.asked === 0
+    ? ok(`no currency picked: US dollars and no rates asked (de-DE: ${ppDe.value.trim()})`)
+    : fail(`popup currency default: ${JSON.stringify(ppDe)}`);
 
   // Scan: a background that scans in the Open Hangar tab brings it to the front (the
   // popup closes, as before); one that scans unseen keeps the popup open with the bar,
@@ -5104,10 +5173,11 @@ try {
     ? ok('a scan that stopped: Scan stopped and Scan Again')
     : fail(`popup stopped: ${JSON.stringify(stopped)}`);
 
-  // Before the first scan: no tabs, one heading and Scan. Signed out: Log In to RSI, a
-  // grey Scan still there to press (the popup reads no RSI cookie, so it can't tell when
-  // you've logged in again). No access to RSI: Allow Access to RSI, on the basic page.
-  // After an update: the dot on the version, once.
+  // Before the first scan: no tabs, one heading and Scan. Signed out: Log In to RSI and a
+  // grey Scan, off while RSI's sign-in cookie is gone and back once it's there again;
+  // still there to press when only the last scan said so (the cookie can't tell). No
+  // access to RSI: Allow Access to RSI, on the basic page. After an update: the dot on
+  // the version, once.
   await popAt({ __demoLocal: { db: null } }, '#pp-first');
   const ppFirst = await page.evaluate(() => ({
     text: document.getElementById('pp-first').textContent.trim(),
@@ -5138,6 +5208,42 @@ try {
   outGo === 'https://robertsspaceindustries.com/connect'
     ? ok("signed out of RSI: Log In to RSI opens RSI's sign-in page, a grey Scan under it")
     : fail(`popup signed out: ${JSON.stringify({ out: ppOut, outGo })}`);
+  // RSI's sign-in cookie gone: Scan greyed and off; signing in (another tab) brings it
+  // back, with no Log In to RSI. The check asks the browser only whether it's there.
+  await popAt({ ...signedIn, __demoCookie: 'out' }, '#pp-login');
+  const ppGone = await page.evaluate(() => ({
+    off: document.getElementById('pp-scan').disabled,
+    grey: document.getElementById('pp-scan').classList.contains('grey'),
+    asks: __demo.cookieAsks,
+  }));
+  await page.evaluate(() => __demo.setCookie(true));
+  await page.waitForFunction(() => !document.getElementById('pp-login'), { timeout: 3000 });
+  const ppBack = await page.evaluate(() => ({
+    on: !document.getElementById('pp-scan').disabled,
+    primary: document.getElementById('pp-scan').classList.contains('primary'),
+  }));
+  // Signed in again and the popup opened afresh: the last scan's "signed out" is old news.
+  await popAt(
+    {
+      ...signedIn,
+      __demoAccount: { loggedIn: false, fetchedAt: T0 - 60e3 },
+      __demoSession: { rsiCookieGone: T0 - 30e3 },
+    },
+    '#pp-scan',
+  );
+  const ppAgain = await page.evaluate(() => ({
+    login: !!document.getElementById('pp-login'),
+    primary: document.getElementById('pp-scan').classList.contains('primary'),
+  }));
+  ppGone.off &&
+  ppGone.grey &&
+  ppGone.asks >= 1 &&
+  ppBack.on &&
+  ppBack.primary &&
+  !ppAgain.login &&
+  ppAgain.primary
+    ? ok("RSI's sign-in cookie gone: Scan greyed and off; back once you sign in again")
+    : fail(`popup sign-in cookie: ${JSON.stringify({ ppGone, ppBack, ppAgain })}`);
   await popAt({ ...signedIn, __demoNoRsi: true }, '#pp-rsi-allow');
   const noRsi = await page.evaluate(() => ({
     scan: !!document.getElementById('pp-scan'),
@@ -5249,8 +5355,9 @@ try {
     ? ok("the scan's sync asked about a new RSI account: Sync It or Not This One on Hangar")
     : fail(`popup pilot ask: ${JSON.stringify({ askPilot, askedPilot })}`);
 
-  // Connected, alerts on, with the Wishlist the store alerts read: named rows, on sale or
-  // not, the count, and Full Wishlist to the website (the popup itself asks nothing).
+  // Connected, the website's Wishlist off for the extension (its 404), alerts on: the
+  // Wishlist the store alerts read, read only as before: named rows, on sale or not, the
+  // count, and Full Wishlist to the website.
   const ppSite = 'https://app.openhangar.space';
   const ppWishLink = { token: 't', name: 'demo@pilot', connectedAt: 1, lastSync: T0 - 60e3 };
   await popAt(
@@ -5297,6 +5404,7 @@ try {
     ),
     more: document.querySelector('#pp-wish .pp-note')?.textContent || '',
     remove: !!document.querySelector('#pp-wish input, #pp-wish [aria-label^="Remove"]'),
+    asked: __demo.wish.map((w) => `${w.method} ${w.url} ${w.auth}`),
   }));
   await page.click('#pp-wish-full');
   const wishFull = await page.evaluate(() => __demo.opened.at(-1));
@@ -5304,11 +5412,12 @@ try {
   ppWish.rows.join(' | ') === 'Avenger Titan On Sale $55 | Zeus Mk II CL Not for Sale' &&
   ppWish.more === 'And 1 more' &&
   !ppWish.remove &&
+  ppWish.asked.join() === `GET ${ppSite}/api/v1/wishlist?with=items Bearer t` &&
   wishFull === `${ppSite}/hangar/wishlist`
-    ? ok('Wishlist, connected: named rows, on sale or not, read only, Full Wishlist ↗')
+    ? ok('Wishlist, the website not taking changes: read only as before, Full Wishlist ↗')
     : fail(`popup wishlist: ${JSON.stringify({ ppWish, wishFull })}`);
   // No sale feed kept yet: the ship list names the ships (never an empty list over "And
-  // N more").
+  // N more"), and nothing is said about sales.
   await popAt(
     {
       ...signedIn,
@@ -5335,12 +5444,11 @@ try {
     more: !!document.querySelector('#pp-wish .pp-note'),
   }));
   wishNoFeed.head === 'Your Wishlist · 2' &&
-  wishNoFeed.rows.join(' | ') === 'Avenger Titan Not for Sale | Zeus Mk II CL Not for Sale' &&
+  wishNoFeed.rows.join(' | ') === 'Avenger Titan | Zeus Mk II CL' &&
   !wishNoFeed.more
-    ? ok('Wishlist with no sale feed yet: named from the ship list')
+    ? ok('Wishlist with no sale feed yet: named from the ship list, nothing said about sales')
     : fail(`popup wishlist, no feed: ${JSON.stringify(wishNoFeed)}`);
-  // Store alerts off (the default): nothing is read (the privacy policy), the Wishlist
-  // lives on the website.
+  // The website's Wishlist off and store alerts off: the Wishlist lives on the website.
   await popAt(
     {
       ...signedIn,
@@ -5349,9 +5457,243 @@ try {
     '#pp-wish-off',
   );
   const wishOff = await page.$eval('#pp-wish-off', (e) => e.textContent.replace(/\s+/g, ' ').trim());
-  wishOff === 'Your Wishlist Lives on openhangar.space Full Wishlist ↗' && !ppAsked.length
-    ? ok('Wishlist with store alerts off: nothing read, Full Wishlist ↗ to the website')
-    : fail(`popup wishlist, alerts off: ${JSON.stringify({ wishOff, ppAsked })}`);
+  wishOff === 'Your Wishlist Lives on openhangar.space Full Wishlist ↗'
+    ? ok("Wishlist off on the website, alerts off: Full Wishlist ↗ to the website")
+    : fail(`popup wishlist, alerts off: ${JSON.stringify({ wishOff })}`);
+
+  // The website takes changes (its extension_wishlist_write on): the items it read, a
+  // search on this device (what's typed goes nowhere), add, Target Price and Remove, one
+  // POST each with only the change, and Disconnect deletes the copy kept here.
+  const wishItem = (key, name, more = {}) => ({
+    key,
+    name,
+    category: 'ships',
+    target: null,
+    insurance: null,
+    from: null,
+    at: 1,
+    ...more,
+  });
+  await popAt(
+    {
+      ...signedIn,
+      __demoWish: {
+        mode: 'items',
+        items: [
+          wishItem('ship:avenger-titan', 'Avenger Titan', { target: 5000, insurance: 'lti' }),
+          wishItem('sku:501', 'Cutlass - Ghoulish Green Paint', { category: 'paints' }),
+        ],
+      },
+      __demoLocal: {
+        popupPrefs: { tab: 'wishlist' },
+        siteUrl: ppSite,
+        siteLink: ppWishLink,
+        alertsOn: true,
+        alertsFeed: {
+          data: {
+            v: 1,
+            ships: [
+              { slug: 'avenger-titan', name: 'Avenger Titan', keys: [] },
+              { slug: 'zeus-mk-ii-cl', name: 'Zeus Mk II CL', keys: [] },
+            ],
+            items: [
+              { id: 'sku-1', kind: 'ship', name: 'Avenger Titan', price: 55, sale: [], ships: ['avenger-titan'] },
+              { id: 'sku-501', kind: 'paint', name: 'Cutlass - Ghoulish Green Paint', price: 10, sale: [], ships: [] },
+              { id: 'upgrade-16', kind: 'upgrade', name: 'Upgrade to Freelancer', price: 110, sale: [], ships: [] },
+            ],
+          },
+        },
+      },
+    },
+    '.pp-wedit li',
+  );
+  const wishRowsNow = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('.pp-wedit li')].map((li) => ({
+        text: li.querySelector('.pp-wrow').textContent.replace(/\s+/g, ' ').trim(),
+        target: li.querySelector('.pp-wtarget input').value,
+        label: li.querySelector('.pp-wtarget').textContent.replace(/[\s$]+/g, ' ').trim(),
+        remove: li.querySelector('.pp-wx').getAttribute('aria-label'),
+      })),
+    );
+  const ppEd = {
+    head: await page.$eval('#pp-wish-h', (e) => e.textContent),
+    rows: await wishRowsNow(),
+    placeholder: await page.$eval('#pp-wish-q', (e) => e.placeholder),
+  };
+  // Typing finds on the device: the request log doesn't move.
+  const ppBefore = await page.evaluate(() => __demo.fetched.length);
+  await page.type('#pp-wish-q', 'zeus');
+  await page.waitForSelector('.pp-wadd');
+  const ppFound = await page.evaluate((n) => ({
+    names: [...document.querySelectorAll('.pp-wadd')].map((b) =>
+      b.textContent.replace(/\s+/g, ' ').trim(),
+    ),
+    sent: __demo.fetched.slice(n),
+  }), ppBefore);
+  await page.click('.pp-wadd');
+  await page.waitForFunction(() => document.querySelectorAll('.pp-wedit li').length === 3);
+  const afterAdd = {
+    q: await page.$eval('#pp-wish-q', (e) => e.value),
+    focus: await page.evaluate(() => document.activeElement?.id),
+    rows: (await wishRowsNow()).map((r) => r.text),
+  };
+  await page.type('#pp-wish-q', 'upgrade freel');
+  await page.waitForFunction(
+    () => document.querySelector('.pp-wadd .pp-iname')?.textContent === 'Upgrade to Freelancer',
+  );
+  await page.click('.pp-wadd');
+  await page.waitForFunction(() => document.querySelectorAll('.pp-wedit li').length === 4);
+  // Target Price: a price the website can't take stays here, marked; one it can goes.
+  const paintTarget = '.pp-wedit li:nth-child(4) .pp-wtarget input';
+  await page.click(paintTarget);
+  await page.type(paintTarget, 'abc');
+  await page.keyboard.press('Enter');
+  await sleep(200);
+  const badMark = await page.$eval(paintTarget, (e) => e.getAttribute('aria-invalid'));
+  const sentBad = await page.evaluate(() => __demo.wish.filter((w) => w.method === 'POST').length);
+  await page.$eval(paintTarget, (e) => (e.value = ''));
+  await page.type(paintTarget, '7.5');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(
+    (sel) => document.querySelector(sel)?.value === '7.50' && !document.querySelector(sel).disabled,
+    {},
+    paintTarget,
+  );
+  // Remove the Avenger Titan.
+  await page.click('.pp-wedit li:nth-child(3) .pp-wx');
+  await page.waitForFunction(() => document.querySelectorAll('.pp-wedit li').length === 3);
+  const wishDone = await page.evaluate(async () => ({
+    head: document.getElementById('pp-wish-h').textContent,
+    rows: [...document.querySelectorAll('.pp-wedit .pp-aname')].map((e) => e.textContent),
+    posts: __demo.wish
+      .filter((w) => w.method === 'POST')
+      .map((w) => ({ auth: w.auth, url: w.url, body: w.body })),
+    reads: __demo.wish.filter((w) => w.method === 'GET').length,
+    kept: (await chrome.storage.local.get('popupWish')).popupWish?.items?.map((i) => i.key),
+    wide: document.documentElement.scrollWidth > 360,
+  }));
+  const POSTS = [
+    { v: 1, do: 'add', item: { kind: 'ship', name: 'Zeus Mk II CL' } },
+    { v: 1, do: 'add', item: { kind: 'ccu', id: 'upgrade-16', name: 'Upgrade to Freelancer' } },
+    { v: 1, do: 'save', key: 'sku:501', target: '7.50' },
+    { v: 1, do: 'remove', key: 'ship:avenger-titan' },
+  ];
+  ppEd.head === 'Your Wishlist · 2' &&
+  ppEd.rows[0].text === 'Avenger Titan On Sale $55 ✕' &&
+  ppEd.rows[0].target === '50' &&
+  ppEd.rows[0].label === 'Target Price' &&
+  ppEd.rows[0].remove === 'Remove Avenger Titan' &&
+  ppEd.rows[1].text === 'Cutlass - Ghoulish Green Paint On Sale $10 ✕' &&
+  ppEd.placeholder === 'Add a ship, paint or upgrade' &&
+  ppFound.names.slice(0, 3).join() === 'Zeus Mk II CL +,Zeus Mk II ES +,Zeus Mk II MR +' &&
+  !ppFound.sent.length &&
+  afterAdd.q === '' &&
+  afterAdd.focus === 'pp-wish-q' &&
+  afterAdd.rows[0] === 'Zeus Mk II CL Not for Sale ✕' &&
+  badMark === 'true' &&
+  sentBad === 2 &&
+  JSON.stringify(wishDone.posts.map((p) => p.body)) === JSON.stringify(POSTS) &&
+  wishDone.posts.every((p) => p.auth === 'Bearer t' && p.url === `${ppSite}/api/v1/wishlist`) &&
+  wishDone.reads === 1 &&
+  wishDone.head === 'Your Wishlist · 3' &&
+  wishDone.rows.join() === 'Upgrade to Freelancer,Zeus Mk II CL,Cutlass - Ghoulish Green Paint' &&
+  wishDone.kept?.join() === 'ccu:16,ship:zeus-mk-ii-cl,sku:501' &&
+  !wishDone.wide
+    ? ok('Wishlist editing: search here, add, Target Price, Remove; one POST each, only the change')
+    : fail(`popup wishlist editing: ${JSON.stringify({ ppEd, ppFound, afterAdd, badMark, wishDone })}`);
+  // A Target Price that doesn't go through (the website down, no Retry-After the popup
+  // can read): the field puts back the price the website has, the note says so, and
+  // the next change waits the website's minute.
+  const paintNow = '.pp-wedit li:nth-child(3) .pp-wtarget input';
+  await page.evaluate(() => (__demo.wishDown = true));
+  await page.$eval(paintNow, (e) => (e.value = ''));
+  await page.type(paintNow, '12');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(
+    (sel) => document.getElementById('pp-wish-note') && !document.querySelector(sel).disabled,
+    {},
+    paintNow,
+  );
+  await sleep(100);
+  const wishDown = await page.evaluate(async (sel) => {
+    const el = document.querySelector(sel);
+    const { popupWish } = await chrome.storage.local.get('popupWish');
+    return {
+      value: el.value,
+      invalid: el.getAttribute('aria-invalid'),
+      note: document.getElementById('pp-wish-note').textContent,
+      sent: __demo.wish.at(-1)?.body,
+      held: Number(popupWish?.holdUntil) > Date.now(),
+    };
+  }, paintNow);
+  await page.evaluate(() => (__demo.wishDown = false));
+  wishDown.value === '7.50' &&
+  !wishDown.invalid &&
+  wishDown.note === "Couldn't Reach openhangar.space" &&
+  wishDown.sent?.target === '12' &&
+  wishDown.held
+    ? ok("a Target Price that didn't go through: the saved one back in the field, a minute's hold")
+    : fail(`popup wishlist failed save: ${JSON.stringify(wishDown)}`);
+  // Disconnect deletes the copy kept here (the Wishlist stays on the account).
+  await page.click('#pp-tab-settings');
+  await page.waitForSelector('#pp-disconnect');
+  await page.click('#pp-disconnect');
+  await page.waitForSelector('#pp-disconnect-yes');
+  await page.click('#pp-disconnect-yes');
+  await sleep(300);
+  const wishGone = await page.evaluate(async () => {
+    const got = await chrome.storage.local.get(['popupWish', 'siteLink']);
+    return { copy: 'popupWish' in got, link: 'siteLink' in got };
+  });
+  !wishGone.copy && !wishGone.link
+    ? ok("Disconnect deletes the popup's Wishlist copy")
+    : fail(`popup disconnect, the Wishlist copy: ${JSON.stringify(wishGone)}`);
+  // Store alerts off: the search finds ships only and its placeholder says so; a search
+  // that finds nothing (a paint's name: paints come with the alerts' sale feed) says No
+  // matches. under the box; one letter isn't searched, so nothing is said.
+  await popAt(
+    {
+      ...signedIn,
+      __demoWish: { mode: 'items', items: [wishItem('ship:avenger-titan', 'Avenger Titan')] },
+      __demoLocal: { popupPrefs: { tab: 'wishlist' }, siteUrl: ppSite, siteLink: ppWishLink },
+    },
+    '.pp-wedit li',
+  );
+  const setWishQ = (v) =>
+    page.$eval(
+      '#pp-wish-q',
+      (e, s) => {
+        e.value = s;
+        e.dispatchEvent(new Event('input', { bubbles: true }));
+      },
+      v,
+    );
+  const wishNoMatch = () =>
+    page.evaluate(() => ({
+      line: document.getElementById('pp-wish-none')?.textContent ?? null,
+      found: document.querySelectorAll('.pp-wadd').length,
+    }));
+  const offHint = await page.$eval('#pp-wish-q', (e) => [e.placeholder, e.getAttribute('aria-label')]);
+  await page.type('#pp-wish-q', 'ghoulish');
+  await page.waitForSelector('#pp-wish-none');
+  const offNone = await wishNoMatch();
+  await setWishQ('g');
+  await sleep(100);
+  const offShort = await wishNoMatch();
+  await setWishQ('');
+  await page.type('#pp-wish-q', 'zeus');
+  await page.waitForSelector('.pp-wadd');
+  const offShips = await wishNoMatch();
+  offHint.join() === 'Add a ship,Add a ship' &&
+  offNone.line === 'No matches.' &&
+  offNone.found === 0 &&
+  offShort.line === null &&
+  offShort.found === 0 &&
+  offShips.line === null &&
+  offShips.found > 0
+    ? ok('Wishlist search, alerts off: Add a ship, and No matches. when a search finds nothing')
+    : fail(`popup wishlist search, alerts off: ${JSON.stringify({ offHint, offNone, offShort, offShips })}`);
 
   // Saved Accounts: another account's hangar can be removed (the privacy policy promises
   // it), after a question; Log Out of RSI; Clear Data asks first.
@@ -5470,12 +5812,14 @@ try {
   await page.setViewport({ width: 1280, height: 900 });
   page.off('request', ppAsk);
   !ppAsked.length
-    ? ok('the popup never asked openhangar.space for the Wishlist itself')
-    : fail(`popup asked for the Wishlist: ${JSON.stringify(ppAsked)}`);
+    ? ok('no Wishlist request reached the internet (the demo answers each one)')
+    : fail(`popup Wishlist request went out: ${JSON.stringify(ppAsked)}`);
 
-  // The basic page (the connector build, src/basic.html): the lists with search and
-  // totals, the CSV and backup files, Clear Data, a scan, Report a Scan Problem, all
-  // with every request off this computer refused (it must work with no network).
+  // The basic page (the connector build, src/basic.html), small since 0.4.0: no lists,
+  // search, totals or CSV (the popup and openhangar.space have the hangar), only what
+  // needs a page that stays open. A scan, Report a Scan Problem, Firefox's asks and
+  // Connect, all with every request off this computer refused (it must work with no
+  // network).
   console.log('Basic Page');
   const outside = [];
   await page.setRequestInterception(true);
@@ -5487,74 +5831,60 @@ try {
   };
   page.on('request', offline);
   await page.goto(URL0 + 'basic.html', { waitUntil: 'networkidle0' });
-  await page.waitForSelector('#bp-pledges tbody tr');
-  const bp = await page.evaluate(async () => {
-    const db = await OH.loadDB();
-    const q = (s) => document.querySelector(s);
-    return {
-      rows: document.querySelectorAll('#bp-pledges tbody tr').length,
-      items: db.sources.hangar.items.length,
-      totals: q('.bp-totals').textContent,
-      tab: q('.bp-tabs [aria-current="page"]').getAttribute('href'),
-    };
+  await page.waitForSelector('#bp-about');
+  const slim = await page.evaluate(() => ({
+    about: document.getElementById('bp-about').textContent.trim(),
+    scan: !!document.getElementById('bp-scan'),
+    gone: [
+      '#bp-pledges',
+      '#bp-buybacks',
+      '.bp-tabs',
+      '.bp-search',
+      '.bp-totals',
+      'table',
+      '#bp-site',
+      '#bp-export-json',
+      '#bp-clear',
+      '#bp-accounts',
+      '#bp-logout',
+      '#bp-alerts',
+    ].filter((sel) => document.querySelector(sel)),
+    csv: [...document.querySelectorAll('button')].some((b) => /CSV/.test(b.textContent)),
+  }));
+  slim.about ===
+    "Open Hangar lives in the toolbar popup now. This page only opens when it needs to ask you something, or when a scan can't run hidden." &&
+  slim.scan &&
+  !slim.gone.length &&
+  !slim.csv
+    ? ok('the slim page: Scan and its one line; no lists, search, totals, CSV or settings')
+    : fail(`basic page slim: ${JSON.stringify(slim)}`);
+  // Opened for openhangar.space (#settings: the popup's Connect, the background's asks):
+  // the openhangar.space card and nothing else of the old settings. The demo has no sync
+  // site built in, so it's set here (a store build has production's).
+  await page.evaluate(async () => {
+    await chrome.storage.local.set({ siteUrl: 'https://app.openhangar.space' });
+    for (const f of __demo.listeners) f({ siteLink: { newValue: undefined } }, 'local');
+    location.hash = '#settings';
   });
-  bp.rows === Math.min(bp.items, 300) &&
-  /^[\d,]+ pledges?, \$[\d,.]+ melt \([\d,]+ with melt listed\)/.test(bp.totals)
-    ? ok(`Pledges: ${bp.rows} rows and their totals, offline`)
-    : fail(`basic page pledges: ${JSON.stringify(bp)}`);
-  const firstName = await page.$eval('#bp-pledges tbody td.name', (e) =>
-    e.firstChild.textContent.trim(),
-  );
-  await page.type('.bp-search', firstName);
-  await new Promise((r) => setTimeout(r, 200));
-  const found = await page.$$eval('#bp-pledges tbody tr', (r) => r.length);
-  await page.click('#bp-pledges .bp-bar .bp-btn');
-  const csv = await page.evaluate(async () => {
-    const b = __demo.saved.at(-1);
-    return b ? await b.text() : '';
-  });
-  const csvRows = csv.trim().split('\r\n');
-  found >= 1 &&
-  found < bp.rows &&
-  csvRows[0].startsWith('id,name,type,value') &&
-  csvRows.length === found + 1
-    ? ok(`search finds ${found} row(s); Export CSV saves just those`)
-    : fail(`basic search/CSV: ${JSON.stringify({ found, csvRows: csvRows.length })}`);
-  await page.click('.bp-tabs a[href="#buybacks"]');
-  await page.waitForSelector('#bp-buybacks');
-  const bbRows = await page.$$eval('#bp-buybacks tbody tr', (r) => r.length);
-  bbRows > 0 ? ok(`Buy-Backs: ${bbRows} rows`) : fail('basic page: no buy-back rows');
-  await page.click('.bp-tabs a[href="#settings"]');
-  await page.waitForSelector('#bp-export-json');
-  await page.click('#bp-export-json');
-  const bpBackup = await page.evaluate(async () => {
-    const text = await __demo.saved.at(-1).text();
-    const j = JSON.parse(text);
-    return {
-      app: j.app,
-      pledges: j.sources?.hangar?.items?.length,
-      code: text.includes(window.DEMO_REFERRAL.code),
-      hash: location.hash,
-    };
-  });
-  bpBackup.pledges === bp.items && !bpBackup.code && bpBackup.hash === '#settings'
-    ? ok('Export JSON: the whole hangar, no referral code')
-    : fail(`basic backup: ${JSON.stringify(bpBackup)}`);
-  await page.click('#bp-clear');
-  const asked = await page.$('#bp-clear-yes');
-  await page.click('#bp-clear-yes');
-  await page.waitForFunction(
-    () => !document.querySelector('.bp-tabs small')?.textContent.match(/[1-9]/),
-  );
-  const cleared = await page.evaluate(
-    async () => (await OH.loadDB()).sources.hangar?.items?.length || 0,
-  );
-  asked && cleared === 0
-    ? ok('Clear Data asks first, then clears')
-    : fail(`basic Clear Data: ${JSON.stringify({ asked: !!asked, cleared })}`);
+  await page.waitForSelector('#bp-site');
+  const forSite = await page.evaluate(() => ({
+    connect: !!document.getElementById('bp-connect'),
+    about: !!document.getElementById('bp-about'),
+    others: ['#bp-export-json', '#bp-clear', '#bp-accounts', '#bp-logout', '#bp-alerts'].filter(
+      (sel) => document.querySelector(sel),
+    ),
+  }));
+  forSite.connect && !forSite.about && !forSite.others.length
+    ? ok('#settings: the openhangar.space card with Connect, and only that')
+    : fail(`basic page #settings: ${JSON.stringify(forSite)}`);
+  await page.goto('about:blank'); // a new document (dropping the hash might only scroll)
+  await page.goto(URL0 + 'basic.html', { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#bp-about');
   // A scan (RSI stood in for): saved, reported, then one that fails offers Report a
   // Scan Problem, which opens a prefilled GitHub issue.
   const bpScan = await page.evaluate(async () => {
+    // An empty browser, so no buy-back pack is read after the scan (that asks RSI).
+    await OH.clearData();
     const item = (i) => ({
       id: String(500 + i),
       name: `Demo Pledge ${i}`,
@@ -5677,9 +6007,9 @@ try {
   outsideNow.length === 0
     ? ok(`no request off this computer but the kill switch file (${outside.length} refused)`)
     : fail(`basic page asked the network: ${outsideNow.join(', ')}`);
-  // A phone-width window: no sideways scroll for the page (the table scrolls in its box).
+  // A phone-width window: no sideways scroll for the page.
   await page.setViewport({ width: 375, height: 800 });
-  await page.goto(URL0 + 'basic.html#pledges', { waitUntil: 'networkidle0' });
+  await page.goto(URL0 + 'basic.html', { waitUntil: 'networkidle0' });
   const narrow = await page.evaluate(() => document.documentElement.scrollWidth);
   narrow <= 375
     ? ok('375 px wide: no sideways scroll')
@@ -6002,55 +6332,88 @@ try {
     ? ok('an alert opens that item on our Store')
     : fail(`alert row went to ${alRow}`);
   await page.removeScriptToEvaluateOnNewDocument(alHook.identifier);
-  await page.setViewport({ width: 1280, height: 900 });
-  // The basic page's switch.
-  await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
-  await page.waitForSelector('#bp-alerts-on');
-  await page.click('#bp-alerts-on');
-  await page.waitForSelector('#bp-alerts-off');
-  const alSwitch = await page.evaluate(async () => ({
-    asked: __demo.asked,
-    on: (await chrome.storage.local.get('alertsOn')).alertsOn,
-    card: document.getElementById('bp-alerts').textContent.replace(/\s+/g, ' '),
-  }));
-  await page.click('#bp-alerts-off');
-  await page.waitForSelector('#bp-alerts-on');
-  const alSwitchOff = await page.evaluate(async () => ({
-    removed: __demo.removed,
-    on: (await chrome.storage.local.get('alertsOn')).alertsOn,
-  }));
-  alSwitch.asked.join() === 'notifications' &&
-  alSwitch.on === true &&
-  alSwitch.card.includes('Notifications are on.') &&
-  alSwitch.card.includes('Connect to openhangar.space to add your Wishlist.') &&
-  alSwitchOff.removed.join() === 'notifications' &&
-  alSwitchOff.on === false
-    ? ok(
-        'settings: Turn On asks for Notifications and switches alerts on; Turn Off gives them back',
-      )
-    : fail(`alerts switch: ${JSON.stringify({ alSwitch, alSwitchOff })}`);
-  // A no from the browser: alerts still on (the badge and the list), and a way to ask again.
-  const noHook = await page.evaluateOnNewDocument(() => (window.__demoNotify = false));
-  // A new document (the same address with a hash would only scroll).
+  // Alerts on with nothing that's news for your ships: Fleet News says so, and All Alerts
+  // still opens the rest.
+  const quiet = {
+    ...alState,
+    popupPrefs: { tab: 'hangar' },
+    alerts: { ...alState.alerts, items: alState.alerts.items.slice(0, 2) },
+  };
+  const quietHook = await page.evaluateOnNewDocument((st) => (window.__demoAlerts = st), quiet);
   await page.goto('about:blank');
-  await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
-  await page.waitForSelector('#bp-alerts-on');
-  await page.click('#bp-alerts-on');
-  await page.waitForSelector('#bp-alerts-allow');
-  const alNo = await page.$eval('#bp-alerts', (e) => e.textContent.replace(/\s+/g, ' '));
-  await page.removeScriptToEvaluateOnNewDocument(noHook.identifier);
-  alNo.includes('Notifications are off, so alerts show on the badge and in the popup only.') &&
-  alNo.includes('Ask for Notifications Again')
-    ? ok('Notifications said no: alerts on, the badge only, and Allow to ask again')
-    : fail(`alerts without notifications: ${alNo}`);
-  await page.setViewport({ width: 375, height: 800 });
-  await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
-  await page.waitForSelector('#bp-alerts');
-  const alNarrow = await page.evaluate(() => document.documentElement.scrollWidth);
-  alNarrow <= 375
-    ? ok('settings with the alerts card at 375 px: no sideways scroll')
-    : fail(`settings ${alNarrow} px wide at 375`);
+  await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#pp-news');
+  const alQuiet = await page.evaluate(() => ({
+    none: document.getElementById('pp-news-none')?.textContent || '',
+    items: document.querySelectorAll('#pp-news .pp-item').length,
+    all: !!document.getElementById('pp-all-alerts'),
+  }));
+  await page.removeScriptToEvaluateOnNewDocument(quietHook.identifier);
+  alQuiet.none === 'No news for your ships right now.' && !alQuiet.items && alQuiet.all
+    ? ok('Fleet News with nothing for your ships: "No news for your ships right now."')
+    : fail(`popup fleet news empty: ${JSON.stringify(alQuiet)}`);
   await page.setViewport({ width: 1280, height: 900 });
+  // The alerts switch is the popup's since 0.4.0: the basic page has none.
+  await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#bp-scan:not([disabled])');
+  const noSwitch = await page.evaluate(() => !document.querySelector('#bp-alerts, #bp-alerts-on'));
+  noSwitch
+    ? ok("the basic page has no alerts switch (it's the popup's)")
+    : fail('basic page: an alerts switch is still there');
+  await page.setViewport({ width: 1280, height: 900 });
+
+  // The hidden scan page (src/scan.html, ui/scan/main.js), as Firefox's frame: it takes
+  // the scan asked of its run, says it's still there as it reads (the event page would
+  // be suspended otherwise), saves its report and says it's done. Offline, RSI stood in
+  // for (__demoScan).
+  console.log('Hidden Scan Page');
+  const hiddenRun = 'smoke1-0a0b0c0d0e0f';
+  const scanHook = await page.evaluateOnNewDocument((r) => {
+    window.__demoScan = true;
+    window.__demoSession = {
+      scanRequest: { at: Date.now(), tabId: null, reason: 'popup', run: r, by: 'frame' },
+    };
+  }, hiddenRun);
+  await page.setRequestInterception(true);
+  const asked = [];
+  const cutOff = (req) => {
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)[:/]/.test(req.url()) || req.url().startsWith('data:'))
+      return req.continue();
+    asked.push(req.url());
+    req.abort('internetdisconnected');
+  };
+  page.on('request', cutOff);
+  await page.goto(`${URL0}scan.html?run=${hiddenRun}&by=frame&v=0.4.0`, { waitUntil: 'load' });
+  await page
+    .waitForFunction(() => __demo.sent.some((m) => m.ohScan?.op === 'done'), { timeout: 30000 })
+    .catch(() => {});
+  const hidden = await page.evaluate(async () => ({
+    sent: __demo.sent.map((m) => m.ohScan?.op || Object.keys(m)[0]),
+    done: __demo.sent.find((m) => m.ohScan?.op === 'done')?.ohScan || null,
+    report: (await chrome.storage.local.get('scanReport')).scanReport || null,
+    left: Object.keys(
+      await chrome.storage.session.get(['scanRequest', 'scanRunning', 'scanProgress']),
+    ),
+    text: document.body.innerText.trim(),
+  }));
+  page.off('request', cutOff);
+  await page.setRequestInterception(false);
+  await page.removeScriptToEvaluateOnNewDocument(scanHook.identifier);
+  hidden.done?.run === hiddenRun &&
+  hidden.sent.includes('ping') &&
+  hidden.sent.at(-1) === 'done' &&
+  hidden.report?.run === hiddenRun &&
+  hidden.report.by === 'frame' &&
+  hidden.report.reason === 'popup' &&
+  hidden.report.rows?.[0]?.n === 2 &&
+  !hidden.left.length &&
+  !hidden.text
+    ? ok('the hidden page: takes its run, pings as it reads, reports, says done, shows nothing')
+    : fail(`hidden scan page: ${JSON.stringify(hidden)}`);
+  const offStatus = asked.filter((u) => !/^https:\/\/openhangar\.space\/status\.json/.test(u));
+  !offStatus.length
+    ? ok(`the hidden page asked nothing off this computer but the kill switch file`)
+    : fail(`hidden scan page asked the network: ${offStatus.join(', ')}`);
 } finally {
   await browser.close();
   server.kill();

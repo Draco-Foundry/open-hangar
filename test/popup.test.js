@@ -265,7 +265,10 @@ test("Wishlist keys by the website's ship slug", async () => {
   assert.equal(shipSlug(null), '');
 });
 
-test('the Wishlist tab reads only the store alerts’ copy, and nothing with alerts off', async () => {
+// The read-only list when the website's Wishlist read doesn't answer for the tab (its 404):
+// the store alerts' copy, as before, which asks nothing itself. The tab's own read is
+// test/popup-wishlist.test.js.
+test('the read-only Wishlist: the store alerts’ copy, and nothing with alerts off', async () => {
   const { readWishlist } = await import('../ui/popup/wishlist.js');
   const was = { chrome: globalThis.chrome, AL: globalThis.OHAlerts, fetch: globalThis.fetch };
   let store = {};
@@ -373,8 +376,9 @@ test('the shortcut: the browser’s for opening the popup, or none', async () =>
 test('the popup settings: anything odd stored reads as the defaults', async () => {
   const { cleanPrefs, LOOKS, CURRENCIES } = await import('../ui/popup/prefs.js');
   assert.deepEqual(LOOKS, ['auto', 'dark', 'light']);
-  assert.deepEqual(CURRENCIES, ['USD']);
-  const def = { tab: 'hangar', look: 'auto', currency: 'USD', seenVersion: '', reportSeenAt: 0 };
+  assert.equal(CURRENCIES[0], 'USD');
+  // No currency picked yet: '' (US dollars then, ui/popup/currency.js).
+  const def = { tab: 'hangar', look: 'auto', currency: '', seenVersion: '', reportSeenAt: 0 };
   assert.deepEqual(cleanPrefs(undefined), def);
   assert.deepEqual(cleanPrefs([]), def);
   assert.deepEqual(cleanPrefs({ look: 'neon', currency: 'XYZ', reportSeenAt: 'x' }), def);
@@ -382,6 +386,8 @@ test('the popup settings: anything odd stored reads as the defaults', async () =
     cleanPrefs({ tab: 'settings', look: 'light', seenVersion: '0.4.0', reportSeenAt: NOW }),
     { ...def, tab: 'settings', look: 'light', seenVersion: '0.4.0', reportSeenAt: NOW },
   );
+  assert.equal(cleanPrefs({ currency: 'EUR' }).currency, 'EUR');
+  assert.equal(cleanPrefs({ currency: 'USD' }).currency, 'USD', 'USD picked stays picked');
 });
 
 test("popup copy: Title Case labels, no em dashes, and the basic page's words word for word", async () => {
@@ -467,7 +473,41 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
     for (const w of t(k, { version: '0.4.0' }).split(/\s+/).slice(1))
       if (/^[a-z]/.test(w) && !SMALL.has(w) && !/^openhangar\.space/.test(w))
         assert.fail(`${k}: "${w}" in Title Case`);
-  // Every new word waits for the owner's OK, said beside it.
+  // The owner's approved words (2026-10-14), word for word.
+  const APPROVED = {
+    'popup.token-next': 'Next refill {date}',
+    'popup.fleet-news-none': 'No news for your ships right now.',
+    'popup.wish-search': 'Add a ship, paint or upgrade',
+    'popup.wish-search-ships': 'Add a ship',
+    'popup.wish-no-match': 'No matches.',
+    'popup.wish-not-added': "Couldn't add {name}.",
+    'popup.wish-remove': 'Remove {name}',
+    'popup.wish-target': 'Target Price',
+    'popup.export-json': 'JSON Backup',
+    'popup.export-pledges': 'Pledges CSV',
+    'popup.export-buybacks': 'Buy-Backs CSV',
+    'popup.auto-first': 'Runs once a day while your browser is open.',
+    'popup.auto-quick': 'Last: {when}, no changes',
+    'popup.auto-full': 'Last: {when}, hangar updated',
+    'popup.auto-signed-out': 'Skipped {when}: signed out of RSI',
+    'popup.auto-other': 'Skipped {when}: a different RSI account is signed in',
+    'popup.auto-paused': 'Skipped {when}: scans are paused',
+    'popup.auto-bad': "Last: {when}, something looked wrong and wasn't saved. Scan to check.",
+    'popup.auto-stopped': 'Last: {when}, RSI stopped answering partway. Scan to check.',
+  };
+  // The retired line (replaced 2026-10-14) is gone for good.
+  for (const k of KEYS) assert.ok(!/kept your last good scan/.test(t(k)), `${k}: retired words`);
+  for (const [k, words] of Object.entries(APPROVED)) assert.equal(t(k), words, k);
+  for (const k of ['popup.wish-target', 'popup.export-json', 'popup.export-pledges'])
+    for (const w of t(k).split(/\s+/)) assert.match(w, /^[A-Z]/, `${k}: Title Case`);
+  // Only the words still waiting for the owner's OK carry the mark, each one said
+  // beside it (NEW_WORDS lists them for the PR).
+  const { NEW_WORDS } = await import('../ui/popup/copy.js');
   const src = fs.readFileSync(path.join(ROOT, 'ui/popup/copy.js'), 'utf8');
-  assert.ok((src.match(/NEW: needs the owner's OK/g) || []).length >= 40);
+  const marked = src
+    .split('\n')
+    .filter((l) => /^\s+'popup\.[^']+':.*NEW: needs the owner's OK/.test(l))
+    .map((l) => /'(popup\.[^']+)'/.exec(l)[1]);
+  assert.deepEqual(marked, NEW_WORDS);
+  for (const k of NEW_WORDS) assert.ok(KEYS.includes(k), k);
 });

@@ -4,19 +4,22 @@
 //   npm run pack && npm run test:privacy      (CI runs it on the store build)
 //   node scripts/privacy-check.mjs [dir]      dir defaults to dist/chrome
 //
-// It opens the extension's page, presses Scan, visits every view, then calls Sync and
-// Disconnect directly. The store build is the connector (docs/CONNECTOR.md): its basic
-// page (Scan, Pledges, Buy-Backs, Settings) and the toolbar popup. A build without the
-// connector: the dashboard's Home and every page. Nothing leaves the machine: the
-// page's requests are answered here (openhangar.space's feeds get an empty answer, RSI
-// is cut off), and the browser can only go out through a local proxy that refuses
-// everything. Every request from the page and the background worker is noted. It
-// fails on:
+// It opens the extension's page, starts a scan, visits every view, then calls Sync and
+// Disconnect directly. The store build is the connector (docs/CONNECTOR.md): the scan
+// starts the way the popup's Scan starts it (the background's requestScan) and runs in
+// the hidden scan page (an offscreen document, src/scan-host.js), never a tab; then the
+// basic page (plain, and #settings for Connect) and the toolbar popup. A build without
+// the connector: the dashboard's Home and every page, and its Scan button. Nothing
+// leaves the machine: the page's requests are answered here (openhangar.space's feeds
+// get an empty answer, RSI is cut off), and the browser can only go out through a local
+// proxy that refuses everything. Every request from the pages, the hidden scan page
+// and the background worker is noted. It fails on:
 // - any request to app.openhangar.space or another openhangar.space subdomain (the
 //   sync site), from anywhere in the browser (the proxy sees those too)
 // - a request to openhangar.space that isn't a plain GET with no body (the public feeds)
 // - a request from the extension to any host other than RSI and openhangar.space
 // - Sync or Disconnect making a request with no Connect
+// - the connector's scan opening a tab, or not running in the hidden page
 // And it checks the build is what the store gets: sync on, built in to production.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -39,8 +42,9 @@ const PAGES = [
   'updates',
   'developers',
 ];
-// The connector's: the basic page's views, then the popup.
-const CONNECTOR_VIEWS = ['pledges', 'buybacks', 'settings'];
+// The connector's: the basic page, plain and opened for Connect, then the popup.
+const CONNECTOR_VIEWS = ['', 'settings'];
+const SCAN_PAGE = 'src/scan.html';
 const CONNECTOR = fs.existsSync(path.join(dir, 'src', 'basic.html'));
 
 function findChrome() {
@@ -104,19 +108,32 @@ const browser = await puppeteer.launch({
 try {
   const id = await browser.installExtension(dir);
   const ORIGIN = `chrome-extension://${id}`;
-  // The background worker, each time it starts: its requests, from the browser's side.
+  // The background worker, each time it starts, and the hidden scan page (an offscreen
+  // document, which the browser lists as a background page): their requests, from the
+  // browser's side.
   const watched = new Set();
+  const hiddenPages = [];
   const watchWorker = async (t) => {
-    if (t.type() !== 'service_worker' || !t.url().startsWith(ORIGIN) || watched.has(t)) return;
+    if (!t.url().startsWith(ORIGIN) || watched.has(t)) return;
+    const from =
+      t.type() === 'service_worker'
+        ? 'worker'
+        : t.url().startsWith(`${ORIGIN}/${SCAN_PAGE}`)
+          ? 'scan page'
+          : null;
+    if (!from) return;
     watched.add(t);
+    if (from === 'scan page') hiddenPages.push({ type: t.type(), url: t.url() });
     const cdp = await t.createCDPSession();
     cdp.on('Network.requestWillBeSent', ({ request: q }) => {
       if (/^https?:/.test(q.url))
-        seen.push({ from: 'worker', method: q.method, url: q.url, body: q.postData || '' });
+        seen.push({ from, method: q.method, url: q.url, body: q.postData || '' });
     });
     await cdp.send('Network.enable');
   };
   browser.on('targetcreated', (t) => watchWorker(t).catch(() => {}));
+  // A page's address can come a moment after its target (the offscreen document's does).
+  browser.on('targetchanged', (t) => watchWorker(t).catch(() => {}));
   await Promise.all(browser.targets().map((t) => watchWorker(t).catch(() => {})));
 
   const page = await browser.newPage();
@@ -170,10 +187,47 @@ try {
   if (state.link) fail('a fresh install has a sync link');
 
   const views = CONNECTOR ? CONNECTOR_VIEWS : PAGES;
-  await page.evaluate(
-    (sel) => document.querySelector(sel)?.click(),
-    CONNECTOR ? '#bp-scan' : '#scan-home',
-  );
+  if (CONNECTOR) {
+    // The popup's Scan: the background's requestScan, which runs it in the hidden page.
+    const tabsBefore = (await browser.pages()).length;
+    const sw = await (
+      await browser.waitForTarget(
+        (t) => t.type() === 'service_worker' && t.url().startsWith(ORIGIN),
+      )
+    ).worker();
+    const asked = await sw.evaluate(() => requestScan('popup'));
+    // The scan's report, then the page closing once it's done.
+    const until = Date.now() + 90e3;
+    let report = null;
+    let open = true;
+    while (Date.now() < until && (!report || open)) {
+      await new Promise((r) => setTimeout(r, 1000));
+      report = await sw.evaluate(
+        async () => (await chrome.storage.local.get('scanReport')).scanReport || null,
+      );
+      open = await sw.evaluate(
+        async () =>
+          (await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] })).length > 0,
+      );
+    }
+    const tabsAfter = (await browser.pages()).length;
+    if (
+      asked?.ok &&
+      asked.by === 'offscreen' &&
+      report?.by === 'offscreen' &&
+      report.run &&
+      !open &&
+      hiddenPages.length &&
+      tabsAfter === tabsBefore
+    )
+      ok(`Scan ran in the hidden page (${hiddenPages[0].type}), no tab, and it closed after`);
+    else
+      fail(
+        `the scan didn't run hidden: ${JSON.stringify({ asked, by: report?.by, open, hiddenPages, tabsBefore, tabsAfter })}`,
+      );
+  } else {
+    await page.evaluate(() => document.querySelector('#scan-home')?.click());
+  }
   await settle();
   for (const p of views) {
     await page.evaluate((h) => (location.hash = h), `#${p}`);
