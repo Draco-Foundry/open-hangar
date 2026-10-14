@@ -3,7 +3,7 @@
 //   fullDue    whether today's run reads everything (else a quick check comes first)
 //   owedSync   whether a saved scan's sync never went out (it goes with the next run)
 //   bigDrop    whether a hangar lost too much to keep without buy-backs to explain it
-//   retryAtOf  when the next run may ask RSI again, after RSI didn't answer
+//   retryAtOf  when the next run may ask RSI again, after a run that didn't finish
 //   lineOf     the run's line in the popup (ui/popup/data.js autoLine has the words)
 
 // The parts, as the stored DB names them (db.sources), in the order they're read. The
@@ -16,10 +16,13 @@ export const WEEK = 7 * DAY;
 // (owner's default, 2026-10-14), or an empty hangar where there was one.
 export const DROP_MIN = 5;
 export const DROP_SHARE = 0.1;
-// The longest backoff after RSI didn't answer.
+// The longest backoff after runs that didn't finish.
 export const BACKOFF_MAX = 4 * DAY;
 // The run's lines (local autoScan.line).
 export const LINES = ['quick', 'full', 'signed-out', 'other', 'paused', 'bad', 'partway'];
+// The lines that ask for a scan (ui/popup/data.js autoAsk), and a day skipped.
+export const ASKS = ['bad', 'partway'];
+const SKIPS = ['signed-out', 'other', 'paused'];
 
 const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
 const lc = (s) =>
@@ -96,13 +99,22 @@ export function bigDrop({ saved, gone, next }) {
   return (saved > 0 && next === 0) || (gone >= DROP_MIN && gone >= DROP_SHARE * saved);
 }
 
-// When the next run may ask RSI again: `fails` runs in a row that RSI didn't answer
-// double the wait from a day, up to BACKOFF_MAX, and never sooner than its Retry-After
-// (seconds or an HTTP date: `retryAfterMs`, OH.retryAfterMs). → ms, or null when RSI
-// answered (fails 0).
-export function retryAtOf({ at, fails, retryAfter = null }, retryAfterMs = () => 0) {
+// Retry-After (seconds or an HTTP date) → ms to wait from `now`, or 0 without one. Not
+// capped at a day as OH.retryAfterMs is: retryAtOf caps the wait at BACKOFF_MAX.
+export function retryAfterMs(value, now = Date.now()) {
+  const v = String(value ?? '').trim();
+  if (!v) return 0;
+  const ms = /^\d+$/.test(v) ? Number(v) * 1000 : Date.parse(v) - now;
+  return Number.isFinite(ms) && ms > 0 ? ms : 0;
+}
+
+// When the next run may ask RSI again: `fails` runs in a row that didn't finish (RSI
+// didn't answer, or a part stopped partway) double the wait from a day, up to
+// BACKOFF_MAX, and never sooner than its Retry-After (`parse`: retryAfterMs, above).
+// → ms, or null when the run finished (fails 0).
+export function retryAtOf({ at, fails, retryAfter = null }, parse = retryAfterMs) {
   if (!(fails > 0) || !Number.isFinite(at)) return null;
-  const after = retryAfterMs(retryAfter, at) || 0;
+  const after = parse(retryAfter, at) || 0;
   return at + Math.min(BACKOFF_MAX, Math.max(after, DAY * 2 ** (fails - 1)));
 }
 
@@ -132,17 +144,22 @@ export function connectedPilot(handle, answer, profiles = []) {
 
 // The record a run leaves (local autoScan, replaced whole): { v, at, ended, line, run,
 // startedAt, fails, retryAt, syncTried }. A run with no line of its own (RSI didn't
-// answer, say) keeps the last one's line and its time.
+// answer, say) keeps the last one's line and its time. So does a day skipped (signed
+// out, another account, paused) after a run that asks for a scan, until a scan saves
+// since that run (`savedAt`: the hangar's saved scan time now, as ui/popup/data.js
+// autoAsk compares it with `ended`).
 export function record(
   was,
-  { at, ended, line = null, run = null, startedAt = null, fails, retryAt, syncTried },
+  { at, ended, line = null, run = null, startedAt = null, fails, retryAt, syncTried, savedAt },
 ) {
   const prev = isObj(was) && was.v === 1 ? was : null;
+  const asks = ASKS.includes(prev?.line) && !(savedAt > prev.ended);
+  const keep = !line || (asks && SKIPS.includes(line));
   return {
     v: 1,
-    at: line ? at : (prev?.at ?? null),
+    at: keep ? (prev?.at ?? null) : at,
     ended,
-    line: line || prev?.line || null,
+    line: keep ? prev?.line || null : line,
     run,
     startedAt,
     fails,

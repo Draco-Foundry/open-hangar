@@ -58,9 +58,9 @@ popup: `chrome.action.onClicked` opens `src/dashboard.html` in a tab. It also:
   again whenever the worker starts, all in one queue (`autoQueue`: a worker woken by the
   alarm finds it already gone). A late alarm (the browser was closed) runs once, 10 to 30
   minutes on. It skips without asking RSI anything after any scan in the last 20 hours
-  (`scanStarted`), while its last run's `retryAt` holds, offline, or while a scan runs,
-  and otherwise asks the hidden scan page for it, never a tab
-  (`requestScan('auto', { hiddenOnly: true })`). The run is the page's
+  (`scanStarted`, or its own last run's `autoScan.ended`), while its last run's `retryAt`
+  holds, offline, or while a scan runs, and otherwise asks the hidden scan page for it,
+  never a tab (`requestScan('auto', { hiddenOnly: true })`). The run is the page's
   ([The Scan Pipeline](#the-scan-pipeline)). A run that found nothing new keeps the
   badge's scan fresh. The link going (by any route) turns it off and clears its alarm;
   store alerts' alarm is never touched.

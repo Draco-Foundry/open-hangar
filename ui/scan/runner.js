@@ -37,6 +37,7 @@
 import { afterScan, retryDue, scanElsewhere, syncWhen } from './sync-timing.js';
 import { importWishlist } from './wishlist-import.js';
 import {
+  ASKS,
   PARTS,
   PAUSE_ID,
   bigDrop,
@@ -655,7 +656,14 @@ export function createRunner(env) {
     try {
       if (!run.noRecord) {
         const at = now();
-        const fails = run.down ? (Number(was?.fails) || 0) + 1 : 0;
+        // A run that didn't finish backs off, whatever stopped it: RSI not answering, or
+        // a part stopped partway (so a page RSI changed isn't read in full every day).
+        const failed = run.down || run.line === 'partway';
+        const fails = failed ? (Number(was?.fails) || 0) + 1 : 0;
+        // The last run asked for a scan: whether one saved since (./auto.js record).
+        const savedAt = ASKS.includes(was?.line)
+          ? ((await OH.loadDB().catch(() => null))?.sources?.hangar?.scannedAt ?? null)
+          : null;
         rec = record(was, {
           at: startedAt,
           ended: at,
@@ -663,7 +671,8 @@ export function createRunner(env) {
           run: run.full ? me.run : null,
           startedAt: run.full ? startedAt : null,
           fails,
-          retryAt: retryAtOf({ at, fails, retryAfter: run.retryAfter }, OH.retryAfterMs),
+          retryAt: retryAtOf({ at, fails, retryAfter: run.retryAfter }),
+          savedAt,
         });
         // Written before the sync: a browser that closes during it still has the run.
         await store.set({ autoScan: rec });

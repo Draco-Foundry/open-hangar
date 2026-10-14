@@ -63,8 +63,9 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
   it off. The worker keeps one alarm (`oh-auto-scan`) at a random time 20 to 28 hours
   after the last run, made again whenever it starts; a day missed while the browser was
   closed runs once, 10 to 30 minutes after it's back. It skips without asking RSI anything
-  after any scan in the last 20 hours, while RSI asked it to back off, offline, or while
-  a scan runs. When it goes off, the hidden scan page runs `runner.autoScan()`
+  after any scan (or its own last run) in the last 20 hours, while it's backing off (RSI
+  didn't answer, or the last runs stopped partway), offline, or while a scan runs. When
+  it goes off, the hidden scan page runs `runner.autoScan()`
   (`requestScan('auto', { hiddenOnly: true })`: never a tab, and where there's no hidden
   page it waits for tomorrow). The run checks locally first (connected, switched on, not
   paused by `site/status.json`'s `autoScan` or `hangar`, the live hangar one this link

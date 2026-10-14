@@ -649,7 +649,8 @@ test("a page it can't read, or a save that fails: partway, and the part is due",
   rsi.fail = (kind) => (kind === 'hangar:1' ? new Response('', { status: 403 }) : null);
   const rec = await r.autoScan();
   assert.equal(rec.line, 'partway');
-  assert.equal(rec.fails, 0, 'RSI answered: no backoff');
+  assert.equal(rec.fails, 1, 'RSI answered, but it stopped partway: it backs off too');
+  assert.equal(rec.retryAt, rec.ended + DAY);
   assert.deepEqual(mem.db, before.db);
   // The storage write for the hangar fails.
   const f = await fullRun();
@@ -669,13 +670,89 @@ test("a page it can't read, or a save that fails: partway, and the part is due",
   }
 });
 
-test('signed out by the end of a part: not kept, partway, no backoff', async () => {
+test('signed out by the end of a part: not kept, partway, and it backs off like any partway', async () => {
   const { r, before } = await fullRun();
   rsi.who = (n) => (n >= 3 ? null : 'Test_Pilot');
   const rec = await r.autoScan();
   assert.equal(rec.line, 'partway');
-  assert.equal(rec.fails, 0);
+  assert.equal(rec.fails, 1);
+  assert.equal(rec.retryAt, rec.ended + DAY, 'a day: about when the next run is due anyway');
   assert.deepEqual(mem.db.sources.hangar, before.db.sources.hangar);
+});
+
+test('a referrals 4xx two runs in a row backs off two days, not a full read every day', async () => {
+  const { r } = await fullRun();
+  rsi.fail = (kind) => (kind.startsWith('referrals:') ? new Response('', { status: 400 }) : null);
+  const one = await r.autoScan();
+  assert.equal(one.line, 'partway');
+  assert.equal(one.fails, 1);
+  assert.equal(one.retryAt, one.ended + DAY);
+  assert.equal(stamps().referral, undefined, 'due: the next run reads in full');
+  const two = await r.autoScan();
+  assert.equal(two.line, 'partway');
+  assert.equal(two.fails, 2, 'it counts like RSI not answering');
+  assert.equal(two.retryAt, two.ended + 2 * DAY);
+  // RSI's page mended: a run that finishes ends the backoff.
+  rsi.fail = null;
+  const ok = await r.autoScan();
+  assert.equal(ok.fails, 0);
+  assert.equal(ok.retryAt, null);
+  assert.ok(['quick', 'full'].includes(ok.line), ok.line);
+});
+
+test('a signed-out day after a partway run still asks; a scan that saves ends the ask', async () => {
+  const { autoAsk, autoLine } = await import('../ui/popup/data.js');
+  const ask = () =>
+    autoAsk({ on: true, rec: mem.autoScan, scannedAt: mem.db.sources.hangar.scannedAt });
+  const { r } = await fullRun();
+  rsi.hangar = [...pledges(1, 900), ...rsi.hangar];
+  rsi.fail = (kind) => (kind === 'hangar:3' ? new Response('', { status: 429 }) : null);
+  const partway = await r.autoScan();
+  assert.equal(partway.line, 'partway');
+  assert.equal(ask(), true);
+  rsi.fail = null;
+  // Signed out the next day (the cookie, or RSI says so): the ask stays.
+  for (const how of ['cookie', 'rsi']) {
+    if (how === 'cookie') cookie = 'out';
+    else [cookie, rsi.who] = [null, null];
+    const skipped = await r.autoScan();
+    assert.equal(skipped.line, 'partway', how);
+    assert.equal(skipped.at, partway.at, `${how}: the time of the run that asked`);
+    assert.equal(ask(), true, `${how}: the Settings dot stays`);
+    assert.equal(autoLine({ on: true, rec: skipped }, Date.now()).ask, true, `${how}: amber`);
+  }
+  // A pressed Scan saves: the ask ends, and the next skipped day says so itself.
+  [cookie, rsi.who] = ['in', 'Test_Pilot'];
+  await new Promise((done) => realTimeout(done, 2)); // its save a moment after that run
+  await r.scan({ reason: 'popup' });
+  await r.packsDone();
+  assert.equal(ask(), false, 'a scan saved since');
+  cookie = 'out';
+  const after = await r.autoScan();
+  assert.equal(after.line, 'signed-out');
+  assert.equal(ask(), false);
+  // And a later run that saves ends it too.
+  cookie = 'in';
+  rsi.hangar = [...pledges(1, 901), ...rsi.hangar]; // something new: a full read
+  rsi.fail = (kind) => (kind === 'hangar:3' ? new Response('', { status: 429 }) : null);
+  assert.equal((await r.autoScan()).line, 'partway');
+  rsi.fail = null;
+  const full = await r.autoScan();
+  assert.ok(['quick', 'full'].includes(full.line), full.line);
+  assert.equal(ask(), false);
+});
+
+test('a Retry-After over a day holds: 2 days for 2, 4 days for 10', async () => {
+  const r = await scannedAndSynced();
+  const wait = (s) => (kind) =>
+    kind === 'who' ? new Response('', { status: 429, headers: { 'retry-after': s } }) : null;
+  rsi.fail = wait(String(2 * 86400));
+  const two = await r.autoScan();
+  assert.equal(two.fails, 1);
+  assert.equal(two.retryAt, two.ended + 2 * DAY, 'not cut to a day');
+  rsi.fail = wait(String(10 * 86400));
+  const ten = await r.autoScan();
+  assert.equal(ten.retryAt, ten.ended + 4 * DAY, 'its own 4-day cap');
 });
 
 test('a part being read is due until it is kept: a browser closing then reads it in full next', async () => {

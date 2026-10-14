@@ -34,8 +34,8 @@ never more: no buy-back packs. Its budget, per pilot with it switched on:
 - **At most one run a day**, at the pilot's own random time (20 to 28 hours after the
   last), so 5,000 pilots spread over the whole day. A day missed while the browser was
   closed runs once, 10 to 30 minutes after it's back, never one per day missed.
-- **0 requests** when it's off, not connected, paused (below), a scan began in the last
-  20 hours (pressed or automatic), RSI asked it to back off, the browser is offline, a
+- **0 requests** when it's off, not connected, paused (below), a scan began or its own
+  last run ended in the last 20 hours, RSI asked it to back off, the browser is offline, a
   scan is running, there's no hidden page, the live hangar is another account's, or
   RSI's sign-in cookie isn't in the browser (signed out: the cookie's presence only,
   nothing sent).
@@ -58,11 +58,13 @@ How it asks:
   run's first, one at a time.
 - **Retry-After and backoff:** a 429 comes straight back (never retried), as does a 5xx
   that carries Retry-After; other 5xx and network errors keep Scan's three retries. A run
-  that RSI didn't answer stops there, saves nothing more, and the next one waits a day,
-  doubling each run in a row up to 4 days, and never before Retry-After (seconds or an
-  HTTP date). It's kept in its record (`autoScan.retryAt`), and the worker moves the
+  that RSI didn't answer, or that stopped partway for any reason (a 4xx, a page it can't
+  read), stops there, saves nothing more, and the next one waits a day, doubling each run
+  in a row up to 4 days, and never before Retry-After (seconds or an HTTP date, also up
+  to 4 days). It's kept in its record (`autoScan.retryAt`), and the worker moves the
   alarm after it.
-- **The 20-hour rule:** no run within 20 hours of any scan's start.
+- **The 20-hour rule:** no run within 20 hours of any scan's start or of its own last
+  run's end (a quick check too, so switching it off and on doesn't run it again).
 - **Pauses** (`site/status.json`, docs/RSI-CHANGES.md): `sources.autoScan` pauses it
   alone, `hangar` pauses it too, `buybacks` or `referrals` skip that part, and
   `scanHidden` off skips the day (it never runs in a tab).

@@ -704,10 +704,10 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 // (a browser restart can drop alarms). When it goes off, the hidden scan page runs it
 // (requestScan 'auto', never a tab; ui/scan/runner.js autoScan), and that page writes
 // how it went (local `autoScan`). It never notifies (check 6 in the privacy notes).
-// Skipped without asking RSI anything: a scan began under 20 hours ago (any scan), RSI
-// asked it to back off, the browser is offline, or a scan is running. A day missed
-// while the browser was closed or the machine asleep runs once, 10 to 30 minutes after
-// it's back (the alarm came late, or there's none left).
+// Skipped without asking RSI anything: a scan began under 20 hours ago (any scan) or its
+// own last run ended then, RSI asked it to back off, the browser is offline, or a scan is
+// running. A day missed while the browser was closed or the machine asleep runs once, 10
+// to 30 minutes after it's back (the alarm came late, or there's none left).
 const AUTO_ALARM = 'oh-auto-scan';
 const AUTO_ON = 'autoScanOn';
 const AUTO_NEXT = 'autoScanNext';
@@ -775,11 +775,15 @@ async function autoFired(alarm) {
   const retryAt = autoRetryAt(got[AUTO_STATE]);
   const retry = retryAt > now ? retryAt + autoRand(AUTO_RETRY_SPREAD) : 0;
   await autoSchedule(Math.max(autoDaily(now), retry));
-  // Skipped, asking RSI nothing and writing nothing: a scan began under 20 hours ago
-  // (the next run is 20 to 28 hours after it), RSI asked to wait, offline, or a scan is
+  // Skipped, asking RSI nothing and writing nothing: a scan began under 20 hours ago, or
+  // Auto Scan Daily's last run ended then (a quick check writes no scanStarted, and
+  // switching it off and on again would otherwise run it again in 10 to 30 minutes): the
+  // next run is 20 to 28 hours after it. Or RSI asked to wait, offline, or a scan is
   // running.
-  const started = got.scanStarted?.at;
-  if (Number.isFinite(started) && started <= now && now - started < AUTO_GAP)
+  const started = Math.max(
+    ...[got.scanStarted?.at, got[AUTO_STATE]?.ended].filter((t) => Number.isFinite(t) && t <= now),
+  );
+  if (Number.isFinite(started) && now - started < AUTO_GAP)
     return autoSchedule(Math.max(autoDaily(started), retry));
   if (retryAt > now) return;
   if (self.navigator?.onLine === false) return;

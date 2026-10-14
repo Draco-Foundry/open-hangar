@@ -16,11 +16,12 @@ const auto = () => import('../ui/scan/auto.js');
 const H = 3600e3;
 const MIN = 60e3;
 const DAY = 24 * H;
-// OH.retryAfterMs (src/lib.js), as the run hands it to retryAtOf: seconds or an HTTP date.
+// OH.retryAfterMs (src/lib.js): the other callers' parse, capped at a day. Auto Scan
+// Daily's backoff has its own (ui/scan/auto.js retryAfterMs), capped at its 4 days.
 global.window = globalThis;
 global.chrome = { storage: { local: { get: async () => ({}), set: async () => {} } } };
 require('../src/lib.js');
-const retryAfterMs = globalThis.OH.retryAfterMs;
+const ohRetryAfterMs = globalThis.OH.retryAfterMs;
 
 // --- The rules (ui/scan/auto.js) ---------------------------------------------------------
 
@@ -112,22 +113,35 @@ test('newBuybackIds and goneCount: by id; fallback ids and a first buy-back scan
 
 test('retryAtOf: doubles from a day, at most 4 days, never before Retry-After', async () => {
   const { retryAtOf } = await auto();
-  const ms = retryAfterMs;
   const AT = Date.parse('2026-10-14T06:12:00Z');
-  assert.equal(retryAtOf({ at: AT, fails: 0 }, ms), null, 'RSI answered');
-  assert.equal(retryAtOf({ at: AT, fails: 1 }, ms), AT + DAY);
-  assert.equal(retryAtOf({ at: AT, fails: 2 }, ms), AT + 2 * DAY);
-  assert.equal(retryAtOf({ at: AT, fails: 3 }, ms), AT + 4 * DAY);
-  assert.equal(retryAtOf({ at: AT, fails: 9 }, ms), AT + 4 * DAY, 'capped');
-  // Retry-After longer than the backoff wins, as seconds or as a date (each capped at a
-  // day by OH.retryAfterMs).
+  assert.equal(retryAtOf({ at: AT, fails: 0 }), null, 'the run finished');
+  assert.equal(retryAtOf({ at: AT, fails: 1 }), AT + DAY);
+  assert.equal(retryAtOf({ at: AT, fails: 2 }), AT + 2 * DAY);
+  assert.equal(retryAtOf({ at: AT, fails: 3 }), AT + 4 * DAY);
+  assert.equal(retryAtOf({ at: AT, fails: 9 }), AT + 4 * DAY, 'capped');
+  // Retry-After longer than the backoff wins, as seconds or as a date.
   const later = new Date(AT + 30 * H).toUTCString();
-  assert.equal(retryAtOf({ at: AT, fails: 1, retryAfter: later }, ms), AT + DAY);
+  assert.equal(retryAtOf({ at: AT, fails: 1, retryAfter: later }), AT + 30 * H);
   const soon = new Date(AT + 2 * H).toUTCString();
-  assert.equal(retryAtOf({ at: AT, fails: 1, retryAfter: soon }, ms), AT + DAY);
+  assert.equal(retryAtOf({ at: AT, fails: 1, retryAfter: soon }), AT + DAY);
   const custom = (v) => (v === 'big' ? 3 * DAY : 0);
   assert.equal(retryAtOf({ at: AT, fails: 1, retryAfter: 'big' }, custom), AT + 3 * DAY);
-  assert.equal(retryAtOf({ at: AT, fails: 2, retryAfter: '60' }, ms), AT + 2 * DAY);
+  assert.equal(retryAtOf({ at: AT, fails: 2, retryAfter: '60' }), AT + 2 * DAY);
+  assert.equal(retryAtOf({ at: AT, fails: 1, retryAfter: 'soon' }), AT + DAY, 'unreadable');
+});
+
+test('retryAtOf: a Retry-After over a day holds, up to the 4-day cap', async () => {
+  const { retryAtOf, retryAfterMs } = await auto();
+  const AT = Date.parse('2026-10-14T06:12:00Z');
+  // Two days, as seconds or as a date: held two days, not cut to one.
+  assert.equal(retryAfterMs(String(2 * 86400), AT), 2 * DAY);
+  assert.equal(retryAtOf({ at: AT, fails: 1, retryAfter: String(2 * 86400) }), AT + 2 * DAY);
+  const date = new Date(AT + 2 * DAY).toUTCString();
+  assert.equal(retryAtOf({ at: AT, fails: 1, retryAfter: date }), AT + 2 * DAY);
+  // Ten days: its own cap, 4 days.
+  assert.equal(retryAtOf({ at: AT, fails: 1, retryAfter: String(10 * 86400) }), AT + 4 * DAY);
+  // The other callers' parse still stops at a day.
+  assert.equal(ohRetryAfterMs(String(2 * 86400), AT), DAY);
 });
 
 test('lineOf: another account or a drop first, then partway, then whether anything changed', async () => {
@@ -186,6 +200,37 @@ test('record: replaced whole; a run with no line keeps the last line and its tim
     Object.keys(record(null, { at: 1, ended: 2, line: 'full', fails: 0, retryAt: null })),
     ['v', 'at', 'ended', 'line', 'run', 'startedAt', 'fails', 'retryAt', 'syncTried'],
   );
+});
+
+test('record: a day skipped after a run that asks keeps the ask, until a scan saves', async () => {
+  const { record } = await auto();
+  const asked = { v: 1, at: 5, ended: 6, line: 'partway', fails: 1, retryAt: 99 };
+  const run = (was, line, savedAt) =>
+    record(was, { at: 20, ended: 21, line, fails: 0, retryAt: null, savedAt });
+  for (const line of ['signed-out', 'other', 'paused']) {
+    // No scan since (the hangar's saved scan time from before the run that asked).
+    const kept = run(asked, line, 4);
+    assert.equal(kept.line, 'partway', line);
+    assert.equal(kept.at, 5, `${line}: the time of the run that asked`);
+    assert.equal(kept.ended, 21, `${line}: this run's end`);
+    assert.equal(run({ ...asked, line: 'bad' }, line, null).line, 'bad', line);
+    // A scan saved since: the skip's own line.
+    const saved = run(asked, line, 7);
+    assert.equal(saved.line, line);
+    assert.equal(saved.at, 20);
+  }
+  // Kept through days in a row, then a scan saves: the next skip says so.
+  const twice = run(run(asked, 'signed-out', 4), 'signed-out', 4);
+  assert.equal(twice.line, 'partway');
+  assert.equal(run(twice, 'signed-out', 22).line, 'signed-out');
+  // A run with a line of its own that isn't a skip replaces it.
+  for (const line of ['quick', 'full', 'bad', 'partway']) {
+    const next = run(asked, line, 4);
+    assert.equal(next.line, line);
+    assert.equal(next.at, 20);
+  }
+  // A skip after a line that doesn't ask: its own line, as before.
+  assert.equal(run({ ...asked, line: 'quick' }, 'signed-out', 4).line, 'signed-out');
 });
 
 // --- The worker (src/background.js) ------------------------------------------------------
@@ -301,6 +346,45 @@ test('a scan began under 20 hours ago: the next run 20 to 28 hours after it, not
   within(alarm(x).when, started + 20 * H, started + 28 * H);
   assert.equal(x.docs.length, 0);
   assert.equal(x.stores.session.scanRequest, undefined);
+});
+
+test('switched off and on (or disconnected, connected, on) after a quick check: not again within 20 hours', async () => {
+  // A quick check that found nothing new: it writes no scanStarted, only its record.
+  const ended = Date.now() - 2 * H;
+  const rec = { v: 1, at: ended - MIN, ended, line: 'quick', fails: 0, retryAt: null };
+  const x = worker({ local: { autoScanOn: true, autoScan: rec } });
+  await until(() => alarm(x));
+  await x.chrome.storage.local.set({ autoScanOn: false });
+  await until(() => !alarm(x));
+  const t0 = Date.now();
+  await x.chrome.storage.local.set({ autoScanOn: true });
+  await until(() => alarm(x));
+  within(alarm(x).when, t0 + 10 * MIN, Date.now() + 30 * MIN);
+  // Its alarm goes off: nothing asked, the next run 20 to 28 hours after the last one.
+  await x.fireAlarm('oh-auto-scan', { scheduledTime: Date.now() });
+  await settle();
+  assert.equal(x.docs.length, 0, 'no hidden page');
+  assert.equal(x.stores.session.scanRequest, undefined);
+  within(alarm(x).when, ended + 20 * H, ended + 28 * H);
+  assert.equal(x.stores.local.autoScanNext, alarm(x).when);
+  // Disconnected, connected again, switched on: the same.
+  const y = worker({ local: { autoScanOn: true, autoScan: rec } });
+  await until(() => alarm(y));
+  await y.chrome.storage.local.remove('siteLink');
+  await until(() => !alarm(y));
+  await y.chrome.storage.local.set({ ...LINK, autoScanOn: true });
+  await until(() => alarm(y));
+  await y.fireAlarm('oh-auto-scan', { scheduledTime: Date.now() });
+  await settle();
+  assert.equal(y.docs.length, 0);
+  within(alarm(y).when, ended + 20 * H, ended + 28 * H);
+  // Over 20 hours after it: it runs.
+  const old = { ...rec, at: Date.now() - 21 * H, ended: Date.now() - 21 * H + MIN };
+  const z = worker({ local: { autoScanOn: true, autoScan: old } });
+  await until(() => alarm(z));
+  await z.fireAlarm('oh-auto-scan', { scheduledTime: Date.now() });
+  await until(() => z.docs.length === 1);
+  assert.equal(z.stores.session.scanRequest.reason, 'auto');
 });
 
 test('backoff, offline, a scan running or a hidden page open: skipped, no page', async () => {
