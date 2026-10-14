@@ -2,8 +2,8 @@
   // The Wishlist tab (the privacy policy's "Your Wishlist"): while connected, the
   // account's Wishlist from openhangar.space (./wish-client.js, a copy kept here), and,
   // while the website takes changes from the extension, a search to add a ship, paint or
-  // upgrade, a Target Price for each item and its Remove. The search runs on this device
-  // over what the extension already keeps (./wishlist.js: the ship list, and with store
+  // upgrade, and each item's Remove (no Target Price: a ship is on sale or it isn't).
+  // The search runs on this device over what the extension already keeps (./wishlist.js: the ship list, and with store
   // alerts on the sale feed); what's typed goes nowhere. Each change is one request, one
   // at a time, only from a click. On Sale and prices come from the sale feed, so only
   // with store alerts on, in the currency picked (the dollar figure on hover). The
@@ -22,14 +22,7 @@
     searched,
     shipNames,
   } from './wishlist.js';
-  import {
-    WISH_MAX,
-    centsText,
-    loadWish,
-    parseTarget,
-    popupEnv,
-    writeWish,
-  } from './wish-client.js';
+  import { WISH_MAX, loadWish, popupEnv, writeWish } from './wish-client.js';
   import { openHub, openTab } from './actions.js';
   import { USD, money } from './currency.js';
 
@@ -44,7 +37,6 @@
   let q = $state('');
   let busy = $state(false); // a change on its way
   let note = $state('');
-  let bad = $state(''); // the item whose Target Price can't be a price
   let search = $state();
   const env = popupEnv();
 
@@ -112,8 +104,7 @@
       await load({ force: true });
       return r;
     }
-    if (r.outcome === 'bad-target') bad = c.key;
-    else if (r.error === 'refused' && c.do === 'add') note = t('popup.wish-not-added', { name });
+    if (r.error === 'refused' && c.do === 'add') note = t('popup.wish-not-added', { name });
     else if (r.outcome !== 'not-found') note = t('popup.wish-trouble');
     return r;
   }
@@ -127,27 +118,6 @@
   }
   function remove(item) {
     change({ do: 'remove', key: item.key }, item.name);
-  }
-  // Target Price, sent when it's left or Enter is pressed, only when it changed and is a
-  // price the website takes ("150", "89.50"; empty clears it). A save that didn't go
-  // through puts back the price the website has, so the field never shows one it doesn't
-  // (a price it refused stays, marked, to be fixed).
-  async function target(item, el) {
-    const p = parseTarget(el.value);
-    if (!p.ok) {
-      bad = item.key;
-      return;
-    }
-    if (bad === item.key) bad = '';
-    el.value = centsText(p.cents);
-    if (p.cents === item.target) return;
-    const r = await change(
-      { do: 'save', key: item.key, target: centsText(p.cents) || null },
-      item.name,
-    );
-    if (r.ok || bad === item.key) return;
-    const saved = (list?.mode === 'edit' && list.items.find((i) => i.key === item.key)) || item;
-    el.value = centsText(saved.target);
   }
   const KIND_ICON = { ship: 'ship', ccu: 'up', paint: 'paint' };
 </script>
@@ -252,20 +222,6 @@
                 onclick={() => remove(item)}>✕</button
               >
             </div>
-            <label class="pp-wtarget">
-              <span>{t('popup.wish-target')}</span>
-              <span class="pp-dollar" aria-hidden="true">$</span>
-              <input
-                type="text"
-                inputmode="decimal"
-                maxlength="12"
-                autocomplete="off"
-                value={centsText(item.target)}
-                aria-invalid={bad === item.key ? 'true' : null}
-                disabled={busy}
-                onchange={(ev) => target(item, ev.currentTarget)}
-              />
-            </label>
           </li>
         {/each}
       </ul>
