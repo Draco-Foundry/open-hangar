@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "revision": "2026-10-11",
+  "revision": "2026-10-14",
   "paging": { "page": "page", "size": "pagesize" },
   "signedOut": {
     "redirect": { "source": "account\\/(connect|sign-?in)|\\/connect\\b", "flags": "i" },
@@ -10,7 +10,7 @@
     }
   },
   "hangar": {
-    "path": "/account/pledges",
+    "path": "/en/account/pledges",
     "pageSize": 10,
     "marker": { "source": "js-pledge-id", "flags": "" },
     "id": ".js-pledge-id",
@@ -31,7 +31,7 @@
     "date": ".date-col"
   },
   "buybacks": {
-    "path": "/account/buy-back-pledges",
+    "path": "/en/account/buy-back-pledges",
     "pageSize": 100,
     "empty": { "source": "no pledges available", "flags": "i" },
     "card": "article",
@@ -61,7 +61,7 @@
     "noTokens": { "source": "^no$", "flags": "i" }
   },
   "buybackDetail": {
-    "path": "/pledge/buyback/",
+    "path": "/en/pledge/buyback/",
     "price": ".final-price[data-value]",
     "cents": "data-value",
     "currency": "data-currency",

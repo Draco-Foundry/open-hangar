@@ -374,13 +374,26 @@ test("RSI's real buy-back token sentence, from the list page", () => {
   assert.equal(P.parseBuybackTokens(html.replace('You have', 'You had')), null);
 });
 
+// RSI's only language is /en/ (/de/ and /fr/ redirect there too), and it 301s a
+// page asked for without it: every page the extension reads uses the /en/ form, so
+// none costs a second request (open-hangar#661). APIs (graphql) aren't redirected.
+test('every RSI page in the rules is its /en/ address', () => {
+  const pages = Object.entries(RULES_JSON).filter(
+    ([, v]) => v && typeof v.path === 'string' && !/graphql$|\/api\//.test(v.path),
+  );
+  assert.ok(pages.length >= 6, 'the hangar, buy-backs, details, account, dossier and cart');
+  for (const [key, v] of pages) assert.match(v.path, /^\/en\//, `${key}.path`);
+});
+
 test('the scan reads the addresses, paging and signs from the rules', () => {
   const hangar = OH.getSource('hangar');
   const buybacks = OH.getSource('buybacks');
-  assert.equal(hangar.url, 'https://robertsspaceindustries.com/account/pledges');
+  // The /en/ addresses: RSI 301s the bare ones there, so each page would cost two
+  // requests (open-hangar#661).
+  assert.equal(hangar.url, 'https://robertsspaceindustries.com/en/account/pledges');
   assert.equal(hangar.pageSize, 10);
   assert.equal(hangar.marker, RULES.hangar.marker);
-  assert.equal(buybacks.url, 'https://robertsspaceindustries.com/account/buy-back-pledges');
+  assert.equal(buybacks.url, 'https://robertsspaceindustries.com/en/account/buy-back-pledges');
   assert.equal(buybacks.pageSize, 100);
   assert.equal(buybacks.emptyMarker, RULES.buybacks.empty);
   assert.ok(buybacks.emptyMarker.test('You have no pledges available for buy back.'));
