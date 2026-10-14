@@ -539,6 +539,24 @@ test('search: every word, the closest first, two letters at least, and nothing s
   }
 });
 
+test("the search's words: ships only with alerts off, No matches only for a search", async () => {
+  const { searchEntries, searchWish, searchHint, searched } = await search();
+  const { t } = await import('../ui/popup/copy.js');
+  // The placeholder says what the search covers: the sale feed brings paints and upgrades.
+  assert.equal(t(searchHint(FEED)), 'Add a ship, paint or upgrade');
+  assert.equal(t(searchHint(null)), 'Add a ship', 'alerts off: no sale feed');
+  // Alerts off: a paint's name finds nothing, and it was searched, so the tab says so.
+  const ships = searchEntries({ names: new Map([['avenger-titan', 'Avenger Titan']]) });
+  assert.deepEqual(searchWish(ships, 'ghost paint'), []);
+  assert.equal(searched('ghost paint'), true);
+  assert.equal(searched('ti'), true);
+  // Too short, only spaces or only marks: not searched, so nothing is said.
+  for (const typed of ['', '   ', 'a', ' g ', '--', null])
+    assert.equal(searched(typed), false, String(typed));
+  assert.equal(t('popup.wish-no-match'), 'No matches.');
+  assert.equal(t('popup.wish-not-added', { name: 'Zeus Mk II CL' }), "Couldn't add Zeus Mk II CL.");
+});
+
 test('the sale line: only with a sale feed, a ship at its cheapest edition', async () => {
   const { wishSale } = await import('../ui/popup/data.js');
   assert.equal(wishSale(null), null, 'alerts off: nothing said about sales');

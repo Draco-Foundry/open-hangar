@@ -13,7 +13,15 @@
   import { onMount, tick } from 'svelte';
   import { t } from './copy.js';
   import { wishRows, wishSale } from './data.js';
-  import { readWishlist, saleFeed, searchEntries, searchWish, shipNames } from './wishlist.js';
+  import {
+    readWishlist,
+    saleFeed,
+    searchEntries,
+    searchHint,
+    searchWish,
+    searched,
+    shipNames,
+  } from './wishlist.js';
   import {
     WISH_MAX,
     centsText,
@@ -45,6 +53,9 @@
     list?.mode === 'edit' ? searchEntries({ names, feed, onList: list.items.map((i) => i.key) }) : [],
   );
   const found = $derived(searchWish(entries, q));
+  // Searched and nothing matched (once the ship list is read, so never while it loads).
+  const nothing = $derived(names != null && searched(q) && !found.length);
+  const hint = $derived(t(searchHint(feed)));
   const full = $derived(list?.mode === 'edit' && list.items.length >= WISH_MAX);
   const price = (n) => money(n, fx, { most: Number.isInteger(n) ? 0 : 2 });
 
@@ -183,8 +194,8 @@
         id="pp-wish-q"
         bind:this={search}
         bind:value={q}
-        placeholder={t('popup.wish-search')}
-        aria-label={t('popup.wish-search')}
+        placeholder={hint}
+        aria-label={hint}
         aria-controls={found.length ? 'pp-wish-found' : null}
         autocomplete="off"
         spellcheck="false"
@@ -214,6 +225,8 @@
           </li>
         {/each}
       </ul>
+    {:else if nothing}
+      <p class="pp-note" id="pp-wish-none" role="status">{t('popup.wish-no-match')}</p>
     {/if}
     {#if note}<p class="pp-note" id="pp-wish-note" role="status">{note}</p>{/if}
     {#if list.items.length}

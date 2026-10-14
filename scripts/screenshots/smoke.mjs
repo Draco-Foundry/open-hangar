@@ -5649,6 +5649,51 @@ try {
   !wishGone.copy && !wishGone.link
     ? ok("Disconnect deletes the popup's Wishlist copy")
     : fail(`popup disconnect, the Wishlist copy: ${JSON.stringify(wishGone)}`);
+  // Store alerts off: the search finds ships only and its placeholder says so; a search
+  // that finds nothing (a paint's name: paints come with the alerts' sale feed) says No
+  // matches. under the box; one letter isn't searched, so nothing is said.
+  await popAt(
+    {
+      ...signedIn,
+      __demoWish: { mode: 'items', items: [wishItem('ship:avenger-titan', 'Avenger Titan')] },
+      __demoLocal: { popupPrefs: { tab: 'wishlist' }, siteUrl: ppSite, siteLink: ppWishLink },
+    },
+    '.pp-wedit li',
+  );
+  const setWishQ = (v) =>
+    page.$eval(
+      '#pp-wish-q',
+      (e, s) => {
+        e.value = s;
+        e.dispatchEvent(new Event('input', { bubbles: true }));
+      },
+      v,
+    );
+  const wishNoMatch = () =>
+    page.evaluate(() => ({
+      line: document.getElementById('pp-wish-none')?.textContent ?? null,
+      found: document.querySelectorAll('.pp-wadd').length,
+    }));
+  const offHint = await page.$eval('#pp-wish-q', (e) => [e.placeholder, e.getAttribute('aria-label')]);
+  await page.type('#pp-wish-q', 'ghoulish');
+  await page.waitForSelector('#pp-wish-none');
+  const offNone = await wishNoMatch();
+  await setWishQ('g');
+  await sleep(100);
+  const offShort = await wishNoMatch();
+  await setWishQ('');
+  await page.type('#pp-wish-q', 'zeus');
+  await page.waitForSelector('.pp-wadd');
+  const offShips = await wishNoMatch();
+  offHint.join() === 'Add a ship,Add a ship' &&
+  offNone.line === 'No matches.' &&
+  offNone.found === 0 &&
+  offShort.line === null &&
+  offShort.found === 0 &&
+  offShips.line === null &&
+  offShips.found > 0
+    ? ok('Wishlist search, alerts off: Add a ship, and No matches. when a search finds nothing')
+    : fail(`popup wishlist search, alerts off: ${JSON.stringify({ offHint, offNone, offShort, offShips })}`);
 
   // Saved Accounts: another account's hangar can be removed (the privacy policy promises
   // it), after a question; Log Out of RSI; Clear Data asks first.

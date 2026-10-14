@@ -112,12 +112,20 @@ export function searchEntries({ names = null, feed = null, onList = [] } = {}) {
   return out;
 }
 
+// The search box's words (copy.js keys): with the sale feed (store alerts on) ships,
+// paints and upgrades; without it ships only, since store items come with the feed.
+export const searchHint = (feed) => (feed ? 'popup.wish-search' : 'popup.wish-search-ships');
+
+// Whether what's typed is searched at all (two letters at least): only then can the tab
+// say nothing matched.
+export const searched = (query) => fold(query).length >= 2;
+
 // The entries for what's typed: every word somewhere in the name, a name that is or
 // starts with it first, then one with a word that starts with it, then the shortest.
 // Fewer than two letters finds nothing. Pure, and it sends nothing.
 export function searchWish(entries, query, max = 6) {
+  if (!searched(query)) return [];
   const q = fold(query);
-  if (q.length < 2) return [];
   const words = q.split(' ');
   const rank = (e) =>
     e.hay === q ? 0 : e.hay.startsWith(q) ? 1 : ` ${e.hay}`.includes(` ${words[0]}`) ? 2 : 3;

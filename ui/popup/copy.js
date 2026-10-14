@@ -106,12 +106,17 @@ const COPY = {
   // The search box's placeholder (and its name for screen readers): searched on this
   // device, never sent.
   'popup.wish-search': 'Add a ship, paint or upgrade',
+  // The same with store alerts off: ships only (paints and upgrades come with the alerts'
+  // sale feed).
+  'popup.wish-search-ships': 'Add a ship',
+  // Under the search box: what's typed is searched and nothing matched.
+  'popup.wish-no-match': 'No matches.',
   // The ✕ beside an item, for screen readers.
   'popup.wish-remove': 'Remove {name}',
   // The field for the price you're waiting for, in US dollars.
   'popup.wish-target': 'Target Price',
   // The website didn't take an add (it couldn't place the item, or the list is full).
-  'popup.wish-not-added': "Couldn't add {name}.", // NEW: needs the owner's OK
+  'popup.wish-not-added': "Couldn't add {name}.",
   // --- Settings tab ---
   // Connected to openhangar.space: as whom, and when it last synced.
   'popup.connected': 'Connected as {name}',
@@ -193,4 +198,4 @@ export function t(key, vars = {}) {
 }
 export const KEYS = Object.keys(COPY);
 // The words still waiting for the owner's OK (marked beside them above).
-export const NEW_WORDS = ['popup.wish-not-added'];
+export const NEW_WORDS = [];
