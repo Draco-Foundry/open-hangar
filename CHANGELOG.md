@@ -4,6 +4,10 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Fixed: Connecting to openhangar.space while a scan runs no longer sends half a
+  hangar. The sync waits for the scan to finish, and the open Open Hangar tab comes to
+  the front instead of a second one opening.
+
 ## 0.3.1 — 2026-10-14
 
 - Improved: Scans ask RSI for each page at its own address instead of being redirected

@@ -15,6 +15,9 @@ const COPY = {
   'basic.scan': 'Scan', // the Scan button
   'basic.scanning': 'Scanning', // the button while a scan runs
   'basic.scan-start': 'Asking RSI for your hangar.', // first progress line, before RSI answers
+  // Another Open Hangar tab is scanning, so this one's Scan waits (#658). The popup's
+  // approved words for the same thing (popup.scan-busy), word for word.
+  'basic.scan-elsewhere': 'A scan is already running.',
   // Access to robertsspaceindustries.com is off (Firefox's add-ons page, say): the short
   // reason above the "Allow Access to RSI" button. Scan reads your hangar there, and
   // only there; one click lets it, then the scan runs.

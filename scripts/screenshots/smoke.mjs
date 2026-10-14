@@ -4834,6 +4834,33 @@ try {
   !bpScan.out.report
     ? ok('signed out: the title and the line under it, no Report a Scan Problem')
     : fail(`basic signed out: ${JSON.stringify(bpScan.out)}`);
+  // Another Open Hangar tab scanning (its scanRunning mark): this one's Scan waits and
+  // says so; the mark gone, Scan is back (#658).
+  const bpElsewhere = await page.evaluate(async () => {
+    await chrome.storage.session.set({ scanRunning: { at: Date.now(), tabId: 999 } });
+    __demo.listeners.forEach((f) => f({ scanRunning: { newValue: {} } }, 'session'));
+    await new Promise((r) => setTimeout(r, 300));
+    const during = {
+      line: document.getElementById('bp-scan-elsewhere')?.textContent || '',
+      off: document.getElementById('bp-scan')?.disabled,
+    };
+    await chrome.storage.session.remove('scanRunning');
+    __demo.listeners.forEach((f) => f({ scanRunning: { oldValue: {} } }, 'session'));
+    await new Promise((r) => setTimeout(r, 300));
+    return {
+      during,
+      after: {
+        line: !!document.getElementById('bp-scan-elsewhere'),
+        off: document.getElementById('bp-scan')?.disabled,
+      },
+    };
+  });
+  bpElsewhere.during.line === 'A scan is already running.' &&
+  bpElsewhere.during.off === true &&
+  !bpElsewhere.after.line &&
+  bpElsewhere.after.off === false
+    ? ok('a scan in another tab: Scan waits and says so, then comes back')
+    : fail(`basic scan elsewhere: ${JSON.stringify(bpElsewhere)}`);
   const outsideNow = outside.filter((u) => !/^https:\/\/openhangar\.space\/status\.json/.test(u));
   outsideNow.length === 0
     ? ok(`no request off this computer but the kill switch file (${outside.length} refused)`)
