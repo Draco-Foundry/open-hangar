@@ -720,7 +720,7 @@ body {
   font-size: 13px;
   color: var(--head);
 }
-/* The Wishlist's search, what it found, and each item's Target Price and Remove. */
+/* The Wishlist's search, what it found, and each item's Remove. */
 .pp-wsearch {
   display: flex;
   align-items: center;
@@ -820,37 +820,6 @@ body {
 .pp-wx:disabled {
   opacity: 0.55;
   cursor: not-allowed;
-}
-.pp-wtarget {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--muted);
-}
-.pp-wtarget > span:first-child {
-  margin-right: auto;
-}
-.pp-wtarget input {
-  width: 84px;
-  height: 26px;
-  box-sizing: border-box;
-  padding: 0 8px;
-  font: inherit;
-  font-family: var(--font-data);
-  font-size: 13px;
-  text-align: right;
-  color: var(--text);
-  background: var(--lift-2);
-  border: 1px solid var(--line);
-  border-radius: 7px;
-}
-.pp-wtarget input:focus {
-  outline: 0;
-  border-color: var(--accent);
-}
-.pp-wtarget input[aria-invalid='true'] {
-  border-color: var(--warn);
 }
 .pp-wnone {
   margin: 8px 0 0;
@@ -1096,9 +1065,6 @@ html.phone body {
 }
 .phone .pp-wx {
   width: 44px;
-}
-.phone .pp-wtarget input {
-  height: 40px;
 }
 .phone .pp-bell,
 .phone .pp-back {

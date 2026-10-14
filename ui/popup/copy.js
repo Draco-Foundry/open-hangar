@@ -114,7 +114,6 @@ const COPY = {
   // The ✕ beside an item, for screen readers.
   'popup.wish-remove': 'Remove {name}',
   // The field for the price you're waiting for, in US dollars.
-  'popup.wish-target': 'Target Price',
   // The website didn't take an add (it couldn't place the item, or the list is full).
   'popup.wish-not-added': "Couldn't add {name}.",
   // --- Settings tab ---

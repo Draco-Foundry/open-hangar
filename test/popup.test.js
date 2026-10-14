@@ -561,7 +561,6 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
     'popup.wish-no-match': 'No matches.',
     'popup.wish-not-added': "Couldn't add {name}.",
     'popup.wish-remove': 'Remove {name}',
-    'popup.wish-target': 'Target Price',
     'popup.export-json': 'JSON Backup',
     'popup.export-pledges': 'Pledges CSV',
     'popup.export-buybacks': 'Buy-Backs CSV',
@@ -580,7 +579,7 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
   // The retired line (replaced 2026-10-14) is gone for good.
   for (const k of KEYS) assert.ok(!/kept your last good scan/.test(t(k)), `${k}: retired words`);
   for (const [k, words] of Object.entries(APPROVED)) assert.equal(t(k), words, k);
-  for (const k of ['popup.wish-target', 'popup.export-json', 'popup.export-pledges'])
+  for (const k of ['popup.export-json', 'popup.export-pledges'])
     for (const w of t(k).split(/\s+/)) assert.match(w, /^[A-Z]/, `${k}: Title Case`);
   // Only the words still waiting for the owner's OK carry the mark, each one said
   // beside it (NEW_WORDS lists them for the PR).

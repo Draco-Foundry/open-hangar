@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Changed: **No Target Price on Wishlist items.** Ships go on sale or they don't, so there's no price to wait for.
+
 ## 0.4.0 — 2026-10-14
 
 - New: **A new toolbar popup.** Three tabs, Hangar, Wishlist and Settings, plus an alerts bell whose number matches the toolbar badge. The Hangar tab shows your RSI portrait and handle, Account Value and how it changed since an earlier scan, Store Credit, Buy-Back Tokens with the next refill, up to three Fleet News notes, and Scan.

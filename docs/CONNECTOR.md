@@ -21,7 +21,7 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
   background shares them; greyed while RSI's sign-in cookie isn't in the browser,
   `ui/popup/rsi-cookie.js`, presence only), Open My Hangar. Wishlist, while connected:
   the account's Wishlist from the website (`ui/popup/wish-client.js`, a copy kept in
-  `popupWish`), with a search on the device to add, a Target Price and Remove while the
+  `popupWish`), with a search on the device to add and Remove (no Target Price) while the
   website takes changes from the extension; read only as the store alerts read it when
   it doesn't. Settings: the settings the basic page had until 0.4.0, plus Look (light mode),
   Currency (the day's rates for anything but USD) and the shortcut (`commands` in
@@ -150,7 +150,7 @@ step 3 above).
 | openhangar.space `api/store/on-sale` (alerts on, every 30 minutes at most, **new**)   | Extension Alerts: the public sale feed, matched on the device             |
 | app.openhangar.space `GET /api/v1/wishlist` (alerts on and connected, **new**)        | Extension Alerts: your account's Wishlist keys, read only                 |
 | app.openhangar.space `GET /api/v1/wishlist?with=items` (connected, 0.4.0)             | The popup's Wishlist tab (a copy younger than 5 minutes is used)          |
-| app.openhangar.space `POST /api/v1/wishlist` (a click, one at a time, 0.4.0)          | The Wishlist tab: one change (which item, and a Target Price if set)      |
+| app.openhangar.space `POST /api/v1/wishlist` (a click, one at a time, 0.4.0)          | The Wishlist tab: one change (which item)                                 |
 | openhangar.space `rates.json` (a currency picked, not USD, once a day at most, 0.4.0) | The popup's Currency                                                      |
 
 Extension Alerts' two requests are new too: the sale feed is the same public file for
