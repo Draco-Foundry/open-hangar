@@ -87,15 +87,14 @@ const dashboardHtml = (who) =>
     : '<html><a href="/connect">Sign in</a></html>';
 const SIGN_IN = '<input name="password">';
 global.fetch = async (url, init = {}) => {
-  url = String(url);
-  if (url.startsWith(SITE)) {
-    const path = url.slice(SITE.length);
+  const u = new URL(String(url));
+  if (u.origin === SITE) {
+    const path = u.pathname + u.search;
     site.push({ path, method: init.method || 'GET', autoScan: structuredClone(mem.autoScan) });
     if (path === '/api/v1/sync' && init.method === 'POST') return syncAnswer();
     return new Response('', { status: 404 });
   }
-  if (!url.startsWith(RSI)) return new Response('', { status: 404 });
-  const u = new URL(url);
+  if (u.origin !== RSI) return new Response('', { status: 404 });
   let kind;
   if (u.pathname === '/en/account/dashboard') kind = 'who';
   else if (u.pathname.startsWith('/en/citizens/')) kind = 'dossier';
