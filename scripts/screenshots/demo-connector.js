@@ -1,10 +1,11 @@
 // Loaded after demo-shim.js on the connector's own pages (src/popup.html,
-// src/basic.html): what only
+// src/basic.html, src/scan.html): what only
 // they use. Session storage, storage change events, the popup's message to the
 // background, and new tabs, recorded on window.__demo for the UI test.
 (function () {
   const demo = (window.__demo = { sent: [], opened: [], listeners: [] });
-  const session = {};
+  // __demoSession: session storage to start with (a scan asked of the hidden page).
+  const session = { ...(window.__demoSession || {}) };
   const keysOf = (k) =>
     k == null
       ? Object.keys(session)

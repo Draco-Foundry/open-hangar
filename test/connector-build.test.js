@@ -1,8 +1,9 @@
 'use strict';
 // The connector build (scripts/connector.mjs, scripts/pack.mjs,
-// scripts/check-store-build.mjs): only the popup, the basic page and what they load,
-// requests limited to RSI, openhangar.space and the sync site, and a store check that
-// knows the difference. Real builds in a scratch copy of the repo. Run: `npm test`.
+// scripts/check-store-build.mjs): only the popup, the basic page, the hidden scan page
+// (scripts/scan-host.mjs) and what they load, requests limited to RSI, openhangar.space
+// and the sync site, and a store check that knows the difference. Real builds in a
+// scratch copy of the repo. Run: `npm test`.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -69,7 +70,8 @@ const filesOf = (dir) => {
   return out;
 };
 
-test('connector build: the popup, the basic page and what they load, nothing else', () => {
+const PAGES = ['src/popup.html', 'src/basic.html', 'src/scan.html'];
+test('connector build: the popup, the basic page, the scan page and what they load, nothing else', () => {
   const dir = scratch();
   try {
     run(dir, 'pack.mjs');
@@ -77,34 +79,53 @@ test('connector build: the popup, the basic page and what they load, nothing els
       const out = path.join(dir, 'dist', t);
       const files = filesOf(out);
       const src = files.filter((f) => f.startsWith('src/') && !f.startsWith('src/ui/fonts/'));
-      for (const f of ['src/popup.html', 'src/basic.html', 'src/ui/popup.js', 'src/ui/basic.js'])
+      for (const f of [
+        ...PAGES,
+        'src/ui/popup.js',
+        'src/ui/basic.js',
+        'src/ui/scan.js',
+        'src/scan-host.js',
+        'src/scan-shim.js',
+      ])
         assert.ok(files.includes(f), `${t}: ${f}`);
       for (const f of ['src/dashboard.html', 'src/dashboard.js', 'src/quips.js', 'CHANGELOG.md'])
         assert.ok(!files.includes(f), `${t}: no ${f}`);
       assert.ok(!files.some((f) => f.startsWith('src/assets/')), `${t}: no dashboard pictures`);
       assert.deepEqual(
         files.filter((f) => f.startsWith('src/ui/')).sort(),
-        ['basic.css', 'basic.js', 'fonts/m.woff2', 'popup.css', 'popup.js']
-          .concat(['shared.js', 'tokens.css', 'when.js'])
+        ['basic.css', 'basic.js', 'fonts/m.woff2', 'popup.css', 'popup.js', 'runner.js']
+          .concat(['scan.js', 'shared.js', 'tokens.css', 'when.js'])
           .map((f) => `src/ui/${f}`),
-        `${t}: only what the two pages load`,
+        `${t}: only what the three pages load`,
       );
-      // Every script the two pages load is there.
-      for (const page of ['src/popup.html', 'src/basic.html']) {
+      // Every script the three pages load is there.
+      for (const page of PAGES) {
         const html = fs.readFileSync(path.join(out, page), 'utf8');
         for (const [, ref] of html.matchAll(/\b(?:src|href)="([^"]+)"/g))
           assert.ok(files.includes(path.posix.join('src', ref)), `${t}: ${page} loads ${ref}`);
       }
-      assert.ok(src.length < 30, `${t}: a small build (${src.length} files)`);
+      assert.ok(src.length <= 32, `${t}: a small build (${src.length} files)`);
       const m = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8'));
       assert.equal(m.action.default_popup, 'src/popup.html');
       assert.match(
         m.content_security_policy.extension_pages,
         /; connect-src 'self' https:\/\/robertsspaceindustries\.com https:\/\/openhangar\.space https:\/\/app\.openhangar\.space$/,
       );
-      // The permissions stay as they are (docs/FLAGS.md, The Connector).
-      assert.deepEqual(m.permissions, ['storage', 'unlimitedStorage', 'cookies', 'identity']);
+      // The permissions stay as they are (docs/FLAGS.md, The Connector), with Chrome and
+      // Edge's offscreen for the hidden scan page (scripts/scan-host.mjs). Firefox holds
+      // that page in a frame of its own event page instead: only its pages may frame
+      // the extension's own.
+      const BASE = ['storage', 'unlimitedStorage', 'cookies', 'identity'];
+      assert.deepEqual(m.permissions, t === 'chrome' ? [...BASE, 'offscreen'] : BASE);
       assert.deepEqual(m.host_permissions, ['https://robertsspaceindustries.com/*']);
+      assert.match(
+        m.content_security_policy.extension_pages,
+        t === 'chrome' ? /; frame-src 'none';/ : /; frame-src 'self';/,
+      );
+      const scripts = m.background.scripts || [];
+      if (t === 'firefox') assert.ok(scripts.includes('src/scan-host.js'), 'Firefox loads it');
+      const bg = fs.readFileSync(path.join(out, 'src', 'background.js'), 'utf8');
+      assert.match(bg, /importScripts\('scan-host\.js'\)/);
     }
     assert.match(run(dir, 'check-store-build.mjs'), /clean store build/);
   } finally {
@@ -205,6 +226,7 @@ test('alerts build: src/alerts.js, alarms, notifications only optional, producti
         'cookies',
         'identity',
         'alarms',
+        ...(t === 'chrome' ? ['offscreen'] : []),
       ]);
       assert.deepEqual(m.optional_permissions, ['notifications']);
       const alerts = fs.readFileSync(path.join(dir, 'dist', t, 'src', 'alerts.js'), 'utf8');
@@ -216,7 +238,14 @@ test('alerts build: src/alerts.js, alarms, notifications only optional, producti
     assert.match(run(dir, 'check-store-build.mjs'), /clean store build/);
     // Tampered: notifications required, alarms gone, Firefox not loading the file.
     const m = manifestOf(dir, 'chrome');
-    m.permissions = ['storage', 'unlimitedStorage', 'cookies', 'identity', 'notifications'];
+    m.permissions = [
+      'storage',
+      'unlimitedStorage',
+      'cookies',
+      'identity',
+      'notifications',
+      'offscreen',
+    ];
     writeManifest(dir, 'chrome', m);
     const ff = manifestOf(dir, 'firefox');
     ff.background.scripts = ff.background.scripts.filter((f) => f !== 'src/alerts.js');

@@ -102,10 +102,7 @@ Firefox Add-ons. Work top to bottom. Items marked ✅ are ready in the repo; ⬜
 
 **`cookies`**
 
-> Used solely to implement "Log out of RSI": clears robertsspaceindustries.com
-> cookies (including the HttpOnly session cookie that page scripts can't remove) so
-> the user can fully end their RSI session from the extension. The extension never
-> reads cookie values or sends them anywhere.
+> Used for two things. First, "Log Out of RSI": clears robertsspaceindustries.com cookies (including the HttpOnly session cookie that page scripts can't remove) so the user can fully end their RSI session from the extension. Second, telling whether the user is signed in to RSI: the extension checks only whether RSI's sign-in cookie exists, so the popup can show "Log In to RSI" instead of Scan. It never uses, stores or sends cookie values, and the check doesn't contact RSI.
 
 **`host_permissions` → `https://robertsspaceindustries.com/*`**
 
@@ -121,6 +118,10 @@ install prompt only names robertsspaceindustries.com.)_
 **`alarms`** (added in 0.3.0)
 
 > Used only for store alerts, which the user turns on in the extension's settings (they're off by default). The alarm wakes the extension for a check at most every 30 minutes: it downloads one public sale file from openhangar.space (the same file for everyone, with nothing about the user in the request) and matches it on the device. Turning alerts off clears the alarm.
+
+**`offscreen`** (added in 0.4.0; Chrome and Edge only)
+
+> Scans read the user's own RSI pages as HTML. The offscreen document parses them with DOMParser, so the scan runs without opening a tab. It reads nothing beyond what the visible scan read before.
 
 **`notifications`** (optional, added in 0.3.0)
 
