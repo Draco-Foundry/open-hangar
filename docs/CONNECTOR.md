@@ -102,7 +102,7 @@ step 3 above).
 | openhangar.space `api/store/on-sale` (alerts on, every 30 minutes at most, **new**)   | Extension Alerts: the public sale feed, matched on the device             |
 | app.openhangar.space `GET /api/v1/wishlist` (alerts on and connected, **new**)        | Extension Alerts: your account's Wishlist keys, read only                 |
 | app.openhangar.space `GET /api/v1/wishlist?with=items` (connected, 0.4.0)             | The popup's Wishlist tab (a copy younger than 5 minutes is used)          |
-| app.openhangar.space `POST /api/v1/wishlist` (a click, one at a time, 0.4.0)          | The Wishlist tab: one change (a Target Price goes with its insurance)     |
+| app.openhangar.space `POST /api/v1/wishlist` (a click, one at a time, 0.4.0)          | The Wishlist tab: one change (which item, and a Target Price if set)      |
 | openhangar.space `rates.json` (a currency picked, not USD, once a day at most, 0.4.0) | The popup's Currency                                                      |
 
 Extension Alerts' two requests are new too: the sale feed is the same public file for

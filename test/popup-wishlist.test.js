@@ -287,7 +287,7 @@ test('add: one POST with only the item, and the website’s copy of it goes firs
   assert.doesNotMatch(init.body, /tok-1/, 'the token only in its header');
 });
 
-test('remove and save: only which item, and the target price with the insurance it had', async () => {
+test('remove and save: only which item, and the target price (never the insurance)', async () => {
   const { writeWish } = await client();
   const titan = item('ship:avenger-titan', 'Avenger Titan', { insurance: 'lti' });
   const paint = item('sku:12', 'Ghost Paint', { insurance: null, category: 'paints' });
@@ -303,35 +303,25 @@ test('remove and save: only which item, and the target price with the insurance 
       item: { ...titan, target: 15000 },
     });
   };
-  const saved = await writeWish(env, {
-    do: 'save',
-    key: titan.key,
-    target: '150',
-    insurance: titan.insurance,
-  });
+  // Exactly v, do, key and target: the website keeps the stored insurance.
+  const saved = await writeWish(env, { do: 'save', key: titan.key, target: '150' });
   assert.equal(saved.items[0].target, 15000);
   assert.deepEqual(sentBody(env, 0), {
     v: 1,
     do: 'save',
     key: 'ship:avenger-titan',
     target: '150',
-    insurance: 'lti',
   });
+  assert.deepEqual(Object.keys(sentBody(env, 0)), ['v', 'do', 'key', 'target']);
   const removed = await writeWish(env, { do: 'remove', key: paint.key });
   assert.deepEqual(sentBody(env, 1), { v: 1, do: 'remove', key: 'sku:12' });
   assert.deepEqual(
     removed.items.map((i) => i.key),
     ['ship:avenger-titan'],
   );
-  // A cleared target is null; extra fields a caller passes never go.
-  await writeWish(env, { do: 'save', key: titan.key, target: null, insurance: null, name: 'x' });
-  assert.deepEqual(sentBody(env, 2), {
-    v: 1,
-    do: 'save',
-    key: 'ship:avenger-titan',
-    target: null,
-    insurance: null,
-  });
+  // A cleared target is null; extra fields a caller passes (an insurance too) never go.
+  await writeWish(env, { do: 'save', key: titan.key, target: null, insurance: 'lti', name: 'x' });
+  assert.deepEqual(sentBody(env, 2), { v: 1, do: 'save', key: 'ship:avenger-titan', target: null });
 });
 
 test('one change at a time: a second click waits for the first', async () => {
@@ -426,10 +416,10 @@ test('the website said no: the list is full, it was gone, a price it can’t tak
     ['sku:1'],
   );
   env.answer = () => json({ ok: false, outcome: 'bad-target', key: 'sku:1', on: true });
-  const bad = await writeWish(env, { do: 'save', key: 'sku:1', target: '1', insurance: null });
+  const bad = await writeWish(env, { do: 'save', key: 'sku:1', target: '1' });
   assert.equal(bad.outcome, 'bad-target');
   env.answer = () => json({ ok: false, outcome: 'not-found', key: 'sku:1', on: false });
-  const gone = await writeWish(env, { do: 'save', key: 'sku:1', target: '1', insurance: null });
+  const gone = await writeWish(env, { do: 'save', key: 'sku:1', target: '1' });
   assert.deepEqual(gone.items, [], 'an item the website no longer has leaves the copy');
   assert.equal(env.asked.length, 3);
 });

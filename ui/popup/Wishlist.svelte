@@ -131,7 +131,7 @@
     el.value = centsText(p.cents);
     if (p.cents === item.target) return;
     const r = await change(
-      { do: 'save', key: item.key, target: centsText(p.cents) || null, insurance: item.insurance },
+      { do: 'save', key: item.key, target: centsText(p.cents) || null },
       item.name,
     );
     if (r.ok || bad === item.key) return;

@@ -1,9 +1,8 @@
 // The Wishlist tab's own read and writes (0.4.0; the privacy policy's "Your Wishlist"):
 // while this browser is connected, the account's Wishlist on openhangar.space, with the
-// sync token, and the one change you make to it. Nothing else goes with a change but a
-// Target Price save's insurance: the item's own, as last read, sent back unchanged
-// because the website takes the two together (the policy's "Nothing else is sent with
-// it" doesn't cover that yet: words pending). Nothing typed in the search goes anywhere
+// sync token, and the one change you make to it: which item, and the target price if
+// you set one. Nothing else is sent with it (a Target Price save leaves the insurance
+// out, and the website keeps the stored one). Nothing typed in the search goes anywhere
 // (the search is ./wishlist.js, on this device).
 //
 //   GET  <site>/api/v1/wishlist?with=items     (Authorization: Bearer <sync token>)
@@ -18,11 +17,9 @@
 //                                                   id: 'sku-N', name }
 //                                               | { kind: 'ccu', id: 'upgrade-N', name }
 //        { v: 1, do: 'remove', key }
-//        { v: 1, do: 'save', key, target, insurance }   target: US dollars as typed
-//                                               ('150', '89.50') or null; insurance: the
-//                                               item's own, as last read (the website
-//                                               takes the two together, so a save never
-//                                               wipes the other)
+//        { v: 1, do: 'save', key, target }      target: US dollars as typed
+//                                               ('150', '89.50') or null; nothing else
+//                                               (the website keeps the stored insurance)
 //        → 200 { ok, outcome, key, on, item? }: `item` the item as stored now
 //
 // Polite (docs/dev/requests.md): a copy younger than FRESH_MS is used as it is; a read
@@ -222,7 +219,8 @@ export function writeWish(env, change) {
 function bodyOf(c) {
   if (c.do === 'add') return { v: 1, do: 'add', item: c.item };
   if (c.do === 'remove') return { v: 1, do: 'remove', key: c.key };
-  return { v: 1, do: 'save', key: c.key, target: c.target ?? null, insurance: c.insurance ?? null };
+  // Which item and the target only: the website keeps the stored insurance.
+  return { v: 1, do: 'save', key: c.key, target: c.target ?? null };
 }
 // The copy's items after the website's answer: a removed item (or one a save found gone)
 // leaves, an added or saved one is the website's own copy of it.

@@ -5576,7 +5576,7 @@ try {
   const POSTS = [
     { v: 1, do: 'add', item: { kind: 'ship', name: 'Zeus Mk II CL' } },
     { v: 1, do: 'add', item: { kind: 'ccu', id: 'upgrade-16', name: 'Upgrade to Freelancer' } },
-    { v: 1, do: 'save', key: 'sku:501', target: '7.50', insurance: null },
+    { v: 1, do: 'save', key: 'sku:501', target: '7.50' },
     { v: 1, do: 'remove', key: 'ship:avenger-titan' },
   ];
   ppEd.head === 'Your Wishlist · 2' &&
