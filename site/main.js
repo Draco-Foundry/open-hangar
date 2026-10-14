@@ -32,10 +32,17 @@
         ? 'chrome'
         : null;
   var LABELS = { review: 'In Review', planned: 'Soon™' };
+  // Each store page, written here rather than read from the page, so a link is never
+  // built from page text (CodeQL #21).
+  var STORE_URLS = {
+    chrome: 'https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl',
+    edge: 'https://microsoftedge.microsoft.com/addons/detail/fmcnemfepnifokjelgjacgdhoodaiicl',
+    firefox: 'https://addons.mozilla.org/en-US/firefox/addon/open-hangar/',
+  };
   var box = document.getElementById('installs');
   var allLive = true;
   box.querySelectorAll('.install').forEach(function (a) {
-    var url = a.getAttribute('data-url');
+    var url = STORE_URLS[a.getAttribute('data-browser')];
     var status = a.getAttribute('data-status') || 'planned';
     // Only real store links (https) become hrefs (CodeQL #285).
     if (status === 'live' && url && /^https:\/\//.test(url)) {

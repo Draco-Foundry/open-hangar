@@ -1017,7 +1017,16 @@
   // Every account with data in this browser: the live one plus parked ones.
   //   [{ nickname, displayname, pledges, scannedAt, active }]
   OH.listProfiles = async function listProfiles() {
-    const all = await chrome.storage.local.get(null);
+    // Only the hangars, where the browser can list its keys: the hidden scan page's
+    // storage is the background's (src/scan-shim.js), and the rest of storage (history,
+    // the archive, the log) would cross over with every call.
+    const area = chrome.storage.local;
+    const keys = typeof area.getKeys === 'function' ? await area.getKeys().catch(() => null) : null;
+    const all = await area.get(
+      Array.isArray(keys)
+        ? keys.filter((k) => k === DB_KEY || String(k).startsWith(PROFILE_PREFIX))
+        : null,
+    );
     const row = (db, active) => ({
       nickname: db.owner && db.owner.nickname,
       displayname: (db.owner && db.owner.displayname) || null,

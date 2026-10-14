@@ -61,15 +61,10 @@
 
         <div class="installs" id="installs">
           <!-- Per-store status. When a listing goes live: set data-status="live" and
-               data-url to the store page. Other values: "review", "planned".
+               add its store page to STORE_URLS in main.js. Other values: "review", "planned".
                The version spans are filled at deploy and daily with each store's live
                version and a newer one in review (scripts/publish/store-versions.mjs). -->
-          <a
-            class="install"
-            data-browser="chrome"
-            data-status="live"
-            data-url="https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl"
-          >
+          <a class="install" data-browser="chrome" data-status="live">
             <img class="b-logo" src="img/browsers/chrome.svg" alt="" width="36" height="36" />
             <span class="b-name">Get&nbsp;It for&nbsp;Chrome</span>
             <span class="b-vers"
@@ -77,12 +72,7 @@
               ><span class="b-pend" data-pend="chrome"></span
             ></span>
           </a>
-          <a
-            class="install"
-            data-browser="edge"
-            data-status="live"
-            data-url="https://microsoftedge.microsoft.com/addons/detail/fmcnemfepnifokjelgjacgdhoodaiicl"
-          >
+          <a class="install" data-browser="edge" data-status="live">
             <img class="b-logo" src="img/browsers/edge.svg" alt="" width="36" height="36" />
             <span class="b-name">Get&nbsp;It for&nbsp;Edge</span>
             <span class="b-vers"
@@ -90,12 +80,7 @@
               ><span class="b-pend" data-pend="edge"></span
             ></span>
           </a>
-          <a
-            class="install"
-            data-browser="firefox"
-            data-status="live"
-            data-url="https://addons.mozilla.org/en-US/firefox/addon/open-hangar/"
-          >
+          <a class="install" data-browser="firefox" data-status="live">
             <img class="b-logo" src="img/browsers/firefox.svg" alt="" width="36" height="36" />
             <span class="b-name">Get&nbsp;It for&nbsp;Firefox</span>
             <span class="b-vers"

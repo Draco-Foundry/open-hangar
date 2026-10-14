@@ -19,6 +19,11 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 - New: Light mode for the popup. It follows your browser, or pick Dark or Light in
   Settings.
 - New: Alt+Shift+H opens the popup. Change it on your browser's shortcuts page.
+- Changed: **Scan runs out of sight.** Press Scan in the toolbar popup and the scan runs
+  in a hidden page, so no tab opens, and closing the popup doesn't stop it. The small
+  Open Hangar page opens only when Open Hangar needs to ask you something, or when a
+  scan can't run hidden. Its pledge and buy-back lists are gone: your hangar is in the
+  popup and on openhangar.space.
 - Fixed: Connecting to openhangar.space while a scan runs no longer sends half a
   hangar. The sync waits for the scan to finish, and the open Open Hangar tab comes to
   the front instead of a second one opening.

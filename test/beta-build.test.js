@@ -82,6 +82,9 @@ test('Firefox beta: its own add-on id, update_url, the beta version and sync dat
     // Store alerts are on in the beta too: alarms, and Notifications only when asked.
     assert.ok(ff.permissions.includes('alarms'), 'store alerts');
     assert.deepEqual(ff.optional_permissions, ['notifications']);
+    // Scans in a hidden frame of the event page (scripts/scan-host.mjs): no offscreen.
+    assert.ok(!ff.permissions.includes('offscreen'), 'no offscreen on Firefox');
+    assert.match(ff.content_security_policy.extension_pages, /frame-src 'self'/);
     assert.deepEqual(ff.background, {
       scripts: [
         'src/flags.js',
@@ -92,6 +95,7 @@ test('Firefox beta: its own add-on id, update_url, the beta version and sync dat
         'src/rsi-cart.js',
         'src/sync-schema.js',
         'src/hangar-shape.js',
+        'src/scan-host.js',
         'src/alerts.js',
         'src/background.js',
       ],
@@ -108,6 +112,9 @@ test('Firefox beta: its own add-on id, update_url, the beta version and sync dat
     // The Chrome and Edge beta next to it stays as it was.
     const chrome = manifestOf(dir, 'beta');
     assert.equal(chrome.browser_specific_settings, undefined);
+    // Its scans in an offscreen document (scripts/scan-host.mjs).
+    assert.ok(chrome.permissions.includes('offscreen'), 'offscreen on Chrome and Edge');
+    assert.match(chrome.content_security_policy.extension_pages, /frame-src 'none'/);
     assert.equal(chrome.version, b.version);
     assert.deepEqual(chrome.externally_connectable, { matches: PAGES });
     // Both are the connector, like the public build: the toolbar opens the popup, and

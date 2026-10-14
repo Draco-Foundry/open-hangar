@@ -1,5 +1,6 @@
-// The scan, for any extension page that runs one: the basic page today (src/basic.html,
-// ui/basic/hub.svelte.js), a hidden page later. Plain JavaScript: no Svelte, no words a
+// The scan, for any extension page that runs one: the hidden scan page (src/scan.html,
+// ./main.js) and the basic page in a tab when there's none (src/basic.html,
+// ui/basic/hub.svelte.js). Plain JavaScript: no Svelte, no words a
 // player reads, no clicks (the browser's asks need a click, so the page asks and passes
 // the answers in). Every OH call (src/lib.js, window.OH) is made when it's needed, so a
 // page or a test that swaps one out is heard.
@@ -18,6 +19,10 @@
 //                        | 'hangar' | 'buybacks' | 'referrals' | 'packs' | 'sync'. For
 //                        packs, page is the packs read so far and count how many to read.
 //   local scanReport     the last scan's report (REPORT_V, below), ids and counts only
+//   local scanStarted    { run, by, reason, at }: the last scan that began. Unlike the
+//                        session marks it outlasts the browser closing mid-scan (the
+//                        hidden page goes with it), so a start with no report for its
+//                        run is a scan that stopped (#665)
 //   local avatarImg      { nickname, src, at, url }: a small copy of the RSI portrait
 //                        (src: a data URL; url: the RSI address it's a copy of, so it's
 //                        read again only when that changes). A page shows src, never an
@@ -283,6 +288,7 @@ export function createRunner(env) {
       if (!busy) markedDone();
     }
     hooks.start?.();
+    store.set({ scanStarted: { run: me.run, by: me.by, reason, at: startedAt } }).catch(() => {});
     setProgress('start');
     mark(true);
     writes.then(markedDone);
@@ -543,6 +549,13 @@ export function createRunner(env) {
     // run (held, or this page scanning already): a page that hands a scan request back
     // then, so there's never a moment with neither.
     marked: () => marked,
+    // Settles once the pack reads running now (the last scan's, or one asked for) are
+    // done and saved: a page that closes after it loses nothing (./main.js).
+    packsDone: () =>
+      (packs || Promise.resolve()).then(
+        () => {},
+        () => {},
+      ),
     get busy() {
       return busy;
     },

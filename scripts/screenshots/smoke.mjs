@@ -5815,9 +5815,11 @@ try {
     ? ok('no Wishlist request reached the internet (the demo answers each one)')
     : fail(`popup Wishlist request went out: ${JSON.stringify(ppAsked)}`);
 
-  // The basic page (the connector build, src/basic.html): the lists with search and
-  // totals, the CSV and backup files, Clear Data, a scan, Report a Scan Problem, all
-  // with every request off this computer refused (it must work with no network).
+  // The basic page (the connector build, src/basic.html), small since 0.4.0: no lists,
+  // search, totals or CSV (the popup and openhangar.space have the hangar), only what
+  // needs a page that stays open. A scan, Report a Scan Problem, Firefox's asks and
+  // Connect, all with every request off this computer refused (it must work with no
+  // network).
   console.log('Basic Page');
   const outside = [];
   await page.setRequestInterception(true);
@@ -5829,74 +5831,60 @@ try {
   };
   page.on('request', offline);
   await page.goto(URL0 + 'basic.html', { waitUntil: 'networkidle0' });
-  await page.waitForSelector('#bp-pledges tbody tr');
-  const bp = await page.evaluate(async () => {
-    const db = await OH.loadDB();
-    const q = (s) => document.querySelector(s);
-    return {
-      rows: document.querySelectorAll('#bp-pledges tbody tr').length,
-      items: db.sources.hangar.items.length,
-      totals: q('.bp-totals').textContent,
-      tab: q('.bp-tabs [aria-current="page"]').getAttribute('href'),
-    };
+  await page.waitForSelector('#bp-about');
+  const slim = await page.evaluate(() => ({
+    about: document.getElementById('bp-about').textContent.trim(),
+    scan: !!document.getElementById('bp-scan'),
+    gone: [
+      '#bp-pledges',
+      '#bp-buybacks',
+      '.bp-tabs',
+      '.bp-search',
+      '.bp-totals',
+      'table',
+      '#bp-site',
+      '#bp-export-json',
+      '#bp-clear',
+      '#bp-accounts',
+      '#bp-logout',
+      '#bp-alerts',
+    ].filter((sel) => document.querySelector(sel)),
+    csv: [...document.querySelectorAll('button')].some((b) => /CSV/.test(b.textContent)),
+  }));
+  slim.about ===
+    "Open Hangar lives in the toolbar popup now. This page only opens when it needs to ask you something, or when a scan can't run hidden." &&
+  slim.scan &&
+  !slim.gone.length &&
+  !slim.csv
+    ? ok('the slim page: Scan and its one line; no lists, search, totals, CSV or settings')
+    : fail(`basic page slim: ${JSON.stringify(slim)}`);
+  // Opened for openhangar.space (#settings: the popup's Connect, the background's asks):
+  // the openhangar.space card and nothing else of the old settings. The demo has no sync
+  // site built in, so it's set here (a store build has production's).
+  await page.evaluate(async () => {
+    await chrome.storage.local.set({ siteUrl: 'https://app.openhangar.space' });
+    for (const f of __demo.listeners) f({ siteLink: { newValue: undefined } }, 'local');
+    location.hash = '#settings';
   });
-  bp.rows === Math.min(bp.items, 300) &&
-  /^[\d,]+ pledges?, \$[\d,.]+ melt \([\d,]+ with melt listed\)/.test(bp.totals)
-    ? ok(`Pledges: ${bp.rows} rows and their totals, offline`)
-    : fail(`basic page pledges: ${JSON.stringify(bp)}`);
-  const firstName = await page.$eval('#bp-pledges tbody td.name', (e) =>
-    e.firstChild.textContent.trim(),
-  );
-  await page.type('.bp-search', firstName);
-  await new Promise((r) => setTimeout(r, 200));
-  const found = await page.$$eval('#bp-pledges tbody tr', (r) => r.length);
-  await page.click('#bp-pledges .bp-bar .bp-btn');
-  const csv = await page.evaluate(async () => {
-    const b = __demo.saved.at(-1);
-    return b ? await b.text() : '';
-  });
-  const csvRows = csv.trim().split('\r\n');
-  found >= 1 &&
-  found < bp.rows &&
-  csvRows[0].startsWith('id,name,type,value') &&
-  csvRows.length === found + 1
-    ? ok(`search finds ${found} row(s); Export CSV saves just those`)
-    : fail(`basic search/CSV: ${JSON.stringify({ found, csvRows: csvRows.length })}`);
-  await page.click('.bp-tabs a[href="#buybacks"]');
-  await page.waitForSelector('#bp-buybacks');
-  const bbRows = await page.$$eval('#bp-buybacks tbody tr', (r) => r.length);
-  bbRows > 0 ? ok(`Buy-Backs: ${bbRows} rows`) : fail('basic page: no buy-back rows');
-  await page.click('.bp-tabs a[href="#settings"]');
-  await page.waitForSelector('#bp-export-json');
-  await page.click('#bp-export-json');
-  const bpBackup = await page.evaluate(async () => {
-    const text = await __demo.saved.at(-1).text();
-    const j = JSON.parse(text);
-    return {
-      app: j.app,
-      pledges: j.sources?.hangar?.items?.length,
-      code: text.includes(window.DEMO_REFERRAL.code),
-      hash: location.hash,
-    };
-  });
-  bpBackup.pledges === bp.items && !bpBackup.code && bpBackup.hash === '#settings'
-    ? ok('Export JSON: the whole hangar, no referral code')
-    : fail(`basic backup: ${JSON.stringify(bpBackup)}`);
-  await page.click('#bp-clear');
-  const asked = await page.$('#bp-clear-yes');
-  await page.click('#bp-clear-yes');
-  await page.waitForFunction(
-    () => !document.querySelector('.bp-tabs small')?.textContent.match(/[1-9]/),
-  );
-  const cleared = await page.evaluate(
-    async () => (await OH.loadDB()).sources.hangar?.items?.length || 0,
-  );
-  asked && cleared === 0
-    ? ok('Clear Data asks first, then clears')
-    : fail(`basic Clear Data: ${JSON.stringify({ asked: !!asked, cleared })}`);
+  await page.waitForSelector('#bp-site');
+  const forSite = await page.evaluate(() => ({
+    connect: !!document.getElementById('bp-connect'),
+    about: !!document.getElementById('bp-about'),
+    others: ['#bp-export-json', '#bp-clear', '#bp-accounts', '#bp-logout', '#bp-alerts'].filter(
+      (sel) => document.querySelector(sel),
+    ),
+  }));
+  forSite.connect && !forSite.about && !forSite.others.length
+    ? ok('#settings: the openhangar.space card with Connect, and only that')
+    : fail(`basic page #settings: ${JSON.stringify(forSite)}`);
+  await page.goto('about:blank'); // a new document (dropping the hash might only scroll)
+  await page.goto(URL0 + 'basic.html', { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#bp-about');
   // A scan (RSI stood in for): saved, reported, then one that fails offers Report a
   // Scan Problem, which opens a prefilled GitHub issue.
   const bpScan = await page.evaluate(async () => {
+    // An empty browser, so no buy-back pack is read after the scan (that asks RSI).
+    await OH.clearData();
     const item = (i) => ({
       id: String(500 + i),
       name: `Demo Pledge ${i}`,
@@ -6019,9 +6007,9 @@ try {
   outsideNow.length === 0
     ? ok(`no request off this computer but the kill switch file (${outside.length} refused)`)
     : fail(`basic page asked the network: ${outsideNow.join(', ')}`);
-  // A phone-width window: no sideways scroll for the page (the table scrolls in its box).
+  // A phone-width window: no sideways scroll for the page.
   await page.setViewport({ width: 375, height: 800 });
-  await page.goto(URL0 + 'basic.html#pledges', { waitUntil: 'networkidle0' });
+  await page.goto(URL0 + 'basic.html', { waitUntil: 'networkidle0' });
   const narrow = await page.evaluate(() => document.documentElement.scrollWidth);
   narrow <= 375
     ? ok('375 px wide: no sideways scroll')
@@ -6365,54 +6353,67 @@ try {
     ? ok('Fleet News with nothing for your ships: "No news for your ships right now."')
     : fail(`popup fleet news empty: ${JSON.stringify(alQuiet)}`);
   await page.setViewport({ width: 1280, height: 900 });
-  // The basic page's switch.
+  // The alerts switch is the popup's since 0.4.0: the basic page has none.
   await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
-  await page.waitForSelector('#bp-alerts-on');
-  await page.click('#bp-alerts-on');
-  await page.waitForSelector('#bp-alerts-off');
-  const alSwitch = await page.evaluate(async () => ({
-    asked: __demo.asked,
-    on: (await chrome.storage.local.get('alertsOn')).alertsOn,
-    card: document.getElementById('bp-alerts').textContent.replace(/\s+/g, ' '),
-  }));
-  await page.click('#bp-alerts-off');
-  await page.waitForSelector('#bp-alerts-on');
-  const alSwitchOff = await page.evaluate(async () => ({
-    removed: __demo.removed,
-    on: (await chrome.storage.local.get('alertsOn')).alertsOn,
-  }));
-  alSwitch.asked.join() === 'notifications' &&
-  alSwitch.on === true &&
-  alSwitch.card.includes('Notifications are on.') &&
-  alSwitch.card.includes('Connect to openhangar.space to add your Wishlist.') &&
-  alSwitchOff.removed.join() === 'notifications' &&
-  alSwitchOff.on === false
-    ? ok(
-        'settings: Turn On asks for Notifications and switches alerts on; Turn Off gives them back',
-      )
-    : fail(`alerts switch: ${JSON.stringify({ alSwitch, alSwitchOff })}`);
-  // A no from the browser: alerts still on (the badge and the list), and a way to ask again.
-  const noHook = await page.evaluateOnNewDocument(() => (window.__demoNotify = false));
-  // A new document (the same address with a hash would only scroll).
-  await page.goto('about:blank');
-  await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
-  await page.waitForSelector('#bp-alerts-on');
-  await page.click('#bp-alerts-on');
-  await page.waitForSelector('#bp-alerts-allow');
-  const alNo = await page.$eval('#bp-alerts', (e) => e.textContent.replace(/\s+/g, ' '));
-  await page.removeScriptToEvaluateOnNewDocument(noHook.identifier);
-  alNo.includes('Notifications are off, so alerts show on the badge and in the popup only.') &&
-  alNo.includes('Ask for Notifications Again')
-    ? ok('Notifications said no: alerts on, the badge only, and Allow to ask again')
-    : fail(`alerts without notifications: ${alNo}`);
-  await page.setViewport({ width: 375, height: 800 });
-  await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
-  await page.waitForSelector('#bp-alerts');
-  const alNarrow = await page.evaluate(() => document.documentElement.scrollWidth);
-  alNarrow <= 375
-    ? ok('settings with the alerts card at 375 px: no sideways scroll')
-    : fail(`settings ${alNarrow} px wide at 375`);
+  await page.waitForSelector('#bp-scan:not([disabled])');
+  const noSwitch = await page.evaluate(() => !document.querySelector('#bp-alerts, #bp-alerts-on'));
+  noSwitch
+    ? ok("the basic page has no alerts switch (it's the popup's)")
+    : fail('basic page: an alerts switch is still there');
   await page.setViewport({ width: 1280, height: 900 });
+
+  // The hidden scan page (src/scan.html, ui/scan/main.js), as Firefox's frame: it takes
+  // the scan asked of its run, says it's still there as it reads (the event page would
+  // be suspended otherwise), saves its report and says it's done. Offline, RSI stood in
+  // for (__demoScan).
+  console.log('Hidden Scan Page');
+  const hiddenRun = 'smoke1-0a0b0c0d0e0f';
+  const scanHook = await page.evaluateOnNewDocument((r) => {
+    window.__demoScan = true;
+    window.__demoSession = {
+      scanRequest: { at: Date.now(), tabId: null, reason: 'popup', run: r, by: 'frame' },
+    };
+  }, hiddenRun);
+  await page.setRequestInterception(true);
+  const asked = [];
+  const cutOff = (req) => {
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)[:/]/.test(req.url()) || req.url().startsWith('data:'))
+      return req.continue();
+    asked.push(req.url());
+    req.abort('internetdisconnected');
+  };
+  page.on('request', cutOff);
+  await page.goto(`${URL0}scan.html?run=${hiddenRun}&by=frame&v=0.4.0`, { waitUntil: 'load' });
+  await page
+    .waitForFunction(() => __demo.sent.some((m) => m.ohScan?.op === 'done'), { timeout: 30000 })
+    .catch(() => {});
+  const hidden = await page.evaluate(async () => ({
+    sent: __demo.sent.map((m) => m.ohScan?.op || Object.keys(m)[0]),
+    done: __demo.sent.find((m) => m.ohScan?.op === 'done')?.ohScan || null,
+    report: (await chrome.storage.local.get('scanReport')).scanReport || null,
+    left: Object.keys(
+      await chrome.storage.session.get(['scanRequest', 'scanRunning', 'scanProgress']),
+    ),
+    text: document.body.innerText.trim(),
+  }));
+  page.off('request', cutOff);
+  await page.setRequestInterception(false);
+  await page.removeScriptToEvaluateOnNewDocument(scanHook.identifier);
+  hidden.done?.run === hiddenRun &&
+  hidden.sent.includes('ping') &&
+  hidden.sent.at(-1) === 'done' &&
+  hidden.report?.run === hiddenRun &&
+  hidden.report.by === 'frame' &&
+  hidden.report.reason === 'popup' &&
+  hidden.report.rows?.[0]?.n === 2 &&
+  !hidden.left.length &&
+  !hidden.text
+    ? ok('the hidden page: takes its run, pings as it reads, reports, says done, shows nothing')
+    : fail(`hidden scan page: ${JSON.stringify(hidden)}`);
+  const offStatus = asked.filter((u) => !/^https:\/\/openhangar\.space\/status\.json/.test(u));
+  !offStatus.length
+    ? ok(`the hidden page asked nothing off this computer but the kill switch file`)
+    : fail(`hidden scan page asked the network: ${offStatus.join(', ')}`);
 } finally {
   await browser.close();
   server.kill();

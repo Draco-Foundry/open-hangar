@@ -20,6 +20,7 @@ backend: everything it reads is kept in `chrome.storage.local` in your browser.
 | Svelte pages        | `ui/` (built into `src/ui/`)                                | The new Home page cards (0.3.0 redesign, in progress)              |
 | Connector pages     | `src/popup.html`, `src/basic.html` (`ui/popup`, `ui/basic`) | The `connector` build's popup and basic page (docs/CONNECTOR.md)   |
 | Scan runner         | `ui/scan/runner.js` and its two helpers in `ui/scan/`       | The scan, pack reads and sync after it, for any page that scans    |
+| Hidden scan page    | `src/scan.html`, `ui/scan/main.js`, `src/scan-host.js`      | Scans with no tab: offscreen (Chrome, Edge), a frame (Firefox)     |
 | Bundled data        | `src/data/ship-catalog.json`, `src/data/ship-codes.json`    | Ship list and prices; ship codes for the HTF export                |
 | Packaging           | `scripts/pack.mjs`                                          | Per-browser builds in `dist/chrome` and `dist/firefox`             |
 | Website             | `site/`, `site-worker/wrangler.jsonc`                       | openhangar.space, including the `status.json` kill switch          |
@@ -104,10 +105,12 @@ Our hangar page (Local Mode, behind the `localMode` flag, which needs `sync`):
   days) and `running`: a `scanRunning` mark in session storage (the scanning tab and a
   time the dashboard renews every minute, counted while that tab is open and for 10
   minutes at most), or a `scanRequest` from the last minute that its tab hasn't started.
-- `oh-request-scan`: opens or focuses the extension's page (the basic page, or the
-  dashboard without the connector) and leaves a `scanRequest` naming it and who asked
-  (`reason`: `'site'` here, `'popup'` for the toolbar popup); that tab runs its Scan
-  button's own scan. Busy while a scan runs and for 60 seconds after a request. The
+- `oh-request-scan`: in the connector build, opens the hidden scan page (or tells the
+  one open) and leaves a `scanRequest` naming its run (`src/scan-host.js`); without one,
+  opens or focuses the extension's page (the basic page, or the dashboard without the
+  connector) and names its tab. Either way the request says who asked (`reason`:
+  `'site'` here, `'popup'` for the toolbar popup), and the answer stays
+  `{ ok, opened: true }`. Busy while a scan runs and for 60 seconds after a request. The
   worker never scans or asks RSI anything for it.
 
 Chrome and Edge: the pages message the extension directly
