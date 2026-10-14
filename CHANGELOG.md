@@ -4,6 +4,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Improved: Scans ask RSI for each page at its own address instead of being redirected
+  first, so a scan sends half as many page requests and lands sooner.
+
 ## 0.3.0 — 2026-10-13
 
 - Changed: **The extension is now a lighter connector, and your full hangar opens on
