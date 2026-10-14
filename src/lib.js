@@ -1753,6 +1753,7 @@
           unfinished: true,
           error: msg,
           rsiDown: !!why.rsiDown,
+          signedOut: !!why.signedOut,
           retryAfter: why.retryAfter ?? null,
         };
       }

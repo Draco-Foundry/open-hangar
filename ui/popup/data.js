@@ -212,10 +212,11 @@ const AUTO_KEY = {
   other: 'popup.auto-other',
   paused: 'popup.auto-paused',
   bad: 'popup.auto-bad',
+  'out-partway': 'popup.auto-out-partway',
   partway: 'popup.auto-stopped',
 };
 // The lines that ask you to scan yourself: a part that wasn't kept.
-const AUTO_ASKS = ['bad', 'partway'];
+const AUTO_ASKS = ['bad', 'out-partway', 'partway'];
 // "{when}" in the line: "today 6:12 AM", or the day and time on another day ("Oct 13,
 // 6:12 AM"). `locale`: the browser's, unless a test names one.
 export function autoWhen(at, now = Date.now(), locale) {

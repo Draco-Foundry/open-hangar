@@ -635,7 +635,7 @@ export function createRunner(env) {
       retryAfter: null,
       owed: false, // a saved scan's sync never went out
       mayOwe: false, // and it may go at the end
-      stop: null, // 'bad' | 'partway': no part read after it
+      stop: null, // 'bad' | 'out' | 'partway': no part read after it
       dropped: false, // the hangar dropped with nothing to explain it
       saved: [], // the parts kept
       changed: false, // a part kept is different from before
@@ -658,7 +658,7 @@ export function createRunner(env) {
         const at = now();
         // A run that didn't finish backs off, whatever stopped it: RSI not answering, or
         // a part stopped partway (so a page RSI changed isn't read in full every day).
-        const failed = run.down || run.line === 'partway';
+        const failed = run.down || run.line === 'partway' || run.line === 'out-partway';
         const fails = failed ? (Number(was?.fails) || 0) + 1 : 0;
         // The last run asked for a scan: whether one saved since (./auto.js record).
         const savedAt = ASKS.includes(was?.line)
@@ -704,6 +704,7 @@ export function createRunner(env) {
   const autoLineOf = (run) =>
     lineOf({
       bad: run.stop === 'bad' || run.dropped,
+      out: run.stop === 'out',
       partway: run.stop === 'partway',
       changed: run.changed,
     });
@@ -778,15 +779,17 @@ export function createRunner(env) {
     const before = Object.fromEntries(PARTS.map((p) => [p, db?.sources?.[p] || null]));
     const read = new Map(); // part → its result
     // The account it started on, asked again after a part: another one means nothing
-    // more is read ('bad'); signed out or no answer, the part didn't finish ('partway').
+    // more is read ('bad'); signed out, the part didn't finish ('out'); no answer, it
+    // didn't finish either ('partway').
     const stillThem = async () => {
       await OH.autoPause();
       const got = await OH.whoIsSignedIn();
       if (got?.state === 'in' && sameHandle(got.nickname, who.nickname)) return true;
       if (got?.state === 'in') run.stop = 'bad';
+      else if (got?.state === 'out') run.stop = 'out';
       else {
         run.stop = 'partway';
-        if (got?.state !== 'out') autoDown(run, got);
+        autoDown(run, got);
       }
       return false;
     };
@@ -839,9 +842,9 @@ export function createRunner(env) {
         run.saved.push(p);
         if (Number.isFinite(r.scannedAt)) await noteFull({ [p]: r.scannedAt });
       } else if (!r?.paused && !r?.refused) {
-        // Didn't finish (RSI stopped answering, a page it couldn't read, a save that
-        // failed): nothing more is read.
-        run.stop ||= 'partway';
+        // Didn't finish (signed out midway: 'out'; RSI stopped answering, a page it
+        // couldn't read, a save that failed: 'partway'): nothing more is read.
+        run.stop ||= r?.signedOut ? 'out' : 'partway';
         if (r?.rsiDown) autoDown(run, r);
       }
       return r;
