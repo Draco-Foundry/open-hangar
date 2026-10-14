@@ -136,6 +136,11 @@ const BUDGET = {
   // The toolbar popup's own settings (ui/popup/prefs.js): the last tab, Look, currency,
   // the version whose What's New was read and when the last scan report was shown.
   popupPrefs: small('five short fields, replaced whole'),
+  // The popup's copy of the account's Wishlist (ui/popup/wish-client.js COPY_KEY).
+  popupWish: {
+    cap: 'WISH_MAX 300 items (names 200 characters at most), replaced whole',
+    max: 200 * KB,
+  },
 };
 // Keys built at run time, as the source writes them (test/storage-keys.js).
 const DYNAMIC = {
@@ -373,6 +378,26 @@ async function fillWorstCase() {
       at: 1,
       connectedAt: 1,
       retryAt: 2,
+      fails: 0,
+    },
+    // The popup's Wishlist copy at its cap: 300 items, each name at its 200 characters,
+    // a target, an upgrade's From.
+    popupWish: {
+      v: 1,
+      connectedAt: 1,
+      at: 1,
+      keys: null,
+      items: Array.from({ length: 300 }, (_, i) => ({
+        key: `ccu:${1000000000 + i}`,
+        name: `Upgrade to Anvil Carrack Expedition ${i}`.padEnd(200, 'x'),
+        category: 'ships',
+        target: 10_000_000,
+        insurance: 'either',
+        from: { id: 1000000000 + i, name: 'x'.repeat(200) },
+        at: 1e12 + i,
+      })),
+      retryAt: 2,
+      holdUntil: 3,
       fails: 0,
     },
     feedGameStatus: {

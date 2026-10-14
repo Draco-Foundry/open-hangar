@@ -18,11 +18,15 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
   view is `ui/popup/Alerts.svelte`, and opening the popup marks them seen), then three
   tabs. Hangar: the portrait the scan saved, Account Value and its change, Store Credit,
   buy-back tokens, Fleet News, Scan (with the scan's progress and report when the
-  background shares them), Open My Hangar. Wishlist: the account's Wishlist as the store
-  alerts read it (only with alerts on; the popup asks the website nothing), read only.
-  Settings: what the basic page's settings do, plus Look (light mode), Currency and the
-  shortcut (`commands` in manifest.json, Alt+Shift+H). Connect still opens the basic
-  page: the browser's sign-in window would close the popup.
+  background shares them; greyed while RSI's sign-in cookie isn't in the browser,
+  `ui/popup/rsi-cookie.js`, presence only), Open My Hangar. Wishlist, while connected:
+  the account's Wishlist from the website (`ui/popup/wish-client.js`, a copy kept in
+  `popupWish`), with a search on the device to add, a Target Price and Remove while the
+  website takes changes from the extension; read only as the store alerts read it when
+  it doesn't. Settings: what the basic page's settings do, plus Look (light mode),
+  Currency (the day's rates for anything but USD) and the shortcut (`commands` in
+  manifest.json, Alt+Shift+H), and JSON Backup, Pledges CSV and Buy-Backs CSV. Connect
+  still opens the basic page: the browser's sign-in window would close the popup.
 - **The basic page** (`src/basic.html`, `ui/basic/`): Pledges and Buy-Backs with search,
   totals and CSV, Export JSON, Report a Scan Problem, and the settings (openhangar.space,
   the store alerts' switch with the `alerts` flag, Clear Data, Saved Accounts, Log Out of
@@ -97,6 +101,9 @@ step 3 above).
 | app.openhangar.space `POST /api/v1/wishlist/import` (once per connection, **new**)    | The 0.3.x wishlist into your account (`wishlistImport` flag)              |
 | openhangar.space `api/store/on-sale` (alerts on, every 30 minutes at most, **new**)   | Extension Alerts: the public sale feed, matched on the device             |
 | app.openhangar.space `GET /api/v1/wishlist` (alerts on and connected, **new**)        | Extension Alerts: your account's Wishlist keys, read only                 |
+| app.openhangar.space `GET /api/v1/wishlist?with=items` (connected, 0.4.0)             | The popup's Wishlist tab (a copy younger than 5 minutes is used)          |
+| app.openhangar.space `POST /api/v1/wishlist` (a click, one at a time, 0.4.0)          | The Wishlist tab's add, remove and Target Price: only that one change     |
+| openhangar.space `rates.json` (a currency other than USD, once a day at most, 0.4.0)  | The popup's Currency                                                      |
 
 Extension Alerts' two requests are new too: the sale feed is the same public file for
 everyone; the Wishlist read brings your account's Wishlist keys to this browser, and

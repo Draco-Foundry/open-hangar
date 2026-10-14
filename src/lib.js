@@ -919,8 +919,10 @@
       ]);
       return;
     }
-    // The last scan's report and the RSI portrait (ui/scan/runner.js) go with the rest.
+    // The last scan's report and the RSI portrait (ui/scan/runner.js) go with the rest,
+    // and the popup's copy of the account's Wishlist (read again while connected).
     await chrome.storage.local.remove([
+      'popupWish',
       DB_KEY,
       HISTORY_KEY,
       ARCHIVE_KEY,
@@ -3919,7 +3921,7 @@
     if (res.status === 401) {
       // Forget this link only: one connected again meanwhile stays.
       if ((await OH.getSiteLink())?.token === link.token)
-        await chrome.storage.local.remove('siteLink');
+        await chrome.storage.local.remove(['siteLink', 'popupWish']);
       throw new Error('This extension was disconnected on the website. Connect again.');
     }
     if (!res.ok) {
@@ -3978,7 +3980,9 @@
         headers: { authorization: `Bearer ${link.token}` },
       }).catch(() => null);
     }
-    await chrome.storage.local.remove('siteLink');
+    // The popup's copy of the account's Wishlist (ui/popup/wish-client.js COPY_KEY) goes
+    // with the connection; the Wishlist stays on the account.
+    await chrome.storage.local.remove(['siteLink', 'popupWish']);
   };
   // @sync-end
 
@@ -4905,6 +4909,11 @@
     // A cache saved before a currency was added doesn't count (it lacks its rate).
     const fits = cached && (cached.want == null ? false : cached.want === want);
     if (fits && cached.rates && Date.now() - cached.at < FX_TTL) return cached;
+    // At most once a day, a try that didn't bring them included (the privacy policy):
+    // until a day after it, the saved rates (or none) stand.
+    const tried = cached && cached.triedFor === want ? cached.triedAt : null;
+    if (Number.isFinite(tried) && Date.now() - tried >= 0 && Date.now() - tried < FX_TTL)
+      return cached.rates ? cached : null;
     try {
       const res = await OH.guarded(fetchFn)(RATES_URL, {
         credentials: 'omit',
@@ -4926,6 +4935,13 @@
       }
     } catch (e) {
       OH.log('warn', 'fx', `exchange rates download failed: ${e?.message || e}`);
+    }
+    try {
+      await chrome.storage.local.set({
+        [FX_KEY]: { ...(cached || {}), triedAt: Date.now(), triedFor: want },
+      });
+    } catch {
+      // Not saved: the next ask may try again.
     }
     return cached && cached.rates ? cached : null; // stale beats nothing
   };

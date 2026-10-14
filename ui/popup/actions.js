@@ -2,7 +2,7 @@
 // calls the basic page's settings make (ui/basic/hub.svelte.js), so both pages agree.
 // Connect stays on the basic page: the browser's sign-in window closes the popup.
 import { download } from '../basic/download.js';
-import { exportName, pledgeRow, pledgesCsv } from '../basic/rows.js';
+import { buybackRow, buybacksCsv, exportName, pledgeRow, pledgesCsv } from '../basic/rows.js';
 import { HUB_PAGE } from './data.js';
 
 const OH = () => globalThis.OH;
@@ -92,12 +92,31 @@ export async function exportJson() {
   );
 }
 // Every pledge as a CSV (the basic page's Pledges CSV). → how many rows.
-export async function exportCsv() {
+export async function exportPledgesCsv() {
   const db = await OH().loadDB();
   const rows = (db.sources?.hangar?.items || []).map(pledgeRow);
   download(
     new Blob([pledgesCsv(rows)], { type: 'text/csv' }),
     exportName('pledges', handleOf(db), 'csv'),
+  );
+  return rows.length;
+}
+// Every stored buy-back as a CSV (the basic page's Buy-Backs CSV), with the price its own
+// page gave once read. → how many rows.
+export async function exportBuybacksCsv() {
+  const db = await OH().loadDB();
+  const details =
+    (await OH()
+      .getBuybackDetails()
+      .catch(() => null)) || {};
+  // Each with its type as the basic page's list reads it (ui/scan/runner.js buybacksOf).
+  const classify = globalThis.OpenHangar?.classifyBuyback;
+  const rows = (db.sources?.buybacks?.items || []).map((b) =>
+    buybackRow({ ...b, kind: classify?.(b.name, b.contains) || b.kind }, details[b.id]),
+  );
+  download(
+    new Blob([buybacksCsv(rows)], { type: 'text/csv' }),
+    exportName('buybacks', handleOf(db), 'csv'),
   );
   return rows.length;
 }

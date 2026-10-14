@@ -219,6 +219,23 @@ test('sync and disconnect use the versioned /api/v1/sync', async () => {
   assert.equal(mem.siteLink, undefined, 'forgotten after disconnect');
 });
 
+// The privacy policy's "Your Wishlist": Disconnect deletes the popup's copy of it (the
+// Wishlist stays on the account), and so does a sync the website says isn't connected.
+test("Disconnect deletes the popup's Wishlist copy", async () => {
+  const { COPY_KEY } = await import('../ui/popup/wish-client.js');
+  const copy = { v: 1, connectedAt: 1, at: 1, items: [{ key: 'ship:a', name: 'A' }] };
+  linked(scanned(Date.now() - 60_000));
+  mem[COPY_KEY] = copy;
+  await OH.siteDisconnect();
+  assert.equal(mem[COPY_KEY], undefined);
+  linked(scanned(Date.now() - 60_000));
+  mem[COPY_KEY] = copy;
+  answer = () => new Response(JSON.stringify({ error: 'not connected' }), { status: 401 });
+  await assert.rejects(OH.siteSync(), /disconnected on the website/);
+  assert.equal(mem[COPY_KEY], undefined);
+  answer = () => new Response(JSON.stringify({ ok: true, synced_at: 123 }), { status: 200 });
+});
+
 // --- What sync leaves out ------------------------------------------------------------
 // The referral prospects list is other players (handles, monikers, enlist dates) who
 // aren't recruits yet: the backup file keeps it, sync never sends it.

@@ -27,6 +27,8 @@
   } from './data.js';
   import { applyLook, cleanPrefs, loadPrefs, savePref } from './prefs.js';
   import { pilotAnswer, rsiAccess } from './actions.js';
+  import { fxFor, loadRates, shownCurrency } from './currency.js';
+  import { GONE_KEY, rsiCookie, rsiSignIn, watchCookie } from './rsi-cookie.js';
   import { flag } from '../lib/flags.js';
   import Alerts from './Alerts.svelte';
   import Hangar from './Hangar.svelte';
@@ -53,6 +55,11 @@
   let prefs = $state(cleanPrefs());
   let session = $state({});
   let rsiOff = $state(false); // no access to robertsspaceindustries.com
+  // RSI's sign-in cookie: 'in', 'out' or null (can't tell), and when a popup last saw it
+  // gone (./rsi-cookie.js: whether it's there, never its value).
+  let cookie = $state(null);
+  let goneAt = $state(null);
+  let rates = $state(null); // the day's exchange rates, only for a currency other than USD
   let now = $state(Date.now());
   let asked = $state(0); // when this popup asked for a scan the background runs unseen
   let note = $state('');
@@ -80,9 +87,19 @@
   const frac = $derived(sc.progress ? Math.round(progressFraction(sc.progress) * 100) : null);
   const age = $derived(scanAge(v?.scannedAt, now));
   const news = $derived(ALERTS && alerts.on ? fleetNews(alerts.items, fresh) : []);
-  // Signed out of RSI: the last account read or scan said so (the popup reads no RSI
-  // cookie: the privacy policy says cookie values are never read).
-  const signedOut = $derived(!!v?.signedOut || (!!report?.signedOut && !newer(report)));
+  // Signed out of RSI: RSI's sign-in cookie isn't in this browser ('out': Scan greyed and
+  // off until it's back), or the last account read or scan said so and the cookie can't
+  // say otherwise ('maybe': a grey Scan still there to press).
+  const readOut = $derived.by(() => {
+    if (report?.signedOut && !newer(report) && Number.isFinite(report.at)) return report.at;
+    if (v?.signedOut) return Number.isFinite(account?.fetchedAt) ? account.fetchedAt : 0;
+    return null;
+  });
+  const signIn = $derived(rsiSignIn({ cookie, readOut, goneAt }));
+  const signedOut = $derived(signIn !== 'in');
+  // Amounts in the currency picked (or the browser's language's), from US dollars.
+  const currency = $derived(shownCurrency(prefs.currency));
+  const fx = $derived(fxFor(currency, rates));
   const failing = $derived(
     failed || reportSyncFailed(report, v?.connected ? { lastSync: v.connected.lastSync } : null),
   );
@@ -140,8 +157,18 @@
   }
   async function loadSession() {
     session = chrome.storage.session
-      ? await chrome.storage.session.get(['scanRunning', 'scanRequest', 'scanProgress'])
+      ? await chrome.storage.session.get(['scanRunning', 'scanRequest', 'scanProgress', GONE_KEY])
       : {};
+    if (Number.isFinite(session[GONE_KEY])) goneAt = session[GONE_KEY];
+  }
+  // Whether RSI's sign-in cookie is here, and when it's gone, that it was (for the next
+  // popup: a cookie it finds came back since).
+  async function readCookie() {
+    const c = await rsiCookie(chrome.cookies, { access: !rsiOff });
+    cookie = c;
+    if (c !== 'out') return;
+    goneAt = Date.now();
+    await chrome.storage.session?.set({ [GONE_KEY]: goneAt }).catch(() => {});
   }
   function setReport(r) {
     report = r;
@@ -186,16 +213,31 @@
     }
   }
   const readAccess = async () => (rsiOff = !(await rsiAccess()));
+  const accessChanged = async () => {
+    await readAccess();
+    await readCookie();
+  };
+  // The rates, once this popup's settings are read: none for USD.
+  $effect(() => {
+    if (!ready) return;
+    const code = currency;
+    loadRates(code).then((r) => {
+      if (code === currency) rates = r;
+    });
+  });
 
   onMount(() => {
     (async () => {
       prefs = await loadPrefs();
       applyLook(prefs.look);
       await Promise.all([loadData(), loadSession(), loadAlerts(), readAccess()]);
+      await readCookie();
       const unseenNews = news.filter((m) => fresh.has(m.id)).length;
       tab = v?.scannedAt == null ? 'hangar' : openingTab(prefs.tab, unseenNews);
       ready = true;
     })();
+    // A sign-in or sign-out in another tab while the popup is open.
+    const unwatch = watchCookie(readCookie, chrome.cookies);
     const changed = (c, area) => {
       if (area === 'local') {
         if (c.db || c.account || c.siteLink || c.siteUrl || c.avatarImg) loadData();
@@ -213,13 +255,14 @@
     chrome.storage.onChanged.addListener(changed);
     // Access to RSI given or taken back (the basic page's Allow Access to RSI, Firefox's
     // add-ons page).
-    chrome.permissions?.onAdded?.addListener(readAccess);
-    chrome.permissions?.onRemoved?.addListener(readAccess);
+    chrome.permissions?.onAdded?.addListener(accessChanged);
+    chrome.permissions?.onRemoved?.addListener(accessChanged);
     const clock = setInterval(() => (now = Date.now()), 15e3);
     return () => {
       chrome.storage.onChanged.removeListener(changed);
-      chrome.permissions?.onAdded?.removeListener(readAccess);
-      chrome.permissions?.onRemoved?.removeListener(readAccess);
+      chrome.permissions?.onAdded?.removeListener(accessChanged);
+      chrome.permissions?.onRemoved?.removeListener(accessChanged);
+      unwatch();
       clearInterval(clock);
     };
   });
@@ -325,7 +368,7 @@
         >
       </span>
     </header>
-    <Alerts {alerts} {fresh} />
+    <Alerts {alerts} {fresh} {fx} />
   {:else}
     <header class="pp-hd">
       <svg class="pp-logo" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"
@@ -393,7 +436,9 @@
           {account}
           {sc}
           {signedOut}
+          scanOff={signIn === 'out'}
           {rsiOff}
+          {fx}
           report={shown}
           lastReport={report}
           {note}
@@ -437,7 +482,9 @@
               {account}
               {sc}
               {signedOut}
+              scanOff={signIn === 'out'}
               {rsiOff}
+              {fx}
               report={shown}
               lastReport={report}
               {pilot}
@@ -450,13 +497,14 @@
               {fresh}
             />
           {:else if tab === 'wishlist'}
-            <Wishlist connected={!!v.connected} />
+            <Wishlist connected={!!v.connected} {fx} />
           {:else}
             <Settings
               {v}
               {busy}
               {failing}
               {prefs}
+              {currency}
               lastReport={report}
               onlook={setLook}
               oncurrency={setCurrency}

@@ -1,17 +1,18 @@
 // The popup's own settings, in one key (`popupPrefs`): the tab it was closed on, the
-// Look (Match Browser, Dark, Light), the currency, the version whose What's New was
-// read (Got It), and when the last scan report was shown (shown once).
+// Look (Match Browser, Dark, Light), the currency picked ('' until one is: the browser's
+// language's then, ./currency.js), the version whose What's New was read (Got It), and
+// when the last scan report was shown (shown once).
+import { CURRENCIES } from './currency.js';
+
 export const LOOKS = ['auto', 'dark', 'light'];
-// Amounts stay in dollars until exchange rates are wired into the popup: RSI charges in
-// dollars anyway. More join this list then.
-export const CURRENCIES = ['USD'];
+export { CURRENCIES };
 
 export function cleanPrefs(p) {
   const o = p && typeof p === 'object' && !Array.isArray(p) ? p : {};
   return {
     tab: typeof o.tab === 'string' ? o.tab : 'hangar',
     look: LOOKS.includes(o.look) ? o.look : 'auto',
-    currency: CURRENCIES.includes(o.currency) ? o.currency : 'USD',
+    currency: CURRENCIES.includes(o.currency) ? o.currency : '',
     seenVersion: typeof o.seenVersion === 'string' ? o.seenVersion : '',
     reportSeenAt: Number.isFinite(o.reportSeenAt) ? o.reportSeenAt : 0,
   };

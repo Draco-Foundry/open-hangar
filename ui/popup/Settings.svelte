@@ -18,8 +18,9 @@
     commands,
     disconnect,
     dropNotify,
-    exportCsv,
+    exportBuybacksCsv,
     exportJson,
+    exportPledgesCsv,
     listProfiles,
     logOut,
     notifyAllowed,
@@ -33,7 +34,9 @@
     syncNow,
   } from './actions.js';
 
-  let { v, busy, failing, prefs, lastReport, onlook, oncurrency, onfailed, onnote } = $props();
+  // `currency`: the one shown (picked, or the browser's language's: ./currency.js).
+  let { v, busy, failing, prefs, currency, lastReport, onlook, oncurrency, onfailed, onnote } =
+    $props();
   const OH = globalThis.OH;
   const AL = globalThis.OHAlerts;
   const ALERTS = flag('alerts') && !!AL;
@@ -133,8 +136,9 @@
     await exportJson();
     dataNote = t('popup.json-saved');
   }
-  async function csv() {
-    dataNote = t('popup.csv-saved', { n: await exportCsv() });
+  async function csv(what) {
+    const n = await (what === 'buybacks' ? exportBuybacksCsv() : exportPledgesCsv());
+    dataNote = t('popup.csv-saved', { n });
   }
   async function signOut() {
     const r = await logOut();
@@ -185,6 +189,8 @@
               ><i></i></button
             >
           </div>
+          <!-- Its status line (copy.js popup.auto-*): before its first run, for now. -->
+          <p class="pp-r pp-msg calm" id="pp-auto-line">{t('popup.auto-first')}</p>
         {/if}
         {#if pilot}
           <div class="pp-r pp-col" id="pp-pilot" role="group" aria-labelledby="pp-pilot-h">
@@ -265,7 +271,7 @@
     </label>
     <label class="pp-r">
       <span class="pp-grow">{t('popup.currency')}</span>
-      <select class="pp-sel" id="pp-currency" value={prefs.currency} onchange={(e) => oncurrency(e.currentTarget.value)}>
+      <select class="pp-sel" id="pp-currency" value={currency} onchange={(e) => oncurrency(e.currentTarget.value)}>
         {#each CURRENCIES as c (c)}<option value={c}>{c}</option>{/each}
       </select>
     </label>
@@ -282,9 +288,14 @@
     {/if}
   </div>
 
-  <div class="pp-pair">
-    <button type="button" class="pp-btn2" id="pp-export-json" onclick={backup}>Export JSON</button>
-    <button type="button" class="pp-btn2" id="pp-export-csv" onclick={csv}>Export CSV</button>
+  <div class="pp-pair pp-three">
+    <button type="button" class="pp-btn2" id="pp-export-json" onclick={backup}>{t('popup.export-json')}</button>
+    <button type="button" class="pp-btn2" id="pp-export-pledges" onclick={() => csv('pledges')}
+      >{t('popup.export-pledges')}</button
+    >
+    <button type="button" class="pp-btn2" id="pp-export-buybacks" onclick={() => csv('buybacks')}
+      >{t('popup.export-buybacks')}</button
+    >
   </div>
 
   {#if profiles.length}
