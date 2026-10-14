@@ -1,7 +1,7 @@
 // The popup's own settings, in one key (`popupPrefs`): the tab it was closed on, the
-// Look (Match Browser, Dark, Light), the currency picked ('' until one is: the browser's
-// language's then, ./currency.js), the version whose What's New was read (Got It), and
-// when the last scan report was shown (shown once).
+// Look (Match Browser, Dark, Light), the currency picked ('' until one is: US dollars
+// then, ./currency.js), the version whose What's New was read (Got It), and when the last
+// scan report was shown (shown once).
 import { CURRENCIES } from './currency.js';
 
 export const LOOKS = ['auto', 'dark', 'light'];

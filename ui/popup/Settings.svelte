@@ -34,7 +34,7 @@
     syncNow,
   } from './actions.js';
 
-  // `currency`: the one shown (picked, or the browser's language's: ./currency.js).
+  // `currency`: the one shown (picked, or USD until one is: ./currency.js).
   let { v, busy, failing, prefs, currency, lastReport, onlook, oncurrency, onfailed, onnote } =
     $props();
   const OH = globalThis.OH;

@@ -118,8 +118,10 @@
     change({ do: 'remove', key: item.key }, item.name);
   }
   // Target Price, sent when it's left or Enter is pressed, only when it changed and is a
-  // price the website takes ("150", "89.50"; empty clears it).
-  function target(item, el) {
+  // price the website takes ("150", "89.50"; empty clears it). A save that didn't go
+  // through puts back the price the website has, so the field never shows one it doesn't
+  // (a price it refused stays, marked, to be fixed).
+  async function target(item, el) {
     const p = parseTarget(el.value);
     if (!p.ok) {
       bad = item.key;
@@ -128,7 +130,13 @@
     if (bad === item.key) bad = '';
     el.value = centsText(p.cents);
     if (p.cents === item.target) return;
-    change({ do: 'save', key: item.key, target: centsText(p.cents) || null, insurance: item.insurance }, item.name);
+    const r = await change(
+      { do: 'save', key: item.key, target: centsText(p.cents) || null, insurance: item.insurance },
+      item.name,
+    );
+    if (r.ok || bad === item.key) return;
+    const saved = (list?.mode === 'edit' && list.items.find((i) => i.key === item.key)) || item;
+    el.value = centsText(saved.target);
   }
   const KIND_ICON = { ship: 'ship', ccu: 'up', paint: 'paint' };
 </script>

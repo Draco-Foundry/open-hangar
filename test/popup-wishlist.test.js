@@ -204,13 +204,29 @@ test('a read that fails: the copy stays, Retry-After honored, then a longer wait
 });
 
 test('a 401: the website ended this connection, nothing of it is kept', async () => {
-  const { loadWish, COPY_KEY } = await client();
+  const { loadWish, COPY_KEY, OFF_MS } = await client();
   const env = fakeEnv({
-    store: { siteLink: LINK, [COPY_KEY]: { v: 1, connectedAt: 5, at: 0, items: [] } },
+    store: {
+      siteLink: LINK,
+      [COPY_KEY]: { v: 1, connectedAt: 5, at: 0, items: [item('sku:1', 'Paint')] },
+    },
     answer: () => json({ error: 'not connected' }, 401),
   });
   assert.equal((await loadWish(env)).mode, 'error');
-  assert.equal(env.store[COPY_KEY], undefined);
+  // No items or keys, only when to ask again.
+  const rec = env.store[COPY_KEY];
+  assert.equal(rec.items, undefined);
+  assert.equal(rec.keys, undefined);
+  assert.equal(rec.retryAt, NOW + OFF_MS);
+  // Opening the tab again (or a forced read) doesn't send the dead token again.
+  for (let i = 0; i < 4; i++)
+    assert.equal((await loadWish(env, { force: i % 2 === 1 })).mode, 'error');
+  assert.equal(env.asked.length, 1, 'one GET for five opens');
+  // Connecting again: a new connection's copy, read at once.
+  env.store.siteLink = { ...LINK, token: 'tok-2', connectedAt: 6 };
+  env.answer = () => json({ v: 1, keys: ['sku:1'], items: [item('sku:1', 'Paint')] });
+  assert.equal((await loadWish(env)).mode, 'edit');
+  assert.equal(env.asked.length, 2);
 });
 
 test("another connection's copy is deleted, and Firefox's no keeps everything home", async () => {
@@ -339,7 +355,7 @@ test('one change at a time: a second click waits for the first', async () => {
 });
 
 test('a change that fails is never tried again by itself; Retry-After holds the next one', async () => {
-  const { writeWish } = await client();
+  const { writeWish, HOLD_MS } = await client();
   const env = fakeEnv({
     store: editing([item('sku:1', 'A')]),
     answer: () => json({ error: 'slow down' }, 429, { 'retry-after': '120' }),
@@ -357,13 +373,34 @@ test('a change that fails is never tried again by itself; Retry-After holds the 
   assert.equal(held.error, 'held');
   assert.equal(env.asked.length, 1, 'nothing sent while the website asked to wait');
   env.clock += 2e3;
+  // A 503 (or a 429) whose Retry-After the popup can't read (a cross-origin answer
+  // hides it): the website's minute holds the next one all the same.
   env.answer = () => json({ error: 'down' }, 503);
   assert.equal((await writeWish(env, { do: 'remove', key: 'sku:1' })).error, 'net');
   assert.equal(env.asked.length, 2);
+  env.clock += HOLD_MS - 1e3;
+  assert.equal((await writeWish(env, { do: 'remove', key: 'sku:1' })).error, 'held');
+  assert.equal(env.asked.length, 2, 'held a minute with no Retry-After');
+  env.clock += 2e3;
   // No network: one try.
   env.answer = () => Promise.reject(new TypeError('Failed to fetch'));
   assert.equal((await writeWish(env, { do: 'remove', key: 'sku:1' })).error, 'net');
   assert.equal(env.asked.length, 3);
+});
+
+test('a 429 with no Retry-After it can read: the next change waits a minute', async () => {
+  const { writeWish, HOLD_MS, COPY_KEY } = await client();
+  const env = fakeEnv({
+    store: editing([item('sku:1', 'A')]),
+    // What the popup sees of the website's 429 today: no exposed Retry-After.
+    answer: () => json({ error: 'too many requests, try again in a minute' }, 429),
+  });
+  assert.equal((await writeWish(env, { do: 'remove', key: 'sku:1' })).error, 'net');
+  assert.equal(env.store[COPY_KEY].holdUntil, NOW + HOLD_MS);
+  assert.equal(HOLD_MS, 60e3, "the website's RETRY_AFTER_S");
+  for (let i = 0; i < 2; i++)
+    assert.equal((await writeWish(env, { do: 'remove', key: 'sku:1' })).error, 'held');
+  assert.equal(env.asked.length, 1, 'two quick clicks after a 429 send nothing');
 });
 
 test('a 404 on a change: the website stopped taking them, the list is read again', async () => {

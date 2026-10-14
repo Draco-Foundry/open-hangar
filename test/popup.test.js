@@ -377,7 +377,7 @@ test('the popup settings: anything odd stored reads as the defaults', async () =
   const { cleanPrefs, LOOKS, CURRENCIES } = await import('../ui/popup/prefs.js');
   assert.deepEqual(LOOKS, ['auto', 'dark', 'light']);
   assert.equal(CURRENCIES[0], 'USD');
-  // No currency picked yet: '' (the browser's language's then, ui/popup/currency.js).
+  // No currency picked yet: '' (US dollars then, ui/popup/currency.js).
   const def = { tab: 'hangar', look: 'auto', currency: '', seenVersion: '', reportSeenAt: 0 };
   assert.deepEqual(cleanPrefs(undefined), def);
   assert.deepEqual(cleanPrefs([]), def);
@@ -489,8 +489,11 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
     'popup.auto-signed-out': 'Skipped {when}: signed out of RSI',
     'popup.auto-other': 'Skipped {when}: a different RSI account is signed in',
     'popup.auto-paused': 'Skipped {when}: scans are paused',
-    'popup.auto-bad': 'Last: {when}, kept your last good scan. Scan to check.',
+    'popup.auto-bad': "Last: {when}, something looked wrong and wasn't saved. Scan to check.",
+    'popup.auto-stopped': 'Last: {when}, RSI stopped answering partway. Scan to check.',
   };
+  // The retired line (replaced 2026-10-14) is gone for good.
+  for (const k of KEYS) assert.ok(!/kept your last good scan/.test(t(k)), `${k}: retired words`);
   for (const [k, words] of Object.entries(APPROVED)) assert.equal(t(k), words, k);
   for (const k of ['popup.wish-target', 'popup.export-json', 'popup.export-pledges'])
     for (const w of t(k).split(/\s+/)) assert.match(w, /^[A-Z]/, `${k}: Title Case`);

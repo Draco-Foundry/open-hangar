@@ -109,6 +109,12 @@ Firefox Add-ons. Work top to bottom. Items marked ✅ are ready in the repo; ⬜
 > exists, so the popup can show "Log In to RSI" instead of Scan. It never uses, stores
 > or sends cookie values, and the check doesn't contact RSI.
 
+_(⬜ Not accurate yet, don't paste it for 0.4.0: Add to RSI Cart (`src/rsi-cart.js`)
+also reads the `Rsi-Token` cookie's value and sends it to robertsspaceindustries.com as
+`x-rsi-token`, which "two things" and "never uses, stores or sends cookie values" leave
+out. The policy's cookies bullet has the same gap. Needs words from Claude chat for both,
+or a cart that doesn't read the value: #680.)_
+
 **`host_permissions` → `https://robertsspaceindustries.com/*`**
 
 > The extension reads the signed-in user's OWN RSI account (hangar, buy-backs,

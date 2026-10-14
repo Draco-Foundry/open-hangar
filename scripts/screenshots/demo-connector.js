@@ -183,6 +183,9 @@
       return answerJson({ v: 1, keys: keys(), items: wishState.items });
     }
     if (wishState.mode !== 'items') return answerJson({ error: 'not found' }, 404);
+    // The website down for a change (demo.wishDown): a 503 with no Retry-After the
+    // popup can read, as a cross-origin answer looks today.
+    if (demo.wishDown) return answerJson({ error: 'try again later' }, 503);
     if (body.do === 'add') {
       const it = body.item;
       const m = /^(sku|upgrade)-(\d+)$/.exec(it.id || '');

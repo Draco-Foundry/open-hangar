@@ -140,14 +140,18 @@ const COPY = {
   'popup.auto-scan': 'Auto Scan Daily',
   // Its status line, one at a time ({when}: "today 6:12 AM"): before its first run, a
   // quick check that found nothing new, a full scan saved, a day skipped (signed out of
-  // RSI, another RSI account signed in, scans paused), a bad scan thrown away.
+  // RSI, another RSI account signed in, scans paused).
   'popup.auto-first': 'Runs once a day while your browser is open.',
   'popup.auto-quick': 'Last: {when}, no changes',
   'popup.auto-full': 'Last: {when}, hangar updated',
   'popup.auto-signed-out': 'Skipped {when}: signed out of RSI',
   'popup.auto-other': 'Skipped {when}: a different RSI account is signed in',
   'popup.auto-paused': 'Skipped {when}: scans are paused',
-  'popup.auto-bad': 'Last: {when}, kept your last good scan. Scan to check.',
+  // A part thrown away: only when it came back as another account, or with a sudden
+  // drop. Not for a part RSI stopped answering partway (auto-stopped is).
+  'popup.auto-bad': "Last: {when}, something looked wrong and wasn't saved. Scan to check.",
+  // A part that didn't finish because RSI stopped answering partway.
+  'popup.auto-stopped': 'Last: {when}, RSI stopped answering partway. Scan to check.',
   'popup.store-alerts': 'Store Alerts', // the basic page's heading (basic.alerts-title)
   'popup.notifications': 'Notifications', // the switch's name
   'popup.look': 'Look',

@@ -236,6 +236,26 @@ test("Disconnect deletes the popup's Wishlist copy", async () => {
   answer = () => new Response(JSON.stringify({ ok: true, synced_at: 123 }), { status: 200 });
 });
 
+// The store alerts' copy of the Wishlist keys is part of "Your Wishlist" too. Its own
+// check deletes it for a link that's gone, but a check waits while status.json pauses
+// alerts, so Disconnect (and a sync the website refuses as not connected) deletes it.
+test("Disconnect deletes the store alerts' Wishlist keys, alerts paused or not", async () => {
+  const { WISH_KEY } = require('../src/alerts.js');
+  assert.equal(WISH_KEY, 'alertsWish');
+  const paused = { at: 1, data: { sources: { alerts: { enabled: false } } } };
+  const keys = { connectedAt: 1, at: 1, keys: ['ship:a'] };
+  linked(scanned(Date.now() - 60_000));
+  Object.assign(mem, { alertsOn: true, remoteStatus: paused, [WISH_KEY]: keys });
+  await OH.siteDisconnect();
+  assert.equal(mem[WISH_KEY], undefined);
+  linked(scanned(Date.now() - 60_000));
+  Object.assign(mem, { alertsOn: true, remoteStatus: paused, [WISH_KEY]: keys });
+  answer = () => new Response(JSON.stringify({ error: 'not connected' }), { status: 401 });
+  await assert.rejects(OH.siteSync(), /disconnected on the website/);
+  assert.equal(mem[WISH_KEY], undefined);
+  answer = () => new Response(JSON.stringify({ ok: true, synced_at: 123 }), { status: 200 });
+});
+
 // --- What sync leaves out ------------------------------------------------------------
 // The referral prospects list is other players (handles, monikers, enlist dates) who
 // aren't recruits yet: the backup file keeps it, sync never sends it.

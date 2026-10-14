@@ -2,8 +2,8 @@
 // at the day's rate. RSI charges in US dollars, so each converted amount keeps the
 // dollar figure on hover (its title). The rates are the ECB's, from openhangar.space's
 // rates.json (OH.getFxRates: at most once a day, kept in `fxRates`), read only for a
-// currency other than USD. Until you pick one, the currency is your browser's language's
-// (US English: USD). Pure apart from loadRates.
+// currency you picked other than USD. Until you pick one, it's US dollars. Pure apart from
+// loadRates.
 
 // The currencies the popup offers: OH.CURRENCIES in src/lib.js, in its order
 // (test/popup-settings.test.js keeps them the same).
@@ -25,40 +25,9 @@ export const CURRENCIES = [
 ];
 const ZERO_DECIMAL = ['JPY', 'KRW']; // no cents (OH.ZERO_DECIMAL)
 
-// The euro's countries, and the other regions with a currency here.
-const EURO = 'AT BE CY DE EE ES FI FR GR HR IE IT LT LU LV MT NL PT SI SK'.split(' ');
-const REGION = {
-  US: 'USD',
-  GB: 'GBP',
-  CA: 'CAD',
-  AU: 'AUD',
-  NZ: 'NZD',
-  CH: 'CHF',
-  LI: 'CHF',
-  SE: 'SEK',
-  PL: 'PLN',
-  CZ: 'CZK',
-  BR: 'BRL',
-  CN: 'CNY',
-  JP: 'JPY',
-  KR: 'KRW',
-};
-// The browser's language ("en-US", "de-DE", "fr") → its currency, else USD. A language
-// with no country is read as its most likely one ("de" → Germany).
-export function currencyFor(language) {
-  let region = '';
-  try {
-    const loc = new Intl.Locale(String(language || 'en-US'));
-    region = loc.region || loc.maximize().region || '';
-  } catch {
-    return 'USD';
-  }
-  if (EURO.includes(region)) return 'EUR';
-  return REGION[region] || 'USD';
-}
-// The currency shown: the one picked in Settings, else the browser's language's.
-export const shownCurrency = (picked, language = globalThis.navigator?.language) =>
-  CURRENCIES.includes(picked) ? picked : currencyFor(language);
+// The currency shown: the one picked in Settings, else US dollars. Nothing is guessed
+// from the browser: rates are read only after you pick a currency other than USD.
+export const shownCurrency = (picked) => (CURRENCIES.includes(picked) ? picked : 'USD');
 
 // The rate to use: { code, rate, date } (US dollars, rate 1, until a picked currency's
 // rate is in).

@@ -29,37 +29,17 @@ test("the popup's currencies are lib.js's, in its order", async () => {
   }
 });
 
-test("until one is picked: the browser's language's currency, USD for US English", async () => {
-  const { currencyFor, shownCurrency } = await currency();
-  for (const [lang, code] of [
-    ['en-US', 'USD'],
-    ['en', 'USD'],
-    ['en-GB', 'GBP'],
-    ['de-DE', 'EUR'],
-    ['de', 'EUR'],
-    ['fr-CA', 'CAD'],
-    ['de-CH', 'CHF'],
-    ['pt-BR', 'BRL'],
-    ['pt-PT', 'EUR'],
-    ['ja', 'JPY'],
-    ['ko-KR', 'KRW'],
-    ['zh-CN', 'CNY'],
-    ['sv-SE', 'SEK'],
-    ['pl', 'PLN'],
-    ['cs-CZ', 'CZK'],
-    ['en-AU', 'AUD'],
-    ['en-NZ', 'NZD'],
-    ['es-MX', 'USD'],
-    ['zh-TW', 'USD'],
-    ['not a language', 'USD'],
-    ['', 'USD'],
-    [undefined, 'USD'],
-  ])
-    assert.equal(currencyFor(lang), code, String(lang));
-  assert.equal(shownCurrency('', 'de-DE'), 'EUR');
-  assert.equal(shownCurrency('USD', 'de-DE'), 'USD', 'a pick wins');
-  assert.equal(shownCurrency('GBP', 'en-US'), 'GBP');
-  assert.equal(shownCurrency('XYZ', 'en-US'), 'USD');
+test("until one is picked: US dollars, whatever the browser's language", async () => {
+  const { shownCurrency } = await currency();
+  assert.equal(shownCurrency(''), 'USD');
+  assert.equal(shownCurrency(undefined), 'USD');
+  assert.equal(shownCurrency('XYZ'), 'USD');
+  assert.equal(shownCurrency('EUR'), 'EUR', 'a pick wins');
+  assert.equal(shownCurrency('GBP'), 'GBP');
+  // The policy: rates only if you pick a currency other than USD, so nothing in the
+  // popup's currency reads the browser's language to choose one.
+  const src = fs.readFileSync(path.join(ROOT, 'ui/popup/currency.js'), 'utf8');
+  assert.doesNotMatch(src, /navigator|Intl\.Locale/);
 });
 
 test('no rates are asked for USD; another currency asks lib.js, which asks once a day', async () => {

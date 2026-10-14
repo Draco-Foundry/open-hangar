@@ -1,8 +1,10 @@
 // The Wishlist tab's own read and writes (0.4.0; the privacy policy's "Your Wishlist"):
 // while this browser is connected, the account's Wishlist on openhangar.space, with the
-// sync token, and the one change you make to it. Nothing else goes with a change, and
-// nothing typed in the search goes anywhere (the search is ./wishlist.js, on this
-// device).
+// sync token, and the one change you make to it. Nothing else goes with a change but a
+// Target Price save's insurance: the item's own, as last read, sent back unchanged
+// because the website takes the two together (the policy's "Nothing else is sent with
+// it" doesn't cover that yet: words pending). Nothing typed in the search goes anywhere
+// (the search is ./wishlist.js, on this device).
 //
 //   GET  <site>/api/v1/wishlist?with=items     (Authorization: Bearer <sync token>)
 //        → 200 { v: 1, keys, items: [{ key, name, category, target, insurance, from, at }] }
@@ -26,7 +28,8 @@
 // Polite (docs/dev/requests.md): a copy younger than FRESH_MS is used as it is; a read
 // that fails waits longer each time (Retry-After when the website says, doubling up to
 // 6 hours), and a 404 waits OFF_MS. Writes go one at a time, each only from a click,
-// never tried again by themselves, and none goes while the website asked to wait.
+// never tried again by themselves, and none goes while the website asked to wait (its
+// Retry-After, or HOLD_MS when the answer doesn't let the popup read one).
 //
 // The copy (`popupWish`) is this connection's: another connection's, or one with no
 // connection left, is deleted (Disconnect deletes it too: src/lib.js siteDisconnect).
@@ -40,6 +43,9 @@ export const OFF_MS = 6 * 3600e3;
 export const BACKOFF_MS = 60e3;
 export const BACKOFF_MAX_MS = 6 * 3600e3;
 export const RETRY_AFTER_MAX_MS = 24 * 3600e3;
+// A write the website answered 429 or 5xx with no Retry-After the popup can read: the
+// next one waits this long (the website's own RETRY_AFTER_S).
+export const HOLD_MS = 60e3;
 export const TIMEOUT_MS = 10e3;
 // The website's limit per login (src/alerts.js WISH_MAX).
 export const WISH_MAX = 300;
@@ -176,9 +182,10 @@ export async function loadWish(env, { force = false } = {}) {
       if (list) next = { ...base, at: now, keys: list.items ? null : list.keys, items: list.items };
       else if (res.status === 404) next = { ...base, at: now, off: true, retryAt: now + OFF_MS };
       else if (res.status === 401) {
-        // A connection the website ended: nothing of it is kept.
-        await env.remove(COPY_KEY);
-        return { mode: 'error', items: null, keys: null };
+        // A connection the website ended: nothing of its Wishlist is kept, only when to
+        // ask again (OFF_MS: connecting again starts a new copy at once), so opening the
+        // tab doesn't send the dead token each time.
+        next = { ...base, at: now, retryAt: now + OFF_MS };
       } else {
         const fails = ((mine && mine.fails) || 0) + 1;
         const wait = Math.max(retryAfterMs(header(res, 'retry-after'), now), backoff(fails));
@@ -268,8 +275,10 @@ async function writeNow(env, change) {
       return fail('off', items);
     }
     if (res.status === 429 || res.status >= 500) {
-      const wait = retryAfterMs(header(res, 'retry-after'), now);
-      if (wait && mine) await save({ ...mine, holdUntil: now + wait });
+      // Retry-After when the browser lets the popup read it (a cross-origin answer hides
+      // it unless the website exposes it), else the website's own minute.
+      const wait = retryAfterMs(header(res, 'retry-after'), now) || HOLD_MS;
+      if (mine) await save({ ...mine, holdUntil: now + wait });
       return fail('net', items);
     }
     if (!res.ok) return fail(res.status === 400 ? 'refused' : 'net', items);

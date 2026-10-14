@@ -3921,7 +3921,7 @@
     if (res.status === 401) {
       // Forget this link only: one connected again meanwhile stays.
       if ((await OH.getSiteLink())?.token === link.token)
-        await chrome.storage.local.remove(['siteLink', 'popupWish']);
+        await chrome.storage.local.remove(['siteLink', 'popupWish', 'alertsWish']);
       throw new Error('This extension was disconnected on the website. Connect again.');
     }
     if (!res.ok) {
@@ -3980,9 +3980,11 @@
         headers: { authorization: `Bearer ${link.token}` },
       }).catch(() => null);
     }
-    // The popup's copy of the account's Wishlist (ui/popup/wish-client.js COPY_KEY) goes
-    // with the connection; the Wishlist stays on the account.
-    await chrome.storage.local.remove(['siteLink', 'popupWish']);
+    // The popup's copy of the account's Wishlist (ui/popup/wish-client.js COPY_KEY) and
+    // the store alerts' copy of its keys (src/alerts.js WISH_KEY) go with the connection,
+    // here rather than at the alerts' next check (which waits while alerts are paused);
+    // the Wishlist stays on the account.
+    await chrome.storage.local.remove(['siteLink', 'popupWish', 'alertsWish']);
   };
   // @sync-end
 

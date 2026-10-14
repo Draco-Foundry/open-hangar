@@ -97,7 +97,7 @@
   });
   const signIn = $derived(rsiSignIn({ cookie, readOut, goneAt }));
   const signedOut = $derived(signIn !== 'in');
-  // Amounts in the currency picked (or the browser's language's), from US dollars.
+  // Amounts in the currency picked (US dollars until one is), from US dollars.
   const currency = $derived(shownCurrency(prefs.currency));
   const fx = $derived(fxFor(currency, rates));
   const failing = $derived(

@@ -4860,8 +4860,7 @@ try {
         `JSON Backup, Pledges CSV and Buy-Backs CSV (${ppSaved.rows} buy-backs) save their files, one row`,
       )
     : fail(`popup exports: ${JSON.stringify({ ppSaved, bbNote })}`);
-  // Currency: the browser's language's (US English here: USD) until one is picked, and no
-  // exchange rates asked for USD; EUR picked asks for the day's rates once and shows the
+  // Currency: USD until one is picked, and no exchange rates asked for USD; EUR picked asks for the day's rates once and shows the
   // dollar figure on hover; back to USD asks nothing more.
   const rated = () =>
     page.evaluate(() => __demo.fetched.filter((u) => /\/rates\.json$/.test(u)).length);
@@ -4996,19 +4995,20 @@ try {
     ? ok("Open My Hangar goes to the website's My Hangar")
     : fail(`popup Open My Hangar: ${went}`);
 
-  // A German browser with no currency picked: euros from the start (the day's rates, once).
+  // A German browser with no currency picked: still US dollars, and no rates asked (the
+  // policy: only if you pick a currency other than USD).
   const ppDeHook = await page.evaluateOnNewDocument(() =>
     Object.defineProperty(navigator, 'language', { get: () => 'de-DE' }),
   );
   await popAt(signedIn, '#pp-value');
-  await page.waitForFunction(() => /€/.test(document.getElementById('pp-value')?.textContent));
+  await sleep(300);
   const ppDe = await page.evaluate(() => ({
     value: document.getElementById('pp-value').textContent,
     asked: __demo.fetched.filter((u) => /\/rates\.json$/.test(u)).length,
   }));
   await page.removeScriptToEvaluateOnNewDocument(ppDeHook.identifier);
-  /€/.test(ppDe.value) && ppDe.asked === 1
-    ? ok(`no currency picked: the browser's language's (de-DE: ${ppDe.value})`)
+  /^\$/.test(ppDe.value.trim()) && !/€/.test(ppDe.value) && ppDe.asked === 0
+    ? ok(`no currency picked: US dollars and no rates asked (de-DE: ${ppDe.value.trim()})`)
     : fail(`popup currency default: ${JSON.stringify(ppDe)}`);
 
   // Scan: a background that scans in the Open Hangar tab brings it to the front (the
@@ -5602,6 +5602,39 @@ try {
   !wishDone.wide
     ? ok('Wishlist editing: search here, add, Target Price, Remove; one POST each, only the change')
     : fail(`popup wishlist editing: ${JSON.stringify({ ppEd, ppFound, afterAdd, badMark, wishDone })}`);
+  // A Target Price that doesn't go through (the website down, no Retry-After the popup
+  // can read): the field puts back the price the website has, the note says so, and
+  // the next change waits the website's minute.
+  const paintNow = '.pp-wedit li:nth-child(3) .pp-wtarget input';
+  await page.evaluate(() => (__demo.wishDown = true));
+  await page.$eval(paintNow, (e) => (e.value = ''));
+  await page.type(paintNow, '12');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(
+    (sel) => document.getElementById('pp-wish-note') && !document.querySelector(sel).disabled,
+    {},
+    paintNow,
+  );
+  await sleep(100);
+  const wishDown = await page.evaluate(async (sel) => {
+    const el = document.querySelector(sel);
+    const { popupWish } = await chrome.storage.local.get('popupWish');
+    return {
+      value: el.value,
+      invalid: el.getAttribute('aria-invalid'),
+      note: document.getElementById('pp-wish-note').textContent,
+      sent: __demo.wish.at(-1)?.body,
+      held: Number(popupWish?.holdUntil) > Date.now(),
+    };
+  }, paintNow);
+  await page.evaluate(() => (__demo.wishDown = false));
+  wishDown.value === '7.50' &&
+  !wishDown.invalid &&
+  wishDown.note === "Couldn't Reach openhangar.space" &&
+  wishDown.sent?.target === '12' &&
+  wishDown.held
+    ? ok("a Target Price that didn't go through: the saved one back in the field, a minute's hold")
+    : fail(`popup wishlist failed save: ${JSON.stringify(wishDown)}`);
   // Disconnect deletes the copy kept here (the Wishlist stays on the account).
   await page.click('#pp-tab-settings');
   await page.waitForSelector('#pp-disconnect');
