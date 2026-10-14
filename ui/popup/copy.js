@@ -158,8 +158,11 @@ const COPY = {
   // drop. Not for a part RSI stopped answering partway (auto-stopped is).
   'popup.auto-bad': "Last: {when}, something looked wrong and wasn't saved. Scan to check.",
   // A part that didn't finish because RSI stopped answering partway (the run's line
-  // 'partway': signed out midway or a page it couldn't read, too).
+  // 'partway': a page it couldn't read, too).
   'popup.auto-stopped': 'Last: {when}, RSI stopped answering partway. Scan to check.',
+  // A part that didn't finish because the pilot signed out of RSI midway (the run's line
+  // 'out-partway'). Claude chat, 2026-10-14 22:00 UTC.
+  'popup.auto-out-partway': 'Last: {when}, signed out of RSI partway. Scan to check.',
   // {when} on the day it ran: "today 6:12 AM" (another day: "Oct 13, 6:12 AM").
   'popup.auto-today': 'today {time}',
   'popup.store-alerts': 'Store Alerts', // the basic page's heading (basic.alerts-title)

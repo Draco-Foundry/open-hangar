@@ -19,9 +19,18 @@ export const DROP_SHARE = 0.1;
 // The longest backoff after runs that didn't finish.
 export const BACKOFF_MAX = 4 * DAY;
 // The run's lines (local autoScan.line).
-export const LINES = ['quick', 'full', 'signed-out', 'other', 'paused', 'bad', 'partway'];
+export const LINES = [
+  'quick',
+  'full',
+  'signed-out',
+  'other',
+  'paused',
+  'bad',
+  'out-partway',
+  'partway',
+];
 // The lines that ask for a scan (ui/popup/data.js autoAsk), and a day skipped.
-export const ASKS = ['bad', 'partway'];
+export const ASKS = ['bad', 'out-partway', 'partway'];
 const SKIPS = ['signed-out', 'other', 'paused'];
 
 const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -119,13 +128,14 @@ export function retryAtOf({ at, fails, retryAfter = null }, parse = retryAfterMs
 }
 
 // The run's line, most serious first: 'bad' (a part read from another account, or a
-// hangar dropped with nothing to explain it), 'partway' (a part that didn't finish:
-// RSI stopped answering, signed out midway, a page it couldn't read, a save that
-// failed), else 'full' when a saved part changed ("hangar updated"), or 'quick' ("no
+// hangar dropped with nothing to explain it), 'out-partway' (signed out of RSI midway),
+// 'partway' (a part that didn't finish: RSI stopped answering, a page it couldn't read,
+// a save that failed), else 'full' when a saved part changed ("hangar updated"), or 'quick' ("no
 // changes": the quick check found nothing new, or a full read found nothing
 // different).
-export function lineOf({ bad = false, partway = false, changed = false } = {}) {
+export function lineOf({ bad = false, out = false, partway = false, changed = false } = {}) {
   if (bad) return 'bad';
+  if (out) return 'out-partway';
   if (partway) return 'partway';
   return changed ? 'full' : 'quick';
 }
