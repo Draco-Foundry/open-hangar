@@ -258,6 +258,33 @@ test('getFxRates keeps the saved rates when the file is incomplete or unreachabl
   }
 });
 
+// The privacy policy: the rates at most once a day, a try that didn't bring them included.
+test('getFxRates asks at most once a day, even after a try that failed', async () => {
+  const store = {};
+  fxStore(store);
+  let calls = 0;
+  const missing = async () => {
+    calls++;
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+  assert.equal(await OH.getFxRates(missing), null);
+  assert.equal(await OH.getFxRates(missing), null);
+  assert.equal(calls, 1, 'not again the same day');
+  store.fxRates.triedAt -= 24 * 3600e3 + 1;
+  const back = async () => {
+    calls++;
+    return { ok: true, json: async () => ratesFile() };
+  };
+  assert.equal((await OH.getFxRates(back)).rates.EUR, 0.88);
+  assert.equal((await OH.getFxRates(back)).rates.EUR, 0.88);
+  assert.equal(calls, 2);
+  // Rates saved, then a day later a try that fails: the saved ones stand, for a day.
+  store.fxRates.at -= 24 * 3600e3 + 1;
+  assert.equal((await OH.getFxRates(missing)).rates.EUR, 0.88);
+  assert.equal((await OH.getFxRates(missing)).rates.EUR, 0.88);
+  assert.equal(calls, 3);
+});
+
 // Account Value (#164, #165): everything owned, one rule set for today and history.
 test('accountValue counts ships, CCUs, other pledges at melt and Store Credit', () => {
   const items = [

@@ -238,20 +238,21 @@ the rules (docs/RSI-CHANGES.md).
 Everything lives in `chrome.storage.local` (the `unlimitedStorage` permission lifts the
 browser's default quota). The main keys:
 
-| Key                        | What it holds                                                                                    | Code                                      |
-| -------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------- |
-| `db`                       | `{ schemaVersion, sources: { hangar, buybacks, referral: { items, scannedAt, meta? } }, owner }` | `readDB()`, `writeDB()`, `OH.loadDB()`    |
-| `dbHistory`                | Scan history: `[{ at, items: [[id, name, value]], credit?, checkedAt? }]`                        | `recordHistory()`, `OH.trimHistory()`     |
-| `dbCorrupt`                | Up to 3 damaged originals that failed the check, kept until Clear Data                           | `setAside()`, `OH.getDamaged()`           |
-| `dbRecovery`               | `{ at, db }`: the previous account's data, saved before an automatic clear                       | `clearDataNow()`, `OH.recoverData()`      |
-| `profile:<nickname>`       | Another RSI account's whole DB (history inside), parked while a different account is signed in   | `OH.switchProfile()`, `OH.listProfiles()` |
-| `account`                  | Cached RSI identity and balances (10 minutes)                                                    | `OH.getAccount()`                         |
-| `errorLog`                 | The rolling error log                                                                            | `OH.log()`                                |
-| `remoteStatus`, `netDown`  | Cached kill switch file; sites that recently timed out                                           | `loadStatus()`, `OH.guarded()`            |
-| `bbDetails`                | Buy-back details: packs read after a buy-back scan, the rest with Load Details (paced)           | `OH.fetchBuybackDetails()`                |
-| `lastBackupAt`             | When you last downloaded a backup file                                                           | `downloadBackup()` in `src/dashboard.js`  |
-| `alertsOn`, `alerts`       | Extension Alerts: the switch; the matches and which you've seen (`alerts` flag)                  | `OHAlerts.check()`, `src/background.js`   |
-| `alertsFeed`, `alertsWish` | The last sale feed (ETag, when to ask again); the account's Wishlist keys for this connection    | `OHAlerts.check()`                        |
+| Key                        | What it holds                                                                                     | Code                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `db`                       | `{ schemaVersion, sources: { hangar, buybacks, referral: { items, scannedAt, meta? } }, owner }`  | `readDB()`, `writeDB()`, `OH.loadDB()`    |
+| `dbHistory`                | Scan history: `[{ at, items: [[id, name, value]], credit?, checkedAt? }]`                         | `recordHistory()`, `OH.trimHistory()`     |
+| `dbCorrupt`                | Up to 3 damaged originals that failed the check, kept until Clear Data                            | `setAside()`, `OH.getDamaged()`           |
+| `dbRecovery`               | `{ at, db }`: the previous account's data, saved before an automatic clear                        | `clearDataNow()`, `OH.recoverData()`      |
+| `profile:<nickname>`       | Another RSI account's whole DB (history inside), parked while a different account is signed in    | `OH.switchProfile()`, `OH.listProfiles()` |
+| `account`                  | Cached RSI identity and balances (10 minutes)                                                     | `OH.getAccount()`                         |
+| `errorLog`                 | The rolling error log                                                                             | `OH.log()`                                |
+| `remoteStatus`, `netDown`  | Cached kill switch file; sites that recently timed out                                            | `loadStatus()`, `OH.guarded()`            |
+| `bbDetails`                | Buy-back details: packs read after a buy-back scan, the rest with Load Details (paced)            | `OH.fetchBuybackDetails()`                |
+| `lastBackupAt`             | When you last downloaded a backup file                                                            | `downloadBackup()` in `src/dashboard.js`  |
+| `alertsOn`, `alerts`       | Extension Alerts: the switch; the matches and which you've seen (`alerts` flag)                   | `OHAlerts.check()`, `src/background.js`   |
+| `alertsFeed`, `alertsWish` | The last sale feed (ETag, when to ask again); the account's Wishlist keys for this connection     | `OHAlerts.check()`                        |
+| `popupPrefs`, `popupWish`  | The popup's settings; its copy of the account's Wishlist for this connection (gone on Disconnect) | `ui/popup/prefs.js`, `wish-client.js`     |
 
 Other keys are caches of public data (for example `shipMatrix`, `shipCatalog`,
 `shipImages`, `scVersion`, `patchNotes`, `storeShips`, `fxRates`) and UI
