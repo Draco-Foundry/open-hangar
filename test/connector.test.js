@@ -204,8 +204,8 @@ test("popup: the line for pledges with no price, in the owner's words (2026-10-1
 test("popup copy: the owner's words (2026-10-13), filled in", async () => {
   const { t } = await import('../ui/popup/copy.js');
   assert.equal(t('popup.scan'), 'Scan');
-  assert.equal(t('popup.last-scan', { when: 'today' }), 'Scanned today');
-  assert.equal(t('popup.stale', { days: 9 }), 'Last scan 9 days ago. Time for a fresh one.');
+  assert.equal(t('popup.synced', { when: '2h ago' }), 'Synced 2h ago');
+  assert.equal(t('popup.alerts', { n: 2 }), 'Alerts: 2');
   assert.equal(
     t('popup.sync-wait', { time: '6:02 PM' }),
     'Try again at 6:02 PM. The last sync was moments ago.',

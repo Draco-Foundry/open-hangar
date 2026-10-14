@@ -129,6 +129,9 @@ const BUDGET = {
     max: 2.5 * MB,
   },
   alertsWish: small('the account Wishlist keys, 300 at most, replaced whole'),
+  // The toolbar popup's own settings (ui/popup/prefs.js): the last tab, Look, currency,
+  // the version whose What's New was read and when the last scan report was shown.
+  popupPrefs: small('five short fields, replaced whole'),
 };
 // Keys built at run time, as the source writes them (test/storage-keys.js).
 const DYNAMIC = {

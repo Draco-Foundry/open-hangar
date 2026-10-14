@@ -4,6 +4,14 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- New: **A new toolbar popup with three tabs.** Hangar shows your portrait, Account
+  Value and how it moved since an earlier scan, Store Credit, buy-back tokens, Fleet
+  News and Scan. Wishlist shows your openhangar.space Wishlist. Settings holds what the
+  extension page's settings did, plus Look, Currency and the shortcut. Store alerts sit
+  behind the bell in the header.
+- New: Light mode for the popup. It follows your browser, or pick Dark or Light in
+  Settings.
+- New: Alt+Shift+H opens the popup. Change it on your browser's shortcuts page.
 - Fixed: Connecting to openhangar.space while a scan runs no longer sends half a
   hangar. The sync waits for the scan to finish, and the open Open Hangar tab comes to
   the front instead of a second one opening.

@@ -1,0 +1,351 @@
+'use strict';
+// The 0.4.0 toolbar popup (ui/popup/): what it works out from what's stored, its
+// settings and its words. The background's side of it is test/connector.test.js and
+// test/alerts-background.test.js. Run: `npm test`.
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const ROOT = path.join(__dirname, '..');
+const data = () => import('../ui/popup/data.js');
+const NOW = Date.UTC(2026, 9, 14, 12);
+const MIN = 60e3;
+const HOUR = 3600e3;
+const DAY = 86400e3;
+
+test('header: the scan age, green, amber from a week, grey before any scan', async () => {
+  const { scanAge } = await data();
+  assert.deepEqual(scanAge(null, NOW), { tone: 'never', n: null, unit: null });
+  assert.deepEqual(scanAge(NOW - 20e3, NOW), { tone: 'fresh', n: 1, unit: 'm' });
+  assert.deepEqual(scanAge(NOW - 42 * MIN, NOW), { tone: 'fresh', n: 42, unit: 'm' });
+  assert.deepEqual(scanAge(NOW - 2 * HOUR, NOW), { tone: 'fresh', n: 2, unit: 'h' });
+  assert.deepEqual(scanAge(new Date(NOW - 3 * DAY).toISOString(), NOW), {
+    tone: 'fresh',
+    n: 3,
+    unit: 'd',
+  });
+  assert.deepEqual(scanAge(NOW - 7 * DAY, NOW), { tone: 'stale', n: 7, unit: 'd' });
+});
+
+test('scan: running from the shared marks, hidden without a tab, progress only its run', async () => {
+  const { scanState } = await data();
+  const run = { at: NOW - MIN, tabId: null, run: 'r1', by: 'offscreen' };
+  const prog = { run: 'r1', at: NOW - 1e3, part: 'buybacks', page: 2, count: 20, retry: null };
+  const s = scanState({ scanRunning: run, scanProgress: prog }, NOW);
+  assert.equal(s.phase, 'running');
+  assert.equal(s.hidden, true);
+  assert.equal(s.progress, prog);
+  // Another run's progress isn't this one's.
+  assert.equal(
+    scanState({ scanRunning: run, scanProgress: { ...prog, run: 'r0' } }, NOW).progress,
+    null,
+  );
+  // Today's mark from the Open Hangar tab: running, in a tab.
+  const tab = scanState({ scanRunning: { at: NOW - MIN, tabId: 42 } }, NOW);
+  assert.equal(tab.phase, 'running');
+  assert.equal(tab.hidden, false);
+  assert.equal(scanState({ scanRunning: { ...run, by: 'tab', tabId: 7 } }, NOW).hidden, false);
+  // Asked for a moment ago: running.
+  assert.equal(scanState({ scanRequest: { at: NOW - 10e3 } }, NOW).phase, 'running');
+  assert.equal(scanState({ scanRequest: { at: NOW - 2 * MIN } }, NOW).phase, 'idle');
+  assert.equal(scanState({}, NOW).phase, 'idle');
+});
+
+test('scan: stopped when its page went away, never when it reported', async () => {
+  const { scanState } = await data();
+  // A mark left behind past the background's 10 minutes.
+  const old = { at: NOW - 11 * MIN, tabId: null, run: 'r2', by: 'offscreen' };
+  assert.equal(scanState({ scanRunning: old }, NOW).phase, 'stopped');
+  assert.equal(scanState({ scanRunning: old, scanReport: { run: 'r2' } }, NOW).phase, 'idle');
+  // Progress gone quiet with no mark and no report for its run.
+  const quiet = { run: 'r3', at: NOW - 3 * MIN, part: 'hangar', page: 4 };
+  assert.equal(scanState({ scanProgress: quiet }, NOW).phase, 'stopped');
+  assert.equal(scanState({ scanProgress: { ...quiet, at: NOW - 30e3 } }, NOW).phase, 'idle');
+  assert.equal(scanState({ scanProgress: quiet, scanReport: { run: 'r3' } }, NOW).phase, 'idle');
+});
+
+test('scan: the bar only moves forward, and the steps follow the part', async () => {
+  const { progressFraction, scanSteps } = await data();
+  const order = [
+    { part: 'start' },
+    { part: 'account' },
+    { part: 'hangar', page: 1 },
+    { part: 'hangar', page: 30 },
+    { part: 'buybacks', page: 1 },
+    { part: 'referrals' },
+    { part: 'packs' },
+    { part: 'sync' },
+  ].map(progressFraction);
+  for (let i = 1; i < order.length; i++) assert.ok(order[i] > order[i - 1], `step ${i}`);
+  assert.ok(order.every((f) => f > 0 && f < 1));
+  assert.equal(progressFraction(null), progressFraction({ part: 'start' }));
+  const states = (part) =>
+    scanSteps(part)
+      .map((s) => s.state)
+      .join();
+  assert.equal(states('account'), 'now,todo,todo');
+  assert.equal(states('hangar'), 'now,todo,todo');
+  assert.equal(states('buybacks'), 'done,now,todo');
+  assert.equal(states('referrals'), 'done,done,now');
+  assert.equal(states('sync'), 'done,done,done');
+  assert.deepEqual(
+    scanSteps('hangar').map((s) => s.id),
+    ['hangar', 'buybacks', 'referrals'],
+  );
+});
+
+test('scan report: shown once, and how long it took', async () => {
+  const { newReport, took } = await data();
+  const r = { v: 1, at: NOW, ms: 38e3, rows: [] };
+  assert.equal(newReport(r, 0), r);
+  assert.equal(newReport(r, NOW), null, 'already shown');
+  assert.equal(newReport({ ...r, v: 2 }, 0), null, 'a shape this version does not know');
+  assert.equal(newReport(null, 0), null);
+  assert.deepEqual(took(38e3), { m: 0, s: 38 });
+  assert.deepEqual(took(125e3), { m: 2, s: 5 });
+  assert.deepEqual(took(200), { m: 0, s: 1 });
+  assert.equal(took(undefined), null);
+});
+
+test('Account Value since an earlier scan: the newest one that differs, never this one', async () => {
+  const { valueSince } = await data();
+  const snap = (at, v) => ({ at, items: [['1', 'x', v]] });
+  const valueOf = (s) => s.items[0][2];
+  const history = [snap(NOW - 30 * DAY, 4000), snap(NOW - 2 * DAY, 4160), snap(NOW, 4280)];
+  assert.deepEqual(valueSince(history, 4280, valueOf, NOW), { delta: 120, at: NOW - 2 * DAY });
+  // The same value as before: the one before that.
+  const same = [snap(NOW - 30 * DAY, 4000), snap(NOW - 2 * DAY, 4280), snap(NOW, 4280)];
+  assert.deepEqual(valueSince(same, 4280, valueOf, NOW), { delta: 280, at: NOW - 30 * DAY });
+  // Down is a change too.
+  assert.equal(valueSince([snap(NOW - DAY, 4300)], 4280, valueOf, NOW).delta, -20);
+  assert.equal(valueSince([snap(NOW, 4000)], 4280, valueOf, NOW), null, 'only this scan');
+  assert.equal(valueSince([], 4280, valueOf, NOW), null);
+  assert.equal(valueSince(null, 4280, valueOf, NOW), null);
+});
+
+test('Fleet News: the Wishlist first, then ships you own on sale, three at most', async () => {
+  const { fleetNews } = await data();
+  const m = (id, ...why) => ({ id, name: id, why: why.map((w) => ({ why: w, ships: [] })) });
+  const items = [
+    m('paint', 'paint'),
+    m('ltd', 'limited'),
+    m('wb', 'warbond'),
+    m('wish', 'wishlist'),
+    m('back', 'buyback'),
+    m('wish2', 'wishlist', 'limited'),
+  ];
+  assert.deepEqual(
+    fleetNews(items).map((x) => x.id),
+    ['wish', 'wish2', 'ltd'],
+  );
+  // Unseen first within the same kind.
+  assert.deepEqual(
+    fleetNews(items, new Set(['wish2'])).map((x) => x.id),
+    ['wish2', 'wish', 'ltd'],
+  );
+  assert.deepEqual(fleetNews([m('paint', 'paint'), m('back', 'buyback')]), []);
+  assert.deepEqual(fleetNews(null), []);
+});
+
+test('the tab the popup opens on: the last one, Hangar while Fleet News is unseen', async () => {
+  const { openingTab, TABS } = await data();
+  assert.deepEqual(TABS, ['hangar', 'wishlist', 'settings']);
+  assert.equal(openingTab('wishlist', 0), 'wishlist');
+  assert.equal(openingTab('wishlist', 2), 'hangar');
+  assert.equal(openingTab('alerts', 0), 'hangar', 'an old or unknown tab');
+  assert.equal(openingTab(undefined, 0), 'hangar');
+});
+
+test('Wishlist rows: named from the sale feed, on sale with the cheapest price, never guessed', async () => {
+  const { wishRows } = await data();
+  const feed = {
+    ships: [
+      { slug: 'avenger-titan', name: 'Avenger Titan' },
+      { slug: 'zeus-mk-ii-cl', name: 'Zeus Mk II CL' },
+    ],
+    items: [
+      {
+        id: 'sku-10',
+        kind: 'ship',
+        name: 'Avenger Titan Warbond',
+        price: 55,
+        ships: ['avenger-titan'],
+      },
+      { id: 'sku-11', kind: 'ship', name: 'Avenger Titan', price: 70, ships: ['avenger-titan'] },
+      { id: 'sku-20', kind: 'paint', name: 'Titan - Ghost Paint', price: 10, ships: [] },
+      { id: 'upgrade-5', kind: 'upgrade', name: 'Titan to Cutlass Black', price: 55, ships: [] },
+    ],
+  };
+  const keys = [
+    'ship:avenger-titan',
+    'ship:zeus-mk-ii-cl',
+    'sku:20',
+    'ccu:5',
+    'sku:99',
+    'ship:nope',
+  ];
+  assert.deepEqual(wishRows(keys, feed), {
+    rows: [
+      { key: 'ship:avenger-titan', name: 'Avenger Titan', onSale: true, price: 55 },
+      { key: 'ship:zeus-mk-ii-cl', name: 'Zeus Mk II CL', onSale: false, price: null },
+      { key: 'sku:20', name: 'Titan - Ghost Paint', onSale: true, price: 10 },
+      { key: 'ccu:5', name: 'Titan to Cutlass Black', onSale: true, price: 55 },
+    ],
+    unnamed: 2,
+  });
+  assert.deepEqual(wishRows(['ship:avenger-titan'], null), { rows: [], unnamed: 1 });
+  assert.deepEqual(wishRows(null, feed), { rows: [], unnamed: 0 });
+});
+
+test("Settings: a sync that didn't go through, and when it tries again", async () => {
+  const { syncTrouble, reportSyncFailed } = await data();
+  const connected = { name: 'p', lastSync: NOW - HOUR, waitUntil: NOW + 4 * MIN };
+  assert.deepEqual(syncTrouble({ connected, again: { at: NOW - MIN } }, NOW), {
+    until: NOW + 4 * MIN,
+    again: true,
+    msg: '',
+  });
+  assert.equal(syncTrouble({ connected, again: null }, NOW).again, false);
+  const ok = { ...connected, waitUntil: null };
+  assert.equal(syncTrouble({ connected: ok }, NOW), null);
+  assert.deepEqual(syncTrouble({ connected: ok, failed: { msg: 'responded 500' } }, NOW), {
+    until: null,
+    again: false,
+    msg: 'responded 500',
+  });
+  assert.equal(syncTrouble({ connected: null, failed: { msg: 'x' } }, NOW), null);
+  // The last scan's sync failed after the last one that went through, not before.
+  const report = { sync: { state: 'error', msg: 'responded 500', at: NOW } };
+  assert.deepEqual(reportSyncFailed(report, { lastSync: NOW - HOUR }), { msg: 'responded 500' });
+  assert.equal(reportSyncFailed(report, { lastSync: NOW + MIN }), null);
+  assert.equal(reportSyncFailed({ sync: { state: 'sent', at: NOW } }, null), null);
+  assert.equal(reportSyncFailed(null, null), null);
+});
+
+test('the portrait: only the copy the scan saved, only for this account', async () => {
+  const { portrait } = await data();
+  const src = 'data:image/jpeg;base64,/9j/4AAQ';
+  assert.equal(portrait({ nickname: 'Demo_Citizen', src, at: NOW }, 'demo_citizen'), src);
+  assert.equal(portrait({ nickname: 'Someone', src }, 'Demo_Citizen'), null, 'another account');
+  // Never an address the popup would fetch (the privacy policy: it never asks RSI).
+  const rsi = 'https://cdn.robertsspaceindustries.com/static/images/account/avatar_default_big.jpg';
+  assert.equal(portrait({ nickname: 'Demo_Citizen', src: rsi }, 'Demo_Citizen'), null);
+  assert.equal(portrait({ nickname: 'x', src: 'data:text/html;base64,PGI+' }, 'x'), null);
+  assert.equal(portrait(null, 'x'), null);
+});
+
+test('the shortcut: the browser’s for opening the popup, or none', async () => {
+  const { popupShortcut } = await data();
+  assert.equal(
+    popupShortcut([{ name: '_execute_action', shortcut: 'Alt+Shift+H' }]),
+    'Alt+Shift+H',
+  );
+  assert.equal(popupShortcut([{ name: '_execute_action', shortcut: '' }]), '');
+  assert.equal(popupShortcut([{ name: 'other' }]), null);
+  assert.equal(popupShortcut(null), null, 'no shortcuts in this browser');
+  // manifest.json suggests it for every build; the store check keeps it there
+  // (scripts/connector.mjs, test/connector-build.test.js).
+  const m = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
+  assert.deepEqual(m.commands._execute_action.suggested_key, {
+    default: 'Alt+Shift+H',
+    mac: 'Alt+Shift+H',
+  });
+});
+
+test('the popup settings: anything odd stored reads as the defaults', async () => {
+  const { cleanPrefs, LOOKS, CURRENCIES } = await import('../ui/popup/prefs.js');
+  assert.deepEqual(LOOKS, ['auto', 'dark', 'light']);
+  assert.deepEqual(CURRENCIES, ['USD']);
+  const def = { tab: 'hangar', look: 'auto', currency: 'USD', seenVersion: '', reportSeenAt: 0 };
+  assert.deepEqual(cleanPrefs(undefined), def);
+  assert.deepEqual(cleanPrefs([]), def);
+  assert.deepEqual(cleanPrefs({ look: 'neon', currency: 'XYZ', reportSeenAt: 'x' }), def);
+  assert.deepEqual(
+    cleanPrefs({ tab: 'settings', look: 'light', seenVersion: '0.4.0', reportSeenAt: NOW }),
+    { ...def, tab: 'settings', look: 'light', seenVersion: '0.4.0', reportSeenAt: NOW },
+  );
+});
+
+test("popup copy: Title Case labels, no em dashes, and the basic page's words word for word", async () => {
+  const { t, KEYS } = await import('../ui/popup/copy.js');
+  const basic = await import('../ui/basic/copy.js');
+  for (const k of KEYS) assert.doesNotMatch(t(k), /—/, `${k}: no em dash`);
+  // One and many.
+  assert.equal(t('popup.csv-saved', { n: 1 }), 'Saved 1 row to a CSV file.');
+  assert.equal(t('popup.csv-saved', { n: 3 }), 'Saved 3 rows to a CSV file.');
+  for (const k of KEYS.filter((k) => k.endsWith('.one')))
+    assert.ok(KEYS.includes(k.slice(0, -4)), `${k} has its many`);
+  // Copied from the basic page: the same words.
+  const SAME = {
+    'popup.scanning-short': 'basic.scanning',
+    'popup.tabs': 'basic.tabs',
+    'popup.tab-settings': 'basic.tab-settings',
+    'popup.scan-problem': 'basic.scan-problem',
+    'popup.syncing': 'basic.syncing',
+    'popup.firefox-no': 'basic.firefox-no',
+    'popup.pilot-yes': 'basic.pilot-yes',
+    'popup.pilot-no': 'basic.pilot-no',
+    'popup.pilot-body': 'basic.pilot-body',
+    'popup.store-alerts': 'basic.alerts-title',
+    'popup.json-saved': 'basic.json-saved',
+    'popup.clear-ask': 'basic.clear-ask',
+    'popup.keep-data': 'basic.keep-data',
+    'popup.cleared': 'basic.cleared',
+    'popup.account-live': 'basic.account-live',
+    'popup.account-remove': 'basic.account-remove',
+    'popup.account-remove-ask': 'basic.account-remove-ask',
+    'popup.logged-out': 'basic.logged-out',
+    'popup.logout-failed': 'basic.logout-failed',
+  };
+  for (const [mine, theirs] of Object.entries(SAME)) assert.equal(t(mine), basic.t(theirs), mine);
+  assert.equal(
+    t('popup.pilot-title', { handle: 'X' }),
+    basic.t('basic.pilot-title', { handle: 'X' }),
+  );
+  assert.equal(
+    t('popup.account-line', { n: 1, when: 'x' }),
+    basic.t('basic.account-line', { n: 1, when: 'x' }),
+  );
+  assert.equal(
+    t('popup.switched-back', { who: 'X' }),
+    basic.t('basic.switched-back', { who: 'X' }),
+  );
+  assert.equal(t('popup.switched-new', { who: 'X' }), basic.t('basic.switched-new', { who: 'X' }));
+  // The dashboard's Disconnect question, word for word.
+  const dc = fs.readFileSync(path.join(ROOT, 'ui/site/YouDisconnect.svelte'), 'utf8');
+  for (const k of ['popup.disconnect-ask', 'popup.stay'])
+    assert.ok(dc.includes(t(k)), `${k} is the dashboard's`);
+  // Headings, buttons and links in Title Case (small words and openhangar.space aside).
+  const LABELS = [
+    'popup.new-in',
+    'popup.what-changed',
+    'popup.got-it',
+    'popup.fleet-news',
+    'popup.all-alerts',
+    'popup.scan-again',
+    'popup.first',
+    'popup.log-in',
+    'popup.open-store',
+    'popup.alerts-off-title',
+    'popup.wish-empty',
+    'popup.wish-full',
+    'popup.wish-trouble',
+    'popup.wish-connect',
+    'popup.sync-trouble',
+    'popup.auto-scan',
+    'popup.look-auto',
+    'popup.shortcut-none',
+    'popup.shortcut-change',
+    'popup.disconnect-ask',
+    'popup.stay',
+  ];
+  const SMALL = new Set(['a', 'an', 'and', 'at', 'for', 'in', 'of', 'on', 'the', 'to', 'from']);
+  for (const k of LABELS)
+    for (const w of t(k, { version: '0.4.0' }).split(/\s+/).slice(1))
+      if (/^[a-z]/.test(w) && !SMALL.has(w) && !/^openhangar\.space/.test(w))
+        assert.fail(`${k}: "${w}" in Title Case`);
+  // Every new word waits for the owner's OK, said beside it.
+  const src = fs.readFileSync(path.join(ROOT, 'ui/popup/copy.js'), 'utf8');
+  assert.ok((src.match(/NEW: needs the owner's OK/g) || []).length >= 40);
+});

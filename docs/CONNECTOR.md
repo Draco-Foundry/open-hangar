@@ -13,9 +13,15 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
 
 ## What a Connector Build Has
 
-- **The toolbar popup** (`src/popup.html`, `ui/popup/`): Account Value, the last scan,
-  Scan, Open My Hangar, the store alerts with why (with the `alerts` flag,
-  `ui/popup/Alerts.svelte`: opening the popup marks them seen), where sync stands.
+- **The toolbar popup** (`src/popup.html`, `ui/popup/`, the 0.4.0 mockups): a header with
+  the version, the scan's age and the alerts bell (with the `alerts` flag; its Alerts
+  view is `ui/popup/Alerts.svelte`, and opening the popup marks them seen), then three
+  tabs. Hangar: the portrait the scan saved, Account Value and its change, Store Credit,
+  buy-back tokens, Fleet News, Scan (with the scan's progress and report when the
+  background shares them), Open My Hangar. Wishlist: the account's Wishlist, read only.
+  Settings: what the basic page's settings do, plus Look (light mode), Currency and the
+  shortcut (`commands` in manifest.json, Alt+Shift+H). Connect still opens the basic
+  page: the browser's sign-in window would close the popup.
 - **The basic page** (`src/basic.html`, `ui/basic/`): Pledges and Buy-Backs with search,
   totals and CSV, Export JSON, Report a Scan Problem, and the settings (openhangar.space,
   the store alerts' switch with the `alerts` flag, Clear Data, Saved Accounts, Log Out of

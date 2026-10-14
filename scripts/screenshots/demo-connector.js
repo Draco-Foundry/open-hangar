@@ -1,7 +1,11 @@
 // Loaded after demo-shim.js on the connector's own pages (src/popup.html,
 // src/basic.html): what only
-// they use. Session storage, storage change events, the popup's message to the
-// background, and new tabs, recorded on window.__demo for the UI test.
+// they use. Session storage, storage change events, the popup's messages to the
+// background, new tabs, the browser's shortcuts and its RSI cookie, recorded on
+// window.__demo for the UI test. Set before a page loads (evaluateOnNewDocument):
+// __demoAccount (the `account` key), __demoAvatar (`avatarImg`), __demoLocal (any other
+// local keys), __demoSession (session keys), __demoRsiCookie ('' for none, a value, or
+// leave it out for a browser that can't tell), __demoShortcut ('' for none set).
 (function () {
   const demo = (window.__demo = { sent: [], opened: [], listeners: [] });
   const session = {};
@@ -27,11 +31,33 @@
     addListener: (f) => demo.listeners.push(f),
     removeListener: (f) => (demo.listeners = demo.listeners.filter((x) => x !== f)),
   };
-  // The background's answer to the popup's Scan (src/background.js requestScan).
+  // The background's answers to the popup (src/background.js): its Scan
+  // (requestScan) and the alerts it saw. `demo.answers` by ohPopup, or `demo.answer`
+  // for every one.
+  demo.answers = {};
   chrome.runtime.sendMessage = async (msg) => {
     demo.sent.push(msg);
-    return demo.answer || { ok: true, opened: true };
+    const own = msg && demo.answers[msg.ohPopup];
+    return own || demo.answer || { ok: true, opened: true };
   };
+  // The browser's shortcut for the popup (manifest.json commands), and its own page.
+  chrome.commands = {
+    getAll: async () => [
+      {
+        name: '_execute_action',
+        description: '',
+        shortcut: window.__demoShortcut ?? 'Alt+Shift+H',
+      },
+    ],
+  };
+  // RSI's session cookie (Rsi-Token), or none.
+  if ('__demoRsiCookie' in window) {
+    chrome.cookies.get = async ({ name }) =>
+      window.__demoRsiCookie && name === 'Rsi-Token'
+        ? { name, value: window.__demoRsiCookie, domain: '.robertsspaceindustries.com' }
+        : null;
+  }
+  chrome.cookies.onChanged = { addListener() {}, removeListener() {} };
   chrome.tabs.create = (o) => void demo.opened.push(o.url);
   window.close = () => void (demo.closed = true);
   // Files the page saves (CSV, the backup) and pages it opens (Report a Scan Problem).
@@ -68,6 +94,10 @@
     return true;
   };
   if (window.__demoAlerts) chrome.storage.local.set(window.__demoAlerts);
+  if (window.__demoAccount) chrome.storage.local.set({ account: window.__demoAccount });
+  if (window.__demoAvatar) chrome.storage.local.set({ avatarImg: window.__demoAvatar });
+  if (window.__demoLocal) chrome.storage.local.set(window.__demoLocal);
+  if (window.__demoSession) Object.assign(session, window.__demoSession);
   chrome.runtime.reload = () => void (demo.reloaded = true);
   // Firefox before it lets the extension share, with our hangar page's ask waiting for
   // this tab (src/background.js oh-get-hangar): set by the UI test.

@@ -20,6 +20,7 @@ test('registry parses: every flag has a name, a one-line about and a default', a
   validateRegistry(registry);
   assert.deepEqual(Object.keys(registry).sort(), [
     'alerts',
+    'autoScan',
     'connector',
     'localMode',
     'orgFleet',
@@ -57,6 +58,8 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     connector: true,
     wishlistImport: true,
     alerts: true,
+    // Auto Scan Daily isn't built yet (the popup only draws its row with it on).
+    autoScan: false,
   };
   assert.deepEqual(buildValues(registry), STORE);
   // The beta is the same set: no flag has a beta value of its own today.
@@ -66,6 +69,7 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     sync: false,
   });
   assert.equal(registry.orgFleet.devOnly, true, 'orgFleet stays out of every store build');
+  assert.equal(registry.autoScan.devOnly, true, 'Auto Scan Daily stays out until it ships');
   assert.ok(!registry.localMode.devOnly, 'Local Mode ships');
   assert.ok(!registry.connector.devOnly, 'the connector ships');
   assert.ok(!registry.alerts.devOnly, 'store alerts ship');
@@ -98,6 +102,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     connector: false,
     wishlistImport: false,
     alerts: false,
+    autoScan: true,
   });
   const { values } = loadFlags(fs.readFileSync(file, 'utf8'));
   assert.deepEqual(values, {
@@ -107,6 +112,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     connector: false,
     wishlistImport: false,
     alerts: false,
+    autoScan: true,
   });
   assert.throws(() => writeFlags(file, {}), /expected one/, 'only ever written once');
   fs.rmSync(dir, { recursive: true, force: true });
@@ -252,6 +258,8 @@ test('pack: writes each build its values and cuts the code of flags that are off
     connector: true,
     wishlistImport: true,
     alerts: true,
+    // Auto Scan Daily isn't built yet (the popup only draws its row with it on).
+    autoScan: false,
   };
   // Without the connector, what needs it goes too.
   const NO_CONNECTOR = [

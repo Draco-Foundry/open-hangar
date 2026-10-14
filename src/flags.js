@@ -61,6 +61,15 @@
       about: "Store alerts: a badge and notifications for what's on sale for you, matched here.",
       default: true,
     },
+    // Auto Scan Daily (owner, 2026-10-14, the 0.4.0 mockups): a scan once a day while
+    // connected. Nothing behind it yet: the popup's Settings draws its row, switched off
+    // and greyed, only in a build with it on. Needs the alarms permission and the
+    // privacy policy's words before it can ship, so it stays out of every store build.
+    autoScan: {
+      about: 'Auto Scan Daily: a scan once a day while connected. Nothing behind it yet.',
+      default: false,
+      devOnly: true,
+    },
   };
 
   // Set per build by scripts/pack.mjs. Keep it empty here.
