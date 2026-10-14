@@ -6005,13 +6005,13 @@ try {
   // be suspended otherwise), saves its report and says it's done. Offline, RSI stood in
   // for (__demoScan).
   console.log('Hidden Scan Page');
-  const run = 'smoke1-0a0b0c0d0e0f';
+  const hiddenRun = 'smoke1-0a0b0c0d0e0f';
   const scanHook = await page.evaluateOnNewDocument((r) => {
     window.__demoScan = true;
     window.__demoSession = {
       scanRequest: { at: Date.now(), tabId: null, reason: 'popup', run: r, by: 'frame' },
     };
-  }, run);
+  }, hiddenRun);
   await page.setRequestInterception(true);
   const asked = [];
   const cutOff = (req) => {
@@ -6021,7 +6021,7 @@ try {
     req.abort('internetdisconnected');
   };
   page.on('request', cutOff);
-  await page.goto(`${URL0}scan.html?run=${run}&by=frame&v=0.4.0`, { waitUntil: 'load' });
+  await page.goto(`${URL0}scan.html?run=${hiddenRun}&by=frame&v=0.4.0`, { waitUntil: 'load' });
   await page
     .waitForFunction(() => __demo.sent.some((m) => m.ohScan?.op === 'done'), { timeout: 30000 })
     .catch(() => {});
@@ -6037,10 +6037,10 @@ try {
   page.off('request', cutOff);
   await page.setRequestInterception(false);
   await page.removeScriptToEvaluateOnNewDocument(scanHook.identifier);
-  hidden.done?.run === run &&
+  hidden.done?.run === hiddenRun &&
   hidden.sent.includes('ping') &&
   hidden.sent.at(-1) === 'done' &&
-  hidden.report?.run === run &&
+  hidden.report?.run === hiddenRun &&
   hidden.report.by === 'frame' &&
   hidden.report.reason === 'popup' &&
   hidden.report.rows?.[0]?.n === 2 &&
