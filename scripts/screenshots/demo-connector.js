@@ -1,5 +1,5 @@
 // Loaded after demo-shim.js on the connector's own pages (src/popup.html,
-// src/basic.html): what only
+// src/basic.html, src/scan.html): what only
 // they use. Session storage, storage change events, the popup's messages to the
 // background, new tabs and the browser's shortcuts, recorded on window.__demo for the
 // UI test. Set before a page loads (evaluateOnNewDocument): __demoAccount (the

@@ -30,6 +30,9 @@ most users see it within a few hours.
   `"minVersion": "0.2.13"` pauses it only on older versions (use this once the fix
   is out, so people on the fix keep scanning). `message` is optional (300 characters,
   plain text).
+- `sources.scanHidden`: `"enabled": false` runs scans on the small Open Hangar page in a
+  tab again instead of the hidden scan page (0.4.0, `src/scan-host.js`), if the hidden
+  page itself breaks. It only ever turns the hidden page off.
 - `banner`: a notice across the top of the dashboard. `level` is `warn` or `info`;
   `until` (a date) hides it automatically after that day; `maxVersion` shows it only
   on that version or older (versions before 0.3.0 ignore it and always show it).

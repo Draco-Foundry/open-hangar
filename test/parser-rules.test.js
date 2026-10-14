@@ -350,7 +350,7 @@ test('the rules load in a worker too: no window, document, chrome or require', (
 });
 
 test('every page that reads RSI loads the rules first', () => {
-  for (const page of ['src/dashboard.html', 'src/basic.html', 'src/popup.html']) {
+  for (const page of ['src/dashboard.html', 'src/basic.html', 'src/popup.html', 'src/scan.html']) {
     const order = [...read(page).matchAll(/\bsrc="([^"]+\.js)"/g)].map((m) => m[1]);
     const pos = (f) => order.indexOf(f);
     assert.ok(pos('schema-check.js') >= 0, `${page}: schema-check.js`);

@@ -62,6 +62,7 @@ const BUDGET = {
   // The scan runner (ui/scan/runner.js): the last scan's report (three rows, ids and
   // counts) and the RSI portrait (a data URL of AVATAR_MAX 64 KB at most).
   scanReport: small('the last scan, replaced whole'),
+  scanStarted: small('the last scan that began: its run and time, replaced whole'),
   avatarImg: { cap: 'one portrait, AVATAR_MAX 64 KB, replaced whole', max: 70 * KB },
   feedShips: { cap: 'one ships feed (~330 ships), replaced whole (a day)', max: 300 * KB },
   feedCatalog: {

@@ -20,19 +20,36 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
   buy-back tokens, Fleet News, Scan (with the scan's progress and report when the
   background shares them), Open My Hangar. Wishlist: the account's Wishlist as the store
   alerts read it (only with alerts on; the popup asks the website nothing), read only.
-  Settings: what the basic page's settings do, plus Look (light mode), Currency and the
+  Settings: the settings the basic page had until 0.4.0, plus Look (light mode), Currency and the
   shortcut (`commands` in manifest.json, Alt+Shift+H). Connect still opens the basic
   page: the browser's sign-in window would close the popup.
-- **The basic page** (`src/basic.html`, `ui/basic/`): Pledges and Buy-Backs with search,
-  totals and CSV, Export JSON, Report a Scan Problem, and the settings (openhangar.space,
-  the store alerts' switch with the `alerts` flag, Clear Data, Saved Accounts, Log Out of
-  RSI). Text only; it works with no network.
+- **The basic page** (`src/basic.html`, `ui/basic/`), small since 0.4.0: what needs a
+  page that stays open. Firefox's asks (its data card), Allow Access to RSI, Connect
+  (`#settings`: the sign-in window would close the popup), and a scan that can't run
+  hidden, with its progress, report and Report a Scan Problem. No lists, search, totals
+  or CSV in any build (the privacy policy's 0.4.0 words); text only.
+- **The hidden scan page** (`src/scan.html`, `ui/scan/main.js`, `src/scan-host.js`):
+  where Scan runs, so no tab opens. An offscreen document on Chrome and Edge, which only
+  has `chrome.runtime`, so `src/scan-shim.js` asks the background for its storage and
+  permission checks (one message type, answered only for that page); a hidden frame in
+  Firefox's event page, which pings it after every page and every 10 seconds (Firefox
+  suspends an idle event page about 30 seconds after its last event). It falls back to
+  the basic page's tab when the browser has neither, when the page can't be made, when
+  access to RSI is off (the tab asks for it on a click, then scans), when
+  `site/status.json` has `"scanHidden": { "enabled": false }` (it can only turn the
+  hidden page off; the popup and the hidden page read the file as they open, so the
+  background's cached copy is fresh), or for the rest of the browser session once a
+  hidden page went quiet (a scan asked of it never taken, or its scan mark not renewed
+  for 10 minutes) or stopped on an error. A scan asked for while the hidden page reads
+  packs starts at once, and a mark left by a hidden page that went away mid-scan never
+  holds the next scan.
 - **The background worker** as today: our pages' messages (bridge v2), the rescan badge,
   updates.
 - **The scan**, at the same depth: account and balances, the hangar (with the pledge
   archive and history), buy-backs and up to 30 unread packs, referrals. It's the scan
-  runner (`ui/scan/runner.js`), which the basic page runs in its tab; it stores its
-  progress (session `scanProgress`) and its last report (`scanReport`) for any page.
+  runner (`ui/scan/runner.js`), which the hidden scan page runs (the basic page in its
+  tab when it can't); it stores its progress (session `scanProgress`) and its last
+  report (`scanReport`) for any page.
 
 `scripts/pack.mjs` leaves the dashboard out of it (`scripts/connector.mjs`):
 `src/dashboard.html`, `src/dashboard.js`, `src/quips.js`, `src/qr.js`, `src/assets/`,
@@ -41,7 +58,8 @@ their imports). `scripts/check-store-build.mjs` refuses a connector build with a
 them, and a build without the connector that has the popup or the basic page.
 
 **Permissions** stay as they are (Extension Alerts, the `alerts` flag, add `alarms` and an
-optional `notifications`, docs/FLAGS.md "Alerts"): `storage`, `unlimitedStorage` (big hangars, history
+optional `notifications`, docs/FLAGS.md "Alerts"; the hidden scan page adds `offscreen` on
+Chrome and Edge only, and `frame-src 'self'` to Firefox's pages): `storage`, `unlimitedStorage` (big hangars, history
 and the archive), `cookies` (Log Out of RSI), `identity` (Connect's sign-in window), and
 host access to robertsspaceindustries.com only. The **hosts** the pages may reach shrink:
 a connector build's content security policy adds

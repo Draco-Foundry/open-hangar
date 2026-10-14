@@ -19,8 +19,9 @@ const ROOT = path.join(__dirname, '..');
 // note, then the entry here, never the other way round.
 const ALLOWED = {
   // alarms and the optional notifications: store alerts (the policy's "alarms" and
-  // "notifications", owner-approved 2026-10-13).
-  permissions: ['storage', 'unlimitedStorage', 'cookies', 'identity', 'alarms'],
+  // "notifications", owner-approved 2026-10-13). offscreen: the hidden scan page on
+  // Chrome and Edge (the policy's "offscreen", owner-approved 2026-10-14).
+  permissions: ['storage', 'unlimitedStorage', 'cookies', 'identity', 'alarms', 'offscreen'],
   optional_permissions: ['notifications'],
   host_permissions: ['https://robertsspaceindustries.com/*'],
   optional_host_permissions: [],
