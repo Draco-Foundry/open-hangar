@@ -1819,7 +1819,9 @@
   // Its address and keys: RULES.account.
   const ACCOUNT_URL = RSI_ORIGIN + RULES.account.path;
   const ACCOUNT_TTL_MS = 10 * 60 * 1000;
-  const ACCOUNT_CACHE_V = 6; // bump when the cached account shape changes (v6: + referral)
+  // Bump when the cached account shape changes (v6: + referral; v7: without the code of
+  // the player who recruited you, which isn't kept any more).
+  const ACCOUNT_CACHE_V = 7;
 
   // Brace-scan outward from a key match to extract the smallest enclosing {...}
   // JSON object, then parse it. Shared by extractAccount/extractReferral because
@@ -1885,8 +1887,9 @@
 
   // The dashboard HTML embeds a SEPARATE referral blob (not inside the nickname
   // object): { referralCode, referralUrl, referralUrlCopy, referrerReferralCode }.
-  // referralUrlCopy is the clean (non-encoded) enlist URL. Verified May 2026.
-  // Returns { code, url, referrerCode } or null when absent (e.g. signed out).
+  // referralUrlCopy is the clean (non-encoded) enlist URL. Verified May 2026. Only the
+  // player's own code and link are read: referrerReferralCode (the recruiter's code)
+  // is never kept. Returns { code, url } or null when absent (e.g. signed out).
   function extractReferral(html) {
     const un = unescapeEntities(html);
     const at = keyIndex(un, RULES.account.referral.code);
@@ -1895,7 +1898,6 @@
     return {
       code: obj[RULES.account.referral.code],
       url: RULES.account.referral.url.map((k) => obj[k]).find(Boolean) || null,
-      referrerCode: obj[RULES.account.referral.referrerCode] || null,
     };
   }
 
@@ -2020,7 +2022,7 @@
             : null,
         citizenRecord: null,
         org: null, // { name, sid, rank, logo } from the public dossier, or null
-        referral: extractReferral(html), // { code, url, referrerCode } | null — from the SAME fetch (free)
+        referral: extractReferral(html), // { code, url } | null — from the SAME fetch (free)
       };
       // UEE Citizen Record + main Organization live on the public dossier
       // (citizen profile) page — one fetch covers both.

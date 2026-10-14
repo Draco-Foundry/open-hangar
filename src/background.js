@@ -90,6 +90,12 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   const to = chrome.runtime.getManifest().version;
   // Caches of RSI news, which Home no longer shows (0.3.0): drop them.
   await chrome.storage.local.remove(['rsiNews', 'twisc2']);
+  // The code of the player who recruited you, which the cached account no longer keeps.
+  const { account } = await chrome.storage.local.get('account');
+  if (account?.referral && Object.hasOwn(account.referral, 'referrerCode')) {
+    delete account.referral.referrerCode;
+    await chrome.storage.local.set({ account });
+  }
   await chrome.storage.local.remove('updateReady');
   if (details.previousVersion && details.previousVersion !== to) {
     await chrome.storage.local.set({ justUpdated: { from: details.previousVersion, to } });

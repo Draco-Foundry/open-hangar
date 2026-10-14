@@ -470,7 +470,7 @@
               description:
                 "The referral object's keys: the enlist link is the first of `url` it has.",
               type: 'object',
-              required: ['code', 'url', 'referrerCode'],
+              required: ['code', 'url'],
               additionalProperties: false,
               properties: {
                 code: { $ref: '#/$defs/jsonKey' },
@@ -480,7 +480,6 @@
                   maxItems: 5,
                   items: { $ref: '#/$defs/jsonKey' },
                 },
-                referrerCode: { $ref: '#/$defs/jsonKey' },
               },
             },
           },
@@ -1039,11 +1038,7 @@
           next: 'conciergeNextLevel',
           percent: 'conciergeNextLevelPercentage',
         },
-        referral: {
-          code: 'referralCode',
-          url: ['referralUrlCopy', 'referralUrl'],
-          referrerCode: 'referrerReferralCode',
-        },
+        referral: { code: 'referralCode', url: ['referralUrlCopy', 'referralUrl'] },
       },
       dossier: {
         path: '/en/citizens/',
