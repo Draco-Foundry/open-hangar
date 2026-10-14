@@ -25,3 +25,7 @@ try {
 
 const el = document.getElementById('oh-popup');
 if (el && window.OH) mount(Popup, { target: el });
+// The kill switch's file (status.json, cached for hours), fresh for the next Scan: the
+// background worker only reads the cached copy to choose where a scan runs
+// (src/scan-host.js), and a scan that fails early never fetches it.
+window.OH?.getRemoteStatus?.()?.catch(() => {});

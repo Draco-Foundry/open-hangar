@@ -368,6 +368,24 @@ test('scan: held while another run scans, never by its own run; held without RSI
   assert.deepEqual(off.calls, []);
   assert.ok(off.logs.includes('info status: scan held: no access to robertsspaceindustries.com'));
   assert.equal(off.session.data.scanRunning, undefined, 'never marked');
+  // A held scan never began: no start kept.
+  assert.equal(x.local.data.scanStarted, undefined);
+  assert.equal(off.local.data.scanStarted, undefined);
+});
+
+test('scan: its start is kept past a browser restart, and its report names the same run', async () => {
+  // The session marks go when the browser closes (the hidden page with them); the start
+  // stays, so a start with no report for its run is a scan that stopped (#665).
+  const x = await setup({ by: 'offscreen', tabId: null });
+  let seen = null;
+  x.OH.scanSource = async (id) => {
+    seen ??= structuredClone(x.local.data.scanStarted);
+    return { ok: true, items: [] };
+  };
+  const report = await x.runner.scan({ reason: 'site' });
+  assert.deepEqual(seen, { run: 'run-a', by: 'offscreen', reason: 'site', at: report.startedAt });
+  assert.equal(seen.run, report.run, 'its report is the same run: it finished');
+  assert.deepEqual(x.local.data.scanStarted, seen);
 });
 
 test('scan: one at a time in a page; signed out reads nothing and sends nothing', async () => {

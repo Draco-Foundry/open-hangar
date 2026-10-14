@@ -10,9 +10,11 @@ const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
 const read = (page) => fs.readFileSync(path.join(ROOT, 'src', page), 'utf8');
-// Pages with an HTML file of their own (the connector's popup and basic page); the rest are mounted
-// into dashboard.html.
-const OWN_PAGE = { popup: 'popup.html', basic: 'basic.html' };
+// Pages with an HTML file of their own (the connector's popup, basic page and hidden scan
+// page); the rest are mounted into dashboard.html. The scan page is never shown, so it
+// has no look of its own.
+const OWN_PAGE = { popup: 'popup.html', basic: 'basic.html', scan: 'scan.html' };
+const SHOWN = ['popup', 'basic'];
 const config = fs.readFileSync(path.join(ROOT, 'vite.config.mjs'), 'utf8');
 
 test('every page entry that imports CSS has its stylesheet linked in its page', () => {
@@ -31,9 +33,17 @@ test('every page entry that imports CSS has its stylesheet linked in its page', 
 
 test("the connector's pages link the Clean Pro look (ui/tokens.css) before their own", () => {
   assert.match(config, /tokens: 'ui\/tokens\.css'/, 'built on its own');
-  for (const [name, page] of Object.entries(OWN_PAGE)) {
+  for (const name of SHOWN) {
+    const page = OWN_PAGE[name];
     const html = read(page);
     const at = html.indexOf('<link rel="stylesheet" href="ui/tokens.css" />');
     assert.ok(at >= 0 && at < html.indexOf(`href="ui/${name}.css"`), page);
   }
+});
+
+test('the hidden scan page has no look: no stylesheet, and a script with no CSS', () => {
+  assert.match(config, /scan: 'ui\/scan\/main\.js'/, 'a Vite entry');
+  assert.doesNotMatch(read('scan.html'), /<link\b|<style\b/);
+  const main = fs.readFileSync(path.join(ROOT, 'ui', 'scan', 'main.js'), 'utf8');
+  assert.doesNotMatch(main, /^import '[^']+\.css';/m);
 });
