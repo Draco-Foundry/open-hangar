@@ -127,14 +127,14 @@ test('a store or beta build with alerts on: the policy explains its permissions 
   }
 });
 
-// The wishlist import (ui/basic/wishlist-import.js): a store or beta build with the
+// The wishlist import (ui/scan/wishlist-import.js): a store or beta build with the
 // `wishlistImport` flag on sends the wishlist this browser kept to the openhangar.space
 // account. It fails here until both copies of the policy explain it in Optional Sync
 // ("Your old wishlist, once", owner-approved words, word for word) and name it among the
 // requests while connected, and the basic page never sends it in a build without the flag.
 test('a store or beta build with the wishlist import on: the policy names it', async () => {
   const { buildValues, readRegistry } = await import('../scripts/build-flags.mjs');
-  const { MAX_ITEMS } = await import('../ui/basic/wishlist-import.js');
+  const { MAX_ITEMS } = await import('../ui/scan/wishlist-import.js');
   const registry = readRegistry(path.join(ROOT, 'src', 'flags.js'));
   // The policy's text, as plain words (no Markdown marks, no tags).
   const words = (f) =>
@@ -162,9 +162,12 @@ test('a store or beta build with the wishlist import on: the policy names it', a
       );
     }
   }
-  // The basic page asks the flag before anything else.
-  const hub = read('ui/basic/hub.svelte.js');
-  const fn = /async function wishlistToAccount\(\) \{\n\s*(.*)\n/.exec(hub);
-  assert.ok(fn, 'ui/basic/hub.svelte.js has wishlistToAccount');
+  // The scan runner (every page's import, the basic page's too) asks the flag before
+  // anything else, and no page sends it another way.
+  const runner = read('ui/scan/runner.js');
+  const fn = /async function wishlistToAccount\(\) \{\n\s*(.*)\n/.exec(runner);
+  assert.ok(fn, 'ui/scan/runner.js has wishlistToAccount');
   assert.equal(fn[1], "if (!flag('wishlistImport')) return;");
+  assert.match(runner, /const flag = \(name\) => OH\?\.flags\?\.\[name\] === true;/);
+  assert.doesNotMatch(read('ui/basic/hub.svelte.js'), /importWishlist/);
 });

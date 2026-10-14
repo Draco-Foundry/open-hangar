@@ -5562,18 +5562,35 @@ try {
       kind: 'ship',
       contents: [],
     });
-    OH.scanSource = async (id) => {
+    OH.scanSource = async (id, onProgress) => {
       const items = id === 'hangar' ? [item(1), item(2)] : [];
+      onProgress(1, items.length); // RSI's first page
       await OH.storageSettled();
       return { ok: true, items, scannedAt: Date.now() };
     };
     OH.getReferral = async () => ({ ok: true });
+    // What the scan runner (ui/scan/runner.js) stores for other pages: its marks while
+    // it runs, gone after; its report, ids and counts only.
+    const marks = [];
+    const sessionSet = chrome.storage.session.set;
+    chrome.storage.session.set = (o) => {
+      if (o.scanRunning || o.scanProgress) marks.push(JSON.parse(JSON.stringify(o)));
+      return sessionSet(o);
+    };
     document.getElementById('bp-scan').click();
     await new Promise((r) => setTimeout(r, 600));
+    chrome.storage.session.set = sessionSet;
     const done = document.getElementById('bp-done')?.textContent || '';
+    const stored = {
+      report: (await chrome.storage.local.get('scanReport')).scanReport || null,
+      left: Object.keys(await chrome.storage.session.get(['scanRunning', 'scanProgress'])),
+      running: marks.find((m) => m.scanRunning)?.scanRunning || null,
+      parts: [...new Set(marks.filter((m) => m.scanProgress).map((m) => m.scanProgress.part))],
+    };
     OH.scanSource = async () => ({ ok: false, error: 'RSI changed something' });
     document.getElementById('bp-scan').click();
     await new Promise((r) => setTimeout(r, 600));
+    stored.failed = (await chrome.storage.local.get('scanReport')).scanReport || null;
     const rep = document.getElementById('bp-report')?.textContent || '';
     const rows = [...document.querySelectorAll('#bp-report li')].map((li) => li.textContent);
     document.getElementById('bp-report-btn')?.click();
@@ -5589,8 +5606,9 @@ try {
       line: document.getElementById('bp-signed-out')?.textContent || '',
       report: !!document.getElementById('bp-report-btn'),
     };
+    stored.signedOut = (await chrome.storage.local.get('scanReport')).scanReport?.signedOut;
     OH.getAccount = getAccount;
-    return { done, rep, rows, opened, out };
+    return { done, rep, rows, opened, out, stored };
   });
   /Scan complete:\s*2 pledges · 0 buy-backs · referrals read/.test(bpScan.done) &&
   /RSI changed something/.test(bpScan.rep) &&
@@ -5604,6 +5622,30 @@ try {
   !bpScan.out.report
     ? ok('signed out: the title and the line under it, no Report a Scan Problem')
     : fail(`basic signed out: ${JSON.stringify(bpScan.out)}`);
+  const runStore = bpScan.stored;
+  const rowsOf = (r) => JSON.stringify(r?.rows?.map((x) => [x.id, x.ok, x.n]));
+  runStore.report?.v === 1 &&
+  runStore.report.by === 'tab' &&
+  runStore.report.reason === 'page' &&
+  rowsOf(runStore.report) ===
+    JSON.stringify([
+      ['hangar', true, 2],
+      ['buybacks', true, 0],
+      ['referrals', true, null],
+    ]) &&
+  runStore.report.bad === false &&
+  !JSON.stringify(runStore.report).includes('Demo Pledge') &&
+  runStore.running?.by === 'tab' &&
+  runStore.running.tabId === 42 &&
+  typeof runStore.running.run === 'string' &&
+  runStore.report.run === runStore.running.run &&
+  ['start', 'account', 'hangar', 'buybacks'].every((p) => runStore.parts.includes(p)) &&
+  !runStore.left.length &&
+  runStore.failed?.bad === true &&
+  runStore.failed.rows[0].error === 'RSI changed something' &&
+  runStore.signedOut === true
+    ? ok('the scan runner stores its marks while it runs and its report, ids only, for other pages')
+    : fail(`basic scan storage: ${JSON.stringify(runStore)}`);
   // Another Open Hangar tab scanning (its scanRunning mark): this one's Scan waits and
   // says so; the mark gone, Scan is back (#658).
   const bpElsewhere = await page.evaluate(async () => {

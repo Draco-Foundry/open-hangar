@@ -30,7 +30,9 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
 - **The background worker** as today: our pages' messages (bridge v2), the rescan badge,
   updates.
 - **The scan**, at the same depth: account and balances, the hangar (with the pledge
-  archive and history), buy-backs and up to 30 unread packs, referrals.
+  archive and history), buy-backs and up to 30 unread packs, referrals. It's the scan
+  runner (`ui/scan/runner.js`), which the basic page runs in its tab; it stores its
+  progress (session `scanProgress`) and its last report (`scanReport`) for any page.
 
 `scripts/pack.mjs` leaves the dashboard out of it (`scripts/connector.mjs`):
 `src/dashboard.html`, `src/dashboard.js`, `src/quips.js`, `src/qr.js`, `src/assets/`,
@@ -77,23 +79,24 @@ step 3 above).
 
 **Stays**
 
-| Request                                                                             | Why                                                                       |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| robertsspaceindustries.com `/account/pledges`, `/account/buy-back-pledges`          | Scan: hangar and buy-backs                                                |
-| robertsspaceindustries.com `/pledge/buyback/<id>`                                   | Scan: up to 30 unread packs                                               |
-| robertsspaceindustries.com `/en/account/dashboard`                                  | Identity and balances: Scan, and opening the basic page (kept 10 minutes) |
-| robertsspaceindustries.com `/en/citizens/<handle>` (no cookies)                     | Citizen Record and org, with the one above                                |
-| robertsspaceindustries.com `POST /graphql` (referral recruits)                      | Scan: referrals                                                           |
-| robertsspaceindustries.com `/pledge-store/api/upgrade/graphql`, the cart            | Add to RSI Cart from our pages                                            |
-| robertsspaceindustries.com `POST /graphql` (`AddCartMultiItemMutation`)             | The Store's Haul: store items into the RSI cart, on a click               |
-| openhangar.space `status.json`                                                      | The kill switch                                                           |
-| openhangar.space `api/ships` (once a day)                                           | The popup's Account Value                                                 |
-| app.openhangar.space `/connect`, `/api/link/token`, `/link`                         | Connect                                                                   |
-| app.openhangar.space `POST` and `DELETE /api/v1/sync`                               | Sync, Disconnect                                                          |
-| github.com new issue (only when you press Report a Scan Problem)                    | Report a Scan Problem                                                     |
-| app.openhangar.space `POST /api/v1/wishlist/import` (once per connection, **new**)  | The 0.3.x wishlist into your account (`wishlistImport` flag)              |
-| openhangar.space `api/store/on-sale` (alerts on, every 30 minutes at most, **new**) | Extension Alerts: the public sale feed, matched on the device             |
-| app.openhangar.space `GET /api/v1/wishlist` (alerts on and connected, **new**)      | Extension Alerts: your account's Wishlist keys, read only                 |
+| Request                                                                               | Why                                                                       |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| robertsspaceindustries.com `/account/pledges`, `/account/buy-back-pledges`            | Scan: hangar and buy-backs                                                |
+| robertsspaceindustries.com `/pledge/buyback/<id>`                                     | Scan: up to 30 unread packs                                               |
+| robertsspaceindustries.com `/en/account/dashboard`                                    | Identity and balances: Scan, and opening the basic page (kept 10 minutes) |
+| robertsspaceindustries.com `/en/citizens/<handle>` (no cookies)                       | Citizen Record and org, with the one above                                |
+| robertsspaceindustries.com `/media/…` portrait (no cookies, when it changes, **new**) | Scan: a small copy of your RSI picture for our pages (`avatarImg`)        |
+| robertsspaceindustries.com `POST /graphql` (referral recruits)                        | Scan: referrals                                                           |
+| robertsspaceindustries.com `/pledge-store/api/upgrade/graphql`, the cart              | Add to RSI Cart from our pages                                            |
+| robertsspaceindustries.com `POST /graphql` (`AddCartMultiItemMutation`)               | The Store's Haul: store items into the RSI cart, on a click               |
+| openhangar.space `status.json`                                                        | The kill switch                                                           |
+| openhangar.space `api/ships` (once a day)                                             | The popup's Account Value                                                 |
+| app.openhangar.space `/connect`, `/api/link/token`, `/link`                           | Connect                                                                   |
+| app.openhangar.space `POST` and `DELETE /api/v1/sync`                                 | Sync, Disconnect                                                          |
+| github.com new issue (only when you press Report a Scan Problem)                      | Report a Scan Problem                                                     |
+| app.openhangar.space `POST /api/v1/wishlist/import` (once per connection, **new**)    | The 0.3.x wishlist into your account (`wishlistImport` flag)              |
+| openhangar.space `api/store/on-sale` (alerts on, every 30 minutes at most, **new**)   | Extension Alerts: the public sale feed, matched on the device             |
+| app.openhangar.space `GET /api/v1/wishlist` (alerts on and connected, **new**)        | Extension Alerts: your account's Wishlist keys, read only                 |
 
 Extension Alerts' two requests are new too: the sale feed is the same public file for
 everyone; the Wishlist read brings your account's Wishlist keys to this browser, and

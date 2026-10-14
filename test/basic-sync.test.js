@@ -1,11 +1,11 @@
 'use strict';
-// When the basic page may sync (ui/basic/sync-timing.js): never while a scan runs, here
-// or in another Open Hangar tab; a sync asked for then waits for the scan's own sync at
+// When a scan's page may sync (ui/scan/sync-timing.js): never while a scan runs, here
+// or in another Open Hangar page; a sync asked for then waits for the scan's own sync at
 // its end, and one the website's pace held back is tried once more (#658). Run: `npm test`.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const timing = () => import('../ui/basic/sync-timing.js');
+const timing = () => import('../ui/scan/sync-timing.js');
 
 test('another tab scanning: only a fresh mark from a different tab counts', async () => {
   const { scanElsewhere, SCAN_RUN_MAX } = await timing();
@@ -16,6 +16,30 @@ test('another tab scanning: only a fresh mark from a different tab counts', asyn
   assert.equal(scanElsewhere({ at: now - SCAN_RUN_MAX, tabId: 9 }, 5, now), false, 'stale');
   assert.equal(scanElsewhere({ at: now - 1000 }, 5, now), true, 'no tab id: assume another');
   assert.equal(scanElsewhere({ at: 'x', tabId: 9 }, 5, now), false, 'a broken mark');
+  // The same, asked as { tabId, run } (ui/scan/runner.js) about a mark without a run.
+  assert.equal(scanElsewhere({ at: now - 1000, tabId: 5 }, { tabId: 5, run: 'a' }, now), false);
+  assert.equal(scanElsewhere({ at: now - 1000, tabId: 9 }, { tabId: 5, run: 'a' }, now), true);
+  assert.equal(scanElsewhere({ at: now - 1000 }, { tabId: 5, run: 'a' }, now), true);
+});
+
+test("a mark with a run id: this run's own, wherever it runs", async () => {
+  const { scanElsewhere } = await timing();
+  const now = 1_000_000_000;
+  // A hidden page has no tab: its mark is its own, never another tab's scan.
+  const hidden = { at: now - 1000, tabId: null, run: 'r1', by: 'offscreen' };
+  assert.equal(scanElsewhere(hidden, { tabId: null, run: 'r1' }, now), false, 'its own run');
+  assert.equal(scanElsewhere(hidden, { tabId: 5, run: 'r2' }, now), true, 'another page');
+  assert.equal(scanElsewhere(hidden, { tabId: null, run: 'r2' }, now), true, 'another hidden page');
+  // A tab's mark: another run in another tab counts; this tab's earlier page (reloaded
+  // mid-scan) doesn't, as before.
+  const tab = { at: now - 1000, tabId: 7, run: 'r3', by: 'tab' };
+  assert.equal(scanElsewhere(tab, { tabId: 7, run: 'r3' }, now), false, 'this run');
+  assert.equal(scanElsewhere(tab, { tabId: 8, run: 'r4' }, now), true, 'another tab');
+  assert.equal(scanElsewhere(tab, { tabId: 7, run: 'r4' }, now), false, 'this tab, reloaded');
+  assert.equal(scanElsewhere({ ...tab, at: now - 11 * 60e3 }, { run: 'r4' }, now), false, 'stale');
+  // An older caller with a tab id only: keyed on the tab, as before.
+  assert.equal(scanElsewhere(hidden, 5, now), true);
+  assert.equal(scanElsewhere(tab, 7, now), false);
 });
 
 test('a sync during a scan waits for the scan; the scan’s own sync goes now', async () => {

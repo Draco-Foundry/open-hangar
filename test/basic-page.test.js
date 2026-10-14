@@ -1,6 +1,7 @@
 'use strict';
-// The connector's basic page (ui/basic/rows.js, ui/basic/copy.js): rows, search,
-// totals and the CSV export, which must work from what's stored alone. Run: `npm test`.
+// The connector's basic page (ui/basic/rows.js, ui/basic/copy.js, ui/basic/report-lines.js):
+// rows, search, totals and the CSV export, which must work from what's stored alone, and
+// the scan's words. Run: `npm test`.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { pledge, buyback } = require('./stored-data.js');
@@ -102,12 +103,96 @@ test("basic page copy: the scan's report rows and the signed-out box (2026-10-13
     "the problem box shows a row's own words",
   );
   assert.match(page, /t\('basic\.signed-out-line'\)/, 'the line under the signed-out title');
-  const hub = fs.readFileSync(`${__dirname}/../ui/basic/hub.svelte.js`, 'utf8');
+  // The rows' words are the page's own (ui/basic/report-lines.js), from the runner's ids.
+  const lines = fs.readFileSync(`${__dirname}/../ui/basic/report-lines.js`, 'utf8');
   assert.match(
-    hub,
+    lines,
     /box: t\('basic\.row-referrals-box'\)/,
     'the referrals row carries its box words',
   );
+});
+
+// --- The scan's words (ui/basic/report-lines.js, from ui/scan/runner.js's report) -------
+const runnerReport = (rows, extra = {}) => ({
+  v: 1,
+  run: 'r',
+  by: 'tab',
+  reason: 'page',
+  startedAt: 1,
+  at: 2,
+  ms: 1,
+  held: null,
+  signedOut: false,
+  switched: null,
+  rows,
+  bad: rows.some((r) => !r.ok || !!r.partial),
+  sync: null,
+  ...extra,
+});
+
+test("the scan's report in the basic page's words, as before the runner", async () => {
+  const { t } = await import('../ui/basic/copy.js');
+  const { reportLines, reportSummary } = await import('../ui/basic/report-lines.js');
+  const fine = reportLines(
+    runnerReport([
+      { id: 'hangar', ok: true, partial: null, n: 2, error: null },
+      { id: 'buybacks', ok: true, partial: null, n: 0, error: null },
+      { id: 'referrals', ok: true, partial: null, n: null, error: null },
+    ]),
+    t,
+  );
+  assert.deepEqual(fine, {
+    rows: [
+      { name: 'Hangar', ok: true, text: '2 pledges' },
+      { name: 'Buy-Backs', ok: true, text: '0 buy-backs' },
+      { name: 'Referrals', ok: true, text: 'referrals read', box: 'read' },
+    ],
+    signedOut: false,
+    bad: 0,
+  });
+  assert.equal(
+    `${t('basic.scan-done')} ${fine.rows.map((r) => r.text).join(' · ')}`,
+    'Scan complete: 2 pledges · 0 buy-backs · referrals read',
+  );
+  // A part cut short is a problem; a failed one shows its own words.
+  const trouble = reportLines(
+    runnerReport([
+      { id: 'hangar', ok: true, partial: 'stopped at page 3', n: 1, error: null },
+      { id: 'buybacks', ok: false, partial: null, n: null, error: 'RSI changed something' },
+    ]),
+    t,
+  );
+  assert.deepEqual(trouble.rows, [
+    { name: 'Hangar', ok: false, text: '1 pledge' },
+    { name: 'Buy-Backs', ok: false, text: 'RSI changed something' },
+  ]);
+  assert.equal(trouble.bad, 2);
+  assert.equal(reportSummary(trouble), 'Hangar: problem · Buy-Backs: problem');
+  // Signed out: no rows, the title says so.
+  const out = reportLines(runnerReport([], { signedOut: true }), t);
+  assert.deepEqual(out, { rows: [], signedOut: true, bad: 0 });
+  assert.equal(reportSummary(out, true), 'signed out of RSI');
+  assert.equal(reportSummary(null), 'no scan this session');
+  // A scan that never ran (another tab's scan, no RSI access) leaves the last one up.
+  assert.equal(reportLines(runnerReport([], { held: 'busy' }), t), null);
+  assert.equal(reportLines(runnerReport([], { held: 'no-rsi' }), t), null);
+  assert.equal(reportLines(null, t), null);
+});
+
+test("the scan's progress line, in the basic page's words", async () => {
+  const { t } = await import('../ui/basic/copy.js');
+  const { progressLine } = await import('../ui/basic/report-lines.js');
+  const p = (part, page = null, count = null, retry = null) => ({ part, page, count, retry });
+  assert.equal(progressLine(p('start'), t), 'Asking RSI for your hangar.');
+  assert.equal(progressLine(p('account'), t), 'Asking RSI for your hangar.');
+  assert.equal(progressLine(p('hangar', 2, 20), t), 'Hangar: page 2, 20 so far');
+  assert.equal(progressLine(p('buybacks', 1, 5), t), 'Buy-Backs: page 1, 5 so far');
+  assert.equal(
+    progressLine(p('hangar', 3, 30, { attempt: 1, of: 3 }), t),
+    'Hangar: page 3. RSI stalled, trying again (1 of 3)',
+  );
+  assert.equal(progressLine(p('referrals', null, 12), t), 'Referrals: 12 so far');
+  assert.equal(progressLine(p('packs', 1, 30), t), '');
 });
 
 test('basic page copy: one pledge, one buy-back', async () => {
@@ -136,8 +221,8 @@ test('basic page copy: one pledge, one buy-back', async () => {
   }
 });
 
-// --- The wishlist into the account, once (ui/basic/wishlist-import.js) -------------------
-const wish = () => import('../ui/basic/wishlist-import.js');
+// --- The wishlist into the account, once (ui/scan/wishlist-import.js) --------------------
+const wish = () => import('../ui/scan/wishlist-import.js');
 function memStore(data) {
   return {
     data,

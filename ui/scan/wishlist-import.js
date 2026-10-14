@@ -1,8 +1,8 @@
 // The 0.3.x wishlist into your openhangar.space account, once (the connector build).
 // The wishlist moved to the website; the one this browser kept (`wishlist`, the
-// dashboard's Store page) goes up once per connection, the first time the basic page
-// sees one, and the website adds it to the account's (a union: nothing there is
-// removed). The copy here is never touched.
+// dashboard's Store page) goes up once per connection, the first time the scan runner
+// (ui/scan/runner.js) sees one, and the website adds it to the account's (a union:
+// nothing there is removed). The copy here is never touched.
 //
 //   POST <site>/api/v1/wishlist/import   (Authorization: Bearer <sync token>)
 //   { v: 1, appVersion, items: [{ kind: 'ship', name }
