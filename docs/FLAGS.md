@@ -139,7 +139,7 @@ dashboard, for a developer; the store check refuses that build.
 
 `wishlistImport` lets the basic page send the wishlist this browser kept (the 0.3.x
 dashboard's Store page) to the openhangar.space account, once per connection
-(`ui/basic/wishlist-import.js`, `POST /api/v1/wishlist/import` with the sync token; the
+(`ui/scan/wishlist-import.js`, `POST /api/v1/wishlist/import` with the sync token; the
 website adds it and removes nothing). Until 0.3.0 the wishlist never left the browser.
 It's on in every store build and the beta from 0.3.0: the privacy policy (docs/PRIVACY.md
 and site/privacy.html) explains it under Optional Sync ("Your old wishlist, once",

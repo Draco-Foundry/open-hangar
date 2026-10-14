@@ -22,7 +22,8 @@ only: Prettier, web-ext, jsdom and jsqr (tests), puppeteer-core (drives the inst
   (`window.OH`: scan, storage, export, feeds, sync), `scraper/parser.js`, `flags.js`,
   `popup.html` and `basic.html` (the connector pages). `src/ui/` is Vite output (gitignored).
 - `ui/`: Svelte sources, one folder per page with a `main.js` entry (vite.config.mjs);
-  shared code in `ui/lib/`. Only `ui/popup/` and `ui/basic/` reach store builds.
+  shared code in `ui/lib/`. Only `ui/popup/`, `ui/basic/` and `ui/scan/` (the scan
+  runner the basic page imports) reach store builds.
 - `site/`: openhangar.space static files (`status.json` is the live kill switch);
   `site-worker/`: its front Worker.
 - `schema/`: the sync payload's JSON Schema. `test/`: `*.test.js` and `fixtures/`.

@@ -914,10 +914,12 @@
         'hangar',
         'scannedAt',
         'account',
+        'avatarImg',
         'subStore',
       ]);
       return;
     }
+    // The last scan's report and the RSI portrait (ui/scan/runner.js) go with the rest.
     await chrome.storage.local.remove([
       DB_KEY,
       HISTORY_KEY,
@@ -927,6 +929,8 @@
       'hangar',
       'scannedAt',
       'account',
+      'avatarImg',
+      'scanReport',
       'subStore',
       RECOVERY_KEY,
       LOG_KEY,
@@ -1031,8 +1035,14 @@
     return out;
   };
 
-  // Forget a parked account's saved data.
-  OH.deleteProfile = (nickname) => chrome.storage.local.remove(profileKey(nickname));
+  // Forget a parked account's saved data, and its portrait when the copy is theirs
+  // (avatarImg, ui/scan/runner.js).
+  OH.deleteProfile = async function deleteProfile(nickname) {
+    await chrome.storage.local.remove(profileKey(nickname));
+    const { avatarImg } = await chrome.storage.local.get('avatarImg');
+    if (avatarImg && profileKey(avatarImg.nickname) === profileKey(nickname))
+      await chrome.storage.local.remove('avatarImg');
+  };
 
   // One-time: turn an old "Restore previous hangar" snapshot (from before saved
   // accounts existed) into a parked account, unless that account is live.
@@ -3074,17 +3084,23 @@
   // Saves are debounced, merged with what's stored (another tab may have added
   // some), and flushed if the page closes before the timer fires.
   let bbdSave = null;
+  let bbdFlushed = Promise.resolve(); // the last save, landed
   function flushBuybackDetails() {
     clearTimeout(bbdSave);
     bbdSave = null;
     if (!bbdMem) return Promise.resolve();
     const mine = bbdMem;
-    return mutateStored(BBD_KEY, (cur = {}) => ({ ...cur, ...mine })).catch(() => {});
+    return (bbdFlushed = mutateStored(BBD_KEY, (cur = {}) => ({ ...cur, ...mine })).catch(
+      () => {},
+    ));
   }
   function saveBuybackDetails() {
     clearTimeout(bbdSave);
     bbdSave = setTimeout(flushBuybackDetails, 500);
   }
+  // A save still waiting goes now (a scan's page that may close next, ui/scan/runner.js).
+  // → once every save so far has landed.
+  OH.flushBuybackDetails = () => (bbdSave ? flushBuybackDetails() : bbdFlushed);
   if (typeof window !== 'undefined' && window.addEventListener) {
     window.addEventListener('pagehide', () => {
       if (bbdSave) flushBuybackDetails();

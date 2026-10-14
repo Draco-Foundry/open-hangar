@@ -57,8 +57,12 @@ const BUDGET = {
     max: 400 * KB,
   },
   // openhangar.space's feeds (OH.siteFeed): each one copy, replaced whole.
-  // The connector's one-time wishlist import (ui/basic/wishlist-import.js).
+  // The connector's one-time wishlist import (ui/scan/wishlist-import.js).
   wishImport: small('one record for the current connection'),
+  // The scan runner (ui/scan/runner.js): the last scan's report (three rows, ids and
+  // counts) and the RSI portrait (a data URL of AVATAR_MAX 64 KB at most).
+  scanReport: small('the last scan, replaced whole'),
+  avatarImg: { cap: 'one portrait, AVATAR_MAX 64 KB, replaced whole', max: 70 * KB },
   feedShips: { cap: 'one ships feed (~330 ships), replaced whole (a day)', max: 300 * KB },
   feedCatalog: {
     cap: 'one store catalog (RSI store size, ~700 items), replaced whole (30 minutes)',
@@ -425,6 +429,35 @@ async function fillWorstCase() {
     marketAnnotations: Object.fromEntries(
       Array.from({ length: 1500 }, (_, i) => [`package - ship ${i}|350`, { price: '400' }]),
     ),
+    // The scan runner's report at its longest (every row a problem in long words) and
+    // the portrait at its cap (ui/scan/runner.js AVATAR_MAX).
+    scanReport: {
+      v: 1,
+      run: 'mq1x-0a1b2c3d4e5f',
+      by: 'offscreen',
+      reason: 'alarm',
+      startedAt: 1,
+      at: 2,
+      ms: 1,
+      held: null,
+      signedOut: false,
+      switched: { who: 'x'.repeat(60), restored: true },
+      rows: ['hangar', 'buybacks', 'referrals'].map((id) => ({
+        id,
+        ok: false,
+        partial: 'x'.repeat(300),
+        n: 1500,
+        error: 'x'.repeat(600),
+      })),
+      bad: true,
+      sync: { state: 'error', msg: 'x'.repeat(600), at: 3 },
+    },
+    avatarImg: {
+      nickname: 'x'.repeat(60),
+      src: `data:image/jpeg;base64,${'A'.repeat(64 * 1024 - 23)}`,
+      at: 1,
+      url: `https://robertsspaceindustries.com/media/${'x'.repeat(200)}/heap_infobox/avatar.jpg`,
+    },
   };
   // The capped caches, each through one real write.
   await OH.getShipImage('Brand New Ship');

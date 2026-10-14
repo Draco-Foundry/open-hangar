@@ -59,8 +59,15 @@ test('switching accounts parks the old data and restores it later', async () => 
       ['Alt', 5, false],
     ],
   );
+  // Removing a saved account takes its portrait (ui/scan/runner.js avatarImg), never
+  // another pilot's.
+  mem.avatarImg = { nickname: 'Main', src: 'data:image/png;base64,AA==', at: 1 };
   await OH.deleteProfile('ALT');
   assert.equal((await OH.listProfiles()).length, 1);
+  assert.equal(mem.avatarImg.nickname, 'Main', "another pilot's portrait stays");
+  mem.avatarImg = { nickname: 'Alt', src: 'data:image/png;base64,AA==', at: 1 };
+  await OH.deleteProfile('alt');
+  assert.equal(mem.avatarImg, undefined);
 });
 
 test('switching to the account that is already live does nothing', async () => {
