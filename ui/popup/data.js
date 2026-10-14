@@ -5,6 +5,7 @@
 // the public ship list from openhangar.space, read at most once a day and bundled-only
 // offline), the last RSI account read (the `account` key) for Store Credit, and the
 // portrait the scan saved (`avatarImg`, a data URL: never an RSI address).
+import { t } from './copy.js';
 
 // The extension's own page in the connector build, where Connect lives (and, with an
 // older background, where scans run).
@@ -145,11 +146,26 @@ export function scanSteps(part) {
   return STEPS.map((id, i) => ({ id, state: i < at ? 'done' : i === at ? 'now' : 'todo' }));
 }
 
+// A scan's start (local scanStarted) counts as one that stopped once it's this old with
+// nothing to say it's running or that it ended.
+const STARTED_QUIET = 60e3;
+// Did the scan that began (`started`, local scanStarted { run, at }) end? Its report
+// (Scan's scanReport) or Auto Scan Daily's record (autoScan) is for that run, at that
+// start, or for a scan that began after it. A run id alone never pairs: a page keeps
+// its run for every scan it runs.
+const endedBy = (started, end) =>
+  isObj(end) &&
+  Number.isFinite(end.startedAt) &&
+  ((end.run === started.run && end.startedAt === started.at) || end.startedAt > started.at);
+
 // → { phase: 'idle' | 'running' | 'stopped', hidden, progress, run }. `hidden`: the
 // scan runs without a tab (its mark's `by` isn't 'tab'), so nothing else shows it.
 // A mark with a run id belongs to that run; progress counts only for the run marked.
+// `scanStarted` and `autoScan` (local, so they outlast a browser restart, #676): a scan
+// that began and never ended (no report or record for it) is one that stopped, Scan's
+// and Auto Scan Daily's alike.
 export function scanState(
-  { scanRunning, scanRequest, scanProgress, scanReport },
+  { scanRunning, scanRequest, scanProgress, scanReport, scanStarted, autoScan },
   now = Date.now(),
 ) {
   const mark = isObj(scanRunning) && Number.isFinite(scanRunning.at) ? scanRunning : null;
@@ -173,7 +189,56 @@ export function scanState(
   if (mark && !reported(mark.run)) return { phase: 'stopped', hidden: false, progress: null };
   if (prog && now - prog.at >= PROGRESS_QUIET && !reported(prog.run))
     return { phase: 'stopped', hidden: false, progress: null };
+  const started =
+    isObj(scanStarted) && typeof scanStarted.run === 'string' && Number.isFinite(scanStarted.at)
+      ? scanStarted
+      : null;
+  if (
+    started &&
+    now - started.at >= STARTED_QUIET &&
+    !endedBy(started, scanReport) &&
+    !endedBy(started, autoScan)
+  )
+    return { phase: 'stopped', hidden: false, progress: null };
   return { phase: 'idle', hidden: false, progress: null, run: null };
+}
+
+// --- Auto Scan Daily in Settings (the `autoScan` flag) -----------------------------------
+// The run's line (local autoScan.line, ui/scan/auto.js lineOf) → its words' key.
+const AUTO_KEY = {
+  quick: 'popup.auto-quick',
+  full: 'popup.auto-full',
+  'signed-out': 'popup.auto-signed-out',
+  other: 'popup.auto-other',
+  paused: 'popup.auto-paused',
+  bad: 'popup.auto-bad',
+  partway: 'popup.auto-stopped',
+};
+// The lines that ask you to scan yourself: a part that wasn't kept.
+const AUTO_ASKS = ['bad', 'partway'];
+// "{when}" in the line: "today 6:12 AM", or the day and time on another day ("Oct 13,
+// 6:12 AM"). `locale`: the browser's, unless a test names one.
+export function autoWhen(at, now = Date.now(), locale) {
+  const d = new Date(at);
+  // A plain space before AM/PM (some browsers' formats put a narrow one there).
+  const time = d
+    .toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })
+    .replace(/\u202f/g, ' ');
+  if (d.toDateString() === new Date(now).toDateString()) return t('popup.auto-today', { time });
+  return `${d.toLocaleDateString(locale, { month: 'short', day: 'numeric' })}, ${time}`;
+}
+// The line under the switch: null while it's off, the first-run line before its first
+// run, else the last run's. → { key, when, ask } (ask: it asks for a scan).
+export function autoLine({ on, rec }, now = Date.now(), locale) {
+  if (on !== true) return null;
+  const key = isObj(rec) ? AUTO_KEY[rec.line] : null;
+  if (!key || !Number.isFinite(rec.at)) return { key: 'popup.auto-first', when: '', ask: false };
+  return { key, when: autoWhen(rec.at, now, locale), ask: AUTO_ASKS.includes(rec.line) };
+}
+// The amber dot on Settings: the last run kept a part back, until a scan saves since.
+export function autoAsk({ on, rec, scannedAt }) {
+  if (on !== true || !isObj(rec) || !AUTO_ASKS.includes(rec.line)) return false;
+  return !(Number.isFinite(scannedAt) && Number.isFinite(rec.ended) && scannedAt > rec.ended);
 }
 
 // The scan report to show, once: one newer than the last the popup showed.

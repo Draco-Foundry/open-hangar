@@ -58,8 +58,8 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     connector: true,
     wishlistImport: true,
     alerts: true,
-    // Auto Scan Daily isn't built yet (the popup only draws its row with it on).
-    autoScan: false,
+    // Auto Scan Daily (#666): the privacy policy names it (test/privacy-permissions.test.js).
+    autoScan: true,
   };
   assert.deepEqual(buildValues(registry), STORE);
   // The beta is the same set: no flag has a beta value of its own today.
@@ -69,7 +69,7 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     sync: false,
   });
   assert.equal(registry.orgFleet.devOnly, true, 'orgFleet stays out of every store build');
-  assert.equal(registry.autoScan.devOnly, true, 'Auto Scan Daily stays out until it ships');
+  assert.ok(!registry.autoScan.devOnly, 'Auto Scan Daily ships');
   assert.ok(!registry.localMode.devOnly, 'Local Mode ships');
   assert.ok(!registry.connector.devOnly, 'the connector ships');
   assert.ok(!registry.alerts.devOnly, 'store alerts ship');
@@ -258,15 +258,17 @@ test('pack: writes each build its values and cuts the code of flags that are off
     connector: true,
     wishlistImport: true,
     alerts: true,
-    // Auto Scan Daily isn't built yet (the popup only draws its row with it on).
-    autoScan: false,
+    // Auto Scan Daily (#666): the privacy policy names it (test/privacy-permissions.test.js).
+    autoScan: true,
   };
-  // Without the connector, what needs it goes too.
+  // Without the connector, what needs it goes too (Auto Scan Daily needs the alerts).
   const NO_CONNECTOR = [
     '--flag',
     'connector=off',
     '--flag',
     'alerts=off',
+    '--flag',
+    'autoScan=off',
     '--flag',
     'wishlistImport=off',
   ];
@@ -403,6 +405,21 @@ test('pack: writes each build its values and cuts the code of flags that are off
     assert.throws(() => pack(dir, ['--flag', 'localMode=off']), /connector=on needs localMode on/);
     // Store alerts show in the popup: not without the connector.
     assert.throws(() => pack(dir, ['--flag', 'connector=off']), /alerts=on needs the connector/);
+    // Auto Scan Daily's daily alarm is the alerts' alarms permission: not without them.
+    assert.throws(
+      () => pack(dir, ['--flag', 'alerts=off']),
+      /autoScan=on needs alerts on \(it uses their alarms permission\)/,
+    );
+    // Without it: its code cut from the worker (its alarm, its badge rule).
+    pack(dir, ['--flag', 'autoScan=off']);
+    for (const t of ['chrome', 'firefox']) {
+      const bg = read(t, 'src/background.js');
+      assert.ok(!/oh-auto-scan|autoScanOn|requestScan\('auto'/.test(bg), `${t}: Auto Scan cut`);
+      assert.match(bg, /OHAlerts/, `${t}: the alerts kept`);
+    }
+    pack(dir);
+    for (const t of ['chrome', 'firefox'])
+      assert.match(read(t, 'src/background.js'), /const AUTO_ALARM = 'oh-auto-scan';/, t);
 
     // Without sync (so without Local Mode and the connector): a developer's build with the
     // sync code cut, which the store check refuses. The identity permission stays (it's
@@ -420,6 +437,7 @@ test('pack: writes each build its values and cuts the code of flags that are off
           connector: false,
           wishlistImport: false,
           alerts: false,
+          autoScan: false,
         },
         t,
       );
@@ -491,7 +509,7 @@ test('pack: writes each build its values and cuts the code of flags that are off
       );
     assert.deepEqual(
       problemsOf(dir).sort(),
-      offDefault(['alerts', 'connector', 'wishlistImport']).sort(),
+      offDefault(['alerts', 'autoScan', 'connector', 'wishlistImport']).sort(),
     );
 
     // Without Local Mode too: the hangar page in no list and its requests cut; the store
@@ -505,7 +523,7 @@ test('pack: writes each build its values and cuts the code of flags that are off
     assert.ok(!/oh-get-hangar|scanRequest/.test(read('chrome', 'src/background.js')));
     assert.deepEqual(
       problemsOf(dir).sort(),
-      offDefault(['alerts', 'connector', 'localMode', 'wishlistImport']).sort(),
+      offDefault(['alerts', 'autoScan', 'connector', 'localMode', 'wishlistImport']).sort(),
     );
     const pagesFile = path.join(dir, 'dist', 'chrome', 'src', 'site-pages.js');
     fs.writeFileSync(

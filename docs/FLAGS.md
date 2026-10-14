@@ -43,15 +43,15 @@ orgFleet: {
 Today's flags (from 0.3.0 every store build is the connector, with Local Mode, the
 wishlist import and store alerts):
 
-| Flag             | What it turns on                                          | Store | Beta | Dev-only |
-| ---------------- | --------------------------------------------------------- | ----- | ---- | -------- |
-| `sync`           | Website sync (Connect This Browser, Sync Now, ...)        | on    | on   | no       |
-| `orgFleet`       | Org Fleet sharing (nothing behind it yet)                 | off   | off  | yes      |
-| `localMode`      | Our hangar page reads this browser's hangar               | on    | on   | no       |
-| `connector`      | A toolbar popup and one basic page (the connector)        | on    | on   | no       |
-| `wishlistImport` | This browser's wishlist into the account (the basic page) | on    | on   | no       |
-| `alerts`         | Store alerts matched on the device (needs connector)      | on    | on   | no       |
-| `autoScan`       | Auto Scan Daily in the popup (nothing behind it yet)      | off   | off  | yes      |
+| Flag             | What it turns on                                           | Store | Beta | Dev-only |
+| ---------------- | ---------------------------------------------------------- | ----- | ---- | -------- |
+| `sync`           | Website sync (Connect This Browser, Sync Now, ...)         | on    | on   | no       |
+| `orgFleet`       | Org Fleet sharing (nothing behind it yet)                  | off   | off  | yes      |
+| `localMode`      | Our hangar page reads this browser's hangar                | on    | on   | no       |
+| `connector`      | A toolbar popup and one basic page (the connector)         | on    | on   | no       |
+| `wishlistImport` | This browser's wishlist into the account (the basic page)  | on    | on   | no       |
+| `alerts`         | Store alerts matched on the device (needs connector)       | on    | on   | no       |
+| `autoScan`       | Auto Scan Daily, once a day while connected (needs alerts) | on    | on   | no       |
 
 ## Adding or Retiring a Flag
 
@@ -186,10 +186,21 @@ themselves. The kill switch (site/status.json) pauses the checks with
 
 ## Auto Scan
 
-`autoScan` is Auto Scan Daily from the 0.4.0 mockups: a scan once a day while connected.
-Nothing is behind it yet. With it on, the popup's Settings draws the row, switched off
-and greyed. It's dev-only until it's built: it needs the `alarms` permission outside the
-alerts build and the privacy policy's words first.
+`autoScan` is Auto Scan Daily (#666): once a day while connected, a quick check of the
+newest page of the hangar and of buy-backs, and a full scan, saved part by part, only
+when something there is new or a week has gone by (docs/CONNECTOR.md, its request budget
+in docs/dev/requests.md). It's on in every store build and the beta from 0.4.0: the
+privacy policy has its section and names it under alarms and Disconnect (owner-approved
+words 2026-10-14), and a store or beta build with it on fails `npm test` while it
+doesn't (test/privacy-permissions.test.js). Each pilot still turns it on themselves, in
+the popup's Settings.
+
+It needs `alerts`: its daily alarm is the `alarms` permission the alerts' build brings
+(`scripts/alerts.mjs`), so `--flag autoScan=on` with `--flag alerts=off` doesn't build
+(and a build without the alerts passes `--flag autoScan=off` too). Its code is the
+`@flag-start autoScan` blocks in `src/background.js` (the alarm and the badge rule), the
+popup's switch (`flag('autoScan')`) and the hidden scan page's run (`ui/scan/main.js`).
+The kill switch (site/status.json) pauses it with `"autoScan": { "enabled": false }`.
 
 ## How Builds Set Them
 

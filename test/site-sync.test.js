@@ -256,6 +256,70 @@ test("Disconnect deletes the store alerts' Wishlist keys, alerts paused or not",
   answer = () => new Response(JSON.stringify({ ok: true, synced_at: 123 }), { status: 200 });
 });
 
+// --- Auto Scan Daily (#666) ----------------------------------------------------------
+// Check 5 of the privacy notes: Disconnect turns Auto Scan Daily off (its switch and its
+// next run go with the link and the popup's Wishlist copy), and so does a sync the
+// website says isn't connected. The worker then clears its alarm (src/background.js).
+test('Disconnect turns off Auto Scan Daily, as a sync refused as not connected does', async () => {
+  const on = { autoScanOn: true, autoScanNext: Date.now() + 3600e3, popupWish: { v: 1 } };
+  const kept = { autoScan: { v: 1, line: 'quick', at: 1 }, scanFull: { hangar: 1 } };
+  linked(scanned(Date.now() - 60_000));
+  Object.assign(mem, on, kept);
+  await OH.siteDisconnect();
+  for (const k of ['siteLink', 'popupWish', 'autoScanOn', 'autoScanNext'])
+    assert.equal(mem[k], undefined, k);
+  assert.deepEqual(mem.autoScan, kept.autoScan, 'its last run stays (the row is hidden)');
+  linked(scanned(Date.now() - 60_000));
+  Object.assign(mem, on);
+  answer = () => new Response(JSON.stringify({ error: 'not connected' }), { status: 401 });
+  await assert.rejects(OH.siteSync(), /disconnected on the website/);
+  for (const k of ['siteLink', 'popupWish', 'autoScanOn', 'autoScanNext'])
+    assert.equal(mem[k], undefined, k);
+  answer = () => new Response(JSON.stringify({ ok: true, synced_at: 123 }), { status: 200 });
+});
+
+test('a background seeing the link go clears Auto Scan Daily and leaves store alerts', async () => {
+  const { loadBackground } = require('./bridge-env.js');
+  const x = loadBackground({
+    changes: true,
+    offscreen: true,
+    local: { siteLink: { token: 't' }, autoScanOn: true, alertsOn: true },
+  });
+  const until = async (ok) => {
+    for (let i = 0; i < 200 && !ok(); i++) await new Promise((r) => setTimeout(r, 2));
+    assert.ok(ok());
+  };
+  await until(() => x.alarms.has('oh-auto-scan') && x.alarms.has('oh-alerts'));
+  // Disconnect's removal, as OH.siteDisconnect writes it.
+  await x.chrome.storage.local.remove([
+    'siteLink',
+    'popupWish',
+    'alertsWish',
+    'autoScanOn',
+    'autoScanNext',
+  ]);
+  await until(() => !x.alarms.has('oh-auto-scan'));
+  assert.ok(x.alarms.has('oh-alerts'), "store alerts' alarm untouched");
+  assert.equal(x.stores.local.autoScanNext, undefined);
+});
+
+// Which scan a sync sent, for a sync that never went out (ui/scan/auto.js owedSync), and
+// a refusal's status, for one not to send again until the scan changes.
+test('a sync that goes through keeps the scan it sent; a refusal carries its status', async () => {
+  const db = scanned(Date.now() - 60_000);
+  db.sources.buybacks = { scannedAt: 77, items: [] };
+  linked(db);
+  await OH.siteSync();
+  assert.equal(mem.siteLink.syncedScan, `${db.sources.hangar.scannedAt}|77|`);
+  answer = () => new Response(JSON.stringify({ reason: 'older-scan' }), { status: 409 });
+  const err = await OH.siteSync().catch((e) => e);
+  assert.equal(err.status, 409);
+  answer = () => new Response(JSON.stringify({ reason: 'too-soon' }), { status: 429 });
+  linked(db);
+  assert.equal((await OH.siteSync().catch((e) => e)).status, 429);
+  answer = () => new Response(JSON.stringify({ ok: true, synced_at: 123 }), { status: 200 });
+});
+
 // --- What sync leaves out ------------------------------------------------------------
 // The referral prospects list is other players (handles, monikers, enlist dates) who
 // aren't recruits yet: the backup file keeps it, sync never sends it.

@@ -61,14 +61,15 @@
       about: "Store alerts: a badge and notifications for what's on sale for you, matched here.",
       default: true,
     },
-    // Auto Scan Daily (owner, 2026-10-14, the 0.4.0 mockups): a scan once a day while
-    // connected. Nothing behind it yet: the popup's Settings draws its row, switched off
-    // and greyed, only in a build with it on. Needs the alarms permission and the
-    // privacy policy's words before it can ship, so it stays out of every store build.
+    // Auto Scan Daily (owner, 2026-10-14, #666): a quick check of the connected RSI
+    // account once a day, a full scan when something's new or a week has gone by, in the
+    // hidden scan page. On in every build from 0.4.0: the privacy policy has its section
+    // and names it under alarms and Disconnect (owner-approved words 2026-10-14;
+    // test/privacy-permissions.test.js). Off for each pilot until they turn it on. Needs
+    // alerts, whose build brings the alarms permission (scripts/pack.mjs).
     autoScan: {
-      about: 'Auto Scan Daily: a scan once a day while connected. Nothing behind it yet.',
-      default: false,
-      devOnly: true,
+      about: 'Auto Scan Daily: a quick check once a day while connected, a full scan when needed.',
+      default: true,
     },
   };
 

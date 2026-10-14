@@ -1,6 +1,7 @@
 'use strict';
 // Referral bonus events and reward pictures: openhangar.space's referral-events
-// feed (OH.getReferralEvents, OH.wikiImageUrls), never the wiki itself.
+// feed (OH.getReferralEvents, OH.wikiImageUrls), never the wiki itself. And the referral
+// part of a scan (OH.getReferral) in Auto Scan Daily's mode (#666).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
@@ -9,8 +10,12 @@ global.window = globalThis;
 global.chrome = {
   storage: {
     local: {
-      get: async (k) => (k in store ? { [k]: structuredClone(store[k]) } : {}),
+      get: async (k) =>
+        Object.fromEntries(
+          [].concat(k).flatMap((x) => (x in store ? [[x, structuredClone(store[x])]] : [])),
+        ),
       set: async (o) => Object.assign(store, structuredClone(o)),
+      remove: async (k) => [].concat(k).forEach((x) => delete store[x]),
     },
   },
 };
@@ -86,4 +91,98 @@ test('wikiImageUrls answers from the feed: our copies only, file names with spac
   assert.deepEqual(r, { 'Referral_Pulse.jpg': 'https://media.openhangar.space/pulse.jpg' });
   await OH.wikiImageUrls(['Referral Pulse.jpg'], fetchFn);
   assert.equal(calls, 1); // one feed for every picture, cached
+});
+
+// --- The referral part in Auto Scan Daily's mode (#666) ----------------------------------
+// RSI's referral lists (GraphQL): the legacy recruits over two pages, the current ones
+// and the prospects on one each. `fail(campaign, converted, page)` → a Response to
+// answer instead, or nothing.
+const ACCOUNT = {
+  loggedIn: true,
+  nickname: 'Test_Pilot',
+  referral: { code: 'STAR-ABCD-1234', url: null },
+};
+const rows = (n, from = 0) =>
+  Array.from({ length: n }, (_, i) => ({ id: `r${from + i}`, nickname: `Recruit${from + i}` }));
+function referralRsi(fail = () => null) {
+  const asked = [];
+  global.fetch = async (url, init) => {
+    const v = JSON.parse(init.body).variables;
+    asked.push(`${v.campaignId}/${v.converted}/${v.page}`);
+    const bad = fail(v.campaignId, v.converted, v.page);
+    if (bad) return bad;
+    const list = v.campaignId === '1' ? rows(60) : v.converted ? rows(3) : rows(2, 100).slice(0, 2);
+    const data = list.slice((v.page - 1) * 50, v.page * 50);
+    return Response.json({
+      data: { referralRecruitsList: { recruitsCount: 60, prospectsCount: 2, data } },
+    });
+  };
+  return asked;
+}
+async function withReferrals(fn) {
+  const was = { fetch: global.fetch, pause: OH.autoPause };
+  OH.autoPause = async () => {};
+  store = { remoteStatus: { at: Date.now(), data: null } }; // status.json as cached
+  try {
+    await fn();
+  } finally {
+    global.fetch = was.fetch;
+    OH.autoPause = was.pause;
+  }
+}
+
+test('getReferral in auto mode: a list that fails or comes back short saves nothing', async () => {
+  await withReferrals(async () => {
+    // The legacy recruits' second page fails (RSI down, Retry-After).
+    referralRsi((c, conv, page) =>
+      c === '1' && page === 2
+        ? new Response('', { status: 503, headers: { 'retry-after': '300' } })
+        : null,
+    );
+    const r = await OH.getReferral(null, { account: ACCOUNT, auto: true });
+    assert.equal(r.ok, false);
+    assert.equal(r.unfinished, true);
+    assert.equal(r.rsiDown, true);
+    assert.equal(r.retryAfter, '300');
+    assert.equal(store.db, undefined, 'nothing saved');
+    // A 429 on the prospects' first page: the same, nothing merged.
+    referralRsi((c, conv) =>
+      c === '2' && !conv
+        ? new Response('', { status: 429, headers: { 'retry-after': '60' } })
+        : null,
+    );
+    const p = await OH.getReferral(null, { account: ACCOUNT, auto: true });
+    assert.equal(p.unfinished, true);
+    assert.equal(p.retryAfter, '60');
+    assert.equal(store.db, undefined);
+  });
+});
+
+test('getReferral: the keep gate decides in auto mode; a pressed Scan still merges', async () => {
+  await withReferrals(async () => {
+    const asked = referralRsi();
+    const seen = [];
+    const no = await OH.getReferral(null, {
+      account: ACCOUNT,
+      auto: true,
+      keep: async ({ referral }) => (seen.push(referral.recruitsList.length), false),
+    });
+    assert.deepEqual(no, { ok: false, refused: true });
+    assert.deepEqual(seen, [60]);
+    assert.equal(store.db, undefined, 'refused: nothing saved');
+    assert.deepEqual(asked, ['1/true/1', '1/true/2', '2/true/1', '2/false/1']);
+    const yes = await OH.getReferral(null, {
+      account: ACCOUNT,
+      auto: true,
+      keep: async () => true,
+    });
+    assert.equal(yes.ok, true);
+    assert.equal(store.db.sources.referral.items.recruitsList.length, 60);
+    // Pressed Scan, the prospects failing: the saved list stands in for them, as before.
+    referralRsi((c, conv) => (c === '2' && !conv ? new Response('', { status: 500 }) : null));
+    const manual = await OH.getReferral(null, { account: ACCOUNT });
+    assert.equal(manual.ok, true);
+    assert.equal(manual.partial, 'prospects');
+    assert.equal(store.db.sources.referral.items.prospectsList.length, 2, 'the last good list');
+  });
 });

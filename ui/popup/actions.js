@@ -64,6 +64,8 @@ export async function pilotAnswer(who, yes) {
   return yes ? syncNow() : {};
 }
 export const disconnect = () => OH().siteDisconnect();
+// Auto Scan Daily's switch (src/background.js keeps its alarm; Disconnect turns it off).
+export const setAutoScan = (on) => chrome.storage.local.set({ autoScanOn: on === true });
 
 // --- Store alerts --------------------------------------------------------------------
 // The switch (src/background.js runs the checks). Off gives Notifications back too.

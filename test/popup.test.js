@@ -65,6 +65,80 @@ test('scan: stopped when its page went away, never when it reported', async () =
   assert.equal(scanState({ scanProgress: quiet, scanReport: { run: 'r3' } }, NOW).phase, 'idle');
 });
 
+test('scan: stopped after a browser restart, from the start kept locally (#676)', async () => {
+  const { scanState } = await data();
+  // A scan began 5 minutes ago and the browser closed: no session marks are left.
+  const started = { run: 'r4', by: 'offscreen', reason: 'popup', at: NOW - 5 * MIN };
+  assert.equal(scanState({ scanStarted: started }, NOW).phase, 'stopped');
+  // Ended: its report or Auto Scan Daily's record, for that run at that start.
+  const ended = { run: 'r4', startedAt: started.at };
+  assert.equal(scanState({ scanStarted: started, scanReport: ended }, NOW).phase, 'idle');
+  assert.equal(scanState({ scanStarted: started, autoScan: ended }, NOW).phase, 'idle');
+  // The run alone never pairs: a page keeps its run for every scan it runs.
+  const earlier = { run: 'r4', startedAt: started.at - DAY };
+  assert.equal(scanState({ scanStarted: started, scanReport: earlier }, NOW).phase, 'stopped');
+  assert.equal(scanState({ scanStarted: started, autoScan: earlier }, NOW).phase, 'stopped');
+  // One that began after it (a held scan, say) ends it too.
+  const later = { run: 'r5', startedAt: started.at + MIN };
+  assert.equal(scanState({ scanStarted: started, scanReport: later }, NOW).phase, 'idle');
+  // A start under a minute old: not yet (its marks are on their way).
+  assert.equal(scanState({ scanStarted: { ...started, at: NOW - 30e3 } }, NOW).phase, 'idle');
+  // Fresh marks: running, whatever was kept.
+  const mark = { at: NOW - MIN, tabId: null, run: 'r4', by: 'offscreen' };
+  assert.equal(scanState({ scanStarted: started, scanRunning: mark }, NOW).phase, 'running');
+  // Nothing usable kept: idle.
+  assert.equal(scanState({ scanStarted: { at: NOW - DAY } }, NOW).phase, 'idle');
+});
+
+// --- Auto Scan Daily in Settings (#666) ----------------------------------------------
+test("Auto Scan Daily's line: each run's approved words, none while it's off", async () => {
+  const { autoLine, autoWhen } = await data();
+  const { t } = await import('../ui/popup/copy.js');
+  const at = new Date(2026, 9, 14, 6, 12).getTime(); // local time
+  const now = new Date(2026, 9, 14, 18, 40).getTime();
+  assert.equal(autoWhen(at, now, 'en-US'), 'today 6:12 AM');
+  assert.equal(autoWhen(at, new Date(2026, 9, 15, 7).getTime(), 'en-US'), 'Oct 14, 6:12 AM');
+  const say = (rec, on = true) => {
+    const l = autoLine({ on, rec }, now, 'en-US');
+    return l && { words: t(l.key, { when: l.when }), ask: l.ask };
+  };
+  assert.equal(say({ v: 1, at, line: 'quick' }, false), null, 'off: no line');
+  assert.deepEqual(say(null), { words: 'Runs once a day while your browser is open.', ask: false });
+  assert.deepEqual(say({ v: 1, at: null, line: null }), {
+    words: 'Runs once a day while your browser is open.',
+    ask: false,
+  });
+  const rows = {
+    quick: ['Last: today 6:12 AM, no changes', false],
+    full: ['Last: today 6:12 AM, hangar updated', false],
+    'signed-out': ['Skipped today 6:12 AM: signed out of RSI', false],
+    other: ['Skipped today 6:12 AM: a different RSI account is signed in', false],
+    paused: ['Skipped today 6:12 AM: scans are paused', false],
+    bad: ["Last: today 6:12 AM, something looked wrong and wasn't saved. Scan to check.", true],
+    partway: ['Last: today 6:12 AM, RSI stopped answering partway. Scan to check.', true],
+  };
+  for (const [line, [words, ask]] of Object.entries(rows))
+    assert.deepEqual(say({ v: 1, at, line }), { words, ask }, line);
+  // Another day: the date and time.
+  assert.equal(
+    t(autoLine({ on: true, rec: { at, line: 'full' } }, now + DAY, 'en-US').key, {
+      when: autoWhen(at, now + DAY, 'en-US'),
+    }),
+    'Last: Oct 14, 6:12 AM, hangar updated',
+  );
+});
+
+test("Auto Scan Daily's ask: the Settings dot for a part not kept, until a scan saves since", async () => {
+  const { autoAsk } = await data();
+  const rec = { v: 1, at: NOW - HOUR, ended: NOW - HOUR + MIN, line: 'partway' };
+  assert.equal(autoAsk({ on: true, rec, scannedAt: NOW - DAY }), true);
+  assert.equal(autoAsk({ on: true, rec: { ...rec, line: 'bad' }, scannedAt: NOW - DAY }), true);
+  assert.equal(autoAsk({ on: true, rec, scannedAt: NOW }), false, 'a scan saved since');
+  assert.equal(autoAsk({ on: false, rec, scannedAt: NOW - DAY }), false, 'switched off');
+  for (const line of ['quick', 'full', 'signed-out', 'other', 'paused', null])
+    assert.equal(autoAsk({ on: true, rec: { ...rec, line }, scannedAt: NOW - DAY }), false, line);
+});
+
 test('scan: the bar only moves forward, and the steps follow the part', async () => {
   const { progressFraction, scanSteps } = await data();
   const order = [
@@ -494,6 +568,8 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
     'popup.auto-paused': 'Skipped {when}: scans are paused',
     'popup.auto-bad': "Last: {when}, something looked wrong and wasn't saved. Scan to check.",
     'popup.auto-stopped': 'Last: {when}, RSI stopped answering partway. Scan to check.',
+    // {when}'s form on the day it ran ("today 6:12 AM", the approved status lines').
+    'popup.auto-today': 'today {time}',
   };
   // The retired line (replaced 2026-10-14) is gone for good.
   for (const k of KEYS) assert.ok(!/kept your last good scan/.test(t(k)), `${k}: retired words`);

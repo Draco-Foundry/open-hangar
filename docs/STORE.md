@@ -117,7 +117,7 @@ install prompt only names robertsspaceindustries.com.)_
 
 **`alarms`** (added in 0.3.0)
 
-> Used only for store alerts, which the user turns on in the extension's settings (they're off by default). The alarm wakes the extension for a check at most every 30 minutes: it downloads one public sale file from openhangar.space (the same file for everyone, with nothing about the user in the request) and matches it on the device. Turning alerts off clears the alarm.
+> Used only for two optional features, both off until the user turns them on in the extension's settings. Store alerts: the alarm wakes the extension for a check at most every 30 minutes. It downloads one public sale file from openhangar.space (the same file for everyone, with nothing about the user in the request), reads the user's own Wishlist if they connected openhangar.space, and matches both on the device. Auto Scan Daily (only while connected to openhangar.space): the alarm wakes the extension once a day to scan the user's own RSI account, the same as pressing Scan, and only when the signed-in RSI account is the connected one. Turning a feature off clears its alarm.
 
 **`offscreen`** (added in 0.4.0; Chrome and Edge only)
 

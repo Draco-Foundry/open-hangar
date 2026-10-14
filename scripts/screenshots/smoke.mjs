@@ -4823,7 +4823,7 @@ try {
   set.shortcut === 'Alt+Shift+H' &&
   set.look === 'auto' &&
   !set.autoScan
-    ? ok('Settings: every group, alerts off, the shortcut, no Auto Scan row without its flag')
+    ? ok('Settings: every group, alerts off, the shortcut, no Auto Scan row until connected')
     : fail(`popup settings: ${JSON.stringify({ set, setMissing })}`);
   await page.click('#pp-shortcut-change');
   const shortGo = await page.evaluate(() => __demo.opened.at(-1));
@@ -4864,7 +4864,10 @@ try {
   // dollar figure on hover; back to USD asks nothing more.
   const rated = () =>
     page.evaluate(() => __demo.fetched.filter((u) => /\/rates\.json$/.test(u)).length);
-  const usdFirst = { picked: await page.$eval('#pp-currency', (s) => s.value), asked: await rated() };
+  const usdFirst = {
+    picked: await page.$eval('#pp-currency', (s) => s.value),
+    asked: await rated(),
+  };
   await page.select('#pp-currency', 'EUR');
   await sleep(300);
   const ppEurAsked = await rated();
@@ -4985,7 +4988,9 @@ try {
   popWait.dot &&
   retry.includes(`Try again at ${ppTime}.`) &&
   !/Retrying/.test(retry)
-    ? ok(`a sync that didn't go through: an amber dot and "Try again at ${ppTime}", no retry promised`)
+    ? ok(
+        `a sync that didn't go through: an amber dot and "Try again at ${ppTime}", no retry promised`,
+      )
     : fail(`popup sync wait: ${JSON.stringify({ popWait, retry, time: ppTime })}`);
   await page.click('#pp-tab-hangar');
   await page.waitForSelector('#pp-hangar');
@@ -4994,6 +4999,120 @@ try {
   went === 'https://app.openhangar.space/hangar'
     ? ok("Open My Hangar goes to the website's My Hangar")
     : fail(`popup Open My Hangar: ${went}`);
+
+  // Auto Scan Daily (#666): its switch in the openhangar.space group while connected, off
+  // until it's turned on; then its line under it in the approved words for each run,
+  // amber with the Settings dot for a part not kept; off again, no line; a narrow window.
+  await page.setViewport({ width: 360, height: 600 });
+  const autoLink = { token: 't', name: 'demo@pilot', connectedAt: 1, lastSync: T0 - 60e3 };
+  await popAt(
+    {
+      ...signedIn,
+      __demoLocal: {
+        popupPrefs: { tab: 'settings' },
+        siteUrl: 'https://app.openhangar.space',
+        siteLink: autoLink,
+      },
+    },
+    '#pp-auto-sw',
+  );
+  const autoState = () =>
+    page.evaluate(async () => ({
+      sw: document.getElementById('pp-auto-sw')?.getAttribute('aria-checked'),
+      inGroup: !!document.querySelector('#pp-site #pp-auto-sw'),
+      label: document.getElementById('pp-auto-l')?.textContent,
+      line: document.getElementById('pp-auto-line')?.textContent.replace(/\s+/g, ' ') ?? null,
+      calm: !!document.getElementById('pp-auto-line')?.classList.contains('calm'),
+      dot: document.getElementById('pp-tab-settings').classList.contains('dot'),
+      kept: (await chrome.storage.local.get('autoScanOn')).autoScanOn,
+      // The popup's own width (360 px, its narrowest): nothing sticks out sideways.
+      wide:
+        document.documentElement.scrollWidth > 360 ||
+        (() => {
+          const el = document.getElementById('pp-auto-line');
+          return !!el && el.scrollWidth > el.clientWidth;
+        })(),
+    }));
+  const autoOff = await autoState();
+  await page.click('#pp-auto-sw');
+  await sleep(200);
+  const autoOn = await autoState();
+  autoOff.sw === 'false' &&
+  autoOff.inGroup &&
+  autoOff.label === 'Auto Scan Daily' &&
+  autoOff.line === null &&
+  autoOn.sw === 'true' &&
+  autoOn.kept === true &&
+  autoOn.line === 'Runs once a day while your browser is open.' &&
+  autoOn.calm &&
+  !autoOn.dot
+    ? ok('Auto Scan Daily: off in the openhangar.space group; on: autoScanOn, the first-run line')
+    : fail(`popup auto scan switch: ${JSON.stringify({ autoOff, autoOn })}`);
+  const autoNow = await pageNow();
+  const autoWhen = await page.evaluate(
+    (u) => ({
+      time: new Date(u).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
+      day: new Date(u - 3 * 86400e3).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+      }),
+    }),
+    autoNow,
+  );
+  const today = `today ${autoWhen.time}`.replace(/\s+/g, ' ');
+  const AUTO_LINES = {
+    quick: [`Last: ${today}, no changes`, false],
+    full: [`Last: ${today}, hangar updated`, false],
+    'signed-out': [`Skipped ${today}: signed out of RSI`, false],
+    other: [`Skipped ${today}: a different RSI account is signed in`, false],
+    paused: [`Skipped ${today}: scans are paused`, false],
+    bad: [`Last: ${today}, something looked wrong and wasn't saved. Scan to check.`, true],
+    partway: [`Last: ${today}, RSI stopped answering partway. Scan to check.`, true],
+  };
+  const autoSeen = {};
+  const autoRec = (line, at = autoNow) => ({
+    v: 1,
+    at,
+    ended: at + 1000,
+    line,
+    run: null,
+    startedAt: null,
+    fails: 0,
+    retryAt: null,
+    syncTried: null,
+  });
+  for (const line of Object.keys(AUTO_LINES)) {
+    await told({ autoScan: { newValue: autoRec(line) } });
+    autoSeen[line] = await autoState();
+  }
+  const autoWrong = Object.entries(AUTO_LINES).filter(
+    ([line, [words, ask]]) =>
+      autoSeen[line].line !== words || autoSeen[line].calm === ask || autoSeen[line].dot !== ask,
+  );
+  !autoWrong.length
+    ? ok(
+        'Auto Scan Daily: every line in its approved words; amber and the Settings dot for bad and partway',
+      )
+    : fail(`popup auto scan lines: ${JSON.stringify({ autoWrong, autoSeen })}`);
+  // Another day: its date and time. The popup's 360 px holds the longest line.
+  await told({ autoScan: { newValue: autoRec('full', autoNow - 3 * 86400e3) } });
+  const autoOld = await autoState();
+  await told({ autoScan: { newValue: autoRec('bad') } });
+  const autoNarrow = await autoState();
+  await page.click('#pp-auto-sw');
+  await sleep(200);
+  const autoAgain = await autoState();
+  autoOld.line === `Last: ${autoWhen.day}, ${autoWhen.time}, hangar updated`.replace(/\s+/g, ' ') &&
+  !autoNarrow.wide &&
+  /something looked wrong/.test(autoNarrow.line) &&
+  autoAgain.sw === 'false' &&
+  autoAgain.kept === false &&
+  autoAgain.line === null &&
+  !autoAgain.dot
+    ? ok(
+        'Auto Scan Daily: another day shows its date; 360 px holds the longest line; off again, no line',
+      )
+    : fail(`popup auto scan: ${JSON.stringify({ autoOld, autoNarrow, autoAgain, autoWhen })}`);
 
   // A German browser with no currency picked: still US dollars, and no rates asked (the
   // policy: only if you pick a currency other than USD).
@@ -5172,6 +5291,29 @@ try {
   stopped.age === 'Scan stopped' && stopped.scan === 'Scan Again'
     ? ok('a scan that stopped: Scan stopped and Scan Again')
     : fail(`popup stopped: ${JSON.stringify(stopped)}`);
+  // After a browser restart there are no session marks: the start kept locally
+  // (scanStarted, #676) with no report or Auto Scan record for it says the same; one
+  // that ended (its run at its start) doesn't.
+  const began = { run: 'r10', by: 'offscreen', reason: 'popup', at: T0 - 5 * 60e3 };
+  const afterRestart = {};
+  for (const [name, more] of [
+    ['none', {}],
+    ['report', { scanReport: { v: 1, run: 'r10', startedAt: began.at, at: T0 - 60e3 } }],
+    ['auto', { autoScan: { v: 1, run: 'r10', startedAt: began.at, at: began.at, line: 'full' } }],
+  ]) {
+    await popAt({ ...signedIn, __demoLocal: { scanStarted: began, ...more } }, '#pp-scan');
+    afterRestart[name] = await page.evaluate(() => ({
+      age: document.getElementById('pp-age').textContent.trim(),
+      scan: document.getElementById('pp-scan').textContent,
+    }));
+  }
+  afterRestart.none.age === 'Scan stopped' &&
+  afterRestart.none.scan === 'Scan Again' &&
+  afterRestart.report.age !== 'Scan stopped' &&
+  afterRestart.report.scan === 'Scan' &&
+  afterRestart.auto.age !== 'Scan stopped'
+    ? ok('after a restart: a start with no end says Scan stopped and Scan Again; an ended one not')
+    : fail(`popup stopped after a restart: ${JSON.stringify(afterRestart)}`);
 
   // Before the first scan: no tabs, one heading and Scan. Signed out: Log In to RSI and a
   // grey Scan, off while RSI's sign-in cookie is gone and back once it's there again;
@@ -5307,9 +5449,7 @@ try {
     'The Scan Ran Into Trouble Hangar: 20 pledges Buy-Backs: RSI answered 500 Report a Scan Problem' &&
   !troubleDone &&
   /^https:\/\/github\.com\/Draco-Foundry\/open-hangar\/issues\/new\?/.test(reported) &&
-  reported.includes(
-    encodeURIComponent('Hangar: problem · Buy-Backs: problem').replace(/%20/g, '+'),
-  )
+  reported.includes(encodeURIComponent('Hangar: problem · Buy-Backs: problem').replace(/%20/g, '+'))
     ? ok('a scan with trouble: the rows not read or read in part, and Report a Scan Problem')
     : fail(`popup scan trouble: ${JSON.stringify({ trouble, troubleDone, reported })}`);
 
@@ -5344,9 +5484,7 @@ try {
   await sleep(300);
   const askedPilot = await page.evaluate(async () => ({
     gone: !document.getElementById('pp-pilot'),
-    declined: (await chrome.storage.local.get('siteLink')).siteLink?.declined?.map(
-      (p) => p.handle,
-    ),
+    declined: (await chrome.storage.local.get('siteLink')).siteLink?.declined?.map((p) => p.handle),
   }));
   askPilot.startsWith('Sync Demo_Citizen Too?') &&
   askPilot.endsWith('Sync It Not This One') &&
@@ -5456,9 +5594,11 @@ try {
     },
     '#pp-wish-off',
   );
-  const wishOff = await page.$eval('#pp-wish-off', (e) => e.textContent.replace(/\s+/g, ' ').trim());
+  const wishOff = await page.$eval('#pp-wish-off', (e) =>
+    e.textContent.replace(/\s+/g, ' ').trim(),
+  );
   wishOff === 'Your Wishlist Lives on openhangar.space Full Wishlist ↗'
-    ? ok("Wishlist off on the website, alerts off: Full Wishlist ↗ to the website")
+    ? ok('Wishlist off on the website, alerts off: Full Wishlist ↗ to the website')
     : fail(`popup wishlist, alerts off: ${JSON.stringify({ wishOff })}`);
 
   // The website takes changes (its extension_wishlist_write on): the items it read, a
@@ -5497,9 +5637,30 @@ try {
               { slug: 'zeus-mk-ii-cl', name: 'Zeus Mk II CL', keys: [] },
             ],
             items: [
-              { id: 'sku-1', kind: 'ship', name: 'Avenger Titan', price: 55, sale: [], ships: ['avenger-titan'] },
-              { id: 'sku-501', kind: 'paint', name: 'Cutlass - Ghoulish Green Paint', price: 10, sale: [], ships: [] },
-              { id: 'upgrade-16', kind: 'upgrade', name: 'Upgrade to Freelancer', price: 110, sale: [], ships: [] },
+              {
+                id: 'sku-1',
+                kind: 'ship',
+                name: 'Avenger Titan',
+                price: 55,
+                sale: [],
+                ships: ['avenger-titan'],
+              },
+              {
+                id: 'sku-501',
+                kind: 'paint',
+                name: 'Cutlass - Ghoulish Green Paint',
+                price: 10,
+                sale: [],
+                ships: [],
+              },
+              {
+                id: 'upgrade-16',
+                kind: 'upgrade',
+                name: 'Upgrade to Freelancer',
+                price: 110,
+                sale: [],
+                ships: [],
+              },
             ],
           },
         },
@@ -5512,7 +5673,10 @@ try {
       [...document.querySelectorAll('.pp-wedit li')].map((li) => ({
         text: li.querySelector('.pp-wrow').textContent.replace(/\s+/g, ' ').trim(),
         target: li.querySelector('.pp-wtarget input').value,
-        label: li.querySelector('.pp-wtarget').textContent.replace(/[\s$]+/g, ' ').trim(),
+        label: li
+          .querySelector('.pp-wtarget')
+          .textContent.replace(/[\s$]+/g, ' ')
+          .trim(),
         remove: li.querySelector('.pp-wx').getAttribute('aria-label'),
       })),
     );
@@ -5525,12 +5689,15 @@ try {
   const ppBefore = await page.evaluate(() => __demo.fetched.length);
   await page.type('#pp-wish-q', 'zeus');
   await page.waitForSelector('.pp-wadd');
-  const ppFound = await page.evaluate((n) => ({
-    names: [...document.querySelectorAll('.pp-wadd')].map((b) =>
-      b.textContent.replace(/\s+/g, ' ').trim(),
-    ),
-    sent: __demo.fetched.slice(n),
-  }), ppBefore);
+  const ppFound = await page.evaluate(
+    (n) => ({
+      names: [...document.querySelectorAll('.pp-wadd')].map((b) =>
+        b.textContent.replace(/\s+/g, ' ').trim(),
+      ),
+      sent: __demo.fetched.slice(n),
+    }),
+    ppBefore,
+  );
   await page.click('.pp-wadd');
   await page.waitForFunction(() => document.querySelectorAll('.pp-wedit li').length === 3);
   const afterAdd = {
@@ -5601,7 +5768,9 @@ try {
   wishDone.kept?.join() === 'ccu:16,ship:zeus-mk-ii-cl,sku:501' &&
   !wishDone.wide
     ? ok('Wishlist editing: search here, add, Target Price, Remove; one POST each, only the change')
-    : fail(`popup wishlist editing: ${JSON.stringify({ ppEd, ppFound, afterAdd, badMark, wishDone })}`);
+    : fail(
+        `popup wishlist editing: ${JSON.stringify({ ppEd, ppFound, afterAdd, badMark, wishDone })}`,
+      );
   // A Target Price that doesn't go through (the website down, no Retry-After the popup
   // can read): the field puts back the price the website has, the note says so, and
   // the next change waits the website's minute.
@@ -5674,7 +5843,10 @@ try {
       line: document.getElementById('pp-wish-none')?.textContent ?? null,
       found: document.querySelectorAll('.pp-wadd').length,
     }));
-  const offHint = await page.$eval('#pp-wish-q', (e) => [e.placeholder, e.getAttribute('aria-label')]);
+  const offHint = await page.$eval('#pp-wish-q', (e) => [
+    e.placeholder,
+    e.getAttribute('aria-label'),
+  ]);
   await page.type('#pp-wish-q', 'ghoulish');
   await page.waitForSelector('#pp-wish-none');
   const offNone = await wishNoMatch();
@@ -5693,7 +5865,9 @@ try {
   offShips.line === null &&
   offShips.found > 0
     ? ok('Wishlist search, alerts off: Add a ship, and No matches. when a search finds nothing')
-    : fail(`popup wishlist search, alerts off: ${JSON.stringify({ offHint, offNone, offShort, offShips })}`);
+    : fail(
+        `popup wishlist search, alerts off: ${JSON.stringify({ offHint, offNone, offShort, offShips })}`,
+      );
 
   // Saved Accounts: another account's hangar can be removed (the privacy policy promises
   // it), after a question; Log Out of RSI; Clear Data asks first.
@@ -5753,7 +5927,9 @@ try {
   ppCleared.note === 'Saved data cleared from this browser.' &&
   !ppCleared.tabs &&
   !ppCleared.db
-    ? ok('Log Out of RSI, and Clear Data after its question: back to the first view, said under Scan')
+    ? ok(
+        'Log Out of RSI, and Clear Data after its question: back to the first view, said under Scan',
+      )
     : fail(`popup log out and clear: ${JSON.stringify({ loggedOut, clearAsk, ppCleared })}`);
 
   // 375 px wide: still no sideways scroll. A phone (Firefox for Android opens the popup as

@@ -63,6 +63,12 @@ const BUDGET = {
   // counts) and the RSI portrait (a data URL of AVATAR_MAX 64 KB at most).
   scanReport: small('the last scan, replaced whole'),
   scanStarted: small('the last scan that began: its run and time, replaced whole'),
+  // Auto Scan Daily (#666): its switch, its next run (src/background.js), its last run
+  // and each part's last complete read (ui/scan/runner.js).
+  autoScanOn: small('the Auto Scan Daily switch'),
+  autoScanNext: small('one timestamp'),
+  autoScan: small('the last Auto Scan: when, how it went, the backoff; replaced whole'),
+  scanFull: small('the last complete read of each part: three timestamps'),
   avatarImg: { cap: 'one portrait, AVATAR_MAX 64 KB, replaced whole', max: 70 * KB },
   feedShips: { cap: 'one ships feed (~330 ships), replaced whole (a day)', max: 300 * KB },
   feedCatalog: {
