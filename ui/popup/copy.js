@@ -141,11 +141,13 @@ const COPY = {
   'popup.disconnect-body':
     'Your synced copy stays on openhangar.space until you delete it there. This extension just stops syncing.',
   'popup.stay': 'Stay Connected',
-  // A daily scan while connected (the `autoScan` flag, off until it's built).
+  // A daily scan while connected (the `autoScan` flag): its switch, in the
+  // openhangar.space group.
   'popup.auto-scan': 'Auto Scan Daily',
-  // Its status line, one at a time ({when}: "today 6:12 AM"): before its first run, a
-  // quick check that found nothing new, a full scan saved, a day skipped (signed out of
-  // RSI, another RSI account signed in, scans paused).
+  // Its status line under the switch, one at a time (ui/popup/data.js autoLine): before
+  // its first run, a quick check that found nothing new (or a full read that found
+  // nothing different), a full scan saved with something new, a day skipped (signed out
+  // of RSI, another RSI account signed in, scans paused).
   'popup.auto-first': 'Runs once a day while your browser is open.',
   'popup.auto-quick': 'Last: {when}, no changes',
   'popup.auto-full': 'Last: {when}, hangar updated',
@@ -155,8 +157,11 @@ const COPY = {
   // A part thrown away: only when it came back as another account, or with a sudden
   // drop. Not for a part RSI stopped answering partway (auto-stopped is).
   'popup.auto-bad': "Last: {when}, something looked wrong and wasn't saved. Scan to check.",
-  // A part that didn't finish because RSI stopped answering partway.
+  // A part that didn't finish because RSI stopped answering partway (the run's line
+  // 'partway': signed out midway or a page it couldn't read, too).
   'popup.auto-stopped': 'Last: {when}, RSI stopped answering partway. Scan to check.',
+  // {when} on the day it ran: "today 6:12 AM" (another day: "Oct 13, 6:12 AM").
+  'popup.auto-today': 'today {time}',
   'popup.store-alerts': 'Store Alerts', // the basic page's heading (basic.alerts-title)
   'popup.notifications': 'Notifications', // the switch's name
   'popup.look': 'Look',

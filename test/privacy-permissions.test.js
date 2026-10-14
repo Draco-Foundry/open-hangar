@@ -161,6 +161,56 @@ test('a store or beta build with the connector: the policy explains offscreen', 
       }
 });
 
+// Auto Scan Daily (#666): a store or beta build with the `autoScan` flag on scans the
+// connected RSI account once a day on an alarm. It fails here until both copies of the
+// policy have its section (#auto-scan-daily, with "A bad part is never kept", owner-
+// approved words 2026-10-14, word for word), name it in the alarms bullet, and say
+// Disconnect turns it off; and while the flag needs the alerts' alarms permission.
+test('a store or beta build with Auto Scan Daily on: the policy explains it', async () => {
+  const { buildValues, readRegistry } = await import('../scripts/build-flags.mjs');
+  const registry = readRegistry(path.join(ROOT, 'src', 'flags.js'));
+  const words = (f) =>
+    plain(
+      read(f)
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\*\*/g, '')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'),
+    ).replace(/ ([.,:;)])/g, '$1');
+  const BAD_PART =
+    "A bad part is never kept: Auto Scan Daily saves your hangar, buy-backs and referrals one part at a time, as each is fully read. A part that doesn't finish, a part read after RSI switched to a different account than the scan started on, or a hangar that would suddenly drop much of what's in it with no buy-backs to explain it, is never saved or synced. That part keeps your last good scan, and the popup asks you to scan yourself.";
+  const QUICK = 'A quick check that finds nothing new stops there and sends nothing.';
+  let checked = 0;
+  for (const [build, beta] of [
+    ['store', false],
+    ['beta', true],
+  ]) {
+    const flags = buildValues(registry, { beta });
+    if (!flags.autoScan) continue;
+    assert.ok(flags.alerts, `the ${build} build has the alerts' alarms permission for it`);
+    checked++;
+    assert.match(read('docs/PRIVACY.md'), /\n## Auto Scan Daily\n/, 'docs/PRIVACY.md');
+    assert.match(read('site/privacy.html'), /<h2 id="auto-scan-daily">Auto Scan Daily<\/h2>/);
+    for (const [file, bullets] of [
+      ['docs/PRIVACY.md', mdBullets()],
+      ['site/privacy.html', htmlBullets()],
+    ]) {
+      const text = words(file);
+      assert.ok(
+        text.includes(BAD_PART),
+        `${file}: "A bad part is never kept" (the ${build} build)`,
+      );
+      assert.ok(text.includes(QUICK), `${file}: the quick check sends nothing`);
+      assert.ok(
+        text.includes('stops syncing, turns off Auto Scan Daily and cancels this extension'),
+        `${file}: Disconnect turns it off`,
+      );
+      const alarms = bullets.find((b) => b.startsWith('alarms:'));
+      assert.match(alarms || '', /^alarms: for store alerts and Auto Scan Daily only\./, file);
+    }
+  }
+  assert.ok(checked, 'Auto Scan Daily is on in the store build (src/flags.js)');
+});
+
 // The wishlist import (ui/scan/wishlist-import.js): a store or beta build with the
 // `wishlistImport` flag on sends the wishlist this browser kept to the openhangar.space
 // account. It fails here until both copies of the policy explain it in Optional Sync

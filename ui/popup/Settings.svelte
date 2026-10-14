@@ -7,7 +7,7 @@
   // Log Out of RSI and Clear Data, then Help, Report a Scan Problem and Privacy.
   import { onMount, tick } from 'svelte';
   import { t } from './copy.js';
-  import { popupShortcut, scanAge, syncTrouble } from './data.js';
+  import { autoLine, popupShortcut, scanAge, syncTrouble } from './data.js';
   import { CURRENCIES, LOOKS } from './prefs.js';
   import { at } from '../site/when.js';
   import { flag } from '../lib/flags.js';
@@ -31,6 +31,7 @@
     reportProblem,
     removeProfile,
     setAlerts,
+    setAutoScan,
     syncNow,
   } from './actions.js';
 
@@ -57,6 +58,12 @@
   let dataNote = $state('');
   let shortcut = $state(null); // '' none set, null no shortcuts here
   let now = $state(Date.now());
+  // Auto Scan Daily (the `autoScan` flag): its switch (local autoScanOn) and its last run
+  // (local autoScan, written by the hidden scan page: ui/scan/runner.js).
+  const AUTO = flag('autoScan');
+  let autoOn = $state(false);
+  let autoRec = $state(null);
+  const line = $derived(autoLine({ on: autoOn, rec: autoRec }, now));
 
   const trouble = $derived(syncTrouble({ connected: v.connected, failed: failing }, now));
   const ago = (ms) => {
@@ -71,13 +78,21 @@
     alertsOn = (await chrome.storage.local.get(AL.ON_KEY))[AL.ON_KEY] === true;
     notify = await notifyAllowed();
   }
+  async function loadAuto() {
+    if (!AUTO) return;
+    const got = await chrome.storage.local.get(['autoScanOn', 'autoScan']);
+    autoOn = got.autoScanOn === true;
+    autoRec = got.autoScan || null;
+  }
   onMount(() => {
     OH.siteEnabled().then((on) => (siteOn = on));
     listProfiles().then((p) => (profiles = p));
     commands().then((c) => (shortcut = popupShortcut(c)));
     loadAlerts();
+    loadAuto();
     const changed = (c, area) => {
       if (area === 'local' && ALERTS && c[AL.ON_KEY]) loadAlerts();
+      if (area === 'local' && AUTO && (c.autoScanOn || c.autoScan)) loadAuto();
       if (area === 'local' && c.db) listProfiles().then((p) => (profiles = p));
     };
     chrome.storage.onChanged.addListener(changed);
@@ -116,6 +131,11 @@
     askDisconnect = false;
     shown({});
     await disconnect().catch((e) => (msg = String(e?.message || e)));
+  }
+  async function autoSwitch() {
+    const on = !autoOn;
+    autoOn = on;
+    await setAutoScan(on);
   }
   async function alertsSwitch() {
     const on = !alertsOn;
@@ -182,15 +202,24 @@
             <small>{trouble.until ? t('popup.sync-wait', { time: at(trouble.until) }) : trouble.msg}</small>
           </div>
         {/if}
-        {#if flag('autoScan')}
+        {#if AUTO}
           <div class="pp-r">
             <span class="pp-grow" id="pp-auto-l">{t('popup.auto-scan')}</span>
-            <button type="button" role="switch" class="pp-sw" aria-checked="false" aria-labelledby="pp-auto-l" disabled
-              ><i></i></button
+            <button
+              type="button"
+              role="switch"
+              class="pp-sw"
+              id="pp-auto-sw"
+              aria-checked={autoOn}
+              aria-labelledby="pp-auto-l"
+              onclick={autoSwitch}><i></i></button
             >
           </div>
-          <!-- Its status line (copy.js popup.auto-*): before its first run, for now. -->
-          <p class="pp-r pp-msg calm" id="pp-auto-line">{t('popup.auto-first')}</p>
+          <!-- Its status line while it's on (copy.js popup.auto-*, data.js autoLine); amber
+               when the last run kept a part back and asks for a scan. -->
+          {#if line}
+            <p class="pp-r pp-msg" class:calm={!line.ask} id="pp-auto-line">{t(line.key, { when: line.when })}</p>
+          {/if}
         {/if}
         {#if pilot}
           <div class="pp-r pp-col" id="pp-pilot" role="group" aria-labelledby="pp-pilot-h">

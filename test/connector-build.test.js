@@ -16,9 +16,10 @@ const { UI_STUBS, stubUi } = require('./ui-stubs.js');
 
 // A scratch copy of the repo with the Svelte pages stood in for. Its registry's store
 // build has the connector with Local Mode (as every store build since 0.3.0) and the
-// wishlist import, and Extension Alerts only with `alerts: true` (the store builds have
-// them too). With `connector: false`, a registry whose store build has no connector and
-// no wishlist import (Local Mode stays on, as the beta had it before).
+// wishlist import, and Extension Alerts (with Auto Scan Daily, which needs their alarms)
+// only with `alerts: true` (the store builds have both too). With `connector: false`, a
+// registry whose store build has no connector and no wishlist import (Local Mode stays
+// on, as the beta had it before).
 function scratch({ connector = true, alerts = false } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'oh-connector-'));
   for (const f of ['manifest.json', 'CHANGELOG.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md'])
@@ -37,6 +38,7 @@ function scratch({ connector = true, alerts = false } = {}) {
   setDefault('connector', connector);
   setDefault('wishlistImport', connector);
   setDefault('alerts', alerts);
+  setDefault('autoScan', alerts);
   return dir;
 }
 const run = (dir, script, args = []) =>
@@ -308,6 +310,15 @@ test('alerts need the connector', () => {
     assert.match(
       run(dir, 'pack.mjs', ['--flag', 'alerts=on']),
       /flags on: sync, localMode, connector, wishlistImport, alerts \(dev build, never for a store\)/,
+    );
+    // Auto Scan Daily's alarm is the alerts' alarms permission: not without them.
+    assert.throws(
+      () => run(dir, 'pack.mjs', ['--flag', 'autoScan=on']),
+      /autoScan=on needs alerts on \(it uses their alarms permission\)/,
+    );
+    assert.match(
+      run(dir, 'pack.mjs', ['--flag', 'alerts=on', '--flag', 'autoScan=on']),
+      /flags on: sync, localMode, connector, wishlistImport, alerts, autoScan \(dev build, never for a store\)/,
     );
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
