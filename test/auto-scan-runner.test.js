@@ -616,6 +616,93 @@ test("a pressed Scan notes the parts it read whole; one cut short isn't", async 
   assert.deepEqual(Object.keys(stamps()), ['referral']);
 });
 
+test('a part the status file pauses is skipped; the others are read and kept', async () => {
+  const r = await scannedAndSynced();
+  mem.remoteStatus = { at: Date.now(), data: { sources: { referrals: { enabled: false } } } };
+  rsi.hangar = [...pledges(1, 900), ...rsi.hangar];
+  const rec = await r.autoScan();
+  assert.equal(rec.line, 'full');
+  assert.ok(!asked.some((k) => k.startsWith('referrals:')), 'referrals paused');
+  assert.ok(asked.includes('buybacks:1'));
+  // Buy-backs paused: the quick check counts them as the same, and doesn't ask.
+  const q = await scannedAndSynced();
+  mem.remoteStatus = { at: Date.now(), data: { sources: { buybacks: { enabled: false } } } };
+  assert.equal((await q.autoScan()).line, 'quick');
+  assert.deepEqual(asked, ['who', 'hangar:1']);
+});
+
+test('signed out at the start: nothing read, and a sync owed still goes', async () => {
+  const r = await scannedAndSynced();
+  mem.siteLink.syncedScan = 'an older scan';
+  cookie = 'out';
+  const rec = await r.autoScan();
+  assert.equal(rec.line, 'signed-out');
+  assert.equal(rsiAsked(), 0);
+  assert.deepEqual(
+    site.map((s) => s.path),
+    ['/api/v1/sync'],
+    'the saved scan whose sync never went out',
+  );
+});
+
+test("a page it can't read, or a save that fails: partway, and the part is due", async () => {
+  const { r, before } = await fullRun();
+  rsi.fail = (kind) => (kind === 'hangar:1' ? new Response('', { status: 403 }) : null);
+  const rec = await r.autoScan();
+  assert.equal(rec.line, 'partway');
+  assert.equal(rec.fails, 0, 'RSI answered: no backoff');
+  assert.deepEqual(mem.db, before.db);
+  // The storage write for the hangar fails.
+  const f = await fullRun();
+  rsi.hangar = [...pledges(1, 900), ...rsi.hangar];
+  const set = chrome.storage.local.set;
+  chrome.storage.local.set = async (o) => {
+    if ('db' in o) throw new Error('QUOTA_BYTES quota exceeded');
+    return set(o);
+  };
+  try {
+    const failed = await f.r.autoScan();
+    assert.equal(failed.line, 'partway');
+    assert.equal(stamps().hangar, undefined);
+    assert.ok(!asked.some((k) => k.startsWith('buybacks:')));
+  } finally {
+    chrome.storage.local.set = set;
+  }
+});
+
+test('signed out by the end of a part: not kept, partway, no backoff', async () => {
+  const { r, before } = await fullRun();
+  rsi.who = (n) => (n >= 3 ? null : 'Test_Pilot');
+  const rec = await r.autoScan();
+  assert.equal(rec.line, 'partway');
+  assert.equal(rec.fails, 0);
+  assert.deepEqual(mem.db.sources.hangar, before.db.sources.hangar);
+});
+
+test('a part being read is due until it is kept: a browser closing then reads it in full next', async () => {
+  const run = await scannedAndSynced(); // every part's last complete read noted
+  rsi.hangar = [...pledges(1, 900), ...rsi.hangar];
+  let during = null;
+  rsi.fail = (kind) => {
+    if (kind === 'hangar:2') during = structuredClone(mem.scanFull);
+    return null;
+  };
+  await run.autoScan();
+  assert.equal(during.hangar, undefined, 'the hangar due while it was read');
+  assert.ok(during.buybacks, 'the parts not begun stand');
+  assert.equal(stamps().hangar, mem.db.sources.hangar.scannedAt, 'kept: it stands again');
+});
+
+test('Clear Data turns Auto Scan Daily off and forgets its runs and starts', async () => {
+  const r = await scannedAndSynced();
+  await r.autoScan();
+  mem.autoScanNext = Date.now() + 3600e3;
+  for (const k of ['autoScan', 'autoScanOn', 'scanFull', 'scanStarted']) assert.ok(k in mem, k);
+  await OH.clearData();
+  for (const k of ['autoScan', 'autoScanOn', 'autoScanNext', 'scanFull', 'scanStarted'])
+    assert.equal(mem[k], undefined, k);
+});
+
 // --- Check 10 -----------------------------------------------------------------------------
 
 test('check 10: every part not saved ends with bad or partway and no last complete read', async () => {
