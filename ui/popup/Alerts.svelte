@@ -6,17 +6,12 @@
   // asks anything. Alerts off: a heading and Turn On Alerts, the settings' switch.
   import { t } from './copy.js';
   import { openTab, setAlerts } from './actions.js';
+  import { USD, money } from './currency.js';
 
-  let { alerts, fresh } = $props();
+  let { alerts, fresh, fx = USD } = $props();
   const AL = globalThis.OHAlerts;
-  const money = (n) =>
-    Number.isFinite(n)
-      ? n.toLocaleString(undefined, {
-          style: 'currency',
-          currency: 'USD',
-          maximumFractionDigits: Number.isInteger(n) ? 0 : 2,
-        })
-      : '';
+  // The price in the currency picked, the dollar figure on hover.
+  const price = (n) => money(n, fx, { most: Number.isInteger(n) ? 0 : 2 });
   const newOnes = $derived(alerts.items.filter((m) => fresh.has(m.id)));
   const earlier = $derived(alerts.items.filter((m) => !fresh.has(m.id)));
   let busy = $state(false);
@@ -35,7 +30,7 @@
         <span class="pp-aname">{m.name}</span>
         {#each AL.lines(m) as line}<small>{line}</small>{/each}
       </span>
-      {#if Number.isFinite(m.price)}<span class="pp-price">{money(m.price)}</span>{/if}
+      {#if Number.isFinite(m.price)}{@const p = price(m.price)}<span class="pp-price" title={p.title || null}>{p.text}</span>{/if}
     </button>
   </li>
 {/snippet}

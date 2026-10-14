@@ -596,7 +596,7 @@ body {
   height: 52px;
   font-size: 16px;
 }
-/* Scan under Log In to RSI: grey, and still there to press. */
+/* Scan under Log In to RSI: grey; off (below) while RSI's sign-in cookie is gone. */
 .pp-btn.grey {
   background: transparent;
   color: var(--muted);
@@ -639,6 +639,14 @@ body {
 .pp-pair {
   display: flex;
   gap: 8px;
+}
+/* The three data buttons: one row, wrapping on a narrow screen. */
+.pp-three {
+  flex-wrap: wrap;
+}
+.pp-three .pp-btn2 {
+  flex: 1 1 30%;
+  white-space: nowrap;
 }
 .pp-link {
   font: inherit;
@@ -711,6 +719,142 @@ body {
   font-family: var(--font-data);
   font-size: 13px;
   color: var(--head);
+}
+/* The Wishlist's search, what it found, and each item's Target Price and Remove. */
+.pp-wsearch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--lift-2);
+  color: var(--muted);
+}
+.pp-wsearch:focus-within {
+  border-color: var(--accent);
+}
+.pp-wsearch input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  outline: 0;
+}
+.pp-wsearch input::placeholder {
+  color: var(--muted);
+}
+.pp-wsearch input:disabled {
+  cursor: not-allowed;
+}
+.pp-wfound {
+  list-style: none;
+  margin: -6px 0 0;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--lift-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pp-wadd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 6px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.pp-wadd:hover {
+  background: var(--accent-soft);
+}
+.pp-wadd:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.pp-wadd .pp-iname {
+  flex: 1;
+  min-width: 0;
+}
+.pp-plus {
+  flex: none;
+  color: var(--link);
+  font-size: 16px;
+}
+.pp-wedit li {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+.pp-wrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pp-wx {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.pp-wx:hover {
+  background: var(--lift-2);
+  color: var(--warn);
+}
+.pp-wx:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.pp-wtarget {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.pp-wtarget > span:first-child {
+  margin-right: auto;
+}
+.pp-wtarget input {
+  width: 84px;
+  height: 26px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  font: inherit;
+  font-family: var(--font-data);
+  font-size: 13px;
+  text-align: right;
+  color: var(--text);
+  background: var(--lift-2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+.pp-wtarget input:focus {
+  outline: 0;
+  border-color: var(--accent);
+}
+.pp-wtarget input[aria-invalid='true'] {
+  border-color: var(--warn);
+}
+.pp-wnone {
+  margin: 8px 0 0;
+  text-align: center;
 }
 
 /* Settings. */
@@ -942,6 +1086,19 @@ html.phone body {
 }
 .phone .pp-btn2 {
   height: 48px;
+}
+.phone .pp-wsearch {
+  height: 48px;
+}
+.phone .pp-wadd,
+.phone .pp-wx {
+  min-height: 44px;
+}
+.phone .pp-wx {
+  width: 44px;
+}
+.phone .pp-wtarget input {
+  height: 40px;
 }
 .phone .pp-bell,
 .phone .pp-back {

@@ -3,11 +3,13 @@
   // and the handle), Account Value and its change since an earlier scan, Store Credit,
   // buy-back tokens, Fleet News (what in the store is news for this hangar, from the
   // store alerts) and Scan. Before the first scan: one heading and Scan. Signed out of
-  // RSI: Log In to RSI, with a grey Scan under it (the popup reads no RSI cookie, so it
-  // can't tell when you've logged in again: Scan stays there to press). No access to RSI
-  // (Firefox's add-ons page): Allow Access to RSI, on the basic page. While a scan runs:
-  // its steps instead of Scan. After one: how long it took, or what went wrong, and the
-  // question when its sync found an RSI account new to the connection.
+  // RSI: Log In to RSI, with a grey Scan under it, off until RSI's sign-in cookie is back
+  // in this browser (`scanOff`; ./rsi-cookie.js), still there to press when only the
+  // last scan said so. No access to RSI (Firefox's add-ons page): Allow Access to RSI, on
+  // the basic page. While a scan runs: its steps instead of Scan. After one: how long it
+  // took, or what went wrong, and the question when its sync found an RSI account new to
+  // the connection. Amounts in the currency picked (`fx`, ./currency.js), the dollar
+  // figure on hover.
   import { t } from './copy.js';
   import {
     reportDone,
@@ -18,6 +20,7 @@
     unpricedLine,
   } from './data.js';
   import { openHub, openTab, reportProblem, rsiSignIn } from './actions.js';
+  import { USD, money } from './currency.js';
 
   let {
     v,
@@ -27,6 +30,8 @@
     account,
     sc,
     signedOut,
+    scanOff = false, // signed out of RSI for sure: Scan waits for the sign-in
+    fx = USD,
     rsiOff = false, // no access to robertsspaceindustries.com
     report, // the report shown once (Scanned in 38s)
     lastReport, // the last scan's report, for a problem
@@ -43,18 +48,12 @@
 
   const OH = globalThis.OH;
   const AL = globalThis.OHAlerts;
-  // Dollars: cents for Store Credit, none for a change or a big total.
-  const money = (n, cents = false, most = n >= 1000 ? 0 : 2) =>
-    n == null
-      ? ''
-      : n.toLocaleString(undefined, {
-          style: 'currency',
-          currency: 'USD',
-          maximumFractionDigits: cents ? 2 : most,
-          minimumFractionDigits: cents ? 2 : Math.min(2, most),
-        });
+  // Cents for Store Credit, none for a change or a big total.
+  const total = $derived(money(value ? value.total : v.melt, fx));
+  const change = $derived(since ? money(Math.abs(since.delta), fx, { most: 0 }) : null);
   const day = (at) => new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   const credit = $derived(storeCredit(account));
+  const creditText = $derived(credit != null ? money(credit, fx, { cents: true }) : null);
   const nextToken = $derived(OH.nextBuybackToken ? OH.nextBuybackToken(Date.now()) : null);
   const running = $derived(sc.phase === 'running');
   const steps = $derived(scanSteps(sc.progress?.part));
@@ -116,15 +115,15 @@
       <div class="pp-vtop">
         <span class="pp-lbl">{value ? 'Account Value' : t('popup.melt-label')}</span>
         {#if since && value}
-          <span class="pp-since" class:up={since.delta > 0} id="pp-since"
+          <span class="pp-since" class:up={since.delta > 0} id="pp-since" title={change.title || null}
             >{t(since.delta > 0 ? 'popup.up-since' : 'popup.down-since', {
-              amount: money(Math.abs(since.delta), false, 0),
+              amount: change.text,
               date: day(since.at),
             })}</span
           >
         {/if}
       </div>
-      <div class="pp-big" id="pp-value">{money(value ? value.total : v.melt)}</div>
+      <div class="pp-big" id="pp-value" title={total.title || null}>{total.text}</div>
       {#if (value ? value.unpriced : v.unpriced) > 0}
         <div class="pp-unpriced">{unpricedLine(value ? value.unpriced : v.unpriced)}</div>
       {/if}
@@ -134,7 +133,7 @@
       <div class="pp-tiles">
         {#if credit != null}
           <div class="pp-tile" id="pp-credit">
-            <span class="pp-lbl">Store Credit</span><b>{money(credit, true)}</b>
+            <span class="pp-lbl">Store Credit</span><b title={creditText.title || null}>{creditText.text}</b>
           </div>
         {/if}
         {#if v.tokens != null}
@@ -177,12 +176,15 @@
       </div>
     {/if}
 
-    {#if news.length}
+    {#if news.length || alerts?.on}
       <section class="pp-news" id="pp-news" aria-labelledby="pp-news-h">
         <div class="pp-newstop">
           <h2 class="pp-h3" id="pp-news-h">{t('popup.fleet-news')}</h2>
-          <button type="button" class="pp-link" id="pp-all-alerts" onclick={onbell}>{t('popup.all-alerts')}</button>
+          {#if alerts?.items?.length}
+            <button type="button" class="pp-link" id="pp-all-alerts" onclick={onbell}>{t('popup.all-alerts')}</button>
+          {/if}
         </div>
+        {#if !news.length}<p class="pp-note" id="pp-news-none">{t('popup.fleet-news-none')}</p>{/if}
         {#each news as m (m.id)}
           {@const wish = m.why.some((w) => w.why === 'wishlist')}
           <button
@@ -235,7 +237,7 @@
     <button type="button" class="pp-btn primary big" id="pp-login" onclick={() => openTab(rsiSignIn())}
       >{t('popup.log-in')}</button
     >
-    <button type="button" class="pp-btn grey" id="pp-scan" onclick={onscan}>{t('popup.scan')}</button>
+    <button type="button" class="pp-btn grey" id="pp-scan" disabled={scanOff} onclick={onscan}>{t('popup.scan')}</button>
   {:else}
     <button type="button" class="pp-btn primary" id="pp-scan" onclick={onscan}
       >{sc.phase === 'stopped' ? t('popup.scan-again') : t('popup.scan')}</button

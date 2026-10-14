@@ -1,7 +1,8 @@
 'use strict';
 // Every chrome.storage.local key the extension's code writes, read from the source
 // (src/*.js, ui/**/*.svelte|js): `storage.local.set({ … })` (and the Svelte pages'
-// `store.set({ … })`) top-level keys, plus `mutateStored(KEY, …)`. A key built
+// `store.set({ … })`, and the `env.set({ … })` of code handed its storage: src/alerts.js,
+// ui/popup/wish-client.js) top-level keys, plus `mutateStored(KEY, …)`. A key built
 // from a constant (`[STORE_KEY]`) is looked up as `const STORE_KEY = '…'`; one that
 // can't be (`[key]`) is returned as written, in brackets. Used by
 // test/storage-budget.test.js so a new key can't slip in without a cap.
@@ -91,7 +92,7 @@ function writtenKeys() {
     const text = fs.readFileSync(f, 'utf8').replace(/(^|\s)\/\/[^\n]*/g, '$1');
     const consts = {};
     for (const m of text.matchAll(/const (\w+) = '([^']+)'/g)) consts[m[1]] = m[2];
-    for (const m of text.matchAll(/(?:storage\.local|\bstore)\.set\(\s*\{/g)) {
+    for (const m of text.matchAll(/(?:storage\.local|\bstore|\benv)\.set\(\s*\{/g)) {
       const at = m.index + m[0].length - 1;
       for (const e of entries(text, at)) for (const k of keyOf(e, consts)) add(k, f);
     }
