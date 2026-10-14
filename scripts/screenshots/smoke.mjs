@@ -5602,7 +5602,7 @@ try {
     : fail(`popup wishlist, alerts off: ${JSON.stringify({ wishOff })}`);
 
   // The website takes changes (its extension_wishlist_write on): the items it read, a
-  // search on this device (what's typed goes nowhere), add, Target Price and Remove, one
+  // search on this device (what's typed goes nowhere), add and Remove (no Target Price), one
   // POST each with only the change, and Disconnect deletes the copy kept here.
   const wishItem = (key, name, more = {}) => ({
     key,
@@ -5672,11 +5672,7 @@ try {
     page.evaluate(() =>
       [...document.querySelectorAll('.pp-wedit li')].map((li) => ({
         text: li.querySelector('.pp-wrow').textContent.replace(/\s+/g, ' ').trim(),
-        target: li.querySelector('.pp-wtarget input').value,
-        label: li
-          .querySelector('.pp-wtarget')
-          .textContent.replace(/[\s$]+/g, ' ')
-          .trim(),
+        target: !!li.querySelector('input'),
         remove: li.querySelector('.pp-wx').getAttribute('aria-label'),
       })),
     );
@@ -5711,22 +5707,6 @@ try {
   );
   await page.click('.pp-wadd');
   await page.waitForFunction(() => document.querySelectorAll('.pp-wedit li').length === 4);
-  // Target Price: a price the website can't take stays here, marked; one it can goes.
-  const paintTarget = '.pp-wedit li:nth-child(4) .pp-wtarget input';
-  await page.click(paintTarget);
-  await page.type(paintTarget, 'abc');
-  await page.keyboard.press('Enter');
-  await sleep(200);
-  const badMark = await page.$eval(paintTarget, (e) => e.getAttribute('aria-invalid'));
-  const sentBad = await page.evaluate(() => __demo.wish.filter((w) => w.method === 'POST').length);
-  await page.$eval(paintTarget, (e) => (e.value = ''));
-  await page.type(paintTarget, '7.5');
-  await page.keyboard.press('Enter');
-  await page.waitForFunction(
-    (sel) => document.querySelector(sel)?.value === '7.50' && !document.querySelector(sel).disabled,
-    {},
-    paintTarget,
-  );
   // Remove the Avenger Titan.
   await page.click('.pp-wedit li:nth-child(3) .pp-wx');
   await page.waitForFunction(() => document.querySelectorAll('.pp-wedit li').length === 3);
@@ -5743,13 +5723,11 @@ try {
   const POSTS = [
     { v: 1, do: 'add', item: { kind: 'ship', name: 'Zeus Mk II CL' } },
     { v: 1, do: 'add', item: { kind: 'ccu', id: 'upgrade-16', name: 'Upgrade to Freelancer' } },
-    { v: 1, do: 'save', key: 'sku:501', target: '7.50' },
     { v: 1, do: 'remove', key: 'ship:avenger-titan' },
   ];
   ppEd.head === 'Your Wishlist · 2' &&
   ppEd.rows[0].text === 'Avenger Titan On Sale $55 ✕' &&
-  ppEd.rows[0].target === '50' &&
-  ppEd.rows[0].label === 'Target Price' &&
+  !ppEd.rows.some((r) => r.target) &&
   ppEd.rows[0].remove === 'Remove Avenger Titan' &&
   ppEd.rows[1].text === 'Cutlass - Ghoulish Green Paint On Sale $10 ✕' &&
   ppEd.placeholder === 'Add a ship, paint or upgrade' &&
@@ -5758,8 +5736,6 @@ try {
   afterAdd.q === '' &&
   afterAdd.focus === 'pp-wish-q' &&
   afterAdd.rows[0] === 'Zeus Mk II CL Not for Sale ✕' &&
-  badMark === 'true' &&
-  sentBad === 2 &&
   JSON.stringify(wishDone.posts.map((p) => p.body)) === JSON.stringify(POSTS) &&
   wishDone.posts.every((p) => p.auth === 'Bearer t' && p.url === `${ppSite}/api/v1/wishlist`) &&
   wishDone.reads === 1 &&
@@ -5767,43 +5743,36 @@ try {
   wishDone.rows.join() === 'Upgrade to Freelancer,Zeus Mk II CL,Cutlass - Ghoulish Green Paint' &&
   wishDone.kept?.join() === 'ccu:16,ship:zeus-mk-ii-cl,sku:501' &&
   !wishDone.wide
-    ? ok('Wishlist editing: search here, add, Target Price, Remove; one POST each, only the change')
-    : fail(
-        `popup wishlist editing: ${JSON.stringify({ ppEd, ppFound, afterAdd, badMark, wishDone })}`,
-      );
-  // A Target Price that doesn't go through (the website down, no Retry-After the popup
-  // can read): the field puts back the price the website has, the note says so, and
-  // the next change waits the website's minute.
-  const paintNow = '.pp-wedit li:nth-child(3) .pp-wtarget input';
+    ? ok('Wishlist editing: search here, add, Remove, no Target Price; one POST each, only the change')
+    : fail(`popup wishlist editing: ${JSON.stringify({ ppEd, ppFound, afterAdd, wishDone })}`);
+  // A Remove that doesn't go through (the website down, no Retry-After the popup can
+  // read): the item stays, the note says so, and the next change waits the website's
+  // minute.
   await page.evaluate(() => (__demo.wishDown = true));
-  await page.$eval(paintNow, (e) => (e.value = ''));
-  await page.type(paintNow, '12');
-  await page.keyboard.press('Enter');
+  await page.click('.pp-wedit li:nth-child(3) .pp-wx');
   await page.waitForFunction(
-    (sel) => document.getElementById('pp-wish-note') && !document.querySelector(sel).disabled,
-    {},
-    paintNow,
+    () =>
+      document.getElementById('pp-wish-note') &&
+      !document.querySelector('.pp-wedit li:nth-child(3) .pp-wx').disabled,
   );
   await sleep(100);
-  const wishDown = await page.evaluate(async (sel) => {
-    const el = document.querySelector(sel);
+  const wishDown = await page.evaluate(async () => {
     const { popupWish } = await chrome.storage.local.get('popupWish');
     return {
-      value: el.value,
-      invalid: el.getAttribute('aria-invalid'),
+      rows: [...document.querySelectorAll('.pp-wedit .pp-aname')].map((e) => e.textContent),
       note: document.getElementById('pp-wish-note').textContent,
       sent: __demo.wish.at(-1)?.body,
       held: Number(popupWish?.holdUntil) > Date.now(),
     };
-  }, paintNow);
+  });
   await page.evaluate(() => (__demo.wishDown = false));
-  wishDown.value === '7.50' &&
-  !wishDown.invalid &&
+  wishDown.rows.join() === 'Upgrade to Freelancer,Zeus Mk II CL,Cutlass - Ghoulish Green Paint' &&
   wishDown.note === "Couldn't Reach openhangar.space" &&
-  wishDown.sent?.target === '12' &&
+  wishDown.sent?.do === 'remove' &&
+  wishDown.sent?.key === 'sku:501' &&
   wishDown.held
-    ? ok("a Target Price that didn't go through: the saved one back in the field, a minute's hold")
-    : fail(`popup wishlist failed save: ${JSON.stringify(wishDown)}`);
+    ? ok("a Remove that didn't go through: the item stays, a minute's hold")
+    : fail(`popup wishlist failed remove: ${JSON.stringify(wishDown)}`);
   // Disconnect deletes the copy kept here (the Wishlist stays on the account).
   await page.click('#pp-tab-settings');
   await page.waitForSelector('#pp-disconnect');
