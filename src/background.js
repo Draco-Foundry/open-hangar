@@ -416,9 +416,10 @@ siteHandlers['oh-scan-status'] = async () => {
 
 // The dashboard runs the scan, the same one its Scan button runs, in its own tab: this
 // worker never scans and never asks RSI anything for it. The request names the tab
-// (src/dashboard.js scanIfAsked), so only that one scans. Our hangar page asks for it,
-// and the toolbar popup in the connector build (below).
-async function requestScan() {
+// (src/dashboard.js scanIfAsked), so only that one scans. Our hangar page asks for it
+// ('site'), and the toolbar popup in the connector build (below, 'popup'): the request
+// says which, for the scan's report (ui/scan/runner.js scanReport.reason).
+async function requestScan(reason) {
   const now = Date.now();
   // Checked and set before any wait, so two requests at once can't both pass; kept in
   // session storage too, for a worker that stopped and started again in between.
@@ -432,10 +433,10 @@ async function requestScan() {
   }
   await chrome.storage.session.set({ scanAskedAt: now });
   const tabId = await dashboardTab();
-  await chrome.storage.session.set({ scanRequest: { at: Date.now(), tabId } });
+  await chrome.storage.session.set({ scanRequest: { at: Date.now(), tabId, reason } });
   return { ok: true, opened: true };
 }
-siteHandlers['oh-request-scan'] = () => requestScan();
+siteHandlers['oh-request-scan'] = () => requestScan('site');
 // @flag-end localMode
 
 // @flag-start connector: the toolbar popup (needs localMode, scripts/pack.mjs)
@@ -450,7 +451,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   // Only our own popup: an extension page, not a tab, at exactly its address.
   if (sender.id !== chrome.runtime.id || sender.tab) return false;
   if (String(sender.url || '').split(/[?#]/)[0] !== chrome.runtime.getURL(POPUP)) return false;
-  requestScan()
+  requestScan('popup')
     .then(async (r) => {
       if (!r.ok) await dashboardTab();
       return r;

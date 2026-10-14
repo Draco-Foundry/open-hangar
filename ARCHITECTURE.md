@@ -19,6 +19,7 @@ backend: everything it reads is kept in `chrome.storage.local` in your browser.
 | Parser rules        | `src/data/parser-rules.json`, `src/parser-rules.js`         | Where things are on RSI's pages, as data (`window.OHRules`)        |
 | Svelte pages        | `ui/` (built into `src/ui/`)                                | The new Home page cards (0.3.0 redesign, in progress)              |
 | Connector pages     | `src/popup.html`, `src/basic.html` (`ui/popup`, `ui/basic`) | The `connector` build's popup and basic page (docs/CONNECTOR.md)   |
+| Scan runner         | `ui/scan/runner.js` and its two helpers in `ui/scan/`       | The scan, pack reads and sync after it, for any page that scans    |
 | Bundled data        | `src/data/ship-catalog.json`, `src/data/ship-codes.json`    | Ship list and prices; ship codes for the HTF export                |
 | Packaging           | `scripts/pack.mjs`                                          | Per-browser builds in `dist/chrome` and `dist/firefox`             |
 | Website             | `site/`, `site-worker/wrangler.jsonc`                       | openhangar.space, including the `status.json` kill switch          |
@@ -104,9 +105,10 @@ Our hangar page (Local Mode, behind the `localMode` flag, which needs `sync`):
   time the dashboard renews every minute, counted while that tab is open and for 10
   minutes at most), or a `scanRequest` from the last minute that its tab hasn't started.
 - `oh-request-scan`: opens or focuses the extension's page (the basic page, or the
-  dashboard without the connector) and leaves a `scanRequest` naming it; that tab runs
-  its Scan button's own scan. Busy while a scan runs and for 60 seconds
-  after a request. The worker never scans or asks RSI anything for it.
+  dashboard without the connector) and leaves a `scanRequest` naming it and who asked
+  (`reason`: `'site'` here, `'popup'` for the toolbar popup); that tab runs its Scan
+  button's own scan. Busy while a scan runs and for 60 seconds after a request. The
+  worker never scans or asks RSI anything for it.
 
 Chrome and Edge: the pages message the extension directly
 (`externally_connectable`, exact `https://host/*` patterns) and the browser gives

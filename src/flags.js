@@ -45,7 +45,7 @@
       default: true,
     },
     // The basic page sends the wishlist this browser kept to the openhangar.space account,
-    // once per connection (ui/basic/wishlist-import.js). On in every build from 0.3.0:
+    // once per connection (ui/scan/wishlist-import.js). On in every build from 0.3.0:
     // the privacy policy names it ("Your old wishlist, once", owner-approved words
     // 2026-10-13; test/privacy-permissions.test.js). It runs in the connector's basic page.
     wishlistImport: {
