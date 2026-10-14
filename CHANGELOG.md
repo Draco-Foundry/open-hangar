@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.3.1 — 2026-10-14
+
 - Improved: Scans ask RSI for each page at its own address instead of being redirected
   first, so a scan sends half as many page requests and lands sooner.
 
