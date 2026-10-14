@@ -101,11 +101,8 @@ export async function exportCsv() {
   );
   return rows.length;
 }
-// Clear Data, and the scan's report and portrait with it.
-export async function clearData() {
-  await OH().clearData();
-  await chrome.storage.local.remove(['scanReport', 'avatarImg']);
-}
+// Clear Data (OH.clearData takes the scan's report and portrait with it).
+export const clearData = () => OH().clearData();
 export const listProfiles = () =>
   OH()
     .listProfiles()
