@@ -4,29 +4,19 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
-- New: **A new toolbar popup with three tabs.** Hangar shows your portrait, Account
-  Value and how it moved since an earlier scan, Store Credit, buy-back tokens, Fleet
-  News and Scan. Wishlist shows your openhangar.space Wishlist while you're connected.
-  Settings holds what the extension page's settings did, plus Look, Currency and the
-  shortcut. Store alerts sit behind the bell in the header.
-- New: **Change your Wishlist from the popup.** Search for a ship, paint or upgrade to
-  add it, set a Target Price or remove an item. The search runs on your device.
-- New: Currency in Settings shows your Account Value and prices in your currency, at
-  the day's rate. Hover an amount to see it in dollars, the way RSI charges.
-- New: Signed out of RSI, the popup shows Log In to RSI, and Scan waits until you're
-  signed in again.
-- New: JSON Backup, Pledges CSV and Buy-Backs CSV in the popup's Settings.
-- New: Light mode for the popup. It follows your browser, or pick Dark or Light in
-  Settings.
-- New: Alt+Shift+H opens the popup. Change it on your browser's shortcuts page.
-- Changed: **Scan runs out of sight.** Press Scan in the toolbar popup and the scan runs
-  in a hidden page, so no tab opens, and closing the popup doesn't stop it. The small
-  Open Hangar page opens only when Open Hangar needs to ask you something, or when a
-  scan can't run hidden. Its pledge and buy-back lists are gone: your hangar is in the
-  popup and on openhangar.space.
-- Fixed: Connecting to openhangar.space while a scan runs no longer sends half a
-  hangar. The sync waits for the scan to finish, and the open Open Hangar tab comes to
-  the front instead of a second one opening.
+- New: **A new toolbar popup.** Three tabs, Hangar, Wishlist and Settings, plus an alerts bell whose number matches the toolbar badge. The Hangar tab shows your RSI portrait and handle, Account Value and how it changed since an earlier scan, Store Credit, Buy-Back Tokens with the next refill, up to three Fleet News notes, and Scan.
+- New: **Scans run out of sight.** No more scan tab: the scan runs in a hidden page, and closing the popup doesn't stop it. If your browser closes mid-scan, the parts that finished are saved and the popup shows Scan stopped, even after a restart.
+- New: **Auto Scan Daily (optional).** While you're connected to openhangar.space, Open Hangar can check your hangar once a day. It looks at the newest pages first, runs a full scan only when something is new or once a week, saves part by part, and skips days when you're signed out or signed in to a different RSI account. Off until you turn it on.
+- New: **Your Wishlist in the popup.** While you're connected, search to add a ship, paint or upgrade, set a Target Price, or remove an item. Search runs on your device. With store alerts off, it covers ships only.
+- New: **Pick your currency.** Amounts show in US dollars until you pick another currency in Settings. After that they use the day's rate, and hovering an amount shows it in dollars.
+- New: **Light mode and a shortcut.** Look follows your browser, or pick Dark or Light. Alt+Shift+H opens the popup.
+- Changed: **Settings live in the popup now:** Sync Now, Disconnect, Store Alerts, Notifications, Look, Currency, Shortcut, JSON Backup, Pledges CSV, Buy-Backs CSV, Saved Accounts, Log Out of RSI, Clear Data, Help, Report a Scan Problem and Privacy.
+- Changed: **The Open Hangar page is smaller.** It opens only to ask you something, or to run a scan that can't run hidden. Its pledge and buy-back lists are gone. Open My Hangar shows your whole hangar: My Hangar on openhangar.space when you're connected, or hangar.openhangar.space when you're not.
+- Changed: **Signed out of RSI?** The popup shows Log In to RSI, and Scan waits until you're signed in again.
+- Changed: **Privacy policy updated** for the popup, hidden scans, Auto Scan Daily and Wishlist editing: openhangar.space/privacy.html
+- Improved: A badge on the toolbar button when there's new Fleet News, a dot on the version tag once per new version, how long each scan took ("Scanned in 38s"), and the popup reopens on your last tab (Hangar when there's news).
+- Fixed: **Connecting mid-scan.** Connecting to openhangar.space during a scan no longer sends half a hangar.
+- Changed: Open Hangar no longer keeps the referral code of the player who recruited you. Updating clears any saved copy. It was never synced or exported.
 
 ## 0.3.1 — 2026-10-14
 
