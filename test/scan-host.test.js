@@ -190,18 +190,24 @@ test('one offscreen document: a page still open (reading packs) gets the next sc
   assert.equal(both[0].run, both[1].run);
 });
 
-test('a page gone quiet is closed and made again', async () => {
-  // A request a minute old that the page never took: it's stuck.
+test('a page gone quiet is closed, and scans go to the tab for the rest of the session', async () => {
+  // A request a minute old that the page never took (it never loaded, say): it's stuck.
   const x = chromeX();
   await fromPopup(x);
-  const run = x.stores.session.scanRequest.run;
   x.stores.session.scanRequest.at -= 61e3;
   later(x);
-  assert.equal((await fromPopup(x)).by, 'offscreen');
-  assert.equal(x.docs.length, 1);
-  assert.notEqual(runOf(x.docs[0].url), run, 'a new page');
-  assert.equal(x.stores.session.scanRequest.run, runOf(x.docs[0].url));
-  // A mark older than any running scan's.
+  assert.deepEqual(await fromPopup(x), { ok: true, opened: true });
+  assert.equal(x.docs.length, 0, 'closed, and no new one');
+  assert.deepEqual(x.opened, [BASIC]);
+  assert.equal(x.stores.session.scanRequest.by, 'tab');
+  assert.equal(x.stores.session.scanHiddenOff.why, 'stuck');
+  // The next scan too: the hidden page is off until the browser starts again.
+  delete x.stores.session.scanRequest;
+  later(x);
+  assert.deepEqual(await fromPopup(x), { ok: true, opened: true });
+  assert.equal(x.docs.length, 0);
+  assert.equal(await host(x).choose(), 'tab');
+  // A mark older than any running scan's: the same, and the mark goes with its page.
   const y = chromeX();
   await fromPopup(y);
   const old = y.stores.session.scanRequest.run;
@@ -212,9 +218,116 @@ test('a page gone quiet is closed and made again', async () => {
     run: old,
     by: 'offscreen',
   };
+  y.stores.session.scanProgress = { at: Date.now() - 11 * 60e3, run: old, part: 'hangar' };
+  later(y);
+  assert.deepEqual(await fromPopup(y), { ok: true, opened: true });
+  assert.equal(y.docs.length, 0);
+  assert.equal('scanRunning' in y.stores.session, false);
+  assert.equal('scanProgress' in y.stores.session, false);
+  assert.equal(y.stores.session.scanHiddenOff.why, 'stuck');
+  // Firefox: its frame, the same.
+  const ff = firefoxX();
+  await ff.fromPage({ type: 'oh-request-scan' }, `${HANGAR}/`);
+  ff.stores.session.scanRequest.at -= 61e3;
+  later(ff);
+  await ff.fromPage({ type: 'oh-request-scan' }, `${HANGAR}/`);
+  assert.equal(ff.frames.length, 0);
+  assert.equal(ff.stores.session.scanRequest.by, 'tab');
+  // A page that only reads packs (no request, no mark) isn't quiet: it gets the next scan.
+  const z = chromeX();
+  await fromPopup(z);
+  delete z.stores.session.scanRequest;
+  later(z);
+  assert.equal((await fromPopup(z)).by, 'offscreen');
+  assert.equal(z.stores.session.scanHiddenOff, undefined);
+});
+
+test('a page that stopped on an error: closed, its request dropped, and scans go to the tab', async () => {
+  const x = chromeX();
+  await fromPopup(x);
+  const run = x.stores.session.scanRequest.run;
+  const q = `?run=${run}&by=offscreen&v=0.3.0`;
+  // Its request still waiting (taking it failed): closed all the same, never "again".
+  assert.deepEqual(
+    await x.fromScanPage({ ohScan: { op: 'done', run, arg: { failed: true } } }, q),
+    { ok: true, value: {} },
+  );
+  assert.equal(x.docs.length, 0);
+  assert.equal('scanRequest' in x.stores.session, false);
+  assert.equal(x.stores.session.scanHiddenOff.why, 'failed');
+  later(x);
+  assert.deepEqual(await fromPopup(x), { ok: true, opened: true });
+  assert.equal(x.docs.length, 0);
+  assert.deepEqual(x.opened, [BASIC]);
+});
+
+test("a hidden page's mark left behind when it went away never holds the next scan", async () => {
+  // The offscreen page's renderer crashed mid-scan: its mark, renewed a moment ago, stays.
+  const x = chromeX();
+  await fromPopup(x);
+  const dead = x.stores.session.scanRequest.run;
+  delete x.stores.session.scanRequest;
+  const at = Date.now() - 5000;
+  x.stores.session.scanRunning = { at, tabId: null, run: dead, by: 'offscreen' };
+  x.stores.session.scanProgress = { at, run: dead, part: 'hangar' };
+  x.docs.length = 0;
+  later(x);
+  assert.equal((await fromPopup(x)).by, 'offscreen');
+  const run = runOf(x.docs[0].url);
+  assert.notEqual(run, dead);
+  assert.equal('scanRunning' in x.stores.session, false, "the gone page's mark goes");
+  assert.equal('scanProgress' in x.stores.session, false);
+  assert.equal(x.stores.session.scanRequest.run, run);
+  // The new page's runner sees no other scan (ui/scan/sync-timing.js scanElsewhere).
+  const { scanElsewhere } = await import('../ui/scan/sync-timing.js');
+  assert.equal(scanElsewhere(x.stores.session.scanRunning, { tabId: null, run }), false);
+  // Another page's progress, with no mark, is left alone; so is the open page's own mark.
+  const y = chromeX();
+  await fromPopup(y);
+  const open = y.stores.session.scanRequest.run;
+  delete y.stores.session.scanRequest;
+  y.stores.session.scanRunning = {
+    at: Date.now() - 5000,
+    tabId: null,
+    run: 'old-run-001',
+    by: 'frame',
+  };
+  y.stores.session.scanProgress = { at: Date.now(), run: open, part: 'packs' };
   later(y);
   await fromPopup(y);
-  assert.notEqual(runOf(y.docs[0].url), old);
+  assert.equal(
+    'scanRunning' in y.stores.session,
+    false,
+    'a frame mark with the offscreen page open',
+  );
+  assert.equal(y.stores.session.scanProgress.run, open);
+  // A tab's mark is the tab's (its page takes it with it).
+  const t = chromeX({
+    contexts: [],
+    session: { scanRunning: { at: Date.now() - 5000, tabId: 7, run: 'r-tab0', by: 'tab' } },
+  });
+  await fromPopup(t);
+  assert.equal(t.stores.session.scanRunning.run, 'r-tab0');
+  // Firefox's event page restarted, the frame with it.
+  const ff = firefoxX({
+    session: {
+      scanRunning: { at: Date.now() - 5000, tabId: null, run: 'gone-frame1', by: 'frame' },
+    },
+  });
+  assert.equal((await ff.fromPage({ type: 'oh-request-scan' }, `${HANGAR}/`)).ok, true);
+  assert.equal(ff.frames.length, 1);
+  assert.equal('scanRunning' in ff.stores.session, false);
+  // The tab's scan (the kill switch here) isn't held by one either.
+  const off = chromeX({
+    local: {
+      remoteStatus: { at: Date.now(), data: { sources: { scanHidden: { enabled: false } } } },
+    },
+    session: {
+      scanRunning: { at: Date.now() - 5000, tabId: null, run: 'gone-page1', by: 'offscreen' },
+    },
+  });
+  assert.deepEqual(await fromPopup(off), { ok: true, opened: true });
+  assert.equal('scanRunning' in off.stores.session, false);
 });
 
 // --- Who may ask, and what ----------------------------------------------------------------
@@ -252,6 +365,9 @@ test("the page's one message type: only the scan page, never a tab or another pa
     { op: 'permissions.contains', arg: { origins: 'x' } },
     { op: 'done' }, // a run to close is needed
     { op: 'done', run: 'no spaces allowed' },
+    { op: 'done', run: 'abc123-0011', arg: { failed: false } },
+    { op: 'done', run: 'abc123-0011', arg: { failed: true, more: 1 } },
+    { op: 'done', run: 'abc123-0011', arg: 'failed' },
     'local.get',
     null,
   ]) {
@@ -635,4 +751,142 @@ test("the page: another run's request is not its own; Firefox's frame pings whil
   delete globalThis.chrome;
   delete globalThis.location;
   delete globalThis.OH;
+});
+
+// The page and the worker together: Chrome's offscreen page (its storage the worker's,
+// as the shim makes it), the page's messages answered by the worker and the worker's
+// heard by the page. `clock.t` is the time on both sides. A buy-back pack to read after
+// each scan, held until `packsGo()`.
+async function pageAndWorker({ failGet = false } = {}) {
+  const x = chromeX();
+  const clock = { t: Date.now() };
+  const realNow = Date.now;
+  Date.now = () => clock.t;
+  x.ctx.__clock = clock;
+  vm.runInContext('Date.now = () => __clock.t', x.ctx);
+  const listeners = [];
+  x.chrome.runtime.sendMessage = async (m) => {
+    x.sent.push(structuredClone(m));
+    for (const f of listeners) f(structuredClone(m), {}, () => {});
+  };
+  await fromPopup(x);
+  const query = new URL(x.docs[0].url, 'chrome-extension://x/').search;
+  const pageSent = [];
+  const session = failGet
+    ? {
+        ...x.chrome.storage.session,
+        get: async () => {
+          throw new Error('the worker went away');
+        },
+      }
+    : x.chrome.storage.session;
+  globalThis.chrome = {
+    storage: { local: x.chrome.storage.local, session, onChanged: { addListener() {} } },
+    permissions: { contains: async () => true },
+    runtime: {
+      getManifest: () => ({ version: '0.4.0' }),
+      onMessage: { addListener: (f) => listeners.push(f) },
+      sendMessage: (m) => {
+        pageSent.push(structuredClone(m));
+        return x.fromScanPage(structuredClone(m), query);
+      },
+    },
+  };
+  globalThis.location = { search: query };
+  const calls = [];
+  let packsGo;
+  const held = new Promise((r) => (packsGo = r));
+  const db = {
+    owner: { nickname: 'P' },
+    sources: { buybacks: { items: [{ id: '701', name: 'Pack', kind: 'pack', isCCU: false }] } },
+  };
+  globalThis.OH = {
+    flags: {},
+    log: () => {},
+    getRemoteStatus: async () => void calls.push('status'),
+    getAccount: async () => {
+      calls.push('account');
+      return { loggedIn: true, nickname: 'P' };
+    },
+    loadDB: async () => structuredClone(db),
+    scanSource: async (id, onProgress) => {
+      onProgress(1, 1);
+      return { ok: true, items: id === 'buybacks' ? db.sources.buybacks.items : [] };
+    },
+    getReferral: async () => ({ ok: true }),
+    getHistory: async () => [],
+    fillBuybackDetailsFromHistory: async () => {},
+    getBuybackDetails: async () => ({}),
+    fetchBuybackDetails: async (ids, say) => {
+      calls.push('packs');
+      say(1, ids.length);
+      await held;
+      return { done: ids.length, errors: 0, total: ids.length };
+    },
+    flushBuybackDetails: async () => {},
+    storageSettled: async () => {},
+    siteEnabled: async () => false,
+  };
+  await import(`../ui/scan/main.js?page=${++loads}`);
+  const until = async (fn, what) => {
+    for (let i = 0; i < 500 && !fn(); i++) await new Promise((r) => setTimeout(r, 1));
+    assert.ok(fn(), `waited for ${what}`);
+  };
+  const restore = () => {
+    Date.now = realNow;
+    delete globalThis.chrome;
+    delete globalThis.location;
+    delete globalThis.OH;
+  };
+  return { x, clock, calls, packsGo, pageSent, until, restore, run: runOf(x.docs[0].url) };
+}
+const count = (list, what) => list.filter((c) => c === what).length;
+
+test('the page: a scan asked for while its packs are read runs at once, however long they take', async () => {
+  const p = await pageAndWorker();
+  try {
+    const s = p.x.stores.session;
+    await p.until(() => p.calls.includes('packs') && !s.scanRunning, 'the pack reads');
+    assert.equal(count(p.calls, 'account'), 1);
+    assert.ok(p.calls.includes('status'), "the kill switch's file, read as the page opened");
+    // Over a minute into the pack reads, Scan again: the open page is asked, and scans.
+    p.clock.t += 61e3;
+    later(p.x);
+    assert.deepEqual(await fromPopup(p.x), { ok: true, opened: false, by: 'offscreen' });
+    await p.until(() => count(p.calls, 'account') === 2, 'the second scan');
+    await p.until(() => p.x.stores.local.scanReport?.startedAt === p.clock.t, 'its report');
+    assert.equal('scanRequest' in s, false, 'taken at once');
+    assert.equal(p.x.docs.length, 1, 'the packs still being read');
+    // The pack reads outlast that request's minute too, then end: done, and closed.
+    p.clock.t += 61e3;
+    p.packsGo();
+    await p.until(() => p.x.docs.length === 0, 'the page closed');
+    assert.equal(count(p.calls, 'packs'), 1, 'one pack read, shared by both scans');
+    assert.deepEqual(
+      Object.keys(s).filter((k) => /^scan(Request|Running|Progress)$/.test(k)),
+      [],
+    );
+    assert.equal(s.scanHiddenOff, undefined);
+    assert.deepEqual(p.pageSent.at(-1), { ohScan: { op: 'done', run: p.run } });
+  } finally {
+    p.restore();
+  }
+});
+
+test('the page: stopped on an error, it says so, and the next scan goes to the tab', async () => {
+  const p = await pageAndWorker({ failGet: true });
+  try {
+    await p.until(() => p.x.docs.length === 0, 'the page closed');
+    assert.deepEqual(p.pageSent.at(-1), {
+      ohScan: { op: 'done', run: p.run, arg: { failed: true } },
+    });
+    assert.equal('scanRequest' in p.x.stores.session, false);
+    assert.equal(p.x.stores.session.scanHiddenOff.why, 'failed');
+    assert.equal(count(p.calls, 'account'), 0);
+    later(p.x);
+    assert.deepEqual(await fromPopup(p.x), { ok: true, opened: true });
+    assert.equal(p.x.docs.length, 0);
+  } finally {
+    p.restore();
+  }
 });

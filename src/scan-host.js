@@ -15,25 +15,35 @@
  *                event (a fetch or a storage write isn't one), so the frame pings
  *                after every page and every 10 seconds while it works.
  *   'tab'        Neither (or the kill switch, below, access to RSI turned off, which
- *                that page asks for on a click, or the hidden page couldn't be made):
- *                the Open Hangar page in a tab, as before.
+ *                that page asks for on a click, the hidden page couldn't be made, or
+ *                one went quiet or failed this browser session, below): the Open
+ *                Hangar page in a tab, as before.
  *
  * The page's run (ui/scan/runner.js) is in its address (?run=…&by=…&v=…, v: this
  * version, which an offscreen document can't read itself). A scan asked for leaves
  * session `scanRequest { at, tabId: null, reason, run, by }` for that run, the way a
  * tab's names its tab; the page takes it, scans, reads the packs, saves, and says
- * `done`; then it's closed, and any mark it left goes with it.
+ * `done`; then it's closed, and any mark it left goes with it. One page at a time: a
+ * mark a hidden page left behind when it went away mid-scan is nobody's once another
+ * scan is asked for (forget, below), so it never holds that one.
  *
  * The kill switch: site/status.json `"sources": { "scanHidden": { "enabled": false } }`
- * (as the extension's pages cached it, `remoteStatus`) sends scans back to the tab. It
- * can only turn the hidden page off, never anything on.
+ * (as the extension's pages cached it, `remoteStatus`: the popup and the hidden page
+ * read the file as they open, so the cache is fresh even when no scan got far) sends
+ * scans back to the tab. It can only turn the hidden page off, never anything on. A
+ * hidden page that went quiet (a scan asked of it never taken, or its scan mark not
+ * renewed for 10 minutes) or that stopped on an error does the same for the rest of
+ * this browser session (session `scanHiddenOff { at, why: 'stuck' | 'failed' }`; a
+ * restart or an update clears it), so one that can't work here costs one Scan.
  *
  * Messages from the page, one type, each checked: { ohScan: { op, run?, arg? } } →
  * { ok: true, value } | { ok: false, error }, answered only for src/scan.html in this
  * extension, never a tab (an extension page at exactly that address, with no tab):
  *   ping                    the frame is still working (Firefox)
  *   done                    its work is done → { again: true } when a scan was asked
- *                           of it meanwhile, else {} (and it's closed)
+ *                           of it meanwhile, else {} (and it's closed). arg
+ *                           { failed: true }: it stopped on an error (closed, and
+ *                           scans go to the tab, above)
  *   local.get | local.set | local.remove | local.getKeys | local.getBytesInUse
  *   session.get | session.set | session.remove
  *   permissions.contains    the offscreen page's storage and permission checks
@@ -50,6 +60,8 @@
     "Scans read the user's own RSI pages as HTML. The offscreen document parses them with DOMParser, so the scan runs without opening a tab.";
   const RUN = /^[\w-]{6,64}$/;
   const RSI_HOST = { origins: ['https://robertsspaceindustries.com/*'] };
+  // A scan mark's `by` from a hidden page (ui/scan/main.js); a tab's is 'tab'.
+  const HIDDEN = ['offscreen', 'frame'];
   const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
   const strings = (x) => Array.isArray(x) && x.every((s) => typeof s === 'string');
   const keysArg = (k) => k === null || typeof k === 'string' || strings(k);
@@ -63,7 +75,8 @@
   // Each op's argument check.
   const OPS = {
     ping: () => true,
-    done: () => true,
+    done: (a) =>
+      a === null || (isObj(a) && Object.keys(a).join() === 'failed' && a.failed === true),
     'local.get': (a) => keysArg(a) || isObj(a),
     'session.get': (a) => keysArg(a) || isObj(a),
     'local.set': isObj,
@@ -118,14 +131,17 @@
       return 'tab';
     }
     // Where the next scan runs: the hidden page, unless this browser has none, the kill
-    // switch sends it to the tab, or access to RSI is off (then the tab's page asks for
-    // it on a click, Allow Access to RSI, and scans: a hidden scan could only be held).
+    // switch sends it to the tab, a hidden page went quiet or failed this session, or
+    // access to RSI is off (then the tab's page asks for it on a click, Allow Access to
+    // RSI, and scans: a hidden scan could only be held).
     async function choose() {
       const k = kind();
       if (k === 'tab') return k;
       try {
         const { remoteStatus } = await chrome.storage.local.get('remoteStatus');
         if (switchedOff(remoteStatus)) return 'tab';
+        const { scanHiddenOff } = await chrome.storage.session.get('scanHiddenOff');
+        if (scanHiddenOff) return 'tab';
         const rsi = await chrome.permissions.contains(RSI_HOST).catch(() => true);
         return rsi === false ? 'tab' : k;
       } catch {
@@ -209,20 +225,44 @@
       return next;
     }
 
-    // A scan asked for (requestScan): its request, for the hidden page open now or a
-    // new one. → { by, run }, or null when it runs in the tab instead (no hidden page
-    // here, the kill switch, or the page couldn't be made).
+    // A hidden page went quiet or failed: the scans after it this browser session run
+    // in the tab (see the top).
+    const turnOff = (why) =>
+      chrome.storage.session.set({ scanHiddenOff: { at: now(), why } }).catch(() => {});
+    // The marks a hidden page left when it went away mid-scan (its renderer crashed,
+    // Firefox put its event page to sleep, or it was closed as stuck). There's one
+    // hidden page at a time, so a hidden page's mark for any run but `keep` (the page
+    // open now, or the one about to be made) is nobody's. Left, it would hold the next
+    // scan as busy for up to 10 minutes. Its progress goes with it.
+    async function forget(keep) {
+      const s = await chrome.storage.session.get(['scanRunning', 'scanProgress']);
+      const m = s.scanRunning;
+      if (!isObj(m) || !HIDDEN.includes(m.by) || m.run === keep) return;
+      await chrome.storage.session.remove(
+        s.scanProgress?.run === m.run ? ['scanRunning', 'scanProgress'] : 'scanRunning',
+      );
+    }
+
+    // A scan asked for (requestScan; never while a scan runs): its request, for the
+    // hidden page open now or a new one. → { by, run }, or null when it runs in the tab
+    // instead (no hidden page here, the kill switch, a hidden page that went quiet, now
+    // or before, or the page couldn't be made).
     const start = (reason) =>
       inLine(async () => {
-        const by = await choose();
-        if (by === 'tab') return null;
+        let by = await choose();
         let run = null;
         try {
           let host = await open();
           if (host && (!host.run || (await stuck(host.run)))) {
             await close();
+            if (host.run) {
+              await turnOff('stuck');
+              by = 'tab';
+            }
             host = null;
           }
+          await forget(host?.run ?? null);
+          if (by === 'tab') return null;
           run = host?.run || newRun();
           await chrome.storage.session.set({
             scanRequest: { at: now(), tabId: null, reason, run, by },
@@ -242,12 +282,13 @@
     }
 
     // The page's work is done: closed, unless a scan was asked of it meanwhile. Its
-    // marks go with it (a closed page can't take them itself).
-    const done = (run) =>
+    // marks go with it (a closed page can't take them itself). `failed`: it stopped on
+    // an error, so it's closed whatever was asked of it, and scans go to the tab.
+    const done = (run, { failed = false } = {}) =>
       inLine(async () => {
         const s = await chrome.storage.session.get(['scanRequest', 'scanRunning', 'scanProgress']);
         const r = s.scanRequest;
-        if (r?.run === run && Number.isFinite(r.at) && now() - r.at < ASK_MAX) {
+        if (!failed && r?.run === run && Number.isFinite(r.at) && now() - r.at < ASK_MAX) {
           poke(run);
           return { again: true };
         }
@@ -255,6 +296,7 @@
           (k) => s[k]?.run === run,
         );
         if (left.length) await chrome.storage.session.remove(left);
+        if (failed) await turnOff('failed');
         await close(run);
         await env.afterDone?.();
         return {};
@@ -284,7 +326,7 @@
     // What the page asks of the worker (see the top).
     async function answer({ op, run, arg }) {
       if (op === 'ping') return {};
-      if (op === 'done') return done(run);
+      if (op === 'done') return done(run, { failed: arg?.failed === true });
       if (op === 'permissions.contains') return chrome.permissions.contains(arg);
       const [name, fn] = op.split('.');
       const area = chrome.storage[name];

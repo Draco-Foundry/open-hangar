@@ -26,7 +26,8 @@ const SITE_DATA = {
 };
 const firefox = () => !!chrome.runtime.getManifest?.()?.browser_specific_settings?.gecko;
 
-const tell = (op) => chrome.runtime.sendMessage({ ohScan: { op, run } });
+const tell = (op, arg) =>
+  chrome.runtime.sendMessage({ ohScan: arg ? { op, run, arg } : { op, run } });
 let pingAt = 0;
 function ping(force = false) {
   if (by !== 'frame') return;
@@ -66,28 +67,57 @@ async function takeRequest() {
   return true;
 }
 
-// Every scan asked of this page, then its pack reads, everything saved, then done. The
-// worker answers `again` when a scan was asked of it meanwhile.
+// Every scan asked of this page, one after the other, each to its end. Asked again
+// while it runs, the answer is this one's.
+let taking = null;
+const takeAll = () =>
+  (taking ??= (async () => {
+    while (await takeRequest());
+  })().finally(() => (taking = null)));
+
+// Every scan asked of this page and the pack reads after them, everything saved, then
+// done. A scan asked for while the packs are read starts at once (kick, below), as on
+// the Open Hangar page, so it never waits on them and goes stale. Once the page is
+// saying it's done (`closing`), one asked for is the worker's to hand back (`again`).
+// Stopped on an error, it says so, and scans go to the tab (src/scan-host.js).
+let closing = false;
 async function work() {
   const beat = by === 'frame' ? setInterval(() => ping(true), PING_GAP) : null;
+  // The kill switch's file (status.json), fresh for where the next scan runs: read
+  // before anything here can fail (the scan reads it again from the cache).
+  OH.getRemoteStatus?.()?.catch(() => {});
   try {
     for (let again = true; again;) {
-      while (await takeRequest());
-      await runner.packsDone();
+      closing = false;
+      do {
+        await takeAll();
+        await runner.packsDone();
+      } while (taking);
+      closing = true;
       await OH.flushBuybackDetails?.();
       await OH.storageSettled?.();
       const r = await tell('done').catch(() => null);
       again = !!r?.value?.again;
     }
   } catch (e) {
+    closing = true;
     OH.log?.('warn', 'status', `hidden scan page: ${e?.message || e}`);
-    await tell('done').catch(() => null);
+    await tell('done', { failed: true }).catch(() => null);
   } finally {
     clearInterval(beat);
   }
 }
 let working = null;
-const kick = () => (working ??= work().finally(() => (working = null)));
+function kick() {
+  if (working) {
+    if (!closing) takeAll().catch(() => {});
+    return working;
+  }
+  return (working = work().finally(() => {
+    working = null;
+    closing = false;
+  }));
+}
 
 if (run && OH) {
   // A scan asked of this page while it's open: the worker tells it, and Firefox's frame

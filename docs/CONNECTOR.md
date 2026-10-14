@@ -35,9 +35,14 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
   Firefox's event page, which pings it after every page and every 10 seconds (Firefox
   suspends an idle event page about 30 seconds after its last event). It falls back to
   the basic page's tab when the browser has neither, when the page can't be made, when
-  access to RSI is off (the tab asks for it on a click, then scans), or when
+  access to RSI is off (the tab asks for it on a click, then scans), when
   `site/status.json` has `"scanHidden": { "enabled": false }` (it can only turn the
-  hidden page off).
+  hidden page off; the popup and the hidden page read the file as they open, so the
+  background's cached copy is fresh), or for the rest of the browser session once a
+  hidden page went quiet (a scan asked of it never taken, or its scan mark not renewed
+  for 10 minutes) or stopped on an error. A scan asked for while the hidden page reads
+  packs starts at once, and a mark left by a hidden page that went away mid-scan never
+  holds the next scan.
 - **The background worker** as today: our pages' messages (bridge v2), the rescan badge,
   updates.
 - **The scan**, at the same depth: account and balances, the hangar (with the pledge

@@ -313,3 +313,81 @@ test('alerts need the connector', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// --- The hidden scan page (scripts/scan-host.mjs) ---------------------------------------------
+
+test('store check: a connector build without what the hidden scan page needs is refused', () => {
+  const dir = scratch();
+  try {
+    run(dir, 'pack.mjs');
+    const read = (t) => manifestOf(dir, t);
+    const write = (t, m) => writeManifest(dir, t, m);
+    const csp = (m, from, to) => {
+      const pages = m.content_security_policy.extension_pages;
+      assert.ok(pages.includes(from), `${from} in ${pages}`);
+      m.content_security_policy.extension_pages = pages.replace(from, to);
+    };
+    // Chrome: offscreen gone, its pages let frames in.
+    const c = read('chrome');
+    c.permissions = c.permissions.filter((p) => p !== 'offscreen');
+    csp(c, "frame-src 'none'", "frame-src 'self'");
+    write('chrome', c);
+    // Firefox: offscreen asked for, frames shut out, the worker script not loaded, the
+    // shim gone.
+    const f = read('firefox');
+    f.permissions.push('offscreen');
+    csp(f, "frame-src 'self'", "frame-src 'none'");
+    f.background.scripts = f.background.scripts.filter((s) => s !== 'src/scan-host.js');
+    write('firefox', f);
+    fs.rmSync(path.join(dir, 'dist', 'firefox', 'src', 'scan-shim.js'));
+    assert.deepEqual(problems(dir).sort(), [
+      'chrome: its pages may hold frames',
+      'chrome: no offscreen permission (the hidden scan page)',
+      "firefox: Firefox's event page doesn't load src/scan-host.js",
+      "firefox: Firefox's pages need frame-src 'self' for the hidden scan page",
+      'firefox: src/scan-shim.js is missing',
+      "firefox: src/scan.html loads scan-shim.js, which isn't in the build",
+      'firefox: the offscreen permission on Firefox',
+    ]);
+    // Offscreen only ever required: never optional.
+    const o = read('chrome');
+    o.optional_permissions = ['offscreen'];
+    write('chrome', o);
+    assert.ok(problems(dir).includes('chrome: offscreen is optional (scans need it)'));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('store check: no hidden scan page without the connector', () => {
+  const dir = scratch({ connector: false });
+  try {
+    run(dir, 'pack.mjs');
+    assert.deepEqual(problems(dir), []);
+    for (const t of ['chrome', 'firefox']) {
+      const m = manifestOf(dir, t);
+      assert.ok(!m.permissions.includes('offscreen'), `${t}: no offscreen`);
+      assert.match(m.content_security_policy.extension_pages, /; frame-src 'none';/);
+      for (const f of ['src/scan.html', 'src/scan-host.js', 'src/scan-shim.js'])
+        assert.ok(!fs.existsSync(path.join(dir, 'dist', t, f)), `${t}: no ${f}`);
+    }
+    const out = path.join(dir, 'dist', 'chrome');
+    fs.copyFileSync(path.join(ROOT, 'src', 'scan-host.js'), path.join(out, 'src', 'scan-host.js'));
+    const m = manifestOf(dir, 'chrome');
+    m.permissions.push('offscreen');
+    writeManifest(dir, 'chrome', m);
+    const f = manifestOf(dir, 'firefox');
+    f.content_security_policy.extension_pages = f.content_security_policy.extension_pages.replace(
+      "frame-src 'none'",
+      "frame-src 'self'",
+    );
+    writeManifest(dir, 'firefox', f);
+    assert.deepEqual(problems(dir).sort(), [
+      'chrome: src/scan-host.js without the connector',
+      'chrome: the offscreen permission without the connector',
+      'firefox: its pages may hold frames',
+    ]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
