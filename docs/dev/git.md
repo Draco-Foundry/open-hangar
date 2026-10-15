@@ -2,15 +2,9 @@
 
 ## Branches
 
-- Branch, open a PR, squash-merge. Never push to `main` directly.
-- Small fixes for 0.2.x go to `main`. The 0.3.0 rebuild goes in PRs into
-  `redesign/0.3-svelte`, one page per PR. `src/lib.js` (reading RSI, parsing, storage,
-  value math) and its tests stay as they are; only screens move to Svelte. A page that
-  needs data `lib.js` doesn't expose gets a small read-only helper on `window.OHApp` in
-  `src/dashboard.js`. Each page lives in `ui/<page>/` with a `main.js` entry in
-  `vite.config.mjs`; shared code goes in `ui/lib/`. The extension keeps working at
-  every step: a half-moved page stays on the classic code until its Svelte version is
-  complete.
+- Branch from `main`, open a PR into `main`, squash-merge. Never push to `main`
+  directly. (The 0.3.0 rebuild's `redesign/0.3-svelte` branch is merged; nothing goes
+  there any more.)
 - Start a branch with `docs/plans/<branch>.md` (the goal, the steps, what "done" means).
   Delete it before merging; CI fails a PR that still has one. Anything left undone
   becomes a GitHub issue.

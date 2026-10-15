@@ -1,12 +1,12 @@
 # Store Launch Checklist & Listing
 
-> **Submission status (2026-09-30):**
+> **Submission status (2026-10-14):**
 >
-> | Store            | Status                                                                                                                                                                                    | IDs / links                                                                                                                                                      |
-> | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-> | Chrome Web Store | **live** v0.2.11; **v0.2.12 in review** (submitted 2026-09-30, new listing: description, screenshots, category Games, official URL openhangar.space) (publisher `[email removed]`) | item `aeabioadfphghjennmdbnpelojlhndjl` · [listing](https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl)                       |
-> | Firefox AMO      | **live** v0.2.12 (approved 2026-09-30; new listing, screenshots, AMO license field All Rights Reserved (repo LICENSE: PolyForm Strict 1.0.0), privacy policy 2026-09-30)                  | [listing](https://addons.mozilla.org/en-US/firefox/addon/open-hangar/) · gecko id `open-hangar@draco-foundry`                                                    |
-> | Microsoft Edge   | v0.2.12 in review with the new listing (resubmitted 2026-09-30, category Entertainment, test notes for reviewers)                                                                         | [listing](https://microsoftedge.microsoft.com/addons/detail/fmcnemfepnifokjelgjacgdhoodaiicl) · CRX `fmcnemfepnifokjelgjacgdhoodaiicl` · Store ID `[id removed]` |
+> | Store            | Status                                                                                                                                                                                              | IDs / links                                                                                                                                                      |
+> | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+> | Chrome Web Store | **live** v0.3.0; **v0.4.1 in review** (submitted 2026-10-14; the 0.3.1 and 0.4.0 reviews were cancelled for it; category Games, official URL openhangar.space) (publisher `[email removed]`) | item `aeabioadfphghjennmdbnpelojlhndjl` · [listing](https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl)                       |
+> | Firefox AMO      | **live** v0.4.0; v0.4.1 submitted 2026-10-14 (AMO license field All Rights Reserved (repo LICENSE: PolyForm Strict 1.0.0))                                                                          | [listing](https://addons.mozilla.org/en-US/firefox/addon/open-hangar/) · gecko id `open-hangar@draco-foundry`                                                    |
+> | Microsoft Edge   | **live** v0.2.19; **v0.4.1 in review** (submitted 2026-10-14; the 0.3.0 and 0.4.0 reviews were cancelled; category Entertainment, listing English only)                                             | [listing](https://microsoftedge.microsoft.com/addons/detail/fmcnemfepnifokjelgjacgdhoodaiicl) · CRX `fmcnemfepnifokjelgjacgdhoodaiicl` · Store ID `[id removed]` |
 >
 > When each goes live, set that button's `data-status="live"` and `data-url` in
 > `site/index.html`; the "in review" line disappears once none are pending.
@@ -44,8 +44,9 @@ Firefox Add-ons. Work top to bottom. Items marked ✅ are ready in the repo; ⬜
 
 - ✅ Valid MV3 `manifest.json` (loads unpacked today).
 - ✅ **`npm run pack`** builds both store zips into `dist/` (runtime files only:
-  `manifest.json`, `_locales/`, `icons/`, `src/`, plus `CHANGELOG.md`, `LICENSE` and
-  `THIRD_PARTY_NOTICES.md`):
+  `manifest.json`, `_locales/` (English only), `icons/`, the connector's part of `src/`,
+  plus `LICENSE` and `THIRD_PARTY_NOTICES.md`; the dashboard and `CHANGELOG.md` stay
+  out, docs/CONNECTOR.md):
   - `open-hangar-chrome-<version>.zip`: Chrome Web Store **and** Edge Add-ons.
   - `open-hangar-firefox-<version>.zip`: Firefox AMO. `scripts/pack.mjs` adds the
     Firefox-only manifest keys (event-page `background.scripts`, gecko add-on id,
@@ -56,13 +57,23 @@ Firefox Add-ons. Work top to bottom. Items marked ✅ are ready in the repo; ⬜
 
 ## 3. Store Listing Assets
 
-- ✅ **Screenshots** (1–5 required), **1280×800** or 640×400 PNG/JPG, from 0.3.0 the
-  connector's (real UI, fictional demo account; PNG copies beside them for Edge):
-  1. The toolbar popup: `docs/store-assets/screenshot-connector-1-popup.jpg`
-  2. The Open Hangar page (Pledges): `docs/store-assets/screenshot-connector-2-basic.jpg`
+- ✅ **Screenshots** (1–5 required), **1280×800** or 640×400 PNG/JPG, from 0.4.0 the
+  toolbar popup's (real UI, fictional demo account), with their AMO captions:
+  1. Hangar: `docs/store-assets/screenshot-040-1-hangar.jpg`, "Your hangar at a glance:
+     portrait, Account Value, Store Credit, Fleet News and Scan."
+  2. Wishlist: `docs/store-assets/screenshot-040-2-wishlist.jpg`, "Add to your Wishlist
+     right from the popup." (retaken for 0.4.1, with no Target Price)
+  3. Settings: `docs/store-assets/screenshot-040-3-settings.jpg`, "Every setting in one
+     place, including Auto Scan Daily."
+  4. Alerts: `docs/store-assets/screenshot-040-4-alerts.jpg`, "Store alerts for your
+     ships and your Wishlist."
+  5. Light mode: `docs/store-assets/screenshot-040-5-light.jpg`, "Light mode, or follow
+     your browser."
 
-  The older `screenshot-1…5-*` files (`npm run screenshots`) show the dashboard, which
-  the 0.3.0 extension doesn't have: don't upload them for 0.3.0.
+  The 0.3.0 `screenshot-connector-*` files show the old popup and the basic page's
+  lists, which 0.4.0 removed, and the older `screenshot-1…5-*` files
+  (`npm run screenshots`) show the dashboard, which store builds don't have: don't
+  upload either.
 
 - ✅ **Small promo tile**: **440×280** PNG (required) — `docs/store-assets/promo-small-440x280.png`. Can be the logo on a dark
   background. (`icons/icon.svg` + the banner in `src/assets/` are starting points.)
@@ -115,6 +126,10 @@ _(Since 0.2.8 there is no `api.star-citizen.wiki` host permission: that public A
 sends `Access-Control-Allow-Origin: *` and we fetch it without credentials, so the
 install prompt only names robertsspaceindustries.com.)_
 
+**`identity`** (added in 0.3.0)
+
+> Used only for the optional Connect to openhangar.space, an OAuth sign-in with PKCE. It gets this extension's own sign-in address (chrome.identity.getRedirectURL) and opens a sign-in window for app.openhangar.space (chrome.identity.launchWebAuthFlow), where the user signs in and approves the connection. The window hands the extension a one-time code, never the user's password. It never reads the user's Google or Chrome account.
+
 **`alarms`** (added in 0.3.0)
 
 > Used only for two optional features, both off until the user turns them on in the extension's settings. Store alerts: the alarm wakes the extension for a check at most every 30 minutes. It downloads one public sale file from openhangar.space (the same file for everyone, with nothing about the user in the request), reads the user's own Wishlist if they connected openhangar.space, and matches both on the device. Auto Scan Daily (only while connected to openhangar.space): the alarm wakes the extension once a day to scan the user's own RSI account, the same as pressing Scan, and only when the signed-in RSI account is the connected one. Turning a feature off clears its alarm.
@@ -138,27 +153,28 @@ install prompt only names robertsspaceindustries.com.)_
 
 > Scan your Star Citizen hangar in one click, see it all on openhangar.space and get store alerts. Private, with no account needed.
 
-The other languages' `_locales/*/messages.json` have no description of their own for
-0.3.0, so every language shows this English line until new translations are approved.
+Only `_locales/en` ships since 0.4.0 (#685), so the stores list English only. A
+language comes back with its real translation.
 
-**Detailed description:**
+**Detailed description** (from 0.4.0):
 
 The store fields are plain text: paste it without the `>` quote marks and the `**` bold
 markers, with each paragraph and each • bullet on one line.
 
 > **Your Star Citizen hangar, one click away.**
 >
-> Open Hangar reads what RSI already shows you (your pledges, buy-backs, balances and referrals) and shows it all on our hangar page, where you can actually use it. No account needed, and no more clicking through page after page of pledges.
+> Open Hangar reads your pledges, buy-backs, balances and referrals from RSI with the session you're already signed in with, and shows them in a popup and on our hangar page. Free, no password, no account needed.
 >
 > What you get:
-> • Scan: one click reads your hangar and buy-backs from RSI, with the session you're already signed in with
-> • The toolbar popup: your Account Value, your last scan and your store alerts at a glance
+> • Scan: one click reads your hangar and buy-backs from RSI. It runs in the background, with no tab to open
+> • The toolbar popup: your hangar at a glance, Fleet News, your Wishlist and every setting, in three tabs
 > • Your full hangar at hangar.openhangar.space: pledges, buy-backs, fleet stats, values, referrals and more, read from this browser, with no account
 > • Store alerts (optional): a badge and a notification when a ship in your buy-backs is back in the store, or a ship you own gets a new paint, a warbond edition or a limited-time sale. Matched on your device
-> • Add to RSI Cart and Send to RSI Cart: put the upgrades and store items you pick in your RSI cart in one click. You always check out on RSI yourself
-> • The Open Hangar page: your pledges and buy-backs with search, totals and CSV, a JSON backup, and your settings
+> • Add to RSI Cart: put a ship upgrade (CCU) in your RSI cart in one click. You always check out on RSI yourself
+> • Backups: save your hangar as a JSON or CSV file any time
+> • With openhangar.space connected: edit your Wishlist from the popup, and turn on Auto Scan Daily to check your hangar once a day, only for the RSI account you connected
 >
-> **Open beta:** this is Open Hangar 0.3, and it's all yours now. Syncing your hangar to openhangar.space opens to everyone at our official launch on November 10.
+> **Open beta:** this is Open Hangar 0.4, and it's all yours now. Syncing your hangar to openhangar.space opens to everyone at our official launch on November 10.
 >
 > **Private by design:** Open Hangar runs in your browser, using the RSI session you're already signed in with. It never asks for your password. Your hangar stays on your device, and nothing about you is sent to us unless you connect.
 >
@@ -166,10 +182,10 @@ markers, with each paragraph and each • bullet on one line.
 >
 > Unofficial and fan-made. Not affiliated with Cloud Imperium Games or RSI. Fly safe, o7.
 
-**If Send to RSI Cart isn't open to everyone on openhangar.space's store when the listing
-goes up,** use this cart bullet instead, and switch to the one above once it is:
+**Once Send to RSI Cart is open to everyone on openhangar.space's store,** switch the cart
+bullet above to this one:
 
-> • Add to RSI Cart: put a ship upgrade (CCU) in your RSI cart in one click. You always check out on RSI yourself
+> • Add to RSI Cart and Send to RSI Cart: put the upgrades and store items you pick in your RSI cart in one click. You always check out on RSI yourself
 
 ## 7. Submit & Review
 

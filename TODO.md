@@ -15,10 +15,12 @@ and fixes still land here.
   lives (the ship window's wishlist button, the Store page's wishlist list) and how
   the alert reads ("Cutlass Black with LTI is in your buy-backs").
 
-- **Translations (later).** The 0.3.0 store listing is English only; languages come
-  back later, one at a time. The 0.2.x translations in `docs/STORE-LISTINGS.md` stay
-  as a starting point, and the translated summaries in `_locales/` need a redo from the
-  new English summary. Translating the dashboard itself waits for the owner's call.
+- **Translations (later).** The store listing is English only, and since 0.4.0 only
+  `_locales/en` ships (#685); languages come back later, one at a time, each with its
+  real translation (German first, after launch). The 0.2.x translations in
+  `docs/STORE-LISTINGS.md` stay as a starting point, and each language's summary is
+  translated again from the new English summary. Translating the extension's pages
+  waits for the owner's call.
 
 - ~~**Detect warbonds (and other discounts) by price, not name.**~~ ✅ Done: the
   **Below store price** filter compares a ship pledge's paid value to its ships'
@@ -137,7 +139,11 @@ the exact request regardless of operation name. Record:
 
 </details>
 
-### Buyback tokens on the front-page Citizen Card (planned — BLOCKED on a capture)
+### Buyback tokens on the front-page Citizen Card — ✅ DONE
+
+Done: the buy-back page's token sentence (`buybacks.tokens` in the parser rules) is read
+on page 1 of the buy-back scan (`sources.buybacks.meta`), and the popup's Hangar tab
+shows Buy-Back Tokens with the next refill (0.4.0). Original plan below.
 
 Surface the number of **available buy-back tokens** — and ideally the
 **next-available date** — on the front-page Citizen Card, next to the balances
@@ -171,8 +177,9 @@ buy-back scan), thread it through `state`, and add the pill in `renderAccount`
 ## Multi-account caching + character switcher (needs research first)
 
 **Update 2026-09-29 (owner question, parked):** per-account saved data now exists
-(Developers → Saved accounts): each RSI account's scan is kept, and the dashboard shows
-whichever account is **signed in to RSI**. There's no way to pick a "primary" account to
+(Saved Accounts, on the popup's Settings tab since 0.4.0; Developers → Saved accounts in
+the dashboard before): each RSI account's scan is kept, and Open Hangar shows whichever
+account is **signed in to RSI**. There's no way to pick a "primary" account to
 track, or to view/compare another saved one without signing in as it. Figure out what
 multi-account owners actually want: choose which account the dashboard follows, a
 switcher to browse saved accounts, and/or side-by-side comparison (combined fleet across
@@ -204,10 +211,17 @@ active }`. Plan a migration from the current single-DB shape (v6 cache → vNext
 - **Scope check.** Weigh against the project's privacy-first stance — the current
   wipe-on-switch is a feature, not a gap. This should be **opt-in**, not the default.
 
-## Make a scan survive closing the dashboard tab (needs research first)
+## Make a scan survive closing the dashboard tab — ✅ DONE (0.4.0)
 
-Today the scan persists across the extension's internal views (single page) but
-dies if the dashboard tab is closed — it runs in the page, not the background
+Done: scans run in a hidden page with no tab (`src/scan.html`, `src/scan-host.js`,
+`ui/scan/`): an offscreen document (reason `DOM_PARSER`) on Chrome and Edge, a hidden
+frame in the event page on Firefox, and the basic page's tab only when neither can run.
+Closing the popup doesn't stop a scan, and the scan keeps its progress and last report
+in storage for the popup (docs/CONNECTOR.md, "The hidden scan page"). Original notes
+below.
+
+Before 0.4.0 the scan persisted across the extension's internal views (single page) but
+died if the dashboard tab was closed — it ran in the page, not the background
 service worker. Moving it to survive a tab close is **not** a quick change; do the
 research before touching it:
 

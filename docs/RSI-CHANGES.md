@@ -38,7 +38,8 @@ most users see it within a few hours.
   alone (0.4.0, #666): pressed scans go on, and each skipped day asks RSI nothing and
   shows "scans are paused" under its switch. Pausing `hangar` pauses it too;
   `buybacks` or `referrals` only skip that part of its full read.
-- `banner`: a notice across the top of the dashboard. `level` is `warn` or `info`;
+- `banner`: a notice at the top of the basic page (the dashboard in a build without
+  the connector). `level` is `warn` or `info`;
   `until` (a date) hides it automatically after that day; `maxVersion` shows it only
   on that version or older (versions before 0.3.0 ignore it and always show it).
 - When the fix is out everywhere, put the file back to
