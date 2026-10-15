@@ -93,7 +93,8 @@ them, and a build without the connector that has the popup or the basic page.
 optional `notifications`, docs/FLAGS.md "Alerts", and Auto Scan Daily uses that same
 `alarms`; the hidden scan page adds `offscreen` on
 Chrome and Edge only, and `frame-src 'self'` to Firefox's pages): `storage`, `unlimitedStorage` (big hangars, history
-and the archive), `cookies` (Log Out of RSI), `identity` (Connect's sign-in window), and
+and the archive), `cookies` (Log Out of RSI, whether RSI's sign-in cookie is there, and
+Add to RSI Cart's token), `identity` (Connect's sign-in window), and
 host access to robertsspaceindustries.com only. The **hosts** the pages may reach shrink:
 a connector build's content security policy adds
 `connect-src 'self' https://robertsspaceindustries.com https://openhangar.space` plus
@@ -106,8 +107,9 @@ The pages the website now has leave in three steps. The code stays until the las
 1. **Gated.** The `connector` flag leaves them out of a connector build; every store
    build still had them.
 2. **Switched on (now, 0.3.0).** `connector` and `localMode` on in the store and the beta
-   (`src/flags.js`, owner 2026-10-13). The store screenshots of the popup and the basic
-   page are `docs/store-assets/screenshot-connector-*` (the older ones show the
+   (`src/flags.js`, owner 2026-10-13). The store screenshots are the 0.4.0 popup's,
+   `docs/store-assets/screenshot-040-*` (docs/STORE.md, section 3; the 0.3.0
+   `screenshot-connector-*` show the old popup and basic page, the older ones the
    dashboard). The privacy policy and the store listing describe the connector
    (owner-approved 2026-10-13), store alerts and the wishlist import included.
 3. **Deleted.** After a release with the connector on: the dashboard and its pages go

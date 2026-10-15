@@ -20,15 +20,17 @@ only: Prettier, web-ext, jsdom and jsqr (tests), puppeteer-core (drives the inst
 
 - `src/`: what ships. `background.js` (service worker; Firefox event page), `lib.js`
   (`window.OH`: scan, storage, export, feeds, sync), `scraper/parser.js`, `flags.js`,
-  `popup.html` and `basic.html` (the connector pages). `src/ui/` is Vite output (gitignored).
+  `popup.html` and `basic.html` (the connector pages), `scan.html` and `scan-host.js` (the
+  hidden scan page). `src/ui/` is Vite output (gitignored).
 - `ui/`: Svelte sources, one folder per page with a `main.js` entry (vite.config.mjs);
   shared code in `ui/lib/`. Only `ui/popup/`, `ui/basic/` and `ui/scan/` (the scan
-  runner the basic page imports) reach store builds.
+  runner the hidden scan page runs, or the basic page when it can't) reach store builds.
 - `site/`: openhangar.space static files (`status.json` is the live kill switch);
   `site-worker/`: its front Worker.
 - `schema/`: the sync payload's JSON Schema. `test/`: `*.test.js` and `fixtures/`.
 - `scripts/`: build, checks, generators, publishing. `docs/`: topic files, `decisions/`,
-  `plans/` (branch plans only). `beta/`, `_locales/` (manifest names only), `icons/`.
+  `plans/` (branch plans only). `beta/`, `_locales/` (the manifest's name and
+  summary, English only since #685), `icons/`.
 - `_dump/`: local scratch, gitignored. Never commit it.
 
 ## Commands

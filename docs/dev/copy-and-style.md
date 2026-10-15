@@ -2,8 +2,9 @@
 
 ## Look
 
-- **One look only: Clean Pro.** No theme picker or alternative looks. If light mode
-  comes (owner to confirm), it's a twin of the same look.
+- **One look only: Clean Pro.** No theme picker or alternative looks. Light mode (the
+  popup's Look setting since 0.4.0: follow the browser, Dark or Light) is a twin of the
+  same look.
 - **Weights:** buttons 500; prices, names and headings 600 at most; only tiny all-caps
   tags may use 700. Never heavier.
 - **No orphans:** no heading or caption ends with one word alone on its last line
