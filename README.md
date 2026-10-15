@@ -24,7 +24,7 @@ never sold.
 > Unofficial fan project, not affiliated with Cloud Imperium Games or RSI. Open Hangar only
 > ever reads **your own** account.
 
-![Open Hangar's Home page in the extension, shown with a demo account](docs/store-assets/screenshot-2-home.jpg)
+![Open Hangar's toolbar popup, shown with a demo account](docs/store-assets/screenshot-040-1-hangar.jpg)
 
 ## Get Open Hangar
 
@@ -40,16 +40,16 @@ current version, or go straight to a store:
 Then:
 
 1. Sign in to [RSI's Website](https://robertsspaceindustries.com/) in the same browser.
-2. Click the Open Hangar icon in your toolbar to open your hangar.
-3. Hit **Scan All**, then explore Home, Inventory, Buy-Backs, Stats and more.
+2. Click the Open Hangar icon in your toolbar (or press Alt+Shift+H) to open the popup.
+3. Hit **Scan**, then **Open My Hangar** to see your whole hangar.
 
-Re-scan any time to refresh. **Clear Data** wipes the local copy, and **Log Out of RSI**
-ends your RSI session.
+Re-scan any time to refresh. On the Settings tab, **Clear Data** wipes the local copy,
+and **Log Out of RSI** ends your RSI session.
 
 The website works in any browser, phone included, and from the Nov 10 launch that's where
 My Hangar lives.
 
-An invite-only beta for 0.3.0 runs Oct 20 to 27, with invites on our
+An invite-only tester round runs Oct 20 to 27, with invites on our
 [Discord](https://discord.gg/FF8Wm5HdnV). Spots are limited.
 
 ## Where We're Headed
@@ -57,15 +57,16 @@ An invite-only beta for 0.3.0 runs Oct 20 to 27, with invites on our
 - **The Website Becomes Your Fleet Manager.** My Hangar on any device, store tools that know
   what you own, a page for every ship, and later your org and the wider community.
 - **The Extension Stays Your Scanner.** It keeps reading your own RSI account in your browser
-  and keeps getting better at it. From Nov 10 (extension 0.3.0), new features land on the
-  website.
+  and keeps getting better at it. From Nov 10, new features land on the website.
 - **Your Data, Your Call.** From Nov 10 you can choose to sync: connect a free
   openhangar.space account and the extension syncs after every scan. Or skip it, and
   everything stays in your browser. Disconnect any time.
 
 ## Road to Launch: November 10, 2026
 
-Extension 0.3.0 and the website launch together, and sign-ups open to everyone.
+The website opens to everyone, and sign-ups open to everyone. The extension no longer
+launches with it: 0.3.0 shipped on Oct 13, and 0.4.0 and 0.4.1 went to the stores on
+Oct 14.
 
 Website features come in **waves**, batches that are built and tested ahead of launch. A
 wave's date is when it's built, not when you get it: Waves 1 to 3 are planned for launch day.
@@ -83,20 +84,21 @@ are 2026, in UTC. Each bar fills as its tasks are done:
 - [x] **Sep 28 to 30:** Shipped. Open Hangar is live on the Chrome, Edge and Firefox stores.
 - [x] **Oct 2 to 7:** Shipped. openhangar.space becomes a Star Citizen news hub and opens the
       Open Hangar Store.
-- [x] **Oct 6:** Built. The [0.3.0 Redesign](https://github.com/Draco-Foundry/open-hangar/milestone/3) rebuilds every
-      extension page in one clean look. Arrives Nov 10.
+- [x] **Oct 13 to 14:** Shipped. Extension 0.3.0 and 0.3.1 make the extension a lighter
+      connector, and 0.4.0 and 0.4.1 bring the new toolbar popup.
 - [ ] **Oct 16:** [Wave 1: Core Hangar Manager](https://github.com/Draco-Foundry/open-hangar/milestone/6)
       built. My Hangar on the website, a page for every ship, and store badges for what you
       own.
 - [ ] **Oct 16 to 19:** bug-fix days, with no new features.
-- [ ] **Oct 20 to 27:** an invite-only beta with 5 to 10 testers, invites on our Discord.
+- [ ] **Oct 20 to 27:** a tester round with 5 to 10 Discord testers on the public extension
+      and the website.
 - [ ] **Oct 25:** [Wave 2: Your Hangar Meets the Store](https://github.com/Draco-Foundry/open-hangar/milestone/7)
       built and in testing.
-- [ ] **Oct 27:** last extension changes in, then a final check before the stores.
-- [ ] **Oct 28:** 0.3.0 goes to the Chrome, Edge and Firefox stores for review.
+- [ ] **Oct 27:** code freeze for the extension, then a go or no-go call.
+- [x] **Oct 28:** 0.3.0 submitted to Chrome, Edge and Firefox. It shipped early, on Oct 13.
 - [ ] **Nov 3:** [Wave 3: Finishing Touches](https://github.com/Draco-Foundry/open-hangar/milestone/9) built.
-- [ ] **Nov 10: [Launch](https://github.com/Draco-Foundry/open-hangar/milestone/4).** Extension 0.3.0
-      and the website launch together, and sign-ups open to everyone.
+- [ ] **Nov 10: [Launch](https://github.com/Draco-Foundry/open-hangar/milestone/4).** The website
+      opens and sign-ups open to everyone.
 - [ ] **Then:** four weeks of bug fixes and keeping ship and store data accurate.
 
 The Oct 27 cut-off is for the extension, which needs store review. Website features can keep
@@ -124,6 +126,14 @@ Anything after launch is a plan, not a promise. The details are in the
 
 ## Recently Shipped
 
+- [x] **Oct 14, 2026 · 0.4.0 and 0.4.1:** a new toolbar popup with three tabs, Hangar,
+      Wishlist and Settings, plus an alerts bell. Also: scans that run out of sight, Auto Scan
+      Daily (optional), your Wishlist in the popup, your own currency and light mode.
+      ([0.4.0](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.4.0),
+      [0.4.1](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.4.1))
+- [x] **Oct 13 to 14, 2026 · 0.3.0 and 0.3.1:** the extension is now a lighter connector,
+      and your full hangar opens on openhangar.space.
+      ([0.3.0](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.3.0))
 - [x] **Oct 6 to 7, 2026 · Website:** the store adds Compare (up to three items side by side),
       prices in your own currency and a What's New view of the latest drops. Pilots with a
       synced hangar (beta testers until launch) see an In Your Hangar mark on what they own,
@@ -146,21 +156,29 @@ Anything after launch is a plan, not a promise. The details are in the
 
 ## What You Get Today
 
-**In the Extension (0.2.19):**
+**In the Extension (0.4.1):**
 
-- **Your Whole Hangar:** every pledge with what's inside, its value and insurance, and
-  whether you can melt or gift it. Search, filters and three views.
-- **What It's Worth:** Account Value at today's store prices, what changed between scans,
-  and a Melt Planner.
-- **Buy-Backs:** everything you can reclaim, with links that open the right item on RSI,
-  plus your buy-back token count.
-- **Home:** your Citizen Card with balances, Game Status and Hangar Alerts.
-- **Your Fleet:** cargo, crew and role stats, a fleet picture to share, and Org Fleet, which
-  puts your org mates' ship lists together as one fleet.
-- **Referrals:** recruits, reward tiers, event bonuses and a share image.
-- **Wishlist:** the ships you want, with a check for whether they're in the store now.
-- **Your Data, Your Way:** export to JSON or CSV, import JSON, or export a Hangar Transfer
-  Format file that other community fleet tools can read.
+- **The Toolbar Popup:** three tabs, Hangar, Wishlist and Settings, plus an alerts bell
+  whose number matches the toolbar badge. The Hangar tab shows your RSI portrait and
+  handle, Account Value and how it changed since an earlier scan, Store Credit, Buy-Back
+  Tokens with the next refill, up to three Fleet News notes, and Scan.
+- **Scans Out of Sight:** no scan tab. The scan runs in a hidden page, and closing the
+  popup doesn't stop it.
+- **Your Whole Hangar:** Open My Hangar shows My Hangar on openhangar.space when you're
+  connected, or hangar.openhangar.space when you're not.
+- **Store Alerts (Optional):** a badge and a notification when a ship in your buy-backs is
+  back in the store, or a ship you own gets a new paint, a warbond edition or a
+  limited-time sale. Matched on your device.
+- **Auto Scan Daily (Optional):** while you're connected to openhangar.space, Open Hangar
+  can check your hangar once a day. Off until you turn it on.
+- **Your Wishlist:** while you're connected, search to add a ship, paint or upgrade, or
+  remove an item. Search runs on your device.
+- **Add to RSI Cart:** put a ship upgrade (CCU) in your RSI cart in one click. You always
+  check out on RSI yourself.
+- **Your Currency, Light Mode and a Shortcut:** amounts show in US dollars until you pick
+  another currency in Settings. Look follows your browser, or pick Dark or Light.
+  Alt+Shift+H opens the popup.
+- **Your Data, Your Way:** JSON Backup, Pledges CSV and Buy-Backs CSV on the Settings tab.
 
 **On [openhangar.space](https://openhangar.space/):**
 
@@ -178,22 +196,24 @@ Anything after launch is a plan, not a promise. The details are in the
   and never sees your password.
 - **Read-Only Scans.** Scans only read, and they pace their requests so RSI's site isn't
   flooded.
-- **Today (0.2.19):** no account and no sign-up, and your hangar data stays in your browser.
-  A few read-only requests fetch public data, like the game version, ship art and exchange
-  rates. None of them carry your personal data, but ship-art lookups are made by ship name,
-  so they weakly hint at which ships you're viewing. The `cookies` permission is used only by
-  **Log Out of RSI**. Each RSI account's data is kept separately, so accounts never mix.
-- **From 0.3.0 (Launching Nov 10, 2026):** your data stays in your browser unless you
-  connect a free openhangar.space account. Once connected, every scan sends the same data as
-  the JSON export to your account there (Sync Now sends it right away). Disconnect stops it,
-  and the website lets you download or delete everything. With or without sync, the
-  extension talks only to RSI and openhangar.space. Apart from reading your own account and
-  syncing, those requests fetch public files that are the same for everyone.
+- **No Account Needed:** the extension and our hangar page, hangar.openhangar.space, work
+  without an account. Without sync, the only other requests fetch public files from
+  openhangar.space, like the status file, the ship list and exchange rates, the same for
+  everyone and with nothing about you. The `cookies` permission is used only on RSI: for
+  **Log Out of RSI**, to see whether you're signed in to RSI, and for **Add to RSI Cart**.
+  Each RSI account's data is kept separately, so accounts never mix.
+- **Optional Sync (Open to Everyone From Nov 10, 2026):** your data stays in your browser
+  unless you connect a free openhangar.space account. Once connected, every scan sends the
+  same data as the JSON export to your account there (Sync Now sends it right away).
+  Disconnect stops it, and the website lets you download or delete everything. With or
+  without sync, the extension talks only to RSI and openhangar.space. Apart from reading
+  your own account, syncing and your Wishlist, those requests fetch public files that are
+  the same for everyone.
 - **Add to RSI Cart (0.3.0)** is the one thing that isn't read-only: when you click it, one
   upgrade goes into your RSI cart. It never checks out or pays.
 
 [Extension Privacy Policy](https://openhangar.space/privacy.html) ·
-[0.3.0 Privacy Policy](docs/PRIVACY.md) ·
+[Privacy Policy Source](docs/PRIVACY.md) ·
 [Website Privacy Policy](https://openhangar.space/privacy)
 
 ## For Developers
@@ -225,11 +245,11 @@ npm run build
   contents, value, date, insurance, and whether it's giftable or meltable.
 - **Buy-Backs:** melted pledges you can get back, each with a direct reclaim link.
 - **Account:** handle, display name, Store Credit, UEC, REC, main org and rank.
-- **Referrals:** recruits and prospects (current and legacy programs), reward tiers, event
-  bonuses and charts.
+- **Referrals:** recruits and prospects (current and legacy programs).
 
-Everything lives in one versioned database in your browser, and exports as one JSON file, a
-CSV of what a page shows, or a Hangar Transfer Format (HTF) file.
+Everything lives in one versioned database in your browser, and exports as one JSON file or
+a CSV of your pledges or buy-backs (a developer's build with the dashboard also writes a
+Hangar Transfer Format (HTF) file).
 
 </details>
 
@@ -291,11 +311,14 @@ RSI updates its site from time to time. All HTML parsing is isolated in
 ```
 manifest.json           permissions + config (Chrome-shaped; see scripts/pack.mjs)
 src/
-  background.js         opens the hub when the toolbar icon is clicked
+  background.js         the popup's scans, the badge, alerts, our pages' messages
   lib.js                source registry, scan loop, storage, export/import
   scraper/parser.js     RSI HTML -> normalized model   (the layer to maintain)
   data/parser-rules.json  where things are on RSI's pages (the parser rules)
-  dashboard.html / .js  the viewer
+  popup.html            the toolbar popup
+  scan.html             the hidden scan page (scan-host.js opens it)
+  basic.html            the small Open Hangar page
+  dashboard.html / .js  the old dashboard (developer builds without the connector)
 ui/                     Svelte pages, built with Vite
 scripts/pack.mjs        builds per-browser bundles into dist/
 ```
@@ -307,13 +330,14 @@ The [Architecture Tour](ARCHITECTURE.md) walks through it all in about ten minut
 <details>
 <summary><strong>Export, Import and Commands</strong></summary>
 
-The contract is the data shape above plus **JSON export and import** on the Developers page:
-pull the whole database out as one self-describing file, or restore it. Import restores
-holdings; the `account` block is a read-only snapshot.
+The contract is the data shape above plus **JSON export and import**: JSON Backup on the
+popup's Settings tab pulls the whole database out as one self-describing file, and the
+dashboard's Developers page (a developer's build) restores it. Import restores holdings;
+the `account` block is a read-only snapshot.
 
-**Export HTF** writes the community Hangar Transfer Format: one entry per ship with
-`ship_code`, manufacturer, `pledge_*`, `lti` and `warbond`, ready for any fleet tool that
-reads HTF. Ship codes come from a bundled MIT-licensed table in `src/data/` (credited in the
+**Export HTF** (the dashboard's Developers page) writes the community Hangar Transfer
+Format: one entry per ship with `ship_code`, manufacturer, `pledge_*`, `lti` and
+`warbond`, ready for any fleet tool that reads HTF. Ship codes come from a bundled MIT-licensed table in `src/data/` (credited in the
 [Third-Party Notices](THIRD_PARTY_NOTICES.md)). CCUs, paints and add-ons have no HTF
 equivalent and are skipped.
 
@@ -323,8 +347,10 @@ Useful commands:
 - `npm run build`: per-browser bundles in `dist/chrome` and `dist/firefox`
 - `npm run pack`: store-ready zips in `dist/`
 - `npm run lint:firefox`: Mozilla's `web-ext lint` against the Firefox build
-- `npm run screenshots`: store screenshots (real UI, demo data) into `docs/store-assets/`
-- `npm run demo`: the same demo dashboard at `localhost:8323`, for trying UI changes
+- `npm run screenshots`: the dashboard's screenshots (real UI, demo data) into
+  `docs/store-assets/` (the store uses the popup's, `screenshot-040-*`)
+- `npm run demo`: the demo dashboard, popup and basic page at `localhost:8323`, for trying
+  UI changes
 - `npm run format`: Prettier
 
 To add a data source, see the [Contributing Guide](CONTRIBUTING.md).

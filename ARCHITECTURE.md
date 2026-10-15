@@ -8,17 +8,23 @@ function) it comes from, so you can check it. The big "why" decisions live in
 ## The Big Picture
 
 Open Hangar is a Manifest V3 browser extension (Chrome, Edge, Firefox). It has no
-backend: everything it reads is kept in `chrome.storage.local` in your browser.
+backend of its own: everything it reads is kept in `chrome.storage.local` in your
+browser, and only the optional sync sends it to app.openhangar.space
+([The Website](#the-website)).
+
+Every store build is the connector (docs/CONNECTOR.md): a toolbar popup, the hidden scan
+page and one small basic page. The classic dashboard is only in a developer's build
+without the connector.
 
 | Piece               | Files                                                       | Job                                                                |
 | ------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------ |
-| Service worker      | `src/background.js`                                         | Opens the dashboard, rescan badge, updates, our pages' messages    |
-| Dashboard (classic) | `src/dashboard.html`, `src/dashboard.js`                    | The whole app: views, scanning, state, most pages                  |
+| Service worker      | `src/background.js`                                         | The popup's scans, badge, alarms, updates, our pages' messages     |
+| Dashboard (classic) | `src/dashboard.html`, `src/dashboard.js`                    | A build without the connector: views, scanning, state, most pages  |
 | Shared library      | `src/lib.js` (exposed as `window.OH`)                       | Source registry, scan loop, storage, export/import, outside data   |
 | Parser              | `src/scraper/parser.js` (exposed as `window.OpenHangar`)    | RSI HTML to normalized items, reading where to look from the rules |
 | Parser rules        | `src/data/parser-rules.json`, `src/parser-rules.js`         | Where things are on RSI's pages, as data (`window.OHRules`)        |
-| Svelte pages        | `ui/` (built into `src/ui/`)                                | The new Home page cards (0.3.0 redesign, in progress)              |
-| Connector pages     | `src/popup.html`, `src/basic.html` (`ui/popup`, `ui/basic`) | The `connector` build's popup and basic page (docs/CONNECTOR.md)   |
+| Svelte pages        | `ui/` (built into `src/ui/`)                                | The connector's pages, and the dashboard's (0.3.0 redesign)        |
+| Connector pages     | `src/popup.html`, `src/basic.html` (`ui/popup`, `ui/basic`) | Every store build's popup and basic page (docs/CONNECTOR.md)       |
 | Scan runner         | `ui/scan/runner.js` and its two helpers in `ui/scan/`       | The scan, pack reads and sync after it, for any page that scans    |
 | Hidden scan page    | `src/scan.html`, `ui/scan/main.js`, `src/scan-host.js`      | Scans with no tab: offscreen (Chrome, Edge), a frame (Firefox)     |
 | Bundled data        | `src/data/ship-catalog.json`, `src/data/ship-codes.json`    | Ship list and prices; ship codes for the HTF export                |
@@ -26,9 +32,12 @@ backend: everything it reads is kept in `chrome.storage.local` in your browser.
 | Website             | `site/`, `site-worker/wrangler.jsonc`                       | openhangar.space, including the `status.json` kill switch          |
 | Workflows           | `.github/workflows/`                                        | CI, release, store publishing, site deploy, canary                 |
 
-`manifest.json` asks for `storage`, `unlimitedStorage` and `cookies`, plus host access
-to `https://robertsspaceindustries.com/*`. The content security policy only allows the
-extension's own scripts (`script-src 'self'`).
+`manifest.json` asks for `storage`, `unlimitedStorage`, `cookies` and `identity`, plus
+host access to `https://robertsspaceindustries.com/*`. `scripts/pack.mjs` adds `alarms`
+(store alerts and Auto Scan Daily), an optional `notifications` (store alerts) and, on
+Chrome and Edge, `offscreen` (the hidden scan page). The content security policy only
+allows the extension's own scripts (`script-src 'self'`), and a connector build's pages
+may only send requests to RSI, openhangar.space and the sync site (`connect-src`).
 
 ## The Service Worker
 
@@ -144,13 +153,17 @@ and `scripts/check-store-build.mjs` check all three agree. The repo's copy of
 
 ## The Scan Pipeline
 
-Scanning runs in the dashboard page itself. `dashboard.html` loads, in order,
-`scraper/parser.js`, `lib.js`, `quips.js`, `qr.js` and `dashboard.js`.
+In a store build the scan is the scan runner, `ui/scan/runner.js`, in the hidden scan
+page (or in the basic page's tab when it can't run hidden; docs/CONNECTOR.md). It's the
+dashboard's Scan All without the store check, and it keeps its progress and report in
+storage for the popup. In a build without the connector, scanning runs in the dashboard
+page itself: `dashboard.html` loads, in order, `scraper/parser.js`, `lib.js`,
+`quips.js`, `qr.js` and `dashboard.js`. Either way the reading is `src/lib.js`'s.
 
-1. **Start.** `runScan()` in `src/dashboard.js` scans the chosen parts: hangar,
-   buy-backs, referrals and (if you have a wishlist) the store. It looks up the RSI
-   account once with `OH.getAccount()` and passes it to every save, so saves cost no
-   extra RSI requests.
+1. **Start.** The runner (or `runScan()` in `src/dashboard.js`) scans the chosen parts:
+   hangar, buy-backs, referrals and, in the dashboard only, the store (if you have a
+   wishlist). It looks up the RSI account once with `OH.getAccount()` and passes it to
+   every save, so saves cost no extra RSI requests.
 2. **Check the kill switch.** `OH.scanSource(id)` in `src/lib.js` finds the source with
    `OH.getSource(id)` and asks `OH.sourcePaused(id)` first. A paused source returns at
    once and never touches RSI (see [The Kill Switch](#the-kill-switch)).
@@ -342,8 +355,8 @@ moved every page to Svelte, one at a time.
 
 - **Build.** `vite.config.mjs` builds each page's `ui/<page>/main.js` into
   `src/ui/<page>.js` (Home also gets `src/ui/home.css`), code the pages share into
-  `src/ui/app.svelte.js`, and fonts into `src/ui/fonts/`. Output is not minified, because store
-  reviewers read it. `src/ui/` is generated and git-ignored: run `npm run build:ui`
+  `src/ui/shared.js` (the shared chunk, below), and fonts into `src/ui/fonts/`. Output
+  is not minified, because store reviewers read it. `src/ui/` is generated and git-ignored: run `npm run build:ui`
   (or `npm run dev:ui` to watch).
 - **Loading.** `src/dashboard.html` links `ui/home.css` and loads `ui/home.js` and
   `ui/stats.js` as modules. `ui/home/main.js` mounts `Home` into `#oh-home`, `ForYou`
@@ -453,12 +466,16 @@ The full list, with what is and isn't sent, is in [docs/PRIVACY.md](docs/PRIVACY
 In short:
 
 - **robertsspaceindustries.com**: your own account pages, with your session
-  (`fetchPage()`, `OH.getAccount()`, `OH.getReferral()`), plus public pages such as
-  the ship matrix and patch notes.
-- **Public read-only data**: `api.star-citizen.wiki`, `starcitizen.tools` and
-  `support.robertsspaceindustries.com`.
-- **openhangar.space**: `status.json` (the kill switch) and `rates.json` (exchange
-  rates, only for a currency other than USD). Nothing is sent.
+  (`fetchPage()`, `OH.getAccount()`, `OH.getReferral()`), and the cart when you click
+  Add to RSI Cart. The dashboard (no connector) also reads public pages such as the
+  ship matrix, patch notes and `support.robertsspaceindustries.com` help articles.
+- **openhangar.space**: `status.json` (the kill switch), the ships feed (`api/ships`,
+  for Account Value), `rates.json` (exchange rates, only for a currency other than USD)
+  and, with store alerts on, the sale feed (`api/store/on-sale`). The dashboard reads a
+  few more public feeds (under `OH.SITE_FEEDS`). Nothing personal is sent; sync and the
+  Wishlist go to app.openhangar.space (below).
+- **Nowhere else.** From 0.3.0 the extension talks only to RSI and openhangar.space;
+  docs/CONNECTOR.md lists what a connector build asks and what went.
 
 Requests to sites other than your RSI account go through `OH.guarded()`: an 8 second
 timeout, and a site that timed out or answered 429/5xx is skipped for 10 minutes
@@ -519,15 +536,20 @@ When RSI changes a page, every installed copy breaks until a fix clears store re
   from the copy the extension's pages cached; the background never fetches the file).
 - `"autoScan": { "enabled": false }` pauses Auto Scan Daily alone (`hangar` pauses it
   too; `buybacks` or `referrals` skip that part of its full read).
-- `OH.scanSource()` and `OH.getReferral()` check it before scanning;
-  `renderSiteNotice()` in `src/dashboard.js` shows the banner.
+- `"scanHidden": { "enabled": false }` turns the hidden scan page off, so scans run in
+  the basic page's tab again (docs/CONNECTOR.md).
+- `OH.scanSource()` and `OH.getReferral()` check it before scanning. The basic page
+  shows the banner (`ui/basic/hub.svelte.js`); without the connector,
+  `renderSiteNotice()` in `src/dashboard.js` does.
 
 ## Build and Packaging
 
 - `npm run build` runs `vite build` (the Svelte pages) and then `scripts/pack.mjs`.
-- `scripts/pack.mjs` copies `_locales`, `icons` and `src` (minus `icons/icon.svg`)
-  plus `CHANGELOG.md` (for the Updates page), `LICENSE` and `THIRD_PARTY_NOTICES.md`
-  into `dist/chrome` and `dist/firefox`, and writes a manifest for each:
+- `scripts/pack.mjs` copies `_locales` (English only), `icons` and `src` (minus
+  `icons/icon.svg`) plus `CHANGELOG.md` (for the dashboard's Updates page), `LICENSE` and
+  `THIRD_PARTY_NOTICES.md` into `dist/chrome` and `dist/firefox`, and writes a manifest
+  for each (a connector build, every store build, then leaves the dashboard and
+  `CHANGELOG.md` out, `scripts/connector.mjs`):
   - `dist/chrome`: `manifest.json` as is. The same zip goes to Chrome and Edge.
   - `dist/firefox`: adds `background.scripts` (Firefox MV3 runs an event page) and
     `browser_specific_settings.gecko` (add-on id `open-hangar@draco-foundry`, minimum
@@ -561,10 +583,10 @@ When RSI changes a page, every installed copy breaks until a fix clears store re
   `package.json`, so a new test file must be added to that list to run. Tests live in
   `test/`, with scrubbed RSI captures in `test/fixtures/`.
 - **UI smoke test:** `npm run test:ui` builds the Svelte pages and runs
-  `scripts/screenshots/smoke.mjs`. It serves the real dashboard with a fictional demo
-  account (`scripts/screenshots/run.mjs --serve` on port 8323; `demo-shim.js` stubs
-  `chrome.*`), drives your installed Chrome with `puppeteer-core`, and fails on page
-  errors, empty views and misaligned List-view rows.
+  `scripts/screenshots/smoke.mjs`. It serves the real dashboard, the toolbar popup and
+  the basic page with a fictional demo account (`scripts/screenshots/run.mjs --serve` on
+  port 8323; `demo-shim.js` stubs `chrome.*`), drives your installed Chrome with
+  `puppeteer-core`, and fails on page errors, empty views and misaligned List-view rows.
 - **Privacy check:** `npm run test:privacy` (after `npm run pack`) loads the built
   Chrome store extension in Chrome as someone who never connected, presses Scan and
   opens every page, with every request answered locally. It fails on any request to the
@@ -618,7 +640,9 @@ page and the website's public pages to the website Worker, with a fallback for e
 when it fails (docs/SITE-CLOUDFLARE.md section 4).
 
 `.github/workflows/pages.yml` deploys it with `wrangler` when `site/` (or a few shared
-files) change on `main`, and daily to refresh exchange rates. Before deploying it
+files) change on `main`, right after a Publish to stores run, and on a schedule (every
+3 hours, hourly while a store has a version in review or held back) that keeps the
+store versions and exchange rates fresh. Before deploying it
 copies in the icon, banner and store screenshots, stamps the current version and its
 date into `site/index.html`, and builds `site/rates.json` with
 `scripts/update-rates.mjs`.

@@ -23,8 +23,10 @@ changes their site and the rest of the extension depends on this layer staying h
 
 ## How Auth Works
 
-The scan runs in the extension's own dashboard page, not in a content
-script. The extension's `host_permissions` for `robertsspaceindustries.com` let
+The scan runs in an extension page of its own, not in a content script: the hidden
+scan page (an offscreen document on Chrome and Edge, a hidden frame on Firefox), or the
+basic page's tab when that can't run (docs/CONNECTOR.md). The extension's
+`host_permissions` for `robertsspaceindustries.com` let
 `fetch(..., { credentials: 'include' })` carry the browser's existing RSI session
 cookie, so no RSI tab needs to be open — only an active RSI login in the profile.
 (The scan can't run in `background.js`: MV3 service workers have no `DOMParser`,
@@ -93,11 +95,11 @@ The scan is persisted automatically under `storage.db.sources[id]`, and
 `DB_VERSION` in `src/lib.js`, add a `MIGRATIONS` step from the old version, teach
 `OH.checkDB` the new shape, and add a test in `test/db.test.js` that loads a DB in
 the old shape. Every load is checked: anything that fails is set aside under
-`dbCorrupt` (never deleted) and the dashboard offers to restore a backup. The backup
-file format has its own number, `EXPORT_VERSION`; only bump it when the file itself
-changes, since older versions refuse newer files. Today `OH.SOURCES` holds two `html`
-sources, the hangar and buy-backs (RSI renders buy-backs as the same server-side HTML as
-pledges). Referrals come from RSI's GraphQL API through their own fetch in `lib.js`,
+`dbCorrupt` (never deleted) and the dashboard (a build without the connector) offers to
+restore a backup. The backup file format has its own number, `EXPORT_VERSION`; only
+bump it when the file itself changes, since older versions refuse newer files. Today
+`OH.SOURCES` holds two `html` sources, the hangar and buy-backs (RSI renders buy-backs as
+the same server-side HTML as pledges). Referrals come from RSI's GraphQL API through their own fetch in `lib.js`,
 outside `OH.SOURCES`.
 
 ## Versioning
@@ -106,7 +108,7 @@ outside `OH.SOURCES`.
 public Chrome Web Store launch ships from `0.2.x`): bump **minor** (`0.3.0`…) for
 features and **patch** (`0.2.7`…) for fixes; `1.0.0` is reserved for the first
 "official/stable" release. `manifest.json` is the source of truth for the version
-(the Home page badge reads it from there); keep `package.json` in sync.
+(the popup's version tag reads it from there); keep `package.json` in sync.
 
 ## Principles
 
@@ -147,8 +149,9 @@ first place to look.
 Everything automated lives in `.github/workflows/`:
 
 - **CI** (`ci.yml`): once per change (pushes to `main`, and every PR whatever its
-  base), runs the unit tests, the Prettier check, the dashboard UI test, builds the
-  store zips through Firefox's store linter, and checks the workflow files themselves.
+  base), runs the unit tests, the Prettier check, the UI smoke test (the dashboard, the
+  popup and the basic page), builds the store zips through Firefox's store linter, and
+  checks the workflow files themselves.
   A new commit on a PR cancels its older run. A PR that only touches Markdown, `docs/`,
   `site/` or issue templates skips the UI test and the zips (the `test` check still
   reports). Tells #ops on Discord when `main` goes red.
@@ -157,7 +160,8 @@ Everything automated lives in `.github/workflows/`:
   `npm test` (a few seconds; the UI test stays in CI). In an emergency,
   `git push --no-verify` skips it.
 - **Pages** (`pages.yml`): deploys the website in `site/` to Cloudflare when it changes
-  on `main`, and once a day to refresh the exchange rates.
+  on `main`, after each Publish to stores run, and every 3 hours (hourly while a store
+  has a version in review) to refresh the store versions and exchange rates.
 - **Release** (`release.yml`): a pushed `v*` tag builds the Chrome and Firefox zips,
   publishes a GitHub Release with that version's CHANGELOG notes, and starts Publish to
   stores for it.
@@ -166,7 +170,7 @@ Everything automated lives in `.github/workflows/`:
   tag's commit, and nothing uploads until the owner approves the `stores` environment.
   A dry run checks it on PRs that touch publishing. See [docs/STORE.md](docs/STORE.md).
 - **Ship catalog** (`ship-catalog.yml`): weekly refresh of `src/data/ship-catalog.json`,
-  committed to `main` only when it changed.
+  opened as a PR from the `bot/ship-catalog` branch only when it changed.
 - **RSI canary** (`canary.yml`): once a day, runs the real parsers on RSI's public pages
   and tells #ops if something changed. See [docs/RSI-CHANGES.md](docs/RSI-CHANGES.md).
 
