@@ -224,7 +224,8 @@
     const state = got[AL.STATE_KEY];
     alerts = {
       on,
-      items: on && Array.isArray(state?.items) ? state.items : [],
+      // Not the ones deleted here (#701, the bell's × and Clear All).
+      items: on ? AL.shown(state) : [],
       connected: !!got.siteLink?.token,
       feeds: AL.sitesOf(got.siteUrl).feeds,
     };

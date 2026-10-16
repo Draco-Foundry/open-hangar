@@ -6477,6 +6477,113 @@ try {
     ? ok('an alert opens that item on our Store')
     : fail(`alert row went to ${alRow}`);
   await page.removeScriptToEvaluateOnNewDocument(alHook.identifier);
+  // 0, 1, 3 and 10 alerts (#699): up to three the list just shows; past three it scrolls
+  // in a fixed height (a tab stop, arrow keys scroll it), the rest of the view stays put.
+  const alCount = async (n) => {
+    const items = Array.from({ length: n }, (_, i) => ({
+      ...alState.alerts.items[i % 3],
+      id: `sku-${30000 + i}`,
+    }));
+    const st = { ...alState, popupPrefs: { tab: 'settings' }, alerts: { ...alState.alerts, items } };
+    const hook = await page.evaluateOnNewDocument((s) => (window.__demoAlerts = s), st);
+    await page.goto('about:blank');
+    await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
+    await page.removeScriptToEvaluateOnNewDocument(hook.identifier);
+    await page.click('#pp-bell');
+    await page.waitForSelector('#pp-open-store');
+    const box = await page.evaluate(() => {
+      const b = document.getElementById('pp-ascroll');
+      return {
+        rows: document.querySelectorAll('#pp-alerts .pp-arow').length,
+        none: !!document.querySelector('#pp-alerts > .pp-note'),
+        many: !!b?.classList.contains('many'),
+        tab: b?.getAttribute('tabindex') ?? null,
+        h: b ? Math.round(b.getBoundingClientRect().height) : 0,
+        scrolls: !!b && b.scrollHeight > b.clientHeight,
+        rowH: Math.round(
+          document.querySelector('#pp-alerts .pp-arow')?.getBoundingClientRect().height || 0,
+        ),
+        store: Math.round(document.getElementById('pp-open-store').getBoundingClientRect().bottom),
+        wide: document.documentElement.scrollWidth > 360,
+      };
+    });
+    if (box.many) {
+      await page.focus('#pp-ascroll');
+      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('ArrowDown');
+      await sleep(200);
+      box.keys = await page.$eval('#pp-ascroll', (b) => b.scrollTop > 0);
+    }
+    return box;
+  };
+  const counts = {};
+  for (const n of [0, 1, 3, 10]) counts[n] = await alCount(n);
+  counts[0].none &&
+  !counts[0].rows &&
+  [1, 3].every((n) => counts[n].rows === n && !counts[n].many && !counts[n].scrolls) &&
+  counts[10].rows === 10 &&
+  counts[10].many &&
+  counts[10].tab === '0' &&
+  counts[10].scrolls &&
+  counts[10].keys &&
+  counts[10].h <= 168 &&
+  counts[10].store <= 600 &&
+  counts[1].rowH <= 44 &&
+  Object.values(counts).every((c) => !c.wide)
+    ? ok(
+        `alerts 0, 1, 3, 10: past three the list scrolls (${counts[10].h} px, arrow keys), rows ${counts[1].rowH} px`,
+      )
+    : fail(`popup alerts count: ${JSON.stringify(counts)}`);
+  // Deleting (#701): a row's × (named for screen readers) takes that one out, focus on the
+  // next ×; Clear All empties the list; both stay gone in the next popup.
+  const alDel = await page.evaluate(async () => {
+    const del = document.querySelector('#pp-alerts .pp-adel');
+    const label = del.getAttribute('aria-label');
+    const id = del.dataset.id;
+    del.click();
+    await new Promise((r) => setTimeout(r, 400));
+    return {
+      label,
+      sent: __demo.sent.some((m) => m?.ohPopup === 'alerts-hide' && m.id === id),
+      gone: !document.querySelector(`#pp-alerts .pp-adel[data-id="${id}"]`),
+      rows: document.querySelectorAll('#pp-alerts .pp-arow').length,
+      focus: document.activeElement?.classList.contains('pp-adel'),
+    };
+  });
+  await page.click('#pp-alerts-clear');
+  await sleep(400);
+  const alCleared = await page.evaluate(() => ({
+    rows: document.querySelectorAll('#pp-alerts .pp-arow').length,
+    none: !!document.querySelector('#pp-alerts > .pp-note'),
+    focus: document.activeElement?.id,
+  }));
+  const alKept = await page.evaluate(async () => (await chrome.storage.local.get('alerts')).alerts);
+  const alHook2 = await page.evaluateOnNewDocument(
+    (s) => (window.__demoAlerts = s),
+    { ...alState, popupPrefs: { tab: 'settings' }, alerts: alKept },
+  );
+  await page.goto('about:blank');
+  await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
+  await page.removeScriptToEvaluateOnNewDocument(alHook2.identifier);
+  await page.waitForSelector('#pp-bell');
+  const alAgain = await page.evaluate(() => ({
+    n: document.querySelector('#pp-bell .pp-n')?.textContent || '',
+  }));
+  await page.click('#pp-bell');
+  await page.waitForSelector('#pp-open-store');
+  alAgain.rows = await page.$$eval('#pp-alerts .pp-arow', (r) => r.length);
+  /^Delete .+/.test(alDel.label) &&
+  alDel.sent &&
+  alDel.gone &&
+  alDel.rows === 9 &&
+  alDel.focus &&
+  !alCleared.rows &&
+  alCleared.none &&
+  alCleared.focus === 'pp-open-store' &&
+  !alAgain.n &&
+  !alAgain.rows
+    ? ok('alerts: × deletes one (focus on the next), Clear All empties the list, both stay gone')
+    : fail(`popup alerts delete: ${JSON.stringify({ alDel, alCleared, alAgain })}`);
   // Alerts on with nothing that's news for your ships: Fleet News says so, and All Alerts
   // still opens the rest.
   const quiet = {
