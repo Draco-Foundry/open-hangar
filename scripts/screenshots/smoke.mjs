@@ -6477,6 +6477,63 @@ try {
     ? ok('an alert opens that item on our Store')
     : fail(`alert row went to ${alRow}`);
   await page.removeScriptToEvaluateOnNewDocument(alHook.identifier);
+  // 0, 1, 3 and 10 alerts (#699): up to three the list just shows; past three it scrolls
+  // in a fixed height (a tab stop, arrow keys scroll it), the rest of the view stays put.
+  const alCount = async (n) => {
+    const items = Array.from({ length: n }, (_, i) => ({
+      ...alState.alerts.items[i % 3],
+      id: `sku-${30000 + i}`,
+    }));
+    const st = { ...alState, popupPrefs: { tab: 'settings' }, alerts: { ...alState.alerts, items } };
+    const hook = await page.evaluateOnNewDocument((s) => (window.__demoAlerts = s), st);
+    await page.goto('about:blank');
+    await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
+    await page.removeScriptToEvaluateOnNewDocument(hook.identifier);
+    await page.click('#pp-bell');
+    await page.waitForSelector('#pp-open-store');
+    const box = await page.evaluate(() => {
+      const b = document.getElementById('pp-ascroll');
+      return {
+        rows: document.querySelectorAll('#pp-alerts .pp-arow').length,
+        none: !!document.querySelector('#pp-alerts > .pp-note'),
+        many: !!b?.classList.contains('many'),
+        tab: b?.getAttribute('tabindex') ?? null,
+        h: b ? Math.round(b.getBoundingClientRect().height) : 0,
+        scrolls: !!b && b.scrollHeight > b.clientHeight,
+        rowH: Math.round(
+          document.querySelector('#pp-alerts .pp-arow')?.getBoundingClientRect().height || 0,
+        ),
+        store: Math.round(document.getElementById('pp-open-store').getBoundingClientRect().bottom),
+        wide: document.documentElement.scrollWidth > 360,
+      };
+    });
+    if (box.many) {
+      await page.focus('#pp-ascroll');
+      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('ArrowDown');
+      await sleep(200);
+      box.keys = await page.$eval('#pp-ascroll', (b) => b.scrollTop > 0);
+    }
+    return box;
+  };
+  const counts = {};
+  for (const n of [0, 1, 3, 10]) counts[n] = await alCount(n);
+  counts[0].none &&
+  !counts[0].rows &&
+  [1, 3].every((n) => counts[n].rows === n && !counts[n].many && !counts[n].scrolls) &&
+  counts[10].rows === 10 &&
+  counts[10].many &&
+  counts[10].tab === '0' &&
+  counts[10].scrolls &&
+  counts[10].keys &&
+  counts[10].h <= 168 &&
+  counts[10].store <= 600 &&
+  counts[1].rowH <= 44 &&
+  Object.values(counts).every((c) => !c.wide)
+    ? ok(
+        `alerts 0, 1, 3, 10: past three the list scrolls (${counts[10].h} px, arrow keys), rows ${counts[1].rowH} px`,
+      )
+    : fail(`popup alerts count: ${JSON.stringify(counts)}`);
   // Alerts on with nothing that's news for your ships: Fleet News says so, and All Alerts
   // still opens the rest.
   const quiet = {

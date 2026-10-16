@@ -711,6 +711,40 @@ body {
 .pp-alist.old .pp-arow {
   opacity: 0.8;
 }
+/* The bell's list (#699): compact rows, the name and the why on one line each; past
+   three alerts it scrolls in a fixed height with a scroll bar that shows. */
+.pp-ascroll {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pp-ascroll.many {
+  max-height: 168px;
+  overflow-y: scroll;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted) transparent;
+  padding: 0 8px;
+  margin: 0 -8px;
+  border-radius: 8px;
+}
+.phone .pp-ascroll.many {
+  max-height: none;
+  overflow: visible;
+}
+.pp-ascroll.many:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.pp-alerts .pp-arow {
+  padding: 4px 8px;
+}
+.pp-alerts .pp-aname,
+.pp-alerts .pp-atext small {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .pp-wlist small.sale {
   color: var(--good);
 }
