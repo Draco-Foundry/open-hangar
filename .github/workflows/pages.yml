@@ -43,6 +43,7 @@ jobs:
   # always go.
   gate:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     outputs:
       go: ${{ steps.gate.outputs.go }}
     steps:
@@ -62,6 +63,7 @@ jobs:
     needs: gate
     if: needs.gate.outputs.go == 'yes'
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
