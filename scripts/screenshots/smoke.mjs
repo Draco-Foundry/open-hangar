@@ -4825,6 +4825,35 @@ try {
   !set.autoScan
     ? ok('Settings: every group, alerts off, the shortcut, no Auto Scan row until connected')
     : fail(`popup settings: ${JSON.stringify({ set, setMissing })}`);
+  // Compact (#700): Look, Currency and Shortcut on one row, the two alert switches on one
+  // row, nothing wrapping or sticking out at 360 px.
+  const setRows = await page.evaluate(() => {
+    const box = (el) => el.getBoundingClientRect();
+    const cells = [...document.querySelectorAll('#pp-prefs .pp-cell')].map(box);
+    const grp = box(document.getElementById('pp-prefs'));
+    const sw = ['pp-al-sw', 'pp-nt-sw'].map((id) => box(document.getElementById(id)));
+    const labels = [...document.querySelectorAll('#pp-prefs .pp-cell small, #pp-alert-set span')];
+    return {
+      cells: cells.length,
+      oneRow: cells.every((c) => Math.abs(c.top - cells[0].top) < 1),
+      inside: cells.every((c) => c.left >= grp.left && c.right <= grp.right + 0.5),
+      switches: Math.abs(sw[0].top - sw[1].top) < 1,
+      wraps: labels.filter((l) => l.getClientRects().length > 1 || box(l).height > 24).length,
+      heading: [...document.querySelectorAll('#pp-site b')].some(
+        (b) => b.textContent === 'openhangar.space',
+      ),
+      wide: document.documentElement.scrollWidth > 360,
+    };
+  });
+  setRows.cells === 3 &&
+  setRows.oneRow &&
+  setRows.inside &&
+  setRows.switches &&
+  !setRows.wraps &&
+  !setRows.heading &&
+  !setRows.wide
+    ? ok('Settings compact: Look, Currency and Shortcut on one row, both alert switches on one')
+    : fail(`popup settings compact: ${JSON.stringify(setRows)}`);
   await page.click('#pp-shortcut-change');
   const shortGo = await page.evaluate(() => __demo.opened.at(-1));
   shortGo === 'chrome://extensions/shortcuts'
