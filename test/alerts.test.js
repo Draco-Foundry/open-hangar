@@ -373,6 +373,54 @@ test("what's been seen: new pairs alert, a short gap doesn't, a day gone alerts 
   assert.equal(AL.unseen(one).length, ms.length - 1);
 });
 
+test('deleted (#701): out of the list and the badge, back only when something new matches', () => {
+  const feed = AL.readFeed(FEED);
+  const ms = AL.matchAll(feed, DB, null);
+  const a = AL.nextState(null, ms, NOW);
+  assert.equal(AL.shown(a.state).length, ms.length);
+  // One deleted: gone from the list and the badge, and it stays gone on the next checks.
+  const one = AL.hide(a.state, NOW, 'sku-11');
+  assert.ok(!AL.shown(one).some((m) => m.id === 'sku-11'));
+  assert.equal(AL.unseen(one).length, ms.length - 1);
+  const later = AL.nextState(one, ms, NOW + 30 * MIN);
+  assert.equal(later.fresh.length, 0);
+  assert.ok(!AL.shown(later.state).some((m) => m.id === 'sku-11'));
+  // Read back after a restart (stored as JSON): still gone.
+  const stored = JSON.parse(JSON.stringify(later.state));
+  assert.ok(!AL.shown(stored).some((m) => m.id === 'sku-11'));
+  // Clear All: nothing listed, nothing on the badge.
+  const all = AL.hide(later.state, NOW + HOUR);
+  assert.equal(AL.shown(all).length, 0);
+  assert.equal(AL.unseen(all).length, 0);
+  // A new reason for an item: it shows again.
+  const db = structuredClone(DB);
+  db.sources.hangar.items.push({
+    id: '9',
+    name: 'Sabre Raven EX',
+    contents: [ship('Sabre Raven EX')],
+  });
+  const more = AL.nextState(all, AL.matchAll(feed, db, null), NOW + 2 * HOUR);
+  assert.deepEqual(
+    AL.shown(more.state)
+      .map((m) => m.id)
+      .sort(),
+    ['sku-19700', 'sku-19701'],
+  );
+  // The same sale gone a day and back: it alerts and shows again.
+  const without = ms.filter((m) => m.id !== 'sku-11');
+  const gone = AL.nextState(all, without, NOW + 2 * HOUR);
+  const long = AL.nextState(gone.state, without, NOW + 2 * HOUR + AL.GONE_KEEP_MS);
+  const back = AL.nextState(long.state, ms, NOW + 30 * HOUR);
+  assert.deepEqual(
+    back.fresh.map((m) => m.id),
+    ['sku-11'],
+  );
+  assert.deepEqual(
+    AL.shown(back.state).map((m) => m.id),
+    ['sku-11'],
+  );
+});
+
 test('notifications: one each, three at most, then one for the rest', () => {
   const ms = AL.matchAll(AL.readFeed(FEED), DB, null);
   assert.equal(ms.length, 4);

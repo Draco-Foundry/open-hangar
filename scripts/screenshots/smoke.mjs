@@ -6534,6 +6534,56 @@ try {
         `alerts 0, 1, 3, 10: past three the list scrolls (${counts[10].h} px, arrow keys), rows ${counts[1].rowH} px`,
       )
     : fail(`popup alerts count: ${JSON.stringify(counts)}`);
+  // Deleting (#701): a row's × (named for screen readers) takes that one out, focus on the
+  // next ×; Clear All empties the list; both stay gone in the next popup.
+  const alDel = await page.evaluate(async () => {
+    const del = document.querySelector('#pp-alerts .pp-adel');
+    const label = del.getAttribute('aria-label');
+    const id = del.dataset.id;
+    del.click();
+    await new Promise((r) => setTimeout(r, 400));
+    return {
+      label,
+      sent: __demo.sent.some((m) => m?.ohPopup === 'alerts-hide' && m.id === id),
+      gone: !document.querySelector(`#pp-alerts .pp-adel[data-id="${id}"]`),
+      rows: document.querySelectorAll('#pp-alerts .pp-arow').length,
+      focus: document.activeElement?.classList.contains('pp-adel'),
+    };
+  });
+  await page.click('#pp-alerts-clear');
+  await sleep(400);
+  const alCleared = await page.evaluate(() => ({
+    rows: document.querySelectorAll('#pp-alerts .pp-arow').length,
+    none: !!document.querySelector('#pp-alerts > .pp-note'),
+    focus: document.activeElement?.id,
+  }));
+  const alKept = await page.evaluate(async () => (await chrome.storage.local.get('alerts')).alerts);
+  const alHook2 = await page.evaluateOnNewDocument(
+    (s) => (window.__demoAlerts = s),
+    { ...alState, popupPrefs: { tab: 'settings' }, alerts: alKept },
+  );
+  await page.goto('about:blank');
+  await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
+  await page.removeScriptToEvaluateOnNewDocument(alHook2.identifier);
+  await page.waitForSelector('#pp-bell');
+  const alAgain = await page.evaluate(() => ({
+    n: document.querySelector('#pp-bell .pp-n')?.textContent || '',
+  }));
+  await page.click('#pp-bell');
+  await page.waitForSelector('#pp-open-store');
+  alAgain.rows = await page.$$eval('#pp-alerts .pp-arow', (r) => r.length);
+  /^Delete .+/.test(alDel.label) &&
+  alDel.sent &&
+  alDel.gone &&
+  alDel.rows === 9 &&
+  alDel.focus &&
+  !alCleared.rows &&
+  alCleared.none &&
+  alCleared.focus === 'pp-open-store' &&
+  !alAgain.n &&
+  !alAgain.rows
+    ? ok('alerts: × deletes one (focus on the next), Clear All empties the list, both stay gone')
+    : fail(`popup alerts delete: ${JSON.stringify({ alDel, alCleared, alAgain })}`);
   // Alerts on with nothing that's news for your ships: Fleet News says so, and All Alerts
   // still opens the rest.
   const quiet = {

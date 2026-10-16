@@ -80,6 +80,13 @@ export async function setAlerts(on) {
 export function askNotify() {
   return chrome.permissions.request(NOTIFY).catch(() => false);
 }
+// An alert deleted in the bell's list (its id), or every one (null: Clear All). The
+// background writes it (src/background.js alerts-hide), as it does seen, and the badge
+// follows.
+export const hideAlert = (id) =>
+  chrome.runtime
+    .sendMessage(id ? { ohPopup: 'alerts-hide', id } : { ohPopup: 'alerts-hide' })
+    .catch(() => null);
 export const dropNotify = () => chrome.permissions.remove(NOTIFY).catch(() => false);
 export const notifyAllowed = () => chrome.permissions.contains(NOTIFY).catch(() => false);
 

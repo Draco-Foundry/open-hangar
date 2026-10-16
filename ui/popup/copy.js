@@ -90,6 +90,9 @@ const COPY = {
   'popup.open-store': 'Open the Store ↗', // our Store
   'popup.alerts-off-title': 'Store Alerts Are Off',
   'popup.alerts-turn-on': 'Turn On Alerts',
+  // Deleting alerts (#701): each row's ×, for screen readers, and the list's Clear All.
+  'popup.alerts-delete': 'Delete {name}', // NEW: needs the owner's OK
+  'popup.alerts-clear': 'Clear All', // NEW: needs the owner's OK
   // --- Wishlist tab ---
   'popup.wish-count': 'Your Wishlist · {n}',
   'popup.wish-on-sale': 'On Sale',
@@ -205,4 +208,4 @@ export function t(key, vars = {}) {
 }
 export const KEYS = Object.keys(COPY);
 // The words still waiting for the owner's OK (marked beside them above).
-export const NEW_WORDS = [];
+export const NEW_WORDS = ['popup.alerts-delete', 'popup.alerts-clear'];

@@ -738,6 +738,48 @@ body {
 }
 .pp-alerts .pp-arow {
   padding: 4px 8px;
+  min-width: 0;
+}
+/* Each alert's × (#701), and Clear All above the list. */
+.pp-ali {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.pp-ali .pp-arow {
+  margin-right: 0;
+  width: auto;
+  flex: 1;
+}
+.pp-adel {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.pp-adel:hover,
+.pp-adel:focus-visible {
+  background: var(--lift-2);
+  color: var(--head);
+}
+.phone .pp-adel {
+  width: 44px;
+  height: 44px;
+}
+.pp-atop {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: -6px;
+}
+.pp-atop .pp-link.quiet {
+  font-size: 12px;
 }
 .pp-alerts .pp-aname,
 .pp-alerts .pp-atext small {
