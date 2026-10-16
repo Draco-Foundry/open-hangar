@@ -287,41 +287,26 @@ test('add: one POST with only the item, and the website’s copy of it goes firs
   assert.doesNotMatch(init.body, /tok-1/, 'the token only in its header');
 });
 
-test('remove and save: only which item, and the target price (never the insurance)', async () => {
+test('remove: only which item; no other change (the old Target Price save) is sent', async () => {
   const { writeWish } = await client();
   const titan = item('ship:avenger-titan', 'Avenger Titan', { insurance: 'lti' });
   const paint = item('sku:12', 'Ghost Paint', { insurance: null, category: 'paints' });
   const env = fakeEnv({ store: editing([titan, paint]) });
   env.answer = (url, init) => {
     const b = JSON.parse(init.body);
-    if (b.do === 'remove') return json({ ok: true, outcome: 'removed', key: b.key, on: false });
-    return json({
-      ok: true,
-      outcome: 'saved',
-      key: b.key,
-      on: true,
-      item: { ...titan, target: 15000 },
-    });
+    return json({ ok: true, outcome: 'removed', key: b.key, on: false });
   };
-  // Exactly v, do, key and target: the website keeps the stored insurance.
-  const saved = await writeWish(env, { do: 'save', key: titan.key, target: '150' });
-  assert.equal(saved.items[0].target, 15000);
-  assert.deepEqual(sentBody(env, 0), {
-    v: 1,
-    do: 'save',
-    key: 'ship:avenger-titan',
-    target: '150',
-  });
-  assert.deepEqual(Object.keys(sentBody(env, 0)), ['v', 'do', 'key', 'target']);
-  const removed = await writeWish(env, { do: 'remove', key: paint.key });
-  assert.deepEqual(sentBody(env, 1), { v: 1, do: 'remove', key: 'sku:12' });
+  const removed = await writeWish(env, { do: 'remove', key: paint.key, name: 'x' });
+  assert.deepEqual(sentBody(env, 0), { v: 1, do: 'remove', key: 'sku:12' });
   assert.deepEqual(
     removed.items.map((i) => i.key),
     ['ship:avenger-titan'],
   );
-  // A cleared target is null; extra fields a caller passes (an insurance too) never go.
-  await writeWish(env, { do: 'save', key: titan.key, target: null, insurance: 'lti', name: 'x' });
-  assert.deepEqual(sentBody(env, 2), { v: 1, do: 'save', key: 'ship:avenger-titan', target: null });
+  // A target price can't be sent: the save is refused before anything goes.
+  const saved = await writeWish(env, { do: 'save', key: titan.key, target: '150' });
+  assert.equal(saved.ok, false);
+  assert.equal(saved.error, 'refused');
+  assert.equal(env.asked.filter((a) => a.init?.method === 'POST').length, 1, 'nothing more sent');
 });
 
 test('one change at a time: a second click waits for the first', async () => {
@@ -405,7 +390,7 @@ test('a 404 on a change: the website stopped taking them, the list is read again
   assert.equal(env.asked.length, 2);
 });
 
-test('the website said no: the list is full, it was gone, a price it can’t take', async () => {
+test('the website said no: the list is full, or it was gone', async () => {
   const { writeWish } = await client();
   const env = fakeEnv({ store: editing([item('sku:1', 'A')]) });
   env.answer = () => json({ ok: false, outcome: 'limit', key: 'ship:x', on: false });
@@ -415,13 +400,10 @@ test('the website said no: the list is full, it was gone, a price it can’t tak
     full.items.map((i) => i.key),
     ['sku:1'],
   );
-  env.answer = () => json({ ok: false, outcome: 'bad-target', key: 'sku:1', on: true });
-  const bad = await writeWish(env, { do: 'save', key: 'sku:1', target: '1' });
-  assert.equal(bad.outcome, 'bad-target');
   env.answer = () => json({ ok: false, outcome: 'not-found', key: 'sku:1', on: false });
-  const gone = await writeWish(env, { do: 'save', key: 'sku:1', target: '1' });
+  const gone = await writeWish(env, { do: 'remove', key: 'sku:1' });
   assert.deepEqual(gone.items, [], 'an item the website no longer has leaves the copy');
-  assert.equal(env.asked.length, 3);
+  assert.equal(env.asked.length, 2);
 });
 
 test('taken with no copy of the item: the list is read again next time', async () => {

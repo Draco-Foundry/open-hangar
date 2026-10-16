@@ -69,7 +69,7 @@ YOUR WISHLIST
 While you're connected, the popup's Wishlist tab shows the Wishlist on your openhangar.space account and lets you change it.
 
 - Reading it: the extension reads your Wishlist from app.openhangar.space/api/v1/wishlist with its sync token, to show it in the popup and, with store alerts on, to match it (see Store Alerts). A copy stays in this browser.
-- Changing it: when you add an item, remove one or set a target price, the extension sends that one change to app.openhangar.space with its sync token: which item, and the target price if you set one. Nothing else is sent with it.
+- Changing it: when you add or remove an item, the extension sends that one change to app.openhangar.space with its sync token: just which item. Nothing else is sent with it.
 - Searching: finding items to add happens on your device. What you type isn't sent anywhere.
 - Disconnecting deletes the copy in this browser. Your Wishlist stays on your account.
 
