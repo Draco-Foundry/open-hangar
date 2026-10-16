@@ -113,6 +113,12 @@ const COPY = {
   'popup.wish-no-match': 'No matches.',
   // The ✕ beside an item, for screen readers.
   'popup.wish-remove': 'Remove {name}',
+  // Remind Me on each item (the website's wishlist_remind): the switch's text on and off,
+  // and its name for screen readers (on or off is read out on its own). Placeholders until
+  // Claude chat's words, approved by the owner, replace them.
+  'popup.wish-remind-on': '[Remind On]', // NEW: needs the owner's OK
+  'popup.wish-remind-off': '[Remind Off]', // NEW: needs the owner's OK
+  'popup.wish-remind': '[Remind Me About {name}]', // NEW: needs the owner's OK
   // The field for the price you're waiting for, in US dollars.
   // The website didn't take an add (it couldn't place the item, or the list is full).
   'popup.wish-not-added': "Couldn't add {name}.",
@@ -205,4 +211,4 @@ export function t(key, vars = {}) {
 }
 export const KEYS = Object.keys(COPY);
 // The words still waiting for the owner's OK (marked beside them above).
-export const NEW_WORDS = [];
+export const NEW_WORDS = ['popup.wish-remind-on', 'popup.wish-remind-off', 'popup.wish-remind'];
