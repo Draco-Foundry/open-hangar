@@ -486,6 +486,8 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
     'popup.scan-problem': 'basic.scan-problem',
     'popup.syncing': 'basic.syncing',
     'popup.firefox-no': 'basic.firefox-no',
+    'popup.update-ready': 'basic.update-ready',
+    'popup.update-reload': 'basic.update-reload',
     'popup.pilot-yes': 'basic.pilot-yes',
     'popup.pilot-no': 'basic.pilot-no',
     'popup.pilot-body': 'basic.pilot-body',
