@@ -225,7 +225,7 @@
                   role="switch"
                   aria-checked={item.remind ? 'true' : 'false'}
                   aria-label={t('popup.wish-remind', { name: item.name })}
-                  title={t(item.remind ? 'popup.wish-remind-on' : 'popup.wish-remind-off')}
+                  title={t('popup.wish-remind-label')}
                   disabled={busy}
                   onclick={() => remind(item)}><span class="pp-wsw-t" aria-hidden="true"></span></button
                 >

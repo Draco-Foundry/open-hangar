@@ -20,5 +20,6 @@ alerts skip that item.
 ## Done When
 
 - `npm test`, `npm run format:check`, `npm run test:ui`, build, `check:store`, Firefox lint pass.
-- Claude chat's words replace the placeholders (labels, privacy line in all three copies,
-  changelog), and this file is deleted before merge.
+- Claude chat's words applied (2026-10-16): labels, the privacy policy's two Wishlist
+  bullets in all three copies, the changelog. Last updated set on release day, and this
+  file deleted, before merge.
