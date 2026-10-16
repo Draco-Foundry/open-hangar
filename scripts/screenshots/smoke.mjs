@@ -5831,7 +5831,7 @@ try {
     wide: await page.evaluate(() => document.documentElement.scrollWidth > 360),
   };
   twoSwitches &&
-  remindBefore[0][0] === '[Remind Me About Avenger Titan]' &&
+  remindBefore[0][0] === 'Remind me about Avenger Titan' &&
   remindBefore.map((s) => s[1]).join() === 'true,false' &&
   remindAfter.states.map((s) => s[1]).join() === 'false,false' &&
   JSON.stringify(remindAfter.sent) ===

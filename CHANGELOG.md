@@ -4,6 +4,9 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- New: **Remind Me on each Wishlist item.** With it off, store alerts skip that item. The website's Wishlist has the same switch.
+- Changed: **Privacy policy updated.** The Wishlist lines cover the Remind Me switch and no longer mention target prices.
+
 ## 0.4.1 — 2026-10-14
 
 - Changed: **No Target Price on Wishlist items.** Ships go on sale or they don't, so there's no price to wait for.
