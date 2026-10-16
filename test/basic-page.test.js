@@ -335,3 +335,21 @@ test("the pledges total line, in the owner's words (2026-10-12)", async () => {
     '1,200 pledges, $0.00 melt (0 with melt listed)',
   );
 });
+
+// Connect done (#692): the tab goes on to the website's My Hangar, the popup's Open My
+// Hangar address, only when it was opened for Connect and nothing holds it here.
+test('after Connect: on to My Hangar, unless a scan or a message keeps the page', async () => {
+  const { afterConnect } = await import('../ui/basic/after-connect.js');
+  const base = {
+    forConnect: true,
+    scanning: false,
+    msg: '',
+    siteUrl: 'https://app.openhangar.space',
+    linked: true,
+  };
+  assert.equal(afterConnect(base), 'https://app.openhangar.space/hangar');
+  assert.equal(afterConnect({ ...base, forConnect: false }), null, 'opened for something else');
+  assert.equal(afterConnect({ ...base, scanning: true }), null, 'a scan runs in this tab');
+  assert.equal(afterConnect({ ...base, msg: 'Firefox said no' }), null, 'a message to read');
+  assert.equal(afterConnect({ ...base, linked: false }), null, 'not linked after all');
+});
