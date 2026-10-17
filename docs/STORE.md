@@ -1,12 +1,12 @@
 # Store Launch Checklist & Listing
 
-> **Submission status (2026-10-14):**
+> **Submission status (2026-10-17):**
 >
-> | Store            | Status                                                                                                                                                                                              | IDs / links                                                                                                                                                      |
-> | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-> | Chrome Web Store | **live** v0.3.0; **v0.4.1 in review** (submitted 2026-10-14; the 0.3.1 and 0.4.0 reviews were cancelled for it; category Games, official URL openhangar.space) (publisher `[email removed]`) | item `aeabioadfphghjennmdbnpelojlhndjl` · [listing](https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl)                       |
-> | Firefox AMO      | **live** v0.4.0; v0.4.1 submitted 2026-10-14 (AMO license field All Rights Reserved (repo LICENSE: PolyForm Strict 1.0.0))                                                                          | [listing](https://addons.mozilla.org/en-US/firefox/addon/open-hangar/) · gecko id `open-hangar@draco-foundry`                                                    |
-> | Microsoft Edge   | **live** v0.2.19; **v0.4.1 in review** (submitted 2026-10-14; the 0.3.0 and 0.4.0 reviews were cancelled; category Entertainment, listing English only)                                             | [listing](https://microsoftedge.microsoft.com/addons/detail/fmcnemfepnifokjelgjacgdhoodaiicl) · CRX `fmcnemfepnifokjelgjacgdhoodaiicl` · Store ID `[id removed]` |
+> | Store            | Status                                                                                                                                         | IDs / links                                                                                                                                                      |
+> | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+> | Chrome Web Store | **live** v0.4.1 (category Games, official URL openhangar.space) (publisher `[email removed]`)                                           | item `aeabioadfphghjennmdbnpelojlhndjl` · [listing](https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl)                       |
+> | Firefox AMO      | **live** v0.4.1 (AMO license field: Other, PolyForm Strict License 1.0.0, same as the repo LICENSE; privacy policy box: the 2026-10-14 policy) | [listing](https://addons.mozilla.org/en-US/firefox/addon/open-hangar/) · gecko id `open-hangar@draco-foundry`                                                    |
+> | Microsoft Edge   | **live** v0.4.1 (category Entertainment, listing English only)                                                                                 | [listing](https://microsoftedge.microsoft.com/addons/detail/fmcnemfepnifokjelgjacgdhoodaiicl) · CRX `fmcnemfepnifokjelgjacgdhoodaiicl` · Store ID `[id removed]` |
 >
 > When each goes live, set that button's `data-status="live"` and `data-url` in
 > `site/index.html`; the "in review" line disappears once none are pending.
@@ -232,6 +232,12 @@ bullet above to this one:
    (Review deployments). It uploads and submits for review; each store still reviews
    before it goes live. To publish one store or retry, run **Actions → Publish to
    stores → Run workflow** by hand with the tag and a store.
+3. **AMO's Privacy Policy box is a separate copy.** AMO keeps its own copy of the policy
+   text, so a release alone leaves it stale. When `docs/PRIVACY.md` changes, run
+   `npm run privacy:plain` and, in the AMO Developer Hub (Manage Authors & License),
+   the owner pastes `docs/store-assets/privacy-amo.md` into the Privacy Policy box. It is
+   the policy in AMO's Markdown: no title, headings as bold lines, section links as text,
+   the same words.
 
 Picking a single store whose secrets aren't set skips it; picking **all** fails
 instead, so Discord never announces a store that got nothing. See Store Keys below for
