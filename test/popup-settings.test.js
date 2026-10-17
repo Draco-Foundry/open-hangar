@@ -303,3 +303,34 @@ test('JSON Backup, Pledges CSV and Buy-Backs CSV save what this browser keeps', 
     globalThis.OH = was.OH;
   }
 });
+
+// --- Notifications ---------------------------------------------------------------------
+
+// The ask is the click's first step everywhere; on Firefox the popup then closes, since
+// Firefox's question sits under it (#694). Chrome and Edge keep the popup open.
+test('Notifications: asked first, and only Firefox closes the popup for the question', async () => {
+  const was = { chrome: global.chrome, window: global.window };
+  const A = await import('../ui/popup/actions.js');
+  const run = async (gecko) => {
+    const steps = [];
+    global.chrome = {
+      runtime: { getManifest: () => (gecko ? { browser_specific_settings: { gecko } } : {}) },
+      permissions: {
+        request: async (p) => (steps.push('ask:' + p.permissions.join()), true),
+      },
+    };
+    global.window = { close: () => steps.push('close') };
+    const asked = A.askNotify();
+    steps.push('returned');
+    assert.equal(await asked, true);
+    await new Promise((r) => setTimeout(r, 5));
+    return steps;
+  };
+  try {
+    assert.deepEqual(await run({ id: 'x' }), ['ask:notifications', 'returned', 'close']);
+    assert.deepEqual(await run(null), ['ask:notifications', 'returned']);
+  } finally {
+    global.chrome = was.chrome;
+    global.window = was.window;
+  }
+});
