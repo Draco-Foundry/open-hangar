@@ -26,6 +26,10 @@ const COPY = {
   'popup.new-in': 'New in {version}',
   'popup.what-changed': 'See What Changed ↗',
   'popup.got-it': 'Got It',
+  // A new version the browser holds until it's let in (src/background.js updateReady):
+  // the basic page's words (basic.update-ready, basic.update-reload), word for word.
+  'popup.update-ready': 'Open Hangar {version} is ready.',
+  'popup.update-reload': 'Reload to Update',
   // --- Tabs ---
   // The tab row's name for screen readers: the basic page's (basic.tabs), word for word.
   'popup.tabs': 'Hangar sections',

@@ -58,6 +58,11 @@
   let link = $state(null); // the openhangar.space link, when sync is on
   let pilotDone = $state(false); // the scan's sync question, answered here
   let justUpdated = $state(null);
+  // At the top of every tab, as on the basic page: a new version waiting to be let in
+  // (local updateReady, src/background.js) and the kill switch's banner (status.json's,
+  // OH.getRemoteStatus: the copy main.js refreshes, so nothing more is asked).
+  let updateReady = $state(null);
+  let banner = $state(null);
   let prefs = $state(cleanPrefs());
   let session = $state({});
   let rsiOff = $state(false); // no access to robertsspaceindustries.com
@@ -146,6 +151,7 @@
         'avatarImg',
         'scanReport',
         'justUpdated',
+        'updateReady',
         'scanStarted',
         'autoScan',
         'autoScanOn',
@@ -157,6 +163,7 @@
     db = stored;
     account = got.account || null;
     justUpdated = got.justUpdated || null;
+    updateReady = got.updateReady || null;
     started = got.scanStarted || null;
     auto = { on: got.autoScanOn === true, rec: got.autoScan || null };
     link = siteLink || null;
@@ -237,6 +244,13 @@
       if (fresh.size) chrome.runtime.sendMessage({ ohPopup: 'alerts-seen' }).catch(() => {});
     }
   }
+  const readBanner = () =>
+    OH.getRemoteStatus()
+      .then((st) => (banner = st?.banner || null))
+      .catch(() => {});
+  // Reload to Update, as the basic page's: the browser lets the new version in (the
+  // popup closes with it). Not while a scan runs: the background lets it in after.
+  const reloadForUpdate = () => chrome.runtime.reload();
   const readAccess = async () => (rsiOff = !(await rsiAccess()));
   const accessChanged = async () => {
     await readAccess();
@@ -255,7 +269,7 @@
     (async () => {
       prefs = await loadPrefs();
       applyLook(prefs.look);
-      await Promise.all([loadData(), loadSession(), loadAlerts(), readAccess()]);
+      await Promise.all([loadData(), loadSession(), loadAlerts(), readAccess(), readBanner()]);
       await readCookie();
       const unseenNews = news.filter((m) => fresh.has(m.id)).length;
       tab = v?.scannedAt == null ? 'hangar' : openingTab(prefs.tab, unseenNews);
@@ -274,6 +288,8 @@
             rec: c.autoScan ? c.autoScan.newValue || null : auto.rec,
           };
         if (c.justUpdated) justUpdated = c.justUpdated.newValue || null;
+        if (c.updateReady) updateReady = c.updateReady.newValue || null;
+        if (c.remoteStatus) readBanner();
         if (ALERTS && (c[AL.ON_KEY] || c[AL.STATE_KEY] || c.siteLink)) loadAlerts();
       }
       if (area === 'session') {
@@ -453,6 +469,20 @@
           >
           <button type="button" class="pp-link quiet" id="pp-got-it" onclick={gotIt}>{t('popup.got-it')}</button>
         </span>
+      </div>
+    {/if}
+
+    {#if updateReady}
+      <div class="pp-notice" id="pp-update" role="status">
+        <span>{t('popup.update-ready', { version: updateReady })}</span>
+        <button type="button" class="pp-link" id="pp-update-reload" disabled={busy} onclick={reloadForUpdate}
+          >{t('popup.update-reload')}</button
+        >
+      </div>
+    {/if}
+    {#if banner}
+      <div class="pp-notice" class:warn={banner.level === 'warn'} id="pp-banner" role="status">
+        {banner.message}
       </div>
     {/if}
 
