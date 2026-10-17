@@ -14,6 +14,9 @@
   const price = (n) => money(n, fx, { most: Number.isInteger(n) ? 0 : 2 });
   const newOnes = $derived(alerts.items.filter((m) => fresh.has(m.id)));
   const earlier = $derived(alerts.items.filter((m) => !fresh.has(m.id)));
+  // Past three, the list scrolls in a fixed height so the rest stays put (#699): the box
+  // takes a tab stop then, so arrow keys scroll it.
+  const many = $derived(alerts.items.length > 3);
   let busy = $state(false);
   async function turnOn() {
     busy = true;
@@ -23,12 +26,13 @@
 </script>
 
 {#snippet row(m, isNew)}
+  {@const why = AL.lines(m).join(' · ')}
   <li>
     <button type="button" class="pp-arow" class:fresh={isNew} onclick={() => openTab(AL.itemUrl(alerts.feeds, m))}>
       <span class="pp-atext">
         {#if isNew}<span class="pp-sr">{t('popup.alerts-unseen')}</span>{/if}
-        <span class="pp-aname">{m.name}</span>
-        {#each AL.lines(m) as line}<small>{line}</small>{/each}
+        <span class="pp-aname" title={m.name}>{m.name}</span>
+        {#if why}<small title={why}>{why}</small>{/if}
       </span>
       {#if Number.isFinite(m.price)}{@const p = price(m.price)}<span class="pp-price" title={p.title || null}>{p.text}</span>{/if}
     </button>
@@ -50,17 +54,29 @@
     {#if !alerts.items.length}
       <p class="pp-note">{t('popup.alerts-none')}</p>
     {/if}
-    {#if newOnes.length}
-      <h2 class="pp-lbl">{t('popup.alerts-new')}</h2>
-      <ul class="pp-alist" id="pp-alist-new">
-        {#each newOnes as m (m.id)}{@render row(m, true)}{/each}
-      </ul>
-    {/if}
-    {#if earlier.length}
-      <h2 class="pp-lbl" class:sep={newOnes.length > 0}>{t('popup.alerts-earlier')}</h2>
-      <ul class="pp-alist old" id="pp-alist-old">
-        {#each earlier as m (m.id)}{@render row(m, false)}{/each}
-      </ul>
+    {#if alerts.items.length}
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <div
+        class="pp-ascroll"
+        class:many
+        id="pp-ascroll"
+        role="region"
+        aria-label={t('popup.bell')}
+        tabindex={many ? 0 : undefined}
+      >
+        {#if newOnes.length}
+          <h2 class="pp-lbl">{t('popup.alerts-new')}</h2>
+          <ul class="pp-alist" id="pp-alist-new">
+            {#each newOnes as m (m.id)}{@render row(m, true)}{/each}
+          </ul>
+        {/if}
+        {#if earlier.length}
+          <h2 class="pp-lbl" class:sep={newOnes.length > 0}>{t('popup.alerts-earlier')}</h2>
+          <ul class="pp-alist old" id="pp-alist-old">
+            {#each earlier as m (m.id)}{@render row(m, false)}{/each}
+          </ul>
+        {/if}
+      </div>
     {/if}
     {#if !alerts.connected}<p class="pp-note">{t('popup.alerts-connect')}</p>{/if}
     <button type="button" class="pp-btn" id="pp-open-store" onclick={() => openTab(`${alerts.feeds}/store`)}
