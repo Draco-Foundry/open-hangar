@@ -151,6 +151,29 @@ test('the popup open: every match seen, the badge back to the reminder', async (
   assert.equal(x.badges.at(-1), '');
 });
 
+test('deleted in the popup: one, then Clear All, the badge follows (#701)', async () => {
+  const x = worker({ answers: [json(FEED)] });
+  await x.chrome.storage.local.set({ alertsOn: true });
+  await until(() => x.stores.local.alerts && x.badges.includes('2'));
+  // Only the popup may.
+  assert.equal(
+    await fromPopup(x, { ohPopup: 'alerts-hide', id: 'sku-20' }, { tab: { id: 1 } }),
+    undefined,
+  );
+  const AL = require('../src/alerts.js');
+  const ids = AL.shown(x.stores.local.alerts).map((m) => m.id);
+  assert.equal(ids.length, 2);
+  assert.deepEqual(await fromPopup(x, { ohPopup: 'alerts-hide', id: ids[0] }), { ok: true });
+  assert.deepEqual(
+    AL.shown(x.stores.local.alerts).map((m) => m.id),
+    [ids[1]],
+  );
+  assert.equal(x.badges.at(-1), '1');
+  assert.deepEqual(await fromPopup(x, { ohPopup: 'alerts-hide' }), { ok: true });
+  assert.equal(AL.shown(x.stores.local.alerts).length, 0);
+  assert.equal(x.badges.at(-1), '');
+});
+
 test("a notification clicked: that item on our Store's page, seen", async () => {
   const x = worker({ answers: [json(FEED)] });
   await x.chrome.storage.local.set({ alertsOn: true });

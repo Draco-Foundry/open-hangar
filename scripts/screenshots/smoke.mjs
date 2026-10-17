@@ -4739,52 +4739,6 @@ try {
   !pop.wide
     ? ok('Edge B: the lifted panel, its ring and the cobalt bar, 360 px, no sideways scroll')
     : fail(`popup look: ${JSON.stringify(pop)}`);
-  // The basic page's notices at the top of every tab (#698, #664): status.json's banner
-  // (as plain text) and an update the browser holds, with Reload to Update; the version
-  // in the header is the manifest's.
-  const notices = async () => {
-    await told({
-      updateReady: { newValue: '9.9.9' },
-      remoteStatus: {
-        newValue: { at: await pageNow(), data: { banner: { message: '<b>RSI</b> changed.' } } },
-      },
-    });
-    const read = () =>
-      page.evaluate(() => ({
-        update: document.getElementById('pp-update')?.textContent.replace(/\s+/g, ' ').trim(),
-        reload: !!document.getElementById('pp-update-reload'),
-        banner: document.getElementById('pp-banner')?.textContent.trim(),
-        html: document.getElementById('pp-banner')?.innerHTML.includes('<b>'),
-        warn: !!document.getElementById('pp-banner')?.classList.contains('warn'),
-        ver: document.getElementById('pp-ver').textContent.trim(),
-        manifest: 'v' + chrome.runtime.getManifest().version,
-        wide: document.documentElement.scrollWidth > 360,
-      }));
-    const hangar = await read();
-    await page.click('#pp-tab-settings');
-    await sleep(150);
-    const settings = await read();
-    await page.click('#pp-tab-hangar');
-    // Let in, and the banner taken down (a fresh copy without one).
-    await told({ updateReady: {}, remoteStatus: { newValue: { at: await pageNow(), data: {} } } });
-    const gone = await page.evaluate(
-      () => !document.getElementById('pp-update') && !document.getElementById('pp-banner'),
-    );
-    return { hangar, settings, gone };
-  };
-  const nt = await notices();
-  [nt.hangar, nt.settings].every(
-    (n) =>
-      n.update === 'Open Hangar 9.9.9 is ready. Reload to Update' &&
-      n.reload &&
-      n.banner === '<b>RSI</b> changed.' &&
-      !n.html &&
-      n.warn &&
-      n.ver === n.manifest &&
-      !n.wide,
-  ) && nt.gone
-    ? ok('notices: update ready and the status banner on every tab, the version the manifest’s')
-    : fail(`popup notices: ${JSON.stringify(nt)}`);
   // The tab row: arrows move along and wrap, Home and End jump, the choice is kept.
   await page.focus('#pp-tab-hangar');
   const keyTo = async (key) => {
@@ -4871,35 +4825,6 @@ try {
   !set.autoScan
     ? ok('Settings: every group, alerts off, the shortcut, no Auto Scan row until connected')
     : fail(`popup settings: ${JSON.stringify({ set, setMissing })}`);
-  // Compact (#700): Look, Currency and Shortcut on one row, the two alert switches on one
-  // row, nothing wrapping or sticking out at 360 px.
-  const setRows = await page.evaluate(() => {
-    const box = (el) => el.getBoundingClientRect();
-    const cells = [...document.querySelectorAll('#pp-prefs .pp-cell')].map(box);
-    const grp = box(document.getElementById('pp-prefs'));
-    const sw = ['pp-al-sw', 'pp-nt-sw'].map((id) => box(document.getElementById(id)));
-    const labels = [...document.querySelectorAll('#pp-prefs .pp-cell small, #pp-alert-set span')];
-    return {
-      cells: cells.length,
-      oneRow: cells.every((c) => Math.abs(c.top - cells[0].top) < 1),
-      inside: cells.every((c) => c.left >= grp.left && c.right <= grp.right + 0.5),
-      switches: Math.abs(sw[0].top - sw[1].top) < 1,
-      wraps: labels.filter((l) => l.getClientRects().length > 1 || box(l).height > 24).length,
-      heading: [...document.querySelectorAll('#pp-site b')].some(
-        (b) => b.textContent === 'openhangar.space',
-      ),
-      wide: document.documentElement.scrollWidth > 360,
-    };
-  });
-  setRows.cells === 3 &&
-  setRows.oneRow &&
-  setRows.inside &&
-  setRows.switches &&
-  !setRows.wraps &&
-  !setRows.heading &&
-  !setRows.wide
-    ? ok('Settings compact: Look, Currency and Shortcut on one row, both alert switches on one')
-    : fail(`popup settings compact: ${JSON.stringify(setRows)}`);
   await page.click('#pp-shortcut-change');
   const shortGo = await page.evaluate(() => __demo.opened.at(-1));
   shortGo === 'chrome://extensions/shortcuts'
@@ -5818,9 +5743,7 @@ try {
   wishDone.rows.join() === 'Upgrade to Freelancer,Zeus Mk II CL,Cutlass - Ghoulish Green Paint' &&
   wishDone.kept?.join() === 'ccu:16,ship:zeus-mk-ii-cl,sku:501' &&
   !wishDone.wide
-    ? ok(
-        'Wishlist editing: search here, add, Remove, no Target Price; one POST each, only the change',
-      )
+    ? ok('Wishlist editing: search here, add, Remove, no Target Price; one POST each, only the change')
     : fail(`popup wishlist editing: ${JSON.stringify({ ppEd, ppFound, afterAdd, wishDone })}`);
   // A Remove that doesn't go through (the website down, no Retry-After the popup can
   // read): the item stays, the note says so, and the next change waits the website's
@@ -6611,6 +6534,56 @@ try {
         `alerts 0, 1, 3, 10: past three the list scrolls (${counts[10].h} px, arrow keys), rows ${counts[1].rowH} px`,
       )
     : fail(`popup alerts count: ${JSON.stringify(counts)}`);
+  // Deleting (#701): a row's × (named for screen readers) takes that one out, focus on the
+  // next ×; Clear All empties the list; both stay gone in the next popup.
+  const alDel = await page.evaluate(async () => {
+    const del = document.querySelector('#pp-alerts .pp-adel');
+    const label = del.getAttribute('aria-label');
+    const id = del.dataset.id;
+    del.click();
+    await new Promise((r) => setTimeout(r, 400));
+    return {
+      label,
+      sent: __demo.sent.some((m) => m?.ohPopup === 'alerts-hide' && m.id === id),
+      gone: !document.querySelector(`#pp-alerts .pp-adel[data-id="${id}"]`),
+      rows: document.querySelectorAll('#pp-alerts .pp-arow').length,
+      focus: document.activeElement?.classList.contains('pp-adel'),
+    };
+  });
+  await page.click('#pp-alerts-clear');
+  await sleep(400);
+  const alCleared = await page.evaluate(() => ({
+    rows: document.querySelectorAll('#pp-alerts .pp-arow').length,
+    none: !!document.querySelector('#pp-alerts > .pp-note'),
+    focus: document.activeElement?.id,
+  }));
+  const alKept = await page.evaluate(async () => (await chrome.storage.local.get('alerts')).alerts);
+  const alHook2 = await page.evaluateOnNewDocument(
+    (s) => (window.__demoAlerts = s),
+    { ...alState, popupPrefs: { tab: 'settings' }, alerts: alKept },
+  );
+  await page.goto('about:blank');
+  await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
+  await page.removeScriptToEvaluateOnNewDocument(alHook2.identifier);
+  await page.waitForSelector('#pp-bell');
+  const alAgain = await page.evaluate(() => ({
+    n: document.querySelector('#pp-bell .pp-n')?.textContent || '',
+  }));
+  await page.click('#pp-bell');
+  await page.waitForSelector('#pp-open-store');
+  alAgain.rows = await page.$$eval('#pp-alerts .pp-arow', (r) => r.length);
+  /^Delete .+/.test(alDel.label) &&
+  alDel.sent &&
+  alDel.gone &&
+  alDel.rows === 9 &&
+  alDel.focus &&
+  !alCleared.rows &&
+  alCleared.none &&
+  alCleared.focus === 'pp-open-store' &&
+  !alAgain.n &&
+  !alAgain.rows
+    ? ok('alerts: × deletes one (focus on the next), Clear All empties the list, both stay gone')
+    : fail(`popup alerts delete: ${JSON.stringify({ alDel, alCleared, alAgain })}`);
   // Alerts on with nothing that's news for your ships: Fleet News says so, and All Alerts
   // still opens the rest.
   const quiet = {

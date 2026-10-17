@@ -94,6 +94,10 @@ const COPY = {
   'popup.open-store': 'Open the Store ↗', // our Store
   'popup.alerts-off-title': 'Store Alerts Are Off',
   'popup.alerts-turn-on': 'Turn On Alerts',
+  // Deleting alerts (#701): each row's ×, for screen readers, and the list's Clear All
+  // (approved 2026-10-16).
+  'popup.alerts-delete': 'Delete {name}',
+  'popup.alerts-clear': 'Clear All',
   // --- Wishlist tab ---
   'popup.wish-count': 'Your Wishlist · {n}',
   'popup.wish-on-sale': 'On Sale',

@@ -132,8 +132,8 @@ const BUDGET = {
   // Extension Alerts (src/alerts.js, the `alerts` build flag).
   alertsOn: small('the switch'),
   alerts: {
-    cap: 'MATCH_MAX 200 matches; PAIRS_MAX 2,000 newest pairs in each of known, seen, gone',
-    max: 400 * KB,
+    cap: 'MATCH_MAX 200 matches; PAIRS_MAX 2,000 newest pairs in each of known, seen, gone, hidden',
+    max: 500 * KB,
   },
   alertsFeed: {
     cap: 'one sale feed (FEED_ITEMS_MAX 2,000 items, FEED_SHIPS_MAX 1,000 ships), replaced whole',
@@ -378,6 +378,7 @@ async function fillWorstCase() {
         known: pairs('paint'),
         seen: pairs('paint'),
         gone: pairs('warbond'),
+        hidden: pairs('limited'),
       };
     })(),
     alertsWish: {

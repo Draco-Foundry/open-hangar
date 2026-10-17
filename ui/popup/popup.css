@@ -207,24 +207,6 @@ body {
 .pp-whatsnew b {
   font-weight: 600;
 }
-/* The basic page's notices at the top of every tab: an update ready, status.json's banner. */
-.pp-notice {
-  margin: 0 16px 10px;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent-line);
-  border-radius: 10px;
-  padding: 9px 12px;
-  font-size: 13px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 12px;
-  text-wrap: pretty;
-}
-.pp-notice.warn {
-  background: var(--warn-soft);
-  border-color: var(--warn-line);
-}
 
 /* --- Tabs --- */
 .pp-tabs {
@@ -756,6 +738,48 @@ body {
 }
 .pp-alerts .pp-arow {
   padding: 4px 8px;
+  min-width: 0;
+}
+/* Each alert's × (#701), and Clear All above the list. */
+.pp-ali {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.pp-ali .pp-arow {
+  margin-right: 0;
+  width: auto;
+  flex: 1;
+}
+.pp-adel {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.pp-adel:hover,
+.pp-adel:focus-visible {
+  background: var(--lift-2);
+  color: var(--head);
+}
+.phone .pp-adel {
+  width: 44px;
+  height: 44px;
+}
+.pp-atop {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: -6px;
+}
+.pp-atop .pp-link.quiet {
+  font-size: 12px;
 }
 .pp-alerts .pp-aname,
 .pp-alerts .pp-atext small {
@@ -926,45 +950,6 @@ body {
 .pp-grow {
   flex: 1;
   min-width: 0;
-}
-/* Two switches on one row, and Look, Currency and Shortcut side by side (#700). */
-.pp-two .pp-gap {
-  margin-left: 6px;
-  padding-left: 12px;
-  border-left: 1px solid var(--line);
-}
-.pp-trio {
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.8fr) minmax(0, 1.25fr);
-  align-items: start;
-  gap: 10px;
-}
-.pp-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-}
-.pp-cell small {
-  font-size: 12px;
-  color: var(--muted);
-  white-space: nowrap;
-}
-.pp-cell small .pp-link {
-  font-size: 12px;
-  margin-left: 4px;
-}
-.pp-cell .pp-sel {
-  text-align: left;
-  max-width: 100%;
-  padding: 0;
-  color: var(--text);
-}
-.pp-cval {
-  font-size: 13px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .pp-val {
   margin-left: auto;
