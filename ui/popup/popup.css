@@ -927,6 +927,45 @@ body {
   flex: 1;
   min-width: 0;
 }
+/* Two switches on one row, and Look, Currency and Shortcut side by side (#700). */
+.pp-two .pp-gap {
+  margin-left: 6px;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
+.pp-trio {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.8fr) minmax(0, 1.25fr);
+  align-items: start;
+  gap: 10px;
+}
+.pp-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.pp-cell small {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.pp-cell small .pp-link {
+  font-size: 12px;
+  margin-left: 4px;
+}
+.pp-cell .pp-sel {
+  text-align: left;
+  max-width: 100%;
+  padding: 0;
+  color: var(--text);
+}
+.pp-cval {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .pp-val {
   margin-left: auto;
   font-size: 13px;
