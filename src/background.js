@@ -352,9 +352,10 @@ siteHandlers['oh-link-check'] = async (msg, origin) => {
 // page through the window (src/site-bridge.js), where any script on that page could
 // read it: the hangar page's strict script policy (no script but its own) is what
 // keeps it there.
-// A scan-running marker older than this is a page that went away mid-scan
-// (src/dashboard.js scanMark refreshes it every minute while a scan runs).
-const SCAN_RUN_MAX = 10 * 60e3;
+// A scan-running marker older than this is a scan that stopped: its page went away
+// mid-scan, or it hung. It's the scan's heartbeat: renewed every 30 seconds while the
+// scan reads (ui/scan/runner.js MARK_GAP, src/dashboard.js scanMark).
+const SCAN_RUN_MAX = 2 * 60e3;
 // One scan request a minute at most, and none while a scan runs.
 const SCAN_ASK_GAP = 60e3;
 let scanAskedAt = 0;
@@ -395,8 +396,8 @@ async function dashboardTab(hash = '') {
 // A scan running in a dashboard or the hidden scan page right now (its scanRunning
 // mark), or one asked for in the last minute that its page hasn't started yet (it takes
 // the request once the scan has begun, or drops it). A mark counts only while its tab
-// or hidden page is still open, as far as this browser can tell, and for 10 minutes at
-// most.
+// or hidden page is still open, as far as this browser can tell, and while its heartbeat
+// is under 2 minutes old.
 const hiddenBy = (by) => by === 'offscreen' || by === 'frame';
 async function scanRunning() {
   const { scanRunning: mark, scanRequest: asked } = await chrome.storage.session.get([
@@ -410,6 +411,46 @@ async function scanRunning() {
   const tabs = await dashboardTabs();
   return !tabs || !Number.isInteger(mark.tabId) || tabs.some((c) => c.tabId === mark.tabId);
 }
+// A scan that stopped, from what it left: its mark and progress, quiet for 2 minutes.
+// Cleared when this worker starts and when the popup opens, so nothing reads as
+// Scanning. A mark whose hidden page is still open stays for the hidden page's own
+// check (src/scan-host.js stuck), which closes it before the next scan. The last full
+// hangar is untouched (a part is saved only once it's read whole), and the scan's start
+// (local scanStarted) stays, for the popup's line.
+async function clearQuietScan() {
+  const s = await chrome.storage.session.get(['scanRunning', 'scanProgress']);
+  const now = Date.now();
+  const quiet = (x) =>
+    !!x && typeof x === 'object' && !(Number.isFinite(x.at) && now - x.at < SCAN_RUN_MAX);
+  const gone = [];
+  if (
+    quiet(s.scanRunning) &&
+    !(hiddenBy(s.scanRunning.by) && (await scanHost?.alive(s.scanRunning)))
+  )
+    gone.push('scanRunning');
+  if (quiet(s.scanProgress)) gone.push('scanProgress');
+  if (gone.length) await chrome.storage.session.remove(gone);
+}
+// A scan's start (local scanStarted { run, at }) that ended: a report (Scan's
+// scanReport) or Auto Scan Daily's record (autoScan) for that start or a later one, as
+// ui/popup/data.js scanState pairs them; here any Auto Scan Daily run after it counts
+// too (a quick check writes no start of its own).
+function scanEnded(started, { scanReport, autoScan }) {
+  const ends = (e) =>
+    !!e &&
+    typeof e === 'object' &&
+    ((Number.isFinite(e.startedAt) && e.startedAt >= started.at) ||
+      (e === autoScan && Number.isFinite(e.at) && e.at > started.at));
+  return ends(scanReport) || ends(autoScan);
+}
+// A scan that began and stopped: no end for its start, and nothing running.
+async function scanStopped(got) {
+  const s = got.scanStarted;
+  if (!s || typeof s !== 'object' || !Number.isFinite(s.at)) return false;
+  if (Date.now() - s.at < SCAN_RUN_MAX || scanEnded(s, got)) return false;
+  return !(await scanRunning());
+}
+clearQuietScan().catch(() => {});
 
 siteHandlers['oh-get-hangar'] = async () => {
   // Handing the hangar to a web page shares it, so Firefox asks first: the same yes
@@ -540,6 +581,16 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     })
     .then(reply, (err) => reply({ ok: false, error: String(err?.message || err) }));
   return true; // answers later
+});
+// The popup opened: a scan that stopped leaves nothing that reads as Scanning. No
+// answer (Auto Scan Daily hears it too, below).
+//   { ohPopup: 'opened' }
+chrome.runtime.onMessage.addListener((msg, sender) => {
+  if (!msg || typeof msg !== 'object' || msg.ohPopup !== 'opened') return false;
+  if (sender.id !== chrome.runtime.id || sender.tab) return false;
+  if (String(sender.url || '').split(/[?#]/)[0] !== chrome.runtime.getURL(POPUP)) return false;
+  clearQuietScan().catch(() => {});
+  return false;
 });
 // @flag-end connector
 
@@ -713,11 +764,15 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 // Skipped without asking RSI anything: a scan began under 20 hours ago (any scan) or its
 // own last run ended then, RSI asked it to back off, the browser is offline, or a scan is
 // running. A day missed while the browser was closed or the machine asleep runs once, 10
-// to 30 minutes after it's back (the alarm came late, or there's none left).
+// to 30 minutes after it's back (the alarm came late, or there's none left). A scan that
+// stopped (scanStopped) is no day's scan: a run of its own that stopped is tried once
+// more, on the next popup open (now) or browser start (10 to 30 minutes after), at most
+// once in 20 hours (local autoScanRetry, when it was).
 const AUTO_ALARM = 'oh-auto-scan';
 const AUTO_ON = 'autoScanOn';
 const AUTO_NEXT = 'autoScanNext';
 const AUTO_STATE = 'autoScan';
+const AUTO_RETRY = 'autoScanRetry';
 const AUTO_GAP = 20 * 3600e3;
 const AUTO_SPREAD = 8 * 3600e3;
 const AUTO_MAX_AHEAD = 28 * 3600e3;
@@ -772,7 +827,13 @@ async function autoWake() {
 // The alarm went off.
 async function autoFired(alarm) {
   const now = Date.now();
-  const got = await chrome.storage.local.get(['siteLink', AUTO_ON, AUTO_STATE, 'scanStarted']);
+  const got = await chrome.storage.local.get([
+    'siteLink',
+    AUTO_ON,
+    AUTO_STATE,
+    'scanStarted',
+    'scanReport',
+  ]);
   if (!got.siteLink?.token || got[AUTO_ON] !== true) return autoWake();
   // Late (the browser was closed, the machine asleep): once, a while from now.
   const due = Number.isFinite(alarm?.scheduledTime) ? alarm.scheduledTime : now;
@@ -784,10 +845,11 @@ async function autoFired(alarm) {
   // Skipped, asking RSI nothing and writing nothing: a scan began under 20 hours ago, or
   // Auto Scan Daily's last run ended then (a quick check writes no scanStarted, and
   // switching it off and on again would otherwise run it again in 10 to 30 minutes): the
-  // next run is 20 to 28 hours after it. Or RSI asked to wait, offline, or a scan is
-  // running.
+  // next run is 20 to 28 hours after it. A scan that stopped doesn't count. Or RSI asked
+  // to wait, offline, or a scan is running.
+  const began = (await scanStopped(got)) ? null : got.scanStarted?.at;
   const started = Math.max(
-    ...[got.scanStarted?.at, got[AUTO_STATE]?.ended].filter((t) => Number.isFinite(t) && t <= now),
+    ...[began, got[AUTO_STATE]?.ended].filter((t) => Number.isFinite(t) && t <= now),
   );
   if (Number.isFinite(started) && now - started < AUTO_GAP)
     return autoSchedule(Math.max(autoDaily(started), retry));
@@ -809,7 +871,42 @@ async function autoBackoff(rec) {
   await autoSchedule(retryAt + autoRand(AUTO_RETRY_SPREAD));
 }
 
+// A run of its own that stopped: once more (see the top), now (the popup opened) or soon
+// (the browser started). Not when it's off, RSI asked to wait, or a retry went in the
+// last 20 hours.
+async function autoRetry({ soon = false } = {}) {
+  const now = Date.now();
+  const got = await chrome.storage.local.get([
+    'siteLink',
+    AUTO_ON,
+    AUTO_STATE,
+    AUTO_RETRY,
+    'scanStarted',
+    'scanReport',
+  ]);
+  if (!got.siteLink?.token || got[AUTO_ON] !== true) return;
+  if (got.scanStarted?.reason !== 'auto' || !(await scanStopped(got))) return;
+  const last = got[AUTO_RETRY];
+  if (Number.isFinite(last) && last <= now && now - last < AUTO_GAP) return;
+  if (autoRetryAt(got[AUTO_STATE]) > now) return;
+  if (soon) {
+    await chrome.storage.local.set({ [AUTO_RETRY]: now });
+    return autoSchedule(autoSoon(now));
+  }
+  if (self.navigator?.onLine === false || (await scanHost?.busy())) return;
+  const r = await requestScan('auto', { hiddenOnly: true });
+  if (r.ok) await chrome.storage.local.set({ [AUTO_RETRY]: now });
+}
+
 autoQueue(autoWake);
+chrome.runtime.onStartup.addListener(() => autoQueue(() => autoRetry({ soon: true })));
+chrome.runtime.onMessage.addListener((msg, sender) => {
+  if (!msg || typeof msg !== 'object' || msg.ohPopup !== 'opened') return false;
+  if (sender.id !== chrome.runtime.id || sender.tab) return false;
+  if (String(sender.url || '').split(/[?#]/)[0] !== chrome.runtime.getURL(POPUP)) return false;
+  autoQueue(() => autoRetry());
+  return false;
+});
 chrome.alarms.onAlarm.addListener((a) => {
   if (a?.name === AUTO_ALARM) autoQueue(() => autoFired(a));
 });

@@ -349,6 +349,7 @@ test('a scan began under 20 hours ago: the next run 20 to 28 hours after it, not
     local: {
       autoScanOn: true,
       scanStarted: { run: 'r1', by: 'tab', reason: 'popup', at: started },
+      scanReport: { v: 1, run: 'r1', startedAt: started, at: started + MIN },
     },
   });
   await until(() => alarm(x));
@@ -357,6 +358,126 @@ test('a scan began under 20 hours ago: the next run 20 to 28 hours after it, not
   within(alarm(x).when, started + 20 * H, started + 28 * H);
   assert.equal(x.docs.length, 0);
   assert.equal(x.stores.session.scanRequest, undefined);
+});
+
+test("a scan that stopped (no report, no record for its start) isn't the day's scan", async () => {
+  const started = Date.now() - 5 * H;
+  for (const reason of ['popup', 'auto']) {
+    const x = worker({
+      local: { autoScanOn: true, scanStarted: { run: 'r1', by: 'offscreen', reason, at: started } },
+    });
+    await until(() => alarm(x));
+    await x.fireAlarm('oh-auto-scan', { scheduledTime: Date.now() });
+    await until(() => x.docs.length === 1);
+    assert.equal(x.stores.session.scanRequest.reason, 'auto', reason);
+  }
+  // One that ended (a held report after it counts too) is.
+  const y = worker({
+    local: {
+      autoScanOn: true,
+      scanStarted: { run: 'r1', by: 'offscreen', reason: 'auto', at: started },
+      autoScan: { v: 1, at: started, ended: started + MIN, startedAt: started, line: 'full' },
+    },
+  });
+  await until(() => alarm(y));
+  await y.fireAlarm('oh-auto-scan', { scheduledTime: Date.now() });
+  await settle();
+  assert.equal(y.docs.length, 0);
+});
+
+test('the worker starting, or the popup opening, clears what a stopped scan left', async () => {
+  // A fresh copy each time: a worker's storage is the object it's handed.
+  const quiet = () => ({
+    scanRunning: { at: Date.now() - 3 * MIN, tabId: null, run: 'r9', by: 'offscreen' },
+    scanProgress: { run: 'r9', at: Date.now() - 3 * MIN, part: 'hangar', page: 2 },
+  });
+  const x = worker({ session: quiet() });
+  await until(() => !x.stores.session.scanRunning && !x.stores.session.scanProgress);
+  // A scan with a fresh heartbeat is left alone.
+  const fresh = {
+    scanRunning: { ...quiet().scanRunning, at: Date.now() - 20e3 },
+    scanProgress: { ...quiet().scanProgress, at: Date.now() - 5e3 },
+  };
+  const y = worker({ session: structuredClone(fresh) });
+  await settle();
+  assert.deepEqual(y.stores.session.scanRunning, fresh.scanRunning);
+  assert.deepEqual(y.stores.session.scanProgress, fresh.scanProgress);
+  // It goes quiet while the worker runs: the popup opening clears it.
+  await y.chrome.storage.session.set(quiet());
+  await y.sendInternal(
+    { ohPopup: 'opened' },
+    { id: CHROME_ID, url: `chrome-extension://${CHROME_ID}/src/popup.html` },
+  );
+  await until(() => !y.stores.session.scanRunning && !y.stores.session.scanProgress);
+});
+
+test('a run of its own that stopped: once more on the next popup open, at most once in 20 hours', async () => {
+  const started = Date.now() - 3 * H;
+  const stopped = { run: 'r1', by: 'offscreen', reason: 'auto', at: started };
+  const POPUP = { id: CHROME_ID, url: `chrome-extension://${CHROME_ID}/src/popup.html` };
+  const x = worker({ local: { autoScanOn: true, scanStarted: stopped } });
+  await until(() => alarm(x));
+  assert.equal(await x.sendInternal({ ohPopup: 'opened' }, POPUP), undefined, 'no answer');
+  await until(() => x.docs.length === 1);
+  assert.equal(x.stores.session.scanRequest.reason, 'auto');
+  assert.deepEqual(x.opened, [], 'no tab');
+  const at = x.stores.local.autoScanRetry;
+  assert.ok(Number.isFinite(at));
+  // It stopped again: not a third time today.
+  await x.chrome.storage.session.remove('scanRequest');
+  x.docs.length = 0;
+  await x.chrome.storage.local.set({ scanStarted: { ...stopped, at: Date.now() - 5 * MIN } });
+  await x.sendInternal({ ohPopup: 'opened' }, POPUP);
+  await settle();
+  assert.equal(x.docs.length, 0);
+  assert.equal(x.stores.local.autoScanRetry, at);
+  // Not for a Scan you pressed, a run that ended, one too fresh to call stopped, while
+  // off, or from anything but the popup.
+  const none = async (local, sender = POPUP) => {
+    const y = worker({ local: { autoScanOn: true, scanStarted: stopped, ...local } });
+    await until(() => (local.autoScanOn === false ? true : alarm(y)));
+    await y.sendInternal({ ohPopup: 'opened' }, sender);
+    await settle();
+    assert.equal(y.docs.length, 0, JSON.stringify(local));
+    assert.equal(y.stores.local.autoScanRetry, local.autoScanRetry);
+  };
+  await none({ scanStarted: { ...stopped, reason: 'popup' } });
+  await none({ autoScan: { v: 1, at: started, ended: started + MIN, startedAt: started } });
+  await none({ scanStarted: { ...stopped, at: Date.now() - 30e3 } });
+  await none({ autoScanOn: false });
+  await none({ autoScanRetry: Date.now() - 19 * H });
+  await none({}, { ...POPUP, tab: { id: 1 } });
+  // A retry over 20 hours ago doesn't hold it.
+  const z = worker({
+    local: { autoScanOn: true, scanStarted: stopped, autoScanRetry: Date.now() - 21 * H },
+  });
+  await until(() => alarm(z));
+  await z.sendInternal({ ohPopup: 'opened' }, POPUP);
+  await until(() => z.docs.length === 1);
+});
+
+test('a run of its own that stopped: the browser starting runs it once, 10 to 30 minutes on', async () => {
+  const stopped = { run: 'r1', by: 'offscreen', reason: 'auto', at: Date.now() - 3 * H };
+  const x = worker({ local: { autoScanOn: true, scanStarted: stopped } });
+  await until(() => alarm(x));
+  const t0 = Date.now();
+  await x.startup();
+  await until(() => Number.isFinite(x.stores.local.autoScanRetry));
+  within(alarm(x).when, t0 + 10 * MIN, Date.now() + 30 * MIN);
+  assert.equal(x.docs.length, 0, 'nothing right away');
+  // Its alarm goes off: the stopped run doesn't hold it.
+  await x.fireAlarm('oh-auto-scan', { scheduledTime: Date.now() });
+  await until(() => x.docs.length === 1);
+  assert.equal(x.stores.session.scanRequest.reason, 'auto');
+  // The next start the same day: nothing more.
+  const y = worker({
+    local: { autoScanOn: true, scanStarted: stopped, autoScanRetry: Date.now() - H },
+  });
+  await until(() => alarm(y));
+  const before = alarm(y).when;
+  await y.startup();
+  await settle();
+  assert.equal(alarm(y).when, before);
 });
 
 test('switched off and on (or disconnected, connected, on) after a quick check: not again within 20 hours', async () => {

@@ -600,8 +600,10 @@ test("a pressed Scan notes the parts it read whole; one cut short isn't", async 
   const r = await scannedAndSynced();
   for (const p of ['hangar', 'buybacks', 'referral'])
     assert.equal(stamps()[p], mem.db.sources[p].scannedAt, p);
-  // A hangar cut short (kept, as Scan does: 30 read over 25) and buy-backs that failed.
+  // A hangar cut short (30 read, never kept over the last full scan) and buy-backs that
+  // failed.
   delete mem.scanFull;
+  const was = mem.db.sources.hangar;
   rsi.hangar = pledges(35);
   rsi.fail = (kind) =>
     kind === 'hangar:4'
@@ -610,7 +612,8 @@ test("a pressed Scan notes the parts it read whole; one cut short isn't", async 
         ? new Response('', { status: 401 })
         : null;
   const report = await r.scan({ reason: 'popup' });
-  assert.ok(report.rows[0].partial);
+  assert.equal(report.rows[0].ok, false);
+  assert.deepEqual(mem.db.sources.hangar.items, was.items, 'the last full scan stays');
   assert.equal(report.rows[1].ok, false);
   assert.deepEqual(Object.keys(stamps()), ['referral']);
 });

@@ -29,6 +29,7 @@
     avatar,
     account,
     sc,
+    noted = false, // the line at the top says the scan stopped, with its own Scan Again
     signedOut,
     scanOff = false, // signed out of RSI for sure: Scan waits for the sign-in
     fx = USD,
@@ -240,7 +241,7 @@
     <button type="button" class="pp-btn grey" id="pp-scan" disabled={scanOff} onclick={onscan}>{t('popup.scan')}</button>
   {:else}
     <button type="button" class="pp-btn primary" id="pp-scan" onclick={onscan}
-      >{sc.phase === 'stopped' ? t('popup.scan-again') : t('popup.scan')}</button
+      >{sc.phase === 'stopped' && !noted ? t('popup.scan-again') : t('popup.scan')}</button
     >
   {/if}
   {#if doneIn && !running}

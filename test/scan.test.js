@@ -129,6 +129,27 @@ test('mid-scan failure keeps the partial result when there is no bigger earlier 
   assert.equal(store.db.sources.hangar.items.length, 20);
 });
 
+test('a partial read never replaces the last full scan, even a smaller one', async () => {
+  const previous = JSON.parse(items(9, 5));
+  await reset(previous);
+  const before = snapshot();
+  script = (page) => (page === 3 ? { status: 502 } : healthy(page));
+  const r = await OH.scanSource('hangar');
+  assert.equal(r.ok, false);
+  assert.match(r.error, /kept your previous scan of 5/);
+  assert.deepEqual(snapshot().db.sources, before.db.sources, 'the 20 it read are not kept over 5');
+  assert.deepEqual(snapshot().dbHistory ?? [], [], 'nothing in the history either');
+  // Signed out after page 1: the same, and it says so.
+  await withSignIn(async () => {
+    script = (page) => (page === 2 ? signInPage : healthy(page));
+    const out = await OH.scanSource('hangar');
+    assert.equal(out.ok, false);
+    assert.equal(out.signedOut, true);
+    assert.match(out.error, /not signed in to RSI/);
+    assert.deepEqual(snapshot().db.sources, before.db.sources);
+  });
+});
+
 test('mid-scan failure never overwrites a bigger earlier scan', async () => {
   const previous = JSON.parse(items(9, 25));
   await reset(previous);
@@ -560,9 +581,12 @@ test('scanSource in auto mode: a part cut short is never saved, however big', as
   assert.equal(r.retryAfter, '120');
   assert.equal(calls[3], 1, 'a 429 comes back at once');
   assert.deepEqual(snapshot().db, before.db, 'the 20 it read are not kept over 5');
-  // A scan you pressed keeps going, as before.
+  // A scan you pressed keeps going (it retries the 429), but a part it couldn't finish
+  // never replaces the last full scan either.
   const manual = await OH.scanSource('hangar');
-  assert.equal(manual.ok, true);
+  assert.equal(manual.ok, false);
+  assert.match(manual.error, /kept your previous scan of 5/);
+  assert.deepEqual(snapshot().db.sources, before.db.sources);
 });
 
 test('scanSource in auto mode: a sign-in page partway is unfinished, not the end of the list', async () => {
@@ -573,10 +597,11 @@ test('scanSource in auto mode: a sign-in page partway is unfinished, not the end
     assert.equal(r.unfinished, true);
     assert.match(r.error, /signed out/);
     assert.equal(store.db.sources.hangar.items.length, 5);
-    // Pressed Scan: the shorter list, as before.
+    // Pressed Scan: signed out partway too, and the last full scan stays.
     const manual = await OH.scanSource('hangar');
-    assert.equal(manual.ok, true);
-    assert.equal(store.db.sources.hangar.items.length, 10);
+    assert.equal(manual.ok, false);
+    assert.equal(manual.signedOut, true);
+    assert.equal(store.db.sources.hangar.items.length, 5);
   });
 });
 

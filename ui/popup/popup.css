@@ -207,6 +207,19 @@ body {
 .pp-whatsnew b {
   font-weight: 600;
 }
+/* The line after a scan stopped partway: trouble's amber edge, What's New's place. */
+.pp-stopnote {
+  margin: 0 16px 10px;
+  background: var(--lift-2);
+  border: 1px solid var(--warn-line);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
 
 /* --- Tabs --- */
 .pp-tabs {

@@ -609,10 +609,11 @@ test('getScanStatus: when each source was scanned, whether a scan runs, and stal
   const old = full();
   old.db.sources.hangar.scannedAt = Date.now() - 7 * 86400000 - 1;
   assert.equal((await load({ local: old }).send({ type: 'oh-scan-status' }, HANGAR)).stale, true);
-  // A marker left by a page that closed mid-scan runs out after 10 minutes.
+  // A marker left by a page that closed mid-scan (or a scan that hung): its heartbeat
+  // runs out after 2 minutes.
   const stuck = load({
     local: full(),
-    session: { scanRunning: { at: Date.now() - 10 * 60e3 - 1, tabId: 9 } },
+    session: { scanRunning: { at: Date.now() - 2 * 60e3 - 1, tabId: 9 } },
   });
   assert.equal((await stuck.send({ type: 'oh-scan-status' }, HANGAR)).running, false);
   // Nothing scanned yet.
@@ -645,11 +646,11 @@ test('getScanStatus: a mark whose tab has closed is no scan; a request not start
     assert.deepEqual(x.focused, []);
     return s.running;
   };
-  const mark = { scanRunning: { at: Date.now() - 9 * 60e3, tabId: 9 } };
+  const mark = { scanRunning: { at: Date.now() - 90e3, tabId: 9 } };
   // The scanning tab is still open: running.
   assert.equal(await status(mark, [tab(4), tab(9)]), true);
-  // It was closed mid-scan (or reloaded into something else): not running, well
-  // before the 10 minutes run out, so the hangar page can ask for a scan again.
+  // It was closed mid-scan (or reloaded into something else): not running, before
+  // its heartbeat's 2 minutes run out, so the hangar page can ask for a scan again.
   assert.equal(await status(mark, [tab(4)]), false);
   assert.equal(await status(mark, [tab(9, 'chrome-extension://other/x.html')]), false);
   assert.equal(await status(mark, []), false);

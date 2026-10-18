@@ -567,8 +567,8 @@ const thisTabId = () =>
     : Promise.resolve(null));
 // A scan running in this page, for our hangar page's scan status (Local Mode,
 // background.js oh-scan-status): this tab and a time in session storage, renewed at
-// most once a minute while the scan goes on, and cleared when it ends or the page
-// goes away. The background counts one whose tab has closed, or older than 10
+// most every 30 seconds while the scan goes on, and cleared when it ends or the page
+// goes away. The background counts one whose tab has closed, or older than 2
 // minutes, as no scan. Written in order (scanMarkWrite), so an end never lands
 // before its start.
 let scanMarkAt = 0;
@@ -576,7 +576,7 @@ let scanMarkWrite = Promise.resolve();
 function scanMark(on) {
   if (!OH.flags.localMode || !chrome.storage.session) return;
   const now = Date.now();
-  if (on && now - scanMarkAt < 60e3) return;
+  if (on && now - scanMarkAt < 30e3) return;
   scanMarkAt = on ? now : 0;
   scanMarkWrite = scanMarkWrite
     .then(async () =>

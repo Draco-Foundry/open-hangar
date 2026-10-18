@@ -67,6 +67,7 @@ const BUDGET = {
   // and each part's last complete read (ui/scan/runner.js).
   autoScanOn: small('the Auto Scan Daily switch'),
   autoScanNext: small('one timestamp'),
+  autoScanRetry: small('one timestamp: the last retry of a run that stopped'),
   autoScan: small('the last Auto Scan: when, how it went, the backoff; replaced whole'),
   scanFull: small('the last complete read of each part: three timestamps'),
   avatarImg: { cap: 'one portrait, AVATAR_MAX 64 KB, replaced whole', max: 70 * KB },

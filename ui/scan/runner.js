@@ -10,9 +10,11 @@
 // as it lands, then a sync when connected, then up to BB_AUTO_MAX buy-back packs never
 // read before, paced, in the background. What it's doing and how it went go to
 // storage, for any page to show in its own words:
-//   session scanRunning  { at, tabId, run, by }: renewed at most once a minute while the
-//                        scan runs, removed at its end (src/background.js scanRunning,
-//                        ui/popup/data.js scanBusy, ./sync-timing.js scanElsewhere)
+//   session scanRunning  { at, tabId, run, by }: the scan's heartbeat, renewed with its
+//                        progress (at most every MARK_GAP) while the scan runs, removed
+//                        at its end. Quiet for 2 minutes, it's a scan that stopped
+//                        (src/background.js scanRunning, ui/popup/data.js scanState,
+//                        ./sync-timing.js scanElsewhere)
 //   session scanProgress { run, at, part, page, count, retry }: about two writes a
 //                        second at most (and one as each part starts, the newest always
 //                        written), removed at the end. part: 'start' | 'account'
@@ -54,7 +56,7 @@ import {
 } from './auto.js';
 
 export const BB_AUTO_MAX = 30; // src/dashboard.js: never-read packs read after a scan
-export const MARK_GAP = 60e3; // scanRunning renewed at most this often
+export const MARK_GAP = 30e3; // scanRunning renewed at most this often
 export const PROGRESS_GAP = 500; // scanProgress written at most this often
 export const AVATAR_MAX = 64 * 1024; // the portrait's data URL, characters
 export const REPORT_V = 1;
@@ -146,6 +148,9 @@ export function createRunner(env) {
   function setProgress(part, page = null, count = null, retry = null) {
     const p = { part, page, count, retry: retry ? { attempt: retry.attempt, of: retry.of } : null };
     hooks.progress?.(p);
+    // While this page scans, every step it takes renews its heartbeat (the packs read
+    // after it, and the sync, have none: their progress is their own).
+    if (busy) mark(true);
     if (!session) return;
     progressNow = { run: me.run, at: now(), ...p };
     const wait = PROGRESS_GAP - (now() - progressAt);
@@ -263,10 +268,7 @@ export function createRunner(env) {
     r?.ok
       ? { id, ok: true, partial: r.partial || null, n, error: null }
       : { id, ok: false, partial: null, n: null, error: r?.error ?? null };
-  const progress = (part) => (page, count, retry) => {
-    mark(true);
-    setProgress(part, page, count, retry);
-  };
+  const progress = (part) => (page, count, retry) => setProgress(part, page, count, retry);
 
   // → the report (REPORT_V): { v, run, by, reason, startedAt, at, ms, held, signedOut,
   // switched, rows: [{ id, ok, partial, n, error }], bad, sync }, or null when this page
@@ -361,10 +363,17 @@ export function createRunner(env) {
         const h = await OH.scanSource('hangar', progress('hangar'), { account });
         if (h?.paused) paused.add('hangar');
         rows.push(row('hangar', h, h?.items?.length ?? 0));
-        const b = await OH.scanSource('buybacks', progress('buybacks'), { account });
+        // Signed out partway (a part not kept): nothing more is read.
+        signedOut = !!h?.signedOut;
+        const b = signedOut
+          ? null
+          : await OH.scanSource('buybacks', progress('buybacks'), { account });
         if (b?.paused) paused.add('buybacks');
-        rows.push(row('buybacks', b, b?.items?.length ?? 0));
-        const r = await OH.getReferral((phase, n) => progress('referrals')(null, n), { account });
+        if (b) rows.push(row('buybacks', b, b?.items?.length ?? 0));
+        signedOut ||= !!b?.signedOut;
+        const r = signedOut
+          ? null
+          : await OH.getReferral((phase, n) => progress('referrals')(null, n), { account });
         if (r?.paused) paused.add('referrals');
         if (r) rows.push(row('referrals', r, null));
         // The parts read whole, for Auto Scan Daily's weekly full read (./auto.js).

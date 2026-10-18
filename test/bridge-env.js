@@ -165,6 +165,7 @@ function loadBackground({
   const flags = wholeFlags(given);
   const firefox = browser === 'firefox' || browser === 'firefox-android';
   const listen = () => ({ addListener() {} });
+  const onStartup = []; // the browser started (startup(), below)
   let external = null;
   // Every onMessage listener, in order (the connector build adds the popup's).
   const internal = [];
@@ -246,7 +247,7 @@ function loadBackground({
     runtime: {
       id: firefox ? FIREFOX_ID : CHROME_ID,
       onInstalled: listen(),
-      onStartup: listen(),
+      onStartup: { addListener: (f) => void onStartup.push(f) },
       onUpdateAvailable: { addListener: (f) => void onUpdate.push(f) },
       reload: () => void reloaded.push(Date.now()),
       sendMessage: async (msg) => void sent.push(structuredClone(msg)),
@@ -389,6 +390,7 @@ function loadBackground({
     alarms.delete(name);
     return Promise.all(onAlarm.map((f) => f({ name, scheduledTime: due })));
   };
+  const startup = () => Promise.all(onStartup.map((f) => f()));
   const clickNote = (id) => Promise.all(onNoteClick.map((f) => f(id)));
   // The browser has an update ready (runtime.onUpdateAvailable).
   const updateAvailable = (details) => Promise.all(onUpdate.map((f) => f(details)));
@@ -412,6 +414,7 @@ function loadBackground({
     alarms,
     notes,
     fireAlarm,
+    startup,
     clickNote,
     docs,
     frames: frameList,

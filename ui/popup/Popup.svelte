@@ -23,6 +23,7 @@
     syncTrouble,
     scanAge,
     scanState,
+    stopLine,
     storeCredit,
     valueSince,
   } from './data.js';
@@ -137,6 +138,13 @@
     return Number.isFinite(last) && last >= report.sync.at ? null : who;
   });
   const hasNews = $derived(justUpdated?.to === version && prefs.seenVersion !== version);
+  // A scan that stopped partway: one line at the top of every tab (Scan Again with it,
+  // unless signed out: Log In to RSI is on Hangar).
+  const stop = $derived(
+    ready && v
+      ? stopLine({ phase: sc.phase, signedOut, report, scannedAt: v.scannedAt })
+      : null,
+  );
 
   // A report older than the last scan's own time is a stale one.
   function newer(r) {
@@ -272,6 +280,9 @@
       applyLook(prefs.look);
       await Promise.all([loadData(), loadSession(), loadAlerts(), readAccess(), readBanner()]);
       await readCookie();
+      // A scan that stopped leaves nothing that reads as Scanning (src/background.js),
+      // and Auto Scan Daily tries a run that stopped once more.
+      chrome.runtime.sendMessage({ ohPopup: 'opened' }).catch(() => {});
       const unseenNews = news.filter((m) => fresh.has(m.id)).length;
       tab = v?.scannedAt == null ? 'hangar' : openingTab(prefs.tab, unseenNews);
       ready = true;
@@ -487,6 +498,15 @@
       </div>
     {/if}
 
+    {#if stop}
+      <div class="pp-stopnote" id="pp-stopped" role="status">
+        <span>{t(stop)}</span>
+        {#if stop === 'popup.stop-partway'}
+          <button type="button" class="pp-link" id="pp-scan-again" onclick={scan}>{t('popup.scan-again')}</button>
+        {/if}
+      </div>
+    {/if}
+
     {#if ready && v}
       {#if firstRun}
         <Hangar
@@ -497,6 +517,7 @@
           {db}
           {account}
           {sc}
+          noted={stop === 'popup.stop-partway'}
           {signedOut}
           scanOff={signIn === 'out'}
           {rsiOff}
@@ -543,6 +564,7 @@
               {db}
               {account}
               {sc}
+              noted={stop === 'popup.stop-partway'}
               {signedOut}
               scanOff={signIn === 'out'}
               {rsiOff}

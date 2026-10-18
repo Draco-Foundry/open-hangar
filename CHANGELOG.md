@@ -4,6 +4,7 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Fixed: **Scans that stop partway.** If a scan stops before it finishes (the browser closes, you're signed out of RSI, the network drops), the popup no longer stays on Scanning. It says the scan stopped, with Scan Again, and your hangar keeps the last full scan: a half-read hangar never replaces it. A stopped Auto Scan Daily tries once more the next time you open the popup or start your browser.
 - Fixed: **Upgraded insurance.** A pledge whose insurance was upgraded now shows the upgraded term, not the one it came with.
 
 ## 0.4.1 — 2026-10-14

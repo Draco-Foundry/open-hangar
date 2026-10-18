@@ -922,7 +922,7 @@
     // The last scan's report, its start and the RSI portrait (ui/scan/runner.js) go with
     // the rest, and the popup's copy of the account's Wishlist (read again while
     // connected). So does Auto Scan Daily: its switch (it's off after Clear Data), its
-    // next run, its last run and the parts' last complete reads.
+    // next run and last retry, its last run and the parts' last complete reads.
     await chrome.storage.local.remove([
       'popupWish',
       DB_KEY,
@@ -940,6 +940,7 @@
       'autoScan',
       'autoScanOn',
       'autoScanNext',
+      'autoScanRetry',
       'subStore',
       RECOVERY_KEY,
       LOG_KEY,
@@ -1524,7 +1525,7 @@
   // item k sits on page floor(k / size) + 1 (what a later probe relies on).
   // `auto` (Auto Scan Daily): a 429 comes straight back, the pages are paced with
   // OH.autoPause, an error says whether RSI didn't answer (`rsiDown`, with its
-  // Retry-After), and a sign-in page after page 1 is a partial result, not the end.
+  // Retry-After). A sign-in page after page 1 is a partial result, not the end.
   async function scanHtmlSource(src, onProgress, prev, { auto = false } = {}) {
     const seen = new Set();
     const all = [];
@@ -1599,9 +1600,9 @@
         }
         break; // logged in, source is genuinely empty
       }
-      // Signed out partway: the list would look shorter and complete. Auto Scan Daily
-      // never keeps that (a scan you pressed keeps what it read, as before).
-      if (!items.length && auto && looksLoggedOut(res, html))
+      // Signed out partway: the list would look shorter and complete. Never kept over
+      // a saved scan (scanSource).
+      if (!items.length && looksLoggedOut(res, html))
         return { items: all, meta, partial: { page, reason: 'signed out', signedOut: true } };
       if (!items.length) break;
 
@@ -1776,10 +1777,11 @@
         return { ok: true, items: saved.items, scannedAt, unchanged: true };
       }
 
-      // A scan cut short by RSI never *shrinks* your data: if an earlier scan
-      // holds more items, keep it and say so instead of saving the partial one.
+      // A scan cut short (RSI stopped answering, signed out partway) never replaces
+      // the last full scan: an earlier scan stays as it was. Only a first scan, with
+      // nothing saved to keep, keeps what it read.
       if (result.partial) {
-        const { page, reason } = result.partial;
+        const { page, reason, signedOut } = result.partial;
         OH.log(
           'warn',
           src.id,
@@ -1787,11 +1789,18 @@
         );
         const prev = await OH.loadSource(src.id);
         const prevCount = Array.isArray(prev.items) ? prev.items.length : 0;
-        if (prevCount > result.items.length) {
-          return {
-            ok: false,
-            error: `RSI stopped responding at page ${page} (${reason}), so we kept your previous scan of ${prevCount}. Try again in a minute.`,
-          };
+        if (prevCount || prev.scannedAt != null) {
+          return signedOut
+            ? {
+                ok: false,
+                signedOut: true,
+                error:
+                  'You’re not signed in to RSI. Log in at robertsspaceindustries.com, then scan again.',
+              }
+            : {
+                ok: false,
+                error: `RSI stopped responding at page ${page} (${reason}), so we kept your previous scan of ${prevCount}. Try again in a minute.`,
+              };
         }
         const scannedAt = await saveSource(src.id, result.items, { meta: result.meta, account });
         return {
@@ -4181,9 +4190,16 @@
   // What goes with the connection: the link, the popup's copy of the account's Wishlist
   // (ui/popup/wish-client.js COPY_KEY), the store alerts' copy of its keys (src/alerts.js
   // WISH_KEY; here rather than at the alerts' next check, which waits while alerts are
-  // paused) and Auto Scan Daily's switch and next run (it works only while connected;
-  // src/background.js clears its alarm). The Wishlist stays on the account.
-  const SITE_LINK_KEYS = ['siteLink', 'popupWish', 'alertsWish', 'autoScanOn', 'autoScanNext'];
+  // paused) and Auto Scan Daily's switch, next run and last retry (it works only while
+  // connected; src/background.js clears its alarm). The Wishlist stays on the account.
+  const SITE_LINK_KEYS = [
+    'siteLink',
+    'popupWish',
+    'alertsWish',
+    'autoScanOn',
+    'autoScanNext',
+    'autoScanRetry',
+  ];
   OH.siteDisconnect = async function siteDisconnect() {
     const link = await OH.getSiteLink();
     if (link) {
