@@ -58,62 +58,9 @@ the public items.
 Icons: edit `beta/icons/icon.svg`, then `node scripts/beta-icons.mjs` redraws the PNGs and
 `beta/logo-300.png` (Edge's store logo).
 
-## Oct 13: Submit (Owner)
+## Submitting
 
-Claude builds the zips and gives you their paths. The text to paste is under Listing Text
-below.
-
-### Chrome Web Store
-
-1. [Developer Dashboard](https://chrome.google.com/webstore/devconsole) (Draco Foundry) →
-   **New Item** → upload `open-hangar-beta-0.3.0.1.zip`.
-2. **Store Listing:** description (below), category **Games**, language English. Reuse
-   `docs/store-assets/screenshot-*.jpg` and `promo-small-440x280.png`.
-3. **Privacy:** single purpose, one justification per permission, remote code **No**,
-   data usage boxes (all below). Privacy policy URL:
-   `https://app.openhangar.space/privacy`.
-4. **Distribution:** visibility **Unlisted**, all regions, free.
-5. **Submit for Review.** Leave publishing automatic, so it goes live once approved.
-
-### Edge Add-ons
-
-1. [Partner Center](https://partner.microsoft.com/dashboard/microsoftedge/overview) →
-   **Create New Extension** → upload the same zip.
-2. **Availability:** visibility **Hidden** (Edge's word for unlisted), all markets.
-3. **Properties:** category Entertainment, privacy policy URL as above, website
-   `https://openhangar.space/`, support `support@openhangar.space`.
-4. **Store Listings** (English): description (below), logo `beta/logo-300.png`, the same
-   screenshots.
-5. **Notes for Certification:** the reviewer notes below. Then **Publish**.
-
-### Firefox (addons.mozilla.org)
-
-1. [Developer Hub](https://addons.mozilla.org/developers/) (Draco Foundry account) →
-   **Submit a New Add-on** → **On your own** (self-distribution, unlisted).
-2. Upload `open-hangar-beta-firefox-0.3.0.1.zip`. Source code only if AMO asks for it
-   (the UI is built with Vite, so it may): Claude makes the source zip with
-   `git archive --format=zip -o open-hangar-beta-source-0.3.0.1.zip HEAD` from the commit
-   the zip was built from; it carries `docs/AMO-SOURCE.md`, the rebuild steps for
-   reviewers.
-3. Wait for signing (usually minutes), then download the signed `.xpi`.
-4. Give the `.xpi` to Claude, who hosts it with `firefox-updates.json` on the website
-   and sets the /beta button.
-
-### Paste Back to Claude
-
-1. The Chrome item ID (32 letters, on the item's page in the dashboard right after the
-   upload).
-2. The Edge CRX ID (Partner Center → the item → Extension Overview; it may only show
-   after you press Publish).
-3. The signed Firefox `.xpi` (the file itself).
-
-Claude then makes one website PR: `BETA_CHROME_URL` and `BETA_EDGE_URL` in
-`app/wrangler.jsonc` (the /beta page shows the buttons as soon as they're set), both
-IDs on the website's extension allowlist (`app/src/lib/cors.ts`), the Firefox beta's
-add-on id `open-hangar-beta@draco-foundry` next to the public one on the Connect list,
-and the signed `.xpi` with its `firefox-updates.json` (below) and the Firefox button.
-Without the allowlists the beta can scan but can't Connect or sync. It needs a
-**production deploy before Oct 20**, in your next batch.
+The owner's steps for submitting to the three stores are kept in the maintainer's private notes.
 
 ### Firefox Updates File
 
@@ -210,63 +157,3 @@ Firefox checks about once a day.
 > sign in at robertsspaceindustries.com, click the extension's icon and press Scan.
 > Sync is optional: Connect needs an openhangar.space account, which is invite-only
 > during the beta, and the extension works fully without it.
-
-## How Testers Install
-
-The /beta page (`app.openhangar.space/beta`, link shared in #beta only) has the install
-buttons; these steps belong in the pinned #beta post:
-
-1. Get your key, either one works:
-   - **The Beta Tester role** in our Discord: open `app.openhangar.space/beta` and Sign In
-     with Discord.
-   - **An invite code** (wave invites): Create Account at `app.openhangar.space/sign-up`,
-     enter the code, confirm your email, then open `app.openhangar.space/beta`. An account
-     made with a code has beta access for good; a later Discord sign-in never takes it away.
-2. /beta says "Welcome to the Beta, Pilot" once your key checks out.
-3. **Turn off the public Open Hangar first** (`chrome://extensions`,
-   `edge://extensions` or Firefox's `about:addons`, switch it off). Both would scan RSI
-   and both answer the website, so testing with both on muddies every report.
-4. Press **Get It for Chrome** (or Edge) and add Open Hangar Beta, the amber icon. On
-   Firefox, press **Get It for Firefox**: it installs the signed `.xpi` straight from
-   /beta (Firefox asks once to allow the install), and it updates itself from then on.
-5. Scan once (the beta has its own local data), then Connect on the Citizen Card to try
-   sync.
-6. Report in #beta-reports.
-
-When the beta ends: remove Open Hangar Beta, switch the public Open Hangar back on, and
-Connect it once after it updates to 0.3.0.
-
-If Chrome hasn't approved the item by Oct 20 (the fallback in #344), testers can load
-the unzipped build unpacked. An unpacked copy gets its own ID, so it can scan but can't
-Connect unless Claude pins it to the store item's ID (the dashboard's public key, in an
-unpacked-only build). Ask Claude when it comes to that.
-
-## Updates During the Beta
-
-1. Bump `beta/beta.json`: `0.3.0.2` and "0.3.0 Beta 2" (the Beta number is always the
-   fourth number; `npm test` checks it). Note the fixes in #beta.
-2. `npm run build:beta`, then upload `dist/open-hangar-beta-0.3.0.2.zip`: Chrome →
-   the item → **Package → Upload New Package → Submit for Review**; Edge → the item →
-   **Packages → Replace → Publish**.
-3. Firefox: upload `dist/open-hangar-beta-firefox-0.3.0.2.zip` as a new version on AMO
-   (Developer Hub → Open Hangar Beta → **Upload New Version** → **On your own**), wait
-   for signing, and give Claude the signed `.xpi`. Claude adds it to
-   `firefox-updates.json` and points the /beta button at it.
-4. Reviews: Chrome updates usually take hours to a few days and only one version can be
-   in review at a time; Edge takes up to 7 business days. Installed copies update by
-   themselves within a few hours of approval. Firefox signs in minutes, and installed
-   copies pick it up at their next daily update check.
-
-Same rule as the public listing: at most one upload a day, and only when you say so.
-Batch the daily fixes into one upload rather than chasing each.
-
-## After Nov 10: Retire the Beta
-
-1. Post in #beta: switch the public Open Hangar back on (it's 0.3.0 now), Connect it
-   once, then remove Open Hangar Beta.
-2. Chrome: the item → **Distribution → Unpublish**. Edge: the item → **Unpublish**.
-   Don't delete them: the same items can carry the next beta. Firefox: nothing on AMO
-   (an unlisted add-on isn't shown anywhere); the website takes the `.xpi` down.
-3. Website: clear `BETA_CHROME_URL` and `BETA_EDGE_URL` and the Firefox button, and
-   around Dec 1 take the beta IDs (the Firefox one too) off the allowlists so leftover
-   beta copies stop syncing.
