@@ -5,47 +5,6 @@ extension gets reading improvements and fixes only. New features land on the web
 (openhangar.space), so a feature idea below is a website idea now; reading improvements
 and fixes still land here.
 
-## Ideas parked for a decision (not yet committed to a direction)
-
-- **Wishlist insurance wants (owner, 2026-09-30).** Let a wishlist entry say what
-  insurance you want: LTI, 120 months, or either. Hangar Alerts (and later the
-  website's email/Discord alerts) fire when it's available that way: in RSI's store
-  (the store scan already reads ship pages; each SKU lists its insurance), or in your
-  own buy-backs (already scanned, insurance known). Mock up first: where the choice
-  lives (the ship window's wishlist button, the Store page's wishlist list) and how
-  the alert reads ("Cutlass Black with LTI is in your buy-backs").
-
-- **Translations (later).** The store listing is English only, and since 0.4.0 only
-  `_locales/en` ships (#685); languages come back later, one at a time, each with its
-  real translation (German first, after launch). The 0.2.x translations in
-  `docs/STORE-LISTINGS.md` stay as a starting point, and each language's summary is
-  translated again from the new English summary. Translating the extension's pages
-  waits for the owner's call.
-
-- ~~**Detect warbonds (and other discounts) by price, not name.**~~ ✅ Done: the
-  **Below store price** filter compares a ship pledge's paid value to its ships'
-  current store price (`OH.hangarValue`). The name-based Warbond filter stays too.
-
-- **Website analytics — decided: not yet (2026-09-25).** Store dashboards (Chrome,
-  Edge, AMO) already give installs/active users/uninstalls, and "no tracking
-  anywhere" is part of the privacy story. Revisit when actively promoting across
-  several channels (Reddit, Spectrum, Discord) and needing to know which drives
-  visits. If so: **GoatCounter** (free for non-commercial, cookieless, no consent
-  banner) on `site/`, plus a short "Website" section in the privacy policy
-  (`site/privacy.html` + `docs/PRIVACY.md`). Avoid Google Analytics (cookies +
-  consent banner, undercuts the privacy message).
-
-- ~~**Hover-image behavior on cards.**~~ ✅ Decided + done: the card hover popup is
-  gone; hover now prefetches a ~1200px `slideshow_wide` variant (same file type as
-  the thumbnail — PNG thumbs have PNG variants) and the modal opens with it, or
-  blurs up from the thumbnail. Reward items (text links, no picture) keep the popup.
-  See `hiResCandidates` / `loadHiRes` / `progressiveImage` in `dashboard.js`.
-- **Show the user's dossier bio on the front page.** The public citizen dossier
-  (`/en/citizens/<handle>`) has a free-text bio we could scrape (we already fetch
-  that page for the UEE record + org). Open question: where does it fit on the
-  Citizen Card without crowding it? Maybe a collapsible line under the org, or a
-  hover/tooltip. Needs a layout decision before building.
-
 ## Scan resilience — retry transient fetch failures — ✅ DONE
 
 Implemented in `lib.js` (`fetchPage` + `scanHtmlSource` + `OH.scanSource`), tested in

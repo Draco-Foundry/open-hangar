@@ -624,7 +624,7 @@ When RSI changes a page, every installed copy breaks until a fix clears store re
    keys. Firefox uploads also attach the source code (docs/AMO-SOURCE.md). After a full
    release a job posts to Discord #updates; a failure posts to #ops. PRs that touch
    publishing get a dry run.
-4. **Docs.** Store setup and keys: [docs/STORE.md](docs/STORE.md). Rolling back a bad
+4. **Docs.** Store setup and listing: [docs/STORE.md](docs/STORE.md). Rolling back a bad
    version: [docs/ROLLBACK.md](docs/ROLLBACK.md).
 
 Each store still reviews every upload before it goes live.
@@ -637,7 +637,7 @@ assets: `site-worker/wrangler.jsonc` (worker `openhangar-site`, custom
 domain `openhangar.space`). It moved off GitHub Pages on 2026-10-01
 (docs/SITE-CLOUDFLARE.md). A small script, `site-worker/src/index.js`, hands the home
 page and the website's public pages to the website Worker, with a fallback for each
-when it fails (docs/SITE-CLOUDFLARE.md section 4).
+when it fails.
 
 `.github/workflows/pages.yml` deploys it with `wrangler` when `site/` (or a few shared
 files) change on `main`, right after a Publish to stores run, and on a schedule (every

@@ -27,3 +27,6 @@ _dump/
 
 # Claude Code session files and its temporary worktrees (local only).
 .claude/
+
+# Python bytecode from docs/brand/draco-foundry/banner.py
+__pycache__/
