@@ -106,7 +106,7 @@
       </span>
       {#if v.myHangar}
         <button type="button" class="pp-link pp-mine" id="pp-hangar" onclick={() => openTab(v.myHangar)}
-          >Open My Hangar ↗</button
+          >Open My Hangar</button
         >
       {/if}
     </div>

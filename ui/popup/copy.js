@@ -24,7 +24,7 @@ const COPY = {
   'popup.back': 'Back', // the bell view's ‹, for screen readers
   // What's new after an update, once per version: the dot on the version tag opens it.
   'popup.new-in': 'New in {version}',
-  'popup.what-changed': 'See What Changed ↗',
+  'popup.what-changed': 'See What Changed',
   'popup.got-it': 'Got It',
   // A new version the browser holds until it's let in (src/background.js updateReady):
   // the basic page's words (basic.update-ready, basic.update-reload), word for word.
@@ -45,7 +45,7 @@ const COPY = {
   // Beside the buy-back token count: when RSI hands out the next one ("Next refill Jan 4").
   'popup.token-next': 'Next refill {date}',
   'popup.fleet-news': 'Fleet News', // heading
-  'popup.all-alerts': 'All Alerts →', // opens the bell view
+  'popup.all-alerts': 'All Alerts', // opens the bell view
   // Fleet News with store alerts on and nothing for your ships or your Wishlist.
   'popup.fleet-news-none': 'No news for your ships right now.',
   // The Scan button (asks the background, which runs the scan).
@@ -58,7 +58,7 @@ const COPY = {
   // Before the first scan: no tabs, one heading and Scan.
   'popup.first': 'Your Hangar, in One Scan',
   // Signed out of RSI: the big button to RSI's sign-in page (a grey Scan under it).
-  'popup.log-in': 'Log In to RSI ↗',
+  'popup.log-in': 'Log In to RSI',
   // The scan's steps, the basic page's names for its parts, word for word.
   'popup.step-hangar': 'Hangar',
   'popup.step-buybacks': 'Buy-Backs',
@@ -91,7 +91,7 @@ const COPY = {
   // account's Wishlist (read on this device, never sent back).
   'popup.alerts-connect':
     "Connect to openhangar.space to add your Wishlist. It's read on this device and never sent back.",
-  'popup.open-store': 'Open the Store ↗', // our Store
+  'popup.open-store': 'Open the Store', // our Store
   'popup.alerts-off-title': 'Store Alerts Are Off',
   'popup.alerts-turn-on': 'Turn On Alerts',
   // Deleting alerts (#701): each row's ×, for screen readers, and the list's Clear All
@@ -107,7 +107,7 @@ const COPY = {
   'popup.wish-empty': 'Your Wishlist Is Empty',
   // The Wishlist couldn't be read, or a change to it didn't go through.
   'popup.wish-trouble': "Couldn't Reach openhangar.space",
-  'popup.wish-full': 'Full Wishlist ↗',
+  'popup.wish-full': 'Full Wishlist',
   // Not connected, or the website's Wishlist is off for this account: the Wishlist
   // lives on the website.
   'popup.wish-connect': 'Your Wishlist Lives on openhangar.space',

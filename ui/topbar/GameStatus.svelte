@@ -82,7 +82,7 @@
       <h3>Game Status</h3>
       {#if gs?.status}
         {#if gs.status.url}<a class="gs-sys {gs.status.level}" href={gs.status.url} target="_blank" rel="noopener"
-            ><i class="dot {gs.status.level}" title={DOT_TITLE[gs.status.level]}></i>{gs.status.label} ↗</a
+            ><i class="dot {gs.status.level}" title={DOT_TITLE[gs.status.level]}></i>{gs.status.label}</a
           >{:else}<span class="gs-sys {gs.status.level}"
             ><i class="dot {gs.status.level}"></i>{gs.status.label}</span
           >{/if}
@@ -111,13 +111,13 @@
       {/if}
       {#if gs.patchNotes}
         <a class="gs-more" href={gs.patchNotes.url} target="_blank" rel="noopener" title={gs.patchNotes.title}
-          >Latest Patch Notes ↗</a
+          >Latest Patch Notes</a
         >
       {/if}
       <div class="gs-evs">
         {#if gs.event}
           <div class="gs-kv">
-            {#if gs.event.url}<a href={gs.event.url} target="_blank" rel="noopener" class="ev">{gs.event.name} ↗</a
+            {#if gs.event.url}<a href={gs.event.url} target="_blank" rel="noopener" class="ev">{gs.event.name}</a
               >{:else}<span class="ev">{gs.event.name}</span>{/if}
             <span class="v">{gs.event.end ? `Ends ${daysUntil(gs.event.end)}` : 'On now'}</span>
           </div>
@@ -128,7 +128,7 @@
           <div class="gs-kv">
             <span class="nx"
               >Next: {#if gs.nextEvent.url}<a href={gs.nextEvent.url} target="_blank" rel="noopener"
-                  >{gs.nextEvent.name} ↗</a
+                  >{gs.nextEvent.name}</a
                 >{:else}{gs.nextEvent.name}{/if}</span
             >
             {#if gs.nextEvent.start}<span class="v">{shortDay(gs.nextEvent.start)}</span>{/if}

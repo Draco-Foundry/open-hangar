@@ -16,9 +16,7 @@
     stroke-linecap="round"
     stroke-linejoin="round"
     aria-hidden="true">{@html QL_ICONS[link.i] || ''}</svg
-  ><span class="ql-t">{link.t}{#if desc && link.d}<small>{link.d}</small>{/if}</span><span
-    class="ql-ext"
-    aria-hidden="true">↗</span
+  ><span class="ql-t">{link.t}{#if desc && link.d}<small>{link.d}</small>{/if}</span
   ></a
 >
 
@@ -52,11 +50,5 @@
     font-size: 12px;
     line-height: 1.3;
     color: var(--muted);
-  }
-  .ql-ext {
-    margin-left: auto;
-    flex: none;
-    color: var(--muted);
-    font-size: 12px;
   }
 </style>

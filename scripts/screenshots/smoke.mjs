@@ -699,8 +699,7 @@ try {
         (a) =>
           a.target === '_blank' &&
           /noopener/.test(a.rel) &&
-          /^https:\/\/([a-z0-9-]+\.)?robertsspaceindustries\.com\//.test(a.href) &&
-          /↗/.test(a.textContent),
+          /^https:\/\/([a-z0-9-]+\.)?robertsspaceindustries\.com\//.test(a.href),
       );
     // Rows end level: every card in a grid row ends on the same line.
     const rowsLevel = () => {
@@ -782,7 +781,7 @@ try {
   ql.back &&
   ql.storedBack
     ? ok(
-        'quick links: Home card across the last row (rows end level), RSI links in a new tab ↗, portrait menu group folds, Hide Card remembered, Show on Home brings it back',
+        'quick links: Home card across the last row (rows end level), RSI links in a new tab, portrait menu group folds, Hide Card remembered, Show on Home brings it back',
       )
     : fail(`quick links: ${JSON.stringify(ql)}`);
 
@@ -1652,7 +1651,7 @@ try {
   oow.homeCard &&
   oow.ffCard &&
   oow.ffClosed &&
-  each(oow.on, 'Open on Website ↗', 'Open on Website ↗') &&
+  each(oow.on, 'Open on Website', 'Open on Website') &&
   oow.homeCorner &&
   oow.homeQuiet &&
   oow.opened === 'https://staging.example.test/hangar' &&
@@ -2491,14 +2490,14 @@ try {
   melt.red &&
   melt.title === 'Gone for Good if You Melt It' &&
   /RSI never sells this one back\. Pledges with Squadron 42/.test(melt.never) &&
-  melt.go === 'I Understand, Open on RSI ↗' &&
+  melt.go === 'I Understand, Open on RSI' &&
   /^https:\/\/robertsspaceindustries\.com\/account\/pledges\?page=\d+$/.test(melt.goHref) &&
   melt.keepFocused &&
   melt.kept
     ? ok('pledge window: Melt on RSI asks first; red Gone for Good warning for never-sold-back')
     : fail(`melt warning: ${JSON.stringify(melt)}`);
   melt.plain &&
-  melt.plainGo === 'Open on RSI ↗' &&
+  melt.plainGo === 'Open on RSI' &&
   /full price.*Buy-Back Token/.test(melt.plainText)
     ? ok('pledge window: a plain melt confirm says what melting costs')
     : fail(`melt confirm: ${JSON.stringify(melt)}`);
@@ -2955,7 +2954,7 @@ try {
   fs1.opened &&
   fs1.href === 'https://openhangar.space/store' &&
   fs1.target === '_blank' &&
-  fs1.label === 'Open the Full Store ↗' &&
+  fs1.label === 'Open the Full Store' &&
   fs1.line &&
   fs1.gone
     ? ok(
@@ -3049,7 +3048,7 @@ try {
   sub.longKind === 'Armor' &&
   sub.kitKind === 'Kits and Bundles' &&
   /^https:\/\/robertsspaceindustries\.com\/en\/pledge\/Subscribers-Store\/Demo-2$/.test(sub.buy) &&
-  sub.buyLabel === 'Buy at RSI ↗' &&
+  sub.buyLabel === 'Buy at RSI' &&
   /^\$9\.00 \$12\.00$/.test(sub.price) &&
   sub.warbond === 'Warbond' &&
   sub.tier === 'Centurion' &&
@@ -3062,7 +3061,7 @@ try {
   sub.search === 1 &&
   sub.paints.join() === 'Nebula Drift Paint' &&
   sub.plans === 'https://robertsspaceindustries.com/en/pledge/subscriptions' &&
-  sub.plansText === 'Subscribers get their own store each month. See Plans ↗' &&
+  sub.plansText === 'Subscribers get their own store each month. See Plans' &&
   sub.plansCards === 0
     ? ok(
         'subscriber store: 6 cards lined up, Warbond and tier chips, Sold Out, search, type chips, See Plans',
@@ -3826,7 +3825,7 @@ try {
     : fail(`cart add: ${JSON.stringify(cart)}`);
   /Log In to RSI First.*log in to RSI in this browser first\. Nothing was added\./.test(
     cart.signedOut,
-  ) && cart.logIn === 'Log In to RSI ↗'
+  ) && cart.logIn === 'Log In to RSI'
     ? ok('cart signed out: the signed-out note with Log In to RSI')
     : fail(`cart signed out: ${JSON.stringify(cart)}`);
   /RSI Didn't Add It.*Nothing was added\. RSI says: “Pretend: this item is unavailable”/.test(
@@ -3848,7 +3847,7 @@ try {
   JSON.stringify(cart.anyAddCall) === JSON.stringify(['add', 777, 900, 9001, {}])
     ? ok('Any Ship: 30 of 35 shown, search finds one, priced on pick, added from a ship not owned')
     : fail(`any ship: ${JSON.stringify(cart)}`);
-  /Cart Already Busy.*holds a buy-back/.test(cart.busy) && cart.busyLink === 'Open RSI Cart ↗'
+  /Cart Already Busy.*holds a buy-back/.test(cart.busy) && cart.busyLink === 'Open RSI Cart'
     ? ok('cart busy: Cart Already Busy with Open RSI Cart')
     : fail(`cart busy: ${JSON.stringify(cart)}`);
   /Buy-Back Price\s*\$15 from RSI just now/.test(cart.bbRows) &&
@@ -4421,7 +4420,7 @@ try {
   rep.part.open &&
   rep.part.title === 'Rough Landing' &&
   rep.part.rows.join() === 'Hangar:false,Buy-Backs:true,Referrals:false' &&
-  rep.part.actions.join() === 'Send Flight Log (opens Discord),Scan Again,Report on GitHub ↗' &&
+  rep.part.actions.join() === 'Send Flight Log (opens Discord),Scan Again,Report on GitHub' &&
   /Nothing is sent until you submit it/.test(rep.part.hint) &&
   rep.cleared
     ? ok('scan report: one row per source with the failed one marked, and its buttons')
@@ -5344,7 +5343,7 @@ try {
   });
   await page.click('#pp-login');
   const outGo = await page.evaluate(() => __demo.opened.at(-1));
-  ppOut.login === 'Log In to RSI ↗' &&
+  ppOut.login === 'Log In to RSI' &&
   ppOut.scanOn &&
   ppOut.grey &&
   outGo === 'https://robertsspaceindustries.com/connect'
@@ -5412,7 +5411,7 @@ try {
     tag: document.getElementById('pp-ver').tagName,
     seen: (await chrome.storage.local.get('popupPrefs')).popupPrefs?.seenVersion,
   }));
-  news === 'New in 0.2.7 See What Changed ↗ Got It' &&
+  news === 'New in 0.2.7 See What Changed Got It' &&
   newsGone.tag === 'SPAN' &&
   newsGone.seen === '0.2.7'
     ? ok("what's new after an update: the dot on the version tag, Got It hides it for good")
@@ -5552,7 +5551,7 @@ try {
   !ppWish.remove &&
   ppWish.asked.join() === `GET ${ppSite}/api/v1/wishlist?with=items Bearer t` &&
   wishFull === `${ppSite}/hangar/wishlist`
-    ? ok('Wishlist, the website not taking changes: read only as before, Full Wishlist ↗')
+    ? ok('Wishlist, the website not taking changes: read only as before, Full Wishlist')
     : fail(`popup wishlist: ${JSON.stringify({ ppWish, wishFull })}`);
   // No sale feed kept yet: the ship list names the ships (never an empty list over "And
   // N more"), and nothing is said about sales.
@@ -5597,8 +5596,8 @@ try {
   const wishOff = await page.$eval('#pp-wish-off', (e) =>
     e.textContent.replace(/\s+/g, ' ').trim(),
   );
-  wishOff === 'Your Wishlist Lives on openhangar.space Full Wishlist ↗'
-    ? ok('Wishlist off on the website, alerts off: Full Wishlist ↗ to the website')
+  wishOff === 'Your Wishlist Lives on openhangar.space Full Wishlist'
+    ? ok('Wishlist off on the website, alerts off: Full Wishlist to the website')
     : fail(`popup wishlist, alerts off: ${JSON.stringify({ wishOff })}`);
 
   // The website takes changes (its extension_wishlist_write on): the items it read, a

@@ -434,7 +434,7 @@ function setStatus(text, isError = false, { scan = false } = {}) {
       const rep = document.createElement('button');
       rep.type = 'button';
       rep.className = 'link-btn';
-      rep.textContent = 'Report on GitHub ↗';
+      rep.textContent = 'Report on GitHub';
       rep.title =
         'Opens a GitHub issue with your flight log filled in. Nothing is sent until you submit it.';
       rep.addEventListener('click', () => openScanReport(text));
@@ -4058,7 +4058,7 @@ function hangarSpot(p) {
 function viewOnRsiLink(p) {
   const s = hangarSpot(p);
   if (!s) return '';
-  return `<a class="bb-reclaim" href="${OH.escapeHtml(s.url)}" target="_blank" rel="noopener" title="Opens page ${s.page} of your RSI hangar; it's number ${s.pos} on that page (as of your last scan)">View ↗</a>`;
+  return `<a class="bb-reclaim" href="${OH.escapeHtml(s.url)}" target="_blank" rel="noopener" title="Opens page ${s.page} of your RSI hangar; it's number ${s.pos} on that page (as of your last scan)">View</a>`;
 }
 
 // A pledge item's type. RSI leaves some blank (armor pieces, hangars), so
