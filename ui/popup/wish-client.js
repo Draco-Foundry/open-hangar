@@ -1,9 +1,9 @@
 // The Wishlist tab's own read and writes (0.4.0; the privacy policy's "Your Wishlist"):
 // while this browser is connected, the account's Wishlist on openhangar.space, with the
-// sync token, and the one change you make to it: which item, and the target price if
-// you set one. Nothing else is sent with it (a Target Price save leaves the insurance
-// out, and the website keeps the stored one). Nothing typed in the search goes anywhere
-// (the search is ./wishlist.js, on this device).
+// sync token, and the one change you make to it, an add or a remove: just which item.
+// Nothing else is sent with it (Target Price left the popup in 0.4.1, so no change
+// carries a price). Nothing typed in the search goes anywhere (the search is
+// ./wishlist.js, on this device).
 //
 //   GET  <site>/api/v1/wishlist?with=items     (Authorization: Bearer <sync token>)
 //        → 200 { v: 1, keys, items: [{ key, name, category, target, insurance, from, at }] }
@@ -17,9 +17,6 @@
 //                                                   id: 'sku-N', name }
 //                                               | { kind: 'ccu', id: 'upgrade-N', name }
 //        { v: 1, do: 'remove', key }
-//        { v: 1, do: 'save', key, target }      target: US dollars as typed
-//                                               ('150', '89.50') or null; nothing else
-//                                               (the website keeps the stored insurance)
 //        → 200 { ok, outcome, key, on, item? }: `item` the item as stored now
 //
 // Polite (docs/dev/requests.md): a copy younger than FRESH_MS is used as it is; a read
@@ -215,21 +212,19 @@ export function writeWish(env, change) {
   lane = run.catch(() => {});
   return run;
 }
-// Only the fields each change has, so nothing else is ever sent.
+// Only the fields each change has, so nothing else is ever sent; any other change
+// (the old Target Price save among them) → null, and nothing goes.
 function bodyOf(c) {
-  if (c.do === 'add') return { v: 1, do: 'add', item: c.item };
-  if (c.do === 'remove') return { v: 1, do: 'remove', key: c.key };
-  // Which item and the target only: the website keeps the stored insurance.
-  return { v: 1, do: 'save', key: c.key, target: c.target ?? null };
+  if (c?.do === 'add') return { v: 1, do: 'add', item: c.item };
+  if (c?.do === 'remove') return { v: 1, do: 'remove', key: c.key };
+  return null;
 }
-// The copy's items after the website's answer: a removed item (or one a save found gone)
-// leaves, an added or saved one is the website's own copy of it.
+// The copy's items after the website's answer: a removed item leaves, an added one is
+// the website's own copy of it.
 function applied(items, change, r) {
   const list = Array.isArray(items) ? items : [];
   const item = r.ok === true && r.item ? readItem(r.item) : null;
-  const gone =
-    (change.do === 'remove' && (r.ok === true || r.outcome === 'not-found')) ||
-    (change.do === 'save' && r.outcome === 'not-found');
+  const gone = change.do === 'remove' && (r.ok === true || r.outcome === 'not-found');
   if (gone) return list.filter((i) => i.key !== change.key);
   if (!item) return list;
   if (change.do === 'add')
@@ -238,6 +233,8 @@ function applied(items, change, r) {
 }
 async function writeNow(env, change) {
   const fail = (error, items = null) => ({ ok: false, outcome: null, items, error });
+  const body = bodyOf(change);
+  if (!body) return fail('refused');
   try {
     const got = await env.get(['siteLink', COPY_KEY]);
     const link = linkOf(got);
@@ -257,7 +254,7 @@ async function writeNow(env, change) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${link.token}`,
         },
-        body: JSON.stringify(bodyOf(change)),
+        body: JSON.stringify(body),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
     } catch {
