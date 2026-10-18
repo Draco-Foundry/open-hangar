@@ -49,6 +49,7 @@
   const DB_KEY = 'db';
   const HISTORY_KEY = 'dbHistory';
   const ARCHIVE_KEY = 'pledgeArchive'; // pledges gone from the hangar (see archiveGone)
+  const PARSER_KEY = 'scanParser'; // which parser read each source (src/hangar-shape.js)
   const CORRUPT_KEY = 'dbCorrupt';
   // Two version numbers, set in src/hangar-shape.js (which says what each changed):
   //   DB_VERSION is how the database is stored in this browser. Changing that
@@ -816,6 +817,12 @@
     return db.sources[id] || { items: [], scannedAt: null };
   };
 
+  // Was this source's saved data read by an older parser (src/hangar-shape.js
+  // PARSER_VERSION)? Then it's stale until the next scan, not current.
+  OH.parserStale = async function parserStale(id) {
+    return SHAPE.parserStale((await chrome.storage.local.get(PARSER_KEY))[PARSER_KEY], id);
+  };
+
   // Everything that writes the live DB (scan saves, fix-ups, Clear Data, restores,
   // account switches, imports) runs one at a time in this queue, and reads storage
   // right before it writes, so nothing can write back a stale copy over another.
@@ -872,6 +879,12 @@
           await chrome.storage.local.set({ [ARCHIVE_KEY]: OH.archiveGone(cur, gone, scannedAt) });
         }
       }
+      // Which parser read this source (src/hangar-shape.js PARSER_VERSION): kept
+      // beside the DB, not in it, so the DB, backups and sync keep their shapes.
+      const stamps = (await chrome.storage.local.get(PARSER_KEY))[PARSER_KEY];
+      await chrome.storage.local.set({
+        [PARSER_KEY]: { ...(isObj(stamps) ? stamps : {}), [id]: SHAPE.PARSER_VERSION },
+      });
       await chrome.storage.local.remove(['hangar', 'scannedAt']); // drop legacy keys
       return scannedAt;
     });

@@ -445,3 +445,36 @@ test('Clear Data right after loading a not-yet-upgraded DB stays cleared', async
   assert.equal(mem.db, undefined);
   assert.equal(mem.dbHistory, undefined);
 });
+
+// --- Parser version ----------------------------------------------------------------
+// Each scan stamps which parser read its source (scanParser, beside the DB), so data
+// read by an older parser shows as stale (src/hangar-shape.js PARSER_VERSION).
+test('a scan stamps its parser version, and an older stamp reads as stale', async () => {
+  const SHAPE = require('../src/hangar-shape.js');
+  reset({});
+  pages = { hangar: rows(2) };
+  assert.equal((await OH.scanSource('hangar', null, { account: acct })).ok, true);
+  await settle();
+  assert.deepEqual(mem.scanParser, { hangar: SHAPE.PARSER_VERSION });
+  assert.equal(await OH.parserStale('hangar'), false);
+  // The stamp lives beside the DB: the DB's own shape is unchanged.
+  assert.equal('parserVersion' in mem.db.sources.hangar, false);
+  assert.equal('scanParser' in mem.db, false);
+
+  mem.scanParser = { hangar: SHAPE.PARSER_VERSION - 1 };
+  assert.equal(await OH.parserStale('hangar'), true);
+  pages = { hangar: rows(2) };
+  await OH.scanSource('hangar', null, { account: acct });
+  await settle();
+  assert.equal(await OH.parserStale('hangar'), false, 'a new scan makes it current');
+});
+
+test('data scanned before stamps existed counts as parser version 1', () => {
+  const { parserStale, PARSER_VERSION } = require('../src/hangar-shape.js');
+  const v1Current = PARSER_VERSION === 1;
+  assert.equal(parserStale(undefined, 'hangar'), !v1Current);
+  assert.equal(parserStale({}, 'hangar'), !v1Current);
+  assert.equal(parserStale({ hangar: 'x' }, 'hangar'), !v1Current);
+  assert.equal(parserStale({ hangar: PARSER_VERSION }, 'hangar'), false);
+  assert.equal(parserStale({ hangar: PARSER_VERSION + 1 }, 'hangar'), true);
+});
