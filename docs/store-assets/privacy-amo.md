@@ -58,7 +58,7 @@ Store alerts tell you when something in RSI's store is for you. They're optional
 
 - **What a check downloads:** one public file from our site, openhangar.space/api/store/on-sale, that lists what's on sale in RSI's store now. It's the same file for everyone, and nothing about you is in the request. A check runs at most every 30 minutes, and less often when our site is busy or can't be reached.
 - **What it's matched against:** the hangar and buy-backs this browser scanned, on your device. For example, a ship in your buy-backs is in the store again, or a ship you own gets a new paint. Alerts never send them anywhere.
-- **Your Wishlist, while you're connected:** alerts also match your account's Wishlist (see Your Wishlist). What it matches stays here.
+- **Your Wishlist, while you're connected:** alerts also match the items on your account's Wishlist that have their reminder on (see Your Wishlist). What it matches stays here.
 - **What you see:** a number on the toolbar button and on the popup's bell, the matches in the popup's alerts list and, if you allow notifications, a notification for each new match (up to three at a time, then one for the rest). Clicking a match opens that item on openhangar.space.
 - **Turning them off:** on the same Settings tab. The checks stop, and the matches saved for alerts are deleted from this browser.
 
@@ -67,7 +67,7 @@ Store alerts tell you when something in RSI's store is for you. They're optional
 While you're connected, the popup's Wishlist tab shows the Wishlist on your openhangar.space account and lets you change it.
 
 - **Reading it:** the extension reads your Wishlist from app.openhangar.space/api/v1/wishlist with its sync token, to show it in the popup and, with store alerts on, to match it (see Store Alerts). A copy stays in this browser.
-- **Changing it:** when you add an item, remove one or set a target price, the extension sends that one change to app.openhangar.space with its sync token: which item, and the target price if you set one. Nothing else is sent with it.
+- **Changing it:** when you add or remove an item, or turn its reminder on or off, the extension sends that one change to app.openhangar.space with its sync token: which item, and for a reminder, on or off. Nothing else is sent with it.
 - **Searching:** finding items to add happens on your device. What you type isn't sent anywhere.
 - **Disconnecting** deletes the copy in this browser. Your Wishlist stays on your account.
 
