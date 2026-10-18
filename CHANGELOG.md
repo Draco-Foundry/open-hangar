@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.5.0 — 2026-10-18
+
 - Fixed: **Notifications on Firefox.** Turning them on now closes the popup so Firefox's question can show.
 - Improved: The popup shows when an update is ready, with Reload to Update, and any notice from us about scans.
 - Changed: After you connect, you land on My Hangar on the website.
