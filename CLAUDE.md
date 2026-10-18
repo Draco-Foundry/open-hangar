@@ -64,6 +64,28 @@ Same on Windows and Mac unless noted.
   [docs/VOICE.md](docs/VOICE.md). Requests: [docs/dev/requests.md](docs/dev/requests.md).
   Tests and builds: [docs/dev/testing.md](docs/dev/testing.md). Flags: [docs/FLAGS.md](docs/FLAGS.md).
 
+## Before a PR Is Ready
+
+- **Check order:** lint (`npm run format:check`, `npm run lint:firefox`), then `npm test`,
+  then the build (`npm run build`, `npm run check:store`). There's no type check: the code
+  is plain JavaScript. Stop at the first failure.
+- **Both builds start clean:** load `dist/chrome` (Manifest V3, a service worker) and
+  `dist/firefox` (Manifest V3, an event page) once each in a fresh profile and open the
+  popup, with no errors in the worker's or the popup's console. Chrome: a new profile,
+  `chrome://extensions`, Load unpacked. Firefox: `npx web-ext run --source-dir dist/firefox`
+  (a temporary profile). If it couldn't be done, say so in the PR. Why (2026-10-18): the
+  tests never load a manifest, so a build can pass CI and still fail on install.
+- **Stored data migrations use literal values:** when stored settings or hangar data change
+  shape, the migration (`MIGRATIONS` in `src/lib.js`) names the old and new values as
+  literals, never imported constants, and gets a test for a migrated case and an unchanged
+  case. Keys added to stored state later are always read as possibly missing (`?? default`).
+  `test/db.test.js` checks the migrations name no constant. Why (2026-10-18): a constant
+  that changes later silently changes what an old migration does.
+- **Screenshots for visible changes:** a PR that changes the popup, the basic page or
+  anything drawn on RSI pages has before and after screenshots from a fresh profile, or
+  says why it can't. Why (2026-10-18): a visible change is reviewed by looking, not by
+  reading the diff.
+
 ## Related Repos
 
 - **Draco-Foundry/open-hangar-server** (private): app.openhangar.space. The extension calls
