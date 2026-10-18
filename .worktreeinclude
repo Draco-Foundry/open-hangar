@@ -1,0 +1,4 @@
+# Local-only files copied into each new git worktree Claude Code makes (gitignore
+# syntax; only files that are also in .gitignore get copied). Never list a tracked file.
+CLAUDE.local.md
+.claude/settings.local.json
