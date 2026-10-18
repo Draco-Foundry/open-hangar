@@ -121,6 +121,11 @@ const COPY = {
   'popup.wish-no-match': 'No matches.',
   // The ✕ beside an item, for screen readers.
   'popup.wish-remove': 'Remove {name}',
+  // Remind Me on each item (the website's wishlist_remind): the switch's label (its
+  // title; on or off shows in the switch itself) and its name for screen readers (on or
+  // off is read out on its own). Approved 2026-10-16.
+  'popup.wish-remind-label': 'Remind Me',
+  'popup.wish-remind': 'Remind me about {name}',
   // The field for the price you're waiting for, in US dollars.
   // The website didn't take an add (it couldn't place the item, or the list is full).
   'popup.wish-not-added': "Couldn't add {name}.",

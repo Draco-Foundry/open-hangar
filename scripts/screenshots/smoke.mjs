@@ -5674,6 +5674,7 @@ try {
         text: li.querySelector('.pp-wrow').textContent.replace(/\s+/g, ' ').trim(),
         target: !!li.querySelector('input'),
         remove: li.querySelector('.pp-wx').getAttribute('aria-label'),
+        remind: !!li.querySelector('.pp-wsw'),
       })),
     );
   const ppEd = {
@@ -5728,6 +5729,7 @@ try {
   ppEd.head === 'Your Wishlist · 2' &&
   ppEd.rows[0].text === 'Avenger Titan On Sale $55 ✕' &&
   !ppEd.rows.some((r) => r.target) &&
+  !ppEd.rows.some((r) => r.remind) &&
   ppEd.rows[0].remove === 'Remove Avenger Titan' &&
   ppEd.rows[1].text === 'Cutlass - Ghoulish Green Paint On Sale $10 ✕' &&
   ppEd.placeholder === 'Add a ship, paint or upgrade' &&
@@ -5743,7 +5745,9 @@ try {
   wishDone.rows.join() === 'Upgrade to Freelancer,Zeus Mk II CL,Cutlass - Ghoulish Green Paint' &&
   wishDone.kept?.join() === 'ccu:16,ship:zeus-mk-ii-cl,sku:501' &&
   !wishDone.wide
-    ? ok('Wishlist editing: search here, add, Remove, no Target Price; one POST each, only the change')
+    ? ok(
+        'Wishlist editing: search here, add, Remove, no Target Price; one POST each, only the change',
+      )
     : fail(`popup wishlist editing: ${JSON.stringify({ ppEd, ppFound, afterAdd, wishDone })}`);
   // A Remove that doesn't go through (the website down, no Retry-After the popup can
   // read): the item stays, the note says so, and the next change waits the website's
@@ -5787,6 +5791,54 @@ try {
   !wishGone.copy && !wishGone.link
     ? ok("Disconnect deletes the popup's Wishlist copy")
     : fail(`popup disconnect, the Wishlist copy: ${JSON.stringify(wishGone)}`);
+  // Remind Me (the website's wishlist_remind on: each item has `remind`): a switch beside
+  // each ✕; a click sends which item and on or off, and the switch follows the answer.
+  // Without `remind` (the flag off) no switch shows, as checked above.
+  await popAt(
+    {
+      ...signedIn,
+      __demoWish: {
+        mode: 'items',
+        items: [
+          wishItem('ship:avenger-titan', 'Avenger Titan', { remind: true }),
+          wishItem('sku:501', 'Cutlass - Ghoulish Green Paint', { remind: false }),
+        ],
+      },
+      __demoLocal: { popupPrefs: { tab: 'wishlist' }, siteUrl: ppSite, siteLink: ppWishLink },
+    },
+    '.pp-wedit li',
+  );
+  const switches = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('.pp-wedit .pp-wsw')].map((b) => [
+        b.getAttribute('aria-label'),
+        b.getAttribute('aria-checked'),
+      ]),
+    );
+  const remindBefore = await switches();
+  const twoSwitches = remindBefore.length === 2;
+  await page.click('.pp-wedit li:nth-child(1) .pp-wsw');
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.pp-wedit li:nth-child(1) .pp-wsw')?.getAttribute('aria-checked') ===
+      'false',
+  );
+  const remindAfter = {
+    states: await switches(),
+    sent: await page.evaluate(() =>
+      __demo.wish.filter((w) => w.method === 'POST').map((w) => w.body),
+    ),
+    wide: await page.evaluate(() => document.documentElement.scrollWidth > 360),
+  };
+  twoSwitches &&
+  remindBefore[0][0] === 'Remind me about Avenger Titan' &&
+  remindBefore.map((s) => s[1]).join() === 'true,false' &&
+  remindAfter.states.map((s) => s[1]).join() === 'false,false' &&
+  JSON.stringify(remindAfter.sent) ===
+    JSON.stringify([{ v: 1, do: 'save', key: 'ship:avenger-titan', remind: false }]) &&
+  !remindAfter.wide
+    ? ok('Wishlist Remind Me: a switch per item, one save with which item and on or off')
+    : fail(`popup wishlist remind: ${JSON.stringify({ remindBefore, remindAfter })}`);
   // Store alerts off: the search finds ships only and its placeholder says so; a search
   // that finds nothing (a paint's name: paints come with the alerts' sale feed) says No
   // matches. under the box; one letter isn't searched, so nothing is said.

@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- New: **Remind Me on each Wishlist item.** With it off, store alerts skip that item. The website's Wishlist has the same switch.
+- Changed: **Privacy policy updated.** The Wishlist lines cover the Remind Me switch and no longer mention target prices.
 - Fixed: **Upgraded insurance.** A pledge whose insurance was upgraded now shows the upgraded term, not the one it came with.
 
 ## 0.4.1 — 2026-10-14

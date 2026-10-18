@@ -23,6 +23,8 @@ const item = (key, name, more = {}) => ({
   insurance: 'either',
   from: null,
   at: 1,
+  // Remind Me: null while the website doesn't offer it (no switch).
+  remind: null,
   ...more,
 });
 const json = (body, status = 200, headers = {}) =>
@@ -307,6 +309,58 @@ test('remove: only which item; no other change (the old Target Price save) is se
   assert.equal(saved.ok, false);
   assert.equal(saved.error, 'refused');
   assert.equal(env.asked.filter((a) => a.init?.method === 'POST').length, 1, 'nothing more sent');
+});
+
+test('Remind Me: read only as a boolean, sent as a save with which item and on or off', async () => {
+  const { readList, writeWish } = await client();
+  // The website's wishlist_remind on: each item says; off (or anything else): no switch.
+  const read = readList({
+    v: 1,
+    keys: ['sku:1', 'sku:2', 'sku:3'],
+    items: [
+      item('sku:1', 'A', { remind: false }),
+      item('sku:2', 'B', { remind: true }),
+      item('sku:3', 'C', { remind: 'no' }),
+    ],
+  });
+  assert.deepEqual(
+    read.items.map((i) => i.remind),
+    [false, true, null],
+  );
+  const a = item('sku:1', 'A', { remind: true });
+  const env = fakeEnv({ store: editing([a, item('sku:2', 'B', { remind: true })]) });
+  env.answer = (url, init) => {
+    const b = JSON.parse(init.body);
+    return json({
+      ok: true,
+      outcome: 'saved',
+      key: b.key,
+      on: true,
+      item: { ...a, remind: b.remind },
+    });
+  };
+  const off = await writeWish(env, { do: 'remind', key: 'sku:1', remind: false, name: 'A' });
+  // Only which item and on or off: nothing else goes.
+  assert.deepEqual(sentBody(env, 0), { v: 1, do: 'save', key: 'sku:1', remind: false });
+  assert.equal(off.ok, true);
+  assert.deepEqual(
+    off.items.map((i) => [i.key, i.remind]),
+    [
+      ['sku:1', false],
+      ['sku:2', true],
+    ],
+  );
+  // Not a boolean: refused before anything goes.
+  const bad = await writeWish(env, { do: 'remind', key: 'sku:1', remind: 'off' });
+  assert.equal(bad.error, 'refused');
+  assert.equal(env.asked.length, 1);
+  // The website no longer has it: it leaves the copy.
+  env.answer = () => json({ ok: false, outcome: 'not-found', key: 'sku:2', on: false });
+  const gone = await writeWish(env, { do: 'remind', key: 'sku:2', remind: false });
+  assert.deepEqual(
+    gone.items.map((i) => i.key),
+    ['sku:1'],
+  );
 });
 
 test('one change at a time: a second click waits for the first', async () => {
