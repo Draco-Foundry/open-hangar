@@ -101,18 +101,32 @@
     return null;
   };
 
-  ns.insuranceTerm = function insuranceTerm(contents) {
-    const ins = (contents || []).find((c) => RULES.kinds.insurance.test(c.kind || ''));
-    if (!ins) return null;
-    const label = ins.label || '';
-    if (RULES.insurance.fromItem.lti.test(label)) return 'LTI';
+  // One insurance item's term in months (Infinity for LTI), or null when the
+  // phrasing isn't recognized. Years count as months, the same as
+  // insuranceFromName ("10 Year" → 120), so one term never shows up two ways in
+  // filters and stats.
+  function insuranceMonths(label) {
+    if (RULES.insurance.fromItem.lti.test(label)) return Infinity;
     const mo = label.match(RULES.insurance.fromItem.months);
-    if (mo) return `${mo.groups.n}M`;
-    // Years in months, the same as insuranceFromName ("10 Year" → "120M"), so
-    // one term never shows up two ways in filters and stats.
+    if (mo) return Number(mo.groups.n);
     const yr = label.match(RULES.insurance.fromItem.years);
-    if (yr) return `${Number(yr.groups.n) * 12}M`;
-    return label || null; // unrecognized phrasing — surface RSI's text verbatim
+    if (yr) return Number(yr.groups.n) * 12;
+    return null;
+  }
+
+  // An upgraded pledge lists its original insurance and the upgrade as separate
+  // items, original first (#712), so the best term wins: LTI, then the most months.
+  ns.insuranceTerm = function insuranceTerm(contents) {
+    const items = (contents || []).filter((c) => RULES.kinds.insurance.test(c.kind || ''));
+    if (!items.length) return null;
+    let best = null;
+    for (const c of items) {
+      const m = insuranceMonths(c.label || '');
+      if (m !== null && (best === null || m > best)) best = m;
+    }
+    if (best === Infinity) return 'LTI';
+    if (best !== null) return `${best}M`;
+    return items[0].label || null; // unrecognized phrasing — surface RSI's text verbatim
   };
 
   // RSI leaves the type off some contained items (#296; other tools see about 1 in

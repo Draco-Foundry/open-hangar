@@ -10,6 +10,7 @@
 // (`by: 'tab'`) and draws what it says in this page's words (./report-lines.js).
 import { t } from './copy.js';
 import { progressLine, reportLines, reportSummary } from './report-lines.js';
+import { afterConnect } from './after-connect.js';
 import { createRunner, newRun } from '../scan/runner.js';
 
 const OH = globalThis.OH;
@@ -229,7 +230,7 @@ export async function firefoxContinue() {
   const why = hub.site.askFirefox;
   hub.site.askFirefox = null;
   if (!(await asked)) return void (hub.site.msg = t('basic.firefox-no'));
-  if (why === 'connect') await connect({ asked });
+  if (why === 'connect') await connect({ asked, fromSite: true });
 }
 
 const b64url = (bytes) =>
@@ -242,7 +243,7 @@ const random = (n) => b64url(crypto.getRandomValues(new Uint8Array(n)));
 // Connect: the browser's sign-in window on the website's /connect, as the dashboard's
 // (PKCE: the verifier never leaves this page). Without the window, the website's
 // Connect This Browser page instead, which asks the extension itself (bridge v2).
-export async function connect({ asked } = {}) {
+export async function connect({ asked, fromSite = false } = {}) {
   const ok = asked || dataOk();
   hub.site.msg = '';
   if (!(await ok)) return void (hub.site.msg = t('basic.firefox-no'));
@@ -292,7 +293,25 @@ export async function connect({ asked } = {}) {
   await refreshSite();
   if (answer.get('sync') === '1') await syncNow();
   await runner.wishlistToAccount();
+  const forConnect = fromSite || location.hash === '#settings';
+  const onward = () => {
+    const next = afterConnect({
+      forConnect,
+      scanning: hub.scan.busy,
+      msg: hub.site.msg,
+      pilot: !!hub.site.pilot,
+      siteUrl: base,
+      linked: !!hub.site.link,
+    });
+    if (next) location.assign(next);
+  };
+  // The first sync asked which pilot (hub.site.pilot): the tab waits for the answer and
+  // goes on from pilotAnswer, after Sync It's sync or straight after a no.
+  afterPilot = hub.site.pilot ? onward : null;
+  onward();
 }
+// Connect's way on to My Hangar, held while its pilot question is open (connect).
+let afterPilot = null;
 
 // Sync Now, and a sync this page asks for (auto). The runner sends it (ui/scan/runner.js
 // sync): while a scan runs, here or in another Open Hangar tab, it's kept for the
@@ -310,10 +329,14 @@ export async function pilotAnswer(yes) {
   hub.site.pilot = null;
   await OH.siteSyncAnswer(who, yes);
   if (yes) await syncNow({ asked });
+  const onward = afterPilot;
+  afterPilot = null;
+  onward?.();
 }
 export async function disconnect() {
   hub.site.msg = '';
   hub.site.pilot = null;
+  afterPilot = null;
   await OH.siteDisconnect().catch((e) => (hub.site.msg = String(e?.message || e)));
   await refreshSite();
 }

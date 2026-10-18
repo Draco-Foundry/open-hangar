@@ -1,0 +1,70 @@
+<!doctype html>
+<!--
+  Made-up hangar pledge cards in RSI's /account/pledges markup, carrying the status
+  tags RSI shows beside a pledge's name: UPGRADED, and since October 2026 a green
+  ATTRIBUTED. The tag elements' classes are a guess (no capture yet); what matters is
+  that they sit on the card, outside every element the parser reads. One card puts
+  them after the date in the date column, the worst place they could land. No
+  personal data. See CONTRIBUTING.md.
+-->
+<html>
+  <body>
+    <div class="account-pledges">
+      <!-- An upgraded ship pledge with both tags: giftable and meltable -->
+      <div class="row">
+        <input class="js-pledge-id" value="601" />
+        <input class="js-pledge-name" value="Standalone Ships - Avenger Titan" />
+        <input class="js-pledge-value" value="$70.00 USD" />
+        <input class="js-pledge-currency" value="USD" />
+        <div class="title-col">
+          <h3>Standalone Ships - Avenger Titan</h3>
+          <span class="tag upgraded">UPGRADED</span>
+          <span class="tag attributed">ATTRIBUTED</span>
+        </div>
+        <div class="date-col"><label>Created:</label> April 12, 2023</div>
+        <a class="shadow-button js-gift gift"><span class="label">Gift</span></a>
+        <a class="shadow-button js-reclaim reclaim"><span class="label">Exchange</span></a>
+        <div class="item">
+          <span class="kind">Ship</span>
+          <span class="title">Avenger Titan</span>
+        </div>
+        <div class="item">
+          <span class="kind">Insurance</span>
+          <span class="title">120 Months Insurance</span>
+        </div>
+      </div>
+
+      <!-- An upgrade with only ATTRIBUTED: no items, meltable, not giftable -->
+      <div class="row">
+        <input class="js-pledge-id" value="602" />
+        <input class="js-pledge-name" value="Upgrade - Aurora MR to Avenger Titan" />
+        <input class="js-pledge-value" value="$25.00 USD" />
+        <input class="js-pledge-currency" value="USD" />
+        <div class="title-col">
+          <h3>Upgrade - Aurora MR to Avenger Titan</h3>
+          <span class="tag attributed">ATTRIBUTED</span>
+        </div>
+        <div class="date-col">October 2, 2026</div>
+        <a class="shadow-button js-reclaim reclaim"><span class="label">Exchange</span></a>
+      </div>
+
+      <!-- A paint with the tags after its date, in the date column -->
+      <div class="row">
+        <input class="js-pledge-id" value="603" />
+        <input class="js-pledge-name" value="Paints - Avenger Stormbringer Paint" />
+        <input class="js-pledge-value" value="$5.00 USD" />
+        <input class="js-pledge-currency" value="USD" />
+        <div class="date-col">
+          <label>Created:</label> October 5, 2026
+          <span class="tag upgraded">UPGRADED</span>
+          <span class="tag attributed">ATTRIBUTED</span>
+        </div>
+        <a class="shadow-button js-gift gift"><span class="label">Gift</span></a>
+        <div class="item">
+          <span class="kind">Paint</span>
+          <span class="title">Avenger Stormbringer Paint</span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -46,6 +46,7 @@ jobs:
             echo "::error::Delete the branch plan before merging: $plans"
             ok=false
           fi
+          node scripts/check-private.mjs || ok=false
           $ok
       # Docs-only PRs (Markdown, docs/, the landing page in site/, issue templates)
       # skip the slow UI test and the store packaging; the fast checks still run.

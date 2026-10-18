@@ -8,12 +8,18 @@
 // List items keep "- ". Markdown this doesn't know (a table, a quote, HTML, a \ escape)
 // stops it with an error rather than slipping into the file. Run this after changing the policy;
 // test/privacy-plain.test.js fails while the two differ.
+//
+// It also writes docs/store-assets/privacy-amo.md, the text the owner pastes into AMO's
+// Privacy Policy box. AMO's Markdown has no headings, so the title line is dropped, each
+// heading becomes a bold line, and a link to a section of the policy becomes its text.
+// Everything else is the policy as written.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 export const POLICY_FILE = 'docs/PRIVACY.md';
 export const PLAIN_FILE = 'docs/store-assets/privacy-plain.txt';
+export const AMO_FILE = 'docs/store-assets/privacy-amo.md';
 
 // Code spans, links, <autolinks> and bare addresses: their insides are never read as
 // emphasis, so an address with _ or * in it stays whole.
@@ -72,7 +78,24 @@ export function plainPolicy(markdown) {
   return out.join('\n').replace(/\n*$/, '\n');
 }
 
+export function amoPolicy(markdown) {
+  const lines = markdown.replace(/\r\n?/g, '\n').split('\n');
+  const out = [];
+  lines.forEach((raw, i) => {
+    const where = `${POLICY_FILE}:${i + 1}`;
+    const line = raw.trimEnd();
+    const heading = HEADING.exec(line);
+    if (!heading) return out.push(line.replace(/\[([^\]]+)\]\(#[^)\s]*\)/g, '$1'));
+    if (heading[1].length === 1) return; // AMO shows the add-on's name: no title line
+    if (/[*_`[\<]/.test(heading[2])) throw new Error(`${where}: Markdown in a heading`);
+    out.push(`**${heading[2]}**`);
+  });
+  return out.join('\n').replace(/^\n+/, '').replace(/\n*$/, '\n');
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  writeFileSync(ROOT + PLAIN_FILE, plainPolicy(readFileSync(ROOT + POLICY_FILE, 'utf8')));
-  console.log(`wrote ${PLAIN_FILE} from ${POLICY_FILE}`);
+  const policy = readFileSync(ROOT + POLICY_FILE, 'utf8');
+  writeFileSync(ROOT + PLAIN_FILE, plainPolicy(policy));
+  writeFileSync(ROOT + AMO_FILE, amoPolicy(policy));
+  console.log(`wrote ${PLAIN_FILE} and ${AMO_FILE} from ${POLICY_FILE}`);
 }

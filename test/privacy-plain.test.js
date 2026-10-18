@@ -80,3 +80,49 @@ test('Markdown with no plain-text rule fails loudly', async () => {
   ])
     assert.throws(() => plainPolicy(`Intro\n\n${md}\n`), /PRIVACY\.md:3/, md);
 });
+
+test('privacy-amo.md is the policy for AMO: same words, no headings, regenerated', async () => {
+  const { amoPolicy, POLICY_FILE, AMO_FILE } = await lib();
+  const md = read(POLICY_FILE);
+  assert.equal(
+    read(AMO_FILE),
+    amoPolicy(md),
+    `${AMO_FILE} differs from ${POLICY_FILE}. Run \`npm run privacy:plain\` and commit the result.`,
+  );
+  // The words are the policy's, minus the title and the section addresses of links.
+  const body = md
+    .split('\n')
+    .filter((l) => !/^# /.test(l))
+    .join('\n')
+    .replace(/\]\(#[^)\s]*\)/g, ']')
+    .replace(/^## /gm, '');
+  const words = (s) => s.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+  assert.deepEqual(words(read(AMO_FILE)), words(body));
+  assert.doesNotMatch(read(AMO_FILE), /^#|\]\(#/m, 'no headings, no section links');
+});
+
+test('AMO copy: no title, headings as bold lines, section links as text', async () => {
+  const { amoPolicy } = await lib();
+  const md = [
+    '# Privacy Policy: Test',
+    '',
+    '**Last updated: 2026-10-14**',
+    '',
+    '## Who we are',
+    '',
+    '- See [Who we are](#who-we-are) and [our site](https://example.com/a_b).',
+    '',
+  ].join('\n');
+  assert.equal(
+    amoPolicy(md),
+    [
+      '**Last updated: 2026-10-14**',
+      '',
+      '**Who we are**',
+      '',
+      '- See Who we are and [our site](https://example.com/a_b).',
+      '',
+    ].join('\n'),
+  );
+  assert.throws(() => amoPolicy('x\n\n## A *b*\n'), /PRIVACY\.md:3/);
+});

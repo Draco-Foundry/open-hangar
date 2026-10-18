@@ -1,0 +1,5 @@
+#!/bin/sh
+# Before every commit: private Claude files (CLAUDE.local.md, anything from the
+# private rules repo) never go in this public repo (scripts/check-private.mjs).
+# Installed by `npm install` (package.json "prepare" sets core.hooksPath).
+exec node scripts/check-private.mjs --staged
