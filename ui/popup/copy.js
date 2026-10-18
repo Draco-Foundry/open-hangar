@@ -26,6 +26,10 @@ const COPY = {
   'popup.new-in': 'New in {version}',
   'popup.what-changed': 'See What Changed ↗',
   'popup.got-it': 'Got It',
+  // A new version the browser holds until it's let in (src/background.js updateReady):
+  // the basic page's words (basic.update-ready, basic.update-reload), word for word.
+  'popup.update-ready': 'Open Hangar {version} is ready.',
+  'popup.update-reload': 'Reload to Update',
   // --- Tabs ---
   // The tab row's name for screen readers: the basic page's (basic.tabs), word for word.
   'popup.tabs': 'Hangar sections',
@@ -90,6 +94,10 @@ const COPY = {
   'popup.open-store': 'Open the Store ↗', // our Store
   'popup.alerts-off-title': 'Store Alerts Are Off',
   'popup.alerts-turn-on': 'Turn On Alerts',
+  // Deleting alerts (#701): each row's ×, for screen readers, and the list's Clear All
+  // (approved 2026-10-16).
+  'popup.alerts-delete': 'Delete {name}',
+  'popup.alerts-clear': 'Clear All',
   // --- Wishlist tab ---
   'popup.wish-count': 'Your Wishlist · {n}',
   'popup.wish-on-sale': 'On Sale',

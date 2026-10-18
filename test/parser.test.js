@@ -73,6 +73,14 @@ test('insuranceTerm normalizes month / year / lifetime phrasings', () => {
   assert.equal(OpenHangar.insuranceTerm([]), null);
 });
 
+test('insuranceTerm returns the best of several insurance items (#712)', () => {
+  const t = (...labels) =>
+    OpenHangar.insuranceTerm(labels.map((label) => ({ kind: 'Insurance', label })));
+  assert.equal(t('6 Months Insurance', 'Lifetime Insurance'), 'LTI');
+  assert.equal(t('6 Months Insurance', '120 Month Insurance'), '120M');
+  assert.equal(t('6 Months Insurance'), '6M'); // one item: unchanged
+});
+
 test('detectCCU only matches "Upgrade - X to Y" names', () => {
   assert.equal(OpenHangar.detectCCU('Origin 300i'), null);
   assert.deepEqual(OpenHangar.detectCCU('Upgrade - Cutlass Black to Freelancer'), {
