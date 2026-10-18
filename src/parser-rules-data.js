@@ -35,6 +35,7 @@
         'subStore',
         'upgrade',
         'cart',
+        'known',
       ],
       additionalProperties: false,
       properties: {
@@ -91,6 +92,9 @@
             'gift',
             'melt',
             'date',
+            'tag',
+            'label',
+            'hook',
           ],
           additionalProperties: false,
           properties: {
@@ -148,6 +152,21 @@
               description: 'The pledge date ("Created: December 08, 2016").',
               $ref: '#/$defs/selector',
             },
+            tag: {
+              description:
+                'A tag beside the pledge name ("Attributed"), checked against known.hangar.tags, not read.',
+              $ref: '#/$defs/selector',
+            },
+            hook: {
+              description:
+                "An element carrying RSI's js-* script hooks, checked against the known hooks.",
+              $ref: '#/$defs/selector',
+            },
+            label: {
+              description:
+                'A card\'s labels ("Created:", the action buttons), checked against known.hangar.labels.',
+              $ref: '#/$defs/selector',
+            },
           },
         },
         buybacks: {
@@ -165,6 +184,8 @@
             'button',
             'ids',
             'hrefId',
+            'label',
+            'hook',
             'image',
             'background',
             'price',
@@ -220,6 +241,16 @@
               description:
                 "The pledge id in the button's link, when the button has none (group `id`).",
               $ref: '#/$defs/pattern',
+            },
+            hook: {
+              description:
+                "An element carrying RSI's js-* script hooks, checked against the known hooks.",
+              $ref: '#/$defs/selector',
+            },
+            label: {
+              description:
+                'A card\'s labels ("Reclaim Date", the button), checked against known.buybacks.labels.',
+              $ref: '#/$defs/selector',
             },
             image: { description: "The card's picture.", $ref: '#/$defs/selector' },
             background: {
@@ -778,6 +809,75 @@
             },
           },
         },
+        known: {
+          description:
+            'What RSI shows on a hangar or buy-back card that the parser has met and handles, read or not (the Attributed tag is shown, not read). Nothing reads these while scanning: test/parser-corpus.test.js counts what a saved page in test/fixtures/corpus/ shows outside them, and any count above 0 fails. A new shape gets a fixture and its place here (or a rule above), never a skip.',
+          type: 'object',
+          required: ['hangar', 'buybacks'],
+          additionalProperties: false,
+          properties: {
+            hangar: {
+              description: 'A hangar (/account/pledges) card.',
+              type: 'object',
+              required: ['itemKinds', 'tags', 'labels', 'hooks'],
+              additionalProperties: false,
+              properties: {
+                itemKinds: {
+                  description: "A contained item's kind (.kind), as RSI writes it.",
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: 60,
+                  items: { type: 'string', minLength: 1 },
+                },
+                tags: {
+                  description: 'A tag beside the pledge name (.availability), as RSI writes it.',
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: 60,
+                  items: { type: 'string', minLength: 1 },
+                },
+                labels: {
+                  description:
+                    'A label on the card (label, .js-label): column names and action buttons.',
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: 60,
+                  items: { type: 'string', minLength: 1 },
+                },
+                hooks: {
+                  description:
+                    "A js-* class on the card: RSI's own script hooks, so a new one is a sign of a new feature.",
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: 60,
+                  items: { type: 'string', minLength: 1 },
+                },
+              },
+            },
+            buybacks: {
+              description: 'A buy-back (/account/buy-back-pledges) card.',
+              type: 'object',
+              required: ['labels', 'hooks'],
+              additionalProperties: false,
+              properties: {
+                labels: {
+                  description: 'A label on the card (dt, .js-label).',
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: 60,
+                  items: { type: 'string', minLength: 1 },
+                },
+                hooks: {
+                  description: 'A js-* class on the card.',
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: 60,
+                  items: { type: 'string', minLength: 1 },
+                },
+              },
+            },
+          },
+        },
       },
       $defs: {
         pattern: {
@@ -875,7 +975,7 @@
     },
     rules: {
       format: 1,
-      revision: '2026-10-14',
+      revision: '2026-10-18',
       paging: { page: 'page', size: 'pagesize' },
       signedOut: {
         redirect: { source: 'account\\/(connect|sign-?in)|\\/connect\\b', flags: 'i' },
@@ -901,6 +1001,9 @@
         gift: '.js-gift',
         melt: '.js-reclaim',
         date: '.date-col',
+        tag: '.availability',
+        label: 'label, .js-label',
+        hook: "[class*='js-']",
       },
       buybacks: {
         path: '/en/account/buy-back-pledges',
@@ -922,6 +1025,8 @@
           toSku: 'data-toskuid',
         },
         hrefId: { source: '(?<id>\\d+)', flags: '' },
+        label: 'dt, .js-label',
+        hook: "[class*='js-']",
         image: 'img',
         background: '[style*="background"]',
         price: '.price, [class*="price"], [class*="cost"]',
@@ -1154,6 +1259,45 @@
           query:
             'mutation AddCartMultiItemMutation($query: [CartAddInput!], $storeFront: String = "pledge") {\n  store(name: $storeFront) {\n    cart {\n      mutations {\n        addMany(query: $query) {\n          count\n          resources {\n            id\n            title\n          }\n        }\n      }\n    }\n  }\n}\n',
           storeFront: 'pledge',
+        },
+      },
+      known: {
+        hangar: {
+          itemKinds: [
+            'Component',
+            'FPS Equipment',
+            'Hangar decoration',
+            'Insurance',
+            'Paint',
+            'Ship',
+            'Skin',
+            'Upgrade',
+            'Vehicle',
+          ],
+          tags: ['Attributed'],
+          labels: ['Apply upgrade', 'Contains:', 'Created:', 'Exchange', 'Gift'],
+          hooks: [
+            'js-apply-upgrade',
+            'js-expand-arrow',
+            'js-gift',
+            'js-label',
+            'js-more',
+            'js-pledge-configuration-value',
+            'js-pledge-currency',
+            'js-pledge-id',
+            'js-pledge-last-alpha',
+            'js-pledge-name',
+            'js-pledge-name-reservations',
+            'js-pledge-nameable-ships',
+            'js-pledge-not-buybackable',
+            'js-pledge-value',
+            'js-reclaim',
+            'js-upgrade-data',
+          ],
+        },
+        buybacks: {
+          labels: ['Buy Back', 'Contained', 'Reclaim Date'],
+          hooks: ['js-label', 'js-open-ship-upgrades'],
         },
       },
     },

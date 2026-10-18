@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "revision": "2026-10-14",
+  "revision": "2026-10-18",
   "paging": { "page": "page", "size": "pagesize" },
   "signedOut": {
     "redirect": { "source": "account\\/(connect|sign-?in)|\\/connect\\b", "flags": "i" },
@@ -28,7 +28,10 @@
     "image": ".image",
     "gift": ".js-gift",
     "melt": ".js-reclaim",
-    "date": ".date-col"
+    "date": ".date-col",
+    "tag": ".availability",
+    "label": "label, .js-label",
+    "hook": "[class*='js-']"
   },
   "buybacks": {
     "path": "/en/account/buy-back-pledges",
@@ -50,6 +53,8 @@
       "toSku": "data-toskuid"
     },
     "hrefId": { "source": "(?<id>\\d+)", "flags": "" },
+    "label": "dt, .js-label",
+    "hook": "[class*='js-']",
     "image": "img",
     "background": "[style*=\"background\"]",
     "price": ".price, [class*=\"price\"], [class*=\"cost\"]",
@@ -271,6 +276,45 @@
       "operation": "AddCartMultiItemMutation",
       "query": "mutation AddCartMultiItemMutation($query: [CartAddInput!], $storeFront: String = \"pledge\") {\n  store(name: $storeFront) {\n    cart {\n      mutations {\n        addMany(query: $query) {\n          count\n          resources {\n            id\n            title\n          }\n        }\n      }\n    }\n  }\n}\n",
       "storeFront": "pledge"
+    }
+  },
+  "known": {
+    "hangar": {
+      "itemKinds": [
+        "Component",
+        "FPS Equipment",
+        "Hangar decoration",
+        "Insurance",
+        "Paint",
+        "Ship",
+        "Skin",
+        "Upgrade",
+        "Vehicle"
+      ],
+      "tags": ["Attributed"],
+      "labels": ["Apply upgrade", "Contains:", "Created:", "Exchange", "Gift"],
+      "hooks": [
+        "js-apply-upgrade",
+        "js-expand-arrow",
+        "js-gift",
+        "js-label",
+        "js-more",
+        "js-pledge-configuration-value",
+        "js-pledge-currency",
+        "js-pledge-id",
+        "js-pledge-last-alpha",
+        "js-pledge-name",
+        "js-pledge-name-reservations",
+        "js-pledge-nameable-ships",
+        "js-pledge-not-buybackable",
+        "js-pledge-value",
+        "js-reclaim",
+        "js-upgrade-data"
+      ]
+    },
+    "buybacks": {
+      "labels": ["Buy Back", "Contained", "Reclaim Date"],
+      "hooks": ["js-label", "js-open-ship-upgrades"]
     }
   }
 }
