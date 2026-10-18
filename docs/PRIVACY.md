@@ -1,6 +1,6 @@
 # Privacy Policy: Open Hangar
 
-**Last updated: 2026-10-14**
+**Last updated: 2026-10-18**
 
 Open Hangar is a source-available browser extension that reads your own Star Citizen / Roberts Space Industries (RSI) account data and stores it locally in your browser. Open Hangar works from its toolbar popup, which holds your hangar's summary, your Wishlist and your settings. Scans run in a hidden page, so no tab opens. A small Open Hangar page opens only when the extension needs to ask you something, or when a scan can't run hidden. Your full hangar is on our website, openhangar.space. This policy explains exactly what it does and does not do with data.
 
