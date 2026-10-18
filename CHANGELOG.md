@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Fixed: **Upgraded insurance.** A pledge whose insurance was upgraded now shows the upgraded term, not the one it came with.
+
 ## 0.4.1 — 2026-10-14
 
 - Changed: **No Target Price on Wishlist items.** Ships go on sale or they don't, so there's no price to wait for.
