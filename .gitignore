@@ -22,6 +22,8 @@ CLAUDE.local.md
 
 # local scratch files (not for the repo)
 _dump/
+# the developer's build's own browser profiles (scripts/dev-run.mjs)
+/.dev-profiles/
 .wrangler/
 
 # built by Vite from ui/ (npm run build:ui)

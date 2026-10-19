@@ -27,6 +27,11 @@
  * different name, version scheme, store item and Firefox add-on id.
  * scripts/check-store-build.mjs --beta checks both.
  *
+ * --dev (npm run dev:chrome, dev:edge, dev:firefox): a developer's build into dist/dev/
+ * and dist/dev-firefox/, named "Open Hangar (Dev)" with purple icons (dev/icons/) and a
+ * Firefox add-on id of its own, so it never stands in for the store copy.
+ * scripts/dev-run.mjs runs it in a browser profile of its own.
+ *
  * Build flags (src/flags.js, docs/FLAGS.md): each build's values go into its copy of
  * src/flags.js, and the code of every flag that's off is cut. Store builds get the
  * registry's defaults, --beta the beta set, and --flag name=on (or =off, repeatable)
@@ -79,6 +84,14 @@ const RUNTIME = ['_locales', 'icons', 'src'];
 
 const args = process.argv.slice(2);
 const BETA = args.includes('--beta');
+// --dev (npm run dev:chrome, dev:firefox): a developer's build that can sit beside the
+// store copy in any browser: its own name, purple icons (dev/icons/) and, on Firefox,
+// its own add-on id. Firefox keys an add-on's storage by that id, so a temporary
+// add-on with the store copy's id stands in for it and reads and writes its hangar.
+// Chrome and Edge give an unpacked build an id of its own already. Into dist/dev/ and
+// dist/dev-firefox/; --flag and --site work as in any developer's build.
+const DEV = args.includes('--dev');
+if (DEV && BETA) throw new Error('--dev and --beta are two different builds; pick one');
 // The sync site of every store build, the beta's included. Staging is never built in
 // to anything a store gets.
 const PRODUCTION_SITE = 'https://app.openhangar.space';
@@ -200,6 +213,8 @@ const SYNC_DATA = ['personallyIdentifyingInfo', 'financialAndPaymentInfo', 'webs
 // format, docs/BETA.md) next to the signed .xpi.
 const BETA_FIREFOX_ID = 'open-hangar-beta@draco-foundry';
 const BETA_FIREFOX_UPDATES = `${PRODUCTION_SITE}/beta/firefox-updates.json`;
+const DEV_NAME = 'Open Hangar (Dev)';
+const DEV_FIREFOX_ID = 'open-hangar-dev@draco-foundry';
 
 // What src/background.js loads with importScripts on Chrome besides flags.js
 // (test/build-flags.test.js checks the two lists agree).
@@ -248,8 +263,10 @@ const builds = BETA
       'beta-firefox': (m) =>
         targets.firefox(m, { id: BETA_FIREFOX_ID, update_url: BETA_FIREFOX_UPDATES }),
     }
-  : targets;
-const FIREFOX = new Set(['firefox', 'beta-firefox']);
+  : DEV
+    ? { dev: targets.chrome, 'dev-firefox': (m) => targets.firefox(m, { id: DEV_FIREFOX_ID }) }
+    : targets;
+const FIREFOX = new Set(['firefox', 'beta-firefox', 'dev-firefox']);
 const beta = BETA ? betaVersion() : null;
 
 // Our pages that may talk to the extension, and what each may ask (src/site-pages.js):
@@ -333,6 +350,12 @@ for (const [name, transform] of Object.entries(builds)) {
     for (const f of readdirSync('beta/icons').filter((f) => f.endsWith('.png')))
       cpSync(`beta/icons/${f}`, `${out}/icons/${f}`);
   }
+  if (DEV) {
+    manifest.name = DEV_NAME;
+    manifest.action = { ...manifest.action, default_title: DEV_NAME };
+    for (const f of readdirSync('dev/icons').filter((f) => f.endsWith('.png')))
+      cpSync(`dev/icons/${f}`, `${out}/icons/${f}`);
+  }
   writeFileSync(`${out}/manifest.json`, JSON.stringify(manifest, null, 2) + '\n');
   writeFlags(`${out}/${FLAGS_FILE}`, FLAGS);
   stripFlagsInDir(`${out}/src`, FLAGS);
@@ -376,6 +399,8 @@ for (const [name, transform] of Object.entries(builds)) {
     `built ${out}${KEEP_SYNC ? ' (with sync)' : ''}${SITE ? `, syncing to ${SITE}` : ''}` +
       (beta ? ` as ${BETA_NAME} ${beta.version} (${beta.version_name})` : '') +
       (FLAGS_ON.length ? `; flags on: ${FLAGS_ON.join(', ')}` : '') +
-      (DEV_SITE || DEV_ONLY_ON.length || OFF_DEFAULT ? ' (dev build, never for a store)' : ''),
+      (DEV || DEV_SITE || DEV_ONLY_ON.length || OFF_DEFAULT
+        ? ' (dev build, never for a store)'
+        : ''),
   );
 }
