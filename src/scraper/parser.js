@@ -531,6 +531,29 @@
     };
   };
 
+  // RSI's pager under a paged account list (hangar and buy-backs): → { current, max }
+  // (the page shown, and the highest page it links to; null when it doesn't say), or
+  // null with no pager. It reads page numbers from the links' ?page=N, not from their
+  // arrows, so the last page needs no markup of its own. The buy-back list's page-size
+  // picker is a plain link too (?page=1&pagesize=N), so whatever size RSI serves, these
+  // numbers follow it. scanHtmlSource in src/lib.js stops on them.
+  ns.parsePager = function parsePager(html) {
+    const doc =
+      typeof html === 'string' ? new DOMParser().parseFromString(html, 'text/html') : html;
+    const pager = doc.querySelector(RULES.paging.pager);
+    if (!pager) return null;
+    const pageOf = (a) => {
+      const query = (a?.getAttribute('href') || '').split('?')[1];
+      const n = Number(new URLSearchParams(query || '').get(RULES.paging.page));
+      return Number.isInteger(n) && n > 0 ? n : null;
+    };
+    const pages = [...pager.querySelectorAll(RULES.paging.links)].map(pageOf).filter(Boolean);
+    return {
+      current: pageOf(pager.querySelector(RULES.paging.active)),
+      max: pages.length ? Math.max(...pages) : null,
+    };
+  };
+
   ns.parseBuybacks = function parseBuybacks(payload) {
     if (payload == null) return [];
     if (typeof payload === 'string') {
