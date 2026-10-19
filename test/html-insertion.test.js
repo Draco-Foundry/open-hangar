@@ -45,8 +45,10 @@ function filesUnder(rel) {
 function findings(text) {
   const out = [];
   text.split('\n').forEach((line, i) => {
-    const code = line.replace(/^\s*(\/\/|\*|<!--).*$/, '');
-    for (const [re, what] of BANNED) if (re.test(code)) out.push(`${i + 1}: ${what}`);
+    // Whole-line comments (//, a /* */ block's *, <!-- -->) only talk about these.
+    const t = line.trimStart();
+    if (t.startsWith('//') || t.startsWith('*') || t.startsWith('<!--')) return;
+    for (const [re, what] of BANNED) if (re.test(line)) out.push(`${i + 1}: ${what}`);
   });
   return out;
 }
