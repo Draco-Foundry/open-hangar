@@ -14,7 +14,6 @@
     autoAsk,
     fleetNews,
     newReport,
-    openingTab,
     popupView,
     portrait,
     progressFraction,
@@ -272,8 +271,6 @@
       applyLook(prefs.look);
       await Promise.all([loadData(), loadSession(), loadAlerts(), readAccess(), readBanner()]);
       await readCookie();
-      const unseenNews = news.filter((m) => fresh.has(m.id)).length;
-      tab = v?.scannedAt == null ? 'hangar' : openingTab(prefs.tab, unseenNews);
       ready = true;
     })();
     // A sign-in or sign-out in another tab while the popup is open.
@@ -333,9 +330,9 @@
     shown = null;
   }
 
+  // Not saved: every popup opens on Hangar (the owner, 2026-10-19).
   function pickTab(id) {
     tab = id;
-    savePref({ tab: id });
   }
   // The tab row's keys: arrows move along (and wrap), Home and End jump.
   async function tabKey(e) {

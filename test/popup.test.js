@@ -271,13 +271,16 @@ test('Fleet News: the Wishlist first, then ships you own on sale, three at most'
   assert.deepEqual(fleetNews(null), []);
 });
 
-test('the tab the popup opens on: the last one, Hangar while Fleet News is unseen', async () => {
-  const { openingTab, TABS } = await data();
+test('the popup always opens on Hangar: no tab is kept between popups', async () => {
+  const { TABS } = await data();
   assert.deepEqual(TABS, ['hangar', 'wishlist', 'settings']);
-  assert.equal(openingTab('wishlist', 0), 'wishlist');
-  assert.equal(openingTab('wishlist', 2), 'hangar');
-  assert.equal(openingTab('alerts', 0), 'hangar', 'an old or unknown tab');
-  assert.equal(openingTab(undefined, 0), 'hangar');
+  const { cleanPrefs } = await import('../ui/popup/prefs.js');
+  // A tab saved by 0.5.0 or before is dropped on the next save.
+  assert.equal('tab' in cleanPrefs({ tab: 'wishlist' }), false);
+  const popup = fs.readFileSync(path.join(ROOT, 'ui/popup/Popup.svelte'), 'utf8');
+  assert.match(popup, /let tab = \$state\('hangar'\);/);
+  assert.doesNotMatch(popup, /savePref\(\{ tab/);
+  assert.doesNotMatch(popup, /prefs\.tab/);
 });
 
 test('Wishlist rows: named from the sale feed, on sale with the cheapest price, never guessed', async () => {
@@ -457,14 +460,16 @@ test('the popup settings: anything odd stored reads as the defaults', async () =
   assert.deepEqual(LOOKS, ['auto', 'dark', 'light']);
   assert.equal(CURRENCIES[0], 'USD');
   // No currency picked yet: '' (US dollars then, ui/popup/currency.js).
-  const def = { tab: 'hangar', look: 'auto', currency: '', seenVersion: '', reportSeenAt: 0 };
+  const def = { look: 'auto', currency: '', seenVersion: '', reportSeenAt: 0 };
   assert.deepEqual(cleanPrefs(undefined), def);
   assert.deepEqual(cleanPrefs([]), def);
   assert.deepEqual(cleanPrefs({ look: 'neon', currency: 'XYZ', reportSeenAt: 'x' }), def);
-  assert.deepEqual(
-    cleanPrefs({ tab: 'settings', look: 'light', seenVersion: '0.4.0', reportSeenAt: NOW }),
-    { ...def, tab: 'settings', look: 'light', seenVersion: '0.4.0', reportSeenAt: NOW },
-  );
+  assert.deepEqual(cleanPrefs({ look: 'light', seenVersion: '0.4.0', reportSeenAt: NOW }), {
+    ...def,
+    look: 'light',
+    seenVersion: '0.4.0',
+    reportSeenAt: NOW,
+  });
   assert.equal(cleanPrefs({ currency: 'EUR' }).currency, 'EUR');
   assert.equal(cleanPrefs({ currency: 'USD' }).currency, 'USD', 'USD picked stays picked');
 });
