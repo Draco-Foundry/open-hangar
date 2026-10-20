@@ -175,9 +175,12 @@ page itself: `dashboard.html` loads, in order, `scraper/parser.js`, `lib.js`,
    `DELAY_MS` (400 ms). Pages are never fetched in parallel.
 4. **Parse.** Each page goes through the source's `parse(html)`, which calls
    `window.OpenHangar.parsePledges` or `parseBuybacks` in `src/scraper/parser.js`.
-   Items are de-duplicated by id, and the loop stops when a page adds no new ids (RSI
-   returns the last page again for out-of-range page numbers). `MAX_PAGES` (1000) is a
-   safety cap.
+   Items are de-duplicated by id. The loop stops on RSI's pager (`parsePager`): when the
+   page shown links to no page after it, or RSI served another page than asked (it
+   returns the last page again for out-of-range page numbers). It also stops on an empty
+   page or one that adds no new ids, never on a short page: the buy-back list has a
+   page-size picker (10 to 100, a `pagesize` link), so a page's length says nothing.
+   `MAX_PAGES` (1000) is a safety cap.
    **Skipping an unchanged hangar.** Sources with `probe: true` (the hangar) check page 1
    against the saved scan first. If it matches, `unchangedSince()` reads only the last
    page (and, when that one is full, the page after it, which RSI should clamp back) and
