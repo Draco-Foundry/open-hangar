@@ -134,7 +134,7 @@ if (SITE_ARG) {
 // A --dev build syncs to staging unless --site says otherwise: Connecting a developer's
 // copy to a real account would replace that account's saved hangar on the website.
 // Staging lets in any Firefox copy, and Chrome or Edge copies whose ids it lists
-// (open-hangar-server's EXTENSION_IDS_EXTRA).
+// (the website's list of developer ids).
 const STAGING_SITE = 'https://staging.openhangar.space';
 const SITE = KEEP_SYNC ? SITE_ARG || (DEV ? STAGING_SITE : PRODUCTION_SITE) : '';
 // Built in to a site other than production: a developer's build.
