@@ -5,6 +5,8 @@ package-lock.json
 test/fixtures/*.json
 src/data/ship-catalog.json
 test/fixtures/*.html
+# Saved RSI pages, kept as RSI served them (scripts/scrub-capture.mjs)
+test/fixtures/corpus/*.html
 test/fixtures/referral-events.wikitext
 test/fixtures/loaner-matrix.html
 test/fixtures/included-vessels.html

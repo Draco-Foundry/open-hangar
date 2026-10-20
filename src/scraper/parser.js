@@ -562,4 +562,64 @@
     if (payload.querySelectorAll) return ns.parseBuybacksFromDOM(payload);
     return [];
   };
+
+  // --- What the parser didn't recognize --------------------------------------
+  // One hangar or buy-back page (HTML or a Document) → { pledges, items, tags,
+  // labels, hooks }, each a list of what the page shows outside the rules: a pledge
+  // with no id, name, readable date or kind; an item kind, a tag beside a pledge's
+  // name, a card label or a js-* class (RSI's script hooks, so a new one usually
+  // means a new feature) not in RULES.known. test/parser-corpus.test.js runs it over
+  // saved pages (test/parser-report.js) and fails on anything listed.
+  ns.unrecognized = function unrecognized(payload, kind) {
+    const doc =
+      typeof payload === 'string' ? new DOMParser().parseFromString(payload, 'text/html') : payload;
+    const clean = (s) =>
+      String(s || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const out = { pledges: [], items: [], tags: [], labels: [], hooks: [] };
+    const hangar = kind === 'hangar';
+    const known = hangar
+      ? { labels: RULES.known.hangar.labels, hooks: RULES.known.hangar.hooks }
+      : { labels: RULES.known.buybacks.labels, hooks: RULES.known.buybacks.hooks };
+    const cards = hangar
+      ? [...doc.querySelectorAll(RULES.hangar.id)].map(resolveCard)
+      : [...doc.querySelectorAll(RULES.buybacks.card)];
+
+    if (hangar) {
+      for (const p of ns.parsePledgesFromDOM(doc)) {
+        if (!p.id || !p.name) out.pledges.push(`a pledge with no ${p.id ? 'name' : 'id'}`);
+        else if (!p.date) out.pledges.push(`pledge ${p.id}: date doesn't read`);
+        else if (p.kind === 'other') out.pledges.push(`pledge ${p.id}: no kind`);
+        for (const c of p.contents) {
+          if (c.kind && !c.guessed && !RULES.known.hangar.itemKinds.includes(c.kind))
+            out.items.push(`pledge ${p.id}: item kind "${c.kind}"`);
+        }
+      }
+      for (const card of cards)
+        for (const t of card.querySelectorAll(RULES.hangar.tag)) {
+          const text = clean(t.textContent);
+          if (text && !RULES.known.hangar.tags.includes(text)) out.tags.push(`tag "${text}"`);
+        }
+    } else {
+      for (const b of ns.parseBuybacksFromDOM(doc)) {
+        if (!b.id || !b.name) out.pledges.push(`a buy-back with no ${b.id ? 'name' : 'id'}`);
+        else if (!ns.parseRsiDate(b.date)) out.pledges.push(`buy-back ${b.id}: date doesn't read`);
+      }
+    }
+
+    const labels = hangar ? RULES.hangar.label : RULES.buybacks.label;
+    const hooks = hangar ? RULES.hangar.hook : RULES.buybacks.hook;
+    for (const card of cards) {
+      for (const l of card.querySelectorAll(labels)) {
+        const text = clean(l.textContent);
+        if (text && !known.labels.includes(text)) out.labels.push(`label "${text}"`);
+      }
+      for (const el of card.querySelectorAll(hooks))
+        for (const c of String(el.className).split(' '))
+          if (c.startsWith('js-') && !known.hooks.includes(c)) out.hooks.push(`hook ${c}`);
+    }
+    for (const k of Object.keys(out)) out[k] = [...new Set(out[k])]; // one line per shape
+    return out;
+  };
 })();
