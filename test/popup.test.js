@@ -535,8 +535,8 @@ test('the portrait: only the copy the scan saved, only for this account', async 
 test('the shortcut: the browser’s for opening the popup, or none', async () => {
   const { popupShortcut } = await data();
   assert.equal(
-    popupShortcut([{ name: '_execute_action', shortcut: 'Alt+Shift+H' }]),
-    'Alt+Shift+H',
+    popupShortcut([{ name: '_execute_action', shortcut: 'Alt+Shift+O' }]),
+    'Alt+Shift+O',
   );
   assert.equal(popupShortcut([{ name: '_execute_action', shortcut: '' }]), '');
   assert.equal(popupShortcut([{ name: 'other' }]), null);
@@ -545,8 +545,8 @@ test('the shortcut: the browser’s for opening the popup, or none', async () =>
   // (scripts/connector.mjs, test/connector-build.test.js).
   const m = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
   assert.deepEqual(m.commands._execute_action.suggested_key, {
-    default: 'Alt+Shift+H',
-    mac: 'Alt+Shift+H',
+    default: 'Alt+Shift+O',
+    mac: 'Alt+Shift+O',
   });
 });
 

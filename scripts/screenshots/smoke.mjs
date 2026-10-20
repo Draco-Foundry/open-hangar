@@ -4884,7 +4884,7 @@ try {
   !setMissing.length &&
   set.alertsSw === 'false' &&
   set.notifyOff &&
-  set.shortcut === 'Alt+Shift+H' &&
+  set.shortcut === 'Alt+Shift+O' &&
   set.look === 'auto' &&
   !set.autoScan
     ? ok('Settings: every group, alerts off, the shortcut, no Auto Scan row until connected')
