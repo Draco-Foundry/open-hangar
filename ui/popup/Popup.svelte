@@ -14,7 +14,6 @@
     autoAsk,
     fleetNews,
     newReport,
-    openingTab,
     popupView,
     portrait,
     progressFraction,
@@ -276,8 +275,6 @@
       // A scan that stopped leaves nothing that reads as Scanning (src/background.js),
       // and Auto Scan Daily tries a run that stopped once more.
       chrome.runtime.sendMessage({ ohPopup: 'opened' }).catch(() => {});
-      const unseenNews = news.filter((m) => fresh.has(m.id)).length;
-      tab = v?.scannedAt == null ? 'hangar' : openingTab(prefs.tab, unseenNews);
       ready = true;
     })();
     // A sign-in or sign-out in another tab while the popup is open.
@@ -337,9 +334,9 @@
     shown = null;
   }
 
+  // Not saved: every popup opens on Hangar (the owner, 2026-10-19).
   function pickTab(id) {
     tab = id;
-    savePref({ tab: id });
   }
   // The tab row's keys: arrows move along (and wrap), Home and End jump.
   async function tabKey(e) {

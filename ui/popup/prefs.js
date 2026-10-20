@@ -1,7 +1,7 @@
-// The popup's own settings, in one key (`popupPrefs`): the tab it was closed on, the
-// Look (Match Browser, Dark, Light), the currency picked ('' until one is: US dollars
-// then, ./currency.js), the version whose What's New was read (Got It), and when the last
-// scan report was shown (shown once).
+// The popup's own settings, in one key (`popupPrefs`): the Look (Match Browser, Dark,
+// Light), the currency picked ('' until one is: US dollars then, ./currency.js), the
+// version whose What's New was read (Got It), and when the last scan report was shown
+// (shown once). Not the tab: every popup opens on Hangar (./Popup.svelte).
 import { CURRENCIES } from './currency.js';
 
 export const LOOKS = ['auto', 'dark', 'light'];
@@ -10,7 +10,6 @@ export { CURRENCIES };
 export function cleanPrefs(p) {
   const o = p && typeof p === 'object' && !Array.isArray(p) ? p : {};
   return {
-    tab: typeof o.tab === 'string' ? o.tab : 'hangar',
     look: LOOKS.includes(o.look) ? o.look : 'auto',
     currency: CURRENCIES.includes(o.currency) ? o.currency : '',
     seenVersion: typeof o.seenVersion === 'string' ? o.seenVersion : '',

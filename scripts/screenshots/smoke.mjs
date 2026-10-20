@@ -4638,11 +4638,16 @@ try {
   const pageNow = () => page.evaluate(() => Date.now());
   // The popup with storage seeded first (scripts/screenshots/demo-connector.js): each
   // load starts from the demo hangar again.
+  // `seed.__tab`: the tab to click once open (every popup opens on Hangar).
   const popAt = async (seed = {}, wait = '#pp-age') => {
     const hook = await page.evaluateOnNewDocument((s) => Object.assign(window, s), seed);
     await page.goto('about:blank');
     await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
     await page.removeScriptToEvaluateOnNewDocument(hook.identifier);
+    if (seed.__tab) {
+      await page.waitForSelector(`#pp-tab-${seed.__tab}`);
+      await page.click(`#pp-tab-${seed.__tab}`);
+    }
     await page.waitForSelector(wait);
     await sleep(250);
   };
@@ -4811,14 +4816,16 @@ try {
   keys.map((k) => k.selected).join() ===
     'pp-tab-wishlist,pp-tab-settings,pp-tab-hangar,pp-tab-settings,pp-tab-hangar,pp-tab-settings' &&
   keys.every((k) => k.focus === k.selected && k.panel === k.selected) &&
-  kept?.tab === 'settings'
-    ? ok('tabs: a tab list, arrows wrap, Home and End jump, the last one is remembered')
+  !('tab' in (kept || {}))
+    ? ok('tabs: a tab list, arrows wrap, Home and End jump, the tab picked is not kept')
     : fail(`popup tabs: ${JSON.stringify({ keys, kept })}`);
-  await popAt({ ...signedIn, __demoLocal: { popupPrefs: { tab: 'wishlist' } } }, '#pp-wish');
+  await popAt({ ...signedIn, __demoLocal: { popupPrefs: { tab: 'wishlist' } } }, '#pp-value');
   const reopened = await page.$eval('[role="tab"][aria-selected="true"]', (b) => b.id);
-  reopened === 'pp-tab-wishlist'
-    ? ok('opens where it was left (Wishlist)')
+  reopened === 'pp-tab-hangar'
+    ? ok('opens on Hangar, even with a tab saved by an older version')
     : fail(`popup reopened on ${reopened}`);
+  await page.click('#pp-tab-wishlist');
+  await page.waitForSelector('#pp-wish-connect');
   // Not connected: the Wishlist's Connect opens the extension's page for it (the
   // browser's sign-in window would close the popup).
   await page.click('#pp-wish-connect');
@@ -4832,7 +4839,7 @@ try {
   await popAt(
     {
       ...signedIn,
-      __demoLocal: { popupPrefs: { tab: 'settings' }, siteUrl: 'https://app.openhangar.space' },
+      __tab: 'settings', __demoLocal: { siteUrl: 'https://app.openhangar.space' },
     },
     '#pp-settings',
   );
@@ -5060,8 +5067,8 @@ try {
   await popAt(
     {
       ...signedIn,
+      __tab: 'settings',
       __demoLocal: {
-        popupPrefs: { tab: 'settings' },
         siteUrl: 'https://app.openhangar.space',
         siteLink: autoLink,
       },
@@ -5581,8 +5588,8 @@ try {
   await popAt(
     {
       ...signedIn,
+      __tab: 'wishlist',
       __demoLocal: {
-        popupPrefs: { tab: 'wishlist' },
         siteUrl: ppSite,
         siteLink: ppWishLink,
         alertsOn: true,
@@ -5639,8 +5646,8 @@ try {
   await popAt(
     {
       ...signedIn,
+      __tab: 'wishlist',
       __demoLocal: {
-        popupPrefs: { tab: 'wishlist' },
         siteUrl: ppSite,
         siteLink: ppWishLink,
         alertsOn: true,
@@ -5670,7 +5677,7 @@ try {
   await popAt(
     {
       ...signedIn,
-      __demoLocal: { popupPrefs: { tab: 'wishlist' }, siteUrl: ppSite, siteLink: ppWishLink },
+      __tab: 'wishlist', __demoLocal: { siteUrl: ppSite, siteLink: ppWishLink },
     },
     '#pp-wish-off',
   );
@@ -5704,8 +5711,8 @@ try {
           wishItem('sku:501', 'Cutlass - Ghoulish Green Paint', { category: 'paints' }),
         ],
       },
+      __tab: 'wishlist',
       __demoLocal: {
-        popupPrefs: { tab: 'wishlist' },
         siteUrl: ppSite,
         siteLink: ppWishLink,
         alertsOn: true,
@@ -5884,7 +5891,7 @@ try {
           wishItem('sku:501', 'Cutlass - Ghoulish Green Paint', { remind: false }),
         ],
       },
-      __demoLocal: { popupPrefs: { tab: 'wishlist' }, siteUrl: ppSite, siteLink: ppWishLink },
+      __tab: 'wishlist', __demoLocal: { siteUrl: ppSite, siteLink: ppWishLink },
     },
     '.pp-wedit li',
   );
@@ -5926,7 +5933,7 @@ try {
     {
       ...signedIn,
       __demoWish: { mode: 'items', items: [wishItem('ship:avenger-titan', 'Avenger Titan')] },
-      __demoLocal: { popupPrefs: { tab: 'wishlist' }, siteUrl: ppSite, siteLink: ppWishLink },
+      __tab: 'wishlist', __demoLocal: { siteUrl: ppSite, siteLink: ppWishLink },
     },
     '.pp-wedit li',
   );
@@ -5977,7 +5984,7 @@ try {
     return { ...db, owner: { nickname: 'Alt_Pilot', displayname: 'Alt Pilot' } };
   });
   await popAt(
-    { ...signedIn, __demoLocal: { popupPrefs: { tab: 'settings' }, 'profile:alt_pilot': alt } },
+    { ...signedIn, __tab: 'settings', __demoLocal: { 'profile:alt_pilot': alt } },
     '#pp-accounts',
   );
   const accts = await page.$$eval('#pp-accounts .pp-acct b', (bs) => bs.map((b) => b.textContent));
@@ -6502,7 +6509,7 @@ try {
   const why = (w, ships = []) => ({ why: w, ships });
   const alState = {
     alertsOn: true,
-    // Closed on Settings last time: Fleet News with something unseen opens on Hangar.
+    // A tab saved by an older version: the popup opens on Hangar all the same.
     popupPrefs: { tab: 'settings' },
     alerts: {
       v: 1,
