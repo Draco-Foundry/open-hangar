@@ -3892,7 +3892,17 @@
           connectedAt: Date.now(),
           lastSync: null,
         };
+        const was = await OH.getSiteLink();
         await chrome.storage.local.set({ siteLink: link });
+        // Connecting again while connected: the old link is revoked, as Disconnect does,
+        // so the account's Connected Extensions list doesn't keep a dead row (#741; the
+        // same in src/background.js oh-connect-finish). After the save, best effort.
+        if (was?.token && was.token !== link.token) {
+          await siteFetch(SYNC_PATH, {
+            method: 'DELETE',
+            headers: { authorization: `Bearer ${was.token}` },
+          }).catch(() => null);
+        }
         return link;
       }
       if (j.status === 'expired') return null;
