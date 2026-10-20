@@ -139,8 +139,11 @@ test("parsePager reads the hangar's pager, which has no page size in its links",
 for (const size of [10, 25, 50, 100]) {
   const shapes = [
     ['no buy-backs', 0],
+    ['one short page', size - 3],
     ['exactly one full page', size],
     ['one full page plus 1', size + 1],
+    ['two full pages', size * 2],
+    ['three pages ending on a short one', size * 2 + 1],
     ['several pages ending on a full one', size * 3],
   ];
   for (const [what, n] of shapes) {
@@ -194,4 +197,78 @@ test('without a pager, the scan still ends when a page brings nothing new', asyn
     served.map((s) => s.page),
     [1, 2, 3],
   );
+});
+
+// --- Saved real pages (test/fixtures/corpus, scrubbed) ------------------------------
+// The same stops on RSI's own markup: the hangar (10 pledges a page, no size picker)
+// and the buy-back list (its picker offers 10, 25, 50 and 100). A list of N pages is
+// the saved pages 1 to N with every pager link past N taken out, which is what RSI
+// shows on a list that ends there.
+const fs = require('node:fs');
+const path = require('node:path');
+const saved = (name) =>
+  fs.readFileSync(path.join(__dirname, 'fixtures', 'corpus', `${name}.html`), 'utf8');
+const endAt = (html, last) =>
+  html.replace(/<a [^>]*href="[^"]*[?&]page=(\d+)[^"]*"[^>]*>[\s\S]*?<\/a>/g, (a, n) =>
+    Number(n) > last ? '' : a,
+  );
+
+test('the saved pages read as RSI showed them', () => {
+  for (const n of [1, 2, 3])
+    assert.deepEqual(P.parsePager(saved(`hangar-page-${n}`)), { current: n, max: 23 });
+  assert.deepEqual(P.parsePager(saved('buybacks-page-1')), { current: 1, max: 11 });
+  assert.deepEqual(P.parsePager(endAt(saved('hangar-page-3'), 3)), { current: 3, max: 3 });
+});
+
+for (const last of [1, 2, 3]) {
+  test(`a saved hangar of ${last} page${last > 1 ? 's' : ''}: every pledge once, stops on page ${last}`, async () => {
+    // The scrub numbers each page's pledges from 9000001, so a page's own number goes in
+    // front to keep them apart, as on RSI.
+    const pages = [1, 2, 3]
+      .slice(0, last)
+      .map((n) =>
+        endAt(saved(`hangar-page-${n}`), last).replace(
+          /js-pledge-id" value="(\d+)"/g,
+          `js-pledge-id" value="${n}$1"`,
+        ),
+      );
+    const asked = [];
+    global.fetch = async (url) => {
+      const u = new URL(String(url));
+      if (!u.pathname.endsWith('/account/pledges')) return new Response('', { status: 404 });
+      const n = Number(u.searchParams.get('page'));
+      asked.push(n);
+      return new Response(pages[Math.min(n, last) - 1]); // past the end: the last page again
+    };
+    for (const k of Object.keys(store)) delete store[k];
+    const r = await OH.scanSource('hangar');
+    assert.equal(r.ok, true, r.error);
+    const want = pages.flatMap((h) => P.parsePledges(h).map((x) => x.id));
+    assert.equal(want.length, last * 10); // RSI's hangar shows 10 a page
+    assert.equal(new Set(want).size, want.length, 'the saved pages share no pledge');
+    assert.deepEqual(
+      r.items.map((x) => x.id),
+      want,
+    );
+    assert.deepEqual(
+      asked,
+      Array.from({ length: last }, (_, i) => i + 1),
+    );
+  });
+}
+
+test('a saved buy-back page that is the only one: 100 buy-backs, one request', async () => {
+  const html = endAt(saved('buybacks-page-1'), 1);
+  const asked = [];
+  global.fetch = async (url) => {
+    const u = new URL(String(url));
+    if (!u.pathname.endsWith(PATH)) return new Response('', { status: 404 });
+    asked.push(Number(u.searchParams.get('page')));
+    return new Response(html);
+  };
+  const r = await scan();
+  assert.equal(r.ok, true, r.error);
+  assert.equal(r.items.length, P.parseBuybacks(html).length);
+  assert.equal(r.items.length, 100);
+  assert.deepEqual(asked, [1]);
 });
