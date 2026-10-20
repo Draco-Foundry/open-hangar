@@ -1,0 +1,153 @@
+name: Auto-merge
+
+# Turns on GitHub's own auto-merge (squash) for a PR that's ready, so GitHub merges it
+# once the required checks pass and it has no conflicts (owner, 2026-10-20; how it
+# works: docs/dev/git.md, Auto-Merge). Agents only mark PRs ready; the `hold` label is
+# the owner's stop switch. A merge releases nothing: store uploads wait for the
+# owner's release tag and approval (publish.yml), and openhangar.space's site/ is
+# published by the owner (pages.yml).
+#
+# A PR qualifies when it is open, not a draft, into main, from this repo (never a
+# fork), not Dependabot's, titled as a conventional commit, has no branch plan in
+# docs/plans/ (README.md aside), has no `hold` label and changes none of OWNER_PATHS
+# below: workflows (CI changes get a person's look, and the App has no Workflows
+# permission) and the privacy text (changed only on the owner's word). The owner
+# merges those by hand. An event that breaks a rule turns auto-merge back off.
+#
+# The merge runs on a GitHub App's token, never GITHUB_TOKEN: GitHub starts no
+# workflow for a push made with GITHUB_TOKEN, so a merge made with it would skip CI
+# on main (ci.yml; publish.yml waits for it on a release commit) and the Last
+# updated badge (last-updated.yml). Until the owner sets the AUTO_MERGE_APP_CLIENT_ID
+# variable and the AUTO_MERGE_APP_KEY secret, a run only says what it would do.
+#
+# pull_request, not pull_request_target: nothing from the PR is checked out or run
+# (the rules read the PR through the API), and a fork's PR gets no secrets and is
+# skipped. Drafts, body edits and other labels never start a run.
+
+on:
+  pull_request:
+    types:
+      [
+        opened,
+        reopened,
+        synchronize,
+        ready_for_review,
+        converted_to_draft,
+        edited,
+        labeled,
+        unlabeled,
+      ]
+
+# The newest event for a PR wins; the rules read the PR as it is now, not the event.
+concurrency:
+  group: auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read # docs/plans/ at the PR's head
+  pull-requests: read # the PR, its labels and its files
+
+jobs:
+  auto-merge:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      (!github.event.pull_request.draft || github.event.action == 'converted_to_draft') &&
+      (github.event.action != 'edited' || github.event.changes.title || github.event.changes.base) &&
+      ((github.event.action != 'labeled' && github.event.action != 'unlabeled') || github.event.label.name == 'hold')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      GH_REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      # Files the owner merges by hand, as one extended regex (see the top).
+      OWNER_PATHS: '^\.github/workflows/|^site/privacy\.html$|^docs/PRIVACY\.md$|^docs/store-assets/privacy-'
+    steps:
+      - name: Rules
+        id: rules
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MAIN: ${{ github.event.repository.default_branch }}
+        run: |
+          pr=$(gh pr view "$PR" --json state,isDraft,title,baseRefName,headRefOid,labels,autoMergeRequest)
+          title=$(jq -r .title <<<"$pr")
+          head=$(jq -r .headRefOid <<<"$pr")
+          why=()
+          open=$(jq -r '.state == "OPEN"' <<<"$pr")
+          [ "$open" = true ] || why+=("it isn't open")
+          [ "$(jq -r .isDraft <<<"$pr")" = false ] || why+=("it's a draft")
+          [ "$(jq -r .baseRefName <<<"$pr")" = "$MAIN" ] ||
+            why+=("its base isn't $MAIN (a stacked PR waits for its base to merge)")
+          # The same title rule as ci.yml's PR rules.
+          printf '%s' "$title" | grep -Eq '^(feat|fix|perf|refactor|docs|test|build|ci|chore|style|revert)(\([a-z0-9._/-]+\))?!?: .+' ||
+            why+=("its title isn't a conventional commit")
+          jq -e '.labels | map(.name) | index("hold")' <<<"$pr" > /dev/null && why+=("it's labeled hold")
+          # The branch plan, read at the PR's head (no plan folder at all is fine).
+          if listing=$(gh api "repos/$GH_REPO/contents/docs/plans?ref=$head" --jq '.[].path' 2> err); then
+            plans=$(grep -v '^docs/plans/README.md$' <<<"$listing" | paste -sd ' ' - || true)
+          elif grep -q 'HTTP 404' err; then
+            plans=''
+          else
+            cat err; exit 1
+          fi
+          [ -z "$plans" ] || why+=("it still has a branch plan: $plans")
+          files=$(gh api --paginate "repos/$GH_REPO/pulls/$PR/files" --jq '.[].filename')
+          owners=$(grep -E "$OWNER_PATHS" <<<"$files" | paste -sd ' ' - || true)
+          [ -z "$owners" ] || why+=("it changes files the owner merges by hand: $owners")
+
+          on=$(jq -r '.autoMergeRequest != null' <<<"$pr")
+          reasons=$(printf '%s; ' "${why[@]}"); reasons=${reasons%; }
+          if [ ${#why[@]} -eq 0 ]; then
+            action=enable; say="Auto-merge on: GitHub squash-merges #$PR once its required checks pass."
+          elif [ "$on" = true ] && [ "$open" = true ]; then
+            action=disable; say="Auto-merge off for #$PR: $reasons."
+          else
+            action=none; say="No auto-merge for #$PR: $reasons."
+          fi
+          echo "$say"; echo "$say" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "action=$action"
+            echo "on=$on"
+            echo "head=$head"
+          } >> "$GITHUB_OUTPUT"
+          # The title goes through a file-safe delimiter: it's the PR author's text.
+          {
+            echo 'title<<TITLE_END_7f3c'
+            printf '%s\n' "$title"
+            echo 'TITLE_END_7f3c'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Not set up yet
+        if: steps.rules.outputs.action != 'none' && vars.AUTO_MERGE_APP_CLIENT_ID == ''
+        env:
+          ACTION: ${{ steps.rules.outputs.action }}
+        run: echo "::notice::Would $ACTION auto-merge, but the App isn't set up (AUTO_MERGE_APP_CLIENT_ID, AUTO_MERGE_APP_KEY; docs/dev/git.md)."
+
+      # A token for this repo only, with only what a merge needs.
+      - name: App token
+        id: app
+        if: steps.rules.outputs.action != 'none' && vars.AUTO_MERGE_APP_CLIENT_ID != ''
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.AUTO_MERGE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.AUTO_MERGE_APP_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Turn auto-merge on or off
+        if: steps.app.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          ACTION: ${{ steps.rules.outputs.action }}
+          ON: ${{ steps.rules.outputs.on }}
+          HEAD: ${{ steps.rules.outputs.head }}
+          TITLE: ${{ steps.rules.outputs.title }}
+        run: |
+          # Off first when it's already on, so a new title or head is what merges.
+          if [ "$ON" = true ]; then gh pr merge "$PR" --disable-auto; fi
+          if [ "$ACTION" = enable ]; then
+            # The squash commit's title is the PR's (the repo's default would take a
+            # one-commit PR's commit subject instead); its body stays GitHub's default,
+            # the commits' messages.
+            gh pr merge "$PR" --auto --squash --match-head-commit "$HEAD" --subject "$TITLE (#$PR)"
+          fi
