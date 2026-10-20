@@ -1,6 +1,7 @@
 <script>
   // One RSI Quick Link (#374): icon, label and an optional one-liner. It leaves the
   // extension for RSI: opens in a new tab; nothing is fetched or sent.
+  import { safeHTML } from './safe-html.js';
   import { QL_ICONS } from './quick-links.js';
 
   let { link, desc = false } = $props();
@@ -15,7 +16,8 @@
     stroke-width="1.8"
     stroke-linecap="round"
     stroke-linejoin="round"
-    aria-hidden="true">{@html QL_ICONS[link.i] || ''}</svg
+    aria-hidden="true"
+    use:safeHTML={QL_ICONS[link.i] || ''}></svg
   ><span class="ql-t">{link.t}{#if desc && link.d}<small>{link.d}</small>{/if}</span
   ></a
 >

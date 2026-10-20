@@ -46,6 +46,7 @@ Same on Windows and Mac unless noted.
 - Store zips: `npm run pack`; beta: `npm run build:beta`; privacy check after pack:
   `npm run test:privacy`. Dev flags: `npm run build -- --flag name=on --site=<url>`
 - Generators: `npm run schema`, `npm run rules`, `npm run privacy:plain`
+- Parser report over saved pages: `npm run report:parser`; scrub a saved page: `npm run scrub`
 - Env vars in docs are POSIX (`OH_SITE=… npm …`). PowerShell: `$env:OH_SITE='…'; npm …`
 
 ## Conventions
@@ -81,10 +82,15 @@ Same on Windows and Mac unless noted.
 - **Never put private data in issues, PRs or commits** (the repo is public): no emails,
   addresses, hangar contents or tokens. Nothing from the private server repo comes here.
   Never commit secrets or `.env` files.
+  The one exception is saved RSI pages scrubbed by `npm run scrub` into
+  `test/fixtures/corpus/` (README there). Why (2026-10-18): the parser needed real pages
+  to test against; the maintainer chose to scrub ids, prices, dates and account details.
 - **Private notes stay local.** A maintainer may keep a gitignored `CLAUDE.local.md` with
   their own rules. Never commit it or anything it points to (CI and the pre-commit hook
   check).
 - **Never load remote code.** Feature flags are build-time only (store policy).
+- **All HTML insertion goes through `setHTML` (`src/safe-html.js`; `use:safeHTML` in Svelte).**
+  Text from RSI goes in as text (`textContent`, `{value}`); `test/html-insertion.test.js` checks.
 - **npm only**, one lockfile (`package-lock.json`). Ask before adding a dependency.
 - **Read first, keep changes small:** one concern per PR, no refactoring of unrelated code.
   Debug by theory, steps with an expected result each, one at a time; file the rest.

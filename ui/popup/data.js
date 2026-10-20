@@ -329,13 +329,6 @@ export function fleetNews(items, unseen = new Set(), max = 3) {
     .map((x) => x.m);
 }
 
-// The tab the popup opens on: Hangar while Fleet News has something unseen, else the
-// one it was closed on.
-export function openingTab(saved, newsUnseen) {
-  if (newsUnseen > 0) return 'hangar';
-  return TABS.includes(saved) ? saved : 'hangar';
-}
-
 // --- The Wishlist tab ----------------------------------------------------------------------
 // The website's slug for a ship's name (its Ship Explorer's shipSlug), which its
 // Wishlist keys use: "Zeus Mk II CL" → "zeus-mk-ii-cl".

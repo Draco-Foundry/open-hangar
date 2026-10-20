@@ -1,9 +1,8 @@
 'use strict';
 
 /*
- * setHTML() in src/dashboard.js: the allowlist sanitizer every piece of
- * dynamic markup goes through. Pulled out of the file and run in jsdom.
- * Run: `npm test`.
+ * setHTML() in src/safe-html.js: the allowlist sanitizer, the one way markup
+ * reaches a page. Run in jsdom. Run: `npm test`.
  */
 
 const test = require('node:test');
@@ -12,20 +11,19 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { JSDOM } = require('jsdom');
 
-const src = fs.readFileSync(path.join(__dirname, '../src/dashboard.js'), 'utf8');
-const start = src.indexOf('const htmlParser = new DOMParser();');
-const end = src.indexOf('function setStatus(');
-assert.ok(start > 0 && end > start, 'setHTML block not found');
+const src = fs.readFileSync(path.join(__dirname, '../src/safe-html.js'), 'utf8');
 
 const dom = new JSDOM(
-  '<!doctype html><body><div id="d"></div><table><tbody id="tb"></tbody></table></body>',
+  '<!doctype html><body><div id="d"></div><table><tbody id="tb"></tbody></table>' +
+    '<svg id="ic" viewBox="0 0 24 24"></svg></body>',
   {
     runScripts: 'outside-only',
   },
 );
 const w = dom.window;
-w.console.warn = () => {};
-w.eval(`${src.slice(start, end)}; window.setHTML = setHTML;`);
+const dropped = [];
+w.console.warn = (m) => dropped.push(m);
+w.eval(`${src}; window.setHTML = self.OHSafeHTML.setHTML;`);
 const d = w.document.getElementById('d');
 
 test('keeps the markup the dashboard uses', () => {
@@ -63,4 +61,42 @@ test('empty input clears the element', () => {
   w.setHTML(d, '<p>x</p>');
   w.setHTML(d, '');
   assert.equal(d.childNodes.length, 0);
+});
+
+test('markup for an <svg> parses as SVG', () => {
+  const ic = w.document.getElementById('ic');
+  w.setHTML(
+    ic,
+    '<path d="M3 20V9"/><circle cx="9" cy="8" r="3.5"/><foreignObject><b>x</b></foreignObject>',
+  );
+  assert.deepEqual(
+    [...ic.children].map((n) => [n.localName, n.namespaceURI]),
+    [
+      ['path', 'http://www.w3.org/2000/svg'],
+      ['circle', 'http://www.w3.org/2000/svg'],
+    ],
+  );
+});
+
+// The Svelte pages' icons go through use:safeHTML (ui/lib/safe-html.js): every one
+// must come through whole, or the UI smoke test fails on the "[setHTML] dropped" log.
+test('every icon the Svelte pages draw passes the sanitizer untouched', async () => {
+  const { QL_ICONS } = await import('../ui/lib/quick-links.js');
+  const svelteIcons = (file) => {
+    const text = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+    return [...text.matchAll(/'(<(?:path|circle|rect)[^']*)'/g)].map((m) => m[1]);
+  };
+  const icons = [
+    ...Object.values(QL_ICONS),
+    ...svelteIcons('ui/topbar/MoreMenu.svelte'),
+    ...svelteIcons('ui/topbar/ScanSplit.svelte'),
+  ];
+  assert.ok(icons.length > 10, `found ${icons.length} icons`);
+  const ic = w.document.getElementById('ic');
+  dropped.length = 0;
+  for (const markup of icons) {
+    w.setHTML(ic, markup);
+    assert.ok(ic.children.length > 0, markup);
+  }
+  assert.deepEqual(dropped, []);
 });

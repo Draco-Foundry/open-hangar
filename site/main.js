@@ -12,7 +12,7 @@
       });
       img.src = tab.dataset.src;
       img.alt = tab.dataset.title + ': ' + tab.dataset.text;
-      cap.innerHTML = '';
+      cap.replaceChildren();
       var strong = document.createElement('strong');
       strong.textContent = tab.dataset.title;
       strong.textContent += ':';
