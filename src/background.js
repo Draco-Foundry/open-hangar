@@ -287,6 +287,15 @@ siteHandlers['oh-connect-begin'] = async (msg, origin) => {
   });
   return { ok: true, challenge: b64url(new Uint8Array(digest)), redirect_uri: redirect };
 };
+// The old link's token, revoked as src/lib.js OH.siteDisconnect does. Best effort.
+async function revokeOldLink(was, token, base) {
+  if (!was?.token || was.token === token) return;
+  await fetch(`${base.replace(/\/+$/, '')}/api/v1/sync`, {
+    method: 'DELETE',
+    credentials: 'omit',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${was.token}` },
+  }).catch(() => null);
+}
 siteHandlers['oh-connect-finish'] = async (msg, origin) => {
   const { siteConnect: p } = await chrome.storage.session.get('siteConnect');
   await chrome.storage.session.remove('siteConnect');
@@ -304,11 +313,16 @@ siteHandlers['oh-connect-finish'] = async (msg, origin) => {
   }).catch(() => null);
   if (!res || !res.ok) return { ok: false, error: "That didn't dock. Try again." };
   const j = await res.json();
+  const old = await chrome.storage.local.get(['siteLink', 'siteUrl']);
   await chrome.storage.local.set({
     siteLink: { token: j.token, name: j.name || '', connectedAt: Date.now(), lastSync: null },
     siteUrl: origin, // sync goes to the site you connected on
     ...(msg.sync ? { siteSyncRequested: Date.now() } : {}),
   });
+  // Connecting again while connected: the link it replaced is revoked at the site it was
+  // made on, so the account's Connected Extensions list doesn't keep a row that never
+  // syncs again (#741). After the save, so a slow or failed revoke never costs the new link.
+  await revokeOldLink(old.siteLink, j.token, old.siteUrl || origin);
   // An Open Hangar tab already open comes to the front instead of a second one (#658):
   // a scan running there keeps going, and the sync waits for it.
   await dashboardTab('#home');

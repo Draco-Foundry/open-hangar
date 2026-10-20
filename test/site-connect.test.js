@@ -17,6 +17,8 @@ function load({
   granted = true,
   flags = STORE_FLAGS,
   contexts = null,
+  local = {},
+  revoke = async () => ({ ok: true }),
 } = {}) {
   const fetched = [];
   const x = loadBackground({
@@ -25,7 +27,12 @@ function load({
     granted,
     flags,
     contexts,
+    local,
     fetch: async (url, init) => {
+      if (init.method === 'DELETE') {
+        fetched.push({ url, method: 'DELETE', auth: init.headers.authorization });
+        return revoke();
+      }
       fetched.push({ url, body: JSON.parse(init.body) });
       return { ok: true, json: async () => ({ token: 'oht_x', name: 'ExamplePilot' }) };
     },
@@ -98,6 +105,44 @@ test('no sync asked, no sync flagged', async () => {
   await x.send({ type: 'oh-connect-begin' }, SITE);
   await x.send({ type: 'oh-connect-finish', code: 'c', sync: false }, SITE);
   assert.equal(x.stores.local.siteSyncRequested, undefined);
+});
+
+// Connecting again while connected (#741): the old link is revoked at the site it was
+// made on, so the account's Connected Extensions list doesn't keep a dead row.
+const OLD = 'https://app.openhangar.space';
+test('connecting again revokes the old link at its own site', async () => {
+  const x = load({ local: { siteLink: { token: 'oht_old' }, siteUrl: OLD } });
+  await x.send({ type: 'oh-connect-begin' }, SITE);
+  await x.send({ type: 'oh-connect-finish', code: 'c' }, SITE);
+  assert.deepEqual(x.fetched[1], {
+    url: `${OLD}/api/v1/sync`,
+    method: 'DELETE',
+    auth: 'Bearer oht_old',
+  });
+  assert.equal(x.stores.local.siteLink.token, 'oht_x');
+  assert.equal(x.stores.local.siteUrl, SITE);
+});
+
+test('the same token back is not revoked', async () => {
+  const x = load({ local: { siteLink: { token: 'oht_x' }, siteUrl: SITE } });
+  await x.send({ type: 'oh-connect-begin' }, SITE);
+  await x.send({ type: 'oh-connect-finish', code: 'c' }, SITE);
+  assert.equal(x.fetched.length, 1, 'only the token exchange');
+  assert.equal(x.stores.local.siteLink.token, 'oht_x');
+});
+
+test('a revoke that fails still keeps the new link', async () => {
+  const x = load({
+    local: { siteLink: { token: 'oht_old' } },
+    revoke: async () => {
+      throw new Error('offline');
+    },
+  });
+  await x.send({ type: 'oh-connect-begin' }, SITE);
+  const done = await x.send({ type: 'oh-connect-finish', code: 'c' }, SITE);
+  assert.deepEqual(done, { ok: true, name: 'ExamplePilot' });
+  assert.equal(x.fetched[1].url, `${SITE}/api/v1/sync`, 'no siteUrl kept: the site connected on');
+  assert.equal(x.stores.local.siteLink.token, 'oht_x');
 });
 
 test('other websites get no answer; finishing needs a begin from the same site', async () => {
