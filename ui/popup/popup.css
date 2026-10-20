@@ -220,6 +220,24 @@ body {
   align-items: flex-start;
   gap: 6px;
 }
+/* The basic page's notices at the top of every tab: an update ready, status.json's banner. */
+.pp-notice {
+  margin: 0 16px 10px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  text-wrap: pretty;
+}
+.pp-notice.warn {
+  background: var(--warn-soft);
+  border-color: var(--warn-line);
+}
 
 /* --- Tabs --- */
 .pp-tabs {
