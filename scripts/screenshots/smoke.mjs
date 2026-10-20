@@ -4744,6 +4744,58 @@ try {
   !pop.wide
     ? ok('Edge B: the lifted panel, its ring and the cobalt bar, 360 px, no sideways scroll')
     : fail(`popup look: ${JSON.stringify(pop)}`);
+  // The basic page's notices at the top of every tab (#698, #664): status.json's banner
+  // (as plain text) and an update the browser holds, with Reload to Update; the version
+  // in the header is the manifest's.
+  const notices = async () => {
+    await told({
+      updateReady: { newValue: '9.9.9' },
+      remoteStatus: {
+        newValue: { at: await pageNow(), data: { banner: { message: '<b>RSI</b> changed.' } } },
+      },
+    });
+    const read = () =>
+      page.evaluate(() => ({
+        update: document.getElementById('pp-update')?.textContent.replace(/\s+/g, ' ').trim(),
+        reload: !!document.getElementById('pp-update-reload'),
+        banner: document.getElementById('pp-banner')?.textContent.trim(),
+        html: document.getElementById('pp-banner')?.innerHTML.includes('<b>'),
+        warn: !!document.getElementById('pp-banner')?.classList.contains('warn'),
+        ver: document.getElementById('pp-ver').textContent.trim(),
+        manifest: 'v' + chrome.runtime.getManifest().version,
+        wide: document.documentElement.scrollWidth > 360,
+        // Styled, not bare divs: the card's padding and border (once lost in a squash).
+        styled: ['pp-update', 'pp-banner'].every((id) => {
+          const s = getComputedStyle(document.getElementById(id));
+          return parseFloat(s.paddingLeft) > 0 && parseFloat(s.borderTopWidth) > 0;
+        }),
+      }));
+    const hangar = await read();
+    await page.click('#pp-tab-settings');
+    await sleep(150);
+    const settings = await read();
+    await page.click('#pp-tab-hangar');
+    // Let in, and the banner taken down (a fresh copy without one).
+    await told({ updateReady: {}, remoteStatus: { newValue: { at: await pageNow(), data: {} } } });
+    const gone = await page.evaluate(
+      () => !document.getElementById('pp-update') && !document.getElementById('pp-banner'),
+    );
+    return { hangar, settings, gone };
+  };
+  const nt = await notices();
+  [nt.hangar, nt.settings].every(
+    (n) =>
+      n.update === 'Open Hangar 9.9.9 is ready. Reload to Update' &&
+      n.reload &&
+      n.banner === '<b>RSI</b> changed.' &&
+      !n.html &&
+      n.warn &&
+      n.styled &&
+      n.ver === n.manifest &&
+      !n.wide,
+  ) && nt.gone
+    ? ok('notices: update ready and the status banner on every tab, the version the manifest’s')
+    : fail(`popup notices: ${JSON.stringify(nt)}`);
   // The tab row: arrows move along and wrap, Home and End jump, the choice is kept.
   await page.focus('#pp-tab-hangar');
   const keyTo = async (key) => {
