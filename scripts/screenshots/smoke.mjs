@@ -5476,6 +5476,18 @@ try {
   });
   await sleep(100);
   const barHold = await sbar();
+  // The longest it gets (a time like 12:45 PM) stays on one line of the bar, uncut, at
+  // the popup's width.
+  const barFits = await page.evaluate(() => {
+    const t = document.querySelector('#pp-sbar .pp-sbar-t > span');
+    t.textContent = 'RSI asked us to wait. Scan after 12:45 PM';
+    return {
+      fits: t.scrollWidth <= t.clientWidth,
+      used: t.scrollWidth,
+      room: t.clientWidth,
+      width: document.body.clientWidth,
+    };
+  });
   await popAt(signedIn, '#pp-scan');
   await page.evaluate(() => (__demo.answers.scan = { ok: false, error: 'busy' }));
   await page.click('#pp-scan');
@@ -5495,14 +5507,15 @@ try {
     barDone.text?.join() === 'Scanned in 1m 12s' &&
     barDone.scan === 'on' &&
     barHold.tone === 'note' &&
-    /^RSI asked us to wait\. Scan at \d/.test(barHold.text?.join() || '') &&
+    /^RSI asked us to wait\. Scan after \d/.test(barHold.text?.join() || '') &&
     barHold.scan === 'off' &&
+    barFits.fits &&
     barBusy.text?.join() === 'A scan is already running.' &&
     barBusy.scan === 'off';
   barOk
     ? ok("scan bar: in Scan's place at once, names and counts, fills by page, waits, done, holds")
     : fail(
-        `popup scan bar: ${JSON.stringify({ barAsked, barHangar, barWait, barDone, barHold, barBusy })}`,
+        `popup scan bar: ${JSON.stringify({ barAsked, barHangar, barWait, barDone, barHold, barFits, barBusy })}`,
       );
   // A scan whose page went away (its mark left behind): Scan stopped, Scan Again.
   await popAt(
