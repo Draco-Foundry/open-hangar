@@ -92,6 +92,26 @@ test('--dev and --beta are refused together', () => {
   );
 });
 
+test('dev build syncs to staging unless --site says otherwise', () => {
+  const site = (dir, t) => {
+    const lib = fs.readFileSync(path.join(dir, 'dist', t, 'src', 'lib.js'), 'utf8');
+    return lib.match(/const SITE_BUILT_IN = ("[^"]*");/)?.[1];
+  };
+  let dir = pack('--dev');
+  try {
+    for (const t of ['dev', 'dev-firefox'])
+      assert.equal(site(dir, t), '"https://staging.openhangar.space"', t);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  dir = pack('--dev', '--site=https://app.openhangar.space');
+  try {
+    assert.equal(site(dir, 'dev'), '"https://app.openhangar.space"');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('every browser runs the dev build in a profile of its own in this folder', async () => {
   const { runOptions, PROFILES } = await devRun();
   const root = path.join(os.tmpdir(), 'oh-repo');

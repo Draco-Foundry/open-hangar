@@ -254,6 +254,9 @@ npm run dev:chrome
 **Open Hangar (Dev)** (purple icons with a DEV tag) into `dist/dev/` or
 `dist/dev-firefox/` and opens the browser with a profile kept in `.dev-profiles/` (not
 committed), so you sign in to RSI there once. Close the browser or press Ctrl+C to stop.
+It syncs to staging.openhangar.space, never your real account on app.openhangar.space
+(add `--site=https://app.openhangar.space` to `dev:build` if you mean to). Staging lets in
+Firefox copies, and Chrome or Edge copies whose ids it has been told about.
 If the browser isn't where it usually is, set `CHROME_PATH`, `EDGE_PATH` or
 `FIREFOX_PATH`. Build flags: `npm run dev:build -- --flag name=on`, then
 `node scripts/dev-run.mjs chrome`.
