@@ -16,6 +16,7 @@
   import { t } from './copy.js';
   import {
     barFraction,
+    barNext,
     barLabel,
     reportDone,
     reportPaused,
@@ -95,6 +96,36 @@
     if (peak.run !== run) peak = { run, f: 0 };
     peak.f = Math.max(peak.f, barFraction(sc.progress));
     return peak.f;
+  });
+  // Between the scan's writes the fill creeps on towards where the next page puts it
+  // (./data.js barNext), over about as long as a page has been taking, and stops just
+  // short of it: the bar keeps moving and never runs ahead of the scan.
+  const next = $derived(fill == null ? null : Math.max(fill, barNext(sc.progress)));
+  const runId = $derived(sc.run || sc.progress?.run || null);
+  let fillEl = $state();
+  let pace = { run: null, at: 0, gap: 1500 };
+  const still = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  $effect(() => {
+    const el = fillEl;
+    if (!el) return;
+    if (fill == null) {
+      el.style.transition = '';
+      el.style.width = '';
+      return;
+    }
+    const t = performance.now();
+    const run = runId;
+    if (pace.run !== run) pace = { run, at: t, gap: 1500 };
+    else if (t - pace.at > 200) pace.gap = Math.min(8000, Math.max(600, (pace.gap + (t - pace.at)) / 2));
+    pace.at = t;
+    el.style.transition = 'width 0.4s ease-out';
+    el.style.width = `${fill * 100}%`;
+    if (still || next <= fill) return;
+    const creep = setTimeout(() => {
+      el.style.transition = `width ${pace.gap}ms linear`;
+      el.style.width = `${(fill + (next - fill) * 0.9) * 100}%`;
+    }, 400);
+    return () => clearTimeout(creep);
   });
   const hold = $derived(running ? null : scanHold(lastReport, now));
   const holdTime = (at) =>
@@ -270,7 +301,7 @@
       aria-valuenow={bar.tone === 'run' && fill != null ? Math.round(fill * 100) : null}
       aria-valuetext={bar.tone === 'run' ? [bar.text, bar.n].filter(Boolean).join(' ') : null}
     >
-      <i class:wait={bar.tone === 'run' && fill == null} style:width={bar.tone === 'run' && fill != null ? `${fill * 100}%` : null}
+      <i class:wait={bar.tone === 'run' && fill == null} bind:this={fillEl}
       ></i>
       <span class="pp-sbar-t"><span>{bar.text}</span>{#if bar.n}<span class="pp-sbar-n">{bar.n}</span>{/if}</span>
     </div>

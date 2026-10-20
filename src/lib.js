@@ -1652,6 +1652,10 @@
       }
       if (!auto) await sleep(DELAY_MS);
     }
+    // Pages read against the page count RSI's pager showed (the popup's scan bar fills by
+    // it), so a pager that says more pages than there are shows in the flight log.
+    if (lastPage)
+      OH.log('info', src.id, `${lastPage} pages read, RSI's pager showed ${pages ?? 'none'}`);
     // Still finding new items on the last allowed page: the list goes on, so
     // report it as partial (saved without counting the rest as "removed").
     if (lastPage === MAX_PAGES && lastAdded > 0 && !ended) {

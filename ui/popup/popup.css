@@ -296,7 +296,8 @@ body {
   padding: 10px 2px 6px;
 }
 .pp-first .pp-btn,
-.pp-empty .pp-btn {
+.pp-empty .pp-btn,
+.pp-first .pp-sbar {
   align-self: stretch;
 }
 .pp-big-ic {

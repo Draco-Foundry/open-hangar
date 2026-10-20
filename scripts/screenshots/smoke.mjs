@@ -5437,6 +5437,14 @@ try {
   await barProg({ part: 'hangar', page: 2, count: 1214, pages: 4 });
   await sleep(100);
   const barHangar = await sbar();
+  // Between pages the fill creeps on: past page 2's point (30%), never to page 3's (42.5%).
+  const fillAt = () =>
+    page.evaluate(() => {
+      const b = document.getElementById('pp-sbar');
+      return b.querySelector('i').getBoundingClientRect().width / b.clientWidth;
+    });
+  await sleep(1800);
+  const barCreep = await fillAt();
   await barProg({ part: 'hangar', page: 3, count: 1214, pages: 4, retry: { attempt: 1, of: 3 } });
   await sleep(100);
   const barWait = await sbar();
@@ -5493,13 +5501,26 @@ try {
   await page.click('#pp-scan');
   await sleep(150);
   const barBusy = await sbar();
+  // Before the first scan: the bar is as wide as Scan was, not a sliver.
+  await popAt({ __demoLocal: { db: null } }, '#pp-first');
+  await page.evaluate(() => (__demo.answers.scan = { ok: true }));
+  await page.click('#pp-scan');
+  await sleep(100);
+  const barFirst = await page.evaluate(() => {
+    const b = document.getElementById('pp-sbar');
+    const box = document.getElementById('pp-first');
+    return b ? b.getBoundingClientRect().width / box.clientWidth : 0;
+  });
   await page.removeScriptToEvaluateOnNewDocument(barHook.identifier);
   const barOk =
+    barFirst > 0.8 &&
     barAsked.text?.join() === 'Scanning' &&
     barAsked.scan === 'none' &&
     !barAsked.top &&
     barHangar.text?.join() === 'Hangar,1,214' &&
     barHangar.now === 30 &&
+    barCreep > 0.31 &&
+    barCreep < 0.425 &&
     barHangar.steps === 0 &&
     barWait.text?.join() === 'Waiting on RSI' &&
     barWait.now === 30 &&
@@ -5515,7 +5536,7 @@ try {
   barOk
     ? ok("scan bar: in Scan's place at once, names and counts, fills by page, waits, done, holds")
     : fail(
-        `popup scan bar: ${JSON.stringify({ barAsked, barHangar, barWait, barDone, barHold, barFits, barBusy })}`,
+        `popup scan bar: ${JSON.stringify({ barFirst, barAsked, barHangar, barCreep, barWait, barDone, barHold, barFits, barBusy })}`,
       );
   // A scan whose page went away (its mark left behind): Scan stopped, Scan Again.
   await popAt(

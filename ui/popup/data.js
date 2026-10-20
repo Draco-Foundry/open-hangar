@@ -180,6 +180,16 @@ export function barFraction(p) {
   if (!isObj(p)) return from;
   return Math.round((from + (to - from) * partDone(p)) * 1000) / 1000;
 }
+// Where the fill will be after the next page (or list, or pack) lands, so the bar can
+// creep towards it while it's read (the owner, 2026-10-20: it should move all the time,
+// not wait on a page). A part that reads no pages creeps towards its end.
+export function barNext(p) {
+  const [, to] = BAR_SPAN[p?.part] || BAR_SPAN.start;
+  if (!isObj(p) || !['hangar', 'buybacks', 'referrals', 'packs'].includes(p.part)) return to;
+  const page = counted(p.page) ? p.page : 0;
+  const read = p.retry ? Math.max(0, page - 1) : page;
+  return Math.min(to, barFraction({ ...p, page: read + 1, retry: null }));
+}
 const BAR_KEY = {
   start: 'popup.scanning-short',
   account: 'popup.part-account',

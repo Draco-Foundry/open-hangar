@@ -206,6 +206,37 @@ test('scan bar: fills by RSI page count, only forward, a part never waits on its
   assert.equal(barFraction({ part: 'packs', page: 0, count: 0 }), 0);
 });
 
+test('scan bar: creeps towards where the next page puts it, never past', async () => {
+  const { barFraction, barNext } = await data();
+  const h = (page, pages, retry = null) => ({ part: 'hangar', page, pages, retry });
+  // Page 2 of 4 read: the next point is page 3's.
+  assert.equal(barNext(h(2, 4)), barFraction(h(3, 4)));
+  // A page being retried: still towards that page.
+  assert.equal(barNext(h(3, 4, { attempt: 1, of: 3 })), barFraction(h(3, 4)));
+  // The last page read: towards the part's end, never into the next part.
+  assert.equal(barNext(h(4, 4)), 0.55);
+  assert.equal(barNext(h(1, 1)), 0.55);
+  // No pager: the eased next page, still short of the end.
+  assert.ok(barNext(h(5, null)) > barFraction(h(5, null)) && barNext(h(5, null)) < 0.55);
+  // Parts without pages creep towards their end.
+  assert.equal(barNext({ part: 'account' }), 0.05);
+  assert.equal(barNext({ part: 'sync' }), 1);
+  assert.equal(barNext(null), 0.02);
+  assert.equal(
+    barNext({ part: 'referrals', page: 1, pages: 3 }),
+    barFraction({ part: 'referrals', page: 2, pages: 3 }),
+  );
+  // Always ahead of (or at) where it is.
+  for (const p of [
+    h(0, 4),
+    h(2, 4),
+    h(4, 4),
+    { part: 'buybacks', page: 1, pages: 2 },
+    { part: 'start' },
+  ])
+    assert.ok(barNext(p) >= barFraction(p));
+});
+
 test('scan bar: names the part and counts what it has read', async () => {
   const { barLabel } = await data();
   const { t } = await import('../ui/popup/copy.js');
