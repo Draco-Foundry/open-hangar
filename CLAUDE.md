@@ -61,6 +61,12 @@ Same on Windows and Mac unless noted.
   `.svelte`, `.css`). No ESLint or type check: web-ext lint is the only linter.
 - Guard tests block a change until its pair is updated (permissions, storage budget,
   privacy policy, export bytes, sync schema, build flags). Update both, never the test alone.
+- A change to how RSI's pages are read (`src/scraper/parser.js`, `src/parser-rules.js`,
+  `src/data/parser-rules.json`) bumps `PARSER_VERSION` in `src/hangar-shape.js`, so data
+  the old parser saved shows as stale (`OH.parserStale`) until the next scan. When the
+  parsed data can't change (a comment, a report), a commit says so instead with the
+  trailer `Parser-Version-Unchanged: <why>`. CI checks it (`scripts/check-parser-version.mjs`).
+  Why (2026-10-18): a parser fix otherwise leaves the old reading on show as current.
 - PR titles are Conventional Commits with a lowercase scope; squash-merge. Player-facing
   changes get a CHANGELOG bullet under `## Unreleased` ([docs/dev/git.md](docs/dev/git.md)).
 - Words, look and what not to build: [docs/dev/copy-and-style.md](docs/dev/copy-and-style.md),

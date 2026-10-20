@@ -48,6 +48,17 @@ jobs:
           fi
           node scripts/check-private.mjs || ok=false
           $ok
+      # A PR that changes how RSI's pages are read bumps PARSER_VERSION
+      # (src/hangar-shape.js) or a commit says why not (scripts/check-parser-version.mjs).
+      - name: Parser version
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate > "$RUNNER_TEMP/pr-files.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/commits" --paginate > "$RUNNER_TEMP/pr-commits.json"
+          node scripts/check-parser-version.mjs --pr "$RUNNER_TEMP/pr-files.json" "$RUNNER_TEMP/pr-commits.json"
       # Docs-only PRs (Markdown, docs/, the landing page in site/, issue templates)
       # skip the slow UI test and the store packaging; the fast checks still run.
       # When in doubt (not a PR, or the file list can't be read) everything runs.
