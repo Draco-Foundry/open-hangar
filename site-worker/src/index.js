@@ -6,7 +6,9 @@
 // (/api/game-status, /api/ships, /api/catalog, /api/referral-events,
 // /api/known-issues): the extension only talks to RSI and this site.
 // The paths below reach this script first (run_worker_first in wrangler.jsonc),
-// and so does any path with no file in ../site. Every file there, including the
+// and so does any path with no file in ../site; any of those that isn't a route
+// named here gets a 404 page (site/404.html), never the website's own pages, so
+// they aren't duplicated here for search engines. Every file there, including the
 // extension's status.json kill switch, rates.json and the Troubleshooting page
 // (/help.html), is served straight from the static files as before.
 //
@@ -46,6 +48,11 @@ const FEEDS = new Set([
   '/api/store/on-sale',
 ]);
 
+// Everything else the website serves on openhangar.space, by prefix: the Store's
+// data, the Ship Explorer's ships, and the files the home page loads.
+const PREFIXES = ['/api/store/', '/ships/', '/_astro/', '/fonts/'];
+const FILES = new Set(['/favicon.svg']);
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -65,6 +72,14 @@ export default {
     const help = path === '/help';
     const newPage =
       help || path === '/whats-next' || path === '/ships' || path.startsWith('/ships/');
+
+    // Any other address: this site's 404 page, not the website's pages.
+    if (
+      !(PAGES.has(path) || FEEDS.has(path) || FILES.has(path)) &&
+      !PREFIXES.some((prefix) => path.startsWith(prefix))
+    ) {
+      return notFound(request, env);
+    }
 
     // Pages and feeds through the gateway, the request as it came: the gateway
     // decides from it whether a kept copy may answer.
@@ -120,4 +135,25 @@ export default {
 // (site/index.html) or the Troubleshooting page (site/help.html).
 function staticPage(path, request, env) {
   return env.ASSETS.fetch(new Request(new URL(path, request.url), request));
+}
+
+// The 404 page (site/404.html) with a 404 status, kept out of search results.
+async function notFound(request, env) {
+  let body = 'Page not found.';
+  try {
+    const page = await staticPage('/404.html', request, env);
+    if (page.ok) body = await page.text();
+  } catch {
+    // The plain line above is enough.
+  }
+  return new Response(body, {
+    status: 404,
+    headers: {
+      'content-type': body.startsWith('<')
+        ? 'text/html; charset=utf-8'
+        : 'text/plain; charset=utf-8',
+      'cache-control': 'no-store',
+      'x-robots-tag': 'noindex',
+    },
+  });
 }
