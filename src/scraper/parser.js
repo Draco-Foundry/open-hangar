@@ -277,7 +277,12 @@
       const kind = clean(tile.querySelector(RULES.hangar.itemKind)?.textContent);
       const label = clean(tile.querySelector(RULES.hangar.itemName)?.textContent);
       if (!kind && !label) continue; // structural noise, not a real item tile
-      contents.push({ kind, label, image: bgUrl(tile.querySelector(RULES.hangar.itemImage)) });
+      const item = { kind, label, image: bgUrl(tile.querySelector(RULES.hangar.itemImage)) };
+      // RSI lists some items apart, by name only, under the card's "Also Contains"
+      // line (RULES.hangar.itemAlso). Marked so the website can show them the same
+      // way; the mark is only there when it's true.
+      if (tile.closest(RULES.hangar.itemAlso)) item.also = true;
+      contents.push(item);
     }
     if (contents.length) return contents;
 

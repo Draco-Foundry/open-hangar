@@ -94,6 +94,7 @@
             'itemKind',
             'itemName',
             'itemImage',
+            'itemAlso',
             'kindFallback',
             'image',
             'gift',
@@ -137,6 +138,11 @@
             itemName: { description: "A tile's name.", $ref: '#/$defs/selector' },
             itemImage: {
               description: "A tile's picture (an inline background-image).",
+              $ref: '#/$defs/selector',
+            },
+            itemAlso: {
+              description:
+                "The block RSI lists a card's Also Contains items in (names only, under its Also Contains line): a tile inside it is marked `also`.",
               $ref: '#/$defs/selector',
             },
             kindFallback: {
@@ -1009,6 +1015,7 @@
         itemKind: '.kind',
         itemName: '.title, .name, .item-name',
         itemImage: '.image',
+        itemAlso: '.without-images',
         kindFallback: '.kind',
         image: '.image',
         gift: '.js-gift',

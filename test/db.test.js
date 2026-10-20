@@ -303,13 +303,13 @@ test('an account parked by an older version (history inside, v2) switches back f
   assert.equal(mem.dbHistory.length, 1);
 });
 
-test('a backup file keeps export format v2 and round-trips the history', async () => {
+test('a backup file is export format v3 and round-trips the history', async () => {
   reset({
     db: { schemaVersion: 3, sources: { hangar: { items: rows(2), scannedAt: 1 } } },
     dbHistory: [snap(1, 2)],
   });
   const file = await OH.exportDB();
-  assert.equal(file.schemaVersion, 2);
+  assert.equal(file.schemaVersion, 3);
   assert.equal(file.history.length, 1);
   reset({});
   const res = await OH.importDB(JSON.parse(JSON.stringify(file)));
@@ -367,7 +367,7 @@ test('restoring a backup merges history both ways: nothing newer or older is los
 
 test('import refuses a backup format it does not know, but takes a stored DB', async () => {
   reset({});
-  const future = await OH.importDB({ app: 'open-hangar', schemaVersion: 3, sources: {} });
+  const future = await OH.importDB({ app: 'open-hangar', schemaVersion: 4, sources: {} });
   assert.equal(future.ok, false);
   assert.match(future.error, /Update the extension/);
   assert.equal(

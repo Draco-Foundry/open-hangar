@@ -4,6 +4,9 @@
 // backup file (OH.exportDB), the sync payload (OH.syncPayload, OH.syncBody) and the
 // body Sync Now really sends are the text they were before the move. The hashes below
 // were taken from lib.js as it was before it (this test passes on that commit too).
+// Format 3 (buy-back packs, the Also Contains mark) changed only the format number for
+// this stored data, which has no pack page read and no Also Contains item: the text is
+// hashed with that number put back to 2 (asFormat2), so every other byte is still held.
 // Run: `npm test`.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -51,6 +54,13 @@ require('../src/lib.js');
 const OH = globalThis.OH;
 
 const sha = (text) => createHash('sha256').update(text).digest('hex');
+// The text as format 2 wrote it: the first schemaVersion (the payload's own, ahead of
+// any row) back to 2. Fails if it isn't 3, so a later format change is seen here too.
+function asFormat2(text) {
+  const re = /"schemaVersion":( ?)3\b/;
+  assert.match(text, re, 'format 3');
+  return text.replace(re, (_, gap) => `"schemaVersion":${gap}2`);
+}
 
 // Per state: the backup file's text, the sync body at the normal budget and at a small
 // one (so the trimming runs too).
@@ -109,9 +119,9 @@ for (const { name, mem: stored } of states()) {
     const file = await OH.exportDB();
     await OH.storageSettled();
     const got = {
-      backup: sha(JSON.stringify(file, null, 2)),
-      sync: sha(OH.syncBody(OH.syncPayload(file))),
-      small: sha(OH.syncBody(OH.syncPayload(file), SMALL_BUDGET)),
+      backup: sha(asFormat2(JSON.stringify(file, null, 2))),
+      sync: sha(asFormat2(OH.syncBody(OH.syncPayload(file)))),
+      small: sha(asFormat2(OH.syncBody(OH.syncPayload(file), SMALL_BUDGET))),
     };
     assert.deepEqual(got, GOLDEN[name]);
   });
@@ -128,5 +138,8 @@ test('unchanged: the body Sync Now sends', async () => {
   await OH.siteSync();
   await OH.storageSettled();
   assert.equal(posted.length, 1);
-  assert.equal(sha(posted[0]), '1be5e9be7ece68d5af1bf1d774617bafb69cbc494822fa335678ce3057545eec');
+  assert.equal(
+    sha(asFormat2(posted[0])),
+    '1be5e9be7ece68d5af1bf1d774617bafb69cbc494822fa335678ce3057545eec',
+  );
 });

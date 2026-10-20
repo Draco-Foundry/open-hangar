@@ -109,6 +109,26 @@ test("each pledge holds as many items as RSI's Contains line says", () => {
   assert.ok(checked > 0, 'no Contains lines found');
 });
 
+// RSI lists some items apart, by name only, under a card's "Also Contains" line
+// (RULES.hangar.itemAlso): exactly those are marked `also`, and none with a picture.
+test('items under Also Contains are marked also, the pictured Items are not', () => {
+  let marked = 0;
+  for (const page of hangarPages) {
+    const apart = doc(page.html).querySelectorAll(`${RULES.hangar.itemAlso} ${RULES.hangar.item}`);
+    const items = P.parsePledges(page.html).flatMap((p) => p.contents);
+    const also = items.filter((c) => c.also);
+    assert.equal(also.length, apart.length, page.file);
+    for (const c of also) assert.equal(c.image, null, `${page.file}: ${c.label}`);
+    for (const c of items) assert.ok(c.also === true || !('also' in c), 'only there when true');
+    marked += also.length;
+  }
+  assert.ok(marked > 0, 'no Also Contains items in the corpus');
+  const p1 = hangarPages.find((p) => p.file.endsWith('hangar-page-1.html'));
+  const all = P.parsePledges(p1.html).flatMap((p) => p.contents);
+  assert.equal(all.find((c) => c.label === 'Revel & York Hangar')?.also, true);
+  assert.equal(all.find((c) => c.label === '120 Month Insurance')?.also, undefined);
+});
+
 // The pager: the active link is this page, the last link (») the last page, and a
 // buy-back page's links carry the page size RSI used.
 function pager(html) {

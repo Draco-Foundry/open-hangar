@@ -338,7 +338,10 @@ cache and log, but keeps UI preferences.
 **Backups and export.** `OH.exportDB()` writes one JSON file:
 `{ app, appVersion, exportedAt, schemaVersion, account, sources, history, pledgeArchive }`,
 with the referral code and URL stripped and the pledge archive trimmed to what buy-back
-details read (`OH.leanArchive()`). The shaping lives in `src/hangar-shape.js`, which the
+details read (`OH.leanArchive()`). Since format 3, each buy-back row whose own RSI page was
+read carries a `pack` (its ships, Also Contains items and price, `OHShape.packOf()`; the
+`bbDetails` cache itself never goes), and a pledge item RSI lists under Also Contains has
+`also: true`. The shaping lives in `src/hangar-shape.js`, which the
 background worker loads too: the same code builds the hangar view, the hangar as the
 website keeps it after a sync (no history, no referral code or prospects, 2,000 archived
 pledges at most), read straight from storage (`OHShape.readHangarView()`). `OH.importDB()`

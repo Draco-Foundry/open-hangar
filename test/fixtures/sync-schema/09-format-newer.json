@@ -1,12 +1,12 @@
 {
-  "name": "A newer format than 2",
+  "name": "A newer format than 3",
   "valid": false,
   "path": "/schemaVersion",
   "payload": {
     "app": "open-hangar",
     "appVersion": "0.3.0",
     "exportedAt": "2026-10-10T12:00:00.000Z",
-    "schemaVersion": 3,
+    "schemaVersion": 4,
     "account": {
       "handle": "TestPilot",
       "displayName": "TestPilot Prime",

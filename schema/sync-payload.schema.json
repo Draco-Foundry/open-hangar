@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://openhangar.space/schema/sync-payload/2",
-  "title": "Open Hangar sync payload, format 2",
-  "description": "What the extension sends to openhangar.space when it syncs (#441): its backup file (format 2, schemaVersion) without the referral prospects list. `history` is optional: the hangar the website keeps, and the hangar view the extension hands our own hangar page, are this same shape without it. Containers whose keys the extension builds itself are strict; pledge and buy-back rows type the keys the extension and the website read and allow new ones. A value RSI reports that the extension passes on as it is (display name, balances, country, recruits, referral counts) takes any simple value ($defs/scalar), so a type change on RSI's side can't stop sync. src/schema-check.js reads it and supports only the keywords used here.",
+  "$id": "https://openhangar.space/schema/sync-payload/3",
+  "title": "Open Hangar sync payload, format 3",
+  "description": "What the extension sends to openhangar.space when it syncs (#441): its backup file (format 3, schemaVersion; format 2, from 0.5.1 and older, is the same without buy-back packs and the Also Contains mark) without the referral prospects list. `history` is optional: the hangar the website keeps, and the hangar view the extension hands our own hangar page, are this same shape without it. Containers whose keys the extension builds itself are strict; pledge and buy-back rows type the keys the extension and the website read and allow new ones. A value RSI reports that the extension passes on as it is (display name, balances, country, recruits, referral counts) takes any simple value ($defs/scalar), so a type change on RSI's side can't stop sync. src/schema-check.js reads it and supports only the keywords used here.",
   "type": "object",
   "required": ["app", "appVersion", "exportedAt", "schemaVersion", "account", "sources"],
   "additionalProperties": false,
@@ -18,7 +18,10 @@
       "type": "string",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
     },
-    "schemaVersion": { "const": 2 },
+    "schemaVersion": {
+      "description": "The backup format: 3, or 2 from 0.5.1 and older (still taken, so an extension that hasn't updated yet keeps syncing).",
+      "enum": [2, 3]
+    },
     "account": { "$ref": "#/$defs/account" },
     "sources": { "$ref": "#/$defs/sources" },
     "history": { "$ref": "#/$defs/history" },
@@ -203,7 +206,11 @@
         "kind": { "type": "string" },
         "label": { "type": "string" },
         "image": { "type": ["string", "null"] },
-        "guessed": { "type": "boolean" }
+        "guessed": { "type": "boolean" },
+        "also": {
+          "description": "RSI lists it apart, by name only, under the pledge's Also Contains line. Only there when true (format 3).",
+          "type": "boolean"
+        }
       }
     },
     "pledge": {
@@ -249,7 +256,39 @@
         "fromShipId": { "type": "string" },
         "toShipId": { "type": "string" },
         "toSkuId": { "type": "string" },
-        "kind": { "type": "string" }
+        "kind": { "type": "string" },
+        "pack": { "$ref": "#/$defs/pack" }
+      }
+    },
+    "pack": {
+      "description": "What the buy-back's own RSI page says is inside it (format 3): only when the extension has read that page.",
+      "type": "object",
+      "required": ["ships", "also", "price", "currency"],
+      "additionalProperties": false,
+      "properties": {
+        "ships": { "type": "array", "items": { "$ref": "#/$defs/packShip" } },
+        "also": {
+          "description": "The page's Also Contains items, by name.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "price": {
+          "description": "What RSI asks to buy it back, in USD, or null when the page didn't say.",
+          "type": ["number", "null"]
+        },
+        "currency": { "type": "string" }
+      }
+    },
+    "packShip": {
+      "description": "A ship in a buy-back pack, as its RSI page shows it.",
+      "type": "object",
+      "required": ["name", "manufacturer", "focus", "image"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "manufacturer": { "type": "string" },
+        "focus": { "type": "string" },
+        "image": { "type": ["string", "null"] }
       }
     },
     "recruitCount": {

@@ -69,7 +69,7 @@ const liveDB = (items = [pledge(1)]) => ({
 test('the export carries the pledge archive, lean: no raw strings, flags or images', async () => {
   mem = { db: liveDB(), dbHistory: [], pledgeArchive: archiveOf([gone(2, 10)]) };
   const file = await OH.exportDB();
-  assert.equal(file.schemaVersion, 2); // additive: older versions ignore the new key
+  assert.equal(file.schemaVersion, 3); // the archive was additive within v2; v3 is packs
   const e = file.pledgeArchive[String(10000002)];
   assert.deepEqual(Object.keys(e).sort(), [
     'contents',

@@ -35,10 +35,12 @@ test('the scripts carry the schema file as it is, frozen', async () => {
   assert.ok(Object.isFrozen(SCHEMA) && Object.isFrozen(SCHEMA.$defs.pledge.properties));
 });
 
-test('the schema: format 2, only keywords the checker knows, strict where the extension builds', () => {
+test('the schema: format 3 (and 2 still taken), only keywords the checker knows, strict where the extension builds', () => {
   assert.equal(SCHEMA.$schema, 'https://json-schema.org/draft/2020-12/schema');
-  assert.match(SCHEMA.$id, /\/2$/, 'its $id ends in the format version');
-  assert.equal(SCHEMA.properties.schemaVersion.const, SHAPE.EXPORT_VERSION);
+  assert.match(SCHEMA.$id, new RegExp(`/${SHAPE.EXPORT_VERSION}$`), 'its $id ends in the format');
+  assert.equal(SHAPE.EXPORT_VERSION, 3);
+  // Format 2 (0.5.1 and older) still fits, so the website can check both.
+  assert.deepEqual(SCHEMA.properties.schemaVersion.enum, [2, SHAPE.EXPORT_VERSION]);
   assert.doesNotThrow(() => prepare(SCHEMA));
   const strict = (s) => s.additionalProperties === false;
   assert.ok(strict(SCHEMA), 'top level');
@@ -46,6 +48,7 @@ test('the schema: format 2, only keywords the checker knows, strict where the ex
   assert.ok(strict(SCHEMA.$defs.account.properties.balances), 'account.balances');
   assert.ok(strict(SCHEMA.$defs.sources), 'sources');
   assert.ok(strict(SCHEMA.$defs.referral), 'the referral block');
+  assert.ok(strict(SCHEMA.$defs.pack) && strict(SCHEMA.$defs.packShip), 'a buy-back pack');
   // What a scan keeps next to its rows, all the way down.
   const meta = (id) => SCHEMA.$defs.sources.properties[id].properties.meta;
   assert.ok(strict(SCHEMA.$defs.hangarMeta) && meta('hangar').$ref === '#/$defs/hangarMeta');
