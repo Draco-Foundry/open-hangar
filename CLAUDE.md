@@ -199,8 +199,9 @@ list only when it gets a test.
 
 ## Gotchas
 
-- Merging to `main` deploys openhangar.space straight away when `site/` or `site-worker/`
-  changes (pages.yml). `site/status.json` reaches every installed extension.
+- openhangar.space publishes only when the owner runs pages.yml by hand (owner,
+  2026-10-20): a merge to `main` changes nothing live until then. `site/status.json`
+  reaches every installed extension once published.
 - Store builds ship only the connector: dashboard pages in `ui/` don't reach players.
 - Generated, don't edit: `src/ui/`, `src/sync-schema.js`, `src/parser-rules-data.js`,
   `docs/store-assets/privacy-plain.txt`, `site/stars.css`, `src/data/ship-catalog.json` (bot).

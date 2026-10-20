@@ -159,9 +159,9 @@ Everything automated lives in `.github/workflows/`:
   `scripts/hooks`, so every `git push` first runs `npm run format:check` and
   `npm test` (a few seconds; the UI test stays in CI). In an emergency,
   `git push --no-verify` skips it.
-- **Pages** (`pages.yml`): deploys the website in `site/` to Cloudflare when it changes
-  on `main`, after each Publish to stores run, and every 3 hours (hourly while a store
-  has a version in review) to refresh the store versions and exchange rates.
+- **Pages** (`pages.yml`): deploys the website in `site/` to Cloudflare only when the
+  owner runs it by hand (Run workflow), refreshing the store versions and exchange
+  rates on each run.
 - **Release** (`release.yml`): a pushed `v*` tag builds the Chrome and Firefox zips,
   publishes a GitHub Release with that version's CHANGELOG notes, and starts Publish to
   stores for it.
