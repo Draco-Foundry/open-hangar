@@ -274,7 +274,7 @@
           aria-labelledby="pp-al-l"
           onclick={alertsSwitch}><i></i></button
         >
-        <span class="pp-grow pp-gap" id="pp-nt-l">{t('popup.notifications')}</span>
+        <span class="pp-grow pp-gap" class:off={!alertsOn} id="pp-nt-l">{t('popup.notifications')}</span>
         <button
           type="button"
           role="switch"
