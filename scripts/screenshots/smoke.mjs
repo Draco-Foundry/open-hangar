@@ -5315,8 +5315,8 @@ try {
     : fail(`popup stopped after a restart: ${JSON.stringify(afterRestart)}`);
 
   // Before the first scan: no tabs, one heading and Scan. Signed out: Log In to RSI and a
-  // grey Scan, off while RSI's sign-in cookie is gone and back once it's there again;
-  // still there to press when only the last scan said so (the cookie can't tell). No
+  // grey Scan, still there to press, while RSI's sign-in cookie is gone; Scan once it's
+  // there, whatever the last scan said (the cookie can't tell, the scan does). No
   // access to RSI: Allow Access to RSI, on the basic page. After an update: the dot on
   // the version, once.
   await popAt({ __demoLocal: { db: null } }, '#pp-first');
@@ -5332,7 +5332,7 @@ try {
   !ppFirst.bell
     ? ok('before the first scan: one heading and Scan, no tabs, "Not scanned"')
     : fail(`popup first run: ${JSON.stringify(ppFirst)}`);
-  await popAt({ __demoAccount: { loggedIn: false } }, '#pp-login');
+  await popAt({ __demoAccount: { loggedIn: false }, __demoCookie: 'out' }, '#pp-login');
   const ppOut = await page.evaluate(() => {
     const scan = document.getElementById('pp-scan');
     return {
@@ -5349,11 +5349,12 @@ try {
   outGo === 'https://robertsspaceindustries.com/connect'
     ? ok("signed out of RSI: Log In to RSI opens RSI's sign-in page, a grey Scan under it")
     : fail(`popup signed out: ${JSON.stringify({ out: ppOut, outGo })}`);
-  // RSI's sign-in cookie gone: Scan greyed and off; signing in (another tab) brings it
-  // back, with no Log In to RSI. The check asks the browser only whether it's there.
+  // RSI's sign-in cookie gone: a grey Scan still there to press; signing in (another tab)
+  // brings Scan back, with no Log In to RSI. The check asks the browser only whether it's
+  // there.
   await popAt({ ...signedIn, __demoCookie: 'out' }, '#pp-login');
   const ppGone = await page.evaluate(() => ({
-    off: document.getElementById('pp-scan').disabled,
+    on: !document.getElementById('pp-scan').disabled,
     grey: document.getElementById('pp-scan').classList.contains('grey'),
     asks: __demo.cookieAsks,
   }));
@@ -5363,27 +5364,26 @@ try {
     on: !document.getElementById('pp-scan').disabled,
     primary: document.getElementById('pp-scan').classList.contains('primary'),
   }));
-  // Signed in again and the popup opened afresh: the last scan's "signed out" is old news.
+  // The last read said signed out, and the cookie is there (RSI keeps the same cookie
+  // through a sign-in): Scan, no Log In to RSI (the owner, 0.5.0 on Firefox, 2026-10-19).
   await popAt(
-    {
-      ...signedIn,
-      __demoAccount: { loggedIn: false, fetchedAt: T0 - 60e3 },
-      __demoSession: { rsiCookieGone: T0 - 30e3 },
-    },
+    { ...signedIn, __demoAccount: { loggedIn: false, fetchedAt: T0 - 60e3 } },
     '#pp-scan',
   );
   const ppAgain = await page.evaluate(() => ({
     login: !!document.getElementById('pp-login'),
     primary: document.getElementById('pp-scan').classList.contains('primary'),
   }));
-  ppGone.off &&
+  ppGone.on &&
   ppGone.grey &&
   ppGone.asks >= 1 &&
   ppBack.on &&
   ppBack.primary &&
   !ppAgain.login &&
   ppAgain.primary
-    ? ok("RSI's sign-in cookie gone: Scan greyed and off; back once you sign in again")
+    ? ok(
+        "RSI's sign-in cookie gone: a grey Scan still on; Scan once it's there, whatever the last scan said",
+      )
     : fail(`popup sign-in cookie: ${JSON.stringify({ ppGone, ppBack, ppAgain })}`);
   await popAt({ ...signedIn, __demoNoRsi: true }, '#pp-rsi-allow');
   const noRsi = await page.evaluate(() => ({
@@ -6535,7 +6535,11 @@ try {
       ...alState.alerts.items[i % 3],
       id: `sku-${30000 + i}`,
     }));
-    const st = { ...alState, popupPrefs: { tab: 'settings' }, alerts: { ...alState.alerts, items } };
+    const st = {
+      ...alState,
+      popupPrefs: { tab: 'settings' },
+      alerts: { ...alState.alerts, items },
+    };
     const hook = await page.evaluateOnNewDocument((s) => (window.__demoAlerts = s), st);
     await page.goto('about:blank');
     await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
@@ -6609,10 +6613,11 @@ try {
     focus: document.activeElement?.id,
   }));
   const alKept = await page.evaluate(async () => (await chrome.storage.local.get('alerts')).alerts);
-  const alHook2 = await page.evaluateOnNewDocument(
-    (s) => (window.__demoAlerts = s),
-    { ...alState, popupPrefs: { tab: 'settings' }, alerts: alKept },
-  );
+  const alHook2 = await page.evaluateOnNewDocument((s) => (window.__demoAlerts = s), {
+    ...alState,
+    popupPrefs: { tab: 'settings' },
+    alerts: alKept,
+  });
   await page.goto('about:blank');
   await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
   await page.removeScriptToEvaluateOnNewDocument(alHook2.identifier);

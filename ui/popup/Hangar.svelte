@@ -3,9 +3,8 @@
   // and the handle), Account Value and its change since an earlier scan, Store Credit,
   // buy-back tokens, Fleet News (what in the store is news for this hangar, from the
   // store alerts) and Scan. Before the first scan: one heading and Scan. Signed out of
-  // RSI: Log In to RSI, with a grey Scan under it, off until RSI's sign-in cookie is back
-  // in this browser (`scanOff`; ./rsi-cookie.js), still there to press when only the
-  // last scan said so. No access to RSI (Firefox's add-ons page): Allow Access to RSI, on
+  // RSI: Log In to RSI, with a grey Scan under it, always there to press (./rsi-cookie.js:
+  // the cookie can't say for sure; the scan does). No access to RSI (Firefox's add-ons page): Allow Access to RSI, on
   // the basic page. While a scan runs: its steps instead of Scan. After one: how long it
   // took, or what went wrong, and the question when its sync found an RSI account new to
   // the connection. Amounts in the currency picked (`fx`, ./currency.js), the dollar
@@ -30,7 +29,6 @@
     account,
     sc,
     signedOut,
-    scanOff = false, // signed out of RSI for sure: Scan waits for the sign-in
     fx = USD,
     rsiOff = false, // no access to robertsspaceindustries.com
     report, // the report shown once (Scanned in 38s)
@@ -237,7 +235,7 @@
     <button type="button" class="pp-btn primary big" id="pp-login" onclick={() => openTab(rsiSignIn())}
       >{t('popup.log-in')}</button
     >
-    <button type="button" class="pp-btn grey" id="pp-scan" disabled={scanOff} onclick={onscan}>{t('popup.scan')}</button>
+    <button type="button" class="pp-btn grey" id="pp-scan" onclick={onscan}>{t('popup.scan')}</button>
   {:else}
     <button type="button" class="pp-btn primary" id="pp-scan" onclick={onscan}
       >{sc.phase === 'stopped' ? t('popup.scan-again') : t('popup.scan')}</button
