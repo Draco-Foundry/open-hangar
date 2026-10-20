@@ -478,3 +478,17 @@ test('data scanned before stamps existed counts as parser version 1', () => {
   assert.equal(parserStale({ hangar: PARSER_VERSION }, 'hangar'), false);
   assert.equal(parserStale({ hangar: PARSER_VERSION + 1 }, 'hangar'), true);
 });
+
+// Storage migrations name the old and new values as literals (CLAUDE.md, Before a PR Is
+// Ready): a step that reads a constant (DB_VERSION, a RULES or SHAPE value) would change
+// what it does when that constant changes, long after the step was written.
+test('storage migrations name no constant', () => {
+  const lib = require('node:fs').readFileSync(require.resolve('../src/lib.js'), 'utf8');
+  const body = lib.match(/const MIGRATIONS = \{([\s\S]*?)\n {2}\};/)?.[1];
+  assert.ok(body, 'MIGRATIONS found in src/lib.js');
+  const code = body.replace(/\/\/[^\n]*/g, ''); // comments may name anything
+  const CONSTANT = /\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b|\b(RULES|SHAPE|OH)\./;
+  assert.doesNotMatch(code, CONSTANT, code);
+  // And the check sees a constant when one is there.
+  assert.match('2: (db) => ({ ...db, v: DB_VERSION })', CONSTANT);
+});
