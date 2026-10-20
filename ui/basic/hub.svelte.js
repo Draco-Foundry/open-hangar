@@ -1,17 +1,17 @@
-// The basic page's state and what it does (the connector build, src/basic.html). The
-// one extension page left when the website is the full app: it scans, keeps the
-// hangar, exports it and holds the settings. Everything goes through lib.js
-// (window.OH); nothing here reads RSI markup or the website's pages. It works with no
-// network: the lists, totals and exports read only what's stored.
+// The basic page's state and what it does (the connector build, src/basic.html). Since
+// 0.4.0 the popup holds the hangar and the settings and scans run in a hidden page
+// (src/scan-host.js), so this page is for what needs a page that stays open: the
+// browser's asks (RSI access, Firefox's yes to share), the new RSI account question,
+// Connect, and a scan that can't run hidden. Everything goes through lib.js
+// (window.OH); nothing here reads RSI markup or the website's pages.
 //
-// The scan is the dashboard's Scan All without the store check (src/dashboard.js
-// runScan): one RSI account read, then the hangar, buy-backs and referrals, each
-// saved as it lands, then up to BB_AUTO_MAX buy-back packs never read before, then a
-// sync when connected. Scan depth is the same; the wishlist and Subscriber Store reads
-// went to the website.
+// The scan itself, the pack reads and the sync after a scan are the scan runner's
+// (ui/scan/runner.js), which any page can run. This page runs it in its own tab
+// (`by: 'tab'`) and draws what it says in this page's words (./report-lines.js).
 import { t } from './copy.js';
-import { importWishlist } from './wishlist-import.js';
-import { flag } from '../lib/flags.js';
+import { progressLine, reportLines, reportSummary } from './report-lines.js';
+import { afterConnect } from './after-connect.js';
+import { createRunner, newRun } from '../scan/runner.js';
 
 const OH = globalThis.OH;
 const SITE_DATA = {
@@ -21,23 +21,19 @@ const SITE_DATA = {
 // the add-ons page (and Chrome or Edge can hold it back): then a scan only fails, so it
 // asks first (rsiAllow).
 const RSI_HOST = { origins: ['https://robertsspaceindustries.com/*'] };
-const BB_AUTO_MAX = 30; // src/dashboard.js: never-read packs read after a scan
 const firefox = () => !!chrome.runtime.getManifest().browser_specific_settings?.gecko;
 
 export const hub = $state({
   ready: false,
-  items: [],
-  buybacks: [],
-  scannedAt: null,
-  bbScannedAt: null,
-  owner: null,
-  bbDetails: {},
+  owner: null, // whose hangar is stored (the handle beside the title)
   account: null,
   // Access to robertsspaceindustries.com: off means the Allow Access to RSI card instead
   // of a scan (rsiAllow).
   rsiOk: true,
   // The scan: busy, what it's on, and the last report ({ rows, signedOut, problem }).
   scan: { busy: false, detail: '', report: null },
+  // Another Open Hangar tab is scanning (its scanRunning mark): this one waits.
+  scanElsewhere: false,
   // openhangar.space: link { name, connectedAt, lastSync } (never the token), Firefox's
   // yes, and an ask waiting: 'connect' | 'local' (Firefox's card), pilot (a new RSI
   // account to sync or not: { handle, record }).
@@ -51,40 +47,21 @@ export const hub = $state({
     askFirefox: null,
     pilot: null,
   },
-  profiles: [],
   update: null, // a newer version waiting for this tab to let it in
   banner: null, // the kill switch's banner (status.json), { message, level }
-  note: '', // the last thing a button did ("Exported …", "Cleared …")
+  note: '', // the last thing that happened (another RSI account signed in)
 });
 
 // --- Data -------------------------------------------------------------------------
-async function loadDB() {
-  const db = await OH.loadDB();
-  hub.items = db.sources.hangar?.items || [];
-  hub.scannedAt = db.sources.hangar?.scannedAt || null;
-  hub.buybacks = (db.sources.buybacks?.items || []).map((b) => ({
-    ...b,
-    kind: globalThis.OpenHangar?.classifyBuyback?.(b.name, b.contains) || b.kind,
-  }));
-  hub.bbScannedAt = db.sources.buybacks?.scannedAt || null;
+// Whose hangar is stored (`db`: one the scan just read, else read here).
+async function loadDB(db) {
+  db = db || (await OH.loadDB());
   hub.owner = db.owner || null;
-  hub.bbDetails = { ...(await OH.getBuybackDetails()) };
 }
 
-// The live hangar belongs to the RSI account signed in here: another one's is parked
-// and comes back when you sign in as them (OH.switchProfile). → a note, or ''.
-async function reconcile(acct) {
-  if (!acct?.loggedIn || !acct.nickname || !hub.owner?.nickname) return '';
-  if (acct.nickname.toLowerCase() === String(hub.owner.nickname).toLowerCase()) return '';
-  const who = acct.displayname || acct.nickname;
-  const { restored } = await OH.switchProfile(acct.nickname, acct.displayname);
-  await loadDB();
-  return t(restored ? 'basic.switched-back' : 'basic.switched-new', { who });
-}
-
-export async function refreshProfiles() {
-  hub.profiles = await OH.listProfiles().catch(() => []);
-}
+// The runner's account switch (OH.switchProfile) → this page's note.
+const switchedNote = (s) =>
+  t(s.restored ? 'basic.switched-back' : 'basic.switched-new', { who: s.who });
 
 // --- Scan -------------------------------------------------------------------------
 let thisTab = null;
@@ -95,32 +72,6 @@ const thisTabId = () =>
         () => null,
       )
     : Promise.resolve(null));
-// A scan running in this tab, for our hangar page's scan status and the popup
-// (src/background.js scanRunning): renewed at most once a minute, cleared at the end.
-let markAt = 0;
-let markWrite = Promise.resolve();
-function scanMark(on) {
-  if (!chrome.storage.session) return;
-  const now = Date.now();
-  if (on && now - markAt < 60e3) return;
-  markAt = on ? now : 0;
-  markWrite = markWrite
-    .then(async () =>
-      on
-        ? chrome.storage.session.set({ scanRunning: { at: now, tabId: await thisTabId() } })
-        : chrome.storage.session.remove('scanRunning'),
-    )
-    .catch(() => {});
-}
-addEventListener('pagehide', () => {
-  if (markAt) chrome.storage.session?.remove('scanRunning').catch(() => {});
-});
-const progress = (part) => (page, count, retry) => {
-  scanMark(true);
-  hub.scan.detail = retry
-    ? t('basic.progress-retry', { part, page, n: retry.attempt, of: retry.of })
-    : t('basic.progress', { part, page, count });
-};
 
 // → whether this extension may read robertsspaceindustries.com. A browser that can't
 // say counts as yes (the scan then says what went wrong).
@@ -128,6 +79,63 @@ async function rsiAccess() {
   if (!chrome.permissions?.contains) return true;
   return (hub.rsiOk = await chrome.permissions.contains(RSI_HOST).catch(() => true));
 }
+
+// The scan runner, in this tab. What it does shows here as it happens.
+const runner = createRunner({
+  OH,
+  store: chrome.storage.local,
+  session: chrome.storage.session || null,
+  me: { by: 'tab', tabId: thisTabId(), run: newRun() },
+  mayReadRsi: rsiAccess,
+  // Without a click: the yes Firefox gave already (dataOk asks on one).
+  mayShare: () => Promise.resolve(hub.site.dataOk),
+  hooks: {
+    start() {
+      hub.scan = { busy: true, detail: t('basic.scan-start'), report: null };
+      hub.note = '';
+    },
+    progress(p) {
+      if (hub.scan.busy) hub.scan.detail = progressLine(p, t);
+    },
+    async account(account, switched) {
+      hub.account = account || hub.account;
+      if (!switched) return;
+      await loadDB();
+      hub.note = switchedNote(switched);
+    },
+    async scanned(report, { db }) {
+      hub.scan = { busy: false, detail: '', report: reportLines(report, t) };
+      if (db) await loadDB(db);
+      if (!hub.site.link) await refreshSite();
+    },
+    syncStart() {
+      hub.site.syncing = true;
+      hub.site.msg = '';
+      hub.site.calm = false;
+    },
+    // A calm refusal (sync not open yet, or one moments ago) is a note, not a problem;
+    // an RSI account this link hasn't synced asks first (hub.site.pilot).
+    async synced(r) {
+      const s = hub.site;
+      if (r.state === 'off') return void (s.msg = t('basic.firefox-no'));
+      if (r.state === 'kept') return;
+      if (r.state === 'ask') s.pilot = r.ask;
+      else if (r.msg) {
+        s.msg = r.msg;
+        s.calm = r.state === 'calm' || r.state === 'held';
+      }
+      s.syncing = false;
+      await refreshSite();
+    },
+  },
+});
+
+// Another Open Hangar tab scanning right now (its scanRunning mark): this tab's Scan
+// waits, and so does any sync (ui/scan/sync-timing.js).
+async function noteOtherScan() {
+  hub.scanElsewhere = await runner.otherScan().catch(() => false);
+}
+
 // Allow Access to RSI: the click the browser's ask needs, so it's asked before any
 // await; yes runs the scan right away (the one that was waiting, or the one pressed).
 export function rsiAllow() {
@@ -144,124 +152,27 @@ export function scanClick() {
   return scan();
 }
 
-export async function scan() {
+export async function scan({ reason = 'page' } = {}) {
   if (hub.scan.busy) return;
-  // No access to RSI: no scan that can only fail. The card asks instead.
-  if (!(await rsiAccess())) {
-    OH.log('info', 'status', 'scan held: no access to robertsspaceindustries.com');
-    return;
-  }
-  hub.scan = { busy: true, detail: t('basic.scan-start'), report: null };
-  hub.note = '';
-  scanMark(true);
-  const rows = [];
-  let signedOut = false;
-  try {
-    const account = (await OH.getAccount({ force: true }).catch(() => null)) || undefined;
-    hub.account = account || hub.account;
-    const switched = await reconcile(account);
-    if (switched) hub.note = switched;
-    // Signed out: RSI's signed-out pages read as an empty hangar, and a scan of
-    // nothing must never be saved over yours.
-    signedOut = account?.loggedIn === false;
-    if (!signedOut) {
-      const h = await OH.scanSource('hangar', progress('Hangar'), { account });
-      rows.push(
-        h.ok
-          ? { name: 'Hangar', ok: !h.partial, text: t('basic.row-pledges', { n: h.items.length }) }
-          : { name: 'Hangar', ok: false, text: h.error },
-      );
-      const b = await OH.scanSource('buybacks', progress('Buy-Backs'), { account });
-      rows.push(
-        b.ok
-          ? {
-              name: 'Buy-Backs',
-              ok: !b.partial,
-              text: t('basic.row-buybacks', { n: b.items.length }),
-            }
-          : { name: 'Buy-Backs', ok: false, text: b.error },
-      );
-      const r = await OH.getReferral(
-        (phase, n) => {
-          scanMark(true);
-          hub.scan.detail = t('basic.progress-referrals', { n });
-        },
-        { account },
-      );
-      if (r)
-        rows.push(
-          r.ok
-            ? {
-                name: 'Referrals',
-                ok: !r.partial,
-                text: t('basic.row-referrals'),
-                box: t('basic.row-referrals-box'),
-              }
-            : { name: 'Referrals', ok: false, text: r.error },
-        );
-      await loadDB();
-      // Buy-backs filled from your own hangar history first (no RSI read), as the
-      // dashboard does.
-      if (b.ok)
-        await OH.fillBuybackDetailsFromHistory(hub.buybacks, {
-          history: await OH.getHistory(),
-        }).catch((e) =>
-          OH.log('warn', 'buybacks', `details from history failed: ${e?.message || e}`),
-        );
-    }
-  } catch (e) {
-    rows.push({ name: 'Hangar', ok: false, text: String(e?.message || e) });
-  }
-  const bad = rows.filter((r) => !r.ok).length;
-  hub.scan = {
-    busy: false,
-    detail: '',
-    report: signedOut || bad ? { rows, signedOut, bad } : { rows, signedOut: false, bad: 0 },
-  };
-  if (signedOut || bad)
-    OH.log(
-      'error',
-      'status',
-      rows.map((r) => `${r.name}: ${r.ok ? 'ok' : 'problem'}`).join(' · ') || 'signed out',
-    );
-  scanMark(false);
-  hub.bbDetails = { ...(await OH.getBuybackDetails()) };
-  await refreshProfiles();
-  // Connected: every finished scan syncs, as the dashboard's does.
-  if (hub.site.link && !signedOut) await syncNow({ auto: true });
-  // Packs never read: their contents, paced, in the background (Scan stays fast).
-  if (rows.some((r) => r.name === 'Buy-Backs' && r.ok)) readPacks();
+  const report = await runner.scan({ reason });
+  // Another Open Hangar tab is scanning: two at once would read RSI twice.
+  if (report?.held === 'busy') hub.scanElsewhere = true;
 }
 
-let packsReading = false;
-async function readPacks() {
-  if (packsReading) return;
-  const todo = hub.buybacks
-    .filter((b) => !b.isCCU && (b.kind === 'pack' || b.kind === 'package'))
-    .filter((b) => !hub.bbDetails[b.id] || hub.bbDetails[b.id].partial)
-    .slice(0, BB_AUTO_MAX)
-    .map((b) => String(b.id));
-  if (!todo.length) return;
-  packsReading = true;
-  try {
-    await OH.fetchBuybackDetails(todo, () => {});
-  } finally {
-    packsReading = false;
-    hub.bbDetails = { ...(await OH.getBuybackDetails()) };
-  }
-}
-
-// Our hangar page or the popup asked for a scan (src/background.js requestScan): the
-// request names this tab. Taken once the scan has marked itself running.
+// Our hangar page or the popup asked for a scan that can't run hidden
+// (src/background.js requestScan): the request names this tab and who asked. Taken once
+// the scan has its scanRunning mark stored (or won't run), so the worker always sees
+// one or the other. A request for the hidden page (src/scan-host.js) names no tab.
 async function scanIfAsked() {
   if (!chrome.storage.session) return;
   const { scanRequest: r } = await chrome.storage.session.get('scanRequest');
-  if (!r) return;
+  if (!r || (r.by && r.by !== 'tab')) return;
   const tab = await thisTabId();
   if (tab == null || r.tabId !== tab) return;
   const go = Date.now() - r.at < 60e3 && !hub.scan.busy;
-  const running = go ? scan() : null;
-  await markWrite;
+  const reason = r.reason === 'site' ? 'site' : 'popup';
+  const running = go ? scan({ reason }) : null;
+  await runner.marked();
   await chrome.storage.session.remove('scanRequest');
   await running;
 }
@@ -283,6 +194,7 @@ export async function refreshSite() {
   };
   clearTimeout(waitTimer);
   if (until) waitTimer = setTimeout(refreshSite, Math.max(0, until - Date.now()) + 500);
+  else if (link && !s.syncing) runner.retryIfDue(link).catch(() => {});
   s.dataOk = !firefox() || (await chrome.permissions.contains(SITE_DATA).catch(() => false));
   if (!firefox() || s.dataOk || !chrome.storage.session) return;
   // Connect was pressed on the website, or our hangar page asked for the hangar,
@@ -318,7 +230,7 @@ export async function firefoxContinue() {
   const why = hub.site.askFirefox;
   hub.site.askFirefox = null;
   if (!(await asked)) return void (hub.site.msg = t('basic.firefox-no'));
-  if (why === 'connect') await connect({ asked });
+  if (why === 'connect') await connect({ asked, fromSite: true });
 }
 
 const b64url = (bytes) =>
@@ -331,7 +243,7 @@ const random = (n) => b64url(crypto.getRandomValues(new Uint8Array(n)));
 // Connect: the browser's sign-in window on the website's /connect, as the dashboard's
 // (PKCE: the verifier never leaves this page). Without the window, the website's
 // Connect This Browser page instead, which asks the extension itself (bridge v2).
-export async function connect({ asked } = {}) {
+export async function connect({ asked, fromSite = false } = {}) {
   const ok = asked || dataOk();
   hub.site.msg = '';
   if (!(await ok)) return void (hub.site.msg = t('basic.firefox-no'));
@@ -380,35 +292,35 @@ export async function connect({ asked } = {}) {
   });
   await refreshSite();
   if (answer.get('sync') === '1') await syncNow();
-  await wishlistToAccount();
+  await runner.wishlistToAccount();
+  const forConnect = fromSite || location.hash === '#settings';
+  const onward = () => {
+    const next = afterConnect({
+      forConnect,
+      scanning: hub.scan.busy,
+      msg: hub.site.msg,
+      pilot: !!hub.site.pilot,
+      siteUrl: base,
+      linked: !!hub.site.link,
+    });
+    if (next) location.assign(next);
+  };
+  // The first sync asked which pilot (hub.site.pilot): the tab waits for the answer and
+  // goes on from pilotAnswer, after Sync It's sync or straight after a no.
+  afterPilot = hub.site.pilot ? onward : null;
+  onward();
 }
+// Connect's way on to My Hangar, held while its pilot question is open (connect).
+let afterPilot = null;
 
-// Sync Now, and the sync after a scan (auto). A calm refusal (sync not open yet, or
-// one moments ago) is a note, not a problem; an RSI account this link hasn't synced
-// asks first (hub.site.pilot).
-export async function syncNow({ auto = false, asked } = {}) {
+// Sync Now, and a sync this page asks for (auto). The runner sends it (ui/scan/runner.js
+// sync): while a scan runs, here or in another Open Hangar tab, it's kept for the
+// scan's own sync at its end (#658). Firefox's ask is this click's, before any await.
+export function syncNow({ auto = false, asked, scanDone = false, again = false } = {}) {
   const s = hub.site;
-  if (s.syncing || !s.link) return;
-  if (!(await (asked || (auto ? Promise.resolve(s.dataOk) : dataOk()))))
-    return void (s.msg = t('basic.firefox-no'));
-  s.syncing = true;
-  s.msg = '';
-  s.calm = false;
-  try {
-    await OH.siteSync({ auto });
-  } catch (err) {
-    if (err?.ask) {
-      s.pilot = err.ask;
-      OH.log('info', 'site', 'asked before syncing an RSI account new to this link');
-    } else if (!err?.quiet) {
-      s.msg = String(err?.message || err);
-      s.calm = !!err?.calm;
-      OH.log(s.calm ? 'info' : 'warn', 'site', s.msg);
-    }
-  }
-  s.syncing = false;
-  await refreshSite();
-  await wishlistToAccount();
+  if (s.syncing || !s.link) return Promise.resolve();
+  const ok = asked || (auto ? Promise.resolve(s.dataOk) : dataOk());
+  return runner.sync({ auto, asked: ok, scanDone, again }).then(() => {});
 }
 export async function pilotAnswer(yes) {
   const who = hub.site.pilot;
@@ -417,10 +329,14 @@ export async function pilotAnswer(yes) {
   hub.site.pilot = null;
   await OH.siteSyncAnswer(who, yes);
   if (yes) await syncNow({ asked });
+  const onward = afterPilot;
+  afterPilot = null;
+  onward?.();
 }
 export async function disconnect() {
   hub.site.msg = '';
   hub.site.pilot = null;
+  afterPilot = null;
   await OH.siteDisconnect().catch((e) => (hub.site.msg = String(e?.message || e)));
   await refreshSite();
 }
@@ -433,67 +349,16 @@ async function syncIfAsked() {
   if (Date.now() - at < 10 * 60e3) await syncNow({ auto: true });
 }
 
-// The 0.3.x wishlist into the account, once per connection (ui/basic/wishlist-import.js).
-// Only in a build with the `wishlistImport` flag (off until the privacy policy names it),
-// only once Firefox lets this extension share (the same yes sync needs), and never in a
-// loop: a website that doesn't take it yet is asked again hours later.
-let wishImporting = false;
-async function wishlistToAccount() {
-  if (!flag('wishlistImport')) return;
-  if (wishImporting || !hub.site.link || !hub.site.dataOk) return;
-  wishImporting = true;
-  try {
-    const r = await importWishlist({
-      store: chrome.storage.local,
-      fetchFn: fetch,
-      siteUrl: await OH.siteUrl(),
-      appVersion: chrome.runtime.getManifest().version,
-    });
-    if (r === 'later') OH.log('info', 'site', 'wishlist not taken by the website yet; later');
-  } catch (e) {
-    OH.log('warn', 'site', `wishlist import: ${e?.message || e}`);
-  } finally {
-    wishImporting = false;
-  }
-}
-
-// --- Settings ---------------------------------------------------------------------
-export async function clearData() {
-  await OH.clearData();
-  await loadDB();
-  await refreshProfiles();
-  hub.scan.report = null;
-  hub.note = t('basic.cleared');
-}
-export async function removeProfile(nickname) {
-  await OH.deleteProfile(nickname);
-  await refreshProfiles();
-}
-export async function logOut() {
-  const r = await OH.logout();
-  hub.note = r.ok ? t('basic.logged-out') : r.error || t('basic.logout-failed');
-  if (r.ok) hub.account = { loggedIn: false };
-}
-
 // Report a Scan Problem: a new GitHub issue from the Scan Broken template, with the
 // scan's counts and the flight log (no handle, no item names; OH.scanProblemUrl).
 // Nothing is sent: you read it on GitHub and submit it yourself.
 export async function reportProblem() {
-  const rows = hub.scan.report?.rows || [];
-  const summary =
-    rows.map((r) => `${r.name}: ${r.ok ? 'ok' : 'problem'}`).join(' · ') ||
-    (hub.scan.report?.signedOut ? 'signed out of RSI' : 'no scan this session');
   const url = OH.scanProblemUrl({
-    summary,
+    summary: reportSummary(hub.scan.report, hub.scan.report?.signedOut),
     report: await OH.errorReport({ maxLines: 25 }),
     version: chrome.runtime.getManifest().version,
   });
   window.open(url, '_blank', 'noopener');
-}
-
-// The backup file (OH.exportDB: the referral code and its link left out).
-export async function exportJson() {
-  return OH.exportDB();
 }
 
 // --- Updates ----------------------------------------------------------------------
@@ -509,10 +374,13 @@ export async function start() {
   await loadDB();
   const acct = await OH.getAccount().catch(() => null);
   hub.account = acct;
-  const switched = await reconcile(acct);
-  if (switched) hub.note = switched;
+  const switched = await runner.reconcile(acct, { owner: hub.owner });
+  if (switched) {
+    await loadDB();
+    hub.note = switchedNote(switched);
+  }
   hub.ready = true;
-  await Promise.all([refreshProfiles(), refreshSite(), rsiAccess()]);
+  await Promise.all([refreshSite(), rsiAccess()]);
   // Turned on or off on the browser's add-ons page while this page is open.
   chrome.permissions?.onAdded?.addListener(() => rsiAccess());
   chrome.permissions?.onRemoved?.addListener(() => rsiAccess());
@@ -523,13 +391,15 @@ export async function start() {
     .catch(() => {});
   chrome.storage.onChanged.addListener((c, area) => {
     if (area === 'local' && c.updateReady) hub.update = c.updateReady.newValue || null;
-    if (area === 'local' && c.siteLink) refreshSite().then(wishlistToAccount);
+    if (area === 'local' && c.siteLink) refreshSite().then(runner.wishlistToAccount);
     if (area === 'local' && c.siteSyncRequested?.newValue) syncIfAsked();
     if (area === 'local' && c.db && !hub.scan.busy) loadDB();
     if (area === 'session' && c.scanRequest?.newValue) scanIfAsked();
+    if (area === 'session' && c.scanRunning) noteOtherScan();
     if (area === 'session' && (c.siteAskFirefox || c.localAskFirefox)) refreshSite();
   });
+  await noteOtherScan();
   await syncIfAsked();
-  await wishlistToAccount();
+  await runner.wishlistToAccount();
   await scanIfAsked();
 }

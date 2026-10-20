@@ -4,17 +4,26 @@
 // Saved Accounts, Sync Now, Disconnect, Log Out of RSI, Report a Scan Problem, Connect
 // to openhangar.space, the type names) are used as they are, not repeated here. {name}
 // parts are filled in by t(), and a key's '.one' words stand in when {n} is 1 ("1
-// pledge"). Headings and buttons in Title Case.
+// pledge"). Headings and buttons in Title Case. Since 0.4.0 the page shows fewer of
+// them (its lists, Your Data, Saved Accounts and the alerts card moved to the popup):
+// those stay here as the approved record, word for word, for the pages that use them.
 const COPY = {
   // --- Page ---
   'basic.loading': 'Loading your hangar.', // the moment before the stored hangar loads
   'basic.tabs': 'Hangar sections', // the tab row's name for screen readers
   'basic.tab-pledges': 'Pledges', // the pledges tab and its heading
   'basic.tab-settings': 'Settings', // the settings tab and its heading
+  // NEW: needs the owner's OK. The page's one line when it isn't open for anything else:
+  // the popup is where Open Hangar is now, and why this page opens at all.
+  'basic.page-about':
+    "Open Hangar lives in the toolbar popup now. This page only opens when it needs to ask you something, or when a scan can't run hidden.",
   // --- Scan ---
   'basic.scan': 'Scan', // the Scan button
   'basic.scanning': 'Scanning', // the button while a scan runs
   'basic.scan-start': 'Asking RSI for your hangar.', // first progress line, before RSI answers
+  // Another Open Hangar tab is scanning, so this one's Scan waits (#658). The popup's
+  // approved words for the same thing (popup.scan-busy), word for word.
+  'basic.scan-elsewhere': 'A scan is already running.',
   // Access to robertsspaceindustries.com is off (Firefox's add-ons page, say): the short
   // reason above the "Allow Access to RSI" button. Scan reads your hangar there, and
   // only there; one click lets it, then the scan runs.
@@ -97,7 +106,7 @@ const COPY = {
     "It hasn't synced to your openhangar.space account before. Syncing adds its hangar there too.",
   'basic.pilot-yes': 'Sync It',
   'basic.pilot-no': 'Not This One',
-  // --- Store alerts (the `alerts` flag, ./AlertsCard.svelte) ---
+  // --- Store alerts (the `alerts` flag; the popup's switch since 0.4.0) ---
   'basic.alerts-title': 'Store Alerts', // the card's heading (Title Case)
   // What alerts do: a badge and notifications when something in RSI's store is for
   // you (Wishlist, buy-backs, paints, warbonds, limited sales), matched in this browser

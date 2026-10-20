@@ -19,6 +19,14 @@ test("popup Scan: the hangar page's scan, in the basic page", async () => {
   assert.deepEqual(await fromPopup(x), { ok: true, opened: true });
   assert.deepEqual(x.opened, [BASIC]);
   assert.equal(x.stores.session.scanRequest.tabId, 100, 'the request names the tab it opened');
+  // And who asked, for the scan's report (ui/scan/runner.js scanReport.reason).
+  assert.equal(x.stores.session.scanRequest.reason, 'popup');
+  const site = loadBackground({ flags: CONNECTOR });
+  assert.deepEqual(await site.send({ type: 'oh-request-scan' }, HANGAR), {
+    ok: true,
+    opened: true,
+  });
+  assert.equal(site.stores.session.scanRequest.reason, 'site', 'our hangar page asked');
   // Asked again within the minute: busy, and the page still comes to the front.
   const open = loadBackground({
     flags: CONNECTOR,
@@ -30,6 +38,34 @@ test("popup Scan: the hangar page's scan, in the basic page", async () => {
   assert.ok(open.focused.some((f) => f.tab === 7 && f.active));
   // The popup and the hangar page share the one-a-minute limit.
   assert.deepEqual(await x.send({ type: 'oh-request-scan' }, HANGAR), { ok: false, error: 'busy' });
+});
+
+test("popup Scan: the scan runner's mark (with its run) holds it as before", async () => {
+  // ui/scan/runner.js marks { at, tabId, run, by }: a tab's mark counts while its tab is
+  // open, and one with no tab (a page that isn't a tab) for its 10 minutes.
+  const mark = (tabId, by = 'tab') => ({
+    scanRunning: { at: Date.now() - 5000, tabId, run: 'mq1x-0a1b2c3d4e5f', by },
+  });
+  const tab = { contextType: 'TAB', tabId: 7, windowId: 3, documentUrl: BASIC };
+  const open = loadBackground({ flags: CONNECTOR, session: mark(7), contexts: [tab] });
+  assert.deepEqual(await fromPopup(open), { ok: false, error: 'busy' });
+  assert.equal((await open.send({ type: 'oh-scan-status' }, HANGAR)).running, true);
+  const closed = loadBackground({ flags: CONNECTOR, session: mark(7), contexts: [] });
+  assert.equal((await closed.send({ type: 'oh-scan-status' }, HANGAR)).running, false);
+  const hidden = loadBackground({
+    flags: CONNECTOR,
+    session: mark(null, 'offscreen'),
+    contexts: [],
+  });
+  assert.equal((await hidden.send({ type: 'oh-scan-status' }, HANGAR)).running, true);
+  assert.deepEqual(await fromPopup(hidden), { ok: false, error: 'busy' });
+  // The popup's own reading of it (ui/popup/data.js).
+  const { scanBusy } = await data();
+  assert.equal(scanBusy(mark(null, 'offscreen')), true);
+  assert.equal(
+    scanBusy({ scanRunning: { ...mark(7).scanRunning, at: Date.now() - 11 * 60e3 } }),
+    false,
+  );
 });
 
 test('popup Scan: only our own popup is heard', async () => {
@@ -204,8 +240,8 @@ test("popup: the line for pledges with no price, in the owner's words (2026-10-1
 test("popup copy: the owner's words (2026-10-13), filled in", async () => {
   const { t } = await import('../ui/popup/copy.js');
   assert.equal(t('popup.scan'), 'Scan');
-  assert.equal(t('popup.last-scan', { when: 'today' }), 'Scanned today');
-  assert.equal(t('popup.stale', { days: 9 }), 'Last scan 9 days ago. Time for a fresh one.');
+  assert.equal(t('popup.synced', { when: '2h ago' }), 'Synced 2h ago');
+  assert.equal(t('popup.alerts', { n: 2 }), 'Alerts: 2');
   assert.equal(
     t('popup.sync-wait', { time: '6:02 PM' }),
     'Try again at 6:02 PM. The last sync was moments ago.',

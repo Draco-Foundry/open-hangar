@@ -1,9 +1,10 @@
 <script>
-  // The basic page (the connector build, src/basic.html): the one extension page left
-  // when the website is the full app. Scan, Pledges and Buy-Backs with search, totals
-  // and CSV, Report a Scan Problem, and the settings. It stays as it is ("frozen"):
-  // new views go to the website. Tabs are the address's hash (#pledges, #buybacks,
-  // #settings), so the popup and the background can open one.
+  // The basic page (the connector build, src/basic.html). Since 0.4.0 the toolbar popup
+  // holds the hangar and the settings, and scans run in a hidden page
+  // (src/scan-host.js), so this page only opens when the extension needs a page that
+  // stays open: Firefox's asks (its data card, Allow Access to RSI), Connect (#settings:
+  // the sign-in window would close the popup), and a scan that can't run hidden, with
+  // its progress and report. No lists here: the hangar itself is on openhangar.space.
   import { onMount } from 'svelte';
   import { t } from './copy.js';
   import {
@@ -16,26 +17,18 @@
     scanClick,
     start,
   } from './hub.svelte.js';
-  import List from './List.svelte';
-  import Settings from './Settings.svelte';
+  import SiteCard from './SiteCard.svelte';
   import FirefoxCard from './FirefoxCard.svelte';
 
-  const TABS = ['pledges', 'buybacks', 'settings'];
-  const fromHash = () => {
-    const h = location.hash.slice(1);
-    return TABS.includes(h) ? h : 'pledges';
-  };
-  let tab = $state(fromHash());
+  // Opened for openhangar.space (the popup's Connect, the background's asks).
+  const forSite = () => location.hash === '#settings';
+  let site = $state(forSite());
   onMount(() => {
     start();
-    const hash = () => (tab = fromHash());
+    const hash = () => (site = forSite());
     addEventListener('hashchange', hash);
     return () => removeEventListener('hashchange', hash);
   });
-  const go = (name) => {
-    tab = name;
-    history.replaceState(null, '', `#${name}`);
-  };
   const handle = $derived(
     (hub.account?.loggedIn && (hub.account.displayname || hub.account.nickname)) ||
       hub.owner?.displayname ||
@@ -55,11 +48,14 @@
       class="bp-btn primary bp-scan"
       id="bp-scan"
       onclick={scanClick}
-      disabled={hub.scan.busy || !hub.ready}
+      disabled={hub.scan.busy || hub.scanElsewhere || !hub.ready}
       >{hub.scan.busy ? t('basic.scanning') : t('basic.scan')}</button
     >
   </header>
-  {#if hub.scan.busy}<p class="bp-detail" role="status">{hub.scan.detail}</p>{/if}
+  {#if hub.scan.busy}<p class="bp-detail" role="status">{hub.scan.detail}</p>
+  {:else if hub.scanElsewhere}<p class="bp-detail" id="bp-scan-elsewhere" role="status">
+      {t('basic.scan-elsewhere')}
+    </p>{/if}
 
   {#if hub.update}
     <div class="bp-note" id="bp-update" role="status">
@@ -130,23 +126,11 @@
     </div>
   {/if}
 
-  <nav class="bp-tabs" aria-label={t('basic.tabs')}>
-    <a href="#pledges" aria-current={tab === 'pledges' ? 'page' : undefined} onclick={(e) => (e.preventDefault(), go('pledges'))}
-      >{t('basic.tab-pledges')} <small>{hub.items.length}</small></a
-    >
-    <a href="#buybacks" aria-current={tab === 'buybacks' ? 'page' : undefined} onclick={(e) => (e.preventDefault(), go('buybacks'))}
-      >Buy-Backs <small>{hub.buybacks.length}</small></a
-    >
-    <a href="#settings" aria-current={tab === 'settings' ? 'page' : undefined} onclick={(e) => (e.preventDefault(), go('settings'))}
-      >{t('basic.tab-settings')}</a
-    >
-  </nav>
-
   {#if !hub.ready}
     <p class="bp-empty">{t('basic.loading')}</p>
-  {:else if tab === 'settings'}
-    <Settings />
-  {:else}
-    {#key tab}<List kind={tab} />{/key}
+  {:else if site && hub.site.enabled}
+    <SiteCard />
+  {:else if !site}
+    <p class="bp-about" id="bp-about">{t('basic.page-about')}</p>
   {/if}
 </div>

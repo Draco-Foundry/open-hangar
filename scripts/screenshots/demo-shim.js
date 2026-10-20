@@ -318,7 +318,7 @@
       rank: 'Admiral',
       logo: '/__demo/demo-org.svg',
     },
-    referral: { code: referral.code, url: referral.url, referrerCode: null },
+    referral: { code: referral.code, url: referral.url },
     fetchedAt: now,
   };
   window.DEMO_REFERRAL = referral;

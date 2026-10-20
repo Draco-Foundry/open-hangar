@@ -10,6 +10,8 @@ dist/
 
 # local editor / tooling config (personal, not project)
 .claude/settings.local.json
+# Each maintainer's local Claude rules (copied into worktrees by .worktreeinclude)
+CLAUDE.local.md
 
 # copied in at deploy time by .github/workflows/pages.yml
 /site/icon.svg
@@ -24,3 +26,9 @@ _dump/
 
 # built by Vite from ui/ (npm run build:ui)
 /src/ui/
+
+# Claude Code session files and its temporary worktrees (local only).
+.claude/
+
+# Python bytecode from docs/brand/draco-foundry/banner.py
+__pycache__/

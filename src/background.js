@@ -40,6 +40,22 @@ const hubUrl = (dash = '') =>
     HUB_PAGE + (self.OH.flags.connector ? (dash === '#home' ? '#settings' : '') : dash),
   );
 
+// Where a scan runs (src/scan-host.js): the hidden scan page, in the connector build.
+// Without it (or in a browser with no hidden page) a scan runs in the extension's tab.
+let scanHost = null;
+// @flag-start connector: scans run in a hidden page, no tab (src/scan-host.js)
+// Chrome and Edge: an offscreen document; Firefox: a frame in this event page. The
+// page's messages (its storage on Chrome and Edge, Firefox's pings, done) are answered
+// here, only for it. Done, its marks go, and an update that waited for it comes in.
+if (typeof importScripts === 'function' && !self.OHScanHost) importScripts('scan-host.js');
+scanHost = self.OHScanHost.create({
+  chrome,
+  document: typeof document === 'undefined' ? null : document,
+  afterDone: () => updateIfIdle(),
+});
+chrome.runtime.onMessage.addListener(scanHost.heard);
+// @flag-end connector
+
 async function updateReminder() {
   // @flag-start alerts: store alerts waiting take the badge (src/alerts.js)
   const AL = self.OHAlerts;
@@ -53,7 +69,19 @@ async function updateReminder() {
   }
   // @flag-end alerts
   const { db, remindRescan } = await chrome.storage.local.get(['db', 'remindRescan']);
-  const at = db && db.sources && db.sources.hangar && db.sources.hangar.scannedAt;
+  let at = db && db.sources && db.sources.hangar && db.sources.hangar.scannedAt;
+  // @flag-start autoScan: Auto Scan Daily's quick check that found nothing new counts too
+  // (a hangar it checked is fresh, though it saved nothing), while it's on.
+  const auto = await chrome.storage.local.get(['autoScanOn', 'autoScan']);
+  const checked = auto.autoScan?.at;
+  if (
+    at &&
+    auto.autoScanOn === true &&
+    ['quick', 'full'].includes(auto.autoScan?.line) &&
+    Number.isFinite(checked)
+  )
+    at = Math.max(at, checked);
+  // @flag-end autoScan
   const days = at ? (Date.now() - at) / 86400000 : null;
   if (remindRescan !== false && days != null && days >= STALE_DAYS) {
     await chrome.action.setBadgeText({ text: '!' });
@@ -74,6 +102,12 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   const to = chrome.runtime.getManifest().version;
   // Caches of RSI news, which Home no longer shows (0.3.0): drop them.
   await chrome.storage.local.remove(['rsiNews', 'twisc2']);
+  // The code of the player who recruited you, which the cached account no longer keeps.
+  const { account } = await chrome.storage.local.get('account');
+  if (account?.referral && Object.hasOwn(account.referral, 'referrerCode')) {
+    delete account.referral.referrerCode;
+    await chrome.storage.local.set({ account });
+  }
   await chrome.storage.local.remove('updateReady');
   if (details.previousVersion && details.previousVersion !== to) {
     await chrome.storage.local.set({ justUpdated: { from: details.previousVersion, to } });
@@ -103,10 +137,17 @@ async function dashboardOpen() {
   return true;
 }
 
+// An update waits for an open dashboard tab, and for a scan in the hidden page (the
+// page and its pack reads, src/scan-host.js); that one lets it in once it's done.
 chrome.runtime.onUpdateAvailable?.addListener(async (details) => {
-  if (await dashboardOpen()) chrome.storage.local.set({ updateReady: details.version });
+  if ((await dashboardOpen()) || (await scanHost?.busy()))
+    chrome.storage.local.set({ updateReady: details.version });
   else chrome.runtime.reload();
 });
+async function updateIfIdle() {
+  const { updateReady } = await chrome.storage.local.get('updateReady');
+  if (updateReady && !(await dashboardOpen()) && !(await scanHost?.busy())) chrome.runtime.reload();
+}
 chrome.runtime.onStartup.addListener(updateReminder);
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && (changes.db || changes.remindRescan)) updateReminder();
@@ -268,7 +309,9 @@ siteHandlers['oh-connect-finish'] = async (msg, origin) => {
     siteUrl: origin, // sync goes to the site you connected on
     ...(msg.sync ? { siteSyncRequested: Date.now() } : {}),
   });
-  chrome.tabs.create({ url: hubUrl('#home') });
+  // An Open Hangar tab already open comes to the front instead of a second one (#658):
+  // a scan running there keeps going, and the sync waits for it.
+  await dashboardTab('#home');
   return { ok: true, name: j.name || '' };
 };
 // Connect with a code (src/dashboard.js siteConnect, when the sign-in window can't
@@ -349,10 +392,12 @@ async function dashboardTab(hash = '') {
   return tab?.id ?? null;
 }
 
-// A scan running in a dashboard right now (src/dashboard.js scanMark), or one asked
-// for in the last minute that its tab hasn't started yet (scanIfAsked takes the
-// request once the scan has begun, or drops it). A mark counts only while its tab is
-// still open, as far as this browser can tell, and for 10 minutes at most.
+// A scan running in a dashboard or the hidden scan page right now (its scanRunning
+// mark), or one asked for in the last minute that its page hasn't started yet (it takes
+// the request once the scan has begun, or drops it). A mark counts only while its tab
+// or hidden page is still open, as far as this browser can tell, and for 10 minutes at
+// most.
+const hiddenBy = (by) => by === 'offscreen' || by === 'frame';
 async function scanRunning() {
   const { scanRunning: mark, scanRequest: asked } = await chrome.storage.session.get([
     'scanRunning',
@@ -361,6 +406,7 @@ async function scanRunning() {
   const now = Date.now();
   if (Number.isFinite(asked?.at) && now - asked.at < SCAN_ASK_GAP) return true;
   if (!(Number.isFinite(mark?.at) && now - mark.at < SCAN_RUN_MAX)) return false;
+  if (hiddenBy(mark.by)) return scanHost ? scanHost.alive(mark) : true;
   const tabs = await dashboardTabs();
   return !tabs || !Number.isInteger(mark.tabId) || tabs.some((c) => c.tabId === mark.tabId);
 }
@@ -412,11 +458,19 @@ siteHandlers['oh-scan-status'] = async () => {
   };
 };
 
-// The dashboard runs the scan, the same one its Scan button runs, in its own tab: this
-// worker never scans and never asks RSI anything for it. The request names the tab
-// (src/dashboard.js scanIfAsked), so only that one scans. Our hangar page asks for it,
-// and the toolbar popup in the connector build (below).
-async function requestScan() {
+// A page runs the scan, never this worker, which never asks RSI anything for it: in the
+// connector build the hidden scan page (src/scan-host.js, no tab), else the dashboard,
+// the same scan its Scan button runs, in its own tab. The request names the page (its
+// run, or its tab: src/dashboard.js scanIfAsked), so only that one scans. Our hangar
+// page asks for it ('site'), and the toolbar popup in the connector build (below,
+// 'popup'): the request says which, for the scan's report (ui/scan/runner.js
+// scanReport.reason). → { ok, opened: true } for a tab, { ok, opened: false, by } for
+// the hidden page, or { ok: false, error: 'busy' }. `hiddenOnly` (Auto Scan Daily,
+// reason 'auto'): only in the hidden page, never a tab; where it can't run there, →
+// { ok: false, error: 'no-hidden' } and nothing opens.
+async function requestScan(reason, { hiddenOnly = false } = {}) {
+  if (hiddenOnly && (!scanHost || (await scanHost.choose()) === 'tab'))
+    return { ok: false, error: 'no-hidden' };
   const now = Date.now();
   // Checked and set before any wait, so two requests at once can't both pass; kept in
   // session storage too, for a worker that stopped and started again in between.
@@ -429,28 +483,59 @@ async function requestScan() {
     return { ok: false, error: 'busy' };
   }
   await chrome.storage.session.set({ scanAskedAt: now });
+  const hidden = await scanHost?.start(reason);
+  if (!hidden && hiddenOnly) {
+    // No hidden page after all: no scan, so it doesn't count as a request either.
+    scanAskedAt = held;
+    await chrome.storage.session.remove('scanAskedAt');
+    return { ok: false, error: 'no-hidden' };
+  }
+  await chrome.storage.session.set({ scanAskedBy: hidden ? hidden.by : 'tab' });
+  if (hidden) return { ok: true, opened: false, by: hidden.by };
   const tabId = await dashboardTab();
-  await chrome.storage.session.set({ scanRequest: { at: Date.now(), tabId } });
+  await chrome.storage.session.set({
+    scanRequest: { at: Date.now(), tabId, reason, by: 'tab' },
+  });
   return { ok: true, opened: true };
 }
-siteHandlers['oh-request-scan'] = () => requestScan();
+// The website's answer stays { ok, opened: true } wherever the scan runs (bridge v2,
+// coordinated with the server repo).
+siteHandlers['oh-request-scan'] = async () => {
+  const r = await requestScan('site');
+  return r.ok ? { ok: true, opened: true } : r;
+};
+// Busy: the tab that scans comes to the front. A scan in the hidden page has none, so
+// nothing opens for it.
+async function showScan() {
+  const s = await chrome.storage.session.get(['scanRunning', 'scanRequest', 'scanAskedBy']);
+  const now = Date.now();
+  const fresh = (x, max) => Number.isFinite(x?.at) && now - x.at < max;
+  const by =
+    (fresh(s.scanRunning, SCAN_RUN_MAX) && s.scanRunning.by) ||
+    (fresh(s.scanRequest, SCAN_ASK_GAP) && s.scanRequest.by) ||
+    s.scanAskedBy;
+  if (!hiddenBy(by)) await dashboardTab();
+}
 // @flag-end localMode
 
 // @flag-start connector: the toolbar popup (needs localMode, scripts/pack.mjs)
 // In the connector build the toolbar icon opens src/popup.html. Its Scan asks here,
-// and gets the same scan our hangar page asks for (requestScan): the dashboard tab
-// comes to the front and runs it. While a scan runs, or a minute after one was asked
-// for, the tab still comes to the front, so the popup's Scan is never a dead click.
-//   { ohPopup: 'scan' } → { ok, opened: true } | { ok: false, error: 'busy' }
+// and gets the same scan our hangar page asks for (requestScan): in the hidden scan
+// page, so the popup stays open and shows it from the scan's marks, or in the basic
+// page's tab, which comes to the front and runs it. While a scan runs in a tab, or a
+// minute after one was asked of it, that tab still comes to the front, so the popup's
+// Scan is never a dead click.
+//   { ohPopup: 'scan' } → { ok, opened: true } (a tab) | { ok, opened: false, by }
+//                         (the hidden page) | { ok: false, error: 'busy' }
 const POPUP = 'src/popup.html';
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (!msg || typeof msg !== 'object' || msg.ohPopup !== 'scan') return false;
   // Only our own popup: an extension page, not a tab, at exactly its address.
   if (sender.id !== chrome.runtime.id || sender.tab) return false;
   if (String(sender.url || '').split(/[?#]/)[0] !== chrome.runtime.getURL(POPUP)) return false;
-  requestScan()
+  requestScan('popup')
     .then(async (r) => {
-      if (!r.ok) await dashboardTab();
+      if (!r.ok) await showScan();
       return r;
     })
     .then(reply, (err) => reply({ ok: false, error: String(err?.message || err) }));
@@ -467,6 +552,8 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 // take the toolbar badge (updateReminder); a new one gets a notification while
 // Notifications are allowed (an optional permission the settings switch asks for).
 //   { ohPopup: 'alerts-seen' } → { ok }: the popup is open, every match is seen
+//   { ohPopup: 'alerts-hide', id? } → { ok }: the popup deleted one match (its id), or
+//     every one (Clear All, no id), so the badge follows
 if (typeof importScripts === 'function' && !self.OHAlerts) importScripts('alerts.js');
 const NOTIFY = { permissions: ['notifications'] };
 const notifyOk = async () =>
@@ -591,15 +678,19 @@ function hearClicks() {
 hearClicks();
 chrome.permissions?.onAdded?.addListener(hearClicks);
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
-  if (!msg || typeof msg !== 'object' || msg.ohPopup !== 'alerts-seen') return false;
+  if (!msg || typeof msg !== 'object') return false;
+  if (msg.ohPopup !== 'alerts-seen' && msg.ohPopup !== 'alerts-hide') return false;
   if (sender.id !== chrome.runtime.id || sender.tab) return false;
   if (String(sender.url || '').split(/[?#]/)[0] !== chrome.runtime.getURL(POPUP)) return false;
   const AL = self.OHAlerts;
+  const id = typeof msg.id === 'string' ? msg.id : null;
+  const next = (st) =>
+    msg.ohPopup === 'alerts-hide' ? AL.hide(st, Date.now(), id) : AL.markSeen(st, Date.now());
   chrome.storage.local
     .get(AL.STATE_KEY)
     .then((got) =>
       got[AL.STATE_KEY]
-        ? chrome.storage.local.set({ [AL.STATE_KEY]: AL.markSeen(got[AL.STATE_KEY], Date.now()) })
+        ? chrome.storage.local.set({ [AL.STATE_KEY]: next(got[AL.STATE_KEY]) })
         : null,
     )
     .then(updateReminder)
@@ -610,6 +701,131 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   return true; // answers later
 });
 // @flag-end alerts
+
+// @flag-start autoScan: Auto Scan Daily (needs alerts, for the alarms permission: scripts/pack.mjs)
+// A scan of the connected RSI account once a day, off until the pilot turns it on in the
+// popup's Settings (local `autoScanOn`), and only while connected (Disconnect turns it
+// off: src/lib.js siteDisconnect). This worker only keeps its time: one alarm, at a
+// random time 20 to 28 hours after the last run, made again whenever the worker starts
+// (a browser restart can drop alarms). When it goes off, the hidden scan page runs it
+// (requestScan 'auto', never a tab; ui/scan/runner.js autoScan), and that page writes
+// how it went (local `autoScan`). It never notifies (check 6 in the privacy notes).
+// Skipped without asking RSI anything: a scan began under 20 hours ago (any scan) or its
+// own last run ended then, RSI asked it to back off, the browser is offline, or a scan is
+// running. A day missed while the browser was closed or the machine asleep runs once, 10
+// to 30 minutes after it's back (the alarm came late, or there's none left).
+const AUTO_ALARM = 'oh-auto-scan';
+const AUTO_ON = 'autoScanOn';
+const AUTO_NEXT = 'autoScanNext';
+const AUTO_STATE = 'autoScan';
+const AUTO_GAP = 20 * 3600e3;
+const AUTO_SPREAD = 8 * 3600e3;
+const AUTO_MAX_AHEAD = 28 * 3600e3;
+const AUTO_LATE = 10 * 60e3;
+const AUTO_RETRY_SPREAD = 2 * 3600e3;
+const autoRand = (ms) => Math.floor(Math.random() * ms);
+const autoSoon = (now) => now + 10 * 60e3 + autoRand(20 * 60e3);
+const autoDaily = (t) => t + AUTO_GAP + autoRand(AUTO_SPREAD);
+// RSI asked the last run to back off (its record's retryAt, ui/scan/auto.js retryAtOf).
+const autoRetryAt = (rec) => (Number.isFinite(rec?.retryAt) ? rec.retryAt : null);
+// The next run at `when`: its alarm and its time (kept, for a worker that starts again
+// with the alarm gone).
+async function autoSchedule(when) {
+  await chrome.alarms.create(AUTO_ALARM, { when });
+  await chrome.storage.local.set({ [AUTO_NEXT]: when });
+}
+// One at a time, in order: the worker's start, the alarm and the switch. A worker woken
+// by this alarm already finds it gone when it starts, so the alarm's own next run must
+// land after the start's.
+let autoLine = Promise.resolve();
+const autoQueue = (fn) =>
+  (autoLine = autoLine
+    .then(fn)
+    .catch((e) => console.warn('[OpenHangar] Auto Scan Daily:', e?.message || e)));
+
+// The worker started (or the switch, or the connection, changed): off or not connected,
+// no alarm (and not connected: switched off); on, the alarm it has, or the time it kept,
+// or a run soon when that's past. One more than 28 hours away (the clock went back) is
+// 20 to 28 hours from now, unless RSI asked to wait longer.
+async function autoWake() {
+  const now = Date.now();
+  const got = await chrome.storage.local.get(['siteLink', AUTO_ON, AUTO_NEXT, AUTO_STATE]);
+  if (!got.siteLink?.token) {
+    await chrome.alarms.clear(AUTO_ALARM);
+    if (AUTO_ON in got || AUTO_NEXT in got) await chrome.storage.local.remove([AUTO_ON, AUTO_NEXT]);
+    return;
+  }
+  if (got[AUTO_ON] !== true) {
+    await chrome.alarms.clear(AUTO_ALARM);
+    if (AUTO_NEXT in got) await chrome.storage.local.remove(AUTO_NEXT);
+    return;
+  }
+  const retryAt = autoRetryAt(got[AUTO_STATE]);
+  const ahead = Math.max(AUTO_MAX_AHEAD, (retryAt ?? 0) - now + AUTO_RETRY_SPREAD);
+  const alarm = await chrome.alarms.get(AUTO_ALARM);
+  if (alarm && Number.isFinite(alarm.scheduledTime) && alarm.scheduledTime - now <= ahead) return;
+  const next = got[AUTO_NEXT];
+  if (Number.isFinite(next) && next > now && next - now <= ahead) return autoSchedule(next);
+  return autoSchedule(Number.isFinite(next) && next > now ? autoDaily(now) : autoSoon(now));
+}
+
+// The alarm went off.
+async function autoFired(alarm) {
+  const now = Date.now();
+  const got = await chrome.storage.local.get(['siteLink', AUTO_ON, AUTO_STATE, 'scanStarted']);
+  if (!got.siteLink?.token || got[AUTO_ON] !== true) return autoWake();
+  // Late (the browser was closed, the machine asleep): once, a while from now.
+  const due = Number.isFinite(alarm?.scheduledTime) ? alarm.scheduledTime : now;
+  if (now - due > AUTO_LATE) return autoSchedule(autoSoon(now));
+  // The next run first, so whatever happens below there's always one.
+  const retryAt = autoRetryAt(got[AUTO_STATE]);
+  const retry = retryAt > now ? retryAt + autoRand(AUTO_RETRY_SPREAD) : 0;
+  await autoSchedule(Math.max(autoDaily(now), retry));
+  // Skipped, asking RSI nothing and writing nothing: a scan began under 20 hours ago, or
+  // Auto Scan Daily's last run ended then (a quick check writes no scanStarted, and
+  // switching it off and on again would otherwise run it again in 10 to 30 minutes): the
+  // next run is 20 to 28 hours after it. Or RSI asked to wait, offline, or a scan is
+  // running.
+  const started = Math.max(
+    ...[got.scanStarted?.at, got[AUTO_STATE]?.ended].filter((t) => Number.isFinite(t) && t <= now),
+  );
+  if (Number.isFinite(started) && now - started < AUTO_GAP)
+    return autoSchedule(Math.max(autoDaily(started), retry));
+  if (retryAt > now) return;
+  if (self.navigator?.onLine === false) return;
+  if ((await scanRunning()) || (await scanHost?.busy())) return;
+  // In the hidden page only: no tab ever opens for it (busy or no hidden page: skipped).
+  await requestScan('auto', { hiddenOnly: true });
+}
+
+// A run that RSI asked to wait (its record's retryAt, later than the next run): the
+// next run moves after it.
+async function autoBackoff(rec) {
+  const retryAt = autoRetryAt(rec);
+  if (retryAt == null) return;
+  const got = await chrome.storage.local.get(['siteLink', AUTO_ON, AUTO_NEXT]);
+  if (!got.siteLink?.token || got[AUTO_ON] !== true) return;
+  if (Number.isFinite(got[AUTO_NEXT]) && retryAt <= got[AUTO_NEXT]) return;
+  await autoSchedule(retryAt + autoRand(AUTO_RETRY_SPREAD));
+}
+
+autoQueue(autoWake);
+chrome.alarms.onAlarm.addListener((a) => {
+  if (a?.name === AUTO_ALARM) autoQueue(() => autoFired(a));
+});
+chrome.storage.onChanged.addListener((c, area) => {
+  if (area !== 'local') return;
+  // Switched on or off, or disconnected (by any route): its alarm follows. Store alerts'
+  // alarm is never touched here.
+  if (c[AUTO_ON] || (c.siteLink && !c.siteLink.newValue?.token)) autoQueue(autoWake);
+  if (c[AUTO_STATE]) {
+    const rec = c[AUTO_STATE].newValue;
+    autoQueue(() => autoBackoff(rec));
+  }
+  // The badge: a run that found nothing new keeps the hangar fresh (updateReminder).
+  if (c[AUTO_STATE] || c[AUTO_ON]) updateReminder();
+});
+// @flag-end autoScan
 
 // The website's messages, all of them: only from our own pages (src/site-pages.js),
 // each checked before its handler runs.

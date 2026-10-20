@@ -1,6 +1,6 @@
-// The basic page's lists (the connector build): pledges and buy-backs as plain rows,
-// search, totals and the CSV export. Pure, so it's tested directly
-// (test/basic-page.test.js). No pictures and nothing fetched: the page works offline.
+// Pledges and buy-backs as plain rows (the connector build): search, totals and the CSV
+// export, for the popup's export (the basic page had the lists until 0.4.0). Pure, so
+// it's tested directly (test/basic-page.test.js). No pictures and nothing fetched.
 
 // RSI's dates come as "2024-03-14" or "Jan 05, 2025"; kept as RSI wrote them.
 const text = (v) => (v == null ? '' : String(v).trim());

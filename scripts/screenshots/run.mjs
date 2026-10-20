@@ -87,11 +87,12 @@ function demoDashboard() {
       '<script src="lib.js"></script>\n    <script src="/__demo/demo-after-lib.js"></script>',
     );
 }
-// The connector's own pages (src/popup.html, src/basic.html): the same shims, before flags.js, plus
+// The connector's own pages (src/popup.html, src/basic.html, the hidden src/scan.html): the
+// same shims, before flags.js, plus
 // what only those pages use (demo-connector.js: session storage, change events, the
 // popup's message to the background). Their flags are a connector build's, Extension
-// Alerts on (connectorFlags), as `--flag localMode=on --flag connector=on --flag
-// alerts=on` builds them.
+// Alerts and Auto Scan Daily on (connectorFlags), as `--flag localMode=on --flag
+// connector=on --flag alerts=on --flag autoScan=on` builds them.
 function demoConnectorPage(file) {
   return fs
     .readFileSync(path.join(SRC, file), 'utf8')
@@ -112,7 +113,7 @@ const connectorFlags = () =>
     .readFileSync(path.join(SRC, 'flags.js'), 'utf8')
     .replace(
       'const BUILD_VALUES = {};',
-      'const BUILD_VALUES = {"sync":true,"orgFleet":false,"localMode":true,"connector":true,"alerts":true};',
+      'const BUILD_VALUES = {"sync":true,"orgFleet":false,"localMode":true,"connector":true,"alerts":true,"autoScan":true};',
     );
 
 async function handle(req, res) {
@@ -149,7 +150,7 @@ async function handle(req, res) {
     }
   }
 
-  if (u.pathname === '/popup.html' || u.pathname === '/basic.html') {
+  if (['/popup.html', '/basic.html', '/scan.html'].includes(u.pathname)) {
     return res
       .writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' })
       .end(demoConnectorPage(u.pathname.slice(1)));

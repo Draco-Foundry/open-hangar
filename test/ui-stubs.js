@@ -1,15 +1,18 @@
 'use strict';
 // Stand-ins for the built Svelte pages in a scratch copy of the repo. src/ui is generated
 // (npm run build:ui), and npm test runs before that build in CI, but every store build
-// now has the connector, whose popup and basic page load src/ui files the store check
-// looks for. Shaped like Vite's output: entries importing a shared chunk. Used by
+// now has the connector, whose popup, basic page and hidden scan page load src/ui files
+// the store check looks for. Shaped like Vite's output: entries importing a shared chunk. Used by
 // test/connector-build.test.js, test/build-flags.test.js and test/beta-build.test.js.
 const fs = require('node:fs');
 const path = require('node:path');
 
 const UI_STUBS = {
   'popup.js': 'import { a } from "./shared.js";\nimport { w } from "./when.js";\n',
-  'basic.js': 'import { a } from "./shared.js";\n',
+  'basic.js': 'import { a } from "./shared.js";\nimport { r } from "./runner.js";\n',
+  // The hidden scan page: the scan runner, shared with the basic page, and no Svelte.
+  'scan.js': 'import { r } from "./runner.js";\n',
+  'runner.js': 'export const r = 3;\n',
   'home.js': 'import { a } from "./shared.js";\nimport { w } from "./when.js";\n',
   'store.js': 'import { a } from "./shared.js";\n',
   'shared.js': "/** @import { X } from './types.js' */\nexport const a = 1;\n",

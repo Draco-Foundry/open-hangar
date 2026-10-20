@@ -59,8 +59,15 @@ test('switching accounts parks the old data and restores it later', async () => 
       ['Alt', 5, false],
     ],
   );
+  // Removing a saved account takes its portrait (ui/scan/runner.js avatarImg), never
+  // another pilot's.
+  mem.avatarImg = { nickname: 'Main', src: 'data:image/png;base64,AA==', at: 1 };
   await OH.deleteProfile('ALT');
   assert.equal((await OH.listProfiles()).length, 1);
+  assert.equal(mem.avatarImg.nickname, 'Main', "another pilot's portrait stays");
+  mem.avatarImg = { nickname: 'Alt', src: 'data:image/png;base64,AA==', at: 1 };
+  await OH.deleteProfile('alt');
+  assert.equal(mem.avatarImg, undefined);
 });
 
 test('switching to the account that is already live does nothing', async () => {
@@ -122,4 +129,39 @@ test('round trips through many big accounts lose nothing and mix nothing (#199)'
   const list = await OH.listProfiles();
   assert.equal(list.length, N);
   assert.ok(list.every((p) => p.pledges === PLEDGES));
+});
+
+test('listProfiles reads only the hangars where the browser can list its keys', async () => {
+  mem = {
+    db: dbFor('Main', 3),
+    'profile:alt': dbFor('Alt', 2),
+    history: Array.from({ length: 50 }, () => ({ items: [] })),
+    log: ['x'],
+  };
+  const local = chrome.storage.local;
+  const asked = [];
+  const get = local.get;
+  local.get = async (keys) => {
+    asked.push(keys);
+    return get(keys);
+  };
+  local.getKeys = async () => Object.keys(mem);
+  try {
+    const rows = await OH.listProfiles();
+    assert.deepEqual(
+      rows.map((r) => [r.nickname, r.pledges, r.active]),
+      [
+        ['Main', 3, true],
+        ['Alt', 2, false],
+      ],
+    );
+    // The hidden scan page's storage is the background's (src/scan-shim.js): history and
+    // the log never cross for it.
+    assert.deepEqual(asked, [['db', 'profile:alt']]);
+  } finally {
+    local.get = get;
+    delete local.getKeys;
+  }
+  // Without getKeys: everything, as before.
+  assert.equal((await OH.listProfiles()).length, 2);
 });

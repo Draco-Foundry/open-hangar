@@ -30,7 +30,16 @@ most users see it within a few hours.
   `"minVersion": "0.2.13"` pauses it only on older versions (use this once the fix
   is out, so people on the fix keep scanning). `message` is optional (300 characters,
   plain text).
-- `banner`: a notice across the top of the dashboard. `level` is `warn` or `info`;
+- `sources.scanHidden`: `"enabled": false` runs scans on the small Open Hangar page in a
+  tab again instead of the hidden scan page (0.4.0, `src/scan-host.js`), if the hidden
+  page itself breaks. It only ever turns the hidden page off. Auto Scan Daily never runs
+  in a tab, so it skips its days until the hidden page is back.
+- `sources.autoScan`: `"enabled": false` (or a `minVersion`) pauses Auto Scan Daily
+  alone (0.4.0, #666): pressed scans go on, and each skipped day asks RSI nothing and
+  shows "scans are paused" under its switch. Pausing `hangar` pauses it too;
+  `buybacks` or `referrals` only skip that part of its full read.
+- `banner`: a notice at the top of the basic page (the dashboard in a build without
+  the connector). `level` is `warn` or `info`;
   `until` (a date) hides it automatically after that day; `maxVersion` shows it only
   on that version or older (versions before 0.3.0 ignore it and always show it).
 - When the fix is out everywhere, put the file back to
@@ -87,27 +96,8 @@ request and markup in DevTools.
 6. `npm test`, `npm run test:ui`, then try a real scan with the unpacked build
    (`npm run build`, load `dist/chrome`).
 
-## 4. Ship it fast
+## 4. Ship It and Tell People
 
-1. Patch version bump in `manifest.json` and `package.json` (e.g. 0.2.8 → 0.2.9),
-   and a CHANGELOG entry ("Fixed: scans after RSI's … change").
-2. Merge, then tag: `git tag v0.2.9 && git push origin v0.2.9` (or `npm run release`).
-   The Release workflow builds the zips, publishes the GitHub Release and starts
-   **Publish to stores** for the tag (`store: all`). If the stores already got an
-   update today, tag it as a hotfix instead:
-   `git tag -a v0.2.9 -m "Open Hangar 0.2.9 [hotfix]"` (or `npm run release 0.2.9 --hotfix`).
-3. Approve the `stores` environment when the Publish run asks (it first waits for
-   CI on the commit). It uploads to Firefox, Edge
-   and Chrome and posts to Discord #updates. If Chrome is still reviewing the last
-   version, rerun later with `store: chrome`. Small fixes for a change on RSI's side
-   usually clear review quickly.
-4. Post in Discord #status: what broke, that a fix is in review, and that people
-   can load it from source (README → Install) if they can't wait.
-
-## 5. Tell people while you work
-
-Open an issue from the **Outage Notice** template, pin it, and link it in Discord
-#status ("RSI changed their hangar page; scans are broken, a fix is on the way") so
-the same report doesn't come in 30 times. People who file anyway use the **Scan
-Broken** template, which points them at the open `scan-broken` issues first. Your data isn't
-lost: a failed or partial scan never overwrites a bigger earlier one.
+The maintainer releases the fix (as a hotfix if the stores already got an update
+today) and posts in Discord while the stores review it. Players open issues from the
+**Scan Broken** template. The release and announcement steps are kept in the maintainer's private notes.

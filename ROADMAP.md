@@ -5,7 +5,7 @@
 Our flight plan: where Open Hangar is going, the steps to get there, and everything shipped so
 far.
 
-_Last reviewed: Oct 8, 2026. Dates are UTC._ Live progress: the pinned
+_Last reviewed: Oct 14, 2026. Dates are UTC._ Live progress: the pinned
 [Road to Launch Tracker](https://github.com/Draco-Foundry/open-hangar/issues/468) and
 [All Milestones](https://github.com/Draco-Foundry/open-hangar/milestones?direction=asc&sort=due_date&state=open).
 
@@ -18,9 +18,9 @@ Jump to: [The Plan](#the-plan-at-a-glance) · [What Launches](#what-launches-on-
   The website, openhangar.space, turns it into a fleet manager you can open on any device: My
   Hangar, store tools that know what you own, a page for every ship, and later your org and
   the wider community.
-- **New Features Land on the Website.** From Nov 10 (extension 0.3.0), the extension focuses
-  on reading your account well, with reading improvements and fixes. Everything new is built
-  on openhangar.space.
+- **New Features Land on the Website.** From Nov 10, the extension focuses on reading your
+  account well, with reading improvements and fixes. Everything new is built on
+  openhangar.space.
 - **Your Data, Your Call.** Open Hangar is free today, with no subscriptions, no premium tier
   and no paid features, and your data is never sold. From Nov 10 you can choose to sync:
   connect a free account and the extension syncs after every scan, or skip it and everything
@@ -30,15 +30,18 @@ Jump to: [The Plan](#the-plan-at-a-glance) · [What Launches](#what-launches-on-
 
 ## Where We Are Today
 
-- **Extension 0.2.19** (Oct 5, 2026) is live on Chrome, Edge and Firefox. It has no sync:
-  everything stays in your browser.
-  ([Release Notes](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.2.19))
+- **Extension 0.4.1** (Oct 14, 2026) went to the Chrome, Edge and Firefox stores, and each
+  store reviews it before it goes live: a new toolbar popup, scans that run out of sight and
+  Auto Scan Daily (optional). Sync is optional, and nothing is sent until you connect.
+  [openhangar.space/extension](https://openhangar.space/extension) shows each store's
+  current version.
+  ([Release Notes](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.4.1))
 - **[openhangar.space](https://openhangar.space/)** is live with a Star Citizen news front
   page, the [Open Hangar Store](https://openhangar.space/store) and accounts. Sign-ups are
   invite-only until launch, and sync is open to beta testers. Several Wave 1 features are
   already built and stay switched off until launch.
-- **0.3.0** is built and in testing: the rebuilt extension with optional sync. It launches on
-  Nov 10.
+- **0.3.0** (Oct 13, 2026) made the extension a lighter connector with optional sync, and
+  your full hangar opens on openhangar.space. The website opens to everyone on Nov 10.
 
 ## The Plan at a Glance
 
@@ -58,23 +61,23 @@ fills as its tasks are done:
       [Foundation](https://github.com/Draco-Foundry/open-hangar/milestone/2) milestones are done.
 - [x] **Oct 2 to 7, 2026:** Shipped. openhangar.space becomes a Star Citizen news hub and opens
       the Open Hangar Store.
-- [x] **Oct 6, 2026:** Built. The [0.3.0 Redesign](https://github.com/Draco-Foundry/open-hangar/milestone/3) rebuilds
-      every extension page in one clean look. Arrives Nov 10.
+- [x] **Oct 13 to 14, 2026:** Shipped. Extension 0.3.0 and 0.3.1 make the extension a lighter
+      connector, and 0.4.0 and 0.4.1 bring the new toolbar popup.
 - [ ] **Oct 16, 2026:** [Wave 1: Core Hangar Manager](https://github.com/Draco-Foundry/open-hangar/milestone/6)
       built.
 - [ ] **Oct 16 to 19, 2026:** bug-fix days, with no new features. [#507](https://github.com/Draco-Foundry/open-hangar/issues/507)
-- [ ] **Oct 20 to 27, 2026:** an invite-only beta with 5 to 10 testers, invites on our Discord.
-      [#508](https://github.com/Draco-Foundry/open-hangar/issues/508)
+- [ ] **Oct 20 to 27, 2026:** a tester round with 5 to 10 Discord testers on the public
+      extension and the website. [#508](https://github.com/Draco-Foundry/open-hangar/issues/508)
 - [ ] **Oct 25, 2026:** [Wave 2: Your Hangar Meets the Store](https://github.com/Draco-Foundry/open-hangar/milestone/7)
       built and in testing.
-- [ ] **Oct 27, 2026:** last extension changes in, then a final check before the stores.
+- [ ] **Oct 27, 2026:** code freeze for the extension, then a go or no-go call.
       [#509](https://github.com/Draco-Foundry/open-hangar/issues/509)
-- [ ] **Oct 28, 2026:** 0.3.0 goes to the Chrome, Edge and Firefox stores for review.
-      [#512](https://github.com/Draco-Foundry/open-hangar/issues/512)
+- [x] **Oct 28, 2026:** 0.3.0 submitted to Chrome, Edge and Firefox. It shipped early, on
+      Oct 13. [#512](https://github.com/Draco-Foundry/open-hangar/issues/512)
 - [ ] **Nov 3, 2026:** [Wave 3: Finishing Touches](https://github.com/Draco-Foundry/open-hangar/milestone/9)
       built.
-- [ ] **Nov 10, 2026: [Launch](https://github.com/Draco-Foundry/open-hangar/milestone/4).** Extension
-      0.3.0 and the website launch together, and sign-ups open to everyone.
+- [ ] **Nov 10, 2026: [Launch](https://github.com/Draco-Foundry/open-hangar/milestone/4).** The
+      website opens and sign-ups open to everyone.
       [#513](https://github.com/Draco-Foundry/open-hangar/issues/513)
 - [ ] **Then:** four weeks of bug fixes and keeping ship and store data accurate.
       ([After Launch: Fixes and Upkeep](https://github.com/Draco-Foundry/open-hangar/milestone/5))
@@ -82,7 +85,7 @@ fills as its tasks are done:
 - [ ] **[Early 2027](https://github.com/Draco-Foundry/open-hangar/milestone/11) and [Later in 2027](https://github.com/Draco-Foundry/open-hangar/milestone/12):**
       planned, not promised.
 
-An invite-only beta runs Oct 20 to 27, with invites on the
+An invite-only tester round runs Oct 20 to 27, with invites on the
 [Draco Foundry Discord](https://discord.gg/FF8Wm5HdnV). Spots are limited.
 
 ## What Launches on November 10
@@ -171,20 +174,20 @@ Your own hangar, tied into the store and the news.
 
 [Bug Fixes and Beta Milestone](https://github.com/Draco-Foundry/open-hangar/milestone/8)
 
-- **Bug-Fix Days (Oct 16 to 19):** fixes and polish only, so the beta starts on solid ground.
-  [#507](https://github.com/Draco-Foundry/open-hangar/issues/507)
+- **Bug-Fix Days (Oct 16 to 19):** fixes and polish only, so the tester round starts on
+  solid ground. [#507](https://github.com/Draco-Foundry/open-hangar/issues/507)
 - **Front Page Fixes:** canceled events keep their strike-through on hover
   [#457](https://github.com/Draco-Foundry/open-hangar/issues/457), the top stories pause when you hover
   [#459](https://github.com/Draco-Foundry/open-hangar/issues/459), and on phones Ships in the News
   leads with the newest story [#467](https://github.com/Draco-Foundry/open-hangar/issues/467).
 - **Org Fleet, Ships Only:** taking member values and comparisons out of the extension's Org
-  Fleet page. [#466](https://github.com/Draco-Foundry/open-hangar/issues/466)
-- **Beta (Oct 20 to 27):** 5 to 10 invited Discord testers try 0.3.0 and the website
-  together, sync included. [#508](https://github.com/Draco-Foundry/open-hangar/issues/508)
+  Fleet page. Done. [#466](https://github.com/Draco-Foundry/open-hangar/issues/466)
+- **Tester Round (Oct 20 to 27):** 5 to 10 invited Discord testers try the public extension
+  and the website together, sync included. [#508](https://github.com/Draco-Foundry/open-hangar/issues/508)
 - **One Sync Format for Both:** the extension and the website share one description of what
-  a sync contains, if it's ready by Oct 27. [#441](https://github.com/Draco-Foundry/open-hangar/issues/441)
-- **Code Freeze and Final Check (Oct 27):** last extension changes in, then a go or no-go call
-  on sending 0.3.0 to the stores. [#509](https://github.com/Draco-Foundry/open-hangar/issues/509)
+  a sync contains. Done. [#441](https://github.com/Draco-Foundry/open-hangar/issues/441)
+- **Code Freeze and Final Check (Oct 27):** last extension changes in, then a go or no-go
+  call. [#509](https://github.com/Draco-Foundry/open-hangar/issues/509)
 
 ### Wave 3: Finishing Touches (Built by Nov 3)
 
@@ -210,13 +213,13 @@ The last round before launch. [Wave 3 Milestone](https://github.com/Draco-Foundr
 
 [Launch Milestone](https://github.com/Draco-Foundry/open-hangar/milestone/4)
 
-- **Easy-to-Find Connect** in the extension. [#434](https://github.com/Draco-Foundry/open-hangar/issues/434)
-- **Bring the 0.3.0 Build Into Main** at code freeze. [#510](https://github.com/Draco-Foundry/open-hangar/issues/510)
+- **Easy-to-Find Connect** in the extension. Done. [#434](https://github.com/Draco-Foundry/open-hangar/issues/434)
+- **Bring the 0.3.0 Build Into Main** at code freeze. Done. [#510](https://github.com/Draco-Foundry/open-hangar/issues/510)
 - **Update the "No Server" Wording** everywhere it no longer fits.
   [#511](https://github.com/Draco-Foundry/open-hangar/issues/511)
-- **Submit 0.3.0 to the Stores (Oct 28).** [#512](https://github.com/Draco-Foundry/open-hangar/issues/512)
-- **Launch Day (Nov 10):** 0.3.0 and the website launch together, and sign-ups open to
-  everyone. [#513](https://github.com/Draco-Foundry/open-hangar/issues/513)
+- **Submit 0.3.0 to the Stores (Oct 28).** It shipped early, on Oct 13. [#512](https://github.com/Draco-Foundry/open-hangar/issues/512)
+- **Launch Day (Nov 10):** the website opens and sign-ups open to everyone.
+  [#513](https://github.com/Draco-Foundry/open-hangar/issues/513)
 
 ### Already Built for 0.3.0
 
@@ -336,9 +339,7 @@ On the list, but not scheduled. Vote for the ones you want in
 
 - **Rankings, or Comparing Players' Hangars.** We don't rank pilots or orgs, or compare
   totals, values or ship counts between players. Stats stay anonymous and hangars stay private
-  by default. One exception is still to fix: the extension's Org Fleet page shows member
-  values and comparisons today, and taking them out is tracked in
-  [#466](https://github.com/Draco-Foundry/open-hangar/issues/466).
+  by default.
 - **CCU Chain Planning.** Open Hangar shows what your upgrades are worth, and from 0.3.0 what
   a single upgrade costs from a ship you own. Planning whole chains is left to the tools built
   for it.
@@ -360,6 +361,15 @@ Newest first. Dates are UTC. Full notes for every version are on the
 
 ### October 2026
 
+- [x] **Oct 14 · 0.4.0 and 0.4.1:** a new toolbar popup with three tabs, Hangar, Wishlist and
+      Settings, plus an alerts bell. Also: scans that run out of sight, Auto Scan Daily
+      (optional), your Wishlist in the popup, your own currency and light mode.
+      ([0.4.0](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.4.0),
+      [0.4.1](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.4.1))
+- [x] **Oct 13 to 14 · 0.3.0 and 0.3.1:** the extension is now a lighter connector, and your
+      full hangar opens on openhangar.space. A scan sends half as many page requests.
+      ([0.3.0](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.3.0),
+      [0.3.1](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.3.1))
 - [x] **Oct 6 to 7 · Website:** a sign-in page for beta pilots, ready for the invite-only beta.
       Invites are on our [Discord](https://discord.gg/FF8Wm5HdnV).
 - [x] **Oct 6 to 7 · Website:** a fresh front page with today's top stories, Ships in the

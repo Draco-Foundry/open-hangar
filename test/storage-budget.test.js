@@ -57,8 +57,19 @@ const BUDGET = {
     max: 400 * KB,
   },
   // openhangar.space's feeds (OH.siteFeed): each one copy, replaced whole.
-  // The connector's one-time wishlist import (ui/basic/wishlist-import.js).
+  // The connector's one-time wishlist import (ui/scan/wishlist-import.js).
   wishImport: small('one record for the current connection'),
+  // The scan runner (ui/scan/runner.js): the last scan's report (three rows, ids and
+  // counts) and the RSI portrait (a data URL of AVATAR_MAX 64 KB at most).
+  scanReport: small('the last scan, replaced whole'),
+  scanStarted: small('the last scan that began: its run and time, replaced whole'),
+  // Auto Scan Daily (#666): its switch, its next run (src/background.js), its last run
+  // and each part's last complete read (ui/scan/runner.js).
+  autoScanOn: small('the Auto Scan Daily switch'),
+  autoScanNext: small('one timestamp'),
+  autoScan: small('the last Auto Scan: when, how it went, the backoff; replaced whole'),
+  scanFull: small('the last complete read of each part: three timestamps'),
+  avatarImg: { cap: 'one portrait, AVATAR_MAX 64 KB, replaced whole', max: 70 * KB },
   feedShips: { cap: 'one ships feed (~330 ships), replaced whole (a day)', max: 300 * KB },
   feedCatalog: {
     cap: 'one store catalog (RSI store size, ~700 items), replaced whole (30 minutes)',
@@ -84,6 +95,7 @@ const BUDGET = {
   siteLink: small(),
   siteUrl: small(),
   siteSyncRequested: small(),
+  siteSyncAgain: small('one { at, auto }: the sync to try once more'),
   justUpdated: small(),
   updateReady: small(),
   reopenAfterUpdate: small(),
@@ -120,14 +132,22 @@ const BUDGET = {
   // Extension Alerts (src/alerts.js, the `alerts` build flag).
   alertsOn: small('the switch'),
   alerts: {
-    cap: 'MATCH_MAX 200 matches; PAIRS_MAX 2,000 newest pairs in each of known, seen, gone',
-    max: 400 * KB,
+    cap: 'MATCH_MAX 200 matches; PAIRS_MAX 2,000 newest pairs in each of known, seen, gone, hidden',
+    max: 500 * KB,
   },
   alertsFeed: {
     cap: 'one sale feed (FEED_ITEMS_MAX 2,000 items, FEED_SHIPS_MAX 1,000 ships), replaced whole',
     max: 2.5 * MB,
   },
   alertsWish: small('the account Wishlist keys, 300 at most, replaced whole'),
+  // The toolbar popup's own settings (ui/popup/prefs.js): the last tab, Look, currency,
+  // the version whose What's New was read and when the last scan report was shown.
+  popupPrefs: small('five short fields, replaced whole'),
+  // The popup's copy of the account's Wishlist (ui/popup/wish-client.js COPY_KEY).
+  popupWish: {
+    cap: 'WISH_MAX 300 items (names 200 characters at most), replaced whole',
+    max: 200 * KB,
+  },
 };
 // Keys built at run time, as the source writes them (test/storage-keys.js).
 const DYNAMIC = {
@@ -358,6 +378,7 @@ async function fillWorstCase() {
         known: pairs('paint'),
         seen: pairs('paint'),
         gone: pairs('warbond'),
+        hidden: pairs('limited'),
       };
     })(),
     alertsWish: {
@@ -365,6 +386,26 @@ async function fillWorstCase() {
       at: 1,
       connectedAt: 1,
       retryAt: 2,
+      fails: 0,
+    },
+    // The popup's Wishlist copy at its cap: 300 items, each name at its 200 characters,
+    // a target, an upgrade's From.
+    popupWish: {
+      v: 1,
+      connectedAt: 1,
+      at: 1,
+      keys: null,
+      items: Array.from({ length: 300 }, (_, i) => ({
+        key: `ccu:${1000000000 + i}`,
+        name: `Upgrade to Anvil Carrack Expedition ${i}`.padEnd(200, 'x'),
+        category: 'ships',
+        target: 10_000_000,
+        insurance: 'either',
+        from: { id: 1000000000 + i, name: 'x'.repeat(200) },
+        at: 1e12 + i,
+      })),
+      retryAt: 2,
+      holdUntil: 3,
       fails: 0,
     },
     feedGameStatus: {
@@ -424,6 +465,35 @@ async function fillWorstCase() {
     marketAnnotations: Object.fromEntries(
       Array.from({ length: 1500 }, (_, i) => [`package - ship ${i}|350`, { price: '400' }]),
     ),
+    // The scan runner's report at its longest (every row a problem in long words) and
+    // the portrait at its cap (ui/scan/runner.js AVATAR_MAX).
+    scanReport: {
+      v: 1,
+      run: 'mq1x-0a1b2c3d4e5f',
+      by: 'offscreen',
+      reason: 'alarm',
+      startedAt: 1,
+      at: 2,
+      ms: 1,
+      held: null,
+      signedOut: false,
+      switched: { who: 'x'.repeat(60), restored: true },
+      rows: ['hangar', 'buybacks', 'referrals'].map((id) => ({
+        id,
+        ok: false,
+        partial: 'x'.repeat(300),
+        n: 1500,
+        error: 'x'.repeat(600),
+      })),
+      bad: true,
+      sync: { state: 'error', msg: 'x'.repeat(600), at: 3 },
+    },
+    avatarImg: {
+      nickname: 'x'.repeat(60),
+      src: `data:image/jpeg;base64,${'A'.repeat(64 * 1024 - 23)}`,
+      at: 1,
+      url: `https://robertsspaceindustries.com/media/${'x'.repeat(200)}/heap_infobox/avatar.jpg`,
+    },
   };
   // The capped caches, each through one real write.
   await OH.getShipImage('Brand New Ship');

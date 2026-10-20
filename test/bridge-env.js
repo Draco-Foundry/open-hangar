@@ -2,8 +2,10 @@
 // The background worker (src/background.js) as scripts/pack.mjs builds it, in a
 // sandbox with a stand-in browser: its flags written into flags.js, its pages into
 // site-pages.js (bridge v2), the code of every flag that's off cut, and a fake
-// chrome API (storage, tabs, the two message listeners). Used by the bridge tests
-// (test/bridge-v2.test.js, test/site-connect.test.js, test/rsi-cart.test.js).
+// chrome API (storage, tabs, the two message listeners, offscreen documents, an event
+// page's document for Firefox's frames). Used by the bridge tests (test/bridge-v2.test.js,
+// test/site-connect.test.js, test/rsi-cart.test.js) and the hidden scan page's
+// (test/scan-host.test.js).
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
@@ -132,6 +134,14 @@ function area(data, changed = null, name = 'local') {
 // Extension Alerts: notify (true: Notifications allowed, so chrome.notifications is
 // there), and changes (true: storage writes tell the onChanged listeners, as the browser
 // does). The fake alarms and notifications are in the answer.
+// The hidden scan page (src/scan-host.js): offscreen (true: Chrome's chrome.offscreen,
+// one document at a time, and getContexts with it; `failOffscreen`: creating one
+// throws), frames (true: Firefox's event page has a document to hold a frame), rsi
+// (false: access to robertsspaceindustries.com is turned off).
+// getContexts answers only the context types asked for (a context with none is a TAB).
+// The answer has `docs` (the offscreen documents open), `frames` (the document's
+// frames), `sent` (runtime.sendMessage's messages), `reloaded` (runtime.reload calls),
+// `updateAvailable(details)` and `fromScanPage(msg, query)`.
 function loadBackground({
   browser = 'chrome',
   flags: given = STORE_FLAGS,
@@ -146,6 +156,10 @@ function loadBackground({
   },
   notify = false,
   changes = false,
+  offscreen = false,
+  failOffscreen = false,
+  frames = false,
+  rsi = true,
   globals = {},
 } = {}) {
   const flags = wholeFlags(given);
@@ -162,18 +176,44 @@ function loadBackground({
   const onAlarm = [];
   const notes = [];
   const onNoteClick = [];
+  const docs = [];
+  const sent = [];
+  const onUpdate = [];
+  const reloaded = [];
+  if (offscreen && !contexts) contexts = [];
   const chrome = {
     storage: {
       local: area(local, changes ? changed : null, 'local'),
       session: area(session, changes ? changed : null, 'session'),
       onChanged: { addListener: (f) => void changed.push(f) },
     },
+    // An alarm keeps its time as the browser says it (scheduledTime) and as asked (when).
     alarms: {
-      create: async (name, o) => void alarms.set(name, { name, ...o }),
+      create: async (name, o) =>
+        void alarms.set(name, {
+          name,
+          scheduledTime: o.when ?? Date.now() + (o.delayInMinutes || 0) * 60e3,
+          ...o,
+        }),
       get: async (name) => (alarms.has(name) ? structuredClone(alarms.get(name)) : undefined),
       clear: async (name) => alarms.delete(name),
       onAlarm: { addListener: (f) => void onAlarm.push(f) },
     },
+    ...(offscreen
+      ? {
+          offscreen: {
+            createDocument: async (o) => {
+              if (failOffscreen) throw new Error('offscreen documents are off here');
+              if (docs.length) throw new Error('Only a single offscreen document may be created.');
+              docs.push(structuredClone(o));
+            },
+            closeDocument: async () => {
+              if (!docs.length) throw new Error('No current offscreen document.');
+              docs.length = 0;
+            },
+          },
+        }
+      : {}),
     ...(notify
       ? {
           notifications: {
@@ -198,14 +238,18 @@ function loadBackground({
       contains: async (q) =>
         q && Array.isArray(q.permissions) && q.permissions.includes('notifications')
           ? notify
-          : granted,
+          : q && Array.isArray(q.origins)
+            ? rsi
+            : granted,
       onAdded: listen(),
     },
     runtime: {
       id: firefox ? FIREFOX_ID : CHROME_ID,
       onInstalled: listen(),
       onStartup: listen(),
-      onUpdateAvailable: listen(),
+      onUpdateAvailable: { addListener: (f) => void onUpdate.push(f) },
+      reload: () => void reloaded.push(Date.now()),
+      sendMessage: async (msg) => void sent.push(structuredClone(msg)),
       // Chrome and Firefox both have both; Firefox's pages never reach the first.
       onMessageExternal: { addListener: (f) => (external = f) },
       onMessage: { addListener: (f) => void internal.push(f) },
@@ -228,7 +272,25 @@ function loadBackground({
             }),
       }),
       getURL: (p) => `${firefox ? 'moz-extension://uuid' : `chrome-extension://${CHROME_ID}`}/${p}`,
-      ...(contexts ? { getContexts: async () => structuredClone(contexts) } : {}),
+      ...(contexts
+        ? {
+            getContexts: async (q) => {
+              const all = [
+                ...contexts,
+                ...docs.map((d) => ({
+                  contextType: 'OFFSCREEN_DOCUMENT',
+                  tabId: -1,
+                  windowId: -1,
+                  documentUrl: chrome.runtime.getURL(d.url),
+                })),
+              ];
+              const types = q?.contextTypes;
+              return structuredClone(
+                types ? all.filter((c) => types.includes(c.contextType || 'TAB')) : all,
+              );
+            },
+          }
+        : {}),
     },
     action: { onClicked: listen(), setBadgeText() {}, setTitle() {}, setBadgeBackgroundColor() {} },
     tabs: {
@@ -247,6 +309,32 @@ function loadBackground({
     'flags.js': () => builtFlags(flags),
     'site-pages.js': () => builtPages(pages),
   };
+  // Firefox's event page: a document whose body holds the hidden scan page's frame.
+  const frameList = [];
+  const document = frames
+    ? {
+        body: {
+          appendChild: (el) => {
+            el.parent = frameList;
+            frameList.push(el);
+            return el;
+          },
+        },
+        documentElement: {},
+        createElement: (tag) => ({
+          tag,
+          attrs: {},
+          setAttribute(k, v) {
+            this.attrs[k] = String(v);
+          },
+          remove() {
+            const i = frameList.indexOf(this);
+            if (i >= 0) frameList.splice(i, 1);
+          },
+        }),
+        getElementById: (id) => frameList.find((el) => el.id === id) || null,
+      }
+    : undefined;
   const ctx = {
     chrome,
     console,
@@ -254,9 +342,11 @@ function loadBackground({
     TextEncoder,
     btoa,
     URL,
+    URLSearchParams,
     setTimeout,
     AbortSignal,
     fetch,
+    ...(document ? { document } : {}),
     ...globals,
   };
   ctx.self = ctx;
@@ -291,13 +381,31 @@ function loadBackground({
       { ohSite: msg },
       { id: chrome.runtime.id, tab: { id: 1 }, frameId: 0, url, ...sender },
     );
-  // An alarm going off, and a notification clicked (Extension Alerts).
-  const fireAlarm = (name) => Promise.all(onAlarm.map((f) => f({ name })));
+  // An alarm going off (when it was due: `scheduledTime`, else the time it was set for),
+  // and a notification clicked (Extension Alerts). The browser forgets a one-off alarm
+  // as it goes off.
+  const fireAlarm = (name, { scheduledTime } = {}) => {
+    const due = scheduledTime ?? alarms.get(name)?.scheduledTime ?? Date.now();
+    alarms.delete(name);
+    return Promise.all(onAlarm.map((f) => f({ name, scheduledTime: due })));
+  };
   const clickNote = (id) => Promise.all(onNoteClick.map((f) => f(id)));
+  // The browser has an update ready (runtime.onUpdateAvailable).
+  const updateAvailable = (details) => Promise.all(onUpdate.map((f) => f(details)));
+  // The hidden scan page's message (src/scan-host.js): an extension page at its address
+  // with `query` (?run=…), no tab.
+  const fromScanPage = (msg, query = '', sender = {}) =>
+    sendInternal(msg, {
+      id: chrome.runtime.id,
+      url: chrome.runtime.getURL(`src/scan.html${query}`),
+      ...sender,
+    });
   return {
     send,
     sendInternal,
     fromPage,
+    fromScanPage,
+    updateAvailable,
     stores: { local, session },
     opened,
     focused,
@@ -305,6 +413,10 @@ function loadBackground({
     notes,
     fireAlarm,
     clickNote,
+    docs,
+    frames: frameList,
+    sent,
+    reloaded,
     ctx,
     chrome,
   };

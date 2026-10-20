@@ -9,21 +9,79 @@ opens a website.
 
 It's the `connector` build flag ([FLAGS.md](FLAGS.md#the-connector)), on in every store
 build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistImport` and
-`alerts`.
+`alerts`, and from 0.4.0 `autoScan` (Auto Scan Daily, below).
 
 ## What a Connector Build Has
 
-- **The toolbar popup** (`src/popup.html`, `ui/popup/`): Account Value, the last scan,
-  Scan, Open My Hangar, the store alerts with why (with the `alerts` flag,
-  `ui/popup/Alerts.svelte`: opening the popup marks them seen), where sync stands.
-- **The basic page** (`src/basic.html`, `ui/basic/`): Pledges and Buy-Backs with search,
-  totals and CSV, Export JSON, Report a Scan Problem, and the settings (openhangar.space,
-  the store alerts' switch with the `alerts` flag, Clear Data, Saved Accounts, Log Out of
-  RSI). Text only; it works with no network.
+- **The toolbar popup** (`src/popup.html`, `ui/popup/`, the 0.4.0 mockups): a header with
+  the version, the scan's age and the alerts bell (with the `alerts` flag; its Alerts
+  view is `ui/popup/Alerts.svelte`, and opening the popup marks them seen), then three
+  tabs. Hangar: the portrait the scan saved, Account Value and its change, Store Credit,
+  buy-back tokens, Fleet News, Scan (with the scan's progress and report when the
+  background shares them; greyed while RSI's sign-in cookie isn't in the browser,
+  `ui/popup/rsi-cookie.js`, presence only), Open My Hangar. Wishlist, while connected:
+  the account's Wishlist from the website (`ui/popup/wish-client.js`, a copy kept in
+  `popupWish`), with a search on the device to add and Remove (no Target Price) while the
+  website takes changes from the extension; read only as the store alerts read it when
+  it doesn't. Settings: the settings the basic page had until 0.4.0, plus Look (light mode),
+  Currency (the day's rates for anything but USD) and the shortcut (`commands` in
+  manifest.json, Alt+Shift+H), and JSON Backup, Pledges CSV and Buy-Backs CSV. Connect
+  still opens the basic page: the browser's sign-in window would close the popup. While
+  connected, the openhangar.space group has Auto Scan Daily's switch and its status line
+  (below). The header says Scan stopped for a scan that began and never ended, even after
+  a browser restart (local `scanStarted`, #676).
+- **The basic page** (`src/basic.html`, `ui/basic/`), small since 0.4.0: what needs a
+  page that stays open. Firefox's asks (its data card), Allow Access to RSI, Connect
+  (`#settings`: the sign-in window would close the popup), and a scan that can't run
+  hidden, with its progress, report and Report a Scan Problem. No lists, search, totals
+  or CSV in any build (the privacy policy's 0.4.0 words); text only.
+- **The hidden scan page** (`src/scan.html`, `ui/scan/main.js`, `src/scan-host.js`):
+  where Scan runs, so no tab opens. An offscreen document on Chrome and Edge, which only
+  has `chrome.runtime`, so `src/scan-shim.js` asks the background for its storage and
+  permission checks (one message type, answered only for that page); a hidden frame in
+  Firefox's event page, which pings it after every page and every 10 seconds (Firefox
+  suspends an idle event page about 30 seconds after its last event). It falls back to
+  the basic page's tab when the browser has neither, when the page can't be made, when
+  access to RSI is off (the tab asks for it on a click, then scans), when
+  `site/status.json` has `"scanHidden": { "enabled": false }` (it can only turn the
+  hidden page off; the popup and the hidden page read the file as they open, so the
+  background's cached copy is fresh), or for the rest of the browser session once a
+  hidden page went quiet (a scan asked of it never taken, or its scan mark not renewed
+  for 10 minutes) or stopped on an error. A scan asked for while the hidden page reads
+  packs starts at once, and a mark left by a hidden page that went away mid-scan never
+  holds the next scan.
 - **The background worker** as today: our pages' messages (bridge v2), the rescan badge,
-  updates.
+  updates, and Auto Scan Daily's alarm (below).
 - **The scan**, at the same depth: account and balances, the hangar (with the pledge
-  archive and history), buy-backs and up to 30 unread packs, referrals.
+  archive and history), buy-backs and up to 30 unread packs, referrals. It's the scan
+  runner (`ui/scan/runner.js`), which the hidden scan page runs (the basic page in its
+  tab when it can't); it stores its progress (session `scanProgress`) and its last
+  report (`scanReport`) for any page.
+
+- **Auto Scan Daily** (the `autoScan` flag, #666; [FLAGS.md](FLAGS.md#auto-scan)), off
+  until the pilot turns it on, and only while connected: Disconnect and Clear Data turn
+  it off. The worker keeps one alarm (`oh-auto-scan`) at a random time 20 to 28 hours
+  after the last run, made again whenever it starts; a day missed while the browser was
+  closed runs once, 10 to 30 minutes after it's back. It skips without asking RSI anything
+  after any scan (or its own last run) in the last 20 hours, while it's backing off (RSI
+  didn't answer, or the last runs stopped partway), offline, or while a scan runs. When
+  it goes off, the hidden scan page runs `runner.autoScan()`
+  (`requestScan('auto', { hiddenOnly: true })`: never a tab, and where there's no hidden
+  page it waits for tomorrow). The run checks locally first (connected, switched on, not
+  paused by `site/status.json`'s `autoScan` or `hangar`, the live hangar one this link
+  syncs), then whether RSI's sign-in cookie is there (presence only, the popup's
+  check; on Chrome and Edge the worker answers it for the offscreen page, never the
+  cookie), then who is signed in (one dashboard read). It never switches accounts. Then a
+  quick check, the newest page of the hangar and of buy-backs, compared with what's
+  saved and saving nothing; a full read only when something there is new, a part is due
+  (`ui/scan/auto.js` fullDue: its last complete read, local `scanFull`, no longer
+  stands), the last complete read is a week old, or a saved scan's sync never went out.
+  The full read saves part by part (hangar, buy-backs, referrals), each only when read
+  whole, from the starting account (asked again after each part), and, for the hangar,
+  without a sudden drop that new buy-backs don't explain. It writes its record (local
+  `autoScan`) and then syncs what it saved. It never reads buy-back packs, never writes
+  a scan report and never notifies. The popup's status line is the record's, in the
+  approved words. The request budget: docs/dev/requests.md.
 
 `scripts/pack.mjs` leaves the dashboard out of it (`scripts/connector.mjs`):
 `src/dashboard.html`, `src/dashboard.js`, `src/quips.js`, `src/qr.js`, `src/assets/`,
@@ -32,8 +90,11 @@ their imports). `scripts/check-store-build.mjs` refuses a connector build with a
 them, and a build without the connector that has the popup or the basic page.
 
 **Permissions** stay as they are (Extension Alerts, the `alerts` flag, add `alarms` and an
-optional `notifications`, docs/FLAGS.md "Alerts"): `storage`, `unlimitedStorage` (big hangars, history
-and the archive), `cookies` (Log Out of RSI), `identity` (Connect's sign-in window), and
+optional `notifications`, docs/FLAGS.md "Alerts", and Auto Scan Daily uses that same
+`alarms`; the hidden scan page adds `offscreen` on
+Chrome and Edge only, and `frame-src 'self'` to Firefox's pages): `storage`, `unlimitedStorage` (big hangars, history
+and the archive), `cookies` (Log Out of RSI, whether RSI's sign-in cookie is there, and
+Add to RSI Cart's token), `identity` (Connect's sign-in window), and
 host access to robertsspaceindustries.com only. The **hosts** the pages may reach shrink:
 a connector build's content security policy adds
 `connect-src 'self' https://robertsspaceindustries.com https://openhangar.space` plus
@@ -46,8 +107,9 @@ The pages the website now has leave in three steps. The code stays until the las
 1. **Gated.** The `connector` flag leaves them out of a connector build; every store
    build still had them.
 2. **Switched on (now, 0.3.0).** `connector` and `localMode` on in the store and the beta
-   (`src/flags.js`, owner 2026-10-13). The store screenshots of the popup and the basic
-   page are `docs/store-assets/screenshot-connector-*` (the older ones show the
+   (`src/flags.js`, owner 2026-10-13). The store screenshots are the 0.4.0 popup's,
+   `docs/store-assets/screenshot-040-*` (docs/STORE.md, section 3; the 0.3.0
+   `screenshot-connector-*` show the old popup and basic page, the older ones the
    dashboard). The privacy policy and the store listing describe the connector
    (owner-approved 2026-10-13), store alerts and the wishlist import included.
 3. **Deleted.** After a release with the connector on: the dashboard and its pages go
@@ -70,23 +132,28 @@ step 3 above).
 
 **Stays**
 
-| Request                                                                             | Why                                                                       |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| robertsspaceindustries.com `/account/pledges`, `/account/buy-back-pledges`          | Scan: hangar and buy-backs                                                |
-| robertsspaceindustries.com `/pledge/buyback/<id>`                                   | Scan: up to 30 unread packs                                               |
-| robertsspaceindustries.com `/en/account/dashboard`                                  | Identity and balances: Scan, and opening the basic page (kept 10 minutes) |
-| robertsspaceindustries.com `/en/citizens/<handle>` (no cookies)                     | Citizen Record and org, with the one above                                |
-| robertsspaceindustries.com `POST /graphql` (referral recruits)                      | Scan: referrals                                                           |
-| robertsspaceindustries.com `/pledge-store/api/upgrade/graphql`, the cart            | Add to RSI Cart from our pages                                            |
-| robertsspaceindustries.com `POST /graphql` (`AddCartMultiItemMutation`)             | The Store's Haul: store items into the RSI cart, on a click               |
-| openhangar.space `status.json`                                                      | The kill switch                                                           |
-| openhangar.space `api/ships` (once a day)                                           | The popup's Account Value                                                 |
-| app.openhangar.space `/connect`, `/api/link/token`, `/link`                         | Connect                                                                   |
-| app.openhangar.space `POST` and `DELETE /api/v1/sync`                               | Sync, Disconnect                                                          |
-| github.com new issue (only when you press Report a Scan Problem)                    | Report a Scan Problem                                                     |
-| app.openhangar.space `POST /api/v1/wishlist/import` (once per connection, **new**)  | The 0.3.x wishlist into your account (`wishlistImport` flag)              |
-| openhangar.space `api/store/on-sale` (alerts on, every 30 minutes at most, **new**) | Extension Alerts: the public sale feed, matched on the device             |
-| app.openhangar.space `GET /api/v1/wishlist` (alerts on and connected, **new**)      | Extension Alerts: your account's Wishlist keys, read only                 |
+| Request                                                                               | Why                                                                       |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| robertsspaceindustries.com `/account/pledges`, `/account/buy-back-pledges`            | Scan: hangar and buy-backs                                                |
+| robertsspaceindustries.com `/pledge/buyback/<id>`                                     | Scan: up to 30 unread packs                                               |
+| robertsspaceindustries.com `/en/account/dashboard`                                    | Identity and balances: Scan, and opening the basic page (kept 10 minutes) |
+| robertsspaceindustries.com list pages and the dashboard (Auto Scan Daily on, **new**) | Auto Scan Daily: once a day at most, a quick check first (requests.md)    |
+| robertsspaceindustries.com `/en/citizens/<handle>` (no cookies)                       | Citizen Record and org, with the one above                                |
+| robertsspaceindustries.com `/media/…` portrait (no cookies, when it changes, **new**) | Scan: a small copy of your RSI picture for our pages (`avatarImg`)        |
+| robertsspaceindustries.com `POST /graphql` (referral recruits)                        | Scan: referrals                                                           |
+| robertsspaceindustries.com `/pledge-store/api/upgrade/graphql`, the cart              | Add to RSI Cart from our pages                                            |
+| robertsspaceindustries.com `POST /graphql` (`AddCartMultiItemMutation`)               | The Store's Haul: store items into the RSI cart, on a click               |
+| openhangar.space `status.json`                                                        | The kill switch                                                           |
+| openhangar.space `api/ships` (once a day)                                             | The popup's Account Value                                                 |
+| app.openhangar.space `/connect`, `/api/link/token`, `/link`                           | Connect                                                                   |
+| app.openhangar.space `POST` and `DELETE /api/v1/sync`                                 | Sync, Disconnect                                                          |
+| github.com new issue (only when you press Report a Scan Problem)                      | Report a Scan Problem                                                     |
+| app.openhangar.space `POST /api/v1/wishlist/import` (once per connection, **new**)    | The 0.3.x wishlist into your account (`wishlistImport` flag)              |
+| openhangar.space `api/store/on-sale` (alerts on, every 30 minutes at most, **new**)   | Extension Alerts: the public sale feed, matched on the device             |
+| app.openhangar.space `GET /api/v1/wishlist` (alerts on and connected, **new**)        | Extension Alerts: your account's Wishlist keys, read only                 |
+| app.openhangar.space `GET /api/v1/wishlist?with=items` (connected, 0.4.0)             | The popup's Wishlist tab (a copy younger than 5 minutes is used)          |
+| app.openhangar.space `POST /api/v1/wishlist` (a click, one at a time, 0.4.0)          | The Wishlist tab: one change (which item)                                 |
+| openhangar.space `rates.json` (a currency picked, not USD, once a day at most, 0.4.0) | The popup's Currency                                                      |
 
 Extension Alerts' two requests are new too: the sale feed is the same public file for
 everyone; the Wishlist read brings your account's Wishlist keys to this browser, and

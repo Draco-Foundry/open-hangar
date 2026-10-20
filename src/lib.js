@@ -914,11 +914,17 @@
         'hangar',
         'scannedAt',
         'account',
+        'avatarImg',
         'subStore',
       ]);
       return;
     }
+    // The last scan's report, its start and the RSI portrait (ui/scan/runner.js) go with
+    // the rest, and the popup's copy of the account's Wishlist (read again while
+    // connected). So does Auto Scan Daily: its switch (it's off after Clear Data), its
+    // next run, its last run and the parts' last complete reads.
     await chrome.storage.local.remove([
+      'popupWish',
       DB_KEY,
       HISTORY_KEY,
       ARCHIVE_KEY,
@@ -927,6 +933,13 @@
       'hangar',
       'scannedAt',
       'account',
+      'avatarImg',
+      'scanReport',
+      'scanStarted',
+      'scanFull',
+      'autoScan',
+      'autoScanOn',
+      'autoScanNext',
       'subStore',
       RECOVERY_KEY,
       LOG_KEY,
@@ -1011,7 +1024,16 @@
   // Every account with data in this browser: the live one plus parked ones.
   //   [{ nickname, displayname, pledges, scannedAt, active }]
   OH.listProfiles = async function listProfiles() {
-    const all = await chrome.storage.local.get(null);
+    // Only the hangars, where the browser can list its keys: the hidden scan page's
+    // storage is the background's (src/scan-shim.js), and the rest of storage (history,
+    // the archive, the log) would cross over with every call.
+    const area = chrome.storage.local;
+    const keys = typeof area.getKeys === 'function' ? await area.getKeys().catch(() => null) : null;
+    const all = await area.get(
+      Array.isArray(keys)
+        ? keys.filter((k) => k === DB_KEY || String(k).startsWith(PROFILE_PREFIX))
+        : null,
+    );
     const row = (db, active) => ({
       nickname: db.owner && db.owner.nickname,
       displayname: (db.owner && db.owner.displayname) || null,
@@ -1031,8 +1053,14 @@
     return out;
   };
 
-  // Forget a parked account's saved data.
-  OH.deleteProfile = (nickname) => chrome.storage.local.remove(profileKey(nickname));
+  // Forget a parked account's saved data, and its portrait when the copy is theirs
+  // (avatarImg, ui/scan/runner.js).
+  OH.deleteProfile = async function deleteProfile(nickname) {
+    await chrome.storage.local.remove(profileKey(nickname));
+    const { avatarImg } = await chrome.storage.local.get('avatarImg');
+    if (avatarImg && profileKey(avatarImg.nickname) === profileKey(nickname))
+      await chrome.storage.local.remove('avatarImg');
+  };
 
   // One-time: turn an old "Restore previous hangar" snapshot (from before saved
   // accounts existed) into a parked account, unless that account is live.
@@ -1482,6 +1510,10 @@
   const pageUrl = (src, page, size) =>
     `${src.url}?${RULES.paging.page}=${page}&${RULES.paging.size}=${size}`;
 
+  // Auto Scan Daily (ui/scan/runner.js autoScan) waits this long, jittered, before
+  // every request it makes to RSI but its first (docs/dev/requests.md): 500 to 1000 ms.
+  OH.autoPause = () => sleep(500 + Math.floor(Math.random() * 500));
+
   // Paginated HTML source: fetch ?page=N&pagesize=…, parse, dedupe by id, stop
   // when a page yields no NEW ids (RSI clamps out-of-range pages to the last).
   // onProgress(page, count, retry?) — retry = { attempt, of } while retrying.
@@ -1490,7 +1522,10 @@
   // it's still current, returns { unchanged: true } after a few requests.
   // A complete result says `aligned` when every page brought only new items, so
   // item k sits on page floor(k / size) + 1 (what a later probe relies on).
-  async function scanHtmlSource(src, onProgress, prev) {
+  // `auto` (Auto Scan Daily): a 429 comes straight back, the pages are paced with
+  // OH.autoPause, an error says whether RSI didn't answer (`rsiDown`, with its
+  // Retry-After), and a sign-in page after page 1 is a partial result, not the end.
+  async function scanHtmlSource(src, onProgress, prev, { auto = false } = {}) {
     const seen = new Set();
     const all = [];
     const size = src.pageSize;
@@ -1498,16 +1533,28 @@
     let lastPage = 0;
     let lastAdded = 0;
     let aligned = true;
+    const down = (got) => ({
+      rsiDown: !!(got.transient || got.rateLimited),
+      retryAfter: got.retryAfter ?? null,
+    });
 
     for (let page = 1; page <= MAX_PAGES; page++) {
-      const got = await fetchPage(pageUrl(src, page, size), (attempt, of, reason) => {
-        OH.log('warn', src.id, `page ${page}: ${reason}, retry ${attempt}/${of}`);
-        onProgress?.(page, all.length, { attempt, of });
-      });
+      if (auto) await OH.autoPause();
+      const got = await fetchPage(
+        pageUrl(src, page, size),
+        (attempt, of, reason) => {
+          OH.log('warn', src.id, `page ${page}: ${reason}, retry ${attempt}/${of}`);
+          onProgress?.(page, all.length, { attempt, of });
+        },
+        { retryRateLimit: !auto },
+      );
       if (got.error) {
         if (page === 1)
-          return { error: `${got.error}. Felt like a 30k: check your connection and try again.` };
-        return { items: all, meta, partial: { page, reason: got.error } };
+          return {
+            error: `${got.error}. Felt like a 30k: check your connection and try again.`,
+            ...down(got),
+          };
+        return { items: all, meta, partial: { page, reason: got.error, ...down(got) } };
       }
       const res = got.res;
       if (res.status === 401 || res.status === 403) {
@@ -1552,6 +1599,10 @@
         }
         break; // logged in, source is genuinely empty
       }
+      // Signed out partway: the list would look shorter and complete. Auto Scan Daily
+      // never keeps that (a scan you pressed keeps what it read, as before).
+      if (!items.length && auto && looksLoggedOut(res, html))
+        return { items: all, meta, partial: { page, reason: 'signed out', signedOut: true } };
       if (!items.length) break;
 
       let added = 0;
@@ -1572,7 +1623,7 @@
       lastAdded = added;
       if (added === 0) break;
       if (added !== items.length) aligned = false;
-      await sleep(DELAY_MS);
+      if (!auto) await sleep(DELAY_MS);
     }
     // Still finding new items on the last allowed page: the list goes on, so
     // report it as partial (saved without counting the rest as "removed").
@@ -1672,7 +1723,11 @@
 
   // Scan one source by id and persist it. Returns { ok, items?, scannedAt?, error? }.
   // opts.account: the account already fetched for this scan (see saveSource).
-  OH.scanSource = async function scanSource(sourceId, onProgress, { account } = {}) {
+  // Auto Scan Daily (opts.auto, ui/scan/runner.js autoScan): no change probe (#294), and
+  // a part that didn't read whole is never saved, however big it is: → { ok: false,
+  // unfinished: true, error, rsiDown, retryAfter }. opts.keep({ items }): asked right
+  // before a complete read is saved; false → { ok: false, refused: true }, nothing saved.
+  OH.scanSource = async function scanSource(sourceId, onProgress, { account, auto, keep } = {}) {
     const src = OH.getSource(sourceId);
     if (!src) return { ok: false, error: `Unknown source: ${sourceId}` };
     if (src.type === 'html' && !(window.OpenHangar && OpenHangar.parsePledges)) {
@@ -1685,9 +1740,23 @@
     }
     try {
       let result;
-      const saved = src.probe ? await OH.loadSource(src.id) : null;
-      if (src.type === 'html') result = await scanHtmlSource(src, onProgress, saved);
+      const saved = src.probe && !auto ? await OH.loadSource(src.id) : null;
+      if (src.type === 'html') result = await scanHtmlSource(src, onProgress, saved, { auto });
       else return { ok: false, error: `Source type '${src.type}' is not implemented yet.` };
+
+      if (auto && (result.error || result.partial)) {
+        const why = result.error || result.partial;
+        const msg = result.error || `stopped at page ${why.page} (${why.reason})`;
+        OH.log('warn', src.id, `auto scan: ${msg}; not saved`);
+        return {
+          ok: false,
+          unfinished: true,
+          error: msg,
+          rsiDown: !!why.rsiDown,
+          signedOut: !!why.signedOut,
+          retryAfter: why.retryAfter ?? null,
+        };
+      }
 
       if (result.error) {
         OH.log('error', src.id, result.error);
@@ -1761,6 +1830,12 @@
         };
       }
 
+      // Auto Scan Daily's last word before a part is kept (the account it was read from,
+      // a sudden drop): no, and nothing is saved.
+      if (keep && !(await keep({ items: result.items }))) {
+        OH.log('warn', src.id, 'auto scan: read whole but not kept');
+        return { ok: false, refused: true };
+      }
       // Only complete hangar scans go into the history (a partial one would read
       // as pledges disappearing).
       const scannedAt = await saveSource(src.id, result.items, {
@@ -1776,6 +1851,43 @@
     } catch (err) {
       OH.log('error', src.id, `scan crashed: ${err?.stack || err?.message || err}`);
       return { ok: false, error: String(err?.message || err) };
+    }
+  };
+
+  // Auto Scan Daily's quick check (ui/scan/runner.js autoScan): the newest page of the
+  // hangar or of buy-backs, compared with what's saved (as unchangedSince compares page
+  // 1; buy-backs' token count too). It only reads: nothing is saved or written, and a
+  // 429 comes straight back. → { same } | { same: true, paused: true } | { signedOut:
+  // true } | { error, rsiDown, retryAfter }.
+  OH.peekSource = async function peekSource(id) {
+    const src = id === 'hangar' || id === 'buybacks' ? OH.getSource(id) : null;
+    if (!src) return { error: `Not a part to peek at: ${id}`, rsiDown: false, retryAfter: null };
+    if (await OH.sourcePaused(src.id)) return { same: true, paused: true };
+    const saved = await OH.loadSource(src.id);
+    if (!saved.scannedAt) return { same: false };
+    try {
+      await OH.autoPause();
+      const got = await fetchPage(pageUrl(src, 1, src.pageSize), null, { retryRateLimit: false });
+      if (got.error) return { error: got.error, rsiDown: true, retryAfter: got.retryAfter ?? null };
+      const res = got.res;
+      if (res.status === 401 || res.status === 403) return { signedOut: true };
+      if (!res.ok)
+        return {
+          error: `RSI responded ${res.status}`,
+          rsiDown: res.status >= 500,
+          retryAfter: header(res, 'retry-after'),
+        };
+      const html = await res.text();
+      const items = fillIds(src, src.parse(html), 1);
+      if (!items.length && looksLoggedOut(res, html)) return { signedOut: true };
+      const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+      const was = Array.isArray(saved.items) ? saved.items : [];
+      let alike = same(items, was.slice(0, src.pageSize));
+      if (alike && src.meta)
+        alike = same(src.meta(html)?.tokens ?? null, saved.meta?.tokens ?? null);
+      return { same: alike };
+    } catch (e) {
+      return { error: String(e?.message || e), rsiDown: false, retryAfter: null };
     }
   };
 
@@ -1798,7 +1910,9 @@
   // Its address and keys: RULES.account.
   const ACCOUNT_URL = RSI_ORIGIN + RULES.account.path;
   const ACCOUNT_TTL_MS = 10 * 60 * 1000;
-  const ACCOUNT_CACHE_V = 6; // bump when the cached account shape changes (v6: + referral)
+  // Bump when the cached account shape changes (v6: + referral; v7: without the code of
+  // the player who recruited you, which isn't kept any more).
+  const ACCOUNT_CACHE_V = 7;
 
   // Brace-scan outward from a key match to extract the smallest enclosing {...}
   // JSON object, then parse it. Shared by extractAccount/extractReferral because
@@ -1864,8 +1978,9 @@
 
   // The dashboard HTML embeds a SEPARATE referral blob (not inside the nickname
   // object): { referralCode, referralUrl, referralUrlCopy, referrerReferralCode }.
-  // referralUrlCopy is the clean (non-encoded) enlist URL. Verified May 2026.
-  // Returns { code, url, referrerCode } or null when absent (e.g. signed out).
+  // referralUrlCopy is the clean (non-encoded) enlist URL. Verified May 2026. Only the
+  // player's own code and link are read: referrerReferralCode (the recruiter's code)
+  // is never kept. Returns { code, url } or null when absent (e.g. signed out).
   function extractReferral(html) {
     const un = unescapeEntities(html);
     const at = keyIndex(un, RULES.account.referral.code);
@@ -1874,7 +1989,6 @@
     return {
       code: obj[RULES.account.referral.code],
       url: RULES.account.referral.url.map((k) => obj[k]).find(Boolean) || null,
-      referrerCode: obj[RULES.account.referral.referrerCode] || null,
     };
   }
 
@@ -1928,7 +2042,18 @@
     return { name, sid, rank, logo };
   }
 
-  OH.getAccount = async function getAccount({ force = false } = {}) {
+  // `expect` (Auto Scan Daily, the handle its run started with): a dashboard that names
+  // another handle → { loggedIn: true, nickname, other: true, fetchedAt }, with no
+  // dossier read and nothing cached; and a read that fails → { loggedIn: null,
+  // fetchedAt: 0 }, never the cached account.
+  const sameHandle = (a, b) =>
+    String(a ?? '')
+      .trim()
+      .toLowerCase() ===
+    String(b ?? '')
+      .trim()
+      .toLowerCase();
+  OH.getAccount = async function getAccount({ force = false, expect } = {}) {
     const { account } = await chrome.storage.local.get('account');
     if (
       !force &&
@@ -1945,6 +2070,14 @@
       });
       const html = res.ok ? await res.text() : '';
       const obj = extractAccount(html);
+      if (obj && expect != null && !sameHandle(obj[RULES.account.keys.nickname], expect)) {
+        return {
+          loggedIn: true,
+          nickname: obj[RULES.account.keys.nickname] || null,
+          other: true,
+          fetchedAt: Date.now(),
+        };
+      }
       if (!obj) {
         // We reached the dashboard but found no account object. A genuinely
         // logged-in dashboard ALWAYS embeds the nickname JSON, so "fetched OK but
@@ -1999,12 +2132,13 @@
             : null,
         citizenRecord: null,
         org: null, // { name, sid, rank, logo } from the public dossier, or null
-        referral: extractReferral(html), // { code, url, referrerCode } | null — from the SAME fetch (free)
+        referral: extractReferral(html), // { code, url } | null — from the SAME fetch (free)
       };
       // UEE Citizen Record + main Organization live on the public dossier
       // (citizen profile) page — one fetch covers both.
       if (out.nickname) {
         try {
+          if (expect != null) await OH.autoPause(); // Auto Scan Daily's pace
           const cres = await fetch(
             RSI_ORIGIN + RULES.dossier.path + encodeURIComponent(out.nickname),
             { credentials: 'omit', signal: AbortSignal.timeout(20000) },
@@ -2023,7 +2157,32 @@
       await chrome.storage.local.set({ account: out });
       return out;
     } catch (e) {
+      if (expect != null) return { loggedIn: null, fetchedAt: 0 };
       return account || { loggedIn: null, fetchedAt: 0 };
+    }
+  };
+
+  // Who is signed in to RSI right now, for Auto Scan Daily (ui/scan/runner.js): one read
+  // of the dashboard, its nickname only (RULES.account.keys). Never the dossier, never
+  // the cached account, and nothing is stored. A 429, or a 5xx with Retry-After, comes
+  // straight back. → { state: 'in', nickname, displayname } | { state: 'out' } (a page
+  // with no account on it, as getAccount reads it) | { state: 'unknown', retryAfter }.
+  OH.whoIsSignedIn = async function whoIsSignedIn() {
+    try {
+      const got = await fetchPage(ACCOUNT_URL, null, { retryRateLimit: false });
+      if (got.error) return { state: 'unknown', retryAfter: got.retryAfter ?? null };
+      if (!got.res.ok) return { state: 'unknown', retryAfter: header(got.res, 'retry-after') };
+      const obj = extractAccount(await got.res.text());
+      if (!obj) return { state: 'out' };
+      const nickname = String(obj[RULES.account.keys.nickname] || '').trim();
+      if (!nickname) return { state: 'unknown', retryAfter: null };
+      return {
+        state: 'in',
+        nickname,
+        displayname: obj[RULES.account.keys.displayname] || null,
+      };
+    } catch {
+      return { state: 'unknown', retryAfter: null };
     }
   };
 
@@ -2042,7 +2201,9 @@
   const REFERRAL_MAX_PAGES = 200; // safety cap (10k rows)
 
   // One page of the recruits/prospects list for a campaign. Returns
-  // { recruitsCount, prospectsCount, data: [...] } or { error }.
+  // { recruitsCount, prospectsCount, data: [...] } or { error }: with `rateLimited`
+  // and RSI's Retry-After on a 429, `transient` on a 5xx (and its Retry-After) or no
+  // answer, so Auto Scan Daily can hold off (ui/scan/runner.js). Never retried here.
   async function fetchReferralPage(campaignId, converted, page) {
     let res;
     try {
@@ -2064,10 +2225,15 @@
         }),
       });
     } catch (e) {
-      return { error: `Couldn't reach RSI (${e.message}).` };
+      return { error: `Couldn't reach RSI (${e.message}).`, transient: true };
     }
     if (res.status === 401 || res.status === 403)
       return { error: 'RSI rejected the request — sign in again.' };
+    const retryAfter = header(res, 'retry-after');
+    if (res.status === 429)
+      return { error: `RSI responded ${res.status}.`, rateLimited: true, retryAfter };
+    if (res.status >= 500)
+      return { error: `RSI responded ${res.status}.`, transient: true, retryAfter };
     if (!res.ok) return { error: `RSI responded ${res.status}.` };
     let json;
     try {
@@ -2089,16 +2255,27 @@
 
   // Walk every page of one campaign+converted list, deduping by id (page 1/2 were
   // verified non-overlapping, but dedupe guards against RSI clamping out-of-range
-  // pages like the hangar does). Returns { count, items } or { error }.
-  async function fetchReferralList(campaignId, converted, onProgress) {
+  // pages like the hangar does). Returns { count, items } or { error }. A failure also
+  // says whether RSI didn't answer (`rsiDown`, its `retryAfter`). `auto` (Auto Scan
+  // Daily): every page waits OH.autoPause first.
+  async function fetchReferralList(campaignId, converted, onProgress, { auto = false } = {}) {
     const seen = new Set();
     const items = [];
     let count = null;
     for (let page = 1; page <= REFERRAL_MAX_PAGES; page++) {
+      if (auto) await OH.autoPause();
       const res = await fetchReferralPage(campaignId, converted, page);
       // A later page failing leaves the list short: say so, so the caller can
       // keep the previous scan's list instead of saving a truncated one.
-      if (res.error) return page === 1 ? { error: res.error } : { count, items, partial: true };
+      if (res.error) {
+        const down = {
+          rsiDown: !!(res.transient || res.rateLimited),
+          retryAfter: res.retryAfter ?? null,
+        };
+        return page === 1
+          ? { error: res.error, ...down }
+          : { count, items, partial: true, ...down };
+      }
       count = converted ? res.recruitsCount : res.prospectsCount;
       let added = 0;
       for (const it of res.data) {
@@ -2117,7 +2294,7 @@
       }
       onProgress?.(items.length, count);
       if (added === 0 || res.data.length < RULES.referrals.pageSize) break;
-      await sleep(DELAY_MS);
+      if (!auto) await sleep(DELAY_MS);
     }
     return { count, items };
   }
@@ -2127,18 +2304,33 @@
   //          recruitsList:[...], prospectsList:[...] }. recruitsList carries a
   // `campaign` tag per row ('current'|'legacy') since legacy is a superset.
   // Returns { ok, referral?, scannedAt?, error? }. Never throws.
-  OH.getReferral = async function getReferral(onProgress, { account } = {}) {
+  // Auto Scan Daily (opts.auto): any list that fails or comes back short means nothing is
+  // merged or saved → { ok: false, unfinished: true, error, rsiDown, retryAfter }; and
+  // opts.keep({ referral }) is asked right before the save (false: { ok: false,
+  // refused: true }).
+  OH.getReferral = async function getReferral(onProgress, { account, auto, keep } = {}) {
     const paused = await OH.sourcePaused('referrals');
     if (paused) {
       OH.log('warn', 'referrals', 'scan paused by remote status');
       return { ok: false, paused: true, error: paused };
     }
+    const unfinished = (l) => {
+      OH.log('warn', 'referrals', `auto scan: ${l.error || 'a list came back short'}; not saved`);
+      return {
+        ok: false,
+        unfinished: true,
+        error: l.error || 'a list came back short',
+        rsiDown: !!l.rsiDown,
+        retryAfter: l.retryAfter ?? null,
+      };
+    };
     try {
       // Code/url come free from the account fetch (already cached/fetched there).
       const acct = account === undefined ? await OH.getAccount() : account;
       if (acct && acct.loggedIn === false) return { ok: false, error: 'Not signed in to RSI.' };
       const code = acct?.referral?.code || null;
       const url = acct?.referral?.url || null;
+      const lists = { auto: !!auto };
 
       // Recruits: legacy is the all-time superset, current is the post-cutoff subset.
       // Pull both and tag each row; prospects are shared, so fetch once (current).
@@ -2147,7 +2339,10 @@
         RULES.referrals.campaigns.legacy,
         true,
         (n, t) => onProgress?.('recruits (legacy)', n, t),
+        lists,
       );
+      if (auto && (legacyRecruits.error || legacyRecruits.partial))
+        return unfinished(legacyRecruits);
       if (legacyRecruits.error && !legacyRecruits.items?.length)
         return { ok: false, error: legacyRecruits.error };
 
@@ -2156,12 +2351,19 @@
         RULES.referrals.campaigns.current,
         true,
         (n, t) => onProgress?.('recruits (current)', n, t),
+        lists,
       );
+      if (auto && (currentRecruits.error || currentRecruits.partial))
+        return unfinished(currentRecruits);
 
       onProgress?.('prospects', 0, null);
-      const prospects = await fetchReferralList(RULES.referrals.campaigns.current, false, (n, t) =>
-        onProgress?.('prospects', n, t),
+      const prospects = await fetchReferralList(
+        RULES.referrals.campaigns.current,
+        false,
+        (n, t) => onProgress?.('prospects', n, t),
+        lists,
       );
+      if (auto && (prospects.error || prospects.partial)) return unfinished(prospects);
 
       // Any list that failed (or came back short) keeps the previous scan's
       // values, so one RSI hiccup can't wipe good data. `partial` names them.
@@ -2212,6 +2414,10 @@
         prospectsList: prospectItems,
       };
 
+      if (keep && !(await keep({ referral }))) {
+        OH.log('warn', 'referrals', 'auto scan: read whole but not kept');
+        return { ok: false, refused: true };
+      }
       const scannedAt = await saveSource('referral', referral, { account: acct || undefined });
       return { ok: true, referral, scannedAt, partial: partial.length ? partial.join(', ') : null };
     } catch (err) {
@@ -3074,17 +3280,23 @@
   // Saves are debounced, merged with what's stored (another tab may have added
   // some), and flushed if the page closes before the timer fires.
   let bbdSave = null;
+  let bbdFlushed = Promise.resolve(); // the last save, landed
   function flushBuybackDetails() {
     clearTimeout(bbdSave);
     bbdSave = null;
     if (!bbdMem) return Promise.resolve();
     const mine = bbdMem;
-    return mutateStored(BBD_KEY, (cur = {}) => ({ ...cur, ...mine })).catch(() => {});
+    return (bbdFlushed = mutateStored(BBD_KEY, (cur = {}) => ({ ...cur, ...mine })).catch(
+      () => {},
+    ));
   }
   function saveBuybackDetails() {
     clearTimeout(bbdSave);
     bbdSave = setTimeout(flushBuybackDetails, 500);
   }
+  // A save still waiting goes now (a scan's page that may close next, ui/scan/runner.js).
+  // → once every save so far has landed.
+  OH.flushBuybackDetails = () => (bbdSave ? flushBuybackDetails() : bbdFlushed);
   if (typeof window !== 'undefined' && window.addEventListener) {
     window.addEventListener('pagehide', () => {
       if (bbdSave) flushBuybackDetails();
@@ -3704,6 +3916,12 @@
     return JSON.stringify(out);
   };
 
+  // Which scan a sync sent: the three parts' scan times, as one string. siteSync keeps
+  // the last one that went through (siteLink.syncedScan), so Auto Scan Daily can tell a
+  // saved scan whose sync never went out (ui/scan/auto.js owedSync). Pure.
+  OH.syncStamp = (db) =>
+    ['hangar', 'buybacks', 'referral'].map((id) => db?.sources?.[id]?.scannedAt ?? '').join('|');
+
   // What sync sends: the backup file's payload without the referral prospects list
   // (other players who used your code but aren't recruits yet stay in this browser;
   // their count still goes). Returns a copy, never changes `payload`. Pure
@@ -3901,9 +4119,10 @@
       body,
     });
     if (res.status === 401) {
-      // Forget this link only: one connected again meanwhile stays.
+      // Forget this link only: one connected again meanwhile stays. Auto Scan Daily goes
+      // with it, as with Disconnect.
       if ((await OH.getSiteLink())?.token === link.token)
-        await chrome.storage.local.remove('siteLink');
+        await chrome.storage.local.remove(SITE_LINK_KEYS);
       throw new Error('This extension was disconnected on the website. Connect again.');
     }
     if (!res.ok) {
@@ -3912,6 +4131,9 @@
       const text = (v) => (typeof v === 'string' ? v.trim() : '');
       const reason = text(body?.reason);
       const err = syncRefusal(res.status, reason, text(body?.error));
+      // The website's status, for Auto Scan Daily (a refusal isn't sent again until the
+      // scan changes; a 429 is: ui/scan/runner.js syncTried).
+      err.status = res.status;
       // The website's format check refused it: where it didn't fit goes in the flight
       // log, for a scan problem report. A JSON Pointer of keys and row numbers only,
       // never a value; anything else is left out.
@@ -3947,6 +4169,8 @@
       return {
         ...rest,
         lastSync: j.synced_at,
+        // The scan this sync sent (OH.syncStamp).
+        syncedScan: OH.syncStamp(live),
         ...(who
           ? { accounts: withPilot(l.accounts, who), declined: withoutPilot(l.declined, who) }
           : {}),
@@ -3954,6 +4178,12 @@
     });
     return j;
   };
+  // What goes with the connection: the link, the popup's copy of the account's Wishlist
+  // (ui/popup/wish-client.js COPY_KEY), the store alerts' copy of its keys (src/alerts.js
+  // WISH_KEY; here rather than at the alerts' next check, which waits while alerts are
+  // paused) and Auto Scan Daily's switch and next run (it works only while connected;
+  // src/background.js clears its alarm). The Wishlist stays on the account.
+  const SITE_LINK_KEYS = ['siteLink', 'popupWish', 'alertsWish', 'autoScanOn', 'autoScanNext'];
   OH.siteDisconnect = async function siteDisconnect() {
     const link = await OH.getSiteLink();
     if (link) {
@@ -3962,7 +4192,7 @@
         headers: { authorization: `Bearer ${link.token}` },
       }).catch(() => null);
     }
-    await chrome.storage.local.remove('siteLink');
+    await chrome.storage.local.remove(SITE_LINK_KEYS);
   };
   // @sync-end
 
@@ -4889,6 +5119,11 @@
     // A cache saved before a currency was added doesn't count (it lacks its rate).
     const fits = cached && (cached.want == null ? false : cached.want === want);
     if (fits && cached.rates && Date.now() - cached.at < FX_TTL) return cached;
+    // At most once a day, a try that didn't bring them included (the privacy policy):
+    // until a day after it, the saved rates (or none) stand.
+    const tried = cached && cached.triedFor === want ? cached.triedAt : null;
+    if (Number.isFinite(tried) && Date.now() - tried >= 0 && Date.now() - tried < FX_TTL)
+      return cached.rates ? cached : null;
     try {
       const res = await OH.guarded(fetchFn)(RATES_URL, {
         credentials: 'omit',
@@ -4910,6 +5145,13 @@
       }
     } catch (e) {
       OH.log('warn', 'fx', `exchange rates download failed: ${e?.message || e}`);
+    }
+    try {
+      await chrome.storage.local.set({
+        [FX_KEY]: { ...(cached || {}), triedAt: Date.now(), triedFor: want },
+      });
+    } catch {
+      // Not saved: the next ask may try again.
     }
     return cached && cached.rates ? cached : null; // stale beats nothing
   };

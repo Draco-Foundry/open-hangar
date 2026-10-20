@@ -2,8 +2,9 @@
 // isn't. Used by scripts/pack.mjs (to build it) and scripts/check-store-build.mjs (to
 // check a build agrees with its flags).
 //
-// With the connector on, the extension is the popup and the basic page: the full
-// dashboard and its Svelte pages stay in the repo (until the website's versions and
+// With the connector on, the extension is the popup, the basic page and the hidden scan
+// page (src/scan.html, scripts/scan-host.mjs): the full dashboard and its Svelte pages
+// stay in the repo (until the website's versions and
 // Local Mode work on staging) but are left out of the build. src/ui/ keeps only what
 // the connector's pages load, found by following their imports, so a page added to the
 // dashboard later never slips in. Its extension pages may only send requests to RSI,
@@ -12,9 +13,16 @@
 import { existsSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
 
-export const CONNECTOR_PAGES = ['src/popup.html', 'src/basic.html'];
+export const CONNECTOR_PAGES = ['src/popup.html', 'src/basic.html', 'src/scan.html'];
 // The connector's entry bundles and stylesheets in src/ui (vite.config.mjs).
-const UI_ENTRIES = ['popup.js', 'basic.js', 'popup.css', 'basic.css', 'tokens.css'];
+export const UI_ENTRIES = [
+  'popup.js',
+  'basic.js',
+  'scan.js',
+  'popup.css',
+  'basic.css',
+  'tokens.css',
+];
 // The dashboard's own files outside src/ui (CHANGELOG.md is read by its Updates page),
 // and its folders: src/assets holds its banner and footer pictures.
 export const DASHBOARD_FILES = [
@@ -111,6 +119,10 @@ export function connectorProblems(unit, { files, read, manifest, connector, site
   if (connector) {
     if (manifest.action?.default_popup !== 'src/popup.html')
       problems.push(`${unit}: the connector's toolbar popup isn't src/popup.html`);
+    // Its keyboard shortcut (manifest.json commands, Alt+Shift+H): the browser opens the
+    // popup itself, no permission needed. The popup shows it in Settings.
+    if (!manifest.commands?._execute_action?.suggested_key?.default)
+      problems.push(`${unit}: no keyboard shortcut opens the popup (commands._execute_action)`);
     for (const f of CONNECTOR_PAGES) if (!has(f)) problems.push(`${unit}: ${f} is missing`);
     for (const f of DASHBOARD_FILES)
       if (has(f)) problems.push(`${unit}: ${f} is in a connector build`);

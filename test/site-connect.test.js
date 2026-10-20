@@ -11,13 +11,20 @@ const { loadBackground, CHROME_ID, STORE_FLAGS } = require('./bridge-env.js');
 // Mode and the connector), its token exchange answered here. staging: a developer's
 // build pointed at staging (npm run build:staging), which lets staging's pages in; the
 // store builds don't. flags: a developer's build's own.
-function load({ staging = true, browser = 'chrome', granted = true, flags = STORE_FLAGS } = {}) {
+function load({
+  staging = true,
+  browser = 'chrome',
+  granted = true,
+  flags = STORE_FLAGS,
+  contexts = null,
+} = {}) {
   const fetched = [];
   const x = loadBackground({
     browser,
     staging,
     granted,
     flags,
+    contexts,
     fetch: async (url, init) => {
       fetched.push({ url, body: JSON.parse(init.body) });
       return { ok: true, json: async () => ({ token: 'oht_x', name: 'ExamplePilot' }) };
@@ -68,6 +75,22 @@ test('our site: hello, begin with a PKCE challenge, finish with the code', async
   await dash.send({ type: 'oh-connect-begin' }, SITE);
   await dash.send({ type: 'oh-connect-finish', code: 'one-time', sync: true }, SITE);
   assert.deepEqual(dash.opened, [`chrome-extension://${CHROME_ID}/src/dashboard.html#home`]);
+});
+
+test('an Open Hangar tab already open comes to the front, no second tab (#658)', async () => {
+  const BASIC = `chrome-extension://${CHROME_ID}/src/basic.html`;
+  const x = load({
+    contexts: [{ contextType: 'TAB', tabId: 7, windowId: 3, documentUrl: `${BASIC}#home` }],
+  });
+  await x.send({ type: 'oh-connect-begin' }, SITE);
+  const done = await x.send({ type: 'oh-connect-finish', code: 'one-time', sync: true }, SITE);
+  assert.ok(done.ok);
+  assert.deepEqual(x.opened, [], 'no new tab: a scan running there keeps going');
+  assert.deepEqual(x.focused, [
+    { tab: 7, active: true },
+    { window: 3, focused: true },
+  ]);
+  assert.ok(x.stores.local.siteSyncRequested, 'the open tab syncs (after its scan)');
 });
 
 test('no sync asked, no sync flagged', async () => {

@@ -1,7 +1,8 @@
 # Store Listings in Other Languages
 
-The short summary is already translated in `_locales/<lang>/messages.json` (the stores
-and browsers pick it up from the manifest). The detailed descriptions below are for
+The short summary comes from `_locales/<lang>/messages.json` (the stores and browsers
+pick it up from the manifest). Only `_locales/en` ships since 0.4.0 (#685): a language's
+folder comes back with its real translation. The detailed descriptions below are for
 pasting into each store's listing, per language:
 
 - **Chrome Web Store:** Developer Dashboard → Store listing → language dropdown (top
@@ -14,13 +15,13 @@ Keep the English listing (docs/STORE.md, section 6) as the source; when it chang
 update these too. Written by us, not by native speakers yet, so corrections from
 players are welcome.
 
-Locales: zh_CN (简体中文), fr, ko, es, pt_BR, de, uk, it, cs, ru.
+Languages below (none ships today): zh_CN (简体中文), fr, ko, es, pt_BR, de, uk, it, cs, ru.
 
 **Retired for 0.3.0.** Every description below was written for 0.2.x and says there's
 no server, which stops being true once sync ships. Don't paste them for 0.3.0. They stay
 here as a starting point for translating the new English listing (docs/STORE.md,
-section 6). The translated summaries in `_locales` are from 0.2.x too (melt candidates,
-CCU savings) and need the same redo from the new English summary.
+section 6). The 0.2.x translated summaries left `_locales` in 0.4.0 (#685); a language's
+summary is translated again from the new English one when it comes back.
 
 ---
 

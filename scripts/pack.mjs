@@ -5,10 +5,14 @@
  * writes a per-browser manifest. `npm run pack` then zips each with web-ext.
  *
  *   chrome   — manifest.json as-is. Same zip goes to Chrome Web Store + Edge.
+ *              With the connector, the `offscreen` permission too (the hidden scan
+ *              page, scripts/scan-host.mjs).
  *   firefox  — adds background.scripts (Firefox MV3 runs an event page, not a
  *              service worker) and browser_specific_settings.gecko (add-on id +
  *              the data collection declaration AMO requires: none required, what
- *              sync sends optional).
+ *              sync sends optional). With the connector, its pages' content security
+ *              policy lets in a frame of its own pages (frame-src 'self'), for the
+ *              hidden scan page in the event page.
  *
  * Kept out of manifest.json itself so Chrome doesn't warn about unknown keys.
  *
@@ -51,8 +55,10 @@ import {
   writeFlags,
 } from './build-flags.mjs';
 import { ALERTS_FILES, alertsProblems, withAlerts } from './alerts.mjs';
+import { SCAN_HOST_FILES, SCAN_HOST_WORKER, scanHostProblems, withScanHost } from './scan-host.mjs';
 import {
   CONNECTOR_PAGES,
+  UI_ENTRIES,
   connectSrc,
   connectorProblems,
   folderBuild,
@@ -127,11 +133,17 @@ if (FLAGS.connector && !FLAGS.localMode)
 // Extension Alerts (scripts/alerts.mjs) show in the connector's popup.
 if (FLAGS.alerts && !FLAGS.connector)
   throw new Error('--flag alerts=on needs the connector on (add --flag connector=on)');
-// The connector's own pages (scripts/connector.mjs). Without the flag they're left out
-// of the build: nothing opens them there.
+// Auto Scan Daily's daily alarm uses the alarms permission the alerts' build brings
+// (scripts/alerts.mjs), and its run is the connector's hidden scan page.
+if (FLAGS.autoScan && !FLAGS.alerts)
+  throw new Error('--flag autoScan=on needs alerts on (it uses their alarms permission)');
+// The connector's own pages (scripts/connector.mjs) and the hidden scan page's scripts
+// (scripts/scan-host.mjs). Without the flag they're left out of the build: nothing opens
+// them there.
 const CONNECTOR_FILES = [
   ...CONNECTOR_PAGES,
-  ...['popup.js', 'popup.css', 'basic.js', 'basic.css', 'tokens.css'].map((f) => `src/ui/${f}`),
+  ...SCAN_HOST_FILES,
+  ...UI_ENTRIES.map((f) => `src/ui/${f}`),
 ];
 const SITE_LINE = "const SITE_BUILT_IN = '';";
 function presetSite(file) {
@@ -199,6 +211,8 @@ const WORKER_SCRIPTS = [
   'src/rsi-cart.js',
   'src/sync-schema.js',
   'src/hangar-shape.js',
+  // Where a scan runs (scripts/scan-host.mjs), only in a build with the connector.
+  ...(FLAGS.connector ? [SCAN_HOST_WORKER] : []),
   // Extension Alerts (scripts/alerts.mjs), only in a build with them.
   ...(FLAGS.alerts ? ALERTS_FILES : []),
 ];
@@ -262,8 +276,12 @@ for (const [name, transform] of Object.entries(builds)) {
   cpSync('LICENSE', `${out}/LICENSE`);
   cpSync('THIRD_PARTY_NOTICES.md', `${out}/THIRD_PARTY_NOTICES.md`);
   // A copy (chrome returns `base` itself), with the alerts' permissions in a build with
-  // them (scripts/alerts.mjs).
-  const manifest = withAlerts({ ...transform(base) }, FLAGS);
+  // them (scripts/alerts.mjs), and the hidden scan page's for this browser in a build
+  // with the connector (scripts/scan-host.mjs: Chrome and Edge's offscreen permission,
+  // Firefox's frame-src 'self').
+  const manifest = withScanHost(withAlerts({ ...transform(base) }, FLAGS), FLAGS, {
+    firefox: FIREFOX.has(name),
+  });
   if (!FLAGS.alerts) for (const f of ALERTS_FILES) rmSync(`${out}/${f}`, { force: true });
   // Sync's sign-in window (identity.launchWebAuthFlow) needs "identity": it's in
   // manifest.json, so every build asks for it.
@@ -344,6 +362,12 @@ for (const [name, transform] of Object.entries(builds)) {
       ...folderBuild(out),
       manifest,
       alerts: FLAGS.alerts,
+      firefox: FIREFOX.has(name),
+    }),
+    ...scanHostProblems(out, {
+      ...folderBuild(out),
+      manifest,
+      connector: FLAGS.connector,
       firefox: FIREFOX.has(name),
     }),
   );

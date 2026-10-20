@@ -127,14 +127,98 @@ test('a store or beta build with alerts on: the policy explains its permissions 
   }
 });
 
-// The wishlist import (ui/basic/wishlist-import.js): a store or beta build with the
+// The hidden scan page (scripts/scan-host.mjs): a store or beta build with the connector
+// asks for `offscreen` on Chrome and Edge, never on Firefox, and pack.mjs adds it per
+// browser, so manifest.json (the first test) never shows it. It fails here until both
+// copies of the policy explain it and say which browsers (owner-approved words
+// 2026-10-14, word for word).
+test('a store or beta build with the connector: the policy explains offscreen', async () => {
+  const { buildValues, readRegistry } = await import('../scripts/build-flags.mjs');
+  const { scanHostPermissions } = await import('../scripts/scan-host.mjs');
+  const registry = readRegistry(path.join(ROOT, 'src', 'flags.js'));
+  // What each browser's build adds, checked here so a change to scripts/scan-host.mjs
+  // can't quietly skip the policy.
+  assert.deepEqual(scanHostPermissions({ connector: true }), ['offscreen']);
+  assert.deepEqual(scanHostPermissions({ connector: true }, { firefox: true }), []);
+  assert.deepEqual(scanHostPermissions({ connector: false }), []);
+  // A permission only some browsers ask for names them before its colon.
+  const noted = (bullets, p) => bullets.some((b) => new RegExp(`^${p}( \\([^)]*\\))?:`).test(b));
+  const copies = [
+    ['docs/PRIVACY.md', mdBullets()],
+    ['site/privacy.html', htmlBullets()],
+  ];
+  for (const [build, beta] of [
+    ['store', false],
+    ['beta', true],
+  ])
+    for (const p of scanHostPermissions(buildValues(registry, { beta })))
+      for (const [file, bullets] of copies) {
+        assert.ok(noted(bullets, p), `${file} explains "${p}" (the ${build} build has it)`);
+        assert.ok(
+          bullets.some((b) => b.startsWith(`${p} (Chrome and Edge only):`)),
+          `${file} says only Chrome and Edge ask for "${p}"`,
+        );
+      }
+});
+
+// Auto Scan Daily (#666): a store or beta build with the `autoScan` flag on scans the
+// connected RSI account once a day on an alarm. It fails here until both copies of the
+// policy have its section (#auto-scan-daily, with "A bad part is never kept", owner-
+// approved words 2026-10-14, word for word), name it in the alarms bullet, and say
+// Disconnect turns it off; and while the flag needs the alerts' alarms permission.
+test('a store or beta build with Auto Scan Daily on: the policy explains it', async () => {
+  const { buildValues, readRegistry } = await import('../scripts/build-flags.mjs');
+  const registry = readRegistry(path.join(ROOT, 'src', 'flags.js'));
+  const words = (f) =>
+    plain(
+      read(f)
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\*\*/g, '')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'),
+    ).replace(/ ([.,:;)])/g, '$1');
+  const BAD_PART =
+    "A bad part is never kept: Auto Scan Daily saves your hangar, buy-backs and referrals one part at a time, as each is fully read. A part that doesn't finish, a part read after RSI switched to a different account than the scan started on, or a hangar that would suddenly drop much of what's in it with no buy-backs to explain it, is never saved or synced. That part keeps your last good scan, and the popup asks you to scan yourself.";
+  const QUICK = 'A quick check that finds nothing new stops there and sends nothing.';
+  let checked = 0;
+  for (const [build, beta] of [
+    ['store', false],
+    ['beta', true],
+  ]) {
+    const flags = buildValues(registry, { beta });
+    if (!flags.autoScan) continue;
+    assert.ok(flags.alerts, `the ${build} build has the alerts' alarms permission for it`);
+    checked++;
+    assert.match(read('docs/PRIVACY.md'), /\n## Auto Scan Daily\n/, 'docs/PRIVACY.md');
+    assert.match(read('site/privacy.html'), /<h2 id="auto-scan-daily">Auto Scan Daily<\/h2>/);
+    for (const [file, bullets] of [
+      ['docs/PRIVACY.md', mdBullets()],
+      ['site/privacy.html', htmlBullets()],
+    ]) {
+      const text = words(file);
+      assert.ok(
+        text.includes(BAD_PART),
+        `${file}: "A bad part is never kept" (the ${build} build)`,
+      );
+      assert.ok(text.includes(QUICK), `${file}: the quick check sends nothing`);
+      assert.ok(
+        text.includes('stops syncing, turns off Auto Scan Daily and cancels this extension'),
+        `${file}: Disconnect turns it off`,
+      );
+      const alarms = bullets.find((b) => b.startsWith('alarms:'));
+      assert.match(alarms || '', /^alarms: for store alerts and Auto Scan Daily only\./, file);
+    }
+  }
+  assert.ok(checked, 'Auto Scan Daily is on in the store build (src/flags.js)');
+});
+
+// The wishlist import (ui/scan/wishlist-import.js): a store or beta build with the
 // `wishlistImport` flag on sends the wishlist this browser kept to the openhangar.space
 // account. It fails here until both copies of the policy explain it in Optional Sync
 // ("Your old wishlist, once", owner-approved words, word for word) and name it among the
 // requests while connected, and the basic page never sends it in a build without the flag.
 test('a store or beta build with the wishlist import on: the policy names it', async () => {
   const { buildValues, readRegistry } = await import('../scripts/build-flags.mjs');
-  const { MAX_ITEMS } = await import('../ui/basic/wishlist-import.js');
+  const { MAX_ITEMS } = await import('../ui/scan/wishlist-import.js');
   const registry = readRegistry(path.join(ROOT, 'src', 'flags.js'));
   // The policy's text, as plain words (no Markdown marks, no tags).
   const words = (f) =>
@@ -162,9 +246,12 @@ test('a store or beta build with the wishlist import on: the policy names it', a
       );
     }
   }
-  // The basic page asks the flag before anything else.
-  const hub = read('ui/basic/hub.svelte.js');
-  const fn = /async function wishlistToAccount\(\) \{\n\s*(.*)\n/.exec(hub);
-  assert.ok(fn, 'ui/basic/hub.svelte.js has wishlistToAccount');
+  // The scan runner (every page's import, the basic page's too) asks the flag before
+  // anything else, and no page sends it another way.
+  const runner = read('ui/scan/runner.js');
+  const fn = /async function wishlistToAccount\(\) \{\n\s*(.*)\n/.exec(runner);
+  assert.ok(fn, 'ui/scan/runner.js has wishlistToAccount');
   assert.equal(fn[1], "if (!flag('wishlistImport')) return;");
+  assert.match(runner, /const flag = \(name\) => OH\?\.flags\?\.\[name\] === true;/);
+  assert.doesNotMatch(read('ui/basic/hub.svelte.js'), /importWishlist/);
 });

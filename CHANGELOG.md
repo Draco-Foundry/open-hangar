@@ -4,6 +4,38 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.5.0 — 2026-10-18
+
+- Fixed: **Notifications on Firefox.** Turning them on now closes the popup so Firefox's question can show.
+- Improved: The popup shows when an update is ready, with Reload to Update, and any notice from us about scans.
+- Changed: After you connect, you land on My Hangar on the website.
+- Improved: The alerts list stays short: with more than three alerts it scrolls, and each alert takes less room.
+- New: **Delete alerts.** An × on each alert, and Clear All. A deleted alert comes back only if something new matches it.
+- Improved: Settings is shorter: Look, Currency and Shortcut sit on one row.
+- New: **Remind Me on each Wishlist item.** With it off, store alerts skip that item. The website's Wishlist has the same switch.
+- Changed: **Privacy policy updated.** The Wishlist lines cover the Remind Me switch and no longer mention target prices.
+- Fixed: **Upgraded insurance.** A pledge whose insurance was upgraded now shows the upgraded term, not the one it came with.
+
+## 0.4.1 — 2026-10-14
+
+- Changed: **No Target Price on Wishlist items.** Ships go on sale or they don't, so there's no price to wait for.
+
+## 0.4.0 — 2026-10-14
+
+- New: **A new toolbar popup.** Three tabs, Hangar, Wishlist and Settings, plus an alerts bell whose number matches the toolbar badge. The Hangar tab shows your RSI portrait and handle, Account Value and how it changed since an earlier scan, Store Credit, Buy-Back Tokens with the next refill, up to three Fleet News notes, and Scan.
+- New: **Scans run out of sight.** No more scan tab: the scan runs in a hidden page, and closing the popup doesn't stop it. If your browser closes mid-scan, the parts that finished are saved and the popup shows Scan stopped, even after a restart.
+- New: **Auto Scan Daily (optional).** While you're connected to openhangar.space, Open Hangar can check your hangar once a day. It looks at the newest pages first, runs a full scan only when something is new or once a week, saves part by part, and skips days when you're signed out or signed in to a different RSI account. Off until you turn it on.
+- New: **Your Wishlist in the popup.** While you're connected, search to add a ship, paint or upgrade, set a Target Price, or remove an item. Search runs on your device. With store alerts off, it covers ships only.
+- New: **Pick your currency.** Amounts show in US dollars until you pick another currency in Settings. After that they use the day's rate, and hovering an amount shows it in dollars.
+- New: **Light mode and a shortcut.** Look follows your browser, or pick Dark or Light. Alt+Shift+H opens the popup.
+- Changed: **Settings live in the popup now:** Sync Now, Disconnect, Store Alerts, Notifications, Look, Currency, Shortcut, JSON Backup, Pledges CSV, Buy-Backs CSV, Saved Accounts, Log Out of RSI, Clear Data, Help, Report a Scan Problem and Privacy.
+- Changed: **The Open Hangar page is smaller.** It opens only to ask you something, or to run a scan that can't run hidden. Its pledge and buy-back lists are gone. Open My Hangar shows your whole hangar: My Hangar on openhangar.space when you're connected, or hangar.openhangar.space when you're not.
+- Changed: **Signed out of RSI?** The popup shows Log In to RSI, and Scan waits until you're signed in again.
+- Changed: **Privacy policy updated** for the popup, hidden scans, Auto Scan Daily and Wishlist editing: openhangar.space/privacy.html
+- Improved: A badge on the toolbar button when there's new Fleet News, a dot on the version tag once per new version, how long each scan took ("Scanned in 38s"), and the popup reopens on your last tab (Hangar when there's news).
+- Fixed: **Connecting mid-scan.** Connecting to openhangar.space during a scan no longer sends half a hangar.
+- Changed: Open Hangar no longer keeps the referral code of the player who recruited you. Updating clears any saved copy. It was never synced or exported.
+
 ## 0.3.1 — 2026-10-14
 
 - Improved: Scans ask RSI for each page at its own address instead of being redirected

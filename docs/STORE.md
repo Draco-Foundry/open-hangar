@@ -1,12 +1,12 @@
 # Store Launch Checklist & Listing
 
-> **Submission status (2026-09-30):**
+> **Submission status (2026-10-18):**
 >
-> | Store            | Status                                                                                                                                                                                    | IDs / links                                                                                                                                                      |
-> | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-> | Chrome Web Store | **live** v0.2.11; **v0.2.12 in review** (submitted 2026-09-30, new listing: description, screenshots, category Games, official URL openhangar.space) (publisher `[email removed]`) | item `aeabioadfphghjennmdbnpelojlhndjl` · [listing](https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl)                       |
-> | Firefox AMO      | **live** v0.2.12 (approved 2026-09-30; new listing, screenshots, AMO license field All Rights Reserved (repo LICENSE: PolyForm Strict 1.0.0), privacy policy 2026-09-30)                  | [listing](https://addons.mozilla.org/en-US/firefox/addon/open-hangar/) · gecko id `open-hangar@draco-foundry`                                                    |
-> | Microsoft Edge   | v0.2.12 in review with the new listing (resubmitted 2026-09-30, category Entertainment, test notes for reviewers)                                                                         | [listing](https://microsoftedge.microsoft.com/addons/detail/fmcnemfepnifokjelgjacgdhoodaiicl) · CRX `fmcnemfepnifokjelgjacgdhoodaiicl` · Store ID `[id removed]` |
+> | Store            | Status                                                                                                                                                                                                                            | IDs / links                                                                                                                                |
+> | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+> | Chrome Web Store | **in review** v0.5.0 (submitted 2026-10-18; v0.4.1 live) (category Games, official URL openhangar.space)                                                                                                                          | item `aeabioadfphghjennmdbnpelojlhndjl` · [listing](https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl) |
+> | Firefox AMO      | **in review** v0.5.0 (submitted 2026-10-18; v0.4.1 live) (AMO license field: Other, PolyForm Strict License 1.0.0, same as the repo LICENSE; privacy policy box: the 2026-10-14 policy until the owner pastes the 2026-10-18 one) | [listing](https://addons.mozilla.org/en-US/firefox/addon/open-hangar/) · gecko id `open-hangar@draco-foundry`                              |
+> | Microsoft Edge   | **in review** v0.5.0 (submitted 2026-10-18; v0.4.1 live) (category Entertainment, listing English only)                                                                                                                           | [listing](https://microsoftedge.microsoft.com/addons/detail/fmcnemfepnifokjelgjacgdhoodaiicl) · CRX `fmcnemfepnifokjelgjacgdhoodaiicl`     |
 >
 > When each goes live, set that button's `data-status="live"` and `data-url` in
 > `site/index.html`; the "in review" line disappears once none are pending.
@@ -29,23 +29,18 @@ Firefox Add-ons. Work top to bottom. Items marked ✅ are ready in the repo; ⬜
 
 ---
 
-## 1. Developer Account (One-Time, ~30 Min)
+## 1. Accounts
 
-- ✅ Chrome Web Store account: `[email removed]` (publisher **Draco Foundry**).
-- ⬜ Public **contact email** on every store: `support@openhangar.space` (Porkbun
-  forward → the maintainer's inbox). Verify it in each dashboard.
-
-- ✅ Register at the [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole): **$5 one-time fee**.
-- ✅ Verify the account (email + payment).
-- ✅ Publish under the **Draco Foundry** brand rather than a personal account, so it
-  matches the GitHub org.
+Every store publishes under the **Draco Foundry** brand. The public contact on
+every store is `support@openhangar.space`. The account setup is kept in the maintainer's private notes.
 
 ## 2. Package the Extension
 
 - ✅ Valid MV3 `manifest.json` (loads unpacked today).
 - ✅ **`npm run pack`** builds both store zips into `dist/` (runtime files only:
-  `manifest.json`, `_locales/`, `icons/`, `src/`, plus `CHANGELOG.md`, `LICENSE` and
-  `THIRD_PARTY_NOTICES.md`):
+  `manifest.json`, `_locales/` (English only), `icons/`, the connector's part of `src/`,
+  plus `LICENSE` and `THIRD_PARTY_NOTICES.md`; the dashboard and `CHANGELOG.md` stay
+  out, docs/CONNECTOR.md):
   - `open-hangar-chrome-<version>.zip`: Chrome Web Store **and** Edge Add-ons.
   - `open-hangar-firefox-<version>.zip`: Firefox AMO. `scripts/pack.mjs` adds the
     Firefox-only manifest keys (event-page `background.scripts`, gecko add-on id,
@@ -56,13 +51,23 @@ Firefox Add-ons. Work top to bottom. Items marked ✅ are ready in the repo; ⬜
 
 ## 3. Store Listing Assets
 
-- ✅ **Screenshots** (1–5 required), **1280×800** or 640×400 PNG/JPG, from 0.3.0 the
-  connector's (real UI, fictional demo account; PNG copies beside them for Edge):
-  1. The toolbar popup: `docs/store-assets/screenshot-connector-1-popup.jpg`
-  2. The Open Hangar page (Pledges): `docs/store-assets/screenshot-connector-2-basic.jpg`
+- ✅ **Screenshots** (1–5 required), **1280×800** or 640×400 PNG/JPG, from 0.4.0 the
+  toolbar popup's (real UI, fictional demo account), with their AMO captions:
+  1. Hangar: `docs/store-assets/screenshot-040-1-hangar.jpg`, "Your hangar at a glance:
+     portrait, Account Value, Store Credit, Fleet News and Scan."
+  2. Wishlist: `docs/store-assets/screenshot-040-2-wishlist.jpg`, "Add to your Wishlist
+     right from the popup." (retaken for 0.4.1, with no Target Price)
+  3. Settings: `docs/store-assets/screenshot-040-3-settings.jpg`, "Every setting in one
+     place, including Auto Scan Daily."
+  4. Alerts: `docs/store-assets/screenshot-040-4-alerts.jpg`, "Store alerts for your
+     ships and your Wishlist."
+  5. Light mode: `docs/store-assets/screenshot-040-5-light.jpg`, "Light mode, or follow
+     your browser."
 
-  The older `screenshot-1…5-*` files (`npm run screenshots`) show the dashboard, which
-  the 0.3.0 extension doesn't have: don't upload them for 0.3.0.
+  The 0.3.0 `screenshot-connector-*` files show the old popup and the basic page's
+  lists, which 0.4.0 removed, and the older `screenshot-1…5-*` files
+  (`npm run screenshots`) show the dashboard, which store builds don't have: don't
+  upload either.
 
 - ✅ **Small promo tile**: **440×280** PNG (required) — `docs/store-assets/promo-small-440x280.png`. Can be the logo on a dark
   background. (`icons/icon.svg` + the banner in `src/assets/` are starting points.)
@@ -115,10 +120,7 @@ same: change one, change the other.
 
 **`cookies`**
 
-> Used solely to implement "Log out of RSI": clears robertsspaceindustries.com
-> cookies (including the HttpOnly session cookie that page scripts can't remove) so
-> the user can fully end their RSI session from the extension. The extension never
-> reads cookie values or sends them anywhere.
+> Used for three things, all on robertsspaceindustries.com. First, "Log Out of RSI": clears RSI's cookies (including the HttpOnly session cookie that page scripts can't remove) so the user can fully end their RSI session from the extension. Second, telling whether the user is signed in to RSI: the extension checks only whether RSI's sign-in cookie exists, so the popup can show "Log In to RSI" and Auto Scan Daily can skip a signed-out day, without contacting RSI. Third, Add to RSI Cart: like RSI's own upgrade window, it reads RSI's session token cookie and sends it back to robertsspaceindustries.com with the cart request the user asked for. Cookie values are never stored and never sent anywhere except RSI.
 
 **`identity`** (added in 0.3.0)
 
@@ -137,9 +139,17 @@ _(Since 0.2.8 there is no `api.star-citizen.wiki` host permission: that public A
 sends `Access-Control-Allow-Origin: *` and we fetch it without credentials, so the
 install prompt only names robertsspaceindustries.com.)_
 
+**`identity`** (added in 0.3.0)
+
+> Used only for the optional Connect to openhangar.space, an OAuth sign-in with PKCE. It gets this extension's own sign-in address (chrome.identity.getRedirectURL) and opens a sign-in window for app.openhangar.space (chrome.identity.launchWebAuthFlow), where the user signs in and approves the connection. The window hands the extension a one-time code, never the user's password. It never reads the user's Google or Chrome account.
+
 **`alarms`** (added in 0.3.0)
 
-> Used only for store alerts, which the user turns on in the extension's settings (they're off by default). The alarm wakes the extension for a check at most every 30 minutes: it downloads one public sale file from openhangar.space (the same file for everyone, with nothing about the user in the request) and matches it on the device. Turning alerts off clears the alarm.
+> Used only for two optional features, both off until the user turns them on in the extension's settings. Store alerts: the alarm wakes the extension for a check at most every 30 minutes. It downloads one public sale file from openhangar.space (the same file for everyone, with nothing about the user in the request), reads the user's own Wishlist if they connected openhangar.space, and matches both on the device. Auto Scan Daily (only while connected to openhangar.space): the alarm wakes the extension once a day to scan the user's own RSI account, the same as pressing Scan, and only when the signed-in RSI account is the connected one. Turning a feature off clears its alarm.
+
+**`offscreen`** (added in 0.4.0; Chrome and Edge only)
+
+> Used only to run the hangar scan in a hidden page instead of opening a tab. The scan reads the signed-in user's own RSI pages and parses their HTML with DOMParser, which the extension's service worker doesn't have (reason: DOM_PARSER). The hidden page reads nothing beyond what the user's Scan already reads from robertsspaceindustries.com.
 
 **`notifications`** (optional, added in 0.3.0)
 
@@ -157,27 +167,28 @@ install prompt only names robertsspaceindustries.com.)_
 
 > Scan your Star Citizen hangar in one click, see it all on openhangar.space and get store alerts. Private, with no account needed.
 
-The other languages' `_locales/*/messages.json` have no description of their own for
-0.3.0, so every language shows this English line until new translations are approved.
+Only `_locales/en` ships since 0.4.0 (#685), so the stores list English only. A
+language comes back with its real translation.
 
-**Detailed description:**
+**Detailed description** (from 0.4.0):
 
 The store fields are plain text: paste it without the `>` quote marks and the `**` bold
 markers, with each paragraph and each • bullet on one line.
 
 > **Your Star Citizen hangar, one click away.**
 >
-> Open Hangar reads what RSI already shows you (your pledges, buy-backs, balances and referrals) and shows it all on our hangar page, where you can actually use it. No account needed, and no more clicking through page after page of pledges.
+> Open Hangar reads your pledges, buy-backs, balances and referrals from RSI with the session you're already signed in with, and shows them in a popup and on our hangar page. Free, no password, no account needed.
 >
 > What you get:
-> • Scan: one click reads your hangar and buy-backs from RSI, with the session you're already signed in with
-> • The toolbar popup: your Account Value, your last scan and your store alerts at a glance
+> • Scan: one click reads your hangar and buy-backs from RSI. It runs in the background, with no tab to open
+> • The toolbar popup: your hangar at a glance, Fleet News, your Wishlist and every setting, in three tabs
 > • Your full hangar at hangar.openhangar.space: pledges, buy-backs, fleet stats, values, referrals and more, read from this browser, with no account
 > • Store alerts (optional): a badge and a notification when a ship in your buy-backs is back in the store, or a ship you own gets a new paint, a warbond edition or a limited-time sale. Matched on your device
-> • Add to RSI Cart and Send to RSI Cart: put the upgrades and store items you pick in your RSI cart in one click. You always check out on RSI yourself
-> • The Open Hangar page: your pledges and buy-backs with search, totals and CSV, a JSON backup, and your settings
+> • Add to RSI Cart: put a ship upgrade (CCU) in your RSI cart in one click. You always check out on RSI yourself
+> • Backups: save your hangar as a JSON or CSV file any time
+> • With openhangar.space connected: edit your Wishlist from the popup, and turn on Auto Scan Daily to check your hangar once a day, only for the RSI account you connected
 >
-> **Open beta:** this is Open Hangar 0.3, and it's all yours now. Syncing your hangar to openhangar.space opens to everyone at our official launch on November 10.
+> **Open beta:** this is Open Hangar 0.4, and it's all yours now. Syncing your hangar to openhangar.space opens to everyone at our official launch on November 10.
 >
 > **Private by design:** Open Hangar runs in your browser, using the RSI session you're already signed in with. It never asks for your password. Your hangar stays on your device, and nothing about you is sent to us unless you connect.
 >
@@ -185,28 +196,16 @@ markers, with each paragraph and each • bullet on one line.
 >
 > Unofficial and fan-made. Not affiliated with Cloud Imperium Games or RSI. Fly safe, o7.
 
-**If Send to RSI Cart isn't open to everyone on openhangar.space's store when the listing
-goes up,** use this cart bullet instead, and switch to the one above once it is:
+**Once Send to RSI Cart is open to everyone on openhangar.space's store,** switch the cart
+bullet above to this one:
 
-> • Add to RSI Cart: put a ship upgrade (CCU) in your RSI cart in one click. You always check out on RSI yourself
+> • Add to RSI Cart and Send to RSI Cart: put the upgrades and store items you pick in your RSI cart in one click. You always check out on RSI yourself
 
-## 7. Submit & Review
+## 7. Submit, Edge and Review
 
-- ✅ Upload zip, fill listing, set visibility to **Public**.
-- ✅ Submit. First review with the `cookies` permission can take **several days to
-  ~2 weeks**; have the §5 justifications ready in case of a clarification email.
-- ✅ Tag the release: `git tag v0.2.8 && git push origin v0.2.8`. The Release workflow builds the zips and publishes the GitHub Release with the CHANGELOG notes.
+The submit and review checklist is kept in the maintainer's private notes.
 
-## 8. Microsoft Edge Add-ons (After Chrome, Same Zip)
-
-- ✅ Register at [Partner Center → Edge](https://partner.microsoft.com/dashboard/microsoftedge/overview) — **free**.
-- ✅ Upload `open-hangar-chrome-<version>.zip`; reuse the §3 assets, §5
-  justifications, §6 copy, and the privacy-policy URL.
-- ✅ Live; current version and review state are in the status table at the top. Review
-  is typically up to ~7 business days. Edge wants a 300×300 logo:
-  `docs/store-assets/logo-300.png`.
-
-## 9. Firefox Add-ons (AMO)
+## 8. Firefox Add-ons (AMO)
 
 - ✅ Sign in at [addons.mozilla.org/developers](https://addons.mozilla.org/developers/) — **free**.
 - ✅ Upload `open-hangar-firefox-<version>.zip` as a **listed** add-on. The manifest
@@ -219,30 +218,10 @@ goes up,** use this cart bullet instead, and switch to the one above once it is:
   Entertainment_.
 - ✅ Automated validation is instant; human review can follow after listing.
 
-## 10. Post-Launch
+## 9. Publishing Updates
 
-- ✅ Add the store links to the README. ⬜ Org profile.
-- ⬜ Watch the dashboard for policy notices; respond promptly to any review query.
-
-## 11. Publishing Updates From GitHub
-
-1. `npm run release <x.y.z>` on a clean `main` (or bump `manifest.json` /
-   `package.json`, move the CHANGELOG's Unreleased notes under the new version, merge,
-   and push a tag). The **Release** workflow builds the zips and the GitHub Release,
-   then starts **Publish to stores** for the tag with `store: all`.
-2. That run checks everything, waits for CI on the release commit to pass, then each
-   upload job waits for you to **Approve** the `stores` environment in the run
-   (Review deployments). It uploads and submits for review; each store still reviews
-   before it goes live. To publish one store or retry, run **Actions → Publish to
-   stores → Run workflow** by hand with the tag and a store.
-
-Picking a single store whose secrets aren't set skips it; picking **all** fails
-instead, so Discord never announces a store that got nothing. See Store Keys below for
-the secrets.
-
-One store update a day: a real run fails if another one sent something to the stores
-in the last 24 hours, unless it finishes the same tag one store at a time or the
-**Hotfix** box is ticked ([ROLLBACK.md](ROLLBACK.md)).
+The maintainer releases (`npm run release`, then the **Publish to stores** workflow,
+which waits for an approval). The release, approval and store-key steps are kept in the maintainer's private notes.
 
 ### Holding a Store Back
 
@@ -265,46 +244,3 @@ can say so with the same yellow pill as "in review", e.g. Firefox `v0.2.19` and
 
 A typo (bad version or date, unknown store) just shows no pill. The pill only appears
 while the store's live version can be read and is older.
-
-## 12. Store Keys
-
-The upload keys are secrets in the `stores` environment (repo Settings → Environments →
-stores), which needs your approval before any job can read them (#192). Keys not moved
-there yet still work from repo Settings → Secrets → Actions. `DISCORD_UPDATES_WEBHOOK`
-stays at repo level.
-
-**Save every key in Bitwarden the moment you create it.** GitHub never shows a secret
-again, and most of these are only shown once by the store too, so a key that isn't saved
-can only be replaced, not recovered.
-
-| Secret              | Where it comes from                                                                           | Shown again? |
-| ------------------- | --------------------------------------------------------------------------------------------- | ------------ |
-| `AMO_JWT_ISSUER`    | addons.mozilla.org → Developer Hub → Manage API Keys (`user:…`)                               | Yes          |
-| `AMO_JWT_SECRET`    | Same page, when you generate credentials                                                      | No           |
-| `EDGE_PRODUCT_ID`   | Partner Center → Microsoft Edge → Open Hangar → Extension overview (a GUID, not the store ID) | Yes          |
-| `EDGE_CLIENT_ID`    | Partner Center → Microsoft Edge → Publish API                                                 | Yes          |
-| `EDGE_API_KEY`      | Same page, Create API credentials                                                             | No           |
-| `CWS_EXTENSION_ID`  | `aeabioadfphghjennmdbnpelojlhndjl` (public, from the store link)                              | Yes          |
-| `CWS_CLIENT_ID`     | Google Cloud Console → APIs & Services → Credentials → the OAuth client                       | Yes          |
-| `CWS_CLIENT_SECRET` | Same client, Add secret                                                                       | No           |
-| `CWS_REFRESH_TOKEN` | OAuth Playground (below)                                                                      | No           |
-
-**Regenerating revokes the old key.** AMO and Edge keys stop working the moment new ones
-are made, so update the secret straight away. A Google client can hold two secrets at
-once: add the new one, confirm a Chrome upload works, then delete the old one.
-
-**Expiry.** Edge API keys expire; Partner Center shows the date. Put it in the Bitwarden
-note and renew before it lapses. Google refresh tokens expire after 7 days if the OAuth
-consent screen is in **Testing**, so keep it **In production** (APIs & Services → OAuth
-consent screen → Publish app). It's only your own tool, so no Google review is needed.
-
-**New Chrome refresh token:**
-
-1. On the OAuth client (a Web application), add the redirect URI
-   `https://developers.google.com/oauthplayground`.
-2. Open developers.google.com/oauthplayground → gear icon → Use your own OAuth
-   credentials, and paste the client ID and secret.
-3. Step 1: scope `https://www.googleapis.com/auth/chromewebstore` → Authorize APIs, and
-   sign in with the Google account that owns the Chrome Web Store listing.
-4. Step 2: Exchange authorization code for tokens, and copy the refresh token into
-   Bitwarden and into `CWS_REFRESH_TOKEN`.

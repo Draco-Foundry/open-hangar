@@ -20,14 +20,17 @@ only: Prettier, web-ext, jsdom and jsqr (tests), puppeteer-core (drives the inst
 
 - `src/`: what ships. `background.js` (service worker; Firefox event page), `lib.js`
   (`window.OH`: scan, storage, export, feeds, sync), `scraper/parser.js`, `flags.js`,
-  `popup.html` and `basic.html` (the connector pages). `src/ui/` is Vite output (gitignored).
+  `popup.html` and `basic.html` (the connector pages), `scan.html` and `scan-host.js` (the
+  hidden scan page). `src/ui/` is Vite output (gitignored).
 - `ui/`: Svelte sources, one folder per page with a `main.js` entry (vite.config.mjs);
-  shared code in `ui/lib/`. Only `ui/popup/` and `ui/basic/` reach store builds.
+  shared code in `ui/lib/`. Only `ui/popup/`, `ui/basic/` and `ui/scan/` (the scan
+  runner the hidden scan page runs, or the basic page when it can't) reach store builds.
 - `site/`: openhangar.space static files (`status.json` is the live kill switch);
   `site-worker/`: its front Worker.
 - `schema/`: the sync payload's JSON Schema. `test/`: `*.test.js` and `fixtures/`.
 - `scripts/`: build, checks, generators, publishing. `docs/`: topic files, `decisions/`,
-  `plans/` (branch plans only). `beta/`, `_locales/` (manifest names only), `icons/`.
+  `plans/` (branch plans only). `beta/`, `_locales/` (the manifest's name and
+  summary, English only since #685), `icons/`.
 - `_dump/`: local scratch, gitignored. Never commit it.
 
 ## Commands
@@ -73,11 +76,14 @@ Same on Windows and Mac unless noted.
 ## Rules
 
 - **Never release.** No version bumps, `npm run release`, the publish workflow or store
-  uploads. The owner releases, one store update a day at most.
+  uploads. Releases are the maintainer's.
 - **Never push to `main` directly.** Open a PR.
 - **Never put private data in issues, PRs or commits** (the repo is public): no emails,
   addresses, hangar contents or tokens. Nothing from the private server repo comes here.
   Never commit secrets or `.env` files.
+- **Private notes stay local.** A maintainer may keep a gitignored `CLAUDE.local.md` with
+  their own rules. Never commit it or anything it points to (CI and the pre-commit hook
+  check).
 - **Never load remote code.** Feature flags are build-time only (store policy).
 - **npm only**, one lockfile (`package-lock.json`). Ask before adding a dependency.
 - **Read first, keep changes small:** one concern per PR, no refactoring of unrelated code.
@@ -105,6 +111,6 @@ Same on Windows and Mac unless noted.
 - A stale `src/ui/` (an old `build:ui`) fails the permission-pin tests: run `npm run build:ui`.
 - Windows: `check:store` on zips shells out to `unzip` (Git's `usr\bin` must be on PATH).
   `.gitattributes` forces LF; a CRLF save fails `format:check`.
-- `npm run release` pushes `main` and a tag itself, which starts publishing. Owner only.
+- `npm run release` pushes `main` and a tag itself, which starts publishing. Maintainer only.
 - The privacy policy lives in three places (docs/PRIVACY.md, site/privacy.html, the plain
   txt), tests keep them equal, and its words are the owner's.
