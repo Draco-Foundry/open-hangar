@@ -40,7 +40,7 @@ current version, or go straight to a store:
 Then:
 
 1. Sign in to [RSI's Website](https://robertsspaceindustries.com/) in the same browser.
-2. Click the Open Hangar icon in your toolbar (or press Alt+Shift+H) to open the popup.
+2. Click the Open Hangar icon in your toolbar (or press Alt+Shift+O) to open the popup.
 3. Hit **Scan**, then **Open My Hangar** to see your whole hangar.
 
 Re-scan any time to refresh. On the Settings tab, **Clear Data** wipes the local copy,
@@ -177,7 +177,7 @@ Anything after launch is a plan, not a promise. The details are in the
   check out on RSI yourself.
 - **Your Currency, Light Mode and a Shortcut:** amounts show in US dollars until you pick
   another currency in Settings. Look follows your browser, or pick Dark or Light.
-  Alt+Shift+H opens the popup.
+  Alt+Shift+O opens the popup.
 - **Your Data, Your Way:** JSON Backup, Pledges CSV and Buy-Backs CSV on the Settings tab.
 
 **On [openhangar.space](https://openhangar.space/):**

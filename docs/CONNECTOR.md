@@ -25,7 +25,7 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
   website takes changes from the extension; read only as the store alerts read it when
   it doesn't. Settings: the settings the basic page had until 0.4.0, plus Look (light mode),
   Currency (the day's rates for anything but USD) and the shortcut (`commands` in
-  manifest.json, Alt+Shift+H), and JSON Backup, Pledges CSV and Buy-Backs CSV. Connect
+  manifest.json, Alt+Shift+O), and JSON Backup, Pledges CSV and Buy-Backs CSV. Connect
   still opens the basic page: the browser's sign-in window would close the popup. While
   connected, the openhangar.space group has Auto Scan Daily's switch and its status line
   (below). The header says Scan stopped for a scan that began and never ended, even after
