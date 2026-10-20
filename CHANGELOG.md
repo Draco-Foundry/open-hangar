@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.5.1 — 2026-10-20
+
 - Fixed: **Scan while signed in.** The popup no longer asks you to log in to RSI when you already are.
 - Fixed: **Long buy-back lists.** A scan no longer counts the same buy-back more than once.
 - Fixed: **Settings tab.** Look, Currency and Shortcut line up again, Currency shows the full code, and the data buttons fit inside the popup.
