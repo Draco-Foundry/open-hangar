@@ -28,6 +28,7 @@ export const UI_ENTRIES = [
 export const DASHBOARD_FILES = [
   'src/dashboard.html',
   'src/dashboard.js',
+  'src/safe-html.js',
   'src/quips.js',
   'src/qr.js',
   'CHANGELOG.md',

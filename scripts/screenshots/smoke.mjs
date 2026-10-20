@@ -4052,6 +4052,10 @@ try {
     r.marked = [...$('#more-menu').querySelectorAll('a[aria-current="page"]')].map((a) =>
       a.textContent.trim(),
     );
+    // Its icons come through use:safeHTML (src/safe-html.js): drawn as SVG, not text.
+    r.icons = [...$('#more-menu').querySelectorAll('svg')].map(
+      (svg) => svg.children.length > 0 && [...svg.children].every((c) => c instanceof SVGElement),
+    );
     document.body.click();
     await tick();
     // Search: shut, the field is out of sight; / opens it with focus in the box.
@@ -4091,9 +4095,11 @@ try {
   more.onReferrals &&
   more.moreActive &&
   more.noBarActive &&
-  more.marked.join(',') === 'Referrals'
+  more.marked.join(',') === 'Referrals' &&
+  more.icons.length === 3 &&
+  more.icons.every(Boolean)
     ? ok(
-        'top bar: four pages in the bar, More ▾ for Stats, Org Fleet and Referrals, marks the page you are on',
+        'top bar: four pages in the bar, More ▾ for Stats, Org Fleet and Referrals (icons drawn), marks the page you are on',
       )
     : fail(`top bar More menu: ${JSON.stringify(more)}`);
   more.searchShut && more.slashOpens && more.escCloses && more.iconOpens && more.clickAwayCloses
@@ -4638,11 +4644,16 @@ try {
   const pageNow = () => page.evaluate(() => Date.now());
   // The popup with storage seeded first (scripts/screenshots/demo-connector.js): each
   // load starts from the demo hangar again.
+  // `seed.__tab`: the tab to click once open (every popup opens on Hangar).
   const popAt = async (seed = {}, wait = '#pp-age') => {
     const hook = await page.evaluateOnNewDocument((s) => Object.assign(window, s), seed);
     await page.goto('about:blank');
     await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
     await page.removeScriptToEvaluateOnNewDocument(hook.identifier);
+    if (seed.__tab) {
+      await page.waitForSelector(`#pp-tab-${seed.__tab}`);
+      await page.click(`#pp-tab-${seed.__tab}`);
+    }
     await page.waitForSelector(wait);
     await sleep(250);
   };
@@ -4739,6 +4750,58 @@ try {
   !pop.wide
     ? ok('Edge B: the lifted panel, its ring and the cobalt bar, 360 px, no sideways scroll')
     : fail(`popup look: ${JSON.stringify(pop)}`);
+  // The basic page's notices at the top of every tab (#698, #664): status.json's banner
+  // (as plain text) and an update the browser holds, with Reload to Update; the version
+  // in the header is the manifest's.
+  const notices = async () => {
+    await told({
+      updateReady: { newValue: '9.9.9' },
+      remoteStatus: {
+        newValue: { at: await pageNow(), data: { banner: { message: '<b>RSI</b> changed.' } } },
+      },
+    });
+    const read = () =>
+      page.evaluate(() => ({
+        update: document.getElementById('pp-update')?.textContent.replace(/\s+/g, ' ').trim(),
+        reload: !!document.getElementById('pp-update-reload'),
+        banner: document.getElementById('pp-banner')?.textContent.trim(),
+        html: document.getElementById('pp-banner')?.innerHTML.includes('<b>'),
+        warn: !!document.getElementById('pp-banner')?.classList.contains('warn'),
+        ver: document.getElementById('pp-ver').textContent.trim(),
+        manifest: 'v' + chrome.runtime.getManifest().version,
+        wide: document.documentElement.scrollWidth > 360,
+        // Styled, not bare divs: the card's padding and border (once lost in a squash).
+        styled: ['pp-update', 'pp-banner'].every((id) => {
+          const s = getComputedStyle(document.getElementById(id));
+          return parseFloat(s.paddingLeft) > 0 && parseFloat(s.borderTopWidth) > 0;
+        }),
+      }));
+    const hangar = await read();
+    await page.click('#pp-tab-settings');
+    await sleep(150);
+    const settings = await read();
+    await page.click('#pp-tab-hangar');
+    // Let in, and the banner taken down (a fresh copy without one).
+    await told({ updateReady: {}, remoteStatus: { newValue: { at: await pageNow(), data: {} } } });
+    const gone = await page.evaluate(
+      () => !document.getElementById('pp-update') && !document.getElementById('pp-banner'),
+    );
+    return { hangar, settings, gone };
+  };
+  const nt = await notices();
+  [nt.hangar, nt.settings].every(
+    (n) =>
+      n.update === 'Open Hangar 9.9.9 is ready. Reload to Update' &&
+      n.reload &&
+      n.banner === '<b>RSI</b> changed.' &&
+      !n.html &&
+      n.warn &&
+      n.styled &&
+      n.ver === n.manifest &&
+      !n.wide,
+  ) && nt.gone
+    ? ok('notices: update ready and the status banner on every tab, the version the manifest’s')
+    : fail(`popup notices: ${JSON.stringify(nt)}`);
   // The tab row: arrows move along and wrap, Home and End jump, the choice is kept.
   await page.focus('#pp-tab-hangar');
   const keyTo = async (key) => {
@@ -4759,14 +4822,16 @@ try {
   keys.map((k) => k.selected).join() ===
     'pp-tab-wishlist,pp-tab-settings,pp-tab-hangar,pp-tab-settings,pp-tab-hangar,pp-tab-settings' &&
   keys.every((k) => k.focus === k.selected && k.panel === k.selected) &&
-  kept?.tab === 'settings'
-    ? ok('tabs: a tab list, arrows wrap, Home and End jump, the last one is remembered')
+  !('tab' in (kept || {}))
+    ? ok('tabs: a tab list, arrows wrap, Home and End jump, the tab picked is not kept')
     : fail(`popup tabs: ${JSON.stringify({ keys, kept })}`);
-  await popAt({ ...signedIn, __demoLocal: { popupPrefs: { tab: 'wishlist' } } }, '#pp-wish');
+  await popAt({ ...signedIn, __demoLocal: { popupPrefs: { tab: 'wishlist' } } }, '#pp-value');
   const reopened = await page.$eval('[role="tab"][aria-selected="true"]', (b) => b.id);
-  reopened === 'pp-tab-wishlist'
-    ? ok('opens where it was left (Wishlist)')
+  reopened === 'pp-tab-hangar'
+    ? ok('opens on Hangar, even with a tab saved by an older version')
     : fail(`popup reopened on ${reopened}`);
+  await page.click('#pp-tab-wishlist');
+  await page.waitForSelector('#pp-wish-connect');
   // Not connected: the Wishlist's Connect opens the extension's page for it (the
   // browser's sign-in window would close the popup).
   await page.click('#pp-wish-connect');
@@ -4780,7 +4845,7 @@ try {
   await popAt(
     {
       ...signedIn,
-      __demoLocal: { popupPrefs: { tab: 'settings' }, siteUrl: 'https://app.openhangar.space' },
+      __tab: 'settings', __demoLocal: { siteUrl: 'https://app.openhangar.space' },
     },
     '#pp-settings',
   );
@@ -5008,8 +5073,8 @@ try {
   await popAt(
     {
       ...signedIn,
+      __tab: 'settings',
       __demoLocal: {
-        popupPrefs: { tab: 'settings' },
         siteUrl: 'https://app.openhangar.space',
         siteLink: autoLink,
       },
@@ -5316,8 +5381,8 @@ try {
     : fail(`popup stopped after a restart: ${JSON.stringify(afterRestart)}`);
 
   // Before the first scan: no tabs, one heading and Scan. Signed out: Log In to RSI and a
-  // grey Scan, off while RSI's sign-in cookie is gone and back once it's there again;
-  // still there to press when only the last scan said so (the cookie can't tell). No
+  // grey Scan, still there to press, while RSI's sign-in cookie is gone; Scan once it's
+  // there, whatever the last scan said (the cookie can't tell, the scan does). No
   // access to RSI: Allow Access to RSI, on the basic page. After an update: the dot on
   // the version, once.
   await popAt({ __demoLocal: { db: null } }, '#pp-first');
@@ -5333,7 +5398,7 @@ try {
   !ppFirst.bell
     ? ok('before the first scan: one heading and Scan, no tabs, "Not scanned"')
     : fail(`popup first run: ${JSON.stringify(ppFirst)}`);
-  await popAt({ __demoAccount: { loggedIn: false } }, '#pp-login');
+  await popAt({ __demoAccount: { loggedIn: false }, __demoCookie: 'out' }, '#pp-login');
   const ppOut = await page.evaluate(() => {
     const scan = document.getElementById('pp-scan');
     return {
@@ -5350,11 +5415,12 @@ try {
   outGo === 'https://robertsspaceindustries.com/connect'
     ? ok("signed out of RSI: Log In to RSI opens RSI's sign-in page, a grey Scan under it")
     : fail(`popup signed out: ${JSON.stringify({ out: ppOut, outGo })}`);
-  // RSI's sign-in cookie gone: Scan greyed and off; signing in (another tab) brings it
-  // back, with no Log In to RSI. The check asks the browser only whether it's there.
+  // RSI's sign-in cookie gone: a grey Scan still there to press; signing in (another tab)
+  // brings Scan back, with no Log In to RSI. The check asks the browser only whether it's
+  // there.
   await popAt({ ...signedIn, __demoCookie: 'out' }, '#pp-login');
   const ppGone = await page.evaluate(() => ({
-    off: document.getElementById('pp-scan').disabled,
+    on: !document.getElementById('pp-scan').disabled,
     grey: document.getElementById('pp-scan').classList.contains('grey'),
     asks: __demo.cookieAsks,
   }));
@@ -5364,27 +5430,26 @@ try {
     on: !document.getElementById('pp-scan').disabled,
     primary: document.getElementById('pp-scan').classList.contains('primary'),
   }));
-  // Signed in again and the popup opened afresh: the last scan's "signed out" is old news.
+  // The last read said signed out, and the cookie is there (RSI keeps the same cookie
+  // through a sign-in): Scan, no Log In to RSI (the owner, 0.5.0 on Firefox, 2026-10-19).
   await popAt(
-    {
-      ...signedIn,
-      __demoAccount: { loggedIn: false, fetchedAt: T0 - 60e3 },
-      __demoSession: { rsiCookieGone: T0 - 30e3 },
-    },
+    { ...signedIn, __demoAccount: { loggedIn: false, fetchedAt: T0 - 60e3 } },
     '#pp-scan',
   );
   const ppAgain = await page.evaluate(() => ({
     login: !!document.getElementById('pp-login'),
     primary: document.getElementById('pp-scan').classList.contains('primary'),
   }));
-  ppGone.off &&
+  ppGone.on &&
   ppGone.grey &&
   ppGone.asks >= 1 &&
   ppBack.on &&
   ppBack.primary &&
   !ppAgain.login &&
   ppAgain.primary
-    ? ok("RSI's sign-in cookie gone: Scan greyed and off; back once you sign in again")
+    ? ok(
+        "RSI's sign-in cookie gone: a grey Scan still on; Scan once it's there, whatever the last scan said",
+      )
     : fail(`popup sign-in cookie: ${JSON.stringify({ ppGone, ppBack, ppAgain })}`);
   await popAt({ ...signedIn, __demoNoRsi: true }, '#pp-rsi-allow');
   const noRsi = await page.evaluate(() => ({
@@ -5501,8 +5566,8 @@ try {
   await popAt(
     {
       ...signedIn,
+      __tab: 'wishlist',
       __demoLocal: {
-        popupPrefs: { tab: 'wishlist' },
         siteUrl: ppSite,
         siteLink: ppWishLink,
         alertsOn: true,
@@ -5559,8 +5624,8 @@ try {
   await popAt(
     {
       ...signedIn,
+      __tab: 'wishlist',
       __demoLocal: {
-        popupPrefs: { tab: 'wishlist' },
         siteUrl: ppSite,
         siteLink: ppWishLink,
         alertsOn: true,
@@ -5590,7 +5655,7 @@ try {
   await popAt(
     {
       ...signedIn,
-      __demoLocal: { popupPrefs: { tab: 'wishlist' }, siteUrl: ppSite, siteLink: ppWishLink },
+      __tab: 'wishlist', __demoLocal: { siteUrl: ppSite, siteLink: ppWishLink },
     },
     '#pp-wish-off',
   );
@@ -5624,8 +5689,8 @@ try {
           wishItem('sku:501', 'Cutlass - Ghoulish Green Paint', { category: 'paints' }),
         ],
       },
+      __tab: 'wishlist',
       __demoLocal: {
-        popupPrefs: { tab: 'wishlist' },
         siteUrl: ppSite,
         siteLink: ppWishLink,
         alertsOn: true,
@@ -5804,7 +5869,7 @@ try {
           wishItem('sku:501', 'Cutlass - Ghoulish Green Paint', { remind: false }),
         ],
       },
-      __demoLocal: { popupPrefs: { tab: 'wishlist' }, siteUrl: ppSite, siteLink: ppWishLink },
+      __tab: 'wishlist', __demoLocal: { siteUrl: ppSite, siteLink: ppWishLink },
     },
     '.pp-wedit li',
   );
@@ -5846,7 +5911,7 @@ try {
     {
       ...signedIn,
       __demoWish: { mode: 'items', items: [wishItem('ship:avenger-titan', 'Avenger Titan')] },
-      __demoLocal: { popupPrefs: { tab: 'wishlist' }, siteUrl: ppSite, siteLink: ppWishLink },
+      __tab: 'wishlist', __demoLocal: { siteUrl: ppSite, siteLink: ppWishLink },
     },
     '.pp-wedit li',
   );
@@ -5897,7 +5962,7 @@ try {
     return { ...db, owner: { nickname: 'Alt_Pilot', displayname: 'Alt Pilot' } };
   });
   await popAt(
-    { ...signedIn, __demoLocal: { popupPrefs: { tab: 'settings' }, 'profile:alt_pilot': alt } },
+    { ...signedIn, __tab: 'settings', __demoLocal: { 'profile:alt_pilot': alt } },
     '#pp-accounts',
   );
   const accts = await page.$$eval('#pp-accounts .pp-acct b', (bs) => bs.map((b) => b.textContent));
@@ -6422,7 +6487,7 @@ try {
   const why = (w, ships = []) => ({ why: w, ships });
   const alState = {
     alertsOn: true,
-    // Closed on Settings last time: Fleet News with something unseen opens on Hangar.
+    // A tab saved by an older version: the popup opens on Hangar all the same.
     popupPrefs: { tab: 'settings' },
     alerts: {
       v: 1,
@@ -6536,7 +6601,11 @@ try {
       ...alState.alerts.items[i % 3],
       id: `sku-${30000 + i}`,
     }));
-    const st = { ...alState, popupPrefs: { tab: 'settings' }, alerts: { ...alState.alerts, items } };
+    const st = {
+      ...alState,
+      popupPrefs: { tab: 'settings' },
+      alerts: { ...alState.alerts, items },
+    };
     const hook = await page.evaluateOnNewDocument((s) => (window.__demoAlerts = s), st);
     await page.goto('about:blank');
     await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
@@ -6610,10 +6679,11 @@ try {
     focus: document.activeElement?.id,
   }));
   const alKept = await page.evaluate(async () => (await chrome.storage.local.get('alerts')).alerts);
-  const alHook2 = await page.evaluateOnNewDocument(
-    (s) => (window.__demoAlerts = s),
-    { ...alState, popupPrefs: { tab: 'settings' }, alerts: alKept },
-  );
+  const alHook2 = await page.evaluateOnNewDocument((s) => (window.__demoAlerts = s), {
+    ...alState,
+    popupPrefs: { tab: 'settings' },
+    alerts: alKept,
+  });
   await page.goto('about:blank');
   await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
   await page.removeScriptToEvaluateOnNewDocument(alHook2.identifier);
