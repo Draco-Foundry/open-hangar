@@ -117,7 +117,7 @@
   {:else if d.state === 'plans'}
     <p class="muted sp-empty sub-plans">
       Subscribers get their own store each month.
-      <a href={PLANS} target="_blank" rel="noopener">See Plans ↗</a>
+      <a href={PLANS} target="_blank" rel="noopener">See Plans</a>
     </p>
   {:else}
     {#if d.has}
@@ -175,7 +175,7 @@
                       >{/if}</span
                     >
                     {#if it.available && it.url}
-                      <a class="btn sub-buy" href={it.url} target="_blank" rel="noopener">Buy at RSI ↗</a>
+                      <a class="btn sub-buy" href={it.url} target="_blank" rel="noopener">Buy at RSI</a>
                     {:else}
                       <span class="sub-out">Sold Out</span>
                     {/if}

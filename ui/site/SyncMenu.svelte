@@ -35,7 +35,7 @@
       >
     </p>
       <button type="button" class="sm-act menu-item" onclick={() => site().open()}
-        >Open My Hangar ↗</button
+        >Open My Hangar</button
       >
     {#if d.msg}<p class="sm-msg" role="status">{d.msg}</p>{/if}
   </div>

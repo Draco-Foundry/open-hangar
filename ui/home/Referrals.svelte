@@ -31,7 +31,7 @@
 </script>
 
 <section class="oh-p ref">
-  <div class="oh-ph"><h3>Referrals</h3><a href="#referrals" class="det">Details →</a></div>
+  <div class="oh-ph"><h3>Referrals</h3><a href="#referrals" class="det">Details</a></div>
   <div class="n" title="{exactCount(d.n)} {plural(d.n, 'recruit', 'recruits')}">
     {shortCount(d.n)} <span>{plural(d.n, 'recruit', 'recruits')}</span>
   </div>
