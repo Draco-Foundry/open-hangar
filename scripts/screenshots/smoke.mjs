@@ -5393,6 +5393,117 @@ try {
   refused.closed && !refused.bar
     ? ok('a scan the background refused: the popup closes, as before, no bar')
     : fail(`popup refused: ${JSON.stringify(refused)}`);
+  // The scan bar (the scanBar flag, owner 2026-10-20), forced on for this part: Scan
+  // becomes the bar at once, the bar names the part and counts, fills by RSI's page
+  // count, says when RSI asks to wait, then how long the scan took, with Scan back under
+  // it. RSI's wait and another scan running grey Scan, said in the bar's spot.
+  const barHook = await page.evaluateOnNewDocument(() => {
+    let flags;
+    const OH = (window.OH = window.OH || {});
+    Object.defineProperty(OH, 'flags', {
+      configurable: true,
+      get: () => flags,
+      set: (f) => (flags = Object.freeze({ ...f, scanBar: true })),
+    });
+  });
+  const sbar = () =>
+    page.evaluate(() => {
+      const b = document.getElementById('pp-sbar');
+      const scan = document.getElementById('pp-scan');
+      return {
+        text: b ? [...b.querySelectorAll('.pp-sbar-t > span')].map((x) => x.textContent.trim()) : null,
+        tone: b ? b.className.replace('pp-sbar', '').trim() : null,
+        now: b ? Number(b.getAttribute('aria-valuenow')) || null : null,
+        scan: scan ? (scan.disabled ? 'off' : 'on') : 'none',
+        top: !!document.querySelector('.pp-bar'),
+        steps: document.querySelectorAll('.pp-step').length,
+      };
+    });
+  await popAt(signedIn, '#pp-scan');
+  await page.evaluate(() => {
+    __demo.answers.scan = { ok: true };
+    __demo.closed = false;
+  });
+  await page.click('#pp-scan');
+  await sleep(100);
+  const barAsked = await sbar();
+  const barAt = await pageNow();
+  await told(
+    { scanRunning: { newValue: { at: barAt, tabId: null, run: 'r20', by: 'offscreen' } } },
+    'session',
+  );
+  const barProg = (p) =>
+    told({ scanProgress: { newValue: { run: 'r20', at: barAt, retry: null, ...p } } }, 'session');
+  await barProg({ part: 'hangar', page: 2, count: 1214, pages: 4 });
+  await sleep(100);
+  const barHangar = await sbar();
+  await barProg({ part: 'hangar', page: 3, count: 1214, pages: 4, retry: { attempt: 1, of: 3 } });
+  await sleep(100);
+  const barWait = await sbar();
+  await told(
+    { scanRunning: { newValue: undefined }, scanProgress: { newValue: undefined } },
+    'session',
+  );
+  const barReport = {
+    v: 1,
+    run: 'r20',
+    by: 'offscreen',
+    reason: 'popup',
+    startedAt: barAt,
+    at: barAt + 72e3,
+    ms: 72e3,
+    held: null,
+    signedOut: false,
+    switched: null,
+    rows: [{ id: 'hangar', ok: true, partial: null, n: 20, error: null }],
+    bad: false,
+    sync: null,
+    wait: null,
+  };
+  await told({ scanReport: { newValue: barReport } });
+  await sleep(100);
+  const barDone = await sbar();
+  await told({
+    scanReport: {
+      newValue: {
+        ...barReport,
+        at: barAt + 80e3,
+        rows: [{ id: 'hangar', ok: false, partial: null, n: null, error: 'RSI asked us to slow down' }],
+        bad: true,
+        wait: barAt + 80e3 + 5 * 60e3,
+      },
+    },
+  });
+  await sleep(100);
+  const barHold = await sbar();
+  await popAt(signedIn, '#pp-scan');
+  await page.evaluate(() => (__demo.answers.scan = { ok: false, error: 'busy' }));
+  await page.click('#pp-scan');
+  await sleep(150);
+  const barBusy = await sbar();
+  await page.removeScriptToEvaluateOnNewDocument(barHook.identifier);
+  const barOk =
+    barAsked.text?.join() === 'Scanning' &&
+    barAsked.scan === 'none' &&
+    !barAsked.top &&
+    barHangar.text?.join() === 'Hangar,1,214' &&
+    barHangar.now === 30 &&
+    barHangar.steps === 0 &&
+    barWait.text?.join() === 'Waiting on RSI' &&
+    barWait.now === 30 &&
+    barDone.tone === 'done' &&
+    barDone.text?.join() === 'Scanned in 1m 12s' &&
+    barDone.scan === 'on' &&
+    barHold.tone === 'note' &&
+    /^RSI asked us to wait\. Scan at \d/.test(barHold.text?.join() || '') &&
+    barHold.scan === 'off' &&
+    barBusy.text?.join() === 'A scan is already running.' &&
+    barBusy.scan === 'off';
+  barOk
+    ? ok("scan bar: in Scan's place at once, names and counts, fills by page, waits, done, holds")
+    : fail(
+        `popup scan bar: ${JSON.stringify({ barAsked, barHangar, barWait, barDone, barHold, barBusy })}`,
+      );
   // A scan whose page went away (its mark left behind): Scan stopped, Scan Again.
   await popAt(
     {

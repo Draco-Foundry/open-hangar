@@ -174,6 +174,70 @@ test('scan: the bar only moves forward, and the steps follow the part', async ()
   );
 });
 
+test('scan bar: fills by RSI page count, only forward, a part never waits on its end', async () => {
+  const { barFraction } = await data();
+  const order = [
+    null,
+    { part: 'start' },
+    { part: 'account' },
+    { part: 'hangar', page: 1, pages: 4 },
+    { part: 'hangar', page: 2, pages: 4 },
+    { part: 'hangar', page: 4, pages: 4 },
+    { part: 'buybacks', page: 1, pages: 2 },
+    { part: 'buybacks', page: 2, pages: 2 },
+    { part: 'referrals', page: 0, pages: 3 },
+    { part: 'referrals', page: 2, pages: 3 },
+    { part: 'sync' },
+  ].map(barFraction);
+  for (let i = 1; i < order.length; i++) assert.ok(order[i] >= order[i - 1], `step ${i}`);
+  assert.ok(order.every((f) => f >= 0 && f <= 1));
+  // Half the hangar's pages read: half its share; all read: where buy-backs begin.
+  const h = (page, pages, retry = null) => barFraction({ part: 'hangar', page, pages, retry });
+  assert.equal(h(2, 4), 0.3);
+  assert.equal(h(4, 4), barFraction({ part: 'buybacks', page: 0, pages: 2 }));
+  // A page being retried isn't read yet.
+  assert.equal(h(3, 4, { attempt: 1, of: 3 }), h(2, 4));
+  // A rescan that found nothing changed (#294): page 1 of 1, the part done at once.
+  assert.equal(h(1, 1), h(4, 4));
+  // No pager: eased, still short of the part's end however many pages.
+  assert.ok(h(1, null) > h(0, null) && h(40, null) < h(4, 4));
+  // Packs read after the scan fill on their own.
+  assert.equal(barFraction({ part: 'packs', page: 3, count: 6 }), 0.5);
+  assert.equal(barFraction({ part: 'packs', page: 0, count: 0 }), 0);
+});
+
+test('scan bar: names the part and counts what it has read', async () => {
+  const { barLabel } = await data();
+  const { t } = await import('../ui/popup/copy.js');
+  const say = (p) => {
+    const l = barLabel(p);
+    return [t(l.key), l.n];
+  };
+  assert.deepEqual(say(null), ['Scanning', '']);
+  assert.deepEqual(say({ part: 'start' }), ['Scanning', '']);
+  assert.deepEqual(say({ part: 'account' }), ['Account', '']);
+  assert.deepEqual(say({ part: 'hangar', page: 2, count: 1214, pages: 3 }), ['Hangar', '1,214']);
+  assert.deepEqual(say({ part: 'hangar', page: 1, count: null }), ['Hangar', '']);
+  assert.deepEqual(say({ part: 'buybacks', page: 1, count: 37 }), ['Buy-Backs', '37']);
+  assert.deepEqual(say({ part: 'referrals', page: 1, count: 12 }), ['Referrals', '12']);
+  assert.deepEqual(say({ part: 'sync' }), ['Syncing', '']);
+  assert.deepEqual(say({ part: 'packs', page: 3, count: 6 }), ['Buy-Back Packs', '3 / 6']);
+  assert.deepEqual(say({ part: 'hangar', page: 2, count: 20, retry: { attempt: 1, of: 3 } }), [
+    'Waiting on RSI',
+    '',
+  ]);
+  assert.deepEqual(say({ part: 'what' }), ['Scanning', '']);
+});
+
+test("scan bar: Scan held back until RSI's wait is over", async () => {
+  const { scanHold } = await data();
+  assert.equal(scanHold({ wait: NOW + 5 * MIN }, NOW), NOW + 5 * MIN);
+  assert.equal(scanHold({ wait: NOW - 1 }, NOW), null);
+  assert.equal(scanHold({ wait: null }, NOW), null);
+  assert.equal(scanHold({}, NOW), null);
+  assert.equal(scanHold(null, NOW), null);
+});
+
 test('scan report: shown once, and how long it took', async () => {
   const { newReport, took } = await data();
   const r = { v: 1, at: NOW, ms: 38e3, rows: [] };

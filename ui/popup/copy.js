@@ -63,6 +63,18 @@ const COPY = {
   'popup.step-hangar': 'Hangar',
   'popup.step-buybacks': 'Buy-Backs',
   'popup.step-referrals': 'Referrals',
+  // The scan bar's other parts (the scanBar flag): the account read first, the website
+  // sync after, and the buy-back packs read after that. In the bar mockup the owner
+  // signed off (2026-10-20).
+  'popup.part-account': 'Account',
+  'popup.part-sync': 'Syncing',
+  'popup.part-packs': 'Buy-Back Packs',
+  // The scan bar while RSI asks the scan to slow down and it waits to try again.
+  // NEW: needs the owner's OK.
+  'popup.rsi-waiting': 'Waiting on RSI',
+  // In the bar's place after RSI kept asking a scan to slow down, Scan greyed until
+  // then ("RSI asked us to wait. Scan at 3:42 PM"). NEW: needs the owner's OK.
+  'popup.rsi-wait': 'RSI asked us to wait. Scan at {time}',
   // Shown once after a scan: how long it took ("Scanned in 38s", "Scanned in 2m 5s").
   'popup.scanned-in-s': 'Scanned in {s}s',
   'popup.scanned-in-m': 'Scanned in {m}m {s}s',

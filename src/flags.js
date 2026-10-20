@@ -71,6 +71,14 @@
       about: 'Auto Scan Daily: a quick check once a day while connected, a full scan when needed.',
       default: true,
     },
+    // The popup's scan bar (owner, 2026-10-20): one bar where Scan sits, naming the part
+    // running and counting what it has read, filled by RSI's page count, then how long
+    // the scan took; Scan held back while one starts or RSI asks to wait. Off: the bar
+    // under the header and the step list (ui/popup/Hangar.svelte).
+    scanBar: {
+      about: 'The popup shows a scan as one counting bar where Scan sits, not a step list.',
+      default: false,
+    },
   };
 
   // Set per build by scripts/pack.mjs. Keep it empty here.
