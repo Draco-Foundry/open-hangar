@@ -8,6 +8,7 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 - Fixed: **Long buy-back lists.** A scan no longer counts the same buy-back more than once.
 - Fixed: **Settings tab.** Look, Currency and Shortcut line up again, Currency shows the full code, and the data buttons fit inside the popup.
 - Fixed: The Update Ready notice and our scan notices in the popup look right again.
+- Fixed: **Connecting again.** Connecting an extension that's already connected no longer leaves an old row in Connected Extensions on your account.
 - Changed: The popup always opens on the Hangar tab.
 - Changed: Arrow symbols are gone from the popup's links and buttons.
 
