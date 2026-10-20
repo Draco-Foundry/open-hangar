@@ -2,18 +2,17 @@
 // and nothing more (the privacy policy's cookies bullet): never its value, never stored
 // or sent, and RSI isn't asked anything. The cookie is the one RSI keeps your session in
 // (Rsi-Token, src/data/parser-rules.json `cart.cookie`: the session cookie Log Out of RSI
-// clears, src/lib.js OH.logout). Without it you're signed out for sure; with it you may
-// be signed in (RSI decides when a scan reads your account).
+// clears, src/lib.js OH.logout).
 //
-// What the popup does with it (./Popup.svelte): signed out for sure, Log In to RSI with
-// Scan greyed out; once the cookie is back, Scan again. The check runs when the popup
-// opens and again whenever a cookie changes while it's open (a sign-in or a sign-out in
-// another tab). When a popup sees the cookie gone it notes the time in session storage
-// (`rsiCookieGone`, a number, nothing of the cookie), so the next popup knows the cookie
-// it finds came back after the last scan said signed out.
+// The cookie only hints: RSI sets it for visitors who aren't signed in too (checked
+// 2026-10-19), so it stays through a sign-in, and a browser can be signed in where this
+// check can't see it (the owner, Firefox, 2026-10-19: Log In to RSI and no Scan while
+// signed in). So it never stops a scan: the scan reads your account and says when you're
+// signed out. What the popup does with it (./Popup.svelte): there, Scan; gone, Log In to
+// RSI first with Scan still there to press. The check runs when the popup opens and again
+// whenever a cookie changes while it's open (a sign-in or a sign-out in another tab).
 
 const RSI = 'https://robertsspaceindustries.com';
-export const GONE_KEY = 'rsiCookieGone';
 // The cookie's name, from the parser rules (window.OHRules, src/parser-rules.js).
 export const cookieName = () => globalThis.OHRules?.cart?.cookie || 'Rsi-Token';
 
@@ -30,17 +29,14 @@ export async function rsiCookie(api = globalThis.chrome?.cookies, { access = tru
   }
 }
 
-// What the popup shows → 'in' (Scan), 'out' (Log In to RSI, Scan greyed and off) or
-// 'maybe' (Log In to RSI, a grey Scan still there to press: the last scan or account
-// read said signed out, and the cookie can't say otherwise). `cookie`: rsiCookie's
-// answer. `readOut`: when the last scan or account read said signed out (ms), or null.
-// `goneAt`: when a popup last saw the cookie gone (ms), or null.
-export function rsiSignIn({ cookie, readOut = null, goneAt = null }) {
-  if (cookie === 'out') return 'out';
-  if (!Number.isFinite(readOut)) return 'in';
-  // The cookie came back after the last read said signed out: signed in again.
-  if (cookie === 'in' && Number.isFinite(goneAt) && goneAt >= readOut) return 'in';
-  return 'maybe';
+// What the popup shows → 'in' (Scan) or 'maybe' (Log In to RSI, a grey Scan still there
+// to press): the cookie gone, or the last scan or account read said signed out and the
+// browser can't say about the cookie. `cookie`: rsiCookie's answer. `readOut`: when the
+// last scan or account read said signed out (ms), or null.
+export function rsiSignIn({ cookie, readOut = null }) {
+  if (cookie === 'in') return 'in';
+  if (cookie === 'out' || Number.isFinite(readOut)) return 'maybe';
+  return 'in';
 }
 
 // Watches for cookie changes while the popup is open → stop(). The browser tells about
