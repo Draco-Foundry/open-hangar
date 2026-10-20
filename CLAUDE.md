@@ -29,8 +29,8 @@ only: Prettier, web-ext, jsdom and jsqr (tests), puppeteer-core (drives the inst
   `site-worker/`: its front Worker.
 - `schema/`: the sync payload's JSON Schema. `test/`: `*.test.js` and `fixtures/`.
 - `scripts/`: build, checks, generators, publishing. `docs/`: topic files, `decisions/`,
-  `plans/` (branch plans only). `beta/`, `_locales/` (the manifest's name and
-  summary, English only since #685), `icons/`.
+  `plans/` (branch plans only). `beta/`, `dev/` (the developer's copy's icons),
+  `_locales/` (the manifest's name and summary, English only since #685), `icons/`.
 - `_dump/`: local scratch, gitignored. Never commit it.
 
 ## Commands
@@ -41,6 +41,8 @@ Same on Windows and Mac unless noted.
 - Test: `npm test` (an explicit list of files: add a new test file to it)
 - Format: `npm run format:check` / `npm run format`
 - UI: `npm run build:ui`; watch `npm run dev:ui`; demo at localhost:8323 `npm run demo`
+- Run the developer's copy in its own browser profile: `npm run dev:chrome` (`dev:edge`,
+  `dev:firefox`); never load a build into the profile the store copy is in
 - Smoke test: `npm run test:ui` (needs Chrome; set `CHROME_PATH` if it's elsewhere)
 - Build: `npm run build`, then `npm run check:store`; Firefox lint: `npm run lint:firefox`
 - Store zips: `npm run pack`; beta: `npm run build:beta`; privacy check after pack:
