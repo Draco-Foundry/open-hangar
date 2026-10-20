@@ -11,8 +11,9 @@ name: Auto-merge
 # fork), not Dependabot's, titled as a conventional commit, has no branch plan in
 # docs/plans/ (README.md aside), has no `hold` label and changes none of OWNER_PATHS
 # below: workflows (CI changes get a person's look, and the App has no Workflows
-# permission) and the privacy text (changed only on the owner's word). The owner
-# merges those by hand. An event that breaks a rule turns auto-merge back off.
+# permission), the privacy text (changed only on the owner's word) and everything
+# openhangar.space publishes (it goes live without a release). The owner merges
+# those by hand. An event that breaks a rule turns auto-merge back off.
 #
 # The merge runs on a GitHub App's token, never GITHUB_TOKEN: GitHub starts no
 # workflow for a push made with GITHUB_TOKEN, so a merge made with it would skip CI
@@ -60,8 +61,10 @@ jobs:
     env:
       GH_REPO: ${{ github.repository }}
       PR: ${{ github.event.pull_request.number }}
-      # Files the owner merges by hand, as one extended regex (see the top).
-      OWNER_PATHS: '^\.github/workflows/|^site/privacy\.html$|^docs/PRIVACY\.md$|^docs/store-assets/privacy-'
+      # Files the owner merges by hand, as one extended regex (see the top). From ^site/
+      # on, it's what pages.yml publishes to openhangar.space: its hourly schedule deploys
+      # whatever is on main, so a merge there would go live within three hours.
+      OWNER_PATHS: '^\.github/workflows/|^docs/PRIVACY\.md$|^docs/store-assets/privacy-|^site/|^site-worker/|^manifest\.json$|^icons/icon\.svg$|^src/assets/banner\.svg$|^docs/store-assets/screenshot-|^scripts/update-rates\.mjs$'
     steps:
       - name: Rules
         id: rules

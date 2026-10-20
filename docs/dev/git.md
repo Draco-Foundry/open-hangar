@@ -24,7 +24,10 @@ No session runs `gh pr merge` or approves a PR.
   Take the label off to let it go.
 - **The owner merges by hand:** anything in `.github/workflows/`, the privacy text
   (`site/privacy.html`, `docs/PRIVACY.md`, `docs/store-assets/privacy-*`;
-  `OWNER_PATHS` in the workflow) and Dependabot's PRs.
+  `OWNER_PATHS` in the workflow), everything `pages.yml` publishes to openhangar.space
+  (`site/`, `site-worker/`, `manifest.json` and its other paths: its hourly run
+  deploys whatever is on `main`, so a merge there goes live within three hours) and
+  Dependabot's PRs.
 - **The squash commit** is titled with the PR's title and `(#N)`.
 - **Events only:** the workflow runs when a PR is opened, marked ready, pushed to,
   retitled, retargeted or labeled `hold`. A PR that was already ready before this
