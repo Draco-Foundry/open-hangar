@@ -150,6 +150,12 @@ test('signed out: the cookie never locks Scan, and with the cookie there it is S
   assert.equal(rsiSignIn({ cookie: 'out' }), 'maybe');
   assert.equal(rsiSignIn({ cookie: 'out', readOut: T }), 'maybe');
   assert.equal(rsiSignIn({ cookie: null, readOut: T }), 'maybe');
+  // The scan this popup just reported said signed out: Log In to RSI, cookie or not, so
+  // the scan never ends with nothing on screen (Firefox 0.5.1, 2026-10-20).
+  assert.equal(rsiSignIn({ cookie: 'in', readOut: T, justOut: true }), 'maybe');
+  assert.equal(rsiSignIn({ cookie: null, justOut: true }), 'maybe');
+  const popup = fs.readFileSync(path.join(ROOT, 'ui/popup/Popup.svelte'), 'utf8');
+  assert.match(popup, /justOut: shown\?\.signedOut === true/, 'the popup passes its report');
   const hangar = fs.readFileSync(path.join(ROOT, 'ui/popup/Hangar.svelte'), 'utf8');
   assert.doesNotMatch(hangar, /id="pp-scan"[^>]*disabled/, 'Scan is never switched off');
 });
