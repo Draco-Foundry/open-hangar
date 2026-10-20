@@ -136,22 +136,22 @@ test("the sign-in check: RSI's session cookie, whether it's there, never its val
   }
 });
 
-test('signed out: greyed Scan while the cookie is gone, Scan again once it is back', async () => {
+test('signed out: the cookie never locks Scan, and with the cookie there it is Scan', async () => {
   const { rsiSignIn } = await cookie();
   const T = 1e12;
   // Nothing said signed out.
   assert.equal(rsiSignIn({ cookie: 'in' }), 'in');
   assert.equal(rsiSignIn({ cookie: null }), 'in');
-  // The cookie's gone: signed out for sure, whatever the last scan said.
-  assert.equal(rsiSignIn({ cookie: 'out' }), 'out');
-  assert.equal(rsiSignIn({ cookie: 'out', readOut: T }), 'out');
-  // The last scan said signed out: the cookie back since a popup saw it gone, signed in.
-  assert.equal(rsiSignIn({ cookie: 'in', readOut: T, goneAt: T + 1 }), 'in');
-  // ... but a cookie never seen gone, or gone before that scan, can't say: Log In to RSI
-  // with a grey Scan still there to press.
-  assert.equal(rsiSignIn({ cookie: 'in', readOut: T }), 'maybe');
-  assert.equal(rsiSignIn({ cookie: 'in', readOut: T, goneAt: T - 1 }), 'maybe');
+  // The cookie there: Scan, even after a scan that said signed out (RSI keeps the same
+  // cookie through a sign-in, so a signed-in player was stuck on Log In to RSI, 0.5.0).
+  assert.equal(rsiSignIn({ cookie: 'in', readOut: T }), 'in');
+  // The cookie gone, or no answer after a signed-out scan: Log In to RSI first, with a
+  // grey Scan still there to press. Never a Scan that's off.
+  assert.equal(rsiSignIn({ cookie: 'out' }), 'maybe');
+  assert.equal(rsiSignIn({ cookie: 'out', readOut: T }), 'maybe');
   assert.equal(rsiSignIn({ cookie: null, readOut: T }), 'maybe');
+  const hangar = fs.readFileSync(path.join(ROOT, 'ui/popup/Hangar.svelte'), 'utf8');
+  assert.doesNotMatch(hangar, /id="pp-scan"[^>]*disabled/, 'Scan is never switched off');
 });
 
 test('watching: any cookie change asks again once, and never reads what changed', async () => {

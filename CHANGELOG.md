@@ -5,6 +5,17 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 ## Unreleased
 
 - Fixed: **Scans that stop partway.** If a scan stops before it finishes (the browser closes, you're signed out of RSI, the network drops), the popup no longer stays on Scanning. It says the scan stopped, with Scan Again, and your hangar keeps the last full scan: a half-read hangar never replaces it. A stopped Auto Scan Daily tries once more the next time you open the popup or start your browser.
+
+## 0.5.0 — 2026-10-18
+
+- Fixed: **Notifications on Firefox.** Turning them on now closes the popup so Firefox's question can show.
+- Improved: The popup shows when an update is ready, with Reload to Update, and any notice from us about scans.
+- Changed: After you connect, you land on My Hangar on the website.
+- Improved: The alerts list stays short: with more than three alerts it scrolls, and each alert takes less room.
+- New: **Delete alerts.** An × on each alert, and Clear All. A deleted alert comes back only if something new matches it.
+- Improved: Settings is shorter: Look, Currency and Shortcut sit on one row.
+- New: **Remind Me on each Wishlist item.** With it off, store alerts skip that item. The website's Wishlist has the same switch.
+- Changed: **Privacy policy updated.** The Wishlist lines cover the Remind Me switch and no longer mention target prices.
 - Fixed: **Upgraded insurance.** A pledge whose insurance was upgraded now shows the upgraded term, not the one it came with.
 
 ## 0.4.1 — 2026-10-14

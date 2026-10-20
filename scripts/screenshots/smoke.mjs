@@ -5344,8 +5344,8 @@ try {
     : fail(`popup stopped after a restart: ${JSON.stringify(afterRestart)}`);
 
   // Before the first scan: no tabs, one heading and Scan. Signed out: Log In to RSI and a
-  // grey Scan, off while RSI's sign-in cookie is gone and back once it's there again;
-  // still there to press when only the last scan said so (the cookie can't tell). No
+  // grey Scan, still there to press, while RSI's sign-in cookie is gone; Scan once it's
+  // there, whatever the last scan said (the cookie can't tell, the scan does). No
   // access to RSI: Allow Access to RSI, on the basic page. After an update: the dot on
   // the version, once.
   await popAt({ __demoLocal: { db: null } }, '#pp-first');
@@ -5361,7 +5361,7 @@ try {
   !ppFirst.bell
     ? ok('before the first scan: one heading and Scan, no tabs, "Not scanned"')
     : fail(`popup first run: ${JSON.stringify(ppFirst)}`);
-  await popAt({ __demoAccount: { loggedIn: false } }, '#pp-login');
+  await popAt({ __demoAccount: { loggedIn: false }, __demoCookie: 'out' }, '#pp-login');
   const ppOut = await page.evaluate(() => {
     const scan = document.getElementById('pp-scan');
     return {
@@ -5378,11 +5378,12 @@ try {
   outGo === 'https://robertsspaceindustries.com/connect'
     ? ok("signed out of RSI: Log In to RSI opens RSI's sign-in page, a grey Scan under it")
     : fail(`popup signed out: ${JSON.stringify({ out: ppOut, outGo })}`);
-  // RSI's sign-in cookie gone: Scan greyed and off; signing in (another tab) brings it
-  // back, with no Log In to RSI. The check asks the browser only whether it's there.
+  // RSI's sign-in cookie gone: a grey Scan still there to press; signing in (another tab)
+  // brings Scan back, with no Log In to RSI. The check asks the browser only whether it's
+  // there.
   await popAt({ ...signedIn, __demoCookie: 'out' }, '#pp-login');
   const ppGone = await page.evaluate(() => ({
-    off: document.getElementById('pp-scan').disabled,
+    on: !document.getElementById('pp-scan').disabled,
     grey: document.getElementById('pp-scan').classList.contains('grey'),
     asks: __demo.cookieAsks,
   }));
@@ -5392,27 +5393,26 @@ try {
     on: !document.getElementById('pp-scan').disabled,
     primary: document.getElementById('pp-scan').classList.contains('primary'),
   }));
-  // Signed in again and the popup opened afresh: the last scan's "signed out" is old news.
+  // The last read said signed out, and the cookie is there (RSI keeps the same cookie
+  // through a sign-in): Scan, no Log In to RSI (the owner, 0.5.0 on Firefox, 2026-10-19).
   await popAt(
-    {
-      ...signedIn,
-      __demoAccount: { loggedIn: false, fetchedAt: T0 - 60e3 },
-      __demoSession: { rsiCookieGone: T0 - 30e3 },
-    },
+    { ...signedIn, __demoAccount: { loggedIn: false, fetchedAt: T0 - 60e3 } },
     '#pp-scan',
   );
   const ppAgain = await page.evaluate(() => ({
     login: !!document.getElementById('pp-login'),
     primary: document.getElementById('pp-scan').classList.contains('primary'),
   }));
-  ppGone.off &&
+  ppGone.on &&
   ppGone.grey &&
   ppGone.asks >= 1 &&
   ppBack.on &&
   ppBack.primary &&
   !ppAgain.login &&
   ppAgain.primary
-    ? ok("RSI's sign-in cookie gone: Scan greyed and off; back once you sign in again")
+    ? ok(
+        "RSI's sign-in cookie gone: a grey Scan still on; Scan once it's there, whatever the last scan said",
+      )
     : fail(`popup sign-in cookie: ${JSON.stringify({ ppGone, ppBack, ppAgain })}`);
   await popAt({ ...signedIn, __demoNoRsi: true }, '#pp-rsi-allow');
   const noRsi = await page.evaluate(() => ({
@@ -5702,6 +5702,7 @@ try {
         text: li.querySelector('.pp-wrow').textContent.replace(/\s+/g, ' ').trim(),
         target: !!li.querySelector('input'),
         remove: li.querySelector('.pp-wx').getAttribute('aria-label'),
+        remind: !!li.querySelector('.pp-wsw'),
       })),
     );
   const ppEd = {
@@ -5756,6 +5757,7 @@ try {
   ppEd.head === 'Your Wishlist · 2' &&
   ppEd.rows[0].text === 'Avenger Titan On Sale $55 ✕' &&
   !ppEd.rows.some((r) => r.target) &&
+  !ppEd.rows.some((r) => r.remind) &&
   ppEd.rows[0].remove === 'Remove Avenger Titan' &&
   ppEd.rows[1].text === 'Cutlass - Ghoulish Green Paint On Sale $10 ✕' &&
   ppEd.placeholder === 'Add a ship, paint or upgrade' &&
@@ -5771,7 +5773,9 @@ try {
   wishDone.rows.join() === 'Upgrade to Freelancer,Zeus Mk II CL,Cutlass - Ghoulish Green Paint' &&
   wishDone.kept?.join() === 'ccu:16,ship:zeus-mk-ii-cl,sku:501' &&
   !wishDone.wide
-    ? ok('Wishlist editing: search here, add, Remove, no Target Price; one POST each, only the change')
+    ? ok(
+        'Wishlist editing: search here, add, Remove, no Target Price; one POST each, only the change',
+      )
     : fail(`popup wishlist editing: ${JSON.stringify({ ppEd, ppFound, afterAdd, wishDone })}`);
   // A Remove that doesn't go through (the website down, no Retry-After the popup can
   // read): the item stays, the note says so, and the next change waits the website's
@@ -5815,6 +5819,54 @@ try {
   !wishGone.copy && !wishGone.link
     ? ok("Disconnect deletes the popup's Wishlist copy")
     : fail(`popup disconnect, the Wishlist copy: ${JSON.stringify(wishGone)}`);
+  // Remind Me (the website's wishlist_remind on: each item has `remind`): a switch beside
+  // each ✕; a click sends which item and on or off, and the switch follows the answer.
+  // Without `remind` (the flag off) no switch shows, as checked above.
+  await popAt(
+    {
+      ...signedIn,
+      __demoWish: {
+        mode: 'items',
+        items: [
+          wishItem('ship:avenger-titan', 'Avenger Titan', { remind: true }),
+          wishItem('sku:501', 'Cutlass - Ghoulish Green Paint', { remind: false }),
+        ],
+      },
+      __demoLocal: { popupPrefs: { tab: 'wishlist' }, siteUrl: ppSite, siteLink: ppWishLink },
+    },
+    '.pp-wedit li',
+  );
+  const switches = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('.pp-wedit .pp-wsw')].map((b) => [
+        b.getAttribute('aria-label'),
+        b.getAttribute('aria-checked'),
+      ]),
+    );
+  const remindBefore = await switches();
+  const twoSwitches = remindBefore.length === 2;
+  await page.click('.pp-wedit li:nth-child(1) .pp-wsw');
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.pp-wedit li:nth-child(1) .pp-wsw')?.getAttribute('aria-checked') ===
+      'false',
+  );
+  const remindAfter = {
+    states: await switches(),
+    sent: await page.evaluate(() =>
+      __demo.wish.filter((w) => w.method === 'POST').map((w) => w.body),
+    ),
+    wide: await page.evaluate(() => document.documentElement.scrollWidth > 360),
+  };
+  twoSwitches &&
+  remindBefore[0][0] === 'Remind me about Avenger Titan' &&
+  remindBefore.map((s) => s[1]).join() === 'true,false' &&
+  remindAfter.states.map((s) => s[1]).join() === 'false,false' &&
+  JSON.stringify(remindAfter.sent) ===
+    JSON.stringify([{ v: 1, do: 'save', key: 'ship:avenger-titan', remind: false }]) &&
+  !remindAfter.wide
+    ? ok('Wishlist Remind Me: a switch per item, one save with which item and on or off')
+    : fail(`popup wishlist remind: ${JSON.stringify({ remindBefore, remindAfter })}`);
   // Store alerts off: the search finds ships only and its placeholder says so; a search
   // that finds nothing (a paint's name: paints come with the alerts' sale feed) says No
   // matches. under the box; one letter isn't searched, so nothing is said.
@@ -6512,7 +6564,11 @@ try {
       ...alState.alerts.items[i % 3],
       id: `sku-${30000 + i}`,
     }));
-    const st = { ...alState, popupPrefs: { tab: 'settings' }, alerts: { ...alState.alerts, items } };
+    const st = {
+      ...alState,
+      popupPrefs: { tab: 'settings' },
+      alerts: { ...alState.alerts, items },
+    };
     const hook = await page.evaluateOnNewDocument((s) => (window.__demoAlerts = s), st);
     await page.goto('about:blank');
     await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
@@ -6586,10 +6642,11 @@ try {
     focus: document.activeElement?.id,
   }));
   const alKept = await page.evaluate(async () => (await chrome.storage.local.get('alerts')).alerts);
-  const alHook2 = await page.evaluateOnNewDocument(
-    (s) => (window.__demoAlerts = s),
-    { ...alState, popupPrefs: { tab: 'settings' }, alerts: alKept },
-  );
+  const alHook2 = await page.evaluateOnNewDocument((s) => (window.__demoAlerts = s), {
+    ...alState,
+    popupPrefs: { tab: 'settings' },
+    alerts: alKept,
+  });
   await page.goto('about:blank');
   await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
   await page.removeScriptToEvaluateOnNewDocument(alHook2.identifier);

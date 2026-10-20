@@ -30,7 +30,7 @@
   import { applyLook, cleanPrefs, loadPrefs, savePref } from './prefs.js';
   import { pilotAnswer, rsiAccess } from './actions.js';
   import { fxFor, loadRates, shownCurrency } from './currency.js';
-  import { GONE_KEY, rsiCookie, rsiSignIn, watchCookie } from './rsi-cookie.js';
+  import { rsiCookie, rsiSignIn, watchCookie } from './rsi-cookie.js';
   import { flag } from '../lib/flags.js';
   import Alerts from './Alerts.svelte';
   import Hangar from './Hangar.svelte';
@@ -67,10 +67,9 @@
   let prefs = $state(cleanPrefs());
   let session = $state({});
   let rsiOff = $state(false); // no access to robertsspaceindustries.com
-  // RSI's sign-in cookie: 'in', 'out' or null (can't tell), and when a popup last saw it
-  // gone (./rsi-cookie.js: whether it's there, never its value).
+  // RSI's sign-in cookie: 'in', 'out' or null (can't tell) (./rsi-cookie.js: whether
+  // it's there, never its value).
   let cookie = $state(null);
-  let goneAt = $state(null);
   let rates = $state(null); // the day's exchange rates, only for a currency other than USD
   let now = $state(Date.now());
   let asked = $state(0); // when this popup asked for a scan the background runs unseen
@@ -102,15 +101,15 @@
   const frac = $derived(sc.progress ? Math.round(progressFraction(sc.progress) * 100) : null);
   const age = $derived(scanAge(v?.scannedAt, now));
   const news = $derived(ALERTS && alerts.on ? fleetNews(alerts.items, fresh) : []);
-  // Signed out of RSI: RSI's sign-in cookie isn't in this browser ('out': Scan greyed and
-  // off until it's back), or the last account read or scan said so and the cookie can't
-  // say otherwise ('maybe': a grey Scan still there to press).
+  // Signed out of RSI: RSI's sign-in cookie isn't in this browser, or the last account
+  // read or scan said so and the browser can't say about the cookie. Log In to RSI first,
+  // with a grey Scan still there to press (./rsi-cookie.js).
   const readOut = $derived.by(() => {
     if (report?.signedOut && !newer(report) && Number.isFinite(report.at)) return report.at;
     if (v?.signedOut) return Number.isFinite(account?.fetchedAt) ? account.fetchedAt : 0;
     return null;
   });
-  const signIn = $derived(rsiSignIn({ cookie, readOut, goneAt }));
+  const signIn = $derived(rsiSignIn({ cookie, readOut }));
   const signedOut = $derived(signIn !== 'in');
   // Amounts in the currency picked (US dollars until one is), from US dollars.
   const currency = $derived(shownCurrency(prefs.currency));
@@ -197,18 +196,12 @@
   }
   async function loadSession() {
     session = chrome.storage.session
-      ? await chrome.storage.session.get(['scanRunning', 'scanRequest', 'scanProgress', GONE_KEY])
+      ? await chrome.storage.session.get(['scanRunning', 'scanRequest', 'scanProgress'])
       : {};
-    if (Number.isFinite(session[GONE_KEY])) goneAt = session[GONE_KEY];
   }
-  // Whether RSI's sign-in cookie is here, and when it's gone, that it was (for the next
-  // popup: a cookie it finds came back since).
+  // Whether RSI's sign-in cookie is here.
   async function readCookie() {
-    const c = await rsiCookie(chrome.cookies, { access: !rsiOff });
-    cookie = c;
-    if (c !== 'out') return;
-    goneAt = Date.now();
-    await chrome.storage.session?.set({ [GONE_KEY]: goneAt }).catch(() => {});
+    cookie = await rsiCookie(chrome.cookies, { access: !rsiOff });
   }
   function setReport(r) {
     report = r;
@@ -519,7 +512,6 @@
           {sc}
           noted={stop === 'popup.stop-partway'}
           {signedOut}
-          scanOff={signIn === 'out'}
           {rsiOff}
           {fx}
           report={shown}
@@ -566,7 +558,6 @@
               {sc}
               noted={stop === 'popup.stop-partway'}
               {signedOut}
-              scanOff={signIn === 'out'}
               {rsiOff}
               {fx}
               report={shown}

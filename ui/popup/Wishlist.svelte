@@ -2,7 +2,8 @@
   // The Wishlist tab (the privacy policy's "Your Wishlist"): while connected, the
   // account's Wishlist from openhangar.space (./wish-client.js, a copy kept here), and,
   // while the website takes changes from the extension, a search to add a ship, paint or
-  // upgrade, and each item's Remove (no Target Price: a ship is on sale or it isn't).
+  // upgrade, and each item's Remove (no Target Price: a ship is on sale or it isn't), and
+  // its Remind Me switch while the website offers one (the item has `remind`).
   // The search runs on this device over what the extension already keeps (./wishlist.js: the ship list, and with store
   // alerts on the sale feed); what's typed goes nowhere. Each change is one request, one
   // at a time, only from a click. On Sale and prices come from the sale feed, so only
@@ -119,6 +120,9 @@
   function remove(item) {
     change({ do: 'remove', key: item.key }, item.name);
   }
+  function remind(item) {
+    change({ do: 'remind', key: item.key, remind: !item.remind }, item.name);
+  }
   const KIND_ICON = { ship: 'ship', ccu: 'up', paint: 'paint' };
 </script>
 
@@ -213,6 +217,18 @@
               {#if s?.onSale && Number.isFinite(s.price)}
                 {@const p = price(s.price)}
                 <span class="pp-price" title={p.title || null}>{p.text}</span>
+              {/if}
+              {#if typeof item.remind === 'boolean'}
+                <button
+                  type="button"
+                  class="pp-wsw"
+                  role="switch"
+                  aria-checked={item.remind ? 'true' : 'false'}
+                  aria-label={t('popup.wish-remind', { name: item.name })}
+                  title={t('popup.wish-remind-label')}
+                  disabled={busy}
+                  onclick={() => remind(item)}><span class="pp-wsw-t" aria-hidden="true"></span></button
+                >
               {/if}
               <button
                 type="button"
