@@ -49,11 +49,18 @@
           pattern: '^\\d{4}-\\d{2}-\\d{2}$',
         },
         paging: {
-          description: 'The query parameters of a paged account list: ?<page>=N&<size>=M.',
+          description:
+            "The query parameters of a paged account list: ?<page>=N&<size>=M. And RSI's pager under the list: `pager` the box, `active` the link to the page shown, `links` every link in it (each carries ?<page>=N), read by parsePager in src/scraper/parser.js.",
           type: 'object',
-          required: ['page', 'size'],
+          required: ['page', 'size', 'pager', 'active', 'links'],
           additionalProperties: false,
-          properties: { page: { $ref: '#/$defs/param' }, size: { $ref: '#/$defs/param' } },
+          properties: {
+            page: { $ref: '#/$defs/param' },
+            size: { $ref: '#/$defs/param' },
+            pager: { $ref: '#/$defs/selector' },
+            active: { $ref: '#/$defs/selector' },
+            links: { $ref: '#/$defs/selector' },
+          },
         },
         signedOut: {
           description: 'Signs that RSI answered with its sign-in page instead of the account page.',
@@ -975,8 +982,14 @@
     },
     rules: {
       format: 1,
-      revision: '2026-10-18',
-      paging: { page: 'page', size: 'pagesize' },
+      revision: '2026-10-19',
+      paging: {
+        page: 'page',
+        size: 'pagesize',
+        pager: '.pager',
+        active: 'a.active',
+        links: 'a[href]',
+      },
       signedOut: {
         redirect: { source: 'account\\/(connect|sign-?in)|\\/connect\\b', flags: 'i' },
         page: { source: 'name=["\']password["\']|id=["\']?password|account\\/connect', flags: 'i' },

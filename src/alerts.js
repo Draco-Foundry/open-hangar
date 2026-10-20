@@ -6,7 +6,9 @@
  * file, openhangar.space's sale feed (/api/store/on-sale: the same file for everyone,
  * nothing about you in the request), and matches it HERE, on this device, against:
  *   - the account's Wishlist, only while this browser is connected: its item keys,
- *     read with the sync token (/api/v1/wishlist), read only, nothing sent back;
+ *     read with the sync token (/api/v1/wishlist), read only, nothing sent back. An
+ *     item with Remind Me off (the popup's switch, the website's wishlist_remind) isn't
+ *     in those keys, so it's skipped here with no rule of its own, from the next check;
  *   - the hangar and buy-backs this browser scanned, which never leave it, by the
  *     owner's rules (2026-10-10):
  *       buyback  a ship in your buy-backs is in the store again

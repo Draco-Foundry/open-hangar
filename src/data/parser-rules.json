@@ -1,7 +1,13 @@
 {
   "format": 1,
-  "revision": "2026-10-18",
-  "paging": { "page": "page", "size": "pagesize" },
+  "revision": "2026-10-19",
+  "paging": {
+    "page": "page",
+    "size": "pagesize",
+    "pager": ".pager",
+    "active": "a.active",
+    "links": "a[href]"
+  },
   "signedOut": {
     "redirect": { "source": "account\\/(connect|sign-?in)|\\/connect\\b", "flags": "i" },
     "page": {
