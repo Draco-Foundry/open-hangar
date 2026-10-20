@@ -219,7 +219,9 @@
     }
     const item = wishState.items.find((i) => i.key === body.key);
     if (!item) return answerJson({ ok: false, outcome: 'not-found', key: body.key, on: false });
-    item.target = body.target == null ? null : Math.round(Number(body.target) * 100);
+    // Remind Me (the website's wishlist_remind): on or off; else the old target.
+    if (typeof body.remind === 'boolean') item.remind = body.remind;
+    else item.target = body.target == null ? null : Math.round(Number(body.target) * 100);
     return answerJson({ ok: true, outcome: 'saved', key: body.key, on: true, item });
   }
   const shimFetch = window.fetch;
