@@ -4052,6 +4052,10 @@ try {
     r.marked = [...$('#more-menu').querySelectorAll('a[aria-current="page"]')].map((a) =>
       a.textContent.trim(),
     );
+    // Its icons come through use:safeHTML (src/safe-html.js): drawn as SVG, not text.
+    r.icons = [...$('#more-menu').querySelectorAll('svg')].map(
+      (svg) => svg.children.length > 0 && [...svg.children].every((c) => c instanceof SVGElement),
+    );
     document.body.click();
     await tick();
     // Search: shut, the field is out of sight; / opens it with focus in the box.
@@ -4091,9 +4095,11 @@ try {
   more.onReferrals &&
   more.moreActive &&
   more.noBarActive &&
-  more.marked.join(',') === 'Referrals'
+  more.marked.join(',') === 'Referrals' &&
+  more.icons.length === 3 &&
+  more.icons.every(Boolean)
     ? ok(
-        'top bar: four pages in the bar, More ▾ for Stats, Org Fleet and Referrals, marks the page you are on',
+        'top bar: four pages in the bar, More ▾ for Stats, Org Fleet and Referrals (icons drawn), marks the page you are on',
       )
     : fail(`top bar More menu: ${JSON.stringify(more)}`);
   more.searchShut && more.slashOpens && more.escCloses && more.iconOpens && more.clickAwayCloses

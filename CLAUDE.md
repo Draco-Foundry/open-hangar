@@ -89,6 +89,8 @@ Same on Windows and Mac unless noted.
   their own rules. Never commit it or anything it points to (CI and the pre-commit hook
   check).
 - **Never load remote code.** Feature flags are build-time only (store policy).
+- **All HTML insertion goes through `setHTML` (`src/safe-html.js`; `use:safeHTML` in Svelte).**
+  Text from RSI goes in as text (`textContent`, `{value}`); `test/html-insertion.test.js` checks.
 - **npm only**, one lockfile (`package-lock.json`). Ask before adding a dependency.
 - **Read first, keep changes small:** one concern per PR, no refactoring of unrelated code.
   Debug by theory, steps with an expected result each, one at a time; file the rest.

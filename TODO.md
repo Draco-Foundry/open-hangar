@@ -410,7 +410,7 @@ The per-item links/hover on the Referrals page (`shipHref` / `wikiHref` in
 ## ~~Replace `innerHTML` templates with a DOM builder~~ ✅ Done differently (2026-09-28)
 
 `web-ext lint` now reports **0 warnings** (was 26 `UNSAFE_VAR_ASSIGNMENT`). Every
-dynamic render goes through `setHTML(el, html)` in `dashboard.js`, an **allowlist**
+dynamic render goes through `setHTML(el, html)` (now `src/safe-html.js`), an **allowlist**
 sanitizer: parse into an inert DOMParser document, keep only the tags/attributes the
 dashboard uses (`SAFE_TAGS` / `SAFE_ATTRS`, plus `data-*` / `aria-*`), allow only
 web/mailto/relative URLs in `href`/`src`, drop `style` values with `url(`, then
