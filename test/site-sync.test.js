@@ -219,6 +219,52 @@ test('sync and disconnect use the versioned /api/v1/sync', async () => {
   assert.equal(mem.siteLink, undefined, 'forgotten after disconnect');
 });
 
+// Connect with a code (OH.siteLinkWait) while already connected (#741): the old token is
+// revoked as Disconnect does, never the new one, and a failed revoke keeps the new link.
+async function codeConnect(token, deleteAnswer) {
+  const real = global.fetch;
+  const deletes = [];
+  global.fetch = async (url, init) => {
+    if (init?.method === 'DELETE') {
+      deletes.push(`${url} ${init.headers.authorization}`);
+      return deleteAnswer();
+    }
+    return new Response(JSON.stringify({ status: 'approved', token, name: 'pilot' }));
+  };
+  try {
+    const link = await OH.siteLinkWait({ device_code: 'd', expires_in: 60, interval: 0.001 });
+    return { link, deletes };
+  } finally {
+    global.fetch = real;
+  }
+}
+const revoked = () => new Response('{}', { status: 200 });
+
+test('connecting again with a code revokes the old token', async () => {
+  linked();
+  const { link, deletes } = await codeConnect('new', revoked);
+  assert.deepEqual(deletes, ['https://staging.example/api/v1/sync Bearer t']);
+  assert.equal(link.token, 'new');
+  assert.equal(mem.siteLink.token, 'new');
+});
+
+test('connecting again with a code to the same token revokes nothing', async () => {
+  linked();
+  const { deletes } = await codeConnect('t', revoked);
+  assert.deepEqual(deletes, []);
+  assert.equal(mem.siteLink.token, 't');
+});
+
+test('a code connect whose revoke fails still keeps the new link', async () => {
+  linked();
+  const { link, deletes } = await codeConnect('new', () => {
+    throw new Error('offline');
+  });
+  assert.equal(deletes.length, 1);
+  assert.equal(link.token, 'new');
+  assert.equal(mem.siteLink.token, 'new');
+});
+
 // The privacy policy's "Your Wishlist": Disconnect deletes the popup's copy of it (the
 // Wishlist stays on the account), and so does a sync the website says isn't connected.
 test("Disconnect deletes the popup's Wishlist copy", async () => {

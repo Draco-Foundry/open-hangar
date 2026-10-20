@@ -326,7 +326,7 @@
                                 href={b.reclaim.url}
                                 target="_blank"
                                 rel="noopener"
-                                title={b.reclaim.retired}>Retired, Buy-Back Still Open ↗</a
+                                title={b.reclaim.retired}>Retired, Buy-Back Still Open</a
                               >
                             {:else if b.reclaim && b.reclaim.retired}
                               <span class="bb-retired" title={b.reclaim.retired}>Retired, Buy-Back Still Open</span>
@@ -336,7 +336,7 @@
                                 href={b.reclaim.url}
                                 target="_blank"
                                 rel="noopener"
-                                title={b.reclaim.tip}>Reclaim ↗</a
+                                title={b.reclaim.tip}>Reclaim</a
                               >
                             {/if}
                           </td>

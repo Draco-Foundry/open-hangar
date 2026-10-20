@@ -4,6 +4,18 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Fixed: **Shortcut on Firefox.** The popup's shortcut is now Alt+Shift+O, because on Firefox Alt+Shift+H opened Firefox's Help menu. Settings shows the shortcut your browser uses.
+
+## 0.5.1 — 2026-10-20
+
+- Fixed: **Scan while signed in.** The popup no longer asks you to log in to RSI when you already are.
+- Fixed: **Long buy-back lists.** A scan no longer counts the same buy-back more than once.
+- Fixed: **Settings tab.** Look, Currency and Shortcut line up again, Currency shows the full code, and the data buttons fit inside the popup.
+- Fixed: The Update Ready notice and our scan notices in the popup look right again.
+- Fixed: **Connecting again.** Connecting an extension that's already connected no longer leaves an old row in Connected Extensions on your account.
+- Changed: The popup always opens on the Hangar tab.
+- Changed: Arrow symbols are gone from the popup's links and buttons.
+
 ## 0.5.0 — 2026-10-18
 
 - Fixed: **Notifications on Firefox.** Turning them on now closes the popup so Firefox's question can show.

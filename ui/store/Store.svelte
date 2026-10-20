@@ -17,7 +17,7 @@
     The full store lives on openhangar.space: every ship, sale history, Compare and prices in your
     currency.
   </p>
-  <a class="btn full-store-btn" href={FULL_STORE} target="_blank" rel="noopener">Open the Full Store ↗</a>
+  <a class="btn full-store-btn" href={FULL_STORE} target="_blank" rel="noopener">Open the Full Store</a>
 </div>
 <Wishlist />
 <SubStore />

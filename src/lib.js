@@ -223,6 +223,8 @@
       // Rescans first check whether anything changed (#294). See unchangedSince.
       probe: true,
       parse: (html) => window.OpenHangar.parsePledges(html),
+      // RSI's pager, where the scan stops (scanHtmlSource).
+      pager: (html) => window.OpenHangar.parsePager?.(html),
     },
     {
       id: 'buybacks',
@@ -236,6 +238,7 @@
       emptyMarker: RULES.buybacks.empty, // RSI's "you have no buy-backs" message
       requiresRender: true, // if RSI ever serves a JS-only shell, report it (don't silently say "empty")
       parse: (html) => window.OpenHangar.parseBuybacks(html),
+      pager: (html) => window.OpenHangar.parsePager?.(html),
       // Read once from page 1 and kept next to the items (db.sources.buybacks.meta).
       meta: (html) => ({ tokens: window.OpenHangar.parseBuybackTokens(html) }),
     },
@@ -1486,7 +1489,10 @@
         if (!retryRateLimit)
           return { error: 'RSI asked us to slow down', rateLimited: true, retryAfter };
         const msg = 'RSI asked us to slow down';
-        if (++slowDowns > RATE_LIMIT_RETRIES) return { error: msg, transient: true };
+        // Still slowed down after every retry: `slowDown` and RSI's Retry-After go back,
+        // so a scan can say how long RSI asked it to wait (ui/scan/runner.js scanWait).
+        if (++slowDowns > RATE_LIMIT_RETRIES)
+          return { error: msg, transient: true, slowDown: true, retryAfter };
         retry = {
           msg,
           wait: Math.min(
@@ -1527,9 +1533,14 @@
   // every request it makes to RSI but its first (docs/dev/requests.md): 500 to 1000 ms.
   OH.autoPause = () => sleep(500 + Math.floor(Math.random() * 500));
 
-  // Paginated HTML source: fetch ?page=N&pagesize=…, parse, dedupe by id, stop
-  // when a page yields no NEW ids (RSI clamps out-of-range pages to the last).
-  // onProgress(page, count, retry?) — retry = { attempt, of } while retrying.
+  // Paginated HTML source: fetch ?page=N&pagesize=…, parse, dedupe by id, stop on
+  // an empty page, when RSI's pager shows no page after this one or another page
+  // than asked (RSI clamps out-of-range pages to the last), or when a page yields no
+  // NEW ids. Never on a short page or a page count worked out from the size: RSI
+  // may serve another size than asked.
+  // onProgress(page, count, retry?, pages?) — retry = { attempt, of } while retrying;
+  // pages: the highest page RSI's pager has linked to so far, or null without a pager.
+  // An unchanged list says pages = page: it's done.
   // If RSI keeps failing mid-scan, returns what was gathered as { items, partial }.
   // `prev`: the saved scan, for sources that probe for changes first (#294). When
   // it's still current, returns { unchanged: true } after a few requests.
@@ -1545,9 +1556,12 @@
     let meta;
     let lastPage = 0;
     let lastAdded = 0;
+    let ended = false; // the pager said this was the last page
     let aligned = true;
+    let pages = null; // the highest page RSI's pager has linked to so far
     const down = (got) => ({
       rsiDown: !!(got.transient || got.rateLimited),
+      slowDown: !!got.slowDown,
       retryAfter: got.retryAfter ?? null,
     });
 
@@ -1557,7 +1571,7 @@
         pageUrl(src, page, size),
         (attempt, of, reason) => {
           OH.log('warn', src.id, `page ${page}: ${reason}, retry ${attempt}/${of}`);
-          onProgress?.(page, all.length, { attempt, of });
+          onProgress?.(page, all.length, { attempt, of }, pages);
         },
         { retryRateLimit: !auto },
       );
@@ -1617,11 +1631,20 @@
       if (!items.length && auto && looksLoggedOut(res, html))
         return { items: all, meta, partial: { page, reason: 'signed out', signedOut: true } };
       if (!items.length) break;
+      // RSI's pager (OpenHangar.parsePager): past the end RSI serves the last page
+      // again, and its pager says so. Stopping on that, and on a page that links to
+      // none after it, works at any page size and with buy-backs that have no id
+      // (fillIds would make a repeated page look new). Without a pager, the
+      // no-new-ids stop below still ends the scan.
+      const pager = src.pager?.(html) ?? null;
+      if (page > 1 && pager?.current && pager.current !== page) break;
+      const lastLinked = pager?.current === page && pager.max != null && pager.max <= page;
+      if (pager?.max != null) pages = Math.max(pages ?? 0, pager.max, page);
 
       let added = 0;
       fillIds(src, items, page);
       if (page === 1 && prev && (await unchangedSince(src, prev, items, size))) {
-        onProgress?.(page, prev.items.length);
+        onProgress?.(page, prev.items.length, null, page);
         return { unchanged: true };
       }
       for (const it of items) {
@@ -1631,16 +1654,24 @@
         all.push(it);
         added++;
       }
-      onProgress?.(page, all.length);
+      onProgress?.(page, all.length, null, pages);
       lastPage = page;
       lastAdded = added;
       if (added === 0) break;
       if (added !== items.length) aligned = false;
+      if (lastLinked) {
+        ended = true;
+        break;
+      }
       if (!auto) await sleep(DELAY_MS);
     }
+    // Pages read against the page count RSI's pager showed (the popup's scan bar fills by
+    // it), so a pager that says more pages than there are shows in the flight log.
+    if (lastPage)
+      OH.log('info', src.id, `${lastPage} pages read, RSI's pager showed ${pages ?? 'none'}`);
     // Still finding new items on the last allowed page: the list goes on, so
     // report it as partial (saved without counting the rest as "removed").
-    if (lastPage === MAX_PAGES && lastAdded > 0) {
+    if (lastPage === MAX_PAGES && lastAdded > 0 && !ended) {
       return { items: all, meta, partial: { page: MAX_PAGES + 1, reason: 'page limit reached' } };
     }
     return { items: all, meta, aligned };
@@ -1771,9 +1802,11 @@
         };
       }
 
+      // RSI still asking to slow down after every retry: said, with its Retry-After.
+      const slow = (r) => (r?.slowDown ? { slowDown: true, retryAfter: r.retryAfter ?? null } : {});
       if (result.error) {
         OH.log('error', src.id, result.error);
-        return { ok: false, error: result.error };
+        return { ok: false, error: result.error, ...slow(result) };
       }
 
       // Nothing changed since the last full scan (#294): keep the saved items and
@@ -1804,6 +1837,7 @@
           return {
             ok: false,
             error: `RSI stopped responding at page ${page} (${reason}), so we kept your previous scan of ${prevCount}. Try again in a minute.`,
+            ...slow(result.partial),
           };
         }
         const scannedAt = await saveSource(src.id, result.items, { meta: result.meta, account });
@@ -1812,6 +1846,7 @@
           items: result.items,
           scannedAt,
           partial: `stopped at page ${page} (${reason}); rescan to get the rest`,
+          ...slow(result.partial),
         };
       }
 
@@ -3886,7 +3921,17 @@
           connectedAt: Date.now(),
           lastSync: null,
         };
+        const was = await OH.getSiteLink();
         await chrome.storage.local.set({ siteLink: link });
+        // Connecting again while connected: the old link is revoked, as Disconnect does,
+        // so the account's Connected Extensions list doesn't keep a dead row (#741; the
+        // same in src/background.js oh-connect-finish). After the save, best effort.
+        if (was?.token && was.token !== link.token) {
+          await siteFetch(SYNC_PATH, {
+            method: 'DELETE',
+            headers: { authorization: `Bearer ${was.token}` },
+          }).catch(() => null);
+        }
         return link;
       }
       if (j.status === 'expired') return null;

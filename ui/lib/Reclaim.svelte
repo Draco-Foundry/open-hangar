@@ -12,5 +12,5 @@
 {#if r.blocked}<span class="bb-retired bb-blocked" title={r.blocked}>Can't Be Bought Back</span
   >{:else}{#if r.retired && mark}<span class="bb-retired-mark" title={RETIRED_TIP}>Retired*</span
     >{/if}{#if r.url}<a class="bb-reclaim" href={r.url} target="_blank" rel="noopener" title={r.tip}
-      >Buy Back ↗</a
+      >Buy Back</a
     >{/if}{/if}

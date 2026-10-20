@@ -699,8 +699,7 @@ try {
         (a) =>
           a.target === '_blank' &&
           /noopener/.test(a.rel) &&
-          /^https:\/\/([a-z0-9-]+\.)?robertsspaceindustries\.com\//.test(a.href) &&
-          /↗/.test(a.textContent),
+          /^https:\/\/([a-z0-9-]+\.)?robertsspaceindustries\.com\//.test(a.href),
       );
     // Rows end level: every card in a grid row ends on the same line.
     const rowsLevel = () => {
@@ -782,7 +781,7 @@ try {
   ql.back &&
   ql.storedBack
     ? ok(
-        'quick links: Home card across the last row (rows end level), RSI links in a new tab ↗, portrait menu group folds, Hide Card remembered, Show on Home brings it back',
+        'quick links: Home card across the last row (rows end level), RSI links in a new tab, portrait menu group folds, Hide Card remembered, Show on Home brings it back',
       )
     : fail(`quick links: ${JSON.stringify(ql)}`);
 
@@ -1652,7 +1651,7 @@ try {
   oow.homeCard &&
   oow.ffCard &&
   oow.ffClosed &&
-  each(oow.on, 'Open on Website ↗', 'Open on Website ↗') &&
+  each(oow.on, 'Open on Website', 'Open on Website') &&
   oow.homeCorner &&
   oow.homeQuiet &&
   oow.opened === 'https://staging.example.test/hangar' &&
@@ -2491,14 +2490,14 @@ try {
   melt.red &&
   melt.title === 'Gone for Good if You Melt It' &&
   /RSI never sells this one back\. Pledges with Squadron 42/.test(melt.never) &&
-  melt.go === 'I Understand, Open on RSI ↗' &&
+  melt.go === 'I Understand, Open on RSI' &&
   /^https:\/\/robertsspaceindustries\.com\/account\/pledges\?page=\d+$/.test(melt.goHref) &&
   melt.keepFocused &&
   melt.kept
     ? ok('pledge window: Melt on RSI asks first; red Gone for Good warning for never-sold-back')
     : fail(`melt warning: ${JSON.stringify(melt)}`);
   melt.plain &&
-  melt.plainGo === 'Open on RSI ↗' &&
+  melt.plainGo === 'Open on RSI' &&
   /full price.*Buy-Back Token/.test(melt.plainText)
     ? ok('pledge window: a plain melt confirm says what melting costs')
     : fail(`melt confirm: ${JSON.stringify(melt)}`);
@@ -2955,7 +2954,7 @@ try {
   fs1.opened &&
   fs1.href === 'https://openhangar.space/store' &&
   fs1.target === '_blank' &&
-  fs1.label === 'Open the Full Store ↗' &&
+  fs1.label === 'Open the Full Store' &&
   fs1.line &&
   fs1.gone
     ? ok(
@@ -3049,7 +3048,7 @@ try {
   sub.longKind === 'Armor' &&
   sub.kitKind === 'Kits and Bundles' &&
   /^https:\/\/robertsspaceindustries\.com\/en\/pledge\/Subscribers-Store\/Demo-2$/.test(sub.buy) &&
-  sub.buyLabel === 'Buy at RSI ↗' &&
+  sub.buyLabel === 'Buy at RSI' &&
   /^\$9\.00 \$12\.00$/.test(sub.price) &&
   sub.warbond === 'Warbond' &&
   sub.tier === 'Centurion' &&
@@ -3062,7 +3061,7 @@ try {
   sub.search === 1 &&
   sub.paints.join() === 'Nebula Drift Paint' &&
   sub.plans === 'https://robertsspaceindustries.com/en/pledge/subscriptions' &&
-  sub.plansText === 'Subscribers get their own store each month. See Plans ↗' &&
+  sub.plansText === 'Subscribers get their own store each month. See Plans' &&
   sub.plansCards === 0
     ? ok(
         'subscriber store: 6 cards lined up, Warbond and tier chips, Sold Out, search, type chips, See Plans',
@@ -3826,7 +3825,7 @@ try {
     : fail(`cart add: ${JSON.stringify(cart)}`);
   /Log In to RSI First.*log in to RSI in this browser first\. Nothing was added\./.test(
     cart.signedOut,
-  ) && cart.logIn === 'Log In to RSI ↗'
+  ) && cart.logIn === 'Log In to RSI'
     ? ok('cart signed out: the signed-out note with Log In to RSI')
     : fail(`cart signed out: ${JSON.stringify(cart)}`);
   /RSI Didn't Add It.*Nothing was added\. RSI says: “Pretend: this item is unavailable”/.test(
@@ -3848,7 +3847,7 @@ try {
   JSON.stringify(cart.anyAddCall) === JSON.stringify(['add', 777, 900, 9001, {}])
     ? ok('Any Ship: 30 of 35 shown, search finds one, priced on pick, added from a ship not owned')
     : fail(`any ship: ${JSON.stringify(cart)}`);
-  /Cart Already Busy.*holds a buy-back/.test(cart.busy) && cart.busyLink === 'Open RSI Cart ↗'
+  /Cart Already Busy.*holds a buy-back/.test(cart.busy) && cart.busyLink === 'Open RSI Cart'
     ? ok('cart busy: Cart Already Busy with Open RSI Cart')
     : fail(`cart busy: ${JSON.stringify(cart)}`);
   /Buy-Back Price\s*\$15 from RSI just now/.test(cart.bbRows) &&
@@ -4052,6 +4051,10 @@ try {
     r.marked = [...$('#more-menu').querySelectorAll('a[aria-current="page"]')].map((a) =>
       a.textContent.trim(),
     );
+    // Its icons come through use:safeHTML (src/safe-html.js): drawn as SVG, not text.
+    r.icons = [...$('#more-menu').querySelectorAll('svg')].map(
+      (svg) => svg.children.length > 0 && [...svg.children].every((c) => c instanceof SVGElement),
+    );
     document.body.click();
     await tick();
     // Search: shut, the field is out of sight; / opens it with focus in the box.
@@ -4091,9 +4094,11 @@ try {
   more.onReferrals &&
   more.moreActive &&
   more.noBarActive &&
-  more.marked.join(',') === 'Referrals'
+  more.marked.join(',') === 'Referrals' &&
+  more.icons.length === 3 &&
+  more.icons.every(Boolean)
     ? ok(
-        'top bar: four pages in the bar, More ▾ for Stats, Org Fleet and Referrals, marks the page you are on',
+        'top bar: four pages in the bar, More ▾ for Stats, Org Fleet and Referrals (icons drawn), marks the page you are on',
       )
     : fail(`top bar More menu: ${JSON.stringify(more)}`);
   more.searchShut && more.slashOpens && more.escCloses && more.iconOpens && more.clickAwayCloses
@@ -4421,7 +4426,7 @@ try {
   rep.part.open &&
   rep.part.title === 'Rough Landing' &&
   rep.part.rows.join() === 'Hangar:false,Buy-Backs:true,Referrals:false' &&
-  rep.part.actions.join() === 'Send Flight Log (opens Discord),Scan Again,Report on GitHub ↗' &&
+  rep.part.actions.join() === 'Send Flight Log (opens Discord),Scan Again,Report on GitHub' &&
   /Nothing is sent until you submit it/.test(rep.part.hint) &&
   rep.cleared
     ? ok('scan report: one row per source with the failed one marked, and its buttons')
@@ -4638,11 +4643,16 @@ try {
   const pageNow = () => page.evaluate(() => Date.now());
   // The popup with storage seeded first (scripts/screenshots/demo-connector.js): each
   // load starts from the demo hangar again.
+  // `seed.__tab`: the tab to click once open (every popup opens on Hangar).
   const popAt = async (seed = {}, wait = '#pp-age') => {
     const hook = await page.evaluateOnNewDocument((s) => Object.assign(window, s), seed);
     await page.goto('about:blank');
     await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
     await page.removeScriptToEvaluateOnNewDocument(hook.identifier);
+    if (seed.__tab) {
+      await page.waitForSelector(`#pp-tab-${seed.__tab}`);
+      await page.click(`#pp-tab-${seed.__tab}`);
+    }
     await page.waitForSelector(wait);
     await sleep(250);
   };
@@ -4739,6 +4749,58 @@ try {
   !pop.wide
     ? ok('Edge B: the lifted panel, its ring and the cobalt bar, 360 px, no sideways scroll')
     : fail(`popup look: ${JSON.stringify(pop)}`);
+  // The basic page's notices at the top of every tab (#698, #664): status.json's banner
+  // (as plain text) and an update the browser holds, with Reload to Update; the version
+  // in the header is the manifest's.
+  const notices = async () => {
+    await told({
+      updateReady: { newValue: '9.9.9' },
+      remoteStatus: {
+        newValue: { at: await pageNow(), data: { banner: { message: '<b>RSI</b> changed.' } } },
+      },
+    });
+    const read = () =>
+      page.evaluate(() => ({
+        update: document.getElementById('pp-update')?.textContent.replace(/\s+/g, ' ').trim(),
+        reload: !!document.getElementById('pp-update-reload'),
+        banner: document.getElementById('pp-banner')?.textContent.trim(),
+        html: document.getElementById('pp-banner')?.innerHTML.includes('<b>'),
+        warn: !!document.getElementById('pp-banner')?.classList.contains('warn'),
+        ver: document.getElementById('pp-ver').textContent.trim(),
+        manifest: 'v' + chrome.runtime.getManifest().version,
+        wide: document.documentElement.scrollWidth > 360,
+        // Styled, not bare divs: the card's padding and border (once lost in a squash).
+        styled: ['pp-update', 'pp-banner'].every((id) => {
+          const s = getComputedStyle(document.getElementById(id));
+          return parseFloat(s.paddingLeft) > 0 && parseFloat(s.borderTopWidth) > 0;
+        }),
+      }));
+    const hangar = await read();
+    await page.click('#pp-tab-settings');
+    await sleep(150);
+    const settings = await read();
+    await page.click('#pp-tab-hangar');
+    // Let in, and the banner taken down (a fresh copy without one).
+    await told({ updateReady: {}, remoteStatus: { newValue: { at: await pageNow(), data: {} } } });
+    const gone = await page.evaluate(
+      () => !document.getElementById('pp-update') && !document.getElementById('pp-banner'),
+    );
+    return { hangar, settings, gone };
+  };
+  const nt = await notices();
+  [nt.hangar, nt.settings].every(
+    (n) =>
+      n.update === 'Open Hangar 9.9.9 is ready. Reload to Update' &&
+      n.reload &&
+      n.banner === '<b>RSI</b> changed.' &&
+      !n.html &&
+      n.warn &&
+      n.styled &&
+      n.ver === n.manifest &&
+      !n.wide,
+  ) && nt.gone
+    ? ok('notices: update ready and the status banner on every tab, the version the manifest’s')
+    : fail(`popup notices: ${JSON.stringify(nt)}`);
   // The tab row: arrows move along and wrap, Home and End jump, the choice is kept.
   await page.focus('#pp-tab-hangar');
   const keyTo = async (key) => {
@@ -4759,14 +4821,16 @@ try {
   keys.map((k) => k.selected).join() ===
     'pp-tab-wishlist,pp-tab-settings,pp-tab-hangar,pp-tab-settings,pp-tab-hangar,pp-tab-settings' &&
   keys.every((k) => k.focus === k.selected && k.panel === k.selected) &&
-  kept?.tab === 'settings'
-    ? ok('tabs: a tab list, arrows wrap, Home and End jump, the last one is remembered')
+  !('tab' in (kept || {}))
+    ? ok('tabs: a tab list, arrows wrap, Home and End jump, the tab picked is not kept')
     : fail(`popup tabs: ${JSON.stringify({ keys, kept })}`);
-  await popAt({ ...signedIn, __demoLocal: { popupPrefs: { tab: 'wishlist' } } }, '#pp-wish');
+  await popAt({ ...signedIn, __demoLocal: { popupPrefs: { tab: 'wishlist' } } }, '#pp-value');
   const reopened = await page.$eval('[role="tab"][aria-selected="true"]', (b) => b.id);
-  reopened === 'pp-tab-wishlist'
-    ? ok('opens where it was left (Wishlist)')
+  reopened === 'pp-tab-hangar'
+    ? ok('opens on Hangar, even with a tab saved by an older version')
     : fail(`popup reopened on ${reopened}`);
+  await page.click('#pp-tab-wishlist');
+  await page.waitForSelector('#pp-wish-connect');
   // Not connected: the Wishlist's Connect opens the extension's page for it (the
   // browser's sign-in window would close the popup).
   await page.click('#pp-wish-connect');
@@ -4780,7 +4844,7 @@ try {
   await popAt(
     {
       ...signedIn,
-      __demoLocal: { popupPrefs: { tab: 'settings' }, siteUrl: 'https://app.openhangar.space' },
+      __tab: 'settings', __demoLocal: { siteUrl: 'https://app.openhangar.space' },
     },
     '#pp-settings',
   );
@@ -4803,7 +4867,7 @@ try {
     'Currency',
     'USD',
     'Shortcut',
-    'Change ↗',
+    'Change',
     'JSON Backup',
     'Pledges CSV',
     'Buy-Backs CSV',
@@ -4820,11 +4884,66 @@ try {
   !setMissing.length &&
   set.alertsSw === 'false' &&
   set.notifyOff &&
-  set.shortcut === 'Alt+Shift+H' &&
+  set.shortcut === 'Alt+Shift+O' &&
   set.look === 'auto' &&
   !set.autoScan
     ? ok('Settings: every group, alerts off, the shortcut, no Auto Scan row until connected')
     : fail(`popup settings: ${JSON.stringify({ set, setMissing })}`);
+  // Compact (#700): Look, Currency and Shortcut on one row, each name over its control,
+  // the two alert switches on one row, nothing wrapping or sticking out at 360 px: the
+  // selects show their whole value, Change sits apart from Shortcut, the data buttons'
+  // names stay inside them, and Notifications' name dims while its switch waits.
+  const setRows = await page.evaluate(() => {
+    const box = (el) => el.getBoundingClientRect();
+    const cells = [...document.querySelectorAll('#pp-prefs .pp-cell')];
+    const grp = box(document.getElementById('pp-prefs'));
+    const sw = ['pp-al-sw', 'pp-nt-sw'].map((id) => box(document.getElementById(id)));
+    const labels = [...document.querySelectorAll('#pp-prefs .pp-cell small, #pp-alert-set span')];
+    const sel = ['pp-look', 'pp-currency'].map((id) => document.getElementById(id));
+    const btns = ['json', 'pledges', 'buybacks'].map((id) =>
+      document.getElementById(`pp-export-${id}`),
+    );
+    const name = [...document.querySelectorAll('#pp-prefs .pp-cell small')][2];
+    const change = document.getElementById('pp-shortcut-change');
+    const settings = box(document.getElementById('pp-settings'));
+    const text = (b) => {
+      const r = document.createRange();
+      r.selectNodeContents(b);
+      return r.getBoundingClientRect();
+    };
+    return {
+      cells: cells.length,
+      oneRow: cells.every((c) => Math.abs(box(c).top - box(cells[0]).top) < 1),
+      over: cells.every((c) => box(c.firstElementChild).bottom <= box(c.lastElementChild).top),
+      inside: cells.every((c) => box(c).left >= grp.left && box(c).right <= grp.right + 0.5),
+      selects: sel.every((s) => s.scrollWidth <= s.clientWidth && box(s).right <= grp.right),
+      gap: box(change).left - text(name.firstChild).right >= 4,
+      switches: Math.abs(sw[0].top - sw[1].top) < 1,
+      wraps: labels.filter((l) => l.getClientRects().length > 1 || box(l).height > 24).length,
+      buttons: btns.every((b) => text(b).right <= box(b).right && box(b).right <= settings.right),
+      dim:
+        getComputedStyle(document.getElementById('pp-nt-l')).color !==
+        getComputedStyle(document.getElementById('pp-al-l')).color,
+      heading: [...document.querySelectorAll('#pp-site b')].some(
+        (b) => b.textContent === 'openhangar.space',
+      ),
+      wide: document.documentElement.scrollWidth > 360,
+    };
+  });
+  setRows.cells === 3 &&
+  setRows.oneRow &&
+  setRows.over &&
+  setRows.inside &&
+  setRows.selects &&
+  setRows.gap &&
+  setRows.switches &&
+  !setRows.wraps &&
+  setRows.buttons &&
+  setRows.dim &&
+  !setRows.heading &&
+  !setRows.wide
+    ? ok('Settings compact: Look, Currency and Shortcut on one row, both alert switches on one')
+    : fail(`popup settings compact: ${JSON.stringify(setRows)}`);
   await page.click('#pp-shortcut-change');
   const shortGo = await page.evaluate(() => __demo.opened.at(-1));
   shortGo === 'chrome://extensions/shortcuts'
@@ -5008,8 +5127,8 @@ try {
   await popAt(
     {
       ...signedIn,
+      __tab: 'settings',
       __demoLocal: {
-        popupPrefs: { tab: 'settings' },
         siteUrl: 'https://app.openhangar.space',
         siteLink: autoLink,
       },
@@ -5274,6 +5393,151 @@ try {
   refused.closed && !refused.bar
     ? ok('a scan the background refused: the popup closes, as before, no bar')
     : fail(`popup refused: ${JSON.stringify(refused)}`);
+  // The scan bar (the scanBar flag, owner 2026-10-20), forced on for this part: Scan
+  // becomes the bar at once, the bar names the part and counts, fills by RSI's page
+  // count, says when RSI asks to wait, then how long the scan took, with Scan back under
+  // it. RSI's wait and another scan running grey Scan, said in the bar's spot.
+  const barHook = await page.evaluateOnNewDocument(() => {
+    let flags;
+    const OH = (window.OH = window.OH || {});
+    Object.defineProperty(OH, 'flags', {
+      configurable: true,
+      get: () => flags,
+      set: (f) => (flags = Object.freeze({ ...f, scanBar: true })),
+    });
+  });
+  const sbar = () =>
+    page.evaluate(() => {
+      const b = document.getElementById('pp-sbar');
+      const scan = document.getElementById('pp-scan');
+      return {
+        text: b ? [...b.querySelectorAll('.pp-sbar-t > span')].map((x) => x.textContent.trim()) : null,
+        tone: b ? b.className.replace('pp-sbar', '').trim() : null,
+        now: b ? Number(b.getAttribute('aria-valuenow')) || null : null,
+        scan: scan ? (scan.disabled ? 'off' : 'on') : 'none',
+        top: !!document.querySelector('.pp-bar'),
+        steps: document.querySelectorAll('.pp-step').length,
+      };
+    });
+  await popAt(signedIn, '#pp-scan');
+  await page.evaluate(() => {
+    __demo.answers.scan = { ok: true };
+    __demo.closed = false;
+  });
+  await page.click('#pp-scan');
+  await sleep(100);
+  const barAsked = await sbar();
+  const barAt = await pageNow();
+  await told(
+    { scanRunning: { newValue: { at: barAt, tabId: null, run: 'r20', by: 'offscreen' } } },
+    'session',
+  );
+  const barProg = (p) =>
+    told({ scanProgress: { newValue: { run: 'r20', at: barAt, retry: null, ...p } } }, 'session');
+  await barProg({ part: 'hangar', page: 2, count: 1214, pages: 4 });
+  await sleep(100);
+  const barHangar = await sbar();
+  // Between pages the fill creeps on: past page 2's point (30%), never to page 3's (42.5%).
+  const fillAt = () =>
+    page.evaluate(() => {
+      const b = document.getElementById('pp-sbar');
+      return b.querySelector('i').getBoundingClientRect().width / b.clientWidth;
+    });
+  await sleep(1800);
+  const barCreep = await fillAt();
+  await barProg({ part: 'hangar', page: 3, count: 1214, pages: 4, retry: { attempt: 1, of: 3 } });
+  await sleep(100);
+  const barWait = await sbar();
+  await told(
+    { scanRunning: { newValue: undefined }, scanProgress: { newValue: undefined } },
+    'session',
+  );
+  const barReport = {
+    v: 1,
+    run: 'r20',
+    by: 'offscreen',
+    reason: 'popup',
+    startedAt: barAt,
+    at: barAt + 72e3,
+    ms: 72e3,
+    held: null,
+    signedOut: false,
+    switched: null,
+    rows: [{ id: 'hangar', ok: true, partial: null, n: 20, error: null }],
+    bad: false,
+    sync: null,
+    wait: null,
+  };
+  await told({ scanReport: { newValue: barReport } });
+  await sleep(100);
+  const barDone = await sbar();
+  await told({
+    scanReport: {
+      newValue: {
+        ...barReport,
+        at: barAt + 80e3,
+        rows: [{ id: 'hangar', ok: false, partial: null, n: null, error: 'RSI asked us to slow down' }],
+        bad: true,
+        wait: barAt + 80e3 + 5 * 60e3,
+      },
+    },
+  });
+  await sleep(100);
+  const barHold = await sbar();
+  // The longest it gets (a time like 12:45 PM) stays on one line of the bar, uncut, at
+  // the popup's width.
+  const barFits = await page.evaluate(() => {
+    const t = document.querySelector('#pp-sbar .pp-sbar-t > span');
+    t.textContent = 'RSI asked us to wait. Scan after 12:45 PM';
+    return {
+      fits: t.scrollWidth <= t.clientWidth,
+      used: t.scrollWidth,
+      room: t.clientWidth,
+      width: document.body.clientWidth,
+    };
+  });
+  await popAt(signedIn, '#pp-scan');
+  await page.evaluate(() => (__demo.answers.scan = { ok: false, error: 'busy' }));
+  await page.click('#pp-scan');
+  await sleep(150);
+  const barBusy = await sbar();
+  // Before the first scan: the bar is as wide as Scan was, not a sliver.
+  await popAt({ __demoLocal: { db: null } }, '#pp-first');
+  await page.evaluate(() => (__demo.answers.scan = { ok: true }));
+  await page.click('#pp-scan');
+  await sleep(100);
+  const barFirst = await page.evaluate(() => {
+    const b = document.getElementById('pp-sbar');
+    const box = document.getElementById('pp-first');
+    return b ? b.getBoundingClientRect().width / box.clientWidth : 0;
+  });
+  await page.removeScriptToEvaluateOnNewDocument(barHook.identifier);
+  const barOk =
+    barFirst > 0.8 &&
+    barAsked.text?.join() === 'Scanning' &&
+    barAsked.scan === 'none' &&
+    !barAsked.top &&
+    barHangar.text?.join() === 'Hangar,1,214' &&
+    barHangar.now === 30 &&
+    barCreep > 0.31 &&
+    barCreep < 0.425 &&
+    barHangar.steps === 0 &&
+    barWait.text?.join() === 'Waiting on RSI' &&
+    barWait.now === 30 &&
+    barDone.tone === 'done' &&
+    barDone.text?.join() === 'Scanned in 1m 12s' &&
+    barDone.scan === 'on' &&
+    barHold.tone === 'note' &&
+    /^RSI asked us to wait\. Scan after \d/.test(barHold.text?.join() || '') &&
+    barHold.scan === 'off' &&
+    barFits.fits &&
+    barBusy.text?.join() === 'A scan is already running.' &&
+    barBusy.scan === 'off';
+  barOk
+    ? ok("scan bar: in Scan's place at once, names and counts, fills by page, waits, done, holds")
+    : fail(
+        `popup scan bar: ${JSON.stringify({ barFirst, barAsked, barHangar, barCreep, barWait, barDone, barHold, barFits, barBusy })}`,
+      );
   // A scan whose page went away (its mark left behind): Scan stopped, Scan Again.
   await popAt(
     {
@@ -5344,7 +5608,7 @@ try {
   });
   await page.click('#pp-login');
   const outGo = await page.evaluate(() => __demo.opened.at(-1));
-  ppOut.login === 'Log In to RSI ↗' &&
+  ppOut.login === 'Log In to RSI' &&
   ppOut.scanOn &&
   ppOut.grey &&
   outGo === 'https://robertsspaceindustries.com/connect'
@@ -5412,7 +5676,7 @@ try {
     tag: document.getElementById('pp-ver').tagName,
     seen: (await chrome.storage.local.get('popupPrefs')).popupPrefs?.seenVersion,
   }));
-  news === 'New in 0.2.7 See What Changed ↗ Got It' &&
+  news === 'New in 0.2.7 See What Changed Got It' &&
   newsGone.tag === 'SPAN' &&
   newsGone.seen === '0.2.7'
     ? ok("what's new after an update: the dot on the version tag, Got It hides it for good")
@@ -5501,8 +5765,8 @@ try {
   await popAt(
     {
       ...signedIn,
+      __tab: 'wishlist',
       __demoLocal: {
-        popupPrefs: { tab: 'wishlist' },
         siteUrl: ppSite,
         siteLink: ppWishLink,
         alertsOn: true,
@@ -5552,15 +5816,15 @@ try {
   !ppWish.remove &&
   ppWish.asked.join() === `GET ${ppSite}/api/v1/wishlist?with=items Bearer t` &&
   wishFull === `${ppSite}/hangar/wishlist`
-    ? ok('Wishlist, the website not taking changes: read only as before, Full Wishlist ↗')
+    ? ok('Wishlist, the website not taking changes: read only as before, Full Wishlist')
     : fail(`popup wishlist: ${JSON.stringify({ ppWish, wishFull })}`);
   // No sale feed kept yet: the ship list names the ships (never an empty list over "And
   // N more"), and nothing is said about sales.
   await popAt(
     {
       ...signedIn,
+      __tab: 'wishlist',
       __demoLocal: {
-        popupPrefs: { tab: 'wishlist' },
         siteUrl: ppSite,
         siteLink: ppWishLink,
         alertsOn: true,
@@ -5590,15 +5854,15 @@ try {
   await popAt(
     {
       ...signedIn,
-      __demoLocal: { popupPrefs: { tab: 'wishlist' }, siteUrl: ppSite, siteLink: ppWishLink },
+      __tab: 'wishlist', __demoLocal: { siteUrl: ppSite, siteLink: ppWishLink },
     },
     '#pp-wish-off',
   );
   const wishOff = await page.$eval('#pp-wish-off', (e) =>
     e.textContent.replace(/\s+/g, ' ').trim(),
   );
-  wishOff === 'Your Wishlist Lives on openhangar.space Full Wishlist ↗'
-    ? ok('Wishlist off on the website, alerts off: Full Wishlist ↗ to the website')
+  wishOff === 'Your Wishlist Lives on openhangar.space Full Wishlist'
+    ? ok('Wishlist off on the website, alerts off: Full Wishlist to the website')
     : fail(`popup wishlist, alerts off: ${JSON.stringify({ wishOff })}`);
 
   // The website takes changes (its extension_wishlist_write on): the items it read, a
@@ -5624,8 +5888,8 @@ try {
           wishItem('sku:501', 'Cutlass - Ghoulish Green Paint', { category: 'paints' }),
         ],
       },
+      __tab: 'wishlist',
       __demoLocal: {
-        popupPrefs: { tab: 'wishlist' },
         siteUrl: ppSite,
         siteLink: ppWishLink,
         alertsOn: true,
@@ -5804,7 +6068,7 @@ try {
           wishItem('sku:501', 'Cutlass - Ghoulish Green Paint', { remind: false }),
         ],
       },
-      __demoLocal: { popupPrefs: { tab: 'wishlist' }, siteUrl: ppSite, siteLink: ppWishLink },
+      __tab: 'wishlist', __demoLocal: { siteUrl: ppSite, siteLink: ppWishLink },
     },
     '.pp-wedit li',
   );
@@ -5846,7 +6110,7 @@ try {
     {
       ...signedIn,
       __demoWish: { mode: 'items', items: [wishItem('ship:avenger-titan', 'Avenger Titan')] },
-      __demoLocal: { popupPrefs: { tab: 'wishlist' }, siteUrl: ppSite, siteLink: ppWishLink },
+      __tab: 'wishlist', __demoLocal: { siteUrl: ppSite, siteLink: ppWishLink },
     },
     '.pp-wedit li',
   );
@@ -5897,7 +6161,7 @@ try {
     return { ...db, owner: { nickname: 'Alt_Pilot', displayname: 'Alt Pilot' } };
   });
   await popAt(
-    { ...signedIn, __demoLocal: { popupPrefs: { tab: 'settings' }, 'profile:alt_pilot': alt } },
+    { ...signedIn, __tab: 'settings', __demoLocal: { 'profile:alt_pilot': alt } },
     '#pp-accounts',
   );
   const accts = await page.$$eval('#pp-accounts .pp-acct b', (bs) => bs.map((b) => b.textContent));
@@ -6422,7 +6686,7 @@ try {
   const why = (w, ships = []) => ({ why: w, ships });
   const alState = {
     alertsOn: true,
-    // Closed on Settings last time: Fleet News with something unseen opens on Hangar.
+    // A tab saved by an older version: the popup opens on Hangar all the same.
     popupPrefs: { tab: 'settings' },
     alerts: {
       v: 1,

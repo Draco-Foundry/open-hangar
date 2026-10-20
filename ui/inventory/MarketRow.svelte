@@ -37,7 +37,7 @@
         href={r.view.url}
         target="_blank"
         rel="noopener"
-        title={r.view.title}>View ↗</a
+        title={r.view.title}>View</a
       >{/if}</td
   >
 </tr>

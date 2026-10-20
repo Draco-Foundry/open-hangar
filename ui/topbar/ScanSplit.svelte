@@ -7,6 +7,7 @@
   // until the next scan. The scan itself, and the progress, live in dashboard.js
   // (window.OHApp.top). Sync builds put the website's section in the menu
   // (#scan-menu-site, filled by ui/site).
+  import { safeHTML } from '../lib/safe-html.js';
   import { app, version } from '../lib/app.svelte.js';
   import {
     menus,
@@ -150,7 +151,8 @@
         stroke-width="1.9"
         stroke-linecap="round"
         stroke-linejoin="round"
-        aria-hidden="true">{@html ICONS[look.icon]}</svg
+        aria-hidden="true"
+        use:safeHTML={ICONS[look.icon]}></svg
       >{#if look.count}<span class="sl-word">{look.word}</span>
         <span class="sl-count">{look.count}</span>{:else}<span class="sl-word">{look.word}</span
         >{/if}</span

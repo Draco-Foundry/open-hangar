@@ -207,6 +207,24 @@ body {
 .pp-whatsnew b {
   font-weight: 600;
 }
+/* The basic page's notices at the top of every tab: an update ready, status.json's banner. */
+.pp-notice {
+  margin: 0 16px 10px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  text-wrap: pretty;
+}
+.pp-notice.warn {
+  background: var(--warn-soft);
+  border-color: var(--warn-line);
+}
 
 /* --- Tabs --- */
 .pp-tabs {
@@ -278,7 +296,8 @@ body {
   padding: 10px 2px 6px;
 }
 .pp-first .pp-btn,
-.pp-empty .pp-btn {
+.pp-empty .pp-btn,
+.pp-first .pp-sbar {
   align-self: stretch;
 }
 .pp-big-ic {
@@ -563,6 +582,69 @@ body {
 .pp-step.todo {
   color: var(--muted);
 }
+/* The scan bar (the scanBar flag, owner 2026-10-20): the soft fill, 28 px, where Scan
+   sits (ui/popup/Hangar.svelte). The fill eases between the scan's writes (about two a
+   second), so it moves smoothly; done, it's full and soft green; a note fills none. */
+.pp-sbar {
+  position: relative;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--line-2);
+  background: var(--lift-2);
+  overflow: hidden;
+  font-size: 12.5px;
+}
+.pp-sbar i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: var(--accent-soft);
+  border-right: 2px solid var(--accent);
+  transition: width 0.6s linear;
+}
+.pp-sbar i.wait {
+  width: 30%;
+  border-right: 0;
+  animation: pp-wait 1.4s ease-in-out infinite;
+}
+.pp-sbar.done i {
+  width: 100%;
+  border-right: 0;
+  background: color-mix(in srgb, var(--good) 14%, transparent);
+}
+.pp-sbar.note i {
+  display: none;
+}
+.pp-sbar-t {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pp-sbar-t > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pp-sbar.done .pp-sbar-t,
+.pp-sbar.note .pp-sbar-t {
+  justify-content: center;
+}
+.pp-sbar-n {
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-sbar i {
+    transition: none;
+  }
+  .pp-sbar i.wait {
+    animation: none;
+  }
+}
 .pp-done {
   margin: 0;
   display: flex;
@@ -640,12 +722,14 @@ body {
   display: flex;
   gap: 8px;
 }
-/* The three data buttons: one row, wrapping on a narrow screen. */
+/* The three data buttons: one row, each as wide as its name at least, so a wider font
+   wraps the row instead of running a name past the edge. */
 .pp-three {
   flex-wrap: wrap;
 }
 .pp-three .pp-btn2 {
-  flex: 1 1 30%;
+  flex: 1 1 auto;
+  min-width: max-content;
   white-space: nowrap;
 }
 .pp-link {
@@ -1002,6 +1086,52 @@ body {
 .pp-grow {
   flex: 1;
   min-width: 0;
+}
+/* Two switches on one row, and Look, Currency and Shortcut side by side (#700): each name
+   over its control (Settings.svelte). Notifications waits on Store Alerts, so its name
+   dims with its switch. */
+.pp-two .pp-gap {
+  margin-left: 6px;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
+.pp-two .pp-gap.off {
+  color: var(--faint);
+}
+.pp-trio {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.8fr) minmax(0, 1.25fr);
+  align-items: start;
+  gap: 10px;
+}
+.pp-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.pp-cell small {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.pp-cell small .pp-link {
+  font-size: 12px;
+}
+.pp-cell .pp-sel {
+  align-self: start;
+  text-align: left;
+  max-width: 100%;
+  padding: 0;
+  color: var(--text);
+}
+.pp-cval {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .pp-val {
   margin-left: auto;

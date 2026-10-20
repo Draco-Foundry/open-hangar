@@ -84,7 +84,7 @@
       {
         name: '_execute_action',
         description: '',
-        shortcut: window.__demoShortcut ?? 'Alt+Shift+H',
+        shortcut: window.__demoShortcut ?? 'Alt+Shift+O',
       },
     ],
   };

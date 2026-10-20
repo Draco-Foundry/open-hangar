@@ -84,37 +84,56 @@ every store is `support@openhangar.space`. The account setup is kept in the main
 - ✅ **Privacy policy hosted** — paste this URL in each store dashboard:
   **`https://openhangar.space/privacy.html`** (source: `site/privacy.html`, mirrors
   `docs/PRIVACY.md`). Homepage / support URL: `https://openhangar.space/`.
-- ⬜ **Single purpose** statement (dashboard asks for it): see §6.
-- ⬜ **Permission justifications** (dashboard requires one per permission): see §5.
-- ⬜ **Data-usage disclosures** (checkboxes in the dashboard):
-  - Data collected: only the user's own RSI account data, stored **locally**.
-  - ☑ "I do not sell or transfer user data to third parties."
-  - ☑ "I do not use/transfer data for purposes unrelated to the item's core function."
-  - ☑ "I do not use/transfer data to determine creditworthiness / for lending."
+- ✅ **Single purpose** statement (dashboard asks for it): see §6.
+- ✅ **Permission justifications** (dashboard requires one per permission): see §5.
+- ✅ **Remote code:** "No, I am not using remote code" (flags are build-time only).
+- ✅ **Data-usage disclosures** (Chrome's Privacy practices tab, filled in 2026-10-14:
+  Chrome refused to submit 0.3.0 until it was). Everything stays in the browser unless
+  the user connects optional sync to their own openhangar.space account; what sync
+  sends is declared, the same three kinds as the Firefox build's optional
+  `data_collection_permissions`:
+  - ☑ Personally identifiable information (the RSI account block: handle, display
+    name, avatar and profile details)
+  - ☑ Financial and payment information (pledge values, store credit and other balances)
+  - ☑ Website content (the hangar read from RSI's pages)
+  - ☑ "I do not sell or transfer user data to third parties, outside of the approved use cases."
+  - ☑ "I do not use or transfer user data for purposes that are unrelated to my item's single purpose."
+  - ☑ "I do not use or transfer user data to determine creditworthiness or for lending purposes."
 
 ## 5. Permission Justifications (Paste Into the Dashboard)
 
+As they stand in the Chrome dashboard (2026-10-14). Keep these and the dashboard the
+same: change one, change the other.
+
 **`storage`**
 
-> Stores the user's scanned hangar/buy-back/referral data and UI preferences
-> locally in the browser (`chrome.storage.local`). Nothing is sent to any server.
+> Stores the user's scanned hangar, buy-back and referral data and UI preferences
+> locally in the browser. Nothing leaves the browser unless the user connects optional
+> sync to their own openhangar.space account.
 
 **`unlimitedStorage`** (added in 0.2.11)
 
-> Large hangars plus their scan history (used for "what changed since last scan")
-> can exceed the default 10 MB local storage quota, which would make scans fail.
-> All data stays on the user's device; this only lifts the local size cap.
+> Big hangars and buy-back lists (1,000+ items, plus scan history for the
+> value-over-time chart and cached ship data) can exceed the default 10 MB local
+> storage quota. unlimitedStorage lets that data stay in chrome.storage.local on the
+> user's own computer. Nothing is sent to any server.
 
 **`cookies`**
 
 > Used for three things, all on robertsspaceindustries.com. First, "Log Out of RSI": clears RSI's cookies (including the HttpOnly session cookie that page scripts can't remove) so the user can fully end their RSI session from the extension. Second, telling whether the user is signed in to RSI: the extension checks only whether RSI's sign-in cookie exists, so the popup can show "Log In to RSI" and Auto Scan Daily can skip a signed-out day, without contacting RSI. Third, Add to RSI Cart: like RSI's own upgrade window, it reads RSI's session token cookie and sends it back to robertsspaceindustries.com with the cart request the user asked for. Cookie values are never stored and never sent anywhere except RSI.
 
+**`identity`** (added in 0.3.0)
+
+> Used only to get this extension's own sign-in address (chrome.identity.getRedirectURL)
+> for the optional Connect to openhangar.space (an OAuth sign-in with PKCE). It never
+> opens a sign-in window and never reads the user's Google or Chrome account.
+
 **`host_permissions` → `https://robertsspaceindustries.com/*`**
 
-> The extension reads the signed-in user's OWN RSI account (hangar, buy-backs,
-> balances, referrals) by making same-session `fetch` requests to RSI, then parses
-> the returned pages/JSON locally. Read-only and rate-limited; only the user's own
-> account is accessed.
+> Reads the signed-in user's own RSI account (hangar, buy-backs, balances, referrals)
+> with same-session requests and parses it locally, rate-limited. The only writes:
+> when the user clicks Add to RSI Cart or Send to RSI Cart, it puts the items they
+> picked in their own RSI cart. It never checks out or pays.
 
 _(Since 0.2.8 there is no `api.star-citizen.wiki` host permission: that public API
 sends `Access-Control-Allow-Origin: *` and we fetch it without credentials, so the
@@ -134,14 +153,15 @@ install prompt only names robertsspaceindustries.com.)_
 
 **`notifications`** (optional, added in 0.3.0)
 
-> Optional. Requested only when the user turns store alerts on, and the user can decline: the toolbar badge and the popup's list still work without it. Used only to show a notification when an item in RSI's store newly matches the user's hangar, buy-backs or wishlist, at most three per check. Matching happens on the device, and nothing is sent. Turning alerts off removes the permission.
+> Optional. Requested only when the user turns store alerts on, and the user can decline: the toolbar badge and the popup's list still work without it. Used only to show a notification when an item in RSI's store newly matches the user's hangar, buy-backs or wishlist: at most three of their own per check, then one for the rest. Matching happens on the device, and nothing is sent. Turning alerts off removes the permission.
 
 ## 6. Listing Copy (Ready to Paste)
 
-**Single purpose:**
+**Single purpose** (as in the Chrome dashboard, 2026-10-14):
 
-> Open Hangar reads the signed-in user's own Star Citizen / RSI account data and
-> organizes it into a clean, local, browsable database they can also export.
+> Open Hangar reads the signed-in user's own Star Citizen / RSI account data, organizes
+> it into a browsable hangar they can export, and can optionally sync it to the user's
+> own openhangar.space account.
 
 **Summary (≤132 chars, also the manifest `description`):**
 

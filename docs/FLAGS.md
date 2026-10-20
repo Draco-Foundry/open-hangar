@@ -52,6 +52,7 @@ wishlist import and store alerts, and from 0.4.0 Auto Scan Daily):
 | `wishlistImport` | This browser's wishlist into the account (the basic page)  | on    | on   | no       |
 | `alerts`         | Store alerts matched on the device (needs connector)       | on    | on   | no       |
 | `autoScan`       | Auto Scan Daily, once a day while connected (needs alerts) | on    | on   | no       |
+| `scanBar`        | The popup's scan as one counting bar where Scan sits       | off   | off  | no       |
 
 ## Adding or Retiring a Flag
 

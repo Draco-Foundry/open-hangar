@@ -146,6 +146,80 @@ export function scanSteps(part) {
   return STEPS.map((id, i) => ({ id, state: i < at ? 'done' : i === at ? 'now' : 'todo' }));
 }
 
+// --- The scan bar (the scanBar flag, owner 2026-10-20; with it off, the bar under the
+// header and the steps above stay). One bar where Scan sits: its label the part running
+// and how many it has read, its fill the scan's real progress. Where each part's share
+// of the whole scan ends: the hangar and buy-backs are most of a scan's pages. Packs
+// read after the scan's end (ui/scan/runner.js readPacks), so they fill on their own.
+const BAR_SPAN = {
+  start: [0, 0.02],
+  account: [0.02, 0.05],
+  hangar: [0.05, 0.55],
+  buybacks: [0.55, 0.85],
+  referrals: [0.85, 0.95],
+  sync: [0.95, 1],
+  packs: [0, 1],
+};
+const counted = (n) => Number.isFinite(n) && n > 0;
+// How much of the part is read, 0 to 1. The hangar and buy-backs by page of RSI's pager
+// (`pages`; a page being retried isn't read yet), eased towards the end without one.
+// Referrals by list of `pages`, packs by packs read of `count`.
+function partDone(p) {
+  const page = counted(p.page) ? p.page : 0;
+  if (p.part === 'packs') return counted(p.count) ? Math.min(1, page / p.count) : 0;
+  if (p.part === 'referrals') return counted(p.pages) ? Math.min(1, page / p.pages) : 0;
+  if (p.part !== 'hangar' && p.part !== 'buybacks') return 0;
+  const read = p.retry ? Math.max(0, page - 1) : page;
+  if (counted(p.pages)) return Math.min(1, read / Math.max(p.pages, page));
+  return read / (read + 3);
+}
+// The bar's fill for scanProgress, 0 to 1 (no percentage is shown): a part's share fills
+// as it reads, so the bar never waits on a part's end to move.
+export function barFraction(p) {
+  const [from, to] = BAR_SPAN[p?.part] || BAR_SPAN.start;
+  if (!isObj(p)) return from;
+  return Math.round((from + (to - from) * partDone(p)) * 1000) / 1000;
+}
+// Where the fill will be after the next page (or list, or pack) lands, so the bar can
+// creep towards it while it's read (the owner, 2026-10-20: it should move all the time,
+// not wait on a page). A part that reads no pages creeps towards its end.
+export function barNext(p) {
+  const [, to] = BAR_SPAN[p?.part] || BAR_SPAN.start;
+  if (!isObj(p) || !['hangar', 'buybacks', 'referrals', 'packs'].includes(p.part)) return to;
+  const page = counted(p.page) ? p.page : 0;
+  const read = p.retry ? Math.max(0, page - 1) : page;
+  return Math.min(to, barFraction({ ...p, page: read + 1, retry: null }));
+}
+const BAR_KEY = {
+  start: 'popup.scanning-short',
+  account: 'popup.part-account',
+  hangar: 'popup.step-hangar',
+  buybacks: 'popup.step-buybacks',
+  referrals: 'popup.step-referrals',
+  packs: 'popup.part-packs',
+  sync: 'popup.part-sync',
+};
+// The bar's words: → { key, n }. key: the part's copy key (while RSI asks the scan to
+// wait and it tries again, that instead); n: what counts up on the right, '' for none:
+// pledges, buy-backs or people read, or packs read of packs to read ("3 / 6").
+export function barLabel(p) {
+  if (!isObj(p)) return { key: 'popup.scanning-short', n: '' };
+  if (p.retry) return { key: 'popup.rsi-waiting', n: '' };
+  const key = BAR_KEY[p.part] || 'popup.scanning-short';
+  const num = (x) => (Number.isFinite(x) && x >= 0 ? x.toLocaleString('en-US') : '');
+  if (p.part === 'packs')
+    return { key, n: counted(p.count) ? `${num(p.page || 0)} / ${num(p.count)}` : '' };
+  if (p.part === 'hangar' || p.part === 'buybacks' || p.part === 'referrals')
+    return { key, n: num(p.count) };
+  return { key, n: '' };
+}
+// Scan held back: RSI kept asking the last scan to slow down (its report's `wait`,
+// ui/scan/runner.js scanWait) and that time hasn't come. → the time (ms), or null.
+export function scanHold(report, now = Date.now()) {
+  const at = isObj(report) ? report.wait : null;
+  return Number.isFinite(at) && at > now ? at : null;
+}
+
 // A scan's start (local scanStarted) counts as one that stopped once it's this old with
 // nothing to say it's running or that it ended.
 const STARTED_QUIET = 60e3;
@@ -327,13 +401,6 @@ export function fleetNews(items, unseen = new Set(), max = 3) {
     .sort((a, b) => a.r - b.r || a.i - b.i)
     .slice(0, max)
     .map((x) => x.m);
-}
-
-// The tab the popup opens on: Hangar while Fleet News has something unseen, else the
-// one it was closed on.
-export function openingTab(saved, newsUnseen) {
-  if (newsUnseen > 0) return 'hangar';
-  return TABS.includes(saved) ? saved : 'hangar';
 }
 
 // --- The Wishlist tab ----------------------------------------------------------------------

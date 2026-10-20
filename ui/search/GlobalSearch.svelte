@@ -115,7 +115,7 @@
     </span>
     <span class="gs-side">
       {#if row.val}<b>{row.val}</b>{#if row.valLbl}<small>{row.valLbl}</small>{/if}{/if}
-      <span class="gs-open">Details →</span>
+      <span class="gs-open">Details</span>
     </span>
   </button>
 {/snippet}
@@ -188,7 +188,7 @@
                   <span class="gs-name">{row.name}</span>
                   <span class="gs-where">Referral reward <em>· {row.sub}</em></span>
                 </span>
-                <span class="gs-side"><span class="gs-open">Referrals →</span></span>
+                <span class="gs-side"><span class="gs-open">Referrals</span></span>
               </a>
             {/each}
           </div>
