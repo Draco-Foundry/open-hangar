@@ -111,7 +111,7 @@
     if (v?.signedOut) return Number.isFinite(account?.fetchedAt) ? account.fetchedAt : 0;
     return null;
   });
-  const signIn = $derived(rsiSignIn({ cookie, readOut }));
+  const signIn = $derived(rsiSignIn({ cookie, readOut, justOut: shown?.signedOut === true }));
   const signedOut = $derived(signIn !== 'in');
   // Amounts in the currency picked (US dollars until one is), from US dollars.
   const currency = $derived(shownCurrency(prefs.currency));
