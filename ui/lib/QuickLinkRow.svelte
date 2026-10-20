@@ -1,6 +1,6 @@
 <script>
-  // One RSI Quick Link (#374): icon, label, an optional one-liner, and ↗ because it
-  // leaves the extension for RSI. Opens in a new tab; nothing is fetched or sent.
+  // One RSI Quick Link (#374): icon, label and an optional one-liner. It leaves the
+  // extension for RSI: opens in a new tab; nothing is fetched or sent.
   import { QL_ICONS } from './quick-links.js';
 
   let { link, desc = false } = $props();
