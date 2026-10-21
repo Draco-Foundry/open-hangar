@@ -109,9 +109,9 @@ test('connector build: the popup, the basic page, the scan page and what they lo
       assert.ok(src.length <= 32, `${t}: a small build (${src.length} files)`);
       const m = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8'));
       assert.equal(m.action.default_popup, 'src/popup.html');
-      // Alt+Shift+H opens the popup in every browser (manifest.json commands).
+      // Alt+Shift+O opens the popup in every browser (manifest.json commands).
       assert.deepEqual(m.commands, {
-        _execute_action: { suggested_key: { default: 'Alt+Shift+H', mac: 'Alt+Shift+H' } },
+        _execute_action: { suggested_key: { default: 'Alt+Shift+O', mac: 'Alt+Shift+O' } },
       });
       assert.match(
         m.content_security_policy.extension_pages,

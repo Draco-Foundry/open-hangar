@@ -398,3 +398,31 @@ test('the scan reads the addresses, paging and signs from the rules', () => {
   assert.equal(buybacks.emptyMarker, RULES.buybacks.empty);
   assert.ok(buybacks.emptyMarker.test('You have no pledges available for buy back.'));
 });
+
+// The parser version check (scripts/check-parser-version.mjs): a PR that changes how
+// pages are read bumps PARSER_VERSION (src/hangar-shape.js) or says why not.
+test('a parser change needs a PARSER_VERSION bump or a Parser-Version-Unchanged trailer', async () => {
+  const { verdict, readPages, PARSER_FILES } = await import('../scripts/check-parser-version.mjs');
+  const parser = { filename: 'src/data/parser-rules.json', patch: '+ "x": 1' };
+  const bump = {
+    filename: 'src/hangar-shape.js',
+    patch: '-  const PARSER_VERSION = 1;\n+  const PARSER_VERSION = 2;',
+  };
+  assert.equal(verdict({ files: [{ filename: 'src/lib.js' }], messages: [] }).ok, true);
+  assert.equal(verdict({ files: [parser], messages: ['fix(parser): x'] }).ok, false);
+  assert.equal(verdict({ files: [parser, bump], messages: [] }).ok, true);
+  const comment = { filename: 'src/hangar-shape.js', patch: '+  // PARSER_VERSION = 2 soon' };
+  assert.equal(verdict({ files: [parser, comment], messages: [] }).ok, false);
+  const why = verdict({
+    files: [parser],
+    messages: ['test(parser): a report\n\nParser-Version-Unchanged: a report only\n'],
+  });
+  assert.deepEqual(why, { ok: true, why: 'Parser-Version-Unchanged: a report only' });
+  assert.equal(verdict({ files: [parser], messages: ['Parser-Version-Unchanged:'] }).ok, false);
+  // Every file it watches exists, and the version lives where the check looks.
+  for (const f of PARSER_FILES) assert.ok(fs.existsSync(path.join(ROOT, f)), f);
+  assert.match(read('src/hangar-shape.js'), /^ {2}const PARSER_VERSION = \d+;$/m);
+  // gh api --paginate prints pages back to back; --slurp wraps them.
+  assert.deepEqual(readPages('[1,2]\n[3]'), [1, 2, 3]);
+  assert.deepEqual(readPages('[[1,2],[3]]'), [1, 2, 3]);
+});

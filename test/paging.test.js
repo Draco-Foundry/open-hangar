@@ -177,6 +177,20 @@ test('buy-backs without an id are read once, not again from a repeated page', as
   assert.equal(served.length, 2);
 });
 
+test("progress says how many pages RSI's pager shows (the popup's scan bar)", async () => {
+  const list = buybacks(25);
+  serve(list, 10);
+  for (const k of Object.keys(store)) delete store[k];
+  const said = [];
+  const r = await OH.scanSource('buybacks', (...a) => said.push(a));
+  exactlyOnce(r, list);
+  assert.deepEqual(said, [
+    [1, 10, null, 3],
+    [2, 20, null, 3],
+    [3, 25, null, 3],
+  ]);
+});
+
 test('without a pager, the scan still ends when a page brings nothing new', async () => {
   const list = buybacks(15);
   served = [];
@@ -192,10 +206,16 @@ test('without a pager, the scan still ends when a page brings nothing new', asyn
       .join('');
     return new Response(`<html><body>${items}</body></html>`);
   };
-  exactlyOnce(await scan(), list);
+  for (const k of Object.keys(store)) delete store[k];
+  const said = [];
+  exactlyOnce(await OH.scanSource('buybacks', (...a) => said.push(a)), list);
   assert.deepEqual(
     served.map((s) => s.page),
     [1, 2, 3],
+  );
+  assert.ok(
+    said.every((a) => a[3] === null),
+    'no page count without a pager',
   );
 });
 

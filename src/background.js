@@ -51,7 +51,10 @@ if (typeof importScripts === 'function' && !self.OHScanHost) importScripts('scan
 scanHost = self.OHScanHost.create({
   chrome,
   document: typeof document === 'undefined' ? null : document,
-  afterDone: () => updateIfIdle(),
+  afterDone: async () => {
+    await freeAskGap().catch(() => {});
+    await updateIfIdle();
+  },
 });
 chrome.runtime.onMessage.addListener(scanHost.heard);
 // @flag-end connector
@@ -369,9 +372,29 @@ siteHandlers['oh-link-check'] = async (msg, origin) => {
 // A scan-running marker older than this is a page that went away mid-scan
 // (src/dashboard.js scanMark refreshes it every minute while a scan runs).
 const SCAN_RUN_MAX = 10 * 60e3;
-// One scan request a minute at most, and none while a scan runs.
+// One scan request a minute at most, and none while a scan runs. A scan that read
+// nothing frees it once its hidden page is done (freeAskGap).
 const SCAN_ASK_GAP = 60e3;
 let scanAskedAt = 0;
+// The hidden page is done (src/scan-host.js afterDone): when the scan asked last read
+// nothing of RSI's lists (signed out, or held: its report has no rows), the minute's
+// limit goes at once, so Scan works right after Log In to RSI instead of saying a scan
+// is running for up to a minute (the owner, Firefox 0.5.1, 2026-10-20). A scan that
+// read anything keeps the limit.
+async function freeAskGap() {
+  const { scanReport: r } = await chrome.storage.local.get('scanReport');
+  const { scanAskedAt: asked } = await chrome.storage.session.get('scanAskedAt');
+  const at = Number.isFinite(asked) ? asked : scanAskedAt;
+  const empty =
+    r &&
+    typeof r === 'object' &&
+    Array.isArray(r.rows) &&
+    !r.rows.length &&
+    (r.signedOut || r.held);
+  if (!at || !empty || !Number.isFinite(r.startedAt) || r.startedAt < at) return;
+  scanAskedAt = 0;
+  await chrome.storage.session.remove('scanAskedAt');
+}
 // One Firefox ask for the hangar page a minute at most.
 const FIREFOX_ASK_GAP = 60e3;
 let firefoxAskedAt = 0;

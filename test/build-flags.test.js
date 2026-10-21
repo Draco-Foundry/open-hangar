@@ -24,6 +24,7 @@ test('registry parses: every flag has a name, a one-line about and a default', a
     'connector',
     'localMode',
     'orgFleet',
+    'scanBar',
     'sync',
     'wishlistImport',
   ]);
@@ -60,6 +61,8 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     alerts: true,
     // Auto Scan Daily (#666): the privacy policy names it (test/privacy-permissions.test.js).
     autoScan: true,
+    // The popup's scan bar ships dark until the owner turns it on (2026-10-20).
+    scanBar: false,
   };
   assert.deepEqual(buildValues(registry), STORE);
   // The beta is the same set: no flag has a beta value of its own today.
@@ -103,6 +106,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     wishlistImport: false,
     alerts: false,
     autoScan: true,
+    scanBar: true,
   });
   const { values } = loadFlags(fs.readFileSync(file, 'utf8'));
   assert.deepEqual(values, {
@@ -113,6 +117,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     wishlistImport: false,
     alerts: false,
     autoScan: true,
+    scanBar: true,
   });
   assert.throws(() => writeFlags(file, {}), /expected one/, 'only ever written once');
   fs.rmSync(dir, { recursive: true, force: true });
@@ -260,6 +265,8 @@ test('pack: writes each build its values and cuts the code of flags that are off
     alerts: true,
     // Auto Scan Daily (#666): the privacy policy names it (test/privacy-permissions.test.js).
     autoScan: true,
+    // The popup's scan bar ships dark until the owner turns it on (2026-10-20).
+    scanBar: false,
   };
   // Without the connector, what needs it goes too (Auto Scan Daily needs the alerts).
   const NO_CONNECTOR = [

@@ -49,6 +49,7 @@
   const DB_KEY = 'db';
   const HISTORY_KEY = 'dbHistory';
   const ARCHIVE_KEY = 'pledgeArchive'; // pledges gone from the hangar (see archiveGone)
+  const PARSER_KEY = 'scanParser'; // which parser read each source (src/hangar-shape.js)
   const CORRUPT_KEY = 'dbCorrupt';
   // Two version numbers, set in src/hangar-shape.js (which says what each changed):
   //   DB_VERSION is how the database is stored in this browser. Changing that
@@ -819,6 +820,12 @@
     return db.sources[id] || { items: [], scannedAt: null };
   };
 
+  // Was this source's saved data read by an older parser (src/hangar-shape.js
+  // PARSER_VERSION)? Then it's stale until the next scan, not current.
+  OH.parserStale = async function parserStale(id) {
+    return SHAPE.parserStale((await chrome.storage.local.get(PARSER_KEY))[PARSER_KEY], id);
+  };
+
   // Everything that writes the live DB (scan saves, fix-ups, Clear Data, restores,
   // account switches, imports) runs one at a time in this queue, and reads storage
   // right before it writes, so nothing can write back a stale copy over another.
@@ -875,6 +882,12 @@
           await chrome.storage.local.set({ [ARCHIVE_KEY]: OH.archiveGone(cur, gone, scannedAt) });
         }
       }
+      // Which parser read this source (src/hangar-shape.js PARSER_VERSION): kept
+      // beside the DB, not in it, so the DB, backups and sync keep their shapes.
+      const stamps = (await chrome.storage.local.get(PARSER_KEY))[PARSER_KEY];
+      await chrome.storage.local.set({
+        [PARSER_KEY]: { ...(isObj(stamps) ? stamps : {}), [id]: SHAPE.PARSER_VERSION },
+      });
       await chrome.storage.local.remove(['hangar', 'scannedAt']); // drop legacy keys
       return scannedAt;
     });
@@ -1476,7 +1489,10 @@
         if (!retryRateLimit)
           return { error: 'RSI asked us to slow down', rateLimited: true, retryAfter };
         const msg = 'RSI asked us to slow down';
-        if (++slowDowns > RATE_LIMIT_RETRIES) return { error: msg, transient: true };
+        // Still slowed down after every retry: `slowDown` and RSI's Retry-After go back,
+        // so a scan can say how long RSI asked it to wait (ui/scan/runner.js scanWait).
+        if (++slowDowns > RATE_LIMIT_RETRIES)
+          return { error: msg, transient: true, slowDown: true, retryAfter };
         retry = {
           msg,
           wait: Math.min(
@@ -1522,7 +1538,9 @@
   // than asked (RSI clamps out-of-range pages to the last), or when a page yields no
   // NEW ids. Never on a short page or a page count worked out from the size: RSI
   // may serve another size than asked.
-  // onProgress(page, count, retry?) — retry = { attempt, of } while retrying.
+  // onProgress(page, count, retry?, pages?) — retry = { attempt, of } while retrying;
+  // pages: the highest page RSI's pager has linked to so far, or null without a pager.
+  // An unchanged list says pages = page: it's done.
   // If RSI keeps failing mid-scan, returns what was gathered as { items, partial }.
   // `prev`: the saved scan, for sources that probe for changes first (#294). When
   // it's still current, returns { unchanged: true } after a few requests.
@@ -1540,8 +1558,10 @@
     let lastAdded = 0;
     let ended = false; // the pager said this was the last page
     let aligned = true;
+    let pages = null; // the highest page RSI's pager has linked to so far
     const down = (got) => ({
       rsiDown: !!(got.transient || got.rateLimited),
+      slowDown: !!got.slowDown,
       retryAfter: got.retryAfter ?? null,
     });
 
@@ -1551,7 +1571,7 @@
         pageUrl(src, page, size),
         (attempt, of, reason) => {
           OH.log('warn', src.id, `page ${page}: ${reason}, retry ${attempt}/${of}`);
-          onProgress?.(page, all.length, { attempt, of });
+          onProgress?.(page, all.length, { attempt, of }, pages);
         },
         { retryRateLimit: !auto },
       );
@@ -1619,11 +1639,12 @@
       const pager = src.pager?.(html) ?? null;
       if (page > 1 && pager?.current && pager.current !== page) break;
       const lastLinked = pager?.current === page && pager.max != null && pager.max <= page;
+      if (pager?.max != null) pages = Math.max(pages ?? 0, pager.max, page);
 
       let added = 0;
       fillIds(src, items, page);
       if (page === 1 && prev && (await unchangedSince(src, prev, items, size))) {
-        onProgress?.(page, prev.items.length);
+        onProgress?.(page, prev.items.length, null, page);
         return { unchanged: true };
       }
       for (const it of items) {
@@ -1633,7 +1654,7 @@
         all.push(it);
         added++;
       }
-      onProgress?.(page, all.length);
+      onProgress?.(page, all.length, null, pages);
       lastPage = page;
       lastAdded = added;
       if (added === 0) break;
@@ -1644,6 +1665,10 @@
       }
       if (!auto) await sleep(DELAY_MS);
     }
+    // Pages read against the page count RSI's pager showed (the popup's scan bar fills by
+    // it), so a pager that says more pages than there are shows in the flight log.
+    if (lastPage)
+      OH.log('info', src.id, `${lastPage} pages read, RSI's pager showed ${pages ?? 'none'}`);
     // Still finding new items on the last allowed page: the list goes on, so
     // report it as partial (saved without counting the rest as "removed").
     if (lastPage === MAX_PAGES && lastAdded > 0 && !ended) {
@@ -1777,9 +1802,11 @@
         };
       }
 
+      // RSI still asking to slow down after every retry: said, with its Retry-After.
+      const slow = (r) => (r?.slowDown ? { slowDown: true, retryAfter: r.retryAfter ?? null } : {});
       if (result.error) {
         OH.log('error', src.id, result.error);
-        return { ok: false, error: result.error };
+        return { ok: false, error: result.error, ...slow(result) };
       }
 
       // Nothing changed since the last full scan (#294): keep the saved items and
@@ -1810,6 +1837,7 @@
           return {
             ok: false,
             error: `RSI stopped responding at page ${page} (${reason}), so we kept your previous scan of ${prevCount}. Try again in a minute.`,
+            ...slow(result.partial),
           };
         }
         const scannedAt = await saveSource(src.id, result.items, { meta: result.meta, account });
@@ -1818,6 +1846,7 @@
           items: result.items,
           scannedAt,
           partial: `stopped at page ${page} (${reason}); rescan to get the rest`,
+          ...slow(result.partial),
         };
       }
 

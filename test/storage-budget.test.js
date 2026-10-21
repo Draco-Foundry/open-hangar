@@ -63,6 +63,8 @@ const BUDGET = {
   // counts) and the RSI portrait (a data URL of AVATAR_MAX 64 KB at most).
   scanReport: small('the last scan, replaced whole'),
   scanStarted: small('the last scan that began: its run and time, replaced whole'),
+  // Which parser read each source (src/hangar-shape.js PARSER_VERSION, src/lib.js).
+  scanParser: small('one version number per source'),
   // Auto Scan Daily (#666): its switch, its next run (src/background.js), its last run
   // and each part's last complete read (ui/scan/runner.js).
   autoScanOn: small('the Auto Scan Daily switch'),

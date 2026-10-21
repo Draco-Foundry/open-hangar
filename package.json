@@ -46,15 +46,15 @@
   "devDependencies": {
     "@fontsource/jetbrains-mono": "5.3.0",
     "@fontsource/manrope": "5.3.0",
-    "@fontsource/source-sans-3": "5.3.0",
+    "@fontsource/source-sans-3": "5.3.1",
     "@sveltejs/vite-plugin-svelte": "7.3.1",
     "jsdom": "^24.1.0",
     "jsqr": "^1.4.0",
-    "prettier": "^3.9.9",
-    "puppeteer-core": "^25.12.0",
-    "svelte": "5.57.1",
-    "vite": "8.3.1",
-    "web-ext": "^10.7.0"
+    "prettier": "^3.9.10",
+    "puppeteer-core": "^25.14.0",
+    "svelte": "5.57.2",
+    "vite": "8.3.4",
+    "web-ext": "^10.8.0"
   },
   "overrides": {
     "shell-quote": "^1.11.0"

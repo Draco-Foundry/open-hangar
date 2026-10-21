@@ -642,10 +642,9 @@ domain `openhangar.space`). It moved off GitHub Pages on 2026-10-01
 page and the website's public pages to the website Worker, with a fallback for each
 when it fails.
 
-`.github/workflows/pages.yml` deploys it with `wrangler` when `site/` (or a few shared
-files) change on `main`, right after a Publish to stores run, and on a schedule (every
-3 hours, hourly while a store has a version in review or held back) that keeps the
-store versions and exchange rates fresh. Before deploying it
+`.github/workflows/pages.yml` deploys it with `wrangler` only when the owner runs it by
+hand (Run workflow; owner, 2026-10-20): a merge to `main` publishes nothing, and each
+run refreshes the store versions and exchange rates. Before deploying it
 copies in the icon, banner and store screenshots, stamps the current version and its
 date into `site/index.html`, and builds `site/rates.json` with
 `scripts/update-rates.mjs`.
