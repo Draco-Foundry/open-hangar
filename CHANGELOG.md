@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.5.2 — 2026-10-20
+
 - Fixed: **Shortcut on Firefox.** The popup's shortcut is now Alt+Shift+O, because on Firefox Alt+Shift+H opened Firefox's Help menu. Settings shows the shortcut your browser uses.
 - Fixed: **Scan while signed out.** When RSI has signed you out, Scan now tells you to log in to RSI instead of stopping with no message.
 - Fixed: **Scan again right away.** After a scan that read nothing, Scan works again at once, so you don't wait a minute after logging in to RSI.
