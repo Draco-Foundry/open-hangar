@@ -2496,9 +2496,7 @@ try {
   melt.kept
     ? ok('pledge window: Melt on RSI asks first; red Gone for Good warning for never-sold-back')
     : fail(`melt warning: ${JSON.stringify(melt)}`);
-  melt.plain &&
-  melt.plainGo === 'Open on RSI' &&
-  /full price.*Buy-Back Token/.test(melt.plainText)
+  melt.plain && melt.plainGo === 'Open on RSI' && /full price.*Buy-Back Token/.test(melt.plainText)
     ? ok('pledge window: a plain melt confirm says what melting costs')
     : fail(`melt confirm: ${JSON.stringify(melt)}`);
   await page.click('#bb-layout [data-layout="gallery"]');
@@ -2961,112 +2959,6 @@ try {
         `store: full store link, Find in Store (${fs1.hits.length} for "cutlass", ships and store items, Add to Wishlist, an upgrade From → To, Enter opens a ship), no price list`,
       )
     : fail(`store slim page: ${JSON.stringify(fs1)}`);
-  // Your Subscriber Store (#418): the demo account is a subscriber; its listing is
-  // an invented one (demo-shim.js), read through the real OH.getSubStore.
-  await page
-    .waitForFunction(() => document.querySelectorAll('#sub-grid .sub-card').length > 0, {
-      timeout: 10000,
-    })
-    .catch(() => {});
-  const sub = await page.evaluate(async () => {
-    const tick = (ms = 80) => new Promise((r) => setTimeout(r, ms));
-    const root = document.querySelector('#sub-store');
-    const cards = () => [...root.querySelectorAll('.sub-card')];
-    const card = (name) => cards().find((c) => c.querySelector('.sub-name').textContent === name);
-    const helmet = card('Quasar Explorer Helmet');
-    const plush = card('Tiny Hangar Plushie');
-    const jacket = card('Starlight Flight Jacket');
-    const res = {
-      head: root.querySelector('h3')?.textContent.replace(/\s+/g, ' ').trim(),
-      meta: root.querySelector('#sub-meta')?.textContent.replace(/\s+/g, ' ').trim(),
-      n: cards().length,
-      buy: helmet?.querySelector('.sub-buy')?.href,
-      buyLabel: helmet?.querySelector('.sub-buy')?.textContent,
-      price: helmet?.querySelector('.sub-price')?.textContent.replace(/\s+/g, ' ').trim(),
-      warbond: helmet?.querySelector('.sub-chip.wb')?.textContent,
-      tier: jacket?.querySelector('.sub-chip.tier')?.textContent,
-      noTier: !helmet?.querySelector('.sub-chip.tier'),
-      soldOut: plush?.querySelector('.sub-out')?.textContent,
-      plushBuy: !!plush?.querySelector('.sub-buy'),
-      lazy: [...root.querySelectorAll('img')].every((i) => i.loading === 'lazy'),
-      note: /What RSI shows your account today\./.test(root.textContent),
-      chips: [...root.querySelectorAll('.sub-kinds .chip')].map((c) =>
-        c.firstChild.textContent.trim(),
-      ),
-    };
-    // Every card in a row lines up: name and price/Buy row at the same height,
-    // whether the name takes one line or two.
-    const rows = new Map();
-    for (const c of cards()) {
-      const top = Math.round(c.getBoundingClientRect().top);
-      const y = (sel) => Math.round(c.querySelector(sel).getBoundingClientRect().top);
-      if (!rows.has(top)) rows.set(top, []);
-      rows.get(top).push([y('.sub-name'), y('.sub-foot')]);
-    }
-    res.aligned =
-      [...rows.values()].some((r) => r.length > 1) &&
-      [...rows.values()].every((r) => r.every(([n, f]) => n === r[0][0] && f === r[0][1]));
-    const long = card("Kastak Arms Inquisitor 'Star Kitten' Armor Set");
-    res.longTitle = long?.querySelector('.sub-name').title;
-    res.longKind = long?.querySelector('.sub-kind').textContent;
-    res.kitKind = card('Star Kitten Kit')?.querySelector('.sub-kind').textContent;
-    const box = root.querySelector('#sub-search');
-    box.value = 'helmet';
-    box.dispatchEvent(new Event('input'));
-    await tick();
-    res.search = cards().length;
-    box.value = '';
-    box.dispatchEvent(new Event('input'));
-    await tick();
-    [...root.querySelectorAll('.sub-kinds .chip')]
-      .find((c) => /^Paints/.test(c.textContent))
-      ?.click();
-    await tick();
-    res.paints = cards().map((c) => c.querySelector('.sub-name').textContent);
-    root.querySelector('.sub-kinds .chip').click(); // All
-    await tick();
-    // Not a subscriber: no list, a pointer to the plans.
-    const s = OHApp.store.sub;
-    const acct = s.account;
-    s.account = { ...acct, subscriber: null };
-    document.dispatchEvent(new Event('oh:home'));
-    await tick();
-    const plans = root.querySelector('.sub-plans a');
-    res.plans = plans && plans.href;
-    res.plansText = root.querySelector('.sub-plans')?.textContent.replace(/\s+/g, ' ').trim();
-    res.plansCards = cards().length;
-    s.account = acct;
-    document.dispatchEvent(new Event('oh:home'));
-    await tick();
-    return res;
-  });
-  sub.head === 'Your Subscriber Store 6' &&
-  sub.meta === '6 items, refreshed today' &&
-  sub.n === 6 &&
-  sub.aligned &&
-  sub.longTitle === "Kastak Arms Inquisitor 'Star Kitten' Armor Set" &&
-  sub.longKind === 'Armor' &&
-  sub.kitKind === 'Kits and Bundles' &&
-  /^https:\/\/robertsspaceindustries\.com\/en\/pledge\/Subscribers-Store\/Demo-2$/.test(sub.buy) &&
-  sub.buyLabel === 'Buy at RSI' &&
-  /^\$9\.00 \$12\.00$/.test(sub.price) &&
-  sub.warbond === 'Warbond' &&
-  sub.tier === 'Centurion' &&
-  sub.noTier &&
-  sub.soldOut === 'Sold Out' &&
-  !sub.plushBuy &&
-  sub.lazy &&
-  sub.note &&
-  sub.chips.join() === 'All,Paints,Armor,Clothing,Flair,Kits and Bundles' &&
-  sub.search === 1 &&
-  sub.paints.join() === 'Nebula Drift Paint' &&
-  sub.plans === 'https://robertsspaceindustries.com/en/pledge/subscriptions' &&
-  sub.plansText === 'Subscribers get their own store each month. See Plans' &&
-  sub.plansCards === 0
-    ? ok(
-        'subscriber store: 6 cards lined up, Warbond and tier chips, Sold Out, search, type chips, See Plans',
-      )
-    : fail(`subscriber store: ${JSON.stringify(sub)}`);
   const st = await page.evaluate(async () => {
     // The Store is Svelte (ui/store): it redraws a tick after a change.
     const tick = (ms = 50) => new Promise((r) => setTimeout(r, ms));
@@ -3111,8 +3003,8 @@ try {
     renderStore();
     return res;
   });
-  st.panels === 4 && !st.ccugame
-    ? ok('store panels: Wishlist, Your Subscriber Store, Your CCUs, Find in Store')
+  st.panels === 3 && !st.ccugame
+    ? ok('store panels: Wishlist, Your CCUs, Find in Store')
     : fail(`store page: ${JSON.stringify(st)}`);
   st.stock.join('|') === 'Not in store|In stock ($110)' &&
   st.ccus > 0 &&
@@ -4844,7 +4736,8 @@ try {
   await popAt(
     {
       ...signedIn,
-      __tab: 'settings', __demoLocal: { siteUrl: 'https://app.openhangar.space' },
+      __tab: 'settings',
+      __demoLocal: { siteUrl: 'https://app.openhangar.space' },
     },
     '#pp-settings',
   );
@@ -5854,7 +5747,8 @@ try {
   await popAt(
     {
       ...signedIn,
-      __tab: 'wishlist', __demoLocal: { siteUrl: ppSite, siteLink: ppWishLink },
+      __tab: 'wishlist',
+      __demoLocal: { siteUrl: ppSite, siteLink: ppWishLink },
     },
     '#pp-wish-off',
   );
@@ -6068,7 +5962,8 @@ try {
           wishItem('sku:501', 'Cutlass - Ghoulish Green Paint', { remind: false }),
         ],
       },
-      __tab: 'wishlist', __demoLocal: { siteUrl: ppSite, siteLink: ppWishLink },
+      __tab: 'wishlist',
+      __demoLocal: { siteUrl: ppSite, siteLink: ppWishLink },
     },
     '.pp-wedit li',
   );
@@ -6110,7 +6005,8 @@ try {
     {
       ...signedIn,
       __demoWish: { mode: 'items', items: [wishItem('ship:avenger-titan', 'Avenger Titan')] },
-      __tab: 'wishlist', __demoLocal: { siteUrl: ppSite, siteLink: ppWishLink },
+      __tab: 'wishlist',
+      __demoLocal: { siteUrl: ppSite, siteLink: ppWishLink },
     },
     '.pp-wedit li',
   );
