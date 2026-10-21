@@ -313,7 +313,8 @@ what they own:
     subscriber, concierge,
     balances: { storeCredit, uec, rec },         // storeCredit.value is in cents
     capturedAt },
-  sources: { hangar: {…}, buybacks: {…},
+  sources: { hangar: {…},                        // contents[].also: under Also Contains
+    buybacks: {…},                               // items[].pack: ships, also, price
     referral: { items: { current, legacy, prospects,
                          recruitsList, prospectsList } } },  // referral code/url never exported
   history: [ { at, items: [[id, name, value]] } ],        // scan snapshots; merged on import

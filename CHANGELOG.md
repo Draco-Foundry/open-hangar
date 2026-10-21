@@ -4,6 +4,7 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Improved: **What's inside each pack syncs.** Sync now sends each buy-back pack's ships, Also Contains items and price, and which hangar items RSI lists under Also Contains, so the website can show them the way RSI groups them. Backups made with this version need this version or newer to restore.
 - Fixed: **Shortcut on Firefox.** The popup's shortcut is now Alt+Shift+O, because on Firefox Alt+Shift+H opened Firefox's Help menu. Settings shows the shortcut your browser uses.
 
 ## 0.5.1 — 2026-10-20

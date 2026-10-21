@@ -340,6 +340,59 @@ test('what a scan keeps next to its rows, as the extension writes it, fits', () 
   assert.equal(SHAPE.checkHangarView(SHAPE.hangarView(sync)), null);
 });
 
+// Format 3: each buy-back's pack, from the page RSI showed for it (src/lib.js bbDetails).
+const PAGE = {
+  title: 'Test Mustang 1',
+  price: 30,
+  currency: 'USD',
+  ships: [{ name: 'Test Mustang', manufacturer: 'Test Maker', focus: 'Starter', image: null }],
+  also: ['Test Poster', '6 Month Insurance'],
+  insurance: '6 months',
+  at: 1,
+};
+test('a buy-back pack: only from a page RSI showed, only the keys the website reads', () => {
+  assert.deepEqual(SHAPE.packOf(PAGE), {
+    ships: PAGE.ships,
+    also: PAGE.also,
+    price: 30,
+    currency: 'USD',
+  });
+  // Worked out from the hangar history, or a value only: stays in this browser.
+  assert.equal(SHAPE.packOf({ ...PAGE, src: 'history' }), null);
+  assert.equal(SHAPE.packOf({ ...PAGE, src: 'scan-history', partial: true }), null);
+  assert.equal(SHAPE.packOf({ at: 1, melt: 50 }), null);
+  assert.equal(SHAPE.packOf(null), null);
+  // Odd rows are cleaned, never passed on.
+  const odd = SHAPE.packOf({ ships: [{ name: 'X', image: 7 }, 'Y', { name: '' }], also: ['A', 3] });
+  assert.deepEqual(odd, {
+    ships: [{ name: 'X', manufacturer: '', focus: '', image: null }],
+    also: ['A'],
+    price: null,
+    currency: 'USD',
+  });
+});
+
+test('the backup file and sync carry each read pack on its buy-back, and it fits the schema', async () => {
+  mem = full();
+  const id = String(mem.db.sources.buybacks.items[0].id);
+  // Kept the way a page read keeps it (src/lib.js fetchBuybackDetail): in the cache.
+  const cache = await OH.getBuybackDetails();
+  cache[id] = PAGE;
+  const file = await OH.exportDB();
+  delete cache[id];
+  assert.equal(file.schemaVersion, 3);
+  const row = file.sources.buybacks.items.find((b) => String(b.id) === id);
+  assert.deepEqual(row.pack, SHAPE.packOf(PAGE));
+  assert.equal(SHAPE.checkPayload(JSON.parse(OH.syncBody(OH.syncPayload(file)))), null);
+  // The cache itself never goes, and the stored rows aren't changed.
+  assert.doesNotMatch(JSON.stringify(file), /bbDetails|"insurance":"6 months"/);
+  assert.equal(mem.db.sources.buybacks.items[0].pack, undefined);
+  // The hangar view our own hangar page reads stays as it was: no packs.
+  const view = await viewOf();
+  assert.ok(view.ok);
+  assert.ok(view.hangar.sources.buybacks.items.every((b) => !('pack' in b)));
+});
+
 test('the shared scripts load in a worker: no window, document, chrome or require', async () => {
   const ctx = vm.createContext({ self: {} });
   ctx.self = ctx;

@@ -1142,7 +1142,13 @@
     } catch {
       /* non-extension context */
     }
-    return SHAPE.exportPayload({ db, account, archive: await readArchive(), appVersion });
+    return SHAPE.exportPayload({
+      db,
+      account,
+      archive: await readArchive(),
+      packs: await OH.getBuybackDetails(),
+      appVersion,
+    });
   };
 
   // --- Hangar Transfer Format (HTF) export ---------------------------------

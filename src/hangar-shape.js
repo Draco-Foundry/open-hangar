@@ -28,9 +28,11 @@
   //     v2 → v3: scan history moved out of `db` into its own key
   //   EXPORT_VERSION is the backup-file format (OH.exportDB / OH.importDB).
   //     v2 added the `account` block (identity, org/rank, balances); v1 had
-  //     sources only. Keeping it at 2 lets older versions import new backups.
+  //     sources only. v3 added what's inside each pack: a buy-back's `pack` (its
+  //     own RSI page's ships, Also Contains items and price) and the `also` mark on
+  //     a pledge's Also Contains items. 0.5.1 and older can't import a v3 file.
   const DB_VERSION = 3;
-  const EXPORT_VERSION = 2;
+  const EXPORT_VERSION = 3;
   // Pledges kept in the pledge archive (src/lib.js archiveGone), and in the hangar
   // view's copy of it.
   const ARCHIVE_MAX = 2000;
@@ -46,7 +48,8 @@
   // PR that changes the parser without a bump, unless a commit in it carries
   // `Parser-Version-Unchanged: <why>` (scripts/check-parser-version.mjs).
   //     1: 2026-10-18, the first.
-  const PARSER_VERSION = 1;
+  //     2: 2026-10-20, a pledge's Also Contains items marked `also` (format 3).
+  const PARSER_VERSION = 2;
   const PARSER_KEY = 'scanParser';
 
   const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -244,20 +247,66 @@
     return out;
   }
 
+  // What a buy-back's own RSI page says is inside the pack (src/lib.js keeps it as
+  // `bbDetails`, by pledge id, which never leaves as it is), as the backup file and
+  // sync carry it on the buy-back row: { ships: [{ name, manufacturer, focus, image }],
+  // also: [labels], price, currency }. Only a page RSI showed counts: details worked
+  // out from the hangar history (src 'history' or 'scan-history') stay in this
+  // browser, since the pledge archive already goes. null when there's none. Pure.
+  function packOf(d) {
+    // A page read (src/lib.js fetchBuybackDetail) always has both lists.
+    if (!isObj(d) || d.src || d.partial || !Array.isArray(d.ships) || !Array.isArray(d.also))
+      return null;
+    const text = (v) => (typeof v === 'string' ? v : '');
+    const ships = d.ships.filter(isObj).map((x) => ({
+      name: text(x.name),
+      manufacturer: text(x.manufacturer),
+      focus: text(x.focus),
+      image: typeof x.image === 'string' && x.image ? x.image : null,
+    }));
+    const also = d.also.filter((l) => typeof l === 'string' && l);
+    return {
+      ships: ships.filter((x) => x.name),
+      also,
+      price: Number.isFinite(d.price) ? d.price : null,
+      currency: typeof d.currency === 'string' && d.currency ? d.currency : 'USD',
+    };
+  }
+
+  // The sources with each buy-back's `pack` from `details` (packOf), where its page
+  // was read; a row keeps a pack it already has (a restored backup) when there's no
+  // page in `details`. Returns a copy, never changes `sources`. Pure.
+  function withPacks(sources, details) {
+    const bb = isObj(sources) ? sources.buybacks : null;
+    if (!isObj(details) || !isObj(bb) || !Array.isArray(bb.items)) return sources;
+    const items = bb.items.map((b) => {
+      const pack = isObj(b) && b.id != null ? packOf(details[String(b.id)]) : null;
+      return pack ? { ...b, pack } : b;
+    });
+    return { ...sources, buybacks: { ...bb, items } };
+  }
+
   // The whole database as a self-describing JSON object (the backup file), ordered
   // the way a backend reads it: provenance → who (identity, org, rank, balances) →
   // what they own (sources). `db` as lib.js's loadDB (or checkDB) returns it,
   // `account` the cached RSI account (cache only, so this works offline), `archive`
-  // the stored pledge archive. ALWAYS the current format (EXPORT_VERSION),
-  // whatever the stored DB's version. Pure.
-  function exportPayload({ db, account = null, archive = null, appVersion = null, now } = {}) {
+  // the stored pledge archive, `packs` the stored buy-back details (withPacks).
+  // ALWAYS the current format (EXPORT_VERSION), whatever the stored DB's version. Pure.
+  function exportPayload({
+    db,
+    account = null,
+    archive = null,
+    packs = null,
+    appVersion = null,
+    now,
+  } = {}) {
     return {
       app: 'open-hangar',
       appVersion,
       exportedAt: new Date(now === undefined ? Date.now() : now).toISOString(),
       schemaVersion: EXPORT_VERSION,
       account: shapeAccount(account, db.owner),
-      sources: sanitizeSources(db.sources),
+      sources: withPacks(sanitizeSources(db.sources), packs),
       // Scan history rides along so a backup file is a complete restore point.
       history: Array.isArray(db.history) ? db.history : [],
       // So does the pledge archive (#388), trimmed to what buy-back details read
@@ -465,6 +514,8 @@
     withoutProspects,
     leanArchive,
     exportPayload,
+    packOf,
+    withPacks,
     capArchive,
     hangarView,
     checkPayload,
