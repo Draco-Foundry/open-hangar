@@ -5,6 +5,7 @@ and the basic page say so, instead of the raw error or Log In to RSI, and nothin
 last scan is lost. No status page, no new permission.
 
 Steps
+
 1. A 5xx partway through a pressed Scan saves nothing from the partial read (src/lib.js).
 2. A pressed Scan's report carries `rsiDown` (ui/scan/runner.js); Auto Scan Daily gets a
    `rsi-down` line for a run that stopped before reading anything.
