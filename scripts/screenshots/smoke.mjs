@@ -6817,7 +6817,7 @@ try {
           price: 185,
           sale: ['limited'],
           endsOn: '2026-10-15',
-          why: [why('buyback', ['Sabre Raven EX'])],
+          why: [why('paint', ['Sabre Raven EX'])],
         },
         {
           id: 'sku-19699',
@@ -6838,7 +6838,7 @@ try {
           why: [why('limited', ['Cutlass Black'])],
         },
       ],
-      known: { 'sku-19623|buyback': 1, 'sku-19699|paint': 2, 'sku-19700|limited': 3 },
+      known: { 'sku-19623|paint': 1, 'sku-19699|paint': 2, 'sku-19700|limited': 3 },
       seen: { 'sku-19699|paint': 3 },
       gone: {},
     },
@@ -6885,7 +6885,7 @@ try {
   alOn.back === 'pp-back' &&
   alOn.fresh.length === 2 &&
   alOn.fresh[0].includes('Not seen yet:') &&
-  alOn.fresh[0].includes('In your buy-backs, now in the store: Sabre Raven EX') &&
+  alOn.fresh[0].includes('paint for your Sabre Raven EX') &&
   alOn.fresh[0].includes('Ends Oct 15') &&
   alOn.fresh[0].includes('$185') &&
   alOn.old.length === 1 &&
