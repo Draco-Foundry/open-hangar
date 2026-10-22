@@ -185,7 +185,7 @@ const COPY = {
   'popup.auto-other': 'Skipped {when}: a different RSI account is signed in',
   'popup.auto-paused': 'Skipped {when}: scans are paused',
   // RSI didn't answer before anything was read (Claude chat, Words, 2026-10-22).
-  'popup.auto-rsi-down': "Skipped {when}: RSI wasn't answering",
+  'popup.auto-rsi-down': 'Skipped {when}: RSI was down or busy',
   // A part thrown away: only when it came back as another account, or with a sudden
   // drop. Not for a part RSI stopped answering partway (auto-stopped is).
   'popup.auto-bad': "Last: {when}, something looked wrong and wasn't saved. Scan to check.",

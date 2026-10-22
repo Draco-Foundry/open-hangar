@@ -1,1 +1,1 @@
-- Improved: **When RSI isn't answering.** Scan now says so instead of showing an error or Log In to RSI, and nothing from your last scan is lost.
+- Improved: **When RSI isn't answering.** Scan now says so instead of showing an error, and nothing from your last scan is lost.
