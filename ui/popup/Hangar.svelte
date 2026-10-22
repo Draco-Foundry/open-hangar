@@ -26,6 +26,7 @@
     scanHold,
     scanSteps,
     storeCredit,
+    gameCredit,
     unpricedLine,
   } from './data.js';
   import { openHub, openTab, reportProblem, rsiSignIn } from './actions.js';
@@ -65,6 +66,8 @@
   const day = (at) => new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   const credit = $derived(storeCredit(account));
   const creditText = $derived(credit != null ? money(credit, fx, { cents: true }) : null);
+  const uec = $derived(gameCredit(account, 'uec'));
+  const rec = $derived(gameCredit(account, 'rec'));
   const nextToken = $derived(OH.nextBuybackToken ? OH.nextBuybackToken(Date.now()) : null);
   const running = $derived(sc.phase === 'running');
   const steps = $derived(scanSteps(sc.progress?.part));
@@ -225,6 +228,20 @@
             <span class="pp-tok"
               ><b>{v.tokens}</b>{#if nextToken}<small>{t('popup.token-next', { date: day(nextToken) })}</small>{/if}</span
             >
+          </div>
+        {/if}
+      </div>
+    {/if}
+    {#if uec || rec}
+      <div class="pp-tiles">
+        {#if uec}
+          <div class="pp-tile" id="pp-uec" title={uec.full} role="group" aria-label={`UEC ${uec.full}`}>
+            <span class="pp-lbl">UEC</span><b>{uec.text}</b>
+          </div>
+        {/if}
+        {#if rec}
+          <div class="pp-tile" id="pp-rec" title={rec.full} role="group" aria-label={`REC ${rec.full}`}>
+            <span class="pp-lbl">REC</span><b>{rec.text}</b>
           </div>
         {/if}
       </div>

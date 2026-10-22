@@ -4579,7 +4579,11 @@ try {
     loggedIn: true,
     nickname: 'Demo_Citizen',
     displayname: 'Demo Citizen',
-    credits: { store: { value: 4250, currency: 'USD' } },
+    credits: {
+      store: { value: 4250, currency: 'USD' },
+      uec: { value: 1234567 },
+      rec: { value: 90000 },
+    },
   };
   const signedIn = {
     __demoAccount: demoAccount,
@@ -4601,6 +4605,16 @@ try {
       face: document.querySelector('.pp-face img')?.getAttribute('src') || '',
       credit: document.getElementById('pp-credit')?.textContent.replace(/\s+/g, ' ') || '',
       tokens: document.getElementById('pp-tokens')?.textContent.replace(/\s+/g, ' ') || '',
+      uec: document.getElementById('pp-uec')?.textContent.replace(/\s+/g, ' ') || '',
+      rec: document.getElementById('pp-rec')?.textContent.replace(/\s+/g, ' ') || '',
+      uecTitle: document.getElementById('pp-uec')?.title || '',
+      uecName: document.getElementById('pp-uec')?.getAttribute('aria-label') || '',
+      tiles: [...document.querySelectorAll('.pp-tile')].every((t) => t.scrollWidth <= t.clientWidth),
+      uecBelow:
+        document.getElementById('pp-uec')?.getBoundingClientRect().top >
+          document.getElementById('pp-credit')?.getBoundingClientRect().bottom &&
+        document.getElementById('pp-uec')?.getBoundingClientRect().left <
+          document.getElementById('pp-rec')?.getBoundingClientRect().left,
       since: document.getElementById('pp-since')?.textContent || '',
       tabs: [...document.querySelectorAll('[role="tab"]')].map(
         (b) => `${b.textContent.trim()}:${b.getAttribute('aria-selected')}`,
@@ -4624,6 +4638,12 @@ try {
   pop.face === PNG &&
   /^Store Credit\s*\$42\.50$/.test(pop.credit.trim()) &&
   /^Buy-Back Tokens\s*2\s*Next refill \w+ \d+$/.test(pop.tokens.trim()) &&
+  pop.uec.trim() === 'UEC1.2M' &&
+  pop.rec.trim() === 'REC90K' &&
+  pop.uecTitle === '1,234,567' &&
+  pop.uecName === 'UEC 1,234,567' &&
+  pop.tiles &&
+  pop.uecBelow &&
   /^[▲▼] \$[\d,]+ since \w+ \d+$/.test(pop.since) &&
   pop.tabs.join() === 'Hangar:true,Wishlist:false,Settings:false' &&
   pop.bell === 'Alerts' &&

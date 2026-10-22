@@ -250,3 +250,27 @@ test("popup copy: the owner's words (2026-10-13), filled in", async () => {
   const src = require('node:fs').readFileSync(`${__dirname}/../ui/popup/copy.js`, 'utf8');
   assert.doesNotMatch(src, /\[copy:/);
 });
+
+test('popup: UEC and REC are compact for the card and full for the tooltip', async () => {
+  const { compactCount, gameCredit } = await data();
+  const cases = [
+    [0, '0'],
+    [950, '950'],
+    [1000, '1K'],
+    [90000, '90K'],
+    [999949, '999.9K'],
+    [999950, '1M'],
+    [1200000, '1.2M'],
+    [3400000000, '3.4B'],
+    [2000000, '2M'],
+  ];
+  for (const [n, text] of cases) assert.equal(compactCount(n), text, String(n));
+  for (const bad of [undefined, null, NaN, '12', -5, Infinity])
+    assert.equal(compactCount(bad), null);
+  const account = { credits: { uec: { value: 1200000 }, rec: { value: 0 } } };
+  assert.deepEqual(gameCredit(account, 'uec'), { text: '1.2M', full: '1,200,000' });
+  assert.deepEqual(gameCredit(account, 'rec'), { text: '0', full: '0' });
+  assert.equal(gameCredit({ credits: { store: { value: 5 } } }, 'uec'), null);
+  assert.equal(gameCredit({ credits: { uec: { value: null } } }, 'uec'), null);
+  assert.equal(gameCredit(null, 'rec'), null);
+});

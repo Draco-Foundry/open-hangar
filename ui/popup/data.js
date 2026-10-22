@@ -52,6 +52,20 @@ export function storeCredit(account) {
   return Number.isFinite(c) ? c / 100 : null;
 }
 
+// UEC or REC (`key`: 'uec' | 'rec') from the cached RSI account: { text, full } with the
+// number compact for a small card and in full for its tooltip and name, or null when the
+// last account read has none (never scanned, or RSI didn't return it).
+const COMPACT = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 });
+const FULL = new Intl.NumberFormat('en-US');
+export function compactCount(n) {
+  return Number.isFinite(n) && n >= 0 ? COMPACT.format(n) : null;
+}
+export function gameCredit(account, key) {
+  const n = account?.credits?.[key]?.value;
+  const text = compactCount(n);
+  return text == null ? null : { text, full: FULL.format(n) };
+}
+
 // Under the value when some pledges have no price (no store price and no melt
 // value): the owner's words (2026-10-12), singular for one.
 export const unpricedLine = (n) =>
