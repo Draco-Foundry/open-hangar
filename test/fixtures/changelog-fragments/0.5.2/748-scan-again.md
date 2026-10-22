@@ -1,0 +1,1 @@
+- Fixed: **Scan again right away.** After a scan that read nothing, Scan works again at once, so you don't wait a minute after logging in to RSI.

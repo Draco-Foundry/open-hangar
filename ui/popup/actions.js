@@ -77,9 +77,24 @@ export async function setAlerts(on) {
 // Notifications, the one optional permission: the browser only asks from a click, and
 // Firefox only when the ask is the click's very first step, so nothing is awaited
 // before it. The browser keeps the answer if the popup closes for its question.
+// Firefox anchors its question next to the toolbar button, under the open popup, so
+// there the popup closes once the ask has gone out: Firefox shows a popup's question on
+// the selected tab and grants it in the browser itself, so the answer still counts, and
+// Settings reads the switch from the permission when the popup opens again. Not on a
+// phone, where the popup is a page of its own (ui/popup/main.js).
+const phone = () => !!globalThis.document?.documentElement.classList.contains('phone');
 export function askNotify() {
-  return chrome.permissions.request(NOTIFY).catch(() => false);
+  const asked = chrome.permissions.request(NOTIFY).catch(() => false);
+  if (firefox() && !phone()) setTimeout(() => window.close(), 0);
+  return asked;
 }
+// An alert deleted in the bell's list (its id), or every one (null: Clear All). The
+// background writes it (src/background.js alerts-hide), as it does seen, and the badge
+// follows.
+export const hideAlert = (id) =>
+  chrome.runtime
+    .sendMessage(id ? { ohPopup: 'alerts-hide', id } : { ohPopup: 'alerts-hide' })
+    .catch(() => null);
 export const dropNotify = () => chrome.permissions.remove(NOTIFY).catch(() => false);
 export const notifyAllowed = () => chrome.permissions.contains(NOTIFY).catch(() => false);
 

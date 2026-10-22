@@ -1,6 +1,6 @@
 {
   "name": "open-hangar",
-  "version": "0.4.1",
+  "version": "0.5.2",
   "private": true,
   "description": "The free Star Citizen fleet manager's browser extension: reads your own RSI account in your browser, with optional sync to openhangar.space.",
   "license": "PolyForm-Strict-1.0.0",
@@ -13,7 +13,7 @@
     "url": "https://github.com/Draco-Foundry/open-hangar/issues"
   },
   "scripts": {
-    "test": "node --test test/parser.test.js test/scan.test.js test/htf.test.js test/value.test.js test/log.test.js test/profiles.test.js test/sanitize.test.js test/catalog.test.js test/org.test.js test/updates.test.js test/source.test.js test/qr.test.js test/referral.test.js test/resilience.test.js test/loaners.test.js test/store.test.js test/home.test.js test/status.test.js test/net.test.js test/buyback-details.test.js test/buyback-history.test.js test/buyback-names.test.js test/db.test.js test/publish.test.js test/rates.test.js test/quips.test.js test/scan-report.test.js test/known-issues.test.js test/retired-buybacks.test.js test/full-size.test.js test/site-connect.test.js test/ui-css-links.test.js test/firefox-data.test.js test/site-sync.test.js test/esc-filters.test.js test/archive-export.test.js test/rsi-cart.test.js test/storage-budget.test.js test/site-import.test.js test/buyback-block.test.js test/beta-build.test.js test/quick-links.test.js test/sub-store.test.js test/home-final.test.js test/feeds.test.js test/build-flags.test.js test/site-worker.test.js test/privacy-permissions.test.js test/export-unchanged.test.js test/sync-schema.test.js test/hangar-shape.test.js test/bridge-v2.test.js test/connector.test.js test/popup.test.js test/popup-wishlist.test.js test/popup-settings.test.js test/basic-page.test.js test/connector-build.test.js test/parser-rules.test.js test/alerts.test.js test/alerts-background.test.js test/permission-pin.test.js test/privacy-plain.test.js test/basic-sync.test.js test/scan-runner.test.js test/scan-host.test.js test/recruiter-code.test.js test/auto-scan.test.js test/auto-scan-runner.test.js",
+    "test": "node --test test/parser.test.js test/scan.test.js test/htf.test.js test/value.test.js test/log.test.js test/profiles.test.js test/sanitize.test.js test/hostile-text.test.js test/html-insertion.test.js test/catalog.test.js test/org.test.js test/updates.test.js test/source.test.js test/qr.test.js test/referral.test.js test/resilience.test.js test/loaners.test.js test/store.test.js test/home.test.js test/status.test.js test/net.test.js test/buyback-details.test.js test/buyback-history.test.js test/buyback-names.test.js test/db.test.js test/publish.test.js test/rates.test.js test/quips.test.js test/scan-report.test.js test/known-issues.test.js test/retired-buybacks.test.js test/full-size.test.js test/site-connect.test.js test/ui-css-links.test.js test/firefox-data.test.js test/site-sync.test.js test/esc-filters.test.js test/archive-export.test.js test/rsi-cart.test.js test/storage-budget.test.js test/site-import.test.js test/buyback-block.test.js test/beta-build.test.js test/quick-links.test.js test/home-final.test.js test/feeds.test.js test/build-flags.test.js test/site-worker.test.js test/privacy-permissions.test.js test/export-unchanged.test.js test/sync-schema.test.js test/hangar-shape.test.js test/bridge-v2.test.js test/connector.test.js test/popup.test.js test/popup-wishlist.test.js test/popup-settings.test.js test/basic-page.test.js test/connector-build.test.js test/parser-rules.test.js test/alerts.test.js test/alerts-background.test.js test/permission-pin.test.js test/privacy-plain.test.js test/basic-sync.test.js test/scan-runner.test.js test/scan-host.test.js test/recruiter-code.test.js test/auto-scan.test.js test/auto-scan-runner.test.js test/hangar-tags.test.js test/check-private.test.js test/changelog-fragments.test.js test/dev-build.test.js test/paging.test.js test/parser-corpus.test.js",
     "format": "prettier --write \"**/*.{js,html,json,md}\"",
     "format:check": "prettier --check \"**/*.{js,html,json,md}\"",
     "build": "npm run build:ui && node scripts/pack.mjs",
@@ -30,9 +30,15 @@
     "update:ships": "node scripts/update-ship-catalog.mjs",
     "schema": "node scripts/sync-schema.mjs",
     "rules": "node scripts/parser-rules.mjs",
+    "report:parser": "node test/parser-report.js",
+    "scrub": "node scripts/scrub-capture.mjs",
     "privacy:plain": "node scripts/privacy-plain.mjs",
     "build:ui": "vite build",
     "dev:ui": "vite build --watch",
+    "dev:build": "npm run build:ui && node scripts/pack.mjs --dev",
+    "dev:chrome": "npm run dev:build && node scripts/dev-run.mjs chrome",
+    "dev:edge": "npm run dev:build && node scripts/dev-run.mjs edge",
+    "dev:firefox": "npm run dev:build && node scripts/dev-run.mjs firefox",
     "release": "node scripts/release.mjs",
     "canary": "node scripts/canary.mjs",
     "prepare": "node scripts/install-hooks.mjs"
@@ -40,15 +46,15 @@
   "devDependencies": {
     "@fontsource/jetbrains-mono": "5.3.0",
     "@fontsource/manrope": "5.3.0",
-    "@fontsource/source-sans-3": "5.3.0",
+    "@fontsource/source-sans-3": "5.3.1",
     "@sveltejs/vite-plugin-svelte": "7.3.1",
     "jsdom": "^24.1.0",
     "jsqr": "^1.4.0",
-    "prettier": "^3.9.9",
-    "puppeteer-core": "^25.12.0",
-    "svelte": "5.57.1",
-    "vite": "8.3.1",
-    "web-ext": "^10.7.0"
+    "prettier": "^3.9.10",
+    "puppeteer-core": "^25.14.0",
+    "svelte": "5.57.2",
+    "vite": "8.3.4",
+    "web-ext": "^10.8.0"
   },
   "overrides": {
     "shell-quote": "^1.11.0"

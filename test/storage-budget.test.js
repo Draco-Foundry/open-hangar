@@ -63,6 +63,8 @@ const BUDGET = {
   // counts) and the RSI portrait (a data URL of AVATAR_MAX 64 KB at most).
   scanReport: small('the last scan, replaced whole'),
   scanStarted: small('the last scan that began: its run and time, replaced whole'),
+  // Which parser read each source (src/hangar-shape.js PARSER_VERSION, src/lib.js).
+  scanParser: small('one version number per source'),
   // Auto Scan Daily (#666): its switch, its next run (src/background.js), its last run
   // and each part's last complete read (ui/scan/runner.js).
   autoScanOn: small('the Auto Scan Daily switch'),
@@ -81,10 +83,6 @@ const BUDGET = {
   feedVersions: small('one versions.json'),
   shipMatrix: { cap: 'one RSI ship-matrix list, replaced whole', max: 300 * KB },
   storeShips: { cap: 'one store list, replaced whole (6 hours)', max: 1 * MB },
-  subStore: {
-    cap: 'SUB_STORE_MAX 2,000 items (20 pages), replaced whole once a day',
-    max: 1.5 * MB,
-  },
   netDown: small('hosts down in the last 10 minutes'),
   remoteStatus: small('one status.json, replaced whole'),
   account: small('the signed-in account, replaced whole'),
@@ -132,8 +130,8 @@ const BUDGET = {
   // Extension Alerts (src/alerts.js, the `alerts` build flag).
   alertsOn: small('the switch'),
   alerts: {
-    cap: 'MATCH_MAX 200 matches; PAIRS_MAX 2,000 newest pairs in each of known, seen, gone',
-    max: 400 * KB,
+    cap: 'MATCH_MAX 200 matches; PAIRS_MAX 2,000 newest pairs in each of known, seen, gone, hidden',
+    max: 500 * KB,
   },
   alertsFeed: {
     cap: 'one sale feed (FEED_ITEMS_MAX 2,000 items, FEED_SHIPS_MAX 1,000 ships), replaced whole',
@@ -378,6 +376,7 @@ async function fillWorstCase() {
         known: pairs('paint'),
         seen: pairs('paint'),
         gone: pairs('warbond'),
+        hidden: pairs('limited'),
       };
     })(),
     alertsWish: {
@@ -585,32 +584,6 @@ async function fillWorstCase() {
         })),
       }),
   });
-  // Your Subscriber Store through one real read: far more items than it keeps.
-  await OH.getSubStore({
-    account: { loggedIn: true, nickname: 'Main', subscriber: { type: 'Imperator' } },
-    pause: async () => {},
-    fetchFn: async (url, init) => {
-      const { page, limit } = JSON.parse(init.body)[0].variables.query;
-      const resources = Array.from({ length: limit }, (_, i) => {
-        const n = (page - 1) * limit + i;
-        return {
-          id: 9000000 + n,
-          name: `Subscriber Exclusive Nebula Drift Paint For The Example Hauler ${n}`,
-          subtitle: 'Example Hauler Series And Variants',
-          url: `/en/pledge/Subscribers-Store/Subscriber-Exclusive-Nebula-Drift-Paint-${n}`,
-          media: { thumbnail: { storeSmall: img(n, 5) } },
-          nativePrice: { amount: 1500, discounted: 1200 },
-          stock: { available: true },
-          tags: Array.from({ length: 12 }, (_, j) => ({ name: `Some Store Tag ${j}` })),
-          label: 'Imperator',
-          isWarbond: true,
-        };
-      });
-      return Response.json([
-        { data: { store: { listing: { resources, count: limit, totalCount: 5000 } } } },
-      ]);
-    },
-  });
   // The log, well past its cap, with the longest messages it keeps.
   for (let i = 0; i < 150; i++) OH.log('warn', 'hangar', `retry ${i} `.padEnd(700, 'x'));
   await OH.log('info', 'hangar', 'done');
@@ -621,7 +594,6 @@ test('worst case: every key within its budget, the total under the warning line'
   assert.ok(Object.keys(mem.shipImages).length <= OH.CACHE_MAX.shipImages);
   assert.ok(Object.keys(mem.pledgeArchive).length <= OH.ARCHIVE_MAX);
   assert.equal(mem.errorLog.length, 100);
-  assert.equal(mem.subStore.items.length, OH.SUB_STORE_MAX);
 
   const u = await OH.storageUsage();
   const over = [];

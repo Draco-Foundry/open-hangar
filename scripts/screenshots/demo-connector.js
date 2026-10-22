@@ -67,6 +67,14 @@
   demo.answers = {};
   chrome.runtime.sendMessage = async (msg) => {
     demo.sent.push(msg);
+    // An alert deleted (or Clear All): written the way the background writes it.
+    if (msg?.ohPopup === 'alerts-hide' && window.OHAlerts) {
+      const { alerts } = await chrome.storage.local.get('alerts');
+      if (alerts)
+        await chrome.storage.local.set({
+          alerts: window.OHAlerts.hide(alerts, Date.now(), msg.id ?? null),
+        });
+    }
     const own = msg && demo.answers[msg.ohPopup];
     return own || demo.answer || { ok: true, opened: true };
   };
@@ -76,7 +84,7 @@
       {
         name: '_execute_action',
         description: '',
-        shortcut: window.__demoShortcut ?? 'Alt+Shift+H',
+        shortcut: window.__demoShortcut ?? 'Alt+Shift+O',
       },
     ],
   };
@@ -211,7 +219,9 @@
     }
     const item = wishState.items.find((i) => i.key === body.key);
     if (!item) return answerJson({ ok: false, outcome: 'not-found', key: body.key, on: false });
-    item.target = body.target == null ? null : Math.round(Number(body.target) * 100);
+    // Remind Me (the website's wishlist_remind): on or off; else the old target.
+    if (typeof body.remind === 'boolean') item.remind = body.remind;
+    else item.target = body.target == null ? null : Math.round(Number(body.target) * 100);
     return answerJson({ ok: true, outcome: 'saved', key: body.key, on: true, item });
   }
   const shimFetch = window.fetch;

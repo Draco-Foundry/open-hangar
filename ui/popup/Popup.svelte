@@ -14,7 +14,6 @@
     autoAsk,
     fleetNews,
     newReport,
-    openingTab,
     popupView,
     portrait,
     progressFraction,
@@ -29,7 +28,7 @@
   import { applyLook, cleanPrefs, loadPrefs, savePref } from './prefs.js';
   import { pilotAnswer, rsiAccess } from './actions.js';
   import { fxFor, loadRates, shownCurrency } from './currency.js';
-  import { GONE_KEY, rsiCookie, rsiSignIn, watchCookie } from './rsi-cookie.js';
+  import { rsiCookie, rsiSignIn, watchCookie } from './rsi-cookie.js';
   import { flag } from '../lib/flags.js';
   import Alerts from './Alerts.svelte';
   import Hangar from './Hangar.svelte';
@@ -58,17 +57,25 @@
   let link = $state(null); // the openhangar.space link, when sync is on
   let pilotDone = $state(false); // the scan's sync question, answered here
   let justUpdated = $state(null);
+  // At the top of every tab, as on the basic page: a new version waiting to be let in
+  // (local updateReady, src/background.js) and the kill switch's banner (status.json's,
+  // OH.getRemoteStatus: the copy main.js refreshes, so nothing more is asked).
+  let updateReady = $state(null);
+  let banner = $state(null);
   let prefs = $state(cleanPrefs());
   let session = $state({});
   let rsiOff = $state(false); // no access to robertsspaceindustries.com
-  // RSI's sign-in cookie: 'in', 'out' or null (can't tell), and when a popup last saw it
-  // gone (./rsi-cookie.js: whether it's there, never its value).
+  // RSI's sign-in cookie: 'in', 'out' or null (can't tell) (./rsi-cookie.js: whether
+  // it's there, never its value).
   let cookie = $state(null);
-  let goneAt = $state(null);
   let rates = $state(null); // the day's exchange rates, only for a currency other than USD
   let now = $state(Date.now());
   let asked = $state(0); // when this popup asked for a scan the background runs unseen
   let note = $state('');
+  // The scanBar flag: Scan asked and the background said another scan is running (when),
+  // said in the bar's spot, with Scan greyed, for a minute.
+  const BAR = flag('scanBar');
+  let busyAt = $state(0);
   let failed = $state(null); // the popup's own Sync Now that didn't go through
   // The store alerts (the `alerts` flag): on, the matches, which were unseen when the
   // popup opened (the bell's number, the toolbar badge's), connected, where our Store is.
@@ -96,15 +103,15 @@
   const frac = $derived(sc.progress ? Math.round(progressFraction(sc.progress) * 100) : null);
   const age = $derived(scanAge(v?.scannedAt, now));
   const news = $derived(ALERTS && alerts.on ? fleetNews(alerts.items, fresh) : []);
-  // Signed out of RSI: RSI's sign-in cookie isn't in this browser ('out': Scan greyed and
-  // off until it's back), or the last account read or scan said so and the cookie can't
-  // say otherwise ('maybe': a grey Scan still there to press).
+  // Signed out of RSI: RSI's sign-in cookie isn't in this browser, or the last account
+  // read or scan said so and the browser can't say about the cookie. Log In to RSI first,
+  // with a grey Scan still there to press (./rsi-cookie.js).
   const readOut = $derived.by(() => {
-    if (report?.signedOut && !newer(report) && Number.isFinite(report.at)) return report.at;
+    if (report?.signedOut && !report.rsiDown && !newer(report) && Number.isFinite(report.at)) return report.at;
     if (v?.signedOut) return Number.isFinite(account?.fetchedAt) ? account.fetchedAt : 0;
     return null;
   });
-  const signIn = $derived(rsiSignIn({ cookie, readOut, goneAt }));
+  const signIn = $derived(rsiSignIn({ cookie, readOut, justOut: shown?.signedOut === true && !shown.rsiDown }));
   const signedOut = $derived(signIn !== 'in');
   // Amounts in the currency picked (US dollars until one is), from US dollars.
   const currency = $derived(shownCurrency(prefs.currency));
@@ -146,6 +153,7 @@
         'avatarImg',
         'scanReport',
         'justUpdated',
+        'updateReady',
         'scanStarted',
         'autoScan',
         'autoScanOn',
@@ -157,6 +165,7 @@
     db = stored;
     account = got.account || null;
     justUpdated = got.justUpdated || null;
+    updateReady = got.updateReady || null;
     started = got.scanStarted || null;
     auto = { on: got.autoScanOn === true, rec: got.autoScan || null };
     link = siteLink || null;
@@ -182,18 +191,12 @@
   }
   async function loadSession() {
     session = chrome.storage.session
-      ? await chrome.storage.session.get(['scanRunning', 'scanRequest', 'scanProgress', GONE_KEY])
+      ? await chrome.storage.session.get(['scanRunning', 'scanRequest', 'scanProgress'])
       : {};
-    if (Number.isFinite(session[GONE_KEY])) goneAt = session[GONE_KEY];
   }
-  // Whether RSI's sign-in cookie is here, and when it's gone, that it was (for the next
-  // popup: a cookie it finds came back since).
+  // Whether RSI's sign-in cookie is here.
   async function readCookie() {
-    const c = await rsiCookie(chrome.cookies, { access: !rsiOff });
-    cookie = c;
-    if (c !== 'out') return;
-    goneAt = Date.now();
-    await chrome.storage.session?.set({ [GONE_KEY]: goneAt }).catch(() => {});
+    cookie = await rsiCookie(chrome.cookies, { access: !rsiOff });
   }
   function setReport(r) {
     report = r;
@@ -224,7 +227,8 @@
     const state = got[AL.STATE_KEY];
     alerts = {
       on,
-      items: on && Array.isArray(state?.items) ? state.items : [],
+      // Not the ones deleted here (#701, the bell's × and Clear All).
+      items: on ? AL.shown(state) : [],
       connected: !!got.siteLink?.token,
       feeds: AL.sitesOf(got.siteUrl).feeds,
     };
@@ -237,6 +241,13 @@
       if (fresh.size) chrome.runtime.sendMessage({ ohPopup: 'alerts-seen' }).catch(() => {});
     }
   }
+  const readBanner = () =>
+    OH.getRemoteStatus()
+      .then((st) => (banner = st?.banner || null))
+      .catch(() => {});
+  // Reload to Update, as the basic page's: the browser lets the new version in (the
+  // popup closes with it). Not while a scan runs: the background lets it in after.
+  const reloadForUpdate = () => chrome.runtime.reload();
   const readAccess = async () => (rsiOff = !(await rsiAccess()));
   const accessChanged = async () => {
     await readAccess();
@@ -255,10 +266,8 @@
     (async () => {
       prefs = await loadPrefs();
       applyLook(prefs.look);
-      await Promise.all([loadData(), loadSession(), loadAlerts(), readAccess()]);
+      await Promise.all([loadData(), loadSession(), loadAlerts(), readAccess(), readBanner()]);
       await readCookie();
-      const unseenNews = news.filter((m) => fresh.has(m.id)).length;
-      tab = v?.scannedAt == null ? 'hangar' : openingTab(prefs.tab, unseenNews);
       ready = true;
     })();
     // A sign-in or sign-out in another tab while the popup is open.
@@ -274,6 +283,8 @@
             rec: c.autoScan ? c.autoScan.newValue || null : auto.rec,
           };
         if (c.justUpdated) justUpdated = c.justUpdated.newValue || null;
+        if (c.updateReady) updateReady = c.updateReady.newValue || null;
+        if (c.remoteStatus) readBanner();
         if (ALERTS && (c[AL.ON_KEY] || c[AL.STATE_KEY] || c.siteLink)) loadAlerts();
       }
       if (area === 'session') {
@@ -300,8 +311,12 @@
 
   async function scan() {
     note = '';
+    // The bar takes Scan's place at once (scanBar), so it can't be pressed twice.
+    if (BAR) asked = now = Date.now();
     const r = await chrome.runtime.sendMessage({ ohPopup: 'scan' }).catch(() => null);
     if (!r?.ok) {
+      if (BAR) asked = 0;
+      if (r?.error === 'busy' && BAR) return void (busyAt = now = Date.now());
       if (r?.error === 'busy') return void (note = t('popup.scan-busy'));
       // Any other no (or no answer): the background brought the Open Hangar page up
       // instead (src/background.js), so the popup closes, as before.
@@ -316,9 +331,9 @@
     shown = null;
   }
 
+  // Not saved: every popup opens on Hangar (the owner, 2026-10-19).
   function pickTab(id) {
     tab = id;
-    savePref({ tab: id });
   }
   // The tab row's keys: arrows move along (and wrap), Home and End jump.
   async function tabKey(e) {
@@ -433,7 +448,7 @@
         >
       {/if}
     </header>
-    {#if busy}
+    {#if busy && !BAR}
       <div class="pp-bar" role="progressbar" aria-label={t('popup.scanning-short')} aria-valuemin="0" aria-valuemax="100"
         aria-valuenow={frac ?? undefined}>
         <i style:width={frac == null ? null : `${frac}%`} class:wait={frac == null}></i>
@@ -456,6 +471,20 @@
       </div>
     {/if}
 
+    {#if updateReady}
+      <div class="pp-notice" id="pp-update" role="status">
+        <span>{t('popup.update-ready', { version: updateReady })}</span>
+        <button type="button" class="pp-link" id="pp-update-reload" disabled={busy} onclick={reloadForUpdate}
+          >{t('popup.update-reload')}</button
+        >
+      </div>
+    {/if}
+    {#if banner}
+      <div class="pp-notice" class:warn={banner.level === 'warn'} id="pp-banner" role="status">
+        {banner.message}
+      </div>
+    {/if}
+
     {#if ready && v}
       {#if firstRun}
         <Hangar
@@ -467,12 +496,13 @@
           {account}
           {sc}
           {signedOut}
-          scanOff={signIn === 'out'}
           {rsiOff}
           {fx}
           report={shown}
           lastReport={report}
           {note}
+          busyNote={BAR && !!busyAt && now - busyAt < 60e3}
+          {now}
           news={[]}
           first
           onscan={scan}
@@ -513,7 +543,6 @@
               {account}
               {sc}
               {signedOut}
-              scanOff={signIn === 'out'}
               {rsiOff}
               {fx}
               report={shown}
@@ -521,6 +550,8 @@
               {pilot}
               onpilot={answerPilot}
               {note}
+          busyNote={BAR && !!busyAt && now - busyAt < 60e3}
+          {now}
               {news}
               onscan={scan}
               onbell={openBell}

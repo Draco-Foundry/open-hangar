@@ -51,7 +51,10 @@ if (typeof importScripts === 'function' && !self.OHScanHost) importScripts('scan
 scanHost = self.OHScanHost.create({
   chrome,
   document: typeof document === 'undefined' ? null : document,
-  afterDone: () => updateIfIdle(),
+  afterDone: async () => {
+    await freeAskGap().catch(() => {});
+    await updateIfIdle();
+  },
 });
 chrome.runtime.onMessage.addListener(scanHost.heard);
 // @flag-end connector
@@ -287,6 +290,15 @@ siteHandlers['oh-connect-begin'] = async (msg, origin) => {
   });
   return { ok: true, challenge: b64url(new Uint8Array(digest)), redirect_uri: redirect };
 };
+// The old link's token, revoked as src/lib.js OH.siteDisconnect does. Best effort.
+async function revokeOldLink(was, token, base) {
+  if (!was?.token || was.token === token) return;
+  await fetch(`${base.replace(/\/+$/, '')}/api/v1/sync`, {
+    method: 'DELETE',
+    credentials: 'omit',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${was.token}` },
+  }).catch(() => null);
+}
 siteHandlers['oh-connect-finish'] = async (msg, origin) => {
   const { siteConnect: p } = await chrome.storage.session.get('siteConnect');
   await chrome.storage.session.remove('siteConnect');
@@ -304,11 +316,16 @@ siteHandlers['oh-connect-finish'] = async (msg, origin) => {
   }).catch(() => null);
   if (!res || !res.ok) return { ok: false, error: "That didn't dock. Try again." };
   const j = await res.json();
+  const old = await chrome.storage.local.get(['siteLink', 'siteUrl']);
   await chrome.storage.local.set({
     siteLink: { token: j.token, name: j.name || '', connectedAt: Date.now(), lastSync: null },
     siteUrl: origin, // sync goes to the site you connected on
     ...(msg.sync ? { siteSyncRequested: Date.now() } : {}),
   });
+  // Connecting again while connected: the link it replaced is revoked at the site it was
+  // made on, so the account's Connected Extensions list doesn't keep a row that never
+  // syncs again (#741). After the save, so a slow or failed revoke never costs the new link.
+  await revokeOldLink(old.siteLink, j.token, old.siteUrl || origin);
   // An Open Hangar tab already open comes to the front instead of a second one (#658):
   // a scan running there keeps going, and the sync waits for it.
   await dashboardTab('#home');
@@ -355,9 +372,29 @@ siteHandlers['oh-link-check'] = async (msg, origin) => {
 // A scan-running marker older than this is a page that went away mid-scan
 // (src/dashboard.js scanMark refreshes it every minute while a scan runs).
 const SCAN_RUN_MAX = 10 * 60e3;
-// One scan request a minute at most, and none while a scan runs.
+// One scan request a minute at most, and none while a scan runs. A scan that read
+// nothing frees it once its hidden page is done (freeAskGap).
 const SCAN_ASK_GAP = 60e3;
 let scanAskedAt = 0;
+// The hidden page is done (src/scan-host.js afterDone): when the scan asked last read
+// nothing of RSI's lists (signed out, or held: its report has no rows), the minute's
+// limit goes at once, so Scan works right after Log In to RSI instead of saying a scan
+// is running for up to a minute (the owner, Firefox 0.5.1, 2026-10-20). A scan that
+// read anything keeps the limit.
+async function freeAskGap() {
+  const { scanReport: r } = await chrome.storage.local.get('scanReport');
+  const { scanAskedAt: asked } = await chrome.storage.session.get('scanAskedAt');
+  const at = Number.isFinite(asked) ? asked : scanAskedAt;
+  const empty =
+    r &&
+    typeof r === 'object' &&
+    Array.isArray(r.rows) &&
+    !r.rows.length &&
+    (r.signedOut || r.held);
+  if (!at || !empty || !Number.isFinite(r.startedAt) || r.startedAt < at) return;
+  scanAskedAt = 0;
+  await chrome.storage.session.remove('scanAskedAt');
+}
 // One Firefox ask for the hangar page a minute at most.
 const FIREFOX_ASK_GAP = 60e3;
 let firefoxAskedAt = 0;
@@ -552,6 +589,8 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 // take the toolbar badge (updateReminder); a new one gets a notification while
 // Notifications are allowed (an optional permission the settings switch asks for).
 //   { ohPopup: 'alerts-seen' } → { ok }: the popup is open, every match is seen
+//   { ohPopup: 'alerts-hide', id? } → { ok }: the popup deleted one match (its id), or
+//     every one (Clear All, no id), so the badge follows
 if (typeof importScripts === 'function' && !self.OHAlerts) importScripts('alerts.js');
 const NOTIFY = { permissions: ['notifications'] };
 const notifyOk = async () =>
@@ -676,15 +715,19 @@ function hearClicks() {
 hearClicks();
 chrome.permissions?.onAdded?.addListener(hearClicks);
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
-  if (!msg || typeof msg !== 'object' || msg.ohPopup !== 'alerts-seen') return false;
+  if (!msg || typeof msg !== 'object') return false;
+  if (msg.ohPopup !== 'alerts-seen' && msg.ohPopup !== 'alerts-hide') return false;
   if (sender.id !== chrome.runtime.id || sender.tab) return false;
   if (String(sender.url || '').split(/[?#]/)[0] !== chrome.runtime.getURL(POPUP)) return false;
   const AL = self.OHAlerts;
+  const id = typeof msg.id === 'string' ? msg.id : null;
+  const next = (st) =>
+    msg.ohPopup === 'alerts-hide' ? AL.hide(st, Date.now(), id) : AL.markSeen(st, Date.now());
   chrome.storage.local
     .get(AL.STATE_KEY)
     .then((got) =>
       got[AL.STATE_KEY]
-        ? chrome.storage.local.set({ [AL.STATE_KEY]: AL.markSeen(got[AL.STATE_KEY], Date.now()) })
+        ? chrome.storage.local.set({ [AL.STATE_KEY]: next(got[AL.STATE_KEY]) })
         : null,
     )
     .then(updateReminder)
@@ -820,6 +863,37 @@ chrome.storage.onChanged.addListener((c, area) => {
   if (c[AUTO_STATE] || c[AUTO_ON]) updateReminder();
 });
 // @flag-end autoScan
+
+// @flag-start pageChangeAlert: the owner's alert when Auto Scan Daily stops on a changed page
+// Dev builds only (src/flags.js): the maintainer's own copy, with Auto Scan Daily on for
+// their account, says on this computer when a run stopped because RSI changed a page
+// (its record's `pageChanged`, ui/scan/runner.js). A notification, nothing sent; it
+// needs the notifications permission store alerts ask for. The owner's approved words
+// (owner.rsi-page-changed-alert, 2026-10-22), word for word.
+const PAGE_NAMES = { hangar: 'Hangar', buybacks: 'Buy-Backs', referral: 'Referrals' };
+function pageChangedLine(part, at) {
+  const d = new Date(at);
+  const two = (n) => String(n).padStart(2, '0');
+  return `RSI page changed: ${PAGE_NAMES[part] || part}, ${two(d.getUTCHours())}:${two(d.getUTCMinutes())} UTC`;
+}
+chrome.storage.onChanged.addListener(async (c, area) => {
+  const rec = area === 'local' ? c.autoScan?.newValue : null;
+  if (!rec?.pageChanged || !Number.isFinite(rec.ended) || rec.ended === c.autoScan.oldValue?.ended)
+    return;
+  const ok =
+    !!chrome.notifications &&
+    (await chrome.permissions.contains({ permissions: ['notifications'] }).catch(() => false));
+  if (!ok) return;
+  await chrome.notifications
+    .create(`oh-page-changed-${rec.ended}`, {
+      type: 'basic',
+      iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+      title: 'Open Hangar',
+      message: pageChangedLine(rec.pageChanged, rec.ended),
+    })
+    .catch(() => {});
+});
+// @flag-end pageChangeAlert
 
 // The website's messages, all of them: only from our own pages (src/site-pages.js),
 // each checked before its handler runs.

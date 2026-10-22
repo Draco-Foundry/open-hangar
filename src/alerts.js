@@ -6,7 +6,9 @@
  * file, openhangar.space's sale feed (/api/store/on-sale: the same file for everyone,
  * nothing about you in the request), and matches it HERE, on this device, against:
  *   - the account's Wishlist, only while this browser is connected: its item keys,
- *     read with the sync token (/api/v1/wishlist), read only, nothing sent back;
+ *     read with the sync token (/api/v1/wishlist), read only, nothing sent back. An
+ *     item with Remind Me off (the popup's switch, the website's wishlist_remind) isn't
+ *     in those keys, so it's skipped here with no rule of its own, from the next check;
  *   - the hangar and buy-backs this browser scanned, which never leave it, by the
  *     owner's rules (2026-10-10):
  *       buyback  a ship in your buy-backs is in the store again
@@ -121,6 +123,30 @@
       .replace(/[^a-z0-9]+/g, ' ')
       .trim();
 
+  // RSI's renames (the parser rules' `aliases`, src/data/parser-rules.json): a folded
+  // name → the other names it has gone by, old or current. A name is looked up as it is,
+  // then as each of those: exact names only, never a guess. The website keeps the same
+  // list. The rules load wherever alerts do (the worker, the popup, the basic page).
+  if (!root.OHRules && typeof require === 'function') require('./parser-rules.js');
+  const RULES = root.OHRules;
+  const ALIASES = new Map();
+  for (const a of RULES.aliases) {
+    const [o, n] = [nameKey(a.old), nameKey(a.now)];
+    if (!o || !n || o === n) continue;
+    for (const [k, other] of [
+      [o, n],
+      [n, o],
+    ]) {
+      if (!ALIASES.has(k)) ALIASES.set(k, []);
+      if (!ALIASES.get(k).includes(other)) ALIASES.get(k).push(other);
+    }
+  }
+  // A name's folded keys to look up: its own first, then its other names.
+  const keysOf = (s) => {
+    const k = nameKey(s);
+    return k ? [k, ...(ALIASES.get(k) || [])] : [];
+  };
+
   // A buy-back's title as the ship it gives back: RSI's store label in front and its
   // insurance and edition words behind off ("Standalone Ships - Cutlass Black - LTI",
   // "Sabre Raven EX Warbond Edition"), an extra after "plus" or "with" too. The ship's
@@ -221,12 +247,16 @@
       for (const k of s.keys)
         owners.set(k, owners.has(k) && owners.get(k) !== s.slug ? null : s.slug);
     const names = new Map(feed.ships.map((s) => [s.slug, s.name]));
+    const look = (s) =>
+      keysOf(s)
+        .map((k) => owners.get(k))
+        .find(Boolean) || null;
     const find = (label) => {
-      const full = nameKey(label);
-      if (owners.get(full)) return owners.get(full);
+      const full = look(label);
+      if (full) return full;
       // RSI's tag after a dash ("MISC RAPTOR - Referral Reward"): the name before it.
       const dash = /^(.+?)\s+[-–]\s+[^-–]+$/.exec(String(label || '').trim());
-      return (dash && owners.get(nameKey(dash[1]))) || null;
+      return (dash && look(dash[1])) || null;
     };
     return { find, name: (slug) => names.get(slug) || slug };
   }
@@ -280,10 +310,12 @@
   function ownedPaints(db) {
     const out = new Set();
     for (const p of items(db, 'hangar')) {
-      if (p.isPaint && typeof p.name === 'string') out.add(paintKey(p.name));
+      // Each under its other names too (RSI's renames), so the store's name finds it.
+      const add = (s) => keysOf(s).forEach((k) => out.add(paintKey(k)));
+      if (p.isPaint && typeof p.name === 'string') add(p.name);
       for (const c of Array.isArray(p.contents) ? p.contents : [])
         if (isObj(c) && typeof c.label === 'string' && PAINT_KIND.test(String(c.kind || '').trim()))
-          out.add(paintKey(c.label));
+          add(c.label);
     }
     out.delete('');
     return out;
@@ -347,9 +379,12 @@
   // again. `known`: pairs matched so far (when first); `seen`: pairs the pilot has seen
   // (the popup opened); `gone`: pairs no longer matched (since when), forgotten after
   // GONE_KEEP_MS so a sale that comes back later alerts again, and a short gap (sold
-  // out between two reads) doesn't.
+  // out between two reads) doesn't. `hidden`: pairs the pilot deleted in the popup (#701,
+  // since when): they stay out of the list and the badge, and are forgotten with the
+  // rest, so only something new (another reason, or the sale back after a day gone)
+  // shows the item again.
   const pairsOf = (m) => m.why.map((w) => `${m.id}|${w.why}`);
-  const emptyState = () => ({ v: 1, items: [], known: {}, seen: {}, gone: {} });
+  const emptyState = () => ({ v: 1, items: [], known: {}, seen: {}, gone: {}, hidden: {} });
   function cleanState(s) {
     if (!isObj(s) || s.v !== 1) return emptyState();
     const map = (x) =>
@@ -360,6 +395,7 @@
       known: map(s.known),
       seen: map(s.seen),
       gone: map(s.gone),
+      hidden: map(s.hidden),
     };
   }
   // → { state, fresh }: fresh are the matches with a pair never matched before.
@@ -369,6 +405,7 @@
     const known = { ...s.known };
     const seen = { ...s.seen };
     const gone = { ...s.gone };
+    const hidden = { ...s.hidden };
     const fresh = matches.filter((m) => pairsOf(m).some((p) => !(p in known)));
     for (const p of live) {
       if (!(p in known)) known[p] = now;
@@ -381,6 +418,7 @@
         delete known[p];
         delete seen[p];
         delete gone[p];
+        delete hidden[p];
       }
     }
     const cap = (m) =>
@@ -390,15 +428,41 @@
           .slice(0, PAIRS_MAX),
       );
     return {
-      state: { ...s, items: matches, known: cap(known), seen: cap(seen), gone: cap(gone) },
+      state: {
+        ...s,
+        items: matches,
+        known: cap(known),
+        seen: cap(seen),
+        gone: cap(gone),
+        hidden: cap(hidden),
+      },
       fresh,
     };
   }
-  // Items with a pair the pilot hasn't seen: the badge's count.
+  // Items with a pair the pilot hasn't seen (or deleted): the badge's count.
   const unseen = (state) => {
     const s = cleanState(state);
-    return s.items.filter((m) => pairsOf(m).some((p) => !(p in s.seen)));
+    return s.items.filter((m) => pairsOf(m).some((p) => !(p in s.seen) && !(p in s.hidden)));
   };
+  // The items the popup lists: those with a pair the pilot hasn't deleted.
+  const shown = (state) => {
+    const s = cleanState(state);
+    return s.items.filter((m) => pairsOf(m).some((p) => !(p in s.hidden)));
+  };
+  // Deleted in the popup: one item's pairs (its ×), or every current one (Clear All).
+  // Deleted counts as seen too.
+  function hide(state, now, id = null) {
+    const s = cleanState(state);
+    const hidden = { ...s.hidden };
+    const seen = { ...s.seen };
+    for (const m of s.items)
+      if (id == null || m.id === id)
+        for (const p of pairsOf(m)) {
+          hidden[p] ??= now;
+          seen[p] ??= now;
+        }
+    return { ...s, hidden, seen };
+  }
   // Every current pair seen (the popup opened), or one item's (its notification clicked).
   function markSeen(state, now, id = null) {
     const s = cleanState(state);
@@ -657,6 +721,7 @@
     COPY,
     t,
     nameKey,
+    keysOf,
     bareShipName,
     containsNames,
     readFeed,
@@ -669,6 +734,8 @@
     matchAll,
     nextState,
     unseen,
+    shown,
+    hide,
     markSeen,
     lines,
     notesFor,

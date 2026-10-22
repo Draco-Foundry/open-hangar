@@ -1,0 +1,1 @@
+- Improved: If RSI changes a page, the scan stops and your last scan is kept.

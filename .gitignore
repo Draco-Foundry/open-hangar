@@ -10,6 +10,8 @@ dist/
 
 # local editor / tooling config (personal, not project)
 .claude/settings.local.json
+# Each maintainer's local Claude rules (copied into worktrees by .worktreeinclude)
+CLAUDE.local.md
 
 # copied in at deploy time by .github/workflows/pages.yml
 /site/icon.svg
@@ -20,10 +22,17 @@ dist/
 
 # local scratch files (not for the repo)
 _dump/
+# the developer's build's own browser profiles (scripts/dev-run.mjs)
+/.dev-profiles/
 .wrangler/
 
 # built by Vite from ui/ (npm run build:ui)
 /src/ui/
 
-# Claude Code session files and its temporary worktrees (local only).
-.claude/
+# Claude Code session files and its temporary worktrees (local only). The shared
+# settings.json (the agents' deny list, CLAUDE.md) is the one file kept.
+.claude/*
+!.claude/settings.json
+
+# Python bytecode from docs/brand/draco-foundry/banner.py
+__pycache__/

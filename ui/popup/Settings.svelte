@@ -252,7 +252,6 @@
         {#if msg && msg !== trouble?.msg}<p class="pp-r pp-msg" class:calm role="status">{msg}</p>{/if}
       {:else}
         <div class="pp-r pp-col">
-          <b>openhangar.space</b>
           <button type="button" class="pp-btn primary" id="pp-connect" onclick={() => openHub('#settings')}
             >Connect to openhangar.space</button
           >
@@ -262,8 +261,9 @@
   {/if}
 
   {#if ALERTS && alertsOn != null}
+    <!-- Both switches on one row (#700). -->
     <div class="pp-grp" id="pp-alert-set">
-      <div class="pp-r">
+      <div class="pp-r pp-two">
         <span class="pp-grow" id="pp-al-l">{t('popup.store-alerts')}</span>
         <button
           type="button"
@@ -274,9 +274,7 @@
           aria-labelledby="pp-al-l"
           onclick={alertsSwitch}><i></i></button
         >
-      </div>
-      <div class="pp-r">
-        <span class="pp-grow" id="pp-nt-l">{t('popup.notifications')}</span>
+        <span class="pp-grow pp-gap" class:off={!alertsOn} id="pp-nt-l">{t('popup.notifications')}</span>
         <button
           type="button"
           role="switch"
@@ -291,28 +289,29 @@
     </div>
   {/if}
 
-  <div class="pp-grp">
-    <label class="pp-r">
-      <span class="pp-grow">{t('popup.look')}</span>
+  <!-- Look, Currency and Shortcut side by side, each name over its control (#700). -->
+  <div class="pp-grp pp-r pp-trio" id="pp-prefs">
+    <label class="pp-cell">
+      <small>{t('popup.look')}</small>
       <select class="pp-sel" id="pp-look" value={prefs.look} onchange={(e) => onlook(e.currentTarget.value)}>
         {#each LOOKS as l (l)}<option value={l}>{t(LOOK[l])}</option>{/each}
       </select>
     </label>
-    <label class="pp-r">
-      <span class="pp-grow">{t('popup.currency')}</span>
+    <label class="pp-cell">
+      <small>{t('popup.currency')}</small>
       <select class="pp-sel" id="pp-currency" value={currency} onchange={(e) => oncurrency(e.currentTarget.value)}>
         {#each CURRENCIES as c (c)}<option value={c}>{c}</option>{/each}
       </select>
     </label>
     {#if shortcut != null}
-      <div class="pp-r">
-        <span class="pp-grow">{t('popup.shortcut')}</span>
-        <span class="pp-val" id="pp-shortcut">{shortcut || t('popup.shortcut-none')}</span>
-        {#if canChangeShortcut()}
-          <button type="button" class="pp-link" id="pp-shortcut-change" onclick={openShortcuts}
-            >{t('popup.shortcut-change')}</button
-          >
-        {/if}
+      <div class="pp-cell">
+        <small
+          >{t('popup.shortcut')}{#if canChangeShortcut()}
+            <button type="button" class="pp-link" id="pp-shortcut-change" onclick={openShortcuts}
+              >{t('popup.shortcut-change')}</button
+            >{/if}</small
+        >
+        <span class="pp-cval" id="pp-shortcut">{shortcut || t('popup.shortcut-none')}</span>
       </div>
     {/if}
   </div>

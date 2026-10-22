@@ -18,7 +18,7 @@
       class="btn-login cc-lo-btn"
       href="https://robertsspaceindustries.com/connect"
       target="_blank"
-      rel="noopener">Log In to RSI ↗</a
+      rel="noopener">Log In to RSI</a
     >
   </div>
 </div>

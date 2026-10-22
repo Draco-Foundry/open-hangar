@@ -101,18 +101,32 @@
     return null;
   };
 
-  ns.insuranceTerm = function insuranceTerm(contents) {
-    const ins = (contents || []).find((c) => RULES.kinds.insurance.test(c.kind || ''));
-    if (!ins) return null;
-    const label = ins.label || '';
-    if (RULES.insurance.fromItem.lti.test(label)) return 'LTI';
+  // One insurance item's term in months (Infinity for LTI), or null when the
+  // phrasing isn't recognized. Years count as months, the same as
+  // insuranceFromName ("10 Year" → 120), so one term never shows up two ways in
+  // filters and stats.
+  function insuranceMonths(label) {
+    if (RULES.insurance.fromItem.lti.test(label)) return Infinity;
     const mo = label.match(RULES.insurance.fromItem.months);
-    if (mo) return `${mo.groups.n}M`;
-    // Years in months, the same as insuranceFromName ("10 Year" → "120M"), so
-    // one term never shows up two ways in filters and stats.
+    if (mo) return Number(mo.groups.n);
     const yr = label.match(RULES.insurance.fromItem.years);
-    if (yr) return `${Number(yr.groups.n) * 12}M`;
-    return label || null; // unrecognized phrasing — surface RSI's text verbatim
+    if (yr) return Number(yr.groups.n) * 12;
+    return null;
+  }
+
+  // An upgraded pledge lists its original insurance and the upgrade as separate
+  // items, original first (#712), so the best term wins: LTI, then the most months.
+  ns.insuranceTerm = function insuranceTerm(contents) {
+    const items = (contents || []).filter((c) => RULES.kinds.insurance.test(c.kind || ''));
+    if (!items.length) return null;
+    let best = null;
+    for (const c of items) {
+      const m = insuranceMonths(c.label || '');
+      if (m !== null && (best === null || m > best)) best = m;
+    }
+    if (best === Infinity) return 'LTI';
+    if (best !== null) return `${best}M`;
+    return items[0].label || null; // unrecognized phrasing — surface RSI's text verbatim
   };
 
   // RSI leaves the type off some contained items (#296; other tools see about 1 in
@@ -517,6 +531,29 @@
     };
   };
 
+  // RSI's pager under a paged account list (hangar and buy-backs): → { current, max }
+  // (the page shown, and the highest page it links to; null when it doesn't say), or
+  // null with no pager. It reads page numbers from the links' ?page=N, not from their
+  // arrows, so the last page needs no markup of its own. The buy-back list's page-size
+  // picker is a plain link too (?page=1&pagesize=N), so whatever size RSI serves, these
+  // numbers follow it. scanHtmlSource in src/lib.js stops on them.
+  ns.parsePager = function parsePager(html) {
+    const doc =
+      typeof html === 'string' ? new DOMParser().parseFromString(html, 'text/html') : html;
+    const pager = doc.querySelector(RULES.paging.pager);
+    if (!pager) return null;
+    const pageOf = (a) => {
+      const query = (a?.getAttribute('href') || '').split('?')[1];
+      const n = Number(new URLSearchParams(query || '').get(RULES.paging.page));
+      return Number.isInteger(n) && n > 0 ? n : null;
+    };
+    const pages = [...pager.querySelectorAll(RULES.paging.links)].map(pageOf).filter(Boolean);
+    return {
+      current: pageOf(pager.querySelector(RULES.paging.active)),
+      max: pages.length ? Math.max(...pages) : null,
+    };
+  };
+
   ns.parseBuybacks = function parseBuybacks(payload) {
     if (payload == null) return [];
     if (typeof payload === 'string') {
@@ -524,5 +561,93 @@
     }
     if (payload.querySelectorAll) return ns.parseBuybacksFromDOM(payload);
     return [];
+  };
+
+  // --- Has RSI changed the page? ----------------------------------------------
+  // One hangar or buy-back page (HTML or a Document) that has cards → what of the
+  // rules' shape it no longer has, as a list of short reasons, [] when it fits. A scan
+  // checks every page with this on the device and saves nothing when a page doesn't
+  // fit (src/lib.js scanHtmlSource): better your last scan than one read wrong. Only
+  // what the parser can't do without: a pledge's name, a date it can read, the items
+  // inside; a buy-back's name and date. A new label or js-* hook isn't a change here
+  // (unrecognized, below, lists those for the saved pages' test).
+  ns.pageChanged = function pageChanged(payload, kind) {
+    const doc =
+      typeof payload === 'string' ? new DOMParser().parseFromString(payload, 'text/html') : payload;
+    const out = [];
+    if (kind === 'hangar') {
+      const list = ns.parsePledgesFromDOM(doc);
+      if (!list.length) return out;
+      if (list.some((p) => !p.id || !p.name)) out.push('a pledge without its id or name');
+      if (!list.some((p) => p.date)) out.push('no pledge date reads');
+      if (list.length >= 3 && !list.some((p) => p.contents.length)) out.push('no pledge items');
+    } else {
+      const cards = doc.querySelectorAll(RULES.buybacks.card).length;
+      const list = ns.parseBuybacksFromDOM(doc);
+      if (cards && !list.length) out.push('buy-back cards without names');
+      if (list.length && !list.some((b) => ns.parseRsiDate(b.date)))
+        out.push('no buy-back date reads');
+    }
+    return out;
+  };
+
+  // --- What the parser didn't recognize --------------------------------------
+  // One hangar or buy-back page (HTML or a Document) → { pledges, items, tags,
+  // labels, hooks }, each a list of what the page shows outside the rules: a pledge
+  // with no id, name, readable date or kind; an item kind, a tag beside a pledge's
+  // name, a card label or a js-* class (RSI's script hooks, so a new one usually
+  // means a new feature) not in RULES.known. test/parser-corpus.test.js runs it over
+  // saved pages (test/parser-report.js) and fails on anything listed.
+  ns.unrecognized = function unrecognized(payload, kind) {
+    const doc =
+      typeof payload === 'string' ? new DOMParser().parseFromString(payload, 'text/html') : payload;
+    const clean = (s) =>
+      String(s || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const out = { pledges: [], items: [], tags: [], labels: [], hooks: [] };
+    const hangar = kind === 'hangar';
+    const known = hangar
+      ? { labels: RULES.known.hangar.labels, hooks: RULES.known.hangar.hooks }
+      : { labels: RULES.known.buybacks.labels, hooks: RULES.known.buybacks.hooks };
+    const cards = hangar
+      ? [...doc.querySelectorAll(RULES.hangar.id)].map(resolveCard)
+      : [...doc.querySelectorAll(RULES.buybacks.card)];
+
+    if (hangar) {
+      for (const p of ns.parsePledgesFromDOM(doc)) {
+        if (!p.id || !p.name) out.pledges.push(`a pledge with no ${p.id ? 'name' : 'id'}`);
+        else if (!p.date) out.pledges.push(`pledge ${p.id}: date doesn't read`);
+        else if (p.kind === 'other') out.pledges.push(`pledge ${p.id}: no kind`);
+        for (const c of p.contents) {
+          if (c.kind && !c.guessed && !RULES.known.hangar.itemKinds.includes(c.kind))
+            out.items.push(`pledge ${p.id}: item kind "${c.kind}"`);
+        }
+      }
+      for (const card of cards)
+        for (const t of card.querySelectorAll(RULES.hangar.tag)) {
+          const text = clean(t.textContent);
+          if (text && !RULES.known.hangar.tags.includes(text)) out.tags.push(`tag "${text}"`);
+        }
+    } else {
+      for (const b of ns.parseBuybacksFromDOM(doc)) {
+        if (!b.id || !b.name) out.pledges.push(`a buy-back with no ${b.id ? 'name' : 'id'}`);
+        else if (!ns.parseRsiDate(b.date)) out.pledges.push(`buy-back ${b.id}: date doesn't read`);
+      }
+    }
+
+    const labels = hangar ? RULES.hangar.label : RULES.buybacks.label;
+    const hooks = hangar ? RULES.hangar.hook : RULES.buybacks.hook;
+    for (const card of cards) {
+      for (const l of card.querySelectorAll(labels)) {
+        const text = clean(l.textContent);
+        if (text && !known.labels.includes(text)) out.labels.push(`label "${text}"`);
+      }
+      for (const el of card.querySelectorAll(hooks))
+        for (const c of String(el.className).split(' '))
+          if (c.startsWith('js-') && !known.hooks.includes(c)) out.hooks.push(`hook ${c}`);
+    }
+    for (const k of Object.keys(out)) out[k] = [...new Set(out[k])]; // one line per shape
+    return out;
   };
 })();

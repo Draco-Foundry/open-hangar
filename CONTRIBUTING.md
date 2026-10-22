@@ -154,17 +154,18 @@ Everything automated lives in `.github/workflows/`:
   checks the workflow files themselves.
   A new commit on a PR cancels its older run. A PR that only touches Markdown, `docs/`,
   `site/` or issue templates skips the UI test and the zips (the `test` check still
-  reports). Tells #ops on Discord when `main` goes red.
+  reports). Warns, without failing, when a PR changes `src/` and adds no changelog
+  fragment (`changelog.d/`). Tells #ops on Discord when `main` goes red.
 - **Pre-push hook** (`scripts/hooks/pre-push`): `npm install` points git at
   `scripts/hooks`, so every `git push` first runs `npm run format:check` and
   `npm test` (a few seconds; the UI test stays in CI). In an emergency,
   `git push --no-verify` skips it.
-- **Pages** (`pages.yml`): deploys the website in `site/` to Cloudflare when it changes
-  on `main`, after each Publish to stores run, and every 3 hours (hourly while a store
-  has a version in review) to refresh the store versions and exchange rates.
+- **Pages** (`pages.yml`): deploys the website in `site/` to Cloudflare only when the
+  owner runs it by hand (Run workflow), refreshing the store versions and exchange
+  rates on each run.
 - **Release** (`release.yml`): a pushed `v*` tag builds the Chrome and Firefox zips,
   publishes a GitHub Release with that version's CHANGELOG notes, and starts Publish to
-  stores for it.
+  stores for it. (`npm run release` folds the `changelog.d/` fragments into CHANGELOG first.)
 - **Publish to stores** (`publish.yml`): uploads a tag to Chrome, Edge and Firefox, then
   announces it on Discord. Started by Release (or by hand); it waits for CI on the
   tag's commit, and nothing uploads until the owner approves the `stores` environment.

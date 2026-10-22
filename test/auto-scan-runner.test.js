@@ -314,7 +314,7 @@ test('who is signed in gets no answer: a quiet end, and the next run backs off',
     kind === 'who' ? new Response('', { status: 429, headers: { 'retry-after': '120' } }) : null;
   const rec = await r.autoScan();
   assert.deepEqual(asked, ['who'], 'a 429 is never retried');
-  assert.equal(rec.line, null, 'no line of its own: the popup still says the last one');
+  assert.equal(rec.line, 'rsi-down', 'RSI not answering before anything was read: its own line');
   assert.equal(rec.fails, 1);
   assert.equal(rec.retryAt, rec.ended + DAY);
   // In a row: twice the wait. Then an answer resets it.
@@ -350,6 +350,15 @@ test('the quick check: page 1 of the hangar different reads in full, without pee
   assert.deepEqual(asked.slice(0, 4), ['who', 'who', 'dossier', 'hangar:1']);
 });
 
+test('who is signed in answers a 5xx: the same line, and the next run backs off', async () => {
+  const r = await scannedAndSynced();
+  rsi.fail = (kind) => (kind === 'who' ? new Response('', { status: 503 }) : null);
+  const rec = await r.autoScan();
+  assert.equal(rec.line, 'rsi-down', 'RSI not answering before anything was read: its own line');
+  assert.equal(rec.fails, 1);
+  assert.equal(rec.retryAt, rec.ended + DAY);
+});
+
 test('the quick check sees a sign-in page: signed out; no answer: a quiet end with backoff', async () => {
   const r = await scannedAndSynced();
   rsi.fail = (kind) => (kind === 'hangar:1' ? new Response(`[]${SIGN_IN}`) : null);
@@ -359,7 +368,7 @@ test('the quick check sees a sign-in page: signed out; no answer: a quiet end wi
       ? new Response('', { status: 503, headers: { 'retry-after': '60' } })
       : null;
   const quiet = await r.autoScan();
-  assert.equal(quiet.line, 'signed-out', 'the last line stays');
+  assert.equal(quiet.line, 'rsi-down', 'RSI not answering: its own line');
   assert.equal(quiet.fails, 1);
   assert.deepEqual(site, []);
 });
@@ -600,7 +609,7 @@ test("a pressed Scan notes the parts it read whole; one cut short isn't", async 
   const r = await scannedAndSynced();
   for (const p of ['hangar', 'buybacks', 'referral'])
     assert.equal(stamps()[p], mem.db.sources[p].scannedAt, p);
-  // A hangar cut short (kept, as Scan does: 30 read over 25) and buy-backs that failed.
+  // A hangar RSI stopped answering for partway (nothing saved) and buy-backs that failed.
   delete mem.scanFull;
   rsi.hangar = pledges(35);
   rsi.fail = (kind) =>
@@ -610,7 +619,8 @@ test("a pressed Scan notes the parts it read whole; one cut short isn't", async 
         ? new Response('', { status: 401 })
         : null;
   const report = await r.scan({ reason: 'popup' });
-  assert.ok(report.rows[0].partial);
+  assert.equal(report.rows[0].ok, false);
+  assert.equal(report.rsiDown, true, 'RSI did not answer: the report says so');
   assert.equal(report.rows[1].ok, false);
   assert.deepEqual(Object.keys(stamps()), ['referral']);
 });

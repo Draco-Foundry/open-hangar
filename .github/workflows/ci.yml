@@ -47,7 +47,24 @@ jobs:
             echo "::error::Delete the branch plan before merging: $plans"
             ok=false
           fi
+          node scripts/check-private.mjs || ok=false
           $ok
+      # A PR that changes how RSI's pages are read bumps PARSER_VERSION
+      # (src/hangar-shape.js) or a commit says why not (scripts/check-parser-version.mjs).
+      - name: Parser version
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate > "$RUNNER_TEMP/pr-files.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/commits" --paginate > "$RUNNER_TEMP/pr-commits.json"
+          node scripts/check-parser-version.mjs --pr "$RUNNER_TEMP/pr-files.json" "$RUNNER_TEMP/pr-commits.json"
+      # A PR that changes src/ without a changelog fragment (changelog.d/) gets a warning,
+      # never a failure: many src/ changes have no player-facing line.
+      - name: Changelog fragment
+        if: github.event_name == 'pull_request'
+        run: node scripts/check-changelog-fragment.mjs "$RUNNER_TEMP/pr-files.json"
       # Docs-only PRs (Markdown, docs/, the landing page in site/, issue templates)
       # skip the slow UI test and the store packaging; the fast checks still run.
       # When in doubt (not a PR, or the file list can't be read) everything runs.
@@ -67,7 +84,7 @@ jobs:
           if [ "$docs_only" = true ]; then
             echo "::notice::Docs-only change: the UI test and store packaging are skipped"
           fi
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
@@ -111,7 +128,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
       - name: Post to #ops

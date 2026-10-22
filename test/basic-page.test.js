@@ -173,6 +173,22 @@ test("the scan's report in the basic page's words, as before the runner", async 
   assert.deepEqual(out, { rows: [], signedOut: true, bad: 0 });
   assert.equal(reportSummary(out, true), 'signed out of RSI');
   assert.equal(reportSummary(null), 'no scan this session');
+  // RSI didn't answer: its own line, and it wins over signed out; a 429 says when to scan again.
+  const bb = { id: 'buybacks', ok: false, partial: null, n: null, error: 'RSI responded 503' };
+  const hg = { id: 'hangar', ok: true, partial: null, n: 2, error: null };
+  const down = reportLines(runnerReport([hg, bb], { rsiDown: true, signedOut: true }), t);
+  assert.equal(down.signedOut, false, 'signed out does not win over RSI not answering');
+  assert.equal(
+    down.down,
+    "RSI isn't answering, so the scan stopped. The parts it didn't finish keep your last scan. Try again soon.",
+  );
+  assert.deepEqual(down.rows, [{ name: 'Hangar', ok: true, text: '2 pledges' }]);
+  const at = new Date(2026, 9, 22, 15, 42).getTime();
+  const slow = reportLines(runnerReport([bb], { rsiDown: true, wait: at }), t, () => '3:42 PM');
+  assert.equal(
+    slow.down,
+    "RSI asked us to wait, so the scan stopped. The parts it didn't finish keep your last scan. Scan again after 3:42 PM.",
+  );
   // A scan that never ran (another tab's scan, no RSI access) leaves the last one up.
   assert.equal(reportLines(runnerReport([], { held: 'busy' }), t), null);
   assert.equal(reportLines(runnerReport([], { held: 'no-rsi' }), t), null);
@@ -334,4 +350,23 @@ test("the pledges total line, in the owner's words (2026-10-12)", async () => {
     pledgeTotalsLine({ count: 1200, value: 0, priced: 0 }, money),
     '1,200 pledges, $0.00 melt (0 with melt listed)',
   );
+});
+
+// Connect done (#692): the tab goes on to the website's My Hangar, the popup's Open My
+// Hangar address, only when it was opened for Connect and nothing holds it here.
+test('after Connect: on to My Hangar, unless a scan or a message keeps the page', async () => {
+  const { afterConnect } = await import('../ui/basic/after-connect.js');
+  const base = {
+    forConnect: true,
+    scanning: false,
+    msg: '',
+    siteUrl: 'https://app.openhangar.space',
+    linked: true,
+  };
+  assert.equal(afterConnect(base), 'https://app.openhangar.space/hangar');
+  assert.equal(afterConnect({ ...base, forConnect: false }), null, 'opened for something else');
+  assert.equal(afterConnect({ ...base, scanning: true }), null, 'a scan runs in this tab');
+  assert.equal(afterConnect({ ...base, msg: 'Firefox said no' }), null, 'a message to read');
+  assert.equal(afterConnect({ ...base, pilot: true }), null, 'the pilot question is open');
+  assert.equal(afterConnect({ ...base, linked: false }), null, 'not linked after all');
 });

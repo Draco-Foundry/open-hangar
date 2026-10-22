@@ -136,22 +136,37 @@ test("the sign-in check: RSI's session cookie, whether it's there, never its val
   }
 });
 
-test('signed out: greyed Scan while the cookie is gone, Scan again once it is back', async () => {
+test('signed out: the cookie never locks Scan, and with the cookie there it is Scan', async () => {
   const { rsiSignIn } = await cookie();
   const T = 1e12;
   // Nothing said signed out.
   assert.equal(rsiSignIn({ cookie: 'in' }), 'in');
   assert.equal(rsiSignIn({ cookie: null }), 'in');
-  // The cookie's gone: signed out for sure, whatever the last scan said.
-  assert.equal(rsiSignIn({ cookie: 'out' }), 'out');
-  assert.equal(rsiSignIn({ cookie: 'out', readOut: T }), 'out');
-  // The last scan said signed out: the cookie back since a popup saw it gone, signed in.
-  assert.equal(rsiSignIn({ cookie: 'in', readOut: T, goneAt: T + 1 }), 'in');
-  // ... but a cookie never seen gone, or gone before that scan, can't say: Log In to RSI
-  // with a grey Scan still there to press.
-  assert.equal(rsiSignIn({ cookie: 'in', readOut: T }), 'maybe');
-  assert.equal(rsiSignIn({ cookie: 'in', readOut: T, goneAt: T - 1 }), 'maybe');
+  // The cookie there: Scan, even after a scan that said signed out (RSI keeps the same
+  // cookie through a sign-in, so a signed-in player was stuck on Log In to RSI, 0.5.0).
+  assert.equal(rsiSignIn({ cookie: 'in', readOut: T }), 'in');
+  // The cookie gone, or no answer after a signed-out scan: Log In to RSI first, with a
+  // grey Scan still there to press. Never a Scan that's off.
+  assert.equal(rsiSignIn({ cookie: 'out' }), 'maybe');
+  assert.equal(rsiSignIn({ cookie: 'out', readOut: T }), 'maybe');
   assert.equal(rsiSignIn({ cookie: null, readOut: T }), 'maybe');
+  // The scan this popup just reported said signed out: Log In to RSI, cookie or not, so
+  // the scan never ends with nothing on screen (Firefox 0.5.1, 2026-10-20).
+  assert.equal(rsiSignIn({ cookie: 'in', readOut: T, justOut: true }), 'maybe');
+  assert.equal(rsiSignIn({ cookie: null, justOut: true }), 'maybe');
+  const popup = fs.readFileSync(path.join(ROOT, 'ui/popup/Popup.svelte'), 'utf8');
+  assert.match(popup, /justOut: shown\?\.signedOut === true/, 'the popup passes its report');
+  const hangar = fs.readFileSync(path.join(ROOT, 'ui/popup/Hangar.svelte'), 'utf8');
+  // The cookie never locks Scan. The one Scan that's ever off is the main one, while a
+  // scan starts or RSI asks to wait (the scanBar flag, the owner 2026-10-20).
+  assert.doesNotMatch(
+    hangar,
+    /class="pp-btn grey" id="pp-scan"[^>]*disabled/,
+    'Scan is never switched off',
+  );
+  const offs = [...hangar.matchAll(/id="pp-scan"[^>]*disabled={([^}]*)}/g)].map((m) => m[1]);
+  assert.deepEqual(offs, ['scanOff'], 'only the main Scan, only for scanOff');
+  assert.doesNotMatch(hangar, /scanOff = [^;]*(signedOut|cookie|signIn)/, 'never for the cookie');
 });
 
 test('watching: any cookie change asks again once, and never reads what changed', async () => {
@@ -301,5 +316,36 @@ test('JSON Backup, Pledges CSV and Buy-Backs CSV save what this browser keeps', 
     URL.createObjectURL = was.create;
     URL.revokeObjectURL = was.revoke;
     globalThis.OH = was.OH;
+  }
+});
+
+// --- Notifications ---------------------------------------------------------------------
+
+// The ask is the click's first step everywhere; on Firefox the popup then closes, since
+// Firefox's question sits under it (#694). Chrome and Edge keep the popup open.
+test('Notifications: asked first, and only Firefox closes the popup for the question', async () => {
+  const was = { chrome: global.chrome, window: global.window };
+  const A = await import('../ui/popup/actions.js');
+  const run = async (gecko) => {
+    const steps = [];
+    global.chrome = {
+      runtime: { getManifest: () => (gecko ? { browser_specific_settings: { gecko } } : {}) },
+      permissions: {
+        request: async (p) => (steps.push('ask:' + p.permissions.join()), true),
+      },
+    };
+    global.window = { close: () => steps.push('close') };
+    const asked = A.askNotify();
+    steps.push('returned');
+    assert.equal(await asked, true);
+    await new Promise((r) => setTimeout(r, 5));
+    return steps;
+  };
+  try {
+    assert.deepEqual(await run({ id: 'x' }), ['ask:notifications', 'returned', 'close']);
+    assert.deepEqual(await run(null), ['ask:notifications', 'returned']);
+  } finally {
+    global.chrome = was.chrome;
+    global.window = was.window;
   }
 });
