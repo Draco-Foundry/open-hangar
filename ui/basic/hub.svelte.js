@@ -11,7 +11,7 @@
 import { t } from './copy.js';
 import { progressLine, reportLines, reportSummary } from './report-lines.js';
 import { afterConnect } from './after-connect.js';
-import { signInWindow } from './sign-in.js';
+import { connectLink } from './link-code.js';
 import { createRunner, newRun } from '../scan/runner.js';
 
 const OH = globalThis.OH;
@@ -39,7 +39,8 @@ export const hub = $state({
   // yes, and an ask waiting: 'connect' | 'local' (Firefox's card), pilot (a new RSI
   // account to sync or not: { handle, record }), switchTo (Connect came back with
   // another account than the one connected: { from, to }, the two names; the new token
-  // waits in `switching`, never here).
+  // waits in `switching`, never here), code (no sign-in window here: the code waiting
+  // for Approve on the website's code page, { code, url }; ./link-code.js).
   site: {
     enabled: false,
     link: null,
@@ -50,6 +51,7 @@ export const hub = $state({
     askFirefox: null,
     pilot: null,
     switchTo: null,
+    code: null,
   },
   update: null, // a newer version waiting for this tab to let it in
   banner: null, // the kill switch's banner (status.json), { message, level }
@@ -252,7 +254,7 @@ async function connectIfAsked() {
 
 // Connect: the browser's sign-in window on the website's /connect (./sign-in.js). The
 // popup's Connect and the website's Connect This Browser both end up here. Without the
-// window, the website's Connect page. One window at a time.
+// window (Firefox for Android), a code on the website's code page. One at a time.
 let connecting = false;
 export async function connect({ asked, fromSite = false } = {}) {
   const ok = asked || dataOk();
@@ -270,13 +272,29 @@ async function connectOnce(ok, fromSite) {
   hub.site.msg = '';
   if (!(await ok)) return void (hub.site.msg = t('basic.firefox-no'));
   const base = await OH.siteUrl();
-  const got = await signInWindow({
-    base,
-    identity: globalThis.chrome?.identity || globalThis.browser?.identity,
-    log: (line) => OH.log('warn', 'site', line),
-  });
-  if (!got) return void chrome.tabs.create({ url: `${base}/link` });
+  const w = { stop: false };
+  codeWait = w;
+  let got;
+  try {
+    got = await connectLink({
+      base,
+      identity: globalThis.chrome?.identity || globalThis.browser?.identity,
+      log: (line) => OH.log('warn', 'site', line),
+      OH,
+      session: chrome.storage.session,
+      open: (url) => chrome.tabs.create({ url }),
+      show: (c) => (hub.site.code = c),
+      shouldGo: () => codeWait === w && !w.stop,
+    });
+  } catch (err) {
+    OH.log('warn', 'site', `link code: ${err?.message || err}`);
+    got = { failed: true };
+  } finally {
+    if (codeWait === w) codeWait = null;
+    hub.site.code = null;
+  }
   if (got.failed) return void (hub.site.msg = t('basic.connect-failed'));
+  if (got.expired) return void (hub.site.msg = t('basic.code-expired'));
   if (got.cancelled) return;
   const { link, sync } = got;
   const forConnect = fromSite || location.hash === '#settings';
@@ -290,6 +308,16 @@ async function connectOnce(ok, fromSite) {
     return;
   }
   await connected(link, sync, forConnect, base);
+}
+// The code waiting for Approve (hub.site.code): Cancel stops the wait, Open the Page
+// Again brings the website's code page back.
+let codeWait = null;
+export function codeCancel() {
+  if (codeWait) codeWait.stop = true;
+  hub.site.code = null;
+}
+export function codeReopen() {
+  if (hub.site.code) chrome.tabs.create({ url: hub.site.code.url });
 }
 // The new link waiting for the switch question (hub.site.switchTo), token and all.
 let switching = null;

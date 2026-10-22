@@ -6,7 +6,7 @@
   import { t } from './copy.js';
   import { tick } from 'svelte';
   import { at } from '../site/when.js';
-  import { connect, disconnect, hub, syncNow } from './hub.svelte.js';
+  import { codeCancel, codeReopen, connect, disconnect, hub, syncNow } from './hub.svelte.js';
 
   let confirmDisconnect = $state(false);
   let stay = $state(); // Stay Connected, focused when the question opens
@@ -26,7 +26,20 @@
 
 <section class="bp-card" id="bp-site" aria-labelledby="bp-site-h">
   <h2 id="bp-site-h">openhangar.space</h2>
-  {#if hub.site.link}
+  {#if hub.site.code}
+    <div id="bp-code" aria-live="polite">
+      <p>{t('basic.code-hint')}</p>
+      <p class="bp-code"><b>{hub.site.code.code}</b></p>
+      <div class="bp-row">
+        <button type="button" class="bp-btn" id="bp-code-again" onclick={codeReopen}
+          >{t('basic.code-again')}</button
+        >
+        <button type="button" class="bp-btn" id="bp-code-cancel" onclick={codeCancel}
+          >{t('basic.code-cancel')}</button
+        >
+      </div>
+    </div>
+  {:else if hub.site.link}
     <p>
       {t('basic.connected', { name: hub.site.link.name })}
       <small

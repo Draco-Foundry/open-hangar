@@ -6778,6 +6778,66 @@ try {
   acctSw.gone
     ? ok('another account from Connect: asked first, naming both; Stay keeps the link')
     : fail(`basic account switch: ${JSON.stringify(acctSw)}`);
+  // No sign-in window (Firefox for Android, #764): Connect shows a code and opens the
+  // website's code page with it; approved there with another account, the same question
+  // comes first. The website is stood in for.
+  await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
+  const byCode = await page.evaluate(async () => {
+    chrome.identity = undefined;
+    if (globalThis.browser) globalThis.browser.identity = undefined;
+    const opened = [];
+    chrome.tabs.create = ({ url }) => opened.push(url);
+    let approved = false;
+    window.fetch = async (url) => {
+      if (String(url).endsWith('/api/link/start'))
+        return new Response(
+          JSON.stringify({
+            device_code: 'd',
+            user_code: 'K7Q-4PX',
+            verification_uri: 'https://elsewhere.example/link',
+            expires_in: 600,
+            interval: 0.05,
+          }),
+        );
+      if (String(url).endsWith('/api/link/poll'))
+        return new Response(
+          JSON.stringify(
+            approved
+              ? { status: 'approved', token: 't-code', name: 'Someone Else' }
+              : { status: 'pending' },
+          ),
+        );
+      return new Response('{}');
+    };
+    const was = { token: 't-mine', name: 'demo@pilot', connectedAt: 1, lastSync: Date.now() };
+    await chrome.storage.local.set({ siteLink: was, siteUrl: 'https://app.openhangar.space' });
+    for (const f of __demo.listeners) f({ siteLink: { newValue: was } }, 'local');
+    await chrome.storage.session.set({ siteConnectAsk: { at: Date.now(), tabId: null } });
+    for (const f of __demo.listeners)
+      f({ siteConnectAsk: { newValue: { at: Date.now() } } }, 'session');
+    for (let i = 0; i < 50 && !document.getElementById('bp-code'); i++)
+      await new Promise((r) => setTimeout(r, 50));
+    const code = document.getElementById('bp-code')?.textContent.replace(/\s+/g, ' ').trim();
+    const wide = document.documentElement.scrollWidth > 375;
+    approved = true;
+    for (let i = 0; i < 50 && !document.getElementById('bp-switch'); i++)
+      await new Promise((r) => setTimeout(r, 50));
+    const asked = !!document.getElementById('bp-switch');
+    const before = (await chrome.storage.local.get('siteLink')).siteLink.token;
+    document.getElementById('bp-switch-no')?.click();
+    await new Promise((r) => setTimeout(r, 300));
+    const after = (await chrome.storage.local.get('siteLink')).siteLink?.token;
+    return { code, wide, opened, asked, before, after };
+  });
+  byCode.code?.includes('Approve this code on openhangar.space') &&
+  byCode.code.includes('K7Q-4PX') &&
+  !byCode.wide &&
+  byCode.opened.join() === 'https://app.openhangar.space/link?code=K7Q-4PX' &&
+  byCode.asked &&
+  byCode.before === 't-mine' &&
+  byCode.after === 't-mine'
+    ? ok('no sign-in window: a code on the website code page, then the account question')
+    : fail(`basic connect by code: ${JSON.stringify(byCode)}`);
   await page.setViewport({ width: 1280, height: 900 });
 
   // Extension Alerts (the `alerts` flag; the connector pages are served as a build with

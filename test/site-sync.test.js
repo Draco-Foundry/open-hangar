@@ -801,3 +801,22 @@ test('a body that fails the sync schema is not sent: reason schema, and where', 
   await OH.siteSync();
   assert.equal(sent.length, 1);
 });
+
+test('a code connect with save: false keeps nothing and revokes nothing', async () => {
+  linked();
+  const real = global.fetch;
+  const deletes = [];
+  global.fetch = async (url, init) => {
+    if (init?.method === 'DELETE') deletes.push(url);
+    return new Response(JSON.stringify({ status: 'approved', token: 'new', name: 'other' }));
+  };
+  try {
+    const start = { device_code: 'd', expires_in: 60, interval: 0.001 };
+    const link = await OH.siteLinkWait(start, () => true, { save: false });
+    assert.equal(link.token, 'new');
+    assert.equal(mem.siteLink.token, 't', 'the old link stays until the page says so');
+    assert.deepEqual(deletes, []);
+  } finally {
+    global.fetch = real;
+  }
+});

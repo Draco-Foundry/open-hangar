@@ -1,0 +1,1 @@
+- Fixed: (placeholder: words from Claude chat) Connect works on Firefox for Android again, with a code you approve on openhangar.space.

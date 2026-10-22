@@ -370,3 +370,115 @@ test('firefox: the code page checks its code through the bridge', async () => {
   assert.deepEqual(await ask('K7Q-4PX'), { ok: true, mine: true });
   assert.deepEqual(await ask('ABC-DEF'), { ok: true, mine: false });
 });
+
+// --- No sign-in window (Firefox for Android, #764): a code from the basic page ---------
+// (ui/basic/link-code.js), with stand-ins for the website's start and poll.
+const linkCode = () => import('../ui/basic/link-code.js');
+function fakeCodeSite({ polls = [{ status: 'approved', token: 'oht_code', name: 'Pilot' }] } = {}) {
+  const asked = [];
+  const OH = {
+    siteLinkStart: async () => ({
+      device_code: 'dev-secret',
+      user_code: 'K7Q-4PX',
+      verification_uri: 'https://elsewhere.example/link',
+      expires_in: 600,
+      interval: 0.001,
+    }),
+    siteLinkWait: async (start, shouldGo, opts) => {
+      asked.push({ device_code: start.device_code, opts });
+      for (const j of polls) {
+        if (!shouldGo()) return null;
+        if (j.status === 'approved') return { token: j.token, name: j.name, lastSync: null };
+        if (j.status === 'expired') return null;
+      }
+      return null;
+    },
+  };
+  return { OH, asked };
+}
+function fakeSession() {
+  const store = {};
+  return {
+    store,
+    seen: [],
+    get: async (k) => (k in store ? { [k]: store[k] } : {}),
+    set: async function (o) {
+      this.seen.push(structuredClone(o));
+      Object.assign(store, o);
+    },
+    remove: async (k) => void delete store[k],
+  };
+}
+const codeRun = async ({ polls, shouldGo, identity } = {}) => {
+  const { connectLink } = await linkCode();
+  const site = fakeCodeSite({ polls });
+  const session = fakeSession();
+  const opened = [];
+  const shown = [];
+  const got = await connectLink({
+    base: SITE,
+    identity,
+    fetch: async () => assert.fail('no token trade without the window'),
+    OH: site.OH,
+    session,
+    open: (url) => opened.push(url),
+    show: (c) => shown.push(c),
+    shouldGo,
+  });
+  return { got, site, session, opened, shown };
+};
+
+test('no sign-in window: Connect starts a code and opens the website code page', async () => {
+  for (const identity of [undefined, {}, { getRedirectURL: () => REDIRECT }]) {
+    const { got, site, session, opened, shown } = await codeRun({ identity });
+    const page = `${SITE}/link?code=K7Q-4PX`;
+    assert.deepEqual(opened, [page], 'this site, never the address the answer names');
+    assert.deepEqual(shown, [{ code: 'K7Q-4PX', url: page }]);
+    // The page may fill in this code only (background.js oh-link-check), until it's done.
+    const pending = session.seen[0].siteLinkPending;
+    assert.deepEqual([pending.code, pending.origin], ['K7Q-4PX', SITE]);
+    assert.ok(pending.until > Date.now());
+    assert.equal(session.store.siteLinkPending, undefined, 'cleared once approved');
+    assert.ok(!JSON.stringify(session.seen).includes('dev-secret'), 'the device code stays');
+    // Approved: the token comes back unsaved, for the account-switch question first.
+    assert.deepEqual(site.asked, [{ device_code: 'dev-secret', opts: { save: false } }]);
+    assert.equal(got.link.token, 'oht_code');
+    assert.equal(got.sync, undefined);
+  }
+});
+
+test('the code: refused or run out reads as expired, Cancel as cancelled', async () => {
+  const expired = await codeRun({ polls: [{ status: 'pending' }, { status: 'expired' }] });
+  assert.deepEqual(expired.got, { expired: true });
+  assert.equal(expired.session.store.siteLinkPending, undefined);
+  const cancelled = await codeRun({ shouldGo: () => false });
+  assert.deepEqual(cancelled.got, { cancelled: true });
+  assert.equal(cancelled.session.store.siteLinkPending, undefined);
+});
+
+test('the code: a newer code waiting is left alone', async () => {
+  const { linkByCode } = await linkCode();
+  const site = fakeCodeSite();
+  const session = fakeSession();
+  site.OH.siteLinkWait = async () => {
+    session.store.siteLinkPending = { code: 'NEW-ONE' };
+    return null;
+  };
+  await linkByCode({ OH: site.OH, base: SITE, session, open() {}, show() {} });
+  assert.deepEqual(session.store.siteLinkPending, { code: 'NEW-ONE' });
+});
+
+test("the code's account: another account than the one connected still asks", async () => {
+  const lib = require('node:fs').readFileSync(require.resolve('../src/lib.js'), 'utf8');
+  const OH = {};
+  // OH.siteSwitches only (pure): the basic page's question before anything is replaced.
+  new Function('OH', lib.match(/OH\.siteSwitches = function[\s\S]*?\n {2}\};/)[0])(OH);
+  const { got } = await codeRun();
+  assert.equal(OH.siteSwitches({ token: 'oht_old', name: 'Other' }, got.link), true);
+  assert.equal(OH.siteSwitches({ token: 'oht_old', name: 'Pilot' }, got.link), false);
+  assert.equal(OH.siteSwitches(null, got.link), false);
+  // ./hub.svelte.js takes Connect's link through that question, whichever way it came.
+  const hub = require('node:fs').readFileSync(require.resolve('../ui/basic/hub.svelte.js'), 'utf8');
+  assert.match(hub, /await connectLink\(/);
+  assert.match(hub, /got\.expired[\s\S]*OH\.siteSwitches\(was, link\)/);
+});
