@@ -609,3 +609,32 @@ test("syncStamp: the three parts' scan times, one string", () => {
   );
   assert.equal(OH.syncStamp(null), '||');
 });
+
+// --- RSI changed a page --------------------------------------------------------
+// A page that no longer fits the parser rules (OpenHangar.pageChanged): nothing of the
+// scan is saved, whichever page it is, and the line says the last scan is kept.
+test('a page RSI changed stops the scan and keeps the last one, Scan and Auto Scan Daily', async () => {
+  const before = pledges(25);
+  OpenHangar.pageChanged = (html) => (html.includes('"h12"') ? ['no pledge date reads'] : []);
+  try {
+    for (const auto of [false, true]) {
+      await reset(before);
+      script = serve(pledges(30));
+      const r = await OH.scanSource('hangar', null, { auto });
+      assert.equal(r.ok, false);
+      assert.equal(r.pageChanged, true);
+      assert.equal(r.error, 'RSI changed a page. Holding your last scan.');
+      if (auto) assert.equal(r.unfinished, true);
+      assert.deepEqual(store.db.sources.hangar.items, before, 'the last scan, as it was');
+      assert.equal(store.db.sources.hangar.scannedAt, 1);
+    }
+    // Pages that fit: a scan as usual.
+    await reset(before);
+    script = serve(pledges(9));
+    const ok = await OH.scanSource('hangar');
+    assert.equal(ok.ok, true);
+    assert.equal(ok.pageChanged, undefined);
+  } finally {
+    delete OpenHangar.pageChanged;
+  }
+});

@@ -5394,6 +5394,36 @@ try {
   await page.click('#pp-scan');
   await sleep(150);
   const barBusy = await sbar();
+  // A scan stopped because RSI changed a page (its row's pageChanged): the bar's line,
+  // not a trouble row, Scan there to press again.
+  const changedRow = { id: 'hangar', ok: false, partial: null, n: null, error: 'x', pageChanged: true };
+  await popAt(
+    {
+      ...signedIn,
+      __demoLocal: {
+        scanReport: {
+          v: 1,
+          run: 'r8',
+          by: 'offscreen',
+          reason: 'popup',
+          startedAt: T0 - 60e3,
+          at: T0 - 30e3,
+          ms: 30e3,
+          held: null,
+          signedOut: false,
+          switched: null,
+          rows: [changedRow],
+          bad: 1,
+          sync: null,
+        },
+      },
+    },
+    '#pp-sbar',
+  );
+  const barChanged = { ...(await sbar()), trouble: await page.$('#pp-trouble').then((e) => !!e) };
+  // OH_SHOTS=<folder>: a picture of it there, for the pull request.
+  if (process.env.OH_SHOTS)
+    await page.screenshot({ path: path.join(process.env.OH_SHOTS, 'popup-page-changed.png') });
   // Before the first scan: the bar is as wide as Scan was, not a sliver.
   await popAt({ __demoLocal: { db: null } }, '#pp-first');
   await page.evaluate(() => (__demo.answers.scan = { ok: true }));
@@ -5425,11 +5455,15 @@ try {
     barHold.scan === 'off' &&
     barFits.fits &&
     barBusy.text?.join() === 'A scan is already running.' &&
-    barBusy.scan === 'off';
+    barBusy.scan === 'off' &&
+    barChanged.text?.join() === 'RSI changed a page. Holding your last scan.' &&
+    barChanged.tone === 'note' &&
+    barChanged.scan === 'on' &&
+    !barChanged.trouble;
   barOk
-    ? ok("scan bar: in Scan's place at once, names and counts, fills by page, waits, done, holds")
+    ? ok("scan bar: in Scan's place at once, names and counts, fills by page, waits, done, holds, a changed page")
     : fail(
-        `popup scan bar: ${JSON.stringify({ barFirst, barAsked, barHangar, barCreep, barWait, barDone, barHold, barFits, barBusy })}`,
+        `popup scan bar: ${JSON.stringify({ barFirst, barAsked, barHangar, barCreep, barWait, barDone, barHold, barFits, barBusy, barChanged })}`,
       );
   // A scan whose page went away (its mark left behind): Scan stopped, Scan Again.
   await popAt(

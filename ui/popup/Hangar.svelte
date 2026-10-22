@@ -19,6 +19,7 @@
     barNext,
     barLabel,
     reportDone,
+    reportPageChanged,
     reportPaused,
     reportTrouble,
     scanHold,
@@ -67,9 +68,13 @@
   const running = $derived(sc.phase === 'running');
   const steps = $derived(scanSteps(sc.progress?.part));
   const STEP = { hangar: 'popup.step-hangar', buybacks: 'popup.step-buybacks', referrals: 'popup.step-referrals' };
+  const BAR = flag('scanBar');
   // A problem in the last scan (a part not read, or read only in part), unless a scan
-  // since went fine.
-  const trouble = $derived(reportTrouble(lastReport, v?.scannedAt));
+  // since went fine. With the scan bar, a page RSI changed is the bar's line instead.
+  const trouble = $derived(
+    reportTrouble(lastReport, v?.scannedAt).filter((r) => !(BAR && r.pageChanged)),
+  );
+  const pageChanged = $derived(!running && reportPageChanged(lastReport, v?.scannedAt));
   const ROW = { hangar: 'popup.row-pledges', buybacks: 'popup.row-buybacks' };
   const rowText = (r) =>
     !r.ok
@@ -86,7 +91,6 @@
   const switched = $derived(report?.switched?.who ? report.switched : null);
   const sub = (m) => (AL ? AL.lines(m)[0] || '' : '');
 
-  const BAR = flag('scanBar');
   // The fill only moves forward within a run (RSI's pager can show more pages as the
   // scan goes). Not state: it's what the bar has shown.
   let peak = { run: null, f: 0 };
@@ -139,6 +143,7 @@
     }
     if (hold) return { text: t('popup.rsi-wait', { time: holdTime(hold) }), n: '', tone: 'note' };
     if (busyNote || report?.held === 'busy') return { text: t('popup.scan-busy'), n: '', tone: 'note' };
+    if (pageChanged) return { text: t('popup.rsi-page-changed'), n: '', tone: 'note' };
     if (doneIn)
       return {
         text: doneIn.m ? t('popup.scanned-in-m', { m: doneIn.m, s: doneIn.s }) : t('popup.scanned-in-s', { s: doneIn.s }),

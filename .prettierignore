@@ -7,6 +7,8 @@ src/data/ship-catalog.json
 test/fixtures/*.html
 # Saved RSI pages, kept as RSI served them (scripts/scrub-capture.mjs)
 test/fixtures/corpus/*.html
+# The same pages, changed the way RSI might change them (test/parser-corpus.test.js)
+test/fixtures/page-change/*.html
 test/fixtures/referral-events.wikitext
 test/fixtures/loaner-matrix.html
 test/fixtures/included-vessels.html

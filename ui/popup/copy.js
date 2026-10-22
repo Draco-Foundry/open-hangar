@@ -74,6 +74,10 @@ const COPY = {
   // In the bar's place after RSI kept asking a scan to slow down, Scan greyed until
   // then ("RSI asked us to wait. Scan after 3:42 PM").
   'popup.rsi-wait': 'RSI asked us to wait. Scan after {time}',
+  // In the bar's place after a scan stopped because a page no longer fit the parser rules
+  // (src/lib.js OH.PAGE_CHANGED): nothing saved, the last scan kept. Approved by the owner
+  // through Claude chat (Words, 2026-10-22).
+  'popup.rsi-page-changed': 'RSI changed a page. Holding your last scan.',
   // Shown once after a scan: how long it took ("Scanned in 38s", "Scanned in 2m 5s").
   'popup.scanned-in-s': 'Scanned in {s}s',
   'popup.scanned-in-m': 'Scanned in {m}m {s}s',

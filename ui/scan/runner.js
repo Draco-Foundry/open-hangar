@@ -285,10 +285,13 @@ export function createRunner(env) {
   }
 
   // --- Scan ---------------------------------------------------------------------------
+  // A part stopped because RSI changed its page (src/lib.js scanSource `pageChanged`):
+  // its row says so, for the popup's scan bar (ui/popup/data.js reportPageChanged).
+  const changedOf = (r) => (r?.pageChanged ? { pageChanged: true } : {});
   const row = (id, r, n) =>
     r?.ok
       ? { id, ok: true, partial: r.partial || null, n, error: null }
-      : { id, ok: false, partial: null, n: null, error: r?.error ?? null };
+      : { id, ok: false, partial: null, n: null, error: r?.error ?? null, ...changedOf(r) };
   const progress = (part) => (page, count, retry, pages) => {
     mark(true);
     setProgress(part, page, count, retry, pages);
@@ -685,6 +688,7 @@ export function createRunner(env) {
       dropped: false, // the hangar dropped with nothing to explain it
       saved: [], // the parts kept
       changed: false, // a part kept is different from before
+      pageChanged: null, // the part whose page RSI changed (nothing of it kept)
     };
     let was = null;
     try {
@@ -719,6 +723,7 @@ export function createRunner(env) {
           fails,
           retryAt: retryAtOf({ at, fails, retryAfter: run.retryAfter }),
           savedAt,
+          pageChanged: run.pageChanged,
         });
         // Written before the sync: a browser that closes during it still has the run.
         await store.set({ autoScan: rec });
@@ -892,6 +897,7 @@ export function createRunner(env) {
         // couldn't read, a save that failed: 'partway'): nothing more is read.
         run.stop ||= r?.signedOut ? 'out' : 'partway';
         if (r?.rsiDown) autoDown(run, r);
+        if (r?.pageChanged) run.pageChanged ||= p;
       }
       return r;
     };

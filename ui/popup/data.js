@@ -348,6 +348,11 @@ export function reportTrouble(report, scannedAt) {
     (r) => isObj(r) && (!r.ok || !!r.partial),
   );
 }
+// The last scan stopped because RSI changed a page (a row's `pageChanged`, ui/scan/runner.js),
+// unless a scan since went fine: nothing of it was saved.
+export function reportPageChanged(report, scannedAt) {
+  return reportTrouble(report, scannedAt).some((r) => r.pageChanged === true);
+}
 // A scan status.json paused (every part): its message (the status file's words, the
 // ones the basic page shows), or ''.
 export function reportPaused(report, scannedAt) {

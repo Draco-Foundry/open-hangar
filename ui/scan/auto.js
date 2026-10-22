@@ -153,14 +153,26 @@ export function connectedPilot(handle, answer, profiles = []) {
 }
 
 // The record a run leaves (local autoScan, replaced whole): { v, at, ended, line, run,
-// startedAt, fails, retryAt, syncTried }. A run with no line of its own (RSI didn't
-// answer, say) keeps the last one's line and its time. So does a day skipped (signed
-// out, another account, paused) after a run that asks for a scan, until a scan saves
-// since that run (`savedAt`: the hangar's saved scan time now, as ui/popup/data.js
-// autoAsk compares it with `ended`).
+// startedAt, fails, retryAt, syncTried, pageChanged }. pageChanged: the part (PARTS) whose
+// page no longer fit the parser rules this run (src/lib.js scanHtmlSource), else null. A
+// run with no line of its own (RSI didn't answer, say) keeps the last one's line and its
+// time. So does a day skipped (signed out, another account, paused) after a run that
+// asks for a scan, until a scan saves since that run (`savedAt`: the hangar's saved scan
+// time now, as ui/popup/data.js autoAsk compares it with `ended`).
 export function record(
   was,
-  { at, ended, line = null, run = null, startedAt = null, fails, retryAt, syncTried, savedAt },
+  {
+    at,
+    ended,
+    line = null,
+    run = null,
+    startedAt = null,
+    fails,
+    retryAt,
+    syncTried,
+    savedAt,
+    pageChanged = null,
+  },
 ) {
   const prev = isObj(was) && was.v === 1 ? was : null;
   const asks = ASKS.includes(prev?.line) && !(savedAt > prev.ended);
@@ -175,5 +187,6 @@ export function record(
     fails,
     retryAt,
     syncTried: syncTried === undefined ? (prev?.syncTried ?? null) : syncTried,
+    pageChanged: PARTS.includes(pageChanged) ? pageChanged : null,
   };
 }
