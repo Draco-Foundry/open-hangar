@@ -13,7 +13,7 @@
 // release commit, then for your Approve on the 'stores' environment, uploads, and
 // posts to Discord #updates. --hotfix marks the tag so that run may be the second
 // store update today (the Hotfix box).
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import fs from 'node:fs';
 import { DIR as FRAG_DIR, foldInto, readFragments } from './changelog-fragments.mjs';
 
@@ -113,7 +113,7 @@ for (const f of ['manifest.json', 'package.json']) {
 }
 run('npx prettier --write CHANGELOG.md manifest.json package.json');
 run('git add CHANGELOG.md manifest.json package.json');
-for (const f of frags) run(`git rm -q -- ${FRAG_DIR}/${f.name}`);
+for (const f of frags) execFileSync('git', ['rm', '-q', '--', `${FRAG_DIR}/${f.name}`]);
 run(`git commit -m "release: ${version}"`);
 // "[hotfix]" in the tag's message ticks the Hotfix box on the publish run that
 // release.yml starts (a second store update within 24 hours).

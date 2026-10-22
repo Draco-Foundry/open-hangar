@@ -65,7 +65,7 @@ test('the 0.5.2 lines as fragments fold to the 0.5.2 section in CHANGELOG.md', a
     const end = rest.search(/^## /m);
     return text.slice(start, end < 0 ? undefined : start + 3 + end);
   };
-  const released = section(log, '0\.5\.2 — ')
+  const released = section(log, '0[.]5[.]2 — ')
     .replace(/^## .*\n\n/, '')
     .trim();
   const folded = foldInto(
