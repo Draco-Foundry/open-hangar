@@ -1,4 +1,5 @@
-// Warns (never fails) when a PR changes src/ but adds no changelog fragment. CI hands it
+// Warns (never fails) when a PR changes src/, ui/popup/ or ui/basic/ but adds no changelog
+// fragment. CI hands it
 // the PR's files from the GitHub API (.github/workflows/ci.yml):
 //   node scripts/check-changelog-fragment.mjs <files.json>
 // A warning is an annotation on the run plus a line in its summary; the exit code is 0
@@ -7,7 +8,9 @@ import { appendFileSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 export function needsFragment(filenames) {
-  const touchesSrc = filenames.some((f) => f.startsWith('src/'));
+  const touchesSrc = filenames.some(
+    (f) => f.startsWith('src/') || f.startsWith('ui/popup/') || f.startsWith('ui/basic/'),
+  );
   const hasFragment = filenames.some(
     (f) => /^changelog\.d\/[^/]+\.md$/.test(f) && f.toLowerCase() !== 'changelog.d/readme.md',
   );
@@ -15,7 +18,7 @@ export function needsFragment(filenames) {
 }
 
 export const MESSAGE =
-  'This PR changes src/ but adds no changelog fragment. If players will notice, add ' +
+  'This PR changes src/, ui/popup/ or ui/basic/ but adds no changelog fragment. If players will notice, add ' +
   'changelog.d/<PR number>-<slug>.md with a New:/Improved:/Changed:/Fixed: bullet ' +
   '(changelog.d/README.md); if not, ignore this.';
 
