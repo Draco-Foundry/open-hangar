@@ -78,6 +78,9 @@ const COPY = {
   // (src/lib.js OH.PAGE_CHANGED): nothing saved, the last scan kept. Approved by the owner
   // through Claude chat (Words, 2026-10-22).
   'popup.rsi-page-changed': 'RSI changed a page. Holding your last scan.',
+  // In the same spot (the bar, or under Scan with the scanBar flag off) after RSI didn't
+  // answer a scan (a 5xx). Claude chat, Words, 2026-10-22.
+  'popup.rsi-down': "RSI isn't answering. Try again soon.",
   // Shown once after a scan: how long it took ("Scanned in 38s", "Scanned in 2m 5s").
   'popup.scanned-in-s': 'Scanned in {s}s',
   'popup.scanned-in-m': 'Scanned in {m}m {s}s',
@@ -181,6 +184,8 @@ const COPY = {
   'popup.auto-signed-out': 'Skipped {when}: signed out of RSI',
   'popup.auto-other': 'Skipped {when}: a different RSI account is signed in',
   'popup.auto-paused': 'Skipped {when}: scans are paused',
+  // RSI didn't answer before anything was read (Claude chat, Words, 2026-10-22).
+  'popup.auto-rsi-down': "Skipped {when}: RSI wasn't answering",
   // A part thrown away: only when it came back as another account, or with a sudden
   // drop. Not for a part RSI stopped answering partway (auto-stopped is).
   'popup.auto-bad': "Last: {when}, something looked wrong and wasn't saved. Scan to check.",

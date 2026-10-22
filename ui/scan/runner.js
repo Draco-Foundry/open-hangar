@@ -320,7 +320,9 @@ export function createRunner(env) {
   // scanning), 'no-rsi' (no access to RSI: nothing read), 'paused' (status.json paused
   // every part), else null. sync: the sync after it (see sync()), null when there was
   // none. wait: when RSI kept asking it to slow down, the time it may be asked again
-  // (scanWait), else null; absent from a held report.
+  // (scanWait), else null; absent from a held report. rsiDown: a part RSI didn't answer
+  // for (a 5xx, or a 429 after every retry), whether or not it also asked to wait; the
+  // popup and the basic page say so instead of showing the error or Log In to RSI.
   let starting = false;
   let marked = Promise.resolve(); // marked(), below
   // The start every scan shares (Scan's and Auto Scan Daily's): → true once this page is
@@ -395,6 +397,7 @@ export function createRunner(env) {
     let switched = null;
     let db = null;
     let wait = null;
+    let rsiDown = false; // a part RSI didn't answer for (a 5xx, or a 429 after every retry)
     try {
       setProgress('account');
       const account = (await OH.getAccount({ force: true }).catch(() => null)) || undefined;
@@ -407,13 +410,16 @@ export function createRunner(env) {
         await keepPortrait(account);
         const h = await OH.scanSource('hangar', progress('hangar'), { account });
         if (h?.paused) paused.add('hangar');
+        if (h?.rsiDown) rsiDown = true;
         rows.push(row('hangar', h, h?.items?.length ?? 0));
         const b = await OH.scanSource('buybacks', progress('buybacks'), { account });
         if (b?.paused) paused.add('buybacks');
+        if (b?.rsiDown) rsiDown = true;
         rows.push(row('buybacks', b, b?.items?.length ?? 0));
         wait = scanWait([h, b], now(), OH.retryAfterMs);
         const r = await OH.getReferral(referralProgress(), { account });
         if (r?.paused) paused.add('referrals');
+        if (r?.rsiDown) rsiDown = true;
         if (r) rows.push(row('referrals', r, null));
         // The parts read whole, for Auto Scan Daily's weekly full read (./auto.js).
         const whole = {};
@@ -466,6 +472,7 @@ export function createRunner(env) {
       bad,
       sync: null,
       wait,
+      rsiDown,
     };
     await writeReport(report);
     // Whatever the page or the sync does next, the progress goes at the end.
@@ -702,6 +709,9 @@ export function createRunner(env) {
       busy = false;
       mark(false);
     }
+    // RSI didn't answer and nothing else explains the run (no part stopped partway): its
+    // own line, a day skipped.
+    if (run.down && !run.line && !run.stop) run.line = 'rsi-down';
     let rec = null;
     try {
       if (!run.noRecord) {

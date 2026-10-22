@@ -1822,10 +1822,12 @@
 
       // RSI still asking to slow down after every retry: said, with its Retry-After.
       const slow = (r) => (r?.slowDown ? { slowDown: true, retryAfter: r.retryAfter ?? null } : {});
+      // RSI itself didn't answer (a 5xx, a network error, a 429 after every retry).
+      const down = (r) => (r?.rsiDown ? { rsiDown: true } : {});
       if (result.error) {
         OH.log('error', src.id, result.error);
         const changed = result.pageChanged ? { pageChanged: true } : {};
-        return { ok: false, error: result.error, ...changed, ...slow(result) };
+        return { ok: false, error: result.error, ...changed, ...slow(result), ...down(result) };
       }
 
       // Nothing changed since the last full scan (#294): keep the saved items and
@@ -1852,11 +1854,22 @@
         );
         const prev = await OH.loadSource(src.id);
         const prevCount = Array.isArray(prev.items) ? prev.items.length : 0;
+        // RSI stopped answering partway: nothing from the partial read is saved, however
+        // many items it holds; the previous scan stays as it was.
+        if (result.partial.rsiDown) {
+          return {
+            ok: false,
+            error: `RSI stopped responding at page ${page} (${reason}), so nothing from this read was saved${prevCount ? ` and your previous scan of ${prevCount} was kept` : ''}. Try again in a minute.`,
+            ...slow(result.partial),
+            ...down(result.partial),
+          };
+        }
         if (prevCount > result.items.length) {
           return {
             ok: false,
             error: `RSI stopped responding at page ${page} (${reason}), so we kept your previous scan of ${prevCount}. Try again in a minute.`,
             ...slow(result.partial),
+            ...down(result.partial),
           };
         }
         const scannedAt = await saveSource(src.id, result.items, { meta: result.meta, account });
@@ -2411,7 +2424,7 @@
       if (auto && (legacyRecruits.error || legacyRecruits.partial))
         return unfinished(legacyRecruits);
       if (legacyRecruits.error && !legacyRecruits.items?.length)
-        return { ok: false, error: legacyRecruits.error };
+        return { ok: false, error: legacyRecruits.error, rsiDown: !!legacyRecruits.rsiDown };
 
       onProgress?.('recruits (current)', 0, null);
       const currentRecruits = await fetchReferralList(
@@ -2486,7 +2499,15 @@
         return { ok: false, refused: true };
       }
       const scannedAt = await saveSource('referral', referral, { account: acct || undefined });
-      return { ok: true, referral, scannedAt, partial: partial.length ? partial.join(', ') : null };
+      // A list RSI didn't answer for (a 5xx, a 429): the scan says so.
+      const rsiDown = [legacyRecruits, currentRecruits, prospects].some((l) => l.rsiDown);
+      return {
+        ok: true,
+        referral,
+        scannedAt,
+        partial: partial.length ? partial.join(', ') : null,
+        ...(rsiDown ? { rsiDown: true } : {}),
+      };
     } catch (err) {
       return { ok: false, error: String(err?.message || err) };
     }

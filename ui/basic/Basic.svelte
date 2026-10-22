@@ -83,6 +83,7 @@
     <div class="bp-note warn" id="bp-report" role="alert">
       <b>{report.signedOut ? t('basic.signed-out') : t('basic.scan-problem')}</b>
       {#if report.signedOut}<p id="bp-signed-out">{t('basic.signed-out-line')}</p>{/if}
+      {#if report.down}<p id="bp-rsi-down">{report.down}</p>{/if}
       {#if report.rows.length}
         <ul>
           {#each report.rows as r (r.name)}
@@ -91,7 +92,7 @@
           {/each}
         </ul>
       {/if}
-      {#if !report.signedOut}
+      {#if !report.signedOut && !report.down}
         <button type="button" class="bp-btn" id="bp-report-btn" onclick={reportProblem}
           >Report a Scan Problem</button
         >
