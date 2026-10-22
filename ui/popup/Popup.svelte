@@ -107,11 +107,11 @@
   // read or scan said so and the browser can't say about the cookie. Log In to RSI first,
   // with a grey Scan still there to press (./rsi-cookie.js).
   const readOut = $derived.by(() => {
-    if (report?.signedOut && !newer(report) && Number.isFinite(report.at)) return report.at;
+    if (report?.signedOut && !report.rsiDown && !newer(report) && Number.isFinite(report.at)) return report.at;
     if (v?.signedOut) return Number.isFinite(account?.fetchedAt) ? account.fetchedAt : 0;
     return null;
   });
-  const signIn = $derived(rsiSignIn({ cookie, readOut, justOut: shown?.signedOut === true }));
+  const signIn = $derived(rsiSignIn({ cookie, readOut, justOut: shown?.signedOut === true && !shown.rsiDown }));
   const signedOut = $derived(signIn !== 'in');
   // Amounts in the currency picked (US dollars until one is), from US dollars.
   const currency = $derived(shownCurrency(prefs.currency));

@@ -282,6 +282,42 @@ test('scan report: shown once, and how long it took', async () => {
   assert.equal(took(undefined), null);
 });
 
+test('scan report: RSI not answering wins over signed out, and shows no trouble rows', async () => {
+  const { reportRsi, reportTrouble, reportDone, autoLine } = await data();
+  const base = {
+    v: 1,
+    run: 'r',
+    at: NOW,
+    ms: 9e3,
+    held: null,
+    signedOut: false,
+    bad: 1,
+    wait: null,
+  };
+  const bb = { id: 'buybacks', ok: false, partial: null, n: null, error: 'RSI responded 503' };
+  // A 5xx: the down line, not the raw error.
+  const down = { ...base, rows: [bb], rsiDown: true };
+  assert.deepEqual(reportRsi(down, NOW - HOUR, NOW), { kind: 'down' });
+  assert.deepEqual(reportTrouble(down, NOW - HOUR), []);
+  assert.equal(reportDone(down), null);
+  // RSI that isn't answering can look signed out: RSI not answering still wins.
+  const both = { ...down, signedOut: true };
+  assert.deepEqual(reportRsi(both, null, NOW), { kind: 'down' });
+  // A 429: RSI's ask to wait, until that time; after it, nothing.
+  const slow = { ...down, wait: NOW + 5 * MIN };
+  assert.deepEqual(reportRsi(slow, null, NOW), { kind: 'wait', at: NOW + 5 * MIN });
+  assert.equal(reportRsi(slow, null, NOW + 6 * MIN), null);
+  // A scan since went fine, a held report, or a scan RSI answered: nothing.
+  assert.equal(reportRsi(down, NOW + 2 * MIN, NOW), null);
+  assert.equal(reportRsi({ ...down, held: 'busy' }, null, NOW), null);
+  assert.equal(reportRsi({ ...down, rsiDown: false }, null, NOW), null);
+  assert.equal(reportRsi(null, null, NOW), null);
+  // Auto Scan Daily's day skipped because RSI wasn't answering.
+  const line = autoLine({ on: true, rec: { line: 'rsi-down', at: NOW } }, NOW, 'en-US');
+  assert.equal(line.key, 'popup.auto-rsi-down');
+  assert.equal(line.ask, false);
+});
+
 test('scan report: a held one, one read in part or signed out is never "Scanned in"', async () => {
   const { reportDone, reportTrouble, reportPaused } = await data();
   const base = { v: 1, run: 'r', at: NOW, ms: 38e3, held: null, signedOut: false, bad: 0 };

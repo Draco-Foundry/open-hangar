@@ -20,6 +20,7 @@
     barLabel,
     reportDone,
     reportPaused,
+    reportRsi,
     reportTrouble,
     scanHold,
     scanSteps,
@@ -82,6 +83,8 @@
   // Only a scan that read everything says how long it took (never a held one).
   const doneIn = $derived(reportDone(report));
   const paused = $derived(reportPaused(lastReport, v?.scannedAt));
+  // RSI didn't answer the last scan: a 5xx, or its ask to wait (./data.js reportRsi).
+  const rsi = $derived(running ? null : reportRsi(lastReport, v?.scannedAt, now));
   const noRsi = $derived(rsiOff || report?.held === 'no-rsi');
   const switched = $derived(report?.switched?.who ? report.switched : null);
   const sub = (m) => (AL ? AL.lines(m)[0] || '' : '');
@@ -138,6 +141,7 @@
       return { text: t(l.key), n: l.n, tone: 'run' };
     }
     if (hold) return { text: t('popup.rsi-wait', { time: holdTime(hold) }), n: '', tone: 'note' };
+    if (rsi?.kind === 'down') return { text: t('popup.rsi-down'), n: '', tone: 'note' };
     if (busyNote || report?.held === 'busy') return { text: t('popup.scan-busy'), n: '', tone: 'note' };
     if (doneIn)
       return {
@@ -319,6 +323,7 @@
       {:else if !sc.hidden}
         <p class="pp-note">{t('popup.scanning')}</p>
       {/if}
+      {#if sc.progress?.retry}<p class="pp-note" id="pp-rsi-waiting">{t('popup.rsi-waiting')}</p>{/if}
     </div>
   {:else if noRsi}
     <!-- The basic page's card asks the browser (its ask would close the popup). -->
@@ -340,6 +345,11 @@
       <span aria-hidden="true">✓</span>{doneIn.m
         ? t('popup.scanned-in-m', { m: doneIn.m, s: doneIn.s })
         : t('popup.scanned-in-s', { s: doneIn.s })}
+    </p>
+  {/if}
+  {#if rsi && !BAR}
+    <p class="pp-note" id="pp-rsi" role="status">
+      {rsi.kind === 'wait' ? t('popup.rsi-wait', { time: holdTime(rsi.at) }) : t('popup.rsi-down')}
     </p>
   {/if}
   {#if paused && !running}<p class="pp-note" id="pp-paused" role="status">{paused}</p>{/if}

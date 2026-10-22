@@ -28,10 +28,11 @@ export const LINES = [
   'bad',
   'out-partway',
   'partway',
+  'rsi-down',
 ];
 // The lines that ask for a scan (ui/popup/data.js autoAsk), and a day skipped.
 export const ASKS = ['bad', 'out-partway', 'partway'];
-const SKIPS = ['signed-out', 'other', 'paused'];
+const SKIPS = ['signed-out', 'other', 'paused', 'rsi-down'];
 
 const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
 const lc = (s) =>

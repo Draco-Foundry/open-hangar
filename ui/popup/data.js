@@ -285,6 +285,7 @@ const AUTO_KEY = {
   'signed-out': 'popup.auto-signed-out',
   other: 'popup.auto-other',
   paused: 'popup.auto-paused',
+  'rsi-down': 'popup.auto-rsi-down',
   bad: 'popup.auto-bad',
   'out-partway': 'popup.auto-out-partway',
   partway: 'popup.auto-stopped',
@@ -342,11 +343,21 @@ const since = (report, scannedAt) =>
 // The rows of the last scan that went wrong (not read, or read only in part), unless a
 // scan since went fine. Held reports read nothing: none.
 export function reportTrouble(report, scannedAt) {
-  if (!isObj(report) || report.held || !report.bad || report.signedOut) return [];
+  if (!isObj(report) || report.held || !report.bad || report.signedOut || report.rsiDown) return [];
   if (since(report, scannedAt)) return [];
   return (Array.isArray(report.rows) ? report.rows : []).filter(
     (r) => isObj(r) && (!r.ok || !!r.partial),
   );
+}
+// The last scan stopped because RSI didn't answer (its report's rsiDown), unless a scan
+// since went fine: → { kind: 'down' } (a 5xx), { kind: 'wait', at } (RSI asked to wait, and
+// that time hasn't come), or null. It comes before signed out: a RSI that isn't answering
+// can look signed out, and Log In to RSI would be the wrong thing to say.
+export function reportRsi(report, scannedAt, now = Date.now()) {
+  if (!isObj(report) || report.held || !report.rsiDown || since(report, scannedAt)) return null;
+  if (Number.isFinite(report.wait))
+    return report.wait > now ? { kind: 'wait', at: report.wait } : null;
+  return { kind: 'down' };
 }
 // A scan status.json paused (every part): its message (the status file's words, the
 // ones the basic page shows), or ''.

@@ -161,6 +161,7 @@ test('lineOf: another account or a drop first, then partway, then whether anythi
     'bad',
     'out-partway',
     'partway',
+    'rsi-down',
   ]);
 });
 
