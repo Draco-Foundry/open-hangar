@@ -173,6 +173,22 @@ test("the scan's report in the basic page's words, as before the runner", async 
   assert.deepEqual(out, { rows: [], signedOut: true, bad: 0 });
   assert.equal(reportSummary(out, true), 'signed out of RSI');
   assert.equal(reportSummary(null), 'no scan this session');
+  // RSI didn't answer: its own line, and it wins over signed out; a 429 says when to scan again.
+  const bb = { id: 'buybacks', ok: false, partial: null, n: null, error: 'RSI responded 503' };
+  const hg = { id: 'hangar', ok: true, partial: null, n: 2, error: null };
+  const down = reportLines(runnerReport([hg, bb], { rsiDown: true, signedOut: true }), t);
+  assert.equal(down.signedOut, false, 'signed out does not win over RSI not answering');
+  assert.equal(
+    down.down,
+    "RSI isn't answering, so the scan stopped. The parts it didn't finish keep your last scan. Try again soon.",
+  );
+  assert.deepEqual(down.rows, [{ name: 'Hangar', ok: true, text: '2 pledges' }]);
+  const at = new Date(2026, 9, 22, 15, 42).getTime();
+  const slow = reportLines(runnerReport([bb], { rsiDown: true, wait: at }), t, () => '3:42 PM');
+  assert.equal(
+    slow.down,
+    "RSI asked us to wait, so the scan stopped. The parts it didn't finish keep your last scan. Scan again after 3:42 PM.",
+  );
   // A scan that never ran (another tab's scan, no RSI access) leaves the last one up.
   assert.equal(reportLines(runnerReport([], { held: 'busy' }), t), null);
   assert.equal(reportLines(runnerReport([], { held: 'no-rsi' }), t), null);

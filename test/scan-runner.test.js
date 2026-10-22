@@ -186,6 +186,7 @@ test('scan: the account, the hangar, buy-backs, referrals, saved, then the sync 
     'bad',
     'sync',
     'wait',
+    'rsiDown',
   ]);
   assert.equal(report.v, 1);
   assert.equal(report.wait, null, 'RSI never asked it to slow down');
