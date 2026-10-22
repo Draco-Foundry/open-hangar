@@ -519,7 +519,11 @@ test('whoIsSignedIn: one request, nothing stored, never the cached account', asy
   assert.equal((await OH.whoIsSignedIn()).state, 'unknown');
   answer = () => new Response('', { status: 429, headers: { 'retry-after': '600' } });
   asked.length = 0;
-  assert.deepEqual(await OH.whoIsSignedIn(), { state: 'unknown', retryAfter: '600' });
+  assert.deepEqual(await OH.whoIsSignedIn(), {
+    state: 'unknown',
+    retryAfter: '600',
+    rateLimited: true,
+  });
   assert.equal(asked.length, 1, 'a 429 is never retried');
   assert.equal(store.account.nickname, 'Cached');
 });

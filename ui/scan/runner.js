@@ -688,6 +688,7 @@ export function createRunner(env) {
       noRecord: false, // ended before anything: no record at all
       full: false, // a full read began (scanStarted)
       down: false, // RSI didn't answer: the next run backs off
+      slowed: false, // ...and at least one answer was a 429 (no rsi-down line)
       retryAfter: null,
       owed: false, // a saved scan's sync never went out
       mayOwe: false, // and it may go at the end
@@ -711,7 +712,7 @@ export function createRunner(env) {
     }
     // RSI didn't answer and nothing else explains the run (no part stopped partway): its
     // own line, a day skipped.
-    if (run.down && !run.line && !run.stop) run.line = 'rsi-down';
+    if (run.down && !run.slowed && !run.line && !run.stop) run.line = 'rsi-down';
     let rec = null;
     try {
       if (!run.noRecord) {
@@ -772,6 +773,8 @@ export function createRunner(env) {
   // RSI didn't answer: the next run backs off (its Retry-After, if it sent one).
   const autoDown = (run, r) => {
     run.down = true;
+    // A 429 backs off like a 5xx but gets no line of its own (owner, 2026-10-22).
+    if (r?.slowDown || r?.rateLimited) run.slowed = true;
     run.retryAfter = r?.retryAfter ?? run.retryAfter ?? null;
   };
   // Still connected and switched on (checked before each part, too).
