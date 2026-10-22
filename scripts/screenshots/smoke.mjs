@@ -5304,7 +5304,9 @@ try {
       const b = document.getElementById('pp-sbar');
       const scan = document.getElementById('pp-scan');
       return {
-        text: b ? [...b.querySelectorAll('.pp-sbar-t > span')].map((x) => x.textContent.trim()) : null,
+        text: b
+          ? [...b.querySelectorAll('.pp-sbar-t > span')].map((x) => x.textContent.trim())
+          : null,
         tone: b ? b.className.replace('pp-sbar', '').trim() : null,
         now: b ? Number(b.getAttribute('aria-valuenow')) || null : null,
         scan: scan ? (scan.disabled ? 'off' : 'on') : 'none',
@@ -5369,7 +5371,9 @@ try {
       newValue: {
         ...barReport,
         at: barAt + 80e3,
-        rows: [{ id: 'hangar', ok: false, partial: null, n: null, error: 'RSI asked us to slow down' }],
+        rows: [
+          { id: 'hangar', ok: false, partial: null, n: null, error: 'RSI asked us to slow down' },
+        ],
         bad: true,
         wait: barAt + 80e3 + 5 * 60e3,
       },
@@ -5396,7 +5400,14 @@ try {
   const barBusy = await sbar();
   // A scan stopped because RSI changed a page (its row's pageChanged): the bar's line,
   // not a trouble row, Scan there to press again.
-  const changedRow = { id: 'hangar', ok: false, partial: null, n: null, error: 'x', pageChanged: true };
+  const changedRow = {
+    id: 'hangar',
+    ok: false,
+    partial: null,
+    n: null,
+    error: 'x',
+    pageChanged: true,
+  };
   await popAt(
     {
       ...signedIn,
@@ -5461,10 +5472,70 @@ try {
     barChanged.scan === 'on' &&
     !barChanged.trouble;
   barOk
-    ? ok("scan bar: in Scan's place at once, names and counts, fills by page, waits, done, holds, a changed page")
+    ? ok(
+        "scan bar: in Scan's place at once, names and counts, fills by page, waits, done, holds, a changed page",
+      )
     : fail(
         `popup scan bar: ${JSON.stringify({ barFirst, barAsked, barHangar, barCreep, barWait, barDone, barHold, barFits, barBusy, barChanged })}`,
       );
+  // RSI didn't answer (its report's rsiDown): a 5xx says so, signed out or not, and a 429
+  // says when to scan again; neither shows a trouble box or Log In to RSI, and Scan is
+  // there to press again.
+  const downRow = {
+    id: 'hangar',
+    ok: false,
+    partial: null,
+    n: null,
+    error: 'RSI responded 503 on page 1.',
+  };
+  const downReport = (extra) => ({
+    v: 1,
+    run: 'r9',
+    by: 'offscreen',
+    reason: 'popup',
+    startedAt: T0 - 60e3,
+    at: T0 - 30e3,
+    ms: 30e3,
+    held: null,
+    signedOut: false,
+    switched: null,
+    rows: [downRow],
+    bad: 1,
+    sync: null,
+    rsiDown: true,
+    ...extra,
+  });
+  const downShot = async (seed, name) => {
+    await popAt({ ...signedIn, __demoLocal: { scanReport: seed } }, '#pp-age');
+    const got = await page.evaluate(() => ({
+      text: (
+        document.querySelector('#pp-sbar .pp-sbar-t > span') || document.getElementById('pp-rsi')
+      )?.textContent.trim(),
+      trouble: !!document.getElementById('pp-trouble'),
+      login: /Log In to RSI/.test(document.body.innerText),
+      scan: !document.getElementById('pp-scan')?.disabled,
+    }));
+    if (process.env.OH_SHOTS)
+      await page.screenshot({ path: path.join(process.env.OH_SHOTS, name) });
+    return got;
+  };
+  const down5xx = await downShot(downReport({}), 'popup-rsi-down.png');
+  const downOut = await downShot(downReport({ signedOut: true }), 'popup-rsi-down-signed-out.png');
+  const down429 = await downShot(
+    downReport({
+      wait: T0 + 10 * 60e3,
+      rows: [{ ...downRow, error: 'RSI asked us to slow down' }],
+    }),
+    'popup-rsi-wait.png',
+  );
+  [down5xx, downOut].every(
+    (d) => d.text === "RSI isn't answering. Try again soon." && !d.trouble && !d.login && d.scan,
+  ) &&
+  /^RSI asked us to wait\. Scan after \d/.test(down429.text || '') &&
+  !down429.trouble &&
+  !down429.login
+    ? ok('RSI not answering: a 5xx and a 429 each get their line, no trouble box, no Log In to RSI')
+    : fail(`popup RSI down: ${JSON.stringify({ down5xx, downOut, down429 })}`);
   // A scan whose page went away (its mark left behind): Scan stopped, Scan Again.
   await popAt(
     {
@@ -6343,6 +6414,47 @@ try {
   !bpScan.out.report
     ? ok('signed out: the title and the line under it, no Report a Scan Problem')
     : fail(`basic signed out: ${JSON.stringify(bpScan.out)}`);
+  // RSI not answering (a 5xx, then a 429): each one's own line in the problem box, and
+  // no Report a Scan Problem for either.
+  const bpDown = await page.evaluate(async () => {
+    const press = async (answer) => {
+      OH.scanSource = async () => answer;
+      document.getElementById('bp-scan').click();
+      await new Promise((r) => setTimeout(r, 600));
+      return {
+        text: document.getElementById('bp-report')?.textContent.replace(/\s+/g, ' ') || '',
+        report: !!document.getElementById('bp-report-btn'),
+      };
+    };
+    const five = await press({
+      ok: false,
+      error: 'RSI responded 503 on page 1.',
+      rsiDown: true,
+      retryAfter: null,
+    });
+    const slow = await press({
+      ok: false,
+      error: 'RSI asked us to slow down',
+      rsiDown: true,
+      slowDown: true,
+      retryAfter: 300,
+    });
+    return { five, slow };
+  });
+  if (process.env.OH_SHOTS)
+    await page.screenshot({ path: path.join(process.env.OH_SHOTS, 'basic-rsi-wait.png') });
+  bpDown.five.text.includes(
+    "RSI isn't answering, so the scan stopped. The parts it didn't finish keep your last scan. Try again soon.",
+  ) &&
+  /RSI asked us to wait, so the scan stopped\. The parts it didn't finish keep your last scan\. Scan again after \d/.test(
+    bpDown.slow.text,
+  ) &&
+  !bpDown.five.report &&
+  !bpDown.slow.report
+    ? ok(
+        'basic page, RSI not answering: a 5xx and a 429 each get their line, no Report a Scan Problem',
+      )
+    : fail(`basic RSI down: ${JSON.stringify(bpDown)}`);
   const runStore = bpScan.stored;
   const rowsOf = (r) => JSON.stringify(r?.rows?.map((x) => [x.id, x.ok, x.n]));
   runStore.report?.v === 1 &&
