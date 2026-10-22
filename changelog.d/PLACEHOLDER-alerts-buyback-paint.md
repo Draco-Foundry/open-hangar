@@ -1,0 +1,1 @@
+- Changed: Store alerts no longer tell you about buy-backs. Paint alerts only come for ships still on their default paint.

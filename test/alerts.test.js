@@ -100,7 +100,7 @@ const FEED = {
       name: 'Cutlass - Akuma Paint',
       price: 15,
       sale: ['back'],
-      ships: ['cutlass-black'],
+      ships: ['cutlass-red'],
     },
     {
       id: 'sku-30',
@@ -321,12 +321,11 @@ test('a renamed ship matches by its old name and its new one, never a guess', ()
 const byId = (ms, id) => ms.find((m) => m.id === id);
 const whys = (m) => (m ? m.why.map((w) => w.why) : []);
 
-test('the hangar rules: buy-back in the store, a paint just in, warbond, limited sale', () => {
+test('the hangar rules: a paint just in, warbond, limited sale (never a buy-back)', () => {
   const ms = AL.matchAll(AL.readFeed(FEED), DB, null);
-  // Your Sabre Raven EX buy-back: both listings are in the store.
-  assert.deepEqual(whys(byId(ms, 'sku-19700')), ['buyback']);
-  assert.deepEqual(byId(ms, 'sku-19700').why[0].ships, ['Sabre Raven EX']);
-  assert.deepEqual(whys(byId(ms, 'sku-19701')), ['buyback']);
+  // Your Sabre Raven EX buy-back in the store: no alert (#695).
+  assert.equal(byId(ms, 'sku-19700'), undefined);
+  assert.equal(byId(ms, 'sku-19701'), undefined);
   // Owned ship sold as a warbond.
   assert.deepEqual(whys(byId(ms, 'sku-11')), ['warbond']);
   assert.deepEqual(byId(ms, 'sku-11').why[0].ships, ['MISC Freelancer MAX']);
@@ -351,9 +350,65 @@ test('owning the ship on a limited sale', () => {
     contents: [ship('Sabre Raven EX')],
   });
   const ms = AL.matchAll(AL.readFeed(FEED), db, null);
-  assert.deepEqual(whys(byId(ms, 'sku-19700')), ['buyback', 'limited']);
-  assert.deepEqual(whys(byId(ms, 'sku-19701')), ['buyback', 'warbond', 'limited']);
+  assert.deepEqual(whys(byId(ms, 'sku-19700')), ['limited']);
+  assert.deepEqual(whys(byId(ms, 'sku-19701')), ['warbond', 'limited']);
   assert.equal(byId(ms, 'sku-19700').endsOn, '2026-10-15');
+});
+
+test('a paint alert only for a ship still on its default paint', () => {
+  const feed = AL.readFeed({
+    ...FEED,
+    items: [
+      ...FEED.items,
+      {
+        id: 'sku-23',
+        kind: 'paint',
+        name: 'Cutlass - Ember Paint',
+        price: 15,
+        sale: [],
+        ships: ['cutlass-black'],
+      },
+    ],
+  });
+  assert.deepEqual(whys(byId(AL.matchAll(feed, DB, null), 'sku-20')), ['paint']);
+  const db = structuredClone(DB);
+  db.sources.hangar.items.push({
+    id: '10',
+    name: 'Paints - Cutlass - Ember Paint',
+    isPaint: true,
+    contents: [{ kind: 'Skin', label: 'Cutlass - Ember Paint' }],
+  });
+  assert.equal(byId(AL.matchAll(feed, db, null), 'sku-20'), undefined);
+});
+
+test('saved buy-back alerts clear out: items, memory, badge', () => {
+  const old = {
+    v: 1,
+    items: [
+      { id: 'sku-19700', name: 'X', why: [{ why: 'buyback', ships: ['A'] }] },
+      {
+        id: 'sku-11',
+        name: 'Y',
+        why: [
+          { why: 'buyback', ships: ['A'] },
+          { why: 'warbond', ships: ['B'] },
+        ],
+      },
+    ],
+    known: { 'sku-19700|buyback': 1, 'sku-11|buyback': 1, 'sku-11|warbond': 1 },
+    seen: { 'sku-11|buyback': 2 },
+    gone: { 'sku-19700|buyback': 3 },
+    hidden: { 'sku-19700|buyback': 3 },
+  };
+  assert.deepEqual(
+    AL.shown(old).map((m) => [m.id, whys(m)]),
+    [['sku-11', ['warbond']]],
+  );
+  assert.equal(AL.badgeFor(true, old).text, '1');
+  const { state } = AL.nextState(old, [], NOW);
+  assert.deepEqual(Object.keys(state.known), ['sku-11|warbond']);
+  assert.deepEqual(state.seen, {});
+  assert.deepEqual(state.hidden, {});
 });
 
 test('the Wishlist: only when connected, by its keys (ship page, store id, upgrade)', () => {
@@ -460,8 +515,9 @@ test('deleted (#701): out of the list and the badge, back only when something ne
 });
 
 test('notifications: one each, three at most, then one for the rest', () => {
-  const ms = AL.matchAll(AL.readFeed(FEED), DB, null);
-  assert.equal(ms.length, 4);
+  const real = AL.matchAll(AL.readFeed(FEED), DB, null);
+  assert.equal(real.length, 2);
+  const ms = [...real, ...real.map((m) => ({ ...m, id: `${m.id}-b` }))];
   const three = AL.notesFor(ms.slice(0, 3));
   assert.equal(three.length, 3);
   assert.deepEqual(AL.notesFor([byId(ms, 'sku-11')])[0], {
@@ -478,16 +534,19 @@ test('notifications: one each, three at most, then one for the rest', () => {
   );
   assert.equal(four[3].id, 'oh-alerts:more');
   assert.equal(four[3].title, 'More alerts: 1');
-  const ends = AL.lines(byId(ms, 'sku-19700'));
-  assert.deepEqual(ends, ['In your buy-backs, now in the store: Sabre Raven EX', 'Ends Oct 15']);
+  const ends = AL.lines({ ...byId(ms, 'sku-11'), endsOn: '2026-10-15' });
+  assert.deepEqual(ends, [
+    'Warbond edition in the store: MISC Freelancer MAX (new money only)',
+    'Ends Oct 15',
+  ]);
 });
 
 test('the badge: unseen items while alerts are on, else the rescan reminder', () => {
   const ms = AL.matchAll(AL.readFeed(FEED), DB, null);
   const { state } = AL.nextState(null, ms, NOW);
   assert.deepEqual(AL.badgeFor(true, state), {
-    text: '4',
-    title: 'Open Hangar alerts: 4. Click to see them.',
+    text: '2',
+    title: 'Open Hangar alerts: 2. Click to see them.',
   });
   assert.equal(AL.badgeFor(false, state), null);
   assert.equal(AL.badgeFor(undefined, state), null);
@@ -593,15 +652,14 @@ test('a check, not connected: the public feed only, with nothing of the pilot in
   const x = env({ local: { alertsOn: true, db: DB }, net: [res(200, FEED, { etag: 'W/"a"' })] });
   const r = await AL.check(x.e);
   assert.equal(r.ran, true);
-  assert.equal(r.matches, 4);
+  assert.equal(r.matches, 2);
   assert.equal(x.asked.length, 1);
   const [{ url, init }] = x.asked;
   assert.equal(url, 'https://openhangar.space/api/store/on-sale');
   assert.equal(init.credentials, 'omit');
   assert.deepEqual(init.headers, { Accept: 'application/json' });
   assert.ok(!('body' in init) && !init.method, 'a plain GET');
-  // Four matches: three of their own, then one for the rest.
-  assert.equal(x.out.notes.length, 4);
+  assert.equal(x.out.notes.length, 2);
   assert.equal(x.out.badges, 1);
   assert.deepEqual(x.out.at, [NOW + 30 * MIN + 150e3]);
   assert.equal(x.data.alertsFeed.etag, 'W/"a"');
@@ -674,7 +732,7 @@ test('polite: ETag, a fresh copy reused, Retry-After honored, backoff, the last 
   await AL.check({ ...x.e, fetch: async () => Promise.reject(new Error('offline')) });
   assert.equal(x.data.alertsFeed.fails, before + 1);
   assert.equal(x.data.alertsFeed.data.items.length, FEED.items.length);
-  assert.equal(x.data.alerts.items.length, 4);
+  assert.equal(x.data.alerts.items.length, 2);
 });
 
 test('the Wishlist read: 404 (its flag off) waits 6 hours, 401 keeps nothing', async () => {
