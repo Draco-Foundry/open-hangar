@@ -4842,6 +4842,35 @@ try {
   shortGo === 'chrome://extensions/shortcuts'
     ? ok("Change opens the browser's shortcuts page")
     : fail(`popup shortcut change: ${shortGo}`);
+  // A faked Mac (navigator.platform and userAgentData): Firefox's "Alt+Shift+O" shows as
+  // ⌥⇧O, Chrome's own symbols stay, and the page doesn't spill. Not a real Mac.
+  const macHook = await page.evaluateOnNewDocument(() => {
+    Object.defineProperty(navigator, 'platform', { get: () => 'MacIntel' });
+    Object.defineProperty(navigator, 'userAgentData', { get: () => ({ platform: 'macOS' }) });
+  });
+  const macShown = {};
+  for (const [name, given] of [
+    ['firefox', 'Alt+Shift+O'],
+    ['chrome', '⌥⇧O'],
+  ]) {
+    await popAt({ __tab: 'settings', __demoShortcut: given }, '#pp-settings');
+    macShown[name] = await page.evaluate(() => ({
+      text: document.getElementById('pp-shortcut')?.textContent,
+      wide: document.documentElement.scrollWidth > 360,
+    }));
+  }
+  await page.removeScriptToEvaluateOnNewDocument(macHook.identifier);
+  await popAt(
+    { ...signedIn, __tab: 'settings', __demoLocal: { siteUrl: 'https://app.openhangar.space' } },
+    '#pp-settings',
+  );
+  await page.waitForSelector('#pp-connect');
+  macShown.firefox.text === '⌥⇧O' &&
+  macShown.chrome.text === '⌥⇧O' &&
+  !macShown.firefox.wide &&
+  !macShown.chrome.wide
+    ? ok('Settings on a faked Mac: the shortcut shows as ⌥⇧O')
+    : fail(`popup shortcut on a faked Mac: ${JSON.stringify(macShown)}`);
   await page.click('#pp-export-pledges');
   await sleep(100);
   await page.click('#pp-export-buybacks');
