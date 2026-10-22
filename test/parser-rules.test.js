@@ -33,7 +33,7 @@ const P = globalThis.OpenHangar;
 const OH = globalThis.OH;
 
 // The files that read the rules, as RULES.<path>.
-const READERS = ['src/scraper/parser.js', 'src/lib.js', 'src/rsi-cart.js'];
+const READERS = ['src/scraper/parser.js', 'src/lib.js', 'src/rsi-cart.js', 'src/alerts.js'];
 
 // A rule is a leaf: a pattern ({ source, flags }), a string, a number or a list (read
 // whole: a table, a list of selectors or labels), or a GraphQL request's fixed

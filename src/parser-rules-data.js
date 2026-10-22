@@ -35,6 +35,7 @@
         'upgrade',
         'cart',
         'known',
+        'aliases',
       ],
       additionalProperties: false,
       properties: {
@@ -825,6 +826,21 @@
             },
           },
         },
+        aliases: {
+          description:
+            'Names RSI changed: a ship or pledge once called `old` that RSI now lists as `now`. Matching by name (src/alerts.js) tries the name it has, then the other name of every entry that names it, both ways, so a scan from before a rename and one from after find the same ship. Exact names only, compared folded (src/alerts.js nameKey): never a guess. The website keeps the same list for its own matching.',
+          type: 'array',
+          maxItems: 500,
+          items: {
+            type: 'object',
+            required: ['old', 'now'],
+            additionalProperties: false,
+            properties: {
+              old: { type: 'string', minLength: 1, maxLength: 120 },
+              now: { type: 'string', minLength: 1, maxLength: 120 },
+            },
+          },
+        },
       },
       $defs: {
         pattern: {
@@ -922,7 +938,7 @@
     },
     rules: {
       format: 1,
-      revision: '2026-10-19',
+      revision: '2026-10-22',
       paging: {
         page: 'page',
         size: 'pagesize',
@@ -1232,6 +1248,7 @@
           hooks: ['js-label', 'js-open-ship-upgrades'],
         },
       },
+      aliases: [{ old: 'Phoenix Emerald', now: 'Constellation Mk IV Phoenix Emerald' }],
     },
   });
   root.OHParserRulesData = data;
