@@ -1,0 +1,1 @@
+- Changed: **Privacy policy updated.** The cookies line now says RSI's session cookie only hints whether you're signed in.
