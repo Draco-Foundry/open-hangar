@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "revision": "2026-10-19",
+  "revision": "2026-10-22",
   "paging": {
     "page": "page",
     "size": "pagesize",
@@ -302,5 +302,6 @@
       "labels": ["Buy Back", "Contained", "Reclaim Date"],
       "hooks": ["js-label", "js-open-ship-upgrades"]
     }
-  }
+  },
+  "aliases": [{ "old": "Phoenix Emerald", "now": "Constellation Mk IV Phoenix Emerald" }]
 }

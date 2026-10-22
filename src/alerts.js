@@ -123,6 +123,30 @@
       .replace(/[^a-z0-9]+/g, ' ')
       .trim();
 
+  // RSI's renames (the parser rules' `aliases`, src/data/parser-rules.json): a folded
+  // name → the other names it has gone by, old or current. A name is looked up as it is,
+  // then as each of those: exact names only, never a guess. The website keeps the same
+  // list. The rules load wherever alerts do (the worker, the popup, the basic page).
+  if (!root.OHRules && typeof require === 'function') require('./parser-rules.js');
+  const RULES = root.OHRules;
+  const ALIASES = new Map();
+  for (const a of RULES.aliases) {
+    const [o, n] = [nameKey(a.old), nameKey(a.now)];
+    if (!o || !n || o === n) continue;
+    for (const [k, other] of [
+      [o, n],
+      [n, o],
+    ]) {
+      if (!ALIASES.has(k)) ALIASES.set(k, []);
+      if (!ALIASES.get(k).includes(other)) ALIASES.get(k).push(other);
+    }
+  }
+  // A name's folded keys to look up: its own first, then its other names.
+  const keysOf = (s) => {
+    const k = nameKey(s);
+    return k ? [k, ...(ALIASES.get(k) || [])] : [];
+  };
+
   // A buy-back's title as the ship it gives back: RSI's store label in front and its
   // insurance and edition words behind off ("Standalone Ships - Cutlass Black - LTI",
   // "Sabre Raven EX Warbond Edition"), an extra after "plus" or "with" too. The ship's
@@ -223,12 +247,16 @@
       for (const k of s.keys)
         owners.set(k, owners.has(k) && owners.get(k) !== s.slug ? null : s.slug);
     const names = new Map(feed.ships.map((s) => [s.slug, s.name]));
+    const look = (s) =>
+      keysOf(s)
+        .map((k) => owners.get(k))
+        .find(Boolean) || null;
     const find = (label) => {
-      const full = nameKey(label);
-      if (owners.get(full)) return owners.get(full);
+      const full = look(label);
+      if (full) return full;
       // RSI's tag after a dash ("MISC RAPTOR - Referral Reward"): the name before it.
       const dash = /^(.+?)\s+[-–]\s+[^-–]+$/.exec(String(label || '').trim());
-      return (dash && owners.get(nameKey(dash[1]))) || null;
+      return (dash && look(dash[1])) || null;
     };
     return { find, name: (slug) => names.get(slug) || slug };
   }
@@ -282,10 +310,12 @@
   function ownedPaints(db) {
     const out = new Set();
     for (const p of items(db, 'hangar')) {
-      if (p.isPaint && typeof p.name === 'string') out.add(paintKey(p.name));
+      // Each under its other names too (RSI's renames), so the store's name finds it.
+      const add = (s) => keysOf(s).forEach((k) => out.add(paintKey(k)));
+      if (p.isPaint && typeof p.name === 'string') add(p.name);
       for (const c of Array.isArray(p.contents) ? p.contents : [])
         if (isObj(c) && typeof c.label === 'string' && PAINT_KIND.test(String(c.kind || '').trim()))
-          out.add(paintKey(c.label));
+          add(c.label);
     }
     out.delete('');
     return out;
@@ -691,6 +721,7 @@
     COPY,
     t,
     nameKey,
+    keysOf,
     bareShipName,
     containsNames,
     readFeed,
