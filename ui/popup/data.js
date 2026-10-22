@@ -540,10 +540,34 @@ export function reportSyncFailed(report, link) {
 
 // The browser's shortcut that opens the popup (chrome.commands.getAll), '' when none
 // is set, or null when this browser has no shortcuts (Firefox for Android).
-export function popupShortcut(commands) {
+export function popupShortcut(commands, mac = isMac()) {
   if (!Array.isArray(commands)) return null;
   const c = commands.find(
     (x) => x?.name === '_execute_action' || x?.name === '_execute_browser_action',
   );
-  return c ? String(c.shortcut || '') : null;
+  return c ? shortcutLabel(String(c.shortcut || ''), mac) : null;
+}
+
+// Whether this is a Mac (userAgentData.platform, else navigator.platform).
+export function isMac(nav = globalThis.navigator) {
+  return /^mac/i.test(String(nav?.userAgentData?.platform || nav?.platform || ''));
+}
+
+// A shortcut as the platform writes it: on a Mac "Alt+Shift+O" is ⌥⇧O, in Mac's order
+// (⌃⌥⇧⌘, then the key, no plus signs). Chrome maps Ctrl to ⌘ there. Strings that
+// already hold the symbols (Chrome and Edge on a Mac) and other platforms pass through.
+export function shortcutLabel(shortcut, mac) {
+  const s = String(shortcut || '');
+  if (!mac || !s || !s.includes('+')) return s;
+  const MARK = { macctrl: '⌃', alt: '⌥', option: '⌥', shift: '⇧', command: '⌘', ctrl: '⌘' };
+  const ORDER = '⌃⌥⇧⌘';
+  const marks = new Set();
+  let key = '';
+  for (const part of s.split('+')) {
+    const m = MARK[part.trim().toLowerCase()];
+    if (m) marks.add(m);
+    else key += part.trim();
+  }
+  if (!marks.size) return s;
+  return [...ORDER].filter((m) => marks.has(m)).join('') + key;
 }

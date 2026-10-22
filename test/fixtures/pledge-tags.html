@@ -2,10 +2,11 @@
 <!--
   Made-up hangar pledge cards in RSI's /account/pledges markup, carrying the status
   tags RSI shows beside a pledge's name: UPGRADED, and since October 2026 a green
-  ATTRIBUTED. The tag elements' classes are a guess (no capture yet); what matters is
-  that they sit on the card, outside every element the parser reads. One card puts
-  them after the date in the date column, the worst place they could land. No
-  personal data. See CONTRIBUTING.md.
+  ATTRIBUTED. ATTRIBUTED is marked up as the real pages in test/fixtures/corpus/ show
+  it (a span.availability in the title column, after the hidden inputs; the capitals
+  are CSS). UPGRADED isn't on those pages yet, so its classes are still a guess. One
+  card puts both after the date in the date column, the worst place they could land.
+  No personal data. See CONTRIBUTING.md.
 -->
 <html>
   <body>
@@ -19,7 +20,7 @@
         <div class="title-col">
           <h3>Standalone Ships - Avenger Titan</h3>
           <span class="tag upgraded">UPGRADED</span>
-          <span class="tag attributed">ATTRIBUTED</span>
+          <span class="availability">Attributed</span>
         </div>
         <div class="date-col"><label>Created:</label> April 12, 2023</div>
         <a class="shadow-button js-gift gift"><span class="label">Gift</span></a>
@@ -42,7 +43,7 @@
         <input class="js-pledge-currency" value="USD" />
         <div class="title-col">
           <h3>Upgrade - Aurora MR to Avenger Titan</h3>
-          <span class="tag attributed">ATTRIBUTED</span>
+          <span class="availability">Attributed</span>
         </div>
         <div class="date-col">October 2, 2026</div>
         <a class="shadow-button js-reclaim reclaim"><span class="label">Exchange</span></a>
@@ -57,7 +58,7 @@
         <div class="date-col">
           <label>Created:</label> October 5, 2026
           <span class="tag upgraded">UPGRADED</span>
-          <span class="tag attributed">ATTRIBUTED</span>
+          <span class="availability">Attributed</span>
         </div>
         <a class="shadow-button js-gift gift"><span class="label">Gift</span></a>
         <div class="item">
