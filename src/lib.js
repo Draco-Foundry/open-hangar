@@ -3936,6 +3936,33 @@
       headers: { 'content-type': 'application/json', ...(init.headers || {}) },
     });
   }
+  // A new link replacing this one would switch accounts: a link is kept, and the new one
+  // names another account (or either has no name to tell by). Then the extension's own
+  // page asks first, naming both (ui/basic/hub.svelte.js connect), before anything is
+  // replaced or synced (connect hardening, #669). The same token, the same name or no
+  // link yet: no question. Pure.
+  OH.siteSwitches = function siteSwitches(was, link) {
+    if (!was?.token || !link || was.token === link.token) return false;
+    return !was.name || !link.name || was.name !== link.name;
+  };
+  // A sync token given back unused (the new link refused at that question): revoked, so
+  // that account's Connected Extensions list doesn't keep a row that never syncs.
+  // Best effort.
+  OH.siteTokenDrop = async function siteTokenDrop(token) {
+    if (!token) return;
+    await siteFetch(SYNC_PATH, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${token}` },
+    }).catch(() => null);
+  };
+  // Keep a new link. Connecting again while connected: the old link is revoked, as
+  // Disconnect does, so the account's Connected Extensions list doesn't keep a dead row
+  // (#741). After the save, so a slow or failed revoke never costs the new link.
+  OH.siteLinkSave = async function siteLinkSave(link) {
+    const was = await OH.getSiteLink();
+    await chrome.storage.local.set({ siteLink: link });
+    if (was?.token && was.token !== link.token) await OH.siteTokenDrop(was.token);
+  };
   // → { device_code, user_code, verification_uri, expires_in, interval }
   OH.siteLinkStart = async function siteLinkStart() {
     const res = await siteFetch('/api/link/start', { method: 'POST', body: '{}' });
@@ -3961,17 +3988,7 @@
           connectedAt: Date.now(),
           lastSync: null,
         };
-        const was = await OH.getSiteLink();
-        await chrome.storage.local.set({ siteLink: link });
-        // Connecting again while connected: the old link is revoked, as Disconnect does,
-        // so the account's Connected Extensions list doesn't keep a dead row (#741; the
-        // same in src/background.js oh-connect-finish). After the save, best effort.
-        if (was?.token && was.token !== link.token) {
-          await siteFetch(SYNC_PATH, {
-            method: 'DELETE',
-            headers: { authorization: `Bearer ${was.token}` },
-          }).catch(() => null);
-        }
+        await OH.siteLinkSave(link);
         return link;
       }
       if (j.status === 'expired') return null;

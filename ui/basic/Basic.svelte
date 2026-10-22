@@ -11,6 +11,7 @@
     firefoxContinue,
     hub,
     pilotAnswer,
+    switchAnswer,
     reloadForUpdate,
     reportProblem,
     rsiAllow,
@@ -122,6 +123,24 @@
         >
         <button type="button" class="bp-btn" onclick={() => pilotAnswer(false)}
           >{t('basic.pilot-no')}</button
+        >
+      </div>
+    </div>
+  {/if}
+
+  {#if hub.site.switchTo}
+    <div class="bp-note" id="bp-switch" role="dialog" aria-labelledby="bp-switch-h">
+      <b id="bp-switch-h">{t('basic.switch-title', hub.site.switchTo)}</b>
+      <p>{t('basic.switch-body', hub.site.switchTo)}</p>
+      <div class="bp-row">
+        <button type="button" class="bp-btn" id="bp-switch-no" onclick={() => switchAnswer(false)}
+          >{t('basic.switch-no', hub.site.switchTo)}</button
+        >
+        <button
+          type="button"
+          class="bp-btn primary"
+          id="bp-switch-yes"
+          onclick={() => switchAnswer(true)}>{t('basic.switch-yes', hub.site.switchTo)}</button
         >
       </div>
     </div>

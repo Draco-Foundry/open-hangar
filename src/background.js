@@ -236,100 +236,64 @@ siteHandlers['oh-add-upgrade'] = (m) =>
 siteHandlers['oh-add-items'] = (m) => cartLane().addItemsToCart(m.items);
 
 // @sync-start: the `sync` build flag's code, in every store build (src/flags.js, #187)
-// Connect from the website (Chrome and Edge, owner 2026-10-04). The website's Connect
-// page (openhangar.space's /link) asks whether Open Hangar is installed here; only
-// our own site can talk to the extension. Connect This Browser there:
-//   oh-connect-begin  → a PKCE pair; the challenge and this extension's redirect
-//                       address go to the page, the verifier stays here
-//   oh-connect-finish → the page's one-time code, traded for the sync token with the
-//                       verifier; then the dashboard opens on Home (and syncs, if
-//                       Sync My Hangar Now was ticked)
-// Only the pages in src/site-pages.js's `connect` list may ask (the app, never the
-// public front page), so a build that leaves staging out (npm run build:beta) can't
-// connect there either.
-const b64url = (bytes) =>
-  btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+// Connect from the website (owner 2026-10-04; connect hardening, #669). The website's
+// Connect page (openhangar.space's /link) asks whether Open Hangar is installed here;
+// only our own site can talk to the extension. Connect This Browser there:
+//   oh-connect-begin → { ok: true, window: true }: the basic page comes to the front
+//                      (or opens) and runs its own Connect, the browser's sign-in
+//                      window on the website's /connect (ui/basic/hub.svelte.js
+//                      connect). You press Approve there, and the one-time code comes
+//                      back to the extension through the browser, never through a
+//                      page, so no script on a page can read or swap it.
+// The page never hands the extension a code, and nothing it sends is saved: switching
+// to another account is asked on the basic page, naming both, before anything is
+// replaced. Only the pages in src/site-pages.js's `connect` list may ask (the app,
+// never the public front page), so a build that leaves staging out (npm run
+// build:beta) can't connect there either. A developer's build without the connector
+// connects from its own dashboard only.
 
 // Firefox asks before an extension sends anything off the device (the Firefox
 // manifest's optional data collection, scripts/pack.mjs), and only from a click in
-// the extension. So the first Connect from the website opens Home with Firefox's
-// card already up (src/dashboard.js siteAskFirefox): its Continue is that click.
+// the extension. So the first Connect from the website opens the basic page with
+// Firefox's card already up (ui/basic/FirefoxCard.svelte): its Continue is that click.
 const SITE_DATA = {
   data_collection: ['personallyIdentifyingInfo', 'financialAndPaymentInfo', 'websiteContent'],
 };
 const firefoxNeedsOk = async () =>
   !!chrome.runtime.getManifest().browser_specific_settings?.gecko &&
   !(await chrome.permissions.contains(SITE_DATA).catch(() => false));
-// This extension's sign-in address: chromiumapp.org on Chrome and Edge,
-// extensions.allizom.org on Firefox (the website checks it, lib/connect.ts). Firefox
-// for Android has no identity API, so there it's worked out the way desktop Firefox
-// does it (the SHA-1 of the add-on id, in hex). Nothing ever opens it here: the code
-// comes back in oh-connect-finish. '' when there's none (then no Connect from the site).
-async function connectRedirect() {
-  if (chrome.identity?.getRedirectURL) return chrome.identity.getRedirectURL();
-  if (!chrome.runtime.getManifest().browser_specific_settings?.gecko) return '';
-  const d = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(chrome.runtime.id));
-  const hex = [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, '0')).join('');
-  return `https://${hex}.extensions.allizom.org/`;
-}
-siteHandlers['oh-connect-begin'] = async (msg, origin) => {
+// One sign-in window at a time, so a page asking again and again doesn't stack windows
+// or tabs: the ask is kept in session storage (siteConnectAskedAt) until the basic
+// page's window closes, for a minute at most, and two asks at once can't both pass (the
+// few seconds' hold here, checked and set before any other wait).
+const CONNECT_ASK_GAP = 60e3;
+const CONNECT_ASK_HOLD = 5e3;
+let connectAskedAt = 0;
+siteHandlers['oh-connect-begin'] = async () => {
+  if (!self.OH.flags.connector)
+    return { ok: false, error: 'Connect from Open Hangar itself here.' };
+  const now = Date.now();
+  if (now - connectAskedAt < CONNECT_ASK_HOLD) return { ok: true, window: true };
+  const held = connectAskedAt;
+  connectAskedAt = now;
+  const { siteConnectAskedAt: before } = await chrome.storage.session.get('siteConnectAskedAt');
+  if (Number.isFinite(before) && now - before < CONNECT_ASK_GAP) return { ok: true, window: true };
   if (await firefoxNeedsOk()) {
-    await chrome.storage.session.set({ siteAskFirefox: Date.now() });
+    await chrome.storage.session.set({ siteAskFirefox: now });
     chrome.tabs.create({ url: hubUrl('#home') });
     return { ok: false, firefoxAsk: true };
   }
-  const redirect = await connectRedirect();
-  if (!redirect) return { ok: false, error: 'Connect from Open Hangar itself here.' };
-  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
-  await chrome.storage.session.set({
-    siteConnect: { verifier, origin, redirect, at: Date.now() },
-  });
-  return { ok: true, challenge: b64url(new Uint8Array(digest)), redirect_uri: redirect };
-};
-// The old link's token, revoked as src/lib.js OH.siteDisconnect does. Best effort.
-async function revokeOldLink(was, token, base) {
-  if (!was?.token || was.token === token) return;
-  await fetch(`${base.replace(/\/+$/, '')}/api/v1/sync`, {
-    method: 'DELETE',
-    credentials: 'omit',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${was.token}` },
-  }).catch(() => null);
-}
-siteHandlers['oh-connect-finish'] = async (msg, origin) => {
-  const { siteConnect: p } = await chrome.storage.session.get('siteConnect');
-  await chrome.storage.session.remove('siteConnect');
-  if (!p || p.origin !== origin || Date.now() - p.at > 5 * 60e3)
-    return { ok: false, error: 'That connect attempt drifted past its window. Try again.' };
-  const res = await fetch(`${origin}/api/link/token`, {
-    method: 'POST',
-    credentials: 'omit',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      code: String(msg.code || ''),
-      code_verifier: p.verifier,
-      redirect_uri: p.redirect,
-    }),
-  }).catch(() => null);
-  if (!res || !res.ok) return { ok: false, error: "That didn't dock. Try again." };
-  const j = await res.json();
-  const old = await chrome.storage.local.get(['siteLink', 'siteUrl']);
-  await chrome.storage.local.set({
-    siteLink: { token: j.token, name: j.name || '', connectedAt: Date.now(), lastSync: null },
-    siteUrl: origin, // sync goes to the site you connected on
-    ...(msg.sync ? { siteSyncRequested: Date.now() } : {}),
-  });
-  // Connecting again while connected: the link it replaced is revoked at the site it was
-  // made on, so the account's Connected Extensions list doesn't keep a row that never
-  // syncs again (#741). After the save, so a slow or failed revoke never costs the new link.
-  await revokeOldLink(old.siteLink, j.token, old.siteUrl || origin);
+  // Firefox for Android has no sign-in window, so no Connect from the website there.
+  if (!chrome.identity?.launchWebAuthFlow) {
+    connectAskedAt = held;
+    return { ok: false, error: 'Connect from Open Hangar itself here.' };
+  }
+  await chrome.storage.session.set({ siteConnectAskedAt: now });
   // An Open Hangar tab already open comes to the front instead of a second one (#658):
-  // a scan running there keeps going, and the sync waits for it.
-  await dashboardTab('#home');
-  return { ok: true, name: j.name || '' };
+  // a scan running there keeps going. Only the tab the ask names runs it.
+  const tabId = await dashboardTab('#home'); // the basic page's settings
+  await chrome.storage.session.set({ siteConnectAsk: { at: now, tabId } });
+  return { ok: true, window: true };
 };
 // Connect with a code (src/dashboard.js siteConnect, when the sign-in window can't
 // open): the dashboard opens the website's code page with its code in the address, and

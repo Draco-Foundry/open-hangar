@@ -265,6 +265,53 @@ test('a code connect whose revoke fails still keeps the new link', async () => {
   assert.equal(mem.siteLink.token, 'new');
 });
 
+// Connect hardening (#669): a link is never replaced by one for another account without
+// the basic page's question naming both (ui/basic/hub.svelte.js connect).
+test('an account switch is asked first; reconnecting the same account is not', () => {
+  const was = { token: 't', name: 'pilot' };
+  assert.equal(OH.siteSwitches(null, { token: 'n', name: 'pilot' }), false, 'no link yet');
+  assert.equal(OH.siteSwitches(was, { token: 't', name: 'other' }), false, 'the same token');
+  assert.equal(OH.siteSwitches(was, { token: 'n', name: 'pilot' }), false, 'the same account');
+  assert.equal(OH.siteSwitches(was, { token: 'n', name: 'Someone Else' }), true);
+  // No name to tell by, on either side: asked.
+  assert.equal(OH.siteSwitches(was, { token: 'n', name: '' }), true);
+  assert.equal(OH.siteSwitches({ token: 't', name: '' }, { token: 'n', name: 'pilot' }), true);
+});
+
+test('a switch said no to: the new token is revoked, the link kept', async () => {
+  linked();
+  const real = global.fetch;
+  const deletes = [];
+  global.fetch = async (url, init) => {
+    deletes.push(`${init.method} ${url} ${init.headers.authorization}`);
+    return new Response('{}');
+  };
+  try {
+    await OH.siteTokenDrop('n');
+  } finally {
+    global.fetch = real;
+  }
+  assert.deepEqual(deletes, ['DELETE https://staging.example/api/v1/sync Bearer n']);
+  assert.deepEqual(mem.siteLink, { token: 't', name: 'pilot' });
+});
+
+test('a switch said yes to: the new link kept, the old one revoked', async () => {
+  linked();
+  const real = global.fetch;
+  const deletes = [];
+  global.fetch = async (url, init) => {
+    deletes.push(`${init.method} ${init.headers.authorization}`);
+    return new Response('{}');
+  };
+  try {
+    await OH.siteLinkSave({ token: 'n', name: 'Someone Else' });
+  } finally {
+    global.fetch = real;
+  }
+  assert.deepEqual(deletes, ['DELETE Bearer t']);
+  assert.equal(mem.siteLink.token, 'n');
+});
+
 // The privacy policy's "Your Wishlist": Disconnect deletes the popup's copy of it (the
 // Wishlist stays on the account), and so does a sync the website says isn't connected.
 test("Disconnect deletes the popup's Wishlist copy", async () => {
