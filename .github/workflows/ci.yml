@@ -59,6 +59,11 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate > "$RUNNER_TEMP/pr-files.json"
           gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/commits" --paginate > "$RUNNER_TEMP/pr-commits.json"
           node scripts/check-parser-version.mjs --pr "$RUNNER_TEMP/pr-files.json" "$RUNNER_TEMP/pr-commits.json"
+      # A PR that changes src/ without a changelog fragment (changelog.d/) gets a warning,
+      # never a failure: many src/ changes have no player-facing line.
+      - name: Changelog fragment
+        if: github.event_name == 'pull_request'
+        run: node scripts/check-changelog-fragment.mjs "$RUNNER_TEMP/pr-files.json"
       # Docs-only PRs (Markdown, docs/, the landing page in site/, issue templates)
       # skip the slow UI test and the store packaging; the fast checks still run.
       # When in doubt (not a PR, or the file list can't be read) everything runs.
