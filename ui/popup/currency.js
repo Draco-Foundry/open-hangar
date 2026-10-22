@@ -118,6 +118,7 @@ export function moneyFit(usd, fx = USD, { cents = false, most, full = FIT.value 
       style: 'currency',
       currency: fx.code,
       notation: 'compact',
+      minimumFractionDigits: 0,
       maximumFractionDigits: 1,
     }),
     shown,
