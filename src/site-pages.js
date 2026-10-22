@@ -36,7 +36,7 @@
     requestScan: ['oh-request-scan'],
     addToCart: ['oh-upgrade-options', 'oh-upgrade-price', 'oh-add-upgrade'],
     addItems: ['oh-add-items'],
-    connect: ['oh-connect-begin', 'oh-connect-finish', 'oh-link-check'],
+    connect: ['oh-connect-begin', 'oh-link-check'],
   };
   const LISTS = {
     hangar: ['hello', 'getHangar', 'getScanStatus', 'requestScan', 'addToCart'],
@@ -48,15 +48,14 @@
   // pages send exactly these. skus (every edition on offer) is cleaned and capped by
   // its handler, as before; v (the bridge version the page speaks) is allowed and not
   // read. pledgeId: a buy-back upgrade's pledge (price and add in RSI's buy-back mode).
-  // A link code: the short code Connect's code page shows (K7Q-4PX).
+  // A link code: the short code Connect's code page shows (K7Q-4PX). Connect itself
+  // takes no code from a page: the sign-in window brings it (src/background.js).
   // items: the Haul's list, 1 to ITEMS_MAX plain { skuId, qty } (whole numbers, qty at
   // most QTY_MAX), nothing else in them; the cart lane checks them again (src/rsi-cart.js).
   const MAX_BYTES = 16 * 1024;
   const ITEMS_MAX = 20;
   const QTY_MAX = 10;
   const posInt = (v) => Number.isInteger(v) && v > 0;
-  const code = (v) => typeof v === 'string' && v.length > 0 && v.length <= 512;
-  const bool = (v) => typeof v === 'boolean';
   const linkCode = (v) => typeof v === 'string' && v.length > 0 && v.length <= 16;
   const item = (v) =>
     isPlain(v) &&
@@ -81,7 +80,6 @@
     'oh-add-upgrade': { fromShipId: ID, toShipId: ID, toSkuId: ID, pledgeId: [posInt, false] },
     'oh-add-items': { items: [items, true] },
     'oh-connect-begin': {},
-    'oh-connect-finish': { code: [code, true], sync: [bool, false] },
     'oh-link-check': { code: [linkCode, true] },
   };
 
