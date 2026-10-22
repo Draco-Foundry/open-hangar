@@ -406,7 +406,9 @@ To add a data source, see the [Contributing Guide](CONTRIBUTING.md).
 The most valuable help is keeping the RSI reader working when RSI updates its site. Start
 with the [Contributing Guide](CONTRIBUTING.md); the [Architecture Tour](ARCHITECTURE.md)
 shows how it all fits together in about ten minutes. This repo holds the extension's code,
-and website features are tracked here as issues too.
+and website features are tracked here as issues too. A change players will notice also
+adds a small file to [changelog.d/](changelog.d/README.md) instead of editing the
+changelog.
 
 ## Terms and Fair Use
 

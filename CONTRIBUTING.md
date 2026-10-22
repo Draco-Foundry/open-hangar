@@ -102,6 +102,15 @@ bump it when the file itself changes, since older versions refuse newer files. T
 the same server-side HTML as pledges). Referrals come from RSI's GraphQL API through their own fetch in `lib.js`,
 outside `OH.SOURCES`.
 
+## The Page-Change Check
+
+The scan checks each RSI page it reads (`src/scraper/parser.js`, called from `lib.js` and
+`background.js`) before it trusts the result. When a page has the markers of a hangar but
+the parser finds nothing in it, the scan stops, keeps the last good scan, and the popup
+says RSI changed a page. When RSI doesn't answer at all, the scan says that instead and
+also keeps the last scan. The tests are in `test/auto-scan.test.js` and the parser corpus.
+For the playbook after one of these, see [docs/RSI-CHANGES.md](docs/RSI-CHANGES.md).
+
 ## Versioning
 
 [SemVer](https://semver.org). The project is in its `0.x` pre-`1.0` line (the first
@@ -133,6 +142,17 @@ production, and opt-in: nothing is sent until you connect. Its code sits between
 new sync code the same way. To test sync locally, set the `siteUrl` storage key to your
 local site, or build one pointed at it with `npm run build -- --site=<url>`
 (`npm run build:staging` for the staging site).
+
+Connecting happens in the extension's own sign-in window (`launchWebAuthFlow`, on the
+basic page); the website only asks the extension to open it. See
+[docs/CONNECTOR.md](docs/CONNECTOR.md).
+
+## Shortcut Display
+
+The popup shows its keyboard shortcut the way the platform writes it: on a Mac,
+`Alt+Shift+O` is shown as ⌥⇧O. `popupShortcut()`, `shortcutLabel()` and `isMac()` in
+`ui/popup/data.js` do it, and `test/popup.test.js` covers it. The shortcut itself is the
+`commands` entry in `manifest.json`.
 
 ## Firefox Notes
 
@@ -174,6 +194,18 @@ Everything automated lives in `.github/workflows/`:
   opened as a PR from the `bot/ship-catalog` branch only when it changed.
 - **RSI canary** (`canary.yml`): once a day, runs the real parsers on RSI's public pages
   and tells #ops if something changed. See [docs/RSI-CHANGES.md](docs/RSI-CHANGES.md).
+
+## Changelog Fragments
+
+A PR with a change players will notice adds one file to `changelog.d/` named
+`<PR number>-<short-slug>.md`, with bullets that start `- New:`, `- Improved:`,
+`- Changed:` or `- Fixed:`, instead of editing `CHANGELOG.md`. The release folds the files
+into `## Unreleased` and deletes them. Details and the preview command:
+[changelog.d/README.md](changelog.d/README.md).
+
+Releasing (owner only): `npm run release <version>` from a clean `main` (add `--dry-run` to
+see what it would do, `--hotfix` for a second store update within 24 hours). It folds the
+fragments, bumps `manifest.json` and `package.json`, tags and pushes.
 
 ## PRs
 
