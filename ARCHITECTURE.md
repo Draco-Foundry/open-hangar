@@ -596,8 +596,7 @@ When RSI changes a page, every installed copy breaks until a fix clears store re
   sync site (app.openhangar.space), anything but a plain GET of openhangar.space's
   public feeds, or a host other than RSI and openhangar.space
   (`scripts/privacy-check.mjs`).
-- **CI** (`.github/workflows/ci.yml`), on every PR and on pushes to `main` and
-  `redesign/0.3-svelte`: `npm ci`, `npm test`, `npm run format:check`,
+- **CI** (`.github/workflows/ci.yml`), on every PR and on pushes to `main`: `npm ci`, `npm test`, `npm run format:check`,
   `npm run test:ui`, `npm run pack`, `web-ext lint` on the Firefox build, the store
   check and the privacy check, and `scripts/actionlint.sh` on the workflow files. A
   docs-only PR runs just the tests, the format check and actionlint.
