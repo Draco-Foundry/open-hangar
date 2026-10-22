@@ -27,6 +27,7 @@ jobs:
   # it reporting success on docs-only PRs (the slow steps skip, the job still runs).
   test:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # PR rules (docs/dev/git.md): the title is a conventional commit (the squash
@@ -86,6 +87,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
+          cache: npm
       - run: npm ci
       - run: npm test
       - run: npm run format:check
@@ -113,20 +115,17 @@ jobs:
       # Its Firefox build is self-distributed, so its update_url is allowed.
       - if: steps.changes.outputs.docs_only != 'true'
         run: npx web-ext lint --self-hosted --source-dir dist/beta-firefox
-
-  # Every workflow file checked, so a typo fails the PR instead of a release (#235).
-  workflows:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Every workflow file checked, so a typo fails the PR instead of a release (#235).
+      # A step here, not a job of its own: a short job still bills a whole minute.
       - run: bash scripts/actionlint.sh
 
   # Tell #ops (private Discord channel) when main goes red. Skipped until the
   # DISCORD_OPS_WEBHOOK secret is set.
   notify:
-    needs: [test, workflows]
+    needs: [test]
     if: failure() && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

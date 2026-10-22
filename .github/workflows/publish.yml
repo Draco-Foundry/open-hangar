@@ -77,6 +77,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     outputs:
       ref: ${{ steps.ref.outputs.ref }}
       version: ${{ steps.v.outputs.version }}
@@ -160,6 +161,7 @@ jobs:
     needs: build
     if: github.event.inputs.store == 'firefox' || github.event.inputs.store == 'all' || github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     # Store keys live in the 'stores' environment, which waits for the owner's
     # Approve click before a real upload (#192). Dry runs skip it: no keys needed.
     environment: ${{ (github.event_name != 'pull_request' && !inputs.dry_run) && 'stores' || '' }}
@@ -200,6 +202,7 @@ jobs:
     needs: build
     if: github.event.inputs.store == 'edge' || github.event.inputs.store == 'all' || github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     # Store keys live in the 'stores' environment, which waits for the owner's
     # Approve click before a real upload (#192). Dry runs skip it: no keys needed.
     environment: ${{ (github.event_name != 'pull_request' && !inputs.dry_run) && 'stores' || '' }}
@@ -247,6 +250,7 @@ jobs:
     needs: build
     if: github.event.inputs.store == 'chrome' || github.event.inputs.store == 'all' || github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     # Store keys live in the 'stores' environment, which waits for the owner's
     # Approve click before a real upload (#192). Dry runs skip it: no keys needed.
     environment: ${{ (github.event_name != 'pull_request' && !inputs.dry_run) && 'stores' || '' }}
@@ -289,6 +293,7 @@ jobs:
       !cancelled() && !failure() &&
       (github.event.inputs.store == 'all' || github.event.inputs.store == 'discord' || github.event_name == 'pull_request')
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     env:
       DISCORD_UPDATES_WEBHOOK: ${{ secrets.DISCORD_UPDATES_WEBHOOK }}
       VERSION: ${{ needs.build.outputs.version }}
@@ -318,6 +323,7 @@ jobs:
     needs: [build, firefox, edge, chrome, discord]
     if: failure() && github.event_name != 'pull_request' && github.event.inputs.dry_run != 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
