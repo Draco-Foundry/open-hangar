@@ -864,6 +864,37 @@ chrome.storage.onChanged.addListener((c, area) => {
 });
 // @flag-end autoScan
 
+// @flag-start pageChangeAlert: the owner's alert when Auto Scan Daily stops on a changed page
+// Dev builds only (src/flags.js): the maintainer's own copy, with Auto Scan Daily on for
+// their account, says on this computer when a run stopped because RSI changed a page
+// (its record's `pageChanged`, ui/scan/runner.js). A notification, nothing sent; it
+// needs the notifications permission store alerts ask for. The owner's approved words
+// (owner.rsi-page-changed-alert, 2026-10-22), word for word.
+const PAGE_NAMES = { hangar: 'Hangar', buybacks: 'Buy-Backs', referral: 'Referrals' };
+function pageChangedLine(part, at) {
+  const d = new Date(at);
+  const two = (n) => String(n).padStart(2, '0');
+  return `RSI page changed: ${PAGE_NAMES[part] || part}, ${two(d.getUTCHours())}:${two(d.getUTCMinutes())} UTC`;
+}
+chrome.storage.onChanged.addListener(async (c, area) => {
+  const rec = area === 'local' ? c.autoScan?.newValue : null;
+  if (!rec?.pageChanged || !Number.isFinite(rec.ended) || rec.ended === c.autoScan.oldValue?.ended)
+    return;
+  const ok =
+    !!chrome.notifications &&
+    (await chrome.permissions.contains({ permissions: ['notifications'] }).catch(() => false));
+  if (!ok) return;
+  await chrome.notifications
+    .create(`oh-page-changed-${rec.ended}`, {
+      type: 'basic',
+      iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+      title: 'Open Hangar',
+      message: pageChangedLine(rec.pageChanged, rec.ended),
+    })
+    .catch(() => {});
+});
+// @flag-end pageChangeAlert
+
 // The website's messages, all of them: only from our own pages (src/site-pages.js),
 // each checked before its handler runs.
 function answerSite(msg, origin, reply) {

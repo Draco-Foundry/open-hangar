@@ -312,6 +312,19 @@ test('scan report: a held one, one read in part or signed out is never "Scanned 
   assert.equal(reportPaused(null, null), '');
 });
 
+test('scan report: a page RSI changed is the scan bar line, until a scan since goes fine', async () => {
+  const { reportPageChanged } = await data();
+  const { t } = await import('../ui/popup/copy.js');
+  assert.equal(t('popup.rsi-page-changed'), 'RSI changed a page. Holding your last scan.');
+  const base = { v: 1, run: 'r', at: NOW, ms: 9e3, held: null, signedOut: false, bad: 1 };
+  const row = { id: 'hangar', ok: false, partial: null, n: null, error: 'x', pageChanged: true };
+  const changed = { ...base, rows: [row] };
+  assert.equal(reportPageChanged(changed, NOW - HOUR), true);
+  assert.equal(reportPageChanged(changed, NOW + 2 * MIN), false, 'a scan since went fine');
+  assert.equal(reportPageChanged({ ...base, rows: [{ ...row, pageChanged: undefined }] }), false);
+  assert.equal(reportPageChanged(null, null), false);
+});
+
 test("scan report: the sync's question names the account the scan read", async () => {
   const { reportPilot } = await data();
   const ask = { v: 1, at: NOW, sync: { state: 'ask', msg: null, at: NOW } };

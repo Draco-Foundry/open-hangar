@@ -42,6 +42,9 @@
 
   const DELAY_MS = 400; // politeness throttle between pages
   const MAX_PAGES = 1000; // safety cap: 10,000 pledges at RSI's 10 per page
+  // A scan stopped because a page no longer fits the parser rules (scanHtmlSource): the
+  // owner's approved words (popup.rsi-page-changed, 2026-10-22), word for word.
+  OH.PAGE_CHANGED = 'RSI changed a page. Holding your last scan.';
   // Skipping an unchanged hangar (#294): only within a day of the last full scan,
   // and only when the probe (3 pages at most) saves real work.
   const PROBE_MAX_AGE_MS = 24 * 3600e3;
@@ -1593,6 +1596,15 @@
 
       const html = await res.text();
       const items = src.parse(html);
+      // RSI changed the page: it has cards, but not what the parser rules read from them
+      // (OpenHangar.pageChanged, checked here on the device). Nothing of this scan is
+      // saved, whichever page it is, so the last scan stays as it was.
+      const changed = () => {
+        const why = window.OpenHangar.pageChanged?.(html, src.id) || [];
+        if (!why.length) return null;
+        OH.log('error', src.id, `page ${page} doesn't fit the parser rules: ${why.join('; ')}`);
+        return { error: OH.PAGE_CHANGED, pageChanged: true };
+      };
       if (page === 1 && src.meta) {
         try {
           meta = src.meta(html);
@@ -1610,11 +1622,14 @@
         }
         // A source can declare how an *intentionally* empty list reads.
         if (src.emptyMarker && src.emptyMarker.test(html)) break; // legitimately empty
+        const off = changed();
+        if (off) return off;
         // Signed in but parsed nothing: if the page still carries the data markers,
         // the parser couldn't read them → RSI likely changed their markup.
         if (src.marker && src.marker.test(html)) {
           return {
             error: `Signed in, but couldn't read any ${src.label.toLowerCase()}. RSI may have changed their site. Send your flight log to #bug-reports and we'll patch it.`,
+            pageChanged: true,
           };
         }
         // Sources that need server-rendered HTML but got none (e.g. a client-side
@@ -1630,6 +1645,8 @@
       // never keeps that (a scan you pressed keeps what it read, as before).
       if (!items.length && auto && looksLoggedOut(res, html))
         return { items: all, meta, partial: { page, reason: 'signed out', signedOut: true } };
+      const off = changed();
+      if (off) return off;
       if (!items.length) break;
       // RSI's pager (OpenHangar.parsePager): past the end RSI serves the last page
       // again, and its pager says so. Stopping on that, and on a page that links to
@@ -1798,6 +1815,7 @@
           error: msg,
           rsiDown: !!why.rsiDown,
           signedOut: !!why.signedOut,
+          pageChanged: !!result.pageChanged,
           retryAfter: why.retryAfter ?? null,
         };
       }
@@ -1806,7 +1824,8 @@
       const slow = (r) => (r?.slowDown ? { slowDown: true, retryAfter: r.retryAfter ?? null } : {});
       if (result.error) {
         OH.log('error', src.id, result.error);
-        return { ok: false, error: result.error, ...slow(result) };
+        const changed = result.pageChanged ? { pageChanged: true } : {};
+        return { ok: false, error: result.error, ...changed, ...slow(result) };
       }
 
       // Nothing changed since the last full scan (#294): keep the saved items and
