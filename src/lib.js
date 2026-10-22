@@ -1948,13 +1948,7 @@
     try {
       await OH.autoPause();
       const got = await fetchPage(pageUrl(src, 1, src.pageSize), null, { retryRateLimit: false });
-      if (got.error)
-        return {
-          error: got.error,
-          rsiDown: true,
-          rateLimited: !!(got.rateLimited || got.slowDown),
-          retryAfter: got.retryAfter ?? null,
-        };
+      if (got.error) return { error: got.error, rsiDown: true, retryAfter: got.retryAfter ?? null };
       const res = got.res;
       if (res.status === 401 || res.status === 403) return { signedOut: true };
       if (!res.ok)
@@ -2256,18 +2250,8 @@
   OH.whoIsSignedIn = async function whoIsSignedIn() {
     try {
       const got = await fetchPage(ACCOUNT_URL, null, { retryRateLimit: false });
-      if (got.error)
-        return {
-          state: 'unknown',
-          retryAfter: got.retryAfter ?? null,
-          ...(got.rateLimited ? { rateLimited: true } : {}),
-        };
-      if (!got.res.ok)
-        return {
-          state: 'unknown',
-          retryAfter: header(got.res, 'retry-after'),
-          ...(got.res.status === 429 ? { rateLimited: true } : {}),
-        };
+      if (got.error) return { state: 'unknown', retryAfter: got.retryAfter ?? null };
+      if (!got.res.ok) return { state: 'unknown', retryAfter: header(got.res, 'retry-after') };
       const obj = extractAccount(await got.res.text());
       if (!obj) return { state: 'out' };
       const nickname = String(obj[RULES.account.keys.nickname] || '').trim();

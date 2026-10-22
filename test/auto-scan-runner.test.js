@@ -314,7 +314,7 @@ test('who is signed in gets no answer: a quiet end, and the next run backs off',
     kind === 'who' ? new Response('', { status: 429, headers: { 'retry-after': '120' } }) : null;
   const rec = await r.autoScan();
   assert.deepEqual(asked, ['who'], 'a 429 is never retried');
-  assert.equal(rec.line, null, 'a 429 gets no line of its own: the popup still says the last one');
+  assert.equal(rec.line, 'rsi-down', 'RSI not answering before anything was read: its own line');
   assert.equal(rec.fails, 1);
   assert.equal(rec.retryAt, rec.ended + DAY);
   // In a row: twice the wait. Then an answer resets it.
@@ -348,15 +348,6 @@ test('the quick check: page 1 of the hangar different reads in full, without pee
   asked = [];
   await r.autoScan();
   assert.deepEqual(asked.slice(0, 4), ['who', 'who', 'dossier', 'hangar:1']);
-});
-
-test('who is signed in answers 5xx: its own line, and the next run backs off', async () => {
-  const r = await scannedAndSynced();
-  rsi.fail = (kind) => (kind === 'who' ? new Response('', { status: 503 }) : null);
-  const rec = await r.autoScan();
-  assert.equal(rec.line, 'rsi-down', 'RSI not answering before anything was read: its own line');
-  assert.equal(rec.fails, 1);
-  assert.equal(rec.retryAt, rec.ended + DAY);
 });
 
 test('the quick check sees a sign-in page: signed out; no answer: a quiet end with backoff', async () => {
