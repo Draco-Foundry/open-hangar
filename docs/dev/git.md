@@ -17,9 +17,14 @@ The squash commit takes the PR's title, so the title is the commit. CI checks it
 
 ## The Changelog
 
-A change players will notice adds a bullet under `## Unreleased` in CHANGELOG.md,
-starting with `New:`, `Improved:`, `Changed:` or `Fixed:`, written for players. The
-release checks those prefixes.
+A change players will notice adds one file to `changelog.d/`, named
+`<PR number>-<slug>.md`, holding its bullet(s): `- New:`, `- Improved:`, `- Changed:` or
+`- Fixed:`, written for players ([changelog.d/README.md](../../changelog.d/README.md)). Don't
+edit CHANGELOG.md in the PR. `npm run release` folds the files into `## Unreleased` in
+order (the number each name starts with, smallest first, then by name), deletes them, and
+checks the prefixes. A PR that changes `src/` without a fragment gets a CI warning, never a
+failure. (Bullets typed straight under `## Unreleased` still work.) Preview the result with
+`node scripts/changelog-fragments.mjs`.
 
 ## Releases
 

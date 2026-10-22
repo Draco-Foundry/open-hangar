@@ -6,14 +6,16 @@
 //
 // On main, with a clean tree: checks the version is newer and every Unreleased bullet
 // starts with New:, Improved:, Changed: or Fixed:; runs the tests; moves "## Unreleased"
-// in CHANGELOG.md under "## <version> — <today>"; bumps manifest.json and package.json;
-// commits, tags v<version> and pushes. The tag builds the GitHub Release, which then
+// in CHANGELOG.md under "## <version> — <today>" (first folding in the changelog.d/
+// fragments and deleting them); bumps manifest.json and package.json; commits, tags
+// v<version> and pushes. The tag builds the GitHub Release, which then
 // starts Actions → Publish to stores (store: all) by itself: that waits for CI on the
 // release commit, then for your Approve on the 'stores' environment, uploads, and
 // posts to Discord #updates. --hotfix marks the tag so that run may be the second
 // store update today (the Hotfix box).
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import fs from 'node:fs';
+import { DIR as FRAG_DIR, foldInto, readFragments } from './changelog-fragments.mjs';
 
 const args = process.argv.slice(2);
 const version = args.find((a) => !a.startsWith('--'));
@@ -51,7 +53,15 @@ if (cmp(version, manifest.version) <= 0) fail(`${version} isn't newer than ${man
 if (run(`git tag -l v${version}`)) fail(`tag v${version} already exists`);
 
 // Changelog: the Unreleased section becomes this version.
-const log = fs.readFileSync('CHANGELOG.md', 'utf8');
+// Fragments in changelog.d/ fold into Unreleased first (docs/dev/git.md).
+let frags;
+let log;
+try {
+  frags = readFragments();
+  log = foldInto(fs.readFileSync('CHANGELOG.md', 'utf8'), frags);
+} catch (e) {
+  fail(e.message);
+}
 const start = log.search(/^## Unreleased\s*$/m);
 if (start < 0) fail('no "## Unreleased" section in CHANGELOG.md');
 const after = log.slice(start).replace(/^## Unreleased\s*\n/, '');
@@ -74,6 +84,7 @@ const newLog =
   (next < 0 ? '' : after.slice(next));
 
 console.log(`Open Hangar ${manifest.version} → ${version} (${today})`);
+if (frags.length) console.log(`  folds ${frags.length} changelog fragment(s) from ${FRAG_DIR}/`);
 console.log(
   `  ${bullets.length} changes: ${count('New')} new, ${count('Improved')} improved, ${count('Changed')} changed, ${count('Fixed')} fixed`,
 );
@@ -102,6 +113,7 @@ for (const f of ['manifest.json', 'package.json']) {
 }
 run('npx prettier --write CHANGELOG.md manifest.json package.json');
 run('git add CHANGELOG.md manifest.json package.json');
+for (const f of frags) execFileSync('git', ['rm', '-q', '--', `${FRAG_DIR}/${f.name}`]);
 run(`git commit -m "release: ${version}"`);
 // "[hotfix]" in the tag's message ticks the Hotfix box on the publish run that
 // release.yml starts (a second store update within 24 hours).
