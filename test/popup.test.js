@@ -584,10 +584,30 @@ test('the portrait: only the copy the scan saved, only for this account', async 
 test('the shortcut: the browser’s for opening the popup, or none', async () => {
   const { popupShortcut } = await data();
   assert.equal(
-    popupShortcut([{ name: '_execute_action', shortcut: 'Alt+Shift+O' }]),
+    popupShortcut([{ name: '_execute_action', shortcut: 'Alt+Shift+O' }], false),
     'Alt+Shift+O',
   );
   assert.equal(popupShortcut([{ name: '_execute_action', shortcut: '' }]), '');
+  // Mac: its symbols, in its order (the owner's pick, 2026-10-22).
+  const mac = (s) => popupShortcut([{ name: '_execute_action', shortcut: s }], true);
+  assert.equal(mac('Alt+Shift+O'), '⌥⇧O', 'Firefox on a Mac');
+  assert.equal(mac('Option+Shift+O'), '⌥⇧O');
+  assert.equal(mac('⌥⇧O'), '⌥⇧O', 'Chrome and Edge on a Mac already hold symbols');
+  assert.equal(mac('Ctrl+Shift+Y'), '⇧⌘Y', 'Ctrl is ⌘ there, and ⇧ comes first');
+  assert.equal(mac('Command+Alt+MacCtrl+Shift+K'), '⌃⌥⇧⌘K');
+  assert.equal(mac('MacCtrl+Comma'), '⌃Comma');
+  assert.equal(mac(''), '');
+  assert.equal(popupShortcut([{ name: 'other' }], true), null);
+  assert.equal(popupShortcut(null, true), null);
+  const other = (s) => popupShortcut([{ name: '_execute_action', shortcut: s }], false);
+  assert.equal(other('Alt+Shift+O'), 'Alt+Shift+O', 'Windows and Linux keep their words');
+  assert.equal(other(''), '');
+  const { isMac } = await data();
+  assert.equal(isMac({ userAgentData: { platform: 'macOS' }, platform: 'x' }), true);
+  assert.equal(isMac({ platform: 'MacIntel' }), true);
+  assert.equal(isMac({ platform: 'Win32' }), false);
+  assert.equal(isMac({ userAgentData: { platform: 'Windows' }, platform: 'MacIntel' }), false);
+  assert.equal(isMac({}), false);
   assert.equal(popupShortcut([{ name: 'other' }]), null);
   assert.equal(popupShortcut(null), null, 'no shortcuts in this browser');
   // manifest.json suggests it for every build; the store check keeps it there
