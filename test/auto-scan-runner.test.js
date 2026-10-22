@@ -815,3 +815,52 @@ test('check 10: every part not saved ends with bad or partway and no last comple
   assert.equal(autoLine({ on: true, rec }, rec.at).ask, true);
   assert.equal(autoAsk({ on: true, rec, scannedAt: rec.ended + 1 }), false);
 });
+
+// #672: a page the parser rules no longer fit (OpenHangar.pageChanged, #759) keeps the last
+// good scan, for the hangar and buy-backs, in the quick check's follow-up read and in the
+// full read, and syncs nothing.
+test('a page RSI changed: the last good hangar and buy-backs stay, nothing is synced', async () => {
+  OpenHangar.pageChanged = (html) => (html.includes('CHANGED') ? ['no pledge date reads'] : []);
+  try {
+    const changedHangar = (page) => (kind) =>
+      kind === `hangar:${page}` ? new Response('[]<p>CHANGED</p>') : null;
+    const cases = [
+      ['hangar page 1', { hangar: pledges(25) }, changedHangar(1), true],
+      ['hangar page 2', { hangar: pledges(25) }, changedHangar(2), true],
+      [
+        'buy-backs page 1',
+        { hangar: pledges(25), bbs: buybacks(3) },
+        (kind) =>
+          kind === 'buybacks:1' ? new Response('{"items":[],"tokens":2}<p>CHANGED</p>') : null,
+        false,
+      ],
+    ];
+    for (const [name, setup, fail, hangarChanges] of cases) {
+      const { r, before } = await fullRun(setup);
+      // Something differs from the saved scan, so the quick check goes on to read in full.
+      if (hangarChanges) rsi.hangar = [...pledges(1, 900), ...rsi.hangar];
+      else rsi.buybacks = [...buybacks(1, 900), ...rsi.buybacks];
+      rsi.fail = fail;
+      const rec = await r.autoScan();
+      assert.equal(rec.line, 'partway', name);
+      const part = hangarChanges ? 'hangar' : 'buybacks';
+      assert.deepEqual(
+        mem.db.sources[part],
+        before.db.sources[part],
+        `${name}: the last good scan, as it was`,
+      );
+      assert.equal(stamps()[part], undefined, `${name}: not counted as read`);
+      // The hangar read whole before buy-backs may sync; a changed page itself never does.
+      if (hangarChanges) assert.deepEqual(site, [], `${name}: nothing synced`);
+    }
+    // The quick check alone only reads: a changed page 1 writes nothing but its record.
+    const { r, before } = await fullRun({ hangar: pledges(25) });
+    mem.scanFull = before.scanFull ?? {};
+    rsi.fail = (kind) => (kind === 'hangar:1' ? new Response('[]<p>CHANGED</p>') : null);
+    await r.autoScan();
+    assert.deepEqual(mem.db, before.db);
+    assert.deepEqual(site, []);
+  } finally {
+    delete OpenHangar.pageChanged;
+  }
+});
