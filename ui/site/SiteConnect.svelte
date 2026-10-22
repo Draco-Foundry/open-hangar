@@ -97,7 +97,7 @@
       {#if d.until}<span class="sc-hint">Good for <b class="sc-left">{left}</b></span>{/if}
       <div class="sc-row">
         <button type="button" class="sc-btn quiet" onclick={() => site().reopen()}
-          >Open the Page Again ↗</button
+          >Open the Page Again</button
         >
         <button type="button" class="sc-btn" onclick={() => site().cancel()}>Cancel</button>
       </div>

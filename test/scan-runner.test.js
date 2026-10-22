@@ -185,8 +185,11 @@ test('scan: the account, the hangar, buy-backs, referrals, saved, then the sync 
     'rows',
     'bad',
     'sync',
+    'wait',
+    'rsiDown',
   ]);
   assert.equal(report.v, 1);
+  assert.equal(report.wait, null, 'RSI never asked it to slow down');
   assert.equal(report.run, 'run-a');
   assert.equal(report.by, 'tab');
   assert.equal(report.reason, 'popup');
@@ -296,6 +299,7 @@ test('scan: progress stored about twice a second at most, the newest kept, gone 
     page: 1,
     count: 10,
     retry: null,
+    pages: null,
   });
   // The page's own line hears every one (hooks.progress is not throttled).
   assert.equal(x.seen.filter((s) => s === 'progress hangar').length, 11);
@@ -326,6 +330,87 @@ test('scan: progress stored about twice a second at most, the newest kept, gone 
       [2, { attempt: 2, of: 3 }],
     ],
   );
+});
+
+test("scan: RSI's page count goes with the progress, referrals count across their lists", async () => {
+  const x = await setup({
+    scanSource: async (id, onProgress) => {
+      onProgress(1, 10, null, 3);
+      x.clock.t += 600;
+      onProgress(2, 20, { attempt: 1, of: 3 }, 3);
+      x.clock.t += 600;
+      onProgress(3, 25, null, 3);
+      x.clock.t += 600;
+      return { ok: true, items: [] };
+    },
+  });
+  x.OH.getReferral = async (onProgress) => {
+    for (const [phase, n] of [
+      ['recruits (legacy)', 0],
+      ['recruits (legacy)', 4],
+      ['recruits (current)', 0],
+      ['recruits (current)', 2],
+      ['prospects', 0],
+      ['prospects', 7],
+    ]) {
+      onProgress(phase, n, 10);
+      x.clock.t += 600;
+    }
+    return { ok: true, partial: null };
+  };
+  await x.runner.scan();
+  const of = (part) =>
+    sets(x.session, 'scanProgress')
+      .filter((p) => p.part === part)
+      .map((p) => [p.page, p.count, p.pages, !!p.retry]);
+  assert.deepEqual(of('hangar'), [
+    [1, 10, 3, false],
+    [2, 20, 3, true],
+    [3, 25, 3, false],
+  ]);
+  // Lists read of three, and everyone read so far (4, then 4 + 2, then 6 + 7).
+  assert.deepEqual(of('referrals'), [
+    [0, 0, 3, false],
+    [0, 4, 3, false],
+    [1, 4, 3, false],
+    [1, 6, 3, false],
+    [2, 6, 3, false],
+    [2, 13, 3, false],
+  ]);
+});
+
+test('scan: RSI still asking it to slow down after every retry says how long to wait', async () => {
+  const { scanWait, WAIT_DEFAULT, WAIT_MAX } = await load();
+  const parse = (v) => (v ? Number(v) * 1000 : 0);
+  assert.equal(scanWait([{ ok: true }, { ok: false, error: 'x' }], 1000, parse), null);
+  assert.equal(scanWait([{ slowDown: true, retryAfter: '120' }], 1000, parse), 1000 + 120e3);
+  assert.equal(scanWait([{ slowDown: true }], 1000, parse), 1000 + WAIT_DEFAULT);
+  assert.equal(scanWait([{ slowDown: true, retryAfter: '86400' }], 1000, parse), 1000 + WAIT_MAX);
+  assert.equal(
+    scanWait(
+      [
+        { slowDown: true, retryAfter: '60' },
+        { slowDown: true, retryAfter: '600' },
+      ],
+      0,
+      parse,
+    ),
+    600e3,
+    'the longer wait',
+  );
+  const x = await setup({
+    scanSource: async (id) =>
+      id === 'hangar'
+        ? { ok: false, error: 'RSI asked us to slow down', slowDown: true, retryAfter: '300' }
+        : { ok: true, items: [] },
+  });
+  x.OH.retryAfterMs = (v) => Number(v) * 1000;
+  const report = await x.runner.scan();
+  assert.equal(report.wait, x.clock.t + 300e3);
+  assert.equal(x.local.data.scanReport.wait, report.wait);
+  const y = await setup();
+  y.OH.retryAfterMs = () => 0;
+  assert.equal((await y.runner.scan()).wait, null, 'a scan RSI never slowed');
 });
 
 test('scan: its progress goes even when the page throws after the report', async () => {

@@ -221,3 +221,21 @@ test('the scrub script keeps the cards and replaces what says whose hangar it is
   assert.equal(p.giftable, true);
   assert.match(out, /href="\?page=1"/);
 });
+
+// RSI changed the page (OpenHangar.pageChanged, which every scan runs on each page): the
+// saved pages fit the rules as they are, and the same pages changed the way RSI might
+// change them (test/fixtures/page-change/, each says what changed) don't.
+test('a page RSI changed trips the page change check, an unchanged one never does', () => {
+  for (const p of PAGES) assert.deepEqual(P.pageChanged(p.html, p.kind), [], p.file);
+  const changed = (f) =>
+    fs.readFileSync(path.join(__dirname, 'fixtures', 'page-change', f), 'utf8');
+  assert.deepEqual(P.pageChanged(changed('hangar-changed.html'), 'hangar'), [
+    'no pledge date reads',
+  ]);
+  assert.deepEqual(P.pageChanged(changed('buybacks-changed.html'), 'buybacks'), [
+    'buy-back cards without names',
+  ]);
+  // A page with no cards (signed out, an empty list) is for the scan's other checks.
+  assert.deepEqual(P.pageChanged('<html><body></body></html>', 'hangar'), []);
+  assert.deepEqual(P.pageChanged('<html><body></body></html>', 'buybacks'), []);
+});

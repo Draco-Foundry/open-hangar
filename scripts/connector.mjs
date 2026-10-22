@@ -28,6 +28,7 @@ export const UI_ENTRIES = [
 export const DASHBOARD_FILES = [
   'src/dashboard.html',
   'src/dashboard.js',
+  'src/safe-html.js',
   'src/quips.js',
   'src/qr.js',
   'CHANGELOG.md',
@@ -119,7 +120,7 @@ export function connectorProblems(unit, { files, read, manifest, connector, site
   if (connector) {
     if (manifest.action?.default_popup !== 'src/popup.html')
       problems.push(`${unit}: the connector's toolbar popup isn't src/popup.html`);
-    // Its keyboard shortcut (manifest.json commands, Alt+Shift+H): the browser opens the
+    // Its keyboard shortcut (manifest.json commands, Alt+Shift+O): the browser opens the
     // popup itself, no permission needed. The popup shows it in Settings.
     if (!manifest.commands?._execute_action?.suggested_key?.default)
       problems.push(`${unit}: no keyboard shortcut opens the popup (commands._execute_action)`);

@@ -141,7 +141,7 @@
         class="sr-btn primary"
         href="https://robertsspaceindustries.com/connect"
         target="_blank"
-        rel="noopener">Log In to RSI ↗</a
+        rel="noopener">Log In to RSI</a
       >
       <button type="button" class="sr-btn" onclick={scanAgain}>Scan Again</button>
     {:else if r.ask}
@@ -157,7 +157,7 @@
       >
       <button type="button" class="sr-btn" onclick={scanAgain}>Scan Again</button>
       <button type="button" class="sr-btn link" onclick={() => app().top.reportProblem()}
-        >Report on GitHub ↗</button
+        >Report on GitHub</button
       >
     {/if}
   </div>

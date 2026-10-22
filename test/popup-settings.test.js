@@ -150,8 +150,23 @@ test('signed out: the cookie never locks Scan, and with the cookie there it is S
   assert.equal(rsiSignIn({ cookie: 'out' }), 'maybe');
   assert.equal(rsiSignIn({ cookie: 'out', readOut: T }), 'maybe');
   assert.equal(rsiSignIn({ cookie: null, readOut: T }), 'maybe');
+  // The scan this popup just reported said signed out: Log In to RSI, cookie or not, so
+  // the scan never ends with nothing on screen (Firefox 0.5.1, 2026-10-20).
+  assert.equal(rsiSignIn({ cookie: 'in', readOut: T, justOut: true }), 'maybe');
+  assert.equal(rsiSignIn({ cookie: null, justOut: true }), 'maybe');
+  const popup = fs.readFileSync(path.join(ROOT, 'ui/popup/Popup.svelte'), 'utf8');
+  assert.match(popup, /justOut: shown\?\.signedOut === true/, 'the popup passes its report');
   const hangar = fs.readFileSync(path.join(ROOT, 'ui/popup/Hangar.svelte'), 'utf8');
-  assert.doesNotMatch(hangar, /id="pp-scan"[^>]*disabled/, 'Scan is never switched off');
+  // The cookie never locks Scan. The one Scan that's ever off is the main one, while a
+  // scan starts or RSI asks to wait (the scanBar flag, the owner 2026-10-20).
+  assert.doesNotMatch(
+    hangar,
+    /class="pp-btn grey" id="pp-scan"[^>]*disabled/,
+    'Scan is never switched off',
+  );
+  const offs = [...hangar.matchAll(/id="pp-scan"[^>]*disabled={([^}]*)}/g)].map((m) => m[1]);
+  assert.deepEqual(offs, ['scanOff'], 'only the main Scan, only for scanOff');
+  assert.doesNotMatch(hangar, /scanOff = [^;]*(signedOut|cookie|signIn)/, 'never for the cookie');
 });
 
 test('watching: any cookie change asks again once, and never reads what changed', async () => {

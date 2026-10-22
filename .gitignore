@@ -22,13 +22,17 @@ CLAUDE.local.md
 
 # local scratch files (not for the repo)
 _dump/
+# the developer's build's own browser profiles (scripts/dev-run.mjs)
+/.dev-profiles/
 .wrangler/
 
 # built by Vite from ui/ (npm run build:ui)
 /src/ui/
 
-# Claude Code session files and its temporary worktrees (local only).
-.claude/
+# Claude Code session files and its temporary worktrees (local only). The shared
+# settings.json (the agents' deny list, CLAUDE.md) is the one file kept.
+.claude/*
+!.claude/settings.json
 
 # Python bytecode from docs/brand/draco-foundry/banner.py
 __pycache__/

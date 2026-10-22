@@ -1,0 +1,1 @@
+- Fixed: **Scan while signed out.** When RSI has signed you out, Scan now tells you to log in to RSI instead of stopping with no message.

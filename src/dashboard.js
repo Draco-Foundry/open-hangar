@@ -348,73 +348,9 @@ const state = {
   referral: null, // { code, url, current, legacy, prospects, recruitsList, prospectsList }
 };
 
-// All dynamic markup goes through setHTML() instead of innerHTML. It's an
-// ALLOWLIST sanitizer (the same idea as DOMPurify): the HTML is parsed into an
-// inert document, and only the tags and attributes this dashboard actually uses
-// survive. Links must be ordinary web/mailto/relative URLs, and style attributes
-// can't load anything (no url()). Anything else is dropped and logged as
-// "[setHTML] dropped …" (the UI smoke test fails on that log), so it backs up
-// OH.escapeHtml rather than replacing it. Table sections parse in table context
-// so <tr>/<td> survive.
-const htmlParser = new DOMParser();
-const TABLE_PARTS = new Set(['TBODY', 'THEAD', 'TFOOT']);
-const SAFE_TAGS = new Set(
-  (
-    'a abbr b br button caption code details div em figcaption figure h2 h3 h4 hr i img ' +
-    'input label li ol option p pre section select small span strong sub summary sup ' +
-    'table tbody td th thead time tr u ul ' +
-    'svg g circle ellipse line path polygon polyline rect text tspan title defs lineargradient stop'
-  ).split(' '),
-);
-const SAFE_ATTRS = new Set(
-  (
-    'alt checked class colspan datetime disabled draggable height hidden href id inputmode loading ' +
-    'maxlength name placeholder rel role rowspan selected src style tabindex target title type ' +
-    'value width srcset sizes ' +
-    'cx cy d dominant-baseline fill fill-opacity font-size font-weight offset opacity points ' +
-    'preserveaspectratio r rx ry stop-color stroke stroke-dasharray stroke-linecap ' +
-    'stroke-linejoin stroke-opacity stroke-width text-anchor transform viewbox x x1 x2 xmlns y y1 y2'
-  ).split(' '),
-);
-const SAFE_URL = /^(https?:|mailto:|#|\/|\.|[^:]*$)/i;
-function setHTML(el, html) {
-  if (!el) return;
-  if (html == null || html === '') {
-    el.replaceChildren();
-    return;
-  }
-  const tag = el.tagName;
-  const t = tag.toLowerCase();
-  let src = String(html);
-  if (tag === 'TR') src = `<table><tbody><tr>${src}</tr></tbody></table>`;
-  else if (TABLE_PARTS.has(tag)) src = `<table><${t}>${src}</${t}></table>`;
-  else if (tag === 'TABLE') src = `<table>${src}</table>`;
-  const body = htmlParser.parseFromString(src, 'text/html').body;
-  const root =
-    tag === 'TR' || TABLE_PARTS.has(tag) || tag === 'TABLE' ? body.querySelector(t) : body;
-  for (const node of [...root.querySelectorAll('*')]) {
-    const name = node.tagName.toLowerCase();
-    if (!SAFE_TAGS.has(name)) {
-      console.warn(`[setHTML] dropped <${name}>`);
-      node.remove();
-      continue;
-    }
-    for (const a of [...node.attributes]) {
-      const an = a.name.toLowerCase();
-      const known = SAFE_ATTRS.has(an) || an.startsWith('data-') || an.startsWith('aria-');
-      const badUrl =
-        ((an === 'href' || an === 'src') && !SAFE_URL.test(a.value.trim())) ||
-        (an === 'srcset' &&
-          a.value.split(',').some((c) => !SAFE_URL.test(c.trim().split(/\s+/)[0] || '')));
-      const badStyle = an === 'style' && /url\s*\(|expression|javascript:/i.test(a.value);
-      if (!known || badUrl || badStyle) {
-        console.warn(`[setHTML] dropped ${an}= on <${name}>`);
-        node.removeAttribute(a.name);
-      }
-    }
-  }
-  el.replaceChildren(...root.childNodes);
-}
+// All dynamic markup goes through setHTML() (src/safe-html.js, loaded before this file
+// by dashboard.html): an allowlist sanitizer, the one way HTML reaches a page.
+const { setHTML } = self.OHSafeHTML;
 
 function setStatus(text, isError = false, { scan = false } = {}) {
   statusEl.textContent = text;
@@ -434,7 +370,7 @@ function setStatus(text, isError = false, { scan = false } = {}) {
       const rep = document.createElement('button');
       rep.type = 'button';
       rep.className = 'link-btn';
-      rep.textContent = 'Report on GitHub ↗';
+      rep.textContent = 'Report on GitHub';
       rep.title =
         'Opens a GitHub issue with your flight log filled in. Nothing is sent until you submit it.';
       rep.addEventListener('click', () => openScanReport(text));
@@ -2722,46 +2658,6 @@ function renderStore() {
   ensurePrices();
   ensureStore();
   ensureCatalog();
-  loadSubStore();
-  homeUpdated();
-}
-
-// Your Subscriber Store (#418): the subscriber-only items RSI offers this account.
-// The cached list shows at once; a fresh read runs at most once a day by itself
-// (here on the Store page, or after a scan) and on the section's Refresh button.
-// Signed out or not a subscriber: no request at all.
-const subStore = { list: null, loading: false, error: null, done: 0, total: null, account: null };
-async function loadSubStore({ force = false, auto = true } = {}) {
-  if (subStore.loading) return;
-  const account = await OH.getAccount().catch(() => null);
-  subStore.account = account;
-  if (!OH.isSubscriber(account)) {
-    subStore.list = null;
-    homeUpdated();
-    return;
-  }
-  if (!subStore.list) subStore.list = await OH.getSubStoreCached(account);
-  homeUpdated();
-  if (!force && !(auto && (await OH.subStoreDue()))) return;
-  subStore.loading = true;
-  subStore.error = null;
-  subStore.done = 0;
-  homeUpdated();
-  const r = await OH.getSubStore({
-    force,
-    account,
-    onProgress: (done, total) => {
-      subStore.done = done;
-      subStore.total = total;
-      homeUpdated();
-    },
-  });
-  subStore.loading = false;
-  if (r.ok) subStore.list = r.list;
-  else {
-    subStore.error = r.error;
-    if (r.list) subStore.list = r.list;
-  }
   homeUpdated();
 }
 
@@ -4058,7 +3954,7 @@ function hangarSpot(p) {
 function viewOnRsiLink(p) {
   const s = hangarSpot(p);
   if (!s) return '';
-  return `<a class="bb-reclaim" href="${OH.escapeHtml(s.url)}" target="_blank" rel="noopener" title="Opens page ${s.page} of your RSI hangar; it's number ${s.pos} on that page (as of your last scan)">View ↗</a>`;
+  return `<a class="bb-reclaim" href="${OH.escapeHtml(s.url)}" target="_blank" rel="noopener" title="Opens page ${s.page} of your RSI hangar; it's number ${s.pos} on that page (as of your last scan)">View</a>`;
 }
 
 // A pledge item's type. RSI leaves some blank (armor pieces, hangars), so
@@ -4539,8 +4435,6 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   const bbRead = rows.some((x) => x.name === 'Buy-Backs' && x.ok);
   if (bbRead && !bbLoading && state.buybacks.some(unreadPack))
     loadBuybackDetails({ packsOnly: true, max: BB_AUTO_MAX, auto: true });
-  // Your Subscriber Store's once-a-day read, after the scan (never part of it).
-  if (!signedOut) loadSubStore();
 }
 
 // The top bar's Scan runs what's ticked in its ▾ menu: "Scan All" by default,
@@ -4633,7 +4527,6 @@ async function clearData() {
   state.bbTraits = new Map();
   state.bbPriceMax = null;
   state.referral = null;
-  subStore.list = null;
   setStatus('Local data cleared. Clean hangar, fresh start.');
   renderAccount(); // clear the referral pill too
   refreshRecoveryUI(); // a full manual wipe also drops any recovery snapshot
@@ -6387,11 +6280,6 @@ window.OHApp = {
     uncheckedPacks,
     setWishSort,
     setWishOrder,
-    // Your Subscriber Store: { list, loading, error, done, total, account } and Refresh.
-    get sub() {
-      return subStore;
-    },
-    refreshSub: () => loadSubStore({ force: true }),
   },
   // For Developers (ui/developers): its links, supporters, the data tools' state
   // (note under the buttons, restore button, saved accounts) and their actions.

@@ -3,7 +3,7 @@
   "name": "__MSG_extName__",
   "description": "__MSG_extDescription__",
   "default_locale": "en",
-  "version": "0.5.0",
+  "version": "0.5.2",
   "author": "Draco Foundry",
   "homepage_url": "https://openhangar.space",
   "permissions": ["storage", "unlimitedStorage", "cookies", "identity"],
@@ -20,8 +20,8 @@
   "commands": {
     "_execute_action": {
       "suggested_key": {
-        "default": "Alt+Shift+H",
-        "mac": "Alt+Shift+H"
+        "default": "Alt+Shift+O",
+        "mac": "Alt+Shift+O"
       }
     }
   },

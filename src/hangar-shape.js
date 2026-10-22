@@ -37,10 +37,31 @@
   const DB_KEY = 'db';
   const ARCHIVE_KEY = 'pledgeArchive';
 
+  // PARSER_VERSION is how a scan reads RSI's pages into the stored hangar and
+  // buy-backs. Bump it when the parser (src/scraper/parser.js, src/parser-rules.js,
+  // src/data/parser-rules.json) reads the same page differently: data a scan saved
+  // with an older one is stale (parserStale) until the next scan. Each scan stamps
+  // its source's version in its own key, `scanParser` (src/lib.js writeSource), so
+  // the database, the backup file and the sync payload keep their shapes. CI fails a
+  // PR that changes the parser without a bump, unless a commit in it carries
+  // `Parser-Version-Unchanged: <why>` (scripts/check-parser-version.mjs).
+  //     1: 2026-10-18, the first.
+  const PARSER_VERSION = 1;
+  const PARSER_KEY = 'scanParser';
+
   const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
   const okTime = (t) =>
     Number.isFinite(t) || (typeof t === 'string' && t !== '' && !isNaN(Date.parse(t)));
   const emptyDB = () => ({ schemaVersion: DB_VERSION, sources: {} });
+
+  // Was this source last read by an older parser? `stamps` is the stored scanParser
+  // ({ hangar: 1, … }, possibly missing). A source scanned before the stamps existed
+  // counts as version 1, written as a literal: that's what the parser was then, and
+  // it mustn't move when PARSER_VERSION does. Pure.
+  function parserStale(stamps, id) {
+    const v = isObj(stamps) && Number.isInteger(stamps[id]) ? stamps[id] : 1;
+    return v !== PARSER_VERSION;
+  }
 
   // Raw stored DB → { db, problems }. `db` always has the shape the rest of the
   // extension relies on; `problems` says what had to be dropped (empty = it was
@@ -433,7 +454,10 @@
   const api = {
     DB_VERSION,
     EXPORT_VERSION,
+    PARSER_VERSION,
+    PARSER_KEY,
     ARCHIVE_MAX,
+    parserStale,
     checkDB,
     cleanSnapshot,
     shapeAccount,

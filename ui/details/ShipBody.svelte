@@ -72,14 +72,14 @@
       href="https://robertsspaceindustries.com/ship-matrix/search?q={v.q}"
       target="_blank"
       rel="noopener"
-      class="bb-reclaim">RSI ↗</a
+      class="bb-reclaim">RSI</a
     >
     ·
     <a
       href="https://starcitizen.tools/index.php?search={v.q}"
       target="_blank"
       rel="noopener"
-      class="bb-reclaim">Wiki ↗</a
+      class="bb-reclaim">Wiki</a
     >
   </Row>
   <h4 class="modal-h">In Your Hangar ({v.pledges.length})</h4>
