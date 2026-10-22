@@ -6,6 +6,7 @@
 // offline), the last RSI account read (the `account` key) for Store Credit, and the
 // portrait the scan saved (`avatarImg`, a data URL: never an RSI address).
 import { t } from './copy.js';
+import { compactCount } from './currency.js';
 
 // The extension's own page in the connector build, where Connect lives (and, with an
 // older background, where scans run).
@@ -52,14 +53,20 @@ export function storeCredit(account) {
   return Number.isFinite(c) ? c / 100 : null;
 }
 
+const FULL = new Intl.NumberFormat('en-US');
+export { compactCount };
+
+// The most Buy-Back Tokens the card shows (two digits); more reads 99+.
+const TOKENS_MAX = 99;
+// → { text, full } for the card, or null when there is no count.
+export function tokenCount(n) {
+  if (!Number.isInteger(n) || n < 0) return null;
+  return { text: n > TOKENS_MAX ? `${TOKENS_MAX}+` : String(n), full: FULL.format(n) };
+}
+
 // UEC or REC (`key`: 'uec' | 'rec') from the cached RSI account: { text, full } with the
 // number compact for a small card and in full for its tooltip and name, or null when the
 // last account read has none (never scanned, or RSI didn't return it).
-const COMPACT = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 });
-const FULL = new Intl.NumberFormat('en-US');
-export function compactCount(n) {
-  return Number.isFinite(n) && n >= 0 ? COMPACT.format(n) : null;
-}
 export function gameCredit(account, key) {
   const n = account?.credits?.[key]?.value;
   const text = compactCount(n);

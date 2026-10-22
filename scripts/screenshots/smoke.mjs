@@ -4609,7 +4609,9 @@ try {
       rec: document.getElementById('pp-rec')?.textContent.replace(/\s+/g, ' ') || '',
       uecTitle: document.getElementById('pp-uec')?.title || '',
       uecName: document.getElementById('pp-uec')?.getAttribute('aria-label') || '',
-      tiles: [...document.querySelectorAll('.pp-tile')].every((t) => t.scrollWidth <= t.clientWidth),
+      tiles: [...document.querySelectorAll('.pp-tile')].every(
+        (t) => t.scrollWidth <= t.clientWidth,
+      ),
       uecBelow:
         document.getElementById('pp-uec')?.getBoundingClientRect().top >
           document.getElementById('pp-credit')?.getBoundingClientRect().bottom &&
@@ -4638,8 +4640,8 @@ try {
   pop.face === PNG &&
   /^Store Credit\s*\$42\.50$/.test(pop.credit.trim()) &&
   /^Buy-Back Tokens\s*2\s*Next refill \w+ \d+$/.test(pop.tokens.trim()) &&
-  pop.uec.trim() === 'UEC1.2M' &&
-  pop.rec.trim() === 'REC90K' &&
+  pop.uec.trim() === 'UEC1.2 M' &&
+  pop.rec.trim() === 'REC90 K' &&
   pop.uecTitle === '1,234,567' &&
   pop.uecName === 'UEC 1,234,567' &&
   pop.tiles &&
@@ -4661,6 +4663,73 @@ try {
   !pop.wide
     ? ok('Edge B: the lifted panel, its ring and the cobalt bar, 360 px, no sideways scroll')
     : fail(`popup look: ${JSON.stringify(pop)}`);
+  // Numbers that fit their box (budgets: ui/popup/currency.js): the widest full figure and
+  // huge ones, at 360 px. Nothing clips or scrolls, and the full figure is the tooltip.
+  const fitCase = async (credits, tokens) => {
+    await popAt(
+      {
+        __demoAccount: { ...demoAccount, credits },
+        __demoBuybackTokens: tokens,
+      },
+      '#pp-value',
+    );
+    return page.evaluate(() => {
+      const fits = (el) => !!el && el.scrollWidth <= el.clientWidth;
+      const get = (id) => document.getElementById(id);
+      return {
+        value: get('pp-value')?.textContent,
+        valueTitle: get('pp-value')?.title,
+        credit: get('pp-credit')?.querySelector('b')?.textContent,
+        creditTitle: get('pp-credit')?.querySelector('b')?.title,
+        creditName: get('pp-credit')?.getAttribute('aria-label') || '',
+        uec: get('pp-uec')?.querySelector('b')?.textContent,
+        rec: get('pp-rec')?.querySelector('b')?.textContent,
+        recName: get('pp-rec')?.getAttribute('aria-label') || '',
+        tokens: get('pp-tokens')?.querySelector('b')?.textContent,
+        tokensName: get('pp-tokens')?.getAttribute('aria-label') || '',
+        fits: fits(get('pp-value')) && [...document.querySelectorAll('.pp-tile b')].every(fits),
+        wide: document.documentElement.scrollWidth > 360,
+      };
+    });
+  };
+  const nb = ' ';
+  const wide = await fitCase(
+    { store: { value: 999999 }, uec: { value: 999 }, rec: { value: 1000 } },
+    99,
+  );
+  wide.credit === '$9,999.99' &&
+  !wide.creditName &&
+  wide.uec === '999' &&
+  wide.rec === `1${nb}K` &&
+  wide.tokens === '99' &&
+  wide.fits &&
+  !wide.wide
+    ? ok('numbers at their widest full figure fit the cards at 360 px')
+    : fail(`popup fit (widest): ${JSON.stringify(wide)}`);
+  const huge = await fitCase(
+    {
+      store: { value: 1200000000 },
+      uec: { value: 3400000000 },
+      rec: { value: 99999999999 },
+    },
+    100,
+  );
+  huge.credit === `$12${nb}M` &&
+  huge.creditTitle === '$12,000,000.00' &&
+  huge.creditName === 'Store Credit $12,000,000.00' &&
+  huge.uec === `3.4${nb}B` &&
+  huge.rec === `100${nb}B` &&
+  huge.recName === 'REC 99,999,999,999' &&
+  huge.tokens === '99+' &&
+  huge.tokensName === 'Buy-Back Tokens 100' &&
+  huge.fits &&
+  !huge.wide
+    ? ok('huge Store Credit, UEC, REC and tokens are compact, fit at 360 px, full in the tooltip')
+    : fail(`popup fit (huge): ${JSON.stringify(huge)}`);
+  const nine = await fitCase({ store: { value: 10000000000 } }, 1);
+  nine.value === `$100${nb}M` && nine.fits && !nine.wide
+    ? ok(`a nine-digit Account Value reads ${nine.value} and fits`)
+    : fail(`popup fit (nine digits): ${JSON.stringify(nine)}`);
   // The basic page's notices at the top of every tab (#698, #664): status.json's banner
   // (as plain text) and an update the browser holds, with Reload to Update; the version
   // in the header is the manifest's.

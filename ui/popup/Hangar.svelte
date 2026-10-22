@@ -27,10 +27,11 @@
     scanSteps,
     storeCredit,
     gameCredit,
+    tokenCount,
     unpricedLine,
   } from './data.js';
   import { openHub, openTab, reportProblem, rsiSignIn } from './actions.js';
-  import { USD, money } from './currency.js';
+  import { FIT, USD, moneyFit } from './currency.js';
   import { flag } from '../lib/flags.js';
 
   let {
@@ -61,13 +62,14 @@
   const OH = globalThis.OH;
   const AL = globalThis.OHAlerts;
   // Cents for Store Credit, none for a change or a big total.
-  const total = $derived(money(value ? value.total : v.melt, fx));
-  const change = $derived(since ? money(Math.abs(since.delta), fx, { most: 0 }) : null);
+  const total = $derived(moneyFit(value ? value.total : v.melt, fx));
+  const change = $derived(since ? moneyFit(Math.abs(since.delta), fx, { most: 0, full: FIT.change }) : null);
   const day = (at) => new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   const credit = $derived(storeCredit(account));
-  const creditText = $derived(credit != null ? money(credit, fx, { cents: true }) : null);
+  const creditText = $derived(credit != null ? moneyFit(credit, fx, { cents: true, full: FIT.credit }) : null);
   const uec = $derived(gameCredit(account, 'uec'));
   const rec = $derived(gameCredit(account, 'rec'));
+  const tokens = $derived(tokenCount(v.tokens));
   const nextToken = $derived(OH.nextBuybackToken ? OH.nextBuybackToken(Date.now()) : null);
   const running = $derived(sc.phase === 'running');
   const steps = $derived(scanSteps(sc.progress?.part));
@@ -209,7 +211,13 @@
           >
         {/if}
       </div>
-      <div class="pp-big" id="pp-value" title={total.title || null}>{total.text}</div>
+      <div
+        class="pp-big"
+        id="pp-value"
+        title={total.title || null}
+        role={total.short ? 'group' : null}
+        aria-label={total.short ? total.title : null}
+      >{total.text}</div>
       {#if (value ? value.unpriced : v.unpriced) > 0}
         <div class="pp-unpriced">{unpricedLine(value ? value.unpriced : v.unpriced)}</div>
       {/if}
@@ -218,15 +226,25 @@
     {#if credit != null || v.tokens != null}
       <div class="pp-tiles">
         {#if credit != null}
-          <div class="pp-tile" id="pp-credit">
+          <div
+            class="pp-tile"
+            id="pp-credit"
+            role={creditText.short ? 'group' : null}
+            aria-label={creditText.short ? `Store Credit ${creditText.title}` : null}
+          >
             <span class="pp-lbl">Store Credit</span><b title={creditText.title || null}>{creditText.text}</b>
           </div>
         {/if}
-        {#if v.tokens != null}
-          <div class="pp-tile" id="pp-tokens">
+        {#if tokens}
+          <div
+            class="pp-tile"
+            id="pp-tokens"
+            role={tokens.text !== tokens.full ? 'group' : null}
+            aria-label={tokens.text !== tokens.full ? `Buy-Back Tokens ${tokens.full}` : null}
+          >
             <span class="pp-lbl">Buy-Back Tokens</span>
             <span class="pp-tok"
-              ><b>{v.tokens}</b>{#if nextToken}<small>{t('popup.token-next', { date: day(nextToken) })}</small>{/if}</span
+              ><b title={tokens.text !== tokens.full ? tokens.full : null}>{tokens.text}</b>{#if nextToken}<small>{t('popup.token-next', { date: day(nextToken) })}</small>{/if}</span
             >
           </div>
         {/if}
