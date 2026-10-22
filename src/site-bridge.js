@@ -28,7 +28,6 @@
     'oh-add-upgrade',
     'oh-add-items',
     'oh-connect-begin',
-    'oh-connect-finish',
     'oh-link-check',
   ];
   const origin = location.origin;

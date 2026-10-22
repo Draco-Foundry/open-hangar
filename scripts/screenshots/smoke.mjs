@@ -6820,6 +6820,53 @@ try {
         'Disconnect asks first: two equal buttons side by side, one line each; Stay Connected keeps it',
       )
     : fail(`basic Disconnect: ${JSON.stringify({ dc, stayed, dropped })}`);
+  // Connect This Browser on the website while connected, and the sign-in window comes
+  // back with another account (connect hardening, #669): nothing is replaced or synced
+  // until the question naming both is answered. Stay keeps the link and gives the new
+  // token back (Switch, OH.siteLinkSave: test/site-sync.test.js, then the page goes on to
+  // My Hangar). At phone width. The window and the website are stood in for.
+  await page.goto(URL0 + 'basic.html#settings', { waitUntil: 'networkidle0' });
+  const acctSw = await page.evaluate(async () => {
+    const redirect = 'https://demo.chromiumapp.org/';
+    const dropped = [];
+    chrome.identity = {
+      getRedirectURL: () => redirect,
+      launchWebAuthFlow: async ({ url }) =>
+        `${redirect}?code=c&state=${new URL(url).searchParams.get('state')}&sync=0`,
+    };
+    window.fetch = async (url, init) => {
+      if (init?.method === 'DELETE') dropped.push(init.headers.authorization);
+      return new Response(JSON.stringify({ token: 't-new', name: 'Someone Else' }));
+    };
+    const was = { token: 't-mine', name: 'demo@pilot', connectedAt: 1, lastSync: Date.now() };
+    await chrome.storage.local.set({ siteLink: was, siteUrl: 'https://app.openhangar.space' });
+    for (const f of __demo.listeners) f({ siteLink: { newValue: was } }, 'local');
+    await chrome.storage.session.set({ siteConnectAsk: { at: Date.now(), tabId: null } });
+    for (const f of __demo.listeners)
+      f({ siteConnectAsk: { newValue: { at: Date.now() } } }, 'session');
+    for (let i = 0; i < 50 && !document.getElementById('bp-switch'); i++)
+      await new Promise((r) => setTimeout(r, 50));
+    const box = document.getElementById('bp-switch');
+    const before = (await chrome.storage.local.get('siteLink')).siteLink.token;
+    const text = box?.textContent.replace(/\s+/g, ' ').trim();
+    const wide = document.documentElement.scrollWidth > 375;
+    const yes = !!document.getElementById('bp-switch-yes');
+    document.getElementById('bp-switch-no')?.click();
+    await new Promise((r) => setTimeout(r, 300));
+    const after = (await chrome.storage.local.get('siteLink')).siteLink?.token;
+    const gone = !document.getElementById('bp-switch');
+    return { text, wide, yes, before, after, dropped, gone };
+  });
+  acctSw.text?.includes('demo@pilot') &&
+  acctSw.text.includes('Someone Else') &&
+  acctSw.yes &&
+  !acctSw.wide &&
+  acctSw.before === 't-mine' &&
+  acctSw.after === 't-mine' &&
+  acctSw.dropped.join() === 'Bearer t-new' &&
+  acctSw.gone
+    ? ok('another account from Connect: asked first, naming both; Stay keeps the link')
+    : fail(`basic account switch: ${JSON.stringify(acctSw)}`);
   await page.setViewport({ width: 1280, height: 900 });
 
   // Extension Alerts (the `alerts` flag; the connector pages are served as a build with
