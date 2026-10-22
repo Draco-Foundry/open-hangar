@@ -350,6 +350,15 @@ test('the quick check: page 1 of the hangar different reads in full, without pee
   assert.deepEqual(asked.slice(0, 4), ['who', 'who', 'dossier', 'hangar:1']);
 });
 
+test('who is signed in answers a 5xx: the same line, and the next run backs off', async () => {
+  const r = await scannedAndSynced();
+  rsi.fail = (kind) => (kind === 'who' ? new Response('', { status: 503 }) : null);
+  const rec = await r.autoScan();
+  assert.equal(rec.line, 'rsi-down', 'RSI not answering before anything was read: its own line');
+  assert.equal(rec.fails, 1);
+  assert.equal(rec.retryAt, rec.ended + DAY);
+});
+
 test('the quick check sees a sign-in page: signed out; no answer: a quiet end with backoff', async () => {
   const r = await scannedAndSynced();
   rsi.fail = (kind) => (kind === 'hangar:1' ? new Response(`[]${SIGN_IN}`) : null);
