@@ -102,13 +102,6 @@
       window.removeEventListener('scroll', quiet);
     };
   });
-  function toSubStore(e) {
-    e.preventDefault();
-    close();
-    location.hash = '#store';
-    setTimeout(() => document.getElementById('sub-store')?.scrollIntoView({ block: 'start' }), 350);
-  }
-
   const d = $derived.by(() => {
     version.n;
     const ohApp = app();
@@ -318,9 +311,9 @@
           <p class="pp-muted pp-plus">Plus {d.sub.extra}Jump Point, The Vault, the Subscriber Den, early PTU access and event tickets.</p>
         {/if}
         <div class="pp-links">
-          <a href="#store" onclick={toSubStore}>Your Subscriber Store →</a>
-          <a href="{RSI}/en/account/billing" target="_blank" rel="noopener">Manage ↗</a>
-          <a href="{RSI}/en/pledge/subscriptions" target="_blank" rel="noopener">See Plans ↗</a>
+          <a href="{RSI}/en/store/pledge/browse/extras/subscribers-store" target="_blank" rel="noopener">Your Subscriber Store</a>
+          <a href="{RSI}/en/account/billing" target="_blank" rel="noopener">Manage</a>
+          <a href="{RSI}/en/pledge/subscriptions" target="_blank" rel="noopener">See Plans</a>
         </div>
       </div>
     {/if}
@@ -359,7 +352,7 @@
           <div class="rw"><b>Next: {d.con.next.name} <span class="pp-muted">{d.con.next.spend}</span></b>{d.con.next.rewards}</div>
         {/if}
         <p class="pp-src">Source: RSI Concierge Levels and Rewards</p>
-        <div class="pp-links"><a href="{RSI}/en/account/concierge" target="_blank" rel="noopener">Your Concierge Page ↗</a></div>
+        <div class="pp-links"><a href="{RSI}/en/account/concierge" target="_blank" rel="noopener">Your Concierge Page</a></div>
       </div>
     {/if}
     <div class="home-balances" id="home-balances">

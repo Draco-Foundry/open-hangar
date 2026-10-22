@@ -3,6 +3,7 @@
   // Fleet and Referrals, one click deeper. On one of those pages More itself shows as
   // active and the page is marked inside the menu. Lined up with More's left edge;
   // the shared menu rules (menus.svelte.js) open, close and move focus.
+  import { safeHTML } from '../lib/safe-html.js';
   import { menus, register, toggleMenu, menuClick } from './menus.svelte.js';
 
   let { view } = $props();
@@ -71,7 +72,8 @@
           stroke-width="1.8"
           stroke-linecap="round"
           stroke-linejoin="round"
-          aria-hidden="true">{@html icon}</svg
+          aria-hidden="true"
+          use:safeHTML={icon}></svg
         >{label}</a
       >
     {/each}

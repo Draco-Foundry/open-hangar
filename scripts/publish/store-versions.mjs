@@ -1,7 +1,7 @@
 // Stamps each store's live version, and a newer one waiting in review, onto the
 // install buttons of openhangar.space/extension (rules in lib.mjs), and writes the
-// same facts plus the latest version as versions.json beside it. Run at deploy
-// and daily by .github/workflows/pages.yml:
+// same facts plus the latest version as versions.json beside it. Run at each deploy
+// by .github/workflows/pages.yml (by hand only):
 //   GH_TOKEN=… GITHUB_REPOSITORY=Draco-Foundry/open-hangar node scripts/publish/store-versions.mjs site/index.html
 // Live versions come from the stores' public update checks (what browsers ask;
 // Edge Add-ons' listing details when Edge's doesn't answer) and the Firefox

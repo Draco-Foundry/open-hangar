@@ -27,7 +27,7 @@
   {#if v.spot}
     <Row k="On RSI">
       <a class="bb-reclaim" href={v.spot.url} target="_blank" rel="noopener" title={v.spot.title}
-        >View ↗</a
+        >View</a
       >
     </Row>
   {/if}

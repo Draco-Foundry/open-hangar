@@ -40,7 +40,7 @@ current version, or go straight to a store:
 Then:
 
 1. Sign in to [RSI's Website](https://robertsspaceindustries.com/) in the same browser.
-2. Click the Open Hangar icon in your toolbar (or press Alt+Shift+H) to open the popup.
+2. Click the Open Hangar icon in your toolbar (or press Alt+Shift+O) to open the popup.
 3. Hit **Scan**, then **Open My Hangar** to see your whole hangar.
 
 Re-scan any time to refresh. On the Settings tab, **Clear Data** wipes the local copy,
@@ -177,7 +177,7 @@ Anything after launch is a plan, not a promise. The details are in the
   check out on RSI yourself.
 - **Your Currency, Light Mode and a Shortcut:** amounts show in US dollars until you pick
   another currency in Settings. Look follows your browser, or pick Dark or Light.
-  Alt+Shift+H opens the popup.
+  Alt+Shift+O opens the popup.
 - **Your Data, Your Way:** JSON Backup, Pledges CSV and Buy-Backs CSV on the Settings tab.
 
 **On [openhangar.space](https://openhangar.space/):**
@@ -235,6 +235,35 @@ npm run build
   **Load unpacked** and pick `dist/chrome`.
 - **Firefox (140+):** open `about:debugging`, then **This Firefox**, then **Load Temporary
   Add-on**, and pick `dist/firefox/manifest.json`.
+
+That's the store build. To work on the extension, run the developer's copy instead.
+
+</details>
+
+<details>
+<summary><strong>Run a Developer's Copy</strong></summary>
+
+A developer's copy runs in a browser profile of its own, so it never touches the Open
+Hangar you installed from a store or the hangar it saved:
+
+```bash
+npm run dev:chrome
+```
+
+`npm run dev:edge` and `npm run dev:firefox` do the same in Edge and Firefox. Each builds
+**Open Hangar (Dev)** (purple icons with a DEV tag) into `dist/dev/` or
+`dist/dev-firefox/` and opens the browser with a profile kept in `.dev-profiles/` (not
+committed), so you sign in to RSI there once. Close the browser or press Ctrl+C to stop.
+It syncs to staging.openhangar.space, never your real account on app.openhangar.space
+(add `--site=https://app.openhangar.space` to `dev:build` if you mean to). Staging lets in
+Firefox copies, and Chrome or Edge copies whose ids it has been told about.
+If the browser isn't where it usually is, set `CHROME_PATH`, `EDGE_PATH` or
+`FIREFOX_PATH`. Build flags: `npm run dev:build -- --flag name=on`, then
+`node scripts/dev-run.mjs chrome`.
+
+Don't load `dist/firefox` into the Firefox profile your store copy is in: it carries the
+store copy's add-on id, so Firefox puts it in the store copy's place, with its saved
+hangar. The developer's copy has its own id.
 
 </details>
 

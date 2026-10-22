@@ -261,6 +261,39 @@ test('a page that stopped on an error: closed, its request dropped, and scans go
   assert.deepEqual(x.opened, [BASIC]);
 });
 
+test('a scan that read nothing frees the minute once its page is done; one that read keeps it', async () => {
+  // Signed out of RSI: the scan ends in a second, and Scan right after Log In to RSI
+  // must scan, not say one is running (Firefox 0.5.1, 2026-10-20).
+  const ended = async (report) => {
+    const x = chromeX();
+    await fromPopup(x);
+    const run = x.stores.session.scanRequest.run;
+    delete x.stores.session.scanRequest; // the page took it
+    x.stores.local.scanReport = { v: 1, run, by: 'offscreen', startedAt: Date.now(), ...report };
+    const q = `?run=${run}&by=offscreen&v=0.3.0`;
+    assert.deepEqual(await x.fromScanPage({ ohScan: { op: 'done', run } }, q), {
+      ok: true,
+      value: {},
+    });
+    return x;
+  };
+  const out = await ended({ signedOut: true, held: null, rows: [] });
+  assert.equal('scanAskedAt' in out.stores.session, false);
+  assert.equal((await fromPopup(out)).ok, true, 'Scan scans again at once');
+  const held = await ended({ signedOut: false, held: 'no-rsi', rows: [] });
+  assert.equal((await fromPopup(held)).ok, true);
+  // A scan that read RSI's lists: still one a minute.
+  const read = await ended({
+    signedOut: false,
+    held: null,
+    rows: [{ id: 'hangar', ok: true, partial: null, n: 3, error: null }],
+  });
+  assert.deepEqual(await fromPopup(read), { ok: false, error: 'busy' });
+  // An older report (not this request's scan) frees nothing.
+  const old = await ended({ signedOut: true, held: null, rows: [], startedAt: 1 });
+  assert.deepEqual(await fromPopup(old), { ok: false, error: 'busy' });
+});
+
 test("a hidden page's mark left behind when it went away never holds the next scan", async () => {
   // The offscreen page's renderer crashed mid-scan: its mark, renewed a moment ago, stays.
   const x = chromeX();

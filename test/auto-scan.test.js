@@ -161,6 +161,7 @@ test('lineOf: another account or a drop first, then partway, then whether anythi
     'bad',
     'out-partway',
     'partway',
+    'rsi-down',
   ]);
 });
 
@@ -206,10 +207,22 @@ test('record: replaced whole; a run with no line keeps the last line and its tim
     fails: 1,
     retryAt: 99,
     syncTried: 'x',
+    pageChanged: null,
   });
   assert.deepEqual(
     Object.keys(record(null, { at: 1, ended: 2, line: 'full', fails: 0, retryAt: null })),
-    ['v', 'at', 'ended', 'line', 'run', 'startedAt', 'fails', 'retryAt', 'syncTried'],
+    [
+      'v',
+      'at',
+      'ended',
+      'line',
+      'run',
+      'startedAt',
+      'fails',
+      'retryAt',
+      'syncTried',
+      'pageChanged',
+    ],
   );
 });
 

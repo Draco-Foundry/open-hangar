@@ -35,7 +35,7 @@
       type="button"
       class="site-open-btn"
       title="Your hangar on openhangar.space"
-      onclick={() => app().site.open()}>Open on Website ↗</button
+      onclick={() => app().site.open()}>Open on Website</button
     >
   </p>
 {:else if d.offer}

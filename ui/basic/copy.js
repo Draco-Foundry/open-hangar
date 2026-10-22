@@ -48,6 +48,12 @@ const COPY = {
   'basic.signed-out': "You're Signed Out of RSI",
   'basic.signed-out-line':
     'Nothing was scanned, and your saved hangar is safe. Log in on RSI, then scan again.',
+  // RSI didn't answer a scan: a 5xx, and a 429 (RSI asked us to wait; {time} is when to
+  // scan again). In the problem box (Claude chat, Words, 2026-10-22).
+  'basic.rsi-down':
+    "RSI isn't answering, so the scan stopped. The parts it didn't finish keep your last scan. Try again soon.",
+  'basic.rsi-wait':
+    "RSI asked us to wait, so the scan stopped. The parts it didn't finish keep your last scan. Scan again after {time}.",
   // A different RSI account is signed in: its hangar is loaded (back) or needs a scan.
   'basic.switched-back': "Signed in as {who} on RSI: that account's saved hangar is back.",
   'basic.switched-new': 'Signed in as {who} on RSI: that account has no scan here yet. Press Scan.',

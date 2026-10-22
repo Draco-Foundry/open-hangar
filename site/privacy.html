@@ -25,9 +25,9 @@
     </div>
     <!-- Mirrors docs/PRIVACY.md — keep the two in sync. -->
     <main class="wrap doc">
-      <p><a href="./">← Open Hangar</a></p>
+      <p><a href="./">Open Hangar</a></p>
       <h1>Privacy Policy</h1>
-      <p class="updated"><em>Last updated: 2026-10-18</em></p>
+      <p class="updated"><em>Last updated: 2026-10-20</em></p>
       <p>
         Open Hangar is a source-available browser extension that reads your own Star Citizen /
         Roberts Space Industries (RSI) account data and stores it locally in your browser. Open
@@ -363,14 +363,16 @@
         </li>
         <li>
           <strong>cookies:</strong> for three things, all on robertsspaceindustries.com. Log Out of
-          RSI clears RSI's cookies so you can fully end your RSI session from the extension. To tell
-          whether you're signed in to RSI, so the popup can show Log In to RSI instead of Scan and
-          Auto Scan Daily can skip a day when you're signed out, the extension checks whether RSI's
-          sign-in cookie is in this browser. The browser hands over the cookie when asked, but for
-          this check the extension only looks at whether it's there, and the check doesn't contact
-          RSI. And Add to RSI Cart works the way RSI's own upgrade window does: it reads RSI's
-          session token cookie and sends it back to robertsspaceindustries.com with the cart
-          request. The extension never saves a cookie's value and never sends one anywhere but RSI.
+          RSI clears RSI's cookies so you can fully end your RSI session from the extension. To
+          guess whether you're signed in to RSI, the extension checks whether RSI's session cookie
+          is in this browser. When it isn't there, the popup shows Log In to RSI first, with Scan
+          still there to press, and Auto Scan Daily skips that day. RSI sets that cookie for
+          visitors who aren't signed in too, so only a scan tells for sure. The browser hands over
+          the cookie when asked, but for this check the extension only looks at whether it's there,
+          and the check doesn't contact RSI. And Add to RSI Cart works the way RSI's own upgrade
+          window does: it reads RSI's session token cookie and sends it back to
+          robertsspaceindustries.com with the cart request. The extension never saves a cookie's
+          value and never sends one anywhere but RSI.
         </li>
         <li>
           <strong>Host access to robertsspaceindustries.com:</strong> to make the read-only requests

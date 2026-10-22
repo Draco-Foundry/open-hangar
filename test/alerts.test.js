@@ -280,6 +280,44 @@ test("the hangar's ships by the feed's spellings: sure ones only", () => {
   assert.equal(twice.find('B'), 'b');
 });
 
+// RSI's renames (the parser rules' aliases): a pledge scanned before the rename and one
+// scanned after are the same ship, found once. The first entry: Phoenix Emerald, now
+// listed as Constellation Mk IV Phoenix Emerald.
+test('a renamed ship matches by its old name and its new one, never a guess', () => {
+  const RULES = require('../src/parser-rules.js').rules;
+  assert.deepEqual(
+    RULES.aliases.find((a) => a.old === 'Phoenix Emerald'),
+    { old: 'Phoenix Emerald', now: 'Constellation Mk IV Phoenix Emerald' },
+  );
+  assert.deepEqual(AL.keysOf('Phoenix Emerald'), [
+    'phoenix emerald',
+    'constellation mk iv phoenix emerald',
+  ]);
+  const feed = (keys) =>
+    AL.readFeed({
+      v: 1,
+      items: [],
+      ships: [{ slug: 'constellation-phoenix-emerald', name: 'Phoenix Emerald', keys }],
+    });
+  const pledge = (id, label) => ({ id, name: label, contents: [{ kind: 'Ship', label }] });
+  const before = pledge('1', 'Phoenix Emerald');
+  const after = pledge('1', 'Constellation Mk IV Phoenix Emerald');
+  // The feed under either name, the hangar under either name: one ship, no drop.
+  for (const keys of [['constellation mk iv phoenix emerald'], ['phoenix emerald']]) {
+    const index = AL.shipIndex(feed(keys));
+    for (const p of [before, after]) {
+      const owned = AL.ownedShips({ sources: { hangar: { items: [p] } } }, index);
+      assert.deepEqual([...owned.keys()], ['constellation-phoenix-emerald']);
+    }
+    // Both scans' names in one hangar still count as one ship, not two.
+    const both = AL.ownedShips({ sources: { hangar: { items: [before, after] } } }, index);
+    assert.equal(both.size, 1);
+    assert.equal(index.find('Phoenix Emerald - Referral Reward'), 'constellation-phoenix-emerald');
+    assert.equal(index.find('Emerald'), null, 'exact names only');
+    assert.equal(index.find('Constellation Phoenix'), null);
+  }
+});
+
 const byId = (ms, id) => ms.find((m) => m.id === id);
 const whys = (m) => (m ? m.why.map((w) => w.why) : []);
 

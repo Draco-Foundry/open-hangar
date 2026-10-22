@@ -59,7 +59,7 @@
         target="_blank"
         rel="noopener"
         onclick={() => (asking = false)}
-        >{m.reason ? 'I Understand, Open on RSI ↗' : 'Open on RSI ↗'}</a
+        >{m.reason ? 'I Understand, Open on RSI' : 'Open on RSI'}</a
       >
     </div>
   </div>

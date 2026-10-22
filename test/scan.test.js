@@ -116,17 +116,31 @@ test('persistent failure on page 1 is an error (nothing gathered)', async () => 
   const r = await OH.scanSource('hangar');
   assert.equal(r.ok, false);
   assert.match(r.error, /RSI responded 500/);
+  assert.equal(r.rsiDown, true, 'RSI did not answer: the report says so');
   assert.equal(calls[1], 4); // 1 try + 3 retries
+  assert.equal(store.db?.sources?.hangar?.items?.length ?? 0, 0, 'nothing saved');
 });
 
-test('mid-scan failure keeps the partial result when there is no bigger earlier scan', async () => {
+test('mid-scan failure saves nothing from the partial read, with no earlier scan', async () => {
   await reset();
   script = (page) => (page === 3 ? { status: 502 } : healthy(page));
   const r = await OH.scanSource('hangar');
-  assert.equal(r.ok, true);
-  assert.equal(r.items.length, 20);
-  assert.match(r.partial, /stopped at page 3/);
-  assert.equal(store.db.sources.hangar.items.length, 20);
+  assert.equal(r.ok, false);
+  assert.equal(r.rsiDown, true);
+  assert.match(r.error, /stopped responding at page 3/);
+  assert.equal(store.db?.sources?.hangar?.items?.length ?? 0, 0);
+});
+
+test('mid-scan failure keeps the earlier scan when the partial read has as many items or more', async () => {
+  const previous = JSON.parse(items(9, 5));
+  await reset(previous);
+  script = (page) => (page === 3 ? { status: 502 } : healthy(page));
+  const r = await OH.scanSource('hangar');
+  assert.equal(r.ok, false);
+  assert.equal(r.rsiDown, true);
+  assert.match(r.error, /previous scan of 5 was kept/);
+  assert.equal(store.db.sources.hangar.items.length, 5, 'the 20 it read are not saved over 5');
+  assert.deepEqual(store.db.sources.hangar.items, previous);
 });
 
 test('mid-scan failure never overwrites a bigger earlier scan', async () => {
@@ -135,7 +149,8 @@ test('mid-scan failure never overwrites a bigger earlier scan', async () => {
   script = (page) => (page === 2 ? 'network' : healthy(page));
   const r = await OH.scanSource('hangar');
   assert.equal(r.ok, false);
-  assert.match(r.error, /kept your previous scan of 25/);
+  assert.match(r.error, /previous scan of 25 was kept/);
+  assert.equal(r.rsiDown, true);
   assert.equal(store.db.sources.hangar.items.length, 25); // untouched
 });
 
@@ -394,8 +409,8 @@ test('a partial scan leaves nothing for the next one to skip on (#294)', async (
   await reset();
   script = (page) => (page === 4 ? { status: 502 } : serve(list)(page));
   const r = await OH.scanSource('hangar');
-  assert.ok(r.partial);
-  assert.equal(store.db.sources.hangar.meta?.probe, undefined);
+  assert.equal(r.ok, false, 'RSI stopped answering partway: nothing saved');
+  assert.equal(store.db?.sources?.hangar?.meta?.probe, undefined);
 });
 
 // --- Auto Scan Daily's reads (#666) -------------------------------------------
@@ -560,9 +575,11 @@ test('scanSource in auto mode: a part cut short is never saved, however big', as
   assert.equal(r.retryAfter, '120');
   assert.equal(calls[3], 1, 'a 429 comes back at once');
   assert.deepEqual(snapshot().db, before.db, 'the 20 it read are not kept over 5');
-  // A scan you pressed keeps going, as before.
+  // A scan you pressed with RSI still not answering saves nothing from the partial read.
   const manual = await OH.scanSource('hangar');
-  assert.equal(manual.ok, true);
+  assert.equal(manual.ok, false);
+  assert.equal(manual.rsiDown, true);
+  assert.deepEqual(snapshot().db.sources.hangar.items, before.db.sources.hangar.items);
 });
 
 test('scanSource in auto mode: a sign-in page partway is unfinished, not the end of the list', async () => {
@@ -608,4 +625,33 @@ test("syncStamp: the three parts' scan times, one string", () => {
     '5||7',
   );
   assert.equal(OH.syncStamp(null), '||');
+});
+
+// --- RSI changed a page --------------------------------------------------------
+// A page that no longer fits the parser rules (OpenHangar.pageChanged): nothing of the
+// scan is saved, whichever page it is, and the line says the last scan is kept.
+test('a page RSI changed stops the scan and keeps the last one, Scan and Auto Scan Daily', async () => {
+  const before = pledges(25);
+  OpenHangar.pageChanged = (html) => (html.includes('"h12"') ? ['no pledge date reads'] : []);
+  try {
+    for (const auto of [false, true]) {
+      await reset(before);
+      script = serve(pledges(30));
+      const r = await OH.scanSource('hangar', null, { auto });
+      assert.equal(r.ok, false);
+      assert.equal(r.pageChanged, true);
+      assert.equal(r.error, 'RSI changed a page. Holding your last scan.');
+      if (auto) assert.equal(r.unfinished, true);
+      assert.deepEqual(store.db.sources.hangar.items, before, 'the last scan, as it was');
+      assert.equal(store.db.sources.hangar.scannedAt, 1);
+    }
+    // Pages that fit: a scan as usual.
+    await reset(before);
+    script = serve(pledges(9));
+    const ok = await OH.scanSource('hangar');
+    assert.equal(ok.ok, true);
+    assert.equal(ok.pageChanged, undefined);
+  } finally {
+    delete OpenHangar.pageChanged;
+  }
 });

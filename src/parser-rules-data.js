@@ -32,9 +32,10 @@
         'account',
         'dossier',
         'referrals',
-        'subStore',
         'upgrade',
         'cart',
+        'known',
+        'aliases',
       ],
       additionalProperties: false,
       properties: {
@@ -48,11 +49,18 @@
           pattern: '^\\d{4}-\\d{2}-\\d{2}$',
         },
         paging: {
-          description: 'The query parameters of a paged account list: ?<page>=N&<size>=M.',
+          description:
+            "The query parameters of a paged account list: ?<page>=N&<size>=M. And RSI's pager under the list: `pager` the box, `active` the link to the page shown, `links` every link in it (each carries ?<page>=N), read by parsePager in src/scraper/parser.js.",
           type: 'object',
-          required: ['page', 'size'],
+          required: ['page', 'size', 'pager', 'active', 'links'],
           additionalProperties: false,
-          properties: { page: { $ref: '#/$defs/param' }, size: { $ref: '#/$defs/param' } },
+          properties: {
+            page: { $ref: '#/$defs/param' },
+            size: { $ref: '#/$defs/param' },
+            pager: { $ref: '#/$defs/selector' },
+            active: { $ref: '#/$defs/selector' },
+            links: { $ref: '#/$defs/selector' },
+          },
         },
         signedOut: {
           description: 'Signs that RSI answered with its sign-in page instead of the account page.',
@@ -91,6 +99,9 @@
             'gift',
             'melt',
             'date',
+            'tag',
+            'label',
+            'hook',
           ],
           additionalProperties: false,
           properties: {
@@ -148,6 +159,21 @@
               description: 'The pledge date ("Created: December 08, 2016").',
               $ref: '#/$defs/selector',
             },
+            tag: {
+              description:
+                'A tag beside the pledge name ("Attributed"), checked against known.hangar.tags, not read.',
+              $ref: '#/$defs/selector',
+            },
+            hook: {
+              description:
+                "An element carrying RSI's js-* script hooks, checked against the known hooks.",
+              $ref: '#/$defs/selector',
+            },
+            label: {
+              description:
+                'A card\'s labels ("Created:", the action buttons), checked against known.hangar.labels.',
+              $ref: '#/$defs/selector',
+            },
           },
         },
         buybacks: {
@@ -165,6 +191,8 @@
             'button',
             'ids',
             'hrefId',
+            'label',
+            'hook',
             'image',
             'background',
             'price',
@@ -220,6 +248,16 @@
               description:
                 "The pledge id in the button's link, when the button has none (group `id`).",
               $ref: '#/$defs/pattern',
+            },
+            hook: {
+              description:
+                "An element carrying RSI's js-* script hooks, checked against the known hooks.",
+              $ref: '#/$defs/selector',
+            },
+            label: {
+              description:
+                'A card\'s labels ("Reclaim Date", the button), checked against known.buybacks.labels.',
+              $ref: '#/$defs/selector',
             },
             image: { description: "The card's picture.", $ref: '#/$defs/selector' },
             background: {
@@ -568,65 +606,6 @@
             pageSize: { $ref: '#/$defs/pageSize' },
           },
         },
-        subStore: {
-          description:
-            "The Subscriber Store's items for the signed-in account. The code adds the page and its size to variables.query (pageSize first; pageSizeMin when RSI refuses that).",
-          type: 'object',
-          required: ['path', 'operation', 'query', 'variables', 'pageSize', 'pageSizeMin'],
-          additionalProperties: false,
-          properties: {
-            path: { $ref: '#/$defs/path' },
-            operation: { $ref: '#/$defs/operation' },
-            query: { $ref: '#/$defs/document' },
-            variables: {
-              type: 'object',
-              required: ['storeFront', 'query'],
-              additionalProperties: false,
-              properties: {
-                storeFront: { type: 'string', pattern: '^[a-z][a-z0-9-]*$' },
-                query: {
-                  type: 'object',
-                  required: ['skus', 'sort'],
-                  additionalProperties: false,
-                  properties: {
-                    skus: {
-                      type: 'object',
-                      required: ['filtersFromTags', 'products'],
-                      additionalProperties: false,
-                      properties: {
-                        filtersFromTags: {
-                          type: 'object',
-                          required: ['tagIdentifiers', 'facetIdentifiers'],
-                          additionalProperties: false,
-                          properties: {
-                            tagIdentifiers: { $ref: '#/$defs/identifiers' },
-                            facetIdentifiers: { $ref: '#/$defs/identifiers' },
-                          },
-                        },
-                        products: {
-                          type: 'array',
-                          maxItems: 20,
-                          items: { type: 'integer', minimum: 0 },
-                        },
-                      },
-                    },
-                    sort: {
-                      type: 'object',
-                      required: ['field', 'direction'],
-                      additionalProperties: false,
-                      properties: {
-                        field: { type: 'string', pattern: '^[A-Za-z_]+$' },
-                        direction: { enum: ['asc', 'desc'] },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            pageSize: { $ref: '#/$defs/pageSize' },
-            pageSizeMin: { $ref: '#/$defs/pageSize' },
-          },
-        },
         upgrade: {
           description:
             "RSI's upgrade tool: the store list (every ship and the editions on sale), and Add to RSI Cart (src/rsi-cart.js): your ships and the mode (ships, app), which ships can upgrade to a SKU (filter), the price (price) and the add itself (add), each asked with the csrf token.",
@@ -778,6 +757,90 @@
             },
           },
         },
+        known: {
+          description:
+            'What RSI shows on a hangar or buy-back card that the parser has met and handles, read or not (the Attributed tag is shown, not read). Nothing reads these while scanning: test/parser-corpus.test.js counts what a saved page in test/fixtures/corpus/ shows outside them, and any count above 0 fails. A new shape gets a fixture and its place here (or a rule above), never a skip.',
+          type: 'object',
+          required: ['hangar', 'buybacks'],
+          additionalProperties: false,
+          properties: {
+            hangar: {
+              description: 'A hangar (/account/pledges) card.',
+              type: 'object',
+              required: ['itemKinds', 'tags', 'labels', 'hooks'],
+              additionalProperties: false,
+              properties: {
+                itemKinds: {
+                  description: "A contained item's kind (.kind), as RSI writes it.",
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: 60,
+                  items: { type: 'string', minLength: 1 },
+                },
+                tags: {
+                  description: 'A tag beside the pledge name (.availability), as RSI writes it.',
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: 60,
+                  items: { type: 'string', minLength: 1 },
+                },
+                labels: {
+                  description:
+                    'A label on the card (label, .js-label): column names and action buttons.',
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: 60,
+                  items: { type: 'string', minLength: 1 },
+                },
+                hooks: {
+                  description:
+                    "A js-* class on the card: RSI's own script hooks, so a new one is a sign of a new feature.",
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: 60,
+                  items: { type: 'string', minLength: 1 },
+                },
+              },
+            },
+            buybacks: {
+              description: 'A buy-back (/account/buy-back-pledges) card.',
+              type: 'object',
+              required: ['labels', 'hooks'],
+              additionalProperties: false,
+              properties: {
+                labels: {
+                  description: 'A label on the card (dt, .js-label).',
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: 60,
+                  items: { type: 'string', minLength: 1 },
+                },
+                hooks: {
+                  description: 'A js-* class on the card.',
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: 60,
+                  items: { type: 'string', minLength: 1 },
+                },
+              },
+            },
+          },
+        },
+        aliases: {
+          description:
+            'Names RSI changed: a ship or pledge once called `old` that RSI now lists as `now`. Matching by name (src/alerts.js) tries the name it has, then the other name of every entry that names it, both ways, so a scan from before a rename and one from after find the same ship. Exact names only, compared folded (src/alerts.js nameKey): never a guess. The website keeps the same list for its own matching.',
+          type: 'array',
+          maxItems: 500,
+          items: {
+            type: 'object',
+            required: ['old', 'now'],
+            additionalProperties: false,
+            properties: {
+              old: { type: 'string', minLength: 1, maxLength: 120 },
+              now: { type: 'string', minLength: 1, maxLength: 120 },
+            },
+          },
+        },
       },
       $defs: {
         pattern: {
@@ -875,8 +938,14 @@
     },
     rules: {
       format: 1,
-      revision: '2026-10-14',
-      paging: { page: 'page', size: 'pagesize' },
+      revision: '2026-10-22',
+      paging: {
+        page: 'page',
+        size: 'pagesize',
+        pager: '.pager',
+        active: 'a.active',
+        links: 'a[href]',
+      },
       signedOut: {
         redirect: { source: 'account\\/(connect|sign-?in)|\\/connect\\b', flags: 'i' },
         page: { source: 'name=["\']password["\']|id=["\']?password|account\\/connect', flags: 'i' },
@@ -901,6 +970,9 @@
         gift: '.js-gift',
         melt: '.js-reclaim',
         date: '.date-col',
+        tag: '.availability',
+        label: 'label, .js-label',
+        hook: "[class*='js-']",
       },
       buybacks: {
         path: '/en/account/buy-back-pledges',
@@ -922,6 +994,8 @@
           toSku: 'data-toskuid',
         },
         hrefId: { source: '(?<id>\\d+)', flags: '' },
+        label: 'dt, .js-label',
+        hook: "[class*='js-']",
         image: 'img',
         background: '[style*="background"]',
         price: '.price, [class*="price"], [class*="cost"]',
@@ -1066,27 +1140,6 @@
         campaigns: { current: '2', legacy: '1' },
         pageSize: 50,
       },
-      subStore: {
-        path: '/graphql',
-        operation: 'GetBrowseSkusByFilter',
-        query:
-          'query GetBrowseSkusByFilter($query: SearchQuery, $storeFront: String = "pledge") {\n  store(browse: true, name: $storeFront) {\n    listing: search(query: $query) {\n      resources {\n        id name title subtitle url type\n        media { thumbnail { storeSmall slideshow } }\n        nativePrice { amount discounted }\n        price { amount discounted }\n        stock { available unlimited show level }\n        tags { name }\n        ... on TySku { label isWarbond isPackage }\n      }\n      count\n      totalCount\n    }\n  }\n}',
-        variables: {
-          storeFront: 'pledge',
-          query: {
-            skus: {
-              filtersFromTags: {
-                tagIdentifiers: [],
-                facetIdentifiers: ['extras-subscribers-store'],
-              },
-              products: [65],
-            },
-            sort: { field: 'weight', direction: 'desc' },
-          },
-        },
-        pageSize: 100,
-        pageSizeMin: 20,
-      },
       upgrade: {
         path: '/pledge-store/api/upgrade/graphql',
         storeList: {
@@ -1156,6 +1209,46 @@
           storeFront: 'pledge',
         },
       },
+      known: {
+        hangar: {
+          itemKinds: [
+            'Component',
+            'FPS Equipment',
+            'Hangar decoration',
+            'Insurance',
+            'Paint',
+            'Ship',
+            'Skin',
+            'Upgrade',
+            'Vehicle',
+          ],
+          tags: ['Attributed'],
+          labels: ['Apply upgrade', 'Contains:', 'Created:', 'Exchange', 'Gift'],
+          hooks: [
+            'js-apply-upgrade',
+            'js-expand-arrow',
+            'js-gift',
+            'js-label',
+            'js-more',
+            'js-pledge-configuration-value',
+            'js-pledge-currency',
+            'js-pledge-id',
+            'js-pledge-last-alpha',
+            'js-pledge-name',
+            'js-pledge-name-reservations',
+            'js-pledge-nameable-ships',
+            'js-pledge-not-buybackable',
+            'js-pledge-value',
+            'js-reclaim',
+            'js-upgrade-data',
+          ],
+        },
+        buybacks: {
+          labels: ['Buy Back', 'Contained', 'Reclaim Date'],
+          hooks: ['js-label', 'js-open-ship-upgrades'],
+        },
+      },
+      aliases: [{ old: 'Phoenix Emerald', now: 'Constellation Mk IV Phoenix Emerald' }],
     },
   });
   root.OHParserRulesData = data;

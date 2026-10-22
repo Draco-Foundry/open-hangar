@@ -5,6 +5,7 @@
   // portrait too), then Currency, Streamer Mode (a badge on the portrait while it's
   // on, #174), Rescan Reminder, RSI Quick Links (#374, folds open), the pages that
   // left the nav (and Customize Home), Log Out of RSI and Clear Data. What each one does stays in dashboard.js (window.OHApp.top).
+  import { safeHTML } from '../lib/safe-html.js';
   import { app, version } from '../lib/app.svelte.js';
   import { menus, register, toggleMenu, menuClick } from './menus.svelte.js';
   import { quickLinks, QL_ICONS } from '../lib/quick-links.js';
@@ -206,7 +207,8 @@
         stroke-width="1.8"
         stroke-linecap="round"
         stroke-linejoin="round"
-        aria-hidden="true">{@html QL_ICONS.grid}</svg
+        aria-hidden="true"
+        use:safeHTML={QL_ICONS.grid}></svg
       >Quick Links<span class="ql-tag">RSI</span><span class="ql-chev" aria-hidden="true">›</span></button
     >
     <div class="ql-in" id="ql-menu" hidden={!qlOpen}>
