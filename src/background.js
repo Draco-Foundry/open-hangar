@@ -545,13 +545,15 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 // @flag-end connector
 
 // @flag-start alerts: Extension Alerts (needs connector, scripts/pack.mjs)
-// Store alerts (src/alerts.js, self.OHAlerts), off until the pilot turns them on in the
-// basic page's settings (`alertsOn`). A check runs on an alarm (the `alarms`
+// Store alerts (src/alerts.js, self.OHAlerts) follow Remind Me: `alertsOn` is set by the
+// popup's Wishlist when Remind Me is turned on for an item and cleared when none has it
+// (ui/popup/wishlist.js alertsFor), and by a check that reads a Wishlist with none on.
+// There is no switch for it. A check runs on an alarm (the `alarms`
 // permission, no install warning) at most every 30 minutes: it downloads the public
 // sale feed and, while this browser is connected, the account's Wishlist keys, and
 // matches them here against this browser's scan, which never leaves it. Unseen matches
 // take the toolbar badge (updateReminder); a new one gets a notification while
-// Notifications are allowed (an optional permission the settings switch asks for).
+// Notifications are allowed (an optional permission the Notifications switch asks for).
 //   { ohPopup: 'alerts-seen' } → { ok }: the popup is open, every match is seen
 //   { ohPopup: 'alerts-hide', id? } → { ok }: the popup deleted one match (its id), or
 //     every one (Clear All, no id), so the badge follows

@@ -3,9 +3,10 @@
   // what's in RSI's store for you right now, each with why, the ones you hadn't seen
   // yet first. Opening the popup marks them all seen (./Popup.svelte; the background
   // clears the badge). Matched in this browser from the public sale feed; nothing here
-  // asks anything. Alerts off: a heading and Turn On Alerts, the settings' switch.
+  // asks anything. Alerts follow Remind Me (no switch of their own): with it on for nothing, the empty note
+  // and its pointer to the Wishlist.
   import { t } from './copy.js';
-  import { hideAlert, openTab, setAlerts } from './actions.js';
+  import { hideAlert, openTab } from './actions.js';
   import { USD, money } from './currency.js';
 
   let { alerts, fresh, fx = USD } = $props();
@@ -17,7 +18,6 @@
   // Past three, the list scrolls in a fixed height so the rest stays put (#699): the box
   // takes a tab stop then, so arrow keys scroll it.
   const many = $derived(alerts.items.length > 3);
-  let busy = $state(false);
   // Deleted here (#701): the background keeps them out for good (src/alerts.js hide)
   // and the list follows its write. Focus goes to the next row's ×, else Clear All's
   // place (the Store button).
@@ -34,11 +34,6 @@
   async function clearAll() {
     await hideAlert(null);
     setTimeout(() => document.getElementById('pp-open-store')?.focus(), 50);
-  }
-  async function turnOn() {
-    busy = true;
-    await setAlerts(true);
-    busy = false;
   }
 </script>
 
@@ -68,17 +63,10 @@
 {/snippet}
 
 <div class="pp-body pp-alerts" id="pp-alerts">
-  {#if alerts.on === false}
-    <div class="pp-empty">
-      <svg class="pp-big-ic" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"
-        ><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10 21a2 2 0 0 0 4 0"></path></svg
-      >
-      <h2 class="pp-h">{t('popup.alerts-off-title')}</h2>
-      <button type="button" class="pp-btn primary" id="pp-alerts-on" disabled={busy} onclick={turnOn}
-        >{t('popup.alerts-turn-on')}</button
-      >
-    </div>
-  {:else if alerts.on}
+  {#if alerts.on !== true}
+    <p class="pp-note">{t('popup.alerts-none')}</p>
+    <p class="pp-note" id="pp-alerts-wish">{t('popup.alerts-wishlist')}</p>
+  {:else}
     {#if !alerts.items.length}
       <p class="pp-note">{t('popup.alerts-none')}</p>
     {/if}

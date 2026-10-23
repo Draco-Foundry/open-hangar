@@ -133,9 +133,6 @@ const COPY = {
   // from one public file, nothing about you sent; a check at most every 30 minutes.
   'basic.alerts-about':
     "A badge, and notifications if you allow them, when something in RSI's store is for you: your Wishlist, buy-backs, paints, warbonds and limited sales. It's matched in this browser from one public file, and nothing about you is sent. The store is checked at most every 30 minutes.",
-  // The switch, off: turn alerts on (the browser then asks about notifications).
-  'basic.alerts-turn-on': 'Turn On Alerts',
-  'basic.alerts-turn-off': 'Turn Off Alerts', // the switch, on
   // On: how many items are alerts right now, and when the store was last checked.
   'basic.alerts-on-line': 'Alerts now: {n}',
   'basic.alerts-checked': 'Store checked {when}',

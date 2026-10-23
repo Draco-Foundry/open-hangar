@@ -339,3 +339,17 @@ test('without the flag: no alerts code, no alarm, nothing asked', async () => {
   );
   assert.ok(!/OHAlerts|chrome\.alarms|chrome\.notifications|alerts\.js/.test(cut));
 });
+
+test('Remind Me off on every item: the list and the badge empty, the checks stop', async () => {
+  const x = worker({
+    local: { ...LINK },
+    answers: [json(FEED), json({ v: 1, keys: ['sku:10'] }), json({ v: 1, keys: [] })],
+  });
+  await x.chrome.storage.local.set({ alertsOn: true });
+  await until(() => x.stores.local.alerts?.items?.length);
+  // A later check finds Remind Me on for nothing (turned off on the website, say).
+  await x.chrome.storage.local.set({ alertsWish: { keys: [], connectedAt: 1, at: 0 } });
+  await x.chrome.storage.local.set({ db: {} });
+  await until(() => x.stores.local.alertsOn === false && !('alerts' in x.stores.local));
+  assert.ok(!x.alarms.has('oh-alerts'));
+});

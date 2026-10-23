@@ -4840,7 +4840,7 @@ try {
   await page.waitForSelector('#pp-connect');
   const set = await page.evaluate(() => ({
     text: document.getElementById('pp-settings').textContent.replace(/\s+/g, ' '),
-    alertsSw: document.getElementById('pp-al-sw')?.getAttribute('aria-checked'),
+    alertsSw: !!document.getElementById('pp-al-sw'),
     notifyOff: document.getElementById('pp-nt-sw')?.disabled,
     shortcut: document.getElementById('pp-shortcut')?.textContent,
     look: document.getElementById('pp-look')?.value,
@@ -4849,7 +4849,6 @@ try {
   const setWords = [
     'openhangar.space',
     'Connect to openhangar.space',
-    'Store Alerts',
     'Notifications',
     'Look',
     'Match Browser',
@@ -4871,22 +4870,24 @@ try {
   ];
   const setMissing = setWords.filter((w) => !set.text.includes(w));
   !setMissing.length &&
-  set.alertsSw === 'false' &&
-  set.notifyOff &&
+  set.alertsSw === false &&
+  set.notifyOff === false &&
   set.shortcut === 'Alt+Shift+O' &&
   set.look === 'auto' &&
   !set.autoScan
-    ? ok('Settings: every group, alerts off, the shortcut, no Auto Scan row until connected')
+    ? ok(
+        'Settings: every group, no Store Alerts switch, the shortcut, no Auto Scan row until connected',
+      )
     : fail(`popup settings: ${JSON.stringify({ set, setMissing })}`);
   // Compact (#700): Look, Currency and Shortcut on one row, each name over its control,
-  // the two alert switches on one row, nothing wrapping or sticking out at 360 px: the
+  // the Notifications switch on its own row, nothing wrapping or sticking out at 360 px: the
   // selects show their whole value, Change sits apart from Shortcut, the data buttons'
-  // names stay inside them, and Notifications' name dims while its switch waits.
+  // names stay inside them.
   const setRows = await page.evaluate(() => {
     const box = (el) => el.getBoundingClientRect();
     const cells = [...document.querySelectorAll('#pp-prefs .pp-cell')];
     const grp = box(document.getElementById('pp-prefs'));
-    const sw = ['pp-al-sw', 'pp-nt-sw'].map((id) => box(document.getElementById(id)));
+    const sw = ['pp-nt-sw'].map((id) => box(document.getElementById(id)));
     const labels = [...document.querySelectorAll('#pp-prefs .pp-cell small, #pp-alert-set span')];
     const sel = ['pp-look', 'pp-currency'].map((id) => document.getElementById(id));
     const btns = ['json', 'pledges', 'buybacks'].map((id) =>
@@ -4907,12 +4908,9 @@ try {
       inside: cells.every((c) => box(c).left >= grp.left && box(c).right <= grp.right + 0.5),
       selects: sel.every((s) => s.scrollWidth <= s.clientWidth && box(s).right <= grp.right),
       gap: box(change).left - text(name.firstChild).right >= 4,
-      switches: Math.abs(sw[0].top - sw[1].top) < 1,
+      switches: sw.length === 1,
       wraps: labels.filter((l) => l.getClientRects().length > 1 || box(l).height > 24).length,
       buttons: btns.every((b) => text(b).right <= box(b).right && box(b).right <= settings.right),
-      dim:
-        getComputedStyle(document.getElementById('pp-nt-l')).color !==
-        getComputedStyle(document.getElementById('pp-al-l')).color,
       heading: [...document.querySelectorAll('#pp-site b')].some(
         (b) => b.textContent === 'openhangar.space',
       ),
@@ -4928,7 +4926,6 @@ try {
   setRows.switches &&
   !setRows.wraps &&
   setRows.buttons &&
-  setRows.dim &&
   !setRows.heading &&
   !setRows.wide
     ? ok('Settings compact: Look, Currency and Shortcut on one row, both alert switches on one')
@@ -5030,27 +5027,23 @@ try {
   (await rated()) === 1
     ? ok(`Currency: USD asks no rates; EUR asks once, ${ppEur.value} with ${ppEur.title} on hover`)
     : fail(`popup currency: ${JSON.stringify({ usdFirst, ppEurAsked, ppEur })}`);
-  // Store Alerts on from the popup; Notifications off gives the permission back, and on
-  // asks as the click's first step.
-  await page.click('#pp-al-sw');
-  await sleep(200);
+  // No Store Alerts switch (they follow Remind Me); Notifications off gives the permission
+  // back, and on asks as the click's first step.
   await page.click('#pp-nt-sw');
   await sleep(200);
   const ntOff = await page.$eval('#pp-nt-sw', (b) => b.getAttribute('aria-checked'));
   await page.click('#pp-nt-sw');
   await sleep(300);
   const sw = await page.evaluate(async () => ({
-    on: (await chrome.storage.local.get('alertsOn')).alertsOn,
     asked: __demo.asked.join(),
     removed: __demo.removed.join(),
     nt: document.getElementById('pp-nt-sw').getAttribute('aria-checked'),
   }));
-  sw.on === true &&
   ntOff === 'false' &&
   sw.removed === 'notifications' &&
   sw.asked === 'notifications' &&
   sw.nt === 'true'
-    ? ok('Store Alerts on from the popup; Notifications gives back and asks again')
+    ? ok('Notifications gives back and asks again, with no Store Alerts switch')
     : fail(`popup alert switches: ${JSON.stringify({ sw, ntOff })}`);
   // Light: picked in Look, and following the browser.
   await page.select('#pp-look', 'light');
@@ -6939,7 +6932,7 @@ try {
   await page.setViewport({ width: 1280, height: 900 });
 
   // Extension Alerts (the `alerts` flag; the connector pages are served as a build with
-  // it on): the popup's bell (off: a heading and Turn On Alerts, the switch itself; on:
+  // it on): the popup's bell (no Remind Me on: the empty note, no switch; on:
   // the number unseen, the matches new and earlier with why, opening the popup marks
   // them seen, a row opens our Store, ‹ goes back), Fleet News on the Hangar tab (the
   // popup opens there while it has news), and the basic page's switch (on asks for
@@ -6949,15 +6942,17 @@ try {
   await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
   await page.waitForSelector('#pp-bell');
   await page.click('#pp-bell');
-  await page.waitForSelector('#pp-alerts-on');
-  const alOff = await page.$eval('#pp-alerts', (e) => e.textContent.replace(/\s+/g, ' ').trim());
-  await page.click('#pp-alerts-on');
-  await new Promise((r) => setTimeout(r, 200));
+  await page.waitForSelector('#pp-alerts-wish');
+  const alOff = await page.$eval('#pp-alerts', (e) => ({
+    turnOn: !!e.querySelector('#pp-alerts-on'),
+    buttons: e.querySelectorAll('button').length,
+    note: !!e.querySelector('#pp-alerts-wish'),
+  }));
   const alOffOn = await page.evaluate(
     async () => (await chrome.storage.local.get('alertsOn')).alertsOn,
   );
-  alOff === 'Store Alerts Are Off Turn On Alerts' && alOffOn === true
-    ? ok('the bell, alerts off: a heading and Turn On Alerts, which switches them on')
+  !alOff.turnOn && alOff.buttons === 0 && alOff.note && alOffOn !== true
+    ? ok('the bell, no Remind Me on: the empty note and a pointer, no Turn On Alerts')
     : fail(`popup alerts off: ${JSON.stringify({ alOff, alOffOn })}`);
   const why = (w, ships = []) => ({ why: w, ships });
   const alState = {
