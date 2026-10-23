@@ -309,7 +309,7 @@ test('alerts need the connector', () => {
     // On top of the store build, which has the connector: a developer's build.
     assert.match(
       run(dir, 'pack.mjs', ['--flag', 'alerts=on']),
-      /flags on: sync, localMode, connector, wishlistImport, alerts \(dev build, never for a store\)/,
+      /flags on: sync, localMode, connector, wishlistImport, alerts, scanBar \(dev build, never for a store\)/,
     );
     // Auto Scan Daily's alarm is the alerts' alarms permission: not without them.
     assert.throws(
@@ -318,7 +318,7 @@ test('alerts need the connector', () => {
     );
     assert.match(
       run(dir, 'pack.mjs', ['--flag', 'alerts=on', '--flag', 'autoScan=on']),
-      /flags on: sync, localMode, connector, wishlistImport, alerts, autoScan \(dev build, never for a store\)/,
+      /flags on: sync, localMode, connector, wishlistImport, alerts, autoScan, scanBar \(dev build, never for a store\)/,
     );
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

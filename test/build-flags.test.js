@@ -64,8 +64,8 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     autoScan: true,
     // The owner's page change alert: dev builds only (2026-10-22).
     pageChangeAlert: false,
-    // The popup's scan bar ships dark until the owner turns it on (2026-10-20).
-    scanBar: false,
+    // The popup's scan bar: on in every build (owner, 2026-10-23).
+    scanBar: true,
   };
   assert.deepEqual(buildValues(registry), STORE);
   // The beta is the same set: no flag has a beta value of its own today.
@@ -277,8 +277,8 @@ test('pack: writes each build its values and cuts the code of flags that are off
     autoScan: true,
     // The owner's page change alert: dev builds only (2026-10-22).
     pageChangeAlert: false,
-    // The popup's scan bar ships dark until the owner turns it on (2026-10-20).
-    scanBar: false,
+    // The popup's scan bar: on in every build (owner, 2026-10-23).
+    scanBar: true,
   };
   // Without the connector, what needs it goes too (Auto Scan Daily needs the alerts).
   const NO_CONNECTOR = [
