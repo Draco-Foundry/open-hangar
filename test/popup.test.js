@@ -708,7 +708,6 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
     'popup.scan-again',
     'popup.first',
     'popup.log-in',
-    'popup.open-store',
     'popup.wish-empty',
     'popup.wish-full',
     'popup.wish-trouble',

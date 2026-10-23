@@ -1,1 +1,1 @@
-- Changed: **Store alerts follow Remind Me.** Remind Me on a Wishlist item turns its alerts on, and no Remind Me means no alerts. Desktop notifications keep their own switch in Settings.
+- Changed: PLACEHOLDER (words from Claude chat, #785): one line for store alerts following Remind Me and the bell giving way to an on-sale count on the Wishlist tab.

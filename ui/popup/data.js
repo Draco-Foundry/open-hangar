@@ -522,6 +522,21 @@ export function wishSale(feed) {
     return { onSale: !!on, price: on?.price ?? null };
   };
 }
+// The Wishlist tab's count: the items with Remind Me on (`keys`, the store alerts' copy
+// of the account's Wishlist, src/alerts.js freshWish) that the store sells now. 0 with
+// no sale feed kept.
+export function remindOnSale(keys, feed) {
+  const sale = wishSale(feed);
+  if (!sale || !Array.isArray(keys)) return 0;
+  return [...new Set(keys)].filter((k) => sale(k).onSale).length;
+}
+// The Wishlist's items with those on sale now first, each side in its own order. `keyOf`
+// reads an item's Wishlist key. Unchanged with no sale feed kept.
+export function onSaleFirst(list, sale, keyOf = (x) => x.key) {
+  if (!sale || !Array.isArray(list)) return list;
+  const on = list.filter((x) => sale(keyOf(x)).onSale);
+  return on.length ? [...on, ...list.filter((x) => !sale(keyOf(x)).onSale)] : list;
+}
 
 // --- openhangar.space in Settings ----------------------------------------------------------
 // A sync that didn't go through: the website's pace held it back (a too-soon wait, with

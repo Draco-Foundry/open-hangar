@@ -389,12 +389,10 @@
   // again. `known`: pairs matched so far (when first); `seen`: pairs the pilot has seen
   // (the popup opened); `gone`: pairs no longer matched (since when), forgotten after
   // GONE_KEEP_MS so a sale that comes back later alerts again, and a short gap (sold
-  // out between two reads) doesn't. `hidden`: pairs the pilot deleted in the popup (#701,
-  // since when): they stay out of the list and the badge, and are forgotten with the
-  // rest, so only something new (another reason, or the sale back after a day gone)
-  // shows the item again.
+  // out between two reads) doesn't. (`hidden`, the pairs deleted from the popup's old
+  // alerts list, #701, is dropped when read: those were marked seen too.)
   const pairsOf = (m) => m.why.map((w) => `${m.id}|${w.why}`);
-  const emptyState = () => ({ v: 1, items: [], known: {}, seen: {}, gone: {}, hidden: {} });
+  const emptyState = () => ({ v: 1, items: [], known: {}, seen: {}, gone: {} });
   // Reasons that no longer exist (the buy-back alert, #695): saved ones are dropped here,
   // so the list, the badge and the memory all lose them.
   const RETIRED = new Set(['buyback']);
@@ -414,14 +412,8 @@
         why: (Array.isArray(m.why) ? m.why : []).filter((w) => !RETIRED.has(w?.why)),
       }))
       .filter((m) => m.why.length);
-    return {
-      ...s,
-      items,
-      known: map(s.known),
-      seen: map(s.seen),
-      gone: map(s.gone),
-      hidden: map(s.hidden),
-    };
+    const { hidden, ...rest } = s;
+    return { ...rest, items, known: map(s.known), seen: map(s.seen), gone: map(s.gone) };
   }
   // → { state, fresh }: fresh are the matches with a pair never matched before.
   function nextState(prev, matches, now) {
@@ -430,7 +422,6 @@
     const known = { ...s.known };
     const seen = { ...s.seen };
     const gone = { ...s.gone };
-    const hidden = { ...s.hidden };
     const fresh = matches.filter((m) => pairsOf(m).some((p) => !(p in known)));
     for (const p of live) {
       if (!(p in known)) known[p] = now;
@@ -443,7 +434,6 @@
         delete known[p];
         delete seen[p];
         delete gone[p];
-        delete hidden[p];
       }
     }
     const cap = (m) =>
@@ -459,35 +449,17 @@
         known: cap(known),
         seen: cap(seen),
         gone: cap(gone),
-        hidden: cap(hidden),
       },
       fresh,
     };
   }
-  // Items with a pair the pilot hasn't seen (or deleted): the badge's count.
+  // Items with a pair the pilot hasn't seen: the badge's count.
   const unseen = (state) => {
     const s = cleanState(state);
-    return s.items.filter((m) => pairsOf(m).some((p) => !(p in s.seen) && !(p in s.hidden)));
+    return s.items.filter((m) => pairsOf(m).some((p) => !(p in s.seen)));
   };
-  // The items the popup lists: those with a pair the pilot hasn't deleted.
-  const shown = (state) => {
-    const s = cleanState(state);
-    return s.items.filter((m) => pairsOf(m).some((p) => !(p in s.hidden)));
-  };
-  // Deleted in the popup: one item's pairs (its ×), or every current one (Clear All).
-  // Deleted counts as seen too.
-  function hide(state, now, id = null) {
-    const s = cleanState(state);
-    const hidden = { ...s.hidden };
-    const seen = { ...s.seen };
-    for (const m of s.items)
-      if (id == null || m.id === id)
-        for (const p of pairsOf(m)) {
-          hidden[p] ??= now;
-          seen[p] ??= now;
-        }
-    return { ...s, hidden, seen };
-  }
+  // The items the popup's Fleet News picks from.
+  const shown = (state) => cleanState(state).items;
   // Every current pair seen (the popup opened), or one item's (its notification clicked).
   function markSeen(state, now, id = null) {
     const s = cleanState(state);
@@ -767,7 +739,6 @@
     nextState,
     unseen,
     shown,
-    hide,
     markSeen,
     lines,
     notesFor,

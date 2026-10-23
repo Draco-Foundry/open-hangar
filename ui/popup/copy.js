@@ -18,10 +18,6 @@ const COPY = {
   // A scan running: the basic page's word for it (basic.scanning), word for word.
   'popup.scanning-short': 'Scanning',
   'popup.stopped': 'Scan stopped', // the scan didn't finish
-  // The bell: its name for screen readers, and with a count the old list's heading
-  // (popup.alerts, approved 2026-10-13).
-  'popup.bell': 'Alerts', // also the bell view's heading
-  'popup.back': 'Back', // the bell view's ‹, for screen readers
   // What's new after an update, once per version: the dot on the version tag opens it.
   'popup.new-in': 'New in {version}',
   'popup.what-changed': 'See What Changed',
@@ -97,28 +93,12 @@ const COPY = {
   // A different RSI account signed in: the basic page's words, word for word.
   'popup.switched-back': "Signed in as {who} on RSI: that account's saved hangar is back.",
   'popup.switched-new': 'Signed in as {who} on RSI: that account has no scan here yet. Press Scan.',
-  // --- The bell's Alerts view (the `alerts` flag, ./Alerts.svelte) ---
-  'popup.alerts': 'Alerts: {n}', // the bell's name with a count
-  'popup.alerts-new': 'New', // alerts you hadn't seen
-  'popup.alerts-earlier': 'Earlier', // the ones seen before
-  // Alerts on, nothing for you in the store right now.
-  'popup.alerts-none': "Nothing in RSI's store for you right now.",
-  // Read by screen readers before an alert you hadn't seen yet.
+  // Read by screen readers before a Fleet News item you hadn't seen yet.
   'popup.alerts-unseen': 'Not seen yet:',
-  // Alerts on, not connected: only the hangar's rules run; connecting adds your
-  // account's Wishlist (read on this device, never sent back).
-  'popup.alerts-connect':
-    "Connect to openhangar.space to add your Wishlist. It's read on this device and never sent back.",
-  'popup.open-store': 'Open the Store', // our Store
-  // PLACEHOLDER (#782, words from Claude chat): the empty Alerts view's pointer to the
-  // Wishlist, shown when no item has Remind Me on.
-  'popup.alerts-wishlist':
-    'Nothing on watch yet. Turn on Remind Me for an item on your Wishlist, and Open Hangar keeps watch for it.',
-  // Deleting alerts (#701): each row's ×, for screen readers, and the list's Clear All
-  // (approved 2026-10-16).
-  'popup.alerts-delete': 'Delete {name}',
-  'popup.alerts-clear': 'Clear All',
   // --- Wishlist tab ---
+  // PLACEHOLDER (words from Claude chat): the tab's count of Remind Me items on sale now,
+  // for screen readers (the number shows on its own).
+  'popup.wish-tab-on-sale': '{n} on sale',
   'popup.wish-count': 'Your Wishlist · {n}',
   'popup.wish-on-sale': 'On Sale',
   'popup.wish-not-sale': 'Not for Sale',

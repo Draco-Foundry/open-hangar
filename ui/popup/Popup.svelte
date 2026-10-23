@@ -1,7 +1,8 @@
 <script>
   // The toolbar popup (the connector build, src/flags.js `connector`), as the owner
-  // signed it off (2026-10-14): a header (the version, the scan's age, the alerts
-  // bell), three tabs (Hangar, Wishlist, Settings) and the bell's Alerts view. It shows
+  // signed it off (2026-10-14): a header (the version, the scan's age), three tabs
+  // (Hangar, Wishlist, Settings; Wishlist with a count of its Remind Me items on sale,
+  // which replaced the alerts bell and its Alerts view). It shows
   // what's stored in this browser and never asks RSI anything (ui/popup/data.js). Scan
   // asks the background (src/background.js), and the popup stays open with the scan's
   // progress and result from the shared keys (session scanRunning and scanProgress,
@@ -17,6 +18,7 @@
     popupView,
     portrait,
     progressFraction,
+    remindOnSale,
     reportPilot,
     reportSyncFailed,
     syncTrouble,
@@ -31,7 +33,6 @@
   import { fxFor, loadRates, shownCurrency } from './currency.js';
   import { rsiCookie, rsiSignIn, watchCookie } from './rsi-cookie.js';
   import { flag } from '../lib/flags.js';
-  import Alerts from './Alerts.svelte';
   import Hangar from './Hangar.svelte';
   import Wishlist from './Wishlist.svelte';
   import Settings from './Settings.svelte';
@@ -80,16 +81,14 @@
   let busyAt = $state(0);
   let failed = $state(null); // the popup's own Sync Now that didn't go through
   // The store alerts (the `alerts` flag): on, the matches, which were unseen when the
-  // popup opened (the bell's number, the toolbar badge's), connected, where our Store is.
+  // popup opened (the toolbar badge's), connected, where our Store is.
   let alerts = $state({ on: null, items: [], connected: false, feeds: '' });
   let fresh = $state(new Set());
-  let bellCount = $state(0);
+  // The Wishlist tab's count: its Remind Me items the store sells now.
+  let onSale = $state(0);
   let tab = $state('hangar');
-  let bell = $state(false);
   let whatsNew = $state(false);
   let first = true;
-  let bellBtn = $state();
-  let backBtn = $state();
 
   const sc = $derived.by(() => {
     const s = scanState(
@@ -229,22 +228,33 @@
   }
   async function loadAlerts() {
     if (!ALERTS) return;
-    const got = await chrome.storage.local.get([AL.ON_KEY, AL.STATE_KEY, 'siteLink', 'siteUrl']);
+    const got = await chrome.storage.local.get([
+      AL.ON_KEY,
+      AL.STATE_KEY,
+      AL.WISH_KEY,
+      AL.FEED_KEY,
+      'siteLink',
+      'siteUrl',
+    ]);
     const on = got[AL.ON_KEY] === true;
     const state = got[AL.STATE_KEY];
+    const link = got.siteLink;
     alerts = {
       on,
-      // Not the ones deleted here (#701, the bell's × and Clear All).
       items: on ? AL.shown(state) : [],
-      connected: !!got.siteLink?.token,
+      connected: !!link?.token,
       feeds: AL.sitesOf(got.siteUrl).feeds,
     };
+    const wish = got[AL.WISH_KEY];
+    onSale =
+      on && link?.token && wish?.connectedAt === link.connectedAt
+        ? remindOnSale(wish.keys, got[AL.FEED_KEY]?.data)
+        : 0;
     // The ones new since you last looked stay marked while the popup is open; opening it
     // marks them seen (the background clears the toolbar badge).
     if (first) {
       first = false;
       fresh = new Set(on ? AL.unseen(state).map((m) => m.id) : []);
-      bellCount = fresh.size;
       if (fresh.size) chrome.runtime.sendMessage({ ohPopup: 'alerts-seen' }).catch(() => {});
     }
   }
@@ -292,7 +302,8 @@
         if (c.justUpdated) justUpdated = c.justUpdated.newValue || null;
         if (c.updateReady) updateReady = c.updateReady.newValue || null;
         if (c.remoteStatus) readBanner();
-        if (ALERTS && (c[AL.ON_KEY] || c[AL.STATE_KEY] || c.siteLink)) loadAlerts();
+        if (ALERTS && (c[AL.ON_KEY] || c[AL.STATE_KEY] || c[AL.WISH_KEY] || c[AL.FEED_KEY] || c.siteLink))
+          loadAlerts();
       }
       if (area === 'session') {
         const next = { ...session };
@@ -361,17 +372,6 @@
     await tick();
     document.getElementById(`pp-tab-${TABS[to]}`)?.focus();
   }
-  async function openBell() {
-    bell = true;
-    await tick();
-    backBtn?.focus();
-  }
-  async function closeBell() {
-    bell = false;
-    bellCount = 0;
-    await tick();
-    bellBtn?.focus();
-  }
   function gotIt() {
     whatsNew = false;
     prefs.seenVersion = version;
@@ -404,185 +404,157 @@
 </script>
 
 <main class="pp" class:first={firstRun}>
-  {#if bell}
-    <header class="pp-hd">
+  <header class="pp-hd">
+    <svg class="pp-logo" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"
+      ><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"></path></svg
+    >
+    <h1 class="pp-name">Open Hangar</h1>
+    {#if hasNews}
       <button
         type="button"
-        class="pp-back"
-        id="pp-back"
-        bind:this={backBtn}
-        aria-label={t('popup.back')}
-        onclick={closeBell}>‹</button
+        class="pp-ver news"
+        id="pp-ver"
+        aria-expanded={whatsNew}
+        onclick={() => (whatsNew = !whatsNew)}
+        >v{version}<i aria-hidden="true"></i><span class="pp-sr">{t('popup.new-in', { version })}</span></button
       >
-      <h1 class="pp-name">{t('popup.bell')}</h1>
-      <span class="pp-bell on" aria-hidden="true">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          ><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10 21a2 2 0 0 0 4 0"></path></svg
-        >
-      </span>
-    </header>
-    <Alerts {alerts} {fresh} {fx} />
-  {:else}
-    <header class="pp-hd">
-      <svg class="pp-logo" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"
-        ><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"></path></svg
-      >
-      <h1 class="pp-name">Open Hangar</h1>
-      {#if hasNews}
-        <button
-          type="button"
-          class="pp-ver news"
-          id="pp-ver"
-          aria-expanded={whatsNew}
-          onclick={() => (whatsNew = !whatsNew)}
-          >v{version}<i aria-hidden="true"></i><span class="pp-sr">{t('popup.new-in', { version })}</span></button
-        >
-      {:else}
-        <span class="pp-ver" id="pp-ver">v{version}</span>
-      {/if}
-      <span class="pp-age {ageTone}" id="pp-age" aria-live="polite"><i aria-hidden="true"></i>{ageLine}</span>
-      {#if ALERTS && !firstRun}
-        <button
-          type="button"
-          class="pp-bell"
-          id="pp-bell"
-          bind:this={bellBtn}
-          aria-label={bellCount ? t('popup.alerts', { n: bellCount }) : t('popup.bell')}
-          onclick={openBell}
-          ><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"
-            ><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10 21a2 2 0 0 0 4 0"></path></svg
-          >{#if bellCount}<span class="pp-n" aria-hidden="true">{bellCount > 9 ? '9+' : bellCount}</span>{/if}</button
-        >
-      {/if}
-    </header>
-    {#if busy && !BAR}
-      <div class="pp-bar" role="progressbar" aria-label={t('popup.scanning-short')} aria-valuemin="0" aria-valuemax="100"
-        aria-valuenow={frac ?? undefined}>
-        <i style:width={frac == null ? null : `${frac}%`} class:wait={frac == null}></i>
-      </div>
+    {:else}
+      <span class="pp-ver" id="pp-ver">v{version}</span>
     {/if}
-    {#if whatsNew && hasNews}
-      <div class="pp-whatsnew" id="pp-whatsnew">
-        <b>{t('popup.new-in', { version })}</b>
-        <span class="pp-row">
+    <span class="pp-age {ageTone}" id="pp-age" aria-live="polite"><i aria-hidden="true"></i>{ageLine}</span>
+  </header>
+  {#if busy && !BAR}
+    <div class="pp-bar" role="progressbar" aria-label={t('popup.scanning-short')} aria-valuemin="0" aria-valuemax="100"
+      aria-valuenow={frac ?? undefined}>
+      <i style:width={frac == null ? null : `${frac}%`} class:wait={frac == null}></i>
+    </div>
+  {/if}
+  {#if whatsNew && hasNews}
+    <div class="pp-whatsnew" id="pp-whatsnew">
+      <b>{t('popup.new-in', { version })}</b>
+      <span class="pp-row">
+        <button
+          type="button"
+          class="pp-link"
+          onclick={() => {
+            chrome.tabs.create({ url: 'https://github.com/Draco-Foundry/open-hangar/blob/main/CHANGELOG.md' });
+            window.close();
+          }}>{t('popup.what-changed')}</button
+        >
+        <button type="button" class="pp-link quiet" id="pp-got-it" onclick={gotIt}>{t('popup.got-it')}</button>
+      </span>
+    </div>
+  {/if}
+
+  {#if updateReady}
+    <div class="pp-notice" id="pp-update" role="status">
+      <span>{t('popup.update-ready', { version: updateReady })}</span>
+      <button type="button" class="pp-link" id="pp-update-reload" disabled={busy} onclick={reloadForUpdate}
+        >{t('popup.update-reload')}</button
+      >
+    </div>
+  {/if}
+  {#if banner}
+    <div class="pp-notice" class:warn={banner.level === 'warn'} id="pp-banner" role="status">
+      {banner.message}
+    </div>
+  {/if}
+
+  {#if ready && v}
+    {#if firstRun}
+      <Hangar
+        {v}
+        {value}
+        {since}
+        {avatar}
+        {db}
+        {account}
+        {sc}
+        {signedOut}
+        {rsiOff}
+        {fx}
+        report={shown}
+        lastReport={report}
+        {note}
+        busyNote={BAR && !!busyAt && now - busyAt < 60e3}
+        {now}
+        news={[]}
+        first
+        onscan={scan}
+        {alerts}
+        {fresh}
+      />
+    {:else}
+      <div class="pp-tabs" role="tablist" aria-label={t('popup.tabs')} tabindex="-1" onkeydown={tabKey}>
+        {#each TABS as id (id)}
           <button
             type="button"
-            class="pp-link"
-            onclick={() => {
-              chrome.tabs.create({ url: 'https://github.com/Draco-Foundry/open-hangar/blob/main/CHANGELOG.md' });
-              window.close();
-            }}>{t('popup.what-changed')}</button
+            role="tab"
+            id="pp-tab-{id}"
+            aria-selected={tab === id}
+            aria-controls="pp-panel-{id}"
+            tabindex={tab === id ? 0 : -1}
+            class:dot={id === 'settings' && (!!trouble || autoAsks)}
+            onclick={() => pickTab(id)}
           >
-          <button type="button" class="pp-link quiet" id="pp-got-it" onclick={gotIt}>{t('popup.got-it')}</button>
-        </span>
-      </div>
-    {/if}
-
-    {#if updateReady}
-      <div class="pp-notice" id="pp-update" role="status">
-        <span>{t('popup.update-ready', { version: updateReady })}</span>
-        <button type="button" class="pp-link" id="pp-update-reload" disabled={busy} onclick={reloadForUpdate}
-          >{t('popup.update-reload')}</button
-        >
-      </div>
-    {/if}
-    {#if banner}
-      <div class="pp-notice" class:warn={banner.level === 'warn'} id="pp-banner" role="status">
-        {banner.message}
-      </div>
-    {/if}
-
-    {#if ready && v}
-      {#if firstRun}
-        <Hangar
-          {v}
-          {value}
-          {since}
-          {avatar}
-          {db}
-          {account}
-          {sc}
-          {signedOut}
-          {rsiOff}
-          {fx}
-          report={shown}
-          lastReport={report}
-          {note}
-          busyNote={BAR && !!busyAt && now - busyAt < 60e3}
-          {now}
-          news={[]}
-          first
-          onscan={scan}
-          onbell={openBell}
-          {alerts}
-          {fresh}
-        />
-      {:else}
-        <div class="pp-tabs" role="tablist" aria-label={t('popup.tabs')} tabindex="-1" onkeydown={tabKey}>
-          {#each TABS as id (id)}
-            <button
-              type="button"
-              role="tab"
-              id="pp-tab-{id}"
-              aria-selected={tab === id}
-              aria-controls="pp-panel-{id}"
-              tabindex={tab === id ? 0 : -1}
-              class:dot={id === 'settings' && (!!trouble || autoAsks)}
-              onclick={() => pickTab(id)}
+            <svg class="pp-ti" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              {#if id === 'hangar'}<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"></path>
+              {:else if id === 'wishlist'}<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"></path>
+              {:else}<circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"></path>{/if}
+            </svg>
+            <span
+              >{t(LABEL[id])}{#if id === 'wishlist' && ALERTS && onSale}<b class="pp-tn" id="pp-wish-n"
+                  ><span aria-hidden="true">{onSale > 9 ? '9+' : onSale}</span><span class="pp-sr"
+                    >{t('popup.wish-tab-on-sale', { n: onSale })}</span
+                  ></b
+                >{/if}</span
             >
-              <svg class="pp-ti" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                {#if id === 'hangar'}<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"></path>
-                {:else if id === 'wishlist'}<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"></path>
-                {:else}<circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"></path>{/if}
-              </svg>
-              <span>{t(LABEL[id])}</span>
-            </button>
-          {/each}
-        </div>
-        <div class="pp-panel" role="tabpanel" id="pp-panel-{tab}" aria-labelledby="pp-tab-{tab}">
-          {#if tab === 'hangar'}
-            <Hangar
-              {v}
-              {value}
-              {since}
-              {avatar}
-              {db}
-              {account}
-              {sc}
-              {signedOut}
-              {rsiOff}
-              {fx}
-              report={shown}
-              lastReport={report}
-              {pilot}
-              onpilot={answerPilot}
-              {note}
-          busyNote={BAR && !!busyAt && now - busyAt < 60e3}
-          {now}
-              {news}
-              onscan={scan}
-              onbell={openBell}
-              {alerts}
-              {fresh}
-            />
-          {:else if tab === 'wishlist'}
-            <Wishlist connected={!!v.connected} {fx} />
-          {:else}
-            <Settings
-              {v}
-              {busy}
-              {failing}
-              {prefs}
-              {currency}
-              lastReport={report}
-              onlook={setLook}
-              oncurrency={setCurrency}
-              onfailed={(f) => (failed = f)}
-              onnote={(n) => (note = n)}
-            />
-          {/if}
-        </div>
-      {/if}
+          </button>
+        {/each}
+      </div>
+      <div class="pp-panel" role="tabpanel" id="pp-panel-{tab}" aria-labelledby="pp-tab-{tab}">
+        {#if tab === 'hangar'}
+          <Hangar
+            {v}
+            {value}
+            {since}
+            {avatar}
+            {db}
+            {account}
+            {sc}
+            {signedOut}
+            {rsiOff}
+            {fx}
+            report={shown}
+            lastReport={report}
+            {pilot}
+            onpilot={answerPilot}
+            {note}
+        busyNote={BAR && !!busyAt && now - busyAt < 60e3}
+        {now}
+            {news}
+            onscan={scan}
+            onbell={() => pickTab('wishlist')}
+            {alerts}
+            {fresh}
+          />
+        {:else if tab === 'wishlist'}
+          <Wishlist connected={!!v.connected} {fx} />
+        {:else}
+          <Settings
+            {v}
+            {busy}
+            {failing}
+            {prefs}
+            {currency}
+            lastReport={report}
+            onlook={setLook}
+            oncurrency={setCurrency}
+            onfailed={(f) => (failed = f)}
+            onnote={(n) => (note = n)}
+          />
+        {/if}
+      </div>
     {/if}
   {/if}
 </main>

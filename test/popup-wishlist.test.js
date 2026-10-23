@@ -630,3 +630,35 @@ test('alerts follow Remind Me: on from the switch, off with the last one, left a
     null,
   );
 });
+
+// The sale feed as the store alerts keep it: a ship sold in two editions, and a paint.
+const SALE = {
+  items: [
+    { id: 'sku-1', kind: 'ship', name: 'Cutlass Black', price: 110, ships: ['cutlass-black'] },
+    { id: 'sku-2', kind: 'ship', name: 'Cutlass Black WB', price: 100, ships: ['cutlass-black'] },
+    { id: 'sku-30', kind: 'paint', name: 'Coalfire', price: 5, ships: [] },
+  ],
+};
+
+test("the Wishlist tab's count: Remind Me items on sale, each once", async () => {
+  const { remindOnSale } = await import('../ui/popup/data.js');
+  // The ship (two editions on sale) counts once; the paint counts; Zeus isn't sold.
+  const keys = ['ship:cutlass-black', 'sku:30', 'ship:zeus-mk-ii-cl', 'ship:cutlass-black'];
+  assert.equal(remindOnSale(keys, SALE), 2);
+  assert.equal(remindOnSale([], SALE), 0);
+  // No sale feed kept, or no keys: nothing to count.
+  assert.equal(remindOnSale(keys, null), 0);
+  assert.equal(remindOnSale(null, SALE), 0);
+});
+
+test('the Wishlist: what is on sale first, each side in its own order', async () => {
+  const { onSaleFirst, wishSale } = await import('../ui/popup/data.js');
+  const list = [{ key: 'ship:zeus-mk-ii-cl' }, { key: 'sku:30' }, { key: 'ship:aurora-mr' }];
+  list.push({ key: 'ship:cutlass-black' });
+  assert.deepEqual(
+    onSaleFirst(list, wishSale(SALE)).map((x) => x.key),
+    ['sku:30', 'ship:cutlass-black', 'ship:zeus-mk-ii-cl', 'ship:aurora-mr'],
+  );
+  // No sale feed kept: the list as it is.
+  assert.equal(onSaleFirst(list, wishSale(null)), list);
+});

@@ -13,7 +13,7 @@
   // browser's sign-in window would close the popup).
   import { onMount, tick } from 'svelte';
   import { t } from './copy.js';
-  import { wishRows, wishSale } from './data.js';
+  import { onSaleFirst, wishRows, wishSale } from './data.js';
   import {
     alertsFor,
     readWishlist,
@@ -43,6 +43,9 @@
   const env = popupEnv();
 
   const sale = $derived(wishSale(feed));
+  // What's on sale now first (the tab's count, ./Popup.svelte).
+  const items = $derived(list?.mode === 'edit' ? onSaleFirst(list.items, sale) : []);
+  const rows = $derived(list?.mode === 'rows' ? onSaleFirst(list.rows, sale) : []);
   const entries = $derived(
     list?.mode === 'edit' ? searchEntries({ names, feed, onList: list.items.map((i) => i.key) }) : [],
   );
@@ -211,7 +214,7 @@
     {#if list.items.length}
       <h2 class="pp-lbl" id="pp-wish-h">{t('popup.wish-count', { n: list.items.length })}</h2>
       <ul class="pp-wlist pp-wedit" aria-labelledby="pp-wish-h">
-        {#each list.items as item (item.key)}
+        {#each items as item (item.key)}
           {@const s = sale ? sale(item.key) : null}
           <li>
             <div class="pp-wrow">
@@ -257,7 +260,7 @@
       <h2 class="pp-lbl" id="pp-wish-h">{t('popup.wish-count', { n: list.rows.length + list.unnamed })}</h2>
       {#if list.rows.length}
         <ul class="pp-wlist" aria-labelledby="pp-wish-h">
-          {#each list.rows as r (r.key)}
+          {#each rows as r (r.key)}
             <li>
               <span class="pp-atext">
                 <span class="pp-aname">{r.name}</span>

@@ -114,55 +114,6 @@ body {
 .pp-age.run i {
   background: var(--accent);
 }
-.pp-bell,
-.pp-back {
-  position: relative;
-  flex: none;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  border: 0;
-  background: none;
-  color: var(--text-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 0;
-}
-.pp-bell:hover,
-.pp-back:hover {
-  background: var(--lift-2);
-}
-.pp-bell.on {
-  margin-left: auto;
-  background: var(--accent-soft);
-  color: var(--link);
-  cursor: default;
-}
-.pp-back {
-  font-size: 22px;
-  line-height: 1;
-  color: var(--muted);
-  margin-left: -8px;
-}
-.pp-n {
-  position: absolute;
-  right: 0;
-  top: 0;
-  min-width: 15px;
-  height: 15px;
-  box-sizing: border-box;
-  border-radius: 8px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 3px;
-}
 /* The scan's progress, under the header. */
 .pp-bar {
   height: 3px;
@@ -254,6 +205,23 @@ body {
 .pp-tabs button:hover {
   color: var(--text);
 }
+/* The Wishlist tab's count: its Remind Me items on sale now. */
+.pp-tabs button .pp-tn {
+  display: inline-block;
+  margin-left: 5px;
+  vertical-align: 1px;
+  min-width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  padding: 0 4px;
+  background: var(--good-soft);
+  color: var(--good);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+}
 /* Something to look at in Settings (a sync that didn't go through). */
 .pp-tabs button.dot span::after {
   content: '';
@@ -275,9 +243,6 @@ body {
   flex-direction: column;
   gap: 10px;
   padding: 12px 16px 14px;
-}
-.pp-alerts {
-  border-top: 1px solid var(--line);
 }
 .first .pp-first,
 .pp-empty {
@@ -768,8 +733,7 @@ body {
   text-decoration: none;
 }
 
-/* Alerts and the Wishlist. */
-.pp-alist,
+/* The Wishlist. */
 .pp-wlist {
   list-style: none;
   margin: 0;
@@ -778,7 +742,6 @@ body {
   flex-direction: column;
   gap: 2px;
 }
-.pp-arow,
 .pp-wlist li {
   display: flex;
   align-items: center;
@@ -792,94 +755,6 @@ body {
   border-radius: 8px;
   background: none;
   color: var(--text);
-}
-.pp-arow {
-  cursor: pointer;
-}
-.pp-arow:hover {
-  background: var(--lift-2);
-}
-.pp-arow.fresh small {
-  color: var(--good);
-}
-.pp-alist.old .pp-arow {
-  opacity: 0.8;
-}
-/* The bell's list (#699): compact rows, the name and the why on one line each; past
-   three alerts it scrolls in a fixed height with a scroll bar that shows. */
-.pp-ascroll {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.pp-ascroll.many {
-  max-height: 168px;
-  overflow-y: scroll;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--muted) transparent;
-  padding: 0 8px;
-  margin: 0 -8px;
-  border-radius: 8px;
-}
-.phone .pp-ascroll.many {
-  max-height: none;
-  overflow: visible;
-}
-.pp-ascroll.many:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-.pp-alerts .pp-arow {
-  padding: 4px 8px;
-  min-width: 0;
-}
-/* Each alert's × (#701), and Clear All above the list. */
-.pp-ali {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-.pp-ali .pp-arow {
-  margin-right: 0;
-  width: auto;
-  flex: 1;
-}
-.pp-adel {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-  color: var(--muted);
-  cursor: pointer;
-}
-.pp-adel:hover,
-.pp-adel:focus-visible {
-  background: var(--lift-2);
-  color: var(--head);
-}
-.phone .pp-adel {
-  width: 44px;
-  height: 44px;
-}
-.pp-atop {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: -6px;
-}
-.pp-atop .pp-link.quiet {
-  font-size: 12px;
-}
-.pp-alerts .pp-aname,
-.pp-alerts .pp-atext small {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .pp-wlist small.sale {
   color: var(--good);
@@ -1312,12 +1187,10 @@ html.phone body {
 }
 .phone .pp-item,
 .phone .pp-r,
-.phone .pp-arow,
 .phone .pp-wlist li {
   min-height: 48px;
   box-sizing: border-box;
 }
-.phone .pp-arow,
 .phone .pp-wlist li {
   box-sizing: content-box;
 }
@@ -1333,9 +1206,4 @@ html.phone body {
 }
 .phone .pp-wx {
   width: 44px;
-}
-.phone .pp-bell,
-.phone .pp-back {
-  width: 44px;
-  height: 44px;
 }

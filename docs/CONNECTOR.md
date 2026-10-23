@@ -14,9 +14,9 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
 ## What a Connector Build Has
 
 - **The toolbar popup** (`src/popup.html`, `ui/popup/`, the 0.4.0 mockups): a header with
-  the version, the scan's age and the alerts bell (with the `alerts` flag; its Alerts
-  view is `ui/popup/Alerts.svelte`, and opening the popup marks them seen), then three
-  tabs. Hangar: the portrait the scan saved, Account Value and its change, Store Credit,
+  the version and the scan's age, then three tabs (with the `alerts` flag, Wishlist
+  carries a count of its Remind Me items on sale, and opening the popup marks the store
+  alerts seen). Hangar: the portrait the scan saved, Account Value and its change, Store Credit,
   buy-back tokens, Fleet News, Scan (with the scan's progress and report when the
   background shares them; greyed while RSI's sign-in cookie isn't in the browser,
   `ui/popup/rsi-cookie.js`, presence only), Open My Hangar. Wishlist, while connected:
