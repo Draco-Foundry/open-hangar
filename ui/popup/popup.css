@@ -26,7 +26,8 @@ body {
   border: 1px solid var(--line-2);
   border-top: 3px solid var(--accent);
   border-radius: 12px;
-  overflow: hidden;
+  /* clip, not hidden: hidden would make it the scroll box Scan's pinned area sticks to. */
+  overflow: clip;
   min-height: 120px;
 }
 .pp button {
@@ -74,6 +75,9 @@ body {
   cursor: pointer;
   color: var(--text);
   border-color: var(--accent);
+  font-family: var(--font-body);
+  font-size: 12px;
+  padding: 0 7px;
 }
 .pp-ver.news i {
   width: 6px;
@@ -268,6 +272,34 @@ body {
 .pp-big-ic {
   color: var(--link);
 }
+/* The first run's line under its heading. */
+.pp-firstline {
+  margin: -4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+/* Scan's area (Scan, Log In to RSI with its grey Scan, the scan bar and its lines), pinned
+   to the bottom of the tab so it never falls below Chrome's 600 px popup (owner,
+   2026-10-23). */
+.pp-act {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 -16px -14px;
+  padding: 8px 16px 12px;
+  background: var(--lift);
+}
+/* The first run is short: its Scan stays where it is. */
+.pp-first .pp-act {
+  position: static;
+  align-self: stretch;
+  margin: 0;
+  padding: 0;
+}
 .pp-h {
   font-family: var(--font-head);
   font-weight: 600;
@@ -407,16 +439,14 @@ body {
   font-size: 12px;
   color: var(--muted);
 }
+/* One balances strip (owner, 2026-10-23): Store Credit, UEC and REC in a row, each label
+   over its number, no boxes. */
 .pp-tiles {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 .pp-tile {
-  background: var(--lift-2);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 8px 10px;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -428,15 +458,26 @@ body {
   color: var(--head);
   font-variant-numeric: tabular-nums;
 }
+/* Buy-Back Tokens and the next refill: one small line under the strip. */
 .pp-tok {
   display: flex;
   align-items: baseline;
   gap: 6px;
+  margin-top: -4px;
+  font-size: 12px;
+  white-space: nowrap;
+  min-width: 0;
+}
+.pp-tok b {
+  font-weight: 600;
+  color: var(--head);
+  font-variant-numeric: tabular-nums;
 }
 .pp-tok small {
   font-size: 12px;
   color: var(--muted);
-  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .pp-trouble {
   display: flex;
@@ -470,35 +511,36 @@ body {
   padding-top: 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
 .pp-newstop {
   display: flex;
   align-items: center;
+  margin-bottom: 2px;
 }
 .pp-newstop .pp-link {
   margin-left: auto;
   font-size: 12px;
 }
+/* Fleet News rows (owner, 2026-10-23): plain rows with dividers, the reason on one line. */
 .pp-item {
   display: flex;
   gap: 10px;
   align-items: center;
   width: 100%;
   text-align: left;
-  background: var(--lift-2);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 8px 10px;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  padding: 5px 0;
   color: var(--text);
   cursor: pointer;
 }
-.pp-item:hover {
-  border-color: var(--accent-line);
+.pp-item:last-child {
+  border-bottom: 0;
 }
-.pp-item.wish {
-  background: var(--good-soft);
-  border-color: var(--good-line);
+.pp-item:hover .pp-iname {
+  text-decoration: underline;
 }
 .pp-ic {
   flex: none;
@@ -514,6 +556,11 @@ body {
 .wish .pp-ic {
   background: var(--good-soft);
   color: var(--good);
+}
+.pp-news .pp-ic {
+  width: 16px;
+  height: auto;
+  background: none;
 }
 .pp-itext,
 .pp-atext {
@@ -538,6 +585,11 @@ body {
   font-size: 12px;
   color: var(--muted);
   overflow-wrap: anywhere;
+}
+.pp-itext small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .pp-chev {
   color: var(--muted);
@@ -1142,6 +1194,14 @@ body {
 .pp-link.bad {
   color: var(--bad);
 }
+/* The version, under Clear Data. */
+.pp-version {
+  margin: -4px 0 0;
+  text-align: center;
+  font-family: var(--font-data);
+  font-size: 11px;
+  color: var(--muted);
+}
 .pp-link.bad:disabled {
   color: var(--faint);
 }
@@ -1323,6 +1383,17 @@ html.phone body {
 }
 .phone .pp-btn2 {
   height: 48px;
+}
+/* Scan's pinned area sits above the tabs: their 8 + 18 px padding, 48 px buttons and
+   1 px border (.phone .pp-tabs). */
+.phone .pp-act {
+  bottom: 75px;
+  margin: 0 -18px -14px;
+  padding: 10px 18px 14px;
+}
+.phone .pp-first .pp-act {
+  margin: 0;
+  padding: 0;
 }
 .phone .pp-wsearch {
   height: 48px;

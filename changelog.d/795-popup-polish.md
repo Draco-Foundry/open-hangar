@@ -1,0 +1,1 @@
+- Changed: PLACEHOLDER, waiting on Claude chat (Words key changelog.popup-polish).

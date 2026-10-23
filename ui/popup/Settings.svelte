@@ -43,6 +43,7 @@
   const AL = globalThis.OHAlerts;
   const ALERTS = flag('alerts') && !!AL;
   const SITE = 'https://openhangar.space';
+  const VERSION = chrome.runtime.getManifest().version || '';
 
   let siteOn = $state(false);
   let syncing = $state(false);
@@ -220,8 +221,8 @@
 <svelte:window onclick={outside} />
 
 <div class="pp-body pp-settings" id="pp-settings">
-  {#if siteOn || ALERTS}
-    <!-- openhangar.space and the switches, in one box; Notifications sits in it either way. -->
+  {#if siteOn}
+    <!-- openhangar.space and its switches, in one box. -->
     <div class="pp-grp pp-site" class:warn={siteOn && !!trouble} id="pp-site">
       {#if siteOn && v.connected}
         <div class="pp-r">
@@ -301,8 +302,9 @@
           >
         </div>
       {/if}
-      {#if ALERTS}
-        <!-- Desktop notifications, the one opt-in left: alerts follow Remind Me. -->
+      {#if ALERTS && v.connected}
+        <!-- Desktop notifications, the one opt-in left: alerts follow Remind Me, and run only
+             while connected (#790), so the switch shows only then (owner, 2026-10-23). -->
         <div class="pp-r pp-col pp-sub" id="pp-alert-set">
           <div class="pp-line">
             <span class="pp-grow" id="pp-nt-l">{t('popup.notifications')}</span>
@@ -466,4 +468,6 @@
       >
     </div>
   {/if}
+  <!-- The version, here instead of the header (owner, 2026-10-23). -->
+  <p class="pp-version" id="pp-version">v{VERSION}</p>
 </div>
