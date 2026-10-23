@@ -49,6 +49,11 @@ const DB = {
 };
 const json = (body, status = 200, headers = {}) =>
   new Response(body == null ? null : JSON.stringify(body), { status, headers });
+// Connected, with Remind Me on for the paint and the ship: only these take the badge and
+// notifications (the hangar's own reasons show in the popup's Fleet News only).
+const SIGNED = { siteLink: { token: 'oht_test', connectedAt: 1 } };
+const WISH = { v: 1, keys: ['sku:20', 'ship:cutlass-black'] };
+const remind = (more = {}) => ({ local: SIGNED, answers: [json(FEED), json(WISH)], ...more });
 
 // The worker with alerts, its network answering `answers` in turn, and every request,
 // badge and title it makes.
@@ -82,7 +87,7 @@ async function until(ok, ms = 1000) {
 const fromPopup = (x, msg, sender = {}) =>
   x.sendInternal(msg, { id: CHROME_ID, url: POPUP, ...sender });
 
-test('turned on: one check, the feed only (not connected), the badge, notifications, the next alarm', async () => {
+test('turned on, not connected: one check, the feed only; hangar matches, no badge or notes', async () => {
   const x = worker({ answers: [json(FEED, 200, { etag: 'W/"1"' })] });
   const t0 = Date.now();
   await x.chrome.storage.local.set({ alertsOn: true });
@@ -91,6 +96,7 @@ test('turned on: one check, the feed only (not connected), the badge, notificati
   assert.equal(x.asked.length, 1);
   assert.equal(x.asked[0].url, 'https://openhangar.space/api/store/on-sale');
   assert.equal(x.asked[0].init.credentials, 'omit');
+  // Kept for the popup's Fleet News.
   assert.deepEqual(
     x.stores.local.alerts.items.map((m) => [m.id, m.why.map((w) => w.why)]),
     [
@@ -98,15 +104,9 @@ test('turned on: one check, the feed only (not connected), the badge, notificati
       ['sku-10', ['warbond']],
     ],
   );
-  await until(() => x.notes.length === 2);
-  assert.deepEqual(
-    x.notes.map((n) => [n.id, n.type, n.title]),
-    [
-      ['oh-alerts:sku-20', 'basic', 'Cutlass - Coalfire Paint'],
-      ['oh-alerts:sku-10', 'basic', 'Cutlass Black'],
-    ],
-  );
-  assert.ok(x.badges.includes('2'));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(x.notes.length, 0);
+  assert.ok(!x.badges.some((b) => /^\d/.test(b)), 'no number on the badge');
   const when = x.alarms.get('oh-alerts').when;
   assert.ok(
     when >= t0 + 30 * 60e3 && when <= Date.now() + 35 * 60e3,
@@ -114,8 +114,29 @@ test('turned on: one check, the feed only (not connected), the badge, notificati
   );
 });
 
+test('Remind Me items on sale: the badge (each Wishlist item once) and a notification each', async () => {
+  const x = worker(remind());
+  await x.chrome.storage.local.set({ alertsOn: true });
+  await until(() => x.notes.length === 2);
+  assert.deepEqual(
+    x.stores.local.alerts.items.map((m) => [m.id, m.why.map((w) => w.why)]),
+    [
+      ['sku-20', ['wishlist', 'paint']],
+      ['sku-10', ['wishlist', 'warbond']],
+    ],
+  );
+  assert.deepEqual(
+    x.notes.map((n) => [n.id, n.type, n.title, n.message]),
+    [
+      ['oh-alerts:sku-20', 'basic', 'Cutlass - Coalfire Paint', 'On your Wishlist'],
+      ['oh-alerts:sku-10', 'basic', 'Cutlass Black', 'On your Wishlist'],
+    ],
+  );
+  await until(() => x.badges.includes('2'));
+});
+
 test('notifications not allowed: the badge only', async () => {
-  const x = worker({ answers: [json(FEED)], notify: false });
+  const x = worker(remind({ notify: false }));
   await x.chrome.storage.local.set({ alertsOn: true });
   await until(() => x.stores.local.alerts);
   await until(() => x.badges.includes('2'));
@@ -133,7 +154,7 @@ test('the alarm: a check, with the saved copy while it is fresh (nothing asked)'
 });
 
 test('the popup open: every match seen, the badge back to the reminder', async () => {
-  const x = worker({ answers: [json(FEED)] });
+  const x = worker(remind());
   await x.chrome.storage.local.set({ alertsOn: true });
   await until(() => x.stores.local.alerts && x.badges.includes('2'));
   // Not from a tab, not from another page.
@@ -147,41 +168,26 @@ test('the popup open: every match seen, the badge back to the reminder', async (
     undefined,
   );
   assert.deepEqual(await fromPopup(x, { ohPopup: 'alerts-seen' }), { ok: true });
-  assert.equal(Object.keys(x.stores.local.alerts.seen).length, 2);
+  assert.equal(Object.keys(x.stores.local.alerts.seen).length, 4);
   assert.equal(x.badges.at(-1), '');
 });
 
-test('deleted in the popup: one, then Clear All, the badge follows (#701)', async () => {
-  const x = worker({ answers: [json(FEED)] });
+test("the old list's delete (alerts-hide) is no longer answered", async () => {
+  const x = worker(remind());
   await x.chrome.storage.local.set({ alertsOn: true });
   await until(() => x.stores.local.alerts && x.badges.includes('2'));
-  // Only the popup may.
-  assert.equal(
-    await fromPopup(x, { ohPopup: 'alerts-hide', id: 'sku-20' }, { tab: { id: 1 } }),
-    undefined,
-  );
-  const AL = require('../src/alerts.js');
-  const ids = AL.shown(x.stores.local.alerts).map((m) => m.id);
-  assert.equal(ids.length, 2);
-  assert.deepEqual(await fromPopup(x, { ohPopup: 'alerts-hide', id: ids[0] }), { ok: true });
-  assert.deepEqual(
-    AL.shown(x.stores.local.alerts).map((m) => m.id),
-    [ids[1]],
-  );
-  assert.equal(x.badges.at(-1), '1');
-  assert.deepEqual(await fromPopup(x, { ohPopup: 'alerts-hide' }), { ok: true });
-  assert.equal(AL.shown(x.stores.local.alerts).length, 0);
-  assert.equal(x.badges.at(-1), '');
+  assert.equal(await fromPopup(x, { ohPopup: 'alerts-hide', id: 'sku-20' }), undefined);
+  assert.equal(x.badges.at(-1), '2');
 });
 
 test("a notification clicked: that item on our Store's page, seen", async () => {
-  const x = worker({ answers: [json(FEED)] });
+  const x = worker(remind());
   await x.chrome.storage.local.set({ alertsOn: true });
   await until(() => x.notes.length === 2);
   await x.clickNote('oh-alerts:sku-20');
   await until(() => x.opened.length === 1);
   assert.deepEqual(x.opened, ['https://openhangar.space/store#item=20']);
-  await until(() => Object.keys(x.stores.local.alerts.seen).length === 1);
+  await until(() => Object.keys(x.stores.local.alerts.seen).length === 2);
   await x.clickNote('oh-alerts:more');
   await until(() => x.opened.length === 2);
   assert.equal(x.opened[1], 'https://openhangar.space/store');

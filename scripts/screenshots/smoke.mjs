@@ -4628,7 +4628,7 @@ try {
       tabs: [...document.querySelectorAll('[role="tab"]')].map(
         (b) => `${b.textContent.trim()}:${b.getAttribute('aria-selected')}`,
       ),
-      bell: document.getElementById('pp-bell')?.getAttribute('aria-label') || '',
+      bell: !!document.getElementById('pp-bell'),
       scan: document.getElementById('pp-scan')?.textContent || '',
       panel: css.backgroundColor,
       ring: css.borderLeftColor,
@@ -4655,7 +4655,7 @@ try {
   pop.uecBelow &&
   /^[▲▼] \$[\d,]+ since \w+ \d+$/.test(pop.since) &&
   pop.tabs.join() === 'Hangar:true,Wishlist:false,Settings:false' &&
-  pop.bell === 'Alerts' &&
+  !pop.bell &&
   pop.scan === 'Scan' &&
   !pop.oldLink
     ? ok(
@@ -5038,12 +5038,17 @@ try {
     asked: __demo.asked.join(),
     removed: __demo.removed.join(),
     nt: document.getElementById('pp-nt-sw').getAttribute('aria-checked'),
+    hint: document.getElementById(document.getElementById('pp-nt-sw').getAttribute('aria-describedby'))
+      ?.textContent,
+    label: document.getElementById('pp-nt-l').textContent,
   }));
   ntOff === 'false' &&
   sw.removed === 'notifications' &&
   sw.asked === 'notifications' &&
-  sw.nt === 'true'
-    ? ok('Notifications gives back and asks again, with no Store Alerts switch')
+  sw.nt === 'true' &&
+  sw.label === 'Notifications' &&
+  sw.hint === 'A pop-up when a Remind Me item goes on sale.'
+    ? ok('Notifications gives back and asks again, its hint line under it, no Store Alerts switch')
     : fail(`popup alert switches: ${JSON.stringify({ sw, ntOff })}`);
   // Light: picked in Look, and following the browser.
   await page.select('#pp-look', 'light');
@@ -5897,8 +5902,9 @@ try {
         siteUrl: ppSite,
         siteLink: ppWishLink,
         alertsOn: true,
+        // Zeus first: what's on sale sorts to the top all the same.
         alertsWish: {
-          keys: ['ship:avenger-titan', 'ship:zeus-mk-ii-cl', 'sku:9'],
+          keys: ['ship:zeus-mk-ii-cl', 'ship:avenger-titan', 'sku:9'],
           at: T0 - 60e3,
           connectedAt: 1,
         },
@@ -5934,6 +5940,15 @@ try {
     more: document.querySelector('#pp-wish .pp-note')?.textContent || '',
     remove: !!document.querySelector('#pp-wish input, #pp-wish [aria-label^="Remove"]'),
     asked: __demo.wish.map((w) => `${w.method} ${w.url} ${w.auth}`),
+    // The tab's count of Remind Me items on sale: the number shown, a name read out.
+    n: document.querySelector('#pp-wish-n [aria-hidden]')?.textContent || '',
+    nName: document.querySelector('#pp-wish-n .pp-sr')?.textContent || '',
+    // What a screen reader reads for the tab: its text without the hidden number.
+    tabName: (() => {
+      const b = document.getElementById('pp-tab-wishlist')?.cloneNode(true);
+      b?.querySelectorAll('[aria-hidden="true"]').forEach((e) => e.remove());
+      return b?.textContent.trim() || '';
+    })(),
   }));
   await page.click('#pp-wish-full');
   const wishFull = await page.evaluate(() => __demo.opened.at(-1));
@@ -5941,9 +5956,12 @@ try {
   ppWish.rows.join(' | ') === 'Avenger Titan On Sale $55 | Zeus Mk II CL Not for Sale' &&
   ppWish.more === 'And 1 more' &&
   !ppWish.remove &&
+  ppWish.n === '1' &&
+  ppWish.nName.trim() === '1 on sale' &&
+  ppWish.tabName === 'Wishlist 1 on sale' &&
   ppWish.asked.join() === `GET ${ppSite}/api/v1/wishlist?with=items Bearer t` &&
   wishFull === `${ppSite}/hangar/wishlist`
-    ? ok('Wishlist, the website not taking changes: read only as before, Full Wishlist')
+    ? ok('Wishlist, read only: on sale first, the tab counts it (1, read as "1 on sale")')
     : fail(`popup wishlist: ${JSON.stringify({ ppWish, wishFull })}`);
   // No sale feed kept yet: the ship list names the ships (never an empty list over "And
   // N more"), and nothing is said about sales.
@@ -5971,11 +5989,13 @@ try {
       li.textContent.replace(/\s+/g, ' ').trim(),
     ),
     more: !!document.querySelector('#pp-wish .pp-note'),
+    n: !!document.getElementById('pp-wish-n'),
   }));
   wishNoFeed.head === 'Your Wishlist · 2' &&
   wishNoFeed.rows.join(' | ') === 'Avenger Titan | Zeus Mk II CL' &&
-  !wishNoFeed.more
-    ? ok('Wishlist with no sale feed yet: named from the ship list, nothing said about sales')
+  !wishNoFeed.more &&
+  !wishNoFeed.n
+    ? ok('Wishlist with no sale feed yet: named from the ship list, no sales, no tab count')
     : fail(`popup wishlist, no feed: ${JSON.stringify(wishNoFeed)}`);
   // The website's Wishlist off and store alerts off: the Wishlist lives on the website.
   await popAt(
@@ -6101,7 +6121,7 @@ try {
   await page.click('.pp-wadd');
   await page.waitForFunction(() => document.querySelectorAll('.pp-wedit li').length === 4);
   // Remove the Avenger Titan.
-  await page.click('.pp-wedit li:nth-child(3) .pp-wx');
+  await page.click('.pp-wedit .pp-wx[aria-label="Remove Avenger Titan"]');
   await page.waitForFunction(() => document.querySelectorAll('.pp-wedit li').length === 3);
   const wishDone = await page.evaluate(async () => ({
     head: document.getElementById('pp-wish-h').textContent,
@@ -6129,12 +6149,13 @@ try {
   !ppFound.sent.length &&
   afterAdd.q === '' &&
   afterAdd.focus === 'pp-wish-q' &&
-  afterAdd.rows[0] === 'Zeus Mk II CL Not for Sale ✕' &&
+  // Added first on the website's list, shown after what's on sale.
+  afterAdd.rows[2] === 'Zeus Mk II CL Not for Sale ✕' &&
   JSON.stringify(wishDone.posts.map((p) => p.body)) === JSON.stringify(POSTS) &&
   wishDone.posts.every((p) => p.auth === 'Bearer t' && p.url === `${ppSite}/api/v1/wishlist`) &&
   wishDone.reads === 1 &&
   wishDone.head === 'Your Wishlist · 3' &&
-  wishDone.rows.join() === 'Upgrade to Freelancer,Zeus Mk II CL,Cutlass - Ghoulish Green Paint' &&
+  wishDone.rows.join() === 'Upgrade to Freelancer,Cutlass - Ghoulish Green Paint,Zeus Mk II CL' &&
   wishDone.kept?.join() === 'ccu:16,ship:zeus-mk-ii-cl,sku:501' &&
   !wishDone.wide
     ? ok(
@@ -6145,11 +6166,12 @@ try {
   // read): the item stays, the note says so, and the next change waits the website's
   // minute.
   await page.evaluate(() => (__demo.wishDown = true));
-  await page.click('.pp-wedit li:nth-child(3) .pp-wx');
+  const paintX = '.pp-wedit .pp-wx[aria-label="Remove Cutlass - Ghoulish Green Paint"]';
+  await page.click(paintX);
   await page.waitForFunction(
-    () =>
-      document.getElementById('pp-wish-note') &&
-      !document.querySelector('.pp-wedit li:nth-child(3) .pp-wx').disabled,
+    (x) => document.getElementById('pp-wish-note') && !document.querySelector(x).disabled,
+    {},
+    paintX,
   );
   await sleep(100);
   const wishDown = await page.evaluate(async () => {
@@ -6162,7 +6184,7 @@ try {
     };
   });
   await page.evaluate(() => (__demo.wishDown = false));
-  wishDown.rows.join() === 'Upgrade to Freelancer,Zeus Mk II CL,Cutlass - Ghoulish Green Paint' &&
+  wishDown.rows.join() === 'Upgrade to Freelancer,Cutlass - Ghoulish Green Paint,Zeus Mk II CL' &&
   wishDown.note === "Couldn't Reach openhangar.space" &&
   wishDown.sent?.do === 'remove' &&
   wishDown.sent?.key === 'sku:501' &&
@@ -6210,6 +6232,19 @@ try {
     );
   const remindBefore = await switches();
   const twoSwitches = remindBefore.length === 2;
+  // The column's label: shown once, not read (each switch has its name), centred over
+  // the switches.
+  const remindHead = await page.evaluate(() => {
+    const h = document.querySelectorAll('#pp-wish-remind-h');
+    const r = h[0]?.getBoundingClientRect();
+    const s = document.querySelector('.pp-wedit .pp-wsw')?.getBoundingClientRect();
+    return {
+      count: h.length,
+      text: h[0]?.textContent.trim(),
+      hidden: h[0]?.getAttribute('aria-hidden'),
+      off: r && s ? Math.abs(r.left + r.width / 2 - (s.left + s.width / 2)) : null,
+    };
+  });
   await page.click('.pp-wedit li:nth-child(1) .pp-wsw');
   await page.waitForFunction(
     () =>
@@ -6229,9 +6264,16 @@ try {
   remindAfter.states.map((s) => s[1]).join() === 'false,false' &&
   JSON.stringify(remindAfter.sent) ===
     JSON.stringify([{ v: 1, do: 'save', key: 'ship:avenger-titan', remind: false }]) &&
-  !remindAfter.wide
-    ? ok('Wishlist Remind Me: a switch per item, one save with which item and on or off')
-    : fail(`popup wishlist remind: ${JSON.stringify({ remindBefore, remindAfter })}`);
+  !remindAfter.wide &&
+  remindHead.count === 1 &&
+  remindHead.text === 'Remind Me' &&
+  remindHead.hidden === 'true' &&
+  remindHead.off != null &&
+  remindHead.off <= 3
+    ? ok(
+        'Wishlist Remind Me: a switch per item, "Remind Me" once above them, one save with which item and on or off',
+      )
+    : fail(`popup wishlist remind: ${JSON.stringify({ remindBefore, remindAfter, remindHead })}`);
   // Store alerts off: the search finds ships only and its placeholder says so; a search
   // that finds nothing (a paint's name: paints come with the alerts' sale feed) says No
   // matches. under the box; one letter isn't searched, so nothing is said.
@@ -6943,28 +6985,21 @@ try {
   await page.setViewport({ width: 1280, height: 900 });
 
   // Extension Alerts (the `alerts` flag; the connector pages are served as a build with
-  // it on): the popup's bell (no Remind Me on: the empty note, no switch; on:
-  // the number unseen, the matches new and earlier with why, opening the popup marks
-  // them seen, a row opens our Store, ‹ goes back), Fleet News on the Hangar tab (the
-  // popup opens there while it has news), and the basic page's switch (on asks for
-  // Notifications first, off gives them back).
+  // it on): no bell (the Wishlist tab's count took its place, checked with the Wishlist
+  // above), Fleet News on the Hangar tab (opening the popup marks the matches seen, an
+  // item opens our Store), and the basic page's switch (on asks for Notifications first,
+  // off gives them back).
   console.log('Store Alerts');
   await page.setViewport({ width: 360, height: 600 });
   await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
-  await page.waitForSelector('#pp-bell');
-  await page.click('#pp-bell');
-  await page.waitForSelector('#pp-alerts-wish');
-  const alOff = await page.$eval('#pp-alerts', (e) => ({
-    turnOn: !!e.querySelector('#pp-alerts-on'),
-    buttons: e.querySelectorAll('button').length,
-    note: !!e.querySelector('#pp-alerts-wish'),
+  await page.waitForSelector('[role="tab"]');
+  const alOff = await page.evaluate(() => ({
+    bell: !!document.querySelector('#pp-bell, #pp-alerts'),
+    n: !!document.getElementById('pp-wish-n'),
   }));
-  const alOffOn = await page.evaluate(
-    async () => (await chrome.storage.local.get('alertsOn')).alertsOn,
-  );
-  !alOff.turnOn && alOff.buttons === 0 && alOff.note && alOffOn !== true
-    ? ok('the bell, no Remind Me on: the empty note and a pointer, no Turn On Alerts')
-    : fail(`popup alerts off: ${JSON.stringify({ alOff, alOffOn })}`);
+  !alOff.bell && !alOff.n
+    ? ok('no bell and no Alerts view; no Wishlist count with nothing on sale')
+    : fail(`popup alerts off: ${JSON.stringify(alOff)}`);
   const why = (w, ships = []) => ({ why: w, ships });
   const alState = {
     alertsOn: true,
@@ -7018,184 +7053,35 @@ try {
     ),
     // The row's arrow is a drawn chevron since the arrow sweep, not a text glyph.
     chev: document.querySelectorAll('#pp-news .pp-item .pp-chev svg.chev').length,
-    bell: document.getElementById('pp-bell').getAttribute('aria-label'),
-    n: document.querySelector('#pp-bell .pp-n')?.textContent,
     sent: __demo.sent.map((m) => m.ohPopup),
   }));
   alHome.tab === 'pp-tab-hangar' &&
-  alHome.news.length === 1 &&
-  alHome.news[0] === 'Not seen yet: Cutlass Black Limited-time sale: Cutlass Black' &&
-  alHome.chev === 1 &&
-  alHome.bell === 'Alerts: 2' &&
-  alHome.n === '2' &&
+  alHome.news.length === 3 &&
+  alHome.news[0].startsWith('Not seen yet: Sabre Raven EX In the store in the last 7 days') &&
+  alHome.news[1] === 'Not seen yet: Cutlass Black Limited-time sale: Cutlass Black' &&
+  alHome.news[2].startsWith('Constellation Mk IV - Nightbreak Paint') &&
+  alHome.chev === 3 &&
   alHome.sent.includes('alerts-seen')
-    ? ok(
-        'Fleet News on Hangar (opened there for it), the bell with the badge number, all marked seen',
-      )
+    ? ok('Fleet News on Hangar: paint and limited sales for your ships, unseen first, all marked seen')
     : fail(`popup fleet news: ${JSON.stringify(alHome)}`);
-  await page.click('#pp-all-alerts');
-  await page.waitForSelector('#pp-alerts .pp-alist li');
-  const alOn = await page.evaluate(() => ({
-    back: document.activeElement?.id,
-    fresh: [...document.querySelectorAll('#pp-alist-new li')].map((li) =>
-      li.textContent.replace(/\s+/g, ' ').trim(),
-    ),
-    old: [...document.querySelectorAll('#pp-alist-old li')].map((li) =>
-      li.textContent.replace(/\s+/g, ' ').trim(),
-    ),
-    connect: document
-      .getElementById('pp-alerts')
-      .textContent.includes('Connect to openhangar.space to add your Wishlist.'),
-    store: !!document.getElementById('pp-open-store'),
-    wide: document.documentElement.scrollWidth > 360,
-  }));
-  alOn.back === 'pp-back' &&
-  alOn.fresh.length === 2 &&
-  alOn.fresh[0].includes('Not seen yet:') &&
-  alOn.fresh[0].includes('paint for your Sabre Raven EX') &&
-  alOn.fresh[0].includes('Ends Oct 15') &&
-  alOn.fresh[0].includes('$185') &&
-  alOn.old.length === 1 &&
-  alOn.old[0].includes('In the store in the last 7 days: paint for your Constellation Andromeda') &&
-  alOn.connect &&
-  alOn.store &&
-  !alOn.wide
-    ? ok('the bell view: New and Earlier with why and price, Open the Store, no sideways scroll')
-    : fail(`popup alerts on: ${JSON.stringify(alOn)}`);
-  await page.click('#pp-back');
-  const alBack = await page.evaluate(() => ({
-    focus: document.activeElement?.id,
-    n: document.querySelector('#pp-bell .pp-n')?.textContent || '',
-  }));
-  alBack.focus === 'pp-bell' && !alBack.n
-    ? ok('‹ goes back to the tabs, focus on the bell, its number read')
-    : fail(`popup alerts back: ${JSON.stringify(alBack)}`);
-  await page.click('#pp-bell');
-  await page.waitForSelector('#pp-alerts .pp-arow');
-  await page.click('#pp-alerts .pp-arow');
+  await page.click('#pp-news .pp-item');
   const alRow = await page.evaluate(() => __demo.opened.at(-1));
+  await page.click('#pp-news-wishlist');
+  const alTab = await page.evaluate(
+    () => document.querySelector('[role="tab"][aria-selected="true"]')?.id,
+  );
+  alTab === 'pp-tab-wishlist'
+    ? ok("Fleet News's link opens the Wishlist tab")
+    : fail(`fleet news link went to ${alTab}`);
   alRow === 'https://openhangar.space/store#item=19623'
-    ? ok('an alert opens that item on our Store')
-    : fail(`alert row went to ${alRow}`);
+    ? ok('a Fleet News item opens that item on our Store')
+    : fail(`fleet news item went to ${alRow}`);
   await page.removeScriptToEvaluateOnNewDocument(alHook.identifier);
-  // 0, 1, 3 and 10 alerts (#699): up to three the list just shows; past three it scrolls
-  // in a fixed height (a tab stop, arrow keys scroll it), the rest of the view stays put.
-  const alCount = async (n) => {
-    const items = Array.from({ length: n }, (_, i) => ({
-      ...alState.alerts.items[i % 3],
-      id: `sku-${30000 + i}`,
-    }));
-    const st = {
-      ...alState,
-      popupPrefs: { tab: 'settings' },
-      alerts: { ...alState.alerts, items },
-    };
-    const hook = await page.evaluateOnNewDocument((s) => (window.__demoAlerts = s), st);
-    await page.goto('about:blank');
-    await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
-    await page.removeScriptToEvaluateOnNewDocument(hook.identifier);
-    await page.click('#pp-bell');
-    await page.waitForSelector('#pp-open-store');
-    const box = await page.evaluate(() => {
-      const b = document.getElementById('pp-ascroll');
-      return {
-        rows: document.querySelectorAll('#pp-alerts .pp-arow').length,
-        none: !!document.querySelector('#pp-alerts > .pp-note'),
-        many: !!b?.classList.contains('many'),
-        tab: b?.getAttribute('tabindex') ?? null,
-        h: b ? Math.round(b.getBoundingClientRect().height) : 0,
-        scrolls: !!b && b.scrollHeight > b.clientHeight,
-        rowH: Math.round(
-          document.querySelector('#pp-alerts .pp-arow')?.getBoundingClientRect().height || 0,
-        ),
-        store: Math.round(document.getElementById('pp-open-store').getBoundingClientRect().bottom),
-        wide: document.documentElement.scrollWidth > 360,
-      };
-    });
-    if (box.many) {
-      await page.focus('#pp-ascroll');
-      await page.keyboard.press('ArrowDown');
-      await page.keyboard.press('ArrowDown');
-      await sleep(200);
-      box.keys = await page.$eval('#pp-ascroll', (b) => b.scrollTop > 0);
-    }
-    return box;
-  };
-  const counts = {};
-  for (const n of [0, 1, 3, 10]) counts[n] = await alCount(n);
-  counts[0].none &&
-  !counts[0].rows &&
-  [1, 3].every((n) => counts[n].rows === n && !counts[n].many && !counts[n].scrolls) &&
-  counts[10].rows === 10 &&
-  counts[10].many &&
-  counts[10].tab === '0' &&
-  counts[10].scrolls &&
-  counts[10].keys &&
-  counts[10].h <= 168 &&
-  counts[10].store <= 600 &&
-  counts[1].rowH <= 44 &&
-  Object.values(counts).every((c) => !c.wide)
-    ? ok(
-        `alerts 0, 1, 3, 10: past three the list scrolls (${counts[10].h} px, arrow keys), rows ${counts[1].rowH} px`,
-      )
-    : fail(`popup alerts count: ${JSON.stringify(counts)}`);
-  // Deleting (#701): a row's × (named for screen readers) takes that one out, focus on the
-  // next ×; Clear All empties the list; both stay gone in the next popup.
-  const alDel = await page.evaluate(async () => {
-    const del = document.querySelector('#pp-alerts .pp-adel');
-    const label = del.getAttribute('aria-label');
-    const id = del.dataset.id;
-    del.click();
-    await new Promise((r) => setTimeout(r, 400));
-    return {
-      label,
-      sent: __demo.sent.some((m) => m?.ohPopup === 'alerts-hide' && m.id === id),
-      gone: !document.querySelector(`#pp-alerts .pp-adel[data-id="${id}"]`),
-      rows: document.querySelectorAll('#pp-alerts .pp-arow').length,
-      focus: document.activeElement?.classList.contains('pp-adel'),
-    };
-  });
-  await page.click('#pp-alerts-clear');
-  await sleep(400);
-  const alCleared = await page.evaluate(() => ({
-    rows: document.querySelectorAll('#pp-alerts .pp-arow').length,
-    none: !!document.querySelector('#pp-alerts > .pp-note'),
-    focus: document.activeElement?.id,
-  }));
-  const alKept = await page.evaluate(async () => (await chrome.storage.local.get('alerts')).alerts);
-  const alHook2 = await page.evaluateOnNewDocument((s) => (window.__demoAlerts = s), {
-    ...alState,
-    popupPrefs: { tab: 'settings' },
-    alerts: alKept,
-  });
-  await page.goto('about:blank');
-  await page.goto(URL0 + 'popup.html', { waitUntil: 'networkidle0' });
-  await page.removeScriptToEvaluateOnNewDocument(alHook2.identifier);
-  await page.waitForSelector('#pp-bell');
-  const alAgain = await page.evaluate(() => ({
-    n: document.querySelector('#pp-bell .pp-n')?.textContent || '',
-  }));
-  await page.click('#pp-bell');
-  await page.waitForSelector('#pp-open-store');
-  alAgain.rows = await page.$$eval('#pp-alerts .pp-arow', (r) => r.length);
-  /^Delete .+/.test(alDel.label) &&
-  alDel.sent &&
-  alDel.gone &&
-  alDel.rows === 9 &&
-  alDel.focus &&
-  !alCleared.rows &&
-  alCleared.none &&
-  alCleared.focus === 'pp-open-store' &&
-  !alAgain.n &&
-  !alAgain.rows
-    ? ok('alerts: × deletes one (focus on the next), Clear All empties the list, both stay gone')
-    : fail(`popup alerts delete: ${JSON.stringify({ alDel, alCleared, alAgain })}`);
-  // Alerts on with nothing that's news for your ships: Fleet News says so, and All Alerts
-  // still opens the rest.
+  // Alerts on with nothing that's news for your ships: Fleet News says so, with no link.
   const quiet = {
     ...alState,
     popupPrefs: { tab: 'hangar' },
-    alerts: { ...alState.alerts, items: alState.alerts.items.slice(0, 2) },
+    alerts: { ...alState.alerts, items: [] },
   };
   const quietHook = await page.evaluateOnNewDocument((st) => (window.__demoAlerts = st), quiet);
   await page.goto('about:blank');
@@ -7204,10 +7090,10 @@ try {
   const alQuiet = await page.evaluate(() => ({
     none: document.getElementById('pp-news-none')?.textContent || '',
     items: document.querySelectorAll('#pp-news .pp-item').length,
-    all: !!document.getElementById('pp-all-alerts'),
+    link: !!document.getElementById('pp-news-wishlist'),
   }));
   await page.removeScriptToEvaluateOnNewDocument(quietHook.identifier);
-  alQuiet.none === 'No news for your ships right now.' && !alQuiet.items && alQuiet.all
+  alQuiet.none === 'No news for your ships right now.' && !alQuiet.items && !alQuiet.link
     ? ok('Fleet News with nothing for your ships: "No news for your ships right now."')
     : fail(`popup fleet news empty: ${JSON.stringify(alQuiet)}`);
   await page.setViewport({ width: 1280, height: 900 });

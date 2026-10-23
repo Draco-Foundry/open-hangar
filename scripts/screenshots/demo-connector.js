@@ -68,14 +68,6 @@
   demo.answers = {};
   chrome.runtime.sendMessage = async (msg) => {
     demo.sent.push(msg);
-    // An alert deleted (or Clear All): written the way the background writes it.
-    if (msg?.ohPopup === 'alerts-hide' && window.OHAlerts) {
-      const { alerts } = await chrome.storage.local.get('alerts');
-      if (alerts)
-        await chrome.storage.local.set({
-          alerts: window.OHAlerts.hide(alerts, Date.now(), msg.id ?? null),
-        });
-    }
     const own = msg && demo.answers[msg.ohPopup];
     return own || demo.answer || { ok: true, opened: true };
   };

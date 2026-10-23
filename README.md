@@ -161,10 +161,11 @@ Anything after launch is a plan, not a promise. The details are in the
 
 **In the Extension (0.4.1):**
 
-- **The Toolbar Popup:** three tabs, Hangar, Wishlist and Settings, plus an alerts bell
-  whose number matches the toolbar badge. The Hangar tab shows your RSI portrait and
-  handle, Account Value and how it changed since an earlier scan, Store Credit, UEC and REC
-  at a glance, Buy-Back Tokens with the next refill, up to three Fleet News notes, and Scan.
+- **The Toolbar Popup:** three tabs, Hangar, Wishlist and Settings. The Wishlist tab
+  counts your Remind Me items on sale and lists what's on sale first, and the toolbar badge
+  counts the ones you haven't seen. The Hangar tab shows your RSI portrait and handle,
+  Account Value and how it changed since an earlier scan, Store Credit, UEC and REC at a
+  glance, Buy-Back Tokens with the next refill, up to three Fleet News notes, and Scan.
 - **Scans Out of Sight:** no scan tab. The scan runs in a hidden page, and closing the
   popup doesn't stop it.
 - **When RSI Has Trouble:** if RSI changes a page or stops answering, Scan stops, tells you
