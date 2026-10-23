@@ -415,9 +415,19 @@ body {
 .pp-since {
   color: var(--muted);
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .pp-since.up {
   color: var(--good);
+}
+.pp-big,
+.pp-tile b {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .pp-big {
   font-family: var(--font-head);

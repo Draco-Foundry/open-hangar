@@ -67,3 +67,61 @@ export function money(usd, fx = USD, { cents = false, most } = {}) {
   if (fx.code === 'USD') return { text: dollars, title: '' };
   return { text: fmt(usd * fx.rate, fx.code), title: dollars };
 }
+
+// --- Numbers that fit their box -------------------------------------------------------
+// Each number on the Hangar tab has a budget: the full figure while it fits, then
+// compact with one decimal at most and no ".0" ($12.4 K, 1.2 M, 3.4 B), the full figure
+// kept in the tooltip and the accessible name. A non-breaking space sits between the
+// digits and the letter so they never wrap apart. Measured at the popup's narrowest
+// width (360 px; a card's text is about 140 px) with the card font (18 px) and the big
+// number's (32 px, about 328 px wide); test:ui checks the huge cases. The budgets:
+//   Account Value (32 px)         the full figure up to 999,999, then compact
+//   Store Credit (18 px, cents)   the full figure up to 9,999.99, then compact
+//   Since-change line (12 px)     the full figure up to 99,999, then compact
+//   UEC and REC (18 px)           under 1,000 as is, then compact
+//   Buy-Back Tokens (18 px)       0 to 99 as is, then 99+
+// The CSS ellipsis (popup.css) is the last guard for a value nobody planned for.
+export const FIT = Object.freeze({ value: 999999, credit: 9999.99, change: 99999 });
+const NBSP = ' ';
+
+// A compact-notation formatter's text for `n`, with NBSP before the suffix letter.
+export function compactText(formatter, n) {
+  const parts = formatter.formatToParts(n);
+  return parts
+    .map((p, i) =>
+      p.type === 'compact' && ['integer', 'fraction'].includes(parts[i - 1]?.type)
+        ? NBSP + p.value
+        : p.value,
+    )
+    .join('');
+}
+
+const compactNumber = new Intl.NumberFormat('en-US', {
+  notation: 'compact',
+  maximumFractionDigits: 1,
+});
+// 950 → "950", 90,000 → "90 K", 1,200,000 → "1.2 M", 3,400,000,000 → "3.4 B"; null for
+// anything that isn't a count.
+export const compactCount = (n) =>
+  Number.isFinite(n) && n >= 0 ? compactText(compactNumber, n) : null;
+
+// money() that fits: `full` is the most (in the shown currency) written in full. When
+// it's shortened, `title` is the full figure (with the dollar figure after it when
+// converted) and `short` is true, for the accessible name.
+export function moneyFit(usd, fx = USD, { cents = false, most, full = FIT.value } = {}) {
+  const whole = money(usd, fx, { cents, most });
+  if (!whole.text) return { ...whole, short: false };
+  const shown = fx.code === 'USD' ? usd : usd * fx.rate;
+  if (Math.abs(shown) <= full) return { ...whole, short: false };
+  const text = compactText(
+    new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: fx.code,
+      notation: 'compact',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 1,
+    }),
+    shown,
+  );
+  return { text, title: whole.title ? `${whole.text} (${whole.title})` : whole.text, short: true };
+}
