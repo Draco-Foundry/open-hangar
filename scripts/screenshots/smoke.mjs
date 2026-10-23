@@ -6181,7 +6181,16 @@ try {
     head: await page.$eval('#pp-wish-h', (e) => e.textContent),
     rows: await wishRowsNow(),
     placeholder: await page.$eval('#pp-wish-q', (e) => e.placeholder),
+    // A row's name opens our Store's page for what the store sells now (the alerts'
+    // address: the id in the fragment).
+    links: await page.evaluate(() =>
+      [...document.querySelectorAll('.pp-wedit li')].map(
+        (li) => li.querySelector('a.pp-aname')?.getAttribute('href') || null,
+      ),
+    ),
   };
+  if (process.env.OH_SHOTS)
+    await page.screenshot({ path: path.join(process.env.OH_SHOTS, 'popup-wishlist.png') });
   // Typing finds on the device: the request log doesn't move.
   const ppBefore = await page.evaluate(() => __demo.fetched.length);
   await page.type('#pp-wish-q', 'zeus');
@@ -6233,6 +6242,8 @@ try {
   ppEd.rows[0].remove === 'Remove Avenger Titan' &&
   ppEd.rows[1].text === 'Cutlass - Ghoulish Green Paint On Sale $10 ✕' &&
   ppEd.placeholder === 'Add a ship, paint or upgrade' &&
+  /\/store#item=1$/.test(ppEd.links[0] || '') &&
+  /\/store#item=501$/.test(ppEd.links[1] || '') &&
   ppFound.names.slice(0, 3).join() === 'Zeus Mk II CL +,Zeus Mk II ES +,Zeus Mk II MR +' &&
   !ppFound.sent.length &&
   afterAdd.q === '' &&
@@ -6554,6 +6565,11 @@ try {
   await page.goto(URL0 + 'basic.html', { waitUntil: 'networkidle0' });
   await page.waitForSelector('#bp-about');
   const slim = await page.evaluate(() => ({
+    // The landmarks: the top bar is the header, the rest is the one main.
+    landmarks:
+      document.querySelectorAll('main').length === 1 &&
+      !!document.querySelector('header.bp-top') &&
+      !document.querySelector('main').contains(document.querySelector('header.bp-top')),
     about: document.getElementById('bp-about').textContent.trim(),
     scan: !!document.getElementById('bp-scan'),
     gone: [
@@ -6575,6 +6591,7 @@ try {
   slim.about ===
     "Open Hangar lives in the toolbar popup now. This page only opens when it needs to ask you something, or when a scan can't run hidden." &&
   slim.scan &&
+  slim.landmarks &&
   !slim.gone.length &&
   !slim.csv
     ? ok('the slim page: Scan and its one line; no lists, search, totals, CSV or settings')

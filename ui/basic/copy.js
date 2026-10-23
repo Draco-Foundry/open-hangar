@@ -5,14 +5,11 @@
 // to openhangar.space, the type names) are used as they are, not repeated here. {name}
 // parts are filled in by t(), and a key's '.one' words stand in when {n} is 1 ("1
 // pledge"). Headings and buttons in Title Case. Since 0.4.0 the page shows fewer of
-// them (its lists, Your Data, Saved Accounts and the alerts card moved to the popup):
-// those stay here as the approved record, word for word, for the pages that use them.
+// them (its lists, Your Data, Saved Accounts and the alerts card moved to the popup,
+// whose words are in ../popup/copy.js); the words only the old page used are gone.
 const COPY = {
   // --- Page ---
   'basic.loading': 'Loading your hangar.', // the moment before the stored hangar loads
-  'basic.tabs': 'Hangar sections', // the tab row's name for screen readers
-  'basic.tab-pledges': 'Pledges', // the pledges tab and its heading
-  'basic.tab-settings': 'Settings', // the settings tab and its heading
   // NEW: needs the owner's OK. The page's one line when it isn't open for anything else:
   // the popup is where Open Hangar is now, and why this page opens at all.
   'basic.page-about':
@@ -58,23 +55,6 @@ const COPY = {
   'basic.switched-back': "Signed in as {who} on RSI: that account's saved hangar is back.",
   'basic.switched-new': 'Signed in as {who} on RSI: that account has no scan here yet. Press Scan.',
   // --- Lists ---
-  'basic.search': 'Search by name', // the search box's hint
-  // Shown buy-backs, and the total of the ones whose price we've read.
-  'basic.buyback-totals': '{n} buy-backs, {value} ({priced} with a price listed)',
-  'basic.buyback-totals.one': '{n} buy-back, {value} ({priced} with a price listed)',
-  'basic.scanned-at': 'Scanned {when}',
-  'basic.no-pledges': 'No scan yet. Press Scan to read your hangar.', // no scan yet: points at Scan
-  'basic.no-buybacks': 'No buy-backs in your last scan.',
-  'basic.no-match': 'Nothing matches "{q}".',
-  'basic.show-all': 'Show All {n}', // button: draw every row
-  'basic.csv-saved': 'Saved {n} rows to a CSV file.',
-  'basic.csv-saved.one': 'Saved {n} row to a CSV file.',
-  'basic.col-name': 'Name',
-  'basic.col-type': 'Type',
-  'basic.col-value': 'Melt Value', // melt value
-  'basic.col-insurance': 'Insurance',
-  'basic.col-date': 'Date',
-  'basic.col-contains': 'Contains',
   // --- Settings ---
   'basic.connect-about': 'Optional. Connect to see your hangar on any device.', // optional; see it on any device
   'basic.connected': 'Connected as {name}',
@@ -92,24 +72,6 @@ const COPY = {
   'basic.code-again': 'Open the Page Again',
   'basic.code-cancel': 'Cancel',
   'basic.code-expired': 'That code expired before it was approved. Connect again.',
-  'basic.your-data': 'Your Data', // heading
-  'basic.data-about':
-    'Your hangar is saved in this browser. Export JSON makes a backup file you keep.', // stays in this browser; backup file
-  'basic.json-saved': 'Backup saved.',
-  'basic.clear-ask':
-    'Clear all saved data from this browser? Export a backup first if you might want it.', // are you sure; a backup first is wise
-  'basic.keep-data': 'Keep It', // the No to a removal
-  'basic.cleared': 'Saved data cleared from this browser.',
-  'basic.no-accounts': 'No saved RSI accounts yet.',
-  'basic.account-line': '{n} pledges, last scan {when}', // pledges, last scan
-  'basic.account-line.one': '{n} pledge, last scan {when}',
-  'basic.account-live': 'Signed In', // tag: the one signed in now
-  'basic.account-remove': 'Remove',
-  'basic.account-remove-ask': "Remove this account's saved hangar from this browser?",
-  'basic.rsi-session': 'RSI Session', // heading over Log Out of RSI
-  'basic.logout-about': 'Logs you out of RSI in this browser. Your saved hangar stays.', // ends the RSI session; data stays
-  'basic.logged-out': 'Logged out of RSI.',
-  'basic.logout-failed': "Couldn't log out of RSI. Try again, or log out on RSI's site.",
   // --- Firefox's data ask (its card's words: ui/basic/FirefoxCard.svelte) ---
   'basic.firefox-no': 'Firefox said no, so sync stays off.', // Firefox said no: sync stays off
   // --- A new RSI account on a connected browser ---
@@ -127,28 +89,9 @@ const COPY = {
   'basic.switch-yes': 'Switch to {to}',
   'basic.switch-no': 'Stay with {from}',
   // --- Store alerts (the `alerts` flag; the popup's switch since 0.4.0) ---
-  'basic.alerts-title': 'Store Alerts', // the card's heading (Title Case)
-  // What alerts do: a badge and notifications when something in RSI's store is for
-  // you (Wishlist, buy-backs, paints, warbonds, limited sales), matched in this browser
-  // from one public file, nothing about you sent; a check at most every 30 minutes.
-  'basic.alerts-about':
-    "A badge, and notifications if you allow them, when something in RSI's store is for you: your Wishlist, buy-backs, paints, warbonds and limited sales. It's matched in this browser from one public file, and nothing about you is sent. The store is checked at most every 30 minutes.",
-  // On: how many items are alerts right now, and when the store was last checked.
-  'basic.alerts-on-line': 'Alerts now: {n}',
-  'basic.alerts-checked': 'Store checked {when}',
-  // Notifications allowed, or not (then the badge and the popup's list only).
-  'basic.alerts-notify-on': 'Notifications are on.',
-  'basic.alerts-notify-off':
-    'Notifications are off, so alerts show on the badge and in the popup only.',
-  'basic.alerts-allow': 'Ask for Notifications Again', // ask for Notifications again (button)
-  // Connected: the account's Wishlist counts too (read, never written or sent back).
-  'basic.alerts-wishlist-on':
-    "Your account's Wishlist counts too. It's read here, never changed or sent back.",
-  // Not connected: only the hangar's rules; Connect adds the Wishlist.
-  'basic.alerts-wishlist-connect': 'Connect to openhangar.space to add your Wishlist.',
-  // The last check didn't reach openhangar.space: it tries again later, calm.
-  'basic.alerts-trouble':
-    "Couldn't reach openhangar.space for the store list. It tries again later.",
+  // --- Words that sat in the template, moved here word for word ---
+  'basic.allow-rsi': 'Allow Access to RSI',
+  'basic.report-problem': 'Report a Scan Problem',
   // --- Updates ---
   'basic.update-ready': 'Open Hangar {version} is ready.',
   'basic.update-reload': 'Reload to Update',

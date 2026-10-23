@@ -17,6 +17,10 @@ body {
   display: grid;
   gap: 14px;
 }
+.bp-main {
+  display: grid;
+  gap: 14px;
+}
 .bp h1,
 .bp h2,
 .bp h3 {

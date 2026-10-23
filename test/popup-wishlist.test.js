@@ -609,6 +609,27 @@ test('the sale line: only with a sale feed, a ship at its cheapest edition', asy
   assert.deepEqual(sale('sku:99'), { onSale: false, price: null });
 });
 
+test("the row's store link: the sale feed's item for the key, none when the store doesn't sell it", async () => {
+  const { wishItem } = await import('../ui/popup/data.js');
+  const AL = require('../src/alerts.js');
+  assert.equal(wishItem(null), null, 'no feed: no link');
+  const item = wishItem({
+    items: [
+      { id: 'sku-10', kind: 'ship', name: 'Titan WB', price: 55, ships: ['avenger-titan'] },
+      { id: 'upgrade-5', kind: 'upgrade', name: 'Up', price: 30, ships: [] },
+    ],
+  });
+  assert.equal(
+    AL.itemUrl('https://openhangar.space', item('ship:avenger-titan')),
+    'https://openhangar.space/store#item=10',
+  );
+  assert.equal(
+    AL.itemUrl('https://openhangar.space', item('ccu:5')),
+    'https://openhangar.space/store#item=Up',
+  );
+  assert.equal(item('ship:zeus'), null, 'not on sale: plain text');
+});
+
 test('alerts follow Remind Me: on from the switch, off with the last one, left alone otherwise', async () => {
   const { alertsFor } = await search();
   const on = [
