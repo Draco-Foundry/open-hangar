@@ -292,3 +292,40 @@ test('a saved buy-back page that is the only one: 100 buy-backs, one request', a
   assert.equal(r.items.length, 100);
   assert.deepEqual(asked, [1]);
 });
+
+// #729: after a full read, the count must fit the pager's last page: (last - 1) × size <
+// count ≤ last × size. Otherwise pages were missed (or read twice) and it's a partial read.
+function serveParts(parts, last, size) {
+  global.fetch = async (url) => {
+    const u = new URL(String(url));
+    if (!u.pathname.endsWith(PATH)) return new Response('', { status: 404 });
+    const n = Math.min(Number(u.searchParams.get('page')), parts.length);
+    return new Response(page(parts[n - 1], n, last, size));
+  };
+}
+test("a count that fits the pager's last page is a whole read", async () => {
+  const list = buybacks(25);
+  // The pager's page 3 holds items 21 to 25: 20 < 25 ≤ 30.
+  serveParts([list.slice(0, 10), list.slice(10, 20), list.slice(20)], 3, 10);
+  exactlyOnce(await scan(), list);
+});
+
+test("a count the pager's last page can't hold keeps the previous scan, and is partial otherwise", async () => {
+  const list = buybacks(14);
+  // Pages of 10, 2 and 2: three pages can't hold 14.
+  serveParts([list.slice(0, 10), list.slice(10, 12), list.slice(12)], 3, 10);
+  const r = await scan();
+  assert.equal(r.ok, true, 'nothing earlier to keep: saved, but said to be partial');
+  assert.match(r.partial, /don't fit 3 pages/);
+  // With an earlier, bigger scan: kept, and the error says why.
+  const before = buybacks(40);
+  store.db = { sources: { buybacks: { scannedAt: 1, items: before } } };
+  const again = await OH.scanSource('buybacks');
+  assert.equal(again.ok, false);
+  assert.match(again.error, /don't fit RSI's page count.*previous scan of 40/);
+  assert.equal(store.db.sources.buybacks.items.length, 40);
+  // Auto Scan Daily never saves it.
+  const auto = await OH.scanSource('buybacks', null, { auto: true });
+  assert.equal(auto.unfinished, true);
+  assert.equal(store.db.sources.buybacks.items.length, 40);
+});

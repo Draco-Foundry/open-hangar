@@ -1,0 +1,1 @@
+- New: TODO(Claude chat): words for the UEC and REC cards in the popup.
