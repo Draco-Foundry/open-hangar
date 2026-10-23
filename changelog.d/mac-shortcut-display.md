@@ -1,1 +1,1 @@
-- Improved: [PLACEHOLDER mac-shortcut-display: words from Claude chat] The popup shows its keyboard shortcut the Mac way (⌥⇧O) on a Mac.
+- Improved: **Shortcut on a Mac.** The popup shows its shortcut the Mac way, ⌥⇧O.

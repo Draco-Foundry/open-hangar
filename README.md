@@ -126,6 +126,9 @@ Anything after launch is a plan, not a promise. The details are in the
 
 ## Recently Shipped
 
+- [x] **Oct 23, 2026 · 0.5.3:** Scan tells you in plain words when RSI isn't answering and
+      keeps your last scan, your Wishlist and alerts still match ships RSI renames, the popup
+      shows UEC and REC, and Connect uses Open Hangar's own sign-in window.
 - [x] **Oct 14, 2026 · 0.4.0 and 0.4.1:** a new toolbar popup with three tabs, Hangar,
       Wishlist and Settings, plus an alerts bell. Also: scans that run out of sight, Auto Scan
       Daily (optional), your Wishlist in the popup, your own currency and light mode.
@@ -160,10 +163,12 @@ Anything after launch is a plan, not a promise. The details are in the
 
 - **The Toolbar Popup:** three tabs, Hangar, Wishlist and Settings, plus an alerts bell
   whose number matches the toolbar badge. The Hangar tab shows your RSI portrait and
-  handle, Account Value and how it changed since an earlier scan, Store Credit, Buy-Back
-  Tokens with the next refill, up to three Fleet News notes, and Scan.
+  handle, Account Value and how it changed since an earlier scan, Store Credit, UEC and REC
+  at a glance, Buy-Back Tokens with the next refill, up to three Fleet News notes, and Scan.
 - **Scans Out of Sight:** no scan tab. The scan runs in a hidden page, and closing the
   popup doesn't stop it.
+- **When RSI Has Trouble:** if RSI changes a page or stops answering, Scan stops, tells you
+  why in plain words and keeps your last scan.
 - **Your Whole Hangar:** Open My Hangar shows My Hangar on openhangar.space when you're
   connected, or hangar.openhangar.space when you're not.
 - **Store Alerts (Optional):** a badge and a notification when a ship in your buy-backs is
@@ -172,12 +177,12 @@ Anything after launch is a plan, not a promise. The details are in the
 - **Auto Scan Daily (Optional):** while you're connected to openhangar.space, Open Hangar
   can check your hangar once a day. Off until you turn it on.
 - **Your Wishlist:** while you're connected, search to add a ship, paint or upgrade, or
-  remove an item. Search runs on your device.
+  remove an item. Search runs on your device. Ships still match after RSI renames them.
 - **Add to RSI Cart:** put a ship upgrade (CCU) in your RSI cart in one click. You always
   check out on RSI yourself.
 - **Your Currency, Light Mode and a Shortcut:** amounts show in US dollars until you pick
   another currency in Settings. Look follows your browser, or pick Dark or Light.
-  Alt+Shift+O opens the popup.
+  Alt+Shift+O opens the popup (⌥⇧O on a Mac).
 - **Your Data, Your Way:** JSON Backup, Pledges CSV and Buy-Backs CSV on the Settings tab.
 
 **On [openhangar.space](https://openhangar.space/):**
