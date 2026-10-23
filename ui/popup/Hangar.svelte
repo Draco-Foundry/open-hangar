@@ -54,7 +54,7 @@
     news,
     first = false,
     onscan,
-    onbell,
+    onwishlist,
     alerts,
     fresh,
   } = $props();
@@ -299,7 +299,9 @@
         <div class="pp-newstop">
           <h2 class="pp-h3" id="pp-news-h">{t('popup.fleet-news')}</h2>
           {#if alerts?.items?.length}
-            <button type="button" class="pp-link" id="pp-all-alerts" onclick={onbell}>{t('popup.all-alerts')}</button>
+            <button type="button" class="pp-link" id="pp-news-wishlist" onclick={onwishlist}
+              >{t('popup.news-wishlist')}</button
+            >
           {/if}
         </div>
         {#if !news.length}<p class="pp-note" id="pp-news-none">{t('popup.fleet-news-none')}</p>{/if}

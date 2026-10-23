@@ -404,7 +404,8 @@ test('saved buy-back alerts clear out: items, memory, badge', () => {
     AL.shown(old).map((m) => [m.id, whys(m)]),
     [['sku-11', ['warbond']]],
   );
-  assert.equal(AL.badgeFor(true, old).text, '1');
+  // A hangar reason only: Fleet News, never the badge.
+  assert.equal(AL.badgeFor(true, old), null);
   const { state } = AL.nextState(old, [], NOW);
   assert.deepEqual(Object.keys(state.known), ['sku-11|warbond']);
   assert.deepEqual(state.seen, {});
@@ -417,6 +418,8 @@ test('the Wishlist: only when connected, by its keys (ship page, store id, upgra
   const ms = AL.matchAll(feed, { sources: {} }, wish);
   assert.deepEqual(ms.map((m) => m.id).sort(), ['sku-10', 'sku-30', 'upgrade-341']);
   assert.ok(ms.every((m) => whys(m).join() === 'wishlist'));
+  // Each with the Wishlist keys it answers to (the badge counts those).
+  assert.deepEqual(byId(ms, 'sku-10').why[0].keys, ['ship:cutlass-black']);
   // A ship on the Wishlist never lights up a paint for it.
   assert.equal(byId(ms, 'sku-20'), undefined);
   assert.deepEqual(AL.matchAll(feed, { sources: {} }, null), []);
@@ -510,9 +513,28 @@ test('notifications: one each, three at most, then one for the rest', () => {
   ]);
 });
 
-test('the badge: unseen items while alerts are on, else the rescan reminder', () => {
-  const ms = AL.matchAll(AL.readFeed(FEED), DB, null);
-  const { state } = AL.nextState(null, ms, NOW);
+test('the badge: Remind Me items on sale, unseen, each Wishlist item once', () => {
+  const feed = AL.readFeed(FEED);
+  // The hangar's reasons alone: Fleet News only, no badge.
+  const own = AL.nextState(null, AL.matchAll(feed, DB, null), NOW);
+  assert.ok(own.state.items.length > 0);
+  assert.equal(AL.badgeFor(true, own.state), null);
+  assert.deepEqual(own.remind, []);
+  // A ship on the Wishlist sold in two editions counts once; a store item once.
+  const two = {
+    ...feed,
+    items: [
+      ...feed.items,
+      { ...byId(feed.items, 'sku-10'), id: 'sku-99', name: 'Cutlass Black WB' },
+    ],
+  };
+  const ms = AL.matchAll(two, DB, ['ship:cutlass-black', 'sku:30']);
+  const { state, remind } = AL.nextState(null, ms, NOW);
+  assert.deepEqual(remind.map((m) => m.id).sort(), ['sku-10', 'sku-30', 'sku-99']);
+  assert.ok(
+    remind.every((m) => whys(m).join() === 'wishlist'),
+    'notified for the Wishlist only',
+  );
   assert.deepEqual(AL.badgeFor(true, state), {
     text: '2',
     title: 'Open Hangar alerts: 2. Click to see them.',
@@ -520,6 +542,9 @@ test('the badge: unseen items while alerts are on, else the rescan reminder', ()
   assert.equal(AL.badgeFor(false, state), null);
   assert.equal(AL.badgeFor(undefined, state), null);
   assert.equal(AL.badgeFor(true, AL.markSeen(state, NOW)), null);
+  // The same matches again: nothing new to notify.
+  assert.deepEqual(AL.nextState(state, ms, NOW + 30 * MIN).remind, []);
+  // Saved before the keys were kept: each item counts once.
   const many = {
     ...state,
     items: Array.from({ length: 12 }, (_, i) => ({
@@ -628,7 +653,8 @@ test('a check, not connected: the public feed only, with nothing of the pilot in
   assert.equal(init.credentials, 'omit');
   assert.deepEqual(init.headers, { Accept: 'application/json' });
   assert.ok(!('body' in init) && !init.method, 'a plain GET');
-  assert.equal(x.out.notes.length, 2);
+  // The hangar's matches are kept for Fleet News, with no notification.
+  assert.equal(x.out.notes.length, 0);
   assert.equal(x.out.badges, 1);
   assert.deepEqual(x.out.at, [NOW + 30 * MIN + 150e3]);
   assert.equal(x.data.alertsFeed.etag, 'W/"a"');

@@ -395,7 +395,7 @@ test('Account Value since an earlier scan: the newest one that differs, never th
   assert.equal(valueSince(null, 4280, valueOf, NOW), null);
 });
 
-test('Fleet News: the Wishlist first, then ships you own on sale, three at most', async () => {
+test('Fleet News: the Wishlist first, then ships you own on sale or a new paint, three at most', async () => {
   const { fleetNews } = await data();
   const m = (id, ...why) => ({ id, name: id, why: why.map((w) => ({ why: w, ships: [] })) });
   const items = [
@@ -408,14 +408,18 @@ test('Fleet News: the Wishlist first, then ships you own on sale, three at most'
   ];
   assert.deepEqual(
     fleetNews(items).map((x) => x.id),
-    ['wish', 'wish2', 'ltd'],
+    ['wish', 'wish2', 'paint'],
   );
   // Unseen first within the same kind.
   assert.deepEqual(
     fleetNews(items, new Set(['wish2'])).map((x) => x.id),
-    ['wish2', 'wish', 'ltd'],
+    ['wish2', 'wish', 'paint'],
   );
-  assert.deepEqual(fleetNews([m('paint', 'paint'), m('back', 'buyback')]), []);
+  assert.deepEqual(
+    fleetNews([m('paint', 'paint'), m('back', 'buyback')]).map((x) => x.id),
+    ['paint'],
+  );
+  assert.deepEqual(fleetNews([m('back', 'buyback')]), []);
   assert.deepEqual(fleetNews(null), []);
 });
 
@@ -704,7 +708,7 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
     'popup.what-changed',
     'popup.got-it',
     'popup.fleet-news',
-    'popup.all-alerts',
+    'popup.news-wishlist',
     'popup.scan-again',
     'popup.first',
     'popup.log-in',

@@ -15,10 +15,12 @@
  *                arrived in the store
  *       warbond  a ship you own is sold as a warbond edition
  *       limited  a ship you own is back on a limited-time sale
- * Each match says why. The badge counts the items with a match you haven't seen (the
- * popup lists them, and opening it marks them seen); a match that's new gets one
- * notification while Notifications are allowed (an optional permission, asked from the
- * Notifications switch's click). Not connected: the hangar rules only.
+ * Each match says why. Only the Wishlist's (Remind Me items on sale) take the toolbar
+ * badge, the Wishlist items you haven't seen (opening the popup marks them seen; its
+ * Wishlist tab counts them), and a notification when new, while Notifications are
+ * allowed (an optional permission, asked from the Notifications switch's click). The
+ * hangar's show only in the popup's Fleet News (the owner, 2026-10-23). Not connected:
+ * the hangar rules only, so no badge or notifications.
  *
  * Polite (docs/dev/requests.md): a check at most every 30 minutes, 30 to 35 apart (an
  * alarm, with jitter); the feed asked with its ETag; Retry-After honored; after a
@@ -351,8 +353,10 @@
     const out = [];
     for (const item of feed.items) {
       const why = [];
-      if (wished && wishKeysOf(item).some((k) => wished.has(k)))
-        why.push({ why: 'wishlist', ships: [] });
+      // The Wishlist keys it answers to, so the badge counts Wishlist items (a ship sold in
+      // two editions is one), as the popup's Wishlist tab does.
+      const keys = wished ? wishKeysOf(item).filter((k) => wished.has(k)) : [];
+      if (keys.length) why.push({ why: 'wishlist', ships: [], keys });
       const ship = item.kind === 'ship' || item.kind === 'vehicle';
       const mine = (from) => item.ships.filter((s) => from.has(s)).map((s) => index.name(s));
       if (ship) {
@@ -415,7 +419,12 @@
     const { hidden, ...rest } = s;
     return { ...rest, items, known: map(s.known), seen: map(s.seen), gone: map(s.gone) };
   }
-  // → { state, fresh }: fresh are the matches with a pair never matched before.
+  // Only a Remind Me item on sale (the Wishlist reason) takes the badge and a notification
+  // (the owner, 2026-10-23); the hangar's reasons show in the popup's Fleet News only.
+  const REMIND = 'wishlist';
+  const remindOnly = (m) => ({ ...m, why: m.why.filter((w) => w?.why === REMIND) });
+  // → { state, fresh, remind }: fresh are the matches with a pair never matched before;
+  // remind, those whose Wishlist pair is the new one (their notifications).
   function nextState(prev, matches, now) {
     const s = cleanState(prev);
     const live = new Set(matches.flatMap(pairsOf));
@@ -423,6 +432,9 @@
     const seen = { ...s.seen };
     const gone = { ...s.gone };
     const fresh = matches.filter((m) => pairsOf(m).some((p) => !(p in known)));
+    const remind = fresh
+      .map(remindOnly)
+      .filter((m) => m.why.length && !(`${m.id}|${REMIND}` in known));
     for (const p of live) {
       if (!(p in known)) known[p] = now;
       delete gone[p];
@@ -451,9 +463,10 @@
         gone: cap(gone),
       },
       fresh,
+      remind,
     };
   }
-  // Items with a pair the pilot hasn't seen: the badge's count.
+  // Items with a pair the pilot hasn't seen: Fleet News marks them.
   const unseen = (state) => {
     const s = cleanState(state);
     return s.items.filter((m) => pairsOf(m).some((p) => !(p in s.seen)));
@@ -501,10 +514,19 @@
       });
     return out;
   }
-  // The toolbar badge while matches wait, or null (the rescan reminder's then).
+  // The toolbar badge while Remind Me items on sale wait unseen, or null (the rescan
+  // reminder's then): how many Wishlist items, each once.
   function badgeFor(on, state) {
     if (on !== true) return null;
-    const n = unseen(state).length;
+    const s = cleanState(state);
+    const items = new Set();
+    for (const m of s.items) {
+      const w = m.why.find((x) => x?.why === REMIND);
+      if (!w || `${m.id}|${REMIND}` in s.seen) continue;
+      const keys = Array.isArray(w.keys) && w.keys.length ? w.keys : [m.id];
+      for (const k of keys) items.add(k);
+    }
+    const n = items.size;
     if (!n) return null;
     return { text: n > 9 ? '9+' : String(n), title: t('alerts.badge-title', { n }) };
   }
@@ -678,7 +700,7 @@
     let state = null;
     if (feed) {
       const r = nextState(s[STATE_KEY], matchAll(feed, s.db, wish), now);
-      fresh = r.fresh;
+      fresh = r.remind;
       const was = isObj(s[STATE_KEY]) ? s[STATE_KEY].checkedAt : null;
       state = { ...r.state, checkedAt: network ? now : Number.isFinite(was) ? was : null };
       save[STATE_KEY] = state;

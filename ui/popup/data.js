@@ -432,9 +432,11 @@ export function valueSince(history, total, valueOf, scannedAt) {
 }
 
 // --- Fleet News: the store alerts that are news for this hangar ------------------------
-// Something on your Wishlist in the store, or a ship you own on sale (a warbond edition
-// or a limited-time sale): up to `max`, the Wishlist first, unseen before seen.
-const NEWS_WHY = ['wishlist', 'warbond', 'limited'];
+// Something on your Wishlist in the store, a ship you own on sale (a warbond edition or a
+// limited-time sale), or a new paint for a ship you own: up to `max`, the Wishlist first,
+// unseen before seen. The only place the hangar's reasons show (the badge and
+// notifications are the Wishlist's, the owner, 2026-10-23).
+const NEWS_WHY = ['wishlist', 'warbond', 'limited', 'paint'];
 export function fleetNews(items, unseen = new Set(), max = 3) {
   const rank = (m) =>
     (m.why.some((x) => x?.why === 'wishlist') ? 0 : 2) + (unseen.has(m.id) ? 0 : 1);

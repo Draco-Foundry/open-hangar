@@ -6098,7 +6098,7 @@ try {
   await page.click('.pp-wadd');
   await page.waitForFunction(() => document.querySelectorAll('.pp-wedit li').length === 4);
   // Remove the Avenger Titan.
-  await page.click('.pp-wedit li:nth-child(3) .pp-wx');
+  await page.click('.pp-wedit .pp-wx[aria-label="Remove Avenger Titan"]');
   await page.waitForFunction(() => document.querySelectorAll('.pp-wedit li').length === 3);
   const wishDone = await page.evaluate(async () => ({
     head: document.getElementById('pp-wish-h').textContent,
@@ -6126,12 +6126,13 @@ try {
   !ppFound.sent.length &&
   afterAdd.q === '' &&
   afterAdd.focus === 'pp-wish-q' &&
-  afterAdd.rows[0] === 'Zeus Mk II CL Not for Sale ✕' &&
+  // Added first on the website's list, shown after what's on sale.
+  afterAdd.rows[2] === 'Zeus Mk II CL Not for Sale ✕' &&
   JSON.stringify(wishDone.posts.map((p) => p.body)) === JSON.stringify(POSTS) &&
   wishDone.posts.every((p) => p.auth === 'Bearer t' && p.url === `${ppSite}/api/v1/wishlist`) &&
   wishDone.reads === 1 &&
   wishDone.head === 'Your Wishlist · 3' &&
-  wishDone.rows.join() === 'Upgrade to Freelancer,Zeus Mk II CL,Cutlass - Ghoulish Green Paint' &&
+  wishDone.rows.join() === 'Upgrade to Freelancer,Cutlass - Ghoulish Green Paint,Zeus Mk II CL' &&
   wishDone.kept?.join() === 'ccu:16,ship:zeus-mk-ii-cl,sku:501' &&
   !wishDone.wide
     ? ok(
@@ -6142,11 +6143,12 @@ try {
   // read): the item stays, the note says so, and the next change waits the website's
   // minute.
   await page.evaluate(() => (__demo.wishDown = true));
-  await page.click('.pp-wedit li:nth-child(3) .pp-wx');
+  const paintX = '.pp-wedit .pp-wx[aria-label="Remove Cutlass - Ghoulish Green Paint"]';
+  await page.click(paintX);
   await page.waitForFunction(
-    () =>
-      document.getElementById('pp-wish-note') &&
-      !document.querySelector('.pp-wedit li:nth-child(3) .pp-wx').disabled,
+    (x) => document.getElementById('pp-wish-note') && !document.querySelector(x).disabled,
+    {},
+    paintX,
   );
   await sleep(100);
   const wishDown = await page.evaluate(async () => {
@@ -6159,7 +6161,7 @@ try {
     };
   });
   await page.evaluate(() => (__demo.wishDown = false));
-  wishDown.rows.join() === 'Upgrade to Freelancer,Zeus Mk II CL,Cutlass - Ghoulish Green Paint' &&
+  wishDown.rows.join() === 'Upgrade to Freelancer,Cutlass - Ghoulish Green Paint,Zeus Mk II CL' &&
   wishDown.note === "Couldn't Reach openhangar.space" &&
   wishDown.sent?.do === 'remove' &&
   wishDown.sent?.key === 'sku:501' &&
@@ -7009,23 +7011,31 @@ try {
     sent: __demo.sent.map((m) => m.ohPopup),
   }));
   alHome.tab === 'pp-tab-hangar' &&
-  alHome.news.length === 1 &&
-  alHome.news[0] === 'Not seen yet: Cutlass Black Limited-time sale: Cutlass Black ›' &&
+  alHome.news.length === 3 &&
+  alHome.news[0].startsWith('Not seen yet: Sabre Raven EX In the store in the last 7 days') &&
+  alHome.news[1] === 'Not seen yet: Cutlass Black Limited-time sale: Cutlass Black ›' &&
+  alHome.news[2].startsWith('Constellation Mk IV - Nightbreak Paint') &&
   alHome.sent.includes('alerts-seen')
-    ? ok('Fleet News on Hangar (opened there for it), all marked seen')
+    ? ok('Fleet News on Hangar: paint and limited sales for your ships, unseen first, all marked seen')
     : fail(`popup fleet news: ${JSON.stringify(alHome)}`);
   await page.click('#pp-news .pp-item');
   const alRow = await page.evaluate(() => __demo.opened.at(-1));
-  alRow === 'https://openhangar.space/store#item=19700'
+  await page.click('#pp-news-wishlist');
+  const alTab = await page.evaluate(
+    () => document.querySelector('[role="tab"][aria-selected="true"]')?.id,
+  );
+  alTab === 'pp-tab-wishlist'
+    ? ok("Fleet News's link opens the Wishlist tab")
+    : fail(`fleet news link went to ${alTab}`);
+  alRow === 'https://openhangar.space/store#item=19623'
     ? ok('a Fleet News item opens that item on our Store')
     : fail(`fleet news item went to ${alRow}`);
   await page.removeScriptToEvaluateOnNewDocument(alHook.identifier);
-  // Alerts on with nothing that's news for your ships: Fleet News says so, and All Alerts
-  // still opens the rest.
+  // Alerts on with nothing that's news for your ships: Fleet News says so, with no link.
   const quiet = {
     ...alState,
     popupPrefs: { tab: 'hangar' },
-    alerts: { ...alState.alerts, items: alState.alerts.items.slice(0, 2) },
+    alerts: { ...alState.alerts, items: [] },
   };
   const quietHook = await page.evaluateOnNewDocument((st) => (window.__demoAlerts = st), quiet);
   await page.goto('about:blank');
@@ -7034,10 +7044,10 @@ try {
   const alQuiet = await page.evaluate(() => ({
     none: document.getElementById('pp-news-none')?.textContent || '',
     items: document.querySelectorAll('#pp-news .pp-item').length,
-    all: !!document.getElementById('pp-all-alerts'),
+    link: !!document.getElementById('pp-news-wishlist'),
   }));
   await page.removeScriptToEvaluateOnNewDocument(quietHook.identifier);
-  alQuiet.none === 'No news for your ships right now.' && !alQuiet.items && alQuiet.all
+  alQuiet.none === 'No news for your ships right now.' && !alQuiet.items && !alQuiet.link
     ? ok('Fleet News with nothing for your ships: "No news for your ships right now."')
     : fail(`popup fleet news empty: ${JSON.stringify(alQuiet)}`);
   await page.setViewport({ width: 1280, height: 900 });

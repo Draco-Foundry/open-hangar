@@ -534,7 +534,7 @@
         {now}
             {news}
             onscan={scan}
-            onbell={() => pickTab('wishlist')}
+            onwishlist={() => pickTab('wishlist')}
             {alerts}
             {fresh}
           />

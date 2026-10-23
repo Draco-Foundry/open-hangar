@@ -41,7 +41,8 @@ const COPY = {
   // Beside the buy-back token count: when RSI hands out the next one ("Next refill Jan 4").
   'popup.token-next': 'Next refill {date}',
   'popup.fleet-news': 'Fleet News', // heading
-  'popup.all-alerts': 'All Alerts', // opens the bell view
+  // PLACEHOLDER (words from Claude chat, #785): Fleet News's link to the Wishlist tab.
+  'popup.news-wishlist': 'Wishlist',
   // Fleet News with store alerts on and nothing for your ships or your Wishlist.
   'popup.fleet-news-none': 'No news for your ships right now.',
   // The Scan button (asks the background, which runs the scan).

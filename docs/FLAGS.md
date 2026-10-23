@@ -164,9 +164,10 @@ everyone) and, while this browser is connected, the account's Wishlist keys
 (`/api/v1/wishlist` with the sync token; read only), and matches them here against the
 hangar and buy-backs this browser scanned. Each match says why: on your Wishlist, a ship
 in your buy-backs is in the store again, a paint for a ship you own just arrived, a ship
-you own is sold as a warbond, or is on a limited-time sale. The badge counts the items
-you haven't seen (the popup's Wishlist tab counts the Remind Me items on sale, and
-opening the popup marks them seen); a new one gets a notification. It's off until the pilot turns it on in the
+you own is sold as a warbond, or is on a limited-time sale. Only the Wishlist's take the
+badge (the Remind Me items on sale you haven't seen; the popup's Wishlist tab counts
+them, and opening the popup marks them seen) and a notification when new; the hangar's
+show in the popup's Fleet News only. It's off until the pilot turns it on in the
 popup's settings (Store Alerts), and asks nothing before that: the popup has its own
 Notifications switch, and turning alerts off stops the checks and gives Notifications
 back. The popup's switch asks as the click's very first step; if the popup closes for
