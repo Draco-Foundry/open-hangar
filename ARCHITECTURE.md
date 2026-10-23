@@ -70,7 +70,10 @@ popup: `chrome.action.onClicked` opens `src/dashboard.html` in a tab. It also:
   minutes on. It skips without asking RSI anything after any scan in the last 20 hours
   (`scanStarted`, or its own last run's `autoScan.ended`), while its last run's `retryAt`
   holds, offline, or while a scan runs, and otherwise asks the hidden scan page for it,
-  never a tab (`requestScan('auto', { hiddenOnly: true })`). The run is the page's
+  never a tab (`requestScan('auto', { hiddenOnly: true })`). A scan that stopped (its start
+  with no report or record, its heartbeat quiet for 2 minutes) doesn't count, and a run
+  of its own that stopped is tried once more on the next popup open or browser start, at
+  most once in 20 hours (`autoScanRetry`). The run is the page's
   ([The Scan Pipeline](#the-scan-pipeline)). A run that found nothing new keeps the
   badge's scan fresh. The link going (by any route) turns it off and clears its alarm;
   store alerts' alarm is never touched.
@@ -303,6 +306,7 @@ browser's default quota). The main keys:
 | `scanStarted`, `scanFull`  | The last scan that began (for Scan stopped after a restart); each part's last complete read                 | `ui/scan/runner.js`                        |
 | `autoScanOn`, `autoScan`   | Auto Scan Daily's switch (gone on Disconnect, Clear Data); its last run, replaced whole                     | `ui/popup/actions.js`, `ui/scan/runner.js` |
 | `autoScanNext`             | Auto Scan Daily's next run, for a worker that starts with its alarm gone                                    | `src/background.js`                        |
+| `autoScanRetry`            | When Auto Scan Daily last tried again a run that stopped (once in 20 hours at most)                         |
 
 Other keys are caches of public data (for example `shipMatrix`, `shipCatalog`,
 `shipImages`, `scVersion`, `patchNotes`, `storeShips`, `fxRates`) and UI

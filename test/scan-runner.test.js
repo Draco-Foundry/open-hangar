@@ -211,13 +211,13 @@ test('scan: the account, the hangar, buy-backs, referrals, saved, then the sync 
   assert.deepEqual(x.local.data.scanReport, report);
 });
 
-test('scan: its marks (run and by), renewed at most once a minute, gone at the end', async () => {
+test('scan: its marks (run and by), its heartbeat every 30 seconds at most, gone at the end', async () => {
   const x = await setup({
     scanSource: async function (id, onProgress) {
-      // RSI pages, a minute and a half apart.
+      // RSI pages, 20 seconds apart.
       for (let page = 1; page <= 4; page++) {
         onProgress(page, page * 10);
-        x.clock.t += 30e3;
+        x.clock.t += 20e3;
       }
       return { ok: true, items: [] };
     },
@@ -225,9 +225,13 @@ test('scan: its marks (run and by), renewed at most once a minute, gone at the e
   await x.runner.scan();
   const marks = sets(x.session, 'scanRunning');
   assert.deepEqual(marks[0], { at: 1_000_000, tabId: 42, run: 'run-a', by: 'tab' });
-  // 8 pages over four minutes: renewed every minute, not every page.
+  // 8 pages over 160 seconds: renewed every 30 seconds or so, not every page, and never
+  // quiet for the 2 minutes that make it a scan that stopped.
   assert.ok(marks.length >= 4 && marks.length <= 6, `${marks.length} marks`);
-  for (let i = 1; i < marks.length; i++) assert.ok(marks[i].at - marks[i - 1].at >= 60e3);
+  for (let i = 1; i < marks.length; i++) {
+    assert.ok(marks[i].at - marks[i - 1].at >= (await load()).MARK_GAP);
+    assert.ok(marks[i].at - marks[i - 1].at < 2 * 60e3);
+  }
   assert.equal(x.session.data.scanRunning, undefined, 'removed at the end');
   assert.equal(x.session.data.scanProgress, undefined, 'removed at the end');
   // A page that learns its tab late (a promise) still marks the tab it's in.
@@ -484,6 +488,25 @@ test('scan: one at a time in a page; signed out reads nothing and sends nothing'
   assert.equal(r.sync, null);
   assert.deepEqual(out.calls, ['getAccount force', 'flush', 'settled']);
   assert.ok(out.logs.includes('error status: signed out'));
+});
+
+test('scan: signed out partway, nothing more is read, and the report says signed out', async () => {
+  const x = await setup();
+  const read = [];
+  x.OH.scanSource = async (id) => {
+    read.push(id);
+    return { ok: false, signedOut: true, error: 'not signed in' };
+  };
+  x.OH.getReferral = async () => (read.push('referral'), { ok: true });
+  const r = await x.runner.scan();
+  assert.deepEqual(read, ['hangar'], 'buy-backs and referrals never asked');
+  assert.equal(r.signedOut, true);
+  assert.equal(r.bad, true);
+  assert.deepEqual(
+    r.rows.map((row) => [row.id, row.ok]),
+    [['hangar', false]],
+  );
+  assert.equal(r.sync?.state ?? null, null, 'nothing sent');
 });
 
 test('scan: a part that fails or stops short is a problem, logged without names', async () => {

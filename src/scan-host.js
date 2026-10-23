@@ -32,7 +32,7 @@
  * read the file as they open, so the cache is fresh even when no scan got far) sends
  * scans back to the tab. It can only turn the hidden page off, never anything on. A
  * hidden page that went quiet (a scan asked of it never taken, or its scan mark not
- * renewed for 10 minutes) or that stopped on an error does the same for the rest of
+ * renewed for 2 minutes) or that stopped on an error does the same for the rest of
  * this browser session (session `scanHiddenOff { at, why: 'stuck' | 'failed' }`; a
  * restart or an update clears it), so one that can't work here costs one Scan.
  *
@@ -55,9 +55,9 @@
 (function (root) {
   const PAGE = 'src/scan.html';
   const FRAME_ID = 'oh-scan';
-  // src/background.js: a scan mark older than this is a page that went away; a scan
-  // request is pending this long.
-  const SCAN_RUN_MAX = 10 * 60e3;
+  // src/background.js: a scan mark older than this is a scan that stopped (the mark is
+  // its heartbeat); a scan request is pending this long.
+  const SCAN_RUN_MAX = 2 * 60e3;
   const ASK_MAX = 60e3;
   // The offscreen document's reason, for Chrome's review (docs/STORE.md, offscreen).
   const WHY =
@@ -245,7 +245,7 @@
     // Firefox put its event page to sleep, or it was closed as stuck). There's one
     // hidden page at a time, so a hidden page's mark for any run but `keep` (the page
     // open now, or the one about to be made) is nobody's. Left, it would hold the next
-    // scan as busy for up to 10 minutes. Its progress goes with it.
+    // scan as busy for up to 2 minutes. Its progress goes with it.
     async function forget(keep) {
       const s = await chrome.storage.session.get(['scanRunning', 'scanProgress']);
       const m = s.scanRunning;
@@ -316,7 +316,7 @@
 
     // A scan mark from a hidden page ({ by, run }) is that page's while it's open. A
     // browser that can't see hidden pages (or can't say right now) trusts the mark for
-    // its 10 minutes.
+    // its 2 minutes.
     async function alive(mark) {
       if (kind() === 'tab') return true;
       try {

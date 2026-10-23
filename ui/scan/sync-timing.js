@@ -4,10 +4,11 @@
 // one. A sync asked for meanwhile waits for the scan's own sync at its end.
 // Pure (test/basic-sync.test.js); ui/scan/runner.js keeps the state.
 
-// A scan mark older than this is a page that went away mid-scan: the same 10 minutes
-// as src/background.js and the popup (ui/popup/data.js). A running scan renews its
-// mark every minute (ui/scan/runner.js).
-export const SCAN_RUN_MAX = 10 * 60e3;
+// A scan mark older than this is a scan that stopped (its page went away mid-scan, or
+// it hung): the same 2 minutes as src/background.js and the popup (ui/popup/data.js).
+// The mark is the scan's heartbeat: renewed every 30 seconds while it reads
+// (ui/scan/runner.js MARK_GAP).
+export const SCAN_RUN_MAX = 2 * 60e3;
 
 // Another page's scan, from its scanRunning mark ({ at, tabId, run, by }). `me` is the
 // asking page: { tabId, run }, or just its tab id. A mark with a run id belongs to that
