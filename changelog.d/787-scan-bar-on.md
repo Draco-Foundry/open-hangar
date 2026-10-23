@@ -1,0 +1,1 @@
+- New: The popup shows a scan as one counting bar. [words pending from Claude chat]
