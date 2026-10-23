@@ -5262,7 +5262,17 @@ try {
 
   // Scan: a background that scans in the Open Hangar tab brings it to the front (the
   // popup closes, as before); one that scans unseen keeps the popup open with the bar,
-  // the steps and, after, how long it took. Clear Data waits while it runs.
+  // the steps and, after, how long it took. Clear Data waits while it runs. The bar is on
+  // by default (owner, 2026-10-23); this part forces it off to keep that path tested.
+  const stepsHook = await page.evaluateOnNewDocument(() => {
+    let flags;
+    const OH = (window.OH = window.OH || {});
+    Object.defineProperty(OH, 'flags', {
+      configurable: true,
+      get: () => flags,
+      set: (f) => (flags = Object.freeze({ ...f, scanBar: false })),
+    });
+  });
   await popAt(signedIn, '#pp-scan');
   await page.click('#pp-scan');
   await sleep(150);
@@ -5404,6 +5414,7 @@ try {
   refused.closed && !refused.bar
     ? ok('a scan the background refused: the popup closes, as before, no bar')
     : fail(`popup refused: ${JSON.stringify(refused)}`);
+  await page.removeScriptToEvaluateOnNewDocument(stepsHook.identifier);
   // The scan bar (the scanBar flag, owner 2026-10-20), forced on for this part: Scan
   // becomes the bar at once, the bar names the part and counts, fills by RSI's page
   // count, says when RSI asks to wait, then how long the scan took, with Scan back under

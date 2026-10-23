@@ -71,10 +71,6 @@
       about: 'Auto Scan Daily: a quick check once a day while connected, a full scan when needed.',
       default: true,
     },
-    // The popup's scan bar (owner, 2026-10-20): one bar where Scan sits, naming the part
-    // running and counting what it has read, filled by RSI's page count, then how long
-    // the scan took; Scan held back while one starts or RSI asks to wait. Off: the bar
-    // under the header and the step list (ui/popup/Hangar.svelte).
     // The owner's alert (owner, 2026-10-22): when Auto Scan Daily stops because RSI changed
     // a page, the maintainer's own copy says so in a notification on that computer
     // (src/background.js), before pilots report broken scans. Nothing is sent. Dev builds
@@ -84,9 +80,14 @@
       default: false,
       devOnly: true,
     },
+    // The popup's scan bar (owner, 2026-10-20): one bar where Scan sits, naming the part
+    // running and counting what it has read, filled by RSI's page count, then how long
+    // the scan took; Scan held back while one starts or RSI asks to wait. On in every
+    // build (owner, 2026-10-23). Off: the bar under the header and the step list
+    // (ui/popup/Hangar.svelte).
     scanBar: {
       about: 'The popup shows a scan as one counting bar where Scan sits, not a step list.',
-      default: false,
+      default: true,
     },
   };
 

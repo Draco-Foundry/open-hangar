@@ -1,0 +1,1 @@
+- New: **Scan progress bar.** While a scan runs, the popup shows one bar where Scan sits, naming the part it's reading with a running count, then how long the scan took.
