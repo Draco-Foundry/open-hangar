@@ -1,1 +1,1 @@
-- Changed: PLACEHOLDER (words needed from Claude chat) Arrows and chevron characters are gone from names, sort labels and help paths; "A to B" and "Up 5%" read as words, and the chevrons are icons.
+- Changed: **Words instead of arrows.** An upgrade's name now reads like "Aurora MR to Mustang Alpha", help paths use slashes, and the popup's chevrons are drawn icons.
