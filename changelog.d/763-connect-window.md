@@ -1,1 +1,1 @@
-- Changed: PLACEHOLDER (words from Claude chat, Handoffs "EXT #669 F1: Words"): Connect This Browser on openhangar.space now opens Open Hangar's own sign-in window, and switching to another account asks first.
+- Changed: **Safer connecting.** Connect This Browser on openhangar.space now opens Open Hangar's own sign-in window, and switching to another account asks you first.
