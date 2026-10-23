@@ -142,6 +142,12 @@ export function scanAge(scannedAt, now = Date.now()) {
   return { tone, n: Math.floor(mins / 1440), unit: 'd' };
 }
 
+// A list an older parser read (OH.parserStale, #728) shows as stale, not as current: the
+// header's age goes amber, in the words it already has, until the next scan reads it again.
+export function staleAge(age, stale) {
+  return stale && age?.tone === 'fresh' ? { ...age, tone: 'stale' } : age;
+}
+
 // --- The scan, from the shared keys (session scanRunning and scanProgress, local
 // scanReport) -----------------------------------------------------------------------
 const STEPS = ['hangar', 'buybacks', 'referrals'];

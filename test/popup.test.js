@@ -15,8 +15,12 @@ const HOUR = 3600e3;
 const DAY = 86400e3;
 
 test('header: the scan age, green, amber from a week, grey before any scan', async () => {
-  const { scanAge } = await data();
+  const { scanAge, staleAge } = await data();
   assert.deepEqual(scanAge(null, NOW), { tone: 'never', n: null, unit: null });
+  // A list an older parser read shows amber, whatever its age; never and stale stay.
+  assert.equal(staleAge(scanAge(NOW - 20e3, NOW), true).tone, 'stale');
+  assert.equal(staleAge(scanAge(NOW - 20e3, NOW), false).tone, 'fresh');
+  assert.equal(staleAge(scanAge(null, NOW), true).tone, 'never');
   assert.deepEqual(scanAge(NOW - 20e3, NOW), { tone: 'fresh', n: 1, unit: 'm' });
   assert.deepEqual(scanAge(NOW - 42 * MIN, NOW), { tone: 'fresh', n: 42, unit: 'm' });
   assert.deepEqual(scanAge(NOW - 2 * HOUR, NOW), { tone: 'fresh', n: 2, unit: 'h' });

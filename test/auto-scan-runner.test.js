@@ -222,6 +222,14 @@ test('check 4: nothing new: 3 requests to RSI, only its record written, nothing 
   assert.equal(sess.scanProgress, undefined);
 });
 
+test('check 4: a list an older parser read is due: a full read, not a quick check (#728)', async () => {
+  const r = await scannedAndSynced();
+  mem.scanParser = { hangar: 1, buybacks: 0 };
+  await r.autoScan();
+  assert.deepEqual(asked.slice(0, 3), ['who', 'who', 'dossier'], 'straight to the full read');
+  assert.equal(mem.scanParser.buybacks, 1, 'and read again: no longer stale');
+});
+
 test('check 4: a sync owed makes it a full read, and the sync goes only at its end', async () => {
   const r = await scannedAndSynced();
   mem.siteLink.syncedScan = 'an older scan';
