@@ -1,10 +1,11 @@
 <script>
-  // The Settings tab (owner, 2026-10-14), what the basic page's settings do
-  // (ui/basic/Settings.svelte), grouped: openhangar.space (Sync Now, Disconnect;
-  // Connect opens the extension's own page, since the browser's sign-in window would
-  // close the popup), the store alerts' switches, Look, Currency and the shortcut, the
-  // data buttons, Saved Accounts (the privacy policy promises you can remove one here),
-  // Log Out of RSI and Clear Data, then Help, Report a Scan Problem and Privacy.
+  // The Settings tab (owner, 2026-10-14; this order 2026-10-24), what the basic page's
+  // settings do (ui/basic/Settings.svelte), top to bottom: one openhangar.space box (Sync
+  // Now, Disconnect, Auto Scan Daily, Notifications; Connect opens the extension's own
+  // page, since the browser's sign-in window would close the popup), Look, Currency and
+  // Shortcut as list rows, Saved Accounts (the privacy policy promises you can remove one
+  // here), the Export menu and Log Out of RSI, then Help, Report a Scan Problem and
+  // Privacy, and Clear Data on its own line.
   import { onMount, tick } from 'svelte';
   import { t } from './copy.js';
   import { autoLine, popupShortcut, scanAge, syncTrouble } from './data.js';
@@ -142,6 +143,47 @@
     // The ask is the click's very first step (Firefox only asks then).
     askNotify().then(async () => (notify = await notifyAllowed()));
   }
+  // The Export menu: a menu button (arrows move, Escape closes back to the button, Tab or
+  // a click outside closes it).
+  let exportOpen = $state(false);
+  let exportBtn = $state();
+  let exportMenu = $state();
+  const items = () => [...(exportMenu?.querySelectorAll('[role="menuitem"]') || [])];
+  async function openExport(at = 0) {
+    exportOpen = true;
+    await tick();
+    items().at(at)?.focus();
+  }
+  function closeExport(back) {
+    exportOpen = false;
+    if (back) exportBtn?.focus();
+  }
+  function exportKey(e) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      openExport(e.key === 'ArrowUp' ? -1 : 0);
+    }
+  }
+  function menuKey(e) {
+    const all = items();
+    const i = all.indexOf(document.activeElement);
+    const go = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: -1 }[e.key];
+    if (go != null) {
+      e.preventDefault();
+      all.at(go % all.length)?.focus();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeExport(true);
+    } else if (e.key === 'Tab') closeExport(false);
+  }
+  function outside(e) {
+    if (exportOpen && !exportMenu?.contains(e.target) && !exportBtn?.contains(e.target))
+      closeExport(false);
+  }
+  async function pick(run) {
+    closeExport(true);
+    await run();
+  }
   async function backup() {
     await exportJson();
     dataNote = t('popup.json-saved');
@@ -171,10 +213,13 @@
   const LOOK = { auto: 'popup.look-auto', dark: 'popup.look-dark', light: 'popup.look-light' };
 </script>
 
+<svelte:window onclick={outside} />
+
 <div class="pp-body pp-settings" id="pp-settings">
-  {#if siteOn}
-    <div class="pp-grp pp-site" class:warn={!!trouble} id="pp-site">
-      {#if v.connected}
+  {#if siteOn || ALERTS}
+    <!-- openhangar.space and the switches, in one box; Notifications sits in it either way. -->
+    <div class="pp-grp pp-site" class:warn={siteOn && !!trouble} id="pp-site">
+      {#if siteOn && v.connected}
         <div class="pp-r">
           <i class="pp-dot" class:on={!trouble} class:warn={!!trouble} aria-hidden="true"></i>
           <span class="pp-grow">{t('popup.connected', { name: v.connected.name })}</span>
@@ -191,25 +236,6 @@
             <b>{t('popup.sync-trouble')}</b>
             <small>{trouble.until ? t('popup.sync-wait', { time: at(trouble.until) }) : trouble.msg}</small>
           </div>
-        {/if}
-        {#if AUTO}
-          <div class="pp-r">
-            <span class="pp-grow" id="pp-auto-l">{t('popup.auto-scan')}</span>
-            <button
-              type="button"
-              role="switch"
-              class="pp-sw"
-              id="pp-auto-sw"
-              aria-checked={autoOn}
-              aria-labelledby="pp-auto-l"
-              onclick={autoSwitch}><i></i></button
-            >
-          </div>
-          <!-- Its status line while it's on (copy.js popup.auto-*, data.js autoLine); amber
-               when the last run kept a part back and asks for a scan. -->
-          {#if line}
-            <p class="pp-r pp-msg" class:calm={!line.ask} id="pp-auto-line">{t(line.key, { when: line.when })}</p>
-          {/if}
         {/if}
         {#if pilot}
           <div class="pp-r pp-col" id="pp-pilot" role="group" aria-labelledby="pp-pilot-h">
@@ -233,76 +259,97 @@
             </div>
           </div>
         {:else}
-          <div class="pp-r pp-pair">
-            <button type="button" class="pp-btn2" id="pp-sync" disabled={syncing || busy} onclick={sync}>Sync Now</button>
-            <button type="button" class="pp-btn2 quiet" id="pp-disconnect" onclick={openAsk}>Disconnect</button>
+          <!-- Sync Now the main button, Disconnect a quiet link beside it. -->
+          <div class="pp-r pp-syncrow">
+            <button type="button" class="pp-btn2 main" id="pp-sync" disabled={syncing || busy} onclick={sync}
+              >Sync Now</button
+            >
+            <button type="button" class="pp-link quiet" id="pp-disconnect" onclick={openAsk}>Disconnect</button>
           </div>
         {/if}
         <!-- A failure already under Last Sync Didn't Go Through isn't said twice. -->
         {#if msg && msg !== trouble?.msg}<p class="pp-r pp-msg" class:calm role="status">{msg}</p>{/if}
-      {:else}
+        {#if AUTO}
+          <div class="pp-r pp-col pp-sub">
+            <div class="pp-line">
+              <span class="pp-grow" id="pp-auto-l">{t('popup.auto-scan')}</span>
+              <button
+                type="button"
+                role="switch"
+                class="pp-sw"
+                id="pp-auto-sw"
+                aria-checked={autoOn}
+                aria-labelledby="pp-auto-l"
+                onclick={autoSwitch}><i></i></button
+              >
+            </div>
+            <!-- Its status line while it's on (copy.js popup.auto-*, data.js autoLine); amber
+                 when the last run kept a part back and asks for a scan. -->
+            {#if line}
+              <p class="pp-msg" class:calm={!line.ask} id="pp-auto-line">{t(line.key, { when: line.when })}</p>
+            {/if}
+          </div>
+        {/if}
+      {:else if siteOn}
         <div class="pp-r pp-col">
           <button type="button" class="pp-btn primary" id="pp-connect" onclick={() => openHub('#settings')}
             >Connect to openhangar.space</button
           >
         </div>
       {/if}
+      {#if ALERTS}
+        <!-- Desktop notifications, the one opt-in left: alerts follow Remind Me. -->
+        <div class="pp-r" id="pp-alert-set">
+          <span class="pp-grow" id="pp-nt-l">{t('popup.notifications')}</span>
+          <button
+            type="button"
+            role="switch"
+            class="pp-sw"
+            id="pp-nt-sw"
+            aria-checked={notify}
+            aria-labelledby="pp-nt-l"
+            onclick={notifySwitch}><i></i></button
+          >
+        </div>
+      {/if}
     </div>
   {/if}
 
-  {#if ALERTS}
-    <!-- Desktop notifications, the one opt-in left: alerts follow Remind Me. -->
-    <div class="pp-grp" id="pp-alert-set">
-      <div class="pp-r">
-        <span class="pp-grow" id="pp-nt-l">{t('popup.notifications')}</span>
-        <button
-          type="button"
-          role="switch"
-          class="pp-sw"
-          id="pp-nt-sw"
-          aria-checked={notify}
-          aria-labelledby="pp-nt-l"
-          onclick={notifySwitch}><i></i></button
-        >
-      </div>
-    </div>
-  {/if}
-
-  <!-- Look, Currency and Shortcut side by side, each name over its control (#700). -->
-  <div class="pp-grp pp-r pp-trio" id="pp-prefs">
-    <label class="pp-cell">
-      <small>{t('popup.look')}</small>
-      <select class="pp-sel" id="pp-look" value={prefs.look} onchange={(e) => onlook(e.currentTarget.value)}>
-        {#each LOOKS as l (l)}<option value={l}>{t(LOOK[l])}</option>{/each}
-      </select>
+  <!-- Look, Currency and Shortcut as list rows: the name, then the value (owner, 2026-10-24). -->
+  <div class="pp-grp" id="pp-prefs">
+    <label class="pp-r pp-li">
+      <span class="pp-grow">{t('popup.look')}</span>
+      <span class="pp-pick"
+        ><select class="pp-sel" id="pp-look" value={prefs.look} onchange={(e) => onlook(e.currentTarget.value)}>
+          {#each LOOKS as l (l)}<option value={l}>{t(LOOK[l])}</option>{/each}
+        </select></span
+      >
     </label>
-    <label class="pp-cell">
-      <small>{t('popup.currency')}</small>
-      <select class="pp-sel" id="pp-currency" value={currency} onchange={(e) => oncurrency(e.currentTarget.value)}>
-        {#each CURRENCIES as c (c)}<option value={c}>{c}</option>{/each}
-      </select>
+    <label class="pp-r pp-li">
+      <span class="pp-grow">{t('popup.currency')}</span>
+      <span class="pp-pick"
+        ><select class="pp-sel" id="pp-currency" value={currency} onchange={(e) => oncurrency(e.currentTarget.value)}>
+          {#each CURRENCIES as c (c)}<option value={c}>{c}</option>{/each}
+        </select></span
+      >
     </label>
     {#if shortcut != null}
-      <div class="pp-cell">
-        <small
-          >{t('popup.shortcut')}{#if canChangeShortcut()}
-            <button type="button" class="pp-link" id="pp-shortcut-change" onclick={openShortcuts}
-              >{t('popup.shortcut-change')}</button
-            >{/if}</small
-        >
-        <span class="pp-cval" id="pp-shortcut">{shortcut || t('popup.shortcut-none')}</span>
+      <div class="pp-r pp-li">
+        <span class="pp-grow" id="pp-shortcut-l">{t('popup.shortcut')}</span>
+        <!-- Where the browser lets you change it, the value opens its shortcuts page. -->
+        {#if canChangeShortcut()}
+          <button
+            type="button"
+            class="pp-pick go"
+            id="pp-shortcut"
+            aria-labelledby="pp-shortcut-l pp-shortcut"
+            onclick={openShortcuts}>{shortcut || t('popup.shortcut-none')}</button
+          >
+        {:else}
+          <span class="pp-pick fixed" id="pp-shortcut">{shortcut || t('popup.shortcut-none')}</span>
+        {/if}
       </div>
     {/if}
-  </div>
-
-  <div class="pp-pair pp-three">
-    <button type="button" class="pp-btn2" id="pp-export-json" onclick={backup}>{t('popup.export-json')}</button>
-    <button type="button" class="pp-btn2" id="pp-export-pledges" onclick={() => csv('pledges')}
-      >{t('popup.export-pledges')}</button
-    >
-    <button type="button" class="pp-btn2" id="pp-export-buybacks" onclick={() => csv('buybacks')}
-      >{t('popup.export-buybacks')}</button
-    >
   </div>
 
   {#if profiles.length}
@@ -337,6 +384,63 @@
     </div>
   {/if}
 
+  <!-- The Export menu (JSON Backup, Pledges CSV, Buy-Backs CSV) next to Log Out of RSI. -->
+  <div class="pp-pair pp-data">
+    <div class="pp-menu">
+      <button
+        type="button"
+        class="pp-btn2"
+        id="pp-export"
+        aria-haspopup="menu"
+        aria-expanded={exportOpen}
+        aria-controls="pp-export-menu"
+        bind:this={exportBtn}
+        onclick={() => (exportOpen ? closeExport(false) : openExport())}
+        onkeydown={exportKey}>{t('popup.export-menu')}</button
+      >
+      {#if exportOpen}
+        <div
+          class="pp-mlist"
+          id="pp-export-menu"
+          role="menu"
+          tabindex="-1"
+          aria-labelledby="pp-export"
+          bind:this={exportMenu}
+          onkeydown={menuKey}
+        >
+          <button type="button" role="menuitem" tabindex="-1" id="pp-export-json" onclick={() => pick(backup)}
+            >{t('popup.export-json')}</button
+          >
+          <button
+            type="button"
+            role="menuitem"
+            tabindex="-1"
+            id="pp-export-pledges"
+            onclick={() => pick(() => csv('pledges'))}>{t('popup.export-pledges')}</button
+          >
+          <button
+            type="button"
+            role="menuitem"
+            tabindex="-1"
+            id="pp-export-buybacks"
+            onclick={() => pick(() => csv('buybacks'))}>{t('popup.export-buybacks')}</button
+          >
+        </div>
+      {/if}
+    </div>
+    <button type="button" class="pp-btn2 quiet" id="pp-logout" onclick={signOut}>Log Out of RSI</button>
+  </div>
+  {#if dataNote}<p class="pp-note" role="status">{dataNote}</p>{/if}
+
+  <nav class="pp-links">
+    <button type="button" class="pp-link" onclick={() => openTab(`${SITE}/help.html`)}>{t('popup.help')}</button>
+    <button type="button" class="pp-link" id="pp-report-problem" onclick={() => reportProblem(lastReport)}
+      >Report a Scan Problem</button
+    >
+    <button type="button" class="pp-link" onclick={() => openTab(`${SITE}/privacy.html`)}>{t('popup.privacy')}</button>
+  </nav>
+
+  <!-- Clear Data on its own line, away from the everyday buttons; it asks first. -->
   {#if askClear}
     <div class="pp-grp warn" id="pp-clear-ask" role="group" aria-label="Clear Data">
       <div class="pp-r pp-col">
@@ -348,20 +452,10 @@
       </div>
     </div>
   {:else}
-    <div class="pp-pair">
-      <button type="button" class="pp-btn2 quiet" id="pp-logout" onclick={signOut}>Log Out of RSI</button>
-      <button type="button" class="pp-btn2 warn" id="pp-clear" disabled={busy} onclick={() => (askClear = true)}
+    <div class="pp-end">
+      <button type="button" class="pp-link bad" id="pp-clear" disabled={busy} onclick={() => (askClear = true)}
         >Clear Data</button
       >
     </div>
   {/if}
-  {#if dataNote}<p class="pp-note" role="status">{dataNote}</p>{/if}
-
-  <nav class="pp-links">
-    <button type="button" class="pp-link" onclick={() => openTab(`${SITE}/help.html`)}>{t('popup.help')}</button>
-    <button type="button" class="pp-link" id="pp-report-problem" onclick={() => reportProblem(lastReport)}
-      >Report a Scan Problem</button
-    >
-    <button type="button" class="pp-link" onclick={() => openTab(`${SITE}/privacy.html`)}>{t('popup.privacy')}</button>
-  </nav>
 </div>

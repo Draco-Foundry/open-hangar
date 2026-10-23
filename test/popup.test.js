@@ -717,7 +717,7 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
     'popup.auto-scan',
     'popup.look-auto',
     'popup.shortcut-none',
-    'popup.shortcut-change',
+    'popup.export-menu',
     'popup.disconnect-ask',
     'popup.stay',
   ];

@@ -208,8 +208,8 @@ const COPY = {
   'popup.currency': 'Currency',
   'popup.shortcut': 'Shortcut',
   'popup.shortcut-none': 'Not Set', // no shortcut set
-  'popup.shortcut-change': 'Change', // the browser's page
-  // The data buttons: the backup file, and a CSV of your pledges or your buy-backs.
+  'popup.export-menu': 'Export', // NEW: needs the owner's OK (placeholder, asked of Claude chat)
+  // The Export menu's items: the backup file, and a CSV of your pledges or your buy-backs.
   'popup.export-json': 'JSON Backup',
   'popup.export-pledges': 'Pledges CSV',
   'popup.export-buybacks': 'Buy-Backs CSV',
@@ -240,4 +240,4 @@ export function t(key, vars = {}) {
 }
 export const KEYS = Object.keys(COPY);
 // The words still waiting for the owner's OK (marked beside them above).
-export const NEW_WORDS = [];
+export const NEW_WORDS = ['popup.export-menu'];
