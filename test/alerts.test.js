@@ -655,6 +655,38 @@ test('a check, not connected: alerts go off, nothing asked (on only while connec
   assert.deepEqual(await AL.check(y.e), { ran: false, why: 'not-connected' });
 });
 
+test("a check, connected: the popup's Wishlist copy, if fresh, is used instead of a second read", async () => {
+  const copy = (over = {}) => ({
+    connectedAt: LINK.connectedAt,
+    at: NOW - 60e3,
+    items: [
+      { key: 'ship:cutlass-black', name: 'Cutlass Black', remind: true },
+      { key: 'ship:zeus', name: 'Zeus', remind: false },
+    ],
+    ...over,
+  });
+  const run = async (popupWish) => {
+    const x = env({
+      local: { alertsOn: true, db: { sources: {} }, siteLink: LINK, popupWish },
+      net: [res(200, FEED), res(200, { v: 1, keys: ['ship:cutlass-black'] })],
+    });
+    await AL.check(x.e);
+    return x;
+  };
+  // Fresh, this connection's: no second read; the keys leave out Remind Me off.
+  const fresh = await run(copy());
+  assert.equal(fresh.asked.length, 1, 'only the sale feed was asked');
+  assert.deepEqual(fresh.data.alertsWish.keys, ['ship:cutlass-black']);
+  // Old (5 minutes or more), another connection's, or read only (no items): asked as before.
+  for (const old of [
+    copy({ at: NOW - 5 * 60e3 }),
+    copy({ connectedAt: 'other' }),
+    copy({ items: null }),
+    undefined,
+  ])
+    assert.equal((await run(old)).asked.length, 2);
+});
+
 test('on only while connected: the stored fix, with literal keys and values', () => {
   // Migrated: on, and no connection (none, or one without a token).
   assert.deepEqual(AL.connectedOnly({ alertsOn: true }), { alertsOn: false });

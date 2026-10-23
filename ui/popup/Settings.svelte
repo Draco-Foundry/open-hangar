@@ -36,7 +36,8 @@
   } from './actions.js';
 
   // `currency`: the one shown (picked, or USD until one is: ./currency.js).
-  let { v, busy, failing, prefs, currency, lastReport, onlook, oncurrency, onfailed, onnote } =
+  // `now`: the popup's one clock (./Popup.svelte).
+  let { v, busy, failing, prefs, currency, lastReport, now, onlook, oncurrency, onfailed, onnote } =
     $props();
   const OH = globalThis.OH;
   const AL = globalThis.OHAlerts;
@@ -57,7 +58,6 @@
   let askClear = $state(false);
   let dataNote = $state('');
   let shortcut = $state(null); // '' none set, null no shortcuts here
-  let now = $state(Date.now());
   // Auto Scan Daily (the `autoScan` flag): its switch (local autoScanOn) and its last run
   // (local autoScan, written by the hidden scan page: ui/scan/runner.js).
   const AUTO = flag('autoScan');
@@ -89,15 +89,19 @@
     commands().then((c) => (shortcut = popupShortcut(c)));
     loadAlerts();
     loadAuto();
+    // listProfiles checks every saved hangar, so a run of db writes (a scan) reads it once.
+    let later;
     const changed = (c, area) => {
-            if (area === 'local' && AUTO && (c.autoScanOn || c.autoScan)) loadAuto();
-      if (area === 'local' && c.db) listProfiles().then((p) => (profiles = p));
+      if (area === 'local' && AUTO && (c.autoScanOn || c.autoScan)) loadAuto();
+      if (area === 'local' && c.db) {
+        clearTimeout(later);
+        later = setTimeout(() => listProfiles().then((p) => (profiles = p)), 1000);
+      }
     };
     chrome.storage.onChanged.addListener(changed);
-    const clock = setInterval(() => (now = Date.now()), 15e3);
     return () => {
       chrome.storage.onChanged.removeListener(changed);
-      clearInterval(clock);
+      clearTimeout(later);
     };
   });
 
@@ -249,23 +253,23 @@
           </div>
         {:else if askDisconnect}
           <!-- The dashboard's question, word for word (ui/site/YouDisconnect.svelte). -->
-          <div class="pp-r pp-col" id="pp-disconnect-ask" role="group" aria-label="Disconnect">
+          <div class="pp-r pp-col" id="pp-disconnect-ask" role="group" aria-label={t('popup.disconnect')}>
             <b>{t('popup.disconnect-ask')}</b>
             <small>{t('popup.disconnect-body')}</small>
             <div class="pp-pair">
               <button type="button" class="pp-btn2" id="pp-stay" bind:this={stay} onclick={() => (askDisconnect = false)}
                 >{t('popup.stay')}</button
               >
-              <button type="button" class="pp-btn2 warn" id="pp-disconnect-yes" onclick={leave}>Disconnect</button>
+              <button type="button" class="pp-btn2 warn" id="pp-disconnect-yes" onclick={leave}>{t('popup.disconnect')}</button>
             </div>
           </div>
         {:else}
           <!-- Sync Now the main button, Disconnect a quiet link beside it. -->
           <div class="pp-r pp-syncrow">
             <button type="button" class="pp-btn2 main" id="pp-sync" disabled={syncing || busy} onclick={sync}
-              >Sync Now</button
+              >{t('popup.sync-now')}</button
             >
-            <button type="button" class="pp-link quiet" id="pp-disconnect" onclick={openAsk}>Disconnect</button>
+            <button type="button" class="pp-link quiet" id="pp-disconnect" onclick={openAsk}>{t('popup.disconnect')}</button>
           </div>
         {/if}
         <!-- A failure already under Last Sync Didn't Go Through isn't said twice. -->
@@ -294,7 +298,7 @@
       {:else if siteOn}
         <div class="pp-r pp-col">
           <button type="button" class="pp-btn primary" id="pp-connect" onclick={() => openHub('#settings')}
-            >Connect to openhangar.space</button
+            >{t('popup.connect-site')}</button
           >
         </div>
       {/if}
@@ -360,7 +364,7 @@
 
   {#if profiles.length}
     <div class="pp-grp" id="pp-accounts" role="group" aria-labelledby="pp-accounts-h">
-      <h2 class="pp-r pp-gh" id="pp-accounts-h">Saved Accounts</h2>
+      <h2 class="pp-r pp-gh" id="pp-accounts-h">{t('popup.saved-accounts')}</h2>
       {#each profiles as p (p.nickname)}
         <div class="pp-r">
           <span class="pp-grow pp-acct"
@@ -434,25 +438,25 @@
         </div>
       {/if}
     </div>
-    <button type="button" class="pp-btn2 quiet" id="pp-logout" onclick={signOut}>Log Out of RSI</button>
+    <button type="button" class="pp-btn2 quiet" id="pp-logout" onclick={signOut}>{t('popup.log-out')}</button>
   </div>
   {#if dataNote}<p class="pp-note" role="status">{dataNote}</p>{/if}
 
   <nav class="pp-links">
     <button type="button" class="pp-link" onclick={() => openTab(`${SITE}/help.html`)}>{t('popup.help')}</button>
     <button type="button" class="pp-link" id="pp-report-problem" onclick={() => reportProblem(lastReport)}
-      >Report a Scan Problem</button
+      >{t('popup.report-problem')}</button
     >
     <button type="button" class="pp-link" onclick={() => openTab(`${SITE}/privacy.html`)}>{t('popup.privacy')}</button>
   </nav>
 
   <!-- Clear Data on its own line, away from the everyday buttons; it asks first. -->
   {#if askClear}
-    <div class="pp-grp warn" id="pp-clear-ask" role="group" aria-label="Clear Data">
+    <div class="pp-grp warn" id="pp-clear-ask" role="group" aria-label={t('popup.clear-data')}>
       <div class="pp-r pp-col">
         <small>{t('popup.clear-ask')}</small>
         <div class="pp-pair">
-          <button type="button" class="pp-btn2 warn" id="pp-clear-yes" disabled={busy} onclick={clear}>Clear Data</button>
+          <button type="button" class="pp-btn2 warn" id="pp-clear-yes" disabled={busy} onclick={clear}>{t('popup.clear-data')}</button>
           <button type="button" class="pp-btn2" onclick={() => (askClear = false)}>{t('popup.keep-data')}</button>
         </div>
       </div>
@@ -460,7 +464,7 @@
   {:else}
     <div class="pp-end">
       <button type="button" class="pp-link bad" id="pp-clear" disabled={busy} onclick={() => (askClear = true)}
-        >Clear Data</button
+        >{t('popup.clear-data')}</button
       >
     </div>
   {/if}

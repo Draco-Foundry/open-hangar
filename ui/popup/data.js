@@ -524,6 +524,12 @@ export function wishSale(feed) {
     return { onSale: !!on, price: on?.price ?? null };
   };
 }
+// The sale feed's item for a Wishlist key, to open its store page: → (key) → the feed item or
+// null (the store doesn't sell it now, so the row has nothing to open). Null with no feed.
+export function wishItem(feed) {
+  if (!isObj(feed) || !Array.isArray(feed.items)) return null;
+  return saleIndex(feed);
+}
 // The Wishlist tab's count: the items with Remind Me on (`keys`, the store alerts' copy
 // of the account's Wishlist, src/alerts.js freshWish) that the store sells now. 0 with
 // no sale feed kept.
