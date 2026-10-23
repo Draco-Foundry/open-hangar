@@ -1,0 +1,1 @@
+- Changed: Store alerts follow Remind Me. [words pending from Claude chat, #782]

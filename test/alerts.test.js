@@ -795,3 +795,21 @@ test("every word alerts show is the owner's (2026-10-13), no placeholder left", 
   for (const [k, v] of Object.entries(AL.COPY)) assert.doesNotMatch(v, /\[copy:/, k);
   assert.equal(AL.COPY['alerts.why.wishlist'], 'On your Wishlist');
 });
+
+test('a check, connected, Remind Me on for nothing: alerts go off, nothing matched or notified', async () => {
+  const x = env({
+    local: { alertsOn: true, db: DB, siteLink: LINK },
+    net: [res(200, FEED), res(200, { v: 1, keys: [] })],
+  });
+  assert.deepEqual(await AL.check(x.e), { ran: false, why: 'no-remind' });
+  assert.equal(x.data.alertsOn, false);
+  assert.equal(x.out.notes.length, 0);
+  assert.ok(!('alerts' in x.data), 'no matches saved');
+  // A Wishlist that answers 404 (its flag off) isn't "none on": the hangar rules still run.
+  const off = env({
+    local: { alertsOn: true, db: DB, siteLink: LINK },
+    net: [res(200, FEED), res(404, {})],
+  });
+  assert.equal((await AL.check(off.e)).ran, true);
+  assert.notEqual(off.data.alertsOn, false);
+});

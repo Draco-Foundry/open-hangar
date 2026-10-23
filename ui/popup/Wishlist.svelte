@@ -15,6 +15,7 @@
   import { t } from './copy.js';
   import { wishRows, wishSale } from './data.js';
   import {
+    alertsFor,
     readWishlist,
     saleFeed,
     searchEntries,
@@ -24,7 +25,7 @@
     shipNames,
   } from './wishlist.js';
   import { WISH_MAX, loadWish, popupEnv, writeWish } from './wish-client.js';
-  import { openHub, openTab } from './actions.js';
+  import { openHub, openTab, setAlerts } from './actions.js';
   import { USD, money } from './currency.js';
 
   let { connected, fx = USD } = $props();
@@ -96,6 +97,10 @@
     const r = await writeWish(env, c);
     busy = false;
     if (r.items) list = { mode: 'edit', items: r.items };
+    if (r.ok && AL) {
+      const on = alertsFor(c, r.items);
+      if (on != null) setAlerts(on);
+    }
     if (r.ok) {
       // Taken, but the answer had no copy of it: the list is read again.
       if (r.stale) await load({ force: true });

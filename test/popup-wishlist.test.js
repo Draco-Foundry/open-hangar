@@ -608,3 +608,25 @@ test('the sale line: only with a sale feed, a ship at its cheapest edition', asy
   assert.deepEqual(sale('ship:zeus'), { onSale: false, price: null });
   assert.deepEqual(sale('sku:99'), { onSale: false, price: null });
 });
+
+test('alerts follow Remind Me: on from the switch, off with the last one, left alone otherwise', async () => {
+  const { alertsFor } = await search();
+  const on = [
+    { key: 'ship:a', remind: true },
+    { key: 'ship:b', remind: false },
+  ];
+  const off = [{ key: 'ship:a', remind: false }];
+  assert.equal(alertsFor({ do: 'remind', key: 'ship:a', remind: true }, on), true);
+  assert.equal(alertsFor({ do: 'remind', key: 'ship:a', remind: false }, off), false);
+  assert.equal(alertsFor({ do: 'remove', key: 'ship:a' }, []), null, 'nothing to read');
+  assert.equal(alertsFor({ do: 'remove', key: 'ship:b' }, on), null, 'Remind Me still on');
+  assert.equal(
+    alertsFor({ do: 'remove', key: 'ship:a' }, [{ key: 'ship:b', remind: false }]),
+    false,
+  );
+  // The website offers no Remind Me (null on every item): alerts are left as they are.
+  assert.equal(
+    alertsFor({ do: 'remind', key: 'ship:a', remind: true }, [{ key: 'ship:a', remind: null }]),
+    null,
+  );
+});

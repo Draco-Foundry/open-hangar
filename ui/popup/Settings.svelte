@@ -30,7 +30,6 @@
     pilotAnswer,
     reportProblem,
     removeProfile,
-    setAlerts,
     setAutoScan,
     syncNow,
   } from './actions.js';
@@ -50,7 +49,6 @@
   let pilot = $state(null);
   let askDisconnect = $state(false);
   let stay = $state();
-  let alertsOn = $state(null);
   let notify = $state(false);
   let profiles = $state([]);
   let removing = $state('');
@@ -75,7 +73,6 @@
 
   async function loadAlerts() {
     if (!ALERTS) return;
-    alertsOn = (await chrome.storage.local.get(AL.ON_KEY))[AL.ON_KEY] === true;
     notify = await notifyAllowed();
   }
   async function loadAuto() {
@@ -91,8 +88,7 @@
     loadAlerts();
     loadAuto();
     const changed = (c, area) => {
-      if (area === 'local' && ALERTS && c[AL.ON_KEY]) loadAlerts();
-      if (area === 'local' && AUTO && (c.autoScanOn || c.autoScan)) loadAuto();
+            if (area === 'local' && AUTO && (c.autoScanOn || c.autoScan)) loadAuto();
       if (area === 'local' && c.db) listProfiles().then((p) => (profiles = p));
     };
     chrome.storage.onChanged.addListener(changed);
@@ -136,12 +132,6 @@
     const on = !autoOn;
     autoOn = on;
     await setAutoScan(on);
-  }
-  async function alertsSwitch() {
-    const on = !alertsOn;
-    alertsOn = on;
-    await setAlerts(on);
-    if (!on) notify = false;
   }
   function notifySwitch() {
     if (notify) {
@@ -260,21 +250,11 @@
     </div>
   {/if}
 
-  {#if ALERTS && alertsOn != null}
-    <!-- Both switches on one row (#700). -->
+  {#if ALERTS}
+    <!-- Desktop notifications, the one opt-in left: alerts follow Remind Me. -->
     <div class="pp-grp" id="pp-alert-set">
-      <div class="pp-r pp-two">
-        <span class="pp-grow" id="pp-al-l">{t('popup.store-alerts')}</span>
-        <button
-          type="button"
-          role="switch"
-          class="pp-sw"
-          id="pp-al-sw"
-          aria-checked={alertsOn}
-          aria-labelledby="pp-al-l"
-          onclick={alertsSwitch}><i></i></button
-        >
-        <span class="pp-grow pp-gap" class:off={!alertsOn} id="pp-nt-l">{t('popup.notifications')}</span>
+      <div class="pp-r">
+        <span class="pp-grow" id="pp-nt-l">{t('popup.notifications')}</span>
         <button
           type="button"
           role="switch"
@@ -282,7 +262,6 @@
           id="pp-nt-sw"
           aria-checked={notify}
           aria-labelledby="pp-nt-l"
-          disabled={!alertsOn}
           onclick={notifySwitch}><i></i></button
         >
       </div>

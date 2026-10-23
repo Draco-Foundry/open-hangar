@@ -54,7 +54,7 @@ popup: `chrome.action.onClicked` opens `src/dashboard.html` in a tab. It also:
   (`reopenAfterUpdate`);
 - answers our own web pages ([Messages From Our Pages](#messages-from-our-pages));
 - in a build with the `alerts` flag (docs/FLAGS.md, "Alerts"), runs the store alerts
-  (`src/alerts.js`, `self.OHAlerts`) once the pilot turns them on (`alertsOn`): a check
+  (`src/alerts.js`, `self.OHAlerts`) once the pilot turns Remind Me on for a Wishlist item (`alertsOn`; no switch of its own): a check
   on an alarm at most every 30 minutes (30 to 35 apart) downloads the public sale feed
   and, while connected, the account's Wishlist keys, and matches them here against the
   stored scan. Unseen matches take the badge in place of the `!`; a new one gets a
@@ -284,24 +284,24 @@ the rules (docs/RSI-CHANGES.md).
 Everything lives in `chrome.storage.local` (the `unlimitedStorage` permission lifts the
 browser's default quota). The main keys:
 
-| Key                        | What it holds                                                                                     | Code                                       |
-| -------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| `db`                       | `{ schemaVersion, sources: { hangar, buybacks, referral: { items, scannedAt, meta? } }, owner }`  | `readDB()`, `writeDB()`, `OH.loadDB()`     |
-| `dbHistory`                | Scan history: `[{ at, items: [[id, name, value]], credit?, checkedAt? }]`                         | `recordHistory()`, `OH.trimHistory()`      |
-| `dbCorrupt`                | Up to 3 damaged originals that failed the check, kept until Clear Data                            | `setAside()`, `OH.getDamaged()`            |
-| `dbRecovery`               | `{ at, db }`: the previous account's data, saved before an automatic clear                        | `clearDataNow()`, `OH.recoverData()`       |
-| `profile:<nickname>`       | Another RSI account's whole DB (history inside), parked while a different account is signed in    | `OH.switchProfile()`, `OH.listProfiles()`  |
-| `account`                  | Cached RSI identity and balances (10 minutes)                                                     | `OH.getAccount()`                          |
-| `errorLog`                 | The rolling error log                                                                             | `OH.log()`                                 |
-| `remoteStatus`, `netDown`  | Cached kill switch file; sites that recently timed out                                            | `loadStatus()`, `OH.guarded()`             |
-| `bbDetails`                | Buy-back details: packs read after a buy-back scan, the rest with Load Details (paced)            | `OH.fetchBuybackDetails()`                 |
-| `lastBackupAt`             | When you last downloaded a backup file                                                            | `downloadBackup()` in `src/dashboard.js`   |
-| `alertsOn`, `alerts`       | Extension Alerts: the switch; the matches and which you've seen (`alerts` flag)                   | `OHAlerts.check()`, `src/background.js`    |
-| `alertsFeed`, `alertsWish` | The last sale feed (ETag, when to ask again); the account's Wishlist keys for this connection     | `OHAlerts.check()`                         |
-| `popupPrefs`, `popupWish`  | The popup's settings; its copy of the account's Wishlist for this connection (gone on Disconnect) | `ui/popup/prefs.js`, `wish-client.js`      |
-| `scanStarted`, `scanFull`  | The last scan that began (for Scan stopped after a restart); each part's last complete read       | `ui/scan/runner.js`                        |
-| `autoScanOn`, `autoScan`   | Auto Scan Daily's switch (gone on Disconnect, Clear Data); its last run, replaced whole           | `ui/popup/actions.js`, `ui/scan/runner.js` |
-| `autoScanNext`             | Auto Scan Daily's next run, for a worker that starts with its alarm gone                          | `src/background.js`                        |
+| Key                        | What it holds                                                                                               | Code                                       |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `db`                       | `{ schemaVersion, sources: { hangar, buybacks, referral: { items, scannedAt, meta? } }, owner }`            | `readDB()`, `writeDB()`, `OH.loadDB()`     |
+| `dbHistory`                | Scan history: `[{ at, items: [[id, name, value]], credit?, checkedAt? }]`                                   | `recordHistory()`, `OH.trimHistory()`      |
+| `dbCorrupt`                | Up to 3 damaged originals that failed the check, kept until Clear Data                                      | `setAside()`, `OH.getDamaged()`            |
+| `dbRecovery`               | `{ at, db }`: the previous account's data, saved before an automatic clear                                  | `clearDataNow()`, `OH.recoverData()`       |
+| `profile:<nickname>`       | Another RSI account's whole DB (history inside), parked while a different account is signed in              | `OH.switchProfile()`, `OH.listProfiles()`  |
+| `account`                  | Cached RSI identity and balances (10 minutes)                                                               | `OH.getAccount()`                          |
+| `errorLog`                 | The rolling error log                                                                                       | `OH.log()`                                 |
+| `remoteStatus`, `netDown`  | Cached kill switch file; sites that recently timed out                                                      | `loadStatus()`, `OH.guarded()`             |
+| `bbDetails`                | Buy-back details: packs read after a buy-back scan, the rest with Load Details (paced)                      | `OH.fetchBuybackDetails()`                 |
+| `lastBackupAt`             | When you last downloaded a backup file                                                                      | `downloadBackup()` in `src/dashboard.js`   |
+| `alertsOn`, `alerts`       | Extension Alerts: Remind Me on or off, set for the pilot; the matches and which you've seen (`alerts` flag) | `OHAlerts.check()`, `src/background.js`    |
+| `alertsFeed`, `alertsWish` | The last sale feed (ETag, when to ask again); the account's Wishlist keys for this connection               | `OHAlerts.check()`                         |
+| `popupPrefs`, `popupWish`  | The popup's settings; its copy of the account's Wishlist for this connection (gone on Disconnect)           | `ui/popup/prefs.js`, `wish-client.js`      |
+| `scanStarted`, `scanFull`  | The last scan that began (for Scan stopped after a restart); each part's last complete read                 | `ui/scan/runner.js`                        |
+| `autoScanOn`, `autoScan`   | Auto Scan Daily's switch (gone on Disconnect, Clear Data); its last run, replaced whole                     | `ui/popup/actions.js`, `ui/scan/runner.js` |
+| `autoScanNext`             | Auto Scan Daily's next run, for a worker that starts with its alarm gone                                    | `src/background.js`                        |
 
 Other keys are caches of public data (for example `shipMatrix`, `shipCatalog`,
 `shipImages`, `scVersion`, `patchNotes`, `storeShips`, `fxRates`) and UI
