@@ -1562,6 +1562,7 @@
     let ended = false; // the pager said this was the last page
     let aligned = true;
     let pages = null; // the highest page RSI's pager has linked to so far
+    let firstSize = 0; // how many items RSI served on page 1 (its real page size)
     const down = (got) => ({
       rsiDown: !!(got.transient || got.rateLimited),
       slowDown: !!got.slowDown,
@@ -1659,6 +1660,7 @@
       if (pager?.max != null) pages = Math.max(pages ?? 0, pager.max, page);
 
       let added = 0;
+      if (page === 1) firstSize = items.length;
       fillIds(src, items, page);
       if (page === 1 && prev && (await unchangedSince(src, prev, items, size))) {
         onProgress?.(page, prev.items.length, null, page);
@@ -1686,6 +1688,28 @@
     // it), so a pager that says more pages than there are shows in the flight log.
     if (lastPage)
       OH.log('info', src.id, `${lastPage} pages read, RSI's pager showed ${pages ?? 'none'}`);
+    // The pager's last page against the count (#729): every page but the last is full, so
+    // (last - 1) × size < count ≤ last × size. Outside that, a page was missed or read
+    // twice: a partial read, so it is never taken for the whole list.
+    if (ended && lastPage > 1 && firstSize) {
+      const n = all.length;
+      if (!((lastPage - 1) * firstSize < n && n <= lastPage * firstSize)) {
+        OH.log(
+          'warn',
+          src.id,
+          `${n} items on ${lastPage} pages of ${firstSize} doesn't fit RSI's pager`,
+        );
+        return {
+          items: all,
+          meta,
+          partial: {
+            page: lastPage,
+            reason: `${n} items don't fit ${lastPage} pages`,
+            countMismatch: true,
+          },
+        };
+      }
+    }
     // Still finding new items on the last allowed page: the list goes on, so
     // report it as partial (saved without counting the rest as "removed").
     if (lastPage === MAX_PAGES && lastAdded > 0 && !ended) {
@@ -1867,7 +1891,9 @@
         if (prevCount > result.items.length) {
           return {
             ok: false,
-            error: `RSI stopped responding at page ${page} (${reason}), so we kept your previous scan of ${prevCount}. Try again in a minute.`,
+            error: result.partial.countMismatch
+              ? `The ${result.items.length} items read don't fit RSI's page count, so we kept your previous scan of ${prevCount}. Try again in a minute.`
+              : `RSI stopped responding at page ${page} (${reason}), so we kept your previous scan of ${prevCount}. Try again in a minute.`,
             ...slow(result.partial),
             ...down(result.partial),
           };
