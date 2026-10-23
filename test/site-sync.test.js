@@ -371,7 +371,7 @@ test('Disconnect turns off Auto Scan Daily, as a sync refused as not connected d
   answer = () => new Response(JSON.stringify({ ok: true, synced_at: 123 }), { status: 200 });
 });
 
-test('a background seeing the link go clears Auto Scan Daily and leaves store alerts', async () => {
+test('a background seeing the link go clears Auto Scan Daily and turns store alerts off', async () => {
   const { loadBackground } = require('./bridge-env.js');
   const x = loadBackground({
     changes: true,
@@ -392,7 +392,8 @@ test('a background seeing the link go clears Auto Scan Daily and leaves store al
     'autoScanNext',
   ]);
   await until(() => !x.alarms.has('oh-auto-scan'));
-  assert.ok(x.alarms.has('oh-alerts'), "store alerts' alarm untouched");
+  // Store alerts are on only while connected: off too, their alarm gone.
+  await until(() => x.stores.local.alertsOn === false && !x.alarms.has('oh-alerts'));
   assert.equal(x.stores.local.autoScanNext, undefined);
 });
 

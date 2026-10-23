@@ -53,19 +53,23 @@ const json = (body, status = 200, headers = {}) =>
 // notifications (the hangar's own reasons show in the popup's Fleet News only).
 const SIGNED = { siteLink: { token: 'oht_test', connectedAt: 1 } };
 const WISH = { v: 1, keys: ['sku:20', 'ship:cutlass-black'] };
-const remind = (more = {}) => ({ local: SIGNED, answers: [json(FEED), json(WISH)], ...more });
+const remind = (more = {}) => ({ answers: [json(FEED), json(WISH)], ...more });
+// The sale feed's requests only (the Wishlist read is the other kind).
+const feedAsks = (x) => x.asked.filter((a) => a.url.endsWith('/api/store/on-sale'));
 
-// The worker with alerts, its network answering `answers` in turn, and every request,
-// badge and title it makes.
+// The worker with alerts, connected (alerts are on only while connected) unless `local`
+// says otherwise, its network answering `answers` in turn (the Wishlist read, once the
+// answers are used up, with WISH), and every request, badge and title it makes.
 function worker({ local = {}, answers = [], notify = true, flags = ALERTS } = {}) {
   const asked = [];
   const x = loadBackground({
     flags,
-    local: { db: structuredClone(DB), ...local },
+    local: { db: structuredClone(DB), ...SIGNED, ...local },
     notify,
     changes: true,
     fetch: async (url, init) => {
       asked.push({ url, init });
+      if (url.endsWith('/api/v1/wishlist') && !answers.length) return json(WISH);
       const a = answers.shift();
       if (!a) throw new Error('no network');
       return a;
@@ -87,31 +91,58 @@ async function until(ok, ms = 1000) {
 const fromPopup = (x, msg, sender = {}) =>
   x.sendInternal(msg, { id: CHROME_ID, url: POPUP, ...sender });
 
-test('turned on, not connected: one check, the feed only; hangar matches, no badge or notes', async () => {
+test('turned on, not connected: off at once, nothing asked, no alarm, no badge', async () => {
+  const x = worker({ local: { siteLink: null }, answers: [json(FEED)] });
+  await x.chrome.storage.local.set({ alertsOn: true });
+  await until(() => x.stores.local.alertsOn === false);
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(x.asked.length, 0);
+  assert.ok(!x.alarms.has('oh-alerts'));
+  assert.ok(!('alerts' in x.stores.local));
+  assert.equal(x.notes.length, 0);
+});
+
+test('turned on, connected: one check, the feed then the Wishlist, the next alarm', async () => {
   const x = worker({ answers: [json(FEED, 200, { etag: 'W/"1"' })] });
   const t0 = Date.now();
   await x.chrome.storage.local.set({ alertsOn: true });
   await until(() => x.stores.local.alerts);
   await until(() => x.alarms.has('oh-alerts'));
-  assert.equal(x.asked.length, 1);
-  assert.equal(x.asked[0].url, 'https://openhangar.space/api/store/on-sale');
-  assert.equal(x.asked[0].init.credentials, 'omit');
-  // Kept for the popup's Fleet News.
   assert.deepEqual(
-    x.stores.local.alerts.items.map((m) => [m.id, m.why.map((w) => w.why)]),
-    [
-      ['sku-20', ['paint']],
-      ['sku-10', ['warbond']],
-    ],
+    x.asked.map((a) => a.url),
+    ['https://openhangar.space/api/store/on-sale', 'https://app.openhangar.space/api/v1/wishlist'],
   );
-  await new Promise((r) => setTimeout(r, 20));
-  assert.equal(x.notes.length, 0);
-  assert.ok(!x.badges.some((b) => /^\d/.test(b)), 'no number on the badge');
+  assert.equal(x.asked[0].init.credentials, 'omit');
   const when = x.alarms.get('oh-alerts').when;
   assert.ok(
     when >= t0 + 30 * 60e3 && when <= Date.now() + 35 * 60e3,
     'next check in 30 to 35 minutes',
   );
+});
+
+test('disconnected: alerts off, the matches and the Wishlist keys gone, no alarm', async () => {
+  const x = worker(remind());
+  await x.chrome.storage.local.set({ alertsOn: true });
+  await until(() => x.stores.local.alerts && x.alarms.has('oh-alerts'));
+  await x.chrome.storage.local.remove('siteLink');
+  await until(() => x.stores.local.alertsOn === false);
+  await until(() => !('alerts' in x.stores.local) && !('alertsWish' in x.stores.local));
+  assert.ok(!x.alarms.has('oh-alerts'));
+  assert.equal(x.badges.at(-1), '');
+});
+
+test('the worker starting with alerts on and no connection (from before 0.5.4): off', async () => {
+  const x = worker({
+    local: {
+      siteLink: null,
+      alertsOn: true,
+      alerts: { v: 1, items: [], known: {}, seen: {}, gone: {}, checkedAt: Date.now() },
+    },
+  });
+  await until(() => x.stores.local.alertsOn === false);
+  await until(() => !('alerts' in x.stores.local));
+  assert.ok(!x.alarms.has('oh-alerts'));
+  assert.equal(x.asked.length, 0);
 });
 
 test('Remind Me items on sale: the badge (each Wishlist item once) and a notification each', async () => {
@@ -150,7 +181,7 @@ test('the alarm: a check, with the saved copy while it is fresh (nothing asked)'
   await x.fireAlarm('oh-alerts');
   await x.fireAlarm('someone-else');
   await new Promise((r) => setTimeout(r, 20));
-  assert.equal(x.asked.length, 1);
+  assert.equal(feedAsks(x).length, 1);
 });
 
 test('the popup open: every match seen, the badge back to the reminder', async () => {
@@ -196,7 +227,8 @@ test("a notification clicked: that item on our Store's page, seen", async () => 
 });
 
 test('a new scan: matched again from the saved feed, nothing asked; a sync changes nothing', async () => {
-  const x = worker({ answers: [json(FEED)] });
+  // Remind Me on for something not in the store: the hangar's matches only.
+  const x = worker({ answers: [json(FEED), json({ v: 1, keys: ['sku:999'] })] });
   await x.chrome.storage.local.set({ alertsOn: true });
   await until(() => x.stores.local.alerts && x.stores.local.alerts.items.length === 2);
   const db = structuredClone(DB);
@@ -231,7 +263,7 @@ function holding(hold, { local = {}, answer } = {}) {
     flags: ALERTS,
     notify: true,
     changes: true,
-    local: { db: structuredClone(DB), ...local },
+    local: { db: structuredClone(DB), siteLink: { token: 'oht_test', connectedAt: 1 }, ...local },
     fetch: async (url) => {
       asked.push(url);
       const wish = url.endsWith('/api/v1/wishlist');
@@ -278,7 +310,11 @@ test("turned off mid-check: the feed's backoff is kept, so turning on again asks
   assert.ok(h.x.stores.local.alertsFeed?.retryAt > Date.now(), 'the 429 is remembered');
   await h.x.chrome.storage.local.set({ alertsOn: true });
   await settle();
-  assert.equal(h.asked.length, 1, 'nothing asked again before Retry-After');
+  assert.equal(
+    h.asked.filter((u) => u.endsWith('/api/store/on-sale')).length,
+    1,
+    'the feed not asked again before Retry-After',
+  );
 });
 
 test('turned off just as a check saves: cleaned up again once it settles', async () => {

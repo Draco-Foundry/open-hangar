@@ -605,10 +605,13 @@ function alertsCheck(o = {}) {
 }
 // The worker started (the browser opened, an update, a wake-up): alerts on but no
 // check scheduled (a browser restart can drop alarms), so one is, 30 to 35 minutes
-// after the last, or a minute or two from now when that's past. Alerts off: none.
+// after the last, or a minute or two from now when that's past. Alerts off: none. On in
+// a browser that isn't connected (from before they followed Remind Me): off, now.
 async function alertsWake() {
   const AL = self.OHAlerts;
-  const got = await chrome.storage.local.get([AL.ON_KEY, AL.STATE_KEY]);
+  const got = await chrome.storage.local.get([AL.ON_KEY, AL.STATE_KEY, 'siteLink']);
+  const fix = AL.connectedOnly(got);
+  if (fix) return chrome.storage.local.set(fix);
   if (got[AL.ON_KEY] !== true) return chrome.alarms.clear(AL.ALARM);
   if (await chrome.alarms.get(AL.ALARM)) return;
   const now = Date.now();

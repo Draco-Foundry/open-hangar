@@ -478,13 +478,14 @@ test("store alerts' alarm and Auto Scan Daily's never clear each other", async (
   await x.chrome.storage.local.set({ autoScanOn: false });
   await until(() => !alarm(x));
   assert.ok(x.alarms.has('oh-alerts'), 'Auto Scan off: alerts stay');
-  // The link gone (Disconnect, by any route): Auto Scan off; alerts as they are.
+  // The link gone (Disconnect, by any route): both off, each by its own rule (alerts
+  // are on only while connected too).
   await x.chrome.storage.local.set({ autoScanOn: true });
   await until(() => alarm(x));
   await x.chrome.storage.local.remove('siteLink');
-  await until(() => !alarm(x));
-  assert.ok(x.alarms.has('oh-alerts'));
+  await until(() => !alarm(x) && !x.alarms.has('oh-alerts'));
   assert.equal(x.stores.local.autoScanOn, undefined);
+  assert.equal(x.stores.local.alertsOn, false);
 });
 
 test('a run that RSI asked to wait moves the next run after it', async () => {
