@@ -193,8 +193,8 @@ const COPY = {
   'popup.currency': 'Currency',
   'popup.shortcut': 'Shortcut',
   'popup.shortcut-none': 'Not Set', // no shortcut set
-  'popup.shortcut-change': 'Change', // the browser's page
-  // The data buttons: the backup file, and a CSV of your pledges or your buy-backs.
+  'popup.export-menu': 'Export Data', // the menu button (Claude chat, 2026-10-23)
+  // The Export menu's items: the backup file, and a CSV of your pledges or your buy-backs.
   'popup.export-json': 'JSON Backup',
   'popup.export-pledges': 'Pledges CSV',
   'popup.export-buybacks': 'Buy-Backs CSV',

@@ -4827,8 +4827,9 @@ try {
     ? ok('Wishlist, not connected: Connect opens the extension page')
     : fail(`popup wishlist connect: ${JSON.stringify(wishGo)}`);
 
-  // Settings: openhangar.space (with a built-in site, as store builds have), the alerts'
-  // switches, Look, Currency and the shortcut, the data buttons, Saved Accounts, the links.
+  // Settings: openhangar.space with Notifications in its box (with a built-in site, as store
+  // builds have), Look, Currency and the shortcut, Saved Accounts, the Export menu and Log
+  // Out of RSI, the links, Clear Data.
   await popAt(
     {
       ...signedIn,
@@ -4855,10 +4856,7 @@ try {
     'Currency',
     'USD',
     'Shortcut',
-    'Change',
-    'JSON Backup',
-    'Pledges CSV',
-    'Buy-Backs CSV',
+    'Export Data',
     'Saved Accounts',
     'Demo Citizen',
     'Signed In',
@@ -4879,61 +4877,97 @@ try {
         'Settings: every group, no Store Alerts switch, the shortcut, no Auto Scan row until connected',
       )
     : fail(`popup settings: ${JSON.stringify({ set, setMissing })}`);
-  // Compact (#700): Look, Currency and Shortcut on one row, each name over its control,
-  // the Notifications switch on its own row, nothing wrapping or sticking out at 360 px: the
-  // selects show their whole value, Change sits apart from Shortcut, the data buttons'
-  // names stay inside them.
+  // The layout (owner, 2026-10-24): Notifications inside the openhangar.space box; Look,
+  // Currency and Shortcut as list rows, the name on the left and the value on the right on
+  // one line, one row under another; the shortcut's value is the button to the browser's
+  // page (no separate Change); Export next to Log Out of RSI; the links, then Clear Data on
+  // its own line at the bottom. Nothing wraps or sticks out at 360 px: the selects show
+  // their whole value, the buttons' names stay inside them.
   const setRows = await page.evaluate(() => {
     const box = (el) => el.getBoundingClientRect();
-    const cells = [...document.querySelectorAll('#pp-prefs .pp-cell')];
+    const rows = [...document.querySelectorAll('#pp-prefs .pp-li')];
     const grp = box(document.getElementById('pp-prefs'));
-    const sw = ['pp-nt-sw'].map((id) => box(document.getElementById(id)));
-    const labels = [...document.querySelectorAll('#pp-prefs .pp-cell small, #pp-alert-set span')];
+    const labels = [
+      ...document.querySelectorAll('#pp-prefs .pp-li > span:first-child, #pp-alert-set span'),
+    ];
     const sel = ['pp-look', 'pp-currency'].map((id) => document.getElementById(id));
-    const btns = ['json', 'pledges', 'buybacks'].map((id) =>
-      document.getElementById(`pp-export-${id}`),
-    );
-    const name = [...document.querySelectorAll('#pp-prefs .pp-cell small')][2];
-    const change = document.getElementById('pp-shortcut-change');
+    const btns = ['pp-export', 'pp-logout'].map((id) => document.getElementById(id));
+    const short = document.getElementById('pp-shortcut');
     const settings = box(document.getElementById('pp-settings'));
+    const links = box(document.querySelector('#pp-settings .pp-links'));
+    const clear = document.getElementById('pp-clear');
     const text = (b) => {
       const r = document.createRange();
       r.selectNodeContents(b);
       return r.getBoundingClientRect();
     };
     return {
-      cells: cells.length,
-      oneRow: cells.every((c) => Math.abs(box(c).top - box(cells[0]).top) < 1),
-      over: cells.every((c) => box(c.firstElementChild).bottom <= box(c.lastElementChild).top),
-      inside: cells.every((c) => box(c).left >= grp.left && box(c).right <= grp.right + 0.5),
+      rows: rows.length,
+      stacked: rows.every((r, i) => !i || box(r).top >= box(rows[i - 1]).bottom - 0.5),
+      sides: rows.every((r) => {
+        const [name, value] = [r.firstElementChild, r.lastElementChild].map(box);
+        return (
+          Math.abs(name.top + name.height / 2 - (value.top + value.height / 2)) < 3 &&
+          value.left - name.right >= 4 &&
+          Math.abs(value.right - (box(r).right - 12)) < 1.5
+        );
+      }),
+      inside: rows.every((r) => box(r).left >= grp.left && box(r).right <= grp.right + 0.5),
       selects: sel.every((s) => s.scrollWidth <= s.clientWidth && box(s).right <= grp.right),
-      gap: box(change).left - text(name.firstChild).right >= 4,
-      switches: sw.length === 1,
+      muted: getComputedStyle(sel[0]).color === getComputedStyle(short).color,
+      shortcutButton: short.tagName === 'BUTTON' && !document.getElementById('pp-shortcut-change'),
+      ntInBox: !!document.querySelector('#pp-site #pp-nt-sw'),
+      hint: (() => {
+        const h = document.querySelector('#pp-site #pp-nt-hint');
+        const sw = document.getElementById('pp-nt-sw');
+        return (
+          !!h &&
+          box(h).top >= box(sw).bottom - 0.5 &&
+          sw.getAttribute('aria-describedby') === 'pp-nt-hint' &&
+          h.textContent === 'A pop-up when a Remind Me item goes on sale.'
+        );
+      })(),
       wraps: labels.filter((l) => l.getClientRects().length > 1 || box(l).height > 24).length,
+      pair: Math.abs(box(btns[0]).top - box(btns[1]).top) < 1,
       buttons: btns.every((b) => text(b).right <= box(b).right && box(b).right <= settings.right),
+      menuShut:
+        !document.getElementById('pp-export-menu') &&
+        btns[0].getAttribute('aria-expanded') === 'false' &&
+        btns[0].getAttribute('aria-haspopup') === 'menu',
+      clearLast:
+        clear.classList.contains('pp-link') &&
+        box(clear).top >= links.bottom &&
+        [...document.querySelectorAll('#pp-settings button')].at(-1) === clear,
       heading: [...document.querySelectorAll('#pp-site b')].some(
         (b) => b.textContent === 'openhangar.space',
       ),
       wide: document.documentElement.scrollWidth > 360,
     };
   });
-  setRows.cells === 3 &&
-  setRows.oneRow &&
-  setRows.over &&
+  setRows.rows === 3 &&
+  setRows.stacked &&
+  setRows.sides &&
   setRows.inside &&
   setRows.selects &&
-  setRows.gap &&
-  setRows.switches &&
+  setRows.muted &&
+  setRows.shortcutButton &&
+  setRows.ntInBox &&
+  setRows.hint &&
   !setRows.wraps &&
+  setRows.pair &&
   setRows.buttons &&
+  setRows.menuShut &&
+  setRows.clearLast &&
   !setRows.heading &&
   !setRows.wide
-    ? ok('Settings compact: Look, Currency and Shortcut on one row, both alert switches on one')
-    : fail(`popup settings compact: ${JSON.stringify(setRows)}`);
-  await page.click('#pp-shortcut-change');
+    ? ok(
+        'Settings layout: Notifications and its hint in the box, three list rows, Export by Log Out, Clear Data last',
+      )
+    : fail(`popup settings layout: ${JSON.stringify(setRows)}`);
+  await page.click('#pp-shortcut');
   const shortGo = await page.evaluate(() => __demo.opened.at(-1));
   shortGo === 'chrome://extensions/shortcuts'
-    ? ok("Change opens the browser's shortcuts page")
+    ? ok("the shortcut opens the browser's shortcuts page")
     : fail(`popup shortcut change: ${shortGo}`);
   // A faked Mac (navigator.platform and userAgentData): Firefox's "Alt+Shift+O" shows as
   // ⌥⇧O, Chrome's own symbols stay, and the page doesn't spill. Not a real Mac.
@@ -4964,11 +4998,37 @@ try {
   !macShown.chrome.wide
     ? ok('Settings on a faked Mac: the shortcut shows as ⌥⇧O')
     : fail(`popup shortcut on a faked Mac: ${JSON.stringify(macShown)}`);
+  // The Export menu: a click opens it with JSON Backup, Pledges CSV and Buy-Backs CSV,
+  // each one closes it and saves its file; by keyboard, Down opens it on the first item,
+  // the arrows move, Escape closes it back to Export; a click outside closes it.
+  await page.click('#pp-export');
+  await page.waitForSelector('#pp-export-menu');
+  const menuOpen = await page.evaluate(() => {
+    const box = (el) => el.getBoundingClientRect();
+    const menu = document.getElementById('pp-export-menu');
+    const items = [...menu.querySelectorAll('[role="menuitem"]')];
+    return {
+      role: menu.getAttribute('role'),
+      expanded: document.getElementById('pp-export').getAttribute('aria-expanded'),
+      items: items.map((b) => b.textContent).join(),
+      focus: document.activeElement?.id,
+      seen: box(menu).top >= 0 && box(menu).right <= document.documentElement.clientWidth,
+      wide: document.documentElement.scrollWidth > 360,
+    };
+  });
   await page.click('#pp-export-pledges');
   await sleep(100);
+  const shutAfter = await page.evaluate(() => ({
+    menu: !!document.getElementById('pp-export-menu'),
+    focus: document.activeElement?.id,
+  }));
+  await page.click('#pp-export');
+  await page.waitForSelector('#pp-export-buybacks');
   await page.click('#pp-export-buybacks');
   await sleep(100);
   const bbNote = await page.$eval('.pp-settings .pp-note[role="status"]', (e) => e.textContent);
+  await page.click('#pp-export');
+  await page.waitForSelector('#pp-export-json');
   await page.click('#pp-export-json');
   await sleep(100);
   const ppSaved = await page.evaluate(async () => ({
@@ -4977,23 +5037,50 @@ try {
     rows: (await __demo.saved[1]?.text())?.trim().split('\r\n').length - 1,
     buybacks: (await chrome.storage.local.get('db')).db?.sources?.buybacks?.items?.length,
     note: document.querySelector('.pp-settings .pp-note[role="status"]')?.textContent || '',
-    row: (() => {
-      const [a, b, c] = ['json', 'pledges', 'buybacks'].map((id) =>
-        document.getElementById(`pp-export-${id}`).getBoundingClientRect(),
-      );
-      return a.top === b.top && b.top === c.top;
-    })(),
   }));
+  await page.focus('#pp-export');
+  await page.keyboard.press('ArrowDown');
+  await page.waitForSelector('#pp-export-menu');
+  const menuKeys = [await page.evaluate(() => document.activeElement?.id)];
+  for (const k of ['ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowUp']) {
+    await page.keyboard.press(k);
+    menuKeys.push(await page.evaluate(() => document.activeElement?.id));
+  }
+  await page.keyboard.press('Escape');
+  await sleep(50);
+  const escaped = await page.evaluate(() => ({
+    menu: !!document.getElementById('pp-export-menu'),
+    focus: document.activeElement?.id,
+  }));
+  await page.click('#pp-export');
+  await page.waitForSelector('#pp-export-menu');
+  await page.click('#pp-accounts-h');
+  await sleep(50);
+  const outsideShut = await page.evaluate(() => !document.getElementById('pp-export-menu'));
+  menuOpen.role === 'menu' &&
+  menuOpen.expanded === 'true' &&
+  menuOpen.items === 'JSON Backup,Pledges CSV,Buy-Backs CSV' &&
+  menuOpen.focus === 'pp-export-json' &&
+  menuOpen.seen &&
+  !menuOpen.wide &&
+  !shutAfter.menu &&
+  shutAfter.focus === 'pp-export' &&
   ppSaved.types.join() === 'text/csv,text/csv,application/json' &&
   ppSaved.head === 'id,name,type,date,contains,insurance,price' &&
   ppSaved.rows === ppSaved.buybacks &&
   bbNote === `Saved ${ppSaved.buybacks} rows to a CSV file.` &&
   ppSaved.note === 'Backup saved.' &&
-  ppSaved.row
+  menuKeys.join() ===
+    'pp-export-json,pp-export-pledges,pp-export-buybacks,pp-export-json,pp-export-buybacks' &&
+  !escaped.menu &&
+  escaped.focus === 'pp-export' &&
+  outsideShut
     ? ok(
-        `JSON Backup, Pledges CSV and Buy-Backs CSV (${ppSaved.rows} buy-backs) save their files, one row`,
+        `Export menu: JSON Backup, Pledges CSV and Buy-Backs CSV (${ppSaved.rows} buy-backs) save their files; arrows, Escape and a click outside work`,
       )
-    : fail(`popup exports: ${JSON.stringify({ ppSaved, bbNote })}`);
+    : fail(
+        `popup exports: ${JSON.stringify({ menuOpen, shutAfter, ppSaved, bbNote, menuKeys, escaped, outsideShut })}`,
+      );
   // Currency: USD until one is picked, and no exchange rates asked for USD; EUR picked asks for the day's rates once and shows the
   // dollar figure on hover; back to USD asks nothing more.
   const rated = () =>
@@ -5038,8 +5125,9 @@ try {
     asked: __demo.asked.join(),
     removed: __demo.removed.join(),
     nt: document.getElementById('pp-nt-sw').getAttribute('aria-checked'),
-    hint: document.getElementById(document.getElementById('pp-nt-sw').getAttribute('aria-describedby'))
-      ?.textContent,
+    hint: document.getElementById(
+      document.getElementById('pp-nt-sw').getAttribute('aria-describedby'),
+    )?.textContent,
     label: document.getElementById('pp-nt-l').textContent,
   }));
   ntOff === 'false' &&
@@ -7062,7 +7150,9 @@ try {
   alHome.news[2].startsWith('Constellation Mk IV - Nightbreak Paint') &&
   alHome.chev === 3 &&
   alHome.sent.includes('alerts-seen')
-    ? ok('Fleet News on Hangar: paint and limited sales for your ships, unseen first, all marked seen')
+    ? ok(
+        'Fleet News on Hangar: paint and limited sales for your ships, unseen first, all marked seen',
+      )
     : fail(`popup fleet news: ${JSON.stringify(alHome)}`);
   await page.click('#pp-news .pp-item');
   const alRow = await page.evaluate(() => __demo.opened.at(-1));

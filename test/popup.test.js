@@ -720,7 +720,7 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
     'popup.auto-scan',
     'popup.look-auto',
     'popup.shortcut-none',
-    'popup.shortcut-change',
+    'popup.export-menu',
     'popup.disconnect-ask',
     'popup.stay',
   ];
@@ -738,6 +738,7 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
     'popup.wish-no-match': 'No matches.',
     'popup.wish-not-added': "Couldn't add {name}.",
     'popup.wish-remove': 'Remove {name}',
+    'popup.export-menu': 'Export Data',
     'popup.export-json': 'JSON Backup',
     'popup.export-pledges': 'Pledges CSV',
     'popup.export-buybacks': 'Buy-Backs CSV',

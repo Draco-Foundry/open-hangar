@@ -697,16 +697,6 @@ body {
   display: flex;
   gap: 8px;
 }
-/* The three data buttons: one row, each as wide as its name at least, so a wider font
-   wraps the row instead of running a name past the edge. */
-.pp-three {
-  flex-wrap: wrap;
-}
-.pp-three .pp-btn2 {
-  flex: 1 1 auto;
-  min-width: max-content;
-  white-space: nowrap;
-}
 .pp-link {
   font: inherit;
   padding: 0;
@@ -989,9 +979,8 @@ body {
   flex: 1;
   min-width: 0;
 }
-/* Two switches on one row, and Look, Currency and Shortcut side by side (#700): each name
-   over its control (Settings.svelte). Notifications waits on Store Alerts, so its name
-   dims with its switch. */
+/* Two switches on one row (Settings.svelte). Notifications waits on Store Alerts, so its
+   name dims with its switch. */
 .pp-two .pp-gap {
   margin-left: 6px;
   padding-left: 12px;
@@ -1000,40 +989,153 @@ body {
 .pp-two .pp-gap.off {
   color: var(--faint);
 }
-.pp-trio {
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.8fr) minmax(0, 1.25fr);
-  align-items: start;
+/* Sync Now the main button, Disconnect a quiet link beside it; a switch with its status
+   line under it. */
+.pp-syncrow {
+  gap: 14px;
+}
+.pp-btn2.main {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.pp-btn2.main:hover {
+  border-color: var(--accent-hover);
+}
+.pp-syncrow .pp-link.quiet {
+  flex: none;
+  margin-left: 0;
+  font-size: 13px;
+}
+.pp-sub {
+  gap: 2px;
+}
+.pp-line {
+  display: flex;
+  align-items: center;
   gap: 10px;
 }
-.pp-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-}
-.pp-cell small {
-  display: flex;
-  gap: 8px;
+.pp-sub .pp-msg {
+  margin: 0;
   font-size: 12px;
+}
+/* Look, Currency and Shortcut as list rows (owner, 2026-10-24): the name, then the value
+   in muted text with a ▾ (a real select, restyled), or a › where the value opens the
+   browser's shortcuts page. */
+.pp-li {
+  cursor: pointer;
+}
+.pp-pick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  max-width: 62%;
+  font: inherit;
+  font-size: 13px;
   color: var(--muted);
+}
+.pp-pick::after {
+  content: '▾' / '';
+  position: absolute;
+  right: 0;
+  font-size: 11px;
+  pointer-events: none;
+}
+.pp-pick .pp-sel {
+  appearance: none;
+  max-width: 100%;
+  padding: 0 14px 0 0;
+  color: inherit;
+  text-align: right;
+  text-align-last: right;
+  text-overflow: ellipsis;
+}
+.pp-pick.go {
+  padding: 0 14px 0 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
   white-space: nowrap;
 }
-.pp-cell small .pp-link {
-  font-size: 12px;
+.pp-pick.go::after {
+  content: '›' / '';
+  font-size: 15px;
 }
-.pp-cell .pp-sel {
-  align-self: start;
-  text-align: left;
-  max-width: 100%;
-  padding: 0;
+.pp-pick.fixed {
+  white-space: nowrap;
+}
+.pp-pick.fixed::after {
+  content: none;
+}
+.pp-li:hover .pp-pick {
   color: var(--text);
 }
-.pp-cval {
+.pp-pick.fixed,
+.pp-li:has(.fixed) {
+  cursor: default;
+}
+.pp-li:has(.fixed):hover .pp-pick {
+  color: var(--muted);
+}
+/* Export and Log Out of RSI, the same width. */
+.pp-data {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+/* The Export menu: it opens upwards over the rows above (the tab ends just below it). */
+.pp-menu {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+.pp-menu .pp-btn2::after {
+  content: ' ▾' / '';
+  color: var(--muted);
+  font-size: 11px;
+}
+.pp-mlist {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 4px);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 100%;
+  padding: 4px;
+  box-sizing: border-box;
+  background: var(--lift);
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.pp-mlist button {
+  font: inherit;
   font-size: 13px;
+  text-align: left;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+.pp-mlist button:hover,
+.pp-mlist button:focus-visible {
+  background: var(--accent-soft);
+}
+/* Clear Data on its own line at the bottom. */
+.pp-end {
+  display: flex;
+  justify-content: center;
+  font-size: 13px;
+}
+.pp-link.bad {
+  color: var(--bad);
+}
+.pp-link.bad:disabled {
+  color: var(--faint);
 }
 .pp-val {
   margin-left: auto;
