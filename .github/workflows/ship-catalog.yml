@@ -42,13 +42,13 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c bot/ship-catalog
           git add src/data/ship-catalog.json
-          git commit -m "data: weekly ship catalog refresh"
+          git commit -m "chore(data): weekly ship catalog refresh"
           git push --force origin bot/ship-catalog
           if gh pr view bot/ship-catalog --json state -q .state 2>/dev/null | grep -q OPEN; then
             echo "Updated the open catalog PR."; exit 0
           fi
           RUN="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           gh pr create --base main --head bot/ship-catalog \
-            --title "data: weekly ship catalog refresh" \
+            --title "chore(data): weekly ship catalog refresh" \
             --body "Ship prices and stats from star-citizen.wiki. The tests passed with this catalog in the [refresh run]($RUN)." \
             || echo "::warning::Couldn't open the PR (allow Actions to create PRs in Settings → Actions → General). The branch bot/ship-catalog is pushed: open the PR by hand."
