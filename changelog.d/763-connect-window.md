@@ -1,1 +1,0 @@
-- Changed: **Safer connecting.** Connect This Browser on openhangar.space now opens Open Hangar's own sign-in window, and switching to another account asks you first.

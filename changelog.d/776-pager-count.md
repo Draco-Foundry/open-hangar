@@ -1,1 +1,0 @@
-- Improved: A scan whose pledge count doesn't fit RSI's page count is treated as cut short, so it can't replace a bigger scan.

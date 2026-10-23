@@ -4,6 +4,18 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.5.3 — 2026-10-23
+
+- Improved: If RSI changes a page, the scan stops and your last scan is kept.
+- Improved: **When RSI isn't answering.** Scan now says so instead of showing an error, and nothing from your last scan is lost.
+- New: **UEC and REC in the popup.** They get their own cards, and every popup number now fits its box, with short forms like 1.2 M.
+- Changed: **Safer connecting.** Connect This Browser on openhangar.space now opens Open Hangar's own sign-in window, and switching to another account asks you first.
+- Fixed: **Connect on Firefox for Android.** It works again, with a code you approve on openhangar.space.
+- Changed: Store alerts no longer tell you about buy-backs. Paint alerts only come for ships still on their default paint.
+- Improved: A scan whose pledge count doesn't fit RSI's page count is treated as cut short, so it can't replace a bigger scan.
+- Improved: A hangar or buy-back list saved by an older version shows as out of date, and Auto Scan reads it again on its next run.
+- Improved: **Shortcut on a Mac.** The popup shows its shortcut the Mac way, ⌥⇧O.
+
 ## 0.5.2 — 2026-10-20
 
 - Fixed: **Shortcut on Firefox.** The popup's shortcut is now Alt+Shift+O, because on Firefox Alt+Shift+H opened Firefox's Help menu. Settings shows the shortcut your browser uses.

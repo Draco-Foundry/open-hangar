@@ -1,1 +1,0 @@
-- Improved: **When RSI isn't answering.** Scan now says so instead of showing an error, and nothing from your last scan is lost.

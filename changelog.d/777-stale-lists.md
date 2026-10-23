@@ -1,1 +1,0 @@
-- Improved: A hangar or buy-back list saved by an older version shows as out of date, and Auto Scan reads it again on its next run.

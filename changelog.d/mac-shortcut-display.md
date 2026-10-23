@@ -1,1 +1,0 @@
-- Improved: **Shortcut on a Mac.** The popup shows its shortcut the Mac way, ⌥⇧O.
