@@ -795,7 +795,11 @@ export function createRunner(env) {
     // A sync owed only counts when it can go (Firefox's yes to share): else it would read
     // everything every day for a sync that waits anyway.
     run.owed = owedSync({ stamp: OH.syncStamp(db), link, rec: was }) && (await mayShare());
-    const due = fullDue(scanFull, db, paused, now(), { owed: run.owed });
+    // A list an older parser read is due again, whatever its stamp says (#728).
+    const stale = new Set();
+    for (const p of ['hangar', 'buybacks'])
+      if (db?.sources?.[p]?.scannedAt != null && (await OH.parserStale(p))) stale.add(p);
+    const due = fullDue(scanFull, db, paused, now(), { owed: run.owed, stale });
     run.mayOwe = true;
 
     // 2. Signed in? Without RSI's sign-in cookie, signed out for sure: RSI isn't asked.

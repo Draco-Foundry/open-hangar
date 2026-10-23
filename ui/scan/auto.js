@@ -52,12 +52,19 @@ const trusted = (scanFull, db, p) =>
 // oldest one a week old (or in the future: the clock went back). `paused`: the parts
 // the status file pauses (a Set of PARTS ids). `owed`: a sync that never went out (the
 // policy's "nothing new stops there and sends nothing": a quick check never sends one,
-// so a run that owes one reads in full and sends it at its end).
-export function fullDue(scanFull, db, paused = new Set(), now = Date.now(), { owed = false } = {}) {
+// so a run that owes one reads in full and sends it at its end). `stale`: the parts an
+// older parser read (OH.parserStale, #728): due like any part whose read doesn't stand.
+export function fullDue(
+  scanFull,
+  db,
+  paused = new Set(),
+  now = Date.now(),
+  { owed = false, stale = new Set() } = {},
+) {
   if (owed) return true;
   const parts = PARTS.filter((p) => !paused.has(p));
   if (!parts.length) return false;
-  if (parts.some((p) => !trusted(scanFull, db, p))) return true;
+  if (parts.some((p) => stale.has(p) || !trusted(scanFull, db, p))) return true;
   const oldest = Math.min(...parts.map((p) => scanFull[p]));
   return now - oldest >= WEEK || now < oldest;
 }

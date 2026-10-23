@@ -55,6 +55,12 @@ test('fullDue: a part whose last complete read no longer stands, a week, a clock
   assert.equal(fullDue(noRef, db(), new Set(['referral']), NOW), false);
   // A sync owed makes it a full read (the quick check never sends).
   assert.equal(fullDue(full(), db(), new Set(), NOW, { owed: true }), true);
+  // A part an older parser read is due (#728), unless the status file pauses it.
+  assert.equal(fullDue(full(), db(), new Set(), NOW, { stale: new Set(['buybacks']) }), true);
+  assert.equal(
+    fullDue(full(), db(), new Set(['buybacks']), NOW, { stale: new Set(['buybacks']) }),
+    false,
+  );
 });
 
 test('owedSync: a saved scan whose sync never went out', async () => {

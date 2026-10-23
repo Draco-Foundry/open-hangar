@@ -21,6 +21,7 @@
     reportSyncFailed,
     syncTrouble,
     scanAge,
+    staleAge,
     scanState,
     storeCredit,
     valueSince,
@@ -46,6 +47,7 @@
   let since = $state(null); // { delta, at }: Account Value since an earlier scan
   let avatar = $state(null);
   let db = $state(null);
+  let parserOld = $state(false); // a saved list was read by an older parser (#728)
   let account = $state(null);
   let report = $state(null); // the last scan's report (local scanReport)
   // The last scan that began (local scanStarted), and Auto Scan Daily's switch and last
@@ -101,7 +103,7 @@
   });
   const busy = $derived(sc.phase === 'running');
   const frac = $derived(sc.progress ? Math.round(progressFraction(sc.progress) * 100) : null);
-  const age = $derived(scanAge(v?.scannedAt, now));
+  const age = $derived(staleAge(scanAge(v?.scannedAt, now), parserOld));
   const news = $derived(ALERTS && alerts.on ? fleetNews(alerts.items, fresh) : []);
   // Signed out of RSI: RSI's sign-in cookie isn't in this browser, or the last account
   // read or scan said so and the browser can't say about the cookie. Log In to RSI first,
@@ -163,6 +165,11 @@
     ]);
     const hangarPage = globalThis.OHPages?.pages?.hangar?.[0] || '';
     db = stored;
+    parserOld = (
+      await Promise.all(
+        ['hangar', 'buybacks'].map(async (id) => stored.sources?.[id]?.scannedAt != null && (await OH.parserStale(id))),
+      )
+    ).some(Boolean);
     account = got.account || null;
     justUpdated = got.justUpdated || null;
     updateReady = got.updateReady || null;
