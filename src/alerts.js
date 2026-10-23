@@ -11,8 +11,8 @@
  *     in those keys, so it's skipped here with no rule of its own, from the next check;
  *   - the hangar and buy-backs this browser scanned, which never leave it, by the
  *     owner's rules (2026-10-10):
- *       buyback  a ship in your buy-backs is in the store again
- *       paint    a ship you own gets a paint that just arrived in the store
+ *       paint    a ship you own, still on its default paint, gets a paint that just
+ *                arrived in the store
  *       warbond  a ship you own is sold as a warbond edition
  *       limited  a ship you own is back on a limited-time sale
  * Each match says why. The badge counts the items with a match you haven't seen (the
@@ -84,9 +84,6 @@
     // Why an item is an alert, one line each:
     // On the pilot's account Wishlist (only while this browser is connected).
     'alerts.why.wishlist': 'On your Wishlist',
-    // A ship in your buy-backs is sold in the store again. Mustn't promise RSI will
-    // sell the buy-back back (its own rules apply: tokens, store credit).
-    'alerts.why.buyback': 'In your buy-backs, now in the store: {ship}',
     // A paint for a ship you own arrived in the store in the last week (our own
     // record of the store). Never "new", "first" or "never sold before".
     'alerts.why.paint': 'In the store in the last 7 days: paint for your {ship}',
@@ -321,6 +318,15 @@
     return out;
   }
 
+  // The ships you own a paint for: the store's paint items you own (by name), their ships.
+  function paintedShips(feed, paints) {
+    const out = new Set();
+    for (const item of feed.items)
+      if (item.kind === 'paint' && paints.has(paintKey(item.name)))
+        for (const s of item.ships) out.add(s);
+    return out;
+  }
+
   // ---- Matching ----
   // The Wishlist keys an item answers to (the website's lib/wishlist.ts keys).
   function wishKeysOf(item) {
@@ -336,8 +342,8 @@
   function matchAll(feed, db, wish) {
     const index = shipIndex(feed);
     const owned = ownedShips(db, index);
-    const backs = buybackShips(db, index);
     const paints = ownedPaints(db);
+    const painted = paintedShips(feed, paints);
     const wished = wish ? new Set(wish) : null;
     const out = [];
     for (const item of feed.items) {
@@ -347,8 +353,6 @@
       const ship = item.kind === 'ship' || item.kind === 'vehicle';
       const mine = (from) => item.ships.filter((s) => from.has(s)).map((s) => index.name(s));
       if (ship) {
-        const bb = mine(backs);
-        if (bb.length) why.push({ why: 'buyback', ships: bb });
         const own = mine(owned);
         if (own.length && item.sale.includes('warbond')) why.push({ why: 'warbond', ships: own });
         if (own.length && item.sale.includes('limited')) why.push({ why: 'limited', ships: own });
@@ -357,7 +361,10 @@
         (item.sale.includes('listed') || item.sale.includes('back')) &&
         !paints.has(paintKey(item.name))
       ) {
-        const own = mine(owned);
+        // Only ships still on their default paint: you own no paint for them yet.
+        const own = item.ships
+          .filter((s) => owned.has(s) && !painted.has(s))
+          .map((s) => index.name(s));
         if (own.length) why.push({ why: 'paint', ships: own });
       }
       if (why.length)
@@ -385,13 +392,28 @@
   // shows the item again.
   const pairsOf = (m) => m.why.map((w) => `${m.id}|${w.why}`);
   const emptyState = () => ({ v: 1, items: [], known: {}, seen: {}, gone: {}, hidden: {} });
+  // Reasons that no longer exist (the buy-back alert, #695): saved ones are dropped here,
+  // so the list, the badge and the memory all lose them.
+  const RETIRED = new Set(['buyback']);
   function cleanState(s) {
     if (!isObj(s) || s.v !== 1) return emptyState();
     const map = (x) =>
-      isObj(x) ? Object.fromEntries(Object.entries(x).filter(([, v]) => Number.isFinite(v))) : {};
+      isObj(x)
+        ? Object.fromEntries(
+            Object.entries(x).filter(
+              ([k, v]) => Number.isFinite(v) && !RETIRED.has(k.slice(k.lastIndexOf('|') + 1)),
+            ),
+          )
+        : {};
+    const items = (Array.isArray(s.items) ? s.items.filter(isObj) : [])
+      .map((m) => ({
+        ...m,
+        why: (Array.isArray(m.why) ? m.why : []).filter((w) => !RETIRED.has(w?.why)),
+      }))
+      .filter((m) => m.why.length);
     return {
       ...s,
-      items: Array.isArray(s.items) ? s.items.filter(isObj) : [],
+      items,
       known: map(s.known),
       seen: map(s.seen),
       gone: map(s.gone),
@@ -473,7 +495,7 @@
   }
 
   // ---- Words ----
-  const WHY_KEYS = { wishlist: 1, buyback: 1, paint: 1, warbond: 1, limited: 1 };
+  const WHY_KEYS = { wishlist: 1, paint: 1, warbond: 1, limited: 1 };
   const whyLine = (w) =>
     WHY_KEYS[w.why] ? t(`alerts.why.${w.why}`, { ship: (w.ships || []).join(', ') }) : '';
   const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
