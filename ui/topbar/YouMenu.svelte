@@ -209,7 +209,7 @@
         stroke-linejoin="round"
         aria-hidden="true"
         use:safeHTML={QL_ICONS.grid}></svg
-      >Quick Links<span class="ql-tag">RSI</span><span class="ql-chev" aria-hidden="true">›</span></button
+      >Quick Links<span class="ql-tag">RSI</span><span class="ql-chev" aria-hidden="true"><svg class="chev" viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 3l5 5-5 5"/></svg></span></button
     >
     <div class="ql-in" id="ql-menu" hidden={!qlOpen}>
       {#if qlPref.hidden}

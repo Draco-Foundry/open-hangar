@@ -35,7 +35,7 @@
 <aside class="oh-fbar" aria-label="Filters">
   <div class="oh-fbar-top">
     <h3>Filters</h3>
-    <button type="button" class="oh-link" onclick={() => onFold(true)}>‹ Hide Filters</button>
+    <button type="button" class="oh-link" onclick={() => onFold(true)}>Hide Filters</button>
   </div>
   <div class="oh-tpills">
     {#each f.types as t (t.key)}

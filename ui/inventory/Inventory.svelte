@@ -19,11 +19,11 @@
     ['default', 'Sort: Hangar order'],
     ['date-desc', 'Pledged: newest first'],
     ['date-asc', 'Pledged: oldest first'],
-    ['value-desc', 'Value: high → low'],
-    ['value-asc', 'Value: low → high'],
-    ['store-desc', 'Store price: high → low'],
-    ['name-asc', 'Name: A → Z'],
-    ['name-desc', 'Name: Z → A'],
+    ['value-desc', 'Value, High to Low'],
+    ['value-asc', 'Value, Low to High'],
+    ['store-desc', 'Store Price, High to Low'],
+    ['name-asc', 'Name, A to Z'],
+    ['name-desc', 'Name, Z to A'],
   ];
   const LAYOUTS = [
     ['gallery', 'Gallery'],
