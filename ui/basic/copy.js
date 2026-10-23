@@ -113,13 +113,13 @@ const COPY = {
   'basic.pilot-yes': 'Sync It',
   'basic.pilot-no': 'Not This One',
   // --- Connect came back with another openhangar.space account (connect hardening) ---
-  // NEW: placeholders, the words come from Claude chat (Handoffs "EXT #669 F1: Words").
   // Asked on this page before anything is replaced or synced: {from} is the account
   // this browser is connected to now, {to} the one the sign-in window approved.
   'basic.switch-title': 'Switch to {to}?',
-  'basic.switch-body': 'This browser is connected to {from}. Switching sends your hangar to {to}.',
+  'basic.switch-body':
+    'This browser is connected to {from}. Switching sends your hangar to {to} from now on.',
   'basic.switch-yes': 'Switch to {to}',
-  'basic.switch-no': 'Stay With {from}',
+  'basic.switch-no': 'Stay with {from}',
   // --- Store alerts (the `alerts` flag; the popup's switch since 0.4.0) ---
   'basic.alerts-title': 'Store Alerts', // the card's heading (Title Case)
   // What alerts do: a badge and notifications when something in RSI's store is for

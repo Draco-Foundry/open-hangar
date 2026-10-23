@@ -80,12 +80,15 @@ test('the 0.5.2 lines as fragments fold to the 0.5.2 section in CHANGELOG.md', a
   );
 });
 
-test('the CI check warns for src/ without a fragment, and for nothing else', async () => {
+test('the CI check warns for src/, ui/popup/ or ui/basic/ without a fragment, and for nothing else', async () => {
   const { needsFragment } = await check();
   assert.equal(needsFragment(['src/lib.js']), true);
   assert.equal(needsFragment(['src/lib.js', 'changelog.d/760-x.md']), false);
+  assert.equal(needsFragment(['ui/popup/Home.svelte']), true);
+  assert.equal(needsFragment(['ui/basic/copy.js']), true);
+  assert.equal(needsFragment(['ui/scan/runner.js']), false);
   assert.equal(needsFragment(['src/lib.js', 'changelog.d/README.md']), true);
-  assert.equal(needsFragment(['docs/dev/git.md', 'ui/popup/Popup.svelte']), false);
+  assert.equal(needsFragment(['docs/dev/git.md', 'ui/scan/runner.js']), false);
 });
 
 test('the CI check exits 0 even when it warns', async () => {

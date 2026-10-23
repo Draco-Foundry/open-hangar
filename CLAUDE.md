@@ -190,15 +190,14 @@ list only when it gets a test.
 
 - Never release (the deny list blocks the usual commands; no test).
 - Never push to `main` directly.
-- Never put private data in issues, PRs or commits; never commit secrets or `.env` files.
-- Never load remote code (web-ext lint catches some forms; no test of our own).
-- npm only, one lockfile; ask before adding a dependency.
+- Never put private data in issues, PRs or commits (`.env` files and key shapes are
+  checked by `scripts/check-private.mjs`; other private data is not).
+- Ask before adding a dependency (the one-lockfile part is tested).
 - One concern per PR, no refactoring of unrelated code.
 - Code and comments never mention plan files.
 - Flag any change that needs the website in the PR.
 - A page's words are the owner's approved words, word for word.
-- Player-facing changes get a CHANGELOG bullet under `## Unreleased`.
-- `src/*.js` stay classic scripts with no imports.
+- Player-facing changes get a changelog fragment (CI only warns, never fails).
 - Done means: Chrome, Edge and Firefox and a narrow window for worker, fetching or CSP
   changes.
 - Don't edit generated files (tested for `src/parser-rules-data.js`, `src/sync-schema.js`
