@@ -7051,13 +7051,16 @@ try {
     news: [...document.querySelectorAll('#pp-news .pp-item')].map((b) =>
       b.textContent.replace(/\s+/g, ' ').trim(),
     ),
+    // The row's arrow is a drawn chevron since the arrow sweep, not a text glyph.
+    chev: document.querySelectorAll('#pp-news .pp-item .pp-chev svg.chev').length,
     sent: __demo.sent.map((m) => m.ohPopup),
   }));
   alHome.tab === 'pp-tab-hangar' &&
   alHome.news.length === 3 &&
   alHome.news[0].startsWith('Not seen yet: Sabre Raven EX In the store in the last 7 days') &&
-  alHome.news[1] === 'Not seen yet: Cutlass Black Limited-time sale: Cutlass Black ›' &&
+  alHome.news[1] === 'Not seen yet: Cutlass Black Limited-time sale: Cutlass Black' &&
   alHome.news[2].startsWith('Constellation Mk IV - Nightbreak Paint') &&
+  alHome.chev === 3 &&
   alHome.sent.includes('alerts-seen')
     ? ok('Fleet News on Hangar: paint and limited sales for your ships, unseen first, all marked seen')
     : fail(`popup fleet news: ${JSON.stringify(alHome)}`);

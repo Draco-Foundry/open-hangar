@@ -21,8 +21,8 @@
     ['date-asc', 'Date: oldest first'],
     ['price-desc', 'Price: high to low'],
     ['price-asc', 'Price: low to high'],
-    ['name-asc', 'Name: A → Z'],
-    ['name-desc', 'Name: Z → A'],
+    ['name-asc', 'Name, A to Z'],
+    ['name-desc', 'Name, Z to A'],
     ['default', 'Scan order'],
   ];
   const LAYOUTS = [

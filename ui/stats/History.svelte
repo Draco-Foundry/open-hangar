@@ -64,7 +64,7 @@
           ...diff.removed.map((c) => ['del', `− ${c.name} (${a.money(c.value)})`]),
           ...diff.changed.map((c) => [
             'chg',
-            `~ ${c.from} → ${c.to} (${a.money(c.fromValue)} → ${a.money(c.toValue)})`,
+            `~ ${c.from} to ${c.to} (${a.money(c.fromValue)} to ${a.money(c.toValue)})`,
           ]),
         ],
       });
@@ -128,6 +128,6 @@
       ? 'Your scans and this history live in this browser. Once you connect, openhangar.space keeps your latest hangar too, but uninstalling the extension or moving to another browser loses the history here.'
       : 'Your scans and this history live only in this browser. Uninstalling the extension or moving to another browser loses them.'}
     Keep the file somewhere safe (a Drive or OneDrive folder works) and restore it with
-    Developers → Import JSON.</span
+    Developers / Import JSON.</span
   >
 </div>

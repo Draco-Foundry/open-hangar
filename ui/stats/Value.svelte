@@ -70,7 +70,7 @@
       {#each d.deals as x}
         <div class="row">
           <div class="nm">{x.name}</div>
-          <div class="vl">{x.paid} → {x.store} <span class="gain">+{x.gain}</span></div>
+          <div class="vl">{x.paid} to {x.store} <span class="gain">+{x.gain}</span></div>
         </div>
       {/each}
     </div>

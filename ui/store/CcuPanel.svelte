@@ -96,7 +96,7 @@
           {#each shown as c (c.key)}
             <tr>
               <td>
-                <ShipLink name={c.from} /> <span class="ccu-flow">→</span>
+                <ShipLink name={c.from} /> <span class="ccu-flow">to</span>
                 <ShipLink name={c.to} />
               </td>
               <td class="num">

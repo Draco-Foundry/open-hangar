@@ -75,7 +75,7 @@
           {/if}
           <span class="mid">
             <span class="n" title={r.name}
-              >{#if r.kind === 'ccu' && r.from && r.to}{r.from} <span class="arrow">→</span> {r.to}{:else}{r.name}{/if}</span
+              >{#if r.kind === 'ccu' && r.from && r.to}{r.from} <span class="arrow">to</span> {r.to}{:else}{r.name}{/if}</span
             >
             <span class="sb">
               <span class="badge {r.kind}">{r.kindLabel}</span>
