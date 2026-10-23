@@ -29,13 +29,15 @@ export async function readWishlist() {
 
 // Store alerts follow Remind Me: what a Wishlist change does to them. `change` is what the
 // tab sent (./wish-client.js), `items` the list after it. → true (Remind Me was just turned
-// on: alerts are on, no other step), false (no item has Remind Me now: alerts off, which
-// empties the list and the badge), or null (leave them: no Remind Me on this site, or a
-// change that turns nothing on). Pure.
+// on, or an item added, which starts with Remind Me on as on the website: alerts are on,
+// no other step), false (no item has Remind Me now: alerts off, which empties the list and
+// the badge), or null (leave them: no Remind Me on this site, or a change that turns
+// nothing on). Pure.
 export function alertsFor(change, items) {
   const list = Array.isArray(items) ? items : [];
   if (!list.some((i) => typeof i?.remind === 'boolean')) return null;
   if (change?.do === 'remind' && change.remind === true) return true;
+  if (change?.do === 'add' && list.some((i) => i?.remind === true)) return true;
   return list.some((i) => i?.remind === true) ? null : false;
 }
 

@@ -212,7 +212,15 @@
     {/if}
     {#if note}<p class="pp-note" id="pp-wish-note" role="status">{note}</p>{/if}
     {#if list.items.length}
-      <h2 class="pp-lbl" id="pp-wish-h">{t('popup.wish-count', { n: list.items.length })}</h2>
+      <!-- The switches' column label, once (each switch has its own name). -->
+      <div class="pp-whead">
+        <h2 class="pp-lbl" id="pp-wish-h">{t('popup.wish-count', { n: list.items.length })}</h2>
+        {#if list.items.some((i) => typeof i.remind === 'boolean')}
+          <span class="pp-lbl pp-wremind" id="pp-wish-remind-h" aria-hidden="true"
+            >{t('popup.wish-remind-label')}</span
+          >
+        {/if}
+      </div>
       <ul class="pp-wlist pp-wedit" aria-labelledby="pp-wish-h">
         {#each items as item (item.key)}
           {@const s = sale ? sale(item.key) : null}

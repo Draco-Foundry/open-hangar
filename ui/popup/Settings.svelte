@@ -262,9 +262,11 @@
           id="pp-nt-sw"
           aria-checked={notify}
           aria-labelledby="pp-nt-l"
+          aria-describedby="pp-nt-hint"
           onclick={notifySwitch}><i></i></button
         >
       </div>
+      <p class="pp-r pp-msg calm" id="pp-nt-hint">{t('popup.notifications-hint')}</p>
     </div>
   {/if}
 

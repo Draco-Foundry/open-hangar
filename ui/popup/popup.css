@@ -868,6 +868,23 @@ body {
 }
 /* Remind Me (the website's wishlist_remind): a small track and knob beside the ✕; on,
    the track takes the accent. Its words are its title and screen reader name. */
+/* The Remind Me column's label over the switches: centred on them (the ✕ after
+   each, 28px, and the 10px gap, so its middle sits 56px from the right). */
+.pp-whead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.pp-wremind {
+  flex: none;
+  width: 76px;
+  margin-right: 18px;
+  text-align: center;
+}
+.phone .pp-wremind {
+  margin-right: 34px;
+}
 .pp-wsw {
   flex: none;
   display: grid;

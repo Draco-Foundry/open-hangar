@@ -125,6 +125,8 @@ const COPY = {
   // Remind Me on each item (the website's wishlist_remind): the switch's label (its
   // title; on or off shows in the switch itself) and its name for screen readers (on or
   // off is read out on its own). Approved 2026-10-16.
+  // Also the switches' column label, once above them (shown, not read: each switch has
+  // popup.wish-remind).
   'popup.wish-remind-label': 'Remind Me',
   'popup.wish-remind': 'Remind me about {name}',
   // The field for the price you're waiting for, in US dollars.
@@ -182,6 +184,8 @@ const COPY = {
   'popup.auto-today': 'today {time}',
   'popup.store-alerts': 'Store Alerts', // the basic page's heading (basic.alerts-title)
   'popup.notifications': 'Notifications', // the switch's name
+  // The muted line under it. Claude chat, Words, 2026-10-23.
+  'popup.notifications-hint': 'A pop-up when a Remind Me item goes on sale.',
   'popup.look': 'Look',
   'popup.look-auto': 'Match Browser',
   'popup.look-dark': 'Dark',

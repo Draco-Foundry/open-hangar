@@ -624,6 +624,11 @@ test('alerts follow Remind Me: on from the switch, off with the last one, left a
     alertsFor({ do: 'remove', key: 'ship:a' }, [{ key: 'ship:b', remind: false }]),
     false,
   );
+  // An item added starts with Remind Me on (the website's default): alerts on. An add
+  // the website answered with Remind Me off everywhere: off, as for any change.
+  const added = [{ key: 'ship:c', remind: true }, ...off];
+  assert.equal(alertsFor({ do: 'add', item: { kind: 'ship', name: 'C' } }, added), true);
+  assert.equal(alertsFor({ do: 'add', item: { kind: 'ship', name: 'C' } }, off), false);
   // The website offers no Remind Me (null on every item): alerts are left as they are.
   assert.equal(
     alertsFor({ do: 'remind', key: 'ship:a', remind: true }, [{ key: 'ship:a', remind: null }]),

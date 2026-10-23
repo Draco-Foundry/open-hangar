@@ -5038,12 +5038,17 @@ try {
     asked: __demo.asked.join(),
     removed: __demo.removed.join(),
     nt: document.getElementById('pp-nt-sw').getAttribute('aria-checked'),
+    hint: document.getElementById(document.getElementById('pp-nt-sw').getAttribute('aria-describedby'))
+      ?.textContent,
+    label: document.getElementById('pp-nt-l').textContent,
   }));
   ntOff === 'false' &&
   sw.removed === 'notifications' &&
   sw.asked === 'notifications' &&
-  sw.nt === 'true'
-    ? ok('Notifications gives back and asks again, with no Store Alerts switch')
+  sw.nt === 'true' &&
+  sw.label === 'Notifications' &&
+  sw.hint === 'A pop-up when a Remind Me item goes on sale.'
+    ? ok('Notifications gives back and asks again, its hint line under it, no Store Alerts switch')
     : fail(`popup alert switches: ${JSON.stringify({ sw, ntOff })}`);
   // Light: picked in Look, and following the browser.
   await page.select('#pp-look', 'light');
@@ -6227,6 +6232,19 @@ try {
     );
   const remindBefore = await switches();
   const twoSwitches = remindBefore.length === 2;
+  // The column's label: shown once, not read (each switch has its name), centred over
+  // the switches.
+  const remindHead = await page.evaluate(() => {
+    const h = document.querySelectorAll('#pp-wish-remind-h');
+    const r = h[0]?.getBoundingClientRect();
+    const s = document.querySelector('.pp-wedit .pp-wsw')?.getBoundingClientRect();
+    return {
+      count: h.length,
+      text: h[0]?.textContent.trim(),
+      hidden: h[0]?.getAttribute('aria-hidden'),
+      off: r && s ? Math.abs(r.left + r.width / 2 - (s.left + s.width / 2)) : null,
+    };
+  });
   await page.click('.pp-wedit li:nth-child(1) .pp-wsw');
   await page.waitForFunction(
     () =>
@@ -6246,9 +6264,16 @@ try {
   remindAfter.states.map((s) => s[1]).join() === 'false,false' &&
   JSON.stringify(remindAfter.sent) ===
     JSON.stringify([{ v: 1, do: 'save', key: 'ship:avenger-titan', remind: false }]) &&
-  !remindAfter.wide
-    ? ok('Wishlist Remind Me: a switch per item, one save with which item and on or off')
-    : fail(`popup wishlist remind: ${JSON.stringify({ remindBefore, remindAfter })}`);
+  !remindAfter.wide &&
+  remindHead.count === 1 &&
+  remindHead.text === 'Remind Me' &&
+  remindHead.hidden === 'true' &&
+  remindHead.off != null &&
+  remindHead.off <= 3
+    ? ok(
+        'Wishlist Remind Me: a switch per item, "Remind Me" once above them, one save with which item and on or off',
+      )
+    : fail(`popup wishlist remind: ${JSON.stringify({ remindBefore, remindAfter, remindHead })}`);
   // Store alerts off: the search finds ships only and its placeholder says so; a search
   // that finds nothing (a paint's name: paints come with the alerts' sale feed) says No
   // matches. under the box; one letter isn't searched, so nothing is said.
