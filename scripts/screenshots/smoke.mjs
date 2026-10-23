@@ -7016,13 +7016,16 @@ try {
     news: [...document.querySelectorAll('#pp-news .pp-item')].map((b) =>
       b.textContent.replace(/\s+/g, ' ').trim(),
     ),
+    // The row's arrow is a drawn chevron since the arrow sweep, not a text glyph.
+    chev: document.querySelectorAll('#pp-news .pp-item .pp-chev svg.chev').length,
     bell: document.getElementById('pp-bell').getAttribute('aria-label'),
     n: document.querySelector('#pp-bell .pp-n')?.textContent,
     sent: __demo.sent.map((m) => m.ohPopup),
   }));
   alHome.tab === 'pp-tab-hangar' &&
   alHome.news.length === 1 &&
-  alHome.news[0] === 'Not seen yet: Cutlass Black Limited-time sale: Cutlass Black ›' &&
+  alHome.news[0] === 'Not seen yet: Cutlass Black Limited-time sale: Cutlass Black' &&
+  alHome.chev === 1 &&
   alHome.bell === 'Alerts: 2' &&
   alHome.n === '2' &&
   alHome.sent.includes('alerts-seen')
