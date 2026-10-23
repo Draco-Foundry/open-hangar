@@ -99,6 +99,9 @@ every store is `support@openhangar.space`. The account setup is kept in the main
   - ☑ "I do not sell or transfer user data to third parties, outside of the approved use cases."
   - ☑ "I do not use or transfer user data for purposes that are unrelated to my item's single purpose."
   - ☑ "I do not use or transfer user data to determine creditworthiness or for lending purposes."
+- ☐ **Disclosures match (every release):** Chrome and Edge's privacy practices answers, the
+  Firefox `data_collection_permissions` declaration and the privacy policy must describe
+  the same data. Re-check all three whenever a permission or a synced field changes.
 
 ## 5. Permission Justifications (Paste Into the Dashboard)
 
