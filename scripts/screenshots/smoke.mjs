@@ -4856,7 +4856,7 @@ try {
     'Currency',
     'USD',
     'Shortcut',
-    'Export',
+    'Export Data',
     'Saved Accounts',
     'Demo Citizen',
     'Signed In',
