@@ -3,4 +3,4 @@
   let { x } = $props();
 </script>
 
-{#if x.ccu}{x.ccu.from} <span class="ccu-flow">→</span> {x.ccu.to}{:else}{x.name}{/if}
+{#if x.ccu}{x.ccu.from} <span class="ccu-flow">to</span> {x.ccu.to}{:else}{x.name}{/if}

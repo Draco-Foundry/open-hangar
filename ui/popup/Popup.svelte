@@ -412,7 +412,7 @@
         id="pp-back"
         bind:this={backBtn}
         aria-label={t('popup.back')}
-        onclick={closeBell}>‹</button
+        onclick={closeBell}><svg class="chev" viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10 3L5 8l5 5"/></svg></button
       >
       <h1 class="pp-name">{t('popup.bell')}</h1>
       <span class="pp-bell on" aria-hidden="true">

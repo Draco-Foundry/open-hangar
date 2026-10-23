@@ -36,7 +36,7 @@
       <a
         href="https://robertsspaceindustries.com/account/buy-back-pledges"
         target="_blank"
-        rel="noopener">RSI › Account › Buy-Back Pledges</a
+        rel="noopener">RSI / Account / Buy-Back Pledges</a
       >, the same pages as your hangar.
     </p>
   </div>

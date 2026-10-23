@@ -3559,7 +3559,7 @@
   // A CCU reads "from → to" either way.
   OH.buybackTitle = function buybackTitle(b, { short = true } = {}) {
     const s = short ? OH.shortBuybackName : (n) => n;
-    if (b.ccu) return `${s(b.ccu.from)} → ${s(b.ccu.to)}`;
+    if (b.ccu) return `${s(b.ccu.from)} to ${s(b.ccu.to)}`;
     return short ? s(b.name) || '—' : b.name || '';
   };
   OH.pruneBuybackDetails = async function pruneBuybackDetails(ids) {

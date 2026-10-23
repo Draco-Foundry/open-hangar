@@ -1,0 +1,1 @@
+- Changed: PLACEHOLDER (words needed from Claude chat) Arrows and chevron characters are gone from names, sort labels and help paths; "A to B" and "Up 5%" read as words, and the chevrons are icons.

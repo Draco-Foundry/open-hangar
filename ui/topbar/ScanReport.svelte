@@ -44,7 +44,7 @@
     const ok = await app().top.sendFlightLog();
     copied = ok
       ? 'Flight log copied. Paste it in #bug-reports.'
-      : 'Copy failed. Grab it from Developers → Flight Log.';
+      : 'Copy failed. Grab it from Developers / Flight Log.';
     clearTimeout(copyTimer);
     copyTimer = setTimeout(() => (copied = ''), 6000);
   }

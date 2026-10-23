@@ -46,8 +46,8 @@ test('never returns an empty title for a non-empty name', () => {
 // on invented names.
 const title = globalThis.OH.buybackTitle;
 const oldShort = (b) =>
-  b.ccu ? `${short(b.ccu.from)} → ${short(b.ccu.to)}` : short(b.name) || '—';
-const oldFull = (b) => (b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '');
+  b.ccu ? `${short(b.ccu.from)} to ${short(b.ccu.to)}` : short(b.name) || '—';
+const oldFull = (b) => (b.ccu ? `${b.ccu.from} to ${b.ccu.to}` : b.name || '');
 const invented = [
   { name: 'Standalone Ship - Kestrel Vantage Warbond Edition' },
   { name: 'Package - Nebula Drifter Starter Pack' },
