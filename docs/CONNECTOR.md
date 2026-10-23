@@ -14,9 +14,9 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
 ## What a Connector Build Has
 
 - **The toolbar popup** (`src/popup.html`, `ui/popup/`, the 0.4.0 mockups): a header with
-  the version, the scan's age and the alerts bell (with the `alerts` flag; its Alerts
-  view is `ui/popup/Alerts.svelte`, and opening the popup marks them seen), then three
-  tabs. Hangar: the portrait the scan saved, Account Value and its change, Store Credit,
+  the version and the scan's age, then three tabs (with the `alerts` flag, Wishlist
+  carries a count of its Remind Me items on sale, and opening the popup marks the store
+  alerts seen). Hangar: the portrait the scan saved, Account Value and its change, Store Credit,
   buy-back tokens, Fleet News, Scan (with the scan's progress and report when the
   background shares them; greyed while RSI's sign-in cookie isn't in the browser,
   `ui/popup/rsi-cookie.js`, presence only), Open My Hangar. Wishlist, while connected:
@@ -25,7 +25,7 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
   website takes changes from the extension; read only as the store alerts read it when
   it doesn't. Settings: the settings the basic page had until 0.4.0, plus Look (light mode),
   Currency (the day's rates for anything but USD) and the shortcut (`commands` in
-  manifest.json, Alt+Shift+H), and JSON Backup, Pledges CSV and Buy-Backs CSV. Connect
+  manifest.json, Alt+Shift+O), and JSON Backup, Pledges CSV and Buy-Backs CSV. Connect
   still opens the basic page: the browser's sign-in window would close the popup. While
   connected, the openhangar.space group has Auto Scan Daily's switch and its status line
   (below). The header says Scan stopped for a scan that began and never ended, even after
@@ -122,7 +122,7 @@ The pages the website now has leave in three steps. The code stays until the las
 Pages that leave: Home (news feeds, Game Status, For You, Customize), Inventory, the
 standalone Buy-Backs page (its Market and Load Details), Stats, Referrals, Store and the
 standalone Wishlist, Org Fleet import, Updates and Known Issues, Developers, the top bar
-(the Alerts bell included), Global Search and the detail windows.
+(the top bar's Alerts bell included), Global Search and the detail windows.
 
 ## Outbound Requests
 

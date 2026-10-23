@@ -753,12 +753,13 @@ test('website bridge in a sync build answers both the cart and Connect', async (
   const x = loadBackground({ sync: true });
   const staging = await x.send({ type: 'oh-hello' }, 'https://staging.openhangar.space');
   assert.deepEqual(staging, hello(['hello', 'addToCart', 'addItems', 'connect']));
-  // Every store build: Connect from the app. Beginning sends nothing anywhere.
+  // Every store build: Connect from the app (test/site-connect.test.js). Beginning
+  // sends nothing anywhere, and hands the page no challenge.
   const app = await x.send({ type: 'oh-hello' }, 'https://app.openhangar.space');
   assert.deepEqual(app, hello(['hello', 'addToCart', 'addItems', 'connect']));
   const begin = await x.send({ type: 'oh-connect-begin' }, 'https://app.openhangar.space');
-  assert.equal(begin.ok, true);
-  assert.match(begin.challenge, /^[\w-]{43}$/);
+  assert.equal(begin.challenge, undefined);
+  assert.equal(begin.redirect_uri, undefined);
   assert.equal(x.rsi.all.length, 0, 'no request made');
   const main = await x.send({ type: 'oh-hello' }, 'https://openhangar.space');
   assert.deepEqual(main, hello(['hello', 'addToCart', 'addItems']), 'Connect stays on the app');
@@ -782,34 +783,6 @@ test('website bridge in a sync build answers both the cart and Connect', async (
     'https://staging.openhangar.space',
   );
   assert.equal(o.ok, true);
-});
-
-test("Connect from the website hands over this browser's own sign-in address", async () => {
-  const SITE = 'https://app.openhangar.space';
-  // Chrome and Edge: the identity API's chromiumapp.org address.
-  const chromeBegin = await loadBackground({ sync: true }).send({ type: 'oh-connect-begin' }, SITE);
-  assert.equal(
-    chromeBegin.redirect_uri,
-    'https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/',
-  );
-  // Firefox for Android has no identity API: the address desktop Firefox gives, the
-  // SHA-1 of the add-on id (the one the website allows), never a chromiumapp.org one.
-  // (Firefox's pages reach the extension through the site bridge.)
-  const android = loadBackground({ sync: true, browser: 'firefox-android' });
-  const begin = await android.fromPage({ type: 'oh-connect-begin' }, `${SITE}/link`);
-  assert.equal(begin.ok, true);
-  assert.equal(
-    begin.redirect_uri,
-    'https://7d8638397fe44e0a2ae860c993d0de41d38c35eb.extensions.allizom.org/',
-  );
-  assert.equal(android.rsi.all.length, 0, 'no request made');
-  // Neither: no address to give, so no Connect from the website (the code still works).
-  const bare = await loadBackground({ sync: true, browser: 'bare' }).send(
-    { type: 'oh-connect-begin' },
-    SITE,
-  );
-  assert.equal(bare.ok, false);
-  assert.equal(bare.redirect_uri, undefined);
 });
 
 test('website bridge passes skus on and returns the edition that worked (#329)', async () => {

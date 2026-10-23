@@ -55,6 +55,12 @@ test('fullDue: a part whose last complete read no longer stands, a week, a clock
   assert.equal(fullDue(noRef, db(), new Set(['referral']), NOW), false);
   // A sync owed makes it a full read (the quick check never sends).
   assert.equal(fullDue(full(), db(), new Set(), NOW, { owed: true }), true);
+  // A part an older parser read is due (#728), unless the status file pauses it.
+  assert.equal(fullDue(full(), db(), new Set(), NOW, { stale: new Set(['buybacks']) }), true);
+  assert.equal(
+    fullDue(full(), db(), new Set(['buybacks']), NOW, { stale: new Set(['buybacks']) }),
+    false,
+  );
 });
 
 test('owedSync: a saved scan whose sync never went out', async () => {
@@ -161,6 +167,7 @@ test('lineOf: another account or a drop first, then partway, then whether anythi
     'bad',
     'out-partway',
     'partway',
+    'rsi-down',
   ]);
 });
 
@@ -206,10 +213,22 @@ test('record: replaced whole; a run with no line keeps the last line and its tim
     fails: 1,
     retryAt: 99,
     syncTried: 'x',
+    pageChanged: null,
   });
   assert.deepEqual(
     Object.keys(record(null, { at: 1, ended: 2, line: 'full', fails: 0, retryAt: null })),
-    ['v', 'at', 'ended', 'line', 'run', 'startedAt', 'fails', 'retryAt', 'syncTried'],
+    [
+      'v',
+      'at',
+      'ended',
+      'line',
+      'run',
+      'startedAt',
+      'fails',
+      'retryAt',
+      'syncTried',
+      'pageChanged',
+    ],
   );
 });
 
@@ -580,13 +599,14 @@ test("store alerts' alarm and Auto Scan Daily's never clear each other", async (
   await x.chrome.storage.local.set({ autoScanOn: false });
   await until(() => !alarm(x));
   assert.ok(x.alarms.has('oh-alerts'), 'Auto Scan off: alerts stay');
-  // The link gone (Disconnect, by any route): Auto Scan off; alerts as they are.
+  // The link gone (Disconnect, by any route): both off, each by its own rule (alerts
+  // are on only while connected too).
   await x.chrome.storage.local.set({ autoScanOn: true });
   await until(() => alarm(x));
   await x.chrome.storage.local.remove('siteLink');
-  await until(() => !alarm(x));
-  assert.ok(x.alarms.has('oh-alerts'));
+  await until(() => !alarm(x) && !x.alarms.has('oh-alerts'));
   assert.equal(x.stores.local.autoScanOn, undefined);
+  assert.equal(x.stores.local.alertsOn, false);
 });
 
 test('a run that RSI asked to wait moves the next run after it', async () => {

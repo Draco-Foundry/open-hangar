@@ -52,6 +52,7 @@ wishlist import and store alerts, and from 0.4.0 Auto Scan Daily):
 | `wishlistImport` | This browser's wishlist into the account (the basic page)  | on    | on   | no       |
 | `alerts`         | Store alerts matched on the device (needs connector)       | on    | on   | no       |
 | `autoScan`       | Auto Scan Daily, once a day while connected (needs alerts) | on    | on   | no       |
+| `scanBar`        | The popup's scan as one counting bar where Scan sits       | on    | on   | no       |
 
 ## Adding or Retiring a Flag
 
@@ -115,8 +116,8 @@ the staging hangar page (hangar-staging.openhangar.space) can talk to that build
 `connector` is the extension as the website's connector (owner, 2026-10-10): the
 website is the full app, and the extension scans RSI, hands the hangar to our pages and
 keeps one basic page that works on its own. With it on, the toolbar icon opens a popup
-(`src/popup.html`, `ui/popup/`: the Hangar, Wishlist and Settings tabs and the alerts
-bell with the `alerts` flag, [CONNECTOR.md](CONNECTOR.md)) instead of a tab. Its scans
+(`src/popup.html`, `ui/popup/`: the Hangar, Wishlist and Settings tabs, Wishlist with
+its on-sale count with the `alerts` flag, [CONNECTOR.md](CONNECTOR.md)) instead of a tab. Its scans
 run in a hidden page, `src/scan.html` (`src/scan-host.js`, `ui/scan/main.js`): an
 offscreen document on Chrome and Edge (the `offscreen` permission), a hidden frame of
 the event page on Firefox (its pages' `frame-src 'self'`), so no tab opens
@@ -163,9 +164,10 @@ everyone) and, while this browser is connected, the account's Wishlist keys
 (`/api/v1/wishlist` with the sync token; read only), and matches them here against the
 hangar and buy-backs this browser scanned. Each match says why: on your Wishlist, a ship
 in your buy-backs is in the store again, a paint for a ship you own just arrived, a ship
-you own is sold as a warbond, or is on a limited-time sale. The badge counts the items
-you haven't seen (the popup lists them, `ui/popup/Alerts.svelte`, and opening it marks
-them seen); a new one gets a notification. It's off until the pilot turns it on in the
+you own is sold as a warbond, or is on a limited-time sale. Only the Wishlist's take the
+badge (the Remind Me items on sale you haven't seen; the popup's Wishlist tab counts
+them, and opening the popup marks them seen) and a notification when new; the hangar's
+show in the popup's Fleet News only. It's off until the pilot turns it on in the
 popup's settings (Store Alerts), and asks nothing before that: the popup has its own
 Notifications switch, and turning alerts off stops the checks and gives Notifications
 back. The popup's switch asks as the click's very first step; if the popup closes for

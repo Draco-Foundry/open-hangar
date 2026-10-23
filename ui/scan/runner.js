@@ -15,11 +15,15 @@
 //                        at its end. Quiet for 2 minutes, it's a scan that stopped
 //                        (src/background.js scanRunning, ui/popup/data.js scanState,
 //                        ./sync-timing.js scanElsewhere)
-//   session scanProgress { run, at, part, page, count, retry }: about two writes a
-//                        second at most (and one as each part starts, the newest always
-//                        written), removed at the end. part: 'start' | 'account'
+//   session scanProgress { run, at, part, page, count, retry, pages }: about two writes
+//                        a second at most (and one as each part starts, the newest
+//                        always written), removed at the end. part: 'start' | 'account'
 //                        | 'hangar' | 'buybacks' | 'referrals' | 'packs' | 'sync'. For
 //                        packs, page is the packs read so far and count how many to read.
+//                        pages: how many pages RSI's pager shows for the hangar and
+//                        buy-backs (null without one; page = pages when a rescan found
+//                        nothing changed). For referrals, page is the lists read of
+//                        `pages` (3) and count the people read across them.
 //   local scanReport     the last scan's report (REPORT_V, below), ids and counts only
 //   local scanStarted    { run, by, reason, at }: the last scan that began. Unlike the
 //                        session marks it outlasts the browser closing mid-scan (the
@@ -66,6 +70,22 @@ const AVATAR_ORIGIN = 'https://robertsspaceindustries.com/';
 const AVATAR_TYPES = /^image\/(png|jpeg|gif|webp)$/;
 // The flight log's names for the report rows (never shown as copy).
 const LOG_NAMES = { hangar: 'Hangar', buybacks: 'Buy-Backs', referrals: 'Referrals' };
+// OH.getReferral's lists, in the order it reads them (src/lib.js).
+const REFERRAL_LISTS = ['recruits (legacy)', 'recruits (current)', 'prospects'];
+// RSI still asking a scan to slow down after every retry: how long the popup holds Scan
+// back (ui/popup/data.js scanHold), RSI's Retry-After within these bounds.
+export const WAIT_DEFAULT = 5 * 60e3; // no Retry-After
+export const WAIT_MAX = 30 * 60e3;
+
+// The report's `wait`: when RSI said a part could be asked again (ms), when a part
+// stopped on RSI's slow-down (`slowDown`, src/lib.js scanSource), else null.
+// `parse`: OH.retryAfterMs.
+export function scanWait(results, at, parse) {
+  const slow = (results || []).filter((r) => r?.slowDown);
+  if (!slow.length || !Number.isFinite(at)) return null;
+  const ms = Math.max(...slow.map((r) => (parse && parse(r.retryAfter, at)) || WAIT_DEFAULT));
+  return at + Math.min(WAIT_MAX, ms);
+}
 
 // A run id: one per page that scans, so its own mark is never another page's scan.
 export function newRun() {
@@ -145,8 +165,14 @@ export function createRunner(env) {
   let progressAt = 0;
   let progressPart = null;
   let progressTimer = null;
-  function setProgress(part, page = null, count = null, retry = null) {
-    const p = { part, page, count, retry: retry ? { attempt: retry.attempt, of: retry.of } : null };
+  function setProgress(part, page = null, count = null, retry = null, pages = null) {
+    const p = {
+      part,
+      page,
+      count,
+      retry: retry ? { attempt: retry.attempt, of: retry.of } : null,
+      pages: Number.isInteger(pages) && pages > 0 ? pages : null,
+    };
     hooks.progress?.(p);
     // While this page scans, every step it takes renews its heartbeat (the packs read
     // after it, and the sync, have none: their progress is their own).
@@ -264,11 +290,31 @@ export function createRunner(env) {
   }
 
   // --- Scan ---------------------------------------------------------------------------
+  // A part stopped because RSI changed its page (src/lib.js scanSource `pageChanged`):
+  // its row says so, for the popup's scan bar (ui/popup/data.js reportPageChanged).
+  const changedOf = (r) => (r?.pageChanged ? { pageChanged: true } : {});
   const row = (id, r, n) =>
     r?.ok
       ? { id, ok: true, partial: r.partial || null, n, error: null }
-      : { id, ok: false, partial: null, n: null, error: r?.error ?? null };
-  const progress = (part) => (page, count, retry) => setProgress(part, page, count, retry);
+      : { id, ok: false, partial: null, n: null, error: r?.error ?? null, ...changedOf(r) };
+  const progress = (part) => (page, count, retry, pages) =>
+    setProgress(part, page, count, retry, pages);
+  // Referrals' progress: OH.getReferral reads three lists in turn, each counting from 0.
+  const referralProgress = () => {
+    const say = progress('referrals');
+    let list = null;
+    let before = 0; // people read in the lists done
+    let last = 0;
+    return (phase, n) => {
+      if (phase !== list) {
+        before += last;
+        last = 0;
+        list = phase;
+      }
+      last = Number.isFinite(n) ? n : 0;
+      say(Math.max(0, REFERRAL_LISTS.indexOf(phase)), before + last, null, REFERRAL_LISTS.length);
+    };
+  };
 
   // → the report (REPORT_V): { v, run, by, reason, startedAt, at, ms, held, signedOut,
   // switched, rows: [{ id, ok, partial, n, error }], bad, sync }, or null when this page
@@ -276,7 +322,10 @@ export function createRunner(env) {
   // short); bad: true when a row isn't ok or is partial. held: 'busy' (another page is
   // scanning), 'no-rsi' (no access to RSI: nothing read), 'paused' (status.json paused
   // every part), else null. sync: the sync after it (see sync()), null when there was
-  // none.
+  // none. wait: when RSI kept asking it to slow down, the time it may be asked again
+  // (scanWait), else null; absent from a held report. rsiDown: a part RSI didn't answer
+  // for (a 5xx, or a 429 after every retry), whether or not it also asked to wait; the
+  // popup and the basic page say so instead of showing the error or Log In to RSI.
   let starting = false;
   let marked = Promise.resolve(); // marked(), below
   // The start every scan shares (Scan's and Auto Scan Daily's): → true once this page is
@@ -350,6 +399,8 @@ export function createRunner(env) {
     let signedOut = false;
     let switched = null;
     let db = null;
+    let wait = null;
+    let rsiDown = false; // a part RSI didn't answer for (a 5xx, or a 429 after every retry)
     try {
       setProgress('account');
       const account = (await OH.getAccount({ force: true }).catch(() => null)) || undefined;
@@ -362,6 +413,7 @@ export function createRunner(env) {
         await keepPortrait(account);
         const h = await OH.scanSource('hangar', progress('hangar'), { account });
         if (h?.paused) paused.add('hangar');
+        if (h?.rsiDown) rsiDown = true;
         rows.push(row('hangar', h, h?.items?.length ?? 0));
         // Signed out partway (a part not kept): nothing more is read.
         signedOut = !!h?.signedOut;
@@ -369,12 +421,13 @@ export function createRunner(env) {
           ? null
           : await OH.scanSource('buybacks', progress('buybacks'), { account });
         if (b?.paused) paused.add('buybacks');
+        if (b?.rsiDown) rsiDown = true;
         if (b) rows.push(row('buybacks', b, b?.items?.length ?? 0));
         signedOut ||= !!b?.signedOut;
-        const r = signedOut
-          ? null
-          : await OH.getReferral((phase, n) => progress('referrals')(null, n), { account });
+        wait = scanWait([h, b], now(), OH.retryAfterMs);
+        const r = signedOut ? null : await OH.getReferral(referralProgress(), { account });
         if (r?.paused) paused.add('referrals');
+        if (r?.rsiDown) rsiDown = true;
         if (r) rows.push(row('referrals', r, null));
         // The parts read whole, for Auto Scan Daily's weekly full read (./auto.js).
         const whole = {};
@@ -426,6 +479,8 @@ export function createRunner(env) {
       rows,
       bad,
       sync: null,
+      wait,
+      rsiDown,
     };
     await writeReport(report);
     // Whatever the page or the sync does next, the progress goes at the end.
@@ -648,6 +703,7 @@ export function createRunner(env) {
       dropped: false, // the hangar dropped with nothing to explain it
       saved: [], // the parts kept
       changed: false, // a part kept is different from before
+      pageChanged: null, // the part whose page RSI changed (nothing of it kept)
     };
     let was = null;
     try {
@@ -661,6 +717,9 @@ export function createRunner(env) {
       busy = false;
       mark(false);
     }
+    // RSI didn't answer and nothing else explains the run (no part stopped partway): its
+    // own line, a day skipped.
+    if (run.down && !run.line && !run.stop) run.line = 'rsi-down';
     let rec = null;
     try {
       if (!run.noRecord) {
@@ -682,6 +741,7 @@ export function createRunner(env) {
           fails,
           retryAt: retryAtOf({ at, fails, retryAfter: run.retryAfter }),
           savedAt,
+          pageChanged: run.pageChanged,
         });
         // Written before the sync: a browser that closes during it still has the run.
         await store.set({ autoScan: rec });
@@ -743,7 +803,11 @@ export function createRunner(env) {
     // A sync owed only counts when it can go (Firefox's yes to share): else it would read
     // everything every day for a sync that waits anyway.
     run.owed = owedSync({ stamp: OH.syncStamp(db), link, rec: was }) && (await mayShare());
-    const due = fullDue(scanFull, db, paused, now(), { owed: run.owed });
+    // A list an older parser read is due again, whatever its stamp says (#728).
+    const stale = new Set();
+    for (const p of ['hangar', 'buybacks'])
+      if (db?.sources?.[p]?.scannedAt != null && (await OH.parserStale(p))) stale.add(p);
+    const due = fullDue(scanFull, db, paused, now(), { owed: run.owed, stale });
     run.mayOwe = true;
 
     // 2. Signed in? Without RSI's sign-in cookie, signed out for sure: RSI isn't asked.
@@ -855,6 +919,7 @@ export function createRunner(env) {
         // couldn't read, a save that failed: 'partway'): nothing more is read.
         run.stop ||= r?.signedOut ? 'out' : 'partway';
         if (r?.rsiDown) autoDown(run, r);
+        if (r?.pageChanged) run.pageChanged ||= p;
       }
       return r;
     };

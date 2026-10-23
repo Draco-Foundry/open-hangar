@@ -51,7 +51,10 @@ if (typeof importScripts === 'function' && !self.OHScanHost) importScripts('scan
 scanHost = self.OHScanHost.create({
   chrome,
   document: typeof document === 'undefined' ? null : document,
-  afterDone: () => updateIfIdle(),
+  afterDone: async () => {
+    await freeAskGap().catch(() => {});
+    await updateIfIdle();
+  },
 });
 chrome.runtime.onMessage.addListener(scanHost.heard);
 // @flag-end connector
@@ -233,86 +236,64 @@ siteHandlers['oh-add-upgrade'] = (m) =>
 siteHandlers['oh-add-items'] = (m) => cartLane().addItemsToCart(m.items);
 
 // @sync-start: the `sync` build flag's code, in every store build (src/flags.js, #187)
-// Connect from the website (Chrome and Edge, owner 2026-10-04). The website's Connect
-// page (openhangar.space's /link) asks whether Open Hangar is installed here; only
-// our own site can talk to the extension. Connect This Browser there:
-//   oh-connect-begin  → a PKCE pair; the challenge and this extension's redirect
-//                       address go to the page, the verifier stays here
-//   oh-connect-finish → the page's one-time code, traded for the sync token with the
-//                       verifier; then the dashboard opens on Home (and syncs, if
-//                       Sync My Hangar Now was ticked)
-// Only the pages in src/site-pages.js's `connect` list may ask (the app, never the
-// public front page), so a build that leaves staging out (npm run build:beta) can't
-// connect there either.
-const b64url = (bytes) =>
-  btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+// Connect from the website (owner 2026-10-04; connect hardening, #669). The website's
+// Connect page (openhangar.space's /link) asks whether Open Hangar is installed here;
+// only our own site can talk to the extension. Connect This Browser there:
+//   oh-connect-begin → { ok: true, window: true }: the basic page comes to the front
+//                      (or opens) and runs its own Connect, the browser's sign-in
+//                      window on the website's /connect (ui/basic/hub.svelte.js
+//                      connect). You press Approve there, and the one-time code comes
+//                      back to the extension through the browser, never through a
+//                      page, so no script on a page can read or swap it.
+// The page never hands the extension a code, and nothing it sends is saved: switching
+// to another account is asked on the basic page, naming both, before anything is
+// replaced. Only the pages in src/site-pages.js's `connect` list may ask (the app,
+// never the public front page), so a build that leaves staging out (npm run
+// build:beta) can't connect there either. A developer's build without the connector
+// connects from its own dashboard only.
 
 // Firefox asks before an extension sends anything off the device (the Firefox
 // manifest's optional data collection, scripts/pack.mjs), and only from a click in
-// the extension. So the first Connect from the website opens Home with Firefox's
-// card already up (src/dashboard.js siteAskFirefox): its Continue is that click.
+// the extension. So the first Connect from the website opens the basic page with
+// Firefox's card already up (ui/basic/FirefoxCard.svelte): its Continue is that click.
 const SITE_DATA = {
   data_collection: ['personallyIdentifyingInfo', 'financialAndPaymentInfo', 'websiteContent'],
 };
 const firefoxNeedsOk = async () =>
   !!chrome.runtime.getManifest().browser_specific_settings?.gecko &&
   !(await chrome.permissions.contains(SITE_DATA).catch(() => false));
-// This extension's sign-in address: chromiumapp.org on Chrome and Edge,
-// extensions.allizom.org on Firefox (the website checks it, lib/connect.ts). Firefox
-// for Android has no identity API, so there it's worked out the way desktop Firefox
-// does it (the SHA-1 of the add-on id, in hex). Nothing ever opens it here: the code
-// comes back in oh-connect-finish. '' when there's none (then no Connect from the site).
-async function connectRedirect() {
-  if (chrome.identity?.getRedirectURL) return chrome.identity.getRedirectURL();
-  if (!chrome.runtime.getManifest().browser_specific_settings?.gecko) return '';
-  const d = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(chrome.runtime.id));
-  const hex = [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, '0')).join('');
-  return `https://${hex}.extensions.allizom.org/`;
-}
-siteHandlers['oh-connect-begin'] = async (msg, origin) => {
+// One sign-in window at a time, so a page asking again and again doesn't stack windows
+// or tabs: the ask is kept in session storage (siteConnectAskedAt) until the basic
+// page's window closes, for a minute at most, and two asks at once can't both pass (the
+// few seconds' hold here, checked and set before any other wait).
+const CONNECT_ASK_GAP = 60e3;
+const CONNECT_ASK_HOLD = 5e3;
+let connectAskedAt = 0;
+siteHandlers['oh-connect-begin'] = async () => {
+  if (!self.OH.flags.connector)
+    return { ok: false, error: 'Connect from Open Hangar itself here.' };
+  const now = Date.now();
+  if (now - connectAskedAt < CONNECT_ASK_HOLD) return { ok: true, window: true };
+  const held = connectAskedAt;
+  connectAskedAt = now;
+  const { siteConnectAskedAt: before } = await chrome.storage.session.get('siteConnectAskedAt');
+  if (Number.isFinite(before) && now - before < CONNECT_ASK_GAP) return { ok: true, window: true };
   if (await firefoxNeedsOk()) {
-    await chrome.storage.session.set({ siteAskFirefox: Date.now() });
+    await chrome.storage.session.set({ siteAskFirefox: now });
     chrome.tabs.create({ url: hubUrl('#home') });
     return { ok: false, firefoxAsk: true };
   }
-  const redirect = await connectRedirect();
-  if (!redirect) return { ok: false, error: 'Connect from Open Hangar itself here.' };
-  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
-  await chrome.storage.session.set({
-    siteConnect: { verifier, origin, redirect, at: Date.now() },
-  });
-  return { ok: true, challenge: b64url(new Uint8Array(digest)), redirect_uri: redirect };
-};
-siteHandlers['oh-connect-finish'] = async (msg, origin) => {
-  const { siteConnect: p } = await chrome.storage.session.get('siteConnect');
-  await chrome.storage.session.remove('siteConnect');
-  if (!p || p.origin !== origin || Date.now() - p.at > 5 * 60e3)
-    return { ok: false, error: 'That connect attempt drifted past its window. Try again.' };
-  const res = await fetch(`${origin}/api/link/token`, {
-    method: 'POST',
-    credentials: 'omit',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      code: String(msg.code || ''),
-      code_verifier: p.verifier,
-      redirect_uri: p.redirect,
-    }),
-  }).catch(() => null);
-  if (!res || !res.ok) return { ok: false, error: "That didn't dock. Try again." };
-  const j = await res.json();
-  await chrome.storage.local.set({
-    siteLink: { token: j.token, name: j.name || '', connectedAt: Date.now(), lastSync: null },
-    siteUrl: origin, // sync goes to the site you connected on
-    ...(msg.sync ? { siteSyncRequested: Date.now() } : {}),
-  });
+  // Firefox for Android has no sign-in window, so no Connect from the website there.
+  if (!chrome.identity?.launchWebAuthFlow) {
+    connectAskedAt = held;
+    return { ok: false, error: 'Connect from Open Hangar itself here.' };
+  }
+  await chrome.storage.session.set({ siteConnectAskedAt: now });
   // An Open Hangar tab already open comes to the front instead of a second one (#658):
-  // a scan running there keeps going, and the sync waits for it.
-  await dashboardTab('#home');
-  return { ok: true, name: j.name || '' };
+  // a scan running there keeps going. Only the tab the ask names runs it.
+  const tabId = await dashboardTab('#home'); // the basic page's settings
+  await chrome.storage.session.set({ siteConnectAsk: { at: now, tabId } });
+  return { ok: true, window: true };
 };
 // Connect with a code (src/dashboard.js siteConnect, when the sign-in window can't
 // open): the dashboard opens the website's code page with its code in the address, and
@@ -356,9 +337,29 @@ siteHandlers['oh-link-check'] = async (msg, origin) => {
 // mid-scan, or it hung. It's the scan's heartbeat: renewed every 30 seconds while the
 // scan reads (ui/scan/runner.js MARK_GAP, src/dashboard.js scanMark).
 const SCAN_RUN_MAX = 2 * 60e3;
-// One scan request a minute at most, and none while a scan runs.
+// One scan request a minute at most, and none while a scan runs. A scan that read
+// nothing frees it once its hidden page is done (freeAskGap).
 const SCAN_ASK_GAP = 60e3;
 let scanAskedAt = 0;
+// The hidden page is done (src/scan-host.js afterDone): when the scan asked last read
+// nothing of RSI's lists (signed out, or held: its report has no rows), the minute's
+// limit goes at once, so Scan works right after Log In to RSI instead of saying a scan
+// is running for up to a minute (the owner, Firefox 0.5.1, 2026-10-20). A scan that
+// read anything keeps the limit.
+async function freeAskGap() {
+  const { scanReport: r } = await chrome.storage.local.get('scanReport');
+  const { scanAskedAt: asked } = await chrome.storage.session.get('scanAskedAt');
+  const at = Number.isFinite(asked) ? asked : scanAskedAt;
+  const empty =
+    r &&
+    typeof r === 'object' &&
+    Array.isArray(r.rows) &&
+    !r.rows.length &&
+    (r.signedOut || r.held);
+  if (!at || !empty || !Number.isFinite(r.startedAt) || r.startedAt < at) return;
+  scanAskedAt = 0;
+  await chrome.storage.session.remove('scanAskedAt');
+}
 // One Firefox ask for the hangar page a minute at most.
 const FIREFOX_ASK_GAP = 60e3;
 let firefoxAskedAt = 0;
@@ -595,16 +596,16 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
 // @flag-end connector
 
 // @flag-start alerts: Extension Alerts (needs connector, scripts/pack.mjs)
-// Store alerts (src/alerts.js, self.OHAlerts), off until the pilot turns them on in the
-// basic page's settings (`alertsOn`). A check runs on an alarm (the `alarms`
+// Store alerts (src/alerts.js, self.OHAlerts) follow Remind Me: `alertsOn` is set by the
+// popup's Wishlist when Remind Me is turned on for an item and cleared when none has it
+// (ui/popup/wishlist.js alertsFor), and by a check that reads a Wishlist with none on.
+// There is no switch for it. A check runs on an alarm (the `alarms`
 // permission, no install warning) at most every 30 minutes: it downloads the public
 // sale feed and, while this browser is connected, the account's Wishlist keys, and
 // matches them here against this browser's scan, which never leaves it. Unseen matches
 // take the toolbar badge (updateReminder); a new one gets a notification while
-// Notifications are allowed (an optional permission the settings switch asks for).
+// Notifications are allowed (an optional permission the Notifications switch asks for).
 //   { ohPopup: 'alerts-seen' } → { ok }: the popup is open, every match is seen
-//   { ohPopup: 'alerts-hide', id? } → { ok }: the popup deleted one match (its id), or
-//     every one (Clear All, no id), so the badge follows
 if (typeof importScripts === 'function' && !self.OHAlerts) importScripts('alerts.js');
 const NOTIFY = { permissions: ['notifications'] };
 const notifyOk = async () =>
@@ -655,10 +656,13 @@ function alertsCheck(o = {}) {
 }
 // The worker started (the browser opened, an update, a wake-up): alerts on but no
 // check scheduled (a browser restart can drop alarms), so one is, 30 to 35 minutes
-// after the last, or a minute or two from now when that's past. Alerts off: none.
+// after the last, or a minute or two from now when that's past. Alerts off: none. On in
+// a browser that isn't connected (from before they followed Remind Me): off, now.
 async function alertsWake() {
   const AL = self.OHAlerts;
-  const got = await chrome.storage.local.get([AL.ON_KEY, AL.STATE_KEY]);
+  const got = await chrome.storage.local.get([AL.ON_KEY, AL.STATE_KEY, 'siteLink']);
+  const fix = AL.connectedOnly(got);
+  if (fix) return chrome.storage.local.set(fix);
   if (got[AL.ON_KEY] !== true) return chrome.alarms.clear(AL.ALARM);
   if (await chrome.alarms.get(AL.ALARM)) return;
   const now = Date.now();
@@ -730,18 +734,15 @@ hearClicks();
 chrome.permissions?.onAdded?.addListener(hearClicks);
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (!msg || typeof msg !== 'object') return false;
-  if (msg.ohPopup !== 'alerts-seen' && msg.ohPopup !== 'alerts-hide') return false;
+  if (msg.ohPopup !== 'alerts-seen') return false;
   if (sender.id !== chrome.runtime.id || sender.tab) return false;
   if (String(sender.url || '').split(/[?#]/)[0] !== chrome.runtime.getURL(POPUP)) return false;
   const AL = self.OHAlerts;
-  const id = typeof msg.id === 'string' ? msg.id : null;
-  const next = (st) =>
-    msg.ohPopup === 'alerts-hide' ? AL.hide(st, Date.now(), id) : AL.markSeen(st, Date.now());
   chrome.storage.local
     .get(AL.STATE_KEY)
     .then((got) =>
       got[AL.STATE_KEY]
-        ? chrome.storage.local.set({ [AL.STATE_KEY]: next(got[AL.STATE_KEY]) })
+        ? chrome.storage.local.set({ [AL.STATE_KEY]: AL.markSeen(got[AL.STATE_KEY], Date.now()) })
         : null,
     )
     .then(updateReminder)
@@ -923,6 +924,37 @@ chrome.storage.onChanged.addListener((c, area) => {
   if (c[AUTO_STATE] || c[AUTO_ON]) updateReminder();
 });
 // @flag-end autoScan
+
+// @flag-start pageChangeAlert: the owner's alert when Auto Scan Daily stops on a changed page
+// Dev builds only (src/flags.js): the maintainer's own copy, with Auto Scan Daily on for
+// their account, says on this computer when a run stopped because RSI changed a page
+// (its record's `pageChanged`, ui/scan/runner.js). A notification, nothing sent; it
+// needs the notifications permission store alerts ask for. The owner's approved words
+// (owner.rsi-page-changed-alert, 2026-10-22), word for word.
+const PAGE_NAMES = { hangar: 'Hangar', buybacks: 'Buy-Backs', referral: 'Referrals' };
+function pageChangedLine(part, at) {
+  const d = new Date(at);
+  const two = (n) => String(n).padStart(2, '0');
+  return `RSI page changed: ${PAGE_NAMES[part] || part}, ${two(d.getUTCHours())}:${two(d.getUTCMinutes())} UTC`;
+}
+chrome.storage.onChanged.addListener(async (c, area) => {
+  const rec = area === 'local' ? c.autoScan?.newValue : null;
+  if (!rec?.pageChanged || !Number.isFinite(rec.ended) || rec.ended === c.autoScan.oldValue?.ended)
+    return;
+  const ok =
+    !!chrome.notifications &&
+    (await chrome.permissions.contains({ permissions: ['notifications'] }).catch(() => false));
+  if (!ok) return;
+  await chrome.notifications
+    .create(`oh-page-changed-${rec.ended}`, {
+      type: 'basic',
+      iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+      title: 'Open Hangar',
+      message: pageChangedLine(rec.pageChanged, rec.ended),
+    })
+    .catch(() => {});
+});
+// @flag-end pageChangeAlert
 
 // The website's messages, all of them: only from our own pages (src/site-pages.js),
 // each checked before its handler runs.

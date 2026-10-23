@@ -47,11 +47,11 @@
 </script>
 
 <section class="oh-p ww" id="oh-wishwatch">
-  <div class="oh-ph"><h3>Wishlist Watch</h3><a class="act" href="#store">Wishlist →</a></div>
+  <div class="oh-ph"><h3>Wishlist Watch</h3><a class="act" href="#store">Wishlist</a></div>
   {#if !d.total}
     <div class="ww-empty">
       <p>Your wishlist is empty. Add anything from Find in Store on the Store page.</p>
-      <a class="oh-more" href="#store">Find in Store →</a>
+      <a class="oh-more" href="#store">Find in Store</a>
     </div>
   {:else}
     <div class="ww-sum">
@@ -75,7 +75,7 @@
           {/if}
           <span class="mid">
             <span class="n" title={r.name}
-              >{#if r.kind === 'ccu' && r.from && r.to}{r.from} <span class="arrow">→</span> {r.to}{:else}{r.name}{/if}</span
+              >{#if r.kind === 'ccu' && r.from && r.to}{r.from} <span class="arrow">to</span> {r.to}{:else}{r.name}{/if}</span
             >
             <span class="sb">
               <span class="badge {r.kind}">{r.kindLabel}</span>
@@ -88,7 +88,7 @@
                 <b><span class="was">{usd(r.price)}</span>{usd(r.warbond)}</b>
                 <span class="save">Warbond, save {usd(r.price - r.warbond)}</span>
               {:else if r.price}<b>{usd(r.price)}</b>{/if}
-              {#if r.buyable}<a class="buy" href={r.url} target="_blank" rel="noopener">Buy at RSI ↗</a>{/if}
+              {#if r.buyable}<a class="buy" href={r.url} target="_blank" rel="noopener">Buy at RSI</a>{/if}
             {:else if r.price}
               <b class="dim" title="Usual price">{usd(r.price)}</b>
             {/if}
@@ -96,7 +96,7 @@
         </div>
       {/each}
     </div>
-    {#if d.more}<a class="oh-more" href="#store">All {d.total} on Your Wishlist →</a>{/if}
+    {#if d.more}<a class="oh-more" href="#store">All {d.total} on Your Wishlist</a>{/if}
     <div class="ww-foot">
       <button type="button" class="btn sm" id="ww-check" disabled={d.checking} onclick={() => a.store.checkWishlist()}
         >{d.checking ? 'Checking…' : 'Check Now'}</button

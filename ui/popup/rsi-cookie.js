@@ -31,9 +31,15 @@ export async function rsiCookie(api = globalThis.chrome?.cookies, { access = tru
 
 // What the popup shows → 'in' (Scan) or 'maybe' (Log In to RSI, a grey Scan still there
 // to press): the cookie gone, or the last scan or account read said signed out and the
-// browser can't say about the cookie. `cookie`: rsiCookie's answer. `readOut`: when the
-// last scan or account read said signed out (ms), or null.
-export function rsiSignIn({ cookie, readOut = null }) {
+// browser can't say about the cookie, or the scan this popup just reported said signed
+// out. `cookie`: rsiCookie's answer. `readOut`: when the last scan or account read said
+// signed out (ms), or null. `justOut`: the report this popup shows now (Popup.svelte
+// `shown`, once per report) said signed out: RSI sets the cookie for visitors who aren't
+// signed in too, so the cookie can't hide that scan's answer, or the scan ends with
+// nothing on screen (the owner, Firefox 0.5.1, 2026-10-20). The next popup goes by the
+// cookie again, so a pilot who signed in since isn't held on Log In to RSI.
+export function rsiSignIn({ cookie, readOut = null, justOut = false }) {
+  if (justOut) return 'maybe';
   if (cookie === 'in') return 'in';
   if (cookie === 'out' || Number.isFinite(readOut)) return 'maybe';
   return 'in';

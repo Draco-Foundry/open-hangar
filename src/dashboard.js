@@ -312,7 +312,7 @@ const state = {
   bbHideSmall: true, // Buy-Backs: paints, add-ons, coupons tucked away
   hideSmall: false, // Inventory: same
   meltMax: null, // Inventory filter: melt value cap in dollars (null = no cap)
-  invFolded: false, // Inventory: filter sidebar folded away ("‹ Hide Filters")
+  invFolded: false, // Inventory: filter sidebar folded away ("Hide Filters")
   invClosed: new Set(['from', 'size']), // Inventory: filter groups folded shut
   savedViews: [], // Inventory saved views: { name, shown, traits, query, sort }
   bbSort: 'date-desc', // default to newest buy-backs first
@@ -370,7 +370,7 @@ function setStatus(text, isError = false, { scan = false } = {}) {
       const rep = document.createElement('button');
       rep.type = 'button';
       rep.className = 'link-btn';
-      rep.textContent = 'Report on GitHub ↗';
+      rep.textContent = 'Report on GitHub';
       rep.title =
         'Opens a GitHub issue with your flight log filled in. Nothing is sent until you submit it.';
       rep.addEventListener('click', () => openScanReport(text));
@@ -411,7 +411,7 @@ async function copyFlightLog(el) {
     const was = el.textContent;
     el.textContent = ok
       ? 'Flight log copied. Drop it in #bug-reports and the engineers will suit up.'
-      : 'Copy failed. Grab it from Developers → Flight Log.';
+      : 'Copy failed. Grab it from Developers / Flight Log.';
     setTimeout(() => {
       el.textContent = was;
     }, 4000);
@@ -430,7 +430,7 @@ async function sendFlightLog(el) {
     const was = el.textContent;
     el.textContent = ok
       ? 'Flight log copied. Paste it in #bug-reports.'
-      : 'Copy failed. Grab it from Developers → Flight Log.';
+      : 'Copy failed. Grab it from Developers / Flight Log.';
     setTimeout(() => {
       el.textContent = was;
     }, 4000);
@@ -662,7 +662,7 @@ function presentKinds() {
 }
 
 function plainName(p) {
-  return p.isCCU && p.ccu ? `${p.ccu.from} → ${p.ccu.to}` : p.name || '—';
+  return p.isCCU && p.ccu ? `${p.ccu.from} to ${p.ccu.to}` : p.name || '—';
 }
 
 // Cards drop RSI's store-category prefix ("Standalone Ships - ", "Paints - ",
@@ -2433,7 +2433,7 @@ async function fleetImageCanvas(list, { title, price }) {
 
     const tx = x + 12,
       tw = CW - 24;
-    const name = p.isCCU && p.ccu ? `${p.ccu.from} → ${p.ccu.to}` : cardName(p);
+    const name = p.isCCU && p.ccu ? `${p.ccu.from} to ${p.ccu.to}` : cardName(p);
     ctx.fillStyle = C.text;
     ctx.font = f(600, 14);
     const nameLines = wrap(name, tw, 2);
@@ -2658,46 +2658,6 @@ function renderStore() {
   ensurePrices();
   ensureStore();
   ensureCatalog();
-  loadSubStore();
-  homeUpdated();
-}
-
-// Your Subscriber Store (#418): the subscriber-only items RSI offers this account.
-// The cached list shows at once; a fresh read runs at most once a day by itself
-// (here on the Store page, or after a scan) and on the section's Refresh button.
-// Signed out or not a subscriber: no request at all.
-const subStore = { list: null, loading: false, error: null, done: 0, total: null, account: null };
-async function loadSubStore({ force = false, auto = true } = {}) {
-  if (subStore.loading) return;
-  const account = await OH.getAccount().catch(() => null);
-  subStore.account = account;
-  if (!OH.isSubscriber(account)) {
-    subStore.list = null;
-    homeUpdated();
-    return;
-  }
-  if (!subStore.list) subStore.list = await OH.getSubStoreCached(account);
-  homeUpdated();
-  if (!force && !(auto && (await OH.subStoreDue()))) return;
-  subStore.loading = true;
-  subStore.error = null;
-  subStore.done = 0;
-  homeUpdated();
-  const r = await OH.getSubStore({
-    force,
-    account,
-    onProgress: (done, total) => {
-      subStore.done = done;
-      subStore.total = total;
-      homeUpdated();
-    },
-  });
-  subStore.loading = false;
-  if (r.ok) subStore.list = r.list;
-  else {
-    subStore.error = r.error;
-    if (r.list) subStore.list = r.list;
-  }
   homeUpdated();
 }
 
@@ -3963,7 +3923,7 @@ function storeRow(p, row) {
     else if (d <= -1) v += ` <span class="muted">(paid ${dollars(-d)} more — likely extras)</span>`;
   }
   const parts = si.ccu
-    ? `<div class="mr-sub">${dollars(si.from)} → ${dollars(si.to)} ships</div>`
+    ? `<div class="mr-sub">${dollars(si.from)} to ${dollars(si.to)} ships</div>`
     : si.ships.length > 1
       ? `<div class="mr-sub">${si.ships
           .map((x) => `${OH.escapeHtml(x.label)} ${x.msrp ? dollars(x.msrp) : '—'}`)
@@ -3994,7 +3954,7 @@ function hangarSpot(p) {
 function viewOnRsiLink(p) {
   const s = hangarSpot(p);
   if (!s) return '';
-  return `<a class="bb-reclaim" href="${OH.escapeHtml(s.url)}" target="_blank" rel="noopener" title="Opens page ${s.page} of your RSI hangar; it's number ${s.pos} on that page (as of your last scan)">View ↗</a>`;
+  return `<a class="bb-reclaim" href="${OH.escapeHtml(s.url)}" target="_blank" rel="noopener" title="Opens page ${s.page} of your RSI hangar; it's number ${s.pos} on that page (as of your last scan)">View</a>`;
 }
 
 // A pledge item's type. RSI leaves some blank (armor pieces, hangars), so
@@ -4046,7 +4006,7 @@ function itemView(p) {
         store.note = { text: `(paid ${dollars(-d)} more, likely extras)`, cls: 'muted' };
     }
     store.sub = si.ccu
-      ? `${dollars(si.from)} → ${dollars(si.to)} ships`
+      ? `${dollars(si.from)} to ${dollars(si.to)} ships`
       : si.ships.length > 1
         ? si.ships.map((x) => `${x.label} ${x.msrp ? dollars(x.msrp) : '—'}`).join(' · ')
         : '';
@@ -4063,7 +4023,7 @@ function itemView(p) {
     meltable: p.meltable,
     store,
     currency: p.currency || '',
-    upgrade: p.isCCU && p.ccu ? `${p.ccu.from} → ${p.ccu.to}` : '',
+    upgrade: p.isCCU && p.ccu ? `${p.ccu.from} to ${p.ccu.to}` : '',
     // RSI has no per-pledge address: link the page it's on and say where on it.
     spot: spot && {
       url: spot.url,
@@ -4107,13 +4067,13 @@ function bbView(b) {
   const d = bbDetail(b);
   const shipish = b.ccu || ['ship', 'pack', 'package'].includes(b.kind);
   return {
-    name: b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : b.name || '—',
+    name: b.ccu ? `${b.ccu.from} to ${b.ccu.to}` : b.name || '—',
     badge: {
       cls: b.isCCU ? 'ccu' : TYPE_KEYS.includes(b.kind) ? b.kind : '',
       text: b.isCCU ? 'CCU' : b.kind || 'buy-back',
     },
     price: bbPriceData(b),
-    upgrade: b.ccu ? `${b.ccu.from} → ${b.ccu.to}` : '',
+    upgrade: b.ccu ? `${b.ccu.from} to ${b.ccu.to}` : '',
     insurance: b.isCCU ? '' : bbInsurance(b),
     date: b.date || '',
     id: b.id ? String(b.id) : '',
@@ -4475,8 +4435,6 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   const bbRead = rows.some((x) => x.name === 'Buy-Backs' && x.ok);
   if (bbRead && !bbLoading && state.buybacks.some(unreadPack))
     loadBuybackDetails({ packsOnly: true, max: BB_AUTO_MAX, auto: true });
-  // Your Subscriber Store's once-a-day read, after the scan (never part of it).
-  if (!signedOut) loadSubStore();
 }
 
 // The top bar's Scan runs what's ticked in its ▾ menu: "Scan All" by default,
@@ -4569,7 +4527,6 @@ async function clearData() {
   state.bbTraits = new Map();
   state.bbPriceMax = null;
   state.referral = null;
-  subStore.list = null;
   setStatus('Local data cleared. Clean hangar, fresh start.');
   renderAccount(); // clear the referral pill too
   refreshRecoveryUI(); // a full manual wipe also drops any recovery snapshot
@@ -6323,11 +6280,6 @@ window.OHApp = {
     uncheckedPacks,
     setWishSort,
     setWishOrder,
-    // Your Subscriber Store: { list, loading, error, done, total, account } and Refresh.
-    get sub() {
-      return subStore;
-    },
-    refreshSub: () => loadSubStore({ force: true }),
   },
   // For Developers (ui/developers): its links, supporters, the data tools' state
   // (note under the buttons, restore button, saved accounts) and their actions.

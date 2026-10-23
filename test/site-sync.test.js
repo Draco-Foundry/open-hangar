@@ -219,6 +219,99 @@ test('sync and disconnect use the versioned /api/v1/sync', async () => {
   assert.equal(mem.siteLink, undefined, 'forgotten after disconnect');
 });
 
+// Connect with a code (OH.siteLinkWait) while already connected (#741): the old token is
+// revoked as Disconnect does, never the new one, and a failed revoke keeps the new link.
+async function codeConnect(token, deleteAnswer) {
+  const real = global.fetch;
+  const deletes = [];
+  global.fetch = async (url, init) => {
+    if (init?.method === 'DELETE') {
+      deletes.push(`${url} ${init.headers.authorization}`);
+      return deleteAnswer();
+    }
+    return new Response(JSON.stringify({ status: 'approved', token, name: 'pilot' }));
+  };
+  try {
+    const link = await OH.siteLinkWait({ device_code: 'd', expires_in: 60, interval: 0.001 });
+    return { link, deletes };
+  } finally {
+    global.fetch = real;
+  }
+}
+const revoked = () => new Response('{}', { status: 200 });
+
+test('connecting again with a code revokes the old token', async () => {
+  linked();
+  const { link, deletes } = await codeConnect('new', revoked);
+  assert.deepEqual(deletes, ['https://staging.example/api/v1/sync Bearer t']);
+  assert.equal(link.token, 'new');
+  assert.equal(mem.siteLink.token, 'new');
+});
+
+test('connecting again with a code to the same token revokes nothing', async () => {
+  linked();
+  const { deletes } = await codeConnect('t', revoked);
+  assert.deepEqual(deletes, []);
+  assert.equal(mem.siteLink.token, 't');
+});
+
+test('a code connect whose revoke fails still keeps the new link', async () => {
+  linked();
+  const { link, deletes } = await codeConnect('new', () => {
+    throw new Error('offline');
+  });
+  assert.equal(deletes.length, 1);
+  assert.equal(link.token, 'new');
+  assert.equal(mem.siteLink.token, 'new');
+});
+
+// Connect hardening (#669): a link is never replaced by one for another account without
+// the basic page's question naming both (ui/basic/hub.svelte.js connect).
+test('an account switch is asked first; reconnecting the same account is not', () => {
+  const was = { token: 't', name: 'pilot' };
+  assert.equal(OH.siteSwitches(null, { token: 'n', name: 'pilot' }), false, 'no link yet');
+  assert.equal(OH.siteSwitches(was, { token: 't', name: 'other' }), false, 'the same token');
+  assert.equal(OH.siteSwitches(was, { token: 'n', name: 'pilot' }), false, 'the same account');
+  assert.equal(OH.siteSwitches(was, { token: 'n', name: 'Someone Else' }), true);
+  // No name to tell by, on either side: asked.
+  assert.equal(OH.siteSwitches(was, { token: 'n', name: '' }), true);
+  assert.equal(OH.siteSwitches({ token: 't', name: '' }, { token: 'n', name: 'pilot' }), true);
+});
+
+test('a switch said no to: the new token is revoked, the link kept', async () => {
+  linked();
+  const real = global.fetch;
+  const deletes = [];
+  global.fetch = async (url, init) => {
+    deletes.push(`${init.method} ${url} ${init.headers.authorization}`);
+    return new Response('{}');
+  };
+  try {
+    await OH.siteTokenDrop('n');
+  } finally {
+    global.fetch = real;
+  }
+  assert.deepEqual(deletes, ['DELETE https://staging.example/api/v1/sync Bearer n']);
+  assert.deepEqual(mem.siteLink, { token: 't', name: 'pilot' });
+});
+
+test('a switch said yes to: the new link kept, the old one revoked', async () => {
+  linked();
+  const real = global.fetch;
+  const deletes = [];
+  global.fetch = async (url, init) => {
+    deletes.push(`${init.method} ${init.headers.authorization}`);
+    return new Response('{}');
+  };
+  try {
+    await OH.siteLinkSave({ token: 'n', name: 'Someone Else' });
+  } finally {
+    global.fetch = real;
+  }
+  assert.deepEqual(deletes, ['DELETE Bearer t']);
+  assert.equal(mem.siteLink.token, 'n');
+});
+
 // The privacy policy's "Your Wishlist": Disconnect deletes the popup's copy of it (the
 // Wishlist stays on the account), and so does a sync the website says isn't connected.
 test("Disconnect deletes the popup's Wishlist copy", async () => {
@@ -278,7 +371,7 @@ test('Disconnect turns off Auto Scan Daily, as a sync refused as not connected d
   answer = () => new Response(JSON.stringify({ ok: true, synced_at: 123 }), { status: 200 });
 });
 
-test('a background seeing the link go clears Auto Scan Daily and leaves store alerts', async () => {
+test('a background seeing the link go clears Auto Scan Daily and turns store alerts off', async () => {
   const { loadBackground } = require('./bridge-env.js');
   const x = loadBackground({
     changes: true,
@@ -299,7 +392,8 @@ test('a background seeing the link go clears Auto Scan Daily and leaves store al
     'autoScanNext',
   ]);
   await until(() => !x.alarms.has('oh-auto-scan'));
-  assert.ok(x.alarms.has('oh-alerts'), "store alerts' alarm untouched");
+  // Store alerts are on only while connected: off too, their alarm gone.
+  await until(() => x.stores.local.alertsOn === false && !x.alarms.has('oh-alerts'));
   assert.equal(x.stores.local.autoScanNext, undefined);
 });
 
@@ -707,4 +801,23 @@ test('a body that fails the sync schema is not sent: reason schema, and where', 
   mem.db.sources.hangar.items[0].value = 90;
   await OH.siteSync();
   assert.equal(sent.length, 1);
+});
+
+test('a code connect with save: false keeps nothing and revokes nothing', async () => {
+  linked();
+  const real = global.fetch;
+  const deletes = [];
+  global.fetch = async (url, init) => {
+    if (init?.method === 'DELETE') deletes.push(url);
+    return new Response(JSON.stringify({ status: 'approved', token: 'new', name: 'other' }));
+  };
+  try {
+    const start = { device_code: 'd', expires_in: 60, interval: 0.001 };
+    const link = await OH.siteLinkWait(start, () => true, { save: false });
+    assert.equal(link.token, 'new');
+    assert.equal(mem.siteLink.token, 't', 'the old link stays until the page says so');
+    assert.deepEqual(deletes, []);
+  } finally {
+    global.fetch = real;
+  }
 });

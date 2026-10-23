@@ -289,7 +289,11 @@
       history,
       sources: {
         hangar: { items: hangar, scannedAt: ts },
-        buybacks: { items: buybacks, scannedAt: ts, meta: { tokens: 2 } },
+        buybacks: {
+          items: buybacks,
+          scannedAt: ts,
+          meta: { tokens: window.__demoBuybackTokens ?? 2 },
+        },
         referral: { items: referral, scannedAt: ts },
       },
     },
@@ -322,50 +326,6 @@
     fetchedAt: now,
   };
   window.DEMO_REFERRAL = referral;
-  // Invented subscriber items (names, prices and stock are made up).
-  const subItem = (id, name, cents, extra = {}) => ({
-    id,
-    name,
-    title: name,
-    url: `/en/pledge/Subscribers-Store/Demo-${id}`,
-    media: null,
-    nativePrice: { amount: cents, discounted: null },
-    stock: { available: true },
-    tags: [],
-    isWarbond: false,
-    ...extra,
-  });
-  window.DEMO_SUB_STORE = [
-    {
-      data: {
-        store: {
-          listing: {
-            resources: [
-              subItem(1, 'Nebula Drift Paint', 500, { tags: [{ name: 'Paints' }] }),
-              subItem(2, 'Quasar Explorer Helmet', 1200, {
-                nativePrice: { amount: 1200, discounted: 900 },
-                isWarbond: true,
-                tags: [{ name: 'Armor' }],
-              }),
-              subItem(3, 'Tiny Hangar Plushie', 300, {
-                stock: { available: false },
-                tags: [{ name: 'Decorations' }],
-              }),
-              subItem(4, 'Starlight Flight Jacket', 800, {
-                label: 'Centurion',
-                tags: [{ name: 'Clothing' }],
-              }),
-              // A long name that wraps, and a kit: cards in a row still line up.
-              subItem(5, "Kastak Arms Inquisitor 'Star Kitten' Armor Set", 2500),
-              subItem(6, 'Star Kitten Kit', 1500),
-            ],
-            count: 6,
-            totalCount: 6,
-          },
-        },
-      },
-    },
-  ];
 
   const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
   const sessionStore = {};
@@ -568,9 +528,6 @@
       return Promise.resolve(
         Response.json({ version: '0.2.19', stores: { firefox: { live: '0.2.19' } } }),
       );
-    // Your Subscriber Store (#418): an invented listing for the demo subscriber.
-    if (/\/graphql$/.test(url) && /GetBrowseSkusByFilter/.test(String(init.body || '')))
-      return Promise.resolve(Response.json(window.DEMO_SUB_STORE));
     if (/^https:\/\/robertsspaceindustries\.com\//.test(url)) {
       if (/\/account\/|\/graphql|\/citizens\//.test(url) && !/\/pledge\/buyback\//.test(url))
         return Promise.resolve(new Response('', { status: 404 }));

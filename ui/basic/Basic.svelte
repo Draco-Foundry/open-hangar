@@ -11,6 +11,7 @@
     firefoxContinue,
     hub,
     pilotAnswer,
+    switchAnswer,
     reloadForUpdate,
     reportProblem,
     rsiAllow,
@@ -83,6 +84,7 @@
     <div class="bp-note warn" id="bp-report" role="alert">
       <b>{report.signedOut ? t('basic.signed-out') : t('basic.scan-problem')}</b>
       {#if report.signedOut}<p id="bp-signed-out">{t('basic.signed-out-line')}</p>{/if}
+      {#if report.down}<p id="bp-rsi-down">{report.down}</p>{/if}
       {#if report.rows.length}
         <ul>
           {#each report.rows as r (r.name)}
@@ -91,7 +93,7 @@
           {/each}
         </ul>
       {/if}
-      {#if !report.signedOut}
+      {#if !report.signedOut && !report.down}
         <button type="button" class="bp-btn" id="bp-report-btn" onclick={reportProblem}
           >Report a Scan Problem</button
         >
@@ -121,6 +123,24 @@
         >
         <button type="button" class="bp-btn" onclick={() => pilotAnswer(false)}
           >{t('basic.pilot-no')}</button
+        >
+      </div>
+    </div>
+  {/if}
+
+  {#if hub.site.switchTo}
+    <div class="bp-note" id="bp-switch" role="dialog" aria-labelledby="bp-switch-h">
+      <b id="bp-switch-h">{t('basic.switch-title', hub.site.switchTo)}</b>
+      <p>{t('basic.switch-body', hub.site.switchTo)}</p>
+      <div class="bp-row">
+        <button type="button" class="bp-btn" id="bp-switch-no" onclick={() => switchAnswer(false)}
+          >{t('basic.switch-no', hub.site.switchTo)}</button
+        >
+        <button
+          type="button"
+          class="bp-btn primary"
+          id="bp-switch-yes"
+          onclick={() => switchAnswer(true)}>{t('basic.switch-yes', hub.site.switchTo)}</button
         >
       </div>
     </div>

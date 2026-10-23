@@ -18,13 +18,9 @@ const COPY = {
   // A scan running: the basic page's word for it (basic.scanning), word for word.
   'popup.scanning-short': 'Scanning',
   'popup.stopped': 'Scan stopped', // the scan didn't finish
-  // The bell: its name for screen readers, and with a count the old list's heading
-  // (popup.alerts, approved 2026-10-13).
-  'popup.bell': 'Alerts', // also the bell view's heading
-  'popup.back': 'Back', // the bell view's ‹, for screen readers
   // What's new after an update, once per version: the dot on the version tag opens it.
   'popup.new-in': 'New in {version}',
-  'popup.what-changed': 'See What Changed ↗',
+  'popup.what-changed': 'See What Changed',
   'popup.got-it': 'Got It',
   // A new version the browser holds until it's let in (src/background.js updateReady):
   // the basic page's words (basic.update-ready, basic.update-reload), word for word.
@@ -45,7 +41,8 @@ const COPY = {
   // Beside the buy-back token count: when RSI hands out the next one ("Next refill Jan 4").
   'popup.token-next': 'Next refill {date}',
   'popup.fleet-news': 'Fleet News', // heading
-  'popup.all-alerts': 'All Alerts →', // opens the bell view
+  // Fleet News's link to the Wishlist tab. Claude chat, Words, 2026-10-23 (#785).
+  'popup.news-wishlist': 'See Your Wishlist',
   // Fleet News with store alerts on and nothing for your ships or your Wishlist.
   'popup.fleet-news-none': 'No news for your ships right now.',
   // The Scan button (asks the background, which runs the scan).
@@ -64,11 +61,29 @@ const COPY = {
   // Before the first scan: no tabs, one heading and Scan.
   'popup.first': 'Your Hangar, in One Scan',
   // Signed out of RSI: the big button to RSI's sign-in page (a grey Scan under it).
-  'popup.log-in': 'Log In to RSI ↗',
+  'popup.log-in': 'Log In to RSI',
   // The scan's steps, the basic page's names for its parts, word for word.
   'popup.step-hangar': 'Hangar',
   'popup.step-buybacks': 'Buy-Backs',
   'popup.step-referrals': 'Referrals',
+  // The scan bar's other parts (the scanBar flag): the account read first, the website
+  // sync after, and the buy-back packs read after that. These five approved by the
+  // owner through Claude chat (Words, 2026-10-20 19:17 UTC).
+  'popup.part-account': 'Account',
+  'popup.part-sync': 'Syncing',
+  'popup.part-packs': 'Buy-Back Packs',
+  // The scan bar while RSI asks the scan to slow down and it waits to try again.
+  'popup.rsi-waiting': 'Waiting on RSI',
+  // In the bar's place after RSI kept asking a scan to slow down, Scan greyed until
+  // then ("RSI asked us to wait. Scan after 3:42 PM").
+  'popup.rsi-wait': 'RSI asked us to wait. Scan after {time}',
+  // In the bar's place after a scan stopped because a page no longer fit the parser rules
+  // (src/lib.js OH.PAGE_CHANGED): nothing saved, the last scan kept. Approved by the owner
+  // through Claude chat (Words, 2026-10-22).
+  'popup.rsi-page-changed': 'RSI changed a page. Holding your last scan.',
+  // In the same spot (the bar, or under Scan with the scanBar flag off) after RSI didn't
+  // answer a scan (a 5xx). Claude chat, Words, 2026-10-22.
+  'popup.rsi-down': "RSI isn't answering. Try again soon.",
   // Shown once after a scan: how long it took ("Scanned in 38s", "Scanned in 2m 5s").
   'popup.scanned-in-s': 'Scanned in {s}s',
   'popup.scanned-in-m': 'Scanned in {m}m {s}s',
@@ -85,26 +100,12 @@ const COPY = {
   // A different RSI account signed in: the basic page's words, word for word.
   'popup.switched-back': "Signed in as {who} on RSI: that account's saved hangar is back.",
   'popup.switched-new': 'Signed in as {who} on RSI: that account has no scan here yet. Press Scan.',
-  // --- The bell's Alerts view (the `alerts` flag, ./Alerts.svelte) ---
-  'popup.alerts': 'Alerts: {n}', // the bell's name with a count
-  'popup.alerts-new': 'New', // alerts you hadn't seen
-  'popup.alerts-earlier': 'Earlier', // the ones seen before
-  // Alerts on, nothing for you in the store right now.
-  'popup.alerts-none': "Nothing in RSI's store for you right now.",
-  // Read by screen readers before an alert you hadn't seen yet.
+  // Read by screen readers before a Fleet News item you hadn't seen yet.
   'popup.alerts-unseen': 'Not seen yet:',
-  // Alerts on, not connected: only the hangar's rules run; connecting adds your
-  // account's Wishlist (read on this device, never sent back).
-  'popup.alerts-connect':
-    "Connect to openhangar.space to add your Wishlist. It's read on this device and never sent back.",
-  'popup.open-store': 'Open the Store ↗', // our Store
-  'popup.alerts-off-title': 'Store Alerts Are Off',
-  'popup.alerts-turn-on': 'Turn On Alerts',
-  // Deleting alerts (#701): each row's ×, for screen readers, and the list's Clear All
-  // (approved 2026-10-16).
-  'popup.alerts-delete': 'Delete {name}',
-  'popup.alerts-clear': 'Clear All',
   // --- Wishlist tab ---
+  // The tab's count of Remind Me items on sale now, for screen readers (the number shows
+  // on its own). Claude chat, Words, 2026-10-23 (#785).
+  'popup.wish-tab-on-sale': '{n} on sale',
   'popup.wish-count': 'Your Wishlist · {n}',
   'popup.wish-on-sale': 'On Sale',
   'popup.wish-not-sale': 'Not for Sale',
@@ -113,7 +114,7 @@ const COPY = {
   'popup.wish-empty': 'Your Wishlist Is Empty',
   // The Wishlist couldn't be read, or a change to it didn't go through.
   'popup.wish-trouble': "Couldn't Reach openhangar.space",
-  'popup.wish-full': 'Full Wishlist ↗',
+  'popup.wish-full': 'Full Wishlist',
   // Not connected, or the website's Wishlist is off for this account: the Wishlist
   // lives on the website.
   'popup.wish-connect': 'Your Wishlist Lives on openhangar.space',
@@ -130,6 +131,8 @@ const COPY = {
   // Remind Me on each item (the website's wishlist_remind): the switch's label (its
   // title; on or off shows in the switch itself) and its name for screen readers (on or
   // off is read out on its own). Approved 2026-10-16.
+  // Also the switches' column label, once above them (shown, not read: each switch has
+  // popup.wish-remind).
   'popup.wish-remind-label': 'Remind Me',
   'popup.wish-remind': 'Remind me about {name}',
   // The field for the price you're waiting for, in US dollars.
@@ -172,6 +175,8 @@ const COPY = {
   'popup.auto-signed-out': 'Skipped {when}: signed out of RSI',
   'popup.auto-other': 'Skipped {when}: a different RSI account is signed in',
   'popup.auto-paused': 'Skipped {when}: scans are paused',
+  // RSI didn't answer before anything was read (Claude chat, Words, 2026-10-22).
+  'popup.auto-rsi-down': 'Skipped {when}: RSI was down or busy',
   // A part thrown away: only when it came back as another account, or with a sudden
   // drop. Not for a part RSI stopped answering partway (auto-stopped is).
   'popup.auto-bad': "Last: {when}, something looked wrong and wasn't saved. Scan to check.",
@@ -185,6 +190,8 @@ const COPY = {
   'popup.auto-today': 'today {time}',
   'popup.store-alerts': 'Store Alerts', // the basic page's heading (basic.alerts-title)
   'popup.notifications': 'Notifications', // the switch's name
+  // The muted line under it. Claude chat, Words, 2026-10-23.
+  'popup.notifications-hint': 'A pop-up when a Remind Me item goes on sale.',
   'popup.look': 'Look',
   'popup.look-auto': 'Match Browser',
   'popup.look-dark': 'Dark',
@@ -192,8 +199,8 @@ const COPY = {
   'popup.currency': 'Currency',
   'popup.shortcut': 'Shortcut',
   'popup.shortcut-none': 'Not Set', // no shortcut set
-  'popup.shortcut-change': 'Change ↗', // the browser's page
-  // The data buttons: the backup file, and a CSV of your pledges or your buy-backs.
+  'popup.export-menu': 'Export Data', // the menu button (Claude chat, 2026-10-23)
+  // The Export menu's items: the backup file, and a CSV of your pledges or your buy-backs.
   'popup.export-json': 'JSON Backup',
   'popup.export-pledges': 'Pledges CSV',
   'popup.export-buybacks': 'Buy-Backs CSV',

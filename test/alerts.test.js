@@ -100,7 +100,7 @@ const FEED = {
       name: 'Cutlass - Akuma Paint',
       price: 15,
       sale: ['back'],
-      ships: ['cutlass-black'],
+      ships: ['cutlass-red'],
     },
     {
       id: 'sku-30',
@@ -280,15 +280,52 @@ test("the hangar's ships by the feed's spellings: sure ones only", () => {
   assert.equal(twice.find('B'), 'b');
 });
 
+// RSI's renames (the parser rules' aliases): a pledge scanned before the rename and one
+// scanned after are the same ship, found once. The first entry: Phoenix Emerald, now
+// listed as Constellation Mk IV Phoenix Emerald.
+test('a renamed ship matches by its old name and its new one, never a guess', () => {
+  const RULES = require('../src/parser-rules.js').rules;
+  assert.deepEqual(
+    RULES.aliases.find((a) => a.old === 'Phoenix Emerald'),
+    { old: 'Phoenix Emerald', now: 'Constellation Mk IV Phoenix Emerald' },
+  );
+  assert.deepEqual(AL.keysOf('Phoenix Emerald'), [
+    'phoenix emerald',
+    'constellation mk iv phoenix emerald',
+  ]);
+  const feed = (keys) =>
+    AL.readFeed({
+      v: 1,
+      items: [],
+      ships: [{ slug: 'constellation-phoenix-emerald', name: 'Phoenix Emerald', keys }],
+    });
+  const pledge = (id, label) => ({ id, name: label, contents: [{ kind: 'Ship', label }] });
+  const before = pledge('1', 'Phoenix Emerald');
+  const after = pledge('1', 'Constellation Mk IV Phoenix Emerald');
+  // The feed under either name, the hangar under either name: one ship, no drop.
+  for (const keys of [['constellation mk iv phoenix emerald'], ['phoenix emerald']]) {
+    const index = AL.shipIndex(feed(keys));
+    for (const p of [before, after]) {
+      const owned = AL.ownedShips({ sources: { hangar: { items: [p] } } }, index);
+      assert.deepEqual([...owned.keys()], ['constellation-phoenix-emerald']);
+    }
+    // Both scans' names in one hangar still count as one ship, not two.
+    const both = AL.ownedShips({ sources: { hangar: { items: [before, after] } } }, index);
+    assert.equal(both.size, 1);
+    assert.equal(index.find('Phoenix Emerald - Referral Reward'), 'constellation-phoenix-emerald');
+    assert.equal(index.find('Emerald'), null, 'exact names only');
+    assert.equal(index.find('Constellation Phoenix'), null);
+  }
+});
+
 const byId = (ms, id) => ms.find((m) => m.id === id);
 const whys = (m) => (m ? m.why.map((w) => w.why) : []);
 
-test('the hangar rules: buy-back in the store, a paint just in, warbond, limited sale', () => {
+test('the hangar rules: a paint just in, warbond, limited sale (never a buy-back)', () => {
   const ms = AL.matchAll(AL.readFeed(FEED), DB, null);
-  // Your Sabre Raven EX buy-back: both listings are in the store.
-  assert.deepEqual(whys(byId(ms, 'sku-19700')), ['buyback']);
-  assert.deepEqual(byId(ms, 'sku-19700').why[0].ships, ['Sabre Raven EX']);
-  assert.deepEqual(whys(byId(ms, 'sku-19701')), ['buyback']);
+  // Your Sabre Raven EX buy-back in the store: no alert (#695).
+  assert.equal(byId(ms, 'sku-19700'), undefined);
+  assert.equal(byId(ms, 'sku-19701'), undefined);
   // Owned ship sold as a warbond.
   assert.deepEqual(whys(byId(ms, 'sku-11')), ['warbond']);
   assert.deepEqual(byId(ms, 'sku-11').why[0].ships, ['MISC Freelancer MAX']);
@@ -313,9 +350,66 @@ test('owning the ship on a limited sale', () => {
     contents: [ship('Sabre Raven EX')],
   });
   const ms = AL.matchAll(AL.readFeed(FEED), db, null);
-  assert.deepEqual(whys(byId(ms, 'sku-19700')), ['buyback', 'limited']);
-  assert.deepEqual(whys(byId(ms, 'sku-19701')), ['buyback', 'warbond', 'limited']);
+  assert.deepEqual(whys(byId(ms, 'sku-19700')), ['limited']);
+  assert.deepEqual(whys(byId(ms, 'sku-19701')), ['warbond', 'limited']);
   assert.equal(byId(ms, 'sku-19700').endsOn, '2026-10-15');
+});
+
+test('a paint alert only for a ship still on its default paint', () => {
+  const feed = AL.readFeed({
+    ...FEED,
+    items: [
+      ...FEED.items,
+      {
+        id: 'sku-23',
+        kind: 'paint',
+        name: 'Cutlass - Ember Paint',
+        price: 15,
+        sale: [],
+        ships: ['cutlass-black'],
+      },
+    ],
+  });
+  assert.deepEqual(whys(byId(AL.matchAll(feed, DB, null), 'sku-20')), ['paint']);
+  const db = structuredClone(DB);
+  db.sources.hangar.items.push({
+    id: '10',
+    name: 'Paints - Cutlass - Ember Paint',
+    isPaint: true,
+    contents: [{ kind: 'Skin', label: 'Cutlass - Ember Paint' }],
+  });
+  assert.equal(byId(AL.matchAll(feed, db, null), 'sku-20'), undefined);
+});
+
+test('saved buy-back alerts clear out: items, memory, badge', () => {
+  const old = {
+    v: 1,
+    items: [
+      { id: 'sku-19700', name: 'X', why: [{ why: 'buyback', ships: ['A'] }] },
+      {
+        id: 'sku-11',
+        name: 'Y',
+        why: [
+          { why: 'buyback', ships: ['A'] },
+          { why: 'warbond', ships: ['B'] },
+        ],
+      },
+    ],
+    known: { 'sku-19700|buyback': 1, 'sku-11|buyback': 1, 'sku-11|warbond': 1 },
+    seen: { 'sku-11|buyback': 2 },
+    gone: { 'sku-19700|buyback': 3 },
+    hidden: { 'sku-19700|buyback': 3 },
+  };
+  assert.deepEqual(
+    AL.shown(old).map((m) => [m.id, whys(m)]),
+    [['sku-11', ['warbond']]],
+  );
+  // A hangar reason only: Fleet News, never the badge.
+  assert.equal(AL.badgeFor(true, old), null);
+  const { state } = AL.nextState(old, [], NOW);
+  assert.deepEqual(Object.keys(state.known), ['sku-11|warbond']);
+  assert.deepEqual(state.seen, {});
+  assert.equal('hidden' in state, false);
 });
 
 test('the Wishlist: only when connected, by its keys (ship page, store id, upgrade)', () => {
@@ -324,6 +418,8 @@ test('the Wishlist: only when connected, by its keys (ship page, store id, upgra
   const ms = AL.matchAll(feed, { sources: {} }, wish);
   assert.deepEqual(ms.map((m) => m.id).sort(), ['sku-10', 'sku-30', 'upgrade-341']);
   assert.ok(ms.every((m) => whys(m).join() === 'wishlist'));
+  // Each with the Wishlist keys it answers to (the badge counts those).
+  assert.deepEqual(byId(ms, 'sku-10').why[0].keys, ['ship:cutlass-black']);
   // A ship on the Wishlist never lights up a paint for it.
   assert.equal(byId(ms, 'sku-20'), undefined);
   assert.deepEqual(AL.matchAll(feed, { sources: {} }, null), []);
@@ -373,57 +469,27 @@ test("what's been seen: new pairs alert, a short gap doesn't, a day gone alerts 
   assert.equal(AL.unseen(one).length, ms.length - 1);
 });
 
-test('deleted (#701): out of the list and the badge, back only when something new matches', () => {
-  const feed = AL.readFeed(FEED);
-  const ms = AL.matchAll(feed, DB, null);
+test('deleted in the old alerts list (#701): that memory dropped when read, still seen', () => {
+  const ms = AL.matchAll(AL.readFeed(FEED), DB, null);
   const a = AL.nextState(null, ms, NOW);
-  assert.equal(AL.shown(a.state).length, ms.length);
-  // One deleted: gone from the list and the badge, and it stays gone on the next checks.
-  const one = AL.hide(a.state, NOW, 'sku-11');
-  assert.ok(!AL.shown(one).some((m) => m.id === 'sku-11'));
-  assert.equal(AL.unseen(one).length, ms.length - 1);
-  const later = AL.nextState(one, ms, NOW + 30 * MIN);
+  // As the popup's old list saved a deleted item: hidden, and seen with it.
+  const pair = `sku-11|${ms.find((m) => m.id === 'sku-11').why[0].why}`;
+  const old = {
+    ...a.state,
+    seen: { ...a.state.seen, [pair]: NOW },
+    hidden: { [pair]: NOW },
+  };
+  assert.ok(AL.shown(old).some((m) => m.id === 'sku-11'));
+  assert.equal(AL.unseen(old).length, ms.length - 1);
+  const later = AL.nextState(old, ms, NOW + 30 * MIN);
+  assert.equal('hidden' in later.state, false);
   assert.equal(later.fresh.length, 0);
-  assert.ok(!AL.shown(later.state).some((m) => m.id === 'sku-11'));
-  // Read back after a restart (stored as JSON): still gone.
-  const stored = JSON.parse(JSON.stringify(later.state));
-  assert.ok(!AL.shown(stored).some((m) => m.id === 'sku-11'));
-  // Clear All: nothing listed, nothing on the badge.
-  const all = AL.hide(later.state, NOW + HOUR);
-  assert.equal(AL.shown(all).length, 0);
-  assert.equal(AL.unseen(all).length, 0);
-  // A new reason for an item: it shows again.
-  const db = structuredClone(DB);
-  db.sources.hangar.items.push({
-    id: '9',
-    name: 'Sabre Raven EX',
-    contents: [ship('Sabre Raven EX')],
-  });
-  const more = AL.nextState(all, AL.matchAll(feed, db, null), NOW + 2 * HOUR);
-  assert.deepEqual(
-    AL.shown(more.state)
-      .map((m) => m.id)
-      .sort(),
-    ['sku-19700', 'sku-19701'],
-  );
-  // The same sale gone a day and back: it alerts and shows again.
-  const without = ms.filter((m) => m.id !== 'sku-11');
-  const gone = AL.nextState(all, without, NOW + 2 * HOUR);
-  const long = AL.nextState(gone.state, without, NOW + 2 * HOUR + AL.GONE_KEEP_MS);
-  const back = AL.nextState(long.state, ms, NOW + 30 * HOUR);
-  assert.deepEqual(
-    back.fresh.map((m) => m.id),
-    ['sku-11'],
-  );
-  assert.deepEqual(
-    AL.shown(back.state).map((m) => m.id),
-    ['sku-11'],
-  );
 });
 
 test('notifications: one each, three at most, then one for the rest', () => {
-  const ms = AL.matchAll(AL.readFeed(FEED), DB, null);
-  assert.equal(ms.length, 4);
+  const real = AL.matchAll(AL.readFeed(FEED), DB, null);
+  assert.equal(real.length, 2);
+  const ms = [...real, ...real.map((m) => ({ ...m, id: `${m.id}-b` }))];
   const three = AL.notesFor(ms.slice(0, 3));
   assert.equal(three.length, 3);
   assert.deepEqual(AL.notesFor([byId(ms, 'sku-11')])[0], {
@@ -440,20 +506,45 @@ test('notifications: one each, three at most, then one for the rest', () => {
   );
   assert.equal(four[3].id, 'oh-alerts:more');
   assert.equal(four[3].title, 'More alerts: 1');
-  const ends = AL.lines(byId(ms, 'sku-19700'));
-  assert.deepEqual(ends, ['In your buy-backs, now in the store: Sabre Raven EX', 'Ends Oct 15']);
+  const ends = AL.lines({ ...byId(ms, 'sku-11'), endsOn: '2026-10-15' });
+  assert.deepEqual(ends, [
+    'Warbond edition in the store: MISC Freelancer MAX (new money only)',
+    'Ends Oct 15',
+  ]);
 });
 
-test('the badge: unseen items while alerts are on, else the rescan reminder', () => {
-  const ms = AL.matchAll(AL.readFeed(FEED), DB, null);
-  const { state } = AL.nextState(null, ms, NOW);
+test('the badge: Remind Me items on sale, unseen, each Wishlist item once', () => {
+  const feed = AL.readFeed(FEED);
+  // The hangar's reasons alone: Fleet News only, no badge.
+  const own = AL.nextState(null, AL.matchAll(feed, DB, null), NOW);
+  assert.ok(own.state.items.length > 0);
+  assert.equal(AL.badgeFor(true, own.state), null);
+  assert.deepEqual(own.remind, []);
+  // A ship on the Wishlist sold in two editions counts once; a store item once.
+  const two = {
+    ...feed,
+    items: [
+      ...feed.items,
+      { ...byId(feed.items, 'sku-10'), id: 'sku-99', name: 'Cutlass Black WB' },
+    ],
+  };
+  const ms = AL.matchAll(two, DB, ['ship:cutlass-black', 'sku:30']);
+  const { state, remind } = AL.nextState(null, ms, NOW);
+  assert.deepEqual(remind.map((m) => m.id).sort(), ['sku-10', 'sku-30', 'sku-99']);
+  assert.ok(
+    remind.every((m) => whys(m).join() === 'wishlist'),
+    'notified for the Wishlist only',
+  );
   assert.deepEqual(AL.badgeFor(true, state), {
-    text: '4',
-    title: 'Open Hangar alerts: 4. Click to see them.',
+    text: '2',
+    title: 'Open Hangar alerts: 2. Click to see them.',
   });
   assert.equal(AL.badgeFor(false, state), null);
   assert.equal(AL.badgeFor(undefined, state), null);
   assert.equal(AL.badgeFor(true, AL.markSeen(state, NOW)), null);
+  // The same matches again: nothing new to notify.
+  assert.deepEqual(AL.nextState(state, ms, NOW + 30 * MIN).remind, []);
+  // Saved before the keys were kept: each item counts once.
   const many = {
     ...state,
     items: Array.from({ length: 12 }, (_, i) => ({
@@ -551,24 +642,31 @@ test('a check: off asks nothing', async () => {
   assert.equal(x.asked.length, 0);
 });
 
-test('a check, not connected: the public feed only, with nothing of the pilot in it', async () => {
-  const x = env({ local: { alertsOn: true, db: DB }, net: [res(200, FEED, { etag: 'W/"a"' })] });
-  const r = await AL.check(x.e);
-  assert.equal(r.ran, true);
-  assert.equal(r.matches, 4);
-  assert.equal(x.asked.length, 1);
-  const [{ url, init }] = x.asked;
-  assert.equal(url, 'https://openhangar.space/api/store/on-sale');
-  assert.equal(init.credentials, 'omit');
-  assert.deepEqual(init.headers, { Accept: 'application/json' });
-  assert.ok(!('body' in init) && !init.method, 'a plain GET');
-  // Four matches: three of their own, then one for the rest.
-  assert.equal(x.out.notes.length, 4);
-  assert.equal(x.out.badges, 1);
-  assert.deepEqual(x.out.at, [NOW + 30 * MIN + 150e3]);
-  assert.equal(x.data.alertsFeed.etag, 'W/"a"');
-  assert.equal(x.data.alerts.checkedAt, NOW);
-  assert.ok(!('alertsWish' in x.data));
+test('a check, not connected: alerts go off, nothing asked (on only while connected)', async () => {
+  const x = env({ local: { alertsOn: true, db: DB }, net: [res(200, FEED)] });
+  assert.deepEqual(await AL.check(x.e), { ran: false, why: 'not-connected' });
+  assert.equal(x.data.alertsOn, false);
+  assert.equal(x.asked.length, 0);
+  assert.equal(x.out.notes.length, 0);
+  assert.equal(x.out.at.length, 0, 'no next check');
+  assert.ok(!('alerts' in x.data), 'no matches saved');
+  // A link without a token is no connection either.
+  const y = env({ local: { alertsOn: true, db: DB, siteLink: { token: '' } } });
+  assert.deepEqual(await AL.check(y.e), { ran: false, why: 'not-connected' });
+});
+
+test('on only while connected: the stored fix, with literal keys and values', () => {
+  // Migrated: on, and no connection (none, or one without a token).
+  assert.deepEqual(AL.connectedOnly({ alertsOn: true }), { alertsOn: false });
+  assert.deepEqual(AL.connectedOnly({ alertsOn: true, siteLink: null }), { alertsOn: false });
+  assert.deepEqual(AL.connectedOnly({ alertsOn: true, siteLink: { token: '' } }), {
+    alertsOn: false,
+  });
+  // Unchanged: connected, or already off, or never set.
+  assert.equal(AL.connectedOnly({ alertsOn: true, siteLink: { token: 't' } }), null);
+  assert.equal(AL.connectedOnly({ alertsOn: false }), null);
+  assert.equal(AL.connectedOnly({}), null);
+  assert.equal(AL.connectedOnly(null), null);
 });
 
 test("a check, connected: the account's Wishlist with the sync token, matched here", async () => {
@@ -593,19 +691,28 @@ test("a check, connected: the account's Wishlist with the sync token, matched he
     ['sku-10'],
   );
   assert.equal(x.data.alertsWish.connectedAt, LINK.connectedAt);
-  // Firefox without its data yes: no Wishlist read, the hangar rules only.
+  // Firefox without its data yes: the Wishlist can't be read, so alerts go off (the
+  // public feed's record kept, nothing matched or notified).
   const ff = env({
     local: { alertsOn: true, db: DB, siteLink: LINK },
     net: [res(200, FEED)],
     share: false,
   });
-  await AL.check(ff.e);
+  assert.deepEqual(await AL.check(ff.e), { ran: false, why: 'no-share' });
   assert.equal(ff.asked.length, 1);
-  assert.ok(!ff.data.alerts.items.some((m) => whys(m).includes('wishlist')));
+  assert.equal(ff.data.alertsOn, false);
+  assert.ok(ff.data.alertsFeed.data, "the public feed's record stays");
+  assert.ok(!('alerts' in ff.data));
+  assert.equal(ff.out.notes.length, 0);
 });
 
 test('polite: ETag, a fresh copy reused, Retry-After honored, backoff, the last copy kept', async () => {
-  const x = env({ local: { alertsOn: true, db: DB }, net: [res(200, FEED, { etag: 'W/"a"' })] });
+  // Connected, with the Wishlist read kept for hours, so only the feed is asked here.
+  const wish = { keys: ['sku:1'], connectedAt: LINK.connectedAt, retryAt: NOW + 100 * HOUR };
+  const x = env({
+    local: { alertsOn: true, db: DB, siteLink: LINK, alertsWish: wish },
+    net: [res(200, FEED, { etag: 'W/"a"' })],
+  });
   await AL.check(x.e);
   // Ten minutes: the saved copy, nothing asked.
   x.tick(5 * MIN);
@@ -636,7 +743,7 @@ test('polite: ETag, a fresh copy reused, Retry-After honored, backoff, the last 
   await AL.check({ ...x.e, fetch: async () => Promise.reject(new Error('offline')) });
   assert.equal(x.data.alertsFeed.fails, before + 1);
   assert.equal(x.data.alertsFeed.data.items.length, FEED.items.length);
-  assert.equal(x.data.alerts.items.length, 4);
+  assert.equal(x.data.alerts.items.length, 2);
 });
 
 test('the Wishlist read: 404 (its flag off) waits 6 hours, 401 keeps nothing', async () => {
@@ -661,7 +768,7 @@ test('the Wishlist read: 404 (its flag off) waits 6 hours, 401 keeps nothing', a
   assert.deepEqual(y.data.alerts.items, []);
 });
 
-test('disconnected: the Wishlist keys go, its matches with them', async () => {
+test('disconnected: alerts go off, nothing asked or scheduled', async () => {
   const x = env({
     local: {
       alertsOn: true,
@@ -674,11 +781,15 @@ test('disconnected: the Wishlist keys go, its matches with them', async () => {
       },
     },
   });
-  await AL.check(x.e, { network: false });
+  // The background clears the matches and the Wishlist keys on the off (OFF_KEYS).
+  assert.deepEqual(await AL.check(x.e, { network: false }), {
+    ran: false,
+    why: 'not-connected',
+  });
+  assert.equal(x.data.alertsOn, false);
   assert.equal(x.asked.length, 0);
-  assert.ok(!('alertsWish' in x.data));
-  assert.deepEqual(x.data.alerts.items, []);
   assert.equal(x.out.at.length, 0, 'matching again schedules nothing');
+  assert.ok(AL.OFF_KEYS.includes('alertsWish') && AL.OFF_KEYS.includes('alerts'));
 });
 
 test('the kill switch pauses the checks: nothing asked', async () => {
@@ -686,6 +797,7 @@ test('the kill switch pauses the checks: nothing asked', async () => {
     local: {
       alertsOn: true,
       db: DB,
+      siteLink: LINK,
       remoteStatus: { at: NOW, data: { sources: { alerts: { enabled: false } } } },
     },
     net: [res(200, FEED)],
@@ -698,4 +810,22 @@ test('the kill switch pauses the checks: nothing asked', async () => {
 test("every word alerts show is the owner's (2026-10-13), no placeholder left", () => {
   for (const [k, v] of Object.entries(AL.COPY)) assert.doesNotMatch(v, /\[copy:/, k);
   assert.equal(AL.COPY['alerts.why.wishlist'], 'On your Wishlist');
+});
+
+test('a check, connected, Remind Me on for nothing: alerts go off, nothing matched or notified', async () => {
+  const x = env({
+    local: { alertsOn: true, db: DB, siteLink: LINK },
+    net: [res(200, FEED), res(200, { v: 1, keys: [] })],
+  });
+  assert.deepEqual(await AL.check(x.e), { ran: false, why: 'no-remind' });
+  assert.equal(x.data.alertsOn, false);
+  assert.equal(x.out.notes.length, 0);
+  assert.ok(!('alerts' in x.data), 'no matches saved');
+  // A Wishlist that answers 404 (its flag off) isn't "none on": the hangar rules still run.
+  const off = env({
+    local: { alertsOn: true, db: DB, siteLink: LINK },
+    net: [res(200, FEED), res(404, {})],
+  });
+  assert.equal((await AL.check(off.e)).ran, true);
+  assert.notEqual(off.data.alertsOn, false);
 });

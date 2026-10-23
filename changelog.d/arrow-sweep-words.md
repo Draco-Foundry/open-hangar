@@ -1,0 +1,1 @@
+- Changed: **Words instead of arrows.** An upgrade's name now reads like "Aurora MR to Mustang Alpha", help paths use slashes, and the popup's chevrons are drawn icons.

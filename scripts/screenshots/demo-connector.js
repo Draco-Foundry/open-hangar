@@ -5,7 +5,8 @@
 // UI test. Set before a page loads (evaluateOnNewDocument): __demoAccount (the
 // `account` key), __demoAvatar (`avatarImg`), __demoLocal (any other local keys),
 // __demoSession (session keys), __demoShortcut ('' for none set), __demoCookie ('out':
-// signed out of RSI) and __demoWish (the account's Wishlist on the website).
+// signed out of RSI), __demoWish (the account's Wishlist on the website) and, read by
+// demo-shim.js, __demoBuybackTokens (the buy-back token count, 2 by default).
 (function () {
   const demo = (window.__demo = { sent: [], opened: [], listeners: [] });
   const session = {};
@@ -67,14 +68,6 @@
   demo.answers = {};
   chrome.runtime.sendMessage = async (msg) => {
     demo.sent.push(msg);
-    // An alert deleted (or Clear All): written the way the background writes it.
-    if (msg?.ohPopup === 'alerts-hide' && window.OHAlerts) {
-      const { alerts } = await chrome.storage.local.get('alerts');
-      if (alerts)
-        await chrome.storage.local.set({
-          alerts: window.OHAlerts.hide(alerts, Date.now(), msg.id ?? null),
-        });
-    }
     const own = msg && demo.answers[msg.ohPopup];
     return own || demo.answer || { ok: true, opened: true };
   };
@@ -84,7 +77,7 @@
       {
         name: '_execute_action',
         description: '',
-        shortcut: window.__demoShortcut ?? 'Alt+Shift+H',
+        shortcut: window.__demoShortcut ?? 'Alt+Shift+O',
       },
     ],
   };

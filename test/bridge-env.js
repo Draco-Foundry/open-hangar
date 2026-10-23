@@ -227,6 +227,10 @@ function loadBackground({
     ...(browser === 'chrome' || browser === 'firefox'
       ? {
           identity: {
+            // The worker never opens the sign-in window: the basic page does.
+            launchWebAuthFlow: async () => {
+              throw new Error('the sign-in window opens from the basic page');
+            },
             getRedirectURL: () =>
               firefox
                 ? 'https://abc123.extensions.allizom.org/'

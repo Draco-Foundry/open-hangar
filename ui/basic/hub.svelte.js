@@ -11,6 +11,7 @@
 import { t } from './copy.js';
 import { progressLine, reportLines, reportSummary } from './report-lines.js';
 import { afterConnect } from './after-connect.js';
+import { connectLink } from './link-code.js';
 import { createRunner, newRun } from '../scan/runner.js';
 
 const OH = globalThis.OH;
@@ -36,7 +37,10 @@ export const hub = $state({
   scanElsewhere: false,
   // openhangar.space: link { name, connectedAt, lastSync } (never the token), Firefox's
   // yes, and an ask waiting: 'connect' | 'local' (Firefox's card), pilot (a new RSI
-  // account to sync or not: { handle, record }).
+  // account to sync or not: { handle, record }), switchTo (Connect came back with
+  // another account than the one connected: { from, to }, the two names; the new token
+  // waits in `switching`, never here), code (no sign-in window here: the code waiting
+  // for Approve on the website's code page, { code, url }; ./link-code.js).
   site: {
     enabled: false,
     link: null,
@@ -46,6 +50,8 @@ export const hub = $state({
     dataOk: true,
     askFirefox: null,
     pilot: null,
+    switchTo: null,
+    code: null,
   },
   update: null, // a newer version waiting for this tab to let it in
   banner: null, // the kill switch's banner (status.json), { message, level }
@@ -196,6 +202,7 @@ export async function refreshSite() {
   if (until) waitTimer = setTimeout(refreshSite, Math.max(0, until - Date.now()) + 500);
   else if (link && !s.syncing) runner.retryIfDue(link).catch(() => {});
   s.dataOk = !firefox() || (await chrome.permissions.contains(SITE_DATA).catch(() => false));
+  await connectIfAsked();
   if (!firefox() || s.dataOk || !chrome.storage.session) return;
   // Connect was pressed on the website, or our hangar page asked for the hangar,
   // before Firefox said yes (src/background.js): this page opened with its card up.
@@ -233,67 +240,102 @@ export async function firefoxContinue() {
   if (why === 'connect') await connect({ asked, fromSite: true });
 }
 
-const b64url = (bytes) =>
-  btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-const random = (n) => b64url(crypto.getRandomValues(new Uint8Array(n)));
+// The website's Connect This Browser (src/background.js oh-connect-begin): this tab was
+// brought to the front, or opened, to run Connect's sign-in window. Only in the tab the
+// ask names; other Open Hangar tabs leave it.
+async function connectIfAsked() {
+  if (!chrome.storage.session) return;
+  const { siteConnectAsk: ask } = await chrome.storage.session.get('siteConnectAsk');
+  if (!ask || (ask.tabId != null && ask.tabId !== (await thisTabId()))) return;
+  await chrome.storage.session.remove('siteConnectAsk');
+  // Not awaited: the window stays open for as long as you take.
+  if (Date.now() - ask.at < 60e3) connect({ fromSite: true });
+}
 
-// Connect: the browser's sign-in window on the website's /connect, as the dashboard's
-// (PKCE: the verifier never leaves this page). Without the window, the website's
-// Connect This Browser page instead, which asks the extension itself (bridge v2).
+// Connect: the browser's sign-in window on the website's /connect (./sign-in.js). The
+// popup's Connect and the website's Connect This Browser both end up here. Without the
+// window (Firefox for Android), a code on the website's code page. One at a time.
+let connecting = false;
 export async function connect({ asked, fromSite = false } = {}) {
   const ok = asked || dataOk();
+  if (connecting) return;
+  connecting = true;
+  try {
+    await connectOnce(ok, fromSite);
+  } finally {
+    connecting = false;
+    // The website may ask again (src/background.js holds its asks while a window is open).
+    await chrome.storage.session?.remove('siteConnectAskedAt').catch(() => {});
+  }
+}
+async function connectOnce(ok, fromSite) {
   hub.site.msg = '';
   if (!(await ok)) return void (hub.site.msg = t('basic.firefox-no'));
   const base = await OH.siteUrl();
-  const identity = globalThis.chrome?.identity || globalThis.browser?.identity;
-  if (!identity?.launchWebAuthFlow || !identity.getRedirectURL) {
-    chrome.tabs.create({ url: `${base}/link` });
-    return;
-  }
-  const redirect = identity.getRedirectURL();
-  const verifier = random(32);
-  const state = random(16);
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
-  const url = `${base}/connect?${new URLSearchParams({
-    response_type: 'code',
-    code_challenge: b64url(new Uint8Array(digest)),
-    code_challenge_method: 'S256',
-    state,
-    redirect_uri: redirect,
-  })}`;
-  let back;
+  const w = { stop: false };
+  codeWait = w;
+  let got;
   try {
-    back = await identity.launchWebAuthFlow({ url, interactive: true });
+    got = await connectLink({
+      base,
+      identity: globalThis.chrome?.identity || globalThis.browser?.identity,
+      log: (line) => OH.log('warn', 'site', line),
+      OH,
+      session: chrome.storage.session,
+      open: (url) => chrome.tabs.create({ url }),
+      show: (c) => (hub.site.code = c),
+      shouldGo: () => codeWait === w && !w.stop,
+    });
   } catch (err) {
-    if (/approve|cancel|denied|closed/i.test(String(err?.message || err))) return;
-    OH.log('warn', 'site', `sign-in window: ${err?.message || err}`);
-    chrome.tabs.create({ url: `${base}/link` });
+    OH.log('warn', 'site', `link code: ${err?.message || err}`);
+    got = { failed: true };
+  } finally {
+    if (codeWait === w) codeWait = null;
+    hub.site.code = null;
+  }
+  if (got.failed) return void (hub.site.msg = t('basic.connect-failed'));
+  if (got.expired) return void (hub.site.msg = t('basic.code-expired'));
+  if (got.cancelled) return;
+  const { link, sync } = got;
+  const forConnect = fromSite || location.hash === '#settings';
+  // Another account than the one connected: nothing is replaced or synced until you
+  // say so here, with both names in front of you (switchAnswer).
+  const was = await OH.getSiteLink();
+  if (OH.siteSwitches(was, link)) {
+    if (switching) await OH.siteTokenDrop(switching.link.token); // an older one, unanswered
+    switching = { link, sync, forConnect };
+    hub.site.switchTo = { from: was.name || '', to: link.name || '' };
     return;
   }
-  const answer = new URL(back).searchParams;
-  if (answer.get('state') !== state || answer.get('error') || !answer.get('code')) return;
-  const res = await fetch(`${base}/api/link/token`, {
-    method: 'POST',
-    credentials: 'omit',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      code: answer.get('code'),
-      code_verifier: verifier,
-      redirect_uri: redirect,
-    }),
-  }).catch(() => null);
-  if (!res || !res.ok) return void (hub.site.msg = t('basic.connect-failed'));
-  const j = await res.json();
-  await chrome.storage.local.set({
-    siteLink: { token: j.token, name: j.name || '', connectedAt: Date.now(), lastSync: null },
-  });
+  await connected(link, sync, forConnect, base);
+}
+// The code waiting for Approve (hub.site.code): Cancel stops the wait, Open the Page
+// Again brings the website's code page back.
+let codeWait = null;
+export function codeCancel() {
+  if (codeWait) codeWait.stop = true;
+  hub.site.code = null;
+}
+export function codeReopen() {
+  if (hub.site.code) chrome.tabs.create({ url: hub.site.code.url });
+}
+// The new link waiting for the switch question (hub.site.switchTo), token and all.
+let switching = null;
+export async function switchAnswer(yes) {
+  const w = switching;
+  switching = null;
+  hub.site.switchTo = null;
+  if (!w) return;
+  if (!yes) return void (await OH.siteTokenDrop(w.link.token));
+  await connected(w.link, w.sync, w.forConnect, await OH.siteUrl());
+}
+// A new link kept: the old one revoked (OH.siteLinkSave), the first sync if /connect
+// asked for it, then on to My Hangar when this page was opened for Connect.
+async function connected(link, sync, forConnect, base) {
+  await OH.siteLinkSave(link);
   await refreshSite();
-  if (answer.get('sync') === '1') await syncNow();
+  if (sync) await syncNow();
   await runner.wishlistToAccount();
-  const forConnect = fromSite || location.hash === '#settings';
   const onward = () => {
     const next = afterConnect({
       forConnect,
@@ -340,15 +382,6 @@ export async function disconnect() {
   await OH.siteDisconnect().catch((e) => (hub.site.msg = String(e?.message || e)));
   await refreshSite();
 }
-// "Sync My Hangar Now" from the website's Connect This Browser (src/background.js
-// oh-connect-finish sets siteSyncRequested): once, here.
-async function syncIfAsked() {
-  const { siteSyncRequested: at } = await chrome.storage.local.get('siteSyncRequested');
-  if (!at) return;
-  await chrome.storage.local.remove('siteSyncRequested');
-  if (Date.now() - at < 10 * 60e3) await syncNow({ auto: true });
-}
-
 // Report a Scan Problem: a new GitHub issue from the Scan Broken template, with the
 // scan's counts and the flight log (no handle, no item names; OH.scanProblemUrl).
 // Nothing is sent: you read it on GitHub and submit it yourself.
@@ -392,14 +425,13 @@ export async function start() {
   chrome.storage.onChanged.addListener((c, area) => {
     if (area === 'local' && c.updateReady) hub.update = c.updateReady.newValue || null;
     if (area === 'local' && c.siteLink) refreshSite().then(runner.wishlistToAccount);
-    if (area === 'local' && c.siteSyncRequested?.newValue) syncIfAsked();
     if (area === 'local' && c.db && !hub.scan.busy) loadDB();
     if (area === 'session' && c.scanRequest?.newValue) scanIfAsked();
     if (area === 'session' && c.scanRunning) noteOtherScan();
     if (area === 'session' && (c.siteAskFirefox || c.localAskFirefox)) refreshSite();
+    if (area === 'session' && c.siteConnectAsk?.newValue) connectIfAsked();
   });
   await noteOtherScan();
-  await syncIfAsked();
   await runner.wishlistToAccount();
   await scanIfAsked();
 }

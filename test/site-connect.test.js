@@ -1,22 +1,25 @@
 'use strict';
-// Connect from the website (src/background.js, sync builds only): our site may ask
-// for a PKCE challenge and hand back a one-time code; the extension trades it with
-// the verifier it kept, saves the link and opens the basic page's settings (the
-// dashboard's Home in a developer's build without the connector). Run: `npm test`.
+// Connect from the website (src/background.js, sync builds only; connect hardening,
+// #669). Our site may only ask: the basic page comes to the front and runs its own
+// sign-in window (ui/basic/sign-in.js), whose one-time code comes back through the
+// browser, never through a page. A page can't hand in a code, and an account switch is
+// asked on the basic page first (OH.siteSwitches). Run: `npm test`.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { loadBackground, CHROME_ID, STORE_FLAGS } = require('./bridge-env.js');
 
 // The background worker as a store build makes it (test/bridge-env.js: sync, Local
-// Mode and the connector), its token exchange answered here. staging: a developer's
-// build pointed at staging (npm run build:staging), which lets staging's pages in; the
-// store builds don't. flags: a developer's build's own.
+// Mode and the connector). staging: a developer's build pointed at staging (npm run
+// build:staging), which lets staging's pages in; the store builds don't. flags: a
+// developer's build's own.
 function load({
   staging = true,
   browser = 'chrome',
   granted = true,
   flags = STORE_FLAGS,
   contexts = null,
+  local = {},
+  session = {},
 } = {}) {
   const fetched = [];
   const x = loadBackground({
@@ -25,9 +28,11 @@ function load({
     granted,
     flags,
     contexts,
+    local,
+    session,
     fetch: async (url, init) => {
-      fetched.push({ url, body: JSON.parse(init.body) });
-      return { ok: true, json: async () => ({ token: 'oht_x', name: 'ExamplePilot' }) };
+      fetched.push({ url, init });
+      return { ok: true, json: async () => ({ token: 'oht_other', name: 'Someone Else' }) };
     },
   });
   return { ...x, fetched };
@@ -44,75 +49,93 @@ const HELLO_APP = {
 };
 
 const SITE = 'https://staging.openhangar.space';
-const b64 = (buf) => Buffer.from(buf).toString('base64url');
+const BASIC = `chrome-extension://${CHROME_ID}/src/basic.html`;
+const UNKNOWN = { ok: false, error: 'unknown request' };
 
-test('our site: hello, begin with a PKCE challenge, finish with the code', async () => {
+test('our site: begin brings up the basic page to connect, and hands the page nothing', async () => {
   const x = load();
   assert.deepEqual(await x.send({ type: 'oh-hello' }, SITE), HELLO_APP);
   const begin = await x.send({ type: 'oh-connect-begin' }, SITE);
-  assert.ok(begin.ok);
-  assert.equal(begin.redirect_uri, `https://${CHROME_ID}.chromiumapp.org/`);
-  const verifier = x.stores.session.siteConnect.verifier;
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
-  assert.equal(begin.challenge, b64(digest));
-
-  const done = await x.send({ type: 'oh-connect-finish', code: 'one-time', sync: true }, SITE);
-  assert.deepEqual(done, { ok: true, name: 'ExamplePilot' });
-  assert.equal(x.fetched[0].url, `${SITE}/api/link/token`);
-  assert.deepEqual(x.fetched[0].body, {
-    code: 'one-time',
-    code_verifier: verifier,
-    redirect_uri: begin.redirect_uri,
-  });
-  assert.equal(x.stores.local.siteLink.token, 'oht_x');
-  assert.equal(x.stores.local.siteUrl, SITE);
-  assert.ok(x.stores.local.siteSyncRequested);
-  // The basic page opens on its settings, where it syncs (siteSyncRequested).
-  assert.deepEqual(x.opened, [`chrome-extension://${CHROME_ID}/src/basic.html#settings`]);
-  assert.equal(x.stores.session.siteConnect, undefined, 'the verifier is used once');
-  // A developer's build without the connector: the dashboard's Home, as before.
-  const dash = load({ flags: { ...STORE_FLAGS, connector: false } });
-  await dash.send({ type: 'oh-connect-begin' }, SITE);
-  await dash.send({ type: 'oh-connect-finish', code: 'one-time', sync: true }, SITE);
-  assert.deepEqual(dash.opened, [`chrome-extension://${CHROME_ID}/src/dashboard.html#home`]);
+  assert.deepEqual(begin, { ok: true, window: true }, 'no challenge, no redirect address');
+  assert.deepEqual(x.opened, [`${BASIC}#settings`]);
+  // The ask names the tab that runs it (ui/basic/hub.svelte.js connectIfAsked).
+  assert.equal(x.stores.session.siteConnectAsk.tabId, 100);
+  assert.ok(x.stores.session.siteConnectAskedAt);
+  // Nothing sent anywhere, nothing kept that a code could be traded with.
+  assert.deepEqual(x.fetched, []);
+  assert.equal(x.stores.session.siteConnect, undefined, 'no verifier in the worker');
+  assert.equal(x.stores.local.siteLink, undefined);
 });
 
 test('an Open Hangar tab already open comes to the front, no second tab (#658)', async () => {
-  const BASIC = `chrome-extension://${CHROME_ID}/src/basic.html`;
   const x = load({
     contexts: [{ contextType: 'TAB', tabId: 7, windowId: 3, documentUrl: `${BASIC}#home` }],
   });
-  await x.send({ type: 'oh-connect-begin' }, SITE);
-  const done = await x.send({ type: 'oh-connect-finish', code: 'one-time', sync: true }, SITE);
-  assert.ok(done.ok);
+  assert.deepEqual(await x.send({ type: 'oh-connect-begin' }, SITE), { ok: true, window: true });
   assert.deepEqual(x.opened, [], 'no new tab: a scan running there keeps going');
   assert.deepEqual(x.focused, [
     { tab: 7, active: true },
     { window: 3, focused: true },
   ]);
-  assert.ok(x.stores.local.siteSyncRequested, 'the open tab syncs (after its scan)');
+  assert.equal(x.stores.session.siteConnectAsk.tabId, 7);
 });
 
-test('no sync asked, no sync flagged', async () => {
+test('a page asking again and again opens one window, until the basic page is done', async () => {
   const x = load();
-  await x.send({ type: 'oh-connect-begin' }, SITE);
-  await x.send({ type: 'oh-connect-finish', code: 'c', sync: false }, SITE);
-  assert.equal(x.stores.local.siteSyncRequested, undefined);
+  const answers = await Promise.all(
+    [1, 2, 3].map(() => x.send({ type: 'oh-connect-begin' }, SITE)),
+  );
+  for (const a of answers) assert.deepEqual(a, { ok: true, window: true });
+  assert.equal(x.opened.length, 1, 'three asks at once: one tab');
+  // A worker that stopped and started again still holds it (session storage).
+  const again = load({ session: { siteConnectAskedAt: Date.now() } });
+  await again.send({ type: 'oh-connect-begin' }, SITE);
+  assert.deepEqual(again.opened, []);
+  // The basic page's window closed (it clears siteConnectAskedAt), or a minute went by:
+  // the next ask opens.
+  const later = load({ session: { siteConnectAskedAt: Date.now() - 61e3 } });
+  await later.send({ type: 'oh-connect-begin' }, SITE);
+  assert.equal(later.opened.length, 1);
 });
 
-test('other websites get no answer; finishing needs a begin from the same site', async () => {
+// A page that hands the extension a one-time code of its own choosing: there's no
+// message for it any more, and nothing it sends is kept.
+test('a page can never hand in a code: no finish, no token, no sync', async () => {
+  const x = load({ local: { siteLink: { token: 'oht_mine', name: 'Me' } } });
+  await x.send({ type: 'oh-connect-begin' }, SITE);
+  for (const msg of [
+    { type: 'oh-connect-finish', code: 'some-code', sync: true },
+    { type: 'oh-connect-finish', code: 'some-code' },
+    { type: 'oh-connect-finish' },
+  ])
+    assert.deepEqual(await x.send(msg, SITE), UNKNOWN, JSON.stringify(msg));
+  const odd = await x.send({ type: 'oh-connect-begin', code: 'some-code' }, SITE);
+  assert.deepEqual(odd, { ok: false, error: 'bad request' });
+  assert.deepEqual(x.fetched, [], 'no token trade, no revoke');
+  assert.deepEqual(x.stores.local.siteLink, { token: 'oht_mine', name: 'Me' }, 'the link stays');
+  assert.equal(x.stores.local.siteSyncRequested, undefined, 'no sync asked');
+  // Nor through Firefox's bridge (whose own list doesn't pass it on: test/bridge-v2.test.js).
+  const ff = loadFirefox();
+  assert.deepEqual(
+    await ff.fromPage({ type: 'oh-connect-finish', code: 'c', sync: true }, `${SITE}/link`),
+    UNKNOWN,
+  );
+  assert.equal(ff.stores.local.siteLink, undefined);
+});
+
+test('other websites, and the public front page, get no Connect', async () => {
   const x = load();
   assert.equal(await x.send({ type: 'oh-hello' }, 'https://evil.example'), undefined);
-  const lone = await x.send({ type: 'oh-connect-finish', code: 'c' }, SITE);
-  assert.equal(lone.ok, false);
-  await x.send({ type: 'oh-connect-begin' }, SITE);
-  const cross = await x.send(
-    { type: 'oh-connect-finish', code: 'c' },
-    'https://app.openhangar.space',
-  );
-  assert.equal(cross.ok, false);
-  assert.equal(x.fetched.length, 0);
-  assert.equal(x.stores.local.siteLink, undefined);
+  assert.equal(await x.send({ type: 'oh-connect-begin' }, 'https://evil.example'), undefined);
+  assert.deepEqual(await x.send({ type: 'oh-connect-begin' }, 'https://openhangar.space'), UNKNOWN);
+  assert.deepEqual(x.opened, []);
+});
+
+test("a developer's build without the connector connects from its own dashboard only", async () => {
+  const dash = load({ flags: { ...STORE_FLAGS, connector: false } });
+  const begin = await dash.send({ type: 'oh-connect-begin' }, SITE);
+  assert.equal(begin.ok, false);
+  assert.deepEqual(dash.opened, []);
 });
 
 // The beta build (npm run build:beta) leaves staging out of the manifest, so the
@@ -129,19 +152,17 @@ test('a build without staging in the manifest connects to production only', asyn
 // Firefox (#434): no externally_connectable; src/site-bridge.js, a content script on
 // our own site only, passes the page's messages on, and the browser says which page
 // it ran in. The first Connect waits for Firefox's own yes, asked from the basic page.
-const loadFirefox = ({ granted = true } = {}) => load({ browser: 'firefox', granted });
+function loadFirefox({ granted = true, browser = 'firefox' } = {}) {
+  return load({ browser, granted });
+}
 
-test('firefox: our site connects through the bridge, with Firefox’s own redirect', async () => {
+test('firefox: our site asks through the bridge, and the basic page connects', async () => {
   const x = loadFirefox();
   assert.deepEqual(await x.fromPage({ type: 'oh-hello' }, `${SITE}/link`), HELLO_APP);
   const begin = await x.fromPage({ type: 'oh-connect-begin' }, `${SITE}/link`);
-  assert.ok(begin.ok);
-  assert.equal(begin.redirect_uri, 'https://abc123.extensions.allizom.org/');
-  const done = await x.fromPage(
-    { type: 'oh-connect-finish', code: 'c', sync: true },
-    `${SITE}/link`,
-  );
-  assert.deepEqual(done, { ok: true, name: 'ExamplePilot' });
+  assert.deepEqual(begin, { ok: true, window: true });
+  assert.deepEqual(x.opened, ['moz-extension://uuid/src/basic.html#settings']);
+  assert.ok(x.stores.session.siteConnectAsk);
 });
 
 test('firefox: only our own content script on our own site gets an answer', async () => {
@@ -171,10 +192,126 @@ test("firefox: before Firefox says yes, Connect opens the basic page's settings 
   const x = loadFirefox({ granted: false });
   const begin = await x.fromPage({ type: 'oh-connect-begin' }, `${SITE}/link`);
   assert.deepEqual(begin, { ok: false, firefoxAsk: true });
-  // The basic page's Firefox card (ui/basic/FirefoxCard.svelte) shows on any of its tabs.
+  // The basic page's Firefox card (ui/basic/FirefoxCard.svelte) shows on any of its tabs;
+  // its Continue runs the same sign-in window.
   assert.deepEqual(x.opened, ['moz-extension://uuid/src/basic.html#settings']);
   assert.ok(x.stores.session.siteAskFirefox);
-  assert.equal(x.stores.session.siteConnect, undefined);
+  assert.equal(x.stores.session.siteConnectAsk, undefined);
+});
+
+test('firefox for android: no sign-in window, so no Connect from the website', async () => {
+  const x = loadFirefox({ browser: 'firefox-android' });
+  const begin = await x.fromPage({ type: 'oh-connect-begin' }, `${SITE}/link`);
+  assert.equal(begin.ok, false);
+  assert.deepEqual(x.opened, []);
+});
+
+// --- The sign-in window (ui/basic/sign-in.js), with a stand-in identity API ----------
+const signIn = () => import('../ui/basic/sign-in.js');
+const REDIRECT = `https://${CHROME_ID}.chromiumapp.org/`;
+// answer: what the window comes back with, as /connect would send it (by default the
+// code, this window's state and the first sync, on the extension's own address).
+function fakeIdentity({ approve = true, redirect = REDIRECT, answer } = {}) {
+  const asked = [];
+  return {
+    asked,
+    getRedirectURL: () => redirect,
+    launchWebAuthFlow: async ({ url, interactive }) => {
+      asked.push({ url: new URL(url), interactive });
+      if (!approve) throw new Error('The user did not approve access.');
+      const state = new URL(url).searchParams.get('state');
+      return answer ? answer(state) : `${redirect}?code=one-time&state=${state}&sync=1`;
+    },
+  };
+}
+function fakeFetch(body = { token: 'oht_new', name: 'Pilot' }, ok = true) {
+  const calls = [];
+  const fetch = async (url, init) => {
+    calls.push({ url, body: JSON.parse(init.body), credentials: init.credentials });
+    return { ok, json: async () => body };
+  };
+  return { fetch, calls };
+}
+const b64 = (buf) => Buffer.from(buf).toString('base64url');
+
+test('the sign-in window: /connect with S256, then the code traded with the verifier', async () => {
+  const { signInWindow } = await signIn();
+  const identity = fakeIdentity();
+  const net = fakeFetch();
+  const got = await signInWindow({ base: SITE, identity, fetch: net.fetch });
+  assert.equal(got.link.token, 'oht_new');
+  assert.equal(got.link.name, 'Pilot');
+  assert.equal(got.sync, true, "/connect's first sync");
+  const { url, interactive } = identity.asked[0];
+  assert.equal(interactive, true);
+  assert.equal(url.origin + url.pathname, `${SITE}/connect`);
+  assert.equal(url.searchParams.get('code_challenge_method'), 'S256');
+  assert.equal(url.searchParams.get('redirect_uri'), REDIRECT);
+  assert.equal(net.calls.length, 1);
+  assert.equal(net.calls[0].url, `${SITE}/api/link/token`);
+  assert.equal(net.calls[0].credentials, 'omit');
+  assert.equal(net.calls[0].body.code, 'one-time');
+  assert.equal(net.calls[0].body.redirect_uri, REDIRECT);
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(net.calls[0].body.code_verifier),
+  );
+  assert.equal(b64(digest), url.searchParams.get('code_challenge'));
+});
+
+test("the sign-in window on Firefox: Firefox's own address", async () => {
+  const { signInWindow } = await signIn();
+  const redirect = 'https://abc123.extensions.allizom.org/';
+  const net = fakeFetch();
+  const identity = fakeIdentity({ redirect });
+  const got = await signInWindow({ base: SITE, identity, fetch: net.fetch });
+  assert.equal(got.link.token, 'oht_new');
+  assert.equal(net.calls[0].body.redirect_uri, redirect);
+});
+
+test('the sign-in window: closed, cancelled, crossed or failed keeps nothing', async () => {
+  const { signInWindow } = await signIn();
+  const net = fakeFetch();
+  const go = (identity, fetch = net.fetch) => signInWindow({ base: SITE, identity, fetch });
+  assert.deepEqual(await go(fakeIdentity({ approve: false })), { cancelled: true });
+  // Cancel on /connect.
+  const cancel = fakeIdentity({
+    answer: (state) => `${REDIRECT}?error=access_denied&state=${state}`,
+  });
+  assert.deepEqual(await go(cancel), { cancelled: true });
+  // Another window's state, or an address that isn't this extension's.
+  const crossed = fakeIdentity({ answer: () => `${REDIRECT}?code=c&state=other` });
+  assert.deepEqual(await go(crossed), { cancelled: true });
+  const elsewhere = fakeIdentity({
+    answer: (state) => `https://evil.example/?code=c&state=${state}`,
+  });
+  assert.deepEqual(await go(elsewhere), { cancelled: true });
+  assert.equal(net.calls.length, 0, 'no code traded');
+  // The trade refused, or no token in its answer.
+  assert.deepEqual(await go(fakeIdentity(), fakeFetch({}, false).fetch), { failed: true });
+  assert.deepEqual(await go(fakeIdentity(), fakeFetch({}).fetch), { failed: true });
+  // No window here (Firefox for Android): the caller uses the website's page.
+  assert.equal(await go({}), null);
+});
+
+// The whole Connect This Browser, as it runs: the website asks, the worker brings up
+// the basic page with the ask, and the basic page's window (here, the stand-in)
+// connects. The switch question is OH.siteSwitches (test/site-sync.test.js).
+test('Connect This Browser, end to end with a stand-in identity API', async () => {
+  const x = load({ staging: false });
+  const APP = 'https://app.openhangar.space';
+  assert.deepEqual(await x.send({ type: 'oh-connect-begin' }, APP), { ok: true, window: true });
+  const ask = x.stores.session.siteConnectAsk;
+  assert.ok(Date.now() - ask.at < 60e3);
+  const { signInWindow } = await signIn();
+  const net = fakeFetch();
+  const got = await signInWindow({ base: APP, identity: fakeIdentity(), fetch: net.fetch });
+  assert.deepEqual(
+    { token: got.link.token, name: got.link.name, sync: got.sync },
+    { token: 'oht_new', name: 'Pilot', sync: true },
+  );
+  assert.equal(net.calls[0].url, `${APP}/api/link/token`);
+  assert.deepEqual(x.fetched, [], 'the worker itself traded nothing');
 });
 
 // Connect with a code (src/dashboard.js siteConnect, when the sign-in window can't
@@ -232,4 +369,116 @@ test('firefox: the code page checks its code through the bridge', async () => {
   const ask = (code) => x.fromPage({ type: 'oh-link-check', code }, `${SITE}/link?code=${code}`);
   assert.deepEqual(await ask('K7Q-4PX'), { ok: true, mine: true });
   assert.deepEqual(await ask('ABC-DEF'), { ok: true, mine: false });
+});
+
+// --- No sign-in window (Firefox for Android, #764): a code from the basic page ---------
+// (ui/basic/link-code.js), with stand-ins for the website's start and poll.
+const linkCode = () => import('../ui/basic/link-code.js');
+function fakeCodeSite({ polls = [{ status: 'approved', token: 'oht_code', name: 'Pilot' }] } = {}) {
+  const asked = [];
+  const OH = {
+    siteLinkStart: async () => ({
+      device_code: 'dev-secret',
+      user_code: 'K7Q-4PX',
+      verification_uri: 'https://elsewhere.example/link',
+      expires_in: 600,
+      interval: 0.001,
+    }),
+    siteLinkWait: async (start, shouldGo, opts) => {
+      asked.push({ device_code: start.device_code, opts });
+      for (const j of polls) {
+        if (!shouldGo()) return null;
+        if (j.status === 'approved') return { token: j.token, name: j.name, lastSync: null };
+        if (j.status === 'expired') return null;
+      }
+      return null;
+    },
+  };
+  return { OH, asked };
+}
+function fakeSession() {
+  const store = {};
+  return {
+    store,
+    seen: [],
+    get: async (k) => (k in store ? { [k]: store[k] } : {}),
+    set: async function (o) {
+      this.seen.push(structuredClone(o));
+      Object.assign(store, o);
+    },
+    remove: async (k) => void delete store[k],
+  };
+}
+const codeRun = async ({ polls, shouldGo, identity } = {}) => {
+  const { connectLink } = await linkCode();
+  const site = fakeCodeSite({ polls });
+  const session = fakeSession();
+  const opened = [];
+  const shown = [];
+  const got = await connectLink({
+    base: SITE,
+    identity,
+    fetch: async () => assert.fail('no token trade without the window'),
+    OH: site.OH,
+    session,
+    open: (url) => opened.push(url),
+    show: (c) => shown.push(c),
+    shouldGo,
+  });
+  return { got, site, session, opened, shown };
+};
+
+test('no sign-in window: Connect starts a code and opens the website code page', async () => {
+  for (const identity of [undefined, {}, { getRedirectURL: () => REDIRECT }]) {
+    const { got, site, session, opened, shown } = await codeRun({ identity });
+    const page = `${SITE}/link?code=K7Q-4PX`;
+    assert.deepEqual(opened, [page], 'this site, never the address the answer names');
+    assert.deepEqual(shown, [{ code: 'K7Q-4PX', url: page }]);
+    // The page may fill in this code only (background.js oh-link-check), until it's done.
+    const pending = session.seen[0].siteLinkPending;
+    assert.deepEqual([pending.code, pending.origin], ['K7Q-4PX', SITE]);
+    assert.ok(pending.until > Date.now());
+    assert.equal(session.store.siteLinkPending, undefined, 'cleared once approved');
+    assert.ok(!JSON.stringify(session.seen).includes('dev-secret'), 'the device code stays');
+    // Approved: the token comes back unsaved, for the account-switch question first.
+    assert.deepEqual(site.asked, [{ device_code: 'dev-secret', opts: { save: false } }]);
+    assert.equal(got.link.token, 'oht_code');
+    assert.equal(got.sync, undefined);
+  }
+});
+
+test('the code: refused or run out reads as expired, Cancel as cancelled', async () => {
+  const expired = await codeRun({ polls: [{ status: 'pending' }, { status: 'expired' }] });
+  assert.deepEqual(expired.got, { expired: true });
+  assert.equal(expired.session.store.siteLinkPending, undefined);
+  const cancelled = await codeRun({ shouldGo: () => false });
+  assert.deepEqual(cancelled.got, { cancelled: true });
+  assert.equal(cancelled.session.store.siteLinkPending, undefined);
+});
+
+test('the code: a newer code waiting is left alone', async () => {
+  const { linkByCode } = await linkCode();
+  const site = fakeCodeSite();
+  const session = fakeSession();
+  site.OH.siteLinkWait = async () => {
+    session.store.siteLinkPending = { code: 'NEW-ONE' };
+    return null;
+  };
+  await linkByCode({ OH: site.OH, base: SITE, session, open() {}, show() {} });
+  assert.deepEqual(session.store.siteLinkPending, { code: 'NEW-ONE' });
+});
+
+test("the code's account: another account than the one connected still asks", async () => {
+  const lib = require('node:fs').readFileSync(require.resolve('../src/lib.js'), 'utf8');
+  const OH = {};
+  // OH.siteSwitches only (pure): the basic page's question before anything is replaced.
+  new Function('OH', lib.match(/OH\.siteSwitches = function[\s\S]*?\n {2}\};/)[0])(OH);
+  const { got } = await codeRun();
+  assert.equal(OH.siteSwitches({ token: 'oht_old', name: 'Other' }, got.link), true);
+  assert.equal(OH.siteSwitches({ token: 'oht_old', name: 'Pilot' }, got.link), false);
+  assert.equal(OH.siteSwitches(null, got.link), false);
+  // ./hub.svelte.js takes Connect's link through that question, whichever way it came.
+  const hub = require('node:fs').readFileSync(require.resolve('../ui/basic/hub.svelte.js'), 'utf8');
+  assert.match(hub, /await connectLink\(/);
+  assert.match(hub, /got\.expired[\s\S]*OH\.siteSwitches\(was, link\)/);
 });

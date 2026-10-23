@@ -114,55 +114,6 @@ body {
 .pp-age.run i {
   background: var(--accent);
 }
-.pp-bell,
-.pp-back {
-  position: relative;
-  flex: none;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  border: 0;
-  background: none;
-  color: var(--text-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 0;
-}
-.pp-bell:hover,
-.pp-back:hover {
-  background: var(--lift-2);
-}
-.pp-bell.on {
-  margin-left: auto;
-  background: var(--accent-soft);
-  color: var(--link);
-  cursor: default;
-}
-.pp-back {
-  font-size: 22px;
-  line-height: 1;
-  color: var(--muted);
-  margin-left: -8px;
-}
-.pp-n {
-  position: absolute;
-  right: 0;
-  top: 0;
-  min-width: 15px;
-  height: 15px;
-  box-sizing: border-box;
-  border-radius: 8px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 3px;
-}
 /* The scan's progress, under the header. */
 .pp-bar {
   height: 3px;
@@ -267,6 +218,23 @@ body {
 .pp-tabs button:hover {
   color: var(--text);
 }
+/* The Wishlist tab's count: its Remind Me items on sale now. */
+.pp-tabs button .pp-tn {
+  display: inline-block;
+  margin-left: 5px;
+  vertical-align: 1px;
+  min-width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  padding: 0 4px;
+  background: var(--good-soft);
+  color: var(--good);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+}
 /* Something to look at in Settings (a sync that didn't go through). */
 .pp-tabs button.dot span::after {
   content: '';
@@ -289,9 +257,6 @@ body {
   gap: 10px;
   padding: 12px 16px 14px;
 }
-.pp-alerts {
-  border-top: 1px solid var(--line);
-}
 .first .pp-first,
 .pp-empty {
   align-items: center;
@@ -309,7 +274,8 @@ body {
   padding: 10px 2px 6px;
 }
 .pp-first .pp-btn,
-.pp-empty .pp-btn {
+.pp-empty .pp-btn,
+.pp-first .pp-sbar {
   align-self: stretch;
 }
 .pp-big-ic {
@@ -427,9 +393,19 @@ body {
 .pp-since {
   color: var(--muted);
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .pp-since.up {
   color: var(--good);
+}
+.pp-big,
+.pp-tile b {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .pp-big {
   font-family: var(--font-head);
@@ -594,6 +570,69 @@ body {
 .pp-step.todo {
   color: var(--muted);
 }
+/* The scan bar (the scanBar flag, owner 2026-10-20): the soft fill, 28 px, where Scan
+   sits (ui/popup/Hangar.svelte). The fill eases between the scan's writes (about two a
+   second), so it moves smoothly; done, it's full and soft green; a note fills none. */
+.pp-sbar {
+  position: relative;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--line-2);
+  background: var(--lift-2);
+  overflow: hidden;
+  font-size: 12.5px;
+}
+.pp-sbar i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: var(--accent-soft);
+  border-right: 2px solid var(--accent);
+  transition: width 0.6s linear;
+}
+.pp-sbar i.wait {
+  width: 30%;
+  border-right: 0;
+  animation: pp-wait 1.4s ease-in-out infinite;
+}
+.pp-sbar.done i {
+  width: 100%;
+  border-right: 0;
+  background: color-mix(in srgb, var(--good) 14%, transparent);
+}
+.pp-sbar.note i {
+  display: none;
+}
+.pp-sbar-t {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pp-sbar-t > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pp-sbar.done .pp-sbar-t,
+.pp-sbar.note .pp-sbar-t {
+  justify-content: center;
+}
+.pp-sbar-n {
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-sbar i {
+    transition: none;
+  }
+  .pp-sbar i.wait {
+    animation: none;
+  }
+}
 .pp-done {
   margin: 0;
   display: flex;
@@ -671,14 +710,6 @@ body {
   display: flex;
   gap: 8px;
 }
-/* The three data buttons: one row, wrapping on a narrow screen. */
-.pp-three {
-  flex-wrap: wrap;
-}
-.pp-three .pp-btn2 {
-  flex: 1 1 30%;
-  white-space: nowrap;
-}
 .pp-link {
   font: inherit;
   padding: 0;
@@ -705,8 +736,7 @@ body {
   text-decoration: none;
 }
 
-/* Alerts and the Wishlist. */
-.pp-alist,
+/* The Wishlist. */
 .pp-wlist {
   list-style: none;
   margin: 0;
@@ -715,7 +745,6 @@ body {
   flex-direction: column;
   gap: 2px;
 }
-.pp-arow,
 .pp-wlist li {
   display: flex;
   align-items: center;
@@ -729,94 +758,6 @@ body {
   border-radius: 8px;
   background: none;
   color: var(--text);
-}
-.pp-arow {
-  cursor: pointer;
-}
-.pp-arow:hover {
-  background: var(--lift-2);
-}
-.pp-arow.fresh small {
-  color: var(--good);
-}
-.pp-alist.old .pp-arow {
-  opacity: 0.8;
-}
-/* The bell's list (#699): compact rows, the name and the why on one line each; past
-   three alerts it scrolls in a fixed height with a scroll bar that shows. */
-.pp-ascroll {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.pp-ascroll.many {
-  max-height: 168px;
-  overflow-y: scroll;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--muted) transparent;
-  padding: 0 8px;
-  margin: 0 -8px;
-  border-radius: 8px;
-}
-.phone .pp-ascroll.many {
-  max-height: none;
-  overflow: visible;
-}
-.pp-ascroll.many:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-.pp-alerts .pp-arow {
-  padding: 4px 8px;
-  min-width: 0;
-}
-/* Each alert's × (#701), and Clear All above the list. */
-.pp-ali {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-.pp-ali .pp-arow {
-  margin-right: 0;
-  width: auto;
-  flex: 1;
-}
-.pp-adel {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-  color: var(--muted);
-  cursor: pointer;
-}
-.pp-adel:hover,
-.pp-adel:focus-visible {
-  background: var(--lift-2);
-  color: var(--head);
-}
-.phone .pp-adel {
-  width: 44px;
-  height: 44px;
-}
-.pp-atop {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: -6px;
-}
-.pp-atop .pp-link.quiet {
-  font-size: 12px;
-}
-.pp-alerts .pp-aname,
-.pp-alerts .pp-atext small {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .pp-wlist small.sale {
   color: var(--good);
@@ -930,6 +871,23 @@ body {
 }
 /* Remind Me (the website's wishlist_remind): a small track and knob beside the ✕; on,
    the track takes the accent. Its words are its title and screen reader name. */
+/* The Remind Me column's label over the switches: centred on them (the ✕ after
+   each, 28px, and the 10px gap, so its middle sits 56px from the right). */
+.pp-whead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.pp-wremind {
+  flex: none;
+  width: 76px;
+  margin-right: 18px;
+  text-align: center;
+}
+.phone .pp-wremind {
+  margin-right: 34px;
+}
 .pp-wsw {
   flex: none;
   display: grid;
@@ -1033,6 +991,164 @@ body {
 .pp-grow {
   flex: 1;
   min-width: 0;
+}
+/* Two switches on one row (Settings.svelte). Notifications waits on Store Alerts, so its
+   name dims with its switch. */
+.pp-two .pp-gap {
+  margin-left: 6px;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
+.pp-two .pp-gap.off {
+  color: var(--faint);
+}
+/* Sync Now the main button, Disconnect a quiet link beside it; a switch with its status
+   line under it. */
+.pp-syncrow {
+  gap: 14px;
+}
+.pp-btn2.main {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.pp-btn2.main:hover {
+  border-color: var(--accent-hover);
+}
+.pp-syncrow .pp-link.quiet {
+  flex: none;
+  margin-left: 0;
+  font-size: 13px;
+}
+.pp-sub {
+  gap: 2px;
+}
+.pp-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pp-sub .pp-msg {
+  margin: 0;
+  font-size: 12px;
+}
+/* Look, Currency and Shortcut as list rows (owner, 2026-10-24): the name, then the value
+   in muted text with a ▾ (a real select, restyled), or a › where the value opens the
+   browser's shortcuts page. */
+.pp-li {
+  cursor: pointer;
+}
+.pp-pick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  max-width: 62%;
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+}
+.pp-pick::after {
+  content: '▾' / '';
+  position: absolute;
+  right: 0;
+  font-size: 11px;
+  pointer-events: none;
+}
+.pp-pick .pp-sel {
+  appearance: none;
+  max-width: 100%;
+  padding: 0 14px 0 0;
+  color: inherit;
+  text-align: right;
+  text-align-last: right;
+  text-overflow: ellipsis;
+}
+.pp-pick.go {
+  padding: 0 14px 0 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pp-pick.go::after {
+  content: '›' / '';
+  font-size: 15px;
+}
+.pp-pick.fixed {
+  white-space: nowrap;
+}
+.pp-pick.fixed::after {
+  content: none;
+}
+.pp-li:hover .pp-pick {
+  color: var(--text);
+}
+.pp-pick.fixed,
+.pp-li:has(.fixed) {
+  cursor: default;
+}
+.pp-li:has(.fixed):hover .pp-pick {
+  color: var(--muted);
+}
+/* Export and Log Out of RSI, the same width. */
+.pp-data {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+/* The Export menu: it opens upwards over the rows above (the tab ends just below it). */
+.pp-menu {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+.pp-menu .pp-btn2::after {
+  content: ' ▾' / '';
+  color: var(--muted);
+  font-size: 11px;
+}
+.pp-mlist {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 4px);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 100%;
+  padding: 4px;
+  box-sizing: border-box;
+  background: var(--lift);
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.pp-mlist button {
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+.pp-mlist button:hover,
+.pp-mlist button:focus-visible {
+  background: var(--accent-soft);
+}
+/* Clear Data on its own line at the bottom. */
+.pp-end {
+  display: flex;
+  justify-content: center;
+  font-size: 13px;
+}
+.pp-link.bad {
+  color: var(--bad);
+}
+.pp-link.bad:disabled {
+  color: var(--faint);
 }
 .pp-val {
   margin-left: auto;
@@ -1203,12 +1319,10 @@ html.phone body {
 }
 .phone .pp-item,
 .phone .pp-r,
-.phone .pp-arow,
 .phone .pp-wlist li {
   min-height: 48px;
   box-sizing: border-box;
 }
-.phone .pp-arow,
 .phone .pp-wlist li {
   box-sizing: content-box;
 }
@@ -1224,9 +1338,4 @@ html.phone body {
 }
 .phone .pp-wx {
   width: 44px;
-}
-.phone .pp-bell,
-.phone .pp-back {
-  width: 44px;
-  height: 44px;
 }

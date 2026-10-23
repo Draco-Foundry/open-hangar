@@ -262,7 +262,7 @@
         >
       </div>
     </div>
-    <a class="cbtn" href={OH().RSI_CART_URL} target="_blank" rel="noopener">Open RSI Cart ↗</a>
+    <a class="cbtn" href={OH().RSI_CART_URL} target="_blank" rel="noopener">Open RSI Cart</a>
     {#if kind === 'upgrade'}<p class="fine">Changed your mind? Remove it from your RSI cart.</p>{/if}
   {:else}
     {#if note}
@@ -271,10 +271,10 @@
         <div><b>{note.title}</b><span>{note.text}</span></div>
       </div>
       {#if error.kind === 'signed-out'}
-        <a class="cbtn ghost" href={RSI_SIGN_IN} target="_blank" rel="noopener">Log In to RSI ↗</a>
+        <a class="cbtn ghost" href={RSI_SIGN_IN} target="_blank" rel="noopener">Log In to RSI</a>
       {:else if error.kind === 'cart-conflict' || (error.kind === 'network' && error.when === 'add')}
         <a class="cbtn ghost" href={OH().RSI_CART_URL} target="_blank" rel="noopener"
-          >Open RSI Cart ↗</a
+          >Open RSI Cart</a
         >
       {/if}
     {/if}

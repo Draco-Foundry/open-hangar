@@ -48,7 +48,7 @@
     let trend = '';
     if (prev30 > 0) {
       const pct = Math.round(((last30 - prev30) / prev30) * 100);
-      trend = pct === 0 ? '→ flat' : pct > 0 ? `↑ ${pct}%` : `↓ ${Math.abs(pct)}%`;
+      trend = pct === 0 ? 'Flat' : pct > 0 ? `Up ${pct}%` : `Down ${Math.abs(pct)}%`;
     } else if (last30 > 0) {
       trend = '↑ new';
     }

@@ -28,10 +28,11 @@ export const LINES = [
   'bad',
   'out-partway',
   'partway',
+  'rsi-down',
 ];
 // The lines that ask for a scan (ui/popup/data.js autoAsk), and a day skipped.
 export const ASKS = ['bad', 'out-partway', 'partway'];
-const SKIPS = ['signed-out', 'other', 'paused'];
+const SKIPS = ['signed-out', 'other', 'paused', 'rsi-down'];
 
 const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
 const lc = (s) =>
@@ -51,12 +52,19 @@ const trusted = (scanFull, db, p) =>
 // oldest one a week old (or in the future: the clock went back). `paused`: the parts
 // the status file pauses (a Set of PARTS ids). `owed`: a sync that never went out (the
 // policy's "nothing new stops there and sends nothing": a quick check never sends one,
-// so a run that owes one reads in full and sends it at its end).
-export function fullDue(scanFull, db, paused = new Set(), now = Date.now(), { owed = false } = {}) {
+// so a run that owes one reads in full and sends it at its end). `stale`: the parts an
+// older parser read (OH.parserStale, #728): due like any part whose read doesn't stand.
+export function fullDue(
+  scanFull,
+  db,
+  paused = new Set(),
+  now = Date.now(),
+  { owed = false, stale = new Set() } = {},
+) {
   if (owed) return true;
   const parts = PARTS.filter((p) => !paused.has(p));
   if (!parts.length) return false;
-  if (parts.some((p) => !trusted(scanFull, db, p))) return true;
+  if (parts.some((p) => stale.has(p) || !trusted(scanFull, db, p))) return true;
   const oldest = Math.min(...parts.map((p) => scanFull[p]));
   return now - oldest >= WEEK || now < oldest;
 }
@@ -153,14 +161,26 @@ export function connectedPilot(handle, answer, profiles = []) {
 }
 
 // The record a run leaves (local autoScan, replaced whole): { v, at, ended, line, run,
-// startedAt, fails, retryAt, syncTried }. A run with no line of its own (RSI didn't
-// answer, say) keeps the last one's line and its time. So does a day skipped (signed
-// out, another account, paused) after a run that asks for a scan, until a scan saves
-// since that run (`savedAt`: the hangar's saved scan time now, as ui/popup/data.js
-// autoAsk compares it with `ended`).
+// startedAt, fails, retryAt, syncTried, pageChanged }. pageChanged: the part (PARTS) whose
+// page no longer fit the parser rules this run (src/lib.js scanHtmlSource), else null. A
+// run with no line of its own (RSI didn't answer, say) keeps the last one's line and its
+// time. So does a day skipped (signed out, another account, paused) after a run that
+// asks for a scan, until a scan saves since that run (`savedAt`: the hangar's saved scan
+// time now, as ui/popup/data.js autoAsk compares it with `ended`).
 export function record(
   was,
-  { at, ended, line = null, run = null, startedAt = null, fails, retryAt, syncTried, savedAt },
+  {
+    at,
+    ended,
+    line = null,
+    run = null,
+    startedAt = null,
+    fails,
+    retryAt,
+    syncTried,
+    savedAt,
+    pageChanged = null,
+  },
 ) {
   const prev = isObj(was) && was.v === 1 ? was : null;
   const asks = ASKS.includes(prev?.line) && !(savedAt > prev.ended);
@@ -175,5 +195,6 @@ export function record(
     fails,
     retryAt,
     syncTried: syncTried === undefined ? (prev?.syncTried ?? null) : syncTried,
+    pageChanged: PARTS.includes(pageChanged) ? pageChanged : null,
   };
 }

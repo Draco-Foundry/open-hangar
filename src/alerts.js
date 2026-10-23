@@ -11,14 +11,16 @@
  *     in those keys, so it's skipped here with no rule of its own, from the next check;
  *   - the hangar and buy-backs this browser scanned, which never leave it, by the
  *     owner's rules (2026-10-10):
- *       buyback  a ship in your buy-backs is in the store again
- *       paint    a ship you own gets a paint that just arrived in the store
+ *       paint    a ship you own, still on its default paint, gets a paint that just
+ *                arrived in the store
  *       warbond  a ship you own is sold as a warbond edition
  *       limited  a ship you own is back on a limited-time sale
- * Each match says why. The badge counts the items with a match you haven't seen (the
- * popup lists them, and opening it marks them seen); a match that's new gets one
- * notification while Notifications are allowed (an optional permission, asked when you
- * turn alerts on). Not connected: the hangar rules only.
+ * Each match says why. Only the Wishlist's (Remind Me items on sale) take the toolbar
+ * badge, the Wishlist items you haven't seen (opening the popup marks them seen; its
+ * Wishlist tab counts them), and a notification when new, while Notifications are
+ * allowed (an optional permission, asked from the Notifications switch's click). The
+ * hangar's show only in the popup's Fleet News (the owner, 2026-10-23). Alerts are on
+ * only while this browser is connected: not connected, they turn off (connectedOnly).
  *
  * Polite (docs/dev/requests.md): a check at most every 30 minutes, 30 to 35 apart (an
  * alarm, with jitter); the feed asked with its ETag; Retry-After honored; after a
@@ -33,7 +35,12 @@
  */
 (function (root) {
   // ---- Storage keys ----
-  const ON_KEY = 'alertsOn'; // true once the pilot turns alerts on (off by default)
+  // Not a switch the pilot flips: on once Remind Me is turned on for a Wishlist item in the
+  // popup (ui/popup/wishlist.js alertsFor), off again when no item has Remind Me (there,
+  // or here, when the Wishlist read finds none). On only while this browser is connected:
+  // a check that finds no connection, or can't read the Wishlist (Firefox without its
+  // data yes), turns it off. Off by default.
+  const ON_KEY = 'alertsOn';
   const STATE_KEY = 'alerts'; // the matches, and which the pilot has seen
   const FEED_KEY = 'alertsFeed'; // the last good sale feed, its ETag and when to ask again
   const WISH_KEY = 'alertsWish'; // the account's Wishlist keys, for the connection
@@ -84,9 +91,6 @@
     // Why an item is an alert, one line each:
     // On the pilot's account Wishlist (only while this browser is connected).
     'alerts.why.wishlist': 'On your Wishlist',
-    // A ship in your buy-backs is sold in the store again. Mustn't promise RSI will
-    // sell the buy-back back (its own rules apply: tokens, store credit).
-    'alerts.why.buyback': 'In your buy-backs, now in the store: {ship}',
     // A paint for a ship you own arrived in the store in the last week (our own
     // record of the store). Never "new", "first" or "never sold before".
     'alerts.why.paint': 'In the store in the last 7 days: paint for your {ship}',
@@ -122,6 +126,30 @@
       .replace(/[‘’'"“”]/g, '')
       .replace(/[^a-z0-9]+/g, ' ')
       .trim();
+
+  // RSI's renames (the parser rules' `aliases`, src/data/parser-rules.json): a folded
+  // name → the other names it has gone by, old or current. A name is looked up as it is,
+  // then as each of those: exact names only, never a guess. The website keeps the same
+  // list. The rules load wherever alerts do (the worker, the popup, the basic page).
+  if (!root.OHRules && typeof require === 'function') require('./parser-rules.js');
+  const RULES = root.OHRules;
+  const ALIASES = new Map();
+  for (const a of RULES.aliases) {
+    const [o, n] = [nameKey(a.old), nameKey(a.now)];
+    if (!o || !n || o === n) continue;
+    for (const [k, other] of [
+      [o, n],
+      [n, o],
+    ]) {
+      if (!ALIASES.has(k)) ALIASES.set(k, []);
+      if (!ALIASES.get(k).includes(other)) ALIASES.get(k).push(other);
+    }
+  }
+  // A name's folded keys to look up: its own first, then its other names.
+  const keysOf = (s) => {
+    const k = nameKey(s);
+    return k ? [k, ...(ALIASES.get(k) || [])] : [];
+  };
 
   // A buy-back's title as the ship it gives back: RSI's store label in front and its
   // insurance and edition words behind off ("Standalone Ships - Cutlass Black - LTI",
@@ -223,12 +251,16 @@
       for (const k of s.keys)
         owners.set(k, owners.has(k) && owners.get(k) !== s.slug ? null : s.slug);
     const names = new Map(feed.ships.map((s) => [s.slug, s.name]));
+    const look = (s) =>
+      keysOf(s)
+        .map((k) => owners.get(k))
+        .find(Boolean) || null;
     const find = (label) => {
-      const full = nameKey(label);
-      if (owners.get(full)) return owners.get(full);
+      const full = look(label);
+      if (full) return full;
       // RSI's tag after a dash ("MISC RAPTOR - Referral Reward"): the name before it.
       const dash = /^(.+?)\s+[-–]\s+[^-–]+$/.exec(String(label || '').trim());
-      return (dash && owners.get(nameKey(dash[1]))) || null;
+      return (dash && look(dash[1])) || null;
     };
     return { find, name: (slug) => names.get(slug) || slug };
   }
@@ -282,12 +314,23 @@
   function ownedPaints(db) {
     const out = new Set();
     for (const p of items(db, 'hangar')) {
-      if (p.isPaint && typeof p.name === 'string') out.add(paintKey(p.name));
+      // Each under its other names too (RSI's renames), so the store's name finds it.
+      const add = (s) => keysOf(s).forEach((k) => out.add(paintKey(k)));
+      if (p.isPaint && typeof p.name === 'string') add(p.name);
       for (const c of Array.isArray(p.contents) ? p.contents : [])
         if (isObj(c) && typeof c.label === 'string' && PAINT_KIND.test(String(c.kind || '').trim()))
-          out.add(paintKey(c.label));
+          add(c.label);
     }
     out.delete('');
+    return out;
+  }
+
+  // The ships you own a paint for: the store's paint items you own (by name), their ships.
+  function paintedShips(feed, paints) {
+    const out = new Set();
+    for (const item of feed.items)
+      if (item.kind === 'paint' && paints.has(paintKey(item.name)))
+        for (const s of item.ships) out.add(s);
     return out;
   }
 
@@ -306,19 +349,19 @@
   function matchAll(feed, db, wish) {
     const index = shipIndex(feed);
     const owned = ownedShips(db, index);
-    const backs = buybackShips(db, index);
     const paints = ownedPaints(db);
+    const painted = paintedShips(feed, paints);
     const wished = wish ? new Set(wish) : null;
     const out = [];
     for (const item of feed.items) {
       const why = [];
-      if (wished && wishKeysOf(item).some((k) => wished.has(k)))
-        why.push({ why: 'wishlist', ships: [] });
+      // The Wishlist keys it answers to, so the badge counts Wishlist items (a ship sold in
+      // two editions is one), as the popup's Wishlist tab does.
+      const keys = wished ? wishKeysOf(item).filter((k) => wished.has(k)) : [];
+      if (keys.length) why.push({ why: 'wishlist', ships: [], keys });
       const ship = item.kind === 'ship' || item.kind === 'vehicle';
       const mine = (from) => item.ships.filter((s) => from.has(s)).map((s) => index.name(s));
       if (ship) {
-        const bb = mine(backs);
-        if (bb.length) why.push({ why: 'buyback', ships: bb });
         const own = mine(owned);
         if (own.length && item.sale.includes('warbond')) why.push({ why: 'warbond', ships: own });
         if (own.length && item.sale.includes('limited')) why.push({ why: 'limited', ships: own });
@@ -327,7 +370,10 @@
         (item.sale.includes('listed') || item.sale.includes('back')) &&
         !paints.has(paintKey(item.name))
       ) {
-        const own = mine(owned);
+        // Only ships still on their default paint: you own no paint for them yet.
+        const own = item.ships
+          .filter((s) => owned.has(s) && !painted.has(s))
+          .map((s) => index.name(s));
         if (own.length) why.push({ why: 'paint', ships: own });
       }
       if (why.length)
@@ -349,34 +395,48 @@
   // again. `known`: pairs matched so far (when first); `seen`: pairs the pilot has seen
   // (the popup opened); `gone`: pairs no longer matched (since when), forgotten after
   // GONE_KEEP_MS so a sale that comes back later alerts again, and a short gap (sold
-  // out between two reads) doesn't. `hidden`: pairs the pilot deleted in the popup (#701,
-  // since when): they stay out of the list and the badge, and are forgotten with the
-  // rest, so only something new (another reason, or the sale back after a day gone)
-  // shows the item again.
+  // out between two reads) doesn't. (`hidden`, the pairs deleted from the popup's old
+  // alerts list, #701, is dropped when read: those were marked seen too.)
   const pairsOf = (m) => m.why.map((w) => `${m.id}|${w.why}`);
-  const emptyState = () => ({ v: 1, items: [], known: {}, seen: {}, gone: {}, hidden: {} });
+  const emptyState = () => ({ v: 1, items: [], known: {}, seen: {}, gone: {} });
+  // Reasons that no longer exist (the buy-back alert, #695): saved ones are dropped here,
+  // so the list, the badge and the memory all lose them.
+  const RETIRED = new Set(['buyback']);
   function cleanState(s) {
     if (!isObj(s) || s.v !== 1) return emptyState();
     const map = (x) =>
-      isObj(x) ? Object.fromEntries(Object.entries(x).filter(([, v]) => Number.isFinite(v))) : {};
-    return {
-      ...s,
-      items: Array.isArray(s.items) ? s.items.filter(isObj) : [],
-      known: map(s.known),
-      seen: map(s.seen),
-      gone: map(s.gone),
-      hidden: map(s.hidden),
-    };
+      isObj(x)
+        ? Object.fromEntries(
+            Object.entries(x).filter(
+              ([k, v]) => Number.isFinite(v) && !RETIRED.has(k.slice(k.lastIndexOf('|') + 1)),
+            ),
+          )
+        : {};
+    const items = (Array.isArray(s.items) ? s.items.filter(isObj) : [])
+      .map((m) => ({
+        ...m,
+        why: (Array.isArray(m.why) ? m.why : []).filter((w) => !RETIRED.has(w?.why)),
+      }))
+      .filter((m) => m.why.length);
+    const { hidden, ...rest } = s;
+    return { ...rest, items, known: map(s.known), seen: map(s.seen), gone: map(s.gone) };
   }
-  // → { state, fresh }: fresh are the matches with a pair never matched before.
+  // Only a Remind Me item on sale (the Wishlist reason) takes the badge and a notification
+  // (the owner, 2026-10-23); the hangar's reasons show in the popup's Fleet News only.
+  const REMIND = 'wishlist';
+  const remindOnly = (m) => ({ ...m, why: m.why.filter((w) => w?.why === REMIND) });
+  // → { state, fresh, remind }: fresh are the matches with a pair never matched before;
+  // remind, those whose Wishlist pair is the new one (their notifications).
   function nextState(prev, matches, now) {
     const s = cleanState(prev);
     const live = new Set(matches.flatMap(pairsOf));
     const known = { ...s.known };
     const seen = { ...s.seen };
     const gone = { ...s.gone };
-    const hidden = { ...s.hidden };
     const fresh = matches.filter((m) => pairsOf(m).some((p) => !(p in known)));
+    const remind = fresh
+      .map(remindOnly)
+      .filter((m) => m.why.length && !(`${m.id}|${REMIND}` in known));
     for (const p of live) {
       if (!(p in known)) known[p] = now;
       delete gone[p];
@@ -388,7 +448,6 @@
         delete known[p];
         delete seen[p];
         delete gone[p];
-        delete hidden[p];
       }
     }
     const cap = (m) =>
@@ -404,35 +463,18 @@
         known: cap(known),
         seen: cap(seen),
         gone: cap(gone),
-        hidden: cap(hidden),
       },
       fresh,
+      remind,
     };
   }
-  // Items with a pair the pilot hasn't seen (or deleted): the badge's count.
+  // Items with a pair the pilot hasn't seen: Fleet News marks them.
   const unseen = (state) => {
     const s = cleanState(state);
-    return s.items.filter((m) => pairsOf(m).some((p) => !(p in s.seen) && !(p in s.hidden)));
+    return s.items.filter((m) => pairsOf(m).some((p) => !(p in s.seen)));
   };
-  // The items the popup lists: those with a pair the pilot hasn't deleted.
-  const shown = (state) => {
-    const s = cleanState(state);
-    return s.items.filter((m) => pairsOf(m).some((p) => !(p in s.hidden)));
-  };
-  // Deleted in the popup: one item's pairs (its ×), or every current one (Clear All).
-  // Deleted counts as seen too.
-  function hide(state, now, id = null) {
-    const s = cleanState(state);
-    const hidden = { ...s.hidden };
-    const seen = { ...s.seen };
-    for (const m of s.items)
-      if (id == null || m.id === id)
-        for (const p of pairsOf(m)) {
-          hidden[p] ??= now;
-          seen[p] ??= now;
-        }
-    return { ...s, hidden, seen };
-  }
+  // The items the popup's Fleet News picks from.
+  const shown = (state) => cleanState(state).items;
   // Every current pair seen (the popup opened), or one item's (its notification clicked).
   function markSeen(state, now, id = null) {
     const s = cleanState(state);
@@ -443,7 +485,7 @@
   }
 
   // ---- Words ----
-  const WHY_KEYS = { wishlist: 1, buyback: 1, paint: 1, warbond: 1, limited: 1 };
+  const WHY_KEYS = { wishlist: 1, paint: 1, warbond: 1, limited: 1 };
   const whyLine = (w) =>
     WHY_KEYS[w.why] ? t(`alerts.why.${w.why}`, { ship: (w.ships || []).join(', ') }) : '';
   const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -474,10 +516,19 @@
       });
     return out;
   }
-  // The toolbar badge while matches wait, or null (the rescan reminder's then).
+  // The toolbar badge while Remind Me items on sale wait unseen, or null (the rescan
+  // reminder's then): how many Wishlist items, each once.
   function badgeFor(on, state) {
     if (on !== true) return null;
-    const n = unseen(state).length;
+    const s = cleanState(state);
+    const items = new Set();
+    for (const m of s.items) {
+      const w = m.why.find((x) => x?.why === REMIND);
+      if (!w || `${m.id}|${REMIND}` in s.seen) continue;
+      const keys = Array.isArray(w.keys) && w.keys.length ? w.keys : [m.id];
+      for (const k of keys) items.add(k);
+    }
+    const n = items.size;
     if (!n) return null;
     return { text: n > 9 ? '9+' : String(n), title: t('alerts.badge-title', { n }) };
   }
@@ -593,6 +644,18 @@
     }
   }
 
+  // ---- On only while connected ----
+  // Alerts on in a browser that isn't connected (on from before they followed Remind Me,
+  // when nothing else could turn them off, or a disconnect while the worker slept): the
+  // change to store, or null. Stored values in, stored values out, written as literals
+  // (never ON_KEY), so it keeps saying the same thing whatever the constants become.
+  function connectedOnly(stored) {
+    if (!isObj(stored) || stored.alertsOn !== true) return null;
+    const link = stored.siteLink;
+    const linked = isObj(link) && typeof link.token === 'string' && link.token !== '';
+    return linked ? null : { alertsOn: false };
+  }
+
   // ---- A check ----
   // env: { get(keys), set(obj), remove(keys), fetch, now(), rand(), mayShare() (Firefox's
   // data yes, for the Wishlist read), notify(notes), badge(), schedule(at) }.
@@ -610,6 +673,12 @@
     ]);
     const now = env.now();
     if (s[ON_KEY] !== true) return { ran: false, why: 'off' };
+    // Not connected: off, which drops the matches and stops the checks (src/background.js).
+    const fix = connectedOnly(s);
+    if (fix) {
+      await env.set(fix);
+      return { ran: false, why: 'not-connected' };
+    }
     if (paused(s.remoteStatus)) {
       if (network) await env.schedule(nextAt(now, env.rand()));
       return { ran: false, why: 'paused' };
@@ -632,10 +701,23 @@
       feedRec = await freshFeed(env, feeds, feedRec, now);
       save[FEED_KEY] = feedRec;
       // Firefox asks before anything goes off the device: the sync token is sync's yes.
-      if (link && (await stillOn()) && (await env.mayShare())) {
+      // Without it the Wishlist can't be read, so nobody could tell whether Remind Me is
+      // on for anything: alerts go off (the public feed's record stays, as for any off).
+      if (link && (await stillOn())) {
+        if (!(await env.mayShare())) {
+          await env.set({ [ON_KEY]: false, [FEED_KEY]: feedRec });
+          return { ran: false, why: 'no-share' };
+        }
         wishRec = await freshWish(env, site, link, wishRec, now);
         save[WISH_KEY] = wishRec;
       }
+    }
+    // Alerts follow Remind Me: a connected Wishlist with it on for nothing means no alerts
+    // and no badge. The switch goes off (src/background.js clears the matches and stops
+    // the checks); the public feed's record stays, as for any off.
+    if (link && wishRec && Array.isArray(wishRec.keys) && !wishRec.keys.length) {
+      await env.set({ [ON_KEY]: false, ...(save[FEED_KEY] ? { [FEED_KEY]: save[FEED_KEY] } : {}) });
+      return { ran: false, why: 'no-remind' };
     }
     const feed = feedRec && feedRec.data ? readFeed(feedRec.data) : null;
     const wish =
@@ -644,7 +726,7 @@
     let state = null;
     if (feed) {
       const r = nextState(s[STATE_KEY], matchAll(feed, s.db, wish), now);
-      fresh = r.fresh;
+      fresh = r.remind;
       const was = isObj(s[STATE_KEY]) ? s[STATE_KEY].checkedAt : null;
       state = { ...r.state, checkedAt: network ? now : Number.isFinite(was) ? was : null };
       save[STATE_KEY] = state;
@@ -691,6 +773,7 @@
     COPY,
     t,
     nameKey,
+    keysOf,
     bareShipName,
     containsNames,
     readFeed,
@@ -704,7 +787,6 @@
     nextState,
     unseen,
     shown,
-    hide,
     markSeen,
     lines,
     notesFor,
@@ -712,6 +794,7 @@
     sitesOf,
     itemUrl,
     paused,
+    connectedOnly,
     retryAfterMs,
     backoffMs,
     nextAt,

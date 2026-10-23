@@ -40,7 +40,7 @@ current version, or go straight to a store:
 Then:
 
 1. Sign in to [RSI's Website](https://robertsspaceindustries.com/) in the same browser.
-2. Click the Open Hangar icon in your toolbar (or press Alt+Shift+H) to open the popup.
+2. Click the Open Hangar icon in your toolbar (or press Alt+Shift+O) to open the popup.
 3. Hit **Scan**, then **Open My Hangar** to see your whole hangar.
 
 Re-scan any time to refresh. On the Settings tab, **Clear Data** wipes the local copy,
@@ -126,6 +126,9 @@ Anything after launch is a plan, not a promise. The details are in the
 
 ## Recently Shipped
 
+- [x] **Oct 23, 2026 · 0.5.3:** Scan tells you in plain words when RSI isn't answering and
+      keeps your last scan, your Wishlist and alerts still match ships RSI renames, the popup
+      shows UEC and REC, and Connect uses Open Hangar's own sign-in window.
 - [x] **Oct 14, 2026 · 0.4.0 and 0.4.1:** a new toolbar popup with three tabs, Hangar,
       Wishlist and Settings, plus an alerts bell. Also: scans that run out of sight, Auto Scan
       Daily (optional), your Wishlist in the popup, your own currency and light mode.
@@ -158,12 +161,15 @@ Anything after launch is a plan, not a promise. The details are in the
 
 **In the Extension (0.4.1):**
 
-- **The Toolbar Popup:** three tabs, Hangar, Wishlist and Settings, plus an alerts bell
-  whose number matches the toolbar badge. The Hangar tab shows your RSI portrait and
-  handle, Account Value and how it changed since an earlier scan, Store Credit, Buy-Back
-  Tokens with the next refill, up to three Fleet News notes, and Scan.
+- **The Toolbar Popup:** three tabs, Hangar, Wishlist and Settings. The Wishlist tab
+  counts your Remind Me items on sale and lists what's on sale first, and the toolbar badge
+  counts the ones you haven't seen. The Hangar tab shows your RSI portrait and handle,
+  Account Value and how it changed since an earlier scan, Store Credit, UEC and REC at a
+  glance, Buy-Back Tokens with the next refill, up to three Fleet News notes, and Scan.
 - **Scans Out of Sight:** no scan tab. The scan runs in a hidden page, and closing the
   popup doesn't stop it.
+- **When RSI Has Trouble:** if RSI changes a page or stops answering, Scan stops, tells you
+  why in plain words and keeps your last scan.
 - **Your Whole Hangar:** Open My Hangar shows My Hangar on openhangar.space when you're
   connected, or hangar.openhangar.space when you're not.
 - **Store Alerts (Optional):** a badge and a notification when a ship in your buy-backs is
@@ -172,12 +178,12 @@ Anything after launch is a plan, not a promise. The details are in the
 - **Auto Scan Daily (Optional):** while you're connected to openhangar.space, Open Hangar
   can check your hangar once a day. Off until you turn it on.
 - **Your Wishlist:** while you're connected, search to add a ship, paint or upgrade, or
-  remove an item. Search runs on your device.
+  remove an item. Search runs on your device. Ships still match after RSI renames them.
 - **Add to RSI Cart:** put a ship upgrade (CCU) in your RSI cart in one click. You always
   check out on RSI yourself.
 - **Your Currency, Light Mode and a Shortcut:** amounts show in US dollars until you pick
   another currency in Settings. Look follows your browser, or pick Dark or Light.
-  Alt+Shift+H opens the popup.
+  Alt+Shift+O opens the popup (⌥⇧O on a Mac).
 - **Your Data, Your Way:** JSON Backup, Pledges CSV and Buy-Backs CSV on the Settings tab.
 
 **On [openhangar.space](https://openhangar.space/):**
@@ -235,6 +241,35 @@ npm run build
   **Load unpacked** and pick `dist/chrome`.
 - **Firefox (140+):** open `about:debugging`, then **This Firefox**, then **Load Temporary
   Add-on**, and pick `dist/firefox/manifest.json`.
+
+That's the store build. To work on the extension, run the developer's copy instead.
+
+</details>
+
+<details>
+<summary><strong>Run a Developer's Copy</strong></summary>
+
+A developer's copy runs in a browser profile of its own, so it never touches the Open
+Hangar you installed from a store or the hangar it saved:
+
+```bash
+npm run dev:chrome
+```
+
+`npm run dev:edge` and `npm run dev:firefox` do the same in Edge and Firefox. Each builds
+**Open Hangar (Dev)** (purple icons with a DEV tag) into `dist/dev/` or
+`dist/dev-firefox/` and opens the browser with a profile kept in `.dev-profiles/` (not
+committed), so you sign in to RSI there once. Close the browser or press Ctrl+C to stop.
+It syncs to staging.openhangar.space, never your real account on app.openhangar.space
+(add `--site=https://app.openhangar.space` to `dev:build` if you mean to). Staging lets in
+Firefox copies, and Chrome or Edge copies whose ids it has been told about.
+If the browser isn't where it usually is, set `CHROME_PATH`, `EDGE_PATH` or
+`FIREFOX_PATH`. Build flags: `npm run dev:build -- --flag name=on`, then
+`node scripts/dev-run.mjs chrome`.
+
+Don't load `dist/firefox` into the Firefox profile your store copy is in: it carries the
+store copy's add-on id, so Firefox puts it in the store copy's place, with its saved
+hangar. The developer's copy has its own id.
 
 </details>
 
@@ -377,7 +412,9 @@ To add a data source, see the [Contributing Guide](CONTRIBUTING.md).
 The most valuable help is keeping the RSI reader working when RSI updates its site. Start
 with the [Contributing Guide](CONTRIBUTING.md); the [Architecture Tour](ARCHITECTURE.md)
 shows how it all fits together in about ten minutes. This repo holds the extension's code,
-and website features are tracked here as issues too.
+and website features are tracked here as issues too. A change players will notice also
+adds a small file to [changelog.d/](changelog.d/README.md) instead of editing the
+changelog.
 
 ## Terms and Fair Use
 

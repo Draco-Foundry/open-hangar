@@ -32,10 +32,10 @@
         'account',
         'dossier',
         'referrals',
-        'subStore',
         'upgrade',
         'cart',
         'known',
+        'aliases',
       ],
       additionalProperties: false,
       properties: {
@@ -606,65 +606,6 @@
             pageSize: { $ref: '#/$defs/pageSize' },
           },
         },
-        subStore: {
-          description:
-            "The Subscriber Store's items for the signed-in account. The code adds the page and its size to variables.query (pageSize first; pageSizeMin when RSI refuses that).",
-          type: 'object',
-          required: ['path', 'operation', 'query', 'variables', 'pageSize', 'pageSizeMin'],
-          additionalProperties: false,
-          properties: {
-            path: { $ref: '#/$defs/path' },
-            operation: { $ref: '#/$defs/operation' },
-            query: { $ref: '#/$defs/document' },
-            variables: {
-              type: 'object',
-              required: ['storeFront', 'query'],
-              additionalProperties: false,
-              properties: {
-                storeFront: { type: 'string', pattern: '^[a-z][a-z0-9-]*$' },
-                query: {
-                  type: 'object',
-                  required: ['skus', 'sort'],
-                  additionalProperties: false,
-                  properties: {
-                    skus: {
-                      type: 'object',
-                      required: ['filtersFromTags', 'products'],
-                      additionalProperties: false,
-                      properties: {
-                        filtersFromTags: {
-                          type: 'object',
-                          required: ['tagIdentifiers', 'facetIdentifiers'],
-                          additionalProperties: false,
-                          properties: {
-                            tagIdentifiers: { $ref: '#/$defs/identifiers' },
-                            facetIdentifiers: { $ref: '#/$defs/identifiers' },
-                          },
-                        },
-                        products: {
-                          type: 'array',
-                          maxItems: 20,
-                          items: { type: 'integer', minimum: 0 },
-                        },
-                      },
-                    },
-                    sort: {
-                      type: 'object',
-                      required: ['field', 'direction'],
-                      additionalProperties: false,
-                      properties: {
-                        field: { type: 'string', pattern: '^[A-Za-z_]+$' },
-                        direction: { enum: ['asc', 'desc'] },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            pageSize: { $ref: '#/$defs/pageSize' },
-            pageSizeMin: { $ref: '#/$defs/pageSize' },
-          },
-        },
         upgrade: {
           description:
             "RSI's upgrade tool: the store list (every ship and the editions on sale), and Add to RSI Cart (src/rsi-cart.js): your ships and the mode (ships, app), which ships can upgrade to a SKU (filter), the price (price) and the add itself (add), each asked with the csrf token.",
@@ -885,6 +826,21 @@
             },
           },
         },
+        aliases: {
+          description:
+            'Names RSI changed: a ship or pledge once called `old` that RSI now lists as `now`. Matching by name (src/alerts.js) tries the name it has, then the other name of every entry that names it, both ways, so a scan from before a rename and one from after find the same ship. Exact names only, compared folded (src/alerts.js nameKey): never a guess. The website keeps the same list for its own matching.',
+          type: 'array',
+          maxItems: 500,
+          items: {
+            type: 'object',
+            required: ['old', 'now'],
+            additionalProperties: false,
+            properties: {
+              old: { type: 'string', minLength: 1, maxLength: 120 },
+              now: { type: 'string', minLength: 1, maxLength: 120 },
+            },
+          },
+        },
       },
       $defs: {
         pattern: {
@@ -982,7 +938,7 @@
     },
     rules: {
       format: 1,
-      revision: '2026-10-19',
+      revision: '2026-10-22',
       paging: {
         page: 'page',
         size: 'pagesize',
@@ -1184,27 +1140,6 @@
         campaigns: { current: '2', legacy: '1' },
         pageSize: 50,
       },
-      subStore: {
-        path: '/graphql',
-        operation: 'GetBrowseSkusByFilter',
-        query:
-          'query GetBrowseSkusByFilter($query: SearchQuery, $storeFront: String = "pledge") {\n  store(browse: true, name: $storeFront) {\n    listing: search(query: $query) {\n      resources {\n        id name title subtitle url type\n        media { thumbnail { storeSmall slideshow } }\n        nativePrice { amount discounted }\n        price { amount discounted }\n        stock { available unlimited show level }\n        tags { name }\n        ... on TySku { label isWarbond isPackage }\n      }\n      count\n      totalCount\n    }\n  }\n}',
-        variables: {
-          storeFront: 'pledge',
-          query: {
-            skus: {
-              filtersFromTags: {
-                tagIdentifiers: [],
-                facetIdentifiers: ['extras-subscribers-store'],
-              },
-              products: [65],
-            },
-            sort: { field: 'weight', direction: 'desc' },
-          },
-        },
-        pageSize: 100,
-        pageSizeMin: 20,
-      },
       upgrade: {
         path: '/pledge-store/api/upgrade/graphql',
         storeList: {
@@ -1313,6 +1248,7 @@
           hooks: ['js-label', 'js-open-ship-upgrades'],
         },
       },
+      aliases: [{ old: 'Phoenix Emerald', now: 'Constellation Mk IV Phoenix Emerald' }],
     },
   });
   root.OHParserRulesData = data;
