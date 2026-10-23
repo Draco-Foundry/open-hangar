@@ -299,17 +299,21 @@
       {/if}
       {#if ALERTS}
         <!-- Desktop notifications, the one opt-in left: alerts follow Remind Me. -->
-        <div class="pp-r" id="pp-alert-set">
-          <span class="pp-grow" id="pp-nt-l">{t('popup.notifications')}</span>
-          <button
-            type="button"
-            role="switch"
-            class="pp-sw"
-            id="pp-nt-sw"
-            aria-checked={notify}
-            aria-labelledby="pp-nt-l"
-            onclick={notifySwitch}><i></i></button
-          >
+        <div class="pp-r pp-col pp-sub" id="pp-alert-set">
+          <div class="pp-line">
+            <span class="pp-grow" id="pp-nt-l">{t('popup.notifications')}</span>
+            <button
+              type="button"
+              role="switch"
+              class="pp-sw"
+              id="pp-nt-sw"
+              aria-checked={notify}
+              aria-labelledby="pp-nt-l"
+              aria-describedby="pp-nt-hint"
+              onclick={notifySwitch}><i></i></button
+            >
+          </div>
+          <p class="pp-msg calm" id="pp-nt-hint">{t('popup.notifications-hint')}</p>
         </div>
       {/if}
     </div>

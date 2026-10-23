@@ -404,11 +404,12 @@ test('saved buy-back alerts clear out: items, memory, badge', () => {
     AL.shown(old).map((m) => [m.id, whys(m)]),
     [['sku-11', ['warbond']]],
   );
-  assert.equal(AL.badgeFor(true, old).text, '1');
+  // A hangar reason only: Fleet News, never the badge.
+  assert.equal(AL.badgeFor(true, old), null);
   const { state } = AL.nextState(old, [], NOW);
   assert.deepEqual(Object.keys(state.known), ['sku-11|warbond']);
   assert.deepEqual(state.seen, {});
-  assert.deepEqual(state.hidden, {});
+  assert.equal('hidden' in state, false);
 });
 
 test('the Wishlist: only when connected, by its keys (ship page, store id, upgrade)', () => {
@@ -417,6 +418,8 @@ test('the Wishlist: only when connected, by its keys (ship page, store id, upgra
   const ms = AL.matchAll(feed, { sources: {} }, wish);
   assert.deepEqual(ms.map((m) => m.id).sort(), ['sku-10', 'sku-30', 'upgrade-341']);
   assert.ok(ms.every((m) => whys(m).join() === 'wishlist'));
+  // Each with the Wishlist keys it answers to (the badge counts those).
+  assert.deepEqual(byId(ms, 'sku-10').why[0].keys, ['ship:cutlass-black']);
   // A ship on the Wishlist never lights up a paint for it.
   assert.equal(byId(ms, 'sku-20'), undefined);
   assert.deepEqual(AL.matchAll(feed, { sources: {} }, null), []);
@@ -466,52 +469,21 @@ test("what's been seen: new pairs alert, a short gap doesn't, a day gone alerts 
   assert.equal(AL.unseen(one).length, ms.length - 1);
 });
 
-test('deleted (#701): out of the list and the badge, back only when something new matches', () => {
-  const feed = AL.readFeed(FEED);
-  const ms = AL.matchAll(feed, DB, null);
+test('deleted in the old alerts list (#701): that memory dropped when read, still seen', () => {
+  const ms = AL.matchAll(AL.readFeed(FEED), DB, null);
   const a = AL.nextState(null, ms, NOW);
-  assert.equal(AL.shown(a.state).length, ms.length);
-  // One deleted: gone from the list and the badge, and it stays gone on the next checks.
-  const one = AL.hide(a.state, NOW, 'sku-11');
-  assert.ok(!AL.shown(one).some((m) => m.id === 'sku-11'));
-  assert.equal(AL.unseen(one).length, ms.length - 1);
-  const later = AL.nextState(one, ms, NOW + 30 * MIN);
+  // As the popup's old list saved a deleted item: hidden, and seen with it.
+  const pair = `sku-11|${ms.find((m) => m.id === 'sku-11').why[0].why}`;
+  const old = {
+    ...a.state,
+    seen: { ...a.state.seen, [pair]: NOW },
+    hidden: { [pair]: NOW },
+  };
+  assert.ok(AL.shown(old).some((m) => m.id === 'sku-11'));
+  assert.equal(AL.unseen(old).length, ms.length - 1);
+  const later = AL.nextState(old, ms, NOW + 30 * MIN);
+  assert.equal('hidden' in later.state, false);
   assert.equal(later.fresh.length, 0);
-  assert.ok(!AL.shown(later.state).some((m) => m.id === 'sku-11'));
-  // Read back after a restart (stored as JSON): still gone.
-  const stored = JSON.parse(JSON.stringify(later.state));
-  assert.ok(!AL.shown(stored).some((m) => m.id === 'sku-11'));
-  // Clear All: nothing listed, nothing on the badge.
-  const all = AL.hide(later.state, NOW + HOUR);
-  assert.equal(AL.shown(all).length, 0);
-  assert.equal(AL.unseen(all).length, 0);
-  // A new reason for an item: it shows again.
-  const db = structuredClone(DB);
-  db.sources.hangar.items.push({
-    id: '9',
-    name: 'Sabre Raven EX',
-    contents: [ship('Sabre Raven EX')],
-  });
-  const more = AL.nextState(all, AL.matchAll(feed, db, null), NOW + 2 * HOUR);
-  assert.deepEqual(
-    AL.shown(more.state)
-      .map((m) => m.id)
-      .sort(),
-    ['sku-19700', 'sku-19701'],
-  );
-  // The same sale gone a day and back: it alerts and shows again.
-  const without = ms.filter((m) => m.id !== 'sku-11');
-  const gone = AL.nextState(all, without, NOW + 2 * HOUR);
-  const long = AL.nextState(gone.state, without, NOW + 2 * HOUR + AL.GONE_KEEP_MS);
-  const back = AL.nextState(long.state, ms, NOW + 30 * HOUR);
-  assert.deepEqual(
-    back.fresh.map((m) => m.id),
-    ['sku-11'],
-  );
-  assert.deepEqual(
-    AL.shown(back.state).map((m) => m.id),
-    ['sku-11'],
-  );
 });
 
 test('notifications: one each, three at most, then one for the rest', () => {
@@ -541,9 +513,28 @@ test('notifications: one each, three at most, then one for the rest', () => {
   ]);
 });
 
-test('the badge: unseen items while alerts are on, else the rescan reminder', () => {
-  const ms = AL.matchAll(AL.readFeed(FEED), DB, null);
-  const { state } = AL.nextState(null, ms, NOW);
+test('the badge: Remind Me items on sale, unseen, each Wishlist item once', () => {
+  const feed = AL.readFeed(FEED);
+  // The hangar's reasons alone: Fleet News only, no badge.
+  const own = AL.nextState(null, AL.matchAll(feed, DB, null), NOW);
+  assert.ok(own.state.items.length > 0);
+  assert.equal(AL.badgeFor(true, own.state), null);
+  assert.deepEqual(own.remind, []);
+  // A ship on the Wishlist sold in two editions counts once; a store item once.
+  const two = {
+    ...feed,
+    items: [
+      ...feed.items,
+      { ...byId(feed.items, 'sku-10'), id: 'sku-99', name: 'Cutlass Black WB' },
+    ],
+  };
+  const ms = AL.matchAll(two, DB, ['ship:cutlass-black', 'sku:30']);
+  const { state, remind } = AL.nextState(null, ms, NOW);
+  assert.deepEqual(remind.map((m) => m.id).sort(), ['sku-10', 'sku-30', 'sku-99']);
+  assert.ok(
+    remind.every((m) => whys(m).join() === 'wishlist'),
+    'notified for the Wishlist only',
+  );
   assert.deepEqual(AL.badgeFor(true, state), {
     text: '2',
     title: 'Open Hangar alerts: 2. Click to see them.',
@@ -551,6 +542,9 @@ test('the badge: unseen items while alerts are on, else the rescan reminder', ()
   assert.equal(AL.badgeFor(false, state), null);
   assert.equal(AL.badgeFor(undefined, state), null);
   assert.equal(AL.badgeFor(true, AL.markSeen(state, NOW)), null);
+  // The same matches again: nothing new to notify.
+  assert.deepEqual(AL.nextState(state, ms, NOW + 30 * MIN).remind, []);
+  // Saved before the keys were kept: each item counts once.
   const many = {
     ...state,
     items: Array.from({ length: 12 }, (_, i) => ({
@@ -659,7 +653,8 @@ test('a check, not connected: the public feed only, with nothing of the pilot in
   assert.equal(init.credentials, 'omit');
   assert.deepEqual(init.headers, { Accept: 'application/json' });
   assert.ok(!('body' in init) && !init.method, 'a plain GET');
-  assert.equal(x.out.notes.length, 2);
+  // The hangar's matches are kept for Fleet News, with no notification.
+  assert.equal(x.out.notes.length, 0);
   assert.equal(x.out.badges, 1);
   assert.deepEqual(x.out.at, [NOW + 30 * MIN + 150e3]);
   assert.equal(x.data.alertsFeed.etag, 'W/"a"');

@@ -15,10 +15,12 @@
  *                arrived in the store
  *       warbond  a ship you own is sold as a warbond edition
  *       limited  a ship you own is back on a limited-time sale
- * Each match says why. The badge counts the items with a match you haven't seen (the
- * popup lists them, and opening it marks them seen); a match that's new gets one
- * notification while Notifications are allowed (an optional permission, asked from the
- * Notifications switch's click). Not connected: the hangar rules only.
+ * Each match says why. Only the Wishlist's (Remind Me items on sale) take the toolbar
+ * badge, the Wishlist items you haven't seen (opening the popup marks them seen; its
+ * Wishlist tab counts them), and a notification when new, while Notifications are
+ * allowed (an optional permission, asked from the Notifications switch's click). The
+ * hangar's show only in the popup's Fleet News (the owner, 2026-10-23). Not connected:
+ * the hangar rules only, so no badge or notifications.
  *
  * Polite (docs/dev/requests.md): a check at most every 30 minutes, 30 to 35 apart (an
  * alarm, with jitter); the feed asked with its ETag; Retry-After honored; after a
@@ -351,8 +353,10 @@
     const out = [];
     for (const item of feed.items) {
       const why = [];
-      if (wished && wishKeysOf(item).some((k) => wished.has(k)))
-        why.push({ why: 'wishlist', ships: [] });
+      // The Wishlist keys it answers to, so the badge counts Wishlist items (a ship sold in
+      // two editions is one), as the popup's Wishlist tab does.
+      const keys = wished ? wishKeysOf(item).filter((k) => wished.has(k)) : [];
+      if (keys.length) why.push({ why: 'wishlist', ships: [], keys });
       const ship = item.kind === 'ship' || item.kind === 'vehicle';
       const mine = (from) => item.ships.filter((s) => from.has(s)).map((s) => index.name(s));
       if (ship) {
@@ -389,12 +393,10 @@
   // again. `known`: pairs matched so far (when first); `seen`: pairs the pilot has seen
   // (the popup opened); `gone`: pairs no longer matched (since when), forgotten after
   // GONE_KEEP_MS so a sale that comes back later alerts again, and a short gap (sold
-  // out between two reads) doesn't. `hidden`: pairs the pilot deleted in the popup (#701,
-  // since when): they stay out of the list and the badge, and are forgotten with the
-  // rest, so only something new (another reason, or the sale back after a day gone)
-  // shows the item again.
+  // out between two reads) doesn't. (`hidden`, the pairs deleted from the popup's old
+  // alerts list, #701, is dropped when read: those were marked seen too.)
   const pairsOf = (m) => m.why.map((w) => `${m.id}|${w.why}`);
-  const emptyState = () => ({ v: 1, items: [], known: {}, seen: {}, gone: {}, hidden: {} });
+  const emptyState = () => ({ v: 1, items: [], known: {}, seen: {}, gone: {} });
   // Reasons that no longer exist (the buy-back alert, #695): saved ones are dropped here,
   // so the list, the badge and the memory all lose them.
   const RETIRED = new Set(['buyback']);
@@ -414,24 +416,25 @@
         why: (Array.isArray(m.why) ? m.why : []).filter((w) => !RETIRED.has(w?.why)),
       }))
       .filter((m) => m.why.length);
-    return {
-      ...s,
-      items,
-      known: map(s.known),
-      seen: map(s.seen),
-      gone: map(s.gone),
-      hidden: map(s.hidden),
-    };
+    const { hidden, ...rest } = s;
+    return { ...rest, items, known: map(s.known), seen: map(s.seen), gone: map(s.gone) };
   }
-  // → { state, fresh }: fresh are the matches with a pair never matched before.
+  // Only a Remind Me item on sale (the Wishlist reason) takes the badge and a notification
+  // (the owner, 2026-10-23); the hangar's reasons show in the popup's Fleet News only.
+  const REMIND = 'wishlist';
+  const remindOnly = (m) => ({ ...m, why: m.why.filter((w) => w?.why === REMIND) });
+  // → { state, fresh, remind }: fresh are the matches with a pair never matched before;
+  // remind, those whose Wishlist pair is the new one (their notifications).
   function nextState(prev, matches, now) {
     const s = cleanState(prev);
     const live = new Set(matches.flatMap(pairsOf));
     const known = { ...s.known };
     const seen = { ...s.seen };
     const gone = { ...s.gone };
-    const hidden = { ...s.hidden };
     const fresh = matches.filter((m) => pairsOf(m).some((p) => !(p in known)));
+    const remind = fresh
+      .map(remindOnly)
+      .filter((m) => m.why.length && !(`${m.id}|${REMIND}` in known));
     for (const p of live) {
       if (!(p in known)) known[p] = now;
       delete gone[p];
@@ -443,7 +446,6 @@
         delete known[p];
         delete seen[p];
         delete gone[p];
-        delete hidden[p];
       }
     }
     const cap = (m) =>
@@ -459,35 +461,18 @@
         known: cap(known),
         seen: cap(seen),
         gone: cap(gone),
-        hidden: cap(hidden),
       },
       fresh,
+      remind,
     };
   }
-  // Items with a pair the pilot hasn't seen (or deleted): the badge's count.
+  // Items with a pair the pilot hasn't seen: Fleet News marks them.
   const unseen = (state) => {
     const s = cleanState(state);
-    return s.items.filter((m) => pairsOf(m).some((p) => !(p in s.seen) && !(p in s.hidden)));
+    return s.items.filter((m) => pairsOf(m).some((p) => !(p in s.seen)));
   };
-  // The items the popup lists: those with a pair the pilot hasn't deleted.
-  const shown = (state) => {
-    const s = cleanState(state);
-    return s.items.filter((m) => pairsOf(m).some((p) => !(p in s.hidden)));
-  };
-  // Deleted in the popup: one item's pairs (its ×), or every current one (Clear All).
-  // Deleted counts as seen too.
-  function hide(state, now, id = null) {
-    const s = cleanState(state);
-    const hidden = { ...s.hidden };
-    const seen = { ...s.seen };
-    for (const m of s.items)
-      if (id == null || m.id === id)
-        for (const p of pairsOf(m)) {
-          hidden[p] ??= now;
-          seen[p] ??= now;
-        }
-    return { ...s, hidden, seen };
-  }
+  // The items the popup's Fleet News picks from.
+  const shown = (state) => cleanState(state).items;
   // Every current pair seen (the popup opened), or one item's (its notification clicked).
   function markSeen(state, now, id = null) {
     const s = cleanState(state);
@@ -529,10 +514,19 @@
       });
     return out;
   }
-  // The toolbar badge while matches wait, or null (the rescan reminder's then).
+  // The toolbar badge while Remind Me items on sale wait unseen, or null (the rescan
+  // reminder's then): how many Wishlist items, each once.
   function badgeFor(on, state) {
     if (on !== true) return null;
-    const n = unseen(state).length;
+    const s = cleanState(state);
+    const items = new Set();
+    for (const m of s.items) {
+      const w = m.why.find((x) => x?.why === REMIND);
+      if (!w || `${m.id}|${REMIND}` in s.seen) continue;
+      const keys = Array.isArray(w.keys) && w.keys.length ? w.keys : [m.id];
+      for (const k of keys) items.add(k);
+    }
+    const n = items.size;
     if (!n) return null;
     return { text: n > 9 ? '9+' : String(n), title: t('alerts.badge-title', { n }) };
   }
@@ -706,7 +700,7 @@
     let state = null;
     if (feed) {
       const r = nextState(s[STATE_KEY], matchAll(feed, s.db, wish), now);
-      fresh = r.fresh;
+      fresh = r.remind;
       const was = isObj(s[STATE_KEY]) ? s[STATE_KEY].checkedAt : null;
       state = { ...r.state, checkedAt: network ? now : Number.isFinite(was) ? was : null };
       save[STATE_KEY] = state;
@@ -767,7 +761,6 @@
     nextState,
     unseen,
     shown,
-    hide,
     markSeen,
     lines,
     notesFor,

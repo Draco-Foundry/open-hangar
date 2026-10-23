@@ -555,8 +555,6 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 // take the toolbar badge (updateReminder); a new one gets a notification while
 // Notifications are allowed (an optional permission the Notifications switch asks for).
 //   { ohPopup: 'alerts-seen' } → { ok }: the popup is open, every match is seen
-//   { ohPopup: 'alerts-hide', id? } → { ok }: the popup deleted one match (its id), or
-//     every one (Clear All, no id), so the badge follows
 if (typeof importScripts === 'function' && !self.OHAlerts) importScripts('alerts.js');
 const NOTIFY = { permissions: ['notifications'] };
 const notifyOk = async () =>
@@ -682,18 +680,15 @@ hearClicks();
 chrome.permissions?.onAdded?.addListener(hearClicks);
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (!msg || typeof msg !== 'object') return false;
-  if (msg.ohPopup !== 'alerts-seen' && msg.ohPopup !== 'alerts-hide') return false;
+  if (msg.ohPopup !== 'alerts-seen') return false;
   if (sender.id !== chrome.runtime.id || sender.tab) return false;
   if (String(sender.url || '').split(/[?#]/)[0] !== chrome.runtime.getURL(POPUP)) return false;
   const AL = self.OHAlerts;
-  const id = typeof msg.id === 'string' ? msg.id : null;
-  const next = (st) =>
-    msg.ohPopup === 'alerts-hide' ? AL.hide(st, Date.now(), id) : AL.markSeen(st, Date.now());
   chrome.storage.local
     .get(AL.STATE_KEY)
     .then((got) =>
       got[AL.STATE_KEY]
-        ? chrome.storage.local.set({ [AL.STATE_KEY]: next(got[AL.STATE_KEY]) })
+        ? chrome.storage.local.set({ [AL.STATE_KEY]: AL.markSeen(got[AL.STATE_KEY], Date.now()) })
         : null,
     )
     .then(updateReminder)

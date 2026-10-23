@@ -1,1 +1,1 @@
-- Changed: **Store alerts follow Remind Me.** Remind Me on a Wishlist item turns its alerts on, and no Remind Me means no alerts. Desktop notifications keep their own switch in Settings.
+- Changed: **Store alerts follow Remind Me.** The bell is gone: the Wishlist tab counts your Remind Me items on sale and lists them first, and only those items get the toolbar number and notifications. Paints and sales for ships you own show in Fleet News.

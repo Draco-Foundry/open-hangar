@@ -57,8 +57,9 @@ popup: `chrome.action.onClicked` opens `src/dashboard.html` in a tab. It also:
   (`src/alerts.js`, `self.OHAlerts`) once the pilot turns Remind Me on for a Wishlist item (`alertsOn`; no switch of its own): a check
   on an alarm at most every 30 minutes (30 to 35 apart) downloads the public sale feed
   and, while connected, the account's Wishlist keys, and matches them here against the
-  stored scan. Unseen matches take the badge in place of the `!`; a new one gets a
-  notification while that optional permission is granted; a click opens the item on our
+  stored scan. Unseen Remind Me items on sale take the badge in place of the `!`; a new
+  one gets a notification while that optional permission is granted (the hangar's
+  matches show in the popup's Fleet News only); a click opens the item on our
   Store; the popup's `{ ohPopup: 'alerts-seen' }` marks them seen. A new scan matches
   again from what's saved, asking nothing;
 - in a build with the `autoScan` flag (docs/FLAGS.md, "Auto Scan", #666), keeps Auto Scan
