@@ -6756,8 +6756,6 @@ try {
   !/429|responded/.test(bpWait.card)
     ? ok(`a too-soon sync: the time (${bpWait.time}) and the website's calm words, no error code`)
     : fail(`basic sync wait: ${JSON.stringify({ bpWait, askedNow })}`);
-  page.off('request', offline);
-  await page.setRequestInterception(false);
   // Connected: Disconnect asks first, two equal buttons side by side, one line each
   // (owner, 2026-10-09); Stay Connected keeps the link, Disconnect drops it. At phone
   // width, the narrowest the question gets. Nothing is sent: the website's half is
@@ -6867,6 +6865,10 @@ try {
   acctSw.gone
     ? ok('another account from Connect: asked first, naming both; Stay keeps the link')
     : fail(`basic account switch: ${JSON.stringify(acctSw)}`);
+  // Off the guard only now: the runner's sync uses the page's own fetch, not the stand-in
+  // above, so the earlier checks stay offline and never reach the real website (CORS).
+  page.off('request', offline);
+  await page.setRequestInterception(false);
   await page.setViewport({ width: 1280, height: 900 });
 
   // Extension Alerts (the `alerts` flag; the connector pages are served as a build with
