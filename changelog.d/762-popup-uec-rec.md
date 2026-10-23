@@ -1,1 +1,1 @@
-- New: TODO(Claude chat): words for the UEC and REC cards in the popup.
+- New: **UEC and REC in the popup.** They get their own cards, and every popup number now fits its box, with short forms like 1.2 M.
