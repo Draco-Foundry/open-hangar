@@ -3995,8 +3995,14 @@
     if (!res.ok) throw new Error(`openhangar.space responded ${res.status}`);
     return res.json();
   };
-  // Poll until approved (→ { name }), expired or stopped (→ null).
-  OH.siteLinkWait = async function siteLinkWait(start, shouldGo = () => true) {
+  // Poll until approved (→ { name }), expired or stopped (→ null). `save: false` hands
+  // the new link back unsaved, for a page that asks about an account switch first
+  // (ui/basic/link-code.js).
+  OH.siteLinkWait = async function siteLinkWait(
+    start,
+    shouldGo = () => true,
+    { save = true } = {},
+  ) {
     const until = Date.now() + start.expires_in * 1000;
     const label = `Open Hangar on ${/Firefox\//.test(globalThis.navigator?.userAgent || '') ? 'Firefox' : 'Chrome'}`;
     while (Date.now() < until && shouldGo()) {
@@ -4014,7 +4020,7 @@
           connectedAt: Date.now(),
           lastSync: null,
         };
-        await OH.siteLinkSave(link);
+        if (save) await OH.siteLinkSave(link);
         return link;
       }
       if (j.status === 'expired') return null;

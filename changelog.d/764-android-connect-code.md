@@ -1,0 +1,1 @@
+- Fixed: **Connect on Firefox for Android.** It works again, with a code you approve on openhangar.space.

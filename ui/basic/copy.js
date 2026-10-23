@@ -86,6 +86,12 @@ const COPY = {
   'basic.sync-wait': 'Try again at {time}. The last sync was moments ago.',
   'basic.syncing': 'Syncing now',
   'basic.connect-failed': "Connecting didn't finish. Try again.", // the token trade failed: try again
+  // Connect with a code, where there's no sign-in window (Firefox for Android): the
+  // dashboard's words, word for word (ui/site/SiteConnect.svelte, src/dashboard.js).
+  'basic.code-hint': 'Approve this code on openhangar.space',
+  'basic.code-again': 'Open the Page Again',
+  'basic.code-cancel': 'Cancel',
+  'basic.code-expired': 'That code expired before it was approved. Connect again.',
   'basic.your-data': 'Your Data', // heading
   'basic.data-about':
     'Your hangar is saved in this browser. Export JSON makes a backup file you keep.', // stays in this browser; backup file

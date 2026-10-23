@@ -6,8 +6,8 @@
 // chrome.identity; Firefox: browser.identity, whose address the website allows too.
 // → { link, sync } once approved and traded for the sync token; { cancelled: true }
 // when the window was closed or Cancel pressed; { failed: true } when the trade
-// failed; or null when there's no window to open here (then the website's Connect
-// page instead).
+// failed; or null when there's no window to open here (then a code instead,
+// ./link-code.js).
 const b64url = (bytes) =>
   btoa(String.fromCharCode(...bytes))
     .replace(/\+/g, '-')
