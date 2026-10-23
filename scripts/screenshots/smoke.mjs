@@ -50,7 +50,14 @@ await new Promise((resolve, reject) => {
 const browser = await puppeteer.launch({
   executablePath: findChrome(),
   headless: true,
-  args: process.env.CI ? ['--no-sandbox'] : [],
+  args: [
+    ...(process.env.CI ? ['--no-sandbox'] : []),
+    // The checks never reach production openhangar.space: it doesn't resolve, so a request
+    // to it fails fast (net::ERR_NAME_NOT_RESOLVED) instead of hitting the live site,
+    // whatever its answer or CORS headers are today. (RSI's pictures still load: the
+    // broken-thumbnail check needs a real card picture.)
+    '--host-resolver-rules=MAP openhangar.space ~NOTFOUND, MAP *.openhangar.space ~NOTFOUND',
+  ],
   defaultViewport: { width: 1280, height: 900 },
 });
 const page = await browser.newPage();
