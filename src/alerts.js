@@ -611,14 +611,18 @@
   // The popup's copy of the Wishlist (ui/popup/wish-client.js, `popupWish`: this
   // connection's, younger than 5 minutes, with its items) → the keys the plain read would
   // give: every item but those with Remind Me off (an item with no `remind` has no switch,
-  // so it counts). Null when there is no such copy. Values written as literals.
+  // so it counts) and those the website marks In Your Hangar (`inHangar`: true). Used only
+  // when every item carries that mark (true or false): the plain read leaves owned ships
+  // out, so a copy without the mark can't stand in for it. Null when there is no such copy.
+  // Values written as literals.
   function popupKeys(rec, link, now) {
     if (!isObj(rec) || rec.connectedAt !== link.connectedAt || !Array.isArray(rec.items))
       return null;
     if (!Number.isFinite(rec.at) || now - rec.at < 0 || now - rec.at >= 5 * 60e3) return null;
+    if (!rec.items.every((i) => isObj(i) && typeof i.inHangar === 'boolean')) return null;
     return readWish({
       v: 1,
-      keys: rec.items.filter((i) => isObj(i) && i.remind !== false).map((i) => i.key),
+      keys: rec.items.filter((i) => i.remind !== false && !i.inHangar).map((i) => i.key),
     });
   }
   // The account's Wishlist keys for this connection, from the saved copy or asked again.

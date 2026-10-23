@@ -660,8 +660,9 @@ test("a check, connected: the popup's Wishlist copy, if fresh, is used instead o
     connectedAt: LINK.connectedAt,
     at: NOW - 60e3,
     items: [
-      { key: 'ship:cutlass-black', name: 'Cutlass Black', remind: true },
-      { key: 'ship:zeus', name: 'Zeus', remind: false },
+      { key: 'ship:cutlass-black', name: 'Cutlass Black', remind: true, inHangar: false },
+      { key: 'ship:zeus', name: 'Zeus', remind: false, inHangar: false },
+      { key: 'ship:aurora-mr', name: 'Aurora MR', remind: true, inHangar: true },
     ],
     ...over,
   });
@@ -673,10 +674,17 @@ test("a check, connected: the popup's Wishlist copy, if fresh, is used instead o
     await AL.check(x.e);
     return x;
   };
-  // Fresh, this connection's: no second read; the keys leave out Remind Me off.
+  // Fresh, this connection's, every item carrying the In Your Hangar mark: no second read;
+  // the keys leave out Remind Me off and the marked items.
   const fresh = await run(copy());
   assert.equal(fresh.asked.length, 1, 'only the sale feed was asked');
   assert.deepEqual(fresh.data.alertsWish.keys, ['ship:cutlass-black']);
+  // Any item without the mark (the website doesn't send it): its own read, as before.
+  const unmarked = copy();
+  delete unmarked.items[1].inHangar;
+  const own = await run(unmarked);
+  assert.equal(own.asked.length, 2, 'asked the website itself');
+  assert.deepEqual(own.data.alertsWish.keys, ['ship:cutlass-black']);
   // Old (5 minutes or more), another connection's, or read only (no items): asked as before.
   for (const old of [
     copy({ at: NOW - 5 * 60e3 }),
