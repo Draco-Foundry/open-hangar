@@ -117,14 +117,14 @@ test('the line after a scan stopped: signed out, or stopped with Scan Again', as
   const { t } = await import('../ui/popup/copy.js');
   const scannedAt = NOW - DAY;
   const line = (o) => stopLine({ phase: 'idle', signedOut: false, report: null, scannedAt, ...o });
-  // The owner's words (2026-10-18), word for word.
+  // The approved words (Words, 2026-10-23), word for word.
   assert.equal(
     t(line({ phase: 'stopped', signedOut: true })),
-    "Your Last Scan Stopped Because You're Signed Out of RSI. Sign In and Scan Again.",
+    'Your last scan stopped because RSI signed you out. Log in to RSI, then scan again.',
   );
   assert.equal(
     t(line({ phase: 'stopped' })),
-    'Your Last Scan Stopped Before It Finished. Your Hangar Shows the Last Full Scan.',
+    'Your last scan stopped before it finished. Your hangar shows the last full scan.',
   );
   // Nothing while a scan runs, after one that finished, or before anything was saved
   // (no last full scan to speak of), unless signed out.

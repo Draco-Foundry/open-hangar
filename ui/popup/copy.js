@@ -52,12 +52,12 @@ const COPY = {
   // A scan running in the Open Hangar tab (an older way to scan, still the fallback).
   'popup.scanning': "Scanning now. Keep the Open Hangar tab open until it's done.",
   'popup.scan-again': 'Scan Again', // after a scan stopped
-  // The line at the top after a scan stopped partway (approved 2026-10-18): signed out
+  // The line at the top after a scan stopped partway (Words, approved 2026-10-23): signed out
   // of RSI, or anything else (with Scan Again).
   'popup.stop-out':
-    "Your Last Scan Stopped Because You're Signed Out of RSI. Sign In and Scan Again.",
+    'Your last scan stopped because RSI signed you out. Log in to RSI, then scan again.',
   'popup.stop-partway':
-    'Your Last Scan Stopped Before It Finished. Your Hangar Shows the Last Full Scan.',
+    'Your last scan stopped before it finished. Your hangar shows the last full scan.',
   // Before the first scan: no tabs, one heading and Scan.
   'popup.first': 'Your Hangar, in One Scan',
   // Signed out of RSI: the big button to RSI's sign-in page (a grey Scan under it).

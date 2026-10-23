@@ -5785,7 +5785,7 @@ try {
   stopped.age === 'Scan stopped' &&
   stopped.scan === 'Scan' &&
   stopped.line ===
-    'Your Last Scan Stopped Before It Finished. Your Hangar Shows the Last Full Scan.' &&
+    'Your last scan stopped before it finished. Your hangar shows the last full scan.' &&
   stopped.again === 'Scan Again' &&
   againAsked
     ? ok('a scan that stopped: Scan stopped, the line at the top and its Scan Again; 90s quiet still Scanning')
@@ -5798,7 +5798,7 @@ try {
     again: !!document.getElementById('pp-scan-again'),
   }));
   stoppedOut.line ===
-    "Your Last Scan Stopped Because You're Signed Out of RSI. Sign In and Scan Again." &&
+    'Your last scan stopped because RSI signed you out. Log in to RSI, then scan again.' &&
   !stoppedOut.again
     ? ok('a scan that stopped signed out: the signed-out line, no Scan Again')
     : fail(`popup stopped signed out: ${JSON.stringify(stoppedOut)}`);
