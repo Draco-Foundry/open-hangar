@@ -87,13 +87,13 @@
   const COPY = {
     // The toolbar button's tooltip while alerts wait: how many, and that the popup
     // shows them.
-    'alerts.badge-title': 'Open Hangar alerts: {n}. Click to see them.',
+    'alerts.badge-title': 'Open Hangar: {n} on sale from your Wishlist',
     // Why an item is an alert, one line each:
     // On the pilot's account Wishlist (only while this browser is connected).
     'alerts.why.wishlist': 'On your Wishlist',
     // A paint for a ship you own arrived in the store in the last week (our own
     // record of the store). Never "new", "first" or "never sold before".
-    'alerts.why.paint': 'In the store in the last 7 days: paint for your {ship}',
+    'alerts.why.paint': 'Paint for your {ship}, in the store this week',
     // A ship you own is sold as a warbond edition now (new money only, cheaper).
     'alerts.why.warbond': 'Warbond edition in the store: {ship} (new money only)',
     // A ship you own is on a limited-time sale now (the Store's Limited-Time Sales).
@@ -102,7 +102,7 @@
     'alerts.ends': 'Ends {day}',
     // One notification for the rest when more than three arrive at once: how many
     // more, and that the toolbar button shows them all.
-    'alerts.notify-more-title': 'More alerts: {n}',
+    'alerts.notify-more-title': 'More on sale: {n}',
     'alerts.notify-more-body': 'Click the Open Hangar button in your toolbar to see them all.',
   };
   function t(key, vars = {}) {
