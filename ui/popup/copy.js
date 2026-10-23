@@ -110,8 +110,10 @@ const COPY = {
   'popup.alerts-connect':
     "Connect to openhangar.space to add your Wishlist. It's read on this device and never sent back.",
   'popup.open-store': 'Open the Store', // our Store
-  'popup.alerts-off-title': 'Store Alerts Are Off',
-  'popup.alerts-turn-on': 'Turn On Alerts',
+  // PLACEHOLDER (#782, words from Claude chat): the empty Alerts view's pointer to the
+  // Wishlist, shown when no item has Remind Me on.
+  'popup.alerts-wishlist':
+    'Nothing on watch yet. Turn on Remind Me for an item on your Wishlist, and Open Hangar keeps watch for it.',
   // Deleting alerts (#701): each row's ×, for screen readers, and the list's Clear All
   // (approved 2026-10-16).
   'popup.alerts-delete': 'Delete {name}',

@@ -88,8 +88,7 @@ every store is `support@openhangar.space`. The account setup is kept in the main
 - ✅ **Permission justifications** (dashboard requires one per permission): see §5.
 - ✅ **Remote code:** "No, I am not using remote code" (flags are build-time only).
 - ✅ **Data-usage disclosures** (Chrome's Privacy practices tab, filled in 2026-10-14:
-  Chrome refused to submit 0.3.0 until it was). Everything stays in the browser unless
-  the user connects optional sync to their own openhangar.space account; what sync
+  Chrome refused to submit 0.3.0 until it was). Data collected: only the user's own RSI account data. It stays in the browser unless the user connects the optional sync with openhangar.space (off until they connect); then each sync sends a copy to the user's own account there. Never sold or shared. What sync
   sends is declared, the same three kinds as the Firefox build's optional
   `data_collection_permissions`:
   - ☑ Personally identifiable information (the RSI account block: handle, display
@@ -111,8 +110,7 @@ same: change one, change the other.
 **`storage`**
 
 > Stores the user's scanned hangar, buy-back and referral data and UI preferences
-> locally in the browser. Nothing leaves the browser unless the user connects optional
-> sync to their own openhangar.space account.
+> locally in the browser. It stays in the browser unless the user connects the optional sync with openhangar.space; then each sync sends a copy to the user's own account there.
 
 **`unlimitedStorage`** (added in 0.2.11)
 
@@ -123,7 +121,7 @@ same: change one, change the other.
 
 **`cookies`**
 
-> Used for three things, all on robertsspaceindustries.com. First, "Log Out of RSI": clears RSI's cookies (including the HttpOnly session cookie that page scripts can't remove) so the user can fully end their RSI session from the extension. Second, telling whether the user is signed in to RSI: the extension checks only whether RSI's sign-in cookie exists, so the popup can show "Log In to RSI" and Auto Scan Daily can skip a signed-out day, without contacting RSI. Third, Add to RSI Cart: like RSI's own upgrade window, it reads RSI's session token cookie and sends it back to robertsspaceindustries.com with the cart request the user asked for. Cookie values are never stored and never sent anywhere except RSI.
+> Used for three things, all on robertsspaceindustries.com. First, "Log Out of RSI": clears RSI's cookies (including the HttpOnly session cookie that page scripts can't remove) so the user can fully end their RSI session from the extension. Second, a guess at whether the user is signed in to RSI: the extension checks only whether RSI's session cookie exists, without contacting RSI. When it's missing, the popup shows "Log In to RSI" first (Scan still works) and Auto Scan Daily skips that day. RSI sets this cookie for signed-out visitors too, so the scan itself confirms. Third, Add to RSI Cart: like RSI's own upgrade window, it reads RSI's session token cookie and sends it back to robertsspaceindustries.com with the cart request the user asked for. Cookie values are never stored and never sent anywhere except RSI.
 
 **`identity`** (added in 0.3.0)
 
@@ -134,9 +132,7 @@ same: change one, change the other.
 **`host_permissions` → `https://robertsspaceindustries.com/*`**
 
 > Reads the signed-in user's own RSI account (hangar, buy-backs, balances, referrals)
-> with same-session requests and parses it locally, rate-limited. The only writes:
-> when the user clicks Add to RSI Cart or Send to RSI Cart, it puts the items they
-> picked in their own RSI cart. It never checks out or pays.
+> with same-session requests and parses it locally. Only the user's own account is accessed, at a limited rate. Everything is read-only except two actions the user starts with a click: Add to RSI Cart and Send to RSI Cart put the items the user picked in their RSI cart through RSI's own store. It never checks out or pays.
 
 _(Since 0.2.8 there is no `api.star-citizen.wiki` host permission: that public API
 sends `Access-Control-Allow-Origin: *` and we fetch it without credentials, so the
@@ -158,13 +154,15 @@ install prompt only names robertsspaceindustries.com.)_
 
 > Optional. Requested only when the user turns store alerts on, and the user can decline: the toolbar badge and the popup's list still work without it. Used only to show a notification when an item in RSI's store newly matches the user's hangar, buy-backs or wishlist: at most three of their own per check, then one for the rest. Matching happens on the device, and nothing is sent. Turning alerts off removes the permission.
 
+**Messages from openhangar.space** (`externally_connectable` on Chrome and Edge; on Firefox, a bridge script on those pages only)
+
+> Lets pages on openhangar.space, app.openhangar.space and hangar.openhangar.space, and no other site, check that the extension is installed and ask it for a fixed set of things: Add to RSI Cart and Send to RSI Cart on the website's store, Connect This Browser on app.openhangar.space, and on hangar.openhangar.space the user's scanned hangar, when it was last scanned, a new scan and Add to RSI Cart. Any other message is refused. The hangar page shows the hangar inside the browser only, and it never reaches the server. On Firefox the bridge script only passes these messages to the extension and its answers back, and reads nothing else on the page.
+
 ## 6. Listing Copy (Ready to Paste)
 
 **Single purpose** (as in the Chrome dashboard, 2026-10-14):
 
-> Open Hangar reads the signed-in user's own Star Citizen / RSI account data, organizes
-> it into a browsable hangar they can export, and can optionally sync it to the user's
-> own openhangar.space account.
+> Open Hangar reads the signed-in user's own Star Citizen (RSI) account so they can see their hangar in the popup and on openhangar.space, get store alerts for it, and put what they pick in their RSI cart.
 
 **Summary (≤132 chars, also the manifest `description`):**
 

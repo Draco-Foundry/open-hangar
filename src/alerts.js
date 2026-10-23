@@ -17,8 +17,8 @@
  *       limited  a ship you own is back on a limited-time sale
  * Each match says why. The badge counts the items with a match you haven't seen (the
  * popup lists them, and opening it marks them seen); a match that's new gets one
- * notification while Notifications are allowed (an optional permission, asked when you
- * turn alerts on). Not connected: the hangar rules only.
+ * notification while Notifications are allowed (an optional permission, asked from the
+ * Notifications switch's click). Not connected: the hangar rules only.
  *
  * Polite (docs/dev/requests.md): a check at most every 30 minutes, 30 to 35 apart (an
  * alarm, with jitter); the feed asked with its ETag; Retry-After honored; after a
@@ -33,7 +33,10 @@
  */
 (function (root) {
   // ---- Storage keys ----
-  const ON_KEY = 'alertsOn'; // true once the pilot turns alerts on (off by default)
+  // Not a switch the pilot flips: on once Remind Me is turned on for a Wishlist item in the
+  // popup (ui/popup/wishlist.js alertsFor), off again when no item has Remind Me (there,
+  // or here, when the Wishlist read finds none). Off by default.
+  const ON_KEY = 'alertsOn';
   const STATE_KEY = 'alerts'; // the matches, and which the pilot has seen
   const FEED_KEY = 'alertsFeed'; // the last good sale feed, its ETag and when to ask again
   const WISH_KEY = 'alertsWish'; // the account's Wishlist keys, for the connection
@@ -688,6 +691,13 @@
         wishRec = await freshWish(env, site, link, wishRec, now);
         save[WISH_KEY] = wishRec;
       }
+    }
+    // Alerts follow Remind Me: a connected Wishlist with it on for nothing means no alerts
+    // and no badge. The switch goes off (src/background.js clears the matches and stops
+    // the checks); the public feed's record stays, as for any off.
+    if (link && wishRec && Array.isArray(wishRec.keys) && !wishRec.keys.length) {
+      await env.set({ [ON_KEY]: false, ...(save[FEED_KEY] ? { [FEED_KEY]: save[FEED_KEY] } : {}) });
+      return { ran: false, why: 'no-remind' };
     }
     const feed = feedRec && feedRec.data ? readFeed(feedRec.data) : null;
     const wish =
