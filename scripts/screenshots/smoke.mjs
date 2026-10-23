@@ -977,6 +977,13 @@ try {
     : fail(`For You ignore: ${JSON.stringify(home)}`);
   // The caught-up line holds still while the menu is open (a scan fires 'oh:alerts'
   // every page, #586) and is picked again on the next open.
+  // The viewport was just set: its resize event can land after the first click and close
+  // the menu (menus.svelte.js closes on resize), which flips every later toggle. Let it
+  // land, and start with every menu shut, so the loop below always opens on its first click.
+  await page.evaluate(async () => {
+    await new Promise((r) => setTimeout(r, 300));
+    document.dispatchEvent(new CustomEvent('oh:close-menus'));
+  });
   const caught = await page.evaluate(async () => {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const line = () => document.querySelector('#bell-menu .bm-none')?.textContent.trim();
