@@ -642,24 +642,31 @@ test('a check: off asks nothing', async () => {
   assert.equal(x.asked.length, 0);
 });
 
-test('a check, not connected: the public feed only, with nothing of the pilot in it', async () => {
-  const x = env({ local: { alertsOn: true, db: DB }, net: [res(200, FEED, { etag: 'W/"a"' })] });
-  const r = await AL.check(x.e);
-  assert.equal(r.ran, true);
-  assert.equal(r.matches, 2);
-  assert.equal(x.asked.length, 1);
-  const [{ url, init }] = x.asked;
-  assert.equal(url, 'https://openhangar.space/api/store/on-sale');
-  assert.equal(init.credentials, 'omit');
-  assert.deepEqual(init.headers, { Accept: 'application/json' });
-  assert.ok(!('body' in init) && !init.method, 'a plain GET');
-  // The hangar's matches are kept for Fleet News, with no notification.
+test('a check, not connected: alerts go off, nothing asked (on only while connected)', async () => {
+  const x = env({ local: { alertsOn: true, db: DB }, net: [res(200, FEED)] });
+  assert.deepEqual(await AL.check(x.e), { ran: false, why: 'not-connected' });
+  assert.equal(x.data.alertsOn, false);
+  assert.equal(x.asked.length, 0);
   assert.equal(x.out.notes.length, 0);
-  assert.equal(x.out.badges, 1);
-  assert.deepEqual(x.out.at, [NOW + 30 * MIN + 150e3]);
-  assert.equal(x.data.alertsFeed.etag, 'W/"a"');
-  assert.equal(x.data.alerts.checkedAt, NOW);
-  assert.ok(!('alertsWish' in x.data));
+  assert.equal(x.out.at.length, 0, 'no next check');
+  assert.ok(!('alerts' in x.data), 'no matches saved');
+  // A link without a token is no connection either.
+  const y = env({ local: { alertsOn: true, db: DB, siteLink: { token: '' } } });
+  assert.deepEqual(await AL.check(y.e), { ran: false, why: 'not-connected' });
+});
+
+test('on only while connected: the stored fix, with literal keys and values', () => {
+  // Migrated: on, and no connection (none, or one without a token).
+  assert.deepEqual(AL.connectedOnly({ alertsOn: true }), { alertsOn: false });
+  assert.deepEqual(AL.connectedOnly({ alertsOn: true, siteLink: null }), { alertsOn: false });
+  assert.deepEqual(AL.connectedOnly({ alertsOn: true, siteLink: { token: '' } }), {
+    alertsOn: false,
+  });
+  // Unchanged: connected, or already off, or never set.
+  assert.equal(AL.connectedOnly({ alertsOn: true, siteLink: { token: 't' } }), null);
+  assert.equal(AL.connectedOnly({ alertsOn: false }), null);
+  assert.equal(AL.connectedOnly({}), null);
+  assert.equal(AL.connectedOnly(null), null);
 });
 
 test("a check, connected: the account's Wishlist with the sync token, matched here", async () => {
@@ -684,19 +691,28 @@ test("a check, connected: the account's Wishlist with the sync token, matched he
     ['sku-10'],
   );
   assert.equal(x.data.alertsWish.connectedAt, LINK.connectedAt);
-  // Firefox without its data yes: no Wishlist read, the hangar rules only.
+  // Firefox without its data yes: the Wishlist can't be read, so alerts go off (the
+  // public feed's record kept, nothing matched or notified).
   const ff = env({
     local: { alertsOn: true, db: DB, siteLink: LINK },
     net: [res(200, FEED)],
     share: false,
   });
-  await AL.check(ff.e);
+  assert.deepEqual(await AL.check(ff.e), { ran: false, why: 'no-share' });
   assert.equal(ff.asked.length, 1);
-  assert.ok(!ff.data.alerts.items.some((m) => whys(m).includes('wishlist')));
+  assert.equal(ff.data.alertsOn, false);
+  assert.ok(ff.data.alertsFeed.data, "the public feed's record stays");
+  assert.ok(!('alerts' in ff.data));
+  assert.equal(ff.out.notes.length, 0);
 });
 
 test('polite: ETag, a fresh copy reused, Retry-After honored, backoff, the last copy kept', async () => {
-  const x = env({ local: { alertsOn: true, db: DB }, net: [res(200, FEED, { etag: 'W/"a"' })] });
+  // Connected, with the Wishlist read kept for hours, so only the feed is asked here.
+  const wish = { keys: ['sku:1'], connectedAt: LINK.connectedAt, retryAt: NOW + 100 * HOUR };
+  const x = env({
+    local: { alertsOn: true, db: DB, siteLink: LINK, alertsWish: wish },
+    net: [res(200, FEED, { etag: 'W/"a"' })],
+  });
   await AL.check(x.e);
   // Ten minutes: the saved copy, nothing asked.
   x.tick(5 * MIN);
@@ -752,7 +768,7 @@ test('the Wishlist read: 404 (its flag off) waits 6 hours, 401 keeps nothing', a
   assert.deepEqual(y.data.alerts.items, []);
 });
 
-test('disconnected: the Wishlist keys go, its matches with them', async () => {
+test('disconnected: alerts go off, nothing asked or scheduled', async () => {
   const x = env({
     local: {
       alertsOn: true,
@@ -765,11 +781,15 @@ test('disconnected: the Wishlist keys go, its matches with them', async () => {
       },
     },
   });
-  await AL.check(x.e, { network: false });
+  // The background clears the matches and the Wishlist keys on the off (OFF_KEYS).
+  assert.deepEqual(await AL.check(x.e, { network: false }), {
+    ran: false,
+    why: 'not-connected',
+  });
+  assert.equal(x.data.alertsOn, false);
   assert.equal(x.asked.length, 0);
-  assert.ok(!('alertsWish' in x.data));
-  assert.deepEqual(x.data.alerts.items, []);
   assert.equal(x.out.at.length, 0, 'matching again schedules nothing');
+  assert.ok(AL.OFF_KEYS.includes('alertsWish') && AL.OFF_KEYS.includes('alerts'));
 });
 
 test('the kill switch pauses the checks: nothing asked', async () => {
@@ -777,6 +797,7 @@ test('the kill switch pauses the checks: nothing asked', async () => {
     local: {
       alertsOn: true,
       db: DB,
+      siteLink: LINK,
       remoteStatus: { at: NOW, data: { sources: { alerts: { enabled: false } } } },
     },
     net: [res(200, FEED)],

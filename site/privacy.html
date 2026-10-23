@@ -27,7 +27,7 @@
     <main class="wrap doc">
       <p><a href="./">Open Hangar</a></p>
       <h1>Privacy Policy</h1>
-      <p class="updated"><em>Last updated: 2026-10-23</em></p>
+      <p class="updated"><em>Last updated: 2026-10-24</em></p>
       <p>
         Open Hangar is a source-available browser extension that reads your own Star Citizen /
         Roberts Space Industries (RSI) account data and stores it locally in your browser. Open
@@ -55,9 +55,9 @@
           pays.
         </li>
         <li>
-          Store alerts are optional and off until you turn them on. They download one public sale
-          file, the same for everyone, and match it on your device (see
-          <a href="#store-alerts">Store Alerts</a>).
+          Store alerts are optional. They're on only while you're connected and an item on your
+          Wishlist has Remind Me on. They download one public sale file, the same for everyone, and
+          match it on your device (see <a href="#store-alerts">Store Alerts</a>).
         </li>
         <li>
           Auto Scan Daily is optional and off until you turn it on. It works only while you're
@@ -187,8 +187,9 @@
       </ul>
       <h2 id="store-alerts">Store Alerts</h2>
       <p>
-        Store alerts tell you when something in RSI's store is for you. They're optional and off
-        until you turn them on, on the popup's Settings tab, and they're matched on your device.
+        Store alerts tell you when something in RSI's store is for you. They're optional: they're on
+        only while you're connected and at least one item on your Wishlist has Remind Me on, and
+        they're matched on your device.
       </p>
       <ul>
         <li>
@@ -198,24 +199,23 @@
           every 30 minutes, and less often when our site is busy or can't be reached.
         </li>
         <li>
-          <strong>What it's matched against:</strong> the hangar and buy-backs this browser scanned,
-          on your device. For example, a ship in your buy-backs is in the store again, or a ship you
-          own gets a new paint. Alerts never send them anywhere.
+          <strong>What it's matched against:</strong> on your device, the items on your account's
+          Wishlist that have Remind Me on (see <a href="#your-wishlist">Your Wishlist</a>), and the
+          hangar this browser scanned. For example, an item you're watching goes on sale, or a ship
+          you own gets a new paint. What it matches stays here.
         </li>
         <li>
-          <strong>Your Wishlist, while you're connected:</strong> alerts also match the items on
-          your account's Wishlist that have their reminder on (see
-          <a href="#your-wishlist">Your Wishlist</a>). What it matches stays here.
+          <strong>What you see:</strong> the popup's Wishlist tab counts your Remind Me items on
+          sale and lists what's on sale first. The number on the toolbar button counts the ones you
+          haven't seen yet and, if you allow notifications, each one newly on sale gets a
+          notification (up to three at a time, then one for the rest). Matches with your hangar show
+          only in the popup's Fleet News. Clicking a match in Fleet News or a notification opens
+          that item on openhangar.space.
         </li>
         <li>
-          <strong>What you see:</strong> a number on the toolbar button and on the popup's bell, the
-          matches in the popup's alerts list and, if you allow notifications, a notification for
-          each new match (up to three at a time, then one for the rest). Clicking a match opens that
-          item on openhangar.space.
-        </li>
-        <li>
-          <strong>Turning them off:</strong> on the same Settings tab. The checks stop, and the
-          matches saved for alerts are deleted from this browser.
+          <strong>Turning them off:</strong> turn Remind Me off for every item on your Wishlist, or
+          disconnect. The checks stop, and the matches saved for alerts are deleted from this
+          browser.
         </li>
       </ul>
       <h2 id="your-wishlist">Your Wishlist</h2>
@@ -231,9 +231,9 @@
           stays in this browser.
         </li>
         <li>
-          <strong>Changing it:</strong> when you add or remove an item, or turn its reminder on or
-          off, the extension sends that one change to app.openhangar.space with its sync token:
-          which item, and for a reminder, on or off. Nothing else is sent with it.
+          <strong>Changing it:</strong> when you add or remove an item, or turn Remind Me on or off
+          for it, the extension sends that one change to app.openhangar.space with its sync token:
+          which item, and for Remind Me, on or off. Nothing else is sent with it.
         </li>
         <li>
           <strong>Searching:</strong> finding items to add happens on your device. What you type
@@ -390,14 +390,14 @@
           <strong>alarms:</strong> for store alerts and Auto Scan Daily only. It wakes the extension
           for a store alerts check at most every 30 minutes while alerts are on (see
           <a href="#store-alerts">Store Alerts</a>), and once a day while Auto Scan Daily is on (see
-          <a href="#auto-scan-daily">Auto Scan Daily</a>). Turning both off stops it. Nothing else
+          <a href="#auto-scan-daily">Auto Scan Daily</a>). When both are off, it stops. Nothing else
           uses it.
         </li>
         <li>
-          <strong>notifications:</strong> optional. The browser asks for it only when you turn store
-          alerts on, and you can say no: the number on the toolbar button and the popup's list still
-          work. With it, each new match gets a notification. Turning alerts off gives it back.
-          Nothing else uses it.
+          <strong>notifications:</strong> optional. The browser asks for it only from the
+          Notifications switch on the popup's Settings tab, and you can say no: the number on the
+          toolbar button and the popup's Wishlist tab still work. With it, each Remind Me item newly
+          on sale gets a notification. Turning the switch off gives it back. Nothing else uses it.
         </li>
         <li>
           <strong>offscreen</strong> (Chrome and Edge only): lets a scan run in a hidden page

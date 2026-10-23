@@ -54,7 +54,7 @@ popup: `chrome.action.onClicked` opens `src/dashboard.html` in a tab. It also:
   (`reopenAfterUpdate`);
 - answers our own web pages ([Messages From Our Pages](#messages-from-our-pages));
 - in a build with the `alerts` flag (docs/FLAGS.md, "Alerts"), runs the store alerts
-  (`src/alerts.js`, `self.OHAlerts`) once the pilot turns Remind Me on for a Wishlist item (`alertsOn`; no switch of its own): a check
+  (`src/alerts.js`, `self.OHAlerts`) once the pilot turns Remind Me on for a Wishlist item, and only while connected (`alertsOn`; no switch of its own; a check that finds no connection turns it off): a check
   on an alarm at most every 30 minutes (30 to 35 apart) downloads the public sale feed
   and, while connected, the account's Wishlist keys, and matches them here against the
   stored scan. Unseen Remind Me items on sale take the badge in place of the `!`; a new

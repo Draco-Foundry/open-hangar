@@ -1,0 +1,1 @@
+- Changed: **Privacy policy updated.** Store Alerts now says alerts follow Remind Me, and notifications have their own switch in Settings.

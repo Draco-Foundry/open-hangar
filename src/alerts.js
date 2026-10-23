@@ -19,8 +19,8 @@
  * badge, the Wishlist items you haven't seen (opening the popup marks them seen; its
  * Wishlist tab counts them), and a notification when new, while Notifications are
  * allowed (an optional permission, asked from the Notifications switch's click). The
- * hangar's show only in the popup's Fleet News (the owner, 2026-10-23). Not connected:
- * the hangar rules only, so no badge or notifications.
+ * hangar's show only in the popup's Fleet News (the owner, 2026-10-23). Alerts are on
+ * only while this browser is connected: not connected, they turn off (connectedOnly).
  *
  * Polite (docs/dev/requests.md): a check at most every 30 minutes, 30 to 35 apart (an
  * alarm, with jitter); the feed asked with its ETag; Retry-After honored; after a
@@ -37,7 +37,9 @@
   // ---- Storage keys ----
   // Not a switch the pilot flips: on once Remind Me is turned on for a Wishlist item in the
   // popup (ui/popup/wishlist.js alertsFor), off again when no item has Remind Me (there,
-  // or here, when the Wishlist read finds none). Off by default.
+  // or here, when the Wishlist read finds none). On only while this browser is connected:
+  // a check that finds no connection, or can't read the Wishlist (Firefox without its
+  // data yes), turns it off. Off by default.
   const ON_KEY = 'alertsOn';
   const STATE_KEY = 'alerts'; // the matches, and which the pilot has seen
   const FEED_KEY = 'alertsFeed'; // the last good sale feed, its ETag and when to ask again
@@ -642,6 +644,18 @@
     }
   }
 
+  // ---- On only while connected ----
+  // Alerts on in a browser that isn't connected (on from before they followed Remind Me,
+  // when nothing else could turn them off, or a disconnect while the worker slept): the
+  // change to store, or null. Stored values in, stored values out, written as literals
+  // (never ON_KEY), so it keeps saying the same thing whatever the constants become.
+  function connectedOnly(stored) {
+    if (!isObj(stored) || stored.alertsOn !== true) return null;
+    const link = stored.siteLink;
+    const linked = isObj(link) && typeof link.token === 'string' && link.token !== '';
+    return linked ? null : { alertsOn: false };
+  }
+
   // ---- A check ----
   // env: { get(keys), set(obj), remove(keys), fetch, now(), rand(), mayShare() (Firefox's
   // data yes, for the Wishlist read), notify(notes), badge(), schedule(at) }.
@@ -659,6 +673,12 @@
     ]);
     const now = env.now();
     if (s[ON_KEY] !== true) return { ran: false, why: 'off' };
+    // Not connected: off, which drops the matches and stops the checks (src/background.js).
+    const fix = connectedOnly(s);
+    if (fix) {
+      await env.set(fix);
+      return { ran: false, why: 'not-connected' };
+    }
     if (paused(s.remoteStatus)) {
       if (network) await env.schedule(nextAt(now, env.rand()));
       return { ran: false, why: 'paused' };
@@ -681,7 +701,13 @@
       feedRec = await freshFeed(env, feeds, feedRec, now);
       save[FEED_KEY] = feedRec;
       // Firefox asks before anything goes off the device: the sync token is sync's yes.
-      if (link && (await stillOn()) && (await env.mayShare())) {
+      // Without it the Wishlist can't be read, so nobody could tell whether Remind Me is
+      // on for anything: alerts go off (the public feed's record stays, as for any off).
+      if (link && (await stillOn())) {
+        if (!(await env.mayShare())) {
+          await env.set({ [ON_KEY]: false, [FEED_KEY]: feedRec });
+          return { ran: false, why: 'no-share' };
+        }
         wishRec = await freshWish(env, site, link, wishRec, now);
         save[WISH_KEY] = wishRec;
       }
@@ -768,6 +794,7 @@
     sitesOf,
     itemUrl,
     paused,
+    connectedOnly,
     retryAfterMs,
     backoffMs,
     nextAt,
