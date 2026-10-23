@@ -41,8 +41,8 @@ const COPY = {
   // Beside the buy-back token count: when RSI hands out the next one ("Next refill Jan 4").
   'popup.token-next': 'Next refill {date}',
   'popup.fleet-news': 'Fleet News', // heading
-  // PLACEHOLDER (words from Claude chat, #785): Fleet News's link to the Wishlist tab.
-  'popup.news-wishlist': 'Wishlist',
+  // Fleet News's link to the Wishlist tab. Claude chat, Words, 2026-10-23 (#785).
+  'popup.news-wishlist': 'See Your Wishlist',
   // Fleet News with store alerts on and nothing for your ships or your Wishlist.
   'popup.fleet-news-none': 'No news for your ships right now.',
   // The Scan button (asks the background, which runs the scan).
@@ -97,8 +97,8 @@ const COPY = {
   // Read by screen readers before a Fleet News item you hadn't seen yet.
   'popup.alerts-unseen': 'Not seen yet:',
   // --- Wishlist tab ---
-  // PLACEHOLDER (words from Claude chat): the tab's count of Remind Me items on sale now,
-  // for screen readers (the number shows on its own).
+  // The tab's count of Remind Me items on sale now, for screen readers (the number shows
+  // on its own). Claude chat, Words, 2026-10-23 (#785).
   'popup.wish-tab-on-sale': '{n} on sale',
   'popup.wish-count': 'Your Wishlist · {n}',
   'popup.wish-on-sale': 'On Sale',

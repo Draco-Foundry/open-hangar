@@ -122,7 +122,7 @@ The pages the website now has leave in three steps. The code stays until the las
 Pages that leave: Home (news feeds, Game Status, For You, Customize), Inventory, the
 standalone Buy-Backs page (its Market and Load Details), Stats, Referrals, Store and the
 standalone Wishlist, Org Fleet import, Updates and Known Issues, Developers, the top bar
-(the Alerts bell included), Global Search and the detail windows.
+(the top bar's Alerts bell included), Global Search and the detail windows.
 
 ## Outbound Requests
 

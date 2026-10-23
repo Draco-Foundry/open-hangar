@@ -505,7 +505,7 @@
             <span
               >{t(LABEL[id])}{#if id === 'wishlist' && ALERTS && onSale}<b class="pp-tn" id="pp-wish-n"
                   ><span aria-hidden="true">{onSale > 9 ? '9+' : onSale}</span><span class="pp-sr"
-                    >{t('popup.wish-tab-on-sale', { n: onSale })}</span
+                    >{' '}{t('popup.wish-tab-on-sale', { n: onSale })}</span
                   ></b
                 >{/if}</span
             >

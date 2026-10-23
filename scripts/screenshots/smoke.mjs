@@ -5927,6 +5927,12 @@ try {
     // The tab's count of Remind Me items on sale: the number shown, a name read out.
     n: document.querySelector('#pp-wish-n [aria-hidden]')?.textContent || '',
     nName: document.querySelector('#pp-wish-n .pp-sr')?.textContent || '',
+    // What a screen reader reads for the tab: its text without the hidden number.
+    tabName: (() => {
+      const b = document.getElementById('pp-tab-wishlist')?.cloneNode(true);
+      b?.querySelectorAll('[aria-hidden="true"]').forEach((e) => e.remove());
+      return b?.textContent.trim() || '';
+    })(),
   }));
   await page.click('#pp-wish-full');
   const wishFull = await page.evaluate(() => __demo.opened.at(-1));
@@ -5935,7 +5941,8 @@ try {
   ppWish.more === 'And 1 more' &&
   !ppWish.remove &&
   ppWish.n === '1' &&
-  ppWish.nName === '1 on sale' &&
+  ppWish.nName.trim() === '1 on sale' &&
+  ppWish.tabName === 'Wishlist 1 on sale' &&
   ppWish.asked.join() === `GET ${ppSite}/api/v1/wishlist?with=items Bearer t` &&
   wishFull === `${ppSite}/hangar/wishlist`
     ? ok('Wishlist, read only: on sale first, the tab counts it (1, read as "1 on sale")')
