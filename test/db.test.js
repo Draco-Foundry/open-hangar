@@ -580,3 +580,104 @@ test('storage migrations name no constant', () => {
   // And the check sees a constant when one is there.
   assert.match('2: (db) => ({ ...db, v: DB_VERSION })', CONSTANT);
 });
+
+// --- Recovery copies expire ------------------------------------------------------------
+// The recovery slot (dbRecovery) and the damaged originals set aside (dbCorrupt) are kept
+// 30 days after they're made, and go sooner when a complete hangar scan replaces them
+// (owner, 2026-10-24).
+const DAY = 86400000;
+const recovery = (nickname, at) => ({
+  at,
+  db: {
+    schemaVersion: 3,
+    owner: { nickname },
+    sources: { hangar: { items: rows(3), scannedAt: 1 } },
+  },
+});
+const damagedCopy = (id, what, at) => ({ id, at, what, problems: ['x'], raw: { junk: id } });
+
+test('recovery copies go 30 days after they are made, whatever else happens', async () => {
+  const now = Date.now();
+  reset({
+    db: { schemaVersion: 3, sources: {} },
+    dbHistory: [],
+    dbRecovery: recovery('Old', now - 31 * DAY),
+    dbCorrupt: [damagedCopy('a', 'db', now - 40 * DAY), damagedCopy('b', 'history', now - 2 * DAY)],
+  });
+  assert.equal(await OH.getRecovery(), null, 'past its 30 days: nothing to restore');
+  await OH.pruneRecoveryCopies({ now });
+  assert.equal(mem.dbRecovery, undefined);
+  assert.deepEqual(
+    mem.dbCorrupt.map((x) => x.id),
+    ['b'],
+  );
+  // 29 days on, the rest stays; on day 31 it goes too, and the key with it.
+  await OH.pruneRecoveryCopies({ now: now + 27 * DAY });
+  assert.equal(mem.dbCorrupt.length, 1);
+  await OH.pruneRecoveryCopies({ now: now + 29 * DAY });
+  assert.equal(mem.dbCorrupt, undefined);
+});
+
+test('a copy with no time gets its 30 days from when it is first seen', async () => {
+  const now = Date.now();
+  const rec = recovery('Old');
+  delete rec.at;
+  reset({
+    db: { schemaVersion: 3, sources: {} },
+    dbRecovery: rec,
+    dbCorrupt: [damagedCopy('a', 'db')],
+  });
+  await OH.pruneRecoveryCopies({ now });
+  assert.equal(mem.dbRecovery.at, now);
+  assert.equal(mem.dbCorrupt[0].at, now);
+  await OH.pruneRecoveryCopies({ now: now + 31 * DAY });
+  assert.equal(mem.dbRecovery, undefined);
+  assert.equal(mem.dbCorrupt, undefined);
+});
+
+test('the first load on a page lets expired recovery copies go', async () => {
+  reset({
+    db: { schemaVersion: 3, sources: {} },
+    dbHistory: [],
+    dbRecovery: recovery('Old', Date.now() - 31 * DAY),
+  });
+  // Another page (the test reloads lib.js the way a new page would).
+  delete require.cache[require.resolve('../src/lib.js')];
+  require('../src/lib.js');
+  const fresh = globalThis.OH;
+  await fresh.loadDB();
+  await fresh.storageSettled();
+  assert.equal(mem.dbRecovery, undefined);
+});
+
+test('a complete hangar scan replaces the recovery copy of that account and damaged databases', async () => {
+  const now = Date.now();
+  const state = () => ({
+    db: { schemaVersion: 3, owner: { nickname: 'Main' }, sources: {} },
+    dbHistory: [],
+    dbRecovery: recovery('MAIN', now - DAY),
+    dbCorrupt: [damagedCopy('a', 'db', now - DAY), damagedCopy('b', 'history', now - DAY)],
+  });
+  // A buy-backs scan replaces nothing.
+  reset(state());
+  pages = { buybacks: rows(1, 'b') };
+  assert.equal((await OH.scanSource('buybacks', null, { account: acct })).ok, true);
+  assert.ok(mem.dbRecovery);
+  assert.equal(mem.dbCorrupt.length, 2);
+  // A complete hangar scan of the same account (any case): the copy and the damaged
+  // database go; the damaged history stays (a scan doesn't bring history back).
+  pages = { hangar: rows(2) };
+  assert.equal((await OH.scanSource('hangar', null, { account: acct })).ok, true);
+  await settle();
+  assert.equal(mem.dbRecovery, undefined);
+  assert.deepEqual(
+    mem.dbCorrupt.map((x) => x.id),
+    ['b'],
+  );
+  // Another account's recovery copy stays for its 30 days.
+  reset({ ...state(), dbRecovery: recovery('Wingmate', now - DAY) });
+  pages = { hangar: rows(2) };
+  assert.equal((await OH.scanSource('hangar', null, { account: acct })).ok, true);
+  await settle();
+  assert.equal(mem.dbRecovery.db.owner.nickname, 'Wingmate');
+});
