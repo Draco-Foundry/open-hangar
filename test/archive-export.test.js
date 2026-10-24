@@ -61,7 +61,7 @@ const gone = (i, goneAt, n) => {
 };
 const archiveOf = (list) => Object.fromEntries(list.map((p) => [p.id, p]));
 const liveDB = (items = [pledge(1)]) => ({
-  schemaVersion: 3,
+  schemaVersion: 4,
   owner: { nickname: 'Main' },
   sources: { hangar: { items, scannedAt: 5 } },
 });
@@ -216,7 +216,7 @@ function worstCase({ history }) {
   }
   return {
     db: {
-      schemaVersion: 3,
+      schemaVersion: 4,
       owner: { nickname: 'Main' },
       sources: { hangar: { items, scannedAt: 5 }, buybacks: { items: buybacks, scannedAt: 5 } },
     },

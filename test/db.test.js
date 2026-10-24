@@ -76,7 +76,7 @@ test('a DB with no sources loads empty instead of crashing, and is set aside', a
   assert.equal(damaged[0].raw, undefined); // the list never carries the data itself
   assert.deepEqual((await OH.exportDamaged())[0].raw, { schemaVersion: 2 }); // the original, untouched
   await settle();
-  assert.deepEqual(mem.db, { schemaVersion: 3, sources: {} }); // written back clean
+  assert.deepEqual(mem.db, { schemaVersion: 4, sources: {} }); // written back clean
   await OH.loadDB();
   await settle();
   assert.equal((await OH.getDamaged()).length, 1); // set aside once, not on every load
@@ -149,16 +149,104 @@ test('at most three damaged copies are kept; dismissing hides them but keeps the
 // --- Versions -------------------------------------------------------------------
 
 test('every older version migrates to the current one', () => {
-  for (let v = 1; v < 3; v++) {
+  for (let v = 1; v < 4; v++) {
     const out = OH.migrateDB({
       schemaVersion: v,
       sources: { hangar: { items: [], scannedAt: 1 } },
     });
-    assert.equal(out.schemaVersion, 3, `from v${v}`);
+    assert.equal(out.schemaVersion, 4, `from v${v}`);
     assert.deepEqual(out.sources, { hangar: { items: [], scannedAt: 1 } });
   }
-  const cur = { schemaVersion: 3, sources: {} };
+  const cur = { schemaVersion: 4, sources: {} };
   assert.deepEqual(OH.migrateDB(cur), cur);
+});
+
+// Storage v4 (2026-10-24): recruits and prospects keep only their dates, and a recruit
+// its campaign. Who they are (RSI id, handle, moniker, avatar) goes from the live DB,
+// every parked account and the recovery copy; counts and everything else stay.
+const whoRow = (n, campaign) => ({
+  id: String(900 + n),
+  handle: `Recruit${n}`,
+  moniker: `Recruit ${n}`,
+  avatar: 'https://robertsspaceindustries.com/media/x/avatar.png',
+  enlistedOn: '2025-02-03',
+  convertedOn: campaign ? '2025-03-04' : null,
+  ...(campaign ? { campaign } : {}),
+});
+const v3Referral = () => ({
+  items: {
+    current: { recruits: 1 },
+    legacy: { recruits: 2 },
+    prospects: 1,
+    recruitsList: [whoRow(1, 'current'), whoRow(2, 'legacy')],
+    prospectsList: [whoRow(3)],
+  },
+  scannedAt: 5,
+});
+const dateRows = {
+  recruitsList: [
+    { enlistedOn: '2025-02-03', convertedOn: '2025-03-04', campaign: 'current' },
+    { enlistedOn: '2025-02-03', convertedOn: '2025-03-04', campaign: 'legacy' },
+  ],
+  prospectsList: [{ enlistedOn: '2025-02-03', convertedOn: null }],
+};
+
+test('v3 → v4: recruits and prospects lose who they are, keep dates and counts', async () => {
+  reset({
+    db: { schemaVersion: 3, owner: { nickname: 'Main' }, sources: { referral: v3Referral() } },
+    dbHistory: [],
+    'profile:alt': {
+      schemaVersion: 3,
+      owner: { nickname: 'Alt' },
+      sources: { referral: v3Referral() },
+      pledgeArchive: { a1: { id: 'a1', name: 'Kept' } },
+    },
+    dbRecovery: {
+      at: 1,
+      db: { schemaVersion: 3, owner: { nickname: 'Old' }, sources: { referral: v3Referral() } },
+    },
+  });
+  const db = await OH.loadDB();
+  const items = db.sources.referral.items;
+  assert.deepEqual(items.recruitsList, dateRows.recruitsList);
+  assert.deepEqual(items.prospectsList, dateRows.prospectsList);
+  assert.deepEqual(
+    [items.current, items.legacy, items.prospects],
+    [{ recruits: 1 }, { recruits: 2 }, 1],
+  );
+  await settle();
+  for (const stored of [mem.db, mem['profile:alt'], mem.dbRecovery.db]) {
+    assert.equal(stored.schemaVersion, 4);
+    assert.deepEqual(stored.sources.referral.items.recruitsList, dateRows.recruitsList);
+    assert.deepEqual(stored.sources.referral.items.prospectsList, dateRows.prospectsList);
+  }
+  assert.deepEqual(mem['profile:alt'].pledgeArchive, { a1: { id: 'a1', name: 'Kept' } });
+  assert.equal(mem.dbRecovery.at, 1);
+  assert.doesNotMatch(JSON.stringify(mem), /Recruit\d|avatar\.png|"90\d"/);
+  assert.deepEqual(await OH.getDamaged(), []);
+});
+
+test('v3 → v4 leaves a DB without referral rows, and a v4 one, as they are', () => {
+  const plain = { schemaVersion: 3, sources: { hangar: { items: [], scannedAt: 1 } } };
+  assert.deepEqual(OH.migrateDB(plain), { ...plain, schemaVersion: 4 });
+  const counts = { schemaVersion: 3, sources: { referral: { items: { prospects: 2 } } } };
+  assert.deepEqual(OH.migrateDB(counts).sources, counts.sources);
+  const v4 = { schemaVersion: 4, sources: { referral: { items: { ...dateRows } } } };
+  assert.deepEqual(OH.migrateDB(v4), v4);
+});
+
+test('an old backup file with who each recruit is imports with dates only', async () => {
+  reset({ db: { schemaVersion: 4, sources: {} }, dbHistory: [] });
+  const r = await OH.importDB({
+    app: 'open-hangar',
+    schemaVersion: 2,
+    sources: { referral: v3Referral() },
+  });
+  assert.equal(r.ok, true);
+  await settle();
+  const items = mem.db.sources.referral.items;
+  assert.deepEqual(items.recruitsList, dateRows.recruitsList);
+  assert.deepEqual(items.prospectsList, dateRows.prospectsList);
 });
 
 test('the pre-database layout ({ hangar, scannedAt }) still loads', async () => {
@@ -181,7 +269,7 @@ test('v2 → v3: history moves out of the DB into its own key, nothing lost', as
   const db = await OH.loadDB();
   assert.equal(db.history.length, 2); // callers still get it as before
   await settle();
-  assert.equal(mem.db.schemaVersion, 3);
+  assert.equal(mem.db.schemaVersion, 4);
   assert.equal(mem.db.history, undefined);
   assert.equal(mem.dbHistory.length, 2);
   assert.deepEqual(await OH.getDamaged(), []); // an upgrade isn't damage
@@ -298,7 +386,7 @@ test('an account parked by an older version (history inside, v2) switches back f
     },
   });
   assert.equal((await OH.switchProfile('Main')).restored, true);
-  assert.equal(mem.db.schemaVersion, 3);
+  assert.equal(mem.db.schemaVersion, 4);
   assert.equal(mem.db.history, undefined);
   assert.equal(mem.dbHistory.length, 1);
 });

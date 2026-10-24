@@ -669,6 +669,26 @@
   const MIGRATIONS = {
     1: (db) => db, // v1 → v2: stored shape unchanged (only the export gained `account`)
     2: (db) => db, // v2 → v3: history moves to its own key (writeDB stores it there)
+    // v3 → v4 (2026-10-24): each recruit and prospect keeps only its dates (and a
+    // recruit its campaign); the RSI id, handle, moniker and avatar go. No page
+    // shows them. Counts are untouched.
+    3: (db) => {
+      const ref = db.sources && db.sources.referral;
+      const items = ref && ref.items;
+      if (!items || typeof items !== 'object' || Array.isArray(items)) return db;
+      const row = (r) => {
+        const out = {
+          enlistedOn: (r && r.enlistedOn) ?? null,
+          convertedOn: (r && r.convertedOn) ?? null,
+        };
+        if (r && (r.campaign === 'current' || r.campaign === 'legacy')) out.campaign = r.campaign;
+        return out;
+      };
+      const next = { ...items };
+      for (const list of ['recruitsList', 'prospectsList'])
+        if (Array.isArray(items[list])) next[list] = items[list].map(row);
+      return { ...db, sources: { ...db.sources, referral: { ...ref, items: next } } };
+    },
   };
   OH.migrateDB = function migrateDB(db) {
     let out = db;
@@ -745,6 +765,7 @@
     const raw = await chrome.storage.local.get([DB_KEY, HISTORY_KEY, 'hangar', 'scannedAt']);
     let db;
     let needsWrite = false;
+    let migrated = false;
     if (raw[DB_KEY] === undefined) {
       db = emptyDB();
       // Before the versioned DB: { hangar, scannedAt } at the top level.
@@ -764,8 +785,10 @@
       if (db.schemaVersion < DB_VERSION) {
         db = OH.migrateDB(db);
         needsWrite = true;
+        migrated = true;
       }
     }
+    if (migrated) queueSetAside();
     let kept = [];
     const h = raw[HISTORY_KEY];
     if (Array.isArray(h)) {
@@ -783,6 +806,48 @@
       needsWrite = true;
     } else db.history = kept;
     return { db, needsWrite };
+  }
+
+  // Parked accounts and the recovery copy migrate when they're swapped back in
+  // (fromStored). This brings them up to date with the live DB's fix-up, so a
+  // migration that removes data (v3 → v4) removes it from every copy at once. Each
+  // copy keeps what else it carries (a parked account's pledgeArchive).
+  async function migrateSetAside() {
+    const area = chrome.storage.local;
+    const keys = typeof area.getKeys === 'function' ? await area.getKeys().catch(() => null) : null;
+    const all = await area.get(
+      Array.isArray(keys)
+        ? keys.filter((k) => k === RECOVERY_KEY || String(k).startsWith(PROFILE_PREFIX))
+        : null,
+    );
+    const old = (b) =>
+      isObj(b) &&
+      Number.isInteger(b.schemaVersion) &&
+      b.schemaVersion >= 1 &&
+      b.schemaVersion < DB_VERSION;
+    const out = {};
+    for (const [k, v] of Object.entries(all || {})) {
+      try {
+        if (String(k).startsWith(PROFILE_PREFIX) && old(v)) out[k] = OH.migrateDB(v);
+        else if (k === RECOVERY_KEY && isObj(v) && old(v.db))
+          out[k] = { ...v, db: OH.migrateDB(v.db) };
+      } catch {
+        /* left as it is: fromStored checks it again when it's swapped in */
+      }
+    }
+    if (Object.keys(out).length) await area.set(out);
+  }
+  // In the save queue, after whatever write found the old version; once however many
+  // reads found it before the sweep ran.
+  let setAsideQueued = false;
+  function queueSetAside() {
+    if (setAsideQueued) return;
+    setAsideQueued = true;
+    exclusive(migrateSetAside)
+      .catch(() => {})
+      .finally(() => {
+        setAsideQueued = false;
+      });
   }
 
   // Store a DB as loadDB returns it: the DB under `db`, its history under its own
@@ -2308,7 +2373,8 @@
   // (May 2026). Two "campaigns": '2' = CURRENT program, '1' = LEGACY (pre-cutoff,
   // different rewards). The PROSPECT pool is shared across both; only RECRUIT
   // counts differ (legacy = all-time total, current = post-cutoff conversions).
-  // Each row: { id, displayName, nickname, avatar, enlistedOn, convertedOn }.
+  // Each row: { id, displayName, nickname, avatar, enlistedOn, convertedOn }. Only the
+  // dates are kept (no page shows who a recruit is: owner, 2026-10-24).
   // `converted:true` filters to recruits; `false` returns the full prospect list.
   // The request (address, operation, document, the variables that never change,
   // the campaigns and page size): RULES.referrals.
@@ -2396,11 +2462,10 @@
         const key = it.id ?? `${it.nickname}:${it.enlistedOn}`;
         if (seen.has(key)) continue;
         seen.add(key);
+        // Only the dates are kept. `key` (RSI's id) tells current recruits from legacy
+        // ones while the scan runs (getReferral) and is never saved.
         items.push({
-          id: it.id ?? null,
-          handle: it.nickname || null,
-          moniker: it.displayName || null,
-          avatar: it.avatar || null,
+          key,
           enlistedOn: it.enlistedOn || null,
           convertedOn: it.convertedOn || null,
         });
@@ -2415,8 +2480,10 @@
 
   // Scrape the full referral picture and persist it as the 'referral' source.
   // Shape: { code, url, current:{recruits}, legacy:{recruits}, prospects,
-  //          recruitsList:[...], prospectsList:[...] }. recruitsList carries a
-  // `campaign` tag per row ('current'|'legacy') since legacy is a superset.
+  //          recruitsList:[{ enlistedOn, convertedOn, campaign }],
+  //          prospectsList:[{ enlistedOn, convertedOn }] }. recruitsList carries a
+  // `campaign` tag per row ('current'|'legacy') since legacy is a superset. No RSI
+  // id, handle, moniker or avatar is kept (OH.referralRow).
   // Returns { ok, referral?, scannedAt?, error? }. Never throws.
   // Auto Scan Daily (opts.auto): any list that fails or comes back short means nothing is
   // merged or saved → { ok: false, unfinished: true, error, rsiDown, retryAfter }; and
@@ -2484,21 +2551,23 @@
       const prev = await OH.loadReferral();
       const bad = (l) => !!(l.error || l.partial);
       const partial = [];
+      // Saved rows have no ids, so the campaign tags can only be worked out from two
+      // whole lists read now: when either recruits list failed, the previous scan's
+      // tagged list stands in whole.
+      let keepPrevList = false;
       let legacyCount = legacyRecruits.count ?? null;
       let legacyItems = legacyRecruits.items || [];
       if (bad(legacyRecruits) && prev) {
         legacyCount = prev.legacy?.recruits ?? legacyCount;
-        legacyItems = prev.recruitsList || legacyItems;
+        keepPrevList = true;
         partial.push('recruits');
       }
       let currentCount = currentRecruits.count ?? null;
-      let currentIds = new Set((currentRecruits.items || []).map((r) => r.id));
+      const currentKeys = new Set((currentRecruits.items || []).map((r) => r.key));
       if (bad(currentRecruits)) {
         if (prev) {
           currentCount = prev.current?.recruits ?? null;
-          currentIds = new Set(
-            (prev.recruitsList || []).filter((r) => r.campaign === 'current').map((r) => r.id),
-          );
+          keepPrevList = true;
         }
         partial.push('current recruits');
       }
@@ -2513,10 +2582,13 @@
       }
 
       // Merge recruit lists: tag current ids, then mark legacy-only rows.
-      const recruitsList = legacyItems.map((r) => ({
-        ...r,
-        campaign: currentIds.has(r.id) ? 'current' : 'legacy',
-      }));
+      const recruitsList =
+        keepPrevList && Array.isArray(prev?.recruitsList)
+          ? prev.recruitsList.map(OH.referralRow)
+          : legacyItems.map((r) =>
+              OH.referralRow({ ...r, campaign: currentKeys.has(r.key) ? 'current' : 'legacy' }),
+            );
+      prospectItems = prospectItems.map(OH.referralRow);
 
       const referral = {
         code,
@@ -2565,6 +2637,18 @@
   // Referral data can arrive from an imported file, and the UI interpolates its
   // counts straight into HTML as numbers — so coerce them to real numbers (and
   // the lists to arrays) before anything renders them.
+  // One recruit or prospect row as it's kept: its dates, and a recruit's campaign.
+  // Never the RSI id, handle, moniker or avatar (a backup file from before
+  // 2026-10-24 has them; no page shows them). Pure.
+  OH.referralRow = function referralRow(r) {
+    const out = {
+      enlistedOn: r?.enlistedOn ?? null,
+      convertedOn: r?.convertedOn ?? null,
+    };
+    if (r?.campaign === 'current' || r?.campaign === 'legacy') out.campaign = r.campaign;
+    return out;
+  };
+
   OH.normalizeReferral = function normalizeReferral(ref) {
     const num = (v) => (v == null ? v : Number.isFinite(+v) ? +v : 0);
     const count = (o) => (o && typeof o === 'object' ? { ...o, recruits: num(o.recruits) } : o);
@@ -2573,8 +2657,8 @@
       current: count(ref.current),
       legacy: count(ref.legacy),
       prospects: num(ref.prospects),
-      recruitsList: Array.isArray(ref.recruitsList) ? ref.recruitsList : [],
-      prospectsList: Array.isArray(ref.prospectsList) ? ref.prospectsList : [],
+      recruitsList: Array.isArray(ref.recruitsList) ? ref.recruitsList.map(OH.referralRow) : [],
+      prospectsList: Array.isArray(ref.prospectsList) ? ref.prospectsList.map(OH.referralRow) : [],
     };
   };
 

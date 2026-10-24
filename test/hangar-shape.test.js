@@ -167,9 +167,9 @@ test('the view is a copy: the export it came from is untouched', async () => {
 test('reading the view: nothing scanned, older storage, damage', async () => {
   mem = {};
   assert.deepEqual(await viewOf(), { ok: false, error: 'no-scan' });
-  mem = { db: { schemaVersion: 3, sources: {} }, account: account() };
+  mem = { db: { schemaVersion: 4, sources: {} }, account: account() };
   assert.deepEqual(await viewOf(), { ok: false, error: 'no-scan' });
-  mem = { db: { schemaVersion: 3, sources: { hangar: { items: [], scannedAt: null } } } };
+  mem = { db: { schemaVersion: 4, sources: { hangar: { items: [], scannedAt: null } } } };
   assert.deepEqual(await viewOf(), { ok: false, error: 'no-scan' });
   for (const { name, mem: stored } of states()) {
     if (!/before the versioned|v2 database|damaged/.test(name)) continue;
@@ -178,7 +178,7 @@ test('reading the view: nothing scanned, older storage, damage', async () => {
   }
   // A database from a newer version (a rollback) is left to an extension page too.
   mem = full();
-  mem.db.schemaVersion = 4;
+  mem.db.schemaVersion = 5;
   assert.deepEqual(await viewOf(), { ok: false, error: 'needs-upgrade' });
   // The dashboard brings storage up to date, then the view reads.
   mem = structuredClone(states().find((s) => /v2 database/.test(s.name)).mem);
@@ -312,7 +312,7 @@ test("a buy-back's own RSI page goes with it: price, insurance, contents (#798)"
   assert.equal(SHAPE.withBuybackDetails({ hangar: {} }, details).buybacks, undefined);
   // What it adds passes the sync schema.
   const payload = SHAPE.exportPayload({
-    db: { schemaVersion: 3, sources },
+    db: { schemaVersion: 4, sources },
     buybackDetails: details,
     appVersion: '0.4.0',
   });

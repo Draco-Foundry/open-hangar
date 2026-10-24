@@ -423,7 +423,7 @@ test('a sync that goes through keeps the scan it sent; a refusal carries its sta
 });
 
 // --- What sync leaves out ------------------------------------------------------------
-// The referral prospects list is other players (handles, monikers, enlist dates) who
+// The referral prospects list is other players (their enlist dates) who
 // aren't recruits yet: the backup file keeps it, sync never sends it.
 
 const withReferral = () => {
@@ -434,10 +434,10 @@ const withReferral = () => {
       current: { recruits: 1 },
       legacy: { recruits: 1 },
       prospects: 2,
-      recruitsList: [{ id: 'r1', handle: 'Recruit_One', campaign: 'current' }],
+      recruitsList: [{ enlistedOn: '2026-08-01', convertedOn: '2026-09-01', campaign: 'current' }],
       prospectsList: [
-        { id: 'x1', handle: 'Someone_Else', moniker: 'Someone', date: '2026-09-01' },
-        { id: 'x2', handle: 'Another_Pilot', moniker: 'Another', date: '2026-09-02' },
+        { enlistedOn: '2026-09-01', convertedOn: null },
+        { enlistedOn: '2026-09-02', convertedOn: null },
       ],
     },
   };
@@ -452,7 +452,8 @@ test('sync leaves the prospects list out; the backup file keeps it', async () =>
   assert.equal('prospectsList' in ref, false, 'no prospects list in the sync');
   assert.equal(ref.prospects, 2, 'the count still goes');
   assert.equal(ref.recruitsList.length, 1, 'the recruits list still goes');
-  assert.ok(!JSON.stringify(sent[0]).includes('Someone_Else'));
+  assert.ok(!JSON.stringify(sent[0]).includes('2026-09-02'));
+  assert.deepEqual(Object.keys(ref.recruitsList[0]), ['enlistedOn', 'convertedOn', 'campaign']);
   // The backup file (OH.exportDB) and the stored data are untouched.
   const backup = await OH.exportDB();
   assert.equal(backup.sources.referral.items.prospectsList.length, 2);
@@ -639,7 +640,7 @@ test("a link's first sync asks when this browser keeps another account too", asy
   linked(scanned(Date.now() - 60_000));
   signedInAs('Pilot_B', '2002');
   mem['profile:pilot_a'] = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     sources: { hangar: { scannedAt: 1, items: [] } },
     owner: { nickname: 'Pilot_A', displayname: 'Pilot_A' },
   };

@@ -26,10 +26,11 @@
   //   shape needs a MIGRATIONS step (src/lib.js, the Storage section).
   //     v1 → v2: unchanged (only the export gained `account`)
   //     v2 → v3: scan history moved out of `db` into its own key
+  //     v3 → v4: referral rows keep only their dates and campaign (2026-10-24)
   //   EXPORT_VERSION is the backup-file format (OH.exportDB / OH.importDB).
   //     v2 added the `account` block (identity, org/rank, balances); v1 had
   //     sources only. Keeping it at 2 lets older versions import new backups.
-  const DB_VERSION = 3;
+  const DB_VERSION = 4;
   const EXPORT_VERSION = 2;
   // Pledges kept in the pledge archive (src/lib.js archiveGone), and in the hangar
   // view's copy of it.
@@ -203,7 +204,7 @@
   }
 
   // What sync sends: the backup file's payload without the referral prospects list.
-  // Prospects are other players (handles, monikers, enlist dates) who used your code but
+  // Prospects are other players (only their enlist dates are kept) who used your code but
   // aren't recruits yet, so they stay in this browser; the backup file keeps them, and
   // the prospects count still goes. Returns a copy, never changes `payload`. Pure.
   function withoutProspects(payload) {
