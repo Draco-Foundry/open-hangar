@@ -689,6 +689,40 @@
         if (Array.isArray(items[list])) next[list] = items[list].map(row);
       return { ...db, sources: { ...db.sources, referral: { ...ref, items: next } } };
     },
+    // v4 → v5 (2026-10-24): the pledge archive keeps only what buy-back details read
+    // (as the backup file has since #388): no picture URLs (the pledge's or its
+    // contents'), no giftable or meltable, no worked-out flags (isCCU, isAddOn,
+    // isCoupon, isPaint, containsShip). No page shows them for a pledge that's gone.
+    // A parked account carries its archive here; the live one and the recovery
+    // copy's are passed in the same way (migrateSetAside).
+    4: (db) => {
+      const a = db.pledgeArchive;
+      if (!a || typeof a !== 'object' || Array.isArray(a)) return db;
+      const lean = {};
+      for (const [key, p] of Object.entries(a)) {
+        if (!p || typeof p !== 'object' || Array.isArray(p) || !key) continue;
+        const e = { id: key, name: String(p.name || '') };
+        if (Number.isFinite(p.value)) e.value = p.value;
+        if (p.currency) e.currency = String(p.currency);
+        if (p.insurance) e.insurance = String(p.insurance);
+        if (p.ccu && typeof p.ccu === 'object')
+          e.ccu = { from: String(p.ccu.from || ''), to: String(p.ccu.to || '') };
+        if (p.kind) e.kind = String(p.kind);
+        if (p.date) e.date = String(p.date);
+        const contents = (Array.isArray(p.contents) ? p.contents : [])
+          .filter((c) => c && typeof c === 'object' && !Array.isArray(c))
+          .map((c) => {
+            const x = {};
+            if (c.kind) x.kind = String(c.kind);
+            if (c.label) x.label = String(c.label);
+            return x;
+          });
+        if (contents.length) e.contents = contents;
+        if (Number.isFinite(p.goneAt)) e.goneAt = p.goneAt;
+        lean[key] = e;
+      }
+      return { ...db, pledgeArchive: lean };
+    },
   };
   OH.migrateDB = function migrateDB(db) {
     let out = db;
@@ -767,7 +801,7 @@
     const raw = await chrome.storage.local.get([DB_KEY, HISTORY_KEY, 'hangar', 'scannedAt']);
     let db;
     let needsWrite = false;
-    let migrated = false;
+    let migrated = null; // the version it was, when it migrated
     if (raw[DB_KEY] === undefined) {
       db = emptyDB();
       // Before the versioned DB: { hangar, scannedAt } at the top level.
@@ -785,12 +819,12 @@
         needsWrite = true;
       }
       if (db.schemaVersion < DB_VERSION) {
+        migrated = db.schemaVersion;
         db = OH.migrateDB(db);
         needsWrite = true;
-        migrated = true;
       }
     }
-    if (migrated) queueSetAside();
+    if (migrated) queueSetAside(migrated);
     let kept = [];
     const h = raw[HISTORY_KEY];
     if (Array.isArray(h)) {
@@ -812,16 +846,22 @@
 
   // Parked accounts and the recovery copy migrate when they're swapped back in
   // (fromStored). This brings them up to date with the live DB's fix-up, so a
-  // migration that removes data (v3 → v4) removes it from every copy at once. Each
-  // copy keeps what else it carries (a parked account's pledgeArchive).
-  async function migrateSetAside() {
+  // migration that removes data (v3 → v4, v4 → v5) removes it from every copy at once.
+  // Each copy keeps what else it carries (a parked account's pledgeArchive). The pledge
+  // archives kept beside a database (the live one's, `liveFrom` its old version, and
+  // the recovery copy's) go through the same steps, inside a database of that version.
+  async function migrateSetAside(liveFrom) {
     const area = chrome.storage.local;
     const keys = typeof area.getKeys === 'function' ? await area.getKeys().catch(() => null) : null;
     const all = await area.get(
       Array.isArray(keys)
-        ? keys.filter((k) => k === RECOVERY_KEY || String(k).startsWith(PROFILE_PREFIX))
+        ? keys.filter(
+            (k) => k === RECOVERY_KEY || k === ARCHIVE_KEY || String(k).startsWith(PROFILE_PREFIX),
+          )
         : null,
     );
+    const archiveFrom = (archive, from) =>
+      OH.migrateDB({ schemaVersion: from, sources: {}, pledgeArchive: archive }).pledgeArchive;
     const old = (b) =>
       isObj(b) &&
       Number.isInteger(b.schemaVersion) &&
@@ -831,8 +871,11 @@
     for (const [k, v] of Object.entries(all || {})) {
       try {
         if (String(k).startsWith(PROFILE_PREFIX) && old(v)) out[k] = OH.migrateDB(v);
-        else if (k === RECOVERY_KEY && isObj(v) && old(v.db))
+        else if (k === RECOVERY_KEY && isObj(v) && old(v.db)) {
           out[k] = { ...v, db: OH.migrateDB(v.db) };
+          if (isObj(v.archive)) out[k].archive = archiveFrom(v.archive, v.db.schemaVersion);
+        } else if (k === ARCHIVE_KEY && isObj(v) && old({ schemaVersion: liveFrom }))
+          out[k] = archiveFrom(v, liveFrom);
       } catch {
         /* left as it is: fromStored checks it again when it's swapped in */
       }
@@ -842,10 +885,10 @@
   // In the save queue, after whatever write found the old version; once however many
   // reads found it before the sweep ran.
   let setAsideQueued = false;
-  function queueSetAside() {
+  function queueSetAside(liveFrom) {
     if (setAsideQueued) return;
     setAsideQueued = true;
-    exclusive(migrateSetAside)
+    exclusive(() => migrateSetAside(liveFrom))
       .catch(() => {})
       .finally(() => {
         setAsideQueued = false;
@@ -3911,22 +3954,25 @@
   // real melt yet, so the names must agree too; a disagreement is counted
   // (`bbHistoryRejects`, ids only) and the buy-back falls through to RSI.
   //
-  // Pledge archive (storage key `pledgeArchive`): { [pledge id]: { ...pledge,
-  // goneAt } } for pledges a complete hangar scan no longer has (melted, gifted,
+  // Pledge archive (storage key `pledgeArchive`): { [pledge id]: { id, name, value,
+  // currency, insurance, ccu, kind, date, contents: [{ kind, label }], goneAt } } for
+  // pledges a complete hangar scan no longer has (melted, gifted,
   // applied as an upgrade), newest ARCHIVE_MAX kept. It belongs to the live
   // account like the scan history (parked with it, in the recovery copy, gone
   // with Clear Data).
   const ARCHIVE_MAX = SHAPE.ARCHIVE_MAX; // 2000 (src/hangar-shape.js)
   OH.ARCHIVE_MAX = ARCHIVE_MAX;
-  // `archive` plus the pledges in `gone`, stamped goneAt = at, newest kept. Pure.
+  // `archive` plus the pledges in `gone`, stamped goneAt = at, newest kept. Each is
+  // kept as the backup file carries it (OH.leanArchive): what buy-back details read,
+  // never its pictures, giftable, meltable or the other flags (storage v5). Pure.
   OH.archiveGone = function archiveGone(archive, gone, at) {
     const out = isObj(archive) ? { ...archive } : {};
+    const add = {};
     for (const p of gone || []) {
       if (!isObj(p) || p.id == null || p.id === '') continue;
-      const { raw, ...keep } = p; // the raw RSI strings aren't needed again
-      out[String(p.id)] = { ...keep, goneAt: at };
+      add[String(p.id)] = { ...p, goneAt: at };
     }
-    return capArchive(out);
+    return capArchive({ ...out, ...SHAPE.leanArchive(add) });
   };
   // The newest ARCHIVE_MAX entries of an archive (by goneAt). Pure.
   function capArchive(out) {

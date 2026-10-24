@@ -27,10 +27,12 @@
   //     v1 → v2: unchanged (only the export gained `account`)
   //     v2 → v3: scan history moved out of `db` into its own key
   //     v3 → v4: referral rows keep only their dates and campaign (2026-10-24)
+  //     v4 → v5: the pledge archive keeps only what buy-back details read, as the
+  //              backup file does (leanArchive): no pictures or flags (2026-10-24)
   //   EXPORT_VERSION is the backup-file format (OH.exportDB / OH.importDB).
   //     v2 added the `account` block (identity, org/rank, balances); v1 had
   //     sources only. Keeping it at 2 lets older versions import new backups.
-  const DB_VERSION = 4;
+  const DB_VERSION = 5;
   const EXPORT_VERSION = 2;
   // Pledges kept in the pledge archive (src/lib.js archiveGone), and in the hangar
   // view's copy of it.
@@ -214,9 +216,10 @@
     return { ...payload, sources: { ...payload.sources, referral: { ...ref, items } } };
   }
 
-  // The archive as the backup file (and so sync) carries it (#388): only what
-  // buy-back details read (name, value, currency, insurance, ccu, contents' kind
-  // and label) plus the date, kind and goneAt. Left out: the flags (isCCU,
+  // The archive as this browser keeps it (lib.js archiveGone, since storage v5) and as
+  // the backup file (and so sync) carries it (#388): only what buy-back details read
+  // (name, value, currency, insurance, ccu, contents' kind and label) plus the date,
+  // kind and goneAt. Left out: the flags (isCCU,
   // isAddOn, giftable…, worked out again from the kind and name) and every image
   // URL (the details window never shows them; the buy-back card has its own
   // picture). The images were about 40% of a big archive. Also cleans a

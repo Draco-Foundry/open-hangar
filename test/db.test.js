@@ -76,7 +76,7 @@ test('a DB with no sources loads empty instead of crashing, and is set aside', a
   assert.equal(damaged[0].raw, undefined); // the list never carries the data itself
   assert.deepEqual((await OH.exportDamaged())[0].raw, { schemaVersion: 2 }); // the original, untouched
   await settle();
-  assert.deepEqual(mem.db, { schemaVersion: 4, sources: {} }); // written back clean
+  assert.deepEqual(mem.db, { schemaVersion: 5, sources: {} }); // written back clean
   await OH.loadDB();
   await settle();
   assert.equal((await OH.getDamaged()).length, 1); // set aside once, not on every load
@@ -149,15 +149,15 @@ test('at most three damaged copies are kept; dismissing hides them but keeps the
 // --- Versions -------------------------------------------------------------------
 
 test('every older version migrates to the current one', () => {
-  for (let v = 1; v < 4; v++) {
+  for (let v = 1; v < 5; v++) {
     const out = OH.migrateDB({
       schemaVersion: v,
       sources: { hangar: { items: [], scannedAt: 1 } },
     });
-    assert.equal(out.schemaVersion, 4, `from v${v}`);
+    assert.equal(out.schemaVersion, 5, `from v${v}`);
     assert.deepEqual(out.sources, { hangar: { items: [], scannedAt: 1 } });
   }
-  const cur = { schemaVersion: 4, sources: {} };
+  const cur = { schemaVersion: 5, sources: {} };
   assert.deepEqual(OH.migrateDB(cur), cur);
 });
 
@@ -216,7 +216,7 @@ test('v3 → v4: recruits and prospects lose who they are, keep dates and counts
   );
   await settle();
   for (const stored of [mem.db, mem['profile:alt'], mem.dbRecovery.db]) {
-    assert.equal(stored.schemaVersion, 4);
+    assert.equal(stored.schemaVersion, 5);
     assert.deepEqual(stored.sources.referral.items.recruitsList, dateRows.recruitsList);
     assert.deepEqual(stored.sources.referral.items.prospectsList, dateRows.prospectsList);
   }
@@ -228,15 +228,15 @@ test('v3 → v4: recruits and prospects lose who they are, keep dates and counts
 
 test('v3 → v4 leaves a DB without referral rows, and a v4 one, as they are', () => {
   const plain = { schemaVersion: 3, sources: { hangar: { items: [], scannedAt: 1 } } };
-  assert.deepEqual(OH.migrateDB(plain), { ...plain, schemaVersion: 4 });
+  assert.deepEqual(OH.migrateDB(plain), { ...plain, schemaVersion: 5 });
   const counts = { schemaVersion: 3, sources: { referral: { items: { prospects: 2 } } } };
   assert.deepEqual(OH.migrateDB(counts).sources, counts.sources);
   const v4 = { schemaVersion: 4, sources: { referral: { items: { ...dateRows } } } };
-  assert.deepEqual(OH.migrateDB(v4), v4);
+  assert.deepEqual(OH.migrateDB(v4), { ...v4, schemaVersion: 5 });
 });
 
 test('an old backup file with who each recruit is imports with dates only', async () => {
-  reset({ db: { schemaVersion: 4, sources: {} }, dbHistory: [] });
+  reset({ db: { schemaVersion: 5, sources: {} }, dbHistory: [] });
   const r = await OH.importDB({
     app: 'open-hangar',
     schemaVersion: 2,
@@ -269,7 +269,7 @@ test('v2 → v3: history moves out of the DB into its own key, nothing lost', as
   const db = await OH.loadDB();
   assert.equal(db.history.length, 2); // callers still get it as before
   await settle();
-  assert.equal(mem.db.schemaVersion, 4);
+  assert.equal(mem.db.schemaVersion, 5);
   assert.equal(mem.db.history, undefined);
   assert.equal(mem.dbHistory.length, 2);
   assert.deepEqual(await OH.getDamaged(), []); // an upgrade isn't damage
@@ -386,7 +386,7 @@ test('an account parked by an older version (history inside, v2) switches back f
     },
   });
   assert.equal((await OH.switchProfile('Main')).restored, true);
-  assert.equal(mem.db.schemaVersion, 4);
+  assert.equal(mem.db.schemaVersion, 5);
   assert.equal(mem.db.history, undefined);
   assert.equal(mem.dbHistory.length, 1);
 });
@@ -680,4 +680,80 @@ test('a complete hangar scan replaces the recovery copy of that account and dama
   assert.equal((await OH.scanSource('hangar', null, { account: acct })).ok, true);
   await settle();
   assert.equal(mem.dbRecovery.db.owner.nickname, 'Wingmate');
+});
+
+// Storage v5 (2026-10-24): the pledge archive keeps only what buy-back details read, as
+// the backup file does. Pictures, giftable, meltable and the worked-out flags go from
+// the live archive, every parked account's and the recovery copy's.
+const fatEntry = (id) => ({
+  id,
+  name: `Package - Ship ${id}`,
+  value: 45,
+  currency: 'USD',
+  contents: [{ kind: 'Ship', label: 'Aurora MR', image: 'https://x/aurora.jpg' }],
+  image: 'https://x/hero.jpg',
+  containsShip: true,
+  isCCU: false,
+  ccu: null,
+  isAddOn: false,
+  isCoupon: false,
+  isPaint: false,
+  kind: 'ship',
+  giftable: true,
+  meltable: true,
+  insurance: 'LTI',
+  date: '2024-05-01',
+  goneAt: 7,
+});
+const leanEntry = (id) => ({
+  id,
+  name: `Package - Ship ${id}`,
+  value: 45,
+  currency: 'USD',
+  insurance: 'LTI',
+  kind: 'ship',
+  date: '2024-05-01',
+  contents: [{ kind: 'Ship', label: 'Aurora MR' }],
+  goneAt: 7,
+});
+
+test('v4 → v5: every pledge archive loses pictures and flags, keeps what details read', async () => {
+  reset({
+    db: { schemaVersion: 4, owner: { nickname: 'Main' }, sources: {} },
+    dbHistory: [],
+    pledgeArchive: { a1: fatEntry('a1') },
+    'profile:alt': {
+      schemaVersion: 4,
+      owner: { nickname: 'Alt' },
+      sources: {},
+      pledgeArchive: { a2: fatEntry('a2') },
+    },
+    dbRecovery: {
+      at: Date.now(),
+      db: { schemaVersion: 4, owner: { nickname: 'Old' }, sources: {} },
+      archive: { a3: fatEntry('a3') },
+    },
+  });
+  await OH.loadDB();
+  await settle();
+  assert.equal(mem.db.schemaVersion, 5);
+  assert.deepEqual(mem.pledgeArchive, { a1: leanEntry('a1') });
+  assert.deepEqual(mem['profile:alt'].pledgeArchive, { a2: leanEntry('a2') });
+  assert.equal(mem['profile:alt'].schemaVersion, 5);
+  assert.deepEqual(mem.dbRecovery.archive, { a3: leanEntry('a3') });
+  assert.equal(mem.dbRecovery.db.schemaVersion, 5);
+  assert.doesNotMatch(JSON.stringify(mem), /x\/(hero|aurora)\.jpg|giftable|meltable/);
+});
+
+test('v4 → v5 leaves an archive kept by v5 alone', async () => {
+  reset({
+    db: { schemaVersion: 5, owner: { nickname: 'Main' }, sources: {} },
+    dbHistory: [],
+    pledgeArchive: { a1: { ...leanEntry('a1'), note: 'kept' } },
+  });
+  await OH.loadDB();
+  await settle();
+  assert.deepEqual(mem.pledgeArchive, { a1: { ...leanEntry('a1'), note: 'kept' } });
+  const v5 = { schemaVersion: 5, sources: {}, pledgeArchive: { a1: fatEntry('a1') } };
+  assert.deepEqual(OH.migrateDB(v5), v5);
 });
