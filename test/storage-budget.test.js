@@ -52,6 +52,7 @@ const BUDGET = {
   bbHistoryRejects: { cap: 'BB_REJECTS_MAX 500 newest', max: 50 * KB },
   bbdSlowDownUntil: small('one timestamp'),
   bbdSlowDowns: small('one count'),
+  bbdMisses: { cap: 'pruned to the current buy-back list, like bbDetails', max: 100 * KB },
   shipImages: {
     cap: 'CACHE_MAX.shipImages 2,000 newest; 90 days (1 day for misses)',
     max: 400 * KB,
@@ -293,6 +294,10 @@ async function fillWorstCase() {
       ]),
     ),
     bbHistoryRejects: timed(500, () => ({ from: 'archive' })),
+    // Every buy-back's page failing (#800): one entry each, pruned like bbDetails.
+    bbdMisses: Object.fromEntries(
+      Array.from({ length: 1000 }, (_, i) => [String(20000000 + i), { n: 5, at: 1.8e12 }]),
+    ),
     // Customize Home at its cap: ten saved layouts with the longest names.
     uiHomeLayout: {
       v: 1,

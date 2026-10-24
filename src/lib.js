@@ -3570,11 +3570,43 @@
   };
   OH.pruneBuybackDetails = async function pruneBuybackDetails(ids) {
     const keep = new Set(ids.map(String));
-    const next = await mutateStored(BBD_KEY, (cur = {}) =>
-      Object.fromEntries(Object.entries(cur).filter(([id]) => keep.has(id))),
-    ).catch(() => null);
+    const only = (cur = {}) =>
+      Object.fromEntries(Object.entries(cur).filter(([id]) => keep.has(id)));
+    const next = await mutateStored(BBD_KEY, only).catch(() => null);
     if (next) bbdMem = next;
+    if ((await chrome.storage.local.get(BBD_MISS_KEY))[BBD_MISS_KEY]) {
+      await mutateStored(BBD_MISS_KEY, only).catch(() => {});
+    }
   };
+  // Pages that failed for a reason that won't pass by itself (RSI answered 404, or the
+  // page couldn't be read): { [pledge id]: { n: failures in a row, at } } (storage key
+  // `bbdMisses`), so the scan's buy-back pages (ui/scan/runner.js readPacks) aren't spent
+  // on them every time (#800). A read clears its entry; pruned with the details.
+  const BBD_MISS_KEY = 'bbdMisses';
+  const BBD_MISS_MS = 24 * 3600e3;
+  const BBD_MISS_MAX_MS = 30 * 24 * 3600e3;
+  OH.getBuybackMisses = async function getBuybackMisses() {
+    return (await chrome.storage.local.get(BBD_MISS_KEY))[BBD_MISS_KEY] || {};
+  };
+  // Until when a scan doesn't ask for a missed page again: a day after the first miss,
+  // doubling with each miss in a row, 30 days at most. 0 for none. Pure.
+  OH.bbdMissUntil = function bbdMissUntil(miss) {
+    if (!isObj(miss) || !Number.isFinite(miss.at)) return 0;
+    const n = Math.max(1, Number(miss.n) || 1);
+    return miss.at + Math.min(BBD_MISS_MS * 2 ** (n - 1), BBD_MISS_MAX_MS);
+  };
+  // Note a batch's misses (ids) and reads (ids), only when something changes.
+  async function noteBuybackMisses(missed, read) {
+    const had = await OH.getBuybackMisses();
+    if (!missed.length && !read.some((id) => had[id])) return;
+    const at = Date.now();
+    await mutateStored(BBD_MISS_KEY, (cur = {}) => {
+      const next = { ...cur };
+      for (const id of read) delete next[id];
+      for (const id of missed) next[id] = { n: (Number(cur[id]?.n) || 0) + 1, at };
+      return next;
+    }).catch(() => {});
+  }
   // Was this buy-back's detail read from its own RSI page? Not when it was filled from
   // this browser's history (`src`) or only half read (`partial`). Only these go in the
   // sync (src/hangar-shape.js withBuybackDetails). Pure.
@@ -3666,6 +3698,8 @@
     let errors = 0;
     let read = 0; // pages read fine
     let fails = 0; // pages in a row that failed for a passing reason
+    const missed = []; // pages that failed for a reason that won't pass (bbdMisses)
+    const got = []; // pages read fine
     for (const [i, id] of todo.entries()) {
       if (!shouldGo()) break;
       const r = await OH.fetchBuybackDetail(id, { rsiOnly });
@@ -3679,12 +3713,17 @@
         const why = r.rateLimited ? 'RSI asked us to slow down' : `${r.error}, with a Retry-After`;
         OH.log('warn', 'buybacks', `details stopped after ${done} pages: ${why}`);
         const busy = r.rateLimited ? {} : { busy: true }; // RSI failing, not a slow-down
+        await noteBuybackMisses(missed, got);
         return { done, errors, total: todo.length, rateLimited: true, retryAt, ...busy };
       }
       if (r.error) {
         errors++;
         if (/signed in/i.test(r.error)) break;
-      } else read++;
+        if (!r.transient) missed.push(String(id));
+      } else {
+        read++;
+        got.push(String(id));
+      }
       fails = r.transient ? fails + 1 : 0;
       done++;
       onProgress?.(done, todo.length);
@@ -3696,6 +3735,7 @@
       if (i < todo.length - 1 && shouldGo()) await sleep(OH.bbdPause(fails));
     }
     if (before && read) await chrome.storage.local.remove(BBD_STRIKES_KEY);
+    await noteBuybackMisses(missed, got);
     return { done, errors, total: todo.length };
   };
 

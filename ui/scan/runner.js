@@ -503,7 +503,9 @@ export function createRunner(env) {
 
   // Up to `max` buy-backs whose own page wasn't read from RSI yet (never read, only half
   // read, or filled from history), in the list's order, paced (src/lib.js
-  // fetchBuybackDetails, rsiOnly). Upgrades have no page. `inScan`: the scan's own read,
+  // fetchBuybackDetails, rsiOnly). Upgrades have no page. A page that failed before
+  // (OH.getBuybackMisses) waits out its time (OH.bbdMissUntil), then goes after the rest,
+  // so a page that never reads doesn't keep a place every scan. `inScan`: the scan's own read,
   // which shows its progress. One read at a time: asked again while it runs, the answer
   // is that one's. → { todo, done, errors, rateLimited?, retryAt? }, once every detail
   // read is saved.
@@ -513,11 +515,14 @@ export function createRunner(env) {
   }
   async function readPacksNow({ max = BB_AUTO_MAX, db, inScan = false } = {}) {
     const details = await OH.getBuybackDetails();
-    const todo = buybacksOf(db || (await OH.loadDB()))
+    const misses = await OH.getBuybackMisses();
+    const due = buybacksOf(db || (await OH.loadDB()))
       .filter((b) => !b.isCCU && !b.ccu && /^\d+$/.test(String(b.id)))
       .filter((b) => !OH.buybackFromRsi(details[b.id]))
-      .slice(0, max)
-      .map((b) => String(b.id));
+      .map((b) => String(b.id))
+      .filter((id) => OH.bbdMissUntil(misses[id]) <= now());
+    const tried = due.filter((id) => misses[id]);
+    const todo = [...due.filter((id) => !misses[id]), ...tried].slice(0, max);
     if (!todo.length) return { todo: 0, done: 0, errors: 0 };
     // Another scan's progress comes first: pages read meanwhile don't say so.
     const say = (page, count) => (inScan || !busy) && setProgress('packs', page, count);

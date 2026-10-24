@@ -191,6 +191,36 @@ test('signed out of RSI mid-batch: stop, and save nothing for that page (#199)',
   assert.deepEqual(Object.keys(await OH.getBuybackDetails()), ['1']);
 });
 
+test('pages that never read are remembered, held a day, then doubling; a read forgets (#800)', async () => {
+  await reset();
+  answer = (id) => (id === '3' ? 404 : 200);
+  OpenHangar.parseBuybackDetail = (html) => (html.includes('odd') ? null : parseOk());
+  body = (id) => (id === '2' ? '<html>odd</html>' : '<html>ok</html>');
+  offline = (id) => id === '5'; // a passing failure: not remembered
+  const t0 = Date.now();
+  await OH.fetchBuybackDetails(ids);
+  const first = await OH.getBuybackMisses();
+  assert.deepEqual(Object.keys(first).sort(), ['2', '3']);
+  assert.equal(first['2'].n, 1);
+  assert.ok(first['2'].at >= t0);
+  // Missed again: counted.
+  await OH.fetchBuybackDetails(['2', '3']);
+  const again = await OH.getBuybackMisses();
+  assert.equal(again['3'].n, 2);
+  // The wait: a day, two, four… 30 days at most.
+  const DAY = 86_400_000;
+  assert.equal(OH.bbdMissUntil({ n: 1, at: 0 }), DAY);
+  assert.equal(OH.bbdMissUntil({ n: 3, at: 0 }), 4 * DAY);
+  assert.equal(OH.bbdMissUntil({ n: 20, at: 0 }), 30 * DAY);
+  assert.equal(OH.bbdMissUntil(undefined), 0);
+  // Read at last: forgotten. Pruned with the details.
+  body = () => '<html>ok</html>';
+  await OH.fetchBuybackDetails(['2']);
+  assert.deepEqual(Object.keys(await OH.getBuybackMisses()), ['3']);
+  await OH.pruneBuybackDetails(['1']);
+  assert.deepEqual(await OH.getBuybackMisses(), {});
+});
+
 // --- Pacing (OH-021): gentle between pages, slower after failures ---------------
 
 test('the pause: 1 to 2 s at random, doubled for each failed page in a row', () => {

@@ -107,6 +107,8 @@ function setup(opts = {}) {
     fillBuybackDetailsFromHistory: async (list) => calls.push(`fill ${list.length}`),
     getBuybackDetails: async () => details,
     buybackFromRsi: (d) => !!d && !d.partial && !d.src,
+    getBuybackMisses: async () => opts.misses || {},
+    bbdMissUntil: (m) => (m ? m.at + 86_400_000 * 2 ** (m.n - 1) : 0),
     fetchBuybackDetails:
       opts.fetchBuybackDetails ||
       (async (ids, onProgress) => {
@@ -691,6 +693,25 @@ test('readPacks: up to the cap, one read at a time, everything saved before it a
     rateLimited: true,
     retryAt: 5,
   });
+});
+
+test('readPacks: a page that failed waits out its time, then goes after the rest (#800)', async () => {
+  const DAY = 86_400_000;
+  const x = await setup({
+    misses: {
+      702: { n: 1, at: 1_000_000 - 1000 }, // failed a moment ago: held a day
+      9: { n: 1, at: 1_000_000 - 2 * DAY }, // its day is over: tried, after the rest
+      703: { n: 3, at: 1_000_000 - 3 * DAY }, // third miss in a row: held 4 days
+    },
+  });
+  await x.runner.readPacks();
+  assert.ok(x.calls.includes('fetchBuybackDetails 11,9'));
+  // With room for one, the page that never failed goes first.
+  await x.runner.readPacks({ max: 1 });
+  assert.equal(
+    x.calls.filter((c) => c.startsWith('fetchBuybackDetails')).at(-1),
+    'fetchBuybackDetails 11',
+  );
 });
 
 test('the portrait: a small copy of the RSI picture, read again only when it changes', async () => {
