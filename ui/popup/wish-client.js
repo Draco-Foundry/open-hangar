@@ -80,6 +80,9 @@ function readItem(i) {
     at: Number.isFinite(i.at) ? i.at : 0,
     // Remind Me, or null when the website doesn't offer it (no switch then).
     remind: typeof i.remind === 'boolean' ? i.remind : null,
+    // In Your Hangar (the website's wishlist_marks), or null when it doesn't say: the
+    // alerts check uses this copy only when every item carries it (src/alerts.js).
+    inHangar: typeof i.inHangar === 'boolean' ? i.inHangar : null,
   };
 }
 // The read → { keys, items } (items null: the website lets the tab only read the list),

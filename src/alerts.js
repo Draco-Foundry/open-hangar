@@ -608,12 +608,34 @@
       return { ...(last || {}), retryAt: now + backoffMs(fails), fails };
     }
   }
+  // The popup's copy of the Wishlist (ui/popup/wish-client.js, `popupWish`: this
+  // connection's, younger than 5 minutes, with its items) → the keys the plain read would
+  // give: every item but those with Remind Me off (an item with no `remind` has no switch,
+  // so it counts) and those the website marks In Your Hangar (`inHangar`: true). Used only
+  // when every item carries that mark (true or false): the plain read leaves owned ships
+  // out, so a copy without the mark can't stand in for it. Null when there is no such copy.
+  // Values written as literals.
+  function popupKeys(rec, link, now) {
+    if (!isObj(rec) || rec.connectedAt !== link.connectedAt || !Array.isArray(rec.items))
+      return null;
+    if (!Number.isFinite(rec.at) || now - rec.at < 0 || now - rec.at >= 5 * 60e3) return null;
+    if (!rec.items.every((i) => isObj(i) && typeof i.inHangar === 'boolean')) return null;
+    return readWish({
+      v: 1,
+      keys: rec.items.filter((i) => i.remind !== false && !i.inHangar).map((i) => i.key),
+    });
+  }
   // The account's Wishlist keys for this connection, from the saved copy or asked again.
   // A 401 or 404 keeps nothing (a link the website no longer knows, or its Wishlist off
   // for this pilot): the hangar rules still run.
-  async function freshWish(env, site, link, rec, now) {
+  async function freshWish(env, site, link, rec, now, popup) {
     const mine = isObj(rec) && rec.connectedAt === link.connectedAt ? rec : null;
     if (mine && mine.retryAt > now) return mine;
+    // The popup's Wishlist tab read the same list a moment ago (with each item's Remind Me
+    // state): its copy is used as it is, so the website is asked once, not twice.
+    const keys = popupKeys(popup, link, now);
+    if (keys)
+      return { keys, at: now, connectedAt: link.connectedAt, retryAt: now + CHECK_MS, fails: 0 };
     try {
       const r = await getJson(env, site + WISH_PATH, { Authorization: `Bearer ${link.token}` });
       const keys = r.ok ? readWish(r.json) : null;
@@ -666,6 +688,7 @@
       STATE_KEY,
       FEED_KEY,
       WISH_KEY,
+      'popupWish',
       'siteLink',
       'siteUrl',
       'remoteStatus',
@@ -708,7 +731,7 @@
           await env.set({ [ON_KEY]: false, [FEED_KEY]: feedRec });
           return { ran: false, why: 'no-share' };
         }
-        wishRec = await freshWish(env, site, link, wishRec, now);
+        wishRec = await freshWish(env, site, link, wishRec, now, s.popupWish);
         save[WISH_KEY] = wishRec;
       }
     }

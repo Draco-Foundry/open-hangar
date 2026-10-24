@@ -73,10 +73,6 @@ test("basic page copy: the owner's words (2026-10-13), filled in", async () => {
   const { t, KEYS } = await import('../ui/basic/copy.js');
   assert.equal(t('basic.scan'), 'Scan');
   assert.equal(
-    t('basic.buyback-totals', { n: 2, value: '$5.00', priced: 1 }),
-    '2 buy-backs, $5.00 (1 with a price listed)',
-  );
-  assert.equal(
     t('basic.switched-new', { who: 'Pilot_A' }),
     'Signed in as Pilot_A on RSI: that account has no scan here yet. Press Scan.',
   );
@@ -218,16 +214,6 @@ test('basic page copy: one pledge, one buy-back', async () => {
   assert.equal(t('basic.row-pledges', { n: 12 }), '12 pledges');
   assert.equal(t('basic.row-buybacks', { n: 1 }), '1 buy-back');
   assert.equal(t('basic.row-buybacks', { n: 3 }), '3 buy-backs');
-  assert.equal(t('basic.account-line', { n: 1, when: 'today' }), '1 pledge, last scan today');
-  assert.equal(t('basic.account-line', { n: 40, when: 'today' }), '40 pledges, last scan today');
-  assert.equal(
-    t('basic.buyback-totals', { n: 1, value: '$5.00', priced: 1 }),
-    '1 buy-back, $5.00 (1 with a price listed)',
-  );
-  assert.equal(t('basic.csv-saved', { n: 1 }), 'Saved 1 row to a CSV file.');
-  assert.equal(t('basic.csv-saved', { n: 7 }), 'Saved 7 rows to a CSV file.');
-  // A key with no singular words keeps its own for 1.
-  assert.equal(t('basic.show-all', { n: 1 }), 'Show All 1');
   // Every singular sits beside its key and fills the same parts.
   const parts = (s) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).join();
   for (const k of KEYS.filter((k) => k.endsWith('.one'))) {

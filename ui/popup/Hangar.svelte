@@ -194,7 +194,7 @@
       </span>
       {#if v.myHangar}
         <button type="button" class="pp-link pp-mine" id="pp-hangar" onclick={() => openTab(v.myHangar)}
-          >Open My Hangar</button
+          >{t('popup.open-my-hangar')}</button
         >
       {/if}
     </div>
@@ -230,9 +230,9 @@
             class="pp-tile"
             id="pp-credit"
             role={creditText.short ? 'group' : null}
-            aria-label={creditText.short ? `Store Credit ${creditText.title}` : null}
+            aria-label={creditText.short ? `${t('popup.store-credit')} ${creditText.title}` : null}
           >
-            <span class="pp-lbl">Store Credit</span><b title={creditText.title || null}>{creditText.text}</b>
+            <span class="pp-lbl">{t('popup.store-credit')}</span><b title={creditText.title || null}>{creditText.text}</b>
           </div>
         {/if}
         {#if tokens}
@@ -270,7 +270,7 @@
         <b>{t('popup.scan-problem')}</b>
         {#each trouble as r (r.id)}<small>{t(STEP[r.id] || 'popup.step-hangar')}: {rowText(r)}</small>{/each}
         <button type="button" class="pp-link" id="pp-report" onclick={() => reportProblem(lastReport)}
-          >Report a Scan Problem</button
+          >{t('popup.report-problem')}</button
         >
       </div>
     {/if}
@@ -370,7 +370,7 @@
   {:else if noRsi}
     <!-- The basic page's card asks the browser (its ask would close the popup). -->
     <button type="button" class="pp-btn primary" id="pp-rsi-allow" onclick={() => openHub()}
-      >Allow Access to RSI</button
+      >{t('popup.allow-rsi')}</button
     >
   {:else if signedOut}
     <button type="button" class="pp-btn primary big" id="pp-login" onclick={() => openTab(rsiSignIn())}

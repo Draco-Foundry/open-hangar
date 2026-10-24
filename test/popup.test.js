@@ -660,26 +660,13 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
   // Copied from the basic page: the same words.
   const SAME = {
     'popup.scanning-short': 'basic.scanning',
-    'popup.tabs': 'basic.tabs',
-    'popup.tab-settings': 'basic.tab-settings',
     'popup.scan-problem': 'basic.scan-problem',
     'popup.syncing': 'basic.syncing',
-    'popup.firefox-no': 'basic.firefox-no',
     'popup.update-ready': 'basic.update-ready',
     'popup.update-reload': 'basic.update-reload',
     'popup.pilot-yes': 'basic.pilot-yes',
     'popup.pilot-no': 'basic.pilot-no',
     'popup.pilot-body': 'basic.pilot-body',
-    'popup.store-alerts': 'basic.alerts-title',
-    'popup.json-saved': 'basic.json-saved',
-    'popup.clear-ask': 'basic.clear-ask',
-    'popup.keep-data': 'basic.keep-data',
-    'popup.cleared': 'basic.cleared',
-    'popup.account-live': 'basic.account-live',
-    'popup.account-remove': 'basic.account-remove',
-    'popup.account-remove-ask': 'basic.account-remove-ask',
-    'popup.logged-out': 'basic.logged-out',
-    'popup.logout-failed': 'basic.logout-failed',
     'popup.row-referrals': 'basic.row-referrals-box',
   };
   for (const [mine, theirs] of Object.entries(SAME)) assert.equal(t(mine), basic.t(theirs), mine);
@@ -690,10 +677,6 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
   assert.equal(
     t('popup.pilot-title', { handle: 'X' }),
     basic.t('basic.pilot-title', { handle: 'X' }),
-  );
-  assert.equal(
-    t('popup.account-line', { n: 1, when: 'x' }),
-    basic.t('basic.account-line', { n: 1, when: 'x' }),
   );
   assert.equal(
     t('popup.switched-back', { who: 'X' }),

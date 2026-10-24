@@ -25,6 +25,8 @@ const item = (key, name, more = {}) => ({
   at: 1,
   // Remind Me: null while the website doesn't offer it (no switch).
   remind: null,
+  // In Your Hangar: null while the website doesn't say.
+  inHangar: null,
   ...more,
 });
 const json = (body, status = 200, headers = {}) =>
@@ -92,6 +94,20 @@ test('the read: items for the tab, keys only when the website keeps them read on
       ['sku:12', 'Ghost Paint', null, null, null],
       ['ccu:900', 'Upgrade to Carrack', null, null, 'Cutlass'],
     ],
+  );
+  // The In Your Hangar mark is kept when it's true or false, else null.
+  const marks = readList({
+    v: 1,
+    keys: ['ship:a', 'ship:b', 'ship:c'],
+    items: [
+      { ...item('ship:a', 'A'), inHangar: true },
+      { ...item('ship:b', 'B'), inHangar: false },
+      { ...item('ship:c', 'C'), inHangar: 'yes' },
+    ],
+  });
+  assert.deepEqual(
+    marks.items.map((i) => i.inHangar),
+    [true, false, null],
   );
   assert.deepEqual(readList({ v: 1, keys: ['sku:1'] }), { keys: ['sku:1'], items: null });
   assert.equal(readList({ v: 2, keys: [] }), null);
@@ -607,6 +623,27 @@ test('the sale line: only with a sale feed, a ship at its cheapest edition', asy
   assert.deepEqual(sale('ccu:5'), { onSale: true, price: 30 });
   assert.deepEqual(sale('ship:zeus'), { onSale: false, price: null });
   assert.deepEqual(sale('sku:99'), { onSale: false, price: null });
+});
+
+test("the row's store link: the sale feed's item for the key, none when the store doesn't sell it", async () => {
+  const { wishItem } = await import('../ui/popup/data.js');
+  const AL = require('../src/alerts.js');
+  assert.equal(wishItem(null), null, 'no feed: no link');
+  const item = wishItem({
+    items: [
+      { id: 'sku-10', kind: 'ship', name: 'Titan WB', price: 55, ships: ['avenger-titan'] },
+      { id: 'upgrade-5', kind: 'upgrade', name: 'Up', price: 30, ships: [] },
+    ],
+  });
+  assert.equal(
+    AL.itemUrl('https://openhangar.space', item('ship:avenger-titan')),
+    'https://openhangar.space/store#item=10',
+  );
+  assert.equal(
+    AL.itemUrl('https://openhangar.space', item('ccu:5')),
+    'https://openhangar.space/store#item=Up',
+  );
+  assert.equal(item('ship:zeus'), null, 'not on sale: plain text');
 });
 
 test('alerts follow Remind Me: on from the switch, off with the last one, left alone otherwise', async () => {
