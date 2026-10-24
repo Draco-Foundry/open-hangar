@@ -210,6 +210,11 @@
           kind: { type: 'string' },
           label: { type: 'string' },
           image: { type: ['string', 'null'] },
+          manufacturer: {
+            description:
+              'The maker line on the item\'s tile, as RSI wrote it ("Aegis Dynamics (AEGS)"); absent when the tile shows none, and in payloads from before it was read (#568).',
+            type: 'string',
+          },
           guessed: { type: 'boolean' },
         },
       },

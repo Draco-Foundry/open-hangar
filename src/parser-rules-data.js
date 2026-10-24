@@ -94,6 +94,7 @@
             'itemKind',
             'itemName',
             'itemImage',
+            'itemMaker',
             'kindFallback',
             'image',
             'gift',
@@ -137,6 +138,10 @@
             itemName: { description: "A tile's name.", $ref: '#/$defs/selector' },
             itemImage: {
               description: "A tile's picture (an inline background-image).",
+              $ref: '#/$defs/selector',
+            },
+            itemMaker: {
+              description: 'A tile\'s maker line, when RSI shows one ("Aegis Dynamics (AEGS)").',
               $ref: '#/$defs/selector',
             },
             kindFallback: {
@@ -965,6 +970,7 @@
         itemKind: '.kind',
         itemName: '.title, .name, .item-name',
         itemImage: '.image',
+        itemMaker: '.liner',
         kindFallback: '.kind',
         image: '.image',
         gift: '.js-gift',
