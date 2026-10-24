@@ -735,6 +735,8 @@ async function scanPage({ run = 'page01-0a0b0c0d0e0f', by = 'offscreen', request
     fillBuybackDetailsFromHistory: async () => {},
     getBuybackDetails: async () => ({}),
     buybackFromRsi: (d) => !!d && !d.partial && !d.src,
+    getBuybackMisses: async () => ({}),
+    bbdMissUntil: () => 0,
     flushBuybackDetails: async () => calls.push('flush'),
     storageSettled: async () => calls.push('settled'),
     siteEnabled: async () => false,
@@ -852,6 +854,8 @@ async function pageAndWorker({ failGet = false } = {}) {
     fillBuybackDetailsFromHistory: async () => {},
     getBuybackDetails: async () => ({}),
     buybackFromRsi: (d) => !!d && !d.partial && !d.src,
+    getBuybackMisses: async () => ({}),
+    bbdMissUntil: () => 0,
     fetchBuybackDetails: async (ids, say) => {
       calls.push('packs');
       say(1, ids.length);
