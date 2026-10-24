@@ -63,9 +63,11 @@ purpose (§3).
 **Data handling summary (for data-disclosure forms):**
 
 - **Data collected:** only the signed-in user's own RSI account data. (The referral
-  section of that account lists the user's own recruits/prospects — other citizens'
-  public handles, monikers, and dates — which are likewise stored locally, and sent
-  only to the user's own openhangar.space account if they connect sync.)
+  section of that account lists the user's own recruits and prospects. The extension
+  keeps only how many there are and each one's dates (and a recruit's referral
+  campaign), never their handles, names or pictures. These are stored locally; each
+  recruit's dates and campaign are sent only to the user's own openhangar.space account
+  if they connect sync, and the prospects list is never sent.)
 - **Where it goes:** stored locally on the user's device. **Nothing is sent to any
   server unless the user opts in to sync** by connecting their own openhangar.space account; once
   connected, the extension syncs after each scan, sending the same data as the JSON
