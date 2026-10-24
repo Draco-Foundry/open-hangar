@@ -14,7 +14,8 @@
  *
  * The backup file (exportPayload, format EXPORT_VERSION):
  *   { app, appVersion, exportedAt, schemaVersion, account, sources, history, pledgeArchive }
- * The sync payload: the same without the referral prospects list (withoutProspects).
+ * The sync payload (syncPayload): the same without the referral prospects list
+ * (withoutProspects), and each history snapshot only its time and pledges.
  * The hangar view (hangarView): the "stored shape", what the website keeps for a
  * synced hangar: the sync payload without history, with no referral code anywhere
  * and the pledge archive capped at ARCHIVE_MAX. schema/sync-payload.schema.json
@@ -124,7 +125,9 @@
     return { db, problems };
   }
 
-  // Keep only well-formed snapshots ({ at, items: [[id, name, value]] }).
+  // Keep only well-formed snapshots ({ at, items: [[id, name, value]] }, and `credit`
+  // when known). Older versions' `checkedAt` (when an unchanged scan last confirmed a
+  // snapshot) goes: no page reads it.
   function cleanSnapshot(x) {
     if (!x || !Number.isFinite(x.at) || !Array.isArray(x.items)) return null;
     const items = x.items
@@ -132,7 +135,6 @@
       .map((r) => [String(r[0]), String(r[1]), Number(r[2]) || 0]);
     const out = { at: x.at, items };
     if (Number.isFinite(x.credit)) out.credit = x.credit;
-    if (Number.isFinite(x.checkedAt)) out.checkedAt = x.checkedAt;
     return out;
   }
 
@@ -212,6 +214,17 @@
     if (!isObj(ref) || !isObj(ref.items) || !('prospectsList' in ref.items)) return payload;
     const { prospectsList, ...items } = ref.items;
     return { ...payload, sources: { ...payload.sources, referral: { ...ref, items } } };
+  }
+
+  // What sync sends: withoutProspects, and each history snapshot as { at, items }. A
+  // snapshot's Store Credit (`credit`, which the popup's value change reads in this
+  // browser) and older versions' `checkedAt` stay out: the website reads neither
+  // (owner, 2026-10-24). Returns a copy, never changes `payload`. Pure.
+  function syncPayload(payload) {
+    const out = withoutProspects(payload);
+    if (!isObj(out) || !Array.isArray(out.history)) return out;
+    const history = out.history.map((s) => (isObj(s) ? { at: s.at, items: s.items } : s));
+    return { ...out, history };
   }
 
   // The archive as the backup file (and so sync) carries it (#388): only what
@@ -519,6 +532,7 @@
     shapeAccount,
     sanitizeSources,
     withoutProspects,
+    syncPayload,
     leanArchive,
     withBuybackDetails,
     exportPayload,

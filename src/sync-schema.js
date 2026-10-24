@@ -323,8 +323,15 @@
                 ],
               },
             },
-            credit: { type: 'number' },
-            checkedAt: { type: 'number' },
+            credit: {
+              description:
+                "Versions before 2026-10-24 only: this version keeps it in the browser and doesn't send it. The website reads neither.",
+              type: 'number',
+            },
+            checkedAt: {
+              description: 'Versions before 2026-10-24 only. The website reads neither.',
+              type: 'number',
+            },
           },
         },
       },
