@@ -941,7 +941,9 @@
     // The last scan's report, its start and the RSI portrait (ui/scan/runner.js) go with
     // the rest, and the popup's copy of the account's Wishlist (read again while
     // connected). So does Auto Scan Daily: its switch (it's off after Clear Data), its
-    // next run, its last run and the parts' last complete reads.
+    // next run, its last run and the parts' last complete reads. And every buy-back page
+    // read (bbDetails) and failed (bbdMisses), with any save of them still waiting.
+    await dropBuybackDetails();
     await chrome.storage.local.remove([
       'popupWish',
       DB_KEY,
@@ -3413,6 +3415,16 @@
   function saveBuybackDetails() {
     clearTimeout(bbdSave);
     bbdSave = setTimeout(flushBuybackDetails, 500);
+  }
+  // Clear Data: the saved details and misses go, and a save still waiting is dropped
+  // rather than writing them back.
+  async function dropBuybackDetails() {
+    clearTimeout(bbdSave);
+    bbdSave = null;
+    bbdMem = null;
+    await bbdFlushed;
+    await storeChain;
+    await chrome.storage.local.remove([BBD_KEY, BBD_MISS_KEY]);
   }
   // A save still waiting goes now (a scan's page that may close next, ui/scan/runner.js).
   // → once every save so far has landed.
