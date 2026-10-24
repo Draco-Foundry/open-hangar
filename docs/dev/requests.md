@@ -8,8 +8,11 @@ loads remote code: what a build can do is fixed when it's built (build-time flag
 
 ## Requests to RSI
 
-- **The Scan stays fast:** list pages only. Anything needing one request per item
-  (buy-back details and the like) is opt-in: a button, with progress, Stop, and a cache.
+- **The Scan stays fast:** list pages, plus up to 30 buy-backs' own pages a scan
+  (owner, 2026-10-24, #798: their price, insurance and contents go in the sync). Each
+  page is read once and kept (`bbDetails`), paced 1 to 2 s apart, and the batch stops at
+  RSI's first slow-down, so a list read whole costs nothing more. Anything else needing
+  one request per item is opt-in: a button, with progress, Stop, and a cache.
 - **Be polite:** an honest User-Agent, one request at a time with pauses, no bursts,
   honor `Retry-After`, back off on 403/429/5xx and stop on a denial, cache where you can.
 
@@ -47,7 +50,7 @@ never more: no buy-back packs. Its budget, per pilot with it switched on:
   never went out: Scan's requests (the account and its dossier, every hangar and
   buy-back page, the referral lists) plus the quick check's and one dashboard read after
   each part (the account check), about Scan's count plus 6. For 150 pledges that's
-  about 27 to 29 requests, against Scan's 23 and up to 30 pack reads.
+  about 27 to 29 requests, against Scan's 23 and up to 30 buy-back pages.
 
 At 5,000 pilots with about one day in five a full read: about 4,000 × 3 + 1,000 × 29, or
 41,000 requests a day, about 0.5 a second spread over the day.

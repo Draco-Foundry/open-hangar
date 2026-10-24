@@ -97,6 +97,29 @@ test('flushBuybackDetails: every detail read is in storage once it answers', asy
   store.bbDetails = JSON.parse(before);
 });
 
+test('rsiOnly: details filled from history are read again from RSI, keeping the melt (#798)', async () => {
+  await reset();
+  answer = () => 200;
+  const all = await OH.getBuybackDetails();
+  all['1'] = { price: 50, melt: 50, src: 'history', ships: [], also: [] };
+  all['2'] = { price: 20, ships: [], also: [], at: 1 }; // read from RSI already
+  // Load Details as before: a detail from history counts as read.
+  assert.deepEqual(await OH.fetchBuybackDetails(['1', '2']), { done: 0, errors: 0, total: 0 });
+  assert.deepEqual(hits, []);
+  // The scan's reads: only pages not read from RSI yet.
+  const r = await OH.fetchBuybackDetails(['1', '2'], null, undefined, { rsiOnly: true });
+  assert.deepEqual(r, { done: 1, errors: 0, total: 1 });
+  assert.deepEqual(hits, ['1']);
+  const now = (await OH.getBuybackDetails())['1'];
+  assert.equal(now.price, 10, "RSI's page price");
+  assert.equal(now.melt, 50, 'the melt value kept');
+  assert.equal(now.src, undefined);
+  assert.ok(OH.buybackFromRsi(now));
+  assert.ok(!OH.buybackFromRsi({ price: 1, src: 'history' }));
+  assert.ok(!OH.buybackFromRsi({ price: 1, partial: true }));
+  assert.ok(!OH.buybackFromRsi(null));
+});
+
 for (const status of [429, 403]) {
   test(`stops the whole batch at the first ${status}, without retrying it`, async () => {
     await reset();

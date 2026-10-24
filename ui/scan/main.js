@@ -91,9 +91,8 @@ const takeAll = () =>
     while (await takeRequest());
   })().finally(() => (taking = null)));
 
-// Every scan asked of this page and the pack reads after them, everything saved, then
-// done. A scan asked for while the packs are read starts at once (kick, below), as on
-// the Open Hangar page, so it never waits on them and goes stale. Once the page is
+// Every scan asked of this page (each reads its buy-back pages before its sync) and any
+// pack read still running, everything saved, then done. Once the page is
 // saying it's done (`closing`), one asked for is the worker's to hand back (`again`).
 // Stopped on an error, it says so, and scans go to the tab (src/scan-host.js).
 let closing = false;
