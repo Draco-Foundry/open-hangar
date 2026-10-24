@@ -1,1 +1,0 @@
-- Improved: **Ship makers.** Scan now also saves the maker RSI shows under each ship in your hangar, and sync sends it to openhangar.space. After this update the popup marks your last scan as old until you scan again.

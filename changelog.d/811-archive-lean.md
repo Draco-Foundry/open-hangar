@@ -1,1 +1,0 @@
-- Changed: **A leaner pledge archive.** Pledges that have left your hangar are kept without pictures or giftable and meltable flags.

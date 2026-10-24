@@ -1,1 +1,0 @@
-- Changed: **Privacy policy updated.** It now says Scan reads up to 30 buy-backs' own pages and Auto Scan Daily doesn't, sync sends their price, insurance and contents, recruits are kept as dates only, and recovery copies go after 30 days.

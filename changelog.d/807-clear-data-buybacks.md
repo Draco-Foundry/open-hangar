@@ -1,1 +1,0 @@
-- Fixed: **Clear Data clears everything.** It now also removes the buy-back details saved from their RSI pages.
