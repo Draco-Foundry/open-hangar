@@ -6,6 +6,8 @@
 // were taken from lib.js as it was before it (this test passes on that commit too).
 // Changed on purpose since: 2026-10-24, recruit and prospect rows keep only their dates
 // (test/stored-data.js holds them that way; storage v4, src/lib.js MIGRATIONS).
+// 2026-10-24 too: sync bodies send each history snapshot without its Store Credit
+// (src/hangar-shape.js syncPayload); backup files are unchanged.
 // Run: `npm test`.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -64,13 +66,13 @@ const GOLDEN = {
   },
   'everything, signed in, with settings around it': {
     backup: 'b020635f6ad917423f1a4e7cc4fdf2a4962c034fc26f747f34ea36b8419f5554',
-    sync: '316d0cc2e778cbb9d2b8bf22ce60d33d0bd589642a0b2edd692192a8b2a3e039',
-    small: '9ae145663e3ebf248e3ebd3677c8971bc2fb91c5fbcd2a9e92dd9b8258604473',
+    sync: '15be9565fbc6d5416987d35ccf120aa723805e9ef4ac761f6a91f957a4721835',
+    small: '6195061238bc4db1fd3248494a055276bff965311545393da89c415ac44afbd5',
   },
   'signed out of RSI: the account block comes from the owner': {
     backup: 'de8e40dffd5450cf3f56efb32816dde4e6ce51cff5fc528f77d88a16a095aa8a',
-    sync: 'e8d80b28d3a303ffd210e88173e6e4317d13c6f5a31fa97ef03b05ac06d2f1b4',
-    small: 'fecdac234261f927b03d31416aac0eba2d070120ec9fec6d538a7d24f4abed8b',
+    sync: '7fd58e81c50803f73c40f52c4312769d236b81c8a27ebb5cd237a3e72f815dc6',
+    small: '454f20920fc93e2e473f2cab54aa703c5c41032b769b138be91c0a76dc05cb6e',
   },
   'no account known at all': {
     backup: '0409beafb556b57bea1ba60b592869de8f275ca312a02d3c9c8d71c9968f4514',
@@ -79,8 +81,8 @@ const GOLDEN = {
   },
   'a referral block without its code (an imported backup)': {
     backup: '38bf0a3df8a357dd6aa319fbd5d64ec41f138fed5d0bba5b29dc569d9fcbec9f',
-    sync: '2dd62d094632bf02c153b59112acd6578fe392d10ad708a6d213b6a3891dd566',
-    small: 'a0dcad413703b991b67237a7faf6b451249fb09a12843bfa0feea191e1286a97',
+    sync: 'f016db2d18d46b49361caf6381b107b96ce9c6542e80b5151bd04e3a921e6309',
+    small: 'c6e6738e6d62fdf556051dc06449d397d3c90f0d629cdcaed046cb3a105f47fc',
   },
   'before the versioned database (hangar and scannedAt at the top)': {
     backup: 'ca661d5cf51edbbfcd9d7b48a005fc96c6486788baee0a4ae1677aedd0d161f7',
@@ -99,8 +101,8 @@ const GOLDEN = {
   },
   'a big account: 2,105 archived pledges and 300 in the hangar': {
     backup: 'e2fc23928f2183896534304b74fdd77db42af5b60342e9e2087ed7edef58e5e8',
-    sync: '0a3a32ebc29154f31190b8f8359bdf8062312f3b7deed95c4654c825d54cbba8',
-    small: 'b22352ef7ee664a8db710115dc8d339b903039d5fbfa8cc306da59ef01283987',
+    sync: '18d3be2785af2a1b3efb10a4a1cc1aba58388b4de60132e2f343ecc824f04e5c',
+    small: '91dc7b80ce713c8b35024ef85721d06fffc9d814a7193926f16e4b3fdb8e677a',
   },
 };
 const SMALL_BUDGET = 3000;
@@ -130,5 +132,5 @@ test('unchanged: the body Sync Now sends', async () => {
   await OH.siteSync();
   await OH.storageSettled();
   assert.equal(posted.length, 1);
-  assert.equal(sha(posted[0]), '316d0cc2e778cbb9d2b8bf22ce60d33d0bd589642a0b2edd692192a8b2a3e039');
+  assert.equal(sha(posted[0]), '15be9565fbc6d5416987d35ccf120aa723805e9ef4ac761f6a91f957a4721835');
 });

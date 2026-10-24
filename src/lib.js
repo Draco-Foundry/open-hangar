@@ -797,6 +797,12 @@
         await setAside('history', h, [`${h.length - kept.length} unreadable snapshot(s)`]);
         needsWrite = true;
       }
+      // Older versions noted when an unchanged scan last confirmed a snapshot
+      // (`checkedAt`); no page reads it, so it goes with the next write (2026-10-24).
+      if (kept.some((s) => 'checkedAt' in s)) {
+        kept = kept.map(({ checkedAt, ...s }) => s);
+        needsWrite = true;
+      }
     } else if (h !== undefined) {
       await setAside('history', h, ['unreadable history']);
       needsWrite = true;
@@ -4225,9 +4231,9 @@
 
   // What sync sends: the backup file's payload without the referral prospects list
   // (other players who used your code but aren't recruits yet stay in this browser;
-  // their count still goes). Returns a copy, never changes `payload`. Pure
-  // (src/hangar-shape.js withoutProspects).
-  OH.syncPayload = SHAPE.withoutProspects;
+  // their count still goes), and each history snapshot without its Store Credit.
+  // Returns a copy, never changes `payload`. Pure (src/hangar-shape.js syncPayload).
+  OH.syncPayload = SHAPE.syncPayload;
 
   // Whose hangar a sync sends. The link is one per browser, but a browser can keep
   // more than one RSI account (OH.switchProfile parks the others), so the link
@@ -5435,8 +5441,7 @@
     return { added, removed, changed, melt: meltOf(b) - meltOf(a) };
   };
 
-  // Append a snapshot to db.history unless nothing changed (then just note when
-  // it was last confirmed). Seeds the history from the previous scan first, so
+  // Append a snapshot to db.history unless nothing changed. Seeds the history from the previous scan first, so
   // the very first scan after this feature shipped already has a "before".
   function recordHistory(db, prevHangar, items, at, credit) {
     const hist = Array.isArray(db.history) ? db.history : [];
@@ -5447,7 +5452,6 @@
     const last = hist[hist.length - 1];
     const d = last && OH.diffSnapshots(last, snap);
     if (d && sameSnapshot(last, snap, d)) {
-      last.checkedAt = at;
       // First scan that knows the credit: fill it in rather than add a snapshot.
       if (!Number.isFinite(last.credit) && Number.isFinite(credit)) last.credit = credit;
     } else hist.push(snap);
@@ -5471,9 +5475,7 @@
     for (const snap of [...byAt.values()].sort((x, y) => x.at - y.at)) {
       const last = out[out.length - 1];
       const d = last && OH.diffSnapshots(last, snap);
-      if (d && sameSnapshot(last, snap, d)) {
-        last.checkedAt = Math.max(last.checkedAt || last.at, snap.checkedAt || snap.at);
-      } else out.push(snap);
+      if (!(d && sameSnapshot(last, snap, d))) out.push(snap);
     }
     return OH.trimHistory(out);
   };

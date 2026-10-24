@@ -444,6 +444,47 @@ const withReferral = () => {
   return db;
 };
 
+// Scan history: each snapshot goes as its time and pledges only. Its Store Credit (which
+// the popup's value change reads here) and an older version's checkedAt stay in this
+// browser: the website reads neither (owner, 2026-10-24).
+test('sync sends history without Store Credit or checkedAt; the backup file keeps the credit', async () => {
+  const db = scanned(Date.now() - 60_000);
+  db.history = [
+    { at: 1, items: [['p1', 'Gladius', 90]], credit: 12.5, checkedAt: 5 },
+    { at: 2, items: [['p1', 'Gladius', 95]], credit: 20 },
+  ];
+  linked(db);
+  answer = () => new Response(JSON.stringify({ ok: true, synced_at: 1 }), { status: 200 });
+  await OH.siteSync();
+  assert.deepEqual(sent[0].history, [
+    { at: 1, items: [['p1', 'Gladius', 90]] },
+    { at: 2, items: [['p1', 'Gladius', 95]] },
+  ]);
+  const backup = await OH.exportDB();
+  assert.deepEqual(
+    backup.history.map((s) => s.credit),
+    [12.5, 20],
+  );
+  assert.equal(
+    backup.history.some((s) => 'checkedAt' in s),
+    false,
+    'checkedAt is no longer kept',
+  );
+  await OH.storageSettled();
+  assert.equal(
+    mem.dbHistory.some((s) => 'checkedAt' in s),
+    false,
+    'and goes from storage',
+  );
+  assert.equal(mem.dbHistory[0].credit, 12.5);
+});
+
+test('OH.syncPayload leaves the payload it is given alone', () => {
+  const payload = { history: [{ at: 1, items: [], credit: 3 }] };
+  assert.deepEqual(OH.syncPayload(payload).history, [{ at: 1, items: [] }]);
+  assert.equal(payload.history[0].credit, 3);
+});
+
 test('sync leaves the prospects list out; the backup file keeps it', async () => {
   linked(withReferral());
   answer = () => new Response(JSON.stringify({ ok: true, synced_at: 1 }), { status: 200 });
