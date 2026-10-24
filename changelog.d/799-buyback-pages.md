@@ -1,1 +1,1 @@
-- Improved: **Buy-back details.** Each scan reads up to 30 buy-backs it hasn't read yet on their own RSI pages, so their price, insurance and contents sync to openhangar.space.
+- Improved: **Buy-back details.** Scan now also reads the RSI pages of up to 30 buy-backs it hasn't read yet (upgrades have none), so their price, insurance and contents sync to openhangar.space.
