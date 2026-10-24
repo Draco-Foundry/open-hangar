@@ -77,7 +77,7 @@ test('siteExportAccounts reads the wrapper, skips accounts never synced', () => 
 test('one account: imported like a backup, owned by its handle, history kept', async () => {
   const snap = { at: 1, items: [['9', 'Ship 9', 50]] };
   mem = {
-    db: { schemaVersion: 3, sources: { hangar: { items: [pledge(9)], scannedAt: 1 } } },
+    db: { schemaVersion: 4, sources: { hangar: { items: [pledge(9)], scannedAt: 1 } } },
     dbHistory: [snap],
   };
   const res = await OH.importDB(siteFile(['Main', synced('Main', [1, 2]), 50]));
@@ -136,7 +136,7 @@ test('several accounts: the one this data belongs to wins over the signed-in one
   const snap = { at: 1, items: [['1', 'Ship 1', 50]] };
   mem = {
     db: {
-      schemaVersion: 3,
+      schemaVersion: 4,
       owner: { nickname: 'Main' },
       sources: { hangar: { items: [pledge(1)], scannedAt: 1 } },
     },
@@ -168,7 +168,7 @@ test("data here for an account the file doesn't have is parked, not overwritten"
   const snap = { at: 1, items: [['8', 'Ship 8', 50]] };
   mem = {
     db: {
-      schemaVersion: 3,
+      schemaVersion: 4,
       owner: { nickname: 'Other' },
       sources: { hangar: { items: [pledge(8)], scannedAt: 1 } },
     },
@@ -190,9 +190,9 @@ test("data here for an account the file doesn't have is parked, not overwritten"
 test('an account already parked here keeps its history; the file refreshes its hangar', async () => {
   const snap = { at: 1, items: [['2', 'Ship 2', 50]] };
   mem = {
-    db: { schemaVersion: 3, owner: { nickname: 'Main' }, sources: {} },
+    db: { schemaVersion: 4, owner: { nickname: 'Main' }, sources: {} },
     'profile:alt': {
-      schemaVersion: 3,
+      schemaVersion: 4,
       owner: { nickname: 'Alt' },
       sources: { hangar: { items: [pledge(2)], scannedAt: 1 } },
       history: [snap],
@@ -223,7 +223,7 @@ test('an account already parked here keeps its history; the file refreshes its h
 });
 
 test('a website file with nothing synced, or too new, is refused and changes nothing', async () => {
-  mem = { db: { schemaVersion: 3, sources: { hangar: { items: [pledge(1)], scannedAt: 1 } } } };
+  mem = { db: { schemaVersion: 4, sources: { hangar: { items: [pledge(1)], scannedAt: 1 } } } };
   const before = structuredClone(mem);
   let res = await OH.importDB(siteFile(['Main', null, 0]));
   assert.equal(res.ok, false);

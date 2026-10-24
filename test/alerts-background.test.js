@@ -37,7 +37,7 @@ const FEED = {
   ],
 };
 const DB = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   sources: {
     hangar: {
       scannedAt: Date.now(),

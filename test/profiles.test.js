@@ -103,7 +103,7 @@ test('round trips through many big accounts lose nothing and mix nothing (#199)'
         .map((p) => [p.id, p.name, p.value]),
     }));
   const scanned = (k) => ({
-    schemaVersion: 3,
+    schemaVersion: 4,
     owner: { nickname: nick(k), displayname: `${nick(k)} D` },
     sources: {
       hangar: { items: items(k), scannedAt: 1000 + k },

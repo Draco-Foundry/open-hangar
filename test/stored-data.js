@@ -67,10 +67,6 @@ function buyback(i) {
 // prospects (other players: invented here).
 function referral() {
   const row = (n, campaign) => ({
-    id: String(900 + n),
-    handle: `Recruit${n}`,
-    moniker: `Recruit ${n}`,
-    avatar: null,
     enlistedOn: '2025-02-03',
     convertedOn: '2025-03-04',
     ...(campaign ? { campaign } : {}),
@@ -150,7 +146,7 @@ function states() {
     remindRescan: true,
     currency: 'EUR',
     'profile:wingmate': {
-      schemaVersion: 3,
+      schemaVersion: 4,
       owner: { nickname: 'Wingmate', displayname: null },
       sources: { hangar: { items: [pledge(9)], scannedAt: AT - 5 } },
     },
@@ -159,7 +155,7 @@ function states() {
   };
   const full = {
     db: {
-      schemaVersion: 3,
+      schemaVersion: 4,
       owner: { nickname: 'TestPilot', displayname: 'TestPilot Prime' },
       sources: {
         hangar: {
@@ -193,7 +189,7 @@ function states() {
     },
     {
       name: 'no account known at all',
-      mem: { db: { schemaVersion: 3, sources: { hangar: { items: hangar, scannedAt: AT } } } },
+      mem: { db: { schemaVersion: 4, sources: { hangar: { items: hangar, scannedAt: AT } } } },
     },
     {
       name: 'a referral block without its code (an imported backup)',
@@ -226,7 +222,7 @@ function states() {
       name: 'damaged rows and a bad scan time',
       mem: {
         db: {
-          schemaVersion: 3,
+          schemaVersion: 4,
           owner: { nickname: 'TestPilot' },
           sources: {
             hangar: { items: [pledge(1), null, 'x', pledge(2)], scannedAt: 'not a time' },

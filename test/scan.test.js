@@ -481,7 +481,7 @@ test('peekSource: buy-backs compare their token count too', async () => {
   await reset();
   const page = { items: [{ id: 'b1', name: 'Cutlass' }], tokens: 2 };
   store.db = {
-    schemaVersion: 3, // as stored today (an older one is written back once)
+    schemaVersion: 4, // as stored today (an older one is written back once)
     sources: { buybacks: { items: page.items, scannedAt: 1, meta: { tokens: 2 } } },
   };
   // status.json as the pages cached it (its cache is the one thing a check may refresh).

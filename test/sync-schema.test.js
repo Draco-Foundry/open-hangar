@@ -98,7 +98,7 @@ test('vectors hold invented data only: no real players, no real referral codes',
 
 test('what the extension really sends fits: every stored state, synced and as a hangar view', () => {
   for (const { name, mem } of states()) {
-    const db = SHAPE.checkDB(mem.db ?? { schemaVersion: 3, sources: {} }).db;
+    const db = SHAPE.checkDB(mem.db ?? { schemaVersion: 4, sources: {} }).db;
     const backup = SHAPE.exportPayload({
       db,
       account: mem.account,
@@ -241,7 +241,7 @@ test('checker: a payload as big as sync allows is checked in good time', () => {
       SHAPE.withoutProspects(
         SHAPE.exportPayload({
           db: {
-            schemaVersion: 3,
+            schemaVersion: 4,
             sources: {
               hangar: { items: Array.from({ length: 1500 }, (_, i) => pledge(i)), scannedAt: 1 },
             },

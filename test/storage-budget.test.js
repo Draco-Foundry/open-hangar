@@ -246,7 +246,7 @@ function account(nick) {
   }
   return {
     db: {
-      schemaVersion: 3,
+      schemaVersion: 4,
       owner: { nickname: nick },
       sources: {
         hangar: { items, scannedAt: 5 },
@@ -666,7 +666,7 @@ test('past the warning line: a log warning, nothing deleted', async () => {
 });
 
 test('the error report (and so a scan problem report) carries the total, a number only', async () => {
-  mem = { db: { schemaVersion: 3, sources: {} }, 'profile:secrethandle': { x: 1 } };
+  mem = { db: { schemaVersion: 4, sources: {} }, 'profile:secrethandle': { x: 1 } };
   const report = await OH.errorReport();
   assert.match(report, /^Storage: +\d+ B$/m);
   assert.ok(!report.includes('secrethandle'));

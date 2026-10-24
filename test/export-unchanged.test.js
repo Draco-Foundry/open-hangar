@@ -4,6 +4,8 @@
 // backup file (OH.exportDB), the sync payload (OH.syncPayload, OH.syncBody) and the
 // body Sync Now really sends are the text they were before the move. The hashes below
 // were taken from lib.js as it was before it (this test passes on that commit too).
+// Changed on purpose since: 2026-10-24, recruit and prospect rows keep only their dates
+// (test/stored-data.js holds them that way; storage v4, src/lib.js MIGRATIONS).
 // Run: `npm test`.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -61,14 +63,14 @@ const GOLDEN = {
     small: '00f88770dde31675dba9d58bfe42cadca64a86a121c22beb23bf1a7a7d9b2b98',
   },
   'everything, signed in, with settings around it': {
-    backup: 'd51aa6b71154d201a3019927e27b17b865e56a2c6c25edfea1fec974b77bcbd3',
-    sync: '1be5e9be7ece68d5af1bf1d774617bafb69cbc494822fa335678ce3057545eec',
-    small: 'ffb7d5cadd475d77c4a34cc306bb25d43d21d165a4de9e5fcb9b48837e4bb482',
+    backup: 'b020635f6ad917423f1a4e7cc4fdf2a4962c034fc26f747f34ea36b8419f5554',
+    sync: '316d0cc2e778cbb9d2b8bf22ce60d33d0bd589642a0b2edd692192a8b2a3e039',
+    small: '9ae145663e3ebf248e3ebd3677c8971bc2fb91c5fbcd2a9e92dd9b8258604473',
   },
   'signed out of RSI: the account block comes from the owner': {
-    backup: '0b83239e99cb9128664f73df193e040431561e7776076e9b752c2f2fbcb87705',
-    sync: '882439afc6e31516a0e79bfbc8817390988c9c57e05484b18fb40f7c4965b6a1',
-    small: '19f8bc5c90277c180a5a2279f559077d8c887634b6ed6767d5351da014078484',
+    backup: 'de8e40dffd5450cf3f56efb32816dde4e6ce51cff5fc528f77d88a16a095aa8a',
+    sync: 'e8d80b28d3a303ffd210e88173e6e4317d13c6f5a31fa97ef03b05ac06d2f1b4',
+    small: 'fecdac234261f927b03d31416aac0eba2d070120ec9fec6d538a7d24f4abed8b',
   },
   'no account known at all': {
     backup: '0409beafb556b57bea1ba60b592869de8f275ca312a02d3c9c8d71c9968f4514',
@@ -86,9 +88,9 @@ const GOLDEN = {
     small: '0da5e134a4d9b575a02ee707da551c7975b7d796ab5ec00c5cbbaf58d81545a9',
   },
   'a v2 database with its history inside': {
-    backup: 'dadb7cc95a4304eab294d4e9dfe5c096d01d3b079b4c93b0f3acc51cd8042a8e',
-    sync: '1300780c5be92508768005077ceaeff26f3e756d843e2abf18d8345e78d295aa',
-    small: '1300780c5be92508768005077ceaeff26f3e756d843e2abf18d8345e78d295aa',
+    backup: '7a3c821a8f23da4ed202c8afb0deab3294dddf68193e9e58511767def7804efc',
+    sync: '262c00668a10ac4bd27f01c4ffed1f8328e26f21542deb8006090af11539b309',
+    small: '262c00668a10ac4bd27f01c4ffed1f8328e26f21542deb8006090af11539b309',
   },
   'damaged rows and a bad scan time': {
     backup: 'fdaaf0e75b4157411eca8a0742daa50f41f6ccde54c9be30eba40c1c84f15498',
@@ -96,9 +98,9 @@ const GOLDEN = {
     small: 'd9c69a6e63dac2c20fb6c56726a28d00d0b9333e5029e5d6e7fe1597866bbd87',
   },
   'a big account: 2,105 archived pledges and 300 in the hangar': {
-    backup: '5991e39217a8199f565c83448b1b8074a3ecb43f9f35457649da9fd26b012d53',
-    sync: 'bce5faf4f4637ce14d76397e847bc1505a929ab45c4181a9e5bf76bd82df8b29',
-    small: '8672a1d4de2a79137da164c25e4ec3cc0be4eee0e93d8bbd18abe7d5b878eb56',
+    backup: 'e2fc23928f2183896534304b74fdd77db42af5b60342e9e2087ed7edef58e5e8',
+    sync: '0a3a32ebc29154f31190b8f8359bdf8062312f3b7deed95c4654c825d54cbba8',
+    small: 'b22352ef7ee664a8db710115dc8d339b903039d5fbfa8cc306da59ef01283987',
   },
 };
 const SMALL_BUDGET = 3000;
@@ -128,5 +130,5 @@ test('unchanged: the body Sync Now sends', async () => {
   await OH.siteSync();
   await OH.storageSettled();
   assert.equal(posted.length, 1);
-  assert.equal(sha(posted[0]), '1be5e9be7ece68d5af1bf1d774617bafb69cbc494822fa335678ce3057545eec');
+  assert.equal(sha(posted[0]), '316d0cc2e778cbb9d2b8bf22ce60d33d0bd589642a0b2edd692192a8b2a3e039');
 });

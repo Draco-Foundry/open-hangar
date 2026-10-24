@@ -285,13 +285,9 @@
       }
     },
     "recruit": {
-      "description": "A recruit as RSI lists it, each value passed on as it is, and the campaign the extension tags it with.",
+      "description": "A recruit's dates as RSI lists them, each passed on as it is, and the campaign the extension tags it with. Never who the recruit is: no RSI id, handle, moniker or avatar (versions before 2026-10-24 sent them; the website drops them).",
       "type": "object",
       "properties": {
-        "id": { "$ref": "#/$defs/scalar" },
-        "handle": { "$ref": "#/$defs/scalar" },
-        "moniker": { "$ref": "#/$defs/scalar" },
-        "avatar": { "$ref": "#/$defs/scalar" },
         "enlistedOn": { "$ref": "#/$defs/scalar" },
         "convertedOn": { "$ref": "#/$defs/scalar" },
         "campaign": { "enum": ["current", "legacy"] }
