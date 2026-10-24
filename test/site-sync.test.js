@@ -681,7 +681,7 @@ test("a link's first sync asks when this browser keeps another account too", asy
   linked(scanned(Date.now() - 60_000));
   signedInAs('Pilot_B', '2002');
   mem['profile:pilot_a'] = {
-    schemaVersion: 4,
+    schemaVersion: 5,
     sources: { hangar: { scannedAt: 1, items: [] } },
     owner: { nickname: 'Pilot_A', displayname: 'Pilot_A' },
   };
