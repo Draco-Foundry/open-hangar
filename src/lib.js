@@ -4018,12 +4018,14 @@
     });
   }
   // A new link replacing this one would switch accounts: a link is kept, and the new one
-  // names another account (or either has no name to tell by). Then the extension's own
-  // page asks first, naming both (ui/basic/hub.svelte.js connect), before anything is
-  // replaced or synced (connect hardening, #669). The same token, the same name or no
-  // link yet: no question. Pure.
+  // is another account. Told apart by the website's account id (`account`) when both
+  // links have one (#765), else by name (links saved before it, or either with no name
+  // to tell by: asked). Then the extension's own page asks first, naming both
+  // (ui/basic/hub.svelte.js connect), before anything is replaced or synced (connect
+  // hardening, #669). The same token, the same account or no link yet: no question. Pure.
   OH.siteSwitches = function siteSwitches(was, link) {
     if (!was?.token || !link || was.token === link.token) return false;
+    if (was.account && link.account) return was.account !== link.account;
     return !was.name || !link.name || was.name !== link.name;
   };
   // A sync token given back unused (the new link refused at that question): revoked, so
@@ -4072,6 +4074,7 @@
         const link = {
           token: j.token,
           name: j.name || '',
+          ...(j.account ? { account: String(j.account) } : {}),
           connectedAt: Date.now(),
           lastSync: null,
         };

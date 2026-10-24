@@ -5044,7 +5044,13 @@ async function siteConnectWindow() {
   });
   if (!res.ok) throw new Error("openhangar.space couldn't finish connecting. Connect again.");
   const j = await res.json();
-  const link = { token: j.token, name: j.name || '', connectedAt: Date.now(), lastSync: null };
+  const link = {
+    token: j.token,
+    name: j.name || '',
+    ...(j.account ? { account: String(j.account) } : {}),
+    connectedAt: Date.now(),
+    lastSync: null,
+  };
   await chrome.storage.local.set({ siteLink: link });
   return { link, sync: answer.get('sync') === '1' };
 }
