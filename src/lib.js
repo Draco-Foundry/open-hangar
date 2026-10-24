@@ -689,8 +689,9 @@
   };
 
   // --- Damaged data, set aside ------------------------------------------------
-  // Up to three originals that failed the check, newest last, kept until the
-  // user clears their data: { id, at, what: 'db' | 'history', problems, raw }.
+  // Up to three originals that failed the check, newest last, kept 30 days at most
+  // (pruneRecoveryCopies) or until the user clears their data:
+  // { id, at, what: 'db' | 'history', problems, raw }.
   // `id` is a hash of the content, so the same damage is only kept once.
   const CORRUPT_MAX = 3;
   function hashText(s) {
@@ -729,7 +730,8 @@
     const { [CORRUPT_KEY]: cur } = await chrome.storage.local.get(CORRUPT_KEY);
     return Array.isArray(cur) ? cur : [];
   };
-  // Hide the notice for what's set aside now (the copies stay until Clear Data).
+  // Hide the notice for what's set aside now (the copies stay until they expire or
+  // Clear Data).
   OH.dismissDamaged = async function dismissDamaged() {
     const { [CORRUPT_KEY]: cur } = await chrome.storage.local.get(CORRUPT_KEY);
     if (!Array.isArray(cur) || !cur.length) return;
@@ -795,10 +797,16 @@
     await chrome.storage.local.set(out);
   }
 
-  // Load the whole DB (with .history). Always the expected shape.
+  // Load the whole DB (with .history). Always the expected shape. The first load on a
+  // page also lets recovery copies past their 30 days go (pruneRecoveryCopies).
+  let prunedThisPage = false;
   OH.loadDB = async function loadDB() {
     const { db, needsWrite } = await readDB();
     if (needsWrite) queueFixUp();
+    if (!prunedThisPage) {
+      prunedThisPage = true;
+      exclusive(() => pruneRecoveryCopies()).catch(() => {});
+    }
     return db;
   };
   // Write the checked/migrated DB back, in the save queue: it reads storage again
@@ -892,6 +900,11 @@
         [PARSER_KEY]: { ...(isObj(stamps) ? stamps : {}), [id]: SHAPE.PARSER_VERSION },
       });
       await chrome.storage.local.remove(['hangar', 'scannedAt']); // drop legacy keys
+      // A complete hangar scan replaces recovery copies; any save lets old ones go.
+      const good = record && id === 'hangar';
+      await pruneRecoveryCopies(
+        good ? { scan: { at: scannedAt, owner: db.owner ? db.owner.nickname : null } } : {},
+      );
       return scannedAt;
     });
   }
@@ -968,12 +981,66 @@
   }
 
   // The most recent auto-cleared snapshot ({ at, db }), or null. Lets the UI
-  // offer a one-click restore after a different-account auto-clear.
+  // offer a one-click restore after a different-account auto-clear. One past its 30
+  // days is null too (pruneRecoveryCopies removes it).
   OH.getRecovery = async function getRecovery() {
     const raw = await chrome.storage.local.get(RECOVERY_KEY);
     const rec = raw[RECOVERY_KEY];
-    return rec && isObj(rec.db) && rec.db.schemaVersion ? rec : null;
+    if (!rec || !isObj(rec.db) || !rec.db.schemaVersion) return null;
+    return Number.isFinite(rec.at) && Date.now() - rec.at > RECOVERY_MAX_AGE ? null : rec;
   };
+
+  // Recovery copies (the recovery slot and the damaged originals set aside, dbCorrupt)
+  // are kept 30 days after they're made, and go sooner when a complete hangar scan
+  // replaces them (owner, 2026-10-24): the recovery copy when it holds the account
+  // just scanned, and every damaged database copy made before the scan (it wrote a
+  // sound one). A damaged history copy isn't replaced by a scan, so it waits out its
+  // 30 days. A copy with no time is stamped now and gets its 30 days from here.
+  // `scan`: { at, owner } of a complete hangar scan just saved. Runs in the save
+  // queue (saveSource, and once per page from loadDB).
+  const RECOVERY_MAX_AGE = 30 * 86400000;
+  async function pruneRecoveryCopies({ scan = null, now = Date.now() } = {}) {
+    const got = await chrome.storage.local.get([RECOVERY_KEY, CORRUPT_KEY]);
+    const expired = (at) => now - at > RECOVERY_MAX_AGE;
+    const drop = [];
+    const set = {};
+    const rec = got[RECOVERY_KEY];
+    if (rec !== undefined) {
+      const owner =
+        isObj(rec) && isObj(rec.db) && isObj(rec.db.owner) ? rec.db.owner.nickname : null;
+      const replaced =
+        !!scan &&
+        typeof owner === 'string' &&
+        typeof scan.owner === 'string' &&
+        owner.toLowerCase() === scan.owner.toLowerCase();
+      if (!isObj(rec) || replaced || (Number.isFinite(rec.at) && expired(rec.at)))
+        drop.push(RECOVERY_KEY);
+      else if (!Number.isFinite(rec.at)) set[RECOVERY_KEY] = { ...rec, at: now };
+    }
+    const list = got[CORRUPT_KEY];
+    if (list !== undefined) {
+      let changed = !Array.isArray(list);
+      const keep = [];
+      for (const x of Array.isArray(list) ? list : []) {
+        if (!isObj(x)) {
+          changed = true;
+          continue;
+        }
+        const at = Number.isFinite(x.at) ? x.at : now;
+        if (expired(at) || (scan && x.what === 'db' && at <= scan.at)) {
+          changed = true;
+          continue;
+        }
+        if (at !== x.at) changed = true;
+        keep.push(at === x.at ? x : { ...x, at });
+      }
+      if (!keep.length) drop.push(CORRUPT_KEY);
+      else if (changed) set[CORRUPT_KEY] = keep;
+    }
+    if (Object.keys(set).length) await chrome.storage.local.set(set);
+    if (drop.length) await chrome.storage.local.remove(drop);
+  }
+  OH.pruneRecoveryCopies = (opts) => exclusive(() => pruneRecoveryCopies(opts));
 
   // Restore a previously auto-cleared snapshot back into the live DB (history
   // included) and drop the recovery slot. Returns the restored DB, or null if
