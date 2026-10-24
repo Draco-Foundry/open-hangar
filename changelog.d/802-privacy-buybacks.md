@@ -1,0 +1,1 @@
+- Changed: **Privacy policy updated.** It now says Scan reads up to 30 buy-backs' own pages, Auto Scan Daily doesn't, and sync sends their price, insurance and contents.
