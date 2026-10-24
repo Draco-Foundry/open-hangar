@@ -393,7 +393,11 @@
           required: ['ship', 'insurance', 'insuranceName'],
           additionalProperties: false,
           properties: {
-            ship: { description: 'A kind meaning a ship.', $ref: '#/$defs/pattern' },
+            ship: {
+              description:
+                'A kind meaning a ship, matched against the word RSI wrote, which the saved hangar keeps as it is: every reader asks through it (lib.js OH.isShipItem), so a kind RSI renames is fixed here alone (#619). Keep "Ship" in it: buy-back pages\' ships are saved with that word.',
+              $ref: '#/$defs/pattern',
+            },
             insurance: {
               description: "A kind (or a buy-back page's item) meaning insurance.",
               $ref: '#/$defs/pattern',

@@ -1276,9 +1276,7 @@ const TRAITS = [
 function pledgeShips(p) {
   if (!state.shipOf) return [];
   const names =
-    p.isCCU && p.ccu
-      ? [p.ccu.to]
-      : (p.contents || []).filter((c) => /^ship$/i.test(c.kind || '')).map((c) => c.label);
+    p.isCCU && p.ccu ? [p.ccu.to] : (p.contents || []).filter(OH.isShipItem).map((c) => c.label);
   return names.map((n) => state.shipOf(n)).filter(Boolean);
 }
 // Where a pledge came from: a game package, a $0 reward, a pack, or on its own.
@@ -1759,7 +1757,7 @@ function isPack(p) {
   const name = p.name || '';
   if (/\bpackage\b/i.test(name)) return true;
   if (/squadron\s*42|\bsq42\b/i.test(name)) return true;
-  const ships = (p.contents || []).filter((c) => /^ship$/i.test((c.kind || '').trim()));
+  const ships = (p.contents || []).filter(OH.isShipItem);
   return ships.length > 1;
 }
 
@@ -4049,7 +4047,7 @@ function itemView(p) {
     contents: (p.contents || []).map((c) => ({
       kind: contentKind(c),
       label: c.label || '',
-      ship: /^ship$/i.test(c.kind || '') && !!c.label,
+      ship: OH.isShipItem(c) && !!c.label,
     })),
     // RSI's art, except a CCU shows the ship it upgrades to.
     art: {
@@ -5343,7 +5341,7 @@ function ownedShips() {
   const byKey = new Map();
   for (const p of state.items) {
     for (const c of p.contents || []) {
-      if (!/^ship$/i.test(c.kind || '') || !c.label) continue;
+      if (!OH.isShipItem(c) || !c.label) continue;
       const v = shipEntry(c.label);
       const key = v ? v.slug : shipKey(c.label);
       if (!byKey.has(key)) byKey.set(key, { label: v ? v.name : c.label, pledges: [] });
@@ -5401,7 +5399,7 @@ function shipView(name) {
   const v = shipEntry(name);
   const title = (v && v.name) || name;
   const pledges = state.items.filter((p) =>
-    (p.contents || []).some((c) => /^ship$/i.test(c.kind || '') && sameShip(c.label, title)),
+    (p.contents || []).some((c) => OH.isShipItem(c) && sameShip(c.label, title)),
   );
   const bbs = state.buybacks.filter((b) => buybackHasShip(b, title));
   const status = v && (SHIP_STATES.find(([k]) => k === v.status) || [])[1];

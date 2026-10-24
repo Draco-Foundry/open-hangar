@@ -39,6 +39,11 @@
   if (!window.OHRules && typeof require === 'function') require('./parser-rules.js');
   const RULES = window.OHRules;
   const RSI_ORIGIN = 'https://robertsspaceindustries.com';
+  // Is this item in a pledge a ship? The saved hangar keeps RSI's own word for an
+  // item's kind ("Ship"), so the word is matched by the parser rules' kinds.ship: a
+  // kind RSI renames is fixed in the rules alone (#619). Every reader asks here.
+  const isShipItem = (c) => !!c && RULES.kinds.ship.test(String(c.kind || '').trim());
+  OH.isShipItem = isShipItem;
 
   const DELAY_MS = 400; // politeness throttle between pages
   const MAX_PAGES = 1000; // safety cap: 10,000 pledges at RSI's 10 per page
@@ -1409,7 +1414,7 @@
   OH.buildHTF = function buildHTF(items, codes = [], matrix = []) {
     const out = [];
     for (const p of items || []) {
-      const ships = (p.contents || []).filter((c) => /^ship$/i.test(c.kind || ''));
+      const ships = (p.contents || []).filter(isShipItem);
       for (const ship of ships) {
         const label = OH.htfShipName(ship.label);
         if (!label) continue;
@@ -3409,7 +3414,7 @@
         };
         continue;
       }
-      const list = (p.contents || []).filter((c) => /^ship$/i.test(c.kind || ''));
+      const list = (p.contents || []).filter(isShipItem);
       if (!list.length) continue;
       const rows = list.map((c) => {
         const hit = priceOf(c.label);
@@ -3529,7 +3534,7 @@
     };
     for (const p of items || []) {
       for (const c of p.contents || []) {
-        if (!/^ship$/i.test(c.kind || '')) continue;
+        if (!isShipItem(c)) continue;
         out.ships++;
         const v = shipOf(c.label);
         if (!v) continue;
@@ -3565,7 +3570,7 @@
       if (p.meltable === true) out.meltable++;
       else if (p.meltable === false) out.notMeltable++;
       for (const c of p.contents || []) {
-        if (!/^ship$/i.test(c.kind || '')) continue;
+        if (!isShipItem(c)) continue;
         const v = shipOf(c.label);
         if (!v || !v.mfr) continue;
         if (!owned.has(v.mfr)) owned.set(v.mfr, new Map());
@@ -3729,9 +3734,7 @@
         : /^(packs?|packages?|game\s+packages?)$/.test(cat)
           ? ' pack'
           : ' pledge';
-      const ships = (p.contents || []).filter(
-        (c) => c && /^ship$/i.test(c.kind || '') && !c.guessed && c.label,
-      );
+      const ships = (p.contents || []).filter((c) => isShipItem(c) && !c.guessed && c.label);
       // The ship it holds now, named only when it's clearly not the original one.
       const now =
         ships.length === 1 && !before.toLowerCase().includes(ships[0].label.toLowerCase())
@@ -4073,7 +4076,6 @@
     if (isObj(a)) {
       if (OH.historyNamesAgree(b, a.name, a.ccu)) {
         const contents = (Array.isArray(a.contents) ? a.contents : []).filter(isObj);
-        const isShip = (c) => /^ship$/i.test(String(c.kind || '').trim());
         const melt = Number.isFinite(a.value) ? a.value : null;
         const ins =
           a.insurance ||
@@ -4087,10 +4089,10 @@
             melt,
             currency: a.currency || 'USD',
             ships: contents
-              .filter((c) => isShip(c) && c.label)
+              .filter((c) => isShipItem(c) && c.label)
               .map((c) => ({ name: c.label, manufacturer: '', focus: '', image: c.image || null })),
             also: contents
-              .filter((c) => !isShip(c))
+              .filter((c) => !isShipItem(c))
               .map((c) => c.label || c.kind || '')
               .filter(Boolean),
             insurance: ins || null,
@@ -5363,7 +5365,7 @@
       const ships = [];
       for (const p of items) {
         for (const c of p.contents || []) {
-          if (/^ship$/i.test(c.kind || '')) {
+          if (isShipItem(c)) {
             ships.push({ name: OH.htfShipName(c.label) || c.label, lti: p.insurance === 'LTI' });
           }
         }
