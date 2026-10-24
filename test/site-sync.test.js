@@ -276,6 +276,14 @@ test('an account switch is asked first; reconnecting the same account is not', (
   // No name to tell by, on either side: asked.
   assert.equal(OH.siteSwitches(was, { token: 'n', name: '' }), true);
   assert.equal(OH.siteSwitches({ token: 't', name: '' }, { token: 'n', name: 'pilot' }), true);
+  // The website's account id, when both links have one (#765): two accounts with one
+  // name are asked; one account renamed isn't.
+  const mine = { token: 't', name: 'pilot', account: 'a1' };
+  assert.equal(OH.siteSwitches(mine, { token: 'n', name: 'pilot', account: 'a2' }), true);
+  assert.equal(OH.siteSwitches(mine, { token: 'n', name: 'Renamed', account: 'a1' }), false);
+  // A link saved before the id: by name, as before.
+  assert.equal(OH.siteSwitches(was, { token: 'n', name: 'pilot', account: 'a2' }), false);
+  assert.equal(OH.siteSwitches(was, { token: 'n', name: 'other', account: 'a2' }), true);
 });
 
 test('a switch said no to: the new token is revoked, the link kept', async () => {

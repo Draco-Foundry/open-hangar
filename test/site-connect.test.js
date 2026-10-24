@@ -259,6 +259,19 @@ test('the sign-in window: /connect with S256, then the code traded with the veri
   assert.equal(b64(digest), url.searchParams.get('code_challenge'));
 });
 
+test("the sign-in window keeps the website's account id when it sends one (#765)", async () => {
+  const { signInWindow } = await signIn();
+  const withId = fakeFetch({ token: 'oht_new', name: 'Pilot', account: 'u_1' });
+  const got = await signInWindow({ base: SITE, identity: fakeIdentity(), fetch: withId.fetch });
+  assert.equal(got.link.account, 'u_1');
+  const before = await signInWindow({
+    base: SITE,
+    identity: fakeIdentity(),
+    fetch: fakeFetch().fetch,
+  });
+  assert.equal('account' in before.link, false, 'a website without it: no id, names compared');
+});
+
 test("the sign-in window on Firefox: Firefox's own address", async () => {
   const { signInWindow } = await signIn();
   const redirect = 'https://abc123.extensions.allizom.org/';
