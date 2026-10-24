@@ -1,0 +1,1 @@
+- Changed: **Leaner sync.** Scan history syncs without your Store Credit, which stays in this browser for the popup's Account Value.

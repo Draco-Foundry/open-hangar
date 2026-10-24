@@ -1,0 +1,1 @@
+- Improved: **Recovery copies expire.** A copy kept to recover a damaged save is deleted after 30 days, or sooner after a complete scan.
