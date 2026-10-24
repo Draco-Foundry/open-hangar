@@ -1,0 +1,1 @@
+- Fixed: **Switching accounts on Connect.** Open Hangar now tells your openhangar.space accounts apart by their ID, so it asks before switching even when two accounts share a name, and not after you rename one.

@@ -1,0 +1,1 @@
+- Changed: **Less about other players.** Your recruits and prospects are kept as dates only, with no handles, names or pictures, in this browser and in sync.
