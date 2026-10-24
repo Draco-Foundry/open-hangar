@@ -221,6 +221,24 @@ test('pages that never read are remembered, held a day, then doubling; a read fo
   assert.deepEqual(await OH.getBuybackMisses(), {});
 });
 
+test('Clear Data leaves no buy-back page details or misses, and none come back', async () => {
+  await reset();
+  answer = (id) => (id === '3' ? 404 : 200);
+  await OH.fetchBuybackDetails(['1', '2', '3']);
+  await OH.flushBuybackDetails();
+  assert.deepEqual(Object.keys(store.bbDetails).sort(), ['1', '2']);
+  assert.deepEqual(Object.keys(store.bbdMisses), ['3']);
+  // A read whose save is still waiting when Clear Data runs.
+  answer = () => 200;
+  await OH.fetchBuybackDetail('4');
+  await OH.clearData();
+  await OH.flushBuybackDetails();
+  const left = Object.keys(store).filter((k) => /^bb(Details|dMisses)$/.test(k));
+  assert.deepEqual(left, []);
+  assert.deepEqual(await OH.getBuybackDetails(), {});
+  assert.deepEqual(await OH.getBuybackMisses(), {});
+});
+
 // --- Pacing (OH-021): gentle between pages, slower after failures ---------------
 
 test('the pause: 1 to 2 s at random, doubled for each failed page in a row', () => {
