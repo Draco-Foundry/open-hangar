@@ -258,7 +258,7 @@ test('scan bar: names the part and counts what it has read', async () => {
   assert.deepEqual(say({ part: 'buybacks', page: 1, count: 37 }), ['Buy-Backs', '37']);
   assert.deepEqual(say({ part: 'referrals', page: 1, count: 12 }), ['Referrals', '12']);
   assert.deepEqual(say({ part: 'sync' }), ['Syncing', '']);
-  assert.deepEqual(say({ part: 'packs', page: 3, count: 6 }), ['Buy-Back Packs', '3 / 6']);
+  assert.deepEqual(say({ part: 'packs', page: 3, count: 6 }), ['Buy-Back Details', '3 / 6']);
   assert.deepEqual(say({ part: 'hangar', page: 2, count: 20, retry: { attempt: 1, of: 3 } }), [
     'Waiting on RSI',
     '',
