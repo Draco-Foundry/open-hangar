@@ -977,37 +977,61 @@ try {
     : fail(`For You ignore: ${JSON.stringify(home)}`);
   // The caught-up line holds still while the menu is open (a scan fires 'oh:alerts'
   // every page, #586) and is picked again on the next open.
-  // The viewport was just set: its resize event can land after the first click and close
-  // the menu (menus.svelte.js closes on resize), which flips every later toggle. Let it
-  // land, and start with every menu shut, so the loop below always opens on its first click.
+  // The menus also close on any resize or scroll (menus.svelte.js), and the viewport
+  // changes just before this leave those events to land whenever the page next draws:
+  // one landing mid-check closed the menu and flipped every later toggle (#791). They
+  // aren't what this checks, so while it runs they're held back from the menus (and
+  // counted), every read is taken with the menu open, and it starts with every menu shut.
   await page.evaluate(async () => {
     await new Promise((r) => setTimeout(r, 300));
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     document.dispatchEvent(new CustomEvent('oh:close-menus'));
   });
   const caught = await page.evaluate(async () => {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const line = () => document.querySelector('#bell-menu .bm-none')?.textContent.trim();
+    const isOpen = () => !document.querySelector('#bell-menu').hidden;
     const btn = document.querySelector('#bell-btn');
+    const held = [];
+    const hold = (e) => {
+      held.push(e.type);
+      e.stopImmediatePropagation();
+    };
+    window.addEventListener('resize', hold, true);
+    window.addEventListener('scroll', hold, true);
     const opens = [];
     let steady = true;
-    for (let i = 0; i < 3; i++) {
-      btn.click();
-      await wait(50);
-      const first = line();
-      for (let j = 0; j < 4; j++) {
-        // A new list each time, as ui/home/ForYou.svelte publishes it.
-        window.OHApp.alerts = { ...window.OHApp.alerts, list: [] };
-        document.dispatchEvent(new CustomEvent('oh:alerts'));
-        await wait(30);
-        if (line() !== first) steady = false;
+    let shut = true; // closed before each open, open while read, closed after each close
+    try {
+      for (let i = 0; i < 3; i++) {
+        if (isOpen()) shut = false;
+        btn.click();
+        await wait(50);
+        if (!isOpen()) shut = false;
+        const first = line();
+        for (let j = 0; j < 4; j++) {
+          // A new list each time, as ui/home/ForYou.svelte publishes it.
+          window.OHApp.alerts = { ...window.OHApp.alerts, list: [] };
+          document.dispatchEvent(new CustomEvent('oh:alerts'));
+          await wait(30);
+          if (line() !== first) steady = false;
+        }
+        opens.push(first);
+        btn.click();
+        await wait(50);
+        if (isOpen()) shut = false;
       }
-      opens.push(first);
-      btn.click();
-      await wait(50);
+    } finally {
+      window.removeEventListener('resize', hold, true);
+      window.removeEventListener('scroll', hold, true);
     }
-    return { opens, steady, closed: document.querySelector('#bell-menu').hidden };
+    return { opens, steady, shut, closed: !isOpen(), held };
   });
-  caught.opens.every(Boolean) && caught.steady && new Set(caught.opens).size > 1 && caught.closed
+  caught.opens.every(Boolean) &&
+  caught.steady &&
+  caught.shut &&
+  new Set(caught.opens).size > 1 &&
+  caught.closed
     ? ok('bell: the caught-up line holds through alerts refreshes, and changes between opens')
     : fail(`bell caught-up line: ${JSON.stringify(caught)}`);
   !(await page.$('#site-connect'))
