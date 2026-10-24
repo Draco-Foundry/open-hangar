@@ -51,7 +51,8 @@
   // PR that changes the parser without a bump, unless a commit in it carries
   // `Parser-Version-Unchanged: <why>` (scripts/check-parser-version.mjs).
   //     1: 2026-10-18, the first.
-  const PARSER_VERSION = 1;
+  //     2: 2026-10-24, a hangar item's maker, when its tile shows one (#568).
+  const PARSER_VERSION = 2;
   const PARSER_KEY = 'scanParser';
 
   const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);

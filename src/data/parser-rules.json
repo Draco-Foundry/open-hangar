@@ -30,6 +30,7 @@
     "itemKind": ".kind",
     "itemName": ".title, .name, .item-name",
     "itemImage": ".image",
+    "itemMaker": ".liner",
     "kindFallback": ".kind",
     "image": ".image",
     "gift": ".js-gift",
