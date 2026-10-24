@@ -61,7 +61,7 @@ const COPY = {
   'popup.step-buybacks': 'Buy-Backs',
   'popup.step-referrals': 'Referrals',
   // The scan bar's other parts (the scanBar flag): the account read first, the website
-  // sync after, and the buy-back packs read after that. These five approved by the
+  // sync after, and the buy-backs' own pages read just before it. These five approved by the
   // owner through Claude chat (Words, 2026-10-20 19:17 UTC).
   'popup.part-account': 'Account',
   'popup.part-sync': 'Syncing',

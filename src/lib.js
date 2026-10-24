@@ -1145,7 +1145,13 @@
     } catch {
       /* non-extension context */
     }
-    return SHAPE.exportPayload({ db, account, archive: await readArchive(), appVersion });
+    return SHAPE.exportPayload({
+      db,
+      account,
+      archive: await readArchive(),
+      buybackDetails: await OH.getBuybackDetails(),
+      appVersion,
+    });
   };
 
   // --- Hangar Transfer Format (HTF) export ---------------------------------
@@ -3569,11 +3575,18 @@
     ).catch(() => null);
     if (next) bbdMem = next;
   };
-  // Read one buy-back page (cached). → detail | { error, rateLimited?, transient?,
-  // retryAfter? } (transient: RSI failed or couldn't be reached, after retries).
-  OH.fetchBuybackDetail = async function fetchBuybackDetail(id) {
+  // Was this buy-back's detail read from its own RSI page? Not when it was filled from
+  // this browser's history (`src`) or only half read (`partial`). Only these go in the
+  // sync (src/hangar-shape.js withBuybackDetails). Pure.
+  OH.buybackFromRsi = (d) => isObj(d) && !d.partial && !d.src;
+  // Read one buy-back page (cached). `rsiOnly`: a detail filled from history is read
+  // again from RSI (the scan's reads, for the sync), keeping its melt value.
+  // → detail | { error, rateLimited?, transient?, retryAfter? } (transient: RSI failed
+  // or couldn't be reached, after retries).
+  OH.fetchBuybackDetail = async function fetchBuybackDetail(id, { rsiOnly = false } = {}) {
     const all = await OH.getBuybackDetails();
-    if (all[id] && !all[id].partial) return all[id];
+    const had = all[id];
+    if (had && !had.partial && (!rsiOnly || OH.buybackFromRsi(had))) return had;
     if (!/^\d+$/.test(String(id))) return { error: 'No RSI page for this buy-back.' };
     const got = await fetchPage(RSI_ORIGIN + RULES.buybackDetail.path + id, null, {
       retryRateLimit: false,
@@ -3598,16 +3611,16 @@
         ? { error: 'Not signed in to RSI.' }
         : { error: "Couldn't read this buy-back's page." };
     }
-    all[id] = { ...d, at: Date.now() };
+    all[id] = { ...(Number.isFinite(had?.melt) ? { melt: had.melt } : {}), ...d, at: Date.now() };
     saveBuybackDetails();
     return all[id];
   };
-  // Read many, politely (the automatic pack read after a scan, Load Details and Get
-  // Details): one page at a time, with a random 1 to 2 s pause between pages
-  // (OH.bbdPause). At RSI's first "slow down" (429, or a 403 block) the whole batch
-  // stops, rather than pushing on page by page, and batches are held off for the
-  // longer of RSI's Retry-After and a cooldown that doubles with each slow-down in a
-  // row (OH.bbdCooldown: 15 minutes, 30, an hour… up to 6 hours; a batch that reads
+  // Read many, politely (the scan's buy-back pages, Load Details and Get Details): one
+  // page at a time, with a random 1 to 2 s pause between pages (OH.bbdPause).
+  // `rsiOnly` as fetchBuybackDetail. At RSI's first "slow down" (429, or a 403 block)
+  // the whole batch stops, rather than pushing on page by page, and batches are held
+  // off for the longer of RSI's Retry-After and a cooldown that doubles with each
+  // slow-down in a row (OH.bbdCooldown: 15 minutes, 30, an hour… up to 6 hours; a batch that reads
   // a page and ends without one starts it over). A page that fails for a passing
   // reason (5xx or no network, after fetchPage's own retries) doubles the next pause;
   // three in a row stop the batch. A 5xx with a Retry-After stops it at once and holds
@@ -3638,9 +3651,11 @@
     ids,
     onProgress,
     shouldGo = () => true,
+    { rsiOnly = false } = {},
   ) {
     const all = await OH.getBuybackDetails();
-    const todo = ids.filter((id) => (!all[id] || all[id].partial) && /^\d+$/.test(String(id)));
+    const due = (d) => !d || d.partial || (rsiOnly && !OH.buybackFromRsi(d));
+    const todo = ids.filter((id) => due(all[id]) && /^\d+$/.test(String(id)));
     const { [BBD_SLOW_KEY]: until = 0, [BBD_STRIKES_KEY]: before = 0 } =
       await chrome.storage.local.get([BBD_SLOW_KEY, BBD_STRIKES_KEY]);
     if (until > Date.now()) {
@@ -3653,7 +3668,7 @@
     let fails = 0; // pages in a row that failed for a passing reason
     for (const [i, id] of todo.entries()) {
       if (!shouldGo()) break;
-      const r = await OH.fetchBuybackDetail(id);
+      const r = await OH.fetchBuybackDetail(id, { rsiOnly });
       const after = r.transient ? OH.retryAfterMs(r.retryAfter) : 0;
       if (r.rateLimited || after) {
         // Slow-downs count toward the cooldown; a failure with a Retry-After waits it out.

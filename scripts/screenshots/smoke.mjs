@@ -6820,6 +6820,8 @@ try {
         return { ok: true, items: [], scannedAt: Date.now() };
       };
       OH.getReferral = async () => ({ ok: true });
+      // The demo's saved buy-backs: their own pages aren't asked for here either.
+      OH.fetchBuybackDetails = async () => ({ done: 0, errors: 0, total: 0 });
       const card = document.getElementById('bp-rsi-access').textContent.replace(/\s+/g, ' ');
       // The popup's Scan (src/background.js requestScan) while access is off.
       const scanRequest = { at: Date.now(), tabId: 42 };

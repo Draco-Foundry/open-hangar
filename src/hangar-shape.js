@@ -36,6 +36,7 @@
   const ARCHIVE_MAX = 2000;
   const DB_KEY = 'db';
   const ARCHIVE_KEY = 'pledgeArchive';
+  const BBD_KEY = 'bbDetails'; // the buy-back details cache (lib.js getBuybackDetails)
 
   // PARSER_VERSION is how a scan reads RSI's pages into the stored hangar and
   // buy-backs. Bump it when the parser (src/scraper/parser.js, src/parser-rules.js,
@@ -244,20 +245,73 @@
     return out;
   }
 
+  // What a buy-back's own RSI page adds to it in the backup file and so the sync
+  // (#798): `price`, its US dollar price as RSI writes one ("$1,234.50 USD"), with
+  // `priceFrom: 'page'`; `insurance`, as a pledge's ("LTI", "120M", or RSI's words when
+  // it's neither; null with none); `contents`, as a pledge's: its ships (kind 'Ship',
+  // with manufacturer and focus) and then everything else on the page ('Insurance', or
+  // '' for anything RSI doesn't type there). Only a page read from RSI counts (lib.js
+  // buybackFromRsi, and a read page always has its price): details filled from this
+  // browser's history (`src`) or only half read (`partial`) add nothing. `details`: the stored buy-back details, by pledge id.
+  // Returns a copy, never changes `sources`. Pure.
+  const BB_INSURANCE_RE = /\binsurance\b|\bLTI\b/i;
+  function usd(n) {
+    const text = n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `$${text} USD`;
+  }
+  function buybackFromPage(b, d) {
+    const out = { ...b };
+    if (d.price >= 0 && (d.currency || 'USD') === 'USD') {
+      out.price = usd(d.price);
+      out.priceFrom = 'page';
+    }
+    out.insurance = d.insurance ? String(d.insurance) : null;
+    const ships = (Array.isArray(d.ships) ? d.ships : [])
+      .filter((s) => isObj(s) && s.name)
+      .map((s) => ({
+        kind: 'Ship',
+        label: String(s.name),
+        manufacturer: String(s.manufacturer || ''),
+        focus: String(s.focus || ''),
+      }));
+    const also = (Array.isArray(d.also) ? d.also : [])
+      .filter((l) => typeof l === 'string' && l.trim())
+      .map((l) => ({ kind: BB_INSURANCE_RE.test(l) ? 'Insurance' : '', label: l.trim() }));
+    out.contents = [...ships, ...also];
+    return out;
+  }
+  function withBuybackDetails(sources, details) {
+    const bb = sources?.buybacks;
+    if (!isObj(details) || !isObj(bb) || !Array.isArray(bb.items)) return sources;
+    const items = bb.items.map((b) => {
+      const d = isObj(b) && b.id != null ? details[String(b.id)] : null;
+      const read = isObj(d) && !d.partial && !d.src && Number.isFinite(d.price);
+      return read ? buybackFromPage(b, d) : b;
+    });
+    return { ...sources, buybacks: { ...bb, items } };
+  }
+
   // The whole database as a self-describing JSON object (the backup file), ordered
   // the way a backend reads it: provenance → who (identity, org, rank, balances) →
   // what they own (sources). `db` as lib.js's loadDB (or checkDB) returns it,
   // `account` the cached RSI account (cache only, so this works offline), `archive`
   // the stored pledge archive. ALWAYS the current format (EXPORT_VERSION),
   // whatever the stored DB's version. Pure.
-  function exportPayload({ db, account = null, archive = null, appVersion = null, now } = {}) {
+  function exportPayload({
+    db,
+    account = null,
+    archive = null,
+    buybackDetails = null,
+    appVersion = null,
+    now,
+  } = {}) {
     return {
       app: 'open-hangar',
       appVersion,
       exportedAt: new Date(now === undefined ? Date.now() : now).toISOString(),
       schemaVersion: EXPORT_VERSION,
       account: shapeAccount(account, db.owner),
-      sources: sanitizeSources(db.sources),
+      sources: withBuybackDetails(sanitizeSources(db.sources), buybackDetails),
       // Scan history rides along so a backup file is a complete restore point.
       history: Array.isArray(db.history) ? db.history : [],
       // So does the pledge archive (#388), trimmed to what buy-back details read
@@ -430,7 +484,7 @@
   //   'schema'         the view fails its checks (+ path); nothing is handed out
   // Reads only the database, the cached account and the pledge archive.
   async function readHangarView(get, { appVersion = null, now } = {}) {
-    const raw = (await get([DB_KEY, 'hangar', 'account', ARCHIVE_KEY])) || {};
+    const raw = (await get([DB_KEY, 'hangar', 'account', ARCHIVE_KEY, BBD_KEY])) || {};
     if (raw[DB_KEY] === undefined)
       return { ok: false, error: Array.isArray(raw.hangar) ? 'needs-upgrade' : 'no-scan' };
     const { db, problems } = checkDB(raw[DB_KEY]);
@@ -443,6 +497,7 @@
         db,
         account: raw.account || null,
         archive: raw[ARCHIVE_KEY],
+        buybackDetails: raw[BBD_KEY],
         appVersion,
         now,
       }),
@@ -464,6 +519,7 @@
     sanitizeSources,
     withoutProspects,
     leanArchive,
+    withBuybackDetails,
     exportPayload,
     capArchive,
     hangarView,
