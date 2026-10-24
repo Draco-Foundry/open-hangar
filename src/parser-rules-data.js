@@ -1223,7 +1223,7 @@
             'Vehicle',
           ],
           tags: ['Attributed'],
-          labels: ['Apply upgrade', 'Contains:', 'Created:', 'Exchange', 'Gift'],
+          labels: ['Apply upgrade', 'Contains:', 'Created:', 'Exchange', 'Gift', 'Upgrades'],
           hooks: [
             'js-apply-upgrade',
             'js-expand-arrow',
@@ -1241,6 +1241,7 @@
             'js-pledge-value',
             'js-reclaim',
             'js-upgrade-data',
+            'js-upgrade-log',
           ],
         },
         buybacks: {
