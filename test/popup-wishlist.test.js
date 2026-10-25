@@ -25,6 +25,8 @@ const item = (key, name, more = {}) => ({
   at: 1,
   // Remind Me: null while the website doesn't offer it (no switch).
   remind: null,
+  // In Your Hangar: null while the website doesn't say.
+  inHangar: null,
   ...more,
 });
 const json = (body, status = 200, headers = {}) =>
@@ -92,6 +94,20 @@ test('the read: items for the tab, keys only when the website keeps them read on
       ['sku:12', 'Ghost Paint', null, null, null],
       ['ccu:900', 'Upgrade to Carrack', null, null, 'Cutlass'],
     ],
+  );
+  // The In Your Hangar mark is kept when it's true or false, else null.
+  const marks = readList({
+    v: 1,
+    keys: ['ship:a', 'ship:b', 'ship:c'],
+    items: [
+      { ...item('ship:a', 'A'), inHangar: true },
+      { ...item('ship:b', 'B'), inHangar: false },
+      { ...item('ship:c', 'C'), inHangar: 'yes' },
+    ],
+  });
+  assert.deepEqual(
+    marks.items.map((i) => i.inHangar),
+    [true, false, null],
   );
   assert.deepEqual(readList({ v: 1, keys: ['sku:1'] }), { keys: ['sku:1'], items: null });
   assert.equal(readList({ v: 2, keys: [] }), null);
