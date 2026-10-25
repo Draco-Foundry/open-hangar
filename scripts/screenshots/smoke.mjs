@@ -2387,8 +2387,7 @@ try {
   );
   await page.select('#bb-sort', 'price-desc');
   const bbPrices = await page.$$eval('#buybacks-body .card .val', (v) =>
-    // parseFloat: an estimate's "est." mark follows its number.
-    v.map((e) => parseFloat(e.textContent.replace(/[$,]/g, ''))),
+    v.map((e) => Number(e.textContent.replace(/[$,]/g, ''))),
   );
   bbPrices.length && bbPrices.every((x, i) => i === 0 || bbPrices[i - 1] >= x)
     ? ok(`buy-backs sort by price (${bbPrices.length} priced)`)
