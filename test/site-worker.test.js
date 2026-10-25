@@ -216,12 +216,72 @@ test("a feed the gateway or website can't answer is a JSON 503 the extension wai
   }
 });
 
-test('look-alike paths get no new-page fallback', async () => {
+test('look-alike paths get no new-page fallback, only the 404 page', async () => {
   for (const page of ['/helpdesk', '/shipsx', '/whats-next-time']) {
     const { res, calls } = await visit(page, 'down');
-    assert.equal(res.status, 502, page);
-    assert.deepEqual(calls.assets, [], page);
+    assert.equal(res.status, 404, page);
+    assert.deepEqual(calls.app, [], page);
+    assert.deepEqual(calls.assets, ['/404.html'], page);
   }
+});
+
+test("an address with no file and no route gets the 404 page, never the website's", async () => {
+  for (const page of ['/sign-in', '/privacy', '/account', '/legal', '/nope/deeper', '/api/other']) {
+    for (const app of [200, 'down']) {
+      const { res, body, calls } = await visit(page, app, { edge: true });
+      assert.equal(res.status, 404, `${page} ${app}`);
+      assert.equal(body, 'static /404.html', `${page} ${app}`);
+      assert.equal(res.headers.get('x-robots-tag'), 'noindex', page);
+      assert.deepEqual(calls.app, [], page);
+      assert.equal(calls.edge.length, 0, page);
+    }
+  }
+});
+
+test('routes meant to pass to the website still do, with a trailing slash too', async () => {
+  const passes = [
+    '/',
+    '/extension',
+    '/store',
+    '/ships',
+    '/ships/aurora-mk-ii',
+    '/whats-next',
+    '/help',
+    '/help/',
+    '/updates',
+    '/about',
+    '/api/game-status',
+    '/api/ships',
+    '/api/catalog',
+    '/api/referral-events',
+    '/api/known-issues',
+    '/api/store/on-sale',
+    '/api/store/anything',
+    '/_astro/page.abc123.js',
+    '/fonts/x.woff2',
+    '/favicon.svg',
+  ];
+  for (const page of passes) {
+    const { res, calls } = await visit(page, 200);
+    assert.equal(res.status, 200, page);
+    assert.equal(calls.app.length, 1, `${page} reaches the website`);
+    const viaEdge = await visit(page, 200, { edge: true });
+    assert.equal(viaEdge.res.status, 200, page);
+  }
+});
+
+test('the 404 page is a real file, and the Worker falls back to a line if it is missing', async () => {
+  const page = fs.readFileSync(path.join(SITE_DIR, '404.html'), 'utf8');
+  assert.match(page, /noindex/);
+  assert.match(page, /Page Not Found/);
+  const worker = await load;
+  const res = await worker.fetch(
+    new Request('https://openhangar.space/nope'),
+    { ASSETS: { fetch: async () => new Response('x', { status: 404 }) } },
+    { waitUntil: () => {} },
+  );
+  assert.equal(res.status, 404);
+  assert.equal(await res.text(), 'Page not found.');
 });
 
 // run_worker_first in wrangler.jsonc, comments dropped.
