@@ -5087,7 +5087,9 @@
     if (!item.inStore)
       return { status: 'soldout', price: last || item.price, warbond: null, ...base };
     if (item.upgrade) {
-      const cost = OH.upgradeCost(cat, item, money(e.fromMsrp) || msrp(e.from));
+      // RSI prices an upgrade from the ship's value today, so today's value wins;
+      // the value saved with the wish only when the ship has none now.
+      const cost = OH.upgradeCost(cat, item, msrp(e.from) || money(e.fromMsrp));
       return cost
         ? { status: 'in', price: cost.price, warbond: cost.warbond, ...base }
         : { status: 'out', price: null, warbond: null, ...base };
