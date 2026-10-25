@@ -1,0 +1,1 @@
+- Improved: **Wishlist items open in the Store.** On the popup's Wishlist tab, an item's name opens it in the Store on openhangar.space.

@@ -13,7 +13,7 @@
   // browser's sign-in window would close the popup).
   import { onMount, tick } from 'svelte';
   import { t } from './copy.js';
-  import { onSaleFirst, wishRows, wishSale } from './data.js';
+  import { onSaleFirst, wishItem, wishRows, wishSale } from './data.js';
   import {
     alertsFor,
     readWishlist,
@@ -36,6 +36,7 @@
   let list = $state(null);
   let feed = $state(null); // the sale feed, with store alerts on
   let names = $state(null); // ship names by slug (the ship list)
+  let feeds = $state(''); // the address the store page opens from
   let q = $state('');
   let busy = $state(false); // a change on its way
   let note = $state('');
@@ -43,6 +44,12 @@
   const env = popupEnv();
 
   const sale = $derived(wishSale(feed));
+  const itemOf = $derived(wishItem(feed));
+  // Our Store's page for an item the store sells now (the alerts' address); null when it doesn't.
+  const hrefOf = (key) => {
+    const item = feeds && itemOf ? itemOf(key) : null;
+    return item && AL?.itemUrl ? AL.itemUrl(feeds, item) : null;
+  };
   // What's on sale now first (the tab's count, ./Popup.svelte).
   const items = $derived(list?.mode === 'edit' ? onSaleFirst(list.items, sale) : []);
   const rows = $derived(list?.mode === 'rows' ? onSaleFirst(list.rows, sale) : []);
@@ -65,6 +72,7 @@
   async function load({ force = false } = {}) {
     if (!connected) return;
     feed = await saleFeed();
+    feeds = AL?.sitesOf ? AL.sitesOf(await OH.siteUrl()).feeds : '';
     const w = await loadWish(env, { force });
     if (w.mode === 'edit') {
       list = { mode: 'edit', items: w.items };
@@ -144,6 +152,15 @@
   </div>
 {/snippet}
 
+{#snippet itemName(key, name)}
+  {@const href = hrefOf(key)}
+  {#if href}
+    <a class="pp-aname pp-alink" {href} onclick={(e) => { e.preventDefault(); openTab(href); }}>{name}</a>
+  {:else}
+    <span class="pp-aname">{name}</span>
+  {/if}
+{/snippet}
+
 {#snippet saleLine(key)}
   {#if sale}
     {@const s = sale(key)}
@@ -159,7 +176,7 @@
       >
       <h2 class="pp-h">{t('popup.wish-connect')}</h2>
       <button type="button" class="pp-btn primary" id="pp-wish-connect" onclick={() => openHub('#settings')}
-        >Connect to openhangar.space</button
+        >{t('popup.connect-site')}</button
       >
     </div>
   {:else if list?.off}
@@ -227,7 +244,7 @@
           <li>
             <div class="pp-wrow">
               <span class="pp-atext">
-                <span class="pp-aname">{item.name}</span>
+                {@render itemName(item.key, item.name)}
                 {@render saleLine(item.key)}
               </span>
               {#if s?.onSale && Number.isFinite(s.price)}
@@ -271,7 +288,7 @@
           {#each rows as r (r.key)}
             <li>
               <span class="pp-atext">
-                <span class="pp-aname">{r.name}</span>
+                {@render itemName(r.key, r.name)}
                 {@render saleLine(r.key)}
               </span>
               {#if sale && r.onSale && Number.isFinite(r.price)}

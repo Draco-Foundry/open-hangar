@@ -150,8 +150,6 @@ const COPY = {
   // "try again at ..." (#570).
   'popup.sync-wait': 'Try again at {time}. The last sync was moments ago.',
   'popup.sync-trouble': "Last Sync Didn't Go Through",
-  // Firefox said no to sharing: the basic page's words (basic.firefox-no), word for word.
-  'popup.firefox-no': 'Firefox said no, so sync stays off.',
   // A new RSI account on a connected browser: the basic page's words, word for word.
   'popup.pilot-title': 'Sync {handle} Too?',
   'popup.pilot-body':
@@ -189,7 +187,6 @@ const COPY = {
   'popup.auto-out-partway': 'Last: {when}, signed out of RSI partway. Scan to check.',
   // {when} on the day it ran: "today 6:12 AM" (another day: "Oct 13, 6:12 AM").
   'popup.auto-today': 'today {time}',
-  'popup.store-alerts': 'Store Alerts', // the basic page's heading (basic.alerts-title)
   'popup.notifications': 'Notifications', // the switch's name
   // The muted line under it. Claude chat, Words, 2026-10-23.
   'popup.notifications-hint': 'A pop-up when a Remind Me item goes on sale.',
@@ -220,6 +217,18 @@ const COPY = {
   'popup.account-remove-ask': "Remove this account's saved hangar from this browser?",
   'popup.logged-out': 'Logged out of RSI.',
   'popup.logout-failed': "Couldn't log out of RSI. Try again, or log out on RSI's site.",
+  // Words that sat in the templates, moved here word for word.
+  'popup.name': 'Open Hangar',
+  'popup.open-my-hangar': 'Open My Hangar',
+  'popup.store-credit': 'Store Credit',
+  'popup.report-problem': 'Report a Scan Problem',
+  'popup.allow-rsi': 'Allow Access to RSI',
+  'popup.disconnect': 'Disconnect',
+  'popup.sync-now': 'Sync Now',
+  'popup.connect-site': 'Connect to openhangar.space',
+  'popup.saved-accounts': 'Saved Accounts',
+  'popup.log-out': 'Log Out of RSI',
+  'popup.clear-data': 'Clear Data',
   // The links at the bottom.
   'popup.help': 'Help',
   'popup.privacy': 'Privacy',

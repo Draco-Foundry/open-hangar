@@ -53,6 +53,7 @@
       >{hub.scan.busy ? t('basic.scanning') : t('basic.scan')}</button
     >
   </header>
+  <main class="bp-main">
   {#if hub.scan.busy}<p class="bp-detail" role="status">{hub.scan.detail}</p>
   {:else if hub.scanElsewhere}<p class="bp-detail" id="bp-scan-elsewhere" role="status">
       {t('basic.scan-elsewhere')}
@@ -75,7 +76,7 @@
     <div class="bp-note warn" id="bp-rsi-access" role="alert">
       <p>{t('basic.rsi-access-why')}</p>
       <button type="button" class="bp-btn primary" id="bp-rsi-allow" onclick={() => rsiAllow()}
-        >Allow Access to RSI</button
+        >{t('basic.allow-rsi')}</button
       >
     </div>
   {/if}
@@ -95,7 +96,7 @@
       {/if}
       {#if !report.signedOut && !report.down}
         <button type="button" class="bp-btn" id="bp-report-btn" onclick={reportProblem}
-          >Report a Scan Problem</button
+          >{t('basic.report-problem')}</button
         >
       {/if}
     </div>
@@ -153,4 +154,5 @@
   {:else if !site}
     <p class="bp-about" id="bp-about">{t('basic.page-about')}</p>
   {/if}
+</main>
 </div>

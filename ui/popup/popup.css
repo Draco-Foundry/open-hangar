@@ -62,7 +62,7 @@ body {
   align-items: center;
   gap: 4px;
   font-family: var(--font-data);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--muted);
   border: 1px solid var(--line);
@@ -230,7 +230,7 @@ body {
   padding: 0 4px;
   background: var(--good-soft);
   color: var(--good);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 16px;
   text-align: center;
@@ -539,6 +539,12 @@ body {
 .pp-aname {
   color: var(--head);
   overflow-wrap: anywhere;
+}
+.pp-alink {
+  text-decoration: none;
+}
+.pp-alink:hover {
+  text-decoration: underline;
 }
 .pp-itext small,
 .pp-atext small {
@@ -852,8 +858,10 @@ body {
 }
 .pp-wx {
   flex: none;
-  width: 28px;
-  height: 28px;
+  /* A 32px target, laid out as the 28px it was (the margin takes the 2px back). */
+  width: 32px;
+  height: 32px;
+  margin: -2px;
   border: 0;
   border-radius: 7px;
   background: none;
@@ -1338,4 +1346,5 @@ html.phone body {
 }
 .phone .pp-wx {
   width: 44px;
+  margin: 0;
 }

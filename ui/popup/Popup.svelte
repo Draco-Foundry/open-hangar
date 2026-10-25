@@ -419,7 +419,7 @@
     <svg class="pp-logo" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"
       ><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"></path></svg
     >
-    <h1 class="pp-name">Open Hangar</h1>
+    <h1 class="pp-name">{t('popup.name')}</h1>
     {#if hasNews}
       <button
         type="button"
@@ -432,7 +432,9 @@
     {:else}
       <span class="pp-ver" id="pp-ver">v{version}</span>
     {/if}
-    <span class="pp-age {ageTone}" id="pp-age" aria-live="polite"><i aria-hidden="true"></i>{ageLine}</span>
+    <span class="pp-age {ageTone}" id="pp-age"><i aria-hidden="true"></i>{ageLine}</span>
+    <!-- Said aloud only for the scan states (scanning, stopped), never the clock text. -->
+    <span class="pp-sr" aria-live="polite">{sc.phase === 'running' || sc.phase === 'stopped' ? ageLine : ''}</span>
   </header>
   {#if busy && !BAR}
     <div class="pp-bar" role="progressbar" aria-label={t('popup.scanning-short')} aria-valuemin="0" aria-valuemax="100"
@@ -570,6 +572,7 @@
             {prefs}
             {currency}
             lastReport={report}
+            {now}
             onlook={setLook}
             oncurrency={setCurrency}
             onfailed={(f) => (failed = f)}
