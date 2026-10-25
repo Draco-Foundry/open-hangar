@@ -1211,7 +1211,8 @@ const TRAITS = [
     // 1 vehicle + 1 paint + 8 gear items), so count every item, not just ships.
     key: 'pack',
     label: 'Packs',
-    title: 'Pledges named "Pack", or that bundle two or more items (ships, paints, gear…)',
+    title:
+      'Two or more ships, a ship bundled with other items, or a set RSI names a Pack. Game Packages have their own filter.',
     notLabel: 'Single Items',
     // The website's rule (OH.packKind in src/lib.js); anything with game access is a
     // Game Package (the chip above), never a Pack. A buy-back's Items line has no kinds
