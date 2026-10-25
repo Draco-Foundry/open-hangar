@@ -52,7 +52,8 @@
   // `Parser-Version-Unchanged: <why>` (scripts/check-parser-version.mjs).
   //     1: 2026-10-18, the first.
   //     2: 2026-10-24, a hangar item's maker, when its tile shows one (#568).
-  const PARSER_VERSION = 2;
+  //     3: 2026-10-25, a hangar item RSI lists under Also Contains is marked `also`.
+  const PARSER_VERSION = 3;
   const PARSER_KEY = 'scanParser';
 
   const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);

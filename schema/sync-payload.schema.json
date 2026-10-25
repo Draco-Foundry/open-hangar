@@ -207,7 +207,11 @@
           "description": "The maker line on the item's tile, as RSI wrote it (\"Aegis Dynamics (AEGS)\"); absent when the tile shows none, and in payloads from before it was read (#568).",
           "type": "string"
         },
-        "guessed": { "type": "boolean" }
+        "guessed": { "type": "boolean" },
+        "also": {
+          "description": "RSI lists it apart, by name only, under the pledge's Also Contains line. Only there when true; absent in payloads from before it was read.",
+          "type": "boolean"
+        }
       }
     },
     "pledge": {
