@@ -1,0 +1,76 @@
+{
+  "about": "A pledge's insurance from RSI's item lines, as RSI shows them (the corpus's phrasings and the ones RSI has used). The extension's parser (test/insurance-cases.test.js) and the website (from a pinned copy) both read every case. want: \"LTI\", a number of months, {\"unknown\": RSI's own words} for an insurance line nobody reads, or null for none.",
+  "cases": [
+    {
+      "why": "lifetime",
+      "contents": [{ "kind": "Insurance", "label": "Lifetime Insurance" }],
+      "want": "LTI"
+    },
+    {
+      "why": "months, plural",
+      "contents": [{ "kind": "Insurance", "label": "120 Months Insurance" }],
+      "want": 120
+    },
+    {
+      "why": "months, singular",
+      "contents": [{ "kind": "Insurance", "label": "6 Month Insurance" }],
+      "want": 6
+    },
+    {
+      "why": "years count as months",
+      "contents": [{ "kind": "Insurance", "label": "10 Year Insurance" }],
+      "want": 120
+    },
+    {
+      "why": "an upgraded pledge lists the original first; the best wins (#712)",
+      "contents": [
+        { "kind": "Ship", "label": "Cutlass Black" },
+        { "kind": "Insurance", "label": "120 Months Insurance" },
+        { "kind": "Insurance", "label": "Lifetime Insurance" }
+      ],
+      "want": "LTI"
+    },
+    {
+      "why": "the most months wins",
+      "contents": [
+        { "kind": "Insurance", "label": "6 Months Insurance" },
+        { "kind": "Insurance", "label": "24 Month Insurance" }
+      ],
+      "want": 24
+    },
+    {
+      "why": "RSI left the kind off; the name says insurance",
+      "contents": [
+        { "kind": "Ship", "label": "Mustang Alpha" },
+        { "kind": "", "label": "6 Month Insurance" }
+      ],
+      "want": 6
+    },
+    {
+      "why": "a line that is insurance but whose term nobody reads: RSI's words",
+      "contents": [{ "kind": "Insurance", "label": "Squadron Coverage Plan" }],
+      "want": { "unknown": "Squadron Coverage Plan" }
+    },
+    {
+      "why": "a known term beats a line nobody reads",
+      "contents": [
+        { "kind": "Insurance", "label": "Squadron Coverage Plan" },
+        { "kind": "Insurance", "label": "6 Month Insurance" }
+      ],
+      "want": 6
+    },
+    {
+      "why": "no insurance item",
+      "contents": [
+        { "kind": "Ship", "label": "Cutlass Black" },
+        { "kind": "Paint", "label": "Cutlass Ghoulish Green Paint" }
+      ],
+      "want": null
+    },
+    {
+      "why": "a name with months that isn't insurance",
+      "contents": [{ "kind": "", "label": "6 Months Imperator Reward" }],
+      "want": null
+    }
+  ]
+}
