@@ -4632,7 +4632,7 @@ try {
     return {
       label: document.querySelector('.pp-value .pp-lbl').textContent,
       value: document.getElementById('pp-value').textContent,
-      ver: document.getElementById('pp-ver').textContent,
+      ver: !!document.getElementById('pp-ver'),
       age: document.getElementById('pp-age').textContent.trim(),
       fresh: document.getElementById('pp-age').classList.contains('fresh'),
       handle: document.getElementById('pp-handle').textContent,
@@ -4646,11 +4646,27 @@ try {
       tiles: [...document.querySelectorAll('.pp-tile')].every(
         (t) => t.scrollWidth <= t.clientWidth,
       ),
-      uecBelow:
-        document.getElementById('pp-uec')?.getBoundingClientRect().top >
-          document.getElementById('pp-credit')?.getBoundingClientRect().bottom &&
-        document.getElementById('pp-uec')?.getBoundingClientRect().left <
-          document.getElementById('pp-rec')?.getBoundingClientRect().left,
+      // One balances strip (owner, 2026-10-23): Store Credit, UEC and REC on one row in
+      // that order, each label over its number, no boxes; Buy-Back Tokens a line under it.
+      strip: (() => {
+        const [c, u, r] = ['pp-credit', 'pp-uec', 'pp-rec'].map((id) =>
+          document.getElementById(id)?.getBoundingClientRect(),
+        );
+        const tok = document.getElementById('pp-tokens')?.getBoundingClientRect();
+        const lbl = document.querySelector('#pp-credit .pp-lbl').getBoundingClientRect();
+        const num = document.querySelector('#pp-credit b').getBoundingClientRect();
+        return (
+          !!(c && u && r && tok) &&
+          Math.abs(c.top - u.top) < 1 &&
+          Math.abs(u.top - r.top) < 1 &&
+          c.left < u.left &&
+          u.left < r.left &&
+          lbl.bottom <= num.top + 0.5 &&
+          tok.top >= Math.max(c.bottom, u.bottom, r.bottom) &&
+          tok.height < 24 &&
+          getComputedStyle(document.getElementById('pp-credit')).borderTopWidth === '0px'
+        );
+      })(),
       since: document.getElementById('pp-since')?.textContent || '',
       tabs: [...document.querySelectorAll('[role="tab"]')].map(
         (b) => `${b.textContent.trim()}:${b.getAttribute('aria-selected')}`,
@@ -4667,7 +4683,7 @@ try {
     };
   });
   pop.label === 'Account Value' &&
-  pop.ver === 'v0.2.7' &&
+  !pop.ver &&
   /^\dh ago$/.test(pop.age) &&
   pop.fresh &&
   pop.handle === 'Demo_Citizen' &&
@@ -4679,8 +4695,8 @@ try {
   pop.uecTitle === '1,234,567' &&
   pop.uecName === 'UEC 1,234,567' &&
   pop.tiles &&
-  pop.uecBelow &&
-  /^[▲▼] \$[\d,]+ since \w+ \d+$/.test(pop.since) &&
+  pop.strip &&
+  /^(Up|Down) \$[\d,]+ since \w+ \d+$/.test(pop.since) &&
   pop.tabs.join() === 'Hangar:true,Wishlist:false,Settings:false' &&
   !pop.bell &&
   pop.scan === 'Scan' &&
@@ -4781,7 +4797,8 @@ try {
         banner: document.getElementById('pp-banner')?.textContent.trim(),
         html: document.getElementById('pp-banner')?.innerHTML.includes('<b>'),
         warn: !!document.getElementById('pp-banner')?.classList.contains('warn'),
-        ver: document.getElementById('pp-ver').textContent.trim(),
+        tag: !!document.getElementById('pp-ver'),
+        ver: document.getElementById('pp-version')?.textContent.trim() ?? null,
         manifest: 'v' + chrome.runtime.getManifest().version,
         wide: document.documentElement.scrollWidth > 360,
         // Styled, not bare divs: the card's padding and border (once lost in a squash).
@@ -4811,10 +4828,15 @@ try {
       !n.html &&
       n.warn &&
       n.styled &&
-      n.ver === n.manifest &&
+      !n.tag &&
       !n.wide,
-  ) && nt.gone
-    ? ok('notices: update ready and the status banner on every tab, the version the manifest’s')
+  ) &&
+  nt.hangar.ver === null &&
+  nt.settings.ver === nt.settings.manifest &&
+  nt.gone
+    ? ok(
+        'notices: update ready and the status banner on every tab; the version under Clear Data, the manifest’s',
+      )
     : fail(`popup notices: ${JSON.stringify(nt)}`);
   // The tab row: arrows move along and wrap, Home and End jump, the choice is kept.
   await page.focus('#pp-tab-hangar');
@@ -4869,7 +4891,7 @@ try {
   const set = await page.evaluate(() => ({
     text: document.getElementById('pp-settings').textContent.replace(/\s+/g, ' '),
     alertsSw: !!document.getElementById('pp-al-sw'),
-    notifyOff: document.getElementById('pp-nt-sw')?.disabled,
+    nt: !!document.getElementById('pp-nt-sw'),
     shortcut: document.getElementById('pp-shortcut')?.textContent,
     look: document.getElementById('pp-look')?.value,
     autoScan: /Auto Scan Daily/.test(document.body.textContent),
@@ -4877,7 +4899,6 @@ try {
   const setWords = [
     'openhangar.space',
     'Connect to openhangar.space',
-    'Notifications',
     'Look',
     'Match Browser',
     'Currency',
@@ -4896,12 +4917,13 @@ try {
   const setMissing = setWords.filter((w) => !set.text.includes(w));
   !setMissing.length &&
   set.alertsSw === false &&
-  set.notifyOff === false &&
+  !set.nt &&
+  !/Notifications/.test(set.text) &&
   set.shortcut === 'Alt+Shift+O' &&
   set.look === 'auto' &&
   !set.autoScan
     ? ok(
-        'Settings: every group, no Store Alerts switch, the shortcut, no Auto Scan row until connected',
+        'Settings: every group, no Store Alerts switch, the shortcut, no Auto Scan or Notifications row until connected',
       )
     : fail(`popup settings: ${JSON.stringify({ set, setMissing })}`);
   // The layout (owner, 2026-10-24): Notifications inside the openhangar.space box; Look,
@@ -4943,17 +4965,6 @@ try {
       selects: sel.every((s) => s.scrollWidth <= s.clientWidth && box(s).right <= grp.right),
       muted: getComputedStyle(sel[0]).color === getComputedStyle(short).color,
       shortcutButton: short.tagName === 'BUTTON' && !document.getElementById('pp-shortcut-change'),
-      ntInBox: !!document.querySelector('#pp-site #pp-nt-sw'),
-      hint: (() => {
-        const h = document.querySelector('#pp-site #pp-nt-hint');
-        const sw = document.getElementById('pp-nt-sw');
-        return (
-          !!h &&
-          box(h).top >= box(sw).bottom - 0.5 &&
-          sw.getAttribute('aria-describedby') === 'pp-nt-hint' &&
-          h.textContent === 'A pop-up when a Remind Me item goes on sale.'
-        );
-      })(),
       wraps: labels.filter((l) => l.getClientRects().length > 1 || box(l).height > 24).length,
       pair: Math.abs(box(btns[0]).top - box(btns[1]).top) < 1,
       buttons: btns.every((b) => text(b).right <= box(b).right && box(b).right <= settings.right),
@@ -4978,8 +4989,6 @@ try {
   setRows.selects &&
   setRows.muted &&
   setRows.shortcutButton &&
-  setRows.ntInBox &&
-  setRows.hint &&
   !setRows.wraps &&
   setRows.pair &&
   setRows.buttons &&
@@ -4987,9 +4996,7 @@ try {
   setRows.clearLast &&
   !setRows.heading &&
   !setRows.wide
-    ? ok(
-        'Settings layout: Notifications and its hint in the box, three list rows, Export by Log Out, Clear Data last',
-      )
+    ? ok('Settings layout: three list rows, Export by Log Out, Clear Data last')
     : fail(`popup settings layout: ${JSON.stringify(setRows)}`);
   await page.click('#pp-shortcut');
   const shortGo = await page.evaluate(() => __demo.opened.at(-1));
@@ -5141,30 +5148,6 @@ try {
   (await rated()) === 1
     ? ok(`Currency: USD asks no rates; EUR asks once, ${ppEur.value} with ${ppEur.title} on hover`)
     : fail(`popup currency: ${JSON.stringify({ usdFirst, ppEurAsked, ppEur })}`);
-  // No Store Alerts switch (they follow Remind Me); Notifications off gives the permission
-  // back, and on asks as the click's first step.
-  await page.click('#pp-nt-sw');
-  await sleep(200);
-  const ntOff = await page.$eval('#pp-nt-sw', (b) => b.getAttribute('aria-checked'));
-  await page.click('#pp-nt-sw');
-  await sleep(300);
-  const sw = await page.evaluate(async () => ({
-    asked: __demo.asked.join(),
-    removed: __demo.removed.join(),
-    nt: document.getElementById('pp-nt-sw').getAttribute('aria-checked'),
-    hint: document.getElementById(
-      document.getElementById('pp-nt-sw').getAttribute('aria-describedby'),
-    )?.textContent,
-    label: document.getElementById('pp-nt-l').textContent,
-  }));
-  ntOff === 'false' &&
-  sw.removed === 'notifications' &&
-  sw.asked === 'notifications' &&
-  sw.nt === 'true' &&
-  sw.label === 'Notifications' &&
-  sw.hint === 'A pop-up when a Remind Me item goes on sale.'
-    ? ok('Notifications gives back and asks again, its hint line under it, no Store Alerts switch')
-    : fail(`popup alert switches: ${JSON.stringify({ sw, ntOff })}`);
   // Light: picked in Look, and following the browser.
   await page.select('#pp-look', 'light');
   await sleep(200);
@@ -5215,6 +5198,52 @@ try {
   ppStayed
     ? ok('connected: who and when; Disconnect asks first and Stay Connected keeps it')
     : fail(`popup connected: ${JSON.stringify({ linked, askFocus, stayed: ppStayed })}`);
+  // Connected: Notifications in the openhangar.space box with its hint under it (alerts run
+  // only while connected, #790; owner, 2026-10-23). No Store Alerts switch (they follow
+  // Remind Me); Notifications off gives the permission back, and on asks as the click's
+  // first step.
+  const ntBox = await page.evaluate(() => {
+    const box = (el) => el.getBoundingClientRect();
+    const h = document.querySelector('#pp-site #pp-nt-hint');
+    const sw = document.querySelector('#pp-site #pp-nt-sw');
+    return {
+      inBox: !!sw,
+      hint:
+        !!h &&
+        !!sw &&
+        box(h).top >= box(sw).bottom - 0.5 &&
+        sw.getAttribute('aria-describedby') === 'pp-nt-hint' &&
+        h.textContent === 'A pop-up when a Remind Me item goes on sale.',
+      wraps: document.getElementById('pp-nt-l').getClientRects().length > 1,
+    };
+  });
+  await page.click('#pp-nt-sw');
+  await sleep(200);
+  const ntOff = await page.$eval('#pp-nt-sw', (b) => b.getAttribute('aria-checked'));
+  await page.click('#pp-nt-sw');
+  await sleep(300);
+  const sw = await page.evaluate(async () => ({
+    asked: __demo.asked.join(),
+    removed: __demo.removed.join(),
+    nt: document.getElementById('pp-nt-sw').getAttribute('aria-checked'),
+    hint: document.getElementById(
+      document.getElementById('pp-nt-sw').getAttribute('aria-describedby'),
+    )?.textContent,
+    label: document.getElementById('pp-nt-l').textContent,
+  }));
+  ntBox.inBox &&
+  ntBox.hint &&
+  !ntBox.wraps &&
+  ntOff === 'false' &&
+  sw.removed === 'notifications' &&
+  sw.asked === 'notifications' &&
+  sw.nt === 'true' &&
+  sw.label === 'Notifications' &&
+  sw.hint === 'A pop-up when a Remind Me item goes on sale.'
+    ? ok(
+        'connected: Notifications in the box with its hint; gives back and asks again; no Store Alerts switch',
+      )
+    : fail(`popup alert switches: ${JSON.stringify({ ntBox, sw, ntOff })}`);
   // The website took a sync moments ago (429, too soon): Settings has an amber dot and
   // says when it can go (owner, 2026-10-09), never an error code; a retry kept by the
   // basic page changes nothing (only that page, open, retries).
@@ -5854,24 +5883,48 @@ try {
     ? ok('after a restart: a start with no end says Scan stopped and Scan Again; an ended one not')
     : fail(`popup stopped after a restart: ${JSON.stringify(afterRestart)}`);
 
-  // Before the first scan: no tabs, one heading and Scan. Signed out: Log In to RSI and a
-  // grey Scan, still there to press, while RSI's sign-in cookie is gone; Scan once it's
-  // there, whatever the last scan said (the cookie can't tell, the scan does). No
-  // access to RSI: Allow Access to RSI, on the basic page. After an update: the dot on
-  // the version, once.
+  // Before the first scan: no tabs, one heading, its muted line under it (owner,
+  // 2026-10-23) and Scan; signed out, neither the heading nor the line. Signed out: Log
+  // In to RSI and a grey Scan, still there to press, while RSI's sign-in cookie is gone;
+  // Scan once it's there, whatever the last scan said (the cookie can't tell, the scan
+  // does). No access to RSI: Allow Access to RSI, on the basic page. After an update: New
+  // in, once.
   await popAt({ __demoLocal: { db: null } }, '#pp-first');
   const ppFirst = await page.evaluate(() => ({
-    text: document.getElementById('pp-first').textContent.trim(),
+    text: document.getElementById('pp-first').textContent.replace(/\s+/g, ' ').trim(),
     tabs: document.querySelectorAll('[role="tab"]').length,
     age: document.getElementById('pp-age').textContent.trim(),
     bell: !!document.getElementById('pp-bell'),
+    line: (() => {
+      const l = document.getElementById('pp-first-line');
+      const h = document.querySelector('#pp-first .pp-h');
+      return (
+        !!l &&
+        l.getBoundingClientRect().top >= h.getBoundingClientRect().bottom &&
+        getComputedStyle(l).color !== getComputedStyle(h).color
+      );
+    })(),
   }));
-  /^Your Hangar, in One Scan\s*Scan$/.test(ppFirst.text) &&
+  await popAt(
+    { __demoLocal: { db: null }, __demoAccount: { loggedIn: false }, __demoCookie: 'out' },
+    '#pp-login',
+  );
+  const ppFirstOut = await page.evaluate(() => ({
+    heading: !!document.querySelector('#pp-first .pp-h'),
+    line: !!document.getElementById('pp-first-line'),
+  }));
+  ppFirst.text ===
+    'Your Hangar, in One Scan Reads your hangar and buy-backs from RSI in this browser, using the RSI sign-in you already have. Scan' &&
+  ppFirst.line &&
+  !ppFirstOut.heading &&
+  !ppFirstOut.line &&
   !ppFirst.tabs &&
   ppFirst.age === 'Not scanned' &&
   !ppFirst.bell
-    ? ok('before the first scan: one heading and Scan, no tabs, "Not scanned"')
-    : fail(`popup first run: ${JSON.stringify(ppFirst)}`);
+    ? ok(
+        'before the first scan: one heading, its line and Scan, no tabs, "Not scanned"; signed out, neither',
+      )
+    : fail(`popup first run: ${JSON.stringify({ ppFirst, ppFirstOut })}`);
   await popAt({ __demoAccount: { loggedIn: false }, __demoCookie: 'out' }, '#pp-login');
   const ppOut = await page.evaluate(() => {
     const scan = document.getElementById('pp-scan');
@@ -5942,19 +5995,21 @@ try {
     { ...signedIn, __demoLocal: { justUpdated: { from: '0.2.6', to: '0.2.7' } } },
     '#pp-ver',
   );
+  const newsBtn = await page.$eval('#pp-ver', (b) => b.textContent.trim());
   await page.click('#pp-ver');
   await page.waitForSelector('#pp-whatsnew');
   const news = await page.$eval('#pp-whatsnew', (e) => e.textContent.replace(/\s+/g, ' ').trim());
   await page.click('#pp-got-it');
   await sleep(150);
   const newsGone = await page.evaluate(async () => ({
-    tag: document.getElementById('pp-ver').tagName,
+    tag: document.getElementById('pp-ver')?.tagName ?? null,
     seen: (await chrome.storage.local.get('popupPrefs')).popupPrefs?.seenVersion,
   }));
+  newsBtn === 'New in 0.2.7' &&
   news === 'New in 0.2.7 See What Changed Got It' &&
-  newsGone.tag === 'SPAN' &&
+  newsGone.tag === null &&
   newsGone.seen === '0.2.7'
-    ? ok("what's new after an update: the dot on the version tag, Got It hides it for good")
+    ? ok("what's new after an update: New in 0.2.7 in the header, Got It hides it for good")
     : fail(`popup what's new: ${JSON.stringify({ news, newsGone })}`);
 
   // The last scan ran into trouble: its rows (one not read, one read only in part) and
@@ -6585,6 +6640,23 @@ try {
       scanH: document.getElementById('pp-scan').getBoundingClientRect().height,
     };
   });
+  // A short phone screen, the Hangar tab taller than it: Scan's area stays pinned just
+  // above the tabs, never under them (owner, 2026-10-23).
+  await page.setViewport({ width: 390, height: 480, isMobile: true, hasTouch: true });
+  await popAt(signedIn, '#pp-value');
+  const ppPhoneAct = await page.evaluate(() => {
+    const act = document.getElementById('pp-act').getBoundingClientRect();
+    const tabs = document.querySelector('[role="tablist"]').getBoundingClientRect();
+    const scan = document.getElementById('pp-scan').getBoundingClientRect();
+    return {
+      taller: document.documentElement.scrollHeight > innerHeight,
+      above: act.bottom <= tabs.top + 0.5 && scan.top >= 0,
+      tabsSeen: tabs.bottom <= innerHeight + 0.5,
+    };
+  });
+  ppPhoneAct.taller && ppPhoneAct.above && ppPhoneAct.tabsSeen
+    ? ok("a short phone screen: Scan's area pinned just above the tabs")
+    : fail(`popup phone pinned Scan: ${JSON.stringify(ppPhoneAct)}`);
   await page.setUserAgent(desktopUA);
   await page.setViewport({ width: 1280, height: 900, isMobile: false, hasTouch: false });
   ppPhone.phone &&
@@ -7215,11 +7287,32 @@ try {
     ),
     // The row's arrow is a drawn chevron since the arrow sweep, not a text glyph.
     chev: document.querySelectorAll('#pp-news .pp-item .pp-chev svg.chev').length,
+    names: [...document.querySelectorAll('#pp-news .pp-item')].map((b) =>
+      b.getAttribute('aria-label'),
+    ),
+    // Plain rows (owner, 2026-10-23): no box, the reason on one line (an ellipsis when long).
+    plain: [...document.querySelectorAll('#pp-news .pp-item')].every((b) => {
+      const st = getComputedStyle(b);
+      const why = b.querySelector('.pp-itext small');
+      return (
+        st.borderTopWidth === '0px' &&
+        st.backgroundColor === 'rgba(0, 0, 0, 0)' &&
+        why.getClientRects().length === 1 &&
+        getComputedStyle(why).textOverflow === 'ellipsis' &&
+        why.scrollHeight <= why.clientHeight + 1
+      );
+    }),
     sent: __demo.sent.map((m) => m.ohPopup),
   }));
   alHome.tab === 'pp-tab-hangar' &&
   alHome.news.length === 3 &&
-  alHome.news[0].startsWith('Not seen yet: Sabre Raven EX In the store in the last 7 days') &&
+  alHome.news[0] ===
+    'Not seen yet: Sabre Raven EX Paint for your Sabre Raven EX, in the store this week' &&
+  alHome.names[0] ===
+    'Not seen yet: Sabre Raven EX, Paint for your Sabre Raven EX, in the store this week' &&
+  alHome.names[2] ===
+    'Constellation Mk IV - Nightbreak Paint, Paint for your Constellation Andromeda, in the store this week' &&
+  alHome.plain &&
   alHome.news[1] === 'Not seen yet: Cutlass Black Limited-time sale: Cutlass Black' &&
   alHome.news[2].startsWith('Constellation Mk IV - Nightbreak Paint') &&
   alHome.chev === 3 &&
@@ -7228,6 +7321,22 @@ try {
         'Fleet News on Hangar: paint and limited sales for your ships, unseen first, all marked seen',
       )
     : fail(`popup fleet news: ${JSON.stringify(alHome)}`);
+  // Scan always in view (owner, 2026-10-23): with three Fleet News items the Hangar tab
+  // fits Chrome's 600 px popup, and a shorter window keeps Scan's area pinned to the
+  // bottom.
+  const scanSeen = () =>
+    page.evaluate(() => ({
+      taller: document.documentElement.scrollHeight > innerHeight,
+      seen: document.getElementById('pp-scan').getBoundingClientRect().bottom <= innerHeight,
+    }));
+  const fit600 = await scanSeen();
+  await page.setViewport({ width: 360, height: 420 });
+  await sleep(100);
+  const fit420 = await scanSeen();
+  await page.setViewport({ width: 360, height: 600 });
+  !fit600.taller && fit600.seen && fit420.taller && fit420.seen
+    ? ok('Hangar with three Fleet News items fits 600 px; shorter, Scan stays pinned in view')
+    : fail(`popup Scan in view: ${JSON.stringify({ fit600, fit420 })}`);
   await page.click('#pp-news .pp-item');
   const alRow = await page.evaluate(() => __demo.opened.at(-1));
   await page.click('#pp-news-wishlist');

@@ -35,9 +35,10 @@ const COPY = {
   // --- Hangar tab ---
   // The value's label before ship prices load: the pledges' melt total for now.
   'popup.melt-label': 'Melt Value',
-  // The change in Account Value since an earlier scan: "▲ $120 since Oct 12".
-  'popup.up-since': '▲ {amount} since {date}',
-  'popup.down-since': '▼ {amount} since {date}',
+  // The change in Account Value since an earlier scan, in words: "Up $120 since Oct 12"
+  // (Claude chat, 2026-10-23).
+  'popup.up-since': 'Up {amount} since {date}',
+  'popup.down-since': 'Down {amount} since {date}',
   // Beside the buy-back token count: when RSI hands out the next one ("Next refill Jan 4").
   'popup.token-next': 'Next refill {date}',
   'popup.fleet-news': 'Fleet News', // heading
@@ -60,6 +61,9 @@ const COPY = {
     'Your last scan stopped before it finished. Your hangar shows the last full scan.',
   // Before the first scan: no tabs, one heading and Scan.
   'popup.first': 'Your Hangar, in One Scan',
+  // The muted line under it: what Scan does (Claude chat, 2026-10-23).
+  'popup.first-line':
+    'Reads your hangar and buy-backs from RSI in this browser, using the RSI sign-in you already have.',
   // Signed out of RSI: the big button to RSI's sign-in page (a grey Scan under it).
   'popup.log-in': 'Log In to RSI',
   // The scan's steps, the basic page's names for its parts, word for word.

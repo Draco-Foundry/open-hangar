@@ -172,8 +172,11 @@
     <svg class="pp-big-ic" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"
       ><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"></path><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"></path></svg
     >
-    {#if !signedOut}<h2 class="pp-h">{t('popup.first')}</h2>{/if}
-    {@render action()}
+    {#if !signedOut}
+      <h2 class="pp-h">{t('popup.first')}</h2>
+      <p class="pp-firstline" id="pp-first-line">{t('popup.first-line')}</p>
+    {/if}
+    <div class="pp-act" id="pp-act">{@render action()}</div>
   </div>
 {:else}
   <div class="pp-body">
@@ -224,8 +227,10 @@
       {/if}
     </div>
 
-    {#if credit != null || v.tokens != null}
-      <div class="pp-tiles">
+    <!-- One balances strip (owner, 2026-10-23): Store Credit, UEC and REC, each label over
+         its number, no boxes; Buy-Back Tokens and the next refill one small line under it. -->
+    {#if credit != null || uec || rec}
+      <div class="pp-tiles" id="pp-balances">
         {#if credit != null}
           <div
             class="pp-tile"
@@ -236,23 +241,6 @@
             <span class="pp-lbl">{t('popup.store-credit')}</span><b title={creditText.title || null}>{creditText.text}</b>
           </div>
         {/if}
-        {#if tokens}
-          <div
-            class="pp-tile"
-            id="pp-tokens"
-            role={tokens.text !== tokens.full ? 'group' : null}
-            aria-label={tokens.text !== tokens.full ? `Buy-Back Tokens ${tokens.full}` : null}
-          >
-            <span class="pp-lbl">Buy-Back Tokens</span>
-            <span class="pp-tok"
-              ><b title={tokens.text !== tokens.full ? tokens.full : null}>{tokens.text}</b>{#if nextToken}<small>{t('popup.token-next', { date: day(nextToken) })}</small>{/if}</span
-            >
-          </div>
-        {/if}
-      </div>
-    {/if}
-    {#if uec || rec}
-      <div class="pp-tiles">
         {#if uec}
           <div class="pp-tile" id="pp-uec" title={uec.full} role="group" aria-label={`UEC ${uec.full}`}>
             <span class="pp-lbl">UEC</span><b>{uec.text}</b>
@@ -263,6 +251,19 @@
             <span class="pp-lbl">REC</span><b>{rec.text}</b>
           </div>
         {/if}
+      </div>
+    {/if}
+    {#if tokens}
+      <div
+        class="pp-tok"
+        id="pp-tokens"
+        role={tokens.text !== tokens.full ? 'group' : null}
+        aria-label={tokens.text !== tokens.full ? `Buy-Back Tokens ${tokens.full}` : null}
+      >
+        <span class="pp-lbl">Buy-Back Tokens</span>
+        <b title={tokens.text !== tokens.full ? tokens.full : null}>{tokens.text}</b>{#if nextToken}<small
+            >{t('popup.token-next', { date: day(nextToken) })}</small
+          >{/if}
       </div>
     {/if}
 
@@ -306,12 +307,15 @@
           {/if}
         </div>
         {#if !news.length}<p class="pp-note" id="pp-news-none">{t('popup.fleet-news-none')}</p>{/if}
+        <!-- Plain rows with dividers (owner, 2026-10-23): the reason on one line, cut with an
+             ellipsis when long, and said in full in the row's name. -->
         {#each news as m (m.id)}
           {@const wish = m.why.some((w) => w.why === 'wishlist')}
           <button
             type="button"
             class="pp-item"
             class:wish
+            aria-label={(fresh.has(m.id) ? `${t('popup.alerts-unseen')} ` : '') + [m.name, sub(m)].filter(Boolean).join(', ')}
             onclick={() => openTab(AL.itemUrl(alerts.feeds, m))}
           >
             <span class="pp-ic" aria-hidden="true">
@@ -332,7 +336,8 @@
       </section>
     {/if}
 
-    {@render action()}
+    <!-- Scan's area, pinned to the bottom so it's never below the popup's 600 px. -->
+    <div class="pp-act" id="pp-act">{@render action()}</div>
   </div>
 {/if}
 

@@ -1,6 +1,6 @@
 <script>
   // The toolbar popup (the connector build, src/flags.js `connector`), as the owner
-  // signed it off (2026-10-14): a header (the version, the scan's age), three tabs
+  // signed it off (2026-10-14): a header (the scan's age; New in after an update), three tabs
   // (Hangar, Wishlist, Settings; Wishlist with a count of its Remind Me items on sale,
   // which replaced the alerts bell and its Alerts view). It shows
   // what's stored in this browser and never asks RSI anything (ui/popup/data.js). Scan
@@ -420,6 +420,8 @@
       ><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"></path></svg
     >
     <h1 class="pp-name">{t('popup.name')}</h1>
+    <!-- No version tag (owner, 2026-10-23: it's under Clear Data in Settings); after an
+         update, New in shows here until Got It. -->
     {#if hasNews}
       <button
         type="button"
@@ -427,10 +429,8 @@
         id="pp-ver"
         aria-expanded={whatsNew}
         onclick={() => (whatsNew = !whatsNew)}
-        >v{version}<i aria-hidden="true"></i><span class="pp-sr">{t('popup.new-in', { version })}</span></button
+        ><i aria-hidden="true"></i>{t('popup.new-in', { version })}</button
       >
-    {:else}
-      <span class="pp-ver" id="pp-ver">v{version}</span>
     {/if}
     <span class="pp-age {ageTone}" id="pp-age"><i aria-hidden="true"></i>{ageLine}</span>
     <!-- Said aloud only for the scan states (scanning, stopped), never the clock text. -->
