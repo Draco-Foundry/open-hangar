@@ -22,6 +22,9 @@
   {#if v.price && v.priceNote}<p class="muted bb-price-note" id="bb-price-note">
       <small>{v.priceNote}</small>
     </p>{/if}
+  {#if v.warbondNote}<p class="muted bb-price-note" id="bb-warbond-note">
+      <small>{v.warbondNote}</small>
+    </p>{/if}
   {#if v.upgrade}<Row k="Upgrade">{v.upgrade}</Row>{/if}
   {#if v.insurance}<Row k="Insurance">{v.insurance}</Row>{/if}
   {#if v.date}<Row k="Melted">{v.date}</Row>{/if}
@@ -36,6 +39,7 @@
         from={v.cart.from}
         pledgeId={v.cart.pledgeId}
         retired={v.cart.retired}
+        warbond={v.cart.warbond}
       />
     {/key}
   {/if}

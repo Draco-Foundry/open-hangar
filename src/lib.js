@@ -3814,6 +3814,17 @@
     return null;
   };
 
+  // A warbond pledge (RSI's name says Warbond or WB): store credit buys one back only
+  // about a month after its promotion ends, and RSI says the wait can vary; cash works
+  // any time with no token. Said on every warbond buy-back and wherever store credit
+  // with a token is offered for one (the approved words, buybacks.warbond-credit-note).
+  OH.WARBOND_CREDIT_NOTE =
+    'Warbond buy-backs take cash only until about a month after the sale ends, and RSI says the wait can vary. After that, store credit works with a Buy-Back Token.';
+  OH.isWarbond = function isWarbond(name) {
+    const n = String(name || '');
+    return /\bwarbond\b/i.test(n) || /\bWB\b/.test(n);
+  };
+
   // What melting a hangar pledge means (#403), from what the scan shows. Never melts
   // anything: the window only links to the pledge on RSI. → { block, lines }, where
   // `block` is a buybackBlock key (or null) and `lines` are short sentences, the
@@ -3859,6 +3870,7 @@
     lines.push(
       "Buying it back costs full price: sale prices and subscriber coupons don't carry over. Store credit also needs a Buy-Back Token, and it's one buy-back per cart.",
     );
+    if (OH.isWarbond(name)) lines.push(OH.WARBOND_CREDIT_NOTE);
     return { block, lines };
   };
 

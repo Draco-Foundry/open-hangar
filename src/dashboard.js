@@ -4078,6 +4078,8 @@ function bbView(b) {
     priceNote: b.isCCU
       ? "A buy-back upgrade costs today's upgrade price, not what you paid."
       : "Buy-backs cost full price: sale prices and subscriber coupons don't carry over.",
+    // A warbond pledge buy-back: store credit only after about a month (OH.isWarbond).
+    warbondNote: !b.isCCU && OH.isWarbond(b.name) ? OH.WARBOND_CREDIT_NOTE : '',
     contents:
       d && !d.partial
         ? {
@@ -4115,6 +4117,7 @@ function bbCartOf(b) {
   return {
     pledgeId,
     retired: !!OH.retiredBuyback(b),
+    warbond: OH.isWarbond(b.name), // RsiCart says store credit waits (OH.WARBOND_CREDIT_NOTE)
     from: { id: fromShipId, name: b.ccu.from },
     target: { toShipId, toSkuId, name: b.ccu.to },
   };

@@ -140,3 +140,14 @@ test('melt facts carry the block for the red warning', () => {
   assert.equal(f.block, 'sq42');
   assert.ok(f.lines.length >= 1);
 });
+
+test('a warbond pledge: store credit only after about a month, said on its buy-back and before melting', () => {
+  assert.equal(OH.isWarbond('Standalone Ships - Corsair Warbond Edition'), true);
+  assert.equal(OH.isWarbond('Packs - Valkyrie Liberator Drop Pack WB'), true);
+  assert.equal(OH.isWarbond('Standalone Ships - Corsair Standard Edition'), false);
+  assert.equal(OH.isWarbond('Paints - Webbed Paint'), false);
+  const wb = OH.meltFacts({ name: 'Standalone Ships - Corsair Warbond Edition', contents: [] });
+  assert.equal(wb.lines.at(-1), OH.WARBOND_CREDIT_NOTE);
+  const std = OH.meltFacts({ name: 'Standalone Ships - Corsair Standard Edition', contents: [] });
+  assert.ok(!std.lines.includes(OH.WARBOND_CREDIT_NOTE));
+});
