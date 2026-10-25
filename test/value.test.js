@@ -361,6 +361,17 @@ test('the latest snapshot of the same hangar values exactly like today', () => {
   assert.equal(OH.snapshotValue(snap, v, priceOf), v.total);
 });
 
+test('a snapshot keeps Store Credit and UEC when known, and neither when not', () => {
+  const items = [{ id: 1, name: 'Gladius', value: 90 }];
+  assert.deepEqual(OH.snapshotOf(items, 5, 12.5, 250000), {
+    at: 5,
+    items: [['1', 'Gladius', 90]],
+    credit: 12.5,
+    uec: 250000,
+  });
+  assert.deepEqual(OH.snapshotOf(items, 5), { at: 5, items: [['1', 'Gladius', 90]] });
+});
+
 test('gone pledges: ships from their name, anything else at melt; old snapshots skip credit', () => {
   const v = OH.accountValue([], priceOf, 0);
   const snap = {

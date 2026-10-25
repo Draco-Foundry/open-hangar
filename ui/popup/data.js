@@ -69,7 +69,11 @@ export function tokenCount(n) {
 // number compact for a small card and in full for its tooltip and name, or null when the
 // last account read has none (never scanned, or RSI didn't return it).
 export function gameCredit(account, key) {
-  const n = account?.credits?.[key]?.value;
+  return countFit(account?.credits?.[key]?.value);
+}
+// A game currency count as the UEC and REC tiles show it: { text, full }, compact and in
+// full, or null for no number. The UEC change uses it too, so both read the same.
+export function countFit(n) {
   const text = compactCount(n);
   return text == null ? null : { text, full: FULL.format(n) };
 }
@@ -426,10 +430,12 @@ export function reportPilot(report, { account, db } = {}) {
 }
 
 // --- Account Value since an earlier scan -----------------------------------------------
-// The change since the newest earlier scan that valued differently (`valueOf` is
-// OH.snapshotValue on today's prices, so pledges still owned count the same): → { delta,
-// at } or null. The last snapshot is this scan itself, so it's left out.
-export function valueSince(history, total, valueOf, scannedAt) {
+// The change since the newest earlier scan that valued differently, or whose UEC was
+// different (`valueOf` is OH.snapshotValue on today's prices, so pledges still owned
+// count the same; `uec` is today's UEC): → { delta, at, uec? } or null, `uec` only when
+// both scans know it and it changed (scans before this kept none). The last snapshot is
+// this scan itself, so it's left out.
+export function valueSince(history, total, valueOf, scannedAt, uec) {
   if (!Array.isArray(history) || !Number.isFinite(total) || typeof valueOf !== 'function')
     return null;
   const now = time(scannedAt);
@@ -440,9 +446,22 @@ export function valueSince(history, total, valueOf, scannedAt) {
     const v = valueOf(s);
     if (!Number.isFinite(v)) continue;
     const delta = Math.round(total - v);
+    const du = Number.isFinite(uec) && Number.isFinite(s.uec) ? uec - s.uec : 0;
+    if (du) return { delta, at: s.at, uec: du };
     if (Math.abs(delta) >= 1) return { delta, at: s.at };
   }
   return null;
+}
+// Which line says it (Claude chat, Words, 2026-10-25): the value alone ("Up {amount}
+// since {date}"), both ("Up {amount}, UEC down {uec} since {date}") or UEC alone ("UEC up
+// {uec} since {date}"). → a copy key, or null for no change.
+export function sinceKey(since) {
+  if (!isObj(since)) return null;
+  const v = Math.abs(since.delta) >= 1 ? (since.delta > 0 ? 'up' : 'down') : null;
+  const u = Number.isFinite(since.uec) && since.uec ? (since.uec > 0 ? 'up' : 'down') : null;
+  if (v && u) return `popup.${v}-since-uec-${u}`;
+  if (v) return `popup.${v}-since`;
+  return u ? `popup.uec-${u}-since` : null;
 }
 
 // --- Fleet News: the store alerts that are news for this hangar ------------------------

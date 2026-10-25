@@ -39,6 +39,14 @@ const COPY = {
   // (Claude chat, 2026-10-23).
   'popup.up-since': 'Up {amount} since {date}',
   'popup.down-since': 'Down {amount} since {date}',
+  // With UEC's change since the same scan, UEC its own subject; UEC alone when Account
+  // Value didn't change (Claude chat, Words, 2026-10-25).
+  'popup.up-since-uec-up': 'Up {amount}, UEC up {uec} since {date}',
+  'popup.up-since-uec-down': 'Up {amount}, UEC down {uec} since {date}',
+  'popup.down-since-uec-up': 'Down {amount}, UEC up {uec} since {date}',
+  'popup.down-since-uec-down': 'Down {amount}, UEC down {uec} since {date}',
+  'popup.uec-up-since': 'UEC up {uec} since {date}',
+  'popup.uec-down-since': 'UEC down {uec} since {date}',
   // Beside the buy-back token count: when RSI hands out the next one ("Next refill Jan 4").
   'popup.token-next': 'Next refill {date}',
   'popup.fleet-news': 'Fleet News', // heading

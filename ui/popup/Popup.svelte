@@ -48,7 +48,7 @@
   let ready = $state(false);
   let v = $state(null);
   let value = $state(null); // OH.accountValue once ship prices are in
-  let since = $state(null); // { delta, at }: Account Value since an earlier scan
+  let since = $state(null); // { delta, at, uec? }: Account Value and UEC since an earlier scan
   let avatar = $state(null);
   let db = $state(null);
   let parserOld = $state(false); // a saved list was read by an older parser (#728)
@@ -199,7 +199,7 @@
       // is the hangar's own.
       const valueOf = (s) =>
         OH.snapshotValue(s, acct, priceOf) + (Number.isFinite(s.credit) ? 0 : acct.credit);
-      since = valueSince(stored.history, acct.total, valueOf, v.scannedAt);
+      since = valueSince(stored.history, acct.total, valueOf, v.scannedAt, got.account?.credits?.uec?.value);
     } else {
       value = null;
       since = null;

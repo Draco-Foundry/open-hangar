@@ -130,7 +130,7 @@
   }
 
   // Keep only well-formed snapshots ({ at, items: [[id, name, value]] }, and `credit`
-  // when known). Older versions' `checkedAt` (when an unchanged scan last confirmed a
+  // and `uec` when known). Older versions' `checkedAt` (when an unchanged scan last confirmed a
   // snapshot) goes: no page reads it.
   function cleanSnapshot(x) {
     if (!x || !Number.isFinite(x.at) || !Array.isArray(x.items)) return null;
@@ -139,6 +139,7 @@
       .map((r) => [String(r[0]), String(r[1]), Number(r[2]) || 0]);
     const out = { at: x.at, items };
     if (Number.isFinite(x.credit)) out.credit = x.credit;
+    if (Number.isFinite(x.uec)) out.uec = x.uec;
     return out;
   }
 
@@ -221,9 +222,9 @@
   }
 
   // What sync sends: withoutProspects, and each history snapshot as { at, items }. A
-  // snapshot's Store Credit (`credit`, which the popup's value change reads in this
-  // browser) and older versions' `checkedAt` stay out: the website reads neither
-  // (owner, 2026-10-24). Returns a copy, never changes `payload`. Pure.
+  // snapshot's Store Credit and UEC (`credit` and `uec`, which the popup's changes read
+  // in this browser) and older versions' `checkedAt` stay out: the website reads none
+  // of them (owner, 2026-10-24; UEC 2026-10-25). Returns a copy, never changes `payload`. Pure.
   function syncPayload(payload) {
     const out = withoutProspects(payload);
     if (!isObj(out) || !Array.isArray(out.history)) return out;
