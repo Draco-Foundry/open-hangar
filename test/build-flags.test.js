@@ -24,6 +24,7 @@ test('registry parses: every flag has a name, a one-line about and a default', a
     'connector',
     'localMode',
     'orgFleet',
+    'pageChangeAlert',
     'scanBar',
     'sync',
     'wishlistImport',
@@ -61,8 +62,10 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     alerts: true,
     // Auto Scan Daily (#666): the privacy policy names it (test/privacy-permissions.test.js).
     autoScan: true,
-    // The popup's scan bar ships dark until the owner turns it on (2026-10-20).
-    scanBar: false,
+    // The owner's page change alert: dev builds only (2026-10-22).
+    pageChangeAlert: false,
+    // The popup's scan bar: on in every build (owner, 2026-10-23).
+    scanBar: true,
   };
   assert.deepEqual(buildValues(registry), STORE);
   // The beta is the same set: no flag has a beta value of its own today.
@@ -72,6 +75,11 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     sync: false,
   });
   assert.equal(registry.orgFleet.devOnly, true, 'orgFleet stays out of every store build');
+  assert.equal(
+    registry.pageChangeAlert.devOnly,
+    true,
+    'the owner alert stays out of every store build',
+  );
   assert.ok(!registry.autoScan.devOnly, 'Auto Scan Daily ships');
   assert.ok(!registry.localMode.devOnly, 'Local Mode ships');
   assert.ok(!registry.connector.devOnly, 'the connector ships');
@@ -106,6 +114,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     wishlistImport: false,
     alerts: false,
     autoScan: true,
+    pageChangeAlert: false,
     scanBar: true,
   });
   const { values } = loadFlags(fs.readFileSync(file, 'utf8'));
@@ -117,6 +126,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     wishlistImport: false,
     alerts: false,
     autoScan: true,
+    pageChangeAlert: false,
     scanBar: true,
   });
   assert.throws(() => writeFlags(file, {}), /expected one/, 'only ever written once');
@@ -265,8 +275,10 @@ test('pack: writes each build its values and cuts the code of flags that are off
     alerts: true,
     // Auto Scan Daily (#666): the privacy policy names it (test/privacy-permissions.test.js).
     autoScan: true,
-    // The popup's scan bar ships dark until the owner turns it on (2026-10-20).
-    scanBar: false,
+    // The owner's page change alert: dev builds only (2026-10-22).
+    pageChangeAlert: false,
+    // The popup's scan bar: on in every build (owner, 2026-10-23).
+    scanBar: true,
   };
   // Without the connector, what needs it goes too (Auto Scan Daily needs the alerts).
   const NO_CONNECTOR = [
@@ -301,6 +313,15 @@ test('pack: writes each build its values and cuts the code of flags that are off
       assert.ok(!/staging/.test(JSON.stringify(b.manifest)), `${t}: no staging`);
     }
     assert.deepEqual(built('chrome').manifest.externally_connectable, { matches: ALL_PAGES });
+    // Firefox: the site bridge on just those pages, in the top frame (#671).
+    assert.deepEqual(built('firefox').manifest.content_scripts, [
+      {
+        matches: ALL_PAGES,
+        js: ['src/site-bridge.js'],
+        run_at: 'document_start',
+        all_frames: false,
+      },
+    ]);
     // The background worker's lists: the same pages, Connect on the app, and our hangar
     // page (Local Mode).
     assert.deepEqual(built('chrome').pages, {

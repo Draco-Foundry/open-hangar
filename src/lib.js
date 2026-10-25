@@ -39,9 +39,17 @@
   if (!window.OHRules && typeof require === 'function') require('./parser-rules.js');
   const RULES = window.OHRules;
   const RSI_ORIGIN = 'https://robertsspaceindustries.com';
+  // Is this item in a pledge a ship? The saved hangar keeps RSI's own word for an
+  // item's kind ("Ship"), so the word is matched by the parser rules' kinds.ship: a
+  // kind RSI renames is fixed in the rules alone (#619). Every reader asks here.
+  const isShipItem = (c) => !!c && RULES.kinds.ship.test(String(c.kind || '').trim());
+  OH.isShipItem = isShipItem;
 
   const DELAY_MS = 400; // politeness throttle between pages
   const MAX_PAGES = 1000; // safety cap: 10,000 pledges at RSI's 10 per page
+  // A scan stopped because a page no longer fits the parser rules (scanHtmlSource): the
+  // owner's approved words (popup.rsi-page-changed, 2026-10-22), word for word.
+  OH.PAGE_CHANGED = 'RSI changed a page. Holding your last scan.';
   // Skipping an unchanged hangar (#294): only within a day of the last full scan,
   // and only when the probe (3 pages at most) saves real work.
   const PROBE_MAX_AGE_MS = 24 * 3600e3;
@@ -49,6 +57,7 @@
   const DB_KEY = 'db';
   const HISTORY_KEY = 'dbHistory';
   const ARCHIVE_KEY = 'pledgeArchive'; // pledges gone from the hangar (see archiveGone)
+  const PARSER_KEY = 'scanParser'; // which parser read each source (src/hangar-shape.js)
   const CORRUPT_KEY = 'dbCorrupt';
   // Two version numbers, set in src/hangar-shape.js (which says what each changed):
   //   DB_VERSION is how the database is stored in this browser. Changing that
@@ -665,6 +674,60 @@
   const MIGRATIONS = {
     1: (db) => db, // v1 → v2: stored shape unchanged (only the export gained `account`)
     2: (db) => db, // v2 → v3: history moves to its own key (writeDB stores it there)
+    // v3 → v4 (2026-10-24): each recruit and prospect keeps only its dates (and a
+    // recruit its campaign); the RSI id, handle, moniker and avatar go. No page
+    // shows them. Counts are untouched.
+    3: (db) => {
+      const ref = db.sources && db.sources.referral;
+      const items = ref && ref.items;
+      if (!items || typeof items !== 'object' || Array.isArray(items)) return db;
+      const row = (r) => {
+        const out = {
+          enlistedOn: (r && r.enlistedOn) ?? null,
+          convertedOn: (r && r.convertedOn) ?? null,
+        };
+        if (r && (r.campaign === 'current' || r.campaign === 'legacy')) out.campaign = r.campaign;
+        return out;
+      };
+      const next = { ...items };
+      for (const list of ['recruitsList', 'prospectsList'])
+        if (Array.isArray(items[list])) next[list] = items[list].map(row);
+      return { ...db, sources: { ...db.sources, referral: { ...ref, items: next } } };
+    },
+    // v4 → v5 (2026-10-24): the pledge archive keeps only what buy-back details read
+    // (as the backup file has since #388): no picture URLs (the pledge's or its
+    // contents'), no giftable or meltable, no worked-out flags (isCCU, isAddOn,
+    // isCoupon, isPaint, containsShip). No page shows them for a pledge that's gone.
+    // A parked account carries its archive here; the live one and the recovery
+    // copy's are passed in the same way (migrateSetAside).
+    4: (db) => {
+      const a = db.pledgeArchive;
+      if (!a || typeof a !== 'object' || Array.isArray(a)) return db;
+      const lean = {};
+      for (const [key, p] of Object.entries(a)) {
+        if (!p || typeof p !== 'object' || Array.isArray(p) || !key) continue;
+        const e = { id: key, name: String(p.name || '') };
+        if (Number.isFinite(p.value)) e.value = p.value;
+        if (p.currency) e.currency = String(p.currency);
+        if (p.insurance) e.insurance = String(p.insurance);
+        if (p.ccu && typeof p.ccu === 'object')
+          e.ccu = { from: String(p.ccu.from || ''), to: String(p.ccu.to || '') };
+        if (p.kind) e.kind = String(p.kind);
+        if (p.date) e.date = String(p.date);
+        const contents = (Array.isArray(p.contents) ? p.contents : [])
+          .filter((c) => c && typeof c === 'object' && !Array.isArray(c))
+          .map((c) => {
+            const x = {};
+            if (c.kind) x.kind = String(c.kind);
+            if (c.label) x.label = String(c.label);
+            return x;
+          });
+        if (contents.length) e.contents = contents;
+        if (Number.isFinite(p.goneAt)) e.goneAt = p.goneAt;
+        lean[key] = e;
+      }
+      return { ...db, pledgeArchive: lean };
+    },
   };
   OH.migrateDB = function migrateDB(db) {
     let out = db;
@@ -685,8 +748,9 @@
   };
 
   // --- Damaged data, set aside ------------------------------------------------
-  // Up to three originals that failed the check, newest last, kept until the
-  // user clears their data: { id, at, what: 'db' | 'history', problems, raw }.
+  // Up to three originals that failed the check, newest last, kept 30 days at most
+  // (pruneRecoveryCopies) or until the user clears their data:
+  // { id, at, what: 'db' | 'history', problems, raw }.
   // `id` is a hash of the content, so the same damage is only kept once.
   const CORRUPT_MAX = 3;
   function hashText(s) {
@@ -725,7 +789,8 @@
     const { [CORRUPT_KEY]: cur } = await chrome.storage.local.get(CORRUPT_KEY);
     return Array.isArray(cur) ? cur : [];
   };
-  // Hide the notice for what's set aside now (the copies stay until Clear Data).
+  // Hide the notice for what's set aside now (the copies stay until they expire or
+  // Clear Data).
   OH.dismissDamaged = async function dismissDamaged() {
     const { [CORRUPT_KEY]: cur } = await chrome.storage.local.get(CORRUPT_KEY);
     if (!Array.isArray(cur) || !cur.length) return;
@@ -741,6 +806,7 @@
     const raw = await chrome.storage.local.get([DB_KEY, HISTORY_KEY, 'hangar', 'scannedAt']);
     let db;
     let needsWrite = false;
+    let migrated = null; // the version it was, when it migrated
     if (raw[DB_KEY] === undefined) {
       db = emptyDB();
       // Before the versioned DB: { hangar, scannedAt } at the top level.
@@ -758,16 +824,24 @@
         needsWrite = true;
       }
       if (db.schemaVersion < DB_VERSION) {
+        migrated = db.schemaVersion;
         db = OH.migrateDB(db);
         needsWrite = true;
       }
     }
+    if (migrated) queueSetAside(migrated);
     let kept = [];
     const h = raw[HISTORY_KEY];
     if (Array.isArray(h)) {
       kept = h.filter((s) => isObj(s) && Number.isFinite(s.at) && Array.isArray(s.items));
       if (kept.length !== h.length) {
         await setAside('history', h, [`${h.length - kept.length} unreadable snapshot(s)`]);
+        needsWrite = true;
+      }
+      // Older versions noted when an unchanged scan last confirmed a snapshot
+      // (`checkedAt`); no page reads it, so it goes with the next write (2026-10-24).
+      if (kept.some((s) => 'checkedAt' in s)) {
+        kept = kept.map(({ checkedAt, ...s }) => s);
         needsWrite = true;
       }
     } else if (h !== undefined) {
@@ -781,6 +855,57 @@
     return { db, needsWrite };
   }
 
+  // Parked accounts and the recovery copy migrate when they're swapped back in
+  // (fromStored). This brings them up to date with the live DB's fix-up, so a
+  // migration that removes data (v3 → v4, v4 → v5) removes it from every copy at once.
+  // Each copy keeps what else it carries (a parked account's pledgeArchive). The pledge
+  // archives kept beside a database (the live one's, `liveFrom` its old version, and
+  // the recovery copy's) go through the same steps, inside a database of that version.
+  async function migrateSetAside(liveFrom) {
+    const area = chrome.storage.local;
+    const keys = typeof area.getKeys === 'function' ? await area.getKeys().catch(() => null) : null;
+    const all = await area.get(
+      Array.isArray(keys)
+        ? keys.filter(
+            (k) => k === RECOVERY_KEY || k === ARCHIVE_KEY || String(k).startsWith(PROFILE_PREFIX),
+          )
+        : null,
+    );
+    const archiveFrom = (archive, from) =>
+      OH.migrateDB({ schemaVersion: from, sources: {}, pledgeArchive: archive }).pledgeArchive;
+    const old = (b) =>
+      isObj(b) &&
+      Number.isInteger(b.schemaVersion) &&
+      b.schemaVersion >= 1 &&
+      b.schemaVersion < DB_VERSION;
+    const out = {};
+    for (const [k, v] of Object.entries(all || {})) {
+      try {
+        if (String(k).startsWith(PROFILE_PREFIX) && old(v)) out[k] = OH.migrateDB(v);
+        else if (k === RECOVERY_KEY && isObj(v) && old(v.db)) {
+          out[k] = { ...v, db: OH.migrateDB(v.db) };
+          if (isObj(v.archive)) out[k].archive = archiveFrom(v.archive, v.db.schemaVersion);
+        } else if (k === ARCHIVE_KEY && isObj(v) && old({ schemaVersion: liveFrom }))
+          out[k] = archiveFrom(v, liveFrom);
+      } catch {
+        /* left as it is: fromStored checks it again when it's swapped in */
+      }
+    }
+    if (Object.keys(out).length) await area.set(out);
+  }
+  // In the save queue, after whatever write found the old version; once however many
+  // reads found it before the sweep ran.
+  let setAsideQueued = false;
+  function queueSetAside(liveFrom) {
+    if (setAsideQueued) return;
+    setAsideQueued = true;
+    exclusive(() => migrateSetAside(liveFrom))
+      .catch(() => {})
+      .finally(() => {
+        setAsideQueued = false;
+      });
+  }
+
   // Store a DB as loadDB returns it: the DB under `db`, its history under its own
   // key, in one storage write. `history: false` leaves the stored history alone
   // (it didn't change), so a buy-back save doesn't rewrite megabytes of history.
@@ -791,10 +916,16 @@
     await chrome.storage.local.set(out);
   }
 
-  // Load the whole DB (with .history). Always the expected shape.
+  // Load the whole DB (with .history). Always the expected shape. The first load on a
+  // page also lets recovery copies past their 30 days go (pruneRecoveryCopies).
+  let prunedThisPage = false;
   OH.loadDB = async function loadDB() {
     const { db, needsWrite } = await readDB();
     if (needsWrite) queueFixUp();
+    if (!prunedThisPage) {
+      prunedThisPage = true;
+      exclusive(() => pruneRecoveryCopies()).catch(() => {});
+    }
     return db;
   };
   // Write the checked/migrated DB back, in the save queue: it reads storage again
@@ -817,6 +948,12 @@
   OH.loadSource = async function loadSource(id) {
     const db = await OH.loadDB();
     return db.sources[id] || { items: [], scannedAt: null };
+  };
+
+  // Was this source's saved data read by an older parser (src/hangar-shape.js
+  // PARSER_VERSION)? Then it's stale until the next scan, not current.
+  OH.parserStale = async function parserStale(id) {
+    return SHAPE.parserStale((await chrome.storage.local.get(PARSER_KEY))[PARSER_KEY], id);
   };
 
   // Everything that writes the live DB (scan saves, fix-ups, Clear Data, restores,
@@ -875,7 +1012,18 @@
           await chrome.storage.local.set({ [ARCHIVE_KEY]: OH.archiveGone(cur, gone, scannedAt) });
         }
       }
+      // Which parser read this source (src/hangar-shape.js PARSER_VERSION): kept
+      // beside the DB, not in it, so the DB, backups and sync keep their shapes.
+      const stamps = (await chrome.storage.local.get(PARSER_KEY))[PARSER_KEY];
+      await chrome.storage.local.set({
+        [PARSER_KEY]: { ...(isObj(stamps) ? stamps : {}), [id]: SHAPE.PARSER_VERSION },
+      });
       await chrome.storage.local.remove(['hangar', 'scannedAt']); // drop legacy keys
+      // A complete hangar scan replaces recovery copies; any save lets old ones go.
+      const good = record && id === 'hangar';
+      await pruneRecoveryCopies(
+        good ? { scan: { at: scannedAt, owner: db.owner ? db.owner.nickname : null } } : {},
+      );
       return scannedAt;
     });
   }
@@ -925,7 +1073,9 @@
     // The last scan's report, its start and the RSI portrait (ui/scan/runner.js) go with
     // the rest, and the popup's copy of the account's Wishlist (read again while
     // connected). So does Auto Scan Daily: its switch (it's off after Clear Data), its
-    // next run, its last run and the parts' last complete reads.
+    // next run, its last run and the parts' last complete reads. And every buy-back page
+    // read (bbDetails) and failed (bbdMisses), with any save of them still waiting.
+    await dropBuybackDetails();
     await chrome.storage.local.remove([
       'popupWish',
       DB_KEY,
@@ -950,12 +1100,66 @@
   }
 
   // The most recent auto-cleared snapshot ({ at, db }), or null. Lets the UI
-  // offer a one-click restore after a different-account auto-clear.
+  // offer a one-click restore after a different-account auto-clear. One past its 30
+  // days is null too (pruneRecoveryCopies removes it).
   OH.getRecovery = async function getRecovery() {
     const raw = await chrome.storage.local.get(RECOVERY_KEY);
     const rec = raw[RECOVERY_KEY];
-    return rec && isObj(rec.db) && rec.db.schemaVersion ? rec : null;
+    if (!rec || !isObj(rec.db) || !rec.db.schemaVersion) return null;
+    return Number.isFinite(rec.at) && Date.now() - rec.at > RECOVERY_MAX_AGE ? null : rec;
   };
+
+  // Recovery copies (the recovery slot and the damaged originals set aside, dbCorrupt)
+  // are kept 30 days after they're made, and go sooner when a complete hangar scan
+  // replaces them (owner, 2026-10-24): the recovery copy when it holds the account
+  // just scanned, and every damaged database copy made before the scan (it wrote a
+  // sound one). A damaged history copy isn't replaced by a scan, so it waits out its
+  // 30 days. A copy with no time is stamped now and gets its 30 days from here.
+  // `scan`: { at, owner } of a complete hangar scan just saved. Runs in the save
+  // queue (saveSource, and once per page from loadDB).
+  const RECOVERY_MAX_AGE = 30 * 86400000;
+  async function pruneRecoveryCopies({ scan = null, now = Date.now() } = {}) {
+    const got = await chrome.storage.local.get([RECOVERY_KEY, CORRUPT_KEY]);
+    const expired = (at) => now - at > RECOVERY_MAX_AGE;
+    const drop = [];
+    const set = {};
+    const rec = got[RECOVERY_KEY];
+    if (rec !== undefined) {
+      const owner =
+        isObj(rec) && isObj(rec.db) && isObj(rec.db.owner) ? rec.db.owner.nickname : null;
+      const replaced =
+        !!scan &&
+        typeof owner === 'string' &&
+        typeof scan.owner === 'string' &&
+        owner.toLowerCase() === scan.owner.toLowerCase();
+      if (!isObj(rec) || replaced || (Number.isFinite(rec.at) && expired(rec.at)))
+        drop.push(RECOVERY_KEY);
+      else if (!Number.isFinite(rec.at)) set[RECOVERY_KEY] = { ...rec, at: now };
+    }
+    const list = got[CORRUPT_KEY];
+    if (list !== undefined) {
+      let changed = !Array.isArray(list);
+      const keep = [];
+      for (const x of Array.isArray(list) ? list : []) {
+        if (!isObj(x)) {
+          changed = true;
+          continue;
+        }
+        const at = Number.isFinite(x.at) ? x.at : now;
+        if (expired(at) || (scan && x.what === 'db' && at <= scan.at)) {
+          changed = true;
+          continue;
+        }
+        if (at !== x.at) changed = true;
+        keep.push(at === x.at ? x : { ...x, at });
+      }
+      if (!keep.length) drop.push(CORRUPT_KEY);
+      else if (changed) set[CORRUPT_KEY] = keep;
+    }
+    if (Object.keys(set).length) await chrome.storage.local.set(set);
+    if (drop.length) await chrome.storage.local.remove(drop);
+  }
+  OH.pruneRecoveryCopies = (opts) => exclusive(() => pruneRecoveryCopies(opts));
 
   // Restore a previously auto-cleared snapshot back into the live DB (history
   // included) and drop the recovery slot. Returns the restored DB, or null if
@@ -1129,7 +1333,13 @@
     } catch {
       /* non-extension context */
     }
-    return SHAPE.exportPayload({ db, account, archive: await readArchive(), appVersion });
+    return SHAPE.exportPayload({
+      db,
+      account,
+      archive: await readArchive(),
+      buybackDetails: await OH.getBuybackDetails(),
+      appVersion,
+    });
   };
 
   // --- Hangar Transfer Format (HTF) export ---------------------------------
@@ -1204,7 +1414,7 @@
   OH.buildHTF = function buildHTF(items, codes = [], matrix = []) {
     const out = [];
     for (const p of items || []) {
-      const ships = (p.contents || []).filter((c) => /^ship$/i.test(c.kind || ''));
+      const ships = (p.contents || []).filter(isShipItem);
       for (const ship of ships) {
         const label = OH.htfShipName(ship.label);
         if (!label) continue;
@@ -1546,6 +1756,7 @@
     let ended = false; // the pager said this was the last page
     let aligned = true;
     let pages = null; // the highest page RSI's pager has linked to so far
+    let firstSize = 0; // how many items RSI served on page 1 (its real page size)
     const down = (got) => ({
       rsiDown: !!(got.transient || got.rateLimited),
       slowDown: !!got.slowDown,
@@ -1580,6 +1791,15 @@
 
       const html = await res.text();
       const items = src.parse(html);
+      // RSI changed the page: it has cards, but not what the parser rules read from them
+      // (OpenHangar.pageChanged, checked here on the device). Nothing of this scan is
+      // saved, whichever page it is, so the last scan stays as it was.
+      const changed = () => {
+        const why = window.OpenHangar.pageChanged?.(html, src.id) || [];
+        if (!why.length) return null;
+        OH.log('error', src.id, `page ${page} doesn't fit the parser rules: ${why.join('; ')}`);
+        return { error: OH.PAGE_CHANGED, pageChanged: true };
+      };
       if (page === 1 && src.meta) {
         try {
           meta = src.meta(html);
@@ -1597,11 +1817,14 @@
         }
         // A source can declare how an *intentionally* empty list reads.
         if (src.emptyMarker && src.emptyMarker.test(html)) break; // legitimately empty
+        const off = changed();
+        if (off) return off;
         // Signed in but parsed nothing: if the page still carries the data markers,
         // the parser couldn't read them → RSI likely changed their markup.
         if (src.marker && src.marker.test(html)) {
           return {
             error: `Signed in, but couldn't read any ${src.label.toLowerCase()}. RSI may have changed their site. Send your flight log to #bug-reports and we'll patch it.`,
+            pageChanged: true,
           };
         }
         // Sources that need server-rendered HTML but got none (e.g. a client-side
@@ -1617,6 +1840,8 @@
       // never keeps that (a scan you pressed keeps what it read, as before).
       if (!items.length && auto && looksLoggedOut(res, html))
         return { items: all, meta, partial: { page, reason: 'signed out', signedOut: true } };
+      const off = changed();
+      if (off) return off;
       if (!items.length) break;
       // RSI's pager (OpenHangar.parsePager): past the end RSI serves the last page
       // again, and its pager says so. Stopping on that, and on a page that links to
@@ -1629,6 +1854,7 @@
       if (pager?.max != null) pages = Math.max(pages ?? 0, pager.max, page);
 
       let added = 0;
+      if (page === 1) firstSize = items.length;
       fillIds(src, items, page);
       if (page === 1 && prev && (await unchangedSince(src, prev, items, size))) {
         onProgress?.(page, prev.items.length, null, page);
@@ -1656,6 +1882,28 @@
     // it), so a pager that says more pages than there are shows in the flight log.
     if (lastPage)
       OH.log('info', src.id, `${lastPage} pages read, RSI's pager showed ${pages ?? 'none'}`);
+    // The pager's last page against the count (#729): every page but the last is full, so
+    // (last - 1) × size < count ≤ last × size. Outside that, a page was missed or read
+    // twice: a partial read, so it is never taken for the whole list.
+    if (ended && lastPage > 1 && firstSize) {
+      const n = all.length;
+      if (!((lastPage - 1) * firstSize < n && n <= lastPage * firstSize)) {
+        OH.log(
+          'warn',
+          src.id,
+          `${n} items on ${lastPage} pages of ${firstSize} doesn't fit RSI's pager`,
+        );
+        return {
+          items: all,
+          meta,
+          partial: {
+            page: lastPage,
+            reason: `${n} items don't fit ${lastPage} pages`,
+            countMismatch: true,
+          },
+        };
+      }
+    }
     // Still finding new items on the last allowed page: the list goes on, so
     // report it as partial (saved without counting the rest as "removed").
     if (lastPage === MAX_PAGES && lastAdded > 0 && !ended) {
@@ -1785,15 +2033,19 @@
           error: msg,
           rsiDown: !!why.rsiDown,
           signedOut: !!why.signedOut,
+          pageChanged: !!result.pageChanged,
           retryAfter: why.retryAfter ?? null,
         };
       }
 
       // RSI still asking to slow down after every retry: said, with its Retry-After.
       const slow = (r) => (r?.slowDown ? { slowDown: true, retryAfter: r.retryAfter ?? null } : {});
+      // RSI itself didn't answer (a 5xx, a network error, a 429 after every retry).
+      const down = (r) => (r?.rsiDown ? { rsiDown: true } : {});
       if (result.error) {
         OH.log('error', src.id, result.error);
-        return { ok: false, error: result.error, ...slow(result) };
+        const changed = result.pageChanged ? { pageChanged: true } : {};
+        return { ok: false, error: result.error, ...changed, ...slow(result), ...down(result) };
       }
 
       // Nothing changed since the last full scan (#294): keep the saved items and
@@ -1820,11 +2072,24 @@
         );
         const prev = await OH.loadSource(src.id);
         const prevCount = Array.isArray(prev.items) ? prev.items.length : 0;
+        // RSI stopped answering partway: nothing from the partial read is saved, however
+        // many items it holds; the previous scan stays as it was.
+        if (result.partial.rsiDown) {
+          return {
+            ok: false,
+            error: `RSI stopped responding at page ${page} (${reason}), so nothing from this read was saved${prevCount ? ` and your previous scan of ${prevCount} was kept` : ''}. Try again in a minute.`,
+            ...slow(result.partial),
+            ...down(result.partial),
+          };
+        }
         if (prevCount > result.items.length) {
           return {
             ok: false,
-            error: `RSI stopped responding at page ${page} (${reason}), so we kept your previous scan of ${prevCount}. Try again in a minute.`,
+            error: result.partial.countMismatch
+              ? `The ${result.items.length} items read don't fit RSI's page count, so we kept your previous scan of ${prevCount}. Try again in a minute.`
+              : `RSI stopped responding at page ${page} (${reason}), so we kept your previous scan of ${prevCount}. Try again in a minute.`,
             ...slow(result.partial),
+            ...down(result.partial),
           };
         }
         const scannedAt = await saveSource(src.id, result.items, { meta: result.meta, account });
@@ -2229,7 +2494,8 @@
   // (May 2026). Two "campaigns": '2' = CURRENT program, '1' = LEGACY (pre-cutoff,
   // different rewards). The PROSPECT pool is shared across both; only RECRUIT
   // counts differ (legacy = all-time total, current = post-cutoff conversions).
-  // Each row: { id, displayName, nickname, avatar, enlistedOn, convertedOn }.
+  // Each row: { id, displayName, nickname, avatar, enlistedOn, convertedOn }. Only the
+  // dates are kept (no page shows who a recruit is: owner, 2026-10-24).
   // `converted:true` filters to recruits; `false` returns the full prospect list.
   // The request (address, operation, document, the variables that never change,
   // the campaigns and page size): RULES.referrals.
@@ -2317,11 +2583,10 @@
         const key = it.id ?? `${it.nickname}:${it.enlistedOn}`;
         if (seen.has(key)) continue;
         seen.add(key);
+        // Only the dates are kept. `key` (RSI's id) tells current recruits from legacy
+        // ones while the scan runs (getReferral) and is never saved.
         items.push({
-          id: it.id ?? null,
-          handle: it.nickname || null,
-          moniker: it.displayName || null,
-          avatar: it.avatar || null,
+          key,
           enlistedOn: it.enlistedOn || null,
           convertedOn: it.convertedOn || null,
         });
@@ -2336,8 +2601,10 @@
 
   // Scrape the full referral picture and persist it as the 'referral' source.
   // Shape: { code, url, current:{recruits}, legacy:{recruits}, prospects,
-  //          recruitsList:[...], prospectsList:[...] }. recruitsList carries a
-  // `campaign` tag per row ('current'|'legacy') since legacy is a superset.
+  //          recruitsList:[{ enlistedOn, convertedOn, campaign }],
+  //          prospectsList:[{ enlistedOn, convertedOn }] }. recruitsList carries a
+  // `campaign` tag per row ('current'|'legacy') since legacy is a superset. No RSI
+  // id, handle, moniker or avatar is kept (OH.referralRow).
   // Returns { ok, referral?, scannedAt?, error? }. Never throws.
   // Auto Scan Daily (opts.auto): any list that fails or comes back short means nothing is
   // merged or saved → { ok: false, unfinished: true, error, rsiDown, retryAfter }; and
@@ -2379,7 +2646,7 @@
       if (auto && (legacyRecruits.error || legacyRecruits.partial))
         return unfinished(legacyRecruits);
       if (legacyRecruits.error && !legacyRecruits.items?.length)
-        return { ok: false, error: legacyRecruits.error };
+        return { ok: false, error: legacyRecruits.error, rsiDown: !!legacyRecruits.rsiDown };
 
       onProgress?.('recruits (current)', 0, null);
       const currentRecruits = await fetchReferralList(
@@ -2405,21 +2672,23 @@
       const prev = await OH.loadReferral();
       const bad = (l) => !!(l.error || l.partial);
       const partial = [];
+      // Saved rows have no ids, so the campaign tags can only be worked out from two
+      // whole lists read now: when either recruits list failed, the previous scan's
+      // tagged list stands in whole.
+      let keepPrevList = false;
       let legacyCount = legacyRecruits.count ?? null;
       let legacyItems = legacyRecruits.items || [];
       if (bad(legacyRecruits) && prev) {
         legacyCount = prev.legacy?.recruits ?? legacyCount;
-        legacyItems = prev.recruitsList || legacyItems;
+        keepPrevList = true;
         partial.push('recruits');
       }
       let currentCount = currentRecruits.count ?? null;
-      let currentIds = new Set((currentRecruits.items || []).map((r) => r.id));
+      const currentKeys = new Set((currentRecruits.items || []).map((r) => r.key));
       if (bad(currentRecruits)) {
         if (prev) {
           currentCount = prev.current?.recruits ?? null;
-          currentIds = new Set(
-            (prev.recruitsList || []).filter((r) => r.campaign === 'current').map((r) => r.id),
-          );
+          keepPrevList = true;
         }
         partial.push('current recruits');
       }
@@ -2434,10 +2703,13 @@
       }
 
       // Merge recruit lists: tag current ids, then mark legacy-only rows.
-      const recruitsList = legacyItems.map((r) => ({
-        ...r,
-        campaign: currentIds.has(r.id) ? 'current' : 'legacy',
-      }));
+      const recruitsList =
+        keepPrevList && Array.isArray(prev?.recruitsList)
+          ? prev.recruitsList.map(OH.referralRow)
+          : legacyItems.map((r) =>
+              OH.referralRow({ ...r, campaign: currentKeys.has(r.key) ? 'current' : 'legacy' }),
+            );
+      prospectItems = prospectItems.map(OH.referralRow);
 
       const referral = {
         code,
@@ -2454,7 +2726,15 @@
         return { ok: false, refused: true };
       }
       const scannedAt = await saveSource('referral', referral, { account: acct || undefined });
-      return { ok: true, referral, scannedAt, partial: partial.length ? partial.join(', ') : null };
+      // A list RSI didn't answer for (a 5xx, a 429): the scan says so.
+      const rsiDown = [legacyRecruits, currentRecruits, prospects].some((l) => l.rsiDown);
+      return {
+        ok: true,
+        referral,
+        scannedAt,
+        partial: partial.length ? partial.join(', ') : null,
+        ...(rsiDown ? { rsiDown: true } : {}),
+      };
     } catch (err) {
       return { ok: false, error: String(err?.message || err) };
     }
@@ -2478,6 +2758,18 @@
   // Referral data can arrive from an imported file, and the UI interpolates its
   // counts straight into HTML as numbers — so coerce them to real numbers (and
   // the lists to arrays) before anything renders them.
+  // One recruit or prospect row as it's kept: its dates, and a recruit's campaign.
+  // Never the RSI id, handle, moniker or avatar (a backup file from before
+  // 2026-10-24 has them; no page shows them). Pure.
+  OH.referralRow = function referralRow(r) {
+    const out = {
+      enlistedOn: r?.enlistedOn ?? null,
+      convertedOn: r?.convertedOn ?? null,
+    };
+    if (r?.campaign === 'current' || r?.campaign === 'legacy') out.campaign = r.campaign;
+    return out;
+  };
+
   OH.normalizeReferral = function normalizeReferral(ref) {
     const num = (v) => (v == null ? v : Number.isFinite(+v) ? +v : 0);
     const count = (o) => (o && typeof o === 'object' ? { ...o, recruits: num(o.recruits) } : o);
@@ -2486,8 +2778,8 @@
       current: count(ref.current),
       legacy: count(ref.legacy),
       prospects: num(ref.prospects),
-      recruitsList: Array.isArray(ref.recruitsList) ? ref.recruitsList : [],
-      prospectsList: Array.isArray(ref.prospectsList) ? ref.prospectsList : [],
+      recruitsList: Array.isArray(ref.recruitsList) ? ref.recruitsList.map(OH.referralRow) : [],
+      prospectsList: Array.isArray(ref.prospectsList) ? ref.prospectsList.map(OH.referralRow) : [],
     };
   };
 
@@ -3122,7 +3414,7 @@
         };
         continue;
       }
-      const list = (p.contents || []).filter((c) => /^ship$/i.test(c.kind || ''));
+      const list = (p.contents || []).filter(isShipItem);
       if (!list.length) continue;
       const rows = list.map((c) => {
         const hit = priceOf(c.label);
@@ -3242,7 +3534,7 @@
     };
     for (const p of items || []) {
       for (const c of p.contents || []) {
-        if (!/^ship$/i.test(c.kind || '')) continue;
+        if (!isShipItem(c)) continue;
         out.ships++;
         const v = shipOf(c.label);
         if (!v) continue;
@@ -3278,7 +3570,7 @@
       if (p.meltable === true) out.meltable++;
       else if (p.meltable === false) out.notMeltable++;
       for (const c of p.contents || []) {
-        if (!/^ship$/i.test(c.kind || '')) continue;
+        if (!isShipItem(c)) continue;
         const v = shipOf(c.label);
         if (!v || !v.mfr) continue;
         if (!owned.has(v.mfr)) owned.set(v.mfr, new Map());
@@ -3328,6 +3620,16 @@
   function saveBuybackDetails() {
     clearTimeout(bbdSave);
     bbdSave = setTimeout(flushBuybackDetails, 500);
+  }
+  // Clear Data: the saved details and misses go, and a save still waiting is dropped
+  // rather than writing them back.
+  async function dropBuybackDetails() {
+    clearTimeout(bbdSave);
+    bbdSave = null;
+    bbdMem = null;
+    await bbdFlushed;
+    await storeChain;
+    await chrome.storage.local.remove([BBD_KEY, BBD_MISS_KEY]);
   }
   // A save still waiting goes now (a scan's page that may close next, ui/scan/runner.js).
   // → once every save so far has landed.
@@ -3432,9 +3734,7 @@
         : /^(packs?|packages?|game\s+packages?)$/.test(cat)
           ? ' pack'
           : ' pledge';
-      const ships = (p.contents || []).filter(
-        (c) => c && /^ship$/i.test(c.kind || '') && !c.guessed && c.label,
-      );
+      const ships = (p.contents || []).filter((c) => isShipItem(c) && !c.guessed && c.label);
       // The ship it holds now, named only when it's clearly not the original one.
       const now =
         ships.length === 1 && !before.toLowerCase().includes(ships[0].label.toLowerCase())
@@ -3480,21 +3780,60 @@
   // A CCU reads "from → to" either way.
   OH.buybackTitle = function buybackTitle(b, { short = true } = {}) {
     const s = short ? OH.shortBuybackName : (n) => n;
-    if (b.ccu) return `${s(b.ccu.from)} → ${s(b.ccu.to)}`;
+    if (b.ccu) return `${s(b.ccu.from)} to ${s(b.ccu.to)}`;
     return short ? s(b.name) || '—' : b.name || '';
   };
   OH.pruneBuybackDetails = async function pruneBuybackDetails(ids) {
     const keep = new Set(ids.map(String));
-    const next = await mutateStored(BBD_KEY, (cur = {}) =>
-      Object.fromEntries(Object.entries(cur).filter(([id]) => keep.has(id))),
-    ).catch(() => null);
+    const only = (cur = {}) =>
+      Object.fromEntries(Object.entries(cur).filter(([id]) => keep.has(id)));
+    const next = await mutateStored(BBD_KEY, only).catch(() => null);
     if (next) bbdMem = next;
+    if ((await chrome.storage.local.get(BBD_MISS_KEY))[BBD_MISS_KEY]) {
+      await mutateStored(BBD_MISS_KEY, only).catch(() => {});
+    }
   };
-  // Read one buy-back page (cached). → detail | { error, rateLimited?, transient?,
-  // retryAfter? } (transient: RSI failed or couldn't be reached, after retries).
-  OH.fetchBuybackDetail = async function fetchBuybackDetail(id) {
+  // Pages that failed for a reason that won't pass by itself (RSI answered 404, or the
+  // page couldn't be read): { [pledge id]: { n: failures in a row, at } } (storage key
+  // `bbdMisses`), so the scan's buy-back pages (ui/scan/runner.js readPacks) aren't spent
+  // on them every time (#800). A read clears its entry; pruned with the details.
+  const BBD_MISS_KEY = 'bbdMisses';
+  const BBD_MISS_MS = 24 * 3600e3;
+  const BBD_MISS_MAX_MS = 30 * 24 * 3600e3;
+  OH.getBuybackMisses = async function getBuybackMisses() {
+    return (await chrome.storage.local.get(BBD_MISS_KEY))[BBD_MISS_KEY] || {};
+  };
+  // Until when a scan doesn't ask for a missed page again: a day after the first miss,
+  // doubling with each miss in a row, 30 days at most. 0 for none. Pure.
+  OH.bbdMissUntil = function bbdMissUntil(miss) {
+    if (!isObj(miss) || !Number.isFinite(miss.at)) return 0;
+    const n = Math.max(1, Number(miss.n) || 1);
+    return miss.at + Math.min(BBD_MISS_MS * 2 ** (n - 1), BBD_MISS_MAX_MS);
+  };
+  // Note a batch's misses (ids) and reads (ids), only when something changes.
+  async function noteBuybackMisses(missed, read) {
+    const had = await OH.getBuybackMisses();
+    if (!missed.length && !read.some((id) => had[id])) return;
+    const at = Date.now();
+    await mutateStored(BBD_MISS_KEY, (cur = {}) => {
+      const next = { ...cur };
+      for (const id of read) delete next[id];
+      for (const id of missed) next[id] = { n: (Number(cur[id]?.n) || 0) + 1, at };
+      return next;
+    }).catch(() => {});
+  }
+  // Was this buy-back's detail read from its own RSI page? Not when it was filled from
+  // this browser's history (`src`) or only half read (`partial`). Only these go in the
+  // sync (src/hangar-shape.js withBuybackDetails). Pure.
+  OH.buybackFromRsi = (d) => isObj(d) && !d.partial && !d.src;
+  // Read one buy-back page (cached). `rsiOnly`: a detail filled from history is read
+  // again from RSI (the scan's reads, for the sync), keeping its melt value.
+  // → detail | { error, rateLimited?, transient?, retryAfter? } (transient: RSI failed
+  // or couldn't be reached, after retries).
+  OH.fetchBuybackDetail = async function fetchBuybackDetail(id, { rsiOnly = false } = {}) {
     const all = await OH.getBuybackDetails();
-    if (all[id] && !all[id].partial) return all[id];
+    const had = all[id];
+    if (had && !had.partial && (!rsiOnly || OH.buybackFromRsi(had))) return had;
     if (!/^\d+$/.test(String(id))) return { error: 'No RSI page for this buy-back.' };
     const got = await fetchPage(RSI_ORIGIN + RULES.buybackDetail.path + id, null, {
       retryRateLimit: false,
@@ -3519,16 +3858,16 @@
         ? { error: 'Not signed in to RSI.' }
         : { error: "Couldn't read this buy-back's page." };
     }
-    all[id] = { ...d, at: Date.now() };
+    all[id] = { ...(Number.isFinite(had?.melt) ? { melt: had.melt } : {}), ...d, at: Date.now() };
     saveBuybackDetails();
     return all[id];
   };
-  // Read many, politely (the automatic pack read after a scan, Load Details and Get
-  // Details): one page at a time, with a random 1 to 2 s pause between pages
-  // (OH.bbdPause). At RSI's first "slow down" (429, or a 403 block) the whole batch
-  // stops, rather than pushing on page by page, and batches are held off for the
-  // longer of RSI's Retry-After and a cooldown that doubles with each slow-down in a
-  // row (OH.bbdCooldown: 15 minutes, 30, an hour… up to 6 hours; a batch that reads
+  // Read many, politely (the scan's buy-back pages, Load Details and Get Details): one
+  // page at a time, with a random 1 to 2 s pause between pages (OH.bbdPause).
+  // `rsiOnly` as fetchBuybackDetail. At RSI's first "slow down" (429, or a 403 block)
+  // the whole batch stops, rather than pushing on page by page, and batches are held
+  // off for the longer of RSI's Retry-After and a cooldown that doubles with each
+  // slow-down in a row (OH.bbdCooldown: 15 minutes, 30, an hour… up to 6 hours; a batch that reads
   // a page and ends without one starts it over). A page that fails for a passing
   // reason (5xx or no network, after fetchPage's own retries) doubles the next pause;
   // three in a row stop the batch. A 5xx with a Retry-After stops it at once and holds
@@ -3559,9 +3898,11 @@
     ids,
     onProgress,
     shouldGo = () => true,
+    { rsiOnly = false } = {},
   ) {
     const all = await OH.getBuybackDetails();
-    const todo = ids.filter((id) => (!all[id] || all[id].partial) && /^\d+$/.test(String(id)));
+    const due = (d) => !d || d.partial || (rsiOnly && !OH.buybackFromRsi(d));
+    const todo = ids.filter((id) => due(all[id]) && /^\d+$/.test(String(id)));
     const { [BBD_SLOW_KEY]: until = 0, [BBD_STRIKES_KEY]: before = 0 } =
       await chrome.storage.local.get([BBD_SLOW_KEY, BBD_STRIKES_KEY]);
     if (until > Date.now()) {
@@ -3572,9 +3913,11 @@
     let errors = 0;
     let read = 0; // pages read fine
     let fails = 0; // pages in a row that failed for a passing reason
+    const missed = []; // pages that failed for a reason that won't pass (bbdMisses)
+    const got = []; // pages read fine
     for (const [i, id] of todo.entries()) {
       if (!shouldGo()) break;
-      const r = await OH.fetchBuybackDetail(id);
+      const r = await OH.fetchBuybackDetail(id, { rsiOnly });
       const after = r.transient ? OH.retryAfterMs(r.retryAfter) : 0;
       if (r.rateLimited || after) {
         // Slow-downs count toward the cooldown; a failure with a Retry-After waits it out.
@@ -3585,12 +3928,17 @@
         const why = r.rateLimited ? 'RSI asked us to slow down' : `${r.error}, with a Retry-After`;
         OH.log('warn', 'buybacks', `details stopped after ${done} pages: ${why}`);
         const busy = r.rateLimited ? {} : { busy: true }; // RSI failing, not a slow-down
+        await noteBuybackMisses(missed, got);
         return { done, errors, total: todo.length, rateLimited: true, retryAt, ...busy };
       }
       if (r.error) {
         errors++;
         if (/signed in/i.test(r.error)) break;
-      } else read++;
+        if (!r.transient) missed.push(String(id));
+      } else {
+        read++;
+        got.push(String(id));
+      }
       fails = r.transient ? fails + 1 : 0;
       done++;
       onProgress?.(done, todo.length);
@@ -3602,6 +3950,7 @@
       if (i < todo.length - 1 && shouldGo()) await sleep(OH.bbdPause(fails));
     }
     if (before && read) await chrome.storage.local.remove(BBD_STRIKES_KEY);
+    await noteBuybackMisses(missed, got);
     return { done, errors, total: todo.length };
   };
 
@@ -3614,22 +3963,25 @@
   // real melt yet, so the names must agree too; a disagreement is counted
   // (`bbHistoryRejects`, ids only) and the buy-back falls through to RSI.
   //
-  // Pledge archive (storage key `pledgeArchive`): { [pledge id]: { ...pledge,
-  // goneAt } } for pledges a complete hangar scan no longer has (melted, gifted,
+  // Pledge archive (storage key `pledgeArchive`): { [pledge id]: { id, name, value,
+  // currency, insurance, ccu, kind, date, contents: [{ kind, label }], goneAt } } for
+  // pledges a complete hangar scan no longer has (melted, gifted,
   // applied as an upgrade), newest ARCHIVE_MAX kept. It belongs to the live
   // account like the scan history (parked with it, in the recovery copy, gone
   // with Clear Data).
   const ARCHIVE_MAX = SHAPE.ARCHIVE_MAX; // 2000 (src/hangar-shape.js)
   OH.ARCHIVE_MAX = ARCHIVE_MAX;
-  // `archive` plus the pledges in `gone`, stamped goneAt = at, newest kept. Pure.
+  // `archive` plus the pledges in `gone`, stamped goneAt = at, newest kept. Each is
+  // kept as the backup file carries it (OH.leanArchive): what buy-back details read,
+  // never its pictures, giftable, meltable or the other flags (storage v5). Pure.
   OH.archiveGone = function archiveGone(archive, gone, at) {
     const out = isObj(archive) ? { ...archive } : {};
+    const add = {};
     for (const p of gone || []) {
       if (!isObj(p) || p.id == null || p.id === '') continue;
-      const { raw, ...keep } = p; // the raw RSI strings aren't needed again
-      out[String(p.id)] = { ...keep, goneAt: at };
+      add[String(p.id)] = { ...p, goneAt: at };
     }
-    return capArchive(out);
+    return capArchive({ ...out, ...SHAPE.leanArchive(add) });
   };
   // The newest ARCHIVE_MAX entries of an archive (by goneAt). Pure.
   function capArchive(out) {
@@ -3724,7 +4076,6 @@
     if (isObj(a)) {
       if (OH.historyNamesAgree(b, a.name, a.ccu)) {
         const contents = (Array.isArray(a.contents) ? a.contents : []).filter(isObj);
-        const isShip = (c) => /^ship$/i.test(String(c.kind || '').trim());
         const melt = Number.isFinite(a.value) ? a.value : null;
         const ins =
           a.insurance ||
@@ -3738,10 +4089,10 @@
             melt,
             currency: a.currency || 'USD',
             ships: contents
-              .filter((c) => isShip(c) && c.label)
+              .filter((c) => isShipItem(c) && c.label)
               .map((c) => ({ name: c.label, manufacturer: '', focus: '', image: c.image || null })),
             also: contents
-              .filter((c) => !isShip(c))
+              .filter((c) => !isShipItem(c))
               .map((c) => c.label || c.kind || '')
               .filter(Boolean),
             insurance: ins || null,
@@ -3883,14 +4234,49 @@
       headers: { 'content-type': 'application/json', ...(init.headers || {}) },
     });
   }
+  // A new link replacing this one would switch accounts: a link is kept, and the new one
+  // is another account. Told apart by the website's account id (`account`) when both
+  // links have one (#765), else by name (links saved before it, or either with no name
+  // to tell by: asked). Then the extension's own page asks first, naming both
+  // (ui/basic/hub.svelte.js connect), before anything is replaced or synced (connect
+  // hardening, #669). The same token, the same account or no link yet: no question. Pure.
+  OH.siteSwitches = function siteSwitches(was, link) {
+    if (!was?.token || !link || was.token === link.token) return false;
+    if (was.account && link.account) return was.account !== link.account;
+    return !was.name || !link.name || was.name !== link.name;
+  };
+  // A sync token given back unused (the new link refused at that question): revoked, so
+  // that account's Connected Extensions list doesn't keep a row that never syncs.
+  // Best effort.
+  OH.siteTokenDrop = async function siteTokenDrop(token) {
+    if (!token) return;
+    await siteFetch(SYNC_PATH, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${token}` },
+    }).catch(() => null);
+  };
+  // Keep a new link. Connecting again while connected: the old link is revoked, as
+  // Disconnect does, so the account's Connected Extensions list doesn't keep a dead row
+  // (#741). After the save, so a slow or failed revoke never costs the new link.
+  OH.siteLinkSave = async function siteLinkSave(link) {
+    const was = await OH.getSiteLink();
+    await chrome.storage.local.set({ siteLink: link });
+    if (was?.token && was.token !== link.token) await OH.siteTokenDrop(was.token);
+  };
   // → { device_code, user_code, verification_uri, expires_in, interval }
   OH.siteLinkStart = async function siteLinkStart() {
     const res = await siteFetch('/api/link/start', { method: 'POST', body: '{}' });
     if (!res.ok) throw new Error(`openhangar.space responded ${res.status}`);
     return res.json();
   };
-  // Poll until approved (→ { name }), expired or stopped (→ null).
-  OH.siteLinkWait = async function siteLinkWait(start, shouldGo = () => true) {
+  // Poll until approved (→ { name }), expired or stopped (→ null). `save: false` hands
+  // the new link back unsaved, for a page that asks about an account switch first
+  // (ui/basic/link-code.js).
+  OH.siteLinkWait = async function siteLinkWait(
+    start,
+    shouldGo = () => true,
+    { save = true } = {},
+  ) {
     const until = Date.now() + start.expires_in * 1000;
     const label = `Open Hangar on ${/Firefox\//.test(globalThis.navigator?.userAgent || '') ? 'Firefox' : 'Chrome'}`;
     while (Date.now() < until && shouldGo()) {
@@ -3905,20 +4291,11 @@
         const link = {
           token: j.token,
           name: j.name || '',
+          ...(j.account ? { account: String(j.account) } : {}),
           connectedAt: Date.now(),
           lastSync: null,
         };
-        const was = await OH.getSiteLink();
-        await chrome.storage.local.set({ siteLink: link });
-        // Connecting again while connected: the old link is revoked, as Disconnect does,
-        // so the account's Connected Extensions list doesn't keep a dead row (#741; the
-        // same in src/background.js oh-connect-finish). After the save, best effort.
-        if (was?.token && was.token !== link.token) {
-          await siteFetch(SYNC_PATH, {
-            method: 'DELETE',
-            headers: { authorization: `Bearer ${was.token}` },
-          }).catch(() => null);
-        }
+        if (save) await OH.siteLinkSave(link);
         return link;
       }
       if (j.status === 'expired') return null;
@@ -3969,9 +4346,9 @@
 
   // What sync sends: the backup file's payload without the referral prospects list
   // (other players who used your code but aren't recruits yet stay in this browser;
-  // their count still goes). Returns a copy, never changes `payload`. Pure
-  // (src/hangar-shape.js withoutProspects).
-  OH.syncPayload = SHAPE.withoutProspects;
+  // their count still goes), and each history snapshot without its Store Credit.
+  // Returns a copy, never changes `payload`. Pure (src/hangar-shape.js syncPayload).
+  OH.syncPayload = SHAPE.syncPayload;
 
   // Whose hangar a sync sends. The link is one per browser, but a browser can keep
   // more than one RSI account (OH.switchProfile parks the others), so the link
@@ -4513,311 +4890,6 @@
     return cached || null;
   };
 
-  // --- Your Subscriber Store (#418) ---------------------------------------------
-  // The subscriber-only items RSI offers the signed-in account: the same /graphql
-  // the referrals use, operation GetBrowseSkusByFilter with the store's
-  // "extras-subscribers-store" facet, in your own RSI session (an anonymous
-  // request gets 0 items). The list is exactly what RSI returns for the session,
-  // so tier differences (Centurion, Imperator) take care of themselves: we never
-  // guess which tier an item is for, only repeat what its tags or label say.
-  // Only for a signed-in subscriber, at most once a day by itself (Store page or
-  // after a scan, never inside the scan) plus the Refresh button. Pages one at a
-  // time with a pause; a 429/403/5xx stops the read and keeps the last list.
-  const SUB_STORE_KEY = 'subStore';
-  const SUB_STORE_TTL = 24 * 3600e3;
-  // The request (address, operation, document, its fixed variables, and the page
-  // size asked first, then RSI's own 20 as the fallback): RULES.subStore.
-  const SUB_STORE_MAX_PAGES = 20;
-  OH.SUB_STORE_MAX = 2000; // items kept (storage budget)
-  const subStoreBody = (page, limit) =>
-    JSON.stringify([
-      {
-        operationName: RULES.subStore.operation,
-        query: RULES.subStore.query,
-        variables: {
-          ...RULES.subStore.variables,
-          query: { page, limit, ...RULES.subStore.variables.query },
-        },
-      },
-    ]);
-  const rsiAbs = (u) => {
-    const s = String(u || '').trim();
-    if (!s) return null;
-    if (/^https:\/\//i.test(s)) return s;
-    if (s.startsWith('//')) return 'https:' + s;
-    if (s.startsWith('/')) return 'https://robertsspaceindustries.com' + s;
-    return null; // anything else (http:, javascript:) isn't kept
-  };
-  // A price block ({ amount, discounted } in cents) → dollars, the sale price when
-  // there is one (RSI's own rule: discounted counts when set and != amount).
-  const subPrice = (p) => {
-    if (!p || typeof p.amount !== 'number') return null;
-    const sale = typeof p.discounted === 'number' && p.discounted !== p.amount;
-    return {
-      price: (sale ? p.discounted : p.amount) / 100,
-      was: sale ? p.amount / 100 : null,
-    };
-  };
-  // Shelf names for the filter chips. RSI's own tags/type first when they name
-  // exactly one shelf; otherwise the item's name (plus label and subtitle), checked
-  // in a fixed order so the more telling word wins: a paint is a paint, a display
-  // or mug is Flair even when it says "Weapon" or "Set", armor stays Armor even as
-  // an "Armor Set", and Kit/Set/Pack/Bundle/Collection wins over the loose words
-  // after it. Other only when nothing matches. Pure.
-  const SUB_TAG_KINDS = [
-    ['Paints', /\b(paints?|liver(y|ies)|skins?)\b/i],
-    ['Armor', /\b(armou?rs?|helmets?|undersuits?)\b/i],
-    ['Weapons', /\b(weapons?|fps weapons?)\b/i],
-    ['Clothing', /\b(clothing|clothes|apparel)\b/i],
-    ['Flair', /\b(flair|decorations?|collectibles?|hangar decor)\b/i],
-    ['Kits and Bundles', /\b(kits?|bundles?|packs?|packages?|collections?)\b/i],
-    ['Ships', /\b(ships?|vehicles?|standalone ships?)\b/i],
-  ];
-  const SUB_NAME_KINDS = [
-    ['Paints', /\b(paints?|liver(y|ies)|skins?)\b/i],
-    [
-      'Flair',
-      /\b(mugs?|cups?|displays?|cases?|racks?|plush(ie)?s?|posters?|models?|trophy|trophies|statues?|figures?|figurines?|paintings?|flags?|banners?|dashbots?|bobbleheads?|coins?|decorations?|flair)\b/i,
-    ],
-    ['Armor', /\b(armou?rs?|helmets?|undersuits?|backpacks?)\b/i],
-    ['Kits and Bundles', /\b(kits?|sets?|packs?|bundles?|collections?)\b/i],
-    [
-      'Weapons',
-      /\b(weapons?|rifles?|pistols?|smgs?|shotguns?|snipers?|knife|knives|launchers?|lmgs?|railguns?)\b/i,
-    ],
-    [
-      'Clothing',
-      /\b(clothing|apparel|outfits?|balaclavas?|hats?|caps?|beanies?|jackets?|coats?|shirts?|t-shirts?|hoodies?|sweaters?|pants|trousers|shorts|boots|shoes|gloves|gowns?|suits?|uniforms?|glasses|sunglasses|goggles|masks?|bandanas?|scarf|scarves|vests?|ponchos?|robes?|dress(es)?)\b/i,
-    ],
-    ['Ships', /\b(ships?|vehicles?|standalone)\b/i],
-  ];
-  OH.subStoreKind = function subStoreKind({
-    tags = [],
-    type = '',
-    name = '',
-    label = '',
-    sub = '',
-  } = {}) {
-    const tagText = [...tags, type].join(' ');
-    const fromTags = SUB_TAG_KINDS.filter(([, re]) => re.test(tagText));
-    if (fromTags.length === 1) return fromTags[0][0];
-    const text = [name, label, sub].join(' ');
-    const hit = SUB_NAME_KINDS.find(([, re]) => re.test(text));
-    return hit ? hit[0] : 'Other';
-  };
-  // What RSI's tags or label say about the tier, as written; never inferred.
-  const subTiers = (text) =>
-    ['Imperator', 'Centurion'].filter((t) => new RegExp(`\\b${t}\\b`, 'i').test(text));
-  // GraphQL answer → { items, count, totalCount } or null (not a listing). Pure.
-  // items: [{ id, name, url, img, price, was, warbond, pack, available, kind, tiers, tags }]
-  OH.parseSubStore = function parseSubStore(json) {
-    const data = Array.isArray(json) ? json[0] : json;
-    const listing = data && data.data && data.data.store && data.data.store.listing;
-    if (!listing || !Array.isArray(listing.resources)) return null;
-    const items = [];
-    for (const r of listing.resources) {
-      if (!r || r.id == null) continue;
-      const name = String(r.title || r.name || '').trim();
-      if (!name) continue;
-      const tags = (Array.isArray(r.tags) ? r.tags : [])
-        .map((t) => String((t && t.name) || '').trim())
-        .filter(Boolean)
-        .slice(0, 12);
-      const label = String(r.label || '').trim();
-      const p = subPrice(r.nativePrice) || subPrice(r.price);
-      const st = r.stock || {};
-      const img = r.media && r.media.thumbnail;
-      items.push({
-        id: String(r.id),
-        name,
-        sub: String(r.subtitle || '').trim() || null,
-        url: rsiAbs(r.url),
-        img: rsiAbs(img && (img.storeSmall || img.slideshow)),
-        price: p ? p.price : null,
-        was: p ? p.was : null,
-        warbond: r.isWarbond === true,
-        pack: r.isPackage === true,
-        available: st.available === true || st.unlimited === true,
-        type: String(r.type || ''),
-        label,
-        kind: OH.subStoreKind({ tags, type: r.type || '', name, label, sub: r.subtitle || '' }),
-        tiers: subTiers([tags.join(' '), label].join(' ')),
-        tags,
-      });
-    }
-    return {
-      items,
-      count: Number.isFinite(listing.count) ? listing.count : items.length,
-      totalCount: Number.isFinite(listing.totalCount) ? listing.totalCount : null,
-    };
-  };
-  // Does this account get a Subscriber Store? (signed in and a subscriber)
-  OH.isSubscriber = (acct) =>
-    !!(acct && acct.loggedIn === true && acct.subscriber && acct.subscriber.type);
-  // The cached list for this account ({ at, nickname, total, items, partial }) or null.
-  OH.getSubStoreCached = async function getSubStoreCached(acct) {
-    const { [SUB_STORE_KEY]: c } = await chrome.storage.local.get(SUB_STORE_KEY);
-    if (!c || !Array.isArray(c.items)) return null;
-    if (acct && acct.nickname && c.nickname && c.nickname !== acct.nickname) return null;
-    // Sort with today's rules, so a saved list follows an update without a refresh.
-    const items = c.items.map((it) => ({
-      ...it,
-      kind: OH.subStoreKind({
-        tags: it.tags || [],
-        type: it.type || '',
-        name: it.name || '',
-        label: it.label || '',
-        sub: it.sub || '',
-      }),
-    }));
-    return { ...c, items };
-  };
-  // Due for its once-a-day read? (never tried, or the last try a day ago)
-  OH.subStoreDue = async function subStoreDue() {
-    const { [SUB_STORE_KEY]: c } = await chrome.storage.local.get(SUB_STORE_KEY);
-    const last = c ? Math.max(c.at || 0, c.triedAt || 0) : 0;
-    return Date.now() - last >= SUB_STORE_TTL;
-  };
-  let subStoreInflight = null;
-  // Read the whole list (or answer from the day's cache unless `force`).
-  // → { ok: true, list } | { ok: false, error, list? (the last good one) }.
-  // error: 'signed-out' | 'not-subscriber' | 'busy' | 'refused' | 'network'. Never throws.
-  // `pause` is the wait between pages (tests skip it).
-  OH.getSubStore = function getSubStore({
-    force = false,
-    account,
-    fetchFn = fetch,
-    onProgress,
-    pause = () => sleep(DELAY_MS + Math.random() * 400),
-  } = {}) {
-    if (subStoreInflight) return subStoreInflight;
-    subStoreInflight = readSubStore({ force, account, fetchFn, onProgress, pause }).finally(() => {
-      subStoreInflight = null;
-    });
-    return subStoreInflight;
-  };
-  async function readSubStore({ force, account, fetchFn, onProgress, pause }) {
-    const acct = account === undefined ? await OH.getAccount().catch(() => null) : account;
-    if (!acct || acct.loggedIn !== true) return { ok: false, error: 'signed-out' };
-    if (!OH.isSubscriber(acct)) return { ok: false, error: 'not-subscriber' };
-    const cached = await OH.getSubStoreCached(acct);
-    if (!force && cached && Date.now() - (cached.at || 0) < SUB_STORE_TTL)
-      return { ok: true, list: cached };
-    const markTried = () =>
-      chrome.storage.local
-        .set({
-          [SUB_STORE_KEY]: {
-            ...(cached || { items: [] }),
-            nickname: acct.nickname || null,
-            triedAt: Date.now(),
-          },
-        })
-        .catch(() => {});
-    const get = OH.guarded(fetchFn, { timeout: 20000 });
-    const ask = async (page, limit) => {
-      let res;
-      try {
-        res = await get(RSI_ORIGIN + RULES.subStore.path, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'content-type': 'application/json', Accept: 'application/json' },
-          body: subStoreBody(page, limit),
-        });
-      } catch (e) {
-        return { error: 'network', msg: e?.message || String(e) };
-      }
-      if (res.status === 401 || res.status === 403) return { error: 'refused', status: res.status };
-      if (res.status === 429 || res.status >= 500) return { error: 'busy', status: res.status };
-      if (!res.ok) return { error: 'bad', status: res.status };
-      let json;
-      try {
-        json = await res.json();
-      } catch {
-        return { error: 'bad' };
-      }
-      const d = Array.isArray(json) ? json[0] : json;
-      if (d && Array.isArray(d.errors) && d.errors.length)
-        return { error: 'bad', msg: d.errors.map((e) => e && e.message).join('; ') };
-      const parsed = OH.parseSubStore(json);
-      return parsed || { error: 'bad', msg: 'no listing in the answer' };
-    };
-    const fail = async (r) => {
-      await markTried();
-      OH.log(
-        'warn',
-        'subStore',
-        `subscriber store read stopped: ${r.error} ${r.status || ''} ${r.msg || ''}`.trim(),
-      );
-      return { ok: false, error: r.error === 'bad' ? 'network' : r.error, list: cached || null };
-    };
-    // Page 1 at 100; if RSI refuses that size, again at its own 20.
-    let limit = RULES.subStore.pageSize;
-    let first = await ask(1, limit);
-    if (first.error === 'bad') {
-      await pause();
-      limit = RULES.subStore.pageSizeMin;
-      first = await ask(1, limit);
-    }
-    if (first.error) return fail(first);
-    const total = first.totalCount;
-    // RSI may hand back fewer than asked: page on at the size it actually uses.
-    if (
-      first.items.length &&
-      first.items.length < limit &&
-      total != null &&
-      first.items.length < total
-    )
-      limit = first.items.length;
-    const seen = new Set();
-    const items = [];
-    const add = (list) => {
-      let n = 0;
-      for (const it of list) {
-        if (seen.has(it.id) || items.length >= OH.SUB_STORE_MAX) continue;
-        seen.add(it.id);
-        items.push(it);
-        n++;
-      }
-      return n;
-    };
-    add(first.items);
-    onProgress?.(items.length, total);
-    let partial = false;
-    for (let page = 2; page <= SUB_STORE_MAX_PAGES; page++) {
-      if (total != null && items.length >= total) break;
-      if (items.length >= OH.SUB_STORE_MAX) break;
-      await pause();
-      const r = await ask(page, limit);
-      if (r.error) {
-        partial = true; // keep what came in, say it's short
-        OH.log(
-          'warn',
-          'subStore',
-          `subscriber store page ${page}: ${r.error} ${r.status || ''}`.trim(),
-        );
-        break;
-      }
-      if (!r.items.length || add(r.items) === 0) break;
-      onProgress?.(items.length, total);
-    }
-    // A short read never replaces a fuller list from earlier.
-    if (partial && cached && cached.items.length > items.length) return fail({ error: 'busy' });
-    const list = {
-      at: Date.now(),
-      nickname: acct.nickname || null,
-      total: total ?? items.length,
-      pageSize: limit,
-      partial,
-      items,
-    };
-    try {
-      await chrome.storage.local.set({ [SUB_STORE_KEY]: list });
-    } catch {
-      /* storage full: this page view still has the list */
-    }
-    return { ok: true, list };
-  }
-
   // --- The store catalog (openhangar.space/api/catalog) ------------------------------
   // Everything in RSI's pledge store right now, as the website's store watcher last
   // read it: one download (ETag'd, so usually a tiny "nothing new") instead of a
@@ -5293,7 +5365,7 @@
       const ships = [];
       for (const p of items) {
         for (const c of p.contents || []) {
-          if (/^ship$/i.test(c.kind || '')) {
+          if (isShipItem(c)) {
             ships.push({ name: OH.htfShipName(c.label) || c.label, lti: p.insurance === 'LTI' });
           }
         }
@@ -5484,8 +5556,7 @@
     return { added, removed, changed, melt: meltOf(b) - meltOf(a) };
   };
 
-  // Append a snapshot to db.history unless nothing changed (then just note when
-  // it was last confirmed). Seeds the history from the previous scan first, so
+  // Append a snapshot to db.history unless nothing changed. Seeds the history from the previous scan first, so
   // the very first scan after this feature shipped already has a "before".
   function recordHistory(db, prevHangar, items, at, credit) {
     const hist = Array.isArray(db.history) ? db.history : [];
@@ -5496,7 +5567,6 @@
     const last = hist[hist.length - 1];
     const d = last && OH.diffSnapshots(last, snap);
     if (d && sameSnapshot(last, snap, d)) {
-      last.checkedAt = at;
       // First scan that knows the credit: fill it in rather than add a snapshot.
       if (!Number.isFinite(last.credit) && Number.isFinite(credit)) last.credit = credit;
     } else hist.push(snap);
@@ -5520,9 +5590,7 @@
     for (const snap of [...byAt.values()].sort((x, y) => x.at - y.at)) {
       const last = out[out.length - 1];
       const d = last && OH.diffSnapshots(last, snap);
-      if (d && sameSnapshot(last, snap, d)) {
-        last.checkedAt = Math.max(last.checkedAt || last.at, snap.checkedAt || snap.at);
-      } else out.push(snap);
+      if (!(d && sameSnapshot(last, snap, d))) out.push(snap);
     }
     return OH.trimHistory(out);
   };

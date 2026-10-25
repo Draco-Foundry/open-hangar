@@ -34,7 +34,7 @@
       {
         title: 'Biggest Savings vs Store Price',
         rows: savings.map(({ p, si }) => ({
-          ...row(p, `${a.dollars(si.paid)} → ${a.dollars(si.store)}`),
+          ...row(p, `${a.dollars(si.paid)} to ${a.dollars(si.store)}`),
           gain: a.dollars(si.store - si.paid),
         })),
       },

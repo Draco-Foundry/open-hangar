@@ -48,6 +48,12 @@ const COPY = {
   'basic.signed-out': "You're Signed Out of RSI",
   'basic.signed-out-line':
     'Nothing was scanned, and your saved hangar is safe. Log in on RSI, then scan again.',
+  // RSI didn't answer a scan: a 5xx, and a 429 (RSI asked us to wait; {time} is when to
+  // scan again). In the problem box (Claude chat, Words, 2026-10-22).
+  'basic.rsi-down':
+    "RSI isn't answering, so the scan stopped. The parts it didn't finish keep your last scan. Try again soon.",
+  'basic.rsi-wait':
+    "RSI asked us to wait, so the scan stopped. The parts it didn't finish keep your last scan. Scan again after {time}.",
   // A different RSI account is signed in: its hangar is loaded (back) or needs a scan.
   'basic.switched-back': "Signed in as {who} on RSI: that account's saved hangar is back.",
   'basic.switched-new': 'Signed in as {who} on RSI: that account has no scan here yet. Press Scan.',
@@ -80,6 +86,12 @@ const COPY = {
   'basic.sync-wait': 'Try again at {time}. The last sync was moments ago.',
   'basic.syncing': 'Syncing now',
   'basic.connect-failed': "Connecting didn't finish. Try again.", // the token trade failed: try again
+  // Connect with a code, where there's no sign-in window (Firefox for Android): the
+  // dashboard's words, word for word (ui/site/SiteConnect.svelte, src/dashboard.js).
+  'basic.code-hint': 'Approve this code on openhangar.space',
+  'basic.code-again': 'Open the Page Again',
+  'basic.code-cancel': 'Cancel',
+  'basic.code-expired': 'That code expired before it was approved. Connect again.',
   'basic.your-data': 'Your Data', // heading
   'basic.data-about':
     'Your hangar is saved in this browser. Export JSON makes a backup file you keep.', // stays in this browser; backup file
@@ -106,6 +118,14 @@ const COPY = {
     "It hasn't synced to your openhangar.space account before. Syncing adds its hangar there too.",
   'basic.pilot-yes': 'Sync It',
   'basic.pilot-no': 'Not This One',
+  // --- Connect came back with another openhangar.space account (connect hardening) ---
+  // Asked on this page before anything is replaced or synced: {from} is the account
+  // this browser is connected to now, {to} the one the sign-in window approved.
+  'basic.switch-title': 'Switch to {to}?',
+  'basic.switch-body':
+    'This browser is connected to {from}. Switching sends your hangar to {to} from now on.',
+  'basic.switch-yes': 'Switch to {to}',
+  'basic.switch-no': 'Stay with {from}',
   // --- Store alerts (the `alerts` flag; the popup's switch since 0.4.0) ---
   'basic.alerts-title': 'Store Alerts', // the card's heading (Title Case)
   // What alerts do: a badge and notifications when something in RSI's store is for
@@ -113,9 +133,6 @@ const COPY = {
   // from one public file, nothing about you sent; a check at most every 30 minutes.
   'basic.alerts-about':
     "A badge, and notifications if you allow them, when something in RSI's store is for you: your Wishlist, buy-backs, paints, warbonds and limited sales. It's matched in this browser from one public file, and nothing about you is sent. The store is checked at most every 30 minutes.",
-  // The switch, off: turn alerts on (the browser then asks about notifications).
-  'basic.alerts-turn-on': 'Turn On Alerts',
-  'basic.alerts-turn-off': 'Turn Off Alerts', // the switch, on
   // On: how many items are alerts right now, and when the store was last checked.
   'basic.alerts-on-line': 'Alerts now: {n}',
   'basic.alerts-checked': 'Store checked {when}',

@@ -158,7 +158,7 @@
                 <option value="">From…</option>
                 {#each h.options as o (o.name)}<option value={o.name}>{o.name}</option>{/each}
               </select>
-              <span class="arrow">→</span>
+              <span class="arrow">to</span>
               <ShipLink name={h.to} />
             {:else if h.ship}
               <ShipLink name={h.ship} text={h.title} />

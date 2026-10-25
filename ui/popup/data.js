@@ -6,6 +6,7 @@
 // offline), the last RSI account read (the `account` key) for Store Credit, and the
 // portrait the scan saved (`avatarImg`, a data URL: never an RSI address).
 import { t } from './copy.js';
+import { compactCount } from './currency.js';
 
 // The extension's own page in the connector build, where Connect lives (and, with an
 // older background, where scans run).
@@ -50,6 +51,26 @@ export function scanBusy({ scanRunning, scanRequest }, now = Date.now()) {
 export function storeCredit(account) {
   const c = account?.credits?.store?.value;
   return Number.isFinite(c) ? c / 100 : null;
+}
+
+const FULL = new Intl.NumberFormat('en-US');
+export { compactCount };
+
+// The most Buy-Back Tokens the card shows (two digits); more reads 99+.
+const TOKENS_MAX = 99;
+// → { text, full } for the card, or null when there is no count.
+export function tokenCount(n) {
+  if (!Number.isInteger(n) || n < 0) return null;
+  return { text: n > TOKENS_MAX ? `${TOKENS_MAX}+` : String(n), full: FULL.format(n) };
+}
+
+// UEC or REC (`key`: 'uec' | 'rec') from the cached RSI account: { text, full } with the
+// number compact for a small card and in full for its tooltip and name, or null when the
+// last account read has none (never scanned, or RSI didn't return it).
+export function gameCredit(account, key) {
+  const n = account?.credits?.[key]?.value;
+  const text = compactCount(n);
+  return text == null ? null : { text, full: FULL.format(n) };
 }
 
 // Under the value when some pledges have no price (no store price and no melt
@@ -121,6 +142,12 @@ export function scanAge(scannedAt, now = Date.now()) {
   return { tone, n: Math.floor(mins / 1440), unit: 'd' };
 }
 
+// A list an older parser read (OH.parserStale, #728) shows as stale, not as current: the
+// header's age goes amber, in the words it already has, until the next scan reads it again.
+export function staleAge(age, stale) {
+  return stale && age?.tone === 'fresh' ? { ...age, tone: 'stale' } : age;
+}
+
 // --- The scan, from the shared keys (session scanRunning and scanProgress, local
 // scanReport) -----------------------------------------------------------------------
 const STEPS = ['hangar', 'buybacks', 'referrals'];
@@ -150,15 +177,15 @@ export function scanSteps(part) {
 // header and the steps above stay). One bar where Scan sits: its label the part running
 // and how many it has read, its fill the scan's real progress. Where each part's share
 // of the whole scan ends: the hangar and buy-backs are most of a scan's pages. Packs
-// read after the scan's end (ui/scan/runner.js readPacks), so they fill on their own.
+// (the buy-backs' own pages, ui/scan/runner.js readPacks) are read before the sync.
 const BAR_SPAN = {
   start: [0, 0.02],
   account: [0.02, 0.05],
   hangar: [0.05, 0.55],
   buybacks: [0.55, 0.85],
-  referrals: [0.85, 0.95],
+  referrals: [0.85, 0.9],
+  packs: [0.9, 0.95],
   sync: [0.95, 1],
-  packs: [0, 1],
 };
 const counted = (n) => Number.isFinite(n) && n > 0;
 // How much of the part is read, 0 to 1. The hangar and buy-backs by page of RSI's pager
@@ -285,6 +312,7 @@ const AUTO_KEY = {
   'signed-out': 'popup.auto-signed-out',
   other: 'popup.auto-other',
   paused: 'popup.auto-paused',
+  'rsi-down': 'popup.auto-rsi-down',
   bad: 'popup.auto-bad',
   'out-partway': 'popup.auto-out-partway',
   partway: 'popup.auto-stopped',
@@ -342,11 +370,26 @@ const since = (report, scannedAt) =>
 // The rows of the last scan that went wrong (not read, or read only in part), unless a
 // scan since went fine. Held reports read nothing: none.
 export function reportTrouble(report, scannedAt) {
-  if (!isObj(report) || report.held || !report.bad || report.signedOut) return [];
+  if (!isObj(report) || report.held || !report.bad || report.signedOut || report.rsiDown) return [];
   if (since(report, scannedAt)) return [];
   return (Array.isArray(report.rows) ? report.rows : []).filter(
     (r) => isObj(r) && (!r.ok || !!r.partial),
   );
+}
+// The last scan stopped because RSI changed a page (a row's `pageChanged`, ui/scan/runner.js),
+// unless a scan since went fine: nothing of it was saved.
+export function reportPageChanged(report, scannedAt) {
+  return reportTrouble(report, scannedAt).some((r) => r.pageChanged === true);
+}
+// The last scan stopped because RSI didn't answer (its report's rsiDown), unless a scan
+// since went fine: → { kind: 'down' } (a 5xx), { kind: 'wait', at } (RSI asked to wait, and
+// that time hasn't come), or null. It comes before signed out: a RSI that isn't answering
+// can look signed out, and Log In to RSI would be the wrong thing to say.
+export function reportRsi(report, scannedAt, now = Date.now()) {
+  if (!isObj(report) || report.held || !report.rsiDown || since(report, scannedAt)) return null;
+  if (Number.isFinite(report.wait))
+    return report.wait > now ? { kind: 'wait', at: report.wait } : null;
+  return { kind: 'down' };
 }
 // A scan status.json paused (every part): its message (the status file's words, the
 // ones the basic page shows), or ''.
@@ -389,9 +432,11 @@ export function valueSince(history, total, valueOf, scannedAt) {
 }
 
 // --- Fleet News: the store alerts that are news for this hangar ------------------------
-// Something on your Wishlist in the store, or a ship you own on sale (a warbond edition
-// or a limited-time sale): up to `max`, the Wishlist first, unseen before seen.
-const NEWS_WHY = ['wishlist', 'warbond', 'limited'];
+// Something on your Wishlist in the store, a ship you own on sale (a warbond edition or a
+// limited-time sale), or a new paint for a ship you own: up to `max`, the Wishlist first,
+// unseen before seen. The only place the hangar's reasons show (the badge and
+// notifications are the Wishlist's, the owner, 2026-10-23).
+const NEWS_WHY = ['wishlist', 'warbond', 'limited', 'paint'];
 export function fleetNews(items, unseen = new Set(), max = 3) {
   const rank = (m) =>
     (m.why.some((x) => x?.why === 'wishlist') ? 0 : 2) + (unseen.has(m.id) ? 0 : 1);
@@ -479,6 +524,21 @@ export function wishSale(feed) {
     return { onSale: !!on, price: on?.price ?? null };
   };
 }
+// The Wishlist tab's count: the items with Remind Me on (`keys`, the store alerts' copy
+// of the account's Wishlist, src/alerts.js freshWish) that the store sells now. 0 with
+// no sale feed kept.
+export function remindOnSale(keys, feed) {
+  const sale = wishSale(feed);
+  if (!sale || !Array.isArray(keys)) return 0;
+  return [...new Set(keys)].filter((k) => sale(k).onSale).length;
+}
+// The Wishlist's items with those on sale now first, each side in its own order. `keyOf`
+// reads an item's Wishlist key. Unchanged with no sale feed kept.
+export function onSaleFirst(list, sale, keyOf = (x) => x.key) {
+  if (!sale || !Array.isArray(list)) return list;
+  const on = list.filter((x) => sale(keyOf(x)).onSale);
+  return on.length ? [...on, ...list.filter((x) => !sale(keyOf(x)).onSale)] : list;
+}
 
 // --- openhangar.space in Settings ----------------------------------------------------------
 // A sync that didn't go through: the website's pace held it back (a too-soon wait, with
@@ -503,10 +563,34 @@ export function reportSyncFailed(report, link) {
 
 // The browser's shortcut that opens the popup (chrome.commands.getAll), '' when none
 // is set, or null when this browser has no shortcuts (Firefox for Android).
-export function popupShortcut(commands) {
+export function popupShortcut(commands, mac = isMac()) {
   if (!Array.isArray(commands)) return null;
   const c = commands.find(
     (x) => x?.name === '_execute_action' || x?.name === '_execute_browser_action',
   );
-  return c ? String(c.shortcut || '') : null;
+  return c ? shortcutLabel(String(c.shortcut || ''), mac) : null;
+}
+
+// Whether this is a Mac (userAgentData.platform, else navigator.platform).
+export function isMac(nav = globalThis.navigator) {
+  return /^mac/i.test(String(nav?.userAgentData?.platform || nav?.platform || ''));
+}
+
+// A shortcut as the platform writes it: on a Mac "Alt+Shift+O" is ⌥⇧O, in Mac's order
+// (⌃⌥⇧⌘, then the key, no plus signs). Chrome maps Ctrl to ⌘ there. Strings that
+// already hold the symbols (Chrome and Edge on a Mac) and other platforms pass through.
+export function shortcutLabel(shortcut, mac) {
+  const s = String(shortcut || '');
+  if (!mac || !s || !s.includes('+')) return s;
+  const MARK = { macctrl: '⌃', alt: '⌥', option: '⌥', shift: '⇧', command: '⌘', ctrl: '⌘' };
+  const ORDER = '⌃⌥⇧⌘';
+  const marks = new Set();
+  let key = '';
+  for (const part of s.split('+')) {
+    const m = MARK[part.trim().toLowerCase()];
+    if (m) marks.add(m);
+    else key += part.trim();
+  }
+  if (!marks.size) return s;
+  return [...ORDER].filter((m) => marks.has(m)).join('') + key;
 }

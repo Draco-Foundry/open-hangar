@@ -14,7 +14,8 @@
  *
  * The backup file (exportPayload, format EXPORT_VERSION):
  *   { app, appVersion, exportedAt, schemaVersion, account, sources, history, pledgeArchive }
- * The sync payload: the same without the referral prospects list (withoutProspects).
+ * The sync payload (syncPayload): the same without the referral prospects list
+ * (withoutProspects), and each history snapshot only its time and pledges.
  * The hangar view (hangarView): the "stored shape", what the website keeps for a
  * synced hangar: the sync payload without history, with no referral code anywhere
  * and the pledge archive capped at ARCHIVE_MAX. schema/sync-payload.schema.json
@@ -26,21 +27,47 @@
   //   shape needs a MIGRATIONS step (src/lib.js, the Storage section).
   //     v1 → v2: unchanged (only the export gained `account`)
   //     v2 → v3: scan history moved out of `db` into its own key
+  //     v3 → v4: referral rows keep only their dates and campaign (2026-10-24)
+  //     v4 → v5: the pledge archive keeps only what buy-back details read, as the
+  //              backup file does (leanArchive): no pictures or flags (2026-10-24)
   //   EXPORT_VERSION is the backup-file format (OH.exportDB / OH.importDB).
   //     v2 added the `account` block (identity, org/rank, balances); v1 had
   //     sources only. Keeping it at 2 lets older versions import new backups.
-  const DB_VERSION = 3;
+  const DB_VERSION = 5;
   const EXPORT_VERSION = 2;
   // Pledges kept in the pledge archive (src/lib.js archiveGone), and in the hangar
   // view's copy of it.
   const ARCHIVE_MAX = 2000;
   const DB_KEY = 'db';
   const ARCHIVE_KEY = 'pledgeArchive';
+  const BBD_KEY = 'bbDetails'; // the buy-back details cache (lib.js getBuybackDetails)
+
+  // PARSER_VERSION is how a scan reads RSI's pages into the stored hangar and
+  // buy-backs. Bump it when the parser (src/scraper/parser.js, src/parser-rules.js,
+  // src/data/parser-rules.json) reads the same page differently: data a scan saved
+  // with an older one is stale (parserStale) until the next scan. Each scan stamps
+  // its source's version in its own key, `scanParser` (src/lib.js writeSource), so
+  // the database, the backup file and the sync payload keep their shapes. CI fails a
+  // PR that changes the parser without a bump, unless a commit in it carries
+  // `Parser-Version-Unchanged: <why>` (scripts/check-parser-version.mjs).
+  //     1: 2026-10-18, the first.
+  //     2: 2026-10-24, a hangar item's maker, when its tile shows one (#568).
+  const PARSER_VERSION = 2;
+  const PARSER_KEY = 'scanParser';
 
   const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
   const okTime = (t) =>
     Number.isFinite(t) || (typeof t === 'string' && t !== '' && !isNaN(Date.parse(t)));
   const emptyDB = () => ({ schemaVersion: DB_VERSION, sources: {} });
+
+  // Was this source last read by an older parser? `stamps` is the stored scanParser
+  // ({ hangar: 1, … }, possibly missing). A source scanned before the stamps existed
+  // counts as version 1, written as a literal: that's what the parser was then, and
+  // it mustn't move when PARSER_VERSION does. Pure.
+  function parserStale(stamps, id) {
+    const v = isObj(stamps) && Number.isInteger(stamps[id]) ? stamps[id] : 1;
+    return v !== PARSER_VERSION;
+  }
 
   // Raw stored DB → { db, problems }. `db` always has the shape the rest of the
   // extension relies on; `problems` says what had to be dropped (empty = it was
@@ -101,7 +128,9 @@
     return { db, problems };
   }
 
-  // Keep only well-formed snapshots ({ at, items: [[id, name, value]] }).
+  // Keep only well-formed snapshots ({ at, items: [[id, name, value]] }, and `credit`
+  // when known). Older versions' `checkedAt` (when an unchanged scan last confirmed a
+  // snapshot) goes: no page reads it.
   function cleanSnapshot(x) {
     if (!x || !Number.isFinite(x.at) || !Array.isArray(x.items)) return null;
     const items = x.items
@@ -109,7 +138,6 @@
       .map((r) => [String(r[0]), String(r[1]), Number(r[2]) || 0]);
     const out = { at: x.at, items };
     if (Number.isFinite(x.credit)) out.credit = x.credit;
-    if (Number.isFinite(x.checkedAt)) out.checkedAt = x.checkedAt;
     return out;
   }
 
@@ -181,7 +209,7 @@
   }
 
   // What sync sends: the backup file's payload without the referral prospects list.
-  // Prospects are other players (handles, monikers, enlist dates) who used your code but
+  // Prospects are other players (only their enlist dates are kept) who used your code but
   // aren't recruits yet, so they stay in this browser; the backup file keeps them, and
   // the prospects count still goes. Returns a copy, never changes `payload`. Pure.
   function withoutProspects(payload) {
@@ -191,9 +219,21 @@
     return { ...payload, sources: { ...payload.sources, referral: { ...ref, items } } };
   }
 
-  // The archive as the backup file (and so sync) carries it (#388): only what
-  // buy-back details read (name, value, currency, insurance, ccu, contents' kind
-  // and label) plus the date, kind and goneAt. Left out: the flags (isCCU,
+  // What sync sends: withoutProspects, and each history snapshot as { at, items }. A
+  // snapshot's Store Credit (`credit`, which the popup's value change reads in this
+  // browser) and older versions' `checkedAt` stay out: the website reads neither
+  // (owner, 2026-10-24). Returns a copy, never changes `payload`. Pure.
+  function syncPayload(payload) {
+    const out = withoutProspects(payload);
+    if (!isObj(out) || !Array.isArray(out.history)) return out;
+    const history = out.history.map((s) => (isObj(s) ? { at: s.at, items: s.items } : s));
+    return { ...out, history };
+  }
+
+  // The archive as this browser keeps it (lib.js archiveGone, since storage v5) and as
+  // the backup file (and so sync) carries it (#388): only what buy-back details read
+  // (name, value, currency, insurance, ccu, contents' kind and label) plus the date,
+  // kind and goneAt. Left out: the flags (isCCU,
   // isAddOn, giftable…, worked out again from the kind and name) and every image
   // URL (the details window never shows them; the buy-back card has its own
   // picture). The images were about 40% of a big archive. Also cleans a
@@ -223,20 +263,73 @@
     return out;
   }
 
+  // What a buy-back's own RSI page adds to it in the backup file and so the sync
+  // (#798): `price`, its US dollar price as RSI writes one ("$1,234.50 USD"), with
+  // `priceFrom: 'page'`; `insurance`, as a pledge's ("LTI", "120M", or RSI's words when
+  // it's neither; null with none); `contents`, as a pledge's: its ships (kind 'Ship',
+  // with manufacturer and focus) and then everything else on the page ('Insurance', or
+  // '' for anything RSI doesn't type there). Only a page read from RSI counts (lib.js
+  // buybackFromRsi, and a read page always has its price): details filled from this
+  // browser's history (`src`) or only half read (`partial`) add nothing. `details`: the stored buy-back details, by pledge id.
+  // Returns a copy, never changes `sources`. Pure.
+  const BB_INSURANCE_RE = /\binsurance\b|\bLTI\b/i;
+  function usd(n) {
+    const text = n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `$${text} USD`;
+  }
+  function buybackFromPage(b, d) {
+    const out = { ...b };
+    if (d.price >= 0 && (d.currency || 'USD') === 'USD') {
+      out.price = usd(d.price);
+      out.priceFrom = 'page';
+    }
+    out.insurance = d.insurance ? String(d.insurance) : null;
+    const ships = (Array.isArray(d.ships) ? d.ships : [])
+      .filter((s) => isObj(s) && s.name)
+      .map((s) => ({
+        kind: 'Ship',
+        label: String(s.name),
+        manufacturer: String(s.manufacturer || ''),
+        focus: String(s.focus || ''),
+      }));
+    const also = (Array.isArray(d.also) ? d.also : [])
+      .filter((l) => typeof l === 'string' && l.trim())
+      .map((l) => ({ kind: BB_INSURANCE_RE.test(l) ? 'Insurance' : '', label: l.trim() }));
+    out.contents = [...ships, ...also];
+    return out;
+  }
+  function withBuybackDetails(sources, details) {
+    const bb = sources?.buybacks;
+    if (!isObj(details) || !isObj(bb) || !Array.isArray(bb.items)) return sources;
+    const items = bb.items.map((b) => {
+      const d = isObj(b) && b.id != null ? details[String(b.id)] : null;
+      const read = isObj(d) && !d.partial && !d.src && Number.isFinite(d.price);
+      return read ? buybackFromPage(b, d) : b;
+    });
+    return { ...sources, buybacks: { ...bb, items } };
+  }
+
   // The whole database as a self-describing JSON object (the backup file), ordered
   // the way a backend reads it: provenance → who (identity, org, rank, balances) →
   // what they own (sources). `db` as lib.js's loadDB (or checkDB) returns it,
   // `account` the cached RSI account (cache only, so this works offline), `archive`
   // the stored pledge archive. ALWAYS the current format (EXPORT_VERSION),
   // whatever the stored DB's version. Pure.
-  function exportPayload({ db, account = null, archive = null, appVersion = null, now } = {}) {
+  function exportPayload({
+    db,
+    account = null,
+    archive = null,
+    buybackDetails = null,
+    appVersion = null,
+    now,
+  } = {}) {
     return {
       app: 'open-hangar',
       appVersion,
       exportedAt: new Date(now === undefined ? Date.now() : now).toISOString(),
       schemaVersion: EXPORT_VERSION,
       account: shapeAccount(account, db.owner),
-      sources: sanitizeSources(db.sources),
+      sources: withBuybackDetails(sanitizeSources(db.sources), buybackDetails),
       // Scan history rides along so a backup file is a complete restore point.
       history: Array.isArray(db.history) ? db.history : [],
       // So does the pledge archive (#388), trimmed to what buy-back details read
@@ -409,7 +502,7 @@
   //   'schema'         the view fails its checks (+ path); nothing is handed out
   // Reads only the database, the cached account and the pledge archive.
   async function readHangarView(get, { appVersion = null, now } = {}) {
-    const raw = (await get([DB_KEY, 'hangar', 'account', ARCHIVE_KEY])) || {};
+    const raw = (await get([DB_KEY, 'hangar', 'account', ARCHIVE_KEY, BBD_KEY])) || {};
     if (raw[DB_KEY] === undefined)
       return { ok: false, error: Array.isArray(raw.hangar) ? 'needs-upgrade' : 'no-scan' };
     const { db, problems } = checkDB(raw[DB_KEY]);
@@ -422,6 +515,7 @@
         db,
         account: raw.account || null,
         archive: raw[ARCHIVE_KEY],
+        buybackDetails: raw[BBD_KEY],
         appVersion,
         now,
       }),
@@ -433,13 +527,18 @@
   const api = {
     DB_VERSION,
     EXPORT_VERSION,
+    PARSER_VERSION,
+    PARSER_KEY,
     ARCHIVE_MAX,
+    parserStale,
     checkDB,
     cleanSnapshot,
     shapeAccount,
     sanitizeSources,
     withoutProspects,
+    syncPayload,
     leanArchive,
+    withBuybackDetails,
     exportPayload,
     capArchive,
     hangarView,

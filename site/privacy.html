@@ -27,7 +27,7 @@
     <main class="wrap doc">
       <p><a href="./">Open Hangar</a></p>
       <h1>Privacy Policy</h1>
-      <p class="updated"><em>Last updated: 2026-10-18</em></p>
+      <p class="updated"><em>Last updated: 2026-10-24</em></p>
       <p>
         Open Hangar is a source-available browser extension that reads your own Star Citizen /
         Roberts Space Industries (RSI) account data and stores it locally in your browser. Open
@@ -55,9 +55,9 @@
           pays.
         </li>
         <li>
-          Store alerts are optional and off until you turn them on. They download one public sale
-          file, the same for everyone, and match it on your device (see
-          <a href="#store-alerts">Store Alerts</a>).
+          Store alerts are optional. They're on only while you're connected and an item on your
+          Wishlist has Remind Me on. They download one public sale file, the same for everyone, and
+          match it on your device (see <a href="#store-alerts">Store Alerts</a>).
         </li>
         <li>
           Auto Scan Daily is optional and off until you turn it on. It works only while you're
@@ -80,8 +80,8 @@
       <ul>
         <li>Your hangar (pledges: ships, CCUs, add-ons, coupons).</li>
         <li>
-          A short history of past hangar scans (pledge id, name and value per scan), so the
-          extension can show what changed between scans.
+          A short history of past hangar scans (pledge id, name and value per scan, and your Store
+          Credit at each scan), so the extension can show what changed between scans.
         </li>
         <li>
           An archive of pledges that have left your hangar (melted, gifted or upgraded away): pledge
@@ -89,25 +89,30 @@
           fill in buy-back details.
         </li>
         <li>
-          Your buy-back pledges. After a good buy-back scan, the extension also opens up to 30
-          buy-back packs it hasn't read yet, to see what is inside each one. This means more
-          requests to RSI than one page per scan. It is still read-only, and only ever your own
-          account.
+          Your buy-back pledges. When you press Scan, after a good buy-back scan, the extension also
+          opens the RSI page of up to 30 buy-backs it hasn't read yet, to see each one's price,
+          insurance and what is inside it. Buy-back upgrades have no page of their own, so they're
+          left out. This means more requests to RSI than one page per scan. It is still read-only,
+          and only ever your own account.
         </li>
         <li>
           Account identity and balances (handle, display name, the web address of your RSI portrait,
           UEE Citizen Record number, enlisted date, country, org (name, tag and logo address) and
           rank, whether you're a subscriber (with your tier and billing period, as RSI shows them),
-          your Concierge level and how close you are to the next one, Store Credit, UEC, REC, and
-          when it was read). The Citizen Record number is the public number on your RSI profile. It
-          never changes.
+          your Concierge level and how close you are to the next one, Store Credit, UEC, REC,
+          Buy-Back Tokens, and when it was read). The Citizen Record number is the public number on
+          your RSI profile. It never changes.
         </li>
         <li>
           A small copy of your RSI portrait, saved in this browser so the popup can show which
           account you're on. The copy itself isn't synced or put in your backup file. Its web
           address is part of your account identity (above).
         </li>
-        <li>Your referral code and your recruits/prospects (handles, monikers, dates).</li>
+        <li>
+          Your referral code, how many recruits and prospects you have, and each one's dates (when
+          they enlisted and converted, and for a recruit, its referral campaign). Not their handles,
+          names or pictures.
+        </li>
       </ul>
       <p>
         If you use more than one RSI account in this browser, each account's data is kept separately
@@ -117,7 +122,8 @@
         All of this is stored only in your browser's local extension storage
         (<code>chrome.storage.local</code>). It is only sent to us if you connect sync (below), and
         never to anyone else. You can remove it at any time with Clear Data on the popup's Settings
-        tab, or by uninstalling the extension (which deletes all stored data).
+        tab, or by uninstalling the extension (which deletes all stored data). If a save is ever
+        damaged, the extension keeps a recovery copy for at most 30 days.
       </p>
       <p>
         The toolbar popup shows what's already stored in this browser: your RSI portrait and handle,
@@ -143,10 +149,11 @@
           accounts.
         </li>
         <li>
-          <strong>What it reads:</strong> the same as Scan (above), from your own RSI account only.
-          It starts with a quick check of the newest page of your hangar and of your buy-backs, and
-          runs a full scan only when something there is new, or when your last full scan is a week
-          old. A quick check that finds nothing new stops there and sends nothing.
+          <strong>What it reads:</strong> the same as Scan (above), except buy-backs' own pages,
+          from your own RSI account only. It starts with a quick check of the newest page of your
+          hangar and of your buy-backs, and runs a full scan only when something there is new, or
+          when your last full scan is a week old. A quick check that finds nothing new stops there
+          and sends nothing.
         </li>
         <li>
           <strong>What it sends:</strong> what it saves syncs to openhangar.space like any other
@@ -187,8 +194,9 @@
       </ul>
       <h2 id="store-alerts">Store Alerts</h2>
       <p>
-        Store alerts tell you when something in RSI's store is for you. They're optional and off
-        until you turn them on, on the popup's Settings tab, and they're matched on your device.
+        Store alerts tell you when something in RSI's store is for you. They're optional: they're on
+        only while you're connected and at least one item on your Wishlist has Remind Me on, and
+        they're matched on your device.
       </p>
       <ul>
         <li>
@@ -198,24 +206,23 @@
           every 30 minutes, and less often when our site is busy or can't be reached.
         </li>
         <li>
-          <strong>What it's matched against:</strong> the hangar and buy-backs this browser scanned,
-          on your device. For example, a ship in your buy-backs is in the store again, or a ship you
-          own gets a new paint. Alerts never send them anywhere.
+          <strong>What it's matched against:</strong> on your device, the items on your account's
+          Wishlist that have Remind Me on (see <a href="#your-wishlist">Your Wishlist</a>), and the
+          hangar this browser scanned. For example, an item you're watching goes on sale, or a ship
+          you own gets a new paint. What it matches stays here.
         </li>
         <li>
-          <strong>Your Wishlist, while you're connected:</strong> alerts also match the items on
-          your account's Wishlist that have their reminder on (see
-          <a href="#your-wishlist">Your Wishlist</a>). What it matches stays here.
+          <strong>What you see:</strong> the popup's Wishlist tab counts your Remind Me items on
+          sale and lists what's on sale first. The number on the toolbar button counts the ones you
+          haven't seen yet and, if you allow notifications, each one newly on sale gets a
+          notification (up to three at a time, then one for the rest). Matches with your hangar show
+          only in the popup's Fleet News. Clicking a match in Fleet News or a notification opens
+          that item on openhangar.space.
         </li>
         <li>
-          <strong>What you see:</strong> a number on the toolbar button and on the popup's bell, the
-          matches in the popup's alerts list and, if you allow notifications, a notification for
-          each new match (up to three at a time, then one for the rest). Clicking a match opens that
-          item on openhangar.space.
-        </li>
-        <li>
-          <strong>Turning them off:</strong> on the same Settings tab. The checks stop, and the
-          matches saved for alerts are deleted from this browser.
+          <strong>Turning them off:</strong> turn Remind Me off for every item on your Wishlist, or
+          disconnect. The checks stop, and the matches saved for alerts are deleted from this
+          browser.
         </li>
       </ul>
       <h2 id="your-wishlist">Your Wishlist</h2>
@@ -231,9 +238,9 @@
           stays in this browser.
         </li>
         <li>
-          <strong>Changing it:</strong> when you add or remove an item, or turn its reminder on or
-          off, the extension sends that one change to app.openhangar.space with its sync token:
-          which item, and for a reminder, on or off. Nothing else is sent with it.
+          <strong>Changing it:</strong> when you add or remove an item, or turn Remind Me on or off
+          for it, the extension sends that one change to app.openhangar.space with its sync token:
+          which item, and for Remind Me, on or off. Nothing else is sent with it.
         </li>
         <li>
           <strong>Searching:</strong> finding items to add happens on your device. What you type
@@ -308,14 +315,16 @@
           a different RSI account in this browser starts syncing only after you say yes when Open
           Hangar asks. You can also press Sync Now on the popup's Settings tab. Each sync sends the
           same data as its JSON backup file, except your referral prospects list: your hangar,
-          buy-backs (including what is inside each pack), scan history, pledge archive, account
-          identity and balances (handle, display name, the web address of your RSI portrait, UEE
-          Citizen Record number, enlisted date, country, org (name, tag and logo address) and rank,
-          whether you're a subscriber (with your tier and billing period, as RSI shows them), your
-          Concierge level and how close you are to the next one, Store Credit, UEC, REC, and when it
-          was read) and your referral recruits list. The Citizen Record number lets the website keep
-          the same account and history if you change your RSI handle. Your referral code is never
-          sent, and neither is your RSI password or any RSI cookie.
+          buy-backs (including each one's price, insurance and what is inside it, once its page has
+          been read), scan history (without its Store Credit), pledge archive, account identity and
+          balances (handle, display name, the web address of your RSI portrait, UEE Citizen Record
+          number, enlisted date, country, org (name, tag and logo address) and rank, whether you're
+          a subscriber (with your tier and billing period, as RSI shows them), your Concierge level
+          and how close you are to the next one, Store Credit, UEC, REC, Buy-Back Tokens, and when
+          it was read), your referral counts, and each recruit's dates and campaign. The Citizen
+          Record number lets the website keep the same account and history if you change your RSI
+          handle. Your referral code is never sent, and neither is your RSI password or any RSI
+          cookie.
         </li>
         <li>
           <strong>No extra RSI requests:</strong> sync sends what the extension already has. It
@@ -363,14 +372,16 @@
         </li>
         <li>
           <strong>cookies:</strong> for three things, all on robertsspaceindustries.com. Log Out of
-          RSI clears RSI's cookies so you can fully end your RSI session from the extension. To tell
-          whether you're signed in to RSI, so the popup can show Log In to RSI instead of Scan and
-          Auto Scan Daily can skip a day when you're signed out, the extension checks whether RSI's
-          sign-in cookie is in this browser. The browser hands over the cookie when asked, but for
-          this check the extension only looks at whether it's there, and the check doesn't contact
-          RSI. And Add to RSI Cart works the way RSI's own upgrade window does: it reads RSI's
-          session token cookie and sends it back to robertsspaceindustries.com with the cart
-          request. The extension never saves a cookie's value and never sends one anywhere but RSI.
+          RSI clears RSI's cookies so you can fully end your RSI session from the extension. To
+          guess whether you're signed in to RSI, the extension checks whether RSI's session cookie
+          is in this browser. When it isn't there, the popup shows Log In to RSI first, with Scan
+          still there to press, and Auto Scan Daily skips that day. RSI sets that cookie for
+          visitors who aren't signed in too, so only a scan tells for sure. The browser hands over
+          the cookie when asked, but for this check the extension only looks at whether it's there,
+          and the check doesn't contact RSI. And Add to RSI Cart works the way RSI's own upgrade
+          window does: it reads RSI's session token cookie and sends it back to
+          robertsspaceindustries.com with the cart request. The extension never saves a cookie's
+          value and never sends one anywhere but RSI.
         </li>
         <li>
           <strong>Host access to robertsspaceindustries.com:</strong> to make the read-only requests
@@ -378,24 +389,24 @@
           click Add to RSI Cart or Send to RSI Cart.
         </li>
         <li>
-          <strong>identity:</strong> for connecting sync. Connect opens a sign-in window, where you
-          sign in to app.openhangar.space and approve the connection (see
+          <strong>identity:</strong> for connecting sync. Connect, in the popup or from Connect This
+          Browser on app.openhangar.space, opens a sign-in window, where you sign in to
+          app.openhangar.space and approve the connection (see
           <a href="#optional-sync">Optional Sync</a>). The window hands the extension a one-time
-          code to finish connecting, never your password. Connect This Browser on the website uses
-          this permission only to look up the extension's sign-in address. Nothing else uses it.
+          code to finish connecting, never your password. Nothing else uses it.
         </li>
         <li>
           <strong>alarms:</strong> for store alerts and Auto Scan Daily only. It wakes the extension
           for a store alerts check at most every 30 minutes while alerts are on (see
           <a href="#store-alerts">Store Alerts</a>), and once a day while Auto Scan Daily is on (see
-          <a href="#auto-scan-daily">Auto Scan Daily</a>). Turning both off stops it. Nothing else
+          <a href="#auto-scan-daily">Auto Scan Daily</a>). When both are off, it stops. Nothing else
           uses it.
         </li>
         <li>
-          <strong>notifications:</strong> optional. The browser asks for it only when you turn store
-          alerts on, and you can say no: the number on the toolbar button and the popup's list still
-          work. With it, each new match gets a notification. Turning alerts off gives it back.
-          Nothing else uses it.
+          <strong>notifications:</strong> optional. The browser asks for it only from the
+          Notifications switch on the popup's Settings tab, and you can say no: the number on the
+          toolbar button and the popup's Wishlist tab still work. With it, each Remind Me item newly
+          on sale gets a notification. Turning the switch off gives it back. Nothing else uses it.
         </li>
         <li>
           <strong>offscreen</strong> (Chrome and Edge only): lets a scan run in a hidden page
@@ -431,8 +442,9 @@
         Open Hangar lets you export your database as a JSON file (or a CSV of your pledges or
         buy-backs) that you choose to save. The JSON file includes your scan history and pledge
         archive. That file is created locally and handled entirely by you; the extension does not
-        upload it anywhere. (Only sync sends this data, minus the referral prospects list, and only
-        if you connected it.) Your referral code is deliberately left out of exports.
+        upload it anywhere. (Only sync sends this data, minus the referral prospects list and the
+        Store Credit in your scan history, and only if you connected it.) Your referral code is
+        deliberately left out of exports.
       </p>
       <h2 id="multiple-accounts">Multiple Accounts</h2>
       <p>

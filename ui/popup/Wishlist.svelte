@@ -13,8 +13,9 @@
   // browser's sign-in window would close the popup).
   import { onMount, tick } from 'svelte';
   import { t } from './copy.js';
-  import { wishRows, wishSale } from './data.js';
+  import { onSaleFirst, wishRows, wishSale } from './data.js';
   import {
+    alertsFor,
     readWishlist,
     saleFeed,
     searchEntries,
@@ -24,7 +25,7 @@
     shipNames,
   } from './wishlist.js';
   import { WISH_MAX, loadWish, popupEnv, writeWish } from './wish-client.js';
-  import { openHub, openTab } from './actions.js';
+  import { openHub, openTab, setAlerts } from './actions.js';
   import { USD, money } from './currency.js';
 
   let { connected, fx = USD } = $props();
@@ -42,6 +43,9 @@
   const env = popupEnv();
 
   const sale = $derived(wishSale(feed));
+  // What's on sale now first (the tab's count, ./Popup.svelte).
+  const items = $derived(list?.mode === 'edit' ? onSaleFirst(list.items, sale) : []);
+  const rows = $derived(list?.mode === 'rows' ? onSaleFirst(list.rows, sale) : []);
   const entries = $derived(
     list?.mode === 'edit' ? searchEntries({ names, feed, onList: list.items.map((i) => i.key) }) : [],
   );
@@ -96,6 +100,10 @@
     const r = await writeWish(env, c);
     busy = false;
     if (r.items) list = { mode: 'edit', items: r.items };
+    if (r.ok && AL) {
+      const on = alertsFor(c, r.items);
+      if (on != null) setAlerts(on);
+    }
     if (r.ok) {
       // Taken, but the answer had no copy of it: the list is read again.
       if (r.stale) await load({ force: true });
@@ -204,9 +212,17 @@
     {/if}
     {#if note}<p class="pp-note" id="pp-wish-note" role="status">{note}</p>{/if}
     {#if list.items.length}
-      <h2 class="pp-lbl" id="pp-wish-h">{t('popup.wish-count', { n: list.items.length })}</h2>
+      <!-- The switches' column label, once (each switch has its own name). -->
+      <div class="pp-whead">
+        <h2 class="pp-lbl" id="pp-wish-h">{t('popup.wish-count', { n: list.items.length })}</h2>
+        {#if list.items.some((i) => typeof i.remind === 'boolean')}
+          <span class="pp-lbl pp-wremind" id="pp-wish-remind-h" aria-hidden="true"
+            >{t('popup.wish-remind-label')}</span
+          >
+        {/if}
+      </div>
       <ul class="pp-wlist pp-wedit" aria-labelledby="pp-wish-h">
-        {#each list.items as item (item.key)}
+        {#each items as item (item.key)}
           {@const s = sale ? sale(item.key) : null}
           <li>
             <div class="pp-wrow">
@@ -252,7 +268,7 @@
       <h2 class="pp-lbl" id="pp-wish-h">{t('popup.wish-count', { n: list.rows.length + list.unnamed })}</h2>
       {#if list.rows.length}
         <ul class="pp-wlist" aria-labelledby="pp-wish-h">
-          {#each list.rows as r (r.key)}
+          {#each rows as r (r.key)}
             <li>
               <span class="pp-atext">
                 <span class="pp-aname">{r.name}</span>

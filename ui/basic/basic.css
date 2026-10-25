@@ -124,6 +124,13 @@ body {
 .bp-msg.calm {
   color: var(--muted);
 }
+/* Connect's code, where there's no sign-in window (SiteCard.svelte) */
+.bp-code b {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 1.4em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
 
 .bp-btn {
   font: inherit;

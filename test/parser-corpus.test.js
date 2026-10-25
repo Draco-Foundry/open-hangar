@@ -130,6 +130,33 @@ test('a hangar page before the last one holds a full page of pledges', () => {
   }
 });
 
+// #568: the maker line under an item's name, kept as RSI wrote it, on exactly the
+// tiles that show one. The DOM's own tiles are the cross-check.
+test("a hangar item's maker is RSI's maker line, on the tiles that show one", () => {
+  let shown = 0;
+  for (const page of hangarPages) {
+    const tiles = [...doc(page.html).querySelectorAll('.item')]
+      .map((t) => ({
+        kind: clean(t.querySelector('.kind')?.textContent),
+        label: clean(t.querySelector('.title')?.textContent),
+        maker: clean(t.querySelector('.liner')?.textContent),
+      }))
+      .filter((t) => t.kind || t.label);
+    const items = P.parsePledges(page.html).flatMap((p) => p.contents);
+    assert.equal(items.length, tiles.length, `${page.file}: every tile read`);
+    items.forEach((c, i) => {
+      if (tiles[i].maker) assert.equal(c.manufacturer, tiles[i].maker, `${page.file} ${c.label}`);
+      else assert.equal('manufacturer' in c, false, `${page.file} ${c.label}: no maker line`);
+    });
+    shown += tiles.filter((t) => t.maker).length;
+  }
+  assert.ok(shown > 0, 'the corpus has tiles with a maker line');
+  const one = hangarPages
+    .flatMap((p) => P.parsePledges(p.html).flatMap((x) => x.contents))
+    .find((c) => c.manufacturer);
+  assert.match(one.manufacturer, /^\S.* \([A-Z0-9]{2,5}\)$/, 'name and code, as RSI shows them');
+});
+
 test('a buy-back page before the last one holds a full page at the size RSI shows', () => {
   for (const page of buybackPages) {
     const { page: n, last, size } = pager(page.html);
@@ -220,4 +247,22 @@ test('the scrub script keeps the cards and replaces what says whose hangar it is
   assert.equal(p.kind, 'ship');
   assert.equal(p.giftable, true);
   assert.match(out, /href="\?page=1"/);
+});
+
+// RSI changed the page (OpenHangar.pageChanged, which every scan runs on each page): the
+// saved pages fit the rules as they are, and the same pages changed the way RSI might
+// change them (test/fixtures/page-change/, each says what changed) don't.
+test('a page RSI changed trips the page change check, an unchanged one never does', () => {
+  for (const p of PAGES) assert.deepEqual(P.pageChanged(p.html, p.kind), [], p.file);
+  const changed = (f) =>
+    fs.readFileSync(path.join(__dirname, 'fixtures', 'page-change', f), 'utf8');
+  assert.deepEqual(P.pageChanged(changed('hangar-changed.html'), 'hangar'), [
+    'no pledge date reads',
+  ]);
+  assert.deepEqual(P.pageChanged(changed('buybacks-changed.html'), 'buybacks'), [
+    'buy-back cards without names',
+  ]);
+  // A page with no cards (signed out, an empty list) is for the scan's other checks.
+  assert.deepEqual(P.pageChanged('<html><body></body></html>', 'hangar'), []);
+  assert.deepEqual(P.pageChanged('<html><body></body></html>', 'buybacks'), []);
 });

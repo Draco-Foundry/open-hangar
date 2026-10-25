@@ -198,7 +198,7 @@
       name,
       value: raw.value ?? null, // numeric dollars, e.g. 35
       currency: raw.currency ?? null,
-      contents, // [{ kind, label, image }] of items contained in this pledge
+      contents, // [{ kind, label, image, manufacturer? }] of items contained in this pledge
       image: raw.image ?? null, // hero thumbnail URL (RSI CDN), or null
       containsShip, // true if any contained .kind === "Ship"
       isCCU,
@@ -277,7 +277,11 @@
       const kind = clean(tile.querySelector(RULES.hangar.itemKind)?.textContent);
       const label = clean(tile.querySelector(RULES.hangar.itemName)?.textContent);
       if (!kind && !label) continue; // structural noise, not a real item tile
-      contents.push({ kind, label, image: bgUrl(tile.querySelector(RULES.hangar.itemImage)) });
+      const item = { kind, label, image: bgUrl(tile.querySelector(RULES.hangar.itemImage)) };
+      // The maker line some tiles show, as RSI wrote it ("Aegis Dynamics (AEGS)", #568).
+      const maker = clean(tile.querySelector(RULES.hangar.itemMaker)?.textContent);
+      if (maker) item.manufacturer = maker;
+      contents.push(item);
     }
     if (contents.length) return contents;
 
@@ -561,6 +565,34 @@
     }
     if (payload.querySelectorAll) return ns.parseBuybacksFromDOM(payload);
     return [];
+  };
+
+  // --- Has RSI changed the page? ----------------------------------------------
+  // One hangar or buy-back page (HTML or a Document) that has cards → what of the
+  // rules' shape it no longer has, as a list of short reasons, [] when it fits. A scan
+  // checks every page with this on the device and saves nothing when a page doesn't
+  // fit (src/lib.js scanHtmlSource): better your last scan than one read wrong. Only
+  // what the parser can't do without: a pledge's name, a date it can read, the items
+  // inside; a buy-back's name and date. A new label or js-* hook isn't a change here
+  // (unrecognized, below, lists those for the saved pages' test).
+  ns.pageChanged = function pageChanged(payload, kind) {
+    const doc =
+      typeof payload === 'string' ? new DOMParser().parseFromString(payload, 'text/html') : payload;
+    const out = [];
+    if (kind === 'hangar') {
+      const list = ns.parsePledgesFromDOM(doc);
+      if (!list.length) return out;
+      if (list.some((p) => !p.id || !p.name)) out.push('a pledge without its id or name');
+      if (!list.some((p) => p.date)) out.push('no pledge date reads');
+      if (list.length >= 3 && !list.some((p) => p.contents.length)) out.push('no pledge items');
+    } else {
+      const cards = doc.querySelectorAll(RULES.buybacks.card).length;
+      const list = ns.parseBuybacksFromDOM(doc);
+      if (cards && !list.length) out.push('buy-back cards without names');
+      if (list.length && !list.some((b) => ns.parseRsiDate(b.date)))
+        out.push('no buy-back date reads');
+    }
+    return out;
   };
 
   // --- What the parser didn't recognize --------------------------------------

@@ -4,7 +4,42 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.5.4 — 2026-10-24
+
+- Changed: **Store alerts follow Remind Me.** The bell is gone: the Wishlist tab counts your Remind Me items on sale and lists them first, and only those items get the toolbar number and notifications. Paints and sales for ships you own show in Fleet News.
+- New: **Scan progress bar.** While a scan runs, the popup shows one bar where Scan sits, naming the part it's reading with a running count, then how long the scan took.
+- Changed: **A tidier Settings tab.** Sync, Auto Scan Daily and Notifications sit together in one box, the backup and CSV files are under Export Data next to Log Out of RSI, and Clear Data is at the bottom.
+- Changed: **Privacy policy updated.** Store Alerts now says alerts follow Remind Me, and notifications have their own switch in Settings.
+- Improved: **Buy-back details.** Scan now also reads the RSI pages of up to 30 buy-backs it hasn't read yet (upgrades have none), so their price, insurance and contents sync to openhangar.space.
+- Changed: **Privacy policy updated.** It now says Scan reads up to 30 buy-backs' own pages and Auto Scan Daily doesn't, sync sends their price, insurance and contents, recruits are kept as dates only, and recovery copies go after 30 days.
+- Fixed: **Buy-back pages that won't load.** A buy-back page RSI can't serve no longer takes one of a scan's 30 reads, and it's tried again later.
+- Fixed: **Switching accounts on Connect.** Open Hangar now tells your openhangar.space accounts apart by their ID, so it asks before switching even when two accounts share a name, and not after you rename one.
+- Fixed: **Clear Data clears everything.** It now also removes the buy-back details saved from their RSI pages.
+- Changed: **Less about other players.** Your recruits and prospects are kept as dates only, with no handles, names or pictures, in this browser and in sync.
+- Improved: **Recovery copies expire.** A copy kept to recover a damaged save is deleted after 30 days, or sooner after a complete scan.
+- Changed: **Leaner sync.** Scan history syncs without your Store Credit, which stays in this browser for the popup's Account Value.
+- Changed: **A leaner pledge archive.** Pledges that have left your hangar are kept without pictures or giftable and meltable flags.
+- Improved: **Ship makers.** Scan now also saves the maker RSI shows under each ship in your hangar, and sync sends it to openhangar.space. After this update the popup marks your last scan as old until you scan again.
+- Changed: **Words instead of arrows.** An upgrade's name now reads like "Aurora MR to Mustang Alpha", help paths use slashes, and the popup's chevrons are drawn icons.
+
+## 0.5.3 — 2026-10-23
+
+- Improved: If RSI changes a page, the scan stops and your last scan is kept.
+- Improved: **When RSI isn't answering.** Scan now says so instead of showing an error, and nothing from your last scan is lost.
+- New: **UEC and REC in the popup.** They get their own cards, and every popup number now fits its box, with short forms like 1.2 M.
+- Changed: **Safer connecting.** Connect This Browser on openhangar.space now opens Open Hangar's own sign-in window, and switching to another account asks you first.
+- Fixed: **Connect on Firefox for Android.** It works again, with a code you approve on openhangar.space.
+- Changed: Store alerts no longer tell you about buy-backs. Paint alerts only come for ships still on their default paint.
+- Improved: A scan whose pledge count doesn't fit RSI's page count is treated as cut short, so it can't replace a bigger scan.
+- Improved: A hangar or buy-back list saved by an older version shows as out of date, and Auto Scan reads it again on its next run.
+- Improved: **Shortcut on a Mac.** The popup shows its shortcut the Mac way, ⌥⇧O.
+
+## 0.5.2 — 2026-10-20
+
 - Fixed: **Shortcut on Firefox.** The popup's shortcut is now Alt+Shift+O, because on Firefox Alt+Shift+H opened Firefox's Help menu. Settings shows the shortcut your browser uses.
+- Fixed: **Scan while signed out.** When RSI has signed you out, Scan now tells you to log in to RSI instead of stopping with no message.
+- Fixed: **Scan again right away.** After a scan that read nothing, Scan works again at once, so you don't wait a minute after logging in to RSI.
+- Changed: **Privacy policy updated.** The cookies line now says RSI's session cookie only hints whether you're signed in.
 
 ## 0.5.1 — 2026-10-20
 

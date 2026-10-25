@@ -7,8 +7,9 @@
 //
 // The scan is the dashboard's Scan All without the store check (src/dashboard.js
 // runScan): one RSI account read, then the hangar, buy-backs and referrals, each saved
-// as it lands, then a sync when connected, then up to BB_AUTO_MAX buy-back packs never
-// read before, paced, in the background. What it's doing and how it went go to
+// as it lands, then up to BB_AUTO_MAX buy-backs' own pages not read from RSI before,
+// paced (their price, insurance and contents go in the sync, #798), then a sync when
+// connected. What it's doing and how it went go to
 // storage, for any page to show in its own words:
 //   session scanRunning  { at, tabId, run, by }: renewed at most once a minute while the
 //                        scan runs, removed at its end (src/background.js scanRunning,
@@ -17,7 +18,8 @@
 //                        a second at most (and one as each part starts, the newest
 //                        always written), removed at the end. part: 'start' | 'account'
 //                        | 'hangar' | 'buybacks' | 'referrals' | 'packs' | 'sync'. For
-//                        packs, page is the packs read so far and count how many to read.
+//                        packs (the buy-backs' own pages), page is the pages read so far
+//                        and count how many to read.
 //                        pages: how many pages RSI's pager shows for the hangar and
 //                        buy-backs (null without one; page = pages when a rescan found
 //                        nothing changed). For referrals, page is the lists read of
@@ -57,7 +59,7 @@ import {
   syncTriedAfter,
 } from './auto.js';
 
-export const BB_AUTO_MAX = 30; // src/dashboard.js: never-read packs read after a scan
+export const BB_AUTO_MAX = 30; // buy-back pages a scan reads at most (readPacks)
 export const MARK_GAP = 60e3; // scanRunning renewed at most this often
 export const PROGRESS_GAP = 500; // scanProgress written at most this often
 export const AVATAR_MAX = 64 * 1024; // the portrait's data URL, characters
@@ -285,10 +287,13 @@ export function createRunner(env) {
   }
 
   // --- Scan ---------------------------------------------------------------------------
+  // A part stopped because RSI changed its page (src/lib.js scanSource `pageChanged`):
+  // its row says so, for the popup's scan bar (ui/popup/data.js reportPageChanged).
+  const changedOf = (r) => (r?.pageChanged ? { pageChanged: true } : {});
   const row = (id, r, n) =>
     r?.ok
       ? { id, ok: true, partial: r.partial || null, n, error: null }
-      : { id, ok: false, partial: null, n: null, error: r?.error ?? null };
+      : { id, ok: false, partial: null, n: null, error: r?.error ?? null, ...changedOf(r) };
   const progress = (part) => (page, count, retry, pages) => {
     mark(true);
     setProgress(part, page, count, retry, pages);
@@ -317,7 +322,9 @@ export function createRunner(env) {
   // scanning), 'no-rsi' (no access to RSI: nothing read), 'paused' (status.json paused
   // every part), else null. sync: the sync after it (see sync()), null when there was
   // none. wait: when RSI kept asking it to slow down, the time it may be asked again
-  // (scanWait), else null; absent from a held report.
+  // (scanWait), else null; absent from a held report. rsiDown: a part RSI didn't answer
+  // for (a 5xx, or a 429 after every retry), whether or not it also asked to wait; the
+  // popup and the basic page say so instead of showing the error or Log In to RSI.
   let starting = false;
   let marked = Promise.resolve(); // marked(), below
   // The start every scan shares (Scan's and Auto Scan Daily's): → true once this page is
@@ -392,6 +399,7 @@ export function createRunner(env) {
     let switched = null;
     let db = null;
     let wait = null;
+    let rsiDown = false; // a part RSI didn't answer for (a 5xx, or a 429 after every retry)
     try {
       setProgress('account');
       const account = (await OH.getAccount({ force: true }).catch(() => null)) || undefined;
@@ -404,13 +412,16 @@ export function createRunner(env) {
         await keepPortrait(account);
         const h = await OH.scanSource('hangar', progress('hangar'), { account });
         if (h?.paused) paused.add('hangar');
+        if (h?.rsiDown) rsiDown = true;
         rows.push(row('hangar', h, h?.items?.length ?? 0));
         const b = await OH.scanSource('buybacks', progress('buybacks'), { account });
         if (b?.paused) paused.add('buybacks');
+        if (b?.rsiDown) rsiDown = true;
         rows.push(row('buybacks', b, b?.items?.length ?? 0));
         wait = scanWait([h, b], now(), OH.retryAfterMs);
         const r = await OH.getReferral(referralProgress(), { account });
         if (r?.paused) paused.add('referrals');
+        if (r?.rsiDown) rsiDown = true;
         if (r) rows.push(row('referrals', r, null));
         // The parts read whole, for Auto Scan Daily's weekly full read (./auto.js).
         const whole = {};
@@ -430,6 +441,8 @@ export function createRunner(env) {
           }).catch((e) =>
             OH.log('warn', 'buybacks', `details from history failed: ${e?.message || e}`),
           );
+        // Then the buy-backs' own pages, before the sync so it carries what they say.
+        if (b?.ok && !b.partial) await readPacks({ db, inScan: true }).catch(() => {});
       }
     } catch (e) {
       rows.push({
@@ -463,6 +476,7 @@ export function createRunner(env) {
       bad,
       sync: null,
       wait,
+      rsiDown,
     };
     await writeReport(report);
     // Whatever the page or the sync does next, the progress goes at the end.
@@ -484,34 +498,38 @@ export function createRunner(env) {
       endProgress();
     }
     if (report.sync) await writeReport(report);
-    // Packs never read: their contents, paced, in the background (Scan stays fast).
-    if (rows.some((r) => r.id === 'buybacks' && r.ok && !r.partial))
-      readPacks({ db }).catch(() => {});
     return report;
   }
 
-  // Up to `max` buy-back packs never read (or only half read), paced (src/lib.js
-  // fetchBuybackDetails). One read at a time: asked again while it runs, the answer is
-  // that one's. → { todo, done, errors, rateLimited?, retryAt? }, once every detail read
-  // is saved.
+  // Up to `max` buy-backs whose own page wasn't read from RSI yet (never read, only half
+  // read, or filled from history), in the list's order, paced (src/lib.js
+  // fetchBuybackDetails, rsiOnly). Upgrades have no page. A page that failed before
+  // (OH.getBuybackMisses) waits out its time (OH.bbdMissUntil), then goes after the rest,
+  // so a page that never reads doesn't keep a place every scan. `inScan`: the scan's own read,
+  // which shows its progress. One read at a time: asked again while it runs, the answer
+  // is that one's. → { todo, done, errors, rateLimited?, retryAt? }, once every detail
+  // read is saved.
   let packs = null;
   function readPacks(opts) {
     return (packs ??= readPacksNow(opts).finally(() => (packs = null)));
   }
-  async function readPacksNow({ max = BB_AUTO_MAX, db } = {}) {
+  async function readPacksNow({ max = BB_AUTO_MAX, db, inScan = false } = {}) {
     const details = await OH.getBuybackDetails();
-    const todo = buybacksOf(db || (await OH.loadDB()))
-      .filter((b) => !b.isCCU && (b.kind === 'pack' || b.kind === 'package'))
-      .filter((b) => !details[b.id] || details[b.id].partial)
-      .slice(0, max)
-      .map((b) => String(b.id));
+    const misses = await OH.getBuybackMisses();
+    const due = buybacksOf(db || (await OH.loadDB()))
+      .filter((b) => !b.isCCU && !b.ccu && /^\d+$/.test(String(b.id)))
+      .filter((b) => !OH.buybackFromRsi(details[b.id]))
+      .map((b) => String(b.id))
+      .filter((id) => OH.bbdMissUntil(misses[id]) <= now());
+    const tried = due.filter((id) => misses[id]);
+    const todo = [...due.filter((id) => !misses[id]), ...tried].slice(0, max);
     if (!todo.length) return { todo: 0, done: 0, errors: 0 };
-    // A scan's own progress comes first: packs read meanwhile don't say so.
-    const say = (page, count) => !busy && setProgress('packs', page, count);
+    // Another scan's progress comes first: pages read meanwhile don't say so.
+    const say = (page, count) => (inScan || !busy) && setProgress('packs', page, count);
     let out = null;
     try {
       say(0, todo.length);
-      out = await OH.fetchBuybackDetails(todo, say);
+      out = await OH.fetchBuybackDetails(todo, say, undefined, { rsiOnly: true });
     } finally {
       await settle();
       if (!busy) endProgress();
@@ -685,6 +703,7 @@ export function createRunner(env) {
       dropped: false, // the hangar dropped with nothing to explain it
       saved: [], // the parts kept
       changed: false, // a part kept is different from before
+      pageChanged: null, // the part whose page RSI changed (nothing of it kept)
     };
     let was = null;
     try {
@@ -698,6 +717,9 @@ export function createRunner(env) {
       busy = false;
       mark(false);
     }
+    // RSI didn't answer and nothing else explains the run (no part stopped partway): its
+    // own line, a day skipped.
+    if (run.down && !run.line && !run.stop) run.line = 'rsi-down';
     let rec = null;
     try {
       if (!run.noRecord) {
@@ -719,6 +741,7 @@ export function createRunner(env) {
           fails,
           retryAt: retryAtOf({ at, fails, retryAfter: run.retryAfter }),
           savedAt,
+          pageChanged: run.pageChanged,
         });
         // Written before the sync: a browser that closes during it still has the run.
         await store.set({ autoScan: rec });
@@ -780,7 +803,11 @@ export function createRunner(env) {
     // A sync owed only counts when it can go (Firefox's yes to share): else it would read
     // everything every day for a sync that waits anyway.
     run.owed = owedSync({ stamp: OH.syncStamp(db), link, rec: was }) && (await mayShare());
-    const due = fullDue(scanFull, db, paused, now(), { owed: run.owed });
+    // A list an older parser read is due again, whatever its stamp says (#728).
+    const stale = new Set();
+    for (const p of ['hangar', 'buybacks'])
+      if (db?.sources?.[p]?.scannedAt != null && (await OH.parserStale(p))) stale.add(p);
+    const due = fullDue(scanFull, db, paused, now(), { owed: run.owed, stale });
     run.mayOwe = true;
 
     // 2. Signed in? Without RSI's sign-in cookie, signed out for sure: RSI isn't asked.
@@ -892,6 +919,7 @@ export function createRunner(env) {
         // couldn't read, a save that failed: 'partway'): nothing more is read.
         run.stop ||= r?.signedOut ? 'out' : 'partway';
         if (r?.rsiDown) autoDown(run, r);
+        if (r?.pageChanged) run.pageChanged ||= p;
       }
       return r;
     };

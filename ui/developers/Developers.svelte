@@ -42,11 +42,11 @@
     buybacks: { items: [ …buy-backs… ], scannedAt },
     referral: { items: {                        // object, not array (one summary)
       current: { recruits }, legacy: { recruits }, prospects,
-      recruitsList: [ { handle, moniker, enlistedOn, convertedOn, campaign } ],
-      prospectsList: [ … ]
+      recruitsList: [ { enlistedOn, convertedOn, campaign } ],
+      prospectsList: [ { enlistedOn, convertedOn } ]
     }, scannedAt }                              // NB: referral code/url are NOT exported
   },
-  history: [ { at, items: [ [id, name, value] ] } ]  // scan snapshots (Stats → History)
+  history: [ { at, items: [ [id, name, value] ] } ]  // scan snapshots (Stats / History)
 }`;
   const RSI = 'https://robertsspaceindustries.com';
 </script>
@@ -137,26 +137,26 @@
   <ul>
     <li>
       <strong>Hangar</strong> (live):
-      <a href="{RSI}/account/pledges" target="_blank" rel="noopener">RSI › Account › Pledges</a>
+      <a href="{RSI}/account/pledges" target="_blank" rel="noopener">RSI / Account / Pledges</a>
       · server-rendered HTML, parsed by <code>parser.js</code>
     </li>
     <li>
       <strong>Account identity + balances</strong> (live):
       <a href="{RSI}/en/account/dashboard" target="_blank" rel="noopener"
-        >RSI › Account › Dashboard</a
+        >RSI / Account / Dashboard</a
       >
       · embedded JSON blob
     </li>
     <li>
       <strong>Buy-Backs</strong> (live):
       <a href="{RSI}/en/account/buy-back-pledges" target="_blank" rel="noopener"
-        >RSI › Account › Buy-Back Pledges</a
+        >RSI / Account / Buy-Back Pledges</a
       >
       · server-rendered HTML, parsed by <code>parser.js</code>
     </li>
     <li>
       <strong>Referrals</strong> (live):
-      <a href="{RSI}/en/referral" target="_blank" rel="noopener">RSI › Referral Rewards</a>
+      <a href="{RSI}/en/referral" target="_blank" rel="noopener">RSI / Referral Rewards</a>
       · <code>POST /graphql</code> (<code>GetReferralRecruitsList</code>); code from the dashboard
       JSON
     </li>

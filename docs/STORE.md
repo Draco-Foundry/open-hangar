@@ -88,8 +88,7 @@ every store is `support@openhangar.space`. The account setup is kept in the main
 - ✅ **Permission justifications** (dashboard requires one per permission): see §5.
 - ✅ **Remote code:** "No, I am not using remote code" (flags are build-time only).
 - ✅ **Data-usage disclosures** (Chrome's Privacy practices tab, filled in 2026-10-14:
-  Chrome refused to submit 0.3.0 until it was). Everything stays in the browser unless
-  the user connects optional sync to their own openhangar.space account; what sync
+  Chrome refused to submit 0.3.0 until it was). Data collected: only the user's own RSI account data. It stays in the browser unless the user connects the optional sync with openhangar.space (off until they connect); then each sync sends a copy to the user's own account there. Never sold or shared. What sync
   sends is declared, the same three kinds as the Firefox build's optional
   `data_collection_permissions`:
   - ☑ Personally identifiable information (the RSI account block: handle, display
@@ -99,6 +98,9 @@ every store is `support@openhangar.space`. The account setup is kept in the main
   - ☑ "I do not sell or transfer user data to third parties, outside of the approved use cases."
   - ☑ "I do not use or transfer user data for purposes that are unrelated to my item's single purpose."
   - ☑ "I do not use or transfer user data to determine creditworthiness or for lending purposes."
+- ☐ **Disclosures match (every release):** Chrome and Edge's privacy practices answers, the
+  Firefox `data_collection_permissions` declaration and the privacy policy must describe
+  the same data. Re-check all three whenever a permission or a synced field changes.
 
 ## 5. Permission Justifications (Paste Into the Dashboard)
 
@@ -108,8 +110,7 @@ same: change one, change the other.
 **`storage`**
 
 > Stores the user's scanned hangar, buy-back and referral data and UI preferences
-> locally in the browser. Nothing leaves the browser unless the user connects optional
-> sync to their own openhangar.space account.
+> locally in the browser. It stays in the browser unless the user connects the optional sync with openhangar.space; then each sync sends a copy to the user's own account there.
 
 **`unlimitedStorage`** (added in 0.2.11)
 
@@ -120,7 +121,7 @@ same: change one, change the other.
 
 **`cookies`**
 
-> Used for three things, all on robertsspaceindustries.com. First, "Log Out of RSI": clears RSI's cookies (including the HttpOnly session cookie that page scripts can't remove) so the user can fully end their RSI session from the extension. Second, telling whether the user is signed in to RSI: the extension checks only whether RSI's sign-in cookie exists, so the popup can show "Log In to RSI" and Auto Scan Daily can skip a signed-out day, without contacting RSI. Third, Add to RSI Cart: like RSI's own upgrade window, it reads RSI's session token cookie and sends it back to robertsspaceindustries.com with the cart request the user asked for. Cookie values are never stored and never sent anywhere except RSI.
+> Used for three things, all on robertsspaceindustries.com. First, "Log Out of RSI": clears RSI's cookies (including the HttpOnly session cookie that page scripts can't remove) so the user can fully end their RSI session from the extension. Second, a guess at whether the user is signed in to RSI: the extension checks only whether RSI's session cookie exists, without contacting RSI. When it's missing, the popup shows "Log In to RSI" first (Scan still works) and Auto Scan Daily skips that day. RSI sets this cookie for signed-out visitors too, so the scan itself confirms. Third, Add to RSI Cart: like RSI's own upgrade window, it reads RSI's session token cookie and sends it back to robertsspaceindustries.com with the cart request the user asked for. Cookie values are never stored and never sent anywhere except RSI.
 
 **`identity`** (added in 0.3.0)
 
@@ -131,9 +132,7 @@ same: change one, change the other.
 **`host_permissions` → `https://robertsspaceindustries.com/*`**
 
 > Reads the signed-in user's own RSI account (hangar, buy-backs, balances, referrals)
-> with same-session requests and parses it locally, rate-limited. The only writes:
-> when the user clicks Add to RSI Cart or Send to RSI Cart, it puts the items they
-> picked in their own RSI cart. It never checks out or pays.
+> with same-session requests and parses it locally. Only the user's own account is accessed, at a limited rate. Everything is read-only except two actions the user starts with a click: Add to RSI Cart and Send to RSI Cart put the items the user picked in their RSI cart through RSI's own store. It never checks out or pays.
 
 _(Since 0.2.8 there is no `api.star-citizen.wiki` host permission: that public API
 sends `Access-Control-Allow-Origin: *` and we fetch it without credentials, so the
@@ -145,7 +144,7 @@ install prompt only names robertsspaceindustries.com.)_
 
 **`alarms`** (added in 0.3.0)
 
-> Used only for two optional features, both off until the user turns them on in the extension's settings. Store alerts: the alarm wakes the extension for a check at most every 30 minutes. It downloads one public sale file from openhangar.space (the same file for everyone, with nothing about the user in the request), reads the user's own Wishlist if they connected openhangar.space, and matches both on the device. Auto Scan Daily (only while connected to openhangar.space): the alarm wakes the extension once a day to scan the user's own RSI account, the same as pressing Scan, and only when the signed-in RSI account is the connected one. Turning a feature off clears its alarm.
+> Used only for two optional features, both off until the user turns them on in the extension's settings. Store alerts (only while the user is connected to openhangar.space): the alarm wakes the extension for a check at most every 30 minutes. It downloads one public sale file from openhangar.space (the same file for everyone, with nothing about the user in the request), reads the user's own Wishlist, and matches them on the device. Auto Scan Daily (only while connected to openhangar.space): the alarm wakes the extension once a day to scan the user's own RSI account, the same as pressing Scan, and only when the signed-in RSI account is the connected one. Turning a feature off clears its alarm.
 
 **`offscreen`** (added in 0.4.0; Chrome and Edge only)
 
@@ -153,15 +152,17 @@ install prompt only names robertsspaceindustries.com.)_
 
 **`notifications`** (optional, added in 0.3.0)
 
-> Optional. Requested only when the user turns store alerts on, and the user can decline: the toolbar badge and the popup's list still work without it. Used only to show a notification when an item in RSI's store newly matches the user's hangar, buy-backs or wishlist: at most three of their own per check, then one for the rest. Matching happens on the device, and nothing is sent. Turning alerts off removes the permission.
+> Optional. Requested only when the user turns on Notifications in the extension's settings, and the user can decline: the toolbar number and the Wishlist tab still work without it. Used only to show a notification when an item the user set to Remind Me on their Wishlist goes on sale in RSI's store, at most three per check, plus one for any more. Matching happens on the device, and nothing is sent. Turning Notifications off removes the permission.
+
+**Messages from openhangar.space** (`externally_connectable` on Chrome and Edge; on Firefox, a bridge script on those pages only)
+
+> Lets pages on openhangar.space, app.openhangar.space and hangar.openhangar.space, and no other site, check that the extension is installed and ask it for a fixed set of things: Add to RSI Cart and Send to RSI Cart on the website's store, Connect This Browser on app.openhangar.space, and on hangar.openhangar.space the user's scanned hangar, when it was last scanned, a new scan and Add to RSI Cart. Any other message is refused. The hangar page shows the hangar inside the browser only, and it never reaches the server. On Firefox the bridge script only passes these messages to the extension and its answers back, and reads nothing else on the page.
 
 ## 6. Listing Copy (Ready to Paste)
 
 **Single purpose** (as in the Chrome dashboard, 2026-10-14):
 
-> Open Hangar reads the signed-in user's own Star Citizen / RSI account data, organizes
-> it into a browsable hangar they can export, and can optionally sync it to the user's
-> own openhangar.space account.
+> Open Hangar reads the signed-in user's own Star Citizen (RSI) account so they can see their hangar in the popup and on openhangar.space, get store alerts for it, and put what they pick in their RSI cart.
 
 **Summary (≤132 chars, also the manifest `description`):**
 
@@ -183,14 +184,21 @@ markers, with each paragraph and each • bullet on one line.
 > • Scan: one click reads your hangar and buy-backs from RSI. It runs in the background, with no tab to open
 > • The toolbar popup: your hangar at a glance, Fleet News, your Wishlist and every setting, in three tabs
 > • Your full hangar at hangar.openhangar.space: pledges, buy-backs, fleet stats, values, referrals and more, read from this browser, with no account
-> • Store alerts (optional): a badge and a notification when a ship in your buy-backs is back in the store, or a ship you own gets a new paint, a warbond edition or a limited-time sale. Matched on your device
+> • Store alerts (optional, with openhangar.space connected): a number on the toolbar button, and a notification if you turn them on, when a Wishlist item set to Remind Me goes on sale. Paints and sales for ships you own show in Fleet News. Matched on your device
 > • Add to RSI Cart: put a ship upgrade (CCU) in your RSI cart in one click. You always check out on RSI yourself
 > • Backups: save your hangar as a JSON or CSV file any time
 > • With openhangar.space connected: edit your Wishlist from the popup, and turn on Auto Scan Daily to check your hangar once a day, only for the RSI account you connected
 >
-> **Open beta:** this is Open Hangar 0.4, and it's all yours now. Syncing your hangar to openhangar.space opens to everyone at our official launch on November 10.
+> **Open beta:** Open Hangar is all yours now. Syncing your hangar to openhangar.space opens to everyone at our official launch on November 10.
 >
 > **Private by design:** Open Hangar runs in your browser, using the RSI session you're already signed in with. It never asks for your password. Your hangar stays on your device, and nothing about you is sent to us unless you connect.
+>
+> What Open Hangar never does:
+> • Never asks for your RSI password.
+> • Never takes your RSI login. Scans run in your own browser.
+> • Never sends anything until you connect sync.
+> • Never sells or shares your data.
+> • Never checks out or pays on RSI.
 >
 > The extension is source available on GitHub. Ideas and bug reports are always welcome.
 >
@@ -200,6 +208,43 @@ markers, with each paragraph and each • bullet on one line.
 bullet above to this one:
 
 > • Add to RSI Cart and Send to RSI Cart: put the upgrades and store items you pick in your RSI cart in one click. You always check out on RSI yourself
+
+### Firefox (AMO) version, in Markdown
+
+AMO takes bold, italic, links, lists and code blocks, no headings; the first 250
+characters carry the key points. Paste this as is (Chrome and Edge keep the plain text above).
+
+```markdown
+**Your Star Citizen hangar, one click away.**
+
+Open Hangar reads your pledges, buy-backs, balances and referrals from RSI with the session you're already signed in with, and shows them in a popup and on our hangar page. Free, no password, no account needed.
+
+**What you get:**
+
+- **Scan:** one click reads your hangar and buy-backs from RSI. It runs in the background, with no tab to open
+- **The toolbar popup:** your hangar at a glance, Fleet News, your Wishlist and every setting, in three tabs
+- **Your full hangar** at [hangar.openhangar.space](https://hangar.openhangar.space): pledges, buy-backs, fleet stats, values, referrals and more, read from this browser, with no account
+- **Store alerts (optional, with [openhangar.space](https://openhangar.space) connected):** a number on the toolbar button, and a notification if you turn them on, when a Wishlist item set to Remind Me goes on sale. Paints and sales for ships you own show in Fleet News. Matched on your device
+- **Add to RSI Cart:** put a ship upgrade (CCU) in your RSI cart in one click. You always check out on RSI yourself
+- **Backups:** save your hangar as a JSON or CSV file any time
+- **With [openhangar.space](https://openhangar.space) connected:** edit your Wishlist from the popup, and turn on Auto Scan Daily to check your hangar once a day, only for the RSI account you connected
+
+**Open beta:** Open Hangar is all yours now. Syncing your hangar to openhangar.space opens to everyone at our official launch on November 10.
+
+**Private by design:** Open Hangar runs in your browser, using the RSI session you're already signed in with. It never asks for your password. Your hangar stays on your device, and nothing about you is sent to us unless you connect.
+
+**What Open Hangar never does:**
+
+- Never asks for your RSI password.
+- Never takes your RSI login. Scans run in your own browser.
+- Never sends anything until you connect sync.
+- Never sells or shares your data.
+- Never checks out or pays on RSI.
+
+The extension is source available on [GitHub](https://github.com/Draco-Foundry/open-hangar). Ideas and bug reports are always welcome.
+
+Unofficial and fan-made. Not affiliated with Cloud Imperium Games or RSI. Fly safe, o7.
+```
 
 ## 7. Submit, Edge and Review
 
@@ -236,8 +281,8 @@ can say so with the same yellow pill as "in review", e.g. Firefox `v0.2.19` and
    { "firefox": { "version": "0.2.20", "on": "2026-10-07" } }
    ```
 
-2. Merge it. That deploys the site (owner OK needed), and the hourly site runs keep it
-   up to date.
+2. Merge it, then the owner runs Pages by hand to publish it (pages.yml has no
+   schedule; each run refreshes the store versions too).
 3. Nothing to undo: the pill goes by itself once that store goes to review ("in
    review" replaces it), has the version live, or the UTC day is over. Set the file
    back to `{}` when convenient.

@@ -18,7 +18,6 @@
       "Bash(git push -f *)",
       "Bash(git push * -f)",
       "Bash(git push * -f *)",
-      "Bash(gh pr merge *)",
       "Bash(gh pr review *--approve*)",
       "Bash(gh pr review -a *)",
       "Bash(gh pr review * -a)",
@@ -42,7 +41,6 @@
       "PowerShell(git push -f *)",
       "PowerShell(git push * -f)",
       "PowerShell(git push * -f *)",
-      "PowerShell(gh pr merge *)",
       "PowerShell(gh pr review *--approve*)",
       "PowerShell(gh pr review -a *)",
       "PowerShell(gh pr review * -a)",
@@ -50,9 +48,7 @@
       "PowerShell(git add -A *)",
       "PowerShell(git add --all *)",
       "PowerShell(git add . *)",
-      "mcp__plugin_github_github__merge_pull_request",
-      "mcp__plugin_github_github__pull_request_review_write",
-      "mcp__ccd_pr__set_auto_merge"
+      "mcp__plugin_github_github__pull_request_review_write"
     ]
   }
 }

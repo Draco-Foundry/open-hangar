@@ -68,11 +68,12 @@ export const disconnect = () => OH().siteDisconnect();
 export const setAutoScan = (on) => chrome.storage.local.set({ autoScanOn: on === true });
 
 // --- Store alerts --------------------------------------------------------------------
-// The switch (src/background.js runs the checks). Off gives Notifications back too.
+// Alerts have no switch of their own: they follow Remind Me (./wishlist.js alertsFor, called
+// after a Wishlist change; src/background.js runs the checks). Notifications are the one
+// opt-in left (askNotify below).
 export async function setAlerts(on) {
   const AL = globalThis.OHAlerts;
   await chrome.storage.local.set({ [AL.ON_KEY]: on === true });
-  if (!on) await chrome.permissions.remove(NOTIFY).catch(() => false);
 }
 // Notifications, the one optional permission: the browser only asks from a click, and
 // Firefox only when the ask is the click's very first step, so nothing is awaited
@@ -88,13 +89,6 @@ export function askNotify() {
   if (firefox() && !phone()) setTimeout(() => window.close(), 0);
   return asked;
 }
-// An alert deleted in the bell's list (its id), or every one (null: Clear All). The
-// background writes it (src/background.js alerts-hide), as it does seen, and the badge
-// follows.
-export const hideAlert = (id) =>
-  chrome.runtime
-    .sendMessage(id ? { ohPopup: 'alerts-hide', id } : { ohPopup: 'alerts-hide' })
-    .catch(() => null);
 export const dropNotify = () => chrome.permissions.remove(NOTIFY).catch(() => false);
 export const notifyAllowed = () => chrome.permissions.contains(NOTIFY).catch(() => false);
 

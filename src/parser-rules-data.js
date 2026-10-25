@@ -32,10 +32,10 @@
         'account',
         'dossier',
         'referrals',
-        'subStore',
         'upgrade',
         'cart',
         'known',
+        'aliases',
       ],
       additionalProperties: false,
       properties: {
@@ -94,6 +94,7 @@
             'itemKind',
             'itemName',
             'itemImage',
+            'itemMaker',
             'kindFallback',
             'image',
             'gift',
@@ -137,6 +138,10 @@
             itemName: { description: "A tile's name.", $ref: '#/$defs/selector' },
             itemImage: {
               description: "A tile's picture (an inline background-image).",
+              $ref: '#/$defs/selector',
+            },
+            itemMaker: {
+              description: 'A tile\'s maker line, when RSI shows one ("Aegis Dynamics (AEGS)").',
               $ref: '#/$defs/selector',
             },
             kindFallback: {
@@ -388,7 +393,11 @@
           required: ['ship', 'insurance', 'insuranceName'],
           additionalProperties: false,
           properties: {
-            ship: { description: 'A kind meaning a ship.', $ref: '#/$defs/pattern' },
+            ship: {
+              description:
+                'A kind meaning a ship, matched against the word RSI wrote, which the saved hangar keeps as it is: every reader asks through it (lib.js OH.isShipItem), so a kind RSI renames is fixed here alone (#619). Keep "Ship" in it: buy-back pages\' ships are saved with that word.',
+              $ref: '#/$defs/pattern',
+            },
             insurance: {
               description: "A kind (or a buy-back page's item) meaning insurance.",
               $ref: '#/$defs/pattern',
@@ -604,65 +613,6 @@
               properties: { current: { $ref: '#/$defs/id' }, legacy: { $ref: '#/$defs/id' } },
             },
             pageSize: { $ref: '#/$defs/pageSize' },
-          },
-        },
-        subStore: {
-          description:
-            "The Subscriber Store's items for the signed-in account. The code adds the page and its size to variables.query (pageSize first; pageSizeMin when RSI refuses that).",
-          type: 'object',
-          required: ['path', 'operation', 'query', 'variables', 'pageSize', 'pageSizeMin'],
-          additionalProperties: false,
-          properties: {
-            path: { $ref: '#/$defs/path' },
-            operation: { $ref: '#/$defs/operation' },
-            query: { $ref: '#/$defs/document' },
-            variables: {
-              type: 'object',
-              required: ['storeFront', 'query'],
-              additionalProperties: false,
-              properties: {
-                storeFront: { type: 'string', pattern: '^[a-z][a-z0-9-]*$' },
-                query: {
-                  type: 'object',
-                  required: ['skus', 'sort'],
-                  additionalProperties: false,
-                  properties: {
-                    skus: {
-                      type: 'object',
-                      required: ['filtersFromTags', 'products'],
-                      additionalProperties: false,
-                      properties: {
-                        filtersFromTags: {
-                          type: 'object',
-                          required: ['tagIdentifiers', 'facetIdentifiers'],
-                          additionalProperties: false,
-                          properties: {
-                            tagIdentifiers: { $ref: '#/$defs/identifiers' },
-                            facetIdentifiers: { $ref: '#/$defs/identifiers' },
-                          },
-                        },
-                        products: {
-                          type: 'array',
-                          maxItems: 20,
-                          items: { type: 'integer', minimum: 0 },
-                        },
-                      },
-                    },
-                    sort: {
-                      type: 'object',
-                      required: ['field', 'direction'],
-                      additionalProperties: false,
-                      properties: {
-                        field: { type: 'string', pattern: '^[A-Za-z_]+$' },
-                        direction: { enum: ['asc', 'desc'] },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            pageSize: { $ref: '#/$defs/pageSize' },
-            pageSizeMin: { $ref: '#/$defs/pageSize' },
           },
         },
         upgrade: {
@@ -885,6 +835,21 @@
             },
           },
         },
+        aliases: {
+          description:
+            'Names RSI changed: a ship or pledge once called `old` that RSI now lists as `now`. Matching by name (src/alerts.js) tries the name it has, then the other name of every entry that names it, both ways, so a scan from before a rename and one from after find the same ship. Exact names only, compared folded (src/alerts.js nameKey): never a guess. The website keeps the same list for its own matching.',
+          type: 'array',
+          maxItems: 500,
+          items: {
+            type: 'object',
+            required: ['old', 'now'],
+            additionalProperties: false,
+            properties: {
+              old: { type: 'string', minLength: 1, maxLength: 120 },
+              now: { type: 'string', minLength: 1, maxLength: 120 },
+            },
+          },
+        },
       },
       $defs: {
         pattern: {
@@ -982,7 +947,7 @@
     },
     rules: {
       format: 1,
-      revision: '2026-10-19',
+      revision: '2026-10-22',
       paging: {
         page: 'page',
         size: 'pagesize',
@@ -1009,6 +974,7 @@
         itemKind: '.kind',
         itemName: '.title, .name, .item-name',
         itemImage: '.image',
+        itemMaker: '.liner',
         kindFallback: '.kind',
         image: '.image',
         gift: '.js-gift',
@@ -1184,27 +1150,6 @@
         campaigns: { current: '2', legacy: '1' },
         pageSize: 50,
       },
-      subStore: {
-        path: '/graphql',
-        operation: 'GetBrowseSkusByFilter',
-        query:
-          'query GetBrowseSkusByFilter($query: SearchQuery, $storeFront: String = "pledge") {\n  store(browse: true, name: $storeFront) {\n    listing: search(query: $query) {\n      resources {\n        id name title subtitle url type\n        media { thumbnail { storeSmall slideshow } }\n        nativePrice { amount discounted }\n        price { amount discounted }\n        stock { available unlimited show level }\n        tags { name }\n        ... on TySku { label isWarbond isPackage }\n      }\n      count\n      totalCount\n    }\n  }\n}',
-        variables: {
-          storeFront: 'pledge',
-          query: {
-            skus: {
-              filtersFromTags: {
-                tagIdentifiers: [],
-                facetIdentifiers: ['extras-subscribers-store'],
-              },
-              products: [65],
-            },
-            sort: { field: 'weight', direction: 'desc' },
-          },
-        },
-        pageSize: 100,
-        pageSizeMin: 20,
-      },
       upgrade: {
         path: '/pledge-store/api/upgrade/graphql',
         storeList: {
@@ -1288,7 +1233,7 @@
             'Vehicle',
           ],
           tags: ['Attributed'],
-          labels: ['Apply upgrade', 'Contains:', 'Created:', 'Exchange', 'Gift'],
+          labels: ['Apply upgrade', 'Contains:', 'Created:', 'Exchange', 'Gift', 'Upgrades'],
           hooks: [
             'js-apply-upgrade',
             'js-expand-arrow',
@@ -1306,6 +1251,7 @@
             'js-pledge-value',
             'js-reclaim',
             'js-upgrade-data',
+            'js-upgrade-log',
           ],
         },
         buybacks: {
@@ -1313,6 +1259,7 @@
           hooks: ['js-label', 'js-open-ship-upgrades'],
         },
       },
+      aliases: [{ old: 'Phoenix Emerald', now: 'Constellation Mk IV Phoenix Emerald' }],
     },
   });
   root.OHParserRulesData = data;

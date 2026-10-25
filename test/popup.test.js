@@ -15,8 +15,12 @@ const HOUR = 3600e3;
 const DAY = 86400e3;
 
 test('header: the scan age, green, amber from a week, grey before any scan', async () => {
-  const { scanAge } = await data();
+  const { scanAge, staleAge } = await data();
   assert.deepEqual(scanAge(null, NOW), { tone: 'never', n: null, unit: null });
+  // A list an older parser read shows amber, whatever its age; never and stale stay.
+  assert.equal(staleAge(scanAge(NOW - 20e3, NOW), true).tone, 'stale');
+  assert.equal(staleAge(scanAge(NOW - 20e3, NOW), false).tone, 'fresh');
+  assert.equal(staleAge(scanAge(null, NOW), true).tone, 'never');
   assert.deepEqual(scanAge(NOW - 20e3, NOW), { tone: 'fresh', n: 1, unit: 'm' });
   assert.deepEqual(scanAge(NOW - 42 * MIN, NOW), { tone: 'fresh', n: 42, unit: 'm' });
   assert.deepEqual(scanAge(NOW - 2 * HOUR, NOW), { tone: 'fresh', n: 2, unit: 'h' });
@@ -187,6 +191,8 @@ test('scan bar: fills by RSI page count, only forward, a part never waits on its
     { part: 'buybacks', page: 2, pages: 2 },
     { part: 'referrals', page: 0, pages: 3 },
     { part: 'referrals', page: 2, pages: 3 },
+    { part: 'packs', page: 0, count: 4 },
+    { part: 'packs', page: 4, count: 4 },
     { part: 'sync' },
   ].map(barFraction);
   for (let i = 1; i < order.length; i++) assert.ok(order[i] >= order[i - 1], `step ${i}`);
@@ -201,9 +207,9 @@ test('scan bar: fills by RSI page count, only forward, a part never waits on its
   assert.equal(h(1, 1), h(4, 4));
   // No pager: eased, still short of the part's end however many pages.
   assert.ok(h(1, null) > h(0, null) && h(40, null) < h(4, 4));
-  // Packs read after the scan fill on their own.
-  assert.equal(barFraction({ part: 'packs', page: 3, count: 6 }), 0.5);
-  assert.equal(barFraction({ part: 'packs', page: 0, count: 0 }), 0);
+  // The buy-backs' own pages, read before the sync, by pages read of `count`.
+  assert.equal(barFraction({ part: 'packs', page: 3, count: 6 }), 0.925);
+  assert.equal(barFraction({ part: 'packs', page: 0, count: 0 }), 0.9);
 });
 
 test('scan bar: creeps towards where the next page puts it, never past', async () => {
@@ -252,7 +258,7 @@ test('scan bar: names the part and counts what it has read', async () => {
   assert.deepEqual(say({ part: 'buybacks', page: 1, count: 37 }), ['Buy-Backs', '37']);
   assert.deepEqual(say({ part: 'referrals', page: 1, count: 12 }), ['Referrals', '12']);
   assert.deepEqual(say({ part: 'sync' }), ['Syncing', '']);
-  assert.deepEqual(say({ part: 'packs', page: 3, count: 6 }), ['Buy-Back Packs', '3 / 6']);
+  assert.deepEqual(say({ part: 'packs', page: 3, count: 6 }), ['Buy-Back Details', '3 / 6']);
   assert.deepEqual(say({ part: 'hangar', page: 2, count: 20, retry: { attempt: 1, of: 3 } }), [
     'Waiting on RSI',
     '',
@@ -280,6 +286,42 @@ test('scan report: shown once, and how long it took', async () => {
   assert.deepEqual(took(125e3), { m: 2, s: 5 });
   assert.deepEqual(took(200), { m: 0, s: 1 });
   assert.equal(took(undefined), null);
+});
+
+test('scan report: RSI not answering wins over signed out, and shows no trouble rows', async () => {
+  const { reportRsi, reportTrouble, reportDone, autoLine } = await data();
+  const base = {
+    v: 1,
+    run: 'r',
+    at: NOW,
+    ms: 9e3,
+    held: null,
+    signedOut: false,
+    bad: 1,
+    wait: null,
+  };
+  const bb = { id: 'buybacks', ok: false, partial: null, n: null, error: 'RSI responded 503' };
+  // A 5xx: the down line, not the raw error.
+  const down = { ...base, rows: [bb], rsiDown: true };
+  assert.deepEqual(reportRsi(down, NOW - HOUR, NOW), { kind: 'down' });
+  assert.deepEqual(reportTrouble(down, NOW - HOUR), []);
+  assert.equal(reportDone(down), null);
+  // RSI that isn't answering can look signed out: RSI not answering still wins.
+  const both = { ...down, signedOut: true };
+  assert.deepEqual(reportRsi(both, null, NOW), { kind: 'down' });
+  // A 429: RSI's ask to wait, until that time; after it, nothing.
+  const slow = { ...down, wait: NOW + 5 * MIN };
+  assert.deepEqual(reportRsi(slow, null, NOW), { kind: 'wait', at: NOW + 5 * MIN });
+  assert.equal(reportRsi(slow, null, NOW + 6 * MIN), null);
+  // A scan since went fine, a held report, or a scan RSI answered: nothing.
+  assert.equal(reportRsi(down, NOW + 2 * MIN, NOW), null);
+  assert.equal(reportRsi({ ...down, held: 'busy' }, null, NOW), null);
+  assert.equal(reportRsi({ ...down, rsiDown: false }, null, NOW), null);
+  assert.equal(reportRsi(null, null, NOW), null);
+  // Auto Scan Daily's day skipped because RSI wasn't answering.
+  const line = autoLine({ on: true, rec: { line: 'rsi-down', at: NOW } }, NOW, 'en-US');
+  assert.equal(line.key, 'popup.auto-rsi-down');
+  assert.equal(line.ask, false);
 });
 
 test('scan report: a held one, one read in part or signed out is never "Scanned in"', async () => {
@@ -312,6 +354,19 @@ test('scan report: a held one, one read in part or signed out is never "Scanned 
   assert.equal(reportPaused(null, null), '');
 });
 
+test('scan report: a page RSI changed is the scan bar line, until a scan since goes fine', async () => {
+  const { reportPageChanged } = await data();
+  const { t } = await import('../ui/popup/copy.js');
+  assert.equal(t('popup.rsi-page-changed'), 'RSI changed a page. Holding your last scan.');
+  const base = { v: 1, run: 'r', at: NOW, ms: 9e3, held: null, signedOut: false, bad: 1 };
+  const row = { id: 'hangar', ok: false, partial: null, n: null, error: 'x', pageChanged: true };
+  const changed = { ...base, rows: [row] };
+  assert.equal(reportPageChanged(changed, NOW - HOUR), true);
+  assert.equal(reportPageChanged(changed, NOW + 2 * MIN), false, 'a scan since went fine');
+  assert.equal(reportPageChanged({ ...base, rows: [{ ...row, pageChanged: undefined }] }), false);
+  assert.equal(reportPageChanged(null, null), false);
+});
+
 test("scan report: the sync's question names the account the scan read", async () => {
   const { reportPilot } = await data();
   const ask = { v: 1, at: NOW, sync: { state: 'ask', msg: null, at: NOW } };
@@ -342,7 +397,7 @@ test('Account Value since an earlier scan: the newest one that differs, never th
   assert.equal(valueSince(null, 4280, valueOf, NOW), null);
 });
 
-test('Fleet News: the Wishlist first, then ships you own on sale, three at most', async () => {
+test('Fleet News: the Wishlist first, then ships you own on sale or a new paint, three at most', async () => {
   const { fleetNews } = await data();
   const m = (id, ...why) => ({ id, name: id, why: why.map((w) => ({ why: w, ships: [] })) });
   const items = [
@@ -355,14 +410,18 @@ test('Fleet News: the Wishlist first, then ships you own on sale, three at most'
   ];
   assert.deepEqual(
     fleetNews(items).map((x) => x.id),
-    ['wish', 'wish2', 'ltd'],
+    ['wish', 'wish2', 'paint'],
   );
   // Unseen first within the same kind.
   assert.deepEqual(
     fleetNews(items, new Set(['wish2'])).map((x) => x.id),
-    ['wish2', 'wish', 'ltd'],
+    ['wish2', 'wish', 'paint'],
   );
-  assert.deepEqual(fleetNews([m('paint', 'paint'), m('back', 'buyback')]), []);
+  assert.deepEqual(
+    fleetNews([m('paint', 'paint'), m('back', 'buyback')]).map((x) => x.id),
+    ['paint'],
+  );
+  assert.deepEqual(fleetNews([m('back', 'buyback')]), []);
   assert.deepEqual(fleetNews(null), []);
 });
 
@@ -535,10 +594,30 @@ test('the portrait: only the copy the scan saved, only for this account', async 
 test('the shortcut: the browser’s for opening the popup, or none', async () => {
   const { popupShortcut } = await data();
   assert.equal(
-    popupShortcut([{ name: '_execute_action', shortcut: 'Alt+Shift+O' }]),
+    popupShortcut([{ name: '_execute_action', shortcut: 'Alt+Shift+O' }], false),
     'Alt+Shift+O',
   );
   assert.equal(popupShortcut([{ name: '_execute_action', shortcut: '' }]), '');
+  // Mac: its symbols, in its order (the owner's pick, 2026-10-22).
+  const mac = (s) => popupShortcut([{ name: '_execute_action', shortcut: s }], true);
+  assert.equal(mac('Alt+Shift+O'), '⌥⇧O', 'Firefox on a Mac');
+  assert.equal(mac('Option+Shift+O'), '⌥⇧O');
+  assert.equal(mac('⌥⇧O'), '⌥⇧O', 'Chrome and Edge on a Mac already hold symbols');
+  assert.equal(mac('Ctrl+Shift+Y'), '⇧⌘Y', 'Ctrl is ⌘ there, and ⇧ comes first');
+  assert.equal(mac('Command+Alt+MacCtrl+Shift+K'), '⌃⌥⇧⌘K');
+  assert.equal(mac('MacCtrl+Comma'), '⌃Comma');
+  assert.equal(mac(''), '');
+  assert.equal(popupShortcut([{ name: 'other' }], true), null);
+  assert.equal(popupShortcut(null, true), null);
+  const other = (s) => popupShortcut([{ name: '_execute_action', shortcut: s }], false);
+  assert.equal(other('Alt+Shift+O'), 'Alt+Shift+O', 'Windows and Linux keep their words');
+  assert.equal(other(''), '');
+  const { isMac } = await data();
+  assert.equal(isMac({ userAgentData: { platform: 'macOS' }, platform: 'x' }), true);
+  assert.equal(isMac({ platform: 'MacIntel' }), true);
+  assert.equal(isMac({ platform: 'Win32' }), false);
+  assert.equal(isMac({ userAgentData: { platform: 'Windows' }, platform: 'MacIntel' }), false);
+  assert.equal(isMac({}), false);
   assert.equal(popupShortcut([{ name: 'other' }]), null);
   assert.equal(popupShortcut(null), null, 'no shortcuts in this browser');
   // manifest.json suggests it for every build; the store check keeps it there
@@ -631,12 +710,10 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
     'popup.what-changed',
     'popup.got-it',
     'popup.fleet-news',
-    'popup.all-alerts',
+    'popup.news-wishlist',
     'popup.scan-again',
     'popup.first',
     'popup.log-in',
-    'popup.open-store',
-    'popup.alerts-off-title',
     'popup.wish-empty',
     'popup.wish-full',
     'popup.wish-trouble',
@@ -645,7 +722,7 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
     'popup.auto-scan',
     'popup.look-auto',
     'popup.shortcut-none',
-    'popup.shortcut-change',
+    'popup.export-menu',
     'popup.disconnect-ask',
     'popup.stay',
   ];
@@ -663,6 +740,7 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
     'popup.wish-no-match': 'No matches.',
     'popup.wish-not-added': "Couldn't add {name}.",
     'popup.wish-remove': 'Remove {name}',
+    'popup.export-menu': 'Export Data',
     'popup.export-json': 'JSON Backup',
     'popup.export-pledges': 'Pledges CSV',
     'popup.export-buybacks': 'Buy-Backs CSV',

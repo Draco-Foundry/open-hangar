@@ -54,11 +54,12 @@ popup: `chrome.action.onClicked` opens `src/dashboard.html` in a tab. It also:
   (`reopenAfterUpdate`);
 - answers our own web pages ([Messages From Our Pages](#messages-from-our-pages));
 - in a build with the `alerts` flag (docs/FLAGS.md, "Alerts"), runs the store alerts
-  (`src/alerts.js`, `self.OHAlerts`) once the pilot turns them on (`alertsOn`): a check
+  (`src/alerts.js`, `self.OHAlerts`) once the pilot turns Remind Me on for a Wishlist item, and only while connected (`alertsOn`; no switch of its own; a check that finds no connection turns it off): a check
   on an alarm at most every 30 minutes (30 to 35 apart) downloads the public sale feed
   and, while connected, the account's Wishlist keys, and matches them here against the
-  stored scan. Unseen matches take the badge in place of the `!`; a new one gets a
-  notification while that optional permission is granted; a click opens the item on our
+  stored scan. Unseen Remind Me items on sale take the badge in place of the `!`; a new
+  one gets a notification while that optional permission is granted (the hangar's
+  matches show in the popup's Fleet News only); a click opens the item on our
   Store; the popup's `{ ohPopup: 'alerts-seen' }` marks them seen. A new scan matches
   again from what's saved, asking nothing;
 - in a build with the `autoScan` flag (docs/FLAGS.md, "Auto Scan", #666), keeps Auto Scan
@@ -284,24 +285,24 @@ the rules (docs/RSI-CHANGES.md).
 Everything lives in `chrome.storage.local` (the `unlimitedStorage` permission lifts the
 browser's default quota). The main keys:
 
-| Key                        | What it holds                                                                                     | Code                                       |
-| -------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| `db`                       | `{ schemaVersion, sources: { hangar, buybacks, referral: { items, scannedAt, meta? } }, owner }`  | `readDB()`, `writeDB()`, `OH.loadDB()`     |
-| `dbHistory`                | Scan history: `[{ at, items: [[id, name, value]], credit?, checkedAt? }]`                         | `recordHistory()`, `OH.trimHistory()`      |
-| `dbCorrupt`                | Up to 3 damaged originals that failed the check, kept until Clear Data                            | `setAside()`, `OH.getDamaged()`            |
-| `dbRecovery`               | `{ at, db }`: the previous account's data, saved before an automatic clear                        | `clearDataNow()`, `OH.recoverData()`       |
-| `profile:<nickname>`       | Another RSI account's whole DB (history inside), parked while a different account is signed in    | `OH.switchProfile()`, `OH.listProfiles()`  |
-| `account`                  | Cached RSI identity and balances (10 minutes)                                                     | `OH.getAccount()`                          |
-| `errorLog`                 | The rolling error log                                                                             | `OH.log()`                                 |
-| `remoteStatus`, `netDown`  | Cached kill switch file; sites that recently timed out                                            | `loadStatus()`, `OH.guarded()`             |
-| `bbDetails`                | Buy-back details: packs read after a buy-back scan, the rest with Load Details (paced)            | `OH.fetchBuybackDetails()`                 |
-| `lastBackupAt`             | When you last downloaded a backup file                                                            | `downloadBackup()` in `src/dashboard.js`   |
-| `alertsOn`, `alerts`       | Extension Alerts: the switch; the matches and which you've seen (`alerts` flag)                   | `OHAlerts.check()`, `src/background.js`    |
-| `alertsFeed`, `alertsWish` | The last sale feed (ETag, when to ask again); the account's Wishlist keys for this connection     | `OHAlerts.check()`                         |
-| `popupPrefs`, `popupWish`  | The popup's settings; its copy of the account's Wishlist for this connection (gone on Disconnect) | `ui/popup/prefs.js`, `wish-client.js`      |
-| `scanStarted`, `scanFull`  | The last scan that began (for Scan stopped after a restart); each part's last complete read       | `ui/scan/runner.js`                        |
-| `autoScanOn`, `autoScan`   | Auto Scan Daily's switch (gone on Disconnect, Clear Data); its last run, replaced whole           | `ui/popup/actions.js`, `ui/scan/runner.js` |
-| `autoScanNext`             | Auto Scan Daily's next run, for a worker that starts with its alarm gone                          | `src/background.js`                        |
+| Key                        | What it holds                                                                                               | Code                                       |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `db`                       | `{ schemaVersion, sources: { hangar, buybacks, referral: { items, scannedAt, meta? } }, owner }`            | `readDB()`, `writeDB()`, `OH.loadDB()`     |
+| `dbHistory`                | Scan history: `[{ at, items: [[id, name, value]], credit? }]` (credit stays here: sync leaves it out)       | `recordHistory()`, `OH.trimHistory()`      |
+| `dbCorrupt`                | Up to 3 damaged originals that failed the check, kept until Clear Data                                      | `setAside()`, `OH.getDamaged()`            |
+| `dbRecovery`               | `{ at, db }`: the previous account's data, saved before an automatic clear                                  | `clearDataNow()`, `OH.recoverData()`       |
+| `profile:<nickname>`       | Another RSI account's whole DB (history inside), parked while a different account is signed in              | `OH.switchProfile()`, `OH.listProfiles()`  |
+| `account`                  | Cached RSI identity and balances (10 minutes)                                                               | `OH.getAccount()`                          |
+| `errorLog`                 | The rolling error log                                                                                       | `OH.log()`                                 |
+| `remoteStatus`, `netDown`  | Cached kill switch file; sites that recently timed out                                                      | `loadStatus()`, `OH.guarded()`             |
+| `bbDetails`                | Buy-back details: packs read after a buy-back scan, the rest with Load Details (paced)                      | `OH.fetchBuybackDetails()`                 |
+| `lastBackupAt`             | When you last downloaded a backup file                                                                      | `downloadBackup()` in `src/dashboard.js`   |
+| `alertsOn`, `alerts`       | Extension Alerts: Remind Me on or off, set for the pilot; the matches and which you've seen (`alerts` flag) | `OHAlerts.check()`, `src/background.js`    |
+| `alertsFeed`, `alertsWish` | The last sale feed (ETag, when to ask again); the account's Wishlist keys for this connection               | `OHAlerts.check()`                         |
+| `popupPrefs`, `popupWish`  | The popup's settings; its copy of the account's Wishlist for this connection (gone on Disconnect)           | `ui/popup/prefs.js`, `wish-client.js`      |
+| `scanStarted`, `scanFull`  | The last scan that began (for Scan stopped after a restart); each part's last complete read                 | `ui/scan/runner.js`                        |
+| `autoScanOn`, `autoScan`   | Auto Scan Daily's switch (gone on Disconnect, Clear Data); its last run, replaced whole                     | `ui/popup/actions.js`, `ui/scan/runner.js` |
+| `autoScanNext`             | Auto Scan Daily's next run, for a worker that starts with its alarm gone                                    | `src/background.js`                        |
 
 Other keys are caches of public data (for example `shipMatrix`, `shipCatalog`,
 `shipImages`, `scVersion`, `patchNotes`, `storeShips`, `fxRates`) and UI
@@ -327,7 +328,7 @@ browser; `EXPORT_VERSION` (2) is the backup file format. Both are defined at the
   scan history out of `db` into `dbHistory`. A DB written by an older version after a
   rollback is also handled on load (`test/db.test.js`).
 - History keeps at most 100 snapshots and about 3 MB (`HISTORY_MAX`,
-  `HISTORY_MAX_BYTES`). A scan that changed nothing only updates `checkedAt`.
+  `HISTORY_MAX_BYTES`). A scan that changed nothing adds no snapshot.
 
 **Accounts.** The live `db` always belongs to the signed-in RSI account. When a
 different account signs in, the current DB is parked under `profile:<nickname>` and
@@ -596,8 +597,7 @@ When RSI changes a page, every installed copy breaks until a fix clears store re
   sync site (app.openhangar.space), anything but a plain GET of openhangar.space's
   public feeds, or a host other than RSI and openhangar.space
   (`scripts/privacy-check.mjs`).
-- **CI** (`.github/workflows/ci.yml`), on every PR and on pushes to `main` and
-  `redesign/0.3-svelte`: `npm ci`, `npm test`, `npm run format:check`,
+- **CI** (`.github/workflows/ci.yml`), on every PR and on pushes to `main`: `npm ci`, `npm test`, `npm run format:check`,
   `npm run test:ui`, `npm run pack`, `web-ext lint` on the Firefox build, the store
   check and the privacy check, and `scripts/actionlint.sh` on the workflow files. A
   docs-only PR runs just the tests, the format check and actionlint.
@@ -642,10 +642,9 @@ domain `openhangar.space`). It moved off GitHub Pages on 2026-10-01
 page and the website's public pages to the website Worker, with a fallback for each
 when it fails.
 
-`.github/workflows/pages.yml` deploys it with `wrangler` when `site/` (or a few shared
-files) change on `main`, right after a Publish to stores run, and on a schedule (every
-3 hours, hourly while a store has a version in review or held back) that keeps the
-store versions and exchange rates fresh. Before deploying it
+`.github/workflows/pages.yml` deploys it with `wrangler` only when the owner runs it by
+hand (Run workflow; owner, 2026-10-20): a merge to `main` publishes nothing, and each
+run refreshes the store versions and exchange rates. Before deploying it
 copies in the icon, banner and store screenshots, stamps the current version and its
 date into `site/index.html`, and builds `site/rates.json` with
 `scripts/update-rates.mjs`.

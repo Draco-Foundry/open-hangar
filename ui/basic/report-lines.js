@@ -19,7 +19,14 @@ export function progressLine(p, t) {
 // "Scan complete: 2 pledges · 0 buy-backs · referrals read", and in the problem box each
 // row as "{name}: {box ?? text}". A row cut short (partial) counts as a problem. null for
 // no report, or one that never ran (held by another page's scan or RSI access).
-export function reportLines(report, t) {
+// RSI didn't answer (report.rsiDown): its own line, and it wins over signed out (a RSI that
+// isn't answering can look signed out). A 429 says when to scan again (`when`: the time,
+// as the page writes it, from `time`).
+export function reportLines(
+  report,
+  t,
+  time = (at) => new Date(at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
+) {
   if (!report || report.held === 'busy' || report.held === 'no-rsi') return null;
   const rows = (report.rows || []).map((r) => {
     const name = PART_NAMES[r.id] || r.id;
@@ -30,6 +37,12 @@ export function reportLines(report, t) {
     return { name, ok, text: t('basic.row-referrals'), box: t('basic.row-referrals-box') };
   });
   const bad = rows.filter((r) => !r.ok).length;
+  if (report.rsiDown) {
+    const down = Number.isFinite(report.wait)
+      ? t('basic.rsi-wait', { time: time(report.wait) })
+      : t('basic.rsi-down');
+    return { rows: rows.filter((r) => r.ok), signedOut: false, bad: Math.max(1, bad), down };
+  }
   return report.signedOut || bad
     ? { rows, signedOut: !!report.signedOut, bad }
     : { rows, signedOut: false, bad: 0 };

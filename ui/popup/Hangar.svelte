@@ -19,15 +19,19 @@
     barNext,
     barLabel,
     reportDone,
+    reportPageChanged,
     reportPaused,
+    reportRsi,
     reportTrouble,
     scanHold,
     scanSteps,
     storeCredit,
+    gameCredit,
+    tokenCount,
     unpricedLine,
   } from './data.js';
   import { openHub, openTab, reportProblem, rsiSignIn } from './actions.js';
-  import { USD, money } from './currency.js';
+  import { FIT, USD, moneyFit } from './currency.js';
   import { flag } from '../lib/flags.js';
 
   let {
@@ -50,7 +54,7 @@
     news,
     first = false,
     onscan,
-    onbell,
+    onwishlist,
     alerts,
     fresh,
   } = $props();
@@ -58,18 +62,25 @@
   const OH = globalThis.OH;
   const AL = globalThis.OHAlerts;
   // Cents for Store Credit, none for a change or a big total.
-  const total = $derived(money(value ? value.total : v.melt, fx));
-  const change = $derived(since ? money(Math.abs(since.delta), fx, { most: 0 }) : null);
+  const total = $derived(moneyFit(value ? value.total : v.melt, fx));
+  const change = $derived(since ? moneyFit(Math.abs(since.delta), fx, { most: 0, full: FIT.change }) : null);
   const day = (at) => new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   const credit = $derived(storeCredit(account));
-  const creditText = $derived(credit != null ? money(credit, fx, { cents: true }) : null);
+  const creditText = $derived(credit != null ? moneyFit(credit, fx, { cents: true, full: FIT.credit }) : null);
+  const uec = $derived(gameCredit(account, 'uec'));
+  const rec = $derived(gameCredit(account, 'rec'));
+  const tokens = $derived(tokenCount(v.tokens));
   const nextToken = $derived(OH.nextBuybackToken ? OH.nextBuybackToken(Date.now()) : null);
   const running = $derived(sc.phase === 'running');
   const steps = $derived(scanSteps(sc.progress?.part));
   const STEP = { hangar: 'popup.step-hangar', buybacks: 'popup.step-buybacks', referrals: 'popup.step-referrals' };
+  const BAR = flag('scanBar');
   // A problem in the last scan (a part not read, or read only in part), unless a scan
-  // since went fine.
-  const trouble = $derived(reportTrouble(lastReport, v?.scannedAt));
+  // since went fine. With the scan bar, a page RSI changed is the bar's line instead.
+  const trouble = $derived(
+    reportTrouble(lastReport, v?.scannedAt).filter((r) => !(BAR && r.pageChanged)),
+  );
+  const pageChanged = $derived(!running && reportPageChanged(lastReport, v?.scannedAt));
   const ROW = { hangar: 'popup.row-pledges', buybacks: 'popup.row-buybacks' };
   const rowText = (r) =>
     !r.ok
@@ -82,11 +93,12 @@
   // Only a scan that read everything says how long it took (never a held one).
   const doneIn = $derived(reportDone(report));
   const paused = $derived(reportPaused(lastReport, v?.scannedAt));
+  // RSI didn't answer the last scan: a 5xx, or its ask to wait (./data.js reportRsi).
+  const rsi = $derived(running ? null : reportRsi(lastReport, v?.scannedAt, now));
   const noRsi = $derived(rsiOff || report?.held === 'no-rsi');
   const switched = $derived(report?.switched?.who ? report.switched : null);
   const sub = (m) => (AL ? AL.lines(m)[0] || '' : '');
 
-  const BAR = flag('scanBar');
   // The fill only moves forward within a run (RSI's pager can show more pages as the
   // scan goes). Not state: it's what the bar has shown.
   let peak = { run: null, f: 0 };
@@ -138,7 +150,9 @@
       return { text: t(l.key), n: l.n, tone: 'run' };
     }
     if (hold) return { text: t('popup.rsi-wait', { time: holdTime(hold) }), n: '', tone: 'note' };
+    if (rsi?.kind === 'down') return { text: t('popup.rsi-down'), n: '', tone: 'note' };
     if (busyNote || report?.held === 'busy') return { text: t('popup.scan-busy'), n: '', tone: 'note' };
+    if (pageChanged) return { text: t('popup.rsi-page-changed'), n: '', tone: 'note' };
     if (doneIn)
       return {
         text: doneIn.m ? t('popup.scanned-in-m', { m: doneIn.m, s: doneIn.s }) : t('popup.scanned-in-s', { s: doneIn.s }),
@@ -197,7 +211,13 @@
           >
         {/if}
       </div>
-      <div class="pp-big" id="pp-value" title={total.title || null}>{total.text}</div>
+      <div
+        class="pp-big"
+        id="pp-value"
+        title={total.title || null}
+        role={total.short ? 'group' : null}
+        aria-label={total.short ? total.title : null}
+      >{total.text}</div>
       {#if (value ? value.unpriced : v.unpriced) > 0}
         <div class="pp-unpriced">{unpricedLine(value ? value.unpriced : v.unpriced)}</div>
       {/if}
@@ -206,16 +226,40 @@
     {#if credit != null || v.tokens != null}
       <div class="pp-tiles">
         {#if credit != null}
-          <div class="pp-tile" id="pp-credit">
+          <div
+            class="pp-tile"
+            id="pp-credit"
+            role={creditText.short ? 'group' : null}
+            aria-label={creditText.short ? `Store Credit ${creditText.title}` : null}
+          >
             <span class="pp-lbl">Store Credit</span><b title={creditText.title || null}>{creditText.text}</b>
           </div>
         {/if}
-        {#if v.tokens != null}
-          <div class="pp-tile" id="pp-tokens">
+        {#if tokens}
+          <div
+            class="pp-tile"
+            id="pp-tokens"
+            role={tokens.text !== tokens.full ? 'group' : null}
+            aria-label={tokens.text !== tokens.full ? `Buy-Back Tokens ${tokens.full}` : null}
+          >
             <span class="pp-lbl">Buy-Back Tokens</span>
             <span class="pp-tok"
-              ><b>{v.tokens}</b>{#if nextToken}<small>{t('popup.token-next', { date: day(nextToken) })}</small>{/if}</span
+              ><b title={tokens.text !== tokens.full ? tokens.full : null}>{tokens.text}</b>{#if nextToken}<small>{t('popup.token-next', { date: day(nextToken) })}</small>{/if}</span
             >
+          </div>
+        {/if}
+      </div>
+    {/if}
+    {#if uec || rec}
+      <div class="pp-tiles">
+        {#if uec}
+          <div class="pp-tile" id="pp-uec" title={uec.full} role="group" aria-label={`UEC ${uec.full}`}>
+            <span class="pp-lbl">UEC</span><b>{uec.text}</b>
+          </div>
+        {/if}
+        {#if rec}
+          <div class="pp-tile" id="pp-rec" title={rec.full} role="group" aria-label={`REC ${rec.full}`}>
+            <span class="pp-lbl">REC</span><b>{rec.text}</b>
           </div>
         {/if}
       </div>
@@ -255,7 +299,9 @@
         <div class="pp-newstop">
           <h2 class="pp-h3" id="pp-news-h">{t('popup.fleet-news')}</h2>
           {#if alerts?.items?.length}
-            <button type="button" class="pp-link" id="pp-all-alerts" onclick={onbell}>{t('popup.all-alerts')}</button>
+            <button type="button" class="pp-link" id="pp-news-wishlist" onclick={onwishlist}
+              >{t('popup.news-wishlist')}</button
+            >
           {/if}
         </div>
         {#if !news.length}<p class="pp-note" id="pp-news-none">{t('popup.fleet-news-none')}</p>{/if}
@@ -279,7 +325,7 @@
               <span class="pp-iname">{m.name}</span>
               <small>{sub(m)}</small>
             </span>
-            <span class="pp-chev" aria-hidden="true">›</span>
+            <span class="pp-chev" aria-hidden="true"><svg class="chev" viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 3l5 5-5 5"/></svg></span>
           </button>
         {/each}
       </section>
@@ -319,6 +365,7 @@
       {:else if !sc.hidden}
         <p class="pp-note">{t('popup.scanning')}</p>
       {/if}
+      {#if sc.progress?.retry}<p class="pp-note" id="pp-rsi-waiting">{t('popup.rsi-waiting')}</p>{/if}
     </div>
   {:else if noRsi}
     <!-- The basic page's card asks the browser (its ask would close the popup). -->
@@ -340,6 +387,11 @@
       <span aria-hidden="true">✓</span>{doneIn.m
         ? t('popup.scanned-in-m', { m: doneIn.m, s: doneIn.s })
         : t('popup.scanned-in-s', { s: doneIn.s })}
+    </p>
+  {/if}
+  {#if rsi && !BAR}
+    <p class="pp-note" id="pp-rsi" role="status">
+      {rsi.kind === 'wait' ? t('popup.rsi-wait', { time: holdTime(rsi.at) }) : t('popup.rsi-down')}
     </p>
   {/if}
   {#if paused && !running}<p class="pp-note" id="pp-paused" role="status">{paused}</p>{/if}

@@ -222,6 +222,15 @@ test('check 4: nothing new: 3 requests to RSI, only its record written, nothing 
   assert.equal(sess.scanProgress, undefined);
 });
 
+test('check 4: a list an older parser read is due: a full read, not a quick check (#728)', async () => {
+  const r = await scannedAndSynced();
+  const { PARSER_VERSION } = require('../src/hangar-shape.js');
+  mem.scanParser = { hangar: PARSER_VERSION, buybacks: PARSER_VERSION - 1 };
+  await r.autoScan();
+  assert.deepEqual(asked.slice(0, 3), ['who', 'who', 'dossier'], 'straight to the full read');
+  assert.equal(mem.scanParser.buybacks, PARSER_VERSION, 'and read again: no longer stale');
+});
+
 test('check 4: a sync owed makes it a full read, and the sync goes only at its end', async () => {
   const r = await scannedAndSynced();
   mem.siteLink.syncedScan = 'an older scan';
@@ -314,7 +323,7 @@ test('who is signed in gets no answer: a quiet end, and the next run backs off',
     kind === 'who' ? new Response('', { status: 429, headers: { 'retry-after': '120' } }) : null;
   const rec = await r.autoScan();
   assert.deepEqual(asked, ['who'], 'a 429 is never retried');
-  assert.equal(rec.line, null, 'no line of its own: the popup still says the last one');
+  assert.equal(rec.line, 'rsi-down', 'RSI not answering before anything was read: its own line');
   assert.equal(rec.fails, 1);
   assert.equal(rec.retryAt, rec.ended + DAY);
   // In a row: twice the wait. Then an answer resets it.
@@ -350,6 +359,15 @@ test('the quick check: page 1 of the hangar different reads in full, without pee
   assert.deepEqual(asked.slice(0, 4), ['who', 'who', 'dossier', 'hangar:1']);
 });
 
+test('who is signed in answers a 5xx: the same line, and the next run backs off', async () => {
+  const r = await scannedAndSynced();
+  rsi.fail = (kind) => (kind === 'who' ? new Response('', { status: 503 }) : null);
+  const rec = await r.autoScan();
+  assert.equal(rec.line, 'rsi-down', 'RSI not answering before anything was read: its own line');
+  assert.equal(rec.fails, 1);
+  assert.equal(rec.retryAt, rec.ended + DAY);
+});
+
 test('the quick check sees a sign-in page: signed out; no answer: a quiet end with backoff', async () => {
   const r = await scannedAndSynced();
   rsi.fail = (kind) => (kind === 'hangar:1' ? new Response(`[]${SIGN_IN}`) : null);
@@ -359,7 +377,7 @@ test('the quick check sees a sign-in page: signed out; no answer: a quiet end wi
       ? new Response('', { status: 503, headers: { 'retry-after': '60' } })
       : null;
   const quiet = await r.autoScan();
-  assert.equal(quiet.line, 'signed-out', 'the last line stays');
+  assert.equal(quiet.line, 'rsi-down', 'RSI not answering: its own line');
   assert.equal(quiet.fails, 1);
   assert.deepEqual(site, []);
 });
@@ -600,7 +618,7 @@ test("a pressed Scan notes the parts it read whole; one cut short isn't", async 
   const r = await scannedAndSynced();
   for (const p of ['hangar', 'buybacks', 'referral'])
     assert.equal(stamps()[p], mem.db.sources[p].scannedAt, p);
-  // A hangar cut short (kept, as Scan does: 30 read over 25) and buy-backs that failed.
+  // A hangar RSI stopped answering for partway (nothing saved) and buy-backs that failed.
   delete mem.scanFull;
   rsi.hangar = pledges(35);
   rsi.fail = (kind) =>
@@ -610,7 +628,8 @@ test("a pressed Scan notes the parts it read whole; one cut short isn't", async 
         ? new Response('', { status: 401 })
         : null;
   const report = await r.scan({ reason: 'popup' });
-  assert.ok(report.rows[0].partial);
+  assert.equal(report.rows[0].ok, false);
+  assert.equal(report.rsiDown, true, 'RSI did not answer: the report says so');
   assert.equal(report.rows[1].ok, false);
   assert.deepEqual(Object.keys(stamps()), ['referral']);
 });
@@ -804,4 +823,53 @@ test('check 10: every part not saved ends with bad or partway and no last comple
   assert.equal(autoAsk({ on: true, rec, scannedAt: mem.db.sources.hangar.scannedAt }), true);
   assert.equal(autoLine({ on: true, rec }, rec.at).ask, true);
   assert.equal(autoAsk({ on: true, rec, scannedAt: rec.ended + 1 }), false);
+});
+
+// #672: a page the parser rules no longer fit (OpenHangar.pageChanged, #759) keeps the last
+// good scan, for the hangar and buy-backs, in the quick check's follow-up read and in the
+// full read, and syncs nothing.
+test('a page RSI changed: the last good hangar and buy-backs stay, nothing is synced', async () => {
+  OpenHangar.pageChanged = (html) => (html.includes('CHANGED') ? ['no pledge date reads'] : []);
+  try {
+    const changedHangar = (page) => (kind) =>
+      kind === `hangar:${page}` ? new Response('[]<p>CHANGED</p>') : null;
+    const cases = [
+      ['hangar page 1', { hangar: pledges(25) }, changedHangar(1), true],
+      ['hangar page 2', { hangar: pledges(25) }, changedHangar(2), true],
+      [
+        'buy-backs page 1',
+        { hangar: pledges(25), bbs: buybacks(3) },
+        (kind) =>
+          kind === 'buybacks:1' ? new Response('{"items":[],"tokens":2}<p>CHANGED</p>') : null,
+        false,
+      ],
+    ];
+    for (const [name, setup, fail, hangarChanges] of cases) {
+      const { r, before } = await fullRun(setup);
+      // Something differs from the saved scan, so the quick check goes on to read in full.
+      if (hangarChanges) rsi.hangar = [...pledges(1, 900), ...rsi.hangar];
+      else rsi.buybacks = [...buybacks(1, 900), ...rsi.buybacks];
+      rsi.fail = fail;
+      const rec = await r.autoScan();
+      assert.equal(rec.line, 'partway', name);
+      const part = hangarChanges ? 'hangar' : 'buybacks';
+      assert.deepEqual(
+        mem.db.sources[part],
+        before.db.sources[part],
+        `${name}: the last good scan, as it was`,
+      );
+      assert.equal(stamps()[part], undefined, `${name}: not counted as read`);
+      // The hangar read whole before buy-backs may sync; a changed page itself never does.
+      if (hangarChanges) assert.deepEqual(site, [], `${name}: nothing synced`);
+    }
+    // The quick check alone only reads: a changed page 1 writes nothing but its record.
+    const { r, before } = await fullRun({ hangar: pledges(25) });
+    mem.scanFull = before.scanFull ?? {};
+    rsi.fail = (kind) => (kind === 'hangar:1' ? new Response('[]<p>CHANGED</p>') : null);
+    await r.autoScan();
+    assert.deepEqual(mem.db, before.db);
+    assert.deepEqual(site, []);
+  } finally {
+    delete OpenHangar.pageChanged;
+  }
 });

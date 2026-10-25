@@ -34,6 +34,7 @@ const PAGES = new Set([
   '/help',
   '/updates',
   '/about',
+  '/news',
 ]);
 // The extension's feeds, and its alerts' sale feed (under /api/store/*). The
 // website's gateway answers them (its edge copy, ETag, Origin check and rate

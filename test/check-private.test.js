@@ -24,6 +24,28 @@ test('a file carrying the private marker fails', async () => {
   assert.match(problems[0], /^docs\/notes\.md:/);
 });
 
+test('.env files fail, templates pass', async () => {
+  const { privateProblems } = await lib();
+  const read = () => 'A=1';
+  assert.equal(privateProblems(['.env', '.env.local', 'server/.env.production'], read).length, 3);
+  assert.deepEqual(privateProblems(['.env.example', 'docs/environment.md'], read), []);
+});
+
+test('key-shaped text fails', async () => {
+  const { privateProblems } = await lib();
+  const keys = {
+    'a.txt': '-----BEGIN RSA PRIVATE ' + 'KEY-----\nabc',
+    'b.txt': 'id AKIA' + 'ABCDEFGHIJKLMNOP',
+    'c.txt': 'ghp_' + 'a'.repeat(36),
+    'd.txt': 'sk-ant-' + 'x'.repeat(40),
+    'e.txt': 'xoxb-' + '1'.repeat(24),
+    'ok.txt': 'a sketch-of-a-plan with AKIA in prose',
+  };
+  const problems = privateProblems(Object.keys(keys), (f) => keys[f]);
+  assert.equal(problems.length, 5);
+  assert.ok(problems.every((p) => !p.startsWith('ok.txt')));
+});
+
 test('ordinary files, CLAUDE.md and unreadable files pass', async () => {
   const { privateProblems } = await lib();
   const read = (f) => {

@@ -37,7 +37,7 @@ const FEED = {
   ],
 };
 const DB = {
-  schemaVersion: 3,
+  schemaVersion: 5,
   sources: {
     hangar: {
       scannedAt: Date.now(),
@@ -49,18 +49,27 @@ const DB = {
 };
 const json = (body, status = 200, headers = {}) =>
   new Response(body == null ? null : JSON.stringify(body), { status, headers });
+// Connected, with Remind Me on for the paint and the ship: only these take the badge and
+// notifications (the hangar's own reasons show in the popup's Fleet News only).
+const SIGNED = { siteLink: { token: 'oht_test', connectedAt: 1 } };
+const WISH = { v: 1, keys: ['sku:20', 'ship:cutlass-black'] };
+const remind = (more = {}) => ({ answers: [json(FEED), json(WISH)], ...more });
+// The sale feed's requests only (the Wishlist read is the other kind).
+const feedAsks = (x) => x.asked.filter((a) => a.url.endsWith('/api/store/on-sale'));
 
-// The worker with alerts, its network answering `answers` in turn, and every request,
-// badge and title it makes.
+// The worker with alerts, connected (alerts are on only while connected) unless `local`
+// says otherwise, its network answering `answers` in turn (the Wishlist read, once the
+// answers are used up, with WISH), and every request, badge and title it makes.
 function worker({ local = {}, answers = [], notify = true, flags = ALERTS } = {}) {
   const asked = [];
   const x = loadBackground({
     flags,
-    local: { db: structuredClone(DB), ...local },
+    local: { db: structuredClone(DB), ...SIGNED, ...local },
     notify,
     changes: true,
     fetch: async (url, init) => {
       asked.push({ url, init });
+      if (url.endsWith('/api/v1/wishlist') && !answers.length) return json(WISH);
       const a = answers.shift();
       if (!a) throw new Error('no network');
       return a;
@@ -82,31 +91,28 @@ async function until(ok, ms = 1000) {
 const fromPopup = (x, msg, sender = {}) =>
   x.sendInternal(msg, { id: CHROME_ID, url: POPUP, ...sender });
 
-test('turned on: one check, the feed only (not connected), the badge, notifications, the next alarm', async () => {
+test('turned on, not connected: off at once, nothing asked, no alarm, no badge', async () => {
+  const x = worker({ local: { siteLink: null }, answers: [json(FEED)] });
+  await x.chrome.storage.local.set({ alertsOn: true });
+  await until(() => x.stores.local.alertsOn === false);
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(x.asked.length, 0);
+  assert.ok(!x.alarms.has('oh-alerts'));
+  assert.ok(!('alerts' in x.stores.local));
+  assert.equal(x.notes.length, 0);
+});
+
+test('turned on, connected: one check, the feed then the Wishlist, the next alarm', async () => {
   const x = worker({ answers: [json(FEED, 200, { etag: 'W/"1"' })] });
   const t0 = Date.now();
   await x.chrome.storage.local.set({ alertsOn: true });
   await until(() => x.stores.local.alerts);
   await until(() => x.alarms.has('oh-alerts'));
-  assert.equal(x.asked.length, 1);
-  assert.equal(x.asked[0].url, 'https://openhangar.space/api/store/on-sale');
+  assert.deepEqual(
+    x.asked.map((a) => a.url),
+    ['https://openhangar.space/api/store/on-sale', 'https://app.openhangar.space/api/v1/wishlist'],
+  );
   assert.equal(x.asked[0].init.credentials, 'omit');
-  assert.deepEqual(
-    x.stores.local.alerts.items.map((m) => [m.id, m.why.map((w) => w.why)]),
-    [
-      ['sku-20', ['paint']],
-      ['sku-10', ['warbond']],
-    ],
-  );
-  await until(() => x.notes.length === 2);
-  assert.deepEqual(
-    x.notes.map((n) => [n.id, n.type, n.title]),
-    [
-      ['oh-alerts:sku-20', 'basic', 'Cutlass - Coalfire Paint'],
-      ['oh-alerts:sku-10', 'basic', 'Cutlass Black'],
-    ],
-  );
-  assert.ok(x.badges.includes('2'));
   const when = x.alarms.get('oh-alerts').when;
   assert.ok(
     when >= t0 + 30 * 60e3 && when <= Date.now() + 35 * 60e3,
@@ -114,8 +120,54 @@ test('turned on: one check, the feed only (not connected), the badge, notificati
   );
 });
 
+test('disconnected: alerts off, the matches and the Wishlist keys gone, no alarm', async () => {
+  const x = worker(remind());
+  await x.chrome.storage.local.set({ alertsOn: true });
+  await until(() => x.stores.local.alerts && x.alarms.has('oh-alerts'));
+  await x.chrome.storage.local.remove('siteLink');
+  await until(() => x.stores.local.alertsOn === false);
+  await until(() => !('alerts' in x.stores.local) && !('alertsWish' in x.stores.local));
+  assert.ok(!x.alarms.has('oh-alerts'));
+  assert.equal(x.badges.at(-1), '');
+});
+
+test('the worker starting with alerts on and no connection (from before 0.5.4): off', async () => {
+  const x = worker({
+    local: {
+      siteLink: null,
+      alertsOn: true,
+      alerts: { v: 1, items: [], known: {}, seen: {}, gone: {}, checkedAt: Date.now() },
+    },
+  });
+  await until(() => x.stores.local.alertsOn === false);
+  await until(() => !('alerts' in x.stores.local));
+  assert.ok(!x.alarms.has('oh-alerts'));
+  assert.equal(x.asked.length, 0);
+});
+
+test('Remind Me items on sale: the badge (each Wishlist item once) and a notification each', async () => {
+  const x = worker(remind());
+  await x.chrome.storage.local.set({ alertsOn: true });
+  await until(() => x.notes.length === 2);
+  assert.deepEqual(
+    x.stores.local.alerts.items.map((m) => [m.id, m.why.map((w) => w.why)]),
+    [
+      ['sku-20', ['wishlist', 'paint']],
+      ['sku-10', ['wishlist', 'warbond']],
+    ],
+  );
+  assert.deepEqual(
+    x.notes.map((n) => [n.id, n.type, n.title, n.message]),
+    [
+      ['oh-alerts:sku-20', 'basic', 'Cutlass - Coalfire Paint', 'On your Wishlist'],
+      ['oh-alerts:sku-10', 'basic', 'Cutlass Black', 'On your Wishlist'],
+    ],
+  );
+  await until(() => x.badges.includes('2'));
+});
+
 test('notifications not allowed: the badge only', async () => {
-  const x = worker({ answers: [json(FEED)], notify: false });
+  const x = worker(remind({ notify: false }));
   await x.chrome.storage.local.set({ alertsOn: true });
   await until(() => x.stores.local.alerts);
   await until(() => x.badges.includes('2'));
@@ -129,11 +181,11 @@ test('the alarm: a check, with the saved copy while it is fresh (nothing asked)'
   await x.fireAlarm('oh-alerts');
   await x.fireAlarm('someone-else');
   await new Promise((r) => setTimeout(r, 20));
-  assert.equal(x.asked.length, 1);
+  assert.equal(feedAsks(x).length, 1);
 });
 
 test('the popup open: every match seen, the badge back to the reminder', async () => {
-  const x = worker({ answers: [json(FEED)] });
+  const x = worker(remind());
   await x.chrome.storage.local.set({ alertsOn: true });
   await until(() => x.stores.local.alerts && x.badges.includes('2'));
   // Not from a tab, not from another page.
@@ -147,41 +199,26 @@ test('the popup open: every match seen, the badge back to the reminder', async (
     undefined,
   );
   assert.deepEqual(await fromPopup(x, { ohPopup: 'alerts-seen' }), { ok: true });
-  assert.equal(Object.keys(x.stores.local.alerts.seen).length, 2);
+  assert.equal(Object.keys(x.stores.local.alerts.seen).length, 4);
   assert.equal(x.badges.at(-1), '');
 });
 
-test('deleted in the popup: one, then Clear All, the badge follows (#701)', async () => {
-  const x = worker({ answers: [json(FEED)] });
+test("the old list's delete (alerts-hide) is no longer answered", async () => {
+  const x = worker(remind());
   await x.chrome.storage.local.set({ alertsOn: true });
   await until(() => x.stores.local.alerts && x.badges.includes('2'));
-  // Only the popup may.
-  assert.equal(
-    await fromPopup(x, { ohPopup: 'alerts-hide', id: 'sku-20' }, { tab: { id: 1 } }),
-    undefined,
-  );
-  const AL = require('../src/alerts.js');
-  const ids = AL.shown(x.stores.local.alerts).map((m) => m.id);
-  assert.equal(ids.length, 2);
-  assert.deepEqual(await fromPopup(x, { ohPopup: 'alerts-hide', id: ids[0] }), { ok: true });
-  assert.deepEqual(
-    AL.shown(x.stores.local.alerts).map((m) => m.id),
-    [ids[1]],
-  );
-  assert.equal(x.badges.at(-1), '1');
-  assert.deepEqual(await fromPopup(x, { ohPopup: 'alerts-hide' }), { ok: true });
-  assert.equal(AL.shown(x.stores.local.alerts).length, 0);
-  assert.equal(x.badges.at(-1), '');
+  assert.equal(await fromPopup(x, { ohPopup: 'alerts-hide', id: 'sku-20' }), undefined);
+  assert.equal(x.badges.at(-1), '2');
 });
 
 test("a notification clicked: that item on our Store's page, seen", async () => {
-  const x = worker({ answers: [json(FEED)] });
+  const x = worker(remind());
   await x.chrome.storage.local.set({ alertsOn: true });
   await until(() => x.notes.length === 2);
   await x.clickNote('oh-alerts:sku-20');
   await until(() => x.opened.length === 1);
   assert.deepEqual(x.opened, ['https://openhangar.space/store#item=20']);
-  await until(() => Object.keys(x.stores.local.alerts.seen).length === 1);
+  await until(() => Object.keys(x.stores.local.alerts.seen).length === 2);
   await x.clickNote('oh-alerts:more');
   await until(() => x.opened.length === 2);
   assert.equal(x.opened[1], 'https://openhangar.space/store');
@@ -190,7 +227,8 @@ test("a notification clicked: that item on our Store's page, seen", async () => 
 });
 
 test('a new scan: matched again from the saved feed, nothing asked; a sync changes nothing', async () => {
-  const x = worker({ answers: [json(FEED)] });
+  // Remind Me on for something not in the store: the hangar's matches only.
+  const x = worker({ answers: [json(FEED), json({ v: 1, keys: ['sku:999'] })] });
   await x.chrome.storage.local.set({ alertsOn: true });
   await until(() => x.stores.local.alerts && x.stores.local.alerts.items.length === 2);
   const db = structuredClone(DB);
@@ -225,7 +263,7 @@ function holding(hold, { local = {}, answer } = {}) {
     flags: ALERTS,
     notify: true,
     changes: true,
-    local: { db: structuredClone(DB), ...local },
+    local: { db: structuredClone(DB), siteLink: { token: 'oht_test', connectedAt: 1 }, ...local },
     fetch: async (url) => {
       asked.push(url);
       const wish = url.endsWith('/api/v1/wishlist');
@@ -272,7 +310,11 @@ test("turned off mid-check: the feed's backoff is kept, so turning on again asks
   assert.ok(h.x.stores.local.alertsFeed?.retryAt > Date.now(), 'the 429 is remembered');
   await h.x.chrome.storage.local.set({ alertsOn: true });
   await settle();
-  assert.equal(h.asked.length, 1, 'nothing asked again before Retry-After');
+  assert.equal(
+    h.asked.filter((u) => u.endsWith('/api/store/on-sale')).length,
+    1,
+    'the feed not asked again before Retry-After',
+  );
 });
 
 test('turned off just as a check saves: cleaned up again once it settles', async () => {
@@ -338,4 +380,18 @@ test('without the flag: no alerts code, no alarm, nothing asked', async () => {
     },
   );
   assert.ok(!/OHAlerts|chrome\.alarms|chrome\.notifications|alerts\.js/.test(cut));
+});
+
+test('Remind Me off on every item: the list and the badge empty, the checks stop', async () => {
+  const x = worker({
+    local: { ...LINK },
+    answers: [json(FEED), json({ v: 1, keys: ['sku:10'] }), json({ v: 1, keys: [] })],
+  });
+  await x.chrome.storage.local.set({ alertsOn: true });
+  await until(() => x.stores.local.alerts?.items?.length);
+  // A later check finds Remind Me on for nothing (turned off on the website, say).
+  await x.chrome.storage.local.set({ alertsWish: { keys: [], connectedAt: 1, at: 0 } });
+  await x.chrome.storage.local.set({ db: {} });
+  await until(() => x.stores.local.alertsOn === false && !('alerts' in x.stores.local));
+  assert.ok(!x.alarms.has('oh-alerts'));
 });

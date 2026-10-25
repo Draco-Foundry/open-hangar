@@ -241,7 +241,6 @@ test("popup copy: the owner's words (2026-10-13), filled in", async () => {
   const { t } = await import('../ui/popup/copy.js');
   assert.equal(t('popup.scan'), 'Scan');
   assert.equal(t('popup.synced', { when: '2h ago' }), 'Synced 2h ago');
-  assert.equal(t('popup.alerts', { n: 2 }), 'Alerts: 2');
   assert.equal(
     t('popup.sync-wait', { time: '6:02 PM' }),
     'Try again at 6:02 PM. The last sync was moments ago.',
@@ -249,4 +248,73 @@ test("popup copy: the owner's words (2026-10-13), filled in", async () => {
   assert.throws(() => t('popup.nope'), /no "popup.nope"/);
   const src = require('node:fs').readFileSync(`${__dirname}/../ui/popup/copy.js`, 'utf8');
   assert.doesNotMatch(src, /\[copy:/);
+});
+
+test('popup: UEC and REC are compact for the card and full for the tooltip', async () => {
+  const { compactCount, gameCredit } = await data();
+  const nb = ' ';
+  const cases = [
+    [0, '0'],
+    [950, '950'],
+    [999, '999'],
+    [1000, `1${nb}K`],
+    [90000, `90${nb}K`],
+    [999949, `999.9${nb}K`],
+    [999950, `1${nb}M`],
+    [1200000, `1.2${nb}M`],
+    [2000000, `2${nb}M`],
+    [3400000000, `3.4${nb}B`],
+  ];
+  for (const [n, text] of cases) assert.equal(compactCount(n), text, String(n));
+  for (const bad of [undefined, null, NaN, '12', -5, Infinity])
+    assert.equal(compactCount(bad), null);
+  const account = { credits: { uec: { value: 1200000 }, rec: { value: 0 } } };
+  assert.deepEqual(gameCredit(account, 'uec'), { text: `1.2${nb}M`, full: '1,200,000' });
+  assert.deepEqual(gameCredit(account, 'rec'), { text: '0', full: '0' });
+  assert.equal(gameCredit({ credits: { store: { value: 5 } } }, 'uec'), null);
+  assert.equal(gameCredit({ credits: { uec: { value: null } } }, 'uec'), null);
+  assert.equal(gameCredit(null, 'rec'), null);
+});
+
+test('popup: Buy-Back Tokens show 0 to 99, then 99+ with the real count', async () => {
+  const { tokenCount } = await data();
+  assert.deepEqual(tokenCount(0), { text: '0', full: '0' });
+  assert.deepEqual(tokenCount(2), { text: '2', full: '2' });
+  assert.deepEqual(tokenCount(99), { text: '99', full: '99' });
+  assert.deepEqual(tokenCount(100), { text: '99+', full: '100' });
+  assert.deepEqual(tokenCount(12345), { text: '99+', full: '12,345' });
+  for (const bad of [null, undefined, -1, 1.5, NaN, '2']) assert.equal(tokenCount(bad), null);
+});
+
+test('popup: money fits its box, the full figure while it fits, then compact', async () => {
+  const { moneyFit, FIT, fxFor } = await import('../ui/popup/currency.js');
+  const nb = ' ';
+  const credit = (usd) => moneyFit(usd, undefined, { cents: true, full: FIT.credit });
+  // Store Credit: $9,999.99 is the widest full figure.
+  assert.deepEqual(credit(51.56), { text: '$51.56', title: '', short: false });
+  assert.equal(credit(9999.99).text, '$9,999.99');
+  assert.equal(credit(9999.99).short, false);
+  assert.equal(credit(10000).text, `$10${nb}K`);
+  assert.equal(credit(12400).text, `$12.4${nb}K`);
+  assert.deepEqual(credit(12000000), { text: `$12${nb}M`, title: '$12,000,000.00', short: true });
+  assert.equal(credit(1.2e9).text, `$1.2${nb}B`);
+  // Account Value: the full figure up to $999,999, then compact.
+  const value = (usd) => moneyFit(usd);
+  assert.equal(value(999999).text, '$999,999');
+  assert.equal(value(999999).short, false);
+  assert.equal(value(1000000).text, `$1${nb}M`);
+  assert.equal(value(1234567).text, `$1.2${nb}M`);
+  assert.deepEqual(value(100000000), { text: `$100${nb}M`, title: '$100,000,000', short: true });
+  // The change line: up to $99,999.
+  const change = (usd) => moneyFit(usd, undefined, { most: 0, full: FIT.change });
+  assert.equal(change(90).text, '$90');
+  assert.equal(change(99999).text, '$99,999');
+  assert.equal(change(100000).text, `$100${nb}K`);
+  // In another currency the threshold is the converted amount; the title keeps both.
+  const eur = fxFor('EUR', { rates: { EUR: 0.9 }, date: '2026-10-23' });
+  const big = moneyFit(10000000, eur);
+  assert.equal(big.short, true);
+  assert.match(big.text, /9/);
+  assert.match(big.title, /\(\$10,000,000\)$/);
+  assert.equal(moneyFit(NaN).text, '');
 });

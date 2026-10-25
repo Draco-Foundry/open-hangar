@@ -78,7 +78,6 @@ const VALID = {
     ],
   },
   'oh-connect-begin': { type: 'oh-connect-begin' },
-  'oh-connect-finish': { type: 'oh-connect-finish', code: 'one-time-code', sync: true },
   'oh-link-check': { type: 'oh-link-check', code: 'K7Q-4PX' },
 };
 
@@ -94,7 +93,7 @@ test('the capability lists: two per-origin lists, each type named once', () => {
     requestScan: ['oh-request-scan'],
     addToCart: ['oh-upgrade-options', 'oh-upgrade-price', 'oh-add-upgrade'],
     addItems: ['oh-add-items'],
-    connect: ['oh-connect-begin', 'oh-connect-finish', 'oh-link-check'],
+    connect: ['oh-connect-begin', 'oh-link-check'],
   });
   assert.deepEqual(Object.keys(VALID).sort(), [...PAGES.TYPES].sort());
   // The Firefox bridge's own list of types is the same.
@@ -202,7 +201,7 @@ test('a request for another page is answered exactly like one that does not exis
   }
   // Connect from the hangar page or the public front page: the same.
   for (const origin of [HANGAR, FRONT])
-    for (const msg of [VALID['oh-connect-begin'], VALID['oh-connect-finish']])
+    for (const msg of [VALID['oh-connect-begin'], VALID['oh-link-check']])
       assert.deepEqual(await x.send(msg, origin), UNKNOWN, `${origin} ${msg.type}`);
   // A message too big or not an object says the same whatever its type.
   const big = 'x'.repeat(20000);
@@ -296,11 +295,8 @@ test('malformed messages are refused before any handler runs', async () => {
       items: Array.from({ length: 21 }, (_, i) => ({ skuId: 19001 + i, qty: 1 })),
     },
     { type: 'oh-connect-begin', redirect: 'https://evil.example/' },
-    { type: 'oh-connect-finish' },
-    { type: 'oh-connect-finish', code: '' },
-    { type: 'oh-connect-finish', code: 7 },
-    { type: 'oh-connect-finish', code: 'x'.repeat(513) },
-    { type: 'oh-connect-finish', code: 'c', sync: 'yes' },
+    { type: 'oh-connect-begin', code: 'one-time-code' },
+    { type: 'oh-connect-begin', sync: true },
   ];
   for (const msg of odd) {
     const origin = /hangar|scan/.test(msg?.type) ? HANGAR : APP;
@@ -337,12 +333,13 @@ test('the 16 KB limit is on the message as sent, in bytes', () => {
   fits.skus.push(1, 1);
   assert.ok(size(fits) > 16 * 1024);
   assert.deepEqual(PAGES.vet(fits, APP, has, pages), { error: 'bad request' });
-  // Counted in bytes: three-byte characters fill it three times as fast.
-  const wide = { type: 'oh-connect-finish', code: '€'.repeat(500) };
+  // Counted in bytes: three-byte characters fill it three times as fast. The size
+  // check comes before the type's, so a type that doesn't exist shows it.
+  const wide = { type: 'oh-nope', pad: '€'.repeat(6000) };
   assert.ok(JSON.stringify(wide).length < 16 * 1024);
-  assert.deepEqual(PAGES.vet(wide, APP, has, pages), { type: 'oh-connect-finish' });
-  assert.deepEqual(PAGES.vet({ ...wide, pad: '€'.repeat(6000) }, APP, has, pages), {
-    error: 'bad request',
+  assert.deepEqual(PAGES.vet(wide, APP, has, pages), { error: 'bad request' });
+  assert.deepEqual(PAGES.vet({ ...wide, pad: 'x'.repeat(6000) }, APP, has, pages), {
+    error: 'unknown request',
   });
   // A message JSON can't write (a BigInt) is refused, never thrown.
   assert.deepEqual(PAGES.vet({ type: 'oh-hello', v: 10n }, APP, has, pages), {
@@ -359,11 +356,6 @@ test("the website's own messages (v1 and today's) all still pass", async () => {
     { type: 'oh-upgrade-price', fromShipId: 101, toShipId: 900, toSkuId: 9001 },
     { type: 'oh-add-upgrade', fromShipId: 101, toShipId: 900, toSkuId: 9001 },
     { type: 'oh-connect-begin' },
-    {
-      type: 'oh-connect-finish',
-      code: 'Zm9yLXRlc3RzLW9ubHktYS1yYW5kb20tb25lLXRpbWUtY29kZQ',
-      sync: true,
-    },
     // Older pages: no skus, no toShipId on the price.
     { type: 'oh-upgrade-options', toShipId: 900, toSkuId: 9001 },
     { type: 'oh-upgrade-price', fromShipId: 101, toSkuId: 9001 },
@@ -749,6 +741,47 @@ test('requestScan: an open basic page is brought to the front and named in the r
 });
 
 // --- Firefox: the background's own checks --------------------------------------------
+test("chrome and edge: only a tab's top frame on one of our pages (#671)", async () => {
+  const x = load();
+  const hello = { type: 'oh-hello' };
+  assert.equal((await x.send(hello, APP)).ok, true);
+  for (const [what, sender] of [
+    ['a frame', { frameId: 1 }],
+    ['no frame id', { frameId: undefined }],
+    ['not in a tab', { tab: undefined }],
+  ])
+    for (const msg of Object.values(VALID))
+      assert.equal(await x.send(msg, APP, sender), undefined, `${what} ${msg.type}`);
+  assert.deepEqual(x.opened, []);
+  assert.deepEqual(x.cart, []);
+});
+
+// The store's host list (#671): every store and beta build lets in exactly our
+// production pages, https and no port, never staging or a developer's site. And the
+// test helper's own copy of the list (test/bridge-env.js) is the build's.
+test('store and beta builds let in only our production pages', async () => {
+  const real = await import('../scripts/site-pages.mjs');
+  const { buildValues, readRegistry } = await import('../scripts/build-flags.mjs');
+  const registry = readRegistry(path.join(__dirname, '..', 'src', 'flags.js'));
+  const PRODUCTION = [HANGAR, FRONT, APP];
+  for (const beta of [false, true]) {
+    const flags = buildValues(registry, { beta });
+    const pages = real.pagesFor({ localMode: flags.localMode, sync: flags.sync });
+    for (const o of [...pages.hangar, ...pages.site, ...pages.connect])
+      assert.ok(PRODUCTION.includes(o), `${beta ? 'beta' : 'store'}: ${o}`);
+    assert.deepEqual(pages.connect, [APP], 'Connect on the app only');
+    assert.deepEqual(real.patternsOf(pages), [`${HANGAR}/*`, `${FRONT}/*`, `${APP}/*`]);
+  }
+  for (const localMode of [false, true])
+    for (const sync of [false, true])
+      for (const staging of [false, true])
+        assert.deepEqual(
+          pagesFor({ localMode, sync, staging }),
+          real.pagesFor({ localMode, sync, devSite: staging }),
+          JSON.stringify({ localMode, sync, staging }),
+        );
+});
+
 test("firefox: only our content script, in a tab's top frame, on one of our pages", async () => {
   const x = load({ browser: 'firefox' });
   const hello = { type: 'oh-hello' };

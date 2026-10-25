@@ -261,6 +261,39 @@ test('a page that stopped on an error: closed, its request dropped, and scans go
   assert.deepEqual(x.opened, [BASIC]);
 });
 
+test('a scan that read nothing frees the minute once its page is done; one that read keeps it', async () => {
+  // Signed out of RSI: the scan ends in a second, and Scan right after Log In to RSI
+  // must scan, not say one is running (Firefox 0.5.1, 2026-10-20).
+  const ended = async (report) => {
+    const x = chromeX();
+    await fromPopup(x);
+    const run = x.stores.session.scanRequest.run;
+    delete x.stores.session.scanRequest; // the page took it
+    x.stores.local.scanReport = { v: 1, run, by: 'offscreen', startedAt: Date.now(), ...report };
+    const q = `?run=${run}&by=offscreen&v=0.3.0`;
+    assert.deepEqual(await x.fromScanPage({ ohScan: { op: 'done', run } }, q), {
+      ok: true,
+      value: {},
+    });
+    return x;
+  };
+  const out = await ended({ signedOut: true, held: null, rows: [] });
+  assert.equal('scanAskedAt' in out.stores.session, false);
+  assert.equal((await fromPopup(out)).ok, true, 'Scan scans again at once');
+  const held = await ended({ signedOut: false, held: 'no-rsi', rows: [] });
+  assert.equal((await fromPopup(held)).ok, true);
+  // A scan that read RSI's lists: still one a minute.
+  const read = await ended({
+    signedOut: false,
+    held: null,
+    rows: [{ id: 'hangar', ok: true, partial: null, n: 3, error: null }],
+  });
+  assert.deepEqual(await fromPopup(read), { ok: false, error: 'busy' });
+  // An older report (not this request's scan) frees nothing.
+  const old = await ended({ signedOut: true, held: null, rows: [], startedAt: 1 });
+  assert.deepEqual(await fromPopup(old), { ok: false, error: 'busy' });
+});
+
 test("a hidden page's mark left behind when it went away never holds the next scan", async () => {
   // The offscreen page's renderer crashed mid-scan: its mark, renewed a moment ago, stays.
   const x = chromeX();
@@ -701,6 +734,9 @@ async function scanPage({ run = 'page01-0a0b0c0d0e0f', by = 'offscreen', request
     getHistory: async () => [],
     fillBuybackDetailsFromHistory: async () => {},
     getBuybackDetails: async () => ({}),
+    buybackFromRsi: (d) => !!d && !d.partial && !d.src,
+    getBuybackMisses: async () => ({}),
+    bbdMissUntil: () => 0,
     flushBuybackDetails: async () => calls.push('flush'),
     storageSettled: async () => calls.push('settled'),
     siteEnabled: async () => false,
@@ -817,6 +853,9 @@ async function pageAndWorker({ failGet = false } = {}) {
     getHistory: async () => [],
     fillBuybackDetailsFromHistory: async () => {},
     getBuybackDetails: async () => ({}),
+    buybackFromRsi: (d) => !!d && !d.partial && !d.src,
+    getBuybackMisses: async () => ({}),
+    bbdMissUntil: () => 0,
     fetchBuybackDetails: async (ids, say) => {
       calls.push('packs');
       say(1, ids.length);
@@ -842,26 +881,20 @@ async function pageAndWorker({ failGet = false } = {}) {
 }
 const count = (list, what) => list.filter((c) => c === what).length;
 
-test('the page: a scan asked for while its packs are read runs at once, however long they take', async () => {
+test("the page: a scan reads its buy-backs' own pages inside it, then syncs and closes", async () => {
   const p = await pageAndWorker();
   try {
     const s = p.x.stores.session;
-    await p.until(() => p.calls.includes('packs') && !s.scanRunning, 'the pack reads');
+    await p.until(() => p.calls.includes('packs'), 'the buy-back pages');
     assert.equal(count(p.calls, 'account'), 1);
     assert.ok(p.calls.includes('status'), "the kill switch's file, read as the page opened");
-    // Over a minute into the pack reads, Scan again: the open page is asked, and scans.
-    p.clock.t += 61e3;
-    later(p.x);
-    assert.deepEqual(await fromPopup(p.x), { ok: true, opened: false, by: 'offscreen' });
-    await p.until(() => count(p.calls, 'account') === 2, 'the second scan');
-    await p.until(() => p.x.stores.local.scanReport?.startedAt === p.clock.t, 'its report');
-    assert.equal('scanRequest' in s, false, 'taken at once');
-    assert.equal(p.x.docs.length, 1, 'the packs still being read');
-    // The pack reads outlast that request's minute too, then end: done, and closed.
-    p.clock.t += 61e3;
+    // The pages are part of the scan (#798): its mark stays while they're read.
+    assert.ok(s.scanRunning, 'still scanning');
+    assert.equal(p.x.stores.local.scanReport, undefined, 'no report before the pages');
     p.packsGo();
     await p.until(() => p.x.docs.length === 0, 'the page closed');
-    assert.equal(count(p.calls, 'packs'), 1, 'one pack read, shared by both scans');
+    assert.equal(count(p.calls, 'packs'), 1);
+    assert.equal(count(p.calls, 'account'), 1);
     assert.deepEqual(
       Object.keys(s).filter((k) => /^scan(Request|Running|Progress)$/.test(k)),
       [],

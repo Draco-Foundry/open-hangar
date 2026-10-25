@@ -145,19 +145,11 @@
           "prospects": 1,
           "recruitsList": [
             {
-              "id": "901",
-              "handle": "Recruit1",
-              "moniker": "Recruit 1",
-              "avatar": null,
               "enlistedOn": "2025-02-03",
               "convertedOn": "2025-03-04",
               "campaign": "current"
             },
             {
-              "id": "902",
-              "handle": "Recruit2",
-              "moniker": "Recruit 2",
-              "avatar": null,
               "enlistedOn": "2025-02-03",
               "convertedOn": "2025-03-04",
               "campaign": "legacy"

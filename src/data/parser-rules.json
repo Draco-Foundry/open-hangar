@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "revision": "2026-10-19",
+  "revision": "2026-10-22",
   "paging": {
     "page": "page",
     "size": "pagesize",
@@ -30,6 +30,7 @@
     "itemKind": ".kind",
     "itemName": ".title, .name, .item-name",
     "itemImage": ".image",
+    "itemMaker": ".liner",
     "kindFallback": ".kind",
     "image": ".image",
     "gift": ".js-gift",
@@ -201,26 +202,6 @@
     "campaigns": { "current": "2", "legacy": "1" },
     "pageSize": 50
   },
-  "subStore": {
-    "path": "/graphql",
-    "operation": "GetBrowseSkusByFilter",
-    "query": "query GetBrowseSkusByFilter($query: SearchQuery, $storeFront: String = \"pledge\") {\n  store(browse: true, name: $storeFront) {\n    listing: search(query: $query) {\n      resources {\n        id name title subtitle url type\n        media { thumbnail { storeSmall slideshow } }\n        nativePrice { amount discounted }\n        price { amount discounted }\n        stock { available unlimited show level }\n        tags { name }\n        ... on TySku { label isWarbond isPackage }\n      }\n      count\n      totalCount\n    }\n  }\n}",
-    "variables": {
-      "storeFront": "pledge",
-      "query": {
-        "skus": {
-          "filtersFromTags": {
-            "tagIdentifiers": [],
-            "facetIdentifiers": ["extras-subscribers-store"]
-          },
-          "products": [65]
-        },
-        "sort": { "field": "weight", "direction": "desc" }
-      }
-    },
-    "pageSize": 100,
-    "pageSizeMin": 20
-  },
   "upgrade": {
     "path": "/pledge-store/api/upgrade/graphql",
     "storeList": {
@@ -298,7 +279,7 @@
         "Vehicle"
       ],
       "tags": ["Attributed"],
-      "labels": ["Apply upgrade", "Contains:", "Created:", "Exchange", "Gift"],
+      "labels": ["Apply upgrade", "Contains:", "Created:", "Exchange", "Gift", "Upgrades"],
       "hooks": [
         "js-apply-upgrade",
         "js-expand-arrow",
@@ -315,12 +296,14 @@
         "js-pledge-not-buybackable",
         "js-pledge-value",
         "js-reclaim",
-        "js-upgrade-data"
+        "js-upgrade-data",
+        "js-upgrade-log"
       ]
     },
     "buybacks": {
       "labels": ["Buy Back", "Contained", "Reclaim Date"],
       "hooks": ["js-label", "js-open-ship-upgrades"]
     }
-  }
+  },
+  "aliases": [{ "old": "Phoenix Emerald", "now": "Constellation Mk IV Phoenix Emerald" }]
 }

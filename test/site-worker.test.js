@@ -147,6 +147,7 @@ test("with the edge gateway bound, the website's pages go through it as they cam
     '/help',
     '/updates',
     '/about',
+    '/news',
   ];
   for (const page of pages) {
     const { res, body, calls } = await visit(`${page}?view=list`, 200, { edge: true });

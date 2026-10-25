@@ -17,9 +17,9 @@
     `https://robertsspaceindustries.com/ship-matrix/search?q=${encodeURIComponent(shipName(it))}`;
   const wikiHref = (it) => `https://starcitizen.tools/index.php?search=${encodeURIComponent(it.n)}`;
 
-  // The list under People: which tab, the search and the sort. Kept while the page stays open.
+  // The list under People: which tab and the sort. Kept while the page stays open. Rows carry
+  // only dates (no handles or names are kept, src/lib.js referralRow), so there's no search.
   let tab = $state('recruits');
-  let query = $state('');
   let sort = $state('newest');
   let copied = $state(false);
 
@@ -48,7 +48,7 @@
     let trend = '';
     if (prev30 > 0) {
       const pct = Math.round(((last30 - prev30) / prev30) * 100);
-      trend = pct === 0 ? '→ flat' : pct > 0 ? `↑ ${pct}%` : `↓ ${Math.abs(pct)}%`;
+      trend = pct === 0 ? 'Flat' : pct > 0 ? `Up ${pct}%` : `Down ${Math.abs(pct)}%`;
     } else if (last30 > 0) {
       trend = '↑ new';
     }
@@ -338,23 +338,20 @@
     };
   });
 
-  // The People list: the active tab, with search and sort applied.
+  // The People list: the active tab, with its sort applied.
   const people = $derived.by(() => {
     if (!page) return null;
     const ref = page.ref;
     const full = (tab === 'prospects' ? ref.prospectsList : ref.recruitsList) || [];
     let list = full;
-    const q = query.trim().toLowerCase();
-    if (q) list = list.filter((r) => `${r.handle || ''} ${r.moniker || ''}`.toLowerCase().includes(q));
     // Sort by the date shown in this tab: recruits by conversion, prospects by enlist.
     const ts = (r) => {
       const d = tab === 'recruits' ? a.recruitDate(r) : a.parseTs(r.enlistedOn);
       return d ? d.getTime() : 0;
     };
-    const byName = (x, y) => (x.handle || x.moniker || '').localeCompare(y.handle || y.moniker || '');
     list = list
       .slice()
-      .sort((x, y) => (sort === 'oldest' ? ts(x) - ts(y) : sort === 'name' ? byName(x, y) : ts(y) - ts(x)));
+      .sort((x, y) => (sort === 'oldest' ? ts(x) - ts(y) : ts(y) - ts(x)));
     return {
       total: full.length,
       rows: list.map((r) => {
@@ -363,9 +360,6 @@
         const d = tab === 'recruits' ? a.recruitDate(r) : a.parseTs(r.enlistedOn);
         const ev = tab === 'recruits' && d ? a.eventForDate(d) : null;
         return {
-          handle: r.handle || r.moniker || '—',
-          url: r.handle ? `https://robertsspaceindustries.com/en/citizens/${encodeURIComponent(r.handle)}` : null,
-          moniker: r.moniker || '',
           legacy: tab === 'recruits' && r.campaign === 'legacy',
           when: d ? d.toLocaleDateString() : '—',
           ev: ev ? `${ev.name}: ${ev.reward}` : '',
@@ -414,7 +408,6 @@
   function pickTab(key) {
     if (tab === key) return;
     tab = key;
-    query = '';
   }
   async function copy() {
     try {
@@ -719,42 +712,30 @@
         onclick={() => pickTab('prospects')}>Prospects <b>{nf(st.prospects)}</b></button
       >
     </div>
-    <input
-      id="ref-search"
-      class="ref-search"
-      type="search"
-      placeholder="Search handle / moniker…"
-      aria-label="Search Referrals"
-      bind:value={query}
-    />
     <select id="ref-sort" class="ref-sort" aria-label="Sort Referrals" bind:value={sort}>
       <option value="newest">Newest First</option>
       <option value="oldest">Oldest First</option>
-      <option value="name">Name (A–Z)</option>
     </select>
   </div>
   <div id="ref-count" class="result-count">Showing {nf(people.rows.length)} of {nf(people.total)}</div>
   <div class="ref-table-scroll">
     <table class="ref-table">
       <thead>
-        <tr><th>Handle</th><th>Moniker</th><th id="ref-date-col">{tab === 'recruits' ? 'Converted' : 'Enlisted'}</th></tr>
+        <tr><th id="ref-date-col">{tab === 'recruits' ? 'Converted' : 'Enlisted'}</th></tr>
       </thead>
       <tbody id="ref-tbody">
         {#each people.rows as r, i (i)}
           <tr>
-            <td class="r-handle"
-              >{#if r.url}<a class="ref-citizen-link" href={r.url} target="_blank" rel="noopener">{r.handle}</a
-                >{:else}{r.handle}{/if}{#if r.legacy}{' '}<span class="ref-badge legacy">legacy</span>{/if}</td
-            >
-            <td>{r.moniker}</td>
             <td
-              >{r.when}{#if r.ev}{' '}<span class="ref-event" title={r.ev}>★</span>{/if}</td
+              >{r.when}{#if r.ev}{' '}<span class="ref-event" title={r.ev}>★</span>{/if}{#if r.legacy}{' '}<span
+                  class="ref-badge legacy">legacy</span
+                >{/if}</td
             >
           </tr>
         {:else}
           <tr>
-            <td colspan="3" class="muted">
-              {people.total ? `No ${tab} match your search.` : `No ${tab} found.`}
+            <td class="muted">
+              {`No ${tab} found.`}
             </td>
           </tr>
         {/each}

@@ -1,14 +1,14 @@
 name: Last updated
 
-# The README's and roadmap's "Last Updated" badge: the time of the latest push to main or
-# redesign/0.3-svelte, in UTC (Zulu). This writes it as a shields.io endpoint file to the
+# The README's and roadmap's "Last Updated" badge: the time of the latest push to main,
+# in UTC (Zulu). This writes it as a shields.io endpoint file to the
 # `badges` branch (one commit, replaced each time), so main itself never gets a bot commit.
 # The badge reads
 # https://raw.githubusercontent.com/Draco-Foundry/open-hangar/badges/last-updated.json
 
 on:
   push:
-    branches: [main, redesign/0.3-svelte]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -22,6 +22,7 @@ concurrency:
 jobs:
   stamp:
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - name: Write the time to the badges branch
         env:

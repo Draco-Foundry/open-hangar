@@ -59,7 +59,7 @@
 <h2 class="section-title">Org Fleet</h2>
 <p class="muted org-intro">
   Put your org's hangars together into one fleet. Each member opens Open Hangar, goes to
-  <strong>Developers → Export HTF</strong> (ships only, nothing personal) and sends you the file.
+  <strong>Developers / Export HTF</strong> (ships only, nothing personal) and sends you the file.
   Import them here. Full backups work too, but only the ships are read. Everything stays in this
   browser.
 </p>
