@@ -2975,6 +2975,35 @@
   // of it) when a vehicle has no size class, e.g. ground vehicles like the Storm.
   const cleanSize = (s) =>
     s && !/^(undefined|null|none|n\/a)$/i.test(String(s).trim()) ? String(s).trim() : null;
+  // RSI's Ship Matrix (which the wiki copies) writes sizes and careers several ways
+  // ("Small" and "small", "Multi-Role" and "multi", "Transporter" and "transport"):
+  // one word each, so Stats counts a size or career once. Pure.
+  const SIZE_WORD = {
+    vehicle: 'Vehicle',
+    snub: 'Snub',
+    small: 'Small',
+    medium: 'Medium',
+    large: 'Large',
+    capital: 'Capital',
+  };
+  const CAREER_WORD = {
+    multi: 'Multi-Role',
+    'multi-role': 'Multi-Role',
+    transport: 'Transporter',
+    transporter: 'Transporter',
+  };
+  OH.matrixSize = function matrixSize(s) {
+    const t = cleanSize(s);
+    return t ? SIZE_WORD[t.toLowerCase()] || t : null;
+  };
+  OH.matrixCareer = function matrixCareer(s) {
+    const t = typeof s === 'string' ? s.trim() : '';
+    if (!t) return null;
+    return (
+      CAREER_WORD[t.toLowerCase()] ||
+      t.replace(/(^|[\s/-])([a-z])/g, (_, a, c) => a + c.toUpperCase())
+    );
+  };
 
   // One wiki vehicle record → the slim entry we keep. Shared with
   // scripts/update-ship-catalog.mjs so the bundled snapshot has the same shape.
@@ -2987,13 +3016,13 @@
       cls: v.class_name ? String(v.class_name).toLowerCase() : null,
       msrp: Number(v.msrp) > 0 ? Number(v.msrp) : null, // USD store price
       // Fleet stats (Stats → Fleet): what the ship is for and how big.
-      career: en(v.type) || v.career || null,
+      career: OH.matrixCareer(en(v.type) || v.career),
       // Every focus the wiki lists, not just the first: the Kraken is
       // "Multi-Role / Light Carrier", and only the second makes it a carrier.
       role:
         (Array.isArray(v.foci) ? v.foci.map(en).filter(Boolean) : []).join(' / ') || v.role || null,
       // Ground vehicles have no size class on the wiki; call them "Vehicle".
-      size: cleanSize(en(v.size)) || (v.is_vehicle === true ? 'Vehicle' : null),
+      size: OH.matrixSize(en(v.size)) || (v.is_vehicle === true ? 'Vehicle' : null),
       status: en(v.production_status) || null, // flight-ready | in-concept | …
       crew: (v.crew && Number(v.crew.max)) || null,
       cargo: Number(v.cargo_capacity) || 0, // SCU
@@ -3001,11 +3030,15 @@
     };
   };
 
-  // Fill missing sizes in place: a leftover "undefined" becomes null, and a special
+  // Fill missing sizes in place: a leftover "undefined" becomes null, sizes and
+  // careers get one spelling each (OH.matrixSize, OH.matrixCareer), and a special
   // edition ("F8C Lightning Wikelo War Special", "Corsair PYAM Exec") takes the size
   // of its base ship (the longest other name it starts with). Pure, returns list.
   OH.fillCatalogSizes = function fillCatalogSizes(list) {
-    for (const v of list || []) v.size = cleanSize(v.size);
+    for (const v of list || []) {
+      v.size = OH.matrixSize(v.size);
+      if (v.career) v.career = OH.matrixCareer(v.career);
+    }
     const sized = (list || []).filter((v) => v.size && v.lname);
     for (const v of list || []) {
       if (v.size || !v.lname) continue;

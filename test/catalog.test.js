@@ -118,3 +118,21 @@ test('ship lookups: "Aurora MR" finds the renamed "Aurora Mk I MR", not the Mk I
   assert.equal(shipOf('Aurora MR')?.slug, 'rsi-aurora-gs-mr');
   assert.equal(shipOf('Aurora Mk II')?.slug, 'rsi-aurora-mk2');
 });
+
+test('Ship Matrix sizes and careers: one spelling each', () => {
+  assert.equal(OH.matrixSize('small'), 'Small');
+  assert.equal(OH.matrixSize(' Capital '), 'Capital');
+  assert.equal(OH.matrixSize('undefined'), null);
+  assert.equal(OH.matrixCareer('multi'), 'Multi-Role');
+  assert.equal(OH.matrixCareer('Multi-Role'), 'Multi-Role');
+  assert.equal(OH.matrixCareer('transport'), 'Transporter');
+  assert.equal(OH.matrixCareer('combat'), 'Combat');
+  assert.equal(OH.matrixCareer(''), null);
+  const base = { name: 'Cutter', slug: 'cutter' };
+  const v = OH.slimVehicle({ ...base, type: { en_EN: 'multi' }, size: { en_EN: 'small' } });
+  assert.deepEqual([v.career, v.size], ['Multi-Role', 'Small']);
+  // A kept list from before is cleaned when it's read.
+  const kept = [{ lname: 'cutter', size: 'small', career: 'transport' }];
+  OH.fillCatalogSizes(kept);
+  assert.deepEqual([kept[0].size, kept[0].career], ['Small', 'Transporter']);
+});
