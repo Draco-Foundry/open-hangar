@@ -76,7 +76,7 @@
 <script module>
   const TIPS = {
     price:
-      "RSI's buy-back price once Load details has read it; before that, today's store price",
+      "RSI's buy-back price once Load Details reads it, or what it was worth in your hangar before you melted it (RSI may ask more, since discounts aren't kept). An upgrade's is today's upgrade price.",
     store:
       "Today's store price of every ship inside (packs need Load details), or a CCU's price gap",
   };
