@@ -46,9 +46,9 @@
   OH.isShipItem = isShipItem;
 
   // Pack or Game Package (the owner's words terms.pack and terms.game-package): the
-  // website's rule (its one kind module), so the
-  // dashboard and the website type a pledge the same way; test/pack-kind.test.js holds
-  // both to the same cases (test/fixtures/pack-kind-cases.json). 'package' (a Game
+  // website's rule (its one kind module), so the dashboard and the website type a pledge
+  // the same way; test/pack-kind.test.js holds both to the same cases
+  // (test/fixtures/pack-kind-cases.json). 'package' (a Game
   // Package: it holds the game), 'pack', or null (the pledge's own kind). Works on a
   // pledge ({ name, contents, isCCU }) and on a buy-back's facets ({ name, items }).
   const PACK_NAME = /\b(packs?|bundles?|kits?|combos?)\b/i;
