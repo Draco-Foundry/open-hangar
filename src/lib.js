@@ -45,6 +45,63 @@
   const isShipItem = (c) => !!c && RULES.kinds.ship.test(String(c.kind || '').trim());
   OH.isShipItem = isShipItem;
 
+  // Pack or Game Package (the owner's words terms.pack and terms.game-package): the
+  // website's rule (its one kind module), so the dashboard and the website type a pledge
+  // the same way; test/pack-kind.test.js holds both to the same cases
+  // (test/fixtures/pack-kind-cases.json). 'package' (a Game
+  // Package: it holds the game), 'pack', or null (the pledge's own kind). Works on a
+  // pledge ({ name, contents, isCCU }) and on a buy-back's facets ({ name, items }).
+  const PACK_NAME = /\b(packs?|bundles?|kits?|combos?)\b/i;
+  const CAT = {
+    // Categories under which a name saying Pack means a Pack (not Paints or Add-Ons: an
+    // "8 Paint Pack" is paints).
+    packName:
+      /^(standalone\s+ships?|ships?|warbonds?|(ground\s+)?vehicles?|gear|fps|fps equipment)$/i,
+  };
+  // RSI's store categories, from the parser rules (categories).
+  const packCategory = (cat) =>
+    RULES.categories.kinds.some((k) => k.kind === 'pack' && k.pattern.test(cat));
+  // An item's kind, coarsely: enough to tell one thing in a pledge from another.
+  function itemKindKey(c) {
+    const kind = String((c && c.kind) || '').trim();
+    const label = String((c && c.label) || '').trim();
+    if (/^game/i.test(kind) || RULES.names.gameAccess.test(label)) return 'game';
+    if (/^ships?$/i.test(kind)) return 'ship';
+    if (/^(vehicles?|ground vehicles?)$/i.test(kind)) return 'vehicle';
+    if (RULES.kinds.insurance.test(kind) || (!kind && RULES.kinds.insuranceName.test(label)))
+      return 'insurance';
+    if (/\bhangars?\b(?!\s+(decorations?|posters?|flair))/i.test(label)) return 'hangar';
+    if (RULES.names.paint.test(kind || label)) return 'paint';
+    return kind.toLowerCase() || 'other';
+  }
+  OH.packKind = function packKind(p) {
+    if (!p || p.isCCU) return null;
+    const name = String(p.name || '').trim();
+    const m = name.match(RULES.names.category);
+    const cat = m ? m.groups.prefix.trim() : '';
+    if (/^upgrades?$/i.test(cat) || /^\s*upgrade\s*-\s*.+\s+to\s+/i.test(name)) return null;
+    const list = Array.isArray(p.contents) ? p.contents : Array.isArray(p.items) ? p.items : [];
+    const items = list.map(itemKindKey);
+    if (items.includes('game')) return 'package';
+    const ships = items.filter((k) => k === 'ship' || k === 'vehicle');
+    // Insurance and a hangar come with a ship; they don't make it a pack.
+    const things = ships.length ? items.filter((k) => k !== 'insurance' && k !== 'hangar') : items;
+    const kinds = new Set(things);
+    if (ships.length > 1) return 'pack';
+    if (kinds.size === 1) return null;
+    // One ship and more: a Pack, unless RSI sells it as a standalone ship.
+    if (ships.length) return RULES.categories.ship.test(cat) ? null : 'pack';
+    if (
+      (kinds.size > 1 || !items.length) &&
+      PACK_NAME.test(name) &&
+      (!cat || CAT.packName.test(cat))
+    )
+      return 'pack';
+    if (RULES.categories.package.test(cat)) return 'package';
+    if (packCategory(cat)) return 'pack';
+    return null;
+  };
+
   const DELAY_MS = 400; // politeness throttle between pages
   const MAX_PAGES = 1000; // safety cap: 10,000 pledges at RSI's 10 per page
   // A scan stopped because a page no longer fits the parser rules (scanHtmlSource): the
