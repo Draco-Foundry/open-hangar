@@ -444,14 +444,14 @@ const withReferral = () => {
   return db;
 };
 
-// Scan history: each snapshot goes as its time and pledges only. Its Store Credit (which
-// the popup's value change reads here) and an older version's checkedAt stay in this
-// browser: the website reads neither (owner, 2026-10-24).
-test('sync sends history without Store Credit or checkedAt; the backup file keeps the credit', async () => {
+// Scan history: each snapshot goes as its time and pledges only. Its Store Credit and
+// UEC (which the popup's changes read here) and an older version's checkedAt stay in this
+// browser: the website reads none of them (owner, 2026-10-24; UEC 2026-10-25).
+test('sync sends history without Store Credit, UEC or checkedAt; the backup file keeps them', async () => {
   const db = scanned(Date.now() - 60_000);
   db.history = [
-    { at: 1, items: [['p1', 'Gladius', 90]], credit: 12.5, checkedAt: 5 },
-    { at: 2, items: [['p1', 'Gladius', 95]], credit: 20 },
+    { at: 1, items: [['p1', 'Gladius', 90]], credit: 12.5, uec: 40000, checkedAt: 5 },
+    { at: 2, items: [['p1', 'Gladius', 95]], credit: 20, uec: 65000 },
   ];
   linked(db);
   answer = () => new Response(JSON.stringify({ ok: true, synced_at: 1 }), { status: 200 });
@@ -464,6 +464,10 @@ test('sync sends history without Store Credit or checkedAt; the backup file keep
   assert.deepEqual(
     backup.history.map((s) => s.credit),
     [12.5, 20],
+  );
+  assert.deepEqual(
+    backup.history.map((s) => s.uec),
+    [40000, 65000],
   );
   assert.equal(
     backup.history.some((s) => 'checkedAt' in s),
@@ -480,9 +484,10 @@ test('sync sends history without Store Credit or checkedAt; the backup file keep
 });
 
 test('OH.syncPayload leaves the payload it is given alone', () => {
-  const payload = { history: [{ at: 1, items: [], credit: 3 }] };
+  const payload = { history: [{ at: 1, items: [], credit: 3, uec: 9 }] };
   assert.deepEqual(OH.syncPayload(payload).history, [{ at: 1, items: [] }]);
   assert.equal(payload.history[0].credit, 3);
+  assert.equal(payload.history[0].uec, 9);
 });
 
 test('sync leaves the prospects list out; the backup file keeps it', async () => {

@@ -4668,6 +4668,7 @@ try {
         );
       })(),
       since: document.getElementById('pp-since')?.textContent || '',
+      sinceTitle: document.getElementById('pp-since')?.title || '',
       tabs: [...document.querySelectorAll('[role="tab"]')].map(
         (b) => `${b.textContent.trim()}:${b.getAttribute('aria-selected')}`,
       ),
@@ -4696,7 +4697,10 @@ try {
   pop.uecName === 'UEC 1,234,567' &&
   pop.tiles &&
   pop.strip &&
-  /^(Up|Down) \$[\d,]+ since \w+ \d+$/.test(pop.since) &&
+  // Account Value's change and UEC's since the same scan, UEC as its tile shows it and in
+  // full on hover (Claude chat, Words, 2026-10-25).
+  /^(Up|Down) \$[\d,]+, UEC up 234\.6\sK since \w+ \d+$/.test(pop.since) &&
+  pop.sinceTitle.includes('UEC up 234,567 since') &&
   pop.tabs.join() === 'Hangar:true,Wishlist:false,Settings:false' &&
   !pop.bell &&
   pop.scan === 'Scan' &&

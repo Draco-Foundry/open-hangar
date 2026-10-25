@@ -270,7 +270,7 @@
   const history = [
     snap([...hangar.slice(0, -4), aurora], now - 150 * 86400e3),
     snap([...hangar.slice(0, -2), aurora], now - 70 * 86400e3),
-    snap(hangar.slice(0, -1), now - 21 * 86400e3),
+    { ...snap(hangar.slice(0, -1), now - 21 * 86400e3), uec: 1000000 }, // the popup's UEC change
     snap(hangar, ts),
   ];
   const store = {

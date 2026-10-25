@@ -444,6 +444,44 @@ test('Account Value since an earlier scan: the newest one that differs, never th
   assert.equal(valueSince(null, 4280, valueOf, NOW), null);
 });
 
+// UEC since the same earlier scan (Claude chat, Words, 2026-10-25): its own subject,
+// beside the value's change; alone when the value didn't change; never from a scan that
+// kept no UEC (before this release).
+test('UEC since an earlier scan: with the value, alone, or not at all', async () => {
+  const { valueSince, sinceKey } = await data();
+  const snap = (at, v, uec) => ({ at, items: [['1', 'x', v]], ...(uec == null ? {} : { uec }) });
+  const valueOf = (s) => s.items[0][2];
+  const both = [snap(NOW - 2 * DAY, 4160, 1000000), snap(NOW, 4280, 1250000)];
+  assert.deepEqual(valueSince(both, 4280, valueOf, NOW, 1250000), {
+    delta: 120,
+    at: NOW - 2 * DAY,
+    uec: 250000,
+  });
+  // The value the same, UEC not: that scan, UEC alone.
+  const uecOnly = [snap(NOW - 30 * DAY, 4000, 900000), snap(NOW - DAY, 4280, 1300000)];
+  assert.deepEqual(valueSince(uecOnly, 4280, valueOf, NOW, 1250000), {
+    delta: 0,
+    at: NOW - DAY,
+    uec: -50000,
+  });
+  // A scan that kept no UEC: the value's change only.
+  const old = [snap(NOW - 2 * DAY, 4160)];
+  assert.deepEqual(valueSince(old, 4280, valueOf, NOW, 1250000), { delta: 120, at: NOW - 2 * DAY });
+  // Neither changed: nothing.
+  assert.equal(valueSince([snap(NOW - DAY, 4280, 5)], 4280, valueOf, NOW, 5), null);
+
+  assert.equal(sinceKey({ delta: 120, at: 1 }), 'popup.up-since');
+  assert.equal(sinceKey({ delta: -20, at: 1 }), 'popup.down-since');
+  assert.equal(sinceKey({ delta: 120, at: 1, uec: 5 }), 'popup.up-since-uec-up');
+  assert.equal(sinceKey({ delta: 120, at: 1, uec: -5 }), 'popup.up-since-uec-down');
+  assert.equal(sinceKey({ delta: -20, at: 1, uec: 5 }), 'popup.down-since-uec-up');
+  assert.equal(sinceKey({ delta: -20, at: 1, uec: -5 }), 'popup.down-since-uec-down');
+  assert.equal(sinceKey({ delta: 0, at: 1, uec: 5 }), 'popup.uec-up-since');
+  assert.equal(sinceKey({ delta: 0, at: 1, uec: -5 }), 'popup.uec-down-since');
+  assert.equal(sinceKey({ delta: 0, at: 1 }), null);
+  assert.equal(sinceKey(null), null);
+});
+
 test('Fleet News: the Wishlist first, then ships you own on sale or a new paint, three at most', async () => {
   const { fleetNews } = await data();
   const m = (id, ...why) => ({ id, name: id, why: why.map((w) => ({ why: w, ships: [] })) });

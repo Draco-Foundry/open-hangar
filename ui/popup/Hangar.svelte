@@ -1,6 +1,7 @@
 <script>
   // The Hangar tab (owner, 2026-10-14): who this is (the RSI portrait the scan saved,
-  // and the handle), Account Value and its change since an earlier scan, Store Credit,
+  // and the handle), Account Value and its change since an earlier scan (with UEC's),
+  // Store Credit,
   // buy-back tokens, Fleet News (what in the store is news for this hangar, from the
   // store alerts) and Scan. Before the first scan: one heading and Scan. Signed out of
   // RSI: Log In to RSI, with a grey Scan under it, always there to press (./rsi-cookie.js:
@@ -27,6 +28,8 @@
     scanSteps,
     storeCredit,
     gameCredit,
+    countFit,
+    sinceKey,
     tokenCount,
     unpricedLine,
   } from './data.js';
@@ -65,6 +68,19 @@
   // Cents for Store Credit, none for a change or a big total.
   const total = $derived(moneyFit(value ? value.total : v.melt, fx));
   const change = $derived(since ? moneyFit(Math.abs(since.delta), fx, { most: 0, full: FIT.change }) : null);
+  // UEC's change as the UEC tile shows a count; the line in full on hover when either
+  // number is short.
+  const uecChange = $derived(since?.uec ? countFit(Math.abs(since.uec)) : null);
+  const sinceAs = $derived(sinceKey(since));
+  const sinceLine = (full) =>
+    t(sinceAs, {
+      amount: full ? change.title || change.text : change.text,
+      uec: uecChange ? (full ? uecChange.full : uecChange.text) : '',
+      date: day(since.at),
+    });
+  const sinceTitle = $derived(
+    sinceAs && (change.title || (uecChange && uecChange.text !== uecChange.full)) ? sinceLine(true) : null,
+  );
   const day = (at) => new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   const credit = $derived(storeCredit(account));
   const creditText = $derived(credit != null ? moneyFit(credit, fx, { cents: true, full: FIT.credit }) : null);
@@ -206,12 +222,12 @@
     <div class="pp-value" aria-live="polite">
       <div class="pp-vtop">
         <span class="pp-lbl">{value ? 'Account Value' : t('popup.melt-label')}</span>
-        {#if since && value}
-          <span class="pp-since" class:up={since.delta > 0} id="pp-since" title={change.title || null}
-            >{t(since.delta > 0 ? 'popup.up-since' : 'popup.down-since', {
-              amount: change.text,
-              date: day(since.at),
-            })}</span
+        {#if sinceAs && value}
+          <span
+            class="pp-since"
+            class:up={Math.abs(since.delta) >= 1 ? since.delta > 0 : since.uec > 0}
+            id="pp-since"
+            title={sinceTitle}>{sinceLine(false)}</span
           >
         {/if}
       </div>

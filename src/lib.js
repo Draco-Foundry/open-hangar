@@ -982,10 +982,13 @@
       }
       const { db, needsWrite } = await readDB();
       const scannedAt = Date.now();
-      // Store Credit in dollars (RSI reports cents), for the value chart.
+      // Store Credit in dollars (RSI reports cents), for the value chart, and UEC (a
+      // whole number), for the popup's UEC change.
       const cents = acct && acct.loggedIn ? acct.credits?.store?.value : null;
       const credit = Number.isFinite(cents) ? cents / 100 : undefined;
-      if (record) recordHistory(db, db.sources[id], items, scannedAt, credit);
+      const uecNow = acct && acct.loggedIn ? acct.credits?.uec?.value : null;
+      const uec = Number.isFinite(uecNow) ? uecNow : undefined;
+      if (record) recordHistory(db, db.sources[id], items, scannedAt, credit, uec);
       // Pledges the last complete scan of this same account had and this one
       // doesn't go to the pledge archive (see archiveGone).
       const prev = db.sources[id];
@@ -5532,8 +5535,9 @@
     return out;
   };
   // `credit` (Store Credit in dollars) is kept when known, so the value chart can
-  // count it; snapshots from before 0.2.13 don't have it.
-  OH.snapshotOf = function snapshotOf(items, at, credit) {
+  // count it; snapshots from before 0.2.13 don't have it. `uec` likewise, for the
+  // popup's UEC change (none before it); this browser only, sync leaves both out.
+  OH.snapshotOf = function snapshotOf(items, at, credit, uec) {
     const snap = {
       at,
       items: (items || []).map((p) => [
@@ -5543,17 +5547,19 @@
       ]),
     };
     if (Number.isFinite(credit)) snap.credit = credit;
+    if (Number.isFinite(uec)) snap.uec = uec;
     return snap;
   };
-  // Same pledges and the same Store Credit (credit unknown on either side counts
-  // as the same, so old snapshots don't all look changed).
+  // Same pledges, the same Store Credit and the same UEC (either unknown on either
+  // side counts as the same, so old snapshots don't all look changed).
   const sameSnapshot = (a, b, d) =>
     !d.added.length &&
     !d.removed.length &&
     !d.changed.length &&
     (!Number.isFinite(a.credit) ||
       !Number.isFinite(b.credit) ||
-      Math.abs(a.credit - b.credit) < 0.01);
+      Math.abs(a.credit - b.credit) < 0.01) &&
+    (!Number.isFinite(a.uec) || !Number.isFinite(b.uec) || a.uec === b.uec);
   const meltOf = (snap) => snap.items.reduce((a, x) => a + (x[2] || 0), 0);
   OH.snapshotMelt = meltOf;
 
@@ -5577,17 +5583,18 @@
 
   // Append a snapshot to db.history unless nothing changed. Seeds the history from the previous scan first, so
   // the very first scan after this feature shipped already has a "before".
-  function recordHistory(db, prevHangar, items, at, credit) {
+  function recordHistory(db, prevHangar, items, at, credit, uec) {
     const hist = Array.isArray(db.history) ? db.history : [];
     if (!hist.length && prevHangar && Array.isArray(prevHangar.items) && prevHangar.items.length) {
       hist.push(OH.snapshotOf(prevHangar.items, prevHangar.scannedAt || at - 1));
     }
-    const snap = OH.snapshotOf(items, at, credit);
+    const snap = OH.snapshotOf(items, at, credit, uec);
     const last = hist[hist.length - 1];
     const d = last && OH.diffSnapshots(last, snap);
     if (d && sameSnapshot(last, snap, d)) {
-      // First scan that knows the credit: fill it in rather than add a snapshot.
+      // First scan that knows the credit or UEC: fill it in rather than add a snapshot.
       if (!Number.isFinite(last.credit) && Number.isFinite(credit)) last.credit = credit;
+      if (!Number.isFinite(last.uec) && Number.isFinite(uec)) last.uec = uec;
     } else hist.push(snap);
     db.history = OH.trimHistory(hist);
   }
