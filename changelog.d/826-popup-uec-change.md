@@ -1,0 +1,1 @@
+- New: **UEC change in the popup.** Next to Account Value's change, the popup now shows how your UEC changed since an earlier scan.
