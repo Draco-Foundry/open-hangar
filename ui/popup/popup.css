@@ -20,11 +20,15 @@ body {
   line-height: 1.35;
 }
 .pp {
+  /* One corner radius for every box and button, and one height for Scan's row in every
+     state (the owner, 2026-10-26). */
+  --pp-r: 8px;
+  --pp-row: 36px;
   display: flex;
   flex-direction: column;
   background: var(--lift);
-  border: 1px solid var(--line-2);
-  border-top: 3px solid var(--accent);
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--accent);
   border-radius: 12px;
   /* clip, not hidden: hidden would make it the scroll box Scan's pinned area sticks to. */
   overflow: clip;
@@ -151,9 +155,8 @@ body {
 .pp-whatsnew {
   margin: 0 16px 10px;
   background: var(--accent-soft);
-  border: 1px solid var(--accent-line);
-  border-radius: 10px;
-  padding: 9px 12px;
+  border-radius: var(--pp-r);
+  padding: 8px 12px;
   font-size: 13px;
   display: flex;
   flex-direction: column;
@@ -162,13 +165,13 @@ body {
 .pp-whatsnew b {
   font-weight: 600;
 }
-/* The line after a scan stopped partway: trouble's amber edge, What's New's place. */
+/* The line after a scan stopped partway: trouble's amber edge, under Scan. */
 .pp-stopnote {
   margin: 0 16px 10px;
   background: var(--lift-2);
-  border: 1px solid var(--warn-line);
-  border-radius: 10px;
-  padding: 9px 12px;
+  box-shadow: inset 2px 0 0 var(--warn);
+  border-radius: var(--pp-r);
+  padding: 8px 12px;
   font-size: 13px;
   display: flex;
   flex-direction: column;
@@ -179,9 +182,8 @@ body {
 .pp-notice {
   margin: 0 16px 10px;
   background: var(--accent-soft);
-  border: 1px solid var(--accent-line);
-  border-radius: 10px;
-  padding: 9px 12px;
+  border-radius: var(--pp-r);
+  padding: 8px 12px;
   font-size: 13px;
   display: flex;
   flex-wrap: wrap;
@@ -191,7 +193,7 @@ body {
 }
 .pp-notice.warn {
   background: var(--warn-soft);
-  border-color: var(--warn-line);
+  box-shadow: inset 2px 0 0 var(--warn);
 }
 
 /* --- Tabs --- */
@@ -292,26 +294,27 @@ body {
   color: var(--muted);
   text-wrap: pretty;
 }
-/* Scan's area (Scan, Log In to RSI with its grey Scan, the scan bar and its lines), pinned
-   to the bottom of the tab so it never falls below Chrome's 600 px popup (owner,
-   2026-10-23). */
+/* Scan's row (./ScanBar.svelte): under the header on every tab (owner, 2026-10-26), one
+   height in every state, its rare lines under it. */
+.pp-top {
+  padding: 0 16px 10px;
+}
 .pp-act {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin: 0 -16px -14px;
-  padding: 8px 16px 12px;
-  background: var(--lift);
+  gap: 8px;
 }
-/* The first run is short: its Scan stays where it is. */
 .pp-first .pp-act {
-  position: static;
   align-self: stretch;
-  margin: 0;
-  padding: 0;
+}
+/* Log In to RSI with the grey Scan beside it. */
+.pp-pair2 {
+  display: flex;
+  gap: 8px;
+}
+.pp-pair2 .pp-btn.solid {
+  flex: 1;
+  min-width: 0;
 }
 .pp-h {
   font-family: var(--font-head);
@@ -375,10 +378,9 @@ body {
   width: 34px;
   height: 34px;
   box-sizing: border-box;
-  border-radius: 8px;
+  border-radius: var(--pp-r);
   overflow: hidden;
   background: linear-gradient(135deg, var(--line-2), var(--panel-2));
-  border: 1px solid var(--line-2);
   color: var(--muted);
   display: flex;
   align-items: center;
@@ -497,9 +499,9 @@ body {
   flex-direction: column;
   gap: 4px;
   background: var(--lift-2);
-  border: 1px solid var(--warn-line);
-  border-radius: 10px;
-  padding: 9px 12px;
+  box-shadow: inset 2px 0 0 var(--warn);
+  border-radius: var(--pp-r);
+  padding: 8px 12px;
 }
 .pp-trouble b {
   font-weight: 600;
@@ -512,7 +514,7 @@ body {
 }
 /* The sync's question (an RSI account new to the connection): a question, not trouble. */
 .pp-trouble.pp-pilot {
-  border-color: var(--accent-line);
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 .pp-pilot .pp-pair {
   margin-top: 4px;
@@ -559,7 +561,7 @@ body {
   flex: none;
   width: 26px;
   height: 26px;
-  border-radius: 7px;
+  border-radius: var(--pp-r);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -628,24 +630,24 @@ body {
 .pp-step.todo {
   color: var(--muted);
 }
-/* The scan bar (the scanBar flag, owner 2026-10-20): the soft fill, 28 px, where Scan
-   sits (ui/popup/Hangar.svelte). The fill eases between the scan's writes (about two a
-   second), so it moves smoothly; done, it's full and soft green; a note fills none. */
+/* The scan bar (the scanBar flag, owner 2026-10-20): Scan itself filling (owner,
+   2026-10-26), the same shape and tint as Scan (ui/popup/ScanBar.svelte). The fill eases
+   between the scan's writes (about two a second), so it moves smoothly; done, it's full
+   and soft green; a note fills none and has a small Scan at its end. */
 .pp-sbar {
   position: relative;
-  height: 28px;
-  border-radius: 8px;
-  border: 1px solid var(--line-2);
-  background: var(--lift-2);
+  box-sizing: border-box;
+  height: var(--pp-row);
+  border-radius: var(--pp-r);
+  background: var(--accent-soft);
   overflow: hidden;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .pp-sbar i {
   position: absolute;
   inset: 0 auto 0 0;
   width: 0;
-  background: var(--accent-soft);
-  border-right: 2px solid var(--accent);
+  background: var(--accent-line);
   transition: width 0.6s linear;
 }
 .pp-sbar i.wait {
@@ -653,13 +655,19 @@ body {
   border-right: 0;
   animation: pp-wait 1.4s ease-in-out infinite;
 }
-.pp-sbar.done i {
-  width: 100%;
-  border-right: 0;
-  background: color-mix(in srgb, var(--good) 14%, transparent);
+.pp-sbar.done {
+  background: var(--good-soft);
 }
-.pp-sbar.note i {
+.pp-sbar.done i {
   display: none;
+}
+/* A note: the line, then a small Scan, in one row. */
+.pp-sbar.note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px 0 12px;
+  background: var(--lift-2);
 }
 .pp-sbar-t {
   position: absolute;
@@ -668,20 +676,31 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 0 10px;
+  padding: 0 12px;
+  color: var(--head);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.pp-sbar.note .pp-sbar-t {
+  position: static;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  color: var(--text-2);
 }
 .pp-sbar-t > span:first-child {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.pp-sbar.done .pp-sbar-t,
-.pp-sbar.note .pp-sbar-t {
+.pp-sbar.done .pp-sbar-t {
   justify-content: center;
 }
+.pp-sbar.done .pp-sbar-t b {
+  color: var(--good);
+  font-weight: 600;
+}
 .pp-sbar-n {
-  color: var(--muted);
+  color: var(--text-2);
 }
 @media (prefers-reduced-motion: reduce) {
   .pp-sbar i {
@@ -702,44 +721,69 @@ body {
 }
 
 /* Buttons. */
+/* Buttons: quiet cobalt for the main one (Scan, Connect), solid for the one thing to do
+   (Log In to RSI, Allow Access to RSI) (owner, 2026-10-26). */
 .pp-btn {
-  height: 44px;
-  border-radius: 10px;
+  box-sizing: border-box;
+  height: var(--pp-row);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  border-radius: var(--pp-r);
   border: 1px solid var(--line);
   background: var(--lift-2);
   color: var(--text);
   font-weight: 500;
-  font-size: 15px;
+  font-size: 14px;
   cursor: pointer;
 }
 .pp-btn.primary {
-  border-color: var(--accent);
+  border-color: transparent;
+  background: var(--accent-soft);
+  color: var(--link);
+}
+.pp-btn.primary:hover {
+  background: var(--accent-line);
+  color: var(--head);
+}
+.pp-btn.primary.solid {
   background: var(--accent);
   color: #fff;
 }
-.pp-btn.primary:hover {
+.pp-btn.primary.solid:hover {
   background: var(--accent-hover);
 }
-.pp-btn.big {
-  height: 52px;
-  font-size: 16px;
+.pp-btn.sm {
+  flex: none;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 13px;
 }
-/* Scan under Log In to RSI: grey; off (below) while RSI's sign-in cookie is gone. */
+.pp-scan-ic {
+  flex: none;
+}
+/* Scan beside Log In to RSI: grey. */
 .pp-btn.grey {
+  border-color: var(--line-2);
   background: transparent;
-  color: var(--muted);
+  color: var(--text-2);
+}
+.pp-pair2 .pp-btn.grey {
+  height: var(--pp-row);
 }
 .pp-btn:disabled {
   color: var(--faint);
   background: var(--lift-2);
-  border-color: var(--line);
+  border-color: transparent;
   cursor: not-allowed;
 }
 .pp-btn2 {
   flex: 1;
   min-width: 0;
   height: 36px;
-  border-radius: 8px;
+  border-radius: var(--pp-r);
   border: 1px solid var(--line);
   background: var(--lift-2);
   color: var(--text);
@@ -813,7 +857,7 @@ body {
   margin: 0 -8px;
   box-sizing: content-box;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--pp-r);
   background: none;
   color: var(--text);
 }
@@ -834,7 +878,7 @@ body {
   height: 38px;
   padding: 0 10px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--pp-r);
   background: var(--lift-2);
   color: var(--muted);
 }
@@ -862,7 +906,7 @@ body {
   margin: -6px 0 0;
   padding: 4px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--pp-r);
   background: var(--lift-2);
   display: flex;
   flex-direction: column;
@@ -876,7 +920,7 @@ body {
   text-align: left;
   padding: 6px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--pp-r);
   background: none;
   color: var(--text);
   font: inherit;
@@ -915,7 +959,7 @@ body {
   height: 32px;
   margin: -2px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--pp-r);
   background: none;
   color: var(--muted);
   font-size: 13px;
@@ -956,7 +1000,7 @@ body {
   height: 28px;
   padding: 0;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--pp-r);
   background: none;
   cursor: pointer;
 }
@@ -1007,7 +1051,7 @@ body {
 .pp-grp {
   background: var(--lift-2);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--pp-r);
 }
 .pp-grp.warn {
   border-color: var(--warn-line);
@@ -1037,10 +1081,6 @@ body {
   font-size: 12px;
   color: var(--muted);
   text-wrap: pretty;
-}
-.pp-col .pp-btn {
-  height: 40px;
-  font-size: 14px;
 }
 .pp-gh {
   font-family: var(--font-body);
@@ -1179,7 +1219,7 @@ body {
   box-sizing: border-box;
   background: var(--lift);
   border: 1px solid var(--line-2);
-  border-radius: 8px;
+  border-radius: var(--pp-r);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
 .pp-mlist button {
@@ -1336,7 +1376,7 @@ html.phone body {
 .phone .pp {
   min-height: 100vh;
   border: 0;
-  border-top: 3px solid var(--accent);
+  border-top: 2px solid var(--accent);
   border-radius: 0;
 }
 .phone .pp-hd {
@@ -1380,10 +1420,17 @@ html.phone body {
 .phone .pp-ti {
   display: block;
 }
+.phone .pp {
+  --pp-row: 48px;
+}
+.phone .pp-top {
+  padding: 0 18px 12px;
+}
 .phone .pp-btn {
-  height: 52px;
-  font-size: 17px;
-  border-radius: 12px;
+  font-size: 16px;
+}
+.phone .pp-btn.sm {
+  height: 40px;
 }
 .phone .pp-item,
 .phone .pp-r,
@@ -1396,17 +1443,6 @@ html.phone body {
 }
 .phone .pp-btn2 {
   height: 48px;
-}
-/* Scan's pinned area sits above the tabs: their 8 + 18 px padding, 48 px buttons and
-   1 px border (.phone .pp-tabs). */
-.phone .pp-act {
-  bottom: 75px;
-  margin: 0 -18px -14px;
-  padding: 10px 18px 14px;
-}
-.phone .pp-first .pp-act {
-  margin: 0;
-  padding: 0;
 }
 .phone .pp-wsearch {
   height: 48px;

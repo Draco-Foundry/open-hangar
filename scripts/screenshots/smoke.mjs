@@ -4706,12 +4706,12 @@ try {
       )
     : fail(`popup: ${JSON.stringify(pop)}`);
   pop.panel === 'rgb(20, 25, 34)' &&
-  pop.ring === 'rgb(58, 67, 82)' &&
-  pop.top === '3px rgb(59, 106, 237)' &&
+  pop.ring === 'rgb(42, 49, 61)' &&
+  pop.top === '2px rgb(59, 106, 237)' &&
   pop.radius === '12px' &&
   pop.width === 360 &&
   !pop.wide
-    ? ok('Edge B: the lifted panel, its ring and the cobalt bar, 360 px, no sideways scroll')
+    ? ok('Edge B: the lifted panel, its hairline ring and the thin cobalt bar, 360 px, no sideways scroll')
     : fail(`popup look: ${JSON.stringify(pop)}`);
   // Numbers that fit their box (budgets: ui/popup/currency.js): the widest full figure and
   // huge ones, at 360 px. Nothing clips or scrolls, and the full figure is the tooltip.
@@ -4801,10 +4801,10 @@ try {
         ver: document.getElementById('pp-version')?.textContent.trim() ?? null,
         manifest: 'v' + chrome.runtime.getManifest().version,
         wide: document.documentElement.scrollWidth > 360,
-        // Styled, not bare divs: the card's padding and border (once lost in a squash).
+        // Styled, not bare divs: the card's padding and fill (once lost in a squash).
         styled: ['pp-update', 'pp-banner'].every((id) => {
           const s = getComputedStyle(document.getElementById(id));
-          return parseFloat(s.paddingLeft) > 0 && parseFloat(s.borderTopWidth) > 0;
+          return parseFloat(s.paddingLeft) > 0 && s.backgroundColor !== 'rgba(0, 0, 0, 0)';
         }),
       }));
     const hangar = await read();
@@ -5543,7 +5543,7 @@ try {
   });
   const heldBusy = await page.evaluate(() => ({
     done: !!document.getElementById('pp-done'),
-    note: document.querySelector('#pp-panel-hangar .pp-note[role="status"]')?.textContent || '',
+    note: document.querySelector('#pp-act .pp-note[role="status"]')?.textContent || '',
     bar: !!document.querySelector('.pp-bar'),
   }));
   !heldBusy.done && heldBusy.note === 'A scan is already running.' && !heldBusy.bar
@@ -5645,6 +5645,13 @@ try {
   await told({ scanReport: { newValue: barReport } });
   await sleep(100);
   const barDone = await sbar();
+  // The done line holds Scan's place for 4 seconds, longer while the pointer is on it.
+  await page.hover('#pp-sbar');
+  await sleep(4400);
+  const barHeld = await sbar();
+  await page.mouse.move(0, 0);
+  await sleep(700);
+  const barBack = await sbar();
   await told({
     scanReport: {
       newValue: {
@@ -5739,7 +5746,10 @@ try {
     barWait.now === 30 &&
     barDone.tone === 'done' &&
     barDone.text?.join() === 'Scanned in 1m 12s' &&
-    barDone.scan === 'on' &&
+    barDone.scan === 'none' &&
+    barHeld.tone === 'done' &&
+    barBack.tone === null &&
+    barBack.scan === 'on' &&
     barHold.tone === 'note' &&
     /^RSI asked us to wait\. Scan after \d/.test(barHold.text?.join() || '') &&
     barHold.scan === 'off' &&
@@ -5816,8 +5826,9 @@ try {
     ? ok('RSI not answering: a 5xx and a 429 each get their line, no trouble box, no Log In to RSI')
     : fail(`popup RSI down: ${JSON.stringify({ down5xx, downOut, down429 })}`);
   // A scan whose page went away (its mark left behind, its heartbeat quiet for 2
-  // minutes): Scan stopped, and the line at the top with Scan Again (Hangar's own button
-  // is Scan then). A heartbeat 90 seconds old is still Scanning, on the scan bar.
+  // minutes): Scan stopped, Scan says Scan Again, and the line under it, with no second
+  // Scan Again (owner, 2026-10-26). A heartbeat 90 seconds old is still Scanning, on the
+  // scan bar.
   const markAt = (ago) => ({
     ...signedIn,
     __demoSession: { scanRunning: { at: T0 - ago, tabId: null, run: 'r9', by: 'offscreen' } },
@@ -5832,22 +5843,26 @@ try {
     age: document.getElementById('pp-age').textContent.trim(),
     scan: document.getElementById('pp-scan').textContent,
     line: document.querySelector('#pp-stopped span')?.textContent || '',
-    again: document.getElementById('pp-scan-again')?.textContent || '',
+    again: !!document.getElementById('pp-scan-again'),
+    under:
+      document.getElementById('pp-act').compareDocumentPosition(document.getElementById('pp-stopped')) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
   }));
-  await page.click('#pp-scan-again');
+  await page.click('#pp-scan');
   const againAsked = await page.evaluate(() => __demo.sent?.some?.((m) => m?.ohPopup === 'scan'));
   beating.age === 'Scanning' &&
   !beating.line &&
   stopped.age === 'Scan stopped' &&
-  stopped.scan === 'Scan' &&
+  stopped.scan === 'Scan Again' &&
   stopped.line ===
     'Your last scan stopped before it finished. Your hangar shows the last full scan.' &&
-  stopped.again === 'Scan Again' &&
+  !stopped.again &&
+  stopped.under &&
   againAsked
-    ? ok('a scan that stopped: Scan stopped, the line at the top and its Scan Again; 90s quiet still Scanning')
+    ? ok('a scan that stopped: Scan stopped, Scan Again at the top and the line under it; 90s quiet still Scanning')
     : fail(`popup stopped: ${JSON.stringify({ beating, stopped, againAsked })}`);
   // Stopped and signed out of RSI: the signed-out line, no Scan Again (Log In to RSI is
-  // on Hangar).
+  // at the top).
   await popAt({ ...markAt(3 * 60e3), __demoCookie: 'out' }, '#pp-login');
   const stoppedOut = await page.evaluate(() => ({
     line: document.querySelector('#pp-stopped span')?.textContent || '',
@@ -5872,11 +5887,10 @@ try {
     afterRestart[name] = await page.evaluate(() => ({
       age: document.getElementById('pp-age').textContent.trim(),
       scan: document.getElementById('pp-scan').textContent,
-      again: document.getElementById('pp-scan-again')?.textContent || '',
     }));
   }
   afterRestart.none.age === 'Scan stopped' &&
-  afterRestart.none.again === 'Scan Again' &&
+  afterRestart.none.scan === 'Scan Again' &&
   afterRestart.report.age !== 'Scan stopped' &&
   afterRestart.report.scan === 'Scan' &&
   afterRestart.auto.age !== 'Scan stopped'
@@ -6640,8 +6654,8 @@ try {
       scanH: document.getElementById('pp-scan').getBoundingClientRect().height,
     };
   });
-  // A short phone screen, the Hangar tab taller than it: Scan's area stays pinned just
-  // above the tabs, never under them (owner, 2026-10-23).
+  // A short phone screen, the Hangar tab taller than it: Scan at the top, seen without
+  // scrolling, and the tabs still at the bottom (owner, 2026-10-26).
   await page.setViewport({ width: 390, height: 480, isMobile: true, hasTouch: true });
   await popAt(signedIn, '#pp-value');
   const ppPhoneAct = await page.evaluate(() => {
@@ -6650,12 +6664,12 @@ try {
     const scan = document.getElementById('pp-scan').getBoundingClientRect();
     return {
       taller: document.documentElement.scrollHeight > innerHeight,
-      above: act.bottom <= tabs.top + 0.5 && scan.top >= 0,
+      above: act.bottom <= tabs.top + 0.5 && scan.top >= 0 && scan.bottom <= innerHeight,
       tabsSeen: tabs.bottom <= innerHeight + 0.5,
     };
   });
   ppPhoneAct.taller && ppPhoneAct.above && ppPhoneAct.tabsSeen
-    ? ok("a short phone screen: Scan's area pinned just above the tabs")
+    ? ok('a short phone screen: Scan at the top, seen, the tabs at the bottom')
     : fail(`popup phone pinned Scan: ${JSON.stringify(ppPhoneAct)}`);
   await page.setUserAgent(desktopUA);
   await page.setViewport({ width: 1280, height: 900, isMobile: false, hasTouch: false });
@@ -6664,8 +6678,8 @@ try {
   !ppPhone.wide &&
   ppPhone.tabsLow &&
   ppPhone.tabH >= 48 &&
-  ppPhone.scanH >= 52
-    ? ok('a phone: the whole width, the tabs at the bottom, 48 px tabs and a 52 px Scan')
+  ppPhone.scanH >= 48
+    ? ok('a phone: the whole width, the tabs at the bottom, 48 px tabs and a 48 px Scan')
     : fail(`popup phone: ${JSON.stringify(ppPhone)}`);
   await page.emulateMediaFeatures([]);
   await page.setViewport({ width: 1280, height: 900 });
