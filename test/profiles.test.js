@@ -77,10 +77,14 @@ test('switching to the account that is already live does nothing', async () => {
 });
 
 test('an old restore snapshot becomes a saved account', async () => {
-  mem = { db: dbFor('Alt', 1), dbRecovery: { at: 1, db: dbFor('Main', 4) } };
+  mem = { db: dbFor('Alt', 1), dbRecovery: { at: Date.now() - 1000, db: dbFor('Main', 4) } };
   assert.equal(await OH.migrateRecovery(), true);
   assert.equal(mem.dbRecovery, undefined);
   assert.equal(mem['profile:main'].sources.hangar.items.length, 4);
+  // One past its 30 days isn't kept as an account (pruneRecoveryCopies removes it).
+  mem = { db: dbFor('Alt', 1), dbRecovery: { at: 1, db: dbFor('Main', 4) } };
+  assert.equal(await OH.migrateRecovery(), false);
+  assert.equal(mem['profile:main'], undefined);
 });
 
 test('round trips through many big accounts lose nothing and mix nothing (#199)', async () => {
@@ -103,7 +107,7 @@ test('round trips through many big accounts lose nothing and mix nothing (#199)'
         .map((p) => [p.id, p.name, p.value]),
     }));
   const scanned = (k) => ({
-    schemaVersion: 3,
+    schemaVersion: 5,
     owner: { nickname: nick(k), displayname: `${nick(k)} D` },
     sources: {
       hangar: { items: items(k), scannedAt: 1000 + k },

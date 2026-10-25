@@ -62,6 +62,13 @@ export async function signInWindow({ base, identity, fetch = globalThis.fetch, l
   if (!res || !res.ok) return { failed: true };
   const j = await res.json().catch(() => null);
   if (!j?.token) return { failed: true };
-  const link = { token: j.token, name: j.name || '', connectedAt: Date.now(), lastSync: null };
+  const link = {
+    token: j.token,
+    name: j.name || '',
+    // The website's id for the account (#765): tells two accounts with one name apart.
+    ...(j.account ? { account: String(j.account) } : {}),
+    connectedAt: Date.now(),
+    lastSync: null,
+  };
   return { link, sync: answer.get('sync') === '1' };
 }

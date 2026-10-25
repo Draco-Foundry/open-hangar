@@ -198,7 +198,7 @@
       name,
       value: raw.value ?? null, // numeric dollars, e.g. 35
       currency: raw.currency ?? null,
-      contents, // [{ kind, label, image }] of items contained in this pledge
+      contents, // [{ kind, label, image, manufacturer? }] of items contained in this pledge
       image: raw.image ?? null, // hero thumbnail URL (RSI CDN), or null
       containsShip, // true if any contained .kind === "Ship"
       isCCU,
@@ -277,7 +277,11 @@
       const kind = clean(tile.querySelector(RULES.hangar.itemKind)?.textContent);
       const label = clean(tile.querySelector(RULES.hangar.itemName)?.textContent);
       if (!kind && !label) continue; // structural noise, not a real item tile
-      contents.push({ kind, label, image: bgUrl(tile.querySelector(RULES.hangar.itemImage)) });
+      const item = { kind, label, image: bgUrl(tile.querySelector(RULES.hangar.itemImage)) };
+      // The maker line some tiles show, as RSI wrote it ("Aegis Dynamics (AEGS)", #568).
+      const maker = clean(tile.querySelector(RULES.hangar.itemMaker)?.textContent);
+      if (maker) item.manufacturer = maker;
+      contents.push(item);
     }
     if (contents.length) return contents;
 

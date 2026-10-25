@@ -291,7 +291,7 @@ browser's default quota). The main keys:
 | Key                        | What it holds                                                                                               | Code                                       |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
 | `db`                       | `{ schemaVersion, sources: { hangar, buybacks, referral: { items, scannedAt, meta? } }, owner }`            | `readDB()`, `writeDB()`, `OH.loadDB()`     |
-| `dbHistory`                | Scan history: `[{ at, items: [[id, name, value]], credit?, checkedAt? }]`                                   | `recordHistory()`, `OH.trimHistory()`      |
+| `dbHistory`                | Scan history: `[{ at, items: [[id, name, value]], credit? }]` (credit stays here: sync leaves it out)       | `recordHistory()`, `OH.trimHistory()`      |
 | `dbCorrupt`                | Up to 3 damaged originals that failed the check, kept until Clear Data                                      | `setAside()`, `OH.getDamaged()`            |
 | `dbRecovery`               | `{ at, db }`: the previous account's data, saved before an automatic clear                                  | `clearDataNow()`, `OH.recoverData()`       |
 | `profile:<nickname>`       | Another RSI account's whole DB (history inside), parked while a different account is signed in              | `OH.switchProfile()`, `OH.listProfiles()`  |
@@ -332,7 +332,7 @@ browser; `EXPORT_VERSION` (2) is the backup file format. Both are defined at the
   scan history out of `db` into `dbHistory`. A DB written by an older version after a
   rollback is also handled on load (`test/db.test.js`).
 - History keeps at most 100 snapshots and about 3 MB (`HISTORY_MAX`,
-  `HISTORY_MAX_BYTES`). A scan that changed nothing only updates `checkedAt`.
+  `HISTORY_MAX_BYTES`). A scan that changed nothing adds no snapshot.
 
 **Accounts.** The live `db` always belongs to the signed-in RSI account. When a
 different account signs in, the current DB is parked under `profile:<nickname>` and

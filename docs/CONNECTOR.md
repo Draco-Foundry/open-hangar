@@ -47,13 +47,13 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
   hidden page off; the popup and the hidden page read the file as they open, so the
   background's cached copy is fresh), or for the rest of the browser session once a
   hidden page went quiet (a scan asked of it never taken, or its scan mark not renewed
-  for 2 minutes) or stopped on an error. A scan asked for while the hidden page reads
-  packs starts at once, and a mark left by a hidden page that went away mid-scan never
-  holds the next scan.
+  for 2 minutes) or stopped on an error. A mark left by a hidden page that went away
+  mid-scan never holds the next scan.
 - **The background worker** as today: our pages' messages (bridge v2), the rescan badge,
   updates, and Auto Scan Daily's alarm (below).
 - **The scan**, at the same depth: account and balances, the hangar (with the pledge
-  archive and history), buy-backs and up to 30 unread packs, referrals. It's the scan
+  archive and history), buy-backs, referrals, then up to 30 buy-backs' own pages not
+  read from RSI yet (their price, insurance and contents go in the sync, #798). It's the scan
   runner (`ui/scan/runner.js`), which the hidden scan page runs (the basic page in its
   tab when it can't); it stores its progress (session `scanProgress`) and its last
   report (`scanReport`) for any page.
@@ -135,7 +135,7 @@ step 3 above).
 | Request                                                                               | Why                                                                       |
 | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | robertsspaceindustries.com `/account/pledges`, `/account/buy-back-pledges`            | Scan: hangar and buy-backs                                                |
-| robertsspaceindustries.com `/pledge/buyback/<id>`                                     | Scan: up to 30 unread packs                                               |
+| robertsspaceindustries.com `/pledge/buyback/<id>`                                     | Scan: up to 30 buy-back pages not read yet                                |
 | robertsspaceindustries.com `/en/account/dashboard`                                    | Identity and balances: Scan, and opening the basic page (kept 10 minutes) |
 | robertsspaceindustries.com list pages and the dashboard (Auto Scan Daily on, **new**) | Auto Scan Daily: once a day at most, a quick check first (requests.md)    |
 | robertsspaceindustries.com `/en/citizens/<handle>` (no cookies)                       | Citizen Record and org, with the one above                                |

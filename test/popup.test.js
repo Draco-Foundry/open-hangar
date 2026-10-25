@@ -238,6 +238,8 @@ test('scan bar: fills by RSI page count, only forward, a part never waits on its
     { part: 'buybacks', page: 2, pages: 2 },
     { part: 'referrals', page: 0, pages: 3 },
     { part: 'referrals', page: 2, pages: 3 },
+    { part: 'packs', page: 0, count: 4 },
+    { part: 'packs', page: 4, count: 4 },
     { part: 'sync' },
   ].map(barFraction);
   for (let i = 1; i < order.length; i++) assert.ok(order[i] >= order[i - 1], `step ${i}`);
@@ -252,9 +254,9 @@ test('scan bar: fills by RSI page count, only forward, a part never waits on its
   assert.equal(h(1, 1), h(4, 4));
   // No pager: eased, still short of the part's end however many pages.
   assert.ok(h(1, null) > h(0, null) && h(40, null) < h(4, 4));
-  // Packs read after the scan fill on their own.
-  assert.equal(barFraction({ part: 'packs', page: 3, count: 6 }), 0.5);
-  assert.equal(barFraction({ part: 'packs', page: 0, count: 0 }), 0);
+  // The buy-backs' own pages, read before the sync, by pages read of `count`.
+  assert.equal(barFraction({ part: 'packs', page: 3, count: 6 }), 0.925);
+  assert.equal(barFraction({ part: 'packs', page: 0, count: 0 }), 0.9);
 });
 
 test('scan bar: creeps towards where the next page puts it, never past', async () => {
@@ -303,7 +305,7 @@ test('scan bar: names the part and counts what it has read', async () => {
   assert.deepEqual(say({ part: 'buybacks', page: 1, count: 37 }), ['Buy-Backs', '37']);
   assert.deepEqual(say({ part: 'referrals', page: 1, count: 12 }), ['Referrals', '12']);
   assert.deepEqual(say({ part: 'sync' }), ['Syncing', '']);
-  assert.deepEqual(say({ part: 'packs', page: 3, count: 6 }), ['Buy-Back Packs', '3 / 6']);
+  assert.deepEqual(say({ part: 'packs', page: 3, count: 6 }), ['Buy-Back Details', '3 / 6']);
   assert.deepEqual(say({ part: 'hangar', page: 2, count: 20, retry: { attempt: 1, of: 3 } }), [
     'Waiting on RSI',
     '',

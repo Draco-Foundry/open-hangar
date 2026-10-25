@@ -94,6 +94,7 @@
             'itemKind',
             'itemName',
             'itemImage',
+            'itemMaker',
             'kindFallback',
             'image',
             'gift',
@@ -137,6 +138,10 @@
             itemName: { description: "A tile's name.", $ref: '#/$defs/selector' },
             itemImage: {
               description: "A tile's picture (an inline background-image).",
+              $ref: '#/$defs/selector',
+            },
+            itemMaker: {
+              description: 'A tile\'s maker line, when RSI shows one ("Aegis Dynamics (AEGS)").',
               $ref: '#/$defs/selector',
             },
             kindFallback: {
@@ -388,7 +393,11 @@
           required: ['ship', 'insurance', 'insuranceName'],
           additionalProperties: false,
           properties: {
-            ship: { description: 'A kind meaning a ship.', $ref: '#/$defs/pattern' },
+            ship: {
+              description:
+                'A kind meaning a ship, matched against the word RSI wrote, which the saved hangar keeps as it is: every reader asks through it (lib.js OH.isShipItem), so a kind RSI renames is fixed here alone (#619). Keep "Ship" in it: buy-back pages\' ships are saved with that word.',
+              $ref: '#/$defs/pattern',
+            },
             insurance: {
               description: "A kind (or a buy-back page's item) meaning insurance.",
               $ref: '#/$defs/pattern',
@@ -965,6 +974,7 @@
         itemKind: '.kind',
         itemName: '.title, .name, .item-name',
         itemImage: '.image',
+        itemMaker: '.liner',
         kindFallback: '.kind',
         image: '.image',
         gift: '.js-gift',
@@ -1223,7 +1233,7 @@
             'Vehicle',
           ],
           tags: ['Attributed'],
-          labels: ['Apply upgrade', 'Contains:', 'Created:', 'Exchange', 'Gift'],
+          labels: ['Apply upgrade', 'Contains:', 'Created:', 'Exchange', 'Gift', 'Upgrades'],
           hooks: [
             'js-apply-upgrade',
             'js-expand-arrow',
@@ -1241,6 +1251,7 @@
             'js-pledge-value',
             'js-reclaim',
             'js-upgrade-data',
+            'js-upgrade-log',
           ],
         },
         buybacks: {

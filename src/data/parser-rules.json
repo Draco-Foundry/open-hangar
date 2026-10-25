@@ -30,6 +30,7 @@
     "itemKind": ".kind",
     "itemName": ".title, .name, .item-name",
     "itemImage": ".image",
+    "itemMaker": ".liner",
     "kindFallback": ".kind",
     "image": ".image",
     "gift": ".js-gift",
@@ -278,7 +279,7 @@
         "Vehicle"
       ],
       "tags": ["Attributed"],
-      "labels": ["Apply upgrade", "Contains:", "Created:", "Exchange", "Gift"],
+      "labels": ["Apply upgrade", "Contains:", "Created:", "Exchange", "Gift", "Upgrades"],
       "hooks": [
         "js-apply-upgrade",
         "js-expand-arrow",
@@ -295,7 +296,8 @@
         "js-pledge-not-buybackable",
         "js-pledge-value",
         "js-reclaim",
-        "js-upgrade-data"
+        "js-upgrade-data",
+        "js-upgrade-log"
       ]
     },
     "buybacks": {

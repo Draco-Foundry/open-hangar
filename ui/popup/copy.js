@@ -67,11 +67,12 @@ const COPY = {
   'popup.step-buybacks': 'Buy-Backs',
   'popup.step-referrals': 'Referrals',
   // The scan bar's other parts (the scanBar flag): the account read first, the website
-  // sync after, and the buy-back packs read after that. These five approved by the
-  // owner through Claude chat (Words, 2026-10-20 19:17 UTC).
+  // sync after, and the buy-backs' own pages read just before it. These five approved by the
+  // owner through Claude chat (Words, 2026-10-20 19:17 UTC); part-packs reworded
+  // 2026-10-24 (Words, 00:32 UTC).
   'popup.part-account': 'Account',
   'popup.part-sync': 'Syncing',
-  'popup.part-packs': 'Buy-Back Packs',
+  'popup.part-packs': 'Buy-Back Details',
   // The scan bar while RSI asks the scan to slow down and it waits to try again.
   'popup.rsi-waiting': 'Waiting on RSI',
   // In the bar's place after RSI kept asking a scan to slow down, Scan greyed until

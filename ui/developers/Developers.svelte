@@ -42,8 +42,8 @@
     buybacks: { items: [ …buy-backs… ], scannedAt },
     referral: { items: {                        // object, not array (one summary)
       current: { recruits }, legacy: { recruits }, prospects,
-      recruitsList: [ { handle, moniker, enlistedOn, convertedOn, campaign } ],
-      prospectsList: [ … ]
+      recruitsList: [ { enlistedOn, convertedOn, campaign } ],
+      prospectsList: [ { enlistedOn, convertedOn } ]
     }, scannedAt }                              // NB: referral code/url are NOT exported
   },
   history: [ { at, items: [ [id, name, value] ] } ]  // scan snapshots (Stats / History)

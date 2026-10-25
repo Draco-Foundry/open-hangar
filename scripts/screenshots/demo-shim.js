@@ -241,19 +241,11 @@
   );
   const iso = (d) => new Date(now - d * day).toISOString();
   const recruitsList = Array.from({ length: 14 }, (_, i) => ({
-    id: `r${i}`,
-    handle: `Demo_Pilot_${String(i + 1).padStart(2, '0')}`,
-    moniker: `Demo Pilot ${i + 1}`,
-    avatar: null,
     enlistedOn: iso(14 + i * 47),
     convertedOn: iso(4 + i * 41),
     campaign: i < 9 ? 'current' : 'legacy',
   }));
   const prospectsList = Array.from({ length: 23 }, (_, i) => ({
-    id: `p${i}`,
-    handle: `Demo_Recruit_${String(i + 1).padStart(2, '0')}`,
-    moniker: `Demo Recruit ${i + 1}`,
-    avatar: null,
     enlistedOn: iso(10 + i * 31),
     convertedOn: null,
   }));

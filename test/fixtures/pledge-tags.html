@@ -1,71 +1,180 @@
 <!doctype html>
 <!--
-  Made-up hangar pledge cards in RSI's /account/pledges markup, carrying the status
-  tags RSI shows beside a pledge's name: UPGRADED, and since October 2026 a green
-  ATTRIBUTED. ATTRIBUTED is marked up as the real pages in test/fixtures/corpus/ show
-  it (a span.availability in the title column, after the hidden inputs; the capitals
-  are CSS). UPGRADED isn't on those pages yet, so its classes are still a guess. One
-  card puts both after the date in the date column, the worst place they could land.
-  No personal data. See CONTRIBUTING.md.
+  Hangar pledge cards in RSI's /account/pledges markup as captured in October 2026,
+  scrubbed: ids, names, prices, dates and pictures are made up. The status tags sit in
+  the title column after the hidden inputs: a green span.availability "Attributed" and,
+  on an upgraded pledge, an orange span.upgraded "upgraded" right after it (the capitals
+  are CSS). An upgraded pledge's h3 also gets class "upgraded" and an Upgrades button
+  (a.js-upgrade-log). No personal data. See CONTRIBUTING.md.
 -->
 <html>
   <body>
-    <div class="account-pledges">
+    <ul class="list-items">
       <!-- An upgraded ship pledge with both tags: giftable and meltable -->
-      <div class="row">
-        <input class="js-pledge-id" value="601" />
-        <input class="js-pledge-name" value="Standalone Ships - Avenger Titan" />
-        <input class="js-pledge-value" value="$70.00 USD" />
-        <input class="js-pledge-currency" value="USD" />
-        <div class="title-col">
-          <h3>Standalone Ships - Avenger Titan</h3>
-          <span class="tag upgraded">UPGRADED</span>
-          <span class="availability">Attributed</span>
+      <li>
+        <div class="row dark trans-03s trans-background active">
+          <div class="basic-infos clearfix">
+            <div class="item-image-wrapper content-block3"><div class="image"></div></div>
+            <div class="wrapper-col">
+              <a class="arrow js-expand-arrow trans-02s"
+                ><span class="effect trans-02s trans-opacity"></span
+              ></a>
+              <div class="title-col">
+                <div class="pledge-title-row">
+                  <h3 class="upgraded">
+                    Standalone Ships - Avenger Titan
+                    <a class="shadow-button trans-02s trans-color js-upgrade-log upgrade">
+                      <span class="label js-label trans-02s">Upgrades</span>
+                      <span class="icon trans-02s"
+                        ><span class="effect trans-opacity trans-03s"></span
+                      ></span>
+                    </a>
+                  </h3>
+                </div>
+                <script class="js-pledge-name-reservations" type="application/json">
+                  []
+                </script>
+                <script class="js-pledge-nameable-ships" type="application/json">
+                  null
+                </script>
+                <input type="hidden" class="js-pledge-id" value="601" />
+                <input
+                  type="hidden"
+                  class="js-pledge-name"
+                  value="Standalone Ships - Avenger Titan"
+                />
+                <input type="hidden" class="js-pledge-value" value="$70.00 USD" />
+                <input type="hidden" class="js-pledge-configuration-value" value="$0.00 USD" />
+                <input type="hidden" class="js-pledge-currency" value="Store Credit" />
+                <input type="hidden" class="js-pledge-last-alpha" value="0" />
+                <input type="hidden" class="js-pledge-not-buybackable" value="0" />
+                <span class="availability  ">Attributed</span>
+                <span class="upgraded">upgraded</span>
+              </div>
+              <div class="date-col"><label>Created:</label> April 12, 2023</div>
+              <div class="items-col"><label>Contains:</label> Avenger Titan and 1 item</div>
+            </div>
+          </div>
+          <div class="items more js-more trans-02s trans-height">
+            <h2>Items</h2>
+            <a class="shadow-button trans-02s trans-color js-gift gift"
+              ><span class="label js-label trans-02s">Gift</span></a
+            >
+            <a class="shadow-button trans-02s trans-color js-reclaim reclaim rm"
+              ><span class="label js-label trans-02s">Exchange</span></a
+            >
+            <span class="clear"></span>
+            <div class="content-block1">
+              <div class="with-images">
+                <div class="item">
+                  <div class="image"></div>
+                  <div class="text">
+                    <div class="title">Avenger Titan</div>
+                    <div class="kind">Ship</div>
+                    <div class="liner">Aegis Dynamics (<span>AEGS</span>)</div>
+                  </div>
+                </div>
+                <div class="item">
+                  <div class="image"></div>
+                  <div class="text">
+                    <div class="title">120 Months Insurance</div>
+                    <div class="kind">Insurance</div>
+                  </div>
+                </div>
+                <div class="cboth"></div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="date-col"><label>Created:</label> April 12, 2023</div>
-        <a class="shadow-button js-gift gift"><span class="label">Gift</span></a>
-        <a class="shadow-button js-reclaim reclaim"><span class="label">Exchange</span></a>
-        <div class="item">
-          <span class="kind">Ship</span>
-          <span class="title">Avenger Titan</span>
-        </div>
-        <div class="item">
-          <span class="kind">Insurance</span>
-          <span class="title">120 Months Insurance</span>
-        </div>
-      </div>
+      </li>
 
-      <!-- An upgrade with only ATTRIBUTED: no items, meltable, not giftable -->
-      <div class="row">
-        <input class="js-pledge-id" value="602" />
-        <input class="js-pledge-name" value="Upgrade - Aurora MR to Avenger Titan" />
-        <input class="js-pledge-value" value="$25.00 USD" />
-        <input class="js-pledge-currency" value="USD" />
-        <div class="title-col">
-          <h3>Upgrade - Aurora MR to Avenger Titan</h3>
-          <span class="availability">Attributed</span>
+      <!-- An upgrade with only Attributed: no items, meltable, not giftable -->
+      <li>
+        <div class="row dark trans-03s trans-background active">
+          <div class="basic-infos clearfix">
+            <div class="item-image-wrapper content-block3"><div class="image"></div></div>
+            <div class="wrapper-col">
+              <div class="title-col">
+                <div class="pledge-title-row">
+                  <h3 class="">Upgrade - Aurora MR to Avenger Titan</h3>
+                </div>
+                <input type="hidden" class="js-pledge-id" value="602" />
+                <input
+                  type="hidden"
+                  class="js-pledge-name"
+                  value="Upgrade - Aurora MR to Avenger Titan"
+                />
+                <input type="hidden" class="js-pledge-value" value="$25.00 USD" />
+                <input type="hidden" class="js-pledge-configuration-value" value="$0.00 USD" />
+                <input type="hidden" class="js-pledge-currency" value="Store Credit" />
+                <input type="hidden" class="js-pledge-last-alpha" value="0" />
+                <input type="hidden" class="js-pledge-not-buybackable" value="0" />
+                <span class="availability  ">Attributed</span>
+              </div>
+              <div class="date-col"><label>Created:</label> October 2, 2026</div>
+              <div class="items-col"><label>Contains:</label></div>
+            </div>
+          </div>
+          <div class="items more js-more trans-02s trans-height">
+            <h2>Items</h2>
+            <a class="shadow-button trans-02s trans-color js-reclaim reclaim rm"
+              ><span class="label js-label trans-02s">Exchange</span></a
+            >
+            <span class="clear"></span>
+          </div>
         </div>
-        <div class="date-col">October 2, 2026</div>
-        <a class="shadow-button js-reclaim reclaim"><span class="label">Exchange</span></a>
-      </div>
+      </li>
 
-      <!-- A paint with the tags after its date, in the date column -->
-      <div class="row">
-        <input class="js-pledge-id" value="603" />
-        <input class="js-pledge-name" value="Paints - Avenger Stormbringer Paint" />
-        <input class="js-pledge-value" value="$5.00 USD" />
-        <input class="js-pledge-currency" value="USD" />
-        <div class="date-col">
-          <label>Created:</label> October 5, 2026
-          <span class="tag upgraded">UPGRADED</span>
-          <span class="availability">Attributed</span>
+      <!-- A paint bought in October: Attributed only, Exchange but no Gift -->
+      <li>
+        <div class="row dark trans-03s trans-background active">
+          <div class="basic-infos clearfix">
+            <div class="item-image-wrapper content-block3"><div class="image"></div></div>
+            <div class="wrapper-col">
+              <div class="title-col">
+                <div class="pledge-title-row">
+                  <h3 class="">Paints - Avenger Stormbringer Paint</h3>
+                </div>
+                <input type="hidden" class="js-pledge-id" value="603" />
+                <input
+                  type="hidden"
+                  class="js-pledge-name"
+                  value="Paints - Avenger Stormbringer Paint"
+                />
+                <input type="hidden" class="js-pledge-value" value="$5.00 USD" />
+                <input type="hidden" class="js-pledge-configuration-value" value="$0.00 USD" />
+                <input type="hidden" class="js-pledge-currency" value="Store Credit" />
+                <input type="hidden" class="js-pledge-last-alpha" value="0" />
+                <input type="hidden" class="js-pledge-not-buybackable" value="0" />
+                <span class="availability  ">Attributed</span>
+              </div>
+              <div class="date-col"><label>Created:</label> October 5, 2026</div>
+              <div class="items-col">
+                <label>Contains:</label> Avenger - Stormbringer Paint
+              </div>
+            </div>
+          </div>
+          <div class="items more js-more trans-02s trans-height">
+            <h2>Items</h2>
+            <a class="shadow-button trans-02s trans-color js-reclaim reclaim rm"
+              ><span class="label js-label trans-02s">Exchange</span></a
+            >
+            <span class="clear"></span>
+            <div class="content-block1">
+              <div class="with-images">
+                <div class="item">
+                  <div class="image"></div>
+                  <div class="text">
+                    <div class="title">Avenger - Stormbringer Paint</div>
+                    <div class="kind">Skin</div>
+                  </div>
+                </div>
+                <div class="cboth"></div>
+              </div>
+            </div>
+          </div>
         </div>
-        <a class="shadow-button js-gift gift"><span class="label">Gift</span></a>
-        <div class="item">
-          <span class="kind">Paint</span>
-          <span class="title">Avenger Stormbringer Paint</span>
-        </div>
-      </div>
-    </div>
+      </li>
+    </ul>
   </body>
 </html>

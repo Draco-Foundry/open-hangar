@@ -7,8 +7,9 @@
 //
 // The scan is the dashboard's Scan All without the store check (src/dashboard.js
 // runScan): one RSI account read, then the hangar, buy-backs and referrals, each saved
-// as it lands, then a sync when connected, then up to BB_AUTO_MAX buy-back packs never
-// read before, paced, in the background. What it's doing and how it went go to
+// as it lands, then up to BB_AUTO_MAX buy-backs' own pages not read from RSI before,
+// paced (their price, insurance and contents go in the sync, #798), then a sync when
+// connected. What it's doing and how it went go to
 // storage, for any page to show in its own words:
 //   session scanRunning  { at, tabId, run, by }: the scan's heartbeat, renewed with its
 //                        progress (at most every MARK_GAP) while the scan runs, removed
@@ -19,7 +20,8 @@
 //                        a second at most (and one as each part starts, the newest
 //                        always written), removed at the end. part: 'start' | 'account'
 //                        | 'hangar' | 'buybacks' | 'referrals' | 'packs' | 'sync'. For
-//                        packs, page is the packs read so far and count how many to read.
+//                        packs (the buy-backs' own pages), page is the pages read so far
+//                        and count how many to read.
 //                        pages: how many pages RSI's pager shows for the hangar and
 //                        buy-backs (null without one; page = pages when a rescan found
 //                        nothing changed). For referrals, page is the lists read of
@@ -59,7 +61,7 @@ import {
   syncTriedAfter,
 } from './auto.js';
 
-export const BB_AUTO_MAX = 30; // src/dashboard.js: never-read packs read after a scan
+export const BB_AUTO_MAX = 30; // buy-back pages a scan reads at most (readPacks)
 export const MARK_GAP = 30e3; // scanRunning renewed at most this often
 export const PROGRESS_GAP = 500; // scanProgress written at most this often
 export const AVATAR_MAX = 64 * 1024; // the portrait's data URL, characters
@@ -447,6 +449,8 @@ export function createRunner(env) {
           }).catch((e) =>
             OH.log('warn', 'buybacks', `details from history failed: ${e?.message || e}`),
           );
+        // Then the buy-backs' own pages, before the sync so it carries what they say.
+        if (b?.ok && !b.partial) await readPacks({ db, inScan: true }).catch(() => {});
       }
     } catch (e) {
       rows.push({
@@ -502,34 +506,38 @@ export function createRunner(env) {
       endProgress();
     }
     if (report.sync) await writeReport(report);
-    // Packs never read: their contents, paced, in the background (Scan stays fast).
-    if (rows.some((r) => r.id === 'buybacks' && r.ok && !r.partial))
-      readPacks({ db }).catch(() => {});
     return report;
   }
 
-  // Up to `max` buy-back packs never read (or only half read), paced (src/lib.js
-  // fetchBuybackDetails). One read at a time: asked again while it runs, the answer is
-  // that one's. → { todo, done, errors, rateLimited?, retryAt? }, once every detail read
-  // is saved.
+  // Up to `max` buy-backs whose own page wasn't read from RSI yet (never read, only half
+  // read, or filled from history), in the list's order, paced (src/lib.js
+  // fetchBuybackDetails, rsiOnly). Upgrades have no page. A page that failed before
+  // (OH.getBuybackMisses) waits out its time (OH.bbdMissUntil), then goes after the rest,
+  // so a page that never reads doesn't keep a place every scan. `inScan`: the scan's own read,
+  // which shows its progress. One read at a time: asked again while it runs, the answer
+  // is that one's. → { todo, done, errors, rateLimited?, retryAt? }, once every detail
+  // read is saved.
   let packs = null;
   function readPacks(opts) {
     return (packs ??= readPacksNow(opts).finally(() => (packs = null)));
   }
-  async function readPacksNow({ max = BB_AUTO_MAX, db } = {}) {
+  async function readPacksNow({ max = BB_AUTO_MAX, db, inScan = false } = {}) {
     const details = await OH.getBuybackDetails();
-    const todo = buybacksOf(db || (await OH.loadDB()))
-      .filter((b) => !b.isCCU && (b.kind === 'pack' || b.kind === 'package'))
-      .filter((b) => !details[b.id] || details[b.id].partial)
-      .slice(0, max)
-      .map((b) => String(b.id));
+    const misses = await OH.getBuybackMisses();
+    const due = buybacksOf(db || (await OH.loadDB()))
+      .filter((b) => !b.isCCU && !b.ccu && /^\d+$/.test(String(b.id)))
+      .filter((b) => !OH.buybackFromRsi(details[b.id]))
+      .map((b) => String(b.id))
+      .filter((id) => OH.bbdMissUntil(misses[id]) <= now());
+    const tried = due.filter((id) => misses[id]);
+    const todo = [...due.filter((id) => !misses[id]), ...tried].slice(0, max);
     if (!todo.length) return { todo: 0, done: 0, errors: 0 };
-    // A scan's own progress comes first: packs read meanwhile don't say so.
-    const say = (page, count) => !busy && setProgress('packs', page, count);
+    // Another scan's progress comes first: pages read meanwhile don't say so.
+    const say = (page, count) => (inScan || !busy) && setProgress('packs', page, count);
     let out = null;
     try {
       say(0, todo.length);
-      out = await OH.fetchBuybackDetails(todo, say);
+      out = await OH.fetchBuybackDetails(todo, say, undefined, { rsiOnly: true });
     } finally {
       await settle();
       if (!busy) endProgress();
