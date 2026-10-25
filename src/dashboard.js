@@ -2152,12 +2152,12 @@ function underStoreText(p) {
 }
 // A buy-back cheaper than the same ship in today's store (exact price loaded).
 function bbUnderStore(b) {
-  const d = bbDetail(b);
+  const p = bbReadPrice(b);
   const sp = buybackStorePrice(b);
-  return !!(d && d.price != null && sp && sp - d.price >= 1);
+  return !!(p != null && sp && sp - p >= 1);
 }
 function bbUnderText(b) {
-  return bbUnderStore(b) ? dollars(buybackStorePrice(b) - bbDetail(b).price) : '';
+  return bbUnderStore(b) ? dollars(buybackStorePrice(b) - bbReadPrice(b)) : '';
 }
 // Stack identical buy-backs (same name, contents and price) into one row with a
 // count. Off by default: each buy-back is its own item.
@@ -3572,39 +3572,30 @@ function bbInsurance(b) {
   );
 }
 
-// The buy-back's real price once its page has been read (or its value from this
-// browser's history). Else, for a CCU only, today's upgrade price as an estimate:
-// RSI sells a CCU back at today's price, but a pledge at what it cost then, which
-// today's store price can't tell.
-function bbEstimate(b) {
-  return b.isCCU ? buybackStorePrice(b) : null;
-}
-function bbPrice(b) {
+// RSI's own price for a buy-back, from its page once read. Never a value from this
+// browser's history (src): that's the melt value, what was paid, and RSI sells a
+// pledge back at its full price, with no sale, coupon or warbond discount kept.
+function bbReadPrice(b) {
   const d = bbDetail(b);
-  if (d && d.price != null) return d.price;
-  return bbEstimate(b);
+  return d && d.price != null && !d.src ? d.price : null;
 }
-// Where a known price came from, when it wasn't RSI's buy-back page.
-const BB_PRICE_TITLE = {
-  history: 'What it was worth in your hangar before it was melted',
-  'scan-history': 'What it was worth in your hangar before it was melted (from your scan history)',
-};
+// The buy-back's price: RSI's own once read, else today's standard store price as a
+// muted estimate (buybackStorePrice: the ship list's standard price, never a sale or
+// warbond one; a CCU's is today's upgrade price), else none.
+function bbPrice(b) {
+  const p = bbReadPrice(b);
+  return p != null ? p : buybackStorePrice(b);
+}
 // The small print in a buy-back's window when its details came from this browser.
 const BB_SOURCE_NOTE = {
   history: 'From your hangar history',
-  'scan-history': 'Price from your hangar history',
 };
 // The price a buy-back card or row shows: { text, title, est } or null.
 function bbPriceData(b) {
-  const d = bbDetail(b);
-  if (d && d.price != null)
-    return {
-      text: money(d.price),
-      title: BB_PRICE_TITLE[d.src] || 'Buy-back price on RSI',
-      est: false,
-    };
+  const p = bbReadPrice(b);
+  if (p != null) return { text: money(p), title: 'Buy-back price on RSI', est: false };
   if (b.price) return { text: String(b.price), title: '', est: false };
-  const sp = bbEstimate(b);
+  const sp = buybackStorePrice(b);
   return sp
     ? {
         text: dollars(sp),
@@ -3628,9 +3619,9 @@ function bbStoreText(b) {
 // Ships and CCUs only: a pack's extras make a ship-price comparison misleading.
 function bbVsStore(b) {
   if (!b.isCCU && b.kind !== 'ship') return null;
-  const d = bbDetail(b);
+  const p = bbReadPrice(b);
   const sp = buybackStorePrice(b);
-  return d && d.price != null && sp ? sp - d.price : null;
+  return p != null && sp ? sp - p : null;
 }
 function bbVsStoreText(b) {
   const v = bbVsStore(b);
@@ -3639,8 +3630,8 @@ function bbVsStoreText(b) {
   return v > 0 ? `Save ${dollars(v)}` : `${dollars(-v)} more`;
 }
 function bbPriceText(b) {
-  const d = bbDetail(b);
-  if (d && d.price != null) return money(d.price);
+  const p = bbReadPrice(b);
+  if (p != null) return money(p);
   if (b.price) return String(b.price);
   const sp = buybackStorePrice(b);
   return sp ? dollars(sp) : '';
