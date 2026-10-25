@@ -1,1 +1,0 @@
-- Changed: **A tidier Settings tab.** Sync, Auto Scan Daily and Notifications sit together in one box, the backup and CSV files are under Export Data next to Log Out of RSI, and Clear Data is at the bottom.

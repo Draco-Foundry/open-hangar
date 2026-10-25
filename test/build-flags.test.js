@@ -313,6 +313,15 @@ test('pack: writes each build its values and cuts the code of flags that are off
       assert.ok(!/staging/.test(JSON.stringify(b.manifest)), `${t}: no staging`);
     }
     assert.deepEqual(built('chrome').manifest.externally_connectable, { matches: ALL_PAGES });
+    // Firefox: the site bridge on just those pages, in the top frame (#671).
+    assert.deepEqual(built('firefox').manifest.content_scripts, [
+      {
+        matches: ALL_PAGES,
+        js: ['src/site-bridge.js'],
+        run_at: 'document_start',
+        all_frames: false,
+      },
+    ]);
     // The background worker's lists: the same pages, Connect on the app, and our hangar
     // page (Local Mode).
     assert.deepEqual(built('chrome').pages, {

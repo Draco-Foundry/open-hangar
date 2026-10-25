@@ -97,6 +97,29 @@ test('flushBuybackDetails: every detail read is in storage once it answers', asy
   store.bbDetails = JSON.parse(before);
 });
 
+test('rsiOnly: details filled from history are read again from RSI, keeping the melt (#798)', async () => {
+  await reset();
+  answer = () => 200;
+  const all = await OH.getBuybackDetails();
+  all['1'] = { price: 50, melt: 50, src: 'history', ships: [], also: [] };
+  all['2'] = { price: 20, ships: [], also: [], at: 1 }; // read from RSI already
+  // Load Details as before: a detail from history counts as read.
+  assert.deepEqual(await OH.fetchBuybackDetails(['1', '2']), { done: 0, errors: 0, total: 0 });
+  assert.deepEqual(hits, []);
+  // The scan's reads: only pages not read from RSI yet.
+  const r = await OH.fetchBuybackDetails(['1', '2'], null, undefined, { rsiOnly: true });
+  assert.deepEqual(r, { done: 1, errors: 0, total: 1 });
+  assert.deepEqual(hits, ['1']);
+  const now = (await OH.getBuybackDetails())['1'];
+  assert.equal(now.price, 10, "RSI's page price");
+  assert.equal(now.melt, 50, 'the melt value kept');
+  assert.equal(now.src, undefined);
+  assert.ok(OH.buybackFromRsi(now));
+  assert.ok(!OH.buybackFromRsi({ price: 1, src: 'history' }));
+  assert.ok(!OH.buybackFromRsi({ price: 1, partial: true }));
+  assert.ok(!OH.buybackFromRsi(null));
+});
+
 for (const status of [429, 403]) {
   test(`stops the whole batch at the first ${status}, without retrying it`, async () => {
     await reset();
@@ -166,6 +189,54 @@ test('signed out of RSI mid-batch: stop, and save nothing for that page (#199)',
   assert.deepEqual(r, { done: 1, errors: 1, total: 5 });
   assert.deepEqual(hits, ['1', '2']);
   assert.deepEqual(Object.keys(await OH.getBuybackDetails()), ['1']);
+});
+
+test('pages that never read are remembered, held a day, then doubling; a read forgets (#800)', async () => {
+  await reset();
+  answer = (id) => (id === '3' ? 404 : 200);
+  OpenHangar.parseBuybackDetail = (html) => (html.includes('odd') ? null : parseOk());
+  body = (id) => (id === '2' ? '<html>odd</html>' : '<html>ok</html>');
+  offline = (id) => id === '5'; // a passing failure: not remembered
+  const t0 = Date.now();
+  await OH.fetchBuybackDetails(ids);
+  const first = await OH.getBuybackMisses();
+  assert.deepEqual(Object.keys(first).sort(), ['2', '3']);
+  assert.equal(first['2'].n, 1);
+  assert.ok(first['2'].at >= t0);
+  // Missed again: counted.
+  await OH.fetchBuybackDetails(['2', '3']);
+  const again = await OH.getBuybackMisses();
+  assert.equal(again['3'].n, 2);
+  // The wait: a day, two, four… 30 days at most.
+  const DAY = 86_400_000;
+  assert.equal(OH.bbdMissUntil({ n: 1, at: 0 }), DAY);
+  assert.equal(OH.bbdMissUntil({ n: 3, at: 0 }), 4 * DAY);
+  assert.equal(OH.bbdMissUntil({ n: 20, at: 0 }), 30 * DAY);
+  assert.equal(OH.bbdMissUntil(undefined), 0);
+  // Read at last: forgotten. Pruned with the details.
+  body = () => '<html>ok</html>';
+  await OH.fetchBuybackDetails(['2']);
+  assert.deepEqual(Object.keys(await OH.getBuybackMisses()), ['3']);
+  await OH.pruneBuybackDetails(['1']);
+  assert.deepEqual(await OH.getBuybackMisses(), {});
+});
+
+test('Clear Data leaves no buy-back page details or misses, and none come back', async () => {
+  await reset();
+  answer = (id) => (id === '3' ? 404 : 200);
+  await OH.fetchBuybackDetails(['1', '2', '3']);
+  await OH.flushBuybackDetails();
+  assert.deepEqual(Object.keys(store.bbDetails).sort(), ['1', '2']);
+  assert.deepEqual(Object.keys(store.bbdMisses), ['3']);
+  // A read whose save is still waiting when Clear Data runs.
+  answer = () => 200;
+  await OH.fetchBuybackDetail('4');
+  await OH.clearData();
+  await OH.flushBuybackDetails();
+  const left = Object.keys(store).filter((k) => /^bb(Details|dMisses)$/.test(k));
+  assert.deepEqual(left, []);
+  assert.deepEqual(await OH.getBuybackDetails(), {});
+  assert.deepEqual(await OH.getBuybackMisses(), {});
 });
 
 // --- Pacing (OH-021): gentle between pages, slower after failures ---------------

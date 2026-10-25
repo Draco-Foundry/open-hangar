@@ -155,7 +155,7 @@ test('mergeHistory unions by time, collapses repeats, drops junk', () => {
     m.map((x) => x.at),
     [100, 300],
   ); // 200 was identical to 100 → folded in
-  assert.equal(m[0].checkedAt, 200);
+  assert.equal('checkedAt' in m[0], false, 'no confirm time is kept');
   const many = Array.from({ length: 150 }, (_, i) => s(i, [{ id: i, name: 'x', value: i }]));
   assert.equal(OH.mergeHistory(many, []).length, 100);
 });
@@ -174,7 +174,7 @@ test('mergeHistory: same moment in both keeps this browser’s copy; order never
       [200, 99],
     ],
   ); // 100 is mine; 300 matched 200 and folded in
-  assert.equal(m[1].checkedAt, 300);
+  assert.equal('checkedAt' in m[1], false);
   // Trimming keeps the newest, wherever they came from.
   const old = Array.from({ length: 120 }, (_, i) => s(i, [{ id: i, name: 'x', value: i }]));
   const kept = OH.mergeHistory([], old.slice().reverse());

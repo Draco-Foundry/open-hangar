@@ -167,9 +167,9 @@ test('the view is a copy: the export it came from is untouched', async () => {
 test('reading the view: nothing scanned, older storage, damage', async () => {
   mem = {};
   assert.deepEqual(await viewOf(), { ok: false, error: 'no-scan' });
-  mem = { db: { schemaVersion: 3, sources: {} }, account: account() };
+  mem = { db: { schemaVersion: 5, sources: {} }, account: account() };
   assert.deepEqual(await viewOf(), { ok: false, error: 'no-scan' });
-  mem = { db: { schemaVersion: 3, sources: { hangar: { items: [], scannedAt: null } } } };
+  mem = { db: { schemaVersion: 5, sources: { hangar: { items: [], scannedAt: null } } } };
   assert.deepEqual(await viewOf(), { ok: false, error: 'no-scan' });
   for (const { name, mem: stored } of states()) {
     if (!/before the versioned|v2 database|damaged/.test(name)) continue;
@@ -178,7 +178,7 @@ test('reading the view: nothing scanned, older storage, damage', async () => {
   }
   // A database from a newer version (a rollback) is left to an extension page too.
   mem = full();
-  mem.db.schemaVersion = 4;
+  mem.db.schemaVersion = 6;
   assert.deepEqual(await viewOf(), { ok: false, error: 'needs-upgrade' });
   // The dashboard brings storage up to date, then the view reads.
   mem = structuredClone(states().find((s) => /v2 database/.test(s.name)).mem);
@@ -238,11 +238,85 @@ test('a hangar never goes under another RSI login: the same rule as sync', async
   );
 });
 
-test('reading the view touches only the database, the account and the archive', async () => {
+test('reading the view touches only the database, the account, the archive and buy-back details', async () => {
   mem = full();
   reads = [];
   await viewOf();
-  assert.deepEqual(reads, [['db', 'hangar', 'account', 'pledgeArchive']]);
+  assert.deepEqual(reads, [['db', 'hangar', 'account', 'pledgeArchive', 'bbDetails']]);
+});
+
+test("a buy-back's own RSI page goes with it: price, insurance, contents (#798)", () => {
+  const sources = {
+    hangar: { items: [], scannedAt: 1 },
+    buybacks: {
+      items: [
+        { id: '1', name: 'Package - Big Pack', price: '' },
+        { id: '2', name: 'Standalone Ships - Cutter', price: '' },
+        { id: '3', name: 'From history' },
+        { id: '4', name: 'Half read' },
+        { id: '5', name: 'Never read' },
+        { id: '6', name: 'In euros' },
+      ],
+      scannedAt: 1,
+    },
+  };
+  const details = {
+    1: {
+      price: 1234.5,
+      currency: 'USD',
+      ships: [
+        { name: 'Carrack', manufacturer: 'Anvil Aerospace', focus: 'Expedition', image: 'x' },
+        { name: '' },
+      ],
+      also: ['Lifetime Insurance', 'Star Citizen Digital Download', ' '],
+      insurance: 'LTI',
+      at: 5,
+    },
+    2: { price: 45, currency: 'USD', ships: [], also: [], insurance: null, at: 5 },
+    3: { price: 90, melt: 90, src: 'history', ships: [], also: [], insurance: '6M' },
+    4: { price: 90, partial: true },
+    6: { price: 40, currency: 'EUR', ships: [], also: ['120 Months Insurance'], insurance: '120M' },
+  };
+  const before = structuredClone(sources);
+  const out = SHAPE.withBuybackDetails(sources, details);
+  assert.deepEqual(sources, before, 'a copy');
+  const [big, cutter, hist, half, never, eur] = out.buybacks.items;
+  assert.deepEqual(big, {
+    id: '1',
+    name: 'Package - Big Pack',
+    price: '$1,234.50 USD',
+    priceFrom: 'page',
+    insurance: 'LTI',
+    contents: [
+      { kind: 'Ship', label: 'Carrack', manufacturer: 'Anvil Aerospace', focus: 'Expedition' },
+      { kind: 'Insurance', label: 'Lifetime Insurance' },
+      { kind: '', label: 'Star Citizen Digital Download' },
+    ],
+  });
+  assert.equal(cutter.price, '$45.00 USD');
+  assert.equal(cutter.insurance, null);
+  assert.deepEqual(cutter.contents, []);
+  // Filled from history, half read or never read: only what the list said.
+  for (const [b, i] of [
+    [hist, 2],
+    [half, 3],
+    [never, 4],
+  ])
+    assert.deepEqual(b, sources.buybacks.items[i]);
+  // A price that isn't in US dollars isn't sent; the rest of the page is.
+  assert.equal(eur.price, undefined);
+  assert.equal(eur.priceFrom, undefined);
+  assert.equal(eur.insurance, '120M');
+  // No details, or no buy-backs: unchanged.
+  assert.equal(SHAPE.withBuybackDetails(sources, null), sources);
+  assert.equal(SHAPE.withBuybackDetails({ hangar: {} }, details).buybacks, undefined);
+  // What it adds passes the sync schema.
+  const payload = SHAPE.exportPayload({
+    db: { schemaVersion: 5, sources },
+    buybackDetails: details,
+    appVersion: '0.4.0',
+  });
+  assert.equal(SHAPE.checkPayload(JSON.parse(JSON.stringify(payload))), null);
 });
 
 test('a view that fails its checks is never handed out: { error: schema, path }', async () => {

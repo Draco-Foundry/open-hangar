@@ -55,7 +55,7 @@
     // Every ship in every pledge, as Stats counts them (OH.fleetStats), without
     // looking each one up: the count is all this card needs.
     const ships = items.reduce(
-      (n, p) => n + (p.contents || []).filter((c) => /^ship$/i.test(c.kind || '')).length,
+      (n, p) => n + (p.contents || []).filter(OH().isShipItem).length,
       0,
     );
     const shipPledges = items.filter((p) => p.containsShip).length;

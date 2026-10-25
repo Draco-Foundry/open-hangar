@@ -869,11 +869,13 @@ function answerSite(msg, origin, reply) {
   return true; // answers later
 }
 // Chrome and Edge: straight from the page; the browser says which page it is (our
-// externally_connectable names no other extension, so none can call). Firefox has no
+// externally_connectable names no other extension, so none can call). Only a tab's top
+// frame, as on Firefox: our pages never send from a frame (#671). Firefox has no
 // externally_connectable: there this event carries other add-ons' messages, never a
 // page's, so the Firefox build doesn't listen to it at all.
 if (!chrome.runtime.getManifest().browser_specific_settings?.gecko)
   chrome.runtime.onMessageExternal?.addListener((msg, sender, reply) => {
+    if (!sender.tab || sender.frameId !== 0) return false;
     if (!self.OHPages.known(sender.origin)) return false;
     return answerSite(msg, sender.origin, reply);
   });

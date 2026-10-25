@@ -977,30 +977,61 @@ try {
     : fail(`For You ignore: ${JSON.stringify(home)}`);
   // The caught-up line holds still while the menu is open (a scan fires 'oh:alerts'
   // every page, #586) and is picked again on the next open.
+  // The menus also close on any resize or scroll (menus.svelte.js), and the viewport
+  // changes just before this leave those events to land whenever the page next draws:
+  // one landing mid-check closed the menu and flipped every later toggle (#791). They
+  // aren't what this checks, so while it runs they're held back from the menus (and
+  // counted), every read is taken with the menu open, and it starts with every menu shut.
+  await page.evaluate(async () => {
+    await new Promise((r) => setTimeout(r, 300));
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    document.dispatchEvent(new CustomEvent('oh:close-menus'));
+  });
   const caught = await page.evaluate(async () => {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const line = () => document.querySelector('#bell-menu .bm-none')?.textContent.trim();
+    const isOpen = () => !document.querySelector('#bell-menu').hidden;
     const btn = document.querySelector('#bell-btn');
+    const held = [];
+    const hold = (e) => {
+      held.push(e.type);
+      e.stopImmediatePropagation();
+    };
+    window.addEventListener('resize', hold, true);
+    window.addEventListener('scroll', hold, true);
     const opens = [];
     let steady = true;
-    for (let i = 0; i < 3; i++) {
-      btn.click();
-      await wait(50);
-      const first = line();
-      for (let j = 0; j < 4; j++) {
-        // A new list each time, as ui/home/ForYou.svelte publishes it.
-        window.OHApp.alerts = { ...window.OHApp.alerts, list: [] };
-        document.dispatchEvent(new CustomEvent('oh:alerts'));
-        await wait(30);
-        if (line() !== first) steady = false;
+    let shut = true; // closed before each open, open while read, closed after each close
+    try {
+      for (let i = 0; i < 3; i++) {
+        if (isOpen()) shut = false;
+        btn.click();
+        await wait(50);
+        if (!isOpen()) shut = false;
+        const first = line();
+        for (let j = 0; j < 4; j++) {
+          // A new list each time, as ui/home/ForYou.svelte publishes it.
+          window.OHApp.alerts = { ...window.OHApp.alerts, list: [] };
+          document.dispatchEvent(new CustomEvent('oh:alerts'));
+          await wait(30);
+          if (line() !== first) steady = false;
+        }
+        opens.push(first);
+        btn.click();
+        await wait(50);
+        if (isOpen()) shut = false;
       }
-      opens.push(first);
-      btn.click();
-      await wait(50);
+    } finally {
+      window.removeEventListener('resize', hold, true);
+      window.removeEventListener('scroll', hold, true);
     }
-    return { opens, steady, closed: document.querySelector('#bell-menu').hidden };
+    return { opens, steady, shut, closed: !isOpen(), held };
   });
-  caught.opens.every(Boolean) && caught.steady && new Set(caught.opens).size > 1 && caught.closed
+  caught.opens.every(Boolean) &&
+  caught.steady &&
+  caught.shut &&
+  new Set(caught.opens).size > 1 &&
+  caught.closed
     ? ok('bell: the caught-up line holds through alerts refreshes, and changes between opens')
     : fail(`bell caught-up line: ${JSON.stringify(caught)}`);
   !(await page.$('#site-connect'))
@@ -3428,30 +3459,28 @@ try {
         `gallery ${refUi.gallery} rewards, ${refUi.timeline} milestones, prospect ages, event banner`,
       )
     : fail(`referral sections: ${JSON.stringify(refUi)}`);
-  // People list (Svelte): tabs swap the list and clear the search, search filters
-  // live, sort reorders.
+  // People list (Svelte): tabs swap the list, sort reorders. Rows are dates only (no
+  // handles are kept), so there's no search.
   const people = await page.evaluate(async () => {
     const wait = () => new Promise((r) => setTimeout(r, 50));
     const rows = () => [...document.querySelectorAll('#ref-tbody tr')];
     const count = () => document.querySelector('#ref-count').textContent;
-    const search = document.querySelector('#ref-search');
-    const out = { recruits: rows().length, count: count() };
-    const first = rows()[0]?.querySelector('td').textContent.trim() || '';
-    search.value = first;
-    search.dispatchEvent(new Event('input', { bubbles: true }));
-    await wait();
-    out.searched = rows().length;
+    const out = {
+      recruits: rows().length,
+      count: count(),
+      search: !!document.querySelector('#ref-search'),
+    };
     document.querySelector('[data-reftab="prospects"]').click();
     await wait();
     out.prospects = rows().length;
-    out.cleared = search.value === '';
     out.dateCol = document.querySelector('#ref-date-col').textContent;
     const sort = document.querySelector('#ref-sort');
-    sort.value = 'name';
+    const firstRow = () => rows()[0]?.querySelector('td').textContent.trim() || '';
+    const newest = firstRow();
+    sort.value = 'oldest';
     sort.dispatchEvent(new Event('change', { bubbles: true }));
     await wait();
-    const names = rows().map((r) => r.querySelector('td').textContent.trim());
-    out.sorted = names.every((n, i) => !i || names[i - 1].localeCompare(n) <= 0);
+    out.sorted = firstRow() !== newest;
     document.querySelector('[data-reftab="recruits"]').click();
     sort.value = 'newest';
     sort.dispatchEvent(new Event('change', { bubbles: true }));
@@ -3460,13 +3489,11 @@ try {
   });
   people.recruits > 1 &&
   /^Showing \d+ of \d+$/.test(people.count) &&
-  people.searched >= 1 &&
-  people.searched < people.recruits &&
+  !people.search &&
   people.prospects > 0 &&
-  people.cleared &&
   people.dateCol === 'Enlisted' &&
   people.sorted
-    ? ok(`people list: tabs, search (${people.searched} of ${people.recruits}), sort by name`)
+    ? ok(`people list: tabs (${people.recruits} recruits, ${people.prospects} prospects), sort`)
     : fail(`people list: ${JSON.stringify(people)}`);
   // jsQR (dev-only) reads the QR back out of the finished image.
   await page.addScriptTag({ path: 'node_modules/jsqr/dist/jsQR.js' });
@@ -6902,6 +6929,8 @@ try {
         return { ok: true, items: [], scannedAt: Date.now() };
       };
       OH.getReferral = async () => ({ ok: true });
+      // The demo's saved buy-backs: their own pages aren't asked for here either.
+      OH.fetchBuybackDetails = async () => ({ done: 0, errors: 0, total: 0 });
       const card = document.getElementById('bp-rsi-access').textContent.replace(/\s+/g, ' ');
       // The popup's Scan (src/background.js requestScan) while access is off.
       const scanRequest = { at: Date.now(), tabId: 42 };

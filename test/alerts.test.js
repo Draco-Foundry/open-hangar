@@ -122,7 +122,7 @@ const FEED = {
 };
 const ship = (label) => ({ kind: 'Ship', label });
 const DB = {
-  schemaVersion: 3,
+  schemaVersion: 5,
   sources: {
     hangar: {
       scannedAt: NOW - HOUR,

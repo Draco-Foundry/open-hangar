@@ -88,7 +88,7 @@ async function reset(state = {}) {
 // --- The pledge archive -------------------------------------------------------------
 
 test('a complete hangar scan keeps the pledges that left in the archive', async () => {
-  await reset({ db: { schemaVersion: 3, sources: {} }, dbHistory: [] });
+  await reset({ db: { schemaVersion: 5, sources: {} }, dbHistory: [] });
   pages.hangar = [pack(1, 'Package - Starter'), pack(2, 'Package - Other')];
   await OH.scanSource('hangar', null, { account: acct });
   assert.equal(mem.pledgeArchive, undefined); // nothing gone yet
@@ -98,6 +98,11 @@ test('a complete hangar scan keeps the pledges that left in the archive', async 
   assert.deepEqual(Object.keys(a), ['1']);
   assert.equal(a['1'].name, 'Package - Starter');
   assert.equal(a['1'].contents.length, 4); // everything the hangar showed
+  // ...as buy-back details read it: no pictures, giftable, meltable or other flags.
+  const keys = Object.keys(a['1']);
+  for (const k of ['image', 'giftable', 'meltable', 'isCCU', 'isAddOn', 'containsShip'])
+    assert.equal(keys.includes(k), false, k);
+  assert.deepEqual(a['1'].contents[0], { kind: 'Ship', label: 'Cutlass Black' });
   assert.equal(a['1'].insurance, 'LTI');
   assert.ok(Number.isFinite(a['1'].goneAt));
   assert.equal(a['1'].raw, undefined); // RSI's raw strings aren't kept
@@ -106,7 +111,7 @@ test('a complete hangar scan keeps the pledges that left in the archive', async 
 test('a hangar that belonged to another account is never archived', async () => {
   await reset({
     db: {
-      schemaVersion: 3,
+      schemaVersion: 5,
       owner: { nickname: 'Alt' },
       sources: { hangar: { items: [pack(7, 'Package - Alt Pack')], scannedAt: 1 } },
     },
@@ -129,7 +134,7 @@ test('the archive keeps the newest ARCHIVE_MAX', () => {
 
 test('Clear Data removes the archive; an account switch parks it and brings it back', async () => {
   const live = {
-    schemaVersion: 3,
+    schemaVersion: 5,
     owner: { nickname: 'Main' },
     sources: { hangar: { items: [pack(2, 'Package - Other')], scannedAt: 1 } },
   };
@@ -240,7 +245,7 @@ test('history beats RSI: filled buy-backs are never read, the rest are, and reje
       21: pack(21, 'Package - Starter'),
       22: pack(22, 'Package - Renamed Since'),
     },
-    db: { schemaVersion: 3, sources: {} },
+    db: { schemaVersion: 5, sources: {} },
     dbHistory: [{ at: 1, items: [['23', 'Package - Value Only', 60]] }],
   });
   const list = [
@@ -270,7 +275,7 @@ test('history beats RSI: filled buy-backs are never read, the rest are, and reje
 });
 
 test('a pledge melted between two scans shows its contents without an RSI request', async () => {
-  await reset({ db: { schemaVersion: 3, sources: {} }, dbHistory: [] });
+  await reset({ db: { schemaVersion: 5, sources: {} }, dbHistory: [] });
   pages.hangar = [pack(31, 'Package - Starter'), pack(32, 'Package - Other')];
   await OH.scanSource('hangar', null, { account: acct });
   pages.hangar = [pack(32, 'Package - Other')];

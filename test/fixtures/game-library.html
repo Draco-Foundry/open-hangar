@@ -1,95 +1,259 @@
 <!doctype html>
 <!--
-  Made-up hangar pledge cards in RSI's /account/pledges markup for the Game Library
-  (live since 2026-10-01). An account's primary Game Access pledge can never be melted
-  or gifted, so RSI renders neither action on it. A pledge bought from October on is
-  marked as a gift at purchase; one bought before keeps the gifting it had. The tag
-  elements' classes and words are a guess (no capture yet): the parser reads only the
-  rendered Gift and Exchange actions. No personal data. See CONTRIBUTING.md.
+  Hangar pledge cards in RSI's /account/pledges markup for the Game Library (live since
+  2026-10-01), as captured in October 2026 and scrubbed: ids, names, prices, dates and
+  pictures are made up. The primary Game Access pledge still lists on /account/pledges:
+  its title row gets class "has-entitlement-lock" and one a.entitlement-lock per game
+  ("SC Game Access", "SQ42 Game Access") linking to the Game Library, and RSI renders
+  neither Gift nor Exchange on it. Every pledge carries the span.availability
+  "Attributed" tag. The parser reads only the rendered Gift and Exchange actions. No
+  personal data. See CONTRIBUTING.md.
 -->
 <html>
   <body>
-    <div class="account-pledges">
-      <!-- The primary Game Access pledge: no Gift, no Exchange -->
-      <div class="row">
-        <input class="js-pledge-id" value="701" />
-        <input class="js-pledge-name" value="Package - Aurora MR Starter Pack" />
-        <input class="js-pledge-value" value="$45.00 USD" />
-        <input class="js-pledge-currency" value="USD" />
-        <div class="title-col">
-          <h3>Package - Aurora MR Starter Pack</h3>
-          <span class="tag game-access">GAME ACCESS</span>
+    <ul class="list-items">
+      <!-- The primary Game Access pledge: both locks, no Gift, no Exchange -->
+      <li>
+        <div class="row trans-03s trans-background active">
+          <div class="basic-infos clearfix">
+            <div class="item-image-wrapper content-block3"><div class="image"></div></div>
+            <div class="wrapper-col">
+              <div class="title-col">
+                <div class="pledge-title-row has-entitlement-lock">
+                  <h3 class="">Package - Aurora MR Star Citizen + Squadron 42 Combo</h3>
+                  <a
+                    class="entitlement-lock"
+                    href="/account/settings/games-library"
+                    title="Melt &amp; gift are disabled for this pledge because it grants your game access. Reassign your game to another pledge first to free it."
+                  >
+                    <span class="entitlement-lock-icon"></span>
+                    <span class="entitlement-lock-label">SC Game Access</span>
+                  </a>
+                  <a
+                    class="entitlement-lock"
+                    href="/account/settings/games-library"
+                    title="Melt &amp; gift are disabled for this pledge because it grants your game access. Reassign your game to another pledge first to free it."
+                  >
+                    <span class="entitlement-lock-icon"></span>
+                    <span class="entitlement-lock-label">SQ42 Game Access</span>
+                  </a>
+                </div>
+                <input type="hidden" class="js-pledge-id" value="701" />
+                <input
+                  type="hidden"
+                  class="js-pledge-name"
+                  value="Package - Aurora MR Star Citizen + Squadron 42 Combo"
+                />
+                <input type="hidden" class="js-pledge-value" value="$60.00 USD" />
+                <input type="hidden" class="js-pledge-configuration-value" value="$0.00 USD" />
+                <input type="hidden" class="js-pledge-currency" value="Store Credit" />
+                <input type="hidden" class="js-pledge-last-alpha" value="0" />
+                <input type="hidden" class="js-pledge-not-buybackable" value="1" />
+                <span class="availability  ">Attributed</span>
+              </div>
+              <div class="date-col"><label>Created:</label> June 1, 2019</div>
+              <div class="items-col"><label>Contains:</label> Aurora MR and 3 items</div>
+            </div>
+          </div>
+          <div class="items more js-more trans-02s trans-height">
+            <h2>Items</h2>
+            <span class="clear"></span>
+            <div class="content-block1">
+              <div class="with-images">
+                <div class="item">
+                  <div class="image"></div>
+                  <div class="text">
+                    <div class="title">Aurora MR</div>
+                    <div class="kind">Ship</div>
+                    <div class="liner">Roberts Space Industries (<span>RSI</span>)</div>
+                  </div>
+                </div>
+                <div class="item">
+                  <div class="image"></div>
+                  <div class="text">
+                    <div class="title">Lifetime Insurance</div>
+                    <div class="kind">Insurance</div>
+                  </div>
+                </div>
+                <div class="item">
+                  <div class="image"></div>
+                  <div class="text">
+                    <div class="title">Star Citizen Digital Download</div>
+                  </div>
+                </div>
+                <div class="cboth"></div>
+              </div>
+              <div class="also-contains">Also Contains</div>
+              <div class="without-images">
+                <div class="item"><div class="title">Squadron 42 Digital Download</div></div>
+                <div class="cboth"></div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="date-col"><label>Created:</label> June 1, 2019</div>
-        <div class="item">
-          <span class="kind">Ship</span>
-          <span class="title">Aurora MR</span>
-        </div>
-        <div class="item">
-          <span class="kind">Insurance</span>
-          <span class="title">Lifetime Insurance</span>
-        </div>
-        <div class="also-contains">
-          <h3>Also Contains</h3>
-          <div class="item"><span class="title">Star Citizen Digital Download</span></div>
-          <div class="item"><span class="title">Squadron 42 Digital Download</span></div>
-        </div>
-      </div>
+      </li>
 
       <!-- A second game package bought before October: keeps its Gift and Exchange -->
-      <div class="row">
-        <input class="js-pledge-id" value="702" />
-        <input class="js-pledge-name" value="Package - Mustang Alpha Starter Pack" />
-        <input class="js-pledge-value" value="$45.00 USD" />
-        <input class="js-pledge-currency" value="USD" />
-        <div class="date-col"><label>Created:</label> November 20, 2025</div>
-        <a class="shadow-button js-gift gift"><span class="label">Gift</span></a>
-        <a class="shadow-button js-reclaim reclaim"><span class="label">Exchange</span></a>
-        <div class="item">
-          <span class="kind">Ship</span>
-          <span class="title">Mustang Alpha</span>
+      <li>
+        <div class="row trans-03s trans-background active">
+          <div class="basic-infos clearfix">
+            <div class="item-image-wrapper content-block3"><div class="image"></div></div>
+            <div class="wrapper-col">
+              <div class="title-col">
+                <div class="pledge-title-row">
+                  <h3 class="">Package - Mustang Alpha Starter Pack</h3>
+                </div>
+                <input type="hidden" class="js-pledge-id" value="702" />
+                <input
+                  type="hidden"
+                  class="js-pledge-name"
+                  value="Package - Mustang Alpha Starter Pack"
+                />
+                <input type="hidden" class="js-pledge-value" value="$45.00 USD" />
+                <input type="hidden" class="js-pledge-configuration-value" value="$0.00 USD" />
+                <input type="hidden" class="js-pledge-currency" value="Store Credit" />
+                <input type="hidden" class="js-pledge-last-alpha" value="0" />
+                <input type="hidden" class="js-pledge-not-buybackable" value="0" />
+                <span class="availability  ">Attributed</span>
+              </div>
+              <div class="date-col"><label>Created:</label> November 20, 2025</div>
+              <div class="items-col"><label>Contains:</label> Mustang Alpha and 1 item</div>
+            </div>
+          </div>
+          <div class="items more js-more trans-02s trans-height">
+            <h2>Items</h2>
+            <a class="shadow-button trans-02s trans-color js-gift gift"
+              ><span class="label js-label trans-02s">Gift</span></a
+            >
+            <a class="shadow-button trans-02s trans-color js-reclaim reclaim rm"
+              ><span class="label js-label trans-02s">Exchange</span></a
+            >
+            <span class="clear"></span>
+            <div class="content-block1">
+              <div class="with-images">
+                <div class="item">
+                  <div class="image"></div>
+                  <div class="text">
+                    <div class="title">Mustang Alpha</div>
+                    <div class="kind">Ship</div>
+                    <div class="liner">Consolidated Outland (<span>CNOU</span>)</div>
+                  </div>
+                </div>
+                <div class="item">
+                  <div class="image"></div>
+                  <div class="text">
+                    <div class="title">Star Citizen Digital Download</div>
+                  </div>
+                </div>
+                <div class="cboth"></div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="also-contains">
-          <h3>Also Contains</h3>
-          <div class="item"><span class="title">Star Citizen Digital Download</span></div>
-        </div>
-      </div>
+      </li>
 
-      <!-- Bought in October, marked as a gift at purchase: Gift only -->
-      <div class="row">
-        <input class="js-pledge-id" value="703" />
-        <input class="js-pledge-name" value="Standalone Ships - Cutlass Black" />
-        <input class="js-pledge-value" value="$110.00 USD" />
-        <input class="js-pledge-currency" value="USD" />
-        <div class="title-col">
-          <h3>Standalone Ships - Cutlass Black</h3>
-          <span class="tag gift">GIFT</span>
+      <!-- Bought in October: Exchange, no Gift, no tag besides Attributed -->
+      <li>
+        <div class="row dark trans-03s trans-background active">
+          <div class="basic-infos clearfix">
+            <div class="item-image-wrapper content-block3"><div class="image"></div></div>
+            <div class="wrapper-col">
+              <div class="title-col">
+                <div class="pledge-title-row">
+                  <h3 class="">Standalone Ships - Cutlass Black</h3>
+                </div>
+                <input type="hidden" class="js-pledge-id" value="703" />
+                <input
+                  type="hidden"
+                  class="js-pledge-name"
+                  value="Standalone Ships - Cutlass Black"
+                />
+                <input type="hidden" class="js-pledge-value" value="$110.00 USD" />
+                <input type="hidden" class="js-pledge-configuration-value" value="$0.00 USD" />
+                <input type="hidden" class="js-pledge-currency" value="Store Credit" />
+                <input type="hidden" class="js-pledge-last-alpha" value="0" />
+                <input type="hidden" class="js-pledge-not-buybackable" value="0" />
+                <span class="availability  ">Attributed</span>
+              </div>
+              <div class="date-col"><label>Created:</label> October 9, 2026</div>
+              <div class="items-col"><label>Contains:</label> Cutlass Black and 1 item</div>
+            </div>
+          </div>
+          <div class="items more js-more trans-02s trans-height">
+            <h2>Items</h2>
+            <a class="shadow-button trans-02s trans-color js-reclaim reclaim rm"
+              ><span class="label js-label trans-02s">Exchange</span></a
+            >
+            <span class="clear"></span>
+            <div class="content-block1">
+              <div class="with-images">
+                <div class="item">
+                  <div class="image"></div>
+                  <div class="text">
+                    <div class="title">Cutlass Black</div>
+                    <div class="kind">Ship</div>
+                    <div class="liner">Drake Interplanetary (<span>DRAK</span>)</div>
+                  </div>
+                </div>
+                <div class="item">
+                  <div class="image"></div>
+                  <div class="text">
+                    <div class="title">6 Months Insurance</div>
+                    <div class="kind">Insurance</div>
+                  </div>
+                </div>
+                <div class="cboth"></div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="date-col"><label>Created:</label> October 9, 2026</div>
-        <a class="shadow-button js-gift gift"><span class="label">Gift</span></a>
-        <div class="item">
-          <span class="kind">Ship</span>
-          <span class="title">Cutlass Black</span>
-        </div>
-        <div class="item">
-          <span class="kind">Insurance</span>
-          <span class="title">6 Months Insurance</span>
-        </div>
-      </div>
+      </li>
 
       <!-- Bought before October, never giftable: stays not giftable, still meltable -->
-      <div class="row">
-        <input class="js-pledge-id" value="704" />
-        <input class="js-pledge-name" value="Standalone Ships - Arrow" />
-        <input class="js-pledge-value" value="$75.00 USD" />
-        <input class="js-pledge-currency" value="USD" />
-        <div class="date-col"><label>Created:</label> August 14, 2024</div>
-        <a class="shadow-button js-reclaim reclaim"><span class="label">Exchange</span></a>
-        <div class="item">
-          <span class="kind">Ship</span>
-          <span class="title">Arrow</span>
+      <li>
+        <div class="row dark trans-03s trans-background active">
+          <div class="basic-infos clearfix">
+            <div class="item-image-wrapper content-block3"><div class="image"></div></div>
+            <div class="wrapper-col">
+              <div class="title-col">
+                <div class="pledge-title-row">
+                  <h3 class="">Standalone Ships - Arrow</h3>
+                </div>
+                <input type="hidden" class="js-pledge-id" value="704" />
+                <input type="hidden" class="js-pledge-name" value="Standalone Ships - Arrow" />
+                <input type="hidden" class="js-pledge-value" value="$75.00 USD" />
+                <input type="hidden" class="js-pledge-configuration-value" value="$0.00 USD" />
+                <input type="hidden" class="js-pledge-currency" value="Store Credit" />
+                <input type="hidden" class="js-pledge-last-alpha" value="0" />
+                <input type="hidden" class="js-pledge-not-buybackable" value="0" />
+                <span class="availability  ">Attributed</span>
+              </div>
+              <div class="date-col"><label>Created:</label> August 14, 2024</div>
+              <div class="items-col"><label>Contains:</label> Arrow</div>
+            </div>
+          </div>
+          <div class="items more js-more trans-02s trans-height">
+            <h2>Items</h2>
+            <a class="shadow-button trans-02s trans-color js-reclaim reclaim rm"
+              ><span class="label js-label trans-02s">Exchange</span></a
+            >
+            <span class="clear"></span>
+            <div class="content-block1">
+              <div class="with-images">
+                <div class="item">
+                  <div class="image"></div>
+                  <div class="text">
+                    <div class="title">Arrow</div>
+                    <div class="kind">Ship</div>
+                    <div class="liner">Anvil Aerospace (<span>ANVL</span>)</div>
+                  </div>
+                </div>
+                <div class="cboth"></div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      </li>
+    </ul>
   </body>
 </html>

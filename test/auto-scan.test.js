@@ -504,7 +504,7 @@ test('a run that RSI asked to wait moves the next run after it', async () => {
 
 test('the badge: a run that found nothing new keeps an old scan fresh, while it is on', async () => {
   const old = {
-    schemaVersion: 3,
+    schemaVersion: 5,
     sources: { hangar: { scannedAt: Date.now() - 9 * DAY, items: [] } },
   };
   const rec = { v: 1, at: Date.now() - H, line: 'quick' };

@@ -103,7 +103,14 @@ const ACCOUNT = {
   referral: { code: 'STAR-ABCD-1234', url: null },
 };
 const rows = (n, from = 0) =>
-  Array.from({ length: n }, (_, i) => ({ id: `r${from + i}`, nickname: `Recruit${from + i}` }));
+  Array.from({ length: n }, (_, i) => ({
+    id: `r${from + i}`,
+    nickname: `Recruit${from + i}`,
+    displayName: `Recruit ${from + i}`,
+    avatar: 'https://robertsspaceindustries.com/media/x/avatar.png',
+    enlistedOn: '2025-02-03',
+    convertedOn: from < 100 ? '2025-03-04' : null,
+  }));
 function referralRsi(fail = () => null) {
   const asked = [];
   global.fetch = async (url, init) => {
@@ -184,5 +191,34 @@ test('getReferral: the keep gate decides in auto mode; a pressed Scan still merg
     assert.equal(manual.ok, true);
     assert.equal(manual.partial, 'prospects');
     assert.equal(store.db.sources.referral.items.prospectsList.length, 2, 'the last good list');
+  });
+});
+
+// Who a recruit or prospect is (RSI id, handle, moniker, avatar) is never kept: only the
+// dates, and each recruit's campaign, worked out from the ids while the scan runs.
+test('getReferral keeps dates and campaigns only, never who', async () => {
+  await withReferrals(async () => {
+    referralRsi();
+    const r = await OH.getReferral(null, { account: ACCOUNT });
+    assert.equal(r.ok, true);
+    const items = store.db.sources.referral.items;
+    assert.equal(items.recruitsList.length, 60);
+    // The current campaign's three (r0 to r2) are tagged so; the rest are legacy.
+    assert.deepEqual(
+      items.recruitsList.slice(0, 4).map((x) => x.campaign),
+      ['current', 'current', 'current', 'legacy'],
+    );
+    for (const row of items.recruitsList)
+      assert.deepEqual(Object.keys(row), ['enlistedOn', 'convertedOn', 'campaign']);
+    assert.deepEqual(items.prospectsList, [
+      { enlistedOn: '2025-02-03', convertedOn: null },
+      { enlistedOn: '2025-02-03', convertedOn: null },
+    ]);
+    assert.doesNotMatch(JSON.stringify(store.db), /Recruit|avatar\.png|"r\d+"/);
+    // The current recruits failing: the last scan's tagged list stands in whole.
+    referralRsi((c, conv) => (c === '2' && conv ? new Response('', { status: 500 }) : null));
+    const again = await OH.getReferral(null, { account: ACCOUNT });
+    assert.equal(again.partial, 'current recruits');
+    assert.deepEqual(store.db.sources.referral.items.recruitsList, items.recruitsList);
   });
 });
