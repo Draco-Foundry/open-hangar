@@ -1,6 +1,7 @@
 <script>
   // The toolbar popup (the connector build, src/flags.js `connector`), as the owner
-  // signed it off (2026-10-14): a header (the scan's age; New in after an update), three tabs
+  // signed it off (2026-10-14): a header (the scan's age; New in after an update), Scan under
+  // it (./ScanBar.svelte, the owner 2026-10-26), three tabs
   // (Hangar, Wishlist, Settings; Wishlist with a count of its Remind Me items on sale,
   // which replaced the alerts bell and its Alerts view). It shows
   // what's stored in this browser and never asks RSI anything (ui/popup/data.js). Scan
@@ -35,6 +36,7 @@
   import { rsiCookie, rsiSignIn, watchCookie } from './rsi-cookie.js';
   import { flag } from '../lib/flags.js';
   import Hangar from './Hangar.svelte';
+  import ScanBar from './ScanBar.svelte';
   import Wishlist from './Wishlist.svelte';
   import Settings from './Settings.svelte';
 
@@ -141,8 +143,8 @@
     return Number.isFinite(last) && last >= report.sync.at ? null : who;
   });
   const hasNews = $derived(justUpdated?.to === version && prefs.seenVersion !== version);
-  // A scan that stopped partway: one line at the top of every tab (Scan Again with it,
-  // unless signed out: Log In to RSI is on Hangar).
+  // A scan that stopped partway: one line at the top of every tab, under Scan (which
+  // says Scan Again then; signed out, Log In to RSI).
   const stop = $derived(
     ready && v
       ? stopLine({ phase: sc.phase, signedOut, report, scannedAt: v.scannedAt })
@@ -442,6 +444,23 @@
       <i style:width={frac == null ? null : `${frac}%`} class:wait={frac == null}></i>
     </div>
   {/if}
+  <!-- Scan at the top, on every tab (the owner, 2026-10-26); the first run keeps it under
+       its heading. -->
+  {#snippet scanRow()}
+    <ScanBar
+      {v}
+      {sc}
+      {signedOut}
+      {rsiOff}
+      report={shown}
+      lastReport={report}
+      {note}
+      busyNote={BAR && !!busyAt && now - busyAt < 60e3}
+      {now}
+      onscan={scan}
+    />
+  {/snippet}
+  {#if ready && v && !firstRun}<div class="pp-top">{@render scanRow()}</div>{/if}
   {#if whatsNew && hasNews}
     <div class="pp-whatsnew" id="pp-whatsnew">
       <b>{t('popup.new-in', { version })}</b>
@@ -476,9 +495,6 @@
   {#if stop}
     <div class="pp-stopnote" id="pp-stopped" role="status">
       <span>{t(stop)}</span>
-      {#if stop === 'popup.stop-partway'}
-        <button type="button" class="pp-link" id="pp-scan-again" onclick={scan}>{t('popup.scan-again')}</button>
-      {/if}
     </div>
   {/if}
 
@@ -491,19 +507,13 @@
         {avatar}
         {db}
         {account}
-        {sc}
-        noted={stop === 'popup.stop-partway'}
         {signedOut}
-        {rsiOff}
         {fx}
         report={shown}
         lastReport={report}
-        {note}
-        busyNote={BAR && !!busyAt && now - busyAt < 60e3}
-        {now}
         news={[]}
         first
-        onscan={scan}
+        scan={scanRow}
         {alerts}
         {fresh}
       />
@@ -544,20 +554,13 @@
             {avatar}
             {db}
             {account}
-            {sc}
-            noted={stop === 'popup.stop-partway'}
             {signedOut}
-            {rsiOff}
             {fx}
             report={shown}
             lastReport={report}
             {pilot}
             onpilot={answerPilot}
-            {note}
-        busyNote={BAR && !!busyAt && now - busyAt < 60e3}
-        {now}
             {news}
-            onscan={scan}
             onwishlist={() => pickTab('wishlist')}
             {alerts}
             {fresh}
