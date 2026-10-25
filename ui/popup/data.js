@@ -177,15 +177,15 @@ export function scanSteps(part) {
 // header and the steps above stay). One bar where Scan sits: its label the part running
 // and how many it has read, its fill the scan's real progress. Where each part's share
 // of the whole scan ends: the hangar and buy-backs are most of a scan's pages. Packs
-// read after the scan's end (ui/scan/runner.js readPacks), so they fill on their own.
+// (the buy-backs' own pages, ui/scan/runner.js readPacks) are read before the sync.
 const BAR_SPAN = {
   start: [0, 0.02],
   account: [0.02, 0.05],
   hangar: [0.05, 0.55],
   buybacks: [0.55, 0.85],
-  referrals: [0.85, 0.95],
+  referrals: [0.85, 0.9],
+  packs: [0.9, 0.95],
   sync: [0.95, 1],
-  packs: [0, 1],
 };
 const counted = (n) => Number.isFinite(n) && n > 0;
 // How much of the part is read, 0 to 1. The hangar and buy-backs by page of RSI's pager

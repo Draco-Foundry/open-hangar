@@ -1,1 +1,0 @@
-- Changed: **Store alerts follow Remind Me.** The bell is gone: the Wishlist tab counts your Remind Me items on sale and lists them first, and only those items get the toolbar number and notifications. Paints and sales for ships you own show in Fleet News.

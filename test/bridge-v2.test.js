@@ -741,6 +741,47 @@ test('requestScan: an open basic page is brought to the front and named in the r
 });
 
 // --- Firefox: the background's own checks --------------------------------------------
+test("chrome and edge: only a tab's top frame on one of our pages (#671)", async () => {
+  const x = load();
+  const hello = { type: 'oh-hello' };
+  assert.equal((await x.send(hello, APP)).ok, true);
+  for (const [what, sender] of [
+    ['a frame', { frameId: 1 }],
+    ['no frame id', { frameId: undefined }],
+    ['not in a tab', { tab: undefined }],
+  ])
+    for (const msg of Object.values(VALID))
+      assert.equal(await x.send(msg, APP, sender), undefined, `${what} ${msg.type}`);
+  assert.deepEqual(x.opened, []);
+  assert.deepEqual(x.cart, []);
+});
+
+// The store's host list (#671): every store and beta build lets in exactly our
+// production pages, https and no port, never staging or a developer's site. And the
+// test helper's own copy of the list (test/bridge-env.js) is the build's.
+test('store and beta builds let in only our production pages', async () => {
+  const real = await import('../scripts/site-pages.mjs');
+  const { buildValues, readRegistry } = await import('../scripts/build-flags.mjs');
+  const registry = readRegistry(path.join(__dirname, '..', 'src', 'flags.js'));
+  const PRODUCTION = [HANGAR, FRONT, APP];
+  for (const beta of [false, true]) {
+    const flags = buildValues(registry, { beta });
+    const pages = real.pagesFor({ localMode: flags.localMode, sync: flags.sync });
+    for (const o of [...pages.hangar, ...pages.site, ...pages.connect])
+      assert.ok(PRODUCTION.includes(o), `${beta ? 'beta' : 'store'}: ${o}`);
+    assert.deepEqual(pages.connect, [APP], 'Connect on the app only');
+    assert.deepEqual(real.patternsOf(pages), [`${HANGAR}/*`, `${FRONT}/*`, `${APP}/*`]);
+  }
+  for (const localMode of [false, true])
+    for (const sync of [false, true])
+      for (const staging of [false, true])
+        assert.deepEqual(
+          pagesFor({ localMode, sync, staging }),
+          real.pagesFor({ localMode, sync, devSite: staging }),
+          JSON.stringify({ localMode, sync, staging }),
+        );
+});
+
 test("firefox: only our content script, in a tab's top frame, on one of our pages", async () => {
   const x = load({ browser: 'firefox' });
   const hello = { type: 'oh-hello' };

@@ -45,8 +45,8 @@ const ACCOUNT = {
 };
 const pack = (i) => ({ id: String(700 + i), name: `Pack ${i}`, kind: 'pack', isCCU: false });
 
-// A stand-in OH with a hangar of two pledges, buy-backs with three packs never read, a
-// clock (`clock.t`) and every call noted in order.
+// A stand-in OH with a hangar of two pledges, buy-backs (three packs, one read from RSI,
+// a ship, an upgrade, a pack filled from history), a clock (`clock.t`) and every call noted in order.
 function setup(opts = {}) {
   const calls = [];
   const logs = [];
@@ -57,12 +57,22 @@ function setup(opts = {}) {
     owner: { nickname: 'Test_Pilot' },
     sources: {
       hangar: { items: [{ id: '1' }, { id: '2' }], scannedAt: 1 },
-      buybacks: { items: [pack(1), pack(2), pack(3), { id: '9', kind: 'ship' }], scannedAt: 1 },
+      buybacks: {
+        items: [
+          pack(1),
+          pack(2),
+          pack(3),
+          { id: '9', kind: 'ship' },
+          { id: '10', kind: 'ccu', isCCU: true },
+          { id: '11', kind: 'pack' },
+        ],
+        scannedAt: 1,
+      },
     },
     history: [],
     ...(opts.db || {}),
   };
-  const details = { 701: { price: 10 } };
+  const details = { 701: { price: 10 }, 11: { price: 20, src: 'history' } };
   const OH = {
     flags: { wishlistImport: false, ...(opts.flags || {}) },
     log: (level, where, msg) => logs.push(`${level} ${where}: ${msg}`),
@@ -96,6 +106,9 @@ function setup(opts = {}) {
     getHistory: async () => [],
     fillBuybackDetailsFromHistory: async (list) => calls.push(`fill ${list.length}`),
     getBuybackDetails: async () => details,
+    buybackFromRsi: (d) => !!d && !d.partial && !d.src,
+    getBuybackMisses: async () => opts.misses || {},
+    bbdMissUntil: (m) => (m ? m.at + 86_400_000 * 2 ** (m.n - 1) : 0),
     fetchBuybackDetails:
       opts.fetchBuybackDetails ||
       (async (ids, onProgress) => {
@@ -145,10 +158,10 @@ function setup(opts = {}) {
   });
 }
 
-test('scan: the account, the hangar, buy-backs, referrals, saved, then the sync and packs', async () => {
+test('scan: the account, the hangar, buy-backs, referrals, their pages, saved, then the sync', async () => {
   const x = await setup();
   const report = await x.runner.scan({ reason: 'popup' });
-  await x.runner.readPacks(); // the one the scan started
+  await x.runner.packsDone();
   assert.deepEqual(x.calls, [
     'getAccount force',
     'loadDB', // whose hangar is live (reconcile)
@@ -156,20 +169,23 @@ test('scan: the account, the hangar, buy-backs, referrals, saved, then the sync 
     'scanSource buybacks',
     'getReferral',
     'loadDB',
-    'fill 4',
+    'fill 6',
+    // Every buy-back's own page not read from RSI yet (701 was; 11 only from history),
+    // before the sync so it carries them (#798). Upgrades have no page.
+    'fetchBuybackDetails 702,703,9,11',
+    'flush',
+    'settled',
     'flush',
     'settled',
     'siteSync auto',
-    'fetchBuybackDetails 702,703', // packs never read (701 was), not the ship
-    'flush',
-    'settled',
   ]);
   assert.deepEqual(x.seen.slice(0, 3), ['start', 'progress start', 'progress account']);
   assert.ok(
     x.seen.indexOf('scanned 3') < x.seen.indexOf('syncStart'),
     'the report before the sync',
   );
-  assert.ok(x.seen.includes('synced sent') && x.seen.at(-1) === 'packs');
+  assert.ok(x.seen.indexOf('packs') < x.seen.indexOf('scanned 3'), 'the pages in the scan');
+  assert.ok(x.seen.includes('synced sent'));
   // The report: ids and counts, never words.
   assert.deepEqual(Object.keys(report), [
     'v',
@@ -198,7 +214,7 @@ test('scan: the account, the hangar, buy-backs, referrals, saved, then the sync 
   assert.equal(report.switched, null);
   assert.deepEqual(report.rows, [
     { id: 'hangar', ok: true, partial: null, n: 2, error: null },
-    { id: 'buybacks', ok: true, partial: null, n: 4, error: null },
+    { id: 'buybacks', ok: true, partial: null, n: 6, error: null },
     { id: 'referrals', ok: true, partial: null, n: null, error: null },
   ]);
   assert.equal(report.bad, false);
@@ -285,7 +301,6 @@ test('scan: progress stored about twice a second at most, the newest kept, gone 
     },
   });
   await x.runner.scan();
-  await x.runner.readPacks(); // the packs the scan went on to read
   const hangar = sets(x.session, 'scanProgress').filter((p) => p.part === 'hangar');
   // Pages at 0, 100 … 1000 ms: written at 0, 500 and 1000 ms only.
   assert.deepEqual(
@@ -305,7 +320,7 @@ test('scan: progress stored about twice a second at most, the newest kept, gone 
   assert.equal(x.seen.filter((s) => s === 'progress hangar').length, 11);
   // Each part's start is written right away.
   const parts = [...new Set(sets(x.session, 'scanProgress').map((p) => p.part))];
-  assert.deepEqual(parts, ['start', 'account', 'hangar', 'buybacks', 'referrals', 'sync', 'packs']);
+  assert.deepEqual(parts, ['start', 'account', 'hangar', 'buybacks', 'referrals', 'packs', 'sync']);
   assert.ok(removals(x.session, 'scanProgress') >= 1);
   assert.equal(x.session.data.scanProgress, undefined);
 
@@ -672,12 +687,31 @@ test('readPacks: up to the cap, one read at a time, everything saved before it a
     fetchBuybackDetails: async () => ({ done: 0, errors: 0, rateLimited: true, retryAt: 5 }),
   });
   assert.deepEqual(await slow.runner.readPacks(), {
-    todo: 2,
+    todo: 4,
     done: 0,
     errors: 0,
     rateLimited: true,
     retryAt: 5,
   });
+});
+
+test('readPacks: a page that failed waits out its time, then goes after the rest (#800)', async () => {
+  const DAY = 86_400_000;
+  const x = await setup({
+    misses: {
+      702: { n: 1, at: 1_000_000 - 1000 }, // failed a moment ago: held a day
+      9: { n: 1, at: 1_000_000 - 2 * DAY }, // its day is over: tried, after the rest
+      703: { n: 3, at: 1_000_000 - 3 * DAY }, // third miss in a row: held 4 days
+    },
+  });
+  await x.runner.readPacks();
+  assert.ok(x.calls.includes('fetchBuybackDetails 11,9'));
+  // With room for one, the page that never failed goes first.
+  await x.runner.readPacks({ max: 1 });
+  assert.equal(
+    x.calls.filter((c) => c.startsWith('fetchBuybackDetails')).at(-1),
+    'fetchBuybackDetails 11',
+  );
 });
 
 test('the portrait: a small copy of the RSI picture, read again only when it changes', async () => {

@@ -313,7 +313,7 @@ test('an unchanged hangar is checked with 3 requests, not every page (#294)', as
   assert.deepEqual(r.items, list);
   assert.deepEqual(calls, { 1: 1, 5: 1, 6: 1 }); // first, last, and RSI clamping after it
   assert.equal(store.dbHistory.length, snaps); // same snapshot, just re-checked
-  assert.ok(store.dbHistory.at(-1).checkedAt);
+  assert.equal('checkedAt' in store.dbHistory.at(-1), false, 'no confirm time is kept');
 });
 
 test('a short last page needs no clamp check (#294)', async () => {
@@ -481,7 +481,7 @@ test('peekSource: buy-backs compare their token count too', async () => {
   await reset();
   const page = { items: [{ id: 'b1', name: 'Cutlass' }], tokens: 2 };
   store.db = {
-    schemaVersion: 3, // as stored today (an older one is written back once)
+    schemaVersion: 5, // as stored today (an older one is written back once)
     sources: { buybacks: { items: page.items, scannedAt: 1, meta: { tokens: 2 } } },
   };
   // status.json as the pages cached it (its cache is the one thing a check may refresh).

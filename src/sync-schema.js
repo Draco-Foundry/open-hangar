@@ -210,6 +210,11 @@
           kind: { type: 'string' },
           label: { type: 'string' },
           image: { type: ['string', 'null'] },
+          manufacturer: {
+            description:
+              'The maker line on the item\'s tile, as RSI wrote it ("Aegis Dynamics (AEGS)"); absent when the tile shows none, and in payloads from before it was read (#568).',
+            type: 'string',
+          },
           guessed: { type: 'boolean' },
         },
       },
@@ -239,7 +244,8 @@
         },
       },
       buyback: {
-        description: "A pledge on RSI's buy-back list.",
+        description:
+          'A pledge on RSI\'s buy-back list. price, priceFrom, insurance and contents come from the buy-back\'s own RSI page once the extension has read it (#798): price then reads like "$1,234.50 USD" with priceFrom "page"; insurance and contents are as a pledge\'s. Without that read, price is whatever the list showed (usually empty) and the other three are absent.',
         type: 'object',
         required: ['id', 'name'],
         properties: {
@@ -250,6 +256,9 @@
           contains: { type: 'string' },
           href: { type: 'string' },
           price: { type: 'string' },
+          priceFrom: { const: 'page' },
+          insurance: { type: ['string', 'null'] },
+          contents: { type: 'array', items: { $ref: '#/$defs/buybackContent' } },
           isCCU: { type: 'boolean' },
           ccu: { $ref: '#/$defs/ccu' },
           wasUpgraded: { type: 'boolean' },
@@ -257,6 +266,19 @@
           toShipId: { type: 'string' },
           toSkuId: { type: 'string' },
           kind: { type: 'string' },
+        },
+      },
+      buybackContent: {
+        description:
+          "One thing in a buy-back, from its own RSI page: kind Ship (with manufacturer and focus), Insurance, or empty when the page doesn't say.",
+        type: 'object',
+        required: ['kind', 'label'],
+        additionalProperties: false,
+        properties: {
+          kind: { type: 'string' },
+          label: { type: 'string' },
+          manufacturer: { type: 'string' },
+          focus: { type: 'string' },
         },
       },
       recruitCount: {
@@ -277,13 +299,9 @@
       },
       recruit: {
         description:
-          'A recruit as RSI lists it, each value passed on as it is, and the campaign the extension tags it with.',
+          "A recruit's dates as RSI lists them, each passed on as it is, and the campaign the extension tags it with. Never who the recruit is: no RSI id, handle, moniker or avatar (versions before 2026-10-24 sent them; the website drops them).",
         type: 'object',
         properties: {
-          id: { $ref: '#/$defs/scalar' },
-          handle: { $ref: '#/$defs/scalar' },
-          moniker: { $ref: '#/$defs/scalar' },
-          avatar: { $ref: '#/$defs/scalar' },
           enlistedOn: { $ref: '#/$defs/scalar' },
           convertedOn: { $ref: '#/$defs/scalar' },
           campaign: { enum: ['current', 'legacy'] },
@@ -310,8 +328,15 @@
                 ],
               },
             },
-            credit: { type: 'number' },
-            checkedAt: { type: 'number' },
+            credit: {
+              description:
+                "Versions before 2026-10-24 only: this version keeps it in the browser and doesn't send it. The website reads neither.",
+              type: 'number',
+            },
+            checkedAt: {
+              description: 'Versions before 2026-10-24 only. The website reads neither.',
+              type: 'number',
+            },
           },
         },
       },

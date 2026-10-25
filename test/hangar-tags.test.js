@@ -1,9 +1,10 @@
 'use strict';
 
 /*
- * RSI's October 2026 hangar (OH-055): the green ATTRIBUTED tag beside UPGRADED, the
- * Game Library's primary Game Access pledge (never meltable or giftable) and pledges
- * marked as a gift at purchase. The parser reads none of the tags, so a tagged card
+ * RSI's October 2026 hangar (OH-055, #713): the green ATTRIBUTED tag beside UPGRADED,
+ * the Game Library's primary Game Access pledge (its locks, never meltable or giftable)
+ * and pledges bought from October on. The fixtures are real captured markup with made-up
+ * ids and names. The parser reads none of the tags, so a tagged card
  * reads exactly as it did, giftable and meltable still come from the rendered Gift and
  * Exchange actions, and a hangar scan over these pages is complete, not partial.
  * Run: `npm test`.
@@ -76,12 +77,27 @@ test('ATTRIBUTED and UPGRADED tags leave the pledge as it reads without them', (
   assert.equal(ccu.meltable, true);
 });
 
-test('tags after the date in the date column still leave the date readable', () => {
+test('a pledge bought in October: Exchange but no Gift, as RSI renders it', () => {
   const paint = byId(P.parsePledges(TAGS), '603');
   assert.equal(paint.date, '2026-10-05');
   assert.equal(paint.kind, 'paint');
-  assert.equal(paint.giftable, true);
-  assert.equal(paint.meltable, false);
+  assert.equal(paint.giftable, false);
+  assert.equal(paint.meltable, true);
+});
+
+test("an upgraded pledge's Upgrades button and tags stay out of its name and contents", () => {
+  const ship = byId(P.parsePledges(TAGS), '601');
+  assert.deepEqual(
+    ship.contents.map((c) => c.label),
+    ['Avenger Titan', '120 Months Insurance'],
+  );
+  assert.doesNotMatch(words(ship), /upgrades/);
+});
+
+test('nothing on the tagged and Game Library cards is unrecognized (parser report)', () => {
+  const none = { pledges: [], items: [], tags: [], labels: [], hooks: [] };
+  assert.deepEqual(P.unrecognized(TAGS, 'hangar'), none);
+  assert.deepEqual(P.unrecognized(LIBRARY, 'hangar'), none);
 });
 
 test('the primary Game Access pledge reads as neither giftable nor meltable', () => {
@@ -100,9 +116,15 @@ test('the primary Game Access pledge reads as neither giftable nor meltable', ()
     ],
   );
   assert.doesNotMatch(words(p), /game access/);
+  // The card does carry both locks (the fixture is the real markup).
+  const card = new JSDOM(LIBRARY).window.document.querySelector('.has-entitlement-lock');
+  assert.deepEqual(
+    [...card.querySelectorAll('.entitlement-lock-label')].map((l) => l.textContent),
+    ['SC Game Access', 'SQ42 Game Access'],
+  );
 });
 
-test('gift-marked and older pledges keep the gifting RSI renders for them', () => {
+test('October and older pledges keep the gifting RSI renders for them', () => {
   const pledges = P.parsePledges(LIBRARY);
   assert.equal(pledges.length, 4);
   const flags = (id) => {
@@ -111,9 +133,8 @@ test('gift-marked and older pledges keep the gifting RSI renders for them', () =
   };
   // A second game package from before October: both, as before.
   assert.deepEqual(flags('702'), { giftable: true, meltable: true });
-  // Marked as a gift at purchase in October: the Gift action, no Exchange.
-  assert.deepEqual(flags('703'), { giftable: true, meltable: false });
-  assert.doesNotMatch(words(byId(pledges, '703')), /"gift"/);
+  // Bought in October (the capture): Exchange, no Gift, no tag of its own.
+  assert.deepEqual(flags('703'), { giftable: false, meltable: true });
   // Bought before October and never giftable: still not giftable.
   assert.deepEqual(flags('704'), { giftable: false, meltable: true });
 });

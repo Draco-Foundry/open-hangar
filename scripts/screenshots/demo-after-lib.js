@@ -14,3 +14,9 @@ if (window.__demoScan) {
   // The packs after it: none read (each one would ask RSI).
   OH.fetchBuybackDetails = async () => ({ done: 0, errors: 0, total: 0 });
 }
+// The demo hangar was read by today's parser (src/hangar-shape.js PARSER_VERSION), so it
+// shows as current (OH.parserStale, #728), unless a test seeded its own stamps.
+if (!window.__demoLocal?.scanParser) {
+  const v = window.OHShape.PARSER_VERSION;
+  chrome.storage.local.set({ scanParser: { hangar: v, buybacks: v } });
+}

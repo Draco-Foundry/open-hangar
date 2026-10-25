@@ -374,8 +374,10 @@ function loadBackground({
       }
       res(undefined);
     });
-  // Chrome and Edge: a page's message, with the origin the browser gives.
-  const send = (msg, origin, sender = {}) => answer(external, msg, { origin, ...sender });
+  // Chrome and Edge: a page's message, with the origin the browser gives (a tab's top
+  // frame unless `sender` says otherwise).
+  const send = (msg, origin, sender = {}) =>
+    answer(external, msg, { origin, tab: { id: 1 }, frameId: 0, ...sender });
   // Firefox: the raw message as the bridge sends it, and its sender.
   const sendInternal = (msg, sender) => answer(internal, msg, sender);
   // Firefox: what the bridge passes on from a page at `url` (our content script, top

@@ -276,6 +276,14 @@ test('an account switch is asked first; reconnecting the same account is not', (
   // No name to tell by, on either side: asked.
   assert.equal(OH.siteSwitches(was, { token: 'n', name: '' }), true);
   assert.equal(OH.siteSwitches({ token: 't', name: '' }, { token: 'n', name: 'pilot' }), true);
+  // The website's account id, when both links have one (#765): two accounts with one
+  // name are asked; one account renamed isn't.
+  const mine = { token: 't', name: 'pilot', account: 'a1' };
+  assert.equal(OH.siteSwitches(mine, { token: 'n', name: 'pilot', account: 'a2' }), true);
+  assert.equal(OH.siteSwitches(mine, { token: 'n', name: 'Renamed', account: 'a1' }), false);
+  // A link saved before the id: by name, as before.
+  assert.equal(OH.siteSwitches(was, { token: 'n', name: 'pilot', account: 'a2' }), false);
+  assert.equal(OH.siteSwitches(was, { token: 'n', name: 'other', account: 'a2' }), true);
 });
 
 test('a switch said no to: the new token is revoked, the link kept', async () => {
@@ -415,7 +423,7 @@ test('a sync that goes through keeps the scan it sent; a refusal carries its sta
 });
 
 // --- What sync leaves out ------------------------------------------------------------
-// The referral prospects list is other players (handles, monikers, enlist dates) who
+// The referral prospects list is other players (their enlist dates) who
 // aren't recruits yet: the backup file keeps it, sync never sends it.
 
 const withReferral = () => {
@@ -426,15 +434,56 @@ const withReferral = () => {
       current: { recruits: 1 },
       legacy: { recruits: 1 },
       prospects: 2,
-      recruitsList: [{ id: 'r1', handle: 'Recruit_One', campaign: 'current' }],
+      recruitsList: [{ enlistedOn: '2026-08-01', convertedOn: '2026-09-01', campaign: 'current' }],
       prospectsList: [
-        { id: 'x1', handle: 'Someone_Else', moniker: 'Someone', date: '2026-09-01' },
-        { id: 'x2', handle: 'Another_Pilot', moniker: 'Another', date: '2026-09-02' },
+        { enlistedOn: '2026-09-01', convertedOn: null },
+        { enlistedOn: '2026-09-02', convertedOn: null },
       ],
     },
   };
   return db;
 };
+
+// Scan history: each snapshot goes as its time and pledges only. Its Store Credit (which
+// the popup's value change reads here) and an older version's checkedAt stay in this
+// browser: the website reads neither (owner, 2026-10-24).
+test('sync sends history without Store Credit or checkedAt; the backup file keeps the credit', async () => {
+  const db = scanned(Date.now() - 60_000);
+  db.history = [
+    { at: 1, items: [['p1', 'Gladius', 90]], credit: 12.5, checkedAt: 5 },
+    { at: 2, items: [['p1', 'Gladius', 95]], credit: 20 },
+  ];
+  linked(db);
+  answer = () => new Response(JSON.stringify({ ok: true, synced_at: 1 }), { status: 200 });
+  await OH.siteSync();
+  assert.deepEqual(sent[0].history, [
+    { at: 1, items: [['p1', 'Gladius', 90]] },
+    { at: 2, items: [['p1', 'Gladius', 95]] },
+  ]);
+  const backup = await OH.exportDB();
+  assert.deepEqual(
+    backup.history.map((s) => s.credit),
+    [12.5, 20],
+  );
+  assert.equal(
+    backup.history.some((s) => 'checkedAt' in s),
+    false,
+    'checkedAt is no longer kept',
+  );
+  await OH.storageSettled();
+  assert.equal(
+    mem.dbHistory.some((s) => 'checkedAt' in s),
+    false,
+    'and goes from storage',
+  );
+  assert.equal(mem.dbHistory[0].credit, 12.5);
+});
+
+test('OH.syncPayload leaves the payload it is given alone', () => {
+  const payload = { history: [{ at: 1, items: [], credit: 3 }] };
+  assert.deepEqual(OH.syncPayload(payload).history, [{ at: 1, items: [] }]);
+  assert.equal(payload.history[0].credit, 3);
+});
 
 test('sync leaves the prospects list out; the backup file keeps it', async () => {
   linked(withReferral());
@@ -444,7 +493,8 @@ test('sync leaves the prospects list out; the backup file keeps it', async () =>
   assert.equal('prospectsList' in ref, false, 'no prospects list in the sync');
   assert.equal(ref.prospects, 2, 'the count still goes');
   assert.equal(ref.recruitsList.length, 1, 'the recruits list still goes');
-  assert.ok(!JSON.stringify(sent[0]).includes('Someone_Else'));
+  assert.ok(!JSON.stringify(sent[0]).includes('2026-09-02'));
+  assert.deepEqual(Object.keys(ref.recruitsList[0]), ['enlistedOn', 'convertedOn', 'campaign']);
   // The backup file (OH.exportDB) and the stored data are untouched.
   const backup = await OH.exportDB();
   assert.equal(backup.sources.referral.items.prospectsList.length, 2);
@@ -631,7 +681,7 @@ test("a link's first sync asks when this browser keeps another account too", asy
   linked(scanned(Date.now() - 60_000));
   signedInAs('Pilot_B', '2002');
   mem['profile:pilot_a'] = {
-    schemaVersion: 3,
+    schemaVersion: 5,
     sources: { hangar: { scannedAt: 1, items: [] } },
     owner: { nickname: 'Pilot_A', displayname: 'Pilot_A' },
   };
