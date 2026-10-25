@@ -2334,6 +2334,18 @@ try {
   bbPass.hideOn && bbPass.stackOff && bbPass.stacked === bbPass.flat - 2 && bbPass.badges === 2
     ? ok('buy-backs: small stuff hidden by default; Stack identical is opt-in and stacks copies')
     : fail(`buy-backs pass: ${JSON.stringify(bbPass)}`);
+  // A pledge buy-back has a price only once its RSI page is read (a CCU's is today's
+  // upgrade price), so three read pages for the price cap and the price sort.
+  const BB_READ = { 8801: 60, 8802: 50, 8803: 45 };
+  // Kept where the dashboard reloads them from (OH.getBuybackDetails), until the
+  // market tools are checked.
+  await page.evaluate(async (read) => {
+    const kept = await OH.getBuybackDetails();
+    for (const [id, price] of Object.entries(read))
+      kept[id] = { price, currency: 'USD', ships: [], also: [] };
+    state.bbDetails = { ...kept }; // a new object, so the cards redraw
+    renderBuybacks();
+  }, BB_READ);
   // The same filter sidebar as Inventory (ui/buybacks): insurance read from the
   // contents line, a price cap, the pills, and Clear All.
   const bbSide = await page.evaluate(async () => {
@@ -2450,6 +2462,12 @@ try {
   bbTools.store
     ? ok(`buy-back market tools: pick, % → price, total ("${bbTools.sel.trim()}"), exports`)
     : fail(`buy-back market tools: ${JSON.stringify(bbTools)}`);
+  await page.evaluate(async (read) => {
+    const kept = await OH.getBuybackDetails();
+    for (const id of Object.keys(read)) delete kept[id];
+    state.bbDetails = { ...kept };
+    renderBuybacks();
+  }, BB_READ);
   await page.evaluate(async () => {
     const box = document.querySelector('#buybacks-body .mk-pick');
     box.click(); // untick so later checks start clean

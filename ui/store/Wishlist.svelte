@@ -14,7 +14,7 @@
   // Ships and packs first, then CCUs; newest melt first within each.
   const bbRank = (b) => (b.ccu ? 2 : b.kind === 'ship' ? 0 : 1);
   const bbType = (b) =>
-    b.ccu ? 'CCU' : b.kind === 'package' ? 'Package' : b.kind === 'pack' ? 'Pack' : 'Ship';
+    b.ccu ? 'CCU' : b.kind === 'package' ? 'Game Package' : b.kind === 'pack' ? 'Pack' : 'Ship';
   const plural = (n, w) => (n ? `${n} ${w}${n === 1 ? '' : 's'}` : '');
 
   const d = $derived.by(() => {

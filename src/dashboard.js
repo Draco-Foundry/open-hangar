@@ -28,7 +28,7 @@ const statusEl = $('#status');
 const BB_KINDS = [
   { key: 'ship', label: 'Ships' },
   { key: 'pack', label: 'Packs' },
-  { key: 'package', label: 'Packages' },
+  { key: 'package', label: 'Game Packages' },
   { key: 'ccu', label: 'CCUs' },
   { key: 'paint', label: 'Paints' },
   { key: 'addon', label: 'Add-Ons' },
@@ -1161,7 +1161,6 @@ function computeShown() {
 // Trait filters cut ACROSS kinds (a multi-ship pack is still a "ship" pledge),
 // so they're a second, AND-combined selection: Ships + LTI + Giftable = LTI ships
 // you can gift. Only traits some pledge actually has are shown.
-const GAME_ITEM_RE = /\b(star citizen|squadron 42)\b.*\b(digital|download|game|package)\b/i;
 
 // Traits read a common "facets" view so the same filters work on hangar pledges
 // (tagged items) and buy-backs (one free-text "Items" line, e.g.
@@ -1170,6 +1169,7 @@ function pledgeFacets(p) {
   return {
     name: p.name || '',
     items: p.contents || [],
+    typed: true, // RSI gave each item its kind
     lti: p.insurance === 'LTI',
     giftable: p.giftable === true,
     meltable: p.meltable === undefined ? null : p.meltable === true,
@@ -1203,9 +1203,8 @@ const TRAITS = [
     label: 'Game Packages',
     title: 'Pledges that include game access (Star Citizen / Squadron 42)',
     notLabel: 'No Game Package',
-    test: (f) =>
-      /^package\b/i.test(f.name) ||
-      f.items.some((c) => /^game$/i.test(c.kind || '') || GAME_ITEM_RE.test(c.label || '')),
+    // The website's rule (OH.packKind in src/lib.js): anything that holds the game.
+    test: (f) => OH.packKind(f) === 'package',
   },
   {
     // Most packs bundle a ship with paints and gear (e.g. Nine Tails Shogun Pack:
@@ -1214,11 +1213,15 @@ const TRAITS = [
     label: 'Packs',
     title: 'Pledges named "Pack", or that bundle two or more items (ships, paints, gear…)',
     notLabel: 'Single Items',
-    // Owner's rules: "Pack" in the name makes it a pack, even with one item listed;
-    // anything with game access is a Package (the chip above), never a Pack.
-    test: (f) =>
-      !TRAITS[0].test(f) &&
-      (/\bpacks?\b/i.test(f.name) || f.items.filter(notInsurance).length >= 2),
+    // The website's rule (OH.packKind in src/lib.js); anything with game access is a
+    // Game Package (the chip above), never a Pack. A buy-back's Items line has no kinds
+    // to tell a ship from a paint, so there "Pack" in the name or two or more things
+    // (not counting insurance) still makes a pack.
+    test: (f) => {
+      const k = OH.packKind(f);
+      if (k || f.typed) return k === 'pack';
+      return /\bpacks?\b/i.test(f.name) || f.items.filter(notInsurance).length >= 2;
+    },
   },
   { key: 'lti', label: 'LTI', notLabel: 'No LTI', title: 'Lifetime insurance', test: (f) => f.lti },
   {
@@ -1321,7 +1324,7 @@ const INV_GROUPS = [
     fixed: [
       ['standalone', 'Standalone'],
       ['pack', 'Pack'],
-      ['package', 'Package'],
+      ['package', 'Game Package'],
       ['reward', 'Reward'],
     ].map(([k, l]) => [k, l, (p) => cameFrom(p) === k]),
   },
@@ -1491,7 +1494,7 @@ const BB_GROUPS = [
     fixed: [
       ['standalone', 'Standalone'],
       ['pack', 'Pack'],
-      ['package', 'Package'],
+      ['package', 'Game Package'],
     ].map(([k, l]) => [
       k,
       l,
@@ -1732,33 +1735,18 @@ function meltLabel(p) {
 }
 
 // Sale-sheet sections, in display order. A pledge lands in the FIRST section
-// whose test matches. "Packs" vs "Standalone Ships" both contain a ship, so we
-// split them with a best-effort heuristic: a pack is a game package / bundle
-// (named "Package …", a "Star Citizen + Squadron 42" game pack, or a card that
-// contains more than one ship). A single ship that merely ships with a paint
-// (e.g. "Cutter plus Groundswell Paint") stays a Standalone Ship.
+// whose test matches. "Packs" vs "Standalone Ships" both contain a ship: pledgeType
+// splits them (OH.packKind).
 // The type shown on a pledge's badge (and its color, same everywhere):
 // ccu · package (game access) · pack · ship · paint · addon · coupon.
 const TYPE_KEYS = ['ccu', 'ship', 'pack', 'package', 'paint', 'addon', 'coupon'];
-// Owner's definitions (2026-10-01): a PACKAGE includes game access (Star Citizen or
-// Squadron 42), e.g. Mustang Alpha Starter Pack; a PACK is a bundle without the game,
-// e.g. Nine Tails Shogun Pack, or anything with "Pack" in its name. Separate types,
-// separate sections, apart from ships, CCUs and add-ons.
-const hasGameAccess = (p) => TRAITS[0].test(pledgeFacets(p));
+// A Game Package holds the game (Star Citizen or Squadron 42), e.g. Mustang Alpha
+// Starter Pack; a Pack is two or more ships, a ship with other things that RSI doesn't
+// sell as a standalone ship, or a set named Pack. Decided by OH.packKind (src/lib.js),
+// the website's rule, so both type a pledge the same way.
 function pledgeType(p) {
   if (p.isCCU) return 'ccu';
-  if (hasGameAccess(p)) return 'package';
-  if (/\bpacks?\b/i.test(p.name || '')) return 'pack';
-  if (isPack(p)) return 'pack';
-  return p.kind;
-}
-function isPack(p) {
-  if (!p.containsShip) return false;
-  const name = p.name || '';
-  if (/\bpackage\b/i.test(name)) return true;
-  if (/squadron\s*42|\bsq42\b/i.test(name)) return true;
-  const ships = (p.contents || []).filter(OH.isShipItem);
-  return ships.length > 1;
+  return OH.packKind(p) || p.kind;
 }
 
 // A standalone hangar pledge ("VFG Industrial Hangar", "Self-Land Hangar",
@@ -1775,14 +1763,14 @@ function isLandClaim(p) {
 
 const MARKET_SECTIONS = [
   // Same rule as the type badge (pledgeType): a pack that holds one ship belongs
-  // under Packs, a starter pack with the game under Packages, never Standalone Ships.
+  // under Packs, a starter pack with the game under Game Packages, never Standalone Ships.
   {
     key: 'ship',
     label: 'Standalone Ships',
     test: (p) => p.containsShip && !['ccu', 'pack', 'package'].includes(pledgeType(p)),
   },
   { key: 'pack', label: 'Packs', test: (p) => pledgeType(p) === 'pack' },
-  { key: 'package', label: 'Packages', test: (p) => pledgeType(p) === 'package' },
+  { key: 'package', label: 'Game Packages', test: (p) => pledgeType(p) === 'package' },
   { key: 'ccu', label: 'Upgrades', test: (p) => p.isCCU },
   { key: 'landclaim', label: 'Land Claims', test: (p) => isLandClaim(p) },
   { key: 'hangar', label: 'Hangars', test: (p) => isHangar(p) },
@@ -3584,12 +3572,17 @@ function bbInsurance(b) {
   );
 }
 
-// The buy-back's real price once its page has been read; else today's store
-// price for the ship as an estimate.
+// The buy-back's real price once its page has been read (or its value from this
+// browser's history). Else, for a CCU only, today's upgrade price as an estimate:
+// RSI sells a CCU back at today's price, but a pledge at what it cost then, which
+// today's store price can't tell.
+function bbEstimate(b) {
+  return b.isCCU ? buybackStorePrice(b) : null;
+}
 function bbPrice(b) {
   const d = bbDetail(b);
   if (d && d.price != null) return d.price;
-  return buybackStorePrice(b);
+  return bbEstimate(b);
 }
 // Where a known price came from, when it wasn't RSI's buy-back page.
 const BB_PRICE_TITLE = {
@@ -3611,7 +3604,7 @@ function bbPriceData(b) {
       est: false,
     };
   if (b.price) return { text: String(b.price), title: '', est: false };
-  const sp = buybackStorePrice(b);
+  const sp = bbEstimate(b);
   return sp
     ? {
         text: dollars(sp),

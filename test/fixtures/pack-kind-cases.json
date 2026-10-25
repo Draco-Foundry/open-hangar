@@ -1,0 +1,105 @@
+{
+  "about": "Pack or Game Package for a pledge as RSI shows it. The extension (src/lib.js OH.packKind, test/pack-kind.test.js) and the website (from a pinned copy) both read every case. want: package (a Game Package), pack, or null (the pledge's own kind).",
+  "cases": [
+    {
+      "why": "a starter pack with the game",
+      "name": "Package - Mustang Alpha Starter Pack",
+      "contents": [
+        { "kind": "Ship", "label": "Mustang Alpha" },
+        { "kind": "", "label": "Star Citizen Digital Download" },
+        { "kind": "Insurance", "label": "6 Month Insurance" }
+      ],
+      "want": "package"
+    },
+    {
+      "why": "RSI's own Game kind",
+      "name": "Package - Squadron 42",
+      "contents": [{ "kind": "Game", "label": "Squadron 42 Digital Download" }],
+      "want": "package"
+    },
+    {
+      "why": "two ships",
+      "name": "Combos - Cutlass Black and Arrow",
+      "contents": [
+        { "kind": "Ship", "label": "Cutlass Black" },
+        { "kind": "Ship", "label": "Arrow" }
+      ],
+      "want": "pack"
+    },
+    {
+      "why": "a ship with paint and gear, not sold as a standalone ship",
+      "name": "Packs - Nine Tails Shogun Pack",
+      "contents": [
+        { "kind": "Vehicle", "label": "Nox" },
+        { "kind": "Paint", "label": "Nox Shogun Paint" },
+        { "kind": "FPS Equipment", "label": "Shogun Helmet" }
+      ],
+      "want": "pack"
+    },
+    {
+      "why": "a standalone ship with a paint thrown in stays the ship",
+      "name": "Standalone Ships - Cutter plus Groundswell Paint",
+      "contents": [
+        { "kind": "Ship", "label": "Cutter" },
+        { "kind": "Paint", "label": "Cutter Groundswell Paint" },
+        { "kind": "Insurance", "label": "Lifetime Insurance" }
+      ],
+      "want": null
+    },
+    {
+      "why": "a ship and its insurance is the ship",
+      "name": "Standalone Ships - Drake Cutlass Black",
+      "contents": [
+        { "kind": "Ship", "label": "Cutlass Black" },
+        { "kind": "Insurance", "label": "120 Months Insurance" }
+      ],
+      "want": null
+    },
+    {
+      "why": "Package in front of a plain ship pledge: the contents decide",
+      "name": "Package - Avenger Titan",
+      "contents": [
+        { "kind": "Ship", "label": "Avenger Titan" },
+        { "kind": "Insurance", "label": "6 Month Insurance" }
+      ],
+      "want": null
+    },
+    {
+      "why": "a paint pack is paints",
+      "name": "Paints - 8 Paint Pack",
+      "contents": [
+        { "kind": "Paint", "label": "Cutlass Red Paint" },
+        { "kind": "Paint", "label": "Cutlass Blue Paint" }
+      ],
+      "want": null
+    },
+    {
+      "why": "a gear set named Pack with mixed items",
+      "name": "Gear - 2956 Racing Gear Pack",
+      "contents": [
+        { "kind": "Armor", "label": "Racing Helmet" },
+        { "kind": "Hangar decoration", "label": "Racing Trophy" }
+      ],
+      "want": "pack"
+    },
+    {
+      "why": "nothing listed, the category says Package",
+      "name": "Package - Arena Commander Pass",
+      "contents": [],
+      "want": "package"
+    },
+    {
+      "why": "an upgrade is never a pack",
+      "name": "Upgrade - Cutlass Black to Constellation Andromeda",
+      "isCCU": true,
+      "contents": [{ "kind": "Upgrade", "label": "Cutlass Black to Constellation Andromeda" }],
+      "want": null
+    },
+    {
+      "why": "one paint",
+      "name": "Paints - Cutlass Ghoulish Green Paint",
+      "contents": [{ "kind": "Paint", "label": "Cutlass Ghoulish Green Paint" }],
+      "want": null
+    }
+  ]
+}
