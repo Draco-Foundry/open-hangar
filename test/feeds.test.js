@@ -346,6 +346,12 @@ test('catalogWishStatus: ships by name, any item by id, CCUs priced from your sh
   const ccu = { id: 'upgrade-16', kind: 'ccu', name: 'Aurora MR to Freelancer', from: 'Aurora MR' };
   const up = OH.catalogWishStatus(c, ccu, opts);
   assert.deepEqual([up.status, up.price, up.warbond], ['in', 85, 75]);
+  // Today's value of the ship you start from, never the one saved with the wish.
+  const saved = OH.catalogWishStatus(c, { ...ccu, fromMsrp: 45 }, opts);
+  assert.deepEqual([saved.price, saved.warbond], [85, 75]);
+  // The saved one only when the ship has no value today.
+  const old = OH.catalogWishStatus(c, { ...ccu, from: 'Retired Ship', fromMsrp: 45 }, opts);
+  assert.deepEqual([old.price, old.warbond], [65, 55]);
   const gone = OH.catalogWishStatus(
     c,
     { id: 'sku-404', kind: 'paint', name: 'Old Paint', price: 5 },
