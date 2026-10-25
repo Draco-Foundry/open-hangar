@@ -12,9 +12,18 @@
   // nothing else in it), so both forms say so.
   import { OH, app, version } from '../lib/app.svelte.js';
 
-  let { kind = 'upgrade', target, from = null, pledgeId = null, retired = false } = $props();
+  let {
+    kind = 'upgrade',
+    target,
+    from = null,
+    pledgeId = null,
+    retired = false,
+    warbond = false,
+  } = $props();
   // retired: a retired ship's buy-back (#306). RSI still sells those back, so the
   // button stays; only a real refusal from RSI says it closed.
+  // warbond: a warbond buy-back, which store credit buys only after about a month
+  // (OH.WARBOND_CREDIT_NOTE): said in place of the token line.
   // target: { toShipId, toSkuId, skus?, name }; from: { id, name } for a buy-back.
 
   const RSI_SIGN_IN = 'https://robertsspaceindustries.com/connect';
@@ -132,6 +141,7 @@
   // quarter and they don't stack.
   const tokenLine = $derived.by(() => {
     version.n;
+    if (warbond && OH().WARBOND_CREDIT_NOTE) return OH().WARBOND_CREDIT_NOTE;
     const n = app() && app().state ? app().state.bbTokens : null;
     if (n == null || !Number.isFinite(Number(n)))
       return "Store credit needs a Buy-Back Token. Cash doesn't.";
