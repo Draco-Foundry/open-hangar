@@ -3584,12 +3584,17 @@ function bbInsurance(b) {
   );
 }
 
-// The buy-back's real price once its page has been read; else today's store
-// price for the ship as an estimate.
+// The buy-back's real price once its page has been read (or its value from this
+// browser's history). Else, for a CCU only, today's upgrade price as an estimate:
+// RSI sells a CCU back at today's price, but a pledge at what it cost then, which
+// today's store price can't tell.
+function bbEstimate(b) {
+  return b.isCCU ? buybackStorePrice(b) : null;
+}
 function bbPrice(b) {
   const d = bbDetail(b);
   if (d && d.price != null) return d.price;
-  return buybackStorePrice(b);
+  return bbEstimate(b);
 }
 // Where a known price came from, when it wasn't RSI's buy-back page.
 const BB_PRICE_TITLE = {
@@ -3611,7 +3616,7 @@ function bbPriceData(b) {
       est: false,
     };
   if (b.price) return { text: String(b.price), title: '', est: false };
-  const sp = buybackStorePrice(b);
+  const sp = bbEstimate(b);
   return sp
     ? {
         text: dollars(sp),
