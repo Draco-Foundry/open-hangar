@@ -1,9 +1,4 @@
 {
   "_help": "Kill switch for the extension. How to use it: docs/RSI-CHANGES.md, step 0.",
-  "sources": {},
-  "banner": {
-    "message": "Open Hangar is in Open Beta, Citizen.",
-    "level": "info",
-    "until": "2026-11-11"
-  }
+  "sources": {}
 }
