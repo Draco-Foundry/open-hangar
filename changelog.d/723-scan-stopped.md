@@ -1,1 +1,1 @@
-- Fixed: **Scans that stop partway.** The popup no longer stays on Scanning: it says the scan stopped, offers Scan Again and keeps your last full scan. A stopped Auto Scan Daily tries once more the next time you open the popup or start your browser.
+- Fixed: **Scans that stop partway.** The popup no longer stays on Scanning: it says the scan stopped, offers Scan Again and keeps your last full scan.

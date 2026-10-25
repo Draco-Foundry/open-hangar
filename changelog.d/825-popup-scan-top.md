@@ -1,0 +1,1 @@
+- Changed: **Scan at the top of the popup.** Scan now sits at the top of every tab, and the button itself shows the scan's progress: the part it's reading and its count, then how long the scan took. If a scan stops, it says Scan Again. The popup also has a quieter look.
