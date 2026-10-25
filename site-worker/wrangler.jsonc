@@ -35,6 +35,8 @@
       "/api/known-issues",
       "/_astro/*",
       "/fonts/*",
+      // The home page's pictures (open-hangar-server app/public/home/).
+      "/home/*",
       "/favicon.svg",
     ],
   },

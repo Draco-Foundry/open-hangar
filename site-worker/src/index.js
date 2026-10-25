@@ -51,7 +51,7 @@ const FEEDS = new Set([
 
 // Everything else the website serves on openhangar.space, by prefix: the Store's
 // data, the Ship Explorer's ships, and the files the home page loads.
-const PREFIXES = ['/api/store/', '/ships/', '/_astro/', '/fonts/'];
+const PREFIXES = ['/api/store/', '/ships/', '/_astro/', '/fonts/', '/home/'];
 const FILES = new Set(['/favicon.svg']);
 
 export default {

@@ -160,7 +160,13 @@ test("with the edge gateway bound, the website's pages go through it as they cam
     assert.deepEqual(calls.cache, [], page);
   }
   // The Store's own data and files go straight to the website.
-  for (const p of ['/api/store/catalog', '/api/store/item', '/_astro/app.js', '/fonts/x.woff2']) {
+  for (const p of [
+    '/api/store/catalog',
+    '/api/store/item',
+    '/_astro/app.js',
+    '/fonts/x.woff2',
+    '/home/sample-hangar.jpg',
+  ]) {
     const { calls } = await visit(p, 200, { edge: true });
     assert.deepEqual(calls.edge, [], p);
     assert.equal(calls.app.length, 1, p);
@@ -259,6 +265,7 @@ test('routes meant to pass to the website still do, with a trailing slash too', 
     '/api/store/anything',
     '/_astro/page.abc123.js',
     '/fonts/x.woff2',
+    '/home/sample-hangar.jpg',
     '/favicon.svg',
   ];
   for (const page of passes) {
