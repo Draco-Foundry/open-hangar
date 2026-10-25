@@ -87,7 +87,9 @@
         <thead>
           <tr>
             <th>Upgrade</th>
-            <th class="num">Worth</th>
+            <!-- The standard price gap between its ships: a value, not what RSI charges
+                 (that's the target edition's price, warbond ones too, less the From ship's). -->
+            <th class="num">Standard Value</th>
             <th class="num">You Paid</th>
             <th class="num">Stock</th>
           </tr>
