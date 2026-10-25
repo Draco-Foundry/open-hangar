@@ -216,6 +216,11 @@
             type: 'string',
           },
           guessed: { type: 'boolean' },
+          also: {
+            description:
+              "RSI lists it apart, by name only, under the pledge's Also Contains line. Only there when true; absent in payloads from before it was read.",
+            type: 'boolean',
+          },
         },
       },
       pledge: {

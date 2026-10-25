@@ -95,6 +95,7 @@
             'itemName',
             'itemImage',
             'itemMaker',
+            'itemAlso',
             'kindFallback',
             'image',
             'gift',
@@ -142,6 +143,11 @@
             },
             itemMaker: {
               description: 'A tile\'s maker line, when RSI shows one ("Aegis Dynamics (AEGS)").',
+              $ref: '#/$defs/selector',
+            },
+            itemAlso: {
+              description:
+                "The block RSI lists a card's Also Contains items in (names only, under its Also Contains line): a tile inside it is marked `also`.",
               $ref: '#/$defs/selector',
             },
             kindFallback: {
@@ -975,6 +981,7 @@
         itemName: '.title, .name, .item-name',
         itemImage: '.image',
         itemMaker: '.liner',
+        itemAlso: '.without-images',
         kindFallback: '.kind',
         image: '.image',
         gift: '.js-gift',

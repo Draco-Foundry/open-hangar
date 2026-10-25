@@ -281,6 +281,10 @@
       // The maker line some tiles show, as RSI wrote it ("Aegis Dynamics (AEGS)", #568).
       const maker = clean(tile.querySelector(RULES.hangar.itemMaker)?.textContent);
       if (maker) item.manufacturer = maker;
+      // RSI lists some items apart, by name only, under the card's "Also Contains"
+      // line (RULES.hangar.itemAlso). Marked so the website can show them the same
+      // way; the mark is only there when it's true.
+      if (tile.closest(RULES.hangar.itemAlso)) item.also = true;
       contents.push(item);
     }
     if (contents.length) return contents;
