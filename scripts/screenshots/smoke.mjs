@@ -5429,7 +5429,8 @@ try {
     sent: __demo.sent.map((m) => m.ohPopup),
     closed: !!__demo.closed,
   }));
-  scanned.sent.join() === 'scan' && scanned.closed
+  // 'opened' first: every popup says it opened (a scan that stopped is cleared).
+  scanned.sent.join() === 'opened,scan' && scanned.closed
     ? ok('Scan asks the background; a scan in a tab closes the popup, as before')
     : fail(`popup Scan: ${JSON.stringify(scanned)}`);
   await page.evaluate(() => {
@@ -5814,23 +5815,49 @@ try {
   !down429.login
     ? ok('RSI not answering: a 5xx and a 429 each get their line, no trouble box, no Log In to RSI')
     : fail(`popup RSI down: ${JSON.stringify({ down5xx, downOut, down429 })}`);
-  // A scan whose page went away (its mark left behind): Scan stopped, Scan Again.
-  await popAt(
-    {
-      ...signedIn,
-      __demoSession: {
-        scanRunning: { at: T0 - 11 * 60e3, tabId: null, run: 'r9', by: 'offscreen' },
-      },
-    },
-    '#pp-scan',
-  );
+  // A scan whose page went away (its mark left behind, its heartbeat quiet for 2
+  // minutes): Scan stopped, and the line at the top with Scan Again (Hangar's own button
+  // is Scan then). A heartbeat 90 seconds old is still Scanning, on the scan bar.
+  const markAt = (ago) => ({
+    ...signedIn,
+    __demoSession: { scanRunning: { at: T0 - ago, tabId: null, run: 'r9', by: 'offscreen' } },
+  });
+  await popAt(markAt(90e3), '#pp-sbar');
+  const beating = await page.evaluate(() => ({
+    age: document.getElementById('pp-age').textContent.trim(),
+    line: !!document.getElementById('pp-stopped'),
+  }));
+  await popAt(markAt(3 * 60e3), '#pp-scan');
   const stopped = await page.evaluate(() => ({
     age: document.getElementById('pp-age').textContent.trim(),
     scan: document.getElementById('pp-scan').textContent,
+    line: document.querySelector('#pp-stopped span')?.textContent || '',
+    again: document.getElementById('pp-scan-again')?.textContent || '',
   }));
-  stopped.age === 'Scan stopped' && stopped.scan === 'Scan Again'
-    ? ok('a scan that stopped: Scan stopped and Scan Again')
-    : fail(`popup stopped: ${JSON.stringify(stopped)}`);
+  await page.click('#pp-scan-again');
+  const againAsked = await page.evaluate(() => __demo.sent?.some?.((m) => m?.ohPopup === 'scan'));
+  beating.age === 'Scanning' &&
+  !beating.line &&
+  stopped.age === 'Scan stopped' &&
+  stopped.scan === 'Scan' &&
+  stopped.line ===
+    'Your last scan stopped before it finished. Your hangar shows the last full scan.' &&
+  stopped.again === 'Scan Again' &&
+  againAsked
+    ? ok('a scan that stopped: Scan stopped, the line at the top and its Scan Again; 90s quiet still Scanning')
+    : fail(`popup stopped: ${JSON.stringify({ beating, stopped, againAsked })}`);
+  // Stopped and signed out of RSI: the signed-out line, no Scan Again (Log In to RSI is
+  // on Hangar).
+  await popAt({ ...markAt(3 * 60e3), __demoCookie: 'out' }, '#pp-login');
+  const stoppedOut = await page.evaluate(() => ({
+    line: document.querySelector('#pp-stopped span')?.textContent || '',
+    again: !!document.getElementById('pp-scan-again'),
+  }));
+  stoppedOut.line ===
+    'Your last scan stopped because RSI signed you out. Log in to RSI, then scan again.' &&
+  !stoppedOut.again
+    ? ok('a scan that stopped signed out: the signed-out line, no Scan Again')
+    : fail(`popup stopped signed out: ${JSON.stringify(stoppedOut)}`);
   // After a browser restart there are no session marks: the start kept locally
   // (scanStarted, #676) with no report or Auto Scan record for it says the same; one
   // that ended (its run at its start) doesn't.
@@ -5845,10 +5872,11 @@ try {
     afterRestart[name] = await page.evaluate(() => ({
       age: document.getElementById('pp-age').textContent.trim(),
       scan: document.getElementById('pp-scan').textContent,
+      again: document.getElementById('pp-scan-again')?.textContent || '',
     }));
   }
   afterRestart.none.age === 'Scan stopped' &&
-  afterRestart.none.scan === 'Scan Again' &&
+  afterRestart.none.again === 'Scan Again' &&
   afterRestart.report.age !== 'Scan stopped' &&
   afterRestart.report.scan === 'Scan' &&
   afterRestart.auto.age !== 'Scan stopped'

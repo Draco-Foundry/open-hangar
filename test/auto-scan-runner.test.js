@@ -620,6 +620,7 @@ test("a pressed Scan notes the parts it read whole; one cut short isn't", async 
     assert.equal(stamps()[p], mem.db.sources[p].scannedAt, p);
   // A hangar RSI stopped answering for partway (nothing saved) and buy-backs that failed.
   delete mem.scanFull;
+  const was = mem.db.sources.hangar;
   rsi.hangar = pledges(35);
   rsi.fail = (kind) =>
     kind === 'hangar:4'
@@ -629,6 +630,7 @@ test("a pressed Scan notes the parts it read whole; one cut short isn't", async 
         : null;
   const report = await r.scan({ reason: 'popup' });
   assert.equal(report.rows[0].ok, false);
+  assert.deepEqual(mem.db.sources.hangar.items, was.items, 'the last full scan stays');
   assert.equal(report.rsiDown, true, 'RSI did not answer: the report says so');
   assert.equal(report.rows[1].ok, false);
   assert.deepEqual(Object.keys(stamps()), ['referral']);

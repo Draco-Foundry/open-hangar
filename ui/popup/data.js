@@ -14,9 +14,10 @@ export const HUB_PAGE = 'src/basic.html';
 
 // The toolbar badge's rule (src/background.js updateReminder).
 export const STALE_DAYS = 7;
-// src/background.js counts a scan mark this old as a page that went away mid-scan, and
-// a scan request as pending for a minute.
-const SCAN_RUN_MAX = 10 * 60e3;
+// src/background.js counts a scan mark this old as a scan that stopped (the mark is its
+// heartbeat, renewed every 30 seconds while it reads), and a scan request as pending for
+// a minute.
+const SCAN_RUN_MAX = 2 * 60e3;
 const SCAN_ASK_GAP = 60e3;
 // Progress this quiet, with no scan mark left, is a scan that stopped (the page that
 // ran it went away before it could say so).
@@ -400,6 +401,19 @@ export function reportPaused(report, scannedAt) {
   );
   return row ? row.error : '';
 }
+// The line at the top after a scan stopped partway: → 'popup.stop-out' (signed out of
+// RSI), 'popup.stop-partway' (anything else; it comes with Scan Again) or null. For a
+// scan that stopped (scanState's 'stopped'), or a last report that ended signed out
+// (until a scan since is newer); never while one runs. Before any scan was saved there's
+// no last full scan to speak of: only the signed-out line.
+export function stopLine({ phase, signedOut, report, scannedAt }) {
+  if (phase === 'running') return null;
+  const out = isObj(report) && report.signedOut === true && !report.held;
+  if (phase !== 'stopped' && !(out && !since(report, scannedAt))) return null;
+  if (signedOut) return 'popup.stop-out';
+  return scannedAt == null ? null : 'popup.stop-partway';
+}
+
 // The sync after the scan asked first (state 'ask': an RSI account this link hasn't
 // synced). The report keeps no handle, so it's the account the scan read: → { handle,
 // record } for the question, or null.
