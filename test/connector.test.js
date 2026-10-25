@@ -224,8 +224,9 @@ test('popup view: a scan running, Store Credit', async () => {
   assert.equal(scanBusy({}, NOW), false);
   assert.equal(scanBusy({ scanRequest: { at: NOW - 30e3 } }, NOW), true);
   assert.equal(scanBusy({ scanRequest: { at: NOW - 90e3 } }, NOW), false);
-  assert.equal(scanBusy({ scanRunning: { at: NOW - 5 * 60e3 } }, NOW), true);
-  assert.equal(scanBusy({ scanRunning: { at: NOW - 11 * 60e3 } }, NOW), false);
+  // The mark is the scan's heartbeat: quiet for 2 minutes, the scan stopped.
+  assert.equal(scanBusy({ scanRunning: { at: NOW - 90e3 } }, NOW), true);
+  assert.equal(scanBusy({ scanRunning: { at: NOW - 2 * 60e3 } }, NOW), false);
   assert.equal(storeCredit({ credits: { store: { value: 12345 } } }), 123.45);
   assert.equal(storeCredit({}), null);
 });

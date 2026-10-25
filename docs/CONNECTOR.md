@@ -47,7 +47,7 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
   hidden page off; the popup and the hidden page read the file as they open, so the
   background's cached copy is fresh), or for the rest of the browser session once a
   hidden page went quiet (a scan asked of it never taken, or its scan mark not renewed
-  for 10 minutes) or stopped on an error. A mark left by a hidden page that went away
+  for 2 minutes) or stopped on an error. A mark left by a hidden page that went away
   mid-scan never holds the next scan.
 - **The background worker** as today: our pages' messages (bridge v2), the rescan badge,
   updates, and Auto Scan Daily's alarm (below).

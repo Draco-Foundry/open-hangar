@@ -94,6 +94,53 @@ test('scan: stopped after a browser restart, from the start kept locally (#676)'
   assert.equal(scanState({ scanStarted: { at: NOW - DAY } }, NOW).phase, 'idle');
 });
 
+test('scan: a heartbeat quiet for 2 minutes is a scan that stopped, never Scanning', async () => {
+  const { scanState, scanBusy } = await data();
+  // The mark is renewed every 30 seconds while the scan reads.
+  const mark = (ago) => ({ at: NOW - ago, tabId: null, run: 'r6', by: 'offscreen' });
+  assert.equal(scanState({ scanRunning: mark(90e3) }, NOW).phase, 'running');
+  assert.equal(scanState({ scanRunning: mark(2 * MIN) }, NOW).phase, 'stopped');
+  assert.equal(scanBusy({ scanRunning: mark(2 * MIN) }, NOW), false);
+  // Its progress quiet too, and its start kept: stopped, not Scanning.
+  const prog = { run: 'r6', at: NOW - 3 * MIN, part: 'hangar', page: 1 };
+  const started = { run: 'r6', by: 'offscreen', reason: 'popup', at: NOW - 4 * MIN };
+  assert.equal(
+    scanState({ scanRunning: mark(3 * MIN), scanProgress: prog, scanStarted: started }, NOW).phase,
+    'stopped',
+  );
+  // Once the worker cleared the marks, the start alone still says so.
+  assert.equal(scanState({ scanStarted: started }, NOW).phase, 'stopped');
+});
+
+test('the line after a scan stopped: signed out, or stopped with Scan Again', async () => {
+  const { stopLine } = await data();
+  const { t } = await import('../ui/popup/copy.js');
+  const scannedAt = NOW - DAY;
+  const line = (o) => stopLine({ phase: 'idle', signedOut: false, report: null, scannedAt, ...o });
+  // The approved words (Words, 2026-10-23), word for word.
+  assert.equal(
+    t(line({ phase: 'stopped', signedOut: true })),
+    'Your last scan stopped because RSI signed you out. Log in to RSI, then scan again.',
+  );
+  assert.equal(
+    t(line({ phase: 'stopped' })),
+    'Your last scan stopped before it finished. Your hangar shows the last full scan.',
+  );
+  // Nothing while a scan runs, after one that finished, or before anything was saved
+  // (no last full scan to speak of), unless signed out.
+  assert.equal(line({ phase: 'running', signedOut: true }), null);
+  assert.equal(line({}), null);
+  assert.equal(line({ phase: 'stopped', scannedAt: null }), null);
+  assert.equal(line({ phase: 'stopped', scannedAt: null, signedOut: true }), 'popup.stop-out');
+  // A scan that ended signed out (partway, or at the start), until a scan since.
+  const out = { v: 1, at: NOW - HOUR, signedOut: true, rows: [] };
+  assert.equal(line({ report: out, signedOut: true }), 'popup.stop-out');
+  assert.equal(line({ report: out }), 'popup.stop-partway', 'signed in again since');
+  assert.equal(line({ report: out, scannedAt: NOW - 5 * MIN }), null, 'a scan since');
+  assert.equal(line({ report: { ...out, held: 'busy' }, signedOut: true }), null);
+  assert.equal(line({ report: { ...out, signedOut: false } }), null);
+});
+
 // --- Auto Scan Daily in Settings (#666) ----------------------------------------------
 test("Auto Scan Daily's line: each run's approved words, none while it's off", async () => {
   const { autoLine, autoWhen } = await data();
