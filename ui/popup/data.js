@@ -694,3 +694,20 @@ export function newViewUrl(myHangar) {
   const s = String(myHangar || '');
   return /\/hangar$/.test(s) ? `${s}/pledges?view=new` : null;
 }
+
+// A new pledge's picture, only from RSI's own servers: an https address on
+// robertsspaceindustries.com or one of its subdomains (the saved pages use
+// robertsspaceindustries.com/media/… and media.robertsspaceindustries.com). Anything
+// else is no picture, so the popup never asks another host for one (the privacy
+// policy's line on these pictures). Pure.
+export function rsiPicture(url) {
+  try {
+    const u = new URL(String(url || ''));
+    const host = u.hostname.toLowerCase();
+    const rsi =
+      host === 'robertsspaceindustries.com' || host.endsWith('.robertsspaceindustries.com');
+    return u.protocol === 'https:' && rsi && !u.username && !u.password && !u.port ? u.href : null;
+  } catch {
+    return null;
+  }
+}

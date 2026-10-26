@@ -17,6 +17,7 @@
     insChip,
     newSinceScan,
     newViewUrl,
+    rsiPicture,
     NEW_SHOWN,
     sinceKey,
     tokenCount,
@@ -235,10 +236,11 @@
           {#each newRows as p (p.id)}
             {@const m = melt(p.value)}
             {@const ins = insChip(p.insurance)}
+            {@const pic = rsiPicture(p.image)}
             <div class="pp-arr">
               <span class="pp-arrpic">
-                {#if p.image && !noPic[p.id]}<img
-                    src={p.image}
+                {#if pic && !noPic[p.id]}<img
+                    src={pic}
                     alt=""
                     width="96"
                     height="54"

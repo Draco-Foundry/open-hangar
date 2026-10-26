@@ -910,3 +910,24 @@ test("New Since Last Scan: the card's name, insurance chip and the website's New
   assert.equal(newViewUrl('chrome-extension://x/src/hangar.html/'), null);
   assert.equal(newViewUrl(null), null);
 });
+
+test("New Since Last Scan's pictures: only from RSI's own servers", async () => {
+  const { rsiPicture } = await data();
+  const media = 'https://media.robertsspaceindustries.com/abc123/store_small.jpg';
+  const site = 'https://robertsspaceindustries.com/media/abc123/store_small/x.jpg';
+  assert.equal(rsiPicture(media), media);
+  assert.equal(rsiPicture(site), site);
+  for (const bad of [
+    'http://media.robertsspaceindustries.com/a.jpg',
+    'https://robertsspaceindustries.com.evil.example/a.jpg',
+    'https://evilrobertsspaceindustries.com/a.jpg',
+    'https://example.com/a.jpg',
+    'https://user@robertsspaceindustries.com/a.jpg',
+    'https://robertsspaceindustries.com:8443/a.jpg',
+    '/media/a.jpg',
+    'data:image/png;base64,AAAA',
+    '',
+    null,
+  ])
+    assert.equal(rsiPicture(bad), null, String(bad));
+});
