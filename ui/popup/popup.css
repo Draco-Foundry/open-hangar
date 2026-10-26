@@ -1455,3 +1455,183 @@ html.phone body {
   width: 44px;
   margin: 0;
 }
+
+/* New Since Last Scan (the newSinceScan flag): the website's title-only pledge card in
+   its row shape. The picture, the name, then the melt value with the G and M marks right
+   after it and the insurance chip at the right. The marks and the chip take the
+   website's colours (its styles/gm-mark.css and its insurance tier tokens), so they read
+   the same in both places. */
+.pp {
+  --ins-lti-fill: #3c3489;
+  --ins-lti-text: #cecbf6;
+  --ins-lti-line: #7f77dd;
+  --ins-long-fill: #085041;
+  --ins-long-text: #9fe1cb;
+  --ins-long-line: #1d9e75;
+  --ins-mid-fill: #273140;
+  --ins-mid-text: #c5cfdc;
+  --ins-mid-line: #4a5668;
+  --ins-short-text: #b4b2a9;
+  --ins-short-line: #5f5e5a;
+}
+:root[data-look='light'] .pp {
+  --ins-lti-fill: #eeedfe;
+  --ins-lti-text: #3c3489;
+  --ins-lti-line: #afa9ec;
+  --ins-long-fill: #e1f5ee;
+  --ins-long-text: #085041;
+  --ins-long-line: #5dcaa5;
+  --ins-mid-fill: #edf1f5;
+  --ins-mid-text: #334155;
+  --ins-mid-line: #b8c4d2;
+  --ins-short-text: #5f5e5a;
+  --ins-short-line: #b4b2a9;
+}
+@media (prefers-color-scheme: light) {
+  :root[data-look='auto'] .pp {
+    --ins-lti-fill: #eeedfe;
+    --ins-lti-text: #3c3489;
+    --ins-lti-line: #afa9ec;
+    --ins-long-fill: #e1f5ee;
+    --ins-long-text: #085041;
+    --ins-long-line: #5dcaa5;
+    --ins-mid-fill: #edf1f5;
+    --ins-mid-text: #334155;
+    --ins-mid-line: #b8c4d2;
+    --ins-short-text: #5f5e5a;
+    --ins-short-line: #b4b2a9;
+  }
+}
+.pp-arrived {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pp-arrtop {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.pp-arrtotal {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--head);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pp-arrwhen {
+  margin-top: -6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.pp-arr {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.pp-arr + .pp-arr {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+.pp-arrpic {
+  flex: none;
+  width: 96px;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--pp-r);
+  overflow: hidden;
+  background: var(--panel-2);
+}
+.pp-arrpic img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pp-arrtext {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pp-arrname {
+  font-weight: 600;
+  color: var(--head);
+  overflow-wrap: anywhere;
+}
+.pp-arrline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pp-arrmelt {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--head);
+  font-variant-numeric: tabular-nums;
+}
+.pp-gm {
+  display: inline-flex;
+  gap: 4px;
+  flex: none;
+}
+.pp-gm i {
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid;
+  border-radius: 6px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1;
+}
+.pp-gm .y {
+  color: var(--good);
+  border-color: color-mix(in srgb, var(--good) 50%, transparent);
+  background: color-mix(in srgb, var(--good) 12%, transparent);
+}
+.pp-gm .n {
+  color: var(--bad);
+  border-color: color-mix(in srgb, var(--bad) 50%, transparent);
+  background: color-mix(in srgb, var(--bad) 10%, transparent);
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+.pp-ins {
+  box-sizing: border-box;
+  margin-left: auto;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 56px;
+  height: 22px;
+  border: 1px solid;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.pp-ins.ins-lti {
+  color: var(--ins-lti-text);
+  background: var(--ins-lti-fill);
+  border-color: var(--ins-lti-line);
+}
+.pp-ins.ins-long {
+  color: var(--ins-long-text);
+  background: var(--ins-long-fill);
+  border-color: var(--ins-long-line);
+}
+.pp-ins.ins-mid {
+  color: var(--ins-mid-text);
+  background: var(--ins-mid-fill);
+  border-color: var(--ins-mid-line);
+}
+.pp-ins.ins-short {
+  color: var(--ins-short-text);
+  border-color: var(--ins-short-line);
+}

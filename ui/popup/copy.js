@@ -49,6 +49,25 @@ const COPY = {
   'popup.uec-down-since': 'UEC down {uec} since {date}',
   // Beside the buy-back token count: when RSI hands out the next one ("Next refill Jan 4").
   'popup.token-next': 'Next refill {date}',
+  // New Since Last Scan (the newSinceScan flag): the pledges the last scan found that the
+  // one before it didn't. Placeholders until Claude chat's words come back: the heading,
+  // the total beside it, when the hangar it's compared with was scanned, a scan that
+  // found nothing, the link past three rows (the website's New view), and the section's
+  // name for screen readers.
+  'popup.new-since': 'New Since Last Scan', // NEW: needs the owner's OK
+  'popup.new-total': '{n} new · {melt} melt', // NEW: needs the owner's OK
+  'popup.new-total.one': '1 new · {melt} melt', // NEW: needs the owner's OK
+  'popup.new-since-when': 'Since {date}', // NEW: needs the owner's OK
+  'popup.new-none': 'Nothing new since your last scan.', // NEW: needs the owner's OK
+  'popup.new-see-all': 'See All {n} on openhangar.space', // NEW: needs the owner's OK
+  'popup.new-sr': '{n} new pledges since your last scan, {melt} melt value', // NEW: needs the owner's OK
+  'popup.new-sr.one': '1 new pledge since your last scan, {melt} melt value', // NEW: needs the owner's OK
+  // The G and M marks' words for screen readers and the hover title: RSI's own words, as
+  // the website's marks say them.
+  'popup.giftable': 'Giftable',
+  'popup.not-giftable': 'Not Giftable',
+  'popup.meltable': 'Meltable',
+  'popup.not-meltable': 'Not Meltable',
   'popup.fleet-news': 'Fleet News', // heading
   // Fleet News's link to the Wishlist tab. Claude chat, Words, 2026-10-23 (#785).
   'popup.news-wishlist': 'See Your Wishlist',
@@ -253,4 +272,13 @@ export function t(key, vars = {}) {
 }
 export const KEYS = Object.keys(COPY);
 // The words still waiting for the owner's OK (marked beside them above).
-export const NEW_WORDS = [];
+export const NEW_WORDS = [
+  'popup.new-since',
+  'popup.new-total',
+  'popup.new-total.one',
+  'popup.new-since-when',
+  'popup.new-none',
+  'popup.new-see-all',
+  'popup.new-sr',
+  'popup.new-sr.one',
+];

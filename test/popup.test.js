@@ -840,3 +840,64 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
   assert.deepEqual(marked, NEW_WORDS);
   for (const k of NEW_WORDS) assert.ok(KEYS.includes(k), k);
 });
+
+test('New Since Last Scan: by pledge id against the scan before, only for this scan', async () => {
+  const { newSinceScan } = await data();
+  const snap = (at, ids) => ({ at, items: ids.map((id) => [id, `P ${id}`, 10]) });
+  const items = [
+    { id: 3, name: 'Gifted', value: 240 },
+    { id: 4, name: 'Traded', value: 210.5 },
+    { id: 1, name: 'Old', value: 45 },
+  ];
+  const history = [snap(NOW - 2 * DAY, ['1']), snap(NOW, ['3', '4', '1'])];
+  // Two new, in the hangar's order, their melt added up, compared with the scan before.
+  assert.deepEqual(newSinceScan(history, items, NOW), {
+    items: [items[0], items[1]],
+    total: 450.5,
+    since: NOW - 2 * DAY,
+  });
+  // A scan that changed nothing keeps no snapshot: nothing new.
+  assert.deepEqual(newSinceScan(history, items, NOW + DAY), { items: [], total: 0, since: null });
+  // A scan that only lost a pledge: nothing new either.
+  const lost = [snap(NOW - DAY, ['1', '2']), snap(NOW, ['1'])];
+  assert.deepEqual(newSinceScan(lost, [items[2]], NOW).items, []);
+  // A pledge with no melt value counts $0 in the total.
+  const free = [snap(NOW - DAY, []), snap(NOW, ['9'])];
+  assert.equal(newSinceScan(free, [{ id: '9', name: 'Reward', value: null }], NOW).total, 0);
+  // The first scan, or no scan: no section at all.
+  assert.equal(newSinceScan([snap(NOW, ['1'])], items, NOW), null);
+  assert.equal(newSinceScan([], items, NOW), null);
+  assert.equal(newSinceScan(null, items, NOW), null);
+  assert.equal(newSinceScan(history, items, null), null);
+});
+
+test("New Since Last Scan: the card's name, insurance chip and the website's New view", async () => {
+  const { cardName, insChip, newViewUrl } = await data();
+  assert.equal(cardName('Standalone Ships - Constellation Andromeda'), 'Constellation Andromeda');
+  assert.equal(cardName('Package - Corsair - 10 Year'), 'Corsair - 10 Year');
+  // Other prefixes stay, as on the website's cards.
+  assert.equal(
+    cardName('Aegis Gladius Dunlevy - Referral Reward'),
+    'Aegis Gladius Dunlevy - Referral Reward',
+  );
+  assert.equal(
+    cardName('Imperator Reward - 20% Coupon: SRSVH6WBT3'),
+    'Imperator Reward - 20% Coupon: ••••WBT3',
+  );
+  assert.equal(cardName('Cutlass Black'), 'Cutlass Black');
+  assert.deepEqual(insChip('LTI'), { text: 'LTI', tier: 'lti' });
+  assert.deepEqual(insChip('120M'), { text: '10 yr', tier: 'long' });
+  assert.deepEqual(insChip('10Y'), { text: '10 yr', tier: 'long' });
+  assert.deepEqual(insChip('6M'), { text: '6 mo', tier: 'mid' });
+  assert.deepEqual(insChip('24M'), { text: '2 yr', tier: 'mid' });
+  assert.deepEqual(insChip('3M'), { text: '3 mo', tier: 'short' });
+  // None, or RSI's own words: no chip on a card.
+  assert.equal(insChip(null), null);
+  assert.equal(insChip('Some Insurance'), null);
+  assert.equal(
+    newViewUrl('https://app.openhangar.space/hangar'),
+    'https://app.openhangar.space/hangar/pledges?view=new',
+  );
+  assert.equal(newViewUrl('chrome-extension://x/src/hangar.html/'), null);
+  assert.equal(newViewUrl(null), null);
+});
