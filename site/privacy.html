@@ -128,11 +128,13 @@
       <p>
         The toolbar popup shows what's already stored in this browser: your RSI portrait and handle,
         your Account Value, Store Credit, UEC, REC and Buy-Back Tokens, how your Account Value and
-        UEC changed since an earlier scan, Fleet News, store alerts and whether sync is connected.
-        Fleet News is up to three short notes about your own ships and your Wishlist, worked out on
-        your device. The popup never asks RSI anything itself. Its Scan button starts a scan in the
-        hidden page, and closing the popup doesn't stop it. While you're connected, the popup also
-        shows your Wishlist (see
+        UEC changed since an earlier scan, the pledges that are new since your last scan, Fleet
+        News, store alerts and whether sync is connected. Fleet News is up to three short notes
+        about your own ships and your Wishlist, worked out on your device. The popup asks RSI for
+        nothing itself, except the pictures of those new pledges: it loads them from RSI's own
+        servers, the same way RSI's hangar page loads them, and sends RSI nothing else. Its Scan
+        button starts a scan in the hidden page, and closing the popup doesn't stop it. While you're
+        connected, the popup also shows your Wishlist (see
         <a href="#your-wishlist">Your Wishlist</a>).
       </p>
       <h2 id="auto-scan-daily">Auto Scan Daily</h2>
@@ -254,9 +256,9 @@
       </ul>
       <h2 id="outbound-network-requests">Outbound Network Requests</h2>
       <p>
-        Besides reading your own RSI account, the cart buttons, store alerts, your Wishlist (all
-        above) and sync (below), Open Hangar only talks to our own public site, openhangar.space.
-        None of these requests carry your personal data.
+        Besides reading your own RSI account, the popup's pictures of new pledges, the cart buttons,
+        store alerts, your Wishlist (all above) and sync (below), Open Hangar only talks to our own
+        public site, openhangar.space. None of these requests carry your personal data.
       </p>
       <ul>
         <li>
