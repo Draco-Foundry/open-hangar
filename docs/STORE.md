@@ -58,7 +58,7 @@ every store is `support@openhangar.space`. The account setup is kept in the main
   2. Wishlist: `docs/store-assets/screenshot-040-2-wishlist.jpg`, "Add to your Wishlist
      right from the popup." (retaken for 0.4.1, with no Target Price)
   3. Settings: `docs/store-assets/screenshot-040-3-settings.jpg`, "Every setting in one
-     place, including Auto Scan Daily."
+     place, including the Daily Scan Reminder."
   4. Alerts: `docs/store-assets/screenshot-040-4-alerts.jpg`, "Store alerts for your
      ships and your Wishlist."
   5. Light mode: `docs/store-assets/screenshot-040-5-light.jpg`, "Light mode, or follow
@@ -121,7 +121,7 @@ same: change one, change the other.
 
 **`cookies`**
 
-> Used for three things, all on robertsspaceindustries.com. First, "Log Out of RSI": clears RSI's cookies (including the HttpOnly session cookie that page scripts can't remove) so the user can fully end their RSI session from the extension. Second, a guess at whether the user is signed in to RSI: the extension checks only whether RSI's session cookie exists, without contacting RSI. When it's missing, the popup shows "Log In to RSI" first (Scan still works) and Auto Scan Daily skips that day. RSI sets this cookie for signed-out visitors too, so the scan itself confirms. Third, Add to RSI Cart: like RSI's own upgrade window, it reads RSI's session token cookie and sends it back to robertsspaceindustries.com with the cart request the user asked for. Cookie values are never stored and never sent anywhere except RSI.
+> Used for three things, all on robertsspaceindustries.com. First, "Log Out of RSI": clears RSI's cookies (including the HttpOnly session cookie that page scripts can't remove) so the user can fully end their RSI session from the extension. Second, a guess at whether the user is signed in to RSI: the extension checks only whether RSI's session cookie exists, without contacting RSI. When it's missing, the popup shows "Log In to RSI" first (Scan still works). RSI sets this cookie for signed-out visitors too, so the scan itself confirms. Third, Add to RSI Cart: like RSI's own upgrade window, it reads RSI's session token cookie and sends it back to robertsspaceindustries.com with the cart request the user asked for. Cookie values are never stored and never sent anywhere except RSI.
 
 **`identity`** (added in 0.3.0)
 
@@ -144,7 +144,7 @@ install prompt only names robertsspaceindustries.com.)_
 
 **`alarms`** (added in 0.3.0)
 
-> Used only for two optional features, both off until the user turns them on in the extension's settings. Store alerts (only while the user is connected to openhangar.space): the alarm wakes the extension for a check at most every 30 minutes. It downloads one public sale file from openhangar.space (the same file for everyone, with nothing about the user in the request), reads the user's own Wishlist, and matches them on the device. Auto Scan Daily (only while connected to openhangar.space): the alarm wakes the extension once a day to scan the user's own RSI account, the same as pressing Scan, and only when the signed-in RSI account is the connected one. Turning a feature off clears its alarm.
+> Used only for two optional features, both off until the user turns them on in the extension's settings. Store alerts (only while the user is connected to openhangar.space): the alarm wakes the extension for a check at most every 30 minutes. It downloads one public sale file from openhangar.space (the same file for everyone, with nothing about the user in the request), reads the user's own Wishlist, and matches them on the device. Daily Scan Reminder (only while connected to openhangar.space): the alarm wakes the extension once a day to check the time of the user's last scan, saved on the device, and shows a notification if it's more than a day old. It reads nothing from RSI. A scan starts only when the user clicks the notification. Turning a feature off clears its alarm.
 
 **`offscreen`** (added in 0.4.0; Chrome and Edge only)
 
@@ -152,7 +152,7 @@ install prompt only names robertsspaceindustries.com.)_
 
 **`notifications`** (optional, added in 0.3.0)
 
-> Optional. Requested only when the user turns on Notifications in the extension's settings, and the user can decline: the toolbar number and the Wishlist tab still work without it. Used only to show a notification when an item the user set to Remind Me on their Wishlist goes on sale in RSI's store, at most three per check, plus one for any more. Matching happens on the device, and nothing is sent. Turning Notifications off removes the permission.
+> Optional. Requested only when the user turns on Notifications or the Daily Scan Reminder in the extension's settings, and the user can decline: the toolbar number and the Wishlist tab still work without it, and the reminder stays off. Used only to show a notification when an item the user set to Remind Me on their Wishlist goes on sale in RSI's store, at most three per check, plus one for any more, and, with the Daily Scan Reminder on, a reminder to scan at most once a day. Matching happens on the device, and nothing is sent. Turning both off removes the permission.
 
 **Messages from openhangar.space** (`externally_connectable` on Chrome and Edge; on Firefox, a bridge script on those pages only)
 
@@ -187,7 +187,7 @@ markers, with each paragraph and each • bullet on one line.
 > • Store alerts (optional, with openhangar.space connected): a number on the toolbar button, and a notification if you turn them on, when a Wishlist item set to Remind Me goes on sale. Paints and sales for ships you own show in Fleet News. Matched on your device
 > • Add to RSI Cart: put a ship upgrade (CCU) in your RSI cart in one click. You always check out on RSI yourself
 > • Backups: save your hangar as a JSON or CSV file any time
-> • With openhangar.space connected: edit your Wishlist from the popup, and turn on Auto Scan Daily to check your hangar once a day, only for the RSI account you connected
+> • With openhangar.space connected: edit your Wishlist from the popup, and turn on the Daily Scan Reminder for a notification when it's time to scan
 >
 > **Open beta:** Open Hangar is all yours now. Syncing your hangar to openhangar.space opens to everyone at our official launch on November 10.
 >
@@ -227,7 +227,7 @@ Open Hangar reads your pledges, buy-backs, balances and referrals from RSI with 
 - **Store alerts (optional, with [openhangar.space](https://openhangar.space) connected):** a number on the toolbar button, and a notification if you turn them on, when a Wishlist item set to Remind Me goes on sale. Paints and sales for ships you own show in Fleet News. Matched on your device
 - **Add to RSI Cart:** put a ship upgrade (CCU) in your RSI cart in one click. You always check out on RSI yourself
 - **Backups:** save your hangar as a JSON or CSV file any time
-- **With [openhangar.space](https://openhangar.space) connected:** edit your Wishlist from the popup, and turn on Auto Scan Daily to check your hangar once a day, only for the RSI account you connected
+- **With [openhangar.space](https://openhangar.space) connected:** edit your Wishlist from the popup, and turn on the Daily Scan Reminder for a notification when it's time to scan
 
 **Open beta:** Open Hangar is all yours now. Syncing your hangar to openhangar.space opens to everyone at our official launch on November 10.
 
