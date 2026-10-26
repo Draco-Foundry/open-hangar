@@ -4777,7 +4777,7 @@ try {
   });
   !offArrived &&
   arr.head === 'New Since Last Scan' &&
-  arr.total === '1 new · $0 melt' &&
+  arr.total === '1 new · $0 melt value' &&
   arr.sr === '1 new pledge since your last scan, $0 melt value' &&
   /^Since \w+ \d+$/.test(arr.when) &&
   arr.rows === 1 &&

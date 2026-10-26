@@ -801,6 +801,15 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
         assert.fail(`${k}: "${w}" in Title Case`);
   // The owner's approved words (2026-10-14), word for word.
   const APPROVED = {
+    // New Since Last Scan (owner-approved 2026-10-26).
+    'popup.new-since': 'New Since Last Scan',
+    'popup.new-total': '{n} new · {melt} melt value',
+    'popup.new-total.one': '1 new · {melt} melt value',
+    'popup.new-since-when': 'Since {date}',
+    'popup.new-none': 'Nothing new since your last scan.',
+    'popup.new-see-all': 'See All {n} on openhangar.space',
+    'popup.new-sr': '{n} new pledges since your last scan, {melt} melt value',
+    'popup.new-sr.one': '1 new pledge since your last scan, {melt} melt value',
     'popup.token-next': 'Next refill {date}',
     'popup.fleet-news-none': 'No news for your ships right now.',
     'popup.wish-search': 'Add a ship, paint or upgrade',

@@ -50,18 +50,18 @@ const COPY = {
   // Beside the buy-back token count: when RSI hands out the next one ("Next refill Jan 4").
   'popup.token-next': 'Next refill {date}',
   // New Since Last Scan (the newSinceScan flag): the pledges the last scan found that the
-  // one before it didn't. Placeholders until Claude chat's words come back: the heading,
-  // the total beside it, when the hangar it's compared with was scanned, a scan that
-  // found nothing, the link to the website's New view, and the section's
-  // name for screen readers.
-  'popup.new-since': 'New Since Last Scan', // NEW: needs the owner's OK
-  'popup.new-total': '{n} new · {melt} melt', // NEW: needs the owner's OK
-  'popup.new-total.one': '1 new · {melt} melt', // NEW: needs the owner's OK
-  'popup.new-since-when': 'Since {date}', // NEW: needs the owner's OK
-  'popup.new-none': 'Nothing new since your last scan.', // NEW: needs the owner's OK
-  'popup.new-see-all': 'See All {n} on openhangar.space', // NEW: needs the owner's OK
-  'popup.new-sr': '{n} new pledges since your last scan, {melt} melt value', // NEW: needs the owner's OK
-  'popup.new-sr.one': '1 new pledge since your last scan, {melt} melt value', // NEW: needs the owner's OK
+  // one before it didn't (owner-approved 2026-10-26, the website's New view says the
+  // same). The heading, the total beside it, when the hangar it's compared with was
+  // scanned, a scan that found nothing, the link to the website's New view, and the
+  // section's name for screen readers.
+  'popup.new-since': 'New Since Last Scan',
+  'popup.new-total': '{n} new · {melt} melt value',
+  'popup.new-total.one': '1 new · {melt} melt value',
+  'popup.new-since-when': 'Since {date}',
+  'popup.new-none': 'Nothing new since your last scan.',
+  'popup.new-see-all': 'See All {n} on openhangar.space',
+  'popup.new-sr': '{n} new pledges since your last scan, {melt} melt value',
+  'popup.new-sr.one': '1 new pledge since your last scan, {melt} melt value',
   // The G and M marks' words for screen readers and the hover title: RSI's own words, as
   // the website's marks say them.
   'popup.giftable': 'Giftable',
@@ -272,13 +272,4 @@ export function t(key, vars = {}) {
 }
 export const KEYS = Object.keys(COPY);
 // The words still waiting for the owner's OK (marked beside them above).
-export const NEW_WORDS = [
-  'popup.new-since',
-  'popup.new-total',
-  'popup.new-total.one',
-  'popup.new-since-when',
-  'popup.new-none',
-  'popup.new-see-all',
-  'popup.new-sr',
-  'popup.new-sr.one',
-];
+export const NEW_WORDS = [];
