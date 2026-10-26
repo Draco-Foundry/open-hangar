@@ -1,0 +1,1 @@
+- Changed: **Buy-back pages read when you open one.** Scan no longer reads up to 30 buy-backs' own pages. A buy-back's page is read when you open that buy-back on openhangar.space or our hangar page.

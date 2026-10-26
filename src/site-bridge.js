@@ -27,6 +27,7 @@
     'oh-upgrade-price',
     'oh-add-upgrade',
     'oh-add-items',
+    'oh-read-buyback',
     'oh-connect-begin',
     'oh-link-check',
   ];

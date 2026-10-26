@@ -8,11 +8,12 @@ loads remote code: what a build can do is fixed when it's built (build-time flag
 
 ## Requests to RSI
 
-- **The Scan stays fast:** list pages, plus up to 30 buy-backs' own pages a scan
-  (owner, 2026-10-24, #798: their price, insurance and contents go in the sync). Each
-  page is read once and kept (`bbDetails`), paced 1 to 2 s apart, and the batch stops at
-  RSI's first slow-down, so a list read whole costs nothing more. Anything else needing
-  one request per item is opt-in: a button, with progress, Stop, and a cache.
+- **The Scan stays fast:** list pages only. A buy-back's own page (its price, insurance
+  and contents, which go in the sync, #798) is read when the pilot opens that buy-back
+  on the website or our hangar page (bridge `oh-read-buyback`): one page per open, only
+  one not read from RSI yet, kept (`bbDetails`), and RSI's slow-down honored. Anything
+  else needing one request per item is opt-in: a button, with progress, Stop, and a
+  cache.
 - **Be polite:** an honest User-Agent, one request at a time with pauses, no bursts,
   honor `Retry-After`, back off on 403/429/5xx and stop on a denial, cache where you can.
 

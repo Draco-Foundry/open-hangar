@@ -552,6 +552,71 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
   clearQuietScan().catch(() => {});
   return false;
 });
+
+// One buy-back's own RSI page, read when the pilot opens that buy-back on the website's
+// My Hangar or our hangar page: a scan never reads them. One page per open, only one
+// not read from RSI yet, never an upgrade's (it has none), in the hidden scan page only
+// (never a tab), one at a time, and never while a scan runs. The page waits for it:
+//   oh-read-buyback { pledgeId } → { ok: true, read, buyback } | { ok: false, error }
+// buyback: that row as getHangar hands it (its price, insurance and contents once its
+// page is read); read: whether its page was read for this ask (false: read before).
+// error: 'firefox-ask' (Firefox's data yes first, the same as getHangar's), 'not-found'
+// (no such buy-back in this browser's scan), 'no-page' (an upgrade), 'busy' (a scan or
+// another buy-back's read under way), 'no-hidden' (no hidden page here), 'not-read'
+// (RSI didn't give the page: signed out, slow down, down or gone), or a scan's own
+// ('no-scan', 'needs-upgrade'). While connected, the hidden page syncs right after a
+// page it read, so the website gets it too.
+const BB_READ_MAX = 60e3; // how long the page waits for the read
+let bbReading = false;
+async function bbRow(id) {
+  const r = await self.OHShape.readHangarView((keys) => chrome.storage.local.get(keys), {
+    appVersion: chrome.runtime.getManifest().version,
+  });
+  if (!r.ok) return { error: r.error };
+  const row = (r.hangar.sources?.buybacks?.items || []).find((b) => String(b?.id) === id);
+  return row ? { row } : { error: 'not-found' };
+}
+// The hidden page's answer for buy-back `id` (session bbRead { id, at, ok, error? },
+// ui/scan/runner.js readBuyback) from `since` on, or null when none came in time.
+// Listening before the read is asked, so a quick answer is never missed.
+function bbAnswer(id, since) {
+  return new Promise((done) => {
+    const heard = (c, area) => {
+      const a = area === 'session' ? c.bbRead?.newValue : null;
+      if (a?.id === id && a.at >= since) finish(a);
+    };
+    const timer = setTimeout(() => finish(null), BB_READ_MAX);
+    function finish(a) {
+      clearTimeout(timer);
+      chrome.storage.onChanged.removeListener?.(heard);
+      done(a);
+    }
+    chrome.storage.onChanged.addListener(heard);
+  });
+}
+siteHandlers['oh-read-buyback'] = async (m) => {
+  if (await firefoxNeedsOk()) return { ok: false, error: 'firefox-ask' };
+  const id = String(m.pledgeId);
+  const was = await bbRow(id);
+  if (was.error) return { ok: false, error: was.error };
+  if (was.row.isCCU || was.row.ccu) return { ok: false, error: 'no-page' };
+  if (was.row.priceFrom === 'page') return { ok: true, read: false, buyback: was.row };
+  if (bbReading || (await scanRunning())) return { ok: false, error: 'busy' };
+  if (!scanHost || (await scanHost.choose()) === 'tab') return { ok: false, error: 'no-hidden' };
+  bbReading = true;
+  try {
+    const answer = bbAnswer(id, Date.now());
+    const hidden = await scanHost.start('buyback', { buyback: id });
+    if (!hidden) return { ok: false, error: 'no-hidden' };
+    const a = await answer;
+    const now = await bbRow(id);
+    if (now.error) return { ok: false, error: now.error };
+    if (!a?.ok || now.row.priceFrom !== 'page') return { ok: false, error: a?.error || 'not-read' };
+    return { ok: true, read: true, buyback: now.row };
+  } finally {
+    bbReading = false;
+  }
+};
 // @flag-end connector
 
 // @flag-start alerts: Extension Alerts (needs connector, scripts/pack.mjs)

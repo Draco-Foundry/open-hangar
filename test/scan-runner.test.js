@@ -158,7 +158,7 @@ function setup(opts = {}) {
   });
 }
 
-test('scan: the account, the hangar, buy-backs, referrals, their pages, saved, then the sync', async () => {
+test('scan: the account, the hangar, buy-backs, referrals, saved, then the sync; no buy-back page', async () => {
   const x = await setup();
   const report = await x.runner.scan({ reason: 'popup' });
   await x.runner.packsDone();
@@ -170,11 +170,7 @@ test('scan: the account, the hangar, buy-backs, referrals, their pages, saved, t
     'getReferral',
     'loadDB',
     'fill 6',
-    // Every buy-back's own page not read from RSI yet (701 was; 11 only from history),
-    // before the sync so it carries them (#798). Upgrades have no page.
-    'fetchBuybackDetails 702,703,9,11',
-    'flush',
-    'settled',
+    // No buy-back's own page: those are read as the pilot opens one (readBuyback).
     'flush',
     'settled',
     'siteSync auto',
@@ -184,7 +180,7 @@ test('scan: the account, the hangar, buy-backs, referrals, their pages, saved, t
     x.seen.indexOf('scanned 3') < x.seen.indexOf('syncStart'),
     'the report before the sync',
   );
-  assert.ok(x.seen.indexOf('packs') < x.seen.indexOf('scanned 3'), 'the pages in the scan');
+  assert.ok(!x.seen.includes('packs'), 'no buy-back page in the scan');
   assert.ok(x.seen.includes('synced sent'));
   // The report: ids and counts, never words.
   assert.deepEqual(Object.keys(report), [
@@ -324,7 +320,7 @@ test('scan: progress stored about twice a second at most, the newest kept, gone 
   assert.equal(x.seen.filter((s) => s === 'progress hangar').length, 11);
   // Each part's start is written right away.
   const parts = [...new Set(sets(x.session, 'scanProgress').map((p) => p.part))];
-  assert.deepEqual(parts, ['start', 'account', 'hangar', 'buybacks', 'referrals', 'packs', 'sync']);
+  assert.deepEqual(parts, ['start', 'account', 'hangar', 'buybacks', 'referrals', 'sync']);
   assert.ok(removals(x.session, 'scanProgress') >= 1);
   assert.equal(x.session.data.scanProgress, undefined);
 
@@ -735,6 +731,67 @@ test('readPacks: a page that failed waits out its time, then goes after the rest
     x.calls.filter((c) => c.startsWith('fetchBuybackDetails')).at(-1),
     'fetchBuybackDetails 11',
   );
+});
+
+// --- One buy-back's own page, as it's opened (src/background.js oh-read-buyback) ------
+
+// setup()'s stand-in, with every page read saved as RSI's.
+async function opened(opts = {}) {
+  const x = await setup(opts);
+  const details = structuredClone(await x.OH.getBuybackDetails());
+  x.OH.getBuybackDetails = async () => details;
+  x.OH.fetchBuybackDetails = async (ids, onProgress) => {
+    x.calls.push(`fetchBuybackDetails ${ids.join(',')}`);
+    for (const id of ids) if (!opts.fails) details[id] = { price: 45 };
+    onProgress(ids.length, ids.length);
+    return { done: ids.length, errors: opts.fails ? ids.length : 0, total: ids.length };
+  };
+  return x;
+}
+const fetched = (x) => x.calls.filter((c) => c.startsWith('fetchBuybackDetails'));
+
+test('readBuyback: that one page, its answer for the worker, then the sync', async () => {
+  const x = await opened();
+  assert.deepEqual(await x.runner.readBuyback('702'), { ok: true });
+  assert.deepEqual(fetched(x), ['fetchBuybackDetails 702'], 'one page, no other');
+  assert.deepEqual(x.session.data.bbRead, { id: '702', at: 1_000_000, ok: true });
+  assert.equal(x.calls.at(-1), 'siteSync auto', 'connected: the sync after it');
+  assert.ok(x.calls.indexOf('fetchBuybackDetails 702') < x.calls.indexOf('siteSync auto'));
+  // Not connected: no sync.
+  const y = await opened({ linked: false });
+  assert.deepEqual(await y.runner.readBuyback(703), { ok: true });
+  assert.ok(!y.calls.includes('siteSync auto'));
+});
+
+test('readBuyback: read before, an upgrade, a scan running or RSI not giving it', async () => {
+  // Read from RSI before (701): nothing read again, nothing synced.
+  const a = await opened();
+  assert.deepEqual(await a.runner.readBuyback('701'), { ok: true });
+  assert.deepEqual(fetched(a), []);
+  assert.ok(!a.calls.includes('siteSync auto'));
+  // Filled from history only (11): its page is read.
+  const b = await opened();
+  assert.deepEqual(await b.runner.readBuyback('11'), { ok: true });
+  assert.deepEqual(fetched(b), ['fetchBuybackDetails 11']);
+  // An upgrade (10) has no page.
+  const c = await opened();
+  assert.deepEqual(await c.runner.readBuyback('10'), { ok: false, error: 'not-read' });
+  assert.deepEqual(fetched(c), []);
+  // A scan in another page: busy, nothing read.
+  const d = await opened({
+    session: { scanRunning: { at: 1_000_000, tabId: 7, run: 'run-b', by: 'tab' } },
+  });
+  assert.deepEqual(await d.runner.readBuyback('702'), { ok: false, error: 'busy' });
+  assert.deepEqual(fetched(d), []);
+  assert.deepEqual(d.session.data.bbRead, { id: '702', at: 1_000_000, ok: false, error: 'busy' });
+  // RSI didn't give it (signed out, a slow-down): not read, no sync.
+  const e = await opened({ fails: true });
+  assert.deepEqual(await e.runner.readBuyback('702'), { ok: false, error: 'not-read' });
+  assert.ok(!e.calls.includes('siteSync auto'));
+  // No access to RSI: nothing asked.
+  const f = await opened({ rsi: false });
+  assert.deepEqual(await f.runner.readBuyback('702'), { ok: false, error: 'not-read' });
+  assert.deepEqual(fetched(f), []);
 });
 
 test('the portrait: a small copy of the RSI picture, read again only when it changes', async () => {

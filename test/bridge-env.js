@@ -352,6 +352,7 @@ function loadBackground({
     URL,
     URLSearchParams,
     setTimeout,
+    clearTimeout,
     AbortSignal,
     fetch,
     ...(document ? { document } : {}),

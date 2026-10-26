@@ -247,8 +247,9 @@
     // A scan asked for (requestScan; never while a scan runs): its request, for the
     // hidden page open now or a new one. → { by, run }, or null when it runs in the tab
     // instead (no hidden page here, the kill switch, a hidden page that went quiet, now
-    // or before, or the page couldn't be made).
-    const start = (reason) =>
+    // or before, or the page couldn't be made). `buyback`: not a scan, one buy-back's
+    // own page (reason 'buyback', src/background.js readBuyback).
+    const start = (reason, { buyback } = {}) =>
       inLine(async () => {
         let by = await choose();
         let run = null;
@@ -266,7 +267,14 @@
           if (by === 'tab') return null;
           run = host?.run || newRun();
           await chrome.storage.session.set({
-            scanRequest: { at: now(), tabId: null, reason, run, by },
+            scanRequest: {
+              at: now(),
+              tabId: null,
+              reason,
+              run,
+              by,
+              ...(buyback ? { buyback: String(buyback) } : {}),
+            },
           });
           if (host) poke(run);
           else await make(by, run);

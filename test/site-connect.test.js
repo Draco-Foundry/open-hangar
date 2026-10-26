@@ -42,7 +42,7 @@ const HELLO_APP = {
   ok: true,
   v: 2,
   version: '0.3.0',
-  caps: ['hello', 'addToCart', 'addItems', 'connect'],
+  caps: ['hello', 'addToCart', 'addItems', 'readBuyback', 'connect'],
   cart: true,
   buyback: true,
   connect: true,
