@@ -170,9 +170,23 @@ test('no format version, or any other refusal, keeps the status', async () => {
   const noFormat = await refusedWith(400, { error: 'no format', reason: 'no-format' });
   assert.equal(noFormat.message, 'openhangar.space responded 400');
   assert.ok(!noFormat.calm);
+  // A website from before the reason codes: the status alone.
   const accounts = await refusedWith(403, { error: 'too many RSI accounts on this login' });
   assert.equal(accounts.message, 'openhangar.space responded 403');
   assert.ok(!accounts.calm);
+});
+
+test('no RSI handle, and too many RSI accounts, read as plain advice', async () => {
+  const handle = await refusedWith(400, { error: 'no RSI handle', reason: 'no-handle' });
+  assert.match(handle.message, /Sign in to RSI, scan again/);
+  assert.ok(!handle.calm, 'something to do, not a note');
+  const accounts = await refusedWith(403, {
+    error: 'too many RSI accounts on this login',
+    reason: 'too-many-accounts',
+  });
+  assert.match(accounts.message, /as many RSI accounts as it can/);
+  assert.ok(!accounts.calm);
+  for (const e of [handle, accounts]) assert.doesNotMatch(e.message, /responded/);
 });
 
 test("a body that isn't JSON still gives a message", async () => {

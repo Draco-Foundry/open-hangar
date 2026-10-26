@@ -4571,6 +4571,14 @@
     "That's more cargo than openhangar.space can hold. Your hangar stays safe in your browser.";
   const SYNC_OTHER_LOGIN =
     'This hangar belongs to another pilot than the one signed in to RSI. Reload Open Hangar to switch hangars, then sync.';
+  // Scanned while signed out of RSI, so the sync says no handle (400, reason
+  // `no-handle`), and a login already holding as many RSI accounts as it may before one
+  // is verified (403, reason `too-many-accounts`). Placeholder words: they need the
+  // owner's approved words before the release.
+  const SYNC_NO_HANDLE =
+    "Open Hangar couldn't tell whose hangar this is. Sign in to RSI, scan again, then press Sync Now.";
+  const SYNC_TOO_MANY_ACCOUNTS =
+    'Your openhangar.space account holds as many RSI accounts as it can for now. Verify one on your Account page, then sync again.';
   // What this version would send doesn't fit the sync format (#441), so nothing went;
   // or the website's own check of it said so (400, reason `schema`, #584).
   // Owner-approved words (2026-10-10).
@@ -4588,6 +4596,8 @@
       return Object.assign(new Error(own || fallback), { calm: true });
     }
     if (reason === 'schema') return Object.assign(new Error(SYNC_SCHEMA), { reason });
+    if (reason === 'no-handle') return new Error(SYNC_NO_HANDLE);
+    if (reason === 'too-many-accounts') return new Error(SYNC_TOO_MANY_ACCOUNTS);
     if (status === 409) return new Error(reason === 'older-scan' ? SYNC_OLDER_SCAN : SYNC_NO_SCAN);
     if (status === 426 || reason === 'old-format') return new Error(SYNC_OLD_FORMAT);
     if (reason === 'newer-format') return new Error(SYNC_NEWER_FORMAT);
