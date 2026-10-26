@@ -108,7 +108,7 @@ The scan checks each RSI page it reads (`src/scraper/parser.js`, called from `li
 `background.js`) before it trusts the result. When a page has the markers of a hangar but
 the parser finds nothing in it, the scan stops, keeps the last good scan, and the popup
 says RSI changed a page. When RSI doesn't answer at all, the scan says that instead and
-also keeps the last scan. The tests are in `test/auto-scan.test.js` and the parser corpus.
+also keeps the last scan. The tests are in `test/scan.test.js` and the parser corpus.
 For the playbook after one of these, see [docs/RSI-CHANGES.md](docs/RSI-CHANGES.md).
 
 ## Versioning

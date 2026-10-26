@@ -256,8 +256,7 @@ export function scanHold(report, now = Date.now()) {
 // nothing to say it's running or that it ended.
 const STARTED_QUIET = 60e3;
 // Did the scan that began (`started`, local scanStarted { run, at }) end? Its report
-// (Scan's scanReport) or Auto Scan Daily's record (autoScan) is for that run, at that
-// start, or for a scan that began after it. A run id alone never pairs: a page keeps
+// (scanReport) is for that run, at that start, or for a scan that began after it. A run id alone never pairs: a page keeps
 // its run for every scan it runs.
 const endedBy = (started, end) =>
   isObj(end) &&
@@ -267,11 +266,10 @@ const endedBy = (started, end) =>
 // → { phase: 'idle' | 'running' | 'stopped', hidden, progress, run }. `hidden`: the
 // scan runs without a tab (its mark's `by` isn't 'tab'), so nothing else shows it.
 // A mark with a run id belongs to that run; progress counts only for the run marked.
-// `scanStarted` and `autoScan` (local, so they outlast a browser restart, #676): a scan
-// that began and never ended (no report or record for it) is one that stopped, Scan's
-// and Auto Scan Daily's alike.
+// `scanStarted` (local, so it outlasts a browser restart, #676): a scan that began and
+// never ended (no report for it) is one that stopped.
 export function scanState(
-  { scanRunning, scanRequest, scanProgress, scanReport, scanStarted, autoScan },
+  { scanRunning, scanRequest, scanProgress, scanReport, scanStarted },
   now = Date.now(),
 ) {
   const mark = isObj(scanRunning) && Number.isFinite(scanRunning.at) ? scanRunning : null;
@@ -299,54 +297,34 @@ export function scanState(
     isObj(scanStarted) && typeof scanStarted.run === 'string' && Number.isFinite(scanStarted.at)
       ? scanStarted
       : null;
-  if (
-    started &&
-    now - started.at >= STARTED_QUIET &&
-    !endedBy(started, scanReport) &&
-    !endedBy(started, autoScan)
-  )
+  if (started && now - started.at >= STARTED_QUIET && !endedBy(started, scanReport))
     return { phase: 'stopped', hidden: false, progress: null };
   return { phase: 'idle', hidden: false, progress: null, run: null };
 }
 
-// --- Auto Scan Daily in Settings (the `autoScan` flag) -----------------------------------
-// The run's line (local autoScan.line, ui/scan/auto.js lineOf) → its words' key.
-const AUTO_KEY = {
-  quick: 'popup.auto-quick',
-  full: 'popup.auto-full',
-  'signed-out': 'popup.auto-signed-out',
-  other: 'popup.auto-other',
-  paused: 'popup.auto-paused',
-  'rsi-down': 'popup.auto-rsi-down',
-  bad: 'popup.auto-bad',
-  'out-partway': 'popup.auto-out-partway',
-  partway: 'popup.auto-stopped',
-};
-// The lines that ask you to scan yourself: a part that wasn't kept.
-const AUTO_ASKS = ['bad', 'out-partway', 'partway'];
-// "{when}" in the line: "today 6:12 AM", or the day and time on another day ("Oct 13,
+// --- The Daily Scan Reminder in Settings (the `autoScan` flag) ----------------------------
+// "{when}" in its line: "today 6:12 AM", or the day and time on another day ("Oct 13,
 // 6:12 AM"). `locale`: the browser's, unless a test names one.
-export function autoWhen(at, now = Date.now(), locale) {
+export function lineWhen(at, now = Date.now(), locale) {
   const d = new Date(at);
   // A plain space before AM/PM (some browsers' formats put a narrow one there).
   const time = d
     .toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })
-    .replace(/\u202f/g, ' ');
+    .replace(/ /g, ' ');
   if (d.toDateString() === new Date(now).toDateString()) return t('popup.auto-today', { time });
   return `${d.toLocaleDateString(locale, { month: 'short', day: 'numeric' })}, ${time}`;
 }
-// The line under the switch: null while it's off, the first-run line before its first
-// run, else the last run's. → { key, when, ask } (ask: it asks for a scan).
-export function autoLine({ on, rec }, now = Date.now(), locale) {
-  if (on !== true) return null;
-  const key = isObj(rec) ? AUTO_KEY[rec.line] : null;
-  if (!key || !Number.isFinite(rec.at)) return { key: 'popup.auto-first', when: '', ask: false };
-  return { key, when: autoWhen(rec.at, now, locale), ask: AUTO_ASKS.includes(rec.line) };
-}
-// The amber dot on Settings: the last run kept a part back, until a scan saves since.
-export function autoAsk({ on, rec, scannedAt }) {
-  if (on !== true || !isObj(rec) || !AUTO_ASKS.includes(rec.line)) return false;
-  return !(Number.isFinite(scannedAt) && Number.isFinite(rec.ended) && scannedAt > rec.ended);
+// The one line under the switch (its record: local scanReminder { at, line }, written by
+// src/background.js). `denied`: turning it on just now, the browser said no to
+// notifications. Off, or on with no reminder yet: what it does. → { key, when, ask }
+// (ask: amber).
+const REMINDER_KEY = { shown: 'popup.scan-reminder-last', paused: 'popup.scan-reminder-paused' };
+export function reminderLine({ on, rec, denied = false }, now = Date.now(), locale) {
+  if (denied) return { key: 'popup.scan-reminder-denied', when: '', ask: true };
+  const key = on === true && isObj(rec) ? REMINDER_KEY[rec.line] : null;
+  if (!key || !Number.isFinite(rec.at))
+    return { key: 'popup.scan-reminder-hint', when: '', ask: false };
+  return { key, when: lineWhen(rec.at, now, locale), ask: false };
 }
 
 // The scan report to show, once: one newer than the last the popup showed.

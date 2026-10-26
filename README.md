@@ -175,8 +175,9 @@ Anything after launch is a plan, not a promise. The details are in the
 - **Store Alerts (Optional):** a badge and a notification when a ship in your buy-backs is
   back in the store, or a ship you own gets a new paint, a warbond edition or a
   limited-time sale. Matched on your device.
-- **Auto Scan Daily (Optional):** while you're connected to openhangar.space, Open Hangar
-  can check your hangar once a day. Off until you turn it on.
+- **Daily Scan Reminder (Optional):** while you're connected to openhangar.space, Open
+  Hangar can remind you once a day, with a notification, when it's time to scan. It never
+  scans on its own. Off until you turn it on.
 - **Your Wishlist:** while you're connected, search to add a ship, paint or upgrade, or
   remove an item. Search runs on your device. Ships still match after RSI renames them.
 - **Add to RSI Cart:** put a ship upgrade (CCU) in your RSI cart in one click. You always

@@ -61,24 +61,16 @@
       about: "Store alerts: a badge and notifications for what's on sale for you, matched here.",
       default: true,
     },
-    // Auto Scan Daily (owner, 2026-10-14, #666): a quick check of the connected RSI
-    // account once a day, a full scan when something's new or a week has gone by, in the
-    // hidden scan page. On in every build from 0.4.0: the privacy policy has its section
-    // and names it under alarms and Disconnect (owner-approved words 2026-10-14;
-    // test/privacy-permissions.test.js). Off for each pilot until they turn it on. Needs
-    // alerts, whose build brings the alarms permission (scripts/pack.mjs).
+    // The Daily Scan Reminder (owner, 2026-10-26; it replaced Auto Scan Daily, #666): a
+    // notification once a day at most, while connected, when the last scan in this
+    // browser is over a day old; clicking it starts a scan. It never reads RSI on its
+    // own. The flag keeps Auto Scan Daily's name until the privacy policy's words for the
+    // reminder land (test/privacy-permissions.test.js). Off for each pilot until they
+    // turn it on. Needs alerts, whose build brings the alarms and notifications
+    // permissions (scripts/pack.mjs).
     autoScan: {
-      about: 'Auto Scan Daily: a quick check once a day while connected, a full scan when needed.',
+      about: 'Daily Scan Reminder: a notification to scan once a day while connected.',
       default: true,
-    },
-    // The owner's alert (owner, 2026-10-22): when Auto Scan Daily stops because RSI changed
-    // a page, the maintainer's own copy says so in a notification on that computer
-    // (src/background.js), before pilots report broken scans. Nothing is sent. Dev builds
-    // only: no store build notifies for Auto Scan Daily (the privacy policy).
-    pageChangeAlert: {
-      about: 'Dev only: a notification when Auto Scan Daily stops on a page RSI changed.',
-      default: false,
-      devOnly: true,
     },
     // The popup's scan bar (owner, 2026-10-20): one bar where Scan sits, naming the part
     // running and counting what it has read, filled by RSI's page count, then how long

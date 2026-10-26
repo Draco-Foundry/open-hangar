@@ -25,7 +25,6 @@ test('registry parses: every flag has a name, a one-line about and a default', a
     'localMode',
     'newSinceScan',
     'orgFleet',
-    'pageChangeAlert',
     'scanBar',
     'sync',
     'wishlistImport',
@@ -61,10 +60,9 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     connector: true,
     wishlistImport: true,
     alerts: true,
-    // Auto Scan Daily (#666): the privacy policy names it (test/privacy-permissions.test.js).
+    // The Daily Scan Reminder (Auto Scan Daily's flag, #666): the privacy policy names it
+    // (test/privacy-permissions.test.js).
     autoScan: true,
-    // The owner's page change alert: dev builds only (2026-10-22).
-    pageChangeAlert: false,
     // The popup's scan bar: on in every build (owner, 2026-10-23).
     scanBar: true,
     // New Since Last Scan: off until its words and privacy line are approved.
@@ -78,12 +76,7 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     sync: false,
   });
   assert.equal(registry.orgFleet.devOnly, true, 'orgFleet stays out of every store build');
-  assert.equal(
-    registry.pageChangeAlert.devOnly,
-    true,
-    'the owner alert stays out of every store build',
-  );
-  assert.ok(!registry.autoScan.devOnly, 'Auto Scan Daily ships');
+  assert.ok(!registry.autoScan.devOnly, 'the Daily Scan Reminder ships');
   assert.ok(!registry.localMode.devOnly, 'Local Mode ships');
   assert.ok(!registry.connector.devOnly, 'the connector ships');
   assert.ok(!registry.alerts.devOnly, 'store alerts ship');
@@ -117,7 +110,6 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     wishlistImport: false,
     alerts: false,
     autoScan: true,
-    pageChangeAlert: false,
     scanBar: true,
     newSinceScan: false,
   });
@@ -130,7 +122,6 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     wishlistImport: false,
     alerts: false,
     autoScan: true,
-    pageChangeAlert: false,
     scanBar: true,
     newSinceScan: false,
   });
@@ -278,16 +269,15 @@ test('pack: writes each build its values and cuts the code of flags that are off
     connector: true,
     wishlistImport: true,
     alerts: true,
-    // Auto Scan Daily (#666): the privacy policy names it (test/privacy-permissions.test.js).
+    // The Daily Scan Reminder (Auto Scan Daily's flag, #666): the privacy policy names it
+    // (test/privacy-permissions.test.js).
     autoScan: true,
-    // The owner's page change alert: dev builds only (2026-10-22).
-    pageChangeAlert: false,
     // The popup's scan bar: on in every build (owner, 2026-10-23).
     scanBar: true,
     // New Since Last Scan: off until its words and privacy line are approved.
     newSinceScan: false,
   };
-  // Without the connector, what needs it goes too (Auto Scan Daily needs the alerts).
+  // Without the connector, what needs it goes too (the Daily Scan Reminder needs the alerts).
   const NO_CONNECTOR = [
     '--flag',
     'connector=off',
@@ -440,21 +430,21 @@ test('pack: writes each build its values and cuts the code of flags that are off
     assert.throws(() => pack(dir, ['--flag', 'localMode=off']), /connector=on needs localMode on/);
     // Store alerts show in the popup: not without the connector.
     assert.throws(() => pack(dir, ['--flag', 'connector=off']), /alerts=on needs the connector/);
-    // Auto Scan Daily's daily alarm is the alerts' alarms permission: not without them.
+    // The Daily Scan Reminder uses the alerts' alarms and notifications: not without them.
     assert.throws(
       () => pack(dir, ['--flag', 'alerts=off']),
       /autoScan=on needs alerts on \(it uses their alarms permission\)/,
     );
-    // Without it: its code cut from the worker (its alarm, its badge rule).
+    // Without it: its code cut from the worker (the reminder's alarm).
     pack(dir, ['--flag', 'autoScan=off']);
     for (const t of ['chrome', 'firefox']) {
       const bg = read(t, 'src/background.js');
-      assert.ok(!/oh-auto-scan|autoScanOn|requestScan\('auto'/.test(bg), `${t}: Auto Scan cut`);
+      assert.ok(!/oh-scan-reminder|scanReminderOn/.test(bg), `${t}: the reminder cut`);
       assert.match(bg, /OHAlerts/, `${t}: the alerts kept`);
     }
     pack(dir);
     for (const t of ['chrome', 'firefox'])
-      assert.match(read(t, 'src/background.js'), /const AUTO_ALARM = 'oh-auto-scan';/, t);
+      assert.match(read(t, 'src/background.js'), /const REMIND_ALARM = 'oh-scan-reminder';/, t);
 
     // Without sync (so without Local Mode and the connector): a developer's build with the
     // sync code cut, which the store check refuses. The identity permission stays (it's

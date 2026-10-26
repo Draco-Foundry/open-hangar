@@ -192,31 +192,19 @@ const COPY = {
   'popup.disconnect-body':
     'Your synced copy stays on openhangar.space until you delete it there. This extension just stops syncing.',
   'popup.stay': 'Stay Connected',
-  // A daily scan while connected (the `autoScan` flag): its switch, in the
-  // openhangar.space group.
-  'popup.auto-scan': 'Auto Scan Daily',
-  // Its status line under the switch, one at a time (ui/popup/data.js autoLine): before
-  // its first run, a quick check that found nothing new (or a full read that found
-  // nothing different), a full scan saved with something new, a day skipped (signed out
-  // of RSI, another RSI account signed in, scans paused).
-  'popup.auto-first': 'Runs once a day while your browser is open.',
-  'popup.auto-quick': 'Last: {when}, no changes',
-  'popup.auto-full': 'Last: {when}, hangar updated',
-  'popup.auto-signed-out': 'Skipped {when}: signed out of RSI',
-  'popup.auto-other': 'Skipped {when}: a different RSI account is signed in',
-  'popup.auto-paused': 'Skipped {when}: scans are paused',
-  // RSI didn't answer before anything was read (Claude chat, Words, 2026-10-22).
-  'popup.auto-rsi-down': 'Skipped {when}: RSI was down or busy',
-  // A part thrown away: only when it came back as another account, or with a sudden
-  // drop. Not for a part RSI stopped answering partway (auto-stopped is).
-  'popup.auto-bad': "Last: {when}, something looked wrong and wasn't saved. Scan to check.",
-  // A part that didn't finish because RSI stopped answering partway (the run's line
-  // 'partway': a page it couldn't read, too).
-  'popup.auto-stopped': 'Last: {when}, RSI stopped answering partway. Scan to check.',
-  // A part that didn't finish because the pilot signed out of RSI midway (the run's line
-  // 'out-partway'). Claude chat, 2026-10-14 22:00 UTC.
-  'popup.auto-out-partway': 'Last: {when}, signed out of RSI partway. Scan to check.',
-  // {when} on the day it ran: "today 6:12 AM" (another day: "Oct 13, 6:12 AM").
+  // The Daily Scan Reminder (the `autoScan` flag): its switch, in the openhangar.space
+  // group, and the one line under it (ui/popup/data.js reminderLine). Claude chat, Words,
+  // 2026-10-25.
+  'popup.scan-reminder': 'Daily Scan Reminder',
+  'popup.scan-reminder-hint':
+    'A notification when your last scan is over a day old. Click it to scan.',
+  // Turned on, and the browser's notification ask said no (the switch goes back off).
+  'popup.scan-reminder-denied': 'The reminder needs notifications, and your browser said no.',
+  // A day skipped because the status file pauses scans.
+  'popup.scan-reminder-paused': 'Skipped {when}: scans are paused',
+  // After a reminder went out.
+  'popup.scan-reminder-last': 'Last reminder: {when}',
+  // {when} on the same day: "today 6:12 AM" (another day: "Oct 13, 6:12 AM").
   'popup.auto-today': 'today {time}',
   'popup.notifications': 'Notifications', // the switch's name
   // The muted line under it. Claude chat, Words, 2026-10-23.
