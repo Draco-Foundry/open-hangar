@@ -1,1 +1,0 @@
-- Changed: **Privacy policy updated.** It now describes the Daily Scan Reminder in place of Auto Scan Daily.

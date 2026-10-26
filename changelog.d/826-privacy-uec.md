@@ -1,1 +1,0 @@
-- Changed: **Privacy policy updated.** It now says your scan history keeps your UEC at each scan, in this browser only, sync leaves it out, and the popup shows UEC, REC and how your UEC changed.

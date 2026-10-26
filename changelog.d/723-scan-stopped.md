@@ -1,1 +1,0 @@
-- Fixed: **Scans that stop partway.** The popup no longer stays on Scanning: it says the scan stopped, offers Scan Again and keeps your last full scan.
