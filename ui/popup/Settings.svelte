@@ -1,14 +1,14 @@
 <script>
   // The Settings tab (owner, 2026-10-14; this order 2026-10-24), what the basic page's
   // settings do (ui/basic/Settings.svelte), top to bottom: one openhangar.space box (Sync
-  // Now, Disconnect, Auto Scan Daily, Notifications; Connect opens the extension's own
+  // Now, Disconnect, Daily Scan Reminder, Notifications; Connect opens the extension's own
   // page, since the browser's sign-in window would close the popup), Look, Currency and
   // Shortcut as list rows, Saved Accounts (the privacy policy promises you can remove one
   // here), the Export menu and Log Out of RSI, then Help, Report a Scan Problem and
   // Privacy, and Clear Data on its own line.
   import { onMount, tick } from 'svelte';
   import { t } from './copy.js';
-  import { autoLine, popupShortcut, scanAge, syncTrouble } from './data.js';
+  import { popupShortcut, reminderLine, scanAge, syncTrouble } from './data.js';
   import { CURRENCIES, LOOKS } from './prefs.js';
   import { at } from '../site/when.js';
   import { flag } from '../lib/flags.js';
@@ -31,7 +31,7 @@
     pilotAnswer,
     reportProblem,
     removeProfile,
-    setAutoScan,
+    setScanReminder,
     syncNow,
   } from './actions.js';
 
@@ -58,12 +58,14 @@
   let askClear = $state(false);
   let dataNote = $state('');
   let shortcut = $state(null); // '' none set, null no shortcuts here
-  // Auto Scan Daily (the `autoScan` flag): its switch (local autoScanOn) and its last run
-  // (local autoScan, written by the hidden scan page: ui/scan/runner.js).
+  // The Daily Scan Reminder (the `autoScan` flag): its switch (local scanReminderOn) and
+  // its last reminder (local scanReminder, written by src/background.js). `denied`: the
+  // browser said no to notifications as it was turned on.
   const AUTO = flag('autoScan');
   let autoOn = $state(false);
   let autoRec = $state(null);
-  const line = $derived(autoLine({ on: autoOn, rec: autoRec }, now));
+  let denied = $state(false);
+  const line = $derived(reminderLine({ on: autoOn, rec: autoRec, denied }, now));
 
   const trouble = $derived(syncTrouble({ connected: v.connected, failed: failing }, now));
   const ago = (ms) => {
@@ -79,9 +81,9 @@
   }
   async function loadAuto() {
     if (!AUTO) return;
-    const got = await chrome.storage.local.get(['autoScanOn', 'autoScan']);
-    autoOn = got.autoScanOn === true;
-    autoRec = got.autoScan || null;
+    const got = await chrome.storage.local.get(['scanReminderOn', 'scanReminder']);
+    autoOn = got.scanReminderOn === true;
+    autoRec = got.scanReminder || null;
   }
   onMount(() => {
     OH.siteEnabled().then((on) => (siteOn = on));
@@ -92,7 +94,7 @@
     // listProfiles checks every saved hangar, so a run of db writes (a scan) reads it once.
     let later;
     const changed = (c, area) => {
-      if (area === 'local' && AUTO && (c.autoScanOn || c.autoScan)) loadAuto();
+      if (area === 'local' && AUTO && (c.scanReminderOn || c.scanReminder)) loadAuto();
       if (area === 'local' && c.db) {
         clearTimeout(later);
         later = setTimeout(() => listProfiles().then((p) => (profiles = p)), 1000);
@@ -134,10 +136,27 @@
     shown({});
     await disconnect().catch((e) => (msg = String(e?.message || e)));
   }
-  async function autoSwitch() {
-    const on = !autoOn;
-    autoOn = on;
-    await setAutoScan(on);
+  // On asks for notifications, the click's very first step (Firefox only asks then); the
+  // switch is written at once too, for a popup that closes for the question (the worker
+  // turns it off again if the answer was no). No: back off, and the line says why.
+  function autoSwitch() {
+    denied = false;
+    if (autoOn) {
+      autoOn = false;
+      setScanReminder(false);
+      return;
+    }
+    const asked = askNotify();
+    autoOn = true;
+    setScanReminder(true);
+    asked.then(async () => {
+      const ok = await notifyAllowed();
+      notify = ok;
+      if (ok) return;
+      autoOn = false;
+      denied = true;
+      await setScanReminder(false);
+    });
   }
   function notifySwitch() {
     if (notify) {
@@ -277,7 +296,7 @@
         {#if AUTO}
           <div class="pp-r pp-col pp-sub">
             <div class="pp-line">
-              <span class="pp-grow" id="pp-auto-l">{t('popup.auto-scan')}</span>
+              <span class="pp-grow" id="pp-auto-l">{t('popup.scan-reminder')}</span>
               <button
                 type="button"
                 role="switch"
@@ -285,14 +304,13 @@
                 id="pp-auto-sw"
                 aria-checked={autoOn}
                 aria-labelledby="pp-auto-l"
+                aria-describedby="pp-auto-line"
                 onclick={autoSwitch}><i></i></button
               >
             </div>
-            <!-- Its status line while it's on (copy.js popup.auto-*, data.js autoLine); amber
-                 when the last run kept a part back and asks for a scan. -->
-            {#if line}
-              <p class="pp-msg" class:calm={!line.ask} id="pp-auto-line">{t(line.key, { when: line.when })}</p>
-            {/if}
+            <!-- One line (copy.js popup.scan-reminder-*, data.js reminderLine): what it does,
+                 the last reminder or a day skipped; amber when notifications were refused. -->
+            <p class="pp-msg" class:calm={!line.ask} id="pp-auto-line">{t(line.key, { when: line.when })}</p>
           </div>
         {/if}
       {:else if siteOn}

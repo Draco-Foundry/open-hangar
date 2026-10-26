@@ -47,10 +47,6 @@
  *   local.get | local.set | local.remove | local.getKeys | local.getBytesInUse
  *   session.get | session.set | session.remove
  *   permissions.contains    the offscreen page's storage and permission checks
- *   cookies.get             Auto Scan Daily's sign-in check (ui/popup/rsi-cookie.js), for
- *                           RSI's sign-in cookie only ({ url: RSI, name }): {} when it's in
- *                           this browser, else null. Only whether it's there: the cookie
- *                           and its value never leave this worker.
  */
 (function (root) {
   const PAGE = 'src/scan.html';
@@ -65,8 +61,6 @@
   const RUN = /^[\w-]{6,64}$/;
   const RSI = 'https://robertsspaceindustries.com';
   const RSI_HOST = { origins: [`${RSI}/*`] };
-  // RSI's sign-in cookie, as the parser rules name it (src/parser-rules.js `cart.cookie`).
-  const cookieName = () => root.OHRules?.cart?.cookie || 'Rsi-Token';
   // A scan mark's `by` from a hidden page (ui/scan/main.js); a tab's is 'tab'.
   const HIDDEN = ['offscreen', 'frame'];
   const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -96,11 +90,6 @@
       isObj(a) &&
       Object.keys(a).every((k) => ['origins', 'permissions', 'data_collection'].includes(k)) &&
       Object.values(a).every(strings),
-    'cookies.get': (a) =>
-      isObj(a) &&
-      Object.keys(a).sort().join() === 'name,url' &&
-      a.url === RSI &&
-      a.name === cookieName(),
   };
   // A message from the page, checked → { op, run, arg }, or null.
   function vet(m) {
@@ -340,11 +329,6 @@
       if (op === 'ping') return {};
       if (op === 'done') return done(run, { failed: arg?.failed === true });
       if (op === 'permissions.contains') return chrome.permissions.contains(arg);
-      // Whether it's there, and nothing more: never the cookie itself.
-      if (op === 'cookies.get') {
-        if (!chrome.cookies?.get) throw new Error('no cookies here');
-        return (await chrome.cookies.get({ url: RSI, name: cookieName() })) != null ? {} : null;
-      }
       const [name, fn] = op.split('.');
       const area = chrome.storage[name];
       if (fn === 'getKeys')

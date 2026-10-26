@@ -34,7 +34,7 @@ without the connector.
 
 `manifest.json` asks for `storage`, `unlimitedStorage`, `cookies` and `identity`, plus
 host access to `https://robertsspaceindustries.com/*`. `scripts/pack.mjs` adds `alarms`
-(store alerts and Auto Scan Daily), an optional `notifications` (store alerts) and, on
+(store alerts and the Daily Scan Reminder), an optional `notifications` (both) and, on
 Chrome and Edge, `offscreen` (the hidden scan page). The content security policy only
 allows the extension's own scripts (`script-src 'self'`), and a connector build's pages
 may only send requests to RSI, openhangar.space and the sync site (`connect-src`).
@@ -62,21 +62,16 @@ popup: `chrome.action.onClicked` opens `src/dashboard.html` in a tab. It also:
   matches show in the popup's Fleet News only); a click opens the item on our
   Store; the popup's `{ ohPopup: 'alerts-seen' }` marks them seen. A new scan matches
   again from what's saved, asking nothing;
-- in a build with the `autoScan` flag (docs/FLAGS.md, "Auto Scan", #666), keeps Auto Scan
-  Daily's time once the pilot turns it on (`autoScanOn`, only while connected): one alarm
-  (`oh-auto-scan`) 20 to 28 hours after the last run, kept as `autoScanNext` and made
-  again whenever the worker starts, all in one queue (`autoQueue`: a worker woken by the
-  alarm finds it already gone). A late alarm (the browser was closed) runs once, 10 to 30
-  minutes on. It skips without asking RSI anything after any scan in the last 20 hours
-  (`scanStarted`, or its own last run's `autoScan.ended`), while its last run's `retryAt`
-  holds, offline, or while a scan runs, and otherwise asks the hidden scan page for it,
-  never a tab (`requestScan('auto', { hiddenOnly: true })`). A scan that stopped (its start
-  with no report or record, its heartbeat quiet for 2 minutes) doesn't count, and a run
-  of its own that stopped is tried once more on the next popup open or browser start, at
-  most once in 20 hours (`autoScanRetry`). The run is the page's
-  ([The Scan Pipeline](#the-scan-pipeline)). A run that found nothing new keeps the
-  badge's scan fresh. The link going (by any route) turns it off and clears its alarm;
-  store alerts' alarm is never touched.
+- in a build with the `autoScan` flag (docs/FLAGS.md, "Daily Scan Reminder"), keeps the
+  Daily Scan Reminder once the pilot turns it on (`scanReminderOn`, only while
+  connected, with notifications allowed): one alarm (`oh-scan-reminder`), checked at most
+  once a day. When this browser's last hangar scan is over a day old and no reminder went
+  out in the last day, it shows a notification; clicking it is the popup's Scan
+  (`requestScan('popup')`). It reads nothing from RSI and sends nothing: only the saved
+  scan time and the cached status file (`autoScan` or `hangar` paused: the day is
+  skipped). Its record is `scanReminder`. Notifications taken back, or the link going (by
+  any route), turn it off; store alerts' alarm is never touched. On start it moves Auto
+  Scan Daily's old keys over once (on stays on only when notifications are allowed).
 
 Scanning can't run here: MV3 service workers have no `DOMParser`, which the parser
 needs (see the header of `src/lib.js` and CONTRIBUTING.md, "How Auth Works").
@@ -209,23 +204,10 @@ endpoint (`POST /graphql`, `GetReferralRecruitsList`) and saves them as the `ref
 source. Account identity and balances come from `OH.getAccount()`, cached for
 10 minutes under the `account` key.
 
-**Auto Scan Daily** (the `autoScan` flag, #666) runs in the hidden scan page only:
-`runner.autoScan()` in `ui/scan/runner.js`, with its rules in `ui/scan/auto.js` (pure).
-Local checks first, asking RSI nothing (connected and switched on, not paused, the live
-hangar one this link syncs), then RSI's sign-in cookie (presence only: no cookie, signed
-out, and RSI isn't asked), then `OH.whoIsSignedIn()` (one dashboard read, nothing
-cached). Unless a full read is due (`fullDue`: a part's last complete read, local
-`scanFull`, no longer stands, it's a week old, or a sync is owed: `owedSync`,
-`OH.syncStamp()` against `siteLink.syncedScan`), `OH.peekSource()` reads the newest page
-of the hangar, then of buy-backs, and compares it with what's saved, saving nothing.
-Something new: `scanStarted` (reason `auto`), `OH.getAccount({ expect })` (another handle
-comes back as `other`, never cached), then each part in auto mode (`scanSource` and
-`getReferral` with `{ auto, keep }`: no probe, a 429 back at once, nothing saved unless
-read whole, and the `keep` gate asks `whoIsSignedIn()` again and, for the hangar, runs
-the drop check, reading buy-backs first to explain a sudden drop). It never reconciles
-or switches accounts, never reads packs, never writes `scanReport` and never notifies.
-Its record (local `autoScan`: the line, when, the backoff, `syncTried`) is written
-before the sync of what it saved.
+Nothing reads RSI without a click: Auto Scan Daily's run is gone (the Daily Scan
+Reminder replaced it), and a request left with its reason (`auto`) runs nothing in the
+hidden page. Its helpers in `src/lib.js` (`peekSource`, `whoIsSignedIn`, the `auto`
+modes) aren't called any more.
 
 All errors, retries and partial scans go to a small local log (`OH.log()`, key
 `errorLog`, last 100 entries). `OH.scrubLog()` removes emails and referral codes, and
@@ -288,25 +270,24 @@ the rules (docs/RSI-CHANGES.md).
 Everything lives in `chrome.storage.local` (the `unlimitedStorage` permission lifts the
 browser's default quota). The main keys:
 
-| Key                        | What it holds                                                                                               | Code                                       |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| `db`                       | `{ schemaVersion, sources: { hangar, buybacks, referral: { items, scannedAt, meta? } }, owner }`            | `readDB()`, `writeDB()`, `OH.loadDB()`     |
-| `dbHistory`                | Scan history: `[{ at, items: [[id, name, value]], credit? }]` (credit stays here: sync leaves it out)       | `recordHistory()`, `OH.trimHistory()`      |
-| `dbCorrupt`                | Up to 3 damaged originals that failed the check, kept until Clear Data                                      | `setAside()`, `OH.getDamaged()`            |
-| `dbRecovery`               | `{ at, db }`: the previous account's data, saved before an automatic clear                                  | `clearDataNow()`, `OH.recoverData()`       |
-| `profile:<nickname>`       | Another RSI account's whole DB (history inside), parked while a different account is signed in              | `OH.switchProfile()`, `OH.listProfiles()`  |
-| `account`                  | Cached RSI identity and balances (10 minutes)                                                               | `OH.getAccount()`                          |
-| `errorLog`                 | The rolling error log                                                                                       | `OH.log()`                                 |
-| `remoteStatus`, `netDown`  | Cached kill switch file; sites that recently timed out                                                      | `loadStatus()`, `OH.guarded()`             |
-| `bbDetails`                | Buy-back details: packs read after a buy-back scan, the rest with Load Details (paced)                      | `OH.fetchBuybackDetails()`                 |
-| `lastBackupAt`             | When you last downloaded a backup file                                                                      | `downloadBackup()` in `src/dashboard.js`   |
-| `alertsOn`, `alerts`       | Extension Alerts: Remind Me on or off, set for the pilot; the matches and which you've seen (`alerts` flag) | `OHAlerts.check()`, `src/background.js`    |
-| `alertsFeed`, `alertsWish` | The last sale feed (ETag, when to ask again); the account's Wishlist keys for this connection               | `OHAlerts.check()`                         |
-| `popupPrefs`, `popupWish`  | The popup's settings; its copy of the account's Wishlist for this connection (gone on Disconnect)           | `ui/popup/prefs.js`, `wish-client.js`      |
-| `scanStarted`, `scanFull`  | The last scan that began (for Scan stopped after a restart); each part's last complete read                 | `ui/scan/runner.js`                        |
-| `autoScanOn`, `autoScan`   | Auto Scan Daily's switch (gone on Disconnect, Clear Data); its last run, replaced whole                     | `ui/popup/actions.js`, `ui/scan/runner.js` |
-| `autoScanNext`             | Auto Scan Daily's next run, for a worker that starts with its alarm gone                                    | `src/background.js`                        |
-| `autoScanRetry`            | When Auto Scan Daily last tried again a run that stopped (once in 20 hours at most)                         |
+| Key                        | What it holds                                                                                               | Code                                      |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `db`                       | `{ schemaVersion, sources: { hangar, buybacks, referral: { items, scannedAt, meta? } }, owner }`            | `readDB()`, `writeDB()`, `OH.loadDB()`    |
+| `dbHistory`                | Scan history: `[{ at, items: [[id, name, value]], credit? }]` (credit stays here: sync leaves it out)       | `recordHistory()`, `OH.trimHistory()`     |
+| `dbCorrupt`                | Up to 3 damaged originals that failed the check, kept until Clear Data                                      | `setAside()`, `OH.getDamaged()`           |
+| `dbRecovery`               | `{ at, db }`: the previous account's data, saved before an automatic clear                                  | `clearDataNow()`, `OH.recoverData()`      |
+| `profile:<nickname>`       | Another RSI account's whole DB (history inside), parked while a different account is signed in              | `OH.switchProfile()`, `OH.listProfiles()` |
+| `account`                  | Cached RSI identity and balances (10 minutes)                                                               | `OH.getAccount()`                         |
+| `errorLog`                 | The rolling error log                                                                                       | `OH.log()`                                |
+| `remoteStatus`, `netDown`  | Cached kill switch file; sites that recently timed out                                                      | `loadStatus()`, `OH.guarded()`            |
+| `bbDetails`                | Buy-back details: packs read after a buy-back scan, the rest with Load Details (paced)                      | `OH.fetchBuybackDetails()`                |
+| `lastBackupAt`             | When you last downloaded a backup file                                                                      | `downloadBackup()` in `src/dashboard.js`  |
+| `alertsOn`, `alerts`       | Extension Alerts: Remind Me on or off, set for the pilot; the matches and which you've seen (`alerts` flag) | `OHAlerts.check()`, `src/background.js`   |
+| `alertsFeed`, `alertsWish` | The last sale feed (ETag, when to ask again); the account's Wishlist keys for this connection               | `OHAlerts.check()`                        |
+| `popupPrefs`, `popupWish`  | The popup's settings; its copy of the account's Wishlist for this connection (gone on Disconnect)           | `ui/popup/prefs.js`, `wish-client.js`     |
+| `scanStarted`              | The last scan that began (for Scan stopped after a restart)                                                 | `ui/scan/runner.js`                       |
+| `scanReminderOn`           | The Daily Scan Reminder's switch (gone on Disconnect, Clear Data, or notifications taken back)              | `ui/popup/actions.js`                     |
+| `scanReminder`             | Its last reminder or day skipped (`{ at, line }`)                                                           | `src/background.js`                       |
 
 Other keys are caches of public data (for example `shipMatrix`, `shipCatalog`,
 `shipImages`, `scVersion`, `patchNotes`, `storeShips`, `fxRates`) and UI
@@ -542,8 +523,8 @@ When RSI changes a page, every installed copy breaks until a fix clears store re
 - It fails open: no file, a bad file or no connection means scan as normal.
 - `"alerts": { "enabled": false }` pauses Extension Alerts' checks (`src/alerts.js`,
   from the copy the extension's pages cached; the background never fetches the file).
-- `"autoScan": { "enabled": false }` pauses Auto Scan Daily alone (`hangar` pauses it
-  too; `buybacks` or `referrals` skip that part of its full read).
+- `"autoScan": { "enabled": false }` pauses the Daily Scan Reminder alone (`hangar`
+  pauses it too), from the copy the extension's pages cached.
 - `"scanHidden": { "enabled": false }` turns the hidden scan page off, so scans run in
   the basic page's tab again (docs/CONNECTOR.md).
 - `OH.scanSource()` and `OH.getReferral()` check it before scanning. The basic page

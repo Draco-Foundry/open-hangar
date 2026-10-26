@@ -357,55 +357,47 @@ test("Disconnect deletes the store alerts' Wishlist keys, alerts paused or not",
   answer = () => new Response(JSON.stringify({ ok: true, synced_at: 123 }), { status: 200 });
 });
 
-// --- Auto Scan Daily (#666) ----------------------------------------------------------
-// Check 5 of the privacy notes: Disconnect turns Auto Scan Daily off (its switch and its
-// next run go with the link and the popup's Wishlist copy), and so does a sync the
-// website says isn't connected. The worker then clears its alarm (src/background.js).
-test('Disconnect turns off Auto Scan Daily, as a sync refused as not connected does', async () => {
-  const on = { autoScanOn: true, autoScanNext: Date.now() + 3600e3, popupWish: { v: 1 } };
-  const kept = { autoScan: { v: 1, line: 'quick', at: 1 }, scanFull: { hangar: 1 } };
+// --- The Daily Scan Reminder ------------------------------------------------------------
+// Check 5 of the privacy notes: Disconnect turns the reminder off (its switch goes with
+// the link and the popup's Wishlist copy), and so does a sync the website says isn't
+// connected. The worker then clears its alarm (src/background.js).
+test('Disconnect turns off the Daily Scan Reminder, as a sync refused as not connected does', async () => {
+  const on = { scanReminderOn: true, popupWish: { v: 1 } };
+  const kept = { scanReminder: { at: 1, line: 'shown' } };
   linked(scanned(Date.now() - 60_000));
   Object.assign(mem, on, kept);
   await OH.siteDisconnect();
-  for (const k of ['siteLink', 'popupWish', 'autoScanOn', 'autoScanNext'])
-    assert.equal(mem[k], undefined, k);
-  assert.deepEqual(mem.autoScan, kept.autoScan, 'its last run stays (the row is hidden)');
+  for (const k of ['siteLink', 'popupWish', 'scanReminderOn']) assert.equal(mem[k], undefined, k);
+  assert.deepEqual(mem.scanReminder, kept.scanReminder, 'its last reminder stays');
   linked(scanned(Date.now() - 60_000));
   Object.assign(mem, on);
   answer = () => new Response(JSON.stringify({ error: 'not connected' }), { status: 401 });
   await assert.rejects(OH.siteSync(), /disconnected on the website/);
-  for (const k of ['siteLink', 'popupWish', 'autoScanOn', 'autoScanNext'])
-    assert.equal(mem[k], undefined, k);
+  for (const k of ['siteLink', 'popupWish', 'scanReminderOn']) assert.equal(mem[k], undefined, k);
   answer = () => new Response(JSON.stringify({ ok: true, synced_at: 123 }), { status: 200 });
 });
 
-test('a background seeing the link go clears Auto Scan Daily and turns store alerts off', async () => {
+test('a background seeing the link go clears the reminder and turns store alerts off', async () => {
   const { loadBackground } = require('./bridge-env.js');
   const x = loadBackground({
     changes: true,
     offscreen: true,
-    local: { siteLink: { token: 't' }, autoScanOn: true, alertsOn: true },
+    local: { siteLink: { token: 't' }, scanReminderOn: true, alertsOn: true },
   });
   const until = async (ok) => {
     for (let i = 0; i < 200 && !ok(); i++) await new Promise((r) => setTimeout(r, 2));
     assert.ok(ok());
   };
-  await until(() => x.alarms.has('oh-auto-scan') && x.alarms.has('oh-alerts'));
+  await until(() => x.alarms.has('oh-scan-reminder') && x.alarms.has('oh-alerts'));
   // Disconnect's removal, as OH.siteDisconnect writes it.
-  await x.chrome.storage.local.remove([
-    'siteLink',
-    'popupWish',
-    'alertsWish',
-    'autoScanOn',
-    'autoScanNext',
-  ]);
-  await until(() => !x.alarms.has('oh-auto-scan'));
+  await x.chrome.storage.local.remove(['siteLink', 'popupWish', 'alertsWish', 'scanReminderOn']);
+  await until(() => !x.alarms.has('oh-scan-reminder'));
   // Store alerts are on only while connected: off too, their alarm gone.
   await until(() => x.stores.local.alertsOn === false && !x.alarms.has('oh-alerts'));
-  assert.equal(x.stores.local.autoScanNext, undefined);
+  assert.equal(x.stores.local.scanReminderOn, undefined);
 });
 
-// Which scan a sync sent, for a sync that never went out (ui/scan/auto.js owedSync), and
+// Which scan a sync sent, for a sync that never went out (siteLink.syncedScan), and
 // a refusal's status, for one not to send again until the scan changes.
 test('a sync that goes through keeps the scan it sent; a refusal carries its status', async () => {
   const db = scanned(Date.now() - 60_000);

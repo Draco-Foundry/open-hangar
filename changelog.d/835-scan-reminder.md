@@ -1,0 +1,1 @@
+- Changed: **Auto Scan Daily is now the Daily Scan Reminder.** Open Hangar no longer scans on its own. Once a day, when your last scan is over a day old, it shows a notification, and a scan starts when you click it. If you had Auto Scan Daily on and notifications allowed, the reminder is on.

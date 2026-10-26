@@ -6,14 +6,9 @@
 // (session scanRequest, the way the Open Hangar page takes one for its tab), then the
 // pack reads, saves everything and says it's done; the worker closes it. Nothing here
 // asks the browser for anything: what needs a click stays on the Open Hangar page.
-// Auto Scan Daily's run (reason 'auto', the `autoScan` flag) runs here and only here.
 import { createRunner } from './runner.js';
-import { rsiCookie } from '../popup/rsi-cookie.js';
 
 const OH = globalThis.OH;
-// This build's flags (src/flags.js), as ui/lib/flags.js reads them (not imported: this
-// page needs none of the Svelte pages' shared code).
-const flag = (name) => OH?.flags?.[name] === true;
 const RUN = /^[\w-]{6,64}$/;
 const params = new URLSearchParams(location.search);
 const by = params.get('by') === 'frame' ? 'frame' : 'offscreen';
@@ -53,10 +48,6 @@ const runner = createRunner({
     !chrome.permissions?.contains || chrome.permissions.contains(RSI_HOST).catch(() => true),
   // Firefox's yes to share, given before (the Open Hangar page asks on a click).
   mayShare: async () => !firefox() || chrome.permissions.contains(SITE_DATA).catch(() => false),
-  // Auto Scan Daily's sign-in check: whether RSI's sign-in cookie is here, nothing more
-  // (the popup's check; on Chrome and Edge src/scan-shim.js asks the worker, which says
-  // only whether it's there).
-  rsiCookie: () => rsiCookie(chrome.cookies),
   hooks: { progress: () => ping() },
 });
 
@@ -67,13 +58,11 @@ async function takeRequest() {
   const { scanRequest: r } = await session.get('scanRequest');
   if (!r || r.run !== run) return false;
   const go = Date.now() - r.at < ASK_MAX && !runner.busy;
-  // Auto Scan Daily's run is never a Scan in its place (a build without it never asks).
-  const running = !go
-    ? null
-    : r.reason === 'auto'
-      ? flag('autoScan')
-        ? runner.autoScan()
-        : null
+  // A request left from Auto Scan Daily (reason 'auto', before the reminder replaced it)
+  // is no Scan: nothing runs for it.
+  const running =
+    !go || r.reason === 'auto'
+      ? null
       : runner.scan({ reason: r.reason === 'site' ? 'site' : 'popup' });
   await runner.marked();
   // Only this request: one asked for since is the next one's.

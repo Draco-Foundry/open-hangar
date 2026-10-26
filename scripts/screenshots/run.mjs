@@ -91,8 +91,9 @@ function demoDashboard() {
 // same shims, before flags.js, plus
 // what only those pages use (demo-connector.js: session storage, change events, the
 // popup's message to the background). Their flags are a connector build's, Extension
-// Alerts and Auto Scan Daily on (connectorFlags), as `--flag localMode=on --flag
-// connector=on --flag alerts=on --flag autoScan=on` builds them.
+// Alerts and the Daily Scan Reminder (the autoScan flag) on (connectorFlags), as
+// `--flag localMode=on --flag connector=on --flag alerts=on --flag autoScan=on` builds
+// them.
 function demoConnectorPage(file) {
   return fs
     .readFileSync(path.join(SRC, file), 'utf8')

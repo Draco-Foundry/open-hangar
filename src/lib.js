@@ -1132,10 +1132,9 @@
     }
     // The last scan's report, its start and the RSI portrait (ui/scan/runner.js) go with
     // the rest, and the popup's copy of the account's Wishlist (read again while
-    // connected). So does Auto Scan Daily: its switch (it's off after Clear Data), its
-    // next run and last retry, its last run and the parts' last complete reads. And every
-    // buy-back page read (bbDetails) and failed (bbdMisses), with any save of them still
-    // waiting.
+    // connected). So does the Daily Scan Reminder: its switch (it's off after Clear Data)
+    // and its last reminder. And every buy-back page read (bbDetails) and failed
+    // (bbdMisses), with any save of them still waiting.
     await dropBuybackDetails();
     await chrome.storage.local.remove([
       'popupWish',
@@ -1150,11 +1149,8 @@
       'avatarImg',
       'scanReport',
       'scanStarted',
-      'scanFull',
-      'autoScan',
-      'autoScanOn',
-      'autoScanNext',
-      'autoScanRetry',
+      'scanReminder',
+      'scanReminderOn',
       'subStore',
       RECOVERY_KEY,
       LOG_KEY,
@@ -4656,8 +4652,8 @@
       body,
     });
     if (res.status === 401) {
-      // Forget this link only: one connected again meanwhile stays. Auto Scan Daily goes
-      // with it, as with Disconnect.
+      // Forget this link only: one connected again meanwhile stays. The Daily Scan
+      // Reminder goes with it, as with Disconnect.
       if ((await OH.getSiteLink())?.token === link.token)
         await chrome.storage.local.remove(SITE_LINK_KEYS);
       throw new Error('This extension was disconnected on the website. Connect again.');
@@ -4718,16 +4714,9 @@
   // What goes with the connection: the link, the popup's copy of the account's Wishlist
   // (ui/popup/wish-client.js COPY_KEY), the store alerts' copy of its keys (src/alerts.js
   // WISH_KEY; here rather than at the alerts' next check, which waits while alerts are
-  // paused) and Auto Scan Daily's switch, next run and last retry (it works only while
-  // connected; src/background.js clears its alarm). The Wishlist stays on the account.
-  const SITE_LINK_KEYS = [
-    'siteLink',
-    'popupWish',
-    'alertsWish',
-    'autoScanOn',
-    'autoScanNext',
-    'autoScanRetry',
-  ];
+  // paused) and the Daily Scan Reminder's switch (it works only while connected;
+  // src/background.js clears its alarm). The Wishlist stays on the account.
+  const SITE_LINK_KEYS = ['siteLink', 'popupWish', 'alertsWish', 'scanReminderOn'];
   OH.siteDisconnect = async function siteDisconnect() {
     const link = await OH.getSiteLink();
     if (link) {

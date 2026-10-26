@@ -72,19 +72,7 @@ async function updateReminder() {
   }
   // @flag-end alerts
   const { db, remindRescan } = await chrome.storage.local.get(['db', 'remindRescan']);
-  let at = db && db.sources && db.sources.hangar && db.sources.hangar.scannedAt;
-  // @flag-start autoScan: Auto Scan Daily's quick check that found nothing new counts too
-  // (a hangar it checked is fresh, though it saved nothing), while it's on.
-  const auto = await chrome.storage.local.get(['autoScanOn', 'autoScan']);
-  const checked = auto.autoScan?.at;
-  if (
-    at &&
-    auto.autoScanOn === true &&
-    ['quick', 'full'].includes(auto.autoScan?.line) &&
-    Number.isFinite(checked)
-  )
-    at = Math.max(at, checked);
-  // @flag-end autoScan
+  const at = db && db.sources && db.sources.hangar && db.sources.hangar.scannedAt;
   const days = at ? (Date.now() - at) / 86400000 : null;
   if (remindRescan !== false && days != null && days >= STALE_DAYS) {
     await chrome.action.setBadgeText({ text: '!' });
@@ -432,25 +420,6 @@ async function clearQuietScan() {
   if (quiet(s.scanProgress)) gone.push('scanProgress');
   if (gone.length) await chrome.storage.session.remove(gone);
 }
-// A scan's start (local scanStarted { run, at }) that ended: a report (Scan's
-// scanReport) or Auto Scan Daily's record (autoScan) for that start or a later one, as
-// ui/popup/data.js scanState pairs them; here any Auto Scan Daily run after it counts
-// too (a quick check writes no start of its own).
-function scanEnded(started, { scanReport, autoScan }) {
-  const ends = (e) =>
-    !!e &&
-    typeof e === 'object' &&
-    ((Number.isFinite(e.startedAt) && e.startedAt >= started.at) ||
-      (e === autoScan && Number.isFinite(e.at) && e.at > started.at));
-  return ends(scanReport) || ends(autoScan);
-}
-// A scan that began and stopped: no end for its start, and nothing running.
-async function scanStopped(got) {
-  const s = got.scanStarted;
-  if (!s || typeof s !== 'object' || !Number.isFinite(s.at)) return false;
-  if (Date.now() - s.at < SCAN_RUN_MAX || scanEnded(s, got)) return false;
-  return !(await scanRunning());
-}
 clearQuietScan().catch(() => {});
 
 siteHandlers['oh-get-hangar'] = async () => {
@@ -507,12 +476,8 @@ siteHandlers['oh-scan-status'] = async () => {
 // page asks for it ('site'), and the toolbar popup in the connector build (below,
 // 'popup'): the request says which, for the scan's report (ui/scan/runner.js
 // scanReport.reason). → { ok, opened: true } for a tab, { ok, opened: false, by } for
-// the hidden page, or { ok: false, error: 'busy' }. `hiddenOnly` (Auto Scan Daily,
-// reason 'auto'): only in the hidden page, never a tab; where it can't run there, →
-// { ok: false, error: 'no-hidden' } and nothing opens.
-async function requestScan(reason, { hiddenOnly = false } = {}) {
-  if (hiddenOnly && (!scanHost || (await scanHost.choose()) === 'tab'))
-    return { ok: false, error: 'no-hidden' };
+// the hidden page, or { ok: false, error: 'busy' }.
+async function requestScan(reason) {
   const now = Date.now();
   // Checked and set before any wait, so two requests at once can't both pass; kept in
   // session storage too, for a worker that stopped and started again in between.
@@ -526,12 +491,6 @@ async function requestScan(reason, { hiddenOnly = false } = {}) {
   }
   await chrome.storage.session.set({ scanAskedAt: now });
   const hidden = await scanHost?.start(reason);
-  if (!hidden && hiddenOnly) {
-    // No hidden page after all: no scan, so it doesn't count as a request either.
-    scanAskedAt = held;
-    await chrome.storage.session.remove('scanAskedAt');
-    return { ok: false, error: 'no-hidden' };
-  }
   await chrome.storage.session.set({ scanAskedBy: hidden ? hidden.by : 'tab' });
   if (hidden) return { ok: true, opened: false, by: hidden.by };
   const tabId = await dashboardTab();
@@ -584,7 +543,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   return true; // answers later
 });
 // The popup opened: a scan that stopped leaves nothing that reads as Scanning. No
-// answer (Auto Scan Daily hears it too, below).
+// answer.
 //   { ohPopup: 'opened' }
 chrome.runtime.onMessage.addListener((msg, sender) => {
   if (!msg || typeof msg !== 'object' || msg.ohPopup !== 'opened') return false;
@@ -754,207 +713,164 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 });
 // @flag-end alerts
 
-// @flag-start autoScan: Auto Scan Daily (needs alerts, for the alarms permission: scripts/pack.mjs)
-// A scan of the connected RSI account once a day, off until the pilot turns it on in the
-// popup's Settings (local `autoScanOn`), and only while connected (Disconnect turns it
-// off: src/lib.js siteDisconnect). This worker only keeps its time: one alarm, at a
-// random time 20 to 28 hours after the last run, made again whenever the worker starts
-// (a browser restart can drop alarms). When it goes off, the hidden scan page runs it
-// (requestScan 'auto', never a tab; ui/scan/runner.js autoScan), and that page writes
-// how it went (local `autoScan`). It never notifies (check 6 in the privacy notes).
-// Skipped without asking RSI anything: a scan began under 20 hours ago (any scan) or its
-// own last run ended then, RSI asked it to back off, the browser is offline, or a scan is
-// running. A day missed while the browser was closed or the machine asleep runs once, 10
-// to 30 minutes after it's back (the alarm came late, or there's none left). A scan that
-// stopped (scanStopped) is no day's scan: a run of its own that stopped is tried once
-// more, on the next popup open (now) or browser start (10 to 30 minutes after), at most
-// once in 20 hours (local autoScanRetry, when it was).
-const AUTO_ALARM = 'oh-auto-scan';
-const AUTO_ON = 'autoScanOn';
-const AUTO_NEXT = 'autoScanNext';
-const AUTO_STATE = 'autoScan';
-const AUTO_RETRY = 'autoScanRetry';
-const AUTO_GAP = 20 * 3600e3;
-const AUTO_SPREAD = 8 * 3600e3;
-const AUTO_MAX_AHEAD = 28 * 3600e3;
-const AUTO_LATE = 10 * 60e3;
-const AUTO_RETRY_SPREAD = 2 * 3600e3;
-const autoRand = (ms) => Math.floor(Math.random() * ms);
-const autoSoon = (now) => now + 10 * 60e3 + autoRand(20 * 60e3);
-const autoDaily = (t) => t + AUTO_GAP + autoRand(AUTO_SPREAD);
-// RSI asked the last run to back off (its record's retryAt, ui/scan/auto.js retryAtOf).
-const autoRetryAt = (rec) => (Number.isFinite(rec?.retryAt) ? rec.retryAt : null);
-// The next run at `when`: its alarm and its time (kept, for a worker that starts again
-// with the alarm gone).
-async function autoSchedule(when) {
-  await chrome.alarms.create(AUTO_ALARM, { when });
-  await chrome.storage.local.set({ [AUTO_NEXT]: when });
+// @flag-start autoScan: the Daily Scan Reminder (needs alerts: their alarms and notifications)
+// A reminder to scan, never a scan (it replaced Auto Scan Daily). Off until the pilot
+// turns it on in the popup's Settings (local `scanReminderOn`, which asks for the
+// notifications permission), and only while connected (Disconnect turns it off:
+// src/lib.js siteDisconnect). One alarm, checked again at most once a day: when the
+// last scan in this browser (db.sources.hangar.scannedAt) is over a day old and no
+// reminder went out in the last day, a notification. Clicking it starts a scan, the
+// same as the popup's Scan (requestScan 'popup'); ignored, nothing happens. It asks RSI
+// nothing and sends nothing: it reads the saved scan time, and the status file as the
+// extension's pages cached it (remoteStatus): while that pauses scans (`autoScan` or
+// `hangar`) the day is skipped. Its record (local `scanReminder` { at, line: 'shown' |
+// 'paused' }) is the popup's line. Notifications taken back (the Notifications switch,
+// the browser): it turns itself off.
+const REMIND_ALARM = 'oh-scan-reminder';
+const REMIND_ON = 'scanReminderOn';
+const REMIND_STATE = 'scanReminder';
+const REMIND_GAP = 24 * 3600e3;
+// The approved words (Claude chat, Words, 2026-10-25), word for word.
+const REMIND_WORDS = {
+  'notify.scan-reminder-title': 'Time to Scan',
+  'notify.scan-reminder-body': 'Your last scan was {when}. Click here to scan your hangar.',
+  // {when}: "yesterday", "2 days ago" up to 6, then the date ("Oct 12").
+  'notify.scan-reminder-yesterday': 'yesterday',
+  'notify.scan-reminder-days': '{n} days ago',
+};
+const remindSay = (key, vars = {}) =>
+  REMIND_WORDS[key].replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
+// When the last scan was, in the notification's words: by the calendar day.
+function remindWhen(at, now = Date.now(), locale) {
+  const day = (t) => {
+    const d = new Date(t);
+    return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400e3;
+  };
+  const n = Math.round(day(now) - day(at));
+  if (n <= 1) return remindSay('notify.scan-reminder-yesterday');
+  if (n <= 6) return remindSay('notify.scan-reminder-days', { n });
+  return new Date(at).toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 }
-// One at a time, in order: the worker's start, the alarm and the switch. A worker woken
-// by this alarm already finds it gone when it starts, so the alarm's own next run must
-// land after the start's.
-let autoLine = Promise.resolve();
-const autoQueue = (fn) =>
-  (autoLine = autoLine
+const scanTime = (db) => {
+  const t = db?.sources?.hangar?.scannedAt;
+  const ms = typeof t === 'number' ? t : typeof t === 'string' ? Date.parse(t) : NaN;
+  return Number.isFinite(ms) ? ms : null;
+};
+// The status file pauses scans (as src/alerts.js reads it for alerts).
+const remindPaused = (status) =>
+  ['autoScan', 'hangar'].some((id) => status?.data?.sources?.[id]?.enabled === false);
+
+// Auto Scan Daily's keys, from before the reminder replaced it: once, on the worker's
+// start. A pilot who had it on gets the reminder on when notifications are allowed
+// already and this browser is still connected, else off. Its alarm, switch, record,
+// next run, last retry and the parts' last complete reads go.
+const AUTO_OLD = ['autoScanOn', 'autoScan', 'autoScanNext', 'autoScanRetry', 'scanFull'];
+async function remindFromAuto() {
+  const got = await chrome.storage.local.get([...AUTO_OLD, 'siteLink', REMIND_ON]);
+  await chrome.alarms.clear('oh-auto-scan');
+  if (!AUTO_OLD.some((k) => k in got)) return;
+  if (got.autoScanOn === true && !(REMIND_ON in got) && got.siteLink?.token && (await notifyOk()))
+    await chrome.storage.local.set({ [REMIND_ON]: true });
+  await chrome.storage.local.remove(AUTO_OLD);
+}
+
+// One at a time, in order: the worker's start, the alarm, the switch and a click.
+let remindLine = Promise.resolve();
+const remindQueue = (fn) =>
+  (remindLine = remindLine
     .then(fn)
-    .catch((e) => console.warn('[OpenHangar] Auto Scan Daily:', e?.message || e)));
+    .catch((e) => console.warn('[OpenHangar] Daily Scan Reminder:', e?.message || e)));
 
-// The worker started (or the switch, or the connection, changed): off or not connected,
-// no alarm (and not connected: switched off); on, the alarm it has, or the time it kept,
-// or a run soon when that's past. One more than 28 hours away (the clock went back) is
-// 20 to 28 hours from now, unless RSI asked to wait longer.
-async function autoWake() {
-  const now = Date.now();
-  const got = await chrome.storage.local.get(['siteLink', AUTO_ON, AUTO_NEXT, AUTO_STATE]);
+// The worker started (or the switch, or the connection, changed): not connected, off
+// for good; off, no alarm; on, the alarm it has, or a check in a minute (the check
+// works out the day's time).
+async function remindWake() {
+  const got = await chrome.storage.local.get(['siteLink', REMIND_ON]);
   if (!got.siteLink?.token) {
-    await chrome.alarms.clear(AUTO_ALARM);
-    if (AUTO_ON in got || AUTO_NEXT in got) await chrome.storage.local.remove([AUTO_ON, AUTO_NEXT]);
+    await chrome.alarms.clear(REMIND_ALARM);
+    if (REMIND_ON in got) await chrome.storage.local.remove(REMIND_ON);
     return;
   }
-  if (got[AUTO_ON] !== true) {
-    await chrome.alarms.clear(AUTO_ALARM);
-    if (AUTO_NEXT in got) await chrome.storage.local.remove(AUTO_NEXT);
-    return;
-  }
-  const retryAt = autoRetryAt(got[AUTO_STATE]);
-  const ahead = Math.max(AUTO_MAX_AHEAD, (retryAt ?? 0) - now + AUTO_RETRY_SPREAD);
-  const alarm = await chrome.alarms.get(AUTO_ALARM);
-  if (alarm && Number.isFinite(alarm.scheduledTime) && alarm.scheduledTime - now <= ahead) return;
-  const next = got[AUTO_NEXT];
-  if (Number.isFinite(next) && next > now && next - now <= ahead) return autoSchedule(next);
-  return autoSchedule(Number.isFinite(next) && next > now ? autoDaily(now) : autoSoon(now));
+  if (got[REMIND_ON] !== true) return chrome.alarms.clear(REMIND_ALARM);
+  if (await chrome.alarms.get(REMIND_ALARM)) return;
+  await chrome.alarms.create(REMIND_ALARM, { when: Date.now() + 60e3 });
 }
 
-// The alarm went off.
-async function autoFired(alarm) {
+// The alarm went off: the next check first (a day after the last scan or the last
+// reminder, whichever is later), then the notification when it's due.
+async function remindFired() {
   const now = Date.now();
   const got = await chrome.storage.local.get([
     'siteLink',
-    AUTO_ON,
-    AUTO_STATE,
-    'scanStarted',
-    'scanReport',
+    REMIND_ON,
+    REMIND_STATE,
+    'db',
+    'remoteStatus',
   ]);
-  if (!got.siteLink?.token || got[AUTO_ON] !== true) return autoWake();
-  // Late (the browser was closed, the machine asleep): once, a while from now.
-  const due = Number.isFinite(alarm?.scheduledTime) ? alarm.scheduledTime : now;
-  if (now - due > AUTO_LATE) return autoSchedule(autoSoon(now));
-  // The next run first, so whatever happens below there's always one.
-  const retryAt = autoRetryAt(got[AUTO_STATE]);
-  const retry = retryAt > now ? retryAt + autoRand(AUTO_RETRY_SPREAD) : 0;
-  await autoSchedule(Math.max(autoDaily(now), retry));
-  // Skipped, asking RSI nothing and writing nothing: a scan began under 20 hours ago, or
-  // Auto Scan Daily's last run ended then (a quick check writes no scanStarted, and
-  // switching it off and on again would otherwise run it again in 10 to 30 minutes): the
-  // next run is 20 to 28 hours after it. A scan that stopped doesn't count. Or RSI asked
-  // to wait, offline, or a scan is running.
-  const began = (await scanStopped(got)) ? null : got.scanStarted?.at;
-  const started = Math.max(
-    ...[began, got[AUTO_STATE]?.ended].filter((t) => Number.isFinite(t) && t <= now),
-  );
-  if (Number.isFinite(started) && now - started < AUTO_GAP)
-    return autoSchedule(Math.max(autoDaily(started), retry));
-  if (retryAt > now) return;
-  if (self.navigator?.onLine === false) return;
-  if ((await scanRunning()) || (await scanHost?.busy())) return;
-  // In the hidden page only: no tab ever opens for it (busy or no hidden page: skipped).
-  await requestScan('auto', { hiddenOnly: true });
+  if (!got.siteLink?.token || got[REMIND_ON] !== true) return remindWake();
+  if (!(await notifyOk())) return chrome.storage.local.set({ [REMIND_ON]: false });
+  const past = (t) => (Number.isFinite(t) && t <= now ? t + REMIND_GAP : 0);
+  const scanned = scanTime(got.db);
+  const due = Math.max(past(scanned), past(got[REMIND_STATE]?.at));
+  if (due > now) return chrome.alarms.create(REMIND_ALARM, { when: due });
+  await chrome.alarms.create(REMIND_ALARM, { when: now + REMIND_GAP });
+  // Nothing scanned here yet: nothing to remind of.
+  if (scanned == null) return;
+  if (remindPaused(got.remoteStatus))
+    return chrome.storage.local.set({ [REMIND_STATE]: { at: now, line: 'paused' } });
+  // A scan running now: today's is under way.
+  if (await scanRunning()) return;
+  await chrome.notifications
+    .create(REMIND_ALARM, {
+      type: 'basic',
+      iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+      title: remindSay('notify.scan-reminder-title'),
+      message: remindSay('notify.scan-reminder-body', { when: remindWhen(scanned, now) }),
+    })
+    .catch(() => {});
+  await chrome.storage.local.set({ [REMIND_STATE]: { at: now, line: 'shown' } });
 }
 
-// A run that RSI asked to wait (its record's retryAt, later than the next run): the
-// next run moves after it.
-async function autoBackoff(rec) {
-  const retryAt = autoRetryAt(rec);
-  if (retryAt == null) return;
-  const got = await chrome.storage.local.get(['siteLink', AUTO_ON, AUTO_NEXT]);
-  if (!got.siteLink?.token || got[AUTO_ON] !== true) return;
-  if (Number.isFinite(got[AUTO_NEXT]) && retryAt <= got[AUTO_NEXT]) return;
-  await autoSchedule(retryAt + autoRand(AUTO_RETRY_SPREAD));
+// Its notification clicked: the popup's Scan, nothing more.
+async function remindClicked(id) {
+  if (id !== REMIND_ALARM) return;
+  chrome.notifications.clear(id).catch(() => {});
+  const r = await requestScan('popup');
+  if (!r.ok) await showScan();
 }
-
-// A run of its own that stopped: once more (see the top), now (the popup opened) or soon
-// (the browser started). Not when it's off, RSI asked to wait, or a retry went in the
-// last 20 hours.
-async function autoRetry({ soon = false } = {}) {
-  const now = Date.now();
-  const got = await chrome.storage.local.get([
-    'siteLink',
-    AUTO_ON,
-    AUTO_STATE,
-    AUTO_RETRY,
-    'scanStarted',
-    'scanReport',
-  ]);
-  if (!got.siteLink?.token || got[AUTO_ON] !== true) return;
-  if (got.scanStarted?.reason !== 'auto' || !(await scanStopped(got))) return;
-  const last = got[AUTO_RETRY];
-  if (Number.isFinite(last) && last <= now && now - last < AUTO_GAP) return;
-  if (autoRetryAt(got[AUTO_STATE]) > now) return;
-  if (soon) {
-    await chrome.storage.local.set({ [AUTO_RETRY]: now });
-    return autoSchedule(autoSoon(now));
-  }
-  if (self.navigator?.onLine === false || (await scanHost?.busy())) return;
-  const r = await requestScan('auto', { hiddenOnly: true });
-  if (r.ok) await chrome.storage.local.set({ [AUTO_RETRY]: now });
+// chrome.notifications only exists once its optional permission is granted, so its
+// listener goes on then too (once).
+let remindHeard = false;
+function remindHear() {
+  if (remindHeard || !chrome.notifications?.onClicked) return;
+  remindHeard = true;
+  chrome.notifications.onClicked.addListener((id) => remindQueue(() => remindClicked(id)));
 }
+remindHear();
+chrome.permissions?.onAdded?.addListener(remindHear);
+// Notifications taken back: the reminder can't show, so it's off.
+chrome.permissions?.onRemoved?.addListener((p) => {
+  if (p?.permissions?.includes('notifications'))
+    remindQueue(() => chrome.storage.local.set({ [REMIND_ON]: false }));
+});
 
-autoQueue(autoWake);
-chrome.runtime.onStartup.addListener(() => autoQueue(() => autoRetry({ soon: true })));
-chrome.runtime.onMessage.addListener((msg, sender) => {
-  if (!msg || typeof msg !== 'object' || msg.ohPopup !== 'opened') return false;
-  if (sender.id !== chrome.runtime.id || sender.tab) return false;
-  if (String(sender.url || '').split(/[?#]/)[0] !== chrome.runtime.getURL(POPUP)) return false;
-  autoQueue(() => autoRetry());
-  return false;
+remindQueue(async () => {
+  await remindFromAuto();
+  await remindWake();
 });
 chrome.alarms.onAlarm.addListener((a) => {
-  if (a?.name === AUTO_ALARM) autoQueue(() => autoFired(a));
+  if (a?.name === REMIND_ALARM) remindQueue(remindFired);
 });
 chrome.storage.onChanged.addListener((c, area) => {
   if (area !== 'local') return;
   // Switched on or off, or disconnected (by any route): its alarm follows. Store alerts'
   // alarm is never touched here.
-  if (c[AUTO_ON] || (c.siteLink && !c.siteLink.newValue?.token)) autoQueue(autoWake);
-  if (c[AUTO_STATE]) {
-    const rec = c[AUTO_STATE].newValue;
-    autoQueue(() => autoBackoff(rec));
-  }
-  // The badge: a run that found nothing new keeps the hangar fresh (updateReminder).
-  if (c[AUTO_STATE] || c[AUTO_ON]) updateReminder();
+  if (c[REMIND_ON] || (c.siteLink && !c.siteLink.newValue?.token)) remindQueue(remindWake);
+  // A scan saved: a reminder still up has done its job.
+  if (c.db && scanTime(c.db.newValue) !== scanTime(c.db.oldValue))
+    chrome.notifications?.clear(REMIND_ALARM).catch(() => {});
 });
 // @flag-end autoScan
-
-// @flag-start pageChangeAlert: the owner's alert when Auto Scan Daily stops on a changed page
-// Dev builds only (src/flags.js): the maintainer's own copy, with Auto Scan Daily on for
-// their account, says on this computer when a run stopped because RSI changed a page
-// (its record's `pageChanged`, ui/scan/runner.js). A notification, nothing sent; it
-// needs the notifications permission store alerts ask for. The owner's approved words
-// (owner.rsi-page-changed-alert, 2026-10-22), word for word.
-const PAGE_NAMES = { hangar: 'Hangar', buybacks: 'Buy-Backs', referral: 'Referrals' };
-function pageChangedLine(part, at) {
-  const d = new Date(at);
-  const two = (n) => String(n).padStart(2, '0');
-  return `RSI page changed: ${PAGE_NAMES[part] || part}, ${two(d.getUTCHours())}:${two(d.getUTCMinutes())} UTC`;
-}
-chrome.storage.onChanged.addListener(async (c, area) => {
-  const rec = area === 'local' ? c.autoScan?.newValue : null;
-  if (!rec?.pageChanged || !Number.isFinite(rec.ended) || rec.ended === c.autoScan.oldValue?.ended)
-    return;
-  const ok =
-    !!chrome.notifications &&
-    (await chrome.permissions.contains({ permissions: ['notifications'] }).catch(() => false));
-  if (!ok) return;
-  await chrome.notifications
-    .create(`oh-page-changed-${rec.ended}`, {
-      type: 'basic',
-      iconUrl: chrome.runtime.getURL('icons/icon128.png'),
-      title: 'Open Hangar',
-      message: pageChangedLine(rec.pageChanged, rec.ended),
-    })
-    .catch(() => {});
-});
-// @flag-end pageChangeAlert
 
 // The website's messages, all of them: only from our own pages (src/site-pages.js),
 // each checked before its handler runs.
