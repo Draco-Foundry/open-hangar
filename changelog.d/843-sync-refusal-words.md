@@ -1,0 +1,1 @@
+- Improved: **Clearer sync refusals.** Syncing after a scan while signed out of RSI, or with more RSI accounts than your openhangar.space account can hold yet, now says what to do instead of an error number.
