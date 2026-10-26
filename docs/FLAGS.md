@@ -53,6 +53,7 @@ wishlist import and store alerts, and from 0.4.0 Auto Scan Daily):
 | `alerts`         | Store alerts matched on the device (needs connector)      | on    | on   | no       |
 | `autoScan`       | The Daily Scan Reminder (needs alerts)                    | on    | on   | no       |
 | `scanBar`        | The popup's scan as one counting bar where Scan sits      | on    | on   | no       |
+| `newSinceScan`   | The popup's New Since Last Scan list                      | off   | off  | no       |
 
 ## Adding or Retiring a Flag
 

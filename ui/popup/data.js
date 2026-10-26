@@ -611,3 +611,81 @@ export function shortcutLabel(shortcut, mac) {
   if (!marks.size) return s;
   return [...ORDER].filter((m) => marks.has(m)).join('') + key;
 }
+
+// --- New Since Last Scan (the newSinceScan flag) ---
+// What the last scan found that the one before it didn't, by pledge id, never by RSI's
+// pledge date (a gifted pledge can keep the buyer's date). The scan history (src/lib.js
+// recordHistory) gains a snapshot only when a scan changed something, so the newest
+// snapshot is this scan's exactly when its time is the hangar's scannedAt:
+//   null                    no section: no scan, or the first scan (nothing before it)
+//   { items: [], ... }      this scan found nothing new (it changed nothing, or only
+//                           removed or changed pledges)
+//   { items, total, since } the pledges new in it, in the hangar's order; `total` their
+//                           melt value; `since` the snapshot compared with
+// Stays the same until the next scan. Pure.
+export function newSinceScan(history, items, scannedAt) {
+  if (!Array.isArray(history) || !history.length || !Number.isFinite(scannedAt)) return null;
+  const last = history[history.length - 1];
+  const none = { items: [], total: 0, since: null };
+  if (last?.at !== scannedAt) return none;
+  if (history.length < 2) return null;
+  const before = history[history.length - 2];
+  const had = new Set((before?.items || []).map((x) => String(x?.[0] ?? '')));
+  const fresh = (Array.isArray(items) ? items : []).filter(
+    (p) => p && !had.has(String(p.id ?? '')),
+  );
+  if (!fresh.length) return none;
+  const total = fresh.reduce((a, p) => a + (Number.isFinite(p.value) ? p.value : 0), 0);
+  return { items: fresh, total, since: Number.isFinite(before.at) ? before.at : null };
+}
+// Rows the popup lists; the rest are on the website's New view.
+export const NEW_SHOWN = 3;
+
+// A pledge's name as the website's pledge cards write it (its shownPledgeName): without
+// RSI's "Standalone Ship(s) -" or "Package -" in front, and a coupon's code down to its
+// last four characters ("Coupon: ••••WBT3").
+const COUPON_CODE = /(\bcoupon\b[^:\n]*:\s*)([A-Za-z0-9][A-Za-z0-9-]{4,})/i;
+export function cardName(name) {
+  const n = String(name || '');
+  const shown = n.replace(/^\s*(?:Standalone Ships?|Package)\s*[-–]\s*/i, '').trim() || n;
+  return shown.replace(COUPON_CODE, (_, lead, code) => `${lead}••••${code.slice(-4)}`);
+}
+
+// The insurance chip as the website draws it (its insurance tiers): the parser's term
+// (LTI, 120M, 6M, 5Y) → { text, tier } with tier lti | long | mid | short, or null when
+// there's none or RSI wrote it in words (no chip on a card, never a guessed term).
+export function insChip(term) {
+  const s = String(term || '').trim();
+  if (/^lti$/i.test(s)) return { text: 'LTI', tier: 'lti' };
+  const m = s.match(/^(\d+)\s*([MY])$/i);
+  if (!m) return null;
+  const months = Number(m[1]) * (/y/i.test(m[2]) ? 12 : 1);
+  if (!(months > 0)) return null;
+  const tier = months >= 120 ? 'long' : months >= 6 ? 'mid' : 'short';
+  const text = months >= 12 && months % 12 === 0 ? `${months / 12} yr` : `${months} mo`;
+  return { text, tier };
+}
+
+// The website's New view in My Hangar's Pledges tab, from the popup's My Hangar link
+// (myHangarUrl), or null when that link isn't the website's (not connected).
+export function newViewUrl(myHangar) {
+  const s = String(myHangar || '');
+  return /\/hangar$/.test(s) ? `${s}/pledges?view=new` : null;
+}
+
+// A new pledge's picture, only from RSI's own servers: an https address on
+// robertsspaceindustries.com or one of its subdomains (the saved pages use
+// robertsspaceindustries.com/media/… and media.robertsspaceindustries.com). Anything
+// else is no picture, so the popup never asks another host for one (the privacy
+// policy's line on these pictures). Pure.
+export function rsiPicture(url) {
+  try {
+    const u = new URL(String(url || ''));
+    const host = u.hostname.toLowerCase();
+    const rsi =
+      host === 'robertsspaceindustries.com' || host.endsWith('.robertsspaceindustries.com');
+    return u.protocol === 'https:' && rsi && !u.username && !u.password && !u.port ? u.href : null;
+  } catch {
+    return null;
+  }
+}

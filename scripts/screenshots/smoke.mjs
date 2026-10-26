@@ -4737,6 +4737,63 @@ try {
         'Edge B: the lifted panel, its hairline ring and the thin cobalt bar, 360 px, no sideways scroll',
       )
     : fail(`popup look: ${JSON.stringify(pop)}`);
+  // New Since Last Scan (the newSinceScan flag, off in every build for now): none while
+  // it's off; on, what the demo's last scan found that the scan before didn't (its
+  // referral reward: no melt value, so no price, both marks struck, the LTI chip), as the
+  // website's title-only pledge card.
+  const offArrived = await page.evaluate(() => !!document.querySelector('#pp-arrived'));
+  const newHook = await page.evaluateOnNewDocument(() => {
+    let flags;
+    const OH = (window.OH = window.OH || {});
+    Object.defineProperty(OH, 'flags', {
+      configurable: true,
+      get: () => flags,
+      set: (f) => (flags = Object.freeze({ ...f, newSinceScan: true })),
+    });
+  });
+  await popAt(signedIn, '#pp-arrived');
+  await page.removeScriptToEvaluateOnNewDocument(newHook.identifier);
+  const arr = await page.evaluate(() => {
+    const s = document.querySelector('#pp-arrived');
+    const rows = [...s.querySelectorAll('.pp-arr')];
+    const r = rows[0];
+    const box = (el) => el && el.getBoundingClientRect();
+    return {
+      head: s.querySelector('#pp-arrived-h')?.textContent,
+      total: s.querySelector('#pp-arrived-total')?.textContent,
+      sr: s.getAttribute('aria-label'),
+      when: s.querySelector('.pp-arrwhen')?.textContent,
+      rows: rows.length,
+      name: r?.querySelector('.pp-arrname')?.textContent,
+      melt: !!r?.querySelector('.pp-arrmelt'),
+      marks: [...(r?.querySelectorAll('.pp-gm i') || [])].map((i) => `${i.className}:${i.title}`),
+      chip: r?.querySelector('.pp-ins')?.textContent,
+      chipW: box(r?.querySelector('.pp-ins'))?.width,
+      chipRight: Math.round(box(r?.querySelector('.pp-ins'))?.right - box(r)?.right),
+      oneLine:
+        Math.abs(box(r.querySelector('.pp-gm')).top - box(r.querySelector('.pp-ins')).top) < 2,
+      beforeNews: !document.querySelector('#pp-news') ||
+        !!(s.compareDocumentPosition(document.querySelector('#pp-news')) & 4),
+      wide: document.documentElement.scrollWidth > 360,
+    };
+  });
+  !offArrived &&
+  arr.head === 'New Since Last Scan' &&
+  arr.total === '1 new · $0 melt value' &&
+  arr.sr === '1 new pledge since your last scan, $0 melt value' &&
+  /^Since \w+ \d+$/.test(arr.when) &&
+  arr.rows === 1 &&
+  arr.name === 'Aegis Gladius Dunlevy - Referral Reward' &&
+  !arr.melt &&
+  arr.marks.join() === 'n:Not Giftable,n:Not Meltable' &&
+  arr.chip === 'LTI' &&
+  arr.chipW === 56 &&
+  arr.chipRight === 0 &&
+  arr.oneLine &&
+  arr.beforeNews &&
+  !arr.wide
+    ? ok(`New Since Last Scan: off by default; on, ${arr.total}, ${arr.name} with its marks and chip`)
+    : fail(`popup new since last scan: ${JSON.stringify({ offArrived, ...arr })}`);
   // Numbers that fit their box (budgets: ui/popup/currency.js): the widest full figure and
   // huge ones, at 360 px. Nothing clips or scrolls, and the full figure is the tooltip.
   const fitCase = async (credits, tokens) => {
