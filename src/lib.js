@@ -3906,8 +3906,8 @@
   };
   // Pages that failed for a reason that won't pass by itself (RSI answered 404, or the
   // page couldn't be read): { [pledge id]: { n: failures in a row, at } } (storage key
-  // `bbdMisses`), so the scan's buy-back pages (ui/scan/runner.js readPacks) aren't spent
-  // on them every time (#800). A read clears its entry; pruned with the details.
+  // `bbdMisses`), so buy-back page reads (ui/scan/runner.js readPacks) aren't spent on
+  // them every time (#800). A read clears its entry; pruned with the details.
   const BBD_MISS_KEY = 'bbdMisses';
   const BBD_MISS_MS = 24 * 3600e3;
   const BBD_MISS_MAX_MS = 30 * 24 * 3600e3;

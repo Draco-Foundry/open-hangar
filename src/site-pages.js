@@ -5,9 +5,11 @@
  * Two lists of pages, each with its own requests (capabilities):
  *   hangar  our own hangar page, hangar.openhangar.space (Local Mode, the `localMode`
  *           build flag): hello, the hangar this browser scanned (getHangar), how fresh
- *           it is (getScanStatus), a scan (requestScan) and Add to RSI Cart (addToCart)
+ *           it is (getScanStatus), a scan (requestScan), Add to RSI Cart (addToCart) and
+ *           one buy-back's own page, read as it's opened (readBuyback)
  *   site    the website, openhangar.space and its app: hello, Add to RSI Cart, the
- *           Store's Haul sending its items to the RSI cart (addItems), and Connect
+ *           Store's Haul sending its items to the RSI cart (addItems), one buy-back's
+ *           own page (readBuyback), and Connect
  *           (connect: Connect This Browser, and whether a code is the one this
  *           extension is waiting for) on the pages in `connect` (the app, in builds
  *           with sync)
@@ -36,11 +38,12 @@
     requestScan: ['oh-request-scan'],
     addToCart: ['oh-upgrade-options', 'oh-upgrade-price', 'oh-add-upgrade'],
     addItems: ['oh-add-items'],
+    readBuyback: ['oh-read-buyback'],
     connect: ['oh-connect-begin', 'oh-link-check'],
   };
   const LISTS = {
-    hangar: ['hello', 'getHangar', 'getScanStatus', 'requestScan', 'addToCart'],
-    site: ['hello', 'addToCart', 'addItems', 'connect'],
+    hangar: ['hello', 'getHangar', 'getScanStatus', 'requestScan', 'addToCart', 'readBuyback'],
+    site: ['hello', 'addToCart', 'addItems', 'readBuyback', 'connect'],
   };
   const TYPES = Object.values(CAPS).flat();
 
@@ -52,6 +55,7 @@
   // takes no code from a page: the sign-in window brings it (src/background.js).
   // items: the Haul's list, 1 to ITEMS_MAX plain { skuId, qty } (whole numbers, qty at
   // most QTY_MAX), nothing else in them; the cart lane checks them again (src/rsi-cart.js).
+  // oh-read-buyback's pledgeId: the buy-back pledge opened on the page.
   const MAX_BYTES = 16 * 1024;
   const ITEMS_MAX = 20;
   const QTY_MAX = 10;
@@ -79,6 +83,7 @@
     },
     'oh-add-upgrade': { fromShipId: ID, toShipId: ID, toSkuId: ID, pledgeId: [posInt, false] },
     'oh-add-items': { items: [items, true] },
+    'oh-read-buyback': { pledgeId: ID },
     'oh-connect-begin': {},
     'oh-link-check': { code: [linkCode, true] },
   };

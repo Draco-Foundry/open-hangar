@@ -4331,10 +4331,9 @@ try {
     r.cleared = !document.querySelector('#scan-report') && !/Rough/.test(btn.textContent);
     return r;
   });
+  // No buy-back page is read after a scan (read only when one is opened).
   rep.packs &&
-  (rep.packs.want === 0
-    ? rep.packs.asked === null || rep.packs.asked === 0
-    : rep.packs.asked === Math.min(rep.packs.want, 30) && rep.packs.same) &&
+  (rep.packs.asked === null || rep.packs.asked === 0) &&
   rep.out &&
   rep.out.asked === 0 &&
   rep.out.kept &&
@@ -4357,10 +4356,9 @@ try {
   rep.hist.note === 'From your hangar history' &&
   !rep.hist.loading &&
   rep.hist.rsi === 0 &&
-  rep.hist.skipped &&
-  rep.hist.asked === 30
+  (rep.hist.asked === null || rep.hist.asked === 0)
     ? ok(
-        'buy-backs: a melted pack shows its contents from your hangar history, no RSI read; 30 packs per scan',
+        'buy-backs: a melted pack shows its contents from your hangar history; no page read after a scan',
       )
     : fail(`buy-backs from hangar history: ${JSON.stringify(rep.hist)}`);
   rep.closed && rep.reopened

@@ -25,7 +25,14 @@ const PAGES = require('../src/site-pages.js');
 
 const UNKNOWN = { ok: false, error: 'unknown request' };
 const BAD = { ok: false, error: 'bad request' };
-const HANGAR_CAPS = ['hello', 'getHangar', 'getScanStatus', 'requestScan', 'addToCart'];
+const HANGAR_CAPS = [
+  'hello',
+  'getHangar',
+  'getScanStatus',
+  'requestScan',
+  'addToCart',
+  'readBuyback',
+];
 // The extension's one page in every store build (the connector, src/flags.js): the
 // basic page. A developer's build without the connector opens the dashboard instead.
 const BASIC = 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/src/basic.html';
@@ -77,6 +84,7 @@ const VALID = {
       { skuId: 19002, qty: 2 },
     ],
   },
+  'oh-read-buyback': { type: 'oh-read-buyback', pledgeId: 555 },
   'oh-connect-begin': { type: 'oh-connect-begin' },
   'oh-link-check': { type: 'oh-link-check', code: 'K7Q-4PX' },
 };
@@ -84,7 +92,7 @@ const VALID = {
 test('the capability lists: two per-origin lists, each type named once', () => {
   assert.deepEqual(PAGES.LISTS, {
     hangar: HANGAR_CAPS,
-    site: ['hello', 'addToCart', 'addItems', 'connect'],
+    site: ['hello', 'addToCart', 'addItems', 'readBuyback', 'connect'],
   });
   assert.deepEqual(PAGES.CAPS, {
     hello: ['oh-hello'],
@@ -93,6 +101,7 @@ test('the capability lists: two per-origin lists, each type named once', () => {
     requestScan: ['oh-request-scan'],
     addToCart: ['oh-upgrade-options', 'oh-upgrade-price', 'oh-add-upgrade'],
     addItems: ['oh-add-items'],
+    readBuyback: ['oh-read-buyback'],
     connect: ['oh-connect-begin', 'oh-link-check'],
   });
   assert.deepEqual(Object.keys(VALID).sort(), [...PAGES.TYPES].sort());
@@ -124,9 +133,16 @@ const ALLOWED = {
     'oh-scan-status',
     'oh-request-scan',
     ...PAGES.CAPS.addToCart,
+    'oh-read-buyback',
   ],
-  app: ['oh-hello', ...PAGES.CAPS.addToCart, ...PAGES.CAPS.addItems, ...PAGES.CAPS.connect],
-  front: ['oh-hello', ...PAGES.CAPS.addToCart, ...PAGES.CAPS.addItems],
+  app: [
+    'oh-hello',
+    ...PAGES.CAPS.addToCart,
+    ...PAGES.CAPS.addItems,
+    'oh-read-buyback',
+    ...PAGES.CAPS.connect,
+  ],
+  front: ['oh-hello', ...PAGES.CAPS.addToCart, ...PAGES.CAPS.addItems, 'oh-read-buyback'],
 };
 const ORIGINS = [
   ['hangar', HANGAR, ALLOWED.hangar, false],
@@ -226,11 +242,11 @@ test('hello v2: the version, and what this page may ask in this build', async ()
   assert.deepEqual(await x.send({ type: 'oh-hello' }, HANGAR), v2(HANGAR_CAPS));
   assert.deepEqual(
     await x.send({ type: 'oh-hello' }, APP),
-    v2(['hello', 'addToCart', 'addItems', 'connect']),
+    v2(['hello', 'addToCart', 'addItems', 'readBuyback', 'connect']),
   );
   assert.deepEqual(
     await x.send({ type: 'oh-hello' }, FRONT),
-    v2(['hello', 'addToCart', 'addItems']),
+    v2(['hello', 'addToCart', 'addItems', 'readBuyback']),
   );
   // A page may say which version it speaks; it's allowed and changes nothing.
   assert.deepEqual(await x.send({ type: 'oh-hello', v: 2 }, HANGAR), v2(HANGAR_CAPS));
@@ -791,6 +807,7 @@ test("firefox: only our content script, in a tab's top frame, on one of our page
     'hello',
     'addToCart',
     'addItems',
+    'readBuyback',
     'connect',
   ]);
   const no = [

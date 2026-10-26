@@ -52,8 +52,9 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
 - **The background worker** as today: our pages' messages (bridge v2), the rescan badge,
   updates, and the Daily Scan Reminder's alarm (below).
 - **The scan**, at the same depth: account and balances, the hangar (with the pledge
-  archive and history), buy-backs, referrals, then up to 30 buy-backs' own pages not
-  read from RSI yet (their price, insurance and contents go in the sync, #798). It's the scan
+  archive and history), buy-backs and referrals. A buy-back's own page (its price,
+  insurance and contents go in the sync, #798) is read when the pilot opens that buy-back
+  on the website or our hangar page (bridge `oh-read-buyback`, in the hidden page). It's the scan
   runner (`ui/scan/runner.js`), which the hidden scan page runs (the basic page in its
   tab when it can't); it stores its progress (session `scanProgress`) and its last
   report (`scanReport`) for any page.
@@ -120,7 +121,7 @@ step 3 above).
 | Request                                                                               | Why                                                                       |
 | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | robertsspaceindustries.com `/account/pledges`, `/account/buy-back-pledges`            | Scan: hangar and buy-backs                                                |
-| robertsspaceindustries.com `/pledge/buyback/<id>`                                     | Scan: up to 30 buy-back pages not read yet                                |
+| robertsspaceindustries.com `/pledge/buyback/<id>`                                     | One, when you open that buy-back on our pages, if not read yet            |
 | robertsspaceindustries.com `/en/account/dashboard`                                    | Identity and balances: Scan, and opening the basic page (kept 10 minutes) |
 | robertsspaceindustries.com `/en/citizens/<handle>` (no cookies)                       | Citizen Record and org, with the one above                                |
 | robertsspaceindustries.com `/media/…` portrait (no cookies, when it changes, **new**) | Scan: a small copy of your RSI picture for our pages (`avatarImg`)        |

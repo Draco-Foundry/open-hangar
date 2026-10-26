@@ -59,11 +59,14 @@ async function takeRequest() {
   if (!r || r.run !== run) return false;
   const go = Date.now() - r.at < ASK_MAX && !runner.busy;
   // A request left from Auto Scan Daily (reason 'auto', before the reminder replaced it)
-  // is no Scan: nothing runs for it.
+  // is no Scan: nothing runs for it. Reason 'buyback': one buy-back's own page, not a
+  // scan (src/background.js oh-read-buyback).
   const running =
     !go || r.reason === 'auto'
       ? null
-      : runner.scan({ reason: r.reason === 'site' ? 'site' : 'popup' });
+      : r.reason === 'buyback'
+        ? runner.readBuyback(r.buyback)
+        : runner.scan({ reason: r.reason === 'site' ? 'site' : 'popup' });
   await runner.marked();
   // Only this request: one asked for since is the next one's.
   const { scanRequest: still } = await session.get('scanRequest');

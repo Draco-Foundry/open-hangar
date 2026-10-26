@@ -686,7 +686,7 @@ test("the shim and the worker together: the offscreen page's storage is the work
 
 // The page in Node: its globals stood in for, then the module loaded fresh.
 let loads = 0;
-async function scanPage({ run = 'page01-0a0b0c0d0e0f', by = 'offscreen', request, scan } = {}) {
+async function scanPage({ run = 'page01-0a0b0c0d0e0f', by = 'offscreen', request, scan, oh } = {}) {
   const local = {};
   const session = {};
   const sent = [];
@@ -740,6 +740,7 @@ async function scanPage({ run = 'page01-0a0b0c0d0e0f', by = 'offscreen', request
     flushBuybackDetails: async () => calls.push('flush'),
     storageSettled: async () => calls.push('settled'),
     siteEnabled: async () => false,
+    ...(oh ? oh(calls) : {}),
   };
   await import(`../ui/scan/main.js?page=${++loads}`);
   await Promise.race([done, new Promise((r) => setTimeout(r, 2000))]);
@@ -760,6 +761,42 @@ test('the page: scans the request for its run, saves, then says done', async () 
   assert.deepEqual(p.sent.at(-1), { ohScan: { op: 'done', run: 'page01-0a0b0c0d0e0f' } });
   // No pings from an offscreen document: nothing suspends it.
   assert.ok(!p.sent.some((m) => m.ohScan?.op === 'ping'));
+});
+
+test("the page: a buy-back's request reads that page, no scan; Auto Scan Daily's runs nothing", async () => {
+  const details = {};
+  const p = await scanPage({
+    request: { reason: 'buyback', buyback: '701' },
+    oh: (calls) => ({
+      loadDB: async () => ({
+        owner: { nickname: 'P' },
+        sources: { buybacks: { items: [{ id: '701', kind: 'pack', isCCU: false }] } },
+      }),
+      getBuybackDetails: async () => details,
+      fetchBuybackDetails: async (ids) => {
+        calls.push(`page ${ids.join(',')}`);
+        for (const id of ids) details[id] = { price: 45 };
+        return { done: ids.length, errors: 0, total: ids.length };
+      },
+    }),
+  });
+  assert.deepEqual(
+    p.calls.filter((c) => c === 'hangar' || c.startsWith('page')),
+    ['page 701'],
+  );
+  assert.equal(p.session.bbRead.id, '701');
+  assert.equal(p.session.bbRead.ok, true);
+  assert.equal(p.local.scanReport, undefined, 'no scan, no report');
+  assert.equal(p.session.scanRequest, undefined, 'the request is taken');
+  assert.deepEqual(p.sent.at(-1), { ohScan: { op: 'done', run: 'page01-0a0b0c0d0e0f' } });
+  // A request left from Auto Scan Daily (reason 'auto'): taken, nothing read.
+  const auto = await scanPage({ request: { reason: 'auto' } });
+  assert.deepEqual(
+    auto.calls.filter((c) => c === 'hangar'),
+    [],
+  );
+  assert.equal(auto.local.scanReport, undefined);
+  assert.equal(auto.session.scanRequest, undefined);
 });
 
 test("the page: another run's request is not its own; Firefox's frame pings while it works", async () => {
@@ -791,8 +828,8 @@ test("the page: another run's request is not its own; Firefox's frame pings whil
 
 // The page and the worker together: Chrome's offscreen page (its storage the worker's,
 // as the shim makes it), the page's messages answered by the worker and the worker's
-// heard by the page. `clock.t` is the time on both sides. A buy-back pack to read after
-// each scan, held until `packsGo()`.
+// heard by the page. `clock.t` is the time on both sides. A buy-back page read is held
+// until `packsGo()`.
 async function pageAndWorker({ failGet = false } = {}) {
   const x = chromeX();
   const clock = { t: Date.now() };
@@ -881,20 +918,15 @@ async function pageAndWorker({ failGet = false } = {}) {
 }
 const count = (list, what) => list.filter((c) => c === what).length;
 
-test("the page: a scan reads its buy-backs' own pages inside it, then syncs and closes", async () => {
+test('the page: a scan reads no buy-back page, then closes', async () => {
   const p = await pageAndWorker();
   try {
     const s = p.x.stores.session;
-    await p.until(() => p.calls.includes('packs'), 'the buy-back pages');
-    assert.equal(count(p.calls, 'account'), 1);
-    assert.ok(p.calls.includes('status'), "the kill switch's file, read as the page opened");
-    // The pages are part of the scan (#798): its mark stays while they're read.
-    assert.ok(s.scanRunning, 'still scanning');
-    assert.equal(p.x.stores.local.scanReport, undefined, 'no report before the pages');
-    p.packsGo();
     await p.until(() => p.x.docs.length === 0, 'the page closed');
-    assert.equal(count(p.calls, 'packs'), 1);
+    assert.ok(p.calls.includes('status'), "the kill switch's file, read as the page opened");
     assert.equal(count(p.calls, 'account'), 1);
+    assert.equal(count(p.calls, 'packs'), 0, 'a buy-back page is read only as it is opened');
+    assert.ok(p.x.stores.local.scanReport, 'its report');
     assert.deepEqual(
       Object.keys(s).filter((k) => /^scan(Request|Running|Progress)$/.test(k)),
       [],
@@ -902,6 +934,7 @@ test("the page: a scan reads its buy-backs' own pages inside it, then syncs and 
     assert.equal(s.scanHiddenOff, undefined);
     assert.deepEqual(p.pageSent.at(-1), { ohScan: { op: 'done', run: p.run } });
   } finally {
+    p.packsGo();
     p.restore();
   }
 });

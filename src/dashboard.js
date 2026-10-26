@@ -4232,9 +4232,6 @@ document.addEventListener('click', (e) => {
   renderBuybacks();
 });
 
-// The automatic buy-back pack read after a scan reads at most this many pages.
-const BB_AUTO_MAX = 30;
-
 // Scan a chosen set of sources. Each is independent and persisted on its own, so
 // a partial scan (e.g. just referrals) refreshes only those and leaves the rest
 // of your data untouched; a failure in one still keeps the others' results.
@@ -4419,17 +4416,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
   topBar.busy = false;
   scanMark(false);
   homeUpdated(); // the welcome card and the top bar follow topBar.busy
-  // Buy-back packs whose contents we've never read get read now, in the background
-  // and paced like Get Details (owner, 2026-10-06: fully automatic). Only the
-  // never-read ones, so after the first time it's usually none, and only after a
-  // buy-back scan that worked. The scan itself is already done: it stays as fast.
-  // Packs filled from your own hangar history (at the buy-back scan above) are
-  // skipped, and at most BB_AUTO_MAX are read per scan: the rest wait for the next.
-  const unreadPack = (b) =>
-    !b.isCCU && bbNeedsRead(b) && (b.kind === 'pack' || b.kind === 'package');
-  const bbRead = rows.some((x) => x.name === 'Buy-Backs' && x.ok);
-  if (bbRead && !bbLoading && state.buybacks.some(unreadPack))
-    loadBuybackDetails({ packsOnly: true, max: BB_AUTO_MAX, auto: true });
+  // A buy-back's own page is never read after a scan: only when asked (its Get Details).
 }
 
 // The top bar's Scan runs what's ticked in its ▾ menu: "Scan All" by default,

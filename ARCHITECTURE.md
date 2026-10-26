@@ -81,14 +81,15 @@ needs (see the header of `src/lib.js` and CONTRIBUTING.md, "How Auth Works").
 Our own web pages may ask the extension a few things (bridge v2). Which pages, and what
 each may ask, is `src/site-pages.js` (`self.OHPages`), loaded by the background worker:
 
-| Pages                                      | May ask                                                                 |
-| ------------------------------------------ | ----------------------------------------------------------------------- |
-| hangar.openhangar.space (`localMode` flag) | hello, getHangar, getScanStatus, requestScan, addToCart                 |
-| openhangar.space, app.openhangar.space     | hello, addToCart, addItems, and connect on the app (builds with `sync`) |
+| Pages                                      | May ask                                                                              |
+| ------------------------------------------ | ------------------------------------------------------------------------------------ |
+| hangar.openhangar.space (`localMode` flag) | hello, getHangar, getScanStatus, requestScan, addToCart, readBuyback                 |
+| openhangar.space, app.openhangar.space     | hello, addToCart, addItems, readBuyback, and connect on the app (builds with `sync`) |
 
 Each capability has its message types (`oh-hello`; `oh-get-hangar`; `oh-scan-status`;
 `oh-request-scan`; `oh-upgrade-options`, `oh-upgrade-price` and `oh-add-upgrade` for Add
-to RSI Cart; `oh-add-items` for the Store's Haul; `oh-connect-begin`, `oh-connect-finish` and `oh-link-check` for Connect).
+to RSI Cart; `oh-add-items` for the Store's Haul; `oh-read-buyback` for one buy-back's
+page; `oh-connect-begin`, `oh-connect-finish` and `oh-link-check` for Connect).
 `oh-link-check { code }` answers `{ ok: true, mine }`: whether a code on the website's
 code page is the one the dashboard is waiting for (it keeps it in session storage while
 it waits), so the page fills a code in only then; the code itself never leaves.
@@ -97,6 +98,13 @@ SKUs, 1 to 10 of each) in the RSI cart in one request, RSI's own `AddCartMultiIt
 on `/graphql` with the store page's csrf token, and answers `{ ok, count, added }`: RSI's
 count and the SKU ids it says it added, with `rsiSays` when it turned some down. Like the
 upgrade add, it's only ever a click on our page and never retried.
+`oh-read-buyback { pledgeId }` (connector builds) reads that buy-back's own RSI page as
+the pilot opens it on our page, in the hidden scan page (scan request reason `buyback`,
+`runner.readBuyback`, its answer in session `bbRead`), never a tab, one at a time and
+never while a scan runs: only one not read from RSI yet and never an upgrade's. It
+answers `{ ok, read, buyback }` (the row as getHangar hands it) or `{ ok: false, error }`
+(`firefox-ask`, `not-found`, `no-page`, `busy`, `no-hidden`, `not-read`), and the hidden
+page syncs right after a page it read while connected. A scan never reads these pages.
 
 Every message is checked before its handler runs (`OHPages.vet`): a plain object of at
 most 16 KB with a string `type` (else `bad request`), a type this page may ask in this
