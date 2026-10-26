@@ -4573,12 +4573,13 @@
     'This hangar belongs to another pilot than the one signed in to RSI. Reload Open Hangar to switch hangars, then sync.';
   // Scanned while signed out of RSI, so the sync says no handle (400, reason
   // `no-handle`), and a login already holding as many RSI accounts as it may before one
-  // is verified (403, reason `too-many-accounts`). Placeholder words: they need the
-  // owner's approved words before the release.
+  // is verified (403, reason `too-many-accounts`). Words sync.no-handle and
+  // sync.too-many-accounts, approved 2026-10-26: support, not the Account page, since
+  // most pilots can't verify a handle yet.
   const SYNC_NO_HANDLE =
     "Open Hangar couldn't tell whose hangar this is. Sign in to RSI, scan again, then press Sync Now.";
   const SYNC_TOO_MANY_ACCOUNTS =
-    'Your openhangar.space account holds as many RSI accounts as it can for now. Verify one on your Account page, then sync again.';
+    'Your openhangar.space account already holds as many RSI accounts as it can. Email support@openhangar.space if you need room for another.';
   // What this version would send doesn't fit the sync format (#441), so nothing went;
   // or the website's own check of it said so (400, reason `schema`, #584).
   // Owner-approved words (2026-10-10).
