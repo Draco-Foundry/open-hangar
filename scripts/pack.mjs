@@ -151,8 +151,8 @@ if (FLAGS.connector && !FLAGS.localMode)
 // Extension Alerts (scripts/alerts.mjs) show in the connector's popup.
 if (FLAGS.alerts && !FLAGS.connector)
   throw new Error('--flag alerts=on needs the connector on (add --flag connector=on)');
-// Auto Scan Daily's daily alarm uses the alarms permission the alerts' build brings
-// (scripts/alerts.mjs), and its run is the connector's hidden scan page.
+// The Daily Scan Reminder's alarm and notification use the alarms and notifications
+// permissions the alerts' build brings (scripts/alerts.mjs).
 if (FLAGS.autoScan && !FLAGS.alerts)
   throw new Error('--flag autoScan=on needs alerts on (it uses their alarms permission)');
 // The connector's own pages (scripts/connector.mjs) and the hidden scan page's scripts

@@ -177,6 +177,8 @@ function loadBackground({
   const onAlarm = [];
   const notes = [];
   const onNoteClick = [];
+  const onRemoved = []; // permissions taken back (revoke(), below)
+  let notifyOn = notify;
   const docs = [];
   const sent = [];
   const onUpdate = [];
@@ -215,7 +217,7 @@ function loadBackground({
           },
         }
       : {}),
-    ...(notify
+    ...(notifyOn
       ? {
           notifications: {
             create: async (id, o) => void notes.push({ id, ...o }),
@@ -242,11 +244,12 @@ function loadBackground({
     permissions: {
       contains: async (q) =>
         q && Array.isArray(q.permissions) && q.permissions.includes('notifications')
-          ? notify
+          ? notifyOn
           : q && Array.isArray(q.origins)
             ? rsi
             : granted,
       onAdded: listen(),
+      onRemoved: { addListener: (f) => void onRemoved.push(f) },
     },
     runtime: {
       id: firefox ? FIREFOX_ID : CHROME_ID,
@@ -398,6 +401,11 @@ function loadBackground({
   };
   const startup = () => Promise.all(onStartup.map((f) => f()));
   const clickNote = (id) => Promise.all(onNoteClick.map((f) => f(id)));
+  // Notifications taken back (the Notifications switch, the browser's settings).
+  const revoke = () => {
+    notifyOn = false;
+    return Promise.all(onRemoved.map((f) => f({ permissions: ['notifications'] })));
+  };
   // The browser has an update ready (runtime.onUpdateAvailable).
   const updateAvailable = (details) => Promise.all(onUpdate.map((f) => f(details)));
   // The hidden scan page's message (src/scan-host.js): an extension page at its address
@@ -422,6 +430,7 @@ function loadBackground({
     fireAlarm,
     startup,
     clickNote,
+    revoke,
     docs,
     frames: frameList,
     sent,

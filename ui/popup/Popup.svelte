@@ -13,7 +13,6 @@
   import { t } from './copy.js';
   import {
     TABS,
-    autoAsk,
     fleetNews,
     newReport,
     popupView,
@@ -54,11 +53,9 @@
   let parserOld = $state(false); // a saved list was read by an older parser (#728)
   let account = $state(null);
   let report = $state(null); // the last scan's report (local scanReport)
-  // The last scan that began (local scanStarted), and Auto Scan Daily's switch and last
-  // run (local autoScanOn, autoScan): a start that never ended shows Scan stopped, even
-  // after a browser restart (#676).
+  // The last scan that began (local scanStarted): a start that never ended shows Scan
+  // stopped, even after a browser restart (#676).
   let started = $state(null);
-  let auto = $state({ on: false, rec: null });
   let shown = $state(null); // the report shown once (Scanned in 38s)
   let link = $state(null); // the openhangar.space link, when sync is on
   let pilotDone = $state(false); // the scan's sync question, answered here
@@ -95,7 +92,7 @@
 
   const sc = $derived.by(() => {
     const s = scanState(
-      { ...session, scanReport: report, scanStarted: started, autoScan: auto.rec },
+      { ...session, scanReport: report, scanStarted: started },
       now,
     );
     // Asked from here a moment ago, and nothing written yet: running all the same.
@@ -123,14 +120,8 @@
   const failing = $derived(
     failed || reportSyncFailed(report, v?.connected ? { lastSync: v.connected.lastSync } : null),
   );
-  // A sync that didn't go through: the amber dot on Settings. So does an Auto Scan Daily
-  // run that kept a part back (until a scan saves since), while it's on.
+  // A sync that didn't go through: the amber dot on Settings.
   const trouble = $derived(syncTrouble({ connected: v?.connected, failed: failing }, now));
-  const autoAsks = $derived(
-    flag('autoScan') &&
-      !!v?.connected &&
-      autoAsk({ on: auto.on, rec: auto.rec, scannedAt: v?.scannedAt }),
-  );
   // The scan's sync asked first (an RSI account new to this connection): the question
   // on Hangar, until it's answered here or anywhere else, or a sync since went through.
   const pilot = $derived.by(() => {
@@ -166,8 +157,6 @@
         'justUpdated',
         'updateReady',
         'scanStarted',
-        'autoScan',
-        'autoScanOn',
       ]),
       OH.siteEnabled().then((on) => (on ? OH.getSiteLink() : null)),
       OH.siteUrl(),
@@ -183,7 +172,6 @@
     justUpdated = got.justUpdated || null;
     updateReady = got.updateReady || null;
     started = got.scanStarted || null;
-    auto = { on: got.autoScanOn === true, rec: got.autoScan || null };
     link = siteLink || null;
     v = popupView(
       { db: stored, account: got.account, link: siteLink, siteUrl, hangarPage },
@@ -295,8 +283,7 @@
       applyLook(prefs.look);
       await Promise.all([loadData(), loadSession(), loadAlerts(), readAccess(), readBanner()]);
       await readCookie();
-      // A scan that stopped leaves nothing that reads as Scanning (src/background.js),
-      // and Auto Scan Daily tries a run that stopped once more.
+      // A scan that stopped leaves nothing that reads as Scanning (src/background.js).
       chrome.runtime.sendMessage({ ohPopup: 'opened' }).catch(() => {});
       ready = true;
     })();
@@ -307,11 +294,6 @@
         if (c.db || c.account || c.siteLink || c.siteUrl || c.avatarImg) loadData();
         else if (c.scanReport) setReport(c.scanReport.newValue || null);
         if (c.scanStarted) started = c.scanStarted.newValue || null;
-        if (c.autoScan || c.autoScanOn)
-          auto = {
-            on: c.autoScanOn ? c.autoScanOn.newValue === true : auto.on,
-            rec: c.autoScan ? c.autoScan.newValue || null : auto.rec,
-          };
         if (c.justUpdated) justUpdated = c.justUpdated.newValue || null;
         if (c.updateReady) updateReady = c.updateReady.newValue || null;
         if (c.remoteStatus) readBanner();
@@ -527,7 +509,7 @@
             aria-selected={tab === id}
             aria-controls="pp-panel-{id}"
             tabindex={tab === id ? 0 : -1}
-            class:dot={id === 'settings' && (!!trouble || autoAsks)}
+            class:dot={id === 'settings' && !!trouble}
             onclick={() => pickTab(id)}
           >
             <svg class="pp-ti" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">

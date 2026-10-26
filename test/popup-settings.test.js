@@ -212,11 +212,8 @@ test('who uses the cookies API: Log Out of RSI, Add to RSI Cart and the sign-in 
   assert.deepEqual(users.sort(), [
     'src/lib.js', // OH.logout: Log Out of RSI
     'src/rsi-cart.js', // Add to RSI Cart (#651)
-    'src/scan-host.js', // tells the hidden scan page whether the sign-in cookie is there
-    'src/scan-shim.js', // the hidden page's stand-in for chrome.cookies on Chrome and Edge
     'ui/popup/Popup.svelte', // hands chrome.cookies to the sign-in check
     'ui/popup/rsi-cookie.js', // the sign-in check
-    'ui/scan/main.js', // hands chrome.cookies to the same check, for Auto Scan Daily
   ]);
   const popup = fs.readFileSync(path.join(ROOT, 'ui/popup/Popup.svelte'), 'utf8');
   assert.deepEqual(
@@ -231,28 +228,10 @@ test('who uses the cookies API: Log Out of RSI, Add to RSI Cart and the sign-in 
     'onChanged',
   ]);
   assert.doesNotMatch(check, /\.value\b/, 'never the value');
-  // Auto Scan Daily (#666): the hidden scan page runs the popup's same check, and on
-  // Chrome and Edge the worker answers only whether the cookie is there.
-  const page = fs.readFileSync(path.join(ROOT, 'ui/scan/main.js'), 'utf8');
-  assert.deepEqual(
-    [...page.matchAll(/chrome\.cookies(\.\w+)?/g)].map((m) => m[0]),
-    ['chrome.cookies'],
-    'the hidden page only hands it on',
-  );
-  assert.match(page, /rsiCookie: \(\) => rsiCookie\(chrome\.cookies\)/);
-  const host = fs.readFileSync(path.join(ROOT, 'src/scan-host.js'), 'utf8');
-  assert.deepEqual(
-    [...host.matchAll(/chrome\.cookies(\?)?\.(\w+)/g)].map((m) => m[2]),
-    ['get', 'get'],
-  );
-  assert.match(
-    host,
-    /return \(await chrome\.cookies\.get\(\{ url: RSI, name: cookieName\(\) \}\)\) != null \? \{\} : null;/,
-    'whether it is there, never the cookie',
-  );
-  assert.doesNotMatch(host, /\.value\b/, 'never the value');
-  const shim = fs.readFileSync(path.join(ROOT, 'src/scan-shim.js'), 'utf8');
-  assert.match(shim, /c\.cookies = \{ get: \(q\) => call\('cookies\.get', q\) \};/);
+  // The hidden scan page has no cookies API of its own (Auto Scan Daily's sign-in check
+  // went with it).
+  for (const f of ['ui/scan/main.js', 'src/scan-host.js', 'src/scan-shim.js'])
+    assert.doesNotMatch(fs.readFileSync(path.join(ROOT, f), 'utf8'), /cookies/, f);
 });
 
 // --- Exports ---------------------------------------------------------------------------

@@ -4733,7 +4733,9 @@ try {
   pop.radius === '12px' &&
   pop.width === 360 &&
   !pop.wide
-    ? ok('Edge B: the lifted panel, its hairline ring and the thin cobalt bar, 360 px, no sideways scroll')
+    ? ok(
+        'Edge B: the lifted panel, its hairline ring and the thin cobalt bar, 360 px, no sideways scroll',
+      )
     : fail(`popup look: ${JSON.stringify(pop)}`);
   // Numbers that fit their box (budgets: ui/popup/currency.js): the widest full figure and
   // huge ones, at 360 px. Nothing clips or scrolls, and the full figure is the tooltip.
@@ -4916,7 +4918,7 @@ try {
     nt: !!document.getElementById('pp-nt-sw'),
     shortcut: document.getElementById('pp-shortcut')?.textContent,
     look: document.getElementById('pp-look')?.value,
-    autoScan: /Auto Scan Daily/.test(document.body.textContent),
+    autoScan: /Daily Scan Reminder/.test(document.body.textContent),
   }));
   const setWords = [
     'openhangar.space',
@@ -4945,7 +4947,7 @@ try {
   set.look === 'auto' &&
   !set.autoScan
     ? ok(
-        'Settings: every group, no Store Alerts switch, the shortcut, no Auto Scan or Notifications row until connected',
+        'Settings: every group, no Store Alerts switch, the shortcut, no Daily Scan Reminder or Notifications row until connected',
       )
     : fail(`popup settings: ${JSON.stringify({ set, setMissing })}`);
   // The layout (owner, 2026-10-24): Notifications inside the openhangar.space box; Look,
@@ -5301,31 +5303,28 @@ try {
     ? ok("Open My Hangar goes to the website's My Hangar")
     : fail(`popup Open My Hangar: ${went}`);
 
-  // Auto Scan Daily (#666): its switch in the openhangar.space group while connected, off
-  // until it's turned on; then its line under it in the approved words for each run,
-  // amber with the Settings dot for a part not kept; off again, no line; a narrow window.
+  // The Daily Scan Reminder: its switch in the openhangar.space group while connected,
+  // off until it's turned on, with one line under it in the approved words: what it
+  // does, then the last reminder or a day skipped; on asks for notifications as the
+  // click's first step, and a no turns it back off with its line, amber; a narrow window.
   await page.setViewport({ width: 360, height: 600 });
   const autoLink = { token: 't', name: 'demo@pilot', connectedAt: 1, lastSync: T0 - 60e3 };
-  await popAt(
-    {
-      ...signedIn,
-      __tab: 'settings',
-      __demoLocal: {
-        siteUrl: 'https://app.openhangar.space',
-        siteLink: autoLink,
-      },
-    },
-    '#pp-auto-sw',
-  );
+  const autoSeed = {
+    ...signedIn,
+    __tab: 'settings',
+    __demoLocal: { siteUrl: 'https://app.openhangar.space', siteLink: autoLink },
+  };
+  await popAt(autoSeed, '#pp-auto-sw');
   const autoState = () =>
     page.evaluate(async () => ({
       sw: document.getElementById('pp-auto-sw')?.getAttribute('aria-checked'),
       inGroup: !!document.querySelector('#pp-site #pp-auto-sw'),
       label: document.getElementById('pp-auto-l')?.textContent,
       line: document.getElementById('pp-auto-line')?.textContent.replace(/\s+/g, ' ') ?? null,
+      described: document.getElementById('pp-auto-sw')?.getAttribute('aria-describedby'),
       calm: !!document.getElementById('pp-auto-line')?.classList.contains('calm'),
-      dot: document.getElementById('pp-tab-settings').classList.contains('dot'),
-      kept: (await chrome.storage.local.get('autoScanOn')).autoScanOn,
+      kept: (await chrome.storage.local.get('scanReminderOn')).scanReminderOn,
+      asked: __demo.asked.join(),
       // The popup's own width (360 px, its narrowest): nothing sticks out sideways.
       wide:
         document.documentElement.scrollWidth > 360 ||
@@ -5334,21 +5333,25 @@ try {
           return !!el && el.scrollWidth > el.clientWidth;
         })(),
     }));
+  const HINT = 'A notification when your last scan is over a day old. Click it to scan.';
   const autoOff = await autoState();
   await page.click('#pp-auto-sw');
   await sleep(200);
   const autoOn = await autoState();
   autoOff.sw === 'false' &&
   autoOff.inGroup &&
-  autoOff.label === 'Auto Scan Daily' &&
-  autoOff.line === null &&
+  autoOff.label === 'Daily Scan Reminder' &&
+  autoOff.line === HINT &&
+  autoOff.described === 'pp-auto-line' &&
+  autoOff.calm &&
   autoOn.sw === 'true' &&
   autoOn.kept === true &&
-  autoOn.line === 'Runs once a day while your browser is open.' &&
-  autoOn.calm &&
-  !autoOn.dot
-    ? ok('Auto Scan Daily: off in the openhangar.space group; on: autoScanOn, the first-run line')
-    : fail(`popup auto scan switch: ${JSON.stringify({ autoOff, autoOn })}`);
+  autoOn.asked === 'notifications' &&
+  autoOn.line === HINT
+    ? ok(
+        'Daily Scan Reminder: off in the openhangar.space group with its hint; on asks for notifications',
+      )
+    : fail(`popup scan reminder switch: ${JSON.stringify({ autoOff, autoOn })}`);
   const autoNow = await pageNow();
   const autoWhen = await page.evaluate(
     (u) => ({
@@ -5361,59 +5364,40 @@ try {
     autoNow,
   );
   const today = `today ${autoWhen.time}`.replace(/\s+/g, ' ');
-  const AUTO_LINES = {
-    quick: [`Last: ${today}, no changes`, false],
-    full: [`Last: ${today}, hangar updated`, false],
-    'signed-out': [`Skipped ${today}: signed out of RSI`, false],
-    other: [`Skipped ${today}: a different RSI account is signed in`, false],
-    paused: [`Skipped ${today}: scans are paused`, false],
-    bad: [`Last: ${today}, something looked wrong and wasn't saved. Scan to check.`, true],
-    partway: [`Last: ${today}, RSI stopped answering partway. Scan to check.`, true],
-  };
-  const autoSeen = {};
-  const autoRec = (line, at = autoNow) => ({
-    v: 1,
-    at,
-    ended: at + 1000,
-    line,
-    run: null,
-    startedAt: null,
-    fails: 0,
-    retryAt: null,
-    syncTried: null,
-  });
-  for (const line of Object.keys(AUTO_LINES)) {
-    await told({ autoScan: { newValue: autoRec(line) } });
-    autoSeen[line] = await autoState();
-  }
-  const autoWrong = Object.entries(AUTO_LINES).filter(
-    ([line, [words, ask]]) =>
-      autoSeen[line].line !== words || autoSeen[line].calm === ask || autoSeen[line].dot !== ask,
-  );
-  !autoWrong.length
-    ? ok(
-        'Auto Scan Daily: every line in its approved words; amber and the Settings dot for bad and partway',
-      )
-    : fail(`popup auto scan lines: ${JSON.stringify({ autoWrong, autoSeen })}`);
-  // Another day: its date and time. The popup's 360 px holds the longest line.
-  await told({ autoScan: { newValue: autoRec('full', autoNow - 3 * 86400e3) } });
+  await told({ scanReminder: { newValue: { at: autoNow, line: 'shown' } } });
+  const autoShown = await autoState();
+  await told({ scanReminder: { newValue: { at: autoNow, line: 'paused' } } });
+  const autoPaused = await autoState();
+  await told({ scanReminder: { newValue: { at: autoNow - 3 * 86400e3, line: 'shown' } } });
   const autoOld = await autoState();
-  await told({ autoScan: { newValue: autoRec('bad') } });
-  const autoNarrow = await autoState();
   await page.click('#pp-auto-sw');
   await sleep(200);
   const autoAgain = await autoState();
-  autoOld.line === `Last: ${autoWhen.day}, ${autoWhen.time}, hangar updated`.replace(/\s+/g, ' ') &&
-  !autoNarrow.wide &&
-  /something looked wrong/.test(autoNarrow.line) &&
+  autoShown.line === `Last reminder: ${today}` &&
+  autoPaused.line === `Skipped ${today}: scans are paused` &&
+  autoOld.line === `Last reminder: ${autoWhen.day}, ${autoWhen.time}`.replace(/\s+/g, ' ') &&
+  !autoOld.wide &&
   autoAgain.sw === 'false' &&
   autoAgain.kept === false &&
-  autoAgain.line === null &&
-  !autoAgain.dot
+  autoAgain.line === HINT
+    ? ok('Daily Scan Reminder: the last reminder, a day skipped, another day; off again, the hint')
+    : fail(
+        `popup scan reminder lines: ${JSON.stringify({ autoShown, autoPaused, autoOld, autoAgain })}`,
+      );
+  // The browser says no to notifications: back off, and the line says why, amber.
+  await popAt({ ...autoSeed, __demoNotify: false }, '#pp-auto-sw');
+  await page.click('#pp-auto-sw');
+  await sleep(300);
+  const autoNo = await autoState();
+  autoNo.sw === 'false' &&
+  autoNo.kept === false &&
+  autoNo.line === 'The reminder needs notifications, and your browser said no.' &&
+  !autoNo.calm &&
+  !autoNo.wide
     ? ok(
-        'Auto Scan Daily: another day shows its date; 360 px holds the longest line; off again, no line',
+        'Daily Scan Reminder: notifications refused, back off with its amber line; 360 px holds it',
       )
-    : fail(`popup auto scan: ${JSON.stringify({ autoOld, autoNarrow, autoAgain, autoWhen })}`);
+    : fail(`popup scan reminder refused: ${JSON.stringify(autoNo)}`);
 
   // A German browser with no currency picked: still US dollars, and no rates asked (the
   // policy: only if you pick a currency other than USD).
@@ -5867,7 +5851,9 @@ try {
     line: document.querySelector('#pp-stopped span')?.textContent || '',
     again: !!document.getElementById('pp-scan-again'),
     under:
-      document.getElementById('pp-act').compareDocumentPosition(document.getElementById('pp-stopped')) &
+      document
+        .getElementById('pp-act')
+        .compareDocumentPosition(document.getElementById('pp-stopped')) &
       Node.DOCUMENT_POSITION_FOLLOWING,
   }));
   await page.click('#pp-scan');
@@ -5881,7 +5867,9 @@ try {
   !stopped.again &&
   stopped.under &&
   againAsked
-    ? ok('a scan that stopped: Scan stopped, Scan Again at the top and the line under it; 90s quiet still Scanning')
+    ? ok(
+        'a scan that stopped: Scan stopped, Scan Again at the top and the line under it; 90s quiet still Scanning',
+      )
     : fail(`popup stopped: ${JSON.stringify({ beating, stopped, againAsked })}`);
   // Stopped and signed out of RSI: the signed-out line, no Scan Again (Log In to RSI is
   // at the top).
@@ -5896,14 +5884,13 @@ try {
     ? ok('a scan that stopped signed out: the signed-out line, no Scan Again')
     : fail(`popup stopped signed out: ${JSON.stringify(stoppedOut)}`);
   // After a browser restart there are no session marks: the start kept locally
-  // (scanStarted, #676) with no report or Auto Scan record for it says the same; one
+  // (scanStarted, #676) with no report for it says the same; one
   // that ended (its run at its start) doesn't.
   const began = { run: 'r10', by: 'offscreen', reason: 'popup', at: T0 - 5 * 60e3 };
   const afterRestart = {};
   for (const [name, more] of [
     ['none', {}],
     ['report', { scanReport: { v: 1, run: 'r10', startedAt: began.at, at: T0 - 60e3 } }],
-    ['auto', { autoScan: { v: 1, run: 'r10', startedAt: began.at, at: began.at, line: 'full' } }],
   ]) {
     await popAt({ ...signedIn, __demoLocal: { scanStarted: began, ...more } }, '#pp-scan');
     afterRestart[name] = await page.evaluate(() => ({
@@ -5914,8 +5901,7 @@ try {
   afterRestart.none.age === 'Scan stopped' &&
   afterRestart.none.scan === 'Scan Again' &&
   afterRestart.report.age !== 'Scan stopped' &&
-  afterRestart.report.scan === 'Scan' &&
-  afterRestart.auto.age !== 'Scan stopped'
+  afterRestart.report.scan === 'Scan'
     ? ok('after a restart: a start with no end says Scan stopped and Scan Again; an ended one not')
     : fail(`popup stopped after a restart: ${JSON.stringify(afterRestart)}`);
 
