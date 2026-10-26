@@ -95,7 +95,8 @@
   // before it didn't (./data.js newSinceScan), until the next scan. Each row is the
   // website's title-only pledge card in its row shape: the picture, the name, then the
   // melt value with the G and M marks after it and the insurance chip at the right.
-  // Three rows, then the website's New view; every row when there's no website.
+  // Three rows, and always the link to the website's New view while connected (owner,
+  // 2026-10-26: see more on openhangar.space); every row when there's no website.
   const NEW = flag('newSinceScan');
   const arrived = $derived(NEW ? newSinceScan(db?.history, v.items, v.scannedAt) : null);
   const newAll = $derived(arrived ? newViewUrl(v.myHangar) : null);
@@ -269,7 +270,7 @@
               </span>
             </div>
           {/each}
-          {#if newAll && arrived.items.length > NEW_SHOWN}
+          {#if newAll}
             <button type="button" class="pp-link" id="pp-arrived-all" onclick={() => openTab(newAll)}
               >{t('popup.new-see-all', { n: arrived.items.length })}</button
             >

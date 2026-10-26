@@ -52,7 +52,7 @@ const COPY = {
   // New Since Last Scan (the newSinceScan flag): the pledges the last scan found that the
   // one before it didn't. Placeholders until Claude chat's words come back: the heading,
   // the total beside it, when the hangar it's compared with was scanned, a scan that
-  // found nothing, the link past three rows (the website's New view), and the section's
+  // found nothing, the link to the website's New view, and the section's
   // name for screen readers.
   'popup.new-since': 'New Since Last Scan', // NEW: needs the owner's OK
   'popup.new-total': '{n} new · {melt} melt', // NEW: needs the owner's OK
