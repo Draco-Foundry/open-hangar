@@ -79,7 +79,12 @@ test('turning it on: a check in a minute; off, none; not connected, off for good
 
 test('the last scan over a day old: one notification in the approved words, nothing read', async () => {
   const t0 = Date.now();
-  const x = worker({ local: { scanReminderOn: true, ...scanned(t0 - 2 * DAY - H) } });
+  // Midday two calendar days back, so "2 days ago" holds at any hour (2 days and an hour
+  // back is three calendar days just after midnight; the 0.5.5 release run hit it at 00:58).
+  const last = new Date(t0);
+  last.setHours(12, 0, 0, 0);
+  last.setDate(last.getDate() - 2);
+  const x = worker({ local: { scanReminderOn: true, ...scanned(last.getTime()) } });
   await fire(x);
   assert.equal(x.notes.length, 1);
   const [n] = x.notes;
