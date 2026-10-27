@@ -6,9 +6,8 @@ Open Hangar is an unofficial Star Citizen fan project made by Draco Foundry. It 
 
 ## Pages
 
-- [Home](https://openhangar.space/): what Open Hangar is
+- [Home](https://openhangar.space/): Hangar Uplink, Star Citizen news summaries that link to the source, and what Open Hangar is
 - [The Extension](https://openhangar.space/extension): what it does, and the Chrome, Edge and Firefox store listings
 - [The Store](https://openhangar.space/store): Star Citizen store prices, deals and what's new
-- [News](https://openhangar.space/news): Star Citizen news summaries that link to the source
 - [Troubleshooting](https://openhangar.space/help.html): fixes for common problems
 - [Privacy Policy](https://openhangar.space/privacy.html): what is read, what is kept and what is never sent
