@@ -145,5 +145,7 @@ jobs:
           # Through env, never pasted into the script: a commit message is untrusted.
           MSG: ${{ github.event.head_commit.message || github.sha }}
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        # The commit's first line only (owner, 2026-10-28), as one titled card.
         run: |
-          node scripts/notify.mjs ops --down "CI failed on main: $MSG $RUN"
+          first=${MSG%%$'\n'*}
+          node scripts/notify.mjs ops --down --title="Extension CI Failed on Main" --footer="Extension CI" --run="$RUN" "$first"

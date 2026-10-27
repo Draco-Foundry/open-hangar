@@ -341,4 +341,4 @@ jobs:
             Discord: ${{ needs.discord.result }}
           REF: ${{ needs.build.outputs.ref || github.event.inputs.tag }}
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: node .tools/scripts/notify.mjs ops --down "Publishing $REF ($STORE) had a failure. $RESULTS $RUN"
+        run: node .tools/scripts/notify.mjs ops --down --title="Extension Publish Failed" --footer=Publish --run="$RUN" "Publishing $REF ($STORE) had a failure. $RESULTS"

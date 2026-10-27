@@ -1,7 +1,11 @@
 // Posts a release to the Discord #updates channel (called by the Publish to stores
 // workflow once every store upload went through). The whole release goes out,
-// laid out like the extension's Updates page (#238): a header, then New /
-// Improved / Fixed, every item with its bold lead. Nobody is pinged.
+// laid out like the extension's Updates page (#238), in Open Hangar's Discord
+// standard (owner, 2026-10-28, Direction A): a grey header card, then New /
+// Improved / Fixed cards, every item with its bold lead, and on the last card the
+// footer and Discord's own timestamp. Every card has a title, no emoji, nobody is
+// pinged. Words: "Open Hangar {version} Is on the Way" and "Extension {version}"
+// (approved 2026-10-27), with the website post's "Fly safe, Citizens. o7".
 //
 //   DISCORD_UPDATES_WEBHOOK=<url> node scripts/discord-post.mjs 0.2.12
 //   node scripts/discord-post.mjs 0.2.12 --dry-run   (prints the messages instead)
@@ -33,6 +37,9 @@ const kindOf = (b) => {
 
 // Discord's limits: 4096 characters per embed description, 6000 across a
 // message's embeds, 10 embeds per message.
+// The header card's grey (Discord's own neutral), as on the website's post.
+const HEADER_COLOR = 0x4e5058;
+const SIGN_OFF = 'Fly safe, Citizens. o7';
 const DESC_MAX = 4096;
 const MSG_MAX = 6000;
 const EMBEDS_MAX = 10;
@@ -80,34 +87,37 @@ function pack(lines, max) {
   return out;
 }
 
-// The webhook bodies for one release, in order. Pure.
-export function buildMessages(log, version) {
+// One item as a line: `- ` to start, a capital first, no closing full stop (an
+// ellipsis stays), the same as the website's post.
+const line = (b) =>
+  `- ${plain(b.replace(TAG, ''))
+    .replace(/(?<!\.)\.$/, '')
+    .replace(/^(\*\*)?(\w)/, (_, bold, c) => (bold || '') + c.toUpperCase())}`;
+
+// The webhook bodies for one release, in order. Pure. now: the last card's timestamp.
+export function buildMessages(log, version, now = Date.now()) {
   const section = releaseSection(log, version);
   if (!section) return null;
   const header = {
-    title: `Open Hangar ${version} is on the way`,
+    title: `Open Hangar ${version} Is on the Way`,
     description: [
       ...section.intro.map(plain),
       `It rolls out as each store finishes its review: ${STORES}`,
     ].join('\n\n'),
-    color: 0x2f81f7,
+    color: HEADER_COLOR,
   };
   const embeds = [header];
   for (const [key, label, color] of GROUPS) {
-    const items = section.bullets
-      .filter((b) => kindOf(b) === key)
-      .map((b) =>
-        plain(b.replace(TAG, '')).replace(
-          /^(\*\*)?(\w)/,
-          (_, bold, c) => (bold || '') + c.toUpperCase(),
-        ),
-      )
-      .map((b) => `• ${b}`);
-    pack(items, DESC_MAX).forEach((description, i) =>
-      embeds.push({ ...(i === 0 ? { title: label } : {}), description, color }),
+    const items = section.bullets.filter((b) => kindOf(b) === key).map(line);
+    // A kind too long for one card goes on in another with the same title.
+    pack(items, DESC_MAX).forEach((description) =>
+      embeds.push({ title: label, description, color }),
     );
   }
-  const size = (e) => (e.title || '').length + e.description.length;
+  const last = embeds[embeds.length - 1];
+  last.footer = { text: `Extension ${version} · ${SIGN_OFF}` };
+  last.timestamp = new Date(now).toISOString();
+  const size = (e) => e.title.length + e.description.length + (e.footer?.text.length ?? 0);
   const messages = [];
   let batch = [];
   for (const e of embeds) {

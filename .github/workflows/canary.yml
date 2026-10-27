@@ -35,5 +35,5 @@ jobs:
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           body=$(cat "$REPORT" 2>/dev/null || echo "The canary crashed before writing a report.")
-          node scripts/notify.mjs ops --down "RSI canary: $body
-          $RUN"
+          # One titled card; a long report is cut at 4,000 with the run link (notify.mjs).
+          node scripts/notify.mjs ops --down --title="RSI Canary Failed" --footer=Canary --run="$RUN" "$body"
