@@ -138,25 +138,39 @@ const withinLimits = (messages) =>
   messages.every(
     (m) =>
       m.embeds.length <= 10 &&
-      m.embeds.reduce((n, e) => n + (e.title || '').length + e.description.length, 0) <= 6000 &&
+      m.embeds.reduce(
+        (n, e) => n + e.title.length + e.description.length + (e.footer?.text.length ?? 0),
+        0,
+      ) <= 6000 &&
+      m.embeds.every((e) => e.title) &&
       m.embeds.every((e) => e.description.length <= 4096) &&
       m.allowed_mentions.parse.length === 0,
   );
 
 test('Discord post: the whole release, grouped like the Updates page', async () => {
   const { buildMessages, releaseSection } = await discord();
-  const messages = buildMessages(changelog, '0.2.13');
+  const at = Date.parse('2026-10-28T18:02:00Z');
+  const messages = buildMessages(changelog, '0.2.13', at);
   const embeds = embedsOf(messages);
-  assert.equal(embeds[0].title, 'Open Hangar 0.2.13 is on the way');
-  const titles = embeds.map((e) => e.title).filter(Boolean);
+  // The Discord standard (owner, 2026-10-28): a grey header card, every card titled.
+  assert.equal(embeds[0].title, 'Open Hangar 0.2.13 Is on the Way');
+  assert.equal(embeds[0].color, 0x4e5058);
+  const titles = embeds.map((e) => e.title);
   assert.deepEqual(titles.slice(1), ['Improved', 'Fixed']); // 0.2.13 has no New items
   const items = embeds.slice(1).flatMap((e) => e.description.split('\n'));
   assert.equal(items.length, releaseSection(changelog, '0.2.13').bullets.length);
   for (const it of items) {
-    assert.match(it, /^• (\*\*)?[A-Z0-9"]/); // prefix gone, first letter capitalized
-    assert.doesNotMatch(it, /^• (\*\*)?(New|Improved|Changed|Fixed):/);
+    assert.match(it, /^- (\*\*)?[A-Z0-9"]/); // prefix gone, first letter capitalized
+    assert.doesNotMatch(it, /^- (\*\*)?(New|Improved|Changed|Fixed):/);
+    assert.doesNotMatch(it, /[^.]\.$/); // no closing full stop
   }
+  // The footer and Discord's timestamp on the last card only.
+  const last = embeds[embeds.length - 1];
+  assert.equal(last.footer.text, 'Extension 0.2.13 · Fly safe, Citizens. o7');
+  assert.equal(last.timestamp, new Date(at).toISOString());
+  for (const e of embeds.slice(0, -1)) assert.equal(e.footer ?? e.timestamp, undefined);
   assert.doesNotMatch(JSON.stringify(messages), /—/); // house style: no em dashes
+  assert.doesNotMatch(JSON.stringify(messages), /\p{Extended_Pictographic}/u); // no emoji
   assert.ok(withinLimits(messages));
 });
 
