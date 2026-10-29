@@ -1924,8 +1924,14 @@ try {
     // Both sizes break together, as they would for a dead RSI link.
     if (img.hasAttribute('srcset')) img.srcset = `${missing}-s.jpg 351w, ${missing}-l.jpg 648w`;
     img.src = `${missing}.jpg`; // 404
-    await new Promise((r) => setTimeout(r, 800));
-    const retried = img.dataset.retried === '1' && img.isConnected; // waiting to retry
+    // Waits for the retry mark rather than a set time: the mark comes after two failed
+    // loads (the sizes, then the plain picture; ui/lib/Thumb.svelte onerror), which a
+    // slow runner took longer than 800 ms to reach once (CI on main, 2026-10-29).
+    let retried = false;
+    for (let t = 0; t < 50 && !retried; t++) {
+      retried = img.dataset.retried === '1' && img.isConnected; // waiting to retry
+      if (!retried) await new Promise((r) => setTimeout(r, 100));
+    }
     await new Promise((r) => setTimeout(r, 2500));
     return { retried, placeholder: !!card.querySelector('.thumb.placeholder, img.thumb') };
   });
