@@ -67,7 +67,15 @@ jobs:
             section CHANGELOG.main.md > notes.md
           fi
           if [ ! -s notes.md ]; then echo "See CHANGELOG.md." > notes.md; fi
+          # Where a pilot's data lives stays the very last line, after Install. From
+          # 0.5.6 on the tag's own scripts have it; an older tag has none.
+          NOTE=$(node -e "import('./scripts/changelog-fragments.mjs').then(m => m.DATA_NOTE && console.log(m.DATA_NOTE))" 2>/dev/null || true)
+          if [ -n "$NOTE" ]; then
+            grep -vxF "$NOTE" notes.md > notes.tmp || true
+            mv notes.tmp notes.md
+          fi
           printf '\n---\n**Install:** [openhangar.space](https://openhangar.space/). The zips below are the exact store packages.\n' >> notes.md
+          if [ -n "$NOTE" ]; then printf '\n%s\n' "$NOTE" >> notes.md; fi
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}

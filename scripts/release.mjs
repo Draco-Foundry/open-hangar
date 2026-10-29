@@ -15,7 +15,7 @@
 // store update today (the Hotfix box).
 import { execFileSync, execSync } from 'node:child_process';
 import fs from 'node:fs';
-import { DIR as FRAG_DIR, foldInto, readFragments } from './changelog-fragments.mjs';
+import { DIR as FRAG_DIR, foldInto, readFragments, withDataNote } from './changelog-fragments.mjs';
 
 const args = process.argv.slice(2);
 const version = args.find((a) => !a.startsWith('--'));
@@ -80,7 +80,7 @@ const d = new Date();
 const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const newLog =
   log.slice(0, start) +
-  `## Unreleased\n\n## ${version} — ${today}\n\n${body}\n\n` +
+  `## Unreleased\n\n## ${version} — ${today}\n\n${withDataNote(body)}\n\n` +
   (next < 0 ? '' : after.slice(next));
 
 console.log(`Open Hangar ${manifest.version} → ${version} (${today})`);
