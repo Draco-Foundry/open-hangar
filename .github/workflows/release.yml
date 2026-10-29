@@ -50,6 +50,11 @@ jobs:
       - run: npm run pack
       # A store package never carries a dev build's staging site or the sync code.
       - run: node scripts/check-store-build.mjs
+      # A checksum file next to the zips, so anyone can check a download matches the
+      # release. It only reads the zips: they go up unchanged, and Publish to stores
+      # builds its own from the tag.
+      - name: Checksums
+        run: cd dist && sha256sum -- *.zip > SHA256SUMS && cat SHA256SUMS
       - name: Release notes from CHANGELOG
         run: |
           V="${{ steps.tag.outputs.version }}"
@@ -77,10 +82,10 @@ jobs:
         run: |
           T="${{ steps.tag.outputs.tag }}"
           if gh release view "$T" >/dev/null 2>&1; then
-            gh release upload "$T" dist/*.zip --clobber
+            gh release upload "$T" dist/*.zip dist/SHA256SUMS --clobber
             gh release edit "$T" --notes-file notes.md
           else
-            gh release create "$T" dist/*.zip --title "Open Hangar ${{ steps.tag.outputs.version }}" --notes-file notes.md
+            gh release create "$T" dist/*.zip dist/SHA256SUMS --title "Open Hangar ${{ steps.tag.outputs.version }}" --notes-file notes.md
           fi
       # One step: start publishing this tag to every store. Publish waits for CI on
       # the commit and for the owner's Approve (environment 'stores'), and keeps its
