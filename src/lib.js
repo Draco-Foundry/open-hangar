@@ -2119,9 +2119,9 @@
         return { ok: true, items: saved.items, scannedAt, unchanged: true };
       }
 
-      // A scan cut short (RSI stopped answering, signed out partway) never replaces
-      // the last full scan: an earlier scan stays as it was. Only a first scan, with
-      // nothing saved to keep, keeps what it read.
+      // A scan cut short (RSI stopped answering, signed out partway) is never saved:
+      // an earlier scan stays as it was, and a first scan saves nothing, so a partial
+      // hangar is never synced either.
       if (result.partial) {
         const { page, reason, signedOut } = result.partial;
         OH.log(
@@ -2141,30 +2141,23 @@
             ...down(result.partial),
           };
         }
-        if (prevCount || prev.scannedAt != null) {
-          if (signedOut)
-            return {
-              ok: false,
-              signedOut: true,
-              error:
-                'You’re not signed in to RSI. Log in at robertsspaceindustries.com, then scan again.',
-            };
+        if (signedOut)
           return {
             ok: false,
-            error: result.partial.countMismatch
-              ? `The ${result.items.length} items read don't fit RSI's page count, so we kept your previous scan of ${prevCount}. Try again in a minute.`
-              : `RSI stopped responding at page ${page} (${reason}), so we kept your previous scan of ${prevCount}. Try again in a minute.`,
-            ...slow(result.partial),
-            ...down(result.partial),
+            signedOut: true,
+            error:
+              'You’re not signed in to RSI. Log in at robertsspaceindustries.com, then scan again.',
           };
-        }
-        const scannedAt = await saveSource(src.id, result.items, { meta: result.meta, account });
+        const kept = prevCount
+          ? `so we kept your previous scan of ${prevCount}`
+          : 'so nothing from this read was saved';
         return {
-          ok: true,
-          items: result.items,
-          scannedAt,
-          partial: `stopped at page ${page} (${reason}); rescan to get the rest`,
+          ok: false,
+          error: result.partial.countMismatch
+            ? `The ${result.items.length} items read don't fit RSI's page count, ${kept}. Try again in a minute.`
+            : `RSI stopped responding at page ${page} (${reason}), ${kept}. Try again in a minute.`,
           ...slow(result.partial),
+          ...down(result.partial),
         };
       }
 
