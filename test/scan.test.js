@@ -164,6 +164,21 @@ test('a partial read never replaces the last full scan, even a smaller one', asy
   });
 });
 
+test('a first scan cut short saves nothing, so there is no partial hangar to sync', async () => {
+  // Signed out after page 1, with no earlier scan in this browser: before, the 10 items
+  // read were kept as the hangar and then synced.
+  await reset();
+  await withSignIn(async () => {
+    script = (page) => (page === 2 ? signInPage : healthy(page));
+    const r = await OH.scanSource('hangar');
+    assert.equal(r.ok, false);
+    assert.equal(r.signedOut, true);
+    assert.equal(r.partial, undefined);
+    assert.equal(store.db?.sources?.hangar?.scannedAt ?? null, null, 'nothing saved');
+    assert.equal(store.db?.sources?.hangar?.items?.length ?? 0, 0);
+  });
+});
+
 test('mid-scan failure never overwrites a bigger earlier scan', async () => {
   const previous = JSON.parse(items(9, 25));
   await reset(previous);
