@@ -104,23 +104,3 @@ test('the CI check exits 0 even when it warns', async () => {
   );
   assert.match(out, /^::warning /);
 });
-
-test('the data note ends a release section once, after everything else', async () => {
-  const { DATA_NOTE, withDataNote } = await lib();
-  assert.match(DATA_NOTE, /^What Open Hangar reads from RSI stays in this browser/);
-  const body = '- Fixed: a\n- New: b';
-  const once = withDataNote(body);
-  assert.equal(once, `${body}\n\n${DATA_NOTE}`);
-  assert.equal(withDataNote(once), once, 'never twice');
-  assert.equal(withDataNote(`${DATA_NOTE}\n${body}`), once, 'moved to the end');
-  assert.equal(withDataNote(''), DATA_NOTE);
-});
-
-test('the Discord post leaves the data note out', async () => {
-  const { DATA_NOTE, withDataNote } = await lib();
-  const { releaseSection } = await import('../scripts/discord-post.mjs');
-  const log = `## 9.9.9 — 2026-11-02\n\nIntro.\n\n${withDataNote('- Fixed: a')}\n\n## 9.9.8 — x\n`;
-  const s = releaseSection(log, '9.9.9');
-  assert.deepEqual(s.intro, ['Intro.']);
-  assert.deepEqual(s.bullets, ['Fixed: a']);
-});

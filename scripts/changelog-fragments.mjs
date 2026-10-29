@@ -14,22 +14,6 @@ import { pathToFileURL } from 'node:url';
 export const DIR = 'changelog.d';
 export const PREFIX = /^- (New|Improved|Changed|Fixed):/;
 
-// Where a pilot's data lives: the last line of every release's notes from 0.5.6 on, in
-// CHANGELOG.md (scripts/release.mjs) and the GitHub release (.github/workflows/release.yml).
-// The owner's approved words (Words changelog.data-note, 2026-10-29), word for word.
-export const DATA_NOTE =
-  "What Open Hangar reads from RSI stays in this browser until you connect the extension to your openhangar.space account. After that, every scan syncs there; disconnecting stops it, and what's already synced stays until you delete your account.";
-
-// A release section's body with DATA_NOTE as its last line, once. Pure.
-export function withDataNote(body) {
-  const rest = String(body || '')
-    .split('\n')
-    .filter((l) => l.trim() !== DATA_NOTE)
-    .join('\n')
-    .trim();
-  return rest ? `${rest}\n\n${DATA_NOTE}` : DATA_NOTE;
-}
-
 // → [{ name, bullets: ['- Fixed: …'] }] in fold order. Throws on a bad fragment.
 export function readFragments(dir = DIR) {
   let names;

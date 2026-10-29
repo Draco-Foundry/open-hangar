@@ -16,7 +16,6 @@
 // Skips quietly (exit 0) when the webhook isn't set, like the store jobs do.
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { DATA_NOTE } from './changelog-fragments.mjs';
 
 const STORES =
   '[Chrome](https://chromewebstore.google.com/detail/open-hangar/aeabioadfphghjennmdbnpelojlhndjl) · ' +
@@ -68,8 +67,7 @@ export function releaseSection(log, version) {
     if (!line) cur = null;
     else if (line.startsWith('- ')) bullets.push((cur = line.slice(2)));
     else if (cur !== null) bullets[bullets.length - 1] = cur = `${cur} ${line}`;
-    // The data note closes the GitHub release and CHANGELOG.md only, not the post.
-    else if (line !== DATA_NOTE) intro.push(line);
+    else intro.push(line);
   }
   return { intro, bullets };
 }
