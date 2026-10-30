@@ -133,7 +133,15 @@
     const last = v.connected.lastSync;
     return Number.isFinite(last) && last >= report.sync.at ? null : who;
   });
-  const hasNews = $derived(justUpdated?.to === version && prefs.seenVersion !== version);
+  // New in after an update (owner, 2026-10-30: it needn't stay up for good): until it's
+  // opened, and a week at most from the update (`at`, src/background.js). An update
+  // recorded before `at` existed shows until it's opened, as before.
+  const NEWS_DAYS = 7;
+  const hasNews = $derived(
+    justUpdated?.to === version &&
+      prefs.seenVersion !== version &&
+      !(justUpdated.at > 0 && now - justUpdated.at > NEWS_DAYS * 864e5),
+  );
   // A scan that stopped partway: one line at the top of every tab, under Scan (which
   // says Scan Again then; signed out, Log In to RSI).
   const stop = $derived(
@@ -367,10 +375,18 @@
     await tick();
     document.getElementById(`pp-tab-${TABS[to]}`)?.focus();
   }
-  function gotIt() {
-    whatsNew = false;
+  // Opening New in counts as seen: it stays up while open, and is gone next time.
+  function markSeen() {
     prefs.seenVersion = version;
     savePref({ seenVersion: version });
+  }
+  function toggleNews() {
+    whatsNew = !whatsNew;
+    if (whatsNew) markSeen();
+  }
+  function gotIt() {
+    whatsNew = false;
+    markSeen();
   }
   function setLook(look) {
     prefs.look = look;
@@ -405,14 +421,14 @@
     >
     <h1 class="pp-name">{t('popup.name')}</h1>
     <!-- No version tag (owner, 2026-10-23: it's under Clear Data in Settings); after an
-         update, New in shows here until Got It. -->
-    {#if hasNews}
+         update, New in shows here until it's opened, a week at most. -->
+    {#if hasNews || whatsNew}
       <button
         type="button"
         class="pp-ver news"
         id="pp-ver"
         aria-expanded={whatsNew}
-        onclick={() => (whatsNew = !whatsNew)}
+        onclick={toggleNews}
         ><i aria-hidden="true"></i>{t('popup.new-in', { version })}</button
       >
     {/if}
@@ -443,7 +459,7 @@
     />
   {/snippet}
   {#if ready && v && !firstRun}<div class="pp-top">{@render scanRow()}</div>{/if}
-  {#if whatsNew && hasNews}
+  {#if whatsNew}
     <div class="pp-whatsnew" id="pp-whatsnew">
       <b>{t('popup.new-in', { version })}</b>
       <span class="pp-row">
