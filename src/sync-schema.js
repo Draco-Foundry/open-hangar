@@ -156,6 +156,57 @@
               },
             },
           },
+          orders: {
+            description:
+              "RSI's order history (Account, Billing), read only once the pilot turns it on. Strict all the way down, so no payment method, card, address or gift recipient can ride along.",
+            type: 'object',
+            required: ['items'],
+            additionalProperties: false,
+            properties: {
+              items: { type: 'array', items: { $ref: '#/$defs/order' } },
+              scannedAt: { $ref: '#/$defs/scanTime' },
+              meta: { $ref: '#/$defs/orderMeta' },
+            },
+          },
+        },
+      },
+      orderMeta: {
+        description:
+          'How far the last order history read got: the pages it read, and whether it reached the oldest order.',
+        type: 'object',
+        additionalProperties: false,
+        properties: { pages: { type: 'integer', minimum: 0 }, complete: { type: 'boolean' } },
+      },
+      order: {
+        description:
+          "One order as RSI lists it. Amounts are whole cents of the order's currency, or null where RSI doesn't show them: the total, the Store Credit used (credit), what was charged to the payment method, never which one (cash), and the tax. gift: sent as a gift, never to whom.",
+        type: 'object',
+        required: ['id', 'date', 'lines'],
+        additionalProperties: false,
+        properties: {
+          id: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,40}$' },
+          date: { type: ['string', 'null'], maxLength: 40 },
+          status: { type: ['string', 'null'], maxLength: 40 },
+          currency: { type: ['string', 'null'], maxLength: 8 },
+          total: { type: ['integer', 'null'], minimum: 0 },
+          credit: { type: ['integer', 'null'], minimum: 0 },
+          cash: { type: ['integer', 'null'], minimum: 0 },
+          tax: { type: ['integer', 'null'], minimum: 0 },
+          gift: { type: ['boolean', 'null'] },
+          lines: { type: 'array', items: { $ref: '#/$defs/orderLine' } },
+        },
+      },
+      orderLine: {
+        description:
+          "One item in an order, each value as RSI shows it: its name, how many, the price of one in whole cents, and RSI's label for its type.",
+        type: 'object',
+        required: ['name'],
+        additionalProperties: false,
+        properties: {
+          name: { type: 'string', maxLength: 200 },
+          qty: { type: ['integer', 'null'], minimum: 1 },
+          price: { type: ['integer', 'null'], minimum: 0 },
+          kind: { type: ['string', 'null'], maxLength: 60 },
         },
       },
       hangarMeta: {

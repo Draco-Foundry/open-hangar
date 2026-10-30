@@ -402,10 +402,13 @@
   // A backup file (exportPayload) → the hangar as the website stores a synced one:
   //   { app, appVersion, exportedAt, schemaVersion, account, sources, pledgeArchive }
   // without history, the referral code (in the referral source and on the account
-  // block) and the prospects list, and the pledge archive capped (pledgeArchive left
-  // out when there's none). Returns a copy, never changes `payload`. Pure.
+  // block), the prospects list and the order history (the website keeps orders apart
+  // from the hangar, and our hangar page has no use for them), and the pledge archive
+  // capped (pledgeArchive left out when there's none). Returns a copy, never changes
+  // `payload`. Pure.
   function hangarView(payload) {
     const { history, ...out } = payload;
+    if (isObj(out.sources) && 'orders' in out.sources) out.sources = omit(out.sources, ['orders']);
     const ref = out.sources?.referral;
     if (isObj(ref) && isObj(ref.items))
       out.sources = {

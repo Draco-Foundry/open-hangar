@@ -43,17 +43,18 @@ orgFleet: {
 Today's flags (from 0.3.0 every store build is the connector, with Local Mode, the
 wishlist import and store alerts, and from 0.4.0 Auto Scan Daily):
 
-| Flag             | What it turns on                                          | Store | Beta | Dev-only |
-| ---------------- | --------------------------------------------------------- | ----- | ---- | -------- |
-| `sync`           | Website sync (Connect This Browser, Sync Now, ...)        | on    | on   | no       |
-| `orgFleet`       | Org Fleet sharing (nothing behind it yet)                 | off   | off  | yes      |
-| `localMode`      | Our hangar page reads this browser's hangar               | on    | on   | no       |
-| `connector`      | A toolbar popup and one basic page (the connector)        | on    | on   | no       |
-| `wishlistImport` | This browser's wishlist into the account (the basic page) | on    | on   | no       |
-| `alerts`         | Store alerts matched on the device (needs connector)      | on    | on   | no       |
-| `autoScan`       | The Daily Scan Reminder (needs alerts)                    | on    | on   | no       |
-| `scanBar`        | The popup's scan as one counting bar where Scan sits      | on    | on   | no       |
-| `newSinceScan`   | The popup's New Since Last Scan list                      | off   | off  | no       |
+| Flag             | What it turns on                                            | Store | Beta | Dev-only |
+| ---------------- | ----------------------------------------------------------- | ----- | ---- | -------- |
+| `sync`           | Website sync (Connect This Browser, Sync Now, ...)          | on    | on   | no       |
+| `orgFleet`       | Org Fleet sharing (nothing behind it yet)                   | off   | off  | yes      |
+| `localMode`      | Our hangar page reads this browser's hangar                 | on    | on   | no       |
+| `connector`      | A toolbar popup and one basic page (the connector)          | on    | on   | no       |
+| `wishlistImport` | This browser's wishlist into the account (the basic page)   | on    | on   | no       |
+| `alerts`         | Store alerts matched on the device (needs connector)        | on    | on   | no       |
+| `autoScan`       | The Daily Scan Reminder (needs alerts)                      | on    | on   | no       |
+| `scanBar`        | The popup's scan as one counting bar where Scan sits        | on    | on   | no       |
+| `newSinceScan`   | The popup's New Since Last Scan list                        | off   | off  | no       |
+| `orderHistory`   | A scan reads RSI order history; sync sends it (nothing yet) | off   | off  | yes      |
 
 ## Adding or Retiring a Flag
 
