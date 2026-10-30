@@ -571,6 +571,132 @@
     return [];
   };
 
+  // --- Order history (the orderHistory flag) -----------------------------------
+  // One page of the Pledge Store order history (Account, Billing; HTML or a Document) →
+  // the orders on it, each in the sync's shape (schema/sync-payload.schema.json order):
+  // the card's labelled cells, its line table and the labelled sums under it, every
+  // amount in whole cents (null where it doesn't read). Only what RULES.orders names is
+  // read, so an order's bill-to address and its payments table (the processor) never
+  // are; test/orders.test.js checks that nothing of them comes out. The date is the
+  // day, read like a pledge's (parseRsiDate), so the two compare.
+  const cents = (text) => {
+    const digits = String(text || '').replace(/[^0-9.]/g, '');
+    const n = [...digits].some((c) => c >= '0' && c <= '9') ? Number(digits) : NaN;
+    return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null;
+  };
+  const words = (el) =>
+    String(el?.textContent || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  // A label's own words, as the rules write labels: lower case, no colon.
+  const labelOf = (el) => {
+    const w = words(el).toLowerCase();
+    return w.endsWith(':') ? w.slice(0, -1).trim() : w;
+  };
+  // The value after a label: the text or element that follows it, up to the next one.
+  const afterLabel = (label) => {
+    for (let n = label.nextSibling; n; n = n.nextSibling) {
+      if (n.nodeType === 1 && (n.nodeName === 'BR' || n.nodeName === 'STRONG')) break;
+      const t = words(n);
+      if (t) return t;
+    }
+    return '';
+  };
+  // A cell's value: its words without its label's.
+  const cellValue = (cell, label) => {
+    const all = words(cell);
+    const own = words(label);
+    return (all.startsWith(own) ? all.slice(own.length) : all).trim();
+  };
+  // Which value a label names, or undefined: `map` holds each value's labels.
+  const pick = (map, key) => Object.keys(map).find((k) => map[k].includes(key));
+  // RSI's order ids are letters and digits; the sync also allows - and _.
+  const idChar = (c) =>
+    (c >= '0' && c <= '9') ||
+    (c >= 'A' && c <= 'Z') ||
+    (c >= 'a' && c <= 'z') ||
+    c === '-' ||
+    c === '_';
+  const short = (v) => (v ? String(v).slice(0, 40) : null);
+
+  // Page `page` (from 1) of the Pledge Store order history, as a path on RSI's site,
+  // RULES.orders.pageSize orders a page. Only the Pledge Store tab: the others sell
+  // physical goods and merch, which hold no hangar items.
+  ns.ordersPath = function ordersPath(page) {
+    const q = new URLSearchParams();
+    q.set(RULES.orders.storefront.param, RULES.orders.storefront.value);
+    q.set(RULES.paging.page, String(Number.isInteger(page) && page > 0 ? page : 1));
+    q.set(RULES.paging.size, String(RULES.orders.pageSize));
+    return `${RULES.orders.path}?${q}`;
+  };
+
+  ns.parseOrders = function parseOrders(payload) {
+    const doc =
+      typeof payload === 'string' ? new DOMParser().parseFromString(payload, 'text/html') : payload;
+    if (!doc?.querySelectorAll) return [];
+    const fields = {
+      date: RULES.orders.fields.date,
+      id: RULES.orders.fields.id,
+      status: RULES.orders.fields.status,
+      payment: RULES.orders.fields.payment,
+      fulfillment: RULES.orders.fields.fulfillment,
+    };
+    const sumLabels = {
+      items: RULES.orders.sums.items,
+      discount: RULES.orders.sums.discount,
+      credit: RULES.orders.sums.credit,
+      beforeTax: RULES.orders.sums.beforeTax,
+      total: RULES.orders.sums.total,
+    };
+    const out = [];
+    for (const card of doc.querySelectorAll(RULES.orders.card)) {
+      const f = {};
+      for (const cell of card.querySelectorAll(RULES.orders.cell)) {
+        const label = cell.querySelector(RULES.orders.cellLabel);
+        const key = label && pick(fields, labelOf(label));
+        if (key && !(key in f)) f[key] = cellValue(cell, label);
+      }
+      const id = f.id || '';
+      if (!id || id.length > 40 || ![...id].every(idChar)) continue;
+      const lines = [];
+      for (const row of card.querySelectorAll(RULES.orders.lineRow)) {
+        const cell = (i) => (row.children[i]?.nodeName === 'TD' ? words(row.children[i]) : '');
+        const name = cell(RULES.orders.lineCells.name).slice(0, 200);
+        if (!name) continue; // the heading row has th cells, no td
+        const qty = Number(cell(RULES.orders.lineCells.qty));
+        lines.push({
+          name,
+          qty: Number.isInteger(qty) && qty >= 1 ? qty : null,
+          price: cents(cell(RULES.orders.lineCells.price)),
+          discount: cents(cell(RULES.orders.lineCells.discount)),
+          total: cents(cell(RULES.orders.lineCells.total)),
+        });
+      }
+      const sums = {};
+      for (const label of card.querySelectorAll(RULES.orders.sumLabel)) {
+        const key = pick(sumLabels, labelOf(label));
+        if (key && !(key in sums)) sums[key] = afterLabel(label);
+      }
+      const amount = (k) => (k in sums ? cents(sums[k]) : null);
+      const currency = String(sums.total || '').match(/\b([A-Z]{3})\b/);
+      out.push({
+        id,
+        date: ns.parseRsiDate(f.date),
+        status: short(f.status),
+        payment: short(f.payment),
+        fulfillment: short(f.fulfillment),
+        currency: currency ? currency[1] : null,
+        items: amount('items'),
+        discount: amount('discount'),
+        credit: amount('credit'),
+        beforeTax: amount('beforeTax'),
+        total: amount('total'),
+        lines,
+      });
+    }
+    return out;
+  };
+
   // --- Has RSI changed the page? ----------------------------------------------
   // One hangar or buy-back page (HTML or a Document) that has cards → what of the
   // rules' shape it no longer has, as a list of short reasons, [] when it fits. A scan

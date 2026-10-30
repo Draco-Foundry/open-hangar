@@ -158,7 +158,7 @@
           },
           orders: {
             description:
-              "RSI's order history (Account, Billing), read only once the pilot turns it on. Strict all the way down, so no payment method, card, address or gift recipient can ride along.",
+              "RSI's Pledge Store order history (Account, Billing), read only once the pilot turns it on. Strict all the way down, so no payment method, card, address or gift recipient can ride along.",
             type: 'object',
             required: ['items'],
             additionalProperties: false,
@@ -179,7 +179,7 @@
       },
       order: {
         description:
-          "One order as RSI lists it. Amounts are whole cents of the order's currency, or null where RSI doesn't show them: the total, the Store Credit used (credit), what was charged to the payment method, never which one (cash), and the tax. gift: sent as a gift, never to whom.",
+          "One order from RSI's Pledge Store order history (Account, Billing), each value as the order's card shows it. Amounts are whole cents of the order's currency, or null where the card doesn't show them: items (the lines' totals), discount (Additional Discount), credit (Credits used), beforeTax (Total before Tax: what was charged, before tax) and total (with tax). status, payment and fulfillment are RSI's words. Never the payment processor, the bill-to address or anything about a gift's recipient.",
         type: 'object',
         required: ['id', 'date', 'lines'],
         additionalProperties: false,
@@ -187,18 +187,20 @@
           id: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,40}$' },
           date: { type: ['string', 'null'], maxLength: 40 },
           status: { type: ['string', 'null'], maxLength: 40 },
+          payment: { type: ['string', 'null'], maxLength: 40 },
+          fulfillment: { type: ['string', 'null'], maxLength: 40 },
           currency: { type: ['string', 'null'], maxLength: 8 },
-          total: { type: ['integer', 'null'], minimum: 0 },
+          items: { type: ['integer', 'null'], minimum: 0 },
+          discount: { type: ['integer', 'null'], minimum: 0 },
           credit: { type: ['integer', 'null'], minimum: 0 },
-          cash: { type: ['integer', 'null'], minimum: 0 },
-          tax: { type: ['integer', 'null'], minimum: 0 },
-          gift: { type: ['boolean', 'null'] },
+          beforeTax: { type: ['integer', 'null'], minimum: 0 },
+          total: { type: ['integer', 'null'], minimum: 0 },
           lines: { type: 'array', items: { $ref: '#/$defs/orderLine' } },
         },
       },
       orderLine: {
         description:
-          "One item in an order, each value as RSI shows it: its name, how many, the price of one in whole cents, and RSI's label for its type.",
+          "One line of an order, each value as RSI shows it: the item's name, how many, the price of one, the line's discount and its total, in whole cents.",
         type: 'object',
         required: ['name'],
         additionalProperties: false,
@@ -206,7 +208,8 @@
           name: { type: 'string', maxLength: 200 },
           qty: { type: ['integer', 'null'], minimum: 1 },
           price: { type: ['integer', 'null'], minimum: 0 },
-          kind: { type: ['string', 'null'], maxLength: 60 },
+          discount: { type: ['integer', 'null'], minimum: 0 },
+          total: { type: ['integer', 'null'], minimum: 0 },
         },
       },
       hangarMeta: {

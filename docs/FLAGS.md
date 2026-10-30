@@ -54,7 +54,7 @@ wishlist import and store alerts, and from 0.4.0 Auto Scan Daily):
 | `autoScan`       | The Daily Scan Reminder (needs alerts)                      | on    | on   | no       |
 | `scanBar`        | The popup's scan as one counting bar where Scan sits        | on    | on   | no       |
 | `newSinceScan`   | The popup's New Since Last Scan list                        | off   | off  | no       |
-| `orderHistory`   | A scan reads RSI order history; sync sends it (nothing yet) | off   | off  | yes      |
+| `orderHistory`   | A scan reads RSI order history; sync sends it (reader only) | off   | off  | yes      |
 
 ## Adding or Retiring a Flag
 

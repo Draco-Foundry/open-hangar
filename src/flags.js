@@ -92,8 +92,9 @@
     // Order History (owner, 2026-10-30): once a pilot turns it on, a scan reads RSI's
     // order history (Account, Billing) and sync sends it as sources.orders
     // (schema/sync-payload.schema.json), so the website can show what each pledge cost.
-    // Developer builds only until the privacy policy names it. Nothing behind it yet:
-    // the sync format comes first, the reader after.
+    // Developer builds only until the privacy policy names it. Its page reader is in
+    // (src/scraper/parser.js parseOrders, Pledge Store tab only); the scan step and the
+    // setting that turns it on come next, with their words.
     orderHistory: {
       about: 'Order History: a scan reads RSI order history and sync sends it, once turned on.',
       default: false,

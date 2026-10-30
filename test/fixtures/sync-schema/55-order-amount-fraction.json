@@ -179,46 +179,53 @@
       "orders": {
         "items": [
           {
-            "id": "TEST0001",
-            "date": "2024-02-11",
-            "status": "Paid",
+            "id": "TESTORDER0001",
+            "date": "Feb 11, 2024  18:30",
+            "status": "CLOSED",
+            "payment": "PAID",
+            "fulfillment": "DONE",
             "currency": "USD",
-            "total": 119.16,
+            "items": 11100,
+            "discount": 0,
             "credit": 4000,
-            "cash": 7916,
-            "tax": 816,
-            "gift": false,
+            "beforeTax": 7100,
+            "total": 71.5,
             "lines": [
               {
                 "name": "Package - Test Cutlass Black 1",
                 "qty": 1,
                 "price": 11100,
-                "kind": "Standalone Ship"
+                "discount": 0,
+                "total": 11100
               }
             ]
           },
           {
-            "id": "TEST0002",
-            "date": "2024-03-12",
-            "status": "Paid",
+            "id": "TESTORDER0002",
+            "date": "Mar 12, 2024  09:05",
+            "status": "CLOSED",
+            "payment": "PAID",
+            "fulfillment": "DONE",
             "currency": "USD",
-            "total": 1500,
+            "items": 2000,
+            "discount": 500,
             "credit": 1500,
-            "cash": 0,
-            "tax": 0,
-            "gift": null,
+            "beforeTax": 0,
+            "total": 0,
             "lines": [
               {
                 "name": "Upgrade - Test Arrow to Test Hornet 2",
                 "qty": 1,
                 "price": 1500,
-                "kind": null
+                "discount": 0,
+                "total": 1500
               },
               {
                 "name": "Test Poster",
-                "qty": null,
-                "price": null,
-                "kind": null
+                "qty": 2,
+                "price": 300,
+                "discount": 100,
+                "total": 500
               }
             ]
           }
