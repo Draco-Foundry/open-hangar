@@ -101,7 +101,10 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   }
   await chrome.storage.local.remove('updateReady');
   if (details.previousVersion && details.previousVersion !== to) {
-    await chrome.storage.local.set({ justUpdated: { from: details.previousVersion, to } });
+    // `at`: the popup's New in leaves on its own a week after the update (ui/popup/Popup.svelte).
+    await chrome.storage.local.set({
+      justUpdated: { from: details.previousVersion, to, at: Date.now() },
+    });
   }
 });
 

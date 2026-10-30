@@ -6096,6 +6096,27 @@ try {
   newsGone.seen === '0.2.7'
     ? ok("what's new after an update: New in 0.2.7 in the header, Got It hides it for good")
     : fail(`popup what's new: ${JSON.stringify({ news, newsGone })}`);
+  // Opening New in counts as seen, without Got It; and it leaves on its own after a week.
+  await popAt(
+    { ...signedIn, __demoLocal: { justUpdated: { from: '0.2.6', to: '0.2.7' } } },
+    '#pp-ver',
+  );
+  await page.click('#pp-ver');
+  await sleep(150);
+  const openSeen = await page.evaluate(async () => ({
+    open: !!document.getElementById('pp-whatsnew'),
+    seen: (await chrome.storage.local.get('popupPrefs')).popupPrefs?.seenVersion,
+  }));
+  // Long before the demo clock's today, whatever date that is.
+  const weekOld = Date.UTC(2020, 0, 1);
+  await popAt({
+    ...signedIn,
+    __demoLocal: { justUpdated: { from: '0.2.6', to: '0.2.7', at: weekOld } },
+  });
+  const oldTag = await page.evaluate(() => !!document.getElementById('pp-ver'));
+  openSeen.open && openSeen.seen === '0.2.7' && !oldTag
+    ? ok('New in: opening it counts as seen, and it leaves a week after the update')
+    : fail(`popup new in fades: ${JSON.stringify({ openSeen, oldTag })}`);
 
   // The last scan ran into trouble: its rows (one not read, one read only in part) and
   // Report a Scan Problem on Hangar, never a success line.
