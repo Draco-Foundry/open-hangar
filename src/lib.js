@@ -3812,6 +3812,10 @@
   // with a token is offered for one (the approved words, buybacks.warbond-credit-note).
   OH.WARBOND_CREDIT_NOTE =
     'Warbond buy-backs take cash only until about a month after the sale ends, and RSI says the wait can vary. After that, store credit works with a Buy-Back Token.';
+  // A giftable pledge's line in the Melt on RSI confirm (the approved words,
+  // melt-facts.giftable). It never says a buy-back keeps gifting: whether one does is
+  // unsettled since RSI's gifting changed on 2026-10-30.
+  OH.MELT_FACTS_GIFTABLE = "It's giftable now. If you buy it back later, it may not be giftable.";
   OH.isWarbond = function isWarbond(name) {
     const n = String(name || '');
     return /\bwarbond\b/i.test(n) || /\bWB\b/.test(n);
@@ -3857,7 +3861,7 @@
       lines.push(`It carries ${ins}. Melting it gives that up until you buy it back.`);
     }
     if (p.giftable) {
-      lines.push("It's giftable now. Bought back with store credit, it can't be gifted.");
+      lines.push(OH.MELT_FACTS_GIFTABLE);
     }
     lines.push(
       "Buying it back costs full price: sale prices and subscriber coupons don't carry over. Store credit also needs a Buy-Back Token, and it's one buy-back per cart.",

@@ -121,7 +121,7 @@ test('melt facts: no upgrade line without proof; insurance, gifting, full price'
   assert.equal(f.lines.length, 3);
   assert.doesNotMatch(f.lines.join(' '), /original/);
   assert.equal(f.lines[0], 'It carries LTI. Melting it gives that up until you buy it back.');
-  assert.match(f.lines[1], /giftable now.*store credit, it can't be gifted/);
+  assert.equal(f.lines[1], "It's giftable now. If you buy it back later, it may not be giftable.");
   assert.match(f.lines[2], /full price.*Buy-Back Token.*one buy-back per cart/);
   const s = OH.meltFacts({ name: 'Standalone Ships - Arrow', insurance: '120M', giftable: false });
   assert.equal(
