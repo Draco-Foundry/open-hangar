@@ -347,6 +347,14 @@ const readAll = (r) => isObj(r) && !r.held && !r.bad && !r.signedOut;
 export function reportDone(report) {
   return readAll(report) ? took(report.ms) : null;
 }
+// The done line shows for 5 seconds from when the scan ended (`report.at`), not from when
+// the popup opened: a popup opened hours after a scan never shows it (the owner,
+// 2026-10-30). → the ms it has left, 0 when its time is over.
+export const DONE_MS = 5000;
+export function doneLeft(report, now = Date.now()) {
+  if (!isObj(report) || !Number.isFinite(report.at)) return 0;
+  return Math.max(0, Math.min(DONE_MS, report.at + DONE_MS - now));
+}
 // A report older than a scan since (`scannedAt` newer) says nothing any more.
 const since = (report, scannedAt) =>
   Number.isFinite(scannedAt) && Number.isFinite(report.at) && scannedAt > report.at + 60e3;

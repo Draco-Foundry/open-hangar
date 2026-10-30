@@ -3,8 +3,8 @@
   // 2026-10-26); on the first run, under its heading. One row, one height in every state.
   // The Scan button is the bar (the scanBar flag): pressed, the same shape fills with the
   // part running and what it has read (./data.js barLabel, barFraction). After a full scan:
-  // how long it took, for 4 seconds (longer while the pointer or focus is on it), then Scan
-  // again. RSI's wait, a scan already running elsewhere, RSI not answering or a page RSI
+  // how long it took, until 5 seconds after it ended (longer while the pointer or focus is
+  // on it), then Scan again. RSI's wait, a scan already running elsewhere, RSI not answering or a page RSI
   // changed: the line in the row, with a small Scan beside it (greyed for the first two).
   // Signed out of RSI: Log In to RSI, with a grey Scan beside it, always there to press
   // (./rsi-cookie.js: the cookie can't say for sure; the scan does). No access to RSI
@@ -15,6 +15,7 @@
     barFraction,
     barNext,
     barLabel,
+    doneLeft,
     reportDone,
     reportPageChanged,
     reportPaused,
@@ -94,20 +95,25 @@
   const holdTime = (at) =>
     new Date(at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }).replace(/ /g, ' ');
 
-  // The done line holds the row for 4 seconds, then gives way to Scan; never while the
-  // pointer or focus is on it (the owner, 2026-10-26).
-  const DONE_MS = 4000;
+  // The done line holds the row until 5 seconds after the scan ended (./data.js doneLeft),
+  // then gives way to Scan; never while the pointer or focus is on it (the owner,
+  // 2026-10-26). A popup opened after that time never shows it (the owner, 2026-10-30).
   let rowEl = $state();
   let doneOver = $state(null); // the report whose done line has had its time
   $effect(() => {
     const r = report;
-    if (!BAR || !doneIn || doneOver === r) return;
+    if (!doneIn || doneOver === r) return;
+    const left = doneLeft(r);
+    if (!left) {
+      doneOver = r;
+      return;
+    }
     let timer;
     const tick = () => {
       if (rowEl?.matches(':hover') || rowEl?.contains(document.activeElement)) timer = setTimeout(tick, 500);
       else doneOver = r;
     };
-    timer = setTimeout(tick, DONE_MS);
+    timer = setTimeout(tick, left);
     return () => clearTimeout(timer);
   });
 
@@ -199,7 +205,7 @@
     >
   {/if}
   {#if running && BAR && !sc.progress && !sc.hidden}<p class="pp-note">{t('popup.scanning')}</p>{/if}
-  {#if doneIn && !running && !BAR}
+  {#if doneIn && doneOver !== report && !running && !BAR}
     <p class="pp-done" id="pp-done" role="status">
       <span aria-hidden="true">✓</span>{doneIn.m
         ? t('popup.scanned-in-m', { m: doneIn.m, s: doneIn.s })

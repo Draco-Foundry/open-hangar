@@ -320,6 +320,19 @@ test('scan report: shown once, and how long it took', async () => {
   assert.equal(took(undefined), null);
 });
 
+test('scan report: the done line lasts 5 seconds from when the scan ended', async () => {
+  const { doneLeft, DONE_MS } = await data();
+  const r = { v: 1, at: NOW, ms: 38e3, rows: [] };
+  assert.equal(DONE_MS, 5000);
+  assert.equal(doneLeft(r, NOW), 5000, 'just ended');
+  assert.equal(doneLeft(r, NOW + 3000), 2000, 'opened partway: only what is left');
+  assert.equal(doneLeft(r, NOW + 5000), 0, 'time up');
+  assert.equal(doneLeft(r, NOW + 6 * 60 * MIN), 0, 'popup opened hours later');
+  assert.equal(doneLeft(r, NOW - 60e3), 5000, 'a clock behind never holds it longer');
+  assert.equal(doneLeft({ v: 1 }, NOW), 0);
+  assert.equal(doneLeft(null, NOW), 0);
+});
+
 test('scan report: RSI not answering wins over signed out, and shows no trouble rows', async () => {
   const { reportRsi, reportTrouble, reportDone } = await data();
   const base = {
