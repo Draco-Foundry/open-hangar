@@ -5714,9 +5714,10 @@ try {
   await told({ scanReport: { newValue: barReport } });
   await sleep(100);
   const barDone = await sbar();
-  // The done line holds Scan's place for 4 seconds, longer while the pointer is on it.
+  // The done line holds Scan's place until 5 seconds after the scan ended, longer while
+  // the pointer is on it.
   await page.hover('#pp-sbar');
-  await sleep(4400);
+  await sleep(5400);
   const barHeld = await sbar();
   await page.mouse.move(0, 0);
   await sleep(700);
