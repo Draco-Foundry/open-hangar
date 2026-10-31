@@ -23,6 +23,7 @@
     searchWish,
     searched,
     shipNames,
+    unobtainable,
   } from './wishlist.js';
   import { WISH_MAX, loadWish, popupEnv, writeWish } from './wish-client.js';
   import { openHub, openTab, setAlerts } from './actions.js';
@@ -242,6 +243,8 @@
               {#if s?.onSale && Number.isFinite(s.price)}
                 {@const p = price(s.price)}
                 <span class="pp-price" title={p.title || null}>{p.text}</span>
+              {:else if item.category === 'ships' && unobtainable(item.name)}
+                <span class="pp-price">{t('popup.wish-gone')}</span>
               {:else}
                 <span class="pp-price"></span>
               {/if}
@@ -287,6 +290,8 @@
               {#if sale && r.onSale && Number.isFinite(r.price)}
                 {@const p = price(r.price)}
                 <span class="pp-price" title={p.title || null}>{p.text}</span>
+              {:else if r.key.startsWith('ship:') && unobtainable(r.name)}
+                <span class="pp-price">{t('popup.wish-gone')}</span>
               {/if}
             </li>
           {/each}

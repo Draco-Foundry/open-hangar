@@ -750,3 +750,169 @@ test('search: one row per ship, the maker prefix off (Starfarer, Starfarer Gemin
     ],
   );
 });
+
+// --- One row per ship, the real lists (the Wishlist search audit, 2026-10-31) ---------
+// The bundled ship list and the sale feed's ships (test/fixtures/onsale-ships.json, a copy
+// of the public feed's ships) through the same steps the tab takes. Refresh the fixture
+// from openhangar.space/api/store/on-sale when the feed's ship list grows.
+const fs = require('node:fs');
+const path = require('node:path');
+const bundled = JSON.parse(
+  fs.readFileSync(path.join(__dirname, '..', 'src', 'data', 'ship-catalog.json'), 'utf8'),
+).list;
+const feedShips = JSON.parse(
+  fs.readFileSync(path.join(__dirname, 'fixtures', 'onsale-ships.json'), 'utf8'),
+).ships;
+
+async function realEntries() {
+  const { plainShipName, searchEntries } = await search();
+  const { shipSlug } = await import('../ui/popup/data.js');
+  const names = new Map();
+  for (const s of bundled) {
+    const name = plainShipName(s);
+    const slug = shipSlug(name);
+    if (slug && !names.has(slug)) names.set(slug, name);
+  }
+  return searchEntries({ names, feed: { ships: feedShips, items: [] } }).filter(
+    (e) => e.kind === 'ship',
+  );
+}
+
+// A ship's identity as a pilot sees it: the name's words in order, without the maker's
+// name or initials in front (the ship list says "MISC Starfarer", the feed "Starfarer"),
+// "Mk I" and "MkI" alike, apostrophes and dashes gone. Editions stay: the website treats
+// "Hammerhead 2949 Best In Show Edition" as a ship of its own.
+function identities(name, makers) {
+  const words = String(name)
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/['’`]/g, '')
+    .replace(/\bw\//g, 'with ')
+    .replace(/\bmk\.?\s*/g, 'mk')
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+  const out = [words.join('')];
+  for (let i = 1; i < words.length && makers.has(words[i - 1]); i++)
+    out.push(words.slice(i).join(''));
+  return out;
+}
+
+test('search audit: no two entries are the same ship (the real bundled list and the feed)', async () => {
+  const entries = await realEntries();
+  assert.ok(entries.length > 250, 'the real lists are read');
+  // The makers' spellings: each ship list maker (words and initials) and the ship codes.
+  const makers = new Set();
+  for (const s of bundled) {
+    const w = String(s.mfr || '')
+      .toLowerCase()
+      .split(/\s+/);
+    for (const x of w) makers.add(x);
+    makers.add(w.map((x) => x[0]).join(''));
+    makers.add(String(s.cls || '').split('_')[0]);
+  }
+  makers.delete('');
+  const seen = new Map();
+  const same = [];
+  for (const e of entries)
+    for (const id of new Set(identities(e.name, makers))) {
+      if (seen.has(id) && seen.get(id) !== e) same.push(`${seen.get(id).name} = ${e.name}`);
+      else seen.set(id, e);
+    }
+  assert.deepEqual(same, [], `one ship twice in the Wishlist search: ${same.join('; ')}`);
+});
+
+test('search audit: a ship-list name that spells a feed ship is that ship', async () => {
+  const { searchEntries } = await search();
+  const feed = {
+    ships: [
+      {
+        slug: 'misc-starlancer-max',
+        name: 'MISC Starlancer MAX',
+        keys: ['starlancer max', 'misc starlancer max'],
+      },
+      { slug: 'carrack', name: 'Carrack', keys: ['carrack'] },
+    ],
+  };
+  const names = new Map([
+    ['starlancer-max', 'Starlancer MAX'],
+    ['hornet-mk-iii', 'Hornet Mk III'],
+  ]);
+  assert.deepEqual(
+    searchEntries({ names, feed }).map((e) => e.key),
+    ['ship:misc-starlancer-max', 'ship:carrack', 'ship:hornet-mk-iii'],
+  );
+});
+
+// --- Ships nobody can get anymore stay out of the search -------------------------------
+test('unobtainable: the AMD package, in-game rewards and retired ships; not stock or windows', async () => {
+  const { unobtainable } = await search();
+  for (const [name, why] of [
+    ['Mustang Omega : AMD Edition', 'amd'],
+    ['Valkyrie AMD Edition', 'amd'],
+    ['Idris-P Wikelo War Special', 'in-game'],
+    ['Cutlass Black PYAM Exec', 'in-game'],
+    ['MOLE Alliance', 'in-game'],
+    ['Mauler Destroyer', 'in-game'],
+    ['Aurora Mk I ES', 'retired'],
+    ['F7C Hornet Mk I', 'retired'],
+    ['F7C-M Super Hornet Mk I', 'retired'],
+  ])
+    assert.equal(unobtainable(name), why, name);
+  // They come back, or are sold today: kept.
+  for (const name of [
+    'Mustang Omega',
+    'Aurora Mk II',
+    'F7C Hornet Mk II',
+    'F7A Hornet Mk I',
+    'Hammerhead 2949 Best In Show Edition',
+    'Nautilus Solstice Edition',
+    '600i Executive Edition',
+    'Idris-P',
+    'Polaris',
+    'Starfarer',
+    'Constellation Mk V Centaurus',
+    'Skylark',
+  ])
+    assert.equal(unobtainable(name), null, name);
+});
+
+test('unobtainable: the search never offers one, a time-limited ship stays', async () => {
+  const { searchEntries } = await search();
+  const feed = {
+    ships: [
+      { slug: 'mustang-omega-amd-edition', name: 'Mustang Omega : AMD Edition', keys: [] },
+      { slug: 'mustang-omega', name: 'Mustang Omega', keys: [] },
+      {
+        slug: 'hammerhead-2949-best-in-show-edition',
+        name: 'Hammerhead 2949 Best In Show Edition',
+        keys: [],
+      },
+    ],
+  };
+  const names = new Map([['aurora-mk-i-es', 'Aurora Mk I ES']]);
+  assert.deepEqual(
+    searchEntries({ names, feed }).map((e) => e.key),
+    ['ship:mustang-omega', 'ship:hammerhead-2949-best-in-show-edition'],
+  );
+});
+
+test('unobtainable: every ship the lists give no price and no flight status is judged', async () => {
+  // A new row with no pledge price and not flyable is in-game only until proven otherwise:
+  // it must be in `unobtainable`, or here with why it stays (a person looked at it).
+  const { unobtainable } = await search();
+  const keep = new Set([
+    'ATLS Orange Line', // a gradient variant of the ATLS; unclear, kept
+    'Argo ATLS GEO IKTI', // sold as hangar items; unclear, kept
+    'Argo ATLS IKTI Akuma', // in hangars from pledges; kept
+    'Argo ATLS IKTI Rad',
+    'Dragonfly Star Kitten', // a charity edition sold once; may return
+    '600i Executive Edition', // sold in the store in windows
+    'Constellation Mk V Centaurus', // concept sold in windows
+    'Skylark', // the flight-ready Skylark has this name too
+  ]);
+  const left = bundled
+    .filter((s) => s.msrp == null && s.status == null && !unobtainable(s.name) && !keep.has(s.name))
+    .map((s) => s.name);
+  assert.deepEqual(left, [], `judge these new rows (unobtainable or keep): ${left.join('; ')}`);
+});

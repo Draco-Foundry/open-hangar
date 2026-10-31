@@ -71,6 +71,32 @@ export function plainShipName(s) {
     : name;
 }
 
+// Ships nobody can get from RSI's store anymore, by name (the Wishlist search leaves them
+// out; one already on the Wishlist stays and shows it). Only what the data proves: never a
+// ship that's merely out of stock or sold in windows (it comes back). Kept equal to the
+// website's list (open-hangar-server app/src/lib/unobtainable.ts): change both.
+//  - the AMD package: sold only with the AMD promotion, never sold back
+//  - in-game rewards, never a pledge (no price, not flyable in the ship list): Wikelo's
+//    trades, the Pyro Executive Hangar's "PYAM Exec" ships, the "Alliance" ships, two
+//    Wiki vehicles RSI never sold
+//  - retired from the store for good (the website's lib/retired.ts: Aurora Mk I, Hornet
+//    F7C Mk I); its buy-backs may still be sold, a new pledge isn't
+const UNOBTAINABLE = [
+  ['amd', /\bAMD\b/i],
+  ['in-game', /\bWikelo\b/i],
+  ['in-game', /\bPYAM Exec\b/i],
+  ['in-game', /\bAlliance$/i],
+  ['in-game', /^(?:Command Module|Mauler Destroyer)$/i],
+  ['retired', /^aurora mk i\b(?! ?i)/i],
+  ['retired', /^f7c(-[mrs])?\b.*\bmk i$/i],
+];
+// → why a ship can't be had ('amd' | 'in-game' | 'retired'), or null. Pure.
+export function unobtainable(name) {
+  const n = String(name ?? '').trim();
+  for (const [why, re] of UNOBTAINABLE) if (re.test(n)) return why;
+  return null;
+}
+
 // Ship names by the website's slug (ship:<slug>), from the ship list the extension
 // already keeps for prices (OH.getShipCatalog: bundled, plus the public list from
 // openhangar.space at most once a day). → Map, empty when there's none.
@@ -119,7 +145,9 @@ const NAME_MAX = 200;
 // add sends (the website places it), `key` the Wishlist key it becomes. `onList`: the
 // keys already on the Wishlist, left out. Ships from the sale feed's ship list (the
 // website's own names) first, then the ship list; store items and upgrades from the
-// sale feed. Pure.
+// sale feed. One row per ship: a ship-list name that is one of a feed ship's spellings
+// (the feed's `keys`: "Starlancer MAX Wikelo Work Special" for the feed's "MISC Starlancer
+// MAX …") is that ship, and ships nobody can get anymore (unobtainable) are left out. Pure.
 export function searchEntries({ names = null, feed = null, onList = [] } = {}) {
   const out = [];
   const taken = new Set(onList);
@@ -128,12 +156,19 @@ export function searchEntries({ names = null, feed = null, onList = [] } = {}) {
     taken.add(key);
     out.push({ key, kind, name, item, hay: fold(name) });
   };
-  const ship = (slug, raw) => {
+  // A spelling two feed ships share names neither (the website leaves those out too).
+  const owner = new Map();
+  for (const s of Array.isArray(feed?.ships) ? feed.ships : [])
+    for (const k of Array.isArray(s?.keys) ? s.keys : [])
+      owner.set(k, owner.has(k) && owner.get(k) !== s.slug ? null : s.slug);
+  const ship = (slug, raw, listed = false) => {
     const name = typeof raw === 'string' ? raw.trim().slice(0, NAME_MAX) : '';
-    if (slug && name) add(`ship:${slug}`, 'ship', name, { kind: 'ship', name });
+    if (!slug || !name || unobtainable(name)) return;
+    if (listed && owner.get(fold(name)) && owner.get(fold(name)) !== slug) return;
+    add(`ship:${slug}`, 'ship', name, { kind: 'ship', name });
   };
   for (const s of Array.isArray(feed?.ships) ? feed.ships : []) ship(s?.slug, s?.name);
-  if (names instanceof Map) for (const [slug, name] of names) ship(slug, name);
+  if (names instanceof Map) for (const [slug, name] of names) ship(slug, name, true);
   for (const i of Array.isArray(feed?.items) ? feed.items : []) {
     const kind = FEED_KIND[i?.kind];
     const m = /^(sku|upgrade)-([1-9]\d{0,9})$/.exec(String(i?.id || ''));

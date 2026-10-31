@@ -1,0 +1,1 @@
+- Fixed: **The Wishlist search lists one row per ship.** A ship the lists spell two ways shows once, and ships nobody can get from RSI anymore (the AMD package, in-game rewards, retired ships) are no longer offered. One already on your Wishlist stays and says it isn't for sale.
