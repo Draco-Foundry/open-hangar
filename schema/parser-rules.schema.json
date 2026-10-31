@@ -21,6 +21,7 @@
     "account",
     "dossier",
     "referrals",
+    "subStore",
     "upgrade",
     "cart",
     "known",
@@ -667,6 +668,64 @@
           "properties": { "current": { "$ref": "#/$defs/id" }, "legacy": { "$ref": "#/$defs/id" } }
         },
         "pageSize": { "$ref": "#/$defs/pageSize" }
+      }
+    },
+    "subStore": {
+      "description": "The Subscriber Store's items for the signed-in subscriber (the subStore build flag). The code adds the page and its size to variables.query (pageSize first; pageSizeMin when RSI refuses that).",
+      "type": "object",
+      "required": ["path", "operation", "query", "variables", "pageSize", "pageSizeMin"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "operation": { "$ref": "#/$defs/operation" },
+        "query": { "$ref": "#/$defs/document" },
+        "variables": {
+          "type": "object",
+          "required": ["storeFront", "query"],
+          "additionalProperties": false,
+          "properties": {
+            "storeFront": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+            "query": {
+              "type": "object",
+              "required": ["skus", "sort"],
+              "additionalProperties": false,
+              "properties": {
+                "skus": {
+                  "type": "object",
+                  "required": ["filtersFromTags", "products"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "filtersFromTags": {
+                      "type": "object",
+                      "required": ["tagIdentifiers", "facetIdentifiers"],
+                      "additionalProperties": false,
+                      "properties": {
+                        "tagIdentifiers": { "$ref": "#/$defs/identifiers" },
+                        "facetIdentifiers": { "$ref": "#/$defs/identifiers" }
+                      }
+                    },
+                    "products": {
+                      "type": "array",
+                      "maxItems": 20,
+                      "items": { "type": "integer", "minimum": 0 }
+                    }
+                  }
+                },
+                "sort": {
+                  "type": "object",
+                  "required": ["field", "direction"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "field": { "type": "string", "pattern": "^[A-Za-z_]+$" },
+                    "direction": { "enum": ["asc", "desc"] }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "pageSize": { "$ref": "#/$defs/pageSize" },
+        "pageSizeMin": { "$ref": "#/$defs/pageSize" }
       }
     },
     "upgrade": {

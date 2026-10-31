@@ -100,6 +100,17 @@
       default: false,
       devOnly: true,
     },
+    // Your Subscriber Store (#418; owner, 2026-10-31): a scan reads the Subscriber Store
+    // RSI shows the signed-in subscriber, at most once a day (src/lib.js getSubStore,
+    // ui/scan/runner.js), and sync sends it as sources.subStore
+    // (schema/sync-payload.schema.json) for the website's Store. RSI lists it only to a
+    // signed-in subscriber, so only the pilot's own extension can read it. Developer
+    // builds only until the privacy policy names it.
+    subStore: {
+      about: 'Your Subscriber Store: a scan reads it once a day and sync sends it.',
+      default: false,
+      devOnly: true,
+    },
   };
 
   // Set per build by scripts/pack.mjs. Keep it empty here.

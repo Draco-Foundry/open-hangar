@@ -53,6 +53,10 @@ test('the schema: format 2, only keywords the checker knows, strict where the ex
   assert.ok(strict(SCHEMA.$defs.sources.properties.orders), 'the orders source');
   for (const id of ['order', 'orderLine', 'orderMeta']) assert.ok(strict(SCHEMA.$defs[id]), id);
   assert.equal(meta('orders').$ref, '#/$defs/orderMeta');
+  // So is the Subscriber Store: an item's own keys only, never the account.
+  assert.ok(strict(SCHEMA.$defs.sources.properties.subStore), 'the subStore source');
+  for (const id of ['subStoreItem', 'subStoreMeta']) assert.ok(strict(SCHEMA.$defs[id]), id);
+  assert.equal(meta('subStore').$ref, '#/$defs/subStoreMeta');
   assert.ok(strict(SCHEMA.$defs.hangarMeta) && meta('hangar').$ref === '#/$defs/hangarMeta');
   for (const k of ['shape', 'probe']) assert.ok(strict(SCHEMA.$defs.hangarMeta.properties[k]), k);
   assert.ok(strict(SCHEMA.$defs.buybackMeta) && meta('buybacks').$ref === '#/$defs/buybackMeta');

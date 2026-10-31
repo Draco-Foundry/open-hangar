@@ -407,6 +407,11 @@ export function createRunner(env) {
           );
         // Then the buy-backs' own pages, before the sync so it carries what they say.
         if (b?.ok && !b.partial) await readPacks({ db, inScan: true }).catch(() => {});
+        // Your Subscriber Store (the subStore build flag, src/lib.js getSubStore): at most
+        // once a day, signed-in subscribers only, before the sync so it carries it. It
+        // isn't a row of the scan: its problems only go to the log.
+        if (flag('subStore') && !signedOut && OH.getSubStore)
+          await OH.getSubStore({ account }).catch(() => {});
       }
     } catch (e) {
       rows.push({
