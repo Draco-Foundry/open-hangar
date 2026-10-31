@@ -1,0 +1,1 @@
+- Fixed: **How long a scan took.** When a scan ends, the popup now shows it (like "Scanned in 12s") for 5 seconds.
