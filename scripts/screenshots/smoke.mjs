@@ -5274,6 +5274,16 @@ try {
   await told({ siteLink: { newValue: ppLink } });
   await page.waitForSelector('#pp-disconnect');
   const linked = await page.$eval('#pp-site', (e) => e.textContent.replace(/\s+/g, ' '));
+  // Sync Now and Disconnect are small links on the Connected row itself.
+  const oneRow = await page.evaluate(() => {
+    const r = document.getElementById('pp-sync')?.closest('.pp-r');
+    return (
+      !!r &&
+      r === document.getElementById('pp-disconnect')?.closest('.pp-r') &&
+      /^Connected as/.test(r.textContent.trim()) &&
+      document.getElementById('pp-sync').classList.contains('pp-link')
+    );
+  });
   await page.click('#pp-disconnect');
   await page.waitForSelector('#pp-disconnect-ask');
   const askFocus = await page.evaluate(() => document.activeElement?.id);
@@ -5282,25 +5292,19 @@ try {
   /Connected as demo@pilot/.test(linked) &&
   /Synced \d+m ago/.test(linked) &&
   askFocus === 'pp-stay' &&
-  ppStayed
-    ? ok('connected: who and when; Disconnect asks first and Stay Connected keeps it')
+  ppStayed &&
+  oneRow
+    ? ok('connected: who and when; Sync Now and Disconnect on its row; Disconnect asks first and Stay Connected keeps it')
     : fail(`popup connected: ${JSON.stringify({ linked, askFocus, stayed: ppStayed })}`);
-  // Connected: Notifications in the openhangar.space box with its hint under it (alerts run
+  // Connected: Notifications in the openhangar.space box, no hint under it (alerts run
   // only while connected, #790; owner, 2026-10-23). No Store Alerts switch (they follow
   // Remind Me); Notifications off gives the permission back, and on asks as the click's
   // first step.
   const ntBox = await page.evaluate(() => {
-    const box = (el) => el.getBoundingClientRect();
-    const h = document.querySelector('#pp-site #pp-nt-hint');
     const sw = document.querySelector('#pp-site #pp-nt-sw');
     return {
       inBox: !!sw,
-      hint:
-        !!h &&
-        !!sw &&
-        box(h).top >= box(sw).bottom - 0.5 &&
-        sw.getAttribute('aria-describedby') === 'pp-nt-hint' &&
-        h.textContent === 'A pop-up when a Remind Me item goes on sale.',
+      hint: !document.getElementById('pp-nt-hint') && !sw?.hasAttribute('aria-describedby'),
       wraps: document.getElementById('pp-nt-l').getClientRects().length > 1,
     };
   });
@@ -5313,9 +5317,6 @@ try {
     asked: __demo.asked.join(),
     removed: __demo.removed.join(),
     nt: document.getElementById('pp-nt-sw').getAttribute('aria-checked'),
-    hint: document.getElementById(
-      document.getElementById('pp-nt-sw').getAttribute('aria-describedby'),
-    )?.textContent,
     label: document.getElementById('pp-nt-l').textContent,
   }));
   ntBox.inBox &&
@@ -5325,10 +5326,9 @@ try {
   sw.removed === 'notifications' &&
   sw.asked === 'notifications' &&
   sw.nt === 'true' &&
-  sw.label === 'Notifications' &&
-  sw.hint === 'A pop-up when a Remind Me item goes on sale.'
+  sw.label === 'Notifications'
     ? ok(
-        'connected: Notifications in the box with its hint; gives back and asks again; no Store Alerts switch',
+        'connected: Notifications in the box with no hint; gives back and asks again; no Store Alerts switch',
       )
     : fail(`popup alert switches: ${JSON.stringify({ ntBox, sw, ntOff })}`);
   // The website took a sync moments ago (429, too soon): Settings has an amber dot and
