@@ -4778,7 +4778,8 @@ try {
       chipRight: Math.round(box(r?.querySelector('.pp-ins'))?.right - box(r)?.right),
       oneLine:
         Math.abs(box(r.querySelector('.pp-gm')).top - box(r.querySelector('.pp-ins')).top) < 2,
-      beforeNews: !document.querySelector('#pp-news') ||
+      beforeNews:
+        !document.querySelector('#pp-news') ||
         !!(s.compareDocumentPosition(document.querySelector('#pp-news')) & 4),
       wide: document.documentElement.scrollWidth > 360,
     };
@@ -4798,15 +4799,18 @@ try {
   arr.oneLine &&
   arr.beforeNews &&
   !arr.wide
-    ? ok(`New Since Last Scan: off by default; on, ${arr.total}, ${arr.name} with its marks and chip`)
+    ? ok(
+        `New Since Last Scan: off by default; on, ${arr.total}, ${arr.name} with its marks and chip`,
+      )
     : fail(`popup new since last scan: ${JSON.stringify({ offArrived, ...arr })}`);
   // Numbers that fit their box (budgets: ui/popup/currency.js): the widest full figure and
   // huge ones, at 360 px. Nothing clips or scrolls, and the full figure is the tooltip.
-  const fitCase = async (credits, tokens) => {
+  const fitCase = async (credits, tokens, extra = {}) => {
     await popAt(
       {
         __demoAccount: { ...demoAccount, credits },
         __demoBuybackTokens: tokens,
+        ...extra,
       },
       '#pp-value',
     );
@@ -4863,7 +4867,10 @@ try {
   !huge.wide
     ? ok('huge Store Credit, UEC, REC and tokens are compact, fit at 360 px, full in the tooltip')
     : fail(`popup fit (huge): ${JSON.stringify(huge)}`);
-  const nine = await fitCase({ store: { value: 10000000000 } }, 1);
+  // Store Credit is not in Account Value, so the nine digits come from a pledge.
+  const nine = await fitCase({ store: { value: 100 } }, 1, {
+    __demoPledge: { id: 9000, name: 'Hangar Decoration - Plush Gold', value: 100000000 },
+  });
   nine.value === `$100${nb}M` && nine.fits && !nine.wide
     ? ok(`a nine-digit Account Value reads ${nine.value} and fits`)
     : fail(`popup fit (nine digits): ${JSON.stringify(nine)}`);
@@ -5294,7 +5301,9 @@ try {
   askFocus === 'pp-stay' &&
   ppStayed &&
   oneRow
-    ? ok('connected: who and when; Sync Now and Disconnect on its row; Disconnect asks first and Stay Connected keeps it')
+    ? ok(
+        'connected: who and when; Sync Now and Disconnect on its row; Disconnect asks first and Stay Connected keeps it',
+      )
     : fail(`popup connected: ${JSON.stringify({ linked, askFocus, stayed: ppStayed })}`);
   // Connected: Notifications in the openhangar.space box, no hint under it (alerts run
   // only while connected, #790; owner, 2026-10-23). No Store Alerts switch (they follow

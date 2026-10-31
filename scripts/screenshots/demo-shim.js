@@ -258,6 +258,8 @@
     recruitsList,
     prospectsList,
   };
+  // One extra pledge a test asks for (__demoPledge), e.g. a huge value for the popup's fit check.
+  if (window.__demoPledge) hangar.push(window.__demoPledge);
   const owner = { nickname: 'Demo_Citizen', displayname: 'Demo Citizen' };
   const ts = now - 2 * 3600e3;
   // Scan history (Stats → History, Home "since last scan"): a melted Aurora, a
