@@ -66,13 +66,9 @@ const BUDGET = {
   scanStarted: small('the last scan that began: its run and time, replaced whole'),
   // Which parser read each source (src/hangar-shape.js PARSER_VERSION, src/lib.js).
   scanParser: small('one version number per source'),
-  // Auto Scan Daily (#666): its switch, its next run (src/background.js), its last run
-  // and each part's last complete read (ui/scan/runner.js).
-  autoScanOn: small('the Auto Scan Daily switch'),
-  autoScanNext: small('one timestamp'),
-  autoScanRetry: small('one timestamp: the last retry of a run that stopped'),
-  autoScan: small('the last Auto Scan: when, how it went, the backoff; replaced whole'),
-  scanFull: small('the last complete read of each part: three timestamps'),
+  // The Daily Scan Reminder (src/background.js): its switch and its last reminder.
+  scanReminderOn: small('the Daily Scan Reminder switch'),
+  scanReminder: small('the last reminder: when, and whether it went or the day was skipped'),
   avatarImg: { cap: 'one portrait, AVATAR_MAX 64 KB, replaced whole', max: 70 * KB },
   feedShips: { cap: 'one ships feed (~330 ships), replaced whole (a day)', max: 300 * KB },
   feedCatalog: {

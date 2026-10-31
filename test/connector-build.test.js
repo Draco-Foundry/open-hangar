@@ -16,7 +16,7 @@ const { UI_STUBS, stubUi } = require('./ui-stubs.js');
 
 // A scratch copy of the repo with the Svelte pages stood in for. Its registry's store
 // build has the connector with Local Mode (as every store build since 0.3.0) and the
-// wishlist import, and Extension Alerts (with Auto Scan Daily, which needs their alarms)
+// wishlist import, and Extension Alerts (with the Daily Scan Reminder, which needs their alarms)
 // only with `alerts: true` (the store builds have both too). With `connector: false`, a
 // registry whose store build has no connector and no wishlist import (Local Mode stays
 // on, as the beta had it before).
@@ -311,7 +311,7 @@ test('alerts need the connector', () => {
       run(dir, 'pack.mjs', ['--flag', 'alerts=on']),
       /flags on: sync, localMode, connector, wishlistImport, alerts, scanBar \(dev build, never for a store\)/,
     );
-    // Auto Scan Daily's alarm is the alerts' alarms permission: not without them.
+    // The Daily Scan Reminder's alarm is the alerts' alarms permission: not without them.
     assert.throws(
       () => run(dir, 'pack.mjs', ['--flag', 'autoScan=on']),
       /autoScan=on needs alerts on \(it uses their alarms permission\)/,

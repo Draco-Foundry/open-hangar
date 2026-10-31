@@ -1,11 +1,13 @@
 name: Ship catalog
 
 # Weekly refresh of src/data/ship-catalog.json (ship prices and stats bundled
-# with the extension). When the list changed and the tests still pass with it
-# (#194), it opens a PR from the bot/ship-catalog branch (main is protected, #193);
-# merge it and the next release picks it up. PRs made with the workflow token
-# don't start CI on their own, but this job already ran the tests: merge with the
-# admin bypass, or close and reopen the PR to run CI.
+# with the extension, and read from main by the website). When the list changed and
+# the tests still pass with it (#194), it opens a PR from the bot/ship-catalog branch
+# (main is protected, #193) and merges it by itself (owner, 2026-10-31: the site's
+# ship list lagged while the PR waited): PRs made with the workflow token don't start
+# CI, so the job starts CI on the branch with workflow_dispatch (one run a week; that
+# run reports the "test" check on the PR's head commit) and turns on squash
+# auto-merge. Only a PR that touches nothing but the catalog file is auto-merged.
 # Needs Settings → Actions → General → "Allow GitHub Actions to create and approve
 # pull requests". Without it the branch is still pushed and the run says so.
 
@@ -17,6 +19,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write # to start CI on the branch
 
 jobs:
   refresh:
@@ -44,11 +47,15 @@ jobs:
           git add src/data/ship-catalog.json
           git commit -m "chore(data): weekly ship catalog refresh"
           git push --force origin bot/ship-catalog
-          if gh pr view bot/ship-catalog --json state -q .state 2>/dev/null | grep -q OPEN; then
-            echo "Updated the open catalog PR."; exit 0
+          if ! gh pr view bot/ship-catalog --json state -q .state 2>/dev/null | grep -q OPEN; then
+            RUN="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            gh pr create --base main --head bot/ship-catalog               --title "chore(data): weekly ship catalog refresh"               --body "Ship prices and stats from star-citizen.wiki. The tests passed with this catalog in the [refresh run]($RUN). Merges by itself once CI passes."               || { echo "::warning::Couldn't open the PR (allow Actions to create PRs in Settings → Actions → General). The branch bot/ship-catalog is pushed: open the PR by hand."; exit 0; }
           fi
-          RUN="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-          gh pr create --base main --head bot/ship-catalog \
-            --title "chore(data): weekly ship catalog refresh" \
-            --body "Ship prices and stats from star-citizen.wiki. The tests passed with this catalog in the [refresh run]($RUN)." \
-            || echo "::warning::Couldn't open the PR (allow Actions to create PRs in Settings → Actions → General). The branch bot/ship-catalog is pushed: open the PR by hand."
+          # Guard: only data may merge by itself.
+          files=$(gh pr diff bot/ship-catalog --name-only)
+          if [ "$files" != "src/data/ship-catalog.json" ]; then
+            echo "::warning::The catalog PR changes more than the catalog file, so it won't merge by itself: $files"
+            exit 0
+          fi
+          gh workflow run ci.yml --ref bot/ship-catalog
+          gh pr merge bot/ship-catalog --auto --squash

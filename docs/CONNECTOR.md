@@ -9,7 +9,7 @@ opens a website.
 
 It's the `connector` build flag ([FLAGS.md](FLAGS.md#the-connector)), on in every store
 build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistImport` and
-`alerts`, and from 0.4.0 `autoScan` (Auto Scan Daily, below).
+`alerts`, and from 0.4.0 `autoScan` (now the Daily Scan Reminder, below).
 
 ## What a Connector Build Has
 
@@ -27,7 +27,7 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
   Currency (the day's rates for anything but USD) and the shortcut (`commands` in
   manifest.json, Alt+Shift+O), and JSON Backup, Pledges CSV and Buy-Backs CSV. Connect
   still opens the basic page: the browser's sign-in window would close the popup. While
-  connected, the openhangar.space group has Auto Scan Daily's switch and its status line
+  connected, the openhangar.space group has the Daily Scan Reminder's switch and its line
   (below). The header says Scan stopped for a scan that began and never ended, even after
   a browser restart (local `scanStarted`, #676).
 - **The basic page** (`src/basic.html`, `ui/basic/`), small since 0.4.0: what needs a
@@ -50,7 +50,7 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
   for 2 minutes) or stopped on an error. A mark left by a hidden page that went away
   mid-scan never holds the next scan.
 - **The background worker** as today: our pages' messages (bridge v2), the rescan badge,
-  updates, and Auto Scan Daily's alarm (below).
+  updates, and the Daily Scan Reminder's alarm (below).
 - **The scan**, at the same depth: account and balances, the hangar (with the pledge
   archive and history), buy-backs, referrals, then up to 30 buy-backs' own pages not
   read from RSI yet (their price, insurance and contents go in the sync, #798). It's the scan
@@ -58,30 +58,15 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
   tab when it can't); it stores its progress (session `scanProgress`) and its last
   report (`scanReport`) for any page.
 
-- **Auto Scan Daily** (the `autoScan` flag, #666; [FLAGS.md](FLAGS.md#auto-scan)), off
-  until the pilot turns it on, and only while connected: Disconnect and Clear Data turn
-  it off. The worker keeps one alarm (`oh-auto-scan`) at a random time 20 to 28 hours
-  after the last run, made again whenever it starts; a day missed while the browser was
-  closed runs once, 10 to 30 minutes after it's back. It skips without asking RSI anything
-  after any scan (or its own last run) in the last 20 hours, while it's backing off (RSI
-  didn't answer, or the last runs stopped partway), offline, or while a scan runs. When
-  it goes off, the hidden scan page runs `runner.autoScan()`
-  (`requestScan('auto', { hiddenOnly: true })`: never a tab, and where there's no hidden
-  page it waits for tomorrow). The run checks locally first (connected, switched on, not
-  paused by `site/status.json`'s `autoScan` or `hangar`, the live hangar one this link
-  syncs), then whether RSI's sign-in cookie is there (presence only, the popup's
-  check; on Chrome and Edge the worker answers it for the offscreen page, never the
-  cookie), then who is signed in (one dashboard read). It never switches accounts. Then a
-  quick check, the newest page of the hangar and of buy-backs, compared with what's
-  saved and saving nothing; a full read only when something there is new, a part is due
-  (`ui/scan/auto.js` fullDue: its last complete read, local `scanFull`, no longer
-  stands), the last complete read is a week old, or a saved scan's sync never went out.
-  The full read saves part by part (hangar, buy-backs, referrals), each only when read
-  whole, from the starting account (asked again after each part), and, for the hangar,
-  without a sudden drop that new buy-backs don't explain. It writes its record (local
-  `autoScan`) and then syncs what it saved. It never reads buy-back packs, never writes
-  a scan report and never notifies. The popup's status line is the record's, in the
-  approved words. The request budget: docs/dev/requests.md.
+- **The Daily Scan Reminder** (the `autoScan` flag; [FLAGS.md](FLAGS.md#auto-scan)),
+  which replaced Auto Scan Daily (#666) so that every read of RSI starts with a click.
+  Off until the pilot turns it on (which asks for notifications), and only while
+  connected: Disconnect, Clear Data and notifications taken back turn it off. The worker
+  keeps one alarm (`oh-scan-reminder`), checked at most once a day: when the last scan
+  in this browser is over a day old and no reminder went out in the last day, a
+  notification; clicking it starts the popup's Scan. It reads nothing from RSI and sends
+  nothing (the saved scan time and the cached status file only; `autoScan` or `hangar`
+  paused skips the day). Its record (local `scanReminder`) is the popup's line.
 
 `scripts/pack.mjs` leaves the dashboard out of it (`scripts/connector.mjs`):
 `src/dashboard.html`, `src/dashboard.js`, `src/quips.js`, `src/qr.js`, `src/assets/`,
@@ -90,8 +75,8 @@ their imports). `scripts/check-store-build.mjs` refuses a connector build with a
 them, and a build without the connector that has the popup or the basic page.
 
 **Permissions** stay as they are (Extension Alerts, the `alerts` flag, add `alarms` and an
-optional `notifications`, docs/FLAGS.md "Alerts", and Auto Scan Daily uses that same
-`alarms`; the hidden scan page adds `offscreen` on
+optional `notifications`, docs/FLAGS.md "Alerts", and the Daily Scan Reminder uses those
+same two; the hidden scan page adds `offscreen` on
 Chrome and Edge only, and `frame-src 'self'` to Firefox's pages): `storage`, `unlimitedStorage` (big hangars, history
 and the archive), `cookies` (Log Out of RSI, whether RSI's sign-in cookie is there, and
 Add to RSI Cart's token), `identity` (Connect's sign-in window), and
@@ -137,7 +122,6 @@ step 3 above).
 | robertsspaceindustries.com `/account/pledges`, `/account/buy-back-pledges`            | Scan: hangar and buy-backs                                                |
 | robertsspaceindustries.com `/pledge/buyback/<id>`                                     | Scan: up to 30 buy-back pages not read yet                                |
 | robertsspaceindustries.com `/en/account/dashboard`                                    | Identity and balances: Scan, and opening the basic page (kept 10 minutes) |
-| robertsspaceindustries.com list pages and the dashboard (Auto Scan Daily on, **new**) | Auto Scan Daily: once a day at most, a quick check first (requests.md)    |
 | robertsspaceindustries.com `/en/citizens/<handle>` (no cookies)                       | Citizen Record and org, with the one above                                |
 | robertsspaceindustries.com `/media/…` portrait (no cookies, when it changes, **new**) | Scan: a small copy of your RSI picture for our pages (`avatarImg`)        |
 | robertsspaceindustries.com `POST /graphql` (referral recruits)                        | Scan: referrals                                                           |

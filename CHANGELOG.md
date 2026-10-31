@@ -4,6 +4,17 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.5.5 — 2026-10-27
+
+- Fixed: **Scans that stop partway.** The popup no longer stays on Scanning: it says the scan stopped, offers Scan Again and keeps your last full scan.
+- Improved: **Wishlist items open in the Store.** On the popup's Wishlist tab, an item's name opens it in the Store on openhangar.space.
+- Improved: **A cleaner popup.** Your balances sit in one strip with Buy-Back Tokens under it, Fleet News reads as simple rows, and Account Value's change is spelled out in words. Notifications shows in Settings only while you're connected to openhangar.space, and the version number moved to the bottom of Settings.
+- Changed: **Scan at the top of the popup.** Scan now sits at the top of every tab, and the button itself shows the scan's progress: the part it's reading and its count, then how long the scan took. If a scan stops, it says Scan Again. The popup also has a quieter look.
+- New: **UEC change in the popup.** Next to Account Value's change, the popup now shows how your UEC changed since an earlier scan.
+- Changed: **Privacy policy updated.** It now says your scan history keeps your UEC at each scan, in this browser only, sync leaves it out, and the popup shows UEC, REC and how your UEC changed.
+- Changed: **Auto Scan Daily is now the Daily Scan Reminder.** At most once a day, when your last scan is over a day old, it shows a notification and clicking it starts a scan, so Open Hangar never reads RSI on its own. If you had Auto Scan Daily on and notifications allowed, the reminder is already on; if not, turn it on in Settings.
+- Changed: **Privacy policy updated.** It now describes the Daily Scan Reminder in place of Auto Scan Daily.
+
 ## 0.5.4 — 2026-10-24
 
 - Changed: **Store alerts follow Remind Me.** The bell is gone: the Wishlist tab counts your Remind Me items on sale and lists them first, and only those items get the toolbar number and notifications. Paints and sales for ships you own show in Fleet News.

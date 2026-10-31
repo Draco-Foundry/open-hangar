@@ -13,6 +13,12 @@
     storeCredit,
     gameCredit,
     countFit,
+    cardName,
+    insChip,
+    newSinceScan,
+    newViewUrl,
+    rsiPicture,
+    NEW_SHOWN,
     sinceKey,
     tokenCount,
     unpricedLine,
@@ -26,6 +32,7 @@
     value,
     since,
     avatar,
+    db,
     account,
     signedOut,
     fx = USD,
@@ -84,6 +91,25 @@
           : '';
   const switched = $derived(report?.switched?.who ? report.switched : null);
   const sub = (m) => (AL ? AL.lines(m)[0] || '' : '');
+
+  // New Since Last Scan (the newSinceScan flag): what the last scan found that the one
+  // before it didn't (./data.js newSinceScan), until the next scan. Each row is the
+  // website's title-only pledge card in its row shape: the picture, the name, then the
+  // melt value with the G and M marks after it and the insurance chip at the right.
+  // Three rows, and always the link to the website's New view while connected (owner,
+  // 2026-10-26: see more on openhangar.space); every row when there's no website.
+  const NEW = flag('newSinceScan');
+  const arrived = $derived(NEW ? newSinceScan(db?.history, v.items, v.scannedAt) : null);
+  const newAll = $derived(arrived ? newViewUrl(v.myHangar) : null);
+  const newRows = $derived(
+    arrived ? (newAll ? arrived.items.slice(0, NEW_SHOWN) : arrived.items) : [],
+  );
+  // Whole dollars, cents when there are some (the website's one money rule).
+  const melt = (n) =>
+    moneyFit(n, fx, Number.isInteger(Math.round(n * 100) / 100) ? { most: 0 } : { cents: true });
+  const newTotal = $derived(arrived ? melt(arrived.total) : null);
+  let noPic = $state({}); // pledge id → its picture didn't load
+
 </script>
 
 {#if first}
@@ -184,6 +210,75 @@
             >{t('popup.token-next', { date: day(nextToken) })}</small
           >{/if}
       </div>
+    {/if}
+
+    {#if arrived}
+      <section
+        class="pp-arrived"
+        id="pp-arrived"
+        aria-label={arrived.items.length
+          ? t('popup.new-sr', { n: arrived.items.length, melt: newTotal.title || newTotal.text })
+          : null}
+        aria-labelledby={arrived.items.length ? null : 'pp-arrived-h'}
+      >
+        <div class="pp-arrtop">
+          <h2 class="pp-h3" id="pp-arrived-h">{t('popup.new-since')}</h2>
+          {#if arrived.items.length}
+            <span class="pp-arrtotal" id="pp-arrived-total" title={newTotal.title || null}
+              >{t('popup.new-total', { n: arrived.items.length, melt: newTotal.text })}</span
+            >
+          {/if}
+        </div>
+        {#if !arrived.items.length}
+          <p class="pp-note" id="pp-arrived-none">{t('popup.new-none')}</p>
+        {:else}
+          {#if arrived.since}<small class="pp-arrwhen">{t('popup.new-since-when', { date: day(arrived.since) })}</small>{/if}
+          {#each newRows as p (p.id)}
+            {@const m = melt(p.value)}
+            {@const ins = insChip(p.insurance)}
+            {@const pic = rsiPicture(p.image)}
+            <div class="pp-arr">
+              <span class="pp-arrpic">
+                {#if pic && !noPic[p.id]}<img
+                    src={pic}
+                    alt=""
+                    width="96"
+                    height="54"
+                    loading="lazy"
+                    referrerpolicy="no-referrer"
+                    onerror={() => (noPic = { ...noPic, [p.id]: true })}
+                  />{/if}
+              </span>
+              <span class="pp-arrtext">
+                <b class="pp-arrname">{cardName(p.name)}</b>
+                <span class="pp-arrline">
+                  {#if Number.isFinite(p.value) && p.value > 0}<span class="pp-arrmelt" title={m.title || null}
+                      >{m.text}</span
+                    >{/if}
+                  <span class="pp-gm">
+                    <i class={p.giftable ? 'y' : 'n'} title={t(p.giftable ? 'popup.giftable' : 'popup.not-giftable')}
+                      ><span aria-hidden="true">G</span><span class="pp-sr"
+                        >{t(p.giftable ? 'popup.giftable' : 'popup.not-giftable')}</span
+                      ></i
+                    >
+                    <i class={p.meltable ? 'y' : 'n'} title={t(p.meltable ? 'popup.meltable' : 'popup.not-meltable')}
+                      ><span aria-hidden="true">M</span><span class="pp-sr"
+                        >{t(p.meltable ? 'popup.meltable' : 'popup.not-meltable')}</span
+                      ></i
+                    >
+                  </span>
+                  {#if ins}<span class="pp-ins ins-{ins.tier}">{ins.text}</span>{/if}
+                </span>
+              </span>
+            </div>
+          {/each}
+          {#if newAll}
+            <button type="button" class="pp-link" id="pp-arrived-all" onclick={() => openTab(newAll)}
+              >{t('popup.new-see-all', { n: arrived.items.length })}</button
+            >
+          {/if}
+        {/if}
+      </section>
     {/if}
 
     {#if trouble.length}

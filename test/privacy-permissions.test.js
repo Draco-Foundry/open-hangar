@@ -161,12 +161,13 @@ test('a store or beta build with the connector: the policy explains offscreen', 
       }
 });
 
-// Auto Scan Daily (#666): a store or beta build with the `autoScan` flag on scans the
-// connected RSI account once a day on an alarm. It fails here until both copies of the
-// policy have its section (#auto-scan-daily, with "A bad part is never kept", owner-
-// approved words 2026-10-14, word for word), name it in the alarms bullet, and say
-// Disconnect turns it off; and while the flag needs the alerts' alarms permission.
-test('a store or beta build with Auto Scan Daily on: the policy explains it', async () => {
+// The Daily Scan Reminder (the `autoScan` flag; it replaced Auto Scan Daily, #666): a
+// store or beta build with it on fails here until both copies of the policy have its
+// section (#daily-scan-reminder, owner-approved words 2026-10-25, word for word) saying
+// it reads and sends nothing, name it in the alarms and notifications bullets, say
+// Disconnect turns it off, and no longer describe Auto Scan Daily; and while the flag
+// needs the alerts' alarms and notifications permissions.
+test('a store or beta build with the Daily Scan Reminder on: the policy explains it', async () => {
   const { buildValues, readRegistry } = await import('../scripts/build-flags.mjs');
   const registry = readRegistry(path.join(ROOT, 'src', 'flags.js'));
   const words = (f) =>
@@ -176,9 +177,8 @@ test('a store or beta build with Auto Scan Daily on: the policy explains it', as
         .replace(/\*\*/g, '')
         .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'),
     ).replace(/ ([.,:;)])/g, '$1');
-  const BAD_PART =
-    "A bad part is never kept: Auto Scan Daily saves your hangar, buy-backs and referrals one part at a time, as each is fully read. A part that doesn't finish, a part read after RSI switched to a different account than the scan started on, or a hangar that would suddenly drop much of what's in it with no buy-backs to explain it, is never saved or synced. That part keeps your last good scan, and the popup asks you to scan yourself.";
-  const QUICK = 'A quick check that finds nothing new stops there and sends nothing.';
+  const READS =
+    'What it reads and sends: nothing. It only checks the time of your last scan, saved in this browser.';
   let checked = 0;
   for (const [build, beta] of [
     ['store', false],
@@ -186,29 +186,37 @@ test('a store or beta build with Auto Scan Daily on: the policy explains it', as
   ]) {
     const flags = buildValues(registry, { beta });
     if (!flags.autoScan) continue;
-    assert.ok(flags.alerts, `the ${build} build has the alerts' alarms permission for it`);
+    assert.ok(flags.alerts, `the ${build} build has the alerts' permissions for it`);
     checked++;
-    assert.match(read('docs/PRIVACY.md'), /\n## Auto Scan Daily\n/, 'docs/PRIVACY.md');
-    assert.match(read('site/privacy.html'), /<h2 id="auto-scan-daily">Auto Scan Daily<\/h2>/);
+    assert.match(read('docs/PRIVACY.md'), /\n## Daily Scan Reminder\n/, 'docs/PRIVACY.md');
+    assert.match(
+      read('site/privacy.html'),
+      /<h2 id="daily-scan-reminder">Daily Scan Reminder<\/h2>/,
+    );
     for (const [file, bullets] of [
       ['docs/PRIVACY.md', mdBullets()],
       ['site/privacy.html', htmlBullets()],
     ]) {
       const text = words(file);
+      assert.ok(text.includes(READS), `${file}: it reads and sends nothing (the ${build} build)`);
       assert.ok(
-        text.includes(BAD_PART),
-        `${file}: "A bad part is never kept" (the ${build} build)`,
-      );
-      assert.ok(text.includes(QUICK), `${file}: the quick check sends nothing`);
-      assert.ok(
-        text.includes('stops syncing, turns off Auto Scan Daily and cancels this extension'),
+        text.includes(
+          'stops syncing, turns off the Daily Scan Reminder and cancels this extension',
+        ),
         `${file}: Disconnect turns it off`,
       );
+      assert.doesNotMatch(text, /Auto Scan Daily/, `${file}: no Auto Scan Daily left`);
       const alarms = bullets.find((b) => b.startsWith('alarms:'));
-      assert.match(alarms || '', /^alarms: for store alerts and Auto Scan Daily only\./, file);
+      assert.match(
+        alarms || '',
+        /^alarms: for store alerts and the Daily Scan Reminder only\./,
+        file,
+      );
+      const notes = bullets.find((b) => b.startsWith('notifications:'));
+      assert.match(notes || '', /the Daily Scan Reminder switch/, file);
     }
   }
-  assert.ok(checked, 'Auto Scan Daily is on in the store build (src/flags.js)');
+  assert.ok(checked, 'the Daily Scan Reminder is on in the store build (src/flags.js)');
 });
 
 // The wishlist import (ui/scan/wishlist-import.js): a store or beta build with the

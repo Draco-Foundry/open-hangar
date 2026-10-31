@@ -108,7 +108,7 @@ The scan checks each RSI page it reads (`src/scraper/parser.js`, called from `li
 `background.js`) before it trusts the result. When a page has the markers of a hangar but
 the parser finds nothing in it, the scan stops, keeps the last good scan, and the popup
 says RSI changed a page. When RSI doesn't answer at all, the scan says that instead and
-also keeps the last scan. The tests are in `test/auto-scan.test.js` and the parser corpus.
+also keeps the last scan. The tests are in `test/scan.test.js` and the parser corpus.
 For the playbook after one of these, see [docs/RSI-CHANGES.md](docs/RSI-CHANGES.md).
 
 ## Versioning
@@ -184,14 +184,16 @@ Everything automated lives in `.github/workflows/`:
   owner runs it by hand (Run workflow), refreshing the store versions and exchange
   rates on each run.
 - **Release** (`release.yml`): a pushed `v*` tag builds the Chrome and Firefox zips,
-  publishes a GitHub Release with that version's CHANGELOG notes, and starts Publish to
-  stores for it. (`npm run release` folds the `changelog.d/` fragments into CHANGELOG first.)
+  publishes a GitHub Release with that version's CHANGELOG notes and a `SHA256SUMS` file
+  for the zips, and starts Publish to stores for it. (`npm run release` folds the `changelog.d/` fragments into CHANGELOG first.)
 - **Publish to stores** (`publish.yml`): uploads a tag to Chrome, Edge and Firefox, then
   announces it on Discord. Started by Release (or by hand); it waits for CI on the
   tag's commit, and nothing uploads until the owner approves the `stores` environment.
   A dry run checks it on PRs that touch publishing. See [docs/STORE.md](docs/STORE.md).
 - **Ship catalog** (`ship-catalog.yml`): weekly refresh of `src/data/ship-catalog.json`,
-  opened as a PR from the `bot/ship-catalog` branch only when it changed.
+  opened as a PR from the `bot/ship-catalog` branch only when it changed. It starts CI on
+  the branch and turns on squash auto-merge, so it lands by itself once `test` passes (only
+  while the PR changes nothing but that file).
 - **RSI canary** (`canary.yml`): once a day, runs the real parsers on RSI's public pages
   and tells #ops if something changed. See [docs/RSI-CHANGES.md](docs/RSI-CHANGES.md).
 

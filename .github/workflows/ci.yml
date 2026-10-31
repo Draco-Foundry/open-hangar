@@ -3,17 +3,23 @@ name: CI
 # One run per change: a push to main runs on push, everything else runs as a pull
 # request (any base). Release tags need no run of their own: the tag's
 # commit is main's, and publish.yml waits for CI on it.
+#
+# Draft PRs aren't checked (2026-10-26, fewer and cheaper CI runs): a branch
+# is a draft while it's being built and is checked once when marked ready for review.
 on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 # A newer commit on a PR cancels the PR's older run. Push runs never cancel or
 # queue behind each other (each gets its own group): publish.yml waits for CI on
-# the release commit, so that run must always finish.
+# the release commit, so that run must always finish. A draft's runs have a group of
+# their own, so a push while still a draft, landing just before or after "Ready for
+# review", never cancels the real check.
 concurrency:
-  group: ci-${{ github.event_name == 'pull_request' && github.ref || format('{0}-{1}', github.ref, github.run_id) }}
+  group: ci-${{ github.event_name == 'pull_request' && format('{0}-{1}', github.ref, github.event.pull_request.draft && 'draft' || 'ready') || format('{0}-{1}', github.ref, github.run_id) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -23,7 +29,11 @@ permissions:
 jobs:
   # Branch protection requires this job by name ("test"): keep the name, and keep
   # it reporting success on docs-only PRs (the slow steps skip, the job still runs).
+  # GitHub counts a skipped job as passed, so a draft's skipped run goes by another
+  # name and can never stand in for the real "test" check.
   test:
+    name: ${{ github.event.pull_request.draft && 'test (draft, not checked)' || 'test' }}
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -135,5 +145,7 @@ jobs:
           # Through env, never pasted into the script: a commit message is untrusted.
           MSG: ${{ github.event.head_commit.message || github.sha }}
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        # The commit's first line only (owner, 2026-10-28), as one titled card.
         run: |
-          node scripts/notify.mjs ops --down "CI failed on main: $MSG $RUN"
+          first=${MSG%%$'\n'*}
+          node scripts/notify.mjs ops --down --title="Extension CI Failed on Main" --footer="Extension CI" --run="$RUN" "$first"

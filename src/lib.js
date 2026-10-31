@@ -1132,10 +1132,9 @@
     }
     // The last scan's report, its start and the RSI portrait (ui/scan/runner.js) go with
     // the rest, and the popup's copy of the account's Wishlist (read again while
-    // connected). So does Auto Scan Daily: its switch (it's off after Clear Data), its
-    // next run and last retry, its last run and the parts' last complete reads. And every
-    // buy-back page read (bbDetails) and failed (bbdMisses), with any save of them still
-    // waiting.
+    // connected). So does the Daily Scan Reminder: its switch (it's off after Clear Data)
+    // and its last reminder. And every buy-back page read (bbDetails) and failed
+    // (bbdMisses), with any save of them still waiting.
     await dropBuybackDetails();
     await chrome.storage.local.remove([
       'popupWish',
@@ -1150,11 +1149,8 @@
       'avatarImg',
       'scanReport',
       'scanStarted',
-      'scanFull',
-      'autoScan',
-      'autoScanOn',
-      'autoScanNext',
-      'autoScanRetry',
+      'scanReminder',
+      'scanReminderOn',
       'subStore',
       RECOVERY_KEY,
       LOG_KEY,
@@ -2123,9 +2119,9 @@
         return { ok: true, items: saved.items, scannedAt, unchanged: true };
       }
 
-      // A scan cut short (RSI stopped answering, signed out partway) never replaces
-      // the last full scan: an earlier scan stays as it was. Only a first scan, with
-      // nothing saved to keep, keeps what it read.
+      // A scan cut short (RSI stopped answering, signed out partway) is never saved:
+      // an earlier scan stays as it was, and a first scan saves nothing, so a partial
+      // hangar is never synced either.
       if (result.partial) {
         const { page, reason, signedOut } = result.partial;
         OH.log(
@@ -2145,30 +2141,23 @@
             ...down(result.partial),
           };
         }
-        if (prevCount || prev.scannedAt != null) {
-          if (signedOut)
-            return {
-              ok: false,
-              signedOut: true,
-              error:
-                'You’re not signed in to RSI. Log in at robertsspaceindustries.com, then scan again.',
-            };
+        if (signedOut)
           return {
             ok: false,
-            error: result.partial.countMismatch
-              ? `The ${result.items.length} items read don't fit RSI's page count, so we kept your previous scan of ${prevCount}. Try again in a minute.`
-              : `RSI stopped responding at page ${page} (${reason}), so we kept your previous scan of ${prevCount}. Try again in a minute.`,
-            ...slow(result.partial),
-            ...down(result.partial),
+            signedOut: true,
+            error:
+              'You’re not signed in to RSI. Log in at robertsspaceindustries.com, then scan again.',
           };
-        }
-        const scannedAt = await saveSource(src.id, result.items, { meta: result.meta, account });
+        const kept = prevCount
+          ? `so we kept your previous scan of ${prevCount}`
+          : 'so nothing from this read was saved';
         return {
-          ok: true,
-          items: result.items,
-          scannedAt,
-          partial: `stopped at page ${page} (${reason}); rescan to get the rest`,
+          ok: false,
+          error: result.partial.countMismatch
+            ? `The ${result.items.length} items read don't fit RSI's page count, ${kept}. Try again in a minute.`
+            : `RSI stopped responding at page ${page} (${reason}), ${kept}. Try again in a minute.`,
           ...slow(result.partial),
+          ...down(result.partial),
         };
       }
 
@@ -3823,6 +3812,10 @@
   // with a token is offered for one (the approved words, buybacks.warbond-credit-note).
   OH.WARBOND_CREDIT_NOTE =
     'Warbond buy-backs take cash only until about a month after the sale ends, and RSI says the wait can vary. After that, store credit works with a Buy-Back Token.';
+  // A giftable pledge's line in the Melt on RSI confirm (the approved words,
+  // melt-facts.giftable). It never says a buy-back keeps gifting: whether one does is
+  // unsettled since RSI's gifting changed on 2026-10-30.
+  OH.MELT_FACTS_GIFTABLE = "It's giftable now. If you buy it back later, it may not be giftable.";
   OH.isWarbond = function isWarbond(name) {
     const n = String(name || '');
     return /\bwarbond\b/i.test(n) || /\bWB\b/.test(n);
@@ -3868,7 +3861,7 @@
       lines.push(`It carries ${ins}. Melting it gives that up until you buy it back.`);
     }
     if (p.giftable) {
-      lines.push("It's giftable now. Bought back with store credit, it can't be gifted.");
+      lines.push(OH.MELT_FACTS_GIFTABLE);
     }
     lines.push(
       "Buying it back costs full price: sale prices and subscriber coupons don't carry over. Store credit also needs a Buy-Back Token, and it's one buy-back per cart.",
@@ -4656,8 +4649,8 @@
       body,
     });
     if (res.status === 401) {
-      // Forget this link only: one connected again meanwhile stays. Auto Scan Daily goes
-      // with it, as with Disconnect.
+      // Forget this link only: one connected again meanwhile stays. The Daily Scan
+      // Reminder goes with it, as with Disconnect.
       if ((await OH.getSiteLink())?.token === link.token)
         await chrome.storage.local.remove(SITE_LINK_KEYS);
       throw new Error('This extension was disconnected on the website. Connect again.');
@@ -4718,16 +4711,9 @@
   // What goes with the connection: the link, the popup's copy of the account's Wishlist
   // (ui/popup/wish-client.js COPY_KEY), the store alerts' copy of its keys (src/alerts.js
   // WISH_KEY; here rather than at the alerts' next check, which waits while alerts are
-  // paused) and Auto Scan Daily's switch, next run and last retry (it works only while
-  // connected; src/background.js clears its alarm). The Wishlist stays on the account.
-  const SITE_LINK_KEYS = [
-    'siteLink',
-    'popupWish',
-    'alertsWish',
-    'autoScanOn',
-    'autoScanNext',
-    'autoScanRetry',
-  ];
+  // paused) and the Daily Scan Reminder's switch (it works only while connected;
+  // src/background.js clears its alarm). The Wishlist stays on the account.
+  const SITE_LINK_KEYS = ['siteLink', 'popupWish', 'alertsWish', 'scanReminderOn'];
   OH.siteDisconnect = async function siteDisconnect() {
     const link = await OH.getSiteLink();
     if (link) {

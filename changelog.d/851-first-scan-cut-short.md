@@ -1,0 +1,1 @@
+- Fixed: **A first scan that stops partway.** It no longer keeps the part it read, so only a whole hangar is ever saved or synced. Scan again to read it all.

@@ -156,6 +156,60 @@
               },
             },
           },
+          orders: {
+            description:
+              "RSI's Pledge Store order history (Account, Billing), read only once the pilot turns it on. Strict all the way down, so no payment method, card, address or gift recipient can ride along.",
+            type: 'object',
+            required: ['items'],
+            additionalProperties: false,
+            properties: {
+              items: { type: 'array', items: { $ref: '#/$defs/order' } },
+              scannedAt: { $ref: '#/$defs/scanTime' },
+              meta: { $ref: '#/$defs/orderMeta' },
+            },
+          },
+        },
+      },
+      orderMeta: {
+        description:
+          'How far the last order history read got: the pages it read, and whether it reached the oldest order.',
+        type: 'object',
+        additionalProperties: false,
+        properties: { pages: { type: 'integer', minimum: 0 }, complete: { type: 'boolean' } },
+      },
+      order: {
+        description:
+          "One order from RSI's Pledge Store order history (Account, Billing), each value as the order's card shows it. Amounts are whole cents of the order's currency, or null where the card doesn't show them: items (the lines' totals), discount (Additional Discount), credit (Credits used), beforeTax (Total before Tax: what was charged, before tax) and total (with tax). status, payment and fulfillment are RSI's words. Never the payment processor, the bill-to address or anything about a gift's recipient.",
+        type: 'object',
+        required: ['id', 'date', 'lines'],
+        additionalProperties: false,
+        properties: {
+          id: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,40}$' },
+          date: { type: ['string', 'null'], maxLength: 40 },
+          status: { type: ['string', 'null'], maxLength: 40 },
+          payment: { type: ['string', 'null'], maxLength: 40 },
+          fulfillment: { type: ['string', 'null'], maxLength: 40 },
+          currency: { type: ['string', 'null'], maxLength: 8 },
+          items: { type: ['integer', 'null'], minimum: 0 },
+          discount: { type: ['integer', 'null'], minimum: 0 },
+          credit: { type: ['integer', 'null'], minimum: 0 },
+          beforeTax: { type: ['integer', 'null'], minimum: 0 },
+          total: { type: ['integer', 'null'], minimum: 0 },
+          lines: { type: 'array', items: { $ref: '#/$defs/orderLine' } },
+        },
+      },
+      orderLine: {
+        description:
+          "One line of an order, each value as RSI shows it: the item's name, how many, the price of one, the line's discount and its total, in whole cents.",
+        type: 'object',
+        required: ['name'],
+        additionalProperties: false,
+        properties: {
+          name: { type: 'string', maxLength: 200 },
+          qty: { type: ['integer', 'null'], minimum: 1 },
+          price: { type: ['integer', 'null'], minimum: 0 },
+          discount: { type: ['integer', 'null'], minimum: 0 },
+          total: { type: ['integer', 'null'], minimum: 0 },
         },
       },
       hangarMeta: {

@@ -74,14 +74,12 @@ test('scan: stopped after a browser restart, from the start kept locally (#676)'
   // A scan began 5 minutes ago and the browser closed: no session marks are left.
   const started = { run: 'r4', by: 'offscreen', reason: 'popup', at: NOW - 5 * MIN };
   assert.equal(scanState({ scanStarted: started }, NOW).phase, 'stopped');
-  // Ended: its report or Auto Scan Daily's record, for that run at that start.
+  // Ended: its report, for that run at that start.
   const ended = { run: 'r4', startedAt: started.at };
   assert.equal(scanState({ scanStarted: started, scanReport: ended }, NOW).phase, 'idle');
-  assert.equal(scanState({ scanStarted: started, autoScan: ended }, NOW).phase, 'idle');
   // The run alone never pairs: a page keeps its run for every scan it runs.
   const earlier = { run: 'r4', startedAt: started.at - DAY };
   assert.equal(scanState({ scanStarted: started, scanReport: earlier }, NOW).phase, 'stopped');
-  assert.equal(scanState({ scanStarted: started, autoScan: earlier }, NOW).phase, 'stopped');
   // One that began after it (a held scan, say) ends it too.
   const later = { run: 'r5', startedAt: started.at + MIN };
   assert.equal(scanState({ scanStarted: started, scanReport: later }, NOW).phase, 'idle');
@@ -141,58 +139,45 @@ test('the line after a scan stopped: signed out, or stopped with Scan Again', as
   assert.equal(line({ report: { ...out, signedOut: false } }), null);
 });
 
-// --- Auto Scan Daily in Settings (#666) ----------------------------------------------
-test("Auto Scan Daily's line: each run's approved words, none while it's off", async () => {
-  const { autoLine, autoWhen } = await data();
+// --- The Daily Scan Reminder in Settings ---------------------------------------------
+test("the Daily Scan Reminder's line: what it does, the last reminder, a day skipped, a no", async () => {
+  const { reminderLine, lineWhen } = await data();
   const { t } = await import('../ui/popup/copy.js');
   const at = new Date(2026, 9, 14, 6, 12).getTime(); // local time
   const now = new Date(2026, 9, 14, 18, 40).getTime();
-  assert.equal(autoWhen(at, now, 'en-US'), 'today 6:12 AM');
-  assert.equal(autoWhen(at, new Date(2026, 9, 15, 7).getTime(), 'en-US'), 'Oct 14, 6:12 AM');
-  const say = (rec, on = true) => {
-    const l = autoLine({ on, rec }, now, 'en-US');
-    return l && { words: t(l.key, { when: l.when }), ask: l.ask };
+  assert.equal(lineWhen(at, now, 'en-US'), 'today 6:12 AM');
+  assert.equal(lineWhen(at, new Date(2026, 9, 15, 7).getTime(), 'en-US'), 'Oct 14, 6:12 AM');
+  const say = (o, when = now) => {
+    const l = reminderLine(o, when, 'en-US');
+    return { words: t(l.key, { when: l.when }), ask: l.ask };
   };
-  assert.equal(say({ v: 1, at, line: 'quick' }, false), null, 'off: no line');
-  assert.deepEqual(say(null), { words: 'Runs once a day while your browser is open.', ask: false });
-  assert.deepEqual(say({ v: 1, at: null, line: null }), {
-    words: 'Runs once a day while your browser is open.',
+  const hint = {
+    words: 'A notification when your last scan is over a day old. Click it to scan.',
+    ask: false,
+  };
+  assert.deepEqual(say({ on: false, rec: null }), hint, 'off');
+  assert.deepEqual(say({ on: false, rec: { at, line: 'shown' } }), hint, 'off, a record kept');
+  assert.deepEqual(say({ on: true, rec: null }), hint, 'on, no reminder yet');
+  assert.deepEqual(say({ on: true, rec: { at: null, line: 'shown' } }), hint);
+  assert.deepEqual(say({ on: true, rec: { at, line: 'shown' } }), {
+    words: 'Last reminder: today 6:12 AM',
     ask: false,
   });
-  const rows = {
-    quick: ['Last: today 6:12 AM, no changes', false],
-    full: ['Last: today 6:12 AM, hangar updated', false],
-    'signed-out': ['Skipped today 6:12 AM: signed out of RSI', false],
-    other: ['Skipped today 6:12 AM: a different RSI account is signed in', false],
-    paused: ['Skipped today 6:12 AM: scans are paused', false],
-    bad: ["Last: today 6:12 AM, something looked wrong and wasn't saved. Scan to check.", true],
-    'out-partway': ['Last: today 6:12 AM, signed out of RSI partway. Scan to check.', true],
-    partway: ['Last: today 6:12 AM, RSI stopped answering partway. Scan to check.', true],
-  };
-  for (const [line, [words, ask]] of Object.entries(rows))
-    assert.deepEqual(say({ v: 1, at, line }), { words, ask }, line);
-  // Another day: the date and time.
-  assert.equal(
-    t(autoLine({ on: true, rec: { at, line: 'full' } }, now + DAY, 'en-US').key, {
-      when: autoWhen(at, now + DAY, 'en-US'),
-    }),
-    'Last: Oct 14, 6:12 AM, hangar updated',
-  );
-});
-
-test("Auto Scan Daily's ask: the Settings dot for a part not kept, until a scan saves since", async () => {
-  const { autoAsk } = await data();
-  const rec = { v: 1, at: NOW - HOUR, ended: NOW - HOUR + MIN, line: 'partway' };
-  assert.equal(autoAsk({ on: true, rec, scannedAt: NOW - DAY }), true);
-  assert.equal(autoAsk({ on: true, rec: { ...rec, line: 'bad' }, scannedAt: NOW - DAY }), true);
-  assert.equal(
-    autoAsk({ on: true, rec: { ...rec, line: 'out-partway' }, scannedAt: NOW - DAY }),
-    true,
-  );
-  assert.equal(autoAsk({ on: true, rec, scannedAt: NOW }), false, 'a scan saved since');
-  assert.equal(autoAsk({ on: false, rec, scannedAt: NOW - DAY }), false, 'switched off');
-  for (const line of ['quick', 'full', 'signed-out', 'other', 'paused', null])
-    assert.equal(autoAsk({ on: true, rec: { ...rec, line }, scannedAt: NOW - DAY }), false, line);
+  assert.deepEqual(say({ on: true, rec: { at, line: 'paused' } }), {
+    words: 'Skipped today 6:12 AM: scans are paused',
+    ask: false,
+  });
+  assert.deepEqual(say({ on: true, rec: { at, line: 'shown' } }, now + DAY), {
+    words: 'Last reminder: Oct 14, 6:12 AM',
+    ask: false,
+  });
+  // Auto Scan Daily's lines are gone: a record of one shows what it does.
+  assert.deepEqual(say({ on: true, rec: { at, line: 'quick' } }), hint);
+  // The browser said no to notifications as it was turned on.
+  assert.deepEqual(say({ on: false, rec: null, denied: true }), {
+    words: 'The reminder needs notifications, and your browser said no.',
+    ask: true,
+  });
 });
 
 test('scan: the bar only moves forward, and the steps follow the part', async () => {
@@ -335,8 +320,21 @@ test('scan report: shown once, and how long it took', async () => {
   assert.equal(took(undefined), null);
 });
 
+test('scan report: the done line lasts 5 seconds from when the scan ended', async () => {
+  const { doneLeft, DONE_MS } = await data();
+  const r = { v: 1, at: NOW, ms: 38e3, rows: [] };
+  assert.equal(DONE_MS, 5000);
+  assert.equal(doneLeft(r, NOW), 5000, 'just ended');
+  assert.equal(doneLeft(r, NOW + 3000), 2000, 'opened partway: only what is left');
+  assert.equal(doneLeft(r, NOW + 5000), 0, 'time up');
+  assert.equal(doneLeft(r, NOW + 6 * 60 * MIN), 0, 'popup opened hours later');
+  assert.equal(doneLeft(r, NOW - 60e3), 5000, 'a clock behind never holds it longer');
+  assert.equal(doneLeft({ v: 1 }, NOW), 0);
+  assert.equal(doneLeft(null, NOW), 0);
+});
+
 test('scan report: RSI not answering wins over signed out, and shows no trouble rows', async () => {
-  const { reportRsi, reportTrouble, reportDone, autoLine } = await data();
+  const { reportRsi, reportTrouble, reportDone } = await data();
   const base = {
     v: 1,
     run: 'r',
@@ -365,10 +363,6 @@ test('scan report: RSI not answering wins over signed out, and shows no trouble 
   assert.equal(reportRsi({ ...down, held: 'busy' }, null, NOW), null);
   assert.equal(reportRsi({ ...down, rsiDown: false }, null, NOW), null);
   assert.equal(reportRsi(null, null, NOW), null);
-  // Auto Scan Daily's day skipped because RSI wasn't answering.
-  const line = autoLine({ on: true, rec: { line: 'rsi-down', at: NOW } }, NOW, 'en-US');
-  assert.equal(line.key, 'popup.auto-rsi-down');
-  assert.equal(line.ask, false);
 });
 
 test('scan report: a held one, one read in part or signed out is never "Scanned in"', async () => {
@@ -787,7 +781,7 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
     'popup.wish-trouble',
     'popup.wish-connect',
     'popup.sync-trouble',
-    'popup.auto-scan',
+    'popup.scan-reminder',
     'popup.look-auto',
     'popup.shortcut-none',
     'popup.export-menu',
@@ -801,6 +795,15 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
         assert.fail(`${k}: "${w}" in Title Case`);
   // The owner's approved words (2026-10-14), word for word.
   const APPROVED = {
+    // New Since Last Scan (owner-approved 2026-10-26).
+    'popup.new-since': 'New Since Last Scan',
+    'popup.new-total': '{n} new · {melt} melt value',
+    'popup.new-total.one': '1 new · {melt} melt value',
+    'popup.new-since-when': 'Since {date}',
+    'popup.new-none': 'Nothing new since your last scan.',
+    'popup.new-see-all': 'See All {n} on openhangar.space',
+    'popup.new-sr': '{n} new pledges since your last scan, {melt} melt value',
+    'popup.new-sr.one': '1 new pledge since your last scan, {melt} melt value',
     'popup.token-next': 'Next refill {date}',
     'popup.fleet-news-none': 'No news for your ships right now.',
     'popup.wish-search': 'Add a ship, paint or upgrade',
@@ -812,16 +815,14 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
     'popup.export-json': 'JSON Backup',
     'popup.export-pledges': 'Pledges CSV',
     'popup.export-buybacks': 'Buy-Backs CSV',
-    'popup.auto-first': 'Runs once a day while your browser is open.',
-    'popup.auto-quick': 'Last: {when}, no changes',
-    'popup.auto-full': 'Last: {when}, hangar updated',
-    'popup.auto-signed-out': 'Skipped {when}: signed out of RSI',
-    'popup.auto-other': 'Skipped {when}: a different RSI account is signed in',
-    'popup.auto-paused': 'Skipped {when}: scans are paused',
-    'popup.auto-bad': "Last: {when}, something looked wrong and wasn't saved. Scan to check.",
-    'popup.auto-stopped': 'Last: {when}, RSI stopped answering partway. Scan to check.',
-    'popup.auto-out-partway': 'Last: {when}, signed out of RSI partway. Scan to check.',
-    // {when}'s form on the day it ran ("today 6:12 AM", the approved status lines').
+    // The Daily Scan Reminder (Claude chat, Words, 2026-10-25).
+    'popup.scan-reminder': 'Daily Scan Reminder',
+    'popup.scan-reminder-hint':
+      'A notification when your last scan is over a day old. Click it to scan.',
+    'popup.scan-reminder-denied': 'The reminder needs notifications, and your browser said no.',
+    'popup.scan-reminder-paused': 'Skipped {when}: scans are paused',
+    'popup.scan-reminder-last': 'Last reminder: {when}',
+    // {when}'s form on the same day ("today 6:12 AM", the approved status lines').
     'popup.auto-today': 'today {time}',
   };
   // The retired line (replaced 2026-10-14) is gone for good.
@@ -839,4 +840,86 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
     .map((l) => /'(popup\.[^']+)'/.exec(l)[1]);
   assert.deepEqual(marked, NEW_WORDS);
   for (const k of NEW_WORDS) assert.ok(KEYS.includes(k), k);
+});
+
+test('New Since Last Scan: by pledge id against the scan before, only for this scan', async () => {
+  const { newSinceScan } = await data();
+  const snap = (at, ids) => ({ at, items: ids.map((id) => [id, `P ${id}`, 10]) });
+  const items = [
+    { id: 3, name: 'Gifted', value: 240 },
+    { id: 4, name: 'Traded', value: 210.5 },
+    { id: 1, name: 'Old', value: 45 },
+  ];
+  const history = [snap(NOW - 2 * DAY, ['1']), snap(NOW, ['3', '4', '1'])];
+  // Two new, in the hangar's order, their melt added up, compared with the scan before.
+  assert.deepEqual(newSinceScan(history, items, NOW), {
+    items: [items[0], items[1]],
+    total: 450.5,
+    since: NOW - 2 * DAY,
+  });
+  // A scan that changed nothing keeps no snapshot: nothing new.
+  assert.deepEqual(newSinceScan(history, items, NOW + DAY), { items: [], total: 0, since: null });
+  // A scan that only lost a pledge: nothing new either.
+  const lost = [snap(NOW - DAY, ['1', '2']), snap(NOW, ['1'])];
+  assert.deepEqual(newSinceScan(lost, [items[2]], NOW).items, []);
+  // A pledge with no melt value counts $0 in the total.
+  const free = [snap(NOW - DAY, []), snap(NOW, ['9'])];
+  assert.equal(newSinceScan(free, [{ id: '9', name: 'Reward', value: null }], NOW).total, 0);
+  // The first scan, or no scan: no section at all.
+  assert.equal(newSinceScan([snap(NOW, ['1'])], items, NOW), null);
+  assert.equal(newSinceScan([], items, NOW), null);
+  assert.equal(newSinceScan(null, items, NOW), null);
+  assert.equal(newSinceScan(history, items, null), null);
+});
+
+test("New Since Last Scan: the card's name, insurance chip and the website's New view", async () => {
+  const { cardName, insChip, newViewUrl } = await data();
+  assert.equal(cardName('Standalone Ships - Constellation Andromeda'), 'Constellation Andromeda');
+  assert.equal(cardName('Package - Corsair - 10 Year'), 'Corsair - 10 Year');
+  // Other prefixes stay, as on the website's cards.
+  assert.equal(
+    cardName('Aegis Gladius Dunlevy - Referral Reward'),
+    'Aegis Gladius Dunlevy - Referral Reward',
+  );
+  assert.equal(
+    cardName('Imperator Reward - 20% Coupon: SRSVH6WBT3'),
+    'Imperator Reward - 20% Coupon: ••••WBT3',
+  );
+  assert.equal(cardName('Cutlass Black'), 'Cutlass Black');
+  assert.deepEqual(insChip('LTI'), { text: 'LTI', tier: 'lti' });
+  assert.deepEqual(insChip('120M'), { text: '10 yr', tier: 'long' });
+  assert.deepEqual(insChip('10Y'), { text: '10 yr', tier: 'long' });
+  assert.deepEqual(insChip('6M'), { text: '6 mo', tier: 'mid' });
+  assert.deepEqual(insChip('24M'), { text: '2 yr', tier: 'mid' });
+  assert.deepEqual(insChip('3M'), { text: '3 mo', tier: 'short' });
+  // None, or RSI's own words: no chip on a card.
+  assert.equal(insChip(null), null);
+  assert.equal(insChip('Some Insurance'), null);
+  assert.equal(
+    newViewUrl('https://app.openhangar.space/hangar'),
+    'https://app.openhangar.space/hangar/pledges?view=new',
+  );
+  assert.equal(newViewUrl('chrome-extension://x/src/hangar.html/'), null);
+  assert.equal(newViewUrl(null), null);
+});
+
+test("New Since Last Scan's pictures: only from RSI's own servers", async () => {
+  const { rsiPicture } = await data();
+  const media = 'https://media.robertsspaceindustries.com/abc123/store_small.jpg';
+  const site = 'https://robertsspaceindustries.com/media/abc123/store_small/x.jpg';
+  assert.equal(rsiPicture(media), media);
+  assert.equal(rsiPicture(site), site);
+  for (const bad of [
+    'http://media.robertsspaceindustries.com/a.jpg',
+    'https://robertsspaceindustries.com.evil.example/a.jpg',
+    'https://evilrobertsspaceindustries.com/a.jpg',
+    'https://example.com/a.jpg',
+    'https://user@robertsspaceindustries.com/a.jpg',
+    'https://robertsspaceindustries.com:8443/a.jpg',
+    '/media/a.jpg',
+    'data:image/png;base64,AAAA',
+    '',
+    null,
+  ])
+    assert.equal(rsiPicture(bad), null, String(bad));
 });

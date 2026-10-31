@@ -13,7 +13,6 @@
   import { t } from './copy.js';
   import {
     TABS,
-    autoAsk,
     fleetNews,
     newReport,
     popupView,
@@ -54,11 +53,9 @@
   let parserOld = $state(false); // a saved list was read by an older parser (#728)
   let account = $state(null);
   let report = $state(null); // the last scan's report (local scanReport)
-  // The last scan that began (local scanStarted), and Auto Scan Daily's switch and last
-  // run (local autoScanOn, autoScan): a start that never ended shows Scan stopped, even
-  // after a browser restart (#676).
+  // The last scan that began (local scanStarted): a start that never ended shows Scan
+  // stopped, even after a browser restart (#676).
   let started = $state(null);
-  let auto = $state({ on: false, rec: null });
   let shown = $state(null); // the report shown once (Scanned in 38s)
   let link = $state(null); // the openhangar.space link, when sync is on
   let pilotDone = $state(false); // the scan's sync question, answered here
@@ -95,7 +92,7 @@
 
   const sc = $derived.by(() => {
     const s = scanState(
-      { ...session, scanReport: report, scanStarted: started, autoScan: auto.rec },
+      { ...session, scanReport: report, scanStarted: started },
       now,
     );
     // Asked from here a moment ago, and nothing written yet: running all the same.
@@ -123,14 +120,8 @@
   const failing = $derived(
     failed || reportSyncFailed(report, v?.connected ? { lastSync: v.connected.lastSync } : null),
   );
-  // A sync that didn't go through: the amber dot on Settings. So does an Auto Scan Daily
-  // run that kept a part back (until a scan saves since), while it's on.
+  // A sync that didn't go through: the amber dot on Settings.
   const trouble = $derived(syncTrouble({ connected: v?.connected, failed: failing }, now));
-  const autoAsks = $derived(
-    flag('autoScan') &&
-      !!v?.connected &&
-      autoAsk({ on: auto.on, rec: auto.rec, scannedAt: v?.scannedAt }),
-  );
   // The scan's sync asked first (an RSI account new to this connection): the question
   // on Hangar, until it's answered here or anywhere else, or a sync since went through.
   const pilot = $derived.by(() => {
@@ -142,7 +133,15 @@
     const last = v.connected.lastSync;
     return Number.isFinite(last) && last >= report.sync.at ? null : who;
   });
-  const hasNews = $derived(justUpdated?.to === version && prefs.seenVersion !== version);
+  // New in after an update (owner, 2026-10-30: it needn't stay up for good): until it's
+  // opened, and a week at most from the update (`at`, src/background.js). An update
+  // recorded before `at` existed shows until it's opened, as before.
+  const NEWS_DAYS = 7;
+  const hasNews = $derived(
+    justUpdated?.to === version &&
+      prefs.seenVersion !== version &&
+      !(justUpdated.at > 0 && now - justUpdated.at > NEWS_DAYS * 864e5),
+  );
   // A scan that stopped partway: one line at the top of every tab, under Scan (which
   // says Scan Again then; signed out, Log In to RSI).
   const stop = $derived(
@@ -166,8 +165,6 @@
         'justUpdated',
         'updateReady',
         'scanStarted',
-        'autoScan',
-        'autoScanOn',
       ]),
       OH.siteEnabled().then((on) => (on ? OH.getSiteLink() : null)),
       OH.siteUrl(),
@@ -183,7 +180,6 @@
     justUpdated = got.justUpdated || null;
     updateReady = got.updateReady || null;
     started = got.scanStarted || null;
-    auto = { on: got.autoScanOn === true, rec: got.autoScan || null };
     link = siteLink || null;
     v = popupView(
       { db: stored, account: got.account, link: siteLink, siteUrl, hangarPage },
@@ -295,8 +291,7 @@
       applyLook(prefs.look);
       await Promise.all([loadData(), loadSession(), loadAlerts(), readAccess(), readBanner()]);
       await readCookie();
-      // A scan that stopped leaves nothing that reads as Scanning (src/background.js),
-      // and Auto Scan Daily tries a run that stopped once more.
+      // A scan that stopped leaves nothing that reads as Scanning (src/background.js).
       chrome.runtime.sendMessage({ ohPopup: 'opened' }).catch(() => {});
       ready = true;
     })();
@@ -307,11 +302,6 @@
         if (c.db || c.account || c.siteLink || c.siteUrl || c.avatarImg) loadData();
         else if (c.scanReport) setReport(c.scanReport.newValue || null);
         if (c.scanStarted) started = c.scanStarted.newValue || null;
-        if (c.autoScan || c.autoScanOn)
-          auto = {
-            on: c.autoScanOn ? c.autoScanOn.newValue === true : auto.on,
-            rec: c.autoScan ? c.autoScan.newValue || null : auto.rec,
-          };
         if (c.justUpdated) justUpdated = c.justUpdated.newValue || null;
         if (c.updateReady) updateReady = c.updateReady.newValue || null;
         if (c.remoteStatus) readBanner();
@@ -385,10 +375,18 @@
     await tick();
     document.getElementById(`pp-tab-${TABS[to]}`)?.focus();
   }
-  function gotIt() {
-    whatsNew = false;
+  // Opening New in counts as seen: it stays up while open, and is gone next time.
+  function markSeen() {
     prefs.seenVersion = version;
     savePref({ seenVersion: version });
+  }
+  function toggleNews() {
+    whatsNew = !whatsNew;
+    if (whatsNew) markSeen();
+  }
+  function gotIt() {
+    whatsNew = false;
+    markSeen();
   }
   function setLook(look) {
     prefs.look = look;
@@ -423,14 +421,14 @@
     >
     <h1 class="pp-name">{t('popup.name')}</h1>
     <!-- No version tag (owner, 2026-10-23: it's under Clear Data in Settings); after an
-         update, New in shows here until Got It. -->
-    {#if hasNews}
+         update, New in shows here until it's opened, a week at most. -->
+    {#if hasNews || whatsNew}
       <button
         type="button"
         class="pp-ver news"
         id="pp-ver"
         aria-expanded={whatsNew}
-        onclick={() => (whatsNew = !whatsNew)}
+        onclick={toggleNews}
         ><i aria-hidden="true"></i>{t('popup.new-in', { version })}</button
       >
     {/if}
@@ -461,7 +459,7 @@
     />
   {/snippet}
   {#if ready && v && !firstRun}<div class="pp-top">{@render scanRow()}</div>{/if}
-  {#if whatsNew && hasNews}
+  {#if whatsNew}
     <div class="pp-whatsnew" id="pp-whatsnew">
       <b>{t('popup.new-in', { version })}</b>
       <span class="pp-row">
@@ -527,7 +525,7 @@
             aria-selected={tab === id}
             aria-controls="pp-panel-{id}"
             tabindex={tab === id ? 0 : -1}
-            class:dot={id === 'settings' && (!!trouble || autoAsks)}
+            class:dot={id === 'settings' && !!trouble}
             onclick={() => pickTab(id)}
           >
             <svg class="pp-ti" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">

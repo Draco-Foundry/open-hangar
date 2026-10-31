@@ -310,13 +310,14 @@ test("a count that fits the pager's last page is a whole read", async () => {
   exactlyOnce(await scan(), list);
 });
 
-test("a count the pager's last page can't hold keeps the previous scan, and is partial otherwise", async () => {
+test("a count the pager's last page can't hold is never saved, and keeps the previous scan", async () => {
   const list = buybacks(14);
   // Pages of 10, 2 and 2: three pages can't hold 14.
   serveParts([list.slice(0, 10), list.slice(10, 12), list.slice(12)], 3, 10);
   const r = await scan();
-  assert.equal(r.ok, true, 'nothing earlier to keep: saved, but said to be partial');
-  assert.match(r.partial, /don't fit 3 pages/);
+  assert.equal(r.ok, false, 'nothing earlier to keep: still not saved');
+  assert.match(r.error, /don't fit RSI's page count, so nothing from this read was saved/);
+  assert.equal(store.db?.sources?.buybacks?.scannedAt ?? null, null);
   // With an earlier, bigger scan: kept, and the error says why.
   const before = buybacks(40);
   store.db = { sources: { buybacks: { scannedAt: 1, items: before } } };

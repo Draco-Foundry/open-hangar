@@ -61,24 +61,16 @@
       about: "Store alerts: a badge and notifications for what's on sale for you, matched here.",
       default: true,
     },
-    // Auto Scan Daily (owner, 2026-10-14, #666): a quick check of the connected RSI
-    // account once a day, a full scan when something's new or a week has gone by, in the
-    // hidden scan page. On in every build from 0.4.0: the privacy policy has its section
-    // and names it under alarms and Disconnect (owner-approved words 2026-10-14;
-    // test/privacy-permissions.test.js). Off for each pilot until they turn it on. Needs
-    // alerts, whose build brings the alarms permission (scripts/pack.mjs).
+    // The Daily Scan Reminder (owner, 2026-10-26; it replaced Auto Scan Daily, #666): a
+    // notification once a day at most, while connected, when the last scan in this
+    // browser is over a day old; clicking it starts a scan. It never reads RSI on its
+    // own. The flag keeps Auto Scan Daily's name until the privacy policy's words for the
+    // reminder land (test/privacy-permissions.test.js). Off for each pilot until they
+    // turn it on. Needs alerts, whose build brings the alarms and notifications
+    // permissions (scripts/pack.mjs).
     autoScan: {
-      about: 'Auto Scan Daily: a quick check once a day while connected, a full scan when needed.',
+      about: 'Daily Scan Reminder: a notification to scan once a day while connected.',
       default: true,
-    },
-    // The owner's alert (owner, 2026-10-22): when Auto Scan Daily stops because RSI changed
-    // a page, the maintainer's own copy says so in a notification on that computer
-    // (src/background.js), before pilots report broken scans. Nothing is sent. Dev builds
-    // only: no store build notifies for Auto Scan Daily (the privacy policy).
-    pageChangeAlert: {
-      about: 'Dev only: a notification when Auto Scan Daily stops on a page RSI changed.',
-      default: false,
-      devOnly: true,
     },
     // The popup's scan bar (owner, 2026-10-20): one bar where Scan sits, naming the part
     // running and counting what it has read, filled by RSI's page count, then how long
@@ -88,6 +80,25 @@
     scanBar: {
       about: 'The popup shows a scan as one counting bar where Scan sits, not a step list.',
       default: true,
+    },
+    // New Since Last Scan (owner, 2026-10-26): the pledges a scan found that the one
+    // before it didn't, with their melt value, insurance and G and M marks, on the
+    // popup's Hangar tab (ui/popup/Hangar.svelte). Off until its words are approved and
+    // the privacy policy says the popup shows RSI's pictures of them.
+    newSinceScan: {
+      about: "The popup lists what the last scan found that the one before it didn't.",
+      default: false,
+    },
+    // Order History (owner, 2026-10-30): once a pilot turns it on, a scan reads RSI's
+    // order history (Account, Billing) and sync sends it as sources.orders
+    // (schema/sync-payload.schema.json), so the website can show what each pledge cost.
+    // Developer builds only until the privacy policy names it. Its page reader is in
+    // (src/scraper/parser.js parseOrders, Pledge Store tab only); the scan step and the
+    // setting that turns it on come next, with their words.
+    orderHistory: {
+      about: 'Order History: a scan reads RSI order history and sync sends it, once turned on.',
+      default: false,
+      devOnly: true,
     },
   };
 
