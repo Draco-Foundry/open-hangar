@@ -155,6 +155,14 @@ test('the archive in the view: the newest 2,000 by goneAt, objects only, order k
   assert.ok(!('pledgeArchive' in view), 'no archive, no key');
 });
 
+test('the view leaves the order history out', () => {
+  const orders = { items: [{ id: 'TEST0001', date: '2024-02-11', lines: [] }] };
+  const payload = { app: 'open-hangar', sources: { hangar: { items: [] }, orders } };
+  const view = SHAPE.hangarView(payload);
+  assert.deepEqual(Object.keys(view.sources), ['hangar']);
+  assert.ok('orders' in payload.sources, 'the payload is untouched');
+});
+
 test('the view is a copy: the export it came from is untouched', async () => {
   mem = full();
   const page = await OH.exportDB();

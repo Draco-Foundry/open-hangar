@@ -90,6 +90,31 @@
     "image": "img",
     "also": ".package-listing.item li"
   },
+  "orders": {
+    "path": "/en/account/billing",
+    "storefront": { "param": "storefront", "value": "2" },
+    "pageSize": 100,
+    "card": "ul.orders-item > li",
+    "cell": ".basic-infos .col",
+    "cellLabel": "span",
+    "fields": {
+      "date": ["order placed"],
+      "id": ["order id"],
+      "status": ["status"],
+      "payment": ["payment"],
+      "fulfillment": ["fulfillment"]
+    },
+    "lineRow": "table.billing-summary tr",
+    "lineCells": { "name": 0, "price": 1, "qty": 2, "discount": 3, "total": 4 },
+    "sumLabel": ".payment-wrapper .right-section strong",
+    "sums": {
+      "items": ["items"],
+      "discount": ["additional discount"],
+      "credit": ["credits used"],
+      "beforeTax": ["total before tax"],
+      "total": ["total"]
+    }
+  },
   "names": {
     "ccu": { "source": "^\\s*upgrade\\s*-\\s*(?<from>.+?)\\s+to\\s+(?<to>.+?)\\s*$", "flags": "i" },
     "addon": { "source": "^\\s*add[\\s-]*on\\s*-", "flags": "i" },

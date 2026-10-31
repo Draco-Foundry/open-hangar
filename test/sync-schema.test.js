@@ -48,6 +48,11 @@ test('the schema: format 2, only keywords the checker knows, strict where the ex
   assert.ok(strict(SCHEMA.$defs.referral), 'the referral block');
   // What a scan keeps next to its rows, all the way down.
   const meta = (id) => SCHEMA.$defs.sources.properties[id].properties.meta;
+  // Order history is strict to the last key, so nothing about how a pilot paid (card,
+  // address) or who a gift went to can ever be sent.
+  assert.ok(strict(SCHEMA.$defs.sources.properties.orders), 'the orders source');
+  for (const id of ['order', 'orderLine', 'orderMeta']) assert.ok(strict(SCHEMA.$defs[id]), id);
+  assert.equal(meta('orders').$ref, '#/$defs/orderMeta');
   assert.ok(strict(SCHEMA.$defs.hangarMeta) && meta('hangar').$ref === '#/$defs/hangarMeta');
   for (const k of ['shape', 'probe']) assert.ok(strict(SCHEMA.$defs.hangarMeta.properties[k]), k);
   assert.ok(strict(SCHEMA.$defs.buybackMeta) && meta('buybacks').$ref === '#/$defs/buybackMeta');

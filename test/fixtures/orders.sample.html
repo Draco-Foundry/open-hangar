@@ -1,0 +1,140 @@
+<!doctype html>
+<!--
+  The shape of RSI's order history (Account, Billing, the Pledge Store tab, 2026-10-30),
+  every value invented: test/orders.test.js. The bill-to block and the payments table
+  are here so the test can show nothing of them is read.
+-->
+<html>
+  <body>
+    <div class="orders">
+      <h3>ORDERS</h3>
+      <div class="controls">
+        <div class="storefront-selector">
+          <a class="on" data-filter="" href="https://robertsspaceindustries.com/en/account/billing?storefront="><div class="text">All</div></a>
+          <a class="js-filter" data-filter="2" href="https://robertsspaceindustries.com/en/account/billing?storefront=2"><div class="text">Pledge Store</div></a>
+        </div>
+        <div class="options-selector pager-wrapper">
+          <div class="pager clearfix js-pager">
+            <div class="right">
+              <a class="trans-02s trans-color active" href="https://robertsspaceindustries.com/en/account/billing?page=1&amp;pagesize=100">1</a>
+              <a class="trans-02s trans-color" href="https://robertsspaceindustries.com/en/account/billing?page=2&amp;pagesize=100">2</a>
+              <span class="spacer"></span>
+              <a class="gt btn" href="https://robertsspaceindustries.com/en/account/billing?page=2&amp;pagesize=100"><span></span></a>
+              <a class="raquo btn" href="https://robertsspaceindustries.com/en/account/billing?page=2&amp;pagesize=100"><span></span></a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cboth"></div>
+    </div>
+    <ul class="orders-item">
+      <li>
+        <div class="row trans-03s trans-background pledge">
+          <div class="basic-infos clearfix">
+            <div class="col date"><span>Order Placed:</span> Feb 11, 2024 18:30</div>
+            <div class="col amount"><span>Amount:</span> $71.00 USD</div>
+            <div class="col"><span>Order Id:</span> TESTORDER0001</div>
+            <div class="col small status-C"><span>Status:</span> CLOSED</div>
+            <div class="col small payment-green"><span>Payment:</span> PAID</div>
+            <div class="col small fulfillment-green last"><span>Fulfillment:</span> DONE</div>
+          </div>
+          <div class="more js-more trans-02s trans-height">
+            <h2>Order Summary <a class="shadow-button js-print-invoice" data-order-slug="testorder0001"><span class="label js-label">Print</span></a></h2>
+            <table class="billing-summary">
+              <tbody>
+                <tr><th class="item">Item</th><th class="price">Price</th><th class="qty">Qty.</th><th class="discount">Discount</th><th>Total</th><th></th></tr>
+                <tr><td>Package - Test Cutlass Black 1</td><td>$111.00 USD</td><td>1</td><td><span>$0.00 USD</span></td><td>$111.00 USD</td></tr>
+              </tbody>
+            </table>
+            <div class="payment-wrapper clearfix">
+              <div class="left-section">
+                <div class="bill-to address">
+                  <h4>Bill To:</h4>
+                  <p><strong>Test Billing Name</strong><br>1 Test Billing Street<br>Testville, TS - 00000<br>Testland</p>
+                </div>
+              </div>
+              <div class="right-section">
+                <div class="s-row">
+                  <strong>Items:</strong>$111.00 USD<br>
+                  <strong>Additional Discount:</strong><span class="">$0.00 USD</span><br>
+                  <strong>Credits used:</strong><span class="">$40.00 USD</span>
+                </div>
+                <div class="s-row">
+                  <strong>Total before Tax:</strong>
+                  $71.00 USD
+                  <br>
+                </div>
+                <div class="s-row last">
+                  <strong>Total:</strong>$71.00 USD
+                </div>
+              </div>
+              <div>
+                <h4>Payments</h4>
+                <table>
+                  <tbody>
+                    <tr><th class="date">Date</th><th class="description">Processor</th><th class="due">Status</th><th class="amount">Amount</th></tr>
+                    <tr><td>2024-02-11, 18:30</td><td>Test-Processor</td><td style="color: yellow;">PAID</td><td>$71.00 USD</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="row trans-03s trans-background pledge">
+          <div class="basic-infos clearfix">
+            <div class="col date"><span>Order Placed:</span> Mar 12, 2024 09:05</div>
+            <div class="col amount"><span>Amount:</span> $1,234.50 USD</div>
+            <div class="col"><span>Order Id:</span> TESTORDER0002</div>
+            <div class="col small status-C"><span>Status:</span> CLOSED</div>
+            <div class="col small payment-green"><span>Payment:</span> PAID</div>
+            <div class="col small fulfillment-green last"><span>Fulfillment:</span> DONE</div>
+          </div>
+          <div class="more js-more trans-02s trans-height">
+            <table class="billing-summary">
+              <tbody>
+                <tr><th class="item">Item</th><th class="price">Price</th><th class="qty">Qty.</th><th class="discount">Discount</th><th>Total</th><th></th></tr>
+                <tr><td>Standalone Ship - Test Carrack</td><td>$1,200.00 USD</td><td>1</td><td><span>$0.00 USD</span></td><td>$1,200.00 USD</td></tr>
+                <tr><td>Upgrade - Test Arrow to Test Hornet 2</td><td>$15.00 USD</td><td>1</td><td><span>$0.00 USD</span></td><td>$15.00 USD</td></tr>
+                <tr><td>Test Poster</td><td>$3.00 USD</td><td>4</td><td><span>$1.00 USD</span></td><td>$11.00 USD</td></tr>
+              </tbody>
+            </table>
+            <div class="payment-wrapper clearfix">
+              <div class="left-section">
+                <div class="bill-to address">
+                  <h4>Bill To:</h4>
+                  <p><strong>Test Billing Name</strong><br>1 Test Billing Street<br>Testland</p>
+                </div>
+              </div>
+              <div class="right-section">
+                <div class="s-row">
+                  <strong>Items:</strong>$1,226.00 USD<br>
+                  <strong>Additional Discount:</strong><span class="">$5.00 USD</span><br>
+                  <strong>Credits used:</strong><span class="">$100.00 USD</span>
+                </div>
+                <div class="s-row">
+                  <strong>Total before Tax:</strong>
+                  $1,121.00 USD
+                  <br>
+                </div>
+                <div class="s-row last">
+                  <strong>Total:</strong>$1,234.50 USD
+                </div>
+              </div>
+              <div>
+                <h4>Payments</h4>
+                <table>
+                  <tbody>
+                    <tr><th class="date">Date</th><th class="description">Processor</th><th class="due">Status</th><th class="amount">Amount</th></tr>
+                    <tr><td>2024-03-12, 09:05</td><td>Test-Processor</td><td style="color: yellow;">PAID</td><td>$1,234.50 USD</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </li>
+    </ul>
+  </body>
+</html>
