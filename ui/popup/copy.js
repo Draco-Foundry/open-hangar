@@ -154,6 +154,10 @@ const COPY = {
   // The same with store alerts off: ships only (paints and upgrades come with the alerts'
   // sale feed).
   'popup.wish-search-ships': 'Add a ship',
+  // On a Wishlist row for a ship nobody can get from RSI anymore (the AMD package, in-game
+  // rewards, retired ships), where the price would be. PLACEHOLDER: Needs Words (Words
+  // DB), not approved.
+  'popup.wish-gone': 'Not for Sale',
   // Under the search box: what's typed is searched and nothing matched.
   'popup.wish-no-match': 'No matches.',
   // The ✕ beside an item, for screen readers.

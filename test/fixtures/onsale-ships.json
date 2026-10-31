@@ -1,0 +1,1833 @@
+{
+ "note": "The ships of openhangar.space/api/store/on-sale as of 2026-10-31 (slug, name and spellings only): the audit input for the Wishlist search guard in test/popup-wishlist.test.js. Public data.",
+ "ships": [
+  {
+   "slug": "100i",
+   "name": "100i",
+   "keys": [
+    "100i",
+    "orig 100i",
+    "origin 100i",
+    "origin jumpworks 100i"
+   ]
+  },
+  {
+   "slug": "125a",
+   "name": "125a",
+   "keys": [
+    "125a",
+    "orig 125a",
+    "origin 125a",
+    "origin jumpworks 125a"
+   ]
+  },
+  {
+   "slug": "135c",
+   "name": "135c",
+   "keys": [
+    "135c",
+    "orig 135c",
+    "origin 135c",
+    "origin jumpworks 135c"
+   ]
+  },
+  {
+   "slug": "300i",
+   "name": "300i",
+   "keys": [
+    "300i",
+    "orig 300i",
+    "origin 300i",
+    "origin jumpworks 300i"
+   ]
+  },
+  {
+   "slug": "315p",
+   "name": "315p",
+   "keys": [
+    "315p",
+    "orig 315p",
+    "origin 315p",
+    "origin jumpworks 315p"
+   ]
+  },
+  {
+   "slug": "325a",
+   "name": "325a",
+   "keys": [
+    "325a",
+    "orig 325a",
+    "origin 325a",
+    "origin jumpworks 325a"
+   ]
+  },
+  {
+   "slug": "400i",
+   "name": "400i",
+   "keys": [
+    "400i",
+    "orig 400i",
+    "origin 400i",
+    "origin jumpworks 400i"
+   ]
+  },
+  {
+   "slug": "600i",
+   "name": "600i",
+   "keys": [
+    "600i",
+    "600i explorer",
+    "orig 600i",
+    "orig 600i explorer",
+    "origin 600i",
+    "origin 600i explorer",
+    "origin jumpworks 600i",
+    "origin jumpworks 600i explorer"
+   ]
+  },
+  {
+   "slug": "890-jump",
+   "name": "890 Jump",
+   "keys": [
+    "890 jump",
+    "orig 890 jump",
+    "origin 890 jump",
+    "origin jumpworks 890 jump"
+   ]
+  },
+  {
+   "slug": "a1-spirit",
+   "name": "A1 Spirit",
+   "keys": [
+    "a1 spirit",
+    "crsd a1 spirit",
+    "crus a1 spirit",
+    "crusader a1 spirit",
+    "crusader industries a1 spirit"
+   ]
+  },
+  {
+   "slug": "a2-hercules-starlifter",
+   "name": "A2 Hercules Starlifter",
+   "keys": [
+    "a2 hercules",
+    "a2 hercules starlifter",
+    "crsd a2 hercules",
+    "crsd a2 hercules starlifter",
+    "crus a2 hercules",
+    "crus a2 hercules starlifter",
+    "crusader a2 hercules",
+    "crusader a2 hercules starlifter",
+    "crusader industries a2 hercules",
+    "crusader industries a2 hercules starlifter"
+   ]
+  },
+  {
+   "slug": "a2-hercules-starlifter-wikelo-war-special",
+   "name": "A2 Hercules Starlifter Wikelo War Special",
+   "keys": [
+    "a2 hercules starlifter wikelo war special",
+    "crsd a2 hercules starlifter wikelo war special",
+    "crus a2 hercules starlifter wikelo war special",
+    "crusader a2 hercules starlifter wikelo war special",
+    "crusader industries a2 hercules starlifter wikelo war special"
+   ]
+  },
+  {
+   "slug": "apollo-medivac",
+   "name": "Apollo Medivac",
+   "keys": [
+    "apollo medivac",
+    "roberts apollo medivac",
+    "roberts space industries apollo medivac",
+    "rsi apollo medivac"
+   ]
+  },
+  {
+   "slug": "apollo-triage",
+   "name": "Apollo Triage",
+   "keys": [
+    "apollo triage",
+    "roberts apollo triage",
+    "roberts space industries apollo triage",
+    "rsi apollo triage"
+   ]
+  },
+  {
+   "slug": "apollo-triage-wikelo-sneak-special",
+   "name": "Apollo Triage Wikelo Sneak Special",
+   "keys": [
+    "apollo triage wikelo sneak special",
+    "roberts apollo triage wikelo sneak special",
+    "roberts space industries apollo triage wikelo sneak special",
+    "rsi apollo triage wikelo sneak special"
+   ]
+  },
+  {
+   "slug": "ares-star-fighter-inferno",
+   "name": "Ares Star Fighter Inferno",
+   "keys": [
+    "ares inferno",
+    "ares star fighter inferno",
+    "crsd ares inferno",
+    "crsd ares star fighter inferno",
+    "crus ares inferno",
+    "crus ares star fighter inferno",
+    "crusader ares inferno",
+    "crusader ares star fighter inferno",
+    "crusader industries ares inferno",
+    "crusader industries ares star fighter inferno"
+   ]
+  },
+  {
+   "slug": "ares-star-fighter-inferno-wikelo-war-special",
+   "name": "Ares Star Fighter Inferno Wikelo War Special",
+   "keys": [
+    "ares star fighter inferno wikelo war special",
+    "crsd ares star fighter inferno wikelo war special",
+    "crus ares star fighter inferno wikelo war special",
+    "crusader ares star fighter inferno wikelo war special",
+    "crusader industries ares star fighter inferno wikelo war special"
+   ]
+  },
+  {
+   "slug": "ares-star-fighter-ion",
+   "name": "Ares Star Fighter Ion",
+   "keys": [
+    "ares ion",
+    "ares star fighter ion",
+    "crsd ares ion",
+    "crsd ares star fighter ion",
+    "crus ares ion",
+    "crus ares star fighter ion",
+    "crusader ares ion",
+    "crusader ares star fighter ion",
+    "crusader industries ares ion",
+    "crusader industries ares star fighter ion"
+   ]
+  },
+  {
+   "slug": "ares-star-fighter-ion-wikelo-sneak-special",
+   "name": "Ares Star Fighter Ion Wikelo Sneak Special",
+   "keys": [
+    "ares star fighter ion wikelo sneak special",
+    "crsd ares star fighter ion wikelo sneak special",
+    "crus ares star fighter ion wikelo sneak special",
+    "crusader ares star fighter ion wikelo sneak special",
+    "crusader industries ares star fighter ion wikelo sneak special"
+   ]
+  },
+  {
+   "slug": "arrow",
+   "name": "Arrow",
+   "keys": [
+    "anvil aerospace arrow",
+    "anvil arrow",
+    "anvl arrow",
+    "arrow"
+   ]
+  },
+  {
+   "slug": "asgard",
+   "name": "Asgard",
+   "keys": [
+    "anvil aerospace asgard",
+    "anvil asgard",
+    "anvl asgard",
+    "asgard"
+   ]
+  },
+  {
+   "slug": "atls",
+   "name": "ATLS",
+   "keys": [
+    "argo astronautics atls",
+    "argo atls",
+    "atls"
+   ]
+  },
+  {
+   "slug": "atls-geo",
+   "name": "ATLS GEO",
+   "keys": [
+    "argo astronautics atls geo",
+    "argo atls geo",
+    "atls geo"
+   ]
+  },
+  {
+   "slug": "aurora-mk-ii",
+   "name": "Aurora Mk II",
+   "keys": [
+    "aurora mk ii",
+    "roberts aurora mk ii",
+    "roberts space industries aurora mk ii",
+    "rsi aurora mk ii"
+   ]
+  },
+  {
+   "slug": "avenger-stalker",
+   "name": "Avenger Stalker",
+   "keys": [
+    "aegis avenger stalker",
+    "aegis dynamics avenger stalker",
+    "aegs avenger stalker",
+    "avenger stalker"
+   ]
+  },
+  {
+   "slug": "avenger-titan",
+   "name": "Avenger Titan",
+   "keys": [
+    "aegis avenger titan",
+    "aegis dynamics avenger titan",
+    "aegs avenger titan",
+    "avenger titan"
+   ]
+  },
+  {
+   "slug": "avenger-titan-renegade",
+   "name": "Avenger Titan Renegade",
+   "keys": [
+    "aegis avenger titan renegade",
+    "aegis dynamics avenger titan renegade",
+    "aegs avenger titan renegade",
+    "avenger titan renegade"
+   ]
+  },
+  {
+   "slug": "avenger-warlock",
+   "name": "Avenger Warlock",
+   "keys": [
+    "aegis avenger warlock",
+    "aegis dynamics avenger warlock",
+    "aegs avenger warlock",
+    "avenger warlock"
+   ]
+  },
+  {
+   "slug": "ballista",
+   "name": "Ballista",
+   "keys": [
+    "anvil aerospace ballista",
+    "anvil ballista",
+    "anvl ballista",
+    "ballista"
+   ]
+  },
+  {
+   "slug": "basher",
+   "name": "Basher",
+   "keys": [
+    "basher",
+    "glsn basher",
+    "greys basher",
+    "greys market basher"
+   ]
+  },
+  {
+   "slug": "buccaneer",
+   "name": "Buccaneer",
+   "keys": [
+    "buccaneer",
+    "drak buccaneer",
+    "drake buccaneer",
+    "drake interplanetary buccaneer"
+   ]
+  },
+  {
+   "slug": "c1-spirit",
+   "name": "C1 Spirit",
+   "keys": [
+    "c1 spirit",
+    "crsd c1 spirit",
+    "crus c1 spirit",
+    "crusader c1 spirit",
+    "crusader industries c1 spirit"
+   ]
+  },
+  {
+   "slug": "c1-spirit-wikelo-special",
+   "name": "C1 Spirit Wikelo Special",
+   "keys": [
+    "c1 spirit wikelo special",
+    "crsd c1 spirit wikelo special",
+    "crus c1 spirit wikelo special",
+    "crusader c1 spirit wikelo special",
+    "crusader industries c1 spirit wikelo special"
+   ]
+  },
+  {
+   "slug": "c2-hercules-starlifter",
+   "name": "C2 Hercules Starlifter",
+   "keys": [
+    "c2 hercules",
+    "c2 hercules starlifter",
+    "crsd c2 hercules",
+    "crsd c2 hercules starlifter",
+    "crus c2 hercules",
+    "crus c2 hercules starlifter",
+    "crusader c2 hercules",
+    "crusader c2 hercules starlifter",
+    "crusader industries c2 hercules",
+    "crusader industries c2 hercules starlifter"
+   ]
+  },
+  {
+   "slug": "c8-pisces",
+   "name": "C8 Pisces",
+   "keys": [
+    "anvil aerospace c8 pisces",
+    "anvil c8 pisces",
+    "anvl c8 pisces",
+    "c8 pisces"
+   ]
+  },
+  {
+   "slug": "c8r-pisces-rescue",
+   "name": "C8R Pisces Rescue",
+   "keys": [
+    "anvil aerospace c8r pisces",
+    "anvil aerospace c8r pisces rescue",
+    "anvil c8r pisces",
+    "anvil c8r pisces rescue",
+    "anvl c8r pisces",
+    "anvl c8r pisces rescue",
+    "c8r pisces",
+    "c8r pisces rescue"
+   ]
+  },
+  {
+   "slug": "c8x-pisces-expedition",
+   "name": "C8X Pisces Expedition",
+   "keys": [
+    "anvil aerospace c8x pisces expedition",
+    "anvil c8x pisces expedition",
+    "anvl c8x pisces expedition",
+    "c8x pisces expedition"
+   ]
+  },
+  {
+   "slug": "carrack",
+   "name": "Carrack",
+   "keys": [
+    "anvil aerospace carrack",
+    "anvil carrack",
+    "anvl carrack",
+    "carrack"
+   ]
+  },
+  {
+   "slug": "caterpillar",
+   "name": "Caterpillar",
+   "keys": [
+    "caterpillar",
+    "drak caterpillar",
+    "drake caterpillar",
+    "drake interplanetary caterpillar"
+   ]
+  },
+  {
+   "slug": "centurion",
+   "name": "Centurion",
+   "keys": [
+    "anvil aerospace centurion",
+    "anvil centurion",
+    "anvl centurion",
+    "centurion"
+   ]
+  },
+  {
+   "slug": "clipper",
+   "name": "Clipper",
+   "keys": [
+    "clipper",
+    "drak clipper",
+    "drake clipper",
+    "drake interplanetary clipper"
+   ]
+  },
+  {
+   "slug": "constellation-mk-iv-andromeda",
+   "name": "Constellation Mk IV Andromeda",
+   "keys": [
+    "constellation mk iv andromeda",
+    "roberts constellation mk iv andromeda",
+    "roberts space industries constellation mk iv andromeda",
+    "rsi constellation mk iv andromeda"
+   ]
+  },
+  {
+   "slug": "constellation-mk-iv-aquila",
+   "name": "Constellation Mk IV Aquila",
+   "keys": [
+    "constellation mk iv aquila",
+    "roberts constellation mk iv aquila",
+    "roberts space industries constellation mk iv aquila",
+    "rsi constellation mk iv aquila"
+   ]
+  },
+  {
+   "slug": "constellation-mk-iv-phoenix",
+   "name": "Constellation Mk IV Phoenix",
+   "keys": [
+    "constellation mk iv phoenix",
+    "roberts constellation mk iv phoenix",
+    "roberts space industries constellation mk iv phoenix",
+    "rsi constellation mk iv phoenix"
+   ]
+  },
+  {
+   "slug": "constellation-mk-iv-phoenix-emerald",
+   "name": "Constellation Mk IV Phoenix Emerald",
+   "keys": [
+    "constellation mk iv phoenix emerald",
+    "roberts constellation mk iv phoenix emerald",
+    "roberts space industries constellation mk iv phoenix emerald",
+    "rsi constellation mk iv phoenix emerald"
+   ]
+  },
+  {
+   "slug": "constellation-mk-iv-taurus",
+   "name": "Constellation Mk IV Taurus",
+   "keys": [
+    "constellation mk iv taurus",
+    "roberts constellation mk iv taurus",
+    "roberts space industries constellation mk iv taurus",
+    "rsi constellation mk iv taurus"
+   ]
+  },
+  {
+   "slug": "constellation-mk-iv-taurus-wikelo-war-special",
+   "name": "Constellation Mk IV Taurus Wikelo War Special",
+   "keys": [
+    "constellation mk iv taurus wikelo war special",
+    "roberts constellation mk iv taurus wikelo war special",
+    "roberts space industries constellation mk iv taurus wikelo war special",
+    "rsi constellation mk iv taurus wikelo war special"
+   ]
+  },
+  {
+   "slug": "constellation-mk-v-centaurus",
+   "name": "Constellation Mk V Centaurus",
+   "keys": [
+    "constellation mk v centaurus",
+    "roberts constellation mk v centaurus",
+    "roberts space industries constellation mk v centaurus",
+    "rsi constellation mk v centaurus"
+   ]
+  },
+  {
+   "slug": "corsair",
+   "name": "Corsair",
+   "keys": [
+    "corsair",
+    "drak corsair",
+    "drake corsair",
+    "drake interplanetary corsair"
+   ]
+  },
+  {
+   "slug": "csv-sm",
+   "name": "CSV-SM",
+   "keys": [
+    "argo astronautics csv sm",
+    "argo csv sm",
+    "csv sm"
+   ]
+  },
+  {
+   "slug": "cutlass-black",
+   "name": "Cutlass Black",
+   "keys": [
+    "cutlass black",
+    "drak cutlass black",
+    "drake cutlass black",
+    "drake interplanetary cutlass black"
+   ]
+  },
+  {
+   "slug": "cutlass-black-pyam-exec",
+   "name": "Cutlass Black PYAM Exec",
+   "keys": [
+    "cutlass black pyam exec",
+    "drak cutlass black pyam exec",
+    "drake cutlass black pyam exec",
+    "drake interplanetary cutlass black pyam exec"
+   ]
+  },
+  {
+   "slug": "cutlass-blue",
+   "name": "Cutlass Blue",
+   "keys": [
+    "cutlass blue",
+    "drak cutlass blue",
+    "drake cutlass blue",
+    "drake interplanetary cutlass blue"
+   ]
+  },
+  {
+   "slug": "cutlass-red",
+   "name": "Cutlass Red",
+   "keys": [
+    "cutlass red",
+    "drak cutlass red",
+    "drake cutlass red",
+    "drake interplanetary cutlass red"
+   ]
+  },
+  {
+   "slug": "cutter",
+   "name": "Cutter",
+   "keys": [
+    "cutter",
+    "drak cutter",
+    "drake cutter",
+    "drake interplanetary cutter"
+   ]
+  },
+  {
+   "slug": "cyclone",
+   "name": "Cyclone",
+   "keys": [
+    "cyclone",
+    "tmbl cyclone",
+    "tumbril cyclone",
+    "tumbril land systems cyclone"
+   ]
+  },
+  {
+   "slug": "defender",
+   "name": "Defender",
+   "keys": [
+    "banu defender",
+    "banu souli defender",
+    "defender"
+   ]
+  },
+  {
+   "slug": "dragonfly",
+   "name": "Dragonfly",
+   "keys": [
+    "dragonfly",
+    "dragonfly black",
+    "drak dragonfly",
+    "drak dragonfly black",
+    "drake dragonfly",
+    "drake dragonfly black",
+    "drake interplanetary dragonfly",
+    "drake interplanetary dragonfly black"
+   ]
+  },
+  {
+   "slug": "e1-spirit",
+   "name": "E1 Spirit",
+   "keys": [
+    "crsd e1 spirit",
+    "crus e1 spirit",
+    "crusader e1 spirit",
+    "crusader industries e1 spirit",
+    "e1 spirit"
+   ]
+  },
+  {
+   "slug": "eclipse",
+   "name": "Eclipse",
+   "keys": [
+    "aegis dynamics eclipse",
+    "aegis eclipse",
+    "aegs eclipse",
+    "eclipse"
+   ]
+  },
+  {
+   "slug": "f7a-hornet-mk-ii",
+   "name": "F7A Hornet Mk II",
+   "keys": [
+    "anvil aerospace f7a hornet mk ii",
+    "anvil f7a hornet mk ii",
+    "anvl f7a hornet mk ii",
+    "f7a hornet mk ii"
+   ]
+  },
+  {
+   "slug": "f7c-hornet-mk-ii",
+   "name": "F7C Hornet Mk II",
+   "keys": [
+    "anvil aerospace f7c hornet mk ii",
+    "anvil f7c hornet mk ii",
+    "anvl f7c hornet mk ii",
+    "f7c hornet mk ii"
+   ]
+  },
+  {
+   "slug": "f7c-m-hornet-heartseeker-mk-ii",
+   "name": "F7C-M Hornet Heartseeker Mk II",
+   "keys": [
+    "anvil aerospace f7c m hornet heartseeker mk ii",
+    "anvil f7c m hornet heartseeker mk ii",
+    "anvl f7c m hornet heartseeker mk ii",
+    "f7c m hornet heartseeker mk ii"
+   ]
+  },
+  {
+   "slug": "f7c-m-super-hornet-mk-ii",
+   "name": "F7C-M Super Hornet Mk II",
+   "keys": [
+    "anvil aerospace f7c m super hornet mk ii",
+    "anvil f7c m super hornet mk ii",
+    "anvl f7c m super hornet mk ii",
+    "f7c m super hornet mk ii"
+   ]
+  },
+  {
+   "slug": "f7c-r-hornet-tracker-mk-ii",
+   "name": "F7C-R Hornet Tracker Mk II",
+   "keys": [
+    "anvil aerospace f7c r hornet tracker mk ii",
+    "anvil f7c r hornet tracker mk ii",
+    "anvl f7c r hornet tracker mk ii",
+    "f7c r hornet tracker mk ii"
+   ]
+  },
+  {
+   "slug": "f7c-s-hornet-ghost-mk-ii",
+   "name": "F7C-S Hornet Ghost Mk II",
+   "keys": [
+    "anvil aerospace f7c s hornet ghost mk ii",
+    "anvil f7c s hornet ghost mk ii",
+    "anvl f7c s hornet ghost mk ii",
+    "f7c s hornet ghost mk ii"
+   ]
+  },
+  {
+   "slug": "fortune",
+   "name": "Fortune",
+   "keys": [
+    "fortune",
+    "misc fortune",
+    "misc misc fortune",
+    "musashi fortune",
+    "musashi industrial and starflight concern fortune",
+    "musashi industrial and starflight concern misc fortune",
+    "musashi misc fortune"
+   ]
+  },
+  {
+   "slug": "freelancer",
+   "name": "Freelancer",
+   "keys": [
+    "freelancer",
+    "misc freelancer",
+    "misc misc freelancer",
+    "musashi freelancer",
+    "musashi industrial and starflight concern freelancer",
+    "musashi industrial and starflight concern misc freelancer",
+    "musashi misc freelancer"
+   ]
+  },
+  {
+   "slug": "freelancer-dur",
+   "name": "Freelancer DUR",
+   "keys": [
+    "freelancer dur",
+    "misc freelancer dur",
+    "misc misc freelancer dur",
+    "musashi freelancer dur",
+    "musashi industrial and starflight concern freelancer dur",
+    "musashi industrial and starflight concern misc freelancer dur",
+    "musashi misc freelancer dur"
+   ]
+  },
+  {
+   "slug": "freelancer-max",
+   "name": "Freelancer MAX",
+   "keys": [
+    "freelancer max",
+    "misc freelancer max",
+    "misc misc freelancer max",
+    "musashi freelancer max",
+    "musashi industrial and starflight concern freelancer max",
+    "musashi industrial and starflight concern misc freelancer max",
+    "musashi misc freelancer max"
+   ]
+  },
+  {
+   "slug": "fury",
+   "name": "Fury",
+   "keys": [
+    "fury",
+    "mirai fury",
+    "misc fury",
+    "mrai fury",
+    "musashi fury"
+   ]
+  },
+  {
+   "slug": "gladius",
+   "name": "Gladius",
+   "keys": [
+    "aegis dynamics gladius",
+    "aegis gladius",
+    "aegs gladius",
+    "gladius"
+   ]
+  },
+  {
+   "slug": "golem",
+   "name": "Golem",
+   "keys": [
+    "drak golem",
+    "drake golem",
+    "drake interplanetary golem",
+    "golem"
+   ]
+  },
+  {
+   "slug": "guardian",
+   "name": "Guardian",
+   "keys": [
+    "guardian",
+    "mirai guardian",
+    "mrai guardian"
+   ]
+  },
+  {
+   "slug": "hammerhead",
+   "name": "Hammerhead",
+   "keys": [
+    "aegis dynamics hammerhead",
+    "aegis hammerhead",
+    "aegs hammerhead",
+    "hammerhead"
+   ]
+  },
+  {
+   "slug": "hawk",
+   "name": "Hawk",
+   "keys": [
+    "anvil aerospace hawk",
+    "anvil hawk",
+    "anvl hawk",
+    "hawk"
+   ]
+  },
+  {
+   "slug": "herald",
+   "name": "Herald",
+   "keys": [
+    "drak herald",
+    "drake herald",
+    "drake interplanetary herald",
+    "herald"
+   ]
+  },
+  {
+   "slug": "hermes",
+   "name": "Hermes",
+   "keys": [
+    "hermes",
+    "roberts hermes",
+    "roberts space industries hermes",
+    "rsi hermes"
+   ]
+  },
+  {
+   "slug": "hornet-f7a-mk-ii-pyam-exec",
+   "name": "Hornet F7A Mk II PYAM Exec",
+   "keys": [
+    "anvil aerospace hornet f7a mk ii pyam exec",
+    "anvil hornet f7a mk ii pyam exec",
+    "anvl hornet f7a mk ii pyam exec",
+    "hornet f7a mk ii pyam exec"
+   ]
+  },
+  {
+   "slug": "hoverquad",
+   "name": "HoverQuad",
+   "keys": [
+    "cnou hoverquad",
+    "co hoverquad",
+    "consolidated hoverquad",
+    "consolidated outland hoverquad",
+    "hoverquad"
+   ]
+  },
+  {
+   "slug": "hull-a",
+   "name": "Hull A",
+   "keys": [
+    "hull a",
+    "misc hull a",
+    "misc misc hull a",
+    "musashi hull a",
+    "musashi industrial and starflight concern hull a",
+    "musashi industrial and starflight concern misc hull a",
+    "musashi misc hull a"
+   ]
+  },
+  {
+   "slug": "hull-b",
+   "name": "Hull B",
+   "keys": [
+    "hull b",
+    "misc hull b",
+    "misc misc hull b",
+    "musashi hull b",
+    "musashi industrial and starflight concern hull b",
+    "musashi industrial and starflight concern misc hull b",
+    "musashi misc hull b"
+   ]
+  },
+  {
+   "slug": "hull-c",
+   "name": "Hull C",
+   "keys": [
+    "hull c",
+    "misc hull c",
+    "misc misc hull c",
+    "musashi hull c",
+    "musashi industrial and starflight concern hull c",
+    "musashi industrial and starflight concern misc hull c",
+    "musashi misc hull c"
+   ]
+  },
+  {
+   "slug": "hurricane",
+   "name": "Hurricane",
+   "keys": [
+    "anvil aerospace hurricane",
+    "anvil hurricane",
+    "anvl hurricane",
+    "hurricane"
+   ]
+  },
+  {
+   "slug": "intrepid",
+   "name": "Intrepid",
+   "keys": [
+    "crsd intrepid",
+    "crus intrepid",
+    "crusader industries intrepid",
+    "crusader intrepid",
+    "intrepid"
+   ]
+  },
+  {
+   "slug": "ironclad",
+   "name": "Ironclad",
+   "keys": [
+    "drak ironclad",
+    "drake interplanetary ironclad",
+    "drake ironclad",
+    "ironclad"
+   ]
+  },
+  {
+   "slug": "khartu-al",
+   "name": "Khartu-al",
+   "keys": [
+    "aopoa khartu al",
+    "khartu al",
+    "xian khartu al",
+    "xnaa khartu al"
+   ]
+  },
+  {
+   "slug": "l-21-wolf",
+   "name": "L-21 Wolf",
+   "keys": [
+    "krig l 21 wolf",
+    "kruger intergalactic l 21 wolf",
+    "kruger l 21 wolf",
+    "l 21 wolf"
+   ]
+  },
+  {
+   "slug": "l-21-wolf-wikelo-sneak-special",
+   "name": "L-21 Wolf Wikelo Sneak Special",
+   "keys": [
+    "krig l 21 wolf wikelo sneak special",
+    "kruger intergalactic l 21 wolf wikelo sneak special",
+    "kruger l 21 wolf wikelo sneak special",
+    "l 21 wolf wikelo sneak special"
+   ]
+  },
+  {
+   "slug": "l-21-wolf-wikelo-war-special",
+   "name": "L-21 Wolf Wikelo War Special",
+   "keys": [
+    "krig l 21 wolf wikelo war special",
+    "kruger intergalactic l 21 wolf wikelo war special",
+    "kruger l 21 wolf wikelo war special",
+    "l 21 wolf wikelo war special"
+   ]
+  },
+  {
+   "slug": "l-22-alpha-wolf",
+   "name": "L-22 Alpha Wolf",
+   "keys": [
+    "krig l 22 alpha wolf",
+    "kruger intergalactic l 22 alpha wolf",
+    "kruger l 22 alpha wolf",
+    "l 22 alpha wolf"
+   ]
+  },
+  {
+   "slug": "l-22-alpha-wolf-wikelo-war-special",
+   "name": "L-22 Alpha Wolf Wikelo War Special",
+   "keys": [
+    "krig l 22 alpha wolf wikelo war special",
+    "kruger intergalactic l 22 alpha wolf wikelo war special",
+    "kruger l 22 alpha wolf wikelo war special",
+    "l 22 alpha wolf wikelo war special"
+   ]
+  },
+  {
+   "slug": "lynx",
+   "name": "Lynx",
+   "keys": [
+    "lynx",
+    "roberts lynx",
+    "roberts space industries lynx",
+    "rsi lynx"
+   ]
+  },
+  {
+   "slug": "m2-hercules-starlifter",
+   "name": "M2 Hercules Starlifter",
+   "keys": [
+    "crsd m2 hercules",
+    "crsd m2 hercules starlifter",
+    "crus m2 hercules",
+    "crus m2 hercules starlifter",
+    "crusader industries m2 hercules",
+    "crusader industries m2 hercules starlifter",
+    "crusader m2 hercules",
+    "crusader m2 hercules starlifter",
+    "m2 hercules",
+    "m2 hercules starlifter"
+   ]
+  },
+  {
+   "slug": "m50-interceptor",
+   "name": "M50 Interceptor",
+   "keys": [
+    "m50",
+    "m50 interceptor",
+    "orig m50",
+    "orig m50 interceptor",
+    "origin jumpworks m50",
+    "origin jumpworks m50 interceptor",
+    "origin m50",
+    "origin m50 interceptor"
+   ]
+  },
+  {
+   "slug": "m80",
+   "name": "M80",
+   "keys": [
+    "m80",
+    "orig m80",
+    "origin jumpworks m80",
+    "origin m80"
+   ]
+  },
+  {
+   "slug": "mantis",
+   "name": "Mantis",
+   "keys": [
+    "mantis",
+    "roberts mantis",
+    "roberts space industries mantis",
+    "rsi mantis"
+   ]
+  },
+  {
+   "slug": "mercury-star-runner",
+   "name": "Mercury Star Runner",
+   "keys": [
+    "crsd mercury",
+    "crsd mercury star runner",
+    "crus mercury",
+    "crus mercury star runner",
+    "crusader industries mercury",
+    "crusader industries mercury star runner",
+    "crusader mercury",
+    "crusader mercury star runner",
+    "mercury",
+    "mercury star runner"
+   ]
+  },
+  {
+   "slug": "meteor",
+   "name": "Meteor",
+   "keys": [
+    "meteor",
+    "roberts meteor",
+    "roberts space industries meteor",
+    "rsi meteor"
+   ]
+  },
+  {
+   "slug": "misc-starlancer-max-wikelo-work-special",
+   "name": "MISC Starlancer MAX Wikelo Work Special",
+   "keys": [
+    "misc misc starlancer max wikelo work special",
+    "misc starlancer max wikelo work special",
+    "musashi industrial and starflight concern misc starlancer max wikelo work special",
+    "musashi industrial and starflight concern starlancer max wikelo work special",
+    "musashi misc starlancer max wikelo work special",
+    "musashi starlancer max wikelo work special",
+    "starlancer max wikelo work special"
+   ]
+  },
+  {
+   "slug": "misc-starlancer-tac-wikelo-war-special",
+   "name": "MISC Starlancer TAC Wikelo War Special",
+   "keys": [
+    "misc misc starlancer tac wikelo war special",
+    "misc starlancer tac wikelo war special",
+    "musashi industrial and starflight concern misc starlancer tac wikelo war special",
+    "musashi industrial and starflight concern starlancer tac wikelo war special",
+    "musashi misc starlancer tac wikelo war special",
+    "musashi starlancer tac wikelo war special",
+    "starlancer tac wikelo war special"
+   ]
+  },
+  {
+   "slug": "mole",
+   "name": "MOLE",
+   "keys": [
+    "argo astronautics mole",
+    "argo mole",
+    "mole"
+   ]
+  },
+  {
+   "slug": "moth",
+   "name": "MOTH",
+   "keys": [
+    "argo astronautics moth",
+    "argo moth",
+    "moth"
+   ]
+  },
+  {
+   "slug": "mpuv-cargo",
+   "name": "MPUV Cargo",
+   "keys": [
+    "argo astronautics mpuv cargo",
+    "argo mpuv cargo",
+    "mpuv cargo"
+   ]
+  },
+  {
+   "slug": "mpuv-personnel",
+   "name": "MPUV Personnel",
+   "keys": [
+    "argo astronautics mpuv personnel",
+    "argo mpuv personnel",
+    "mpuv personnel"
+   ]
+  },
+  {
+   "slug": "mpuv-tractor",
+   "name": "MPUV Tractor",
+   "keys": [
+    "argo astronautics mpuv tractor",
+    "argo mpuv tractor",
+    "mpuv tractor"
+   ]
+  },
+  {
+   "slug": "mule",
+   "name": "Mule",
+   "keys": [
+    "drak mule",
+    "drake interplanetary mule",
+    "drake mule",
+    "mule"
+   ]
+  },
+  {
+   "slug": "mustang-alpha",
+   "name": "Mustang Alpha",
+   "keys": [
+    "cnou mustang alpha",
+    "co mustang alpha",
+    "consolidated mustang alpha",
+    "consolidated outland mustang alpha",
+    "mustang alpha"
+   ]
+  },
+  {
+   "slug": "mustang-beta",
+   "name": "Mustang Beta",
+   "keys": [
+    "cnou mustang beta",
+    "co mustang beta",
+    "consolidated mustang beta",
+    "consolidated outland mustang beta",
+    "mustang beta"
+   ]
+  },
+  {
+   "slug": "mustang-citizencon-2948-edition",
+   "name": "Mustang CitizenCon 2948 Edition",
+   "keys": [
+    "cnou mustang alpha vindicator",
+    "cnou mustang citizencon 2948 edition",
+    "co mustang alpha vindicator",
+    "co mustang citizencon 2948 edition",
+    "consolidated mustang alpha vindicator",
+    "consolidated mustang citizencon 2948 edition",
+    "consolidated outland mustang alpha vindicator",
+    "consolidated outland mustang citizencon 2948 edition",
+    "mustang alpha vindicator",
+    "mustang citizencon 2948 edition"
+   ]
+  },
+  {
+   "slug": "mustang-delta",
+   "name": "Mustang Delta",
+   "keys": [
+    "cnou mustang delta",
+    "co mustang delta",
+    "consolidated mustang delta",
+    "consolidated outland mustang delta",
+    "mustang delta"
+   ]
+  },
+  {
+   "slug": "mustang-gamma",
+   "name": "Mustang Gamma",
+   "keys": [
+    "cnou mustang gamma",
+    "co mustang gamma",
+    "consolidated mustang gamma",
+    "consolidated outland mustang gamma",
+    "mustang gamma"
+   ]
+  },
+  {
+   "slug": "mustang-omega",
+   "name": "Mustang Omega",
+   "keys": [
+    "cnou mustang omega",
+    "co mustang omega",
+    "consolidated mustang omega",
+    "consolidated outland mustang omega",
+    "mustang omega"
+   ]
+  },
+  {
+   "slug": "nomad",
+   "name": "Nomad",
+   "keys": [
+    "cnou nomad",
+    "co nomad",
+    "consolidated nomad",
+    "consolidated outland nomad",
+    "nomad"
+   ]
+  },
+  {
+   "slug": "nova",
+   "name": "Nova",
+   "keys": [
+    "nova",
+    "tmbl nova",
+    "tumbril land systems nova",
+    "tumbril nova"
+   ]
+  },
+  {
+   "slug": "nox",
+   "name": "Nox",
+   "keys": [
+    "aopoa nox",
+    "nox",
+    "xian nox",
+    "xnaa nox"
+   ]
+  },
+  {
+   "slug": "p-72-archimedes",
+   "name": "P-72 Archimedes",
+   "keys": [
+    "krig p 72 archimedes",
+    "kruger intergalactic p 72 archimedes",
+    "kruger p 72 archimedes",
+    "p 72 archimedes"
+   ]
+  },
+  {
+   "slug": "paladin",
+   "name": "Paladin",
+   "keys": [
+    "anvil aerospace paladin",
+    "anvil paladin",
+    "anvl paladin",
+    "paladin"
+   ]
+  },
+  {
+   "slug": "perseus",
+   "name": "Perseus",
+   "keys": [
+    "perseus",
+    "roberts perseus",
+    "roberts space industries perseus",
+    "rsi perseus"
+   ]
+  },
+  {
+   "slug": "pitbull",
+   "name": "Pitbull",
+   "keys": [
+    "drak pitbull",
+    "drake interplanetary pitbull",
+    "drake pitbull",
+    "pitbull"
+   ]
+  },
+  {
+   "slug": "polaris",
+   "name": "Polaris",
+   "keys": [
+    "polaris",
+    "roberts polaris",
+    "roberts space industries polaris",
+    "rsi polaris"
+   ]
+  },
+  {
+   "slug": "prospector",
+   "name": "Prospector",
+   "keys": [
+    "misc misc prospector",
+    "misc prospector",
+    "musashi industrial and starflight concern misc prospector",
+    "musashi industrial and starflight concern prospector",
+    "musashi misc prospector",
+    "musashi prospector",
+    "prospector"
+   ]
+  },
+  {
+   "slug": "prowler",
+   "name": "Prowler",
+   "keys": [
+    "esperia prowler",
+    "espr prowler",
+    "prowler"
+   ]
+  },
+  {
+   "slug": "ptv",
+   "name": "PTV",
+   "keys": [
+    "greycat industrial ptv",
+    "greycat ptv",
+    "grin ptv",
+    "ptv"
+   ]
+  },
+  {
+   "slug": "pulse",
+   "name": "Pulse",
+   "keys": [
+    "mirai pulse",
+    "mrai pulse",
+    "pulse"
+   ]
+  },
+  {
+   "slug": "pulse-lx",
+   "name": "Pulse LX",
+   "keys": [
+    "mirai pulse lx",
+    "mrai pulse lx",
+    "pulse lx"
+   ]
+  },
+  {
+   "slug": "raft",
+   "name": "RAFT",
+   "keys": [
+    "argo astronautics raft",
+    "argo raft",
+    "raft"
+   ]
+  },
+  {
+   "slug": "railen",
+   "name": "Railen",
+   "keys": [
+    "gama railen",
+    "gatac manufacture railen",
+    "gatac railen",
+    "railen"
+   ]
+  },
+  {
+   "slug": "razor",
+   "name": "Razor",
+   "keys": [
+    "mirai razor",
+    "misc razor",
+    "mrai razor",
+    "musashi razor",
+    "razor"
+   ]
+  },
+  {
+   "slug": "redeemer",
+   "name": "Redeemer",
+   "keys": [
+    "aegis dynamics redeemer",
+    "aegis redeemer",
+    "aegs redeemer",
+    "redeemer"
+   ]
+  },
+  {
+   "slug": "reliant-kore",
+   "name": "Reliant Kore",
+   "keys": [
+    "misc misc reliant kore",
+    "misc reliant kore",
+    "musashi industrial and starflight concern misc reliant kore",
+    "musashi industrial and starflight concern reliant kore",
+    "musashi misc reliant kore",
+    "musashi reliant kore",
+    "reliant kore"
+   ]
+  },
+  {
+   "slug": "reliant-mako",
+   "name": "Reliant Mako",
+   "keys": [
+    "misc misc reliant mako",
+    "misc reliant mako",
+    "musashi industrial and starflight concern misc reliant mako",
+    "musashi industrial and starflight concern reliant mako",
+    "musashi misc reliant mako",
+    "musashi reliant mako",
+    "reliant mako"
+   ]
+  },
+  {
+   "slug": "reliant-sen",
+   "name": "Reliant Sen",
+   "keys": [
+    "misc misc reliant sen",
+    "misc reliant sen",
+    "musashi industrial and starflight concern misc reliant sen",
+    "musashi industrial and starflight concern reliant sen",
+    "musashi misc reliant sen",
+    "musashi reliant sen",
+    "reliant sen"
+   ]
+  },
+  {
+   "slug": "reliant-tana",
+   "name": "Reliant Tana",
+   "keys": [
+    "misc misc reliant tana",
+    "misc reliant tana",
+    "musashi industrial and starflight concern misc reliant tana",
+    "musashi industrial and starflight concern reliant tana",
+    "musashi misc reliant tana",
+    "musashi reliant tana",
+    "reliant tana"
+   ]
+  },
+  {
+   "slug": "retaliator",
+   "name": "Retaliator",
+   "keys": [
+    "aegis dynamics retaliator",
+    "aegis dynamics retaliator bomber",
+    "aegis retaliator",
+    "aegis retaliator bomber",
+    "aegs retaliator",
+    "aegs retaliator bomber",
+    "retaliator",
+    "retaliator bomber"
+   ]
+  },
+  {
+   "slug": "roc",
+   "name": "ROC",
+   "keys": [
+    "greycat industrial roc",
+    "greycat roc",
+    "grin roc",
+    "roc"
+   ]
+  },
+  {
+   "slug": "roc-ds",
+   "name": "ROC-DS",
+   "keys": [
+    "greycat industrial roc ds",
+    "greycat roc ds",
+    "grin roc ds",
+    "roc ds"
+   ]
+  },
+  {
+   "slug": "s-65-stingray",
+   "name": "S-65 Stingray",
+   "keys": [
+    "krig s 65 stingray",
+    "kruger intergalactic s 65 stingray",
+    "kruger s 65 stingray",
+    "s 65 stingray"
+   ]
+  },
+  {
+   "slug": "sabre",
+   "name": "Sabre",
+   "keys": [
+    "aegis dynamics sabre",
+    "aegis sabre",
+    "aegs sabre",
+    "sabre"
+   ]
+  },
+  {
+   "slug": "sabre-raven-ex",
+   "name": "Sabre Raven EX",
+   "keys": [
+    "aegis dynamics sabre raven ex",
+    "aegis sabre raven ex",
+    "aegs sabre raven ex",
+    "sabre raven ex"
+   ]
+  },
+  {
+   "slug": "salvation",
+   "name": "Salvation",
+   "keys": [
+    "roberts salvation",
+    "roberts space industries salvation",
+    "rsi salvation",
+    "salvation"
+   ]
+  },
+  {
+   "slug": "santok-yai",
+   "name": "San'tok.yāi",
+   "keys": [
+    "aopoa santok yai",
+    "santok yai",
+    "xian santok yai",
+    "xnaa santok yai"
+   ]
+  },
+  {
+   "slug": "scorpius",
+   "name": "Scorpius",
+   "keys": [
+    "roberts scorpius",
+    "roberts space industries scorpius",
+    "rsi scorpius",
+    "scorpius"
+   ]
+  },
+  {
+   "slug": "shiv",
+   "name": "Shiv",
+   "keys": [
+    "glsn shiv",
+    "greys market shiv",
+    "greys shiv",
+    "shiv"
+   ]
+  },
+  {
+   "slug": "spartan",
+   "name": "Spartan",
+   "keys": [
+    "anvil aerospace spartan",
+    "anvil spartan",
+    "anvl spartan",
+    "spartan"
+   ]
+  },
+  {
+   "slug": "srv",
+   "name": "SRV",
+   "keys": [
+    "argo astronautics srv",
+    "argo srv",
+    "srv"
+   ]
+  },
+  {
+   "slug": "starfarer",
+   "name": "Starfarer",
+   "keys": [
+    "misc misc starfarer",
+    "misc starfarer",
+    "musashi industrial and starflight concern misc starfarer",
+    "musashi industrial and starflight concern starfarer",
+    "musashi misc starfarer",
+    "musashi starfarer",
+    "starfarer"
+   ]
+  },
+  {
+   "slug": "starlancer-max",
+   "name": "Starlancer MAX",
+   "keys": [
+    "misc misc starlancer max",
+    "misc starlancer max",
+    "musashi industrial and starflight concern misc starlancer max",
+    "musashi industrial and starflight concern starlancer max",
+    "musashi misc starlancer max",
+    "musashi starlancer max",
+    "starlancer max"
+   ]
+  },
+  {
+   "slug": "starlancer-tac",
+   "name": "Starlancer TAC",
+   "keys": [
+    "misc misc starlancer tac",
+    "misc starlancer tac",
+    "musashi industrial and starflight concern misc starlancer tac",
+    "musashi industrial and starflight concern starlancer tac",
+    "musashi misc starlancer tac",
+    "musashi starlancer tac",
+    "starlancer tac"
+   ]
+  },
+  {
+   "slug": "starlite",
+   "name": "Starlite",
+   "keys": [
+    "misc misc starlite",
+    "misc starlite",
+    "musashi industrial and starflight concern misc starlite",
+    "musashi industrial and starflight concern starlite",
+    "musashi misc starlite",
+    "musashi starlite",
+    "starlite"
+   ]
+  },
+  {
+   "slug": "stinger",
+   "name": "Stinger",
+   "keys": [
+    "esperia stinger",
+    "espr stinger",
+    "stinger",
+    "vanduul stinger",
+    "vncl stinger"
+   ]
+  },
+  {
+   "slug": "storm",
+   "name": "Storm",
+   "keys": [
+    "storm",
+    "tmbl storm",
+    "tumbril land systems storm",
+    "tumbril storm"
+   ]
+  },
+  {
+   "slug": "stv",
+   "name": "STV",
+   "keys": [
+    "greycat industrial stv",
+    "greycat stv",
+    "grin stv",
+    "stv"
+   ]
+  },
+  {
+   "slug": "syulen",
+   "name": "Syulen",
+   "keys": [
+    "gama syulen",
+    "gatac manufacture syulen",
+    "gatac syulen",
+    "syulen"
+   ]
+  },
+  {
+   "slug": "talon",
+   "name": "Talon",
+   "keys": [
+    "esperia talon",
+    "espr talon",
+    "talon"
+   ]
+  },
+  {
+   "slug": "terrapin",
+   "name": "Terrapin",
+   "keys": [
+    "anvil aerospace terrapin",
+    "anvil terrapin",
+    "anvl terrapin",
+    "terrapin"
+   ]
+  },
+  {
+   "slug": "tiburon",
+   "name": "Tiburon",
+   "keys": [
+    "aegis dynamics tiburon",
+    "aegis tiburon",
+    "aegs tiburon",
+    "tiburon"
+   ]
+  },
+  {
+   "slug": "tyilui",
+   "name": "Tyilui",
+   "keys": [
+    "gama tyilui",
+    "gatac manufacture tyilui",
+    "gatac tyilui",
+    "tyilui"
+   ]
+  },
+  {
+   "slug": "ursa",
+   "name": "Ursa",
+   "keys": [
+    "roberts space industries ursa",
+    "roberts ursa",
+    "rsi ursa",
+    "ursa"
+   ]
+  },
+  {
+   "slug": "utv",
+   "name": "UTV",
+   "keys": [
+    "greycat industrial utv",
+    "greycat utv",
+    "grin utv",
+    "utv"
+   ]
+  },
+  {
+   "slug": "valkyrie",
+   "name": "Valkyrie",
+   "keys": [
+    "anvil aerospace valkyrie",
+    "anvil valkyrie",
+    "anvl valkyrie",
+    "valkyrie"
+   ]
+  },
+  {
+   "slug": "vanguard-harbinger",
+   "name": "Vanguard Harbinger",
+   "keys": [
+    "aegis dynamics vanguard harbinger",
+    "aegis vanguard harbinger",
+    "aegs vanguard harbinger",
+    "vanguard harbinger"
+   ]
+  },
+  {
+   "slug": "vanguard-hoplite",
+   "name": "Vanguard Hoplite",
+   "keys": [
+    "aegis dynamics vanguard hoplite",
+    "aegis vanguard hoplite",
+    "aegs vanguard hoplite",
+    "vanguard hoplite"
+   ]
+  },
+  {
+   "slug": "vanguard-sentinel",
+   "name": "Vanguard Sentinel",
+   "keys": [
+    "aegis dynamics vanguard sentinel",
+    "aegis vanguard sentinel",
+    "aegs vanguard sentinel",
+    "vanguard sentinel"
+   ]
+  },
+  {
+   "slug": "vanguard-warden",
+   "name": "Vanguard Warden",
+   "keys": [
+    "aegis dynamics vanguard warden",
+    "aegis vanguard warden",
+    "aegs vanguard warden",
+    "vanguard warden"
+   ]
+  },
+  {
+   "slug": "vulture",
+   "name": "Vulture",
+   "keys": [
+    "drak vulture",
+    "drake interplanetary vulture",
+    "drake vulture",
+    "vulture"
+   ]
+  },
+  {
+   "slug": "x1",
+   "name": "X1",
+   "keys": [
+    "orig x1",
+    "origin jumpworks x1",
+    "origin x1",
+    "x1"
+   ]
+  },
+  {
+   "slug": "zeus-mk-ii-cl",
+   "name": "Zeus Mk II CL",
+   "keys": [
+    "roberts space industries zeus mk ii cl",
+    "roberts zeus mk ii cl",
+    "rsi zeus mk ii cl",
+    "zeus mk ii cl"
+   ]
+  },
+  {
+   "slug": "zeus-mk-ii-es",
+   "name": "Zeus Mk II ES",
+   "keys": [
+    "roberts space industries zeus mk ii es",
+    "roberts zeus mk ii es",
+    "rsi zeus mk ii es",
+    "zeus mk ii es"
+   ]
+  },
+  {
+   "slug": "zeus-mk-ii-es-wikelo-work-special",
+   "name": "Zeus Mk II ES Wikelo Work Special",
+   "keys": [
+    "roberts space industries zeus mk ii es wikelo work special",
+    "roberts zeus mk ii es wikelo work special",
+    "rsi zeus mk ii es wikelo work special",
+    "zeus mk ii es wikelo work special"
+   ]
+  },
+  {
+   "slug": "zeus-mk-ii-mr",
+   "name": "Zeus Mk II MR",
+   "keys": [
+    "roberts space industries zeus mk ii mr",
+    "roberts zeus mk ii mr",
+    "rsi zeus mk ii mr",
+    "zeus mk ii mr"
+   ]
+  }
+ ]
+}
