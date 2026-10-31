@@ -249,10 +249,11 @@
         },
       },
       rsiUrl: {
-        description: "An address on RSI's site or its media host, or null.",
+        description:
+          "An address on RSI's site or its media host, or null. The pattern spells each slash and dot as a class ([/], [.]), so the schema holds no address itself: the website's hangar page ships a copy that has none.",
         type: ['string', 'null'],
         maxLength: 500,
-        pattern: '^https://([a-z0-9-]+\\.)*robertsspaceindustries\\.com/',
+        pattern: '^https:[/][/]([a-z0-9-]+[.])*robertsspaceindustries[.]com[/]',
       },
       hangarMeta: {
         description:
