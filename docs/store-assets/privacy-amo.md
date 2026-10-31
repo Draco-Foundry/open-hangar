@@ -27,7 +27,7 @@ If you use more than one RSI account in this browser, each account's data is kep
 
 All of this is stored only in your browser's local extension storage (`chrome.storage.local`). It is only sent to us if you connect sync (below), and never to anyone else. You can remove it at any time with Clear Data on the popup's Settings tab, or by uninstalling the extension (which deletes all stored data). If a save is ever damaged, the extension keeps a recovery copy for at most 30 days.
 
-The toolbar popup shows what's already stored in this browser: your RSI portrait and handle, your Account Value, Store Credit, UEC, REC and Buy-Back Tokens, how your Account Value and UEC changed since an earlier scan, Fleet News, store alerts and whether sync is connected. Fleet News is up to three short notes about your own ships and your Wishlist, worked out on your device. The popup never asks RSI anything itself. Its Scan button starts a scan in the hidden page, and closing the popup doesn't stop it. While you're connected, the popup also shows your Wishlist (see Your Wishlist).
+The toolbar popup shows what's already stored in this browser: your RSI portrait and handle, your Account Value, Store Credit, UEC, REC and Buy-Back Tokens, how your Account Value and UEC changed since an earlier scan, the pledges that are new since your last scan, Fleet News, store alerts and whether sync is connected. Fleet News is up to three short notes about your own ships and your Wishlist, worked out on your device. The popup asks RSI for nothing itself, except the pictures of those new pledges: it loads them from RSI's own servers, the same way RSI's hangar page loads them, and sends RSI nothing else. Its Scan button starts a scan in the hidden page, and closing the popup doesn't stop it. While you're connected, the popup also shows your Wishlist (see Your Wishlist).
 
 **Daily Scan Reminder**
 
@@ -71,7 +71,7 @@ While you're connected, the popup's Wishlist tab shows the Wishlist on your open
 
 **Outbound network requests**
 
-Besides reading your own RSI account, the cart buttons, store alerts, your Wishlist (all above) and sync (below), Open Hangar only talks to our own public site, openhangar.space. None of these requests carry your personal data.
+Besides reading your own RSI account, the popup's pictures of new pledges, the cart buttons, store alerts, your Wishlist (all above) and sync (below), Open Hangar only talks to our own public site, openhangar.space. None of these requests carry your personal data.
 
 - openhangar.space (our own site, public, read-only). Every file below is the same for everyone and is cached on your device:
   - a small status file, at most every few hours, so we can pause a scan that RSI's site changes have broken (the Daily Scan Reminder pauses with it), or pause store alerts, and show a short notice until a fix is out;
