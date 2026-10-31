@@ -105,8 +105,9 @@
     // marks for a Concierge member, at most once a day (src/lib.js getSubStore,
     // ui/scan/runner.js), and sync sends them as sources.subStore
     // (schema/sync-payload.schema.json) for the website's Store. RSI lists them only to
-    // that signed-in account, so only the pilot's own extension can read them. Developer
-    // builds only until the privacy policy names them.
+    // that signed-in account, so only the pilot's own extension can read them. The privacy
+    // policy names the read (docs/PRIVACY.md, 2026-10-31); developer builds only until the
+    // owner's release turns it on.
     subStore: {
       about:
         'Your Subscriber Store and Concierge items: a scan reads them once a day and sync sends them.',
