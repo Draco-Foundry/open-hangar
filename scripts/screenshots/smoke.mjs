@@ -6241,6 +6241,8 @@ try {
       li.textContent.replace(/\s+/g, ' ').trim(),
     ),
     more: document.querySelector('#pp-wish .pp-note')?.textContent || '',
+    // One line each: a name and, on sale, its price (no On Sale or Not for Sale line).
+    tall: [...document.querySelectorAll('.pp-wlist li')].some((li) => li.offsetHeight > 36),
     remove: !!document.querySelector('#pp-wish input, #pp-wish [aria-label^="Remove"]'),
     asked: __demo.wish.map((w) => `${w.method} ${w.url} ${w.auth}`),
     // The tab's count of Remind Me items on sale: the number shown, a name read out.
@@ -6256,8 +6258,9 @@ try {
   await page.click('#pp-wish-full');
   const wishFull = await page.evaluate(() => __demo.opened.at(-1));
   ppWish.head === 'Your Wishlist · 3' &&
-  ppWish.rows.join(' | ') === 'Avenger Titan On Sale $55 | Zeus Mk II CL Not for Sale' &&
+  ppWish.rows.join(' | ') === 'Avenger Titan $55 | Zeus Mk II CL' &&
   ppWish.more === 'And 1 more' &&
+  !ppWish.tall &&
   !ppWish.remove &&
   ppWish.n === '1' &&
   ppWish.nName.trim() === '1 on sale' &&
@@ -6451,11 +6454,11 @@ try {
     { v: 1, do: 'remove', key: 'ship:avenger-titan' },
   ];
   ppEd.head === 'Your Wishlist · 2' &&
-  ppEd.rows[0].text === 'Avenger Titan On Sale $55 ✕' &&
+  ppEd.rows[0].text === 'Avenger Titan $55 ✕' &&
   !ppEd.rows.some((r) => r.target) &&
   !ppEd.rows.some((r) => r.remind) &&
   ppEd.rows[0].remove === 'Remove Avenger Titan' &&
-  ppEd.rows[1].text === 'Cutlass - Ghoulish Green Paint On Sale $10 ✕' &&
+  ppEd.rows[1].text === 'Cutlass - Ghoulish Green Paint $10 ✕' &&
   ppEd.placeholder === 'Add a ship, paint or upgrade' &&
   /\/store#item=1$/.test(ppEd.links[0] || '') &&
   /\/store#item=501$/.test(ppEd.links[1] || '') &&
@@ -6464,7 +6467,7 @@ try {
   afterAdd.q === '' &&
   afterAdd.focus === 'pp-wish-q' &&
   // Added first on the website's list, shown after what's on sale.
-  afterAdd.rows[2] === 'Zeus Mk II CL Not for Sale ✕' &&
+  afterAdd.rows[2] === 'Zeus Mk II CL ✕' &&
   JSON.stringify(wishDone.posts.map((p) => p.body)) === JSON.stringify(POSTS) &&
   wishDone.posts.every((p) => p.auth === 'Bearer t' && p.url === `${ppSite}/api/v1/wishlist`) &&
   wishDone.reads === 1 &&
