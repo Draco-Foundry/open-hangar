@@ -584,6 +584,13 @@ body {
   display: flex;
   flex-direction: column;
 }
+/* Wishlist rows are one line: a long name ends in an ellipsis. */
+.pp-wlist .pp-atext {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .pp-iname,
 .pp-aname {
   color: var(--head);
@@ -861,11 +868,13 @@ body {
   background: none;
   color: var(--text);
 }
-.pp-wlist small.sale {
+.pp-wlist .pp-price {
   color: var(--good);
 }
 .pp-price {
   flex: none;
+  min-width: 56px;
+  text-align: right;
   font-family: var(--font-data);
   font-size: 13px;
   color: var(--head);
