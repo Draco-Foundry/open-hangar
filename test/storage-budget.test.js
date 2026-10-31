@@ -81,9 +81,11 @@ const BUDGET = {
   feedVersions: small('one versions.json'),
   shipMatrix: { cap: 'one RSI ship-matrix list, replaced whole', max: 300 * KB },
   storeShips: { cap: 'one store list, replaced whole (6 hours)', max: 1 * MB },
+  // 1.1 MB since the Concierge read (#418, 2026-10-31): each item gained kind and
+  // concierge, about 40 bytes, so 2,000 worst-case items come to about 1.02 MB.
   subStore: {
-    cap: 'SUB_STORE_MAX 2,000 items (20 pages), replaced whole once a day',
-    max: 1 * MB,
+    cap: 'SUB_STORE_MAX 2,000 items (both parts), replaced whole once a day',
+    max: 1.1 * MB,
   },
   netDown: small('hosts down in the last 10 minutes'),
   remoteStatus: small('one status.json, replaced whole'),

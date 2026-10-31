@@ -55,7 +55,7 @@ wishlist import and store alerts, and from 0.4.0 Auto Scan Daily):
 | `scanBar`        | The popup's scan as one counting bar where Scan sits        | on    | on   | no       |
 | `newSinceScan`   | The popup's New Since Last Scan list                        | off   | off  | no       |
 | `orderHistory`   | A scan reads RSI order history; sync sends it (reader only) | off   | off  | yes      |
-| `subStore`       | A scan reads your Subscriber Store; sync sends it           | off   | off  | yes      |
+| `subStore`       | A scan reads your Subscriber Store and Concierge items      | off   | off  | yes      |
 
 ## Adding or Retiring a Flag
 

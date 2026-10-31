@@ -311,11 +311,23 @@
     return { ...sources, buybacks: { ...bb, items } };
   }
 
-  // The Subscriber Store list (lib.js getSubStore: { at, total, partial, items }) →
+  // The members' store list (lib.js getSubStore: { at, total, partial, items }: the
+  // Subscriber Store and Concierge items) →
   // sources.subStore { items, scannedAt, meta: { total, complete } }, each item with
   // only the keys the sync format allows, so nothing else stored can ride along. No
   // list, or one without a read time: sources as they are. Pure.
-  const SUB_STORE_ITEM_KEYS = ['id', 'name', 'url', 'img', 'price', 'was', 'pack', 'inStock'];
+  const SUB_STORE_ITEM_KEYS = [
+    'id',
+    'name',
+    'kind',
+    'concierge',
+    'url',
+    'img',
+    'price',
+    'was',
+    'pack',
+    'inStock',
+  ];
   function withSubStore(sources, list) {
     if (!isObj(list) || !Array.isArray(list.items) || !Number.isFinite(list.at)) return sources;
     const items = list.items

@@ -1,9 +1,10 @@
 'use strict';
-// Your Subscriber Store (#418, the subStore build flag): the parser on invented answers
-// in RSI's shape (no real data), the reader's rules (only for a signed-in subscriber,
-// once a day, pages until totalCount, page size 100 with RSI's 20 as the fallback, stop
-// on a refusal, never a short list over a fuller one), and what sync sends: only the
-// item keys the sync format allows, never the account. Run: `npm test`.
+// Your Subscriber Store and Concierge items (#418, the subStore build flag): the parser on
+// invented answers in RSI's shape (no real data), the reader's rules (only for a signed-in
+// subscriber or Concierge member, once a day, pages until totalCount, page size 100 with
+// RSI's 20 as the fallback, each store category for Concierge keeping only the items RSI
+// marks isVip, stop on a refusal, never a short list over a fuller one), and what sync
+// sends: only the item keys the sync format allows, never the account. Run: `npm test`.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
@@ -87,6 +88,8 @@ test('parseSubStore: only the kept fields, in whole cents (invented answer)', ()
   assert.deepEqual(out.items[0], {
     id: '900001',
     name: 'Test Item 1',
+    kind: 'subscriber',
+    concierge: false,
     url: 'https://robertsspaceindustries.com/pledge/Subscribers-Store/Test-Item-1',
     img: 'https://media.robertsspaceindustries.com/t1/s.jpg',
     price: 2100, // nativePrice (USD) first, not the taxed price
@@ -131,15 +134,15 @@ function fakeRsi({ total = 250, size = Infinity, maxAsk = Infinity, fail = {} } 
   return { calls, fetchFn };
 }
 
-test('getSubStore: signed out or not a subscriber, RSI is never asked', async () => {
+test('getSubStore: signed out, or neither a subscriber nor Concierge, RSI is never asked', async () => {
   const rsi = fakeRsi();
   const opts = { fetchFn: rsi.fetchFn, pause: noPause };
   assert.equal(
     (await OH.getSubStore({ ...opts, account: { loggedIn: false } })).error,
     'signed-out',
   );
-  const plain = { loggedIn: true, nickname: 'TestPilot', subscriber: null };
-  assert.equal((await OH.getSubStore({ ...opts, account: plain })).error, 'not-subscriber');
+  const plain = { loggedIn: true, nickname: 'TestPilot', subscriber: null, concierge: null };
+  assert.equal((await OH.getSubStore({ ...opts, account: plain })).error, 'not-member');
   assert.equal(rsi.calls.length, 0);
 });
 
@@ -235,4 +238,136 @@ test('the read is the subStore flag: off in the repo, the sync leaves it out', a
   store.account = SUB;
   const payload = await OH.exportDB({ schemaVersion: SHAPE.DB_VERSION, sources: {} });
   assert.equal(payload.sources.subStore, undefined);
+});
+
+// A fake RSI store for a Concierge account: per product list (the category's first
+// product), `n` items of which every `vipEvery`th is marked isVip. The Subscriber Store
+// (product 65) answers the same way.
+const CC = { loggedIn: true, nickname: 'TestPilot', concierge: { level: 'Lieutenant' } };
+function fakeStore({ sizes = {}, vipEvery = 10, subTotal = 0, fail = {} } = {}) {
+  const calls = [];
+  const fetchFn = async (url, init) => {
+    const body = JSON.parse(init.body)[0];
+    const { page, limit, skus } = body.variables.query;
+    const product = skus.products[0];
+    calls.push({ product, page, limit, facets: skus.filtersFromTags, doc: body.query });
+    const key = `${product}:${page}`;
+    if (fail[key]) return new Response('', { status: fail[key] });
+    const total = product === 65 ? subTotal : (sizes[product] ?? 0);
+    const from = (page - 1) * limit;
+    const n = Math.max(0, Math.min(limit, total - from));
+    const base = product * 1000;
+    return Response.json(
+      answer(
+        Array.from({ length: n }, (_, i) =>
+          sku(base + from + i + 1 - 900000, { isVip: (from + i + 1) % vipEvery === 0 }),
+        ),
+        total,
+      ),
+    );
+  };
+  return { calls, fetchFn };
+}
+const CATS = () => globalThis.OHRules.conciergeStore.categories;
+
+test('getSubStore: a Concierge account reads each store category and keeps only isVip items', async () => {
+  const shop = fakeStore({ sizes: { 72: 150, 268: 230, 289: 40 }, vipEvery: 10 });
+  let pauses = 0;
+  const r = await OH.getSubStore({
+    account: CC,
+    fetchFn: shop.fetchFn,
+    pause: () => {
+      pauses++;
+      return Promise.resolve();
+    },
+  });
+  assert.equal(r.ok, true);
+  // Every category the rule names, in order, each with its products and no facet; the
+  // Subscriber Store isn't asked for an account that isn't a subscriber.
+  assert.deepEqual(
+    [...new Set(shop.calls.map((c) => c.product))],
+    CATS().map((c) => c.products[0]),
+  );
+  assert.ok(shop.calls.every((c) => c.facets === undefined && /isVip/.test(c.doc)));
+  // Ships 150 (2 pages), paints 230 (3), gear 40 (1), the rest one empty page each.
+  const asked = 2 + 3 + 1 + (CATS().length - 3);
+  assert.equal(shop.calls.length, asked);
+  assert.equal(pauses, asked - 1); // a pause before every request but the first
+  assert.equal(r.list.items.length, 15 + 23 + 4);
+  assert.ok(r.list.items.every((i) => i.concierge === true));
+  assert.deepEqual([...new Set(r.list.items.map((i) => i.kind))], ['ships', 'paints', 'gear']);
+  assert.equal(r.list.total, 42);
+  assert.equal(r.list.partial, false);
+  // Once a day, like the Subscriber Store.
+  const again = await OH.getSubStore({ account: CC, fetchFn: shop.fetchFn, pause: noPause });
+  assert.equal(again.list.items.length, 42);
+  assert.equal(shop.calls.length, asked);
+});
+
+test('getSubStore: a subscriber with Concierge gets both parts, one item each, marked', async () => {
+  // The Subscriber Store marks every 5th isVip, and so do the paints.
+  const shop = fakeStore({ subTotal: 12, sizes: { 268: 20 }, vipEvery: 5 });
+  const r = await OH.getSubStore({
+    account: { ...SUB, concierge: { level: 'Lieutenant' } },
+    fetchFn: shop.fetchFn,
+    pause: noPause,
+  });
+  assert.equal(shop.calls[0].product, 65);
+  assert.deepEqual(shop.calls[0].facets.facetIdentifiers, ['extras-subscribers-store']);
+  const subs = r.list.items.filter((i) => i.kind === 'subscriber');
+  assert.equal(subs.length, 12); // every Subscriber Store item, marked or not
+  assert.deepEqual(
+    subs.filter((i) => i.concierge).map((i) => i.id),
+    ['65005', '65010'],
+  );
+  assert.equal(r.list.items.filter((i) => i.kind === 'paints').length, 4);
+  assert.equal(r.list.total, 16);
+  assert.equal(r.list.partial, false);
+});
+
+test('getSubStore: a refusal in the Concierge part stops the read and keeps what came in', async () => {
+  const shop = fakeStore({ sizes: { 72: 100, 268: 300 }, vipEvery: 10, fail: { '268:2': 403 } });
+  const r = await OH.getSubStore({ account: CC, fetchFn: shop.fetchFn, pause: noPause });
+  assert.equal(r.ok, true);
+  assert.equal(r.list.partial, true);
+  assert.equal(r.list.items.length, 10 + 10); // ships, then paints page 1
+  // Nothing asked after the refusal.
+  assert.deepEqual([shop.calls.at(-1).product, shop.calls.at(-1).page], [268, 2]);
+  // Refused before any item came in: the read fails and asks nothing more.
+  store = {};
+  const early = fakeStore({ sizes: { 72: 100 }, fail: { '72:1': 429 } });
+  const x = await OH.getSubStore({ account: CC, fetchFn: early.fetchFn, pause: noPause });
+  assert.equal(x.ok, false);
+  assert.equal(x.error, 'busy');
+  assert.equal(early.calls.length, 1);
+});
+
+test('getSubStore: the Concierge part stops at the page budget the rule sets', async () => {
+  const max = globalThis.OHRules.conciergeStore.maxPages;
+  const shop = fakeStore({ sizes: { 72: 100 * (max + 5) }, vipEvery: 50 });
+  const r = await OH.getSubStore({ account: CC, fetchFn: shop.fetchFn, pause: noPause });
+  assert.equal(shop.calls.length, max);
+  assert.equal(r.list.partial, true);
+});
+
+test('sync: Concierge items carry their kind and mark, and fit the sync format', async () => {
+  const shop = fakeStore({ sizes: { 268: 30 }, vipEvery: 10 });
+  const { list } = await OH.getSubStore({ account: CC, fetchFn: shop.fetchFn, pause: noPause });
+  const db = { schemaVersion: SHAPE.DB_VERSION, sources: {} };
+  const payload = SHAPE.exportPayload({ db, subStore: list, appVersion: '0.3.0', now: 0 });
+  assert.deepEqual(Object.keys(payload.sources.subStore.items[0]), [
+    'id',
+    'name',
+    'kind',
+    'concierge',
+    'url',
+    'img',
+    'price',
+    'was',
+    'pack',
+    'inStock',
+  ]);
+  assert.equal(payload.sources.subStore.items[0].kind, 'paints');
+  assert.equal(payload.sources.subStore.items[0].concierge, true);
+  assert.equal(SHAPE.checkPayload(JSON.parse(JSON.stringify(SHAPE.syncPayload(payload)))), null);
 });
