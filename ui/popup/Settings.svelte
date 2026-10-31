@@ -304,13 +304,15 @@
                 id="pp-auto-sw"
                 aria-checked={autoOn}
                 aria-labelledby="pp-auto-l"
-                aria-describedby="pp-auto-line"
+                aria-describedby={line ? 'pp-auto-line' : null}
                 onclick={autoSwitch}><i></i></button
               >
             </div>
-            <!-- One line (copy.js popup.scan-reminder-*, data.js reminderLine): what it does,
-                 the last reminder or a day skipped; amber when notifications were refused. -->
-            <p class="pp-msg" class:calm={!line.ask} id="pp-auto-line">{t(line.key, { when: line.when })}</p>
+            <!-- One line (copy.js popup.scan-reminder-*, data.js reminderLine): the last reminder
+                 or a day skipped; amber when notifications were refused; none otherwise. -->
+            {#if line}
+              <p class="pp-msg" class:calm={!line.ask} id="pp-auto-line">{t(line.key, { when: line.when })}</p>
+            {/if}
           </div>
         {/if}
       {:else if siteOn}

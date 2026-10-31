@@ -149,16 +149,13 @@ test("the Daily Scan Reminder's line: what it does, the last reminder, a day ski
   assert.equal(lineWhen(at, new Date(2026, 9, 15, 7).getTime(), 'en-US'), 'Oct 14, 6:12 AM');
   const say = (o, when = now) => {
     const l = reminderLine(o, when, 'en-US');
-    return { words: t(l.key, { when: l.when }), ask: l.ask };
+    return l && { words: t(l.key, { when: l.when }), ask: l.ask };
   };
-  const hint = {
-    words: 'A notification when your last scan is over a day old. Click it to scan.',
-    ask: false,
-  };
-  assert.deepEqual(say({ on: false, rec: null }), hint, 'off');
-  assert.deepEqual(say({ on: false, rec: { at, line: 'shown' } }), hint, 'off, a record kept');
-  assert.deepEqual(say({ on: true, rec: null }), hint, 'on, no reminder yet');
-  assert.deepEqual(say({ on: true, rec: { at: null, line: 'shown' } }), hint);
+  // No hint line: off, or on with no reminder yet, shows nothing under the switch.
+  assert.equal(say({ on: false, rec: null }), null, 'off');
+  assert.equal(say({ on: false, rec: { at, line: 'shown' } }), null, 'off, a record kept');
+  assert.equal(say({ on: true, rec: null }), null, 'on, no reminder yet');
+  assert.equal(say({ on: true, rec: { at: null, line: 'shown' } }), null);
   assert.deepEqual(say({ on: true, rec: { at, line: 'shown' } }), {
     words: 'Last reminder: today 6:12 AM',
     ask: false,
@@ -171,8 +168,8 @@ test("the Daily Scan Reminder's line: what it does, the last reminder, a day ski
     words: 'Last reminder: Oct 14, 6:12 AM',
     ask: false,
   });
-  // Auto Scan Daily's lines are gone: a record of one shows what it does.
-  assert.deepEqual(say({ on: true, rec: { at, line: 'quick' } }), hint);
+  // Auto Scan Daily's lines are gone: a record of one shows nothing.
+  assert.equal(say({ on: true, rec: { at, line: 'quick' } }), null);
   // The browser said no to notifications as it was turned on.
   assert.deepEqual(say({ on: false, rec: null, denied: true }), {
     words: 'The reminder needs notifications, and your browser said no.',
@@ -817,8 +814,6 @@ test("popup copy: Title Case labels, no em dashes, and the basic page's words wo
     'popup.export-buybacks': 'Buy-Backs CSV',
     // The Daily Scan Reminder (Claude chat, Words, 2026-10-25).
     'popup.scan-reminder': 'Daily Scan Reminder',
-    'popup.scan-reminder-hint':
-      'A notification when your last scan is over a day old. Click it to scan.',
     'popup.scan-reminder-denied': 'The reminder needs notifications, and your browser said no.',
     'popup.scan-reminder-paused': 'Skipped {when}: scans are paused',
     'popup.scan-reminder-last': 'Last reminder: {when}',
