@@ -193,11 +193,9 @@ const COPY = {
     'Your synced copy stays on openhangar.space until you delete it there. This extension just stops syncing.',
   'popup.stay': 'Stay Connected',
   // The Daily Scan Reminder (the `autoScan` flag): its switch, in the openhangar.space
-  // group, and the one line under it (ui/popup/data.js reminderLine). Claude chat, Words,
-  // 2026-10-25.
+  // group, and the lines under it (ui/popup/data.js reminderLine). Claude chat, Words,
+  // 2026-10-25. Its hint line was dropped by the owner, 2026-10-31.
   'popup.scan-reminder': 'Daily Scan Reminder',
-  'popup.scan-reminder-hint':
-    'A notification when your last scan is over a day old. Click it to scan.',
   // Turned on, and the browser's notification ask said no (the switch goes back off).
   'popup.scan-reminder-denied': 'The reminder needs notifications, and your browser said no.',
   // A day skipped because the status file pauses scans.

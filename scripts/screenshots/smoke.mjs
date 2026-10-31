@@ -5367,8 +5367,8 @@ try {
     : fail(`popup Open My Hangar: ${went}`);
 
   // The Daily Scan Reminder: its switch in the openhangar.space group while connected,
-  // off until it's turned on, with one line under it in the approved words: what it
-  // does, then the last reminder or a day skipped; on asks for notifications as the
+  // off until it's turned on, with no line under it until a reminder went out: then the
+  // last reminder or a day skipped; on asks for notifications as the
   // click's first step, and a no turns it back off with its line, amber; a narrow window.
   await page.setViewport({ width: 360, height: 600 });
   const autoLink = { token: 't', name: 'demo@pilot', connectedAt: 1, lastSync: T0 - 60e3 };
@@ -5396,7 +5396,6 @@ try {
           return !!el && el.scrollWidth > el.clientWidth;
         })(),
     }));
-  const HINT = 'A notification when your last scan is over a day old. Click it to scan.';
   const autoOff = await autoState();
   await page.click('#pp-auto-sw');
   await sleep(200);
@@ -5404,15 +5403,14 @@ try {
   autoOff.sw === 'false' &&
   autoOff.inGroup &&
   autoOff.label === 'Daily Scan Reminder' &&
-  autoOff.line === HINT &&
-  autoOff.described === 'pp-auto-line' &&
-  autoOff.calm &&
+  autoOff.line === null &&
+  autoOff.described === null &&
   autoOn.sw === 'true' &&
   autoOn.kept === true &&
   autoOn.asked === 'notifications' &&
-  autoOn.line === HINT
+  autoOn.line === null
     ? ok(
-        'Daily Scan Reminder: off in the openhangar.space group with its hint; on asks for notifications',
+        'Daily Scan Reminder: off in the openhangar.space group with no hint line; on asks for notifications',
       )
     : fail(`popup scan reminder switch: ${JSON.stringify({ autoOff, autoOn })}`);
   const autoNow = await pageNow();
@@ -5442,8 +5440,8 @@ try {
   !autoOld.wide &&
   autoAgain.sw === 'false' &&
   autoAgain.kept === false &&
-  autoAgain.line === HINT
-    ? ok('Daily Scan Reminder: the last reminder, a day skipped, another day; off again, the hint')
+  autoAgain.line === null
+    ? ok('Daily Scan Reminder: the last reminder, a day skipped, another day; off again, no line')
     : fail(
         `popup scan reminder lines: ${JSON.stringify({ autoShown, autoPaused, autoOld, autoAgain })}`,
       );
