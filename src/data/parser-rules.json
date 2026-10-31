@@ -231,7 +231,7 @@
   "subStore": {
     "path": "/graphql",
     "operation": "GetBrowseSkusByFilter",
-    "query": "query GetBrowseSkusByFilter($query: SearchQuery, $storeFront: String = \"pledge\") {\n  store(browse: true, name: $storeFront) {\n    listing: search(query: $query) {\n      resources {\n        id name title url\n        media { thumbnail { storeSmall slideshow } }\n        nativePrice { amount discounted }\n        price { amount discounted }\n        stock { available unlimited }\n        ... on TySku { isPackage }\n      }\n      count\n      totalCount\n    }\n  }\n}",
+    "query": "query GetBrowseSkusByFilter($query: SearchQuery, $storeFront: String = \"pledge\") {\n  store(browse: true, name: $storeFront) {\n    listing: search(query: $query) {\n      resources {\n        id name title url\n        media { thumbnail { storeSmall slideshow } }\n        nativePrice { amount discounted }\n        price { amount discounted }\n        stock { available unlimited }\n        ... on TySku { isPackage isVip }\n      }\n      count\n      totalCount\n    }\n  }\n}",
     "variables": {
       "storeFront": "pledge",
       "query": {
@@ -247,6 +247,34 @@
     },
     "pageSize": 100,
     "pageSizeMin": 20
+  },
+  "conciergeStore": {
+    "path": "/graphql",
+    "operation": "GetBrowseSkusByFilter",
+    "query": "query GetBrowseSkusByFilter($query: SearchQuery, $storeFront: String = \"pledge\") {\n  store(browse: true, name: $storeFront) {\n    listing: search(query: $query) {\n      resources {\n        id name title url\n        media { thumbnail { storeSmall slideshow } }\n        nativePrice { amount discounted }\n        price { amount discounted }\n        stock { available unlimited }\n        ... on TySku { isPackage isVip }\n      }\n      count\n      totalCount\n    }\n  }\n}",
+    "variables": {
+      "storeFront": "pledge",
+      "query": { "sort": { "field": "weight", "direction": "desc" } }
+    },
+    "categories": [
+      { "kind": "ships", "products": [72] },
+      { "kind": "starter", "products": [45] },
+      { "kind": "packs", "products": [270] },
+      { "kind": "paints", "products": [268, 102] },
+      { "kind": "gear", "products": [289] },
+      {
+        "kind": "addons",
+        "products": [
+          3, 34, 35, 36, 37, 38, 40, 57, 86, 87, 88, 89, 90, 91, 92, 93, 95, 96, 99, 100, 101, 108,
+          109, 122, 123, 124, 129, 130, 131, 133, 134, 138, 150, 151, 152, 153, 154, 155, 156, 157,
+          158, 159, 160, 161
+        ]
+      },
+      { "kind": "subs", "products": [32, 33, 58, 261] }
+    ],
+    "pageSize": 100,
+    "pageSizeMin": 20,
+    "maxPages": 60
   },
   "upgrade": {
     "path": "/pledge-store/api/upgrade/graphql",

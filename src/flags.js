@@ -100,14 +100,16 @@
       default: false,
       devOnly: true,
     },
-    // Your Subscriber Store (#418; owner, 2026-10-31): a scan reads the Subscriber Store
-    // RSI shows the signed-in subscriber, at most once a day (src/lib.js getSubStore,
-    // ui/scan/runner.js), and sync sends it as sources.subStore
-    // (schema/sync-payload.schema.json) for the website's Store. RSI lists it only to a
-    // signed-in subscriber, so only the pilot's own extension can read it. Developer
-    // builds only until the privacy policy names it.
+    // Your Subscriber Store and Concierge items (#418; owner, 2026-10-31): a scan reads the
+    // Subscriber Store RSI shows the signed-in subscriber, and the pledge store items RSI
+    // marks for a Concierge member, at most once a day (src/lib.js getSubStore,
+    // ui/scan/runner.js), and sync sends them as sources.subStore
+    // (schema/sync-payload.schema.json) for the website's Store. RSI lists them only to
+    // that signed-in account, so only the pilot's own extension can read them. Developer
+    // builds only until the privacy policy names them.
     subStore: {
-      about: 'Your Subscriber Store: a scan reads it once a day and sync sends it.',
+      about:
+        'Your Subscriber Store and Concierge items: a scan reads them once a day and sync sends them.',
       default: false,
       devOnly: true,
     },

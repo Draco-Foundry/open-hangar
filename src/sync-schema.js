@@ -170,7 +170,7 @@
           },
           subStore: {
             description:
-              "Your Subscriber Store: the subscriber-only items RSI's store lists for the signed-in subscriber (RSI shows it to no one else, so only the pilot's own extension can read it), read at most once a day behind the subStore build flag. Strict all the way down: each item's id, name, address, picture, price and kit mark, nothing about the account.",
+              "Your Subscriber Store and Concierge items: the store items RSI lists only for the signed-in account (the Subscriber Store for a subscriber, and the pledge store items RSI marks for Concierge members for an account with a Concierge level; RSI shows them to no one else, so only the pilot's own extension can read them), read at most once a day behind the subStore build flag. Strict all the way down: each item's id, name, kind, Concierge mark, address, picture, price and kit mark, nothing about the account.",
             type: 'object',
             required: ['items'],
             additionalProperties: false,
@@ -233,13 +233,17 @@
       },
       subStoreItem: {
         description:
-          "One Subscriber Store item as RSI's store lists it: its SKU id, name, its page and picture on RSI's site, the price you pay and the price before a discount (was, null without one) in whole US cents, whether it's a kit or set (pack), and whether it's in stock.",
+          "One item as RSI's store lists it for the account: its SKU id, name, kind (subscriber: from the Subscriber Store; else the store category it was read from), whether RSI marks it for Concierge members (concierge), its page and picture on RSI's site, the price you pay and the price before a discount (was, null without one) in whole US cents, whether it's a kit or set (pack), and whether it's in stock. kind and concierge are missing from extensions before them: read that as a Subscriber Store item.",
         type: 'object',
         required: ['id', 'name'],
         additionalProperties: false,
         properties: {
           id: { type: 'string', pattern: '^\\d{1,12}$' },
           name: { type: 'string', minLength: 1, maxLength: 200 },
+          kind: {
+            enum: ['subscriber', 'ships', 'starter', 'packs', 'paints', 'gear', 'addons', 'subs'],
+          },
+          concierge: { type: 'boolean' },
           url: { $ref: '#/$defs/rsiUrl' },
           img: { $ref: '#/$defs/rsiUrl' },
           price: { type: ['integer', 'null'], minimum: 0 },
