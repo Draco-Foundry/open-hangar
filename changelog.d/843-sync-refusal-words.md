@@ -1,0 +1,1 @@
+- Improved: **Clearer sync messages.** When a sync can't go through because you scanned while signed out of RSI, or because your openhangar.space account holds as many RSI accounts as it can, Open Hangar now says what to do instead of showing an error number.
