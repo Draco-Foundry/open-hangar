@@ -228,6 +228,26 @@
     "campaigns": { "current": "2", "legacy": "1" },
     "pageSize": 50
   },
+  "subStore": {
+    "path": "/graphql",
+    "operation": "GetBrowseSkusByFilter",
+    "query": "query GetBrowseSkusByFilter($query: SearchQuery, $storeFront: String = \"pledge\") {\n  store(browse: true, name: $storeFront) {\n    listing: search(query: $query) {\n      resources {\n        id name title url\n        media { thumbnail { storeSmall slideshow } }\n        nativePrice { amount discounted }\n        price { amount discounted }\n        stock { available unlimited }\n        ... on TySku { isPackage }\n      }\n      count\n      totalCount\n    }\n  }\n}",
+    "variables": {
+      "storeFront": "pledge",
+      "query": {
+        "skus": {
+          "filtersFromTags": {
+            "tagIdentifiers": [],
+            "facetIdentifiers": ["extras-subscribers-store"]
+          },
+          "products": [65]
+        },
+        "sort": { "field": "weight", "direction": "desc" }
+      }
+    },
+    "pageSize": 100,
+    "pageSizeMin": 20
+  },
   "upgrade": {
     "path": "/pledge-store/api/upgrade/graphql",
     "storeList": {
