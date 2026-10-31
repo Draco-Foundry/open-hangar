@@ -191,7 +191,9 @@ Everything automated lives in `.github/workflows/`:
   tag's commit, and nothing uploads until the owner approves the `stores` environment.
   A dry run checks it on PRs that touch publishing. See [docs/STORE.md](docs/STORE.md).
 - **Ship catalog** (`ship-catalog.yml`): weekly refresh of `src/data/ship-catalog.json`,
-  opened as a PR from the `bot/ship-catalog` branch only when it changed.
+  opened as a PR from the `bot/ship-catalog` branch only when it changed. It starts CI on
+  the branch and turns on squash auto-merge, so it lands by itself once `test` passes (only
+  while the PR changes nothing but that file).
 - **RSI canary** (`canary.yml`): once a day, runs the real parsers on RSI's public pages
   and tells #ops if something changed. See [docs/RSI-CHANGES.md](docs/RSI-CHANGES.md).
 
