@@ -704,3 +704,49 @@ test('the Wishlist: what is on sale first, each side in its own order', async ()
   // No sale feed kept: the list as it is.
   assert.equal(onSaleFirst(list, wishSale(null)), list);
 });
+
+test('search: one row per ship, the maker prefix off (Starfarer, Starfarer Gemini)', async () => {
+  const { searchEntries, searchWish, plainShipName, shipNames } = await search();
+  const misc = 'Musashi Industrial and Starflight Concern';
+  assert.equal(plainShipName({ name: 'MISC Starfarer', mfr: misc }), 'Starfarer');
+  assert.equal(plainShipName({ name: 'MISC Starfarer Gemini', mfr: misc }), 'Starfarer Gemini');
+  assert.equal(plainShipName({ name: 'Starfarer', mfr: misc }), 'Starfarer');
+  assert.equal(
+    plainShipName({ name: 'Cutlass Black', mfr: 'Drake Interplanetary' }),
+    'Cutlass Black',
+  );
+  const was = globalThis.OH;
+  globalThis.OH = {
+    getShipCatalog: async () => [
+      { name: 'MISC Starfarer', mfr: misc },
+      { name: 'MISC Starfarer Gemini', mfr: misc },
+      { name: 'Cutlass Black', mfr: 'Drake Interplanetary' },
+    ],
+  };
+  const names = await shipNames();
+  globalThis.OH = was;
+  assert.deepEqual(
+    [...names],
+    [
+      ['starfarer', 'Starfarer'],
+      ['starfarer-gemini', 'Starfarer Gemini'],
+      ['cutlass-black', 'Cutlass Black'],
+    ],
+  );
+  const feed = {
+    ships: [
+      { slug: 'starfarer', name: 'Starfarer', keys: [] },
+      { slug: 'starfarer-gemini', name: 'Starfarer Gemini', keys: [] },
+    ],
+    items: [{ id: 'sku-30', kind: 'paint', name: 'Starfarer - Green Paint', price: 5, ships: [] }],
+  };
+  const found = searchWish(searchEntries({ names, feed }), 'starfar');
+  assert.deepEqual(
+    found.map((e) => [e.key, e.name]),
+    [
+      ['ship:starfarer', 'Starfarer'],
+      ['ship:starfarer-gemini', 'Starfarer Gemini'],
+      ['sku:30', 'Starfarer - Green Paint'],
+    ],
+  );
+});

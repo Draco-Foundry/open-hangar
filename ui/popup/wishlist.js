@@ -54,6 +54,23 @@ export async function saleFeed() {
   }
 }
 
+// The ship list writes some makers' ships with the maker's short name in front ("MISC
+// Starfarer"); the website and the rest of the popup say "Starfarer", and its Wishlist key
+// is ship:starfarer. The prefix is the first word when it spells the initials of the ship's
+// maker (mfr: "Musashi Industrial and Starflight Concern" → MISC). Pure.
+export function plainShipName(s) {
+  const name = String(s?.name ?? '').trim();
+  const first = name.split(/\s+/)[0];
+  const initials = String(s?.mfr ?? '')
+    .split(/\s+/)
+    .filter((w) => /^[A-Z]/.test(w))
+    .map((w) => w[0])
+    .join('');
+  return first.length > 1 && first === initials && name.length > first.length
+    ? name.slice(first.length).trim()
+    : name;
+}
+
 // Ship names by the website's slug (ship:<slug>), from the ship list the extension
 // already keeps for prices (OH.getShipCatalog: bundled, plus the public list from
 // openhangar.space at most once a day). → Map, empty when there's none.
@@ -64,8 +81,9 @@ export async function shipNames() {
     const list = OH?.getShipCatalog ? await OH.getShipCatalog() : [];
     for (const s of Array.isArray(list) ? list : []) {
       if (!s || typeof s.name !== 'string' || !s.name) continue;
-      const slug = shipSlug(s.name);
-      if (slug && !names.has(slug)) names.set(slug, s.name);
+      const name = plainShipName(s);
+      const slug = shipSlug(name);
+      if (slug && !names.has(slug)) names.set(slug, name);
     }
   } catch {
     // No ship list: those keys stay counted, never guessed.
