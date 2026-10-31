@@ -4,6 +4,12 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.5.6 — 2026-10-31
+
+- Fixed: **A first scan that stops partway.** It no longer keeps the part it read, so only a whole hangar is ever saved or synced. Scan again to read it all.
+- Fixed: **The New in button clears.** Once you've opened it, it's gone, and it leaves on its own a week after an update.
+- Fixed: **How long a scan took.** When a scan ends, the popup now shows it (like "Scanned in 12s") for 5 seconds.
+
 ## 0.5.5 — 2026-10-27
 
 - Fixed: **Scans that stop partway.** The popup no longer stays on Scanning: it says the scan stopped, offers Scan Again and keeps your last full scan.

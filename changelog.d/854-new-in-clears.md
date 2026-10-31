@@ -1,1 +1,0 @@
-- Fixed: **The New in button clears.** Once you've opened it, it's gone, and it leaves on its own a week after an update.
