@@ -322,7 +322,7 @@ const state = {
   bbTraits: new Map(), // buy-back filter picks: group key → Set of option keys (BB_GROUPS)
   bbLayout: 'gallery', // gallery | compact | list | market (independent of inventory)
   owner: null, // { nickname, displayname } the stored data was scanned from
-  storeCredit: null, // dollars, from the RSI account (counts in Account Value)
+  storeCredit: null, // dollars, from the RSI account (its own number, not in Account Value)
   shown: new Set(), // inventory kind filter
   traits: new Map(), // inventory filter picks: group key → Set of option keys (INV_GROUPS)
   priceOf: null, // ship name → { msrp } resolver (OH.getShipIndex), once loaded
@@ -625,7 +625,7 @@ function hangarValue() {
   }
   return valueCache.value;
 }
-// OH.accountValue (everything you own: ships, CCUs, other pledges, Store Credit),
+// OH.accountValue (everything you own at today's store price; Store Credit is its own number),
 // memoised like hangarValue. Null until store prices load.
 let acctCache = { v: null, credit: null, value: null };
 function accountValue() {
@@ -861,7 +861,7 @@ function renderAccount() {
     updateSignedOutBanner(loggedOut);
     renderWelcome();
 
-    // Store Credit counts toward Account Value.
+    // Store Credit is shown on its own, not in Account Value.
     const c = a.credits || {};
     const store = c.store ? c.store.value / 100 : null;
     if (store !== state.storeCredit) state.storeCredit = store;
@@ -2818,23 +2818,8 @@ const fmtDay = (t) => new Date(t).toLocaleDateString(undefined, { dateStyle: 'me
 // Account value of a history snapshot, on the same rules as the headline
 // (OH.snapshotValue): pledges still owned count exactly as today; ones since melted
 // or gifted are estimated from their name or their melt value.
-// The latest scan is "now": if it predates Store Credit being recorded, it takes
-// today's credit, so the chart always ends on the headline.
 function snapshotStore(snap) {
-  const hist = state.history || [];
-  const latest = snap === hist[hist.length - 1];
-  const s =
-    !Number.isFinite(snap.credit) && latest && state.storeCredit != null
-      ? { ...snap, credit: state.storeCredit }
-      : snap;
-  return OH.snapshotValue(s, accountValue(), state.priceOf);
-}
-// Tooltip note for chart points from scans that didn't record Store Credit.
-function creditNote(snap) {
-  const hist = state.history || [];
-  return Number.isFinite(snap.credit) || snap === hist[hist.length - 1]
-    ? ''
-    : ' (Store Credit not recorded)';
+  return OH.snapshotValue(snap, accountValue(), state.priceOf);
 }
 
 // Stats is the Svelte page in ui/stats (mounted into #stats-body); this only loads
@@ -5856,7 +5841,6 @@ window.OHApp = {
   hangarValue,
   // A history snapshot's ships at today's store prices (same as Stats → History).
   accountValue,
-  creditNote,
   // A history snapshot's value on the headline's rules (same as Stats → History).
   snapshotStore: (snap) => (state.priceOf ? snapshotStore(snap) : null),
   money,

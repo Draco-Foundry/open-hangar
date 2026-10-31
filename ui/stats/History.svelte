@@ -17,7 +17,7 @@
     B = 22;
 
   function chart(a, hist) {
-    const pts = hist.map((h) => ({ t: h.at, v: a.snapshotStore(h), note: a.creditNote(h) }));
+    const pts = hist.map((h) => ({ t: h.at, v: a.snapshotStore(h) }));
     const t0 = pts[0].t,
       t1 = pts[pts.length - 1].t || t0 + 1;
     const vmin = Math.min(...pts.map((p) => p.v)),
@@ -30,7 +30,7 @@
       dots: pts.map((p) => ({
         cx: x(p.t),
         cy: y(p.v),
-        tip: `${a.fmtDay(p.t)}: ${a.dollars(p.v)}${p.note}`,
+        tip: `${a.fmtDay(p.t)}: ${a.dollars(p.v)}`,
       })),
       max: a.dollars(vmax),
       min: a.dollars(vmin),
@@ -97,8 +97,7 @@
     </svg>
     <p class="muted value-note tight">
       Everything you held at each scan, valued like Account Value today: ships at today's store
-      prices, CCUs at standard price, everything else at melt value, plus Store Credit from scans
-      that recorded it. Pledges you've since melted are estimated from their names.
+      prices, CCUs at standard price, everything else at melt value. Pledges you've since melted are estimated from their names.
     </p>
   {:else}
     <p class="muted">Loading ship prices…</p>

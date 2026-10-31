@@ -3555,7 +3555,7 @@
   //  ccus:  CCUs at standard price, the gap between the two ships (melt value when
   //         either ship is unpriced)
   //  other: paints, gear, add-ons, hangars, game packages, at melt value
-  //  credit: Store Credit, dollars
+  //  credit: Store Credit, dollars; shown on its own, never in the total (owner, 2026-10-31)
   // Buy-backs, UEC and REC don't count. `byId[id]` is each pledge's share, so a
   // history snapshot can be valued with exactly the same numbers.
   OH.accountValue = function accountValue(items, priceOf, credit, hv) {
@@ -3582,7 +3582,7 @@
       out.byId[p.id] = amt;
     }
     out.credit = Number.isFinite(credit) && credit > 0 ? credit : 0;
-    out.total = out.ships + out.ccus + out.other + out.credit;
+    out.total = out.ships + out.ccus + out.other;
     return out;
   };
 
@@ -3590,7 +3590,7 @@
   // same rules. Pledges still owned count exactly as in `acct.byId`; ones since
   // melted or gifted: a ship pledge is priced from its name ("Standalone Ship -
   // Cutlass Black" → Cutlass Black), anything else at the melt value it had.
-  // Store Credit only when the snapshot recorded it (older ones didn't). Pure.
+  // Store Credit is not in it (a snapshot still records it, shown on its own). Pure.
   OH.snapshotValue = function snapshotValue(snap, acct, priceOf) {
     let sum = 0;
     for (const [id, name, melt] of snap.items) {
@@ -3611,7 +3611,7 @@
       const hit = priceOf && (priceOf(base) || priceOf(bare));
       sum += hit && hit.msrp ? hit.msrp : m;
     }
-    return sum + (Number.isFinite(snap.credit) ? snap.credit : 0);
+    return sum;
   };
 
   // Fleet stats from the wiki's per-ship data: every ship in every pledge (a

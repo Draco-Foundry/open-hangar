@@ -191,10 +191,7 @@
       const { priceOf } = await OH.getShipIndex();
       const acct = OH.accountValue(v.items, priceOf, storeCredit(got.account));
       value = acct;
-      // Scans from before Store Credit was recorded count today's credit, so the change
-      // is the hangar's own.
-      const valueOf = (s) =>
-        OH.snapshotValue(s, acct, priceOf) + (Number.isFinite(s.credit) ? 0 : acct.credit);
+      const valueOf = (s) => OH.snapshotValue(s, acct, priceOf);
       since = valueSince(stored.history, acct.total, valueOf, v.scannedAt, got.account?.credits?.uec?.value);
     } else {
       value = null;

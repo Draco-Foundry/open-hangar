@@ -286,7 +286,7 @@ test('getFxRates asks at most once a day, even after a try that failed', async (
 });
 
 // Account Value (#164, #165): everything owned, one rule set for today and history.
-test('accountValue counts ships, CCUs, other pledges at melt and Store Credit', () => {
+test('accountValue counts ships, CCUs, other pledges at melt; Store Credit is its own number', () => {
   const items = [
     {
       id: 'a',
@@ -320,7 +320,7 @@ test('accountValue counts ships, CCUs, other pledges at melt and Store Credit', 
   assert.equal(v.ccus, 600 - 110); // standard price, the gap between the ships
   assert.equal(v.other, 12); // paint at melt
   assert.equal(v.credit, 42.5);
-  assert.equal(v.total, 675 + 490 + 12 + 42.5);
+  assert.equal(v.total, 675 + 490 + 12); // Store Credit is not in it
   assert.equal(v.byId.c, 12);
 });
 
@@ -372,7 +372,7 @@ test('a snapshot keeps Store Credit and UEC when known, and neither when not', (
   assert.deepEqual(OH.snapshotOf(items, 5), { at: 5, items: [['1', 'Gladius', 90]] });
 });
 
-test('gone pledges: ships from their name, anything else at melt; old snapshots skip credit', () => {
+test('gone pledges: ships from their name, anything else at melt; Store Credit is not in it', () => {
   const v = OH.accountValue([], priceOf, 0);
   const snap = {
     at: 1,
@@ -384,7 +384,7 @@ test('gone pledges: ships from their name, anything else at melt; old snapshots 
     ],
   };
   assert.equal(OH.snapshotValue(snap, v, priceOf), 110 + 8 + 20 + 5);
-  assert.equal(OH.snapshotValue({ ...snap, credit: 30 }, v, priceOf), 110 + 8 + 20 + 5 + 30);
+  assert.equal(OH.snapshotValue({ ...snap, credit: 30 }, v, priceOf), 110 + 8 + 20 + 5);
 });
 
 test('a scan that only changes Store Credit keeps a new snapshot', () => {
