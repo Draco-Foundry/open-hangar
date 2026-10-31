@@ -246,7 +246,7 @@
       {#if siteOn && v.connected}
         <div class="pp-r">
           <i class="pp-dot" class:on={!trouble} class:warn={!!trouble} aria-hidden="true"></i>
-          <span class="pp-grow">{t('popup.connected', { name: v.connected.name })}</span>
+          <span class="pp-grow pp-cut">{t('popup.connected', { name: v.connected.name })}</span>
           <span class="pp-val"
             >{syncing
               ? t('popup.syncing')
@@ -254,6 +254,13 @@
                 ? t('popup.synced', { when: ago(v.connected.lastSync) })
                 : t('popup.not-synced')}</span
           >
+          {#if !pilot && !askDisconnect}
+            <!-- Each scan syncs, so Sync Now is a small link beside it; Disconnect another. -->
+            <button type="button" class="pp-link" id="pp-sync" disabled={syncing || busy} onclick={sync}
+              >{t('popup.sync-now')}</button
+            >
+            <button type="button" class="pp-link quiet" id="pp-disconnect" onclick={openAsk}>{t('popup.disconnect')}</button>
+          {/if}
         </div>
         {#if trouble}
           <div class="pp-r pp-col" id="pp-sync-trouble">
@@ -281,14 +288,6 @@
               >
               <button type="button" class="pp-btn2 warn" id="pp-disconnect-yes" onclick={leave}>{t('popup.disconnect')}</button>
             </div>
-          </div>
-        {:else}
-          <!-- Sync Now the main button, Disconnect a quiet link beside it. -->
-          <div class="pp-r pp-syncrow">
-            <button type="button" class="pp-btn2 main" id="pp-sync" disabled={syncing || busy} onclick={sync}
-              >{t('popup.sync-now')}</button
-            >
-            <button type="button" class="pp-link quiet" id="pp-disconnect" onclick={openAsk}>{t('popup.disconnect')}</button>
           </div>
         {/if}
         <!-- A failure already under Last Sync Didn't Go Through isn't said twice. -->
@@ -335,11 +334,9 @@
               id="pp-nt-sw"
               aria-checked={notify}
               aria-labelledby="pp-nt-l"
-              aria-describedby="pp-nt-hint"
               onclick={notifySwitch}><i></i></button
             >
           </div>
-          <p class="pp-msg calm" id="pp-nt-hint">{t('popup.notifications-hint')}</p>
         </div>
       {/if}
     </div>

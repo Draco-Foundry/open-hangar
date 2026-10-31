@@ -204,7 +204,6 @@ const COPY = {
   'popup.auto-today': 'today {time}',
   'popup.notifications': 'Notifications', // the switch's name
   // The muted line under it. Claude chat, Words, 2026-10-23.
-  'popup.notifications-hint': 'A pop-up when a Remind Me item goes on sale.',
   'popup.look': 'Look',
   'popup.look-auto': 'Match Browser',
   'popup.look-dark': 'Dark',
