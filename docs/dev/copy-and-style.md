@@ -27,6 +27,9 @@
   hint after a joke label when needed. Legal and privacy text stays plain.
 - **Don't name other community tools or sites** in public text, except required data
   and license credits (#448).
+- **The ™ mark:** "Open Hangar™" appears only in the README and the website's Legal
+  Notice, never in the extension, store titles, emails or every mention. No ® until the
+  mark is registered.
 
 ## What Not to Build
 
