@@ -194,7 +194,7 @@ const COPY = {
   'popup.disconnect-body':
     'Your synced copy stays on openhangar.space until you delete it there. This extension just stops syncing.',
   'popup.stay': 'Stay Connected',
-  // RSI Account Logs (the `accountLogs` flag, developer builds only): the Settings row
+  // RSI Account Logs (the `accountLogs` flag, every build from 0.5.8): the Settings row
   // and its switch (on asks for the full history, src/lib.js wantAccountLogs; off stops
   // and removes the logs, stopAccountLogs), the button that reads the whole history
   // again, and the line under it while it loads. Approved in Words, 2026-11-01.

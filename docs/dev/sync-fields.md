@@ -199,7 +199,7 @@ policy's words are the owner's; this list never edits them.
 | `sources.subStore.meta`                              | How much of the list the last read got.                                                 |
 | `sources.subStore.meta.total`                        | How many items RSI said it lists.                                                       |
 | `sources.subStore.meta.complete`                     | True when every item came in.                                                           |
-| `sources.pledgeLog`                                  | RSI's pledge log (behind the accountLogs flag, dev only). Never a handle or an email.   |
+| `sources.pledgeLog`                                  | RSI's pledge log (accountLogs, with Account History on). Never a handle or an email.    |
 | `sources.pledgeLog.items`                            | The log's lines, newest first, at most 10,000.                                          |
 | `sources.pledgeLog.items[]`                          | One pledge event. Strict: no handle, email or payment field.                            |
 | `sources.pledgeLog.items[].at`                       | When it happened, UTC to the second.                                                    |
@@ -212,7 +212,7 @@ policy's words are the owner's; this list never edits them.
 | `sources.pledgeLog.meta`                             | How much of the log the reads covered.                                                  |
 | `sources.pledgeLog.meta.pages`                       | How many pages the log had.                                                             |
 | `sources.pledgeLog.meta.unread`                      | Lines the parser could not read (left out).                                             |
-| `sources.creditLog`                                  | RSI's store credit log (behind the accountLogs flag, dev only).                         |
+| `sources.creditLog`                                  | RSI's store credit log (accountLogs, with Account History on).                          |
 | `sources.creditLog.items`                            | The log's lines, newest first, at most 10,000.                                          |
 | `sources.creditLog.items[]`                          | One store credit line. Strict: no payment field, nobody else.                           |
 | `sources.creditLog.items[].at`                       | When it happened, UTC to the second.                                                    |
