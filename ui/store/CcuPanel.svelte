@@ -24,7 +24,7 @@
       const si = v && v.pledges[p.id];
       const s = stacks.get(key) || { key, from, to, n: 0, paid: 0, worth: null };
       s.n++;
-      s.paid += Number.isFinite(p.value) ? p.value : 0;
+      s.paid += OH().usdValue(p) ?? 0; // dollars only, never UEC
       if (si && si.from && si.to) s.worth = si.to - si.from;
       stacks.set(key, s);
     }

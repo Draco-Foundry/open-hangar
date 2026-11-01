@@ -649,6 +649,8 @@ function storeInfo(p) {
 function formatValue(p) {
   if (!Number.isFinite(p.value)) return '';
   if (streamer.on) return MASK;
+  // In-game money: "5,000 UEC", never "$5000.00 UEC" (OH.uecText, the one UEC style).
+  if (OH.isUEC(p)) return OH.uecText(p.value);
   if (!p.currency || p.currency === 'USD' || !/^[A-Z]{3}$/.test(p.currency)) return money(p.value);
   const s = '$' + p.value.toFixed(2);
   // Only append a real non-USD ISO-4217 code. Guards against RSI's junk currency
@@ -1415,7 +1417,7 @@ function filterView({ items, kinds, shown, groups, picks, cap }) {
 function applyInvFilters(list) {
   list = applyGroups(list, INV_GROUPS, state.traits);
   if (state.meltMax != null)
-    list = list.filter((p) => Number.isFinite(p.value) && p.value <= state.meltMax);
+    list = list.filter((p) => OH.usdValue(p) != null && OH.usdValue(p) <= state.meltMax);
   return list;
 }
 // Inventory's sidebar.
@@ -1431,7 +1433,7 @@ function invFilters() {
         title: 'Melt Value',
         pill: 'Melt',
         value: state.meltMax,
-        of: (p) => p.value,
+        of: (p) => OH.usdValue(p), // dollars: a UEC price isn't on this scale
       },
     }),
     switches: [
@@ -1794,7 +1796,7 @@ function marketRow(g) {
   return {
     key: g.key,
     ids: g.ids,
-    melt: Number.isFinite(p.value) ? p.value * fx.rate : '',
+    melt: OH.usdValue(p) != null ? OH.usdValue(p) * fx.rate : '', // dollars only, never UEC
     name: plainName(p),
     ins: marketInsurance(p),
     gift: giftableLabel(g),
@@ -1957,7 +1959,7 @@ function marketCsv(sections) {
         giftableLabel(g),
         meltLabel(g.rep),
         marketStore(g.rep),
-        pctOfMelt(saved && saved.price, g.rep.value * fx.rate),
+        pctOfMelt(saved && saved.price, (OH.usdValue(g.rep) ?? 0) * fx.rate), // UEC: none
         saved && saved.price != null ? saved.price : '',
         g.stock,
       ]);

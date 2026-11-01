@@ -2,7 +2,7 @@
   // Stats → Spending: what you've pledged per year (by pledge date) and the running
   // total. Uses each pledge's melt value, the store credit you'd get back, so gifts
   // and rewards count as $0 and upgrades count what they added.
-  import { app, version } from '../lib/app.svelte.js';
+  import { app, OH, version } from '../lib/app.svelte.js';
   import { flag } from '../lib/flags.js';
 
   // Builds with website sync say the pledges go once you connect (docs/FLAGS.md).
@@ -15,7 +15,7 @@
     let undated = 0;
     for (const p of a.state.items) {
       const y = /^(\d{4})/.exec(p.date || '');
-      const v = Number.isFinite(p.value) ? p.value : 0;
+      const v = OH().usdValue(p) ?? 0; // dollars only: a UEC price isn't pledged money
       if (!y) {
         undated += v;
         continue;

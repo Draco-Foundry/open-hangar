@@ -628,9 +628,10 @@ export function shortcutLabel(shortcut, mac) {
 //   { items: [], ... }      this scan found nothing new (it changed nothing, or only
 //                           removed or changed pledges)
 //   { items, total, since } the pledges new in it, in the hangar's order; `total` their
-//                           melt value; `since` the snapshot compared with
+//                           melt value in dollars; `since` the snapshot compared with
+// `usdValue` is OH.usdValue (src/lib.js): a pledge priced in UEC adds nothing to `total`.
 // Stays the same until the next scan. Pure.
-export function newSinceScan(history, items, scannedAt) {
+export function newSinceScan(history, items, scannedAt, usdValue = globalThis.OH?.usdValue) {
   if (!Array.isArray(history) || !history.length || !Number.isFinite(scannedAt)) return null;
   const last = history[history.length - 1];
   const none = { items: [], total: 0, since: null };
@@ -642,7 +643,7 @@ export function newSinceScan(history, items, scannedAt) {
     (p) => p && !had.has(String(p.id ?? '')),
   );
   if (!fresh.length) return none;
-  const total = fresh.reduce((a, p) => a + (Number.isFinite(p.value) ? p.value : 0), 0);
+  const total = fresh.reduce((a, p) => a + (usdValue(p) ?? 0), 0);
   return { items: fresh, total, since: Number.isFinite(before.at) ? before.at : null };
 }
 // Rows the popup lists; the rest are on the website's New view.

@@ -4803,6 +4803,52 @@ try {
         `New Since Last Scan: off by default; on, ${arr.total}, ${arr.name} with its marks and chip`,
       )
     : fail(`popup new since last scan: ${JSON.stringify({ offArrived, ...arr })}`);
+  // A new pledge priced in UEC (invented): its row says UEC as the UEC tile counts it,
+  // never "$", and neither the new total nor Account Value counts it (OH.usdValue).
+  const uecHook = await page.evaluateOnNewDocument(() => {
+    let flags;
+    const OH = (window.OH = window.OH || {});
+    Object.defineProperty(OH, 'flags', {
+      configurable: true,
+      get: () => flags,
+      set: (f) => (flags = Object.freeze({ ...f, newSinceScan: true })),
+    });
+  });
+  await popAt(
+    {
+      ...signedIn,
+      __demoPledge: {
+        id: 99001,
+        name: 'Hangar Decoration - Invented Plush',
+        value: 5000,
+        currency: 'UEC',
+        kind: 'other',
+        contents: [],
+        giftable: false,
+        meltable: false,
+      },
+    },
+    '#pp-arrived',
+  );
+  await page.removeScriptToEvaluateOnNewDocument(uecHook.identifier);
+  const uecRow = await page.evaluate(() => {
+    const s = document.querySelector('#pp-arrived');
+    const r = s.querySelector('.pp-arr');
+    return {
+      total: s.querySelector('#pp-arrived-total')?.textContent,
+      name: r?.querySelector('.pp-arrname')?.textContent,
+      melt: r?.querySelector('.pp-arrmelt')?.textContent,
+      title: r?.querySelector('.pp-arrmelt')?.title,
+      value: document.getElementById('pp-value')?.textContent,
+    };
+  });
+  uecRow.total === '1 new · $0 melt value' &&
+  uecRow.name === 'Hangar Decoration - Invented Plush' &&
+  uecRow.melt === '5 K UEC' &&
+  uecRow.title === '5,000 UEC' &&
+  uecRow.value === pop.value
+    ? ok(`New Since Last Scan: a UEC pledge shows ${uecRow.melt}, counted in no dollar total`)
+    : fail(`popup UEC pledge: ${JSON.stringify({ ...uecRow, was: pop.value })}`);
   // Numbers that fit their box (budgets: ui/popup/currency.js): the widest full figure and
   // huge ones, at 360 px. Nothing clips or scrolls, and the full figure is the tooltip.
   const fitCase = async (credits, tokens, extra = {}) => {
