@@ -2540,7 +2540,7 @@ function ensureStore() {
       storeByKey.set(s.lname, s);
     }
     if (currentView() === 'store') renderStore();
-    homeUpdated(); // an open ship window shows In Store Now
+    homeUpdated(); // an open ship window shows In Store
   });
   return storeRequested;
 }
@@ -2581,7 +2581,7 @@ function storeOf(name) {
     null;
   return hit && specialEdition(hit.name) === specialEdition(name) ? hit : null;
 }
-// What the catalog says about a wishlist entry or ship, as the "In Store Now" cell
+// What the catalog says about a wishlist entry or ship, as the "In Store" cell
 // shows it: { cls, text, title, url }, or null before the catalog has loaded.
 function stockLabel(e) {
   if (!catalog) return null;
@@ -4358,7 +4358,7 @@ async function runScan({ hangar = true, buybacks = true, referrals = true, store
     const text =
       n == null
         ? 'store list still on its way, checked next time'
-        : `${n} wishlist item${n === 1 ? '' : 's'} on sale`;
+        : `${n} Wishlist item${n === 1 ? '' : 's'} in the store`;
     parts.push(text);
     rows.push({ name: 'Store', ok: true, text });
   }
@@ -6220,7 +6220,7 @@ window.OHApp = {
     get active() {
       return currentView() === 'store';
     },
-    // The store catalog has loaded (In Store Now can be answered).
+    // The store catalog has loaded (In Store can be answered).
     get feedLoaded() {
       return !!catalog;
     },
@@ -6237,7 +6237,7 @@ window.OHApp = {
     shipKey,
     ownedShips,
     storeOf,
-    // A wishlist entry (or ship name) as the "In Store Now" cell shows it: { cls,
+    // A wishlist entry (or ship name) as the "In Store" cell shows it: { cls,
     // text, title, url }, or null until the catalog has loaded.
     stock: stockLabel,
     wishStatus: (e) => (catalog ? wishStatus(e) : null),

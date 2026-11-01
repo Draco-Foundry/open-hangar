@@ -137,7 +137,7 @@ const COPY = {
   // --- Wishlist tab ---
   // The tab's count of Remind Me items on sale now, for screen readers (the number shows
   // on its own). Claude chat, Words, 2026-10-23 (#785).
-  'popup.wish-tab-on-sale': '{n} on sale',
+  'popup.wish-tab-on-sale': '{n} in store',
   'popup.wish-count': 'Your Wishlist · {n}',
   // Items the store list can't name here, shown on the website.
   'popup.wish-more': 'And {n} more',

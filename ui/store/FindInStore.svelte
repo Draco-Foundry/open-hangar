@@ -64,7 +64,7 @@
           ship: title,
           title,
           price: ship.msrp ? a.dollars(ship.msrp) : '',
-          note: 'Not on Sale',
+          note: 'Not for Sale',
           entry: title,
         };
       }
