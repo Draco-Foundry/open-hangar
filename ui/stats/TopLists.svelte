@@ -1,7 +1,7 @@
 <script>
   // Stats → Top Lists: most valuable pledges, biggest savings vs store price, oldest
   // pledges, most valuable LTI ships. Every row opens its pledge.
-  import { app, version } from '../lib/app.svelte.js';
+  import { app, OH, version } from '../lib/app.svelte.js';
   import Row from './Row.svelte';
 
   const d = $derived.by(() => {
@@ -9,6 +9,8 @@
     const a = app();
     const items = a.state.items;
     const row = (p, right) => ({ id: p.id, name: a.plainName(p), right });
+    // Ranked in dollars (OH.usdValue): a UEC price isn't on the same scale.
+    const usd = (p) => OH().usdValue(p);
     const dt = (p) => {
       const t = Date.parse(p.date);
       return Number.isNaN(t) ? null : t;
@@ -26,8 +28,8 @@
       {
         title: 'Most Valuable Pledges',
         rows: items
-          .filter((p) => Number.isFinite(p.value) && p.value > 0)
-          .sort((x, y) => y.value - x.value)
+          .filter((p) => usd(p) > 0)
+          .sort((x, y) => usd(y) - usd(x))
           .slice(0, 10)
           .map((p) => row(p, a.formatValue(p))),
       },
@@ -49,8 +51,8 @@
       {
         title: 'Most Valuable LTI Ships',
         rows: items
-          .filter((p) => p.insurance === 'LTI' && p.containsShip && Number.isFinite(p.value))
-          .sort((x, y) => y.value - x.value)
+          .filter((p) => p.insurance === 'LTI' && p.containsShip && usd(p) != null)
+          .sort((x, y) => usd(y) - usd(x))
           .slice(0, 10)
           .map((p) => row(p, a.formatValue(p))),
       },

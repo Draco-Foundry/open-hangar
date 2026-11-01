@@ -99,7 +99,9 @@
   // Three rows, and always the link to the website's New view while connected (owner,
   // 2026-10-26: see more on openhangar.space); every row when there's no website.
   const NEW = flag('newSinceScan');
-  const arrived = $derived(NEW ? newSinceScan(db?.history, v.items, v.scannedAt) : null);
+  const arrived = $derived(
+    NEW ? newSinceScan(db?.history, v.items, v.scannedAt, OH.usdValue) : null,
+  );
   const newAll = $derived(arrived ? newViewUrl(v.myHangar) : null);
   const newRows = $derived(
     arrived ? (newAll ? arrived.items.slice(0, NEW_SHOWN) : arrived.items) : [],
@@ -108,6 +110,15 @@
   const melt = (n) =>
     moneyFit(n, fx, Number.isInteger(Math.round(n * 100) / 100) ? { most: 0 } : { cents: true });
   const newTotal = $derived(arrived ? melt(arrived.total) : null);
+  // A row's price: dollars as above, or a UEC price as the UEC tile counts it (countFit),
+  // never with a "$" (src/lib.js OH.isUEC).
+  const rowMelt = (p) => {
+    if (!OH.isUEC(p)) return melt(p.value);
+    const c = countFit(p.value);
+    return c
+      ? { text: `${c.text} UEC`, title: c.text !== c.full ? `${c.full} UEC` : null }
+      : { text: '' };
+  };
   let noPic = $state({}); // pledge id → its picture didn't load
 
 </script>
@@ -234,7 +245,7 @@
         {:else}
           {#if arrived.since}<small class="pp-arrwhen">{t('popup.new-since-when', { date: day(arrived.since) })}</small>{/if}
           {#each newRows as p (p.id)}
-            {@const m = melt(p.value)}
+            {@const m = rowMelt(p)}
             {@const ins = insChip(p.insurance)}
             {@const pic = rsiPicture(p.image)}
             <div class="pp-arr">

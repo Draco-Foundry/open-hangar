@@ -53,6 +53,8 @@
     if (!hist.length) return { backup };
     if (hist.length < 2) return { backup, since: a.fmtDay(hist[0].at) };
     const steps = [];
+    // A UEC-priced row's value as UEC (OH.uecText), never with a "$".
+    const amt = (n, c) => (c && c !== 'USD' ? OH().uecText(n) : a.money(n));
     for (let i = hist.length - 1; i > 0 && steps.length < 12; i--) {
       const diff = OH().diffSnapshots(hist[i - 1], hist[i]);
       steps.push({
@@ -60,11 +62,11 @@
         date: a.fmtDay(hist[i].at),
         summary: a.changeSummary(diff),
         changes: [
-          ...diff.added.map((c) => ['add', `+ ${c.name} (${a.money(c.value)})`]),
-          ...diff.removed.map((c) => ['del', `− ${c.name} (${a.money(c.value)})`]),
+          ...diff.added.map((c) => ['add', `+ ${c.name} (${amt(c.value, c.currency)})`]),
+          ...diff.removed.map((c) => ['del', `− ${c.name} (${amt(c.value, c.currency)})`]),
           ...diff.changed.map((c) => [
             'chg',
-            `~ ${c.from} to ${c.to} (${a.money(c.fromValue)} to ${a.money(c.toValue)})`,
+            `~ ${c.from} to ${c.to} (${amt(c.fromValue, c.currency)} to ${amt(c.toValue, c.currency)})`,
           ]),
         ],
       });

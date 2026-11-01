@@ -3,14 +3,18 @@
   // ship on your wishlist that buys, in the store or from your buy-backs (with
   // store credit a buy-back takes a token; cash ones don't). Owner's wording: no
   // "ticked", no "store credit if melted".
-  import { app, version } from '../lib/app.svelte.js';
+  import { app, OH, version } from '../lib/app.svelte.js';
 
   const d = $derived.by(() => {
     version.n;
     const a = app();
     const s = a.state;
     const picked = a.inv.picked();
-    const total = picked.reduce((acc, p) => acc + (a.inv.isMeltable(p) ? p.value : 0), 0);
+    // Dollars only (OH.usdValue): a pledge priced in UEC gives back no store credit here.
+    const total = picked.reduce(
+      (acc, p) => acc + (a.inv.isMeltable(p) ? (OH().usdValue(p) ?? 0) : 0),
+      0,
+    );
     if (!picked.length || !total) return null;
     const wish = a.store.wishShips(); // ships only (names); store items aren't melted into
     const priced = wish

@@ -396,3 +396,102 @@ test('a scan that only changes Store Credit keeps a new snapshot', () => {
   assert.equal(merged.length, 2);
   assert.equal(merged[1].credit, 25);
 });
+
+// UEC is in-game money: a pledge priced in it never counts as dollars in any total.
+const USD_AND_UEC = [
+  {
+    id: 'usd',
+    name: 'Paint - Carrack Pathfinder',
+    value: 100,
+    currency: 'USD',
+    contents: [{ kind: 'Skin', label: 'Pathfinder' }],
+  },
+  {
+    id: 'uec',
+    name: 'Hangar Decoration - Invented Plush',
+    value: 5000,
+    currency: 'UEC',
+    contents: [],
+  },
+];
+
+test('usdValue: dollars or no currency count; UEC, aUEC and other currencies do not', () => {
+  assert.equal(OH.usdValue({ value: 35, currency: 'USD' }), 35);
+  assert.equal(OH.usdValue({ value: 35 }), 35);
+  assert.equal(OH.usdValue({ value: 5000, currency: 'UEC' }), null);
+  assert.equal(OH.usdValue({ value: 5000, currency: 'aUEC' }), null);
+  assert.equal(OH.usdValue({ value: 5000, currency: 'EUR' }), null);
+  // Scanned before the parser marked it: RSI's own words still say UEC.
+  assert.equal(OH.usdValue({ value: 5000, currency: null, raw: { rawValue: '5,000 aUEC' } }), null);
+  assert.equal(OH.usdValue({ value: null, currency: 'USD' }), null);
+  assert.equal(OH.isUEC({ currency: 'UEC' }), true);
+  assert.equal(OH.isUEC({ currency: 'USD', raw: { rawValue: '$5.00 USD' } }), false);
+  assert.equal(OH.uecText(5000), '5,000 UEC');
+});
+
+test('a UEC pledge adds nothing to totalValue, hangarValue paid or accountValue', () => {
+  assert.equal(OH.totalValue(USD_AND_UEC), 100);
+  const hv = OH.hangarValue(
+    [
+      {
+        id: 's',
+        name: 'Standalone Ship - Carrack',
+        value: 100,
+        currency: 'USD',
+        contents: [{ kind: 'Ship', label: 'Carrack' }],
+      },
+      {
+        id: 'u',
+        name: 'Standalone Ship - Cutlass Black',
+        value: 5000,
+        currency: 'UEC',
+        contents: [{ kind: 'Ship', label: 'Cutlass Black' }],
+      },
+    ],
+    priceOf,
+  );
+  assert.equal(hv.paidPriced, 100);
+  assert.equal(hv.store, 600); // the Carrack only
+  assert.equal(hv.pledges.u, undefined);
+  const v = OH.accountValue(USD_AND_UEC, priceOf, 0);
+  assert.equal(v.total, 100);
+  assert.equal(v.byId.uec, 0);
+  assert.equal(v.unpriced, 0); // left out, not "with no price"
+});
+
+test('a snapshot keeps UEC as the 4th field; its totals count the USD pledge alone', () => {
+  const snap = OH.snapshotOf(USD_AND_UEC, 1);
+  assert.deepEqual(snap.items, [
+    ['usd', 'Paint - Carrack Pathfinder', 100],
+    ['uec', 'Hangar Decoration - Invented Plush', 5000, 'UEC'],
+  ]);
+  assert.equal(OH.snapshotMelt(snap), 100);
+  assert.equal(OH.snapshotValue(snap, OH.accountValue([], priceOf, 0), priceOf), 100);
+  assert.equal(OH.snapshotValue(snap, OH.accountValue(USD_AND_UEC, priceOf, 0), priceOf), 100);
+  // A UEC pledge arriving adds no melt; its row says it's UEC.
+  const d = OH.diffSnapshots({ at: 0, items: [snap.items[0]] }, snap);
+  assert.equal(d.melt, 0);
+  assert.deepEqual(d.added, [
+    { id: 'uec', name: 'Hangar Decoration - Invented Plush', value: 5000, currency: 'UEC' },
+  ]);
+  // Survives the stored shape's clean-up; an old snapshot without it stays as it was.
+  assert.deepEqual(OH.mergeHistory([snap], [])[0].items, snap.items);
+  const old = { at: 2, items: [['uec', 'Hangar Decoration - Invented Plush', 5000]] };
+  assert.equal(OH.snapshotMelt(OH.mergeHistory([old], [])[0]), 5000);
+});
+
+test('New Since Last Scan totals dollars only (ui/popup/data.js with OH.usdValue)', async () => {
+  const { newSinceScan } = await import('../ui/popup/data.js');
+  const history = [
+    { at: 1, items: [] },
+    { at: 2, items: [] },
+  ];
+  assert.equal(newSinceScan(history, USD_AND_UEC, 2, OH.usdValue).total, 100);
+  // Without one passed, it uses the page's OH.usdValue.
+  assert.equal(newSinceScan(history, USD_AND_UEC, 2).total, 100);
+});
+
+test('the basic rows total dollars only (ui/basic/rows.js)', async () => {
+  const { pledgeRow, totals } = await import('../ui/basic/rows.js');
+  assert.deepEqual(totals(USD_AND_UEC.map(pledgeRow)), { count: 2, value: 100, priced: 1 });
+});

@@ -74,11 +74,13 @@ export function search(rows, q) {
 
 // → { count, value } where value is the sum of the known values (melt value for
 // pledges, the buy-back page's price for buy-backs), and `priced` how many had one.
+// Dollars only: a pledge row in another currency ('UEC', in-game money; the parser
+// marks it) isn't added, as OH.usdValue (src/lib.js) leaves it out everywhere.
 export function totals(rows, key = 'value') {
   let value = 0;
   let priced = 0;
   for (const r of rows)
-    if (Number.isFinite(r[key])) {
+    if (Number.isFinite(r[key]) && (!r.currency || r.currency === 'USD')) {
       value += r[key];
       priced++;
     }

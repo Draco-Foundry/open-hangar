@@ -2857,9 +2857,31 @@
     { key: 'other', label: 'Other' },
   ];
 
-  // Sum the numeric pledge values, skipping nulls.
+  // A pledge's value in US dollars, or null: no value, or one in another currency. A
+  // pledge priced in in-game UEC (the parser marks it 'UEC') is never dollars, so every
+  // money total adds this, not `p.value`. No currency counts as dollars, unless RSI's
+  // own words said UEC (data scanned before the parser read them). The pattern is the
+  // parser's rule (RULES.hangar.uec). Pure.
+  OH.isUEC = function isUEC(p) {
+    if (!p) return false;
+    if (p.currency) return RULES.hangar.uec.test(String(p.currency));
+    return !!(p.raw && RULES.hangar.uec.test(String(p.raw.rawValue || '')));
+  };
+  OH.usdValue = function usdValue(p) {
+    if (!p || !Number.isFinite(p.value)) return null;
+    if (p.currency && p.currency !== 'USD') return null;
+    return OH.isUEC(p) ? null : p.value;
+  };
+  // A UEC amount as the popup's UEC tile counts it, with its unit: "5,000 UEC". The
+  // one way a pledge's UEC price is written (src/dashboard.js formatValue, the popup's
+  // rows), never with a "$". Pure.
+  OH.uecText = function uecText(n) {
+    return Number.isFinite(n) ? `${Math.round(n).toLocaleString('en-US')} UEC` : '';
+  };
+
+  // Sum the pledges' dollar values (OH.usdValue), skipping nulls and UEC.
   OH.totalValue = function totalValue(items) {
-    return items.reduce((sum, p) => sum + (Number.isFinite(p.value) ? p.value : 0), 0);
+    return items.reduce((sum, p) => sum + (OH.usdValue(p) ?? 0), 0);
   };
 
   // --- Star Citizen game version (openhangar.space's game-status feed) -----------
@@ -3486,12 +3508,14 @@
     const unpricedNames = new Map();
     const ccu = { n: 0, priced: 0, store: 0, paid: 0 };
     for (const p of items || []) {
+      // Priced in UEC (OH.isUEC): in-game money, so no dollar store value or paid.
+      if (OH.isUEC(p)) continue;
       // A CCU's standard price is the gap between its ships' store prices;
       // warbond CCUs sell for less, which is what `below` catches.
       if (p.isCCU && p.ccu) {
         const from = priceOf(p.ccu.from);
         const to = priceOf(p.ccu.to);
-        const paid = Number.isFinite(p.value) ? p.value : null;
+        const paid = OH.usdValue(p);
         const std = from && to && to.msrp > from.msrp ? to.msrp - from.msrp : null;
         ccu.n++;
         if (std != null) {
@@ -3519,7 +3543,7 @@
       });
       const unpriced = rows.filter((r) => r.msrp == null).length;
       const sum = rows.reduce((a, r) => a + (r.msrp || 0), 0);
-      const paid = Number.isFinite(p.value) ? p.value : null;
+      const paid = OH.usdValue(p);
       ships += rows.length;
       priced += rows.length - unpriced;
       for (const r of rows) {
@@ -3562,10 +3586,17 @@
     const v = hv || OH.hangarValue(items, priceOf);
     const out = { ships: 0, ccus: 0, other: 0, credit: 0, total: 0, byId: {}, unpriced: 0 };
     for (const p of items || []) {
+      // Priced in UEC: in-game money, never dollars, so it adds nothing (and isn't
+      // "with no price" either).
+      if (OH.isUEC(p)) {
+        out.byId[p.id] = 0;
+        continue;
+      }
       const si = v.pledges[p.id];
-      const melt = Number.isFinite(p.value) ? p.value : 0;
+      const usd = OH.usdValue(p);
+      const melt = usd ?? 0;
       // No store price and no melt value: it adds nothing, and `unpriced` says so.
-      if (!Number.isFinite(p.value) && !(si && si.store != null)) out.unpriced++;
+      if (usd == null && !(si && si.store != null)) out.unpriced++;
       let amt;
       let bucket;
       if (si && si.ccu) {
@@ -3590,14 +3621,16 @@
   // same rules. Pledges still owned count exactly as in `acct.byId`; ones since
   // melted or gifted: a ship pledge is priced from its name ("Standalone Ship -
   // Cutlass Black" → Cutlass Black), anything else at the melt value it had.
-  // Store Credit is not in it (a snapshot still records it, shown on its own). Pure.
+  // Store Credit is not in it (a snapshot still records it, shown on its own). An item
+  // whose 4th field names a currency other than dollars ('UEC') adds nothing. Pure.
   OH.snapshotValue = function snapshotValue(snap, acct, priceOf) {
     let sum = 0;
-    for (const [id, name, melt] of snap.items) {
+    for (const [id, name, melt, cur] of snap.items) {
       if (acct && id in acct.byId) {
         sum += acct.byId[id];
         continue;
       }
+      if (cur && cur !== 'USD') continue;
       const m = Number(melt) || 0;
       if (/\bupgrade\b|\bccu\b|\s→\s|\bpaint\b|\bskin\b|\blivery\b/i.test(name || '')) {
         sum += m;
@@ -5944,14 +5977,16 @@
   // `credit` (Store Credit in dollars) is kept when known, so the value chart can
   // count it; snapshots from before 0.2.13 don't have it. `uec` likewise, for the
   // popup's UEC change (none before it); this browser only, sync leaves both out.
+  // A pledge priced in UEC keeps 'UEC' as its 4th field, so the snapshot's totals
+  // (meltOf, snapshotValue) leave it out; a dollar pledge has 3, as before.
   OH.snapshotOf = function snapshotOf(items, at, credit, uec) {
     const snap = {
       at,
-      items: (items || []).map((p) => [
-        String(p.id ?? ''),
-        p.name || '',
-        Number.isFinite(p.value) ? p.value : 0,
-      ]),
+      items: (items || []).map((p) => {
+        const row = [String(p.id ?? ''), p.name || '', Number.isFinite(p.value) ? p.value : 0];
+        if (OH.isUEC(p)) row.push('UEC');
+        return row;
+      }),
     };
     if (Number.isFinite(credit)) snap.credit = credit;
     if (Number.isFinite(uec)) snap.uec = uec;
@@ -5967,22 +6002,27 @@
       !Number.isFinite(b.credit) ||
       Math.abs(a.credit - b.credit) < 0.01) &&
     (!Number.isFinite(a.uec) || !Number.isFinite(b.uec) || a.uec === b.uec);
-  const meltOf = (snap) => snap.items.reduce((a, x) => a + (x[2] || 0), 0);
+  // Dollars only: an item with a 4th field ('UEC') isn't counted.
+  const meltOf = (snap) =>
+    snap.items.reduce((a, x) => a + (x[3] && x[3] !== 'USD' ? 0 : x[2] || 0), 0);
   OH.snapshotMelt = meltOf;
 
   // What changed from snapshot a to b: added / removed pledges, and ones whose
-  // name or value changed (an applied CCU keeps its pledge id). Pure.
+  // name or value changed (an applied CCU keeps its pledge id). A row priced in UEC
+  // carries `currency: 'UEC'` (the snapshot item's 4th field). Pure.
   OH.diffSnapshots = function diffSnapshots(a, b) {
     const before = new Map(a.items.map((x) => [x[0], x]));
     const after = new Map(b.items.map((x) => [x[0], x]));
-    const row = (x) => ({ id: x[0], name: x[1], value: x[2] });
+    const row = (x) => ({ id: x[0], name: x[1], value: x[2], ...(x[3] ? { currency: x[3] } : {}) });
     const added = b.items.filter((x) => !before.has(x[0])).map(row);
     const removed = a.items.filter((x) => !after.has(x[0])).map(row);
     const changed = [];
     for (const x of b.items) {
       const y = before.get(x[0]);
       if (y && (y[1] !== x[1] || Math.abs(y[2] - x[2]) >= 0.01)) {
-        changed.push({ id: x[0], from: y[1], to: x[1], fromValue: y[2], toValue: x[2] });
+        const c = { id: x[0], from: y[1], to: x[1], fromValue: y[2], toValue: x[2] };
+        if (x[3]) c.currency = x[3];
+        changed.push(c);
       }
     }
     return { added, removed, changed, melt: meltOf(b) - meltOf(a) };
