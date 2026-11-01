@@ -9,7 +9,8 @@ opens a website.
 
 It's the `connector` build flag ([FLAGS.md](FLAGS.md#the-connector)), on in every store
 build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistImport` and
-`alerts`, and from 0.4.0 `autoScan` (now the Daily Scan Reminder, below).
+`alerts`, from 0.4.0 `autoScan` (the Daily Scan Reminder), and from 0.5.8 `autoScanRun` (Auto
+Scan Daily, below, in its place).
 
 ## What a Connector Build Has
 
@@ -27,7 +28,7 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
   Currency (the day's rates for anything but USD) and the shortcut (`commands` in
   manifest.json, Alt+Shift+O), and JSON Backup, Pledges CSV and Buy-Backs CSV. Connect
   still opens the basic page: the browser's sign-in window would close the popup. While
-  connected, the openhangar.space group has the Daily Scan Reminder's switch and its line
+  connected, the openhangar.space group has the Auto Scan Daily switch and its line
   (below). The header says Scan stopped for a scan that began and never ended, even after
   a browser restart (local `scanStarted`, #676).
 - **The basic page** (`src/basic.html`, `ui/basic/`), small since 0.4.0: what needs a
@@ -50,7 +51,7 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
   for 2 minutes) or stopped on an error. A mark left by a hidden page that went away
   mid-scan never holds the next scan.
 - **The background worker** as today: our pages' messages (bridge v2), the rescan badge,
-  updates, and the Daily Scan Reminder's alarm (below).
+  updates, and Auto Scan Daily's alarm (below).
 - **The scan**, at the same depth: account and balances, the hangar (with the pledge
   archive and history), buy-backs, referrals, then up to 30 buy-backs' own pages not
   read from RSI yet (their price, insurance and contents go in the sync, #798). It's the scan
@@ -58,15 +59,20 @@ build and the beta from 0.3.0 (owner, 2026-10-13), with `localMode`, `wishlistIm
   tab when it can't); it stores its progress (session `scanProgress`) and its last
   report (`scanReport`) for any page.
 
-- **The Daily Scan Reminder** (the `autoScan` flag; [FLAGS.md](FLAGS.md#auto-scan)),
-  which replaced Auto Scan Daily (#666) so that every read of RSI starts with a click.
-  Off until the pilot turns it on (which asks for notifications), and only while
-  connected: Disconnect, Clear Data and notifications taken back turn it off. The worker
-  keeps one alarm (`oh-scan-reminder`), checked at most once a day: when the last scan
-  in this browser is over a day old and no reminder went out in the last day, a
-  notification; clicking it starts the popup's Scan. It reads nothing from RSI and sends
-  nothing (the saved scan time and the cached status file only; `autoScan` or `hangar`
-  paused skips the day). Its record (local `scanReminder`) is the popup's line.
+- **Auto Scan Daily** (the `autoScanRun` flag, from 0.5.8; [FLAGS.md](FLAGS.md#auto-scan)),
+  in place of the Daily Scan Reminder (`autoScan`, 0.5.5 to 0.5.7), which a build with
+  it turns off. Off until the pilot turns it on (which asks for notifications; a no
+  leaves it on, without its notice), and only while connected: Disconnect and Clear Data
+  turn it off. The worker keeps one alarm (`oh-auto-daily`) at a random time 20 to 28
+  hours after the last run, and the hidden scan page runs it (`runner.autoScan()`,
+  never a tab): the account check first (the sign-in cookie, who is signed in, compared
+  with this browser's last-scanned account by UEE Citizen Record when one was kept, else
+  by handle), then a quick check of the newest hangar and buy-back pages, and a full
+  scan only when something is new or a week has passed. Never buy-backs' own pages;
+  with Account History on, only the newest log lines. About a second between requests,
+  no retries. Signed out or an account it can't confirm: one notification asking for a
+  scan; `autoScan` or `hangar` paused skips the day quietly. Its record (local
+  `autoDaily`) is the popup's line.
 
 `scripts/pack.mjs` leaves the dashboard out of it (`scripts/connector.mjs`):
 `src/dashboard.html`, `src/dashboard.js`, `src/quips.js`, `src/qr.js`, `src/assets/`,
@@ -75,7 +81,7 @@ their imports). `scripts/check-store-build.mjs` refuses a connector build with a
 them, and a build without the connector that has the popup or the basic page.
 
 **Permissions** stay as they are (Extension Alerts, the `alerts` flag, add `alarms` and an
-optional `notifications`, docs/FLAGS.md "Alerts", and the Daily Scan Reminder uses those
+optional `notifications`, docs/FLAGS.md "Alerts", and Auto Scan Daily uses those
 same two; the hidden scan page adds `offscreen` on
 Chrome and Edge only, and `frame-src 'self'` to Firefox's pages): `storage`, `unlimitedStorage` (big hangars, history
 and the archive), `cookies` (Log Out of RSI, whether RSI's sign-in cookie is there, and
