@@ -5327,12 +5327,12 @@ try {
   await told({ siteLink: { newValue: ppLink } });
   await page.waitForSelector('#pp-disconnect');
   const linked = await page.$eval('#pp-site', (e) => e.textContent.replace(/\s+/g, ' '));
-  // Sync Now and Disconnect are small links on the Connected row itself.
+  // Sync Now is a small link on the Connected row; Disconnect sits with Clear Data.
   const oneRow = await page.evaluate(() => {
     const r = document.getElementById('pp-sync')?.closest('.pp-r');
     return (
       !!r &&
-      r === document.getElementById('pp-disconnect')?.closest('.pp-r') &&
+      !r.contains(document.getElementById('pp-disconnect')) &&
       /^Connected as/.test(r.textContent.trim()) &&
       document.getElementById('pp-sync').classList.contains('pp-link')
     );

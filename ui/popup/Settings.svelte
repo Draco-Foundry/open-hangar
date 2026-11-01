@@ -180,6 +180,7 @@
     askDisconnect = true;
     await tick();
     stay?.focus();
+    stay?.scrollIntoView?.({ block: 'nearest' });
   }
   async function leave() {
     askDisconnect = false;
@@ -309,20 +310,22 @@
       {#if siteOn && v.connected}
         <div class="pp-r">
           <i class="pp-dot" class:on={!trouble} class:warn={!!trouble} aria-hidden="true"></i>
-          <span class="pp-grow pp-cut">{t('popup.connected', { name: v.connected.name })}</span>
-          <span class="pp-val"
-            >{syncing
-              ? t('popup.syncing')
-              : v.connected.lastSync
-                ? t('popup.synced', { when: ago(v.connected.lastSync) })
-                : t('popup.not-synced')}</span
-          >
+          <span class="pp-grow pp-two1">
+            <span class="pp-cut">{t('popup.connected', { name: v.connected.name })}</span>
+            <small class="pp-val" id="pp-synced"
+              >{syncing
+                ? t('popup.syncing')
+                : v.connected.lastSync
+                  ? t('popup.synced', { when: ago(v.connected.lastSync) })
+                  : t('popup.not-synced')}</small
+            >
+          </span>
           {#if !pilot && !askDisconnect}
-            <!-- Each scan syncs, so Sync Now is a small link beside it; Disconnect another. -->
+            <!-- Each scan syncs, so Sync Now is one small link; Disconnect sits with the
+                 account actions at the bottom. -->
             <button type="button" class="pp-link" id="pp-sync" disabled={syncing || busy} onclick={sync}
               >{t('popup.sync-now')}</button
             >
-            <button type="button" class="pp-link quiet" id="pp-disconnect" onclick={openAsk}>{t('popup.disconnect')}</button>
           {/if}
         </div>
         {#if trouble}
@@ -594,6 +597,9 @@
     </div>
   {:else}
     <div class="pp-end">
+      {#if siteOn && v.connected && !pilot && !askDisconnect}
+        <button type="button" class="pp-link quiet" id="pp-disconnect" onclick={openAsk}>{t('popup.disconnect')}</button>
+      {/if}
       <button type="button" class="pp-link bad" id="pp-clear" disabled={busy} onclick={() => (askClear = true)}
         >{t('popup.clear-data')}</button
       >

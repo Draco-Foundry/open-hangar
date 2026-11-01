@@ -4,6 +4,8 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+- Changed: the popup's Connected row is less busy. The sync time sits under it, Sync Now stays on the right, and Disconnect moves down beside Clear Data.
+
 ## 0.5.7 — 2026-10-31
 
 - Changed: Account Value no longer adds in your Store Credit, so it matches the website. Store Credit still shows on its own.
