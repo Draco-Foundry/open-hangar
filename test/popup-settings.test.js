@@ -340,6 +340,17 @@ test('Notifications: asked first, and only Firefox closes the popup for the ques
   try {
     assert.deepEqual(await run({ id: 'x' }), ['ask:notifications', 'returned', 'close']);
     assert.deepEqual(await run(null), ['ask:notifications', 'returned']);
+    // Already allowed (the reminder's switch, with Notifications on): no question, so the
+    // popup stays open, on Firefox too.
+    const steps = [];
+    global.chrome = {
+      runtime: { getManifest: () => ({ browser_specific_settings: { gecko: { id: 'x' } } }) },
+      permissions: { request: async () => (steps.push('ask'), true) },
+    };
+    global.window = { close: () => steps.push('close') };
+    assert.equal(await A.askNotify(true), true);
+    await new Promise((r) => setTimeout(r, 5));
+    assert.deepEqual(steps, []);
   } finally {
     global.chrome = was.chrome;
     global.window = was.window;
