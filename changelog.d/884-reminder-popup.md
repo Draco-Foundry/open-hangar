@@ -1,0 +1,1 @@
+- Fixed: On Firefox, turning on the Daily Scan Reminder no longer closes the popup when notifications are already allowed. If Firefox still needs to ask, the popup closes while it asks, as before.

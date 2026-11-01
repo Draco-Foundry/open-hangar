@@ -24,7 +24,7 @@ buy-backs, balances, organization, and referral standing — and view or export 
   unless the user opts in to sync by connecting their own openhangar.space account;
   once connected, it syncs to that account after each scan;
 - **is read-only and rate-limited** — it reads pages the user can already see, with
-  a politeness delay, and does not perform bulk or automated account actions. The one
+  a politeness delay, and never changes anything on the account by itself. The only reading it does on its own is Auto Scan Daily, which the user turns on: once a day, for the account last scanned in that browser, and it stops if RSI asks it to slow down. The one
   exception to read-only is Add to RSI Cart (and Send to RSI Cart on openhangar.space's
   store), which puts what the user picked in their RSI cart when they click it and
   never checks out;
@@ -132,8 +132,7 @@ stance on fan activity:
 ## 7. Ongoing compliance commitments
 
 - Remain rate-limited and credential-free, and read-only apart from Add to RSI Cart
-  when the user clicks it (keep the politeness delay in `lib.js`; no bulk or automated
-  account actions; never check out).
+  when the user clicks it (keep the politeness delay in `lib.js`; no bulk or automatic changes to the account; reading on its own only through Auto Scan Daily, opt-in and once a day; never check out).
 - Keep the extension local by default: nothing is sent to any server unless the user
   connects sync, and sync sends only to the user's own openhangar.space account; keep
   the privacy policy accurate to behavior.
