@@ -98,8 +98,9 @@ const checks = [
     },
   },
   {
-    // Not RSI: our own rates file (#243). Weekends and holidays have no new ECB
-    // rates, so up to 5 days old is normal.
+    // Not RSI: our own rates file (#243), built by openhangar.space's front Worker
+    // (site-worker/) with the last Pages run's copy as its fallback. Weekends and
+    // holidays have no new ECB rates, so up to 5 days old is normal.
     name: 'Exchange rates (openhangar.space/rates.json)',
     host: 'openhangar.space',
     own: true,
@@ -110,7 +111,9 @@ const checks = [
       const missing = OH.CURRENCIES.filter((c) => !(file?.rates?.[c] > 0));
       if (missing.length) return `missing ${missing.join(', ')}`;
       const age = (Date.now() - Date.parse(file.date)) / 86400e3;
-      return age > 5 ? `rates are from ${file.date} (the daily Pages run may be failing)` : null;
+      return age > 5
+        ? `rates are from ${file.date} (the site's rates sources may be failing)`
+        : null;
     },
   },
   {

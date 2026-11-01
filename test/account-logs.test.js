@@ -527,3 +527,35 @@ test('the sync schema refuses an email, a handle or a payment field on a log lin
   odd.sources.pledgeLog.items[0].at = 'Oct 30, 2026';
   assert.ok(validate(SCHEMA, odd), 'a time not in UTC ISO form is refused');
 });
+
+// Auto Scan Daily (ui/scan/runner.js autoScan, `dailyOnly`): only the newest lines, never
+// the full history, which waits for a scan the pilot starts (the privacy policy's Auto
+// Scan Daily section).
+test('dailyOnly: the full history waits; once it is in, only the newest lines', async () => {
+  const rsi = fakeRsi({ pledge: pagesOf(1, 60), credit: [creditPage] });
+  await OH.wantAccountLogs(ME);
+  const held = await OH.readAccountLogs({
+    account: ME,
+    token: 't',
+    fetchFn: rsi.fetchFn,
+    pause: noPause,
+    dailyOnly: true,
+  });
+  assert.deepEqual(held.parts, { pledge: { did: 'none' }, credit: { did: 'none' } });
+  assert.equal(rsi.calls.length, 0, 'nothing read');
+  assert.ok(store.accountLogsLoad, 'the full history still wanted');
+  await OH.readAccountLogs({ account: ME, token: 't', fetchFn: rsi.fetchFn, pause: noPause });
+  const later = fakeRsi({ pledge: pagesOf(1, 70), credit: [creditPage] });
+  const r = await OH.readAccountLogs({
+    account: ME,
+    token: 't',
+    fetchFn: later.fetchFn,
+    pause: noPause,
+    dailyOnly: true,
+  });
+  assert.deepEqual(r.parts.pledge, { did: 'daily', n: 10 });
+  assert.deepEqual(
+    later.calls.map((c) => `${c.log}:${c.page}`),
+    ['pledge:1', 'credit:1'],
+  );
+});

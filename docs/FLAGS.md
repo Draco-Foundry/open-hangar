@@ -58,7 +58,7 @@ wishlist import and store alerts, and from 0.4.0 Auto Scan Daily):
 | `meltValue`      | The popup and Home show Melt Value, its parts at melt            | off   | on   | no       |
 | `orderHistory`   | A scan reads RSI order history; sync sends it (reader only)      | off   | off  | yes      |
 | `subStore`       | A scan reads your Subscriber Store and Concierge items           | off   | off  | yes      |
-| `accountLogs`    | A scan reads RSI's pledge and store credit logs; sync sends them | off   | off  | yes      |
+| `accountLogs`    | A scan reads RSI's pledge and store credit logs; sync sends them | on    | on   | no       |
 
 ## Adding or Retiring a Flag
 

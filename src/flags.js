@@ -140,12 +140,14 @@
     // log (Account), the full history once when the pilot asks and the day's new lines
     // after (src/lib.js readAccountLogs, ui/scan/runner.js), and sync sends them as
     // sources.pledgeLog and sources.creditLog (schema/sync-payload.schema.json). Handles
-    // and emails never leave the parser (src/scraper/parser.js). Developer builds only
-    // until the privacy policy and the store forms name both reads.
+    // and emails never leave the parser (src/scraper/parser.js). Off for each pilot until
+    // they turn on Account History (the popup's Settings tab); turning it off stops the
+    // reads and removes the logs (OH.stopAccountLogs). In the store builds and the beta
+    // from 0.5.8 (owner, 2026-11-01): the privacy policy names both reads (Words
+    // privacy-ext.account-logs, approved word for word; test/privacy-permissions.test.js).
     accountLogs: {
       about: 'RSI Account Logs: a scan reads the pledge and store credit logs and sync sends them.',
-      default: false,
-      devOnly: true,
+      default: true,
     },
   };
 

@@ -5568,23 +5568,26 @@
   // lines once the full history is in, else nothing.
   // → { ok, parts: { pledge, credit } }, each { did: 'full' | 'daily' | 'none' | 'paused'
   // | 'resume-later', n?, error? }, or { ok: false, error: 'signed-out' }.
-  // `onProgress(part, page, pagecount)` after each full-history page. Never throws.
+  // `onProgress(part, page, pagecount)` after each full-history page. `dailyOnly` (Auto
+  // Scan Daily, ui/scan/runner.js autoScan): never the full history, which waits for a scan
+  // the pilot starts ('none'). Never throws.
   OH.readAccountLogs = function readAccountLogs({
     account,
     fetchFn = fetch,
     pause = () => sleep(500 + Math.random() * 1000),
     token,
     onProgress = () => {},
+    dailyOnly = false,
   } = {}) {
     if (accountLogsInflight) return accountLogsInflight;
-    accountLogsInflight = readLogs({ account, fetchFn, pause, token, onProgress })
+    accountLogsInflight = readLogs({ account, fetchFn, pause, token, onProgress, dailyOnly })
       .catch((e) => ({ ok: false, error: 'network', msg: e?.message }))
       .finally(() => {
         accountLogsInflight = null;
       });
     return accountLogsInflight;
   };
-  async function readLogs({ account, fetchFn, pause, token, onProgress }) {
+  async function readLogs({ account, fetchFn, pause, token, onProgress, dailyOnly }) {
     const acct = account === undefined ? await OH.getAccount().catch(() => null) : account;
     if (!acct || acct.loggedIn !== true || !acct.nickname)
       return { ok: false, error: 'signed-out' };
@@ -5605,12 +5608,15 @@
       }
       const load = await OH.getAccountLogsLoad(acct);
       const mine = (await OH.getAccountLogs(acct))?.[part.id];
+      const full = load?.want && !(load.done || []).includes(part.id);
       const r =
-        load?.want && !(load.done || []).includes(part.id)
-          ? await fullLoad(part, acct, load, ask, onProgress)
-          : isObj(mine) && Array.isArray(mine.items)
-            ? await dailyRead(part, acct, mine, ask)
-            : { did: 'none' };
+        full && dailyOnly
+          ? { did: 'none' }
+          : full
+            ? await fullLoad(part, acct, load, ask, onProgress)
+            : isObj(mine) && Array.isArray(mine.items)
+              ? await dailyRead(part, acct, mine, ask)
+              : { did: 'none' };
       parts[part.id] = r;
       if (r.error) {
         OH.log('warn', part.source, `log read stopped: ${r.error} ${r.status || ''}`.trim());

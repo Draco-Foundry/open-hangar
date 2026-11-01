@@ -260,3 +260,52 @@ test('a store or beta build with the wishlist import on: the policy names it', a
   assert.match(runner, /const flag = \(name\) => OH\?\.flags\?\.\[name\] === true;/);
   assert.doesNotMatch(read('ui/basic/hub.svelte.js'), /importWishlist/);
 });
+
+// RSI Account Logs (the `accountLogs` flag): a store or beta build with it on reads RSI's
+// pledge log and store credit log and syncs them. It fails here until both copies of the
+// policy have the approved words (Words privacy-ext.account-logs, owner-approved
+// 2026-11-01, word for word): the What Data Is Accessed bullet with its off switch and
+// its 10,000 lines (OH.ACCOUNT_LOG_MAX), the logs in Optional Sync's list, the cookies
+// bullet's fourth use, and the hangar page's hangar without them; and while the hangar
+// page's view still leaves them out (src/hangar-shape.js hangarView).
+test('a store or beta build with RSI Account Logs on: the policy explains them', async () => {
+  const { buildValues, readRegistry } = await import('../scripts/build-flags.mjs');
+  const registry = readRegistry(path.join(ROOT, 'src', 'flags.js'));
+  const words = (f) =>
+    plain(
+      read(f)
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\*\*/g, '')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'),
+    ).replace(/ ([.,:;)])/g, '$1');
+  const lib = read('src/lib.js');
+  const max = /OH\.ACCOUNT_LOG_MAX = (\d+);/.exec(lib);
+  assert.ok(max, 'src/lib.js sets OH.ACCOUNT_LOG_MAX');
+  const lines = Number(max[1]).toLocaleString('en-US');
+  const SAYS = [
+    "Your RSI account history, only if you turn on Account History on the popup's Settings tab: RSI's pledge log and store credit log, on your RSI Account pages.",
+    'It never keeps a handle, an email or a payment detail, so it never keeps who a gift went to or came from.',
+    `The newest ${lines} lines of each log stay in this browser until you turn Account History off or use Clear Data. Turning it off also stops the reads.`,
+    'your account history if you loaded it (see above), account identity and balances',
+    'cookies: for four things, all on robertsspaceindustries.com.',
+    "Reading your account history works the same way: the extension sends that cookie back to robertsspaceindustries.com with each page of the logs it asks for, as RSI's own Account pages do.",
+    'your account history, your referral code and your referral prospects list.',
+  ];
+  let checked = 0;
+  for (const [build, beta] of [
+    ['store', false],
+    ['beta', true],
+  ]) {
+    if (!buildValues(registry, { beta }).accountLogs) continue;
+    checked++;
+    for (const file of ['docs/PRIVACY.md', 'site/privacy.html']) {
+      const text = words(file);
+      for (const s of SAYS) assert.ok(text.includes(s), `${file} (the ${build} build): ${s}`);
+    }
+  }
+  assert.ok(checked, 'RSI Account Logs are on in the store build (src/flags.js)');
+  // The hangar page's hangar leaves the logs out, as the policy says.
+  const { hangarView } = require('../src/hangar-shape.js');
+  const view = hangarView({ sources: { pledgeLog: { items: [] }, creditLog: { items: [] } } });
+  assert.ok(!('pledgeLog' in view.sources) && !('creditLog' in view.sources));
+});

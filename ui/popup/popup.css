@@ -1111,8 +1111,7 @@ body {
 .pp-two .pp-gap.off {
   color: var(--faint);
 }
-/* Sync Now and Disconnect: small links at the end of the Connected row; the name gives way
-   first. A switch with its status line under it. */
+/* Sync Now: a small link at the end of the Connected row. A switch with its status line under it. */
 .pp-site .pp-r > .pp-link {
   flex: none;
   margin-left: 0;
@@ -1246,6 +1245,7 @@ body {
 .pp-end {
   display: flex;
   justify-content: center;
+  gap: 18px;
   font-size: 13px;
 }
 .pp-link.bad {
@@ -1269,6 +1269,18 @@ body {
   white-space: nowrap;
 }
 .pp-site .pp-val {
+  margin-left: 0;
+}
+/* Connected over its Synced line, so the name is never cut by the status. */
+.pp-two1 {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.pp-two1 .pp-val {
+  font-size: 12px;
+}
+.pp-end .pp-link.quiet {
   margin-left: 0;
 }
 .pp-dot {

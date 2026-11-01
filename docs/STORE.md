@@ -121,7 +121,7 @@ same: change one, change the other.
 
 **`cookies`**
 
-> Used for three things, all on robertsspaceindustries.com. First, "Log Out of RSI": clears RSI's cookies (including the HttpOnly session cookie that page scripts can't remove) so the user can fully end their RSI session from the extension. Second, a guess at whether the user is signed in to RSI: the extension checks only whether RSI's session cookie exists, without contacting RSI. When it's missing, the popup shows "Log In to RSI" first (Scan still works) and Auto Scan Daily skips that day. RSI sets this cookie for signed-out visitors too, so the scan itself confirms. Third, Add to RSI Cart: like RSI's own upgrade window, it reads RSI's session token cookie and sends it back to robertsspaceindustries.com with the cart request the user asked for. Cookie values are never stored and never sent anywhere except RSI.
+> Used for four things, all on robertsspaceindustries.com. First, "Log Out of RSI": clears RSI's cookies (including the HttpOnly session cookie that page scripts can't remove) so the user can fully end their RSI session from the extension. Second, a guess at whether the user is signed in to RSI: the extension checks only whether RSI's session cookie exists, without contacting RSI. When it's missing, the popup shows "Log In to RSI" first (Scan still works) and Auto Scan Daily skips that day. RSI sets this cookie for signed-out visitors too, so the scan itself confirms. Third, Add to RSI Cart: like RSI's own upgrade window, it reads RSI's session token cookie and sends it back to robertsspaceindustries.com with the cart request the user asked for. Fourth, reading the user's own account history (RSI's pledge log and store credit log) when they ask: it sends RSI's session token cookie back to robertsspaceindustries.com with each page request, as RSI's own Account pages do. Cookie values are never stored and never sent anywhere except RSI.
 
 **`identity`** (added in 0.3.0)
 
@@ -131,7 +131,7 @@ same: change one, change the other.
 
 **`host_permissions` → `https://robertsspaceindustries.com/*`**
 
-> Reads the signed-in user's own RSI account (hangar, buy-backs, balances, referrals, and the store items RSI shows only to subscribers and Concierge members)
+> Reads the signed-in user's own RSI account (hangar, buy-backs, balances, referrals, account history, and the store items RSI shows only to subscribers and Concierge members)
 > with same-session requests and parses it locally. Only the user's own account is accessed, at a limited rate. Everything is read-only except two actions the user starts with a click: Add to RSI Cart and Send to RSI Cart put the items the user picked in their RSI cart through RSI's own store. It never checks out or pays.
 
 _(Since 0.2.8 there is no `api.star-citizen.wiki` host permission: that public API
