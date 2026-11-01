@@ -4,7 +4,16 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.5.8 — 2026-11-01
+
 - Changed: the popup's Connected row is less busy. The sync time sits under it, Sync Now stays on the right, and Disconnect moves down beside Clear Data.
+- Fixed: **Pledges priced in UEC.** A pledge priced in UEC or aUEC no longer counts as dollars in Account Value or any other money total.
+- Changed: **Store words match the website.** The Wishlist tab, the toolbar badge and store alerts now say an item is in the store when you can buy it now, as openhangar.space does.
+- New: **Account History.** Turn it on in the popup's Settings tab, and the next scan reads your full RSI pledge log and store credit log, slowly and once; after that, each scan reads only the newest lines. Turn it off to stop the reads and remove the logs from this browser.
+- Changed: **Privacy policy updated.** It now describes Account History: what it reads and keeps from your pledge log and store credit log, that sync sends it, how the RSI cookie is used to read it, and that our hangar page leaves it out.
+- Changed: **The Daily Scan Reminder is now Auto Scan Daily.** Once a day, it scans your hangar for you, only for the RSI account this browser last scanned; if you're signed out or on another account, it reads nothing and a notification asks you to scan. It starts off, so if you had the reminder on, turn on Auto Scan Daily in Settings.
+- Changed: **Privacy policy updated.** It now describes Auto Scan Daily in place of the Daily Scan Reminder: when it runs, how it checks your RSI account first, what it reads, and its notification.
+- Fixed: On Firefox, turning on the Daily Scan Reminder no longer closes the popup when notifications are already allowed. If Firefox still needs to ask, the popup closes while it asks, as before.
 
 ## 0.5.7 — 2026-10-31
 

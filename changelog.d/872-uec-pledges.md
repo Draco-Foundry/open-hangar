@@ -1,1 +1,0 @@
-- Fixed: **Pledges priced in UEC.** A pledge priced in UEC or aUEC no longer counts as dollars in Account Value or any other money total.

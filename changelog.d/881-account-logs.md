@@ -1,2 +1,0 @@
-- New: **Account History.** Turn it on in the popup's Settings tab, and the next scan reads your full RSI pledge log and store credit log, slowly and once; after that, each scan reads only the newest lines. Turn it off to stop the reads and remove the logs from this browser.
-- Changed: **Privacy policy updated.** It now describes Account History: what it reads and keeps from your pledge log and store credit log, that sync sends it, how the RSI cookie is used to read it, and that our hangar page leaves it out.

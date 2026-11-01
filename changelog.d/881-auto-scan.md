@@ -1,2 +1,0 @@
-- Changed: **The Daily Scan Reminder is now Auto Scan Daily.** Once a day, it scans your hangar for you, only for the RSI account this browser last scanned; if you're signed out or on another account, it reads nothing and a notification asks you to scan. It starts off, so if you had the reminder on, turn on Auto Scan Daily in Settings.
-- Changed: **Privacy policy updated.** It now describes Auto Scan Daily in place of the Daily Scan Reminder: when it runs, how it checks your RSI account first, what it reads, and its notification.

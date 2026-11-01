@@ -1,1 +1,0 @@
-- Changed: **Store words match the website.** The Wishlist tab, the toolbar badge and store alerts now say an item is in the store when you can buy it now, as openhangar.space does.
