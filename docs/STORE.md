@@ -94,7 +94,7 @@ every store is `support@openhangar.space`. The account setup is kept in the main
   - ☑ Personally identifiable information (the RSI account block: handle, display
     name, avatar and profile details)
   - ☑ Financial and payment information (pledge values, store credit and other balances)
-  - ☑ Website content (the hangar read from RSI's pages)
+  - ☑ Website content (the hangar, and the store items RSI shows only to subscribers and Concierge members, read from RSI's pages)
   - ☑ "I do not sell or transfer user data to third parties, outside of the approved use cases."
   - ☑ "I do not use or transfer user data for purposes that are unrelated to my item's single purpose."
   - ☑ "I do not use or transfer user data to determine creditworthiness or for lending purposes."
@@ -131,7 +131,7 @@ same: change one, change the other.
 
 **`host_permissions` → `https://robertsspaceindustries.com/*`**
 
-> Reads the signed-in user's own RSI account (hangar, buy-backs, balances, referrals)
+> Reads the signed-in user's own RSI account (hangar, buy-backs, balances, referrals, and the store items RSI shows only to subscribers and Concierge members)
 > with same-session requests and parses it locally. Only the user's own account is accessed, at a limited rate. Everything is read-only except two actions the user starts with a click: Add to RSI Cart and Send to RSI Cart put the items the user picked in their RSI cart through RSI's own store. It never checks out or pays.
 
 _(Since 0.2.8 there is no `api.star-citizen.wiki` host permission: that public API

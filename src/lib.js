@@ -1391,11 +1391,16 @@
     } catch {
       /* non-extension context */
     }
+    let subStore = null;
+    // @flag-start subStore: the account's own Subscriber Store goes as sources.subStore
+    if (OH.flags?.subStore) subStore = await OH.getSubStoreCached(account).catch(() => null);
+    // @flag-end subStore
     return SHAPE.exportPayload({
       db,
       account,
       archive: await readArchive(),
       buybackDetails: await OH.getBuybackDetails(),
+      subStore,
       appVersion,
     });
   };
@@ -3550,7 +3555,7 @@
   //  ccus:  CCUs at standard price, the gap between the two ships (melt value when
   //         either ship is unpriced)
   //  other: paints, gear, add-ons, hangars, game packages, at melt value
-  //  credit: Store Credit, dollars
+  //  credit: Store Credit, dollars; shown on its own, never in the total (owner, 2026-10-31)
   // Buy-backs, UEC and REC don't count. `byId[id]` is each pledge's share, so a
   // history snapshot can be valued with exactly the same numbers.
   OH.accountValue = function accountValue(items, priceOf, credit, hv) {
@@ -3577,7 +3582,7 @@
       out.byId[p.id] = amt;
     }
     out.credit = Number.isFinite(credit) && credit > 0 ? credit : 0;
-    out.total = out.ships + out.ccus + out.other + out.credit;
+    out.total = out.ships + out.ccus + out.other;
     return out;
   };
 
@@ -3585,7 +3590,7 @@
   // same rules. Pledges still owned count exactly as in `acct.byId`; ones since
   // melted or gifted: a ship pledge is priced from its name ("Standalone Ship -
   // Cutlass Black" → Cutlass Black), anything else at the melt value it had.
-  // Store Credit only when the snapshot recorded it (older ones didn't). Pure.
+  // Store Credit is not in it (a snapshot still records it, shown on its own). Pure.
   OH.snapshotValue = function snapshotValue(snap, acct, priceOf) {
     let sum = 0;
     for (const [id, name, melt] of snap.items) {
@@ -3606,7 +3611,7 @@
       const hit = priceOf && (priceOf(base) || priceOf(bare));
       sum += hit && hit.msrp ? hit.msrp : m;
     }
-    return sum + (Number.isFinite(snap.credit) ? snap.credit : 0);
+    return sum;
   };
 
   // Fleet stats from the wiki's per-ship data: every ship in every pledge (a
@@ -4997,6 +5002,320 @@
     }
     return cached || null;
   };
+
+  // @flag-start subStore: Your Subscriber Store and Concierge items (#418), read by a scan, sent by sync
+  // --- Your Subscriber Store and Concierge items (#418) ----------------------------
+  // The store items RSI shows only to the signed-in account, from the same /graphql the
+  // referrals use, in your own RSI session; RSI answers an anonymous request with none of
+  // them, so only this read can see them. Two parts, one list:
+  // - the Subscriber Store, for a subscriber: operation GetBrowseSkusByFilter with the
+  //   store's "extras-subscribers-store" facet (RULES.subStore); kind 'subscriber'.
+  // - Concierge items, for an account with a Concierge level (owner, 2026-10-31): RSI adds
+  //   them to that account's own category lists and marks each with isVip, so the read
+  //   asks each category the website's Store records (RULES.conciergeStore.categories)
+  //   and keeps only the marked items, each with its category as its kind.
+  // An item RSI marks isVip carries `concierge: true` whichever part found it.
+  // At most once a day (the scan asks, ui/scan/runner.js). Pages one at a time with a
+  // pause; a 401/403/429/5xx stops the whole read and keeps the last list. Each item keeps
+  // only what the website's Store shows (id, name, kind, Concierge or not, url, picture,
+  // price, the price before a discount, kit or not, in stock); nothing else from the
+  // answer is kept, and the documents ask for nothing more.
+  const SUB_STORE_KEY = 'subStore';
+  const SUB_STORE_TTL = 24 * 3600e3;
+  const SUB_STORE_MAX_PAGES = 20;
+  OH.SUB_STORE_MAX = 2000; // items kept, both parts together (storage budget)
+  const subStoreBody = (rule, query, page, limit) =>
+    JSON.stringify([
+      {
+        operationName: rule.operation,
+        query: rule.doc,
+        variables: { ...rule.variables, query: { page, limit, ...query } },
+      },
+    ]);
+  // Each part's request, read from its rules one by one (test/parser-rules.test.js).
+  const subStoreRule = () => ({
+    path: RULES.subStore.path,
+    operation: RULES.subStore.operation,
+    doc: RULES.subStore.query,
+    variables: RULES.subStore.variables,
+    pageSize: RULES.subStore.pageSize,
+    pageSizeMin: RULES.subStore.pageSizeMin,
+  });
+  const conciergeRule = () => ({
+    path: RULES.conciergeStore.path,
+    operation: RULES.conciergeStore.operation,
+    doc: RULES.conciergeStore.query,
+    variables: RULES.conciergeStore.variables,
+    pageSize: RULES.conciergeStore.pageSize,
+    pageSizeMin: RULES.conciergeStore.pageSizeMin,
+  });
+  // An RSI address as the sync format takes it (https, on RSI's site or its media
+  // host), else null.
+  const subStoreUrl = (u) => {
+    const s = String(u || '').trim();
+    const abs = s.startsWith('//') ? 'https:' + s : s.startsWith('/') ? RSI_ORIGIN + s : s;
+    return /^https:\/\/([a-z0-9-]+\.)*robertsspaceindustries\.com\//i.test(abs) && abs.length <= 500
+      ? abs
+      : null;
+  };
+  const subCents = (v) => (Number.isInteger(v) && v >= 0 ? v : null);
+  // A price block ({ amount, discounted } in cents) → { price, was } in whole cents: the
+  // sale price when there is one (RSI's own rule: discounted counts when set and !=
+  // amount), and the price before it.
+  const subPrice = (p) => {
+    const amount = subCents(p?.amount);
+    if (amount == null) return null;
+    const off = subCents(p.discounted);
+    const sale = off != null && off !== amount;
+    return { price: sale ? off : amount, was: sale ? amount : null };
+  };
+  // GraphQL answer → { items, count, totalCount } or null (not a listing). Pure.
+  // items: [{ id, name, kind, concierge, url, img, price, was, pack, inStock }], `kind`
+  // the part it was read for ('subscriber', or a Concierge category's kind).
+  OH.parseSubStore = function parseSubStore(json, kind = 'subscriber') {
+    const data = Array.isArray(json) ? json[0] : json;
+    const listing = data?.data?.store?.listing;
+    if (!listing || !Array.isArray(listing.resources)) return null;
+    const items = [];
+    for (const r of listing.resources) {
+      const id = r && /^\d{1,12}$/.test(String(r.id ?? '')) ? String(r.id) : null;
+      const name = String(r?.title || r?.name || '')
+        .trim()
+        .slice(0, 200);
+      if (!id || !name) continue;
+      const p = subPrice(r.nativePrice) || subPrice(r.price);
+      const thumb = r.media?.thumbnail;
+      items.push({
+        id,
+        name,
+        kind,
+        concierge: r.isVip === true,
+        url: subStoreUrl(r.url),
+        img: subStoreUrl(thumb && (thumb.storeSmall || thumb.slideshow)),
+        price: p ? p.price : null,
+        was: p ? p.was : null,
+        pack: r.isPackage === true,
+        inStock: r.stock?.available === true || r.stock?.unlimited === true,
+      });
+    }
+    return {
+      items,
+      count: Number.isFinite(listing.count) ? listing.count : items.length,
+      totalCount: Number.isFinite(listing.totalCount) ? listing.totalCount : null,
+    };
+  };
+  // Does this account get a Subscriber Store? (signed in and a subscriber)
+  OH.isSubscriber = (acct) =>
+    !!(acct && acct.loggedIn === true && acct.subscriber && acct.subscriber.type);
+  // Does this account see Concierge items? (signed in, with a Concierge level)
+  OH.isConcierge = (acct) =>
+    !!(acct && acct.loggedIn === true && acct.concierge && acct.concierge.level);
+  // The cached list for this account ({ at, nickname, total, partial, items }) or null.
+  OH.getSubStoreCached = async function getSubStoreCached(acct) {
+    const { [SUB_STORE_KEY]: c } = await chrome.storage.local.get(SUB_STORE_KEY);
+    if (!isObj(c) || !Array.isArray(c.items) || !Number.isFinite(c.at)) return null;
+    if (!acct?.nickname || lcName(c.nickname) !== lcName(acct.nickname)) return null;
+    return c;
+  };
+  const lcName = (s) => String(s || '').toLowerCase();
+  let subStoreInflight = null;
+  // Read the whole list (or answer from the day's cache unless `force`).
+  // → { ok: true, list } | { ok: false, error, list? (the last good one) }.
+  // error: 'signed-out' | 'not-member' | 'busy' | 'refused' | 'network'. Never throws.
+  // `pause` is the wait between requests (tests skip it).
+  OH.getSubStore = function getSubStore({
+    force = false,
+    account,
+    fetchFn = fetch,
+    pause = () => sleep(DELAY_MS + Math.random() * 400),
+  } = {}) {
+    if (subStoreInflight) return subStoreInflight;
+    subStoreInflight = readSubStore({ force, account, fetchFn, pause })
+      .catch((e) => ({ ok: false, error: 'network', msg: e?.message }))
+      .finally(() => {
+        subStoreInflight = null;
+      });
+    return subStoreInflight;
+  };
+  async function readSubStore({ force, account, fetchFn, pause }) {
+    const acct = account === undefined ? await OH.getAccount().catch(() => null) : account;
+    if (!acct || acct.loggedIn !== true) return { ok: false, error: 'signed-out' };
+    const sub = OH.isSubscriber(acct);
+    const con = OH.isConcierge(acct);
+    if (!sub && !con) return { ok: false, error: 'not-member' };
+    const { [SUB_STORE_KEY]: stored } = await chrome.storage.local.get(SUB_STORE_KEY);
+    const cached = await OH.getSubStoreCached(acct);
+    // Once a day, a failed try included: RSI isn't asked again until the day is up.
+    const last = Math.max(cached?.at || 0, isObj(stored) ? stored.triedAt || 0 : 0);
+    if (!force && Date.now() - last < SUB_STORE_TTL)
+      return cached ? { ok: true, list: cached } : { ok: false, error: 'busy' };
+    const markTried = () =>
+      chrome.storage.local
+        .set({ [SUB_STORE_KEY]: { ...(cached || {}), triedAt: Date.now() } })
+        .catch(() => {});
+    const get = OH.guarded(fetchFn, { timeout: 20000 });
+    let asked = 0; // requests so far: every one after the first waits `pause`
+    const ask = async (rule, query, kind, page, limit) => {
+      if (asked++) await pause();
+      let res;
+      try {
+        res = await get(RSI_ORIGIN + rule.path, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'content-type': 'application/json', Accept: 'application/json' },
+          body: subStoreBody(rule, query, page, limit),
+        });
+      } catch (e) {
+        return { error: 'network', msg: e?.message || String(e) };
+      }
+      if (res.status === 401 || res.status === 403) return { error: 'refused', status: res.status };
+      if (res.status === 429 || res.status >= 500) return { error: 'busy', status: res.status };
+      if (!res.ok) return { error: 'bad', status: res.status };
+      let json;
+      try {
+        json = await res.json();
+      } catch {
+        return { error: 'bad' };
+      }
+      const d = Array.isArray(json) ? json[0] : json;
+      // RSI's error text isn't logged: only that there was one.
+      if (d && Array.isArray(d.errors) && d.errors.length) return { error: 'bad', msg: 'errors' };
+      const parsed = OH.parseSubStore(json, kind);
+      return parsed || { error: 'bad', msg: 'no listing in the answer' };
+    };
+    const seen = new Map(); // id → the kept item
+    const items = [];
+    const add = (list, keep) => {
+      for (const it of list) {
+        const had = seen.get(it.id);
+        // Found twice (a Concierge item in the Subscriber Store): one item, marked.
+        if (had) {
+          if (it.concierge) had.concierge = true;
+          continue;
+        }
+        if (!keep(it) || items.length >= OH.SUB_STORE_MAX) continue;
+        seen.set(it.id, it);
+        items.push(it);
+      }
+    };
+    // One list (the Subscriber Store, or one Concierge category), page by page, keeping
+    // what `keep` says. Page 1 at the rule's size; if RSI refuses that, again at its own
+    // smaller size. → { total, more } or { error, page } when a page failed (the read
+    // stops). `budget.pages` is shared by every list of one part.
+    const readList = async (rule, query, kind, keep, budget) => {
+      let limit = rule.pageSize;
+      let first = await ask(rule, query, kind, 1, limit);
+      budget.pages--;
+      if (first.error === 'bad') {
+        limit = rule.pageSizeMin;
+        first = await ask(rule, query, kind, 1, limit);
+        budget.pages--;
+      }
+      if (first.error) return { ...first, page: 1 };
+      const total = first.totalCount;
+      // RSI may hand back fewer than asked: page on at the size it actually uses.
+      if (
+        first.items.length &&
+        first.items.length < limit &&
+        total != null &&
+        first.items.length < total
+      )
+        limit = first.items.length;
+      add(first.items, keep);
+      let read = first.items.length;
+      for (let page = 2; ; page++) {
+        if (total != null && read >= total) break;
+        if (items.length >= OH.SUB_STORE_MAX || budget.pages <= 0) break;
+        const r = await ask(rule, query, kind, page, limit);
+        budget.pages--;
+        if (r.error) return { ...r, page };
+        if (!r.items.length) break;
+        read += r.items.length;
+        add(r.items, keep);
+      }
+      return { total, more: total != null && read < total };
+    };
+    const fail = async (r) => {
+      await markTried();
+      OH.log(
+        'warn',
+        'subStore',
+        `members' store read stopped: ${r.error} ${r.status || ''} ${r.msg || ''}`.trim(),
+      );
+      return { ok: false, error: r.error === 'bad' ? 'network' : r.error, list: cached || null };
+    };
+    // A page that fails before anything came in fails the read. Later, the read stops
+    // there, keeps what came in and says it's short.
+    let partial = false;
+    let total = 0;
+    const stopsAll = (r) => {
+      if (!items.length) return true;
+      partial = true;
+      OH.log(
+        'warn',
+        'subStore',
+        `members' store page ${r.page}: ${r.error} ${r.status || ''}`.trim(),
+      );
+      return false;
+    };
+    if (sub) {
+      const r = await readList(
+        subStoreRule(),
+        RULES.subStore.variables.query,
+        'subscriber',
+        () => true,
+        { pages: SUB_STORE_MAX_PAGES },
+      );
+      if (r.error) {
+        if (stopsAll(r)) return fail(r);
+      } else {
+        // RSI's own count when it gave one, else what came in.
+        total += r.total ?? items.length;
+        if (r.more) partial = true;
+      }
+    }
+    if (con && !(partial && items.length)) {
+      const rule = conciergeRule();
+      const budget = { pages: RULES.conciergeStore.maxPages };
+      for (const cat of RULES.conciergeStore.categories) {
+        if (budget.pages <= 0 || items.length >= OH.SUB_STORE_MAX) {
+          partial = true;
+          break;
+        }
+        const before = items.length;
+        const r = await readList(
+          rule,
+          { ...rule.variables.query, skus: { products: cat.products } },
+          cat.kind,
+          (it) => it.concierge,
+          budget,
+        );
+        if (r.error) {
+          if (stopsAll(r)) return fail(r);
+          break;
+        }
+        // Concierge items aren't counted by RSI: what came in is the count.
+        total += items.length - before;
+        if (r.more) partial = true;
+      }
+    }
+    // A short read never replaces a fuller list from earlier.
+    if (partial && cached && cached.items.length > items.length) return fail({ error: 'busy' });
+    const list = {
+      at: Date.now(),
+      nickname: acct.nickname || null,
+      total: Math.max(total, items.length),
+      partial,
+      items,
+    };
+    try {
+      await chrome.storage.local.set({ [SUB_STORE_KEY]: list });
+    } catch {
+      /* storage full: the sync still gets this list */
+    }
+    return { ok: true, list };
+  }
+  // @flag-end subStore
 
   // --- The store catalog (openhangar.space/api/catalog) ------------------------------
   // Everything in RSI's pledge store right now, as the website's store watcher last

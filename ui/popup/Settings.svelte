@@ -246,7 +246,7 @@
       {#if siteOn && v.connected}
         <div class="pp-r">
           <i class="pp-dot" class:on={!trouble} class:warn={!!trouble} aria-hidden="true"></i>
-          <span class="pp-grow">{t('popup.connected', { name: v.connected.name })}</span>
+          <span class="pp-grow pp-cut">{t('popup.connected', { name: v.connected.name })}</span>
           <span class="pp-val"
             >{syncing
               ? t('popup.syncing')
@@ -254,6 +254,13 @@
                 ? t('popup.synced', { when: ago(v.connected.lastSync) })
                 : t('popup.not-synced')}</span
           >
+          {#if !pilot && !askDisconnect}
+            <!-- Each scan syncs, so Sync Now is a small link beside it; Disconnect another. -->
+            <button type="button" class="pp-link" id="pp-sync" disabled={syncing || busy} onclick={sync}
+              >{t('popup.sync-now')}</button
+            >
+            <button type="button" class="pp-link quiet" id="pp-disconnect" onclick={openAsk}>{t('popup.disconnect')}</button>
+          {/if}
         </div>
         {#if trouble}
           <div class="pp-r pp-col" id="pp-sync-trouble">
@@ -282,14 +289,6 @@
               <button type="button" class="pp-btn2 warn" id="pp-disconnect-yes" onclick={leave}>{t('popup.disconnect')}</button>
             </div>
           </div>
-        {:else}
-          <!-- Sync Now the main button, Disconnect a quiet link beside it. -->
-          <div class="pp-r pp-syncrow">
-            <button type="button" class="pp-btn2 main" id="pp-sync" disabled={syncing || busy} onclick={sync}
-              >{t('popup.sync-now')}</button
-            >
-            <button type="button" class="pp-link quiet" id="pp-disconnect" onclick={openAsk}>{t('popup.disconnect')}</button>
-          </div>
         {/if}
         <!-- A failure already under Last Sync Didn't Go Through isn't said twice. -->
         {#if msg && msg !== trouble?.msg}<p class="pp-r pp-msg" class:calm role="status">{msg}</p>{/if}
@@ -304,13 +303,15 @@
                 id="pp-auto-sw"
                 aria-checked={autoOn}
                 aria-labelledby="pp-auto-l"
-                aria-describedby="pp-auto-line"
+                aria-describedby={line ? 'pp-auto-line' : null}
                 onclick={autoSwitch}><i></i></button
               >
             </div>
-            <!-- One line (copy.js popup.scan-reminder-*, data.js reminderLine): what it does,
-                 the last reminder or a day skipped; amber when notifications were refused. -->
-            <p class="pp-msg" class:calm={!line.ask} id="pp-auto-line">{t(line.key, { when: line.when })}</p>
+            <!-- One line (copy.js popup.scan-reminder-*, data.js reminderLine): the last reminder
+                 or a day skipped; amber when notifications were refused; none otherwise. -->
+            {#if line}
+              <p class="pp-msg" class:calm={!line.ask} id="pp-auto-line">{t(line.key, { when: line.when })}</p>
+            {/if}
           </div>
         {/if}
       {:else if siteOn}
@@ -333,11 +334,9 @@
               id="pp-nt-sw"
               aria-checked={notify}
               aria-labelledby="pp-nt-l"
-              aria-describedby="pp-nt-hint"
               onclick={notifySwitch}><i></i></button
             >
           </div>
-          <p class="pp-msg calm" id="pp-nt-hint">{t('popup.notifications-hint')}</p>
         </div>
       {/if}
     </div>

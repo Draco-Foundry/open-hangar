@@ -4778,7 +4778,8 @@ try {
       chipRight: Math.round(box(r?.querySelector('.pp-ins'))?.right - box(r)?.right),
       oneLine:
         Math.abs(box(r.querySelector('.pp-gm')).top - box(r.querySelector('.pp-ins')).top) < 2,
-      beforeNews: !document.querySelector('#pp-news') ||
+      beforeNews:
+        !document.querySelector('#pp-news') ||
         !!(s.compareDocumentPosition(document.querySelector('#pp-news')) & 4),
       wide: document.documentElement.scrollWidth > 360,
     };
@@ -4798,15 +4799,18 @@ try {
   arr.oneLine &&
   arr.beforeNews &&
   !arr.wide
-    ? ok(`New Since Last Scan: off by default; on, ${arr.total}, ${arr.name} with its marks and chip`)
+    ? ok(
+        `New Since Last Scan: off by default; on, ${arr.total}, ${arr.name} with its marks and chip`,
+      )
     : fail(`popup new since last scan: ${JSON.stringify({ offArrived, ...arr })}`);
   // Numbers that fit their box (budgets: ui/popup/currency.js): the widest full figure and
   // huge ones, at 360 px. Nothing clips or scrolls, and the full figure is the tooltip.
-  const fitCase = async (credits, tokens) => {
+  const fitCase = async (credits, tokens, extra = {}) => {
     await popAt(
       {
         __demoAccount: { ...demoAccount, credits },
         __demoBuybackTokens: tokens,
+        ...extra,
       },
       '#pp-value',
     );
@@ -4863,7 +4867,10 @@ try {
   !huge.wide
     ? ok('huge Store Credit, UEC, REC and tokens are compact, fit at 360 px, full in the tooltip')
     : fail(`popup fit (huge): ${JSON.stringify(huge)}`);
-  const nine = await fitCase({ store: { value: 10000000000 } }, 1);
+  // Store Credit is not in Account Value, so the nine digits come from a pledge.
+  const nine = await fitCase({ store: { value: 100 } }, 1, {
+    __demoPledge: { id: 9000, name: 'Hangar Decoration - Plush Gold', value: 100000000 },
+  });
   nine.value === `$100${nb}M` && nine.fits && !nine.wide
     ? ok(`a nine-digit Account Value reads ${nine.value} and fits`)
     : fail(`popup fit (nine digits): ${JSON.stringify(nine)}`);
@@ -5274,6 +5281,16 @@ try {
   await told({ siteLink: { newValue: ppLink } });
   await page.waitForSelector('#pp-disconnect');
   const linked = await page.$eval('#pp-site', (e) => e.textContent.replace(/\s+/g, ' '));
+  // Sync Now and Disconnect are small links on the Connected row itself.
+  const oneRow = await page.evaluate(() => {
+    const r = document.getElementById('pp-sync')?.closest('.pp-r');
+    return (
+      !!r &&
+      r === document.getElementById('pp-disconnect')?.closest('.pp-r') &&
+      /^Connected as/.test(r.textContent.trim()) &&
+      document.getElementById('pp-sync').classList.contains('pp-link')
+    );
+  });
   await page.click('#pp-disconnect');
   await page.waitForSelector('#pp-disconnect-ask');
   const askFocus = await page.evaluate(() => document.activeElement?.id);
@@ -5282,25 +5299,21 @@ try {
   /Connected as demo@pilot/.test(linked) &&
   /Synced \d+m ago/.test(linked) &&
   askFocus === 'pp-stay' &&
-  ppStayed
-    ? ok('connected: who and when; Disconnect asks first and Stay Connected keeps it')
+  ppStayed &&
+  oneRow
+    ? ok(
+        'connected: who and when; Sync Now and Disconnect on its row; Disconnect asks first and Stay Connected keeps it',
+      )
     : fail(`popup connected: ${JSON.stringify({ linked, askFocus, stayed: ppStayed })}`);
-  // Connected: Notifications in the openhangar.space box with its hint under it (alerts run
+  // Connected: Notifications in the openhangar.space box, no hint under it (alerts run
   // only while connected, #790; owner, 2026-10-23). No Store Alerts switch (they follow
   // Remind Me); Notifications off gives the permission back, and on asks as the click's
   // first step.
   const ntBox = await page.evaluate(() => {
-    const box = (el) => el.getBoundingClientRect();
-    const h = document.querySelector('#pp-site #pp-nt-hint');
     const sw = document.querySelector('#pp-site #pp-nt-sw');
     return {
       inBox: !!sw,
-      hint:
-        !!h &&
-        !!sw &&
-        box(h).top >= box(sw).bottom - 0.5 &&
-        sw.getAttribute('aria-describedby') === 'pp-nt-hint' &&
-        h.textContent === 'A pop-up when a Remind Me item goes on sale.',
+      hint: !document.getElementById('pp-nt-hint') && !sw?.hasAttribute('aria-describedby'),
       wraps: document.getElementById('pp-nt-l').getClientRects().length > 1,
     };
   });
@@ -5313,9 +5326,6 @@ try {
     asked: __demo.asked.join(),
     removed: __demo.removed.join(),
     nt: document.getElementById('pp-nt-sw').getAttribute('aria-checked'),
-    hint: document.getElementById(
-      document.getElementById('pp-nt-sw').getAttribute('aria-describedby'),
-    )?.textContent,
     label: document.getElementById('pp-nt-l').textContent,
   }));
   ntBox.inBox &&
@@ -5325,10 +5335,9 @@ try {
   sw.removed === 'notifications' &&
   sw.asked === 'notifications' &&
   sw.nt === 'true' &&
-  sw.label === 'Notifications' &&
-  sw.hint === 'A pop-up when a Remind Me item goes on sale.'
+  sw.label === 'Notifications'
     ? ok(
-        'connected: Notifications in the box with its hint; gives back and asks again; no Store Alerts switch',
+        'connected: Notifications in the box with no hint; gives back and asks again; no Store Alerts switch',
       )
     : fail(`popup alert switches: ${JSON.stringify({ ntBox, sw, ntOff })}`);
   // The website took a sync moments ago (429, too soon): Settings has an amber dot and
@@ -5367,8 +5376,8 @@ try {
     : fail(`popup Open My Hangar: ${went}`);
 
   // The Daily Scan Reminder: its switch in the openhangar.space group while connected,
-  // off until it's turned on, with one line under it in the approved words: what it
-  // does, then the last reminder or a day skipped; on asks for notifications as the
+  // off until it's turned on, with no line under it until a reminder went out: then the
+  // last reminder or a day skipped; on asks for notifications as the
   // click's first step, and a no turns it back off with its line, amber; a narrow window.
   await page.setViewport({ width: 360, height: 600 });
   const autoLink = { token: 't', name: 'demo@pilot', connectedAt: 1, lastSync: T0 - 60e3 };
@@ -5396,7 +5405,6 @@ try {
           return !!el && el.scrollWidth > el.clientWidth;
         })(),
     }));
-  const HINT = 'A notification when your last scan is over a day old. Click it to scan.';
   const autoOff = await autoState();
   await page.click('#pp-auto-sw');
   await sleep(200);
@@ -5404,15 +5412,14 @@ try {
   autoOff.sw === 'false' &&
   autoOff.inGroup &&
   autoOff.label === 'Daily Scan Reminder' &&
-  autoOff.line === HINT &&
-  autoOff.described === 'pp-auto-line' &&
-  autoOff.calm &&
+  autoOff.line === null &&
+  autoOff.described === null &&
   autoOn.sw === 'true' &&
   autoOn.kept === true &&
   autoOn.asked === 'notifications' &&
-  autoOn.line === HINT
+  autoOn.line === null
     ? ok(
-        'Daily Scan Reminder: off in the openhangar.space group with its hint; on asks for notifications',
+        'Daily Scan Reminder: off in the openhangar.space group with no hint line; on asks for notifications',
       )
     : fail(`popup scan reminder switch: ${JSON.stringify({ autoOff, autoOn })}`);
   const autoNow = await pageNow();
@@ -5442,8 +5449,8 @@ try {
   !autoOld.wide &&
   autoAgain.sw === 'false' &&
   autoAgain.kept === false &&
-  autoAgain.line === HINT
-    ? ok('Daily Scan Reminder: the last reminder, a day skipped, another day; off again, the hint')
+  autoAgain.line === null
+    ? ok('Daily Scan Reminder: the last reminder, a day skipped, another day; off again, no line')
     : fail(
         `popup scan reminder lines: ${JSON.stringify({ autoShown, autoPaused, autoOld, autoAgain })}`,
       );
@@ -6243,6 +6250,8 @@ try {
       li.textContent.replace(/\s+/g, ' ').trim(),
     ),
     more: document.querySelector('#pp-wish .pp-note')?.textContent || '',
+    // One line each: a name and, on sale, its price (no On Sale or Not for Sale line).
+    tall: [...document.querySelectorAll('.pp-wlist li')].some((li) => li.offsetHeight > 36),
     remove: !!document.querySelector('#pp-wish input, #pp-wish [aria-label^="Remove"]'),
     asked: __demo.wish.map((w) => `${w.method} ${w.url} ${w.auth}`),
     // The tab's count of Remind Me items on sale: the number shown, a name read out.
@@ -6258,8 +6267,9 @@ try {
   await page.click('#pp-wish-full');
   const wishFull = await page.evaluate(() => __demo.opened.at(-1));
   ppWish.head === 'Your Wishlist · 3' &&
-  ppWish.rows.join(' | ') === 'Avenger Titan On Sale $55 | Zeus Mk II CL Not for Sale' &&
+  ppWish.rows.join(' | ') === 'Avenger Titan $55 | Zeus Mk II CL' &&
   ppWish.more === 'And 1 more' &&
+  !ppWish.tall &&
   !ppWish.remove &&
   ppWish.n === '1' &&
   ppWish.nName.trim() === '1 on sale' &&
@@ -6453,11 +6463,11 @@ try {
     { v: 1, do: 'remove', key: 'ship:avenger-titan' },
   ];
   ppEd.head === 'Your Wishlist · 2' &&
-  ppEd.rows[0].text === 'Avenger Titan On Sale $55 ✕' &&
+  ppEd.rows[0].text === 'Avenger Titan $55 ✕' &&
   !ppEd.rows.some((r) => r.target) &&
   !ppEd.rows.some((r) => r.remind) &&
   ppEd.rows[0].remove === 'Remove Avenger Titan' &&
-  ppEd.rows[1].text === 'Cutlass - Ghoulish Green Paint On Sale $10 ✕' &&
+  ppEd.rows[1].text === 'Cutlass - Ghoulish Green Paint $10 ✕' &&
   ppEd.placeholder === 'Add a ship, paint or upgrade' &&
   /\/store#item=1$/.test(ppEd.links[0] || '') &&
   /\/store#item=501$/.test(ppEd.links[1] || '') &&
@@ -6466,7 +6476,7 @@ try {
   afterAdd.q === '' &&
   afterAdd.focus === 'pp-wish-q' &&
   // Added first on the website's list, shown after what's on sale.
-  afterAdd.rows[2] === 'Zeus Mk II CL Not for Sale ✕' &&
+  afterAdd.rows[2] === 'Zeus Mk II CL ✕' &&
   JSON.stringify(wishDone.posts.map((p) => p.body)) === JSON.stringify(POSTS) &&
   wishDone.posts.every((p) => p.auth === 'Bearer t' && p.url === `${ppSite}/api/v1/wishlist`) &&
   wishDone.reads === 1 &&

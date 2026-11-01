@@ -33,6 +33,8 @@
         'account',
         'dossier',
         'referrals',
+        'subStore',
+        'conciergeStore',
         'upgrade',
         'cart',
         'known',
@@ -696,6 +698,132 @@
             pageSize: { $ref: '#/$defs/pageSize' },
           },
         },
+        subStore: {
+          description:
+            "The Subscriber Store's items for the signed-in subscriber (the subStore build flag). The code adds the page and its size to variables.query (pageSize first; pageSizeMin when RSI refuses that).",
+          type: 'object',
+          required: ['path', 'operation', 'query', 'variables', 'pageSize', 'pageSizeMin'],
+          additionalProperties: false,
+          properties: {
+            path: { $ref: '#/$defs/path' },
+            operation: { $ref: '#/$defs/operation' },
+            query: { $ref: '#/$defs/document' },
+            variables: {
+              type: 'object',
+              required: ['storeFront', 'query'],
+              additionalProperties: false,
+              properties: {
+                storeFront: { type: 'string', pattern: '^[a-z][a-z0-9-]*$' },
+                query: {
+                  type: 'object',
+                  required: ['skus', 'sort'],
+                  additionalProperties: false,
+                  properties: {
+                    skus: {
+                      type: 'object',
+                      required: ['filtersFromTags', 'products'],
+                      additionalProperties: false,
+                      properties: {
+                        filtersFromTags: {
+                          type: 'object',
+                          required: ['tagIdentifiers', 'facetIdentifiers'],
+                          additionalProperties: false,
+                          properties: {
+                            tagIdentifiers: { $ref: '#/$defs/identifiers' },
+                            facetIdentifiers: { $ref: '#/$defs/identifiers' },
+                          },
+                        },
+                        products: {
+                          type: 'array',
+                          maxItems: 20,
+                          items: { type: 'integer', minimum: 0 },
+                        },
+                      },
+                    },
+                    sort: {
+                      type: 'object',
+                      required: ['field', 'direction'],
+                      additionalProperties: false,
+                      properties: {
+                        field: { type: 'string', pattern: '^[A-Za-z_]+$' },
+                        direction: { enum: ['asc', 'desc'] },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            pageSize: { $ref: '#/$defs/pageSize' },
+            pageSizeMin: { $ref: '#/$defs/pageSize' },
+          },
+        },
+        conciergeStore: {
+          description:
+            "The pledge store items RSI marks for Concierge members (isVip on its SKU), for a signed-in account with a Concierge level (the subStore build flag). RSI adds them to that account's own category lists, so the code reads each category below, keeps only the marked items and tags each with the category's kind. The code adds the page, its size and the category's products to variables.query (pageSize first; pageSizeMin when RSI refuses that); maxPages caps the pages of one read across all categories.",
+          type: 'object',
+          required: [
+            'path',
+            'operation',
+            'query',
+            'variables',
+            'categories',
+            'pageSize',
+            'pageSizeMin',
+            'maxPages',
+          ],
+          additionalProperties: false,
+          properties: {
+            path: { $ref: '#/$defs/path' },
+            operation: { $ref: '#/$defs/operation' },
+            query: { $ref: '#/$defs/document' },
+            variables: {
+              type: 'object',
+              required: ['storeFront', 'query'],
+              additionalProperties: false,
+              properties: {
+                storeFront: { type: 'string', pattern: '^[a-z][a-z0-9-]*$' },
+                query: {
+                  type: 'object',
+                  required: ['sort'],
+                  additionalProperties: false,
+                  properties: {
+                    sort: {
+                      type: 'object',
+                      required: ['field', 'direction'],
+                      additionalProperties: false,
+                      properties: {
+                        field: { type: 'string', pattern: '^[A-Za-z_]+$' },
+                        direction: { enum: ['asc', 'desc'] },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            categories: {
+              type: 'array',
+              minItems: 1,
+              maxItems: 20,
+              items: {
+                type: 'object',
+                required: ['kind', 'products'],
+                additionalProperties: false,
+                properties: {
+                  kind: { enum: ['ships', 'starter', 'packs', 'paints', 'gear', 'addons', 'subs'] },
+                  products: {
+                    type: 'array',
+                    minItems: 1,
+                    maxItems: 60,
+                    items: { type: 'integer', minimum: 0 },
+                  },
+                },
+              },
+            },
+            pageSize: { $ref: '#/$defs/pageSize' },
+            pageSizeMin: { $ref: '#/$defs/pageSize' },
+            maxPages: { type: 'integer', minimum: 1, maximum: 100 },
+          },
+        },
         upgrade: {
           description:
             "RSI's upgrade tool: the store list (every ship and the editions on sale), and Add to RSI Cart (src/rsi-cart.js): your ships and the mode (ships, app), which ships can upgrade to a SKU (filter), the price (price) and the add itself (add), each asked with the csrf token.",
@@ -1256,6 +1384,56 @@
         variables: { display: 'ALL_TIME', sortBy: 'NEWEST' },
         campaigns: { current: '2', legacy: '1' },
         pageSize: 50,
+      },
+      subStore: {
+        path: '/graphql',
+        operation: 'GetBrowseSkusByFilter',
+        query:
+          'query GetBrowseSkusByFilter($query: SearchQuery, $storeFront: String = "pledge") {\n  store(browse: true, name: $storeFront) {\n    listing: search(query: $query) {\n      resources {\n        id name title url\n        media { thumbnail { storeSmall slideshow } }\n        nativePrice { amount discounted }\n        price { amount discounted }\n        stock { available unlimited }\n        ... on TySku { isPackage isVip }\n      }\n      count\n      totalCount\n    }\n  }\n}',
+        variables: {
+          storeFront: 'pledge',
+          query: {
+            skus: {
+              filtersFromTags: {
+                tagIdentifiers: [],
+                facetIdentifiers: ['extras-subscribers-store'],
+              },
+              products: [65],
+            },
+            sort: { field: 'weight', direction: 'desc' },
+          },
+        },
+        pageSize: 100,
+        pageSizeMin: 20,
+      },
+      conciergeStore: {
+        path: '/graphql',
+        operation: 'GetBrowseSkusByFilter',
+        query:
+          'query GetBrowseSkusByFilter($query: SearchQuery, $storeFront: String = "pledge") {\n  store(browse: true, name: $storeFront) {\n    listing: search(query: $query) {\n      resources {\n        id name title url\n        media { thumbnail { storeSmall slideshow } }\n        nativePrice { amount discounted }\n        price { amount discounted }\n        stock { available unlimited }\n        ... on TySku { isPackage isVip }\n      }\n      count\n      totalCount\n    }\n  }\n}',
+        variables: {
+          storeFront: 'pledge',
+          query: { sort: { field: 'weight', direction: 'desc' } },
+        },
+        categories: [
+          { kind: 'ships', products: [72] },
+          { kind: 'starter', products: [45] },
+          { kind: 'packs', products: [270] },
+          { kind: 'paints', products: [268, 102] },
+          { kind: 'gear', products: [289] },
+          {
+            kind: 'addons',
+            products: [
+              3, 34, 35, 36, 37, 38, 40, 57, 86, 87, 88, 89, 90, 91, 92, 93, 95, 96, 99, 100, 101,
+              108, 109, 122, 123, 124, 129, 130, 131, 133, 134, 138, 150, 151, 152, 153, 154, 155,
+              156, 157, 158, 159, 160, 161,
+            ],
+          },
+          { kind: 'subs', products: [32, 33, 58, 261] },
+        ],
+        pageSize: 100,
+        pageSizeMin: 20,
+        maxPages: 60,
       },
       upgrade: {
         path: '/pledge-store/api/upgrade/graphql',

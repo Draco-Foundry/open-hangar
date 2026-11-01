@@ -1,6 +1,6 @@
 <script>
   // Account Value: everything you own (OH.accountValue: ships at store price, CCUs at
-  // standard price, everything else at melt value, plus Store Credit), what it's made
+  // standard price, everything else at melt value; Store Credit is not in it), what it's made
   // of, how it compares with melt value (not "what you paid", which RSI can't know
   // for gifted or grey-market pledges), and clickable counts that open Inventory
   // filtered. The value trend lives on Stats → History (owner: no chart on Home).
@@ -29,7 +29,6 @@
             ['Ships', acct.ships],
             ['CCUs', acct.ccus],
             ['Other', acct.other],
-            ['Store Credit', acct.credit],
           ].filter(([, n]) => n >= 0.5)
         : [],
       melt,
@@ -162,7 +161,7 @@
     </div>
   </div>
   {#if d.store != null && d.parts.length > 1}
-    <div class="parts" title="Ships at today's store price, CCUs at standard price, everything else at melt value, plus Store Credit. Buy-backs, UEC and REC aren't counted.">
+    <div class="parts" title="Ships at today's store price, CCUs at standard price, everything else at melt value. Store Credit, buy-backs, UEC and REC aren't counted.">
       {#each d.parts as [label, n], i (label)}{#if i}<span class="sep">·</span>{/if}<span>{label} <b>{a.bigMoney(n)}</b></span>{/each}
     </div>
   {/if}

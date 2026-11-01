@@ -23,6 +23,7 @@
     searchWish,
     searched,
     shipNames,
+    unobtainable,
   } from './wishlist.js';
   import { WISH_MAX, loadWish, popupEnv, writeWish } from './wish-client.js';
   import { openHub, openTab, setAlerts } from './actions.js';
@@ -161,13 +162,6 @@
   {/if}
 {/snippet}
 
-{#snippet saleLine(key)}
-  {#if sale}
-    {@const s = sale(key)}
-    <small class:sale={s.onSale}>{s.onSale ? t('popup.wish-on-sale') : t('popup.wish-not-sale')}</small>
-  {/if}
-{/snippet}
-
 <div class="pp-body" id="pp-wish">
   {#if !connected}
     <div class="pp-empty">
@@ -245,11 +239,14 @@
             <div class="pp-wrow">
               <span class="pp-atext">
                 {@render itemName(item.key, item.name)}
-                {@render saleLine(item.key)}
               </span>
               {#if s?.onSale && Number.isFinite(s.price)}
                 {@const p = price(s.price)}
                 <span class="pp-price" title={p.title || null}>{p.text}</span>
+              {:else if item.category === 'ships' && unobtainable(item.name)}
+                <span class="pp-price">{t('popup.wish-gone')}</span>
+              {:else}
+                <span class="pp-price"></span>
               {/if}
               {#if typeof item.remind === 'boolean'}
                 <button
@@ -289,11 +286,12 @@
             <li>
               <span class="pp-atext">
                 {@render itemName(r.key, r.name)}
-                {@render saleLine(r.key)}
               </span>
               {#if sale && r.onSale && Number.isFinite(r.price)}
                 {@const p = price(r.price)}
                 <span class="pp-price" title={p.title || null}>{p.text}</span>
+              {:else if r.key.startsWith('ship:') && unobtainable(r.name)}
+                <span class="pp-price">{t('popup.wish-gone')}</span>
               {/if}
             </li>
           {/each}

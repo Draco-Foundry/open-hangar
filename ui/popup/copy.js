@@ -139,8 +139,6 @@ const COPY = {
   // on its own). Claude chat, Words, 2026-10-23 (#785).
   'popup.wish-tab-on-sale': '{n} on sale',
   'popup.wish-count': 'Your Wishlist · {n}',
-  'popup.wish-on-sale': 'On Sale',
-  'popup.wish-not-sale': 'Not for Sale',
   // Items the store list can't name here, shown on the website.
   'popup.wish-more': 'And {n} more',
   'popup.wish-empty': 'Your Wishlist Is Empty',
@@ -156,6 +154,10 @@ const COPY = {
   // The same with store alerts off: ships only (paints and upgrades come with the alerts'
   // sale feed).
   'popup.wish-search-ships': 'Add a ship',
+  // On a Wishlist row for a ship nobody can get from RSI anymore (the AMD package, in-game
+  // rewards, retired ships), where the price would be. PLACEHOLDER: Needs Words (Words
+  // DB), not approved.
+  'popup.wish-gone': 'Not for Sale',
   // Under the search box: what's typed is searched and nothing matched.
   'popup.wish-no-match': 'No matches.',
   // The ✕ beside an item, for screen readers.
@@ -193,11 +195,9 @@ const COPY = {
     'Your synced copy stays on openhangar.space until you delete it there. This extension just stops syncing.',
   'popup.stay': 'Stay Connected',
   // The Daily Scan Reminder (the `autoScan` flag): its switch, in the openhangar.space
-  // group, and the one line under it (ui/popup/data.js reminderLine). Claude chat, Words,
-  // 2026-10-25.
+  // group, and the lines under it (ui/popup/data.js reminderLine). Claude chat, Words,
+  // 2026-10-25. Its hint line was dropped by the owner, 2026-10-31.
   'popup.scan-reminder': 'Daily Scan Reminder',
-  'popup.scan-reminder-hint':
-    'A notification when your last scan is over a day old. Click it to scan.',
   // Turned on, and the browser's notification ask said no (the switch goes back off).
   'popup.scan-reminder-denied': 'The reminder needs notifications, and your browser said no.',
   // A day skipped because the status file pauses scans.
@@ -208,7 +208,6 @@ const COPY = {
   'popup.auto-today': 'today {time}',
   'popup.notifications': 'Notifications', // the switch's name
   // The muted line under it. Claude chat, Words, 2026-10-23.
-  'popup.notifications-hint': 'A pop-up when a Remind Me item goes on sale.',
   'popup.look': 'Look',
   'popup.look-auto': 'Match Browser',
   'popup.look-dark': 'Dark',

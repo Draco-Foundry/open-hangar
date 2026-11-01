@@ -584,6 +584,13 @@ body {
   display: flex;
   flex-direction: column;
 }
+/* Wishlist rows are one line: a long name ends in an ellipsis. */
+.pp-wlist .pp-atext {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .pp-iname,
 .pp-aname {
   color: var(--head);
@@ -861,11 +868,13 @@ body {
   background: none;
   color: var(--text);
 }
-.pp-wlist small.sale {
+.pp-wlist .pp-price {
   color: var(--good);
 }
 .pp-price {
   flex: none;
+  min-width: 56px;
+  text-align: right;
   font-family: var(--font-data);
   font-size: 13px;
   color: var(--head);
@@ -1102,22 +1111,17 @@ body {
 .pp-two .pp-gap.off {
   color: var(--faint);
 }
-/* Sync Now the main button, Disconnect a quiet link beside it; a switch with its status
-   line under it. */
-.pp-syncrow {
-  gap: 14px;
-}
-.pp-btn2.main {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-.pp-btn2.main:hover {
-  border-color: var(--accent-hover);
-}
-.pp-syncrow .pp-link.quiet {
+/* Sync Now and Disconnect: small links at the end of the Connected row; the name gives way
+   first. A switch with its status line under it. */
+.pp-site .pp-r > .pp-link {
   flex: none;
   margin-left: 0;
   font-size: 13px;
+}
+.pp-cut {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .pp-sub {
   gap: 2px;

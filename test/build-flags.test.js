@@ -27,6 +27,7 @@ test('registry parses: every flag has a name, a one-line about and a default', a
     'orderHistory',
     'orgFleet',
     'scanBar',
+    'subStore',
     'sync',
     'wishlistImport',
   ]);
@@ -70,6 +71,8 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     newSinceScan: false,
     // Order History: developer builds only until the privacy policy names it.
     orderHistory: false,
+    // Your Subscriber Store: developer builds only until the privacy policy names it.
+    subStore: false,
   };
   assert.deepEqual(buildValues(registry), STORE);
   // The beta is the same set: no flag has a beta value of its own today.
@@ -83,6 +86,11 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     registry.orderHistory.devOnly,
     true,
     'Order History stays out until the privacy policy names it',
+  );
+  assert.equal(
+    registry.subStore.devOnly,
+    true,
+    'Your Subscriber Store stays out until the privacy policy names it',
   );
   assert.ok(!registry.autoScan.devOnly, 'the Daily Scan Reminder ships');
   assert.ok(!registry.localMode.devOnly, 'Local Mode ships');
@@ -121,6 +129,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     scanBar: true,
     newSinceScan: false,
     orderHistory: false,
+    subStore: false,
   });
   const { values } = loadFlags(fs.readFileSync(file, 'utf8'));
   assert.deepEqual(values, {
@@ -134,6 +143,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     scanBar: true,
     newSinceScan: false,
     orderHistory: false,
+    subStore: false,
   });
   assert.throws(() => writeFlags(file, {}), /expected one/, 'only ever written once');
   fs.rmSync(dir, { recursive: true, force: true });
@@ -288,6 +298,8 @@ test('pack: writes each build its values and cuts the code of flags that are off
     newSinceScan: false,
     // Order History: developer builds only until the privacy policy names it.
     orderHistory: false,
+    // Your Subscriber Store: developer builds only until the privacy policy names it.
+    subStore: false,
   };
   // Without the connector, what needs it goes too (the Daily Scan Reminder needs the alerts).
   const NO_CONNECTOR = [
