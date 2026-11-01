@@ -81,7 +81,9 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     orderHistory: false,
     // Your Subscriber Store: developer builds only until the privacy policy names it.
     subStore: false,
-    accountLogs: false,
+    // RSI Account Logs: in every build from 0.5.8 (owner, 2026-11-01); the privacy policy
+    // names both reads (test/privacy-permissions.test.js).
+    accountLogs: true,
   };
   assert.deepEqual(buildValues(registry), STORE);
   // The beta is the same set but for meltValue and autoScanRun, on there first.
@@ -105,11 +107,7 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     true,
     'Your Subscriber Store stays out until the privacy policy names it',
   );
-  assert.equal(
-    registry.accountLogs.devOnly,
-    true,
-    'RSI Account Logs stay out until the privacy policy and store forms name them',
-  );
+  assert.ok(!registry.accountLogs.devOnly, 'RSI Account Logs ship');
   assert.ok(!registry.autoScanRun.devOnly, 'Auto Scan Daily goes in the beta');
   assert.ok(!registry.autoScan.devOnly, 'the Daily Scan Reminder ships');
   assert.ok(!registry.localMode.devOnly, 'Local Mode ships');
@@ -329,7 +327,9 @@ test('pack: writes each build its values and cuts the code of flags that are off
     orderHistory: false,
     // Your Subscriber Store: developer builds only until the privacy policy names it.
     subStore: false,
-    accountLogs: false,
+    // RSI Account Logs: in every build from 0.5.8 (owner, 2026-11-01); the privacy policy
+    // names both reads (test/privacy-permissions.test.js).
+    accountLogs: true,
   };
   // Without the connector, what needs it goes too (the Daily Scan Reminder needs the alerts).
   const NO_CONNECTOR = [

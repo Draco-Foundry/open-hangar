@@ -5035,10 +5035,14 @@ try {
     shortcut: document.getElementById('pp-shortcut')?.textContent,
     look: document.getElementById('pp-look')?.value,
     autoScan: /Daily Scan Reminder/.test(document.body.textContent),
+    // RSI Account Logs (on in store builds from 0.5.8): the switch, off until turned on.
+    logsSw: document.getElementById('pp-logs-sw')?.getAttribute('aria-checked'),
+    logsLoad: !!document.getElementById('pp-logs-load'),
   }));
   const setWords = [
     'openhangar.space',
     'Connect to openhangar.space',
+    'Account History',
     'Look',
     'Match Browser',
     'Currency',
@@ -5061,9 +5065,11 @@ try {
   !/Notifications/.test(set.text) &&
   set.shortcut === 'Alt+Shift+O' &&
   set.look === 'auto' &&
-  !set.autoScan
+  !set.autoScan &&
+  set.logsSw === 'false' &&
+  !set.logsLoad
     ? ok(
-        'Settings: every group, no Store Alerts switch, the shortcut, no Daily Scan Reminder or Notifications row until connected',
+        'Settings: every group, no Store Alerts switch, the shortcut, Account History off, no Daily Scan Reminder or Notifications row until connected',
       )
     : fail(`popup settings: ${JSON.stringify({ set, setMissing })}`);
   // The layout (owner, 2026-10-24): Notifications inside the openhangar.space box; Look,
