@@ -204,6 +204,11 @@ const COPY = {
   'popup.scan-reminder-paused': 'Skipped {when}: scans are paused',
   // After a reminder went out.
   'popup.scan-reminder-last': 'Last reminder: {when}',
+  // Auto Scan (the `autoScanRun` flag, beta builds): its switch under the reminder's, and
+  // the reminder's line after a scan it ran. PLACEHOLDER: Needs Words (Words DB), not
+  // approved.
+  'popup.auto-scan': 'Auto Scan',
+  'popup.auto-scan-last': 'Last auto scan: {when}',
   // {when} on the same day: "today 6:12 AM" (another day: "Oct 13, 6:12 AM").
   'popup.auto-today': 'today {time}',
   'popup.notifications': 'Notifications', // the switch's name

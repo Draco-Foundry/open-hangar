@@ -479,8 +479,9 @@ siteHandlers['oh-scan-status'] = async () => {
 // page asks for it ('site'), and the toolbar popup in the connector build (below,
 // 'popup'): the request says which, for the scan's report (ui/scan/runner.js
 // scanReport.reason). → { ok, opened: true } for a tab, { ok, opened: false, by } for
-// the hidden page, or { ok: false, error: 'busy' }.
-async function requestScan(reason) {
+// the hidden page, or { ok: false, error: 'busy' }. `hiddenOnly` (Auto Scan): never a
+// tab; no hidden page → { ok: false, error: 'no-hidden' }, and it didn't count.
+async function requestScan(reason, { hiddenOnly = false } = {}) {
   const now = Date.now();
   // Checked and set before any wait, so two requests at once can't both pass; kept in
   // session storage too, for a worker that stopped and started again in between.
@@ -494,6 +495,11 @@ async function requestScan(reason) {
   }
   await chrome.storage.session.set({ scanAskedAt: now });
   const hidden = await scanHost?.start(reason);
+  if (!hidden && hiddenOnly) {
+    scanAskedAt = held;
+    await chrome.storage.session.set({ scanAskedAt: Number.isFinite(before) ? before : 0 });
+    return { ok: false, error: 'no-hidden' };
+  }
   await chrome.storage.session.set({ scanAskedBy: hidden ? hidden.by : 'tab' });
   if (hidden) return { ok: true, opened: false, by: hidden.by };
   const tabId = await dashboardTab();
@@ -777,6 +783,10 @@ async function remindFromAuto() {
   await chrome.storage.local.remove(AUTO_OLD);
 }
 
+// Auto Scan's turn at the alarm (the autoScanRun block below sets it): (now) → true when
+// a scan was asked for instead of the notification.
+let remindScanFirst = null;
+
 // One at a time, in order: the worker's start, the alarm, the switch and a click.
 let remindLine = Promise.resolve();
 const remindQueue = (fn) =>
@@ -823,6 +833,13 @@ async function remindFired() {
     return chrome.storage.local.set({ [REMIND_STATE]: { at: now, line: 'paused' } });
   // A scan running now: today's is under way.
   if (await scanRunning()) return;
+  // Auto Scan on (a build with autoScanRun): the scan instead, and this notification
+  // only when it can't run (autoScanDone).
+  if (remindScanFirst && (await remindScanFirst(now))) return;
+  await remindNotify(scanned, now);
+}
+// The notification, and its record for the popup's line.
+async function remindNotify(scanned, now) {
   await chrome.notifications
     .create(REMIND_ALARM, {
       type: 'basic',
@@ -874,6 +891,49 @@ chrome.storage.onChanged.addListener((c, area) => {
     chrome.notifications?.clear(REMIND_ALARM).catch(() => {});
 });
 // @flag-end autoScan
+
+// @flag-start autoScanRun: Auto Scan (needs autoScan: the reminder's alarm and notification)
+// With the Daily Scan Reminder on and Auto Scan turned on too (local `autoScanRunOn`,
+// the popup's Settings; off until the pilot turns it on), the reminder's alarm, when a
+// reminder is due, asks the hidden scan page for a scan (requestScan 'auto', never a
+// tab) instead of showing the notification. It's the popup's Scan less the buy-backs'
+// own pages: the hangar, buy-backs, referrals, then the sync. Before reading anything the
+// scan page checks the account (ui/scan/runner.js autoBefore, autoAfter): the RSI account
+// signed in now must be the one this browser last scanned, and one the link has synced
+// when it knows them. Signed out, another account, no hidden page or a scan that didn't
+// read everything: the reminder's notification instead. The status file's pause skips
+// the day before this is asked (remindFired). The record's line: 'auto' (asked), then
+// 'scanned' (read it all) or the notification's 'shown'.
+const AUTO_RUN_ON = 'autoScanRunOn';
+async function autoScanFirst(now) {
+  const { [AUTO_RUN_ON]: on } = await chrome.storage.local.get(AUTO_RUN_ON);
+  if (on !== true) return false;
+  const r = await requestScan('auto', { hiddenOnly: true });
+  if (!r.ok) return false;
+  await chrome.storage.local.set({ [REMIND_STATE]: { at: now, line: 'auto' } });
+  return true;
+}
+remindScanFirst = autoScanFirst;
+// An Auto Scan's report (once per run: it's written again after its sync).
+async function autoScanDone(r) {
+  const got = await chrome.storage.local.get(['db', REMIND_ON]);
+  if (got[REMIND_ON] !== true) return;
+  const now = Date.now();
+  if (!r.held && !r.signedOut && !r.bad)
+    return chrome.storage.local.set({ [REMIND_STATE]: { at: now, line: 'scanned' } });
+  // Paused (the status file) or another scan running: that's no reason to scan.
+  if (r.held === 'paused' || r.held === 'busy') return;
+  const scanned = scanTime(got.db);
+  if (scanned != null && (await notifyOk())) await remindNotify(scanned, now);
+}
+chrome.storage.onChanged.addListener((c, area) => {
+  const r = area === 'local' ? c.scanReport?.newValue : null;
+  if (r?.reason !== 'auto') return;
+  const was = c.scanReport.oldValue;
+  if (was?.run === r.run && was?.startedAt === r.startedAt) return;
+  remindQueue(() => autoScanDone(r));
+});
+// @flag-end autoScanRun
 
 // The website's messages, all of them: only from our own pages (src/site-pages.js),
 // each checked before its handler runs.

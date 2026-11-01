@@ -318,7 +318,12 @@ export function lineWhen(at, now = Date.now(), locale) {
 // src/background.js). `denied`: turning it on just now, the browser said no to
 // notifications. Off, or on with no reminder yet: no line (null). → { key, when, ask }
 // (ask: amber) or null.
-const REMINDER_KEY = { shown: 'popup.scan-reminder-last', paused: 'popup.scan-reminder-paused' };
+// 'scanned': Auto Scan (the autoScanRun flag) read it all instead of a reminder.
+const REMINDER_KEY = {
+  shown: 'popup.scan-reminder-last',
+  paused: 'popup.scan-reminder-paused',
+  scanned: 'popup.auto-scan-last',
+};
 export function reminderLine({ on, rec, denied = false }, now = Date.now(), locale) {
   if (denied) return { key: 'popup.scan-reminder-denied', when: '', ask: true };
   const key = on === true && isObj(rec) ? REMINDER_KEY[rec.line] : null;

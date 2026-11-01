@@ -69,6 +69,8 @@ const BUDGET = {
   // The Daily Scan Reminder (src/background.js): its switch and its last reminder.
   scanReminderOn: small('the Daily Scan Reminder switch'),
   scanReminder: small('the last reminder: when, and whether it went or the day was skipped'),
+  // Auto Scan (src/background.js, the autoScanRun flag): its switch.
+  autoScanRunOn: small('the Auto Scan switch'),
   avatarImg: { cap: 'one portrait, AVATAR_MAX 64 KB, replaced whole', max: 70 * KB },
   feedShips: { cap: 'one ships feed (~330 ships), replaced whole (a day)', max: 300 * KB },
   feedCatalog: {

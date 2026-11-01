@@ -170,6 +170,13 @@ test("the Daily Scan Reminder's line: what it does, the last reminder, a day ski
   });
   // Auto Scan Daily's lines are gone: a record of one shows nothing.
   assert.equal(say({ on: true, rec: { at, line: 'quick' } }), null);
+  // Auto Scan (the autoScanRun flag): asked, nothing yet; read it all, its line
+  // (placeholder words, Needs Words).
+  assert.equal(say({ on: true, rec: { at, line: 'auto' } }), null);
+  assert.deepEqual(say({ on: true, rec: { at, line: 'scanned' } }), {
+    words: 'Last auto scan: today 6:12 AM',
+    ask: false,
+  });
   // The browser said no to notifications as it was turned on.
   assert.deepEqual(say({ on: false, rec: null, denied: true }), {
     words: 'The reminder needs notifications, and your browser said no.',

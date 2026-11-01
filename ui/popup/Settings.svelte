@@ -31,6 +31,7 @@
     pilotAnswer,
     reportProblem,
     removeProfile,
+    setAutoScan,
     setScanReminder,
     syncNow,
   } from './actions.js';
@@ -65,6 +66,10 @@
   let autoOn = $state(false);
   let autoRec = $state(null);
   let denied = $state(false);
+  // Auto Scan (the `autoScanRun` flag): its switch (local autoScanRunOn), shown while the
+  // reminder is on; the reminder's alarm runs it (src/background.js).
+  const AUTO_RUN = AUTO && flag('autoScanRun');
+  let autoRunOn = $state(false);
   const line = $derived(reminderLine({ on: autoOn, rec: autoRec, denied }, now));
 
   const trouble = $derived(syncTrouble({ connected: v.connected, failed: failing }, now));
@@ -84,6 +89,7 @@
     const got = await chrome.storage.local.get(['scanReminderOn', 'scanReminder']);
     autoOn = got.scanReminderOn === true;
     autoRec = got.scanReminder || null;
+    if (AUTO_RUN) autoRunOn = (await chrome.storage.local.get('autoScanRunOn')).autoScanRunOn === true;
   }
   onMount(() => {
     OH.siteEnabled().then((on) => (siteOn = on));
@@ -94,7 +100,7 @@
     // listProfiles checks every saved hangar, so a run of db writes (a scan) reads it once.
     let later;
     const changed = (c, area) => {
-      if (area === 'local' && AUTO && (c.scanReminderOn || c.scanReminder)) loadAuto();
+      if (area === 'local' && AUTO && (c.scanReminderOn || c.scanReminder || c.autoScanRunOn)) loadAuto();
       if (area === 'local' && c.db) {
         clearTimeout(later);
         later = setTimeout(() => listProfiles().then((p) => (profiles = p)), 1000);
@@ -157,6 +163,10 @@
       denied = true;
       await setScanReminder(false);
     });
+  }
+  function autoRunSwitch() {
+    autoRunOn = !autoRunOn;
+    setAutoScan(autoRunOn);
   }
   function notifySwitch() {
     if (notify) {
@@ -311,6 +321,20 @@
                  or a day skipped; amber when notifications were refused; none otherwise. -->
             {#if line}
               <p class="pp-msg" class:calm={!line.ask} id="pp-auto-line">{t(line.key, { when: line.when })}</p>
+            {/if}
+            {#if AUTO_RUN && autoOn}
+              <div class="pp-line">
+                <span class="pp-grow" id="pp-autorun-l">{t('popup.auto-scan')}</span>
+                <button
+                  type="button"
+                  role="switch"
+                  class="pp-sw"
+                  id="pp-autorun-sw"
+                  aria-checked={autoRunOn}
+                  aria-labelledby="pp-autorun-l"
+                  onclick={autoRunSwitch}><i></i></button
+                >
+              </div>
             {/if}
           </div>
         {/if}

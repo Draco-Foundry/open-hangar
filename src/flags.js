@@ -72,6 +72,18 @@
       about: 'Daily Scan Reminder: a notification to scan once a day while connected.',
       default: true,
     },
+    // Auto Scan (owner, 2026-11-01; #666): with the Daily Scan Reminder on and Auto Scan
+    // turned on too, the reminder's alarm runs a scan (no buy-back pages) in the hidden
+    // page instead of the notification, only when the RSI account signed in is the one this browser
+    // last scanned (and one the link synced); else the notification. Beta only: the
+    // privacy policy and store listing say every read of RSI starts with a click, and its
+    // words aren't written yet. Off for each pilot until they turn it on. Needs autoScan.
+    autoScanRun: {
+      about:
+        'Auto Scan: the daily reminder scans by itself when the same RSI account is signed in.',
+      default: false,
+      beta: true,
+    },
     // The popup's scan bar (owner, 2026-10-20): one bar where Scan sits, naming the part
     // running and counting what it has read, filled by RSI's page count, then how long
     // the scan took; Scan held back while one starts or RSI asks to wait. On in every

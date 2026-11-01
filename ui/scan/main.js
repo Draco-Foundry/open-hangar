@@ -58,12 +58,10 @@ async function takeRequest() {
   const { scanRequest: r } = await session.get('scanRequest');
   if (!r || r.run !== run) return false;
   const go = Date.now() - r.at < ASK_MAX && !runner.busy;
-  // A request left from Auto Scan Daily (reason 'auto', before the reminder replaced it)
-  // is no Scan: nothing runs for it.
-  const running =
-    !go || r.reason === 'auto'
-      ? null
-      : runner.scan({ reason: r.reason === 'site' ? 'site' : 'popup' });
+  // 'auto': Auto Scan (src/background.js, the autoScanRun flag). The runner checks the
+  // signed-in account before it reads anything, and holds it in a build without the flag.
+  const reason = ['site', 'auto'].includes(r.reason) ? r.reason : 'popup';
+  const running = go ? runner.scan({ reason }) : null;
   await runner.marked();
   // Only this request: one asked for since is the next one's.
   const { scanRequest: still } = await session.get('scanRequest');

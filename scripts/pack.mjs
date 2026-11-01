@@ -155,6 +155,9 @@ if (FLAGS.alerts && !FLAGS.connector)
 // permissions the alerts' build brings (scripts/alerts.mjs).
 if (FLAGS.autoScan && !FLAGS.alerts)
   throw new Error('--flag autoScan=on needs alerts on (it uses their alarms permission)');
+// Auto Scan runs on the Daily Scan Reminder's alarm, and falls back to its notification.
+if (FLAGS.autoScanRun && !FLAGS.autoScan)
+  throw new Error('--flag autoScanRun=on needs autoScan on (it runs on the reminder)');
 // The connector's own pages (scripts/connector.mjs) and the hidden scan page's scripts
 // (scripts/scan-host.mjs). Without the flag they're left out of the build: nothing opens
 // them there.

@@ -69,6 +69,13 @@ export function scanWait(results, at, parse) {
   return at + Math.min(WAIT_MAX, ms);
 }
 
+// Two RSI handles are one account: the same, ignoring case and spaces around.
+const lc = (s) =>
+  String(s ?? '')
+    .trim()
+    .toLowerCase();
+export const sameHandle = (a, b) => !!lc(a) && lc(a) === lc(b);
+
 // A run id: one per page that scans, so its own mark is never another page's scan.
 export function newRun() {
   const bytes = globalThis.crypto?.getRandomValues?.(new Uint8Array(6));
@@ -300,7 +307,10 @@ export function createRunner(env) {
   // scanning), 'no-rsi' (no access to RSI: nothing read), 'paused' (status.json paused
   // every part), else null. sync: the sync after it (see sync()), null when there was
   // none. wait: when RSI kept asking it to slow down, the time it may be asked again
-  // (scanWait), else null; absent from a held report. rsiDown: a part RSI didn't answer
+  // (scanWait), else null; absent from a held report. An Auto Scan (reason 'auto') is also
+  // held by its account check: 'off' (a build without autoScanRun), 'no-owner',
+  // 'not-linked', 'other-account', 'signed-out' or 'no-account' (autoBefore, autoAfter).
+  // rsiDown: a part RSI didn't answer
   // for (a 5xx, or a 429 after every retry), whether or not it also asked to wait; the
   // popup and the basic page say so instead of showing the error or Log In to RSI.
   let starting = false;
@@ -311,12 +321,16 @@ export function createRunner(env) {
   // scanning ('busy': two at once would read RSI twice) or there's no access to RSI
   // ('no-rsi': no scan that can only fail; the page asks instead). `started()` runs as
   // it begins.
-  async function begin({ held = async () => false, started = () => {} } = {}) {
+  // `check()`: a reason to hold it before anything is read (Auto Scan's autoBefore), or
+  // null.
+  async function begin({ held = async () => false, started = () => {}, check } = {}) {
     if (busy || starting) return null;
     starting = true;
     let markedDone;
     marked = new Promise((r) => (markedDone = r));
     try {
+      const why = check ? await check() : null;
+      if (why) return await held(why);
       if (await otherScan()) return await held('busy');
       if (!(await mayReadRsi())) {
         OH.log('info', 'status', 'scan held: no access to robertsspaceindustries.com');
@@ -333,6 +347,33 @@ export function createRunner(env) {
     mark(true);
     writes.then(markedDone);
     return true;
+  }
+
+  // --- Auto Scan (the autoScanRun flag) ----------------------------------------------
+  // A scan nobody clicked reads whichever RSI account the browser is signed in to, so it
+  // reads only the one this browser last scanned (the live hangar's owner) and, when the
+  // link knows the RSI accounts it synced, one of those. Before any RSI read: no owner
+  // ('no-owner'), not connected ('not-linked'), or an owner the link doesn't know
+  // ('other-account') → held. → the held reason, or null to go on.
+  async function autoBefore() {
+    const owner = (await OH.loadDB())?.owner?.nickname;
+    if (!owner) return { held: 'no-owner' };
+    const link = (await OH.siteEnabled()) ? await OH.getSiteLink() : null;
+    if (!link?.token) return { held: 'not-linked' };
+    const known = (Array.isArray(link.accounts) ? link.accounts : [])
+      .map((a) => a?.handle)
+      .filter(Boolean);
+    if (known.length && !known.some((h) => sameHandle(h, owner))) return { held: 'other-account' };
+    return { owner };
+  }
+  // After RSI's account read: signed out ('signed-out'), unknown ('no-account': the read
+  // failed) or another handle ('other-account') → held, with nothing more read and the
+  // saved account never switched.
+  function autoAfter(account, owner) {
+    if (account?.loggedIn === false) return 'signed-out';
+    if (account?.loggedIn !== true || !account.nickname) return 'no-account';
+    if (account.other || !sameHandle(account.nickname, owner)) return 'other-account';
+    return null;
   }
 
   async function scan({ reason = 'page' } = {}) {
@@ -353,8 +394,17 @@ export function createRunner(env) {
       await writeReport(report);
       return report;
     };
+    const auto = reason === 'auto';
+    let before = {};
+    const check = async () => {
+      if (!flag('autoScanRun')) return 'off';
+      before = await autoBefore();
+      if (before.held) OH.log('info', 'status', `auto scan held: ${before.held}`);
+      return before.held || null;
+    };
     const go = await begin({
       held,
+      check: auto ? check : undefined,
       started: () =>
         store
           .set({ scanStarted: { run: me.run, by: me.by, reason, at: startedAt } })
@@ -368,15 +418,19 @@ export function createRunner(env) {
     let db = null;
     let wait = null;
     let rsiDown = false; // a part RSI didn't answer for (a 5xx, or a 429 after every retry)
+    let autoHeld = null; // Auto Scan held at RSI's account read (autoAfter)
     try {
       setProgress('account');
-      const account = (await OH.getAccount({ force: true }).catch(() => null)) || undefined;
-      switched = await reconcile(account);
-      await hooks.account?.(account, switched);
+      const ask = auto ? { force: true, expect: before.owner } : { force: true };
+      const account = (await OH.getAccount(ask).catch(() => null)) || undefined;
+      autoHeld = auto ? autoAfter(account, before.owner) : null;
+      if (autoHeld) OH.log('info', 'status', `auto scan held: ${autoHeld}`);
+      switched = autoHeld ? null : await reconcile(account);
+      if (!autoHeld) await hooks.account?.(account, switched);
       // Signed out: RSI's signed-out pages read as an empty hangar, and a scan of
       // nothing must never be saved over yours.
       signedOut = account?.loggedIn === false;
-      if (!signedOut) {
+      if (!signedOut && !autoHeld) {
         await keepPortrait(account);
         const h = await OH.scanSource('hangar', progress('hangar'), { account });
         if (h?.paused) paused.add('hangar');
@@ -406,7 +460,8 @@ export function createRunner(env) {
             OH.log('warn', 'buybacks', `details from history failed: ${e?.message || e}`),
           );
         // Then the buy-backs' own pages, before the sync so it carries what they say.
-        if (b?.ok && !b.partial) await readPacks({ db, inScan: true }).catch(() => {});
+        // Never in an Auto Scan: one read per buy-back is too many unasked.
+        if (b?.ok && !b.partial && !auto) await readPacks({ db, inScan: true }).catch(() => {});
         // Your Subscriber Store (the subStore build flag, src/lib.js getSubStore): at most
         // once a day, signed-in subscribers only, before the sync so it carries it. It
         // isn't a row of the scan: its problems only go to the log.
@@ -438,7 +493,7 @@ export function createRunner(env) {
       ...base,
       at: now(),
       ms: now() - startedAt,
-      held: rows.length && rows.every((r) => paused.has(r.id)) ? 'paused' : null,
+      held: autoHeld || (rows.length && rows.every((r) => paused.has(r.id)) ? 'paused' : null),
       signedOut,
       switched,
       rows,
@@ -456,6 +511,8 @@ export function createRunner(env) {
       // website's Sync My Hangar Now) was kept for this one (#658). This scan's mark is
       // gone first, so the sync doesn't wait on it.
       await writes;
+      // An Auto Scan held at the account read sends nothing (a sync kept stays kept).
+      if (autoHeld) return report;
       const isLinked = await linked();
       const go = afterScan({ linked: isLinked, signedOut, kept: await takeKeptSync() });
       if (go) {

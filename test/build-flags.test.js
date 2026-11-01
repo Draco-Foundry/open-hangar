@@ -21,6 +21,7 @@ test('registry parses: every flag has a name, a one-line about and a default', a
   assert.deepEqual(Object.keys(registry).sort(), [
     'alerts',
     'autoScan',
+    'autoScanRun',
     'connector',
     'localMode',
     'newSinceScan',
@@ -65,6 +66,9 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     // The Daily Scan Reminder (Auto Scan Daily's flag, #666): the privacy policy names it
     // (test/privacy-permissions.test.js).
     autoScan: true,
+    // Auto Scan (owner, 2026-11-01): beta only, until the privacy policy and store
+    // listing's words for it are approved.
+    autoScanRun: false,
     // The popup's scan bar: on in every build (owner, 2026-10-23).
     scanBar: true,
     // New Since Last Scan: off until its words and privacy line are approved.
@@ -75,8 +79,8 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     subStore: false,
   };
   assert.deepEqual(buildValues(registry), STORE);
-  // The beta is the same set: no flag has a beta value of its own today.
-  assert.deepEqual(buildValues(registry, { beta: true }), STORE);
+  // The beta is the same set but for Auto Scan, the one flag with a beta value of its own.
+  assert.deepEqual(buildValues(registry, { beta: true }), { ...STORE, autoScanRun: true });
   assert.deepEqual(buildValues(registry, { overrides: { sync: false } }), {
     ...STORE,
     sync: false,
@@ -126,6 +130,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     wishlistImport: false,
     alerts: false,
     autoScan: true,
+    autoScanRun: false,
     scanBar: true,
     newSinceScan: false,
     orderHistory: false,
@@ -140,6 +145,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     wishlistImport: false,
     alerts: false,
     autoScan: true,
+    autoScanRun: false,
     scanBar: true,
     newSinceScan: false,
     orderHistory: false,
@@ -292,6 +298,9 @@ test('pack: writes each build its values and cuts the code of flags that are off
     // The Daily Scan Reminder (Auto Scan Daily's flag, #666): the privacy policy names it
     // (test/privacy-permissions.test.js).
     autoScan: true,
+    // Auto Scan (owner, 2026-11-01): beta only, until the privacy policy and store
+    // listing's words for it are approved.
+    autoScanRun: false,
     // The popup's scan bar: on in every build (owner, 2026-10-23).
     scanBar: true,
     // New Since Last Scan: off until its words and privacy line are approved.
@@ -324,6 +333,7 @@ test('pack: writes each build its values and cuts the code of flags that are off
       const b = built(t);
       assert.deepEqual(b.flags, STORE, t);
       assert.equal(b.probe, 'keep();\n', `${t}: orgFleet code cut`);
+      assert.doesNotMatch(read(t, 'src/background.js'), /autoScanFirst/, `${t}: Auto Scan cut`);
       assert.match(b.lib, /OH\.siteLinkStart\s*=/, `${t}: sync code kept`);
       assert.match(
         b.lib,
@@ -587,10 +597,13 @@ test('pack: writes each build its values and cuts the code of flags that are off
     assert.ok(problemsOf(dir).includes('chrome: the hangar page with localMode off'));
 
     // The beta: exactly the beta set, no overrides. It's the store's (the connector with
-    // Local Mode), so the production hangar page is let in and the toolbar opens the popup.
+    // Local Mode) but for Auto Scan, so the production hangar page is let in and the
+    // toolbar opens the popup; Auto Scan's code is in the beta and cut from the store's.
     pack(dir, ['--beta']);
-    assert.deepEqual(built('beta').flags, STORE);
-    assert.deepEqual(built('beta-firefox').flags, STORE);
+    assert.deepEqual(built('beta').flags, { ...STORE, autoScanRun: true });
+    assert.deepEqual(built('beta-firefox').flags, { ...STORE, autoScanRun: true });
+    for (const t of ['beta', 'beta-firefox'])
+      assert.match(read(t, 'src/background.js'), /function autoScanFirst/, t);
     assert.deepEqual(built('beta').pages.hangar, ['https://hangar.openhangar.space']);
     for (const t of ['beta', 'beta-firefox'])
       assert.equal(built(t).manifest.action.default_popup, 'src/popup.html', t);
