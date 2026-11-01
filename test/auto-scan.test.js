@@ -605,8 +605,8 @@ test('check 6: every alarm is the alerts, the reminder or Auto Scan Daily; it no
     .replace(/^\s*\/\/.*$/gm, '');
   assert.ok(run.length > 3000, 'found autoScan()');
   assert.doesNotMatch(run, /reconcile\(|switchProfile/, 'never switches accounts');
-  // Only the worker notifies, once, for a day skipped (signed out, another account,
-  // paused): the run and its rules never do.
+  // Only the worker notifies, once, for a day the account check skipped (signed out, an
+  // account it can't confirm; never a paused day): the run and its rules never do.
   for (const [name, text] of [
     ['ui/scan/auto.js', read('ui/scan/auto.js')],
     ['autoScan()', run],
@@ -617,7 +617,7 @@ test('check 6: every alarm is the alerts, the reminder or Auto Scan Daily; it no
       `${name}: never notifies`,
     );
   assert.equal([...block.matchAll(/chrome\.notifications\s*\.create\(/g)].length, 1);
-  assert.match(block, /const AUTO_TELL = \['signed-out', 'other', 'paused'\];/);
+  assert.match(block, /const AUTO_TELL = \['signed-out', 'other'\];/);
   for (const text of [block, read('ui/scan/auto.js'), run])
     assert.doesNotMatch(text, /chrome\.cookies/, 'no cookies API of its own');
   // No pack reads, no scan report, no tab.
@@ -646,8 +646,8 @@ const scannedAt = (at) => ({
 });
 const ran = (line, at = Date.now()) => ({ v: 1, at, ended: at + 1, line });
 
-test('a day skipped for the account or the pause: one notification; a no to them, none', async () => {
-  for (const line of ['signed-out', 'other', 'paused']) {
+test('a day skipped by the account check: one notification; paused or a no to them, none', async () => {
+  for (const line of ['signed-out', 'other']) {
     const x = worker({
       notify: true,
       local: { autoDailyOn: true, ...scannedAt(Date.now() - DAY) },
@@ -664,8 +664,9 @@ test('a day skipped for the account or the pause: one notification; a no to them
     await settle();
     assert.equal(x.notes.length, 1, line);
   }
-  // A run that read, or one that asks in the popup: no notification.
-  for (const line of ['quick', 'full', 'partway', 'bad', 'rsi-down']) {
+  // A run that read, one that asks in the popup, or a paused day (a scan the pilot starts
+  // would be paused too): no notification.
+  for (const line of ['quick', 'full', 'partway', 'bad', 'rsi-down', 'paused']) {
     const x = worker({
       notify: true,
       local: { autoDailyOn: true, ...scannedAt(Date.now() - DAY) },

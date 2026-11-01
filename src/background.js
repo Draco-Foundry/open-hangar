@@ -895,7 +895,7 @@ chrome.storage.onChanged.addListener((c, area) => {
 // under 20 hours ago or its own last run ended then, RSI asked it to back off, the
 // browser is offline, or a scan is running. A day missed while the browser was closed
 // runs once, 10 to 30 minutes after it's back. A run held by the account check (signed
-// out, another account) or the status file's pause: one notification asking for a scan
+// out, an account it can't confirm): one notification asking for a scan
 // (the reminder's, so a click scans), when notifications are allowed; without them it
 // still runs, with no notice. Its keys and alarm aren't 0.4.0's (the reminder's start
 // removes those).
@@ -909,7 +909,9 @@ const AUTO_MAX_AHEAD = 28 * 3600e3;
 const AUTO_LATE = 10 * 60e3;
 const AUTO_RETRY_SPREAD = 2 * 3600e3;
 // The run's lines that ask for a scan by notification (ui/scan/auto.js LINES).
-const AUTO_TELL = ['signed-out', 'other', 'paused'];
+// A paused day skips quietly: a scan the pilot starts would be paused too (Claude chat,
+// Words, 2026-11-01).
+const AUTO_TELL = ['signed-out', 'other'];
 const autoRand = (ms) => Math.floor(Math.random() * ms);
 const autoSoon = (now) => now + 10 * 60e3 + autoRand(20 * 60e3);
 const autoDaily = (t) => t + AUTO_GAP + autoRand(AUTO_SPREAD);
@@ -984,14 +986,14 @@ async function autoFired(alarm) {
 }
 
 // A run's record: RSI asked it to wait (its retryAt, later than the next run), the next
-// run moves after it; held by the account check or the pause, one notification.
+// run moves after it; held by the account check, one notification.
 async function autoDone(rec, was) {
   const got = await chrome.storage.local.get(['siteLink', AUTO_ON, AUTO_NEXT, 'db']);
   if (!got.siteLink?.token || got[AUTO_ON] !== true) return;
   const retryAt = autoRetryAt(rec);
   if (retryAt != null && !(Number.isFinite(got[AUTO_NEXT]) && retryAt <= got[AUTO_NEXT]))
     await autoSchedule(retryAt + autoRand(AUTO_RETRY_SPREAD));
-  // A new run (its end changed) whose line is a day skipped for the account or the pause.
+  // A new run (its end changed) whose line is a day skipped by the account check.
   if (!AUTO_TELL.includes(rec?.line) || rec?.ended === was?.ended) return;
   const scanned = scanTime(got.db);
   if (scanned == null || !(await notifyOk())) return;
