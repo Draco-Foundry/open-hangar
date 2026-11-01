@@ -133,7 +133,7 @@ test('the pledge log: each event, its time in UTC, nobody named', () => {
       value: null,
     },
     {
-      at: '2026-10-24T15:04:00Z',
+      at: '2026-10-04T15:04:00Z',
       pledge: '90000007',
       name: 'Add-Ons - Example Paint',
       kind: 'bought',
@@ -186,6 +186,8 @@ test('the store credit log: in and out, melts and orders, amounts in cents', () 
 });
 
 test('log times: 12-hour and 24-hour clocks, seconds, and impossible days refused', () => {
+  // RSI's own form (the owner's log, 2026-11-01): a zero-padded day, no comma after it.
+  assert.equal(P.parseLogTime('Nov 01 2026, 3:18 am -'), '2026-11-01T03:18:00Z');
   assert.equal(P.parseLogTime('Oct 30, 2026, 12:00 am -'), '2026-10-30T00:00:00Z');
   assert.equal(P.parseLogTime('Oct 30, 2026, 12:00 pm -'), '2026-10-30T12:00:00Z');
   assert.equal(P.parseLogTime('October 3 2017, 23:59:58'), '2017-10-03T23:59:58Z');
