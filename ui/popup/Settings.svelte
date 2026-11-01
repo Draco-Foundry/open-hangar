@@ -79,6 +79,41 @@
     if (!ALERTS) return;
     notify = await notifyAllowed();
   }
+  // RSI Account Logs (the `accountLogs` flag): a full history load asked for or under
+  // way (local accountLogsLoad, src/lib.js readAccountLogs), for the row's line.
+  const LOGS = flag('accountLogs');
+  let logsLoad = $state(null);
+  let logsOn = $state(false); // a log kept or a load asked for
+  const logsLine = $derived(
+    !logsLoad
+      ? ''
+      : logsLoad.part && logsLoad.pagecount
+        ? t(`popup.account-logs-${logsLoad.part === 'credit' ? 'credit' : 'pledge'}`, {
+            page: Math.max(0, (logsLoad.next || 1) - 1),
+            pages: logsLoad.pagecount,
+          })
+        : t('popup.account-logs-asked'),
+  );
+  async function loadLogs() {
+    if (!LOGS) return;
+    const got = await chrome.storage.local.get(['accountLogsLoad', 'accountLogs']);
+    logsLoad = got.accountLogsLoad || null;
+    logsOn = !!(got.accountLogsLoad || got.accountLogs);
+  }
+  // Ask for the full history and start a scan to read it (it goes on scan by scan).
+  async function askLogs() {
+    if (!(await OH.wantAccountLogs())) return;
+    await loadLogs();
+    chrome.runtime.sendMessage({ ohPopup: 'scan' }).catch(() => null);
+  }
+  // The pilot's off switch (Claude chat's rec, 2026-11-01): off stops the reads and
+  // removes the kept logs, so sync sends none; on asks for the full history again.
+  async function logsSwitch() {
+    if (!logsOn) return askLogs();
+    logsOn = false;
+    logsLoad = null;
+    await OH.stopAccountLogs();
+  }
   async function loadAuto() {
     if (!AUTO) return;
     const got = await chrome.storage.local.get(['scanReminderOn', 'scanReminder']);
@@ -91,10 +126,12 @@
     commands().then((c) => (shortcut = popupShortcut(c)));
     loadAlerts();
     loadAuto();
+    loadLogs();
     // listProfiles checks every saved hangar, so a run of db writes (a scan) reads it once.
     let later;
     const changed = (c, area) => {
       if (area === 'local' && AUTO && (c.scanReminderOn || c.scanReminder)) loadAuto();
+      if (area === 'local' && LOGS && (c.accountLogsLoad || c.accountLogs)) loadLogs();
       if (area === 'local' && c.db) {
         clearTimeout(later);
         later = setTimeout(() => listProfiles().then((p) => (profiles = p)), 1000);
@@ -343,6 +380,36 @@
   {/if}
 
   <!-- Look, Currency and Shortcut as list rows: the name, then the value (owner, 2026-10-24). -->
+  {#if LOGS}
+    <!-- RSI Account Logs (the accountLogs flag): its switch (on asks for the full history,
+         which the next scan reads page by page and goes on where it stopped; off stops and
+         removes the logs), and, while on, Load Full History to read it all again
+         (src/lib.js readAccountLogs, stopAccountLogs). -->
+    <div class="pp-grp" id="pp-logs">
+      <div class="pp-r pp-col">
+        <div class="pp-line">
+          <span class="pp-grow" id="pp-logs-l">{t('popup.account-logs')}</span>
+          {#if logsOn && !logsLoad}
+            <button type="button" class="pp-btn2" id="pp-logs-load" onclick={askLogs}
+              >{t('popup.account-logs-load')}</button
+            >
+          {/if}
+          <button
+            type="button"
+            role="switch"
+            class="pp-sw"
+            id="pp-logs-sw"
+            aria-checked={logsOn}
+            aria-labelledby="pp-logs-l"
+            aria-describedby={logsLine ? 'pp-logs-line' : null}
+            onclick={logsSwitch}><i></i></button
+          >
+        </div>
+        {#if logsLine}<p class="pp-msg calm" id="pp-logs-line" role="status">{logsLine}</p>{/if}
+      </div>
+    </div>
+  {/if}
+
   <div class="pp-grp" id="pp-prefs">
     <label class="pp-r pp-li">
       <span class="pp-grow">{t('popup.look')}</span>

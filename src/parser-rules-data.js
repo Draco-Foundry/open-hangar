@@ -39,6 +39,7 @@
         'cart',
         'known',
         'aliases',
+        'accountLogs',
       ],
       additionalProperties: false,
       properties: {
@@ -1065,6 +1066,83 @@
             },
           },
         },
+        accountLogs: {
+          description:
+            "RSI's two account logs (Account, the pledge log and the store credit log), read behind the accountLogs build flag: POST {page:N} to each path with the Rsi-Token cookie as cart.tokenHeader and the ajax header, 25 entries a page, the reply's data.rendered HTML read here. Only named groups are read from a line: never a handle or an email.",
+          type: 'object',
+          required: [
+            'pledgeLog',
+            'creditLog',
+            'pageSize',
+            'ajaxHeader',
+            'ajaxValue',
+            'entry',
+            'line',
+            'name',
+            'creditIn',
+            'creditOut',
+            'when',
+            'lead',
+            'amount',
+            'events',
+            'credit',
+          ],
+          additionalProperties: false,
+          properties: {
+            pledgeLog: { $ref: '#/$defs/path' },
+            creditLog: { $ref: '#/$defs/path' },
+            pageSize: { $ref: '#/$defs/pageSize' },
+            ajaxHeader: { $ref: '#/$defs/headerName' },
+            ajaxValue: {
+              description: "The ajax header's value.",
+              type: 'string',
+              pattern: '^[A-Za-z]+$',
+            },
+            entry: { $ref: '#/$defs/selector' },
+            line: { $ref: '#/$defs/selector' },
+            name: { $ref: '#/$defs/selector' },
+            creditIn: { $ref: '#/$defs/selector' },
+            creditOut: { $ref: '#/$defs/selector' },
+            when: { $ref: '#/$defs/pattern' },
+            lead: { $ref: '#/$defs/pattern' },
+            amount: { $ref: '#/$defs/pattern' },
+            events: {
+              description:
+                'Each pledge log event, tried in this order on the words after the pledge id; the first that matches names it. Only the order group is read.',
+              type: 'object',
+              required: [
+                'buyBackCreated',
+                'bought',
+                'boughtBack',
+                'melted',
+                'giftSent',
+                'giftClaimed',
+                'granted',
+              ],
+              additionalProperties: false,
+              properties: {
+                buyBackCreated: { $ref: '#/$defs/pattern' },
+                bought: { $ref: '#/$defs/pattern' },
+                boughtBack: { $ref: '#/$defs/pattern' },
+                melted: { $ref: '#/$defs/pattern' },
+                giftSent: { $ref: '#/$defs/pattern' },
+                giftClaimed: { $ref: '#/$defs/pattern' },
+                granted: { $ref: '#/$defs/pattern' },
+              },
+            },
+            credit: {
+              description:
+                'What a credit line says after its amount: a melt (the pledge id and name) or an order (its number).',
+              type: 'object',
+              required: ['reclaim', 'order'],
+              additionalProperties: false,
+              properties: {
+                reclaim: { $ref: '#/$defs/pattern' },
+                order: { $ref: '#/$defs/pattern' },
+              },
+            },
+          },
+        },
       },
       $defs: {
         pattern: {
@@ -1552,6 +1630,56 @@
         },
       },
       aliases: [{ old: 'Phoenix Emerald', now: 'Constellation Mk IV Phoenix Emerald' }],
+      accountLogs: {
+        pledgeLog: '/api/account/pledgeLog',
+        creditLog: '/api/account/creditLog',
+        pageSize: 25,
+        ajaxHeader: 'X-Requested-With',
+        ajaxValue: 'XMLHttpRequest',
+        entry: 'div.pledge-log-entry',
+        line: ':scope > p',
+        name: 'span.important',
+        creditIn: 'ins',
+        creditOut: 'del',
+        when: {
+          source:
+            '^\\s*(?<month>[A-Za-z]{3})[a-z]*\\.?\\s+(?<day>\\d{1,2}),?\\s+(?<year>\\d{4}),?\\s+(?<hour>\\d{1,2}):(?<minute>\\d{2})(?::(?<second>\\d{2}))?\\s*(?<ampm>[ap]\\.?m\\.?)?',
+          flags: 'i',
+        },
+        lead: { source: '^\\s*#(?<id>\\d{1,12})\\s*-\\s*', flags: '' },
+        amount: {
+          source: '(?<value>-?\\$\\s?[0-9][0-9,]*(?:\\.[0-9]{1,2})?)(?:\\s*[A-Z]{3})?\\s*$',
+          flags: '',
+        },
+        events: {
+          buyBackCreated: {
+            source: '^created by\\b.*\\s-\\s*buy-?back order\\s*#(?<order>[A-Za-z0-9_-]{1,40})',
+            flags: 'i',
+          },
+          bought: {
+            source: '^created by\\b.*\\s-\\s*order\\s*#(?<order>[A-Za-z0-9_-]{1,40})',
+            flags: 'i',
+          },
+          boughtBack: {
+            source: '^buy-?back by\\b.*\\s-\\s*order\\s*#(?<order>[A-Za-z0-9_-]{1,40})',
+            flags: 'i',
+          },
+          melted: { source: '^reclaimed by\\b', flags: 'i' },
+          giftSent: { source: '^gifted to\\b', flags: 'i' },
+          giftClaimed: { source: '^claimed as a gift by\\b', flags: 'i' },
+          granted: { source: '^(?:(?!\\bby\\b).)*$', flags: 'i' },
+        },
+        credit: {
+          reclaim: {
+            source: '^\\s*-?\\s*reclaim of pledge\\s*#(?<id>\\d{1,12})\\s*(?<name>.*)$',
+            flags: 'i',
+          },
+          order: {
+            source: '^\\s*-?\\s*order created:?\\s*#?(?<order>[A-Za-z0-9_-]{1,40})',
+            flags: 'i',
+          },
+        },
+      },
     },
   });
   root.OHParserRulesData = data;

@@ -354,19 +354,49 @@
     };
   }
 
+  // The account logs as lib.js's readAccountLogs keeps them ({ pledge, credit }, each
+  // { items, at, pages, unread }, only ever a whole read) → sources.pledgeLog and
+  // sources.creditLog { items, scannedAt, meta: { pages, unread } }, each line with only
+  // the keys the sync format allows. A log not read yet: left out. Pure.
+  const PLEDGE_LOG_KEYS = ['at', 'pledge', 'name', 'kind', 'order', 'value'];
+  const CREDIT_LOG_KEYS = ['at', 'dir', 'amount', 'kind', 'pledge', 'name', 'order'];
+  function withAccountLogs(sources, logs) {
+    if (!isObj(logs)) return sources;
+    const out = { ...sources };
+    for (const [id, source, keys] of [
+      ['pledge', 'pledgeLog', PLEDGE_LOG_KEYS],
+      ['credit', 'creditLog', CREDIT_LOG_KEYS],
+    ]) {
+      const log = logs[id];
+      if (!isObj(log) || !Array.isArray(log.items) || !Number.isFinite(log.at)) continue;
+      const count = (n) => (Number.isInteger(n) && n >= 0 ? n : 0);
+      out[source] = {
+        items: log.items
+          .filter(isObj)
+          .map((it) => Object.fromEntries(keys.filter((k) => k in it).map((k) => [k, it[k]]))),
+        scannedAt: log.at,
+        meta: { pages: count(log.pages), unread: count(log.unread) },
+      };
+    }
+    return out;
+  }
+
   // The whole database as a self-describing JSON object (the backup file), ordered
   // the way a backend reads it: provenance → who (identity, org, rank, balances) →
   // what they own (sources). `db` as lib.js's loadDB (or checkDB) returns it,
   // `account` the cached RSI account (cache only, so this works offline), `archive`
   // the stored pledge archive, `subStore` the account's own Subscriber Store as
-  // lib.js's getSubStore keeps it (only with the subStore build flag). ALWAYS the
-  // current format (EXPORT_VERSION), whatever the stored DB's version. Pure.
+  // lib.js's getSubStore keeps it (only with the subStore build flag), `accountLogs` the
+  // account's pledge and store credit logs as lib.js's readAccountLogs keeps them (only
+  // with the accountLogs build flag). ALWAYS the current format (EXPORT_VERSION),
+  // whatever the stored DB's version. Pure.
   function exportPayload({
     db,
     account = null,
     archive = null,
     buybackDetails = null,
     subStore = null,
+    accountLogs = null,
     appVersion = null,
     now,
   } = {}) {
@@ -376,9 +406,9 @@
       exportedAt: new Date(now === undefined ? Date.now() : now).toISOString(),
       schemaVersion: EXPORT_VERSION,
       account: shapeAccount(account, db.owner),
-      sources: withSubStore(
-        withBuybackDetails(sanitizeSources(db.sources), buybackDetails),
-        subStore,
+      sources: withAccountLogs(
+        withSubStore(withBuybackDetails(sanitizeSources(db.sources), buybackDetails), subStore),
+        accountLogs,
       ),
       // Scan history rides along so a backup file is a complete restore point.
       history: Array.isArray(db.history) ? db.history : [],
@@ -450,14 +480,15 @@
   // A backup file (exportPayload) → the hangar as the website stores a synced one:
   //   { app, appVersion, exportedAt, schemaVersion, account, sources, pledgeArchive }
   // without history, the referral code (in the referral source and on the account
-  // block), the prospects list, the order history and the Subscriber Store (the website
-  // keeps those apart from the hangar, and our hangar page has no use for them), and
-  // the pledge archive capped (pledgeArchive left out when there's none). Returns a copy, never changes
-  // `payload`. Pure.
+  // block), the prospects list, the order history, the account logs and the Subscriber
+  // Store (the website keeps those apart from the hangar, and our hangar page has no use
+  // for them), and the pledge archive capped (pledgeArchive left out when there's none).
+  // Returns a copy, never changes `payload`. Pure.
   function hangarView(payload) {
     const { history, ...out } = payload;
-    if (isObj(out.sources) && ('orders' in out.sources || 'subStore' in out.sources))
-      out.sources = omit(out.sources, ['orders', 'subStore']);
+    const apart = ['orders', 'subStore', 'pledgeLog', 'creditLog'];
+    if (isObj(out.sources) && apart.some((k) => k in out.sources))
+      out.sources = omit(out.sources, apart);
     const ref = out.sources?.referral;
     if (isObj(ref) && isObj(ref.items))
       out.sources = {

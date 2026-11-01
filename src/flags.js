@@ -124,6 +124,17 @@
       default: false,
       devOnly: true,
     },
+    // RSI Account Logs (owner, 2026-11-01): a scan reads RSI's pledge log and store credit
+    // log (Account), the full history once when the pilot asks and the day's new lines
+    // after (src/lib.js readAccountLogs, ui/scan/runner.js), and sync sends them as
+    // sources.pledgeLog and sources.creditLog (schema/sync-payload.schema.json). Handles
+    // and emails never leave the parser (src/scraper/parser.js). Developer builds only
+    // until the privacy policy and the store forms name both reads.
+    accountLogs: {
+      about: 'RSI Account Logs: a scan reads the pledge and store credit logs and sync sends them.',
+      default: false,
+      devOnly: true,
+    },
   };
 
   // Set per build by scripts/pack.mjs. Keep it empty here.

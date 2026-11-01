@@ -199,6 +199,33 @@ policy's words are the owner's; this list never edits them.
 | `sources.subStore.meta`                              | How much of the list the last read got.                                                 |
 | `sources.subStore.meta.total`                        | How many items RSI said it lists.                                                       |
 | `sources.subStore.meta.complete`                     | True when every item came in.                                                           |
+| `sources.pledgeLog`                                  | RSI's pledge log (behind the accountLogs flag, dev only). Never a handle or an email.   |
+| `sources.pledgeLog.items`                            | The log's lines, newest first, at most 10,000.                                          |
+| `sources.pledgeLog.items[]`                          | One pledge event. Strict: no handle, email or payment field.                            |
+| `sources.pledgeLog.items[].at`                       | When it happened, UTC to the second.                                                    |
+| `sources.pledgeLog.items[].pledge`                   | The pledge id.                                                                          |
+| `sources.pledgeLog.items[].name`                     | The pledge's name as the log writes it.                                                 |
+| `sources.pledgeLog.items[].kind`                     | What happened: bought, buy-back, melted, gift, granted or other.                        |
+| `sources.pledgeLog.items[].order`                    | The order number (a purchase or a buy-back), or null.                                   |
+| `sources.pledgeLog.items[].value`                    | Paid, melted for or a gift's value, whole US cents, or null.                            |
+| `sources.pledgeLog.scannedAt`                        | When the pledge log was last read.                                                      |
+| `sources.pledgeLog.meta`                             | How much of the log the reads covered.                                                  |
+| `sources.pledgeLog.meta.pages`                       | How many pages the log had.                                                             |
+| `sources.pledgeLog.meta.unread`                      | Lines the parser could not read (left out).                                             |
+| `sources.creditLog`                                  | RSI's store credit log (behind the accountLogs flag, dev only).                         |
+| `sources.creditLog.items`                            | The log's lines, newest first, at most 10,000.                                          |
+| `sources.creditLog.items[]`                          | One store credit line. Strict: no payment field, nobody else.                           |
+| `sources.creditLog.items[].at`                       | When it happened, UTC to the second.                                                    |
+| `sources.creditLog.items[].dir`                      | in or out.                                                                              |
+| `sources.creditLog.items[].amount`                   | The credit, whole US cents.                                                             |
+| `sources.creditLog.items[].kind`                     | melt, order or other.                                                                   |
+| `sources.creditLog.items[].pledge`                   | A melt's pledge id, or null.                                                            |
+| `sources.creditLog.items[].name`                     | A melt's pledge name, or null.                                                          |
+| `sources.creditLog.items[].order`                    | An order's number, or null.                                                             |
+| `sources.creditLog.scannedAt`                        | When the store credit log was last read.                                                |
+| `sources.creditLog.meta`                             | How much of the log the reads covered.                                                  |
+| `sources.creditLog.meta.pages`                       | How many pages the log had.                                                             |
+| `sources.creditLog.meta.unread`                      | Lines the parser could not read (left out).                                             |
 | `history`                                            | Scan snapshots, oldest first (optional).                                                |
 | `history[]`                                          | One snapshot.                                                                           |
 | `history[].at`                                       | When it was taken.                                                                      |

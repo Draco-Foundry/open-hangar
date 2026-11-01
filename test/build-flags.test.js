@@ -19,6 +19,7 @@ test('registry parses: every flag has a name, a one-line about and a default', a
   const { registry, values } = loadFlags(FLAGS_SRC);
   validateRegistry(registry);
   assert.deepEqual(Object.keys(registry).sort(), [
+    'accountLogs',
     'alerts',
     'autoScan',
     'connector',
@@ -76,6 +77,7 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     orderHistory: false,
     // Your Subscriber Store: developer builds only until the privacy policy names it.
     subStore: false,
+    accountLogs: false,
   };
   assert.deepEqual(buildValues(registry), STORE);
   // The beta is the same set but for meltValue, on there first.
@@ -94,6 +96,11 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     registry.subStore.devOnly,
     true,
     'Your Subscriber Store stays out until the privacy policy names it',
+  );
+  assert.equal(
+    registry.accountLogs.devOnly,
+    true,
+    'RSI Account Logs stay out until the privacy policy and store forms name them',
   );
   assert.ok(!registry.autoScan.devOnly, 'the Daily Scan Reminder ships');
   assert.ok(!registry.localMode.devOnly, 'Local Mode ships');
@@ -134,6 +141,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     meltValue: false,
     orderHistory: false,
     subStore: false,
+    accountLogs: false,
   });
   const { values } = loadFlags(fs.readFileSync(file, 'utf8'));
   assert.deepEqual(values, {
@@ -149,6 +157,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     meltValue: false,
     orderHistory: false,
     subStore: false,
+    accountLogs: false,
   });
   assert.throws(() => writeFlags(file, {}), /expected one/, 'only ever written once');
   fs.rmSync(dir, { recursive: true, force: true });
@@ -307,6 +316,7 @@ test('pack: writes each build its values and cuts the code of flags that are off
     orderHistory: false,
     // Your Subscriber Store: developer builds only until the privacy policy names it.
     subStore: false,
+    accountLogs: false,
   };
   // Without the connector, what needs it goes too (the Daily Scan Reminder needs the alerts).
   const NO_CONNECTOR = [

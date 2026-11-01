@@ -30,6 +30,10 @@ most users see it within a few hours.
   `"minVersion": "0.2.13"` pauses it only on older versions (use this once the fix
   is out, so people on the fix keep scanning). `message` is optional (300 characters,
   plain text).
+- `sources.pledgeLog` and `sources.creditLog`: `"enabled": false` pauses that account log
+  alone (RSI Account Logs, the `accountLogs` build flag): its full history load and its
+  daily read stop, and what it kept stays as it was. A load paused partway goes on from
+  its next page once the switch is back on.
 - `sources.scanHidden`: `"enabled": false` runs scans on the small Open Hangar page in a
   tab again instead of the hidden scan page (0.4.0, `src/scan-host.js`), if the hidden
   page itself breaks. It only ever turns the hidden page off.

@@ -240,7 +240,8 @@ paging, the signs of RSI's sign-in page, the hangar's and buy-backs' selectors a
 positions, the buy-back page's, the name patterns that sort pledges and buy-backs
 (upgrades, add-ons, coupons, game access, paints, store categories), insurance terms,
 dates, the buy-back token sentence, the account's JSON keys, the dossier's selectors,
-the GraphQL requests (referrals, the Subscriber Store, the store list) and Add to RSI
+the GraphQL requests (referrals, the Subscriber Store, the store list), the account
+logs' requests and line patterns (the pledge log and store credit log) and Add to RSI
 Cart's requests (addresses, GraphQL documents, the token's cookie and headers, RSI's
 refusal words). The parsing stays in `src/scraper/parser.js`, `src/lib.js` and
 `src/rsi-cart.js`, which read it as `RULES.<path>`; when RSI moves something, the fix is in

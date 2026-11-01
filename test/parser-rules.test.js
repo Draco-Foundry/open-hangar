@@ -193,6 +193,14 @@ test('the parts of a match the code reads are named groups in its pattern', () =
     'dates.named': ['year', 'month', 'day'],
     'dossier.orgSid': ['sid'],
     'cart.csrfValue': ['value'],
+    'accountLogs.when': ['month', 'day', 'year', 'hour', 'minute', 'second', 'ampm'],
+    'accountLogs.lead': ['id'],
+    'accountLogs.amount': ['value'],
+    'accountLogs.events.buyBackCreated': ['order'],
+    'accountLogs.events.bought': ['order'],
+    'accountLogs.events.boughtBack': ['order'],
+    'accountLogs.credit.reclaim': ['id', 'name'],
+    'accountLogs.credit.order': ['order'],
   };
   const groupsOf = (re) =>
     Object.keys(new RegExp(`(?:${re.source})|`, re.flags).exec('').groups || {});

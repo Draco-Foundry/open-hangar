@@ -380,5 +380,69 @@
       "hooks": ["js-label", "js-open-ship-upgrades"]
     }
   },
-  "aliases": [{ "old": "Phoenix Emerald", "now": "Constellation Mk IV Phoenix Emerald" }]
+  "aliases": [{ "old": "Phoenix Emerald", "now": "Constellation Mk IV Phoenix Emerald" }],
+  "accountLogs": {
+    "pledgeLog": "/api/account/pledgeLog",
+    "creditLog": "/api/account/creditLog",
+    "pageSize": 25,
+    "ajaxHeader": "X-Requested-With",
+    "ajaxValue": "XMLHttpRequest",
+    "entry": "div.pledge-log-entry",
+    "line": ":scope > p",
+    "name": "span.important",
+    "creditIn": "ins",
+    "creditOut": "del",
+    "when": {
+      "source": "^\\s*(?<month>[A-Za-z]{3})[a-z]*\\.?\\s+(?<day>\\d{1,2}),?\\s+(?<year>\\d{4}),?\\s+(?<hour>\\d{1,2}):(?<minute>\\d{2})(?::(?<second>\\d{2}))?\\s*(?<ampm>[ap]\\.?m\\.?)?",
+      "flags": "i"
+    },
+    "lead": {
+      "source": "^\\s*#(?<id>\\d{1,12})\\s*-\\s*",
+      "flags": ""
+    },
+    "amount": {
+      "source": "(?<value>-?\\$\\s?[0-9][0-9,]*(?:\\.[0-9]{1,2})?)(?:\\s*[A-Z]{3})?\\s*$",
+      "flags": ""
+    },
+    "events": {
+      "buyBackCreated": {
+        "source": "^created by\\b.*\\s-\\s*buy-?back order\\s*#(?<order>[A-Za-z0-9_-]{1,40})",
+        "flags": "i"
+      },
+      "bought": {
+        "source": "^created by\\b.*\\s-\\s*order\\s*#(?<order>[A-Za-z0-9_-]{1,40})",
+        "flags": "i"
+      },
+      "boughtBack": {
+        "source": "^buy-?back by\\b.*\\s-\\s*order\\s*#(?<order>[A-Za-z0-9_-]{1,40})",
+        "flags": "i"
+      },
+      "melted": {
+        "source": "^reclaimed by\\b",
+        "flags": "i"
+      },
+      "giftSent": {
+        "source": "^gifted to\\b",
+        "flags": "i"
+      },
+      "giftClaimed": {
+        "source": "^claimed as a gift by\\b",
+        "flags": "i"
+      },
+      "granted": {
+        "source": "^(?:(?!\\bby\\b).)*$",
+        "flags": "i"
+      }
+    },
+    "credit": {
+      "reclaim": {
+        "source": "^\\s*-?\\s*reclaim of pledge\\s*#(?<id>\\d{1,12})\\s*(?<name>.*)$",
+        "flags": "i"
+      },
+      "order": {
+        "source": "^\\s*-?\\s*order created:?\\s*#?(?<order>[A-Za-z0-9_-]{1,40})",
+        "flags": "i"
+      }
+    }
+  }
 }
