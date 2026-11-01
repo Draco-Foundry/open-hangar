@@ -52,7 +52,7 @@ wishlist import and store alerts, and from 0.4.0 Auto Scan Daily):
 | `wishlistImport` | This browser's wishlist into the account (the basic page)        | on    | on   | no       |
 | `alerts`         | Store alerts matched on the device (needs connector)             | on    | on   | no       |
 | `autoScan`       | The Daily Scan Reminder (needs alerts)                           | on    | on   | no       |
-| `autoScanRun`    | Auto Scan Daily, in place of the reminder (needs autoScan)       | off   | on   | no       |
+| `autoScanRun`    | Auto Scan Daily, in place of the reminder (needs autoScan)       | on    | on   | no       |
 | `scanBar`        | The popup's scan as one counting bar where Scan sits             | on    | on   | no       |
 | `newSinceScan`   | The popup's New Since Last Scan list                             | off   | off  | no       |
 | `meltValue`      | The popup and Home show Melt Value, its parts at melt            | off   | on   | no       |

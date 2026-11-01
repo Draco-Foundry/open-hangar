@@ -39,6 +39,7 @@ function scratch({ connector = true, alerts = false } = {}) {
   setDefault('wishlistImport', connector);
   setDefault('alerts', alerts);
   setDefault('autoScan', alerts);
+  setDefault('autoScanRun', alerts);
   return dir;
 }
 const run = (dir, script, args = []) =>

@@ -8,7 +8,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { CHROME_ID, cutFlags, loadBackground } = require('./bridge-env.js');
+const { CHROME_ID, STORE_FLAGS, cutFlags, loadBackground } = require('./bridge-env.js');
 
 const ROOT = path.join(__dirname, '..');
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
@@ -24,6 +24,9 @@ const scanned = (at) => ({
 // The store build's worker, connected, notifications allowed unless `notify` says no.
 function worker(o = {}) {
   const x = loadBackground({
+    // A build with the reminder and without Auto Scan Daily, which replaces it in the
+    // store build (test/auto-scan.test.js).
+    flags: { ...STORE_FLAGS, autoScanRun: false },
     changes: true,
     offscreen: true,
     notify: true,
