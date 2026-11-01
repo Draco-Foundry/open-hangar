@@ -3,7 +3,8 @@
 What's changed in each release of Open Hangar. Dates are when the version was cut.
 
 ## Unreleased
-n- Changed: the popup's Connected row is less busy. The sync time sits under it, Sync Now stays on the right, and Disconnect moves down beside Clear Data.
+
+- Changed: the popup's Connected row is less busy. The sync time sits under it, Sync Now stays on the right, and Disconnect moves down beside Clear Data.
 
 ## 0.5.7 — 2026-10-31
 
