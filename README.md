@@ -437,4 +437,6 @@ an unofficial fan project, not affiliated with the Cloud Imperium group of compa
 - **Email:** [support@openhangar.space](mailto:support@openhangar.space)
 - **Security Issues:** please report privately, see the [Security Policy](SECURITY.md).
 
+Open Hangar™ is a trademark of Draco Foundry, LLC. The license doesn't give any right to use the name or logo.
+
 See you in the 'verse. o7
