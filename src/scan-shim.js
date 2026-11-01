@@ -10,6 +10,9 @@
  *   chrome.storage.local    get, set, remove, getKeys, getBytesInUse
  *   chrome.storage.session  get, set, remove
  *   chrome.permissions      contains
+ *   chrome.cookies          get (the autoScanRun flag), for Auto Scan Daily's sign-in check
+ *                           and only for RSI's sign-in cookie: the worker answers whether
+ *                           it's there ({} or null), never the cookie or its value
  *   chrome.runtime          getManifest: { manifest_version, version }, the version from
  *                           the page's address (the worker puts it there)
  *
@@ -41,6 +44,9 @@
     session: area('session'),
   };
   c.permissions = { contains: (q) => call('permissions.contains', q) };
+  // @flag-start autoScanRun: Auto Scan Daily's sign-in check
+  c.cookies = { get: (q) => call('cookies.get', q) };
+  // @flag-end autoScanRun
   if (typeof c.runtime.getManifest !== 'function')
     c.runtime.getManifest = () => ({ manifest_version: 3, version });
 })();

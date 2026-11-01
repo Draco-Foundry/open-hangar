@@ -204,11 +204,23 @@ const COPY = {
   'popup.scan-reminder-paused': 'Skipped {when}: scans are paused',
   // After a reminder went out.
   'popup.scan-reminder-last': 'Last reminder: {when}',
-  // Auto Scan (the `autoScanRun` flag, beta builds): its switch under the reminder's, and
-  // the reminder's line after a scan it ran. PLACEHOLDER: Needs Words (Words DB), not
-  // approved.
-  'popup.auto-scan': 'Auto Scan',
-  'popup.auto-scan-last': 'Last auto scan: {when}',
+  // Auto Scan Daily (the `autoScanRun` flag, developer builds): its switch, in place of
+  // the reminder's, and the last run's line under it (ui/popup/data.js autoLine): a quick
+  // check that found nothing new (or a full read that found nothing different), a full
+  // scan saved with something new, a day skipped (signed out of RSI, another RSI account
+  // signed in, scans paused, RSI down or busy), a part not kept (another account or a
+  // sudden drop), RSI stopped answering partway, signed out partway. PLACEHOLDER: Needs
+  // Words (Words DB), not approved; 0.4.0's words for now.
+  'popup.auto-scan': 'Auto Scan Daily',
+  'popup.auto-quick': 'Last: {when}, no changes',
+  'popup.auto-full': 'Last: {when}, hangar updated',
+  'popup.auto-signed-out': 'Skipped {when}: signed out of RSI',
+  'popup.auto-other': 'Skipped {when}: a different RSI account is signed in',
+  'popup.auto-paused': 'Skipped {when}: scans are paused',
+  'popup.auto-rsi-down': 'Skipped {when}: RSI was down or busy',
+  'popup.auto-bad': "Last: {when}, something looked wrong and wasn't saved. Scan to check.",
+  'popup.auto-stopped': 'Last: {when}, RSI stopped answering partway. Scan to check.',
+  'popup.auto-out-partway': 'Last: {when}, signed out of RSI partway. Scan to check.',
   // {when} on the same day: "today 6:12 AM" (another day: "Oct 13, 6:12 AM").
   'popup.auto-today': 'today {time}',
   'popup.notifications': 'Notifications', // the switch's name

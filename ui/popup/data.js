@@ -318,17 +318,40 @@ export function lineWhen(at, now = Date.now(), locale) {
 // src/background.js). `denied`: turning it on just now, the browser said no to
 // notifications. Off, or on with no reminder yet: no line (null). → { key, when, ask }
 // (ask: amber) or null.
-// 'scanned': Auto Scan (the autoScanRun flag) read it all instead of a reminder.
-const REMINDER_KEY = {
-  shown: 'popup.scan-reminder-last',
-  paused: 'popup.scan-reminder-paused',
-  scanned: 'popup.auto-scan-last',
-};
+const REMINDER_KEY = { shown: 'popup.scan-reminder-last', paused: 'popup.scan-reminder-paused' };
 export function reminderLine({ on, rec, denied = false }, now = Date.now(), locale) {
   if (denied) return { key: 'popup.scan-reminder-denied', when: '', ask: true };
   const key = on === true && isObj(rec) ? REMINDER_KEY[rec.line] : null;
   if (!key || !Number.isFinite(rec.at)) return null;
   return { key, when: lineWhen(rec.at, now, locale), ask: false };
+}
+
+// --- Auto Scan Daily in Settings (the `autoScanRun` flag) -------------------------------
+// The run's line (local autoDaily.line, ui/scan/auto.js lineOf) → its words' key.
+const AUTO_KEY = {
+  quick: 'popup.auto-quick',
+  full: 'popup.auto-full',
+  'signed-out': 'popup.auto-signed-out',
+  other: 'popup.auto-other',
+  paused: 'popup.auto-paused',
+  'rsi-down': 'popup.auto-rsi-down',
+  bad: 'popup.auto-bad',
+  'out-partway': 'popup.auto-out-partway',
+  partway: 'popup.auto-stopped',
+};
+// The lines that ask you to scan yourself: a part that wasn't kept.
+const AUTO_ASKS = ['bad', 'out-partway', 'partway'];
+// The line under the switch: none while it's off or before its first run, else the last
+// run's. → { key, when, ask } (ask: amber, it asks for a scan) or null.
+export function autoLine({ on, rec }, now = Date.now(), locale) {
+  const key = on === true && isObj(rec) ? AUTO_KEY[rec.line] : null;
+  if (!key || !Number.isFinite(rec.at)) return null;
+  return { key, when: lineWhen(rec.at, now, locale), ask: AUTO_ASKS.includes(rec.line) };
+}
+// The last run kept a part back, until a scan saves since.
+export function autoAsk({ on, rec, scannedAt }) {
+  if (on !== true || !isObj(rec) || !AUTO_ASKS.includes(rec.line)) return false;
+  return !(Number.isFinite(scannedAt) && Number.isFinite(rec.ended) && scannedAt > rec.ended);
 }
 
 // The scan report to show, once: one newer than the last the popup showed.

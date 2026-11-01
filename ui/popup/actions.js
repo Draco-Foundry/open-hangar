@@ -67,8 +67,8 @@ export const disconnect = () => OH().siteDisconnect();
 // The Daily Scan Reminder's switch (src/background.js keeps its alarm, and turns it off
 // without notifications; Disconnect turns it off too).
 export const setScanReminder = (on) => chrome.storage.local.set({ scanReminderOn: on === true });
-// Auto Scan (the `autoScanRun` flag): its switch, under the reminder's.
-export const setAutoScan = (on) => chrome.storage.local.set({ autoScanRunOn: on === true });
+// Auto Scan Daily's switch (the `autoScanRun` flag; src/background.js keeps its alarm).
+export const setAutoDaily = (on) => chrome.storage.local.set({ autoDailyOn: on === true });
 
 // --- Store alerts --------------------------------------------------------------------
 // Alerts have no switch of their own: they follow Remind Me (./wishlist.js alertsFor, called

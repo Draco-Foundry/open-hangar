@@ -8,7 +8,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { CHROME_ID, STORE_FLAGS, cutFlags, loadBackground } = require('./bridge-env.js');
+const { CHROME_ID, cutFlags, loadBackground } = require('./bridge-env.js');
 
 const ROOT = path.join(__dirname, '..');
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
@@ -244,12 +244,12 @@ test('from Auto Scan Daily: on with notifications allowed stays on as the remind
   assert.equal(v.stores.local.scanReminderOn, false);
 });
 
-test("a scan request with reason 'auto' goes to the runner, which holds it without the flag", () => {
+test("a scan request with reason 'auto' runs nothing in a build without Auto Scan Daily", () => {
   const page = read('ui/scan/main.js');
-  assert.match(page, /\['site', 'auto'\]\.includes\(r\.reason\)/);
-  assert.doesNotMatch(page, /autoScan\(/);
-  // The runner's check (test/scan-runner.test.js has each case).
-  assert.match(read('ui/scan/runner.js'), /if \(!flag\('autoScanRun'\)\) return 'off';/);
+  assert.match(
+    page,
+    /r\.reason === 'auto'\s*\?\s*flag\('autoScanRun'\)\s*\?\s*runner\.autoScan\(\)\s*:\s*null/,
+  );
 });
 
 test("store alerts' alarm and the reminder's never clear each other", async () => {
@@ -299,7 +299,9 @@ test('check 6: every alarm is the alerts or the reminder; the reminder reads not
   for (const f of files)
     for (const m of read(`src/${f}`).matchAll(/chrome\.alarms\.create\(\s*([^,]+),/g))
       made.push(`${f}: ${m[1].trim()}`);
-  for (const m of made) assert.match(m, /: (self\.OHAlerts\.ALARM|AL\.ALARM|REMIND_ALARM)$/, m);
+  // Auto Scan Daily's (the autoScanRun flag, developer builds): test/auto-scan.test.js.
+  for (const m of made)
+    assert.match(m, /: (self\.OHAlerts\.ALARM|AL\.ALARM|REMIND_ALARM|AUTO_ALARM)$/, m);
   assert.ok(made.includes('background.js: REMIND_ALARM'), made.join(', '));
   assert.ok(made.includes('background.js: AL.ALARM'), made.join(', '));
   const bg = read('src/background.js');
@@ -312,25 +314,16 @@ test('check 6: every alarm is the alerts or the reminder; the reminder reads not
   assert.doesNotMatch(block, /fetch\(|chrome\.cookies|robertsspaceindustries/);
   assert.equal([...block.matchAll(/requestScan\(/g)].length, 1);
   assert.match(block, /async function remindClicked\(id\) \{[\s\S]*?requestScan\('popup'\)/);
-  // Auto Scan Daily's run is gone from every page.
-  assert.equal(fs.existsSync(path.join(ROOT, 'ui/scan/auto.js')), false);
-  assert.doesNotMatch(read('ui/scan/runner.js'), /autoScan\(|scanFull/);
-  // Auto Scan (the autoScanRun flag, beta only) asks the hidden page for one scan and
-  // reads nothing itself; a build without it has none of it.
-  const runs = [
-    ...bg.matchAll(/@flag-start autoScanRun:[^\n]*\n([\s\S]*?)@flag-end autoScanRun\n/g),
-  ].map((m) => m[1].replace(/^\s*\/\/.*$/gm, ''));
-  assert.equal(runs.length, 1, 'one Auto Scan block');
-  assert.doesNotMatch(runs[0], /fetch\(|chrome\.cookies|robertsspaceindustries/);
-  assert.deepEqual(
-    [...runs[0].matchAll(/requestScan\([^)]*\)/g)].map((m) => m[0]),
-    ["requestScan('auto', { hiddenOnly: true })"],
-  );
-  assert.equal([...bg.matchAll(/requestScan\('auto'/g)].length, 1);
-  assert.doesNotMatch(
-    cutFlags(bg, { sync: true, localMode: true, connector: true, alerts: true, autoScan: true }),
-    /requestScan\('auto'|autoScanRunOn/,
-  );
+  // Auto Scan Daily's run is cut from every build without its flag (every store build
+  // and the beta): the store build's worker never asks for one.
+  const store = cutFlags(bg, {
+    sync: true,
+    localMode: true,
+    connector: true,
+    alerts: true,
+    autoScan: true,
+  });
+  assert.doesNotMatch(store, /requestScan\('auto'|oh-auto-daily|autoDailyOn/);
   // A build without the flag has none of it.
   const off = cutFlags(bg, {
     sync: true,
@@ -340,107 +333,4 @@ test('check 6: every alarm is the alerts or the reminder; the reminder reads not
     autoScan: false,
   });
   assert.doesNotMatch(off, /oh-scan-reminder|scanReminderOn|REMIND_ALARM/);
-});
-
-// --- Auto Scan (the autoScanRun flag, the beta's set) ----------------------------------
-// With Auto Scan on too, the reminder's alarm asks the hidden scan page for a scan
-// (reason 'auto') instead of the notification; the page checks the account
-// (test/scan-runner.test.js). Its report decides: read it all, the line says so; held
-// (signed out, another account) or short, the reminder's notification after all.
-const BETA = { ...STORE_FLAGS, autoScanRun: true };
-const OLD = Date.now() - 2 * DAY;
-const autoWorker = (o = {}) =>
-  worker({
-    flags: BETA,
-    ...o,
-    local: { scanReminderOn: true, autoScanRunOn: true, ...scanned(OLD), ...(o.local || {}) },
-  });
-// The scan page's report for the scan asked of it.
-const report = (x, more) =>
-  x.chrome.storage.local.set({
-    scanReport: {
-      v: 1,
-      run: x.stores.session.scanRequest.run,
-      reason: 'auto',
-      startedAt: Date.now(),
-      at: Date.now(),
-      held: null,
-      signedOut: false,
-      rows: [],
-      bad: false,
-      ...more,
-    },
-  });
-
-test('auto: the reminder due, the hidden page scans instead; nothing read here, no tab', async () => {
-  const t0 = Date.now();
-  const x = autoWorker();
-  await fire(x);
-  assert.equal(x.notes.length, 0, 'no notification');
-  assert.equal(x.docs.length, 1, 'the hidden page');
-  assert.equal(x.stores.session.scanRequest.reason, 'auto');
-  assert.deepEqual(x.opened, [], 'no tab');
-  assert.deepEqual(x.fetched, [], 'the worker asks RSI nothing');
-  assert.equal(x.stores.local.scanReminder.line, 'auto');
-  within(alarm(x).when, t0 + DAY, Date.now() + DAY);
-  // It read everything: the line says so, no notification.
-  await report(x, { rows: [{ id: 'hangar', ok: true }] });
-  await until(() => x.stores.local.scanReminder.line === 'scanned');
-  assert.equal(x.notes.length, 0);
-});
-
-test('auto: held by the account check or signed out, the reminder notification instead', async () => {
-  for (const more of [
-    { held: 'other-account' },
-    { held: 'signed-out', signedOut: true },
-    { held: 'no-account' },
-    { held: 'no-owner' },
-    { held: 'not-linked' },
-    { bad: true, rows: [{ id: 'hangar', ok: false }] },
-    { signedOut: true, rows: [{ id: 'hangar', ok: true }] },
-  ]) {
-    const x = autoWorker();
-    await fire(x);
-    await report(x, more);
-    await until(() => x.notes.length === 1);
-    assert.equal(x.notes[0].title, 'Time to Scan', JSON.stringify(more));
-    assert.equal(x.stores.local.scanReminder.line, 'shown');
-    // Its second write (after the sync) is the same run: no second notification.
-    await x.chrome.storage.local.set({
-      scanReport: { ...x.stores.local.scanReport, sync: { state: 'off' } },
-    });
-    await settle();
-    assert.equal(x.notes.length, 1);
-  }
-  // Paused or another scan running: no reason to scan, so no notification.
-  for (const held of ['paused', 'busy']) {
-    const x = autoWorker();
-    await fire(x);
-    await report(x, { held });
-    await settle();
-    assert.equal(x.notes.length, 0, held);
-  }
-});
-
-test('auto: off, no hidden page, or a store build: the notification as before', async () => {
-  const off = autoWorker({ local: { autoScanRunOn: false } });
-  await fire(off);
-  assert.equal(off.notes.length, 1);
-  assert.equal(off.stores.session.scanRequest, undefined);
-  // No hidden page (offscreen documents off): never a tab, the notification instead, and
-  // the popup's Scan isn't held back by it.
-  const none = autoWorker({ offscreen: false });
-  await fire(none);
-  assert.deepEqual(none.opened, []);
-  assert.equal(none.notes.length, 1);
-  assert.ok(!none.stores.session.scanAskedAt, 'it did not count as a request');
-  // The store build has no Auto Scan: the switch does nothing.
-  const store = autoWorker({ flags: STORE_FLAGS });
-  await fire(store);
-  assert.equal(store.notes.length, 1);
-  assert.equal(store.docs.length, 0);
-  // The reminder off: no alarm, so nothing at all.
-  const quiet = autoWorker({ local: { scanReminderOn: false } });
-  await settle();
-  assert.equal(alarm(quiet), undefined);
 });

@@ -72,17 +72,18 @@
       about: 'Daily Scan Reminder: a notification to scan once a day while connected.',
       default: true,
     },
-    // Auto Scan (owner, 2026-11-01; #666): with the Daily Scan Reminder on and Auto Scan
-    // turned on too, the reminder's alarm runs a scan (no buy-back pages) in the hidden
-    // page instead of the notification, only when the RSI account signed in is the one this browser
-    // last scanned (and one the link synced); else the notification. Beta only: the
-    // privacy policy and store listing say every read of RSI starts with a click, and its
-    // words aren't written yet. Off for each pilot until they turn it on. Needs autoScan.
+    // Auto Scan Daily returns (owner, 2026-11-01; #666): once a day at a random time, while
+    // connected, a quick check of the newest hangar and buy-back pages, and a full scan
+    // only when something is new or a week has passed, in the hidden page
+    // (ui/scan/runner.js autoScan), only when the RSI account signed in is the one this
+    // browser last scanned. It replaces the Daily Scan Reminder in a build with it.
+    // Developer builds only, the beta included, until the privacy policy and store listing
+    // say it (Words privacy-ext.auto-scan): they say every read of RSI starts with a click.
+    // Off for each pilot until they turn it on. Needs autoScan.
     autoScanRun: {
-      about:
-        'Auto Scan: the daily reminder scans by itself when the same RSI account is signed in.',
+      about: 'Auto Scan Daily: a daily scan of the same RSI account, quick check first.',
       default: false,
-      beta: true,
+      devOnly: true,
     },
     // The popup's scan bar (owner, 2026-10-20): one bar where Scan sits, naming the part
     // running and counting what it has read, filled by RSI's page count, then how long

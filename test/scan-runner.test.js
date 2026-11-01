@@ -76,8 +76,8 @@ function setup(opts = {}) {
   const OH = {
     flags: { wishlistImport: false, ...(opts.flags || {}) },
     log: (level, where, msg) => logs.push(`${level} ${where}: ${msg}`),
-    getAccount: async ({ force, expect } = {}) => {
-      calls.push(`getAccount${force ? ' force' : ''}${expect ? ` expect ${expect}` : ''}`);
+    getAccount: async ({ force } = {}) => {
+      calls.push(`getAccount${force ? ' force' : ''}`);
       return opts.account === undefined ? ACCOUNT : opts.account;
     },
     loadDB: async () => {
@@ -568,110 +568,6 @@ test('scan: another RSI account signed in switches the hangar, said as ids', asy
   // The same account: nothing to switch.
   assert.equal(await x.runner.reconcile(ACCOUNT, { owner: { nickname: 'test_pilot' } }), null);
   assert.equal(await x.runner.reconcile({ loggedIn: false }), null);
-});
-
-// Auto Scan (reason 'auto', the autoScanRun flag): it reads only the RSI account this
-// browser last scanned, and one the link synced when it knows them. Every other case is
-// held with nothing read from RSI past the account, nothing saved and nothing sent.
-const AUTO = { flags: { autoScanRun: true } };
-const nothingRead = (x, report, held) => {
-  assert.equal(report.held, held);
-  assert.deepEqual(report.rows, []);
-  assert.equal(report.sync, null);
-  assert.equal(report.switched, null);
-  assert.ok(
-    !x.calls.some((c) =>
-      /^(scanSource|getReferral|fetchBuybackDetails|switchProfile|siteSync)/.test(c),
-    ),
-    x.calls.join(', '),
-  );
-  assert.ok(!x.seen.some((s) => s.startsWith('account')), 'no account shown');
-};
-
-test('auto: the account this browser last scanned is signed in, so it scans and syncs', async () => {
-  const x = await setup(AUTO);
-  const r = await x.runner.scan({ reason: 'auto' });
-  assert.equal(r.reason, 'auto');
-  assert.equal(r.held, null);
-  assert.ok(x.calls.includes('getAccount force expect Test_Pilot'), x.calls.join(', '));
-  assert.ok(x.calls.includes('scanSource hangar'));
-  assert.ok(x.calls.includes('scanSource buybacks'));
-  assert.ok(x.calls.includes('getReferral'));
-  // Never the buy-backs' own pages (a popup Scan reads them).
-  assert.ok(!x.calls.some((c) => c.startsWith('fetchBuybackDetails')), x.calls.join(', '));
-  assert.ok(x.calls.includes('siteSync auto'));
-  assert.ok(!x.calls.some((c) => c.startsWith('switchProfile')));
-  // The handle as RSI writes it: case and spaces don't matter.
-  const y = await setup({ ...AUTO, account: { ...ACCOUNT, nickname: ' test_pilot ' } });
-  assert.equal((await y.runner.scan({ reason: 'auto' })).held, null);
-  assert.ok(y.calls.includes('scanSource hangar'));
-});
-
-test('auto: another RSI account signed in reads nothing and never switches the hangar', async () => {
-  // RSI's account read with `expect` (src/lib.js getAccount) says so itself...
-  const x = await setup({
-    ...AUTO,
-    account: { loggedIn: true, nickname: 'Alt_Pilot', other: true },
-  });
-  const r = await x.runner.scan({ reason: 'auto' });
-  nothingRead(x, r, 'other-account');
-  assert.equal(r.signedOut, false);
-  assert.ok(x.logs.includes('info status: auto scan held: other-account'));
-  // ...and another handle is held even without that mark.
-  const y = await setup({ ...AUTO, account: { ...ACCOUNT, nickname: 'Alt_Pilot' } });
-  nothingRead(y, await y.runner.scan({ reason: 'auto' }), 'other-account');
-  // A popup Scan with the same account signed in still switches, as before.
-  const z = await setup({ ...AUTO, account: { ...ACCOUNT, nickname: 'Alt_Pilot' } });
-  await z.runner.scan({ reason: 'popup' });
-  assert.ok(z.calls.includes('switchProfile Alt_Pilot'));
-});
-
-test('auto: signed out of RSI, or RSI not answering who is signed in, reads nothing', async () => {
-  const x = await setup({ ...AUTO, account: { loggedIn: false } });
-  const r = await x.runner.scan({ reason: 'auto' });
-  nothingRead(x, r, 'signed-out');
-  assert.equal(r.signedOut, true);
-  const y = await setup({ ...AUTO, account: { loggedIn: null, fetchedAt: 0 } });
-  nothingRead(y, await y.runner.scan({ reason: 'auto' }), 'no-account');
-  const z = await setup({ ...AUTO, account: null });
-  nothingRead(z, await z.runner.scan({ reason: 'auto' }), 'no-account');
-});
-
-test("auto: the link's RSI accounts, when it knows them, must include this browser's", async () => {
-  const accounts = (...h) => ({
-    siteLink: {
-      token: 't',
-      name: 'pilot',
-      connectedAt: 1,
-      accounts: h.map((handle) => ({ handle, record: null })),
-    },
-  });
-  // Not one of them: held before RSI is asked anything.
-  const x = await setup({ ...AUTO, local: accounts('Alt_Pilot') });
-  const r = await x.runner.scan({ reason: 'auto' });
-  nothingRead(x, r, 'other-account');
-  assert.ok(!x.calls.some((c) => c.startsWith('getAccount')), 'no RSI read');
-  // One of them (any case): it scans.
-  const y = await setup({ ...AUTO, local: accounts('Alt_Pilot', 'TEST_PILOT') });
-  assert.equal((await y.runner.scan({ reason: 'auto' })).held, null);
-  assert.ok(y.calls.includes('scanSource hangar'));
-});
-
-test('auto: never scanned here, not connected, or a build without the flag: no RSI read', async () => {
-  const noRead = (x) =>
-    assert.ok(!x.calls.some((c) => c.startsWith('getAccount')), x.calls.join(', '));
-  const x = await setup({ ...AUTO, db: { owner: null } });
-  nothingRead(x, await x.runner.scan({ reason: 'auto' }), 'no-owner');
-  noRead(x);
-  const y = await setup({ ...AUTO, linked: false });
-  nothingRead(y, await y.runner.scan({ reason: 'auto' }), 'not-linked');
-  noRead(y);
-  const z = await setup();
-  nothingRead(z, await z.runner.scan({ reason: 'auto' }), 'off');
-  noRead(z);
-  // Held, it isn't scanning: the next scan runs.
-  assert.equal(z.runner.busy, false);
-  assert.equal((await z.runner.scan()).held, null);
 });
 
 test('sync: one asked for during a scan is kept, then sent as a press at its end (#658)', async () => {
