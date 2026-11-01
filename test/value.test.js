@@ -324,6 +324,44 @@ test('accountValue counts ships, CCUs, other pledges at melt; Store Credit is it
   assert.equal(v.byId.c, 12);
 });
 
+// The meltValue flag (owner, 2026-11-01): a tester couldn't see how ships at store price
+// and CCUs at standard price made one smaller melt total. At melt the parts add up to it.
+test('meltValue: ships, CCUs and other at melt, adding up to the melt total', () => {
+  const items = [
+    {
+      id: 'a',
+      name: 'Standalone Ship - Carrack',
+      value: 500,
+      contents: [{ kind: 'Ship', label: 'Carrack' }],
+    },
+    {
+      id: 'b',
+      name: 'Upgrade - Cutlass Black to Carrack',
+      value: 400,
+      isCCU: true,
+      kind: 'ccu',
+      ccu: { from: 'Cutlass Black', to: 'Carrack' },
+    },
+    { id: 'c', name: 'Paint - Carrack Pathfinder', value: 12, contents: [] },
+    { id: 'u', name: 'Some UEC Thing', value: 9000, currency: 'UEC' },
+  ];
+  const v = OH.meltValue(items, 42.5);
+  assert.equal(v.ships, 500); // the Carrack's melt, never its 600 store price
+  assert.equal(v.ccus, 400); // the CCU's melt, never the 490 gap
+  assert.equal(v.other, 12);
+  assert.equal(v.total, v.ships + v.ccus + v.other);
+  assert.equal(v.total, OH.totalValue(items));
+  assert.equal(v.credit, 42.5); // still its own number, never in the total
+  // A snapshot with a pledge since melted counts the melt it had, never a store price.
+  const snap = {
+    items: [
+      ['a', 'Standalone Ship - Carrack', 500],
+      ['z', 'Standalone Ship - Carrack', 480],
+    ],
+  };
+  assert.equal(OH.snapshotValue(snap, v, null), 980);
+});
+
 test('accountValue counts the pledges with no price at all, and adds nothing for them', () => {
   const items = [
     {

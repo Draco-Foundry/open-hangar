@@ -194,6 +194,15 @@ const COPY = {
   'popup.disconnect-body':
     'Your synced copy stays on openhangar.space until you delete it there. This extension just stops syncing.',
   'popup.stay': 'Stay Connected',
+  // RSI Account Logs (the `accountLogs` flag, developer builds only): the Settings row
+  // and its switch (on asks for the full history, src/lib.js wantAccountLogs; off stops
+  // and removes the logs, stopAccountLogs), the button that reads the whole history
+  // again, and the line under it while it loads. Approved in Words, 2026-11-01.
+  'popup.account-logs': 'Account History',
+  'popup.account-logs-load': 'Load Full History',
+  'popup.account-logs-asked': 'Starts with your next scan',
+  'popup.account-logs-pledge': 'Pledge log: page {page} of {pages}',
+  'popup.account-logs-credit': 'Store credit log: page {page} of {pages}',
   // The Daily Scan Reminder (the `autoScan` flag): its switch, in the openhangar.space
   // group, and the lines under it (ui/popup/data.js reminderLine). Claude chat, Words,
   // 2026-10-25. Its hint line was dropped by the owner, 2026-10-31.
@@ -204,7 +213,7 @@ const COPY = {
   'popup.scan-reminder-paused': 'Skipped {when}: scans are paused',
   // After a reminder went out.
   'popup.scan-reminder-last': 'Last reminder: {when}',
-  // Auto Scan Daily (the `autoScanRun` flag, developer builds): its switch, in place of
+  // Auto Scan Daily (the `autoScanRun` flag, beta builds): its switch, in place of
   // the reminder's, and the last run's line under it (ui/popup/data.js autoLine): a quick
   // check that found nothing new (or a full read that found nothing different), a full
   // scan saved with something new, a day skipped (signed out of RSI, an account it can't

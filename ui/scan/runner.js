@@ -461,6 +461,12 @@ export function createRunner(env) {
         // isn't a row of the scan: its problems only go to the log.
         if (flag('subStore') && !signedOut && OH.getSubStore)
           await OH.getSubStore({ account }).catch(() => {});
+        // RSI Account Logs (the accountLogs build flag, src/lib.js readAccountLogs): the
+        // full history once the pilot asks for it (resumed scan by scan), then the day's
+        // new lines, before the sync so it carries them. Not a row of the scan: problems
+        // go to the log, a load's progress to its own stored key.
+        if (flag('accountLogs') && !signedOut && OH.readAccountLogs)
+          await OH.readAccountLogs({ account }).catch(() => {});
       }
     } catch (e) {
       rows.push({

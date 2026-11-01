@@ -164,6 +164,16 @@ const FULL = {
       scannedAt: 1,
       meta: { total: 1, complete: true },
     },
+    pledgeLog: {
+      items: [{ at: '2026-10-30T22:12:00Z', pledge: '1', kind: 'bought' }],
+      scannedAt: 1,
+      meta: { pages: 1, unread: 0 },
+    },
+    creditLog: {
+      items: [{ at: '2026-10-30T22:12:00Z', dir: 'in', amount: 100, kind: 'melt' }],
+      scannedAt: 1,
+      meta: { pages: 1, unread: 0 },
+    },
   },
   history: [{ at: 1, items: [[1, 'Test Pledge', 100]] }],
   pledgeArchive: {
@@ -187,6 +197,8 @@ const FORBIDDEN = [
   'giftRecipient',
   'recipient',
   'processor',
+  'email',
+  'recipientEmail',
 ];
 
 test('the sample payload is valid and reaches every object in the schema', () => {

@@ -93,6 +93,17 @@ const BUDGET = {
     cap: 'SUB_STORE_MAX 2,000 items (both parts), replaced whole once a day',
     max: 1.1 * MB,
   },
+  // RSI Account Logs (accountLogs flag): each line at most about 400 bytes (a 200-character
+  // name), so two logs of ACCOUNT_LOG_MAX 10,000 lines come to about 8 MB, and a load
+  // under way holds at most one whole log.
+  accountLogs: {
+    cap: 'ACCOUNT_LOG_MAX 10,000 lines per log, two logs, replaced whole',
+    max: 9 * MB,
+  },
+  accountLogsLoad: {
+    cap: 'one log being loaded, ACCOUNT_LOG_MAX 10,000 lines',
+    max: 4.5 * MB,
+  },
   netDown: small('hosts down in the last 10 minutes'),
   remoteStatus: small('one status.json, replaced whole'),
   account: small('the signed-in account, replaced whole'),
@@ -624,6 +635,47 @@ async function fillWorstCase() {
       ]);
     },
   });
+  // Both account logs past their cap, every line its longest, and a load under way.
+  const longLine = (n) => ({
+    at: new Date(Date.UTC(2017, 0, 1) + n * 60e3).toISOString().slice(0, 19) + 'Z',
+    pledge: String(100000000000 + n).slice(-12),
+    name: `Standalone Ship - Example Hauler ${n}`.padEnd(200, 'x'),
+    kind: 'buyBackCreated',
+    order: `ORDER${n}`.padEnd(40, 'X'),
+    value: 99999999,
+  });
+  const longCredit = (n) => ({
+    at: new Date(Date.UTC(2017, 0, 1) + n * 60e3).toISOString().slice(0, 19) + 'Z',
+    dir: 'out',
+    amount: 99999999,
+    kind: 'melt',
+    pledge: String(100000000000 + n).slice(-12),
+    name: `Standalone Ship - Example Hauler ${n}`.padEnd(200, 'x'),
+    order: `ORDER${n}`.padEnd(40, 'X'),
+  });
+  const many = (make) => Array.from({ length: OH.ACCOUNT_LOG_MAX + 500 }, (_, n) => make(n));
+  const pledgeLog = OH.mergeAccountLog('pledge', many(longLine));
+  mem.accountLogs = {
+    nickname: 'TestPilot',
+    pledge: { items: pledgeLog, at: 1, pages: 99999, unread: 99999 },
+    credit: {
+      items: OH.mergeAccountLog('credit', many(longCredit)),
+      at: 1,
+      pages: 99999,
+      unread: 99999,
+    },
+  };
+  mem.accountLogsLoad = {
+    nickname: 'TestPilot',
+    want: true,
+    at: 1,
+    done: [],
+    part: 'pledge',
+    next: 99999,
+    pagecount: 99999,
+    items: pledgeLog,
+    unread: 99999,
+  };
   // The log, well past its cap, with the longest messages it keeps.
   for (let i = 0; i < 150; i++) OH.log('warn', 'hangar', `retry ${i} `.padEnd(700, 'x'));
   await OH.log('info', 'hangar', 'done');
@@ -635,6 +687,8 @@ test('worst case: every key within its budget, the total under the warning line'
   assert.ok(Object.keys(mem.pledgeArchive).length <= OH.ARCHIVE_MAX);
   assert.equal(mem.errorLog.length, 100);
   assert.equal(mem.subStore.items.length, OH.SUB_STORE_MAX);
+  assert.equal(mem.accountLogs.pledge.items.length, OH.ACCOUNT_LOG_MAX);
+  assert.equal(mem.accountLogs.credit.items.length, OH.ACCOUNT_LOG_MAX);
 
   const u = await OH.storageUsage();
   const over = [];

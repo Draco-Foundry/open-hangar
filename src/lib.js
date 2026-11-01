@@ -1127,6 +1127,8 @@
         'account',
         'avatarImg',
         'subStore',
+        'accountLogs',
+        'accountLogsLoad',
       ]);
       return;
     }
@@ -1157,6 +1159,8 @@
       'autoDailyNext',
       'autoDailyFull',
       'subStore',
+      'accountLogs',
+      'accountLogsLoad',
       RECOVERY_KEY,
       LOG_KEY,
     ]);
@@ -1400,12 +1404,17 @@
     // @flag-start subStore: the account's own Subscriber Store goes as sources.subStore
     if (OH.flags?.subStore) subStore = await OH.getSubStoreCached(account).catch(() => null);
     // @flag-end subStore
+    let accountLogs = null;
+    // @flag-start accountLogs: the account's own logs go as sources.pledgeLog and creditLog
+    if (OH.flags?.accountLogs) accountLogs = await OH.getAccountLogs(account).catch(() => null);
+    // @flag-end accountLogs
     return SHAPE.exportPayload({
       db,
       account,
       archive: await readArchive(),
       buybackDetails: await OH.getBuybackDetails(),
       subStore,
+      accountLogs,
       appVersion,
     });
   };
@@ -3648,6 +3657,14 @@
     return out;
   };
 
+  // Melt value split the same way (the meltValue flag, owner 2026-11-01): OH.accountValue
+  // with no store prices, so ships and CCUs count at melt like everything else and
+  // ships + ccus + other is the melt total (OH.totalValue). Pass it to OH.snapshotValue with
+  // no priceOf and a pledge since melted counts at the melt it had. Pure.
+  OH.meltValue = function meltValue(items, credit) {
+    return OH.accountValue(items, () => null, credit);
+  };
+
   // Value of a history snapshot ({ items: [[id, name, melt]], credit? }) on the
   // same rules. Pledges still owned count exactly as in `acct.byId`; ones since
   // melted or gifted: a ship pledge is priced from its name ("Standalone Ship -
@@ -5380,6 +5397,303 @@
     return { ok: true, list };
   }
   // @flag-end subStore
+
+  // @flag-start accountLogs: RSI's pledge log and store credit log, read by a scan, sent by sync
+  // --- Account logs: the pledge log and the store credit log --------------------------
+  // RSI keeps two logs on Account: every pledge's events (bought, melted, bought back,
+  // gifted, granted) and every store credit line (credit in from a melt, credit out on an
+  // order). Each is POST <path> with {page:N}, 25 lines a page, newest first, in your own
+  // RSI session: the Rsi-Token cookie goes as RULES.cart.tokenHeader, as RSI's own account
+  // pages send it. src/scraper/parser.js reads a page, keeping only the order number, an
+  // amount, a pledge's id and name (never a handle or an email). Two ways to read, one
+  // log after the other:
+  // - The full history, once, when the pilot asks (OH.wantAccountLogs): every page,
+  //   paced 0.5 to 1.5 s apart, its progress saved after each page (ACCOUNT_LOGS_LOAD) so
+  //   a stopped load goes on from the next page. Newest first means a line added
+  //   meanwhile pushes older ones onto later pages: a resumed load reads some lines twice
+  //   (kept once), never skips one. Nothing is kept as the log until the last page is in.
+  // - Day to day, once the full history is in: from page 1 until a page holds a line
+  //   already kept, usually one page. One that finds none within ACCOUNT_LOGS_DAILY_PAGES
+  //   keeps nothing and asks for the full history again.
+  // A 401/403/429/5xx or no answer stops the read; nothing half read is kept. Each log has
+  // its own pause switch in status.json (sources.pledgeLog, sources.creditLog;
+  // docs/RSI-CHANGES.md).
+  const ACCOUNT_LOGS_KEY = 'accountLogs';
+  const ACCOUNT_LOGS_LOAD = 'accountLogsLoad';
+  // A day's read: up to 200 new lines (8 pages of RSI's 25).
+  const ACCOUNT_LOGS_DAILY_PAGES = () => Math.ceil(200 / RULES.accountLogs.pageSize);
+  OH.ACCOUNT_LOG_MAX = 10000; // lines kept per log, newest first (storage budget)
+  // What makes a line itself: its time, pledge, event and order (a claimed gift keyed
+  // the same, yours or received).
+  const pledgeLogKey = (e) =>
+    [e.at, e.pledge, e.kind === 'giftReceived' ? 'giftClaimed' : e.kind, e.order || ''].join('|');
+  const creditLogKey = (l) => [l.at, l.dir, l.amount, l.pledge || '', l.order || ''].join('|');
+  const LOG_PARTS = () => [
+    {
+      id: 'pledge',
+      source: 'pledgeLog',
+      path: RULES.accountLogs.pledgeLog,
+      read: (html) => {
+        const r = window.OpenHangar.parsePledgeLog(html);
+        return { items: r.events, unread: r.unread };
+      },
+      key: pledgeLogKey,
+    },
+    {
+      id: 'credit',
+      source: 'creditLog',
+      path: RULES.accountLogs.creditLog,
+      read: (html) => {
+        const r = window.OpenHangar.parseCreditLog(html);
+        return { items: r.lines, unread: r.unread };
+      },
+      key: creditLogKey,
+    },
+  ];
+  // Lines newest first, each once, at most ACCOUNT_LOG_MAX. A claimed gift is one you
+  // received unless this account's log has that pledge going out as a gift (gifts keep
+  // their pledge id). Pure.
+  OH.mergeAccountLog = function mergeAccountLog(id, ...lists) {
+    const key = id === 'pledge' ? pledgeLogKey : creditLogKey;
+    const seen = new Set();
+    const out = [];
+    for (const list of lists)
+      for (const it of Array.isArray(list) ? list : []) {
+        const k = isObj(it) && key(it);
+        if (!k || seen.has(k)) continue;
+        seen.add(k);
+        out.push({ ...it });
+      }
+    out.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+    if (id === 'pledge') {
+      const sent = new Set(out.filter((e) => e.kind === 'giftSent').map((e) => e.pledge));
+      for (const e of out)
+        if (e.kind === 'giftClaimed' || e.kind === 'giftReceived')
+          e.kind = sent.has(e.pledge) ? 'giftClaimed' : 'giftReceived';
+    }
+    return out.slice(0, OH.ACCOUNT_LOG_MAX);
+  };
+  // Kept for this account? (subStore's lcName is cut from builds without that flag.)
+  const sameNick = (o, acct) =>
+    isObj(o) &&
+    !!acct?.nickname &&
+    String(o.nickname || '').toLowerCase() === String(acct.nickname).toLowerCase();
+  // The kept logs for this account ({ nickname, pledge, credit }, each
+  // { items, at, pages, unread }) or null.
+  OH.getAccountLogs = async function getAccountLogs(acct) {
+    const { [ACCOUNT_LOGS_KEY]: c } = await chrome.storage.local.get(ACCOUNT_LOGS_KEY);
+    return sameNick(c, acct) ? c : null;
+  };
+  // A full history load asked for or under way ({ nickname, want, at, done, part, next,
+  // pagecount, items, unread }), or null.
+  OH.getAccountLogsLoad = async function getAccountLogsLoad(acct) {
+    const { [ACCOUNT_LOGS_LOAD]: l } = await chrome.storage.local.get(ACCOUNT_LOGS_LOAD);
+    return sameNick(l, acct) ? l : null;
+  };
+  // The pilot asked for the full history: the next scan reads it (ui/scan/runner.js). A
+  // load already under way goes on where it is.
+  OH.wantAccountLogs = async function wantAccountLogs(acct) {
+    const a = acct === undefined ? await OH.getAccount().catch(() => null) : acct;
+    if (!a?.nickname) return false;
+    const had = await OH.getAccountLogsLoad(a);
+    await chrome.storage.local.set({
+      [ACCOUNT_LOGS_LOAD]: had || { nickname: a.nickname, want: true, at: Date.now() },
+    });
+    return true;
+  };
+  // The pilot's off switch: the logs and any load under way go, so nothing more is read
+  // or synced until the pilot asks again (a read under way keeps nothing: keepLog and
+  // fullLoad check the load is still asked for). Every account's, as Clear Data does.
+  OH.stopAccountLogs = async function stopAccountLogs() {
+    await chrome.storage.local.remove([ACCOUNT_LOGS_KEY, ACCOUNT_LOGS_LOAD]);
+  };
+  // The Rsi-Token cookie's value: '' when there is none (signed out), null when the
+  // browser can't say.
+  async function rsiTokenCookie() {
+    try {
+      if (!chrome.cookies?.get) return null;
+      const got = await chrome.cookies.get({ url: RSI_ORIGIN, name: RULES.cart.cookie });
+      if (!got?.value) return '';
+      try {
+        return decodeURIComponent(got.value);
+      } catch {
+        return got.value;
+      }
+    } catch {
+      return null;
+    }
+  }
+  // One page of one log → { items, unread, pagecount } or { error, status?, msg? }.
+  async function accountLogPage(part, page, token, get) {
+    let res;
+    try {
+      res = await get(RSI_ORIGIN + part.path, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'content-type': 'application/json',
+          Accept: 'application/json',
+          [RULES.cart.tokenHeader]: token,
+          [RULES.accountLogs.ajaxHeader]: RULES.accountLogs.ajaxValue,
+        },
+        body: JSON.stringify({ page }),
+      });
+    } catch (e) {
+      return { error: 'network', msg: e?.message || String(e) };
+    }
+    if (res.status === 401 || res.status === 403) return { error: 'refused', status: res.status };
+    if (res.status === 429 || res.status >= 500) return { error: 'busy', status: res.status };
+    if (!res.ok) return { error: 'bad', status: res.status };
+    let json;
+    try {
+      json = await res.json();
+    } catch {
+      return { error: 'bad', msg: 'not JSON' };
+    }
+    // RSI's own words aren't logged: only that it said no.
+    if (!isObj(json) || json.success === false || json.success === 0)
+      return { error: 'refused', msg: 'not a success' };
+    const data = isObj(json.data) ? json.data : {};
+    // An empty log answers without page or pagecount: no pages.
+    const count = Number(data.pagecount);
+    const pagecount = Number.isInteger(count) && count > 0 ? count : 0;
+    const html = typeof data.rendered === 'string' ? data.rendered : '';
+    const { items, unread } = html ? part.read(html) : { items: [], unread: 0 };
+    // A page with lines and none of them read: RSI changed it. Stop, keep nothing.
+    if (!items.length && unread) return { error: 'changed', msg: `${unread} lines unread` };
+    return { items, unread, pagecount };
+  }
+  let accountLogsInflight = null;
+  // Read what's due for each log: a full load asked for or under way, else the day's new
+  // lines once the full history is in, else nothing.
+  // → { ok, parts: { pledge, credit } }, each { did: 'full' | 'daily' | 'none' | 'paused'
+  // | 'resume-later', n?, error? }, or { ok: false, error: 'signed-out' }.
+  // `onProgress(part, page, pagecount)` after each full-history page. Never throws.
+  OH.readAccountLogs = function readAccountLogs({
+    account,
+    fetchFn = fetch,
+    pause = () => sleep(500 + Math.random() * 1000),
+    token,
+    onProgress = () => {},
+  } = {}) {
+    if (accountLogsInflight) return accountLogsInflight;
+    accountLogsInflight = readLogs({ account, fetchFn, pause, token, onProgress })
+      .catch((e) => ({ ok: false, error: 'network', msg: e?.message }))
+      .finally(() => {
+        accountLogsInflight = null;
+      });
+    return accountLogsInflight;
+  };
+  async function readLogs({ account, fetchFn, pause, token, onProgress }) {
+    const acct = account === undefined ? await OH.getAccount().catch(() => null) : account;
+    if (!acct || acct.loggedIn !== true || !acct.nickname)
+      return { ok: false, error: 'signed-out' };
+    const tok = token === undefined ? await rsiTokenCookie() : token;
+    if (!tok) return { ok: false, error: 'signed-out' };
+    const get = OH.guarded(fetchFn, { timeout: 20000 });
+    let asked = 0; // requests so far: every one after the first waits `pause`
+    const ask = async (part, page) => {
+      if (asked++) await pause();
+      return accountLogPage(part, page, tok, get);
+    };
+    const parts = {};
+    for (const part of LOG_PARTS()) {
+      if (await OH.sourcePaused(part.source)) {
+        OH.log('warn', part.source, 'read paused by remote status');
+        parts[part.id] = { did: 'paused' };
+        continue;
+      }
+      const load = await OH.getAccountLogsLoad(acct);
+      const mine = (await OH.getAccountLogs(acct))?.[part.id];
+      const r =
+        load?.want && !(load.done || []).includes(part.id)
+          ? await fullLoad(part, acct, load, ask, onProgress)
+          : isObj(mine) && Array.isArray(mine.items)
+            ? await dailyRead(part, acct, mine, ask)
+            : { did: 'none' };
+      parts[part.id] = r;
+      if (r.error) {
+        OH.log('warn', part.source, `log read stopped: ${r.error} ${r.status || ''}`.trim());
+        // RSI said no or to wait: the other log waits too.
+        if (['refused', 'busy', 'network'].includes(r.error)) break;
+      }
+    }
+    return { ok: !Object.values(parts).some((p) => p.error), parts };
+  }
+  // Keep one log (only ever a whole read). `mustHave`: only onto a log still kept (a
+  // day's read the off switch may have stopped meanwhile).
+  async function keepLog(part, acct, items, extra, mustHave = false) {
+    await mutateStored(ACCOUNT_LOGS_KEY, (cur) =>
+      mustHave && !sameNick(cur, acct)
+        ? cur
+        : {
+            ...(sameNick(cur, acct) ? cur : {}),
+            nickname: acct.nickname,
+            [part.id]: { items, at: Date.now(), ...extra },
+          },
+    );
+  }
+  async function fullLoad(part, acct, load, ask, onProgress) {
+    // Go on where this log stopped, or start it at page 1.
+    const same = load.part === part.id;
+    let next = same && Number.isInteger(load.next) && load.next > 0 ? load.next : 1;
+    let pagecount = same && Number.isInteger(load.pagecount) ? load.pagecount : null;
+    let items = same && Array.isArray(load.items) ? load.items : [];
+    let unread = same && Number.isInteger(load.unread) ? load.unread : 0;
+    const save = (more) =>
+      mutateStored(ACCOUNT_LOGS_LOAD, (cur) => (sameNick(cur, acct) ? { ...cur, ...more } : cur));
+    while (pagecount == null || next <= pagecount) {
+      const r = await ask(part, next);
+      if (r.error) return { did: 'resume-later', ...r };
+      pagecount = r.pagecount;
+      items = OH.mergeAccountLog(part.id, items, r.items);
+      unread += r.unread;
+      next++;
+      await save({ part: part.id, next, pagecount, items, unread });
+      onProgress(part.id, Math.min(next - 1, pagecount), pagecount);
+      if (!pagecount) break;
+    }
+    // Turned off meanwhile: keep nothing.
+    if (!(await OH.getAccountLogsLoad(acct))) return { did: 'none' };
+    // Every page in: this is the log now, with any line a daily read kept meanwhile.
+    const kept = (await OH.getAccountLogs(acct))?.[part.id];
+    const log = OH.mergeAccountLog(part.id, items, kept?.items);
+    await keepLog(part, acct, log, { pages: pagecount, unread });
+    const done = [...new Set([...(load.done || []), part.id])];
+    if (LOG_PARTS().every((p) => done.includes(p.id)))
+      await chrome.storage.local.remove(ACCOUNT_LOGS_LOAD);
+    else await save({ done, part: null, next: null, pagecount: null, items: [], unread: 0 });
+    return { did: 'full', n: log.length };
+  }
+  async function dailyRead(part, acct, mine, ask) {
+    const known = new Set(mine.items.map(part.key));
+    let fresh = [];
+    let unread = 0;
+    for (let page = 1; page <= ACCOUNT_LOGS_DAILY_PAGES(); page++) {
+      const r = await ask(part, page);
+      if (r.error) return { did: 'daily', ...r };
+      fresh = fresh.concat(r.items);
+      unread += r.unread;
+      // Met a line already kept, or the log's end: the read is whole.
+      if (r.items.some((it) => known.has(part.key(it))) || page >= r.pagecount) {
+        await keepLog(
+          part,
+          acct,
+          OH.mergeAccountLog(part.id, fresh, mine.items),
+          {
+            pages: Math.max(r.pagecount, mine.pages || 0),
+            unread: (mine.unread || 0) + unread,
+          },
+          true,
+        );
+        return { did: 'daily', n: fresh.filter((it) => !known.has(part.key(it))).length };
+      }
+    }
+    // More new lines than a day's read: keep nothing, read the whole history again.
+    await OH.wantAccountLogs(acct);
+    return { did: 'daily', error: 'too-many' };
+  }
+  // @flag-end accountLogs
 
   // --- The store catalog (openhangar.space/api/catalog) ------------------------------
   // Everything in RSI's pledge store right now, as the website's store watcher last

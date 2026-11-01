@@ -623,7 +623,7 @@ test('check 6: every alarm is the alerts, the reminder or Auto Scan Daily; it no
   // No pack reads, no scan report, no tab.
   assert.doesNotMatch(run, /readPacks\(|writeReport\(|scanReport/);
   assert.match(block, /requestScan\('auto', \{ hiddenOnly: true \}\)/);
-  // A build without the flag (every store build and the beta) has none of it.
+  // A build without the flag (every store build) has none of it.
   const off = cutFlags(bg, {
     sync: true,
     localMode: true,

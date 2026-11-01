@@ -212,7 +212,7 @@ test('who uses the cookies API: Log Out of RSI, Add to RSI Cart and the sign-in 
   assert.deepEqual(users.sort(), [
     'src/lib.js', // OH.logout: Log Out of RSI
     'src/rsi-cart.js', // Add to RSI Cart (#651)
-    // Auto Scan Daily's sign-in check (the autoScanRun flag: cut from every other build,
+    // Auto Scan Daily's sign-in check (the autoScanRun flag: cut from every store build,
     // test/auto-scan.test.js check 6): the worker tells the hidden scan page whether the
     // sign-in cookie is there, through the page's stand-in on Chrome and Edge.
     'src/scan-host.js',

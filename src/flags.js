@@ -77,13 +77,14 @@
     // only when something is new or a week has passed, in the hidden page
     // (ui/scan/runner.js autoScan), only when the RSI account signed in is the one this
     // browser last scanned. It replaces the Daily Scan Reminder in a build with it.
-    // Developer builds only, the beta included, until the privacy policy and store listing
-    // say it (Words privacy-ext.auto-scan): they say every read of RSI starts with a click.
-    // Off for each pilot until they turn it on. Needs autoScan.
+    // In the beta (Claude chat, 2026-11-01: Words privacy-ext.auto-scan approved); store
+    // builds wait for the release that puts its privacy policy and store words live (the
+    // shipped policy still says every read of RSI starts with a click). Off for each pilot
+    // until they turn it on. Needs autoScan.
     autoScanRun: {
       about: 'Auto Scan Daily: a daily scan of the same RSI account, quick check first.',
       default: false,
-      devOnly: true,
+      beta: true,
     },
     // The popup's scan bar (owner, 2026-10-20): one bar where Scan sits, naming the part
     // running and counting what it has read, filled by RSI's page count, then how long
@@ -101,6 +102,16 @@
     newSinceScan: {
       about: "The popup lists what the last scan found that the one before it didn't.",
       default: false,
+    },
+    // Melt Value in Account Value's place (owner, 2026-11-01: a beta tester couldn't see how
+    // ships at store price and CCUs at standard price made one smaller melt total; only melt
+    // counts). The popup's total and its change since a scan, and Home's value card with its
+    // parts and Most Valuable, all at melt (OH.meltValue). The same as the website's
+    // hangar_melt_value. No new words: the popup's own Melt Value label.
+    meltValue: {
+      about: "The popup and Home show Melt Value, its parts at melt, in Account Value's place.",
+      default: false,
+      beta: true,
     },
     // Order History (owner, 2026-10-30): once a pilot turns it on, a scan reads RSI's
     // order history (Account, Billing) and sync sends it as sources.orders
@@ -124,6 +135,17 @@
     subStore: {
       about:
         'Your Subscriber Store and Concierge items: a scan reads them once a day and sync sends them.',
+      default: false,
+      devOnly: true,
+    },
+    // RSI Account Logs (owner, 2026-11-01): a scan reads RSI's pledge log and store credit
+    // log (Account), the full history once when the pilot asks and the day's new lines
+    // after (src/lib.js readAccountLogs, ui/scan/runner.js), and sync sends them as
+    // sources.pledgeLog and sources.creditLog (schema/sync-payload.schema.json). Handles
+    // and emails never leave the parser (src/scraper/parser.js). Developer builds only
+    // until the privacy policy and the store forms name both reads.
+    accountLogs: {
+      about: 'RSI Account Logs: a scan reads the pledge and store credit logs and sync sends them.',
       default: false,
       devOnly: true,
     },

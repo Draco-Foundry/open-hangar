@@ -299,7 +299,7 @@ test('check 6: every alarm is the alerts or the reminder; the reminder reads not
   for (const f of files)
     for (const m of read(`src/${f}`).matchAll(/chrome\.alarms\.create\(\s*([^,]+),/g))
       made.push(`${f}: ${m[1].trim()}`);
-  // Auto Scan Daily's (the autoScanRun flag, developer builds): test/auto-scan.test.js.
+  // Auto Scan Daily's (the autoScanRun flag, beta builds): test/auto-scan.test.js.
   for (const m of made)
     assert.match(m, /: (self\.OHAlerts\.ALARM|AL\.ALARM|REMIND_ALARM|AUTO_ALARM)$/, m);
   assert.ok(made.includes('background.js: REMIND_ALARM'), made.join(', '));
@@ -314,8 +314,8 @@ test('check 6: every alarm is the alerts or the reminder; the reminder reads not
   assert.doesNotMatch(block, /fetch\(|chrome\.cookies|robertsspaceindustries/);
   assert.equal([...block.matchAll(/requestScan\(/g)].length, 1);
   assert.match(block, /async function remindClicked\(id\) \{[\s\S]*?requestScan\('popup'\)/);
-  // Auto Scan Daily's run is cut from every build without its flag (every store build
-  // and the beta): the store build's worker never asks for one.
+  // Auto Scan Daily's run is cut from every build without its flag (every store build):
+  // the store build's worker never asks for one.
   const store = cutFlags(bg, {
     sync: true,
     localMode: true,
