@@ -5468,10 +5468,12 @@ try {
   autoOff.described === null &&
   autoOn.sw === 'true' &&
   autoOn.kept === true &&
-  autoOn.asked === 'notifications' &&
+  // Notifications already allowed here: no question, so Firefox's popup stays open
+  // (owner, 2026-11-01). A browser that hasn't allowed them is asked (below).
+  autoOn.asked === '' &&
   autoOn.line === null
     ? ok(
-        'Daily Scan Reminder: off in the openhangar.space group with no hint line; on asks for notifications',
+        'Daily Scan Reminder: off in the openhangar.space group with no hint line; on, with notifications allowed, asks nothing',
       )
     : fail(`popup scan reminder switch: ${JSON.stringify({ autoOff, autoOn })}`);
   const autoNow = await pageNow();

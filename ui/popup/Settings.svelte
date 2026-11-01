@@ -197,7 +197,7 @@
       setScanReminder(false);
       return;
     }
-    const asked = askNotify();
+    const asked = askNotify(notify);
     autoOn = true;
     setScanReminder(true);
     asked.then(async () => {
@@ -217,7 +217,7 @@
       setAutoDaily(false);
       return;
     }
-    const asked = askNotify();
+    const asked = askNotify(notify);
     dailyOn = true;
     setAutoDaily(true);
     asked.then(async () => (notify = await notifyAllowed()));
