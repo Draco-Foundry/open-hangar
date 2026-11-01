@@ -197,10 +197,9 @@ const COPY = {
   // RSI Account Logs (the `accountLogs` flag, every build from 0.5.8): the Settings row
   // and its switch (on asks for the full history, src/lib.js wantAccountLogs; off stops
   // and removes the logs, stopAccountLogs), the button that reads the whole history
-  // again, and the line under it while it loads. Approved in Words, 2026-11-01.
+  // again, and the line under it while a log is read. Approved in Words, 2026-11-01.
   'popup.account-logs': 'Account History',
   'popup.account-logs-load': 'Load Full History',
-  'popup.account-logs-asked': 'Starts with your next scan',
   'popup.account-logs-pledge': 'Pledge log: page {page} of {pages}',
   'popup.account-logs-credit': 'Store credit log: page {page} of {pages}',
   // The Daily Scan Reminder (the `autoScan` flag): its switch, in the openhangar.space

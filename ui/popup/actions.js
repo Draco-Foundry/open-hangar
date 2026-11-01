@@ -85,9 +85,12 @@ export async function setAlerts(on) {
 // there the popup closes once the ask has gone out: Firefox shows a popup's question on
 // the selected tab and grants it in the browser itself, so the answer still counts, and
 // Settings reads the switch from the permission when the popup opens again. Not on a
-// phone, where the popup is a page of its own (ui/popup/main.js).
+// phone, where the popup is a page of its own (ui/popup/main.js). `have`: the popup
+// already knows notifications are allowed, so there's no question and nothing to close
+// for (owner, 2026-11-01: turning on the Daily Scan Reminder closed the popup).
 const phone = () => !!globalThis.document?.documentElement.classList.contains('phone');
-export function askNotify() {
+export function askNotify(have = false) {
+  if (have) return Promise.resolve(true);
   const asked = chrome.permissions.request(NOTIFY).catch(() => false);
   if (firefox() && !phone()) setTimeout(() => window.close(), 0);
   return asked;

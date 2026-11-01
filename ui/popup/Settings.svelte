@@ -88,19 +88,18 @@
     notify = await notifyAllowed();
   }
   // RSI Account Logs (the `accountLogs` flag): a full history load asked for or under
-  // way (local accountLogsLoad, src/lib.js readAccountLogs), for the row's line.
+  // way (local accountLogsLoad, src/lib.js readAccountLogs), for the row's line: only
+  // while a log is being read (owner, 2026-11-01: no line while it waits for a scan).
   const LOGS = flag('accountLogs');
   let logsLoad = $state(null);
   let logsOn = $state(false); // a log kept or a load asked for
   const logsLine = $derived(
-    !logsLoad
-      ? ''
-      : logsLoad.part && logsLoad.pagecount
-        ? t(`popup.account-logs-${logsLoad.part === 'credit' ? 'credit' : 'pledge'}`, {
-            page: Math.max(0, (logsLoad.next || 1) - 1),
-            pages: logsLoad.pagecount,
-          })
-        : t('popup.account-logs-asked'),
+    logsLoad?.part && logsLoad.pagecount
+      ? t(`popup.account-logs-${logsLoad.part === 'credit' ? 'credit' : 'pledge'}`, {
+          page: Math.max(0, (logsLoad.next || 1) - 1),
+          pages: logsLoad.pagecount,
+        })
+      : '',
   );
   async function loadLogs() {
     if (!LOGS) return;
@@ -197,7 +196,7 @@
       setScanReminder(false);
       return;
     }
-    const asked = askNotify();
+    const asked = askNotify(notify);
     autoOn = true;
     setScanReminder(true);
     asked.then(async () => {
@@ -217,7 +216,7 @@
       setAutoDaily(false);
       return;
     }
-    const asked = askNotify();
+    const asked = askNotify(notify);
     dailyOn = true;
     setAutoDaily(true);
     asked.then(async () => (notify = await notifyAllowed()));
@@ -426,40 +425,43 @@
           </div>
         </div>
       {/if}
+      {#if LOGS}{@render logsRow(true)}{/if}
     </div>
+  {/if}
+
+  <!-- RSI Account Logs (the accountLogs flag): its switch (on asks for the full history,
+       which the next scan reads page by page and goes on where it stopped; off stops and
+       removes the logs), and, while on, Load Full History to read it all again
+       (src/lib.js readAccountLogs, stopAccountLogs). With the other switches, in the
+       openhangar.space box, no divider (owner, 2026-11-01); on its own without that box. -->
+  {#snippet logsRow(sub)}
+    <div class="pp-r pp-col" class:pp-sub={sub} id="pp-logs">
+      <div class="pp-line">
+        <span class="pp-grow" id="pp-logs-l">{t('popup.account-logs')}</span>
+        {#if logsOn && !logsLoad}
+          <button type="button" class="pp-btn2" id="pp-logs-load" onclick={askLogs}
+            >{t('popup.account-logs-load')}</button
+          >
+        {/if}
+        <button
+          type="button"
+          role="switch"
+          class="pp-sw"
+          id="pp-logs-sw"
+          aria-checked={logsOn}
+          aria-labelledby="pp-logs-l"
+          aria-describedby={logsLine ? 'pp-logs-line' : null}
+          onclick={logsSwitch}><i></i></button
+        >
+      </div>
+      {#if logsLine}<p class="pp-msg calm" id="pp-logs-line" role="status">{logsLine}</p>{/if}
+    </div>
+  {/snippet}
+  {#if LOGS && !siteOn}
+    <div class="pp-grp">{@render logsRow(false)}</div>
   {/if}
 
   <!-- Look, Currency and Shortcut as list rows: the name, then the value (owner, 2026-10-24). -->
-  {#if LOGS}
-    <!-- RSI Account Logs (the accountLogs flag): its switch (on asks for the full history,
-         which the next scan reads page by page and goes on where it stopped; off stops and
-         removes the logs), and, while on, Load Full History to read it all again
-         (src/lib.js readAccountLogs, stopAccountLogs). -->
-    <div class="pp-grp" id="pp-logs">
-      <div class="pp-r pp-col">
-        <div class="pp-line">
-          <span class="pp-grow" id="pp-logs-l">{t('popup.account-logs')}</span>
-          {#if logsOn && !logsLoad}
-            <button type="button" class="pp-btn2" id="pp-logs-load" onclick={askLogs}
-              >{t('popup.account-logs-load')}</button
-            >
-          {/if}
-          <button
-            type="button"
-            role="switch"
-            class="pp-sw"
-            id="pp-logs-sw"
-            aria-checked={logsOn}
-            aria-labelledby="pp-logs-l"
-            aria-describedby={logsLine ? 'pp-logs-line' : null}
-            onclick={logsSwitch}><i></i></button
-          >
-        </div>
-        {#if logsLine}<p class="pp-msg calm" id="pp-logs-line" role="status">{logsLine}</p>{/if}
-      </div>
-    </div>
-  {/if}
-
   <div class="pp-grp" id="pp-prefs">
     <label class="pp-r pp-li">
       <span class="pp-grow">{t('popup.look')}</span>
