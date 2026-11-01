@@ -1,0 +1,25 @@
+# docs/auto-scan-daily-policy
+
+## Goal
+
+Put the owner-approved privacy policy and store-listing words for Auto Scan Daily (approved
+word for word 2026-11-01, with revised items 3 and 8) into the docs, ready for the release
+that turns `autoScanRun` on in store builds. Draft until that release.
+
+## Steps
+
+1. docs/PRIVACY.md: items 1 to 8 (Short Version, What data is accessed, the Auto Scan
+   Daily section, status file, Disconnecting, cookies, alarms, notifications). Item 9
+   applies only with an Account History section.
+2. site/privacy.html: the same words; regenerate privacy-plain.txt and privacy-amo.md with
+   `npm run privacy:plain`.
+3. docs/STORE.md: items 10 to 14.
+4. docs/COMPLIANCE.md: alarms and notifications rows matched to items 10 and 11.
+5. Leave "Last updated" for the release to set.
+
+## Done Criteria
+
+- No "Daily Scan Reminder" left in the policy copies, STORE.md or COMPLIANCE.md's rows.
+- `npm run format:check`, `npm test`, `npm run build`, `npm run check:store` results
+  reported in the PR (the reminder guard test is expected to fail until the flag change
+  lands with the release).

@@ -60,9 +60,10 @@
           match it on your device (see <a href="#store-alerts">Store Alerts</a>).
         </li>
         <li>
-          The Daily Scan Reminder is optional and off until you turn it on. It works only while
-          you're connected. It reminds you to scan and reads nothing itself: Open Hangar scans only
-          when you click (see <a href="#daily-scan-reminder">Daily Scan Reminder</a>).
+          Auto Scan Daily is optional and off until you turn it on. It works only while you're
+          connected, and it scans only the RSI account this browser last scanned: signed out or
+          signed in to another account, it reads nothing (see
+          <a href="#auto-scan-daily">Auto Scan Daily</a>).
         </li>
         <li>
           We do not sell or share your personal data. Without sync we collect nothing; with sync we
@@ -71,11 +72,11 @@
       </ul>
       <h2>What Data Is Accessed and Where It Is Stored</h2>
       <p>
-        When you press Scan in the toolbar popup, or click the Daily Scan Reminder's notification
-        (see <a href="#daily-scan-reminder">Daily Scan Reminder</a>), the extension reads your own
-        RSI account by making requests to robertsspaceindustries.com using your existing browser
-        session, and parses the results locally. The scan runs in a hidden page, so no tab opens. If
-        it can't run there, it runs on the small Open Hangar page instead. This may include:
+        When you press Scan in the toolbar popup, or when Auto Scan Daily runs (see
+        <a href="#auto-scan-daily">Auto Scan Daily</a>), the extension reads your own RSI account by
+        making requests to robertsspaceindustries.com using your existing browser session, and
+        parses the results locally. The scan runs in a hidden page, so no tab opens. If it can't run
+        there, it runs on the small Open Hangar page instead. This may include:
       </p>
       <ul>
         <li>Your hangar (pledges: ships, CCUs, add-ons, coupons).</li>
@@ -146,27 +147,51 @@
         shows your Wishlist (see
         <a href="#your-wishlist">Your Wishlist</a>).
       </p>
-      <h2 id="daily-scan-reminder">Daily Scan Reminder</h2>
+      <h2 id="auto-scan-daily">Auto Scan Daily</h2>
       <p>
-        The Daily Scan Reminder tells you when it's time to scan. It's optional and off until you
-        turn it on, in the openhangar.space part of the popup's Settings tab, and it works only
-        while you're connected.
+        Auto Scan Daily scans your hangar for you once a day, without a click. It's optional and off
+        until you turn it on, in the openhangar.space part of the popup's Settings tab, and it works
+        only while you're connected.
       </p>
       <ul>
+        <li><strong>When:</strong> once a day, at a random time, while your browser is open.</li>
         <li>
-          <strong>When:</strong> at most once a day, while your browser is open, if your last scan
-          in this browser is more than a day old. It skips the day if we've paused scans (see
-          <a href="#outbound-network-requests">Outbound network requests</a>).
+          <strong>Account check first:</strong> it starts by checking which RSI account this browser
+          is signed in to, with one read of who is signed in and, to match it, one read of that
+          account's public RSI profile. If you're signed out, if this browser hasn't yet scanned an
+          account you sync, or if it's a different RSI account from the one this browser last
+          scanned, it reads nothing more and keeps nothing, and shows a notification asking you to
+          scan yourself. It never switches accounts.
         </li>
         <li>
-          <strong>How:</strong> a notification. Turning the reminder on asks your browser for
-          permission to show notifications, and if you say no, the reminder stays off. Click the
-          notification to scan. If you don't, nothing happens.
+          <strong>Paused:</strong> if we've paused scans (see
+          <a href="#outbound-network-requests">Outbound network requests</a>), it skips the day.
         </li>
         <li>
-          <strong>What it reads and sends:</strong> nothing. It only checks the time of your last
-          scan, saved in this browser. The scan you start from it is the same as pressing Scan
-          (above), and it syncs like any other scan.
+          <strong>What it reads:</strong> the same as Scan (above), except buy-backs' own pages,
+          from your own RSI account only. It starts with a quick check of the newest page of your
+          hangar and of your buy-backs, and runs a full scan only when something there is new, or
+          when your last full scan is a week old. A quick check that finds nothing new stops there
+          and sends nothing. It waits about a second between pages and stops if RSI asks it to slow
+          down.
+        </li>
+        <li>
+          <strong>What it sends:</strong> what it saves syncs to openhangar.space like any other
+          scan (see <a href="#optional-sync">Optional Sync</a>). If your browser closes before that
+          sync goes out, it goes out on the next run. Nothing else.
+        </li>
+        <li>
+          <strong>A bad part is never kept:</strong> Auto Scan Daily saves your hangar, buy-backs
+          and referrals one part at a time, as each is fully read. A part that doesn't finish, a
+          part read after RSI switched to a different account than the scan started on, or a hangar
+          that would suddenly drop much of what's in it with no buy-backs to explain it, is never
+          saved or synced. That part keeps your last good scan, and the popup asks you to scan
+          yourself.
+        </li>
+        <li>
+          <strong>Notifications:</strong> turning Auto Scan Daily on asks your browser for
+          permission to show notifications, used only to tell you when a day's scan couldn't run. If
+          you say no, it still scans, without that notice.
         </li>
         <li>
           <strong>Turning it off:</strong> on the same Settings tab. Disconnecting turns it off too.
@@ -264,8 +289,8 @@
           <ul>
             <li>
               a small status file, at most every few hours, so we can pause a scan that RSI's site
-              changes have broken (the Daily Scan Reminder pauses with it), or pause store alerts,
-              and show a short notice until a fix is out;
+              changes have broken (Auto Scan Daily pauses with it), or pause store alerts, and show
+              a short notice until a fix is out;
             </li>
             <li>
               the public ship list (names, store prices and pictures), at most once a day, to value
@@ -346,9 +371,9 @@
         </li>
         <li>
           <strong>Disconnecting:</strong> Disconnect on the popup's Settings tab stops syncing,
-          turns off the Daily Scan Reminder and cancels this extension's token. The copy already
-          synced stays on the website until you delete it there; your Account page on the website
-          can download or delete everything.
+          turns off Auto Scan Daily and cancels this extension's token. The copy already synced
+          stays on the website until you delete it there; your Account page on the website can
+          download or delete everything.
         </li>
         <li>
           <strong>Inactive accounts:</strong> if a website account has no sign-in and no sync for 24
@@ -375,12 +400,13 @@
           RSI clears RSI's cookies so you can fully end your RSI session from the extension. To
           guess whether you're signed in to RSI, the extension checks whether RSI's session cookie
           is in this browser. When it isn't there, the popup shows Log In to RSI first, with Scan
-          still there to press. RSI sets that cookie for visitors who aren't signed in too, so only
-          a scan tells for sure. The browser hands over the cookie when asked, but for this check
-          the extension only looks at whether it's there, and the check doesn't contact RSI. And Add
-          to RSI Cart works the way RSI's own upgrade window does: it reads RSI's session token
-          cookie and sends it back to robertsspaceindustries.com with the cart request. The
-          extension never saves a cookie's value and never sends one anywhere but RSI.
+          still there to press, and Auto Scan Daily skips that day. RSI sets that cookie for
+          visitors who aren't signed in too, so only a scan tells for sure. The browser hands over
+          the cookie when asked, but for this check the extension only looks at whether it's there,
+          and the check doesn't contact RSI. And Add to RSI Cart works the way RSI's own upgrade
+          window does: it reads RSI's session token cookie and sends it back to
+          robertsspaceindustries.com with the cart request. The extension never saves a cookie's
+          value and never sends one anywhere but RSI.
         </li>
         <li>
           <strong>Host access to robertsspaceindustries.com:</strong> to make the read-only requests
@@ -395,20 +421,20 @@
           code to finish connecting, never your password. Nothing else uses it.
         </li>
         <li>
-          <strong>alarms:</strong> for store alerts and the Daily Scan Reminder only. It wakes the
-          extension for a store alerts check at most every 30 minutes while alerts are on (see
-          <a href="#store-alerts">Store Alerts</a>), and once a day while the reminder is on, to
-          check the time of your last scan (see
-          <a href="#daily-scan-reminder">Daily Scan Reminder</a>). When both are off, it stops.
-          Nothing else uses it.
+          <strong>alarms:</strong> for store alerts and Auto Scan Daily only. It wakes the extension
+          for a store alerts check at most every 30 minutes while alerts are on (see
+          <a href="#store-alerts">Store Alerts</a>), and once a day while Auto Scan Daily is on (see
+          <a href="#auto-scan-daily">Auto Scan Daily</a>). When both are off, it stops. Nothing else
+          uses it.
         </li>
         <li>
           <strong>notifications:</strong> optional. The browser asks for it only from the
-          Notifications switch or the Daily Scan Reminder switch on the popup's Settings tab, and
-          you can say no: the number on the toolbar button and the popup's Wishlist tab still work,
-          and the reminder stays off. With it, each Remind Me item newly on sale gets a notification
-          while Notifications is on, and the Daily Scan Reminder shows its notification while it's
-          on. Turning both switches off gives it back. Nothing else uses it.
+          Notifications switch or the Auto Scan Daily switch on the popup's Settings tab, and you
+          can say no: the number on the toolbar button and the popup's Wishlist tab still work, and
+          Auto Scan Daily still scans, without its notice. With it, each Remind Me item newly on
+          sale gets a notification while Notifications is on, and Auto Scan Daily tells you when a
+          day's scan couldn't run. Turning the Notifications switch off gives it back, and Auto Scan
+          Daily then scans without its notice. Nothing else uses it.
         </li>
         <li>
           <strong>offscreen</strong> (Chrome and Edge only): lets a scan run in a hidden page
