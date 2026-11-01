@@ -120,10 +120,10 @@ test('wish rows: generic kinds, Buy only when in the store, Warbond only when ch
   });
   assert.equal(on.buyable, true);
   assert.equal(on.warbond, 100);
-  assert.equal(on.statusLabel, 'In Store Now');
+  assert.equal(on.statusLabel, 'In Store');
   const off = wishRow({ kind: 'ship', name: 'Pioneer', price: 850, status: 'out', url });
   assert.equal(off.buyable, false, 'never a Buy button when not for sale');
-  assert.equal(off.statusLabel, 'Not on Sale');
+  assert.equal(off.statusLabel, 'Not for Sale');
   assert.equal(wishRow({ name: 'X', status: 'soldout', url }).buyable, false);
   assert.equal(wishRow({ name: 'X', status: 'pack', url }).buyable, false);
   assert.equal(wishRow({ name: 'X', price: 50, warbond: 60, status: 'in', url }).warbond, null);
@@ -264,4 +264,26 @@ test('Most Valuable: short insurance chip', async () => {
   assert.equal(insChip('6M'), '6 Mo');
   assert.equal(insChip('Unknown'), '');
   assert.equal(insChip(''), '');
+});
+
+test('In Store words: the store-now status reads "in the store" everywhere it shows', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const read = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
+  const old = [/In Store Now/, /Not on Sale/, /\bon sale from your Wishlist/, /More on sale:/];
+  for (const f of [
+    'src/alerts.js',
+    'src/dashboard.js',
+    'ui/popup/copy.js',
+    'ui/lib/wish-watch.js',
+    'ui/home/WishWatch.svelte',
+    'ui/home/ForYou.svelte',
+    'ui/store/Wishlist.svelte',
+    'ui/store/FindInStore.svelte',
+  ]) {
+    for (const re of old) assert.doesNotMatch(read(f), re, `${f} still has ${re}`);
+  }
+  assert.match(read('ui/popup/copy.js'), /'popup\.wish-tab-on-sale': '\{n\} in store'/);
+  assert.match(read('src/alerts.js'), /'Open Hangar: \{n\} from your Wishlist in the store'/);
+  assert.match(read('src/alerts.js'), /'More in the store: \{n\}'/);
 });

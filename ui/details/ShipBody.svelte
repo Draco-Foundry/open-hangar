@@ -8,7 +8,7 @@
 
   let { v, onChange } = $props();
 
-  // In Store Now: what openhangar.space's store catalog says ("Checking…" till it loads).
+  // In Store: what openhangar.space's store catalog says ("Checking…" till it loads).
   const stock = $derived.by(() => {
     version.n;
     return app().store.stock(v.title);

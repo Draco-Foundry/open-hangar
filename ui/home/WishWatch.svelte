@@ -1,7 +1,7 @@
 <script>
   // Wishlist Watch: your wishlist with what RSI's store had at the last check
-  // (openhangar.space's store catalog, matched on your machine): In Store Now
-  // (price, Warbond savings in green, Buy at RSI), Not on Sale or Sold Out. Shows
+  // (openhangar.space's store catalog, matched on your machine): In Store
+  // (price, Warbond savings in green, Buy at RSI), Not for Sale or Sold Out. Shows
   // the LAST check ("Checked 2 days ago") until the next one; only Check Now (or
   // Scan → Store) asks, never anything by itself. Rows are generic items
   // (ui/lib/wish-watch.js): ships, packs, paints, gear, add-ons and CCUs.
@@ -56,7 +56,7 @@
   {:else}
     <div class="ww-sum">
       {#if d.at}
-        <span><b>{d.sum.on} of {d.sum.total}</b> on sale on their own</span>
+        <span><b>{d.sum.on} of {d.sum.total}</b> in the store on their own</span>
         <span id="ww-checked" title={new Date(d.at).toLocaleString()}>Checked {checkedAgo(d.at, now)}</span>
       {:else}
         <span><b>{d.total}</b> on your wishlist</span><span id="ww-checked">Not checked yet</span>

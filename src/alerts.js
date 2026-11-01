@@ -87,7 +87,7 @@
   const COPY = {
     // The toolbar button's tooltip while alerts wait: how many, and that the popup
     // shows them.
-    'alerts.badge-title': 'Open Hangar: {n} on sale from your Wishlist',
+    'alerts.badge-title': 'Open Hangar: {n} from your Wishlist in the store',
     // Why an item is an alert, one line each:
     // On the pilot's account Wishlist (only while this browser is connected).
     'alerts.why.wishlist': 'On your Wishlist',
@@ -102,7 +102,7 @@
     'alerts.ends': 'Ends {day}',
     // One notification for the rest when more than three arrive at once: how many
     // more, and that the toolbar button shows them all.
-    'alerts.notify-more-title': 'More on sale: {n}',
+    'alerts.notify-more-title': 'More in the store: {n}',
     'alerts.notify-more-body': 'Click the Open Hangar button in your toolbar to see them all.',
   };
   function t(key, vars = {}) {

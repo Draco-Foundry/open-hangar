@@ -4,7 +4,7 @@
 //   { kind: 'ship'|'pack'|'paint'|'gear'|'addon'|'ccu', name, from?, to?,
 //     price (USD, what it sells for now, or its usual price), warbond (USD, the
 //     Warbond edition's price when it's cheaper) | null, status, url, img }
-// status: 'in' (In Store Now), 'pack' (Only in a Pack), 'out' (Not on Sale),
+// status: 'in' (In Store), 'pack' (Only in a Pack), 'out' (Not for Sale),
 // 'soldout' (Sold Out), 'unknown' (not checked yet). Pure.
 export const WISH_KINDS = {
   ship: 'Ship',
@@ -15,9 +15,9 @@ export const WISH_KINDS = {
   ccu: 'CCU',
 };
 export const WISH_STATUS = {
-  in: 'In Store Now',
+  in: 'In Store',
   pack: 'Only in a Pack',
-  out: 'Not on Sale',
+  out: 'Not for Sale',
   soldout: 'Sold Out',
   unknown: 'Not Checked Yet',
 };
@@ -47,14 +47,14 @@ export function wishRow(raw) {
     warbond: status === 'in' && wb && price && wb < price ? wb : null,
     status,
     statusLabel: WISH_STATUS[status],
-    // Buy only when it can be bought on its own right now (never on Not on Sale).
+    // Buy only when it can be bought on its own right now (never on Not for Sale).
     buyable: status === 'in' && !!url,
     url,
     img: text(r.img),
   };
 }
 
-// "2 of 5 on sale on their own" for the card's summary.
+// "2 of 5 in the store on their own" for the card's summary.
 export function wishSummary(rows) {
   const on = rows.filter((r) => r.status === 'in').length;
   return { on, total: rows.length };

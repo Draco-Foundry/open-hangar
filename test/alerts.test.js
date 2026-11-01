@@ -505,7 +505,7 @@ test('notifications: one each, three at most, then one for the rest', () => {
     ms.slice(0, 3).map((m) => `oh-alerts:${m.id}`),
   );
   assert.equal(four[3].id, 'oh-alerts:more');
-  assert.equal(four[3].title, 'More on sale: 1');
+  assert.equal(four[3].title, 'More in the store: 1');
   const ends = AL.lines({ ...byId(ms, 'sku-11'), endsOn: '2026-10-15' });
   assert.deepEqual(ends, [
     'Warbond edition in the store: MISC Freelancer MAX (new money only)',
@@ -537,7 +537,7 @@ test('the badge: Remind Me items on sale, unseen, each Wishlist item once', () =
   );
   assert.deepEqual(AL.badgeFor(true, state), {
     text: '2',
-    title: 'Open Hangar: 2 on sale from your Wishlist',
+    title: 'Open Hangar: 2 from your Wishlist in the store',
   });
   assert.equal(AL.badgeFor(false, state), null);
   assert.equal(AL.badgeFor(undefined, state), null);
