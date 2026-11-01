@@ -1,1 +1,0 @@
-- Changed: Account Value no longer adds in your Store Credit, so it matches the website. Store Credit still shows on its own.

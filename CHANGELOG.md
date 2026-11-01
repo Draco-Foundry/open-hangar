@@ -4,6 +4,11 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.5.7 — 2026-10-31
+
+- Changed: Account Value no longer adds in your Store Credit, so it matches the website. Store Credit still shows on its own.
+- Fixed: **The Wishlist search lists one row per ship.** A ship the lists spell two ways shows once, and ships nobody can get from RSI anymore (the AMD package, in-game rewards, retired ships) are no longer offered. One already on your Wishlist stays and says it isn't for sale.
+
 ## 0.5.6 — 2026-10-31
 
 - Fixed: **A first scan that stops partway.** It no longer keeps the part it read, so only a whole hangar is ever saved or synced. Scan again to read it all.
