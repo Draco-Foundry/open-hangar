@@ -195,15 +195,14 @@ const COPY = {
     'Your synced copy stays on openhangar.space until you delete it there. This extension just stops syncing.',
   'popup.stay': 'Stay Connected',
   // RSI Account Logs (the `accountLogs` flag, developer builds only): the Settings row
-  // that asks for the full history once (src/lib.js wantAccountLogs; the next scan reads
-  // it), and the line under it while it loads, page {page} of {pages} of the pledge log
-  // or the store credit log. PLACEHOLDER: Needs Words (Words DB), not approved; none of
-  // it reaches a store build until Claude chat's words are in.
-  'popup.account-logs': '{Needs Words: popup.account-logs}',
-  'popup.account-logs-load': '{Needs Words: popup.account-logs-load}',
-  'popup.account-logs-asked': '{Needs Words: popup.account-logs-asked}',
-  'popup.account-logs-pledge': '{Needs Words: popup.account-logs-pledge} {page}/{pages}',
-  'popup.account-logs-credit': '{Needs Words: popup.account-logs-credit} {page}/{pages}',
+  // and its switch (on asks for the full history, src/lib.js wantAccountLogs; off stops
+  // and removes the logs, stopAccountLogs), the button that reads the whole history
+  // again, and the line under it while it loads. Approved in Words, 2026-11-01.
+  'popup.account-logs': 'Account History',
+  'popup.account-logs-load': 'Load Full History',
+  'popup.account-logs-asked': 'Starts with your next scan',
+  'popup.account-logs-pledge': 'Pledge log: page {page} of {pages}',
+  'popup.account-logs-credit': 'Store credit log: page {page} of {pages}',
   // The Daily Scan Reminder (the `autoScan` flag): its switch, in the openhangar.space
   // group, and the lines under it (ui/popup/data.js reminderLine). Claude chat, Words,
   // 2026-10-25. Its hint line was dropped by the owner, 2026-10-31.

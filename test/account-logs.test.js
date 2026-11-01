@@ -384,6 +384,33 @@ test("more new lines than a day's read: nothing kept, the full history asked for
   assert.equal(store.accountLogsLoad.want, true);
 });
 
+test("the pilot's off switch: the logs go, nothing more is read, a read under way keeps nothing", async () => {
+  const rsi = fakeRsi({ pledge: pagesOf(1, 10), credit: [creditPage] });
+  await OH.wantAccountLogs(ME);
+  await OH.readAccountLogs({ account: ME, token: 't', fetchFn: rsi.fetchFn, pause: noPause });
+  assert.equal(store.accountLogs.pledge.items.length, 10);
+  await OH.stopAccountLogs();
+  assert.equal(store.accountLogs, undefined);
+  const off = await OH.readAccountLogs({ account: ME, token: 't', fetchFn: rsi.fetchFn });
+  assert.deepEqual(off.parts, { pledge: { did: 'none' }, credit: { did: 'none' } });
+  assert.equal(await OH.getAccountLogs(ME), null, 'so sync sends none');
+  // Turned off halfway through a full load: nothing is kept.
+  await OH.wantAccountLogs(ME);
+  const slow = fakeRsi({ pledge: pagesOf(1, 60), credit: [creditPage] });
+  let n = 0;
+  const r = await OH.readAccountLogs({
+    account: ME,
+    token: 't',
+    fetchFn: slow.fetchFn,
+    pause: async () => {
+      if (++n === 2) await OH.stopAccountLogs();
+    },
+  });
+  assert.equal(r.parts.pledge.did, 'none');
+  assert.equal(store.accountLogs, undefined);
+  assert.equal(store.accountLogsLoad, undefined);
+});
+
 test('each log has its own pause switch', async () => {
   const rsi = fakeRsi({ pledge: pagesOf(1, 5), credit: [creditPage] });
   await OH.wantAccountLogs(ME);

@@ -13,7 +13,7 @@ parser.
    whole), the day's read after (stops at a known line), each log's pause switch.
 4. The scan runs it; Clear Data and an account switch drop it; export shapes it.
 5. The sync schema and the field list; test vectors for the website's pin.
-6. The popup's Load Full History row with placeholder words.
+6. The popup's Account History row: its off switch (stops and removes the logs) and Load Full History, with the words approved 2026-11-01.
 
 ## Done
 

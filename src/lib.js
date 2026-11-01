@@ -5429,6 +5429,12 @@
     });
     return true;
   };
+  // The pilot's off switch: the logs and any load under way go, so nothing more is read
+  // or synced until the pilot asks again (a read under way keeps nothing: keepLog and
+  // fullLoad check the load is still asked for). Every account's, as Clear Data does.
+  OH.stopAccountLogs = async function stopAccountLogs() {
+    await chrome.storage.local.remove([ACCOUNT_LOGS_KEY, ACCOUNT_LOGS_LOAD]);
+  };
   // The Rsi-Token cookie's value: '' when there is none (signed out), null when the
   // browser can't say.
   async function rsiTokenCookie() {
@@ -5542,13 +5548,18 @@
     }
     return { ok: !Object.values(parts).some((p) => p.error), parts };
   }
-  // Keep one log (only ever a whole read).
-  async function keepLog(part, acct, items, extra) {
-    await mutateStored(ACCOUNT_LOGS_KEY, (cur) => ({
-      ...(sameNick(cur, acct) ? cur : {}),
-      nickname: acct.nickname,
-      [part.id]: { items, at: Date.now(), ...extra },
-    }));
+  // Keep one log (only ever a whole read). `mustHave`: only onto a log still kept (a
+  // day's read the off switch may have stopped meanwhile).
+  async function keepLog(part, acct, items, extra, mustHave = false) {
+    await mutateStored(ACCOUNT_LOGS_KEY, (cur) =>
+      mustHave && !sameNick(cur, acct)
+        ? cur
+        : {
+            ...(sameNick(cur, acct) ? cur : {}),
+            nickname: acct.nickname,
+            [part.id]: { items, at: Date.now(), ...extra },
+          },
+    );
   }
   async function fullLoad(part, acct, load, ask, onProgress) {
     // Go on where this log stopped, or start it at page 1.
@@ -5570,6 +5581,8 @@
       onProgress(part.id, Math.min(next - 1, pagecount), pagecount);
       if (!pagecount) break;
     }
+    // Turned off meanwhile: keep nothing.
+    if (!(await OH.getAccountLogsLoad(acct))) return { did: 'none' };
     // Every page in: this is the log now, with any line a daily read kept meanwhile.
     const kept = (await OH.getAccountLogs(acct))?.[part.id];
     const log = OH.mergeAccountLog(part.id, items, kept?.items);
@@ -5591,10 +5604,16 @@
       unread += r.unread;
       // Met a line already kept, or the log's end: the read is whole.
       if (r.items.some((it) => known.has(part.key(it))) || page >= r.pagecount) {
-        await keepLog(part, acct, OH.mergeAccountLog(part.id, fresh, mine.items), {
-          pages: Math.max(r.pagecount, mine.pages || 0),
-          unread: (mine.unread || 0) + unread,
-        });
+        await keepLog(
+          part,
+          acct,
+          OH.mergeAccountLog(part.id, fresh, mine.items),
+          {
+            pages: Math.max(r.pagecount, mine.pages || 0),
+            unread: (mine.unread || 0) + unread,
+          },
+          true,
+        );
         return { did: 'daily', n: fresh.filter((it) => !known.has(part.key(it))).length };
       }
     }
