@@ -244,10 +244,12 @@ test('from Auto Scan Daily: on with notifications allowed stays on as the remind
   assert.equal(v.stores.local.scanReminderOn, false);
 });
 
-test('a scan request left from Auto Scan Daily runs nothing in the hidden page', () => {
+test("a scan request with reason 'auto' runs nothing in a build without Auto Scan Daily", () => {
   const page = read('ui/scan/main.js');
-  assert.match(page, /!go \|\| r\.reason === 'auto'\s*\?\s*null/);
-  assert.doesNotMatch(page, /autoScan\(/);
+  assert.match(
+    page,
+    /r\.reason === 'auto'\s*\?\s*flag\('autoScanRun'\)\s*\?\s*runner\.autoScan\(\)\s*:\s*null/,
+  );
 });
 
 test("store alerts' alarm and the reminder's never clear each other", async () => {
@@ -297,23 +299,31 @@ test('check 6: every alarm is the alerts or the reminder; the reminder reads not
   for (const f of files)
     for (const m of read(`src/${f}`).matchAll(/chrome\.alarms\.create\(\s*([^,]+),/g))
       made.push(`${f}: ${m[1].trim()}`);
-  for (const m of made) assert.match(m, /: (self\.OHAlerts\.ALARM|AL\.ALARM|REMIND_ALARM)$/, m);
+  // Auto Scan Daily's (the autoScanRun flag, beta builds): test/auto-scan.test.js.
+  for (const m of made)
+    assert.match(m, /: (self\.OHAlerts\.ALARM|AL\.ALARM|REMIND_ALARM|AUTO_ALARM)$/, m);
   assert.ok(made.includes('background.js: REMIND_ALARM'), made.join(', '));
   assert.ok(made.includes('background.js: AL.ALARM'), made.join(', '));
   const bg = read('src/background.js');
-  const blocks = [...bg.matchAll(/@flag-start autoScan[^\n]*\n([\s\S]*?)@flag-end autoScan/g)].map(
-    (m) => m[1].replace(/^\s*\/\/.*$/gm, ''),
-  );
+  const blocks = [
+    ...bg.matchAll(/@flag-start autoScan:[^\n]*\n([\s\S]*?)@flag-end autoScan\n/g),
+  ].map((m) => m[1].replace(/^\s*\/\/.*$/gm, ''));
   assert.equal(blocks.length, 1, 'one block');
   const [block] = blocks;
   // No network, no cookies, no RSI; a scan only from its notification's click.
   assert.doesNotMatch(block, /fetch\(|chrome\.cookies|robertsspaceindustries/);
   assert.equal([...block.matchAll(/requestScan\(/g)].length, 1);
   assert.match(block, /async function remindClicked\(id\) \{[\s\S]*?requestScan\('popup'\)/);
-  // Auto Scan Daily's run is gone from every page.
-  assert.equal(fs.existsSync(path.join(ROOT, 'ui/scan/auto.js')), false);
-  assert.doesNotMatch(read('ui/scan/runner.js'), /autoScan|scanFull/);
-  assert.doesNotMatch(bg, /requestScan\('auto'/);
+  // Auto Scan Daily's run is cut from every build without its flag (every store build):
+  // the store build's worker never asks for one.
+  const store = cutFlags(bg, {
+    sync: true,
+    localMode: true,
+    connector: true,
+    alerts: true,
+    autoScan: true,
+  });
+  assert.doesNotMatch(store, /requestScan\('auto'|oh-auto-daily|autoDailyOn/);
   // A build without the flag has none of it.
   const off = cutFlags(bg, {
     sync: true,

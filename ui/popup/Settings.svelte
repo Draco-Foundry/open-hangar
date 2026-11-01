@@ -8,7 +8,7 @@
   // Privacy, and Clear Data on its own line.
   import { onMount, tick } from 'svelte';
   import { t } from './copy.js';
-  import { popupShortcut, reminderLine, scanAge, syncTrouble } from './data.js';
+  import { autoLine, popupShortcut, reminderLine, scanAge, syncTrouble } from './data.js';
   import { CURRENCIES, LOOKS } from './prefs.js';
   import { at } from '../site/when.js';
   import { flag } from '../lib/flags.js';
@@ -31,6 +31,7 @@
     pilotAnswer,
     reportProblem,
     removeProfile,
+    setAutoDaily,
     setScanReminder,
     syncNow,
   } from './actions.js';
@@ -66,6 +67,13 @@
   let autoRec = $state(null);
   let denied = $state(false);
   const line = $derived(reminderLine({ on: autoOn, rec: autoRec, denied }, now));
+  // Auto Scan Daily (the `autoScanRun` flag, beta builds): in place of the reminder,
+  // its switch (local autoDailyOn) and its last run's line (local autoDaily, written by
+  // ui/scan/runner.js autoScan).
+  const DAILY = AUTO && flag('autoScanRun');
+  let dailyOn = $state(false);
+  let dailyRec = $state(null);
+  const dailyLine = $derived(autoLine({ on: dailyOn, rec: dailyRec }, now));
 
   const trouble = $derived(syncTrouble({ connected: v.connected, failed: failing }, now));
   const ago = (ms) => {
@@ -119,6 +127,10 @@
     const got = await chrome.storage.local.get(['scanReminderOn', 'scanReminder']);
     autoOn = got.scanReminderOn === true;
     autoRec = got.scanReminder || null;
+    if (!DAILY) return;
+    const daily = await chrome.storage.local.get(['autoDailyOn', 'autoDaily']);
+    dailyOn = daily.autoDailyOn === true;
+    dailyRec = daily.autoDaily || null;
   }
   onMount(() => {
     OH.siteEnabled().then((on) => (siteOn = on));
@@ -130,7 +142,8 @@
     // listProfiles checks every saved hangar, so a run of db writes (a scan) reads it once.
     let later;
     const changed = (c, area) => {
-      if (area === 'local' && AUTO && (c.scanReminderOn || c.scanReminder)) loadAuto();
+      if (area === 'local' && AUTO && (c.scanReminderOn || c.scanReminder || c.autoDailyOn || c.autoDaily))
+        loadAuto();
       if (area === 'local' && LOGS && (c.accountLogsLoad || c.accountLogs)) loadLogs();
       if (area === 'local' && c.db) {
         clearTimeout(later);
@@ -194,6 +207,19 @@
       denied = true;
       await setScanReminder(false);
     });
+  }
+  // On asks for notifications, the click's very first step, for the one notice a day it
+  // skips; a no still leaves it on (it scans, without the notice).
+  function dailySwitch() {
+    if (dailyOn) {
+      dailyOn = false;
+      setAutoDaily(false);
+      return;
+    }
+    const asked = askNotify();
+    dailyOn = true;
+    setAutoDaily(true);
+    asked.then(async () => (notify = await notifyAllowed()));
   }
   function notifySwitch() {
     if (notify) {
@@ -329,7 +355,28 @@
         {/if}
         <!-- A failure already under Last Sync Didn't Go Through isn't said twice. -->
         {#if msg && msg !== trouble?.msg}<p class="pp-r pp-msg" class:calm role="status">{msg}</p>{/if}
-        {#if AUTO}
+        {#if DAILY}
+          <div class="pp-r pp-col pp-sub">
+            <div class="pp-line">
+              <span class="pp-grow" id="pp-daily-l">{t('popup.auto-scan')}</span>
+              <button
+                type="button"
+                role="switch"
+                class="pp-sw"
+                id="pp-daily-sw"
+                aria-checked={dailyOn}
+                aria-labelledby="pp-daily-l"
+                aria-describedby={dailyLine ? 'pp-daily-line' : null}
+                onclick={dailySwitch}><i></i></button
+              >
+            </div>
+            <!-- One line (copy.js popup.auto-*, data.js autoLine): the last run; amber when it
+                 asks for a scan; none before its first run. -->
+            {#if dailyLine}
+              <p class="pp-msg" class:calm={!dailyLine.ask} id="pp-daily-line">{t(dailyLine.key, { when: dailyLine.when })}</p>
+            {/if}
+          </div>
+        {:else if AUTO}
           <div class="pp-r pp-col pp-sub">
             <div class="pp-line">
               <span class="pp-grow" id="pp-auto-l">{t('popup.scan-reminder')}</span>

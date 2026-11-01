@@ -1153,6 +1153,11 @@
       'scanStarted',
       'scanReminder',
       'scanReminderOn',
+      // Auto Scan Daily (the autoScanRun flag): its switch, runs, next time and reads.
+      'autoDailyOn',
+      'autoDaily',
+      'autoDailyNext',
+      'autoDailyFull',
       'subStore',
       'accountLogs',
       'accountLogsLoad',
@@ -1732,8 +1737,9 @@
   const RATE_LIMIT_STEP_MS = 5000;
   const MAX_RATE_LIMIT_WAIT_MS = 30000;
   // opts.retryRateLimit: false = a 429 comes straight back as { rateLimited }, for
-  // batches that should stop rather than push on (buy-back details).
-  async function fetchPage(url, onRetry, { retryRateLimit = true } = {}) {
+  // batches that should stop rather than push on (buy-back details). opts.retry: false =
+  // no retry at all (Auto Scan Daily: a network error or a 5xx comes straight back too).
+  async function fetchPage(url, onRetry, { retryRateLimit = true, retry: again = true } = {}) {
     let errors = 0;
     let slowDowns = 0;
     let retry = null; // { msg, wait, attempt, of } for the next try
@@ -1748,7 +1754,7 @@
         res = await fetch(url, { credentials: 'include', signal: AbortSignal.timeout(30000) });
       } catch (e) {
         const msg = `Couldn't reach RSI (${e.message})`;
-        if (++errors > RETRIES) return { error: msg, transient: true };
+        if (!again || ++errors > RETRIES) return { error: msg, transient: true };
         retry = { msg, wait: DELAY_MS * 2 ** errors, attempt: errors, of: RETRIES };
         continue;
       }
@@ -1781,7 +1787,7 @@
         if (!retryRateLimit && OH.retryAfterMs(retryAfter)) {
           return { error: msg, transient: true, retryAfter };
         }
-        if (++errors > RETRIES) return { error: msg, transient: true, retryAfter };
+        if (!again || ++errors > RETRIES) return { error: msg, transient: true, retryAfter };
         retry = {
           msg,
           wait: Math.min(after > 0 ? after : DELAY_MS * 2 ** errors, MAX_RETRY_WAIT_MS),
@@ -1799,8 +1805,9 @@
     `${src.url}?${RULES.paging.page}=${page}&${RULES.paging.size}=${size}`;
 
   // Auto Scan Daily (ui/scan/runner.js autoScan) waits this long, jittered, before
-  // every request it makes to RSI but its first (docs/dev/requests.md): 500 to 1000 ms.
-  OH.autoPause = () => sleep(500 + Math.floor(Math.random() * 500));
+  // every request it makes to RSI but its first (docs/dev/requests.md): about a second,
+  // 800 to 1200 ms.
+  OH.autoPause = () => sleep(800 + Math.floor(Math.random() * 400));
 
   // Paginated HTML source: fetch ?page=N&pagesize=…, parse, dedupe by id, stop on
   // an empty page, when RSI's pager shows no page after this one or another page
@@ -1843,7 +1850,7 @@
           OH.log('warn', src.id, `page ${page}: ${reason}, retry ${attempt}/${of}`);
           onProgress?.(page, all.length, { attempt, of }, pages);
         },
-        { retryRateLimit: !auto },
+        { retryRateLimit: !auto, retry: !auto },
       );
       if (got.error) {
         if (page === 1)
@@ -2240,7 +2247,10 @@
     if (!saved.scannedAt) return { same: false };
     try {
       await OH.autoPause();
-      const got = await fetchPage(pageUrl(src, 1, src.pageSize), null, { retryRateLimit: false });
+      const got = await fetchPage(pageUrl(src, 1, src.pageSize), null, {
+        retryRateLimit: false,
+        retry: false,
+      });
       if (got.error) return { error: got.error, rsiDown: true, retryAfter: got.retryAfter ?? null };
       const res = got.res;
       if (res.status === 401 || res.status === 403) return { signedOut: true };
@@ -2542,7 +2552,7 @@
   // with no account on it, as getAccount reads it) | { state: 'unknown', retryAfter }.
   OH.whoIsSignedIn = async function whoIsSignedIn() {
     try {
-      const got = await fetchPage(ACCOUNT_URL, null, { retryRateLimit: false });
+      const got = await fetchPage(ACCOUNT_URL, null, { retryRateLimit: false, retry: false });
       if (got.error) return { state: 'unknown', retryAfter: got.retryAfter ?? null };
       if (!got.res.ok) return { state: 'unknown', retryAfter: header(got.res, 'retry-after') };
       const obj = extractAccount(await got.res.text());
@@ -2556,6 +2566,27 @@
       };
     } catch {
       return { state: 'unknown', retryAfter: null };
+    }
+  };
+
+  // A handle's UEE Citizen Record, for Auto Scan Daily's account check (ui/scan/runner.js):
+  // one read of the public dossier page, as getAccount reads it (RULES.dossier), without
+  // RSI's cookies and never retried. Paced (OH.autoPause), nothing stored. → the record's
+  // digits ("#123456" → "123456"), or null when RSI didn't show one.
+  OH.citizenRecordOf = async function citizenRecordOf(nickname) {
+    if (!nickname) return null;
+    try {
+      await OH.autoPause();
+      const res = await fetch(RSI_ORIGIN + RULES.dossier.path + encodeURIComponent(nickname), {
+        credentials: 'omit',
+        signal: AbortSignal.timeout(20000),
+      });
+      if (!res.ok) return null;
+      const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+      const text = doc.querySelector(RULES.dossier.record)?.textContent || '';
+      return text.match(/(\d{1,12})/)?.[1] || null;
+    } catch {
+      return null;
     }
   };
 

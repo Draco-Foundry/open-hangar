@@ -22,6 +22,7 @@ test('registry parses: every flag has a name, a one-line about and a default', a
     'accountLogs',
     'alerts',
     'autoScan',
+    'autoScanRun',
     'connector',
     'localMode',
     'meltValue',
@@ -67,6 +68,9 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     // The Daily Scan Reminder (Auto Scan Daily's flag, #666): the privacy policy names it
     // (test/privacy-permissions.test.js).
     autoScan: true,
+    // Auto Scan Daily (owner, 2026-11-01): in the beta; store builds wait for the release
+    // that puts its privacy policy and store words live.
+    autoScanRun: false,
     // The popup's scan bar: on in every build (owner, 2026-10-23).
     scanBar: true,
     // New Since Last Scan: off until its words and privacy line are approved.
@@ -80,8 +84,12 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     accountLogs: false,
   };
   assert.deepEqual(buildValues(registry), STORE);
-  // The beta is the same set but for meltValue, on there first.
-  assert.deepEqual(buildValues(registry, { beta: true }), { ...STORE, meltValue: true });
+  // The beta is the same set but for meltValue and autoScanRun, on there first.
+  assert.deepEqual(buildValues(registry, { beta: true }), {
+    ...STORE,
+    meltValue: true,
+    autoScanRun: true,
+  });
   assert.deepEqual(buildValues(registry, { overrides: { sync: false } }), {
     ...STORE,
     sync: false,
@@ -102,6 +110,7 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     true,
     'RSI Account Logs stay out until the privacy policy and store forms name them',
   );
+  assert.ok(!registry.autoScanRun.devOnly, 'Auto Scan Daily goes in the beta');
   assert.ok(!registry.autoScan.devOnly, 'the Daily Scan Reminder ships');
   assert.ok(!registry.localMode.devOnly, 'Local Mode ships');
   assert.ok(!registry.connector.devOnly, 'the connector ships');
@@ -136,6 +145,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     wishlistImport: false,
     alerts: false,
     autoScan: true,
+    autoScanRun: false,
     scanBar: true,
     newSinceScan: false,
     meltValue: false,
@@ -152,6 +162,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     wishlistImport: false,
     alerts: false,
     autoScan: true,
+    autoScanRun: false,
     scanBar: true,
     newSinceScan: false,
     meltValue: false,
@@ -306,6 +317,8 @@ test('pack: writes each build its values and cuts the code of flags that are off
     // The Daily Scan Reminder (Auto Scan Daily's flag, #666): the privacy policy names it
     // (test/privacy-permissions.test.js).
     autoScan: true,
+    // Auto Scan Daily: the beta only, until its words go live.
+    autoScanRun: false,
     // The popup's scan bar: on in every build (owner, 2026-10-23).
     scanBar: true,
     // New Since Last Scan: off until its words and privacy line are approved.
@@ -341,6 +354,11 @@ test('pack: writes each build its values and cuts the code of flags that are off
       const b = built(t);
       assert.deepEqual(b.flags, STORE, t);
       assert.equal(b.probe, 'keep();\n', `${t}: orgFleet code cut`);
+      assert.doesNotMatch(
+        read(t, 'src/background.js'),
+        /oh-auto-daily/,
+        `${t}: Auto Scan Daily cut`,
+      );
       assert.match(b.lib, /OH\.siteLinkStart\s*=/, `${t}: sync code kept`);
       assert.match(
         b.lib,
@@ -604,10 +622,14 @@ test('pack: writes each build its values and cuts the code of flags that are off
     assert.ok(problemsOf(dir).includes('chrome: the hangar page with localMode off'));
 
     // The beta: exactly the beta set, no overrides. It's the store's (the connector with
-    // Local Mode), so the production hangar page is let in and the toolbar opens the popup.
+    // Local Mode), so the production hangar page is let in and the toolbar opens the
+    // popup, with Melt Value and Auto Scan Daily (cut from the store's).
     pack(dir, ['--beta']);
-    assert.deepEqual(built('beta').flags, { ...STORE, meltValue: true });
-    assert.deepEqual(built('beta-firefox').flags, { ...STORE, meltValue: true });
+    const BETA = { ...STORE, meltValue: true, autoScanRun: true };
+    assert.deepEqual(built('beta').flags, BETA);
+    assert.deepEqual(built('beta-firefox').flags, BETA);
+    for (const t of ['beta', 'beta-firefox'])
+      assert.match(read(t, 'src/background.js'), /oh-auto-daily/, t);
     assert.deepEqual(built('beta').pages.hangar, ['https://hangar.openhangar.space']);
     for (const t of ['beta', 'beta-firefox'])
       assert.equal(built(t).manifest.action.default_popup, 'src/popup.html', t);

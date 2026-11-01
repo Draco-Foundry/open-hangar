@@ -326,6 +326,34 @@ export function reminderLine({ on, rec, denied = false }, now = Date.now(), loca
   return { key, when: lineWhen(rec.at, now, locale), ask: false };
 }
 
+// --- Auto Scan Daily in Settings (the `autoScanRun` flag) -------------------------------
+// The run's line (local autoDaily.line, ui/scan/auto.js lineOf) → its words' key.
+const AUTO_KEY = {
+  quick: 'popup.auto-quick',
+  full: 'popup.auto-full',
+  'signed-out': 'popup.auto-signed-out',
+  other: 'popup.auto-other',
+  paused: 'popup.auto-paused',
+  'rsi-down': 'popup.auto-rsi-down',
+  bad: 'popup.auto-bad',
+  'out-partway': 'popup.auto-out-partway',
+  partway: 'popup.auto-stopped',
+};
+// The lines that ask you to scan yourself: a part that wasn't kept.
+const AUTO_ASKS = ['bad', 'out-partway', 'partway'];
+// The line under the switch: none while it's off or before its first run, else the last
+// run's. → { key, when, ask } (ask: amber, it asks for a scan) or null.
+export function autoLine({ on, rec }, now = Date.now(), locale) {
+  const key = on === true && isObj(rec) ? AUTO_KEY[rec.line] : null;
+  if (!key || !Number.isFinite(rec.at)) return null;
+  return { key, when: lineWhen(rec.at, now, locale), ask: AUTO_ASKS.includes(rec.line) };
+}
+// The last run kept a part back, until a scan saves since.
+export function autoAsk({ on, rec, scannedAt }) {
+  if (on !== true || !isObj(rec) || !AUTO_ASKS.includes(rec.line)) return false;
+  return !(Number.isFinite(scannedAt) && Number.isFinite(rec.ended) && scannedAt > rec.ended);
+}
+
 // The scan report to show, once: one newer than the last the popup showed.
 export function newReport(report, seenAt) {
   if (!isObj(report) || report.v !== 1 || !Number.isFinite(report.at)) return null;

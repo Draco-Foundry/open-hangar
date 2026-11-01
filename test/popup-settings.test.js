@@ -212,8 +212,14 @@ test('who uses the cookies API: Log Out of RSI, Add to RSI Cart and the sign-in 
   assert.deepEqual(users.sort(), [
     'src/lib.js', // OH.logout: Log Out of RSI
     'src/rsi-cart.js', // Add to RSI Cart (#651)
+    // Auto Scan Daily's sign-in check (the autoScanRun flag: cut from every store build,
+    // test/auto-scan.test.js check 6): the worker tells the hidden scan page whether the
+    // sign-in cookie is there, through the page's stand-in on Chrome and Edge.
+    'src/scan-host.js',
+    'src/scan-shim.js',
     'ui/popup/Popup.svelte', // hands chrome.cookies to the sign-in check
     'ui/popup/rsi-cookie.js', // the sign-in check
+    'ui/scan/main.js', // hands chrome.cookies to the same check, for Auto Scan Daily
   ]);
   const popup = fs.readFileSync(path.join(ROOT, 'ui/popup/Popup.svelte'), 'utf8');
   assert.deepEqual(
@@ -228,10 +234,20 @@ test('who uses the cookies API: Log Out of RSI, Add to RSI Cart and the sign-in 
     'onChanged',
   ]);
   assert.doesNotMatch(check, /\.value\b/, 'never the value');
-  // The hidden scan page has no cookies API of its own (Auto Scan Daily's sign-in check
-  // went with it).
-  for (const f of ['ui/scan/main.js', 'src/scan-host.js', 'src/scan-shim.js'])
-    assert.doesNotMatch(fs.readFileSync(path.join(ROOT, f), 'utf8'), /cookies/, f);
+  // The hidden scan page's cookies API is Auto Scan Daily's alone: cut from a build without
+  // the autoScanRun flag (src/), handed on only with it (ui/scan/main.js).
+  const { cutFlags } = require('./bridge-env.js');
+  for (const f of ['src/scan-host.js', 'src/scan-shim.js'])
+    assert.doesNotMatch(
+      cutFlags(fs.readFileSync(path.join(ROOT, f), 'utf8'), { autoScan: true }),
+      /'cookies\.get'|chrome\.cookies\.get|c\.cookies =/,
+      f,
+    );
+  const page = fs.readFileSync(path.join(ROOT, 'ui/scan/main.js'), 'utf8');
+  assert.deepEqual(
+    [...page.matchAll(/^.*chrome\.cookies.*$/gm)].map((m) => m[0].trim()),
+    ["rsiCookie: flag('autoScanRun') ? () => rsiCookie(chrome.cookies) : undefined,"],
+  );
 });
 
 // --- Exports ---------------------------------------------------------------------------
