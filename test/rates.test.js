@@ -59,3 +59,47 @@ test('check rejects missing currencies and wild jumps', async () => {
   assert.match(check(r, previous).join(), /EUR jumped/);
   assert.deepEqual(check(null, null), ['nothing read']);
 });
+
+test('pickRates tries the ECB, then the stand-ins, and says why each was skipped', async () => {
+  const { pickRates, WANT } = await rates();
+  const usd = Object.fromEntries(WANT.map((c) => [c.toLowerCase(), 2]));
+  const asked = [];
+  const warned = [];
+  const file = await pickRates(
+    null,
+    async (url, as) => {
+      asked.push(as);
+      if (url.includes('ecb')) throw new Error('HTTP 503');
+      return { date: '2026-10-31', usd };
+    },
+    (line) => warned.push(line),
+  );
+  assert.deepEqual(file, {
+    base: 'USD',
+    date: '2026-10-31',
+    source: 'currency-api',
+    rates: { USD: 1, ...Object.fromEntries(WANT.map((c) => [c, 2])) },
+  });
+  assert.deepEqual(asked, ['text', 'json']);
+  assert.deepEqual(warned, ["ECB couldn't be read (HTTP 503)"]);
+  // Nothing passes: null, with every source named.
+  warned.length = 0;
+  assert.equal(
+    await pickRates(
+      null,
+      async () => ({}),
+      (line) => warned.push(line),
+    ),
+    null,
+  );
+  assert.equal(warned.length, 3);
+});
+
+test('the shared rates module needs nothing from Node, so it bundles into the Worker', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const file = path.join(__dirname, '..', 'site-worker', 'src', 'rates.mjs');
+  const src = fs.readFileSync(file, 'utf8');
+  assert.doesNotMatch(src, /^\s*import\b/m);
+  assert.doesNotMatch(src, /\brequire\(/);
+});

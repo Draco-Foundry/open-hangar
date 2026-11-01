@@ -10,13 +10,17 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 
 const WORKER_DIR = path.join(__dirname, '..', 'site-worker');
 const SITE_DIR = path.join(__dirname, '..', 'site');
 
 // The worker is an ES module in a package with no "type" field; loading its
-// source as a data: URL runs it as one without Node's module-type warning.
-const source = fs.readFileSync(path.join(WORKER_DIR, 'src', 'index.js'), 'utf8');
+// source as a data: URL runs it as one without Node's module-type warning. Its
+// one import (the rates module) is pointed at the file itself.
+const source = fs
+  .readFileSync(path.join(WORKER_DIR, 'src', 'index.js'), 'utf8')
+  .replace("'./rates.mjs'", `'${pathToFileURL(path.join(WORKER_DIR, 'src', 'rates.mjs')).href}'`);
 const load = import('data:text/javascript;base64,' + Buffer.from(source).toString('base64')).then(
   (m) => m.default,
 );
@@ -316,8 +320,12 @@ test('run_worker_first names the new pages and never shadows a static file', () 
   const files = fs
     .readdirSync(SITE_DIR, { withFileTypes: true })
     .filter((f) => f.isFile() && !f.name.startsWith('_'))
-    .map((f) => `/${f.name}`);
+    .map((f) => `/${f.name}`)
+    // Built by each Pages run (never committed): the Worker serves it on purpose,
+    // with this file as its fallback.
+    .filter((f) => f !== '/rates.json');
   assert.ok(files.includes('/help.html'));
+  assert.ok(patterns.includes('/rates.json'), '/rates.json is in run_worker_first');
   for (const pattern of patterns) {
     const re = patternToRegExp(pattern);
     for (const file of files) {
@@ -346,4 +354,184 @@ test('the sitemap lists only pages openhangar.space serves, the Store among them
     const live = LIVE_WEBSITE_PAGES.includes(url.pathname) && patterns.includes(url.pathname);
     assert.ok(live || Boolean(file?.isFile()), `${loc} is served here`);
   }
+});
+
+// /rates.json through the worker. `sources` is what each rates source answers
+// ('ecb', 'fawaz', 'erapi': a body, or 'down'); `staticFile` the static copy in
+// site/ (null for none); `kept` the edge's kept copy, if any.
+const ECB_XML = `<Cube><Cube time='2026-10-30'>
+<Cube currency='USD' rate='1.16'/><Cube currency='JPY' rate='178.2'/>
+<Cube currency='GBP' rate='0.88'/><Cube currency='CZK' rate='24.3'/>
+<Cube currency='PLN' rate='4.25'/><Cube currency='SEK' rate='11.0'/>
+<Cube currency='CHF' rate='0.93'/><Cube currency='AUD' rate='1.77'/>
+<Cube currency='BRL' rate='6.2'/><Cube currency='CAD' rate='1.62'/>
+<Cube currency='CNY' rate='8.25'/><Cube currency='KRW' rate='1660'/>
+<Cube currency='NZD' rate='2.02'/></Cube></Cube>`;
+// The static copy: a few days older, within the day limit of the reading above.
+const STATIC_RATES = {
+  base: 'USD',
+  date: '2026-10-26',
+  source: 'ECB',
+  rates: {
+    USD: 1,
+    EUR: 0.862,
+    GBP: 0.759,
+    CAD: 1.4,
+    AUD: 1.53,
+    NZD: 1.74,
+    CHF: 0.8,
+    SEK: 9.48,
+    PLN: 3.66,
+    CZK: 20.9,
+    BRL: 5.34,
+    CNY: 7.11,
+    JPY: 153.6,
+    KRW: 1431,
+  },
+};
+
+async function visitRates({ sources = {}, staticFile = STATIC_RATES, kept } = {}) {
+  const worker = await load;
+  const calls = { fetch: [], assets: [], put: [], waited: 0 };
+  globalThis.caches = {
+    default: {
+      match: async () => kept,
+      put: async (req, res) => {
+        calls.put.push({
+          url: req.url,
+          cache: res.headers.get('cache-control'),
+          body: await res.text(),
+        });
+      },
+    },
+  };
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const name = url.includes('ecb.europa.eu')
+      ? 'ecb'
+      : url.includes('jsdelivr')
+        ? 'fawaz'
+        : url.includes('er-api')
+          ? 'erapi'
+          : 'other';
+    calls.fetch.push(name);
+    const answer = sources[name] ?? 'down';
+    if (answer === 'down') throw new Error(`${name} unreachable`);
+    return new Response(typeof answer === 'string' ? answer : JSON.stringify(answer));
+  };
+  const env = {
+    ASSETS: {
+      fetch: async (req) => {
+        calls.assets.push(new URL(req.url).pathname);
+        return staticFile
+          ? new Response(JSON.stringify(staticFile) + '\n')
+          : new Response('not found', { status: 404 });
+      },
+    },
+  };
+  const waits = [];
+  const ctx = {
+    waitUntil: (p) => {
+      calls.waited++;
+      waits.push(p);
+    },
+  };
+  try {
+    const res = await worker.fetch(new Request('https://openhangar.space/rates.json'), env, ctx);
+    const body = await res.text();
+    await Promise.all(waits);
+    return { res, body, calls };
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+
+test('rates.json is built from the ECB, in the static file shape, and kept 6 hours', async () => {
+  const { res, body, calls } = await visitRates({ sources: { ecb: ECB_XML } });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('access-control-allow-origin'), '*');
+  assert.equal(res.headers.get('cache-control'), 'public, max-age=3600');
+  assert.equal(res.headers.get('content-type'), 'application/json; charset=utf-8');
+  assert.equal(res.headers.get('x-rates'), 'built');
+  const file = JSON.parse(body);
+  assert.deepEqual(Object.keys(file), ['base', 'date', 'source', 'rates']);
+  assert.equal(file.base, 'USD');
+  assert.equal(file.date, '2026-10-30');
+  assert.equal(file.source, 'ECB');
+  assert.equal(file.rates.EUR, Number((1 / 1.16).toPrecision(6)));
+  assert.deepEqual(calls.fetch, ['ecb']);
+  assert.deepEqual(calls.assets, ['/rates.json']);
+  assert.equal(calls.put.length, 1);
+  assert.equal(calls.put[0].url, 'https://openhangar.space/rates.json');
+  assert.equal(calls.put[0].cache, 'public, max-age=21600');
+  assert.equal(calls.put[0].body, body);
+  assert.equal(calls.waited, 1);
+});
+
+test('rates.json falls to the stand-in sources in order when the ECB fails', async () => {
+  const usd = Object.fromEntries(
+    Object.entries(STATIC_RATES.rates).map(([c, r]) => [c.toLowerCase(), r]),
+  );
+  const fawaz = await visitRates({ sources: { fawaz: { date: '2026-10-31', usd } } });
+  assert.equal(JSON.parse(fawaz.body).source, 'currency-api');
+  assert.deepEqual(fawaz.calls.fetch, ['ecb', 'fawaz']);
+  const erapi = await visitRates({
+    sources: {
+      ecb: '<html>maintenance</html>',
+      erapi: {
+        result: 'success',
+        time_last_update_utc: 'Sat, 31 Oct 2026 00:02:31 +0000',
+        rates: STATIC_RATES.rates,
+      },
+    },
+  });
+  assert.equal(JSON.parse(erapi.body).source, 'ExchangeRate-API');
+  assert.equal(JSON.parse(erapi.body).date, '2026-10-31');
+  assert.deepEqual(erapi.calls.fetch, ['ecb', 'fawaz', 'erapi']);
+});
+
+test('rates.json serves the static copy when no reading passes, and retries in an hour', async () => {
+  const staticBody = JSON.stringify(STATIC_RATES) + '\n';
+  // Every source down; then an ECB reading whose yen jumped past the day limit.
+  const jumped = ECB_XML.replace("rate='178.2'", "rate='400'");
+  for (const sources of [{}, { ecb: jumped }]) {
+    const { res, body, calls } = await visitRates({ sources });
+    assert.equal(res.status, 200);
+    assert.equal(body, staticBody);
+    assert.equal(res.headers.get('x-rates'), 'static');
+    assert.equal(res.headers.get('access-control-allow-origin'), '*');
+    assert.deepEqual(calls.fetch, ['ecb', 'fawaz', 'erapi']);
+    assert.equal(calls.put[0].cache, 'public, max-age=3600');
+  }
+  // A reading older than the static copy loses to it.
+  const older = await visitRates({
+    sources: { ecb: ECB_XML.replace('2026-10-30', '2026-10-20') },
+  });
+  assert.equal(older.body, staticBody);
+  assert.equal(older.res.headers.get('x-rates'), 'static');
+});
+
+test('rates.json answers from the edge copy without asking any source', async () => {
+  const kept = new Response('{"kept":true}', {
+    headers: { 'cache-control': 'public, max-age=21600', 'x-rates': 'built' },
+  });
+  const { res, body, calls } = await visitRates({ sources: { ecb: ECB_XML }, kept });
+  assert.equal(body, '{"kept":true}');
+  assert.equal(res.headers.get('cache-control'), 'public, max-age=3600');
+  assert.equal(res.headers.get('access-control-allow-origin'), '*');
+  assert.equal(res.headers.get('x-rates'), 'built');
+  assert.deepEqual(calls.fetch, []);
+  assert.deepEqual(calls.assets, []);
+  assert.deepEqual(calls.put, []);
+});
+
+test('rates.json with no static copy and no source is a JSON 503, never kept', async () => {
+  const { res, body, calls } = await visitRates({ staticFile: null });
+  assert.equal(res.status, 503);
+  assert.equal(res.headers.get('cache-control'), 'no-store');
+  assert.deepEqual(JSON.parse(body), { error: 'rates unavailable' });
+  assert.deepEqual(calls.put, []);
+  // With no static copy, a good reading still serves.
+  const built = await visitRates({ staticFile: null, sources: { ecb: ECB_XML } });
+  assert.equal(JSON.parse(built.body).source, 'ECB');
 });

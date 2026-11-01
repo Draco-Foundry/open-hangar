@@ -9,8 +9,13 @@
 // and so does any path with no file in ../site; any of those that isn't a route
 // named here gets a 404 page (site/404.html), never the website's own pages, so
 // they aren't duplicated here for search engines. Every file there, including the
-// extension's status.json kill switch, rates.json and the Troubleshooting page
-// (/help.html), is served straight from the static files as before.
+// extension's status.json kill switch and the Troubleshooting page (/help.html),
+// is served straight from the static files as before.
+//
+// The extension's exchange rates (/rates.json) are built here from the ECB, with
+// two stand-in sources, and kept at the edge for about 6 hours, so they stay
+// fresh without a Pages run. A reading that fails the checks, or is older than the
+// static copy in ../site (built by each Pages run), gives way to that copy.
 //
 // If the website Worker is down or errors, openhangar.space never goes blank:
 // the home page and /extension get the old static home page (site/index.html),
@@ -23,6 +28,8 @@
 // gateway checking the caller's Origin and rate there; anything it doesn't keep
 // goes on to the website as before. Without the EDGE binding, straight to the
 // website.
+
+import { USER_AGENT, pickRates } from './rates.mjs';
 
 // The website's pages (not its feeds or files) that may come through the gateway.
 const PAGES = new Set([
@@ -55,8 +62,9 @@ const PREFIXES = ['/api/store/', '/ships/', '/_astro/', '/fonts/', '/home/'];
 const FILES = new Set(['/favicon.svg']);
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.pathname === '/rates.json') return rates(request, env, ctx);
     const home = url.pathname === '/';
     // The extension's own page (owner, 2026-10-04), rendered by the website
     // (open-hangar-server pages/extension.astro). The news home's "Get the
@@ -157,4 +165,75 @@ async function notFound(request, env) {
       'x-robots-tag': 'noindex',
     },
   });
+}
+
+// How long the edge keeps a fresh reading, and the static copy when no source
+// passed (so a source outage costs one try an hour, not one per visitor).
+const RATES_KEEP = 6 * 3600;
+const RATES_RETRY = 3600;
+// What the extension and browsers are told, as the static file always said
+// (site/_headers): the extension reads it from its own pages, so it needs CORS.
+const RATES_HEADERS = {
+  'content-type': 'application/json; charset=utf-8',
+  'cache-control': 'public, max-age=3600',
+  'access-control-allow-origin': '*',
+  'x-content-type-options': 'nosniff',
+};
+
+// /rates.json: the edge's kept copy, else a new reading that passes check()
+// against the static copy, else the static copy itself. Same shape and address
+// as the static file, so the extension and the website read it unchanged.
+async function rates(request, env, ctx) {
+  const cache = globalThis.caches?.default;
+  const key = new Request(new URL('/rates.json', request.url));
+  const kept = cache ? await cache.match(key).catch(() => undefined) : undefined;
+  if (kept) return withHeaders(kept.body, kept.headers.get('x-rates'));
+
+  let fallback = null;
+  let previous = null;
+  try {
+    const res = await staticPage('/rates.json', request, env);
+    if (res.ok) fallback = await res.text();
+    previous = fallback ? JSON.parse(fallback) : null;
+  } catch {
+    previous = null;
+  }
+  let file = await pickRates(previous, getRates).catch(() => null);
+  if (file && previous?.date && file.date < previous.date) file = null;
+
+  const body = file ? JSON.stringify(file) + '\n' : fallback;
+  if (body == null) {
+    return new Response(JSON.stringify({ error: 'rates unavailable' }), {
+      status: 503,
+      headers: { ...RATES_HEADERS, 'cache-control': 'no-store', 'retry-after': '600' },
+    });
+  }
+  const from = file ? 'built' : 'static';
+  if (cache) {
+    const keep = new Response(body, {
+      headers: {
+        ...RATES_HEADERS,
+        'cache-control': `public, max-age=${file ? RATES_KEEP : RATES_RETRY}`,
+        'x-rates': from,
+      },
+    });
+    const put = cache.put(key, keep).catch(() => {});
+    if (ctx?.waitUntil) ctx.waitUntil(put);
+    else await put;
+  }
+  return withHeaders(body, from);
+}
+
+function withHeaders(body, from) {
+  return new Response(body, { headers: { ...RATES_HEADERS, 'x-rates': from || 'static' } });
+}
+
+// One rates source's body, 'text' or 'json'; throws on a failed answer.
+async function getRates(url, as) {
+  const res = await fetch(url, {
+    headers: { 'user-agent': USER_AGENT },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return as === 'json' ? res.json() : res.text();
 }
