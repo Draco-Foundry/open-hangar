@@ -159,6 +159,11 @@ const FULL = {
       scannedAt: 1,
       meta: { pages: 1, complete: true },
     },
+    subStore: {
+      items: [{ id: '1', name: 'Test Item', kind: 'subscriber', concierge: false }],
+      scannedAt: 1,
+      meta: { total: 1, complete: true },
+    },
   },
   history: [{ at: 1, items: [[1, 'Test Pledge', 100]] }],
   pledgeArchive: {

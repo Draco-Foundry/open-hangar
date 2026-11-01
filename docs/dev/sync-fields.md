@@ -182,6 +182,23 @@ policy's words are the owner's; this list never edits them.
 | `sources.orders.meta`                                | How far the last order read got.                                                        |
 | `sources.orders.meta.pages`                          | How many pages it read.                                                                 |
 | `sources.orders.meta.complete`                       | True when it reached the oldest order.                                                  |
+| `sources.subStore`                                   | Your Subscriber Store and Concierge items (behind the subStore flag, dev only).         |
+| `sources.subStore.items`                             | The items, at most 2000.                                                                |
+| `sources.subStore.items[]`                           | One store item RSI lists for this account. Strict: nothing about the account.           |
+| `sources.subStore.items[].id`                        | The item's SKU id.                                                                      |
+| `sources.subStore.items[].name`                      | The item's name.                                                                        |
+| `sources.subStore.items[].kind`                      | subscriber, or the store category it was read from.                                     |
+| `sources.subStore.items[].concierge`                 | True when RSI marks it for Concierge members.                                           |
+| `sources.subStore.items[].url`                       | Its page on RSI's site, or null.                                                        |
+| `sources.subStore.items[].img`                       | Its picture on RSI's site, or null.                                                     |
+| `sources.subStore.items[].price`                     | The price you pay, whole US cents.                                                      |
+| `sources.subStore.items[].was`                       | The price before a discount, or null.                                                   |
+| `sources.subStore.items[].pack`                      | True for a kit or set.                                                                  |
+| `sources.subStore.items[].inStock`                   | True when it's in stock.                                                                |
+| `sources.subStore.scannedAt`                         | When the members' store was read.                                                       |
+| `sources.subStore.meta`                              | How much of the list the last read got.                                                 |
+| `sources.subStore.meta.total`                        | How many items RSI said it lists.                                                       |
+| `sources.subStore.meta.complete`                     | True when every item came in.                                                           |
 | `history`                                            | Scan snapshots, oldest first (optional).                                                |
 | `history[]`                                          | One snapshot.                                                                           |
 | `history[].at`                                       | When it was taken.                                                                      |
