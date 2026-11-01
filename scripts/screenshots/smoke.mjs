@@ -5034,7 +5034,7 @@ try {
     nt: !!document.getElementById('pp-nt-sw'),
     shortcut: document.getElementById('pp-shortcut')?.textContent,
     look: document.getElementById('pp-look')?.value,
-    autoScan: /Daily Scan Reminder/.test(document.body.textContent),
+    autoScan: /Daily Scan Reminder|Auto Scan Daily/.test(document.body.textContent),
     // RSI Account Logs (on in store builds from 0.5.8): the switch, off until turned on.
     logsSw: document.getElementById('pp-logs-sw')?.getAttribute('aria-checked'),
     logsLoad: !!document.getElementById('pp-logs-load'),
@@ -5072,7 +5072,7 @@ try {
   !set.logsLoad &&
   set.logsInSite
     ? ok(
-        'Settings: every group, no Store Alerts switch, the shortcut, Account History off in the site box, no Daily Scan Reminder or Notifications row until connected',
+        'Settings: every group, no Store Alerts switch, the shortcut, Account History off in the site box, no Auto Scan Daily or Notifications row until connected',
       )
     : fail(`popup settings: ${JSON.stringify({ set, setMissing })}`);
   // The layout (owner, 2026-10-24): Notifications inside the openhangar.space box; Look,
@@ -5430,10 +5430,11 @@ try {
     ? ok("Open My Hangar goes to the website's My Hangar")
     : fail(`popup Open My Hangar: ${went}`);
 
-  // The Daily Scan Reminder: its switch in the openhangar.space group while connected,
-  // off until it's turned on, with no line under it until a reminder went out: then the
-  // last reminder or a day skipped; on asks for notifications as the
-  // click's first step, and a no turns it back off with its line, amber; a narrow window.
+  // Auto Scan Daily (on in store builds from 0.5.8, in the Daily Scan Reminder's place):
+  // its switch in the openhangar.space group while connected, off until it's turned on,
+  // with no line under it until a run; then the run's line (calm, amber when a part was
+  // kept back). On asks for notifications only when they aren't allowed yet, and a no
+  // leaves it on (it scans without its notice). No reminder switch. A narrow window.
   await page.setViewport({ width: 360, height: 600 });
   const autoLink = { token: 't', name: 'demo@pilot', connectedAt: 1, lastSync: T0 - 60e3 };
   const autoSeed = {
@@ -5441,90 +5442,91 @@ try {
     __tab: 'settings',
     __demoLocal: { siteUrl: 'https://app.openhangar.space', siteLink: autoLink },
   };
-  await popAt(autoSeed, '#pp-auto-sw');
+  await popAt(autoSeed, '#pp-daily-sw');
   const autoState = () =>
     page.evaluate(async () => ({
-      sw: document.getElementById('pp-auto-sw')?.getAttribute('aria-checked'),
-      inGroup: !!document.querySelector('#pp-site #pp-auto-sw'),
-      label: document.getElementById('pp-auto-l')?.textContent,
-      line: document.getElementById('pp-auto-line')?.textContent.replace(/\s+/g, ' ') ?? null,
-      described: document.getElementById('pp-auto-sw')?.getAttribute('aria-describedby'),
-      calm: !!document.getElementById('pp-auto-line')?.classList.contains('calm'),
-      kept: (await chrome.storage.local.get('scanReminderOn')).scanReminderOn,
+      sw: document.getElementById('pp-daily-sw')?.getAttribute('aria-checked'),
+      inGroup: !!document.querySelector('#pp-site #pp-daily-sw'),
+      label: document.getElementById('pp-daily-l')?.textContent,
+      reminder: !!document.getElementById('pp-auto-sw'),
+      line: document.getElementById('pp-daily-line')?.textContent.replace(/\s+/g, ' ') ?? null,
+      described: document.getElementById('pp-daily-sw')?.getAttribute('aria-describedby'),
+      calm: !!document.getElementById('pp-daily-line')?.classList.contains('calm'),
+      kept: (await chrome.storage.local.get('autoDailyOn')).autoDailyOn,
       asked: __demo.asked.join(),
       // The popup's own width (360 px, its narrowest): nothing sticks out sideways.
       wide:
         document.documentElement.scrollWidth > 360 ||
         (() => {
-          const el = document.getElementById('pp-auto-line');
+          const el = document.getElementById('pp-daily-line');
           return !!el && el.scrollWidth > el.clientWidth;
         })(),
     }));
   const autoOff = await autoState();
-  await page.click('#pp-auto-sw');
+  await page.click('#pp-daily-sw');
   await sleep(200);
   const autoOn = await autoState();
   autoOff.sw === 'false' &&
   autoOff.inGroup &&
-  autoOff.label === 'Daily Scan Reminder' &&
+  autoOff.label === 'Auto Scan Daily' &&
+  !autoOff.reminder &&
   autoOff.line === null &&
   autoOff.described === null &&
   autoOn.sw === 'true' &&
   autoOn.kept === true &&
-  // Notifications already allowed here: no question, so Firefox's popup stays open
-  // (owner, 2026-11-01). A browser that hasn't allowed them is asked (below).
+  // Notifications already allowed here: no question, so Firefox's popup stays open.
   autoOn.asked === '' &&
   autoOn.line === null
     ? ok(
-        'Daily Scan Reminder: off in the openhangar.space group with no hint line; on, with notifications allowed, asks nothing',
+        'Auto Scan Daily: off in the openhangar.space group, no reminder switch, no line; on, with notifications allowed, asks nothing',
       )
-    : fail(`popup scan reminder switch: ${JSON.stringify({ autoOff, autoOn })}`);
+    : fail(`popup auto scan switch: ${JSON.stringify({ autoOff, autoOn })}`);
   const autoNow = await pageNow();
   const autoWhen = await page.evaluate(
     (u) => ({
       time: new Date(u).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
-      day: new Date(u - 3 * 86400e3).toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-      }),
     }),
     autoNow,
   );
   const today = `today ${autoWhen.time}`.replace(/\s+/g, ' ');
-  await told({ scanReminder: { newValue: { at: autoNow, line: 'shown' } } });
-  const autoShown = await autoState();
-  await told({ scanReminder: { newValue: { at: autoNow, line: 'paused' } } });
-  const autoPaused = await autoState();
-  await told({ scanReminder: { newValue: { at: autoNow - 3 * 86400e3, line: 'shown' } } });
-  const autoOld = await autoState();
-  await page.click('#pp-auto-sw');
+  const ran = (line) => ({
+    autoDaily: { newValue: { v: 1, at: autoNow, ended: autoNow + 1, line } },
+  });
+  await told(ran('quick'));
+  const autoQuick = await autoState();
+  await told(ran('other'));
+  const autoOther = await autoState();
+  await told(ran('bad'));
+  const autoBad = await autoState();
+  await page.click('#pp-daily-sw');
   await sleep(200);
   const autoAgain = await autoState();
-  autoShown.line === `Last reminder: ${today}` &&
-  autoPaused.line === `Skipped ${today}: scans are paused` &&
-  autoOld.line === `Last reminder: ${autoWhen.day}, ${autoWhen.time}`.replace(/\s+/g, ' ') &&
-  !autoOld.wide &&
+  autoQuick.line === `Last: ${today}, no changes` &&
+  autoQuick.calm &&
+  autoOther.line ===
+    `Skipped ${today}: couldn't confirm it's the RSI account you scan here. Scan to check.` &&
+  autoOther.calm &&
+  !autoOther.wide &&
+  autoBad.line === `Last: ${today}, something looked wrong and wasn't saved. Scan to check.` &&
+  !autoBad.calm &&
+  !autoBad.wide &&
   autoAgain.sw === 'false' &&
   autoAgain.kept === false &&
   autoAgain.line === null
-    ? ok('Daily Scan Reminder: the last reminder, a day skipped, another day; off again, no line')
+    ? ok(
+        "Auto Scan Daily: a run's line, calm, amber when a part was kept back; off again, no line; 360 px holds it",
+      )
     : fail(
-        `popup scan reminder lines: ${JSON.stringify({ autoShown, autoPaused, autoOld, autoAgain })}`,
+        `popup auto scan lines: ${JSON.stringify({ autoQuick, autoOther, autoBad, autoAgain })}`,
       );
-  // The browser says no to notifications: back off, and the line says why, amber.
-  await popAt({ ...autoSeed, __demoNotify: false }, '#pp-auto-sw');
-  await page.click('#pp-auto-sw');
+  // The browser says no to notifications: it stays on, and scans without its notice.
+  await popAt({ ...autoSeed, __demoNotify: false }, '#pp-daily-sw');
+  await page.click('#pp-daily-sw');
   await sleep(300);
   const autoNo = await autoState();
-  autoNo.sw === 'false' &&
-  autoNo.kept === false &&
-  autoNo.line === 'The reminder needs notifications, and your browser said no.' &&
-  !autoNo.calm &&
-  !autoNo.wide
-    ? ok(
-        'Daily Scan Reminder: notifications refused, back off with its amber line; 360 px holds it',
-      )
-    : fail(`popup scan reminder refused: ${JSON.stringify(autoNo)}`);
+  autoNo.sw === 'true' && autoNo.kept === true && autoNo.line === null && !autoNo.wide
+    ? ok('Auto Scan Daily: notifications refused, it stays on with no line')
+    : fail(`popup auto scan refused: ${JSON.stringify(autoNo)}`);
 
   // A German browser with no currency picked: still US dollars, and no rates asked (the
   // policy: only if you pick a currency other than USD).
