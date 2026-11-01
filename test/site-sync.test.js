@@ -378,8 +378,10 @@ test('Disconnect turns off the Daily Scan Reminder, as a sync refused as not con
 });
 
 test('a background seeing the link go clears the reminder and turns store alerts off', async () => {
-  const { loadBackground } = require('./bridge-env.js');
+  const { STORE_FLAGS, loadBackground } = require('./bridge-env.js');
   const x = loadBackground({
+    // A build with the reminder (Auto Scan Daily replaces it in the store build).
+    flags: { ...STORE_FLAGS, autoScanRun: false },
     changes: true,
     offscreen: true,
     local: { siteLink: { token: 't' }, scanReminderOn: true, alertsOn: true },

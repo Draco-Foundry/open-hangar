@@ -985,6 +985,11 @@ export function createRunner(env) {
       if (left.length) await noteFull(Object.fromEntries(left.map((p) => [p, null])));
     }
 
+    // Account History (the accountLogs flag), when it's on and nothing stopped the run:
+    // only the newest lines of each log, never the full history (a scan the pilot starts
+    // reads that). Paced, as every request here; its problems only go to the log.
+    if (flag('accountLogs') && !run.stop && OH.readAccountLogs)
+      await OH.readAccountLogs({ account, pause: OH.autoPause, dailyOnly: true }).catch(() => {});
     // Buy-backs filled from your own hangar history (no RSI read), as Scan does. Never
     // the pack reads.
     const after = await OH.loadDB();

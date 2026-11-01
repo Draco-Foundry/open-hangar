@@ -265,8 +265,8 @@ test('record: a day skipped after a run that asks keeps the ask, until a scan sa
 
 // --- The worker (src/background.js) ------------------------------------------------------
 const LINK = { siteLink: { token: 't', name: 'pilot', connectedAt: 1, lastSync: null } };
-// A developer build's worker (the autoScanRun flag), connected, with Auto Scan Daily's
-// switch where `local` puts it.
+// The store build's worker (Auto Scan Daily, the autoScanRun flag, is in it), connected, with
+// Auto Scan Daily's switch where `local` puts it.
 const DEV = { ...STORE_FLAGS, autoScanRun: true };
 function worker(o = {}) {
   const x = loadBackground({
@@ -696,8 +696,12 @@ test('it replaces the reminder: the reminder goes off, and stays off', async () 
   // Set again by any route: off again.
   await x.chrome.storage.local.set({ scanReminderOn: true });
   await until(() => !('scanReminderOn' in x.stores.local));
-  // A store build keeps the reminder as it is.
-  const s = worker({ flags: STORE_FLAGS, notify: true, local: { scanReminderOn: true } });
+  // A build without it (the reminder alone) keeps the reminder as it is.
+  const s = worker({
+    flags: { ...STORE_FLAGS, autoScanRun: false },
+    notify: true,
+    local: { scanReminderOn: true },
+  });
   await until(() => s.alarms.get('oh-scan-reminder'));
   assert.equal(s.stores.local.scanReminderOn, true);
 });

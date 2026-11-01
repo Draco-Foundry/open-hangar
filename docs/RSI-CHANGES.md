@@ -37,9 +37,10 @@ most users see it within a few hours.
 - `sources.scanHidden`: `"enabled": false` runs scans on the small Open Hangar page in a
   tab again instead of the hidden scan page (0.4.0, `src/scan-host.js`), if the hidden
   page itself breaks. It only ever turns the hidden page off.
-- `sources.autoScan`: `"enabled": false` pauses the Daily Scan Reminder alone (it
-  replaced Auto Scan Daily, #666): pressed scans go on, and each skipped day shows "scans
-  are paused" under its switch, with no notification. Pausing `hangar` pauses it too.
+- `sources.autoScan`: `"enabled": false` pauses Auto Scan Daily alone (the Daily
+  Scan Reminder in a build without it): pressed scans go on, and each skipped day shows
+  "scans are paused" under its switch, with no notification. Pausing `hangar` pauses it
+  too.
 - `banner`: a notice at the top of the basic page (the dashboard in a build without
   the connector). `level` is `warn` or `info`;
   `until` (a date) hides it automatically after that day; `maxVersion` shows it only

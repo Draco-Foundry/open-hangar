@@ -52,7 +52,7 @@ wishlist import and store alerts, and from 0.4.0 Auto Scan Daily):
 | `wishlistImport` | This browser's wishlist into the account (the basic page)        | on    | on   | no       |
 | `alerts`         | Store alerts matched on the device (needs connector)             | on    | on   | no       |
 | `autoScan`       | The Daily Scan Reminder (needs alerts)                           | on    | on   | no       |
-| `autoScanRun`    | Auto Scan Daily, in place of the reminder (needs autoScan)       | off   | on   | no       |
+| `autoScanRun`    | Auto Scan Daily, in place of the reminder (needs autoScan)       | on    | on   | no       |
 | `scanBar`        | The popup's scan as one counting bar where Scan sits             | on    | on   | no       |
 | `newSinceScan`   | The popup's New Since Last Scan list                             | off   | off  | no       |
 | `meltValue`      | The popup and Home show Melt Value, its parts at melt            | off   | on   | no       |
@@ -194,10 +194,18 @@ themselves. The kill switch (site/status.json) pauses the checks with
 
 ## Auto Scan
 
-`autoScan` is the Daily Scan Reminder (it replaced Auto Scan Daily, #666, and keeps its
-flag's name until the privacy policy's words for it land): while connected, a
-notification at most once a day when the last scan in this browser is over a day old;
-clicking it starts a scan. It never reads RSI on its own. It needs the alerts' alarms
+`autoScanRun` is Auto Scan Daily (#666, back in 0.5.8): while connected, once a day at
+a random time, the hidden scan page checks the RSI account signed in, then scans it
+(ui/scan/runner.js autoScan). In a build with it, it replaces the Daily Scan Reminder,
+`autoScan`, whose alarm and notification it uses, so `--flag autoScanRun=on` needs
+`autoScan` on. Its code is the `@flag-start autoScanRun` blocks in `src/background.js`,
+`src/scan-host.js` and `src/scan-shim.js`, and `flag('autoScanRun')` in the popup and
+the scan page.
+
+`autoScan` is the Daily Scan Reminder (0.5.5 to 0.5.7, it replaced Auto Scan Daily for a
+while): while connected, a notification at most once a day when the last scan in this
+browser is over a day old; clicking it starts a scan. It never reads RSI on its own. It
+needs the alerts' alarms
 and notifications permissions (`scripts/alerts.mjs`), so `--flag autoScan=on` with
 `--flag alerts=off` doesn't build (and a build without the alerts passes
 `--flag autoScan=off` too). Its code is the `@flag-start autoScan` block in

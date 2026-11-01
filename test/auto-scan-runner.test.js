@@ -945,3 +945,24 @@ test('a page RSI changed: the last good hangar and buy-backs stay, nothing is sy
     delete OpenHangar.pageChanged;
   }
 });
+
+test('Account History on: a full read reads only the newest log lines; a quick check none', async () => {
+  const r = await scannedAndSynced();
+  const asks = [];
+  const keep = OH.readAccountLogs;
+  OH.readAccountLogs = async (o) => (asks.push(o), { ok: true, parts: {} });
+  OH.flags = { ...OH.flags, accountLogs: true };
+  try {
+    // Nothing new: the quick check stops there, no log read.
+    await r.autoScan();
+    assert.equal(asks.length, 0);
+    // A full read: one daily-only read, paced like every request of the run.
+    delete mem.autoDailyFull;
+    await r.autoScan();
+    assert.equal(asks.length, 1);
+    assert.equal(asks[0].dailyOnly, true);
+    assert.equal(asks[0].pause, OH.autoPause);
+  } finally {
+    OH.readAccountLogs = keep;
+  }
+});
