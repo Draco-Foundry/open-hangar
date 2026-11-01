@@ -3617,6 +3617,14 @@
     return out;
   };
 
+  // Melt value split the same way (the meltValue flag, owner 2026-11-01): OH.accountValue
+  // with no store prices, so ships and CCUs count at melt like everything else and
+  // ships + ccus + other is the melt total (OH.totalValue). Pass it to OH.snapshotValue with
+  // no priceOf and a pledge since melted counts at the melt it had. Pure.
+  OH.meltValue = function meltValue(items, credit) {
+    return OH.accountValue(items, () => null, credit);
+  };
+
   // Value of a history snapshot ({ items: [[id, name, melt]], credit? }) on the
   // same rules. Pledges still owned count exactly as in `acct.byId`; ones since
   // melted or gifted: a ship pledge is priced from its name ("Standalone Ship -

@@ -256,6 +256,28 @@ test('Most Valuable: fully priced ship pledges by store price, gain only when me
   assert.deepEqual(mostValuable([{ id: 7 }], hv), []);
 });
 
+test('Most Valuable at melt (meltValue): ship pledges with a melt value, biggest melt first', async () => {
+  const { mostValuable } = await mvLib();
+  const items = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }];
+  const hv = {
+    pledges: {
+      1: { store: 600, paid: 450, unpriced: 0 },
+      2: { store: 275, paid: 500, unpriced: 0 },
+      3: { store: null, paid: 120, unpriced: 1 }, // no store price: still has a melt
+      4: { ccu: true, store: 800, paid: 900, unpriced: 0 }, // CCUs aren't ships
+      5: { store: 90, paid: 0, unpriced: 0 }, // no melt value: left out
+    },
+  };
+  assert.deepEqual(
+    mostValuable(items, hv, 4, true).map((r) => [r.id, r.paid, r.gain]),
+    [
+      ['2', 500, null],
+      ['1', 450, null],
+      ['3', 120, null],
+    ],
+  );
+});
+
 test('Most Valuable: short insurance chip', async () => {
   const { insChip } = await mvLib();
   assert.equal(insChip('LTI'), 'LTI');
