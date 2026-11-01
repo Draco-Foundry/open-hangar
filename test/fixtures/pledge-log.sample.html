@@ -1,0 +1,66 @@
+<!--
+  One page of RSI's pledge log (POST /api/account/pledgeLog, the reply's data.rendered),
+  invented line by line in the shape RSI writes it: no real ids, orders, handles or
+  emails. The handles (ExamplePilot, OldExampleName, OtherPilot42) are here, and the test
+  puts an invented email where {recipient} is (no fixture may hold one, parser-corpus
+  test), so test/account-logs.test.js can check none of them comes out of the parser.
+-->
+<div class="pledge-log-entry">
+  <p>
+    Oct 30, 2026, 10:12 pm - <span class="important">Standalone Ship - Example Hauler</span>
+    #90000001 - Created by ExamplePilot - order #EXAMPLE0001, value: $1,234.50 USD
+  </p>
+</div>
+<div class="pledge-log-entry">
+  <p>
+    Oct 29, 2026, 9:00 am -
+    <span class="important">Standalone Ships - Example Scout&nbsp; </span> #90000002 - Created
+    by OldExampleName - Buy-Back order #EXAMPLE0002
+  </p>
+</div>
+<div class="pledge-log-entry">
+  <p>
+    Oct 29, 2026, 9:00 am - <span class="important">Standalone Ships - Example Scout</span>
+    #90000000 - Buy-back by OldExampleName - order #EXAMPLE0002
+  </p>
+</div>
+<div class="pledge-log-entry">
+  <p>
+    Oct 28, 2026, 8:15 pm -
+    <span class="important">Package - Example Starter &#39;Deluxe&#39; </span> #90000003 -
+    Reclaimed by ExamplePilot for $45.00 USD
+  </p>
+</div>
+<div class="pledge-log-entry">
+  <p>
+    Oct 27, 2026, 12:30 pm - <span class="important">Standalone Ship - Example Gift</span>
+    #90000004 - Claimed as a gift by OtherPilot42, value: $60.00 USD
+  </p>
+</div>
+<div class="pledge-log-entry">
+  <p>
+    Oct 27, 2026, 12:00 pm - <span class="important">Standalone Ship - Example Gift</span>
+    #90000004 - Gifted to {recipient}, value: $60.00 USD
+  </p>
+</div>
+<div class="pledge-log-entry">
+  <p>
+    Oct 26, 2026, 12:05 am - <span class="important">Standalone Ship - Example Present</span>
+    #90000005 - Claimed as a gift by ExamplePilot, value: $30.00 USD
+  </p>
+</div>
+<div class="pledge-log-entry">
+  <p>
+    Oct 25, 2026, 6:00 pm - <span class="important">Example Flair</span> #90000006 - Example
+    Event Reward for pilots
+  </p>
+</div>
+<div class="pledge-log-entry">
+  <p>
+    Oct 24, 2026, 3:04 pm - <span class="important">Add-Ons - Example Paint</span> #90000007
+    - Created by ExamplePilot - order #EXAMPLE0007, value: $0.00 USD
+  </p>
+</div>
+<div class="pledge-log-entry">
+  <p>A line RSI wrote some other way, with no pledge in it.</p>
+</div>

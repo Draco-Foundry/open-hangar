@@ -697,6 +697,147 @@
     return out;
   };
 
+  // --- Account logs (the accountLogs flag) -------------------------------------
+  // RSI's pledge log and store credit log (Account): src/lib.js asks for a page and hands
+  // its server HTML (the reply's data.rendered) here. Each line starts with its time, in
+  // UTC on RSI's side. Only the rules' named groups ever leave a line: the order number,
+  // an amount, a pledge's id and name. Who did it (a handle, maybe an old one) and whom a
+  // gift went to (an email) are never read out of the words, so nothing can store or
+  // sync them (test/account-logs.test.js checks).
+  const squash = (s) =>
+    String(s || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  const toDoc = (payload) =>
+    typeof payload === 'string' ? new DOMParser().parseFromString(payload, 'text/html') : payload;
+  // The words before and after `el` inside `parent` (el, or the child of parent holding it).
+  const around = (parent, el) => {
+    let mark = el;
+    while (mark && mark.parentNode && mark.parentNode !== parent) mark = mark.parentNode;
+    let before = '';
+    let after = '';
+    let seen = false;
+    for (const n of parent.childNodes) {
+      if (n === mark) seen = true;
+      else if (seen) after += n.textContent || '';
+      else before += n.textContent || '';
+    }
+    return [squash(before), squash(after)];
+  };
+  // "Oct 30, 2026, 10:12 pm" (UTC) → "2026-10-30T22:12:00Z", or null.
+  ns.parseLogTime = function parseLogTime(text) {
+    const m = RULES.accountLogs.when.exec(squash(text));
+    if (!m) return null;
+    const g = m.groups;
+    const month = RULES.dates.months.indexOf(g.month.slice(0, 3).toLowerCase()) + 1;
+    const day = Number(g.day);
+    const minute = Number(g.minute);
+    const second = g.second ? Number(g.second) : 0;
+    let hour = Number(g.hour);
+    if (g.ampm) {
+      if (hour < 1 || hour > 12) return null;
+      hour = (hour % 12) + (g.ampm[0].toLowerCase() === 'p' ? 12 : 0);
+    }
+    if (!month || day < 1 || hour > 23 || minute > 59 || second > 59) return null;
+    const d = new Date(Date.UTC(Number(g.year), month - 1, day, hour, minute, second));
+    if (d.getUTCDate() !== day) return null; // Feb 30 and the like
+    return d.toISOString().slice(0, 19) + 'Z';
+  };
+  // The amount a line ends with ("$1,234.50 USD") in whole cents, or null.
+  const endAmount = (said) => {
+    const m = RULES.accountLogs.amount.exec(said);
+    return m ? cents(m.groups.value) : null;
+  };
+  // Which event the words after the pledge id name: the first rule that matches, in this
+  // order (a buy-back's "Created by" before a purchase's; 'granted' is a line with no
+  // "by"), else 'other'.
+  const VALUED = ['bought', 'melted', 'giftSent', 'giftClaimed'];
+  const logKind = (said) => {
+    const tries = [
+      ['buyBackCreated', RULES.accountLogs.events.buyBackCreated],
+      ['bought', RULES.accountLogs.events.bought],
+      ['boughtBack', RULES.accountLogs.events.boughtBack],
+      ['melted', RULES.accountLogs.events.melted],
+      ['giftSent', RULES.accountLogs.events.giftSent],
+      ['giftClaimed', RULES.accountLogs.events.giftClaimed],
+      ['granted', RULES.accountLogs.events.granted],
+    ];
+    for (const [kind, rule] of tries) {
+      const m = rule.exec(said);
+      if (m) return { kind, order: m.groups?.order || null };
+    }
+    return { kind: 'other', order: null };
+  };
+
+  // One page of the pledge log → { events, unread }: each event
+  // { at, pledge, name, kind, order, value } (value in whole cents, for a purchase, a
+  // melt or a gift; null otherwise), unread the lines this couldn't read. A gift claimed
+  // stays 'giftClaimed' here: whether it was yours or one you received is decided over
+  // the whole log (src/lib.js).
+  ns.parsePledgeLog = function parsePledgeLog(payload) {
+    const doc = toDoc(payload);
+    const events = [];
+    let unread = 0;
+    if (!doc?.querySelectorAll) return { events, unread };
+    for (const entry of doc.querySelectorAll(RULES.accountLogs.entry)) {
+      const line = entry.querySelector(RULES.accountLogs.line) || entry;
+      const span = line.querySelector(RULES.accountLogs.name);
+      const [before, after] = span ? around(line, span) : ['', ''];
+      const at = ns.parseLogTime(before);
+      const lead = RULES.accountLogs.lead.exec(after);
+      const name = span ? squash(span.textContent).slice(0, 200) : '';
+      if (!at || !lead || !name) {
+        unread++;
+        continue;
+      }
+      const said = after.slice(lead[0].length);
+      const { kind, order } = logKind(said);
+      events.push({
+        at,
+        pledge: lead.groups.id,
+        name,
+        kind,
+        order,
+        value: VALUED.includes(kind) ? endAmount(said) : null,
+      });
+    }
+    return { events, unread };
+  };
+
+  // One page of the store credit log → { lines, unread }: each line
+  // { at, dir ('in' | 'out'), amount (whole cents), kind ('melt' | 'order' | 'other'),
+  // pledge, name (a melt's), order (an order's) }.
+  ns.parseCreditLog = function parseCreditLog(payload) {
+    const doc = toDoc(payload);
+    const lines = [];
+    let unread = 0;
+    if (!doc?.querySelectorAll) return { lines, unread };
+    for (const entry of doc.querySelectorAll(RULES.accountLogs.entry)) {
+      const line = entry.querySelector(RULES.accountLogs.line) || entry;
+      const inEl = line.querySelector(RULES.accountLogs.creditIn);
+      const el = inEl || line.querySelector(RULES.accountLogs.creditOut);
+      const [before, after] = el ? around(line, el) : ['', ''];
+      const at = ns.parseLogTime(before);
+      const amount = el ? cents(el.textContent) : null;
+      if (!at || amount == null) {
+        unread++;
+        continue;
+      }
+      const melt = RULES.accountLogs.credit.reclaim.exec(after);
+      const order = melt ? null : RULES.accountLogs.credit.order.exec(after);
+      lines.push({
+        at,
+        dir: inEl ? 'in' : 'out',
+        amount,
+        kind: melt ? 'melt' : order ? 'order' : 'other',
+        pledge: melt ? melt.groups.id : null,
+        name: melt ? squash(melt.groups.name).slice(0, 200) || null : null,
+        order: order ? order.groups.order : null,
+      });
+    }
+    return { lines, unread };
+  };
+
   // --- Has RSI changed the page? ----------------------------------------------
   // One hangar or buy-back page (HTML or a Document) that has cards → what of the
   // rules' shape it no longer has, as a list of short reasons, [] when it fits. A scan

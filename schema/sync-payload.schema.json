@@ -171,6 +171,138 @@
             "scannedAt": { "$ref": "#/$defs/scanTime" },
             "meta": { "$ref": "#/$defs/subStoreMeta" }
           }
+        },
+        "pledgeLog": {
+          "description": "RSI's pledge log (Account): every pledge event, read behind the accountLogs build flag, the full history once the pilot asks and the day's new lines after, only ever a whole read. Strict all the way down: each line's time, pledge, name, event, order and value, never who did it (a handle) or whom a gift went to (an email), and nothing about payment.",
+          "type": "object",
+          "required": ["items"],
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "type": "array",
+              "maxItems": 10000,
+              "items": {
+                "$ref": "#/$defs/pledgeLogEvent"
+              }
+            },
+            "scannedAt": {
+              "$ref": "#/$defs/scanTime"
+            },
+            "meta": {
+              "$ref": "#/$defs/accountLogMeta"
+            }
+          }
+        },
+        "creditLog": {
+          "description": "RSI's store credit log (Account): every store credit line, read with the pledge log. Strict all the way down: each line's time, direction, amount, and the melt (pledge and name) or order it came from or went to, nothing about payment or anyone else.",
+          "type": "object",
+          "required": ["items"],
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "type": "array",
+              "maxItems": 10000,
+              "items": {
+                "$ref": "#/$defs/creditLogLine"
+              }
+            },
+            "scannedAt": {
+              "$ref": "#/$defs/scanTime"
+            },
+            "meta": {
+              "$ref": "#/$defs/accountLogMeta"
+            }
+          }
+        }
+      }
+    },
+    "accountLogMeta": {
+      "description": "How much of a log the reads have covered: its pages at the last read, and how many lines the parser could not read (left out).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pages": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unread": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "pledgeLogEvent": {
+      "description": "One pledge log line: when (UTC, to the second), the pledge's id, its name as the log writes it (the original pledge's name, maybe with a category in front), what happened, the order number (a purchase or a buy-back) and the value in whole US cents (paid on a purchase, credit on a melt, a gift's value; null otherwise). kind: bought, buyBackCreated (the new pledge a buy-back made), boughtBack (the old pledge it retired, same order), melted, giftSent, giftClaimed (your gift, claimed), giftReceived (a gift to you), granted (from CIG, no buyer), other (a line the parser doesn't know).",
+      "type": "object",
+      "required": ["at", "pledge", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "pledge": {
+          "type": "string",
+          "pattern": "^\\d{1,12}$"
+        },
+        "name": {
+          "type": ["string", "null"],
+          "maxLength": 200
+        },
+        "kind": {
+          "enum": [
+            "bought",
+            "buyBackCreated",
+            "boughtBack",
+            "melted",
+            "giftSent",
+            "giftClaimed",
+            "giftReceived",
+            "granted",
+            "other"
+          ]
+        },
+        "order": {
+          "type": ["string", "null"],
+          "pattern": "^[A-Za-z0-9_-]{1,40}$"
+        },
+        "value": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        }
+      }
+    },
+    "creditLogLine": {
+      "description": "One store credit log line: when (UTC, to the second), in or out, the amount in whole US cents, and where it came from or went: a melt (melt: its pledge id and name), an order (order: its number) or something else (other).",
+      "type": "object",
+      "required": ["at", "dir", "amount", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "dir": {
+          "enum": ["in", "out"]
+        },
+        "amount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "kind": {
+          "enum": ["melt", "order", "other"]
+        },
+        "pledge": {
+          "type": ["string", "null"],
+          "pattern": "^\\d{1,12}$"
+        },
+        "name": {
+          "type": ["string", "null"],
+          "maxLength": 200
+        },
+        "order": {
+          "type": ["string", "null"],
+          "pattern": "^[A-Za-z0-9_-]{1,40}$"
         }
       }
     },
