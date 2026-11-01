@@ -5038,6 +5038,8 @@ try {
     // RSI Account Logs (on in store builds from 0.5.8): the switch, off until turned on.
     logsSw: document.getElementById('pp-logs-sw')?.getAttribute('aria-checked'),
     logsLoad: !!document.getElementById('pp-logs-load'),
+    // In the openhangar.space box with the other switches (owner, 2026-11-01).
+    logsInSite: !!document.querySelector('#pp-site #pp-logs-sw'),
   }));
   const setWords = [
     'openhangar.space',
@@ -5067,9 +5069,10 @@ try {
   set.look === 'auto' &&
   !set.autoScan &&
   set.logsSw === 'false' &&
-  !set.logsLoad
+  !set.logsLoad &&
+  set.logsInSite
     ? ok(
-        'Settings: every group, no Store Alerts switch, the shortcut, Account History off, no Daily Scan Reminder or Notifications row until connected',
+        'Settings: every group, no Store Alerts switch, the shortcut, Account History off in the site box, no Daily Scan Reminder or Notifications row until connected',
       )
     : fail(`popup settings: ${JSON.stringify({ set, setMissing })}`);
   // The layout (owner, 2026-10-24): Notifications inside the openhangar.space box; Look,
