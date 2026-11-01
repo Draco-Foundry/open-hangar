@@ -94,6 +94,7 @@
             'name',
             'value',
             'currency',
+            'uec',
             'item',
             'itemKind',
             'itemName',
@@ -135,6 +136,11 @@
             name: { description: 'The name input.', $ref: '#/$defs/selector' },
             value: { description: 'The value input ("$35.00 USD").', $ref: '#/$defs/selector' },
             currency: { description: 'The currency input.', $ref: '#/$defs/selector' },
+            uec: {
+              description:
+                'A value or currency in in-game money ("¤ 5,000 UEC", "5,000 aUEC"): the pledge\'s currency is \'UEC\', never dollars.',
+              $ref: '#/$defs/pattern',
+            },
             item: { description: "A contained item's tile.", $ref: '#/$defs/selector' },
             itemKind: {
               description: 'A tile\'s kind ("Ship", "Insurance"…).',
@@ -1234,7 +1240,7 @@
     },
     rules: {
       format: 1,
-      revision: '2026-10-22',
+      revision: '2026-11-01',
       paging: {
         page: 'page',
         size: 'pagesize',
@@ -1257,6 +1263,7 @@
         name: '.js-pledge-name',
         value: '.js-pledge-value',
         currency: '.js-pledge-currency',
+        uec: { source: '(^|[^A-Za-z])a?uec([^A-Za-z]|$)', flags: 'i' },
         item: '.item',
         itemKind: '.kind',
         itemName: '.title, .name, .item-name',

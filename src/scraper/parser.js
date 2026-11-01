@@ -336,6 +336,10 @@
         const m = (rawValue || '').match(/\b([A-Z]{3})\b/);
         currency = m ? m[1] : null;
       }
+      // In-game money ("¤ 5,000 UEC", "5,000 aUEC") is 'UEC', never dollars: OH.usdValue
+      // (src/lib.js) leaves it out of every money total.
+      if (RULES.hangar.uec.test(rawCurrency || '') || RULES.hangar.uec.test(rawValue || ''))
+        currency = 'UEC';
       const contents = readContents(card);
       // Giftability is whatever RSI decided: a transferable pledge renders a
       // "Gift" action (`a.js-gift`), a bound one doesn't. We read the rendered

@@ -120,10 +120,10 @@ test('wish rows: generic kinds, Buy only when in the store, Warbond only when ch
   });
   assert.equal(on.buyable, true);
   assert.equal(on.warbond, 100);
-  assert.equal(on.statusLabel, 'In Store Now');
+  assert.equal(on.statusLabel, 'In Store');
   const off = wishRow({ kind: 'ship', name: 'Pioneer', price: 850, status: 'out', url });
   assert.equal(off.buyable, false, 'never a Buy button when not for sale');
-  assert.equal(off.statusLabel, 'Not on Sale');
+  assert.equal(off.statusLabel, 'Not for Sale');
   assert.equal(wishRow({ name: 'X', status: 'soldout', url }).buyable, false);
   assert.equal(wishRow({ name: 'X', status: 'pack', url }).buyable, false);
   assert.equal(wishRow({ name: 'X', price: 50, warbond: 60, status: 'in', url }).warbond, null);
@@ -256,6 +256,28 @@ test('Most Valuable: fully priced ship pledges by store price, gain only when me
   assert.deepEqual(mostValuable([{ id: 7 }], hv), []);
 });
 
+test('Most Valuable at melt (meltValue): ship pledges with a melt value, biggest melt first', async () => {
+  const { mostValuable } = await mvLib();
+  const items = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }];
+  const hv = {
+    pledges: {
+      1: { store: 600, paid: 450, unpriced: 0 },
+      2: { store: 275, paid: 500, unpriced: 0 },
+      3: { store: null, paid: 120, unpriced: 1 }, // no store price: still has a melt
+      4: { ccu: true, store: 800, paid: 900, unpriced: 0 }, // CCUs aren't ships
+      5: { store: 90, paid: 0, unpriced: 0 }, // no melt value: left out
+    },
+  };
+  assert.deepEqual(
+    mostValuable(items, hv, 4, true).map((r) => [r.id, r.paid, r.gain]),
+    [
+      ['2', 500, null],
+      ['1', 450, null],
+      ['3', 120, null],
+    ],
+  );
+});
+
 test('Most Valuable: short insurance chip', async () => {
   const { insChip } = await mvLib();
   assert.equal(insChip('LTI'), 'LTI');
@@ -264,4 +286,26 @@ test('Most Valuable: short insurance chip', async () => {
   assert.equal(insChip('6M'), '6 Mo');
   assert.equal(insChip('Unknown'), '');
   assert.equal(insChip(''), '');
+});
+
+test('In Store words: the store-now status reads "in the store" everywhere it shows', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const read = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
+  const old = [/In Store Now/, /Not on Sale/, /\bon sale from your Wishlist/, /More on sale:/];
+  for (const f of [
+    'src/alerts.js',
+    'src/dashboard.js',
+    'ui/popup/copy.js',
+    'ui/lib/wish-watch.js',
+    'ui/home/WishWatch.svelte',
+    'ui/home/ForYou.svelte',
+    'ui/store/Wishlist.svelte',
+    'ui/store/FindInStore.svelte',
+  ]) {
+    for (const re of old) assert.doesNotMatch(read(f), re, `${f} still has ${re}`);
+  }
+  assert.match(read('ui/popup/copy.js'), /'popup\.wish-tab-on-sale': '\{n\} in store'/);
+  assert.match(read('src/alerts.js'), /'Open Hangar: \{n\} from your Wishlist in the store'/);
+  assert.match(read('src/alerts.js'), /'More in the store: \{n\}'/);
 });

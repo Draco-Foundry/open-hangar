@@ -28,7 +28,20 @@ const pledges = OpenHangar.parsePledges(fixture);
 const byId = (id) => pledges.find((p) => p.id === id);
 
 test('parses every pledge card', () => {
-  assert.equal(pledges.length, 3);
+  assert.equal(pledges.length, 5);
+});
+
+test('a pledge priced in UEC or aUEC has currency UEC, never dollars', () => {
+  assert.equal(byId('444').value, 5000); // "¤ 5,000 UEC", no currency field
+  assert.equal(byId('444').currency, 'UEC');
+  assert.equal(byId('555').value, 5000); // "5,000 aUEC", currency field "aUEC"
+  assert.equal(byId('555').currency, 'UEC');
+  // Any case, from the value alone.
+  const card = (value) =>
+    `<div class="row"><input class="js-pledge-id" value="9" /><input class="js-pledge-name" value="X" /><input class="js-pledge-value" value="${value}" /></div>`;
+  assert.equal(OpenHangar.parsePledges(card('5,000 auec'))[0].currency, 'UEC');
+  assert.equal(OpenHangar.parsePledges(card('5000 Uec'))[0].currency, 'UEC');
+  assert.equal(OpenHangar.parsePledges(card('$35.00 USD'))[0].currency, 'USD');
 });
 
 test('classifies a standalone ship (value + currency + containsShip)', () => {

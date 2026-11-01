@@ -2,7 +2,7 @@
   // Wishlist: one row per ship or store item (packs, paints, gear, add-ons, CCUs
   // from Find in Store). A ship's buy-backs (standalone copies, and CCUs that
   // upgrade to it) open underneath with dates, pledge IDs and Reclaim links.
-  // "In Store Now" is what openhangar.space's store catalog says (one download,
+  // "In Store" is what openhangar.space's store catalog says (one download,
   // matched here). Removing a row and its Undo bar go through the classic
   // [data-wish-remove] / [data-wish-undo] handlers.
   import { tick } from 'svelte';
@@ -231,7 +231,7 @@
           <tr>
             <th>Item</th>
             <th class="num">Store Price</th>
-            <th>In Store Now</th>
+            <th>In Store</th>
             <th>Status</th>
             <th>Buy-backs</th>
             <th></th>

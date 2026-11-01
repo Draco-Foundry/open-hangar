@@ -28,9 +28,10 @@
           val: `${n} · ${a.money(lib.totalValue(items.filter((p) => p.kind === k.key)))}`,
         };
       }),
+      // Ranked in dollars (OH.usdValue): a UEC price isn't on the same scale.
       top: items
-        .filter((p) => Number.isFinite(p.value))
-        .sort((x, y) => y.value - x.value)
+        .filter((p) => lib.usdValue(p) != null)
+        .sort((x, y) => lib.usdValue(y) - lib.usdValue(x))
         .slice(0, 10)
         .map((p) => ({ id: p.id, name: a.plainName(p), value: a.formatValue(p) })),
     };

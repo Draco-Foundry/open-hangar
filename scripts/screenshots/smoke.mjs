@@ -483,9 +483,9 @@ try {
     r.checked = /Checked just now/.test(card().textContent) && asked >= 1;
     r.inStore =
       !!cut &&
-      /In Store Now/.test(cut.textContent) &&
+      /In Store/.test(cut.textContent) &&
       !!cut.querySelector('a.buy[href^="https://robertsspaceindustries.com/"]');
-    r.notOnSale = !!pio && /Not on Sale/.test(pio.textContent) && !pio.querySelector('.buy');
+    r.notOnSale = !!pio && /Not for Sale/.test(pio.textContent) && !pio.querySelector('.buy');
     const saved = (await chrome.storage.local.get('wishWatch')).wishWatch;
     r.saved = !!saved && Number.isFinite(saved.at) && saved.items['Cutlass Black']?.status === 'in';
     // Two days later the same check still shows, with its age.
@@ -498,7 +498,7 @@ try {
   });
   Object.values(ww).every(Boolean)
     ? ok(
-        'Wishlist Watch: empty state, Not Checked Yet with Check Now, no background check, Buy only when In Store Now, last check kept in storage',
+        'Wishlist Watch: empty state, Not Checked Yet with Check Now, no background check, Buy only when In Store, last check kept in storage',
       )
     : fail(`wishlist watch: ${JSON.stringify(ww)}`);
 
@@ -613,7 +613,7 @@ try {
       ?.querySelector('.bm-x');
     x?.click();
     await new Promise((r) => setTimeout(r, 150));
-    const hidden = !/Cutlass Black is on sale/.test(bell.textContent);
+    const hidden = !/Cutlass Black is in the store/.test(bell.textContent);
     state.wishlist = [];
     document.dispatchEvent(new CustomEvent('oh:home'));
     await chrome.storage.local.set({ homeIgnored: [] });
@@ -966,7 +966,7 @@ try {
   home.guide && home.cards === 0
     ? ok('how-to guide on its own page (gear menu → How to Use), off Home')
     : fail(`home layout: ${JSON.stringify(home)}`);
-  /Cutlass Black is on sale/.test(home.wish) &&
+  /Cutlass Black is in the store/.test(home.wish) &&
   !/Pioneer/.test(home.wish) &&
   home.count === '1' &&
   home.full
@@ -4803,6 +4803,52 @@ try {
         `New Since Last Scan: off by default; on, ${arr.total}, ${arr.name} with its marks and chip`,
       )
     : fail(`popup new since last scan: ${JSON.stringify({ offArrived, ...arr })}`);
+  // A new pledge priced in UEC (invented): its row says UEC as the UEC tile counts it,
+  // never "$", and neither the new total nor Account Value counts it (OH.usdValue).
+  const uecHook = await page.evaluateOnNewDocument(() => {
+    let flags;
+    const OH = (window.OH = window.OH || {});
+    Object.defineProperty(OH, 'flags', {
+      configurable: true,
+      get: () => flags,
+      set: (f) => (flags = Object.freeze({ ...f, newSinceScan: true })),
+    });
+  });
+  await popAt(
+    {
+      ...signedIn,
+      __demoPledge: {
+        id: 99001,
+        name: 'Hangar Decoration - Invented Plush',
+        value: 5000,
+        currency: 'UEC',
+        kind: 'other',
+        contents: [],
+        giftable: false,
+        meltable: false,
+      },
+    },
+    '#pp-arrived',
+  );
+  await page.removeScriptToEvaluateOnNewDocument(uecHook.identifier);
+  const uecRow = await page.evaluate(() => {
+    const s = document.querySelector('#pp-arrived');
+    const r = s.querySelector('.pp-arr');
+    return {
+      total: s.querySelector('#pp-arrived-total')?.textContent,
+      name: r?.querySelector('.pp-arrname')?.textContent,
+      melt: r?.querySelector('.pp-arrmelt')?.textContent,
+      title: r?.querySelector('.pp-arrmelt')?.title,
+      value: document.getElementById('pp-value')?.textContent,
+    };
+  });
+  uecRow.total === '1 new · $0 melt value' &&
+  uecRow.name === 'Hangar Decoration - Invented Plush' &&
+  uecRow.melt === '5 K UEC' &&
+  uecRow.title === '5,000 UEC' &&
+  uecRow.value === pop.value
+    ? ok(`New Since Last Scan: a UEC pledge shows ${uecRow.melt}, counted in no dollar total`)
+    : fail(`popup UEC pledge: ${JSON.stringify({ ...uecRow, was: pop.value })}`);
   // Numbers that fit their box (budgets: ui/popup/currency.js): the widest full figure and
   // huge ones, at 360 px. Nothing clips or scrolls, and the full figure is the tooltip.
   const fitCase = async (credits, tokens, extra = {}) => {
@@ -6272,11 +6318,11 @@ try {
   !ppWish.tall &&
   !ppWish.remove &&
   ppWish.n === '1' &&
-  ppWish.nName.trim() === '1 on sale' &&
-  ppWish.tabName === 'Wishlist 1 on sale' &&
+  ppWish.nName.trim() === '1 in store' &&
+  ppWish.tabName === 'Wishlist 1 in store' &&
   ppWish.asked.join() === `GET ${ppSite}/api/v1/wishlist?with=items Bearer t` &&
   wishFull === `${ppSite}/hangar/wishlist`
-    ? ok('Wishlist, read only: on sale first, the tab counts it (1, read as "1 on sale")')
+    ? ok('Wishlist, read only: on sale first, the tab counts it (1, read as "1 in store")')
     : fail(`popup wishlist: ${JSON.stringify({ ppWish, wishFull })}`);
   // No sale feed kept yet: the ship list names the ships (never an empty list over "And
   // N more"), and nothing is said about sales.

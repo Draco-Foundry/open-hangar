@@ -53,7 +53,8 @@
   //     1: 2026-10-18, the first.
   //     2: 2026-10-24, a hangar item's maker, when its tile shows one (#568).
   //     3: 2026-10-25, a hangar item RSI lists under Also Contains is marked `also`.
-  const PARSER_VERSION = 3;
+  //     4: 2026-11-01, a pledge priced in UEC or aUEC has currency 'UEC'.
+  const PARSER_VERSION = 4;
   const PARSER_KEY = 'scanParser';
 
   const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -129,14 +130,21 @@
     return { db, problems };
   }
 
-  // Keep only well-formed snapshots ({ at, items: [[id, name, value]] }, and `credit`
-  // and `uec` when known). Older versions' `checkedAt` (when an unchanged scan last confirmed a
+  // Keep only well-formed snapshots ({ at, items: [[id, name, value, currency?]] }, and
+  // `credit` and `uec` when known). An item's 4th field is its currency when it isn't
+  // dollars ('UEC'; src/lib.js snapshotOf), so totals leave it out; older snapshots
+  // don't have one. Older versions' `checkedAt` (when an unchanged scan last confirmed a
   // snapshot) goes: no page reads it.
   function cleanSnapshot(x) {
     if (!x || !Number.isFinite(x.at) || !Array.isArray(x.items)) return null;
     const items = x.items
       .filter((r) => Array.isArray(r) && r.length >= 3)
-      .map((r) => [String(r[0]), String(r[1]), Number(r[2]) || 0]);
+      .map((r) => {
+        const row = [String(r[0]), String(r[1]), Number(r[2]) || 0];
+        if (typeof r[3] === 'string' && /^[A-Za-z]{3,4}$/.test(r[3]) && r[3] !== 'USD')
+          row.push(r[3]);
+        return row;
+      });
     const out = { at: x.at, items };
     if (Number.isFinite(x.credit)) out.credit = x.credit;
     if (Number.isFinite(x.uec)) out.uec = x.uec;

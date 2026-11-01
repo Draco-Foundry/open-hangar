@@ -75,6 +75,8 @@
   const nextToken = $derived(OH.nextBuybackToken ? OH.nextBuybackToken(Date.now()) : null);
   const STEP = { hangar: 'popup.step-hangar', buybacks: 'popup.step-buybacks', referrals: 'popup.step-referrals' };
   const BAR = flag('scanBar');
+  // Melt Value in Account Value's place (meltValue): `value` is OH.meltValue then.
+  const MELT = flag('meltValue');
   // A problem in the last scan (a part not read, or read only in part), unless a scan
   // since went fine. With the scan bar, a page RSI changed is the bar's line instead.
   const trouble = $derived(
@@ -99,7 +101,9 @@
   // Three rows, and always the link to the website's New view while connected (owner,
   // 2026-10-26: see more on openhangar.space); every row when there's no website.
   const NEW = flag('newSinceScan');
-  const arrived = $derived(NEW ? newSinceScan(db?.history, v.items, v.scannedAt) : null);
+  const arrived = $derived(
+    NEW ? newSinceScan(db?.history, v.items, v.scannedAt, OH.usdValue) : null,
+  );
   const newAll = $derived(arrived ? newViewUrl(v.myHangar) : null);
   const newRows = $derived(
     arrived ? (newAll ? arrived.items.slice(0, NEW_SHOWN) : arrived.items) : [],
@@ -108,6 +112,15 @@
   const melt = (n) =>
     moneyFit(n, fx, Number.isInteger(Math.round(n * 100) / 100) ? { most: 0 } : { cents: true });
   const newTotal = $derived(arrived ? melt(arrived.total) : null);
+  // A row's price: dollars as above, or a UEC price as the UEC tile counts it (countFit),
+  // never with a "$" (src/lib.js OH.isUEC).
+  const rowMelt = (p) => {
+    if (!OH.isUEC(p)) return melt(p.value);
+    const c = countFit(p.value);
+    return c
+      ? { text: `${c.text} UEC`, title: c.text !== c.full ? `${c.full} UEC` : null }
+      : { text: '' };
+  };
   let noPic = $state({}); // pledge id → its picture didn't load
 
 </script>
@@ -150,7 +163,7 @@
 
     <div class="pp-value" aria-live="polite">
       <div class="pp-vtop">
-        <span class="pp-lbl">{value ? 'Account Value' : t('popup.melt-label')}</span>
+        <span class="pp-lbl">{value && !MELT ? 'Account Value' : t('popup.melt-label')}</span>
         {#if sinceAs && value}
           <span
             class="pp-since"
@@ -234,7 +247,7 @@
         {:else}
           {#if arrived.since}<small class="pp-arrwhen">{t('popup.new-since-when', { date: day(arrived.since) })}</small>{/if}
           {#each newRows as p (p.id)}
-            {@const m = melt(p.value)}
+            {@const m = rowMelt(p)}
             {@const ins = insChip(p.insurance)}
             {@const pic = rsiPicture(p.image)}
             <div class="pp-arr">

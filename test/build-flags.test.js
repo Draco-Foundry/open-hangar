@@ -24,6 +24,7 @@ test('registry parses: every flag has a name, a one-line about and a default', a
     'autoScan',
     'connector',
     'localMode',
+    'meltValue',
     'newSinceScan',
     'orderHistory',
     'orgFleet',
@@ -70,6 +71,8 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     scanBar: true,
     // New Since Last Scan: off until its words and privacy line are approved.
     newSinceScan: false,
+    // Melt Value in Account Value's place: Beta builds first (owner, 2026-11-01).
+    meltValue: false,
     // Order History: developer builds only until the privacy policy names it.
     orderHistory: false,
     // Your Subscriber Store: developer builds only until the privacy policy names it.
@@ -77,8 +80,8 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     accountLogs: false,
   };
   assert.deepEqual(buildValues(registry), STORE);
-  // The beta is the same set: no flag has a beta value of its own today.
-  assert.deepEqual(buildValues(registry, { beta: true }), STORE);
+  // The beta is the same set but for meltValue, on there first.
+  assert.deepEqual(buildValues(registry, { beta: true }), { ...STORE, meltValue: true });
   assert.deepEqual(buildValues(registry, { overrides: { sync: false } }), {
     ...STORE,
     sync: false,
@@ -135,6 +138,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     autoScan: true,
     scanBar: true,
     newSinceScan: false,
+    meltValue: false,
     orderHistory: false,
     subStore: false,
     accountLogs: false,
@@ -150,6 +154,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     autoScan: true,
     scanBar: true,
     newSinceScan: false,
+    meltValue: false,
     orderHistory: false,
     subStore: false,
     accountLogs: false,
@@ -305,6 +310,8 @@ test('pack: writes each build its values and cuts the code of flags that are off
     scanBar: true,
     // New Since Last Scan: off until its words and privacy line are approved.
     newSinceScan: false,
+    // Melt Value in Account Value's place: Beta builds first (owner, 2026-11-01).
+    meltValue: false,
     // Order History: developer builds only until the privacy policy names it.
     orderHistory: false,
     // Your Subscriber Store: developer builds only until the privacy policy names it.
@@ -599,8 +606,8 @@ test('pack: writes each build its values and cuts the code of flags that are off
     // The beta: exactly the beta set, no overrides. It's the store's (the connector with
     // Local Mode), so the production hangar page is let in and the toolbar opens the popup.
     pack(dir, ['--beta']);
-    assert.deepEqual(built('beta').flags, STORE);
-    assert.deepEqual(built('beta-firefox').flags, STORE);
+    assert.deepEqual(built('beta').flags, { ...STORE, meltValue: true });
+    assert.deepEqual(built('beta-firefox').flags, { ...STORE, meltValue: true });
     assert.deepEqual(built('beta').pages.hangar, ['https://hangar.openhangar.space']);
     for (const t of ['beta', 'beta-firefox'])
       assert.equal(built(t).manifest.action.default_popup, 'src/popup.html', t);

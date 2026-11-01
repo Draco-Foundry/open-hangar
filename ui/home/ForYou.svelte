@@ -78,7 +78,7 @@
       out.push({
         key: `sale:${x.name}`,
         kind: 'onsale',
-        title: `${x.name} is on sale`,
+        title: `${x.name} is in the store`,
         sub: x.price ? `${a.dollars(x.price)} in the store` : 'In the store now',
         href: '#store',
       });

@@ -846,8 +846,10 @@ test('New Since Last Scan: by pledge id against the scan before, only for this s
     { id: 1, name: 'Old', value: 45 },
   ];
   const history = [snap(NOW - 2 * DAY, ['1']), snap(NOW, ['3', '4', '1'])];
+  // The page passes OH.usdValue (UEC left out: test/value.test.js); these are all dollars.
+  const usd = (p) => (Number.isFinite(p.value) ? p.value : null);
   // Two new, in the hangar's order, their melt added up, compared with the scan before.
-  assert.deepEqual(newSinceScan(history, items, NOW), {
+  assert.deepEqual(newSinceScan(history, items, NOW, usd), {
     items: [items[0], items[1]],
     total: 450.5,
     since: NOW - 2 * DAY,
@@ -859,7 +861,7 @@ test('New Since Last Scan: by pledge id against the scan before, only for this s
   assert.deepEqual(newSinceScan(lost, [items[2]], NOW).items, []);
   // A pledge with no melt value counts $0 in the total.
   const free = [snap(NOW - DAY, []), snap(NOW, ['9'])];
-  assert.equal(newSinceScan(free, [{ id: '9', name: 'Reward', value: null }], NOW).total, 0);
+  assert.equal(newSinceScan(free, [{ id: '9', name: 'Reward', value: null }], NOW, usd).total, 0);
   // The first scan, or no scan: no section at all.
   assert.equal(newSinceScan([snap(NOW, ['1'])], items, NOW), null);
   assert.equal(newSinceScan([], items, NOW), null);

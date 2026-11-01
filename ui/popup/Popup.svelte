@@ -42,6 +42,7 @@
   const OH = globalThis.OH;
   const AL = globalThis.OHAlerts;
   const ALERTS = flag('alerts') && !!AL;
+  const MELT = flag('meltValue');
   const version = chrome.runtime.getManifest().version || '';
 
   let ready = $state(false);
@@ -188,8 +189,11 @@
     avatar = portrait(got.avatarImg, v.nickname);
     setReport(got.scanReport || null);
     if (v.items.length) {
-      const { priceOf } = await OH.getShipIndex();
-      const acct = OH.accountValue(v.items, priceOf, storeCredit(got.account));
+      // With meltValue on, the total and its change are at melt (no store prices at all).
+      const priceOf = MELT ? null : (await OH.getShipIndex()).priceOf;
+      const acct = MELT
+        ? OH.meltValue(v.items, storeCredit(got.account))
+        : OH.accountValue(v.items, priceOf, storeCredit(got.account));
       value = acct;
       const valueOf = (s) => OH.snapshotValue(s, acct, priceOf);
       since = valueSince(stored.history, acct.total, valueOf, v.scannedAt, got.account?.credits?.uec?.value);

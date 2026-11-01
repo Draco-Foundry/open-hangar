@@ -1,7 +1,7 @@
 <!doctype html>
 <!--
   Scrubbed sample of RSI's /account/pledges markup — enough cards to exercise the
-  parser's classification paths (ship / CCU / add-on) and the pledge date column
+  parser's classification paths (ship / CCU / add-on / priced in UEC) and the pledge date column
   (with and without the "Created:" label; the add-on has none). No personal data. If RSI
   changes their markup, update this fixture from a fresh (scrubbed) capture so the
   tests reflect reality. See CONTRIBUTING.md.
@@ -53,6 +53,29 @@
         <div class="item">
           <span class="kind">Poster</span>
           <span class="title">Digital Poster</span>
+        </div>
+      </div>
+
+      <!-- Priced in in-game UEC (invented): the value names UEC, no currency field -->
+      <div class="row">
+        <input class="js-pledge-id" value="444" />
+        <input class="js-pledge-name" value="Hangar Decoration - Invented Plush" />
+        <input class="js-pledge-value" value="¤ 5,000 UEC" />
+        <div class="item">
+          <span class="kind">Hangar decoration</span>
+          <span class="title">Invented Plush</span>
+        </div>
+      </div>
+
+      <!-- Priced in aUEC (invented): both the value and the currency field say so -->
+      <div class="row">
+        <input class="js-pledge-id" value="555" />
+        <input class="js-pledge-name" value="Hangar Decoration - Invented Poster" />
+        <input class="js-pledge-value" value="5,000 aUEC" />
+        <input class="js-pledge-currency" value="aUEC" />
+        <div class="item">
+          <span class="kind">Hangar decoration</span>
+          <span class="title">Invented Poster</span>
         </div>
       </div>
     </div>
