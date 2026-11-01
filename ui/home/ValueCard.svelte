@@ -8,6 +8,12 @@
   import { SvelteMap } from 'svelte/reactivity';
   import { exactCount, plural, shortCount } from '../lib/format.js';
   import { insChip, mostValuable } from '../lib/most-valuable.js';
+  import { flag } from '../lib/flags.js';
+
+  // Melt Value in Account Value's place (meltValue, owner 2026-11-01): the total, its parts
+  // and Most Valuable all at melt (OH.meltValue), so the parts add up to the figure, and no
+  // vs-melt pill (it would always be zero).
+  const MELT = flag('meltValue');
 
   // Rows in the Most Valuable list: enough that the card ends level with Latest
   // Acquisitions (five rows) at 1440 and 1100 wide.
@@ -18,7 +24,7 @@
     const s = a.state;
     const items = s.items;
     const v = a.hangarValue();
-    const acct = a.accountValue();
+    const acct = MELT ? OH().meltValue(items, s.storeCredit) : a.accountValue();
     const melt = OH().totalValue(items);
     return {
       scannedAt: s.scannedAt || null,
@@ -34,7 +40,7 @@
       melt,
       // Most Valuable: the top ship pledges at today's store price (the numbers
       // behind "Ships $X"; owner picked this to fill the card, 2026-10-06).
-      top: mostValuable(items, v, TOP_N).map((r) => ({
+      top: mostValuable(items, v, TOP_N, MELT).map((r) => ({
         ...r,
         name: a.cardName(r.p),
         full: a.plainName(r.p),
@@ -42,7 +48,7 @@
         img: a.realImage(r.p.image),
         resolve: a.resolveImageName(r.p),
       })),
-      vsPaid: v && v.paidPriced ? v.storePriced - v.paidPriced : null,
+      vsPaid: !MELT && v && v.paidPriced ? v.storePriced - v.paidPriced : null,
       // Ships · CCUs · Paints · Other, in the usual category order (owner, 2026-10-09):
       // Ships counts every ship (a pack with two counts two), not pledges; Other's
       // hover names what it holds. No LTI, pledge or buy-back counts here.
@@ -136,7 +142,7 @@
 
 <section class="oh-p value">
   <div class="top">
-    <div class="oh-lbl">{d.store != null ? 'Account Value' : 'Melt Value'}</div>
+    <div class="oh-lbl">{d.store != null && !MELT ? 'Account Value' : 'Melt Value'}</div>
     {#if upd}
       <div class="upd" class:stale={upd.stale} title="Last scan: {upd.full}">
         {upd.text}{#if upd.stale}
@@ -161,7 +167,7 @@
     </div>
   </div>
   {#if d.store != null && d.parts.length > 1}
-    <div class="parts" title="Ships at today's store price, CCUs at standard price, everything else at melt value. Store Credit, buy-backs, UEC and REC aren't counted.">
+    <div class="parts" title={MELT ? null : "Ships at today's store price, CCUs at standard price, everything else at melt value. Store Credit, buy-backs, UEC and REC aren't counted."}>
       {#each d.parts as [label, n], i (label)}{#if i}<span class="sep">·</span>{/if}<span>{label} <b>{a.bigMoney(n)}</b></span>{/each}
     </div>
   {/if}
@@ -180,8 +186,12 @@
             {#if r.ins}<span class="ins" title="Insurance">{r.ins}</span>{/if}
           </span>
           <span class="meta">
-            <b title={"Today's store price: " + a.dollars(r.store)}>{a.bigMoney(r.store)}</b>
-            {#if r.gain != null && Math.abs(r.gain) >= 1}
+            {#if MELT}
+              <b title={'Melt value: ' + a.dollars(r.paid)}>{a.bigMoney(r.paid)}</b>
+            {:else}
+              <b title={"Today's store price: " + a.dollars(r.store)}>{a.bigMoney(r.store)}</b>
+            {/if}
+            {#if !MELT && r.gain != null && Math.abs(r.gain) >= 1}
               <span class="gain" class:down={r.gain < 0} title="Melt value: {a.dollars(r.paid)}"
                 >{#if r.gain >= 0}{signed(r.gain)} over what you paid{:else}{signed(r.gain)}{/if}</span
               >

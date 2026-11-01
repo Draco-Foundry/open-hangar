@@ -75,6 +75,8 @@
   const nextToken = $derived(OH.nextBuybackToken ? OH.nextBuybackToken(Date.now()) : null);
   const STEP = { hangar: 'popup.step-hangar', buybacks: 'popup.step-buybacks', referrals: 'popup.step-referrals' };
   const BAR = flag('scanBar');
+  // Melt Value in Account Value's place (meltValue): `value` is OH.meltValue then.
+  const MELT = flag('meltValue');
   // A problem in the last scan (a part not read, or read only in part), unless a scan
   // since went fine. With the scan bar, a page RSI changed is the bar's line instead.
   const trouble = $derived(
@@ -161,7 +163,7 @@
 
     <div class="pp-value" aria-live="polite">
       <div class="pp-vtop">
-        <span class="pp-lbl">{value ? 'Account Value' : t('popup.melt-label')}</span>
+        <span class="pp-lbl">{value && !MELT ? 'Account Value' : t('popup.melt-label')}</span>
         {#if sinceAs && value}
           <span
             class="pp-since"
