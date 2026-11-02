@@ -31,7 +31,7 @@ If you use more than one RSI account in this browser, each account's data is kep
 
 All of this is stored only in your browser's local extension storage (chrome.storage.local). It is only sent to us if you connect sync (below), and never to anyone else. You can remove it at any time with Clear Data on the popup's Settings tab, or by uninstalling the extension (which deletes all stored data). If a save is ever damaged, the extension keeps a recovery copy for at most 30 days.
 
-The toolbar popup shows what's already stored in this browser: your RSI portrait and handle, your Account Value, Store Credit, UEC, REC and Buy-Back Tokens, how your Account Value and UEC changed since an earlier scan, Fleet News, store alerts and whether sync is connected. Fleet News is up to three short notes about your own ships and your Wishlist, worked out on your device. The popup never asks RSI anything itself. Its Scan button starts a scan in the hidden page, and closing the popup doesn't stop it. While you're connected, the popup also shows your Wishlist (see Your Wishlist).
+The toolbar popup shows what's already stored in this browser: your RSI portrait and handle, your Melt Value, Store Credit, UEC, REC and Buy-Back Tokens, how your Melt Value and UEC changed since an earlier scan, Fleet News, store alerts and whether sync is connected. Fleet News is up to three short notes about your own ships and your Wishlist, worked out on your device. The popup never asks RSI anything itself. Its Scan button starts a scan in the hidden page, and closing the popup doesn't stop it. While you're connected, the popup also shows your Wishlist (see Your Wishlist).
 
 AUTO SCAN DAILY
 

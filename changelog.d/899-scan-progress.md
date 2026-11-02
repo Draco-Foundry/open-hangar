@@ -1,1 +1,1 @@
-- Improved: **Scan Progress Shows Time, Not Steps.** The popup's scan bar fills by how long each part takes, so it no longer sits near full while the buy-back details are still loading. Under it, dots for each part and about how long is left, and the toolbar icon shows the percent while a scan runs.
+- Improved: **Scan Progress Shows Time Left.** The scan bar now fills by how long each part takes, so it no longer sits near full while buy-backs load, with a dot for each part, about how long is left, and the percent on the toolbar icon.

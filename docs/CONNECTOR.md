@@ -134,6 +134,7 @@ step 3 above).
 | robertsspaceindustries.com `/pledge-store/api/upgrade/graphql`, the cart              | Add to RSI Cart from our pages                                            |
 | robertsspaceindustries.com `POST /graphql` (`AddCartMultiItemMutation`)               | The Store's Haul: store items into the RSI cart, on a click               |
 | openhangar.space `status.json`                                                        | The kill switch                                                           |
+| openhangar.space `api/ships` (once a day)                                             | The popup's Wishlist search (ship names)                                  |
 | app.openhangar.space `/connect`, `/api/link/token`, `/link`                           | Connect                                                                   |
 | app.openhangar.space `POST` and `DELETE /api/v1/sync`                                 | Sync, Disconnect                                                          |
 | github.com new issue (only when you press Report a Scan Problem)                      | Report a Scan Problem                                                     |
