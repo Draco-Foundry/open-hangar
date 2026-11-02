@@ -8,7 +8,7 @@
   // Privacy, and Clear Data on its own line.
   import { onMount, tick } from 'svelte';
   import { t } from './copy.js';
-  import { autoLine, popupShortcut, reminderLine, scanAge, syncTrouble } from './data.js';
+  import { autoLine, logsLine as logsLineOf, popupShortcut, reminderLine, scanAge, syncTrouble } from './data.js';
   import { CURRENCIES, LOOKS } from './prefs.js';
   import { at } from '../site/when.js';
   import { flag } from '../lib/flags.js';
@@ -89,25 +89,32 @@
   }
   // RSI Account Logs (the `accountLogs` flag): a full history load asked for or under
   // way (local accountLogsLoad, src/lib.js readAccountLogs), for the row's line: only
-  // while a log is being read (owner, 2026-11-01: no line while it waits for a scan).
+  // while a log is being read (owner, 2026-11-01: no line while it waits for a scan),
+  // the same line as the scan bar's (./data.js logsLine).
   const LOGS = flag('accountLogs');
   let logsLoad = $state(null);
   let logsOn = $state(false); // a log kept or a load asked for
-  const logsLine = $derived(
-    logsLoad?.part && logsLoad.pagecount
-      ? t(`popup.account-logs-${logsLoad.part === 'credit' ? 'credit' : 'pledge'}`, {
-          page: Math.max(0, (logsLoad.next || 1) - 1),
-          pages: logsLoad.pagecount,
-        })
-      : '',
-  );
+  const logsLine = $derived.by(() => {
+    const l =
+      logsLoad?.part &&
+      logsLineOf({
+        part: logsLoad.part === 'credit' ? 'creditLog' : 'pledgeLog',
+        page: (logsLoad.next || 1) - 1,
+        pages: logsLoad.pagecount,
+      });
+    return l ? t(l.key, l.vars) : '';
+  });
+  // First scan will take several minutes: while the switch is off, while a full history
+  // waits for its scan, and under the line while one is read (Claude chat, 2026-11-02:
+  // not on repeat scans, which read only what's new).
+  const logsFirst = $derived(!logsOn || !!logsLoad);
   async function loadLogs() {
     if (!LOGS) return;
     const got = await chrome.storage.local.get(['accountLogsLoad', 'accountLogs']);
     logsLoad = got.accountLogsLoad || null;
     logsOn = !!(got.accountLogsLoad || got.accountLogs);
   }
-  // Ask for the full history and start a scan to read it (it goes on scan by scan).
+  // Ask for the full history and start a scan to read it.
   async function askLogs() {
     if (!(await OH.wantAccountLogs())) return;
     await loadLogs();
@@ -431,18 +438,14 @@
 
   <!-- RSI Account Logs (the accountLogs flag): its switch (on asks for the full history,
        which the next scan reads page by page and goes on where it stopped; off stops and
-       removes the logs), and, while on, Load Full History to read it all again
-       (src/lib.js readAccountLogs, stopAccountLogs). With the other switches, in the
+       removes the logs; src/lib.js readAccountLogs, stopAccountLogs), the page line while
+       a full history is read and the first-scan note. No Load Full History (owner,
+       2026-11-02): each scan after the first reads only what's new. With the other switches, in the
        openhangar.space box, no divider (owner, 2026-11-01); on its own without that box. -->
   {#snippet logsRow(sub)}
     <div class="pp-r pp-col" class:pp-sub={sub} id="pp-logs">
       <div class="pp-line">
         <span class="pp-grow" id="pp-logs-l">{t('popup.account-logs')}</span>
-        {#if logsOn && !logsLoad}
-          <button type="button" class="pp-btn2" id="pp-logs-load" onclick={askLogs}
-            >{t('popup.account-logs-load')}</button
-          >
-        {/if}
         <button
           type="button"
           role="switch"
@@ -450,11 +453,13 @@
           id="pp-logs-sw"
           aria-checked={logsOn}
           aria-labelledby="pp-logs-l"
-          aria-describedby={logsLine ? 'pp-logs-line' : null}
+          aria-describedby={[logsLine && 'pp-logs-line', logsFirst && 'pp-logs-first'].filter(Boolean).join(' ') ||
+            null}
           onclick={logsSwitch}><i></i></button
         >
       </div>
       {#if logsLine}<p class="pp-msg calm" id="pp-logs-line" role="status">{logsLine}</p>{/if}
+      {#if logsFirst}<p class="pp-msg calm" id="pp-logs-first">{t('popup.account-logs-first-scan')}</p>{/if}
     </div>
   {/snippet}
   {#if LOGS && !siteOn}

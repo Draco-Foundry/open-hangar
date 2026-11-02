@@ -222,6 +222,8 @@ test('scan bar: fills by RSI page count, only forward, a part never waits on its
     { part: 'referrals', page: 2, pages: 3 },
     { part: 'packs', page: 0, count: 4 },
     { part: 'packs', page: 4, count: 4 },
+    { part: 'pledgeLog', page: 1, pages: 173 },
+    { part: 'pledgeLog', page: 173, pages: 173 },
     { part: 'sync' },
   ].map(barFraction);
   for (let i = 1; i < order.length; i++) assert.ok(order[i] >= order[i - 1], `step ${i}`);
@@ -293,6 +295,36 @@ test('scan bar: names the part and counts what it has read', async () => {
     '',
   ]);
   assert.deepEqual(say({ part: 'what' }), ['Scanning', '']);
+});
+
+// RSI Account Logs: a full history's page of RSI's pagecount, in the approved Live words,
+// one line for the scan bar and Settings.
+test("scan bar: a log's full history shows its page of pages", async () => {
+  const { barLabel, logsLine, scanSteps, barFraction } = await data();
+  const { t } = await import('../ui/popup/copy.js');
+  const say = (p) => {
+    const l = barLabel(p);
+    return [t(l.key, l.vars), l.n];
+  };
+  assert.deepEqual(say({ part: 'pledgeLog', page: 121, pages: 173 }), [
+    'Pledge log: page 121 of 173',
+    '',
+  ]);
+  assert.deepEqual(say({ part: 'creditLog', page: 2, pages: 4 }), [
+    'Store credit log: page 2 of 4',
+    '',
+  ]);
+  assert.equal(logsLine({ part: 'pledgeLog', page: 9, pages: 4 }).vars.page, 4);
+  assert.equal(logsLine({ part: 'pledgeLog', page: 1, pages: 0 }), null, 'an empty log: no line');
+  assert.equal(logsLine({ part: 'hangar', page: 1, pages: 4 }), null);
+  assert.equal(logsLine(null), null);
+  assert.deepEqual(
+    scanSteps('pledgeLog').map((s) => s.state),
+    ['done', 'done', 'done'],
+  );
+  const half = barFraction({ part: 'pledgeLog', page: 50, pages: 100 });
+  assert.ok(half > barFraction({ part: 'packs', page: 4, count: 4 }));
+  assert.ok(half < barFraction({ part: 'sync' }));
 });
 
 test("scan bar: Scan held back until RSI's wait is over", async () => {

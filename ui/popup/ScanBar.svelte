@@ -16,6 +16,7 @@
     barNext,
     barLabel,
     doneLeft,
+    logsLine,
     reportDone,
     reportPageChanged,
     reportPaused,
@@ -41,6 +42,9 @@
 
   const running = $derived(sc.phase === 'running');
   const steps = $derived(scanSteps(sc.progress?.part));
+  // A log's full history being read (the accountLogs flag): its page on the bar (in the
+  // step list without the bar), and the first-scan note under it, as in Settings.
+  const logs = $derived(running ? logsLine(sc.progress) : null);
   const STEP = { hangar: 'popup.step-hangar', buybacks: 'popup.step-buybacks', referrals: 'popup.step-referrals' };
   const BAR = flag('scanBar');
   const pageChanged = $derived(!running && reportPageChanged(lastReport, v?.scannedAt));
@@ -122,7 +126,7 @@
     if (!BAR) return null;
     if (running) {
       const l = barLabel(sc.progress);
-      return { text: t(l.key), n: l.n, tone: 'run' };
+      return { text: t(l.key, l.vars), n: l.n, tone: 'run' };
     }
     if (hold) return { text: t('popup.rsi-wait', { time: holdTime(hold) }), n: '', tone: 'note' };
     if (rsi?.kind === 'down') return { text: t('popup.rsi-down'), n: '', tone: 'note' };
@@ -205,6 +209,10 @@
     >
   {/if}
   {#if running && BAR && !sc.progress && !sc.hidden}<p class="pp-note">{t('popup.scanning')}</p>{/if}
+  {#if logs}
+    {#if !BAR}<p class="pp-note" id="pp-logs-scan" role="status">{t(logs.key, logs.vars)}</p>{/if}
+    <p class="pp-note" id="pp-logs-first">{t('popup.account-logs-first-scan')}</p>
+  {/if}
   {#if doneIn && doneOver !== report && !running && !BAR}
     <p class="pp-done" id="pp-done" role="status">
       <span aria-hidden="true">✓</span>{doneIn.m

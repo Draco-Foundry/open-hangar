@@ -19,13 +19,16 @@
 //   session scanProgress { run, at, part, page, count, retry, pages }: about two writes
 //                        a second at most (and one as each part starts, the newest
 //                        always written), removed at the end. part: 'start' | 'account'
-//                        | 'hangar' | 'buybacks' | 'referrals' | 'packs' | 'sync'. For
+//                        | 'hangar' | 'buybacks' | 'referrals' | 'packs' | 'pledgeLog'
+//                        | 'creditLog' | 'sync'. For
 //                        packs (the buy-backs' own pages), page is the pages read so far
 //                        and count how many to read.
 //                        pages: how many pages RSI's pager shows for the hangar and
 //                        buy-backs (null without one; page = pages when a rescan found
 //                        nothing changed). For referrals, page is the lists read of
-//                        `pages` (3) and count the people read across them.
+//                        `pages` (3) and count the people read across them. For a
+//                        log's full history (pledgeLog, creditLog), page is the pages
+//                        read so far and pages RSI's pagecount.
 //   local scanReport     the last scan's report (REPORT_V, below), ids and counts only
 //   local scanStarted    { run, by, reason, at }: the last scan that began. Unlike the
 //                        session marks it outlasts the browser closing mid-scan (the
@@ -464,10 +467,17 @@ export function createRunner(env) {
         // RSI Account Logs (the accountLogs build flag, src/lib.js readAccountLogs): the
         // full history once the pilot asks for it (resumed scan by scan), then the day's
         // new lines, before the sync so it carries them. Not a row of the scan: problems
-        // go to the log, a load's progress to its own stored key. Each page renews the
-        // heartbeat: a load runs past the 2 minutes a quiet scan counts as stopped.
+        // go to the log. A full history's page of pages goes to scanProgress (and the
+        // load's own stored key) as each page lands, for the popup to show; each page
+        // renews the heartbeat: a load runs past the 2 minutes a quiet scan counts as stopped.
         if (flag('accountLogs') && !signedOut && OH.readAccountLogs)
-          await OH.readAccountLogs({ account, onProgress: () => mark(true) }).catch(() => {});
+          await OH.readAccountLogs({
+            account,
+            onProgress: (log, page, pages) => {
+              mark(true);
+              setProgress(log === 'credit' ? 'creditLog' : 'pledgeLog', page, null, null, pages);
+            },
+          }).catch(() => {});
       }
     } catch (e) {
       rows.push({

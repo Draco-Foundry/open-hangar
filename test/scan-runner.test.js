@@ -274,6 +274,13 @@ test('scan: an Account History load renews the heartbeat page by page, and the s
   const last = marks[marks.length - 1];
   assert.ok(x.clock.t - last.at < 2 * 60e3, 'never quiet for the 2 minutes of a stopped scan');
   for (let i = 1; i < marks.length; i++) assert.ok(marks[i].at - marks[i - 1].at < 2 * 60e3);
+  // Each page goes to scanProgress as the log's page of RSI's pagecount, for the popup.
+  const prog = sets(x.session, 'scanProgress').filter((p) => p.part === 'pledgeLog');
+  assert.ok(prog.length > 1, 'written as the pages land');
+  assert.deepEqual(
+    { page: prog[prog.length - 1].page, pages: prog[prog.length - 1].pages },
+    { page: 90, pages: 173 },
+  );
   // The load going on next scan is no problem of the scan's: it has its report and syncs.
   assert.equal(report.bad, false);
   assert.equal(x.local.data.scanReport.run, 'run-a');

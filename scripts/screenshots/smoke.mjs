@@ -5037,7 +5037,8 @@ try {
     autoScan: /Daily Scan Reminder|Auto Scan Daily/.test(document.body.textContent),
     // RSI Account Logs (on in store builds from 0.5.8): the switch, off until turned on.
     logsSw: document.getElementById('pp-logs-sw')?.getAttribute('aria-checked'),
-    logsLoad: !!document.getElementById('pp-logs-load'),
+    // Off: the first-scan note as its hint (no Load Full History since 0.5.9).
+    logsFirst: document.getElementById('pp-logs-first')?.textContent,
     // In the openhangar.space box with the other switches (owner, 2026-11-01).
     logsInSite: !!document.querySelector('#pp-site #pp-logs-sw'),
   }));
@@ -5069,10 +5070,10 @@ try {
   set.look === 'auto' &&
   !set.autoScan &&
   set.logsSw === 'false' &&
-  !set.logsLoad &&
+  set.logsFirst === 'First scan will take several minutes.' &&
   set.logsInSite
     ? ok(
-        'Settings: every group, no Store Alerts switch, the shortcut, Account History off in the site box, no Auto Scan Daily or Notifications row until connected',
+        'Settings: every group, no Store Alerts switch, the shortcut, Account History off in the site box with its first-scan note, no Auto Scan Daily or Notifications row until connected',
       )
     : fail(`popup settings: ${JSON.stringify({ set, setMissing })}`);
   // The layout (owner, 2026-10-24): Notifications inside the openhangar.space box; Look,
