@@ -6,7 +6,7 @@
 // offline), the last RSI account read (the `account` key) for Store Credit, and the
 // portrait the scan saved (`avatarImg`, a data URL: never an RSI address).
 import { t } from './copy.js';
-import { compactCount } from './currency.js';
+import { compactCount, FIT } from './currency.js';
 
 // The extension's own page in the connector build, where Connect lives (and, with an
 // older background, where scans run).
@@ -71,11 +71,14 @@ export function tokenCount(n) {
 export function gameCredit(account, key) {
   return countFit(account?.credits?.[key]?.value);
 }
-// A game currency count as the UEC and REC tiles show it: { text, full }, compact and in
-// full, or null for no number. The UEC change uses it too, so both read the same.
+// A game currency count as the UEC and REC tiles show it: { text, full }, in full up to
+// FIT.count (as the website's wallet) then compact, and in full; or null for no number.
+// The UEC change uses it too, so both read the same.
 export function countFit(n) {
   const text = compactCount(n);
-  return text == null ? null : { text, full: FULL.format(n) };
+  if (text == null) return null;
+  const full = FULL.format(n);
+  return { text: n <= FIT.count ? full : text, full };
 }
 
 // Under the value when some pledges have no price (no store price and no melt
