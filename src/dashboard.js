@@ -322,7 +322,7 @@ const state = {
   bbTraits: new Map(), // buy-back filter picks: group key → Set of option keys (BB_GROUPS)
   bbLayout: 'gallery', // gallery | compact | list | market (independent of inventory)
   owner: null, // { nickname, displayname } the stored data was scanned from
-  storeCredit: null, // dollars, from the RSI account (its own number, not in Account Value)
+  storeCredit: null, // dollars, from the RSI account (its own number, not in Melt Value)
   shown: new Set(), // inventory kind filter
   traits: new Map(), // inventory filter picks: group key → Set of option keys (INV_GROUPS)
   priceOf: null, // ship name → { msrp } resolver (OH.getShipIndex), once loaded
@@ -625,20 +625,18 @@ function hangarValue() {
   }
   return valueCache.value;
 }
-// OH.accountValue (everything you own at today's store price; Store Credit is its own number),
-// memoised like hangarValue. Null until store prices load.
-let acctCache = { v: null, credit: null, value: null };
-function accountValue() {
-  const v = hangarValue();
-  if (!v) return null;
-  if (acctCache.v !== v || acctCache.credit !== state.storeCredit) {
-    acctCache = {
-      v,
+// OH.meltValue (everything you own at melt, the website's Melt Value; owner, 2026-11-02:
+// Melt Value everywhere; Store Credit is its own number), memoised. Needs no store prices.
+let meltCache = { items: null, credit: null, value: null };
+function meltValue() {
+  if (meltCache.items !== state.items || meltCache.credit !== state.storeCredit) {
+    meltCache = {
+      items: state.items,
       credit: state.storeCredit,
-      value: OH.accountValue(state.items, state.priceOf, state.storeCredit, v),
+      value: OH.meltValue(state.items, state.storeCredit),
     };
   }
-  return acctCache.value;
+  return meltCache.value;
 }
 // Store-price info for one pledge ({ store, ships, unpriced, paid, below }) or null.
 function storeInfo(p) {
@@ -863,7 +861,7 @@ function renderAccount() {
     updateSignedOutBanner(loggedOut);
     renderWelcome();
 
-    // Store Credit is shown on its own, not in Account Value.
+    // Store Credit is shown on its own, not in Melt Value.
     const c = a.credits || {};
     const store = c.store ? c.store.value / 100 : null;
     if (store !== state.storeCredit) state.storeCredit = store;
@@ -1075,7 +1073,7 @@ function renderHome() {
   homeUpdated();
 
   // First run: the welcome screen instead of empty cards (when you last scanned
-  // shows on Account Value once there's data).
+  // shows on Melt Value once there's data).
   renderWelcome();
 }
 
@@ -2817,11 +2815,11 @@ function changeSummary(d) {
 }
 const fmtDay = (t) => new Date(t).toLocaleDateString(undefined, { dateStyle: 'medium' });
 
-// Account value of a history snapshot, on the same rules as the headline
-// (OH.snapshotValue): pledges still owned count exactly as today; ones since melted
-// or gifted are estimated from their name or their melt value.
+// Melt value of a history snapshot, on the same rules as the headline
+// (OH.snapshotValue with no store prices): pledges still owned count exactly as today;
+// ones since melted or gifted at the melt value they had.
 function snapshotStore(snap) {
-  return OH.snapshotValue(snap, accountValue(), state.priceOf);
+  return OH.snapshotValue(snap, meltValue(), null);
 }
 
 // Stats is the Svelte page in ui/stats (mounted into #stats-body); this only loads
@@ -5841,10 +5839,10 @@ window.OHApp = {
   shortMoney: (n) => shortMoney(n, money),
   tokenTitle,
   hangarValue,
-  // A history snapshot's ships at today's store prices (same as Stats → History).
-  accountValue,
+  // Melt Value now (the headline, Home and Stats → History).
+  meltValue,
   // A history snapshot's value on the headline's rules (same as Stats → History).
-  snapshotStore: (snap) => (state.priceOf ? snapshotStore(snap) : null),
+  snapshotStore,
   money,
   dollars,
   // Whole amounts in the chosen currency: exact under 100,000, then "$1.24M" /

@@ -7,13 +7,13 @@ guessing.
 
 For how the code fits together, see [ARCHITECTURE.md](../../ARCHITECTURE.md).
 
-| #                                        | Decision                                     | Date       |
-| ---------------------------------------- | -------------------------------------------- | ---------- |
-| [0001](0001-local-first.md)              | Local-first, no server for scan data         | 2026-06-01 |
-| [0002](0002-source-available-license.md) | Source available under PolyForm Strict       | 2026-09-30 |
-| [0003](0003-repo-split.md)               | Website services in a private repo           | 2026-09-30 |
-| [0004](0004-account-value.md)            | What Account Value counts                    | 2026-09-30 |
-| [0005](0005-no-self-hosted-images.md)    | Images load from their source, not re-hosted | 2026-06-01 |
+| #                                        | Decision                                                       | Date       |
+| ---------------------------------------- | -------------------------------------------------------------- | ---------- |
+| [0001](0001-local-first.md)              | Local-first, no server for scan data                           | 2026-06-01 |
+| [0002](0002-source-available-license.md) | Source available under PolyForm Strict                         | 2026-09-30 |
+| [0003](0003-repo-split.md)               | Website services in a private repo                             | 2026-09-30 |
+| [0004](0004-account-value.md)            | What Account Value counts (superseded: Melt Value, 2026-11-02) | 2026-09-30 |
+| [0005](0005-no-self-hosted-images.md)    | Images load from their source, not re-hosted                   | 2026-06-01 |
 
 ## Adding One
 

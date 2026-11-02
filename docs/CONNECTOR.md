@@ -17,7 +17,7 @@ Scan Daily, below, in its place).
 - **The toolbar popup** (`src/popup.html`, `ui/popup/`, the 0.4.0 mockups): a header with
   the version and the scan's age, then three tabs (with the `alerts` flag, Wishlist
   carries a count of its Remind Me items on sale, and opening the popup marks the store
-  alerts seen). Hangar: the portrait the scan saved, Account Value and its change, Store Credit,
+  alerts seen). Hangar: the portrait the scan saved, Melt Value and its change, Store Credit,
   buy-back tokens, Fleet News, Scan (with the scan's progress and report when the
   background shares them; greyed while RSI's sign-in cookie isn't in the browser,
   `ui/popup/rsi-cookie.js`, presence only), Open My Hangar. Wishlist, while connected:
@@ -134,7 +134,6 @@ step 3 above).
 | robertsspaceindustries.com `/pledge-store/api/upgrade/graphql`, the cart              | Add to RSI Cart from our pages                                            |
 | robertsspaceindustries.com `POST /graphql` (`AddCartMultiItemMutation`)               | The Store's Haul: store items into the RSI cart, on a click               |
 | openhangar.space `status.json`                                                        | The kill switch                                                           |
-| openhangar.space `api/ships` (once a day)                                             | The popup's Account Value                                                 |
 | app.openhangar.space `/connect`, `/api/link/token`, `/link`                           | Connect                                                                   |
 | app.openhangar.space `POST` and `DELETE /api/v1/sync`                                 | Sync, Disconnect                                                          |
 | github.com new issue (only when you press Report a Scan Problem)                      | Report a Scan Problem                                                     |

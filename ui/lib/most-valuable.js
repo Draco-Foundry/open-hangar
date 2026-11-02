@@ -1,34 +1,19 @@
-// Account Value's "Most Valuable" list (ui/home/ValueCard.svelte): your ship pledges
-// by today's store price, from OH.hangarValue's per-pledge numbers (the same ones
-// behind the card's "Ships $X"), so nothing new is fetched or priced. Pure.
+// Melt Value's "Most Valuable" list (ui/home/ValueCard.svelte): your ship pledges by
+// melt value (owner, 2026-11-02: Melt Value everywhere), from OH.hangarValue's per-pledge
+// numbers, so nothing new is fetched or priced. Pure.
 
-// The pledges whose ships all have a store price, most valuable first, at most `n`.
-//  { id, store, paid, gain }: `gain` is store price minus melt value, only when the
-//  melt value is known and above $0 (the card's vs-melt rule, per pledge; a $0
-//  reward or gift has nothing to compare with), otherwise null.
-export function mostValuable(items, hv, n = 3, melt = false) {
+// Ship pledges with a melt value, biggest melt first, at most `n`: { id, store, paid,
+// gain } (`paid` the melt value; `gain` always null, kept for the row's shape).
+export function mostValuable(items, hv, n = 3) {
   if (!hv || !hv.pledges) return [];
   const out = [];
   for (const p of items || []) {
     const si = hv.pledges[p.id];
     if (!si || si.ccu) continue;
     const paid = si.paid != null && si.paid > 0 ? si.paid : null;
-    // At melt (the meltValue flag): any ship pledge with a melt value, biggest melt first.
-    if (melt) {
-      if (paid != null) out.push({ id: String(p.id), p, store: si.store, paid, gain: null });
-      continue;
-    }
-    if (si.unpriced || !(si.store > 0)) continue;
-    out.push({
-      id: String(p.id),
-      p,
-      store: si.store,
-      paid,
-      gain: paid != null ? si.store - paid : null,
-    });
+    if (paid != null) out.push({ id: String(p.id), p, store: si.store, paid, gain: null });
   }
-  const by = melt ? 'paid' : 'store';
-  out.sort((x, y) => y[by] - x[by] || String(x.id).localeCompare(String(y.id)));
+  out.sort((x, y) => y.paid - x.paid || String(x.id).localeCompare(String(y.id)));
   return out.slice(0, Math.max(0, n));
 }
 

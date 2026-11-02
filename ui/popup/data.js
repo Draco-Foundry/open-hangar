@@ -1,10 +1,8 @@
 // What the toolbar popup shows, from what's stored in this browser. Pure, so it's
 // tested directly (test/connector.test.js, test/popup.test.js); ui/popup/Popup.svelte
-// reads storage and draws it. The popup never asks RSI anything: the account value uses
-// the ship prices the extension already has (OH.getShipIndex: the bundled list, plus
-// the public ship list from openhangar.space, read at most once a day and bundled-only
-// offline), the last RSI account read (the `account` key) for Store Credit, and the
-// portrait the scan saved (`avatarImg`, a data URL: never an RSI address).
+// reads storage and draws it. The popup never asks RSI anything: Melt Value is the
+// pledges' own melt values, Store Credit the last RSI account read (the `account`
+// key), and the portrait the scan saved (`avatarImg`, a data URL: never an RSI address).
 import { t } from './copy.js';
 import { compactCount, FIT } from './currency.js';
 
@@ -471,7 +469,7 @@ export function reportPilot(report, { account, db } = {}) {
   return handle ? { handle, record: (live && live.citizenRecord) || null } : null;
 }
 
-// --- Account Value since an earlier scan -----------------------------------------------
+// --- Melt Value since an earlier scan --------------------------------------------------
 // The change since the newest earlier scan that valued differently, or whose UEC was
 // different (`valueOf` is OH.snapshotValue on today's prices, so pledges still owned
 // count the same; `uec` is today's UEC): → { delta, at, uec? } or null, `uec` only when

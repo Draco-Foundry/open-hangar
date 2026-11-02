@@ -85,8 +85,7 @@
     Ships at current standalone store prices (USD, before tax) from star-citizen.wiki; a CCU's
     standard price is the gap between its two ships. Paints, gear and game access aren't counted;
     concept and limited ships often have no public price. "vs melt value" covers ship pledges whose
-    ships are all priced. Account Value on Home adds CCUs at standard price, everything else at melt
-    value; Store Credit, buy-backs, UEC and REC aren't counted. Melt value is the pledge's
+    ships are all priced. Melt value is the pledge's
     value on RSI (what it was originally bought for); for gifted or grey-market pledges that isn't
     what you paid.
   </p>

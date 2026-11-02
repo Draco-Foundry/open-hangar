@@ -78,3 +78,31 @@ test('npm only: one package-lock.json at the root, no other lockfile', () => {
   );
   assert.deepEqual(locks, ['package-lock.json']);
 });
+
+// Melt Value everywhere (owner, 2026-11-02: "we need Melt Value globally no account value
+// anymore"): no player-facing code or page says Account Value again. Its words, comments
+// and names are checked in what ships and what the extension's pages draw (src/, ui/,
+// site/); the identifier OH.accountValue (the split behind OH.meltValue) is fine. The
+// privacy policy's own copy (site/privacy.html) changes only with approved words, so it's
+// left out until they're in.
+test('no player-facing code says Account Value', () => {
+  const files = [
+    ...walk(path.join(root, 'src'), ['.js', '.html']).filter(
+      (f) => !f.startsWith(path.join(root, 'src', 'ui') + path.sep),
+    ),
+    ...walk(path.join(root, 'ui'), ['.js', '.svelte', '.html', '.css']),
+    ...walk(path.join(root, 'site'), ['.html', '.js', '.json']).filter(
+      (f) => path.basename(f) !== 'privacy.html',
+    ),
+  ];
+  assert.ok(files.length > 50, 'the walk found the sources');
+  const hits = [];
+  for (const f of files) {
+    fs.readFileSync(f, 'utf8')
+      .split('\n')
+      .forEach((line, i) => {
+        if (/account[\s-]+value/i.test(line)) hits.push(`${path.relative(root, f)}:${i + 1}`);
+      });
+  }
+  assert.deepEqual(hits, [], 'say Melt Value');
+});

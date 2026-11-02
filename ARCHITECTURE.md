@@ -358,7 +358,7 @@ moved every page to Svelte, one at a time.
   outside the card (gear-menu portrait, Log Out, the signed-out banner) up to date.
 - **Classic to Svelte.** `src/dashboard.js` owns scanning, storage and state. At the
   end of the file it publishes `window.OHApp`: a getter for `state` plus read-only
-  helpers (`hangarValue`, `accountValue`, `bigMoney`, `priceOf`, …) and a few actions
+  helpers (`hangarValue`, `meltValue`, `bigMoney`, `priceOf`, …) and a few actions
   that switch views (`openItem`, `showInventory`, `showBuybacks`). When Home's data
   changes it calls `homeUpdated()`, which fires one `oh:home` event per microtask.
   `renderStats()` only loads ship prices (and loaners on the Fleet tab) and calls
@@ -460,7 +460,7 @@ In short:
   Add to RSI Cart. The dashboard (no connector) also reads public pages such as the
   ship matrix, patch notes and `support.robertsspaceindustries.com` help articles.
 - **openhangar.space**: `status.json` (the kill switch), the ships feed (`api/ships`,
-  for Account Value), `rates.json` (exchange rates, only for a currency other than USD)
+  the dashboard's store prices; the popup shows Melt Value and reads none), `rates.json` (exchange rates, only for a currency other than USD)
   and, with store alerts on, the sale feed (`api/store/on-sale`). The dashboard reads a
   few more public feeds (under `OH.SITE_FEEDS`). Nothing personal is sent; sync and the
   Wishlist go to app.openhangar.space (below).

@@ -1,6 +1,6 @@
 <script>
-  // Stats → History: account value over time (one point per scan, on the same rules
-  // as Home's Account Value), a log of what changed per scan, and a backup button
+  // Stats → History: melt value over time (one point per scan, on the same rules as
+  // Home's Melt Value: owner, 2026-11-02, Melt Value everywhere), a log of what changed per scan, and a backup button
   // (scans and history live in this browser; the website keeps the latest synced
   // hangar, but its file has no history, so this backup is the way to restore it).
   import { app, OH, version } from '../lib/app.svelte.js';
@@ -73,7 +73,7 @@
     }
     return {
       backup,
-      chart: s.priceOf ? chart(a, hist) : null,
+      chart: chart(a, hist),
       steps,
       count: hist.length,
     };
@@ -85,9 +85,9 @@
     Tracking since {d.since}. Rescan after your hangar changes and each change shows up here.
   </p>
 {:else if d.steps}
-  <h3 class="section-title" id="history">Account Value Over Time</h3>
+  <h3 class="section-title" id="history">Melt Value Over Time</h3>
   {#if d.chart}
-    <svg class="hist-chart" viewBox="0 0 {W} {H}" role="img" aria-label="Account value over time">
+    <svg class="hist-chart" viewBox="0 0 {W} {H}" role="img" aria-label="Melt value over time">
       <text x={L - 6} y={T + 8} text-anchor="end">{d.chart.max}</text>
       <text x={L - 6} y={H - B} text-anchor="end">{d.chart.min}</text>
       <text x={L} y={H - 4}>{d.chart.from}</text>
@@ -97,12 +97,6 @@
         <circle cx={p.cx} cy={p.cy} r="3"><title>{p.tip}</title></circle>
       {/each}
     </svg>
-    <p class="muted value-note tight">
-      Everything you held at each scan, valued like Account Value today: ships at today's store
-      prices, CCUs at standard price, everything else at melt value. Pledges you've since melted are estimated from their names.
-    </p>
-  {:else}
-    <p class="muted">Loading ship prices…</p>
   {/if}
   <div class="hist-list">
     {#each d.steps as st}

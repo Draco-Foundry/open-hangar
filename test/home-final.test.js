@@ -223,42 +223,13 @@ test('loadGameStatus: shapes the shared feed (lib.js OH.getGameStatus), null whe
   assert.equal(await loadGameStatus({ feed: null }), null);
 });
 
-// --- Account Value: Most Valuable ----------------------------------------------
+// --- Melt Value: Most Valuable --------------------------------------------------
 
 const mvLib = () => import('../ui/lib/most-valuable.js');
 
-test('Most Valuable: fully priced ship pledges by store price, gain only when melt is known', async () => {
+test('Most Valuable at melt: ship pledges with a melt value, biggest melt first', async () => {
   const { mostValuable } = await mvLib();
-  const items = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }, { id: 6 }, { id: 7 }];
-  const hv = {
-    pledges: {
-      1: { store: 600, paid: 600, unpriced: 0 },
-      2: { store: 275, paid: 225, unpriced: 0 },
-      3: { store: 900, paid: null, unpriced: 1 }, // a ship without a price: left out
-      4: { ccu: true, store: 800, paid: 50, unpriced: 0 }, // CCUs aren't ships
-      5: { store: 90, paid: 0, unpriced: 0 }, // $0 reward: nothing to compare with
-      6: { store: 260, paid: 300, unpriced: 0 },
-      // 7: not a ship pledge at all
-    },
-  };
-  const top = mostValuable(items, hv, 4);
-  assert.deepEqual(
-    top.map((r) => [r.id, r.store, r.gain]),
-    [
-      ['1', 600, 0],
-      ['2', 275, 50],
-      ['6', 260, -40],
-      ['5', 90, null],
-    ],
-  );
-  assert.equal(mostValuable(items, hv).length, 3);
-  assert.deepEqual(mostValuable(items, null), []);
-  assert.deepEqual(mostValuable([{ id: 7 }], hv), []);
-});
-
-test('Most Valuable at melt (meltValue): ship pledges with a melt value, biggest melt first', async () => {
-  const { mostValuable } = await mvLib();
-  const items = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }];
+  const items = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }, { id: 6 }];
   const hv = {
     pledges: {
       1: { store: 600, paid: 450, unpriced: 0 },
@@ -266,16 +237,20 @@ test('Most Valuable at melt (meltValue): ship pledges with a melt value, biggest
       3: { store: null, paid: 120, unpriced: 1 }, // no store price: still has a melt
       4: { ccu: true, store: 800, paid: 900, unpriced: 0 }, // CCUs aren't ships
       5: { store: 90, paid: 0, unpriced: 0 }, // no melt value: left out
+      // 6: not a ship pledge at all
     },
   };
   assert.deepEqual(
-    mostValuable(items, hv, 4, true).map((r) => [r.id, r.paid, r.gain]),
+    mostValuable(items, hv, 4).map((r) => [r.id, r.paid, r.gain]),
     [
       ['2', 500, null],
       ['1', 450, null],
       ['3', 120, null],
     ],
   );
+  assert.equal(mostValuable(items, hv, 2).length, 2);
+  assert.deepEqual(mostValuable(items, null), []);
+  assert.deepEqual(mostValuable([{ id: 6 }], hv), []);
 });
 
 test('Most Valuable: short insurance chip', async () => {

@@ -3613,7 +3613,9 @@
     };
   };
 
-  // Account value: everything you own, one number (owner, 2026-09-30). Pure.
+  // The value split by part, with store prices when `priceOf` gives them (owner,
+  // 2026-09-30). Shown only at melt since 2026-11-02 (owner: Melt Value everywhere, no
+  // store-price total): OH.meltValue below. Pure.
   //  ships: pledges with ships, at today's store price (melt value when none of
   //         their ships has a public price)
   //  ccus:  CCUs at standard price, the gap between the two ships (melt value when
@@ -3657,8 +3659,8 @@
     return out;
   };
 
-  // Melt value split the same way (the meltValue flag, owner 2026-11-01): OH.accountValue
-  // with no store prices, so ships and CCUs count at melt like everything else and
+  // Melt Value, what the popup, Home and Stats show (owner, 2026-11-02; the website's
+  // Melt Value for the same sync): the split above with no store prices, so ships and CCUs count at melt like everything else and
   // ships + ccus + other is the melt total (OH.totalValue). Pass it to OH.snapshotValue with
   // no priceOf and a pledge since melted counts at the melt it had. Pure.
   OH.meltValue = function meltValue(items, credit) {
@@ -6334,7 +6336,7 @@
   // --- Scan history --------------------------------------------------------------
   // Each full hangar scan that changed something is kept as a compact snapshot
   // ({ at, items: [[id, name, value]] }) in the DB, so the UI can say what changed
-  // since last time and chart account value over time. Stays in this browser; it is
+  // since last time and chart melt value over time. Stays in this browser; it is
   // included in the user's own JSON export (their backup file).
   const HISTORY_MAX = 100;
   const HISTORY_MAX_BYTES = 3e6; // about 3 MB: big hangars keep fewer snapshots

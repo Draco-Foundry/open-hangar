@@ -1,6 +1,6 @@
 // Every word the popup shows, in one place: the owner's approved words, word for word.
 // The note beside each says what it's for. Words the extension already uses elsewhere
-// (Account Value, Store Credit, Buy-Back Tokens, Open My Hangar, Connect to
+// (Store Credit, Buy-Back Tokens, Open My Hangar, Connect to
 // openhangar.space, Sync Now, Disconnect, Saved Accounts, Log Out of RSI, Clear Data,
 // Report a Scan Problem) are used as they are, not repeated here; the basic page's that
 // the popup now shows too are copied below with a note.
@@ -33,9 +33,10 @@ const COPY = {
   'popup.tab-wishlist': 'Wishlist',
   'popup.tab-settings': 'Settings', // the basic page's tab (basic.tab-settings)
   // --- Hangar tab ---
-  // The value's label before ship prices load: the pledges' melt total for now.
+  // The value's label: the pledges' melt total, the website's Melt Value (owner,
+  // 2026-11-02: Melt Value everywhere).
   'popup.melt-label': 'Melt Value',
-  // The change in Account Value since an earlier scan, in words: "Up $120 since Oct 12"
+  // The change in Melt Value since an earlier scan, in words: "Up $120 since Oct 12"
   // (Claude chat, 2026-10-23).
   'popup.up-since': 'Up {amount} since {date}',
   'popup.down-since': 'Down {amount} since {date}',

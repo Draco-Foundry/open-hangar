@@ -42,13 +42,12 @@
   const OH = globalThis.OH;
   const AL = globalThis.OHAlerts;
   const ALERTS = flag('alerts') && !!AL;
-  const MELT = flag('meltValue');
   const version = chrome.runtime.getManifest().version || '';
 
   let ready = $state(false);
   let v = $state(null);
-  let value = $state(null); // OH.accountValue once ship prices are in
-  let since = $state(null); // { delta, at, uec? }: Account Value and UEC since an earlier scan
+  let value = $state(null); // OH.meltValue (Melt Value, as the website: owner, 2026-11-02)
+  let since = $state(null); // { delta, at, uec? }: Melt Value and UEC since an earlier scan
   let avatar = $state(null);
   let db = $state(null);
   let parserOld = $state(false); // a saved list was read by an older parser (#728)
@@ -189,13 +188,11 @@
     avatar = portrait(got.avatarImg, v.nickname);
     setReport(got.scanReport || null);
     if (v.items.length) {
-      // With meltValue on, the total and its change are at melt (no store prices at all).
-      const priceOf = MELT ? null : (await OH.getShipIndex()).priceOf;
-      const acct = MELT
-        ? OH.meltValue(v.items, storeCredit(got.account))
-        : OH.accountValue(v.items, priceOf, storeCredit(got.account));
+      // Melt Value, the total and its change since a scan, with no store prices at all
+      // (owner, 2026-11-02: Melt Value everywhere, the website's figure for the same sync).
+      const acct = OH.meltValue(v.items, storeCredit(got.account));
       value = acct;
-      const valueOf = (s) => OH.snapshotValue(s, acct, priceOf);
+      const valueOf = (s) => OH.snapshotValue(s, acct, null);
       since = valueSince(stored.history, acct.total, valueOf, v.scannedAt, got.account?.credits?.uec?.value);
     } else {
       value = null;

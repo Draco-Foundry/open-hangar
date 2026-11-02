@@ -1,6 +1,6 @@
 <script>
   // The Hangar tab (owner, 2026-10-14): who this is (the RSI portrait the scan saved,
-  // and the handle), Account Value and its change since an earlier scan (with UEC's),
+  // and the handle), Melt Value and its change since an earlier scan (with UEC's),
   // Store Credit,
   // buy-back tokens, Fleet News (what in the store is news for this hangar, from the
   // store alerts). Scan sits at the top of the popup (./ScanBar.svelte); before the first
@@ -79,8 +79,6 @@
   const nextToken = $derived(OH.nextBuybackToken ? OH.nextBuybackToken(Date.now()) : null);
   const STEP = { hangar: 'popup.step-hangar', buybacks: 'popup.step-buybacks', referrals: 'popup.step-referrals' };
   const BAR = flag('scanBar');
-  // Melt Value in Account Value's place (meltValue): `value` is OH.meltValue then.
-  const MELT = flag('meltValue');
   // A problem in the last scan (a part not read, or read only in part), unless a scan
   // since went fine. With the scan bar, a page RSI changed is the bar's line instead.
   const trouble = $derived(
@@ -164,7 +162,7 @@
 
     <div class="pp-value" aria-live="polite">
       <div class="pp-vtop">
-        <span class="pp-lbl">{value && !MELT ? 'Account Value' : t('popup.melt-label')}</span>
+        <span class="pp-lbl">{t('popup.melt-label')}</span>
         {#if sinceAs && value}
           <span
             class="pp-since"
