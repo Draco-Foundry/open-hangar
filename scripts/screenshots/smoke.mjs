@@ -5780,7 +5780,14 @@ try {
       left: document.getElementById('pp-left')?.textContent.trim() || null,
       quick: !!document.querySelector('#pp-sbar.quick'),
     }));
-  await barProg({ part: 'packs', page: 13, count: 30, f: 0.44, next: 0.46, left: 150e3 });
+  // A scan of its own: within one, the fill never moves back from the slices' 97% above.
+  await told(
+    { scanRunning: { newValue: { at: barAt, tabId: null, run: 'r21', by: 'offscreen' } } },
+    'session',
+  );
+  const timedProg = (p) =>
+    told({ scanProgress: { newValue: { run: 'r21', at: barAt, retry: null, ...p } } }, 'session');
+  await timedProg({ part: 'packs', page: 13, count: 30, f: 0.44, next: 0.46, left: 150e3 });
   await sleep(100);
   const barTimed = { ...(await sbar()), ...(await under()) };
   barTimed.now === 44 &&
@@ -5790,7 +5797,7 @@ try {
   !barTimed.quick
     ? ok('scan bar: filled by time (44% at 13 of 30 details), the dots and about 3 min left')
     : fail(`scan bar timed: ${JSON.stringify(barTimed)}`);
-  await barProg({ part: 'hangar', page: 1, pages: 1, f: 0.3, next: 0.4, left: 2e3, quick: true });
+  await timedProg({ part: 'hangar', page: 1, pages: 1, f: 0.5, next: 0.6, left: 2e3, quick: true });
   await sleep(100);
   const barQuick = await under();
   barQuick.quick && !barQuick.dots.length && !barQuick.left
