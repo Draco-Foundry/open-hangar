@@ -184,6 +184,7 @@ const SPAN = {
   sync: [0.95, 0.98],
 };
 export function progressFraction(p) {
+  if (timed(p)) return p.f;
   const [from, to] = SPAN[p?.part] || SPAN.start;
   const page = Number.isFinite(p?.page) && p.page > 0 ? p.page : 0;
   return Math.round((from + (to - from) * (page / (page + 3))) * 1000) / 1000;
@@ -214,6 +215,8 @@ const BAR_SPAN = {
   sync: [0.98, 1],
 };
 const counted = (n) => Number.isFinite(n) && n > 0;
+// scanProgress with the scan's own fill (ui/scan/runner.js, ui/lib/scan-pace.js).
+const timed = (p) => isObj(p) && Number.isFinite(p.f) && p.f >= 0 && p.f <= 1;
 // How much of the part is read, 0 to 1. The hangar and buy-backs by page of RSI's pager
 // (`pages`; a page being retried isn't read yet), eased towards the end without one.
 // Referrals by list of `pages`, packs by packs read of `count`.
@@ -227,9 +230,12 @@ function partDone(p) {
   if (counted(p.pages)) return Math.min(1, read / Math.max(p.pages, page));
   return read / (read + 3);
 }
-// The bar's fill for scanProgress, 0 to 1 (no percentage is shown): a part's share fills
-// as it reads, so the bar never waits on a part's end to move.
+// The bar's fill for scanProgress, 0 to 1: the scan's own, weighted by time (`f`, written
+// by ui/scan/runner.js from ui/lib/scan-pace.js, the same as the toolbar badge's), or
+// without one a part's share above filling as it reads, so the bar never waits on a
+// part's end to move.
 export function barFraction(p) {
+  if (timed(p)) return p.f;
   const [from, to] = BAR_SPAN[p?.part] || BAR_SPAN.start;
   if (!isObj(p)) return from;
   return Math.round((from + (to - from) * partDone(p)) * 1000) / 1000;
@@ -238,6 +244,7 @@ export function barFraction(p) {
 // creep towards it while it's read (the owner, 2026-10-20: it should move all the time,
 // not wait on a page). A part that reads no pages creeps towards its end.
 export function barNext(p) {
+  if (timed(p) && Number.isFinite(p.next)) return Math.max(p.f, Math.min(1, p.next));
   const [, to] = BAR_SPAN[p?.part] || BAR_SPAN.start;
   if (!isObj(p) || !['hangar', 'buybacks', 'referrals', 'packs', ...LOG_PARTS].includes(p.part))
     return to;
@@ -271,6 +278,33 @@ export function barLabel(p) {
     return { key, n: num(p.count) };
   return { key, n: '' };
 }
+// The time left under the bar, from the scan's own estimate (`left`, ms when it was
+// written at `at`), counting down between writes: → { key, vars } or null (no estimate
+// yet, or a scan too short for a bar). Minutes rounded up.
+export function scanLeft(p, now = Date.now()) {
+  if (!timed(p) || p.quick || !Number.isFinite(p.left)) return null;
+  const ms = p.left - (Number.isFinite(p.at) ? Math.max(0, now - p.at) : 0);
+  if (ms < 60e3) return { key: 'popup.left-soon', vars: {} };
+  return { key: 'popup.left-min', vars: { n: Math.ceil(ms / 60e3) } };
+}
+// The dots under the bar, for the part running: Hangar (and the account read before it),
+// Buy-Backs (with referrals and the buy-backs' own pages) and, with Account History, Logs.
+// → [{ id, key, state: 'done' | 'now' | 'todo' }]. The sync after: every dot done.
+const DOTS = [
+  { id: 'hangar', key: 'popup.step-hangar', parts: ['start', 'account', 'hangar'] },
+  { id: 'buybacks', key: 'popup.step-buybacks', parts: ['buybacks', 'referrals', 'packs'] },
+  { id: 'logs', key: 'popup.dot-logs', parts: LOG_PARTS },
+];
+export function scanDots(part, logs = false) {
+  const dots = logs ? DOTS : DOTS.slice(0, 2);
+  const at = part === 'sync' ? dots.length : dots.findIndex((d) => d.parts.includes(part));
+  return dots.map(({ id, key }, i) => ({
+    id,
+    key,
+    state: at < 0 ? 'todo' : i < at ? 'done' : i === at ? 'now' : 'todo',
+  }));
+}
+
 // Scan held back: RSI kept asking the last scan to slow down (its report's `wait`,
 // ui/scan/runner.js scanWait) and that time hasn't come. → the time (ms), or null.
 export function scanHold(report, now = Date.now()) {

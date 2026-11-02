@@ -952,3 +952,40 @@ test("New Since Last Scan's pictures: only from RSI's own servers", async () => 
   ])
     assert.equal(rsiPicture(bad), null, String(bad));
 });
+
+test('scan bar: the runner fill, weighted by time, wins over the part slices', async () => {
+  const { barFraction, barNext, progressFraction } = await data();
+  // Buy-Back Details 13 of 30 (the owner's screenshot, 2026-11-02): 92% from the slices,
+  // the runner's time-weighted 0.44 when it gives one (ui/lib/scan-pace.js).
+  const p = { part: 'packs', page: 13, count: 30 };
+  assert.equal(barFraction(p), 0.922);
+  assert.equal(barFraction({ ...p, f: 0.44, next: 0.46 }), 0.44);
+  assert.equal(progressFraction({ ...p, f: 0.44 }), 0.44);
+  assert.equal(barNext({ ...p, f: 0.44, next: 0.46 }), 0.46);
+  // Never behind the fill, never past the end; an odd f falls back to the slices.
+  assert.equal(barNext({ ...p, f: 0.44, next: 0.2 }), 0.44);
+  assert.equal(barNext({ ...p, f: 0.44, next: 3 }), 1);
+  assert.equal(barFraction({ ...p, f: 2 }), 0.922);
+});
+
+test('scan bar: time left counts down between writes, in whole minutes', async () => {
+  const { scanLeft } = await data();
+  const p = (left, extra = {}) => ({ part: 'packs', f: 0.4, at: NOW, left, ...extra });
+  assert.deepEqual(scanLeft(p(150e3), NOW), { key: 'popup.left-min', vars: { n: 3 } });
+  assert.deepEqual(scanLeft(p(150e3), NOW + 40e3), { key: 'popup.left-min', vars: { n: 2 } });
+  assert.deepEqual(scanLeft(p(70e3), NOW + 20e3), { key: 'popup.left-soon', vars: {} });
+  // No estimate, no fill of its own, or a quick scan: nothing under the bar.
+  assert.equal(scanLeft({ part: 'packs', f: 0.4, at: NOW }, NOW), null);
+  assert.equal(scanLeft({ part: 'packs', left: 9e4, at: NOW }, NOW), null);
+  assert.equal(scanLeft(p(9e4, { quick: true }), NOW), null);
+});
+
+test('scan bar: the dots under it, Logs only with Account History', async () => {
+  const { scanDots } = await data();
+  const states = (part, logs) => scanDots(part, logs).map((d) => `${d.id}:${d.state}`);
+  assert.deepEqual(states('account', false), ['hangar:now', 'buybacks:todo']);
+  assert.deepEqual(states('packs', false), ['hangar:done', 'buybacks:now']);
+  assert.deepEqual(states('pledgeLog', true), ['hangar:done', 'buybacks:done', 'logs:now']);
+  assert.deepEqual(states('sync', true), ['hangar:done', 'buybacks:done', 'logs:done']);
+  assert.deepEqual(states('referrals', true), ['hangar:done', 'buybacks:now', 'logs:todo']);
+});

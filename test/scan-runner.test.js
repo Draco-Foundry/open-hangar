@@ -203,7 +203,14 @@ test('scan: the account, the hangar, buy-backs, referrals, their pages, saved, t
     'sync',
     'wait',
     'rsiDown',
+    'pace',
   ]);
+  // Each part's time per request and requests read, numbers only (ui/lib/scan-pace.js).
+  for (const [id, p] of Object.entries(report.pace)) {
+    assert.ok(Number.isFinite(p.ms) && p.ms > 0 && Number.isInteger(p.n), id);
+    assert.deepEqual(Object.keys(p), ['ms', 'n']);
+  }
+  assert.ok(report.pace.hangar && report.pace.packs, 'every part has a pace');
   assert.equal(report.v, 1);
   assert.equal(report.wait, null, 'RSI never asked it to slow down');
   assert.equal(report.run, 'run-a');
@@ -364,7 +371,8 @@ test('scan: progress stored about twice a second at most, the newest kept, gone 
     hangar.map((p) => p.page),
     [1, 6, 11],
   );
-  assert.deepEqual(hangar[0], {
+  const { f, next, left, quick, ...first } = hangar[0];
+  assert.deepEqual(first, {
     run: 'run-a',
     at: 1_000_000,
     part: 'hangar',
@@ -373,6 +381,11 @@ test('scan: progress stored about twice a second at most, the newest kept, gone 
     retry: null,
     pages: null,
   });
+  // The scan's own estimate (ui/lib/scan-pace.js): numbers only, the fill moving forward.
+  assert.ok(f >= 0 && f <= next && next <= 1 && Number.isFinite(left));
+  assert.equal(typeof quick, 'boolean');
+  const fills = sets(x.session, 'scanProgress').map((p) => p.f);
+  for (let i = 1; i < fills.length; i++) assert.ok(fills[i] >= fills[i - 1], `write ${i}`);
   // The page's own line hears every one (hooks.progress is not throttled).
   assert.equal(x.seen.filter((s) => s === 'progress hangar').length, 11);
   // Each part's start is written right away.

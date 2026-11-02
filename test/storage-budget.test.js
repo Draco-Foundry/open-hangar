@@ -510,6 +510,19 @@ async function fillWorstCase() {
       })),
       bad: true,
       sync: { state: 'error', msg: 'x'.repeat(600), at: 3 },
+      // Every part timed (ui/lib/scan-pace.js cleanPace caps ms at 60000).
+      pace: Object.fromEntries(
+        [
+          'account',
+          'hangar',
+          'buybacks',
+          'referrals',
+          'packs',
+          'pledgeLog',
+          'creditLog',
+          'sync',
+        ].map((id) => [id, { ms: 60000, n: 99999 }]),
+      ),
     },
     avatarImg: {
       nickname: 'x'.repeat(60),

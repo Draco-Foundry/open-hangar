@@ -5770,6 +5770,32 @@ try {
   barLogs.first === 'First scan will take several minutes.'
     ? ok('scan bar: a full Account History read shows its page of pages and the first-scan note')
     : fail(`scan bar logs: ${JSON.stringify(barLogs)}`);
+  // Weighted by time (ui/lib/scan-pace.js): the scan's own fill, the dots under the bar
+  // and the time left; a quick scan has neither and no fill.
+  const under = () =>
+    page.evaluate(() => ({
+      dots: [...document.querySelectorAll('#pp-sbar-under .pp-dot')].map((d) =>
+        [d.id.replace('pp-dot-', ''), d.className.replace('pp-dot', '').trim()].join(':'),
+      ),
+      left: document.getElementById('pp-left')?.textContent.trim() || null,
+      quick: !!document.querySelector('#pp-sbar.quick'),
+    }));
+  await barProg({ part: 'packs', page: 13, count: 30, f: 0.44, next: 0.46, left: 150e3 });
+  await sleep(100);
+  const barTimed = { ...(await sbar()), ...(await under()) };
+  barTimed.now === 44 &&
+  barTimed.text?.[1] === '13 / 30' &&
+  barTimed.left === 'About 3 min left' &&
+  barTimed.dots.join(' ') === 'hangar:done buybacks:now logs:todo' &&
+  !barTimed.quick
+    ? ok('scan bar: filled by time (44% at 13 of 30 details), the dots and about 3 min left')
+    : fail(`scan bar timed: ${JSON.stringify(barTimed)}`);
+  await barProg({ part: 'hangar', page: 1, pages: 1, f: 0.3, next: 0.4, left: 2e3, quick: true });
+  await sleep(100);
+  const barQuick = await under();
+  barQuick.quick && !barQuick.dots.length && !barQuick.left
+    ? ok('scan bar: a quick repeat scan shows no fill, no dots and no time left')
+    : fail(`scan bar quick: ${JSON.stringify(barQuick)}`);
   await told(
     { scanRunning: { newValue: undefined }, scanProgress: { newValue: undefined } },
     'session',

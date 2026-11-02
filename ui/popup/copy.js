@@ -104,6 +104,12 @@ const COPY = {
   'popup.part-account': 'Account',
   'popup.part-sync': 'Syncing',
   'popup.part-packs': 'Buy-Back Details',
+  // Under the scan bar while it runs: the time left from the scan's pace ("About 3 min
+  // left", under a minute its own line) and the Logs dot beside Hangar and Buy-Backs (with
+  // Account History). NEW: needs the owner's OK.
+  'popup.left-min': 'About {n} min left',
+  'popup.left-soon': 'Under a minute left',
+  'popup.dot-logs': 'Logs',
   // The scan bar while RSI asks the scan to slow down and it waits to try again.
   'popup.rsi-waiting': 'Waiting on RSI',
   // In the bar's place after RSI kept asking a scan to slow down, Scan greyed until
