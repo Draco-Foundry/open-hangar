@@ -18,6 +18,12 @@
  * Chrome is found automatically; override with CHROME_PATH=/path/to/chrome.
  * `npm run demo` serves the same demo dashboard without capturing, for trying
  * UI changes by hand at http://localhost:8323.
+ *
+ * `npm run screenshots -- --popup` captures the store listing's popup Settings shot
+ * instead (docs/store-assets/screenshot-058-3-settings.jpg and .png): the demo's
+ * connected, signed-in account, the store build's flags (the registry's defaults), on the
+ * listing's 1280x800 dark backdrop, as the 0.4.0 set was framed. OH_SHOT_NAME=<name>
+ * picks another file name (without the extension).
  */
 
 import http from 'node:http';
@@ -224,6 +230,74 @@ if (process.argv.includes('--serve')) {
   await new Promise(() => {});
 }
 
+// The popup Settings store shot (`--popup`): the popup alone, in its own 360 px page with
+// the demo's account connected, then placed on the listing's 1280x800 backdrop.
+async function popupSettingsShot(browser) {
+  const T0 = Date.parse('2026-10-01T15:00:00Z');
+  const PNG =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+  const seed = {
+    __demoAccount: {
+      loggedIn: true,
+      nickname: 'Demo_Citizen',
+      displayname: 'Demo Citizen',
+      credits: {
+        store: { value: 4250, currency: 'USD' },
+        uec: { value: 1234567 },
+        rec: { value: 90000 },
+      },
+    },
+    __demoAvatar: { nickname: 'Demo_Citizen', src: PNG, at: T0 },
+    __demoLocal: {
+      siteUrl: 'https://app.openhangar.space',
+      siteLink: { token: 't', name: 'Demo_Citizen', connectedAt: 1, lastSync: T0 - 60e3 },
+      autoDailyOn: true,
+      accountLogs: {},
+    },
+  };
+  const page = await browser.newPage();
+  await page.setViewport({ width: 360, height: 1000, deviceScaleFactor: 1 });
+  await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
+  await page.evaluateOnNewDocument((s) => Object.assign(window, s), seed);
+  await page.goto(`http://localhost:${PORT}/popup.html`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#pp-tab-settings');
+  await page.click('#pp-tab-settings');
+  await page.waitForSelector('#pp-daily-sw');
+  // The demo shim's manifest says 0.2.7; the shot shows the version it is for.
+  const { version } = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
+  await page.evaluate((v) => {
+    const el = document.getElementById('pp-version');
+    if (el) el.textContent = 'v' + v;
+  }, version);
+  await new Promise((r) => setTimeout(r, 500));
+  const box = await (await page.$('.pp')).boundingBox();
+  const popup = await page.screenshot({
+    type: 'png',
+    clip: { x: box.x, y: box.y, width: box.width, height: box.height },
+  });
+  const icon = fs.readFileSync(path.join(ROOT, 'icons', 'icon.svg')).toString('base64');
+  const top = Math.max(20, Math.round((800 - box.height) / 2));
+  const stage = await browser.newPage();
+  await stage.setViewport({ width: 1280, height: 800, deviceScaleFactor: 1 });
+  await stage.setContent(`<!doctype html><meta charset="utf-8"><style>
+    html,body{margin:0;width:1280px;height:800px;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif}
+    body{background:radial-gradient(ellipse 600px 500px at 1000px 280px,#1a2f6b 0%,transparent 70%),
+      radial-gradient(ellipse 500px 400px at 200px 760px,#2a1f55 0%,transparent 70%),#0b1024}
+    .brand{position:absolute;left:56px;top:48px;display:flex;align-items:center;gap:16px;color:#e8ecf6;font-size:30px;font-weight:600}
+    .brand img{width:44px;height:44px;border-radius:10px}
+    .pop{position:absolute;left:460px;top:${top}px;border-radius:12px}
+  </style>
+  <div class="brand"><img src="data:image/svg+xml;base64,${icon}">Open Hangar</div>
+  <img class="pop" src="data:image/png;base64,${popup.toString('base64')}">`);
+  await new Promise((r) => setTimeout(r, 300));
+  const name = process.env.OH_SHOT_NAME || 'screenshot-058-3-settings';
+  for (const type of ['jpeg', 'png']) {
+    const file = path.join(OUT, `${name}.${type === 'jpeg' ? 'jpg' : 'png'}`);
+    await stage.screenshot({ path: file, type, ...(type === 'jpeg' ? { quality: 92 } : {}) });
+    console.log(`  ${path.relative(ROOT, file)}  (popup ${box.width}x${box.height})`);
+  }
+}
+
 const browser = await puppeteer.launch({
   executablePath: findChrome(),
   headless: true,
@@ -232,6 +306,10 @@ const browser = await puppeteer.launch({
 
 try {
   fs.mkdirSync(OUT, { recursive: true });
+  if (process.argv.includes('--popup')) {
+    await popupSettingsShot(browser);
+    process.exit(0);
+  }
   const page = await browser.newPage();
   for (const [i, view] of VIEWS.entries()) {
     await page.goto(`http://localhost:${PORT}/#${view}`, { waitUntil: 'networkidle0' });
