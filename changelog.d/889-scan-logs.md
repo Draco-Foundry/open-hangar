@@ -1,0 +1,3 @@
+- Fixed: **Long Pledge Logs No Longer Show Scan Stopped.** With Account History on, the popup now shows the scan as running while it reads a long pledge log, then it finishes and syncs as usual.
+- Changed: **Load Full History Removed.** Turning on Account History reads your full history once, and each scan after that reads only what's new.
+- New: **First Scan Progress.** While your first scan reads your history, the popup shows the page it's on and that it will take several minutes.

@@ -5758,6 +5758,18 @@ try {
   await barProg({ part: 'hangar', page: 3, count: 1214, pages: 4, retry: { attempt: 1, of: 3 } });
   await sleep(100);
   const barWait = await sbar();
+  // RSI Account Logs: a full history read names its page of RSI's pages on the bar, with
+  // the first-scan note under it.
+  await barProg({ part: 'pledgeLog', page: 121, pages: 173 });
+  await sleep(100);
+  const barLogs = {
+    ...(await sbar()),
+    first: await page.$eval('#pp-logs-first', (e) => e.textContent).catch(() => null),
+  };
+  barLogs.text?.[0] === 'Pledge log: page 121 of 173' &&
+  barLogs.first === 'First scan will take several minutes.'
+    ? ok('scan bar: a full Account History read shows its page of pages and the first-scan note')
+    : fail(`scan bar logs: ${JSON.stringify(barLogs)}`);
   await told(
     { scanRunning: { newValue: undefined }, scanProgress: { newValue: undefined } },
     'session',
