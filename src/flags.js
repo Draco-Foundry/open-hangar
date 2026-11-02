@@ -105,11 +105,12 @@
     // ships at store price and CCUs at standard price made one smaller melt total; only melt
     // counts). The popup's total and its change since a scan, and Home's value card with its
     // parts and Most Valuable, all at melt (OH.meltValue). The same as the website's
-    // hangar_melt_value. No new words: the popup's own Melt Value label.
+    // hangar_melt_value. No new words: the popup's own Melt Value label. Beta first, then
+    // every build from 0.5.9 (owner, 2026-11-02: the popup's Account Value didn't match the
+    // website's Melt Value for the same sync).
     meltValue: {
       about: "The popup and Home show Melt Value, its parts at melt, in Account Value's place.",
-      default: false,
-      beta: true,
+      default: true,
     },
     // Order History (owner, 2026-10-30): once a pilot turns it on, a scan reads RSI's
     // order history (Account, Billing) and sync sends it as sources.orders

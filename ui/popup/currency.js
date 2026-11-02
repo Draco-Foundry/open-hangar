@@ -78,10 +78,12 @@ export function money(usd, fx = USD, { cents = false, most } = {}) {
 //   Account Value (32 px)         the full figure up to 999,999, then compact
 //   Store Credit (18 px, cents)   the full figure up to 9,999.99, then compact
 //   Since-change line (12 px)     the full figure up to 99,999, then compact
-//   UEC and REC (18 px)           under 1,000 as is, then compact
+//   UEC and REC (18 px)           the full figure up to 999,999, then compact (the
+//                                 website's wallet budget, its lib/number-fit.ts FIT.wallet:
+//                                 one display, owner 2026-11-02)
 //   Buy-Back Tokens (18 px)       0 to 99 as is, then 99+
 // The CSS ellipsis (popup.css) is the last guard for a value nobody planned for.
-export const FIT = Object.freeze({ value: 999999, credit: 9999.99, change: 99999 });
+export const FIT = Object.freeze({ value: 999999, credit: 9999.99, change: 99999, count: 999999 });
 const NBSP = ' ';
 
 // A compact-notation formatter's text for `n`, with NBSP before the suffix letter.

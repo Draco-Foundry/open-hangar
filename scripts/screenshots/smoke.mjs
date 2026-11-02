@@ -266,10 +266,13 @@ try {
     document.dispatchEvent(new CustomEvent('oh:home'));
     await tick();
     const g = rows()[0]?.querySelector('.gain');
-    r.gain =
-      !!g &&
-      /^\+.*100 over what you paid$/.test(g.textContent.trim()) &&
-      !g.classList.contains('down');
+    // At melt (the meltValue flag, every build from 0.5.9) there's no gain over what was
+    // paid to show: the list is at melt itself (ui/lib/most-valuable.js).
+    r.gain = window.OH.flags?.meltValue
+      ? !g
+      : !!g &&
+        /^\+.*100 over what you paid$/.test(g.textContent.trim()) &&
+        !g.classList.contains('down');
     top.value = saved;
     state.items = [...state.items];
     document.dispatchEvent(new CustomEvent('oh:home'));
@@ -4707,7 +4710,8 @@ try {
       oldLink: /Open Pledges and Settings/.test(document.body.textContent),
     };
   });
-  pop.label === 'Account Value' &&
+  // Melt Value in Account Value's place (meltValue, every build from 0.5.9).
+  pop.label === 'Melt Value' &&
   !pop.ver &&
   /^\dh ago$/.test(pop.age) &&
   pop.fresh &&
@@ -4716,15 +4720,16 @@ try {
   /^Store Credit\s*\$42\.50$/.test(pop.credit.trim()) &&
   /^Buy-Back Tokens\s*2\s*Next refill \w+ \d+$/.test(pop.tokens.trim()) &&
   pop.uec.trim() === 'UEC1.2 M' &&
-  pop.rec.trim() === 'REC90 K' &&
+  // In full up to 999,999, as the website's wallet shows it.
+  pop.rec.trim() === 'REC90,000' &&
   pop.uecTitle === '1,234,567' &&
   pop.uecName === 'UEC 1,234,567' &&
   pop.tiles &&
   pop.strip &&
-  // Account Value's change and UEC's since the same scan, UEC as its tile shows it and in
-  // full on hover (Claude chat, Words, 2026-10-25).
-  /^(Up|Down) \$[\d,]+, UEC up 234\.6\sK since \w+ \d+$/.test(pop.since) &&
-  pop.sinceTitle.includes('UEC up 234,567 since') &&
+  // The value's change and UEC's since the same scan (Claude chat, Words, 2026-10-25). At
+  // melt the demo's pledges melt as they did, so only UEC moved; in full, so no tooltip.
+  /^((Up|Down) \$[\d,.]+, )?UEC up 234,567 since \w+ \d+$/.test(pop.since) &&
+  !pop.sinceTitle &&
   pop.tabs.join() === 'Hangar:true,Wishlist:false,Settings:false' &&
   !pop.bell &&
   pop.scan === 'Scan' &&
@@ -4844,8 +4849,9 @@ try {
   });
   uecRow.total === '1 new · $0 melt value' &&
   uecRow.name === 'Hangar Decoration - Invented Plush' &&
-  uecRow.melt === '5 K UEC' &&
-  uecRow.title === '5,000 UEC' &&
+  // In full up to 999,999, as the UEC tile and the website.
+  uecRow.melt === '5,000 UEC' &&
+  !uecRow.title &&
   uecRow.value === pop.value
     ? ok(`New Since Last Scan: a UEC pledge shows ${uecRow.melt}, counted in no dollar total`)
     : fail(`popup UEC pledge: ${JSON.stringify({ ...uecRow, was: pop.value })}`);
@@ -4881,13 +4887,13 @@ try {
   };
   const nb = ' ';
   const wide = await fitCase(
-    { store: { value: 999999 }, uec: { value: 999 }, rec: { value: 1000 } },
+    { store: { value: 999999 }, uec: { value: 999999 }, rec: { value: 1000000 } },
     99,
   );
   wide.credit === '$9,999.99' &&
   !wide.creditName &&
-  wide.uec === '999' &&
-  wide.rec === `1${nb}K` &&
+  wide.uec === '999,999' &&
+  wide.rec === `1${nb}M` &&
   wide.tokens === '99' &&
   wide.fits &&
   !wide.wide
