@@ -234,7 +234,7 @@ try {
     await settle(1500);
   }
   if (CONNECTOR) {
-    // The toolbar popup, as a page (its Account Value reads the public ship list).
+    // The toolbar popup, as a page (its Wishlist search reads the public ship list).
     await page.goto(`${ORIGIN}/src/popup.html`);
     await settle(1500);
     await page.goto(`${HUB}#settings`);

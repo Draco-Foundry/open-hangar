@@ -82,18 +82,17 @@ test('npm only: one package-lock.json at the root, no other lockfile', () => {
 // Melt Value everywhere (owner, 2026-11-02: "we need Melt Value globally no account value
 // anymore"): no player-facing code or page says Account Value again. Its words, comments
 // and names are checked in what ships and what the extension's pages draw (src/, ui/,
-// site/); the identifier OH.accountValue (the split behind OH.meltValue) is fine. The
-// privacy policy's own copy (site/privacy.html) changes only with approved words, so it's
-// left out until they're in.
+// site/), and in the privacy policy and store texts players read (approved words,
+// 2026-11-02); the identifier OH.accountValue (the split behind OH.meltValue) is fine.
 test('no player-facing code says Account Value', () => {
   const files = [
     ...walk(path.join(root, 'src'), ['.js', '.html']).filter(
       (f) => !f.startsWith(path.join(root, 'src', 'ui') + path.sep),
     ),
     ...walk(path.join(root, 'ui'), ['.js', '.svelte', '.html', '.css']),
-    ...walk(path.join(root, 'site'), ['.html', '.js', '.json']).filter(
-      (f) => path.basename(f) !== 'privacy.html',
-    ),
+    ...walk(path.join(root, 'site'), ['.html', '.js', '.json']),
+    ...['PRIVACY.md', 'STORE.md'].map((f) => path.join(root, 'docs', f)),
+    ...walk(path.join(root, 'docs', 'store-assets'), ['.md', '.txt']),
   ];
   assert.ok(files.length > 50, 'the walk found the sources');
   const hits = [];
