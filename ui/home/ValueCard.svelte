@@ -1,19 +1,12 @@
 <script>
-  // Account Value: everything you own (OH.accountValue: ships at store price, CCUs at
-  // standard price, everything else at melt value; Store Credit is not in it), what it's made
-  // of, how it compares with melt value (not "what you paid", which RSI can't know
-  // for gifted or grey-market pledges), and clickable counts that open Inventory
-  // filtered. The value trend lives on Stats → History (owner: no chart on Home).
+  // Melt Value: everything you own at melt (OH.meltValue, the website's Melt Value; owner,
+  // 2026-11-02: Melt Value everywhere, no store-price total; Store Credit is not in it), what
+  // it's made of, so the parts add up to the figure, Most Valuable at melt, and clickable
+  // counts that open Inventory filtered. The value trend lives on Stats → History (owner: no chart on Home).
   import { app, OH, version } from '../lib/app.svelte.js';
   import { SvelteMap } from 'svelte/reactivity';
   import { exactCount, plural, shortCount } from '../lib/format.js';
   import { insChip, mostValuable } from '../lib/most-valuable.js';
-  import { flag } from '../lib/flags.js';
-
-  // Melt Value in Account Value's place (meltValue, owner 2026-11-01): the total, its parts
-  // and Most Valuable all at melt (OH.meltValue), so the parts add up to the figure, and no
-  // vs-melt pill (it would always be zero).
-  const MELT = flag('meltValue');
 
   // Rows in the Most Valuable list: enough that the card ends level with Latest
   // Acquisitions (five rows) at 1440 and 1100 wide.
@@ -24,7 +17,7 @@
     const s = a.state;
     const items = s.items;
     const v = a.hangarValue();
-    const acct = MELT ? OH().meltValue(items, s.storeCredit) : a.accountValue();
+    const acct = OH().meltValue(items, s.storeCredit);
     const melt = OH().totalValue(items);
     return {
       scannedAt: s.scannedAt || null,
@@ -38,9 +31,9 @@
           ].filter(([, n]) => n >= 0.5)
         : [],
       melt,
-      // Most Valuable: the top ship pledges at today's store price (the numbers
-      // behind "Ships $X"; owner picked this to fill the card, 2026-10-06).
-      top: mostValuable(items, v, TOP_N, MELT).map((r) => ({
+      // Most Valuable: the top ship pledges at melt (owner picked this to fill the card,
+      // 2026-10-06).
+      top: mostValuable(items, v, TOP_N).map((r) => ({
         ...r,
         name: a.cardName(r.p),
         full: a.plainName(r.p),
@@ -48,7 +41,6 @@
         img: a.realImage(r.p.image),
         resolve: a.resolveImageName(r.p),
       })),
-      vsPaid: !MELT && v && v.paidPriced ? v.storePriced - v.paidPriced : null,
       // Ships · CCUs · Paints · Other, in the usual category order (owner, 2026-10-09):
       // Ships counts every ship (a pack with two counts two), not pledges; Other's
       // hover names what it holds. No LTI, pledge or buy-back counts here.
@@ -94,8 +86,6 @@
     ].filter((c) => c.n > 0);
   }
   const a = app();
-  const signed = (n) => (n >= 0 ? '+' : '−') + a.bigMoney(Math.abs(n));
-  const exact = (n) => (n < 0 ? '−' : '') + a.dollars(Math.abs(n));
 
   // "Updated today, 9:45 AM"; after a week it turns amber: "Updated 8 days ago · Rescan?".
   const upd = $derived.by(() => {
@@ -142,7 +132,7 @@
 
 <section class="oh-p value">
   <div class="top">
-    <div class="oh-lbl">{d.store != null && !MELT ? 'Account Value' : 'Melt Value'}</div>
+    <div class="oh-lbl">Melt Value</div>
     {#if upd}
       <div class="upd" class:stale={upd.stale} title="Last scan: {upd.full}">
         {upd.text}{#if upd.stale}
@@ -150,24 +140,15 @@
       </div>
     {/if}
   </div>
-  <!-- The number with the vs-melt pill beside it (owner picked Option A, #166); the
-       pill wraps under the number when the card is narrow. -->
   <div class="headline">
     {#if d.store != null}
       <div class="big" title={a.dollars(d.store)}>{a.bigMoney(d.store)}</div>
     {:else}
       <div class="big" title={a.money(d.melt)}>{a.bigMoney(d.melt)}</div>
     {/if}
-    <div class="pills">
-      {#if d.vsPaid != null}
-        <span class="pill" class:down={d.vsPaid < 0} title={exact(d.vsPaid)}
-          >{signed(d.vsPaid)} vs melt value</span
-        >
-      {/if}
-    </div>
   </div>
   {#if d.store != null && d.parts.length > 1}
-    <div class="parts" title={MELT ? null : "Ships at today's store price, CCUs at standard price, everything else at melt value. Store Credit, buy-backs, UEC and REC aren't counted."}>
+    <div class="parts">
       {#each d.parts as [label, n], i (label)}{#if i}<span class="sep">·</span>{/if}<span>{label} <b>{a.bigMoney(n)}</b></span>{/each}
     </div>
   {/if}
@@ -186,16 +167,7 @@
             {#if r.ins}<span class="ins" title="Insurance">{r.ins}</span>{/if}
           </span>
           <span class="meta">
-            {#if MELT}
-              <b title={'Melt value: ' + a.dollars(r.paid)}>{a.bigMoney(r.paid)}</b>
-            {:else}
-              <b title={"Today's store price: " + a.dollars(r.store)}>{a.bigMoney(r.store)}</b>
-            {/if}
-            {#if !MELT && r.gain != null && Math.abs(r.gain) >= 1}
-              <span class="gain" class:down={r.gain < 0} title="Melt value: {a.dollars(r.paid)}"
-                >{#if r.gain >= 0}{signed(r.gain)} over what you paid{:else}{signed(r.gain)}{/if}</span
-              >
-            {/if}
+            <b title={'Melt value: ' + a.dollars(r.paid)}>{a.bigMoney(r.paid)}</b>
           </span>
         </button>
       {/each}
@@ -266,26 +238,6 @@
   }
   .headline .big {
     margin-top: 0;
-  }
-  .pills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .pills:empty {
-    display: none;
-  }
-  .pill {
-    font: 600 13px var(--font-head);
-    border-radius: 999px;
-    padding: 5px 12px;
-    background: var(--good-soft);
-    color: var(--good);
-    white-space: nowrap;
-  }
-  .pill.down {
-    background: var(--bad-soft);
-    color: var(--bad);
   }
   /* Most Valuable: rows shaped like Latest Acquisitions' so the two cards match. */
   .mv {
@@ -363,12 +315,6 @@
     display: block;
     color: var(--text);
     font-weight: 600;
-  }
-  .gain {
-    color: var(--good);
-  }
-  .gain.down {
-    color: var(--muted);
   }
   @media (max-width: 480px) {
     .mv-row {

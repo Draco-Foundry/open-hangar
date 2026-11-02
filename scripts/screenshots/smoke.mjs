@@ -231,9 +231,9 @@ try {
   clicks.ships && clicks.rows === 5 && clicks.modal
     ? ok('home: Ships count filters Inventory; 5 latest acquisitions, a row opens details')
     : fail(`home clicks: ${JSON.stringify(clicks)}`);
-  // Account Value's Most Valuable list (owner 2026-10-06): the top 3 ship pledges by
-  // today's store price, insurance chip, "+$N over what you paid" only when the melt
-  // value differs, a row opens details; no priced ships hides the list.
+  // Melt Value's Most Valuable list (owner 2026-10-06; at melt from 2026-11-02): the top 3
+  // ship pledges by melt value, insurance chip, no gain line, a row opens details; no ship
+  // pledges hides the list.
   const mv = await page.evaluate(async () => {
     const tick = () => new Promise((r) => setTimeout(r, 250));
     const $v = () => document.querySelector('#oh-grid [data-card="value"]');
@@ -241,8 +241,8 @@ try {
     const hv = window.OHApp.hangarValue();
     const want = state.items
       .map((p) => [String(p.id), hv.pledges[p.id]])
-      .filter(([, s]) => s && !s.ccu && !s.unpriced && s.store > 0)
-      .sort((x, y) => y[1].store - x[1].store)
+      .filter(([, s]) => s && !s.ccu && s.paid > 0)
+      .sort((x, y) => y[1].paid - x[1].paid || x[0].localeCompare(y[0]))
       .slice(0, 3)
       .map(([id]) => state.items.find((p) => String(p.id) === id));
     const r = {
@@ -254,11 +254,10 @@ try {
           .map((b) => b.title)
           .join('|') === want.map((p) => window.OHApp.plainName(p)).join('|'),
       chip: rows().some((b) => /^(LTI|\d+ Mo)$/.test(b.querySelector('.ins')?.textContent || '')),
-      // The demo's top ships melt at their store price: no gain line to show.
       noFakeGain: rows().every((b) => !b.querySelector('.gain')),
       beforeCounts: $v().querySelector('.mv')?.nextElementSibling?.classList.contains('counts'),
     };
-    // A ship melting below its store price shows the green gain.
+    // A ship melting below its store price still shows no gain line.
     const top = want[0];
     const saved = top.value;
     top.value = saved - 100;
@@ -266,13 +265,8 @@ try {
     document.dispatchEvent(new CustomEvent('oh:home'));
     await tick();
     const g = rows()[0]?.querySelector('.gain');
-    // At melt (the meltValue flag, every build from 0.5.9) there's no gain over what was
-    // paid to show: the list is at melt itself (ui/lib/most-valuable.js).
-    r.gain = window.OH.flags?.meltValue
-      ? !g
-      : !!g &&
-        /^\+.*100 over what you paid$/.test(g.textContent.trim()) &&
-        !g.classList.contains('down');
+    // At melt there's no gain over what was paid to show (ui/lib/most-valuable.js).
+    r.gain = !g;
     top.value = saved;
     state.items = [...state.items];
     document.dispatchEvent(new CustomEvent('oh:home'));
@@ -393,7 +387,7 @@ try {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await wait(80);
     r.popEsc = !$('#cc-pop-con') && document.activeElement === con;
-    // Row 2: three across, ending level; Account Value without the chart or melt line.
+    // Row 2: three across, ending level; Melt Value without the chart.
     const cells = [...document.querySelectorAll('#oh-grid > .oh-cell')].map((c) => c.dataset.card);
     r.order = cells.join(',');
     const box = (id) => $(`#oh-grid > [data-card="${id}"]`).getBoundingClientRect();
@@ -443,7 +437,7 @@ try {
   fin.noChart &&
   fin.counts
     ? ok(
-        'Home rows: Account Value, Latest Acquisitions, Wishlist Watch a third each and level, then Quick Links; no chart or melt line',
+        'Home rows: Melt Value, Latest Acquisitions, Wishlist Watch a third each and level, then Quick Links; no chart',
       )
     : fail(`home rows: ${JSON.stringify(fin)}`);
 
@@ -2593,19 +2587,19 @@ try {
     return {
       title: [...document.querySelectorAll('#stats-body h3')].map((h) => h.textContent).join('|'),
       store: snapshotStore(last),
-      now: accountValue().total,
+      now: meltValue().total,
       dots: document.querySelectorAll('.hist-chart circle').length,
       steps: document.querySelectorAll('#stats-body .hist-step').length,
       tip: document.querySelector('.hist-chart circle:last-of-type title')?.textContent || '',
     };
   });
-  /Account Value Over Time/.test(acct.title) &&
+  /Melt Value Over Time/.test(acct.title) &&
   acct.store > 0 &&
   Math.abs(acct.store - acct.now) < 1 &&
   acct.dots >= 2 &&
   acct.steps >= 1
-    ? ok(`history charts account value (latest ${acct.tip})`)
-    : fail(`account value: ${JSON.stringify(acct)}`);
+    ? ok(`history charts melt value (latest ${acct.tip})`)
+    : fail(`melt value: ${JSON.stringify(acct)}`);
   // Download Backup (the classic [data-backup] handler) updates the line beside it.
   const backup = await page.evaluate(async () => {
     const before = document.querySelector('#stats-body .backup-row').textContent;
@@ -4710,7 +4704,7 @@ try {
       oldLink: /Open Pledges and Settings/.test(document.body.textContent),
     };
   });
-  // Melt Value in Account Value's place (meltValue, every build from 0.5.9).
+  // Melt Value, as the website (owner, 2026-11-02).
   pop.label === 'Melt Value' &&
   !pop.ver &&
   /^\dh ago$/.test(pop.age) &&
@@ -4809,7 +4803,7 @@ try {
       )
     : fail(`popup new since last scan: ${JSON.stringify({ offArrived, ...arr })}`);
   // A new pledge priced in UEC (invented): its row says UEC as the UEC tile counts it,
-  // never "$", and neither the new total nor Account Value counts it (OH.usdValue).
+  // never "$", and neither the new total nor Melt Value counts it (OH.usdValue).
   const uecHook = await page.evaluateOnNewDocument(() => {
     let flags;
     const OH = (window.OH = window.OH || {});
@@ -4919,12 +4913,12 @@ try {
   !huge.wide
     ? ok('huge Store Credit, UEC, REC and tokens are compact, fit at 360 px, full in the tooltip')
     : fail(`popup fit (huge): ${JSON.stringify(huge)}`);
-  // Store Credit is not in Account Value, so the nine digits come from a pledge.
+  // Store Credit is not in Melt Value, so the nine digits come from a pledge.
   const nine = await fitCase({ store: { value: 100 } }, 1, {
     __demoPledge: { id: 9000, name: 'Hangar Decoration - Plush Gold', value: 100000000 },
   });
   nine.value === `$100${nb}M` && nine.fits && !nine.wide
-    ? ok(`a nine-digit Account Value reads ${nine.value} and fits`)
+    ? ok(`a nine-digit Melt Value reads ${nine.value} and fits`)
     : fail(`popup fit (nine digits): ${JSON.stringify(nine)}`);
   // The basic page's notices at the top of every tab (#698, #664): status.json's banner
   // (as plain text) and an update the browser holds, with Reload to Update; the version

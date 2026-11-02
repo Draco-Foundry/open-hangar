@@ -1,5 +1,5 @@
 <script>
-  // Home under the Citizen Card ("Layout B, Final", owner 2026-10-05): Account Value,
+  // Home under the Citizen Card ("Layout B, Final", owner 2026-10-05): Melt Value,
   // Latest Acquisitions and Wishlist Watch a third each, then Quick Links across the
   // whole width. Game Status lives in the top bar. Customize Home shows or hides each
   // card (Hangar Spotlight and Referrals are off by default). A 12-column grid: cards

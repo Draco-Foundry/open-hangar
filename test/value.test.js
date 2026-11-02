@@ -285,7 +285,7 @@ test('getFxRates asks at most once a day, even after a try that failed', async (
   assert.equal(calls, 3);
 });
 
-// Account Value (#164, #165): everything owned, one rule set for today and history.
+// The value split (#164, #165): everything owned, one rule set for today and history.
 test('accountValue counts ships, CCUs, other pledges at melt; Store Credit is its own number', () => {
   const items = [
     {
@@ -324,8 +324,9 @@ test('accountValue counts ships, CCUs, other pledges at melt; Store Credit is it
   assert.equal(v.byId.c, 12);
 });
 
-// The meltValue flag (owner, 2026-11-01): a tester couldn't see how ships at store price
-// and CCUs at standard price made one smaller melt total. At melt the parts add up to it.
+// Melt Value (owner, 2026-11-01; everywhere from 2026-11-02): a tester couldn't see how
+// ships at store price and CCUs at standard price made one smaller melt total. At melt the
+// parts add up to it.
 test('meltValue: ships, CCUs and other at melt, adding up to the melt total', () => {
   const items = [
     {

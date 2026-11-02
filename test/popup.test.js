@@ -451,7 +451,7 @@ test("scan report: the sync's question names the account the scan read", async (
   assert.equal(reportPilot(ask, {}), null, 'no handle known');
 });
 
-test('Account Value since an earlier scan: the newest one that differs, never this one', async () => {
+test('Melt Value since an earlier scan: the newest one that differs, never this one', async () => {
   const { valueSince } = await data();
   const snap = (at, v) => ({ at, items: [['1', 'x', v]] });
   const valueOf = (s) => s.items[0][2];

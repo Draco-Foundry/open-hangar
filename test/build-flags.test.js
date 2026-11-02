@@ -25,7 +25,6 @@ test('registry parses: every flag has a name, a one-line about and a default', a
     'autoScanRun',
     'connector',
     'localMode',
-    'meltValue',
     'newSinceScan',
     'orderHistory',
     'orgFleet',
@@ -75,8 +74,6 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     scanBar: true,
     // New Since Last Scan: off until its words and privacy line are approved.
     newSinceScan: false,
-    // Melt Value in Account Value's place: every build from 0.5.9 (owner, 2026-11-02).
-    meltValue: true,
     // Order History: developer builds only until the privacy policy names it.
     orderHistory: false,
     // Your Subscriber Store: developer builds only until the privacy policy names it.
@@ -142,7 +139,6 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     autoScanRun: false,
     scanBar: true,
     newSinceScan: false,
-    meltValue: false,
     orderHistory: false,
     subStore: false,
     accountLogs: false,
@@ -159,7 +155,6 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     autoScanRun: false,
     scanBar: true,
     newSinceScan: false,
-    meltValue: false,
     orderHistory: false,
     subStore: false,
     accountLogs: false,
@@ -317,8 +312,6 @@ test('pack: writes each build its values and cuts the code of flags that are off
     scanBar: true,
     // New Since Last Scan: off until its words and privacy line are approved.
     newSinceScan: false,
-    // Melt Value in Account Value's place: every build from 0.5.9 (owner, 2026-11-02).
-    meltValue: true,
     // Order History: developer builds only until the privacy policy names it.
     orderHistory: false,
     // Your Subscriber Store: developer builds only until the privacy policy names it.

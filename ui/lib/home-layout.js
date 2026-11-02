@@ -14,7 +14,7 @@ export const MAX_NAME = 24;
 // id, name, shown by default, columns (wide, narrower), note in the drawer.
 export const HOME_CARDS = [
   { id: 'citizen', name: 'Citizen Card', pinned: true, on: true, wide: 12, mid: 12 },
-  { id: 'value', name: 'Account Value', on: true, wide: 4, mid: 6 },
+  { id: 'value', name: 'Melt Value', on: true, wide: 4, mid: 6 },
   { id: 'acquisitions', name: 'Latest Acquisitions', on: true, wide: 4, mid: 6 },
   { id: 'wishlist', name: 'Wishlist Watch', on: true, wide: 4, mid: 6 },
   { id: 'quicklinks', name: 'Quick Links', on: true, wide: 12, mid: 12 },

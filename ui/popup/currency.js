@@ -75,7 +75,7 @@ export function money(usd, fx = USD, { cents = false, most } = {}) {
 // digits and the letter so they never wrap apart. Measured at the popup's narrowest
 // width (360 px; a card's text is about 140 px) with the card font (18 px) and the big
 // number's (32 px, about 328 px wide); test:ui checks the huge cases. The budgets:
-//   Account Value (32 px)         the full figure up to 999,999, then compact
+//   Melt Value (32 px)            the full figure up to 999,999, then compact
 //   Store Credit (18 px, cents)   the full figure up to 9,999.99, then compact
 //   Since-change line (12 px)     the full figure up to 99,999, then compact
 //   UEC and REC (18 px)           the full figure up to 999,999, then compact (the

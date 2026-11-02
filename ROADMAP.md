@@ -294,7 +294,7 @@ Planned, not promised. The order may change.
 [Early 2027 Milestone](https://github.com/Draco-Foundry/open-hangar/milestone/11)
 
 - **Value and Savings:** your hangar's value and what you've saved, on the website, going
-  further than the extension's Account Value. Facts, never financial advice.
+  further than the extension's Melt Value. Facts, never financial advice.
   [#521](https://github.com/Draco-Foundry/open-hangar/issues/521)
 - **Trade Post Builder:** turn the pledges you pick into a tidy, ready-to-paste trade post.
   [#522](https://github.com/Draco-Foundry/open-hangar/issues/522)

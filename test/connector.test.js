@@ -303,7 +303,7 @@ test('popup: money fits its box, the full figure while it fits, then compact', a
   assert.equal(credit(12400).text, `$12.4${nb}K`);
   assert.deepEqual(credit(12000000), { text: `$12${nb}M`, title: '$12,000,000.00', short: true });
   assert.equal(credit(1.2e9).text, `$1.2${nb}B`);
-  // Account Value: the full figure up to $999,999, then compact.
+  // Melt Value: the full figure up to $999,999, then compact.
   const value = (usd) => moneyFit(usd);
   assert.equal(value(999999).text, '$999,999');
   assert.equal(value(999999).short, false);

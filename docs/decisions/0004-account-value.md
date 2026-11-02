@@ -1,5 +1,12 @@
 # 0004: What Account Value Counts
 
+> **Superseded 2026-11-02 (owner: "we need Melt Value globally no account value anymore").**
+> The extension and the website show Melt Value only: every pledge at its melt value
+> (`OH.meltValue()`, the same sum as the website's Melt Value for the same sync), its
+> change since a scan and Stats → History's chart at melt, and no store-price total.
+> Store Credit, buy-backs, UEC and REC still aren't counted. `test/repo-rules.test.js`
+> keeps the old name out of player-facing code. The rest of this page is the record.
+
 - **Date:** 2026-09-30
 - **Sources:** docs/REDESIGN-0.3.md, "Owner's Fix List" items 4 and 6; commit 582da97
   (#173); `OH.accountValue()` and `OH.snapshotValue()` in `src/lib.js`; CHANGELOG.md
