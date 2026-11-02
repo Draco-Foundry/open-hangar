@@ -119,9 +119,9 @@ same: change one, change the other.
 > storage quota. unlimitedStorage lets that data stay in chrome.storage.local on the
 > user's own computer. Nothing is sent to any server.
 
-**`cookies`**
+**`cookies`** (shortened 2026-11-01 for the Chrome dashboard's 1,000-character limit; the owner's OK)
 
-> Used for four things, all on robertsspaceindustries.com. First, "Log Out of RSI": clears RSI's cookies (including the HttpOnly session cookie that page scripts can't remove) so the user can fully end their RSI session from the extension. Second, a guess at whether the user is signed in to RSI: the extension checks only whether RSI's session cookie exists, without contacting RSI. When it's missing, the popup shows "Log In to RSI" first (Scan still works) and Auto Scan Daily skips that day. RSI sets this cookie for signed-out visitors too, so the scan itself confirms. Third, Add to RSI Cart: like RSI's own upgrade window, it reads RSI's session token cookie and sends it back to robertsspaceindustries.com with the cart request the user asked for. Fourth, reading the user's own account history (RSI's pledge log and store credit log) when they ask: it sends RSI's session token cookie back to robertsspaceindustries.com with each page request, as RSI's own Account pages do. Cookie values are never stored and never sent anywhere except RSI.
+> Used on robertsspaceindustries.com only, for four things. 1) Log Out of RSI: clears RSI's cookies, including the HttpOnly session cookie page scripts can't remove. 2) A signed-in guess: checks only whether RSI's session cookie exists, without contacting RSI; if missing, the popup shows "Log In to RSI" first (Scan still works) and Auto Scan Daily skips that day. 3) Add to RSI Cart: like RSI's own upgrade window, sends RSI's session token cookie back to RSI with the cart request the user asked for. 4) The user's own account history (pledge log and store credit log), when they ask: sends RSI's session token cookie back to RSI with each page request, as RSI's Account pages do. Cookie values are never stored and never sent anywhere except RSI.
 
 **`identity`** (added in 0.3.0)
 
