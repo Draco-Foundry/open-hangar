@@ -51,7 +51,11 @@
   const OH = globalThis.OH;
   const AL = globalThis.OHAlerts;
   // Cents for Store Credit, none for a change or a big total.
-  const total = $derived(moneyFit(value ? value.total : v.melt, fx));
+  // Whole dollars, cents when there are some (the website's one money rule, as its Melt
+  // Value card shows it).
+  const cash = (n) =>
+    moneyFit(n, fx, Number.isInteger(Math.round(n * 100) / 100) ? { most: 0 } : { cents: true });
+  const total = $derived(cash(value ? value.total : v.melt));
   const change = $derived(since ? moneyFit(Math.abs(since.delta), fx, { most: 0, full: FIT.change }) : null);
   // UEC's change as the UEC tile shows a count; the line in full on hover when either
   // number is short.
@@ -108,14 +112,11 @@
   const newRows = $derived(
     arrived ? (newAll ? arrived.items.slice(0, NEW_SHOWN) : arrived.items) : [],
   );
-  // Whole dollars, cents when there are some (the website's one money rule).
-  const melt = (n) =>
-    moneyFit(n, fx, Number.isInteger(Math.round(n * 100) / 100) ? { most: 0 } : { cents: true });
-  const newTotal = $derived(arrived ? melt(arrived.total) : null);
+  const newTotal = $derived(arrived ? cash(arrived.total) : null);
   // A row's price: dollars as above, or a UEC price as the UEC tile counts it (countFit),
   // never with a "$" (src/lib.js OH.isUEC).
   const rowMelt = (p) => {
-    if (!OH.isUEC(p)) return melt(p.value);
+    if (!OH.isUEC(p)) return cash(p.value);
     const c = countFit(p.value);
     return c
       ? { text: `${c.text} UEC`, title: c.text !== c.full ? `${c.full} UEC` : null }

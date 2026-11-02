@@ -75,8 +75,8 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     scanBar: true,
     // New Since Last Scan: off until its words and privacy line are approved.
     newSinceScan: false,
-    // Melt Value in Account Value's place: Beta builds first (owner, 2026-11-01).
-    meltValue: false,
+    // Melt Value in Account Value's place: every build from 0.5.9 (owner, 2026-11-02).
+    meltValue: true,
     // Order History: developer builds only until the privacy policy names it.
     orderHistory: false,
     // Your Subscriber Store: developer builds only until the privacy policy names it.
@@ -86,8 +86,8 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     accountLogs: true,
   };
   assert.deepEqual(buildValues(registry), STORE);
-  // The beta is the same set but for meltValue, on there first.
-  assert.deepEqual(buildValues(registry, { beta: true }), { ...STORE, meltValue: true });
+  // The beta is the same set.
+  assert.deepEqual(buildValues(registry, { beta: true }), STORE);
   assert.deepEqual(buildValues(registry, { overrides: { sync: false } }), {
     ...STORE,
     sync: false,
@@ -317,8 +317,8 @@ test('pack: writes each build its values and cuts the code of flags that are off
     scanBar: true,
     // New Since Last Scan: off until its words and privacy line are approved.
     newSinceScan: false,
-    // Melt Value in Account Value's place: Beta builds first (owner, 2026-11-01).
-    meltValue: false,
+    // Melt Value in Account Value's place: every build from 0.5.9 (owner, 2026-11-02).
+    meltValue: true,
     // Order History: developer builds only until the privacy policy names it.
     orderHistory: false,
     // Your Subscriber Store: developer builds only until the privacy policy names it.
@@ -631,9 +631,9 @@ test('pack: writes each build its values and cuts the code of flags that are off
 
     // The beta: exactly the beta set, no overrides. It's the store's (the connector with
     // Local Mode), so the production hangar page is let in and the toolbar opens the
-    // popup, with Melt Value.
+    // popup.
     pack(dir, ['--beta']);
-    const BETA = { ...STORE, meltValue: true };
+    const BETA = STORE;
     assert.deepEqual(built('beta').flags, BETA);
     assert.deepEqual(built('beta-firefox').flags, BETA);
     for (const t of ['beta', 'beta-firefox'])

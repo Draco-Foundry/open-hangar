@@ -251,7 +251,7 @@ test("popup copy: the owner's words (2026-10-13), filled in", async () => {
   assert.doesNotMatch(src, /\[copy:/);
 });
 
-test('popup: UEC and REC are compact for the card and full for the tooltip', async () => {
+test('popup: UEC and REC in full up to 999,999 (as the website), then compact; full in the tooltip', async () => {
   const { compactCount, gameCredit } = await data();
   const nb = ' ';
   const cases = [
@@ -272,6 +272,10 @@ test('popup: UEC and REC are compact for the card and full for the tooltip', asy
   const account = { credits: { uec: { value: 1200000 }, rec: { value: 0 } } };
   assert.deepEqual(gameCredit(account, 'uec'), { text: `1.2${nb}M`, full: '1,200,000' });
   assert.deepEqual(gameCredit(account, 'rec'), { text: '0', full: '0' });
+  const uec = (value) => gameCredit({ credits: { uec: { value } } }, 'uec').text;
+  assert.equal(uec(45000), '45,000', 'in full, as the website writes it');
+  assert.equal(uec(999999), '999,999');
+  assert.equal(uec(1000000), `1${nb}M`);
   assert.equal(gameCredit({ credits: { store: { value: 5 } } }, 'uec'), null);
   assert.equal(gameCredit({ credits: { uec: { value: null } } }, 'uec'), null);
   assert.equal(gameCredit(null, 'rec'), null);
