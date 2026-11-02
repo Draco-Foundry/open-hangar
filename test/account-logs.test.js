@@ -446,6 +446,94 @@ test('a page whose lines none read: RSI changed it, nothing kept', async () => {
   assert.equal(store.accountLogs?.pledge, undefined);
 });
 
+// A long pledge log (173 pages of 25): a scan reads its share, never all of it at once.
+const LONG = 173 * 25;
+const read = (fetchFn) => OH.readAccountLogs({ account: ME, token: 't', fetchFn, pause: noPause });
+const asked = (rsi) => rsi.calls.map((c) => `${c.log}:${c.page}`);
+
+test("a 173-page log: a scan's share of pages, no error, on from there scan by scan", async () => {
+  const rsi = fakeRsi({ pledge: pagesOf(1, LONG), credit: [creditPage] });
+  await OH.wantAccountLogs(ME);
+  const per = OH.ACCOUNT_LOGS_SCAN_PAGES;
+  const first = await read(rsi.fetchFn);
+  assert.equal(first.ok, true, 'a share read is no error');
+  assert.deepEqual(first.parts, { pledge: { did: 'resume-later' } }, 'the credit log waits');
+  assert.equal(rsi.calls.length, per);
+  assert.equal(store.accountLogsLoad.next, per + 1);
+  assert.equal(store.accountLogsLoad.pagecount, 173);
+  assert.equal(store.accountLogs, undefined, 'nothing half read is kept');
+  const scans = [first];
+  while (store.accountLogsLoad && scans.length < 10) {
+    rsi.calls.length = 0;
+    scans.push(await read(rsi.fetchFn));
+    assert.ok(rsi.calls.length <= per, `scan ${scans.length}: ${rsi.calls.length} pages`);
+  }
+  assert.equal(scans.length, Math.ceil(174 / per), 'every page once, then the credit log');
+  assert.ok(scans.every((s) => s.ok));
+  assert.equal(store.accountLogs.pledge.items.length, LONG);
+  assert.equal(store.accountLogs.pledge.pages, 173);
+  assert.equal(store.accountLogs.credit.items.length, 1);
+  assert.equal(store.accountLogsLoad, undefined, 'the load is done');
+});
+
+test('a 173-page log: a 429 mid-load stops both logs with no retry, and goes on from there', async () => {
+  let busy = true;
+  const rsi = fakeRsi({
+    pledge: pagesOf(1, LONG),
+    credit: [creditPage],
+    fail: ({ log, page }) => (busy && log === 'pledge' && page === 20 ? 429 : null),
+  });
+  await OH.wantAccountLogs(ME);
+  const r = await read(rsi.fetchFn);
+  assert.equal(r.ok, false);
+  assert.equal(r.parts.pledge.did, 'resume-later');
+  assert.equal(r.parts.pledge.status, 429);
+  assert.equal(r.parts.credit, undefined);
+  assert.equal(rsi.calls.length, 20, 'no retry, nothing after the 429');
+  assert.equal(store.accountLogsLoad.next, 20);
+  busy = false;
+  rsi.calls.length = 0;
+  delete store.netDown;
+  await read(rsi.fetchFn);
+  assert.equal(asked(rsi)[0], 'pledge:20', 'on from the page RSI said to wait on');
+});
+
+test("a challenge page (not the log's JSON) stops both logs", async () => {
+  const rsi = fakeRsi({ pledge: pagesOf(1, 100), credit: [creditPage] });
+  await OH.wantAccountLogs(ME);
+  const challenge = async (url, init) =>
+    JSON.parse(init.body).page === 3
+      ? new Response('<html><title>Just a moment...</title></html>', { status: 200 })
+      : rsi.fetchFn(url, init);
+  const r = await read(challenge);
+  assert.equal(r.parts.pledge.error, 'bad');
+  assert.equal(r.parts.credit, undefined, 'the credit log waits too');
+  assert.equal(store.accountLogsLoad.next, 3);
+});
+
+test('a malformed page the parser throws on stops that log only, never the read', async () => {
+  const rsi = fakeRsi({ pledge: pagesOf(1, 100), credit: [creditPage] });
+  await OH.wantAccountLogs(ME);
+  const keep = P.parsePledgeLog;
+  let n = 0;
+  P.parsePledgeLog = (html) => {
+    if (++n === 4) throw new TypeError('unexpected shape');
+    return keep(html);
+  };
+  try {
+    const r = await read(rsi.fetchFn);
+    assert.equal(r.parts.pledge.did, 'resume-later');
+    assert.equal(r.parts.pledge.error, 'changed');
+    assert.equal(r.parts.credit.did, 'full', 'the other log is read');
+    assert.equal(store.accountLogs.pledge, undefined, 'nothing half read is kept');
+    // Still wanted: read again (from page 1) once the parser reads that page.
+    assert.equal(store.accountLogsLoad.want, true);
+    assert.deepEqual(store.accountLogsLoad.done, ['credit']);
+  } finally {
+    P.parsePledgeLog = keep;
+  }
+});
+
 test("an empty log (no page or pagecount in RSI's answer) is a whole, empty read", async () => {
   const rsi = fakeRsi({ pledge: [], credit: [] });
   await OH.wantAccountLogs(ME);

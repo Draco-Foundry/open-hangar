@@ -256,6 +256,30 @@ test('scan: its marks (run and by), its heartbeat every 30 seconds at most, gone
   assert.equal(sets(y.session, 'scanRunning')[0].tabId, 7);
 });
 
+test('scan: an Account History load renews the heartbeat page by page, and the scan ends as one', async () => {
+  const x = await setup({ flags: { accountLogs: true } });
+  let asked = null;
+  x.OH.readAccountLogs = async (o) => {
+    asked = o;
+    // 90 log pages, 1.5 seconds apart: over 2 minutes with no other progress.
+    for (let page = 1; page <= 90; page++) {
+      x.clock.t += 1500;
+      o.onProgress?.('pledge', page, 173);
+    }
+    return { ok: true, parts: { pledge: { did: 'resume-later' } } };
+  };
+  const report = await x.runner.scan({ reason: 'popup' });
+  assert.equal(asked.account.nickname, 'Test_Pilot');
+  const marks = sets(x.session, 'scanRunning');
+  const last = marks[marks.length - 1];
+  assert.ok(x.clock.t - last.at < 2 * 60e3, 'never quiet for the 2 minutes of a stopped scan');
+  for (let i = 1; i < marks.length; i++) assert.ok(marks[i].at - marks[i - 1].at < 2 * 60e3);
+  // The load going on next scan is no problem of the scan's: it has its report and syncs.
+  assert.equal(report.bad, false);
+  assert.equal(x.local.data.scanReport.run, 'run-a');
+  assert.ok(x.calls.includes('siteSync auto'));
+});
+
 test('marked: settles once the scan has its mark stored, or once it is held', async () => {
   const x = await setup();
   // A slow session: the mark lands well after the scan has started.
