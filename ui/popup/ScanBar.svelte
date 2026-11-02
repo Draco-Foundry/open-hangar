@@ -21,7 +21,9 @@
     reportPageChanged,
     reportPaused,
     reportRsi,
+    scanDots,
     scanHold,
+    scanLeft,
     scanSteps,
   } from './data.js';
   import { openHub, openTab, rsiSignIn } from './actions.js';
@@ -54,6 +56,13 @@
   // RSI didn't answer the last scan: a 5xx, or its ask to wait (./data.js reportRsi).
   const rsi = $derived(running ? null : reportRsi(lastReport, v?.scannedAt, now));
   const noRsi = $derived(rsiOff || report?.held === 'no-rsi');
+  // Under the bar while it runs (the owner, 2026-11-02): the step dots and the time left,
+  // both from the scan's own estimate. A scan too short for a bar has neither, and no fill.
+  const quick = $derived(running && sc.progress?.quick === true);
+  const dots = $derived(running && !quick ? scanDots(sc.progress?.part, flag('accountLogs')) : null);
+  const left = $derived(
+    running && sc.progress ? scanLeft(sc.progress, Math.max(now, sc.progress.at || 0)) : null,
+  );
 
   // The fill only moves forward within a run (RSI's pager can show more pages as the
   // scan goes). Not state: it's what the bar has shown.
@@ -156,6 +165,7 @@
   {#if bar && bar.tone !== 'note'}
     <div
       class="pp-sbar {bar.tone}"
+      class:quick={bar.tone === 'run' && quick}
       id="pp-sbar"
       role={bar.tone === 'run' ? 'progressbar' : 'status'}
       aria-label={bar.tone === 'run' ? t('popup.scanning-short') : null}
@@ -171,6 +181,16 @@
           >{/if}</span
       >
     </div>
+    {#if bar.tone === 'run' && dots}
+      <div class="pp-sbar-under" id="pp-sbar-under">
+        <span class="pp-dots">
+          {#each dots as d (d.id)}
+            <span class="pp-dot {d.state}" id="pp-dot-{d.id}"><i aria-hidden="true"></i>{t(d.key)}</span>
+          {/each}
+        </span>
+        {#if left}<span class="pp-left" id="pp-left">{t(left.key, left.vars)}</span>{/if}
+      </div>
+    {/if}
   {:else if running}
     <div class="pp-steps" id="pp-steps" aria-live="polite">
       {#if sc.progress}

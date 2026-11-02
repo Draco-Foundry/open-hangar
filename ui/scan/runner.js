@@ -28,7 +28,10 @@
 //                        nothing changed). For referrals, page is the lists read of
 //                        `pages` (3) and count the people read across them. For a
 //                        log's full history (pledgeLog, creditLog), page is the pages
-//                        read so far and pages RSI's pagecount.
+//                        read so far and pages RSI's pagecount. During a scan also f,
+//                        next, left, quick: the share done weighted by time, where the
+//                        next request puts it, the ms left and a scan too short for a
+//                        bar (ui/lib/scan-pace.js)
 //   local scanReport     the last scan's report (REPORT_V, below), ids and counts only
 //   local scanStarted    { run, by, reason, at }: the last scan that began. Unlike the
 //                        session marks it outlasts the browser closing mid-scan (the
@@ -48,6 +51,7 @@
 //                        again
 import { afterScan, retryDue, scanElsewhere, syncWhen } from './sync-timing.js';
 import { importWishlist } from './wishlist-import.js';
+import { createPace } from '../lib/scan-pace.js';
 import {
   ASKS,
   PARTS,
@@ -173,6 +177,7 @@ export function createRunner(env) {
   let progressAt = 0;
   let progressPart = null;
   let progressTimer = null;
+  let paceNow = null; // this scan's timing (ui/lib/scan-pace.js), from begin() to its end
   function setProgress(part, page = null, count = null, retry = null, pages = null) {
     const p = {
       part,
@@ -181,6 +186,7 @@ export function createRunner(env) {
       retry: retry ? { attempt: retry.attempt, of: retry.of } : null,
       pages: Number.isInteger(pages) && pages > 0 ? pages : null,
     };
+    if (paceNow) Object.assign(p, paceNow.step(p, now()));
     hooks.progress?.(p);
     // While this page scans, every step it takes renews its heartbeat (the packs read
     // after it, and the sync, have none: their progress is their own).
@@ -207,6 +213,7 @@ export function createRunner(env) {
     progressNow = null;
     progressAt = 0;
     progressPart = null;
+    paceNow = null;
     if (session && was) queue(() => session.remove('scanProgress'));
   }
   // A page that goes away mid-scan takes its marks with it.
@@ -325,7 +332,7 @@ export function createRunner(env) {
   };
 
   // → the report (REPORT_V): { v, run, by, reason, startedAt, at, ms, held, signedOut,
-  // switched, rows: [{ id, ok, partial, n, error }], bad, sync }, or null when this page
+  // switched, rows: [{ id, ok, partial, n, error }], bad, sync, pace }, or null when this page
   // is scanning already. A row's ok: that part was read and saved (partial: why it's
   // short); bad: true when a row isn't ok or is partial. held: 'busy' (another page is
   // scanning), 'no-rsi' (no access to RSI: nothing read), 'paused' (status.json paused
@@ -333,7 +340,9 @@ export function createRunner(env) {
   // none. wait: when RSI kept asking it to slow down, the time it may be asked again
   // (scanWait), else null; absent from a held report. rsiDown: a part RSI didn't answer
   // for (a 5xx, or a 429 after every retry), whether or not it also asked to wait; the
-  // popup and the basic page say so instead of showing the error or Log In to RSI.
+  // popup and the basic page say so instead of showing the error or Log In to RSI. pace:
+  // each part's ms per request and requests read ({ hangar: { ms, n }, … }), for the next
+  // scan's bar (ui/lib/scan-pace.js); absent from a held report.
   let starting = false;
   let marked = Promise.resolve(); // marked(), below
   // The start every scan shares (Scan's and Auto Scan Daily's): → true once this page is
@@ -360,6 +369,9 @@ export function createRunner(env) {
     }
     hooks.start?.();
     started();
+    // The last scan's pace weighs this one's bar (ui/lib/scan-pace.js).
+    const { scanReport: last } = await store.get('scanReport').catch(() => ({}));
+    paceNow = createPace(last?.pace, now());
     setProgress('start');
     mark(true);
     writes.then(markedDone);
@@ -512,6 +524,7 @@ export function createRunner(env) {
       sync: null,
       wait,
       rsiDown,
+      pace: paceNow?.result(now()) ?? null,
     };
     await writeReport(report);
     // Whatever the page or the sync does next, the progress goes at the end.
