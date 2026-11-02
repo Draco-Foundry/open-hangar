@@ -280,6 +280,28 @@ test('scan: an Account History load renews the heartbeat page by page, and the s
   assert.ok(x.calls.includes('siteSync auto'));
 });
 
+test('scan: the hangar is saved before Account History is read, and a log read that fails costs it nothing', async () => {
+  const x = await setup({ flags: { accountLogs: true } });
+  x.OH.readAccountLogs = async () => {
+    x.calls.push('readAccountLogs');
+    throw new Error('the log read broke');
+  };
+  const report = await x.runner.scan({ reason: 'popup' });
+  const at = (c) => x.calls.indexOf(c);
+  assert.ok(at('scanSource hangar') >= 0 && at('scanSource hangar') < at('readAccountLogs'));
+  assert.ok(at('scanSource buybacks') < at('readAccountLogs'));
+  assert.equal(report.bad, false);
+  assert.deepEqual(
+    report.rows.map((r) => [r.id, r.ok]),
+    [
+      ['hangar', true],
+      ['buybacks', true],
+      ['referrals', true],
+    ],
+  );
+  assert.ok(x.calls.includes('siteSync auto'), 'the scan still syncs');
+});
+
 test('marked: settles once the scan has its mark stored, or once it is held', async () => {
   const x = await setup();
   // A slow session: the mark lands well after the scan has started.
