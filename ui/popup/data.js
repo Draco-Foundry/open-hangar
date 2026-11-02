@@ -156,6 +156,20 @@ export function staleAge(age, stale) {
 // --- The scan, from the shared keys (session scanRunning and scanProgress, local
 // scanReport) -----------------------------------------------------------------------
 const STEPS = ['hangar', 'buybacks', 'referrals'];
+// RSI Account Logs (the accountLogs flag): a log's full history, read after the packs
+// and before the sync (ui/scan/runner.js), page of RSI's pagecount.
+const LOG_PARTS = ['pledgeLog', 'creditLog'];
+// The line for a log's full history being read, the same in Settings and on the scan bar:
+// `p` { part: 'pledgeLog' | 'creditLog', page, pages } → { key, vars } or null.
+export function logsLine(p) {
+  if (!isObj(p) || !LOG_PARTS.includes(p.part) || !(Number.isFinite(p.pages) && p.pages > 0))
+    return null;
+  const page = Number.isFinite(p.page) && p.page > 0 ? Math.min(p.page, p.pages) : 0;
+  return {
+    key: p.part === 'creditLog' ? 'popup.account-logs-credit' : 'popup.account-logs-pledge',
+    vars: { page, pages: p.pages },
+  };
+}
 // How far along each part is, start and end, for the bar under the header. Pages are
 // counted as they come (RSI never says how many), so a part fills towards its end.
 const SPAN = {
@@ -165,6 +179,8 @@ const SPAN = {
   buybacks: [0.5, 0.8],
   referrals: [0.8, 0.9],
   packs: [0.9, 0.95],
+  pledgeLog: [0.95, 0.97],
+  creditLog: [0.95, 0.97],
   sync: [0.95, 0.98],
 };
 export function progressFraction(p) {
@@ -174,7 +190,9 @@ export function progressFraction(p) {
 }
 // The three steps the popup lists ('done' | 'now' | 'todo'), for the part running.
 export function scanSteps(part) {
-  const at = part === 'packs' || part === 'sync' ? STEPS.length : Math.max(0, STEPS.indexOf(part));
+  const at = ['packs', 'sync', ...LOG_PARTS].includes(part)
+    ? STEPS.length
+    : Math.max(0, STEPS.indexOf(part));
   return STEPS.map((id, i) => ({ id, state: i < at ? 'done' : i === at ? 'now' : 'todo' }));
 }
 
@@ -190,7 +208,10 @@ const BAR_SPAN = {
   buybacks: [0.55, 0.85],
   referrals: [0.85, 0.9],
   packs: [0.9, 0.95],
-  sync: [0.95, 1],
+  // A log's full history can be most of a first scan's time: it fills by page of pages.
+  pledgeLog: [0.95, 0.98],
+  creditLog: [0.95, 0.98],
+  sync: [0.98, 1],
 };
 const counted = (n) => Number.isFinite(n) && n > 0;
 // How much of the part is read, 0 to 1. The hangar and buy-backs by page of RSI's pager
@@ -199,7 +220,8 @@ const counted = (n) => Number.isFinite(n) && n > 0;
 function partDone(p) {
   const page = counted(p.page) ? p.page : 0;
   if (p.part === 'packs') return counted(p.count) ? Math.min(1, page / p.count) : 0;
-  if (p.part === 'referrals') return counted(p.pages) ? Math.min(1, page / p.pages) : 0;
+  if (p.part === 'referrals' || LOG_PARTS.includes(p.part))
+    return counted(p.pages) ? Math.min(1, page / p.pages) : 0;
   if (p.part !== 'hangar' && p.part !== 'buybacks') return 0;
   const read = p.retry ? Math.max(0, page - 1) : page;
   if (counted(p.pages)) return Math.min(1, read / Math.max(p.pages, page));
@@ -217,7 +239,8 @@ export function barFraction(p) {
 // not wait on a page). A part that reads no pages creeps towards its end.
 export function barNext(p) {
   const [, to] = BAR_SPAN[p?.part] || BAR_SPAN.start;
-  if (!isObj(p) || !['hangar', 'buybacks', 'referrals', 'packs'].includes(p.part)) return to;
+  if (!isObj(p) || !['hangar', 'buybacks', 'referrals', 'packs', ...LOG_PARTS].includes(p.part))
+    return to;
   const page = counted(p.page) ? p.page : 0;
   const read = p.retry ? Math.max(0, page - 1) : page;
   return Math.min(to, barFraction({ ...p, page: read + 1, retry: null }));
@@ -231,12 +254,15 @@ const BAR_KEY = {
   packs: 'popup.part-packs',
   sync: 'popup.part-sync',
 };
-// The bar's words: → { key, n }. key: the part's copy key (while RSI asks the scan to
-// wait and it tries again, that instead); n: what counts up on the right, '' for none:
-// pledges, buy-backs or people read, or packs read of packs to read ("3 / 6").
+// The bar's words: → { key, n, vars? }. key: the part's copy key (while RSI asks the
+// scan to wait and it tries again, that instead); n: what counts up on the right, '' for
+// none: pledges, buy-backs or people read, or packs read of packs to read ("3 / 6"). A
+// log's full history: its line (logsLine), with its page in the words.
 export function barLabel(p) {
   if (!isObj(p)) return { key: 'popup.scanning-short', n: '' };
   if (p.retry) return { key: 'popup.rsi-waiting', n: '' };
+  const logs = logsLine(p);
+  if (logs) return { ...logs, n: '' };
   const key = BAR_KEY[p.part] || 'popup.scanning-short';
   const num = (x) => (Number.isFinite(x) && x >= 0 ? x.toLocaleString('en-US') : '');
   if (p.part === 'packs')

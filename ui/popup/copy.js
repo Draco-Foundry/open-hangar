@@ -196,12 +196,15 @@ const COPY = {
   'popup.stay': 'Stay Connected',
   // RSI Account Logs (the `accountLogs` flag, every build from 0.5.8): the Settings row
   // and its switch (on asks for the full history, src/lib.js wantAccountLogs; off stops
-  // and removes the logs, stopAccountLogs), the button that reads the whole history
-  // again, and the line under it while a log is read. Approved in Words, 2026-11-01.
+  // and removes the logs, stopAccountLogs), and the line while a log's full history is
+  // read, in Settings and on the scan bar (ui/popup/data.js logsLine). Approved in Words,
+  // 2026-11-01.
   'popup.account-logs': 'Account History',
-  'popup.account-logs-load': 'Load Full History',
   'popup.account-logs-pledge': 'Pledge log: page {page} of {pages}',
   'popup.account-logs-credit': 'Store credit log: page {page} of {pages}',
+  // The switch's hint while it's off or a full history is still to read, and under the
+  // line while one is read (Words popup.account-logs-first-scan, approved 2026-11-02).
+  'popup.account-logs-first-scan': 'First scan will take several minutes.',
   // The Daily Scan Reminder (the `autoScan` flag): its switch, in the openhangar.space
   // group, and the lines under it (ui/popup/data.js reminderLine). Claude chat, Words,
   // 2026-10-25. Its hint line was dropped by the owner, 2026-10-31.

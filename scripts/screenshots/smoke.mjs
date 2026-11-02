@@ -5037,7 +5037,8 @@ try {
     autoScan: /Daily Scan Reminder|Auto Scan Daily/.test(document.body.textContent),
     // RSI Account Logs (on in store builds from 0.5.8): the switch, off until turned on.
     logsSw: document.getElementById('pp-logs-sw')?.getAttribute('aria-checked'),
-    logsLoad: !!document.getElementById('pp-logs-load'),
+    // Off: the first-scan note as its hint (no Load Full History since 0.5.9).
+    logsFirst: document.getElementById('pp-logs-first')?.textContent,
     // In the openhangar.space box with the other switches (owner, 2026-11-01).
     logsInSite: !!document.querySelector('#pp-site #pp-logs-sw'),
   }));
@@ -5069,10 +5070,10 @@ try {
   set.look === 'auto' &&
   !set.autoScan &&
   set.logsSw === 'false' &&
-  !set.logsLoad &&
+  set.logsFirst === 'First scan will take several minutes.' &&
   set.logsInSite
     ? ok(
-        'Settings: every group, no Store Alerts switch, the shortcut, Account History off in the site box, no Auto Scan Daily or Notifications row until connected',
+        'Settings: every group, no Store Alerts switch, the shortcut, Account History off in the site box with its first-scan note, no Auto Scan Daily or Notifications row until connected',
       )
     : fail(`popup settings: ${JSON.stringify({ set, setMissing })}`);
   // The layout (owner, 2026-10-24): Notifications inside the openhangar.space box; Look,
@@ -5757,6 +5758,18 @@ try {
   await barProg({ part: 'hangar', page: 3, count: 1214, pages: 4, retry: { attempt: 1, of: 3 } });
   await sleep(100);
   const barWait = await sbar();
+  // RSI Account Logs: a full history read names its page of RSI's pages on the bar, with
+  // the first-scan note under it.
+  await barProg({ part: 'pledgeLog', page: 121, pages: 173 });
+  await sleep(100);
+  const barLogs = {
+    ...(await sbar()),
+    first: await page.$eval('#pp-logs-first', (e) => e.textContent).catch(() => null),
+  };
+  barLogs.text?.[0] === 'Pledge log: page 121 of 173' &&
+  barLogs.first === 'First scan will take several minutes.'
+    ? ok('scan bar: a full Account History read shows its page of pages and the first-scan note')
+    : fail(`scan bar logs: ${JSON.stringify(barLogs)}`);
   await told(
     { scanRunning: { newValue: undefined }, scanProgress: { newValue: undefined } },
     'session',
