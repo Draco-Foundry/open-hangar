@@ -5408,14 +5408,16 @@
   // amount, a pledge's id and name (never a handle or an email). Two ways to read, one
   // log after the other:
   // - The full history, once, when the pilot asks (OH.wantAccountLogs): every page,
-  //   paced 0.5 to 1.5 s apart, its progress saved after each page (ACCOUNT_LOGS_LOAD) so
-  //   a stopped load goes on from the next page. Newest first means a line added
+  //   paced 0.5 to 1.5 s apart, its progress saved after each page (ACCOUNT_LOGS_LOAD)
+  //   so a stopped load goes on from the next page. Newest first means a line added
   //   meanwhile pushes older ones onto later pages: a resumed load reads some lines twice
   //   (kept once), never skips one. Nothing is kept as the log until the last page is in.
   // - Day to day, once the full history is in: from page 1 until a page holds a line
   //   already kept, usually one page. One that finds none within ACCOUNT_LOGS_DAILY_PAGES
   //   keeps nothing and asks for the full history again.
-  // A 401/403/429/5xx or no answer stops the read; nothing half read is kept. Each log has
+  // A 401/403/429/5xx, no answer or an answer that isn't the log's JSON (a challenge
+  // page) stops the read, with no retry; nothing half read is kept. A page the parser
+  // can't read stops that log only. Each log has
   // its own pause switch in status.json (sources.pledgeLog, sources.creditLog;
   // docs/RSI-CHANGES.md).
   const ACCOUNT_LOGS_KEY = 'accountLogs';
@@ -5558,7 +5560,13 @@
     const count = Number(data.pagecount);
     const pagecount = Number.isInteger(count) && count > 0 ? count : 0;
     const html = typeof data.rendered === 'string' ? data.rendered : '';
-    const { items, unread } = html ? part.read(html) : { items: [], unread: 0 };
+    let read;
+    try {
+      read = html ? part.read(html) : { items: [], unread: 0 };
+    } catch (e) {
+      return { error: 'changed', msg: e?.message || String(e) };
+    }
+    const { items, unread } = read;
     // A page with lines and none of them read: RSI changed it. Stop, keep nothing.
     if (!items.length && unread) return { error: 'changed', msg: `${unread} lines unread` };
     return { items, unread, pagecount };
@@ -5567,7 +5575,10 @@
   // Read what's due for each log: a full load asked for or under way, else the day's new
   // lines once the full history is in, else nothing.
   // → { ok, parts: { pledge, credit } }, each { did: 'full' | 'daily' | 'none' | 'paused'
-  // | 'resume-later', n?, error? }, or { ok: false, error: 'signed-out' }.
+  // | 'resume-later', n?, error? }, or { ok: false, error: 'signed-out' }. `pages`: at
+  // most this many full-history pages in this read, then 'resume-later' with no error and
+  // the load goes on next read. No limit by default: the privacy policy says the next
+  // scan you start reads every page (ui/scan/runner.js renews its heartbeat meanwhile).
   // `onProgress(part, page, pagecount)` after each full-history page. `dailyOnly` (Auto
   // Scan Daily, ui/scan/runner.js autoScan): never the full history, which waits for a scan
   // the pilot starts ('none'). Never throws.
@@ -5578,16 +5589,17 @@
     token,
     onProgress = () => {},
     dailyOnly = false,
+    pages = Infinity,
   } = {}) {
     if (accountLogsInflight) return accountLogsInflight;
-    accountLogsInflight = readLogs({ account, fetchFn, pause, token, onProgress, dailyOnly })
+    accountLogsInflight = readLogs({ account, fetchFn, pause, token, onProgress, dailyOnly, pages })
       .catch((e) => ({ ok: false, error: 'network', msg: e?.message }))
       .finally(() => {
         accountLogsInflight = null;
       });
     return accountLogsInflight;
   };
-  async function readLogs({ account, fetchFn, pause, token, onProgress, dailyOnly }) {
+  async function readLogs({ account, fetchFn, pause, token, onProgress, dailyOnly, pages }) {
     const acct = account === undefined ? await OH.getAccount().catch(() => null) : account;
     if (!acct || acct.loggedIn !== true || !acct.nickname)
       return { ok: false, error: 'signed-out' };
@@ -5595,7 +5607,11 @@
     if (!tok) return { ok: false, error: 'signed-out' };
     const get = OH.guarded(fetchFn, { timeout: 20000 });
     let asked = 0; // requests so far: every one after the first waits `pause`
-    const ask = async (part, page) => {
+    // A full load's pages this scan, at most `pages`; a day's read is never held.
+    let loaded = 0;
+    const ask = async (part, page, full = false) => {
+      if (full && loaded >= pages) return { held: true };
+      if (full) loaded++;
       if (asked++) await pause();
       return accountLogPage(part, page, tok, get);
     };
@@ -5620,9 +5636,12 @@
       parts[part.id] = r;
       if (r.error) {
         OH.log('warn', part.source, `log read stopped: ${r.error} ${r.status || ''}`.trim());
-        // RSI said no or to wait: the other log waits too.
-        if (['refused', 'busy', 'network'].includes(r.error)) break;
+        // RSI said no or to wait, or answered with a page that isn't the log (a challenge
+        // page): the other log waits too.
+        if (['refused', 'busy', 'network', 'bad'].includes(r.error)) break;
       }
+      // This scan's share is read: the other log waits for the next scan.
+      if (r.did === 'resume-later' && !r.error) break;
     }
     return { ok: !Object.values(parts).some((p) => p.error), parts };
   }
@@ -5649,7 +5668,8 @@
     const save = (more) =>
       mutateStored(ACCOUNT_LOGS_LOAD, (cur) => (sameNick(cur, acct) ? { ...cur, ...more } : cur));
     while (pagecount == null || next <= pagecount) {
-      const r = await ask(part, next);
+      const r = await ask(part, next, true);
+      if (r.held) return { did: 'resume-later' };
       if (r.error) return { did: 'resume-later', ...r };
       pagecount = r.pagecount;
       items = OH.mergeAccountLog(part.id, items, r.items);

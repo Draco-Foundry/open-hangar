@@ -464,9 +464,10 @@ export function createRunner(env) {
         // RSI Account Logs (the accountLogs build flag, src/lib.js readAccountLogs): the
         // full history once the pilot asks for it (resumed scan by scan), then the day's
         // new lines, before the sync so it carries them. Not a row of the scan: problems
-        // go to the log, a load's progress to its own stored key.
+        // go to the log, a load's progress to its own stored key. Each page renews the
+        // heartbeat: a load runs past the 2 minutes a quiet scan counts as stopped.
         if (flag('accountLogs') && !signedOut && OH.readAccountLogs)
-          await OH.readAccountLogs({ account }).catch(() => {});
+          await OH.readAccountLogs({ account, onProgress: () => mark(true) }).catch(() => {});
       }
     } catch (e) {
       rows.push({
