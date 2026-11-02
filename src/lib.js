@@ -5408,9 +5408,8 @@
   // amount, a pledge's id and name (never a handle or an email). Two ways to read, one
   // log after the other:
   // - The full history, once, when the pilot asks (OH.wantAccountLogs): every page,
-  //   paced 0.5 to 1.5 s apart, at most ACCOUNT_LOGS_SCAN_PAGES a scan, its progress
-  //   saved after each page (ACCOUNT_LOGS_LOAD) so the next scan goes on from the next
-  //   page. Newest first means a line added
+  //   paced 0.5 to 1.5 s apart, its progress saved after each page (ACCOUNT_LOGS_LOAD)
+  //   so a stopped load goes on from the next page. Newest first means a line added
   //   meanwhile pushes older ones onto later pages: a resumed load reads some lines twice
   //   (kept once), never skips one. Nothing is kept as the log until the last page is in.
   // - Day to day, once the full history is in: from page 1 until a page holds a line
@@ -5425,9 +5424,6 @@
   const ACCOUNT_LOGS_LOAD = 'accountLogsLoad';
   // A day's read: up to 200 new lines (8 pages of RSI's 25).
   const ACCOUNT_LOGS_DAILY_PAGES = () => Math.ceil(200 / RULES.accountLogs.pageSize);
-  // A scan's share of a full history load (about a minute at the pace above), so a long
-  // log never holds a scan open for minutes: the rest goes on next scan.
-  OH.ACCOUNT_LOGS_SCAN_PAGES = 50;
   OH.ACCOUNT_LOG_MAX = 10000; // lines kept per log, newest first (storage budget)
   // What makes a line itself: its time, pledge, event and order (a claimed gift keyed
   // the same, yours or received).
@@ -5579,8 +5575,10 @@
   // Read what's due for each log: a full load asked for or under way, else the day's new
   // lines once the full history is in, else nothing.
   // → { ok, parts: { pledge, credit } }, each { did: 'full' | 'daily' | 'none' | 'paused'
-  // | 'resume-later', n?, error? }, or { ok: false, error: 'signed-out' }. 'resume-later'
-  // with no error: this scan's `pages` were read, the load goes on next scan.
+  // | 'resume-later', n?, error? }, or { ok: false, error: 'signed-out' }. `pages`: at
+  // most this many full-history pages in this read, then 'resume-later' with no error and
+  // the load goes on next read. No limit by default: the privacy policy says the next
+  // scan you start reads every page (ui/scan/runner.js renews its heartbeat meanwhile).
   // `onProgress(part, page, pagecount)` after each full-history page. `dailyOnly` (Auto
   // Scan Daily, ui/scan/runner.js autoScan): never the full history, which waits for a scan
   // the pilot starts ('none'). Never throws.
@@ -5591,7 +5589,7 @@
     token,
     onProgress = () => {},
     dailyOnly = false,
-    pages = OH.ACCOUNT_LOGS_SCAN_PAGES,
+    pages = Infinity,
   } = {}) {
     if (accountLogsInflight) return accountLogsInflight;
     accountLogsInflight = readLogs({ account, fetchFn, pause, token, onProgress, dailyOnly, pages })

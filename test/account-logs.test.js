@@ -446,16 +446,27 @@ test('a page whose lines none read: RSI changed it, nothing kept', async () => {
   assert.equal(store.accountLogs?.pledge, undefined);
 });
 
-// A long pledge log (173 pages of 25): a scan reads its share, never all of it at once.
+// A long pledge log (173 pages of 25).
 const LONG = 173 * 25;
-const read = (fetchFn) => OH.readAccountLogs({ account: ME, token: 't', fetchFn, pause: noPause });
+const read = (fetchFn, more) =>
+  OH.readAccountLogs({ account: ME, token: 't', fetchFn, pause: noPause, ...more });
 const asked = (rsi) => rsi.calls.map((c) => `${c.log}:${c.page}`);
 
-test("a 173-page log: a scan's share of pages, no error, on from there scan by scan", async () => {
+test('a 173-page log: the next scan reads every page, as the privacy policy says', async () => {
   const rsi = fakeRsi({ pledge: pagesOf(1, LONG), credit: [creditPage] });
   await OH.wantAccountLogs(ME);
-  const per = OH.ACCOUNT_LOGS_SCAN_PAGES;
-  const first = await read(rsi.fetchFn);
+  const r = await read(rsi.fetchFn);
+  assert.equal(r.ok, true);
+  assert.equal(rsi.calls.length, 174);
+  assert.equal(store.accountLogs.pledge.items.length, LONG);
+  assert.equal(store.accountLogsLoad, undefined, 'the load is done');
+});
+
+test("a 173-page log with a page limit: each read's share, no error, on from there", async () => {
+  const rsi = fakeRsi({ pledge: pagesOf(1, LONG), credit: [creditPage] });
+  await OH.wantAccountLogs(ME);
+  const per = 50;
+  const first = await read(rsi.fetchFn, { pages: per });
   assert.equal(first.ok, true, 'a share read is no error');
   assert.deepEqual(first.parts, { pledge: { did: 'resume-later' } }, 'the credit log waits');
   assert.equal(rsi.calls.length, per);
@@ -465,7 +476,7 @@ test("a 173-page log: a scan's share of pages, no error, on from there scan by s
   const scans = [first];
   while (store.accountLogsLoad && scans.length < 10) {
     rsi.calls.length = 0;
-    scans.push(await read(rsi.fetchFn));
+    scans.push(await read(rsi.fetchFn, { pages: per }));
     assert.ok(rsi.calls.length <= per, `scan ${scans.length}: ${rsi.calls.length} pages`);
   }
   assert.equal(scans.length, Math.ceil(174 / per), 'every page once, then the credit log');
