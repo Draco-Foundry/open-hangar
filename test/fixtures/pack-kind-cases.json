@@ -37,6 +37,25 @@
       "want": "pack"
     },
     {
+      "why": "one vehicle with only its paint is the vehicle, whatever the category",
+      "name": "3.21 Referral Reward - HoverQuad",
+      "contents": [
+        { "kind": "Vehicle", "label": "HoverQuad" },
+        { "kind": "Insurance", "label": "Lifetime Insurance" },
+        { "kind": "Paint", "label": "HoverQuad Copperhead Paint" }
+      ],
+      "want": null
+    },
+    {
+      "why": "one ship with only its paint and a name saying Pack is a Pack",
+      "name": "Packs - Arrow Collector Pack",
+      "contents": [
+        { "kind": "Ship", "label": "Arrow" },
+        { "kind": "Paint", "label": "Arrow Frostbite Paint" }
+      ],
+      "want": "pack"
+    },
+    {
       "why": "a standalone ship with a paint thrown in stays the ship",
       "name": "Standalone Ships - Cutter plus Groundswell Paint",
       "contents": [

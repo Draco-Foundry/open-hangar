@@ -89,6 +89,16 @@
     const kinds = new Set(things);
     if (ships.length > 1) return 'pack';
     if (kinds.size === 1) return null;
+    // One ship or vehicle with only looks beside it (its paint, flair, a hangar decoration)
+    // is that ship, unless the name says Pack: the website's rule (its lib/item-kind.ts
+    // decidePledge), held to the same cases.
+    const LOOKS = /^(paint|flair|hangar decorations?)$/;
+    if (
+      ships.length === 1 &&
+      things.every((k) => k === 'ship' || k === 'vehicle' || LOOKS.test(k)) &&
+      !PACK_NAME.test(name)
+    )
+      return null;
     // One ship and more: a Pack, unless RSI sells it as a standalone ship.
     if (ships.length) return RULES.categories.ship.test(cat) ? null : 'pack';
     if (
