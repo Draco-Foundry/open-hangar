@@ -53,7 +53,7 @@ every store is `support@openhangar.space`. The account setup is kept in the main
 
 - ✅ **Screenshots** (1–5 required), **1280×800** or 640×400 PNG/JPG, from 0.4.0 the
   toolbar popup's (real UI, fictional demo account), with their AMO captions:
-  1. Hangar: `docs/store-assets/screenshot-040-1-hangar.jpg`, "Your hangar at a glance:
+  1. Hangar: `docs/store-assets/screenshot-059-1-hangar.jpg`, "Your hangar at a glance:
      portrait, Melt Value, Store Credit, Fleet News and Scan."
   2. Wishlist: `docs/store-assets/screenshot-040-2-wishlist.jpg`, "Add to your Wishlist
      right from the popup." (retaken for 0.4.1, with no Target Price)
