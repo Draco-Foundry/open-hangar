@@ -279,33 +279,6 @@ export function barLabel(p) {
     return { key, n: num(p.count) };
   return { key, n: '' };
 }
-// The time left under the bar, from the scan's own estimate (`left`, ms when it was
-// written at `at`), counting down between writes: → { key, vars } or null (no estimate
-// yet, or a scan too short for a bar). Minutes rounded up.
-export function scanLeft(p, now = Date.now()) {
-  if (!timed(p) || p.quick || !Number.isFinite(p.left)) return null;
-  const ms = p.left - (Number.isFinite(p.at) ? Math.max(0, now - p.at) : 0);
-  if (ms < 60e3) return { key: 'popup.left-soon', vars: {} };
-  return { key: 'popup.left-min', vars: { n: Math.ceil(ms / 60e3) } };
-}
-// The dots under the bar, for the part running: Hangar (and the account read before it),
-// Buy-Backs (with referrals and the buy-backs' own pages) and, with Account History, Logs.
-// → [{ id, key, state: 'done' | 'now' | 'todo' }]. The sync after: every dot done.
-const DOTS = [
-  { id: 'hangar', key: 'popup.step-hangar', parts: ['start', 'account', 'hangar'] },
-  { id: 'buybacks', key: 'popup.step-buybacks', parts: ['buybacks', 'referrals', 'packs'] },
-  { id: 'logs', key: 'popup.dot-logs', parts: LOG_PARTS },
-];
-export function scanDots(part, logs = false) {
-  const dots = logs ? DOTS : DOTS.slice(0, 2);
-  const at = part === 'sync' ? dots.length : dots.findIndex((d) => d.parts.includes(part));
-  return dots.map(({ id, key }, i) => ({
-    id,
-    key,
-    state: at < 0 ? 'todo' : i < at ? 'done' : i === at ? 'now' : 'todo',
-  }));
-}
-
 // Scan held back: RSI kept asking the last scan to slow down (its report's `wait`,
 // ui/scan/runner.js scanWait) and that time hasn't come. → the time (ms), or null.
 export function scanHold(report, now = Date.now()) {
