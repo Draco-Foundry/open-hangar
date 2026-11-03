@@ -258,6 +258,8 @@ async function popupSettingsShot(browser) {
   };
   // The Hangar tab's Fleet News: a Wishlist ship on sale and a limited-time sale.
   if (process.env.OH_SHOT_TAB === 'hangar') {
+    // No picture: the popup draws its person outline, as the 0.4.0 shot did.
+    delete seed.__demoAvatar;
     seed.__demoAlerts = {
       alertsOn: true,
       alerts: {
