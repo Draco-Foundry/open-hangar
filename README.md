@@ -24,7 +24,7 @@ never sold.
 > Unofficial fan project, not affiliated with Cloud Imperium Games or RSI. Open Hangar only
 > ever reads **your own** account.
 
-![Open Hangar's toolbar popup, shown with a demo account](docs/store-assets/screenshot-040-1-hangar.jpg)
+![Open Hangar's toolbar popup, shown with a demo account](docs/store-assets/screenshot-059-1-hangar.jpg)
 
 ## Get Open Hangar
 

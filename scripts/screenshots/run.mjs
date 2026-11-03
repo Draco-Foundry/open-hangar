@@ -23,7 +23,8 @@
  * instead (docs/store-assets/screenshot-058-3-settings.jpg and .png): the demo's
  * connected, signed-in account, the store build's flags (the registry's defaults), on the
  * listing's 1280x800 dark backdrop, as the 0.4.0 set was framed. OH_SHOT_NAME=<name>
- * picks another file name (without the extension).
+ * picks another file name (without the extension); OH_SHOT_TAB=hangar shoots the Hangar
+ * tab instead of Settings.
  */
 
 import http from 'node:http';
@@ -255,14 +256,52 @@ async function popupSettingsShot(browser) {
       accountLogs: {},
     },
   };
+  // The Hangar tab's Fleet News: a Wishlist ship on sale and a limited-time sale.
+  if (process.env.OH_SHOT_TAB === 'hangar') {
+    seed.__demoAlerts = {
+      alertsOn: true,
+      alerts: {
+        v: 1,
+        checkedAt: T0 - 60e3,
+        items: [
+          {
+            id: 'sku-1',
+            name: 'Avenger Titan',
+            kind: 'ship',
+            price: 70,
+            sale: ['listed'],
+            endsOn: null,
+            why: [{ why: 'wishlist', ships: [] }],
+          },
+          {
+            id: 'sku-2',
+            name: 'Cutlass Black',
+            kind: 'ship',
+            price: 110,
+            sale: ['limited'],
+            endsOn: null,
+            why: [{ why: 'limited', ships: ['Cutlass Black'] }],
+          },
+        ],
+        known: { 'sku-1|wishlist': 1, 'sku-2|limited': 2 },
+        seen: { 'sku-1|wishlist': 3, 'sku-2|limited': 3 },
+        gone: {},
+      },
+    };
+  }
   const page = await browser.newPage();
   await page.setViewport({ width: 360, height: 1000, deviceScaleFactor: 1 });
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
   await page.evaluateOnNewDocument((s) => Object.assign(window, s), seed);
   await page.goto(`http://localhost:${PORT}/popup.html`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#pp-tab-settings');
-  await page.click('#pp-tab-settings');
-  await page.waitForSelector('#pp-daily-sw');
+  // OH_SHOT_TAB=hangar keeps the popup's first view (the Hangar tab) instead of Settings.
+  if (process.env.OH_SHOT_TAB === 'hangar') {
+    await page.waitForSelector('#pp-news');
+  } else {
+    await page.click('#pp-tab-settings');
+    await page.waitForSelector('#pp-daily-sw');
+  }
   // The demo shim's manifest says 0.2.7; the shot shows the version it is for.
   const { version } = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
   await page.evaluate((v) => {
