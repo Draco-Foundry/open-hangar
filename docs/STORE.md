@@ -172,25 +172,25 @@ install prompt only names robertsspaceindustries.com.)_
 Only `_locales/en` ships since 0.4.0 (#685), so the stores list English only. A
 language comes back with its real translation.
 
-**Detailed description** (from 0.4.0):
+**Detailed description** (0.5.9, the owner's word-for-word OK 2026-11-03):
 
 The store fields are plain text: paste it without the `>` quote marks and the `**` bold
 markers, with each paragraph and each • bullet on one line.
 
 > **Your Star Citizen hangar, one click away.**
 >
-> Open Hangar reads your pledges, buy-backs, balances and referrals from RSI with the session you're already signed in with, and shows them in a popup and on our hangar page. Free, no password, no account needed.
+> Open Hangar reads your pledges, buy-backs, balances and referrals from RSI with the session you're already signed in with, and shows them in a popup and on openhangar.space. Free, with no paid features. No password, no account needed.
 >
 > What you get:
 > • Scan: one click reads your hangar and buy-backs from RSI. It runs in the background, with no tab to open
-> • The toolbar popup: your hangar at a glance, Fleet News, your Wishlist and every setting, in three tabs
+> • The toolbar popup: your Melt Value, Store Credit, UEC and Fleet News at a glance, plus your Wishlist and every setting, in three tabs
 > • Your full hangar at hangar.openhangar.space: pledges, buy-backs, fleet stats, values, referrals and more, read from this browser, with no account
-> • Store alerts (optional, with openhangar.space connected): a number on the toolbar button, and a notification if you turn them on, when a Wishlist item set to Remind Me goes on sale. Paints and sales for ships you own show in Fleet News. Matched on your device
+> • Sync (optional): connect a free openhangar.space account to see your hangar on any device and edit your Wishlist from the popup
+> • Account History (optional): reads your RSI pledge log and store credit log, so you can see each pledge's history and what you paid. Off until you turn it on
+> • Store alerts (optional, with sync connected): a number on the toolbar button, and a notification if you turn them on, when a Wishlist item set to Remind Me goes on sale. Paints and sales for ships you own show in Fleet News. Matched on your device
+> • Auto Scan Daily (optional, with sync connected): scans your hangar once a day, only for the RSI account this browser last scanned
 > • Add to RSI Cart: put a ship upgrade (CCU) in your RSI cart in one click. You always check out on RSI yourself
 > • Backups: save your hangar as a JSON or CSV file any time
-> • With openhangar.space connected: edit your Wishlist from the popup, and turn on Auto Scan Daily to scan your hangar once a day, only for the RSI account this browser last scanned
->
-> **Open beta:** Open Hangar is all yours now. Syncing your hangar to openhangar.space opens to everyone at our official launch on November 10.
 >
 > **Private by design:** Open Hangar runs in your browser, using the RSI session you're already signed in with. It never asks for your password. Your hangar stays on your device, and nothing about you is sent to us unless you connect.
 >
@@ -218,19 +218,19 @@ characters carry the key points. Paste this as is (Chrome and Edge keep the plai
 ```markdown
 **Your Star Citizen hangar, one click away.**
 
-Open Hangar reads your pledges, buy-backs, balances and referrals from RSI with the session you're already signed in with, and shows them in a popup and on our hangar page. Free, no password, no account needed.
+Open Hangar reads your pledges, buy-backs, balances and referrals from RSI with the session you're already signed in with, and shows them in a popup and on [openhangar.space](https://openhangar.space). Free, with no paid features. No password, no account needed.
 
 **What you get:**
 
 - **Scan:** one click reads your hangar and buy-backs from RSI. It runs in the background, with no tab to open
-- **The toolbar popup:** your hangar at a glance, Fleet News, your Wishlist and every setting, in three tabs
+- **The toolbar popup:** your Melt Value, Store Credit, UEC and Fleet News at a glance, plus your Wishlist and every setting, in three tabs
 - **Your full hangar** at [hangar.openhangar.space](https://hangar.openhangar.space): pledges, buy-backs, fleet stats, values, referrals and more, read from this browser, with no account
-- **Store alerts (optional, with [openhangar.space](https://openhangar.space) connected):** a number on the toolbar button, and a notification if you turn them on, when a Wishlist item set to Remind Me goes on sale. Paints and sales for ships you own show in Fleet News. Matched on your device
+- **Sync (optional):** connect a free [openhangar.space](https://openhangar.space) account to see your hangar on any device and edit your Wishlist from the popup
+- **Account History (optional):** reads your RSI pledge log and store credit log, so you can see each pledge's history and what you paid. Off until you turn it on
+- **Store alerts (optional, with sync connected):** a number on the toolbar button, and a notification if you turn them on, when a Wishlist item set to Remind Me goes on sale. Paints and sales for ships you own show in Fleet News. Matched on your device
+- **Auto Scan Daily (optional, with sync connected):** scans your hangar once a day, only for the RSI account this browser last scanned
 - **Add to RSI Cart:** put a ship upgrade (CCU) in your RSI cart in one click. You always check out on RSI yourself
 - **Backups:** save your hangar as a JSON or CSV file any time
-- **With [openhangar.space](https://openhangar.space) connected:** edit your Wishlist from the popup, and turn on Auto Scan Daily to scan your hangar once a day, only for the RSI account this browser last scanned
-
-**Open beta:** Open Hangar is all yours now. Syncing your hangar to openhangar.space opens to everyone at our official launch on November 10.
 
 **Private by design:** Open Hangar runs in your browser, using the RSI session you're already signed in with. It never asks for your password. Your hangar stays on your device, and nothing about you is sent to us unless you connect.
 
