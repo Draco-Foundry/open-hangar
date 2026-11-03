@@ -569,7 +569,7 @@ export function wishRows(keys, feed, names = null) {
       continue;
     }
     const item = sale(key);
-    if ((kind === 'sku' || kind === 'ccu') && item)
+    if ((kind === 'sku' || kind === 'ccu' || kind === 'paint') && item)
       rows.push({ key, name: item.name, onSale: true, price: item.price ?? null });
     else unnamed++;
   }
@@ -586,6 +586,11 @@ function saleIndex(feed) {
     const [kind, id] = String(key).split(':');
     if (kind === 'sku' || kind === 'ccu')
       return items.get(`${kind === 'ccu' ? 'upgrade' : 'sku'}-${id}`) || null;
+    // A paint wished before the store listed it: the feed item carrying its key.
+    if (kind === 'paint') {
+      for (const i of items.values()) if (i.paint === key) return i;
+      return null;
+    }
     if (kind !== 'ship') return null;
     let best = null;
     for (const i of items.values())

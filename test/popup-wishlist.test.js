@@ -916,3 +916,35 @@ test('unobtainable: every ship the lists give no price and no flight status is j
     .map((s) => s.name);
   assert.deepEqual(left, [], `judge these new rows (unobtainable or keep): ${left.join('; ')}`);
 });
+
+test('a paint: item: shown by its name, on sale once the feed carries its key', async () => {
+  const { readList } = await client();
+  const list = readList({
+    v: 1,
+    keys: ['paint:cutlass-akuma'],
+    items: [
+      { key: 'paint:cutlass-akuma', name: 'Cutlass - Akuma Paint', category: 'paints', at: 1 },
+    ],
+  });
+  assert.deepEqual(list.keys, ['paint:cutlass-akuma']);
+  assert.equal(list.items[0].name, 'Cutlass - Akuma Paint');
+  const { wishSale, wishRows } = await import('../ui/popup/data.js');
+  const feed = {
+    ships: [],
+    items: [
+      {
+        id: 'sku-50',
+        kind: 'paint',
+        name: 'Cutlass - Akuma Paint',
+        price: 5,
+        ships: [],
+        paint: 'paint:cutlass-akuma',
+      },
+    ],
+  };
+  assert.deepEqual(wishSale(feed)('paint:cutlass-akuma'), { onSale: true, price: 5 });
+  assert.deepEqual(wishSale({ items: [] })('paint:cutlass-akuma'), { onSale: false, price: null });
+  assert.deepEqual(wishRows(['paint:cutlass-akuma'], feed).rows, [
+    { key: 'paint:cutlass-akuma', name: 'Cutlass - Akuma Paint', onSale: true, price: 5 },
+  ]);
+});
