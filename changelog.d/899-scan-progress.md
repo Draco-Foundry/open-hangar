@@ -1,1 +1,1 @@
-- Improved: **Scan Progress Shows Time Left.** The scan bar now fills by how long each part takes, so it no longer sits near full while buy-backs load, with a dot for each part, about how long is left, and the percent on the toolbar icon.
+- Improved: **Scan Bar Fills by Time.** The scan bar now fills by how long each part takes, so it no longer sits near full while buy-backs load.
