@@ -1,1 +1,0 @@
-- Improved: **Scan Bar Fills by Time.** The scan bar now fills by how long each part takes, so it no longer sits near full while buy-backs load.

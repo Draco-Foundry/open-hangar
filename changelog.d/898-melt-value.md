@@ -1,2 +1,0 @@
-- Changed: **Melt Value Replaces Account Value.** The popup's total now shows every pledge at its melt value, the same figure as Melt Value on openhangar.space, and its change since an earlier scan is at melt too.
-- Changed: **Full UEC and REC Numbers.** The popup now shows UEC and REC in full up to 999,999, as the website does, and shortens only bigger numbers.

@@ -4,6 +4,15 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.5.9 — 2026-11-02
+
+- Fixed: **Long Pledge Logs No Longer Show Scan Stopped.** With Account History on, the popup now shows the scan as running while it reads a long pledge log, then it finishes and syncs as usual.
+- Changed: **Load Full History Removed.** Turning on Account History reads your full history once, and each scan after that reads only what's new.
+- New: **First Scan Progress.** While your first scan reads your history, the popup shows the page it's on and that it will take several minutes.
+- Changed: **Melt Value Replaces Account Value.** The popup's total now shows every pledge at its melt value, the same figure as Melt Value on openhangar.space, and its change since an earlier scan is at melt too.
+- Changed: **Full UEC and REC Numbers.** The popup now shows UEC and REC in full up to 999,999, as the website does, and shortens only bigger numbers.
+- Improved: **Scan Bar Fills by Time.** The scan bar now fills by how long each part takes, so it no longer sits near full while buy-backs load.
+
 ## 0.5.8 — 2026-11-01
 
 - Changed: the popup's Connected row is less busy. The sync time sits under it, Sync Now stays on the right, and Disconnect moves down beside Clear Data.
