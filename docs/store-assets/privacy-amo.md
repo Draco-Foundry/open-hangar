@@ -1,4 +1,4 @@
-**Last updated: 2026-11-01**
+**Last updated: 2026-11-03**
 
 Open Hangar is a source-available browser extension that reads your own Star Citizen / Roberts Space Industries (RSI) account data and stores it locally in your browser. Open Hangar works from its toolbar popup, which holds your hangar's summary, your Wishlist and your settings. Scans run in a hidden page, so no tab opens. A small Open Hangar page opens only when the extension needs to ask you something, or when a scan can't run hidden. Your full hangar is on our website, openhangar.space. This policy explains exactly what it does and does not do with data.
 
@@ -81,7 +81,7 @@ Besides reading your own RSI account, the cart buttons, store alerts, your Wishl
 
 - openhangar.space (our own site, public, read-only). Every file below is the same for everyone and is cached on your device:
   - a small status file, at most every few hours, so we can pause a scan that RSI's site changes have broken (Auto Scan Daily pauses with it), or pause store alerts, and show a short notice until a fix is out;
-  - the public ship list (names, store prices and pictures), at most once a day, to value your ships;
+  - the public ship list (names, store prices and pictures, the same file for everyone), at most once a day, so the popup's Wishlist search can find ships by name;
   - today's exchange rates (the European Central Bank's), only if you pick a currency other than USD, at most once a day.
 
   Nothing is sent to us by these requests. The site is hosted on Cloudflare, which, like any website host, sees the request's IP address; we keep nothing from it except a short-lived count per address to stop abuse.
