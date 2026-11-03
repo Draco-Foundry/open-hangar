@@ -869,3 +869,55 @@ test('a check, connected, Remind Me on for nothing: alerts go off, nothing match
   assert.equal((await AL.check(off.e)).ran, true);
   assert.notEqual(off.data.alertsOn, false);
 });
+
+test('a paint wished before the store sold it: the feed names its paint: key, matched by key', () => {
+  const raw = {
+    v: 1,
+    updatedAt: null,
+    ships: [],
+    items: [
+      {
+        id: 'sku-50',
+        kind: 'paint',
+        name: 'Cutlass - Akuma Paint',
+        price: 5,
+        sale: [],
+        ships: [],
+        paint: 'paint:cutlass-akuma',
+      },
+      {
+        id: 'sku-51',
+        kind: 'paint',
+        name: 'Cutlass - Odd Paint',
+        price: 5,
+        sale: [],
+        ships: [],
+        paint: 'paint:Bad Key',
+      },
+      {
+        id: 'sku-52',
+        kind: 'gear',
+        name: 'Hat',
+        price: 5,
+        sale: [],
+        ships: [],
+        paint: 'paint:hat',
+      },
+    ],
+  };
+  const feed = AL.readFeed(raw);
+  assert.equal(feed.items[0].paint, 'paint:cutlass-akuma');
+  // A bad key, or one on anything but a paint, is dropped.
+  assert.equal('paint' in feed.items[1], false);
+  assert.equal('paint' in feed.items[2], false);
+  assert.deepEqual(AL.wishKeysOf(feed.items[0]), ['sku:50', 'paint:cutlass-akuma']);
+  const ms = AL.matchAll(feed, { sources: {} }, ['paint:cutlass-akuma']);
+  assert.deepEqual(
+    ms.map((m) => [m.id, m.why[0].keys]),
+    [['sku-50', ['paint:cutlass-akuma']]],
+  );
+  // The Wishlist read keeps the key; anything that isn't one is dropped.
+  assert.deepEqual(AL.readWish({ v: 1, keys: ['paint:cutlass-akuma', 'paint:', 'paint:A'] }), [
+    'paint:cutlass-akuma',
+  ]);
+});

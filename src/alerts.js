@@ -228,14 +228,22 @@
         ships: (Array.isArray(i.ships) ? i.ships : [])
           .filter((x) => typeof x === 'string' && SLUG.test(x))
           .slice(0, SHIPS_PER_ITEM_MAX),
+        // A paint's Wishlist key, when the website gives one (a paint the Wiki lists); left
+        // out otherwise, so every other item reads as before.
+        ...(kind === 'paint' && isPaintKey(i.paint) ? { paint: i.paint } : {}),
       });
     }
     const updatedAt = typeof json.updatedAt === 'string' ? json.updatedAt.slice(0, 40) : null;
     return { v: 1, updatedAt, ships, items };
   }
 
-  // The Wishlist read (v1) → its keys, or null for anything else.
-  const WISH_KEY_RE = /^(?:ship:[a-z0-9]+(?:-[a-z0-9]+)*|sku:[1-9]\d{0,9}|ccu:[1-9]\d{0,9})$/;
+  // The Wishlist read (v1) → its keys, or null for anything else. "paint:<slug>" is a paint
+  // the Star Citizen Wiki lists that the store didn't sell when it was wished (the website's
+  // lib/wishlist.ts paintWishKey); a version before it drops those keys.
+  const WISH_KEY_RE =
+    /^(?:ship:[a-z0-9]+(?:-[a-z0-9]+)*|sku:[1-9]\d{0,9}|ccu:[1-9]\d{0,9}|paint:[a-z0-9]+(?:-[a-z0-9]+)*)$/;
+  const isPaintKey = (k) =>
+    typeof k === 'string' && k.length <= 90 && k.startsWith('paint:') && WISH_KEY_RE.test(k);
   function readWish(json) {
     if (!isObj(json) || json.v !== 1 || !Array.isArray(json.keys)) return null;
     return [...new Set(json.keys.filter((k) => typeof k === 'string' && k.length <= 90))]
@@ -342,6 +350,8 @@
     const out = [`sku:${n}`];
     if (item.kind === 'ship' || item.kind === 'vehicle')
       for (const s of item.ships) out.push(`ship:${s}`);
+    // A paint wished before the store listed it: the feed names its key.
+    if (item.paint) out.push(item.paint);
     return out;
   }
   // The feed against this browser's scan (`db`) and the account's Wishlist keys (`wish`:

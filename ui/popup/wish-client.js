@@ -54,7 +54,9 @@ export const TARGET_MAX_CENTS = 10_000_000;
 const NAME_MAX = 200;
 
 const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
-const KEY_RE = /^(?:ship:[a-z0-9]+(?:-[a-z0-9]+)*|sku:[1-9]\d{0,9}|ccu:[1-9]\d{0,9})$/;
+// paint: a paint the Wiki lists, wished before the store sold it (src/alerts.js WISH_KEY_RE).
+const KEY_RE =
+  /^(?:ship:[a-z0-9]+(?:-[a-z0-9]+)*|sku:[1-9]\d{0,9}|ccu:[1-9]\d{0,9}|paint:[a-z0-9]+(?:-[a-z0-9]+)*)$/;
 const INSURANCE = ['either', 'lti', '120'];
 export const isKey = (k) => typeof k === 'string' && k.length <= 90 && KEY_RE.test(k);
 
