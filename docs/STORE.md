@@ -57,11 +57,11 @@ every store is `support@openhangar.space`. The account setup is kept in the main
      portrait, Melt Value, Store Credit, Fleet News and Scan."
   2. Wishlist: `docs/store-assets/screenshot-040-2-wishlist.jpg`, "Add to your Wishlist
      right from the popup." (retaken for 0.4.1, with no Target Price)
-  3. Settings: `docs/store-assets/screenshot-040-3-settings.jpg`, "Every setting in one
+  3. Settings: `docs/store-assets/screenshot-058-3-settings.jpg`, "Every setting in one
      place, including Auto Scan Daily."
   4. Alerts: `docs/store-assets/screenshot-040-4-alerts.jpg`, "Store alerts for your
      ships and your Wishlist."
-  5. Light mode: `docs/store-assets/screenshot-040-5-light.jpg`, "Light mode, or follow
+  5. Light mode: `docs/store-assets/screenshot-059-5-light.jpg`, "Light mode, or follow
      your browser."
 
   The 0.3.0 `screenshot-connector-*` files show the old popup and the basic page's

@@ -24,7 +24,7 @@
  * connected, signed-in account, the store build's flags (the registry's defaults), on the
  * listing's 1280x800 dark backdrop, as the 0.4.0 set was framed. OH_SHOT_NAME=<name>
  * picks another file name (without the extension); OH_SHOT_TAB=hangar shoots the Hangar
- * tab instead of Settings.
+ * tab instead of Settings; OH_SHOT_THEME=light shoots it in light mode.
  */
 
 import http from 'node:http';
@@ -293,7 +293,9 @@ async function popupSettingsShot(browser) {
   }
   const page = await browser.newPage();
   await page.setViewport({ width: 360, height: 1000, deviceScaleFactor: 1 });
-  await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
+  // OH_SHOT_THEME=light shoots the popup in light mode (store screenshot 5).
+  const scheme = process.env.OH_SHOT_THEME === 'light' ? 'light' : 'dark';
+  await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: scheme }]);
   await page.evaluateOnNewDocument((s) => Object.assign(window, s), seed);
   await page.goto(`http://localhost:${PORT}/popup.html`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#pp-tab-settings');
