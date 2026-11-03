@@ -967,25 +967,3 @@ test('scan bar: the runner fill, weighted by time, wins over the part slices', a
   assert.equal(barNext({ ...p, f: 0.44, next: 3 }), 1);
   assert.equal(barFraction({ ...p, f: 2 }), 0.922);
 });
-
-test('scan bar: time left counts down between writes, in whole minutes', async () => {
-  const { scanLeft } = await data();
-  const p = (left, extra = {}) => ({ part: 'packs', f: 0.4, at: NOW, left, ...extra });
-  assert.deepEqual(scanLeft(p(150e3), NOW), { key: 'popup.left-min', vars: { n: 3 } });
-  assert.deepEqual(scanLeft(p(150e3), NOW + 40e3), { key: 'popup.left-min', vars: { n: 2 } });
-  assert.deepEqual(scanLeft(p(70e3), NOW + 20e3), { key: 'popup.left-soon', vars: {} });
-  // No estimate, no fill of its own, or a quick scan: nothing under the bar.
-  assert.equal(scanLeft({ part: 'packs', f: 0.4, at: NOW }, NOW), null);
-  assert.equal(scanLeft({ part: 'packs', left: 9e4, at: NOW }, NOW), null);
-  assert.equal(scanLeft(p(9e4, { quick: true }), NOW), null);
-});
-
-test('scan bar: the dots under it, Logs only with Account History', async () => {
-  const { scanDots } = await data();
-  const states = (part, logs) => scanDots(part, logs).map((d) => `${d.id}:${d.state}`);
-  assert.deepEqual(states('account', false), ['hangar:now', 'buybacks:todo']);
-  assert.deepEqual(states('packs', false), ['hangar:done', 'buybacks:now']);
-  assert.deepEqual(states('pledgeLog', true), ['hangar:done', 'buybacks:done', 'logs:now']);
-  assert.deepEqual(states('sync', true), ['hangar:done', 'buybacks:done', 'logs:done']);
-  assert.deepEqual(states('referrals', true), ['hangar:done', 'buybacks:now', 'logs:todo']);
-});

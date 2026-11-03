@@ -59,25 +59,7 @@ scanHost = self.OHScanHost.create({
 chrome.runtime.onMessage.addListener(scanHost.heard);
 // @flag-end connector
 
-// While a scan runs, the share of it done on the toolbar badge ("43%", the owner,
-// 2026-11-02): the same number as the popup's bar, worked out by the scan runner
-// (session scanProgress `f`, ui/lib/scan-pace.js). A scan too short for a bar shows none.
-// When its progress goes, the alerts or the reminder take the badge back.
-let scanBadge = null;
-chrome.storage.onChanged.addListener((c, area) => {
-  if (area !== 'session' || !c.scanProgress) return;
-  const p = c.scanProgress.newValue;
-  const pct =
-    p && Number.isFinite(p.f) && !p.quick ? Math.min(99, Math.max(0, Math.floor(p.f * 100))) : null;
-  if (pct === scanBadge) return;
-  scanBadge = pct;
-  if (pct == null) return void updateReminder();
-  chrome.action.setBadgeText({ text: `${pct}%` }).catch(() => {});
-  chrome.action.setBadgeBackgroundColor({ color: '#3b6aed' }).catch(() => {});
-});
-
 async function updateReminder() {
-  if (scanBadge != null) return; // a scan's % holds the badge until it ends
   // @flag-start alerts: store alerts waiting take the badge (src/alerts.js)
   const AL = self.OHAlerts;
   const got = await chrome.storage.local.get([AL.ON_KEY, AL.STATE_KEY]);
