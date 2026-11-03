@@ -23,8 +23,9 @@
  * instead (docs/store-assets/screenshot-058-3-settings.jpg and .png): the demo's
  * connected, signed-in account, the store build's flags (the registry's defaults), on the
  * listing's 1280x800 dark backdrop, as the 0.4.0 set was framed. OH_SHOT_NAME=<name>
- * picks another file name (without the extension); OH_SHOT_TAB=hangar shoots the Hangar
- * tab instead of Settings; OH_SHOT_THEME=light shoots it in light mode.
+ * picks another file name (without the extension); OH_SHOT_TAB=hangar or wishlist shoots that
+ * tab instead of Settings; OH_SHOT_THEME=light shoots it in light mode;
+ * OH_SHOT_VERSION=0.5.9 sets the version label (before the release bumps the manifest).
  */
 
 import http from 'node:http';
@@ -291,6 +292,61 @@ async function popupSettingsShot(browser) {
       },
     };
   }
+  // The Wishlist tab: four items, two on sale (named by the store feed, priced by its items).
+  if (process.env.OH_SHOT_TAB === 'wishlist') {
+    const wishItem = (key, name, category = 'ships') => ({
+      key,
+      name,
+      category,
+      target: null,
+      insurance: null,
+      from: null,
+      at: 1,
+    });
+    seed.__demoWish = {
+      mode: 'items',
+      items: [
+        wishItem('ship:avenger-titan', 'Avenger Titan'),
+        wishItem('ship:zeus-mk-ii-cl', 'Zeus Mk II CL'),
+        wishItem('ship:cutlass-black', 'Cutlass Black'),
+        wishItem('sku:501', 'Cutlass - Ghoulish Green Paint', 'paints'),
+      ],
+    };
+    Object.assign(seed.__demoLocal, {
+      alertsOn: true,
+      alertsFeed: {
+        data: {
+          v: 1,
+          ships: [
+            { slug: 'avenger-titan', name: 'Avenger Titan', keys: [] },
+            { slug: 'zeus-mk-ii-cl', name: 'Zeus Mk II CL', keys: [] },
+            { slug: 'cutlass-black', name: 'Cutlass Black', keys: [] },
+            { slug: 'prospector', name: 'Prospector', keys: [] },
+          ],
+          items: [
+            {
+              id: 'sku-1',
+              kind: 'ship',
+              name: 'Avenger Titan',
+              price: 55,
+              sale: ['discount'],
+              endsOn: null,
+              ships: ['avenger-titan'],
+            },
+            {
+              id: 'sku-2',
+              kind: 'ship',
+              name: 'Cutlass Black',
+              price: 110,
+              sale: ['limited'],
+              endsOn: null,
+              ships: ['cutlass-black'],
+            },
+          ],
+        },
+      },
+    });
+  }
   const page = await browser.newPage();
   await page.setViewport({ width: 360, height: 1000, deviceScaleFactor: 1 });
   // OH_SHOT_THEME=light shoots the popup in light mode (store screenshot 5).
@@ -302,12 +358,17 @@ async function popupSettingsShot(browser) {
   // OH_SHOT_TAB=hangar keeps the popup's first view (the Hangar tab) instead of Settings.
   if (process.env.OH_SHOT_TAB === 'hangar') {
     await page.waitForSelector('#pp-news');
+  } else if (process.env.OH_SHOT_TAB === 'wishlist') {
+    await page.click('#pp-tab-wishlist');
+    await page.waitForSelector('.pp-wlist li');
   } else {
     await page.click('#pp-tab-settings');
     await page.waitForSelector('#pp-daily-sw');
   }
   // The demo shim's manifest says 0.2.7; the shot shows the version it is for.
-  const { version } = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
+  const version =
+    process.env.OH_SHOT_VERSION ||
+    JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8')).version;
   await page.evaluate((v) => {
     const el = document.getElementById('pp-version');
     if (el) el.textContent = 'v' + v;

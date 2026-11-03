@@ -55,14 +55,15 @@ every store is `support@openhangar.space`. The account setup is kept in the main
   toolbar popup's (real UI, fictional demo account), with their AMO captions:
   1. Hangar: `docs/store-assets/screenshot-059-1-hangar.jpg`, "Your hangar at a glance:
      portrait, Melt Value, Store Credit, Fleet News and Scan."
-  2. Wishlist: `docs/store-assets/screenshot-040-2-wishlist.jpg`, "Add to your Wishlist
-     right from the popup." (retaken for 0.4.1, with no Target Price)
-  3. Settings: `docs/store-assets/screenshot-058-3-settings.jpg`, "Every setting in one
+  2. Wishlist: `docs/store-assets/screenshot-059-2-wishlist.jpg`, "Add to your Wishlist
+     right from the popup."
+  3. Settings: `docs/store-assets/screenshot-059-3-settings.jpg`, "Every setting in one
      place, including Auto Scan Daily."
-  4. Alerts: `docs/store-assets/screenshot-040-4-alerts.jpg`, "Store alerts for your
-     ships and your Wishlist."
-  5. Light mode: `docs/store-assets/screenshot-059-5-light.jpg`, "Light mode, or follow
+  4. Light mode: `docs/store-assets/screenshot-059-4-light.jpg`, "Light mode, or follow
      your browser."
+
+  The popup has no Alerts view since 0.5.x (Fleet News on the Hangar tab replaced it), so
+  the old 0.4.0 "Store alerts" shot is gone: four screenshots, not five.
 
   The 0.3.0 `screenshot-connector-*` files show the old popup and the basic page's
   lists, which 0.4.0 removed, and the older `screenshot-1…5-*` files
