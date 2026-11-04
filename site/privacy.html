@@ -27,7 +27,7 @@
     <main class="wrap doc">
       <p><a href="./">Open Hangar</a></p>
       <h1>Privacy Policy</h1>
-      <p class="updated"><em>Last updated: 2026-11-03</em></p>
+      <p class="updated"><em>Last updated: 2026-11-04</em></p>
       <p>
         Open Hangar is a source-available browser extension that reads your own Star Citizen /
         Roberts Space Industries (RSI) account data and stores it locally in your browser. Open
@@ -222,9 +222,10 @@
       <p>
         When you click Send to RSI Cart on the store at openhangar.space, the extension puts the
         items in your Haul (paints, ships, packs or gear) in your RSI cart in one request, with your
-        existing RSI session. It sends RSI only each item's store id and how many you picked. The
-        page then sees which items RSI added, and RSI's own message for any it turned down, inside
-        your browser only.
+        existing RSI session. It sends RSI only each item's store id and how many you picked. Any
+        ship upgrades in your Haul go in one at a time through RSI's upgrade store, the same way as
+        Add to RSI Cart above, with only their ship and upgrade ids. The page then sees which items
+        RSI added, and RSI's own message for any it turned down, inside your browser only.
       </p>
       <p>For both:</p>
       <ul>
@@ -420,12 +421,12 @@
           still there to press, and Auto Scan Daily skips that day. RSI sets that cookie for
           visitors who aren't signed in too, so only a scan tells for sure. The browser hands over
           the cookie when asked, but for this check the extension only looks at whether it's there,
-          and the check doesn't contact RSI. And Add to RSI Cart works the way RSI's own upgrade
-          window does: it reads RSI's session token cookie and sends it back to
-          robertsspaceindustries.com with the cart request. Reading your account history works the
-          same way: the extension sends that cookie back to robertsspaceindustries.com with each
-          page of the logs it asks for, as RSI's own Account pages do. The extension never saves a
-          cookie's value and never sends one anywhere but RSI.
+          and the check doesn't contact RSI. And Add to RSI Cart, and Send to RSI Cart for a ship
+          upgrade, work the way RSI's own upgrade window does: they read RSI's session token cookie
+          and send it back to robertsspaceindustries.com with the cart request. Reading your account
+          history works the same way: the extension sends that cookie back to
+          robertsspaceindustries.com with each page of the logs it asks for, as RSI's own Account
+          pages do. The extension never saves a cookie's value and never sends one anywhere but RSI.
         </li>
         <li>
           <strong>Host access to robertsspaceindustries.com:</strong> to make the read-only requests
@@ -468,21 +469,22 @@
           three things. The first is Add to RSI Cart on the website's store: the page sees which of
           your ships can be upgraded and RSI's prices, inside your browser only (see
           <a href="#add-to-rsi-cart">Add to RSI Cart</a>). The second is Send to RSI Cart on the
-          website's store: the page sends the items in your Haul and sees which ones RSI added,
-          inside your browser only (see <a href="#add-to-rsi-cart">Add to RSI Cart</a>). The third,
-          on app.openhangar.space only, is Connect This Browser, which connects sync from the
-          website. hangar.openhangar.space is our hangar page, which shows your hangar without an
-          account. It can ask for four things: your hangar as this browser scanned it, when it was
-          last scanned, a new scan, and Add to RSI Cart. Your hangar here means your backup file
-          without the scan history, the store items RSI shows only to subscribers and Concierge
-          members, your account history, your referral code and your referral prospects list. It
-          never includes your sync token, the site address, your settings or your wishlist. The page
-          shows it inside your browser only and keeps no copy after you close it. Your hangar never
-          reaches our server. On Firefox, the page can read your hangar only after you say yes to
-          Firefox's data prompt. Chrome and Edge let these pages message the extension directly.
-          Firefox doesn't, so on Firefox the extension runs a small bridge script on these pages
-          that only passes their messages to the extension and its answers back. It reads nothing
-          else on the page and sends nothing anywhere else.
+          website's store: the page sends the items and ship upgrades in your Haul and sees which
+          ones RSI added, inside your browser only (see
+          <a href="#add-to-rsi-cart">Add to RSI Cart</a>). The third, on app.openhangar.space only,
+          is Connect This Browser, which connects sync from the website. hangar.openhangar.space is
+          our hangar page, which shows your hangar without an account. It can ask for four things:
+          your hangar as this browser scanned it, when it was last scanned, a new scan, and Add to
+          RSI Cart. Your hangar here means your backup file without the scan history, the store
+          items RSI shows only to subscribers and Concierge members, your account history, your
+          referral code and your referral prospects list. It never includes your sync token, the
+          site address, your settings or your wishlist. The page shows it inside your browser only
+          and keeps no copy after you close it. Your hangar never reaches our server. On Firefox,
+          the page can read your hangar only after you say yes to Firefox's data prompt. Chrome and
+          Edge let these pages message the extension directly. Firefox doesn't, so on Firefox the
+          extension runs a small bridge script on these pages that only passes their messages to the
+          extension and its answers back. It reads nothing else on the page and sends nothing
+          anywhere else.
         </li>
       </ul>
       <h2>Data Export</h2>
