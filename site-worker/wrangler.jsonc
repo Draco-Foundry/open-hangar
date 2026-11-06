@@ -27,6 +27,15 @@
       "/ships/*",
       "/whats-next",
       "/help",
+      // Event fact pages and the public data page (the website, open-hangar-server).
+      "/events",
+      "/events/*",
+      "/data",
+      // The crawler files, built by the website; the files in ../site are their
+      // fallback (src/index.js crawlerFile).
+      "/robots.txt",
+      "/sitemap.xml",
+      "/llms.txt",
       // The extension's public feeds (the website answers them, Origin-checked).
       "/api/game-status",
       "/api/ships",
