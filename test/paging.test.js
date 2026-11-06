@@ -277,6 +277,47 @@ for (const last of [1, 2, 3]) {
   });
 }
 
+// A pledge card RSI served without its js-pledge-id input can't be read, so it would drop
+// out silently (page 2 on) or trip the #729 count check on every scan (page 1). It's a
+// page change (#914): the approved hold words, and the last scan kept as it was.
+for (const at of [1, 3]) {
+  test(`a saved hangar whose page ${at} has a card without its id: held, the last scan kept`, async () => {
+    const pages = [1, 2, 3].map((n) =>
+      endAt(saved(`hangar-page-${n}`), 3).replace(
+        /js-pledge-id" value="(\d+)"/g,
+        `js-pledge-id" value="${n}$1"`,
+      ),
+    );
+    const whole = pages.flatMap((h) => P.parsePledges(h));
+    pages[at - 1] = pages[at - 1].replace(/<input type="hidden" class="js-pledge-id"[^>]*>/, '');
+    assert.equal(P.parsePledges(pages[at - 1]).length, 9, 'one card no longer reads');
+    const asked = [];
+    global.fetch = async (url) => {
+      const u = new URL(String(url));
+      if (!u.pathname.endsWith('/account/pledges')) return new Response('', { status: 404 });
+      const n = Number(u.searchParams.get('page'));
+      asked.push(n);
+      return new Response(pages[Math.min(n, 3) - 1]);
+    };
+    for (const auto of [false, true]) {
+      for (const k of Object.keys(store)) delete store[k];
+      store.db = { sources: { hangar: { scannedAt: 1, items: whole } } };
+      asked.length = 0;
+      const r = await OH.scanSource('hangar', null, { auto });
+      assert.equal(r.ok, false);
+      assert.equal(r.pageChanged, true);
+      if (!auto) assert.equal(r.error, OH.PAGE_CHANGED);
+      assert.deepEqual(
+        asked,
+        Array.from({ length: at }, (_, i) => i + 1),
+      );
+      assert.equal(store.db.sources.hangar.scannedAt, 1);
+      assert.equal(store.db.sources.hangar.items.length, 30);
+      assert.equal(store.pledgeArchive, undefined, 'nothing filed as gone');
+    }
+  });
+}
+
 test('a saved buy-back page that is the only one: 100 buy-backs, one request', async () => {
   const html = endAt(saved('buybacks-page-1'), 1);
   const asked = [];
