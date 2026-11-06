@@ -330,3 +330,99 @@ test("a count the pager's last page can't hold is never saved, and keeps the pre
   assert.equal(auto.unfinished, true);
   assert.equal(store.db.sources.buybacks.items.length, 40);
 });
+
+// --- An empty page partway (#914) ---------------------------------------------------
+// RSI's pager linked a page, and that page came back with no cards (an error page, or
+// the list rendered empty): the read is cut short, so it's stopped partway like RSI not
+// answering. Nothing is saved over the previous scan, nothing goes to the pledge archive
+// and no cached buy-back details are pruned, for the Scan button and Auto Scan Daily.
+const ERROR_PAGE = '<html><body><h1>Something went wrong</h1></body></html>';
+const noCards = {
+  hangar: (html) =>
+    html.replace(/<ul class="list-items">[\s\S]*?<\/ul>/, '<ul class="list-items"></ul>'),
+  buybacks: (html) => html.replace(/<article[\s\S]*?<\/article>/g, ''),
+};
+// The saved pages as a list of 3: each page's own number goes in front of its ids (the
+// scrub numbers every page from 9000001), and the buy-back page, saved as page 1, shows
+// as page n in its pager.
+const listOf3 = {
+  hangar: [1, 2, 3].map((n) =>
+    endAt(saved(`hangar-page-${n}`), 3).replace(
+      /js-pledge-id" value="(\d+)"/g,
+      `js-pledge-id" value="${n}$1"`,
+    ),
+  ),
+  buybacks: [1, 2, 3].map((n) =>
+    endAt(saved('buybacks-page-1'), 3)
+      .replace(/(buyback\/|data-pledgeid=")(9\d{6})/g, `$1${n}$2`)
+      .replace('trans-color active" href', 'trans-color " href')
+      .replace(
+        `trans-color " href="?page=${n}&amp;pagesize=100">${n}<`,
+        `trans-color active" href="?page=${n}&amp;pagesize=100">${n}<`,
+      ),
+  ),
+};
+const listPath = { hangar: '/account/pledges', buybacks: PATH };
+const parseOf = { hangar: P.parsePledges, buybacks: P.parseBuybacks };
+
+test('the saved pages make a list of 3 whose ids are all different', () => {
+  for (const id of ['hangar', 'buybacks']) {
+    const pages = listOf3[id];
+    pages.forEach((h, i) => assert.deepEqual(P.parsePager(h), { current: i + 1, max: 3 }));
+    const ids = pages.flatMap((h) => parseOf[id](h).map((x) => x.id));
+    assert.equal(new Set(ids).size, ids.length, id);
+    assert.deepEqual(parseOf[id](noCards[id](pages[0])), [], `${id} with no cards`);
+  }
+});
+
+for (const id of ['hangar', 'buybacks']) {
+  for (const k of [2, 3]) {
+    for (const [what, empty] of [
+      ['an error page', () => ERROR_PAGE],
+      ['the page with no cards on it', (html) => noCards[id](html)],
+    ]) {
+      test(`${id}: page ${k} of 3 is ${what}: stopped partway, the previous scan kept whole`, async () => {
+        const pages = listOf3[id].slice();
+        const whole = pages.flatMap((h) => parseOf[id](h));
+        pages[k - 1] = empty(pages[k - 1]);
+        const asked = [];
+        global.fetch = async (url) => {
+          const u = new URL(String(url));
+          if (!u.pathname.endsWith(listPath[id])) return new Response('', { status: 404 });
+          const n = Number(u.searchParams.get('page'));
+          asked.push(n);
+          return new Response(pages[Math.min(n, 3) - 1]);
+        };
+        const details = Object.fromEntries(whole.map((b) => [String(b.id), { id: b.id }]));
+        const reset = () => {
+          for (const x of Object.keys(store)) delete store[x];
+          store.db = { sources: { [id]: { scannedAt: 1, items: whole } } };
+          if (id === 'buybacks') store.bbDetails = details;
+        };
+        const unchanged = () => {
+          assert.equal(store.db.sources[id].scannedAt, 1);
+          assert.equal(store.db.sources[id].items.length, whole.length);
+          assert.equal(store.pledgeArchive, undefined, 'nothing filed as gone');
+          if (id === 'buybacks')
+            assert.equal(Object.keys(store.bbDetails).length, whole.length, 'details kept');
+        };
+
+        reset();
+        const r = await OH.scanSource(id);
+        assert.equal(r.ok, false);
+        assert.match(r.error, new RegExp(`page ${k}\\b.*previous scan of ${whole.length}`));
+        assert.deepEqual(
+          asked,
+          Array.from({ length: k }, (_, i) => i + 1),
+        );
+        unchanged();
+
+        reset();
+        const auto = await OH.scanSource(id, null, { auto: true });
+        assert.equal(auto.ok, false);
+        assert.equal(auto.unfinished, true);
+        unchanged();
+      });
+    }
+  }
+}
