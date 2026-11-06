@@ -1931,6 +1931,11 @@
         return { items: all, meta, partial: { page, reason: 'signed out', signedOut: true } };
       const off = changed();
       if (off) return off;
+      // A page RSI's pager linked to, with nothing on it (an error page, a list rendered
+      // empty): the list would look shorter and complete, so it's stopped partway, never
+      // kept over a saved scan (scanSource). Without a pager, an empty page is the end.
+      if (!items.length && pages != null && page <= pages)
+        return { items: all, meta, partial: { page, reason: 'empty page', emptyPage: true } };
       if (!items.length) break;
       // RSI's pager (OpenHangar.parsePager): past the end RSI serves the last page
       // again, and its pager says so. Stopping on that, and on a page that links to
