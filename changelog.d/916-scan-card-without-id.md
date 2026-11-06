@@ -1,0 +1,1 @@
+- Fixed: A pledge RSI shows without its id now holds the scan and keeps your last one, instead of dropping that pledge or asking you to try again on every scan.

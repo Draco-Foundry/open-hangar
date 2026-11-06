@@ -282,6 +282,16 @@ test('a page RSI changed trips the page change check, an unchanged one never doe
   assert.deepEqual(P.pageChanged(changed('buybacks-changed.html'), 'buybacks'), [
     'buy-back cards without names',
   ]);
+  // One card the parser can't find (#914): a pledge card without its js-pledge-id input
+  // (more names than ids), a buy-back card without its name (more cards than read).
+  for (const p of hangarPages) {
+    const html = p.html.replace(/<input type="hidden" class="js-pledge-id"[^>]*>/, '');
+    assert.deepEqual(P.pageChanged(html, 'hangar'), ['a pledge card without its id'], p.file);
+  }
+  for (const p of buybackPages) {
+    const html = p.html.replace(/<h1>[\s\S]*?<\/h1>/, ''); // the first card's
+    assert.deepEqual(P.pageChanged(html, 'buybacks'), ['a buy-back card without its name'], p.file);
+  }
   // A page with no cards (signed out, an empty list) is for the scan's other checks.
   assert.deepEqual(P.pageChanged('<html><body></body></html>', 'hangar'), []);
   assert.deepEqual(P.pageChanged('<html><body></body></html>', 'buybacks'), []);

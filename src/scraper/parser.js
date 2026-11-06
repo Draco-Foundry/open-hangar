@@ -855,6 +855,10 @@
       typeof payload === 'string' ? new DOMParser().parseFromString(payload, 'text/html') : payload;
     const out = [];
     if (kind === 'hangar') {
+      // Cards are found by their id input: one without it would drop out unread.
+      const names = doc.querySelectorAll(RULES.hangar.name).length;
+      if (names > doc.querySelectorAll(RULES.hangar.id).length)
+        out.push('a pledge card without its id');
       const list = ns.parsePledgesFromDOM(doc);
       if (!list.length) return out;
       if (list.some((p) => !p.id || !p.name)) out.push('a pledge without its id or name');
@@ -864,6 +868,7 @@
       const cards = doc.querySelectorAll(RULES.buybacks.card).length;
       const list = ns.parseBuybacksFromDOM(doc);
       if (cards && !list.length) out.push('buy-back cards without names');
+      else if (list.length < cards) out.push('a buy-back card without its name');
       if (list.length && !list.some((b) => ns.parseRsiDate(b.date)))
         out.push('no buy-back date reads');
     }
