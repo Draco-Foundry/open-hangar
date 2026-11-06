@@ -4,6 +4,12 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.5.10 — 2026-11-05
+
+- Fixed: A pledge of one ship with only its paint is filed as that ship, not as a pack.
+- Fixed: When RSI sends an empty page partway through your hangar or buy-backs, the scan now stops and keeps your last full scan, instead of saving a shorter list.
+- Fixed: A pledge RSI shows without its id now holds the scan and keeps your last one, instead of dropping that pledge or asking you to try again on every scan.
+
 ## 0.5.9 — 2026-11-02
 
 - Fixed: **Long Pledge Logs No Longer Show Scan Stopped.** With Account History on, the popup now shows the scan as running while it reads a long pledge log, then it finishes and syncs as usual.

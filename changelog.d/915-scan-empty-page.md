@@ -1,1 +1,0 @@
-- Fixed: When RSI sends an empty page partway through your hangar or buy-backs, the scan now stops and keeps your last full scan, instead of saving a shorter list.
