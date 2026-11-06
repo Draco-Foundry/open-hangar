@@ -66,11 +66,12 @@ const FEEDS = new Set([
 // data, the Ship Explorer's ships, and the files the home page loads.
 const PREFIXES = ['/api/store/', '/ships/', '/events/', '/_astro/', '/fonts/', '/home/'];
 const FILES = new Set(['/favicon.svg']);
-// The crawler files (robots.txt, the sitemap and llms.txt), built by the website from
+// The crawler files (robots.txt, the sitemap, llms.txt and the IndexNow key file), built
+// by the website from
 // its one list of crawlers and public pages (open-hangar-server), so both hosts
 // say the same. The copies in ../site answer whenever the
 // website can't (an error, a 404 before its deploy, or no answer at all).
-const CRAWLER_FILES = new Set(['/robots.txt', '/sitemap.xml', '/llms.txt']);
+const CRAWLER_FILES = new Set(['/robots.txt', '/sitemap.xml', '/llms.txt', '/indexnow.txt']);
 
 export default {
   async fetch(request, env, ctx) {

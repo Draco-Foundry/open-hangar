@@ -36,6 +36,7 @@
       "/robots.txt",
       "/sitemap.xml",
       "/llms.txt",
+      "/indexnow.txt",
       // The extension's public feeds (the website answers them, Origin-checked).
       "/api/game-status",
       "/api/ships",

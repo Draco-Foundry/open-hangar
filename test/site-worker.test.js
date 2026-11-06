@@ -227,7 +227,7 @@ test("a feed the gateway or website can't answer is a JSON 503 the extension wai
 });
 
 test('the crawler files come from the website, the static copies when it cannot answer', async () => {
-  for (const file of ['/robots.txt', '/sitemap.xml', '/llms.txt']) {
+  for (const file of ['/robots.txt', '/sitemap.xml', '/llms.txt', '/indexnow.txt']) {
     let r = await visit(file, 200, { edge: true });
     assert.equal(r.body, 'website 200', file);
     assert.deepEqual(r.calls.app, [file]);
