@@ -226,6 +226,30 @@ test("a feed the gateway or website can't answer is a JSON 503 the extension wai
   }
 });
 
+test('the crawler files come from the website, the static copies when it cannot answer', async () => {
+  for (const file of ['/robots.txt', '/sitemap.xml', '/llms.txt', '/indexnow.txt']) {
+    let r = await visit(file, 200, { edge: true });
+    assert.equal(r.body, 'website 200', file);
+    assert.deepEqual(r.calls.app, [file]);
+    assert.equal(r.calls.edge.length, 0, `${file} never through the gateway`);
+    for (const app of [404, 500, 'down']) {
+      r = await visit(file, app);
+      assert.equal(r.body, `static ${file}`, `${file} ${app}`);
+      assert.deepEqual(r.calls.assets, [file]);
+    }
+  }
+});
+
+test('the event pages and the data page pass to the website, try again when it fails', async () => {
+  for (const page of ['/events', '/events/iae-2956', '/data']) {
+    let r = await visit(page, 404);
+    assert.equal(r.res.status, 404, page);
+    assert.equal(r.body, 'website 404', page);
+    r = await visit(page, 'down');
+    assert.equal(r.res.status, 503, page);
+  }
+});
+
 test('look-alike paths get no new-page fallback, only the 404 page', async () => {
   for (const page of ['/helpdesk', '/shipsx', '/whats-next-time']) {
     const { res, calls } = await visit(page, 'down');
@@ -322,8 +346,9 @@ test('run_worker_first names the new pages and never shadows a static file', () 
     .filter((f) => f.isFile() && !f.name.startsWith('_'))
     .map((f) => `/${f.name}`)
     // Built by each Pages run (never committed): the Worker serves it on purpose,
-    // with this file as its fallback.
-    .filter((f) => f !== '/rates.json');
+    // with this file as its fallback. The crawler files the same way: the website
+    // builds them, these copies are the fallback.
+    .filter((f) => !['/rates.json', '/robots.txt', '/sitemap.xml', '/llms.txt'].includes(f));
   assert.ok(files.includes('/help.html'));
   assert.ok(patterns.includes('/rates.json'), '/rates.json is in run_worker_first');
   for (const pattern of patterns) {

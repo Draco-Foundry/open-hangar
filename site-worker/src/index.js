@@ -2,7 +2,9 @@
 // website Worker (open-hangar-server, app.openhangar.space) renders with live
 // Star Citizen data, the extension page (/extension), the Store (/store and the
 // data it loads, /api/store/*), the Ship Explorer (/ships, /ships/<ship>), What's
-// Next (/whats-next), Help (/help) and the public feeds the extension reads
+// Next (/whats-next), Help (/help), the event pages (/events, /events/<event>), the
+// data page (/data), the crawler files (/robots.txt, /sitemap.xml, /llms.txt, with
+// the copies in ../site as their fallback) and the public feeds the extension reads
 // (/api/game-status, /api/ships, /api/catalog, /api/referral-events,
 // /api/known-issues): the extension only talks to RSI and this site.
 // The paths below reach this script first (run_worker_first in wrangler.jsonc),
@@ -42,6 +44,10 @@ const PAGES = new Set([
   '/updates',
   '/about',
   '/news',
+  // Event fact pages and the public data page (the website's AI visibility work),
+  // each a 404 there until its flag is on.
+  '/events',
+  '/data',
 ]);
 // The extension's feeds, and its alerts' sale feed (under /api/store/*). The
 // website's gateway answers them (its edge copy, ETag, Origin check and rate
@@ -58,8 +64,14 @@ const FEEDS = new Set([
 
 // Everything else the website serves on openhangar.space, by prefix: the Store's
 // data, the Ship Explorer's ships, and the files the home page loads.
-const PREFIXES = ['/api/store/', '/ships/', '/_astro/', '/fonts/', '/home/'];
+const PREFIXES = ['/api/store/', '/ships/', '/events/', '/_astro/', '/fonts/', '/home/'];
 const FILES = new Set(['/favicon.svg']);
+// The crawler files (robots.txt, the sitemap, llms.txt and the IndexNow key file), built
+// by the website from
+// its one list of crawlers and public pages (open-hangar-server), so both hosts
+// say the same. The copies in ../site answer whenever the
+// website can't (an error, a 404 before its deploy, or no answer at all).
+const CRAWLER_FILES = new Set(['/robots.txt', '/sitemap.xml', '/llms.txt', '/indexnow.txt']);
 
 export default {
   async fetch(request, env, ctx) {
@@ -80,7 +92,15 @@ export default {
     const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, '') : url.pathname;
     const help = path === '/help';
     const newPage =
-      help || path === '/whats-next' || path === '/ships' || path.startsWith('/ships/');
+      help ||
+      path === '/whats-next' ||
+      path === '/ships' ||
+      path.startsWith('/ships/') ||
+      path === '/events' ||
+      path.startsWith('/events/') ||
+      path === '/data';
+
+    if (CRAWLER_FILES.has(url.pathname)) return crawlerFile(url.pathname, request, env);
 
     // Any other address: this site's 404 page, not the website's pages.
     if (
@@ -92,7 +112,9 @@ export default {
 
     // Pages and feeds through the gateway, the request as it came: the gateway
     // decides from it whether a kept copy may answer.
-    const viaEdge = env.EDGE && (PAGES.has(path) || path.startsWith('/ships/') || feed);
+    const viaEdge =
+      env.EDGE &&
+      (PAGES.has(path) || path.startsWith('/ships/') || path.startsWith('/events/') || feed);
 
     let res;
     try {
@@ -139,6 +161,19 @@ export default {
     return res;
   },
 };
+
+// A crawler file from the website, or this site's own copy when the website can't
+// give one.
+async function crawlerFile(path, request, env) {
+  let res = null;
+  try {
+    res = await env.APP.fetch(request);
+  } catch {
+    res = null;
+  }
+  if (res && res.ok) return res;
+  return env.ASSETS.fetch(new Request(new URL(path, request.url), request));
+}
 
 // A page from the static site, as a fallback: the old landing page
 // (site/index.html) or the Troubleshooting page (site/help.html).
