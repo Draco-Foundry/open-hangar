@@ -97,6 +97,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # No GPL, LGPL or AGPL packages in the lockfile (scripts/check-licences.mjs; ~1s).
+      - run: node scripts/check-licences.mjs
       - run: npm test
       - run: npm run format:check
       # Click through the real dashboard with the demo account (Chrome is
