@@ -381,6 +381,47 @@
     return out;
   }
 
+  // The order history as lib.js's readOrderHistory keeps it ({ items, at, pages,
+  // complete }, only ever a whole read, only while Order History is on) →
+  // sources.orders { items, scannedAt, meta: { pages, complete } }, each order and line
+  // with only the keys the sync format allows (schema/sync-payload.schema.json order,
+  // orderLine), so nothing else stored can ride along. None kept: sources as they are.
+  // Pure.
+  const ORDER_KEYS = [
+    'id',
+    'date',
+    'status',
+    'payment',
+    'fulfillment',
+    'currency',
+    'items',
+    'discount',
+    'credit',
+    'beforeTax',
+    'total',
+  ];
+  const ORDER_LINE_KEYS = ['name', 'qty', 'price', 'discount', 'total'];
+  const only = (o, keys) => Object.fromEntries(keys.filter((k) => k in o).map((k) => [k, o[k]]));
+  function withOrders(sources, kept) {
+    if (!isObj(kept) || !Array.isArray(kept.items) || !Number.isFinite(kept.at)) return sources;
+    return {
+      ...sources,
+      orders: {
+        items: kept.items.filter(isObj).map((o) => ({
+          ...only(o, ORDER_KEYS),
+          lines: (Array.isArray(o.lines) ? o.lines : [])
+            .filter(isObj)
+            .map((l) => only(l, ORDER_LINE_KEYS)),
+        })),
+        scannedAt: kept.at,
+        meta: {
+          pages: Number.isInteger(kept.pages) && kept.pages >= 0 ? kept.pages : 0,
+          complete: kept.complete === true,
+        },
+      },
+    };
+  }
+
   // The whole database as a self-describing JSON object (the backup file), ordered
   // the way a backend reads it: provenance → who (identity, org, rank, balances) →
   // what they own (sources). `db` as lib.js's loadDB (or checkDB) returns it,
@@ -388,7 +429,9 @@
   // the stored pledge archive, `subStore` the account's own Subscriber Store as
   // lib.js's getSubStore keeps it (only with the subStore build flag), `accountLogs` the
   // account's pledge and store credit logs as lib.js's readAccountLogs keeps them (only
-  // with the accountLogs build flag). ALWAYS the current format (EXPORT_VERSION),
+  // with the accountLogs build flag), `orders` the account's order history as lib.js's
+  // readOrderHistory keeps it (only with the orderHistory build flag, and only while the
+  // pilot has Order History on). ALWAYS the current format (EXPORT_VERSION),
   // whatever the stored DB's version. Pure.
   function exportPayload({
     db,
@@ -397,6 +440,7 @@
     buybackDetails = null,
     subStore = null,
     accountLogs = null,
+    orders = null,
     appVersion = null,
     now,
   } = {}) {
@@ -406,9 +450,12 @@
       exportedAt: new Date(now === undefined ? Date.now() : now).toISOString(),
       schemaVersion: EXPORT_VERSION,
       account: shapeAccount(account, db.owner),
-      sources: withAccountLogs(
-        withSubStore(withBuybackDetails(sanitizeSources(db.sources), buybackDetails), subStore),
-        accountLogs,
+      sources: withOrders(
+        withAccountLogs(
+          withSubStore(withBuybackDetails(sanitizeSources(db.sources), buybackDetails), subStore),
+          accountLogs,
+        ),
+        orders,
       ),
       // Scan history rides along so a backup file is a complete restore point.
       history: Array.isArray(db.history) ? db.history : [],

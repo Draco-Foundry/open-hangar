@@ -104,6 +104,12 @@ const BUDGET = {
     cap: 'one log being loaded, ACCOUNT_LOG_MAX 10,000 lines',
     max: 4.5 * MB,
   },
+  // Order History (orderHistory flag): an order with five lines of 200-character names is
+  // about 1.7 KB, so ORDER_MAX 3,000 orders come to about 5.1 MB, and a read under way
+  // holds at most as many.
+  orderHistory: { cap: 'ORDER_MAX 3,000 orders, replaced whole', max: 5.5 * MB },
+  orderHistoryLoad: { cap: 'one every-page read, ORDER_MAX 3,000 orders', max: 5.5 * MB },
+  orderHistoryOn: small('the switch: when it was turned on'),
   netDown: small('hosts down in the last 10 minutes'),
   remoteStatus: small('one status.json, replaced whole'),
   account: small('the signed-in account, replaced whole'),
@@ -689,6 +695,45 @@ async function fillWorstCase() {
     items: pledgeLog,
     unread: 99999,
   };
+  // The order history past its cap, every order with five of the longest lines, and a
+  // read under way.
+  const longOrder = (n) => ({
+    id: `ORDER${n}`.padEnd(40, 'X'),
+    date: '2017-01-01',
+    status: 'CLOSED'.padEnd(40, 'x'),
+    payment: 'PAID'.padEnd(40, 'x'),
+    fulfillment: 'DONE'.padEnd(40, 'x'),
+    currency: 'USD',
+    items: 99999999,
+    discount: 99999999,
+    credit: 99999999,
+    beforeTax: 99999999,
+    total: 99999999,
+    lines: Array.from({ length: 5 }, (_, i) => ({
+      name: `Package - Example Hauler ${n} ${i}`.padEnd(200, 'x'),
+      qty: 99,
+      price: 99999999,
+      discount: 99999999,
+      total: 99999999,
+    })),
+  });
+  const orders = OH.mergeOrders(Array.from({ length: OH.ORDER_MAX + 50 }, (_, n) => longOrder(n)));
+  mem.orderHistory = {
+    nickname: 'TestPilot',
+    since: 1,
+    items: orders,
+    at: 1,
+    pages: 99999,
+    complete: true,
+  };
+  mem.orderHistoryLoad = {
+    nickname: 'TestPilot',
+    since: 1,
+    next: 99999,
+    pages: 99999,
+    items: orders,
+  };
+  mem.orderHistoryOn = Date.now();
   // The log, well past its cap, with the longest messages it keeps.
   for (let i = 0; i < 150; i++) OH.log('warn', 'hangar', `retry ${i} `.padEnd(700, 'x'));
   await OH.log('info', 'hangar', 'done');
@@ -702,6 +747,7 @@ test('worst case: every key within its budget, the total under the warning line'
   assert.equal(mem.subStore.items.length, OH.SUB_STORE_MAX);
   assert.equal(mem.accountLogs.pledge.items.length, OH.ACCOUNT_LOG_MAX);
   assert.equal(mem.accountLogs.credit.items.length, OH.ACCOUNT_LOG_MAX);
+  assert.equal(mem.orderHistory.items.length, OH.ORDER_MAX);
 
   const u = await OH.storageUsage();
   const over = [];
