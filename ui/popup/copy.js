@@ -210,8 +210,9 @@ const COPY = {
   // its switch (on: the next scan reads every page of the Pledge Store order history,
   // src/lib.js setOrderHistory, readOrderHistory; off stops the reads and the sending),
   // and its hint while it's off or every page is still to read. The row's name is the
-  // one the approved privacy line names (Words privacy.order-history). PLACEHOLDER: Needs
-  // Words (Words popup.order-history, popup.order-history-first-scan), not approved.
+  // one the approved privacy line names (Words privacy.order-history); the hint is
+  // Account History's. Approved in Words (popup.order-history,
+  // popup.order-history-first-scan), 2026-11-11.
   'popup.order-history': 'Order History',
   'popup.order-history-first-scan': 'First scan will take several minutes.',
   // The Daily Scan Reminder (the `autoScan` flag): its switch, in the openhangar.space
