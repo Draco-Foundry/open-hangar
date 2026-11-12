@@ -128,6 +128,28 @@
     logsLoad = null;
     await OH.stopAccountLogs();
   }
+  // Order History (the `orderHistory` flag): the switch (local orderHistoryOn, src/lib.js
+  // setOrderHistory) and whether every page is still to read, for the first-scan hint:
+  // while it's off, and until the first scan after turning it on has read every page
+  // (the kept orders' `since` is the switch's time once it has).
+  const ORDERS = flag('orderHistory');
+  let ordersOn = $state(false);
+  let ordersFirst = $state(true);
+  async function loadOrders() {
+    if (!ORDERS) return;
+    const got = await chrome.storage.local.get(['orderHistoryOn', 'orderHistory']);
+    ordersOn = Number.isFinite(got.orderHistoryOn) && got.orderHistoryOn > 0;
+    ordersFirst = !ordersOn || got.orderHistory?.since !== got.orderHistoryOn;
+  }
+  // On: the next scan reads every page, so one starts now. Off: no more reads or sending;
+  // the orders already read stay until Clear Data (the approved privacy line).
+  async function ordersSwitch() {
+    const on = !ordersOn;
+    ordersOn = on;
+    await OH.setOrderHistory(on);
+    await loadOrders();
+    if (on) chrome.runtime.sendMessage({ ohPopup: 'scan' }).catch(() => null);
+  }
   async function loadAuto() {
     if (!AUTO) return;
     const got = await chrome.storage.local.get(['scanReminderOn', 'scanReminder']);
@@ -145,12 +167,14 @@
     loadAlerts();
     loadAuto();
     loadLogs();
+    loadOrders();
     // listProfiles checks every saved hangar, so a run of db writes (a scan) reads it once.
     let later;
     const changed = (c, area) => {
       if (area === 'local' && AUTO && (c.scanReminderOn || c.scanReminder || c.autoDailyOn || c.autoDaily))
         loadAuto();
       if (area === 'local' && LOGS && (c.accountLogsLoad || c.accountLogs)) loadLogs();
+      if (area === 'local' && ORDERS && (c.orderHistoryOn || c.orderHistory)) loadOrders();
       if (area === 'local' && c.db) {
         clearTimeout(later);
         later = setTimeout(() => listProfiles().then((p) => (profiles = p)), 1000);
@@ -433,6 +457,7 @@
         </div>
       {/if}
       {#if LOGS}{@render logsRow(true)}{/if}
+      {#if ORDERS}{@render ordersRow(true)}{/if}
     </div>
   {/if}
 
@@ -464,6 +489,33 @@
   {/snippet}
   {#if LOGS && !siteOn}
     <div class="pp-grp">{@render logsRow(false)}</div>
+  {/if}
+
+  <!-- Order History (the orderHistory flag, developer builds only): its switch, off to
+       start (on: the next scan reads every page of the Pledge Store order history, then
+       each scan only the newest; off stops the reads and the sending, the orders read stay
+       until Clear Data; src/lib.js setOrderHistory, readOrderHistory) and the first-scan
+       hint. Under Account History, the same way. -->
+  {#snippet ordersRow(sub)}
+    <div class="pp-r pp-col" class:pp-sub={sub} id="pp-orders">
+      <div class="pp-line">
+        <span class="pp-grow" id="pp-orders-l">{t('popup.order-history')}</span>
+        <button
+          type="button"
+          role="switch"
+          class="pp-sw"
+          id="pp-orders-sw"
+          aria-checked={ordersOn}
+          aria-labelledby="pp-orders-l"
+          aria-describedby={ordersFirst ? 'pp-orders-first' : null}
+          onclick={ordersSwitch}><i></i></button
+        >
+      </div>
+      {#if ordersFirst}<p class="pp-msg calm" id="pp-orders-first">{t('popup.order-history-first-scan')}</p>{/if}
+    </div>
+  {/snippet}
+  {#if ORDERS && !siteOn}
+    <div class="pp-grp">{@render ordersRow(false)}</div>
   {/if}
 
   <!-- Look, Currency and Shortcut as list rows: the name, then the value (owner, 2026-10-24). -->

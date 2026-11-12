@@ -34,6 +34,10 @@ most users see it within a few hours.
   alone (RSI Account Logs, the `accountLogs` build flag): its full history load and its
   daily read stop, and what it kept stays as it was. A load paused partway goes on from
   its next page once the switch is back on.
+- `sources.orders`: `"enabled": false` pauses the order history read alone (Order History,
+  the `orderHistory` build flag): its every-page read and each scan's newest-orders read
+  stop, and what it kept stays as it was. An every-page read paused partway goes on from
+  its next page once the switch is back on.
 - `sources.scanHidden`: `"enabled": false` runs scans on the small Open Hangar page in a
   tab again instead of the hidden scan page (0.4.0, `src/scan-host.js`), if the hidden
   page itself breaks. It only ever turns the hidden page off.

@@ -490,6 +490,12 @@ export function createRunner(env) {
               setProgress(log === 'credit' ? 'creditLog' : 'pledgeLog', page, null, null, pages);
             },
           }).catch(() => {});
+        // Order History (the orderHistory build flag, src/lib.js readOrderHistory), once
+        // the pilot turns it on: every page the first scan after (resumed scan by scan),
+        // then the newest orders, before the sync so it carries them. Not a row of the
+        // scan: problems go to the log. Each page renews the heartbeat, as the logs do.
+        if (flag('orderHistory') && !signedOut && OH.readOrderHistory)
+          await OH.readOrderHistory({ account, onProgress: () => mark(true) }).catch(() => {});
       }
     } catch (e) {
       rows.push({
@@ -1014,6 +1020,10 @@ export function createRunner(env) {
     // reads that). Paced, as every request here; its problems only go to the log.
     if (flag('accountLogs') && !run.stop && OH.readAccountLogs)
       await OH.readAccountLogs({ account, pause: OH.autoPause, dailyOnly: true }).catch(() => {});
+    // Order History (the orderHistory flag), the same way: only the newest orders, never
+    // every page (a scan the pilot starts reads those).
+    if (flag('orderHistory') && !run.stop && OH.readOrderHistory)
+      await OH.readOrderHistory({ account, pause: OH.autoPause, dailyOnly: true }).catch(() => {});
     // Buy-backs filled from your own hangar history (no RSI read), as Scan does. Never
     // the pack reads.
     const after = await OH.loadDB();

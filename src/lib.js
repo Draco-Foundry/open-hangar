@@ -1139,6 +1139,9 @@
         'subStore',
         'accountLogs',
         'accountLogsLoad',
+        'orderHistory',
+        'orderHistoryLoad',
+        'orderHistoryOn',
       ]);
       return;
     }
@@ -1171,6 +1174,11 @@
       'subStore',
       'accountLogs',
       'accountLogsLoad',
+      // Order History (the orderHistory flag): the orders read, a read under way, and
+      // the switch (it's off after Clear Data).
+      'orderHistory',
+      'orderHistoryLoad',
+      'orderHistoryOn',
       RECOVERY_KEY,
       LOG_KEY,
     ]);
@@ -1418,6 +1426,10 @@
     // @flag-start accountLogs: the account's own logs go as sources.pledgeLog and creditLog
     if (OH.flags?.accountLogs) accountLogs = await OH.getAccountLogs(account).catch(() => null);
     // @flag-end accountLogs
+    let orders = null;
+    // @flag-start orderHistory: the account's own orders go as sources.orders while it's on
+    if (OH.flags?.orderHistory) orders = await OH.getOrderHistory(account).catch(() => null);
+    // @flag-end orderHistory
     return SHAPE.exportPayload({
       db,
       account,
@@ -1425,6 +1437,7 @@
       buybackDetails: await OH.getBuybackDetails(),
       subStore,
       accountLogs,
+      orders,
       appVersion,
     });
   };
@@ -5737,6 +5750,247 @@
     return { did: 'daily', error: 'too-many' };
   }
   // @flag-end accountLogs
+
+  // @flag-start orderHistory: RSI's Pledge Store order history, read by a scan, sent by sync
+  // --- Order History: what each pledge cost ------------------------------------------
+  // Off until the pilot turns on Order History (the popup's Settings tab). The switch
+  // (ORDERS_ON) holds the time it was turned on. Each order history page is a plain GET
+  // of RSI's Account, Billing page, Pledge Store tab, 100 orders a page, newest first
+  // (OpenHangar.ordersPath), read in your own RSI session; src/scraper/parser.js
+  // parseOrders reads each order's cells, lines and sums, never the bill-to address or
+  // the payments table. Two ways to read:
+  // - Every page, the first scan after the switch is turned on: paced 0.5 to 1.5 s apart,
+  //   its progress saved after each page (ORDERS_LOAD) so a stopped read goes on from the
+  //   next page. Nothing is kept as the order history until the last page is in.
+  // - After that, each scan: from page 1 until a page holds an order already kept,
+  //   usually one page. One that finds none within ORDERS_DAILY_PAGES keeps nothing and
+  //   reads every page again on the next scan the pilot starts.
+  // Turning it off stops the reads and the sending (exportDB sends the orders only while
+  // it's on); the orders already read stay in this browser until Clear Data.
+  // A 401/403/429/5xx, no answer, a sign-in page or a page whose order cards don't read
+  // stops the read, with no retry; nothing half read is kept. The status file can pause it
+  // (sources.orders; docs/RSI-CHANGES.md).
+  const ORDERS_KEY = 'orderHistory'; // { nickname, items, at, pages, complete, since }
+  const ORDERS_LOAD = 'orderHistoryLoad'; // { nickname, since, next, pages, items }
+  const ORDERS_ON = 'orderHistoryOn'; // when the pilot turned it on (ms), or absent
+  OH.ORDER_MAX = 3000; // orders kept, newest first (storage budget)
+  // A scan's read once every page is in: up to 300 new orders.
+  const ORDERS_DAILY_PAGES = 3;
+  // Each order once (the first list it comes in wins: pass the newest read first), newest
+  // day first, at most ORDER_MAX. Orders of one day keep the order they came in. Pure.
+  OH.mergeOrders = function mergeOrders(...lists) {
+    const seen = new Set();
+    const out = [];
+    for (const list of lists)
+      for (const o of Array.isArray(list) ? list : []) {
+        if (!isObj(o) || typeof o.id !== 'string' || !o.id || seen.has(o.id)) continue;
+        seen.add(o.id);
+        out.push(o);
+      }
+    const day = (o) => (typeof o.date === 'string' ? o.date : '');
+    // Array.prototype.sort is stable: same-day orders stay as they came.
+    out.sort((a, b) => (day(a) < day(b) ? 1 : day(a) > day(b) ? -1 : 0));
+    return out.slice(0, OH.ORDER_MAX);
+  };
+  // When the switch was turned on (ms), or null while it's off.
+  OH.orderHistoryOn = async function orderHistoryOn() {
+    const { [ORDERS_ON]: on } = await chrome.storage.local.get(ORDERS_ON);
+    return Number.isFinite(on) && on > 0 ? on : null;
+  };
+  // The pilot's switch. On: the next scan reads every page (a read half done for an
+  // earlier switch starts over). Off: no more reads or sending; the orders already read
+  // stay until Clear Data, as the privacy policy says.
+  OH.setOrderHistory = async function setOrderHistory(on) {
+    if (on) {
+      await chrome.storage.local.remove(ORDERS_LOAD);
+      await chrome.storage.local.set({ [ORDERS_ON]: Date.now() });
+    } else {
+      await chrome.storage.local.remove([ORDERS_ON, ORDERS_LOAD]);
+    }
+  };
+  // The orders kept for this account ({ nickname, items, at, pages, complete, since }) or
+  // null. `any`: whether the switch is on or not (exportDB asks only while it's on).
+  OH.getOrderHistory = async function getOrderHistory(acct, { any = false } = {}) {
+    if (!any && !(await OH.orderHistoryOn())) return null;
+    const { [ORDERS_KEY]: c } = await chrome.storage.local.get(ORDERS_KEY);
+    return sameNick(c, acct) && Array.isArray(c.items) ? c : null;
+  };
+  // Every page read under way for this switch and account ({ nickname, since, next,
+  // pages, items }), or null.
+  OH.getOrderHistoryLoad = async function getOrderHistoryLoad(acct) {
+    const on = await OH.orderHistoryOn();
+    const { [ORDERS_LOAD]: l } = await chrome.storage.local.get(ORDERS_LOAD);
+    return on && sameNick(l, acct) && l.since === on ? l : null;
+  };
+  // One page → { orders, pager } or { error, status?, msg? }.
+  async function ordersPage(page, get) {
+    let res;
+    try {
+      res = await get(RSI_ORIGIN + window.OpenHangar.ordersPath(page), {
+        credentials: 'include',
+      });
+    } catch (e) {
+      return { error: 'network', msg: e?.message || String(e) };
+    }
+    if (res.status === 401 || res.status === 403) return { error: 'refused', status: res.status };
+    if (res.status === 429 || res.status >= 500) return { error: 'busy', status: res.status };
+    if (!res.ok) return { error: 'bad', status: res.status };
+    let html;
+    try {
+      html = await res.text();
+    } catch (e) {
+      return { error: 'network', msg: e?.message || String(e) };
+    }
+    if (looksLoggedOut(res, html)) return { error: 'signed-out' };
+    let orders;
+    let cards;
+    let pager;
+    try {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      cards = doc.querySelectorAll(RULES.orders.card).length;
+      orders = window.OpenHangar.parseOrders(doc);
+      pager = window.OpenHangar.parsePager(doc);
+    } catch (e) {
+      return { error: 'changed', msg: e?.message || String(e) };
+    }
+    // Order cards and none of them read: RSI changed the page. Stop, keep nothing.
+    if (cards && !orders.length) return { error: 'changed', msg: `${cards} cards unread` };
+    return { orders, pager };
+  }
+  // Whether this page is the last: no orders on it, RSI's pager saying so (it links to no
+  // page after this one, or shows another page than asked: past the end RSI serves the
+  // last page again), or nothing new on it.
+  const lastOrdersPage = (page, r, fresh) =>
+    !r.orders.length ||
+    (page > 1 && r.pager?.current != null && r.pager.current !== page) ||
+    (r.pager?.current === page && r.pager.max != null && r.pager.max <= page) ||
+    !fresh;
+  let ordersInflight = null;
+  // Read what's due: every page after the switch is turned on (resumed scan by scan),
+  // else the newest orders once every page is in, else nothing.
+  // → { ok, did: 'full' | 'daily' | 'none' | 'off' | 'paused' | 'resume-later', n?,
+  // error? }, or { ok: false, error: 'signed-out' }. `onProgress(page, pages)` after each
+  // page of a full read (pages: the highest page RSI's pager has linked to, or null).
+  // `dailyOnly` (Auto Scan Daily): never every page, which waits for a scan the pilot
+  // starts ('none'). Never throws.
+  OH.readOrderHistory = function readOrderHistory({
+    account,
+    fetchFn = fetch,
+    pause = () => sleep(500 + Math.random() * 1000),
+    onProgress = () => {},
+    dailyOnly = false,
+  } = {}) {
+    if (ordersInflight) return ordersInflight;
+    ordersInflight = readOrders({ account, fetchFn, pause, onProgress, dailyOnly })
+      .catch((e) => ({ ok: false, error: 'network', msg: e?.message }))
+      .finally(() => {
+        ordersInflight = null;
+      });
+    return ordersInflight;
+  };
+  async function readOrders({ account, fetchFn, pause, onProgress, dailyOnly }) {
+    const on = await OH.orderHistoryOn();
+    if (!on) return { ok: true, did: 'off' };
+    const acct = account === undefined ? await OH.getAccount().catch(() => null) : account;
+    if (!acct || acct.loggedIn !== true || !acct.nickname)
+      return { ok: false, error: 'signed-out' };
+    if (await OH.sourcePaused('orders')) {
+      OH.log('warn', 'orders', 'read paused by remote status');
+      return { ok: true, did: 'paused' };
+    }
+    const get = OH.guarded(fetchFn, { timeout: 30000 });
+    let asked = 0; // requests so far: every one after the first waits `pause`
+    const ask = async (page) => {
+      if (asked++) await pause();
+      return ordersPage(page, get);
+    };
+    const kept = await OH.getOrderHistory(acct);
+    const r =
+      kept && kept.since === on
+        ? await dailyOrders(acct, kept, on, ask)
+        : dailyOnly
+          ? { did: 'none' }
+          : await fullOrders(acct, on, kept, ask, onProgress);
+    if (r.error)
+      OH.log('warn', 'orders', `order read stopped: ${r.error} ${r.status || ''}`.trim());
+    return { ok: !r.error, ...r };
+  }
+  // Keep the order history (only ever a whole read), only while the switch it was read
+  // for is still on: turned off or on again meanwhile, nothing is kept.
+  async function keepOrders(acct, on, rec) {
+    if ((await OH.orderHistoryOn()) !== on) return false;
+    await chrome.storage.local.set({
+      [ORDERS_KEY]: { nickname: acct.nickname, since: on, ...rec },
+    });
+    return true;
+  }
+  async function fullOrders(acct, on, kept, ask, onProgress) {
+    // Go on where this switch's read stopped, or start at page 1.
+    const load = await OH.getOrderHistoryLoad(acct);
+    let next = Number.isInteger(load?.next) && load.next > 0 ? load.next : 1;
+    let pages = Number.isInteger(load?.pages) ? load.pages : null;
+    let items = Array.isArray(load?.items) ? load.items : [];
+    const maxPages = Math.ceil(OH.ORDER_MAX / RULES.orders.pageSize);
+    let complete = false;
+    while (next <= maxPages) {
+      const page = next;
+      const r = await ask(page);
+      if (r.error) return { did: 'resume-later', ...r };
+      const before = items.length;
+      // Past the end, RSI serves the last page again: nothing on it is new.
+      if (!(page > 1 && r.pager?.current != null && r.pager.current !== page))
+        items = OH.mergeOrders(items, r.orders);
+      if (r.pager?.max != null) pages = Math.max(pages ?? 0, r.pager.max, page);
+      next++;
+      if ((await OH.orderHistoryOn()) !== on) return { did: 'none' };
+      await chrome.storage.local.set({
+        [ORDERS_LOAD]: { nickname: acct.nickname, since: on, next, pages, items },
+      });
+      onProgress(page, pages);
+      if (lastOrdersPage(page, r, items.length > before)) {
+        complete = items.length < OH.ORDER_MAX;
+        break;
+      }
+    }
+    // Every page in: this is the order history now, with what an earlier switch read
+    // (kept from before it was turned off) where this read didn't reach.
+    const merged = OH.mergeOrders(items, kept?.items);
+    const ok = await keepOrders(acct, on, {
+      items: merged,
+      at: Date.now(),
+      pages: Math.max(0, next - 1),
+      complete,
+    });
+    await chrome.storage.local.remove(ORDERS_LOAD);
+    return ok ? { did: 'full', n: items.length } : { did: 'none' };
+  }
+  async function dailyOrders(acct, kept, on, ask) {
+    const known = new Set(kept.items.map((o) => o.id));
+    let fresh = [];
+    for (let page = 1; page <= ORDERS_DAILY_PAGES; page++) {
+      const r = await ask(page);
+      if (r.error) return { did: 'daily', ...r };
+      const seen = new Set(fresh.map((o) => o.id));
+      const add = r.orders.filter((o) => !seen.has(o.id));
+      fresh = fresh.concat(add);
+      // Met an order already kept, or the end: the read is whole. Orders read now
+      // replace their kept copy (a refund changes an order's payment).
+      if (r.orders.some((o) => known.has(o.id)) || lastOrdersPage(page, r, add.length > 0)) {
+        await keepOrders(acct, on, {
+          items: OH.mergeOrders(fresh, kept.items),
+          at: Date.now(),
+          pages: Math.max(page, kept.pages || 0),
+          complete: kept.complete === true,
+        });
+        return { did: 'daily', n: fresh.filter((o) => !known.has(o.id)).length };
+      }
+    }
+    // More new orders than a scan's read: keep nothing, read every page again (the next
+    // scan the pilot starts). The kept orders stay until then.
+    await keepOrders(acct, on, { ...kept, since: 0 });
+    return { did: 'daily', error: 'too-many' };
+  }
+  // @flag-end orderHistory
 
   // --- The store catalog (openhangar.space/api/catalog) ------------------------------
   // Everything in RSI's pledge store right now, as the website's store watcher last
