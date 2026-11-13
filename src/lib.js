@@ -4654,7 +4654,9 @@
   // the sync after a scan holds off for SYNC_NOT_OPEN_WAIT_MS (Sync Now still tries),
   // and a 429's Retry-After holds every sync, Sync Now too.
   const SYNC_NOT_OPEN_WAIT_MS = 6 * 3600e3;
-  const SYNC_TOO_SOON_WAIT_MS = 5 * 60e3; // a 429 without Retry-After
+  // A 429 without Retry-After: the website's own pace, one sync per account every 2
+  // minutes (it always sends Retry-After and `retry_after`, so this is only a fallback).
+  const SYNC_TOO_SOON_WAIT_MS = 2 * 60e3;
   // → the wait that holds this sync ({ reason, until, said }) or null. One that runs
   // past a day (a clock set back) is ignored. Pure.
   OH.siteSyncWait = function siteSyncWait(link, { auto = false, now = Date.now() } = {}) {

@@ -755,12 +755,12 @@ test('too soon (429): a calm note, and Retry-After holds every sync', async () =
   linked(scanned(Date.now() - 60_000));
   answer = () =>
     new Response(
-      JSON.stringify({ error: 'One sync every 5 minutes. Try again soon.', reason: 'too-soon' }),
+      JSON.stringify({ error: 'One sync every 2 minutes. Try again soon.', reason: 'too-soon' }),
       { status: 429, headers: { 'retry-after': '120' } },
     );
   const before = Date.now();
   await assert.rejects(OH.siteSync(), (e) => {
-    assert.equal(e.message, 'One sync every 5 minutes. Try again soon.');
+    assert.equal(e.message, 'One sync every 2 minutes. Try again soon.');
     assert.equal(e.calm, true);
     return true;
   });
@@ -773,7 +773,7 @@ test('too soon (429): a calm note, and Retry-After holds every sync', async () =
     await assert.rejects(OH.siteSync(opts), (e) => {
       assert.equal(e.held, 'too-soon');
       assert.equal(e.calm, true);
-      assert.equal(e.message, 'One sync every 5 minutes. Try again soon.');
+      assert.equal(e.message, 'One sync every 2 minutes. Try again soon.');
       return true;
     });
   }
@@ -785,7 +785,7 @@ test('too soon (429): a calm note, and Retry-After holds every sync', async () =
   assert.equal(sent.length, 2);
 });
 
-test('a 429 without a reason or Retry-After waits 5 minutes, with built-in words', async () => {
+test('a 429 without a reason or Retry-After waits 2 minutes, with built-in words', async () => {
   const err = await refusedWith(429, '<html>Too many</html>');
   assert.equal(err.calm, true);
   assert.equal(
@@ -793,7 +793,7 @@ test('a 429 without a reason or Retry-After waits 5 minutes, with built-in words
     'openhangar.space just took a sync for this account. The next one can launch in a few minutes.',
   );
   const left = mem.siteLink.wait.until - Date.now();
-  assert.ok(left > 4.9 * 60e3 && left <= 5 * 60e3);
+  assert.ok(left > 1.9 * 60e3 && left <= 2 * 60e3);
 });
 
 // An extension page only sees the Retry-After header when the website exposes it (CORS);
