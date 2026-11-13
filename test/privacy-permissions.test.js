@@ -286,10 +286,12 @@ test('a store or beta build with RSI Account Logs on: the policy explains them',
     "Your RSI account history, only if you turn on Account History on the popup's Settings tab: RSI's pledge log and store credit log, on your RSI Account pages.",
     'It never keeps a handle, an email or a payment detail, so it never keeps who a gift went to or came from.',
     `The newest ${lines} lines of each log stay in this browser until you turn Account History off or use Clear Data. Turning it off also stops the reads.`,
-    'your account history if you loaded it (see above), account identity and balances',
+    // Order History's own words (Words privacy.order-history) sit inside these two lists
+    // from 0.5.11; the test below holds those.
+    'your account history if you loaded it (see above), your order history if Order History is on (see above), account identity and balances',
     'cookies: for four things, all on robertsspaceindustries.com.',
     "Reading your account history works the same way: the extension sends that cookie back to robertsspaceindustries.com with each page of the logs it asks for, as RSI's own Account pages do.",
-    'your account history, your referral code and your referral prospects list.',
+    'your account history, your order history, your referral code and your referral prospects list.',
   ];
   let checked = 0;
   for (const [build, beta] of [
@@ -308,4 +310,53 @@ test('a store or beta build with RSI Account Logs on: the policy explains them',
   const { hangarView } = require('../src/hangar-shape.js');
   const view = hangarView({ sources: { pledgeLog: { items: [] }, creditLog: { items: [] } } });
   assert.ok(!('pledgeLog' in view.sources) && !('creditLog' in view.sources));
+});
+
+// Order History (the `orderHistory` flag): a store or beta build with it on reads RSI's
+// Pledge Store order history once the pilot turns it on, and syncs it. It fails here until
+// both copies of the policy have the approved words (Words privacy.order-history,
+// owner-approved 2026-10-30 21:38 UTC, line 1's third sentence revised and approved
+// 2026-11-13, word for word): the What Data Is Accessed bullet, the orders in Optional
+// Sync's list with what turning it off does, the backup file, and the hangar page's hangar
+// without them; and while the hangar page's view still leaves them out (src/hangar-shape.js
+// hangarView).
+test('a store or beta build with Order History on: the policy explains it', async () => {
+  const { buildValues, readRegistry } = await import('../scripts/build-flags.mjs');
+  const registry = readRegistry(path.join(ROOT, 'src', 'flags.js'));
+  const words = (f) =>
+    plain(
+      read(f)
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\*\*/g, '')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'),
+    ).replace(/ ([.,:;)])/g, '$1');
+  const SAYS = [
+    "Your order history, only if you turn on Order History on the popup's Settings tab. It's off until you do.",
+    'The first scan after you turn it on reads every page of your Pledge Store orders on RSI (Account, Billing), slowly.',
+    'After that, each scan reads only your newest orders and stops at one it already has, which adds about one request to RSI.',
+    "From each order it keeps the order number, date, status, total, Store Credit used, amount charged, tax, currency and additional discount, and each item's name, quantity, price, discount and total.",
+    "RSI's billing pages also show your payment method and billing address: the extension skips them and never keeps or sends them, or who a gift went to.",
+    'Turn Order History off to stop reading it; the orders it already read stay in this browser until you use Clear Data.',
+    'your order history if Order History is on (see above), account identity and balances',
+    'Turning Order History off stops sending new orders; the website keeps the ones it has until you delete your account there.',
+    'The JSON file includes your scan history, pledge archive and, if Order History is on, your order history.',
+    'your order history, your referral code and your referral prospects list.',
+  ];
+  let checked = 0;
+  for (const [build, beta] of [
+    ['store', false],
+    ['beta', true],
+  ]) {
+    if (!buildValues(registry, { beta }).orderHistory) continue;
+    checked++;
+    for (const file of ['docs/PRIVACY.md', 'site/privacy.html']) {
+      const text = words(file);
+      for (const s of SAYS) assert.ok(text.includes(s), `${file} (the ${build} build): ${s}`);
+    }
+  }
+  assert.ok(checked, 'Order History is on in the store build (src/flags.js)');
+  // The hangar page's hangar leaves the orders out, as the policy says.
+  const { hangarView } = require('../src/hangar-shape.js');
+  const view = hangarView({ sources: { orders: { items: [] } } });
+  assert.ok(!('orders' in view.sources));
 });

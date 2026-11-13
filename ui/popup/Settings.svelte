@@ -491,7 +491,7 @@
     <div class="pp-grp">{@render logsRow(false)}</div>
   {/if}
 
-  <!-- Order History (the orderHistory flag, developer builds only): its switch, off to
+  <!-- Order History (the orderHistory flag): its switch, off to
        start (on: the next scan reads every page of the Pledge Store order history, then
        each scan only the newest; off stops the reads and the sending, the orders read stay
        until Clear Data; src/lib.js setOrderHistory, readOrderHistory) and the first-scan
