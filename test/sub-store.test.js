@@ -231,12 +231,19 @@ test('sync: sources.subStore carries the allowed keys only, and fits the sync fo
   assert.equal(half.sources.subStore.meta.complete, false);
 });
 
-test('the read is the subStore flag: off in the repo, the sync leaves it out', async () => {
-  assert.equal(OH.flags.subStore, false);
+test('the read is the subStore flag: on in the store build, the sync sends it', async () => {
+  assert.equal(OH.flags.subStore, true);
+  store.account = SUB;
+  // Nothing read yet: nothing sent.
+  let payload = await OH.exportDB({ schemaVersion: SHAPE.DB_VERSION, sources: {} });
+  assert.equal(payload.sources.subStore, undefined);
   await OH.getSubStore({ account: SUB, fetchFn: fakeRsi({ total: 2 }).fetchFn, pause: noPause });
   assert.ok(store.subStore);
-  store.account = SUB;
-  const payload = await OH.exportDB({ schemaVersion: SHAPE.DB_VERSION, sources: {} });
+  payload = await OH.exportDB({ schemaVersion: SHAPE.DB_VERSION, sources: {} });
+  assert.equal(payload.sources.subStore.items.length, 2);
+  // Another pilot signed in to RSI in this browser: their sync never carries this list.
+  store.account = { ...SUB, nickname: 'OtherPilot' };
+  payload = await OH.exportDB({ schemaVersion: SHAPE.DB_VERSION, sources: {} });
   assert.equal(payload.sources.subStore, undefined);
 });
 

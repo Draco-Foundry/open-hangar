@@ -360,3 +360,49 @@ test('a store or beta build with Order History on: the policy explains it', asyn
   const view = hangarView({ sources: { orders: { items: [] } } });
   assert.ok(!('orders' in view.sources));
 });
+
+// Your Subscriber Store and Concierge items (the `subStore` flag): a store or beta build
+// with it on reads, at most once a day, the store items RSI lists only for the signed-in
+// subscriber or Concierge member, and syncs them. It fails here until both copies of the
+// policy have the approved words (Extension Privacy Policy, Members' Store Items: Revised
+// Line 1 approved 2026-10-31 17:25 UTC, lines 2 and 3 approved 16:08 UTC, word for word,
+// #869): the What Data Is Accessed bullet, the items in Optional Sync's list, and the
+// hangar page's hangar without them; and while the hangar page's view still leaves them
+// out (src/hangar-shape.js hangarView).
+test('a store or beta build with the Subscriber Store read on: the policy explains it', async () => {
+  const { buildValues, readRegistry } = await import('../scripts/build-flags.mjs');
+  const registry = readRegistry(path.join(ROOT, 'src', 'flags.js'));
+  const words = (f) =>
+    plain(
+      read(f)
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\*\*/g, '')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'),
+    ).replace(/ ([.,:;)])/g, '$1');
+  const SAYS = [
+    "The store items RSI shows only to subscribers and Concierge members, if you're one (your account identity, above, says which).",
+    "During a scan, at most once a day, the extension asks RSI's store for the Subscriber Store's items and for the pledge store items RSI marks for Concierge members, with the same kind of requests RSI's store page makes when you open it.",
+    'That scan then makes more requests to RSI, all read-only.',
+    "From each item it keeps its name and kind (including whether it's a kit or set), RSI's id for it, the address of its page on RSI's store, its picture's web address, its price and any discount RSI shows you, and whether it's in stock.",
+    "If you're neither a subscriber nor a Concierge member, it doesn't ask.",
+    'pledge archive, the store items RSI shows only to subscribers and Concierge members (see above), your account history',
+    'Your hangar here means your backup file without the scan history, the store items RSI shows only to subscribers and Concierge members, your account history',
+  ];
+  let checked = 0;
+  for (const [build, beta] of [
+    ['store', false],
+    ['beta', true],
+  ]) {
+    if (!buildValues(registry, { beta }).subStore) continue;
+    checked++;
+    for (const file of ['docs/PRIVACY.md', 'site/privacy.html']) {
+      const text = words(file);
+      for (const s of SAYS) assert.ok(text.includes(s), `${file} (the ${build} build): ${s}`);
+    }
+  }
+  assert.ok(checked, 'the Subscriber Store read is on in the store build (src/flags.js)');
+  // The hangar page's hangar leaves the items out, as the policy says.
+  const { hangarView } = require('../src/hangar-shape.js');
+  const view = hangarView({ sources: { subStore: { items: [] } } });
+  assert.ok(!('subStore' in view.sources));
+});
