@@ -1,0 +1,2 @@
+- New: **Order History.** Turn it on in the popup's Settings tab, and the next scan reads your RSI Pledge Store orders, slowly and once; after that, each scan reads only your newest orders. Turn it off to stop the reads; the orders already read stay in this browser until you use Clear Data.
+- Changed: **Privacy policy updated.** It now describes Order History: what it reads and keeps from your RSI orders, that it skips your payment method and billing address, that sync sends your orders only while it's on, and that our hangar page leaves them out.

@@ -5041,11 +5041,16 @@ try {
     logsFirst: document.getElementById('pp-logs-first')?.textContent,
     // In the openhangar.space box with the other switches (owner, 2026-11-01).
     logsInSite: !!document.querySelector('#pp-site #pp-logs-sw'),
+    // Order History (on in store builds from 0.5.11): its switch, off until turned on, with
+    // the first-scan note.
+    ordersSw: document.getElementById('pp-orders-sw')?.getAttribute('aria-checked'),
+    ordersFirst: document.getElementById('pp-orders-first')?.textContent,
   }));
   const setWords = [
     'openhangar.space',
     'Connect to openhangar.space',
     'Account History',
+    'Order History',
     'Look',
     'Match Browser',
     'Currency',
@@ -5071,9 +5076,11 @@ try {
   !set.autoScan &&
   set.logsSw === 'false' &&
   set.logsFirst === 'First scan will take several minutes.' &&
-  set.logsInSite
+  set.logsInSite &&
+  set.ordersSw === 'false' &&
+  set.ordersFirst === 'First scan will take several minutes.'
     ? ok(
-        'Settings: every group, no Store Alerts switch, the shortcut, Account History off in the site box with its first-scan note, no Auto Scan Daily or Notifications row until connected',
+        'Settings: every group, no Store Alerts switch, the shortcut, Account History off in the site box with its first-scan note, Order History off with its note, no Auto Scan Daily or Notifications row until connected',
       )
     : fail(`popup settings: ${JSON.stringify({ set, setMissing })}`);
   // The layout (owner, 2026-10-24): Notifications inside the openhangar.space box; Look,

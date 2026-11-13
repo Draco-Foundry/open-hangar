@@ -94,7 +94,7 @@ every store is `support@openhangar.space`. The account setup is kept in the main
   `data_collection_permissions`:
   - ☑ Personally identifiable information (the RSI account block: handle, display
     name, avatar and profile details)
-  - ☑ Financial and payment information (pledge values, store credit and other balances)
+  - ☑ Financial and payment information (pledge values, order history, store credit and other balances)
   - ☑ Website content (the hangar, and the store items RSI shows only to subscribers and Concierge members, read from RSI's pages)
   - ☑ "I do not sell or transfer user data to third parties, outside of the approved use cases."
   - ☑ "I do not use or transfer user data for purposes that are unrelated to my item's single purpose."
@@ -132,7 +132,7 @@ same: change one, change the other.
 
 **`host_permissions` → `https://robertsspaceindustries.com/*`**
 
-> Reads the signed-in user's own RSI account (hangar, buy-backs, balances, referrals, account history, and the store items RSI shows only to subscribers and Concierge members)
+> Reads the signed-in user's own RSI account (hangar, buy-backs, balances, referrals, account history, order history, and the store items RSI shows only to subscribers and Concierge members)
 > with same-session requests and parses it locally. Only the user's own account is accessed, at a limited rate. Everything is read-only except two actions the user starts with a click: Add to RSI Cart and Send to RSI Cart put the items the user picked in their RSI cart through RSI's own store. It never checks out or pays.
 
 _(Since 0.2.8 there is no `api.star-citizen.wiki` host permission: that public API
@@ -187,6 +187,7 @@ markers, with each paragraph and each • bullet on one line.
 > • Your full hangar at hangar.openhangar.space: pledges, buy-backs, fleet stats, values, referrals and more, read from this browser, with no account
 > • Sync (optional): connect a free openhangar.space account to see your hangar on any device and edit your Wishlist from the popup
 > • Account History (optional): reads your RSI pledge log and store credit log, so you can see each pledge's history and what you paid. Off until you turn it on
+> • Order History (optional): reads your RSI Pledge Store orders: what you bought, when and what you paid. Off until you turn it on
 > • Store alerts (optional, with sync connected): a number on the toolbar button, and a notification if you turn them on, when a Wishlist item set to Remind Me goes on sale. Paints and sales for ships you own show in Fleet News. Matched on your device
 > • Auto Scan Daily (optional, with sync connected): scans your hangar once a day, only for the RSI account this browser last scanned
 > • Add to RSI Cart: put a ship upgrade (CCU) in your RSI cart in one click. You always check out on RSI yourself
@@ -227,6 +228,7 @@ Open Hangar reads your pledges, buy-backs, balances and referrals from RSI with 
 - **Your full hangar** at [hangar.openhangar.space](https://hangar.openhangar.space): pledges, buy-backs, fleet stats, values, referrals and more, read from this browser, with no account
 - **Sync (optional):** connect a free [openhangar.space](https://openhangar.space) account to see your hangar on any device and edit your Wishlist from the popup
 - **Account History (optional):** reads your RSI pledge log and store credit log, so you can see each pledge's history and what you paid. Off until you turn it on
+- **Order History (optional):** reads your RSI Pledge Store orders: what you bought, when and what you paid. Off until you turn it on
 - **Store alerts (optional, with sync connected):** a number on the toolbar button, and a notification if you turn them on, when a Wishlist item set to Remind Me goes on sale. Paints and sales for ships you own show in Fleet News. Matched on your device
 - **Auto Scan Daily (optional, with sync connected):** scans your hangar once a day, only for the RSI account this browser last scanned
 - **Add to RSI Cart:** put a ship upgrade (CCU) in your RSI cart in one click. You always check out on RSI yourself
