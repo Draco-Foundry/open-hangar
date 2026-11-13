@@ -157,7 +157,7 @@ policy's words are the owner's; this list never edits them.
 | `sources.referral.items.recruitsList[].<other keys>` | Any other key a recruit row may gain.                                                   |
 | `sources.referral.scannedAt`                         | When the referral page was scanned.                                                     |
 | `sources.referral.meta`                              | Always empty: nothing is kept next to a referral scan.                                  |
-| `sources.orders`                                     | The order history scan (behind the orderHistory flag, dev only).                        |
+| `sources.orders`                                     | The order history scan (the orderHistory flag; off until the pilot turns it on).        |
 | `sources.orders.items`                               | The orders.                                                                             |
 | `sources.orders.items[]`                             | One Pledge Store order. Strict: no payment method, card, address or gift recipient.     |
 | `sources.orders.items[].id`                          | The order number.                                                                       |

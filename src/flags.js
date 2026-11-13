@@ -104,16 +104,16 @@
     // Order History (owner, 2026-10-30): once a pilot turns it on, a scan reads RSI's
     // order history (Account, Billing) and sync sends it as sources.orders
     // (schema/sync-payload.schema.json), so the website can show what each pledge cost.
-    // Developer builds only until the privacy policy names it. The page reader
-    // (src/scraper/parser.js parseOrders, Pledge Store tab only), the scan step (src/lib.js
-    // readOrderHistory, ui/scan/runner.js: every page the first scan after it's turned on,
-    // then the newest orders until one already kept) and the switch on the popup's
-    // Settings tab (ui/popup/Settings.svelte, off to start; off stops the reads and the
-    // sending, the orders read stay until Clear Data).
+    // The page reader (src/scraper/parser.js parseOrders, Pledge Store tab only), the scan
+    // step (src/lib.js readOrderHistory, ui/scan/runner.js: every page the first scan after
+    // it's turned on, then the newest orders until one already kept) and the switch on the
+    // popup's Settings tab (ui/popup/Settings.svelte, off to start; off stops the reads and
+    // the sending, the orders read stay until Clear Data). In the store builds and the beta
+    // from 0.5.11 (owner, 2026-11-13): the privacy policy names the read (Words
+    // privacy.order-history, approved word for word; test/privacy-permissions.test.js).
     orderHistory: {
       about: 'Order History: a scan reads RSI order history and sync sends it, once turned on.',
-      default: false,
-      devOnly: true,
+      default: true,
     },
     // Your Subscriber Store and Concierge items (#418; owner, 2026-10-31): a scan reads the
     // Subscriber Store RSI shows the signed-in subscriber, and the pledge store items RSI

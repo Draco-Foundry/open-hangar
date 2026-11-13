@@ -206,7 +206,7 @@ const COPY = {
   // The switch's hint while it's off or a full history is still to read, and under the
   // line while one is read (Words popup.account-logs-first-scan, approved 2026-11-02).
   'popup.account-logs-first-scan': 'First scan will take several minutes.',
-  // Order History (the `orderHistory` flag, developer builds only): the Settings row and
+  // Order History (the `orderHistory` flag): the Settings row and
   // its switch (on: the next scan reads every page of the Pledge Store order history,
   // src/lib.js setOrderHistory, readOrderHistory; off stops the reads and the sending),
   // and its hint while it's off or every page is still to read. The row's name is the

@@ -74,8 +74,9 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     scanBar: true,
     // New Since Last Scan: off until its words and privacy line are approved.
     newSinceScan: false,
-    // Order History: developer builds only until the privacy policy names it.
-    orderHistory: false,
+    // Order History: in every build from 0.5.11 (owner, 2026-11-13); the privacy policy
+    // names the read (test/privacy-permissions.test.js).
+    orderHistory: true,
     // Your Subscriber Store: developer builds only until the privacy policy names it.
     subStore: false,
     // RSI Account Logs: in every build from 0.5.8 (owner, 2026-11-01); the privacy policy
@@ -90,11 +91,7 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     sync: false,
   });
   assert.equal(registry.orgFleet.devOnly, true, 'orgFleet stays out of every store build');
-  assert.equal(
-    registry.orderHistory.devOnly,
-    true,
-    'Order History stays out until the privacy policy names it',
-  );
+  assert.ok(!registry.orderHistory.devOnly, 'Order History ships');
   assert.equal(
     registry.subStore.devOnly,
     true,
@@ -312,8 +309,9 @@ test('pack: writes each build its values and cuts the code of flags that are off
     scanBar: true,
     // New Since Last Scan: off until its words and privacy line are approved.
     newSinceScan: false,
-    // Order History: developer builds only until the privacy policy names it.
-    orderHistory: false,
+    // Order History: in every build from 0.5.11 (owner, 2026-11-13); the privacy policy
+    // names the read (test/privacy-permissions.test.js).
+    orderHistory: true,
     // Your Subscriber Store: developer builds only until the privacy policy names it.
     subStore: false,
     // RSI Account Logs: in every build from 0.5.8 (owner, 2026-11-01); the privacy policy
