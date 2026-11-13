@@ -136,6 +136,12 @@ Anything after launch is a plan, not a promise. The details are in the
   another currency in Settings. Look follows your browser, or pick Dark or Light.
   Alt+Shift+O opens the popup (⌥⇧O on a Mac).
 - **Your Data, Your Way:** JSON Backup, Pledges CSV and Buy-Backs CSV on the Settings tab.
+- **Account History:** optional, turned on in the popup's Settings tab. The next scan reads your
+  full RSI pledge log and store credit log once, slowly, then only the newest lines. Turning it off
+  stops the reads and removes the logs from this browser.
+- **Order History:** optional, turned on in the popup's Settings tab. The next scan reads your RSI
+  Pledge Store orders once, slowly, then only your newest orders. Turning it off stops the reads,
+  and orders already read stay in this browser until Clear Data.
 
 **On [openhangar.space](https://openhangar.space/):**
 
