@@ -4,6 +4,11 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 ## Unreleased
 
+## 0.5.11 — 2026-11-12
+
+- New: **Order History.** Turn it on in the popup's Settings tab, and the next scan reads your RSI Pledge Store orders, slowly and once; after that, each scan reads only your newest orders. Turn it off to stop the reads; the orders already read stay in this browser until you use Clear Data.
+- Changed: **Privacy policy updated.** It now describes Order History: what it reads and keeps from your RSI orders, that it skips your payment method and billing address, that sync sends your orders only while it's on, and that our hangar page leaves them out.
+
 ## 0.5.10 — 2026-11-05
 
 - Fixed: A pledge of one ship with only its paint is filed as that ship, not as a pack.
