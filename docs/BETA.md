@@ -155,5 +155,5 @@ Firefox checks about once a day.
 
 > Beta build of Open Hangar (public listing: Open Hangar) for invited testers. To try it,
 > sign in at robertsspaceindustries.com, click the extension's icon and press Scan.
-> Sync is optional: Connect needs an openhangar.space account, which is invite-only
-> during the beta, and the extension works fully without it.
+> Sync is optional: Connect needs a free openhangar.space account, and the extension works
+> fully without it.

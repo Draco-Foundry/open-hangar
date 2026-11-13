@@ -10,14 +10,14 @@ Open Hangar comes in two parts that work together:
 
 - **The Extension** for Chrome, Edge and Firefox reads your own Star Citizen account on RSI's
   website, right in your browser: every pledge, buy-back, balance and referral, made useful.
-- **The Website**, [openhangar.space](https://openhangar.space/), has Star Citizen news and
-  store tools today. At the **November 10, 2026** launch it also becomes your fleet manager:
-  My Hangar on any device, a store that knows what you own, and a page for every ship.
+- **The Website**, [openhangar.space](https://openhangar.space/), is your fleet manager on any
+  device: My Hangar, a store that knows what you own, a page for every ship, and Star Citizen
+  news.
 
 Free for every pilot: no subscriptions, no premium tier, no paid features, and your data is
 never sold.
 
-**[Get Open Hangar](#get-open-hangar)** · [Road to Launch](#road-to-launch-november-10-2026) ·
+**[Get Open Hangar](#get-open-hangar)** · [What's Next](#whats-next) ·
 [Full Roadmap](ROADMAP.md) · [Recently Shipped](#recently-shipped) ·
 [Discord](https://discord.gg/FF8Wm5HdnV)
 
@@ -46,70 +46,23 @@ Then:
 Re-scan any time to refresh. On the Settings tab, **Clear Data** wipes the local copy,
 and **Log Out of RSI** ends your RSI session.
 
-The website works in any browser, phone included, and from the Nov 10 launch that's where
-My Hangar lives.
-
-An invite-only tester round runs Oct 20 to 27, with invites on our
-[Discord](https://discord.gg/FF8Wm5HdnV). Spots are limited.
+The website works in any browser, phone included, and that's where My Hangar lives. Accounts
+are free and open to everyone at [app.openhangar.space](https://app.openhangar.space/).
 
 ## Where We're Headed
 
-- **The Website Becomes Your Fleet Manager.** My Hangar on any device, store tools that know
-  what you own, a page for every ship, and later your org and the wider community.
+- **The Website Is Your Fleet Manager.** My Hangar on any device, store tools that know what
+  you own, a page for every ship, and later your org and the wider community.
 - **The Extension Stays Your Scanner.** It keeps reading your own RSI account in your browser
-  and keeps getting better at it. From Nov 10, new features land on the website.
-- **Your Data, Your Call.** From Nov 10 you can choose to sync: connect a free
-  openhangar.space account and the extension syncs after every scan. Or skip it, and
-  everything stays in your browser. Disconnect any time.
+  and keeps getting better at it. New features land on the website.
+- **Your Data, Your Call.** Sync is optional: connect a free openhangar.space account and the
+  extension syncs after every scan. Or skip it, and everything stays in your browser.
+  Disconnect any time.
 
-## Road to Launch: November 10, 2026
+## What's Next
 
-The website opens to everyone, and sign-ups open to everyone. The extension no longer
-launches with it: 0.3.0 shipped on Oct 13, and 0.4.0 and 0.4.1 went to the stores on
-Oct 14.
-
-Website features come in **waves**, batches that are built and tested ahead of launch. A
-wave's date is when it's built, not when you get it: Waves 1 to 3 are planned for launch day.
-Anything that isn't ready and tested in time stays switched off until it is.
-
-**Shipped** means you can use it now. **Built** means it's done and arrives Nov 10. All dates
-are 2026, in UTC. Each bar fills as its tasks are done:
-
-[![Wave 1](https://img.shields.io/github/milestones/progress-percent/Draco-Foundry/open-hangar/6?label=Wave%201%20by%20Oct%2016&style=flat)](https://github.com/Draco-Foundry/open-hangar/milestone/6)
-[![Wave 2](https://img.shields.io/github/milestones/progress-percent/Draco-Foundry/open-hangar/7?label=Wave%202%20by%20Oct%2025&style=flat)](https://github.com/Draco-Foundry/open-hangar/milestone/7)
-[![Beta](https://img.shields.io/github/milestones/progress-percent/Draco-Foundry/open-hangar/8?label=Beta%20by%20Oct%2027&style=flat)](https://github.com/Draco-Foundry/open-hangar/milestone/8)
-[![Wave 3](https://img.shields.io/github/milestones/progress-percent/Draco-Foundry/open-hangar/9?label=Wave%203%20by%20Nov%203&style=flat)](https://github.com/Draco-Foundry/open-hangar/milestone/9)
-[![Launch](https://img.shields.io/github/milestones/progress-percent/Draco-Foundry/open-hangar/4?label=Launch%20Nov%2010&style=flat)](https://github.com/Draco-Foundry/open-hangar/milestone/4)
-
-- [x] **Sep 28 to 30:** Shipped. Open Hangar is live on the Chrome, Edge and Firefox stores.
-- [x] **Oct 2 to 7:** Shipped. openhangar.space becomes a Star Citizen news hub and opens the
-      Open Hangar Store.
-- [x] **Oct 13 to 14:** Shipped. Extension 0.3.0 and 0.3.1 make the extension a lighter
-      connector, and 0.4.0 and 0.4.1 bring the new toolbar popup.
-- [ ] **Oct 16:** [Wave 1: Core Hangar Manager](https://github.com/Draco-Foundry/open-hangar/milestone/6)
-      built. My Hangar on the website, a page for every ship, and store badges for what you
-      own.
-- [ ] **Oct 16 to 19:** bug-fix days, with no new features.
-- [ ] **Oct 20 to 27:** a tester round with 5 to 10 Discord testers on the public extension
-      and the website.
-- [ ] **Oct 25:** [Wave 2: Your Hangar Meets the Store](https://github.com/Draco-Foundry/open-hangar/milestone/7)
-      built and in testing.
-- [ ] **Oct 27:** code freeze for the extension, then a go or no-go call.
-- [x] **Oct 28:** 0.3.0 submitted to Chrome, Edge and Firefox. It shipped early, on Oct 13.
-- [ ] **Nov 3:** [Wave 3: Finishing Touches](https://github.com/Draco-Foundry/open-hangar/milestone/9) built.
-- [ ] **Nov 10: [Launch](https://github.com/Draco-Foundry/open-hangar/milestone/4).** The website
-      opens and sign-ups open to everyone.
-- [ ] **Then:** four weeks of bug fixes and keeping ship and store data accurate.
-
-The Oct 27 cut-off is for the extension, which needs store review. Website features can keep
-landing until launch, and each one is tested before it's switched on. Every feature has its
-own issue in the pinned [Road to Launch Tracker](https://github.com/Draco-Foundry/open-hangar/issues/468), and every step
-is in
-[All Milestones](https://github.com/Draco-Foundry/open-hangar/milestones?direction=asc&sort=due_date&state=open).
-
-## After Launch
-
-- **First Four Weeks:** bug fixes and keeping ship and store data accurate. No new features.
+- **First Four Weeks After Launch (to Dec 8):** bug fixes, keeping ship and store data
+  accurate, and switching on features that are already built.
 - **[December 2026](https://github.com/Draco-Foundry/open-hangar/milestone/10) (Planned):** community features on the
   website. Org Fleet (ships only, never prices or what anyone paid), Looking for Crew, Events
   (public, org or private) and phone alerts.
@@ -126,32 +79,28 @@ Anything after launch is a plan, not a promise. The details are in the
 
 ## Recently Shipped
 
-- [x] **Oct 23, 2026 · 0.5.3:** Scan tells you in plain words when RSI isn't answering and
-      keeps your last scan, your Wishlist and alerts still match ships RSI renames, the popup
-      shows UEC and REC, and Connect uses Open Hangar's own sign-in window.
-- [x] **Oct 14, 2026 · 0.4.0 and 0.4.1:** a new toolbar popup with three tabs, Hangar,
-      Wishlist and Settings, plus an alerts bell. Also: scans that run out of sight, Auto Scan
-      Daily (optional), your Wishlist in the popup, your own currency and light mode.
-      ([0.4.0](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.4.0),
-      [0.4.1](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.4.1))
-- [x] **Oct 13 to 14, 2026 · 0.3.0 and 0.3.1:** the extension is now a lighter connector,
-      and your full hangar opens on openhangar.space.
-      ([0.3.0](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.3.0))
-- [x] **Oct 6 to 7, 2026 · Website:** the store adds Compare (up to three items side by side),
-      prices in your own currency and a What's New view of the latest drops. Pilots with a
-      synced hangar (beta testers until launch) see an In Your Hangar mark on what they own,
-      and can hide owned items.
-- [x] **Oct 6 to 7, 2026 · Website:** a fresh front page with today's top stories, Ships in
-      the News, a Patch, Roadmap and Issues card, and each subscriber tier's Vehicle of the
-      Month.
-- [x] **Oct 5, 2026 · 0.2.18 and 0.2.19:** Reclaim on an upgrade buy-back opens the right
-      item, and the next buy-back token date keeps working past RSI's posted 2026 dates.
-- [x] **Oct 4, 2026 · Website:** one page to get Open Hangar, showing each store's current
-      version. ([Get the Extension](https://openhangar.space/extension))
-- [x] **Oct 4, 2026 · 0.2.17:** much faster rescans when nothing has changed, and full-size
-      pictures.
-- [x] **Oct 3, 2026 · Website:** the [Open Hangar Store](https://openhangar.space/store) lists
-      every item RSI sells, with its sale history, how often RSI sells it and insurance.
+- [x] **Nov 10, 2026 · Website:** openhangar.space opens to everyone. Sign-ups are open, and
+      My Hangar and sync work for every pilot.
+- [x] **Nov 12, 2026 · 0.5.11:** Order History: turn it on in the popup's Settings tab, and the
+      next scan reads your RSI Pledge Store orders, slowly and once; after that, each scan
+      reads only your newest orders. ([0.5.11](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.5.11))
+- [x] **Nov 5, 2026 · 0.5.10:** a pledge of one ship with only its paint is filed as that ship,
+      and when RSI sends an empty page or a pledge without its id, the scan keeps your last
+      full scan. ([0.5.10](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.5.10))
+- [x] **Nov 2, 2026 · 0.5.9:** the popup's total shows every pledge at its melt value, the same
+      figure as Melt Value on openhangar.space. Also: UEC and REC in full up to 999,999, first
+      scan progress, and long pledge logs no longer show Scan Stopped. ([0.5.9](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.5.9))
+- [x] **Nov 1, 2026 · 0.5.8:** Account History reads your full RSI pledge log and store credit
+      log once, then only the newest lines. Also: Auto Scan Daily replaces the Daily Scan
+      Reminder, and pledges priced in UEC no longer count as dollars. ([0.5.8](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.5.8))
+- [x] **Oct 31, 2026 · 0.5.7:** Account Value no longer adds in your Store Credit, so it matches
+      the website, and the Wishlist search lists one row per ship. ([0.5.7](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.5.7))
+- [x] **Oct 31, 2026 · 0.5.6:** a first scan that stops partway no longer keeps the part it
+      read, the New in button clears, and the popup shows how long a scan took.
+      ([0.5.6](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.5.6))
+- [x] **Oct 27, 2026 · 0.5.5:** Scan sits at the top of every tab and shows its progress,
+      Wishlist items open in the Store on openhangar.space, and the popup shows how your UEC
+      changed. ([0.5.5](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.5.5))
 
 **[Everything We've Shipped](ROADMAP.md#shipped)** ·
 [Release Notes](https://github.com/Draco-Foundry/open-hangar/releases) ·
@@ -159,7 +108,7 @@ Anything after launch is a plan, not a promise. The details are in the
 
 ## What You Get Today
 
-**In the Extension (0.4.1):**
+**In the Extension:**
 
 - **The Toolbar Popup:** three tabs, Hangar, Wishlist and Settings. The Wishlist tab
   counts your Remind Me items in the store and lists them first, and the toolbar badge
@@ -172,9 +121,9 @@ Anything after launch is a plan, not a promise. The details are in the
   why in plain words and keeps your last scan.
 - **Your Whole Hangar:** Open My Hangar shows My Hangar on openhangar.space when you're
   connected, or hangar.openhangar.space when you're not.
-- **Store Alerts (Optional):** a badge and a notification when a ship in your buy-backs is
-  back in the store, or a ship you own gets a new paint, a warbond edition or a
-  limited-time sale. Matched on your device.
+- **Store Alerts (Optional):** only your Remind Me items get the toolbar number and
+  notifications. Paints and sales for ships you own show in Fleet News. Matched on your
+  device.
 - **Auto Scan Daily (Optional):** while you're connected to openhangar.space, Open Hangar
   can scan your hangar for you once a day, only for the RSI account this browser last
   scanned. If you're signed out or signed in to another account, it reads nothing and asks
@@ -190,13 +139,15 @@ Anything after launch is a plan, not a promise. The details are in the
 
 **On [openhangar.space](https://openhangar.space/):**
 
+- **My Hangar:** your whole hangar on any device, phone included, once the extension syncs to
+  your free account.
 - **Star Citizen News:** game status, an events calendar, what's live now, ships in the news
   and short summaries of official RSI posts.
 - **The [Open Hangar Store](https://openhangar.space/store):** every item RSI sells, with its
   sale history, how often RSI sells it, insurance, side-by-side compare and prices in your
   own currency.
-- **Accounts:** up and running, with sign-ups invite-only until launch. You can download
-  everything the website holds about you from your Account page.
+- **Accounts:** free and open to everyone. You can download everything the website holds
+  about you from your Account page.
 
 ## Privacy
 
@@ -210,7 +161,7 @@ Anything after launch is a plan, not a promise. The details are in the
   everyone and with nothing about you. The `cookies` permission is used only on RSI: for
   **Log Out of RSI**, to see whether you're signed in to RSI, and for **Add to RSI Cart**.
   Each RSI account's data is kept separately, so accounts never mix.
-- **Optional Sync (Open to Everyone From Nov 10, 2026):** your data stays in your browser
+- **Optional Sync:** your data stays in your browser
   unless you connect a free openhangar.space account. Once connected, every scan sends the
   same data as the JSON export to your account there (Sync Now sends it right away).
   Disconnect stops it, and the website lets you download or delete everything. With or

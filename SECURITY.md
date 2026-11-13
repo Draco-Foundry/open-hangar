@@ -23,8 +23,7 @@ or anyone's personal data.
 - The Open Hangar browser extension (Chrome, Edge, Firefox), including its handling of
   your RSI session and the data it saves on your computer.
 - [openhangar.space](https://openhangar.space/), including its status file.
-- [app.openhangar.space](https://app.openhangar.space/), the account and sync site
-  (invite-only for now).
+- [app.openhangar.space](https://app.openhangar.space/), the account and sync site.
 
 Not in scope: RSI's own website and services (report those to
 [Cloud Imperium](https://robertsspaceindustries.com/), not to us), and reports that
