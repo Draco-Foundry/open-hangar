@@ -4096,7 +4096,11 @@
   // reason (5xx or no network, after fetchPage's own retries) doubles the next pause;
   // three in a row stop the batch. A 5xx with a Retry-After stops it at once and holds
   // batches off until then (`busy`). What was read is kept. onProgress(done, total);
-  // stop by returning false from shouldGo().
+  // stop by returning false from shouldGo(). With the bbdMissTransient build flag, a
+  // page that failed for a passing reason is noted in bbdMisses too, so one page RSI
+  // fails every time waits its turn like a 404 instead of being asked every scan; only
+  // when the batch read another page fine (RSI answering for the rest), never on a
+  // slow-down stop.
   // → { done, errors, total, rateLimited?, retryAt?, held?, busy? } (held: still held
   // off from an earlier batch, so RSI wasn't asked at all).
   const BBD_PAUSE_MS = 1000;
@@ -4138,6 +4142,7 @@
     let read = 0; // pages read fine
     let fails = 0; // pages in a row that failed for a passing reason
     const missed = []; // pages that failed for a reason that won't pass (bbdMisses)
+    const passing = []; // pages that failed for a passing reason (bbdMissTransient)
     const got = []; // pages read fine
     for (const [i, id] of todo.entries()) {
       if (!shouldGo()) break;
@@ -4159,6 +4164,7 @@
         errors++;
         if (/signed in/i.test(r.error)) break;
         if (!r.transient) missed.push(String(id));
+        else passing.push(String(id));
       } else {
         read++;
         got.push(String(id));
@@ -4174,6 +4180,7 @@
       if (i < todo.length - 1 && shouldGo()) await sleep(OH.bbdPause(fails));
     }
     if (before && read) await chrome.storage.local.remove(BBD_STRIKES_KEY);
+    if (OH.flags?.bbdMissTransient && read) missed.push(...passing);
     await noteBuybackMisses(missed, got);
     return { done, errors, total: todo.length };
   };

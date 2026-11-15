@@ -221,6 +221,66 @@ test('pages that never read are remembered, held a day, then doubling; a read fo
   assert.deepEqual(await OH.getBuybackMisses(), {});
 });
 
+// The bbdMissTransient build flag, on for one test (lib.js reads OH.flags as it goes).
+async function withFlag(fn) {
+  const keep = OH.flags;
+  OH.flags = Object.freeze({ ...(keep || {}), bbdMissTransient: true });
+  try {
+    return await fn();
+  } finally {
+    OH.flags = keep;
+  }
+}
+
+test('flag off: a page RSI fails every time (5xx) is not remembered', async () => {
+  await reset();
+  answer = (id) => (id === '2' ? 503 : 200);
+  const r = await OH.fetchBuybackDetails(ids);
+  assert.deepEqual(r, { done: 5, errors: 1, total: 5 });
+  assert.deepEqual(await OH.getBuybackMisses(), {});
+});
+
+test('bbdMissTransient: a page RSI fails while the rest read is held a day, then doubling', async () => {
+  await reset();
+  answer = (id) => (id === '2' ? 503 : 200);
+  offline = (id) => id === '4';
+  const t0 = Date.now();
+  const r = await withFlag(() => OH.fetchBuybackDetails(ids));
+  assert.deepEqual(r, { done: 5, errors: 2, total: 5 });
+  const first = await OH.getBuybackMisses();
+  assert.deepEqual(Object.keys(first).sort(), ['2', '4']);
+  assert.equal(first['2'].n, 1);
+  assert.ok(first['2'].at >= t0);
+  // Failed again with nothing else read (page 5 was read last time, so only 2 is due):
+  // not counted.
+  const alone = await withFlag(() => OH.fetchBuybackDetails(['2', '5']));
+  assert.deepEqual(alone, { done: 1, errors: 1, total: 1 });
+  assert.equal((await OH.getBuybackMisses())['2'].n, 1);
+  // Failed again while a new page read fine: counted.
+  await withFlag(() => OH.fetchBuybackDetails(['2', '6']));
+  assert.equal((await OH.getBuybackMisses())['2'].n, 2);
+  // Read at last: forgotten.
+  answer = () => 200;
+  await withFlag(() => OH.fetchBuybackDetails(['2']));
+  assert.deepEqual(Object.keys(await OH.getBuybackMisses()), ['4']);
+});
+
+test('bbdMissTransient: RSI failing every page (nothing read) parks none', async () => {
+  await reset();
+  answer = () => 503;
+  const r = await withFlag(() => OH.fetchBuybackDetails(ids));
+  assert.deepEqual(r, { done: 3, errors: 3, total: 5 });
+  assert.deepEqual(await OH.getBuybackMisses(), {});
+});
+
+test('bbdMissTransient: a slow-down stop parks none', async () => {
+  await reset();
+  answer = (id) => (id === '1' ? 200 : id === '2' ? 503 : 429);
+  const r = await withFlag(() => OH.fetchBuybackDetails(ids));
+  assert.equal(r.rateLimited, true);
+  assert.deepEqual(await OH.getBuybackMisses(), {});
+});
+
 test('Clear Data leaves no buy-back page details or misses, and none come back', async () => {
   await reset();
   answer = (id) => (id === '3' ? 404 : 200);
