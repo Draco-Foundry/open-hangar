@@ -7179,6 +7179,13 @@ try {
       OH.getReferral = async () => ({ ok: true });
       // The demo's saved buy-backs: their own pages aren't asked for here either.
       OH.fetchBuybackDetails = async () => ({ done: 0, errors: 0, total: 0 });
+      // The demo pilot is a subscriber, so a store build's scan reads the Subscriber
+      // Store (the subStore flag): stood in for and counted, as RSI is off here.
+      let subStore = 0;
+      OH.getSubStore = async () => {
+        subStore++;
+        return { ok: false, error: 'busy' };
+      };
       const card = document.getElementById('bp-rsi-access').textContent.replace(/\s+/g, ' ');
       // The popup's Scan (src/background.js requestScan) while access is off.
       const scanRequest = { at: Date.now(), tabId: 42 };
@@ -7193,6 +7200,7 @@ try {
         held,
         asked: __demo.asked.filter((o) => o === 'https://robertsspaceindustries.com/*').length,
         scans,
+        subStore,
         cardAfter: !!document.getElementById('bp-rsi-access'),
         done: !!document.getElementById('bp-done'),
         failed: !!document.getElementById('bp-report'),
@@ -7208,6 +7216,7 @@ try {
   !rsiYes.held.report &&
   rsiYes.asked === 1 &&
   rsiYes.scans > 0 &&
+  rsiYes.subStore === 1 &&
   !rsiYes.cardAfter &&
   rsiYes.done
     ? ok(
@@ -7215,7 +7224,12 @@ try {
       )
     : fail(`basic RSI access: ${JSON.stringify(rsiYes)}`);
   const rsiNo = await rsiCheck('deny');
-  rsiNo.asked === 1 && rsiNo.scans === 0 && rsiNo.cardAfter && !rsiNo.failed && !rsiNo.done
+  rsiNo.asked === 1 &&
+  rsiNo.scans === 0 &&
+  rsiNo.subStore === 0 &&
+  rsiNo.cardAfter &&
+  !rsiNo.failed &&
+  !rsiNo.done
     ? ok('RSI access refused: the card stays, still no scan and no failure')
     : fail(`basic RSI access refused: ${JSON.stringify(rsiNo)}`);
   // A too-soon sync (429) on the basic page, offline: the time Sync Now works again,

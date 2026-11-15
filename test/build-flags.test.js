@@ -77,8 +77,9 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     // Order History: in every build from 0.5.11 (owner, 2026-11-13); the privacy policy
     // names the read (test/privacy-permissions.test.js).
     orderHistory: true,
-    // Your Subscriber Store: developer builds only until the privacy policy names it.
-    subStore: false,
+    // Your Subscriber Store and Concierge items: in every build from 0.5.12 (owner,
+    // 2026-11-13); the privacy policy names the read (test/privacy-permissions.test.js).
+    subStore: true,
     // RSI Account Logs: in every build from 0.5.8 (owner, 2026-11-01); the privacy policy
     // names both reads (test/privacy-permissions.test.js).
     accountLogs: true,
@@ -92,11 +93,7 @@ test('public store builds get the defaults; the beta its set; sync is on in both
   });
   assert.equal(registry.orgFleet.devOnly, true, 'orgFleet stays out of every store build');
   assert.ok(!registry.orderHistory.devOnly, 'Order History ships');
-  assert.equal(
-    registry.subStore.devOnly,
-    true,
-    'Your Subscriber Store stays out until the privacy policy names it',
-  );
+  assert.ok(!registry.subStore.devOnly, 'Your Subscriber Store and Concierge items ship');
   assert.ok(!registry.accountLogs.devOnly, 'RSI Account Logs ship');
   assert.ok(!registry.autoScanRun.devOnly, 'Auto Scan Daily ships');
   assert.ok(!registry.autoScan.devOnly, 'the Daily Scan Reminder ships');
@@ -312,8 +309,9 @@ test('pack: writes each build its values and cuts the code of flags that are off
     // Order History: in every build from 0.5.11 (owner, 2026-11-13); the privacy policy
     // names the read (test/privacy-permissions.test.js).
     orderHistory: true,
-    // Your Subscriber Store: developer builds only until the privacy policy names it.
-    subStore: false,
+    // Your Subscriber Store and Concierge items: in every build from 0.5.12 (owner,
+    // 2026-11-13); the privacy policy names the read (test/privacy-permissions.test.js).
+    subStore: true,
     // RSI Account Logs: in every build from 0.5.8 (owner, 2026-11-01); the privacy policy
     // names both reads (test/privacy-permissions.test.js).
     accountLogs: true,

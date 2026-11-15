@@ -120,14 +120,14 @@
     // marks for a Concierge member, at most once a day (src/lib.js getSubStore,
     // ui/scan/runner.js), and sync sends them as sources.subStore
     // (schema/sync-payload.schema.json) for the website's Store. RSI lists them only to
-    // that signed-in account, so only the pilot's own extension can read them. The privacy
-    // policy names the read (docs/PRIVACY.md, 2026-10-31); developer builds only until the
-    // owner's release turns it on.
+    // that signed-in account, so only the pilot's own extension can read them. In the store
+    // builds and the beta from 0.5.12 (owner, 2026-11-13): the privacy policy names the read
+    // (Members' Store Items, approved word for word 2026-10-31, #869;
+    // test/privacy-permissions.test.js).
     subStore: {
       about:
         'Your Subscriber Store and Concierge items: a scan reads them once a day and sync sends them.',
-      default: false,
-      devOnly: true,
+      default: true,
     },
     // RSI Account Logs (owner, 2026-11-01): a scan reads RSI's pledge log and store credit
     // log (Account), the full history once when the pilot asks and the day's new lines
