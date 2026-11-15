@@ -142,6 +142,14 @@
       about: 'RSI Account Logs: a scan reads the pledge and store credit logs and sync sends them.',
       default: true,
     },
+    // A buy-back's own page that RSI fails (a 5xx, no network) after every retry, while
+    // other pages in the same batch read fine, waits a day, then doubling, like a page
+    // that answers 404 (src/lib.js fetchBuybackDetails, bbdMisses), instead of being
+    // asked again every scan (owner, 2026-11-15). No words, no new requests.
+    bbdMissTransient: {
+      about: 'A buy-back page RSI keeps failing waits a day, then doubling, like a 404.',
+      default: false,
+    },
   };
 
   // Set per build by scripts/pack.mjs. Keep it empty here.
