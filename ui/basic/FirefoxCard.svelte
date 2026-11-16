@@ -4,7 +4,10 @@
   // hangar (Local Mode, no account); its words are owner-approved word for word
   // (2026-10-10). Otherwise Connect from the website: the dashboard's Connect card's
   // words (ui/site/FirefoxExplain.svelte). Continue is the click that asks Firefox.
-  let { local = false, onContinue, onClose } = $props();
+  // Before You Connect shows on every browser before Connect (./consent.js): there its
+  // Continue is the click that agrees. `firefox`: the "Why Firefox asks" line and the
+  // heading that names it, on Firefox only.
+  let { local = false, firefox = true, onContinue, onClose } = $props();
 </script>
 
 <section class="bp-note bp-fx" id="bp-firefox" aria-labelledby="bp-firefox-h">
@@ -43,7 +46,8 @@
     </dl>
   {:else}
     <span class="bp-kick">Before You Connect</span>
-    <h2 id="bp-firefox-h">What We Share, and Why Firefox Asks</h2>
+    <!-- PLACEHOLDER (Chrome and Edge's heading): Needs Words, not approved. -->
+    <h2 id="bp-firefox-h">{firefox ? 'What We Share, and Why Firefox Asks' : 'What We Share'}</h2>
     <dl>
       <dt>What we send</dt>
       <dd>
@@ -54,12 +58,14 @@
       <dd>
         Passwords, card numbers, bank details or how you pay. Open Hangar never sees any of that.
       </dd>
-      <dt>Why Firefox asks</dt>
-      <dd>
-        Firefox makes every extension name what it shares, using a short fixed list. Pledge prices
-        and store credit fall under <b>"financial and payment information"</b>, so that's what its
-        prompt will say.
-      </dd>
+      {#if firefox}
+        <dt>Why Firefox asks</dt>
+        <dd>
+          Firefox makes every extension name what it shares, using a short fixed list. Pledge prices
+          and store credit fall under <b>"financial and payment information"</b>, so that's what its
+          prompt will say.
+        </dd>
+      {/if}
       <dt>If you say no</dt>
       <dd>Nothing changes. Open Hangar stays private and local, and you can connect later.</dd>
       <dt>Change your mind</dt>

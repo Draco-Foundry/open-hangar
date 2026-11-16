@@ -12,6 +12,7 @@ import { t } from './copy.js';
 import { progressLine, reportLines, reportSummary } from './report-lines.js';
 import { afterConnect } from './after-connect.js';
 import { connectLink } from './link-code.js';
+import { consentGiven, consentRecord } from './consent.js';
 import { createRunner, newRun } from '../scan/runner.js';
 
 const OH = globalThis.OH;
@@ -48,6 +49,7 @@ export const hub = $state({
     msg: '',
     calm: false,
     dataOk: true,
+    consent: false, // Before You Connect's Continue was clicked (./consent.js)
     askFirefox: null,
     pilot: null,
     switchTo: null,
@@ -202,6 +204,7 @@ export async function refreshSite() {
   if (until) waitTimer = setTimeout(refreshSite, Math.max(0, until - Date.now()) + 500);
   else if (link && !s.syncing) runner.retryIfDue(link).catch(() => {});
   s.dataOk = !firefox() || (await chrome.permissions.contains(SITE_DATA).catch(() => false));
+  s.consent = consentGiven((await chrome.storage.local.get('dataConsent')).dataConsent);
   await connectIfAsked();
   if (!firefox() || s.dataOk || !chrome.storage.session) return;
   // Connect was pressed on the website, or our hangar page asked for the hangar,
@@ -230,15 +233,29 @@ export function dataOk() {
     .then((ok) => (hub.site.dataOk = !!ok));
 }
 
-// Firefox's card: Continue asks Firefox (the click), then connects unless it was our
-// hangar page asking (then that page just asks again).
+// The card's Continue: on Firefox it asks Firefox (the click). For Connect it's also the
+// click that agrees to Before You Connect (saved, ./consent.js), then it connects; for
+// our hangar page asking (Local Mode), that page just asks again.
 export async function firefoxContinue() {
   const asked = dataOk();
   const why = hub.site.askFirefox;
+  const fromSite = connectAsk?.fromSite ?? true;
   hub.site.askFirefox = null;
+  connectAsk = null;
+  if (why === 'connect') {
+    await chrome.storage.local.set({ dataConsent: consentRecord() });
+    hub.site.consent = true;
+  }
   if (!(await asked)) return void (hub.site.msg = t('basic.firefox-no'));
-  if (why === 'connect') await connect({ asked, fromSite: true });
+  if (why === 'connect') await connect({ asked, fromSite });
 }
+// Not Now on the card: nothing is saved or sent.
+export function firefoxClose() {
+  hub.site.askFirefox = null;
+  connectAsk = null;
+}
+// Connect held for Before You Connect's Continue: { fromSite }.
+let connectAsk = null;
 
 // The website's Connect This Browser (src/background.js oh-connect-begin): this tab was
 // brought to the front, or opened, to run Connect's sign-in window. Only in the tab the
@@ -257,6 +274,13 @@ async function connectIfAsked() {
 // window (Firefox for Android), a code on the website's code page. One at a time.
 let connecting = false;
 export async function connect({ asked, fromSite = false } = {}) {
+  // Before You Connect first, on every browser, until its Continue (firefoxContinue,
+  // which comes back here). Checked before Firefox's ask, which needs that click.
+  if (!hub.site.consent) {
+    connectAsk = { fromSite };
+    hub.site.askFirefox = 'connect';
+    return;
+  }
   const ok = asked || dataOk();
   if (connecting) return;
   connecting = true;

@@ -6962,6 +6962,24 @@ try {
   forSite.connect && !forSite.about && !forSite.others.length
     ? ok('#settings: the openhangar.space card with Connect, and only that')
     : fail(`basic page #settings: ${JSON.stringify(forSite)}`);
+  // Connect on Chrome before Before You Connect's Continue: the card first, what we send
+  // and never send, without Firefox's line; Not Now closes it and saves nothing.
+  await page.click('#bp-connect');
+  await page.waitForSelector('#bp-firefox');
+  const consentCard = await page.$eval('#bp-firefox', (e) => e.textContent.replace(/\s+/g, ' '));
+  await page.click('#bp-firefox .bp-btn:not(.primary)');
+  const consentAfter = await page.evaluate(async () => ({
+    card: !!document.getElementById('bp-firefox'),
+    saved: (await chrome.storage.local.get('dataConsent')).dataConsent ?? null,
+  }));
+  /Before You Connect/.test(consentCard) &&
+  /What we send/.test(consentCard) &&
+  /What we never send/.test(consentCard) &&
+  !/Why Firefox asks/.test(consentCard) &&
+  !consentAfter.card &&
+  consentAfter.saved === null
+    ? ok("Connect on Chrome: Before You Connect first, no Firefox line; Not Now saves nothing")
+    : fail(`basic consent card: ${JSON.stringify({ consentCard, consentAfter })}`);
   await page.goto('about:blank'); // a new document (dropping the hash might only scroll)
   await page.goto(URL0 + 'basic.html', { waitUntil: 'networkidle0' });
   await page.waitForSelector('#bp-about');
@@ -7358,7 +7376,12 @@ try {
       return new Response(JSON.stringify({ token: 't-new', name: 'Someone Else' }));
     };
     const was = { token: 't-mine', name: 'demo@pilot', connectedAt: 1, lastSync: Date.now() };
-    await chrome.storage.local.set({ siteLink: was, siteUrl: 'https://app.openhangar.space' });
+    // Connected before, so Before You Connect was agreed then (ui/basic/consent.js).
+    await chrome.storage.local.set({
+      siteLink: was,
+      siteUrl: 'https://app.openhangar.space',
+      dataConsent: { v: 1, at: 1 },
+    });
     for (const f of __demo.listeners) f({ siteLink: { newValue: was } }, 'local');
     await chrome.storage.session.set({ siteConnectAsk: { at: Date.now(), tabId: null } });
     for (const f of __demo.listeners)
@@ -7418,7 +7441,12 @@ try {
       return new Response('{}');
     };
     const was = { token: 't-mine', name: 'demo@pilot', connectedAt: 1, lastSync: Date.now() };
-    await chrome.storage.local.set({ siteLink: was, siteUrl: 'https://app.openhangar.space' });
+    // Connected before, so Before You Connect was agreed then (ui/basic/consent.js).
+    await chrome.storage.local.set({
+      siteLink: was,
+      siteUrl: 'https://app.openhangar.space',
+      dataConsent: { v: 1, at: 1 },
+    });
     for (const f of __demo.listeners) f({ siteLink: { newValue: was } }, 'local');
     await chrome.storage.session.set({ siteConnectAsk: { at: Date.now(), tabId: null } });
     for (const f of __demo.listeners)
