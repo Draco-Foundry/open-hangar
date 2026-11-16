@@ -1129,11 +1129,6 @@ body {
 .pp-sub {
   gap: 2px;
 }
-.pp-line {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
 .pp-sub .pp-msg {
   margin: 0;
   font-size: 12px;
@@ -1299,37 +1294,6 @@ body {
 }
 .pp-dot.warn {
   background: var(--warn);
-}
-.pp-sw {
-  position: relative;
-  flex: none;
-  width: 34px;
-  height: 19px;
-  border-radius: 10px;
-  border: 0;
-  padding: 0;
-  background: var(--line-2);
-  cursor: pointer;
-}
-.pp-sw i {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: #fff;
-  transition: left 0.15s ease;
-}
-.pp-sw[aria-checked='true'] {
-  background: var(--accent);
-}
-.pp-sw[aria-checked='true'] i {
-  left: 17px;
-}
-.pp-sw:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 .pp-sel {
   font: inherit;
