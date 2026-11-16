@@ -25,6 +25,7 @@ test('registry parses: every flag has a name, a one-line about and a default', a
     'autoScanRun',
     'bbdMissTransient',
     'connector',
+    'firstRun',
     'localMode',
     'newSinceScan',
     'orderHistory',
@@ -86,6 +87,8 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     accountLogs: true,
     // A buy-back page RSI keeps failing waits like a 404: off until the owner turns it on.
     bbdMissTransient: false,
+    // First-run setup: off until its words are approved.
+    firstRun: false,
   };
   assert.deepEqual(buildValues(registry), STORE);
   // The beta is the same set.
@@ -140,6 +143,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     subStore: false,
     accountLogs: false,
     bbdMissTransient: false,
+    firstRun: false,
   });
   const { values } = loadFlags(fs.readFileSync(file, 'utf8'));
   assert.deepEqual(values, {
@@ -157,6 +161,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     subStore: false,
     accountLogs: false,
     bbdMissTransient: false,
+    firstRun: false,
   });
   assert.throws(() => writeFlags(file, {}), /expected one/, 'only ever written once');
   fs.rmSync(dir, { recursive: true, force: true });
@@ -321,6 +326,7 @@ test('pack: writes each build its values and cuts the code of flags that are off
     // names both reads (test/privacy-permissions.test.js).
     accountLogs: true,
     bbdMissTransient: false,
+    firstRun: false,
   };
   // Without the connector, what needs it goes too (the Daily Scan Reminder needs the alerts,
   // and Auto Scan Daily the reminder).

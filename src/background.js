@@ -89,6 +89,13 @@ async function updateReminder() {
 chrome.runtime.onInstalled.addListener(async (details) => {
   console.debug('[OpenHangar] installed:', details.reason);
   updateReminder();
+  // First-run setup (the firstRun flag; ui/basic/Setup.svelte): once, on a fresh
+  // install, never on an update or a browser restart, nor for a temporary add-on
+  // (Firefox's developer load).
+  if (details.reason === 'install' && self.OH.flags.firstRun && !details.temporary) {
+    chrome.tabs.create({ url: chrome.runtime.getURL('src/basic.html#setup') });
+    return;
+  }
   if (details.reason !== 'update') return;
   const to = chrome.runtime.getManifest().version;
   // Caches of RSI news, which Home no longer shows (0.3.0): drop them.

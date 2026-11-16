@@ -1,5 +1,6 @@
 /* The basic page: one column on the Clean Pro tokens (ui/tokens.css), text only. Since
    0.4.0 it's small: Firefox's asks, Connect, and a scan that can't run hidden. */
+@import '../lib/opt-in-row.css';
 html,
 body {
   margin: 0;
@@ -201,4 +202,100 @@ body {
 }
 .bp-fx dd {
   margin: 0;
+}
+
+/* The first-run setup (the firstRun flag, ./Setup.svelte). Its switches are the popup's
+   (ui/lib/OptInRow.svelte); these give their rows the popup's spacing here. */
+.bp-setup {
+  gap: 14px;
+}
+.bp-setup-top {
+  justify-content: space-between;
+  align-items: center;
+}
+.bp-steps {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  max-width: 240px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bp-steps li {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line-2);
+}
+.bp-steps li.on {
+  background: var(--accent);
+}
+.bp-link {
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.bp-link:hover {
+  color: var(--head);
+}
+.bp-opts {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.bp-opts .pp-r {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+}
+.bp-opts .pp-r + .pp-r {
+  border-top: 1px solid var(--line);
+}
+.bp-opts .pp-grow {
+  flex: 1;
+  min-width: 0;
+  color: var(--head);
+  font-weight: 600;
+}
+.bp-opts .pp-msg {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.bp-checks {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.bp-checks li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  flex-wrap: wrap;
+}
+.bp-checks li + li {
+  border-top: 1px solid var(--line);
+}
+.bp-checks li > :last-child {
+  margin-left: auto;
+}
+.bp-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warn);
+  flex: none;
+}
+.bp-dot.on {
+  background: var(--good);
 }

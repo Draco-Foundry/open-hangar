@@ -95,6 +95,33 @@ const COPY = {
   // --- Updates ---
   'basic.update-ready': 'Open Hangar {version} is ready.',
   'basic.update-reload': 'Reload to Update',
+  // --- First-run setup (the `firstRun` flag, ./Setup.svelte; Handoffs row "EXT First-Run
+  // Setup: Words W1-W22") ---
+  // Approved (Claude chat, 2026-11-16, under the owner's standing OK): W1, W4, W14, W15, W16.
+  'setup.welcome': 'Welcome Aboard, Pilot', // W1
+  'setup.what': 'What to Read', // W4, the Before You Connect step's switches
+  'setup.next': 'Next', // W14
+  'setup.back': 'Back', // W14
+  'setup.skip': 'Skip', // W14
+  'setup.done': 'Cleared for Launch', // W15
+  'setup.needs-link': 'Connect to Turn On', // W16, under Auto Scan Daily while not connected
+  // PLACEHOLDER: Needs Words, not approved (W23: what Open Hangar does, the welcome line).
+  'setup.about': 'Open Hangar reads your RSI hangar so you can see it all in one place.',
+  // PLACEHOLDER: Needs Words, not approved (W28: the Connect step's heading).
+  'setup.connect': 'Connect Your Accounts',
+  // PLACEHOLDER: Needs Words, not approved (W31: the First Scan step's heading and button).
+  'setup.scan': 'Scan Your Hangar',
+  'setup.scan-now': 'Scan My Hangar Now',
+  // PLACEHOLDER: Needs Words, not approved (legal-adjacent, owner word for word): each
+  // switch's tip, Claude chat's suggested words (W6, W8, W10, W12), not yet approved.
+  'setup.tip-auto':
+    "Scans your hangar once a day without a click, only while you're connected and only for the RSI account this browser last scanned. It asks to show notifications, used only to tell you when a day's scan couldn't run.",
+  'setup.tip-logs':
+    "Reads RSI's pledge log and store credit log on your RSI Account pages. It never keeps a handle, an email or a payment detail.",
+  'setup.tip-orders':
+    'Reads your Pledge Store orders on RSI. It skips your payment method and billing address and never keeps or sends them.',
+  'setup.tip-notify':
+    "Shows a notification when a Remind Me item on your Wishlist is newly on sale. Works only while you're connected.",
 };
 
 export function t(key, vars = {}) {

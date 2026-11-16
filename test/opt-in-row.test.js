@@ -45,4 +45,6 @@ test('its look is imported into each page that shows it, never left in ui/shared
   );
   const popup = fs.readFileSync(path.join(ROOT, 'ui/popup/popup.css'), 'utf8');
   assert.ok(popup.includes("@import '../lib/opt-in-row.css';"), 'popup.css imports the look');
+  const basic = fs.readFileSync(path.join(ROOT, 'ui/basic/basic.css'), 'utf8');
+  assert.ok(basic.includes("@import '../lib/opt-in-row.css';"), 'basic.css imports the look');
 });

@@ -21,13 +21,21 @@
   } from './hub.svelte.js';
   import SiteCard from './SiteCard.svelte';
   import FirefoxCard from './FirefoxCard.svelte';
+  import Setup from './Setup.svelte';
+  import { flag } from '../lib/flags.js';
 
   // Opened for openhangar.space (the popup's Connect, the background's asks).
   const forSite = () => location.hash === '#settings';
   let site = $state(forSite());
+  // The first-run setup (the firstRun flag): #setup, opened once on install.
+  const forSetup = () => location.hash === '#setup' && flag('firstRun');
+  let setup = $state(forSetup());
   onMount(() => {
     start();
-    const hash = () => (site = forSite());
+    const hash = () => {
+      site = forSite();
+      setup = forSetup();
+    };
     addEventListener('hashchange', hash);
     return () => removeEventListener('hashchange', hash);
   });
@@ -151,9 +159,11 @@
 
   {#if !hub.ready}
     <p class="bp-empty">{t('basic.loading')}</p>
+  {:else if setup}
+    <Setup />
   {:else if site && hub.site.enabled}
     <SiteCard />
-  {:else if !site}
+  {:else if !site && !setup}
     <p class="bp-about" id="bp-about">{t('basic.page-about')}</p>
   {/if}
 </main>
