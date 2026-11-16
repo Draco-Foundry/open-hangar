@@ -318,6 +318,24 @@ test('a renamed ship matches by its old name and its new one, never a guess', ()
   }
 });
 
+// The website's approved list (2026-11-16, open-hangar-server docs/dev/names.md, Approved
+// Recs): RSI's older names, the Aurora Mk I before its mark among them, find today's ship.
+test("RSI's older ship names find today's ship, as on the website", () => {
+  const index = AL.shipIndex(
+    AL.readFeed({
+      v: 1,
+      items: [],
+      ships: [
+        { slug: 'aurora-mk-i-ln', name: 'Aurora Mk I LN', keys: ['aurora mk i ln'] },
+        { slug: 'nova', name: 'Nova', keys: ['nova'] },
+      ],
+    }),
+  );
+  assert.equal(index.find('Aurora LN'), 'aurora-mk-i-ln');
+  assert.equal(index.find('Nova Tank'), 'nova');
+  assert.equal(index.find('Aurora ZZ'), null, 'exact names only');
+});
+
 const byId = (ms, id) => ms.find((m) => m.id === id);
 const whys = (m) => (m ? m.why.map((w) => w.why) : []);
 
