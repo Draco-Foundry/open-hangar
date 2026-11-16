@@ -21,7 +21,8 @@ function files(dir, out = []) {
 // The Wishlist's per-item Remind Me (pp-wsw) and the dashboard's Customize are other
 // controls with their own look, not opt-in settings; they're left to a follow-up.
 test('only OptInRow draws the settings switch', () => {
-  const others = files('ui').filter((f) => !f.endsWith(path.join('lib', 'OptInRow.svelte')));
+  const own = [path.join('lib', 'OptInRow.svelte'), path.join('lib', 'opt-in-row.css')];
+  const others = files('ui').filter((f) => !own.some((o) => f.endsWith(o)));
   const bad = others.filter((f) => {
     const s = fs.readFileSync(path.join(ROOT, f), 'utf8');
     return /\bpp-sw\b/.test(s);
@@ -33,4 +34,15 @@ test("Settings' opt-ins all go through OptInRow", () => {
   const s = fs.readFileSync(path.join(ROOT, 'ui/popup/Settings.svelte'), 'utf8');
   for (const id of ['pp-daily', 'pp-auto', 'pp-nt', 'pp-logs', 'pp-orders'])
     assert.match(s, new RegExp(`<OptInRow\\s+id="${id}"`), id);
+});
+
+test('its look is imported into each page that shows it, never left in ui/shared.css', () => {
+  const row = fs.readFileSync(path.join(ROOT, 'ui/lib/OptInRow.svelte'), 'utf8');
+  assert.doesNotMatch(
+    row,
+    /<style>/,
+    'a component style lands in ui/shared.css, which the popup never loads',
+  );
+  const popup = fs.readFileSync(path.join(ROOT, 'ui/popup/popup.css'), 'utf8');
+  assert.ok(popup.includes("@import '../lib/opt-in-row.css';"), 'popup.css imports the look');
 });

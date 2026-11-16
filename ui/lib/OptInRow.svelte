@@ -5,7 +5,9 @@
   // first-run setup, so the same switch looks the same everywhere (One Display).
   // `id`: the base of the ids (`${id}-l` the name, `${id}-sw` the switch); `rowId` the
   // row's own id, if it has one; `sub`: a row inside a group (tighter); `describedby`:
-  // the ids of the lines that describe it.
+  // the ids of the lines that describe it. Its look is ./opt-in-row.css, which each page
+  // that shows it imports into its own stylesheet (a component's own style block would land
+  // in ui/shared.css, which the popup and the basic page don't load).
   let {
     id,
     rowId = null,
@@ -36,42 +38,3 @@
   </div>
   {@render children?.()}
 </div>
-
-<style>
-  .pp-line {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .pp-sw {
-    position: relative;
-    flex: none;
-    width: 34px;
-    height: 19px;
-    border-radius: 10px;
-    border: 0;
-    padding: 0;
-    background: var(--line-2);
-    cursor: pointer;
-  }
-  .pp-sw i {
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 15px;
-    height: 15px;
-    border-radius: 50%;
-    background: #fff;
-    transition: left 0.15s ease;
-  }
-  .pp-sw[aria-checked='true'] {
-    background: var(--accent);
-  }
-  .pp-sw[aria-checked='true'] i {
-    left: 17px;
-  }
-  .pp-sw:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-</style>

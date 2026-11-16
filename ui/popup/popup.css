@@ -5,6 +5,7 @@
  * (Firefox for Android opens the popup as a page) it fills the screen, the tabs move to
  * the bottom and rows grow to 48 px: one switch on the device, no separate build.
  */
+@import '../lib/opt-in-row.css';
 :root {
   color-scheme: dark;
 }
