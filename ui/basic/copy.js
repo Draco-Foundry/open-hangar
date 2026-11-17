@@ -105,13 +105,13 @@ const COPY = {
   'setup.skip': 'Skip', // W14
   'setup.done': 'Cleared for Launch', // W15
   'setup.needs-link': 'Connect to Turn On', // W16, under Auto Scan Daily while not connected
-  // PLACEHOLDER: Needs Words, not approved (W23: what Open Hangar does, the welcome line).
+  // Approved (Claude chat, 2026-11-17; Handoffs row EXT First-Run Setup: Plain Words W23,
+  // W28, W31, Finish Setup): the welcome line, the Connect and First Scan headings, and
+  // the First Scan button (the same word as the popup's Scan).
   'setup.about': 'Open Hangar reads your RSI hangar so you can see it all in one place.',
-  // PLACEHOLDER: Needs Words, not approved (W28: the Connect step's heading).
-  'setup.connect': 'Connect Your Accounts',
-  // PLACEHOLDER: Needs Words, not approved (W31: the First Scan step's heading and button).
+  'setup.connect': 'Connect Your Account',
   'setup.scan': 'Scan Your Hangar',
-  'setup.scan-now': 'Scan My Hangar Now',
+  'setup.scan-now': 'Scan',
   // PLACEHOLDER: Needs Words, not approved (legal-adjacent, owner word for word): each
   // switch's tip, Claude chat's suggested words (W6, W8, W10, W12), not yet approved.
   'setup.tip-auto':

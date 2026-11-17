@@ -44,7 +44,7 @@ test("setup: the popup's switch row and words, Before You Connect, Skip on every
 test('setup words: unapproved lines are marked placeholders', () => {
   const c = read('ui/basic/copy.js');
   const block = c.slice(c.indexOf('--- First-run setup'));
-  for (const key of ['setup.about', 'setup.connect', 'setup.scan', 'setup.tip-auto']) {
+  for (const key of ['setup.tip-auto', 'setup.tip-logs', 'setup.tip-orders', 'setup.tip-notify']) {
     const at = block.indexOf(`'${key}'`);
     assert.ok(at > 0, key);
     assert.match(block.slice(0, at), /PLACEHOLDER: Needs Words, not approved/);
