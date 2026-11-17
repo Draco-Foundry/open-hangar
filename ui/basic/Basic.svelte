@@ -8,6 +8,7 @@
   import { onMount } from 'svelte';
   import { t } from './copy.js';
   import {
+    firefoxClose,
     firefoxContinue,
     hub,
     pilotAnswer,
@@ -110,8 +111,9 @@
   {#if hub.site.askFirefox}
     <FirefoxCard
       local={hub.site.askFirefox === 'local'}
+      firefox={!!chrome.runtime.getManifest().browser_specific_settings?.gecko}
       onContinue={firefoxContinue}
-      onClose={() => (hub.site.askFirefox = null)}
+      onClose={firefoxClose}
     />
   {/if}
   {#if hub.site.pilot}

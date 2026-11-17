@@ -119,6 +119,7 @@ const BUDGET = {
   includedVessels: { cap: 'one help-center table, replaced whole', max: 100 * KB },
   siteLink: small(),
   siteUrl: small(),
+  dataConsent: small('Before You Connect agreed: one { v, at }'),
   siteSyncRequested: small(),
   siteSyncAgain: small('one { at, auto }: the sync to try once more'),
   justUpdated: small(),
