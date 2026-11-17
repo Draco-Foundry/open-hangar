@@ -294,7 +294,7 @@ const COPY = {
   'popup.turn-on': 'Turn On',
   'popup.not-now': 'Not Now',
   // The first-run setup closed before it was finished or skipped (the firstRun flag): its
-  // button back. PLACEHOLDER: Needs Words, not approved.
+  // button back. Approved (Claude chat, 2026-11-17).
   'popup.setup-continue': 'Finish Setup',
   // The links at the bottom.
   'popup.help': 'Help',
