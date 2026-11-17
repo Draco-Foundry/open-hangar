@@ -6978,7 +6978,7 @@ try {
   !/Why Firefox asks/.test(consentCard) &&
   !consentAfter.card &&
   consentAfter.saved === null
-    ? ok("Connect on Chrome: Before You Connect first, no Firefox line; Not Now saves nothing")
+    ? ok('Connect on Chrome: Before You Connect first, no Firefox line; Not Now saves nothing')
     : fail(`basic consent card: ${JSON.stringify({ consentCard, consentAfter })}`);
   await page.goto('about:blank'); // a new document (dropping the hash might only scroll)
   await page.goto(URL0 + 'basic.html', { waitUntil: 'networkidle0' });
@@ -6986,6 +6986,18 @@ try {
   // A scan (RSI stood in for): saved, reported, then one that fails offers Report a
   // Scan Problem, which opens a prefilled GitHub issue.
   const bpScan = await page.evaluate(async () => {
+    // Wait for the scan the click started to end (its scanRunning mark gone), not a fixed
+    // time: the buy-back step's pause can run past 600 ms. performance.now: the page's clock
+    // is set back to the demo's date.
+    const scanDone = async () => {
+      const end = performance.now() + 8000;
+      await new Promise((r) => setTimeout(r, 100));
+      while (performance.now() < end) {
+        if (!(await chrome.storage.session.get('scanRunning')).scanRunning) break;
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    };
     // An empty browser, so no buy-back pack is read after the scan (that asks RSI).
     await OH.clearData();
     const item = (i) => ({
@@ -7011,7 +7023,7 @@ try {
       return sessionSet(o);
     };
     document.getElementById('bp-scan').click();
-    await new Promise((r) => setTimeout(r, 600));
+    await scanDone();
     chrome.storage.session.set = sessionSet;
     const done = document.getElementById('bp-done')?.textContent || '';
     const stored = {
@@ -7022,7 +7034,7 @@ try {
     };
     OH.scanSource = async () => ({ ok: false, error: 'RSI changed something' });
     document.getElementById('bp-scan').click();
-    await new Promise((r) => setTimeout(r, 600));
+    await scanDone();
     stored.failed = (await chrome.storage.local.get('scanReport')).scanReport || null;
     const rep = document.getElementById('bp-report')?.textContent || '';
     const rows = [...document.querySelectorAll('#bp-report li')].map((li) => li.textContent);
@@ -7033,7 +7045,7 @@ try {
     const getAccount = OH.getAccount;
     OH.getAccount = async () => ({ loggedIn: false });
     document.getElementById('bp-scan').click();
-    await new Promise((r) => setTimeout(r, 600));
+    await scanDone();
     const out = {
       title: document.querySelector('#bp-report b')?.textContent || '',
       line: document.getElementById('bp-signed-out')?.textContent || '',
@@ -7058,10 +7070,22 @@ try {
   // RSI not answering (a 5xx, then a 429): each one's own line in the problem box, and
   // no Report a Scan Problem for either.
   const bpDown = await page.evaluate(async () => {
+    // Wait for the scan the click started to end (its scanRunning mark gone), not a fixed
+    // time: the buy-back step's pause can run past 600 ms. performance.now: the page's clock
+    // is set back to the demo's date.
+    const scanDone = async () => {
+      const end = performance.now() + 8000;
+      await new Promise((r) => setTimeout(r, 100));
+      while (performance.now() < end) {
+        if (!(await chrome.storage.session.get('scanRunning')).scanRunning) break;
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    };
     const press = async (answer) => {
       OH.scanSource = async () => answer;
       document.getElementById('bp-scan').click();
-      await new Promise((r) => setTimeout(r, 600));
+      await scanDone();
       return {
         text: document.getElementById('bp-report')?.textContent.replace(/\s+/g, ' ') || '',
         report: !!document.getElementById('bp-report-btn'),
