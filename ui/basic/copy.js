@@ -113,19 +113,21 @@ const COPY = {
   // Approved by the owner (2026-11-16): the Share step's heading on Chrome and Edge, the
   // same as Before You Connect's (./FirefoxCard.svelte).
   'setup.share': 'What We Share',
-  // PLACEHOLDER: Needs Words, not approved (mockup v4, 2026-11-17; Handoffs row "EXT
-  // First-Run Setup: Words W1-W22", v4 Cleaner Pass): the switches' step heading (was
-  // What to Read), the Share step's two chip rows (disclosure: what's sent and what never
-  // is, | between chips), its two buttons (were Continue and Not Now), and the
+  // Approved (Claude chat, 2026-11-18; Handoffs row "EXT First-Run Setup v4: Plain Words
+  // (Settings, Not Connected)"): the switches' step heading (was What to Read) and the
   // openhangar.space row before connecting.
   'setup.settings': 'Settings',
+  'setup.not-connected': 'Not Connected',
+  // PLACEHOLDER: Needs Words, not approved (mockup v4, 2026-11-17; Handoffs row "EXT
+  // First-Run Setup: Words W1-W22", v4 Cleaner Pass): the Share step's two chip rows
+  // (disclosure: what's sent and what never is, | between chips) and its two buttons
+  // (were Continue and Not Now).
   'setup.sends-h': 'We Send',
   'setup.sends': 'Pledges|Buy-Backs|Store Credit|RSI Handle',
   'setup.never-h': 'Never',
   'setup.never': 'Passwords|Card Numbers|Bank Details',
   'setup.agree': 'I Agree',
   'setup.decline': 'Decline',
-  'setup.not-connected': 'Not Connected',
   // PLACEHOLDER: Needs Words, not approved (legal-adjacent, owner word for word): each
   // switch's tip, one line for the ⓘ pop-up (W6, W8, W10, W12; v4's short drafts).
   'setup.tip-auto': 'Scans your hangar once a day without a click.',

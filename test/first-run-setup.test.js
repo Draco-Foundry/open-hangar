@@ -59,15 +59,23 @@ test("setup: the popup's switch row and words, I Agree or Decline, no Skip, one 
 test('setup words: unapproved lines are marked placeholders', () => {
   const c = read('ui/basic/copy.js');
   const block = c.slice(c.indexOf('--- First-run setup'));
+  // Approved ones sit outside the placeholder blocks.
+  for (const key of ['setup.settings', 'setup.not-connected']) {
+    const at = block.indexOf(`'${key}'`);
+    assert.ok(at > 0, key);
+    const before = block.slice(0, at);
+    assert.ok(
+      before.lastIndexOf('// Approved') > before.lastIndexOf('PLACEHOLDER'),
+      `${key} approved`,
+    );
+  }
   for (const key of [
-    'setup.settings',
     'setup.sends-h',
     'setup.sends',
     'setup.never-h',
     'setup.never',
     'setup.agree',
     'setup.decline',
-    'setup.not-connected',
     'setup.tip-auto',
     'setup.tip-logs',
     'setup.tip-orders',
