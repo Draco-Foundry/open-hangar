@@ -1,19 +1,21 @@
 <script>
-  // First-run setup (the `firstRun` flag; mockup v2, owner 2026-11-15): the basic page at
-  // #setup, opened once on a fresh install (src/background.js). Four steps, Skip on each:
-  // Welcome; Before You Connect (./FirefoxCard.svelte, its approved words, on every
-  // browser) with the opt-in switches, each off until the pilot turns it on; Connect
-  // (openhangar.space and the RSI sign-in, each shown done when it is); First Scan, which
-  // the pilot starts. Not Now on Before You Connect is Local Mode: nothing is sent, and
-  // it goes straight to First Scan. Finished or skipped, `setupDone` is kept and the page
-  // never opens again. The switches are the popup's (ui/lib/OptInRow.svelte), with the
-  // popup's words, and do what the popup's Settings tab does.
+  // First-run setup (the `firstRun` flag; mockup v4, owner 2026-11-17): the basic page at
+  // #setup, opened once on a fresh install (src/background.js). One shell on every step:
+  // dots on top, the title, Back and the main button at the bottom. Welcome; Share (what
+  // we send and what we never send, the RSI and openhangar.space rows): the pilot answers
+  // I Agree (the click that agrees, then Connect) or Decline (Local Mode, nothing sent),
+  // with no Skip; Settings, the opt-in switches, each off until the pilot turns it on, the
+  // ones that need a connection greyed without one; Scan, which the pilot starts; then
+  // Cleared for Launch. Finished, `setupDone` is kept and the page never opens again;
+  // closed early, the popup offers Finish Setup. The switches are the popup's
+  // (ui/lib/OptInRow.svelte), with the popup's words, and do what its Settings tab does.
+  // Every ⓘ is ui/lib/InfoTip.svelte.
   import { onMount } from 'svelte';
   import { t } from './copy.js';
   import { t as pt } from '../popup/copy.js';
   import { flag } from '../lib/flags.js';
   import OptInRow from '../lib/OptInRow.svelte';
-  import FirefoxCard from './FirefoxCard.svelte';
+  import InfoTip from '../lib/InfoTip.svelte';
   import { connect, hub, scanClick, setupAgree } from './hub.svelte.js';
 
   const OH = globalThis.OH;
@@ -24,15 +26,15 @@
   const LOGS = flag('accountLogs');
   const ORDERS = flag('orderHistory');
   const RSI_SIGN_IN = 'https://robertsspaceindustries.com/connect';
+  const STEPS = ['welcome', 'share', 'settings', 'scan'];
 
-  let step = $state('welcome'); // welcome | consent | connect | scan
-  let local = $state(false); // Not Now on Before You Connect: Local Mode
-  let started = $state(false); // First Scan pressed
+  let step = $state('welcome');
+  let started = $state(false); // Scan pressed
   let daily = $state(false);
   let notify = $state(false);
   let logs = $state(false);
   let orders = $state(false);
-  let tip = $state(''); // the switch whose tip is open
+  let tip = $state(''); // the ⓘ held open
 
   const linked = $derived(!!hub.site.link);
   const signedIn = $derived(!!hub.account?.loggedIn);
@@ -58,13 +60,9 @@
     notify = await chrome.permissions.contains(NOTIFY).catch(() => false);
   });
 
-  // Setup is done (finished or skipped): it never opens again.
+  // Setup is done: it never opens again.
   async function finish() {
     await chrome.storage.local.set({ setupDone: { at: Date.now() } });
-  }
-  async function skip() {
-    await finish();
-    location.hash = '';
   }
 
   // The switches, as the popup's Settings tab does them (ui/popup/Settings.svelte). The
@@ -99,16 +97,15 @@
     await OH.setOrderHistory(orders);
   }
 
-  // Before You Connect's Continue: the click that agrees (and Firefox's ask).
+  // Share's I Agree: the click that agrees (and Firefox's ask), then Connect.
   async function agree() {
-    const asked = setupAgree();
-    await asked;
-    local = false;
-    step = 'connect';
+    await setupAgree();
+    connect();
+    step = 'settings';
   }
-  function notNow() {
-    local = true;
-    step = 'scan';
+  // Decline: Local Mode, nothing is sent.
+  function decline() {
+    step = 'settings';
   }
   function scanNow() {
     started = true;
@@ -117,51 +114,130 @@
   async function openHangar() {
     await finish();
     if (hangarUrl) location.assign(hangarUrl);
+    else location.hash = '';
   }
+  const chips = (key) => t(key).split('|');
   const showTip = (id) => (tip = tip === id ? '' : id);
 </script>
 
 <section class="bp-card bp-setup" id="bp-setup" aria-labelledby="bp-setup-h">
-  <div class="bp-row bp-setup-top">
+  {#if !scanned}
     <ol class="bp-steps" aria-hidden="true">
-      {#each ['welcome', 'consent', 'connect', 'scan'] as s, i (s)}
-        <li class:on={['welcome', 'consent', 'connect', 'scan'].indexOf(step) >= i}></li>
+      {#each STEPS as s, i (s)}
+        <li class:on={STEPS.indexOf(step) >= i}></li>
       {/each}
     </ol>
-    <button type="button" class="bp-link" id="bp-setup-skip" onclick={skip}>{t('setup.skip')}</button>
-  </div>
+  {/if}
 
   {#if step === 'welcome'}
-    <h2 id="bp-setup-h">{t('setup.welcome')}</h2>
-    <p>{t('setup.about')}</p>
-    <div class="bp-row">
-      <button type="button" class="bp-btn primary" id="bp-setup-next" onclick={() => (step = 'consent')}
-        >{t('setup.next')}</button
-      >
+    <div class="bp-hero">
+      <img class="bp-mark" src="../icons/icon128.png" alt="" width="64" height="64" />
+      <h2 id="bp-setup-h">{t('setup.welcome')}</h2>
+      <p>{t('setup.about')}</p>
     </div>
-  {:else if step === 'consent'}
-    <h2 id="bp-setup-h">{t('setup.what')}</h2>
+    <button
+      type="button"
+      class="bp-btn primary bp-big"
+      id="bp-setup-next"
+      onclick={() => (step = 'share')}>{t('setup.next')}</button
+    >
+  {:else if step === 'share'}
+    <div class="bp-title">
+      <h2 id="bp-setup-h">{t('setup.share')}</h2>
+      {#if FIREFOX}<InfoTip
+          id="bp-setup-fx-tip"
+          label={t('setup.share')}
+          text={t('consent.why-firefox')}
+          open={tip === 'fx'}
+          ontoggle={() => showTip('fx')}
+        />{/if}
+    </div>
+    <div class="bp-share" id="bp-setup-share">
+      <div>
+        <span class="bp-lab">{t('setup.sends-h')}</span>
+        <ul class="bp-chips">
+          {#each chips('setup.sends') as c (c)}<li>{c}</li>{/each}
+        </ul>
+      </div>
+      <div>
+        <span class="bp-lab">{t('setup.never-h')}</span>
+        <ul class="bp-chips no">
+          {#each chips('setup.never') as c (c)}<li>{c}</li>{/each}
+        </ul>
+      </div>
+    </div>
+    <ul class="bp-checks">
+      <li>
+        <span class="bp-dot" class:on={signedIn}></span>RSI
+        {#if signedIn}<span class="bp-pill ok">{pt('popup.account-live')}</span>
+        {:else}<a class="bp-btn" id="bp-setup-rsi" href={RSI_SIGN_IN} target="_blank" rel="noopener"
+            >{pt('popup.log-in')}</a
+          >{/if}
+      </li>
+      <li>
+        <span class="bp-dot" class:on={linked}></span>openhangar.space
+        <span class="bp-pill" class:ok={linked}
+          >{linked
+            ? t('basic.connected', { name: hub.site.link.name })
+            : t('setup.not-connected')}</span
+        >
+      </li>
+    </ul>
+    <div class="bp-foot">
+      <button type="button" class="bp-btn ghost" onclick={() => (step = 'welcome')}
+        >{t('setup.back')}</button
+      >
+      {#if linked}
+        <button
+          type="button"
+          class="bp-btn primary grow"
+          id="bp-setup-to-settings"
+          onclick={() => (step = 'settings')}>{t('setup.next')}</button
+        >
+      {:else}
+        <span class="bp-btn grow bp-decline">
+          <button type="button" id="bp-setup-decline" onclick={decline}
+            >{t('setup.decline')}</button
+          >
+          <InfoTip
+            id="bp-setup-no-tip"
+            label={t('setup.decline')}
+            text={t('consent.if-no')}
+            note={t('consent.change')}
+            open={tip === 'no'}
+            ontoggle={() => showTip('no')}
+          />
+        </span>
+        <button type="button" class="bp-btn primary grow" id="bp-setup-agree" onclick={agree}
+          >{t('setup.agree')}</button
+        >
+      {/if}
+    </div>
+  {:else if step === 'settings'}
+    <h2 id="bp-setup-h">{t('setup.settings')}</h2>
     <div class="bp-opts" role="group" aria-labelledby="bp-setup-h">
       {#if DAILY}
         <OptInRow
           id="bp-daily"
           label={pt('popup.auto-scan')}
           on={daily}
+          disabled={!linked}
           onclick={dailySwitch}
           tip={t('setup.tip-auto')}
+          note={linked ? '' : t('setup.needs-link')}
           tipOpen={tip === 'daily'}
           ontip={() => showTip('daily')}
-        >
-          {#if !linked}<p class="pp-msg calm">{t('setup.needs-link')}</p>{/if}
-        </OptInRow>
+        />
       {/if}
       {#if ALERTS}
         <OptInRow
           id="bp-nt"
           label={pt('popup.notifications')}
           on={notify}
+          disabled={!linked}
           onclick={notifySwitch}
           tip={t('setup.tip-notify')}
+          note={linked ? '' : t('setup.needs-link')}
           tipOpen={tip === 'notify'}
           ontip={() => showTip('notify')}
         />
@@ -173,11 +249,10 @@
           on={logs}
           onclick={logsSwitch}
           tip={t('setup.tip-logs')}
+          note={pt('popup.account-logs-first-scan')}
           tipOpen={tip === 'logs'}
           ontip={() => showTip('logs')}
-        >
-          <p class="pp-msg calm">{pt('popup.account-logs-first-scan')}</p>
-        </OptInRow>
+        />
       {/if}
       {#if ORDERS}
         <OptInRow
@@ -186,54 +261,41 @@
           on={orders}
           onclick={ordersSwitch}
           tip={t('setup.tip-orders')}
+          note={pt('popup.order-history-first-scan')}
           tipOpen={tip === 'orders'}
           ontip={() => showTip('orders')}
-        >
-          <p class="pp-msg calm">{pt('popup.order-history-first-scan')}</p>
-        </OptInRow>
+        />
       {/if}
     </div>
-    <FirefoxCard firefox={FIREFOX} onContinue={agree} onClose={notNow} />
-  {:else if step === 'connect'}
-    <h2 id="bp-setup-h">{t('setup.connect')}</h2>
-    <ul class="bp-checks">
-      <li>
-        <span class="bp-dot" class:on={linked}></span>openhangar.space
-        {#if linked}<small>{t('basic.connected', { name: hub.site.link.name })}</small>
-        {:else}<button type="button" class="bp-btn primary" id="bp-setup-connect" onclick={() => connect()}
-            >{pt('popup.connect-site')}</button
-          >{/if}
-      </li>
-      <li>
-        <span class="bp-dot" class:on={signedIn}></span>RSI
-        {#if signedIn}<small>{pt('popup.account-live')}</small>
-        {:else}<a class="bp-btn" id="bp-setup-rsi" href={RSI_SIGN_IN} target="_blank" rel="noopener"
-            >{pt('popup.log-in')}</a
-          >{/if}
-      </li>
-    </ul>
-    <div class="bp-row">
-      <button type="button" class="bp-link" onclick={() => (step = 'consent')}>{t('setup.back')}</button>
-      <button type="button" class="bp-btn primary" id="bp-setup-to-scan" onclick={() => (step = 'scan')}
-        >{t('setup.next')}</button
-      >
-    </div>
-  {:else if scanned}
-    <h2 id="bp-setup-h">{t('setup.done')}</h2>
-    <div class="bp-row">
-      {#if hangarUrl}<button type="button" class="bp-btn primary" id="bp-setup-hangar" onclick={openHangar}
-          >{pt('popup.open-my-hangar')}</button
-        >{:else}<button type="button" class="bp-btn primary" onclick={skip}>{t('setup.next')}</button>{/if}
-    </div>
-  {:else}
-    <h2 id="bp-setup-h">{t('setup.scan')}</h2>
-    <div class="bp-row">
-      <button type="button" class="bp-link" onclick={() => (step = local ? 'consent' : 'connect')}
+    <div class="bp-foot">
+      <button type="button" class="bp-btn ghost" onclick={() => (step = 'share')}
         >{t('setup.back')}</button
       >
       <button
         type="button"
-        class="bp-btn primary"
+        class="bp-btn primary grow"
+        id="bp-setup-to-scan"
+        onclick={() => (step = 'scan')}>{t('setup.next')}</button
+      >
+    </div>
+  {:else if scanned}
+    <div class="bp-hero">
+      <span class="bp-mark done" aria-hidden="true"></span>
+      <h2 id="bp-setup-h">{t('setup.done')}</h2>
+    </div>
+    <button type="button" class="bp-btn primary bp-big" id="bp-setup-hangar" onclick={openHangar}
+      >{hangarUrl ? pt('popup.open-my-hangar') : t('setup.next')}</button
+    >
+  {:else}
+    <h2 id="bp-setup-h">{t('setup.scan')}</h2>
+    {#if hub.scan.busy && hub.scan.detail}<p class="bp-scan-on">{hub.scan.detail}</p>{/if}
+    <div class="bp-foot">
+      <button type="button" class="bp-btn ghost" onclick={() => (step = 'settings')}
+        >{t('setup.back')}</button
+      >
+      <button
+        type="button"
+        class="bp-btn primary grow"
         id="bp-setup-scan"
         disabled={hub.scan.busy || hub.scanElsewhere || !hub.ready}
         onclick={scanNow}>{hub.scan.busy ? t('basic.scanning') : t('setup.scan-now')}</button
