@@ -97,14 +97,12 @@ const COPY = {
   'basic.update-reload': 'Reload to Update',
   // --- First-run setup (the `firstRun` flag, ./Setup.svelte; Handoffs row "EXT First-Run
   // Setup: Words W1-W22") ---
-  // Approved (Claude chat, 2026-11-16, under the owner's standing OK): W1, W4, W14, W15, W16.
+  // Approved (Claude chat, 2026-11-16, under the owner's standing OK): W1, W14, W15, W16.
   'setup.welcome': 'Welcome Aboard, Pilot', // W1
-  'setup.what': 'What to Read', // W4, the Before You Connect step's switches
   'setup.next': 'Next', // W14
   'setup.back': 'Back', // W14
-  'setup.skip': 'Skip', // W14
   'setup.done': 'Cleared for Launch', // W15
-  'setup.needs-link': 'Connect to Turn On', // W16, under Auto Scan Daily while not connected
+  'setup.needs-link': 'Connect to Turn On', // W16, in the tip of a switch that needs a connection
   // Approved (Claude chat, 2026-11-17; Handoffs row EXT First-Run Setup: Plain Words W23,
   // W28, W31, Finish Setup): the welcome line, the Connect and First Scan headings, and
   // the First Scan button (the same word as the popup's Scan).
@@ -112,16 +110,35 @@ const COPY = {
   'setup.connect': 'Connect Your Account',
   'setup.scan': 'Scan Your Hangar',
   'setup.scan-now': 'Scan',
+  // Approved by the owner (2026-11-16): the Share step's heading on Chrome and Edge, the
+  // same as Before You Connect's (./FirefoxCard.svelte).
+  'setup.share': 'What We Share',
+  // PLACEHOLDER: Needs Words, not approved (mockup v4, 2026-11-17; Handoffs row "EXT
+  // First-Run Setup: Words W1-W22", v4 Cleaner Pass): the switches' step heading (was
+  // What to Read), the Share step's two chip rows (disclosure: what's sent and what never
+  // is, | between chips), its two buttons (were Continue and Not Now), and the
+  // openhangar.space row before connecting.
+  'setup.settings': 'Settings',
+  'setup.sends-h': 'We Send',
+  'setup.sends': 'Pledges|Buy-Backs|Store Credit|RSI Handle',
+  'setup.never-h': 'Never',
+  'setup.never': 'Passwords|Card Numbers|Bank Details',
+  'setup.agree': 'I Agree',
+  'setup.decline': 'Decline',
+  'setup.not-connected': 'Not Connected',
   // PLACEHOLDER: Needs Words, not approved (legal-adjacent, owner word for word): each
-  // switch's tip, Claude chat's suggested words (W6, W8, W10, W12), not yet approved.
-  'setup.tip-auto':
-    "Scans your hangar once a day without a click, only while you're connected and only for the RSI account this browser last scanned. It asks to show notifications, used only to tell you when a day's scan couldn't run.",
-  'setup.tip-logs':
-    "Reads RSI's pledge log and store credit log on your RSI Account pages. It never keeps a handle, an email or a payment detail.",
-  'setup.tip-orders':
-    'Reads your Pledge Store orders on RSI. It skips your payment method and billing address and never keeps or sends them.',
-  'setup.tip-notify':
-    "Shows a notification when a Remind Me item on your Wishlist is newly on sale. Works only while you're connected.",
+  // switch's tip, one line for the ⓘ pop-up (W6, W8, W10, W12; v4's short drafts).
+  'setup.tip-auto': 'Scans your hangar once a day without a click.',
+  'setup.tip-logs': 'Reads your pledge and store credit logs.',
+  'setup.tip-orders': 'Reads your Pledge Store orders.',
+  'setup.tip-notify': 'Tells you when a Remind Me ship goes on sale.',
+  // Before You Connect's lines (./FirefoxCard.svelte), approved by the owner word for
+  // word; the setup's Decline and Firefox ⓘ pop-ups show the same ones.
+  'consent.if-no':
+    'Nothing changes. Open Hangar stays private and local, and you can connect later.',
+  'consent.change': 'Disconnect any time, and delete what was synced from your Account page.',
+  'consent.why-firefox':
+    'Firefox makes every extension name what it shares, using a short fixed list. Pledge prices and store credit fall under "financial and payment information", so that\'s what its prompt will say.',
 };
 
 export function t(key, vars = {}) {
