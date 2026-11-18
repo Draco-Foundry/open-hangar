@@ -12,6 +12,7 @@
   import { CURRENCIES, LOOKS } from './prefs.js';
   import { at } from '../site/when.js';
   import { flag } from '../lib/flags.js';
+  import OptInRow from '../lib/OptInRow.svelte';
   import {
     askNotify,
     canChangeShortcut,
@@ -389,47 +390,35 @@
         <!-- A failure already under Last Sync Didn't Go Through isn't said twice. -->
         {#if msg && msg !== trouble?.msg}<p class="pp-r pp-msg" class:calm role="status">{msg}</p>{/if}
         {#if DAILY}
-          <div class="pp-r pp-col pp-sub">
-            <div class="pp-line">
-              <span class="pp-grow" id="pp-daily-l">{t('popup.auto-scan')}</span>
-              <button
-                type="button"
-                role="switch"
-                class="pp-sw"
-                id="pp-daily-sw"
-                aria-checked={dailyOn}
-                aria-labelledby="pp-daily-l"
-                aria-describedby={dailyLine ? 'pp-daily-line' : null}
-                onclick={dailySwitch}><i></i></button
-              >
-            </div>
+          <OptInRow
+            id="pp-daily"
+            sub
+            label={t('popup.auto-scan')}
+            on={dailyOn}
+            describedby={dailyLine ? 'pp-daily-line' : null}
+            onclick={dailySwitch}
+          >
             <!-- One line (copy.js popup.auto-*, data.js autoLine): the last run; amber when it
                  asks for a scan; none before its first run. -->
             {#if dailyLine}
               <p class="pp-msg" class:calm={!dailyLine.ask} id="pp-daily-line">{t(dailyLine.key, { when: dailyLine.when })}</p>
             {/if}
-          </div>
+          </OptInRow>
         {:else if AUTO}
-          <div class="pp-r pp-col pp-sub">
-            <div class="pp-line">
-              <span class="pp-grow" id="pp-auto-l">{t('popup.scan-reminder')}</span>
-              <button
-                type="button"
-                role="switch"
-                class="pp-sw"
-                id="pp-auto-sw"
-                aria-checked={autoOn}
-                aria-labelledby="pp-auto-l"
-                aria-describedby={line ? 'pp-auto-line' : null}
-                onclick={autoSwitch}><i></i></button
-              >
-            </div>
+          <OptInRow
+            id="pp-auto"
+            sub
+            label={t('popup.scan-reminder')}
+            on={autoOn}
+            describedby={line ? 'pp-auto-line' : null}
+            onclick={autoSwitch}
+          >
             <!-- One line (copy.js popup.scan-reminder-*, data.js reminderLine): the last reminder
                  or a day skipped; amber when notifications were refused; none otherwise. -->
             {#if line}
               <p class="pp-msg" class:calm={!line.ask} id="pp-auto-line">{t(line.key, { when: line.when })}</p>
             {/if}
-          </div>
+          </OptInRow>
         {/if}
       {:else if siteOn}
         <div class="pp-r pp-col">
@@ -441,20 +430,14 @@
       {#if ALERTS && v.connected}
         <!-- Desktop notifications, the one opt-in left: alerts follow Remind Me, and run only
              while connected (#790), so the switch shows only then (owner, 2026-10-23). -->
-        <div class="pp-r pp-col pp-sub" id="pp-alert-set">
-          <div class="pp-line">
-            <span class="pp-grow" id="pp-nt-l">{t('popup.notifications')}</span>
-            <button
-              type="button"
-              role="switch"
-              class="pp-sw"
-              id="pp-nt-sw"
-              aria-checked={notify}
-              aria-labelledby="pp-nt-l"
-              onclick={notifySwitch}><i></i></button
-            >
-          </div>
-        </div>
+        <OptInRow
+          id="pp-nt"
+          rowId="pp-alert-set"
+          sub
+          label={t('popup.notifications')}
+          on={notify}
+          onclick={notifySwitch}
+        />
       {/if}
       {#if LOGS}{@render logsRow(true)}{/if}
       {#if ORDERS}{@render ordersRow(true)}{/if}
@@ -468,24 +451,18 @@
        2026-11-02): each scan after the first reads only what's new. With the other switches, in the
        openhangar.space box, no divider (owner, 2026-11-01); on its own without that box. -->
   {#snippet logsRow(sub)}
-    <div class="pp-r pp-col" class:pp-sub={sub} id="pp-logs">
-      <div class="pp-line">
-        <span class="pp-grow" id="pp-logs-l">{t('popup.account-logs')}</span>
-        <button
-          type="button"
-          role="switch"
-          class="pp-sw"
-          id="pp-logs-sw"
-          aria-checked={logsOn}
-          aria-labelledby="pp-logs-l"
-          aria-describedby={[logsLine && 'pp-logs-line', logsFirst && 'pp-logs-first'].filter(Boolean).join(' ') ||
-            null}
-          onclick={logsSwitch}><i></i></button
-        >
-      </div>
+    <OptInRow
+      id="pp-logs"
+      rowId="pp-logs"
+      {sub}
+      label={t('popup.account-logs')}
+      on={logsOn}
+      describedby={[logsLine && 'pp-logs-line', logsFirst && 'pp-logs-first'].filter(Boolean).join(' ')}
+      onclick={logsSwitch}
+    >
       {#if logsLine}<p class="pp-msg calm" id="pp-logs-line" role="status">{logsLine}</p>{/if}
       {#if logsFirst}<p class="pp-msg calm" id="pp-logs-first">{t('popup.account-logs-first-scan')}</p>{/if}
-    </div>
+    </OptInRow>
   {/snippet}
   {#if LOGS && !siteOn}
     <div class="pp-grp">{@render logsRow(false)}</div>
@@ -497,22 +474,17 @@
        until Clear Data; src/lib.js setOrderHistory, readOrderHistory) and the first-scan
        hint. Under Account History, the same way. -->
   {#snippet ordersRow(sub)}
-    <div class="pp-r pp-col" class:pp-sub={sub} id="pp-orders">
-      <div class="pp-line">
-        <span class="pp-grow" id="pp-orders-l">{t('popup.order-history')}</span>
-        <button
-          type="button"
-          role="switch"
-          class="pp-sw"
-          id="pp-orders-sw"
-          aria-checked={ordersOn}
-          aria-labelledby="pp-orders-l"
-          aria-describedby={ordersFirst ? 'pp-orders-first' : null}
-          onclick={ordersSwitch}><i></i></button
-        >
-      </div>
+    <OptInRow
+      id="pp-orders"
+      rowId="pp-orders"
+      {sub}
+      label={t('popup.order-history')}
+      on={ordersOn}
+      describedby={ordersFirst ? 'pp-orders-first' : null}
+      onclick={ordersSwitch}
+    >
       {#if ordersFirst}<p class="pp-msg calm" id="pp-orders-first">{t('popup.order-history-first-scan')}</p>{/if}
-    </div>
+    </OptInRow>
   {/snippet}
   {#if ORDERS && !siteOn}
     <div class="pp-grp">{@render ordersRow(false)}</div>
