@@ -49,7 +49,7 @@
     </dl>
   {:else}
     <span class="bp-kick">Before You Connect</span>
-    <!-- PLACEHOLDER (Chrome and Edge's heading): Needs Words, not approved. -->
+    <!-- Chrome and Edge's heading: approved by the owner, 2026-11-16. -->
     <h2 id="bp-firefox-h">{firefox ? 'What We Share, and Why Firefox Asks' : 'What We Share'}</h2>
     <dl>
       <dt>What we send</dt>
