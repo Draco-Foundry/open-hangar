@@ -1,1 +1,0 @@
-- New: **Your Subscriber and Concierge Items.** If you're signed in to RSI as a subscriber or a Concierge member, a scan now reads the store items RSI lists only for you, at most once a day. Your openhangar.space Store shows them (Your Subscriber Store at the top, Concierge items with the gold diamond), and only you see them.

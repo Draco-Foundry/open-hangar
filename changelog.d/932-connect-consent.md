@@ -1,1 +1,0 @@
-- Changed: Connect to openhangar.space now shows Before You Connect first on every browser: what's sent, what never is, and Continue or Not Now.
