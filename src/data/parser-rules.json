@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "revision": "2026-11-01",
+  "revision": "2026-11-16",
   "paging": {
     "page": "page",
     "size": "pagesize",
@@ -380,7 +380,36 @@
       "hooks": ["js-label", "js-open-ship-upgrades"]
     }
   },
-  "aliases": [{ "old": "Phoenix Emerald", "now": "Constellation Mk IV Phoenix Emerald" }],
+  "aliases": [
+    { "old": "Phoenix Emerald", "now": "Constellation Mk IV Phoenix Emerald" },
+    { "old": "Aurora ES", "now": "Aurora Mk I ES" },
+    { "old": "Aurora LX", "now": "Aurora Mk I LX" },
+    { "old": "Aurora MR", "now": "Aurora Mk I MR" },
+    { "old": "Aurora LN", "now": "Aurora Mk I LN" },
+    { "old": "Aurora CL", "now": "Aurora Mk I CL" },
+    { "old": "F7C Hornet", "now": "F7C Hornet Mk I" },
+    { "old": "F7A Hornet", "now": "F7A Hornet Mk I" },
+    { "old": "F7A Military Hornet", "now": "F7A Hornet Mk I" },
+    { "old": "F7C-S Hornet Ghost", "now": "F7C-S Hornet Ghost Mk I" },
+    { "old": "F7C-R Hornet Tracker", "now": "F7C-R Hornet Tracker Mk I" },
+    { "old": "F7C Hornet Wildfire", "now": "F7C Hornet Wildfire Mk I" },
+    { "old": "F7C-M Super Hornet", "now": "F7C-M Super Hornet Mk I" },
+    { "old": "F7C-M Super Hornet Heartseeker", "now": "F7C-M Hornet Heartseeker Mk I" },
+    { "old": "Hornet F7C-M Heartseeker", "now": "F7C-M Hornet Heartseeker Mk I" },
+    { "old": "Ursa Rover Fortuna", "now": "Ursa Fortuna" },
+    { "old": "Nova Tank", "now": "Nova" },
+    { "old": "Khartu-Al Scout", "now": "Khartu-al" },
+    { "old": "Xi'an Scout", "now": "Khartu-al" },
+    { "old": "Esperia Vanduul Blade", "now": "Blade" },
+    { "old": "Esperia Vanduul Glaive", "now": "Glaive" },
+    { "old": "Vanguard", "now": "Vanguard Warden" },
+    { "old": "Pirate Gladius", "now": "Gladius Pirate" },
+    { "old": "600i Exploration", "now": "600i" },
+    { "old": "C8X Pisces", "now": "C8X Pisces Expedition" },
+    { "old": "L-22 Wolf", "now": "L-22 Alpha Wolf" },
+    { "old": "600i 2951 Best in Show Edition", "now": "600i 2951 BIS" },
+    { "old": "F7A Hornet Mk II PYAM Exec", "now": "Hornet F7A Mk II PYAM Exec" }
+  ],
   "accountLogs": {
     "pledgeLog": "/api/account/pledgeLog",
     "creditLog": "/api/account/creditLog",

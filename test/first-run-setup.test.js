@@ -56,25 +56,9 @@ test("setup: the popup's switch row and words, I Agree or Decline, no Skip, one 
   assert.doesNotMatch(mount, /storage\.local\.set|setOrderHistory|wantAccountLogs/);
 });
 
-test('setup words: unapproved lines are marked placeholders', () => {
+test('setup words: every line is approved, none left a placeholder', () => {
   const c = read('ui/basic/copy.js');
   const block = c.slice(c.indexOf('--- First-run setup'));
-  for (const key of [
-    'setup.settings',
-    'setup.sends-h',
-    'setup.sends',
-    'setup.never-h',
-    'setup.never',
-    'setup.agree',
-    'setup.decline',
-    'setup.not-connected',
-    'setup.tip-auto',
-    'setup.tip-logs',
-    'setup.tip-orders',
-    'setup.tip-notify',
-  ]) {
-    const at = block.indexOf(`'${key}'`);
-    assert.ok(at > 0, key);
-    assert.match(block.slice(0, at), /PLACEHOLDER: Needs Words, not approved/);
-  }
+  assert.doesNotMatch(block, /PLACEHOLDER/);
+  assert.ok(block.includes("'setup.sends': 'Pledges|Buy-Backs|Balances|RSI Profile|Referrals'"));
 });
