@@ -1,5 +1,6 @@
 /* The basic page: one column on the Clean Pro tokens (ui/tokens.css), text only. Since
    0.4.0 it's small: Firefox's asks, Connect, and a scan that can't run hidden. */
+@import '../lib/opt-in-row.css';
 html,
 body {
   margin: 0;
@@ -201,4 +202,225 @@ body {
 }
 .bp-fx dd {
   margin: 0;
+}
+
+/* The first-run setup (the firstRun flag, ./Setup.svelte; mockup v4): one shell on every
+   step, dots on top, a centred title, Back and the main button at the bottom, all one
+   height. Its switches are the popup's (ui/lib/OptInRow.svelte); these give their rows
+   the popup's spacing here. */
+.bp-setup {
+  display: grid;
+  gap: 20px;
+  width: 100%;
+  max-width: 460px;
+  box-sizing: border-box;
+  margin-inline: auto;
+  padding: 26px;
+  border-radius: 12px;
+}
+.bp-setup h2 {
+  margin: 0;
+  font-size: 21px;
+  line-height: 1.25;
+  text-align: center;
+}
+.bp-steps {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bp-steps li {
+  width: 22px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-2);
+}
+.bp-steps li.on {
+  background: var(--accent);
+}
+.bp-hero {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.bp-hero p {
+  margin: 0;
+  color: var(--muted);
+}
+.bp-mark {
+  width: 64px;
+  height: 64px;
+}
+.bp-mark.done {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--good-soft);
+  position: relative;
+}
+.bp-mark.done::after {
+  content: '';
+  position: absolute;
+  left: 21px;
+  top: 16px;
+  width: 14px;
+  height: 24px;
+  border: solid var(--good);
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
+}
+.bp-big {
+  width: 100%;
+  min-height: 50px;
+  font-size: 16px;
+  border-radius: 10px;
+}
+.bp-title {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+.bp-share {
+  display: grid;
+  gap: 14px;
+}
+.bp-lab {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.bp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bp-chips li {
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: var(--accent-soft);
+  color: var(--head);
+  font-size: 13px;
+}
+.bp-chips.no li {
+  background: none;
+  border: 1px dashed var(--line-2);
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.bp-checks {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.bp-checks li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 6px 14px;
+  color: var(--head);
+}
+.bp-checks li + li {
+  border-top: 1px solid var(--line);
+}
+.bp-checks li > :last-child {
+  margin-left: auto;
+}
+.bp-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line-2);
+  flex: none;
+}
+.bp-dot.on {
+  background: var(--good);
+}
+.bp-pill {
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 12px;
+}
+.bp-pill.ok {
+  border-color: var(--good-line);
+  background: var(--good-soft);
+  color: var(--good);
+}
+.bp-foot {
+  display: flex;
+  gap: 10px;
+}
+.bp-foot > .bp-btn {
+  min-height: 44px;
+  padding-inline: 16px;
+}
+.bp-foot .grow {
+  flex: 1;
+}
+.bp-btn.ghost {
+  background: none;
+  border-color: transparent;
+  color: var(--muted);
+}
+.bp-btn.ghost:hover {
+  color: var(--head);
+}
+/* Decline and its ⓘ, drawn as one button. */
+.bp-decline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.bp-decline > button {
+  font: inherit;
+  font-weight: 500;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+}
+.bp-opts {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.bp-opts .pp-r {
+  display: grid;
+  padding: 0 14px;
+  min-height: 48px;
+  align-content: center;
+}
+.bp-opts .pp-r + .pp-r {
+  border-top: 1px solid var(--line);
+}
+.bp-opts .pp-grow {
+  min-width: 0;
+  color: var(--head);
+}
+.bp-opts .pp-r:has([role='switch']:disabled) .pp-grow {
+  opacity: 0.55;
+}
+.bp-scan-on {
+  margin: 0;
+  text-align: center;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }

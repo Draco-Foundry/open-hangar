@@ -150,6 +150,15 @@
       about: 'A buy-back page RSI keeps failing waits a day, then doubling, like a 404.',
       default: false,
     },
+    // First-run setup (owner, 2026-11-15, mockup v2; open-hangar-server #2188): a fresh
+    // install opens the basic page's setup once (src/background.js onInstalled, reason
+    // install): Welcome, Before You Connect with the opt-in switches, Connect, First Scan
+    // (ui/basic/Setup.svelte). Off in the store and beta builds until its words are
+    // approved (the switches' tips and the welcome line are placeholders).
+    firstRun: {
+      about: 'First-run setup: a fresh install opens a setup page once.',
+      default: false,
+    },
   };
 
   // Set per build by scripts/pack.mjs. Keep it empty here.

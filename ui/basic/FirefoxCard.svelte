@@ -6,7 +6,10 @@
   // words (ui/site/FirefoxExplain.svelte). Continue is the click that asks Firefox.
   // Before You Connect shows on every browser before Connect (./consent.js): there its
   // Continue is the click that agrees. `firefox`: the "Why Firefox asks" line and the
-  // heading that names it, on Firefox only.
+  // heading that names it, on Firefox only. Its lines live in ./copy.js (consent.*), as
+  // the setup's pop-ups show the same ones.
+  import { t } from './copy.js';
+
   let { local = false, firefox = true, onContinue, onClose } = $props();
 </script>
 
@@ -60,16 +63,12 @@
       </dd>
       {#if firefox}
         <dt>Why Firefox asks</dt>
-        <dd>
-          Firefox makes every extension name what it shares, using a short fixed list. Pledge prices
-          and store credit fall under <b>"financial and payment information"</b>, so that's what its
-          prompt will say.
-        </dd>
+        <dd>{t('consent.why-firefox')}</dd>
       {/if}
       <dt>If you say no</dt>
-      <dd>Nothing changes. Open Hangar stays private and local, and you can connect later.</dd>
+      <dd>{t('consent.if-no')}</dd>
       <dt>Change your mind</dt>
-      <dd>Disconnect any time, and delete what was synced from your Account page.</dd>
+      <dd>{t('consent.change')}</dd>
     </dl>
   {/if}
   <div class="bp-row">

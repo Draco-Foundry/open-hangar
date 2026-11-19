@@ -122,7 +122,10 @@ const connectorFlags = () =>
     .readFileSync(path.join(SRC, 'flags.js'), 'utf8')
     .replace(
       'const BUILD_VALUES = {};',
-      'const BUILD_VALUES = {"sync":true,"orgFleet":false,"localMode":true,"connector":true,"alerts":true,"autoScan":true};',
+      'const BUILD_VALUES = {"sync":true,"orgFleet":false,"localMode":true,"connector":true,"alerts":true,"autoScan":true' +
+        // OH_DEMO_FIRST_RUN=1: the first-run setup too (basic.html#setup), off in the store.
+        (process.env.OH_DEMO_FIRST_RUN === '1' ? ',"firstRun":true' : '') +
+        '};',
     );
 
 async function handle(req, res) {

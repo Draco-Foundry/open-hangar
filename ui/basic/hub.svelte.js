@@ -49,6 +49,7 @@ export const hub = $state({
     msg: '',
     calm: false,
     dataOk: true,
+    url: '', // the website's address (OH.siteUrl), for My Hangar
     consent: false, // Before You Connect's Continue was clicked (./consent.js)
     askFirefox: null,
     pilot: null,
@@ -205,6 +206,7 @@ export async function refreshSite() {
   else if (link && !s.syncing) runner.retryIfDue(link).catch(() => {});
   s.dataOk = !firefox() || (await chrome.permissions.contains(SITE_DATA).catch(() => false));
   s.consent = consentGiven((await chrome.storage.local.get('dataConsent')).dataConsent);
+  s.url = s.enabled ? await OH.siteUrl() : '';
   await connectIfAsked();
   if (!firefox() || s.dataOk || !chrome.storage.session) return;
   // Connect was pressed on the website, or our hangar page asked for the hangar,
@@ -248,6 +250,13 @@ export async function firefoxContinue() {
   }
   if (!(await asked)) return void (hub.site.msg = t('basic.firefox-no'));
   if (why === 'connect') await connect({ asked, fromSite });
+}
+// The first-run setup's Before You Connect (./Setup.svelte): its Continue agrees, as
+// Connect's does, and asks Firefox (call it first thing in the click). → Firefox's yes.
+export function setupAgree() {
+  const asked = dataOk();
+  hub.site.consent = true;
+  return chrome.storage.local.set({ dataConsent: consentRecord() }).then(() => asked);
 }
 // Not Now on the card: nothing is saved or sent.
 export function firefoxClose() {
