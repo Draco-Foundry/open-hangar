@@ -121,6 +121,8 @@ const BUDGET = {
   siteUrl: small(),
   dataConsent: small('Before You Connect agreed: one { v, at }'),
   setupDone: small('the first-run setup finished or skipped: one { at }'),
+  setupOpened: small('when the first-run setup opened, a number'),
+  optInSeen: small('the opt-ins answered after an update: four keys at most'),
   siteSyncRequested: small(),
   siteSyncAgain: small('one { at, auto }: the sync to try once more'),
   justUpdated: small(),

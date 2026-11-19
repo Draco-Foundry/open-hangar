@@ -287,6 +287,15 @@ const COPY = {
   'popup.saved-accounts': 'Saved Accounts',
   'popup.log-out': 'Log Out of RSI',
   'popup.clear-data': 'Clear Data',
+  // After an update, a setting that release added, once (the firstRun flag;
+  // ./NewOptIn.svelte). Approved (Claude chat, 2026-11-16; Handoffs row EXT First-Run
+  // Setup: Words W18, W21, W22).
+  'popup.new-setting': 'New Setting',
+  'popup.turn-on': 'Turn On',
+  'popup.not-now': 'Not Now',
+  // The first-run setup closed before it was finished or skipped (the firstRun flag): its
+  // button back. Approved (Claude chat, 2026-11-17).
+  'popup.setup-continue': 'Finish Setup',
   // The links at the bottom.
   'popup.help': 'Help',
   'popup.privacy': 'Privacy',

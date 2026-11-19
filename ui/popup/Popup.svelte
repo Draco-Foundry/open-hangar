@@ -30,7 +30,9 @@
     valueSince,
   } from './data.js';
   import { applyLook, cleanPrefs, loadPrefs, savePref } from './prefs.js';
-  import { pilotAnswer, rsiAccess } from './actions.js';
+  import { notifyAllowed, openHub, pilotAnswer, rsiAccess } from './actions.js';
+  import { newOptIns } from '../lib/opt-ins.js';
+  import NewOptIn from './NewOptIn.svelte';
   import { fxFor, loadRates, shownCurrency } from './currency.js';
   import { rsiCookie, rsiSignIn, watchCookie } from './rsi-cookie.js';
   import { flag } from '../lib/flags.js';
@@ -60,6 +62,12 @@
   let link = $state(null); // the openhangar.space link, when sync is on
   let pilotDone = $state(false); // the scan's sync question, answered here
   let justUpdated = $state(null);
+  // The first-run setup (the firstRun flag): closed before it was finished or skipped
+  // (setupLeft: its button back), and after an update the newest opt-in not yet
+  // answered (newOpt, ui/lib/opt-ins.js), once.
+  const SETUP = flag('firstRun');
+  let setupLeft = $state(false);
+  let newOpt = $state(null);
   // At the top of every tab, as on the basic page: a new version waiting to be let in
   // (local updateReady, src/background.js) and the kill switch's banner (status.json's,
   // OH.getRemoteStatus: the copy main.js refreshes, so nothing more is asked).
@@ -165,6 +173,13 @@
         'justUpdated',
         'updateReady',
         'scanStarted',
+        'setupOpened',
+        'setupDone',
+        'optInSeen',
+        'autoDailyOn',
+        'accountLogs',
+        'accountLogsLoad',
+        'orderHistoryOn',
       ]),
       OH.siteEnabled().then((on) => (on ? OH.getSiteLink() : null)),
       OH.siteUrl(),
@@ -178,6 +193,24 @@
     ).some(Boolean);
     account = got.account || null;
     justUpdated = got.justUpdated || null;
+    if (SETUP) {
+      setupLeft = !!got.setupOpened && !got.setupDone;
+      const on = [
+        got.autoDailyOn === true && 'autoDaily',
+        (await notifyAllowed()) && 'notify',
+        !!(got.accountLogs || got.accountLogsLoad) && 'accountLogs',
+        got.orderHistoryOn > 0 && 'orderHistory',
+      ].filter(Boolean);
+      newOpt =
+        newOptIns({
+          from: justUpdated?.to === version ? justUpdated.from : null,
+          to: version,
+          seen: got.optInSeen || [],
+          on,
+          flags: OH.flags,
+          cmp: OH.compareVersions,
+        })[0] || null;
+    }
     updateReady = got.updateReady || null;
     started = got.scanStarted || null;
     link = siteLink || null;
@@ -492,6 +525,14 @@
     <div class="pp-stopnote" id="pp-stopped" role="status">
       <span>{t(stop)}</span>
     </div>
+  {/if}
+
+  {#if SETUP && ready && setupLeft}
+    <div class="pp-notice" id="pp-setup-left">
+      <button type="button" class="pp-link" onclick={() => openHub('#setup')}>{t('popup.setup-continue')}</button>
+    </div>
+  {:else if SETUP && ready && newOpt}
+    <NewOptIn opt={newOpt} onanswered={() => (newOpt = null)} />
   {/if}
 
   {#if ready && v}

@@ -93,6 +93,8 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   // install, never on an update or a browser restart, nor for a temporary add-on
   // (Firefox's developer load).
   if (details.reason === 'install' && self.OH.flags.firstRun && !details.temporary) {
+    // The popup offers it again until it's finished or skipped (setupDone).
+    await chrome.storage.local.set({ setupOpened: Date.now() });
     chrome.tabs.create({ url: chrome.runtime.getURL('src/basic.html#setup') });
     return;
   }
