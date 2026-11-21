@@ -24,6 +24,17 @@ test('a file carrying the private marker fails', async () => {
   assert.match(problems[0], /^docs\/notes\.md:/);
 });
 
+test('a file carrying the shared private marker fails', async () => {
+  const { privateProblems, SHARED_MARKER } = await lib();
+  const files = {
+    'docs/notes.md': `# Notes\n\n<!-- ${SHARED_MARKER} to a public repo -->\n`,
+    'README.md': '# Open Hangar\n',
+  };
+  const problems = privateProblems(Object.keys(files), (f) => files[f]);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /^docs\/notes\.md:/);
+});
+
 test('.env files fail, templates pass', async () => {
   const { privateProblems } = await lib();
   const read = () => 'A=1';
