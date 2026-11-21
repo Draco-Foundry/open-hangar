@@ -1,7 +1,8 @@
 // Private-files guard: fails if a maintainer's private Claude files or secrets would land
 // in this public repo. Four kinds: a CLAUDE.local.md anywhere (each machine's gitignored
-// import of the private rules), any file carrying the private repo's marker line (every
-// file there starts with it), a .env file (.env.example and the like are fine), and
+// import of the private rules), any file carrying a private marker line (the private rules
+// repo's, or the shared one the maintainer's other private repos put in every Markdown
+// file), a .env file (.env.example and the like are fine), and
 // text shaped like a key or token. CI runs it on the checkout (.github/workflows/ci.yml);
 // the pre-commit hook runs it on what's staged (scripts/hooks/pre-commit).
 //
@@ -13,6 +14,9 @@ import { pathToFileURL } from 'node:url';
 
 // Split so this file doesn't match itself.
 export const MARKER = 'claude-private' + ': never commit';
+// Shared marker for the maintainer's other private repos. It names no repo on purpose.
+export const SHARED_MARKER = 'draco-private' + ': never commit';
+export const MARKERS = [MARKER, SHARED_MARKER];
 
 // Key and token shapes. The private key one is split so this file doesn't match itself.
 export const SECRET_SHAPES = [
@@ -43,7 +47,8 @@ export function privateProblems(files, read) {
     } catch {
       continue; // deleted or unreadable: nothing to leak
     }
-    if (text.includes(MARKER)) problems.push(`${file}: a file from the private rules repo`);
+    if (MARKERS.some((m) => text.includes(m)))
+      problems.push(`${file}: a file from a private repo (it carries a private marker line)`);
     for (const [what, shape] of SECRET_SHAPES)
       if (shape.test(text)) problems.push(`${file}: looks like it holds ${what}`);
   }
