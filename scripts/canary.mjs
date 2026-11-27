@@ -136,15 +136,16 @@ const liveJson = async (re) => {
   const hit = answers.find(([u]) => re.test(u));
   return hit ? hit[1].clone().json() : null;
 };
-// Fields set in at least half the rows, so one odd row doesn't count.
-function commonFields(rows) {
+// Fields set in at least half the rows, so one odd row doesn't count. A page's `some`
+// fields are set only in some rows by design, and count when set in any row.
+function commonFields(rows, some = []) {
   const list = (Array.isArray(rows) ? rows : []).filter((r) => r && typeof r === 'object');
   const seen = new Map();
   for (const r of list)
     for (const [k, v] of Object.entries(r))
       if (v != null && v !== '') seen.set(k, (seen.get(k) || 0) + 1);
   return [...seen]
-    .filter(([, n]) => n * 2 >= list.length)
+    .filter(([k, n]) => (some.includes(k) ? n > 0 : n * 2 >= list.length))
     .map(([k]) => k)
     .sort();
 }
@@ -153,6 +154,8 @@ const savedPages = [
     file: 'store-ships.json',
     live: async () => OH.parseStoreShips(await liveJson(/upgrade\/graphql/)),
     saved: () => OH.parseStoreShips(JSON.parse(fixture('store-ships.json'))),
+    // Only ships on sale have a price: a big sale puts most of them on sale (Nov 2026).
+    some: ['price'],
   },
 
   {
@@ -200,12 +203,12 @@ for (const c of checks) {
 for (const p of savedPages) {
   let live;
   try {
-    live = commonFields(await p.live());
+    live = commonFields(await p.live(), p.some);
   } catch {
     continue; // no live answer: the check above already said so
   }
   if (!live.length) continue;
-  const saved = commonFields(p.saved());
+  const saved = commonFields(p.saved(), p.some);
   const gone = saved.filter((k) => !live.includes(k));
   const added = live.filter((k) => !saved.includes(k));
   if (gone.length || added.length) {
