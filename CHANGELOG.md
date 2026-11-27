@@ -8,6 +8,7 @@ What's changed in each release of Open Hangar. Dates are when the version was cu
 
 - New: **Your Subscriber and Concierge Items.** If you're signed in to RSI as a subscriber or a Concierge member, a scan now reads the store items RSI lists only for you, at most once a day. Your openhangar.space Store shows them (Your Subscriber Store at the top, Concierge items with the gold diamond), and only you see them.
 - Changed: Connect to openhangar.space now shows Before You Connect first on every browser: what's sent, what never is, and Continue or Not Now.
+- Fixed: Store alerts find a ship you scanned under one of RSI's older names, as the website does.
 
 ## 0.5.11 — 2026-11-12
 

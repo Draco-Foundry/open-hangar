@@ -81,6 +81,9 @@ Anything after launch is a plan, not a promise. The details are in the
 
 - [x] **Nov 10, 2026 · Website:** openhangar.space opens to everyone. Sign-ups are open, and
       My Hangar and sync work for every pilot.
+- [x] **Nov 18, 2026 · 0.5.12:** if you're an RSI subscriber or Concierge member, a scan reads
+      the store items RSI lists only for you, and your openhangar.space Store shows them. Also:
+      Connect shows Before You Connect first on every browser. ([0.5.12](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.5.12))
 - [x] **Nov 12, 2026 · 0.5.11:** Order History: turn it on in the popup's Settings tab, and the
       next scan reads your RSI Pledge Store orders, slowly and once; after that, each scan
       reads only your newest orders. ([0.5.11](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.5.11))
@@ -98,9 +101,6 @@ Anything after launch is a plan, not a promise. The details are in the
 - [x] **Oct 31, 2026 · 0.5.6:** a first scan that stops partway no longer keeps the part it
       read, the New in button clears, and the popup shows how long a scan took.
       ([0.5.6](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.5.6))
-- [x] **Oct 27, 2026 · 0.5.5:** Scan sits at the top of every tab and shows its progress,
-      Wishlist items open in the Store on openhangar.space, and the popup shows how your UEC
-      changed. ([0.5.5](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.5.5))
 
 **[Everything We've Shipped](ROADMAP.md#shipped)** ·
 [Release Notes](https://github.com/Draco-Foundry/open-hangar/releases) ·
@@ -142,6 +142,9 @@ Anything after launch is a plan, not a promise. The details are in the
 - **Order History:** optional, turned on in the popup's Settings tab. The next scan reads your RSI
   Pledge Store orders once, slowly, then only your newest orders. Turning it off stops the reads,
   and orders already read stay in this browser until Clear Data.
+- **Your Subscriber and Concierge Items:** if you're signed in to RSI as a subscriber or a
+  Concierge member, a scan reads the store items RSI lists only for you, at most once a day.
+  Your openhangar.space Store shows them, and only you see them.
 
 **On [openhangar.space](https://openhangar.space/):**
 
@@ -168,8 +171,10 @@ Anything after launch is a plan, not a promise. The details are in the
   **Log Out of RSI**, to see whether you're signed in to RSI, and for **Add to RSI Cart**.
   Each RSI account's data is kept separately, so accounts never mix.
 - **Optional Sync:** your data stays in your browser
-  unless you connect a free openhangar.space account. Once connected, every scan sends the
-  same data as the JSON export to your account there (Sync Now sends it right away).
+  unless you connect a free openhangar.space account. Connecting first shows Before You
+  Connect: what's sent, what never is, and nothing leaves until you click Continue. Once
+  connected, every scan sends the same data as the JSON export to your account there (Sync
+  Now sends it right away).
   Disconnect stops it, and the website lets you download or delete everything. With or
   without sync, the extension talks only to RSI and openhangar.space. Apart from reading
   your own account, syncing and your Wishlist, those requests fetch public files that are
@@ -239,7 +244,10 @@ hangar. The developer's copy has its own id.
   contents, value, date, insurance, and whether it's giftable or meltable.
 - **Buy-Backs:** melted pledges you can get back, each with a direct reclaim link.
 - **Account:** handle, display name, Store Credit, UEC, REC, main org and rank.
-- **Referrals:** recruits and prospects (current and legacy programs).
+- **Referrals:** recruits and prospects (current and legacy programs), kept as dates only.
+- **Only When You Turn It On:** your RSI pledge log and store credit log (Account History)
+  and your Pledge Store orders (Order History).
+- **Only for Members:** the Subscriber Store and Concierge items RSI lists for you.
 
 Everything lives in one versioned database in your browser, and exports as one JSON file or
 a CSV of your pledges or buy-backs (a developer's build with the dashboard also writes a
@@ -342,10 +350,12 @@ Useful commands:
 - `npm run pack`: store-ready zips in `dist/`
 - `npm run lint:firefox`: Mozilla's `web-ext lint` against the Firefox build
 - `npm run screenshots`: the dashboard's screenshots (real UI, demo data) into
-  `docs/store-assets/` (the store uses the popup's, `screenshot-040-*`)
+  `docs/store-assets/` (the store uses the popup's, `screenshot-059-*`)
 - `npm run demo`: the demo dashboard, popup and basic page at `localhost:8323`, for trying
   UI changes
 - `npm run format`: Prettier
+- `npm run test:ui`: the popup and basic page smoke test in Chrome
+- `npm run dev:chrome`: the developer's copy (above)
 
 To add a data source, see the [Contributing Guide](CONTRIBUTING.md).
 

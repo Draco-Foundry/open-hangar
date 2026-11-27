@@ -29,9 +29,9 @@ Jump to: [The Plan](#the-plan-at-a-glance) · [What Launched](#what-launched-on-
 
 ## Where We Are Today
 
-- **Extension 0.5.11** (Nov 12, 2026) is live on the Chrome, Edge, and Firefox stores.
+- **Extension 0.5.12** (Nov 18, 2026) is live on the Chrome, Edge, and Firefox stores.
   [openhangar.space/extension](https://openhangar.space/extension) shows each store's current
-  version. ([Release Notes](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.5.11))
+  version. ([Release Notes](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.5.12))
 - **[openhangar.space](https://openhangar.space/)** opened to everyone on Nov 10, 2026: My
   Hangar, the [Open Hangar Store](https://openhangar.space/store), Star Citizen news, and free
   accounts. Some features are built and switch on after launch, each once it's checked.
@@ -342,6 +342,9 @@ Newest first. Dates are UTC. Full notes for every version are on the
 
 - [x] **Nov 10, 2026 · Website:** openhangar.space opens to everyone. Sign-ups are open, and
       My Hangar and sync work for every pilot.
+- [x] **Nov 18 · 0.5.12:** if you're an RSI subscriber or Concierge member, a scan reads the
+      store items RSI lists only for you, and your openhangar.space Store shows them. Also:
+      Connect shows Before You Connect first on every browser. ([Release Notes](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.5.12))
 - [x] **Nov 12 · 0.5.11:** Order History: turn it on in the popup's Settings tab, and the next
       scan reads your RSI Pledge Store orders, slowly and once; after that, each scan reads
       only your newest orders. ([Release Notes](https://github.com/Draco-Foundry/open-hangar/releases/tag/v0.5.11))
