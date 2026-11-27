@@ -55,7 +55,6 @@ wishlist import and store alerts, and from 0.4.0 Auto Scan Daily):
 | `autoScanRun`      | Auto Scan Daily, in place of the reminder (needs autoScan)       | on    | on   | no       |
 | `scanBar`          | The popup's scan as one counting bar where Scan sits             | on    | on   | no       |
 | `newSinceScan`     | The popup's New Since Last Scan list                             | off   | off  | no       |
-| `meltValue`        | The popup and Home show Melt Value, its parts at melt            | off   | on   | no       |
 | `orderHistory`     | A scan reads RSI order history once turned on; sync sends it     | on    | on   | no       |
 | `subStore`         | A scan reads your Subscriber Store and Concierge items           | on    | on   | no       |
 | `accountLogs`      | A scan reads RSI's pledge and store credit logs; sync sends them | on    | on   | no       |
