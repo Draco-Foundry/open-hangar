@@ -1,0 +1,1 @@
+- Fixed: A ship's picture, price or ship code never comes from another version of the same ship: a Cutter never borrows the Cutter Scout's, and an Avenger Titan Renegade never borrows the Titan's.
