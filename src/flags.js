@@ -168,6 +168,15 @@
       about: "Inventory's Upgraded chip, and the ship an upgraded pledge holds now on its card.",
       default: false,
     },
+    // RSI changed a page (2026-11-28): after a scan whose hangar or buy-back pages hold
+    // what the parser doesn't recognize (src/scraper/parser.js unknownShapes, the same
+    // checks as the parser report), the popup says so in one calm line until a scan
+    // reads them clean. From what a scan already reads, no new request; kept on the
+    // device, never synced. Off until its words are approved (a placeholder).
+    rsiChangeNotice: {
+      about: 'The popup says when RSI changed a page and some details may be missing.',
+      default: false,
+    },
   };
 
   // Set per build by scripts/pack.mjs. Keep it empty here.

@@ -764,3 +764,30 @@ export function rsiPicture(url) {
     return null;
   }
 }
+
+// RSI changed a page (the rsiChangeNotice flag): local rsiChange ({ [part]: { at, shapes } },
+// src/lib.js recordRsiChange, what kinds of change the last complete scan of each part
+// found) and rsiChangeSeen (the shapes Got It hid) → { shapes } for the notice, or null:
+// nothing changed, or every kind of change shown is one already hidden. A new kind brings
+// it back; a clean scan of the part takes its shapes out.
+export const RSI_SEEN_MAX = 50;
+export function rsiNotice(change, seen) {
+  if (!isObj(change)) return null;
+  const shapes = [
+    ...new Set(
+      ['hangar', 'buybacks'].flatMap((p) =>
+        Array.isArray(change[p]?.shapes)
+          ? change[p].shapes.filter((s) => typeof s === 'string')
+          : [],
+      ),
+    ),
+  ].sort();
+  if (!shapes.length) return null;
+  const hidden = new Set(Array.isArray(seen) ? seen : []);
+  return shapes.some((s) => !hidden.has(s)) ? { shapes } : null;
+}
+// Got It: the shapes to keep as hidden, these first, RSI_SEEN_MAX at most.
+export function rsiSeenAfter(shapes, seen) {
+  const old = Array.isArray(seen) ? seen.filter((s) => typeof s === 'string') : [];
+  return [...new Set([...shapes, ...old])].slice(0, RSI_SEEN_MAX);
+}

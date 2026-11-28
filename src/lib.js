@@ -1878,6 +1878,20 @@
     let aligned = true;
     let pages = null; // the highest page RSI's pager has linked to so far
     let firstSize = 0; // how many items RSI served on page 1 (its real page size)
+    // What of the pages the parser didn't recognize, added up (OpenHangar.unknownShapes):
+    // for the popup's notice that RSI changed a page (recordRsiChange). Kept on the device.
+    let unknown = null;
+    // @flag-start rsiChangeNotice: what the scan's pages hold that the parser doesn't know
+    if (OH.flags?.rsiChangeNotice && window.OpenHangar?.unknownShapes)
+      unknown = { cards: 0, shapes: {} };
+    // @flag-end rsiChangeNotice
+    const tally = (html) => {
+      if (!unknown) return;
+      const got = window.OpenHangar.unknownShapes(html, src.id);
+      unknown.cards += got.cards;
+      for (const [k, n] of Object.entries(got.shapes))
+        unknown.shapes[k] = (unknown.shapes[k] || 0) + n;
+    };
     const down = (got) => ({
       rsiDown: !!(got.transient || got.rateLimited),
       slowDown: !!got.slowDown,
@@ -1981,6 +1995,7 @@
 
       let added = 0;
       if (page === 1) firstSize = items.length;
+      tally(html);
       fillIds(src, items, page);
       if (page === 1 && prev && (await unchangedSince(src, prev, items, size))) {
         onProgress?.(page, prev.items.length, null, page);
@@ -2035,8 +2050,29 @@
     if (lastPage === MAX_PAGES && lastAdded > 0 && !ended) {
       return { items: all, meta, partial: { page: MAX_PAGES + 1, reason: 'page limit reached' } };
     }
-    return { items: all, meta, aligned };
+    return { items: all, meta, aligned, unknown };
   }
+
+  // @flag-start rsiChangeNotice: the popup's notice that RSI changed a page
+  // A complete, saved scan of the hangar or buy-backs → local rsiChange: { [part]: { at,
+  // shapes } } with the shapes worth telling the player about (OpenHangar.rsiChangeShapes:
+  // no ids, only what kind of change), or the part taken out when its pages read clean,
+  // so the next clean scan clears the notice. A scan that stopped, failed or found the
+  // hangar unchanged (#294) leaves it as it was. Never synced or sent anywhere.
+  const RSI_CHANGE_KEY = 'rsiChange';
+  async function recordRsiChange(part, unknown) {
+    if (part !== 'hangar' && part !== 'buybacks') return;
+    const shapes = window.OpenHangar.rsiChangeShapes(unknown);
+    const cur = (await chrome.storage.local.get(RSI_CHANGE_KEY))[RSI_CHANGE_KEY];
+    const next = cur && typeof cur === 'object' && !Array.isArray(cur) ? { ...cur } : {};
+    if (shapes.length) {
+      next[part] = { at: Date.now(), shapes };
+      OH.log('warn', part, `RSI changed a page: ${shapes.join('; ')}`);
+    } else delete next[part];
+    if (Object.keys(next).length) await chrome.storage.local.set({ [RSI_CHANGE_KEY]: next });
+    else await chrome.storage.local.remove(RSI_CHANGE_KEY);
+  }
+  // @flag-end rsiChangeNotice
 
   // Rows without an id (e.g. a buy-back with no reclaim button) get one from
   // their position, so identical copies stay separate.
@@ -2271,6 +2307,10 @@
         account,
       });
       OH.log('info', src.id, `scan ok, ${result.items.length} items`);
+      // @flag-start rsiChangeNotice: a complete scan says whether RSI changed its pages
+      if (OH.flags?.rsiChangeNotice && result.unknown)
+        await recordRsiChange(src.id, result.unknown);
+      // @flag-end rsiChangeNotice
       // A complete buy-back list: drop cached details for ones since reclaimed.
       if (src.id === 'buybacks') await OH.pruneBuybackDetails(result.items.map((b) => b.id));
       queueStorageCheck();

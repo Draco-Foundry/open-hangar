@@ -30,6 +30,7 @@ test('registry parses: every flag has a name, a one-line about and a default', a
     'newSinceScan',
     'orderHistory',
     'orgFleet',
+    'rsiChangeNotice',
     'scanBar',
     'subStore',
     'sync',
@@ -92,6 +93,8 @@ test('public store builds get the defaults; the beta its set; sync is on in both
     firstRun: false,
     // The Upgraded filter: off until its words are approved.
     upgradedFilter: false,
+    // RSI changed a page: off until its words are approved.
+    rsiChangeNotice: false,
   };
   assert.deepEqual(buildValues(registry), STORE);
   // The beta is the same set.
@@ -148,6 +151,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     bbdMissTransient: false,
     firstRun: false,
     upgradedFilter: false,
+    rsiChangeNotice: false,
   });
   const { values } = loadFlags(fs.readFileSync(file, 'utf8'));
   assert.deepEqual(values, {
@@ -167,6 +171,7 @@ test('writeFlags puts the values into a built copy, read back as OH.flags', asyn
     bbdMissTransient: false,
     firstRun: false,
     upgradedFilter: false,
+    rsiChangeNotice: false,
   });
   assert.throws(() => writeFlags(file, {}), /expected one/, 'only ever written once');
   fs.rmSync(dir, { recursive: true, force: true });
@@ -333,6 +338,7 @@ test('pack: writes each build its values and cuts the code of flags that are off
     bbdMissTransient: false,
     firstRun: false,
     upgradedFilter: false,
+    rsiChangeNotice: false,
   };
   // Without the connector, what needs it goes too (the Daily Scan Reminder needs the alerts,
   // and Auto Scan Daily the reminder).
