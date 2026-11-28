@@ -159,6 +159,15 @@
       about: 'First-run setup: a fresh install opens a setup page once.',
       default: false,
     },
+    // The Upgraded filter (owner, 2026-11-28): an Upgraded chip in Inventory's Status
+    // filters shows only the pledges RSI marks upgraded, and each one's card adds the
+    // ship it holds now after its name (what it was bought as). Read from what a scan
+    // already reads (src/scraper/parser.js `upgraded`, src/lib.js OH.upgradedNow), no new
+    // request. Off until its words are approved (the "now" line is a placeholder).
+    upgradedFilter: {
+      about: "Inventory's Upgraded chip, and the ship an upgraded pledge holds now on its card.",
+      default: false,
+    },
   };
 
   // Set per build by scripts/pack.mjs. Keep it empty here.

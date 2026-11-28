@@ -117,7 +117,7 @@
     {@render thumb(c.kind, c.kind)}
     <div class="card-body">
       <div class="card-name" title={c.title}>
-        <ItemName x={c} />
+        <ItemName x={c} />{#if c.now}<span class="card-now">{c.now}</span>{/if}
       </div>
       <div class="card-contents">{c.contents}</div>
       <div class="card-ins" title="Insurance">{c.ins}</div>

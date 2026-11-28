@@ -54,7 +54,9 @@
   //     2: 2026-10-24, a hangar item's maker, when its tile shows one (#568).
   //     3: 2026-10-25, a hangar item RSI lists under Also Contains is marked `also`.
   //     4: 2026-11-01, a pledge priced in UEC or aUEC has currency 'UEC'.
-  const PARSER_VERSION = 4;
+  //     5: 2026-11-28, a pledge RSI marks upgraded has `upgraded`, and the Gift button's
+  //        js-gift-v2 hook counts as Gift (giftable).
+  const PARSER_VERSION = 5;
   const PARSER_KEY = 'scanParser';
 
   const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);

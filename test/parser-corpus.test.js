@@ -76,8 +76,8 @@ test('the report counts a shape it has never seen', () => {
   );
 });
 
-// RSI's "Contains:" line: "23 items", "<ship> and 2 items", "4 ships and 2 items", or
-// a single item's name. The parser reads the item tiles, never this line.
+// RSI's "Contains:" line: "23 items", "<ship> and 2 items", "4 ships and 2 items", two
+// items by name ("<ship> and <item>"), or a single item's name. The parser reads the item tiles, never this line.
 function containsCount(text) {
   const t = clean(text).replace(/^Contains:\s*/i, '');
   let m = t.match(/^(\d+) items?$/i);
@@ -86,6 +86,8 @@ function containsCount(text) {
   if (m) return Number(m[1]) + Number(m[2]);
   m = t.match(/ and (\d+) items?$/i);
   if (m) return 1 + Number(m[1]);
+  // Two items by name: "ATLS and Lifetime Insurance" (November 2026).
+  if (/\S and \S/.test(t)) return 2;
   return t ? 1 : 0;
 }
 
@@ -220,6 +222,11 @@ test('no fixture holds an email address or a private handle', () => {
   }
   for (const file of fixtureFiles(CORPUS)) {
     assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /citizens\//i, `${file}: a citizen link`);
+    assert.doesNotMatch(
+      fs.readFileSync(file, 'utf8'),
+      /Serial:\s*(?!\[serial\])\S/i,
+      `${file}: a ship's serial number`,
+    );
   }
 });
 
@@ -239,6 +246,7 @@ test('the scrub script keeps the cards and replaces what says whose hangar it is
       <span class="availability">Attributed</span>
       <div class="date-col"><label>Created:</label> April 12, 2023</div>
       <div class="items-col"><label>Contains:</label> Avenger Titan</div>
+      <div class="liner">Serial: AEGS54321</div>
       <a class="js-gift" href="/citizens/PilotTest99">Gift PilotTest99</a>
       <div class="item"><div class="image" style="background-image:url('/media/abc/x.jpg')"></div>
         <div class="text"><div class="kind">Ship</div><div class="title">Avenger Titan</div></div></div>
@@ -256,6 +264,7 @@ test('the scrub script keeps the cards and replaces what says whose hangar it is
     'My Ship',
     '/media/abc',
     'citizens/',
+    'AEGS54321',
   ]) {
     assert.ok(!out.includes(gone), `still holds ${gone}`);
   }

@@ -89,6 +89,7 @@ policy's words are the owner's; this list never edits them.
 | `sources.hangar.items[].kind`                        | The kind the extension sorted the pledge into.                                          |
 | `sources.hangar.items[].giftable`                    | True when RSI offers Gift.                                                              |
 | `sources.hangar.items[].meltable`                    | True when RSI offers Reclaim.                                                           |
+| `sources.hangar.items[].upgraded`                    | True when RSI marks the pledge upgraded (absent before it was read).                    |
 | `sources.hangar.items[].insurance`                   | The insurance the pledge carries (LTI, months).                                         |
 | `sources.hangar.items[].date`                        | The date on the pledge as RSI shows it.                                                 |
 | `sources.hangar.items[].raw`                         | What the page read keeps for debugging (an object or null). Open: any keys.             |

@@ -74,6 +74,21 @@
     if (RULES.names.paint.test(kind || label)) return 'paint';
     return kind.toLowerCase() || 'other';
   }
+  // Upgraded pledges (the upgradedFilter flag, Inventory's Upgraded chip). RSI marks a
+  // pledge upgraded on its card (src/scraper/parser.js reads it as `upgraded`), keeps the
+  // name it was bought under, and lists the ship it holds now among its items, with no
+  // item naming the ship it started as. So the name is what it was bought as, as RSI
+  // shows it, and the ship and vehicle items are what it is now. Pure.
+  OH.isUpgraded = (p) => !!p && p.upgraded === true;
+  // The ships (and vehicles) an upgraded pledge holds now, as RSI names them, in RSI's
+  // order; [] for a pledge that isn't upgraded. Two ships give both.
+  OH.upgradedNow = function upgradedNow(p) {
+    if (!OH.isUpgraded(p)) return [];
+    return (Array.isArray(p.contents) ? p.contents : [])
+      .filter((c) => c && !c.also && ['ship', 'vehicle'].includes(itemKindKey(c)))
+      .map((c) => String(c.label || '').trim())
+      .filter(Boolean);
+  };
   OH.packKind = function packKind(p) {
     if (!p || p.isCCU) return null;
     const name = String(p.name || '').trim();

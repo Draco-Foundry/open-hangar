@@ -209,6 +209,7 @@
       kind, // display category: 'ccu' | 'ship' | 'paint' | 'addon' | 'coupon' | 'other'
       giftable: raw.giftable === true, // hangar showed a "Gift" action → transferable
       meltable: raw.meltable === true, // hangar showed an "Exchange" (melt) action
+      upgraded: raw.upgraded === true, // RSI marks the card upgraded (an upgrade applied to it)
       insurance: ns.insuranceTerm(contents), // 'LTI' | '120M' | '6M' | … | null
       date: raw.date ?? null, // pledge (purchase) date, ISO 'YYYY-MM-DD', or null
       raw: raw.raw ?? null, // keep originals while reverse-engineering
@@ -342,7 +343,7 @@
         currency = 'UEC';
       const contents = readContents(card);
       // Giftability is whatever RSI decided: a transferable pledge renders a
-      // "Gift" action (`a.js-gift`), a bound one doesn't. We read the rendered
+      // "Gift" action (`a.js-gift`, `a.js-gift-v2` since November 2026), a bound one doesn't. We read the rendered
       // button rather than re-deriving the rules (store-credit purchases, gear,
       // CCUs, …) — RSI already computed it. `.js-gift` lives inside this card's
       // `.row`, so scope the query to the card to avoid neighbour bleed.
@@ -350,6 +351,11 @@
       // Meltable: RSI renders an "Exchange" action (`a.js-reclaim`) on pledges you
       // can melt for store credit — same approach as giftability, same scoping.
       const meltable = !!card.querySelector(RULES.hangar.melt);
+      // Upgraded: RSI marks a pledge with an upgrade applied three ways on its card (the
+      // title's class, the orange "upgraded" tag and the Upgrades button). The name stays
+      // what the pledge was bought as; the Ship item is what it holds now. Any of the
+      // three counts (RULES.hangar.upgraded), scoped to the card like Gift.
+      const upgraded = !!card.querySelector(RULES.hangar.upgraded);
       // Pledge date: the card's first `.date-col` (the selector HangarXPLOR has
       // relied on for years), e.g. "Created: December 08, 2016".
       const dateEl = card.querySelector(RULES.hangar.date);
@@ -365,6 +371,7 @@
           image: pickImage(card, contents),
           giftable,
           meltable,
+          upgraded,
           date,
           raw: { rawValue },
         }),

@@ -7,7 +7,9 @@
  * late page of a 10+ page hangar, two upgrades in a row, and beside a ship sold with only
  * its paint (#908): the scan reads every page, counts every pledge once, keeps the
  * breakdown inside its pledge and shows the ship the pledge is now. The cards are
- * test/fixtures/upgraded-pledges.html, read by the real parser. Run: `npm test`.
+ * test/fixtures/upgraded-pledges.html, read by the real parser. Their Upgrade items are
+ * modelled, not real: RSI's own page lists none (test/upgraded-filter.test.js reads it).
+ * Run: `npm test`.
  */
 
 const test = require('node:test');
