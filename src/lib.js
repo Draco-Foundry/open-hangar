@@ -1477,8 +1477,12 @@
   function bestByName(list, q, nameOf) {
     let best = null;
     let bestScore = 0;
+    const guard = OH.shipNameGuard(
+      list.map((x) => String(nameOf(x) || '').toLowerCase()),
+      q,
+    );
     for (const x of list) {
-      const s = nameScore(String(nameOf(x) || '').toLowerCase(), q);
+      const s = nameScore(String(nameOf(x) || '').toLowerCase(), q, guard);
       if (s > bestScore) {
         bestScore = s;
         best = x;
@@ -3389,26 +3393,66 @@
     return catalogInflight;
   }
 
-  // Score how well a catalog entry's (lowercased) name matches the query. 0 = no
-  // match. Higher = better. Shared by both sources so fuzz rules stay consistent.
-  function nameScore(n, q) {
-    // RSI renamed the original Auroras "Aurora Mk I …" (the Mk II is a new ship), but
-    // pledges and buy-backs still say "Aurora MR": also try the name without "Mk I".
-    // "\bmk i\b" can't match "mk ii".
-    const bare = n
+  // RSI renamed the original Auroras "Aurora Mk I …" (the Mk II is a new ship), but
+  // pledges and buy-backs still say "Aurora MR": a name is also tried without "Mk I".
+  // "\bmk i\b" can't match "mk ii".
+  const bareMkI = (n) =>
+    n
       .replace(/\bmk i\b/g, '')
       .replace(/\s{2,}/g, ' ')
       .trim();
-    if (bare !== n && !/\bmk i\b/.test(q)) return Math.max(rawScore(n, q), rawScore(bare, q) - 1);
-    return rawScore(n, q);
+
+  // Score how well a catalog entry's (lowercased) name matches the query. 0 = no
+  // match. Higher = better. Shared by both sources so fuzz rules stay consistent.
+  // `guard` (OH.shipNameGuard over every name the list knows) keeps a prefix match
+  // from tying a base ship to a variant or a variant to its base.
+  function nameScore(n, q, guard) {
+    const bare = bareMkI(n);
+    if (bare !== n && !/\bmk i\b/.test(q))
+      return Math.max(rawScore(n, q, guard), rawScore(bare, q, guard) - 1);
+    return rawScore(n, q, guard);
   }
-  function rawScore(n, q) {
+  function rawScore(n, q, guard) {
     if (n === q) return 100; // exact
-    if (n.startsWith(q + ' ')) return 80 - (n.length - q.length) * 0.1; // canonical extends query (Genesis → Genesis Starliner)
-    if (q.startsWith(n + ' ')) return 70 + n.length * 0.1; // query extends canonical (PTV Buggy → PTV); prefer longer core
+    if (n.startsWith(q + ' '))
+      return guard && !guard.longer(n) ? 0 : 80 - (n.length - q.length) * 0.1; // canonical extends query (Genesis → Genesis Starliner)
+    if (q.startsWith(n + ' ')) return guard && !guard.shorter(n) ? 0 : 70 + n.length * 0.1; // query extends canonical (PTV Buggy → PTV); prefer longer core
     if (n.includes(q) || q.includes(n)) return 40 + Math.min(n.length, q.length) * 0.1; // loose contains
     return 0;
   }
+  OH.shipNameScore = nameScore; // exported for tests
+
+  // The prefix guard for one query `q` over `names`, every (lowercased) name the list
+  // knows, pictures or not. Ship names are the owner's: a match never strips a
+  // variant, a mark or a loadout. Two checks:
+  //   longer(n)  "Genesis" → "Genesis Starliner" counts only when "Genesis" is not a
+  //              ship itself and one family alone extends it ("Cutter" is a ship, and
+  //              "Mustang" could be the Alpha or the Beta: neither counts).
+  //   shorter(n) "PTV Buggy" → "PTV" counts only when "PTV Buggy" is not a ship
+  //              itself and no longer known name fits it ("Avenger Titan Renegade"
+  //              never becomes the Avenger Titan).
+  // Pure.
+  OH.shipNameGuard = function shipNameGuard(names, q) {
+    const known = new Set();
+    for (const raw of names || []) {
+      if (!raw) continue;
+      const n = String(raw);
+      known.add(n);
+      known.add(bareMkI(n));
+    }
+    const isShip = known.has(q);
+    // The names that extend q, cut to family roots: "Genesis Starliner" and
+    // "Genesis Starliner BIS" are one family.
+    const ext = [...known].filter((n) => n.startsWith(q + ' '));
+    const roots = ext.filter((n) => !ext.some((m) => m !== n && n.startsWith(m + ' ')));
+    // The longest known name that q extends.
+    let core = '';
+    for (const n of known) if (q.startsWith(n + ' ') && n.length > core.length) core = n;
+    return {
+      longer: () => !isShip && roots.length === 1,
+      shorter: (n) => !isShip && (!core || n === core),
+    };
+  };
 
   // Best ship-matrix image for a raw RSI name, or null.
   function matchMatrixImage(matrix, rawName) {
@@ -3416,9 +3460,13 @@
     if (!q || !matrix.length) return null;
     let best = null,
       bestScore = 0;
+    const guard = OH.shipNameGuard(
+      matrix.map((v) => v.lname),
+      q,
+    );
     for (const v of matrix) {
       if (!v.img) continue;
-      const s = nameScore(v.lname, q);
+      const s = nameScore(v.lname, q, guard);
       if (s > bestScore) {
         bestScore = s;
         best = v.img;
@@ -3433,9 +3481,13 @@
     if (!q || !catalog || !catalog.length) return null;
     let best = null;
     let bestScore = 0;
+    const guard = OH.shipNameGuard(
+      catalog.map((v) => v.lname),
+      q,
+    );
     for (const v of catalog) {
       if (!v.img) continue;
-      const sc = nameScore(v.lname, q);
+      const sc = nameScore(v.lname, q, guard);
       if (sc > bestScore) {
         bestScore = sc;
         best = v.img;
@@ -3543,6 +3595,7 @@
       .filter((v) => v && v.lname && !/wikelo/i.test(v.lname)) // in-game reward variants
       .map((v) => ({ ...v, n: v.lname.replace(MFR_PREFIX, '') }));
     const byCls = new Map(cat.filter((v) => v.cls).map((v) => [v.cls, v]));
+    const allNames = cat.map((v) => v.n);
 
     // Best name match (≥55; loose "contains" hits are too risky). Ties — the wiki
     // lists some ships twice — go to the priced entry.
@@ -3550,8 +3603,9 @@
       for (const name of names) {
         let best = null;
         let bestScore = 0;
+        const guard = OH.shipNameGuard(allNames, name);
         for (const v of cat) {
-          const sc = Math.max(nameScore(v.n, name), tokenScore(v.n, name));
+          const sc = Math.max(nameScore(v.n, name, guard), tokenScore(v.n, name));
           if (sc < 55) continue;
           if (sc > bestScore || (sc === bestScore && !best.msrp && v.msrp)) {
             bestScore = sc;
