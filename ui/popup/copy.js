@@ -114,6 +114,11 @@ const COPY = {
   // (src/lib.js OH.PAGE_CHANGED): nothing saved, the last scan kept. Approved by the owner
   // through Claude chat (Words, 2026-10-22).
   'popup.rsi-page-changed': 'RSI changed a page. Holding your last scan.',
+  // RSI changed a page and the scan still read it (the rsiChangeNotice flag): some of it
+  // the parser didn't recognize. Its button is popup.got-it. PLACEHOLDER: Needs Words
+  // (Words DB), not approved.
+  // prettier-ignore
+  'popup.rsi-changed-notice': 'RSI changed a page. Some details may be missing until Open Hangar catches up.', // NEW: needs the owner's OK
   // In the same spot (the bar, or under Scan with the scanBar flag off) after RSI didn't
   // answer a scan (a 5xx). Claude chat, Words, 2026-10-22.
   'popup.rsi-down': "RSI isn't answering. Try again soon.",
@@ -308,4 +313,4 @@ export function t(key, vars = {}) {
 }
 export const KEYS = Object.keys(COPY);
 // The words still waiting for the owner's OK (marked beside them above).
-export const NEW_WORDS = [];
+export const NEW_WORDS = ['popup.rsi-changed-notice'];

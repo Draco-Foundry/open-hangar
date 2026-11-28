@@ -61,6 +61,7 @@ wishlist import and store alerts, and from 0.4.0 Auto Scan Daily):
 | `bbdMissTransient` | A buy-back page RSI keeps failing waits a day, then doubling     | off   | off  | no       |
 | `firstRun`         | A fresh install opens a setup page once (basic page #setup)      | off   | off  | no       |
 | `upgradedFilter`   | Inventory's Upgraded chip and the ship an upgraded pledge holds  | off   | off  | no       |
+| `rsiChangeNotice`  | The popup says when RSI changed a page (details may be missing)  | off   | off  | no       |
 
 ## Adding or Retiring a Flag
 
@@ -213,6 +214,26 @@ and notifications permissions (`scripts/alerts.mjs`), so `--flag autoScan=on` wi
 `--flag autoScan=off` too). Its code is the `@flag-start autoScan` block in
 `src/background.js` and the popup's switch (`flag('autoScan')`). The kill switch
 (site/status.json) pauses it with `"autoScan": { "enabled": false }`.
+
+## RSI Changed a Page
+
+`rsiChangeNotice` tells the pilot when a scan hit an RSI change. A scan already reads
+every hangar and buy-back page; with the flag on it also counts, page by page, what the
+parser doesn't recognize (`OpenHangar.unknownShapes` in `src/scraper/parser.js`, the
+same checks as `npm run report:parser`): a pledge whose date or kind doesn't read, an
+item kind, a tag or a card label the rules don't know. A complete, saved scan keeps
+what's worth saying in local `rsiChange` (`src/lib.js` recordRsiChange), and the popup
+shows one line about it (`ui/popup/data.js` rsiNotice) until a scan reads that part
+clean. Got It hides it until a new kind of change shows up (local `rsiChangeSeen`).
+
+- One stray thing doesn't count: a kind of change has to show on at least two cards in
+  the scan (or on the only card of a one-card list). RSI's `js-*` script hooks never
+  count: a new one is usually a new button, not a detail we lost.
+- Only what kind of change it is is kept (`label "Reward"`, `pledge: no kind`), never a
+  pledge's id. It stays in this browser: not in the sync payload, not in any request.
+- A scan that stopped, failed or found the hangar unchanged leaves it as it was.
+
+Off in every build until its words are approved (a placeholder in `ui/popup/copy.js`).
 
 ## How Builds Set Them
 

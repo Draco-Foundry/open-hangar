@@ -889,14 +889,16 @@
   // name, a card label or a js-* class (RSI's script hooks, so a new one usually
   // means a new feature) not in RULES.known. test/parser-corpus.test.js runs it over
   // saved pages (test/parser-report.js) and fails on anything listed.
-  ns.unrecognized = function unrecognized(payload, kind) {
+  // walkUnknown makes the checks once; emit(group, line, shape, card) gets each
+  // finding: `line` names the pledge, `shape` is the same without its id (what kind of
+  // change it is), `card` says which card on the page it was found on.
+  function walkUnknown(payload, kind, emit) {
     const doc =
       typeof payload === 'string' ? new DOMParser().parseFromString(payload, 'text/html') : payload;
     const clean = (s) =>
       String(s || '')
         .replace(/\s+/g, ' ')
         .trim();
-    const out = { pledges: [], items: [], tags: [], labels: [], hooks: [] };
     const hangar = kind === 'hangar';
     const known = hangar
       ? { labels: RULES.known.hangar.labels, hooks: RULES.known.hangar.hooks }
@@ -906,39 +908,90 @@
       : [...doc.querySelectorAll(RULES.buybacks.card)];
 
     if (hangar) {
-      for (const p of ns.parsePledgesFromDOM(doc)) {
-        if (!p.id || !p.name) out.pledges.push(`a pledge with no ${p.id ? 'name' : 'id'}`);
-        else if (!p.date) out.pledges.push(`pledge ${p.id}: date doesn't read`);
-        else if (p.kind === 'other') out.pledges.push(`pledge ${p.id}: no kind`);
+      ns.parsePledgesFromDOM(doc).forEach((p, i) => {
+        if (!p.id || !p.name) {
+          const s = `a pledge with no ${p.id ? 'name' : 'id'}`;
+          emit('pledges', s, s, i);
+        } else if (!p.date)
+          emit('pledges', `pledge ${p.id}: date doesn't read`, "pledge: date doesn't read", i);
+        else if (p.kind === 'other')
+          emit('pledges', `pledge ${p.id}: no kind`, 'pledge: no kind', i);
         for (const c of p.contents) {
           if (c.kind && !c.guessed && !RULES.known.hangar.itemKinds.includes(c.kind))
-            out.items.push(`pledge ${p.id}: item kind "${c.kind}"`);
+            emit('items', `pledge ${p.id}: item kind "${c.kind}"`, `item kind "${c.kind}"`, i);
         }
-      }
-      for (const card of cards)
+      });
+      cards.forEach((card, i) => {
         for (const t of card.querySelectorAll(RULES.hangar.tag)) {
           const text = clean(t.textContent);
-          if (text && !RULES.known.hangar.tags.includes(text)) out.tags.push(`tag "${text}"`);
+          if (text && !RULES.known.hangar.tags.includes(text))
+            emit('tags', `tag "${text}"`, `tag "${text}"`, i);
         }
+      });
     } else {
-      for (const b of ns.parseBuybacksFromDOM(doc)) {
-        if (!b.id || !b.name) out.pledges.push(`a buy-back with no ${b.id ? 'name' : 'id'}`);
-        else if (!ns.parseRsiDate(b.date)) out.pledges.push(`buy-back ${b.id}: date doesn't read`);
-      }
+      ns.parseBuybacksFromDOM(doc).forEach((b, i) => {
+        if (!b.id || !b.name) {
+          const s = `a buy-back with no ${b.id ? 'name' : 'id'}`;
+          emit('pledges', s, s, i);
+        } else if (!ns.parseRsiDate(b.date))
+          emit('pledges', `buy-back ${b.id}: date doesn't read`, "buy-back: date doesn't read", i);
+      });
     }
 
     const labels = hangar ? RULES.hangar.label : RULES.buybacks.label;
     const hooks = hangar ? RULES.hangar.hook : RULES.buybacks.hook;
-    for (const card of cards) {
+    cards.forEach((card, i) => {
       for (const l of card.querySelectorAll(labels)) {
         const text = clean(l.textContent);
-        if (text && !known.labels.includes(text)) out.labels.push(`label "${text}"`);
+        if (text && !known.labels.includes(text))
+          emit('labels', `label "${text}"`, `label "${text}"`, i);
       }
       for (const el of card.querySelectorAll(hooks))
         for (const c of String(el.className).split(' '))
-          if (c.startsWith('js-') && !known.hooks.includes(c)) out.hooks.push(`hook ${c}`);
-    }
+          if (c.startsWith('js-') && !known.hooks.includes(c))
+            emit('hooks', `hook ${c}`, `hook ${c}`, i);
+    });
+    return cards.length;
+  }
+
+  ns.unrecognized = function unrecognized(payload, kind) {
+    const out = { pledges: [], items: [], tags: [], labels: [], hooks: [] };
+    walkUnknown(payload, kind, (group, line) => out[group].push(line));
     for (const k of Object.keys(out)) out[k] = [...new Set(out[k])]; // one line per shape
     return out;
+  };
+
+  // --- Telling the player RSI changed a page ----------------------------------
+  // The same findings for the popup's notice (the rsiChangeNotice flag, src/lib.js
+  // scanSource): one page → { cards, shapes: { shape: how many cards show it } }. A
+  // shape names no pledge or buy-back (no ids), only what kind of change it is, and
+  // never leaves the browser.
+  ns.unknownShapes = function unknownShapes(payload, kind) {
+    const seen = {};
+    const cards = walkUnknown(payload, kind, (group, line, shape, card) => {
+      if (group === 'hooks') return; // see rsiChangeShapes
+      (seen[shape] ||= new Set()).add(card);
+    });
+    const shapes = {};
+    for (const [shape, on] of Object.entries(seen)) shapes[shape] = on.size;
+    return { cards, shapes };
+  };
+
+  // A whole scan's tally (unknownShapes added up over its pages) → the shapes worth
+  // telling the player about, sorted, at most RSI_CHANGE_MAX. One stray thing doesn't
+  // count: a shape has to show on at least two cards (or on every card of a list with
+  // just one), so an odd label on one pledge stays the parser report's business. js-*
+  // hooks never count: they're RSI's script hooks (a new button, a new feature), not
+  // something we read, so a new one doesn't mean a detail went missing.
+  const RSI_CHANGE_MIN_CARDS = 2;
+  const RSI_CHANGE_MAX = 20;
+  ns.rsiChangeShapes = function rsiChangeShapes(tally) {
+    const cards = Number(tally?.cards) || 0;
+    const min = Math.min(RSI_CHANGE_MIN_CARDS, Math.max(cards, 1));
+    return Object.entries(tally?.shapes || {})
+      .filter(([shape, n]) => !shape.startsWith('hook ') && n >= min)
+      .map(([shape]) => shape.slice(0, 120))
+      .sort()
+      .slice(0, RSI_CHANGE_MAX);
   };
 })();

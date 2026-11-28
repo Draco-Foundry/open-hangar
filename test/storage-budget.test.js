@@ -66,6 +66,11 @@ const BUDGET = {
   scanStarted: small('the last scan that began: its run and time, replaced whole'),
   // Which parser read each source (src/hangar-shape.js PARSER_VERSION, src/lib.js).
   scanParser: small('one version number per source'),
+  // RSI changed a page (the rsiChangeNotice flag, src/lib.js recordRsiChange): per part,
+  // RSI_CHANGE_MAX 20 shapes of 120 characters; and what Got It hid (ui/popup/data.js
+  // RSI_SEEN_MAX 50).
+  rsiChange: small('two parts, 20 short shapes each, replaced whole'),
+  rsiChangeSeen: small('RSI_SEEN_MAX 50 short shapes'),
   // The Daily Scan Reminder (src/background.js): its switch and its last reminder.
   scanReminderOn: small('the Daily Scan Reminder switch'),
   scanReminder: small('the last reminder: when, and whether it went or the day was skipped'),

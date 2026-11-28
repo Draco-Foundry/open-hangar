@@ -125,6 +125,8 @@ const connectorFlags = () =>
       'const BUILD_VALUES = {"sync":true,"orgFleet":false,"localMode":true,"connector":true,"alerts":true,"autoScan":true' +
         // OH_DEMO_FIRST_RUN=1: the first-run setup too (basic.html#setup), off in the store.
         (process.env.OH_DEMO_FIRST_RUN === '1' ? ',"firstRun":true' : '') +
+        // OH_DEMO_RSI_CHANGE=1: the popup's RSI-changed notice (rsiChangeNotice), off in the store.
+        (process.env.OH_DEMO_RSI_CHANGE === '1' ? ',"rsiChangeNotice":true' : '') +
         '};',
     );
 

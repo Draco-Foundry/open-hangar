@@ -21,6 +21,8 @@
     remindOnSale,
     reportPilot,
     reportSyncFailed,
+    rsiNotice,
+    rsiSeenAfter,
     syncTrouble,
     scanAge,
     staleAge,
@@ -73,6 +75,13 @@
   // OH.getRemoteStatus: the copy main.js refreshes, so nothing more is asked).
   let updateReady = $state(null);
   let banner = $state(null);
+  // RSI changed a page (the rsiChangeNotice flag): what the last complete scans found
+  // the parser doesn't know (local rsiChange, src/lib.js) and what Got It hid
+  // (rsiChangeSeen), one line under the others until a clean scan or a Got It.
+  const RSI_NOTE = flag('rsiChangeNotice');
+  let rsiChange = $state(null);
+  let rsiSeen = $state([]);
+  const rsiNote = $derived(RSI_NOTE ? rsiNotice(rsiChange, rsiSeen) : null);
   let prefs = $state(cleanPrefs());
   let session = $state({});
   let rsiOff = $state(false); // no access to robertsspaceindustries.com
@@ -295,6 +304,17 @@
       if (fresh.size) chrome.runtime.sendMessage({ ohPopup: 'alerts-seen' }).catch(() => {});
     }
   }
+  async function readRsiChange() {
+    if (!RSI_NOTE) return;
+    const got = await chrome.storage.local.get(['rsiChange', 'rsiChangeSeen']);
+    rsiChange = got.rsiChange || null;
+    rsiSeen = Array.isArray(got.rsiChangeSeen) ? got.rsiChangeSeen : [];
+  }
+  function rsiGotIt() {
+    if (!rsiNote) return;
+    rsiSeen = rsiSeenAfter(rsiNote.shapes, rsiSeen);
+    chrome.storage.local.set({ rsiChangeSeen: rsiSeen }).catch(() => {});
+  }
   const readBanner = () =>
     OH.getRemoteStatus()
       .then((st) => (banner = st?.banner || null))
@@ -320,7 +340,14 @@
     (async () => {
       prefs = await loadPrefs();
       applyLook(prefs.look);
-      await Promise.all([loadData(), loadSession(), loadAlerts(), readAccess(), readBanner()]);
+      await Promise.all([
+        loadData(),
+        loadSession(),
+        loadAlerts(),
+        readAccess(),
+        readBanner(),
+        readRsiChange(),
+      ]);
       await readCookie();
       // A scan that stopped leaves nothing that reads as Scanning (src/background.js).
       chrome.runtime.sendMessage({ ohPopup: 'opened' }).catch(() => {});
@@ -336,6 +363,7 @@
         if (c.justUpdated) justUpdated = c.justUpdated.newValue || null;
         if (c.updateReady) updateReady = c.updateReady.newValue || null;
         if (c.remoteStatus) readBanner();
+        if (c.rsiChange || c.rsiChangeSeen) readRsiChange();
         if (ALERTS && (c[AL.ON_KEY] || c[AL.STATE_KEY] || c[AL.WISH_KEY] || c[AL.FEED_KEY] || c.siteLink))
           loadAlerts();
       }
@@ -518,6 +546,13 @@
   {#if banner}
     <div class="pp-notice" class:warn={banner.level === 'warn'} id="pp-banner" role="status">
       {banner.message}
+    </div>
+  {/if}
+
+  {#if rsiNote}
+    <div class="pp-notice" id="pp-rsi-changed" role="status">
+      <span>{t('popup.rsi-changed-notice')}</span>
+      <button type="button" class="pp-link quiet" id="pp-rsi-changed-ok" onclick={rsiGotIt}>{t('popup.got-it')}</button>
     </div>
   {/if}
 
