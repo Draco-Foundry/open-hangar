@@ -8,7 +8,7 @@ page saved from the browser, then scrubbed:
 
 The scrub keeps only the pledge list, its pager and the buy-back token line. Ids, prices,
 dates, images, links, upgrade data and ship names become placeholders, emails become
-`[email]` and each `--handle` becomes `PILOT_HANDLE` (scripts/scrub-capture.mjs says
+`[email]`, ship serial numbers `[serial]` and each `--handle` becomes `PILOT_HANDLE` (scripts/scrub-capture.mjs says
 exactly what). Never commit a page that hasn't been through it: this repo is public.
 
 Names follow `hangar-page-<n>.html` and `buybacks-page-<n>.html`, where `<n>` is the page

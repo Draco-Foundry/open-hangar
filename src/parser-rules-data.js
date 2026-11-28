@@ -105,6 +105,7 @@
             'image',
             'gift',
             'melt',
+            'upgraded',
             'date',
             'tag',
             'label',
@@ -174,6 +175,11 @@
             },
             melt: {
               description: 'The Exchange action: the pledge can be melted.',
+              $ref: '#/$defs/selector',
+            },
+            upgraded: {
+              description:
+                "RSI's upgraded marks on a card (the title's class, the orange upgraded tag, the Upgrades button): an upgrade is applied to the pledge.",
               $ref: '#/$defs/selector',
             },
             date: {
@@ -1272,8 +1278,9 @@
         itemAlso: '.without-images',
         kindFallback: '.kind',
         image: '.image',
-        gift: '.js-gift',
+        gift: '.js-gift, .js-gift-v2',
         melt: '.js-reclaim',
+        upgraded: 'h3.upgraded, span.upgraded, a.js-upgrade-log',
         date: '.date-col',
         tag: '.availability',
         label: 'label, .js-label',
@@ -1608,6 +1615,7 @@
             'js-apply-upgrade',
             'js-expand-arrow',
             'js-gift',
+            'js-gift-v2',
             'js-label',
             'js-more',
             'js-pledge-configuration-value',

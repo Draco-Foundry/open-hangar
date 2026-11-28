@@ -1308,6 +1308,10 @@ const INV_GROUPS = [
       ['notMeltable', 'Not Meltable', (p) => p.meltable === false],
       ['giftable', 'Giftable', (p) => p.giftable === true],
       ['notGiftable', 'Not Giftable', (p) => p.giftable === false],
+      // The Upgraded chip (upgradedFilter): the pledges RSI marks upgraded. PLACEHOLDER:
+      // Needs Words (Words inv.status-upgraded); the website's approved word for the same
+      // mark (pledge-columns.mark.up) until the extension's is confirmed.
+      ...(OH.flags.upgradedFilter ? [['upgraded', 'Upgraded', (p) => OH.isUpgraded(p)]] : []),
     ],
   },
   {
@@ -1612,6 +1616,14 @@ const pledgeCard = (p) =>
 // What an Inventory card shows (drawn by ui/lib/Card.svelte). A CCU shows the ship
 // it upgrades to (looked up by the card's picture); RSI's own art for it is a
 // generic upgrade picture, kept only as the fallback (rsiImage).
+// After an upgraded pledge's name on its card: the ship (or ships) it holds now.
+// PLACEHOLDER: Needs Words (Words inv.upgraded-now), not approved.
+const UPGRADED_NOW = ', now {ships}';
+function upgradedNowText(p) {
+  if (!OH.flags.upgradedFilter) return '';
+  const ships = OH.upgradedNow(p);
+  return ships.length ? UPGRADED_NOW.replace('{ships}', ships.join(', ')) : '';
+}
 function pledgeCardData(p) {
   const contents = extraContents(p);
   const ccuArt = p.isCCU && p.ccu && p.ccu.to && !p.shipArt;
@@ -1629,6 +1641,9 @@ function pledgeCardData(p) {
     ccu: p.isCCU && p.ccu ? { from: p.ccu.from, to: p.ccu.to } : null,
     name: cardName(p),
     title: plainName(p),
+    // An upgraded pledge's name is what it was bought as; `now` adds the ship it holds
+    // now (upgradedFilter). '' otherwise.
+    now: upgradedNowText(p),
     // The contents cell is always drawn (empty when there's nothing) so the List
     // view's fixed column grid stays aligned; Gallery/Compact hide empties via CSS.
     contents:

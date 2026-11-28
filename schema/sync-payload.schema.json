@@ -469,6 +469,10 @@
         "kind": { "type": "string" },
         "giftable": { "type": "boolean" },
         "meltable": { "type": "boolean" },
+        "upgraded": {
+          "description": "RSI marks the pledge upgraded: an upgrade is applied, its name is still what it was bought as, and its ship items are what it holds now. Absent in payloads from before it was read.",
+          "type": "boolean"
+        },
         "insurance": { "type": ["string", "null"] },
         "date": { "type": ["string", "null"] },
         "raw": { "type": ["object", "null"] }

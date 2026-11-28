@@ -8,7 +8,8 @@
 //   - prices become $10.00 USD and dates January 01, 2026 (owner, 2026-10-18: which
 //     pledges a hangar holds is private enough without its prices and dates);
 //   - images, links, the upgrade data and ship-name JSON become placeholders, emails
-//     become [email], and each --handle given becomes PILOT_HANDLE.
+//     become [email], a ship's serial number ("Serial: MRAI12345", unique to one
+//     account's ship) becomes [serial], and each --handle given becomes PILOT_HANDLE.
 // test/parser-corpus.test.js fails if a fixture still holds an email or a citizen link.
 //
 //   node scripts/scrub-capture.mjs <saved page> <fixture.html> [--handle NAME]...
@@ -20,6 +21,7 @@ export const PRICE = '$10.00 USD';
 export const DATE = 'January 01, 2026';
 export const IMAGE = 'https://robertsspaceindustries.com/media/placeholder.jpg';
 export const EMAIL = /[\w.+-]+@[\w-]+(\.[\w-]+)+/g;
+export const SERIAL = /(Serial:\s*)(?!\[serial\])\S+/gi;
 
 // The attributes worth keeping; the rest (ids, data-* tracking, inline handlers) go.
 const KEEP_ATTRS = new Set([
@@ -108,6 +110,7 @@ export function scrub(html, { handles = [] } = {}) {
     return ids.get(n);
   });
   text = text.replace(EMAIL, '[email]');
+  text = text.replace(SERIAL, '$1[serial]');
   for (const h of handles.filter(Boolean)) {
     text = text.replace(new RegExp(h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), 'PILOT_HANDLE');
   }

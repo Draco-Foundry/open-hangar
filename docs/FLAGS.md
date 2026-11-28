@@ -60,6 +60,7 @@ wishlist import and store alerts, and from 0.4.0 Auto Scan Daily):
 | `accountLogs`      | A scan reads RSI's pledge and store credit logs; sync sends them | on    | on   | no       |
 | `bbdMissTransient` | A buy-back page RSI keeps failing waits a day, then doubling     | off   | off  | no       |
 | `firstRun`         | A fresh install opens a setup page once (basic page #setup)      | off   | off  | no       |
+| `upgradedFilter`   | Inventory's Upgraded chip and the ship an upgraded pledge holds  | off   | off  | no       |
 
 ## Adding or Retiring a Flag
 
