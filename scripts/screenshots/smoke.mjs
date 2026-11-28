@@ -5018,7 +5018,13 @@ try {
 
   // Settings: openhangar.space with Notifications in its box (with a built-in site, as store
   // builds have), Look, Currency and the shortcut, Saved Accounts, the Export menu and Log
-  // Out of RSI, the links, Clear Data.
+  // Out of RSI, the links, Clear Data. A faked Windows platform, so the shortcut reads
+  // "Alt+Shift+O" on any machine: on a real Mac the popup writes it as ⌥⇧O
+  // (ui/popup/data.js isMac), which the faked-Mac check below covers.
+  const winHook = await page.evaluateOnNewDocument(() => {
+    Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
+    Object.defineProperty(navigator, 'userAgentData', { get: () => ({ platform: 'Windows' }) });
+  });
   await popAt(
     {
       ...signedIn,
@@ -5160,6 +5166,7 @@ try {
   shortGo === 'chrome://extensions/shortcuts'
     ? ok("the shortcut opens the browser's shortcuts page")
     : fail(`popup shortcut change: ${shortGo}`);
+  await page.removeScriptToEvaluateOnNewDocument(winHook.identifier);
   // A faked Mac (navigator.platform and userAgentData): Firefox's "Alt+Shift+O" shows as
   // ⌥⇧O, Chrome's own symbols stay, and the page doesn't spill. Not a real Mac.
   const macHook = await page.evaluateOnNewDocument(() => {
